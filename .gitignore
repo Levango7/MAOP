@@ -77,3 +77,16 @@ docker-compose.override.yml
 
 # -- Node (if any frontend tooling) --
 node_modules/
+
+# -- Temp test results / scripts --
+py/data/
+py/test_full.txt
+py/test_results.txt
+py/test_results_async.txt
+pytest_results.txt
+test-html.py
+scripts/rename_dist.py
+scripts/rename_pev_to_maop.py
+security-audit.md
+config/agents.yaml.bak
+config/agents.yaml.bak2
