@@ -82,11 +82,12 @@ if (Test-Path $pyEntry) {
 switch ($Action) {
   "start" {
     Write-Host "[MAOP] Starting dashboard..."
-    $dashLog = "$logDir\dashboard.log"
-    # Canonical entry: python -m MAOP.dashboard.server (from py/ dir)
+    $dashLogOut = "$logDir\dashboard.out.log"
+    $dashLogErr = "$logDir\dashboard.err.log"
+    # Canonical entry: python -m maop.dashboard.server (from py/ dir)
     $pyDir = Join-Path $MAOP "py"
     $env:MAOP_DASH_PORT = "9079"
-    Start-Process -NoNewWindow -FilePath "python" -ArgumentList "-m","MAOP.dashboard.server" -WorkingDirectory $pyDir -RedirectStandardOutput $dashLog -RedirectStandardError $dashLog
+    Start-Process -NoNewWindow -FilePath "python" -ArgumentList "-m","maop.dashboard.server" -WorkingDirectory $pyDir -RedirectStandardOutput $dashLogOut -RedirectStandardError $dashLogErr
     Write-Host "[MAOP] Dashboard -> http://localhost:9079"
   }
   "stop" {

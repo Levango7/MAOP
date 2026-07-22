@@ -164,7 +164,8 @@ agents:
     - fileops
     cli: goose
     cli_args: run '{task}'
-    description: Goose v1.43.0 (Block, ~1s)
+    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check)'
+    enabled: false
     driver: cli
     model: auto
     timeout_s: 120
@@ -179,7 +180,8 @@ agents:
     - explain
     cli: hermes
     cli_args: -z {task}
-    description: Hermes CLI v0.19.0 (AgnesAI backend, ~1.3s)
+    description: 'DISABLED: CLI not installed (2026-07-22 health check)'
+    enabled: false
     driver: cli
     model: agnes-2.0-flash
     model_display: AgnesAI agnes-2.0-flash
@@ -489,7 +491,7 @@ routing:
     - 复制
   mcp:
     fallback: claude
-    primary: hermes
+    primary: openclaw
     keywords:
     - mcp
     - 工具调用
@@ -523,7 +525,7 @@ routing:
   planning:
     fallback: claude
     primary: kimi
-    tertiary: hermes
+    tertiary: mmx
     keywords:
     - 规划
     - 计划
@@ -579,7 +581,7 @@ routing:
   search:
     fallback: codex
     primary: kimi
-    tertiary: hermes
+    tertiary: claude
     keywords:
     - 搜索
     - 检索

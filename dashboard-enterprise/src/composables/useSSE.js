@@ -28,7 +28,7 @@
 // not support custom headers. The backend reads the token from the query
 // string for SSE endpoints.
 
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, getCurrentInstance } from 'vue';
 
 const AUTH_QUERY_KEY = 'token';
 const DEFAULT_URL = '/api/stream';
@@ -176,8 +176,11 @@ export function useSSE(opts = {}) {
     connected.value = false;
   }
 
-  onMounted(_connect);
-  onUnmounted(close);
+  const _instance = getCurrentInstance();
+  if (_instance) {
+    onMounted(_connect);
+    onUnmounted(close);
+  }
 
   return { connected, lastEvent, error, close };
 }
