@@ -1,0 +1,45 @@
+# MAOP Python — reproducible dependency lock.
+#
+# Generated: 2026-07-16
+# Python:    3.13+ (requires-python >=3.10)
+#
+# This file pins EXACT installed versions (including transitive deps)
+# for reproducible CI builds. Source of truth for DIRECT deps is pyproject.toml.
+#
+# To regenerate:  pip install -r requirements.txt && pip freeze > requirements.lock
+# To install:      pip install -r requirements.lock
+
+# ── Direct dependencies (from pyproject.toml) ──────────────────────
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.13.4
+pydantic-settings==2.5.2
+pyyaml==6.0.2
+httpx==0.28.1
+python-dotenv==1.0.1
+mmh3==5.2.1
+
+# ── Runtime dependencies (transitive, pinned) ──────────────────────
+starlette==0.38.6
+anyio==4.6.2.post1
+typing-extensions==4.12.2
+python-multipart==0.0.12
+httptools==0.6.4
+watchfiles==1.0.4
+websockets==13.1
+h11==0.14.0
+sniffio==1.3.1
+idna==3.10
+certifi==2024.8.30
+annotated-types==0.7.0
+pydantic-core==2.46.4
+
+# ── Dev / test dependencies ────────────────────────────────────────
+pytest>=8.0
+pytest-asyncio>=0.23
+ruff>=0.4
+
+# H2 (2026-07-22, Phase H): sync deps declared in pyproject.toml but missing from lock
+numpy==2.3.5
+cryptography==46.0.7
+sentence-transformers>=2.0  # not installed locally; declared in pyproject.toml

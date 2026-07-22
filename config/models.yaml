@@ -1,0 +1,452 @@
+﻿# MAOP Model Registry — Authoritative model & provider configuration
+# This file is the single source of truth for all model definitions.
+# agents.yaml references models by name; this file defines what each model is.
+#
+# Protocol types:
+#   openai_responses   — OpenAI Responses API (/v1/responses)
+#   openai_completions — OpenAI Chat Completions API (/v1/chat/completions)
+#   claude_code        — Anthropic Claude Code protocol
+#   custom             — Provider-specific protocol
+#
+# Thinking mode levels:
+#   low    — ~512 reasoning tokens, +10-20% latency. Simple tasks.
+#   medium — ~3072 reasoning tokens, +30-50% latency. Planning, review.
+#   high   — ~12288 reasoning tokens, +100-200% latency. Architecture, deep debug.
+
+# ── Providers ──────────────────────────────────────────────────
+providers:
+  stepfun:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://api.stepfun.com/v1"
+    api_key_env: STEPFUN_API_KEY
+    timeout_s: 120
+    max_retries: 3
+    health_check_url: "https://api.stepfun.com/v1/models"
+    enabled: true
+
+  minimax:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://api.minimax.chat/v1"
+    api_key_env: MINIMAX_API_KEY
+    timeout_s: 120
+    max_retries: 3
+    enabled: true
+
+  agnesai:
+    type: custom
+    protocol: openai_completions
+    base_url: "https://api.agnes.ai/v1"
+    api_key_env: AGNES_API_KEY
+    timeout_s: 30
+    max_retries: 2
+    enabled: true
+
+  opencode:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://api.opencode.ai/v1"
+    api_key_env: OPENCODE_API_KEY
+    timeout_s: 60
+    max_retries: 2
+    enabled: true
+
+  aliyun:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    api_key_env: DASHSCOPE_API_KEY
+    timeout_s: 120
+    max_retries: 3
+    enabled: true
+
+  local:
+    type: builtin
+    protocol: custom
+    base_url: ""
+    api_key_env: ""
+    timeout_s: 60
+    max_retries: 1
+    enabled: true
+
+  openrouter:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://openrouter.ai/api/v1"
+    api_key_env: OPENROUTER_API_KEY
+    timeout_s: 120
+    max_retries: 3
+    enabled: false
+
+  # ── Anthropic Claude (example for claude_code protocol) ──
+  anthropic:
+    type: custom
+    protocol: claude_code
+    base_url: "https://api.anthropic.com/v1"
+    api_key_env: ANTHROPIC_API_KEY
+    timeout_s: 120
+    max_retries: 3
+    health_check_url: "https://api.anthropic.com/v1/models"
+    enabled: false
+    extra_headers:
+      anthropic-version: "2024-01-01"
+
+  # ── Ollama (local models) ──
+  ollama:
+    type: ollama
+    protocol: ollama_chat
+    base_url: "http://localhost:11434"
+    api_key_env: ""
+    timeout_s: 300
+    max_retries: 1
+    health_check_url: "http://localhost:11434/api/tags"
+    enabled: false
+
+# ── Models ─────────────────────────────────────────────────────
+models:
+  # ── StepFun models ──
+  step-3.7-flash:
+    provider: stepfun
+    model_id: "step-2-16k-202502"
+    family: step
+    context_window: 32768
+    max_output: 8192
+    cost_per_1k_input: 0.002
+    cost_per_1k_output: 0.006
+    capabilities: [codegen, chat, planning, review, explain, search]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: false
+    thinking:
+      supported: false
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: fast
+    quality_tier: good
+    enabled: true
+
+  yi-large:
+    provider: stepfun
+    model_id: "yi-large"
+    family: yi
+    context_window: 32768
+    max_output: 8192
+    cost_per_1k_input: 0.004
+    cost_per_1k_output: 0.012
+    capabilities: [codegen, refactor, explain, search, planning, review, verify, docgen, quickfix, fileops]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: true
+      long_context: false
+    thinking:
+      supported: true
+      default_level: medium
+      available_levels: [low, medium, high]
+      token_budget_low: 512
+      token_budget_medium: 3072
+      token_budget_high: 12288
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    enabled: true
+
+  # ── MiniMax models ──
+  minimax-m2.7:
+    provider: minimax
+    model_id: "MiniMax-M2"
+    family: minimax
+    context_window: 65536
+    max_output: 16384
+    cost_per_1k_input: 0.003
+    cost_per_1k_output: 0.008
+    capabilities: [codegen, chat, planning, search, review, explain, memory, mcp, pipeline, quickfix, refactor, verify]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: true
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: true
+      long_context: true
+    thinking:
+      supported: true
+      default_level: medium
+      available_levels: [low, medium, high]
+      token_budget_low: 512
+      token_budget_medium: 3072
+      token_budget_high: 12288
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    enabled: true
+
+  # ── AgnesAI models ──
+  agnes-2.0-flash:
+    provider: agnesai
+    model_id: "agnes-2.0-flash"
+    family: agnes
+    context_window: 16384
+    max_output: 4096
+    cost_per_1k_input: 0.001
+    cost_per_1k_output: 0.003
+    capabilities: [codegen, chat, search, mcp, planning, review, explain]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: false
+    thinking:
+      supported: false
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: fast
+    quality_tier: good
+    enabled: true
+
+  # ── OpenCode / free models ──
+  deepseek-v4-flash-free:
+    provider: opencode
+    model_id: "deepseek-v3"
+    family: deepseek
+    context_window: 16384
+    max_output: 4096
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, quickfix, explain, search, fileops, planning, review]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: false
+    thinking:
+      supported: true
+      default_level: low
+      available_levels: [low, medium]
+      token_budget_low: 512
+      token_budget_medium: 2048
+    default_temperature: 0.5
+    max_temperature: 2.0
+    latency_tier: fast
+    quality_tier: fair
+    enabled: true
+
+  # ── Aliyun models ──
+  qwen3.5-plus:
+    provider: aliyun
+    model_id: "qwen-plus"
+    family: qwen
+    context_window: 32768
+    max_output: 8192
+    cost_per_1k_input: 0.003
+    cost_per_1k_output: 0.008
+    capabilities: [codegen, search, fileops, planning, review, explain, chat, refactor]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: true
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: true
+      long_context: false
+    thinking:
+      supported: true
+      default_level: medium
+      available_levels: [low, medium, high]
+      token_budget_low: 512
+      token_budget_medium: 3072
+      token_budget_high: 12288
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: good
+    enabled: true
+
+  # ── Anthropic Claude models (example, disabled by default) ──
+  claude-sonnet-4:
+    provider: anthropic
+    model_id: "claude-sonnet-4-20250514"
+    family: claude
+    context_window: 200000
+    max_output: 16384
+    cost_per_1k_input: 0.003
+    cost_per_1k_output: 0.015
+    capabilities: [codegen, chat, planning, review, explain, search, refactor, verify, fileops, mcp]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: true
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: true
+      web_search: false
+      long_context: true
+    thinking:
+      supported: true
+      default_level: medium
+      available_levels: [low, medium, high]
+      token_budget_low: 1024
+      token_budget_medium: 4096
+      token_budget_high: 16384
+    default_temperature: 1.0
+    max_temperature: 1.0
+    latency_tier: medium
+    quality_tier: excellent
+    enabled: false
+
+  # ── Built-in / CLI-native models ──
+  built-in:
+    provider: local
+    model_id: "built-in"
+    family: builtin
+    context_window: 8192
+    max_output: 4096
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, quickfix]
+    capability_matrix:
+      text_chat: true
+      streaming: false
+    thinking:
+      supported: false
+    latency_tier: instant
+    quality_tier: fair
+    enabled: true
+
+  mimo-v2.5:
+    provider: local
+    model_id: "mimo-v2.5"
+    family: mimo
+    context_window: 8192
+    max_output: 4096
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, quickfix]
+    capability_matrix:
+      text_chat: true
+      streaming: false
+    thinking:
+      supported: false
+    latency_tier: instant
+    quality_tier: fair
+    enabled: true
+
+  native:
+    provider: local
+    model_id: "native"
+    family: native
+    context_window: 4096
+    max_output: 2048
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, fileops, quickfix]
+    capability_matrix:
+      text_chat: true
+      streaming: false
+    thinking:
+      supported: false
+    latency_tier: instant
+    quality_tier: fair
+    enabled: false
+
+  # ── Auto / proxy models ──
+  auto:
+    provider: local
+    model_id: "auto"
+    family: auto
+    context_window: 32768
+    max_output: 8192
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, quickfix, fileops, search]
+    capability_matrix:
+      text_chat: true
+      streaming: true
+      tool_calling: true
+    thinking:
+      supported: false
+    latency_tier: fast
+    quality_tier: fair
+    enabled: true
+
+# ── Policies ──────────────────────────────────────────────────
+policies:
+  # Default selection policy
+  default:
+    strategy: best_quality_within_budget  # cheapest | fastest | best_quality | best_quality_within_budget
+    max_cost_per_task: 0.05  # USD
+    prefer_low_latency: false
+    fallback_on_error: true
+    fallback_on_timeout: true
+    fallback_on_quota_exceeded: true
+
+  # Code generation policy
+  codegen:
+    strategy: best_quality
+    max_cost_per_task: 0.10
+    prefer_low_latency: false
+    fallback_on_error: true
+    fallback_on_timeout: true
+
+  # Quick fix policy
+  quickfix:
+    strategy: fastest
+    max_cost_per_task: 0.02
+    prefer_low_latency: true
+    fallback_on_error: true
+
+  # Chat policy
+  chat:
+    strategy: cheapest
+    max_cost_per_task: 0.01
+    prefer_low_latency: true
+    fallback_on_error: true
+
+# ── Budget ─────────────────────────────────────────────────────
+budget:
+  daily_limit: 5.0  # USD
+  monthly_limit: 100.0  # USD
+  alert_threshold: 0.8  # alert at 80% of daily limit
+  hard_stop: true  # stop dispatching when limit hit
+
+# ── Quota ──────────────────────────────────────────────────────
+quota:
+  # Per-provider rate limits
+  stepfun:
+    requests_per_minute: 60
+    tokens_per_minute: 100000
+  minimax:
+    requests_per_minute: 30
+    tokens_per_minute: 50000
+  agnesai:
+    requests_per_minute: 20
+    tokens_per_minute: 20000
+  aliyun:
+    requests_per_minute: 60
+    tokens_per_minute: 100000
+  opencode:
+    requests_per_minute: 10
+    tokens_per_minute: 10000

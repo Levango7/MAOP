@@ -1,0 +1,294 @@
+﻿"""Tests for maop_plan.py — Task routing to agents."""
+
+from __future__ import annotations
+
+import pytest
+
+from maop.maop_plan import Plan, maop_plan, _route_by_keyword, execute_workflow, _interpolate_vars, _evaluate_condition
+
+
+class TestRouteByKeyword:
+    @pytest.mark.parametrize("task,expected_rk,expected_agent", [
+        ("refactor the module", "code", "codex"),
+        ("rewrite the function", "code", "codex"),
+        ("clean up the code", "code", "codex"),
+        ("write unit test for parser", "test", "codex"),
+        ("verify the results", "test", "codex"),
+        ("fix the bug in login", "debug", "codex"),
+        ("debug the error", "debug", "codex"),
+        ("deploy to production", "deploy", "codex"),
+        ("release version 2.0", "deploy", "codex"),
+        ("document the API", "docs", "claude"),
+        ("update readme", "docs", "claude"),
+        ("design the architecture", "design", "claude"),
+        ("plan the migration strategy", "design", "claude"),
+        ("security audit the code", "security", "codex"),
+        ("audit the CVE vulnerability", "security", "codex"),
+        ("optimize performance", "perf", "codex"),
+        ("speed up the query", "perf", "codex"),
+        ("create database migration", "data", "codex"),
+        ("write SQL query", "data", "codex"),
+        ("update config settings", "config", "codex"),
+        ("set environment variable", "config", "codex"),
+    ])
+    def test_keyword_routing(self, task, expected_rk, expected_agent):
+        rk, agent = _route_by_keyword(task)
+        assert rk == expected_rk
+        assert agent == expected_agent
+
+    def test_default_routing(self):
+        rk, agent = _route_by_keyword("hello world")
+        assert rk == "chat"
+        assert agent == "claude"
+
+    def test_case_insensitive(self):
+        rk, agent = _route_by_keyword("REFACTOR THE MODULE")
+        assert rk == "code"
+        assert agent == "codex"
+
+
+class TestMaopPlan:
+    def test_basic_plan(self):
+        plan = maop_plan("fix the bug")
+        assert plan.phase == "plan"
+        assert plan.task == "fix the bug"
+        assert plan.selected_agent == "codex"
+        assert plan.routing_key == "debug"
+        assert "exit_code" in plan.gates
+        assert "output" in plan.gates
+
+    def test_security_adds_content_safety_gate(self):
+        plan = maop_plan("security audit")
+        assert "content-safety" in plan.gates
+
+    def test_deploy_adds_dry_run_gate(self):
+        plan = maop_plan("deploy to prod")
+        assert "dry-run" in plan.gates
+
+    def test_quickfix_adds_content_safety_gate(self):
+        plan = maop_plan("fix the bug", routing_key="quickfix")
+        assert "content-safety" in plan.gates
+
+    def test_pipeline_adds_dry_run_gate(self):
+        plan = maop_plan("run pipeline", routing_key="pipeline")
+        assert "dry-run" in plan.gates
+
+    def test_review_adds_content_safety_gate(self):
+        plan = maop_plan("review code", routing_key="review")
+        assert "content-safety" in plan.gates
+
+    def test_fileops_adds_dry_run_gate(self):
+        plan = maop_plan("move file", routing_key="fileops")
+        assert "dry-run" in plan.gates
+
+    def test_non_security_no_content_safety_gate(self):
+        plan = maop_plan("write docs")
+        assert "content-safety" not in plan.gates
+
+    def test_non_deploy_no_dry_run_gate(self):
+        plan = maop_plan("hello world")
+        assert "dry-run" not in plan.gates
+
+    def test_default_budget(self):
+        plan = maop_plan("hello world")
+        assert plan.budget["timeout_s"] == 120
+        assert plan.budget["max_retries"] == 1
+
+    def test_explicit_routing_key(self):
+        plan = maop_plan("some task", routing_key="debug")
+        assert plan.routing_key == "debug"
+
+    def test_workdir_param(self):
+        plan = maop_plan("fix bug", workdir="/tmp/test")
+        assert plan.task == "fix bug"
+
+    def test_plan_model_fields(self):
+        plan = maop_plan("test")
+        assert isinstance(plan, Plan)
+        assert hasattr(plan, "selected_agent")
+        assert hasattr(plan, "routing_key")
+        assert hasattr(plan, "gates")
+        assert hasattr(plan, "budget")
+
+
+# ── ADR-012: Config routing tests ──────────────────────────────
+
+from maop.config.loader import MaopConfig, RouteEntry
+from maop.maop_plan import _route_by_config
+
+
+class TestADR012ConfigRouting:
+    """Verify ADR-012: config routing (match + keywords) takes precedence."""
+
+    @pytest.fixture
+    def config(self):
+        return MaopConfig(routing={
+            "codegen": RouteEntry(
+                primary="claude", fallback="cursor", tertiary="kilo",
+                keywords=["编写", "写代码", "implement", "coding", "feature"],
+            ),
+            "refactor": RouteEntry(
+                primary="claude", fallback="qoder",
+                match=r"(?:refactor|rewrite|restructure|clean\s+up)",
+                keywords=["重构", "重写", "rewrite"],
+            ),
+            "search": RouteEntry(
+                primary="kimi", fallback="qoder",
+                keywords=["搜索", "检索", "find", "research", "查询"],
+            ),
+            "verify": RouteEntry(
+                primary="mavis/verifier", fallback="claude",
+                match=r"(?:verify|test|assert|unit\s+test|integration)",
+                keywords=["验证", "verify", "测试"],
+            ),
+            "quickfix": RouteEntry(
+                primary="cursor", fallback="autoclaw",
+                match=r"(?:fix|bug|error|hotfix|patch)",
+                keywords=["修复", "fix", "bug"],
+            ),
+        })
+
+    def test_keyword_match(self, config):
+        rk, agent = _route_by_config("implement new feature", config)
+        assert rk == "codegen"
+        assert agent == "claude"
+
+    def test_keyword_chinese(self, config):
+        rk, agent = _route_by_config("搜索相关资料", config)
+        assert rk == "search"
+        assert agent == "kimi"
+
+    def test_regex_match(self, config):
+        rk, agent = _route_by_config("refactor the module", config)
+        assert rk == "refactor"
+        assert agent == "claude"
+
+    def test_regex_match_over_keyword(self, config):
+        rk, agent = _route_by_config("verify the fix", config)
+        assert rk == "verify"
+        assert agent == "mavis/verifier"
+
+    def test_no_match_returns_none(self, config):
+        result = _route_by_config("hello world random task", config)
+        assert result is None
+
+    def test_none_config_returns_none(self):
+        result = _route_by_config("implement feature", None)
+        assert result is None
+
+    def test_empty_keywords_and_match_skipped(self):
+        config = MaopConfig(routing={
+            "chat": RouteEntry(primary="openclaw", fallback="mimo"),
+        })
+        result = _route_by_config("random task", config)
+        assert result is None
+
+    def test_invalid_regex_skipped(self):
+        config = MaopConfig(routing={
+            "bad": RouteEntry(
+                primary="claude", match="[invalid regex",
+                keywords=["fallback-keyword"],
+            ),
+        })
+        rk, agent = _route_by_config("use fallback-keyword", config)
+        assert rk == "bad"
+        assert agent == "claude"
+
+    def test_config_routing_precedence_over_legacy(self, config):
+        plan = maop_plan("implement new feature", config=config)
+        assert plan.selected_agent == "claude"
+        assert plan.routing_key == "codegen"
+
+    def test_fallback_to_legacy_when_config_misses(self):
+        plan = maop_plan("deploy to production")
+        assert plan.routing_key == "deploy"
+        assert plan.selected_agent == "codex"
+
+
+# ── Workflow DSL ──────────────────────────────────────────────
+
+class TestInterpolateVars:
+    def test_simple_substitution(self):
+        assert _interpolate_vars("Hello ${name}", {"name": "MAOP"}) == "Hello MAOP"
+
+    def test_missing_var_unchanged(self):
+        assert _interpolate_vars("${missing}", {}) == "${missing}"
+
+    def test_multiple_vars(self):
+        assert _interpolate_vars("${a}+${b}", {"a": "1", "b": "2"}) == "1+2"
+
+
+class TestEvaluateCondition:
+    def test_empty_condition_is_true(self):
+        assert _evaluate_condition("", {}) is True
+
+    def test_truthy_var(self):
+        assert _evaluate_condition("x", {"x": True}) is True
+
+    def test_falsy_var(self):
+        assert _evaluate_condition("x", {"x": False}) is False
+
+
+class TestExecuteWorkflow:
+    def test_workflow_not_found(self):
+        result = execute_workflow("nonexistent", config=None)
+        assert result.steps_total == 0
+
+    def test_workflow_with_steps(self):
+        from maop.config.loader import MaopConfig, WorkflowDef, WorkflowStepDef
+
+        config = MaopConfig(workflows={
+            "test_wf": WorkflowDef(
+                steps=[
+                    WorkflowStepDef(agent="claude", task="Write code"),
+                    WorkflowStepDef(agent="codex", task="Run tests"),
+                ]
+            )
+        })
+        result = execute_workflow("test_wf", config=config)
+        assert result.steps_total == 2
+        assert result.steps_completed == 2
+
+    def test_workflow_with_condition_skip(self):
+        from maop.config.loader import MaopConfig, WorkflowDef, WorkflowStepDef
+
+        config = MaopConfig(workflows={
+            "cond_wf": WorkflowDef(
+                steps=[
+                    WorkflowStepDef(agent="claude", task="Step 1"),
+                    WorkflowStepDef(agent="codex", task="Step 2", condition="False"),
+                ]
+            )
+        })
+        result = execute_workflow("cond_wf", config=config)
+        assert result.steps_completed == 1
+        assert result.steps_skipped == 1
+
+    def test_workflow_always_run(self):
+        from maop.config.loader import MaopConfig, WorkflowDef, WorkflowStepDef
+
+        config = MaopConfig(workflows={
+            "always_wf": WorkflowDef(
+                steps=[
+                    WorkflowStepDef(agent="claude", task="Step 1"),
+                    WorkflowStepDef(agent="codex", task="Cleanup", condition="False", always_run=True),
+                ]
+            )
+        })
+        result = execute_workflow("always_wf", config=config)
+        assert result.steps_completed == 2
+        assert result.steps_skipped == 0
+
+    def test_workflow_variable_interpolation(self):
+        from maop.config.loader import MaopConfig, WorkflowDef, WorkflowStepDef
+
+        config = MaopConfig(workflows={
+            "var_wf": WorkflowDef(
+                steps=[
+                    WorkflowStepDef(agent="claude", task="Build ${project}"),
+                ]
+            )
+        })
+        result = execute_workflow("var_wf", config=config, initial_vars={"project": "MAOP"})
+        assert result.steps_completed == 1
+        assert result.variables.get("steps.0.output") is not None

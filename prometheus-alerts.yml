@@ -1,0 +1,62 @@
+# MAOP Prometheus Alert Rules
+# Metrics source: maop.core.monitoring (MetricsCollector)
+
+groups:
+  - name: maop-agent
+    rules:
+      - alert: AgentHighFailureRate
+        expr: |
+          (
+            rate(MAOP_delegations_failed[5m])
+            / rate(MAOP_delegations_total[5m])
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent failure rate exceeds 50%"
+          description: "More than half of delegations are failing (current: {{ $value | humanizePercentage }})."
+
+      - alert: AgentCircuitBreakerOpen
+        expr: MAOP_circuit_breaker_state == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker is OPEN for agent {{ $labels.agent }}"
+          description: "The agent has been circuit-broken and is not accepting requests."
+
+  - name: maop-system
+    rules:
+      - alert: QueueBacklogGrowing
+        expr: |
+          MAOP_queue_pending > 100
+          and
+          deriv(MAOP_queue_pending[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue backlog is growing ({{ $value }} pending)"
+          description: "Pending messages keep increasing, workers may be overwhelmed."
+
+      - alert: NoActiveAgents
+        expr: MAOP_active_agents == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No active agents available"
+          description: "All agents are either disabled or circuit-broken."
+
+      - alert: MemoryStoreGrowing
+        expr: |
+          MAOP_memory_entries > 100000
+          and
+          deriv(MAOP_memory_entries[1h]) > 0
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Memory store exceeds 100K entries and growing"
+          description: "Consider running memory prune to reduce store size."

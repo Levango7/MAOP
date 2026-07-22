@@ -1,0 +1,7 @@
+guards:
+  retry:
+    max_attempts: 3
+    backoff_ms: 2000
+  timeout:
+    default_s: 120
+    # per_agent timeouts are managed in agents.yaml (timeout_s field)

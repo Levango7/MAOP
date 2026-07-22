@@ -1,0 +1,1 @@
+"""MAOP Worker — Background service entry points for cloud-native deployment."""

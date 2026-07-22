@@ -1,0 +1,691 @@
+agents:
+  autoclaw:
+    capabilities:
+    - codegen
+    - chat
+    - quickfix
+    cli: autoclaw -n -y
+    cli_args: chat {task}
+    description: Autoclaw v0.1.6 headless (verified, ~3.2s)
+    driver: cli
+    model: built-in
+    timeout_s: 30
+  claude:
+    capabilities:
+    - codegen
+    - refactor
+    - explain
+    - search
+    - planning
+    - review
+    - techdoc
+    - verify
+    - docgen
+    - quickfix
+    - fileops
+    cli: claude
+    cli_args: -p '{task}'
+    description: Claude Code v2.1.212 + StepFun step-3.7-flash
+    driver: cli
+    model: yi-large
+    timeout_s: 120
+  cline:
+    capabilities:
+    - codegen
+    - refactor
+    - explain
+    - search
+    - review
+    - fileops
+    cli: cline
+    cli_args: --print '{task}'
+    description: Cline CLI v3.0.46 (headless, ~1.5s)
+    driver: cli
+    model: auto
+    timeout_s: 120
+  cloudbase:
+    capabilities:
+    - deploy
+    - cloudops
+    - fileops
+    cli: cloudbase
+    cli_args: '{task}'
+    description: CloudBase CLI v3.6.3 (腾讯云, ~2.6s)
+    driver: cli
+    model: auto
+    timeout_s: 120
+  codebuddy:
+    capabilities:
+    - codegen
+    - quickfix
+    - explain
+    - chat
+    cli: codebuddy
+    cli_args: --print '{task}'
+    description: CodeBuddy v2.123.1 (腾讯, fastest cold-start ~123ms)
+    driver: cli
+    model: auto
+    timeout_s: 60
+  codewhale:
+    capabilities:
+    - codegen
+    - fileops
+    - quickfix
+    cli: codewhale
+    cli_args: '{task}'
+    description: Codewhale v0.9.0 (auth may be broken in v0.8.65)
+    driver: cli
+    model: native
+    timeout_s: 60
+  codex:
+    capabilities:
+    - codegen
+    - search
+    - review
+    - planning
+    - explain
+    cli: codex
+    cli_args: exec {task}
+    description: Codex CLI v0.144.6 + StepFun proxy
+    driver: cli
+    model: qwen3.5-plus
+    timeout_s: 120
+  crush:
+    capabilities:
+    - codegen
+    - chat
+    - explain
+    - search
+    cli: crush
+    cli_args: run '{task}'
+    description: Crush v0.86.0 (Charmbracelet terminal AI, ~1.8s)
+    driver: cli
+    model: auto
+    timeout_s: 120
+  cursor:
+    capabilities:
+    - codegen
+    - quickfix
+    - fileops
+    - search
+    - chat
+    cli: agent
+    cli_args: -p {task}
+    description: Cursor Agent CLI v3.12.17
+    driver: cli
+    model: auto
+    model_display: auto (Cursor Agent CLI, GPT-5.5/Claude on upgrade)
+    timeout_s: 120
+  deepcode:
+    capabilities:
+    - codegen
+    - search
+    - review
+    - explain
+    cli: deepcode
+    cli_args: -p {task}
+    description: DeepCode CLI v0.1.34 (requires Git Bash + interactive TTY for auth)
+    driver: cli
+    model: yi-large
+    timeout_s: 120
+  forge:
+    capabilities:
+    - codegen
+    - quickfix
+    - explain
+    cli: forge
+    cli_args: '{task}'
+    description: Forge v2.13.18 (ForgeCode, ~1.7s)
+    driver: cli
+    model: auto
+    timeout_s: 120
+  gemini:
+    capabilities:
+    - codegen
+    - chat
+    - search
+    - review
+    - explain
+    - vision
+    - multimodal
+    cli: gemini
+    cli_args: -p '{task}'
+    description: Gemini CLI v0.51.0 (Google, requires interactive auth or GEMINI_API_KEY)
+    driver: cli
+    model: auto
+    timeout_s: 120
+  goose:
+    capabilities:
+    - codegen
+    - refactor
+    - explain
+    - search
+    - review
+    - fileops
+    cli: goose
+    cli_args: run '{task}'
+    description: Goose v1.43.0 (Block, ~1s)
+    driver: cli
+    model: auto
+    timeout_s: 120
+  hermes:
+    capabilities:
+    - codegen
+    - chat
+    - search
+    - mcp
+    - planning
+    - review
+    - explain
+    cli: hermes
+    cli_args: -z {task}
+    description: Hermes CLI v0.19.0 (AgnesAI backend, ~1.3s)
+    driver: cli
+    model: agnes-2.0-flash
+    model_display: AgnesAI agnes-2.0-flash
+    timeout_s: 120
+  kilo:
+    capabilities:
+    - codegen
+    - chat
+    - quickfix
+    - explain
+    cli: kilo
+    cli_args: run --prompt {task}
+    description: Kilo CLI v7.4.11 (OpenCode, free model, ~2.5s)
+    driver: cli
+    model: deepseek-v4-flash-free
+    model_display: opencode/deepseek-v4-flash-free (默认)
+    timeout_s: 60
+  kimi:
+    capabilities:
+    - codegen
+    - search
+    - review
+    - planning
+    cli: kimi
+    cli_args: --print -p {task}
+    description: Kimi CLI v1.48.0 + StepFun step-3.7-flash
+    driver: cli
+    model: step-3.7-flash
+    model_display: step-3.7-flash (via StepFun OpenAI)
+    timeout_s: 120
+  lh:
+    capabilities:
+    - codegen
+    - chat
+    - explain
+    - search
+    cli: lh
+    cli_args: '{task}'
+    description: LobeHub CLI v0.0.45 (~0.8s)
+    driver: cli
+    model: auto
+    timeout_s: 120
+  meoo:
+    capabilities:
+    - codegen
+    - chat
+    - quickfix
+    cli: meoo
+    cli_args: '{task}'
+    description: Meoo v0.3.4 (阿里秒悟, ~2s)
+    driver: cli
+    model: auto
+    timeout_s: 60
+  mimo:
+    capabilities:
+    - codegen
+    - chat
+    - quickfix
+    cli: mimo
+    cli_args: --print {task}
+    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check)'
+    driver: cli
+    model: mimo-v2.5
+    model_display: MiMo-V2.5 (built-in)
+    timeout_s: 60
+    enabled: false
+  openclaw:
+    capabilities:
+    - codegen
+    - planning
+    - search
+    - review
+    - chat
+    - mcp
+    - skills
+    - techdoc
+    - verify
+    - docgen
+    - pipeline
+    - refactor
+    - explain
+    - quickfix
+    - fileops
+    - memory
+    cli: openclaw
+    cli_args: agent --json -m {task}
+    description: OpenClaw v2026.7.1 (StepFun backend, ~0.2s, requires Node >=22.22.3)
+    driver: cli
+    model: step-3.7-flash
+    model_display: StepFun step-3.7-flash
+    timeout_s: 120
+  opencode:
+    capabilities:
+    - codegen
+    - chat
+    - explain
+    - search
+    - fileops
+    cli: opencode
+    cli_args: run '{task}'
+    description: OpenCode v1.18.4 (MiniMax, ~0.5s)
+    driver: cli
+    model: auto
+    timeout_s: 120
+  pi:
+    capabilities:
+    - codegen
+    - chat
+    - quickfix
+    - explain
+    cli: pi
+    cli_args: '{task}'
+    description: Pi v0.81.1 (Earendil Works, ~12s cold start)
+    driver: cli
+    model: auto
+    timeout_s: 60
+  qoder:
+    capabilities:
+    - codegen
+    - search
+    - fileops
+    - review
+    - planning
+    - explain
+    - chat
+    - refactor
+    cli: qoderclicn
+    cli_args: -p {task}
+    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check)'
+    driver: cli
+    model: auto
+    model_display: auto (QoderCN built-in)
+    timeout_s: 60
+    enabled: false
+  qwen:
+    capabilities:
+    - codegen
+    - search
+    - fileops
+    - planning
+    - review
+    - explain
+    - chat
+    cli: powershell -NoProfile -Command "qwen -p '{{safePrompt}}' -o json --safe-mode
+      2>$null"
+    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check)'
+    driver: powershell
+    model: qwen3.5-plus
+    model_display: qwen/qwen3.5-plus (built-in)
+    timeout_s: 120
+    enabled: false
+  qwenpaw:
+    capabilities:
+    - codegen
+    - search
+    - fileops
+    - planning
+    - review
+    - explain
+    - chat
+    cli: qwenpaw
+    cli_args: '{task}'
+    description: QwenPaw v2.0.1b1 (AgentScope framework, ~1.6s)
+    driver: cli
+    model: deepseek-v4-flash-free
+    timeout_s: 120
+  doc-pipeline:
+    capabilities:
+    - docgen
+    - pipeline
+    - techdoc
+    - research
+    - verify
+    cli: python
+    cli_args: -c "from maop.delegate.doc_pipeline_adapter import run_pipeline; import
+      json,sys; r=run_pipeline(pipeline_name=sys.argv[1], input_file=sys.argv[2]);
+      print(json.dumps(r))" "{pipeline_name}" "{input_file}"
+    description: doc-pipeline workflow adapter (DAG + quality gate + circuit breaker
+      + event hooks)
+    driver: python
+    model: n/a
+    routing_key: pipeline
+    timeout_s: 600
+  mmx:
+    capabilities:
+    - codegen
+    - chat
+    - planning
+    - search
+    - review
+    - explain
+    cli: mmx
+    cli_args: text chat --non-interactive --output text --message "{task}"
+    description: MiniMax CLI v1.0.18 (mmx, authenticated, global region)
+    driver: cli
+    model: MiniMax-M3
+    model_display: MiniMax-M3 (via mmx text chat)
+    timeout_s: 120
+  nanobot:
+    capabilities:
+    - chat
+    - search
+    - explain
+    cli: nanobot
+    cli_args: agent -m "{task}"
+    description: nanobot v0.2.2 (requires API key in ~/.nanobot/config.json)
+    driver: cli
+    model: auto
+    timeout_s: 60
+  langcli:
+    capabilities:
+    - codegen
+    - refactor
+    - explain
+    - search
+    - review
+    cli: langcli
+    cli_args: -p "{task}"
+    description: Langcli v0.1.43 (Claude Code via LangRouter, requires CLAUDE_CODE_GIT_BASH_PATH)
+    driver: cli
+    model: auto
+    timeout_s: 120
+loops:
+  iterative:
+    backoff_ms: 2000
+    max_attempts: 3
+    stop_on_success: true
+  routing:
+    enabled: true
+routing:
+  codegen:
+    fallback: cursor
+    primary: mmx
+    tertiary: kilo
+    keywords:
+    - 编写
+    - 写代码
+    - 生成
+    - 开发
+    - implement
+    - coding
+    - 功能
+    - feature
+    - 实现
+    - 写个
+    - 写一个
+    - 写段
+    - 实现一个
+    - 实现段
+    - 代码
+    - 程序
+    - 算法
+    - sort
+    - bubble
+    - quicksort
+    - 排序
+    - 函数
+    - 类
+    - 模块
+    - 项目
+  chat:
+    fallback: codebuddy
+    primary: claude
+    tertiary: kimi
+    keywords:
+    - 聊天
+    - 对话
+    - 问答
+    - 闲聊
+    - chat
+    - 一般问题
+    - 随意
+    - 你好
+    - 打招呼
+    - 问候
+    - hi
+    - hello
+    - hey
+    - 在吗
+    - 介绍一下
+  docgen:
+    fallback: claude
+    primary: doc-pipeline
+    tertiary: claude
+    keywords:
+    - 生成文档
+    - 文档
+    - document
+    - 注释
+    - 说明
+    - 文档生成
+    - readme
+    - api文档
+    match: (?:document|doc|readme|guide|comment)
+  fileops:
+    fallback: cline
+    primary: qwenpaw
+    keywords:
+    - 文件操作
+    - 创建文件
+    - 删除文件
+    - 移动文件
+    - 读写文件
+    - file operations
+    - read file
+    - write file
+    - 复制
+  mcp:
+    fallback: claude
+    primary: hermes
+    keywords:
+    - mcp
+    - 工具调用
+    - 外部工具
+    - MCP
+    - tool call
+    - function call
+  memory:
+    fallback: cline
+    primary: claude
+    keywords:
+    - 记忆
+    - 记住
+    - 存储
+    - memory
+    - remember
+    - 历史
+    - 上下文
+  pipeline:
+    fallback: claude
+    primary: doc-pipeline
+    tertiary: MAOP
+    keywords:
+    - 流水线
+    - pipeline
+    - 工作流
+    - workflow
+    - 自动化流程
+    - ci/cd
+    - 持续集成
+  planning:
+    fallback: claude
+    primary: kimi
+    tertiary: hermes
+    keywords:
+    - 规划
+    - 计划
+    - 方案
+    - 架构
+    - plan
+    - design
+    - 设计
+    - blueprint
+    - 策略
+    - strategy
+    match: (?:plan|architect|design|blueprint|strategy)
+  quickfix:
+    fallback: autoclaw
+    primary: cursor
+    tertiary: claude
+    keywords:
+    - 修复
+    - fix
+    - bug
+    - 错误
+    - 紧急
+    - quick fix
+    - hotfix
+    - 补丁
+    - patch
+    - 问题
+    match: (?:fix|bug|error|hotfix|patch|quick\s*fix)
+  refactor:
+    fallback: kimi
+    primary: claude
+    tertiary: claude
+    keywords:
+    - 重构
+    - 重写
+    - rewrite
+    - restructure
+    - 清理
+    - clean up
+    - 优化结构
+    match: (?:refactor|rewrite|restructure|clean\s+up)
+  review:
+    fallback: claude
+    primary: kimi
+    tertiary: codex
+    keywords:
+    - 审查
+    - 审核
+    - review
+    - code review
+    - 评审
+    - 检查代码
+  search:
+    fallback: codex
+    primary: kimi
+    tertiary: hermes
+    keywords:
+    - 搜索
+    - 检索
+    - 查
+    - 查找
+    - find
+    - 调研
+    - research
+    - 查询
+    - look up
+    - 资料
+  techdoc:
+    fallback: claude
+    primary: doc-pipeline
+    tertiary: claude
+    keywords:
+    - 技术文档
+    - 规范
+    - specification
+    - 接口文档
+    - API文档
+    - tech doc
+    - 架构文档
+    - 白皮书
+  verify:
+    fallback: claude
+    primary: claude
+    keywords:
+    - 验证
+    - verify
+    - 测试
+    - test
+    - 单元测试
+    - 集成测试
+    - assert
+    - 断言
+    match: (?:verify|test|assert|spec|unit\s+test|integration)
+  vision:
+    fallback: gemini
+    primary: claude
+    tertiary: MAOP
+    keywords:
+    - 图片
+    - 图像
+    - 视觉
+    - image
+    - vision
+    - 截图
+    - screenshot
+    - 识别
+  multimodal:
+    fallback: gemini
+    primary: claude
+    tertiary: MAOP
+    keywords:
+    - 多模态
+    - multimodal
+    - 图文
+    - 音视频
+    - 混合输入
+  orchestrate:
+    fallback: claude
+    primary: MAOP
+    tertiary: claude
+  MAOP:
+    capabilities:
+    - codegen
+    - chat
+    - planning
+    - search
+    - review
+    - explain
+    - orchestrate
+    - verify
+    - memory
+    - mcp
+    - pipeline
+    - vision
+    - multimodal
+    cli: python
+    cli_args: -m maop.cli run --task "{task}"
+    description: MAOP v4.3 self-referential agent — can delegate to itself (max_self_ref_depth=3)
+    driver: cli
+    model: auto
+    timeout_s: 180
+    subagents:
+      self:
+        cli_args: -m maop.cli run --task "{task}" --depth {depth}
+        capabilities:
+        - codegen
+        - chat
+        - planning
+        - orchestrate
+        - vision
+        - multimodal
+        description: MAOP self-delegation subagent
+workflows:
+  doc-pipeline:
+    capabilities:
+    - docgen
+    - techdoc
+    - pipeline
+    cli: python -m maop.cli run --task "{task}" --mode pipeline
+    description: 'Doc-Pipeline workflow: Planner→Retriever→Checker→Writer→Formatter
+      (11 steps, checkpoint/resume). PS wrapper archived to archive/ps-legacy/.'
+    driver: cli
+    model: auto
+    model_display: 'Doc-Pipeline v2 (Python workflow: 5 agents, 11 steps)'
+    timeout_s: 300

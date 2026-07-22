@@ -1,0 +1,23 @@
+﻿# MCP Server configurations for MAOP
+# Each server defines a Model Context Protocol endpoint that MAOP can connect to.
+# Transport types: stdio (subprocess) or sse (HTTP)
+
+servers: []
+  # Example: Filesystem server
+  # - name: filesystem
+  #   transport: stdio
+  #   command: npx
+  #   args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+  #   enabled: true
+  #   auto_connect: false
+  #   timeout: 30
+
+  # Example: GitHub server
+  # - name: github
+  #   transport: stdio
+  #   command: npx
+  #   args: ["-y", "@modelcontextprotocol/server-github"]
+  #   env:
+  #     GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+  #   enabled: true
+  #   auto_connect: false

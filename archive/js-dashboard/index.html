@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1.0" name="viewport"/>
+<title>MAOP Dashboard v3.2</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+<link rel="shortcut icon" type="image/svg+xml" href="/favicon.svg"/>
+<link href="style.css" rel="stylesheet"/>
+<script src="js/vendor/chart.umd.min.js"></script>
+</head>
+<body>
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay" class="login-overlay">
+  <div class="login-box">
+    <div class="login-header">
+      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#60a5fa" stroke-width="2" class="login-logo"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <h2 class="login-title">MAOP Dashboard</h2>
+      <p class="login-subtitle">Please sign in to continue</p>
+    </div>
+    <div class="login-field">
+      <label class="login-label">Username</label>
+      <input id="login-user" type="text" placeholder="admin" autocomplete="username" class="login-input"/>
+    </div>
+    <div class="login-field">
+      <label class="login-label">Password</label>
+      <input id="login-pass" type="password" placeholder="Enter password" autocomplete="current-password" class="login-input"/>
+    </div>
+    <div id="login-error" class="login-error"></div>
+    <button id="login-btn" data-action="doLogin" class="login-btn">Sign In</button>
+  </div>
+</div>
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    <span>MAOP Hub</span>
+  </div>
+  <nav class="nav-list">
+    <!-- 展示类型 -->
+    <div class="nav-group">
+      <div class="nav-group-title">展示</div>
+      <a class="nav-item active" data-sec="overview"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>概览</a>
+    </div>
+    <!-- 操作类型 -->
+      <div class="nav-group-title">操作</div>
+      <a class="nav-item" data-sec="control"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h4M6 12h4M6 16h4M14 8h4M14 12h4M14 16h4"/></svg>控制面板</a>
+      <a class="nav-item" data-sec="chat"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Chat</a>
+      <a class="nav-item" data-sec="agents"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/><circle cx="18" cy="6" r="2" fill="currentColor" opacity=".4"/></svg>Agent管理</a>
+      <a class="nav-item" data-sec="upgrade"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 8l5-5 5 5M5 21h14"/></svg>Agent升级</a>
+      <a class="nav-item" data-sec="memory"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 2A2.5 2.5 0 0112 4.5v15a2.5 2.5 0 01-5 0v-15A2.5 2.5 0 019.5 2z"/><path d="M14.5 2A2.5 2.5 0 0117 4.5v15a2.5 2.5 0 01-5 0v-15A2.5 2.5 0 0114.5 2z"/></svg>记忆系统</a>
+      <a class="nav-item" data-sec="evolve"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>自进化</a>
+      <a class="nav-item" data-sec="search"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>搜索</a>
+      <a class="nav-item" data-sec="wfexec"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="12" r="1" fill="currentColor"/><circle cx="6" cy="18" r="1" fill="currentColor"/></svg>工作流</a>
+    </div>
+    <!-- 监控类型 -->
+    <div class="nav-group">
+      <div class="nav-group-title">监控</div>
+      <a class="nav-item" data-sec="monitor"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/><circle cx="18" cy="6" r="2" fill="currentColor" opacity=".4"/></svg>Agent监控</a>
+      <a class="nav-item" data-sec="models"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>大模型</a>
+      <a class="nav-item" data-sec="performance"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>性能指标</a>
+      <a class="nav-item" data-sec="logs"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8M8 9h2"/></svg>日志</a>
+    </div>
+    <!-- 工具类型 -->
+    <div class="nav-group">
+      <div class="nav-group-title">工具</div>
+      <a class="nav-item" data-sec="skills"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Skills</a>
+      <a class="nav-item" data-sec="mcp"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="9" height="9" rx="1"/><rect x="13" y="2" width="9" height="9" rx="1"/><rect x="2" y="13" width="9" height="9" rx="1"/><rect x="13" y="13" width="9" height="9" rx="1"/></svg>MCP</a>
+      <a class="nav-item" data-sec="prompts"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>提示词</a>
+    </div>
+    <!-- 说明类型 -->
+    <div class="nav-group">
+      <div class="nav-group-title">说明</div>
+      <a class="nav-item" data-sec="pillars"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-5h6v5"/></svg>四大工程</a>
+      <a class="nav-item" data-sec="roles"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/><circle cx="5" cy="5" r="2" fill="currentColor" opacity=".3"/><circle cx="19" cy="5" r="2" fill="currentColor" opacity=".3"/></svg>角色</a>
+      <a class="nav-item" data-sec="modules"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M10 7h4M7 10v4M17 10v4M10 17h4"/></svg>模块</a>
+      <a class="nav-item" data-sec="architecture"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l5-4v18"/><path d="M10 21V11l5-2v12"/><path d="M15 21V13l5-1v9"/></svg>架构</a>
+      <a class="nav-item" data-sec="workflow"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6a3 3 0 003 3h6"/></svg>工作流程</a>
+    </div>
+  </nav>
+  <div class="sb-footer"><span class="dot"></span><span id="sb-status">MAOP v3.2</span></div>
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<main class="main">
+<div class="topbar">
+  <h1>MAOP Dashboard</h1>
+  <span id="uptime" class="uptime"></span>
+  <button data-action="load" class="topbar-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>刷新</button>
+  <button id="theme-toggle" class="topbar-btn" title="切换浅色/深色主题"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>主题</button>
+</div>
+<hr class="gradient-divider"/>
+
+<!-- ═══ 展示: 概览 ═══ -->
+<section id="sec-overview" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>概览</h2>
+  <div class="stat-grid" id="stat-grid"></div>
+  <div class="card-row">
+    <div class="card cb1"><h3>项目概况</h3><div id="proj-stats"></div></div>
+    <div class="card cb2"><h3>系统状态</h3><div id="sys-status"></div></div>
+  </div>
+  <div class="card-row">
+    <div class="card cb3"><h3>子系统健康</h3><div id="health-grid"></div></div>
+    <div class="card cb4"><h3>最近活动</h3><div id="recent-activity" class="scroll-area"></div></div>
+  </div>
+</section>
+
+<!-- ═══ 操作: 控制面板 ═══ -->
+<section id="sec-control" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h4M6 12h4M6 16h4M14 8h4M14 12h4M14 16h4"/></svg>控制面板</h2>
+  <div class="card">
+    <h3>执行操作</h3>
+    <div id="exec-btns" class="btn-grid3"></div>
+    <h3 class="ctrl-subtitle">维护操作</h3>
+    <div id="maint-btns" class="btn-grid3"></div>
+    <div id="ctrl-msg" class="ctrl-msg"></div>
+  </div>
+  <div class="card"><h3>任务状态</h3><div id="job-list"></div></div>
+  <div class="card"><h3>实时输出</h3><div id="stream-output" class="scroll-area" style="max-height:300px;font-family:monospace;font-size:12px;background:var(--bg,#0f172a);padding:8px;border-radius:4px;"><div class="empty">执行任务后此处显示实时输出</div></div></div>
+</section>
+
+<!-- ═══ 操作: Chat ═══ -->
+<section id="sec-chat" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Chat</h2>
+  <div id="chat-panel" class="card"></div>
+</section>
+
+<!-- ═══ 操作: Agent管理 ═══ -->
+<section id="sec-agents" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/></svg>Agent管理</h2>
+  <div id="agents-panel" class="card"></div>
+</section>
+
+<!-- ═══ 操作: Agent升级 ═══ -->
+<section id="sec-upgrade" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 8l5-5 5 5M5 21h14"/></svg>Agent升级</h2>
+  <div class="card"><h3>版本检测</h3><table><thead><tr><th>Agent</th><th>当前版本</th><th>最新版本</th><th>状态</th><th>操作</th></tr></thead><tbody id="tb-versions"></tbody></table></div>
+  <div class="card"><h3>手动升级</h3>
+  <div class="btn-row">
+    <select id="upgrade-name" class="inp"><option value="">-- 选择Agent --</option></select>
+    <button data-action="upgradeAgent" class="btn-action btn-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 8l5-5 5 5M5 21h14"/></svg>检测升级</button>
+    <button data-action="batchUpgrade" class="btn-action btn-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l4 4 14-14"/></svg>批量检测</button>
+    <button data-action="loadUpgrade" class="btn-action btn-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>刷新列表</button>
+    <button data-action="exportUpgradeReport" class="btn-action btn-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>导出报告</button>
+  </div>
+  <div id="upgrade-result" class="msg-area"></div></div>
+</section>
+
+<!-- ═══ 操作: 记忆系统 ═══ -->
+<section id="sec-memory" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 2A2.5 2.5 0 0112 4.5v15a2.5 2.5 0 01-5 0v-15A2.5 2.5 0 019.5 2z"/><path d="M14.5 2A2.5 2.5 0 0117 4.5v15a2.5 2.5 0 01-5 0v-15A2.5 2.5 0 0114.5 2z"/></svg>记忆系统</h2>
+  <div class="card-row">
+    <div class="card"><h3>记忆图谱</h3><table><thead><tr><th>类型</th><th>数量</th></tr></thead><tbody id="tb-mem-graph"></tbody></table></div>
+    <div class="card"><h3>向量记忆</h3><table><thead><tr><th>属性</th><th>值</th></tr></thead><tbody id="tb-mem-vector"></tbody></table></div>
+  </div>
+  <div class="card-row">
+    <div class="card"><h3>深度记忆</h3><div id="deepmem-stats"></div></div>
+    <div class="card"><h3>记忆追踪</h3><div id="deepmem-trace" class="scroll-area"></div></div>
+  </div>
+  <div class="card-row">
+    <div class="card"><h3>神经机制 (Attention/Transform/Embedding)</h3><div id="neural-status"></div></div>
+    <div class="card"><h3>注意力计算</h3>
+    <div class="btn-row">
+      <input id="attn-query" placeholder="查询文本" class="inp"/>
+      <button data-action="computeAttention" class="btn-action btn-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>计算</button>
+      <button data-action="clearAttnResults" class="btn-action btn-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>清空结果</button>
+      <button data-action="exportAttnResults" class="btn-action btn-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>导出结果</button>
+    </div>
+    <div id="attn-results" class="msg-area"></div></div>
+  </div>
+</section>
+
+<!-- ═══ 操作: 自进化 ═══ -->
+<section id="sec-evolve" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>自进化</h2>
+  <div class="card"><h3>控制</h3>
+  <div id="evolve-summary" class="evolve-summary"></div>
+  <div class="evolve-btn-grid">
+    <button data-action="loadEvolveStatus" class="btn-action btn-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>刷新状态</button>
+    <button data-action="triggerEvolveAnalyze" class="btn-action btn-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>触发分析</button>
+    <button data-action="loadEvolveSuggestions" class="btn-action btn-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0012 2z"/></svg>获取建议</button>
+    <button data-action="applyEvolveSuggestions" class="btn-action btn-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>应用建议</button>
+    <button data-action="exportEvolveReport" class="btn-action btn-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>导出报告</button>
+    <button data-action="resetEvolve" class="btn-action btn-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>重置进化</button>
+  </div>
+  <div id="evolve-result" class="evolve-result"></div>
+  </div>
+  <div class="card"><h3>引擎状态</h3>
+  <div id="evolve-status-summary"></div>
+  <button data-action="toggleEvolveDetail" class="btn-sm btn-blue evolve-toggle-btn" id="evolve-toggle-btn">显示详情</button>
+  <div id="evolve-status-detail" class="evolve-detail-hidden"></div>
+  </div>
+  <div class="card"><h3>进化建议</h3>
+  <div class="evolve-mechanism"><b>建议生成机制：</b>Evolve引擎从Monitor模块采集各Agent执行统计(成功率/延迟/失败次数)，经分析识别性能瓶颈和低效路径，生成优化建议(如调整路由权重/增加重试次数/修改降级策略)。建议可自动应用或人工确认后应用，应用后更新配置并写入Memory供后续复用。</div>
+  <div id="evolve-suggestions" class="scroll-area"></div></div>
+  <div class="card"><h3>性能排行</h3><table><thead><tr><th>Agent</th><th>成功率</th><th>平均延迟</th><th>评分</th><th>等级</th></tr></thead><tbody id="tb-evolve-perf"></tbody></table><div id="perf-rules" class="perf-rules"></div></div>
+</section>
+
+<!-- ═══ 操作: 搜索 ═══ -->
+<section id="sec-search" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>搜索</h2>
+  <!-- 搜索类型切换 -->
+  <div class="search-tabs">
+    <button class="search-tab active" data-stype="memory" data-action="switchSearchType" data-arg="memory"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 2A2.5 2.5 0 0112 4.5v15a2.5 2.5 0 01-5 0v-15A2.5 2.5 0 019.5 2z"/><path d="M14.5 2A2.5 2.5 0 0117 4.5v15a2.5 2.5 0 01-5 0v-15A2.5 2.5 0 0114.5 2z"/></svg>记忆搜索</button>
+    <button class="search-tab" data-stype="vector" data-action="switchSearchType" data-arg="vector"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>向量搜索</button>
+    <button class="search-tab" data-stype="graph" data-action="switchSearchType" data-arg="graph"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6a3 3 0 003 3h6"/></svg>图谱搜索</button>
+    <button class="search-tab" data-stype="log" data-action="switchSearchType" data-arg="log"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>日志搜索</button>
+    <button class="search-tab" data-stype="agent" data-action="switchSearchType" data-arg="agent"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/></svg>Agent搜索</button>
+  </div>
+  <!-- 统一搜索栏 -->
+  <div class="card search-bar-card">
+    <div class="search-bar-row">
+      <input id="unified-search-input" placeholder="输入搜索关键词..." class="inp search-big-input"/>
+      <button data-action="execUnifiedSearch" class="btn-action btn-blue search-go-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>搜索</button>
+      <button data-action="clearSearchResults" class="btn-action btn-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>清空</button>
+    </div>
+    <!-- 搜索选项(根据类型动态显示) -->
+    <div id="search-options" class="search-options"></div>
+  </div>
+  <!-- 搜索统计 -->
+  <div class="card-row">
+    <div class="card"><h3>索引状态</h3><div id="search-index-stats"></div></div>
+    <div class="card"><h3>搜索结果</h3><div id="search-meta" class="search-meta">尚未搜索</div></div>
+  </div>
+  <!-- 统一结果区 -->
+  <div class="card"><h3>结果列表</h3><div id="unified-search-results" class="scroll-area"><div class="empty">请输入关键词后点击搜索</div></div></div>
+</section>
+
+<!-- ═══ 操作: 工作流 ═══ -->
+<section id="sec-wfexec" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="12" r="1" fill="currentColor"/><circle cx="6" cy="18" r="1" fill="currentColor"/></svg>工作流</h2>
+  <div class="card"><h3>工作流列表</h3><table><thead><tr><th>名称</th><th>文件</th><th>操作</th></tr></thead><tbody id="tb-wf"></tbody></table></div>
+  <div class="card"><h3>执行控制</h3>
+  <div class="btn-row">
+    <input id="wf-name" placeholder="工作流名称" class="inp"/>
+    <input id="wf-task" placeholder="任务(可选)" class="inp"/>
+    <button data-action="runWorkflow" class="btn-action btn-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>执行</button>
+    <button data-action="stopWorkflow" class="btn-action btn-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>停止</button>
+    <button data-action="loadWfHistory" class="btn-action btn-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8M3 3v5h5"/></svg>执行历史</button>
+    <button data-action="loadWfExec" class="btn-action btn-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>刷新列表</button>
+  </div>
+  <div id="wf-msg" class="msg-area"></div></div>
+</section>
+
+<!-- ═══ 监控: Agent监控 ═══ -->
+<section id="sec-monitor" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/></svg>Agent监控</h2>
+  <div class="card"><h3>Agent 总览</h3><table><thead><tr><th>名称</th><th>CLI</th><th>模型</th><th>驱动</th><th>能力</th><th>状态</th></tr></thead><tbody id="tb-agents"></tbody></table></div>
+  <div class="card"><h3>Agent可用率</h3><div id="chart-avail" class="chart-container"></div></div>
+</section>
+
+<!-- ═══ 监控: 大模型 ═══ -->
+<section id="sec-models" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>大模型</h2>
+  <div class="card"><h3>Agent模型配置</h3><table><thead><tr><th>Agent</th><th>CLI</th><th>模型</th><th>驱动</th><th>CLI可用</th><th>操作</th></tr></thead><tbody id="tb-model-agents"></tbody></table></div>
+  <div class="card"><h3>额度可用性检测</h3><table><thead><tr><th>Agent</th><th>CLI路径</th><th>状态</th></tr></thead><tbody id="tb-model-quota"></tbody></table><div id="model-extra-info"></div></div>
+  <div class="card"><h3>切换大模型</h3>
+  <div class="btn-row">
+    <select id="switch-agent" class="inp"><option value="">-- 选择Agent --</option></select>
+    <select id="switch-provider" class="inp"><option value="">-- 选择Provider --</option></select>
+    <select id="switch-model" class="inp"><option value="">-- 选择模型 --</option></select>
+    <button data-action="switchModel" class="btn-action btn-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L11 8"/></svg>切换模型</button>
+    <button data-action="testModelConnection" class="btn-action btn-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>测试连接</button>
+    <button data-action="saveModelConfig" class="btn-action btn-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>保存配置</button>
+  </div>
+  <div id="model-msg" class="msg-area"></div></div>
+</section>
+
+<!-- ═══ 监控: 性能指标 ═══ -->
+<section id="sec-performance" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>性能指标</h2>
+  <div class="card-row">
+    <div class="card"><h3>7天时序趋势</h3><div id="chart-ts" class="chart-container"></div></div>
+    <div class="card"><h3>失败排行</h3><table><thead><tr><th>Agent</th><th>失败次数</th><th>占比</th></tr></thead><tbody id="tb-fail"></tbody></table></div>
+  </div>
+  <div class="card"><h3>最近委托</h3><table><thead><tr><th>时间</th><th>Agent</th><th>任务</th><th>延迟</th><th>状态</th></tr></thead><tbody id="tb-live"></tbody></table></div>
+</section>
+
+<!-- ═══ 监控: 日志 ═══ -->
+<section id="sec-logs" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8M8 9h2"/></svg>日志</h2>
+  <div class="card"><h3>日志面板</h3>
+  <div class="log-toolbar">
+    <button data-action="loadLogs" data-arg="dashboard" class="btn-md btn-blue">Dashboard日志</button>
+    <button data-action="loadLogs" data-arg="delegations" class="btn-md btn-blue">委托日志</button>
+    <button data-action="loadLogs" data-arg="checker" class="btn-md btn-blue">检查日志</button>
+    <button data-action="loadLogs" data-arg="all" class="btn-md btn-blue">全部日志</button>
+    <input id="log-filter" placeholder="过滤词..." class="inp"/>
+    <label>开始</label><input id="log-start" type="datetime-local" class="inp"/>
+    <label>结束</label><input id="log-end" type="datetime-local" class="inp"/>
+    <button data-action="clearLogTime" class="btn-md btn-orange">清除时间</button>
+  </div>
+  <div class="log-box">
+    <div class="log-box-title">日志输出</div>
+    <div class="log-box-divider"></div>
+    <div id="log-content" class="log-box-body"></div>
+  </div></div>
+  <div class="card"><h3>日志分析</h3><div id="log-analysis"></div></div>
+</section>
+
+<!-- ═══ 工具: Skills ═══ -->
+<section id="sec-skills" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Skills</h2>
+  <div class="card"><h3>技能列表</h3><table><thead><tr><th>技能</th><th>分类</th><th>使用次数</th></tr></thead><tbody id="tb-skills"></tbody></table></div>
+</section>
+
+<!-- ═══ 工具: MCP ═══ -->
+<section id="sec-mcp" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="9" height="9" rx="1"/><rect x="13" y="2" width="9" height="9" rx="1"/><rect x="2" y="13" width="9" height="9" rx="1"/><rect x="13" y="13" width="9" height="9" rx="1"/></svg>MCP</h2>
+  <div class="card"><h3>MCP服务器列表</h3><table><thead><tr><th>服务器</th><th>工具数</th><th>状态</th></tr></thead><tbody id="tb-mcp"></tbody></table></div>
+  <div class="card"><h3>路由表</h3><div id="route-table"></div></div>
+</section>
+
+<!-- ═══ 工具: 提示词 ═══ -->
+<section id="sec-prompts" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>提示词</h2>
+  <div class="card-row">
+    <div class="card"><h3>提示词模板</h3><table><thead><tr><th>模板</th><th>分类</th></tr></thead><tbody id="tb-prompts"></tbody></table></div>
+    <div class="card"><h3>安全配置</h3><table><thead><tr><th>项目</th><th>状态</th></tr></thead><tbody id="tb-security"></tbody></table></div>
+  </div>
+</section>
+
+<!-- ═══ 说明: 四大工程 ═══ -->
+<section id="sec-pillars" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-5h6v5"/></svg>四大工程</h2>
+  <div id="pillars-content"></div>
+</section>
+
+<!-- ═══ 说明: 角色 ═══ -->
+<section id="sec-roles" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/></svg>角色</h2>
+  <div id="roles-content"></div>
+</section>
+
+<!-- ═══ 说明: 模块 ═══ -->
+<section id="sec-modules" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>模块</h2>
+  <div id="modules-content"></div>
+</section>
+
+<!-- ═══ 说明: 架构 ═══ -->
+<section id="sec-architecture" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l5-4v18"/><path d="M10 21V11l5-2v12"/><path d="M15 21V13l5-1v9"/></svg>架构</h2>
+  <div id="arch-content"></div>
+</section>
+
+<!-- ═══ 说明: 工作流程 ═══ -->
+<section id="sec-workflow" class="panel">
+  <h2 class="panel-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6a3 3 0 003 3h6"/></svg>工作流程</h2>
+  <div id="wf-content"></div>
+</section>
+
+<hr class="gradient-divider bottom"/>
+</main>
+<script src="js/app-core.js"></script>
+<script src="js/app-overview.js"></script>
+<script src="js/app-control.js"></script>
+<script src="js/app-memory.js"></script>
+<script src="js/app-search.js"></script>
+<script src="js/app-evolve.js"></script>
+<script src="js/app-monitor.js"></script>
+<script src="js/app-logs.js"></script>
+<script src="js/app-tools.js"></script>
+<script src="js/app-info.js"></script>
+<script src="js/app-actions.js"></script>
+<script src="js/app-agents.js"></script>
+<script src="js/app-chat.js"></script>
+<script src="js/app-events.js"></script>
+</body></html>

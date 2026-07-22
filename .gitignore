@@ -1,0 +1,79 @@
+# -- Python --
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# -- Virtual environments --
+.venv/
+venv/
+env/
+
+# -- IDE / Editor --
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# -- Testing --
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# t16 (2026-07-21): ad-hoc test runners with hardcoded absolute paths — should
+# never be committed. Use `python -m pytest` from py/ instead.
+test_output.txt
+batch_run_tests.py
+
+# -- Environment variables --
+.env
+.env.local
+.env.*.local
+
+# -- Runtime data (SQLite databases) --
+data/*.db
+data/*.db2
+data/.admin-password
+data/jwt_secret
+data/backups/
+data/sandboxes/
+data/wiki.json
+data/memory.json
+data/evolve-suggestions.json
+data/tools.json
+
+# -- Logs --
+logs/
+
+# -- Dashboard build output --
+dashboard/dist/
+dashboard/dist-enterprise/
+dashboard-enterprise/dist/
+
+# -- Temp / Cache --
+temp/
+cache/
+output/
+
+# -- Snapshots (test artifacts) --
+tests/snapshots/
+*.snap
+
+# -- OS files --
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# -- Docker --
+docker-compose.override.yml
+
+# -- Node (if any frontend tooling) --
+node_modules/

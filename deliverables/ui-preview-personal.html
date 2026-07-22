@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1.0" name="viewport"/>
+<title>MAOP Dashboard — Dual Edition UI Preview</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#050506;--bg2:#0a0a0b;--bg3:#111113;
+  --card:rgba(255,255,255,0.03);--card-hover:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.06);--border-hi:rgba(255,255,255,0.12);
+  --text:#ededef;--text2:#8a8f98;--text3:#555860;
+  --accent:#6366f1;--accent2:#a855f7;--accent3:#818cf8;
+  --green:#34d399;--yellow:#fbbf24;--red:#f87171;--blue:#60a5fa;
+  --ent:#a78bfa;
+  --radius:12px;--radius-sm:8px;
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+}
+html{font-size:14px;scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5;letter-spacing:-0.01em;overflow-x:hidden}
+a{color:var(--accent3);text-decoration:none}
+
+/* ── Layout ── */
+.app{display:flex;min-height:100vh}
+.sidebar{width:240px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50;transition:transform .3s}
+.sidebar-head{padding:20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sidebar-logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center}
+.sidebar-logo svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2}
+.sidebar-brand{font-size:15px;font-weight:600;letter-spacing:-0.02em}
+.sidebar-edition{font-size:10px;font-weight:500;padding:2px 6px;border-radius:4px;margin-left:auto}
+.sidebar-edition.personal{background:rgba(96,165,250,0.15);color:var(--blue)}
+.sidebar-edition.enterprise{background:rgba(167,139,250,0.15);color:var(--ent)}
+.nav-group{padding:8px 0}
+.nav-group-title{padding:6px 20px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 20px;color:var(--text2);font-size:13px;font-weight:450;cursor:pointer;transition:all .15s;border-left:2px solid transparent}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,0.03)}
+.nav-item.active{color:var(--text);background:rgba(99,102,241,0.08);border-left-color:var(--accent)}
+.nav-item svg{width:16px;height:16px;flex-shrink:0}
+.nav-item .badge{margin-left:auto;font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(99,102,241,0.15);color:var(--accent3)}
+.nav-item.ent-only{color:var(--ent);opacity:.7}
+.nav-item.ent-only:hover{opacity:1}
+.sidebar-foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text3)}
+.sidebar-foot .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+
+.main{margin-left:240px;flex:1;min-height:100vh}
+.topbar{padding:16px 32px;display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--border);background:rgba(5,5,6,0.8);backdrop-filter:blur(20px);position:sticky;top:0;z-index:40}
+.topbar h1{font-size:16px;font-weight:600;letter-spacing:-0.02em}
+.topbar .sep{width:1px;height:16px;background:var(--border)}
+.topbar .edition-tag{font-size:11px;font-weight:500;padding:3px 8px;border-radius:4px}
+.topbar .edition-tag.personal{background:rgba(96,165,250,0.1);color:var(--blue)}
+.topbar .edition-tag.enterprise{background:rgba(167,139,250,0.1);color:var(--ent)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.topbar-btn{padding:6px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s;font-family:var(--font)}
+.topbar-btn:hover{background:var(--card-hover);color:var(--text);border-color:var(--border-hi)}
+
+.content{padding:24px 32px}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden;transition:all .2s}
+.card:hover{background:var(--card-hover);border-color:var(--border-hi)}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(99,102,241,0.3),transparent);opacity:0;transition:opacity .3s}
+.card:hover::before{opacity:1}
+.card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card-title svg{width:14px;height:14px}
+
+/* ── Stat Cards ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden}
+.stat-card::after{content:'';position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;opacity:.08}
+.stat-card.c1::after{background:var(--accent)}
+.stat-card.c2::after{background:var(--green)}
+.stat-card.c3::after{background:var(--yellow)}
+.stat-card.c4::after{background:var(--ent)}
+.stat-label{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
+.stat-value{font-size:28px;font-weight:700;letter-spacing:-0.03em;line-height:1.1}
+.stat-change{font-size:11px;margin-top:6px;display:flex;align-items:center;gap:4px}
+.stat-change.up{color:var(--green)}
+.stat-change.down{color:var(--red)}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* ── Bento Grid ── */
+.bento{display:grid;gap:16px;margin-bottom:24px}
+.bento-2{grid-template-columns:1fr 1fr}
+.bento-3{grid-template-columns:1fr 1fr 1fr}
+.bento-2-1{grid-template-columns:2fr 1fr}
+.bento-1-2{grid-template-columns:1fr 2fr}
+.bento-wide{grid-column:span 2}
+
+/* ── Charts ── */
+.chart-area{width:100%;height:200px;position:relative}
+.chart-bar{display:flex;align-items:flex-end;gap:6px;height:160px;padding-top:20px}
+.chart-bar-item{flex:1;border-radius:4px 4px 0 0;transition:all .3s;position:relative;min-width:20px}
+.chart-bar-item:hover{opacity:.8}
+.chart-bar-label{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--text3);white-space:nowrap}
+.chart-bar-val{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2);white-space:nowrap;opacity:0;transition:opacity .2s}
+.chart-bar-item:hover .chart-bar-val{opacity:1}
+
+/* Sparkline */
+.sparkline{display:flex;align-items:flex-end;gap:2px;height:32px}
+.sparkline-bar{flex:1;border-radius:2px;background:var(--accent);opacity:.5;transition:opacity .2s;min-width:3px}
+.sparkline-bar:hover{opacity:1}
+
+/* ── Donut ── */
+.donut-wrap{display:flex;align-items:center;gap:24px}
+.donut{width:120px;height:120px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center}
+.donut-center{position:absolute;font-size:20px;font-weight:700}
+.donut-legend{display:flex;flex-direction:column;gap:8px}
+.donut-legend-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+.donut-legend-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+
+/* ── Table ── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);padding:8px 12px;border-bottom:1px solid var(--border)}
+td{font-size:12px;padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text2)}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px}
+.status-dot.green{background:var(--green);box-shadow:0 0 4px var(--green)}
+.status-dot.yellow{background:var(--yellow)}
+.status-dot.red{background:var(--red)}
+
+/* ── Progress ── */
+.progress-bar{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;border-radius:2px;transition:width .5s}
+
+/* ── Heatmap ── */
+.heatmap{display:grid;grid-template-columns:repeat(24,1fr);gap:2px}
+.heatmap-cell{aspect-ratio:1;border-radius:2px;transition:opacity .2s}
+.heatmap-cell:hover{opacity:.7}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:4px;padding:4px;background:rgba(255,255,255,0.03);border-radius:var(--radius-sm);margin-bottom:20px;width:fit-content}
+.tab{padding:6px 14px;font-size:12px;font-weight:500;color:var(--text3);border-radius:6px;cursor:pointer;transition:all .15s}
+.tab:hover{color:var(--text2)}
+.tab.active{background:rgba(99,102,241,0.15);color:var(--accent3)}
+
+/* ── Section Divider ── */
+.section-title{font-size:13px;font-weight:600;color:var(--text2);margin:24px 0 16px;display:flex;align-items:center;gap:8px}
+.section-title svg{width:16px;height:16px;color:var(--accent)}
+
+/* ── Glow ── */
+.glow{position:absolute;width:200px;height:200px;border-radius:50%;filter:blur(80px);opacity:.08;pointer-events:none}
+
+/* ── Enterprise Badge ── */
+.ent-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(167,139,250,0.12);color:var(--ent);letter-spacing:0.04em}
+
+/* ── Responsive ── */
+@media(max-width:1024px){.sidebar{transform:translateX(-100%)}.main{margin-left:0}.stat-grid{grid-template-columns:repeat(2,1fr)}.bento-2,.bento-3,.bento-2-1,.bento-1-2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- PERSONAL EDITION PREVIEW                                        -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="app" id="view-personal">
+<aside class="sidebar">
+  <div class="sidebar-head">
+    <div class="sidebar-logo"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+    <span class="sidebar-brand">MAOP Hub</span>
+    <span class="sidebar-edition personal">Personal</span>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">概览</div>
+    <div class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">操作</div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h4M6 12h4M14 8h4M14 12h4"/></svg>控制面板</div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Chat<span class="badge">3</span></div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/></svg>Agent 管理</div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 2A2.5 2.5 0 0112 4.5v15a2.5 2.5 0 01-5 0v-15A2.5 2.5 0 019.5 2z"/></svg>记忆系统</div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6a3 3 0 003 3h6"/></svg>工作流</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">监控</div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>性能指标</div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>大模型</div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>成本统计</div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>日志</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">工具</div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Skills</div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="9" height="9" rx="1"/><rect x="13" y="2" width="9" height="9" rx="1"/><rect x="2" y="13" width="9" height="9" rx="1"/><rect x="13" y="13" width="9" height="9" rx="1"/></svg>MCP</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">系统</div>
+    <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>设置</div>
+  </div>
+  <div class="sidebar-foot"><span class="dot"></span>SQLite · 本地模式</div>
+</aside>
+
+<main class="main">
+<div class="topbar">
+  <h1>Dashboard</h1>
+  <div class="sep"></div>
+  <span class="edition-tag personal">Personal Edition</span>
+  <div class="topbar-right">
+    <span style="font-size:11px;color:var(--text3)">运行 2h 14m</span>
+    <button class="topbar-btn">⟳ 刷新</button>
+  </div>
+</div>
+
+<div class="content">
+  <!-- Ambient glow -->
+  <div class="glow" style="top:-100px;left:200px;background:var(--accent)"></div>
+  <div class="glow" style="top:300px;right:-50px;background:var(--accent2)"></div>
+
+  <!-- Stat Cards -->
+  <div class="stat-grid">
+    <div class="stat-card c1">
+      <div class="stat-label">活跃 Agent</div>
+      <div class="stat-value">12</div>
+      <div class="stat-change up">↑ 2 本周新增</div>
+      <div class="stat-sub">8 个配置 · 4 个自定义</div>
+    </div>
+    <div class="stat-card c2">
+      <div class="stat-label">今日任务</div>
+      <div class="stat-value">47</div>
+      <div class="stat-change up">↑ 12% vs 昨日</div>
+      <div class="stat-sub">43 成功 · 2 失败 · 2 运行中</div>
+    </div>
+    <div class="stat-card c3">
+      <div class="stat-label">今日成本</div>
+      <div class="stat-value">¥3.24</div>
+      <div class="stat-change down">↓ 8% vs 昨日</div>
+      <div class="stat-sub">Token: 128K · 本月 ¥42.1</div>
+    </div>
+    <div class="stat-card c4">
+      <div class="stat-label">平均延迟</div>
+      <div class="stat-value">1.2s</div>
+      <div class="stat-change up">↑ 改善 15%</div>
+      <div class="stat-sub">P50: 0.8s · P99: 3.4s</div>
+    </div>
+  </div>
+
+  <!-- Bento Row 1: Activity + Agent Performance -->
+  <div class="bento bento-2-1">
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>任务趋势 (7天)</div>
+      <div class="chart-area">
+        <div class="chart-bar" id="trend-chart"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/></svg>Agent 成功率</div>
+      <div class="donut-wrap">
+        <div class="donut" style="background:conic-gradient(var(--green) 0% 82%, var(--yellow) 82% 92%, var(--red) 92% 100%)">
+          <div class="donut-center" style="color:var(--green)">82%</div>
+        </div>
+        <div class="donut-legend">
+          <div class="donut-legend-item"><span class="donut-legend-dot" style="background:var(--green)"></span>成功 82%</div>
+          <div class="donut-legend-item"><span class="donut-legend-dot" style="background:var(--yellow)"></span>超时 10%</div>
+          <div class="donut-legend-item"><span class="donut-legend-dot" style="background:var(--red)"></span>失败 8%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bento Row 2: Cost Breakdown + Activity Heatmap -->
+  <div class="bento bento-1-2">
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>成本分布</div>
+      <div class="donut-wrap">
+        <div class="donut" style="background:conic-gradient(var(--accent) 0% 38%, var(--accent2) 38% 62%, var(--blue) 62% 81%, var(--green) 81% 100%)">
+          <div class="donut-center" style="font-size:14px;color:var(--text)">¥42.1</div>
+        </div>
+        <div class="donut-legend">
+          <div class="donut-legend-item"><span class="donut-legend-dot" style="background:var(--accent)"></span>codegen ¥16.0</div>
+          <div class="donut-legend-item"><span class="donut-legend-dot" style="background:var(--accent2)"></span>review ¥10.1</div>
+          <div class="donut-legend-item"><span class="donut-legend-dot" style="background:var(--blue)"></span>chat ¥8.0</div>
+          <div class="donut-legend-item"><span class="donut-legend-dot" style="background:var(--green)"></span>其他 ¥8.0</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>24h 活动热力图</div>
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">
+        <span style="font-size:10px;color:var(--text3)">0:00</span>
+        <div class="heatmap" id="heatmap-24h" style="flex:1"></div>
+        <span style="font-size:10px;color:var(--text3)">23:00</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;justify-content:center">
+        <span style="font-size:10px;color:var(--text3)">低</span>
+        <div style="display:flex;gap:2px">
+          <div style="width:12px;height:12px;border-radius:2px;background:rgba(99,102,241,0.1)"></div>
+          <div style="width:12px;height:12px;border-radius:2px;background:rgba(99,102,241,0.3)"></div>
+          <div style="width:12px;height:12px;border-radius:2px;background:rgba(99,102,241,0.5)"></div>
+          <div style="width:12px;height:12px;border-radius:2px;background:rgba(99,102,241,0.7)"></div>
+          <div style="width:12px;height:12px;border-radius:2px;background:rgba(99,102,241,0.9)"></div>
+        </div>
+        <span style="font-size:10px;color:var(--text3)">高</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bento Row 3: Agent Table + Model Usage -->
+  <div class="bento bento-2">
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/></svg>Agent 状态</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Agent</th><th>状态</th><th>成功率</th><th>延迟</th><th>今日调用</th></tr></thead>
+          <tbody>
+            <tr><td style="color:var(--text)">codegen</td><td><span class="status-dot green"></span>健康</td><td>94%</td><td>0.8s</td><td>18</td></tr>
+            <tr><td style="color:var(--text)">chat</td><td><span class="status-dot green"></span>健康</td><td>89%</td><td>1.2s</td><td>12</td></tr>
+            <tr><td style="color:var(--text)">review</td><td><span class="status-dot yellow"></span>降级</td><td>76%</td><td>2.1s</td><td>8</td></tr>
+            <tr><td style="color:var(--text)">kimi</td><td><span class="status-dot green"></span>健康</td><td>91%</td><td>1.5s</td><td>6</td></tr>
+            <tr><td style="color:var(--text)">codex</td><td><span class="status-dot red"></span>断路</td><td>—</td><td>—</td><td>0</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>模型使用分布</div>
+      <div class="donut-wrap" style="flex-direction:column;align-items:flex-start;gap:16px">
+        <div style="width:100%">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;color:var(--text2)">GPT-4o</span><span style="font-size:12px;color:var(--accent3)">42%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:42%;background:var(--accent)"></div></div>
+        </div>
+        <div style="width:100%">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;color:var(--text2)">Claude 3.5</span><span style="font-size:12px;color:var(--accent3)">28%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:28%;background:var(--accent2)"></div></div>
+        </div>
+        <div style="width:100%">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;color:var(--text2)">Kimi</span><span style="font-size:12px;color:var(--accent3)">18%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:18%;background:var(--blue)"></div></div>
+        </div>
+        <div style="width:100%">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;color:var(--text2)">其他</span><span style="font-size:12px;color:var(--accent3)">12%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:12%;background:var(--green)"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bento Row 4: Memory + System Health -->
+  <div class="bento bento-3">
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 2A2.5 2.5 0 0112 4.5v15a2.5 2.5 0 01-5 0v-15A2.5 2.5 0 019.5 2z"/></svg>记忆系统</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--text2)">短期记忆</span><span style="font-size:12px;color:var(--text)">1,247 条</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--text2)">长期记忆</span><span style="font-size:12px;color:var(--text)">389 条</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--text2)">向量索引</span><span style="font-size:12px;color:var(--text)">2,156 维度</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--text2)">缓存命中率</span><span style="font-size:12px;color:var(--green)">73%</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>系统健康</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:var(--text2)">引擎</span><span style="font-size:11px;color:var(--green)">● 运行中</span></div><div class="progress-bar"><div class="progress-fill" style="width:95%;background:var(--green)"></div></div></div>
+        <div><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:var(--text2)">调度器</span><span style="font-size:11px;color:var(--green)">● 正常</span></div><div class="progress-bar"><div class="progress-fill" style="width:88%;background:var(--green)"></div></div></div>
+        <div><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:var(--text2)">记忆</span><span style="font-size:11px;color:var(--yellow)">● 70%</span></div><div class="progress-bar"><div class="progress-fill" style="width:70%;background:var(--yellow)"></div></div></div>
+        <div><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:var(--text2)">成本追踪</span><span style="font-size:11px;color:var(--green)">● 正常</span></div><div class="progress-bar"><div class="progress-fill" style="width:92%;background:var(--green)"></div></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>最近活动</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:12px">
+        <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--text3);font-size:10px;min-width:40px">10:23</span><span style="color:var(--green)">✓</span><span style="color:var(--text2)">codegen 完成</span></div>
+        <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--text3);font-size:10px;min-width:40px">10:20</span><span style="color:var(--green)">✓</span><span style="color:var(--text2)">chat 响应</span></div>
+        <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--text3);font-size:10px;min-width:40px">10:18</span><span style="color:var(--red)">✗</span><span style="color:var(--text2)">review 超时</span></div>
+        <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--text3);font-size:10px;min-width:40px">10:15</span><span style="color:var(--green)">✓</span><span style="color:var(--text2)">kimi 分析</span></div>
+        <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--text3);font-size:10px;min-width:40px">10:12</span><span style="color:var(--yellow)">⚠</span><span style="color:var(--text2)">codex 断路</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</main>
+</div>
+
+<script>
+// Trend chart
+const tc=document.getElementById('trend-chart');
+const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const vals=[32,45,28,52,47,38,47];
+const mx=Math.max(...vals);
+days.forEach((d,i)=>{
+  const h=(vals[i]/mx)*140;
+  const el=document.createElement('div');
+  el.className='chart-bar-item';
+  el.style.height=h+'px';
+  el.style.background=i===6?'var(--accent)':'rgba(99,102,241,0.4)';
+  el.innerHTML=`<span class="chart-bar-val">${vals[i]}</span><span class="chart-bar-label">${d}</span>`;
+  tc.appendChild(el);
+});
+
+// Heatmap
+const hm=document.getElementById('heatmap-24h');
+for(let i=0;i<24;i++){
+  const v=Math.random();
+  const cell=document.createElement('div');
+  cell.className='heatmap-cell';
+  cell.style.background=`rgba(99,102,241,${0.05+v*0.8})`;
+  cell.title=`${i}:00 — ${Math.floor(v*20)} 任务`;
+  hm.appendChild(cell);
+}
+</script>
+</body>
+</html>

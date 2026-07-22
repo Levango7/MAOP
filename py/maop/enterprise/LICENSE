@@ -1,0 +1,34 @@
+MAOP Enterprise Extension License
+==================================
+
+Copyright (c) 2024-2026 MAOP Project
+
+This software is the commercial enterprise extension of the MAOP framework.
+It is NOT covered by the MIT license that applies to the core MAOP package.
+
+LICENSE TERMS
+-------------
+
+1. GRANT: Subject to payment of applicable license fees and compliance with
+   the terms herein, MAOP Project grants you a non-exclusive, non-transferable
+   license to use the MAOP Enterprise Extension ("Software") for your internal
+   business operations.
+
+2. RESTRICTIONS: You may NOT:
+   (a) Distribute, sublicense, or make the Software available to third parties
+   (b) Reverse engineer, decompile, or disassemble the Software
+   (c) Use the Software in a competing product or service
+   (d) Remove or modify any proprietary notices
+
+3. OPEN SOURCE CORE: The MAOP core framework (without the enterprise/ directory)
+   remains under the MIT License. This license applies only to the enterprise
+   extension modules.
+
+4. TERMINATION: This license terminates automatically if you breach any term.
+   Upon termination, you must destroy all copies of the Software.
+
+5. DISCLAIMER: THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND.
+   IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY.
+
+For licensing inquiries: https://github.com/your-org/maop

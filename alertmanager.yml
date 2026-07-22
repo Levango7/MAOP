@@ -1,0 +1,31 @@
+# MAOP AlertManager Configuration
+# Used with: docker compose --profile monitoring up -d
+#
+# Alert rules are based on MAOP's Prometheus metrics:
+#   MAOP_delegations_total, MAOP_delegations_success, MAOP_delegations_failed
+#   MAOP_active_agents, MAOP_memory_entries, MAOP_queue_pending
+#   MAOP_circuit_breaker_state
+
+route:
+  receiver: "maop-default"
+  group_by: ["alertname", "agent"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: "maop-default"
+    # Uncomment one or more integrations:
+    # webhook_configs:
+    #   - url: "http://maop-dashboard:9079/api/alerts/webhook"
+    # slack_configs:
+    #   - api_url: "https://hooks.slack.com/services/XXX"
+    #     channel: "#maop-alerts"
+
+# ── Inhibition rules ──────────────────────────────────────────
+inhibit_rules:
+  - source_match:
+      severity: "critical"
+    target_match:
+      severity: "warning"
+    equal: ["agent"]
