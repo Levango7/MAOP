@@ -124,7 +124,8 @@ agents:
     - explain
     cli: deepcode
     cli_args: -p {task}
-    description: DeepCode CLI v0.1.34 (requires Git Bash + interactive TTY for auth)
+    description: 'DISABLED: not registered / no auth (2026-07-22)'
+    enabled: false
     driver: cli
     model: yi-large
     timeout_s: 120
@@ -150,7 +151,8 @@ agents:
     - multimodal
     cli: gemini
     cli_args: -p '{task}'
-    description: Gemini CLI v0.51.0 (Google, requires interactive auth or GEMINI_API_KEY)
+    description: 'DISABLED: no VPN/proxy for Google APIs (2026-07-22)'
+    enabled: false
     driver: cli
     model: auto
     timeout_s: 120
@@ -400,7 +402,8 @@ agents:
     - review
     cli: langcli
     cli_args: -p "{task}"
-    description: Langcli v0.1.43 (Claude Code via LangRouter, requires CLAUDE_CODE_GIT_BASH_PATH)
+    description: 'DISABLED: no Anthropic API key, no VPN (2026-07-22)'
+    enabled: false
     driver: cli
     model: auto
     timeout_s: 120
@@ -620,7 +623,7 @@ routing:
     - 断言
     match: (?:verify|test|assert|spec|unit\s+test|integration)
   vision:
-    fallback: gemini
+    fallback: crush
     primary: claude
     tertiary: MAOP
     keywords:
@@ -633,7 +636,7 @@ routing:
     - screenshot
     - 识别
   multimodal:
-    fallback: gemini
+    fallback: crush
     primary: claude
     tertiary: MAOP
     keywords:
