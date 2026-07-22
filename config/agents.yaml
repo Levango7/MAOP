@@ -182,8 +182,7 @@ agents:
     - explain
     cli: hermes
     cli_args: -z {task}
-    description: 'DISABLED: CLI not installed (2026-07-22 health check)'
-    enabled: false
+    description: Hermes CLI v0.19.0 (AgnesAI backend, ~1.3s)
     driver: cli
     model: agnes-2.0-flash
     model_display: AgnesAI agnes-2.0-flash
@@ -494,7 +493,7 @@ routing:
     - 复制
   mcp:
     fallback: claude
-    primary: openclaw
+    primary: hermes
     keywords:
     - mcp
     - 工具调用
@@ -528,7 +527,7 @@ routing:
   planning:
     fallback: claude
     primary: kimi
-    tertiary: mmx
+    tertiary: hermes
     keywords:
     - 规划
     - 计划
@@ -584,7 +583,7 @@ routing:
   search:
     fallback: codex
     primary: kimi
-    tertiary: claude
+    tertiary: hermes
     keywords:
     - 搜索
     - 检索
