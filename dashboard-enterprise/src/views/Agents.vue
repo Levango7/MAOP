@@ -15,11 +15,11 @@
         <span class="hint">Agent routing configuration and status</span>
       </template>
       <div class="dispatch-grid">
-        <div class="dispatch-card" v-for="route in routes" :key="route.pattern">
-          <div class="route-pattern">{{ route.pattern }}</div>
+        <div class="dispatch-card" v-for="route in routes" :key="route.name">
+          <div class="route-pattern">{{ route.name }}</div>
           <div class="route-arrow">→</div>
-          <div class="route-target">{{ route.agent }}</div>
-          <span class="route-weight" :style="{ width: route.weight + '%' }">{{ route.weight }}%</span>
+          <div class="route-target">{{ route.provider || route.model || 'default' }}</div>
+          <span class="route-weight" :class="{ on: route.enabled, off: !route.enabled }">{{ route.enabled ? 'ON' : 'OFF' }}</span>
         </div>
       </div>
     </Panel>
@@ -194,7 +194,9 @@ onMounted(loadAgents);
 .route-pattern { font-family: monospace; color: var(--accent); font-size: 12px; }
 .route-arrow { color: var(--text3); }
 .route-target { font-weight: 600; }
-.route-weight { height: 4px; background: var(--accent); border-radius: 2px; margin-left: auto; }
+.route-weight { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-left: auto; min-width: 28px; text-align: center; }
+.route-weight.on { background: rgba(34,197,94,.15); color: var(--success); }
+.route-weight.off { background: var(--bg); color: var(--text3); }
 
 .agent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .agent-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; cursor: pointer; transition: all .15s; }

@@ -1,4 +1,4 @@
-﻿"""Dream Memory Consolidation — intelligent memory compaction + knowledge extraction.
+"""Dream Memory Consolidation — intelligent memory compaction + knowledge extraction.
 
 Inspired by Claude Code's Dream Memory Consolidation mechanism. MAOP's memory
 store is append-only with a simple TTL prune. Over time it accumulates:
@@ -349,6 +349,58 @@ class DreamConsolidator:
                 except Exception as exc:
                     logger.debug("[dream] Prune failed for %s: %s", eid, exc)
 
+        # ── Sync secondary indexes after SQL deletion ──────────────
+        # The DELETE above only removes rows from memory_entries. The
+        # bloom filter, VectorStore vectors, and wiki.json/memory.json
+        # index files still reference the pruned IDs and must be
+        # synchronized to avoid stale lookups and zombie search hits.
+        if all_pruned and not dry_run:
+            # 1. VectorStore — remove vectors for deleted entries
+            try:
+                _vs = getattr(self._store, "_vector_store", None)
+                if _vs is not None:
+                    _synced = 0
+                    for _eid in all_pruned:
+                        try:
+                            if _vs.delete(_eid):
+                                _synced += 1
+                        except Exception as _exc:
+                            logger.debug(
+                                "[dream] VectorStore delete failed for %s: %s",
+                                _eid, _exc,
+                            )
+                    logger.info(
+                        "[dream] Synced VectorStore: %d/%d vectors removed",
+                        _synced, len(all_pruned),
+                    )
+            except Exception as _exc:
+                logger.warning("[dream] VectorStore sync failed: %s", _exc)
+
+            # 2. Bloom filter — standard BloomFilter has no remove().
+            #    Log a warning so operators know stale IDs remain; a
+            #    full rebuild would be needed to fully clear them.
+            try:
+                _bf = getattr(self._store, "_bloom", None)
+                if _bf is not None and not hasattr(_bf, "remove"):
+                    logger.warning(
+                        "[dream] BloomFilter has no remove(); %d pruned IDs "
+                        "remain in filter (false positives possible, rebuild "
+                        "recommended)",
+                        len(all_pruned),
+                    )
+            except Exception as _exc:
+                logger.warning("[dream] Bloom filter sync check failed: %s", _exc)
+
+            # 3. JSON index files (wiki.json, memory.json) — mark store
+            #    dirty and flush so the index reflects the deletions.
+            try:
+                self._store._dirty = True
+                self._store._flush_json()
+                logger.info(
+                    "[dream] Synced JSON index files (wiki.json, memory.json)",
+                )
+            except Exception as _exc:
+                logger.warning("[dream] JSON index sync failed: %s", _exc)
         report.entries_pruned = len(all_pruned)
         report.pruned_ids = all_pruned[:100]  # Cap for report size
         logger.info("[dream] Prune: %d original entries removed", len(all_pruned))

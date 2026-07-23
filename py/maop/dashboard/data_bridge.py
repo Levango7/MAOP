@@ -262,12 +262,48 @@ class DataBridge:
             "ORDER BY timestamp DESC LIMIT 10"
         )
 
+        # Frontend contract (Monitor.vue): add requests_per_min, queue_depth,
+        # cost_per_hour, agents[] while keeping legacy fields for backward compat.
+        requests_per_min = round(len(recent) / 5.0, 1) if recent else 0.0
+        try:
+            qstats = await asyncio.get_event_loop().run_in_executor(
+                None, self._queue_stats_sync
+            )
+            queue_depth = qstats.get("pending", 0)
+        except Exception:
+            queue_depth = 0
+        try:
+            agent_rows = await self.agent_stats()
+            agents_list = [
+                {
+                    "name": a.get("agent", ""),
+                    "healthy": a.get("circuit_breaker", "closed") == "closed",
+                    "queue": queue_depth,
+                    "load": min(100, max(0, int(round(100 - a.get("success_rate", 100.0))))),
+                }
+                for a in agent_rows
+            ]
+        except Exception:
+            agents_list = []
+        cost_per_hour = 0.0
+        try:
+            from maop.core.cost_tracker import CostTracker
+            ct = CostTracker(root_dir=str(self._root))
+            hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+            csum = ct.summary(start_date=hour_ago)
+            cost_per_hour = round(getattr(csum, "total_cost_usd", 0.0), 4)
+        except Exception:
+            pass
         self._record_latency(start)
         return {
             "recent_delegations": recent,
             "open_circuit_breakers": open_breakers,
             "recent_errors": errors,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "requests_per_min": requests_per_min,
+            "queue_depth": queue_depth,
+            "cost_per_hour": cost_per_hour,
+            "agents": agents_list,
         }
 
     async def failures(self, hours: int = 24) -> list[dict[str, Any]]:

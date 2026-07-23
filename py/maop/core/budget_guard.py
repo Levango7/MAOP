@@ -58,6 +58,14 @@ CREATE TABLE IF NOT EXISTS budget_config (
 """
 
 
+# ── Parallel Implementation Note ──────────────────────────────
+# NOTE: BudgetGuard (SQLite-backed, this class) is one of two parallel
+# budget implementations. The other is BudgetGuard (JSON-backed) in
+# maop/model/budget.py. Both have production callers:
+#   - This class (SQLite): used by dashboard/routers/budget.py, dashboard/routers/state.py
+#   - model/budget.py BudgetGuard (JSON): used by maop_loop.py, delegate/dispatcher.py
+# Future work: consider merging into a single canonical implementation.
+
 class BudgetGuard:
     """Enforce daily token and cost budgets for LLM calls.
 

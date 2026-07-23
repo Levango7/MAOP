@@ -1,4 +1,4 @@
-﻿"""MAOP MCP Registry — Manage multiple MCP server connections.
+"""MAOP MCP Registry — Manage multiple MCP server connections.
 
 Central registry for all MCP client connections. Provides:
   - Unified tool namespace (server_name.tool_name)
@@ -50,6 +50,14 @@ from maop.core.mcp_client import MCPClient, MCPServerConfig, MCPToolDef, MCPTool
 
 logger = logging.getLogger(__name__)
 
+
+# ── Parallel Implementation Note ──────────────────────────────
+# NOTE: MCPRegistry is one of two parallel MCP management implementations.
+# The other is MCPHub in maop/core/mcp_hub.py.
+# Both have production callers:
+#   - MCPRegistry (this class): used by core/function_call.py, core/tool_schema.py
+#   - MCPHub: used by core/mcp_adapter.py, core/mcp_discovery.py
+# Future work: consider merging into a single canonical implementation.
 
 class MCPRegistry:
     """Central registry for MCP server connections.

@@ -1,4 +1,4 @@
-﻿"""MAOP Circuit Breaker — agent call circuit-breaker with SQLite persistence,
+"""MAOP Circuit Breaker — agent call circuit-breaker with SQLite persistence,
 failover chains, and health-check recovery.
 
 State machine per agent:
@@ -463,7 +463,8 @@ class CircuitBreaker:
                     half_open_agents.append((agent_name, entry))
 
         if not half_open_agents:
-            return {name: entry.state for name, entry in self._data.items()}
+            async with self._async_lock:
+                return {name: entry.state for name, entry in self._data.items()}
 
         # Probe outside lock to avoid blocking other operations
         for agent_name, entry in half_open_agents:
@@ -487,7 +488,8 @@ class CircuitBreaker:
                 )
             logger.info("[breaker] Health check: %s recovered to CLOSED (probed)", agent_name)
 
-        return {name: entry.state for name, entry in self._data.items()}
+        async with self._async_lock:
+            return {name: entry.state for name, entry in self._data.items()}
 
     def get_open_agents(self) -> list[str]:
         """Return list of agents currently in OPEN state."""
@@ -634,9 +636,10 @@ class CircuitBreaker:
                 if entry.last_failure is not None:
                     elapsed = time.time() - entry.last_failure
                     if elapsed >= entry.cooldown_s:
+                        old_state = entry.state
                         entry.state = BreakerState.HALF_OPEN
                         await asyncio.get_running_loop().run_in_executor(
-                            None, lambda: self._save_agent(agent_name, entry)
+                            None, lambda: self._save_agent(agent_name, entry, old_state=old_state)
                         )
                         return True
                 return False

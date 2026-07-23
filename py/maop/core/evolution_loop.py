@@ -121,6 +121,14 @@ CREATE INDEX IF NOT EXISTS idx_evo_cycles_started ON evolution_cycles(started_at
 """
 
 
+# ── Parallel Implementation Note ──────────────────────────────
+# NOTE: EvolutionLoop is one of two parallel self-evolution implementations.
+# The other is EvolveEngine in maop/evolve.py.
+# Both have production callers:
+#   - EvolutionLoop (this class): used by core/three_layer_memory.py (consolidation)
+#   - EvolveEngine: used by maop_loop.py (main loop), dashboard/routers/evolve.py
+# Future work: consider merging into a single canonical implementation.
+
 class EvolutionLoop:
     """Closed-loop self-evolution orchestrator.
 

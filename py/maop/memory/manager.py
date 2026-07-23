@@ -1,4 +1,4 @@
-﻿"""MAOP Three-Layer Memory Manager — Unified interface for Working / Short-term / Long-term memory.
+"""MAOP Three-Layer Memory Manager — Unified interface for Working / Short-term / Long-term memory.
 
 Architecture:
   Layer 1 — Working Memory (current turn)
@@ -70,6 +70,14 @@ class MemoryManagerConfig(BaseModel):
     inject_max_results: int = 5
     inject_max_tokens: int = 800
 
+
+# ── Parallel Implementation Note ──────────────────────────────
+# NOTE: MemoryManager is one of two parallel three-layer memory
+# implementations. The other is ThreeLayerMemory in
+# maop/core/three_layer_memory.py. Both have production callers:
+#   - MemoryManager (this class): used by core/chat_engine.py (main chat)
+#   - ThreeLayerMemory: used by core/agent_performance.py, core/evolution_loop.py
+# Future work: consider merging into a single canonical implementation.
 
 class MemoryManager:
     """Three-layer memory orchestrator.

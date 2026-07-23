@@ -243,6 +243,14 @@ END;
 
 # ── ThreeLayerMemory ─────────────────────────────────────────
 
+# ── Parallel Implementation Note ──────────────────────────────
+# NOTE: ThreeLayerMemory is one of two parallel three-layer memory
+# implementations. The other is MemoryManager in maop/memory/manager.py.
+# Both have production callers:
+#   - ThreeLayerMemory (this class): used by core/agent_performance.py, core/evolution_loop.py
+#   - MemoryManager: used by core/chat_engine.py (main chat engine)
+# Future work: consider merging into a single canonical implementation.
+
 class ThreeLayerMemory:
     """Three-layer memory: Working (LRU) + Episodic (SQLite) + Semantic (Vector).
 

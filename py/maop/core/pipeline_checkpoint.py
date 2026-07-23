@@ -50,6 +50,8 @@ class StepCheckpoint(BaseModel):
     started_at: float = 0.0
     completed_at: float = 0.0
     metadata: dict[str, Any] = Field(default_factory=dict)
+    attempts: int = 0
+    error: str = ""
 
 
 class RunState(BaseModel):
@@ -81,6 +83,8 @@ CREATE TABLE IF NOT EXISTS pipeline_step_checkpoints (
     started_at REAL DEFAULT 0.0,
     completed_at REAL DEFAULT 0.0,
     metadata TEXT DEFAULT '{}',
+    attempts INTEGER DEFAULT 0,
+    error TEXT DEFAULT '',
     PRIMARY KEY (run_id, step_name)
 );
 
@@ -188,7 +192,7 @@ class PipelineCheckpoint:
         with self._connect() as conn:
             conn.execute(
                 """UPDATE pipeline_step_checkpoints
-                   SET status = 'failed', output = ?, completed_at = ?, metadata = ?
+                   SET status = 'failed', error = ?, completed_at = ?, metadata = ?
                    WHERE run_id = ? AND step_name = ?""",
                 (error, now, json.dumps(metadata or {}), run_id, step_name),
             )
@@ -204,7 +208,7 @@ class PipelineCheckpoint:
         with self._connect() as conn:
             conn.execute(
                 """UPDATE pipeline_step_checkpoints
-                   SET status = 'running', started_at = ?
+                   SET status = 'running', started_at = ?, attempts = attempts + 1
                    WHERE run_id = ? AND step_name = ?""",
                 (now, run_id, step_name),
             )
@@ -261,6 +265,8 @@ class PipelineCheckpoint:
                 started_at=d.get("started_at", 0.0),
                 completed_at=d.get("completed_at", 0.0),
                 metadata=json.loads(d.get("metadata", "{}")),
+                attempts=d.get("attempts", 0),
+                error=d.get("error", ""),
             ))
 
         return RunState(

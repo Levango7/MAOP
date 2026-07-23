@@ -1,4 +1,4 @@
-﻿"""BudgetGuard — Cost tracking and budget enforcement."""
+"""BudgetGuard — Cost tracking and budget enforcement."""
 
 from __future__ import annotations
 
@@ -11,6 +11,14 @@ from maop.model.schema import BudgetConfig
 
 logger = logging.getLogger(__name__)
 
+
+# ── Parallel Implementation Note ──────────────────────────────
+# NOTE: BudgetGuard (JSON-backed, this class) is one of two parallel
+# budget implementations. The other is BudgetGuard (SQLite-backed) in
+# maop/core/budget_guard.py. Both have production callers:
+#   - This class (JSON): used by maop_loop.py, delegate/dispatcher.py (main loop)
+#   - core/budget_guard.py BudgetGuard (SQLite): used by dashboard/routers/budget.py
+# Future work: consider merging into a single canonical implementation.
 
 class BudgetGuard:
     """Tracks spending and enforces budget limits.

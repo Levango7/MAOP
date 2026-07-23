@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -100,12 +101,11 @@ def _load_observability_data_from_db(db_path: Path) -> list[dict[str, Any]]:
         return []
     try:
         import sqlite3
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT agent, routing_key, exit_code, duration_ms FROM delegations ORDER BY id DESC LIMIT 5000"
-        ).fetchall()
-        conn.close()
+        with sqlite3.connect(str(db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT agent, routing_key, exit_code, duration_ms FROM delegations ORDER BY id DESC LIMIT 5000"
+            ).fetchall()
         return [
             {
                 "agent": r["agent"] or "unknown",
@@ -277,6 +277,14 @@ def _generate_suggestions(stats: EvolutionStats, data: list[dict]) -> list[Sugge
 
 # ── Evolve Engine ─────────────────────────────────────────────
 
+# ── Parallel Implementation Note ──────────────────────────────
+# NOTE: EvolveEngine is one of two parallel self-evolution implementations.
+# The other is EvolutionLoop in maop/core/evolution_loop.py.
+# Both have production callers:
+#   - EvolveEngine (this class): used by maop_loop.py (main loop), dashboard/routers/evolve.py
+#   - EvolutionLoop: used by core/three_layer_memory.py (consolidation)
+# Future work: consider merging into a single canonical implementation.
+
 class EvolveEngine:
     """Self-evolution engine for MAOP.
 
@@ -335,6 +343,8 @@ class EvolveEngine:
         suggestions = self._load_suggestions()
         for s in suggestions:
             if s.id == suggestion_id:
+                if not s.auto_applicable:
+                    return EvolveResult(action="promote", applied=s)
                 s.applied = True
                 self._save_suggestions(suggestions)
                 self._apply_to_agents_yaml(s)
@@ -374,6 +384,7 @@ class EvolveEngine:
             agent_cfg["enabled"] = False
 
         try:
+            shutil.copy2(agents_yaml, str(agents_yaml) + ".bak")
             with open(agents_yaml, "w", encoding="utf-8") as f:
                 yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
             logger.info("[evolve] Updated agents.yaml for suggestion %s", suggestion.id)

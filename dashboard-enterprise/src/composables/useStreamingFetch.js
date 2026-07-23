@@ -57,6 +57,7 @@ export function useStreamingFetch() {
       const decoder = new TextDecoder();
       let fullContent = '';
       let buffer = '';
+      let currentEvent = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -67,6 +68,10 @@ export function useStreamingFetch() {
         buffer = lines.pop() || '';
 
         for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+            continue;
+          }
           if (!line.startsWith('data: ')) continue;
           const data = line.slice(6).trim();
           if (data === '[DONE]') {
@@ -75,6 +80,14 @@ export function useStreamingFetch() {
           }
           try {
             const parsed = JSON.parse(data);
+            if (currentEvent === 'error' || parsed.error) {
+              const errMsg = typeof parsed.error === 'string'
+                ? parsed.error
+                : (parsed.error && parsed.error.message) || 'Stream error';
+              if (onError) onError(errMsg);
+              currentEvent = '';
+              return;
+            }
             if (parsed.content) {
               fullContent += parsed.content;
               if (onData) onData(fullContent, parsed);
@@ -89,6 +102,7 @@ export function useStreamingFetch() {
           } catch {
             // Non-JSON data line, skip
           }
+          currentEvent = '';
         }
       }
 

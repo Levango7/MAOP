@@ -107,7 +107,7 @@ async function loadStats() {
   try {
     const r = await api.get('/api/report?hours=24');
     // F-P0-2 fix: use actual backend response fields
-    agentCount.value = r.by_agent?.length || 0;
+    agentCount.value = Object.keys(r.by_agent || {}).length;
     memEntries.value = 0;  // not available in report
     costToday.value = '0.00';  // not available in report
     taskCount.value = r.total_delegations || 0;

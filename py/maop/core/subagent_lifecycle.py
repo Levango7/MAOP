@@ -126,6 +126,14 @@ CREATE INDEX IF NOT EXISTS idx_st_agent ON subagent_transcripts(agent_id);
 """
 
 
+# ── Parallel Implementation Note ──────────────────────────────
+# NOTE: SubAgentManager is one of two parallel subagent implementations.
+# The other is SubagentManager in maop/core/subagent_delegation.py.
+# Both have production callers:
+#   - SubAgentManager (this class): used by dashboard/routers/subagent.py
+#   - SubagentManager: used by delegate/dispatcher.py (main dispatch path)
+# Future work: consider merging into a single canonical implementation.
+
 class SubAgentManager:
     """Manage sub-agent lifecycle: spawn, wait, cancel, transcript.
 

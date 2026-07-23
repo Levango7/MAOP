@@ -215,10 +215,14 @@ def _topological_sort(steps: list[WorkflowStep]) -> list[list[WorkflowStep]]:
                     next_ready.append(dep_id)
         ready = next_ready
 
-    # Add any remaining (cycle or orphan)
+    # Detect cycles: any remaining (unvisited) nodes are part of a cycle.
     remaining = [step_map[sid] for sid in step_map if sid not in visited]
     if remaining:
-        layers.append(remaining)
+        # Hard constraint: DAG execution must check for cyclic dependencies
+        # and throw ValueError with cycle chain.
+        remaining_ids = [s.id for s in remaining]
+        cycle_chain = remaining_ids + [remaining_ids[0]]
+        raise ValueError(f"Cycle detected: {' -> '.join(cycle_chain)}")
 
     return layers
 

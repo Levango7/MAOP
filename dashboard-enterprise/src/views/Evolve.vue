@@ -122,7 +122,8 @@ async function triggerEvolve() {
 
 onMounted(async () => {
   try {
-    const data = await api.get('/api/evolve/status');
+    const resp = await api.get('/api/evolve/status');
+    const data = resp.data || resp;
     totalEvolutions.value = data.total_evolutions || 0;
     successRate.value = data.success_rate || 0;
     activeStrategies.value = data.active_strategies || strategies.value.filter(s => s.enabled).length;

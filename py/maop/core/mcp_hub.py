@@ -327,6 +327,14 @@ class _WebSocketTransport:
         return self._ws is not None and self._ws.open
 
 
+# ── Parallel Implementation Note ──────────────────────────────
+# NOTE: MCPHub is one of two parallel MCP management implementations.
+# The other is MCPRegistry in maop/core/mcp_registry.py.
+# Both have production callers:
+#   - MCPHub (this class): used by core/mcp_adapter.py, core/mcp_discovery.py
+#   - MCPRegistry: used by core/function_call.py, core/tool_schema.py
+# Future work: consider merging into a single canonical implementation.
+
 class MCPHub:
     """MCP Protocol Center — manage MCP server connections and tools.
 

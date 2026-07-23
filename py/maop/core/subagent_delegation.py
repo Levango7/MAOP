@@ -1,4 +1,4 @@
-﻿"""MAOP Subagent System — Hierarchical agent delegation with lifecycle management.
+"""MAOP Subagent System — Hierarchical agent delegation with lifecycle management.
 
 Provides:
   - AgentTree: parent/child relationship tracking
@@ -62,6 +62,14 @@ class AgentTreeNode(BaseModel):
 
 
 # ── SubagentManager ─────────────────────────────────────────────
+
+# ── Parallel Implementation Note ──────────────────────────────
+# NOTE: SubagentManager is one of two parallel subagent implementations.
+# The other is SubAgentManager in maop/core/subagent_lifecycle.py.
+# Both have production callers:
+#   - SubagentManager (this class): used by delegate/dispatcher.py (main dispatch)
+#   - SubAgentManager: used by dashboard/routers/subagent.py (dashboard API)
+# Future work: consider merging into a single canonical implementation.
 
 class SubagentManager:
     """Manage hierarchical agent delegation and inter-agent communication."""
