@@ -391,33 +391,43 @@ async def api_providers() -> Any:
 
 
 @router.get("/api/logs")
-async def api_logs(type: str = "") -> Any:
+async def api_logs(type: str = "", limit: int = Query(500, ge=1, le=5000)) -> Any:
+    """Read log files with bounded size (P2-9 fix: prevents unbounded read_text).
+
+    Args:
+        type: log type name (dashboard, delegations, checker, etc.)
+        limit: max number of lines to return (default 500, max 5000)
+    """
     log_name = type if type and type != "all" else "dashboard"
     if log_name == "delegations":
-        return await get_bridge().logs_get(name="delegations")
+        return await get_bridge().logs_get(name="delegations", limit=limit)
     elif log_name == "checker":
-        return await get_bridge().logs_get(name="checker")
-    result = await get_bridge().logs_get(name=log_name)
+        return await get_bridge().logs_get(name="checker", limit=limit)
+    result = await get_bridge().logs_get(name=log_name, limit=limit)
     log_dir = MAOP_ROOT / "logs"
     if log_dir.exists():
         for f in sorted(log_dir.glob(f"*{log_name}*"), reverse=True):
             try:
-                content = f.read_text(encoding="utf-8", errors="replace")
+                # P2-9 fix: bounded read — only tail last `limit` lines
+                import collections
+                with open(f, encoding="utf-8", errors="replace") as fh:
+                    tail = collections.deque(fh, maxlen=limit)
+                content = "\n".join(tail)
                 if content:
-                    return {"content": content, "source": str(f), "type": log_name}
+                    return {"content": content, "source": str(f), "type": log_name, "lines": len(tail)}
             except Exception as exc:
                 logger.warning('Failed to read log file: %s', exc)
     return result
 
 
 @router.get("/api/logs/delegations")
-async def api_logs_delegations() -> Any:
-    return await get_bridge().logs_get(name="delegations")
+async def api_logs_delegations(limit: int = Query(500, ge=1, le=5000)) -> Any:
+    return await get_bridge().logs_get(name="delegations", limit=limit)
 
 
 @router.get("/api/logs/checker")
-async def api_logs_checker() -> Any:
-    return await get_bridge().logs_get(name="checker")
+async def api_logs_checker(limit: int = Query(500, ge=1, le=5000)) -> Any:
+    return await get_bridge().logs_get(name="checker", limit=limit)
 
 
 @router.get("/api/logs/analysis")

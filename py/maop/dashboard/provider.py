@@ -304,10 +304,11 @@ def create_app(root_dir: str | Path | None = None) -> Any:
     provider = DashboardProvider(root_dir=root_dir)
     app = FastAPI(title="MAOP Dashboard", version="1.0.0")
 
-    @app.get("/", response_class=HTMLResponse)
+    @app.get("/")
     async def index():
-        state = await provider.async_get_state()
-        return _render_html(state)
+        """P2-8 fix: redirect to Vue3 SPA instead of rendering deprecated HTML."""
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/index.html")
 
     @app.get("/api/state")
     async def api_state():
@@ -354,24 +355,12 @@ def _render_html(state: DashboardState) -> str:
     """Render minimal dashboard HTML.
 
     .. deprecated:: 4.0.0
-       This function was the v3.x-era static HTML renderer for the zero-build
-       native JS dashboard. As of t20 (2026-07-21) the frontend has been
-       unified to a single Vue3 SPA built by Vite (dashboard/dist-enterprise/).
-       The native JS dashboard is archived under archive/js-dashboard/.
+       This function is the v3.x-era static HTML renderer. As of P2-8c fix,
+       ``create_app()`` no longer calls this function (it redirects to the
+       Vue3 SPA instead). The function is retained solely for backward
+       compatibility with test_provider.py and test_phase7.py.
 
-       The function is retained only because:
-         1. ``create_app()`` registers a ``GET /`` fallback that calls it.
-         2. ``__init__.py`` re-exports it.
-         3. test_provider.py / test_phase7.py assert on its output.
-
-       Migration path (future PR):
-         - Replace ``GET /`` with a redirect to the Vue3 SPA index.html
-           (already served by server.py via StaticFiles mount).
-         - Move metric-card semantics into Settings.vue's About panel
-           (done in t21).
-         - Remove this function and its tests once all callers migrate.
-
-       Emits a one-time DeprecationWarning on first call.
+       Emits a DeprecationWarning on every call.
     """
     import warnings as _w
     _w.warn(
