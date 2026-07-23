@@ -1,4 +1,4 @@
-﻿"""Data query/read endpoints for MAOP Dashboard.
+"""Data query/read endpoints for MAOP Dashboard.
 
 Aggregates all read-only data endpoints organized by domain:
   - Overview: report, agents, timeseries, metrics, live, failures, chain, optimizer, batch
@@ -25,23 +25,41 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _request_tenant_id(request: Request) -> str:
+    tid = getattr(request.state, "tenant_id", "")
+    return tid or ""
+
+
+def _tenant_filter(data: Any, tenant_id: str) -> Any:
+    if not tenant_id:
+        return data
+    if isinstance(data, dict):
+        return {k: _tenant_filter(v, tenant_id) for k, v in data.items()}
+    if isinstance(data, list):
+        return [
+            _tenant_filter(it, tenant_id) for it in data
+            if not (isinstance(it, dict) and it.get("tenant_id") and it.get("tenant_id") != tenant_id)
+        ]
+    return data
+
+
 # ── Overview ────────────────────────────────────────────────────────────
 
 @router.get("/api/report")
-async def api_report(request: Request) -> Any:
+async def api_report(request: Request, hours: int = Query(48, ge=1, le=720)) -> Any:
     require_admin(request)
-    return await get_bridge().report(hours=48)
+    return _tenant_filter(await get_bridge().report(hours=hours), _tenant_id(request))
 
 
-@router.get("/api/agents")
-async def api_agents() -> Any:
+@router.get("/api/agents/stats")
+async def api_agents_stats(request: Request) -> Any:
     agents = await get_bridge().agent_stats()
-    return {"agents": agents, "count": len(agents)}
+    return _tenant_filter({"agents": agents, "count": len(agents)}, _request_tenant_id(request))
 
 
 @router.get("/api/timeseries")
-async def api_timeseries() -> Any:
-    return await get_bridge().timeseries(hours=168)
+async def api_timeseries(request: Request) -> Any:
+    return _tenant_filter(await get_bridge().timeseries(hours=168), _request_tenant_id(request))
 
 
 @router.get("/api/metrics")
@@ -70,7 +88,7 @@ async def api_metrics(request: Request) -> Any:
         cb = CircuitBreaker(MAOP_ROOT / "data" / "maop.db")
         result["circuit_breaker"] = {
             name: {"state": entry.state.value, "failures": entry.failures}
-            for name, entry in cb._data.items()
+            for name, entry in cb.all_states().items()
         }
     except Exception as exc:
         logger.error('Circuit breaker stats failed: %s', exc)
@@ -82,34 +100,34 @@ async def api_metrics(request: Request) -> Any:
     except Exception as exc:
         logger.error('Cache stats failed: %s', exc)
         result["cache"] = {"status": "error", "error": "Cache stats unavailable"}
-    return result
+    return _tenant_filter(result, _request_tenant_id(request))
 
 
 @router.get("/api/live")
 async def api_live(request: Request) -> Any:
     require_admin(request)
-    return await get_bridge().live()
+    return _tenant_filter(await get_bridge().live(), _request_tenant_id(request))
 
 
 @router.get("/api/snapshot")
 async def api_snapshot(request: Request) -> Any:
     """F-P0-2 fix: Aggregate snapshot for Overview.vue health metrics."""
     require_admin(request)
-    return await get_bridge().snapshot()
+    return _tenant_filter(await get_bridge().snapshot(), _request_tenant_id(request))
 
 
 @router.get("/api/failures")
-async def api_failures() -> Any:
-    return await get_bridge().failures()
+async def api_failures(request: Request) -> Any:
+    return _tenant_filter(await get_bridge().failures(), _request_tenant_id(request))
 
 
 @router.get("/api/chain")
-async def api_chain() -> Any:
-    return await get_bridge().chain()
+async def api_chain(request: Request) -> Any:
+    return _tenant_filter(await get_bridge().chain(), _request_tenant_id(request))
 
 
 @router.get("/api/optimizer")
-async def api_optimizer() -> Any:
+async def api_optimizer(request: Request) -> Any:
     try:
         bridge = get_bridge()
         report = await bridge.report()
@@ -120,17 +138,17 @@ async def api_optimizer() -> Any:
             cache_stats = {"hits": c.hits if hasattr(c, "hits") else 0, "misses": c.misses if hasattr(c, "misses") else 0}
         except Exception as exc:
             logger.warning('Failed to get cache stats: %s', exc)
-        return {"report": report, "cache": cache_stats,
+        return _tenant_filter({"report": report, "cache": cache_stats,
                 "recommendations": ["Enable parallel execution for independent subtasks",
                                     "Increase cache TTL for stable results",
-                                    "Use LoadBalancer for multi-agent tasks"]}
+                                    "Use LoadBalancer for multi-agent tasks"]}, _request_tenant_id(request))
     except Exception as exc:
         logger.error('Optimizer report failed: %s', exc)
         return {"status": "error", "error": "Optimizer report unavailable"}
 
 
 @router.get("/api/batch", deprecated=True, description="Deprecated: use individual /api/* endpoints. Frontend does not call this.")
-async def api_batch(keys: str = Query("")) -> Any:
+async def api_batch(request: Request, keys: str = Query("")) -> Any:
     if not keys:
         return {}
     requested = [k.strip() for k in keys.split(",") if k.strip()]
@@ -152,7 +170,7 @@ async def api_batch(keys: str = Query("")) -> Any:
     for key in requested:
         if key in dispatch:
             result[key] = await dispatch[key]()
-    return result
+    return _tenant_filter(result, _request_tenant_id(request))
 
 
 # ── Graph ───────────────────────────────────────────────────────────────
@@ -414,7 +432,27 @@ async def api_logs(type: str = "", limit: int = Query(500, ge=1, le=5000)) -> An
                     tail = collections.deque(fh, maxlen=limit)
                 content = "\n".join(tail)
                 if content:
-                    return {"content": content, "source": str(f), "type": log_name, "lines": len(tail)}
+                    import re
+                    entries = []
+                    _log_re = re.compile(
+                        r'^(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s*'
+                        r'(?:\[(?P<level>\w+)\])?\s*'
+                        r'(?:\[(?P<agent>[^\]]+)\])?\s*'
+                        r'(?P<msg>.*)$'
+                    )
+                    for raw in tail:
+                        line = raw.rstrip('\r\n')
+                        m = _log_re.match(line)
+                        if m:
+                            entries.append({
+                                "ts": m.group("ts"),
+                                "level": (m.group("level") or "info").lower(),
+                                "agent": m.group("agent") or "system",
+                                "msg": m.group("msg") or line,
+                            })
+                        else:
+                            entries.append({"ts": None, "level": "info", "agent": "system", "msg": line})
+                    return {"logs": entries, "count": len(entries), "source": str(f), "type": log_name}
             except Exception as exc:
                 logger.warning('Failed to read log file: %s', exc)
     return result

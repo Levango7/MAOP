@@ -86,7 +86,7 @@ class TestBasicEndpoints:
         mock_bridge.report.assert_awaited_once()
 
     def test_agents(self, client, mock_bridge):
-        resp = client.get("/api/agents")
+        resp = client.get("/api/agents/stats")
         assert resp.status_code == 200
         assert "agents" in resp.json()
 

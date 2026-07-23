@@ -523,13 +523,52 @@ class Dispatcher:
                 self._effective_model = None
 
         # 2. Circuit-breaker check
-        if not self._breaker.is_available(agent):
+        if not await self._breaker.ais_available(agent):
+            # Attempt failover to a fallback agent before giving up.
+            try:
+                failover = self._breaker.resolve_failover(agent)
+            except Exception as exc:
+                logger.warning("[dispatch] resolve_failover raised for '%s': %s", agent, exc)
+                failover = None
+            if failover is not None and failover.agent:
+                logger.info(
+                    "[dispatch] Circuit OPEN for '%s', failing over to '%s' (degraded=%s)",
+                    agent, failover.agent, failover.degraded,
+                )
+                return await self._dispatch_impl(
+                    failover.agent, task,
+                    routing_key=routing_key, workdir=workdir,
+                    timeout_seconds=timeout_seconds, trace_id=trace_id,
+                    streamer=streamer,
+                )
             result = new_result(
                 agent=agent, task=task,
                 exit_code=-3, error=f"Circuit breaker OPEN for '{agent}'",
                 trace_id=trace_id, routing_key=routing_key,
             )
             return DispatchResult(result=result, breaker_tripped=True)
+
+        # 2.5. Budget check - reject if daily/monthly budget already exceeded.
+        # Non-blocking: any failure in BudgetGuard itself must NOT prevent
+        # normal dispatch (only log a warning).
+        try:
+            from maop.model.budget import BudgetGuard
+            _bg_config = getattr(self._config, "budget", None)
+            _budget_guard = BudgetGuard(root_dir=self._root_dir, config=_bg_config)
+            if not _budget_guard.can_spend(estimated_cost=0.0):
+                logger.warning(
+                    "[dispatch] Budget EXCEEDED for agent='%s' - rejecting task (trace_id=%s)",
+                    agent, trace_id,
+                )
+                result = new_result(
+                    agent=agent, task=task,
+                    exit_code=-6, error="Budget EXCEEDED - daily or monthly limit reached",
+                    trace_id=trace_id, routing_key=routing_key,
+                )
+                return DispatchResult(result=result, breaker_tripped=False)
+        except Exception as exc:
+            # Conservative: budget check failure must not block dispatch.
+            logger.warning("[dispatch] BudgetGuard check unavailable (non-blocking): %s", exc)
 
         # 3. Determine timeout
         timeout = timeout_seconds or config.timeout_s
@@ -542,6 +581,8 @@ class Dispatcher:
                 exit_code=-2, error=f"Unknown driver: {config.driver}",
                 trace_id=trace_id, routing_key=routing_key,
             )
+            await self._breaker.arecord_failure(agent)
+            self._notify_route_scorer(agent, success=False)
             return DispatchResult(result=result, breaker_tripped=False)
 
         # 4. Execute via driver — wrap in try/except to ensure failures are recorded
@@ -553,8 +594,8 @@ class Dispatcher:
             lb = _get_load_balancer()
             if lb:
                 lb.record_start(agent, trace_id or task[:32])
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("LoadBalancer record failed: %s", exc)
         try:
             result = await driver_fn(config, task, timeout, workdir, trace_id, streamer=streamer)  # type: ignore[call-arg]
             result.routing_key = routing_key
@@ -575,8 +616,8 @@ class Dispatcher:
                     duration_ms=(_time.monotonic() - _dispatch_start) * 1000,
                     success=result.is_success(),
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("LoadBalancer record failed: %s", exc)
 
         # 5. Record in circuit-breaker and route scorer cooldown
         if result.is_success():

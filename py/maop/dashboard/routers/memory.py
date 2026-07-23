@@ -1,4 +1,4 @@
-﻿"""Memory and neural mechanism endpoints for MAOP Dashboard."""
+"""Memory and neural mechanism endpoints for MAOP Dashboard."""
 
 from __future__ import annotations
 
@@ -14,9 +14,27 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+def _request_tenant_id(request: Request) -> str:
+    tid = getattr(request.state, "tenant_id", "")
+    return tid or ""
+
+
+def _tenant_filter(data: Any, tenant_id: str) -> Any:
+    if not tenant_id:
+        return data
+    if isinstance(data, dict):
+        return {k: _tenant_filter(v, tenant_id) for k, v in data.items()}
+    if isinstance(data, list):
+        return [
+            _tenant_filter(it, tenant_id) for it in data
+            if not (isinstance(it, dict) and it.get("tenant_id") and it.get("tenant_id") != tenant_id)
+        ]
+    return data
+
+
 @router.get("/api/memory/deep")
 @handle_api_errors("Memory deep stats", error_value={"status": "error", "error": "Memory stats unavailable", "stats": {}})
-async def api_memory_deep() -> Any:
+async def api_memory_deep(request: Request) -> Any:
     from maop.memory.store import MemoryStore
     store = MemoryStore(root_dir=str(MAOP_ROOT))
     stats_obj = store.stats()
@@ -48,12 +66,12 @@ async def api_memory_deep() -> Any:
             recent.append(r)
         else:
             recent.append({"content": str(r)})
-    stats["recent_entries"] = recent
+    stats["recent_entries"] = _tenant_filter(recent, _request_tenant_id(request))
     return {"status": "ok", "stats": stats}
 
 @router.get("/api/memory/search")
 @handle_api_errors("Memory search", error_value={"status": "error", "error": "Memory search unavailable", "results": []})
-async def api_memory_search(q: str = Query(""), k: int = Query(10, alias="topk")) -> Any:
+async def api_memory_search(request: Request, q: str = Query(""), k: int = Query(10, alias="topk")) -> Any:
     from maop.memory.store import MemoryStore
     store = MemoryStore(root_dir=str(MAOP_ROOT))
     raw_results = store.search(query=q, top=k) if q else []
@@ -65,11 +83,11 @@ async def api_memory_search(q: str = Query(""), k: int = Query(10, alias="topk")
             results.append(r)
         else:
             results.append({"content": str(r), "score": 0})
-    return {"status": "ok", "query": q, "results": results, "count": len(results)}
+    return {"status": "ok", "query": q, "results": (_rf := _tenant_filter(results, _request_tenant_id(request))), "count": len(_rf)}
 
 @router.get("/api/memory/trace")
 @handle_api_errors("Memory trace", error_value={"traces": [], "count": 0, "error": "Memory trace unavailable"})
-async def api_memory_trace(agent: str = Query("")) -> Any:
+async def api_memory_trace(request: Request, agent: str = Query("")) -> Any:
     from maop.memory.store import MemoryStore
     store = MemoryStore(root_dir=str(MAOP_ROOT))
     results = store.search(query="", top=50) if hasattr(store, "search") else []
@@ -86,7 +104,7 @@ async def api_memory_trace(agent: str = Query("")) -> Any:
         traces.append({"agent": r_dict.get("agent", "unknown"), "topic": r_dict.get("topic", ""),
             "timestamp": r_dict.get("timestamp", ""), "content": r_dict.get("snippet", r_dict.get("highlighted", ""))[:200],
             "tags": r_dict.get("tags", ""), "trace_id": r_dict.get("trace_id", ""), "score": r_dict.get("score", 0)})
-    return {"traces": traces, "count": len(traces), "agent": agent or "all"}
+    return {"traces": (_tf := _tenant_filter(traces, _request_tenant_id(request))), "count": len(_tf), "agent": agent or "all"}
 
 @router.get("/api/memory/stats")
 @handle_api_errors("Memory stats", error_value={"error": "Memory stats unavailable"})

@@ -28,7 +28,7 @@ class RunRequest(BaseModel):
 
 
 class MaintainRequest(BaseModel):
-    action: str | None = Field(default=None, pattern=r"^(cleanup|reset|rebuild|gc|log-rotate|prune|health|backup|cache-clear|reload)$")
+    action: str | None = Field(default=None, pattern=r"^(cleanup|reset|rebuild|gc|log-rotate|prune|health|backup|cache-clear|reload|reindex|vacuum)$")
 
 
 @router.get("/api/control/status")

@@ -172,13 +172,13 @@ async def lifespan(app: FastAPI) -> Any:
         if _backup_scheduler is not None:
             try:
                 _backup_scheduler.stop_scheduler()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("[shutdown] Backup scheduler stop failed: %s", exc)
         if _log_rotate_scheduler is not None:
             try:
                 _log_rotate_scheduler.stop()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("[shutdown] Log-rotate scheduler stop failed: %s", exc)
 
 
 # ── App ────────────────────────────────────────────────────────────
@@ -223,6 +223,7 @@ app.add_middleware(
         "/api/docs", "/openapi.json",
         "/api/auth/status", "/api/auth/login",
         "/api/csp-report",
+        "/api/stream",  # P0 fix: SSE token validated via _check_sse_token in handler
     ],
 )
 # CSP & security headers (Content-Security-Policy, X-Frame-Options, etc.)
@@ -459,9 +460,16 @@ if _public_dir.exists():
 # ── Health ─────────────────────────────────────────────────────────
 @app.get("/api/health")
 async def health() -> Any:
+    active_agents = 0
+    try:
+        _agents = await _state.get_bridge().agent_stats()
+        active_agents = len(_agents) if isinstance(_agents, list) else 0
+    except Exception:
+        pass
     return {"status": "ok", "version": MAOP_VERSION, "edition": get_edition().value,
             "dashboard": f"MAOP Dashboard v{MAOP_VERSION} (FastAPI)",
             "uptime_ms": round((time.time() - _state.start_time) * 1000),
+            "active_agents": active_agents,
             "tls": _state.tls_enabled, "auth": _state.auth_enabled, "rate_limit": _state.rl_enabled}
 
 # ── CSP Violation Report Endpoint ──────────────────────────────────

@@ -1,4 +1,4 @@
-﻿"""MAOP Dashboard — Streaming API routes.
+"""MAOP Dashboard — Streaming API routes.
 
 SSE endpoints for real-time agent output streaming.
 """
@@ -29,10 +29,10 @@ def _check_sse_token(request: Request) -> None:
         return  # let require_admin handle the missing-auth case
     try:
         mgr = get_auth_mgr()
-        payload = mgr.jwt_handler.verify_token(token)
-        if payload:
-            request.state.auth_roles = payload.get("roles", [])
-            request.state.auth_identity = payload.get("sub", "anonymous")
+        result = mgr.jwt_handler.validate_token(token)
+        if result and result.authenticated:
+            request.state.auth_roles = result.roles
+            request.state.auth_identity = result.identity
     except Exception:
         pass  # invalid token → require_admin will reject
 
@@ -102,6 +102,7 @@ async def list_active_streams(request: Request) -> Any:
 @handle_api_errors
 async def stream_trace(trace_id: str, request: Request) -> Any:
     """SSE endpoint: subscribe to real-time output for a running execution."""
+    _check_sse_token(request)
     require_admin(request)
     from maop.core.streaming import get_stream_registry
 

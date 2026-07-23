@@ -68,6 +68,7 @@ def run() -> None:
     logger.info("Worker ready — consuming from queue...")
 
     while not _shutdown:
+        msg = None
         try:
             msg = queue.dequeue(
                 topic="agent_tasks",
@@ -80,23 +81,36 @@ def run() -> None:
 
             logger.info("Executing task: %s (id=%s)", msg.payload.get("task", "")[:80], msg.id)
 
-            result = asyncio.run(dispatcher.dispatch(
-                agent=msg.payload.get("agent", "claude"),
-                task=msg.payload.get("task", ""),
-                routing_key=msg.payload.get("routing_key", ""),
-                trace_id=msg.id,
-            ))
+            try:
+                result = asyncio.run(dispatcher.dispatch(
+                    agent=msg.payload.get("agent", "claude"),
+                    task=msg.payload.get("task", ""),
+                    routing_key=msg.payload.get("routing_key", ""),
+                    trace_id=msg.id,
+                ))
 
-            logger.info(
-                "Task completed: agent=%s exit_code=%s",
-                getattr(result, "agent", "unknown"),
-                getattr(result, "exit_code", -1),
-            )
+                logger.info(
+                    "Task completed: agent=%s exit_code=%s",
+                    getattr(result, "agent", "unknown"),
+                    getattr(result, "exit_code", -1),
+                )
+                # P0 fix: ACK on successful dispatch so the message is not
+                # reclaimed by _reclaim_unacked and re-executed (previously
+                # caused each task to run up to 4 times).
+                queue.ack(msg.id, consumer_id="worker-1")
+            except Exception as exc:
+                # P0 fix: NACK on dispatch failure so the message is re-queued
+                # or dead-lettered instead of lingering in 'processing'.
+                logger.error("Dispatch failed for task id=%s: %s", msg.id, exc, exc_info=True)
+                try:
+                    queue.nack(msg.id, error=str(exc))
+                except Exception as nack_exc:
+                    logger.warning("Failed to NACK message %s: %s", msg.id, nack_exc)
+                time.sleep(1)
 
         except Exception as exc:
             logger.error("Worker error: %s", exc, exc_info=True)
             time.sleep(1)
-
     logger.info("Agent Executor Worker shut down.")
 
 
