@@ -32,7 +32,7 @@ class MaintainRequest(BaseModel):
 
 
 @router.get("/api/control/status")
-async def control_status() -> Any:
+async def control_status() -> dict[str, Any]:
     jobs = []
     for jid, job in active_jobs.items():
         proc = job.get("process")
@@ -46,7 +46,7 @@ async def control_status() -> Any:
     return {"active_jobs": jobs, "jobs": jobs, "count": len(jobs)}
 
 @router.post("/api/control/run")
-async def control_run(body: RunRequest, request: Request) -> Any:
+async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     actual_task = body.task or body.workflow or "default"
     job_id = _uuid.uuid4().hex[:8]
@@ -61,7 +61,7 @@ async def control_run(body: RunRequest, request: Request) -> Any:
     return {"job_id": job_id, "status": "started", "task": actual_task}
 
 @router.post("/api/control/pause")
-async def control_pause(request: Request) -> Any:
+async def control_pause(request: Request) -> dict[str, Any]:
     require_admin(request)
     pause_file = MAOP_ROOT / "logs" / ".maop_pause"
     pause_file.parent.mkdir(parents=True, exist_ok=True)
@@ -75,7 +75,7 @@ async def control_pause(request: Request) -> Any:
     return {"status": "ok", "action": "pause", "paused": paused}
 
 @router.post("/api/control/resume")
-async def control_resume(request: Request) -> Any:
+async def control_resume(request: Request) -> dict[str, Any]:
     require_admin(request)
     pause_file = MAOP_ROOT / "logs" / ".maop_pause"
     if pause_file.exists():
@@ -88,7 +88,7 @@ async def control_resume(request: Request) -> Any:
     return {"status": "ok", "action": "resume", "resumed": resumed}
 
 @router.post("/api/control/stop")
-async def control_stop(request: Request) -> Any:
+async def control_stop(request: Request) -> dict[str, Any]:
     require_admin(request)
     stopped = 0
     for jid, job in active_jobs.items():
@@ -100,7 +100,7 @@ async def control_stop(request: Request) -> Any:
     return {"status": "ok", "action": "stop", "stopped": stopped}
 
 @router.post("/api/control/validate")
-async def control_validate(request: Request) -> Any:
+async def control_validate(request: Request) -> dict[str, Any]:
     require_admin(request)
     job_id = _uuid.uuid4().hex[:8]
     try:
@@ -114,7 +114,7 @@ async def control_validate(request: Request) -> Any:
         return {"job_id": job_id, "status": "failed", "error": "Validate failed"}
 
 @router.post("/api/control/doctor")
-async def control_doctor(request: Request) -> Any:
+async def control_doctor(request: Request) -> dict[str, Any]:
     require_admin(request)
     job_id = _uuid.uuid4().hex[:8]
     try:
@@ -128,7 +128,7 @@ async def control_doctor(request: Request) -> Any:
         return {"job_id": job_id, "status": "failed", "error": "Doctor check failed"}
 
 @router.post("/api/control/cancel")
-async def control_cancel(request: Request) -> Any:
+async def control_cancel(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     job_id = body.get("job_id", "")
@@ -141,14 +141,14 @@ async def control_cancel(request: Request) -> Any:
     raise HTTPException(404, "job not found")
 
 @router.post("/api/control/refresh")
-async def control_refresh(request: Request) -> Any:
+async def control_refresh(request: Request) -> dict[str, Any]:
     require_admin(request)
     async with cache_lock:
         cache.clear()
     return {"status": "ok", "cache": "cleared"}
 
 @router.post("/api/control/clear-cache")
-async def control_clear_cache(request: Request) -> Any:
+async def control_clear_cache(request: Request) -> dict[str, Any]:
     require_admin(request)
     async with cache_lock:
         cache.clear()
@@ -156,7 +156,7 @@ async def control_clear_cache(request: Request) -> Any:
 
 
 @router.post("/api/control/provider-health")
-async def control_provider_health(request: Request) -> Any:
+async def control_provider_health(request: Request) -> dict[str, Any]:
     require_admin(request)
     try:
         from maop.deploy import health_check
@@ -167,7 +167,7 @@ async def control_provider_health(request: Request) -> Any:
         return {"status": "error", "error": "Provider health check failed"}
 
 @router.post("/api/control/maintain")
-async def api_control_maintain(body: MaintainRequest, request: Request) -> Any:
+async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     action = body.action
     if action is None:

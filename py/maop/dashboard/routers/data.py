@@ -52,7 +52,7 @@ async def api_report(request: Request, hours: int = Query(48, ge=1, le=720)) -> 
 
 
 @router.get("/api/agents/stats")
-async def api_agents_stats(request: Request) -> Any:
+async def api_agents_stats(request: Request) -> dict[str, Any]:
     agents = await get_bridge().agent_stats()
     return _tenant_filter({"agents": agents, "count": len(agents)}, _request_tenant_id(request))
 
@@ -63,7 +63,7 @@ async def api_timeseries(request: Request) -> Any:
 
 
 @router.get("/api/metrics")
-async def api_metrics(request: Request) -> Any:
+async def api_metrics(request: Request) -> dict[str, Any]:
     require_admin(request)
     """Real-time metrics from LoadBalancer, TimeSeries, and CircuitBreaker."""
     result: dict[str, Any] = {}
@@ -127,7 +127,7 @@ async def api_chain(request: Request) -> Any:
 
 
 @router.get("/api/optimizer")
-async def api_optimizer(request: Request) -> Any:
+async def api_optimizer(request: Request) -> dict[str, Any]:
     try:
         bridge = get_bridge()
         report = await bridge.report()
@@ -148,7 +148,7 @@ async def api_optimizer(request: Request) -> Any:
 
 
 @router.get("/api/batch", deprecated=True, description="Deprecated: use individual /api/* endpoints. Frontend does not call this.")
-async def api_batch(request: Request, keys: str = Query("")) -> Any:
+async def api_batch(request: Request, keys: str = Query("")) -> dict[str, Any]:
     if not keys:
         return {}
     requested = [k.strip() for k in keys.split(",") if k.strip()]
@@ -176,7 +176,7 @@ async def api_batch(request: Request, keys: str = Query("")) -> Any:
 # ── Graph ───────────────────────────────────────────────────────────────
 
 @router.get("/api/graph/stats")
-async def api_graph_stats() -> Any:
+async def api_graph_stats() -> dict[str, Any]:
     try:
         bridge = get_bridge()
         nodes = await bridge.graph_nodes()
@@ -209,7 +209,7 @@ async def api_graph_edges() -> Any:
 
 
 @router.get("/api/graph/neighbors")
-async def api_graph_neighbors(node: str = Query(...)) -> Any:
+async def api_graph_neighbors(node: str = Query(...)) -> dict[str, Any]:
     bridge = get_bridge()
     edges = await bridge.graph_edges()
     neighbors = [e for e in edges if isinstance(e, dict) and (e.get("source") == node or e.get("target") == node)]
@@ -224,7 +224,7 @@ async def api_vector_stats() -> Any:
 
 
 @router.get("/api/vector/list")
-async def api_vector_list() -> Any:
+async def api_vector_list() -> dict[str, Any]:
     try:
         from maop.core.vector import VectorStore
         vs = VectorStore(db_path=str(MAOP_ROOT / "data" / "vectors.db"))
@@ -236,7 +236,7 @@ async def api_vector_list() -> Any:
 
 
 @router.get("/api/vector/search")
-async def api_vector_search(q: str = Query(...), k: int = Query(5, alias="topk")) -> Any:
+async def api_vector_search(q: str = Query(...), k: int = Query(5, alias="topk")) -> dict[str, Any]:
     try:
         from maop.core.vector import VectorStore
         vs = VectorStore(db_path=str(MAOP_ROOT / "data" / "vectors.db"))
@@ -256,7 +256,7 @@ async def api_vector_search(q: str = Query(...), k: int = Query(5, alias="topk")
 
 
 @router.get("/api/wiki/stats")
-async def api_wiki_stats() -> Any:
+async def api_wiki_stats() -> dict[str, Any]:
     base = await get_bridge().memory_stats()
     try:
         from maop.core.vector import VectorStore
@@ -269,7 +269,7 @@ async def api_wiki_stats() -> Any:
 
 
 @router.get("/api/prompts")
-async def api_prompts() -> Any:
+async def api_prompts() -> dict[str, Any]:
     try:
         result = await get_bridge().prompts_list()
         if isinstance(result, dict) and "prompts" in result:
@@ -320,7 +320,7 @@ async def api_teams() -> Any:
 
 
 @router.get("/api/skills")
-async def api_skills() -> Any:
+async def api_skills() -> dict[str, Any]:
     try:
         result = await get_bridge().skills_list()
         items = result if isinstance(result, list) else (result.get("skills", []) if isinstance(result, dict) else [])
@@ -385,7 +385,7 @@ async def api_mcp_tools() -> Any:
 
 
 @router.get("/api/mcp")
-async def api_mcp_combined() -> Any:
+async def api_mcp_combined() -> dict[str, Any]:
     servers = await get_bridge().mcp_servers()
     tools = await get_bridge().mcp_tools()
     return {"servers": servers, "tools": tools, "server_count": len(servers), "tool_count": len(tools)}
@@ -394,7 +394,7 @@ async def api_mcp_combined() -> Any:
 # ── System ──────────────────────────────────────────────────────────────
 
 @router.get("/api/versions")
-async def api_versions() -> Any:
+async def api_versions() -> dict[str, Any]:
     try:
         from maop import __version__ as MAOP_ver
     except ImportError:
@@ -469,7 +469,7 @@ async def api_logs_checker(limit: int = Query(500, ge=1, le=5000)) -> Any:
 
 
 @router.get("/api/logs/analysis")
-async def api_logs_analysis() -> Any:
+async def api_logs_analysis() -> dict[str, Any]:
     try:
         logs = await get_bridge().logs_get(name="delegations")
         if not isinstance(logs, list):

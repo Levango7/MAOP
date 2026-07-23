@@ -1,4 +1,4 @@
-﻿"""MAOP Database Backup — Scheduled SQLite backup with retention policy.
+"""MAOP Database Backup — Scheduled SQLite backup with retention policy.
 
 Provides litestream-style continuous backup for MAOP's SQLite databases:
   - data/maop.db (delegations, metrics, checkpoints, circuit_breaker)
@@ -109,11 +109,24 @@ class DbBackup:
 
     # ── Backup execution ─────────────────────────────────────
 
-    def run(self, db_names: list[str] | None = None) -> list[BackupEntry]:
+    def run(
+        self,
+        db_names: list[str] | None = None,
+        wal_checkpoint: bool = True,
+    ) -> list[BackupEntry]:
         """Run backup for specified databases (or all).
 
         Uses SQLite VACUUM INTO for fast, consistent backup
         without holding a write lock on the source database.
+
+        Parameters
+        ----------
+        wal_checkpoint : bool
+            If True (default), run ``PRAGMA wal_checkpoint(TRUNCATE)`` before
+            VACUUM INTO so WAL-mode databases flush pending frames into the
+            main database file, yielding a more consistent snapshot. The
+            checkpoint waits for active readers and may briefly block. On
+            failure a warning is logged and the backup proceeds.
 
         Returns list of BackupEntry for each successful backup.
         """
@@ -128,7 +141,7 @@ class DbBackup:
                 logger.debug("[backup] Skip %s: not found", db_name)
                 continue
 
-            entry = self._backup_one(db_name, db_path)
+            entry = self._backup_one(db_name, db_path, wal_checkpoint=wal_checkpoint)
             if entry is not None:
                 results.append(entry)
                 self._manifest.append(entry)
@@ -139,8 +152,21 @@ class DbBackup:
 
         return results
 
-    def _backup_one(self, db_name: str, db_path: Path) -> BackupEntry | None:
-        """Backup a single database using VACUUM INTO."""
+    def _backup_one(
+        self,
+        db_name: str,
+        db_path: Path,
+        wal_checkpoint: bool = True,
+    ) -> BackupEntry | None:
+        """Backup a single database using VACUUM INTO.
+
+        When ``wal_checkpoint`` is True, ``PRAGMA wal_checkpoint(TRUNCATE)``
+        is executed first so WAL frames are flushed into the main database
+        file and the WAL is truncated. This gives VACUUM INTO a more
+        consistent snapshot. The checkpoint may briefly block until active
+        readers finish; failures are logged as warnings and do not abort
+        the backup.
+        """
         if not re.match(r'^[a-zA-Z0-9_\-]+\.db$', db_name):
             logger.warning("[backup] Invalid db_name rejected: %s", db_name)
             return None
@@ -155,6 +181,22 @@ class DbBackup:
         try:
             try:
                 with sqlite_connect(db_path, timeout=10, wal=True, foreign_keys=False) as conn:
+                    # Flush WAL frames into the main database so VACUUM INTO
+                    # captures a consistent snapshot. TRUNCATE also resets
+                    # the WAL file to zero size after checkpointing.
+                    if wal_checkpoint:
+                        try:
+                            cur = conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                            row = cur.fetchone() if cur is not None else None
+                            logger.debug(
+                                "[backup] %s wal_checkpoint(TRUNCATE) -> %s",
+                                db_name, row,
+                            )
+                        except Exception as cp_exc:
+                            logger.warning(
+                                "[backup] %s wal_checkpoint failed (continuing): %s",
+                                db_name, cp_exc,
+                            )
                     conn.execute(f"VACUUM INTO '{backup_path}'")
             except Exception:
                 shutil.copy2(str(db_path), str(backup_path))

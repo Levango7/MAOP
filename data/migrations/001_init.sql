@@ -1,10 +1,19 @@
--- PEV Initial Schema Migration v1
+﻿-- PEV Initial Schema Migration v1
 -- Creates all core tables for the PEV orchestration framework.
 -- This migration consolidates the DDL previously embedded in:
 --   core/data.py (SCHEMA_DDL), memory/store.py (_MEMORY_DDL),
 --   core/circuit_breaker.py (_BREAKER_DDL), core/message_queue.py,
 --   core/timeseries.py, core/human_proxy.py, core/kv_store.py,
 --   core/sandbox.py, core/tool_manager.py, core/auth.py, prompt_manager.py
+
+-- ── Schema version tracking ───────────────────────────────────
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+INSERT OR IGNORE INTO schema_migrations (version, name) VALUES ('001', 'init');
 
 -- ── Core operational tables ──────────────────────────────────
 

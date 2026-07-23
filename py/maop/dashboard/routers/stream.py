@@ -90,7 +90,7 @@ async def global_state_stream(request: Request) -> Any:
 
 @router.get("/active")
 @handle_api_errors
-async def list_active_streams(request: Request) -> Any:
+async def list_active_streams(request: Request) -> dict[str, Any]:
     """List all currently active streaming executions."""
     require_admin(request)
     from maop.core.streaming import get_stream_registry
