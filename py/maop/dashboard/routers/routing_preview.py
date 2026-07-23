@@ -76,8 +76,9 @@ async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any
 
 
 @router.get("/cooldowns")
-async def get_cooldowns() -> dict[str, Any]:
+async def get_cooldowns(request: Request) -> dict[str, Any]:
     """Get all agents currently in cooldown (recently failed)."""
+    require_admin(request)
     scorer = get_route_scorer()
     cooldowns = scorer.get_cooldown_status()
     return {
@@ -87,8 +88,9 @@ async def get_cooldowns() -> dict[str, Any]:
 
 
 @router.get("/scores")
-async def get_route_scores(task: str = "") -> dict[str, Any]:
+async def get_route_scores(request: Request, task: str = "") -> dict[str, Any]:
     """Get scores for all routes against a given task."""
+    require_admin(request)
     if not task:
         return {"error": "task parameter is required"}
 

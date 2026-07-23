@@ -29,8 +29,11 @@ export const useRealtimeStore = defineStore('realtime', () => {
         ? window.location.hostname
         : 'localhost';
     // P1 fix: use protocol-relative URL so wss:// is used on HTTPS pages
+    // P2-9 fix: when location.port is empty (reverse proxy on 80/443),
+    // omit the port to avoid an invalid `ws://host:/ws` URL.
     const wsProto = typeof location !== 'undefined' && location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${wsProto}//${hostname}:${location.port}/ws`;
+    const wsPort = typeof location !== 'undefined' && location.port ? `:${location.port}` : '';
+    const url = `${wsProto}//${hostname}${wsPort}/ws`;
 
     // useWebSocket auto-registers onMounted/onUnmounted only when called
     // inside a component setup; here we drive connect()/disconnect() manually.

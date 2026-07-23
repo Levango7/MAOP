@@ -1,11 +1,14 @@
 import { ref, onMounted, onUnmounted, getCurrentInstance } from 'vue';
 
+const MAX_RECONNECT_ATTEMPTS = 10;
+
 export function useWebSocket(url = '') {
   const connected = ref(false);
   const lastMessage = ref(null);
   const error = ref(null);
   let ws = null;
   let reconnectTimer = null;
+  let reconnectAttempts = 0;
 
   function getWsUrl() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -27,6 +30,7 @@ export function useWebSocket(url = '') {
       ws.onopen = () => {
         connected.value = true;
         error.value = null;
+        reconnectAttempts = 0; // P2-12: reset on successful connect
       };
       ws.onmessage = (event) => {
         try {
@@ -58,7 +62,14 @@ export function useWebSocket(url = '') {
   }
 
   function scheduleReconnect() {
+    // P2-12: stop reconnecting after MAX_RECONNECT_ATTEMPTS to avoid
+    // infinite retry loops when the backend is permanently down.
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      error.value = new Error('Max reconnection attempts reached');
+      return;
+    }
     if (reconnectTimer) return;
+    reconnectAttempts++;
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connect();

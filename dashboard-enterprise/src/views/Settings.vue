@@ -185,6 +185,7 @@ const adrs = ref([
   { num: '010', file: '010-bugfix-batch.md', title: 'Bugfix Batch' },
   { num: '011', file: '011-state-unification.md', title: 'State Unification' },
   { num: '012', file: '012-routing-refactor.md', title: 'Routing Refactor' },
+  { num: '013', file: '013-agent-llm-direct-cli-fallback.md', title: 'Agent LLM Direct + CLI Fallback' },
 ]);
 
 async function load() {

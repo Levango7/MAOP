@@ -32,6 +32,19 @@ function withAuth(extra, headers) {
 }
 
 /**
+ * P2-11 fix: 统一 30s 超时控制，防止后端无响应时前端请求永久挂起。
+ * 使用 AbortController 在超时后中止请求。
+ */
+const API_TIMEOUT_MS = 30000;
+
+function fetchWithTimeout(url, init) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  return fetch(url, Object.assign({}, init, { signal: controller.signal }))
+    .finally(() => clearTimeout(timeoutId));
+}
+
+/**
  * 统一处理 401：清除登录态并跳转登录页。
  * 仅在企业版前端环境中触发（避免在 Vitest 中触发路由跳转）。
  */
@@ -55,7 +68,7 @@ export const useApiStore = defineStore('api', {
      * @param {object} [opts] { headers } 可选额外 headers
      */
     async get(url, opts) {
-      const res = await fetch(url, withAuth({}, (opts && opts.headers) || {}));
+      const res = await fetchWithTimeout(url, withAuth({}, (opts && opts.headers) || {}));
       if (res.status === 401) {
         handleUnauthorized();
         throw new Error(`API ${url}: 401 Unauthorized`);
@@ -74,7 +87,7 @@ export const useApiStore = defineStore('api', {
         { 'Content-Type': 'application/json' },
         (opts && opts.headers) || {}
       );
-      const res = await fetch(url, withAuth(
+      const res = await fetchWithTimeout(url, withAuth(
         { method: 'POST', body: JSON.stringify(body || {}) },
         headers
       ));
@@ -90,7 +103,7 @@ export const useApiStore = defineStore('api', {
     },
     /** PUT 请求，自动注入 Bearer token */
     async put(url, body) {
-      const res = await fetch(url, withAuth(
+      const res = await fetchWithTimeout(url, withAuth(
         { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) },
         { 'Content-Type': 'application/json' }
       ));
@@ -103,7 +116,7 @@ export const useApiStore = defineStore('api', {
     },
     /** DELETE 请求，自动注入 Bearer token */
     async delete(url) {
-      const res = await fetch(url, withAuth({ method: 'DELETE' }, {}));
+      const res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
       if (res.status === 401) { handleUnauthorized(); throw new Error(`API ${url}: 401`); }
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
@@ -134,7 +147,7 @@ export const useApiStore = defineStore('api', {
     async clearAuthToken() {
       // Notify backend to revoke the token before clearing locally
       try {
-        await fetch('/api/auth/logout', withAuth({ method: 'POST' }, {}));
+        await fetchWithTimeout('/api/auth/logout', withAuth({ method: 'POST' }, {}));
       } catch (e) { /* best-effort — clear locally anyway */ }
       try {
         localStorage.removeItem(TOKEN_KEY);

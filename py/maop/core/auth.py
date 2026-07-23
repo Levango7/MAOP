@@ -212,6 +212,42 @@ class JWTHandler:
             self.config.secret = load_jwt_secret()
         # P1 fix: in-memory token revocation blacklist (sig_b64 → exp timestamp)
         self._revoked: dict[str, float] = {}
+        # P2-2 fix: persist revocation blacklist across restarts so revoked
+        # tokens remain invalid after a server restart.
+        root = os.environ.get("MAOP_ROOT_DIR", ".")
+        self._revoked_file = Path(root) / "data" / "jwt_revoked.json"
+        self._load_revoked()
+
+    def _load_revoked(self) -> None:
+        """Load the revocation blacklist from disk (best-effort)."""
+        try:
+            if self._revoked_file.exists():
+                data = json.loads(self._revoked_file.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    now = time.time()
+                    # Only load non-expired entries
+                    self._revoked = {
+                        str(k): float(v)
+                        for k, v in data.items()
+                        if isinstance(v, (int, float)) and v > now
+                    }
+                    if self._revoked:
+                        logger.info(
+                            "[auth] Loaded %d revoked tokens from %s",
+                            len(self._revoked), self._revoked_file,
+                        )
+        except Exception as exc:
+            logger.warning("[auth] Could not load revoked tokens: %s", exc)
+
+    def _save_revoked(self) -> None:
+        """Persist the revocation blacklist to disk (best-effort)."""
+        try:
+            self._revoked_file.parent.mkdir(parents=True, exist_ok=True)
+            self._revoked_file.write_text(
+                json.dumps(self._revoked), encoding="utf-8"
+            )
+        except Exception as exc:
+            logger.warning("[auth] Could not persist revoked tokens: %s", exc)
 
     def revoke_token(self, token: str) -> bool:
         """Add a token to the revocation blacklist. Returns True if revoked."""
@@ -225,6 +261,7 @@ class JWTHandler:
             if time.time() > exp:
                 return False  # already expired
             self._revoked[sig_b64] = exp
+            self._save_revoked()
             return True
         except Exception:
             return False
@@ -235,6 +272,8 @@ class JWTHandler:
         expired = [sig for sig, exp in self._revoked.items() if exp <= now]
         for sig in expired:
             del self._revoked[sig]
+        if expired:
+            self._save_revoked()
 
     def _b64url_encode(self, data: bytes) -> str:
         return base64.urlsafe_b64encode(data).rstrip(b"=").decode()

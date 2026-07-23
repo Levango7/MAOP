@@ -1,4 +1,4 @@
-﻿"""Shared state for MAOP Dashboard routers.
+"""Shared state for MAOP Dashboard routers.
 
 All router modules import from here to access shared resources:
   - MAOP_ROOT, DASH_DIR, SRC_DIR: path constants
@@ -98,5 +98,6 @@ start_time = time.time()
 
 # ── Config flags ───────────────────────────────────────────────────
 tls_enabled = os.environ.get("MAOP_TLS", "0") == "1"
-auth_enabled = os.environ.get("MAOP_AUTH", "0") == "1"
+_env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
+auth_enabled = os.environ.get("MAOP_AUTH", "1" if _env_is_prod else "0") == "1"
 rl_enabled = os.environ.get("MAOP_RATE_LIMIT", "1") == "1"

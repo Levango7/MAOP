@@ -350,10 +350,35 @@ def get_route_scorer(config: MaopConfig | None = None) -> RouteScorer:
     Config is only accepted on first initialization; subsequent calls
     ignore config to prevent race conditions from concurrent requests
     mutating the shared singleton.
+
+    P2-1 fix: hot-reload support. When a config with a newer ``_version``
+    is passed (e.g. after ``MaopConfig.reload()``), the singleton is
+    reinitialized so routing changes take effect without a process restart.
+    The cooldown state is preserved across the reload to avoid resetting
+    agent failure tracking mid-flight.
     """
     global _instance
     if _instance is None:
         with _singleton_lock:
             if _instance is None:
                 _instance = RouteScorer(config=config)
+                return _instance
+
+    # Hot-reload: reinitialize if the passed config has a different version
+    if config is not None and _instance.config is not None:
+        new_ver = getattr(config, "_version", 0)
+        cur_ver = getattr(_instance.config, "_version", 0)
+        if new_ver and new_ver != cur_ver:
+            with _singleton_lock:
+                # Re-check inside the lock to avoid duplicate reinit
+                cur_ver = getattr(_instance.config, "_version", 0)
+                if new_ver != cur_ver:
+                    logger.info(
+                        "RouteScorer config reload: version %s -> %s",
+                        cur_ver, new_ver,
+                    )
+                    # Preserve cooldown state across reload
+                    old_cooldowns = _instance._cooldowns
+                    _instance = RouteScorer(config=config)
+                    _instance._cooldowns = old_cooldowns
     return _instance
