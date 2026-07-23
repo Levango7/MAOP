@@ -33,7 +33,13 @@ class ApiKeyVault:
     def __init__(self, root_dir: str | Path = "data") -> None:
         self._root = Path(root_dir)
         self._db_path = get_db_path("api_key_vault")
-        self._key_path = self._root / "data" / ".enc_key"
+        # P2-11 fix: when root_dir is already "data" (default), don't
+        # double-nest to data/data/.enc_key. Use _root directly if it
+        # ends with "data", otherwise append "data" subdir.
+        if self._root.name == "data":
+            self._key_path = self._root / ".enc_key"
+        else:
+            self._key_path = self._root / "data" / ".enc_key"
         self._fernet: Any = None
         self._init_db()
         self._init_encryption()
