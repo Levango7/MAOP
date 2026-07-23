@@ -1,4 +1,4 @@
-﻿"""MAOP Route Scorer — Multi-factor route matching and agent selection.
+"""MAOP Route Scorer — Multi-factor route matching and agent selection.
 
 Improvements over legacy _route_by_config:
 1. Multi-route scoring: instead of first-match-wins, score ALL routes and
@@ -196,6 +196,37 @@ class RouteScorer:
         return result
 
     # ── Internal: Route Scoring ──────────────────────────────
+
+    # ── Multi-Factor Scoring Formula ──────────────────────────────
+    #
+    # Score = w_regex * S_regex + w_keyword * S_keyword
+    #       + w_capability * S_capability + w_position * S_position
+    #
+    # Weights (module constants):
+    #   w_regex      = _REGEX_WEIGHT     = 0.50  (highest: exact pattern match is strongest signal)
+    #   w_keyword    = _KEYWORD_BASE     = 0.30  (keyword overlap indicates topical relevance)
+    #   w_capability = _CAPABILITY_BONUS = 0.15  (declared capability alignment bonus)
+    #   w_position   = 0.10  (keyword position bonus - earlier match = higher score)
+    #
+    # Sub-scores are normalized to [0, 1]:
+    #   S_regex      = 1.0 if full match (re.search), 0.0 if no match
+    #   S_keyword    = min(1.0, matched_count / 3) * _KEYWORD_BASE
+    #   S_capability = _CAPABILITY_BONUS (0.15) if primary agent has routing key in capabilities
+    #   S_position   = max(0.0, (1.0 - best_position / task_len)) * 0.10
+    #
+    # Specificity bonus: each additional matched keyword beyond the first adds
+    #   _KEYWORD_BONUS (0.05), capped at 0.15.
+    #
+    # Cooldown mechanism (_COOLDOWN_SEC = 300s):
+    #   Agents that recently failed are SKIPPED in _select_agent (not score-
+    #   penalized). Fallback -> tertiary agents are tried; if all candidates are
+    #   in cooldown, the primary agent is used anyway (better than nothing).
+    #   Repeated failures extend cooldown LINEARLY (not exponentially):
+    #     cooldown = _COOLDOWN_SEC * (1 + min(fail_count - 1, 3) * 0.5)
+    #   i.e. fail_count 1->1.0x, 2->1.5x, 3->2.0x, 4+->2.5x (capped at 2.5x = 750s).
+    #
+    # Tie-breaking: candidates sorted by score descending; higher score wins.
+    # Confidence: >= _CONFIDENCE_HIGH (0.60) = high, >= _CONFIDENCE_MEDIUM (0.35) = medium.
 
     def _score_route(
         self, task_lower: str, routing_key: str, route: RouteEntry

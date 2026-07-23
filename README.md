@@ -1,4 +1,4 @@
-﻿# MAOP — Multi-Agent Orchestration Platform
+# MAOP — Multi-Agent Orchestration Platform
 
 > Python-first agent orchestration framework with Plan-Execute-Verify loop,
 > model management, control plane, and real-time dashboard.
@@ -42,6 +42,122 @@ maop health
 pytest py/tests
 ```
 
+**Choose your starting point:**
+
+| Goal | Command | Learn more |
+|------|---------|------------|
+| Run a quick task | `maop run --task "..."` | [Use Case 1](#1-personal-developer--multi-agent-coordination) |
+| Deploy with auth | `MAOP_AUTH=1 maop start` | [Use Case 2](#2-enterprise-deployment--rbac--multi-tenant) |
+| Chat with memory | Open dashboard → Chat tab | [Use Case 3](#3-tool-calling--memory-augmented-chat) |
+| View costs | Dashboard → Overview → Cost | [Cost Tracking](#cost-tracking) |
+
+## Use Cases
+
+### 1. Personal Developer — Multi-Agent Coordination
+
+Orchestrate multiple agents for a complex refactoring task:
+
+```bash
+# Define agents with complementary capabilities
+# config/agents.yaml already includes coder, analyst, reviewer
+
+# Run a task that requires planning + coding + review
+maop run --task "refactor auth module to use JWT"
+
+# Monitor real-time progress via dashboard
+# Open http://localhost:9079 -> Overview tab shows live delegation
+# SSE stream at /api/stream/trace/{trace_id} shows token-by-token output
+```
+
+**Key features used:**
+- Dynamic routing: agent selected by capability match + regex scoring
+- Circuit breaker: auto-failover if an agent fails repeatedly
+- Three-layer memory: context preserved across agent handoffs
+- Plan-Execute-Verify loop: auto-validation after each step
+
+### 2. Enterprise Deployment — RBAC + Multi-Tenant
+
+Deploy with authentication and role-based access control:
+
+```bash
+# Enable authentication
+$env:MAOP_AUTH = "1"
+$env:MAOP_JWT_SECRET = "your-secret-key"
+maop start --port 9079
+
+# Login as admin (default credentials in data/.admin-password)
+# First launch auto-generates admin password
+
+# Create tenants and assign roles via dashboard
+# -> Settings -> RBAC -> Add Tenant
+# -> Settings -> RBAC -> Add User with role (admin/operator/viewer)
+
+# Agents are isolated per tenant:
+# - Tenant A's users cannot see Tenant B's delegations
+# - Quotas enforced per tenant (agent count, API calls)
+```
+
+**Key features used:**
+- JWT authentication with persistent revocation blacklist
+- RBAC: admin / operator / viewer roles
+- Multi-tenant data isolation (tenant_id filtering on all queries)
+- Audit logging (all write operations recorded)
+- TLS support for production (MAOP_TLS=1)
+
+### 3. Tool Calling + Memory-Augmented Chat
+
+Build a knowledge-augmented assistant:
+
+```bash
+# Start dashboard
+maop start
+
+# Via Chat UI (http://localhost:9079 -> Chat tab):
+# 1. Ask: "Summarize the auth module's design"
+# 2. Agent uses MCP tools to read files
+# 3. Three-layer memory stores the conversation context
+# 4. Follow-up: "What are the security risks?"
+# 5. Agent retrieves episodic memory from previous turn
+
+# Via API:
+curl -X POST http://localhost:9079/api/chat `
+  -H "Content-Type: application/json" `
+  -d '{"message": "Analyze the routing algorithm", "stream": true}'
+# Returns SSE stream with real-time token output
+```
+
+**Key features used:**
+- MCP integration: Stdio/SSE/WebSocket transports
+- Three-layer memory: Working (current turn) -> Episodic (conversation) -> Semantic (knowledge graph)
+- Tool lifecycle: register -> enable -> call -> disable
+- Streaming: SSE for token-by-token output, WebSocket for bidirectional
+
+## Cost Tracking
+
+MAOP includes built-in cost tracking for LLM API usage:
+
+```bash
+# View cost summary via dashboard
+# -> Overview tab -> Cost section shows:
+#   - Total cost (today / week / month)
+#   - Cost per agent
+#   - Cost trend chart
+
+# Via API
+curl http://localhost:9079/api/cost/summary
+# Returns: {"today": 1.23, "week": 8.45, "month": 32.10, "by_agent": {...}}
+
+# Set budget limits
+curl -X POST http://localhost:9079/api/budget/set `
+  -d '{"daily_limit": 10.0, "monthly_limit": 200.0}'
+# When budget exceeded, dispatcher blocks new delegations (exit_code=-6)
+```
+
+**How it works:**
+- `CostTracker` records token counts (input/output) and estimated cost per call
+- `BudgetGuard` enforces daily/monthly limits — excess requests return `exit_code=-6`
+- Cost data stored in SQLite `budget_ledger` table
+- Dashboard auto-refreshes every 30s
 ## Configuration
 
 Agents are defined in `config/agents.yaml`:
@@ -132,6 +248,7 @@ Key architectural decisions in [docs/adr/](docs/adr/README.md):
 - [ADR-010](docs/adr/010-bugfix-batch.md) — Batch bugfix (critical/high/medium)
 - [ADR-011](docs/adr/011-state-unification.md) — State source unification
 - [ADR-012](docs/adr/012-routing-refactor.md) — Config-driven routing refactor
+- [ADR-013](docs/adr/013-agent-llm-direct-cli-fallback.md) — Agent LLM direct + CLI fallback
 
 ## License
 

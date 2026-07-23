@@ -235,6 +235,30 @@ class DreamConsolidator:
 
     # ── Phase 3: Consolidate ──────────────────────────────────
 
+    # ── Consolidation Decision Logic ─────────────────────────────
+    #
+    # Grouping threshold formula (Phase 2: _gather):
+    #
+    #   form_group     if len(sig_entries) >= min_group_size (default: 3)
+    #   cap_group      at max_group_size (default: 50) entries per group
+    #   content_overlap_threshold = 0.6 (default, for similarity gating)
+    #
+    # Task signature (normalized for grouping):
+    #   sig = _task_signature(task)  — lowercase, strip timestamps/IDs, truncate 80 chars
+    #   Entries with same (topic, agent, sig) are consolidation candidates.
+    #
+    # Consolidation (Phase 3: _consolidate):
+    #   For each group, fetch full content -> _build_summary() -> store new
+    #   consolidated entry tagged ["dream-consolidated", topic].
+    #
+    # Prune logic (Phase 5: _prune):
+    #   - Delete original entries (DELETE FROM memory_entries WHERE id = ?)
+    #   - Deleted entries trigger secondary index sync:
+    #     * VectorStore.delete(entry_id) — remove embedding (best-effort)
+    #     * Bloom filter: cannot remove (no remove() method; false-positive
+    #       risk, logged as warning, full rebuild recommended)
+    #     * JSON index flush (wiki.json, memory.json) via _flush_json()
+
     def _consolidate(
         self,
         groups: list[ConsolidationGroup],

@@ -251,6 +251,40 @@ END;
 #   - MemoryManager: used by core/chat_engine.py (main chat engine)
 # Future work: consider merging into a single canonical implementation.
 
+# ── Three-Layer Memory Architecture ────────────────────────────
+#
+# Inspired by cognitive science (Atkinson-Shiffrin model adapted):
+#
+# L1 — Working Memory (short-term, current session)
+#   Storage: in-process LRUCache + overflow to Episodic (SQLite)
+#   TTL: working_ttl = 3600.0s (configurable via constructor param)
+#   Capacity: working_max = 200 entries (LRU eviction when exceeded)
+#   Trigger: every user turn writes to L1 via working_put()
+#   Eviction: when LRU evicts an entry, on_evict callback
+#             (_overflow_to_episodic) overflows it to L2 automatically
+#
+# L2 — Episodic Memory (medium-term, conversation history)
+#   Storage: SQLite episodic_memory table (EpisodicEntry rows)
+#   Promotion: L1 -> L2 via LRU eviction overflow (not access-count based)
+#   Consolidation: consolidate_by_access(min_access_count=3) promotes
+#                  episodic entries with access_count >= 3 to L3 (semantic)
+#   Query: recency-weighted (recent episodes score higher via retrieval_weight)
+#   access_count incremented on each episodic_search hit
+#
+# L3 — Semantic Memory (long-term, vector-indexed knowledge)
+#   Storage: VectorStore (embeddings for similarity search), lazy-loaded
+#   Promotion: L2 -> L3 via consolidate_by_access() or consolidate(min_score=0.7)
+#   Query: semantic_search() delegates to VectorStore similarity search
+#
+# Consolidation Flow:
+#   1. consolidate(min_score=0.7, limit=50) — score-based promotion L2 -> L3
+#   2. consolidate_by_access(min_access_count=3, limit=50) — access-count based:
+#      a. SELECT entries WHERE consolidated=0 AND access_count >= min_access_count
+#      b. Generate text summary -> store in VectorStore (semantic)
+#      c. Mark episodic entry consolidated=1
+#   3. No Bloom filter or knowledge graph in this module - those live in
+#      DreamConsolidator (maop.memory.consolidator) and MemoryStore.
+
 class ThreeLayerMemory:
     """Three-layer memory: Working (LRU) + Episodic (SQLite) + Semantic (Vector).
 

@@ -125,6 +125,45 @@ CREATE INDEX IF NOT EXISTS idx_be_ts ON breaker_events(timestamp);
 
 # ── CircuitBreaker ────────────────────────────────────────────
 
+# ── Circuit Breaker State Machine ──────────────────────────────
+#
+# States (BreakerState enum):
+#   CLOSED    - Normal operation. Requests pass through.
+#   OPEN      - Circuit tripped. All requests rejected immediately.
+#   HALF_OPEN - Trial state. Limited requests allowed to test recovery.
+#
+# State Transitions:
+#
+#   CLOSED -> OPEN
+#     Condition: consecutive failures >= threshold (default: 3)
+#     Action:    record trip time (last_failure), persist breaker_events row
+#                resolve_failover() advances chain -> fallback agent if configured
+#
+#   OPEN -> HALF_OPEN
+#     Condition: time since last_failure >= cooldown_s (default: 60s)
+#     Action:    allow next request through (trial)
+#                (checked in is_available() on each call)
+#
+#   HALF_OPEN -> CLOSED
+#     Condition: trial request succeeds (record_success)
+#     Action:    reset failures to 0, clear last_failure
+#                reset failover chain back to primary
+#
+#   HALF_OPEN -> OPEN
+#     Condition: trial request fails (record_failure)
+#     Action:    record new trip time (cooldown extended)
+#                advance failover chain if this agent is current
+#
+# Thread safety:
+#   - Sync methods use _sync_lock (threading.RLock)
+#   - Async methods use _async_lock (asyncio.Lock)
+#   - health_check acquires _async_lock before reading _data
+#
+# Failover:
+#   register_failover(name, agents: list) - registers primary -> fallback -> tertiary chain
+#   resolve_failover(name) - returns FailoverResult; skips OPEN agents, advances chain
+#   When OPEN, dispatcher calls resolve_failover to redirect requests
+
 class CircuitBreaker:
     """SQLite-backed circuit breaker with failover and health-check.
 
