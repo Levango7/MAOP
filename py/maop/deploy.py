@@ -1,4 +1,4 @@
-﻿"""MAOP Deploy - Deployment entry point with start/stop/status, config validation, and health check.
+"""MAOP Deploy - Deployment entry point with start/stop/status, config validation, and health check.
 
 Provides a unified CLI and programmatic interface for:
   - Starting/stopping the MAOP system (loop + dashboard)
@@ -160,9 +160,8 @@ def health_check(root_dir: str | Path, timeout_s: float = 5.0) -> list[Component
     if db_path.is_file():
         try:
             import sqlite3
-            conn = sqlite3.connect(str(db_path), timeout=timeout_s)
-            conn.execute("SELECT 1")
-            conn.close()
+            with sqlite3.connect(str(db_path), timeout=timeout_s) as conn:
+                conn.execute("SELECT 1")
             results.append(ComponentHealth(
                 name="database",
                 status=HealthStatus.HEALTHY,
@@ -188,9 +187,8 @@ def health_check(root_dir: str | Path, timeout_s: float = 5.0) -> list[Component
     if mem_path.is_file():
         try:
             import sqlite3
-            conn = sqlite3.connect(str(mem_path), timeout=timeout_s)
-            conn.execute("SELECT 1")
-            conn.close()
+            with sqlite3.connect(str(mem_path), timeout=timeout_s) as conn:
+                conn.execute("SELECT 1")
             results.append(ComponentHealth(
                 name="memory",
                 status=HealthStatus.HEALTHY,
