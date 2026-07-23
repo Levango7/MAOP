@@ -145,11 +145,11 @@ def _db_login_user(db_path_str: str, username: str, password: str) -> dict:
         ).fetchone()
 
     if row is None:
-        return JSONResponse({"status": "error", "error": "Invalid credentials"}, status_code=401)
+        return {"status": "error", "error": "Invalid credentials"}
 
     stored_hash = row["password_hash"]
     if not _verify_password(password, stored_hash):
-        return JSONResponse({"status": "error", "error": "Invalid credentials"}, status_code=401)
+        return {"status": "error", "error": "Invalid credentials"}
 
     if _password_needs_rehash(stored_hash):
         with sqlite_connect(db_path_str) as conn:
@@ -279,7 +279,7 @@ async def auth_login(request: Request) -> Any:
 
         if result["status"] != "ok":
             _login_failures.setdefault(username, []).append(now)
-            return result
+            return JSONResponse(result, status_code=401)
 
         mgr = get_auth_mgr()
         token = mgr.jwt_handler.create_token(result["username"], roles=result["roles"], ttl_s=7200.0)
