@@ -1,4 +1,4 @@
-﻿"""MAOP Dashboard — Worktree management API endpoints."""
+"""MAOP Dashboard — Worktree management API endpoints."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def _get_worktree_mgr() -> Any:
 
 @router.post("/api/worktree/create-root")
 @handle_api_errors("Worktree create-root", error_value={"status": "error", "error": "Create failed"})
-async def api_worktree_create_root(request: Request) -> Any:
+async def api_worktree_create_root(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     task = body.get("task", "")
@@ -42,7 +42,7 @@ async def api_worktree_create_root(request: Request) -> Any:
 
 @router.post("/api/worktree/branch")
 @handle_api_errors("Worktree branch", error_value={"status": "error", "error": "Branch failed"})
-async def api_worktree_branch(request: Request) -> Any:
+async def api_worktree_branch(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     parent_id = body.get("parent_id", "")
@@ -61,7 +61,7 @@ async def api_worktree_branch(request: Request) -> Any:
 
 @router.post("/api/worktree/abandon")
 @handle_api_errors("Worktree abandon", error_value={"status": "error", "error": "Abandon failed"})
-async def api_worktree_abandon(request: Request) -> Any:
+async def api_worktree_abandon(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     node_id = body.get("id", "")
@@ -74,7 +74,7 @@ async def api_worktree_abandon(request: Request) -> Any:
 
 @router.get("/api/worktree/get")
 @handle_api_errors("Worktree get", error_value={"status": "error", "error": "Get failed"})
-async def api_worktree_get(node_id: str = "") -> Any:
+async def api_worktree_get(node_id: str = "") -> dict[str, Any]:
     if not node_id:
         raise HTTPException(400, "missing node_id")
     mgr = _get_worktree_mgr()
@@ -86,7 +86,7 @@ async def api_worktree_get(node_id: str = "") -> Any:
 
 @router.get("/api/worktree/list")
 @handle_api_errors("Worktree list", error_value={"branches": [], "count": 0, "error": "List failed"})
-async def api_worktree_list(root_id: str = "", active_only: bool = False) -> Any:
+async def api_worktree_list(root_id: str = "", active_only: bool = False) -> dict[str, Any]:
     mgr = _get_worktree_mgr()
     branches = mgr.list_branches(root_id=root_id, active_only=active_only)
     return {"branches": [b.model_dump() for b in branches], "count": len(branches)}
@@ -94,7 +94,7 @@ async def api_worktree_list(root_id: str = "", active_only: bool = False) -> Any
 
 @router.post("/api/worktree/merge")
 @handle_api_errors("Worktree merge", error_value={"status": "error", "error": "Merge failed"})
-async def api_worktree_merge(request: Request) -> Any:
+async def api_worktree_merge(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     source = body.get("source_branch", "")
@@ -108,7 +108,7 @@ async def api_worktree_merge(request: Request) -> Any:
 
 @router.post("/api/worktree/checkpoint")
 @handle_api_errors("Worktree checkpoint", error_value={"status": "error", "error": "Checkpoint failed"})
-async def api_worktree_checkpoint(request: Request) -> Any:
+async def api_worktree_checkpoint(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     node_id = body.get("node_id", "")
@@ -125,7 +125,7 @@ async def api_worktree_checkpoint(request: Request) -> Any:
 
 @router.post("/api/worktree/rollback")
 @handle_api_errors("Worktree rollback", error_value={"status": "error", "error": "Rollback failed"})
-async def api_worktree_rollback(request: Request) -> Any:
+async def api_worktree_rollback(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     node_id = body.get("node_id", "")

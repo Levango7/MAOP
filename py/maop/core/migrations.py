@@ -1,4 +1,4 @@
-﻿"""MAOP Database Migration Runner.
+"""MAOP Database Migration Runner.
 
 Applies SQL migration scripts from data/migrations/ in order.
 Tracks applied migrations in the schema_migrations table.
@@ -95,6 +95,10 @@ def run_migrations(root_dir: str | Path, db_name: str = "maop.db") -> list[str]:
     if applied:
         logger.info("[migrations] Applied %d migrations: %s", len(applied), applied)
     
+    # Note: For Alembic-managed migrations, use:
+    #   alembic upgrade head
+    # This SQL runner and Alembic can coexist (dual-track).
+    # Alembic revisions 001/002 call the same SQL scripts, ensuring consistency.
     return applied
 
 

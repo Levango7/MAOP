@@ -1,4 +1,4 @@
-﻿"""MAOP Dashboard — MCP Client API routes."""
+"""MAOP Dashboard — MCP Client API routes."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def _get_registry() -> Any:
 
 @router.post("/connect/{server_name}")
 @handle_api_errors
-async def connect_server(server_name: str, request: Request) -> Any:
+async def connect_server(server_name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
     ok = await hub.connect_server(server_name)
@@ -65,7 +65,7 @@ async def connect_server(server_name: str, request: Request) -> Any:
 
 @router.post("/disconnect/{server_name}")
 @handle_api_errors
-async def disconnect_server(server_name: str, request: Request) -> Any:
+async def disconnect_server(server_name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
     await hub.disconnect_server(server_name)
@@ -74,7 +74,7 @@ async def disconnect_server(server_name: str, request: Request) -> Any:
 
 @router.get("/servers")
 @handle_api_errors
-async def list_servers() -> Any:
+async def list_servers() -> dict[str, Any]:
     hub = _get_hub()
     servers = hub.list_servers()
     return {"servers": servers, "count": len(servers)}
@@ -82,7 +82,7 @@ async def list_servers() -> Any:
 
 @router.post("/servers")
 @handle_api_errors
-async def add_server(body: ServerCreate, request: Request) -> Any:
+async def add_server(body: ServerCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
     from maop.core.mcp_hub import MCPServerConfig, TransportType
     hub = _get_hub()
@@ -101,7 +101,7 @@ async def add_server(body: ServerCreate, request: Request) -> Any:
 
 @router.delete("/servers/{server_name}")
 @handle_api_errors
-async def remove_server(server_name: str, request: Request) -> Any:
+async def remove_server(server_name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
     removed = hub.remove_server(server_name)
@@ -110,7 +110,7 @@ async def remove_server(server_name: str, request: Request) -> Any:
 
 @router.get("/tools")
 @handle_api_errors
-async def list_tools() -> Any:
+async def list_tools() -> dict[str, Any]:
     hub = _get_hub()
     tools = hub.all_tools()
     return {"tools": [t.model_dump() if hasattr(t, "model_dump") else str(t) for t in tools], "count": len(tools)}
@@ -118,7 +118,7 @@ async def list_tools() -> Any:
 
 @router.post("/call")
 @handle_api_errors
-async def call_tool(body: ToolCallRequest, request: Request) -> Any:
+async def call_tool(body: ToolCallRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
     result = await hub.call_tool(body.tool, body.arguments)
@@ -127,7 +127,7 @@ async def call_tool(body: ToolCallRequest, request: Request) -> Any:
 
 @router.get("/health")
 @handle_api_errors
-async def health_check() -> Any:
+async def health_check() -> dict[str, Any]:
     hub = _get_hub()
     health = hub.health_check_all()
     return {"health": health}

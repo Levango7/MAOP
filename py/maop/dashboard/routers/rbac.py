@@ -65,7 +65,7 @@ async def list_grants(
     request: Request,
     user_id: str = "",
     tenant_id: str = "",
-) -> Any:
+) -> dict[str, Any]:
     """List all RBAC role grants, optionally filtered by user or tenant."""
     mgr = _get_manager()
     grants = mgr.list_grants(user_id=user_id, tenant_id=tenant_id)
@@ -78,7 +78,7 @@ async def list_grants(
 
 @router.post("/grant")
 @handle_api_errors
-async def grant_role(body: GrantRequest, request: Request) -> Any:
+async def grant_role(body: GrantRequest, request: Request) -> dict[str, Any]:
     """Grant a role to a user. Requires admin."""
     require_admin(request)
     from maop.enterprise.rbac import Role
@@ -100,7 +100,7 @@ async def grant_role(body: GrantRequest, request: Request) -> Any:
 
 @router.post("/revoke")
 @handle_api_errors
-async def revoke_role(body: RevokeRequest, request: Request) -> Any:
+async def revoke_role(body: RevokeRequest, request: Request) -> dict[str, Any]:
     """Revoke a role from a user. Requires admin."""
     require_admin(request)
     from maop.enterprise.rbac import Role
@@ -118,7 +118,7 @@ async def revoke_role(body: RevokeRequest, request: Request) -> Any:
 
 @router.get("/roles")
 @handle_api_errors
-async def list_roles(request: Request) -> Any:
+async def list_roles(request: Request) -> dict[str, Any]:
     """List all available roles and their permissions."""
     from maop.enterprise.rbac import Role, ROLE_PERMISSIONS  # noqa: F401 (re-exported for router use)
     roles_info = []
@@ -134,7 +134,7 @@ async def list_roles(request: Request) -> Any:
 
 @router.get("/permissions")
 @handle_api_errors
-async def list_permissions(request: Request) -> Any:
+async def list_permissions(request: Request) -> dict[str, Any]:
     """List all available permissions and the current user's grants."""
     from maop.enterprise.rbac import Permission
     all_perms = [{"value": p.value, "name": p.name} for p in Permission]

@@ -1,4 +1,4 @@
-﻿"""Self-evolution endpoints for MAOP Dashboard."""
+"""Self-evolution endpoints for MAOP Dashboard."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ router = APIRouter()
 
 @router.get("/api/evolve/status")
 @handle_api_errors("Evolve status", error_value={"status": "error", "error": "Evolve status unavailable"})
-async def api_evolve_status() -> Any:
+async def api_evolve_status() -> dict[str, Any]:
     from maop.evolve import EvolveEngine
     eng = EvolveEngine(root_dir=str(MAOP_ROOT))
     data: Any = eng.status()
@@ -30,7 +30,7 @@ async def api_evolve_status() -> Any:
 
 @router.post("/api/evolve/analyze")
 @handle_api_errors("Evolve analyze", error_value={"status": "error", "error": "Evolve analyze unavailable"})
-async def api_evolve_analyze(request: Request) -> Any:
+async def api_evolve_analyze(request: Request) -> dict[str, Any]:
     require_admin(request)
     from maop.evolve import EvolveEngine
     eng = EvolveEngine(root_dir=str(MAOP_ROOT))
@@ -64,7 +64,7 @@ async def api_evolve_analyze(request: Request) -> Any:
 
 @router.get("/api/evolve/suggestions")
 @handle_api_errors("Evolve suggestions", error_value={"status": "error", "error": "Evolve suggestions unavailable", "suggestions": {"stats": {"by_agent": []}}})
-async def api_evolve_suggestions() -> Any:
+async def api_evolve_suggestions() -> dict[str, Any]:
     from maop.evolve import EvolveEngine
     eng = EvolveEngine(root_dir=str(MAOP_ROOT))
     s: Any = eng.suggest() if hasattr(eng, "suggest") else {}
@@ -89,7 +89,7 @@ async def api_evolve_suggestions() -> Any:
 
 @router.get("/api/evolve/report")
 @handle_api_errors("Evolve report", error_value={"performance": [], "error": "Evolve report unavailable"})
-async def api_evolve_report_v4() -> Any:
+async def api_evolve_report_v4() -> dict[str, Any]:
     from .state import get_bridge
     b = get_bridge()
     agents = await b.agent_stats()

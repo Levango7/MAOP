@@ -1,4 +1,4 @@
-﻿"""Framework system, audit, agent config, overview, and workflow endpoints."""
+"""Framework system, audit, agent config, overview, and workflow endpoints."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ router = APIRouter()
 
 # ── Subsystem Status ──────────────────────────────────────────────
 @router.get("/api/subsystems")
-async def api_subsystems() -> Any:
+async def api_subsystems() -> dict[str, Any]:
     init_subsystems()
     subs = get_subsystems()
     result = {}
@@ -57,7 +57,7 @@ async def api_subsystems() -> Any:
 
 # ── Framework Self-Status ─────────────────────────────────────────
 @router.get("/api/framework/status")
-async def api_framework_status() -> Any:
+async def api_framework_status() -> dict[str, Any]:
     try:
         from maop import __version__ as MAOP_ver
     except ImportError:
@@ -73,7 +73,7 @@ async def api_framework_status() -> Any:
 
 # ── Framework Self-Logging ───────────────────────────────────────
 @router.get("/api/framework/logs")
-async def api_framework_logs(limit: int = Query(50)) -> Any:
+async def api_framework_logs(limit: int = Query(50)) -> dict[str, Any]:
     logs = []
     log_dir = MAOP_ROOT / "logs"
     if log_dir.exists():
@@ -99,7 +99,7 @@ async def api_framework_logs(limit: int = Query(50)) -> Any:
     return {"logs": logs, "count": len(logs)}
 
 @router.get("/api/framework/config")
-async def api_framework_config() -> Any:
+async def api_framework_config() -> dict[str, Any]:
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(MAOP_ROOT)).load()
@@ -112,7 +112,7 @@ async def api_framework_config() -> Any:
 
 # ── Agent Config ──────────────────────────────────────────────────
 @router.get("/api/agent/config")
-async def api_agent_config() -> Any:
+async def api_agent_config() -> dict[str, Any]:
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(MAOP_ROOT)).load()
@@ -127,7 +127,7 @@ async def api_agent_config() -> Any:
         return {"agents": [], "routes": [], "error": "Agent config failed"}
 
 @router.post("/api/agent/config/update")
-async def api_agent_config_update(request: Request) -> Any:
+async def api_agent_config_update(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     agent_name = body.get("agent", "")
@@ -185,7 +185,7 @@ async def api_agent_config_update(request: Request) -> Any:
 
 # ── Agent Upgrade ─────────────────────────────────────────────────
 @router.post("/api/agent/upgrade")
-async def api_agent_upgrade(request: Request, agent: str = "") -> Any:
+async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]:
     require_admin(request)
     agent_name = agent
     if not agent_name:
@@ -256,7 +256,7 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> Any:
         return {"status": "error", "error": "Agent upgrade failed"}
 
 @router.get("/api/agent/upgrade")
-async def api_agent_upgrade_get(agent: str = "") -> Any:
+async def api_agent_upgrade_get(agent: str = "") -> dict[str, Any]:
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(MAOP_ROOT)).load()
@@ -289,7 +289,7 @@ async def api_agent_upgrade_get(agent: str = "") -> Any:
 
 # ── Workflow Management ───────────────────────────────────────────
 @router.get("/api/workflow/list")
-async def api_workflow_list() -> Any:
+async def api_workflow_list() -> dict[str, Any]:
     """List available workflows from config directory."""
     cfg_dir = MAOP_ROOT / "config"
     wfs = []
@@ -299,7 +299,7 @@ async def api_workflow_list() -> Any:
     return {"workflows": wfs, "count": len(wfs)}
 
 @router.post("/api/workflow/run")
-async def api_workflow_run(request: Request) -> Any:
+async def api_workflow_run(request: Request) -> dict[str, Any]:
     require_admin(request)
     import asyncio
     body = await request.json()
@@ -333,7 +333,7 @@ _file_counts_cache: dict[str, Any] = {}
 _FILE_COUNTS_CACHE_TTL = 600.0  # 10 minutes
 
 @router.get("/api/overview")
-async def api_overview(request: Request) -> Any:
+async def api_overview(request: Request) -> dict[str, Any]:
     import time as _time
     now = _time.monotonic()
     cached = _overview_cache.get("data")
@@ -404,7 +404,7 @@ async def api_overview(request: Request) -> Any:
         return {"error": "Overview failed", "agents_total": 0, "modules_total": 0, "tests_total": 0}
 
 @router.get("/api/coordination_report")
-async def api_coordination_report_v4() -> Any:
+async def api_coordination_report_v4() -> dict[str, Any]:
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(MAOP_ROOT)).load()
@@ -415,7 +415,7 @@ async def api_coordination_report_v4() -> Any:
         return {"teams": [], "error": "Coordination report failed"}
 
 @router.get("/api/workflows")
-async def api_workflows_v4() -> Any:
+async def api_workflows_v4() -> dict[str, Any]:
     try:
         wfs = []
         wf_dir = MAOP_ROOT / "config" / "workflows"
@@ -438,7 +438,7 @@ async def api_workflows_v4() -> Any:
         return {"workflows": [], "count": 0, "error": "Workflows list failed"}
 
 @router.get("/api/routing")
-async def api_routing_v4() -> Any:
+async def api_routing_v4() -> dict[str, Any]:
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(MAOP_ROOT)).load()
@@ -449,7 +449,7 @@ async def api_routing_v4() -> Any:
         return {"routes": [], "error": "Routing config failed"}
 
 @router.get("/api/security/config")
-async def api_security_config_v4() -> Any:
+async def api_security_config_v4() -> dict[str, Any]:
     result = {}
     for mod_name, mod_path, cls_name in [("tls", "maop.core.tls", "TLSSettings"), ("auth", "maop.core.auth", "AuthManager"),
         ("rate_limit", "maop.core.rate_limiter", "RateLimiter"), ("guardrail", "maop.core.guardrail", "Guardrail"), ("sandbox", "maop.core.sandbox", "SandboxManager")]:
@@ -463,7 +463,7 @@ async def api_security_config_v4() -> Any:
 
 # ── Audit / Control Plane ─────────────────────────────────────────
 @router.get("/api/audit/events")
-async def api_audit_events(limit: int = Query(100)) -> Any:
+async def api_audit_events(limit: int = Query(100)) -> dict[str, Any]:
     try:
         from maop.control.audit import AuditLog
         events = AuditLog(MAOP_ROOT / "logs" / "audit.jsonl").read_recent(limit=limit)
@@ -473,7 +473,7 @@ async def api_audit_events(limit: int = Query(100)) -> Any:
         return {"events": [], "count": 0, "error": "Audit events failed"}
 
 @router.get("/api/audit/summary")
-async def api_audit_summary() -> Any:
+async def api_audit_summary() -> dict[str, Any]:
     try:
         from maop.control.audit import AuditLog
         log = AuditLog(MAOP_ROOT / "logs" / "audit.jsonl")
@@ -489,7 +489,7 @@ async def api_audit_summary() -> Any:
         return {"total": 0, "by_action": {}, "by_actor": {}, "error": str(exc)}
 
 @router.get("/api/audit/filter")
-async def api_audit_filter(action: str = "", actor: str = "", target: str = "", limit: int = Query(50)) -> Any:
+async def api_audit_filter(action: str = "", actor: str = "", target: str = "", limit: int = Query(50)) -> dict[str, Any]:
     try:
         from maop.control.audit import AuditLog
         events = AuditLog(MAOP_ROOT / "logs" / "audit.jsonl").filter(action=action, actor=actor, target=target, limit=limit)

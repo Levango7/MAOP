@@ -33,7 +33,7 @@ async def api_tool_audit_entries(
     agent: str = "",
     success: bool | None = None,
     limit: int = 50,
-) -> Any:
+) -> dict[str, Any]:
     audit = _get_tool_audit()
     entries = audit.query(tool_name=tool_name, agent=agent, success=success, limit=limit)
     return {"entries": [e.model_dump() for e in entries], "count": len(entries)}
@@ -41,7 +41,7 @@ async def api_tool_audit_entries(
 
 @router.get("/api/tool-audit/stats")
 @handle_api_errors("Tool audit stats", error_value={"status": "error", "error": "Stats failed"})
-async def api_tool_audit_stats() -> Any:
+async def api_tool_audit_stats() -> dict[str, Any]:
     audit = _get_tool_audit()
     stats = audit.stats()
     return {"status": "ok", "stats": stats.model_dump()}
@@ -49,7 +49,7 @@ async def api_tool_audit_stats() -> Any:
 
 @router.post("/api/tool-audit/cleanup")
 @handle_api_errors("Tool audit cleanup", error_value={"status": "error", "error": "Cleanup failed"})
-async def api_tool_audit_cleanup(request: Request) -> Any:
+async def api_tool_audit_cleanup(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     max_age_days = body.get("max_age_days", 90)

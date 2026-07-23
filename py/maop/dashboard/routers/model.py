@@ -1,4 +1,4 @@
-﻿"""Model management endpoints for MAOP Dashboard."""
+"""Model management endpoints for MAOP Dashboard."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ router = APIRouter()
 
 @router.get("/api/model/agents")
 @handle_api_errors("Model agents", error_value={"agents": [], "count": 0, "error": "Model agents failed"})
-async def api_model_agents() -> Any:
+async def api_model_agents() -> dict[str, Any]:
     from maop.config.loader import ConfigLoader
     cfg = ConfigLoader(project_root=str(MAOP_ROOT)).load()
     agents = []
@@ -32,7 +32,7 @@ async def api_model_agents() -> Any:
     return {"agents": agents, "count": len(agents)}
 
 @router.get("/api/model/quota")
-async def api_model_quota() -> Any:
+async def api_model_quota() -> dict[str, Any]:
     agents_cfg = []
     try:
         from maop.config.loader import ConfigLoader
@@ -47,7 +47,7 @@ async def api_model_quota() -> Any:
 
 @router.post("/api/model/switch")
 @handle_api_errors("Model switch", error_value={"status": "error", "error": "Model switch failed"})
-async def api_model_switch(request: Request) -> Any:
+async def api_model_switch(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     agent_name = body.get("agent", "")
@@ -92,12 +92,12 @@ def _get_model_registry() -> Any:
 
 @router.get("/api/model/registry")
 @handle_api_errors("Model registry", error_value={"status": "error", "error": "Model registry failed"})
-async def api_model_registry() -> Any:
+async def api_model_registry() -> dict[str, Any]:
     return {"status": "ok", "stats": _get_model_registry().stats()}
 
 @router.get("/api/model/list")
 @handle_api_errors("Model list", error_value={"models": [], "count": 0, "error": "Model list failed"})
-async def api_model_list() -> Any:
+async def api_model_list() -> dict[str, Any]:
     reg = _get_model_registry()
     models = []
     for m in reg.list_models(enabled_only=False):
@@ -111,32 +111,32 @@ async def api_model_list() -> Any:
 
 @router.get("/api/model/providers")
 @handle_api_errors("Model providers", error_value={"providers": [], "error": "Model providers failed"})
-async def api_model_providers() -> Any:
+async def api_model_providers() -> dict[str, Any]:
     return {"providers": _get_model_registry().providers.list_providers()}
 
 @router.get("/api/model/select")
 @handle_api_errors("Model select", error_value={"status": "error", "error": "Model select failed"})
-async def api_model_select(capability: str = "", agent_model: str = "", policy: str = "default") -> Any:
+async def api_model_select(capability: str = "", agent_model: str = "", policy: str = "default") -> dict[str, Any]:
     from maop.model.selector import ModelSelector
     em = ModelSelector(_get_model_registry()).select(capability=capability, agent_model=agent_model, policy_name=policy)
     return {"status": "ok", "effective_model": em.model_dump()}
 
 @router.get("/api/model/budget")
 @handle_api_errors("Model budget", error_value={"status": "error", "error": "Model budget failed"})
-async def api_model_budget() -> Any:
+async def api_model_budget() -> dict[str, Any]:
     from maop.model.budget import BudgetGuard
     reg = _get_model_registry()
     return {"status": "ok", "budget": BudgetGuard(root_dir=str(MAOP_ROOT), config=reg.config.budget).stats()}
 
 @router.get("/api/model/quota/status")
 @handle_api_errors("Model quota", error_value={"status": "error", "error": "Model quota failed"})
-async def api_model_quota_status() -> Any:
+async def api_model_quota_status() -> dict[str, Any]:
     from maop.model.quota import QuotaEnforcer
     return {"status": "ok", "quotas": QuotaEnforcer(_get_model_registry()).usage_all()}
 
 @router.get("/api/model/policies")
 @handle_api_errors("Model policies", error_value={"policies": [], "count": 0, "error": "Model policies failed"})
-async def api_model_policies() -> Any:
+async def api_model_policies() -> dict[str, Any]:
     reg = _get_model_registry()
     policies = []
     for name, p in reg.config.policies.items():
@@ -149,7 +149,7 @@ async def api_model_policies() -> Any:
 
 @router.post("/api/model/provider/add")
 @handle_api_errors("Provider add", error_value={"status": "error", "error": "Provider add failed"})
-async def api_provider_add(request: Request) -> Any:
+async def api_provider_add(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     name = body.get("name", "")
@@ -164,7 +164,7 @@ async def api_provider_add(request: Request) -> Any:
 
 @router.post("/api/model/provider/delete")
 @handle_api_errors("Provider delete", error_value={"status": "error", "error": "Provider delete failed"})
-async def api_provider_delete(request: Request) -> Any:
+async def api_provider_delete(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     name = body.get("name", "")
@@ -182,7 +182,7 @@ async def api_provider_delete(request: Request) -> Any:
 
 @router.post("/api/model/add")
 @handle_api_errors("Model add", error_value={"status": "error", "error": "Model add failed"})
-async def api_model_add(request: Request) -> Any:
+async def api_model_add(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     name = body.get("name", "")
@@ -197,7 +197,7 @@ async def api_model_add(request: Request) -> Any:
 
 @router.post("/api/model/delete")
 @handle_api_errors("Model delete", error_value={"status": "error", "error": "Model delete failed"})
-async def api_model_delete(request: Request) -> Any:
+async def api_model_delete(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     name = body.get("name", "")
@@ -223,7 +223,7 @@ def _get_api_key_vault() -> Any:
 
 @router.post("/api/model/key/store")
 @handle_api_errors("Key store", error_value={"status": "error", "error": "Key store failed"})
-async def api_key_store(request: Request) -> Any:
+async def api_key_store(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     provider = body.get("provider", "")
@@ -236,7 +236,7 @@ async def api_key_store(request: Request) -> Any:
 
 @router.post("/api/model/key/delete")
 @handle_api_errors("Key delete", error_value={"status": "error", "error": "Key delete failed"})
-async def api_key_delete(request: Request) -> Any:
+async def api_key_delete(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     provider = body.get("provider", "")
@@ -248,7 +248,7 @@ async def api_key_delete(request: Request) -> Any:
 
 @router.get("/api/model/key/list")
 @handle_api_errors("Key list", error_value={"providers": [], "error": "Key list failed"})
-async def api_key_list() -> Any:
+async def api_key_list() -> dict[str, Any]:
     vault = _get_api_key_vault()
     return {"providers": vault.list_providers()}
 
@@ -256,7 +256,7 @@ async def api_key_list() -> Any:
 
 @router.post("/api/model/health/check")
 @handle_api_errors("Health check", error_value={"status": "error", "error": "Health check failed"})
-async def api_health_check(request: Request) -> Any:
+async def api_health_check(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     provider = body.get("provider", "")

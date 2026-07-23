@@ -1,10 +1,11 @@
-﻿"""MAOP Dashboard — Info API Router.
+"""MAOP Dashboard — Info API Router.
 
 Serves the static project metadata (pillars, roles, modules, workflows, architecture)
 that was previously hardcoded in app-info.js.  Now the frontend fetches it via API,
 making it easy to update without redeploying JS.
 """
 from __future__ import annotations
+from typing import Any
 
 from fastapi import APIRouter
 
@@ -336,39 +337,39 @@ ARCHITECTURE = {
 
 
 @router.get("/pillars")
-async def get_pillars() -> dict:
+async def get_pillars() -> dict[str, Any]:
     return {"pillars": PILLARS}
 
 
 @router.get("/roles")
-async def get_roles() -> dict:
+async def get_roles() -> dict[str, Any]:
     return {"groups": ROLES}
 
 
 @router.get("/modules")
-async def get_modules() -> dict:
+async def get_modules() -> dict[str, Any]:
     return {"packages": MODULES}
 
 
 @router.get("/workflows")
-async def get_workflows() -> dict:
+async def get_workflows() -> dict[str, Any]:
     return {"roleFlows": WORKFLOWS}
 
 
 @router.get("/architecture")
-async def get_architecture() -> dict:
+async def get_architecture() -> dict[str, Any]:
     return ARCHITECTURE
 
 
 @router.get("/edition")
-async def get_edition() -> dict:
+async def get_edition() -> dict[str, Any]:
     """Return current edition info, feature flags, backends, and degradations."""
     from maop.config.edition import edition_info
     return edition_info()
 
 
 @router.get("/config")
-async def get_config() -> dict:
+async def get_config() -> dict[str, Any]:
     """Return current runtime configuration (non-sensitive)."""
     try:
         from maop.config.settings import MAOPSettings

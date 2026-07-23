@@ -1,6 +1,7 @@
-﻿"""MAOP Dashboard — Plugin Management API endpoints."""
+"""MAOP Dashboard — Plugin Management API endpoints."""
 
 from __future__ import annotations
+from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
@@ -19,7 +20,7 @@ def _get_plugin_manager():
 
 @router.get("")
 @handle_api_errors
-async def list_plugins(state: str = Query("", description="Filter by state")):
+async def list_plugins(state: str = Query("", description="Filter by state")) -> dict[str, Any]:
     from maop.core.plugin import PluginState
     mgr = _get_plugin_manager()
     filter_state = PluginState(state) if state else None
@@ -29,7 +30,7 @@ async def list_plugins(state: str = Query("", description="Filter by state")):
 
 @router.get("/{plugin_id}")
 @handle_api_errors
-async def get_plugin(plugin_id: str):
+async def get_plugin(plugin_id: str) -> dict[str, Any]:
     mgr = _get_plugin_manager()
     info = mgr.get_plugin(plugin_id)
     if info is None:
@@ -39,7 +40,7 @@ async def get_plugin(plugin_id: str):
 
 @router.post("/discover")
 @handle_api_errors
-async def discover_plugins(request: Request):
+async def discover_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     found = mgr.discover()
@@ -48,7 +49,7 @@ async def discover_plugins(request: Request):
 
 @router.post("/{plugin_id}/load")
 @handle_api_errors
-async def load_plugin(plugin_id: str, request: Request):
+async def load_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     info = mgr.load(plugin_id)
@@ -57,7 +58,7 @@ async def load_plugin(plugin_id: str, request: Request):
 
 @router.post("/{plugin_id}/start")
 @handle_api_errors
-async def start_plugin(plugin_id: str, request: Request, body: dict | None = None):
+async def start_plugin(plugin_id: str, request: Request, body: dict | None = None) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     config = body.get("config") if body else None
@@ -67,7 +68,7 @@ async def start_plugin(plugin_id: str, request: Request, body: dict | None = Non
 
 @router.post("/{plugin_id}/stop")
 @handle_api_errors
-async def stop_plugin(plugin_id: str, request: Request):
+async def stop_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     info = mgr.stop(plugin_id)
@@ -76,7 +77,7 @@ async def stop_plugin(plugin_id: str, request: Request):
 
 @router.post("/{plugin_id}/reload")
 @handle_api_errors
-async def reload_plugin(plugin_id: str, request: Request):
+async def reload_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     info = mgr.reload(plugin_id)
@@ -85,7 +86,7 @@ async def reload_plugin(plugin_id: str, request: Request):
 
 @router.put("/{plugin_id}/config")
 @handle_api_errors
-async def update_plugin_config(plugin_id: str, request: Request, body: dict):
+async def update_plugin_config(plugin_id: str, request: Request, body: dict) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     info = mgr.update_config(plugin_id, config=body.get("config", {}))
@@ -94,7 +95,7 @@ async def update_plugin_config(plugin_id: str, request: Request, body: dict):
 
 @router.post("/load-all")
 @handle_api_errors
-async def load_all_plugins(request: Request):
+async def load_all_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     results = mgr.load_all()
@@ -103,7 +104,7 @@ async def load_all_plugins(request: Request):
 
 @router.post("/start-all")
 @handle_api_errors
-async def start_all_plugins(request: Request):
+async def start_all_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     results = mgr.start_all()
@@ -112,7 +113,7 @@ async def start_all_plugins(request: Request):
 
 @router.post("/stop-all")
 @handle_api_errors
-async def stop_all_plugins(request: Request):
+async def stop_all_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     results = mgr.stop_all()

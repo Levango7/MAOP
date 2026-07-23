@@ -33,7 +33,7 @@ from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -565,6 +565,47 @@ async def websocket_endpoint(ws: WebSocket) -> Any:
     finally:
         async with _ws_lock:
             _ws_clients.discard(ws)
+
+# --- API v1 aliases (backward-compatible versioning) -------------------
+# Register /api/v1/* aliases for every /api/* route so the frontend can
+# migrate incrementally to a versioned API. Old /api/xxx paths remain
+# fully functional (no breaking change). Exempt endpoints - health
+# (K8s/Docker probes), stream (SSE token-via-query), auth (login/logout/
+# refresh) - stay unversioned for infrastructure compatibility.
+def _register_v1_aliases() -> None:
+    """Register /api/v1/* aliases for all /api/* routes (except auth/stream/health)."""
+    EXEMPT = {
+        "/api/health",
+        "/api/stream",
+        "/api/auth/login",
+        "/api/auth/logout",
+        "/api/auth/refresh",
+    }
+    v1 = APIRouter()
+    existing = {getattr(r, "path", None) for r in app.routes}
+    for route in app.routes:
+        path = getattr(route, "path", "")
+        if not path.startswith("/api/") or path in EXEMPT:
+            continue
+        endpoint = getattr(route, "endpoint", None)
+        if endpoint is None:
+            continue
+        v1_path = "/api/v1" + path[4:]
+        if v1_path in existing:
+            continue
+        methods = getattr(route, "methods", None) or {"GET"}
+        v1.add_api_route(v1_path, endpoint, methods=methods)
+    app.include_router(v1)
+    logger.info("[server] Registered %d /api/v1/* alias routes", len(v1.routes))
+
+
+_register_v1_aliases()
+
+
+@app.get("/api/v1/version")
+async def api_v1_version() -> Any:
+    """Return current API version."""
+    return {"version": MAOP_VERSION, "api_version": "v1", "status": "stable"}
 
 # ── SPA fallback for Vue3 client-side routes ───────────────────────
 # Any non-API, non-asset path returns index.html so the Vue router can

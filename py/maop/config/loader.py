@@ -5,6 +5,7 @@ Mirrors the structure of config/agents.yaml and config/rules.yaml.
 
 from __future__ import annotations
 
+import itertools
 import logging
 from pathlib import Path
 from typing import Any, cast
@@ -152,6 +153,42 @@ def _load_yaml(path: Path) -> dict[str, Any] | None:
 from maop.core.db_utils import find_project_root
 
 
+# === Config loading cache ============================================
+#
+# High-frequency call point: every dispatch re-reads agent config. Cache the
+# parsed MaopConfig keyed by config directory + max mtime of the YAML files.
+# A hit returns the previously parsed config without touching disk; a miss
+# re-reads and re-parses. Invalidated automatically when any YAML mtime
+# changes, and cleared explicitly on reload().
+_agent_config_cache: dict[str, tuple[float, MaopConfig]] = {}
+
+# Monotonic version counter for MaopConfig._version (used by hot-reload
+# detection in RouteScorer). next() on itertools.count is atomic under CPython.
+_config_version_seq = itertools.count(1)
+
+
+def _next_config_version() -> int:
+    """Return a monotonically increasing config version."""
+    return next(_config_version_seq)
+
+
+def _config_signature(config_dir: Path) -> float:
+    """Return the max mtime across the config YAML files (0.0 if none exist).
+
+    If any of agents.yaml / rules.yaml / models.yaml changes, its mtime
+    changes and the cache entry is invalidated.
+    """
+    mtimes: list[float] = []
+    for name in ("agents.yaml", "rules.yaml", "models.yaml"):
+        p = config_dir / name
+        try:
+            if p.exists():
+                mtimes.append(p.stat().st_mtime)
+        except OSError:
+            pass
+    return max(mtimes) if mtimes else 0.0
+
+
 # ── Config loader ─────────────────────────────────────────────
 
 
@@ -172,7 +209,21 @@ class ConfigLoader:
         self._config_dir = self._root / "config"
 
     def load(self) -> MaopConfig:
-        """Load agents.yaml + rules.yaml + models.yaml and return a merged MaopConfig."""
+        """Load agents.yaml + rules.yaml + models.yaml and return a merged MaopConfig.
+
+        Results are cached keyed by the config directory and the max mtime of
+        the YAML files; repeated calls without file changes return the cached
+        MaopConfig without re-reading disk.
+        """
+        cache_key = str(self._config_dir)
+        try:
+            sig = _config_signature(self._config_dir)
+        except OSError:
+            sig = 0.0
+        cached = _agent_config_cache.get(cache_key)
+        if cached is not None and cached[0] == sig:
+            return cached[1]
+
         agents_data = _load_yaml(self._config_dir / "agents.yaml") or {}
         rules_data = _load_yaml(self._config_dir / "rules.yaml") or {}
         models_data = _load_yaml(self._config_dir / "models.yaml") or {}
@@ -224,10 +275,16 @@ class ConfigLoader:
         )
         cfg._raw_models = models_data or {}
         cfg._version = _next_config_version()
+        _agent_config_cache[cache_key] = (sig, cfg)
         return cfg
 
     def reload(self) -> MaopConfig:
-        """Re-read config files (for hot-reload support)."""
+        """Re-read config files (for hot-reload support).
+
+        Clears the config cache first so the next load() is guaranteed to
+        re-read from disk regardless of mtime.
+        """
+        _agent_config_cache.clear()
         return self.load()
 
 

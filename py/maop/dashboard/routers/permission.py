@@ -1,4 +1,4 @@
-﻿"""MAOP Dashboard — Permission & Approval API routes."""
+"""MAOP Dashboard — Permission & Approval API routes."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ class RuleCreate(BaseModel):
 
 @router.post("/permission/rules")
 @handle_api_errors
-async def add_rule(body: RuleCreate, request: Request) -> Any:
+async def add_rule(body: RuleCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
     from maop.core.permission import PermissionManager
     pm = PermissionManager(root_dir=str(MAOP_ROOT))
@@ -38,7 +38,7 @@ async def add_rule(body: RuleCreate, request: Request) -> Any:
 
 @router.delete("/permission/rules/{rule_id}")
 @handle_api_errors
-async def remove_rule(rule_id: str, request: Request) -> Any:
+async def remove_rule(rule_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     from maop.core.permission import PermissionManager
     pm = PermissionManager(root_dir=str(MAOP_ROOT))
@@ -48,7 +48,7 @@ async def remove_rule(rule_id: str, request: Request) -> Any:
 
 @router.get("/permission/rules")
 @handle_api_errors
-async def list_rules(limit: int = Query(100, ge=1, le=500)) -> Any:
+async def list_rules(limit: int = Query(100, ge=1, le=500)) -> dict[str, Any]:
     from maop.core.permission import PermissionManager
     pm = PermissionManager(root_dir=str(MAOP_ROOT))
     rules = pm.list_rules(limit=limit)
@@ -57,7 +57,7 @@ async def list_rules(limit: int = Query(100, ge=1, le=500)) -> Any:
 
 @router.get("/permission/check")
 @handle_api_errors
-async def check_permission(agent: str, action: str = "*") -> Any:
+async def check_permission(agent: str, action: str = "*") -> dict[str, Any]:
     from maop.core.permission import PermissionManager
     pm = PermissionManager(root_dir=str(MAOP_ROOT))
     check = pm.check(agent=agent, action=action)
@@ -66,7 +66,7 @@ async def check_permission(agent: str, action: str = "*") -> Any:
 
 @router.get("/approval/pending")
 @handle_api_errors
-async def list_pending_approvals(limit: int = Query(50, ge=1, le=200)) -> Any:
+async def list_pending_approvals(limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
     from maop.core.human_proxy import HumanProxy
     hp = HumanProxy(root_dir=str(MAOP_ROOT))
     pending = hp.pending(limit=limit)
@@ -75,7 +75,7 @@ async def list_pending_approvals(limit: int = Query(50, ge=1, le=200)) -> Any:
 
 @router.post("/approval/{request_id}/approve")
 @handle_api_errors
-async def approve_request(request_id: str, request: Request) -> Any:
+async def approve_request(request_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     from maop.core.human_proxy import HumanProxy
     hp = HumanProxy(root_dir=str(MAOP_ROOT))
@@ -85,7 +85,7 @@ async def approve_request(request_id: str, request: Request) -> Any:
 
 @router.post("/approval/{request_id}/reject")
 @handle_api_errors
-async def reject_request(request_id: str, request: Request, reason: str = "") -> Any:
+async def reject_request(request_id: str, request: Request, reason: str = "") -> dict[str, Any]:
     require_admin(request)
     from maop.core.human_proxy import HumanProxy
     hp = HumanProxy(root_dir=str(MAOP_ROOT))

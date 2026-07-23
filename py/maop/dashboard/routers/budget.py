@@ -28,7 +28,7 @@ def _get_budget_guard() -> Any:
 
 @router.get("/api/budget/status")
 @handle_api_errors("Budget status", error_value={"status": "error", "error": "Status failed"})
-async def api_budget_status() -> Any:
+async def api_budget_status() -> dict[str, Any]:
     guard = _get_budget_guard()
     status = guard.get_status()
     return {"status": "ok", "budget": status.model_dump()}
@@ -36,7 +36,7 @@ async def api_budget_status() -> Any:
 
 @router.post("/api/budget/reset")
 @handle_api_errors("Budget reset", error_value={"status": "error", "error": "Reset failed"})
-async def api_budget_reset(request: Request) -> Any:
+async def api_budget_reset(request: Request) -> dict[str, Any]:
     require_admin(request)
     guard = _get_budget_guard()
     guard.reset_daily()
@@ -45,7 +45,7 @@ async def api_budget_reset(request: Request) -> Any:
 
 @router.post("/api/budget/record")
 @handle_api_errors("Budget record", error_value={"status": "error", "error": "Record failed"})
-async def api_budget_record(request: Request) -> Any:
+async def api_budget_record(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     prompt_tokens = body.get("prompt_tokens", 0)

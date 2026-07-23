@@ -103,3 +103,6 @@ scripts/rename_pev_to_maop.py
 security-audit.md
 config/agents.yaml.bak
 config/agents.yaml.bak2
+
+# Alembic cache
+py/maop/migrations/alembic/__pycache__/

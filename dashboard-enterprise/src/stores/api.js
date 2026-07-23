@@ -60,6 +60,39 @@ function handleUnauthorized() {
   }
 }
 
+/**
+ * API versioning infrastructure (incremental migration).
+ *
+ * Migration plan:
+ *   1. Current: v1Url() helper is ready but all calls still use unversioned /api/* paths
+ *   2. Next: new code calls v1Url("/api/agents") to get "/api/v1/agents"
+ *   3. Final: switch default to /api/v1 and remove old path aliases
+ *
+ * Exempt endpoints (no version prefix, for infrastructure compatibility):
+ *   - /api/health    K8s/Docker liveness & readiness probes
+ *   - /api/stream    SSE stream (token validated via query param)
+ *   - /api/auth/*    authentication flow itself (login/logout/refresh)
+ */
+const API_V1_PREFIX = '/api/v1';
+
+/**
+ * Convert an /api/* path to the versioned /api/v1/* path.
+ * Exempt endpoints (health/stream/auth) are returned unchanged.
+ * @param {string} path - original path, e.g. "/api/agents"
+ * @returns {string} versioned path, e.g. "/api/v1/agents"
+ */
+function v1Url(path) {
+  if (
+    path.startsWith('/api/') &&
+    !path.startsWith('/api/health') &&
+    !path.startsWith('/api/stream') &&
+    !path.startsWith('/api/auth')
+  ) {
+    return API_V1_PREFIX + path.slice(4); // /api/agents -> /api/v1/agents
+  }
+  return path;
+}
+
 export const useApiStore = defineStore('api', {
   actions: {
     /**
@@ -158,4 +191,4 @@ export const useApiStore = defineStore('api', {
 });
 
 // 模块级导出（便于非 Pinia 上下文使用，如 App.vue 直接 import）
-export { getAuthToken, withAuth, handleUnauthorized };
+export { getAuthToken, withAuth, handleUnauthorized, v1Url };

@@ -60,7 +60,7 @@ class UpdateTenantRequest(BaseModel):
 async def list_tenants(
     request: Request,
     status: str = "",
-) -> Any:
+) -> dict[str, Any]:
     """List all tenants, optionally filtered by status."""
     require_admin(request)
     mgr = _get_manager()
@@ -84,7 +84,7 @@ async def list_tenants(
 
 @router.post("/create")
 @handle_api_errors
-async def create_tenant(body: CreateTenantRequest, request: Request) -> Any:
+async def create_tenant(body: CreateTenantRequest, request: Request) -> dict[str, Any]:
     """Create a new tenant. Requires admin."""
     require_admin(request)
     from maop.enterprise.tenant import TenantQuota
@@ -99,7 +99,7 @@ async def create_tenant(body: CreateTenantRequest, request: Request) -> Any:
 
 @router.get("/{tenant_id}")
 @handle_api_errors
-async def get_tenant(tenant_id: str, request: Request) -> Any:
+async def get_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Get a single tenant by ID."""
     require_admin(request)
     mgr = _get_manager()
@@ -111,7 +111,7 @@ async def get_tenant(tenant_id: str, request: Request) -> Any:
 
 @router.post("/{tenant_id}/suspend")
 @handle_api_errors
-async def suspend_tenant(tenant_id: str, request: Request) -> Any:
+async def suspend_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Suspend a tenant. Requires admin."""
     require_admin(request)
     mgr = _get_manager()
@@ -121,7 +121,7 @@ async def suspend_tenant(tenant_id: str, request: Request) -> Any:
 
 @router.post("/{tenant_id}/activate")
 @handle_api_errors
-async def activate_tenant(tenant_id: str, request: Request) -> Any:
+async def activate_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Activate a suspended tenant. Requires admin."""
     require_admin(request)
     mgr = _get_manager()
@@ -131,7 +131,7 @@ async def activate_tenant(tenant_id: str, request: Request) -> Any:
 
 @router.delete("/{tenant_id}")
 @handle_api_errors
-async def delete_tenant(tenant_id: str, request: Request) -> Any:
+async def delete_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Delete a tenant. Requires admin."""
     require_admin(request)
     mgr = _get_manager()
@@ -141,7 +141,7 @@ async def delete_tenant(tenant_id: str, request: Request) -> Any:
 
 @router.get("/{tenant_id}/usage")
 @handle_api_errors
-async def get_usage(tenant_id: str, request: Request) -> Any:
+async def get_usage(tenant_id: str, request: Request) -> dict[str, Any]:
     """Get resource usage for a tenant. Requires admin."""
     require_admin(request)
     mgr = _get_manager()

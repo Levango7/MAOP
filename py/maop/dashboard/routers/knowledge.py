@@ -1,4 +1,4 @@
-﻿"""MAOP Dashboard — Knowledge & Vector Search API.
+"""MAOP Dashboard — Knowledge & Vector Search API.
 
 Endpoints:
   GET  /api/knowledge/stats       — Knowledge base statistics
@@ -48,7 +48,7 @@ class VectorSearchRequest(BaseModel):
 
 @router.get("/stats")
 @handle_api_errors("knowledge stats")
-async def knowledge_stats() -> Any:
+async def knowledge_stats() -> dict[str, Any]:
     """Get knowledge base statistics."""
     from maop.core.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
@@ -62,7 +62,7 @@ async def query_facts(
     predicate: str = "",
     topic: str = "",
     top: int = 20,
-) -> Any:
+) -> dict[str, Any]:
     """Query facts from the knowledge base."""
     from maop.core.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
@@ -72,7 +72,7 @@ async def query_facts(
 
 @router.get("/entities/{name}")
 @handle_api_errors("knowledge entity")
-async def get_entity(name: str) -> Any:
+async def get_entity(name: str) -> dict[str, Any]:
     """Get a specific entity by name."""
     from maop.core.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
@@ -89,7 +89,7 @@ async def query_relations(
     target: str = "",
     relation_type: str = "",
     top: int = 20,
-) -> Any:
+) -> dict[str, Any]:
     """Query relations from the knowledge base."""
     from maop.core.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
@@ -103,7 +103,7 @@ async def get_graph(
     center: str = "",
     topic: str = "",
     max_nodes: int = 50,
-) -> Any:
+) -> dict[str, Any]:
     """Get graph data for visualization."""
     from maop.core.knowledge_graph import KnowledgeGraph
     kg = KnowledgeGraph(root_dir=str(MAOP_ROOT))
@@ -122,7 +122,7 @@ async def get_graph(
 async def build_context(
     entity: str = "",
     max_depth: int = 2,
-) -> Any:
+) -> dict[str, Any]:
     """Build LLM context for an entity from the knowledge graph."""
     from maop.core.knowledge_graph import KnowledgeGraph
     kg = KnowledgeGraph(root_dir=str(MAOP_ROOT))
@@ -132,7 +132,7 @@ async def build_context(
 
 @router.post("/extract")
 @handle_api_errors("knowledge extract")
-async def extract_knowledge(request_body: ExtractRequest, request: Request) -> Any:
+async def extract_knowledge(request_body: ExtractRequest, request: Request) -> dict[str, Any]:
     """Extract knowledge from text and store to the knowledge base."""
     require_admin(request)
     from maop.core.knowledge_extractor import KnowledgeExtractor
@@ -150,7 +150,7 @@ async def extract_knowledge(request_body: ExtractRequest, request: Request) -> A
 
 @router.get("/vector/stats")
 @handle_api_errors("vector stats")
-async def vector_stats() -> Any:
+async def vector_stats() -> dict[str, Any]:
     """Get vector search statistics."""
     from maop.memory.vector_search import VectorSearch
     vs = VectorSearch(root_dir=str(MAOP_ROOT))
@@ -159,7 +159,7 @@ async def vector_stats() -> Any:
 
 @router.post("/vector/search")
 @handle_api_errors("vector search")
-async def vector_search(request_body: VectorSearchRequest, request: Request) -> Any:
+async def vector_search(request_body: VectorSearchRequest, request: Request) -> dict[str, Any]:
     """Perform semantic vector search."""
     require_admin(request)
     from maop.memory.vector_search import VectorSearch
@@ -170,7 +170,7 @@ async def vector_search(request_body: VectorSearchRequest, request: Request) -> 
 
 @router.post("/vector/index")
 @handle_api_errors("vector index")
-async def vector_index(request: Request) -> Any:
+async def vector_index(request: Request) -> dict[str, Any]:
     """Trigger vector indexing of all memory entries."""
     require_admin(request)
     from maop.memory.vector_search import VectorSearch

@@ -1,4 +1,4 @@
-﻿"""MAOP Dashboard — Protocol registry API endpoints."""
+"""MAOP Dashboard — Protocol registry API endpoints."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def _get_protocol_reg() -> Any:
 
 @router.post("/api/protocol/register")
 @handle_api_errors("Protocol register", error_value={"status": "error", "error": "Register failed"})
-async def api_protocol_register(request: Request) -> Any:
+async def api_protocol_register(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     name = body.get("name", "")
@@ -46,7 +46,7 @@ async def api_protocol_register(request: Request) -> Any:
 
 @router.post("/api/protocol/unregister")
 @handle_api_errors("Protocol unregister", error_value={"status": "error", "error": "Unregister failed"})
-async def api_protocol_unregister(request: Request) -> Any:
+async def api_protocol_unregister(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     name = body.get("name", "")
@@ -60,7 +60,7 @@ async def api_protocol_unregister(request: Request) -> Any:
 
 @router.get("/api/protocol/get")
 @handle_api_errors("Protocol get", error_value={"status": "error", "error": "Get failed"})
-async def api_protocol_get(name: str = "", version: str = "1.0") -> Any:
+async def api_protocol_get(name: str = "", version: str = "1.0") -> dict[str, Any]:
     if not name:
         raise HTTPException(400, "missing name")
     reg = _get_protocol_reg()
@@ -72,7 +72,7 @@ async def api_protocol_get(name: str = "", version: str = "1.0") -> Any:
 
 @router.get("/api/protocol/list")
 @handle_api_errors("Protocol list", error_value={"protocols": [], "count": 0, "error": "List failed"})
-async def api_protocol_list() -> Any:
+async def api_protocol_list() -> dict[str, Any]:
     reg = _get_protocol_reg()
     protocols = reg.list_protocols()
     return {"protocols": [p.model_dump() for p in protocols], "count": len(protocols)}
@@ -80,7 +80,7 @@ async def api_protocol_list() -> Any:
 
 @router.get("/api/protocol/versions")
 @handle_api_errors("Protocol versions", error_value={"versions": [], "error": "Versions failed"})
-async def api_protocol_versions(name: str = "") -> Any:
+async def api_protocol_versions(name: str = "") -> dict[str, Any]:
     if not name:
         raise HTTPException(400, "missing name")
     reg = _get_protocol_reg()
@@ -90,7 +90,7 @@ async def api_protocol_versions(name: str = "") -> Any:
 
 @router.post("/api/protocol/validate")
 @handle_api_errors("Protocol validate", error_value={"valid": False, "error": "Validate failed"})
-async def api_protocol_validate(request: Request) -> Any:
+async def api_protocol_validate(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     protocol_name = body.get("protocol", "")
@@ -105,7 +105,7 @@ async def api_protocol_validate(request: Request) -> Any:
 
 @router.post("/api/protocol/send")
 @handle_api_errors("Protocol send", error_value={"status": "error", "error": "Send failed"})
-async def api_protocol_send(request: Request) -> Any:
+async def api_protocol_send(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     protocol = body.get("protocol", "")
@@ -123,7 +123,7 @@ async def api_protocol_send(request: Request) -> Any:
 
 @router.get("/api/protocol/messages")
 @handle_api_errors("Protocol messages", error_value={"messages": [], "count": 0, "error": "Messages failed"})
-async def api_protocol_messages(recipient: str = "", protocol: str = "", limit: int = 100) -> Any:
+async def api_protocol_messages(recipient: str = "", protocol: str = "", limit: int = 100) -> dict[str, Any]:
     if not recipient:
         raise HTTPException(400, "missing recipient")
     reg = _get_protocol_reg()

@@ -196,6 +196,11 @@ class CircuitBreaker:
         self._failover_chains: dict[str, FailoverChain] = {}
         self._sync_lock = threading.RLock()
         self._async_lock = asyncio.Lock()
+        # Short-TTL cache for all_states() snapshot (avoid re-copying _data
+        # under the lock on every call). Accepts up to _STATES_CACHE_TTL of
+        # staleness; mutating operations rely on the TTL for expiry.
+        self._states_cache: tuple[float, dict[str, BreakerEntry]] | None = None
+        self._STATES_CACHE_TTL = 0.5  # 500ms
         self._init_db()
 
     # ── SQLite connection ─────────────────────────────────────
@@ -396,9 +401,19 @@ class CircuitBreaker:
             return False
 
     def all_states(self) -> dict[str, BreakerEntry]:
-        """Return a snapshot of all agent breaker states."""
+        """Return a snapshot of all agent breaker states, with a short TTL cache.
+
+        Repeated calls within _STATES_CACHE_TTL (500ms) return the same
+        cached snapshot without re-acquiring the lock or re-copying _data.
+        Falls back to a fresh snapshot on miss.
+        """
+        now = time.monotonic()
+        if self._states_cache is not None and (now - self._states_cache[0]) < self._STATES_CACHE_TTL:
+            return self._states_cache[1]
         with self._sync_lock:
-            return dict(self._data)
+            snapshot = dict(self._data)
+        self._states_cache = (now, snapshot)
+        return snapshot
 
     # ── Failover ─────────────────────────────────────────────
 

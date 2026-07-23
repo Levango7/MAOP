@@ -38,6 +38,13 @@ _CONFIDENCE_MEDIUM = 0.35 # above this = medium confidence
 _COOLDOWN_SEC = 300       # 5 minutes cooldown for failed agents
 _MAX_COOLDOWN_ENTRIES = 200
 
+# Score cache for RouteScorer._score_route (a pure function of task text,
+# route definition, and config version). Bounded by _SCORE_CACHE_MAX with
+# simple clear-on-full eviction. Stale entries from old config versions are
+# naturally ignored because the config _version is part of the cache key.
+_score_cache: dict[tuple, tuple[float, str]] = {}
+_SCORE_CACHE_MAX = 256
+
 
 # ── Data Classes ─────────────────────────────────────────────
 
@@ -231,10 +238,34 @@ class RouteScorer:
     def _score_route(
         self, task_lower: str, routing_key: str, route: RouteEntry
     ) -> tuple[float, str]:
-        """Score a single route against the task.
+        """Score a single route against the task, with caching.
 
         Returns (score, matched_by) where score is in [0, 1] and
         matched_by describes what triggered the match.
+
+        Cached keyed by (task_lower, routing_key, route fields, config version).
+        The config _version in the key invalidates entries automatically on
+        reload; size is bounded by _SCORE_CACHE_MAX (clear-on-full).
+        """
+        config_version = getattr(self.config, "_version", 0) if self.config else 0
+        cache_key = (
+            task_lower, routing_key, route.match,
+            tuple(route.keywords), route.primary, config_version,
+        )
+        cached = _score_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        result = self._compute_score(task_lower, routing_key, route)
+        if len(_score_cache) >= _SCORE_CACHE_MAX:
+            _score_cache.clear()
+        _score_cache[cache_key] = result
+        return result
+
+    def _compute_score(
+        self, task_lower: str, routing_key: str, route: RouteEntry
+    ) -> tuple[float, str]:
+        """Compute the route score (uncached implementation).
 
         Scoring factors (in priority order):
         1. Regex match: 50% weight (highest specificity)

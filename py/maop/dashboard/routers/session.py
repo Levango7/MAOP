@@ -1,6 +1,7 @@
-﻿"""MAOP Dashboard — Session & Conversation API endpoints."""
+"""MAOP Dashboard — Session & Conversation API endpoints."""
 
 from __future__ import annotations
+from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
@@ -30,7 +31,7 @@ async def list_sessions(
     status: str = Query("", description="Filter by status"),
     agent: str = Query("", description="Filter by agent"),
     limit: int = Query(50, ge=1, le=200),
-):
+) -> dict[str, Any]:
     mgr = _get_session_mgr()
     sessions = mgr.list(status=status, agent=agent, limit=limit)
     return {"sessions": [s.model_dump() for s in sessions]}
@@ -38,7 +39,7 @@ async def list_sessions(
 
 @router.post("/")
 @handle_api_errors
-async def create_session(body: dict, request: Request):
+async def create_session(body: dict, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_session_mgr()
     sid = mgr.create(
@@ -54,13 +55,13 @@ async def create_session(body: dict, request: Request):
 
 @router.get("/stats")
 @handle_api_errors
-async def session_stats():
+async def session_stats() -> dict[str, Any]:
     mgr = _get_session_mgr()
     return mgr.stats()
 
 @router.get("/{session_id}")
 @handle_api_errors
-async def get_session(session_id: str):
+async def get_session(session_id: str) -> dict[str, Any]:
     mgr = _get_session_mgr()
     session = mgr.get(session_id)
     if session is None:
@@ -70,7 +71,7 @@ async def get_session(session_id: str):
 
 @router.patch("/{session_id}")
 @handle_api_errors
-async def update_session(session_id: str, body: dict, request: Request):
+async def update_session(session_id: str, body: dict, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_session_mgr()
     ok = mgr.update(
@@ -89,7 +90,7 @@ async def update_session(session_id: str, body: dict, request: Request):
 
 @router.delete("/{session_id}")
 @handle_api_errors
-async def delete_session(session_id: str, request: Request):
+async def delete_session(session_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_session_mgr()
     ok = mgr.delete(session_id)
@@ -103,7 +104,7 @@ async def get_messages(
     session_id: str,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-):
+) -> dict[str, Any]:
     cmgr = _get_conversation_mgr()
     messages = cmgr.get_history(session_id, limit=limit, offset=offset)
     return {"messages": [m.model_dump() for m in messages]}
@@ -111,7 +112,7 @@ async def get_messages(
 
 @router.post("/{session_id}/messages")
 @handle_api_errors
-async def add_message(session_id: str, body: dict, request: Request):
+async def add_message(session_id: str, body: dict, request: Request) -> dict[str, Any]:
     require_admin(request)
     cmgr = _get_conversation_mgr()
     msg_id = cmgr.add_message(
@@ -131,7 +132,7 @@ async def add_message(session_id: str, body: dict, request: Request):
 async def get_context_window(
     session_id: str,
     max_tokens: int = Query(4000, ge=100, le=128000),
-):
+) -> dict[str, Any]:
     cmgr = _get_conversation_mgr()
     window = cmgr.get_context_window(session_id, max_tokens=max_tokens)
     return {"context": window.model_dump()}
@@ -142,7 +143,7 @@ async def get_context_window(
 async def get_compressed_context(
     session_id: str,
     max_tokens: int = Query(4000, ge=100, le=128000),
-):
+) -> dict[str, Any]:
     cmgr = _get_conversation_mgr()
     window = cmgr.get_compressed_context(session_id, max_tokens=max_tokens)
     return {"context": window.model_dump()}
@@ -150,7 +151,7 @@ async def get_compressed_context(
 
 @router.delete("/{session_id}/messages")
 @handle_api_errors
-async def clear_messages(session_id: str, request: Request):
+async def clear_messages(session_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     cmgr = _get_conversation_mgr()
     count = cmgr.clear_session(session_id)

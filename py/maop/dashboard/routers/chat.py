@@ -1,4 +1,4 @@
-﻿"""MAOP Dashboard — Chat API with SSE streaming and three-layer memory.
+"""MAOP Dashboard — Chat API with SSE streaming and three-layer memory.
 
 Endpoints:
   POST /api/chat          — Send a message, get full response
@@ -60,7 +60,7 @@ class MemorySearchRequest(BaseModel):
 
 @router.post("")
 @handle_api_errors("chat")
-async def chat(request_body: ChatRequestBody, request: Request) -> Any:
+async def chat(request_body: ChatRequestBody, request: Request) -> dict[str, Any]:
     """Send a chat message and get a full response."""
     require_admin(request)
     from maop.core.chat_engine import ChatRequest
@@ -116,7 +116,7 @@ async def chat_stream(request_body: ChatRequestBody, request: Request) -> Any:
 
 @router.get("/models")
 @handle_api_errors("list models")
-async def list_models() -> Any:
+async def list_models() -> dict[str, Any]:
     """List available LLM models from models.yaml."""
     from maop.core.llm_provider import LLMProviderFactory
     factory = LLMProviderFactory(root_dir=str(MAOP_ROOT))
@@ -135,7 +135,7 @@ async def list_models() -> Any:
 
 @router.get("/sessions")
 @handle_api_errors("list chat sessions")
-async def list_sessions() -> Any:
+async def list_sessions() -> dict[str, Any]:
     """List all chat sessions."""
     from maop.core.session import SessionManager
     mgr = SessionManager(root_dir=str(MAOP_ROOT))
@@ -145,7 +145,7 @@ async def list_sessions() -> Any:
 
 @router.get("/{session_id}")
 @handle_api_errors("get chat session")
-async def get_session(session_id: str) -> Any:
+async def get_session(session_id: str) -> dict[str, Any]:
     """Get messages for a chat session."""
     engine = _get_engine()
     history = engine.memory.conversation.get_history(session_id)
@@ -161,7 +161,7 @@ async def get_session(session_id: str) -> Any:
 
 @router.delete("/{session_id}")
 @handle_api_errors("clear chat session")
-async def clear_session(session_id: str, request: Request) -> Any:
+async def clear_session(session_id: str, request: Request) -> dict[str, Any]:
     """Clear all messages in a chat session."""
     require_admin(request)
     engine = _get_engine()
@@ -173,7 +173,7 @@ async def clear_session(session_id: str, request: Request) -> Any:
 
 @router.post("/memory/search")
 @handle_api_errors("memory search")
-async def memory_search(request_body: MemorySearchRequest, request: Request) -> Any:
+async def memory_search(request_body: MemorySearchRequest, request: Request) -> dict[str, Any]:
     """Search across all memory layers."""
     require_admin(request)
     engine = _get_engine()
@@ -183,7 +183,7 @@ async def memory_search(request_body: MemorySearchRequest, request: Request) -> 
 
 @router.post("/memory/consolidate")
 @handle_api_errors("memory consolidate")
-async def memory_consolidate(request: Request) -> Any:
+async def memory_consolidate(request: Request) -> dict[str, Any]:
     """Trigger L2 → L3 memory consolidation."""
     require_admin(request)
     engine = _get_engine()
@@ -193,7 +193,7 @@ async def memory_consolidate(request: Request) -> Any:
 
 @router.get("/memory/stats")
 @handle_api_errors("memory stats")
-async def memory_stats() -> Any:
+async def memory_stats() -> dict[str, Any]:
     """Get memory statistics."""
     engine = _get_engine()
     stats = engine.memory.stats()
@@ -208,7 +208,7 @@ async def upload_image(
     session_id: str = "",
     file: Optional[UploadFile] = File(None),
     request: Request = None,  # type: ignore[assignment]
-) -> Any:
+) -> dict[str, Any]:
     """Upload an image for multimodal chat."""
     require_admin(request)
     from maop.core.image_store import ImageStore
@@ -229,7 +229,7 @@ async def upload_image(
 
 @router.get("/images/{session_id}")
 @handle_api_errors("list session images")
-async def list_session_images(session_id: str) -> Any:
+async def list_session_images(session_id: str) -> dict[str, Any]:
     """List all images for a chat session."""
     from maop.core.image_store import ImageStore
     store = ImageStore(root_dir=str(MAOP_ROOT))
@@ -239,7 +239,7 @@ async def list_session_images(session_id: str) -> Any:
 
 @router.delete("/images/{image_id}")
 @handle_api_errors("delete image")
-async def delete_image(image_id: str, request: Request) -> Any:
+async def delete_image(image_id: str, request: Request) -> dict[str, Any]:
     """Delete an uploaded image."""
     require_admin(request)
     from maop.core.image_store import ImageStore

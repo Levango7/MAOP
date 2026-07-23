@@ -1,4 +1,4 @@
-﻿"""MAOP Dashboard — Hook management API endpoints."""
+"""MAOP Dashboard — Hook management API endpoints."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def _get_hook_mgr() -> Any:
 
 @router.post("/api/hook/register")
 @handle_api_errors("Hook register", error_value={"status": "error", "error": "Register failed"})
-async def api_hook_register(request: Request) -> Any:
+async def api_hook_register(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     event = body.get("event", "")
@@ -50,7 +50,7 @@ async def api_hook_register(request: Request) -> Any:
 
 @router.post("/api/hook/unregister")
 @handle_api_errors("Hook unregister", error_value={"status": "error", "error": "Unregister failed"})
-async def api_hook_unregister(request: Request) -> Any:
+async def api_hook_unregister(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     hook_id = body.get("id", "")
@@ -63,7 +63,7 @@ async def api_hook_unregister(request: Request) -> Any:
 
 @router.post("/api/hook/enable")
 @handle_api_errors("Hook enable", error_value={"status": "error", "error": "Enable failed"})
-async def api_hook_enable(request: Request) -> Any:
+async def api_hook_enable(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     hook_id = body.get("id", "")
@@ -76,7 +76,7 @@ async def api_hook_enable(request: Request) -> Any:
 
 @router.post("/api/hook/disable")
 @handle_api_errors("Hook disable", error_value={"status": "error", "error": "Disable failed"})
-async def api_hook_disable(request: Request) -> Any:
+async def api_hook_disable(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     hook_id = body.get("id", "")
@@ -89,7 +89,7 @@ async def api_hook_disable(request: Request) -> Any:
 
 @router.get("/api/hook/list")
 @handle_api_errors("Hook list", error_value={"hooks": [], "count": 0, "error": "List failed"})
-async def api_hook_list(event: str = "") -> Any:
+async def api_hook_list(event: str = "") -> dict[str, Any]:
     mgr = _get_hook_mgr()
     hooks = mgr.list_hooks(event=event or "")
     return {"hooks": [h.model_dump() for h in hooks], "count": len(hooks)}
@@ -97,7 +97,7 @@ async def api_hook_list(event: str = "") -> Any:
 
 @router.get("/api/hook/get")
 @handle_api_errors("Hook get", error_value={"status": "error", "error": "Get failed"})
-async def api_hook_get(hook_id: str = "") -> Any:
+async def api_hook_get(hook_id: str = "") -> dict[str, Any]:
     if not hook_id:
         raise HTTPException(400, "missing hook_id")
     mgr = _get_hook_mgr()
@@ -109,7 +109,7 @@ async def api_hook_get(hook_id: str = "") -> Any:
 
 @router.post("/api/hook/trigger")
 @handle_api_errors("Hook trigger", error_value={"status": "error", "error": "Trigger failed"})
-async def api_hook_trigger(request: Request) -> Any:
+async def api_hook_trigger(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     event = body.get("event", "")
@@ -123,7 +123,7 @@ async def api_hook_trigger(request: Request) -> Any:
 
 @router.get("/api/hook/logs")
 @handle_api_errors("Hook logs", error_value={"logs": [], "error": "Logs failed"})
-async def api_hook_logs(event: str = "", limit: int = 100) -> Any:
+async def api_hook_logs(event: str = "", limit: int = 100) -> dict[str, Any]:
     mgr = _get_hook_mgr()
     logs = mgr.get_logs(event=event or "", limit=limit)
     return {"logs": logs, "count": len(logs)}
@@ -131,7 +131,7 @@ async def api_hook_logs(event: str = "", limit: int = 100) -> Any:
 
 @router.get("/api/hook/events")
 @handle_api_errors("Hook events", error_value={"events": [], "error": "Events failed"})
-async def api_hook_events() -> Any:
+async def api_hook_events() -> dict[str, Any]:
     from maop.core.hook_manager import LifecycleEvent
     events = [{"name": e.value, "phase": e.value.split(".")[-1], "domain": e.value.split(".")[0]} for e in LifecycleEvent]
     return {"events": events, "count": len(events)}

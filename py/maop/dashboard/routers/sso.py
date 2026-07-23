@@ -62,7 +62,7 @@ class LogoutRequest(BaseModel):
 
 @router.get("/authorize")
 @handle_api_errors
-async def authorize(request: Request, state: str = "") -> Any:
+async def authorize(request: Request, state: str = "") -> dict[str, Any]:
     """Redirect to the IdP's authorize URL."""
     mgr = _get_manager()
     url = mgr.get_authorize_url(state=state)
@@ -76,7 +76,7 @@ async def callback(
     code: str = "",
     state: str = "",
     error: str = "",
-) -> Any:
+) -> dict[str, Any]:
     """Handle OAuth callback — exchange code for session."""
     if error:
         return JSONResponse(
@@ -100,7 +100,7 @@ async def callback(
 
 @router.post("/logout")
 @handle_api_errors
-async def logout(body: LogoutRequest, request: Request) -> Any:
+async def logout(body: LogoutRequest, request: Request) -> dict[str, Any]:
     """Invalidate an SSO session."""
     mgr = _get_manager()
     logged_out = mgr.logout(body.session_id)
@@ -109,7 +109,7 @@ async def logout(body: LogoutRequest, request: Request) -> Any:
 
 @router.get("/validate")
 @handle_api_errors
-async def validate_session(request: Request, session_id: str = "") -> Any:
+async def validate_session(request: Request, session_id: str = "") -> dict[str, Any]:
     """Validate an SSO session ID."""
     if not session_id:
         return {"status": "error", "error": "Missing session_id"}
@@ -127,7 +127,7 @@ async def validate_session(request: Request, session_id: str = "") -> Any:
 
 @router.get("/config")
 @handle_api_errors
-async def get_config(request: Request) -> Any:
+async def get_config(request: Request) -> dict[str, Any]:
     """Return non-secret SSO config for frontend login button rendering.
 
     Does NOT expose client_secret. Returns provider type, authorize URL,

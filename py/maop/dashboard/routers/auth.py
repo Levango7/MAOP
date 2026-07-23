@@ -1,4 +1,4 @@
-﻿"""Authentication & user management endpoints.
+"""Authentication & user management endpoints.
 
 Extracted from server.py for separation of concerns.
 Provides: login, logout, register, user CRUD, auth status.
@@ -250,7 +250,7 @@ _LOCKOUT_SECONDS = 900.0
 _MAX_TRACKED_USERS = 10_000  # P1-18 fix: prevent unbounded growth
 
 @router.get("/api/auth/status")
-async def auth_status(request: Request) -> Any:
+async def auth_status(request: Request) -> dict[str, Any]:
     """Check if auth is enabled and whether user is logged in."""
     # F-P0-8 fix: check actual token from Authorization header
     has_token = False
@@ -272,7 +272,7 @@ async def auth_status(request: Request) -> Any:
 
 
 @router.post("/api/auth/login")
-async def auth_login(request: Request) -> Any:
+async def auth_login(request: Request) -> dict[str, Any]:
     """Login with username/password, returns JWT token."""
     import time as _time
     try:
@@ -327,7 +327,7 @@ async def auth_login(request: Request) -> Any:
 
 
 @router.post("/api/auth/logout")
-async def auth_logout(request: Request) -> Any:
+async def auth_logout(request: Request) -> dict[str, Any]:
     """Logout - revoke JWT token server-side (P1 fix)."""
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
@@ -343,7 +343,7 @@ async def auth_logout(request: Request) -> Any:
 
 
 @router.post("/api/auth/register")
-async def auth_register(request: Request) -> Any:
+async def auth_register(request: Request) -> dict[str, Any]:
     """Register a new user (admin only)."""
     try:
         _require_admin(request)
@@ -373,7 +373,7 @@ async def auth_register(request: Request) -> Any:
 
 
 @router.get("/api/auth/users")
-async def auth_users(request: Request) -> Any:
+async def auth_users(request: Request) -> dict[str, Any]:
     """List all users (admin only)."""
     try:
         _require_admin(request)
@@ -390,7 +390,7 @@ async def auth_users(request: Request) -> Any:
 
 
 @router.delete("/api/auth/users/{username}")
-async def auth_delete_user(username: str, request: Request) -> Any:
+async def auth_delete_user(username: str, request: Request) -> dict[str, Any]:
     """Delete a user (admin only, cannot delete admin)."""
     try:
         _require_admin(request)
@@ -406,7 +406,7 @@ async def auth_delete_user(username: str, request: Request) -> Any:
 
 
 @router.put("/api/auth/users/{username}")
-async def auth_update_user(username: str, request: Request) -> Any:
+async def auth_update_user(username: str, request: Request) -> dict[str, Any]:
     """Update user roles, enabled status, or password (admin only)."""
     try:
         _require_admin(request)

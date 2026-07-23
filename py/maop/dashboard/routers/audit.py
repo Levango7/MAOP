@@ -78,7 +78,7 @@ async def list_events(
     hours: int = 24,
     limit: int = 100,
     offset: int = 0,
-) -> Any:
+) -> dict[str, Any]:
     """List audit events with optional filters."""
     require_admin(request)
     mgr = _get_logger()
@@ -118,7 +118,7 @@ async def get_summary(
     request: Request,
     tenant_id: str = "",
     hours: int = 24,
-) -> Any:
+) -> dict[str, Any]:
     """Get audit event summary (counts by action, critical count)."""
     require_admin(request)
     mgr = _get_logger()

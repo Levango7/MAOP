@@ -28,7 +28,7 @@ def _get_subagent_mgr() -> Any:
 
 @router.post("/api/subagent/spawn")
 @handle_api_errors("SubAgent spawn", error_value={"status": "error", "error": "Spawn failed"})
-async def api_subagent_spawn(request: Request) -> Any:
+async def api_subagent_spawn(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     agent_name = body.get("agent", "")
@@ -51,7 +51,7 @@ async def api_subagent_spawn(request: Request) -> Any:
 
 @router.post("/api/subagent/wait")
 @handle_api_errors("SubAgent wait", error_value={"status": "error", "error": "Wait failed"})
-async def api_subagent_wait(request: Request) -> Any:
+async def api_subagent_wait(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     agent_id = body.get("agent_id", "")
@@ -67,7 +67,7 @@ async def api_subagent_wait(request: Request) -> Any:
 
 @router.post("/api/subagent/cancel")
 @handle_api_errors("SubAgent cancel", error_value={"status": "error", "error": "Cancel failed"})
-async def api_subagent_cancel(request: Request) -> Any:
+async def api_subagent_cancel(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
     agent_id = body.get("agent_id", "")
@@ -85,7 +85,7 @@ async def api_subagent_cancel(request: Request) -> Any:
 
 @router.get("/api/subagent/list")
 @handle_api_errors("SubAgent list", error_value={"agents": [], "count": 0, "error": "List failed"})
-async def api_subagent_list() -> Any:
+async def api_subagent_list() -> dict[str, Any]:
     mgr = _get_subagent_mgr()
     agents = mgr.list_agents()
     return {"agents": agents, "count": len(agents)}
@@ -93,7 +93,7 @@ async def api_subagent_list() -> Any:
 
 @router.get("/api/subagent/transcript")
 @handle_api_errors("SubAgent transcript", error_value={"status": "error", "error": "Transcript failed"})
-async def api_subagent_transcript(agent_id: str = "") -> Any:
+async def api_subagent_transcript(agent_id: str = "") -> dict[str, Any]:
     if not agent_id:
         raise HTTPException(400, "missing agent_id")
     mgr = _get_subagent_mgr()

@@ -1,6 +1,7 @@
-﻿"""MAOP Dashboard — Cost Tracker API endpoints."""
+"""MAOP Dashboard — Cost Tracker API endpoints."""
 
 from __future__ import annotations
+from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
@@ -26,7 +27,7 @@ async def get_cost_entries(
     start_date: str = Query("", description="Start date (ISO)"),
     end_date: str = Query("", description="End date (ISO)"),
     limit: int = Query(100, ge=1, le=1000),
-):
+) -> dict[str, Any]:
     tracker = _get_cost_tracker()
     entries = tracker.get_entries(
         session_id=session_id or "",
@@ -46,7 +47,7 @@ async def get_cost_summary(
     agent: str = Query("", description="Filter by agent"),
     start_date: str = Query("", description="Start date (ISO)"),
     end_date: str = Query("", description="End date (ISO)"),
-):
+) -> dict[str, Any]:
     tracker = _get_cost_tracker()
     summary = tracker.summary(
         session_id=session_id or "",
@@ -59,7 +60,7 @@ async def get_cost_summary(
 
 @router.get("/budget")
 @handle_api_errors
-async def get_budget_status():
+async def get_budget_status() -> dict[str, Any]:
     tracker = _get_cost_tracker()
     status = tracker.budget_status()
     return {"budget": status.model_dump()}
@@ -67,14 +68,14 @@ async def get_budget_status():
 
 @router.get("/pricing")
 @handle_api_errors
-async def get_pricing():
+async def get_pricing() -> dict[str, Any]:
     tracker = _get_cost_tracker()
     return {"pricing": tracker.get_pricing()}
 
 
 @router.put("/pricing/{model}")
 @handle_api_errors
-async def update_pricing(model: str, body: dict, request: Request):
+async def update_pricing(model: str, body: dict, request: Request) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_cost_tracker()
     tracker.update_pricing(
@@ -87,7 +88,7 @@ async def update_pricing(model: str, body: dict, request: Request):
 
 @router.post("/record")
 @handle_api_errors
-async def record_cost(body: dict, request: Request):
+async def record_cost(body: dict, request: Request) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_cost_tracker()
     entry = tracker.record(
