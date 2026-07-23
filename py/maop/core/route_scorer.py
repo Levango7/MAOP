@@ -160,18 +160,23 @@ class RouteScorer:
         self._cooldowns.pop(agent, None)
 
     def is_agent_in_cooldown(self, agent: str) -> bool:
-        """Check if an agent is currently in cooldown (recently failed)."""
+        """Check if an agent is currently in cooldown (recently failed).
+
+        Multiple failures extend cooldown: fail_count=1 -> 1x, 2 -> 1.5x,
+        3 -> 2x, 4+ -> 2.5x of _COOLDOWN_SEC.
+        """
         cd = self._cooldowns.get(agent)
         if cd is None:
             return False
         elapsed = time.time() - cd.last_fail_ts
-        if elapsed > _COOLDOWN_SEC:
-            # Cooldown expired
+        # Compute extended cooldown FIRST, then check (B-P0-1 fix: was checked
+        # against base _COOLDOWN_SEC, making extension logic unreachable)
+        extended = _COOLDOWN_SEC * (1 + min(cd.fail_count - 1, 3) * 0.5)
+        if elapsed > extended:
+            # Cooldown (with extension) expired
             del self._cooldowns[agent]
             return False
-        # Multiple failures extend cooldown
-        extended = _COOLDOWN_SEC * (1 + min(cd.fail_count - 1, 3) * 0.5)
-        return elapsed < extended
+        return True
 
     def get_cooldown_status(self) -> list[dict[str, Any]]:
         """Get current cooldown status for all agents (for dashboard)."""
@@ -179,7 +184,8 @@ class RouteScorer:
         result = []
         for agent, cd in self._cooldowns.items():
             elapsed = now - cd.last_fail_ts
-            remaining = max(0, _COOLDOWN_SEC - elapsed)
+            extended = _COOLDOWN_SEC * (1 + min(cd.fail_count - 1, 3) * 0.5)
+            remaining = max(0, extended - elapsed)
             if remaining > 0:
                 result.append({
                     "agent": agent,

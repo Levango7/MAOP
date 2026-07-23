@@ -37,6 +37,9 @@ class AgentDef(BaseModel):
     driver: str = "cli"  # cli | powershell | wrapper
     capabilities: list[str] = Field(default_factory=list)
     model: str = ""
+    # P2-8 fix: enabled field was silently ignored (extra='ignore' default),
+    # causing disabled agents to be registered as enabled=True.
+    enabled: bool = True
     # F2b (2026-07-22, Phase F): LLM provider name for direct API path
     # (ADR-013 dual-path). Maps to ProviderConfig.name in models.yaml.
     # Empty by default — preserves prior CLI-only behavior.

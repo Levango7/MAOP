@@ -203,7 +203,11 @@ _rl_enabled = os.environ.get("MAOP_RATE_LIMIT", "1") == "1"
 _rl_rate = float(os.environ.get("MAOP_RATE_LIMIT_RPS", "30"))
 _rl_burst = int(os.environ.get("MAOP_RATE_LIMIT_BURST", "60"))
 app.add_middleware(RateLimitMiddleware, rate=_rl_rate, burst=_rl_burst, enabled=_rl_enabled)
-_auth_enabled = os.environ.get("MAOP_AUTH", "0") == "1"
+# C-P0-1 fix: production defaults to auth enabled for safety
+_env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
+_auth_enabled = os.environ.get("MAOP_AUTH", "1" if _env_is_prod else "0") == "1"
+if _env_is_prod and not _auth_enabled:
+    logger.warning("[security] MAOP_AUTH=0 in production — all write endpoints exposed!")
 app.add_middleware(
     AuthMiddleware,
     enabled=_auth_enabled,
@@ -320,7 +324,7 @@ except Exception as _a2a_exc:
 # explicit `logger.warning` + a `has_<name>_router` flag. The previous
 # behavior silently degraded ENTERPRISE mode to "router enabled but 404
 # on every call" because the missing module was treated as a non-event.
-# Phase C will create the missing files (routers/{rbac,tenant,audit,sso}.py)
+# Enterprise routers (files already exist in routers/) (routers/{rbac,tenant,audit,sso}.py)
 # and flip these flags to True.
 _edition_settings = _get_settings()
 has_tenant_router: bool = False

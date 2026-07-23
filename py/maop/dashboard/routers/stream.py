@@ -41,7 +41,9 @@ async def global_state_stream(request: Request) -> Any:
                 try:
                     from maop.dashboard.data_bridge import get_bridge
                     bridge = get_bridge()
-                    snap = bridge.snapshot() if bridge else {}
+                    # F-P0-1 fix: call async snapshot() properly
+                    import asyncio as _aio
+                    snap = await bridge.snapshot() if bridge else {}
                     if snap:
                         state.update({
                             "agents": snap.get("agents_count", 0),
@@ -51,9 +53,11 @@ async def global_state_stream(request: Request) -> Any:
                             "cpu_pct": snap.get("cpu_pct", 0),
                             "queue_health_pct": snap.get("queue_health_pct", 0),
                             "active_streams": snap.get("active_streams", 0),
+                            "success_rate": snap.get("success_rate", 0),
+                            "delegations": snap.get("delegations", []),
                         })
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("[stream] snapshot failed: %s", exc)
                 yield f"event: state\ndata: {json.dumps(state)}\n\n"
             except Exception:
                 pass

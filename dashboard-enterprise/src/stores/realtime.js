@@ -28,7 +28,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
       typeof window !== 'undefined' && window.location
         ? window.location.hostname
         : 'localhost';
-    const url = `ws://${hostname}:9079/ws`;
+    const url = `ws://${hostname}:${location.port}/ws`;
 
     // useWebSocket auto-registers onMounted/onUnmounted only when called
     // inside a component setup; here we drive connect()/disconnect() manually.

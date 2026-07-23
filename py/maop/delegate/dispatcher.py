@@ -210,6 +210,10 @@ class Dispatcher:
             if isinstance(agents, dict):
                 a = agents.get(agent_name)
                 if a is not None:
+                    # B-P0-4 fix: respect enabled: false (was silently ignored)
+                    if getattr(a, 'enabled', True) is False:
+                        logger.warning("Agent '%s' is disabled (enabled: false)", agent_name)
+                        return None
                     cfg = AgentConfig(
                         name=agent_name, cli=a.cli, driver=a.driver,
                         cli_args=getattr(a, 'cli_args', ''),
@@ -224,6 +228,10 @@ class Dispatcher:
                 agents_by_name = self._build_agents_index(agents)
                 a = agents_by_name.get(agent_name)
                 if a is not None:
+                    # B-P0-4 fix: respect enabled: false
+                    if getattr(a, 'enabled', True) is False:
+                        logger.warning("Agent '%s' is disabled (enabled: false)", agent_name)
+                        return None
                     cfg = AgentConfig(
                         name=a.name, cli=a.cli, driver=a.driver,
                         cli_args=a.cli_args, capabilities=a.capabilities,

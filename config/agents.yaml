@@ -23,6 +23,10 @@ agents:
     - docgen
     - quickfix
     - fileops
+    - chat
+    - memory
+    - vision
+    - multimodal
     cli: claude
     cli_args: -p '{task}'
     description: Claude Code v2.1.212 + StepFun step-3.7-flash

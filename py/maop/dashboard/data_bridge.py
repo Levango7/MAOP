@@ -366,6 +366,62 @@ class DataBridge:
             "status": "active" if rules else "no_rules",
         }
 
+    async def snapshot(self) -> dict[str, Any]:
+        """Aggregate system snapshot for SSE/streaming endpoints.
+
+        F-P0-1 fix: stream.py calls bridge.snapshot() but this method
+        was missing, causing SSE to silently fail. Returns fields
+        expected by frontend (Overview.vue, Monitor.vue):
+        agents_count, healthy_agents, total_agents, memory_usage_pct,
+        cpu_pct, queue_health_pct, active_streams, success_rate,
+        delegations.
+        """
+        start = time.monotonic()
+        try:
+            live_data = await self.live()
+            agents = await self.agent_stats()
+        except Exception as exc:
+            logger.warning("[bridge] snapshot aggregation failed: %s", exc)
+            return {}
+
+        total = len(agents)
+        healthy = sum(1 for a in agents if a.get("state", "closed") == "closed")
+        recent_delegations = live_data.get("recent_delegations", [])
+        total_delegations = len(recent_delegations)
+        successes = sum(1 for d in recent_delegations if d.get("exit_code") == 0)
+        success_rate = (successes / total_delegations * 100) if total_delegations else 100.0
+
+        # Queue health: ratio of pending to total (lower = healthier)
+        try:
+            qstats = await asyncio.get_event_loop().run_in_executor(
+                None, self._queue_stats_sync
+            )
+            pending = qstats.get("pending", 0)
+            queue_health = max(0, 100 - pending * 5)
+        except Exception:
+            queue_health = 100.0
+
+        # Memory usage (approximate from memory_stats)
+        try:
+            mem = await self.memory_stats()
+            memory_pct = mem.get("usage_pct", 0)
+        except Exception:
+            memory_pct = 0
+
+        self._record_latency(start)
+        return {
+            "agents_count": total,
+            "healthy_agents": healthy,
+            "total_agents": total,
+            "memory_usage_pct": memory_pct,
+            "cpu_pct": 0,  # CPU not tracked in DB; placeholder
+            "queue_health_pct": queue_health,
+            "active_streams": 0,  # Updated by streaming registry
+            "success_rate": round(success_rate, 1),
+            "delegations": recent_delegations[:10],
+            "timestamp": live_data.get("timestamp", ""),
+        }
+
     def _queue_stats_sync(self) -> dict[str, int]:
         """Sync queue stats — for run_in_executor."""
         pool = self._pool_queue()

@@ -11,9 +11,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from maop.config.loader import load_config
+from maop.core.middleware import require_admin
 from maop.core.route_scorer import get_route_scorer
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,8 @@ router = APIRouter(prefix="/api/routing", tags=["routing"])
 
 
 @router.post("/match")
-async def preview_match(body: dict[str, Any]) -> dict[str, Any]:
+async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any]:
+    require_admin(request)
     """Preview route matching for a task description.
 
     Returns the matched route, agent, score, confidence, and all candidate

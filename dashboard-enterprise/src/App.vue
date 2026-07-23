@@ -57,9 +57,27 @@
     </main>
     <div v-if="authExpired" class="auth-overlay">
       <div class="auth-card">
-        <h3>Session Expired</h3>
-        <p>Your authentication token is no longer valid. Please sign in again.</p>
-        <button @click="reloadForLogin">Sign In</button>
+        <h3>{{ loginTitle }}</h3>
+        <p v-if="loginError" class="login-error">{{ loginError }}</p>
+        <form @submit.prevent="doLogin">
+          <input
+            v-model="loginUsername"
+            type="text"
+            placeholder="Username"
+            autocomplete="username"
+            :disabled="loginLoading"
+          />
+          <input
+            v-model="loginPassword"
+            type="password"
+            placeholder="Password"
+            autocomplete="current-password"
+            :disabled="loginLoading"
+          />
+          <button type="submit" :disabled="loginLoading || !loginUsername || !loginPassword">
+            {{ loginLoading ? 'Signing in...' : 'Sign In' }}
+          </button>
+        </form>
       </div>
     </div>
   </div>
@@ -78,6 +96,12 @@ const realtimeConnected = computed(() => realtime.connected);
 const isLight = ref(localStorage.getItem('maop_theme') !== 'dark');
 const version = ref('4.0.0');
 const authExpired = ref(false);
+// F-P0-8 fix: login form state
+const loginUsername = ref('');
+const loginPassword = ref('');
+const loginError = ref('');
+const loginLoading = ref(false);
+const loginTitle = ref('Sign In');
 
 // D3 (2026-07-22, Phase D): responsive drawer state.
 // On desktop (≥900px) the sidebar is a static flex column and these
@@ -124,11 +148,43 @@ function toggleTheme() {
 }
 
 // 401 监听：由 api store 触发，显示会话过期浮层
-function onUnauthorized() { authExpired.value = true; }
+function onUnauthorized() {
+  authExpired.value = true;
+  loginTitle.value = 'Session Expired';
+  loginError.value = '';
+}
+
+async function doLogin() {
+  loginLoading.value = true;
+  loginError.value = '';
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: loginUsername.value,
+        password: loginPassword.value,
+      }),
+    });
+    const data = await r.json();
+    if (r.ok && data.status === 'ok' && data.token) {
+      localStorage.setItem('maop_token', data.token);
+      authExpired.value = false;
+      loginPassword.value = '';
+      // Reload to re-initialize stores with new token
+      if (typeof window !== 'undefined' && window.location) window.location.reload();
+    } else {
+      loginError.value = data.error || 'Login failed';
+    }
+  } catch (e) {
+    loginError.value = e.message || 'Network error';
+  } finally {
+    loginLoading.value = false;
+  }
+}
 
 function reloadForLogin() {
   authExpired.value = false;
-  // 清除 token 后刷新整页，触发后端登录流程
   api.clearAuthToken();
   if (typeof window !== 'undefined' && window.location) window.location.reload();
 }
@@ -208,7 +264,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans
 .auth-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 360px; text-align: center; }
 .auth-card h3 { margin-bottom: 12px; color: var(--text); }
 .auth-card p { color: var(--text2); font-size: 13px; margin-bottom: 16px; }
-.auth-card button { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-size: 13px; }
+.auth-card button { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-size: 13px; width: 100%; margin-top: 8px; }
+.auth-card button:disabled { opacity: 0.5; cursor: not-allowed; }
+.auth-card form { display: flex; flex-direction: column; gap: 8px; }
+.auth-card input { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 13px; }
+.auth-card input:focus { outline: none; border-color: var(--accent); }
+.login-error { color: var(--fail); font-size: 12px; margin-bottom: 8px; }
 
 .light-theme .panel,
 .light-theme .stat-card,

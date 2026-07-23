@@ -119,10 +119,6 @@ def _ensure_default_user() -> None:
                         "MAOP_ADMIN_PASSWORD not set — generated random admin password "
                         "(set MAOP_ADMIN_PASSWORD env var for production)"
                     )
-                    logger.warning(
-                        "[auth] No MAOP_ADMIN_PASSWORD set — generated random admin password "
-                        "(printed to stderr). Set MAOP_ADMIN_PASSWORD env var for production."
-                    )
                 pwd_hash = _hash_password(admin_pwd)
                 conn.execute(
                     "INSERT INTO users (username, password_hash, roles, created_at, enabled) VALUES (?, ?, ?, ?, 1)",
@@ -234,11 +230,24 @@ _MAX_LOGIN_FAILURES = 5
 _LOCKOUT_SECONDS = 900.0
 
 @router.get("/api/auth/status")
-async def auth_status() -> Any:
+async def auth_status(request: Request) -> Any:
     """Check if auth is enabled and whether user is logged in."""
+    # F-P0-8 fix: check actual token from Authorization header
+    has_token = False
+    if _auth_enabled:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            try:
+                mgr = get_auth_mgr()
+                payload = mgr.jwt_handler.verify_token(token)
+                if payload:
+                    has_token = True
+            except Exception:
+                pass
     return {
         "auth_enabled": _auth_enabled,
-        "has_token": False,
+        "has_token": has_token,
     }
 
 

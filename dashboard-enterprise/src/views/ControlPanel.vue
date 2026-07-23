@@ -107,9 +107,21 @@ async function execAction(action, task) {
   loading.value = true;
   execResult.value = null;
   try {
-    const body = { action };
+    // F-P0-5 fix: dispatch to correct endpoint per action
+    const body = {};
     if (task) body.task = task;
-    const r = await api.post('/api/control/run', body);
+    let r;
+    if (action === 'status') {
+      // GET /api/control/status
+      r = await api.get('/api/control/status');
+    } else {
+      // POST /api/control/{action}
+      const validActions = ['run', 'pause', 'resume', 'stop', 'validate', 'doctor'];
+      if (!validActions.includes(action)) {
+        throw new Error(`Unknown action: ${action}`);
+      }
+      r = await api.post(`/api/control/${action}`, body);
+    }
     execResult.value = { ok: true, msg: r.message || r.detail || `${action} executed` };
     await loadJobs();
   } catch (e) {

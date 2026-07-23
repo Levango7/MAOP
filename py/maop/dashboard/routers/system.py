@@ -290,19 +290,13 @@ async def api_agent_upgrade_get(agent: str = "") -> Any:
 # ── Workflow Management ───────────────────────────────────────────
 @router.get("/api/workflow/list")
 async def api_workflow_list() -> Any:
-    try:
-        from maop.engine import WorkflowEngine  # type: ignore[attr-defined]
-        eng = WorkflowEngine(root_dir=str(MAOP_ROOT))
-        steps = eng.list_steps() if hasattr(eng, "list_steps") else []
-        return {"workflows": steps, "count": len(steps)}
-    except Exception as exc:
-        logger.error('Workflow list failed: %s', exc)
-        cfg_dir = MAOP_ROOT / "config"
-        wfs = []
-        for f in cfg_dir.glob("*.yaml"):
-            if "workflow" in f.name.lower() or "pipeline" in f.name.lower():
-                wfs.append({"name": f.stem, "file": str(f)})
-        return {"workflows": wfs, "count": len(wfs), "error": "Workflow list failed" if not wfs else None}
+    """List available workflows from config directory."""
+    cfg_dir = MAOP_ROOT / "config"
+    wfs = []
+    for f in cfg_dir.glob("*.yaml"):
+        if "workflow" in f.name.lower() or "pipeline" in f.name.lower():
+            wfs.append({"name": f.stem, "file": str(f)})
+    return {"workflows": wfs, "count": len(wfs)}
 
 @router.post("/api/workflow/run")
 async def api_workflow_run(request: Request) -> Any:
@@ -406,18 +400,6 @@ async def api_coordination_report_v4() -> Any:
 async def api_workflows_v4() -> Any:
     try:
         wfs = []
-        try:
-            from maop.engine import WorkflowEngine  # type: ignore[attr-defined]
-            eng = WorkflowEngine(root_dir=str(MAOP_ROOT))
-            if hasattr(eng, "list_steps"):
-                steps = eng.list_steps()
-                for s in (steps if isinstance(steps, list) else []):
-                    if isinstance(s, dict):
-                        wfs.append({"name": s.get("name", ""), "type": "engine", "description": s.get("description", ""), "steps": s.get("steps", [])})
-                    elif isinstance(s, str):
-                        wfs.append({"name": s, "type": "engine"})
-        except Exception as exc:
-            logger.warning('Failed to list workflow steps: %s', exc)
         wf_dir = MAOP_ROOT / "config" / "workflows"
         if not wf_dir.exists():
             wf_dir = MAOP_ROOT / "workflows"

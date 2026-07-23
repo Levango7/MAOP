@@ -77,16 +77,19 @@ async function createTenant() {
 }
 
 async function suspendTenant(id) {
-  try { await api.post('/api/tenant/suspend', { tenant_id: id }); await loadTenants(); } catch {}
+  // F-P0-6 fix: use path parameter instead of body
+  try { await api.post(`/api/tenant/${id}/suspend`, {}); await loadTenants(); } catch {}
 }
 
 async function activateTenant(id) {
-  try { await api.post('/api/tenant/activate', { tenant_id: id }); await loadTenants(); } catch {}
+  // F-P0-6 fix: use path parameter instead of body
+  try { await api.post(`/api/tenant/${id}/activate`, {}); await loadTenants(); } catch {}
 }
 
 async function deleteTenant(id) {
   if (!confirm('Delete tenant ' + id + '? This cannot be undone.')) return;
-  try { await api.post('/api/tenant/delete', { tenant_id: id }); await loadTenants(); } catch {}
+  // F-P0-6 fix: use DELETE method with path parameter
+  try { await api.delete(`/api/tenant/${id}`); await loadTenants(); } catch {}
 }
 
 onMounted(loadTenants);

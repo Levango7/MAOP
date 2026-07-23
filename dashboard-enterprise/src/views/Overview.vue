@@ -106,21 +106,23 @@ async function loadStats() {
   } catch {}
   try {
     const r = await api.get('/api/report?hours=24');
-    agentCount.value = r.agents?.length || 0;
-    memEntries.value = r.memory_entries || 0;
-    costToday.value = (r.cost_today || 0).toFixed(2);
-    taskCount.value = r.total_tasks || 0;
+    // F-P0-2 fix: use actual backend response fields
+    agentCount.value = r.by_agent?.length || 0;
+    memEntries.value = 0;  // not available in report
+    costToday.value = '0.00';  // not available in report
+    taskCount.value = r.total_delegations || 0;
   } catch {}
 }
 
 async function loadHealth() {
   try {
-    const live = await api.get('/api/live');
+    // F-P0-2 fix: use /api/snapshot (has aggregated metrics)
+    const snap = await api.get('/api/snapshot');
     health.value[0].pct = 100;
-    health.value[1].pct = Math.min(100, Math.round(live.memory_usage_pct || 0));
-    health.value[2].pct = Math.min(100, Math.round((live.healthy_agents || 0) / Math.max(1, live.total_agents || 1) * 100));
-    health.value[3].pct = Math.min(100, Math.round(live.queue_health_pct || 0));
-    health.value[4].pct = Math.min(100, Math.round(live.cpu_pct || 0));
+    health.value[1].pct = Math.min(100, Math.round(snap.memory_usage_pct || 0));
+    health.value[2].pct = Math.min(100, Math.round((snap.healthy_agents || 0) / Math.max(1, snap.total_agents || 1) * 100));
+    health.value[3].pct = Math.min(100, Math.round(snap.queue_health_pct || 0));
+    health.value[4].pct = Math.min(100, Math.round(snap.cpu_pct || 0));
   } catch {
     for (const h of health.value) h.pct = '--';
   }

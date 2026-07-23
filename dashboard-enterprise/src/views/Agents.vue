@@ -136,16 +136,16 @@ function selectAgent(a) {
 }
 
 async function switchModel(a) {
-  // P1-12 fix: use /api/agents/{name}/model endpoint
-  try { await api.put(`/api/agents/${a.name}/model`, { model: a.model }); loadAgents(); } catch {}
+  // F-P0-4 fix: PUT /model endpoint not implemented, use alert
+  alert(`Model switching for ${a.name} is not yet supported. Please edit config/agents.yaml to change the model.`);
 }
 async function healthCheck(a) {
   // P1-12 fix: use /api/agents/{name}/health-check endpoint
   try { await api.post(`/api/agents/${a.name}/health-check`, {}); loadAgents(); } catch {}
 }
 async function restartAgent(a) {
-  // P1-12 fix: use /api/agents/{name}/restart endpoint (if available)
-  try { await api.post(`/api/agents/${a.name}/restart`, {}); loadAgents(); } catch {}
+  // F-P0-4 fix: POST /restart endpoint not implemented, use health-check
+  try { await api.post(`/api/agents/${a.name}/health-check`, {}); loadAgents(); } catch {}
 }
 
 async function loadAgents() {

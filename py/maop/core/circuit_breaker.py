@@ -349,8 +349,9 @@ class CircuitBreaker:
                     elapsed = time.time() - entry.last_failure
                     if elapsed >= entry.cooldown_s:
                         # Auto-transition to half-open
+                        old_state = entry.state
                         entry.state = BreakerState.HALF_OPEN
-                        self._save_agent(agent_name, entry)
+                        self._save_agent(agent_name, entry, old_state=old_state)
                         return True
                 return False
             return False
@@ -420,29 +421,38 @@ class CircuitBreaker:
         Args:
             probe: Optional async or sync callable(agent_name) -> bool.
                    If provided, half-open agents are only recovered when
-                   probe returns True. If omitted, recovery still requires
-                   cooldown to have elapsed (no real probe).
+                   probe returns True. If omitted, HALF_OPEN agents are
+                   NOT auto-recovered — they must wait for a real request
+                   to test the agent (record_success/record_failure).
+
+        B-P0-5 fix: Previously, when probe=None, HALF_OPEN agents were
+        immediately recovered to CLOSED because last_failure was not
+        updated on OPEN→HALF_OPEN transition, making elapsed >= cooldown_s
+        always true. This bypassed the probe semantics. Now, without a
+        probe, HALF_OPEN agents stay in HALF_OPEN until a real request
+        tests them.
         """
         with self._sync_lock:
             recovered: dict[str, BreakerState] = {}
             for agent_name, entry in list(self._data.items()):
                 if entry.state == BreakerState.HALF_OPEN:
-                    if entry.last_failure is not None:
-                        elapsed = time.time() - entry.last_failure
-                        if elapsed >= entry.cooldown_s:
-                            if probe is not None:
-                                try:
-                                    is_healthy = probe(agent_name)
-                                except Exception as exc:
-                                    logger.warning("[breaker] Probe for %s failed: %s", agent_name, exc)
-                                    is_healthy = False
-                                if not is_healthy:
-                                    continue
-                            entry.state = BreakerState.CLOSED
-                            entry.failures = 0
-                            self._save_agent(agent_name, entry)
-                            recovered[agent_name] = BreakerState.CLOSED
-                            logger.info("[breaker] Health check: %s recovered to CLOSED%s", agent_name, " (probed)" if probe else " (cooldown)")
+                    if probe is None:
+                        # B-P0-5 fix: require real probe or actual request
+                        # to recover from HALF_OPEN
+                        continue
+                    try:
+                        is_healthy = probe(agent_name)
+                    except Exception as exc:
+                        logger.warning("[breaker] Probe for %s failed: %s", agent_name, exc)
+                        continue
+                    if not is_healthy:
+                        continue
+                    old_state = entry.state
+                    entry.state = BreakerState.CLOSED
+                    entry.failures = 0
+                    self._save_agent(agent_name, entry, old_state=old_state)
+                    recovered[agent_name] = BreakerState.CLOSED
+                    logger.info("[breaker] Health check: %s recovered to CLOSED (probed)", agent_name)
 
             return recovered
 

@@ -127,9 +127,12 @@ class ExecuteMixin:
                 group_results = await asyncio.gather(*coros, return_exceptions=True)
                 for gr in group_results:
                     if isinstance(gr, Exception):
+                        # B-P0-3 fix: continue on exception, was using undefined
+                        # st_id/result from previous iteration causing NameError
+                        # or wrong data
                         logger.warning("Parallel subtask failed: %s", gr)
-                    else:
-                        st_id, result = gr  # type: ignore[misc]
+                        continue
+                    st_id, result = gr  # type: ignore[misc]
                     subtask_results[st_id] = result  # type: ignore[assignment]
 
             self._log("execute", "INFO",
@@ -148,7 +151,7 @@ class ExecuteMixin:
             exit_code=0 if all_success else 1,
             stdout=combined_stdout,
             error="\n".join(r.error for r in combined_errors if r.error) or None,
-            duration_ms=sum(r.duration_ms for r in subtask_results.values()),
+            duration_ms=max((r.duration_ms for r in subtask_results.values()), default=0),
             trace_id=trace_id, routing_key=routing_key,
         )
 
@@ -177,7 +180,10 @@ class ExecuteMixin:
             if attempt > 0:
                 await asyncio.sleep(lc.retry_backoff_ms / 1000)
 
-            for iteration in range(lc.iterative_max_attempts):
+            # B-P0-2 fix: respect retry parameter — when False (parallel
+            # execution), only try once per agent, no iterative retry
+            max_iterations = lc.iterative_max_attempts if retry else 1
+            for iteration in range(max_iterations):
                 if iteration > 0:
                     await asyncio.sleep(lc.iterative_backoff_ms / 1000)
 
@@ -191,9 +197,18 @@ class ExecuteMixin:
 
                     if result.is_success():
                         return cast(MaopResult | None, result)
-                    else:
-                        logger.info("Agent %s failed (exit=%d), iter=%d",
-                                    agent, result.exit_code, iteration + 1)
+
+                    # P2-10 fix: if breaker tripped, stop retrying this agent
+                    # and move to next in fallback chain immediately.
+                    if getattr(dispatch_result, 'breaker_tripped', False):
+                        logger.warning(
+                            "Agent %s breaker tripped, skipping remaining retries",
+                            agent,
+                        )
+                        break
+
+                    logger.info("Agent %s failed (exit=%d), iter=%d",
+                                agent, result.exit_code, iteration + 1)
                 except Exception as exc:
                     logger.warning("Agent %s threw exception: %s", agent, exc)
 

@@ -116,7 +116,7 @@ const statsCards = ref([
 
 async function triggerEvolve() {
   evolving.value = true;
-  try { await api.post('/api/evolve/trigger', { strategies: 'all' }); } catch {}
+  try { await api.post('/api/evolve/analyze', { strategies: 'all' }); } catch {}
   setTimeout(() => { evolving.value = false; }, 3000);
 }
 

@@ -90,6 +90,13 @@ async def api_live(request: Request) -> Any:
     return await get_bridge().live()
 
 
+@router.get("/api/snapshot")
+async def api_snapshot(request: Request) -> Any:
+    """F-P0-2 fix: Aggregate snapshot for Overview.vue health metrics."""
+    require_admin(request)
+    return await get_bridge().snapshot()
+
+
 @router.get("/api/failures")
 async def api_failures() -> Any:
     return await get_bridge().failures()

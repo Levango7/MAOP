@@ -84,6 +84,8 @@ import { useApiStore } from '../stores/api.js';
 import { useStreamingFetch } from '../composables/useStreamingFetch.js';
 
 const api = useApiStore();
+// F-P0-3 fix: composable must be called at setup top level, not inside function
+const { stream } = useStreamingFetch();
 const agents = ref([]);
 const selectedAgent = ref('');
 const sessionId = ref('');
@@ -162,9 +164,8 @@ async function sendMessage(overrideText) {
   streamContent.value = '';
 
   try {
-    // P0-1 fix: use /api/chat/stream (SSE) instead of /api/chat (JSON),
-    // and use useStreamingFetch composable for auth + SSE parsing.
-    const { stream } = useStreamingFetch();
+    // P0-1 fix: use /api/chat/stream (SSE) instead of /api/chat (JSON)
+    // F-P0-3 fix: stream() is now initialized at setup top level
     const body = {
       agent: selectedAgent.value,
       message: text,

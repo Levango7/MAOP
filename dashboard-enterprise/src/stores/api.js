@@ -82,7 +82,33 @@ export const useApiStore = defineStore('api', {
         handleUnauthorized();
         throw new Error(`API ${url}: 401 Unauthorized`);
       }
-      if (!res.ok) throw new Error(`API ${url}: ${res.status}`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || `API ${url}: ${res.status}`);
+      }
+      return res.json();
+    },
+    /** PUT 请求，自动注入 Bearer token */
+    async put(url, body) {
+      const res = await fetch(url, withAuth(
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) },
+        { 'Content-Type': 'application/json' }
+      ));
+      if (res.status === 401) { handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || `API ${url}: ${res.status}`);
+      }
+      return res.json();
+    },
+    /** DELETE 请求，自动注入 Bearer token */
+    async delete(url) {
+      const res = await fetch(url, withAuth({ method: 'DELETE' }, {}));
+      if (res.status === 401) { handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || `API ${url}: ${res.status}`);
+      }
       return res.json();
     },
     /**
