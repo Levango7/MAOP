@@ -89,43 +89,33 @@ def _adaptive_agent_select(route: RouteEntry, rk: str) -> str:
 
 
 def _route_by_config(task: str, config: MaopConfig | None, *, adaptive: bool = True) -> tuple[str, str] | None:
-    """Route using config routing table (match regex + keywords) + adaptive selection.
+    """Route using config routing table with multi-factor scoring.
 
-    ADR-012: This function takes precedence over hardcoded _ROUTING_RULES.
+    Uses RouteScorer to evaluate ALL routes and pick the best match by score,
+    instead of first-match-wins. Handles ambiguous tasks that match multiple
+    routing keys (e.g. "写个测试" matches both codegen and verify).
 
-    Priority:
-      1. route.match (regex) — exact pattern match wins first
-      2. route.keywords — any keyword literal match in task text
-      3. If both empty, skip this route
-      4. Adaptive: if multiple candidates exist, pick best by performance
+    Scoring: regex(50%) + keyword_count(30%) + capability_bonus(15%) + specificity(5%)
+    Confidence: high(>=0.60) / medium(>=0.35) / low(<0.35)
+
+    Also applies agent cooldown — agents that recently failed are skipped in
+    favor of fallback candidates.
 
     Returns (routing_key, selected_agent) or None.
     """
     if config is None:
         return None
 
-    task_lower = task.lower()
-    for rk, route in config.routing.items():
-        matched = False
-        # Step 1: try regex match (most specific)
-        if route.match:
-            try:
-                if re.search(route.match, task_lower):
-                    matched = True
-            except re.error:
-                logger.warning("Invalid regex in routing.%s.match: %r", rk, route.match)
-
-        # Step 2: try keyword list match
-        if not matched and route.keywords:
-            for kw in route.keywords:
-                if kw.lower() in task_lower:
-                    matched = True
-                    break
-
-        if matched:
-            agent = _adaptive_agent_select(route, rk) if adaptive else route.primary
-            logger.debug("Route config: matched rk=%s agent=%s", rk, agent)
-            return rk, agent
+    from maop.core.route_scorer import get_route_scorer
+    scorer = get_route_scorer(config)
+    match = scorer.match(task, adaptive=adaptive)
+    if match:
+        logger.debug(
+            "Route config: rk=%s agent=%s score=%.2f confidence=%s matched_by=%s",
+            match.routing_key, match.agent, match.score,
+            match.confidence, match.matched_by,
+        )
+        return match.routing_key, match.agent
 
     return None
 

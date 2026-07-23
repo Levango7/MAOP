@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, getCurrentInstance } from 'vue';
 
 export function useWebSocket(url = '') {
   const connected = ref(false);
@@ -67,8 +67,14 @@ export function useWebSocket(url = '') {
     connected.value = false;
   }
 
-  onMounted(connect);
-  onUnmounted(disconnect);
+  // Only auto-register lifecycle hooks when called inside a component setup
+  // context. When used from a Pinia store (no active instance), the caller
+  // drives connect()/disconnect() manually — this avoids Vue warnings and
+  // gives the store full control over the socket lifecycle.
+  if (getCurrentInstance()) {
+    onMounted(connect);
+    onUnmounted(disconnect);
+  }
 
-  return { connected, lastMessage, error, send, disconnect };
+  return { connected, lastMessage, error, send, connect, disconnect };
 }

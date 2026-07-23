@@ -36,6 +36,10 @@
       <div class="nav-footer">
         <span class="dot"></span>
         <span>v{{ version }}</span>
+        <span class="live-indicator" :class="{ connected: realtimeConnected }">
+          <span class="live-dot"></span>
+          {{ realtimeConnected ? 'Live' : 'Offline' }}
+        </span>
         <button class="theme-btn" @click="toggleTheme" :title="isLight ? 'Switch to dark' : 'Switch to light'">{{ isLight ? '🌙' : '☀️' }}</button>
       </div>
     </nav>
@@ -62,12 +66,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useEditionStore } from './stores/edition.js';
 import { useApiStore, withAuth } from './stores/api.js';
+import { useRealtimeStore } from './stores/realtime.js';
 
 const edition = useEditionStore();
 const api = useApiStore();
+const realtime = useRealtimeStore();
+const realtimeConnected = computed(() => realtime.connected);
 const isLight = ref(localStorage.getItem('maop_theme') !== 'dark');
 const version = ref('4.0.0');
 const authExpired = ref(false);
@@ -146,6 +153,8 @@ onMounted(async () => {
       // 未登录：保持默认版本号，不强制弹窗（用户可能尚未启用 auth）
     }
   } catch {}
+  // Establish the global realtime WebSocket connection.
+  realtime.connect();
 });
 
 onUnmounted(() => {
@@ -156,6 +165,8 @@ onUnmounted(() => {
   if (typeof document !== 'undefined') {
     document.body.classList.remove('light-theme');
   }
+  // Tear down the global realtime WebSocket connection.
+  realtime.disconnect();
 });
 </script>
 
@@ -186,6 +197,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans
 .nav-footer { margin-top: auto; padding: 12px 20px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text3); display: flex; align-items: center; gap: 6px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+.live-indicator { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; font-size: 11px; color: var(--text3); }
+.live-indicator .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); transition: background .2s; }
+.live-indicator.connected { color: var(--success); }
+.live-indicator.connected .live-dot { background: var(--success); animation: pulse 2s infinite; }
 .theme-btn { margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 14px; padding: 2px 6px; }
 .content { flex: 1; padding: 28px; overflow-y: auto; min-width: 0; }
 

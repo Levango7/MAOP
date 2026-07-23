@@ -90,6 +90,23 @@ agents:
     driver: cli
     model: qwen3.5-plus
     timeout_s: 120
+  copilot:
+    capabilities:
+    - codegen
+    - chat
+    - explain
+    - search
+    - review
+    - planning
+    - refactor
+    - quickfix
+    cli: copilot
+    cli_args: -p "{task}" --allow-all-tools
+    description: GitHub Copilot CLI v1.0.73 (GPT-5.4/Claude, requires GitHub auth)
+    driver: cli
+    model: gpt-5.4
+    model_display: auto (GitHub Copilot, GPT-5.4 default)
+    timeout_s: 120
   crush:
     capabilities:
     - codegen
@@ -165,12 +182,12 @@ agents:
     - review
     - fileops
     cli: goose
-    cli_args: run '{task}'
-    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check)'
-    enabled: false
+    cli_args: run --no-session -q -t '{task}'
+    description: Goose v1.43.0 (agnes-2.0-flash via custom_agnes provider, ~1.3s)
     driver: cli
-    model: auto
+    model: agnes-2.0-flash
     timeout_s: 120
+    model_display: AgnesAI agnes-2.0-flash (via Goose)
   hermes:
     capabilities:
     - codegen
@@ -415,9 +432,9 @@ loops:
     enabled: true
 routing:
   codegen:
-    fallback: cursor
+    fallback: copilot
     primary: mmx
-    tertiary: kilo
+    tertiary: cursor
     keywords:
     - 编写
     - 写代码
@@ -445,9 +462,9 @@ routing:
     - 模块
     - 项目
   chat:
-    fallback: codebuddy
+    fallback: copilot
     primary: claude
-    tertiary: kimi
+    tertiary: codebuddy
     keywords:
     - 聊天
     - 对话
@@ -570,9 +587,9 @@ routing:
     - 优化结构
     match: (?:refactor|rewrite|restructure|clean\s+up)
   review:
-    fallback: claude
+    fallback: copilot
     primary: kimi
-    tertiary: codex
+    tertiary: claude
     keywords:
     - 审查
     - 审核

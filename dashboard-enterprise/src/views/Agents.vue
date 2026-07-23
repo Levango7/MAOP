@@ -2,6 +2,7 @@
   <div class="agents-page">
     <div class="topbar">
       <h1>Agent Dispatch & Management</h1>
+      <span class="live-tag" :class="{ active: realtime.connected }">实时</span>
       <div class="view-toggle">
         <button :class="['toggle-btn', { active: viewMode === 'grid' }]" @click="viewMode = 'grid'">Grid</button>
         <button :class="['toggle-btn', { active: viewMode === 'table' }]" @click="viewMode = 'table'">Table</button>
@@ -96,11 +97,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useApiStore } from '../stores/api.js';
+import { useRealtimeStore } from '../stores/realtime.js';
 import { Panel } from '../components/index.js';
 
 const api = useApiStore();
+const realtime = useRealtimeStore();
 const agents = ref([]);
 const routes = ref([]);
 const viewMode = ref('grid');
@@ -155,11 +158,26 @@ async function loadAgents() {
   }
 }
 
+// Watch the realtime snapshot: when it carries agent-related data,
+// automatically refresh the agents list.
+watch(
+  () => realtime.snapshot,
+  (snap) => {
+    if (!snap) return;
+    const hasAgents =
+      Array.isArray(snap.agents) ||
+      (typeof snap.type === 'string' && snap.type.toLowerCase().includes('agent'));
+    if (hasAgents) loadAgents();
+  }
+);
+
 onMounted(loadAgents);
 </script>
 
 <style scoped>
 .agents-page { }
+.live-tag { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: var(--bg2); color: var(--text3); border: 1px solid var(--border); margin-left: 12px; }
+.live-tag.active { background: rgba(34,197,94,.15); color: var(--success); border-color: rgba(34,197,94,.4); }
 .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
 .topbar h1 { font-size: 24px; font-weight: 700; }
 .view-toggle { display: flex; gap: 4px; background: var(--bg2); border-radius: 10px; padding: 3px; margin-left: 16px; }

@@ -61,6 +61,7 @@ else:
 
 # ── Shared state (imported by routers) ─────────────────────────────
 from maop.dashboard.routers import state as _state
+from maop.dashboard.routers.routing_preview import router as routing_preview_router
 
 from maop import __version__ as MAOP_VERSION
 
@@ -286,6 +287,7 @@ app.include_router(tool_audit_router.router)
 
 from maop.dashboard.routers import agent_bridge as agent_bridge_router
 app.include_router(agent_bridge_router.router)
+app.include_router(routing_preview_router)
 
 # ── A2A protocol endpoint (JSON-RPC /a2a) ─────────────────────────
 # F6b (2026-07-22, Phase F): mount the A2A protocol so external agents

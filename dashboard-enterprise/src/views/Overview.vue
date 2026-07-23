@@ -20,8 +20,8 @@
         <div class="health-bars">
           <div class="health-item" v-for="h in health" :key="h.name">
             <span class="health-name">{{ h.name }}</span>
-            <div class="health-bar"><div class="health-fill" :style="{ width: h.pct + '%', background: h.color }"></div></div>
-            <span class="health-pct">{{ h.pct }}%</span>
+            <div class="health-bar"><div class="health-fill" :style="{ width: (h.pct === '--' ? 0 : h.pct) + '%', background: h.color }"></div></div>
+            <span class="health-pct">{{ h.pct === '--' ? '--' : h.pct + '%' }}</span>
           </div>
         </div>
       </Panel>
@@ -32,6 +32,7 @@
             <span class="activity-dot" :style="{ background: a.color }"></span>
             <span class="activity-text">{{ a.text }}</span>
           </div>
+          <div v-if="!activities.length" class="activity-empty">暂无活动</div>
         </div>
       </Panel>
     </div>
@@ -45,7 +46,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useEditionStore } from '../stores/edition.js';
 import { StatCard, Panel } from '../components/index.js';
@@ -66,21 +67,37 @@ const stats = computed(() => [
 ]);
 
 const health = ref([
-  { name: 'API Server', pct: 100, color: '#22c55e' },
-  { name: 'Memory Store', pct: 87, color: '#3b82f6' },
-  { name: 'Agent Pool', pct: 92, color: '#a78bfa' },
-  { name: 'Queue', pct: 78, color: '#f59e0b' },
+  { name: 'API Server', pct: '--', color: '#22c55e' },
+  { name: 'Memory Store', pct: '--', color: '#3b82f6' },
+  { name: 'Agent Pool', pct: '--', color: '#a78bfa' },
+  { name: 'Queue', pct: '--', color: '#f59e0b' },
+  { name: 'CPU', pct: '--', color: '#ef4444' },
 ]);
 
-const activities = ref([
-  { id: 1, time: '2m ago', text: 'Agent coder completed task #42', color: '#22c55e' },
-  { id: 2, time: '5m ago', text: 'Memory consolidation: 23 entries merged', color: '#3b82f6' },
-  { id: 3, time: '12m ago', text: 'Circuit breaker opened for agent-3', color: '#ef4444' },
-  { id: 4, time: '18m ago', text: 'New agent registered: reviewer', color: '#a78bfa' },
-  { id: 5, time: '25m ago', text: 'Budget guard: $2.34 spent today', color: '#f59e0b' },
-]);
+const activities = ref([]);
 
-onMounted(async () => {
+let refreshTimer = null;
+
+function formatRelativeTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  const diff = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
+
+function levelColor(level) {
+  const l = (level || '').toLowerCase();
+  if (l === 'error' || l === 'err') return '#ef4444';
+  if (l === 'warn' || l === 'warning') return '#f59e0b';
+  if (l === 'info') return '#3b82f6';
+  return '#a78bfa';
+}
+
+async function loadStats() {
   try {
     const h = await api.get('/api/health');
     const ms = h.uptime_ms || 0;
@@ -94,13 +111,46 @@ onMounted(async () => {
     costToday.value = (r.cost_today || 0).toFixed(2);
     taskCount.value = r.total_tasks || 0;
   } catch {}
+}
+
+async function loadHealth() {
   try {
     const live = await api.get('/api/live');
     health.value[0].pct = 100;
-    health.value[1].pct = Math.min(100, Math.round((live.memory_usage_pct || 87)));
+    health.value[1].pct = Math.min(100, Math.round(live.memory_usage_pct || 0));
     health.value[2].pct = Math.min(100, Math.round((live.healthy_agents || 0) / Math.max(1, live.total_agents || 1) * 100));
-    health.value[3].pct = Math.min(100, Math.round((live.queue_health_pct || 78)));
-  } catch {}
+    health.value[3].pct = Math.min(100, Math.round(live.queue_health_pct || 0));
+    health.value[4].pct = Math.min(100, Math.round(live.cpu_pct || 0));
+  } catch {
+    for (const h of health.value) h.pct = '--';
+  }
+}
+
+async function loadActivities() {
+  try {
+    const data = await api.get('/api/logs?limit=10');
+    const logs = Array.isArray(data) ? data : (data && data.logs) || [];
+    activities.value = logs.map((l, i) => ({
+      id: i + 1,
+      time: formatRelativeTime(l.ts),
+      text: '[' + (l.level || 'info') + '] ' + (l.agent || 'system') + ': ' + (l.msg || ''),
+      color: levelColor(l.level),
+    }));
+  } catch {
+    activities.value = [];
+  }
+}
+
+onMounted(async () => {
+  await Promise.allSettled([loadStats(), loadHealth(), loadActivities()]);
+  refreshTimer = setInterval(() => {
+    loadStats();
+    loadHealth();
+  }, 30000);
+});
+
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer);
 });
 </script>
 
@@ -120,6 +170,7 @@ onMounted(async () => {
 .activity-item:last-child { border-bottom: none; }
 .activity-time { font-size: 11px; color: var(--text3); width: 56px; }
 .activity-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.activity-empty { font-size: 13px; color: var(--text3); padding: 12px 0; text-align: center; }
 .degradation-panel { background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.2); border-radius: var(--radius); padding: 16px; }
 .degradation-panel h3 { font-size: 14px; color: var(--warn); margin-bottom: 8px; }
 .degradation-item { font-size: 13px; color: var(--text2); padding: 4px 0; }
