@@ -35,8 +35,16 @@ export function useWebSocket(url = '') {
           lastMessage.value = event.data;
         }
       };
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         connected.value = false;
+        // P1 fix: close code 4401 = auth failure — don't reconnect, trigger login
+        if (event.code === 4401) {
+          error.value = new Error('Authentication required');
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('maop:unauthorized'));
+          }
+          return; // don't schedule reconnect on auth failure
+        }
         scheduleReconnect();
       };
       ws.onerror = (e) => {

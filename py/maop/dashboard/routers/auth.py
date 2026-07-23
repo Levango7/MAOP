@@ -240,8 +240,8 @@ async def auth_status(request: Request) -> Any:
             token = auth_header[7:]
             try:
                 mgr = get_auth_mgr()
-                payload = mgr.jwt_handler.verify_token(token)
-                if payload:
+                result = mgr.jwt_handler.validate_token(token)
+                if result.authenticated:
                     has_token = True
             except Exception:
                 pass
@@ -297,9 +297,19 @@ async def auth_login(request: Request) -> Any:
 
 
 @router.post("/api/auth/logout")
-async def auth_logout() -> Any:
-    """Logout - client-side token removal."""
-    return {"status": "ok", "message": "Token removed."}
+async def auth_logout(request: Request) -> Any:
+    """Logout - revoke JWT token server-side (P1 fix)."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        try:
+            mgr = get_auth_mgr()
+            revoked = mgr.jwt_handler.revoke_token(token)
+            if revoked:
+                logger.info("[auth] Token revoked via logout")
+        except Exception as exc:
+            logger.warning("[auth] Failed to revoke token: %s", exc)
+    return {"status": "ok", "message": "Token revoked."}
 
 
 @router.post("/api/auth/register")

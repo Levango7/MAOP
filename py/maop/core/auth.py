@@ -210,6 +210,31 @@ class JWTHandler:
         self.config = config or JWTConfig()
         if not self.config.secret:
             self.config.secret = load_jwt_secret()
+        # P1 fix: in-memory token revocation blacklist (sig_b64 → exp timestamp)
+        self._revoked: dict[str, float] = {}
+
+    def revoke_token(self, token: str) -> bool:
+        """Add a token to the revocation blacklist. Returns True if revoked."""
+        try:
+            parts = token.split(".")
+            if len(parts) != 3:
+                return False
+            sig_b64 = parts[2]
+            payload = json.loads(self._b64url_decode(parts[1]))
+            exp = payload.get("exp", 0)
+            if time.time() > exp:
+                return False  # already expired
+            self._revoked[sig_b64] = exp
+            return True
+        except Exception:
+            return False
+
+    def _cleanup_revoked(self) -> None:
+        """Remove expired entries from the revocation blacklist."""
+        now = time.time()
+        expired = [sig for sig, exp in self._revoked.items() if exp <= now]
+        for sig in expired:
+            del self._revoked[sig]
 
     def _b64url_encode(self, data: bytes) -> str:
         return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
@@ -288,6 +313,11 @@ class JWTHandler:
             # Check issuer
             if payload.get("iss") != self.config.issuer:
                 return AuthResult(authenticated=False, error="Invalid issuer")
+
+            # P1 fix: check revocation blacklist
+            self._cleanup_revoked()
+            if sig_b64 in self._revoked:
+                return AuthResult(authenticated=False, error="Token revoked")
 
             return AuthResult(
                 authenticated=True,

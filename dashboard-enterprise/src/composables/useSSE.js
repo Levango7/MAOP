@@ -34,6 +34,7 @@ const AUTH_QUERY_KEY = 'token';
 const DEFAULT_URL = '/api/stream';
 const DEFAULT_MAX_BACKOFF_MS = 30_000;
 const INITIAL_BACKOFF_MS = 1_000;
+const DEFAULT_MAX_RETRIES = 10; // P1 fix: stop reconnecting after this many consecutive failures
 
 function _getAuthToken() {
   try {
@@ -71,6 +72,7 @@ export function useSSE(opts = {}) {
   const events = Array.isArray(opts.events) ? opts.events : [];
   const autoReconnect = opts.autoReconnect !== false;
   const maxBackoffMs = opts.maxBackoffMs || DEFAULT_MAX_BACKOFF_MS;
+  const maxRetries = opts.maxRetries || DEFAULT_MAX_RETRIES;
   const withAuth = opts.withAuth !== false;
 
   const connected = ref(false);
@@ -80,6 +82,7 @@ export function useSSE(opts = {}) {
   let es = null;
   let closed = false;
   let backoffMs = INITIAL_BACKOFF_MS;
+  let retryCount = 0;
   let reconnectTimer = null;
   let handlers = [];
 
@@ -92,9 +95,20 @@ export function useSSE(opts = {}) {
 
   function _scheduleReconnect() {
     if (!autoReconnect || closed) return;
+    // P1 fix: stop reconnecting after maxRetries consecutive failures
+    if (retryCount >= maxRetries) {
+      error.value = new Error(`SSE: max retries (${maxRetries}) exceeded`);
+      connected.value = false;
+      // Likely auth failure — trigger login flow
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('maop:unauthorized'));
+      }
+      return;
+    }
     _clearReconnect();
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
+      retryCount++;
       _connect();
     }, backoffMs);
     // Exponential backoff with cap.
@@ -115,8 +129,9 @@ export function useSSE(opts = {}) {
     es.onopen = () => {
       connected.value = true;
       error.value = null;
-      // Reset backoff after a successful connection.
+      // Reset backoff and retry count after a successful connection.
       backoffMs = INITIAL_BACKOFF_MS;
+      retryCount = 0;
     };
     es.onerror = (e) => {
       error.value = e;

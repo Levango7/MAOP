@@ -105,9 +105,9 @@ class DashboardProvider:
                     breaker_state=entry.state.value if entry else "closed",
                     breaker_failures=entry.failures if entry else 0,
                 ))
-        except Exception:
-            # Fallback: return empty list
-            pass
+        except Exception as exc:
+            # P1 fix: log instead of silently swallowing
+            logger.warning("[provider] _collect_agent_status failed: %s", exc)
 
         return agents
 
@@ -124,7 +124,8 @@ class DashboardProvider:
                 return row[0] if row else 0
             finally:
                 conn.close()
-        except Exception:
+        except Exception as exc:
+            logger.warning("[provider] _count_delegations failed: %s", exc)
             return 0
 
     def _compute_success_rate(self) -> float:
@@ -146,7 +147,8 @@ class DashboardProvider:
                 return cast(float, round((success / total) * 100, 1))
             finally:
                 conn.close()
-        except Exception:
+        except Exception as exc:
+            logger.warning("[provider] _compute_success_rate failed: %s", exc)
             return 0.0
 
     def _count_memory_entries(self) -> int:
@@ -156,7 +158,8 @@ class DashboardProvider:
             return 0
         try:
             return len(list(entries_dir.glob("*.json")))
-        except Exception:
+        except Exception as exc:
+            logger.warning("[provider] _count_memory_entries failed: %s", exc)
             return 0
 
     # ── Async variants (aiosqlite — non-blocking event-loop I/O) ──
@@ -188,7 +191,8 @@ class DashboardProvider:
                 cursor = await db.execute("SELECT COUNT(*) FROM delegations")
                 row = await cursor.fetchone()
                 return row[0] if row else 0
-        except Exception:
+        except Exception as exc:
+            logger.warning("[provider] _async_count_delegations failed: %s", exc)
             return 0
 
     async def _async_compute_success_rate(self) -> float:
@@ -207,7 +211,8 @@ class DashboardProvider:
                 )
                 success = (await cursor.fetchone())[0]  # type: ignore[index]
                 return cast(float, round((success / total) * 100, 1))
-        except Exception:
+        except Exception as exc:
+            logger.warning("[provider] _async_compute_success_rate failed: %s", exc)
             return 0.0
 
     def _count_suggestions(self) -> int:
@@ -218,7 +223,8 @@ class DashboardProvider:
         try:
             data = json.loads(sfile.read_text(encoding="utf-8"))
             return len(data) if isinstance(data, list) else 0
-        except Exception:
+        except Exception as exc:
+            logger.warning("[provider] _count_suggestions failed: %s", exc)
             return 0
 
     def get_agent_detail(self, agent_name: str) -> dict[str, Any]:
@@ -246,8 +252,8 @@ class DashboardProvider:
                 detail["breaker_state"] = entry.state.value
                 detail["breaker_failures"] = entry.failures
                 detail["breaker_threshold"] = entry.threshold
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("[provider] get_agent_detail failed: %s", exc)
 
         return detail
 
@@ -261,7 +267,8 @@ class DashboardProvider:
             if isinstance(data, list):
                 return data[-limit:]
             return [data]
-        except Exception:
+        except Exception as exc:
+            logger.warning("[provider] get_recent_delegations failed: %s", exc)
             return []
 
 

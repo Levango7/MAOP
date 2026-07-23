@@ -129,9 +129,13 @@ export const useApiStore = defineStore('api', {
       } catch (e) { /* ignore */ }
     },
     /**
-     * 清除 token（登出）。
+     * 清除 token（登出）。P1 fix: 通知后端撤销 JWT token。
      */
-    clearAuthToken() {
+    async clearAuthToken() {
+      // Notify backend to revoke the token before clearing locally
+      try {
+        await fetch('/api/auth/logout', withAuth({ method: 'POST' }, {}));
+      } catch (e) { /* best-effort — clear locally anyway */ }
       try {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);

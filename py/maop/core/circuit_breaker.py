@@ -379,10 +379,18 @@ class CircuitBreaker:
             self._save_failover_chain(name, chain)
             logger.info("[breaker] Registered failover chain '%s': %s", name, " → ".join(agents))
 
-    def resolve_failover(self, name: str) -> FailoverResult | None:
+    def resolve_failover(
+        self,
+        name: str,
+        *,
+        required_capability: str | None = None,
+        agent_capabilities: dict[str, list[str]] | None = None,
+    ) -> FailoverResult | None:
         """Resolve the current available agent in a failover chain.
 
         Skips OPEN agents and advances the chain automatically.
+        If *required_capability* and *agent_capabilities* are provided,
+        agents lacking the capability are also skipped (P1 fix).
 
         Returns
         -------
@@ -397,16 +405,27 @@ class CircuitBreaker:
             # Try from current index forward
             for i in range(chain.current_index, len(chain.agents)):
                 agent = chain.agents[i]
-                if self.is_available(agent):
-                    chain.current_index = i
-                    self._save_failover_chain(name, chain)
-                    return FailoverResult(
-                        agent=agent,
-                        is_primary=(i == 0),
-                        degraded=(i > 0),
-                    )
+                if not self.is_available(agent):
+                    continue
+                # P1 fix: check capability if filter is provided
+                if required_capability and agent_capabilities:
+                    caps = agent_capabilities.get(agent, [])
+                    if required_capability not in caps:
+                        logger.debug(
+                            "[breaker] Skipping %s in failover '%s': "
+                            "missing capability '%s'",
+                            agent, name, required_capability,
+                        )
+                        continue
+                chain.current_index = i
+                self._save_failover_chain(name, chain)
+                return FailoverResult(
+                    agent=agent,
+                    is_primary=(i == 0),
+                    degraded=(i > 0),
+                )
 
-            # All agents unavailable
+            # All agents unavailable or lack required capability
             return None
 
     def get_failover_chain(self, name: str) -> FailoverChain | None:

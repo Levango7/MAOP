@@ -310,6 +310,19 @@ class RouteScorer:
             except Exception as exc:
                 logger.debug("Adaptive routing fallback: %s", exc)
 
+        # P1 fix: validate driver and warn on unknown
+        _KNOWN_DRIVERS = {"cli", "wrapper", "powershell", "cmd", "python"}
+        if self.config:
+            for agent_name in candidates:
+                adef = self.config.agents.get(agent_name) if hasattr(self.config, 'agents') else None
+                if adef:
+                    drv = getattr(adef, 'driver', '') or ''
+                    if drv and drv not in _KNOWN_DRIVERS:
+                        logger.warning(
+                            "Agent '%s' has unknown driver '%s' (known: %s)",
+                            agent_name, drv, ", ".join(sorted(_KNOWN_DRIVERS)),
+                        )
+
         # Cooldown-aware selection
         for agent in candidates:
             if not self.is_agent_in_cooldown(agent):

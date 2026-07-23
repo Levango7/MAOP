@@ -99,21 +99,37 @@ class ExecuteMixin:
                 st = next((s for s in analysis.sub_tasks if s.id == st_id), None)
                 if st:
                     st_agent = st.assigned_agent or agent
-                    result = await self._execute_with_retry(
-                        task=st.description, fallback_chain=[st_agent],
-                        routing_key=routing_key, workdir=workdir,
-                        timeout=timeout, retry=False, trace_id=trace_id,
-                    )
+                    # P1 fix: wrap in try/except to match parallel branch safety
+                    try:
+                        result = await self._execute_with_retry(
+                            task=st.description, fallback_chain=[st_agent],
+                            routing_key=routing_key, workdir=workdir,
+                            timeout=timeout, retry=False, trace_id=trace_id,
+                        )
+                    except Exception as exc:
+                        logger.warning("Subtask %s raised exception: %s", st_id, exc)
+                        result = new_result(
+                            agent=st_agent, task=st.description, exit_code=1,
+                            error=f"Exception: {exc}", trace_id=trace_id,
+                        )
                     subtask_results[st_id] = result  # type: ignore[assignment]
             else:
                 # Multiple independent subtasks — execute in parallel with concurrency limit
                 async def _run_subtask(st_id: str, st_desc: str, st_agent: str) -> tuple[str, MaopResult]:
                     async with sem:
-                        r = await self._execute_with_retry(
-                            task=st_desc, fallback_chain=[st_agent],
-                            routing_key=routing_key, workdir=workdir,
-                            timeout=timeout, retry=False, trace_id=trace_id,
-                        )
+                        try:
+                            r = await self._execute_with_retry(
+                                task=st_desc, fallback_chain=[st_agent],
+                                routing_key=routing_key, workdir=workdir,
+                                timeout=timeout, retry=False, trace_id=trace_id,
+                            )
+                        except Exception as exc:
+                            # P1 fix: catch exception internally so it counts as failure
+                            logger.warning("Subtask %s raised exception: %s", st_id, exc)
+                            r = new_result(
+                                agent=st_agent, task=st_desc, exit_code=1,
+                                error=f"Exception: {exc}", trace_id=trace_id,
+                            )
                     return st_id, r  # type: ignore[return-value]
 
                 coros = []
@@ -125,12 +141,16 @@ class ExecuteMixin:
 
                 # Run in parallel
                 group_results = await asyncio.gather(*coros, return_exceptions=True)
-                for gr in group_results:
+                for idx, gr in enumerate(group_results):
                     if isinstance(gr, Exception):
-                        # B-P0-3 fix: continue on exception, was using undefined
-                        # st_id/result from previous iteration causing NameError
-                        # or wrong data
-                        logger.warning("Parallel subtask failed: %s", gr)
+                        # P1 fix: construct failure result instead of skipping
+                        # (safety net — _run_subtask should catch internally)
+                        st_id = group[idx] if idx < len(group) else f"unknown_{idx}"
+                        logger.warning("Parallel subtask %s failed: %s", st_id, gr)
+                        subtask_results[st_id] = new_result(
+                            agent=agent, task="parallel_subtask", exit_code=1,
+                            error=f"Exception: {gr}", trace_id=trace_id,
+                        )
                         continue
                     st_id, result = gr  # type: ignore[misc]
                     subtask_results[st_id] = result  # type: ignore[assignment]

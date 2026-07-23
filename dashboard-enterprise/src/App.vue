@@ -41,6 +41,7 @@
           {{ realtimeConnected ? 'Live' : 'Offline' }}
         </span>
         <button class="theme-btn" @click="toggleTheme" :title="isLight ? 'Switch to dark' : 'Switch to light'">{{ isLight ? '🌙' : '☀️' }}</button>
+        <button v-if="authEnabled" class="theme-btn logout-btn" @click="doLogout" title="Sign out">⏻</button>
       </div>
     </nav>
     <main class="content">
@@ -189,6 +190,23 @@ function reloadForLogin() {
   if (typeof window !== 'undefined' && window.location) window.location.reload();
 }
 
+// P1 fix: user-initiated logout — revoke token server-side then reload
+const authEnabled = ref(false);
+async function checkAuthEnabled() {
+  try {
+    const r = await fetch('/api/auth/status');
+    const d = await r.json();
+    authEnabled.value = d.auth_enabled === true;
+  } catch { authEnabled.value = false; }
+}
+
+async function doLogout() {
+  try {
+    await api.clearAuthToken();
+  } catch { /* ignore */ }
+  if (typeof window !== 'undefined' && window.location) window.location.reload();
+}
+
 onMounted(async () => {
   if (typeof window !== 'undefined') {
     window.addEventListener('maop:unauthorized', onUnauthorized);
@@ -199,6 +217,7 @@ onMounted(async () => {
     document.body.classList.toggle('light-theme', isLight.value);
   }
   await edition.fetchEdition();
+  checkAuthEnabled(); // P1 fix: check if auth is enabled to show/hide logout button
   try {
     // 注入 Bearer token（与零构建版行为一致）
     const r = await fetch('/api/health', withAuth({}, {}));
@@ -258,6 +277,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans
 .live-indicator.connected { color: var(--success); }
 .live-indicator.connected .live-dot { background: var(--success); animation: pulse 2s infinite; }
 .theme-btn { margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 14px; padding: 2px 6px; }
+.logout-btn { margin-left: 4px; color: var(--fail); }
+.logout-btn:hover { background: var(--bg3); }
 .content { flex: 1; padding: 28px; overflow-y: auto; min-width: 0; }
 
 .auth-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 9999; }
