@@ -318,12 +318,17 @@ class SkillVersionManager:
 
         action = step.action.lower()
         if action == "terminal":
-            cmd = step.params.get("command", "")
+            # P0-4 fix: replace shell=True with shlex.split to prevent command injection.
+            # Context values are substituted as-is; using shell=False ensures they
+            # cannot be interpreted as shell metacharacters.
+            import shlex
+            cmd_template = step.params.get("command", "")
             for key, val in context.items():
-                cmd = cmd.replace(f"{{{key}}}", str(val))
+                cmd_template = cmd_template.replace(f"{{{key}}}", str(val))
             try:
+                args_list = shlex.split(cmd_template, posix=True)
                 proc = subprocess.run(
-                    cmd, shell=True, capture_output=True, text=True, timeout=step.timeout_s,
+                    args_list, shell=False, capture_output=True, text=True, timeout=step.timeout_s,
                 )
                 return SkillStepResult(
                     step_name=step.name,

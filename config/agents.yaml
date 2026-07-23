@@ -576,7 +576,7 @@ routing:
   refactor:
     fallback: kimi
     primary: claude
-    tertiary: claude
+    tertiary: cursor
     keywords:
     - 重构
     - 重写
@@ -626,7 +626,7 @@ routing:
     - 架构文档
     - 白皮书
   verify:
-    fallback: claude
+    fallback: kimi
     primary: claude
     keywords:
     - 验证
@@ -638,6 +638,7 @@ routing:
     - assert
     - 断言
     match: (?:verify|test|assert|spec|unit\s+test|integration)
+    tertiary: copilot
   vision:
     fallback: crush
     primary: claude
@@ -665,6 +666,15 @@ routing:
     fallback: claude
     primary: MAOP
     tertiary: claude
+    keywords:
+    - orchestrate
+    - 编排
+    - 协调
+    - multi-agent
+    - 多agent
+    - compose
+    - 调度
+    match: (?:orchestrat|编排|协调|compose|调度)
   MAOP:
     capabilities:
     - codegen

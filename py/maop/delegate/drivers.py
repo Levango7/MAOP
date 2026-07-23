@@ -144,7 +144,7 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
 
 
 async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,
-                       workdir: str, trace_id: str) -> MaopResult:
+                       workdir: str, trace_id: str, streamer: Any = None) -> MaopResult:
     """Execute via wrapper driver — PowerShell .ps1 script."""
     wrapper = config.wrapper
     if not Path(wrapper).exists():
@@ -233,7 +233,7 @@ async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,
 
 
 async def _run_powershell(config: AgentConfig, prompt: str, timeout: int,
-                          workdir: str, trace_id: str) -> MaopResult:
+                          workdir: str, trace_id: str, streamer: Any = None) -> MaopResult:
     """Execute via inline PowerShell command.
 
     Supports cli_args template like the CLI driver:
@@ -312,7 +312,7 @@ async def _run_powershell(config: AgentConfig, prompt: str, timeout: int,
 
 
 async def _run_cmd(config: AgentConfig, prompt: str, timeout: int,
-                   workdir: str, trace_id: str) -> MaopResult:
+                   workdir: str, trace_id: str, streamer: Any = None) -> MaopResult:
     """Execute via cmd.exe driver."""
     cli = config.cli
     escaped = _escape_for_cmd(prompt)
@@ -370,18 +370,21 @@ async def _run_cmd(config: AgentConfig, prompt: str, timeout: int,
 
 
 async def _run_python(config: AgentConfig, prompt: str, timeout: int,
-                     workdir: str, trace_id: str) -> MaopResult:
+                     workdir: str, trace_id: str, streamer: Any = None) -> MaopResult:
     """Execute via Python module driver (e.g. doc-pipeline adapter)."""
     import sys
+    import shlex
     cli = config.cli
     args_template = config.cli_args or "{task}"
     task_args = args_template.replace("{task}", prompt)
+    # P1-5 fix: split args safely to prevent parameter injection
+    extra_args = shlex.split(task_args, posix=True) if task_args else []
 
     start = time.monotonic()
     proc = None
     try:
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-m", cli, task_args,
+            sys.executable, "-m", cli, *extra_args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,

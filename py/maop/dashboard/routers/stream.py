@@ -19,6 +19,49 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/stream", tags=["stream"])
 
 
+@router.get("")
+@handle_api_errors
+async def global_state_stream(request: Request) -> Any:
+    """SSE endpoint: push global system state every 2s for Monitor.vue.
+
+    P0-2 fix: Monitor.vue uses useSSE('/api/stream') expecting event="state"
+    with system metrics. This endpoint provides that, complementing the
+    per-trace /{trace_id} streaming endpoint.
+    """
+    require_admin(request)
+    import asyncio
+    import json
+    import time
+
+    async def generate():
+        while True:
+            try:
+                # Gather live system state
+                state = {"ts": time.time()}
+                try:
+                    from maop.dashboard.data_bridge import get_bridge
+                    bridge = get_bridge()
+                    snap = bridge.snapshot() if bridge else {}
+                    if snap:
+                        state.update({
+                            "agents": snap.get("agents_count", 0),
+                            "healthy_agents": snap.get("healthy_agents", 0),
+                            "total_agents": snap.get("total_agents", 0),
+                            "memory_usage_pct": snap.get("memory_usage_pct", 0),
+                            "cpu_pct": snap.get("cpu_pct", 0),
+                            "queue_health_pct": snap.get("queue_health_pct", 0),
+                            "active_streams": snap.get("active_streams", 0),
+                        })
+                except Exception:
+                    pass
+                yield f"event: state\ndata: {json.dumps(state)}\n\n"
+            except Exception:
+                pass
+            await asyncio.sleep(2)
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
 @router.get("/{trace_id}")
 @handle_api_errors
 async def stream_trace(trace_id: str, request: Request) -> Any:

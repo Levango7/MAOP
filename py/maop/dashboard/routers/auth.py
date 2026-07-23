@@ -16,6 +16,7 @@ import os
 logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from .state import MAOP_ROOT
 
@@ -113,15 +114,10 @@ def _ensure_default_user() -> None:
                 if not admin_pwd:
                     import secrets
                     admin_pwd = secrets.token_urlsafe(16)
-                    import sys as _sys
-                    print(
-                        f"\n{'=' * 60}\n"
-                        "  WARNING: MAOP_ADMIN_PASSWORD not set!\n"
-                        "  Generated random admin password (dev mode only):\n"
-                        f"  {admin_pwd}\n"
-                        "  Set MAOP_ADMIN_PASSWORD env var for production.\n"
-                        f"{'=' * 60}\n",
-                        file=_sys.stderr,
+                    # P1-14 fix: do not print password to stderr
+                    logger.warning(
+                        "MAOP_ADMIN_PASSWORD not set — generated random admin password "
+                        "(set MAOP_ADMIN_PASSWORD env var for production)"
                     )
                     logger.warning(
                         "[auth] No MAOP_ADMIN_PASSWORD set — generated random admin password "
@@ -153,11 +149,11 @@ def _db_login_user(db_path_str: str, username: str, password: str) -> dict:
         ).fetchone()
 
     if row is None:
-        return {"status": "error", "error": "Invalid credentials"}
+        return JSONResponse({"status": "error", "error": "Invalid credentials"}, status_code=401)
 
     stored_hash = row["password_hash"]
     if not _verify_password(password, stored_hash):
-        return {"status": "error", "error": "Invalid credentials"}
+        return JSONResponse({"status": "error", "error": "Invalid credentials"}, status_code=401)
 
     if _password_needs_rehash(stored_hash):
         with sqlite_connect(db_path_str) as conn:
@@ -178,7 +174,7 @@ def _db_register_user(db_path_str: str, username: str, password: str, roles: lis
     with sqlite_connect(db_path_str) as conn:
         existing = conn.execute("SELECT username FROM users WHERE username = ?", (username,)).fetchone()
         if existing:
-            return {"status": "error", "error": "Username already exists"}
+            return JSONResponse({"status": "error", "error": "Username already exists"}, status_code=409)
 
         pwd_hash = _hash_password(password)
         conn.execute(
@@ -207,7 +203,7 @@ def _db_delete_user(db_path_str: str, username: str) -> dict:
         deleted = result.rowcount > 0
 
     if not deleted:
-        return {"status": "error", "error": "User not found", "code": 404}
+        return JSONResponse({"status": "error", "error": "User not found"}, status_code=404)
     return {"status": "ok", "message": f"User {username} deleted"}
 
 
@@ -218,14 +214,14 @@ def _db_update_user(db_path_str: str, username: str, body: dict) -> dict:
     with sqlite_connect(db_path_str) as conn:
         existing = conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone()
         if not existing:
-            return {"status": "error", "error": "User not found", "code": 404}
+            return JSONResponse({"status": "error", "error": "User not found"}, status_code=404)
         if "roles" in body:
             conn.execute("UPDATE users SET roles = ? WHERE username = ?", (_json.dumps(body["roles"]), username))
         if "enabled" in body:
             conn.execute("UPDATE users SET enabled = ? WHERE username = ?", (1 if body["enabled"] else 0, username))
         if "password" in body:
             if not isinstance(body["password"], str) or len(body["password"]) < 8:
-                return {"status": "error", "error": "Password must be at least 8 characters"}
+                return JSONResponse({"status": "error", "error": "Password must be at least 8 characters"}, status_code=400)
             pwd_hash = _hash_password(body["password"])
             conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", (pwd_hash, username))
 
@@ -255,14 +251,14 @@ async def auth_login(request: Request) -> Any:
         username = body.get("username", "")
         password = body.get("password", "")
         if not username or not password:
-            return {"status": "error", "error": "Username and password required"}
+            return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
 
         now = _time.monotonic()
         failures = _login_failures.get(username, [])
         failures = [t for t in failures if now - t < _LOCKOUT_SECONDS]
         _login_failures[username] = failures
         if len(failures) >= _MAX_LOGIN_FAILURES:
-            return {"status": "error", "error": "Account locked. Try again later."}
+            return JSONResponse({"status": "error", "error": "Account locked. Try again later."}, status_code=429)
 
         db_path = MAOP_ROOT / "data" / "auth.db"
         if not db_path.exists():
@@ -288,7 +284,7 @@ async def auth_login(request: Request) -> Any:
         }
     except Exception as e:
         logger.error("Login error: %s", e, exc_info=True)
-        return {"status": "error", "error": "Login failed"}
+        return JSONResponse({"status": "error", "error": "Login failed"}, status_code=401)
 
 
 @router.post("/api/auth/logout")
@@ -308,9 +304,9 @@ async def auth_register(request: Request) -> Any:
         roles = body.get("roles", ["read"])
 
         if not username or not password:
-            return {"status": "error", "error": "Username and password required"}
+            return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
         if len(password) < 8:
-            return {"status": "error", "error": "Password must be at least 8 characters"}
+            return JSONResponse({"status": "error", "error": "Password must be at least 8 characters"}, status_code=400)
 
         db_path = MAOP_ROOT / "data" / "auth.db"
         if not db_path.exists():
@@ -324,7 +320,7 @@ async def auth_register(request: Request) -> Any:
         return result
     except Exception as e:
         logger.error("[auth] Registration failed: %s", e, exc_info=True)
-        return {"status": "error", "error": "Registration failed"}
+        return JSONResponse({"status": "error", "error": "Registration failed"}, status_code=400)
 
 
 @router.get("/api/auth/users")
@@ -341,7 +337,7 @@ async def auth_users(request: Request) -> Any:
         return {"status": "ok", "users": users}
     except Exception as e:
         logger.error("[auth] List users failed: %s", e, exc_info=True)
-        return {"status": "error", "error": "Failed to list users"}
+        return JSONResponse({"status": "error", "error": "Failed to list users"}, status_code=500)
 
 
 @router.delete("/api/auth/users/{username}")
@@ -350,14 +346,14 @@ async def auth_delete_user(username: str, request: Request) -> Any:
     try:
         _require_admin(request)
         if username == "admin":
-            return {"status": "error", "error": "Cannot delete admin user"}
+            return JSONResponse({"status": "error", "error": "Cannot delete admin user"}, status_code=403)
         db_path = MAOP_ROOT / "data" / "auth.db"
         return await asyncio.get_running_loop().run_in_executor(
             None, _db_delete_user, str(db_path), username
         )
     except Exception as e:
         logger.error("[auth] Delete user %s failed: %s", username, e, exc_info=True)
-        return {"status": "error", "error": "Failed to delete user"}
+        return JSONResponse({"status": "error", "error": "Failed to delete user"}, status_code=500)
 
 
 @router.put("/api/auth/users/{username}")
@@ -372,4 +368,4 @@ async def auth_update_user(username: str, request: Request) -> Any:
         )
     except Exception as e:
         logger.error("[auth] User update failed: %s", e, exc_info=True)
-        return {"status": "error", "error": "Update failed"}
+        return JSONResponse({"status": "error", "error": "Update failed"}, status_code=500)

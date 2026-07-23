@@ -244,7 +244,11 @@ def _evaluate_condition(condition: str, variables: dict[str, Any]) -> bool:
         return True
     condition = _interpolate_vars(condition, variables)
     try:
-        return bool(eval(condition, {"__builtins__": {}}, variables))
+        # P1-8 fix: use AST-based safe_eval instead of eval() with weak __builtins__ sandbox.
+        # The previous eval(condition, {"__builtins__": {}}, variables) can be escaped via
+        # ().__class__.__bases__[0].__subclasses__() — safe_eval uses an AST whitelist.
+        from maop.engine import safe_eval
+        return bool(safe_eval(condition, variables))
     except Exception:
         return False
 

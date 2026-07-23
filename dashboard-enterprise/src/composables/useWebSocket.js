@@ -8,9 +8,17 @@ export function useWebSocket(url = '') {
   let reconnectTimer = null;
 
   function getWsUrl() {
-    if (url) return url;
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${proto}//${location.host}/ws`;
+    const baseUrl = url || `${proto}//${location.host}/ws`;
+    // P1-10 fix: inject JWT token as query param for auth
+    try {
+      const token = localStorage.getItem('maop_token') || '';
+      if (token) {
+        const sep = baseUrl.includes('?') ? '&' : '?';
+        return `${baseUrl}${sep}token=${encodeURIComponent(token)}`;
+      }
+    } catch {}
+    return baseUrl;
   }
 
   function connect() {

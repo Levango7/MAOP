@@ -136,13 +136,16 @@ function selectAgent(a) {
 }
 
 async function switchModel(a) {
-  try { await api.post('/api/agents/switch-model', { agent: a.name }); loadAgents(); } catch {}
+  // P1-12 fix: use /api/agents/{name}/model endpoint
+  try { await api.put(`/api/agents/${a.name}/model`, { model: a.model }); loadAgents(); } catch {}
 }
 async function healthCheck(a) {
-  try { await api.post('/api/agents/health-check', { agent: a.name }); } catch {}
+  // P1-12 fix: use /api/agents/{name}/health-check endpoint
+  try { await api.post(`/api/agents/${a.name}/health-check`, {}); loadAgents(); } catch {}
 }
 async function restartAgent(a) {
-  try { await api.post('/api/agents/restart', { agent: a.name }); loadAgents(); } catch {}
+  // P1-12 fix: use /api/agents/{name}/restart endpoint (if available)
+  try { await api.post(`/api/agents/${a.name}/restart`, {}); loadAgents(); } catch {}
 }
 
 async function loadAgents() {

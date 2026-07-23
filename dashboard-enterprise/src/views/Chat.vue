@@ -81,6 +81,7 @@
 <script setup>
 import { ref, onMounted, nextTick, watch } from 'vue';
 import { useApiStore } from '../stores/api.js';
+import { useStreamingFetch } from '../composables/useStreamingFetch.js';
 
 const api = useApiStore();
 const agents = ref([]);
@@ -161,61 +162,43 @@ async function sendMessage(overrideText) {
   streamContent.value = '';
 
   try {
+    // P0-1 fix: use /api/chat/stream (SSE) instead of /api/chat (JSON),
+    // and use useStreamingFetch composable for auth + SSE parsing.
+    const { stream } = useStreamingFetch();
     const body = {
       agent: selectedAgent.value,
       message: text,
       session_id: sessionId.value || undefined,
-      image: userMsg.image || undefined,
+      images: userMsg.image ? [userMsg.image] : undefined,  // P1-11 fix: images (plural list)
     };
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
 
-    if (!res.ok) {
-      const err = await res.text();
-      streaming.value = false;
-      messages.value.push({ role: 'assistant', content: `Error: ${err}`, time: now() });
-      return;
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let fullContent = '';
     let msgMeta = {};
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      for (const line of chunk.split('\n')) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6);
-        if (data === '[DONE]') break;
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.content) {
-            fullContent += parsed.content;
-            streamContent.value = fullContent;
-            await nextTick();
-            scrollBottom();
-          }
-          if (parsed.session_id) sessionId.value = parsed.session_id;
-          if (parsed.tokens) msgMeta.tokens = parsed.tokens;
-          if (parsed.model) msgMeta.model = parsed.model;
-        } catch {}
-      }
-    }
-
-    streaming.value = false;
-    messages.value.push({
-      role: 'assistant',
-      content: fullContent,
-      time: now(),
-      ...msgMeta,
+    await stream('/api/chat/stream', body, {
+      onData: async (fullContent) => {
+        streamContent.value = fullContent;
+        await nextTick();
+        scrollBottom();
+      },
+      onMeta: (meta) => {
+        if (meta.session_id) sessionId.value = meta.session_id;
+        Object.assign(msgMeta, meta);
+      },
+      onDone: () => {
+        streaming.value = false;
+        messages.value.push({
+          role: 'assistant',
+          content: streamContent.value,
+          time: now(),
+          ...msgMeta,
+        });
+        streamContent.value = '';
+      },
+      onError: (errMsg) => {
+        streaming.value = false;
+        messages.value.push({ role: 'assistant', content: `Error: ${errMsg}`, time: now() });
+      },
     });
-    streamContent.value = '';
   } catch (exc) {
     streaming.value = false;
     messages.value.push({ role: 'assistant', content: `Connection error: ${exc.message}`, time: now() });

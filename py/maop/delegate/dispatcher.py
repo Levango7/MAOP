@@ -306,6 +306,23 @@ class Dispatcher:
             self._workflows_index = {w.name: w for w in workflows}
         return self._workflows_index
 
+    def _notify_route_scorer(self, agent: str, *, success: bool) -> None:
+        """Notify RouteScorer of agent success/failure for cooldown tracking.
+
+        P0-3 fix: RouteScorer.cooldown was never populated because
+        mark_agent_failed/mark_agent_success had no callers. Now invoked
+        alongside circuit-breaker recording in _dispatch_impl.
+        """
+        try:
+            from maop.core.route_scorer import get_route_scorer
+            scorer = get_route_scorer(self._config)
+            if success:
+                scorer.mark_agent_success(agent)
+            else:
+                scorer.mark_agent_failed(agent)
+        except Exception as exc:
+            logger.debug("[dispatch] RouteScorer notify failed: %s", exc)
+
     def _find_agent_def(self, name: str):
         """Look up an AgentDef by name from the config (dict form only)."""
         agents = getattr(self._config, "agents", None)
@@ -487,14 +504,26 @@ class Dispatcher:
             )
             return DispatchResult(result=result, breaker_tripped=False)
 
-        result = await driver_fn(config, task, timeout, workdir, trace_id, streamer=streamer)  # type: ignore[call-arg]
-        result.routing_key = routing_key
+        # 4. Execute via driver — wrap in try/except to ensure failures are recorded
+        # in circuit-breaker and route scorer cooldown (P0-3 + P1-7 fix)
+        try:
+            result = await driver_fn(config, task, timeout, workdir, trace_id, streamer=streamer)  # type: ignore[call-arg]
+            result.routing_key = routing_key
+        except Exception as exc:
+            result = new_result(
+                agent=agent, task=task,
+                exit_code=-5, error=f"Driver exception: {exc}",
+                trace_id=trace_id, routing_key=routing_key,
+            )
+            logger.error("[dispatch] Driver '%s' raised: %s", config.driver, exc)
 
-        # 5. Record in circuit-breaker
+        # 5. Record in circuit-breaker and route scorer cooldown
         if result.is_success():
             self._breaker.record_success(agent)
+            self._notify_route_scorer(agent, success=True)
         else:
             self._breaker.record_failure(agent)
+            self._notify_route_scorer(agent, success=False)
 
         return DispatchResult(
             result=result,
