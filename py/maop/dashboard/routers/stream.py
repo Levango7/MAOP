@@ -86,7 +86,7 @@ async def stream_trace(trace_id: str, request: Request) -> Any:
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
-@router.get("/")
+@router.get("/active")
 @handle_api_errors
 async def list_active_streams(request: Request) -> Any:
     """List all currently active streaming executions."""

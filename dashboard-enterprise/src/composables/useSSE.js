@@ -47,7 +47,13 @@ function _getAuthToken() {
 function _buildUrl(url, withAuth) {
   if (!withAuth) return url;
   const token = _getAuthToken();
-  if (!token) return url;
+  if (!token) {
+    // P2-16 fix: no token → trigger login instead of silent anonymous fail
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('maop:unauthorized'));
+    }
+    return url;
+  }
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}${AUTH_QUERY_KEY}=${encodeURIComponent(token)}`;
 }

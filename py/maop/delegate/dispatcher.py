@@ -41,7 +41,8 @@ def _get_load_balancer():
     except ImportError:
         return None
     except Exception as exc:
-        logger.warning("Failed to load driver LoadBalancer: %s", exc)
+        # P2-6 fix: upgrade to error — runtime init failures should be visible
+        logger.error("Failed to load driver LoadBalancer: %s", exc, exc_info=True)
         return None
 
 def _get_runtime(config=None):
@@ -54,7 +55,7 @@ def _get_runtime(config=None):
     except ImportError:
         return None
     except Exception as exc:
-        logger.warning("Failed to load driver Runtime: %s", exc)
+        logger.error("Failed to load driver Runtime: %s", exc, exc_info=True)
         return None
 
 def _get_sandbox_manager(root_dir=None):
@@ -65,7 +66,7 @@ def _get_sandbox_manager(root_dir=None):
     except ImportError:
         return None
     except Exception as exc:
-        logger.warning("Failed to load driver SandboxManager: %s", exc)
+        logger.error("Failed to load driver SandboxManager: %s", exc, exc_info=True)
         return None
 
 def _get_subagent_manager(root_dir=None):
@@ -76,7 +77,7 @@ def _get_subagent_manager(root_dir=None):
     except ImportError:
         return None
     except Exception as exc:
-        logger.warning("Failed to load driver SubagentManager: %s", exc)
+        logger.error("Failed to load driver SubagentManager: %s", exc, exc_info=True)
         return None
 
 def _get_agent_registry(root_dir=None):
@@ -87,7 +88,7 @@ def _get_agent_registry(root_dir=None):
     except ImportError:
         return None
     except Exception as exc:
-        logger.warning("Failed to load driver AgentRegistry: %s", exc)
+        logger.error("Failed to load driver AgentRegistry: %s", exc, exc_info=True)
         return None
 
 def _get_capability_matcher(root_dir=None):
@@ -100,7 +101,7 @@ def _get_capability_matcher(root_dir=None):
     except ImportError:
         return None
     except Exception as exc:
-        logger.warning("Failed to load driver CapabilityMatcher: %s", exc)
+        logger.error("Failed to load driver CapabilityMatcher: %s", exc, exc_info=True)
         return None
 
 
@@ -329,7 +330,9 @@ class Dispatcher:
             else:
                 scorer.mark_agent_failed(agent)
         except Exception as exc:
-            logger.debug("[dispatch] RouteScorer notify failed: %s", exc)
+            # P2-7 fix: upgrade to warning — cooldown mechanism failure
+            # affects routing quality and should be visible in logs
+            logger.warning("[dispatch] RouteScorer notify failed: %s", exc)
 
     def _find_agent_def(self, name: str):
         """Look up an AgentDef by name from the config (dict form only)."""
@@ -459,7 +462,9 @@ class Dispatcher:
                     trace_id=trace_id, routing_key=routing_key,
                 )
                 return DispatchResult(result=result, breaker_tripped=False)
-        except Exception as exc:
+        except (ValueError, KeyError, OSError) as exc:
+            # P2-15 fix: narrow exception scope — let TypeError/AttributeError
+            # (programming bugs) propagate, only catch expected data errors
             logger.warning("[dispatch] Guardrail check failed (fail-closed): %s", exc)
             result = new_result(
                 agent=agent, task=task,

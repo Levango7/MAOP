@@ -275,6 +275,22 @@ class DashboardProvider:
 # ── FastAPI app (optional — only if fastapi installed) ────────
 
 def create_app(root_dir: str | Path | None = None) -> Any:
+    """Deprecated: use maop.dashboard.server.app instead.
+
+    This function is retained only for backward compatibility with tests.
+    It creates an isolated FastAPI app with routes that conflict with
+    the main server.py routes. Do not use in production.
+
+    .. deprecated:: 4.0.0
+        Use ``maop.dashboard.server:app`` for all production use.
+    """
+    import warnings
+    warnings.warn(
+        "create_app() is deprecated and will be removed in v4.1. "
+        "Use maop.dashboard.server:app instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     """Create FastAPI dashboard application.
 
     Returns None if FastAPI is not installed.

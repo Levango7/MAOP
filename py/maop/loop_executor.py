@@ -230,7 +230,12 @@ class ExecuteMixin:
                     logger.info("Agent %s failed (exit=%d), iter=%d",
                                 agent, result.exit_code, iteration + 1)
                 except Exception as exc:
+                    # P2-9 fix: construct failure result so breaker records it
                     logger.warning("Agent %s threw exception: %s", agent, exc)
+                    result = new_result(
+                        agent=agent, task=task, exit_code=1,
+                        error=f"Exception: {exc}", trace_id=trace_id,
+                    )
 
             if result and result.is_success():
                 return cast(MaopResult | None, result)

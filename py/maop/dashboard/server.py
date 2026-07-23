@@ -54,7 +54,13 @@ _edition_cfg = _get_settings()
 if DASH_VUE3_DIST_DIR.exists():
     _SERVE_DIR = DASH_VUE3_DIST_DIR
 elif DASH_VUE3_SRC_DIR.exists():
+    # P2-18 fix: dev source dir is not buildable — warn clearly
     _SERVE_DIR = DASH_VUE3_SRC_DIR
+    logger.warning(
+        "[server] Using dashboard-enterprise/ source dir (dev mode). "
+        "Vue .vue files cannot be served as static assets — run "
+        "'cd dashboard-enterprise && npm run build' for production."
+    )
 else:
     _SERVE_DIR = DASH_DIR
     logger.warning("[server] Vue3 dashboard not found, falling back to legacy dashboard/")

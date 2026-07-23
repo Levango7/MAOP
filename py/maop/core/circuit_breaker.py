@@ -434,7 +434,7 @@ class CircuitBreaker:
 
     # ── Health check ─────────────────────────────────────────
 
-    def health_check(self, probe: Any = None) -> dict[str, BreakerState]:
+    async def health_check(self, probe: Any = None) -> dict[str, BreakerState]:
         """Probe all agents and recover half-open → closed if healthy.
 
         Args:
@@ -443,6 +443,9 @@ class CircuitBreaker:
                    probe returns True. If omitted, HALF_OPEN agents are
                    NOT auto-recovered — they must wait for a real request
                    to test the agent (record_success/record_failure).
+
+        P2-14 fix: Now async to support async probe callables. Sync probes
+        are still supported via asyncio.iscoroutine check.
 
         B-P0-5 fix: Previously, when probe=None, HALF_OPEN agents were
         immediately recovered to CLOSED because last_failure was not
@@ -461,6 +464,10 @@ class CircuitBreaker:
                         continue
                     try:
                         is_healthy = probe(agent_name)
+                        # P2-14 fix: await if probe is async
+                        import asyncio as _asyncio
+                        if _asyncio.iscoroutine(is_healthy):
+                            is_healthy = await is_healthy
                     except Exception as exc:
                         logger.warning("[breaker] Probe for %s failed: %s", agent_name, exc)
                         continue

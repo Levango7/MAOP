@@ -49,11 +49,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self.enabled = enabled
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Skip if auth is disabled — grant admin role so require_admin passes
-        if not self.enabled:
-            request.state.auth_roles = ["admin"]
-            request.state.auth_identity = "anonymous"
-            return cast(Response, await call_next(request))
+        # Skip if auth is disabled — P2-3 fix: grant read-only role instead
+        # of admin to prevent anonymous write access when auth is off.
+        # require_admin() will reject write endpoints unless explicitly
+        # overridden with MAOP_AUTH_DISABLED_ADMIN=1.
+        import os
+        disabled_role = "admin" if os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "0") == "1" else "read"
+        request.state.auth_roles = [disabled_role]
+        request.state.auth_identity = "anonymous"
+        return cast(Response, await call_next(request))
 
         # Skip public paths
         path = request.url.path

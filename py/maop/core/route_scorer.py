@@ -190,7 +190,7 @@ class RouteScorer:
                 result.append({
                     "agent": agent,
                     "fail_count": cd.fail_count,
-                    "remaining_sec": round(remaining),
+                    "remaining_s": round(remaining),
                 })
         return result
 
