@@ -211,11 +211,11 @@ class PipelineCheckpoint:
         return True
 
     def pending_steps(self, run_id: str) -> list[str]:
-        """Get step names that are still pending or failed (for retry)."""
+        """Get step names that need execution (pending, failed, or stuck running)."""
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT step_name FROM pipeline_step_checkpoints
-                   WHERE run_id = ? AND status IN ('pending', 'failed')
+                   WHERE run_id = ? AND status IN ('pending', 'failed', 'running')
                    ORDER BY rowid""",
                 (run_id,),
             ).fetchall()

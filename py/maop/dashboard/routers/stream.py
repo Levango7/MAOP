@@ -19,6 +19,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/stream", tags=["stream"])
 
 
+def _check_sse_token(request: Request) -> None:
+    """EventSource cannot set Authorization header, so SSE clients pass
+    JWT via ?token= query param. Extract and validate it here, setting
+    request.state.auth_roles for require_admin to work."""
+    from maop.dashboard.routers.auth import get_auth_mgr
+    token = request.query_params.get("token", "")
+    if not token:
+        return  # let require_admin handle the missing-auth case
+    try:
+        mgr = get_auth_mgr()
+        payload = mgr.jwt_handler.verify_token(token)
+        if payload:
+            request.state.auth_roles = payload.get("roles", [])
+            request.state.auth_identity = payload.get("sub", "anonymous")
+    except Exception:
+        pass  # invalid token → require_admin will reject
+
+
 @router.get("")
 @handle_api_errors
 async def global_state_stream(request: Request) -> Any:
@@ -27,7 +45,11 @@ async def global_state_stream(request: Request) -> Any:
     P0-2 fix: Monitor.vue uses useSSE('/api/stream') expecting event="state"
     with system metrics. This endpoint provides that, complementing the
     per-trace /{trace_id} streaming endpoint.
+
+    P1-12 fix: EventSource can't set Authorization header, so check
+    token from query param (injected by useSSE.js _buildUrl).
     """
+    _check_sse_token(request)
     require_admin(request)
     import asyncio
     import json
@@ -66,6 +88,16 @@ async def global_state_stream(request: Request) -> Any:
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
+@router.get("/active")
+@handle_api_errors
+async def list_active_streams(request: Request) -> Any:
+    """List all currently active streaming executions."""
+    require_admin(request)
+    from maop.core.streaming import get_stream_registry
+    registry = get_stream_registry()
+    active = registry.active()
+    return {"active": active, "count": len(active)}
+
 @router.get("/{trace_id}")
 @handle_api_errors
 async def stream_trace(trace_id: str, request: Request) -> Any:
@@ -84,14 +116,3 @@ async def stream_trace(trace_id: str, request: Request) -> Any:
             yield chunk
 
     return StreamingResponse(generate(), media_type="text/event-stream")
-
-
-@router.get("/active")
-@handle_api_errors
-async def list_active_streams(request: Request) -> Any:
-    """List all currently active streaming executions."""
-    require_admin(request)
-    from maop.core.streaming import get_stream_registry
-
-    registry = get_stream_registry()
-    return {"active": registry.active(), "count": len(registry.active())}

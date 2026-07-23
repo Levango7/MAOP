@@ -385,7 +385,7 @@ class DataBridge:
             return {}
 
         total = len(agents)
-        healthy = sum(1 for a in agents if a.get("state", "closed") == "closed")
+        healthy = sum(1 for a in agents if a.get("circuit_breaker", "closed") == "closed")
         recent_delegations = live_data.get("recent_delegations", [])
         total_delegations = len(recent_delegations)
         successes = sum(1 for d in recent_delegations if d.get("exit_code") == 0)

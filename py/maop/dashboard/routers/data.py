@@ -35,7 +35,8 @@ async def api_report(request: Request) -> Any:
 
 @router.get("/api/agents")
 async def api_agents() -> Any:
-    return await get_bridge().agent_stats()
+    agents = await get_bridge().agent_stats()
+    return {"agents": agents, "count": len(agents)}
 
 
 @router.get("/api/timeseries")

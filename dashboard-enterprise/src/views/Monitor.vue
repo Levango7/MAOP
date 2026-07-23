@@ -210,18 +210,22 @@ async function pollData() {
 async function runMaint(m) {
   m.status = 'running';
   m.statusText = 'Running...';
+  // P1-11 fix: use correct /api/control/maintain endpoint and action names
   const endpoints = {
-    'Prune Memory': '/api/control/execute',
-    'Backup Database': '/api/db/backup',
-    'Reload Config': '/api/control/execute',
-    'Clear Cache': '/api/control/execute',
-    'Rebuild Vector Index': '/api/vector/reindex',
-    'Compact Database': '/api/db/vacuum',
+    'Prune Memory': '/api/control/maintain',
+    'Backup Database': '/api/control/maintain',
+    'Reload Config': '/api/control/maintain',
+    'Clear Cache': '/api/control/maintain',
+    'Rebuild Vector Index': '/api/control/maintain',
+    'Compact Database': '/api/control/maintain',
   };
   try {
-    const body = m.title === 'Prune Memory' ? { action: 'memory.prune' }
-      : m.title === 'Reload Config' ? { action: 'config.reload' }
-      : m.title === 'Clear Cache' ? { action: 'cache.clear' }
+    const body = m.title === 'Prune Memory' ? { action: 'prune' }
+      : m.title === 'Backup Database' ? { action: 'backup' }
+      : m.title === 'Reload Config' ? { action: 'reload' }
+      : m.title === 'Clear Cache' ? { action: 'cache-clear' }
+      : m.title === 'Rebuild Vector Index' ? { action: 'reindex' }
+      : m.title === 'Compact Database' ? { action: 'vacuum' }
       : {};
     await api.post(endpoints[m.title] || '/api/health', body);
     m.status = 'done';

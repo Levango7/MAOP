@@ -49,15 +49,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self.enabled = enabled
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Skip if auth is disabled — P2-3 fix: grant read-only role instead
-        # of admin to prevent anonymous write access when auth is off.
-        # require_admin() will reject write endpoints unless explicitly
-        # overridden with MAOP_AUTH_DISABLED_ADMIN=1.
-        import os
-        disabled_role = "admin" if os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "0") == "1" else "read"
-        request.state.auth_roles = [disabled_role]
-        request.state.auth_identity = "anonymous"
-        return cast(Response, await call_next(request))
+        # P0-1 FIX (R3 audit): restore if-guard that was lost in P2-3 fix.
+        # Without this guard, ALL auth logic below is dead code and every
+        # request gets anonymous/read role regardless of MAOP_AUTH setting.
+        if not self.enabled:
+            import os
+            disabled_role = "admin" if os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "0") == "1" else "read"
+            request.state.auth_roles = [disabled_role]
+            request.state.auth_identity = "anonymous"
+            return cast(Response, await call_next(request))
 
         # Skip public paths
         path = request.url.path
@@ -349,8 +349,9 @@ def setup_middleware(
 # ── Shared auth helpers ──────────────────────────────────────────
 
 def require_admin(request: Request) -> None:
-    """Raise HTTPException(403) if the request is not from an authenticated admin."""
+    """Raise HTTPException(403) if not authenticated as admin or superadmin."""
     roles = getattr(request.state, "auth_roles", None) or []
-    if "admin" not in roles:
+    # P1-13 fix: accept both "admin" and "superadmin" (RBAC hierarchy)
+    if not ({"admin", "superadmin"} & set(roles)):
         from fastapi import HTTPException
         raise HTTPException(403, "Admin role required")

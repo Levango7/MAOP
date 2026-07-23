@@ -157,4 +157,5 @@ async def list_permissions(request: Request) -> Any:
 
 def _current_user(request: Request) -> str:
     """Extract user_id from request state (set by auth middleware)."""
-    return getattr(request.state, "auth_user", "") or ""
+    # P1-14 fix: middleware sets auth_identity, not auth_user
+    return getattr(request.state, "auth_identity", "") or ""

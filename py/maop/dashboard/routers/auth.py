@@ -12,6 +12,7 @@ from typing import Any
 import asyncio
 import logging
 import os
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,8 @@ router = APIRouter()
 from maop.core.auth import AuthManager, APIKeyStore, AuthConfig, JWTConfig, load_jwt_secret
 from maop.core.db_utils import sqlite_connect
 
-_auth_enabled = os.environ.get("MAOP_AUTH", "0") == "1"
+_env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
+_auth_enabled = os.environ.get("MAOP_AUTH", "1" if _env_is_prod else "0") == "1"
 _AUTH_PBKDF2_ITERATIONS = 260_000
 _auth_mgr: AuthManager | None = None
 
@@ -242,8 +244,10 @@ def _db_update_user(db_path_str: str, username: str, body: dict) -> dict:
 
 # ── Endpoints ──────────────────────────────────────────────────────
 _login_failures: dict[str, list[float]] = {}
+_login_failures_lock = threading.Lock()
 _MAX_LOGIN_FAILURES = 5
 _LOCKOUT_SECONDS = 900.0
+_MAX_TRACKED_USERS = 10_000  # P1-18 fix: prevent unbounded growth
 
 @router.get("/api/auth/status")
 async def auth_status(request: Request) -> Any:
@@ -279,9 +283,15 @@ async def auth_login(request: Request) -> Any:
             return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
 
         now = _time.monotonic()
-        failures = _login_failures.get(username, [])
-        failures = [t for t in failures if now - t < _LOCKOUT_SECONDS]
-        _login_failures[username] = failures
+        with _login_failures_lock:
+            failures = _login_failures.get(username, [])
+            failures = [t for t in failures if now - t < _LOCKOUT_SECONDS]
+            _login_failures[username] = failures
+            # P1-18 fix: periodic cleanup to prevent unbounded growth
+            if len(_login_failures) > _MAX_TRACKED_USERS:
+                cutoff = now - _LOCKOUT_SECONDS
+                _login_failures.clear()
+                _login_failures[username] = failures
         if len(failures) >= _MAX_LOGIN_FAILURES:
             return JSONResponse({"status": "error", "error": "Account locked. Try again later."}, status_code=429)
 
@@ -294,11 +304,15 @@ async def auth_login(request: Request) -> Any:
         )
 
         if result["status"] != "ok":
-            _login_failures.setdefault(username, []).append(now)
+            with _login_failures_lock:
+                _login_failures.setdefault(username, []).append(now)
             return JSONResponse(result, status_code=401)
 
         mgr = get_auth_mgr()
         token = mgr.jwt_handler.create_token(result["username"], roles=result["roles"], ttl_s=7200.0)
+        # P1-18 fix: clear failures on successful login
+        with _login_failures_lock:
+            _login_failures.pop(username, None)
 
         return {
             "status": "ok",

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -338,14 +339,21 @@ class RouteScorer:
 
 # ── Singleton Instance ───────────────────────────────────────
 
+_singleton_lock = threading.Lock()
 _instance: RouteScorer | None = None
 
 
 def get_route_scorer(config: MaopConfig | None = None) -> RouteScorer:
-    """Get or create the singleton RouteScorer instance."""
+    """Get or create the singleton RouteScorer instance.
+
+    P1-17 fix: thread-safe singleton creation with Lock.
+    Config is only accepted on first initialization; subsequent calls
+    ignore config to prevent race conditions from concurrent requests
+    mutating the shared singleton.
+    """
     global _instance
     if _instance is None:
-        _instance = RouteScorer(config=config)
-    elif config is not None:
-        _instance.config = config
+        with _singleton_lock:
+            if _instance is None:
+                _instance = RouteScorer(config=config)
     return _instance

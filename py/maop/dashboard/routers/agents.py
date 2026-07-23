@@ -76,6 +76,35 @@ async def list_agents(
     return {"agents": [a.model_dump() for a in agents]}
 
 
+@router.get("/routes")
+@handle_api_errors
+async def get_agent_routes():
+    registry = _get_registry()
+    agents = registry.list_agents()
+    routes = []
+    for a in agents:
+        routes.append({
+            "name": a.name,
+            "provider": getattr(a, "provider", ""),
+            "model": getattr(a, "model", ""),
+            "capabilities": getattr(a, "capabilities", []),
+            "enabled": getattr(a, "enabled", True),
+            "driver": getattr(a, "driver", "cli"),
+        })
+    return {"routes": routes}
+
+@router.get("/match")
+@handle_api_errors
+async def match_agents(
+    task: str = Query(..., description="Task description"),
+    requirements: str = Query("", description="Comma-separated capabilities"),
+    top_k: int = Query(5, ge=1, le=20),
+):
+    matcher = _get_matcher()
+    reqs = [r.strip() for r in requirements.split(",") if r.strip()] if requirements else None
+    scores = matcher.match(task=task, requirements=reqs, top_k=top_k)
+    return {"matches": [s.model_dump() for s in scores]}
+
 @router.get("/{name}")
 @handle_api_errors
 async def get_agent(name: str):
@@ -164,35 +193,6 @@ async def unregister_agent(name: str, request: Request):
     return {"deleted": ok}
 
 
-@router.get("/routes")
-@handle_api_errors
-async def get_agent_routes():
-    registry = _get_registry()
-    agents = registry.list_agents()
-    routes = []
-    for a in agents:
-        routes.append({
-            "name": a.name,
-            "provider": getattr(a, "provider", ""),
-            "model": getattr(a, "model", ""),
-            "capabilities": getattr(a, "capabilities", []),
-            "enabled": getattr(a, "enabled", True),
-            "driver": getattr(a, "driver", "cli"),
-        })
-    return {"routes": routes}
-
-
-@router.get("/match")
-@handle_api_errors
-async def match_agents(
-    task: str = Query(..., description="Task description"),
-    requirements: str = Query("", description="Comma-separated capabilities"),
-    top_k: int = Query(5, ge=1, le=20),
-):
-    matcher = _get_matcher()
-    reqs = [r.strip() for r in requirements.split(",") if r.strip()] if requirements else None
-    scores = matcher.match(task=task, requirements=reqs, top_k=top_k)
-    return {"matches": [s.model_dump() for s in scores]}
 
 
 @router.get("/{name}/health-log")

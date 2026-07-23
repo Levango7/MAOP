@@ -142,6 +142,7 @@ class Dispatcher:
         self._config = MAOP_config
         self._breaker = breaker or CircuitBreaker()
         self._agent_cache: dict[str, AgentConfig] = {}
+        self._cache_versions: dict[str, int] = {}
         self._model_selector = model_selector
         self._effective_model: Any | None = None
         self._root_dir = root_dir
@@ -156,6 +157,11 @@ class Dispatcher:
         """Return the last resolved EffectiveModel (for audit/logging)."""
         return self._effective_model
 
+    def clear_agent_cache(self) -> None:
+        """Clear the agent config cache (call after config reload)."""
+        self._agent_cache.clear()
+        self._cache_versions.clear()
+
     def _resolve_agent(self, agent_name: str) -> AgentConfig | None:
         """Resolve agent config from the loaded MAOP config.
 
@@ -163,11 +169,24 @@ class Dispatcher:
         The parent's *cli* is combined with the child's *cli_args* to build
         the final AgentConfig.
 
+        P1-19 fix: cache entries now store config_version for invalidation
+        when ConfigLoader.reload() is called. Also re-checks enabled flag
+        on cache hit to respect runtime enable/disable changes.
+
         Returns a copy of the cached config to prevent callers from
         mutating the shared cache (e.g., dispatch() overrides model).
         """
-        if agent_name in self._agent_cache:
-            return self._agent_cache[agent_name].model_copy()
+        cached = self._agent_cache.get(agent_name)
+        if cached is not None:
+            # P1-19 fix: version-based cache invalidation
+            current_version = getattr(self._config, '_version', 0) if self._config else 0
+            cached_version = self._cache_versions.get(agent_name, 0)
+            if cached_version == current_version:
+                return cached.model_copy()
+            else:
+                # Config changed, invalidate cache entry
+                del self._agent_cache[agent_name]
+                self._cache_versions.pop(agent_name, None)
 
         # Fallback: AgentRegistry lookup (works even without YAML config)
         if self._config is None:
@@ -203,6 +222,7 @@ class Dispatcher:
                 wrapper=parent_def.wrapper,
             )
             self._agent_cache[agent_name] = cfg
+            self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
             return cfg
 
         # ── Regular agent resolution ─────────────────────────────
@@ -224,6 +244,7 @@ class Dispatcher:
                         wrapper=a.wrapper, command=getattr(a, 'command', ''),
                     )
                     self._agent_cache[agent_name] = cfg
+                    self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
                     return cfg
             else:
                 agents_by_name = self._build_agents_index(agents)
@@ -241,6 +262,7 @@ class Dispatcher:
                         wrapper=a.wrapper, command=a.command,
                     )
                     self._agent_cache[agent_name] = cfg
+                    self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
                     return cfg
 
         # Try workflows section — supports both dict and list
@@ -256,6 +278,7 @@ class Dispatcher:
                         wrapper=w.wrapper, command=getattr(w, 'command', ''),
                     )
                     self._agent_cache[agent_name] = cfg
+                    self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
                     return cfg
             else:
                 wf_by_name = self._build_workflows_index(workflows)
@@ -268,6 +291,7 @@ class Dispatcher:
                         wrapper=w.wrapper, command=w.command,
                     )
                     self._agent_cache[agent_name] = cfg
+                    self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
                     return cfg
 
         # Wildcard match
@@ -284,6 +308,7 @@ class Dispatcher:
                             wrapper=a.wrapper, command=getattr(a, 'command', ''),
                         )
                         self._agent_cache[agent_name] = cfg
+                        self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
                         return cfg
             else:
                 for a in agents:
@@ -296,6 +321,7 @@ class Dispatcher:
                             wrapper=a.wrapper, command=a.command,
                         )
                         self._agent_cache[agent_name] = cfg
+                        self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
                         return cfg
 
         # Fallback: AgentRegistry lookup
@@ -369,6 +395,7 @@ class Dispatcher:
             provider=getattr(agent, 'provider', ''),
         )
         self._agent_cache[agent_name] = cfg
+        self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
         logger.info("[dispatcher] Resolved '%s' from AgentRegistry", agent_name)
         return cfg
 
@@ -532,10 +559,11 @@ class Dispatcher:
 
         # 5. Record in circuit-breaker and route scorer cooldown
         if result.is_success():
-            self._breaker.record_success(agent)
+            # P1-16 fix: use async breaker methods to avoid blocking event loop
+            await self._breaker.arecord_success(agent)
             self._notify_route_scorer(agent, success=True)
         else:
-            self._breaker.record_failure(agent)
+            await self._breaker.arecord_failure(agent)
             self._notify_route_scorer(agent, success=False)
 
         return DispatchResult(

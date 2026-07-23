@@ -379,6 +379,7 @@ class CircuitBreaker:
             self._save_failover_chain(name, chain)
             logger.info("[breaker] Registered failover chain '%s': %s", name, " → ".join(agents))
 
+
     def resolve_failover(
         self,
         name: str,
@@ -454,33 +455,39 @@ class CircuitBreaker:
         probe, HALF_OPEN agents stay in HALF_OPEN until a real request
         tests them.
         """
-        with self._sync_lock:
-            recovered: dict[str, BreakerState] = {}
+        # P1-10 fix (R3 audit): use async_lock, probe outside lock
+        half_open_agents: list[tuple[str, BreakerEntry]] = []
+        async with self._async_lock:
             for agent_name, entry in list(self._data.items()):
                 if entry.state == BreakerState.HALF_OPEN:
-                    if probe is None:
-                        # B-P0-5 fix: require real probe or actual request
-                        # to recover from HALF_OPEN
-                        continue
-                    try:
-                        is_healthy = probe(agent_name)
-                        # P2-14 fix: await if probe is async
-                        import asyncio as _asyncio
-                        if _asyncio.iscoroutine(is_healthy):
-                            is_healthy = await is_healthy
-                    except Exception as exc:
-                        logger.warning("[breaker] Probe for %s failed: %s", agent_name, exc)
-                        continue
-                    if not is_healthy:
-                        continue
-                    old_state = entry.state
-                    entry.state = BreakerState.CLOSED
-                    entry.failures = 0
-                    self._save_agent(agent_name, entry, old_state=old_state)
-                    recovered[agent_name] = BreakerState.CLOSED
-                    logger.info("[breaker] Health check: %s recovered to CLOSED (probed)", agent_name)
+                    half_open_agents.append((agent_name, entry))
 
-            return recovered
+        if not half_open_agents:
+            return {name: entry.state for name, entry in self._data.items()}
+
+        # Probe outside lock to avoid blocking other operations
+        for agent_name, entry in half_open_agents:
+            if probe is None:
+                continue
+            try:
+                is_healthy = probe(agent_name)
+                if asyncio.iscoroutine(is_healthy):
+                    is_healthy = await is_healthy
+            except Exception as exc:
+                logger.warning("[breaker] Probe for %s failed: %s", agent_name, exc)
+                continue
+            if not is_healthy:
+                continue
+            async with self._async_lock:
+                old_state = entry.state
+                entry.state = BreakerState.CLOSED
+                entry.failures = 0
+                await asyncio.get_running_loop().run_in_executor(
+                    None, partial(self._save_agent, agent_name, entry, old_state=old_state)
+                )
+            logger.info("[breaker] Health check: %s recovered to CLOSED (probed)", agent_name)
+
+        return {name: entry.state for name, entry in self._data.items()}
 
     def get_open_agents(self) -> list[str]:
         """Return list of agents currently in OPEN state."""

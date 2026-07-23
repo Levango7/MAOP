@@ -97,8 +97,10 @@ class DependencyDAG(BaseModel):
         # Cycle detection: if not all nodes in order, there's a cycle
         if len(order) != len(self.nodes):
             remaining = [n for n in self.nodes if n not in order]
-            order.extend(remaining)  # Best-effort: append remaining
-            logger.warning("Dependency cycle detected among: %s", remaining)
+            # P1-e fix: throw ValueError with cycle chain (per project hard constraint)
+            raise ValueError(
+                f"Dependency cycle detected: {' -> '.join(remaining)} -> {remaining[0] if remaining else ''}"
+            )
 
         return order
 
@@ -571,7 +573,8 @@ def _select_strategy(dag: DependencyDAG, score: int) -> ExecutionStrategy:
     if len(groups) <= 1:
         return ExecutionStrategy.PARALLEL
     max_group_size = max(len(g) for g in groups)
-    if max_group_size == len(dag.nodes):
+    # P1-d fix: SEQUENTIAL when all groups have size 1 (no parallelism possible)
+    if max_group_size == 1:
         return ExecutionStrategy.SEQUENTIAL
     return ExecutionStrategy.HYBRID
 

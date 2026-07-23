@@ -52,6 +52,12 @@ async def create_session(body: dict, request: Request):
     return {"session": session.model_dump() if session else None}
 
 
+@router.get("/stats")
+@handle_api_errors
+async def session_stats():
+    mgr = _get_session_mgr()
+    return mgr.stats()
+
 @router.get("/{session_id}")
 @handle_api_errors
 async def get_session(session_id: str):
@@ -89,12 +95,6 @@ async def delete_session(session_id: str, request: Request):
     ok = mgr.delete(session_id)
     return {"deleted": ok}
 
-
-@router.get("/stats")
-@handle_api_errors
-async def session_stats():
-    mgr = _get_session_mgr()
-    return mgr.stats()
 
 
 @router.get("/{session_id}/messages")

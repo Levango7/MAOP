@@ -122,7 +122,7 @@ async function execAction(action, task) {
       }
       r = await api.post(`/api/control/${action}`, body);
     }
-    execResult.value = { ok: true, msg: r.message || r.detail || `${action} executed` };
+    execResult.value = { ok: true, msg: r.msg || r.message || r.detail || `${action} executed` };
     await loadJobs();
   } catch (e) {
     execResult.value = { ok: false, msg: e.message || `${action} failed` };
@@ -136,7 +136,7 @@ async function maintainAction(action) {
   maintResult.value = null;
   try {
     const r = await api.post('/api/control/maintain', { action });
-    maintResult.value = { ok: true, msg: r.message || r.detail || `${action} completed` };
+    maintResult.value = { ok: true, msg: r.msg || r.message || r.detail || `${action} completed` };
   } catch (e) {
     maintResult.value = { ok: false, msg: e.message || `${action} failed` };
   } finally {

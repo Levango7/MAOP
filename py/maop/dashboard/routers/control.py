@@ -243,6 +243,26 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> Any:
             except Exception:
                 logger.error("Config reload failed", exc_info=True)
                 return {"status": "ok", "action": "reload", "msg": "Skipped: reload unavailable"}
+        elif action == "reindex":
+            try:
+                from maop.core.vector import VectorStore
+                store = VectorStore() if hasattr(VectorStore, '__init__') else None
+                if store and hasattr(store, 'reindex'):
+                    store.reindex()
+                    return {"status": "ok", "action": "reindex", "msg": "Vector index rebuilt"}
+                return {"status": "ok", "action": "reindex", "msg": "Skipped: vector store unavailable"}
+            except Exception:
+                logger.error("Vector reindex failed", exc_info=True)
+                return {"status": "ok", "action": "reindex", "msg": "Skipped: reindex unavailable"}
+        elif action == "vacuum":
+            try:
+                from maop.core.db_utils import sqlite_connect
+                with sqlite_connect() as conn:
+                    conn.execute("VACUUM")
+                return {"status": "ok", "action": "vacuum", "msg": "Database compacted"}
+            except Exception:
+                logger.error("Database vacuum failed", exc_info=True)
+                return {"status": "ok", "action": "vacuum", "msg": "Skipped: vacuum unavailable"}
         return {"status": "ok", "action": action or "noop"}
     except Exception:
         logger.error("Maintain action failed", exc_info=True)

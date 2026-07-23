@@ -128,6 +128,7 @@ class MaopConfig(BaseModel):
     loops: LoopsConfig = Field(default_factory=LoopsConfig)
     guards: GuardsConfig = Field(default_factory=GuardsConfig)
     _raw_models: dict[str, Any] = PrivateAttr(default_factory=dict)
+    _version: int = PrivateAttr(default=0)
 
 
 # ── YAML loading ──────────────────────────────────────────────
@@ -222,6 +223,7 @@ class ConfigLoader:
             guards=guards,
         )
         cfg._raw_models = models_data or {}
+        cfg._version = _next_config_version()
         return cfg
 
     def reload(self) -> MaopConfig:
