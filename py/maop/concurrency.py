@@ -126,7 +126,7 @@ class TaskPool:
         result = await pool.wait(task.id)
     """
 
-    def __init__(self, max_workers: int = 4, max_queue_size: int = 100) -> None:
+    def __init__(self, max_workers: int = 4, max_queue_size: int = 100, max_retained: int = 200) -> None:
         self._max_workers = max_workers
         self._queue = TaskQueue(max_size=max_queue_size)
         self._tasks: dict[str, Task] = {}
@@ -136,6 +136,9 @@ class TaskPool:
         self._workers: list[asyncio.Task] = []
         self._running = False
         self._active_count = 0
+        # P2-1 fix: bounded retention to prevent memory leak
+        self._max_retained = max_retained
+        self._completion_order: list[str] = []
 
     @property
     def active_count(self) -> int:
@@ -230,6 +233,14 @@ class TaskPool:
         finally:
             task.finished_at = time.time()
             self._active_count -= 1
+            # P2-1 fix: cleanup executor (no longer needed) and enforce retention limit
+            self._executors.pop(task.id, None)
+            self._completion_order.append(task.id)
+            if len(self._completion_order) > self._max_retained:
+                old_id = self._completion_order.pop(0)
+                self._tasks.pop(old_id, None)
+                self._results.pop(old_id, None)
+                self._futures.pop(old_id, None)
 
     async def wait(self, task_id: str, timeout: float = 0) -> Any:
         """Wait for a task to complete and return its result."""

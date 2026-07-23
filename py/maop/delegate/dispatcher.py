@@ -546,6 +546,15 @@ class Dispatcher:
 
         # 4. Execute via driver — wrap in try/except to ensure failures are recorded
         # in circuit-breaker and route scorer cooldown (P0-3 + P1-7 fix)
+        import time as _time
+        _dispatch_start = _time.monotonic()
+        # P2-7 fix: record task start to LoadBalancer for adaptive scoring
+        try:
+            lb = _get_load_balancer()
+            if lb:
+                lb.record_start(agent, trace_id or task[:32])
+        except Exception:
+            pass
         try:
             result = await driver_fn(config, task, timeout, workdir, trace_id, streamer=streamer)  # type: ignore[call-arg]
             result.routing_key = routing_key
@@ -556,6 +565,18 @@ class Dispatcher:
                 trace_id=trace_id, routing_key=routing_key,
             )
             logger.error("[dispatch] Driver '%s' raised: %s", config.driver, exc)
+
+        # P2-7 fix: record task finish to LoadBalancer
+        try:
+            lb = _get_load_balancer()
+            if lb:
+                lb.record_finish(
+                    agent, trace_id or task[:32],
+                    duration_ms=(_time.monotonic() - _dispatch_start) * 1000,
+                    success=result.is_success(),
+                )
+        except Exception:
+            pass
 
         # 5. Record in circuit-breaker and route scorer cooldown
         if result.is_success():

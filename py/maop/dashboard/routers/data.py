@@ -129,7 +129,7 @@ async def api_optimizer() -> Any:
         return {"status": "error", "error": "Optimizer report unavailable"}
 
 
-@router.get("/api/batch")
+@router.get("/api/batch", deprecated=True, description="Deprecated: use individual /api/* endpoints. Frontend does not call this.")
 async def api_batch(keys: str = Query("")) -> Any:
     if not keys:
         return {}

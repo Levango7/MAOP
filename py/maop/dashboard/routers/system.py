@@ -328,6 +328,9 @@ async def api_workflow_run(request: Request) -> Any:
 # ── Overview (v4 compat) ──────────────────────────────────────────
 _overview_cache: dict[str, Any] = {}
 _OVERVIEW_CACHE_TTL = 60.0
+# P2-9 fix: cache file counts separately (rarely change, expensive to compute)
+_file_counts_cache: dict[str, Any] = {}
+_FILE_COUNTS_CACHE_TTL = 600.0  # 10 minutes
 
 @router.get("/api/overview")
 async def api_overview(request: Request) -> Any:
@@ -345,25 +348,40 @@ async def api_overview(request: Request) -> Any:
         live = await b.live()
         fails = await b.failures()
         agent_count = len(agents.get("agents", [])) if isinstance(agents, dict) else (len(agents) if isinstance(agents, list) else 0)
-        py_dir = MAOP_ROOT / "py" / "MAOP"
-        source_files = sum(1 for p in py_dir.rglob("*.py") if "__pycache__" not in str(p))
-        code_lines = 0
-        for p in py_dir.rglob("*.py"):
-            if "__pycache__" in str(p):
-                continue
-            try:
-                code_lines += sum(1 for _ in open(p, encoding="utf-8", errors="replace"))
-            except Exception as exc:
-                logger.warning('Failed to count code lines: %s', exc)
-        test_dir = MAOP_ROOT / "py" / "tests"
-        test_files = sum(1 for p in test_dir.glob("test_*.py")) if test_dir.exists() else 0
-        tests_total = 0
-        if test_dir.exists():
-            for tf in test_dir.glob("test_*.py"):
+        # P2-9 fix: cache file counts (10min TTL) to avoid per-request file traversal
+        _fc_now = _time.monotonic()
+        _fc_cached = _file_counts_cache.get("data")
+        _fc_ts = _file_counts_cache.get("ts", 0)
+        if _fc_cached and _fc_now - _fc_ts < _FILE_COUNTS_CACHE_TTL:
+            source_files = _fc_cached["source_files"]
+            code_lines = _fc_cached["code_lines"]
+            test_files = _fc_cached["test_files"]
+            tests_total = _fc_cached["tests_total"]
+        else:
+            py_dir = MAOP_ROOT / "py" / "MAOP"
+            source_files = sum(1 for p in py_dir.rglob("*.py") if "__pycache__" not in str(p))
+            code_lines = 0
+            for p in py_dir.rglob("*.py"):
+                if "__pycache__" in str(p):
+                    continue
                 try:
-                    tests_total += tf.read_text(encoding="utf-8", errors="replace").count("def test_")
+                    code_lines += sum(1 for _ in open(p, encoding="utf-8", errors="replace"))
                 except Exception as exc:
-                    logger.warning('Failed to count test functions: %s', exc)
+                    logger.warning('Failed to count code lines: %s', exc)
+            test_dir = MAOP_ROOT / "py" / "tests"
+            test_files = sum(1 for p in test_dir.glob("test_*.py")) if test_dir.exists() else 0
+            tests_total = 0
+            if test_dir.exists():
+                for tf in test_dir.glob("test_*.py"):
+                    try:
+                        tests_total += tf.read_text(encoding="utf-8", errors="replace").count("def test_")
+                    except Exception as exc:
+                        logger.warning('Failed to count test functions: %s', exc)
+            _file_counts_cache["data"] = {
+                "source_files": source_files, "code_lines": code_lines,
+                "test_files": test_files, "tests_total": tests_total,
+            }
+            _file_counts_cache["ts"] = _fc_now
         # Count actual API endpoints from FastAPI app routes
         api_endpoints = sum(1 for r in request.app.routes if getattr(r, 'path', '').startswith('/api/'))
         result = {"agents_total": agent_count, "modules_total": source_files, "tests_total": tests_total,

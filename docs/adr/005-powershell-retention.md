@@ -1,7 +1,7 @@
 # ADR-005: 保留 PowerShell 核心引擎，Dashboard 可迁 Python
 
 ## Status
-Accepted (2026-07-10)
+**Superseded** by [ADR-009](009-python-primary-engine.md) (2026-07-15). Original: Accepted (2026-07-10).
 
 ## Context
 整个项目约 9000 行 PowerShell——有人提出是否全部迁移到 Python。关键分析：

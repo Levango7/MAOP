@@ -448,8 +448,12 @@ class MaopLoop(ExecuteMixin):
         self._log("execute", "INFO", "Execute phase started", trace_id=ctx.trace_id)
 
         cache_key = f"{ctx.agent}:{ctx.routing_key}:{ctx.original_task[:200]}"
+        # P2-5 fix: skip cache for side-effecting routing keys (write/run/exec/shell)
+        # to prevent silent dedup of tasks that modify state
+        _side_effect_keys = ("codegen", "review", "verify", "run", "exec", "shell", "deploy", "migrate", "fix", "refactor")
+        cache_enabled = self._result_cache and not any(k in ctx.routing_key.lower() for k in _side_effect_keys)
         exec_result = None
-        if self._result_cache:
+        if cache_enabled:
             try:
                 cached = self._result_cache.get(cache_key)
                 if cached is not None:
@@ -473,7 +477,7 @@ class MaopLoop(ExecuteMixin):
             if is_parallel:
                 ctx.parallel_executed = True
 
-            if self._result_cache and exec_result and exec_result.is_success():
+            if cache_enabled and exec_result and exec_result.is_success():
                 try:
                     self._result_cache.put(cache_key, exec_result)
                 except Exception as exc:

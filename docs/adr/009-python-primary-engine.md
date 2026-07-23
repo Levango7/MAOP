@@ -1,7 +1,7 @@
 # ADR-009: Python 主引擎 — 基于实证的架构转向
 
 ## Status
-Proposed (Supersedes ADR-005)
+**Accepted** (2026-07-15). Supersedes ADR-005.
 
 ## Context
 
