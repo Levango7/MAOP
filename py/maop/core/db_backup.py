@@ -183,30 +183,61 @@ class DbBackup:
     def cleanup(self, retention: int | None = None) -> int:
         """Apply retention policy: remove old backups.
 
+        P2 fix: previously only cleaned manifest entries, leaving orphan
+        .bak files on disk when manifest was out of sync. Now scans disk
+        files directly to ensure full cleanup.
+
         Returns number of backups removed.
         """
         retain = retention or self._retention
         removed = 0
 
-        # Group backups by database name
+        # P2 fix: scan actual .bak files on disk grouped by db_name
+        # This catches orphans not tracked in manifest
+        import re as _re
+        disk_by_db: dict[str, list[Path]] = {}
+        if self._backup_dir.exists():
+            for f in self._backup_dir.glob("*.bak"):
+                # Parse db_name from filename: maop.db.2026-07-23_125324.bak
+                m = _re.match(r'^(.+\.db)\.\d{4}-\d{2}-\d{2}_\d{6}\.bak$', f.name)
+                if m:
+                    disk_by_db.setdefault(m.group(1), []).append(f)
+
+        # Also group manifest entries by db_name
         by_db: dict[str, list[BackupEntry]] = {}
         for entry in self._manifest:
             by_db.setdefault(entry.db_name, []).append(entry)
 
-        for db_name, entries in by_db.items():
-            # Sort by creation time (newest first)
-            entries.sort(key=lambda e: e.created_at, reverse=True)
+        # Process all databases found on disk (superset of manifest)
+        all_db_names = set(disk_by_db.keys()) | set(by_db.keys())
 
-            # Keep only N most recent
-            to_remove = entries[retain:]
-            for entry in to_remove:
-                try:
-                    Path(entry.backup_path).unlink(missing_ok=True)
+        for db_name in all_db_names:
+            # Sort disk files by modification time (newest first)
+            disk_files = disk_by_db.get(db_name, [])
+            disk_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+            # Remove excess files beyond retention limit
+            if len(disk_files) > retain:
+                for f in disk_files[retain:]:
+                    try:
+                        f.unlink(missing_ok=True)
+                        removed += 1
+                        logger.debug("[backup] Removed orphan/old backup: %s", f.name)
+                    except Exception as exc:
+                        logger.warning("[backup] Failed to remove %s: %s", f, exc)
+
+            # Also clean manifest entries beyond retention
+            entries = by_db.get(db_name, [])
+            entries.sort(key=lambda e: e.created_at, reverse=True)
+            for entry in entries[retain:]:
+                if entry in self._manifest:
                     self._manifest.remove(entry)
-                    removed += 1
-                    logger.debug("[backup] Removed old backup: %s", entry.backup_path)
-                except Exception as exc:
-                    logger.warning("[backup] Failed to remove %s: %s", entry.backup_path, exc)
+
+        # Reconcile manifest: remove entries whose files no longer exist
+        self._manifest = [
+            e for e in self._manifest
+            if Path(e.backup_path).exists()
+        ]
 
         if removed > 0:
             self._save_manifest()

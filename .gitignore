@@ -38,10 +38,13 @@ batch_run_tests.py
 .env.local
 .env.*.local
 
-# -- Runtime data (SQLite databases) --
+# -- Runtime data (SQLite databases + generated state) --
 data/*.db
+data/*.db-shm
+data/*.db-wal
 data/*.db2
 data/.admin-password
+data/.enc_key
 data/jwt_secret
 data/backups/
 data/sandboxes/
@@ -49,6 +52,16 @@ data/wiki.json
 data/memory.json
 data/evolve-suggestions.json
 data/tools.json
+# P2 fix: runtime-generated state/cache files (not seed configs)
+data/pev-loop.jsonl
+data/dynamic-routing-cache.json
+data/graph-edges.json
+data/graph-nodes.json
+data/agent-versions.json
+data/budget_ledger.json
+data/vectors.json
+# runtime DAG execution checkpoints (per-run state, not seed configs)
+data/dag-checkpoints/
 
 # -- Logs --
 logs/

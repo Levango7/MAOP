@@ -1,0 +1,133 @@
+# DAG Workflow: 多阶段代码审查 + 修复
+# 功能: 安全扫描 || 逻辑审查 → 聚合 → 验证 → 条件分支(修复/通过)
+# 体现了 DAG + 插件化注册 + 路由表 三者协同
+
+workflow:
+  id: "dag-code-review"
+  name: "多阶段代码审查流水线"
+  version: "1.0"
+  
+  defaults:
+    timeout_s: 60
+    workdir: "{{ task.workdir }}"
+  
+  nodes:
+    # ── 准备阶段 ──
+    - id: plan
+      type: plan
+      agent: claude
+      params:
+        task: "分析以下代码变更，生成审查计划:\n{{ task }}"
+    
+    # ── 并行审查（fan-out） ──
+    # 注: agent_slot 从 routing 表自动解析，不硬编码 agent 名
+    - id: security-scan
+      type: execute
+      agent_slot: "review"      # 解析为 kimi (primary)
+      depends_on: [plan]
+      params:
+        task: |
+          安全审查以下代码:
+          {{ task }}
+          检查: SQL注入, Shell注入, 路径遍历, 密钥泄露, eval/exec
+    
+    - id: logic-review
+      type: execute
+      agent_slot: "reasoning"   # 解析为 claude (primary)
+      depends_on: [plan]
+      params:
+        task: |
+          逻辑审查以下代码:
+          {{ task }}
+          检查: 条件逻辑错误, 资源泄漏, 并发问题, 边界条件
+    
+    - id: style-check
+      type: execute
+      agent_slot: "quick"       # 解析为 nvidia (primary)
+      depends_on: [plan]
+      params:
+        task: |
+          代码风格审查:
+          {{ task }}
+          检查: 命名规范, 类型注解, 文档字符串, 代码复杂度
+    
+    # ── 聚合阶段（同步屏障） ──
+    - id: consolidate
+      type: execute
+      agent: claude
+      depends_on: [security-scan, logic-review, style-check]
+      params:
+        task: |
+          汇总审查结果:
+          
+          ## 安全问题
+          {{ security-scan.output }}
+          
+          ## 逻辑问题
+          {{ logic-review.output }}
+          
+          ## 风格问题
+          {{ style-check.output }}
+          
+          请按严重程度排序，给出综合评分（PASS/CONDITIONAL/FAIL）。
+    
+    # ── 决策阶段 ──
+    - id: verify
+      type: verify
+      agent: mavis-verifier
+      depends_on: [consolidate]
+    
+    - id: decide
+      type: condition
+      depends_on: [verify]
+      condition: "{{ verify.passed }} == false"
+      branches:
+        true: auto-fix          # 验证不通过 → 自动修复
+        false: report           # 验证通过 → 生成报告
+    
+    # ── 修复分支 ──
+    - id: auto-fix
+      type: execute
+      agent_slot: "quickfix"    # 解析为 cursor (primary)
+      depends_on: [decide]
+      params:
+        task: |
+          根据审查结果修复代码:
+          {{ consolidate.output }}
+          原始代码:
+          {{ task }}
+    
+    - id: fix-verify
+      type: verify
+      agent: mavis-verifier
+      depends_on: [auto-fix]
+      params:
+        task: "验证修复结果:\n{{ auto-fix.output }}"
+    
+    # ── 完成分支 ──
+    - id: report
+      type: terminal
+      depends_on: [decide, fix-verify]
+      output: |
+        ## 代码审查报告
+        
+        ### 安全审查
+        {{ security-scan.output | truncate(500) }}
+        
+        ### 逻辑审查
+        {{ logic-review.output | truncate(500) }}
+        
+        ### 风格审查
+        {{ style-check.output | truncate(500) }}
+        
+        ### 综合结论
+        {{ consolidate.output | truncate(300) }}
+        
+        ### 验证结果
+        初始验证: {{ verify.output }}
+        {% if fix-verify.output %}
+        修复验证: {{ fix-verify.output }}
+        {% endif %}
+        
+        ---
+        DAG TraceID: {{ trace_id }}
