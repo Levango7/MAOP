@@ -120,7 +120,7 @@
 
       <!-- t21c: About panel — replaces the v3.x-era static HTML dashboard page.
            The native JS dashboard has been archived (archive/js-dashboard/),
-           and provider._render_html is deprecated (see ADR-006 Supersession). -->
+           and provider._render_html is deprecated. SSE is retained (see ADR-006). -->
       <div class="panel about-panel">
         <h3>About</h3>
         <div class="about-version">
@@ -178,7 +178,7 @@ const adrs = ref([
   { num: '003', file: '003-mock-fallback-removal.md', title: 'Mock Fallback Removal' },
   { num: '004', file: '004-security-hardening.md', title: 'Security Hardening' },
   { num: '005', file: '005-powershell-retention.md', title: 'PowerShell Retention' },
-  { num: '006', file: '006-sse-removal-sync-architecture.md', title: 'SSE Removal — Superseded' },
+  { num: '006', file: '006-sse-removal-sync-architecture.md', title: 'SSE Retained (Superseded Removal)' },
   { num: '007', file: '007-cache-warmup-fix.md', title: 'Cache Warmup Fix' },
   { num: '008', file: '008-dual-arch-scheduling-audit.md', title: 'Dual-Arch Scheduling Audit' },
   { num: '009', file: '009-python-primary-engine.md', title: 'Python Primary Engine' },
