@@ -16,12 +16,12 @@ Submodules:
   - container.py     Docker/K8s orchestration
   - ha.py            High availability
 
-Backend modules (re-exported from core/ for enterprise enhancements):
-  - core/backends_pg.py      PostgreSQL storage
-  - core/backends_redis.py   Redis cache/queue
-  - core/backends_rabbitmq.py RabbitMQ queue
-  - core/backends_vault.py   HashiCorp Vault secrets
-  - core/backends_distributed.py etcd/Consul KV
+Backend modules:
+  - core/backends_pg.py      PostgreSQL storage (implemented)
+  - core/backends_redis.py   Redis cache/queue (planned, Phase 3.4)
+  - core/backends_rabbitmq.py RabbitMQ queue (planned, Phase 3.4)
+  - core/backends_vault.py   HashiCorp Vault secrets (planned, Phase 3.3)
+  - core/backends_distributed.py etcd/Consul KV (planned, Phase 3.4)
 """
 
 from __future__ import annotations

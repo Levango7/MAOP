@@ -1,10 +1,19 @@
 """MAOP Enterprise High Availability.
 
-Provides HA configuration for production deployments:
-  - Leader election (via Redis or DB lease)
-  - Failover coordination
-  - Health monitoring and auto-recovery
-  - Cluster state management
+Current implementation: single-instance in-memory state (Phase 3.2 status).
+Distributed coordination is planned for Phase 3.4.
+
+Provides:
+  - Node registration and health tracking (in-memory)
+  - Leader election via deterministic node_id ordering (not distributed lease)
+  - Health status monitoring (HEALTHY/DEGRADED/UNREACHABLE)
+  - Failover flag detection (caller must trigger re-election)
+
+Planned for Phase 3.4:
+  - Redis/PG lease-based leader election with fencing tokens
+  - Automatic failover coordination
+  - Cross-process cluster state synchronization
+  - Split-brain protection
 """
 
 from __future__ import annotations
