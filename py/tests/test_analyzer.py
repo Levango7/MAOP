@@ -13,6 +13,7 @@ algorithms) remain plain ``def``.
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+import pytest
 
 
 from maop.core.analyzer import (
@@ -127,9 +128,8 @@ class TestDependencyDAG:
     def test_cycle_detection(self):
         # a → b → a (cycle)
         dag = DependencyDAG(nodes=["a", "b"], edges=[("a", "b"), ("b", "a")])
-        order = dag.topological_order()
-        # Should not hang; best-effort order
-        assert len(order) == 2
+        with pytest.raises(ValueError, match="cycle"):
+            dag.topological_order()
 
     def test_get_deps(self):
         dag = DependencyDAG(nodes=["a", "b", "c"], edges=[("a", "c"), ("b", "c")])

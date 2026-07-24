@@ -14,8 +14,7 @@ pytestmark = pytest.mark.contract
 # Paths with {param} are matched as prefixes.
 
 EXPECTED_DATA_ENDPOINTS = [
-    "/api/state",
-    "/api/agents",
+    "/api/agents/stats",
     "/api/overview",
     "/api/report",
     "/api/logs",
@@ -26,7 +25,7 @@ EXPECTED_DATA_ENDPOINTS = [
     "/api/mcp",
     "/api/framework/logs",
     "/api/framework/config",
-    "/api/framework/version",
+    "/api/framework/status",
 ]
 
 EXPECTED_CONTROL_ENDPOINTS = [
@@ -37,13 +36,13 @@ EXPECTED_CONTROL_ENDPOINTS = [
 ]
 
 EXPECTED_MODEL_ENDPOINTS = [
-    "/api/models",
-    "/api/models/active",
+    "/api/model/list",
+    "/api/model/select",
 ]
 
 EXPECTED_MEMORY_ENDPOINTS = [
     "/api/memory/stats",
-    "/api/memory/query",
+    "/api/memory/search",
 ]
 
 EXPECTED_EVOLVE_ENDPOINTS = [
@@ -96,17 +95,17 @@ class TestResponseSchemas:
         assert "GET" in overview_route.methods
 
     def test_agent_config_schema(self):
-        """AgentConfig model must have required fields."""
-        from maop.core.loader import AgentConfig
+        """AgentDef model must have required fields."""
+        from maop.config.loader import AgentDef
         import inspect
 
-        fields = AgentConfig.model_fields
-        required_fields = {"name", "description", "category", "active"}
+        fields = AgentDef.model_fields
+        required_fields = {"description", "enabled", "capabilities", "model"}
         field_names = set(fields.keys())
         # Check that at least the required fields exist (case-insensitive)
         missing = required_fields - field_names
         # Some fields may use different casing or naming
-        assert len(missing) <= 2, f"AgentConfig missing critical fields: {missing}"
+        assert len(missing) <= 2, f"AgentDef missing critical fields: {missing}"
 
     def test_dashboard_state_schema(self):
         """DashboardState model must have required fields."""

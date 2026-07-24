@@ -238,6 +238,7 @@ class TestGetRouteScorer:
 
     def test_get_route_scorer_with_config(self, simple_config: MaopConfig):
         from maop.core.route_scorer import get_route_scorer
+        RouteScorer.reset()
         scorer = get_route_scorer(config=simple_config)
         assert isinstance(scorer, RouteScorer)
         assert scorer.config is simple_config

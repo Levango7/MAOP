@@ -398,6 +398,12 @@ class RouteScorer:
         )
         return route.primary
 
+    @classmethod
+    def reset(cls):
+        """Reset singleton instance (for testing)."""
+        global _instance
+        _instance = None
+
 
 # ── Singleton Instance ───────────────────────────────────────
 

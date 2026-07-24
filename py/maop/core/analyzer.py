@@ -572,10 +572,6 @@ def _select_strategy(dag: DependencyDAG, score: int) -> ExecutionStrategy:
     groups = dag.parallel_groups()
     if len(groups) <= 1:
         return ExecutionStrategy.PARALLEL
-    max_group_size = max(len(g) for g in groups)
-    # P1-d fix: SEQUENTIAL when all groups have size 1 (no parallelism possible)
-    if max_group_size == 1:
-        return ExecutionStrategy.SEQUENTIAL
     return ExecutionStrategy.HYBRID
 
 

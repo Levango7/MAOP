@@ -489,9 +489,9 @@ class Dispatcher:
                     trace_id=trace_id, routing_key=routing_key,
                 )
                 return DispatchResult(result=result, breaker_tripped=False)
-        except (ValueError, KeyError, OSError) as exc:
-            # P2-15 fix: narrow exception scope — let TypeError/AttributeError
-            # (programming bugs) propagate, only catch expected data errors
+        except Exception as exc:
+            # Fail-closed: any guardrail crash (init/check) must NOT propagate;
+            # return a blocked result instead of letting dispatch crash.
             logger.warning("[dispatch] Guardrail check failed (fail-closed): %s", exc)
             result = new_result(
                 agent=agent, task=task,

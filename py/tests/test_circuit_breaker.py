@@ -1,5 +1,6 @@
-﻿"""Tests for MAOP.core.circuit_breaker — SQLite-backed with failover and health-check."""
+"""Tests for MAOP.core.circuit_breaker — SQLite-backed with failover and health-check."""
 
+import asyncio
 import time
 import tempfile
 import shutil
@@ -158,7 +159,7 @@ class TestHealthCheck:
         entry.last_failure = time.time() - 120  # 2 min ago
         breaker._save_agent("claude", entry)
 
-        recovered = breaker.health_check()
+        recovered = asyncio.run(breaker.health_check(probe=lambda n: True))
         assert "claude" in recovered
         assert recovered["claude"] == BreakerState.CLOSED
 
@@ -167,8 +168,8 @@ class TestHealthCheck:
         entry.last_failure = time.time()  # just now
         breaker._save_agent("claude", entry)
 
-        recovered = breaker.health_check()
-        assert "claude" not in recovered
+        recovered = asyncio.run(breaker.health_check(probe=lambda n: False))
+        assert recovered["claude"] == BreakerState.HALF_OPEN
 
     def test_get_open_agents(self, breaker: CircuitBreaker):
         breaker.set_state("claude", BreakerState.OPEN, failures=3)
