@@ -50,6 +50,21 @@ services:
     networks:
       - maop-net
 
+  # ── Redis (cache/queue/HA) ───────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass ${MAOP_REDIS_PASSWORD:-}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - maop-net
+
   maop:
     build:
       context: .
@@ -74,6 +89,11 @@ services:
       - MAOP_SECRET_BACKEND=vault
       - MAOP_VAULT_ADDR=http://vault:8200
       - MAOP_VAULT_TOKEN=${MAOP_VAULT_TOKEN:-dev-token}
+      - MAOP_CACHE_BACKEND=redis
+      - MAOP_QUEUE_BACKEND=redis
+      - MAOP_HA_BACKEND=redis
+      - MAOP_REDIS_HOST=redis
+      - MAOP_REDIS_PASSWORD=${MAOP_REDIS_PASSWORD:-}
     volumes:
       - maop-data:/app/data
       - maop-config:/app/config
@@ -94,6 +114,8 @@ services:
           memory: 512M
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       prometheus:
         condition: service_started
@@ -155,6 +177,7 @@ volumes:
   prometheus-data:
   grafana-data:
   pg-data:
+  redis-data:
   vault-data:
   vault-logs:
 

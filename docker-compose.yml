@@ -248,6 +248,20 @@ services:
       - IPC_LOCK
     profiles: ["vault"]
 
+  # ── Optional: Redis (cache/queue/HA, --profile redis) ───────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles: ["redis"]
+
 volumes:
   maop-data:
     driver: local
@@ -256,4 +270,6 @@ volumes:
   prometheus-data:
     driver: local
   pg-data:
+    driver: local
+  redis-data:
     driver: local
