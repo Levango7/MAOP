@@ -31,6 +31,25 @@ services:
     networks:
       - maop-net
 
+  # ── HashiCorp Vault (production secrets backend) ────────────────
+  vault:
+    image: hashicorp/vault:latest
+    environment:
+      VAULT_LOCAL_CONFIG: |
+        storage "file" { path = "/vault/data" }
+        listener "tcp" { address = "0.0.0.0:8200"; tls_disable = 1 }
+        api_addr = "http://vault:8200"
+    volumes:
+      - vault-data:/vault/data
+      - vault-logs:/vault/logs
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    restart: unless-stopped
+    networks:
+      - maop-net
+
   maop:
     build:
       context: .
@@ -52,6 +71,9 @@ services:
       - MAOP_PG_DATABASE=maop
       - MAOP_PG_USER=maop
       - MAOP_PG_PASSWORD=${MAOP_PG_PASSWORD:-maop_dev}
+      - MAOP_SECRET_BACKEND=vault
+      - MAOP_VAULT_ADDR=http://vault:8200
+      - MAOP_VAULT_TOKEN=${MAOP_VAULT_TOKEN:-dev-token}
     volumes:
       - maop-data:/app/data
       - maop-config:/app/config
@@ -74,6 +96,8 @@ services:
       postgres:
         condition: service_healthy
       prometheus:
+        condition: service_started
+      vault:
         condition: service_started
     networks:
       - maop-net
@@ -131,6 +155,8 @@ volumes:
   prometheus-data:
   grafana-data:
   pg-data:
+  vault-data:
+  vault-logs:
 
 networks:
   maop-net:

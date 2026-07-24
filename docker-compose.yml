@@ -68,6 +68,10 @@ services:
       - MAOP_BACKEND_QUEUE=local
       - MAOP_BACKEND_KV=local
       - MAOP_BACKEND_SECRET=local
+      # t3.3.4: Vault secret backend (opt-in via MAOP_SECRET_BACKEND=vault + --profile vault)
+      - MAOP_SECRET_BACKEND=${MAOP_SECRET_BACKEND:-local}
+      - MAOP_VAULT_ADDR=${MAOP_VAULT_ADDR:-http://vault:8200}
+      - MAOP_VAULT_TOKEN=${MAOP_VAULT_TOKEN:-dev-token}
       # t15: OTEL exporter wired into dashboard container so traces can reach
       # the otel-collector service via its service name (not localhost, which
       # would resolve to the dashboard container itself).
@@ -231,6 +235,18 @@ services:
     ports:
       - "9093:9093"
     restart: unless-stopped
+
+  # ── Optional: HashiCorp Vault (dev server, --profile vault) ──────
+  vault:
+    image: hashicorp/vault:latest
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    profiles: ["vault"]
 
 volumes:
   maop-data:
