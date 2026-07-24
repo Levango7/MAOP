@@ -5,6 +5,7 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
+import pytest
 
 from maop.dashboard import (
     DashboardProvider, DashboardState, AgentStatus,
@@ -133,7 +134,8 @@ class TestRenderHtml:
 
     def test_empty_state(self):
         state = DashboardState()
-        html = _render_html(state)
+        with pytest.warns(DeprecationWarning, match="_render_html is deprecated"):
+            html = _render_html(state)
         assert "MAOP Dashboard" in html
         assert "Delegations" in html
 
@@ -143,7 +145,8 @@ class TestRenderHtml:
             AgentStatus(name="codex", driver="cli", available=False, breaker_state="open"),
         ]
         state = DashboardState(agents=agents, total_delegations=42, success_rate=85.5)
-        html = _render_html(state)
+        with pytest.warns(DeprecationWarning, match="_render_html is deprecated"):
+            html = _render_html(state)
         assert "claude" in html
         assert "codex" in html
         assert "42" in html
@@ -155,16 +158,18 @@ class TestRenderHtml:
 # ═══════════════════════════════════════════════════════════════
 
 class TestCreateApp:
-    """Test FastAPI app creation."""
+    """Test FastAPI app creation — verifies deprecation warning is emitted."""
 
     def test_create_app(self):
-        app = create_app()
+        with pytest.warns(DeprecationWarning, match="create_app.*deprecated"):
+            app = create_app()
         # May be None if FastAPI not installed, but in our env it should work
         if app is not None:
             assert app.title == "MAOP Dashboard"
 
     def test_create_app_with_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
-            app = create_app(root_dir=tmp)
+            with pytest.warns(DeprecationWarning, match="create_app.*deprecated"):
+                app = create_app(root_dir=tmp)
             if app is not None:
                 assert app is not None

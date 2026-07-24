@@ -338,11 +338,12 @@ class TestGetRecentDelegations:
 # ── HTML Rendering Tests ─────────────────────────────────────
 
 class TestRenderHtml:
-    """Tests for _render_html."""
+    """Tests for _render_html — verifies deprecation warning is emitted."""
 
     def test_basic_html(self):
         state = DashboardState()
-        html = _render_html(state)
+        with pytest.warns(DeprecationWarning, match="_render_html is deprecated"):
+            html = _render_html(state)
         assert "<html>" in html
         assert "MAOP Dashboard" in html
 
@@ -352,7 +353,8 @@ class TestRenderHtml:
             AgentStatus(name="codex", driver="cli", available=False, breaker_state="open", breaker_failures=3),
         ]
         state = DashboardState(agents=agents, total_delegations=5, success_rate=80.0)
-        html = _render_html(state)
+        with pytest.warns(DeprecationWarning, match="_render_html is deprecated"):
+            html = _render_html(state)
         assert "claude" in html
         assert "codex" in html
         assert "5" in html
@@ -360,12 +362,14 @@ class TestRenderHtml:
     def test_html_agent_color(self):
         agent_ok = AgentStatus(name="ok", available=True)
         state = DashboardState(agents=[agent_ok])
-        html = _render_html(state)
+        with pytest.warns(DeprecationWarning, match="_render_html is deprecated"):
+            html = _render_html(state)
         assert "#4caf50" in html  # green for available
 
         agent_fail = AgentStatus(name="fail", available=False)
         state = DashboardState(agents=[agent_fail])
-        html = _render_html(state)
+        with pytest.warns(DeprecationWarning, match="_render_html is deprecated"):
+            html = _render_html(state)
         assert "#f44336" in html  # red for unavailable
 
 
@@ -471,15 +475,17 @@ class TestAsyncGetState:
 # ── create_app Tests ─────────────────────────────────────────
 
 class TestCreateApp:
-    """Tests for create_app factory."""
+    """Tests for create_app factory — verifies deprecation warning is emitted."""
 
     def test_create_app_returns_app_or_none(self, tmp_path):
-        app = create_app(root_dir=tmp_path)
+        with pytest.warns(DeprecationWarning, match="create_app.*deprecated"):
+            app = create_app(root_dir=tmp_path)
         # Either returns a FastAPI app or None if fastapi not installed
         if app is not None:
             assert hasattr(app, "routes")
 
     def test_create_app_none_if_no_fastapi(self, tmp_path):
         with patch.dict("sys.modules", {"fastapi": None}):
-            app = create_app(root_dir=tmp_path)
+            with pytest.warns(DeprecationWarning, match="create_app.*deprecated"):
+                app = create_app(root_dir=tmp_path)
             assert app is None

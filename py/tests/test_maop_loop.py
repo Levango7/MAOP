@@ -150,6 +150,11 @@ class TestMaopLoopRun:
             enable_evolve=False,
             enable_dream=False,
             enable_cache_guard=False,
+            # Speed up test: fail fast on empty config (no real agent available)
+            iterative_max_attempts=1,
+            iterative_backoff_ms=0,
+            retry_backoff_ms=0,
+            default_timeout_s=5,
         )
         loop = MaopLoop(root_dir=str(tmp_path), loop_config=lc)
 
@@ -179,6 +184,11 @@ class TestMaopLoopRun:
             enable_evolve=False,
             enable_dream=False,
             enable_cache_guard=False,
+            # Speed up test: fail fast on empty config (no real agent available)
+            iterative_max_attempts=1,
+            iterative_backoff_ms=0,
+            retry_backoff_ms=0,
+            default_timeout_s=5,
         )
         loop = MaopLoop(root_dir=str(tmp_path), loop_config=lc)
 
