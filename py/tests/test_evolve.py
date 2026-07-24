@@ -306,11 +306,12 @@ class TestEvolveEngine:
         assert result.applied is None
 
     def test_promote(self, engine: EvolveEngine, evolve_root: Path):
-        data = [_delegation("claude", exit_code=1) for _ in range(5)]
+        data = [_delegation("claude", exit_code=1, routing_key="x") for _ in range(4)]
         _write_delegations(evolve_root, data)
         engine.suggest()
         suggestions = engine._load_suggestions()
-        result = engine.promote(suggestions[0].id)
+        auto_s = next(s for s in suggestions if s.auto_applicable)
+        result = engine.promote(auto_s.id)
         assert result.action == "promote"
         assert result.applied is not None
         assert result.applied.applied is True

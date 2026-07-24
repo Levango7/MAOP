@@ -106,8 +106,8 @@ def _route_by_config(task: str, config: MaopConfig | None, *, adaptive: bool = T
     if config is None:
         return None
 
-    from maop.core.route_scorer import get_route_scorer
-    scorer = get_route_scorer(config)
+    from maop.core.route_scorer import RouteScorer
+    scorer = RouteScorer(config=config)
     match = scorer.match(task, adaptive=adaptive)
     if match:
         logger.debug(

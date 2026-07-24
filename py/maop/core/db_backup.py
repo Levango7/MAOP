@@ -170,9 +170,16 @@ class DbBackup:
         if not re.match(r'^[a-zA-Z0-9_\-]+\.db$', db_name):
             logger.warning("[backup] Invalid db_name rejected: %s", db_name)
             return None
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S%f")
         backup_name = f"{db_name}.{timestamp}.bak"
         backup_path = self._backup_dir / backup_name
+        # Guard against timestamp collisions when multiple backups are taken
+        # within the same microsecond (e.g. rapid successive runs).
+        suffix = 0
+        while backup_path.exists():
+            suffix += 1
+            backup_name = f"{db_name}.{timestamp}_{suffix}.bak"
+            backup_path = self._backup_dir / backup_name
         if "'" in str(backup_path):
             logger.warning("[backup] Rejected backup_path with quote: %s", backup_path)
             return None
@@ -241,7 +248,7 @@ class DbBackup:
         if self._backup_dir.exists():
             for f in self._backup_dir.glob("*.bak"):
                 # Parse db_name from filename: maop.db.2026-07-23_125324.bak
-                m = _re.match(r'^(.+\.db)\.\d{4}-\d{2}-\d{2}_\d{6}\.bak$', f.name)
+                m = _re.match(r'^(.+\.db)\.\d{4}-\d{2}-\d{2}_\d+(_\d+)?\.bak$', f.name)
                 if m:
                     disk_by_db.setdefault(m.group(1), []).append(f)
 

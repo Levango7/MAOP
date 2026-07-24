@@ -48,7 +48,7 @@ def _tenant_filter(data: Any, tenant_id: str) -> Any:
 @router.get("/api/report")
 async def api_report(request: Request, hours: int = Query(48, ge=1, le=720)) -> Any:
     require_admin(request)
-    return _tenant_filter(await get_bridge().report(hours=hours), _tenant_id(request))
+    return _tenant_filter(await get_bridge().report(hours=hours), _request_tenant_id(request))
 
 
 @router.get("/api/agents/stats")
