@@ -32,6 +32,12 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
                    streamer: Any = None) -> MaopResult:
     """Execute via CLI driver — direct subprocess, no cmd.exe intermediary."""
     cli = config.cli
+    if not cli or not cli.strip():
+        return new_result(
+            agent=config.name, task=prompt,
+            exit_code=-1, error=f"Agent '{config.name}' has empty cli (driver=cli)",
+            duration_ms=0, trace_id=trace_id, driver="cli", model=config.model,
+        )
     cli_parts = cli.split()
     base_cmd = cli_parts[0]
     pre_args = cli_parts[1:]
@@ -243,6 +249,12 @@ async def _run_powershell(config: AgentConfig, prompt: str, timeout: int,
     import re as _re
     _SAFE_CLI_ARGS = _re.compile(r'^[a-zA-Z0-9_\-./\s{}]+$')
     command = config.command or config.cli
+    if not command or not command.strip():
+        return new_result(
+            agent=config.name, task=prompt,
+            exit_code=-1, error=f"Agent '{config.name}' has empty command/cli (driver=powershell)",
+            duration_ms=0, trace_id=trace_id, driver="powershell", model=config.model,
+        )
     escaped = _escape_for_ps_command(prompt)
 
     if config.cli_args:
@@ -315,6 +327,12 @@ async def _run_cmd(config: AgentConfig, prompt: str, timeout: int,
                    workdir: str, trace_id: str, streamer: Any = None) -> MaopResult:
     """Execute via cmd.exe driver."""
     cli = config.cli
+    if not cli or not cli.strip():
+        return new_result(
+            agent=config.name, task=prompt,
+            exit_code=-1, error=f"Agent '{config.name}' has empty cli (driver=cmd)",
+            duration_ms=0, trace_id=trace_id, driver="cmd", model=config.model,
+        )
     escaped = _escape_for_cmd(prompt)
     args_template = config.cli_args or "{task}"
     arg_line = args_template.replace("{task}", escaped)
@@ -375,6 +393,12 @@ async def _run_python(config: AgentConfig, prompt: str, timeout: int,
     import sys
     import shlex
     cli = config.cli
+    if not cli or not cli.strip():
+        return new_result(
+            agent=config.name, task=prompt,
+            exit_code=-1, error=f"Agent '{config.name}' has empty cli (driver=python)",
+            duration_ms=0, trace_id=trace_id, driver="python", model=config.model,
+        )
     args_template = config.cli_args or "{task}"
     task_args = args_template.replace("{task}", prompt)
     # P1-5 fix: split args safely to prevent parameter injection

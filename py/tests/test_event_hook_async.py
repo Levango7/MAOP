@@ -1,13 +1,14 @@
 """Tests for EventHook async webhook delivery (asyncio.Queue + aiohttp)."""
+import os
 import sys
 import time
 import threading
 from pathlib import Path
 
 
-# Ensure doc-pipeline is importable
-DOC_PIPELINE_ROOT = Path(r"F:\Nexus\Workflow\doc-pipeline")
-if str(DOC_PIPELINE_ROOT) not in sys.path:
+# Ensure doc-pipeline is importable (configurable via env var, fallback to default)
+DOC_PIPELINE_ROOT = Path(os.environ.get("DOC_PIPELINE_ROOT", r"F:\Nexus\Workflow\doc-pipeline"))
+if DOC_PIPELINE_ROOT.is_dir() and str(DOC_PIPELINE_ROOT) not in sys.path:
     sys.path.insert(0, str(DOC_PIPELINE_ROOT))
 
 
