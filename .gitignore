@@ -101,6 +101,8 @@ test-html.py
 scripts/rename_dist.py
 scripts/rename_pev_to_maop.py
 security-audit.md
+# Ad-hoc inspection/debug scripts (root-level, underscore-prefixed)
+/_*.py
 config/agents.yaml.bak
 config/agents.yaml.bak2
 
