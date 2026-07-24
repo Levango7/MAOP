@@ -1,0 +1,31 @@
+# MAOP Alert Rules
+
+groups:
+  - name: maop-alerts
+    rules:
+      - alert: MAOPDown
+        expr: up{job="maop"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MAOP Dashboard is down"
+          description: "MAOP has been down for more than 1 minute."
+
+      - alert: MAOPHighMemory
+        expr: process_resident_memory_bytes{job="maop"} > 1000000000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MAOP memory usage > 1GB"
+          description: "MAOP resident memory has exceeded 1GB for 5 minutes."
+
+      - alert: MAOPHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="maop"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MAOP p95 latency > 2s"
+          description: "95th percentile request latency exceeds 2 seconds."

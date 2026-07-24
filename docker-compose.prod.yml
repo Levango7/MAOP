@@ -1,0 +1,109 @@
+# MAOP Production Docker Compose
+# Usage: docker compose -f docker-compose.prod.yml up -d
+#
+# Features:
+#   - Resource limits
+#   - Health checks
+#   - Restart policy
+#   - Volume persistence
+#   - Prometheus + Grafana monitoring
+#   - Nginx reverse proxy with TLS
+
+version: "3.9"
+
+services:
+  maop:
+    build:
+      context: .
+      dockerfile: py/Dockerfile
+    container_name: maop-app
+    restart: unless-stopped
+    ports:
+      - "${MAOP_PORT:-9079}:9079"
+    environment:
+      - MAOP_ENV=production
+      - MAOP_ROOT=/app
+      - MAOP_AUTH=${MAOP_AUTH:-1}
+      - MAOP_JWT_SECRET=${MAOP_JWT_SECRET:?Set MAOP_JWT_SECRET in .env}
+      - MAOP_TLS=${MAOP_TLS:-0}
+      - MAOP_JSON_LOG=1
+      - MAOP_OTEL_ENABLED=${MAOP_OTEL_ENABLED:-0}
+    volumes:
+      - maop-data:/app/data
+      - maop-config:/app/config
+      - maop-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9079/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    depends_on:
+      - prometheus
+    networks:
+      - maop-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: maop-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - nginx-certs:/etc/nginx/certs
+    depends_on:
+      - maop
+    networks:
+      - maop-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: maop-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+    ports:
+      - "9090:9090"
+    networks:
+      - maop-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: maop-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - maop-net
+
+volumes:
+  maop-data:
+  maop-config:
+  maop-logs:
+  nginx-certs:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  maop-net:
+    driver: bridge

@@ -78,14 +78,17 @@ class ChangeTracker:
     SKIP_DIRS = {
         ".git", "__pycache__", "node_modules", ".venv", "venv",
         ".mypy_cache", ".pytest_cache", ".ruff_cache",
-        "dist", "build", ".eggs", "*.egg-info",
-        ".maop-worktrees", "data",
+        "dist", "dist-enterprise", "build", ".tox",
+        ".eggs", "*.egg-info",
+        ".maop-worktrees", ".maop-snapshots", "data",
     }
 
     SKIP_EXTENSIONS = {
-        ".pyc", ".pyo", ".so", ".dll", ".exe", ".obj", ".o",
+        ".pyc", ".pyo", ".so", ".dll", ".dylib", ".exe", ".obj", ".o",
         ".log", ".tmp", ".cache", ".db", ".sqlite",
     }
+
+    _MAX_FILES = 10000  # Safety limit to prevent runaway scans
 
     def __init__(self, root_dir: str | Path) -> None:
         self._root = Path(root_dir)
@@ -144,10 +147,18 @@ class ChangeTracker:
         return sqlite_connect(self._db_path, foreign_keys=False)
 
     def _should_skip(self, path: Path) -> bool:
+        # Skip if any parent directory is in SKIP_DIRS
         for part in path.parts:
             if part in self.SKIP_DIRS:
                 return True
+        # Skip specific suffixes
         if path.suffix in self.SKIP_EXTENSIONS:
+            return True
+        # Skip symlinks (avoid cycles)
+        if path.is_symlink():
+            return True
+        # Skip if not a regular file (directories are handled by rglob caller)
+        if path.exists() and not path.is_file():
             return True
         return False
 
@@ -172,6 +183,13 @@ class ChangeTracker:
             )
             if workdir_path.is_dir():
                 for fpath in workdir_path.rglob("*"):
+                    if file_count >= self._MAX_FILES:
+                        logger.warning(
+                            "[change_tracker] Snapshot truncated at %d files (workdir=%s)",
+                            file_count,
+                            workdir,
+                        )
+                        break
                     if not fpath.is_file():
                         continue
                     if self._should_skip(fpath):
