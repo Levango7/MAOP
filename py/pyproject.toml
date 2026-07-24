@@ -49,7 +49,8 @@ otel = [
 ]
 enterprise = [
     "alembic>=1.13",
-    "psycopg2-binary>=2.9",
+    "psycopg[binary,pool]>=3.1",
+    "asyncpg>=0.29",
     "redis>=5.0",
 ]
 

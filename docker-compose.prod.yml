@@ -12,6 +12,25 @@
 version: "3.9"
 
 services:
+  # ── PostgreSQL (production) ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: maop
+      POSTGRES_USER: maop
+      POSTGRES_PASSWORD: ${MAOP_PG_PASSWORD:-maop_dev}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./backups/postgres:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maop -d maop"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - maop-net
+
   maop:
     build:
       context: .
@@ -28,6 +47,11 @@ services:
       - MAOP_TLS=${MAOP_TLS:-0}
       - MAOP_JSON_LOG=1
       - MAOP_OTEL_ENABLED=${MAOP_OTEL_ENABLED:-0}
+      - MAOP_STORAGE_BACKEND=postgresql
+      - MAOP_PG_HOST=postgres
+      - MAOP_PG_DATABASE=maop
+      - MAOP_PG_USER=maop
+      - MAOP_PG_PASSWORD=${MAOP_PG_PASSWORD:-maop_dev}
     volumes:
       - maop-data:/app/data
       - maop-config:/app/config
@@ -47,7 +71,10 @@ services:
           cpus: "0.5"
           memory: 512M
     depends_on:
-      - prometheus
+      postgres:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
     networks:
       - maop-net
 
@@ -103,6 +130,7 @@ volumes:
   nginx-certs:
   prometheus-data:
   grafana-data:
+  pg-data:
 
 networks:
   maop-net:

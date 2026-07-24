@@ -20,6 +20,24 @@
 # Always run `docker compose` from the repo root.
 
 services:
+  # ── PostgreSQL (optional, --profile postgres) ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: maop
+      POSTGRES_USER: maop
+      POSTGRES_PASSWORD: maop_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maop -d maop"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles: ["postgres"]  # 可选 profile，默认不启动
+
   # ── Dashboard (API + Web UI) ────────────────────────────────────
   dashboard:
     build:
@@ -220,4 +238,6 @@ volumes:
   maop-logs:
     driver: local
   prometheus-data:
+    driver: local
+  pg-data:
     driver: local

@@ -1,4 +1,4 @@
-"""MAOP PostgreSQL Storage Backend — psycopg3 implementation.
+"""MAOP PostgreSQL Storage Backend — psycopg3 with connection pooling.
 
 Implements StorageBackend ABC for PostgreSQL, used when:
   - MAOP_STORAGE_BACKEND=postgresql
@@ -12,7 +12,10 @@ Connection config via environment variables:
   - MAOP_PG_USER     — default maop
   - MAOP_PG_PASSWORD — default empty
 
-Falls back to SQLite with a degradation warning if psycopg is not installed.
+Uses psycopg_pool.ConnectionPool for high-concurrency throughput.
+Falls back to SQLite with a degradation warning if psycopg / psycopg_pool
+is not installed (ImportError propagates to the caller — see backends.py
+get_storage_backend() and enterprise.pg_persist._get_pg_backend()).
 """
 
 from __future__ import annotations
@@ -39,23 +42,23 @@ def _build_dsn() -> str:
 
 
 class PostgreSQLStorageBackend(StorageBackend):
-    """PostgreSQL storage backend using psycopg3."""
+    """PostgreSQL storage backend using psycopg3 + connection pool."""
 
     def __init__(self, dsn: str = "") -> None:
-        import psycopg
+        import psycopg  # noqa: F401 — guard: ImportError if psycopg missing
+        from psycopg_pool import ConnectionPool
+
         self._dsn = dsn or _build_dsn()
-        self._conn: psycopg.Connection | None = None
+        self._pool: Any = ConnectionPool(
+            conninfo=self._dsn,
+            min_size=1,
+            max_size=10,
+            kwargs={"autocommit": True},
+        )
         self._ensure_schema()
 
-    def _get_conn(self) -> Any:
-        import psycopg
-        if self._conn is None or self._conn.closed:
-            self._conn = psycopg.connect(self._dsn, autocommit=True)
-        return self._conn
-
     def _ensure_schema(self) -> None:
-        conn = self._get_conn()
-        with conn.cursor() as cur:
+        with self._pool.connection() as conn, conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS maop_kv (
                     key TEXT PRIMARY KEY,
@@ -72,13 +75,11 @@ class PostgreSQLStorageBackend(StorageBackend):
             """)
 
     def execute(self, sql: str, params: tuple[Any, ...] | None = None) -> None:
-        conn = self._get_conn()
-        with conn.cursor() as cur:
+        with self._pool.connection() as conn, conn.cursor() as cur:
             cur.execute(sql, params or ())
 
     def fetchone(self, sql: str, params: tuple[Any, ...] | None = None) -> dict[str, Any] | None:
-        conn = self._get_conn()
-        with conn.cursor() as cur:
+        with self._pool.connection() as conn, conn.cursor() as cur:
             cur.execute(sql, params or ())
             row = cur.fetchone()
             if row is None:
@@ -87,24 +88,25 @@ class PostgreSQLStorageBackend(StorageBackend):
             return dict(zip(cols, row))
 
     def fetchall(self, sql: str, params: tuple[Any, ...] | None = None) -> list[dict[str, Any]]:
-        conn = self._get_conn()
-        with conn.cursor() as cur:
+        with self._pool.connection() as conn, conn.cursor() as cur:
             cur.execute(sql, params or ())
             cols = [desc[0] for desc in cur.description or []]
             return [dict(zip(cols, row)) for row in cur.fetchall()]
 
     def commit(self) -> None:
-        if self._conn and not self._conn.closed:
-            self._conn.commit()
+        # Pool manages connections per-operation with autocommit=True;
+        # each execute() is its own transaction, so explicit commit is a no-op.
+        pass
 
     def rollback(self) -> None:
-        if self._conn and not self._conn.closed:
-            self._conn.rollback()
+        # With autocommit=True, each statement commits immediately;
+        # rollback is a no-op (matches SQLiteStorageBackend behavior).
+        pass
 
     def close(self) -> None:
-        if self._conn and not self._conn.closed:
-            self._conn.close()
-            self._conn = None
+        if self._pool is not None:
+            self._pool.close()
+            self._pool = None
 
     def table_exists(self, name: str) -> bool:
         row = self.fetchone(
