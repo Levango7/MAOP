@@ -1,4 +1,4 @@
-﻿"""MAOP Cost Tracker — Real-time token usage and cost tracking.
+"""MAOP Cost Tracker — Real-time token usage and cost tracking.
 
 Provides:
   - CostTracker: record/query token usage per session/agent/model
@@ -364,3 +364,19 @@ class CostTracker:
             cost_usd=row["cost_usd"], latency_ms=row["latency_ms"],
             metadata=metadata, created_at=row["created_at"],
         )
+
+# ── Singleton accessor ───────────────────────────────────────
+
+_cost_tracker_instance: CostTracker | None = None
+
+
+def get_cost_tracker() -> CostTracker:
+    """Return a process-wide CostTracker singleton (lazy).
+
+    Lazily initialized on first call. Used by llm_provider to auto-record
+    token usage without creating a new tracker per call.
+    """
+    global _cost_tracker_instance
+    if _cost_tracker_instance is None:
+        _cost_tracker_instance = CostTracker()
+    return _cost_tracker_instance

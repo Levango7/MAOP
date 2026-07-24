@@ -22,10 +22,19 @@ groups:
           description: "MAOP resident memory has exceeded 1GB for 5 minutes."
 
       - alert: MAOPHighLatency
-        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="maop"}[5m])) > 2
+        expr: histogram_quantile(0.95, rate(MAOP_loop_duration_ms_bucket[5m])) > 2000
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "MAOP p95 latency > 2s"
-          description: "95th percentile request latency exceeds 2 seconds."
+          summary: "MAOP loop P95 latency > 2s"
+          description: "Loop duration P95 is {{ $value }}ms"
+
+      - alert: MAOPLowSuccessRate
+        expr: rate(MAOP_tasks_success_total[5m]) / rate(MAOP_tasks_total[5m]) < 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MAOP task success rate < 80%"
+          description: "Task success rate is below 80% for the last 10 minutes."

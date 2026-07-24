@@ -124,6 +124,25 @@ def setup_provider() -> None:
 
     otel_trace.set_tracer_provider(provider)
     logger.info("[otel] Tracing enabled | service=%s | exporter=%s", service_name, exporter_type)
+    # ── Metric Pipeline (Phase α.3.1) ───────────────────────────
+    # MeterProvider mirrors the trace config: OTLP gRPC exporter to the
+    # same endpoint, 15s export interval. Requires opentelemetry-sdk
+    # with the metrics extra; if unavailable, logs a warning and
+    # continues with traces only.
+    try:
+        from opentelemetry.sdk.metrics import MeterProvider as SDKMeterProvider
+        from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+        from opentelemetry import metrics as otel_metrics
+
+        metric_endpoint = os.getenv("MAOP_OTEL_ENDPOINT", "http://localhost:4317")
+        metric_exporter = OTLPMetricExporter(endpoint=metric_endpoint)
+        metric_reader = PeriodicExportingMetricReader(metric_exporter, export_interval_millis=15000)
+        meter_provider = SDKMeterProvider(resource=resource, metric_readers=[metric_reader])
+        otel_metrics.set_meter_provider(meter_provider)
+        logger.info("[otel] Metrics enabled | exporter=otlp | endpoint=%s", metric_endpoint)
+    except ImportError:
+        logger.warning("[otel] Metric pipeline not available (opentelemetry SDK incomplete)")
 
 
 def inject_trace_context(carrier: dict[str, str]) -> None:

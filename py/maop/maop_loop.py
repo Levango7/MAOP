@@ -39,7 +39,6 @@ from maop.core.error_schema import MaopResult
 from maop.core.event_bus import EventBus, Event, get_event_bus
 from maop.core.log_rotate import rotate_logs
 from maop.core.monitoring import StructuredLogger, MetricsCollector
-from maop.core.timeseries import DataPoint
 from maop.maop_plan import maop_plan
 from maop.maop_verify import VerifyResult
 
@@ -194,13 +193,9 @@ class MaopLoop(ExecuteMixin):
         """Record a time-series data point."""
         if self._timeseries:
             try:
-                self._timeseries.write(DataPoint(
-                    metric=name, value=value,
-                    tags=tags or {},
-                    timestamp=time.time(),
-                ))
+                self._timeseries.record(name, value, tags=tags or {})
             except Exception as exc:
-                logger.debug("Metric write failed: %s", exc)
+                logger.warning("Metric record failed for %s: %s", name, exc)
 
     @property
     def llm_factory(self) -> LLMProviderFactory | None:

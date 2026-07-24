@@ -676,6 +676,7 @@ class LLMProviderFactory:
                 )
 
             if not _is_error_response(resp):
+                _record_cost(resp, kwargs)
                 return FallbackResult(
                     response=resp,
                     used_model=current,
@@ -709,6 +710,7 @@ class LLMProviderFactory:
         else:
             resp = LLMResponse(content="[LLM Error] All providers exhausted", provider="none")
 
+        _record_cost(resp, kwargs)
         return FallbackResult(
             response=resp,
             used_model=current,
@@ -723,3 +725,24 @@ def _is_error_response(resp: LLMResponse) -> bool:
     if not resp.content:
         return True
     return resp.content.startswith(("[LLM Error]", "[Claude Error]", "[Ollama Error]"))
+
+def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
+    """Auto-record LLM call metrics to CostTracker (best-effort).
+
+    Extracts session_id/agent from kwargs when callers pass them.
+    Failures are logged as warnings but never break the LLM call.
+    """
+    try:
+        from maop.core.cost_tracker import get_cost_tracker
+        get_cost_tracker().record(
+            model=resp.model,
+            provider=resp.provider,
+            prompt_tokens=resp.prompt_tokens,
+            completion_tokens=resp.completion_tokens,
+            total_tokens=resp.total_tokens,
+            latency_ms=resp.latency_ms,
+            session_id=str(kwargs.get("session_id", "")),
+            agent=str(kwargs.get("agent", "")),
+        )
+    except Exception as exc:
+        logger.warning("[llm_provider] CostTracker record failed: %s", exc)

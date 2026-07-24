@@ -1,0 +1,174 @@
+{
+  "title": "MAOP Overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "uid": "maop-overview",
+  "tags": ["maop", "observability"],
+  "timezone": "browser",
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "15s",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0,
+        "label": "Datasource"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Loop Duration (P50/P95/P99)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, rate(MAOP_loop_duration_ms_bucket[5m]))", "legendFormat": "P50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, rate(MAOP_loop_duration_ms_bucket[5m]))", "legendFormat": "P95" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, rate(MAOP_loop_duration_ms_bucket[5m]))", "legendFormat": "P99" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Tasks Success Rate",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.8 },
+              { "color": "green", "value": 0.95 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto" },
+      "targets": [
+        { "refId": "A", "expr": "rate(MAOP_tasks_success_total[5m]) / rate(MAOP_tasks_total[5m])" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Active Agents",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "refId": "A", "expr": "MAOP_active_agents" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Delegation Duration (P95)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, rate(MAOP_delegation_duration_seconds_bucket[5m]))", "legendFormat": "P95" },
+        { "refId": "B", "expr": "histogram_quantile(0.50, rate(MAOP_delegation_duration_seconds_bucket[5m]))", "legendFormat": "P50" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Queue Pending",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 50 }
+        }
+      },
+      "targets": [
+        { "refId": "A", "expr": "MAOP_queue_pending", "legendFormat": "pending" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Circuit Breaker State",
+      "type": "state-timeline",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "text": "OPEN", "color": "red" }, "0.5": { "text": "HALF-OPEN", "color": "yellow" }, "1": { "text": "CLOSED", "color": "green" } }, "type": "value" }
+          ]
+        }
+      },
+      "options": { "rowHeight": 0.9 },
+      "targets": [
+        { "refId": "A", "expr": "MAOP_circuit_breaker_state", "legendFormat": "state" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "LLM Token Usage (by model)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "stacking": { "mode": "normal" }, "fillOpacity": 30 }
+        }
+      },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(MAOP_llm_tokens_total[5m])) by (model)", "legendFormat": "{{model}}" }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "LLM Cost (Daily / Monthly)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(MAOP_llm_cost_usd_total[1d]))", "legendFormat": "Daily" },
+        { "refId": "B", "expr": "sum(increase(MAOP_llm_cost_usd_total[30d]))", "legendFormat": "Monthly (30d)" }
+      ]
+    }
+  ]
+}
