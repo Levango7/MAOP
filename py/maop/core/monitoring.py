@@ -1,4 +1,4 @@
-﻿"""MAOP Monitoring - Structured logging and Prometheus-compatible metrics.
+"""MAOP Monitoring - Structured logging and Prometheus-compatible metrics.
 
 Provides:
   1. StructuredLogger: JSON-formatted structured logging with trace IDs
@@ -456,3 +456,241 @@ MAOP_ACTIVE_AGENTS = metrics.gauge("MAOP_active_agents", "Number of active agent
 MAOP_MEMORY_ENTRIES = metrics.gauge("MAOP_memory_entries", "Number of memory entries")
 MAOP_QUEUE_PENDING = metrics.gauge("MAOP_queue_pending", "Pending messages in queue")
 MAOP_CIRCUIT_BREAKER_STATE = metrics.gauge("MAOP_circuit_breaker_state", "Circuit breaker state (1=closed, 0.5=half, 0=open)")
+
+# Phase γ-1: SLA-aware scheduling metrics.
+# Follows the existing registration pattern (factory methods without
+# label_names); gauge labels are passed at runtime via the ``labels``
+# dict in inc/dec/set, which works regardless of the label_names metadata.
+MAOP_TASK_DEADLINE_SECONDS = metrics.histogram(
+    "MAOP_task_deadline_seconds",
+    "Remaining time to task deadline at completion (negative = missed)",
+)
+MAOP_TASK_SLA_VIOLATION_TOTAL = metrics.counter(
+    "MAOP_task_sla_violation_total",
+    "Total SLA deadline violations",
+)
+MAOP_TASK_PRIORITY_DISTRIBUTION = metrics.gauge(
+    "MAOP_task_priority_distribution",
+    "In-flight task count per priority level (label=priority)",
+)
+MAOP_TASK_SLA_TIER_DISTRIBUTION = metrics.gauge(
+    "MAOP_task_sla_tier_distribution",
+    "In-flight task count per SLA tier (label=tier)",
+)
+
+# Phase γ-3: multi-objective routing metrics.
+# MAOP_route_pareto_frontier_size — number of Pareto-optimal agents in the
+#   most recent routing decision (smaller frontier ⇒ clearer winner).
+# MAOP_route_multi_objective_score — TOPSIS relative-closeness score
+#   distribution (1 = ideal agent, 0 = nadir).
+# MAOP_route_decision_mode — 1 when the multi-objective path was used,
+#   0 when the legacy weighted-sum path was used (label=mode).
+MAOP_ROUTE_PARETO_FRONTIER_SIZE = metrics.gauge(
+    "MAOP_route_pareto_frontier_size",
+    "Number of Pareto-optimal agents in the most recent routing decision",
+)
+MAOP_ROUTE_MULTI_OBJECTIVE_SCORE = metrics.histogram(
+    "MAOP_route_multi_objective_score",
+    "TOPSIS relative-closeness score (1=ideal, 0=nadir)",
+)
+MAOP_ROUTE_DECISION_MODE = metrics.gauge(
+    "MAOP_route_decision_mode",
+    "Routing decision mode (1=multi_objective, 0=weighted_sum)",
+)
+
+# Phase γ-2: Priority queue + soft preemption metrics.
+#
+# MAOP_task_preemption_total — under soft preemption this counts
+#   "would-be preemption" events: a higher-priority task arrived while
+#   all workers were busy and at least one running task had a lower
+#   priority. The running task is *not* cancelled (checkpoint is not
+#   wired into the execution path, so true cancellation would lose
+#   mid-task progress); the high-priority task is queued ahead and
+#   the event is recorded so monitoring demand for true preemption is
+#   visible. When/if the checkpoint is integrated, this same counter
+#   will record actual cancellations.
+# MAOP_priority_queue_size — gauge per priority level (label=priority).
+# MAOP_priority_queue_wait_seconds — histogram of queue residency time
+#   per priority level. The Histogram class does not carry labels, so
+#   the priority is encoded by observing into a per-priority histogram
+#   registered under ``MAOP_priority_queue_wait_seconds_<prio>``.
+MAOP_TASK_PREEMPTION_TOTAL = metrics.counter(
+    "MAOP_task_preemption_total",
+    "Task preemption events (soft preemption: would-be preemptions; "
+    "true preemption: actual cancellations)",
+)
+MAOP_PRIORITY_QUEUE_SIZE = metrics.gauge(
+    "MAOP_priority_queue_size",
+    "Priority queue length per priority level (label=priority)",
+)
+# Per-priority wait-time histograms. Histograms do not accept labels in
+# this registry, so we expose one histogram per priority level. Callers
+# fetch them via ``get_priority_wait_histogram(priority)``.
+_MAOP_PRIORITY_WAIT_HISTOGRAMS: dict[int, Histogram] = {}
+
+
+def get_priority_wait_histogram(priority: int) -> "Histogram":
+    """Return (creating if needed) the wait-time histogram for a priority level."""
+    if priority not in _MAOP_PRIORITY_WAIT_HISTOGRAMS:
+        _MAOP_PRIORITY_WAIT_HISTOGRAMS[priority] = metrics.histogram(
+            f"MAOP_priority_queue_wait_seconds_p{priority}",
+            f"Queue wait time for priority-{priority} tasks (seconds)",
+        )
+    return _MAOP_PRIORITY_WAIT_HISTOGRAMS[priority]
+
+
+# Phase γ-5: ModelSelector ↔ LoadBalancer/Quota linkage metrics.
+#
+# MAOP_model_selection_quota_rejected_total — counter incremented each time a
+#   model selection is rejected because the provider's quota (RPM/TPM) is
+#   exhausted. Labelled by provider so dashboards can break down which
+#   provider is the bottleneck.
+# MAOP_model_selection_load_aware_total — counter incremented each time the
+#   load-aware preference actually changes the selected model (i.e. the
+#   picked model differs from the strategy-only winner because of load).
+# MAOP_sticky_session_hit_total — counter incremented on each sticky
+#   session cache hit (session_id maps to a non-expired agent).
+# MAOP_sticky_session_miss_total — counter incremented on each sticky
+#   session lookup that misses (no entry or expired).
+# MAOP_sticky_session_active — gauge reflecting the current number of
+#   non-expired sticky sessions tracked by the LoadBalancer.
+MAOP_MODEL_SELECTION_QUOTA_REJECTED = metrics.counter(
+    "MAOP_model_selection_quota_rejected_total",
+    "Model selections rejected due to provider quota exhaustion (label=provider)",
+)
+MAOP_MODEL_SELECTION_LOAD_AWARE = metrics.counter(
+    "MAOP_model_selection_load_aware_total",
+    "Model selections where load-aware preference changed the outcome",
+)
+MAOP_STICKY_SESSION_HIT = metrics.counter(
+    "MAOP_sticky_session_hit_total",
+    "Sticky session cache hits",
+)
+MAOP_STICKY_SESSION_MISS = metrics.counter(
+    "MAOP_sticky_session_miss_total",
+    "Sticky session cache misses",
+)
+MAOP_STICKY_SESSION_ACTIVE = metrics.gauge(
+    "MAOP_sticky_session_active",
+    "Number of currently active sticky sessions",
+)
+
+# Phase δ-3: MCP permission scope + audit integration metrics.
+#
+# MAOP_mcp_call_audited_total — counter incremented for every MCP tool call
+#   that passed through the MCPHub.call_tool permission/audit hook (regardless
+#   of allow/deny outcome). Lets operators verify the hook is wired up; if this
+#   counter is zero while MCP traffic is happening, the hub was constructed
+#   without a permission_checker (legacy mode).
+# MAOP_mcp_call_denied_total — counter labelled by ``reason`` (the matched
+#   permission rule, e.g. ``denied_tools blacklist`` / ``user whitelist``).
+#   Use this to spot spikes in a specific rejection class — e.g. a new server
+#   with too-narrow allowed_users would show up as a step in one label.
+# MAOP_mcp_call_allowed_total — counter of authorised MCP calls (success of
+#   the call itself is tracked in the audit log, not in this counter, because
+#   permission allow != runtime success).
+MAOP_MCP_CALL_AUDITED_TOTAL = metrics.counter(
+    "MAOP_mcp_call_audited_total",
+    "Total MCP tool calls that went through the δ-3 permission/audit hook",
+)
+MAOP_MCP_CALL_DENIED_TOTAL = metrics.counter(
+    "MAOP_mcp_call_denied_total",
+    "MCP tool calls denied by the permission checker (label=reason)",
+)
+MAOP_MCP_CALL_ALLOWED_TOTAL = metrics.counter(
+    "MAOP_mcp_call_allowed_total",
+    "MCP tool calls authorised by the permission checker",
+)
+
+# Phase δ-4: MCP observability metrics.
+#
+# These complement the δ-3 permission/audit counters with transport-level
+# telemetry: call volume / latency / errors per server+tool, plus the
+# connected-server gauge and health-check outcome counter.
+#
+# The Counter and Gauge classes accept a ``labels`` dict at inc/dec/set
+# time, so we register them without explicit ``label_names`` metadata
+# (mirroring how the rest of the file is wired). Histograms in this
+# module do not carry labels, so MAOP_mcp_call_duration_seconds is a
+# single global distribution across all servers — per-server breakdown
+# requires the labels-extension which is intentionally out of scope.
+MAOP_MCP_CALLS_TOTAL = metrics.counter(
+    "MAOP_mcp_calls_total",
+    "Total MCP tool invocations (label=server,tool)",
+)
+MAOP_MCP_CALL_DURATION_SECONDS = metrics.histogram(
+    "MAOP_mcp_call_duration_seconds",
+    "MCP tool call latency in seconds (global; per-server label not supported)",
+)
+MAOP_MCP_SERVERS_CONNECTED = metrics.gauge(
+    "MAOP_mcp_servers_connected",
+    "Number of MCP servers currently connected",
+)
+MAOP_MCP_CALL_ERRORS_TOTAL = metrics.counter(
+    "MAOP_mcp_call_errors_total",
+    "MCP tool invocations that returned an error (label=server,tool)",
+)
+MAOP_MCP_HEALTH_CHECK_TOTAL = metrics.counter(
+    "MAOP_mcp_health_check_total",
+    "MCP server health checks (label=server,result healthy|unhealthy)",
+)
+
+# Phase δ-5: MCP tool result cache + per-server concurrency + RPM limiting.
+#
+# These five metrics give operators visibility into the δ-5 resilience
+# layer added on top of MCPHub.call_tool:
+#
+# MAOP_mcp_cache_hit_total / MAOP_mcp_cache_miss_total — counters labelled
+#   by ``server``. A rising hit ratio means repeated identical calls are
+#   being served from cache instead of re-hitting the external MCP server.
+# MAOP_mcp_cache_eviction_total — counter (no labels) of LRU evictions
+#   from the MCP result cache; sustained growth suggests max_entries is
+#   too small for the working set.
+# MAOP_mcp_concurrent_active — gauge labelled by ``server`` reflecting the
+#   current in-flight call count per server; if this plateaus at the
+#   configured limit, callers are blocking on the concurrency semaphore.
+# MAOP_mcp_rate_limited_total — counter labelled by ``server`` of calls
+#   rejected by the per-server RPM limiter before reaching the transport.
+MAOP_MCP_CACHE_HIT_TOTAL = metrics.counter(
+    "MAOP_mcp_cache_hit_total",
+    "MCP tool call cache hits (label=server)",
+)
+MAOP_MCP_CACHE_MISS_TOTAL = metrics.counter(
+    "MAOP_mcp_cache_miss_total",
+    "MCP tool call cache misses (label=server)",
+)
+MAOP_MCP_CACHE_EVICTION_TOTAL = metrics.counter(
+    "MAOP_mcp_cache_eviction_total",
+    "MCP cache entry evictions (LRU)",
+)
+MAOP_MCP_CONCURRENT_ACTIVE = metrics.gauge(
+    "MAOP_mcp_concurrent_active",
+    "Active concurrent MCP tool calls per server (label=server)",
+)
+MAOP_MCP_RATE_LIMITED_TOTAL = metrics.counter(
+    "MAOP_mcp_rate_limited_total",
+    "MCP tool calls rejected by per-server rate limiter (label=server)",
+)
+
+# Phase γ-4: Scheduling decision trace metrics.
+#
+# MAOP_routing_decision_total — counter incremented each time a routing
+#   subsystem (route_scorer / load_balancer / model_selector /
+#   dispatcher) records a decision. Labelled by ``stage`` so dashboards
+#   can break down volume per subsystem and spot, e.g., a sudden drop in
+#   route_scorer decisions (indicating fallback to legacy routing).
+# MAOP_routing_decision_duration_ms — histogram of per-stage decision
+#   latency in milliseconds. The Histogram class does not carry labels
+#   in this registry, so this is a single global distribution across
+#   all stages; per-stage breakdown requires the labels-extension which
+#   is intentionally out of scope. Use the dashboard
+#   ``/api/routing/decisions/recent?stage=...`` endpoint for per-stage
+#   latency analysis.
+MAOP_ROUTING_DECISION_TOTAL = metrics.counter(
+    "MAOP_routing_decision_total",
+    "Total scheduling decisions per subsystem (label=stage)",
+)
+MAOP_ROUTING_DECISION_DURATION_MS = metrics.histogram(
+    "MAOP_routing_decision_duration_ms",
+    "Scheduling decision latency in milliseconds (all stages)",
+)

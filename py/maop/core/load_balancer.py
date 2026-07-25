@@ -1,4 +1,4 @@
-﻿"""MAOP Load Balancer — Dynamic weighted routing with load awareness.
+"""MAOP Load Balancer — Dynamic weighted routing with load awareness.
 
 Provides agent selection that considers:
   - Static weights from config (capacity, priority)
@@ -35,6 +35,13 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from maop.core.otel import get_tracer, span as otel_span
+from maop.core.routing_decision import (
+    RoutingDecisionRecord,
+    get_active_span_context,
+    record_decision_safe,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -99,12 +106,22 @@ class LoadBalancer:
     cooldown_s : float
         Minimum seconds between selections of the same agent
         (for LEAST_LOADED to avoid thundering herd).
+    sticky_sessions : bool
+        When True, ``select`` honours the ``session_id`` argument: a
+        non-expired entry in the sticky map is returned directly and a
+        fresh selection is recorded for future calls with the same id.
+    sticky_session_ttl_s : float
+        Time-to-live (seconds) for sticky session entries. Entries
+        older than this are treated as misses and pruned.
     """
 
     def __init__(
         self,
         algorithm: LBAlgorithm = LBAlgorithm.ADAPTIVE,
         cooldown_s: float = 0.0,
+        *,
+        sticky_sessions: bool = False,
+        sticky_session_ttl_s: float = 300.0,
     ) -> None:
         self._algorithm = algorithm
         self._cooldown = cooldown_s
@@ -112,6 +129,11 @@ class LoadBalancer:
         self._active_tasks: dict[str, set[str]] = {}  # agent -> task_ids
         self._lock = threading.Lock()
         self._total_selections = 0
+        # Phase γ-5: sticky session support.
+        # session_id -> (agent_name, expires_at_epoch_seconds)
+        self._sticky_sessions = sticky_sessions
+        self._sticky_ttl = sticky_session_ttl_s
+        self._sticky_map: dict[str, tuple[str, float]] = {}
 
     # ── Registration ─────────────────────────────────────────
 
@@ -145,6 +167,7 @@ class LoadBalancer:
         exclude: set[str] | None = None,
         session_id: str = "",
         candidates: list[str] | None = None,
+        trace_id: str = "",
     ) -> str | None:
         """Select the best agent for a task.
 
@@ -155,45 +178,195 @@ class LoadBalancer:
         exclude : set[str] | None
             Agents to exclude (e.g. circuit-breaker open).
         session_id : str
-            For sticky sessions (not implemented yet).
+            For sticky sessions. When ``sticky_sessions`` is enabled and
+            this is non-empty, a non-expired mapping is returned
+            directly; otherwise a fresh selection is made and recorded
+            under this session id for future calls.
         candidates : list[str] | None
             If provided, restrict selection to these agent names.
             Agents not registered will be auto-registered with default weight.
+        trace_id : str
+            Optional MAOP trace id for OTel/span correlation (Phase γ-4).
 
         Returns
         -------
         str | None
             Selected agent name, or None if no agents available.
         """
+        # Phase γ-4: wrap the selection in an OTel span and persist a
+        # RoutingDecisionRecord. Best-effort — span/record failures
+        # never break selection.
+        tracer = get_tracer("maop.routing.load_balancer")
+        _start = time.monotonic()
+        algo_name = self._algorithm.value
+        sticky_hit = False
+        with otel_span(
+            tracer, "routing.load_balancer.select", trace_id=trace_id,
+            attributes={
+                "routing.algorithm": algo_name,
+                "routing.routing_key": routing_key,
+                "routing.sticky_sessions_enabled": 1 if self._sticky_sessions else 0,
+            },
+        ) as _span:
+            # Phase γ-5: sticky session lookup (before acquiring the main
+            # lock for the selection path — we re-check under the lock
+            # when writing).
+            if self._sticky_sessions and session_id:
+                sticky_agent = self._lookup_sticky(session_id)
+                if sticky_agent is not None:
+                    sticky_hit = True
+                    _set_lb_span_attrs(_span, algo_name, 1, sticky_agent,
+                                       sticky_hit, session_id)
+                    _record_lb_decision(
+                        trace_id=trace_id, algorithm=algo_name,
+                        candidate_count=1, selected=sticky_agent,
+                        sticky_hit=sticky_hit, session_id=session_id,
+                        duration_ms=(time.monotonic() - _start) * 1000.0,
+                    )
+                    return sticky_agent
+
+            with self._lock:
+                # Auto-register candidates not yet known
+                if candidates:
+                    for name in candidates:
+                        if name not in self._agents:
+                            self._agents[name] = AgentMetrics(weight=10, effective_weight=10)
+                            self._active_tasks[name] = set()
+                            logger.info("[lb] Auto-registered candidate: %s", name)
+
+                pool = {
+                    name: m for name, m in self._agents.items()
+                    if name not in (exclude or set())
+                    and (candidates is None or name in candidates)
+                }
+                candidate_count = len(pool)
+                if not pool:
+                    _set_lb_span_attrs(_span, algo_name, 0, None,
+                                       sticky_hit, session_id)
+                    _record_lb_decision(
+                        trace_id=trace_id, algorithm=algo_name,
+                        candidate_count=0, selected=None,
+                        sticky_hit=sticky_hit, session_id=session_id,
+                        duration_ms=(time.monotonic() - _start) * 1000.0,
+                    )
+                    return None
+
+                if self._algorithm == LBAlgorithm.WEIGHTED_ROUND_ROBIN:
+                    selected = self._select_wrr(pool)
+                elif self._algorithm == LBAlgorithm.LEAST_LOADED:
+                    selected = self._select_least_loaded(pool)
+                else:  # ADAPTIVE
+                    selected = self._select_adaptive(pool)
+
+                if selected:
+                    self._total_selections += 1
+                    self._agents[selected].last_used = time.time()
+                    # Record sticky session for future lookups.
+                    if self._sticky_sessions and session_id:
+                        self._record_sticky(session_id, selected)
+
+                _set_lb_span_attrs(_span, algo_name, candidate_count,
+                                   selected, sticky_hit, session_id)
+                _record_lb_decision(
+                    trace_id=trace_id, algorithm=algo_name,
+                    candidate_count=candidate_count, selected=selected,
+                    sticky_hit=sticky_hit, session_id=session_id,
+                    duration_ms=(time.monotonic() - _start) * 1000.0,
+                )
+                return selected
+
+    # ── Sticky session helpers ──────────────────────────────
+
+    def _lookup_sticky(self, session_id: str) -> str | None:
+        """Return the sticky agent for ``session_id`` if still valid.
+
+        Updates the hit/miss counters and prunes the entry on expiry.
+        Runs without the main lock — the sticky map has its own atomic
+        read/write semantics under ``self._lock`` for mutations; lookups
+        here are read-only on a dict (CPython atomic) followed by a
+        guarded prune.
+        """
+        from maop.core.monitoring import (
+            MAOP_STICKY_SESSION_HIT,
+            MAOP_STICKY_SESSION_MISS,
+        )
+
+        now = time.time()
         with self._lock:
-            # Auto-register candidates not yet known
-            if candidates:
-                for name in candidates:
-                    if name not in self._agents:
-                        self._agents[name] = AgentMetrics(weight=10, effective_weight=10)
-                        self._active_tasks[name] = set()
-                        logger.info("[lb] Auto-registered candidate: %s", name)
-
-            pool = {
-                name: m for name, m in self._agents.items()
-                if name not in (exclude or set())
-                and (candidates is None or name in candidates)
-            }
-            if not pool:
+            entry = self._sticky_map.get(session_id)
+            if entry is None:
+                MAOP_STICKY_SESSION_MISS.inc()
                 return None
+            agent, expires_at = entry
+            if now >= expires_at:
+                # Expired — prune and miss.
+                self._sticky_map.pop(session_id, None)
+                self._refresh_sticky_gauge_locked()
+                MAOP_STICKY_SESSION_MISS.inc()
+                return None
+            MAOP_STICKY_SESSION_HIT.inc()
+            return agent
 
-            if self._algorithm == LBAlgorithm.WEIGHTED_ROUND_ROBIN:
-                selected = self._select_wrr(pool)
-            elif self._algorithm == LBAlgorithm.LEAST_LOADED:
-                selected = self._select_least_loaded(pool)
-            else:  # ADAPTIVE
-                selected = self._select_adaptive(pool)
+    def _record_sticky(self, session_id: str, agent: str) -> None:
+        """Record (or refresh) a sticky session entry. Caller holds ``self._lock``."""
+        from maop.core.monitoring import MAOP_STICKY_SESSION_ACTIVE
 
-            if selected:
-                self._total_selections += 1
-                self._agents[selected].last_used = time.time()
+        is_new = session_id not in self._sticky_map
+        self._sticky_map[session_id] = (agent, time.time() + self._sticky_ttl)
+        if is_new:
+            self._refresh_sticky_gauge_locked()
 
-            return selected
+    def _refresh_sticky_gauge_locked(self) -> None:
+        """Sync the active-sticky gauge with the map size. Caller holds ``self._lock``."""
+        from maop.core.monitoring import MAOP_STICKY_SESSION_ACTIVE
+
+        MAOP_STICKY_SESSION_ACTIVE.set(float(len(self._sticky_map)))
+
+    def clear_sticky_session(self, session_id: str) -> bool:
+        """Remove a single sticky session entry.
+
+        Returns True if an entry was present and removed.
+        """
+        with self._lock:
+            removed = self._sticky_map.pop(session_id, None) is not None
+            if removed:
+                self._refresh_sticky_gauge_locked()
+            return removed
+
+    def clear_all_sticky_sessions(self) -> int:
+        """Remove all sticky session entries. Returns the count removed."""
+        with self._lock:
+            count = len(self._sticky_map)
+            self._sticky_map.clear()
+            self._refresh_sticky_gauge_locked()
+            return count
+
+    def cleanup_expired_sticky_sessions(self) -> int:
+        """Remove expired sticky session entries. Returns the count removed."""
+        now = time.time()
+        with self._lock:
+            expired = [sid for sid, (_, exp) in self._sticky_map.items() if now >= exp]
+            for sid in expired:
+                self._sticky_map.pop(sid, None)
+            if expired:
+                self._refresh_sticky_gauge_locked()
+            return len(expired)
+
+    def get_sticky_session(self, session_id: str) -> str | None:
+        """Inspect a sticky session without side effects (for tests/diagnostics).
+
+        Returns the agent name if a non-expired entry exists, else None.
+        Does NOT update hit/miss counters.
+        """
+        now = time.time()
+        with self._lock:
+            entry = self._sticky_map.get(session_id)
+            if entry is None:
+                return None
+            agent, expires_at = entry
+            if now >= expires_at:
+                return None
+            return agent
 
     def _select_wrr(self, candidates: dict[str, AgentMetrics]) -> str | None:
         """Weighted round-robin (Nginx-style smooth weighted round-robin)."""
@@ -305,6 +478,18 @@ class LoadBalancer:
         with self._lock:
             return self._agents.get(agent)
 
+    def get_load(self, agent: str) -> int:
+        """Return the current ``active_tasks`` count for ``agent``.
+
+        Returns 0 for unknown agents so callers can treat load uniformly
+        without null checks. Used by ModelSelector's load-aware path.
+        """
+        with self._lock:
+            m = self._agents.get(agent)
+            if m is None:
+                return 0
+            return max(0, m.active_tasks)
+
     def all_agents(self) -> list[str]:
         """Get all registered agent names."""
         with self._lock:
@@ -349,3 +534,95 @@ def get_load_balancer(algorithm: LBAlgorithm = LBAlgorithm.ADAPTIVE) -> LoadBala
     if _global_lb is None:
         _global_lb = LoadBalancer(algorithm=algorithm)
     return _global_lb
+
+
+# ── Phase γ-4: span / decision-record helpers ─────────────────
+
+
+def _set_span_attr(s: Any, key: str, value: Any) -> None:
+    """Best-effort ``set_attribute`` on a (possibly no-op) span."""
+    try:
+        s.set_attribute(key, value)
+    except Exception:
+        pass
+
+
+def _set_lb_span_attrs(
+    span: Any,
+    algorithm: str,
+    candidate_count: int,
+    selected: str | None,
+    sticky_hit: bool,
+    session_id: str,
+) -> None:
+    _set_span_attr(span, "routing.algorithm", algorithm)
+    _set_span_attr(span, "routing.candidate_count", candidate_count)
+    _set_span_attr(span, "routing.selected_agent", selected or "")
+    _set_span_attr(span, "routing.sticky_session_hit", 1 if sticky_hit else 0)
+    if session_id:
+        _set_span_attr(span, "routing.session_id", session_id)
+
+
+def _record_lb_decision(
+    *,
+    trace_id: str,
+    algorithm: str,
+    candidate_count: int,
+    selected: str | None,
+    sticky_hit: bool,
+    session_id: str,
+    duration_ms: float,
+) -> None:
+    """Persist a :class:`RoutingDecisionRecord` for ``load_balancer.select``."""
+    otel_trace_id, span_id, parent_span_id = get_active_span_context()
+    effective_trace = trace_id or otel_trace_id
+
+    if selected is not None:
+        if sticky_hit:
+            explanation = (
+                f"Selected agent '{selected}' via sticky session hit "
+                f"(algorithm={algorithm}, session_id={session_id})."
+            )
+        else:
+            explanation = (
+                f"Selected agent '{selected}' via {algorithm} algorithm. "
+                f"{candidate_count} candidates evaluated. "
+                f"Sticky session: miss (no prior session)."
+            )
+    else:
+        explanation = (
+            f"No agent selected via {algorithm} algorithm "
+            f"(0 candidates available)."
+        )
+
+    try:
+        from maop.core.monitoring import (
+            MAOP_ROUTING_DECISION_TOTAL,
+            MAOP_ROUTING_DECISION_DURATION_MS,
+        )
+        MAOP_ROUTING_DECISION_TOTAL.inc(labels={"stage": "load_balancer"})
+        MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)
+    except Exception:
+        pass
+
+    record_decision_safe(RoutingDecisionRecord(
+        trace_id=effective_trace,
+        span_id=span_id,
+        parent_span_id=parent_span_id,
+        timestamp=time.time(),
+        stage="load_balancer",
+        input_summary={
+            "algorithm": algorithm,
+            "candidate_count": candidate_count,
+            "sticky_session_hit": sticky_hit,
+            "session_id": session_id,
+        },
+        output_summary={"selected_agent": selected},
+        explanation=explanation,
+        duration_ms=duration_ms,
+        attributes={
+            "algorithm": algorithm,
+            "selected_agent": selected or "",
+            "sticky_session_hit": sticky_hit,
+        },
+    ))

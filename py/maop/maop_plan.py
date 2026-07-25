@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -19,15 +20,91 @@ from maop.config.loader import MaopConfig, RouteEntry
 
 logger = logging.getLogger(__name__)
 
+# ── SLA constants (Phase γ-1) ────────────────────────────────
+_VALID_SLA_TIERS = frozenset({"best_effort", "standard", "critical"})
+_VALID_PRIORITY_RANGE = (1, 5)  # 1 = highest, 5 = lowest
+
 
 class Plan(BaseModel):
-    """Result of the Plan phase."""
+    """Result of the Plan phase.
+
+    Phase γ-1 extension: SLA-aware fields (deadline_ms, priority, sla_tier)
+    enable scheduling policies like "critical-first" and "deadline-acceleration".
+    All new fields have defaults so existing callers remain backward compatible.
+    """
     phase: str = "plan"
     task: str = ""
     selected_agent: str = "claude"
     routing_key: str = "chat"
     gates: list[str] = Field(default_factory=lambda: ["exit_code", "output"])
     budget: dict[str, Any] = Field(default_factory=lambda: {"timeout_s": 120, "max_retries": 1})
+    # ── SLA fields (Phase γ-1) ───────────────────────────────────
+    deadline_ms: int | None = None
+    """Absolute deadline timestamp in milliseconds since epoch.
+    None means no explicit deadline (best-effort scheduling)."""
+    priority: int = 3
+    """Scheduling priority: 1 (highest) to 5 (lowest). Default 3 (normal)."""
+    sla_tier: str = "standard"
+    """SLA tier: best_effort | standard | critical."""
+
+    def is_deadline_urgent(self, threshold_ms: int = 30000) -> bool:
+        """Return True if deadline is set and the remaining time is below threshold.
+
+        Parameters
+        ----------
+        threshold_ms : int
+            Urgency threshold in milliseconds (default 30s).
+
+        Returns
+        -------
+        bool
+            False when ``deadline_ms`` is None (no deadline set).
+            True when the time remaining to deadline is less than ``threshold_ms``.
+        """
+        if self.deadline_ms is None:
+            return False
+        now_ms = int(time.time() * 1000)
+        return (self.deadline_ms - now_ms) < threshold_ms
+
+    def effective_priority_score(self) -> float:
+        """Combined priority + deadline-urgency score in [0.0, 1.0].
+
+        Higher score = more urgent, should be scheduled first. Used for
+        sorting pending tasks when scheduling.
+
+        Score composition:
+          - priority contributes 60%: P1 -> 1.0, P5 -> 0.2 (linear).
+          - deadline urgency contributes 40%: 1.0 if past deadline,
+            decaying buckets otherwise; 0.5 neutral when no deadline set.
+
+        Returns
+        -------
+        float
+            Score in [0.0, 1.0].
+        """
+        clamped_prio = max(
+            _VALID_PRIORITY_RANGE[0],
+            min(_VALID_PRIORITY_RANGE[1], self.priority),
+        )
+        priority_score = (6 - clamped_prio) / 5.0
+
+        if self.deadline_ms is None:
+            deadline_score = 0.5
+        else:
+            now_ms = int(time.time() * 1000)
+            remaining_ms = self.deadline_ms - now_ms
+            if remaining_ms <= 0:
+                deadline_score = 1.0  # past deadline
+            elif remaining_ms < 30_000:
+                deadline_score = 0.9
+            elif remaining_ms < 60_000:
+                deadline_score = 0.8
+            elif remaining_ms < 300_000:
+                deadline_score = 0.7
+            else:
+                deadline_score = 0.6
+
+        return 0.6 * priority_score + 0.4 * deadline_score
 
 
 # ── Legacy keyword routing rules (DEPRECATED) ────────────────

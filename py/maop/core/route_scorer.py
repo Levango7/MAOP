@@ -25,6 +25,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from maop.config.loader import MaopConfig, RouteEntry
+from maop.core.otel import get_tracer, span as otel_span
+from maop.core.routing_decision import (
+    RoutingDecisionRecord,
+    get_active_span_context,
+    record_decision_safe,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,15 +93,50 @@ class RouteScorer:
     def __init__(self, config: MaopConfig | None = None) -> None:
         self.config = config
         self._cooldowns: dict[str, _AgentCooldown] = {}
+        # Phase γ-3: multi-objective (Pareto + TOPSIS) agent selection.
+        # Off by default for full backward compatibility; flip via
+        # ``enable_multi_objective()``.
+        self._use_multi_objective: bool = False
+        self._mo_weights: "ObjectiveWeights | None" = None
 
     # ── Public API ───────────────────────────────────────────
 
-    def match(self, task: str, *, adaptive: bool = True) -> RouteMatch | None:
+    def enable_multi_objective(
+        self, weights: "ObjectiveWeights | None" = None
+    ) -> None:
+        """Switch agent selection to the Pareto + TOPSIS scorer.
+
+        Parameters
+        ----------
+        weights : ObjectiveWeights | None
+            Optional custom weights. When None, the scorer's defaults
+            (success_rate=0.4, latency=0.3, cost=0.2, quota_headroom=0.1)
+            are used. The strategy learner may pass tuned weights here.
+        """
+        self._use_multi_objective = True
+        self._mo_weights = weights
+        logger.info(
+            "RouteScorer multi-objective mode ENABLED (weights=%s)",
+            weights,
+        )
+
+    def disable_multi_objective(self) -> None:
+        """Revert to the legacy weighted-sum agent selection."""
+        self._use_multi_objective = False
+        self._mo_weights = None
+        logger.info("RouteScorer multi-objective mode DISABLED")
+
+    @property
+    def is_multi_objective_enabled(self) -> bool:
+        return self._use_multi_objective
+
+    def match(self, task: str, *, adaptive: bool = True, trace_id: str = "") -> RouteMatch | None:
         """Match task against all routes and return the best match.
 
         Args:
             task: Task description text.
             adaptive: If True, use performance data for agent selection.
+            trace_id: Optional MAOP trace id for OTel/span correlation.
 
         Returns:
             RouteMatch with the best score, or None if no route matches.
@@ -103,46 +144,92 @@ class RouteScorer:
         if self.config is None:
             return None
 
-        task_lower = task.lower()
-        candidates: list[tuple[str, RouteEntry, float, str]] = []
+        # Phase γ-4: wrap the full match in an OTel span and persist a
+        # RoutingDecisionRecord so the dashboard can explain "why was
+        # agent X picked for trace Z". Best-effort: span/record failures
+        # never break routing.
+        tracer = get_tracer("maop.routing.route_scorer")
+        _start = time.monotonic()
+        decision_mode = "multi_objective" if self._use_multi_objective else "weighted_sum"
+        with otel_span(
+            tracer, "routing.route_scorer.match", trace_id=trace_id,
+            attributes={
+                "routing.task_preview": task[:80],
+                "routing.adaptive": 1 if adaptive else 0,
+                "routing.decision_mode": decision_mode,
+            },
+        ) as _span:
+            task_lower = task.lower()
+            candidates: list[tuple[str, RouteEntry, float, str]] = []
 
-        for rk, route in self.config.routing.items():
-            score, matched_by = self._score_route(task_lower, rk, route)
-            if score > 0:
-                candidates.append((rk, route, score, matched_by))
+            for rk, route in self.config.routing.items():
+                score, matched_by = self._score_route(task_lower, rk, route)
+                if score > 0:
+                    candidates.append((rk, route, score, matched_by))
 
-        if not candidates:
-            return None
+            if not candidates:
+                _set_span_attr(_span, "routing.candidate_count", 0)
+                _record_route_scorer_decision(
+                    trace_id=trace_id, task=task, result=None,
+                    candidate_count=0, decision_mode=decision_mode,
+                    duration_ms=(time.monotonic() - _start) * 1000.0,
+                )
+                return None
 
-        # Sort by score descending
-        candidates.sort(key=lambda x: x[2], reverse=True)
-        best_rk, best_route, best_score, best_matched_by = candidates[0]
+            # Sort by score descending
+            candidates.sort(key=lambda x: x[2], reverse=True)
+            best_rk, best_route, best_score, best_matched_by = candidates[0]
 
-        # Determine confidence level
-        if best_score >= _CONFIDENCE_HIGH:
-            confidence = "high"
-        elif best_score >= _CONFIDENCE_MEDIUM:
-            confidence = "medium"
-        else:
-            confidence = "low"
+            # Determine confidence level
+            if best_score >= _CONFIDENCE_HIGH:
+                confidence = "high"
+            elif best_score >= _CONFIDENCE_MEDIUM:
+                confidence = "medium"
+            else:
+                confidence = "low"
 
-        # Select agent (adaptive or primary), with cooldown check
-        agent = self._select_agent(best_route, best_rk, adaptive)
+            # Select agent (adaptive or primary), with cooldown check
+            agent = self._select_agent(best_route, best_rk, adaptive)
 
-        logger.debug(
-            "Route match: rk=%s agent=%s score=%.2f confidence=%s matched_by=%s "
-            "(candidates=%d)",
-            best_rk, agent, best_score, confidence, best_matched_by,
-            len(candidates),
-        )
+            # Record the routing-decision mode for observability (Phase γ-3).
+            try:
+                from maop.core.monitoring import MAOP_ROUTE_DECISION_MODE
+                MAOP_ROUTE_DECISION_MODE.set(
+                    1.0 if self._use_multi_objective else 0.0,
+                    labels={"mode": "multi_objective" if self._use_multi_objective else "weighted_sum"},
+                )
+            except Exception:
+                pass
 
-        return RouteMatch(
-            routing_key=best_rk,
-            agent=agent,
-            score=round(best_score, 4),
-            confidence=confidence,
-            matched_by=best_matched_by,
-        )
+            logger.debug(
+                "Route match: rk=%s agent=%s score=%.2f confidence=%s matched_by=%s "
+                "(candidates=%d)",
+                best_rk, agent, best_score, confidence, best_matched_by,
+                len(candidates),
+            )
+
+            result = RouteMatch(
+                routing_key=best_rk,
+                agent=agent,
+                score=round(best_score, 4),
+                confidence=confidence,
+                matched_by=best_matched_by,
+            )
+
+            # Phase γ-4: set span attributes + persist decision record.
+            _set_span_attr(_span, "routing.routing_key", best_rk)
+            _set_span_attr(_span, "routing.candidate_count", len(candidates))
+            _set_span_attr(_span, "routing.selected_agent", agent)
+            _set_span_attr(_span, "routing.score", best_score)
+            _set_span_attr(_span, "routing.confidence", confidence)
+            _set_span_attr(_span, "routing.matched_by", best_matched_by)
+            _set_span_attr(_span, "routing.decision_mode", decision_mode)
+            _record_route_scorer_decision(
+                trace_id=trace_id, task=task, result=result,
+                candidate_count=len(candidates), decision_mode=decision_mode,
+                duration_ms=(time.monotonic() - _start) * 1000.0,
+            )
+            return result
 
     def mark_agent_failed(self, agent: str) -> None:
         """Record an agent failure for cooldown tracking."""
@@ -332,6 +419,94 @@ class RouteScorer:
                 return _CAPABILITY_BONUS
         return 0.0
 
+    # ── Internal: Multi-Objective Agent Selection (Phase γ-3) ─
+
+    def _compute_score_multi_objective(
+        self,
+        candidates: list[str],
+        routing_key: str,
+        default: str = "",
+    ) -> str:
+        """Pick the best agent via Pareto + TOPSIS over live AgentStats.
+
+        Pulls ``AgentStats`` from the global ``AgentPerformanceTracker``
+        for each candidate, builds an :class:`AgentObjectiveVector` for
+        each, asks :class:`MultiObjectiveScorer` to rank them, and returns
+        the top agent name.  On any data-missing / empty-frontier
+        condition, falls back to ``default`` so the caller (which wraps us
+        in a try/except) can degrade gracefully.
+
+        ``quota_headroom`` is derived from the agent's ``AgentStats``
+        success/failure ratio as a proxy when no dedicated quota tracker
+        is available — a higher recent success rate is treated as more
+        "headroom" because the agent is clearly not being throttled.
+        Callers with real quota data may construct vectors directly via
+        :class:`MultiObjectiveScorer` instead of going through this helper.
+        """
+        if not candidates:
+            return default
+
+        # Lazy imports keep the module import-cost low when the multi-
+        # objective path is never enabled.
+        from maop.core.agent_performance import AgentPerformanceTracker
+        from maop.core.multi_objective_scorer import (
+            AgentObjectiveVector,
+            MultiObjectiveScorer,
+            ObjectiveWeights,
+        )
+
+        import os
+        root = os.environ.get("MAOP_ROOT_DIR", ".")
+        tracker = AgentPerformanceTracker(root_dir=root)
+
+        vectors: dict[str, AgentObjectiveVector] = {}
+        for agent in candidates:
+            stats = tracker.get_agent_stats(agent, routing_key=routing_key)
+            # quota_headroom proxy: success_rate itself.  Agents with no
+            # history (total_tasks == 0) get a neutral 0.5 to give new
+            # agents a fair chance without dominating established ones.
+            if stats.total_tasks == 0:
+                quota_headroom = 0.5
+            else:
+                # Blend: 70% success_rate (recent health signal) +
+                # 30% inverse load (more headroom = fewer failures lately).
+                quota_headroom = max(
+                    0.0,
+                    min(
+                        1.0,
+                        0.7 * stats.success_rate
+                        + 0.3 * (1.0 - min(stats.failure_count / max(stats.total_tasks, 1), 1.0)),
+                    ),
+                )
+            vectors[agent] = AgentObjectiveVector(
+                success_rate=stats.success_rate,
+                latency_ms=stats.avg_latency_ms,
+                cost_usd=stats.avg_cost_usd,
+                quota_headroom=quota_headroom,
+            )
+
+        weights = self._mo_weights if self._mo_weights is not None else ObjectiveWeights()
+        scorer = MultiObjectiveScorer(weights=weights)
+        ranking = scorer.rank_agents(vectors, weights=weights)
+
+        # Record metrics for observability.
+        try:
+            from maop.core.monitoring import (
+                MAOP_ROUTE_PARETO_FRONTIER_SIZE,
+                MAOP_ROUTE_MULTI_OBJECTIVE_SCORE,
+            )
+            frontier_size = scorer.compute_pareto_frontier(vectors).frontier_size
+            MAOP_ROUTE_PARETO_FRONTIER_SIZE.set(float(frontier_size))
+            for _name, score in ranking:
+                MAOP_ROUTE_MULTI_OBJECTIVE_SCORE.observe(score)
+        except Exception:
+            # Metrics are best-effort; never fail routing because of them.
+            pass
+
+        if not ranking:
+            return default
+        return ranking[0][0]
+
     # ── Internal: Agent Selection ────────────────────────────
 
     def _select_agent(
@@ -350,6 +525,28 @@ class RouteScorer:
         ]
         if not candidates:
             return "claude"
+
+        # Phase γ-3: multi-objective (Pareto + TOPSIS) path.  Takes
+        # precedence over the legacy weighted-sum adaptive path when
+        # explicitly enabled.  Falls through to the legacy path on any
+        # exception so a transient stats-DB hiccup never breaks routing.
+        if adaptive and self._use_multi_objective and len(candidates) > 1:
+            try:
+                best = self._compute_score_multi_objective(
+                    candidates, routing_key, default=route.primary,
+                )
+                if best and not self.is_agent_in_cooldown(best):
+                    if best != route.primary:
+                        logger.info(
+                            "Multi-objective routing: rk=%s primary=%s → %s "
+                            "(Pareto+TOPSIS)",
+                            routing_key, route.primary, best,
+                        )
+                    return best
+            except Exception as exc:
+                logger.debug(
+                    "Multi-objective routing fallback to adaptive: %s", exc
+                )
 
         # Try adaptive selection first (performance-based)
         if adaptive and len(candidates) > 1:
@@ -450,3 +647,86 @@ def get_route_scorer(config: MaopConfig | None = None) -> RouteScorer:
                     _instance = RouteScorer(config=config)
                     _instance._cooldowns = old_cooldowns
     return _instance
+
+
+# ── Phase γ-4: span / decision-record helpers ─────────────────
+
+
+def _set_span_attr(s: Any, key: str, value: Any) -> None:
+    """Best-effort ``set_attribute`` on a (possibly no-op) span."""
+    try:
+        s.set_attribute(key, value)
+    except Exception:
+        pass
+
+
+def _record_route_scorer_decision(
+    *,
+    trace_id: str,
+    task: str,
+    result: "RouteMatch | None",
+    candidate_count: int,
+    decision_mode: str,
+    duration_ms: float,
+) -> None:
+    """Persist a :class:`RoutingDecisionRecord` for ``route_scorer.match``.
+
+    Best-effort: any failure is logged at debug level inside
+    :func:`record_decision_safe` and never propagates. When ``trace_id``
+    is empty we try to inherit it from the active OTel span context so
+    decisions made inside a parent dispatcher span still correlate.
+    """
+    otel_trace_id, span_id, parent_span_id = get_active_span_context()
+    effective_trace = trace_id or otel_trace_id
+    if result is not None:
+        output_summary = {
+            "selected_agent": result.agent,
+            "routing_key": result.routing_key,
+            "score": result.score,
+            "confidence": result.confidence,
+            "matched_by": result.matched_by,
+        }
+        explanation = (
+            f"Selected agent '{result.agent}' with confidence {result.score} "
+            f"({result.confidence}) using {decision_mode} mode. "
+            f"Matched on {result.matched_by}. {candidate_count} candidates evaluated."
+        )
+    else:
+        output_summary = {"selected_agent": None}
+        explanation = (
+            f"No route matched (0 candidates) using {decision_mode} mode. "
+            f"Task: '{task[:60]}'."
+        )
+
+    try:
+        from maop.core.monitoring import (
+            MAOP_ROUTING_DECISION_TOTAL,
+            MAOP_ROUTING_DECISION_DURATION_MS,
+        )
+        MAOP_ROUTING_DECISION_TOTAL.inc(labels={"stage": "route_scorer"})
+        MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)
+    except Exception:
+        pass
+
+    record_decision_safe(RoutingDecisionRecord(
+        trace_id=effective_trace,
+        span_id=span_id,
+        parent_span_id=parent_span_id,
+        timestamp=time.time(),
+        stage="route_scorer",
+        input_summary={
+            "task_preview": task[:80],
+            "candidate_count": candidate_count,
+            "decision_mode": decision_mode,
+        },
+        output_summary=output_summary,
+        explanation=explanation,
+        duration_ms=duration_ms,
+        attributes={
+            "routing_key": result.routing_key if result else "",
+            "selected_agent": result.agent if result else "",
+            "score": result.score if result else 0.0,
+            "confidence": result.confidence if result else "",
+            "decision_mode": decision_mode,
+        },
+    ))

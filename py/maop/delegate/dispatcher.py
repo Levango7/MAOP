@@ -12,12 +12,27 @@ Architecture (split for maintainability):
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
 from maop.core.circuit_breaker import CircuitBreaker
 from maop.core.error_schema import new_result
 from maop.core.otel import get_tracer, span as otel_span
+from maop.core.monitoring import (
+    MAOP_TASK_DEADLINE_SECONDS,
+    MAOP_TASK_SLA_VIOLATION_TOTAL,
+    MAOP_TASK_PRIORITY_DISTRIBUTION,
+    MAOP_TASK_SLA_TIER_DISTRIBUTION,
+    MAOP_TASK_PREEMPTION_TOTAL,
+    MAOP_ROUTING_DECISION_TOTAL,
+    MAOP_ROUTING_DECISION_DURATION_MS,
+)
+from maop.core.routing_decision import (
+    RoutingDecisionRecord,
+    get_active_span_context,
+    record_decision_safe,
+)
 
 # Re-export for backward compatibility — callers importing from
 # MAOP.delegate.dispatcher still get these symbols.
@@ -30,6 +45,28 @@ from maop.delegate.models import (  # noqa: F401
 from maop.delegate.drivers import DRIVERS as _DRIVERS
 
 logger = logging.getLogger(__name__)
+
+
+# ── SLA helpers (Phase γ-1) ───────────────────────────────────
+
+def _tier_from_priority(priority: int) -> str:
+    """Derive a default SLA tier from a priority level.
+
+    Mapping:
+      - priority 1       -> ``critical``
+      - priority 2..3    -> ``standard``
+      - priority 4..5     -> ``best_effort``
+
+    This is a heuristic used only when the caller does not pass an
+    explicit ``sla_tier`` to dispatch (the dispatch API exposes
+    ``priority`` / ``deadline_ms`` but not ``sla_tier`` per Phase γ-1
+    contract; the Plan model carries the authoritative ``sla_tier``).
+    """
+    if priority <= 1:
+        return "critical"
+    if priority <= 3:
+        return "standard"
+    return "best_effort"
 
 # ── Optional subsystems (lazy import to avoid hard deps) ──────
 
@@ -138,6 +175,7 @@ class Dispatcher:
         *,
         registry: Any | None = None,
         capability_matcher: Any | None = None,
+        priority_queue: Any | None = None,
     ) -> None:
         self._config = MAOP_config
         self._breaker = breaker or CircuitBreaker()
@@ -151,6 +189,11 @@ class Dispatcher:
         self._matcher = capability_matcher
         self._agents_index: dict[str, Any] | None = None
         self._workflows_index: dict[str, Any] | None = None
+        # Phase γ-2: optional priority queue for priority-aware dispatch.
+        # When None (default), dispatch() executes synchronously as before.
+        # When set, dispatch_priority() enqueues and drain_pending() pops in
+        # priority order. Kept optional to preserve backward compatibility.
+        self._priority_queue = priority_queue
 
     @property
     def effective_model(self) -> Any | None:
@@ -161,6 +204,145 @@ class Dispatcher:
         """Clear the agent config cache (call after config reload)."""
         self._agent_cache.clear()
         self._cache_versions.clear()
+
+    # ── Phase γ-2: priority queue integration ──────────────────
+
+    def set_priority_queue(self, queue: Any | None) -> None:
+        """Attach (or detach with ``None``) a priority task queue.
+
+        When a queue is attached, :meth:`dispatch_priority` will enqueue
+        dispatch requests and :meth:`drain_pending` will execute them in
+        priority order. The synchronous :meth:`dispatch` is unaffected.
+        """
+        self._priority_queue = queue
+
+    @property
+    def priority_queue(self) -> Any | None:
+        """The currently attached priority queue (or ``None``)."""
+        return self._priority_queue
+
+    async def dispatch_priority(
+        self,
+        agent: str,
+        task: str,
+        *,
+        routing_key: str = "",
+        workdir: str = "",
+        timeout_seconds: int | None = None,
+        trace_id: str = "",
+        streamer: Any | None = None,
+        priority: int = 3,
+        deadline_ms: int | None = None,
+    ):
+        """Enqueue a dispatch request with priority metadata (Phase γ-2).
+
+        If no priority queue is attached (the default), this falls back to
+        a direct :meth:`dispatch` call, preserving the original synchronous
+        behaviour — so callers can switch to priority dispatch without
+        branching on configuration.
+
+        When a queue is attached, the request is wrapped in a
+        :class:`~maop.core.priority_queue.PriorityTask` and pushed; the
+        returned awaitable resolves to the :class:`DispatchResult` once
+        :meth:`drain_pending` (or a worker loop) eventually executes it.
+
+        Returns
+        -------
+        asyncio.Future | Awaitable[DispatchResult]
+            A future that resolves to the DispatchResult.
+        """
+        if self._priority_queue is None:
+            # Backward-compatible fallback: execute directly.
+            return await self.dispatch(
+                agent, task,
+                routing_key=routing_key, workdir=workdir,
+                timeout_seconds=timeout_seconds, trace_id=trace_id,
+                streamer=streamer,
+                priority=priority, deadline_ms=deadline_ms,
+            )
+
+        # Lazy import to avoid a hard import cycle in tests that stub
+        # the queue with a duck-typed object.
+        from maop.core.priority_queue import PriorityTask
+
+        fut = asyncio.get_running_loop().create_future()
+        pt = PriorityTask(
+            payload={
+                "agent": agent,
+                "task": task,
+                "routing_key": routing_key,
+                "workdir": workdir,
+                "timeout_seconds": timeout_seconds,
+                "trace_id": trace_id,
+                "streamer": streamer,
+                "future": fut,
+            },
+            priority=priority,
+            deadline_ms=deadline_ms,
+        )
+        self._priority_queue.push(pt)
+        return await fut
+
+    async def drain_pending(self, limit: int = 1) -> int:
+        """Execute up to ``limit`` queued dispatch requests in priority order.
+
+        Pops the highest-priority tasks from the attached queue and
+        dispatches each via :meth:`dispatch`. The per-task
+        :class:`asyncio.Future` stored in the payload is resolved with the
+        :class:`DispatchResult` (or the exception on failure).
+
+        Returns the number of tasks actually dispatched.
+
+        No-op (returns 0) when no priority queue is attached.
+        """
+        if self._priority_queue is None:
+            return 0
+        dispatched = 0
+        for _ in range(max(0, limit)):
+            pt = self._priority_queue.pop()
+            if pt is None:
+                break
+            payload = pt.payload or {}
+            fut: asyncio.Future | None = payload.get("future")
+            try:
+                result = await self.dispatch(
+                    payload.get("agent", ""),
+                    payload.get("task", ""),
+                    routing_key=payload.get("routing_key", ""),
+                    workdir=payload.get("workdir", ""),
+                    timeout_seconds=payload.get("timeout_seconds"),
+                    trace_id=payload.get("trace_id", ""),
+                    streamer=payload.get("streamer"),
+                    priority=pt.priority,
+                    deadline_ms=pt.deadline_ms,
+                )
+                if fut is not None and not fut.done():
+                    fut.set_result(result)
+            except Exception as exc:
+                if fut is not None and not fut.done():
+                    fut.set_exception(exc)
+            dispatched += 1
+        return dispatched
+
+    def _record_soft_preemption_for_dispatch(
+        self,
+        incoming_priority: int,
+        running_priorities: list[int],
+    ) -> None:
+        """Record a soft-preemption event for dispatcher-driven dispatch.
+
+        Exposed as a helper so that callers managing their own worker pool
+        can signal "a higher-priority dispatch arrived while lower-priority
+        dispatches are in flight". Under soft preemption the running
+        dispatches are not interrupted; the counter records demand only.
+        """
+        try:
+            if not running_priorities:
+                return
+            if incoming_priority < min(running_priorities):
+                MAOP_TASK_PREEMPTION_TOTAL.inc()
+        except Exception:
+            pass
 
     def _resolve_agent(self, agent_name: str) -> AgentConfig | None:
         """Resolve agent config from the loaded MAOP config.
@@ -341,12 +523,25 @@ class Dispatcher:
             self._workflows_index = {w.name: w for w in workflows}
         return self._workflows_index
 
-    def _notify_route_scorer(self, agent: str, *, success: bool) -> None:
+    def _notify_route_scorer(
+        self,
+        agent: str,
+        *,
+        success: bool,
+        priority: int | None = None,
+        deadline_ms: int | None = None,
+    ) -> None:
         """Notify RouteScorer of agent success/failure for cooldown tracking.
 
         P0-3 fix: RouteScorer.cooldown was never populated because
         mark_agent_failed/mark_agent_success had no callers. Now invoked
         alongside circuit-breaker recording in _dispatch_impl.
+
+        Phase γ-1: ``priority`` / ``deadline_ms`` are accepted to plumb
+        the SLA parameter chain through to the RouteScorer call site.
+        The current RouteScorer API does not yet consume these kwargs —
+        they are reserved for a future SLA-aware cooldown policy
+        (e.g. shorter cooldown for critical tasks).
         """
         try:
             from maop.core.route_scorer import get_route_scorer
@@ -359,6 +554,53 @@ class Dispatcher:
             # P2-7 fix: upgrade to warning — cooldown mechanism failure
             # affects routing quality and should be visible in logs
             logger.warning("[dispatch] RouteScorer notify failed: %s", exc)
+
+    def _record_sla_dispatch_start(self, priority: int, sla_tier: str) -> None:
+        """Record SLA metrics at task dispatch start (Phase γ-1).
+
+        Increments the in-flight gauge for the task's priority level and
+        SLA tier. Failures are non-blocking — metric recording must never
+        prevent dispatch.
+        """
+        try:
+            priority_label = str(priority)
+            MAOP_TASK_PRIORITY_DISTRIBUTION.inc(labels={"priority": priority_label})
+            MAOP_TASK_SLA_TIER_DISTRIBUTION.inc(labels={"tier": sla_tier})
+        except Exception as exc:
+            logger.debug("[dispatch] SLA start-metric record failed: %s", exc)
+
+    def _record_sla_dispatch_end(
+        self,
+        priority: int,
+        sla_tier: str,
+        *,
+        deadline_ms: int | None,
+    ) -> None:
+        """Record SLA metrics at task dispatch completion (Phase γ-1).
+
+        Decrements the in-flight gauges incremented at start, and — when
+        ``deadline_ms`` is set — checks whether the deadline was violated.
+        On violation, increments ``MAOP_task_sla_violation_total`` and
+        observes the (negative) remaining seconds in
+        ``MAOP_task_deadline_seconds``.
+        """
+        try:
+            priority_label = str(priority)
+            MAOP_TASK_PRIORITY_DISTRIBUTION.dec(labels={"priority": priority_label})
+            MAOP_TASK_SLA_TIER_DISTRIBUTION.dec(labels={"tier": sla_tier})
+
+            if deadline_ms is not None:
+                now_ms = int(__import__("time").time() * 1000)
+                remaining_s = (deadline_ms - now_ms) / 1000.0
+                if now_ms > deadline_ms:
+                    MAOP_TASK_SLA_VIOLATION_TOTAL.inc()
+                    MAOP_TASK_DEADLINE_SECONDS.observe(remaining_s)
+                    logger.warning(
+                        "SLA violation: deadline_ms=%d now_ms=%d remaining_s=%.3fs",
+                        deadline_ms, now_ms, remaining_s,
+                    )
+        except Exception as exc:
+            logger.debug("[dispatch] SLA end-metric record failed: %s", exc)
 
     def _find_agent_def(self, name: str):
         """Look up an AgentDef by name from the config (dict form only)."""
@@ -425,6 +667,8 @@ class Dispatcher:
         timeout_seconds: int | None = None,
         trace_id: str = "",
         streamer: Any | None = None,
+        priority: int = 3,
+        deadline_ms: int | None = None,
     ) -> DispatchResult:
         """Dispatch a task to the specified agent.
 
@@ -435,13 +679,66 @@ class Dispatcher:
         3. Execute via the appropriate driver.
         4. Record result in circuit-breaker.
         5. Return DispatchResult envelope.
+
+        Phase γ-1 SLA parameters
+        ------------------------
+        priority : int
+            Scheduling priority 1 (highest) .. 5 (lowest). Default 3 (normal).
+        deadline_ms : int | None
+            Absolute deadline timestamp in milliseconds since epoch.
+            None means no explicit deadline (best-effort).
+
+        Phase γ-4: the dispatch is wrapped in an outer
+        ``routing.dispatcher.dispatch`` span (parent span for the
+        routing decision chain) plus the existing inner ``dispatch.{agent}``
+        span. A :class:`RoutingDecisionRecord` is persisted so the
+        dashboard can explain the dispatch decision.
         """
-        tracer = get_tracer("maop.dispatch")
-        with otel_span(tracer, f"dispatch.{agent}", trace_id=trace_id,
-                       attributes={"agent": agent, "task": task[:80], "routing_key": routing_key}):
-            return await self._dispatch_impl(agent, task, routing_key=routing_key,
-                                             workdir=workdir, timeout_seconds=timeout_seconds,
-                                             trace_id=trace_id, streamer=streamer)
+        import time as _time
+        _start = _time.monotonic()
+        sla_tier = _tier_from_priority(priority)
+        routing_tracer = get_tracer("maop.routing.dispatcher")
+        with otel_span(
+            routing_tracer, "routing.dispatcher.dispatch", trace_id=trace_id,
+            attributes={
+                "routing.agent": agent,
+                "routing.routing_key": routing_key,
+                "sla.priority": priority,
+                "sla.tier": sla_tier,
+                "sla.deadline_ms": deadline_ms or 0,
+            },
+        ) as _routing_span:
+            tracer = get_tracer("maop.dispatch")
+            with otel_span(tracer, f"dispatch.{agent}", trace_id=trace_id,
+                           attributes={"agent": agent, "task": task[:80], "routing_key": routing_key,
+                                       "sla.priority": priority, "sla.deadline_ms": deadline_ms or 0}):
+                result = await self._dispatch_impl(agent, task, routing_key=routing_key,
+                                                    workdir=workdir, timeout_seconds=timeout_seconds,
+                                                    trace_id=trace_id, streamer=streamer,
+                                                    priority=priority, deadline_ms=deadline_ms)
+
+            # Phase γ-4: set span attributes + persist decision record.
+            # The dispatcher span is the PARENT of the routing chain —
+            # route_scorer / load_balancer / model_selector spans opened
+            # inside _dispatch_impl (via ModelSelector.select_for_routing_key)
+            # are children of the inner dispatch.{agent} span, which is
+            # itself a child of this routing.dispatcher.dispatch span.
+            selected_model = ""
+            if self._effective_model is not None:
+                selected_model = getattr(self._effective_model, "model_name", "") or ""
+            try:
+                _routing_span.set_attribute("routing.selected_agent", agent)
+                _routing_span.set_attribute("routing.selected_model", selected_model)
+                _routing_span.set_attribute("routing.sla_tier", sla_tier)
+            except Exception:
+                pass
+            _record_dispatcher_decision(
+                trace_id=trace_id, agent=agent, routing_key=routing_key,
+                priority=priority, sla_tier=sla_tier, deadline_ms=deadline_ms,
+                selected_model=selected_model,
+                duration_ms=(_time.monotonic() - _start) * 1000.0,
+            )
+            return result
 
     async def _dispatch_impl(
         self,
@@ -453,7 +750,58 @@ class Dispatcher:
         timeout_seconds: int | None = None,
         trace_id: str = "",
         streamer: Any | None = None,
+        priority: int = 3,
+        deadline_ms: int | None = None,
     ) -> DispatchResult:
+        # Phase γ-1: derive SLA tier, log SLA context, and record
+        # in-flight gauges. The finally block at the end of this method
+        # decrements the gauges and checks for deadline violation.
+        sla_tier = _tier_from_priority(priority)
+        self._record_sla_dispatch_start(priority, sla_tier)
+        logger.info(
+            "SLA dispatch: agent=%s priority=%d sla_tier=%s deadline_ms=%s trace_id=%s",
+            agent, priority, sla_tier, deadline_ms, trace_id,
+            extra={
+                "sla_priority": priority,
+                "sla_deadline_ms": deadline_ms if deadline_ms is not None else 0,
+                "sla_tier": sla_tier,
+            },
+        )
+
+        try:
+            return await self._dispatch_impl_inner(
+                agent, task,
+                routing_key=routing_key, workdir=workdir,
+                timeout_seconds=timeout_seconds, trace_id=trace_id,
+                streamer=streamer,
+                priority=priority, deadline_ms=deadline_ms,
+                sla_tier=sla_tier,
+            )
+        finally:
+            self._record_sla_dispatch_end(priority, sla_tier, deadline_ms=deadline_ms)
+
+    async def _dispatch_impl_inner(
+        self,
+        agent: str,
+        task: str,
+        *,
+        routing_key: str = "",
+        workdir: str = "",
+        timeout_seconds: int | None = None,
+        trace_id: str = "",
+        streamer: Any | None = None,
+        priority: int = 3,
+        deadline_ms: int | None = None,
+        sla_tier: str = "standard",
+    ) -> DispatchResult:
+        """Inner dispatch implementation (Phase γ-1).
+
+        Split out from ``_dispatch_impl`` so the outer method can wrap
+        the call in a ``try/finally`` for SLA metric cleanup. SLA params
+        are in scope at every call site that touches LoadBalancer /
+        RouteScorer — see ``lb.record_start`` below and
+        ``_notify_route_scorer`` calls for the plumbed parameter chain.
+        """
         # 1. Resolve agent config
         config = self._resolve_agent(agent)
 
@@ -535,11 +883,14 @@ class Dispatcher:
                     "[dispatch] Circuit OPEN for '%s', failing over to '%s' (degraded=%s)",
                     agent, failover.agent, failover.degraded,
                 )
+                # Phase γ-1: propagate SLA context to the failover attempt so
+                # its in-flight gauges + violation check are recorded too.
                 return await self._dispatch_impl(
                     failover.agent, task,
                     routing_key=routing_key, workdir=workdir,
                     timeout_seconds=timeout_seconds, trace_id=trace_id,
                     streamer=streamer,
+                    priority=priority, deadline_ms=deadline_ms,
                 )
             result = new_result(
                 agent=agent, task=task,
@@ -582,14 +933,21 @@ class Dispatcher:
                 trace_id=trace_id, routing_key=routing_key,
             )
             await self._breaker.arecord_failure(agent)
-            self._notify_route_scorer(agent, success=False)
+            self._notify_route_scorer(
+                agent, success=False, priority=priority, deadline_ms=deadline_ms,
+            )
             return DispatchResult(result=result, breaker_tripped=False)
 
         # 4. Execute via driver — wrap in try/except to ensure failures are recorded
         # in circuit-breaker and route scorer cooldown (P0-3 + P1-7 fix)
         import time as _time
         _dispatch_start = _time.monotonic()
-        # P2-7 fix: record task start to LoadBalancer for adaptive scoring
+        # P2-7 fix: record task start to LoadBalancer for adaptive scoring.
+        # Phase γ-1: SLA context (priority, deadline_ms) is in scope here
+        # for a future LoadBalancer enhancement that weights SLA when
+        # computing agent load. The current lb.record_start API does not
+        # yet consume these kwargs — the parameter chain is plumbed so
+        # the LB call site can use them once it accepts them.
         try:
             lb = _get_load_balancer()
             if lb:
@@ -623,10 +981,14 @@ class Dispatcher:
         if result.is_success():
             # P1-16 fix: use async breaker methods to avoid blocking event loop
             await self._breaker.arecord_success(agent)
-            self._notify_route_scorer(agent, success=True)
+            self._notify_route_scorer(
+                agent, success=True, priority=priority, deadline_ms=deadline_ms,
+            )
         else:
             await self._breaker.arecord_failure(agent)
-            self._notify_route_scorer(agent, success=False)
+            self._notify_route_scorer(
+                agent, success=False, priority=priority, deadline_ms=deadline_ms,
+            )
 
         return DispatchResult(
             result=result,
@@ -683,3 +1045,69 @@ def _wildcard_match(pattern: str, name: str) -> bool:
     """
     import fnmatch
     return fnmatch.fnmatch(pattern, name)
+
+
+# ── Phase γ-4: decision-record helper ─────────────────────────
+
+
+def _record_dispatcher_decision(
+    *,
+    trace_id: str,
+    agent: str,
+    routing_key: str,
+    priority: int,
+    sla_tier: str,
+    deadline_ms: int | None,
+    selected_model: str,
+    duration_ms: float,
+) -> None:
+    """Persist a :class:`RoutingDecisionRecord` for ``Dispatcher.dispatch``.
+
+    The dispatcher is the PARENT of the routing decision chain — its
+    record is the entry point for reconstructing the full Plan → Route
+    → LB → ModelSelect trace via ``query_by_trace(trace_id)``.
+    """
+    import time as _time
+    otel_trace_id, span_id, parent_span_id = get_active_span_context()
+    effective_trace = trace_id or otel_trace_id
+
+    deadline_note = f"deadline={deadline_ms}ms" if deadline_ms else "deadline=none"
+    model_note = f", model='{selected_model}'" if selected_model else ""
+    explanation = (
+        f"Dispatched to agent '{agent}' with priority={priority} "
+        f"({sla_tier}), {deadline_note}{model_note}."
+    )
+
+    try:
+        MAOP_ROUTING_DECISION_TOTAL.inc(labels={"stage": "dispatcher"})
+        MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)
+    except Exception:
+        pass
+
+    record_decision_safe(RoutingDecisionRecord(
+        trace_id=effective_trace,
+        span_id=span_id,
+        parent_span_id=parent_span_id,
+        timestamp=_time.time(),
+        stage="dispatcher",
+        input_summary={
+            "agent": agent,
+            "routing_key": routing_key,
+            "priority": priority,
+            "sla_tier": sla_tier,
+            "deadline_ms": deadline_ms,
+        },
+        output_summary={
+            "selected_agent": agent,
+            "selected_model": selected_model,
+        },
+        explanation=explanation,
+        duration_ms=duration_ms,
+        attributes={
+            "priority": priority,
+            "sla_tier": sla_tier,
+            "deadline_ms": deadline_ms or 0,
+            "selected_agent": agent,
+            "selected_model": selected_model,
+        },
+    ))

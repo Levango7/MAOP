@@ -300,6 +300,10 @@ from maop.dashboard.routers import agent_bridge as agent_bridge_router
 app.include_router(agent_bridge_router.router)
 app.include_router(routing_preview_router)
 
+# Phase γ-4: scheduling decision trace API (read-only GET endpoints).
+from maop.dashboard.routers import routing as routing_router
+app.include_router(routing_router.router)
+
 # ── A2A protocol endpoint (JSON-RPC /a2a) ─────────────────────────
 # F6b (2026-07-22, Phase F): mount the A2A protocol so external agents
 # (Google ADK / LangGraph / CrewAI / any A2A-compliant system) can
