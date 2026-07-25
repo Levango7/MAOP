@@ -68,5 +68,16 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Downgrade is not supported for the initial schema (would lose all data)."""
-    raise NotImplementedError("Cannot downgrade initial schema — would lose all data")
+    """Drop all tables created by upgrade.
+
+    按 001_init.sql 中 -- DOWN: 段定义的逆序依赖关系 DROP 所有表。
+    CI 测试环境需要 downgrade base 以验证 upgrade→downgrade→upgrade 幂等性。
+    """
+    sql_path = _find_sql_file()
+    sql = sql_path.read_text(encoding="utf-8")
+    if "-- DOWN:" in sql:
+        # 执行 SQL 文件中预定义的 DOWN 段（DROP TABLE 逆序）
+        down_sql = sql.split("-- DOWN:", 1)[1]
+        _exec_section(down_sql)
+    # schema_migrations 表由 upgrade 创建但未列入 SQL 的 DOWN 段，单独清除
+    op.execute("DROP TABLE IF EXISTS schema_migrations")

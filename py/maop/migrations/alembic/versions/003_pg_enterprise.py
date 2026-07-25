@@ -25,6 +25,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     bind = op.get_bind()
+    # 003 是 PostgreSQL 专用企业表（含 JSONB 类型），SQLite 等非 PG 方言直接跳过
+    if bind.dialect.name != "postgresql":
+        return
     inspector = sa.inspect(bind)
 
     # ── rbac_grants (PgRBACStore) ──────────────────────────────
