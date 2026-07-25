@@ -118,8 +118,15 @@ def detect_edition() -> Edition:
     Priority:
       1. Explicitly set via ``set_edition()`` (programmatic override)
       2. ``MAOP_EDITION`` environment variable
-      3. ``maop.enterprise`` package importable → ENTERPRISE
+      3. ``maop.enterprise`` package importable → ENTERPRISE (with license check)
       4. Default → PERSONAL
+
+    License validation:
+      When enterprise is detected (via env or package import), the
+      license is validated if ``MAOP_LICENSE_KEY`` is set. If no key
+      is present, honor-system mode applies (enterprise package
+      importable = enterprise). If a key is present but invalid,
+      edition degrades to PERSONAL with an error log.
     """
     global _current_edition
     if _current_edition is not None:
@@ -127,17 +134,64 @@ def detect_edition() -> Edition:
 
     env_val = os.getenv("MAOP_EDITION", "").lower().strip()
     if env_val in ("enterprise", "ent"):
-        return Edition.ENTERPRISE
+        return _detect_with_license_check(Edition.ENTERPRISE)
     if env_val in ("personal", "pers", "community"):
         return Edition.PERSONAL
 
     try:
         if _is_enterprise_package_installed():
-            return Edition.ENTERPRISE
+            return _detect_with_license_check(Edition.ENTERPRISE)
     except Exception:
         pass
 
     return Edition.PERSONAL
+
+
+def _detect_with_license_check(requested: Edition) -> Edition:
+    """Verify license when enterprise is requested; degrade on failure.
+
+    If no license key is configured, honor-system mode applies
+    (enterprise package importable = enterprise) with a warning.
+    If a key is present but invalid, degrade to PERSONAL.
+    """
+    if requested != Edition.ENTERPRISE:
+        return requested
+
+    try:
+        from maop.enterprise.license import LicenseValidator, LicenseError
+        validator = LicenseValidator()
+        info = validator.validate_from_env()
+        if info is None:
+            # Honor-system mode: no license key, but package is installed
+            logger.warning(
+                "[edition] Enterprise package installed but no license key found. "
+                "Running in honor-system mode. Set MAOP_LICENSE_KEY for production."
+            )
+            return Edition.ENTERPRISE
+        # License validated successfully
+        logger.info(
+            "[edition] Enterprise license valid for '%s' (expires %s)",
+            info.customer, info.expires_at.isoformat(),
+        )
+        return Edition.ENTERPRISE
+    except LicenseError as exc:
+        logger.error(
+            "[edition] License validation failed: %s. Degrading to PERSONAL.", exc
+        )
+        record_degradation("license", "enterprise", "personal", "license_invalid")
+        return Edition.PERSONAL
+    except ImportError:
+        # maop.enterprise.license not available — shouldn't happen since
+        # we only get here when enterprise package is installed, but handle gracefully
+        logger.warning("[edition] License module not available, honoring package detection")
+        return Edition.ENTERPRISE
+    except Exception as exc:
+        logger.error(
+            "[edition] Unexpected error during license validation: %s. "
+            "Degrading to PERSONAL.", exc, exc_info=True,
+        )
+        record_degradation("license", "enterprise", "personal", "license_error")
+        return Edition.PERSONAL
 
 
 def set_edition(edition: Edition | str) -> None:
