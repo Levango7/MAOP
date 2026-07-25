@@ -37,5 +37,5 @@ logger.info("[enterprise] MAOP Enterprise extension loaded — all enterprise fe
 
 __all__: list[str] = [
     "rbac", "tenant", "audit", "sso",
-    "tls_auto", "container", "ha",
+    "tls_auto", "container", "ha", "n8n",
 ]

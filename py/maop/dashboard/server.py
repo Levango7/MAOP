@@ -409,6 +409,20 @@ if has_feature(FeatureFlag.MULTI_USER):
             _e,
         )
 
+# ── n8n integration router (Enterprise only, gated by FeatureFlag.N8N_INTEGRATION) ──
+has_n8n_router: bool = False
+if has_feature(FeatureFlag.N8N_INTEGRATION):
+    try:
+        from maop.dashboard.routers import n8n as n8n_router
+        app.include_router(n8n_router.router)
+        has_n8n_router = True
+        logger.info("[server] Enterprise router: n8n enabled")
+    except ImportError as _e:
+        logger.warning(
+            "[server] Enterprise router MISSING: n8n (import error: %s).",
+            _e,
+        )
+
 # ── Enterprise API 404 Guard ────────────────────────────────────────
 # In personal edition, enterprise-only API paths return 404 instead of
 # leaking route existence or causing confusing 500 errors.
