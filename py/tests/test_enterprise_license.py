@@ -1,0 +1,217 @@
+"""Tests for MAOP Enterprise license validation."""
+
+from __future__ import annotations
+
+import json
+import base64
+import os
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+from maop.enterprise.license import (
+    LicenseInfo,
+    LicenseValidator,
+    LicenseError,
+    LicenseExpiredError,
+    LicenseSignatureError,
+    LicenseFormatError,
+)
+
+
+# Path to the dev private key (for generating test licenses)
+_DEV_PRIVATE_KEY = Path(__file__).resolve().parents[2] / "scripts" / "dev_private_key.pem"
+
+
+def _generate_test_license(
+    customer: str = "Test Customer",
+    expires_at: datetime | None = None,
+    private_key_path: Path | None = None,
+) -> str:
+    """Generate a test license key using the dev private key."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    if expires_at is None:
+        expires_at = datetime.now(timezone.utc) + timedelta(days=365)
+    if private_key_path is None:
+        private_key_path = _DEV_PRIVATE_KEY
+
+    key_data = private_key_path.read_bytes()
+    if key_data.startswith(b"DEVELOPMENT"):
+        lines = key_data.split(b"\n")
+        key_data = b"\n".join(lines[1:])
+    private_key = serialization.load_pem_private_key(key_data, password=None)
+
+    payload = {
+        "customer": customer,
+        "edition": "enterprise",
+        "issued_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": expires_at.isoformat(),
+    }
+    payload_json = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    signature = private_key.sign(payload_json)
+
+    payload_b64 = base64.urlsafe_b64encode(payload_json).rstrip(b"=").decode("ascii")
+    sig_b64 = base64.urlsafe_b64encode(signature).rstrip(b"=").decode("ascii")
+
+    return f"MAOP-ENT-{payload_b64}.{sig_b64}"
+
+
+class TestLicenseValidator:
+    """Test LicenseValidator class."""
+
+    def test_valid_license(self):
+        """A properly signed, non-expired license should validate."""
+        key = _generate_test_license(customer="ACME Corp")
+        validator = LicenseValidator()
+        info = validator.validate(key)
+        assert info.customer == "ACME Corp"
+        assert info.edition == "enterprise"
+        assert not info.is_expired
+
+    def test_validate_from_env_with_key(self, monkeypatch):
+        """validate_from_env should read MAOP_LICENSE_KEY."""
+        key = _generate_test_license()
+        monkeypatch.setenv("MAOP_LICENSE_KEY", key)
+        validator = LicenseValidator()
+        info = validator.validate_from_env()
+        assert info is not None
+        assert info.customer == "Test Customer"
+
+    def test_validate_from_env_without_key(self, monkeypatch):
+        """validate_from_env should return None if no key is configured."""
+        monkeypatch.delenv("MAOP_LICENSE_KEY", raising=False)
+        # Also ensure data/license.key doesn't interfere
+        monkeypatch.setenv("MAOP_ROOT_DIR", "/nonexistent")
+        validator = LicenseValidator()
+        info = validator.validate_from_env()
+        assert info is None
+
+    def test_expired_license_raises(self):
+        """An expired license (beyond grace period) should raise."""
+        expired = datetime.now(timezone.utc) - timedelta(days=30)
+        key = _generate_test_license(expires_at=expired)
+        validator = LicenseValidator()
+        with pytest.raises(LicenseExpiredError):
+            validator.validate(key)
+
+    def test_grace_period_license(self):
+        """A license expired but within grace period should validate with warning."""
+        recently_expired = datetime.now(timezone.utc) - timedelta(days=2)
+        key = _generate_test_license(expires_at=recently_expired)
+        validator = LicenseValidator()
+        info = validator.validate(key)  # should not raise
+        assert info.is_in_grace_period
+
+    def test_tampered_signature_raises(self):
+        """A tampered signature should raise LicenseSignatureError."""
+        key = _generate_test_license()
+        # Flip the last char of the signature
+        tampered = key[:-1] + ("A" if key[-1] != "A" else "B")
+        validator = LicenseValidator()
+        with pytest.raises(LicenseSignatureError):
+            validator.validate(tampered)
+
+    def test_invalid_format_raises(self):
+        """Malformed keys should raise LicenseFormatError."""
+        validator = LicenseValidator()
+        with pytest.raises(LicenseFormatError):
+            validator.validate("")
+        with pytest.raises(LicenseFormatError):
+            validator.validate("not-a-license")
+        with pytest.raises(LicenseFormatError):
+            validator.validate("MAOP-ENT-nosignature")
+        with pytest.raises(LicenseFormatError):
+            validator.validate("MAOP-ENT-!!!.!!!")
+
+    def test_wrong_signing_key_raises(self):
+        """A license signed by a different key should fail signature verification."""
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives import serialization
+
+        # Generate a rogue key pair
+        rogue_key = Ed25519PrivateKey.generate()
+        rogue_pem = rogue_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        rogue_path = Path(__file__).parent / "_rogue_key.pem"
+        rogue_path.write_bytes(rogue_pem)
+        try:
+            key = _generate_test_license(private_key_path=rogue_path)
+            validator = LicenseValidator()
+            with pytest.raises(LicenseSignatureError):
+                validator.validate(key)
+        finally:
+            rogue_path.unlink(missing_ok=True)
+
+    def test_payload_with_optional_fields(self):
+        """License with max_users and fingerprint should parse correctly."""
+        from cryptography.hazmat.primitives import serialization
+
+        key_data = _DEV_PRIVATE_KEY.read_bytes()
+        if key_data.startswith(b"DEVELOPMENT"):
+            key_data = b"\n".join(key_data.split(b"\n")[1:])
+        private_key = serialization.load_pem_private_key(key_data, password=None)
+
+        payload = {
+            "customer": "Enterprise Corp",
+            "edition": "enterprise",
+            "issued_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),
+            "max_users": 100,
+            "fingerprint": "abc123",
+            "features": ["rbac", "audit_log", "sso"],
+        }
+        payload_json = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        signature = private_key.sign(payload_json)
+        payload_b64 = base64.urlsafe_b64encode(payload_json).rstrip(b"=").decode()
+        sig_b64 = base64.urlsafe_b64encode(signature).rstrip(b"=").decode()
+        key = f"MAOP-ENT-{payload_b64}.{sig_b64}"
+
+        validator = LicenseValidator()
+        info = validator.validate(key)
+        assert info.max_users == 100
+        assert info.fingerprint == "abc123"
+        assert info.features == ["rbac", "audit_log", "sso"]
+
+
+class TestEditionLicenseIntegration:
+    """Test license integration with edition detection."""
+
+    def test_personal_edition_ignores_license(self, monkeypatch):
+        """Personal edition should not check license."""
+        from maop.config.edition import detect_edition, reset_edition
+        reset_edition()
+        monkeypatch.setenv("MAOP_EDITION", "personal")
+        monkeypatch.setenv("MAOP_LICENSE_KEY", "invalid-key")
+        assert detect_edition().value == "personal"
+
+    def test_enterprise_without_license_honor_system(self, monkeypatch):
+        """Enterprise package installed but no license = honor system mode."""
+        from maop.config.edition import detect_edition, reset_edition
+        reset_edition()
+        monkeypatch.setenv("MAOP_EDITION", "enterprise")
+        monkeypatch.delenv("MAOP_LICENSE_KEY", raising=False)
+        monkeypatch.setenv("MAOP_ROOT_DIR", "/nonexistent")
+        assert detect_edition().value == "enterprise"
+
+    def test_enterprise_with_valid_license(self, monkeypatch):
+        """Enterprise with valid license should be enterprise."""
+        from maop.config.edition import detect_edition, reset_edition
+        reset_edition()
+        key = _generate_test_license(customer="Edition Test Corp")
+        monkeypatch.setenv("MAOP_EDITION", "enterprise")
+        monkeypatch.setenv("MAOP_LICENSE_KEY", key)
+        assert detect_edition().value == "enterprise"
+
+    def test_enterprise_with_invalid_license_degrades(self, monkeypatch):
+        """Enterprise with invalid license should degrade to personal."""
+        from maop.config.edition import detect_edition, reset_edition
+        reset_edition()
+        monkeypatch.setenv("MAOP_EDITION", "enterprise")
+        monkeypatch.setenv("MAOP_LICENSE_KEY", "MAOP-ENT-invalid.invalid")
+        assert detect_edition().value == "personal"
