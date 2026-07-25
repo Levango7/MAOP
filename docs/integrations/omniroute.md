@@ -89,3 +89,58 @@ Path A and Path B are **complementary and non-conflicting**:
 - Path B uses `mcp_hub.py` (streamable_http transport) for tool calls
 - Both share W3C trace context via `inject_trace_context`
 - No file overlap between the two configurations
+
+## Default LLM Exit (Phase 2)
+
+As of 2026-07-25, OmniRoute is configured as the **default LLM exit** for MAOP.
+This means:
+
+1. **ModelSelector preference**: When `default_provider: omniroute` is set in
+   `models.yaml`, the selector prefers OmniRoute models as primary for any
+   capability they support.
+
+2. **Agent routing fallback**: Key routing keys (codegen, chat, refactor,
+   review, planning, quickfix, docgen, techdoc, verify) now include
+   `omniroute` as a fallback agent, so if the primary agent fails, the
+   request is retried via OmniRoute.
+
+3. **Last-resort default**: `default_model: omniroute-auto-coding` is used
+   when no model is specified and all other selection logic fails.
+
+### Configuration
+
+```yaml
+# config/models.yaml
+default_provider: omniroute
+default_model: omniroute-auto-coding
+```
+
+### Disabling the default
+
+To revert to legacy strategy-based selection:
+
+```yaml
+default_provider: ""
+default_model: ""
+```
+
+### Fallback topology
+
+```
+Request -> ModelSelector
+  +- Step 1: Exact model resolution (agent.model field)
+  +- Step 1.5: Default provider preference (NEW)
+  |   +- If default_provider set, prefer its models for the capability
+  +- Step 2: Strategy-based selection (legacy)
+  +- Step 3: Built-in fallback
+  +- Step 4: Quota-aware fallback
+```
+
+### Expanded capabilities
+
+To support the default-exit role, OmniRoute model capabilities were expanded:
+
+- `omniroute-auto-coding`: added `chat`, `quickfix`, `docgen`, `techdoc`, `verify`
+  (was: `codegen, refactor, explain, review, planning, search, tool_use`)
+- `omniroute-auto-reasoning`: added `chat`, `verify`
+  (was: `reasoning, planning, explain, review, search`)

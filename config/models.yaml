@@ -1,4 +1,4 @@
-﻿# MAOP Model Registry — Authoritative model & provider configuration
+# MAOP Model Registry — Authoritative model & provider configuration
 # This file is the single source of truth for all model definitions.
 # agents.yaml references models by name; this file defines what each model is.
 #
@@ -12,6 +12,15 @@
 #   low    — ~512 reasoning tokens, +10-20% latency. Simple tasks.
 #   medium — ~3072 reasoning tokens, +30-50% latency. Planning, review.
 #   high   — ~12288 reasoning tokens, +100-200% latency. Architecture, deep debug.
+
+# ── Default LLM exit (Phase 2) ────────────────────────────────
+# When set, ModelSelector prefers models from this provider as primary.
+# Other providers are used as fallback. Set to "" to disable.
+default_provider: omniroute
+
+# Default model of last resort: used when no model is specified and
+# all else fails. Set to "" to disable.
+default_model: omniroute-auto-coding
 
 # ── Providers ──────────────────────────────────────────────────
 providers:
@@ -414,7 +423,7 @@ models:
     max_output: 512000
     cost_per_1k_input: 0.0
     cost_per_1k_output: 0.0
-    capabilities: [codegen, refactor, explain, review, planning, search, tool_use]
+    capabilities: [codegen, refactor, explain, review, planning, search, tool_use, chat, quickfix, docgen, techdoc, verify]
     capability_matrix:
       text_chat: true
       multimodal_understanding: false
@@ -447,7 +456,7 @@ models:
     max_output: 512000
     cost_per_1k_input: 0.0
     cost_per_1k_output: 0.0
-    capabilities: [reasoning, planning, explain, review, search]
+    capabilities: [reasoning, planning, explain, review, search, chat, verify]
     capability_matrix:
       text_chat: true
       multimodal_understanding: false

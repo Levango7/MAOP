@@ -501,6 +501,8 @@ class LLMProviderFactory:
         self._providers: dict[str, BaseLLMProvider] = {}
         self._provider_configs: dict[str, ProviderConfig] = {}
         self._model_configs: dict[str, ModelConfig] = {}
+        self._default_provider: str = ""
+        self._default_model: str = ""
         self._loaded = False
 
     def _ensure_loaded(self) -> None:
@@ -557,6 +559,10 @@ class LLMProviderFactory:
                 fallback_model=mdata.get("fallback_model", ""),
             )
 
+        # Phase 2: OmniRoute default exit — top-level default_provider/default_model
+        self._default_provider = str(data.get("default_provider") or "")
+        self._default_model = str(data.get("default_model") or "")
+
     def get_provider(self, model_name: str) -> BaseLLMProvider | None:
         """Get a provider instance for the given model name."""
         self._ensure_loaded()
@@ -609,6 +615,15 @@ class LLMProviderFactory:
         logger.warning("[llm_provider] Unknown provider type: %s", ptype)
         return None
 
+    def _get_default_model(self) -> str:
+        """Return the configured default model name, if any.
+
+        Used as the fallback model of last resort when no model is
+        specified and all other selection logic fails.
+        """
+        self._ensure_loaded()
+        return self._default_model
+
     async def aclose(self) -> None:
         for provider in self._providers.values():
             await provider.aclose()
@@ -650,6 +665,13 @@ class LLMProviderFactory:
         -------
         FallbackResult
         """
+        # Phase 2: If no model specified, try the configured default
+        if not model_name:
+            default_model = self._get_default_model()
+            if default_model:
+                model_name = default_model
+                logger.debug("[llm-provider] No model specified, using default: %s", model_name)
+
         chain: list[str] = [model_name]
         original_model = model_name
         current = model_name

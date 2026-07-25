@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **OmniRoute 升级为默认 LLM 出口（Phase 2）** — 显式 `default_provider` 字段方案：
+  - `models.yaml` 新增顶层 `default_provider` 和 `default_model` 字段。
+  - `ModelSelector` 新增 Step 1.5：当 `default_provider` 设置时，优先选择该 provider 的模型作为 primary。
+  - OmniRoute 作为 fallback agent 加入 9 个 routing key（codegen, chat, refactor, review, planning, quickfix, docgen, techdoc, verify）。
+  - `ModelRegistry.get_default_model()` 和 `get_default_provider()` 方法。
+  - `LLMProviderFactory._get_default_model()` 辅助方法，`chat_with_fallback()` 在无 model 时使用默认 model。
+  - `ModelRegistryConfig` 新增 `default_provider` / `default_model` Pydantic 字段。
+- Enterprise license validation (Ed25519 signature + 7-day grace period)
+
+### Changed
+
+- Expanded `omniroute-auto-coding` capabilities: +chat, quickfix, docgen, techdoc, verify
+- Expanded `omniroute-auto-reasoning` capabilities: +chat, verify
+
 ## [4.3.0] — 2026-07-25
 
 ### Added

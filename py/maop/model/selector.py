@@ -164,6 +164,26 @@ class ModelSelector:
                 agent_model, model_ref=model_ref,
             )
 
+        # Step 1.5: Default provider preference (Phase 2 — OmniRoute default exit)
+        # When default_provider is set, prefer its models as primary for any
+        # capability they support, before falling back to legacy strategy-based
+        # selection. This makes the default provider the primary LLM exit.
+        if primary_model is None and capability and self._registry.get_default_provider():
+            default_provider = self._registry.get_default_provider()
+            candidates = [
+                m for m in self._registry.models_by_provider(default_provider)
+                if capability in m.capabilities
+                and self._registry.providers.is_healthy(m.provider)
+            ]
+            if candidates:
+                # Sort by strategy to pick the best one from the default provider
+                candidates.sort(key=lambda m: self._strategy_key(m, strategy))
+                primary_model = candidates[0]
+                logger.debug(
+                    "[selector] Selected %s from default provider %s for capability=%s",
+                    primary_model.name, default_provider, capability,
+                )
+
         # Step 2: If not found, select by capability
         if primary_model is None and capability:
             if self._load_balancer is not None:
