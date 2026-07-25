@@ -1,15 +1,16 @@
-# MAOP Production Docker Compose
-# Usage: docker compose -f docker-compose.prod.yml up -d
+# ─────────────────────────────────────────────────────────────────────
+# MAOP Production Compose Override
 #
-# Features:
-#   - Resource limits
-#   - Health checks
-#   - Restart policy
-#   - Volume persistence
-#   - Prometheus + Grafana monitoring
-#   - Nginx reverse proxy with TLS
-
-version: "3.9"
+# This file is NOT a standalone deployment. It overrides/extends
+# docker-compose.yml for production use. Deploy with:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Single source of truth: docker-compose.yml (base services + dev defaults)
+# Production overrides: this file (security hardening, persistence, profiles)
+#
+# See H-1 in audit report for rationale.
+# ─────────────────────────────────────────────────────────────────────
 
 services:
   # ── PostgreSQL (production) ────────────────────────────────────────────────────────────

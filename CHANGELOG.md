@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.3.0] — 2026-07-25
+
+### Added
+
+- **安全审计修复（7 Critical + 2 High）** — 全面消除 RCE、认证绕过与事件循环阻塞风险：
+  - Redis backend 序列化由 `pickle` 改为 JSON，消除反序列化 RCE 风险。
+  - 认证环境变量名统一：`MAOP_AUTH_ENABLED` → `MAOP_AUTH`。
+  - 路径大小写 bug 修复（`py/MAOP` → `py/maop`），恢复 Linux 兼容性。
+  - async 端点 `subprocess.run` → `asyncio.create_subprocess_exec`，避免阻塞事件循环。
+  - Swagger / OpenAPI 文档在生产环境禁用。
+  - `DEFAULT_AGENTS` 改为从 `config/agents.yaml` 动态加载。
+  - CI 覆盖率门槛由 40% 提升至 60%。
+- **PreemptableWorkerPool 完善** — 实现 `wait()` 方法、跟踪 watcher 任务、异常不再被静默吞掉。
+- **hot_reload 哈希算法升级** — MD5 → SHA-256，与项目完整性标准一致。
+- **`.env.example` 补充** — 8 类环境变量文档化。
+- **生产 compose 凭证策略** — 弱凭证默认值改为强制要求覆盖。
+
+### Fixed
+
+- `docker-compose.prod.yml` 中 5 处弱凭证（PostgreSQL / Vault / Redis / Grafana）。
+- MCP Marketplace SSRF 漏洞（URL scheme 白名单）。
+- MCP stdio 命令注入（命令白名单）。
+- MCP dashboard 权限绕过（`user_context` 传递）。
+- 认证默认配置（`MAOP_AUTH_DISABLED_ADMIN=0`）。
+- Prometheus 配置挂载与服务名解析。
+- dashboard / worker 结构化 JSON 日志支持。
+- HAManager dual mode（Redis + Memory）协同。
+
+---
+
+## [4.2.0] — 2026-07-25
+
+### Added
+
+- **Phase δ：MCP 生态扩展** — MCP Marketplace（注册表 / 搜索 / 安装 / 校验）、MCP 权限审计日志、结果缓存与并发控制、命令白名单与严格模式。
+- **Phase γ：智能调度系统** — SLA 感知优先级队列、多目标优化（Pareto 前沿 + TOPSIS）、软抢占 `PreemptableWorkerPool`、路由决策记录与查询。
+- **Phase β：自我演化闭环** — 执行历史分析器、Prompt A/B 测试框架、Agent 策略学习器、缓存策略进化器。
+- **Phase α：可观测性深化** — OpenTelemetry 集成、Grafana SLO 仪表盘、结构化 JSON 日志、SLO 告警规则。
+
+### Fixed
+
+- P0 timeseries bug 修复。
+- CircuitBreaker 测试隔离。
+- flaky 并发测试稳定化。
+- Dashboard MCP router 注入 δ 组件。
+
+---
+
+## [4.1.0] — 2026-07-25
+
+### Added
+
+- **Phase 3：PostgreSQL + Vault + HA 架构升级**
+  - PostgreSQL 生产化集成（95%）—— 连接池、混合存储、迁移管理。
+  - Vault 密钥管理集成（85%）—— 动态密钥、lease 续期、密钥轮换。
+  - 分布式 HA 高可用（90%）—— Redis 租约选举、fencing token、自动故障转移。
+  - Redis Backend（Cache / Queue / Lock）三合一。
+  - ADR-015：分布式 HA 设计文档；ADR-014：HA / backend 文档对齐实际实现。
+- **企业版模块测试（87 个新测试）** — 覆盖审计、RBAC、租户、HA、容器、TLS 自动配置、PG 持久化层。
+- **多因素路由评分算法** — dashboard 实时数据 + Copilot agent。
+- **Stage 2 工程化** — API 版本化、类型注解、缓存、Alembic 迁移。
+- **Stage 1 文档** — 用例、e2e 测试、契约测试、算法注释。
+- **采纳审计报告建议** — 迁移、工具版本化、错误 schema、备份 WAL。
+
+### Changed
+
+- `docker-compose` 使用根目录作为单一来源；`py/docker-compose.yml` 已删除。
+- 前端统一为 Vue3 SPA（`dist-enterprise`）。
+
+### Fixed
+
+- **CI 修复** — Docker build 在 `main` 和 `master` 分支均触发。
+- **R3 / R4 项目审计修复** — 合计 8 P0 + 18 P1 + 15 P2 阻塞与关键问题（含 `deploy.py` SQLite 连接泄漏、`auth_login` 返回类型一致性、`data/data/` 嵌套、ADR-006 标题等）。
+- **aiohttp session 泄漏 + codex driver `IndexError`**。
+- **change_tracker `rglob` 性能 bug + `bloom_filter` 导入 + 部署脚本**。
+- **依赖管理 + `ERR_ABORTED` 根因 + 8 处测试失败**。
+- **10 处遗留测试失败 + CI e2e 支持**。
+- **`DeprecationWarning` 静默 + `maop_loop` 测试提速**。
+
+---
+
 ## [4.0.0] — 2026-07-19
 
 ### New Features
