@@ -453,9 +453,9 @@ loops:
     enabled: true
 routing:
   codegen:
-    fallback: copilot
+    fallback: omniroute
     primary: mmx
-    tertiary: cursor
+    tertiary: copilot
     keywords:
     - 编写
     - 写代码
@@ -483,9 +483,9 @@ routing:
     - 模块
     - 项目
   chat:
-    fallback: copilot
+    fallback: omniroute
     primary: claude
-    tertiary: codebuddy
+    tertiary: copilot
     keywords:
     - 聊天
     - 对话
@@ -503,7 +503,7 @@ routing:
     - 在吗
     - 介绍一下
   docgen:
-    fallback: claude
+    fallback: omniroute
     primary: doc-pipeline
     tertiary: claude
     keywords:
@@ -563,9 +563,9 @@ routing:
     - ci/cd
     - 持续集成
   planning:
-    fallback: claude
+    fallback: omniroute
     primary: kimi
-    tertiary: hermes
+    tertiary: claude
     keywords:
     - 规划
     - 计划
@@ -579,9 +579,9 @@ routing:
     - strategy
     match: (?:plan|architect|design|blueprint|strategy)
   quickfix:
-    fallback: autoclaw
+    fallback: omniroute
     primary: cursor
-    tertiary: claude
+    tertiary: autoclaw
     keywords:
     - 修复
     - fix
@@ -595,9 +595,9 @@ routing:
     - 问题
     match: (?:fix|bug|error|hotfix|patch|quick\s*fix)
   refactor:
-    fallback: kimi
+    fallback: omniroute
     primary: claude
-    tertiary: cursor
+    tertiary: kimi
     keywords:
     - 重构
     - 重写
@@ -608,9 +608,9 @@ routing:
     - 优化结构
     match: (?:refactor|rewrite|restructure|clean\s+up)
   review:
-    fallback: copilot
+    fallback: omniroute
     primary: kimi
-    tertiary: claude
+    tertiary: copilot
     keywords:
     - 审查
     - 审核
@@ -634,7 +634,7 @@ routing:
     - look up
     - 资料
   techdoc:
-    fallback: claude
+    fallback: omniroute
     primary: doc-pipeline
     tertiary: claude
     keywords:
@@ -647,7 +647,7 @@ routing:
     - 架构文档
     - 白皮书
   verify:
-    fallback: kimi
+    fallback: omniroute
     primary: claude
     keywords:
     - 验证
@@ -659,7 +659,7 @@ routing:
     - assert
     - 断言
     match: (?:verify|test|assert|spec|unit\s+test|integration)
-    tertiary: copilot
+    tertiary: kimi
   vision:
     fallback: crush
     primary: claude

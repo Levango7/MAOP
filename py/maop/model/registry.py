@@ -1,4 +1,4 @@
-﻿"""Model & Provider Registry — Load from models.yaml, query by capability/provider/budget."""
+"""Model & Provider Registry — Load from models.yaml, query by capability/provider/budget."""
 
 from __future__ import annotations
 
@@ -174,6 +174,8 @@ class ModelRegistry:
         self._config = ModelRegistryConfig(
             providers=providers, models=models,
             policies=policies, budget=budget, quota=quota,
+            default_provider=str(data.get("default_provider") or ""),
+            default_model=str(data.get("default_model") or ""),
         )
         self._provider_registry = ProviderRegistry(providers)
         return self._config
@@ -240,6 +242,16 @@ class ModelRegistry:
     def models_by_provider(self, provider: str) -> list[ModelDef]:
         return [m for m in self._config.models.values()
                 if m.enabled and m.provider == provider]
+
+    def get_default_model(self) -> ModelDef | None:
+        """Return the configured default model, if any."""
+        if not self._config.default_model:
+            return None
+        return self._config.models.get(self._config.default_model)
+
+    def get_default_provider(self) -> str:
+        """Return the configured default provider name, if any."""
+        return self._config.default_provider
 
     def best_model(
         self,

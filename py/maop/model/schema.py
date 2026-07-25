@@ -201,6 +201,12 @@ class ModelRegistryConfig(BaseModel):
     policies: dict[str, ModelPolicy] = Field(default_factory=dict)
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     quota: dict[str, QuotaConfig] = Field(default_factory=dict)
+    default_provider: str = ""
+    """When set, ModelSelector prefers models from this provider as primary.
+    Empty string = no preference (use legacy strategy-based selection)."""
+    default_model: str = ""
+    """When set, used as the fallback model of last resort if all else fails.
+    Empty string = no default model."""
 
 
 # ── Effective model (runtime) ─────────────────────────────────
