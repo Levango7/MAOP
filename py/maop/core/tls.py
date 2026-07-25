@@ -131,7 +131,11 @@ def generate_self_signed(
         pass
 
     # Fallback: write a note that openssl is not available
-    logger.warning("openssl not available; creating placeholder cert files")
-    cert_path.write_text("# Self-signed cert placeholder - install openssl for real certs\n", encoding="utf-8")
-    key_path.write_text("# Private key placeholder - install openssl for real keys\n", encoding="utf-8")
-    return cert_path, key_path
+    # M1 fix (Phase R5): 不再创建占位符文件，直接抛错。
+    # 占位符不是有效证书，会导致 TLS 启动失败但错误信息不明确。
+    # 要求用户安装 OpenSSL 或提供真实证书。
+    raise RuntimeError(
+        "openssl not available; cannot generate self-signed certificate. "
+        "Please install OpenSSL or provide real certificate files via "
+        "MAOP_TLS_CERT / MAOP_TLS_KEY environment variables."
+    )

@@ -105,6 +105,15 @@ class LicenseExpiredError(LicenseError):
         )
 
 
+# L21/L22 (Phase R6): License 在线撤销（CRL）机制未实现。
+# 当前 license 验证仅检查签名 + 过期时间 + 宽限期。
+# 未来实现 CRL 需要：
+#   1. 在线撤销列表服务（或离线 CRL 文件分发）
+#   2. 客户端定期检查撤销状态
+#   3. 离线降级策略（无法连接 CRL 服务时）
+# 缓解措施：license 过期后自动降级为 Personal 版本，7 天宽限期后强制限制。
+
+
 class LicenseValidator:
     """Validates MAOP Enterprise license keys.
 

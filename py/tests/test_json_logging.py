@@ -286,3 +286,66 @@ class TestSettingsJsonLogField:
         with mock.patch.dict(os.environ, {"MAOP_JSON_LOG": "1"}, clear=False):
             settings = MAOPSettings()
             assert settings.json_log is True
+
+
+class TestSensitiveDataRedaction:
+    """H3 回归测试：JsonLogFormatter 必须对敏感数据脱敏。
+
+    覆盖 OpenAI key / AWS key / api_key / password / secret / token / bearer
+    等常见密钥格式，确保日志中不泄露敏感信息。
+    """
+
+    def _format_msg(self, msg: str) -> str:
+        rec = _make_record(msg=msg)
+        return JsonLogFormatter().format(rec)
+
+    def test_openai_key_redacted(self):
+        out = self._format_msg("calling LLM with sk-abcdefghijklmnopqrstuvwxyz")
+        assert "sk-abcdef" not in out
+        assert "[REDACTED:openai_key]" in out
+
+    def test_aws_key_redacted(self):
+        out = self._format_msg("aws credentials: AKIAIOSFODNN7EXAMPLE")
+        assert "AKIAIOSFODNN7EXAMPLE" not in out
+        assert "[REDACTED:aws_key]" in out
+
+    def test_password_redacted(self):
+        out = self._format_msg("login with password=mySecretPass123")
+        assert "mySecretPass123" not in out
+        assert "[REDACTED:password]" in out
+
+    def test_api_key_redacted(self):
+        out = self._format_msg('config: api_key="ak_live_1234567890abcdef"')
+        assert "ak_live_1234567890abcdef" not in out
+        assert "[REDACTED:api_key]" in out
+
+    def test_bearer_token_redacted(self):
+        out = self._format_msg("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.test.signature")
+        assert "eyJhbGciOiJIUzI1NiJ9" not in out
+        assert "[REDACTED:bearer_token]" in out
+
+    def test_non_sensitive_msg_unchanged(self):
+        msg = "task=fix bug in main.py line 42"
+        out = self._format_msg(msg)
+        assert "task=fix bug in main.py line 42" in out
+
+    def test_empty_msg_not_redacted(self):
+        out = self._format_msg("")
+        assert '"msg": ""' in out
+
+    def test_extras_string_values_redacted(self):
+        rec = _make_record(msg="normal")
+        # 使用纯 api_key 格式（非 sk- 前缀），避免被 openai_key 模式先匹配
+        rec.user_input = 'api_key="ak_live_1234567890abcdef"'
+        out = JsonLogFormatter().format(rec)
+        assert "ak_live_1234567890abcdef" not in out
+        assert "[REDACTED:api_key]" in out
+
+    def test_extras_non_string_values_preserved(self):
+        rec = _make_record(msg="normal")
+        rec.count = 42
+        rec.enabled = True
+        out = JsonLogFormatter().format(rec)
+        payload = json.loads(out)
+        assert payload["count"] == 42
+        assert payload["enabled"] is True
