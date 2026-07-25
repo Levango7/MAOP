@@ -46,8 +46,26 @@ from pydantic import BaseModel, Field
 
 from maop.core.cache import LRUCache
 from maop.core.db_utils import sqlite_connect
+# 共享 DB 路径与术语映射（统一 ThreeLayerMemory 与 MemoryManager 的 DB 文件）
+from maop.memory.shared_db import (
+    LAYER_ALIASES,
+    denormalize_layer_name,
+    get_memory_db_path,
+    migrate_legacy_episodic_db,
+    normalize_layer_name,
+)
 
 logger = logging.getLogger(__name__)
+
+
+# ── 术语映射：ThreeLayerMemory 命名 ↔ MemoryManager 命名 ──────
+# 统一映射到 MemoryManager 的标准命名（working/short_term/long_term）
+# episodic 等价于 short_term，semantic 等价于 long_term
+LAYER_NAME_MAP: dict[str, str] = {
+    "working": "working",
+    "episodic": "short_term",   # episodic 等价于 short_term
+    "semantic": "long_term",    # semantic 等价于 long_term
+}
 
 
 # ── Models ────────────────────────────────────────────────────
@@ -318,8 +336,21 @@ class ThreeLayerMemory:
         )
 
         # Layer 2: Episodic Memory (SQLite)
-        self._episodic_path = self._data_dir / "episodic.db"
+        # 改用共享 DB 路径（与 MemoryManager / MemoryStore 共用 maop.db），
+        # 消除双 DB 不通信问题。episodic_memory 表与 memory_entries 表
+        # schema 不同但表名不冲突，可安全共存于同一 SQLite 文件。
+        self._episodic_path = get_memory_db_path()
         self._init_episodic_db()
+        # 迁移旧的 <root>/data/episodic.db 数据到统一 DB（幂等）
+        try:
+            migrated = migrate_legacy_episodic_db(self._root)
+            if migrated > 0:
+                logger.info(
+                    "[three_layer_memory] Migrated %d episodic entries from legacy DB",
+                    migrated,
+                )
+        except Exception as exc:
+            logger.warning("[three_layer_memory] Legacy DB migration failed: %s", exc)
 
         # Layer 3: Semantic Memory (lazy — delegates to VectorStore)
         self._vector_store: Any = None
@@ -564,6 +595,102 @@ class ThreeLayerMemory:
 
         d = dict(zip(cols, row))
         return self._row_to_episodic(d)
+
+    # ── 统一 API（与 MemoryManager 术语对齐） ─────────────
+    # 接受 working/short_term/long_term 或 working/episodic/semantic
+    # 让 chat_engine (MemoryManager) 与 evolution_loop (ThreeLayerMemory)
+    # 能够互相读取对方写入的数据。
+
+    def store(self, layer: str, content: str, **kwargs: Any) -> str:
+        """统一 layer 存储入口。
+
+        将 ``layer`` 标准化后路由到对应层：
+          - working    -> working_put (LRU 内存)
+          - short_term -> episodic_store (等价于 episodic)
+          - long_term  -> semantic_index (等价于 semantic)
+
+        接受两套命名：``short_term``/``episodic``、``long_term``/``semantic``。
+        返回写入条目的 ID。
+        """
+        normalized = normalize_layer_name(layer)
+        if normalized == "working":
+            key = kwargs.get("key", "") or f"mem-{int(time.time() * 1000)}"
+            self.working_put(key, content, ttl_s=kwargs.get("ttl_s"))
+            return key
+        if normalized == "short_term":
+            # episodic_store 不接受 content 参数，把 content 拼到 summary
+            return self.episodic_store(
+                task=kwargs.get("task", content[:80]),
+                agent=kwargs.get("agent", ""),
+                outcome=kwargs.get("outcome", ""),
+                score=kwargs.get("score", 0.0),
+                lessons=kwargs.get("lessons"),
+                user_feedback=kwargs.get("user_feedback", ""),
+                summary=content,
+                key_decisions=kwargs.get("key_decisions"),
+                files_touched=kwargs.get("files_touched"),
+                metadata=kwargs.get("metadata"),
+            )
+        if normalized == "long_term":
+            doc_id = kwargs.get("doc_id", f"doc-{int(time.time() * 1000)}")
+            return self.semantic_index(doc_id, content, metadata=kwargs.get("metadata"))
+        raise ValueError(f"Unknown layer: {layer!r}")
+
+    def retrieve(self, layer: str, query: str = "", top: int = 10, **kwargs: Any) -> list[Any]:
+        """统一 layer 检索入口。
+
+        将 ``layer`` 标准化后路由到对应层：
+          - working    -> working_get (单条返回，包装为 list)
+          - short_term -> episodic_search (等价于 episodic)
+          - long_term  -> semantic_search (等价于 semantic)
+
+        接受两套命名：``short_term``/``episodic``、``long_term``/``semantic``。
+        """
+        normalized = normalize_layer_name(layer)
+        if normalized == "working":
+            val = self.working_get(query) if query else None
+            return [val] if val is not None else []
+        if normalized == "short_term":
+            return self.episodic_search(
+                query=query, top=top,
+                agent=kwargs.get("agent", ""),
+                outcome=kwargs.get("outcome", ""),
+                min_score=kwargs.get("min_score", 0.0),
+                apply_decay=kwargs.get("apply_decay", True),
+            )
+        if normalized == "long_term":
+            return self.semantic_search(query, top=top)
+        raise ValueError(f"Unknown layer: {layer!r}")
+
+    # ── MemoryManager 兼容查询 ────────────────────────────
+
+    def query_memory_entries(self, query: str = "", top: int = 10) -> list[dict[str, Any]]:
+        """查询 MemoryManager 写入的 memory_entries 表（跨实现通信）。
+
+        ``MemoryManager`` 通过 ``MemoryStore`` 将对话交换写入同一 DB 的
+        ``memory_entries`` 表。本方法让 ``ThreeLayerMemory`` 能够读取这些
+        条目，从而让 evolution_loop / agent_performance 看到 chat 中存入的记忆。
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            每行包含 id/agent/task/content/tags/topic/timestamp 等字段。
+        """
+        sql = "SELECT * FROM memory_entries"
+        params: list[Any] = []
+        if query:
+            sql += " WHERE task LIKE ? OR content LIKE ?"
+            params.extend([f"%{query}%", f"%{query}%"])
+        sql += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(top)
+        try:
+            with self._episodic_connect() as conn:
+                cursor = conn.execute(sql, params)
+                cols = [d[0] for d in cursor.description] if cursor.description else []
+                return [dict(zip(cols, row)) for row in cursor.fetchall()]
+        except Exception as exc:
+            logger.warning("[three_layer_memory] query_memory_entries failed: %s", exc)
+            return []
 
     def _increment_access_counts(self, entry_ids: list[str]) -> None:
         """Increment access_count for the given entry IDs (P3: access-count consolidation)."""

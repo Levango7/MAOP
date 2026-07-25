@@ -173,10 +173,34 @@ class HybridSearch:
         return results
 
     def _vector_search(self, query: str, top: int = 30) -> list[tuple[str, float]]:
-        """Search using VectorStore (semantic)."""
+        """使用 VectorStore 做语义检索。
+
+        优先使用 sentence-transformers 的真实语义 embedding；若未安装则降级到
+        HashEmbedding（伪语义），并在日志中给出 warning 提示。
+        """
         try:
-            from maop.core.vector import VectorStore
-            vs = VectorStore(db_path=str(self._data_dir / "vectors.db"))
+            from maop.core.vector import (
+                EmbeddingProvider,
+                HashEmbedding,
+                SentenceTransformerEmbedding,
+                VectorStore,
+            )
+
+            # 选择 embedding provider：优先 SentenceTransformer，失败时降级 Hash
+            embedding: EmbeddingProvider
+            try:
+                embedding = SentenceTransformerEmbedding()
+            except ImportError:
+                embedding = HashEmbedding()
+                logger.warning(
+                    "Using HashEmbedding (not semantically meaningful). "
+                    "Install sentence-transformers for real semantic search."
+                )
+
+            vs = VectorStore(
+                db_path=str(self._data_dir / "vectors.db"),
+                embedding=embedding,
+            )
             results = vs.search(query, top=top)
             return [(r.id, r.score) for r in results]
         except Exception as exc:

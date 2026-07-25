@@ -11,6 +11,21 @@ Architecture:
   - ``detect_edition()``: auto-detect from env / installed packages
   - ``has_feature()`` / ``require_feature()``: runtime gate
   - ``edition_info()``: structured metadata for /api/info/edition
+
+PLANNED features (declared but NOT implemented):
+  - ``FeatureFlag.RABBITMQ``: RabbitMQ queue backend
+    (``maop/core/backends_rabbitmq.py`` does not exist; runtime falls
+    back to Redis via ImportError degradation in ``core/backends.py``).
+  - ``FeatureFlag.ETCD``: etcd/Consul distributed KV backend
+    (``maop/core/backends_distributed.py`` does not exist; runtime
+    falls back to SQLite via ImportError degradation).
+
+  These two flags are intentionally **excluded** from
+  ``_ENTERPRISE_FEATURES`` to keep ``/api/info/edition`` honest about
+  what is actually shipped.  The enum values are retained for backward
+  compatibility (so existing string comparisons / config files do not
+  break).  Do NOT re-add them to ``_ENTERPRISE_FEATURES`` until the
+  corresponding backend modules are fully implemented.
 """
 
 from __future__ import annotations
@@ -37,9 +52,9 @@ class FeatureFlag(str, Enum):
     VUE_DASHBOARD = "vue_dashboard"
     POSTGRESQL = "postgresql"
     REDIS = "redis"
-    RABBITMQ = "rabbitmq"
+    RABBITMQ = "rabbitmq"  # PLANNED — backend not yet implemented, do not enable
     VAULT = "vault"
-    ETCD = "etcd"
+    ETCD = "etcd"  # PLANNED — backend not yet implemented, do not enable
     TENANT_ISOLATION = "tenant_isolation"
     COST_TRACKING = "cost_tracking"
     CIRCUIT_BREAKER = "circuit_breaker"
@@ -69,6 +84,9 @@ _PERSONAL_FEATURES: frozenset[FeatureFlag] = frozenset({
     FeatureFlag.BUDGET_GUARD,
 })
 
+# 注意：RABBITMQ 和 ETCD 已从此集合中移除，因为对应 backend 模块
+# (backends_rabbitmq.py / backends_distributed.py) 尚未实现。
+# 详见模块 docstring 中的 PLANNED features 说明。
 _ENTERPRISE_FEATURES: frozenset[FeatureFlag] = frozenset({
     FeatureFlag.RBAC,
     FeatureFlag.AUDIT_LOG,
@@ -78,9 +96,7 @@ _ENTERPRISE_FEATURES: frozenset[FeatureFlag] = frozenset({
     FeatureFlag.VUE_DASHBOARD,
     FeatureFlag.POSTGRESQL,
     FeatureFlag.REDIS,
-    FeatureFlag.RABBITMQ,
     FeatureFlag.VAULT,
-    FeatureFlag.ETCD,
     FeatureFlag.TENANT_ISOLATION,
     FeatureFlag.TLS_AUTO,
     FeatureFlag.AUTH_AUTO,
@@ -92,6 +108,9 @@ _FEATURE_MAP: dict[Edition, frozenset[FeatureFlag]] = {
     Edition.ENTERPRISE: _PERSONAL_FEATURES | _ENTERPRISE_FEATURES,
 }
 
+# Enterprise 默认 backend 与实际实现保持一致：
+# - queue: "redis"（非 rabbitmq，因 backends_rabbitmq.py 未实现）
+# - kv: "sqlite"（非 etcd，因 backends_distributed.py 未实现）
 _BACKEND_DEFAULTS: dict[Edition, dict[str, str]] = {
     Edition.PERSONAL: {
         "storage": "sqlite",
@@ -103,8 +122,8 @@ _BACKEND_DEFAULTS: dict[Edition, dict[str, str]] = {
     Edition.ENTERPRISE: {
         "storage": "postgresql",
         "cache": "redis",
-        "queue": "rabbitmq",
-        "kv": "etcd",
+        "queue": "redis",
+        "kv": "sqlite",
         "secret": "vault",
     },
 }

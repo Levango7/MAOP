@@ -28,11 +28,31 @@ class FallbackManager:
         self._failure_counts: dict[str, int] = {}  # model_name -> consecutive failures
 
     def get_chain(self, effective: EffectiveModel) -> list[str]:
-        """Get the full fallback chain including primary."""
+        """获取完整 fallback 链（含主模型），过滤失败次数过多的模型。
+
+        环路检测：去重保留首次出现，防止 A→B→C→A 配置导致外层遍历死循环。
+        自引用检测：若主模型出现在其自身 fallback_chain 中，记录告警并过滤。
+        """
         chain = [effective.model_name]
         chain.extend(effective.fallback_chain)
-        # Filter out models with too many consecutive failures
-        return [m for m in chain if self._failure_counts.get(m, 0) < 5]
+        # 过滤连续失败次数过多的模型（阈值 5）
+        chain = [m for m in chain if self._failure_counts.get(m, 0) < 5]
+
+        # 自引用检测：主模型不应出现在其 fallback_chain 中
+        if effective.model_name in effective.fallback_chain:
+            logger.warning(
+                "Model %s appears in its own fallback chain, filtering out duplicates",
+                effective.model_name,
+            )
+
+        # 环路检测：去重，保留首次出现
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for m in chain:
+            if m not in seen:
+                seen.add(m)
+                deduped.append(m)
+        return deduped
 
     def record_success(self, model_name: str) -> None:
         self._failure_counts.pop(model_name, None)

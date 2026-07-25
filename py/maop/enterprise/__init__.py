@@ -18,10 +18,15 @@ Submodules:
 
 Backend modules:
   - core/backends_pg.py      PostgreSQL storage (implemented)
-  - core/backends_redis.py   Redis cache/queue (planned, Phase 3.4)
-  - core/backends_rabbitmq.py RabbitMQ queue (planned, Phase 3.4)
-  - core/backends_vault.py   HashiCorp Vault secrets (planned, Phase 3.3)
-  - core/backends_distributed.py etcd/Consul KV (planned, Phase 3.4)
+  - core/backends_redis.py   Redis cache/queue/lock (implemented, Phase 3.4)
+  - core/backends_vault.py   HashiCorp Vault secrets (implemented, Phase 3.3)
+  - core/backends_rabbitmq.py RabbitMQ queue (PLANNED — not yet implemented)
+  - core/backends_distributed.py etcd/Consul KV (PLANNED — not yet implemented)
+
+Note: ``FeatureFlag.RABBITMQ`` and ``FeatureFlag.ETCD`` are intentionally
+excluded from ``_ENTERPRISE_FEATURES`` in ``config/edition.py`` because
+their backend modules are not yet implemented.  See the docstring of
+``config/edition.py`` for the PLANNED features policy.
 """
 
 from __future__ import annotations

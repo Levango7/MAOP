@@ -39,7 +39,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.core.db_utils import sqlite_connect
+from maop.core.subagent_db import get_subagent_db_path, migrate_legacy_subagent_db
 
 logger = logging.getLogger(__name__)
 
@@ -91,48 +92,16 @@ class TranscriptEntry(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
 
 
-_SUBAGENT_DDL = """
-CREATE TABLE IF NOT EXISTS subagents (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    role TEXT DEFAULT 'leaf',
-    model TEXT DEFAULT '',
-    task TEXT DEFAULT '',
-    context TEXT DEFAULT '{}',
-    status TEXT DEFAULT 'pending',
-    output TEXT DEFAULT '',
-    tool_calls TEXT DEFAULT '[]',
-    tokens_used INTEGER DEFAULT 0,
-    duration_ms INTEGER DEFAULT 0,
-    error TEXT DEFAULT '',
-    config TEXT DEFAULT '{}',
-    created_at REAL NOT NULL,
-    started_at REAL DEFAULT 0,
-    finished_at REAL DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS idx_sa_status ON subagents(status);
-CREATE INDEX IF NOT EXISTS idx_sa_name ON subagents(name);
-
-CREATE TABLE IF NOT EXISTS subagent_transcripts (
-    id TEXT PRIMARY KEY,
-    agent_id TEXT NOT NULL,
-    timestamp REAL NOT NULL,
-    event TEXT DEFAULT '',
-    data TEXT DEFAULT '{}'
-);
-
-CREATE INDEX IF NOT EXISTS idx_st_agent ON subagent_transcripts(agent_id);
-"""
-
-
 # ── Parallel Implementation Note ──────────────────────────────
 # NOTE: SubAgentManager is one of two parallel subagent implementations.
 # The other is SubagentManager in maop/core/subagent_delegation.py.
 # Both have production callers:
 #   - SubAgentManager (this class): used by dashboard/routers/subagent.py
 #   - SubagentManager: used by delegate/dispatcher.py (main dispatch path)
-# Future work: consider merging into a single canonical implementation.
+# Both share the same ``subagents`` table via maop.core.subagent_db (unified
+# schema = field superset of the two implementations) to avoid the previous
+# dual-DB / dual-schema conflict. Future work: consider merging into a
+# single canonical implementation.
 
 class SubAgentManager:
     """Manage sub-agent lifecycle: spawn, wait, cancel, transcript.
@@ -147,13 +116,18 @@ class SubAgentManager:
         self._root = Path(root_dir)
         self._data_dir = self._root / "data"
         self._data_dir.mkdir(parents=True, exist_ok=True)
-        self._db_path = get_db_path("subagent_manager")
+        self._db_path = get_subagent_db_path()
         self._init_db()
         self._running: dict[str, asyncio.Task[Any]] = {}
 
     def _init_db(self) -> None:
-        with self._connect() as conn:
-            conn.executescript(_SUBAGENT_DDL)
+        """初始化 subagent DB（共享 schema，自动迁移旧表）。
+
+        使用 maop.core.subagent_db 的统一 schema（两套实现的字段超集），
+        并自动迁移旧 DB 文件中可能存在的缺列场景。
+        """
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        migrate_legacy_subagent_db()
 
     def _connect(self):
         return sqlite_connect(self._db_path, foreign_keys=False)
@@ -175,7 +149,7 @@ class SubAgentManager:
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (agent_id, config.name, config.role.value, config.model,
                  task, json.dumps(context or {}), AgentStatus.RUNNING.value,
-                 json.dumps(config.model_dump()), now, now),
+                 json.dumps(config.model_dump()), str(now), now),
             )
 
         self._append_transcript(agent_id, "spawned", {

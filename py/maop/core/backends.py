@@ -429,8 +429,13 @@ def get_queue_backend(db_path: str = "") -> QueueBackend:
 
     Selection priority:
       1. MAOP_QUEUE_BACKEND env var (explicit override)
-      2. MAOP_EDITION=enterprise → RabbitMQ (fallback Redis)
+      2. MAOP_EDITION=enterprise → Redis (RabbitMQ is PLANNED, not yet implemented)
       3. Default → SQLite
+
+    Note: ``FeatureFlag.RABBITMQ`` was removed from ``_ENTERPRISE_FEATURES``
+    because ``backends_rabbitmq.py`` is not implemented.  If a user explicitly
+    sets ``MAOP_QUEUE_BACKEND=rabbitmq``, the import will fail and degrade
+    to Redis, then SQLite.  This branch is retained for forward compatibility.
     """
     global _queue
     if _queue is not None:
@@ -438,6 +443,9 @@ def get_queue_backend(db_path: str = "") -> QueueBackend:
     defaults = _edition_defaults()
     backend_type = os.getenv("MAOP_QUEUE_BACKEND", defaults["queue"]).lower()
     if backend_type == "rabbitmq":
+        # FeatureFlag.RABBITMQ 已从 _ENTERPRISE_FEATURES 移除（backend 未实现）。
+        # 此分支仅在用户显式设置 MAOP_QUEUE_BACKEND=rabbitmq 时触发，
+        # 会因 ImportError 降级到 Redis，再降级到 SQLite。
         try:
             from maop.core.backends_rabbitmq import RabbitMQQueueBackend
             _queue = RabbitMQQueueBackend()
@@ -473,8 +481,14 @@ def get_kv_backend(db_path: str = "") -> KVBackend:
 
     Selection priority:
       1. MAOP_KV_BACKEND env var (explicit override)
-      2. MAOP_EDITION=enterprise → etcd
+      2. MAOP_EDITION=enterprise → SQLite (etcd is PLANNED, not yet implemented)
       3. Default → SQLite
+
+    Note: ``FeatureFlag.ETCD`` was removed from ``_ENTERPRISE_FEATURES``
+    because ``backends_distributed.py`` is not implemented.  If a user
+    explicitly sets ``MAOP_KV_BACKEND=etcd``/``consul``, the import will
+    fail and degrade to SQLite.  This branch is retained for forward
+    compatibility.
     """
     global _kv
     if _kv is not None:
@@ -482,6 +496,9 @@ def get_kv_backend(db_path: str = "") -> KVBackend:
     defaults = _edition_defaults()
     backend_type = os.getenv("MAOP_KV_BACKEND", defaults["kv"]).lower()
     if backend_type in ("etcd", "consul"):
+        # FeatureFlag.ETCD 已从 _ENTERPRISE_FEATURES 移除（backend 未实现）。
+        # 此分支仅在用户显式设置 MAOP_KV_BACKEND=etcd/consul 时触发，
+        # 会因 ImportError 降级到 SQLite。
         try:
             from maop.core.backends_distributed import EtcdKVBackend
             _kv = EtcdKVBackend()

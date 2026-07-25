@@ -11,10 +11,21 @@ Production overrides via environment variables.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings
+
+
+def _default_auth_enabled() -> bool:
+    """生产环境默认启用认证（与 server.py 历史行为保持一致）。
+
+    当 MAOP_ENV=production 且未显式设置 MAOP_AUTH / MAOP_AUTH_ENABLED 时，
+    默认启用认证以保护写接口。非生产环境默认禁用便于本地开发。
+    显式设置 MAOP_AUTH=0 仍可禁用（会触发 server.py 中的安全告警）。
+    """
+    return os.environ.get("MAOP_ENV", "").strip().lower() == "production"
 
 
 class MAOPSettings(BaseSettings):
@@ -42,7 +53,14 @@ class MAOPSettings(BaseSettings):
     tls_min_version: str = Field(default="TLSv1_2", description="Minimum TLS version")
 
     # ── Auth ──────────────────────────────────────────────────────
-    auth_enabled: bool = Field(default=False, description="Enable API auth middleware")
+    # 支持 MAOP_AUTH_ENABLED（规范名）和 MAOP_AUTH（向后兼容，.env.example 使用）
+    # 两个环境变量；AliasChoices 按声明顺序匹配，先 MAOP_AUTH_ENABLED 再 MAOP_AUTH。
+    # default_factory 保留生产环境默认启用的历史行为（见 _default_auth_enabled）。
+    auth_enabled: bool = Field(
+        default_factory=_default_auth_enabled,
+        description="Enable API auth middleware (env: MAOP_AUTH_ENABLED or MAOP_AUTH)",
+        validation_alias=AliasChoices("MAOP_AUTH_ENABLED", "MAOP_AUTH"),
+    )
     auth_db_path: str = Field(default="", description="Auth database path (default: data/auth.db)")
 
     # ── Rate Limit ────────────────────────────────────────────────

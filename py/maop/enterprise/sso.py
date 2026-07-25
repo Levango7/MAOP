@@ -1,8 +1,11 @@
 """MAOP Enterprise SSO — SAML/OIDC Single Sign-On Integration.
 
+SAML provider is currently disabled. OIDC is fully supported.
+
 Provides enterprise identity provider integration:
-  - SAML 2.0 (via python3-saml / pysaml2)
-  - OpenID Connect (via authlib)
+  - OpenID Connect (via authlib) — 完整支持，含 token exchange 与 userinfo
+  - SAML 2.0 — **当前未实现**，显式拒绝以避免 stub session 安全风险。
+    如需 SAML 支持，请安装 pysaml2 并实现 IdP metadata 解析与 XML 签名验证。
   - Automatic user provisioning from IdP claims
   - Session management and token refresh
 """
@@ -24,6 +27,14 @@ from pydantic import BaseModel, Field
 from maop.config.edition import require_feature, FeatureFlag
 
 logger = logging.getLogger(__name__)
+
+
+class SSOError(RuntimeError):
+    """SSO 相关错误（如未实现的 provider、配置缺失等）。
+
+    继承 RuntimeError 以保持与现有 handle_callback 中 RuntimeError
+    抛出风格的兼容性，同时提供更精确的类型供上层 catch。
+    """
 
 
 class SSOProvider(str, Enum):
@@ -79,6 +90,11 @@ class SSOManager:
         return self._config
 
     def get_authorize_url(self, state: str = "") -> str:
+        # SAML 当前未实现，在重定向前就显式拒绝，避免用户跳转后才失败。
+        if self._config.provider == SSOProvider.SAML:
+            raise SSOError(
+                "SAML SSO is not yet implemented. Please configure OIDC instead."
+            )
         if self._config.provider == SSOProvider.OIDC:
             params = {
                 "client_id": self._config.client_id,
@@ -101,9 +117,9 @@ class SSOManager:
         ``userinfo_url`` with Bearer auth, then build a real ``SSOSession``
         with the returned tokens and expiry.
 
-        For SAML: returns a placeholder session and logs a warning — full
-        SAML requires XML signature verification and IdP metadata handling
-        which is out of scope for this task.
+        For SAML: raises ``SSOError`` — SAML is not yet implemented.
+        Full SAML requires XML signature verification and IdP metadata
+        handling (python3-saml / pysaml2),工作量较大故当前显式禁用。
 
         Args:
             code: Authorization code received at the redirect_uri.
@@ -117,16 +133,13 @@ class SSOManager:
                 ``token_url``.
             RuntimeError: Token endpoint returned an error response, a
                 non-JSON body, or was unreachable.
+            SSOError: Provider is SAML (not yet implemented).
         """
         if not code:
             raise ValueError("handle_callback: 'code' must not be empty")
 
         if self._config.provider == SSOProvider.SAML:
-            logger.warning(
-                "[sso] SAML handle_callback not yet implemented; "
-                "returning stub session (no token exchange)"
-            )
-            return self._stub_session(code)
+            return self._handle_saml_callback(code)
 
         # OIDC: real OAuth authorization_code exchange.
         if not self._config.token_url:
@@ -315,30 +328,23 @@ class SSOManager:
                 return [v.strip()]
         return []
 
-    def _stub_session(self, code: str) -> SSOSession:
-        """Build a placeholder session without performing token exchange.
+    def _handle_saml_callback(self, code: str) -> SSOSession:
+        """处理 SAML 回调。
 
-        Used for SAML (full implementation pending) and any future
-        provider that lacks a real ``handle_callback`` path.
+        注意：SAML 完整实现需要 python3-saml 或 pysaml2 库。
+        当前版本未集成，显式拒绝以避免 stub session 安全风险
+        （原实现返回无 token 的占位 session，可被绕过认证）。
+        如需 SAML 支持，请安装 pysaml2 并实现 IdP metadata 解析与
+        XML 签名验证。
+
+        Raises:
+            SSOError: 始终抛出，SAML 当前未实现。
         """
-        now = time.time()
-        user = SSOUser(
-            external_id=f"sso_{self._config.provider.value}_{abs(hash(code)) % 100000}",
-            email="",
-            display_name="SSO User",
-            provider=self._config.provider,
-            roles=[self._config.default_role],
-            last_login=now,
+        raise SSOError(
+            "SAML SSO is not yet implemented. "
+            "Use OIDC provider instead, or install pysaml2 and implement "
+            "SAML response parsing with XML signature verification."
         )
-        session_id = f"sess_{abs(hash(code)) % 1000000}_{int(now)}"
-        session = SSOSession(
-            session_id=session_id,
-            user=user,
-            expires_at=now + 3600,
-            created_at=now,
-        )
-        self._sessions[session_id] = session
-        return session
 
     def validate_session(self, session_id: str) -> SSOSession | None:
         session = self._sessions.get(session_id)

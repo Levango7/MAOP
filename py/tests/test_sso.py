@@ -16,6 +16,7 @@ import pytest
 from maop.config.edition import Edition, set_edition, reset_edition
 from maop.enterprise.sso import (
     SSOConfig,
+    SSOError,
     SSOManager,
     SSOProvider,
     SSOSession,
@@ -273,26 +274,16 @@ class TestHandleCallbackOIDC:
         assert abs((session.expires_at - session.created_at) - 3600) < 5
 
 
-# ── handle_callback SAML stub ────────────────────────────────────────
+# ── handle_callback SAML — 显式拒绝（不再返回 stub session） ─────────
 
 
 class TestHandleCallbackSAML:
-    def test_saml_returns_stub_session_without_network(self, monkeypatch):
+    def test_saml_callback_raises_sso_error(self):
+        # SAML 未实现，handle_callback 应显式抛 SSOError 而非返回 stub session。
         config = _make_oidc_config(provider=SSOProvider.SAML)
         mgr = SSOManager(config)
-
-        # Ensure no network call is attempted.
-        def fail_urlopen(*a, **kw):
-            raise AssertionError("SAML stub should not call urlopen")
-
-        monkeypatch.setattr("urllib.request.urlopen", fail_urlopen)
-
-        session = mgr.handle_callback("SAML_CODE")
-        assert isinstance(session, SSOSession)
-        assert session.access_token == ""  # no real tokens
-        assert session.user.provider == SSOProvider.SAML
-        assert session.user.roles == ["viewer"]
-        assert session.user.external_id.startswith("sso_saml_")
+        with pytest.raises(SSOError, match="SAML SSO is not yet implemented"):
+            mgr.handle_callback("SAML_CODE")
 
     def test_saml_empty_code_still_raises(self):
         # Even SAML must reject empty code (fail-closed).
@@ -341,9 +332,11 @@ class TestGetAuthorizeUrl:
         assert "scope=openid profile email" in url
         assert "state=rand123" in url
 
-    def test_saml_authorize_url_returns_empty(self):
+    def test_saml_authorize_url_raises_sso_error(self):
+        # SAML 未实现，get_authorize_url 应在重定向前就抛 SSOError。
         mgr = SSOManager(_make_oidc_config(provider=SSOProvider.SAML))
-        assert mgr.get_authorize_url() == ""
+        with pytest.raises(SSOError, match="SAML SSO is not yet implemented"):
+            mgr.get_authorize_url()
 
 
 # ── validate_session / logout ─────────────────────────────────────────

@@ -30,6 +30,10 @@ agents:
     cli: claude
     cli_args: -p '{task}'
     description: Claude Code v2.1.212 + StepFun step-3.7-flash
+    # AgentMeta: 编排语义元信息（驱动 PipelineOrchestrator 动态决策）
+    extracts_queries: true
+    supports_regeneration: true
+    results_merge: true
     driver: cli
     model: yi-large
     timeout_s: 120
@@ -91,6 +95,10 @@ agents:
     cli: codex
     cli_args: exec {task}
     description: Codex CLI v0.144.6 + StepFun proxy
+    # AgentMeta: 编排语义元信息（codegen agent，支持结果再生成）
+    extracts_queries: false
+    supports_regeneration: true
+    results_merge: false
     driver: cli
     model: qwen3.5-plus
     timeout_s: 120
@@ -173,6 +181,10 @@ agents:
     cli: gemini
     cli_args: -p '{task}'
     description: 'DISABLED: no VPN/proxy for Google APIs (2026-07-22)'
+    # AgentMeta: 编排语义元信息（vision provider，不参与编排决策）
+    extracts_queries: false
+    supports_regeneration: false
+    results_merge: false
     enabled: false
     driver: cli
     model: auto
@@ -282,6 +294,10 @@ agents:
     - tool_use
     cli: ""  # no CLI - pure LLM provider path (ADR-013 dual-path)
     description: OmniRoute local gateway - 160+ providers with auto failover
+    # AgentMeta: 编排语义元信息（纯 LLM provider，不参与编排决策）
+    extracts_queries: false
+    supports_regeneration: false
+    results_merge: false
     driver: cli
     model: omniroute-auto-coding
     provider: omniroute
@@ -462,6 +478,10 @@ agents:
     cli: python
     cli_args: -m maop.cli run --task "{task}"
     description: MAOP v4.3 self-referential agent — can delegate to itself (max_self_ref_depth=3)
+    # AgentMeta: 编排语义元信息（驱动 PipelineOrchestrator 动态决策）
+    extracts_queries: true
+    supports_regeneration: true
+    results_merge: true
     driver: cli
     model: auto
     timeout_s: 180
