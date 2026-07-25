@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -39,6 +40,32 @@ class JsonLogFormatter(logging.Formatter):
 
     # Keys we always set ourselves; extras with these names are ignored to
     # protect the schema contract.
+    # H3 fix: 敏感数据脱敏正则模式（与 guardrail.py sensitive-patterns 对齐）
+    # 匹配常见密钥格式，命中时替换为 [REDACTED:<type>]
+    _SENSITIVE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+        (re.compile(r"sk-[a-zA-Z0-9]{20,}"), "[REDACTED:openai_key]"),
+        (re.compile(r"AKIA[0-9A-Z]{16}"), "[REDACTED:aws_key]"),
+        (re.compile(r"(?i)(api[_-]?key|apikey)\s*[:=]\s*[\"\']?[A-Za-z0-9_\-]{16,}"), "[REDACTED:api_key]"),
+        (re.compile(r"(?i)(password|passwd|pwd)\s*[:=]\s*[\"\']?[^\s\"\',}]{4,}"), "[REDACTED:password]"),
+        (re.compile(r"(?i)(secret|token)\s*[:=]\s*[\"\']?[A-Za-z0-9_\-\.]{16,}"), "[REDACTED:secret]"),
+        (re.compile(r"(?i)bearer\s+[A-Za-z0-9_\-\.]{20,}"), "[REDACTED:bearer_token]"),
+    ]
+
+    @classmethod
+    def _redact_sensitive(cls, value: Any) -> Any:
+        """对字符串值进行敏感数据脱敏，非字符串原样返回。
+
+        仅对常见密钥格式做正则替换，避免对结构化数据深度遍历的
+        性能开销。命中时替换为 ``[REDACTED:<type>]`` 占位符。
+        """
+        if not isinstance(value, str) or not value:
+            return value
+        redacted = value
+        for pattern, replacement in cls._SENSITIVE_PATTERNS:
+            if pattern.search(redacted):
+                redacted = pattern.sub(replacement, redacted)
+        return redacted
+
     _RESERVED_KEYS = frozenset(
         {"ts", "level", "logger", "msg", "module", "func", "line", "trace_id"}
     )
@@ -51,7 +78,7 @@ class JsonLogFormatter(logging.Formatter):
             "ts": ts,
             "level": record.levelname,
             "logger": record.name,
-            "msg": record.getMessage(),
+            "msg": self._redact_sensitive(record.getMessage()),
             "module": record.module,
             "func": record.funcName,
             "line": record.lineno,
@@ -71,11 +98,11 @@ class JsonLogFormatter(logging.Formatter):
                 continue
             if key in _STANDARD_LOGRECORD_ATTRS:
                 continue
-            payload[key] = value
+            payload[key] = self._redact_sensitive(value) if isinstance(value, str) else value
 
         # Exception info, if requested via exc_info=True.
         if record.exc_info:
-            payload["exc"] = self.formatException(record.exc_info)
+            payload["exc"] = self._redact_sensitive(self.formatException(record.exc_info))
 
         return json.dumps(payload, ensure_ascii=False, default=str)
 

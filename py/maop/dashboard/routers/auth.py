@@ -29,7 +29,8 @@ from maop.core.db_utils import sqlite_connect
 
 _env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
 _auth_enabled = os.environ.get("MAOP_AUTH", "1" if _env_is_prod else "0") == "1"
-_AUTH_PBKDF2_ITERATIONS = 260_000
+# M6 fix (Phase R5): OWASP 2023 推荐 600k 迭代 for PBKDF2-HMAC-SHA256
+_AUTH_PBKDF2_ITERATIONS = 600_000
 _auth_mgr: AuthManager | None = None
 
 
