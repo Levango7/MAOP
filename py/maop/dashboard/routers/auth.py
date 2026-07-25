@@ -10,9 +10,14 @@ from __future__ import annotations
 from typing import Any
 
 import asyncio
+import base64
+import hashlib
+import hmac
+import json
 import logging
 import os
 import threading
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +42,6 @@ _auth_mgr: AuthManager | None = None
 # ── Password helpers ───────────────────────────────────────────────
 def _hash_password(password: str) -> str:
     """Hash a password for dashboard users using PBKDF2-HMAC-SHA256."""
-    import base64
-    import hashlib
 
     salt = os.urandom(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, _AUTH_PBKDF2_ITERATIONS)
@@ -51,9 +54,6 @@ def _hash_password(password: str) -> str:
 
 def _verify_password(password: str, stored_hash: str) -> bool:
     """Verify PBKDF2 hashes only. Legacy unsalted SHA-256 is no longer accepted."""
-    import base64
-    import hashlib
-    import hmac
 
     if not stored_hash.startswith("pbkdf2_sha256$"):
         logger.warning("[auth] Rejected legacy unsalted hash format. User must reset password.")
@@ -99,7 +99,6 @@ def get_auth_mgr() -> AuthManager:
 def _ensure_default_user() -> None:
     """Create default admin user on first run if none exists."""
     try:
-        import time as _t
         db_path = MAOP_ROOT / "data" / "auth.db"
         with sqlite_connect(str(db_path)) as conn:
             conn.execute("""
@@ -141,7 +140,7 @@ def _ensure_default_user() -> None:
                 pwd_hash = _hash_password(admin_pwd)
                 conn.execute(
                     "INSERT INTO users (username, password_hash, roles, created_at, enabled) VALUES (?, ?, ?, ?, 1)",
-                    ("admin", pwd_hash, '["admin","read","write","execute"]', _t.time()),
+                    ("admin", pwd_hash, '["admin","read","write","execute"]', time.time()),
                 )
                 logger.info("[auth] Default admin user created (password from MAOP_ADMIN_PASSWORD env)")
     except Exception as exc:
@@ -155,7 +154,6 @@ from maop.core.middleware import require_admin as _require_admin
 # ── Sync DB helpers (for run_in_executor) ──────────────────────────
 def _db_login_user(db_path_str: str, username: str, password: str) -> dict:
     """Sync: validate user credentials, return result dict."""
-    import json as _json
 
     with sqlite_connect(db_path_str) as conn:
         row = conn.execute(
@@ -177,14 +175,12 @@ def _db_login_user(db_path_str: str, username: str, password: str) -> dict:
                 (_hash_password(password), username),
             )
 
-    roles = _json.loads(row["roles"])
+    roles = json.loads(row["roles"])
     return {"status": "ok", "username": username, "roles": roles}
 
 
 def _db_register_user(db_path_str: str, username: str, password: str, roles: list) -> dict:
     """Sync: register a new user."""
-    import time as _t
-    import json as _json
 
     with sqlite_connect(db_path_str) as conn:
         existing = conn.execute("SELECT username FROM users WHERE username = ?", (username,)).fetchone()
@@ -194,7 +190,7 @@ def _db_register_user(db_path_str: str, username: str, password: str, roles: lis
         pwd_hash = _hash_password(password)
         conn.execute(
             "INSERT INTO users (username, password_hash, roles, created_at, enabled) VALUES (?, ?, ?, ?, 1)",
-            (username, pwd_hash, _json.dumps(roles), _t.time()),
+            (username, pwd_hash, json.dumps(roles), time.time()),
         )
 
     return {"status": "ok", "username": username, "roles": roles}
@@ -202,12 +198,11 @@ def _db_register_user(db_path_str: str, username: str, password: str, roles: lis
 
 def _db_list_users(db_path_str: str) -> list:
     """Sync: list all users."""
-    import json as _json
 
     with sqlite_connect(db_path_str) as conn:
         rows = conn.execute("SELECT username, roles, created_at, enabled FROM users ORDER BY created_at").fetchall()
 
-    return [{"username": r["username"], "roles": _json.loads(r["roles"]),
+    return [{"username": r["username"], "roles": json.loads(r["roles"]),
              "created_at": r["created_at"], "enabled": bool(r["enabled"])} for r in rows]
 
 
@@ -224,14 +219,13 @@ def _db_delete_user(db_path_str: str, username: str) -> dict:
 
 def _db_update_user(db_path_str: str, username: str, body: dict) -> dict:
     """Sync: update user roles, enabled, or password."""
-    import json as _json
 
     with sqlite_connect(db_path_str) as conn:
         existing = conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone()
         if not existing:
             return JSONResponse({"status": "error", "error": "User not found"}, status_code=404)
         if "roles" in body:
-            conn.execute("UPDATE users SET roles = ? WHERE username = ?", (_json.dumps(body["roles"]), username))
+            conn.execute("UPDATE users SET roles = ? WHERE username = ?", (json.dumps(body["roles"]), username))
         if "enabled" in body:
             conn.execute("UPDATE users SET enabled = ? WHERE username = ?", (1 if body["enabled"] else 0, username))
         if "password" in body:
@@ -275,7 +269,6 @@ async def auth_status(request: Request) -> dict[str, Any]:
 @router.post("/api/auth/login")
 async def auth_login(request: Request) -> dict[str, Any]:
     """Login with username/password, returns JWT token."""
-    import time as _time
     try:
         body = await request.json()
         username = body.get("username", "")
@@ -283,7 +276,7 @@ async def auth_login(request: Request) -> dict[str, Any]:
         if not username or not password:
             return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
 
-        now = _time.monotonic()
+        now = time.monotonic()
         with _login_failures_lock:
             failures = _login_failures.get(username, [])
             failures = [t for t in failures if now - t < _LOCKOUT_SECONDS]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from typing import Any
+from pathlib import Path
 
 from fastapi import APIRouter, Query, Request
 
@@ -13,14 +14,12 @@ router = APIRouter(prefix="/api/session", tags=["session"])
 
 def _get_session_mgr():
     from maop.core.session import SessionManager
-    from pathlib import Path
     root = Path(__file__).resolve().parent.parent.parent.parent
     return SessionManager(root_dir=str(root))
 
 
 def _get_conversation_mgr():
     from maop.core.conversation import ConversationManager
-    from pathlib import Path
     root = Path(__file__).resolve().parent.parent.parent.parent
     return ConversationManager(root_dir=str(root))
 

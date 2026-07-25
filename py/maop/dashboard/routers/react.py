@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from typing import Any
+from pathlib import Path
 
 from fastapi import APIRouter, Query, Request
 
@@ -13,14 +14,12 @@ router = APIRouter(prefix="/api/react", tags=["react"])
 
 def _get_change_tracker():
     from maop.core.change_tracker import ChangeTracker
-    from pathlib import Path
     root = Path(__file__).resolve().parent.parent.parent.parent
     return ChangeTracker(root_dir=str(root))
 
 
 def _get_artifact_store():
     from maop.core.artifact_store import ArtifactStore
-    from pathlib import Path
     root = Path(__file__).resolve().parent.parent.parent.parent
     return ArtifactStore(root_dir=str(root))
 
