@@ -1,4 +1,4 @@
-﻿"""MAOP Stress / Concurrency / Load tests.
+"""MAOP Stress / Concurrency / Load tests.
 
 These tests verify thread-safety, concurrency correctness, and performance
 under load for core MAOP subsystems.  They are marked ``pytest.mark.slow``
@@ -441,12 +441,18 @@ class TestMessageQueueConcurrency:
         # Verify no duplicates (set ensures uniqueness)
         assert len(consumed_ids) == len(consumed_ids), "Duplicate detection failed"
 
-        # Drain any remaining messages
+        # Drain any remaining messages. Require 2 consecutive None results
+        # instead of 1 so a transient SQLite "database is locked" error in
+        # _dequeue_one (which returns None) does not prematurely stop the
+        # drain and leave a message unaccounted for.
         remaining = 0
-        while True:
-            msg = mq.dequeue(topic, timeout_s=0)
+        consecutive_none = 0
+        while consecutive_none < 2:
+            msg = mq.dequeue(topic, timeout_s=0.5)
             if msg is None:
-                break
+                consecutive_none += 1
+                continue
+            consecutive_none = 0
             remaining += 1
             mq.ack(msg.id)
 

@@ -1,4 +1,4 @@
-﻿"""MAOP Message Queue — SQLite-backed persistent message queue with consumer groups,
+"""MAOP Message Queue — SQLite-backed persistent message queue with consumer groups,
 delayed delivery, and idempotent consumption.
 
 Provides durable, ordered message delivery with:
@@ -227,23 +227,39 @@ class MessageQueue:
             visible_at=visible_at,
         )
         payload_json = json.dumps(msg.payload, ensure_ascii=False, default=str)
-        try:
-            with self._connect() as conn:
-                conn.execute(
-                    """INSERT INTO queue_messages
-                       (id, topic, payload, priority, status, retries,
-                        max_retries, ack_timeout_s, enqueued_at, visible_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (msg.id, msg.topic, payload_json, msg.priority, "pending",
-                     msg.retries, msg.max_retries, msg.ack_timeout_s,
-                     msg.enqueued_at, msg.visible_at),
-                )
-            logger.info("[mq] Enqueued %s on %s (prio=%d, delay=%.1fs)",
-                        msg.id, topic, priority, delay_s)
-            return msg.id
-        except Exception as exc:
-            logger.warning("[mq] Enqueue failed: %s", exc)
-            return ""
+        # Retry on SQLite "database is locked" to avoid silently dropping
+        # messages under concurrent producers. sqlite_connect already sets
+        # busy_timeout=5000 (internal retry), but under high contention a
+        # write can still fail after the busy_timeout expires. Without this
+        # outer retry, enqueue returns "" and the producer never learns the
+        # message was lost — manifesting as flaky 999/1000 in the stress test.
+        max_attempts = 4
+        for attempt in range(max_attempts):
+            try:
+                with self._connect() as conn:
+                    conn.execute(
+                        """INSERT INTO queue_messages
+                           (id, topic, payload, priority, status, retries,
+                            max_retries, ack_timeout_s, enqueued_at, visible_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (msg.id, msg.topic, payload_json, msg.priority, "pending",
+                         msg.retries, msg.max_retries, msg.ack_timeout_s,
+                         msg.enqueued_at, msg.visible_at),
+                    )
+                logger.info("[mq] Enqueued %s on %s (prio=%d, delay=%.1fs)",
+                            msg.id, topic, priority, delay_s)
+                return msg.id
+            except sqlite3.OperationalError as exc:
+                if "locked" in str(exc).lower() and attempt < max_attempts - 1:
+                    time.sleep(0.05 * (attempt + 1))  # 50ms, 100ms, 150ms backoff
+                    continue
+                logger.warning("[mq] Enqueue failed after %d attempts: %s",
+                               attempt + 1, exc)
+                return ""
+            except Exception as exc:
+                logger.warning("[mq] Enqueue failed: %s", exc)
+                return ""
+        return ""
 
     # ── Dequeue ───────────────────────────────────────────────
 

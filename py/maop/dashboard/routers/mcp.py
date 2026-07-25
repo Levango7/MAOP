@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -35,13 +36,86 @@ class ToolCallRequest(BaseModel):
 
 
 _mcp_hub = None
+_mcp_hub_lock = threading.Lock()
+
+
+def _try_init_delta_component(module_path: str, class_name: str) -> Any:
+    """Import and construct a δ-3/4/5 component with default args.
+
+    Returns the constructed instance, or ``None`` on any failure (import
+    error, DB unavailable, etc.) so a single broken component never
+    blocks ``MCPHub`` creation — the hub degrades gracefully to the
+    pre-δ behaviour for that dimension.
+    """
+    try:
+        import importlib
+        mod = importlib.import_module(module_path)
+        cls = getattr(mod, class_name)
+        return cls()
+    except Exception as exc:
+        logger.warning(
+            "[mcp_router] init %s.%s failed (degraded to None): %s",
+            module_path, class_name, exc,
+        )
+        return None
 
 
 def _get_hub() -> Any:
+    """Lazy-init singleton MCPHub with the full δ-3/4/5 stack.
+
+    The hub is constructed once (thread-safe via ``_mcp_hub_lock``) and
+    reused for every request. δ-3 (permission_checker / audit_logger)
+    and δ-5 (cache / concurrency / rate_limiter) components are injected
+    with default construction; each is built defensively so a failure
+    (e.g. DB unavailable) degrades only that component to ``None``
+    rather than blocking hub creation.
+
+    ``user_context_provider`` is ``None`` for now: the permission checker
+    still enforces the tool-name dimensions (denied_tools / allowed_tools)
+    from each server config; the user/role dimensions are only enforced
+    when a server config carries ``allowed_users`` / ``allowed_roles``
+    AND a per-call ``user_context`` is supplied.
+    """
     global _mcp_hub
-    if _mcp_hub is None:
+    if _mcp_hub is not None:
+        return _mcp_hub
+    with _mcp_hub_lock:
+        if _mcp_hub is not None:  # double-checked locking
+            return _mcp_hub
         from maop.core.mcp_hub import MCPHub
-        _mcp_hub = MCPHub(root_dir=str(MAOP_ROOT))
+
+        # δ-3: permission gate + audit trail
+        permission_checker = _try_init_delta_component(
+            "maop.core.mcp_permission", "MCPPermissionChecker",
+        )
+        audit_logger = _try_init_delta_component(
+            "maop.core.mcp_audit", "MCPAuditLogger",
+        )
+        # δ-5: resilience hooks — cache, per-server concurrency, RPM limiter
+        cache = _try_init_delta_component(
+            "maop.core.mcp_cache", "MCPCache",
+        )
+        concurrency = _try_init_delta_component(
+            "maop.core.mcp_concurrency", "MCPServerConcurrency",
+        )
+        rate_limiter = _try_init_delta_component(
+            "maop.core.mcp_concurrency", "MCPServerRateLimiter",
+        )
+
+        _mcp_hub = MCPHub(
+            root_dir=str(MAOP_ROOT),
+            permission_checker=permission_checker,
+            audit_logger=audit_logger,
+            cache=cache,
+            concurrency=concurrency,
+            rate_limiter=rate_limiter,
+        )
+        logger.info(
+            "[mcp_router] MCPHub singleton initialised (δ-3/4/5 stack: "
+            "permission=%s, audit=%s, cache=%s, concurrency=%s, rate_limiter=%s)",
+            permission_checker is not None, audit_logger is not None,
+            cache is not None, concurrency is not None, rate_limiter is not None,
+        )
     return _mcp_hub
 
 

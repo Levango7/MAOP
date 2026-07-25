@@ -107,7 +107,7 @@ class TestDispatcher:
         finally:
             disp_mod._DRIVERS["cli"] = original_cli
 
-    def test_circuit_breaker_blocks(self):
+    def test_circuit_breaker_blocks(self, tmp_path):
         """When circuit breaker is open, dispatch returns error."""
         mock_agent = MagicMock()
         mock_agent.name = "failing-agent"
@@ -125,7 +125,10 @@ class TestDispatcher:
         mock_config.agents = [mock_agent]
         mock_config.workflows = []
 
-        breaker = CircuitBreaker()  # default constructor
+        # Isolate breaker state in a per-test tmp DB so repeated runs do not
+        # accumulate failures in the production maop.db (which would leave
+        # "failing-agent" permanently OPEN and break other tests).
+        breaker = CircuitBreaker(tmp_path / "test_breaker.db")
         # Trip the breaker: record failures >= threshold (3)
         for _ in range(3):
             breaker.record_failure("failing-agent")
@@ -137,7 +140,7 @@ class TestDispatcher:
         assert result.breaker_tripped
         assert "Circuit breaker OPEN" in (result.result.error or "")
 
-    def test_dispatch_unknown_driver(self):
+    def test_dispatch_unknown_driver(self, tmp_path):
         """Agent with unknown driver returns error."""
         mock_agent = MagicMock()
         mock_agent.name = "bad-driver"
@@ -155,7 +158,13 @@ class TestDispatcher:
         mock_config.agents = [mock_agent]
         mock_config.workflows = []
 
-        dispatcher = Dispatcher(MAOP_config=mock_config)
+        # Isolate breaker state in a per-test tmp DB. Without this, each test
+        # run calls arecord_failure("bad-driver") (dispatcher.py:935) into the
+        # shared production maop.db; after 3 runs the breaker trips OPEN and
+        # the OPEN check (dispatcher.py:874) short-circuits before the
+        # "Unknown driver" path, breaking the assertion.
+        breaker = CircuitBreaker(tmp_path / "test_breaker.db")
+        dispatcher = Dispatcher(MAOP_config=mock_config, breaker=breaker)
         result = asyncio.run(
             dispatcher.dispatch(agent="bad-driver", task="test")
         )
