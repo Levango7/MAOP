@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import time
 from pathlib import Path
 from typing import cast
 
@@ -124,12 +125,11 @@ class ABTestManager:
             name=name, variants=variants,
             min_samples=min_samples, confidence_level=confidence_level,
         )
-        import time as _time
         with self._db_connect() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO ab_experiments (name, variants, min_samples, confidence_level, created_at)
                    VALUES (?, ?, ?, ?, ?)""",
-                (name, json.dumps(variants), min_samples, confidence_level, _time.time()),
+                (name, json.dumps(variants), min_samples, confidence_level, time.time()),
             )
         logger.info("A/B experiment created: %s", name)
         return config
@@ -161,21 +161,19 @@ class ABTestManager:
             if not chosen:
                 chosen = list(variants.keys())[-1]
 
-            import time as _time
             conn.execute(
                 """INSERT INTO ab_assignments (experiment, entity_id, variant, assigned_at)
                    VALUES (?, ?, ?, ?)""",
-                (experiment, entity_id, chosen, _time.time()),
+                (experiment, entity_id, chosen, time.time()),
             )
         return chosen
 
     def record(self, experiment: str, variant: str, entity_id: str, success: bool) -> None:
-        import time as _time
         with self._db_connect() as conn:
             conn.execute(
                 """INSERT INTO ab_metrics (experiment, variant, entity_id, success, recorded_at)
                    VALUES (?, ?, ?, ?, ?)""",
-                (experiment, variant, entity_id, int(success), _time.time()),
+                (experiment, variant, entity_id, int(success), time.time()),
             )
 
     def evaluate(self, experiment: str) -> EvaluationResult:

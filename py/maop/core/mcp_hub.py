@@ -49,7 +49,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time as _time_module
+import time as _time
 import urllib.error
 import urllib.request
 import uuid
@@ -804,7 +804,6 @@ class MCPHub:
                 "mcp.transport": config.transport.value,
             },
         ):
-            import time as _time
             server_id = uuid.uuid4().hex[:16]
             now = _time.time()
 
@@ -1070,7 +1069,7 @@ class MCPHub:
             try:
                 # Time the actual transport call so the audit row carries real
                 # latency, not just the permission overhead.
-                call_started = _time_module.monotonic()
+                call_started = _time.monotonic()
                 error_msg: str | None = None
                 try:
                     response = await transport.send_request(
@@ -1084,7 +1083,7 @@ class MCPHub:
                     # exception now skips that wrapper. Record + re-raise keeps
                     # the audit trail complete for debugging.
                     error_msg = str(exc)
-                    duration_ms = (_time_module.monotonic() - call_started) * 1000.0
+                    duration_ms = (_time.monotonic() - call_started) * 1000.0
                     if checker is not None:
                         self._record_audit(
                             server_name=server_name,
@@ -1103,7 +1102,7 @@ class MCPHub:
                     self._record_call_attempt(server_name, tool_name)
                     raise
 
-                duration_ms = (_time_module.monotonic() - call_started) * 1000.0
+                duration_ms = (_time.monotonic() - call_started) * 1000.0
                 # δ-4: record call volume + latency on every attempt that
                 # returned a response (success or JSON-RPC error).
                 self._record_call_attempt(server_name, tool_name)
@@ -1201,7 +1200,7 @@ class MCPHub:
         if user_context:
             user_id = str(user_context.get("user_id", "") or "")
         record = MCPAuditRecord(
-            timestamp=_time_module.time(),
+            timestamp=_time.time(),
             server_name=server_name,
             tool_name=tool_name,
             user_id=user_id,
@@ -1264,7 +1263,7 @@ class MCPHub:
             from maop.core.monitoring import MAOP_MCP_CALL_DURATION_SECONDS
         except Exception:
             return
-        elapsed = _time_module.monotonic() - started_monotonic
+        elapsed = _time.monotonic() - started_monotonic
         if elapsed < 0:
             elapsed = 0.0
         MAOP_MCP_CALL_DURATION_SECONDS.observe(elapsed)
@@ -1517,7 +1516,6 @@ class MCPHub:
         status: ServerStatus,
         error: str = "",
     ) -> None:
-        import time as _time
         now = _time.time()
         with self._connect() as conn:
             sets = ["status = ?", "updated_at = ?"]
@@ -1561,7 +1559,6 @@ class MCPHub:
 
     def add_server(self, config: MCPServerConfig) -> bool:
         """Register a server config without connecting (compat shim)."""
-        import time as _time
         now = _time.time()
         with self._connect() as conn:
             conn.execute("DELETE FROM mcp_servers WHERE name = ?", (config.name,))

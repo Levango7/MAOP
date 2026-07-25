@@ -1,8 +1,9 @@
-﻿"""MAOP Dashboard — Agent Platform Management API endpoints."""
+"""MAOP Dashboard — Agent Platform Management API endpoints."""
 
 from __future__ import annotations
 
 from typing import Any
+from pathlib import Path
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
@@ -32,7 +33,6 @@ _instance_cache: dict[str, Any] = {}
 def _get_scanner():
     if "scanner" not in _instance_cache:
         from maop.core.agent_scanner import AgentScanner
-        from pathlib import Path
         root = Path(__file__).resolve().parent.parent.parent.parent
         _instance_cache["scanner"] = AgentScanner(root_dir=str(root))
     return _instance_cache["scanner"]
@@ -41,7 +41,6 @@ def _get_scanner():
 def _get_registry():
     if "registry" not in _instance_cache:
         from maop.core.agent_registry import AgentRegistry
-        from pathlib import Path
         root = Path(__file__).resolve().parent.parent.parent.parent
         _instance_cache["registry"] = AgentRegistry(root_dir=str(root))
     return _instance_cache["registry"]
@@ -51,7 +50,6 @@ def _get_matcher():
     if "matcher" not in _instance_cache:
         from maop.core.capability_matcher import CapabilityMatcher
         from maop.core.agent_registry import AgentRegistry
-        from pathlib import Path
         root = Path(__file__).resolve().parent.parent.parent.parent
         registry = AgentRegistry(root_dir=str(root))
         _instance_cache["matcher"] = CapabilityMatcher(registry=registry)
