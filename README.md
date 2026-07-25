@@ -23,11 +23,111 @@ Entry (maop.ps1 / cli.py)
 | Infrastructure | `core/` (30+ modules) | Shared services & utilities |
 | Data | SQLite, JSON, YAML | Persistence & configuration |
 
+## 双版架构（Dual Edition）
+
+MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的双版架构（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)），同一套核心代码同时服务两类用户：
+
+- **个人版 (Personal)**：MIT 许可，零配置开箱即用，面向个人开发者和小团队
+- **企业版 (Enterprise)**：Commercial 许可，面向企业客户，提供 RBAC / 多租户 / SSO / 审计 / HA 等企业级能力
+
+### 能力对比
+
+| 能力 | Personal | Enterprise |
+|------|----------|------------|
+| 多代理编排 (Multi-Agent Orchestration) | ✓ | ✓ |
+| MCP Hub | ✓ | ✓ |
+| 三层记忆 (Three-Layer Memory) | ✓ | ✓ |
+| 向量检索 (Vector Search) | ✓ | ✓ |
+| 预算守卫 (Budget Guard) | ✓ | ✓ |
+| 熔断器 (Circuit Breaker) | ✓ | ✓ |
+| 热重载 (Hot Reload) | ✓ | ✓ |
+| 插件系统 (Plugin System) | ✓ | ✓ |
+| RBAC 角色权限 | ✗ | ✓ |
+| SSO / SAML 单点登录 | ✗ | ✓ |
+| PostgreSQL 持久化 | ✗ | ✓ |
+| Redis 高可用缓存 | ✗ | ✓ |
+| Vault 密钥管理 | ✗ | ✓ |
+| 多租户隔离 (Tenant Isolation) | ✗ | ✓ |
+| Audit Log 审计日志 | ✗ | ✓ |
+| n8n 集成 | ✗ | ✓ |
+| Vue Dashboard 企业版路由 | ✗ | ✓ |
+
+> Enterprise = Personal ∪ Enterprise 独占能力；企业版包含所有功能。
+
+### Edition 检测优先级
+
+通过 `maop/config/edition.py` 的 `detect_edition()` 检测，优先级：
+
+1. `set_edition()` 程序覆盖（测试 / 灰度）
+2. `MAOP_EDITION` 环境变量
+3. `maop.enterprise` 包可导入性自动探测
+4. 默认 `PERSONAL`
+
+### FeatureFlag 统一 Gate
+
+所有 edition 相关能力差异通过 `FeatureFlag` 枚举统一 gate，**禁止**在其他模块直接比较 `get_edition() == ENTERPRISE`：
+
+```python
+from maop.config.edition import has_feature, FeatureFlag, require_feature
+
+if has_feature(FeatureFlag.RBAC):
+    # 企业版逻辑
+else:
+    # 个人版逻辑或跳过
+
+require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
+```
+
+### License 配置
+
+企业版通过 Ed25519 license key 校验激活：
+
+| 场景 | 行为 |
+|------|------|
+| 无 `MAOP_LICENSE_KEY` | honor-system 模式 + 警告日志（向后兼容） |
+| key 有效 | 激活 ENTERPRISE |
+| key 无效 / 过期 | 降级 PERSONAL + error 日志 + 7 天宽限期 |
+
+```bash
+# 配置 license（企业版）
+$env:MAOP_LICENSE_KEY = "your-license-key-here"
+maop start
+```
+
+License 颁发指南见 [docs/enterprise/license-issuance-guide.md](docs/enterprise/license-issuance-guide.md)。
+
+### 后端默认值差异
+
+| 后端类型 | Personal | Enterprise |
+|----------|----------|------------|
+| storage | sqlite | postgresql |
+| cache | memory | redis |
+| queue | sqlite | rabbitmq |
+| kv | sqlite | etcd |
+| secret | local | vault |
+
+企业版后端不可用时自动降级到个人版后端（通过 `record_degradation()` 记录）。
+
+### 双包发布
+
+- `maop`（PyPI, MIT）：核心 + 个人版功能
+- `maop-enterprise`（私有分发, Commercial）：依赖 `maop`，包含 `maop/enterprise/` 模块
+
+```bash
+pip install maop              # 个人版
+pip install maop-enterprise   # 企业版（自动依赖 maop）
+```
+
+`maop/enterprise/__init__.py` 在 import 时调用 `set_edition(Edition.ENTERPRISE)`，这是企业版包"存在即激活"的机制。
+
 ## Quick Start
 
 ```bash
-# Install
+# Install (Python package)
 cd py && pip install -e .
+
+# Build frontend (Vue dashboard, 首次或前端变更后需要)
+cd ../dashboard-enterprise && npm install && npm run build && cd ..
 
 # Start Dashboard (FastAPI, port 9079)
 maop start --port 9079
@@ -50,6 +150,7 @@ pytest py/tests
 | Deploy with auth | `MAOP_AUTH=1 maop start` | [Use Case 2](#2-enterprise-deployment--rbac--multi-tenant) |
 | Chat with memory | Open dashboard → Chat tab | [Use Case 3](#3-tool-calling--memory-augmented-chat) |
 | View costs | Dashboard → Overview → Cost | [Cost Tracking](#cost-tracking) |
+| Activate enterprise | `MAOP_LICENSE_KEY=... maop start` | [双版架构](#双版架构dual-edition) |
 
 ## Use Cases
 
@@ -186,6 +287,8 @@ agents:
 | `MAOP_TLS` | 0 | Enable TLS |
 | `MAOP_JSON_LOG` | 0 | Enable JSON structured logging |
 | `MAOP_PLUGIN_STRICT_CHECKSUM` | 0 | Enforce plugin checksum validation |
+| `MAOP_EDITION` | auto-detect | 强制 edition（personal/enterprise），覆盖自动检测 |
+| `MAOP_LICENSE_KEY` | — | 企业版 license key（缺失时 honor-system，无效时降级 personal + 7 天宽限期） |
 
 ## Dashboard
 
@@ -198,6 +301,8 @@ Web dashboard at `http://localhost:9079` with:
 - Memory search & knowledge graph visualization
 - Self-evolution suggestions & analysis
 - Multi-tenant support with per-tenant quotas
+
+前端源码位于 `dashboard-enterprise/`（Vue 3 + Vite），构建产物输出到 `dashboard/dist-enterprise/`。
 
 ## Core Modules
 
@@ -216,6 +321,8 @@ Web dashboard at `http://localhost:9079` with:
 | `core/circuit_breaker.py` | Circuit breaker pattern |
 | `core/vector.py` | Vector store for semantic search |
 | `core/streaming.py` | SSE streaming infrastructure |
+| `config/edition.py` | Dual-edition 注册表与 FeatureFlag gate（[ADR-016](docs/adr/016-dual-edition-architecture.md)） |
+| `enterprise/` | 企业版扩展模块（rbac/tenant/audit/sso/ha/license/n8n 等，仅 `maop-enterprise` 包含） |
 
 ## Development
 
@@ -229,8 +336,8 @@ python -m mypy py/maop/ --ignore-missing-imports
 # Test
 python -m pytest py/tests/ -v
 
-# Build frontend
-cd dashboard-vite && npm run build
+# Build frontend (Vue dashboard)
+cd dashboard-enterprise && npm run build
 ```
 
 ## Decision Records
@@ -249,7 +356,12 @@ Key architectural decisions in [docs/adr/](docs/adr/README.md):
 - [ADR-011](docs/adr/011-state-unification.md) — State source unification
 - [ADR-012](docs/adr/012-routing-refactor.md) — Config-driven routing refactor
 - [ADR-013](docs/adr/013-agent-llm-direct-cli-fallback.md) — Agent LLM direct + CLI fallback
+- [ADR-014](docs/adr/014-ha-single-instance-status.md) — HA 单实例状态（Superseded by ADR-015）
+- [ADR-015](docs/adr/015-distributed-ha-redis-lease.md) — 分布式 HA Redis 租约
+- [ADR-016](docs/adr/016-dual-edition-architecture.md) — 双版架构（Personal / Enterprise）
 
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
+
+> **Enterprise Edition Note**: `maop-enterprise` 包及 `py/maop/enterprise/` 模块遵循 Commercial 许可，详见 [docs/enterprise/license-issuance-guide.md](docs/enterprise/license-issuance-guide.md)。

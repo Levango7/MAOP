@@ -29,16 +29,25 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import ipaddress
 import logging
+import os
+import socket
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from maop.config.edition import FeatureFlag, has_feature, require_feature
 
 logger = logging.getLogger(__name__)
+
+# 模块级标志：N8N_WEBHOOK_SECRET 未配置时仅记录一次警告，避免刷屏
+_webhook_secret_warned: bool = False
 
 __all__ = [
     "N8nClient",
@@ -65,6 +74,73 @@ class N8nWorkflowExecution(BaseModel):
     error: str | None = Field(default=None, description="Error message if failed")
 
 
+def verify_webhook_signature(
+    payload_body: bytes, signature_header: str | None, secret: str | None
+) -> bool:
+    """校验 n8n webhook 的 HMAC-SHA256 签名。
+
+    用恒定时间比较（``hmac.compare_digest``）防止时序攻击。
+    secret 为空或 signature_header 为空时返回 False。
+    """
+    if not secret or not signature_header:
+        return False
+    expected = hmac.new(
+        secret.encode("utf-8"), payload_body, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature_header)
+
+
+def is_safe_callback_url(url: str) -> bool:
+    """检查 callback_url 是否安全（拒绝私网/保留 IP，防 SSRF）。
+
+    允许 http/https 协议；主机名（IP 或域名）必须解析到公网地址。
+    私网（10.x/172.16-31.x/192.168.x）、环回（127.x/::1）、链路本地
+    （169.254.x，含云元数据端点）、组播、保留、未指定地址全部拒绝。
+    DNS 解析失败或任何异常均返回 False。
+    """
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    if parsed.scheme not in ("http", "https"):
+        return False
+    host = parsed.hostname
+    if not host:
+        return False
+
+    def _ip_unsafe(ip: ipaddress._BaseAddress) -> bool:
+        return (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        )
+
+    # 直接 IP 主机
+    try:
+        return not _ip_unsafe(ipaddress.ip_address(host))
+    except ValueError:
+        pass
+
+    # 域名：解析所有 A/AAAA 记录，任一为私网即拒绝
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except Exception:
+        return False
+    if not infos:
+        return False
+    for info in infos:
+        addr = info[4][0]
+        try:
+            if _ip_unsafe(ipaddress.ip_address(addr)):
+                return False
+        except ValueError:
+            continue
+    return True
+
+
 class N8nWebhookPayload(BaseModel):
     """Payload received from n8n webhook."""
 
@@ -73,6 +149,14 @@ class N8nWebhookPayload(BaseModel):
     event: str = Field(description="Event type (e.g., 'github.pr.opened', 'slack.message')")
     data: dict[str, Any] = Field(default_factory=dict, description="Event payload data")
     callback_url: str | None = Field(default=None, description="URL to POST results back to")
+
+    @field_validator("callback_url")
+    @classmethod
+    def validate_callback_url(cls, v: str | None) -> str | None:
+        """SSRF 防护：callback_url 必须是公网 http/https URL。"""
+        if v is not None and v != "" and not is_safe_callback_url(v):
+            raise ValueError("callback_url must be public https/http URL")
+        return v
 
 
 def require_n8n_feature() -> None:
@@ -252,24 +336,35 @@ class N8nClient:
             return False
 
 
-def handle_n8n_webhook(payload: dict[str, Any]) -> dict[str, Any]:
+def handle_n8n_webhook(
+    payload: dict[str, Any],
+    *,
+    raw_body: bytes | None = None,
+    signature: str | None = None,
+) -> dict[str, Any]:
     """Process an inbound webhook from n8n.
 
     This function is called when n8n sends a webhook to MAOP
     (e.g., "GitHub PR opened → n8n → MAOP for code review").
 
-    The function:
-      1. Validates the payload
-      2. Parses the event type and data
-      3. Returns a response that n8n can use in subsequent nodes
+    签名校验：若配置了环境变量 ``N8N_WEBHOOK_SECRET``，则必须传入
+    ``raw_body`` 与 ``signature`` 且 HMAC-SHA256 匹配，否则拒绝请求。
+    未配置 secret 时仅记录一次警告（向后兼容），但仍允许处理。
 
-    The actual LLM processing is done by the caller (typically a
-    FastAPI route handler that calls /api/delegate internally).
+    The function:
+      1. 校验 HMAC 签名（若已配置 secret）
+      2. Validates the payload（含 callback_url SSRF 防护）
+      3. Parses the event type and data
+      4. Returns a response that n8n can use in subsequent nodes
 
     Parameters
     ----------
     payload : dict
         The JSON body received from n8n.
+    raw_body : bytes, optional
+        原始请求体（用于签名校验，避免 JSON 反序列化后字节不一致）。
+    signature : str, optional
+        请求头中的 HMAC-SHA256 签名（``X-N8N-Signature`` 或 ``X-MAOP-Signature``）。
 
     Returns
     -------
@@ -281,6 +376,21 @@ def handle_n8n_webhook(payload: dict[str, Any]) -> dict[str, Any]:
           - delegate_hint: suggested agent + task for MAOP processing
     """
     require_n8n_feature()
+
+    # HMAC 签名校验
+    secret = os.getenv("N8N_WEBHOOK_SECRET", "")
+    if secret:
+        if raw_body is None or not verify_webhook_signature(raw_body, signature, secret):
+            logger.warning("[n8n] Webhook rejected: invalid or missing signature")
+            return {"status": "rejected", "error": "Invalid or missing signature"}
+    else:
+        global _webhook_secret_warned
+        if not _webhook_secret_warned:
+            logger.warning(
+                "[n8n] N8N_WEBHOOK_SECRET not set — webhook signature verification "
+                "disabled. Configure N8N_WEBHOOK_SECRET for production."
+            )
+            _webhook_secret_warned = True
 
     try:
         webhook = N8nWebhookPayload(**payload)

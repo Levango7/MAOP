@@ -40,6 +40,10 @@
 
         <Panel title="System Resources" :margin-bottom="0">
           <div class="resource-list">
+            <!-- C-7 修复：加载中状态 -->
+            <div v-if="resourcesLoading" class="resource-loading">Loading...</div>
+            <!-- C-7 修复：加载失败或无数据时显示失败提示，避免假数据 -->
+            <div v-else-if="!resources.length" class="resource-loading resource-loading-fail">Failed to load</div>
             <div class="resource-item" v-for="r in resources" :key="r.name">
               <span class="res-name">{{ r.name }}</span>
               <div class="res-bar"><div class="res-fill" :style="{ width: r.pct + '%', background: r.pct > 80 ? 'var(--fail)' : r.pct > 60 ? 'var(--warn)' : 'var(--success)' }"></div></div>
@@ -81,10 +85,14 @@
 
       <Panel title="System Diagnostics">
         <div class="diag-list">
+          <!-- C-7 修复：加载中状态 -->
+          <div v-if="diagnosticsLoading" class="diag-loading">Loading...</div>
+          <!-- C-7 修复：加载失败或无数据时显示失败提示，避免假数据 -->
+          <div v-else-if="!diagnostics.length" class="diag-loading diag-loading-fail">Failed to load</div>
           <div class="diag-item" v-for="d in diagnostics" :key="d.name">
             <span class="diag-dot" :style="{ background: d.ok ? 'var(--success)' : 'var(--fail)' }"></span>
             <span class="diag-name">{{ d.name }}</span>
-            <span class="diag-result">{{ d.result }}</span>
+            <span class="diag-result" :class="{ 'diag-result-fail': !d.ok }">{{ d.result }}</span>
             <span class="diag-detail" v-if="d.detail">{{ d.detail }}</span>
           </div>
         </div>
@@ -157,21 +165,14 @@ const metrics = ref([
 ]);
 
 const agentStatuses = ref([]);
-const resources = ref([
-  { name: 'Memory Store', pct: 45, used: '2.3 MB', total: '5.0 MB' },
-  { name: 'SQLite DB', pct: 32, used: '16 MB', total: '50 MB' },
-  { name: 'Vector Index', pct: 58, used: '120 MB', total: '200 MB' },
-  { name: 'Log Files', pct: 22, used: '44 MB', total: '200 MB' },
-]);
 
-const diagnostics = ref([
-  { name: 'Database Connection', ok: true, result: 'OK', detail: 'maop.db, 0 pending' },
-  { name: 'Agent Registry', ok: true, result: 'OK', detail: 'All agents responsive' },
-  { name: 'Memory Store', ok: true, result: 'OK', detail: 'Read/write normal' },
-  { name: 'Vector Index', ok: true, result: 'OK', detail: '384-dim, Flat index' },
-  { name: 'Config Loader', ok: true, result: 'OK', detail: 'agents.yaml loaded' },
-  { name: 'Audit Log', ok: true, result: 'OK', detail: 'audit.jsonl writable' },
-]);
+// C-7 修复：System Resources 与 System Diagnostics 改为运行时从后端拉取，
+// 不再使用硬编码假数据。初始为空数组，加载中/失败时由模板展示对应状态。
+const resources = ref([]);
+const resourcesLoading = ref(true);
+
+const diagnostics = ref([]);
+const diagnosticsLoading = ref(true);
 
 const maintActions = ref([
   { icon: '🗑️', title: 'Prune Memory', desc: 'Remove stale memory entries older than 30 days', status: 'idle', statusText: 'Ready' },
@@ -186,6 +187,58 @@ function genSparkline() {
   const pts = [];
   for (let i = 0; i < 20; i++) pts.push(`${i * 5},${30 - Math.random() * 25}`);
   return pts.join(' ');
+}
+
+// C-7 修复：从后端 /api/system/resources 与 /api/system/diagnostics 拉取真实数据。
+// 任一接口失败均降级为空数组，由模板展示 "Failed to load"，避免显示假数据。
+async function loadSystemStats() {
+  resourcesLoading.value = true;
+  diagnosticsLoading.value = true;
+
+  // 并行拉取两个接口；任一失败返回 null，便于后续判断
+  const [resRes, diagRes] = await Promise.all([
+    fetch('/api/system/resources').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))).catch(() => null),
+    fetch('/api/system/diagnostics').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))).catch(() => null),
+  ]);
+
+  // ── 系统资源：成功且包含 memory_store 字段才填充 ──
+  if (resRes && !resRes.error && resRes.memory_store) {
+    // 后端 pct 为 0-1 之间的小数，前端展示需乘以 100 转百分比
+    resources.value = [
+      { name: 'Memory Store', pct: Math.round((resRes.memory_store?.pct ?? 0) * 100), used: `${(resRes.memory_store?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.memory_store?.total_mb ?? 0} MB` },
+      { name: 'SQLite DB', pct: Math.round((resRes.sqlite_db?.pct ?? 0) * 100), used: `${(resRes.sqlite_db?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.sqlite_db?.total_mb ?? 0} MB` },
+      { name: 'Vector Index', pct: Math.round((resRes.vector_index?.pct ?? 0) * 100), used: `${(resRes.vector_index?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.vector_index?.total_mb ?? 0} MB` },
+      { name: 'Log Files', pct: Math.round((resRes.log_files?.pct ?? 0) * 100), used: `${(resRes.log_files?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.log_files?.total_mb ?? 0} MB` },
+    ];
+  } else {
+    // 拉取失败或返回 error 字段：清空数组，触发模板显示 "Failed to load"
+    resources.value = [];
+  }
+  resourcesLoading.value = false;
+
+  // ── 系统诊断：成功且至少有一项数据才填充 ──
+  if (diagRes && !diagRes.error && Object.keys(diagRes).length > 0) {
+    // 后端返回的 key 为 snake_case，这里映射为更友好的展示名
+    const nameMap = {
+      database: 'Database Connection',
+      agent_registry: 'Agent Registry',
+      memory_store: 'Memory Store',
+      vector_index: 'Vector Index',
+      config_loader: 'Config Loader',
+      audit_log: 'Audit Log',
+    };
+    diagnostics.value = Object.entries(diagRes).map(([k, v]) => ({
+      name: nameMap[k] || k,
+      ok: !!v.ok,
+      // result 字段展示后端返回的状态文本（如 "OK (maop.db)"、"12 agents"）
+      result: v.result || (v.ok ? 'OK' : 'FAIL'),
+      // detail 字段为空，因为后端 result 已包含完整信息
+      detail: '',
+    }));
+  } else {
+    diagnostics.value = [];
+  }
+  diagnosticsLoading.value = false;
 }
 
 async function pollData() {
@@ -240,6 +293,8 @@ async function runMaint(m) {
 onMounted(() => {
   pollData();
   pollTimer = setInterval(pollData, 10000);
+  // C-7 修复：挂载时拉取系统资源与诊断数据；不轮询（运维页面静态信息）
+  loadSystemStats();
 });
 onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 </script>
@@ -272,6 +327,10 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .res-val { font-size: 12px; color: var(--text3); width: 100px; }
 .res-pct { font-size: 12px; font-weight: 600; width: 36px; text-align: right; }
 
+/* C-7 修复：资源/诊断面板加载中与失败提示样式 */
+.resource-loading, .diag-loading { padding: 16px 0; text-align: center; font-size: 13px; color: var(--text3); font-style: italic; }
+.resource-loading-fail, .diag-loading-fail { color: var(--fail); }
+
 .event-list { max-height: 300px; overflow-y: auto; }
 .event-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .event-time { font-size: 11px; color: var(--text3); width: 60px; font-family: monospace; }
@@ -297,6 +356,8 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .diag-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .diag-name { font-size: 13px; font-weight: 500; width: 160px; }
 .diag-result { font-size: 12px; font-weight: 600; color: var(--success); }
+/* C-7 修复：诊断失败时 result 文本显示为红色 */
+.diag-result.diag-result-fail { color: var(--fail); }
 .diag-detail { font-size: 12px; color: var(--text3); margin-left: auto; }
 
 /* t21: SSE indicator + event count badge */

@@ -215,6 +215,8 @@ class ReactLoop:
         conversation: list[dict[str, Any]],
         model_name: str,
         trace_id: str,
+        *,
+        tools: list[dict] | None = None,
     ) -> MaopResult:
         """F3c (2026-07-22, Phase F): LLM direct call returning a MaopResult.
 
@@ -224,6 +226,19 @@ class ReactLoop:
         and ``duration_ms`` carries the provider-reported latency. On
         failure, returns a failed MaopResult so the caller can decide
         whether to fall back to CLI. See ADR-013.
+
+        Parameters
+        ----------
+        conversation : list[dict]
+            当前对话历史，作为 messages 传给 LLM。
+        model_name : str
+            目标模型名（models.yaml 中的 key）。
+        trace_id : str
+            追踪 ID，用于日志关联。
+        tools : list[dict] | None
+            可用工具的 JSON Schema 列表，会透传给
+            ``chat_with_fallback`` → ``provider.chat(tools=...)``，
+            使 LLM 知道有哪些工具可调用。None 表示不传工具。
         """
         try:
             factory = self.provider_factory
@@ -233,12 +248,18 @@ class ReactLoop:
                     exit_code=-1, error="LLM provider factory not available",
                     trace_id=trace_id,
                 )
-            fb_result = await factory.chat_with_fallback(
-                messages=conversation,
-                model_name=model_name,
-                temperature=0.7,
-                max_tokens=self._config.max_total_tokens,
-            )
+            # 构造传给 chat_with_fallback 的 kwargs，仅当 tools 非空时透传，
+            # 避免覆盖 provider 默认行为（chat_with_fallback 通过 **kwargs
+            # 转发到 provider.chat，OpenAICompatibleProvider 已识别 tools）
+            chat_kwargs: dict[str, Any] = {
+                "messages": conversation,
+                "model_name": model_name,
+                "temperature": 0.7,
+                "max_tokens": self._config.max_total_tokens,
+            }
+            if tools:
+                chat_kwargs["tools"] = tools
+            fb_result = await factory.chat_with_fallback(**chat_kwargs)
             content = fb_result.response.content or ""
             return new_result(
                 agent="", task="",
@@ -322,10 +343,14 @@ class ReactLoop:
                     and self._config.llm_model
                     and self.provider_factory is not None
                 ):
+                    # C-5 修复：把 run() 接收的 tools 透传给 _call_llm，
+                    # 进而通过 chat_with_fallback → provider.chat(tools=...)
+                    # 告知 LLM 可用工具列表
                     llm_result = await self._call_llm(
                         conversation=conversation,
                         model_name=self._config.llm_model,
                         trace_id=trace_id,
+                        tools=tools,
                     )
                     if llm_result.is_success():
                         exec_result = llm_result

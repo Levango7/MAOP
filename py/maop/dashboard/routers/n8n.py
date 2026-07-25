@@ -39,28 +39,23 @@ def _get_client() -> N8nClient:
 async def receive_webhook(request: Request) -> dict[str, Any]:
     """Receive a webhook from n8n.
 
-    This endpoint is called by n8n's HTTP Request node when an external
-    event triggers a workflow. The payload contains the event data and
-    a hint about what MAOP should do with it.
-
-    No authentication required (n8n calls this internally), but the
-    endpoint is gated behind the Enterprise feature flag.
+    通过 HMAC-SHA256 签名校验（请求头 ``X-N8N-Signature`` 或
+    ``X-MAOP-Signature``）替代管理员鉴权——n8n 在请求头中携带用共享密钥
+    计算的签名。需配置环境变量 ``N8N_WEBHOOK_SECRET``；未配置时仅记录
+    警告（向后兼容）。端点仍受 Enterprise 特性开关保护。
     """
     if not has_feature(FeatureFlag.N8N_INTEGRATION):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="n8n integration not available in this edition",
-        )
+        raise HTTPException(status_code=404, detail="n8n integration not available")
+
+    raw_body = await request.body()
+    signature = request.headers.get("X-N8N-Signature") or request.headers.get("X-MAOP-Signature")
 
     try:
         payload = await request.json()
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid JSON payload: {exc}",
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {exc}") from exc
 
-    return handle_n8n_webhook(payload)
+    return handle_n8n_webhook(payload, raw_body=raw_body, signature=signature)
 
 
 @router.get("/workflows")
