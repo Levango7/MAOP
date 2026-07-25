@@ -37,6 +37,12 @@ from pydantic import BaseModel, Field
 
 from maop.core.conversation import ConversationManager, MessageRole
 from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.memory.shared_db import (
+    LAYER_ALIASES,
+    denormalize_layer_name,
+    get_memory_db_path,
+    normalize_layer_name,
+)
 from maop.memory.store import MemoryStore
 
 logger = logging.getLogger(__name__)
@@ -100,7 +106,9 @@ class MemoryManager:
         self._memory = MemoryStore(root_dir=root_dir)
         self._consolidator: Any = None
         self._last_consolidation: str = ""
-        self._db_path = get_db_path("memory_manager")
+        # 共享 DB 路径：与 MemoryStore / ThreeLayerMemory 共用同一个 maop.db
+        # consolidation_log 表与 memory_entries / episodic_memory 表名不冲突。
+        self._db_path = get_memory_db_path()
         self._knowledge_extractor: Any = None
         self._knowledge_graph: Any = None
         self._vector_search: Any = None
@@ -466,3 +474,48 @@ class MemoryManager:
         except Exception as exc:
             logger.warning("[memory_manager] Semantic search failed: %s", exc)
             return []
+
+    # ── ThreeLayerMemory 兼容查询 ────────────────────────
+
+    def query_episodic(self, query: str = "", top: int = 10) -> list[dict[str, Any]]:
+        """查询 ThreeLayerMemory 写入的 episodic_memory 表（跨实现通信）。
+
+        ``ThreeLayerMemory`` 被 agent_performance / evolution_loop 调用，
+        将任务经验（含用户反馈、质量评分、lessons）写入同一 DB 的
+        ``episodic_memory`` 表。本方法让 ``MemoryManager`` 能够读取这些
+        条目，从而让 chat 上下文能看到 agent_performance 的反馈数据。
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            每行包含 id/task/agent/outcome/score/summary/user_feedback/
+            quality_dimensions/lessons 等字段（JSON 字段已反序列化为 dict/list）。
+        """
+        import json as _json
+        sql = "SELECT * FROM episodic_memory"
+        params: list[Any] = []
+        if query:
+            sql += " WHERE task LIKE ? OR summary LIKE ? OR user_feedback LIKE ?"
+            params.extend([f"%{query}%", f"%{query}%", f"%{query}%"])
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        params.append(top)
+        try:
+            with sqlite_connect(self._db_path) as conn:
+                cursor = conn.execute(sql, params)
+                cols = [d[0] for d in cursor.description] if cursor.description else []
+                rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+        except Exception as exc:
+            logger.warning("[memory_manager] query_episodic failed: %s", exc)
+            return []
+
+        # 反序列化 JSON 字段，方便上层使用
+        json_fields = ("lessons", "quality_dimensions", "key_decisions",
+                       "files_touched", "metadata")
+        for row in rows:
+            for field in json_fields:
+                if field in row and isinstance(row[field], str):
+                    try:
+                        row[field] = _json.loads(row[field])
+                    except (ValueError, TypeError):
+                        pass
+        return rows

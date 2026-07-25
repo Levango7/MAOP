@@ -123,6 +123,14 @@ class TestHasFeature:
         assert has_feature(FeatureFlag.COST_TRACKING) is True
         assert has_feature(FeatureFlag.POSTGRESQL) is True
 
+    def test_enterprise_planned_features_disabled(self):
+        # RABBITMQ 和 ETCD 是 PLANNED 但尚未实现 —— 在对应 backend 模块
+        # (backends_rabbitmq.py / backends_distributed.py) 实现之前，
+        # ENTERPRISE 版不应启用这两个 flag。
+        set_edition(Edition.ENTERPRISE)
+        assert has_feature(FeatureFlag.RABBITMQ) is False
+        assert has_feature(FeatureFlag.ETCD) is False
+
     def test_string_flag(self):
         set_edition(Edition.PERSONAL)
         assert has_feature("rbac") is False
@@ -185,8 +193,8 @@ class TestBackendDefaults:
         defaults = backend_defaults()
         assert defaults["storage"] == "postgresql"
         assert defaults["cache"] == "redis"
-        assert defaults["queue"] == "rabbitmq"
-        assert defaults["kv"] == "etcd"
+        assert defaults["queue"] == "redis"  # RabbitMQ backend PLANNED, not yet implemented
+        assert defaults["kv"] == "sqlite"  # etcd backend PLANNED, not yet implemented
         assert defaults["secret"] == "vault"
 
 

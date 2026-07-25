@@ -218,8 +218,10 @@ _rl_rate = float(os.environ.get("MAOP_RATE_LIMIT_RPS", "30"))
 _rl_burst = int(os.environ.get("MAOP_RATE_LIMIT_BURST", "60"))
 app.add_middleware(RateLimitMiddleware, rate=_rl_rate, burst=_rl_burst, enabled=_rl_enabled)
 # C-P0-1 fix: production defaults to auth enabled for safety
+# 配置统一由 settings.py 的 MAOPSettings.auth_enabled 提供（支持 MAOP_AUTH_ENABLED
+# 和 MAOP_AUTH 两个 env alias），消除 server.py 直接读 os.getenv 的双真相源问题。
 _env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
-_auth_enabled = os.environ.get("MAOP_AUTH", "1" if _env_is_prod else "0") == "1"
+_auth_enabled = _get_settings().auth_enabled
 if _env_is_prod and not _auth_enabled:
     logger.warning("[security] MAOP_AUTH=0 in production — all write endpoints exposed!")
 app.add_middleware(

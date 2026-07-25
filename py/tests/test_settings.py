@@ -8,7 +8,15 @@ import pytest
 
 
 class TestMAOPSettings:
-    def test_default_values(self):
+    def test_default_values(self, monkeypatch):
+        # 显式清理影响默认值的环境变量，确保测试隔离。
+        # 某些 e2e 测试（如 test_auth_enabled.py）在模块级
+        # os.environ["MAOP_AUTH"] = "1" 不会自动清理，会污染后续测试。
+        for var in (
+            "MAOP_AUTH", "MAOP_AUTH_ENABLED", "MAOP_ENV",
+            "MAOP_DEBUG", "MAOP_TLS_ENABLED",
+        ):
+            monkeypatch.delenv(var, raising=False)
         from maop.config.settings import MAOPSettings
         s = MAOPSettings()
         assert s.project_name == "MAOP"

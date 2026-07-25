@@ -59,6 +59,11 @@ class RegisteredAgent(BaseModel):
     consecutive_failures: int = 0
     registered_at: str = ""
     source: str = "scanned"
+    # AgentMeta: 编排语义元信息（驱动 PipelineOrchestrator 动态决策）
+    # 见 config/agents.yaml 中的 extracts_queries / supports_regeneration / results_merge
+    extracts_queries: bool = False        # 该 agent 是否从输入中提取子查询
+    supports_regeneration: bool = False   # 该 agent 是否支持结果再生成
+    results_merge: bool = False           # 该 agent 是否合并多个子结果
 
 
 class AgentRegistry:
@@ -117,6 +122,87 @@ class AgentRegistry:
                 CREATE INDEX IF NOT EXISTS idx_health_log_agent
                 ON health_log(agent_name, checked_at)
             """)
+            # AgentMeta 字段增量迁移（向后兼容：旧库无这 3 列时自动补齐）
+            self._migrate_schema(conn)
+
+    def _migrate_schema(self, conn: sqlite3.Connection) -> None:
+        """增量迁移 registered_agents 表：补齐 AgentMeta 字段。
+
+        SQLite 不支持 ``ADD COLUMN IF NOT EXISTS``，因此先用 PRAGMA table_info
+        检查列是否存在，缺失则补加。保证旧库无感升级。
+        """
+        cursor = conn.execute("PRAGMA table_info(registered_agents)")
+        existing_cols: set[str] = {row[1] for row in cursor.fetchall()}
+        new_cols: list[tuple[str, str]] = [
+            ("extracts_queries", "INTEGER DEFAULT 0"),
+            ("supports_regeneration", "INTEGER DEFAULT 0"),
+            ("results_merge", "INTEGER DEFAULT 0"),
+        ]
+        for col_name, col_def in new_cols:
+            if col_name not in existing_cols:
+                conn.execute(
+                    f"ALTER TABLE registered_agents ADD COLUMN {col_name} {col_def}"
+                )
+                logger.info("[registry] Migrated schema: added column %s", col_name)
+
+    def register_from_config(self, config_path: str | Path) -> int:
+        """从 agents.yaml 加载并注册 agent。
+
+        直接读取 YAML（不依赖 ``maop.config.loader.AgentDef``），从而支持
+        AgentMeta 字段（``extracts_queries`` / ``supports_regeneration`` /
+        ``results_merge``）的解析。已存在的 agent 会被覆盖更新。
+
+        Parameters
+        ----------
+        config_path : str | Path
+            agents.yaml 文件路径。
+
+        Returns
+        -------
+        int
+            成功注册的 agent 数量。
+        """
+        import yaml
+
+        cfg_path = Path(config_path)
+        if not cfg_path.exists():
+            logger.warning("[registry] Config file not found: %s", cfg_path)
+            return 0
+
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+        except Exception as exc:
+            logger.warning("[registry] Failed to parse %s: %s", cfg_path, exc)
+            return 0
+
+        agents_data: dict[str, Any] = data.get("agents", {}) or {}
+        count = 0
+        for name, entry in agents_data.items():
+            if not isinstance(entry, dict):
+                continue
+            reg = RegisteredAgent(
+                name=name,
+                cli_path=entry.get("cli", ""),
+                capabilities=entry.get("capabilities", []) or [],
+                description=entry.get("description", ""),
+                model=entry.get("model", ""),
+                driver=entry.get("driver", "cli"),
+                cli_args=entry.get("cli_args", ""),
+                timeout_s=entry.get("timeout_s", 120),
+                enabled=entry.get("enabled", True),
+                provider=entry.get("provider", ""),
+                # AgentMeta: 编排语义元信息（驱动 PipelineOrchestrator）
+                extracts_queries=bool(entry.get("extracts_queries", False)),
+                supports_regeneration=bool(entry.get("supports_regeneration", False)),
+                results_merge=bool(entry.get("results_merge", False)),
+                source="config",
+                health="unknown",
+            )
+            self.register(reg)
+            count += 1
+        logger.info("[registry] Loaded %d agents from %s", count, cfg_path)
+        return count
 
     def register(self, agent: RegisteredAgent) -> RegisteredAgent:
         if not agent.registered_at:
@@ -310,14 +396,18 @@ class AgentRegistry:
                    (name, cli_path, version, provider, capabilities, description,
                     model, driver, cli_args, timeout_s, enabled, health,
                     last_health_check, last_latency_ms, consecutive_failures,
-                    registered_at, source)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    registered_at, source,
+                    extracts_queries, supports_regeneration, results_merge)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,?,?)""",
                 (agent.name, agent.cli_path, agent.version, agent.provider,
                  json.dumps(agent.capabilities), agent.description,
                  agent.model, agent.driver, agent.cli_args, agent.timeout_s,
                  1 if agent.enabled else 0, agent.health,
                  agent.last_health_check, agent.last_latency_ms,
-                 agent.consecutive_failures, agent.registered_at, agent.source),
+                 agent.consecutive_failures, agent.registered_at, agent.source,
+                 1 if agent.extracts_queries else 0,
+                 1 if agent.supports_regeneration else 0,
+                 1 if agent.results_merge else 0),
             )
 
     @staticmethod
@@ -328,6 +418,14 @@ class AgentRegistry:
             capabilities = json.loads(row["capabilities"]) if row["capabilities"] else []
         except (json.JSONDecodeError, TypeError):
             pass
+
+        def _get_bool(key: str, default: bool = False) -> bool:
+            """从 sqlite3.Row 安全读取布尔列（兼容旧库无此列的情况）。"""
+            try:
+                return bool(row[key])
+            except (KeyError, IndexError):
+                return default
+
         return RegisteredAgent(
             name=row["name"], cli_path=row["cli_path"], version=row["version"],
             provider=row["provider"], capabilities=capabilities,
@@ -338,4 +436,8 @@ class AgentRegistry:
             last_latency_ms=row["last_latency_ms"],
             consecutive_failures=row["consecutive_failures"],
             registered_at=row["registered_at"], source=row["source"],
+            # AgentMeta: 编排语义元信息
+            extracts_queries=_get_bool("extracts_queries"),
+            supports_regeneration=_get_bool("supports_regeneration"),
+            results_merge=_get_bool("results_merge"),
         )

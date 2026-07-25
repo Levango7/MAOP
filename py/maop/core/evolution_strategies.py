@@ -44,7 +44,10 @@ class EvolutionDecision(BaseModel):
 
 
 class StrategyConfig(BaseModel):
-    auto_apply_high: bool = True
+    # 默认不自动应用 HIGH 严重级别的配置变更。
+    # 需显式启用 auto_apply_high=True 或通过 approval token 手动批准，
+    # 避免高影响变更未经审核即生效（安全默认值，原为 True）。
+    auto_apply_high: bool = False
     auto_apply_medium: bool = False
     auto_apply_low: bool = False
     cooldown_seconds: int = 3600

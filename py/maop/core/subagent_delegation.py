@@ -26,7 +26,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.core.db_utils import sqlite_connect
+from maop.core.subagent_db import get_subagent_db_path, migrate_legacy_subagent_db
 
 logger = logging.getLogger(__name__)
 
@@ -69,50 +70,28 @@ class AgentTreeNode(BaseModel):
 # Both have production callers:
 #   - SubagentManager (this class): used by delegate/dispatcher.py (main dispatch)
 #   - SubAgentManager: used by dashboard/routers/subagent.py (dashboard API)
-# Future work: consider merging into a single canonical implementation.
+# Both share the same ``subagents`` table via maop.core.subagent_db (unified
+# schema = field superset of the two implementations) to avoid the previous
+# dual-DB / dual-schema conflict where the second manager to initialize would
+# find the wrong column set. Future work: consider merging into a single
+# canonical implementation.
 
 class SubagentManager:
     """Manage hierarchical agent delegation and inter-agent communication."""
 
     def __init__(self, root_dir: str | Path = "data") -> None:
         self._root = Path(root_dir)
-        self._db_path = get_db_path("subagent")
+        self._db_path = get_subagent_db_path()
         self._init_db()
 
     def _init_db(self) -> None:
+        """初始化 subagent DB（共享 schema，自动迁移旧表）。
+
+        使用 maop.core.subagent_db 的统一 schema（两套实现的字段超集），
+        并自动迁移旧 DB 文件中可能存在的缺列场景。
+        """
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite_connect(self._db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS subagents (
-                    id TEXT PRIMARY KEY,
-                    parent_agent TEXT NOT NULL,
-                    child_agent TEXT NOT NULL,
-                    task TEXT DEFAULT '',
-                    status TEXT DEFAULT 'spawned',
-                    created_at TEXT NOT NULL,
-                    finished_at TEXT DEFAULT '',
-                    exit_code INTEGER,
-                    depth INTEGER DEFAULT 0
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS agent_messages (
-                    id TEXT PRIMARY KEY,
-                    sender TEXT NOT NULL,
-                    recipient TEXT NOT NULL,
-                    msg_type TEXT DEFAULT 'info',
-                    payload TEXT DEFAULT '{}',
-                    created_at TEXT NOT NULL
-                )
-            """)
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_sub_parent
-                ON subagents(parent_agent, status)
-            """)
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_msg_recipient
-                ON agent_messages(recipient, created_at)
-            """)
+        migrate_legacy_subagent_db()
 
     def spawn(
         self,

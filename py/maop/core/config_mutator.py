@@ -29,6 +29,9 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
+from maop.core.filelock import FileLock
+from maop.core.safe_writer import safe_write_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -123,10 +126,25 @@ class ConfigMutator:
             return yaml.safe_load(f) or {}
 
     def _save_yaml(self, data: dict[str, Any]) -> None:
-        """Save dict back to agents.yaml."""
+        """原子写入 dict 到 agents.yaml，防止崩溃导致配置损坏。
+
+        使用 safe_write_text 原子写入（先写临时文件 → fsync → os.replace），
+        并通过 FileLock 文件锁防止并发写入冲突。写入后回读校验 YAML 合法性，
+        若解析失败则抛出异常，由上层 apply_suggestion 的 backup 恢复机制处理。
+        """
         import yaml
-        with open(self._agents_yaml, "w", encoding="utf-8") as f:
-            yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        content = yaml.safe_dump(
+            data,
+            allow_unicode=True,
+            sort_keys=False,
+            default_flow_style=False,
+        )
+        lock_path = self._agents_yaml.with_suffix(self._agents_yaml.suffix + ".lock")
+        with FileLock(str(lock_path), timeout_seconds=10):
+            safe_write_text(self._agents_yaml, content, encoding="utf-8")
+            # 回读校验：确保写入的 YAML 可正常解析
+            with open(self._agents_yaml, encoding="utf-8") as f:
+                yaml.safe_load(f)  # 解析失败会抛异常，触发上层 backup 恢复
 
     def _backup_yaml(self) -> Path | None:
         """Create a timestamped backup of agents.yaml."""
