@@ -444,6 +444,38 @@ agents:
     driver: cli
     model: auto
     timeout_s: 120
+  MAOP:
+    capabilities:
+    - codegen
+    - chat
+    - planning
+    - search
+    - review
+    - explain
+    - orchestrate
+    - verify
+    - memory
+    - mcp
+    - pipeline
+    - vision
+    - multimodal
+    cli: python
+    cli_args: -m maop.cli run --task "{task}"
+    description: MAOP v4.3 self-referential agent — can delegate to itself (max_self_ref_depth=3)
+    driver: cli
+    model: auto
+    timeout_s: 180
+    subagents:
+      self:
+        cli_args: -m maop.cli run --task "{task}" --depth {depth}
+        capabilities:
+        - codegen
+        - chat
+        - planning
+        - orchestrate
+        - vision
+        - multimodal
+        description: MAOP self-delegation subagent
 loops:
   iterative:
     backoff_ms: 2000
@@ -696,38 +728,6 @@ routing:
     - compose
     - 调度
     match: (?:orchestrat|编排|协调|compose|调度)
-  MAOP:
-    capabilities:
-    - codegen
-    - chat
-    - planning
-    - search
-    - review
-    - explain
-    - orchestrate
-    - verify
-    - memory
-    - mcp
-    - pipeline
-    - vision
-    - multimodal
-    cli: python
-    cli_args: -m maop.cli run --task "{task}"
-    description: MAOP v4.3 self-referential agent — can delegate to itself (max_self_ref_depth=3)
-    driver: cli
-    model: auto
-    timeout_s: 180
-    subagents:
-      self:
-        cli_args: -m maop.cli run --task "{task}" --depth {depth}
-        capabilities:
-        - codegen
-        - chat
-        - planning
-        - orchestrate
-        - vision
-        - multimodal
-        description: MAOP self-delegation subagent
 workflows:
   doc-pipeline:
     capabilities:

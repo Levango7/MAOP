@@ -1,4 +1,4 @@
-﻿"""MAOP Artifact Store — Versioned file snapshots with rollback support.
+"""MAOP Artifact Store — Versioned file snapshots with rollback support.
 
 Provides:
   - Save artifacts (files or content) with version tracking
@@ -30,6 +30,7 @@ from typing import Any, cast
 from pydantic import BaseModel, Field
 
 from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.core.safe_writer import safe_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +121,16 @@ class ArtifactStore:
         tag: str = "",
         metadata: dict[str, Any] | None = None,
     ) -> int:
+        # 校验 name 防止路径遍历：禁止空值、包含 ".." 或 NUL 字节、以及以路径分隔符开头
+        if not name or any(seg in name for seg in ("..", "\x00")) or name.startswith(("/", "\\")):
+            raise ValueError(f"Invalid artifact name: {name!r}")
+        # 检查解析后路径仍在 blob_dir 内，防止 name 通过符号链接或其他方式逃逸
+        candidate = (self._blob_dir / name).resolve()
+        try:
+            candidate.relative_to(self._blob_dir.resolve())
+        except ValueError:
+            raise ValueError(f"Artifact name escapes blob dir: {name!r}")
+
         now = datetime.now(timezone.utc).isoformat()
         content_hash = self._hash_content(content)
         size = len(content.encode("utf-8"))
@@ -145,7 +156,8 @@ class ArtifactStore:
             blob_path = f"{name}/v{version}"
             blob_file = self._blob_dir / blob_path
             blob_file.parent.mkdir(parents=True, exist_ok=True)
-            blob_file.write_text(content, encoding="utf-8")
+            # 使用 safe_write_text 进行原子写入，防止崩溃导致数据损坏
+            safe_write_text(blob_file, content, encoding="utf-8")
 
             conn.execute(
                 "INSERT INTO artifact_versions (id, artifact_name, version, content_hash, size_bytes, tag, metadata, blob_path, created_at) "
@@ -219,18 +231,27 @@ class ArtifactStore:
         return [ArtifactInfo(**dict(r)) for r in rows]
 
     def delete_artifact(self, name: str) -> bool:
+        # 先收集 blob 路径，再删除 DB 记录，最后清理文件。
+        # 顺序：DB 删除 → 文件删除，这样即使文件删除失败也不会产生孤儿 DB 记录
+        # （孤儿文件比孤儿 DB 记录安全得多，因为 load() 通过 DB 索引定位文件）。
         with self._connect() as conn:
             versions = conn.execute(
                 "SELECT blob_path FROM artifact_versions WHERE artifact_name=?", (name,),
             ).fetchall()
-            for v in versions:
-                try:
-                    Path(v["blob_path"]).unlink(missing_ok=True)
-                except Exception:
-                    pass
+            # 先删 DB 记录
             conn.execute("DELETE FROM artifact_versions WHERE artifact_name=?", (name,))
             cursor = conn.execute("DELETE FROM artifacts WHERE name=?", (name,))
-            return cast(bool, cursor.rowcount > 0)
+            deleted = cursor.rowcount > 0
+
+        # DB 记录删除成功后再清理 blob 文件（保留 try/except，避免文件系统
+        # 错误影响整体删除语义）
+        for v in versions:
+            try:
+                Path(v["blob_path"]).unlink(missing_ok=True)
+            except Exception as exc:
+                logger.warning("[artifact] 清理 blob 文件失败 %s: %s", v["blob_path"], exc)
+
+        return cast(bool, deleted)
 
     def tag_version(self, name: str, version: int, tag: str) -> bool:
         with self._connect() as conn:
