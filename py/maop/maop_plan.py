@@ -285,7 +285,7 @@ def maop_plan(
 
 # ── Workflow DSL Engine ────────────────────────────────────────
 
-class StepResult(BaseModel):
+class PlanStepResult(BaseModel):
     step_index: int
     agent: str
     status: str = "pending"
@@ -298,7 +298,7 @@ class WorkflowResult(BaseModel):
     steps_total: int = 0
     steps_completed: int = 0
     steps_skipped: int = 0
-    step_results: list[StepResult] = Field(default_factory=list)
+    step_results: list[PlanStepResult] = Field(default_factory=list)
     variables: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -429,7 +429,7 @@ def _execute_step(
     step_outputs: dict[str, Any],
 ) -> None:
     """Execute a single workflow step and update result."""
-    sr = StepResult(step_index=index, agent=step.agent)
+    sr = PlanStepResult(step_index=index, agent=step.agent)
 
     resolved_task = _interpolate_vars(step.task, result.variables)
 

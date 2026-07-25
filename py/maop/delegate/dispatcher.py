@@ -13,6 +13,7 @@ Architecture (split for maintainability):
 from __future__ import annotations
 
 import asyncio
+import time
 import logging
 from typing import Any
 
@@ -341,8 +342,9 @@ class Dispatcher:
                 return
             if incoming_priority < min(running_priorities):
                 MAOP_TASK_PREEMPTION_TOTAL.inc()
-        except Exception:
-            pass
+        except Exception as exc:
+            # H10 fix (Phase R7): metrics 记录失败不应静默
+            logger.debug("preemption metric record failed: %s", exc)
 
     def _resolve_agent(self, agent_name: str) -> AgentConfig | None:
         """Resolve agent config from the loaded MAOP config.
@@ -694,8 +696,7 @@ class Dispatcher:
         span. A :class:`RoutingDecisionRecord` is persisted so the
         dashboard can explain the dispatch decision.
         """
-        import time as _time
-        _start = _time.monotonic()
+        _start = time.monotonic()
         sla_tier = _tier_from_priority(priority)
         routing_tracer = get_tracer("maop.routing.dispatcher")
         with otel_span(
@@ -730,13 +731,14 @@ class Dispatcher:
                 _routing_span.set_attribute("routing.selected_agent", agent)
                 _routing_span.set_attribute("routing.selected_model", selected_model)
                 _routing_span.set_attribute("routing.sla_tier", sla_tier)
-            except Exception:
-                pass
+            except Exception as exc:
+                # H10 fix (Phase R7): span 属性设置失败不应静默
+                logger.debug("routing span attribute set failed: %s", exc)
             _record_dispatcher_decision(
                 trace_id=trace_id, agent=agent, routing_key=routing_key,
                 priority=priority, sla_tier=sla_tier, deadline_ms=deadline_ms,
                 selected_model=selected_model,
-                duration_ms=(_time.monotonic() - _start) * 1000.0,
+                duration_ms=(time.monotonic() - _start) * 1000.0,
             )
             return result
 
@@ -940,8 +942,7 @@ class Dispatcher:
 
         # 4. Execute via driver — wrap in try/except to ensure failures are recorded
         # in circuit-breaker and route scorer cooldown (P0-3 + P1-7 fix)
-        import time as _time
-        _dispatch_start = _time.monotonic()
+        _dispatch_start = time.monotonic()
         # P2-7 fix: record task start to LoadBalancer for adaptive scoring.
         # Phase γ-1: SLA context (priority, deadline_ms) is in scope here
         # for a future LoadBalancer enhancement that weights SLA when
@@ -971,7 +972,7 @@ class Dispatcher:
             if lb:
                 lb.record_finish(
                     agent, trace_id or task[:32],
-                    duration_ms=(_time.monotonic() - _dispatch_start) * 1000,
+                    duration_ms=(time.monotonic() - _dispatch_start) * 1000,
                     success=result.is_success(),
                 )
         except Exception as exc:
@@ -1067,7 +1068,6 @@ def _record_dispatcher_decision(
     record is the entry point for reconstructing the full Plan → Route
     → LB → ModelSelect trace via ``query_by_trace(trace_id)``.
     """
-    import time as _time
     otel_trace_id, span_id, parent_span_id = get_active_span_context()
     effective_trace = trace_id or otel_trace_id
 
@@ -1081,14 +1081,15 @@ def _record_dispatcher_decision(
     try:
         MAOP_ROUTING_DECISION_TOTAL.inc(labels={"stage": "dispatcher"})
         MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)
-    except Exception:
-        pass
+    except Exception as exc:
+        # H10 fix (Phase R7): routing metric 记录失败不应静默
+        logger.debug("routing decision metric record failed: %s", exc)
 
     record_decision_safe(RoutingDecisionRecord(
         trace_id=effective_trace,
         span_id=span_id,
         parent_span_id=parent_span_id,
-        timestamp=_time.time(),
+        timestamp=time.time(),
         stage="dispatcher",
         input_summary={
             "agent": agent,

@@ -20,6 +20,10 @@ from typing import Any, Awaitable, Callable, Union
 
 logger = logging.getLogger(__name__)
 
+# M7 fix (Phase R7): 默认上限提取为命名常量，便于统一调整
+_DEFAULT_MAX_HISTORY = 200
+_DEFAULT_MAX_DEAD_LETTERS = 1000
+
 # ── Event model ───────────────────────────────────────────────
 
 
@@ -119,9 +123,9 @@ class EventBus:
         self._subs: dict[str, list[_Subscription]] = defaultdict(list)
         self._counter = 0
         self._history: list[Event] = []
-        self._max_history = 200
+        self._max_history = _DEFAULT_MAX_HISTORY
         self._dead_letters: list[DeadLetterEntry] = []
-        self._max_dead_letters = 1000
+        self._max_dead_letters = _DEFAULT_MAX_DEAD_LETTERS
         # Track in-flight retry tasks so we can await them on close
         self._retry_tasks: list[asyncio.Task] = []
 
