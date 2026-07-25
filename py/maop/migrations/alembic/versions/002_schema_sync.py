@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Sequence, Union
 
 from alembic import op
+import sqlalchemy as sa
 
 revision: str = "002"
 down_revision: Union[str, None] = "001"
@@ -23,9 +24,35 @@ def upgrade() -> None:
 
     sql_path = Path(os.environ.get("MAOP_ROOT", ".")) / "data" / "migrations" / "002_schema_sync.sql"
     if sql_path.exists():
-        op.execute(sql_path.read_text(encoding="utf-8"))
+        # SQLite cursor.execute() 不支持多语句，按 ';' 分割逐条执行
+        sql = sql_path.read_text(encoding="utf-8")
+        conn = op.get_bind()
+        for stmt in sql.split(";"):
+            lines = [ln for ln in stmt.splitlines() if not ln.strip().startswith("--")]
+            cleaned = "\n".join(lines).strip()
+            if cleaned:
+                conn.execute(sa.text(cleaned))
 
 
 def downgrade() -> None:
-    # Cannot easily reverse ALTER TABLE ADD COLUMN in SQLite
-    pass
+    """回滚 002 创建的表和索引。
+
+    注意：queue_messages 新增的列无法在 SQLite 中 DROP COLUMN（旧版本限制），
+    但 001 的 downgrade 会 DROP 整个 queue_messages 表，所以不影响幂等性。
+    """
+    # DROP 002 创建的索引（逆序）
+    op.execute("DROP INDEX IF EXISTS idx_eh_applied_at")
+    op.execute("DROP INDEX IF EXISTS idx_eh_agent")
+    op.execute("DROP INDEX IF EXISTS idx_bl_agent")
+    op.execute("DROP INDEX IF EXISTS idx_bl_tenant_ts")
+    op.execute("DROP INDEX IF EXISTS idx_ckpt_status")
+    op.execute("DROP INDEX IF EXISTS idx_ckpt_run")
+    op.execute("DROP INDEX IF EXISTS idx_qm_cg_status_visible")
+    op.execute("DROP INDEX IF EXISTS idx_qm_status_dequeued")
+    # DROP 002 创建的表（逆序）
+    op.execute("DROP TABLE IF EXISTS evolve_history")
+    op.execute("DROP TABLE IF EXISTS agent_performance")
+    op.execute("DROP TABLE IF EXISTS budget_ledger")
+    op.execute("DROP TABLE IF EXISTS jwt_revoked")
+    op.execute("DROP TABLE IF EXISTS pipeline_step_checkpoints")
+    op.execute("DROP TABLE IF EXISTS pipeline_runs")
