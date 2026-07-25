@@ -142,10 +142,28 @@ class MCPDiscovery:
             args = server_info.get("args", [])
             env = server_info.get("env", {})
             url = server_info.get("url", "")
-
-            transport = TransportType.STDIO if command else (
-                TransportType.SSE if url else TransportType.STDIO
+            headers = server_info.get("headers", {})
+            # δ-4: accept both ``transport`` (legacy) and ``transport_type``
+            # keys. The Claude Desktop format never specified a transport
+            # field, but MAOP configs that mirror it may include one
+            # explicitly to opt into streamable_http.
+            transport_str = (
+                server_info.get("transport_type")
+                or server_info.get("transport")
+                or ""
             )
+
+            if transport_str:
+                try:
+                    transport = TransportType(transport_str)
+                except ValueError:
+                    transport = TransportType.STDIO if command else (
+                        TransportType.SSE if url else TransportType.STDIO
+                    )
+            else:
+                transport = TransportType.STDIO if command else (
+                    TransportType.SSE if url else TransportType.STDIO
+                )
 
             configs.append(MCPServerConfig(
                 name=name,
@@ -154,6 +172,9 @@ class MCPDiscovery:
                 args=args if isinstance(args, list) else [],
                 env=env if isinstance(env, dict) else {},
                 url=url,
+                headers=headers if isinstance(headers, dict) else {},
+                # δ-4: pre-seed session id when provided (streamable_http).
+                session_id=server_info.get("session_id", "") or "",
             ))
             seen_names.add(name)
 
@@ -191,12 +212,21 @@ class MCPDiscovery:
             if not isinstance(server_info, dict):
                 continue
 
-            transport_str = server_info.get("transport", "stdio")
+            # δ-4: accept both ``transport`` (legacy) and ``transport_type``
+            # (MCP 2025 streamable_http friendly) keys. transport_type
+            # takes precedence so an explicit streamable_http declaration
+            # is honoured even if a stale ``transport: sse`` lingers.
+            transport_str = (
+                server_info.get("transport_type")
+                or server_info.get("transport")
+                or "stdio"
+            )
             try:
                 transport = TransportType(transport_str)
             except ValueError:
                 transport = TransportType.STDIO
 
+            headers = server_info.get("headers", {})
             configs.append(MCPServerConfig(
                 name=name,
                 transport=transport,
@@ -204,6 +234,9 @@ class MCPDiscovery:
                 args=server_info.get("args", []),
                 env=server_info.get("env", {}),
                 url=server_info.get("url", ""),
+                headers=headers if isinstance(headers, dict) else {},
+                # δ-4: pre-seed session id when provided (streamable_http).
+                session_id=server_info.get("session_id", "") or "",
             ))
             seen_names.add(name)
 

@@ -35,7 +35,6 @@ class ToolCallRequest(BaseModel):
 
 
 _mcp_hub = None
-_mcp_registry = None
 
 
 def _get_hub() -> Any:
@@ -46,21 +45,19 @@ def _get_hub() -> Any:
     return _mcp_hub
 
 
-def _get_registry() -> Any:
-    global _mcp_registry
-    if _mcp_registry is None:
-        from maop.core.mcp_registry import MCPRegistry
-        _mcp_registry = MCPRegistry(root_dir=str(MAOP_ROOT))
-    return _mcp_registry
-
-
 @router.post("/connect/{server_name}")
 @handle_api_errors
 async def connect_server(server_name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
-    ok = await hub.connect_server(server_name)
-    return {"status": "ok" if ok else "failed", "server": server_name}
+    # δ-1: use MCPHub.connect(config) — look up previously registered config by name
+    config = hub.get_server_config(server_name)
+    if config is None:
+        return {"status": "failed", "server": server_name}
+    # Clear the old record so connect() inserts a fresh connected record
+    hub.remove_server(server_name)
+    server_id = await hub.connect(config)
+    return {"status": "ok" if server_id else "failed", "server": server_name}
 
 
 @router.post("/disconnect/{server_name}")
@@ -68,7 +65,10 @@ async def connect_server(server_name: str, request: Request) -> dict[str, Any]:
 async def disconnect_server(server_name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
-    await hub.disconnect_server(server_name)
+    # δ-1: use MCPHub.disconnect(server_id) — resolve name to id
+    server_id = hub.find_server_id_by_name(server_name)
+    if server_id is not None:
+        await hub.disconnect(server_id)
     return {"status": "ok", "server": server_name}
 
 
@@ -93,7 +93,6 @@ async def add_server(body: ServerCreate, request: Request) -> dict[str, Any]:
         args=body.args,
         url=body.url,
         env=body.env,
-
     )
     hub.add_server(config)
     return {"status": "ok", "server": body.name}
@@ -121,7 +120,7 @@ async def list_tools() -> dict[str, Any]:
 async def call_tool(body: ToolCallRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
-    result = await hub.call_tool(body.tool, body.arguments)
+    result = await hub.call_tool_by_name(body.tool, body.arguments)
     return result.model_dump() if hasattr(result, "model_dump") else result
 
 
@@ -129,5 +128,5 @@ async def call_tool(body: ToolCallRequest, request: Request) -> dict[str, Any]:
 @handle_api_errors
 async def health_check() -> dict[str, Any]:
     hub = _get_hub()
-    health = hub.health_check_all()
+    health = await hub.health_check_all()
     return {"health": health}

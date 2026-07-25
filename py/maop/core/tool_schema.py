@@ -136,8 +136,9 @@ class ToolSchemaGenerator:
 
     def from_mcp_tool(self, mcp_tool: Any) -> ToolSchemaDef:
         """Convert an MCPToolDef to a ToolSchemaDef."""
-        from maop.core.mcp_client import MCPToolDef
-        if isinstance(mcp_tool, MCPToolDef):
+        # δ-1: migrated from MCPToolDef (Stack B) to MCPTool (Stack A)
+        from maop.core.mcp_hub import MCPTool
+        if isinstance(mcp_tool, MCPTool):
             qualified = f"{mcp_tool.server_name}.{mcp_tool.name}" if mcp_tool.server_name else mcp_tool.name
             return ToolSchemaDef(
                 name=qualified,
@@ -194,8 +195,13 @@ class ToolSchemaGenerator:
     def _collect_mcp_schemas(self) -> list[ToolSchemaDef]:
         schemas = []
         try:
-            from maop.core.mcp_registry import get_mcp_registry
-            registry = get_mcp_registry(self._root_dir)
+            # δ-1: migrated from MCPRegistry (Stack B) to MCPHub (Stack A)
+            from maop.core.mcp_hub import MCPHub
+            root = self._root_dir
+            if root is None:
+                from pathlib import Path
+                root = str(Path(__file__).resolve().parent.parent.parent)
+            registry = MCPHub(root_dir=root)
             for tool in registry.all_tools():
                 schemas.append(self.from_mcp_tool(tool))
         except Exception as exc:

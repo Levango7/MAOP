@@ -145,6 +145,130 @@ def cmd_health() -> Any:
         sys.exit(1)
 
 
+def cmd_mcp_marketplace(args: list[str]) -> Any:
+    """Handle ``mcp marketplace <subcommand>`` — registry and server management.
+
+    Subcommands:
+        list-registries                         List configured registries
+        add-registry <name> <url> [--trusted]   Add a registry
+        remove-registry <name>                  Remove a registry
+        search <query> [--tags t1,t2]           Search the catalog
+        install <name> [--registry R] [--no-verify] [--confirm-untrusted]
+        uninstall <name>                        Remove an installed server
+        list-installed                          List installed marketplace servers
+    """
+    parser = argparse.ArgumentParser(
+        prog="maop mcp marketplace",
+        description="MCP Marketplace — discover and install MCP servers from remote registries",
+    )
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    sub.add_parser("list-registries", help="List all configured registries")
+
+    p_add = sub.add_parser("add-registry", help="Add a registry")
+    p_add.add_argument("name", help="Registry name")
+    p_add.add_argument("url", help="Registry URL (HTTP/HTTPS)")
+    p_add.add_argument("--trusted", action="store_true", help="Mark registry as trusted")
+
+    p_remove = sub.add_parser("remove-registry", help="Remove a registry")
+    p_remove.add_argument("name", help="Registry name")
+
+    p_search = sub.add_parser("search", help="Search servers in the catalog")
+    p_search.add_argument("query", help="Search query (matches name/description)")
+    p_search.add_argument("--tags", default="", help="Comma-separated tags to filter by")
+
+    p_install = sub.add_parser("install", help="Install a server from the marketplace")
+    p_install.add_argument("name", help="Server name to install")
+    p_install.add_argument("--registry", default=None, help="Install from a specific registry")
+    p_install.add_argument("--no-verify", action="store_true", help="Skip checksum verification")
+    p_install.add_argument(
+        "--confirm-untrusted", action="store_true",
+        help="Confirm installing from an untrusted registry without a checksum",
+    )
+
+    p_uninstall = sub.add_parser("uninstall", help="Uninstall a marketplace server")
+    p_uninstall.add_argument("name", help="Server name to uninstall")
+
+    sub.add_parser("list-installed", help="List installed marketplace servers")
+
+    parsed = parser.parse_args(args)
+
+    from maop.core.mcp_marketplace import MCPMarketplace
+    # Use the project-root config dir so reads/writes stay local to the project
+    # (not the package-shipped default, which is read-only).
+    config_path = MAOP_ROOT / "config" / "mcp_marketplace.yaml"
+    mp = MCPMarketplace(config_path=config_path)
+
+    if parsed.subcommand == "list-registries":
+        regs = mp.list_registries()
+        if not regs:
+            print("No registries configured.")
+        for r in regs:
+            trust = "trusted" if r.trusted else "untrusted"
+            status = "enabled" if r.enabled else "disabled"
+            print(f"  {r.name}: {r.url} [{trust}, {status}]")
+    elif parsed.subcommand == "add-registry":
+        mp.add_registry(parsed.name, parsed.url, trusted=parsed.trusted)
+        trust = "trusted" if parsed.trusted else "untrusted"
+        print(f"Added {trust} registry '{parsed.name}' -> {parsed.url}")
+    elif parsed.subcommand == "remove-registry":
+        mp.remove_registry(parsed.name)
+        print(f"Removed registry '{parsed.name}'")
+    elif parsed.subcommand == "search":
+        tags = (
+            [t.strip() for t in parsed.tags.split(",") if t.strip()]
+            if parsed.tags else None
+        )
+        results = mp.search(parsed.query, tags=tags)
+        if not results:
+            print("No servers found.")
+        for s in results:
+            verified = " [verified]" if s.verified else ""
+            tags_str = f" tags={','.join(s.tags)}" if s.tags else ""
+            print(f"  {s.name} v{s.version}{verified}{tags_str}: {s.description}")
+    elif parsed.subcommand == "install":
+        try:
+            cfg = mp.install(
+                parsed.name,
+                registry_name=parsed.registry,
+                verify_checksum=not parsed.no_verify,
+                confirm_untrusted=parsed.confirm_untrusted,
+            )
+            print(f"Installed '{parsed.name}' (transport={cfg.transport.value})")
+        except ValueError as e:
+            print(f"ERROR: {e}")
+            sys.exit(1)
+    elif parsed.subcommand == "uninstall":
+        if mp.uninstall(parsed.name):
+            print(f"Uninstalled '{parsed.name}'")
+        else:
+            print(f"ERROR: '{parsed.name}' is not installed")
+            sys.exit(1)
+    elif parsed.subcommand == "list-installed":
+        installed = mp.list_installed()
+        if not installed:
+            print("No marketplace servers installed.")
+        for s in installed:
+            print(
+                f"  {s.get('name', '?')} v{s.get('version', '?')} "
+                f"(from {s.get('registry', '?')})"
+            )
+
+
+def cmd_mcp(args: list[str]) -> Any:
+    """Handle ``mcp <subcommand>`` — currently only ``marketplace`` is supported."""
+    if not args:
+        print("ERROR: 'mcp' requires a subcommand. Available: marketplace")
+        sys.exit(1)
+    sub = args[0]
+    rest = args[1:]
+    if sub == "marketplace":
+        cmd_mcp_marketplace(rest)
+    else:
+        print(f"ERROR: Unknown mcp subcommand '{sub}'. Available: marketplace")
+        sys.exit(1)
+
+
 def main() -> Any:
     # Enable JSON structured logging when MAOP_JSON_LOG=1 (for ELK / Loki).
     if os.environ.get("MAOP_JSON_LOG", "0") == "1":
@@ -153,6 +277,14 @@ def main() -> Any:
             level=os.environ.get("MAOP_LOG_LEVEL", "INFO"),
             log_file=os.environ.get("MAOP_JSON_LOG_FILE") or None,
         )
+
+    # Handle nested `mcp marketplace ...` commands with their own subparser,
+    # separate from the flat top-level action model. Dispatched before the
+    # main parser so the two structures don't interfere.
+    argv = sys.argv[1:]
+    if argv and argv[0] == "mcp":
+        cmd_mcp(argv[1:])
+        return
 
     parser = argparse.ArgumentParser(description="MAOP - Agent Orchestration Framework")
     parser.add_argument("action", nargs="?", default="start",

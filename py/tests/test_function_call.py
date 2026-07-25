@@ -269,9 +269,10 @@ class TestFromPythonFunction:
 
 class TestFromMCPTool:
     def test_mcp_tool_conversion(self):
-        from maop.core.mcp_client import MCPToolDef
+        # δ-1: migrated from MCPToolDef (Stack B) to MCPTool (Stack A)
+        from maop.core.mcp_hub import MCPTool
         gen = ToolSchemaGenerator()
-        mcp_tool = MCPToolDef(
+        mcp_tool = MCPTool(
             name="read_file",
             description="Read a file",
             input_schema={"type": "object", "properties": {"path": {"type": "string"}}},

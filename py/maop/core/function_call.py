@@ -75,12 +75,17 @@ class FunctionCallBridge:
         }
 
     def _get_mcp_registry(self):
+        # δ-1: migrated from MCPRegistry (Stack B) to MCPHub (Stack A)
         if self._mcp_registry is None:
             try:
-                from maop.core.mcp_registry import get_mcp_registry
-                self._mcp_registry = get_mcp_registry(self._root_dir)
+                from maop.core.mcp_hub import MCPHub
+                root = self._root_dir
+                if root is None:
+                    from pathlib import Path
+                    root = str(Path(__file__).resolve().parent.parent.parent)
+                self._mcp_registry = MCPHub(root_dir=root)
             except Exception as exc:
-                logger.debug("[fn_call] MCPRegistry unavailable: %s", exc)
+                logger.debug("[fn_call] MCPHub unavailable: %s", exc)
         return self._mcp_registry
 
     def _get_tool_manager(self):
@@ -201,25 +206,21 @@ class FunctionCallBridge:
         return result
 
     async def _try_mcp(self, call: ToolCall) -> ToolCallResult | None:
-        registry = self._get_mcp_registry()
-        if registry is None:
+        # δ-1: migrated from MCPRegistry (Stack B) to MCPHub (Stack A)
+        hub = self._get_mcp_registry()
+        if hub is None:
             return None
-        from maop.core.mcp_client import MCPServerStatus
-        client, tool_name = registry.find_tool(call.name)
-        if client is None:
-            return None
-        if client.status != MCPServerStatus.CONNECTED:
-            return ToolCallResult(
-                call_id=call.id, tool_name=call.name,
-                success=False, error=f"MCP server '{client.name}' not connected",
-            )
-        mcp_result = await registry.call_tool(call.name, call.arguments)
+        server_id, tool_name = hub.find_tool(call.name)
+        if server_id is None:
+            return None  # tool not registered in MCP, fall through to ToolManager
+        # call_tool_by_name checks connection internally and returns ToolResult
+        mcp_result = await hub.call_tool_by_name(call.name, call.arguments)
         return ToolCallResult(
             call_id=call.id,
             tool_name=call.name,
-            success=mcp_result.success,
-            output=mcp_result.output,
-            error=mcp_result.error,
+            success=not mcp_result.is_error,
+            output=mcp_result.content if not mcp_result.is_error else None,
+            error=mcp_result.error_message,
         )
 
     async def _try_tool_manager(self, call: ToolCall) -> ToolCallResult | None:
@@ -316,8 +317,9 @@ class FunctionCallBridge:
         return tools
 
     def _mcp_tool_to_openai(self, mcp_tool: Any) -> dict[str, Any]:
-        from maop.core.mcp_client import MCPToolDef
-        if isinstance(mcp_tool, MCPToolDef):
+        # δ-1: migrated from MCPToolDef (Stack B) to MCPTool (Stack A)
+        from maop.core.mcp_hub import MCPTool
+        if isinstance(mcp_tool, MCPTool):
             name = f"{mcp_tool.server_name}.{mcp_tool.name}" if mcp_tool.server_name else mcp_tool.name
             return {
                 "type": "function",

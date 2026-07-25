@@ -1,0 +1,29 @@
+# MCP Marketplace Configuration
+#
+# Remote registries for discovering and installing MCP servers.
+# Only `trusted: true` registries allow automatic installation of
+# servers without a SHA-256 checksum (security constraint).
+#
+# Format:
+#   registries:
+#     - name: <unique-name>
+#       url: <HTTP/HTTPS endpoint returning JSON catalog>
+#       trusted: true|false
+#       enabled: true|false
+#
+# Catalog JSON format (served at `url`):
+#   { "servers": [ { "name": "...", "version": "...", ... } ] }
+#   — or just a bare list: [ { "name": "..." } ]
+
+registries:
+  - name: official
+    url: https://registry.maop.example.com/v1/servers
+    trusted: true
+    enabled: true
+  - name: community
+    url: https://raw.githubusercontent.com/maop/community-mcp/main/catalog.json
+    trusted: false
+    enabled: true
+
+# Cache settings
+cache_ttl_s: 3600  # catalog cache TTL in seconds
