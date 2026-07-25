@@ -237,6 +237,18 @@ class MCPDiscovery:
                 headers=headers if isinstance(headers, dict) else {},
                 # δ-4: pre-seed session id when provided (streamable_http).
                 session_id=server_info.get("session_id", "") or "",
+                # δ-3/δ-5: pass through reconnect + permission-scope fields so
+                # YAML declarations are honoured by the loader. Defaults mirror
+                # MCPServerConfig's schema — using None for the optional lists
+                # preserves the "no restriction" semantics (an empty list would
+                # otherwise block all tools/users/roles per mcp_permission.py).
+                auto_reconnect=server_info.get("auto_reconnect", True),
+                max_reconnect_attempts=server_info.get("max_reconnect_attempts", 3),
+                reconnect_delay_s=server_info.get("reconnect_delay_s", 5.0),
+                allowed_tools=server_info.get("allowed_tools"),
+                denied_tools=server_info.get("denied_tools"),
+                allowed_users=server_info.get("allowed_users"),
+                allowed_roles=server_info.get("allowed_roles"),
             ))
             seen_names.add(name)
 

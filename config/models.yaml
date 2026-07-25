@@ -103,6 +103,19 @@ providers:
     health_check_url: "http://localhost:11434/api/tags"
     enabled: false
 
+  # ── OmniRoute (local AI gateway) ──
+  omniroute:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "http://localhost:20128/v1"
+    api_key_env: OMNIROUTE_API_KEY
+    api_key: "dummy"  # local service, no real key needed; OpenAI client requires non-empty
+    timeout_s: 120
+    max_retries: 3
+    health_check_url: "http://localhost:20128/v1/models"
+    enabled: true
+    description: "OmniRoute local AI gateway - 160+ providers, auto failover, MCP/A2A"
+
 # ── Models ─────────────────────────────────────────────────────
 models:
   # ── StepFun models ──
@@ -391,6 +404,73 @@ models:
     latency_tier: fast
     quality_tier: fair
     enabled: true
+
+  # ── OmniRoute models (local AI gateway, auto-routed) ──
+  omniroute-auto-coding:
+    provider: omniroute
+    model_id: "auto/best-coding"
+    family: omniroute
+    context_window: 1048576
+    max_output: 512000
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, refactor, explain, review, planning, search, tool_use]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: true
+      default_level: medium
+      available_levels: [low, medium, high]
+      token_budget_low: 512
+      token_budget_medium: 3072
+      token_budget_high: 12288
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    fallback_model: yi-large  # OmniRoute unavailable -> fall back to stepfun
+    enabled: true
+    description: "OmniRoute best coding model (auto-routed to best coding provider)"
+
+  omniroute-auto-reasoning:
+    provider: omniroute
+    model_id: "auto/best-reasoning"
+    family: omniroute
+    context_window: 1048576
+    max_output: 512000
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [reasoning, planning, explain, review, search]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: true
+      default_level: medium
+      available_levels: [low, medium, high]
+      token_budget_low: 512
+      token_budget_medium: 3072
+      token_budget_high: 12288
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    fallback_model: yi-large
+    enabled: true
+    description: "OmniRoute best reasoning model (auto-routed to best reasoning provider)"
 
 # ── Policies ──────────────────────────────────────────────────
 policies:

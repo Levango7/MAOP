@@ -1,8 +1,36 @@
-﻿# MCP Server configurations for MAOP
+# MCP Server configurations for MAOP
 # Each server defines a Model Context Protocol endpoint that MAOP can connect to.
 # Transport types: stdio (subprocess) or sse (HTTP)
 
-servers: []
+servers:
+  # ── OmniRoute Local AI Gateway ──────────────────────────────
+  # OmniRoute is a local AI gateway supporting 160+ LLM providers
+  # with automatic failover, MCP/A2A protocol, and OpenAI-compatible API.
+  # Running at http://localhost:20128
+  #
+  # Exposed tools (expected):
+  #   - omniroute.chat       — OpenAI-compatible chat completion
+  #   - omniroute.list_models — List available models (160+ providers)
+  #   - omniroute.route      — Explicit routing decision
+  #   - omniroute.failover   — Failover status and configuration
+  #
+  # Note: OmniRoute must implement the MCP 2025 streamable_http spec
+  # at the /mcp endpoint. If it only exposes OpenAI API, use the
+  # LLM provider integration (config/models.yaml) instead.
+  - name: omniroute
+    transport: streamable_http
+    url: http://localhost:20128/mcp
+    headers:
+      Authorization: Bearer ${OMNIROUTE_API_KEY}
+    auto_reconnect: true
+    max_reconnect_attempts: 3
+    reconnect_delay_s: 5.0
+    timeout: 30
+    enabled: true
+    # Permission scope: all authenticated users can call omniroute tools
+    allowed_users: ["*"]
+    allowed_roles: ["admin", "read"]
+
   # Example: Filesystem server
   # - name: filesystem
   #   transport: stdio

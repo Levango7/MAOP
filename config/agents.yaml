@@ -270,6 +270,23 @@ agents:
     model_display: MiMo-V2.5 (built-in)
     timeout_s: 60
     enabled: false
+  omniroute:
+    capabilities:
+    - codegen
+    - refactor
+    - explain
+    - review
+    - planning
+    - search
+    - reasoning
+    - tool_use
+    cli: ""  # no CLI - pure LLM provider path (ADR-013 dual-path)
+    description: OmniRoute local gateway - 160+ providers with auto failover
+    driver: cli
+    model: omniroute-auto-coding
+    provider: omniroute
+    timeout_s: 120
+    enabled: true
   openclaw:
     capabilities:
     - codegen
