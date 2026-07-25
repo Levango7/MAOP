@@ -15,9 +15,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
 
+from maop.config.edition import FeatureFlag, has_feature
 from maop.dashboard.error_handler import handle_api_errors
 from maop.core.middleware import require_admin
 
@@ -29,6 +30,8 @@ router = APIRouter(prefix="/api/rbac", tags=["rbac"])
 # calls require_feature(FeatureFlag.RBAC), so in personal edition this
 # will raise and the router won't be registered (server.py guards the
 # import with has_feature(FeatureFlag.MULTI_USER)).
+# 路由层再加一道显式守卫（双层防护）：即便 manager __init__ 守卫被绕过，
+# 每个端点仍会在入口处检查 FeatureFlag.RBAC，确保 Personal 版返回 404。
 _rbac_manager: Any = None
 
 
@@ -67,6 +70,12 @@ async def list_grants(
     tenant_id: str = "",
 ) -> dict[str, Any]:
     """List all RBAC role grants, optionally filtered by user or tenant."""
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.RBAC):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="RBAC not available in this edition",
+        )
     mgr = _get_manager()
     grants = mgr.list_grants(user_id=user_id, tenant_id=tenant_id)
     return {
@@ -81,6 +90,12 @@ async def list_grants(
 async def grant_role(body: GrantRequest, request: Request) -> dict[str, Any]:
     """Grant a role to a user. Requires admin."""
     require_admin(request)
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.RBAC):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="RBAC not available in this edition",
+        )
     from maop.enterprise.rbac import Role
     try:
         role = Role(body.role)
@@ -103,6 +118,12 @@ async def grant_role(body: GrantRequest, request: Request) -> dict[str, Any]:
 async def revoke_role(body: RevokeRequest, request: Request) -> dict[str, Any]:
     """Revoke a role from a user. Requires admin."""
     require_admin(request)
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.RBAC):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="RBAC not available in this edition",
+        )
     from maop.enterprise.rbac import Role
     try:
         role = Role(body.role)
@@ -120,6 +141,12 @@ async def revoke_role(body: RevokeRequest, request: Request) -> dict[str, Any]:
 @handle_api_errors
 async def list_roles(request: Request) -> dict[str, Any]:
     """List all available roles and their permissions."""
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.RBAC):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="RBAC not available in this edition",
+        )
     from maop.enterprise.rbac import Role, ROLE_PERMISSIONS  # noqa: F401 (re-exported for router use)
     roles_info = []
     for role in Role:
@@ -136,6 +163,12 @@ async def list_roles(request: Request) -> dict[str, Any]:
 @handle_api_errors
 async def list_permissions(request: Request) -> dict[str, Any]:
     """List all available permissions and the current user's grants."""
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.RBAC):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="RBAC not available in this edition",
+        )
     from maop.enterprise.rbac import Permission
     all_perms = [{"value": p.value, "name": p.name} for p in Permission]
     # Also return the current user's roles/permissions if authenticated.

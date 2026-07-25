@@ -363,9 +363,6 @@ class SubAgentManager:
             if provider is None:
                 return f"[No provider for model '{config.model}']"
 
-            model_cfg = factory.get_model_config(config.model)
-            model_id = model_cfg.model_id if model_cfg else config.model
-
             messages = []
             if config.system_prompt:
                 messages.append({"role": "system", "content": config.system_prompt})
@@ -375,12 +372,14 @@ class SubAgentManager:
                 user_msg += f"\n\nContext: {ctx_str}"
             messages.append({"role": "user", "content": user_msg})
 
-            resp = await provider.chat(
-                messages, model=model_id,
+            # 统一走 chat_with_fallback 以触发 _record_cost 成本记录与 fallback 链
+            result = await factory.chat_with_fallback(
+                messages, config.model,
                 temperature=config.temperature,
                 max_tokens=min(config.context_window // 4, 4096),
+                agent=agent_id,
             )
-            return resp.content
+            return result.response.content
         except Exception as exc:
             logger.warning("[subagent] LLM invocation failed for %s: %s", agent_id[:8], exc)
             return f"[LLM Error] {exc}"

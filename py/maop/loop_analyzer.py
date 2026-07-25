@@ -352,8 +352,8 @@ async def simple_analyze(
 
     - **Primary path (LLM)**: when ``enable_llm=True`` and ``llm_factory``
       is provided with a configured provider, call
-      ``provider.chat(messages=_build_llm_extraction_prompt(task),
-      model=model_name, temperature=0.0, max_tokens=1024)`` and parse
+      ``llm_factory.chat_with_fallback(messages=_build_llm_extraction_prompt(task),
+      model_name, temperature=0.0, max_tokens=1024)`` and parse
       the JSON response into RequirementAnalysis. Real semantic
       understanding — action_verbs / tech_stack / complexity come from
       the LLM, not from hardcoded keyword tables.
@@ -384,16 +384,13 @@ async def simple_analyze(
                 model_name,
             )
             return _rule_based_analyze(task)
-        model_cfg = llm_factory.get_model_config(model_name) if model_name else None
-        model_id = model_cfg.model_id if model_cfg else model_name
         messages = _build_llm_extraction_prompt(task)
-        response = await provider.chat(
-            messages=messages,
-            model=model_id,
-            temperature=0.0,
-            max_tokens=1024,
+        # 统一走 chat_with_fallback 以触发 _record_cost 成本记录与 fallback 链
+        fb_result = await llm_factory.chat_with_fallback(
+            messages, model_name,
+            temperature=0.0, max_tokens=1024,
         )
-        result = _parse_llm_extraction(response.content, task)
+        result = _parse_llm_extraction(fb_result.response.content, task)
         if result is not None:
             logger.info(
                 "[loop_analyzer] LLM extraction succeeded: action_verbs=%d "

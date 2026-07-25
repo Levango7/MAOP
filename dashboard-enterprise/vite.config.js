@@ -1,5 +1,14 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+// t22: 计算 ESM 模块下的 __dirname，读取 package.json 的 version 字段，
+// 通过 vite define 注入为全局常量 __APP_VERSION__，供前端展示真实版本号，
+// 避免在源码中硬编码版本号导致前后端版本不一致。
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(resolve(__dirname, './package.json'), 'utf-8'));
 
 export default defineConfig({
   root: '.',
@@ -31,5 +40,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
   },
 });

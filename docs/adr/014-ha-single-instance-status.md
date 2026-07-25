@@ -1,7 +1,13 @@
 # ADR-014: HA Module Current Status — Single-Instance In-Memory
 
 **Date**: 2026-07-25  
-**Status**: Accepted  
+**Status**: Superseded by [ADR-015](015-distributed-ha-redis-lease.md) (2026-07-25) — single-instance baseline retained as fallback when MAOP_HA_BACKEND=memory  
+
+> **Note**: This ADR documents the Phase 3.2 single-instance HA baseline.
+> Distributed HA with Redis lease + fencing tokens has been implemented in
+> [ADR-015](015-distributed-ha-redis-lease.md). The memory-mode fallback
+> described here remains as the degradation path when Redis is unavailable.
+
 **Phase**: 3.2 (Documentation Alignment)
 
 ## Context
