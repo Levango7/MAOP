@@ -17,9 +17,9 @@ Falls back to local backends with a degradation warning if redis is not installe
 
 from __future__ import annotations
 
+import json
 import logging
 import os
-import pickle
 import time
 import uuid
 from typing import Any
@@ -43,7 +43,7 @@ def _build_redis_kwargs() -> dict[str, Any]:
 
 
 class RedisCacheBackend(CacheBackend):
-    """Redis-backed cache with pickle serialization."""
+    """Redis-backed cache with JSON serialization."""
 
     def __init__(self) -> None:
         import redis
@@ -58,10 +58,10 @@ class RedisCacheBackend(CacheBackend):
         data = self._client.get(key)
         if data is None:
             return None
-        return pickle.loads(data)
+        return json.loads(data.decode() if isinstance(data, bytes) else data)
 
     def set(self, key: str, value: Any, ttl: float | None = None) -> None:
-        data = pickle.dumps(value)
+        data = json.dumps(value, default=str).encode()
         if ttl:
             self._client.setex(key, int(ttl), data)
         else:
@@ -105,7 +105,7 @@ class RedisQueueBackend(QueueBackend):
     def publish(self, topic: str, message: dict[str, Any], *, delay: float = 0) -> str:
         stream = self._stream_key(topic)
         # Redis Streams doesn't natively support delay; for delay>0 we store scheduled time
-        msg = {"data": pickle.dumps(message).hex()}
+        msg = {"data": json.dumps(message, default=str).encode().hex()}
         if delay > 0:
             msg["scheduled_at"] = str(time.time() + delay)
         msg_id = self._client.xadd(stream, msg)
@@ -122,7 +122,7 @@ class RedisQueueBackend(QueueBackend):
             for msg_id, fields in entries:
                 data_hex = fields.get(b"data", b"").decode()
                 if data_hex:
-                    msg = pickle.loads(bytes.fromhex(data_hex))
+                    msg = json.loads(bytes.fromhex(data_hex).decode())
                     msg["_msg_id"] = msg_id.decode() if isinstance(msg_id, bytes) else msg_id
                     messages.append(msg)
         return messages

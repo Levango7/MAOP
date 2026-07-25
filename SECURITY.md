@@ -10,7 +10,7 @@ threat model, and operational guidelines.
 
 ### Authentication & Authorization
 - **API Key / JWT auth** — `maop/core/auth.py` + `maop/core/middleware.py`
-- Auth can be enabled via `MAOP_AUTH_ENABLED=1`
+- Auth can be enabled via `MAOP_AUTH=1`
 - Admin password auto-generated on first startup, saved to `data/auth.db`
 - Custom password via `MAOP_ADMIN_PASSWORD` env var
 

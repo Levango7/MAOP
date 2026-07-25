@@ -1,0 +1,295 @@
+# MAOP SLO Alert Rules
+#
+# SLO-based alerts using multi-burn-rate strategy (Google SRE Workbook).
+# Each SLO defines an objective and error budget; alerts fire when the
+# burn rate exceeds thresholds, indicating the error budget will be
+# exhausted within the SLO window.
+#
+# Available metrics (from maop.core.monitoring):
+#   MAOP_delegations_total          (counter)
+#   MAOP_delegations_success        (counter)
+#   MAOP_delegations_failed         (counter)
+#   MAOP_delegation_duration_seconds (histogram)
+#   MAOP_active_agents              (gauge)
+#   MAOP_memory_entries             (gauge)
+#   MAOP_queue_pending              (gauge)
+#   MAOP_circuit_breaker_state      (gauge, 1=closed, 0.5=half, 0=open)
+#
+# SLO objectives:
+#   SLO-1 Availability:     99.9%  (error budget 0.1% over 30d)
+#   SLO-2 Latency P95:      < 2s   (delegation duration)
+#   SLO-3 Error rate:       < 1%   (failed delegations)
+#   SLO-4 Queue freshness:  < 100 pending for 5m
+#
+# Multi-burn-rate thresholds (Google SRE recommended):
+#   Page (critical, 30m window):  burn rate > 14.4  → 2% budget in 1h
+#   Page (critical,  6h window):  burn rate > 6      → 5% budget in 6h
+#   Ticket (warning,  3d window): burn rate > 1      → 10% budget in 3d
+
+groups:
+  # ── SLO-1: Availability (delegation success rate) ──────────────
+  - name: maop-slo-availability
+    rules:
+      # Fast burn: 2% of monthly budget in 1h → page immediately
+      - alert: MAOPAvailabilitySLOBurnFast
+        expr: |
+          (
+            (1 - (
+              sum(rate(MAOP_delegations_success[5m]))
+              /
+              clamp_min(sum(rate(MAOP_delegations_total[5m])), 1e-9)
+            )) > 0.0144
+          )
+          and
+          (
+            (1 - (
+              sum(rate(MAOP_delegations_success[1h]))
+              /
+              clamp_min(sum(rate(MAOP_delegations_total[1h])), 1e-9)
+            )) > 0.0144
+          )
+        for: 2m
+        labels:
+          severity: critical
+          slo: availability
+          burn_rate: fast
+        annotations:
+          summary: "SLO-1 Availability: fast burn rate (page)"
+          description: "Availability error budget burning 14.4x faster than allowed. 2% of monthly budget consumed in 1h. Current error rate: {{ $value | humanizePercentage }}."
+
+      # Slow burn: 5% of monthly budget in 6h → page
+      - alert: MAOPAvailabilitySLOBurnSlow
+        expr: |
+          (
+            (1 - (
+              sum(rate(MAOP_delegations_success[30m]))
+              /
+              clamp_min(sum(rate(MAOP_delegations_total[30m])), 1e-9)
+            )) > 0.006
+          )
+          and
+          (
+            (1 - (
+              sum(rate(MAOP_delegations_success[6h]))
+              /
+              clamp_min(sum(rate(MAOP_delegations_total[6h])), 1e-9)
+            )) > 0.006
+          )
+        for: 15m
+        labels:
+          severity: critical
+          slo: availability
+          burn_rate: slow
+        annotations:
+          summary: "SLO-1 Availability: slow burn rate (page)"
+          description: "Availability error budget burning 6x faster than allowed. 5% of monthly budget consumed in 6h."
+
+      # Ticket: 10% of monthly budget in 3d → ticket
+      - alert: MAOPAvailabilitySLOBurnTicket
+        expr: |
+          (
+            (1 - (
+              sum(rate(MAOP_delegations_success[2h]))
+              /
+              clamp_min(sum(rate(MAOP_delegations_total[2h])), 1e-9)
+            )) > 0.001
+          )
+          and
+          (
+            (1 - (
+              sum(rate(MAOP_delegations_success[1d]))
+              /
+              clamp_min(sum(rate(MAOP_delegations_total[1d])), 1e-9)
+            )) > 0.001
+          )
+        for: 1h
+        labels:
+          severity: warning
+          slo: availability
+          burn_rate: ticket
+        annotations:
+          summary: "SLO-1 Availability: budget consumption (ticket)"
+          description: "Availability error budget on track to be exhausted in 3d. Investigate delegation failures."
+
+  # ── SLO-2: Latency (P95 delegation duration < 2s) ──────────────
+  - name: maop-slo-latency
+    rules:
+      # Fast burn: P95 > 2s for 14.4x budget rate
+      - alert: MAOPLatencySLOBurnFast
+        expr: |
+          (
+            histogram_quantile(0.95, sum by (le) (rate(MAOP_delegation_duration_seconds_bucket[5m]))) > 2
+          )
+          and
+          (
+            histogram_quantile(0.95, sum by (le) (rate(MAOP_delegation_duration_seconds_bucket[1h]))) > 2
+          )
+        for: 2m
+        labels:
+          severity: critical
+          slo: latency
+          burn_rate: fast
+        annotations:
+          summary: "SLO-2 Latency: P95 > 2s fast burn (page)"
+          description: "Delegation P95 latency exceeds 2s SLO. Current P95: {{ $value }}s. 2% of monthly budget consumed in 1h."
+
+      # Slow burn: P95 > 2s sustained over 6h
+      - alert: MAOPLatencySLOBurnSlow
+        expr: |
+          (
+            histogram_quantile(0.95, sum by (le) (rate(MAOP_delegation_duration_seconds_bucket[30m]))) > 2
+          )
+          and
+          (
+            histogram_quantile(0.95, sum by (le) (rate(MAOP_delegation_duration_seconds_bucket[6h]))) > 2
+          )
+        for: 15m
+        labels:
+          severity: critical
+          slo: latency
+          burn_rate: slow
+        annotations:
+          summary: "SLO-2 Latency: P95 > 2s slow burn (page)"
+          description: "Delegation P95 latency exceeds 2s SLO sustained over 6h. 5% of monthly budget consumed."
+
+      # Ticket: P99 > 4s (2x SLO) over 1d
+      - alert: MAOPLatencySLOBurnTicket
+        expr: |
+          histogram_quantile(0.99, sum by (le) (rate(MAOP_delegation_duration_seconds_bucket[1d]))) > 4
+        for: 1h
+        labels:
+          severity: warning
+          slo: latency
+          burn_rate: ticket
+        annotations:
+          summary: "SLO-2 Latency: P99 > 4s (ticket)"
+          description: "Delegation P99 latency exceeds 2x SLO target. Investigate slow agents or bottlenecks."
+
+  # ── SLO-3: Error rate (failed delegations < 1%) ────────────────
+  - name: maop-slo-error-rate
+    rules:
+      # Fast burn: error rate > 14.4% over 5m + 1h
+      - alert: MAOPErrorRateSLOBurnFast
+        expr: |
+          (
+            sum(rate(MAOP_delegations_failed[5m]))
+            /
+            clamp_min(sum(rate(MAOP_delegations_total[5m])), 1e-9)
+          ) > 0.144
+          and
+          (
+            sum(rate(MAOP_delegations_failed[1h]))
+            /
+            clamp_min(sum(rate(MAOP_delegations_total[1h])), 1e-9)
+          ) > 0.144
+        for: 2m
+        labels:
+          severity: critical
+          slo: error_rate
+          burn_rate: fast
+        annotations:
+          summary: "SLO-3 Error rate: > 14.4% fast burn (page)"
+          description: "Delegation failure rate exceeds 14.4% (14.4x SLO budget). Immediate investigation required."
+
+      # Slow burn: error rate > 6% over 30m + 6h
+      - alert: MAOPErrorRateSLOBurnSlow
+        expr: |
+          (
+            sum(rate(MAOP_delegations_failed[30m]))
+            /
+            clamp_min(sum(rate(MAOP_delegations_total[30m])), 1e-9)
+          ) > 0.06
+          and
+          (
+            sum(rate(MAOP_delegations_failed[6h]))
+            /
+            clamp_min(sum(rate(MAOP_delegations_total[6h])), 1e-9)
+          ) > 0.06
+        for: 15m
+        labels:
+          severity: critical
+          slo: error_rate
+          burn_rate: slow
+        annotations:
+          summary: "SLO-3 Error rate: > 6% slow burn (page)"
+          description: "Delegation failure rate exceeds 6% sustained over 6h. 5% of monthly budget consumed."
+
+      # Ticket: error rate > 1% over 2h + 1d
+      - alert: MAOPErrorRateSLOBurnTicket
+        expr: |
+          (
+            sum(rate(MAOP_delegations_failed[2h]))
+            /
+            clamp_min(sum(rate(MAOP_delegations_total[2h])), 1e-9)
+          ) > 0.01
+          and
+          (
+            sum(rate(MAOP_delegations_failed[1d]))
+            /
+            clamp_min(sum(rate(MAOP_delegations_total[1d])), 1e-9)
+          ) > 0.01
+        for: 1h
+        labels:
+          severity: warning
+          slo: error_rate
+          burn_rate: ticket
+        annotations:
+          summary: "SLO-3 Error rate: > 1% sustained (ticket)"
+          description: "Delegation failure rate exceeds 1% SLO target sustained over 1d."
+
+  # ── SLO-4: Queue freshness (pending < 100 for 5m) ──────────────
+  - name: maop-slo-queue-freshness
+    rules:
+      - alert: MAOPQueueFreshnessSLOViolation
+        expr: MAOP_queue_pending > 100
+        for: 5m
+        labels:
+          severity: warning
+          slo: queue_freshness
+        annotations:
+          summary: "SLO-4 Queue freshness: backlog > 100"
+          description: "Queue pending count {{ $value }} exceeds SLO threshold (100) for 5m. Workers may be overwhelmed."
+
+      - alert: MAOPQueueFreshnessSLOCritical
+        expr: MAOP_queue_pending > 500
+        for: 2m
+        labels:
+          severity: critical
+          slo: queue_freshness
+        annotations:
+          summary: "SLO-4 Queue freshness: backlog > 500 (critical)"
+          description: "Queue pending count {{ $value }} critically high. Immediate scaling or investigation required."
+
+  # ── SLO-5: Cost anomaly (daily cost deviation) ─────────────────
+  # Note: requires MAOP_cost_total_usd metric from cost_tracker.
+  # If metric is unavailable, these rules are silently ignored by Prometheus.
+  - name: maop-slo-cost
+    rules:
+      - alert: MAOPCostAnomalyDaily
+        expr: |
+          sum(increase(MAOP_cost_total_usd[1d])) > 50
+        for: 10m
+        labels:
+          severity: warning
+          slo: cost
+        annotations:
+          summary: "SLO-5 Cost: daily spend > $50"
+          description: "Total LLM cost in the last 24h is ${{ $value }}. Review cost drivers in dashboard."
+
+      - alert: MAOPCostAnomalySpike
+        expr: |
+          (
+            sum(rate(MAOP_cost_total_usd[1h])) > 10
+          )
+          and
+          (
+            sum(rate(MAOP_cost_total_usd[1h])) >
+            3 * sum(rate(MAOP_cost_total_usd[1d] offset 1d))
+          )
+        for: 5m
+        labels:
+          severity: critical
+          slo: cost
+        annotations:
+          summary: "SLO-5 Cost: spend spike (>3x daily average)"
+          description: "LLM cost rate is more than 3x the previous day's average. Possible runaway loop or expensive model misuse."

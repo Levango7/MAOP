@@ -202,12 +202,82 @@ class MCPMarketplace:
     def _fetch_url(self, url: str) -> bytes:
         """Fetch raw bytes from a URL with the standard timeout.
 
-        Raises whatever ``urllib`` raises (``URLError`` / ``HTTPError`` /
-        ``socket.timeout``) so callers can distinguish failure modes.
+        Security (C-2 fix): only ``http`` / ``https`` schemes are allowed
+        and the resolved host must NOT be a private / loopback / link-local
+        address — this prevents SSRF via crafted registry URLs pointing at
+        internal services (e.g. ``http://169.254.169.254/...`` metadata
+        endpoints, ``http://127.0.0.1:9079/...`` internal APIs, or
+        ``file:///etc/passwd`` exfiltration).
+
+        Raises ``ValueError`` for disallowed URLs, otherwise whatever
+        ``urllib`` raises (``URLError`` / ``HTTPError`` / ``socket.timeout``)
+        so callers can distinguish failure modes.
         """
+        self._assert_safe_url(url)
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=self.NETWORK_TIMEOUT_S) as resp:
             return resp.read()
+
+    @staticmethod
+    def _assert_safe_url(url: str) -> None:
+        """Validate ``url`` against SSRF rules.
+
+        Allowed schemes: ``http``, ``https``. The hostname (after DNS
+        resolution) must NOT resolve to a private / loopback / link-local
+        / multicast address. This is enforced by resolving the hostname
+        and checking each returned address with :func:`ipaddress.ip_address`
+        against :attr:`ipaddress.ip_address.is_private` /
+        :attr:`is_loopback` / :attr:`is_link_local` /
+        :attr:`is_multicast` / :attr:`is_reserved`.
+        """
+        import ipaddress
+        import socket
+        from urllib.parse import urlsplit
+
+        try:
+            parts = urlsplit(url)
+        except Exception as exc:
+            raise ValueError(f"Invalid URL '{url}': {exc}") from exc
+
+        scheme = (parts.scheme or "").lower()
+        if scheme not in ("http", "https"):
+            raise ValueError(
+                f"URL scheme '{scheme}' not allowed (only http/https permitted): {url}"
+            )
+
+        host = parts.hostname or ""
+        if not host:
+            raise ValueError(f"URL '{url}' has no hostname")
+
+        # Literal IP — check directly without DNS lookup.
+        try:
+            ip = ipaddress.ip_address(host)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
+                raise ValueError(
+                    f"URL '{url}' points to a non-routable IP ({ip})"
+                )
+            return
+        except ValueError:
+            # Not a literal IP — fall through to DNS resolution.
+            if "://" in host:
+                raise
+
+        # Hostname — resolve and check ALL returned addresses.
+        try:
+            infos = socket.getaddrinfo(host, None)
+        except socket.gaierror as exc:
+            raise ValueError(f"Could not resolve host '{host}': {exc}") from exc
+
+        for family, _stype, _proto, _canon, sockaddr in infos:
+            addr_str = sockaddr[0]
+            try:
+                ip = ipaddress.ip_address(addr_str)
+            except ValueError:
+                continue
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
+                raise ValueError(
+                    f"URL '{url}' resolves to non-routable IP {ip} (host '{host}')"
+                )
 
     def _fetch_registry_catalog(
         self, registry: MarketplaceRegistry

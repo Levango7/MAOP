@@ -1,4 +1,4 @@
-﻿"""MAOP Auth - API Key and JWT authentication middleware.
+"""MAOP Auth - API Key and JWT authentication middleware.
 
 Provides authentication for the MAOP Dashboard API:
   - API Key: Simple static key validation (for service-to-service)
@@ -456,7 +456,7 @@ class AuthManager:
             # This prevents accidental admin access in misconfigured deployments.
             logger.warning(
                 "Auth disabled — granting guest role (not admin). "
-                "Enable auth in production via MAOP_AUTH_ENABLED=true."
+                "Enable auth in production via MAOP_AUTH=1."
             )
             return AuthResult(authenticated=True, identity="anonymous", roles=["guest"])
 

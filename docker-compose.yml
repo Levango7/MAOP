@@ -11,7 +11,7 @@
 # With TLS:     docker compose --profile tls up -d
 #
 # Environment variables (see .env.example):
-#   MAOP_DASH_PORT, MAOP_LOG_LEVEL, MAOP_AUTH_ENABLED, etc.
+#   MAOP_DASH_PORT, MAOP_LOG_LEVEL, MAOP_AUTH, etc.
 #
 # t15 (2026-07-21): This is the single source of truth for MAOP docker
 # compose. The previous duplicate at py/docker-compose.yml has been removed
@@ -26,7 +26,11 @@ services:
     environment:
       POSTGRES_DB: maop
       POSTGRES_USER: maop
-      POSTGRES_PASSWORD: maop_dev
+      # O-5 fix: no default password. Operators MUST set MAOP_PG_PASSWORD
+      # (or POSTGRES_PASSWORD) — silently using "maop_dev" in production
+      # is a security risk. Local dev can set MAOP_PG_PASSWORD=maop_dev
+      # in .env to preserve the previous behavior.
+      POSTGRES_PASSWORD: ${MAOP_PG_PASSWORD:?Set MAOP_PG_PASSWORD in .env (use "maop_dev" for local dev)}
     ports:
       - "5432:5432"
     volumes:
@@ -54,13 +58,17 @@ services:
       - MAOP_ROOT=/app
       - MAOP_DATA_DIR=/app/data
       - MAOP_LOG_LEVEL=${MAOP_LOG_LEVEL:-INFO}
+      # O-3 fix: emit JSON-structured logs by default for container
+      # environments (ELK / Loki / CloudWatch parse JSON natively).
+      # Override with MAOP_JSON_LOG=0 to restore plain-text logs.
+      - MAOP_JSON_LOG=${MAOP_JSON_LOG:-1}
       - MAOP_DASH_HOST=0.0.0.0
       - MAOP_DASH_PORT=9079
       - MAOP_WORKERS=${MAOP_DASH_WORKERS:-1}
       - MAOP_RATE_LIMIT_ENABLED=1
       - MAOP_RATE_LIMIT_RPS=${MAOP_RATE_LIMIT_RPS:-30}
       - MAOP_RATE_LIMIT_BURST=${MAOP_RATE_LIMIT_BURST:-60}
-      - MAOP_AUTH_ENABLED=${MAOP_AUTH_ENABLED:-0}
+      - MAOP_AUTH=${MAOP_AUTH:-0}
       - MAOP_TLS=0
       - MAOP_CORS_ORIGINS=${MAOP_CORS_ORIGINS:-http://localhost:9079}
       - MAOP_BACKEND_STORAGE=sqlite
@@ -71,7 +79,11 @@ services:
       # t3.3.4: Vault secret backend (opt-in via MAOP_SECRET_BACKEND=vault + --profile vault)
       - MAOP_SECRET_BACKEND=${MAOP_SECRET_BACKEND:-local}
       - MAOP_VAULT_ADDR=${MAOP_VAULT_ADDR:-http://vault:8200}
-      - MAOP_VAULT_TOKEN=${MAOP_VAULT_TOKEN:-dev-token}
+      # O-5 fix: no default token. When MAOP_SECRET_BACKEND=vault, operators
+      # MUST set MAOP_VAULT_TOKEN explicitly. The previous default "dev-token"
+      # is the well-known Vault dev-mode root token — unacceptable in prod.
+      # Local dev: set MAOP_VAULT_TOKEN=dev-token in .env when using --profile vault.
+      - MAOP_VAULT_TOKEN=${MAOP_VAULT_TOKEN:?Set MAOP_VAULT_TOKEN when using vault profile}
       # t15: OTEL exporter wired into dashboard container so traces can reach
       # the otel-collector service via its service name (not localhost, which
       # would resolve to the dashboard container itself).
@@ -113,6 +125,8 @@ services:
       - MAOP_ROOT=/app
       - MAOP_DATA_DIR=/app/data
       - MAOP_LOG_LEVEL=${MAOP_LOG_LEVEL:-INFO}
+      # O-3 fix: JSON logs for container aggregation.
+      - MAOP_JSON_LOG=${MAOP_JSON_LOG:-1}
       - MAOP_BACKEND_STORAGE=sqlite
       - MAOP_BACKEND_CACHE=local
       - MAOP_BACKEND_QUEUE=local
@@ -151,6 +165,8 @@ services:
       - MAOP_ROOT=/app
       - MAOP_DATA_DIR=/app/data
       - MAOP_LOG_LEVEL=${MAOP_LOG_LEVEL:-INFO}
+      # O-3 fix: JSON logs for container aggregation.
+      - MAOP_JSON_LOG=${MAOP_JSON_LOG:-1}
       - MAOP_BACKEND_STORAGE=sqlite
       - MAOP_BACKEND_QUEUE=local
     depends_on:
@@ -214,7 +230,15 @@ services:
     profiles:
       - monitoring
     volumes:
-      - ./prometheus-alerts.yml:/etc/prometheus/alert_rules.yml:ro
+      # O-1 fix: mount the actual prometheus.yml config (previously only
+      # alert_rules.yml was mounted, but --config.file pointed at
+      # /etc/prometheus/prometheus.yml which did not exist in the container
+      # — Prometheus refused to start).
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Mount canonical alert rule files from monitoring/ so the paths in
+      # prometheus.yml's `rule_files` block resolve inside the container.
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./monitoring/slo-alerts.yml:/etc/prometheus/slo-alerts.yml:ro
       - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"

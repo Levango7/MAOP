@@ -6,10 +6,13 @@ global:
 
 scrape_configs:
   # MAOP Dashboard metrics
+  # O-2 fix: target service name is `dashboard` (per docker-compose.yml),
+  # not `maop` — the previous target caused DNS resolution failures and
+  # Prometheus marked the job as down.
   - job_name: "maop"
     metrics_path: /api/prometheus
     static_configs:
-      - targets: ["maop:9079"]
+      - targets: ["dashboard:9079"]
         labels:
           service: "maop-dashboard"
 
@@ -20,3 +23,4 @@ scrape_configs:
 
 rule_files:
   - /etc/prometheus/alerts.yml
+  - /etc/prometheus/slo-alerts.yml

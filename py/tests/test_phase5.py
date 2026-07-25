@@ -194,7 +194,7 @@ class TestFileHash:
             fpath.write_text("test: value\n", encoding="utf-8")
             h = _file_hash(fpath)
             assert h is not None
-            assert len(h) == 32  # MD5 hex
+            assert len(h) == 64  # SHA-256 hex
 
     def test_nonexistent_file(self):
         h = _file_hash(Path("/nonexistent/file.yaml"))

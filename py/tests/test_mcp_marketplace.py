@@ -777,3 +777,76 @@ class TestMarketplaceSecurity:
             mp.install("fs")
         assert mp._installed_path == config_path.parent / "mcp_installed.yaml"
         assert mp._installed_path.exists()
+
+
+# ── Regression tests for security Critical fixes (C-2 SSRF) ──
+
+import pytest
+from maop.core.mcp_marketplace import MCPMarketplace
+
+
+class TestSSRFProtection:
+    """C-2: _fetch_url must reject non-http(s) schemes and private IPs.
+
+    Without this check, a malicious registry URL like
+    ``http://169.254.169.254/latest/meta-data/`` (cloud metadata) or
+    ``file:///etc/passwd`` could be fetched server-side.
+    """
+
+    def test_rejects_file_scheme(self):
+        with pytest.raises(ValueError, match="scheme"):
+            MCPMarketplace._assert_safe_url("file:///etc/passwd")
+
+    def test_rejects_ftp_scheme(self):
+        with pytest.raises(ValueError, match="scheme"):
+            MCPMarketplace._assert_safe_url("ftp://example.com/file")
+
+    def test_rejects_empty_scheme(self):
+        with pytest.raises(ValueError, match="scheme"):
+            MCPMarketplace._assert_safe_url("//example.com/file")
+
+    def test_rejects_loopback_ipv4(self):
+        with pytest.raises(ValueError, match="non-routable"):
+            MCPMarketplace._assert_safe_url("http://127.0.0.1:9079/api/admin")
+
+    def test_rejects_loopback_ipv6(self):
+        with pytest.raises(ValueError, match="non-routable"):
+            MCPMarketplace._assert_safe_url("http://[::1]:9079/api/admin")
+
+    def test_rejects_private_ip_10(self):
+        with pytest.raises(ValueError, match="non-routable"):
+            MCPMarketplace._assert_safe_url("http://10.0.0.1/internal")
+
+    def test_rejects_private_ip_192_168(self):
+        with pytest.raises(ValueError, match="non-routable"):
+            MCPMarketplace._assert_safe_url("http://192.168.1.1/router")
+
+    def test_rejects_link_local_metadata(self):
+        """Cloud metadata endpoint must be blocked (AWS/Azure/GCP)."""
+        with pytest.raises(ValueError, match="non-routable"):
+            MCPMarketplace._assert_safe_url("http://169.254.169.254/latest/meta-data/")
+
+    def test_accepts_public_https(self):
+        # Should NOT raise — public HTTPS is allowed.
+        # Use ``example.com`` (IANA reserved, has real DNS A records) so
+        # the test works in environments with internet access. Skip
+        # gracefully when offline — the SSRF *rejection* tests above
+        # don't need DNS and always run.
+        import socket
+        try:
+            socket.getaddrinfo("example.com", None)
+        except socket.gaierror:
+            pytest.skip("offline: cannot resolve example.com")
+        MCPMarketplace._assert_safe_url("https://example.com/catalog.json")
+
+    def test_accepts_public_http(self):
+        import socket
+        try:
+            socket.getaddrinfo("example.com", None)
+        except socket.gaierror:
+            pytest.skip("offline: cannot resolve example.com")
+        MCPMarketplace._assert_safe_url("http://example.com/catalog.json")
+
+    def test_rejects_no_hostname(self):
+        with pytest.raises(ValueError, match="hostname"):
+            MCPMarketplace._assert_safe_url("http:///path")

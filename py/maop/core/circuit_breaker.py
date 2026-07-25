@@ -203,6 +203,22 @@ class CircuitBreaker:
         self._STATES_CACHE_TTL = 0.5  # 500ms
         self._init_db()
 
+    @staticmethod
+    def _load_agent_names_from_config() -> list[str]:
+        """Load agent names from config/agents.yaml.
+
+        Returns an empty list if config cannot be loaded (caller should
+        fall back to DEFAULT_AGENTS).
+        """
+        try:
+            from maop.config.loader import ConfigLoader
+            loader = ConfigLoader(project_root=Path(__file__).resolve().parents[3])
+            config = loader.load()
+            names = list(config.agents.keys()) if hasattr(config, "agents") and config.agents else []
+            return names
+        except Exception:
+            return []
+
     # ── SQLite connection ─────────────────────────────────────
 
     def _connect(self):
@@ -233,7 +249,8 @@ class CircuitBreaker:
 
             # Seed default agents if DB is empty
             if not self._data:
-                for agent in DEFAULT_AGENTS:
+                agent_names = self._load_agent_names_from_config() or DEFAULT_AGENTS
+                for agent in agent_names:
                     self._data[agent] = BreakerEntry()
                 self._save_all()
 
@@ -241,7 +258,8 @@ class CircuitBreaker:
             logger.warning("Failed to initialize circuit breaker DB: %s", exc)
             # Fallback to in-memory only
             if not self._data:
-                for agent in DEFAULT_AGENTS:
+                agent_names = self._load_agent_names_from_config() or DEFAULT_AGENTS
+                for agent in agent_names:
                     self._data[agent] = BreakerEntry()
 
     def _save_all(self) -> None:

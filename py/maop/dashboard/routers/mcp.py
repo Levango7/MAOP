@@ -194,7 +194,20 @@ async def list_tools() -> dict[str, Any]:
 async def call_tool(body: ToolCallRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
-    result = await hub.call_tool_by_name(body.tool, body.arguments)
+    # C-4 fix: forward the authenticated caller's identity and roles to
+    # MCPHub.call_tool_by_name so the δ-3 permission checker can enforce
+    # per-user (allowed_users) and per-role (allowed_roles) scope on each
+    # server config. Without this, the checker silently falls back to
+    # default-allow for the user/role dimensions even when a server
+    # carries an allowed_users / allowed_roles whitelist — a permission
+    # bypass.
+    user_context = {
+        "user_id": getattr(request.state, "auth_identity", "anonymous"),
+        "roles": getattr(request.state, "auth_roles", []) or [],
+    }
+    result = await hub.call_tool_by_name(
+        body.tool, body.arguments, user_context=user_context,
+    )
     return result.model_dump() if hasattr(result, "model_dump") else result
 
 

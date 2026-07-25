@@ -25,7 +25,7 @@ class TestFileHash:
     def test_existing_file(self, tmp_path):
         f = tmp_path / "test.txt"
         f.write_bytes(b"hello world")
-        expected = hashlib.md5(b"hello world").hexdigest()
+        expected = hashlib.sha256(b"hello world").hexdigest()
         assert _file_hash(f) == expected
 
     def test_nonexistent_file(self, tmp_path):
@@ -35,7 +35,7 @@ class TestFileHash:
     def test_empty_file(self, tmp_path):
         f = tmp_path / "empty.txt"
         f.write_bytes(b"")
-        expected = hashlib.md5(b"").hexdigest()
+        expected = hashlib.sha256(b"").hexdigest()
         assert _file_hash(f) == expected
 
     def test_different_content_different_hash(self, tmp_path):

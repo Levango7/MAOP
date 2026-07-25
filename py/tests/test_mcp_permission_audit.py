@@ -765,3 +765,48 @@ class TestMetrics:
         before = MAOP_MCP_CALL_AUDITED_TOTAL.get()
         asyncio.run(hub.call_tool(sid, "read_file", {"path": "/x"}))
         assert MAOP_MCP_CALL_AUDITED_TOTAL.get() == before
+
+
+# ── Regression tests for security Critical fixes (C-4 user_context) ──
+
+import asyncio
+import inspect
+from maop.dashboard.routers import mcp as mcp_router
+
+
+class TestUserContextForwarding:
+    """C-4: dashboard /api/mcp/call must forward user_context to call_tool_by_name.
+
+    Without this forwarding, the δ-3 permission checker silently skips
+    the user/role dimensions even when a server config carries
+    ``allowed_users`` / ``allowed_roles`` — a permission bypass.
+    """
+
+    def test_call_tool_endpoint_reads_auth_state(self):
+        """The source of the call_tool endpoint must reference both
+        ``auth_identity`` and ``auth_roles`` from ``request.state`` and
+        pass them as ``user_context`` to ``call_tool_by_name``.
+        """
+        src = inspect.getsource(mcp_router.call_tool)
+        assert "auth_identity" in src, (
+            "call_tool must read request.state.auth_identity for user_context"
+        )
+        assert "auth_roles" in src, (
+            "call_tool must read request.state.auth_roles for user_context"
+        )
+        assert "user_context" in src, (
+            "call_tool must build a user_context dict"
+        )
+        assert "call_tool_by_name" in src
+        # Verify the call passes user_context as a kwarg
+        assert "user_context=" in src, (
+            "call_tool_by_name must be invoked with user_context= kwarg"
+        )
+
+    def test_call_tool_by_name_accepts_user_context(self):
+        """MCPHub.call_tool_by_name must accept a user_context kwarg."""
+        from maop.core.mcp_hub import MCPHub
+        sig = inspect.signature(MCPHub.call_tool_by_name)
+        assert "user_context" in sig.parameters, (
+            "MCPHub.call_tool_by_name must accept user_context kwarg"
+        )

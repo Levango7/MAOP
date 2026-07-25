@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -417,3 +418,161 @@ class EvolveEngine:
             return [Suggestion(**s) for s in raw]
         except Exception:
             return []
+
+    def auto_evolve(self, hours: int = 24) -> dict[str, Any]:
+        """Run automatic evolution based on execution history analysis.
+
+        Phase β: integrates HistoryAnalyzer to identify patterns and
+        generate actionable suggestions with auto-apply for safe ones.
+
+        Phase β.3: also integrates AgentStrategyLearner (agent routing
+        adjustments) and CacheEvolver (cache TTL/threshold tuning) for
+        a complete self-evolution loop.
+
+        Returns a dict with the analysis report summary, the number of
+        new suggestions created, and how many were auto-applied.
+        """
+        from maop.history_analyzer import HistoryAnalyzer
+
+        analyzer = HistoryAnalyzer(root_dir=self._root)
+        report = analyzer.analyze(hours=hours)
+
+        new_suggestions: list[Suggestion] = []
+
+        # Cost-driven suggestions (human decision required)
+        for driver in report.cost_drivers:
+            if driver.dimension == "model" and driver.total_cost > 5.0:
+                new_suggestions.append(Suggestion(
+                    id=f"cost_model_{driver.dimension_value}_{int(time.time())}",
+                    type="high_cost_model",
+                    severity="medium",
+                    detail=f"Model {driver.dimension_value} cost ${driver.total_cost:.2f} in {hours}h",
+                    suggestion=f"Consider switching to a cheaper model or reducing calls to {driver.dimension_value}.",
+                    auto_applicable=False,
+                ))
+
+        # Failure-driven suggestions (human decision required)
+        for cluster in report.failure_clusters:
+            if cluster.count >= 3:
+                new_suggestions.append(Suggestion(
+                    id=f"failure_{cluster.pattern}_{int(time.time())}",
+                    type="recurring_failure",
+                    severity="high",
+                    detail=f"Failure pattern '{cluster.pattern}' occurred {cluster.count} times",
+                    suggestion=cluster.root_cause_hypothesis,
+                    auto_applicable=False,
+                ))
+
+        # Bottleneck-driven suggestions (human decision required)
+        for bottleneck in report.bottlenecks:
+            if bottleneck.avg_duration_ms > 30000:  # > 30s
+                new_suggestions.append(Suggestion(
+                    id=f"bottleneck_{bottleneck.component}_{int(time.time())}",
+                    type="performance_bottleneck",
+                    severity="medium",
+                    detail=f"{bottleneck.component} avg {bottleneck.avg_duration_ms:.0f}ms, impact {bottleneck.impact_score:.2f}",
+                    suggestion=f"Optimize {bottleneck.component} to reduce latency.",
+                    auto_applicable=False,
+                ))
+
+        # ── Phase β.3a: Agent strategy learning ────────────────
+        agent_strategy_report: dict[str, Any] = {}
+        try:
+            from maop.agent_strategy_learner import AgentStrategyLearner
+            learner = AgentStrategyLearner(root_dir=self._root)
+            strat_report = learner.learn(hours=hours)
+            agent_strategy_report = {
+                "total_combos": strat_report.total_combos,
+                "reliable_combos": strat_report.reliable_combos,
+                "underperformers": strat_report.underperformers,
+                "adjustments_count": len(strat_report.adjustments),
+                "routing_winners": strat_report.routing_winners,
+                "recommendations": strat_report.recommendations,
+            }
+            # Convert agent strategy adjustments to suggestions
+            for adj in strat_report.adjustments:
+                sev = "high" if adj.action == "disable" else "medium"
+                new_suggestions.append(Suggestion(
+                    id=f"agent_strategy_{adj.agent}_{adj.routing_key}_{int(time.time())}",
+                    type=f"agent_{adj.action}",
+                    severity=sev,
+                    agent=adj.agent,
+                    routing_key=adj.routing_key,
+                    detail=adj.reason,
+                    suggestion=f"Action: {adj.action}"
+                               + (f" → {adj.suggested_alternative}" if adj.suggested_alternative else ""),
+                    auto_applicable=adj.auto_applicable,
+                ))
+            # Auto-apply safe agent strategy adjustments
+            for adj in strat_report.adjustments:
+                if adj.auto_applicable:
+                    try:
+                        learner.apply_adjustment(adj)
+                    except Exception as exc:
+                        logger.warning("[evolve] Agent strategy apply failed: %s", exc)
+        except Exception as exc:
+            logger.warning("[evolve] Agent strategy learning failed: %s", exc)
+
+        # ── Phase β.3b: Cache strategy evolution ───────────────
+        cache_evolve_report: dict[str, Any] = {}
+        try:
+            from maop.cache_evolver import CacheEvolver
+            cache_evolver = CacheEvolver()
+            c_report = cache_evolver.evolve(apply=True)
+            cache_evolve_report = {
+                "total_caches": c_report.total_caches,
+                "adjustments_count": len(c_report.adjustments),
+                "applied_count": c_report.applied_count,
+                "skipped_count": c_report.skipped_count,
+                "recommendations": c_report.recommendations,
+            }
+            # Convert cache adjustments to suggestions (informational)
+            for cadj in c_report.adjustments:
+                new_suggestions.append(Suggestion(
+                    id=f"cache_{cadj.cache_name}_{cadj.parameter}_{int(time.time())}",
+                    type=f"cache_{cadj.parameter}",
+                    severity="low",
+                    detail=f"{cadj.cache_name}: {cadj.parameter} {cadj.old_value}→{cadj.new_value} ({cadj.reason})",
+                    suggestion=f"Cache {cadj.cache_name} {cadj.parameter} adjustment"
+                               + (" (auto-applied)" if cadj.applied else " (needs review)"),
+                    auto_applicable=cadj.auto_applicable,
+                ))
+        except Exception as exc:
+            logger.warning("[evolve] Cache evolution failed: %s", exc)
+
+        # Merge with existing suggestions (avoid duplicate ids) and persist.
+        existing = self._load_suggestions()
+        existing_ids = {s.id for s in existing}
+        appended = 0
+        for s in new_suggestions:
+            if s.id not in existing_ids:
+                existing.append(s)
+                appended += 1
+        if appended:
+            self._save_suggestions(existing)
+
+        # Auto-apply safe (auto_applicable) suggestions.
+        auto_applied = 0
+        for s in new_suggestions:
+            if s.auto_applicable:
+                try:
+                    self.apply(s.id)
+                    auto_applied += 1
+                except Exception as exc:
+                    logger.warning("[evolve] Auto-apply failed for %s: %s", s.id, exc)
+
+        return {
+            "analysis_report": {
+                "period_hours": report.period_hours,
+                "total_loops": report.total_loops,
+                "success_rate": report.success_rate,
+                "failure_clusters": len(report.failure_clusters),
+                "bottlenecks": len(report.bottlenecks),
+                "cost_drivers": len(report.cost_drivers),
+                "recommendations": report.recommendations,
+            },
+            "agent_strategy": agent_strategy_report,
+            "cache_evolution": cache_evolve_report,
+            "new_suggestions": len(new_suggestions),
+            "auto_applied": auto_applied,
+        }

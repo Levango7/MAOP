@@ -1,4 +1,17 @@
-# MAOP Alert Rules
+# MAOP Alert Rules — Basic Infrastructure Alerts
+#
+# SLO-based alerts are in slo-alerts.yml. This file covers basic
+# infrastructure and process-level alerts that do not fit the SLO model.
+#
+# Available metrics (from maop.core.monitoring):
+#   MAOP_delegations_total          (counter)
+#   MAOP_delegations_success        (counter)
+#   MAOP_delegations_failed         (counter)
+#   MAOP_delegation_duration_seconds (histogram)
+#   MAOP_active_agents              (gauge)
+#   MAOP_memory_entries             (gauge)
+#   MAOP_queue_pending              (gauge)
+#   MAOP_circuit_breaker_state      (gauge, 1=closed, 0.5=half, 0=open)
 
 groups:
   - name: maop-alerts
@@ -22,19 +35,64 @@ groups:
           description: "MAOP resident memory has exceeded 1GB for 5 minutes."
 
       - alert: MAOPHighLatency
-        expr: histogram_quantile(0.95, rate(MAOP_loop_duration_ms_bucket[5m])) > 2000
+        expr: histogram_quantile(0.95, sum by (le) (rate(MAOP_delegation_duration_seconds_bucket[5m]))) > 2
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "MAOP loop P95 latency > 2s"
-          description: "Loop duration P95 is {{ $value }}ms"
+          summary: "MAOP delegation P95 latency > 2s"
+          description: "Delegation duration P95 is {{ $value }}s"
 
       - alert: MAOPLowSuccessRate
-        expr: rate(MAOP_tasks_success_total[5m]) / rate(MAOP_tasks_total[5m]) < 0.8
+        expr: |
+          sum(rate(MAOP_delegations_success[5m]))
+          /
+          clamp_min(sum(rate(MAOP_delegations_total[5m])), 1e-9) < 0.8
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "MAOP task success rate < 80%"
-          description: "Task success rate is below 80% for the last 10 minutes."
+          summary: "MAOP delegation success rate < 80%"
+          description: "Delegation success rate is below 80% for the last 10 minutes."
+
+      - alert: MAOPNoActiveAgents
+        expr: MAOP_active_agents == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No active agents available"
+          description: "All agents are either disabled or circuit-broken for 5 minutes."
+
+      - alert: MAOPCircuitBreakerOpen
+        expr: MAOP_circuit_breaker_state == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker is OPEN"
+          description: "An agent circuit breaker is OPEN and not accepting requests."
+
+      - alert: MAOPMemoryStoreGrowing
+        expr: |
+          MAOP_memory_entries > 100000
+          and
+          deriv(MAOP_memory_entries[1h]) > 0
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Memory store exceeds 100K entries and growing"
+          description: "Consider running memory prune to reduce store size."
+
+      - alert: MAOPQueueBacklogGrowing
+        expr: |
+          MAOP_queue_pending > 100
+          and
+          deriv(MAOP_queue_pending[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue backlog is growing ({{ $value }} pending)"
+          description: "Pending messages keep increasing, workers may be overwhelmed."

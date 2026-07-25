@@ -52,12 +52,16 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # P0-1 FIX (R3 audit): restore if-guard that was lost in P2-3 fix.
         # Without this guard, ALL auth logic below is dead code and every
         # request gets anonymous/read role regardless of MAOP_AUTH setting.
-        # Auth disabled defaults to admin role so require_admin() endpoints
-        # (e.g. /api/snapshot, /api/report, /api/live) stay accessible.
-        # Set MAOP_AUTH_DISABLED_ADMIN=0 to restrict to read-only role.
+        #
+        # Security (C-1 fix): when auth is disabled (dev mode), default to
+        # ``read`` role — NOT ``admin`` — so a misconfigured deployment
+        # does not grant anonymous users write access to admin endpoints.
+        # Operators who explicitly want admin role in disabled mode can set
+        # ``MAOP_AUTH_DISABLED_ADMIN=1`` (NOT recommended outside isolated
+        # local dev). Production should set ``MAOP_AUTH=1`` instead.
         if not self.enabled:
             import os
-            disabled_role = "admin" if os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "1") == "1" else "read"
+            disabled_role = "admin" if os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "0") == "1" else "read"
             request.state.auth_roles = [disabled_role]
             request.state.auth_identity = "anonymous"
             return cast(Response, await call_next(request))

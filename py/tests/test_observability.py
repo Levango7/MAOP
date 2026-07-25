@@ -209,9 +209,9 @@ def test_alert_rules_valid():
     assert "MAOPLowSuccessRate" in rule_names
 
     high_latency = next(r for r in rules if r["alert"] == "MAOPHighLatency")
-    assert "MAOP_loop_duration_ms_bucket" in high_latency["expr"]
+    assert "MAOP_delegation_duration_seconds_bucket" in high_latency["expr"]
     assert "http_request_duration_seconds_bucket" not in high_latency["expr"]
 
     low_success = next(r for r in rules if r["alert"] == "MAOPLowSuccessRate")
-    assert "MAOP_tasks_success_total" in low_success["expr"]
-    assert "MAOP_tasks_total" in low_success["expr"]
+    assert "MAOP_delegations_success" in low_success["expr"]
+    assert "MAOP_delegations_total" in low_success["expr"]

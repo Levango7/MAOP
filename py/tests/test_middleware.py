@@ -250,3 +250,64 @@ class TestCSPMiddleware:
         assert resp.status_code == 200
         assert resp.json()["status"] == "ok"
         assert len(_violations) == 1
+
+
+# ── Regression tests for security Critical fixes ──
+
+import os
+import importlib
+from fastapi import FastAPI, Request
+from starlette.testclient import TestClient
+
+
+class TestAuthDisabledDefaultRole:
+    """C-1: when auth is disabled, default role MUST be 'read' (not 'admin').
+
+    A misconfigured deployment (e.g. MAOP_AUTH=0 in non-prod) must not
+    grant anonymous users admin privileges. Operators who explicitly opt
+    in can set MAOP_AUTH_DISABLED_ADMIN=1, but the default is safe.
+    """
+
+    def _make_app(self, *, enabled: bool) -> FastAPI:
+        from maop.core.middleware import AuthMiddleware
+        app = FastAPI()
+
+        @app.get("/api/whoami")
+        def whoami(request: Request):
+            return {
+                "identity": getattr(request.state, "auth_identity", "anonymous"),
+                "roles": getattr(request.state, "auth_roles", []),
+            }
+
+        app.add_middleware(AuthMiddleware, enabled=enabled)
+        return app
+
+    def test_disabled_auth_defaults_to_read_role(self, monkeypatch):
+        """Default (no env var) → read role."""
+        monkeypatch.delenv("MAOP_AUTH_DISABLED_ADMIN", raising=False)
+        app = self._make_app(enabled=False)
+        with TestClient(app) as client:
+            resp = client.get("/api/whoami")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["roles"] == ["read"], (
+            "Auth-disabled default role must be 'read' (got {body['roles']!r}). "
+            "Set MAOP_AUTH_DISABLED_ADMIN=1 to opt into admin role."
+        )
+
+    def test_disabled_auth_admin_opt_in_via_env(self, monkeypatch):
+        """Explicit env var opt-in still works for legacy/dev workflows."""
+        monkeypatch.setenv("MAOP_AUTH_DISABLED_ADMIN", "1")
+        app = self._make_app(enabled=False)
+        with TestClient(app) as client:
+            resp = client.get("/api/whoami")
+        assert resp.status_code == 200
+        assert resp.json()["roles"] == ["admin"]
+
+    def test_disabled_auth_explicit_zero_is_read(self, monkeypatch):
+        """MAOP_AUTH_DISABLED_ADMIN=0 explicitly → read role."""
+        monkeypatch.setenv("MAOP_AUTH_DISABLED_ADMIN", "0")
+        app = self._make_app(enabled=False)
+        with TestClient(app) as client:
+            resp = client.get("/api/whoami")
+        assert resp.json()["roles"] == ["read"]

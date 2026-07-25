@@ -42,11 +42,17 @@ class HotReloadState(BaseModel):
 # ── File hash cache ───────────────────────────────────────────
 
 def _file_hash(path: Path) -> str | None:
-    """Compute MD5 hash of a file for change detection."""
+    """Compute SHA-256 hash of a file for change detection.
+
+    Uses SHA-256 (not MD5) to align with the project-wide integrity
+    standard mandated by the plugin manifest checksum constraint and
+    ADR-011. MD5 is cryptographically broken and inconsistent with
+    the rest of the codebase.
+    """
     if not path.exists():
         return None
     try:
-        return hashlib.md5(path.read_bytes()).hexdigest()
+        return hashlib.sha256(path.read_bytes()).hexdigest()
     except Exception:
         return None
 

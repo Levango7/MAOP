@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import asyncio
 import importlib
 import logging
 import platform
@@ -62,7 +63,7 @@ async def api_framework_status() -> dict[str, Any]:
         from maop import __version__ as MAOP_ver
     except ImportError:
         MAOP_ver = "unknown"
-    py_modules = sum(1 for p in (MAOP_ROOT / "py" / "MAOP").rglob("*.py") if "__pycache__" not in str(p))
+    py_modules = sum(1 for p in (MAOP_ROOT / "py" / "maop").rglob("*.py") if "__pycache__" not in str(p))
     test_dir = MAOP_ROOT / "py" / "tests"
     test_files = sum(1 for p in test_dir.glob("test_*.py")) if test_dir.exists() else 0
     db_files = [f.name for f in (MAOP_ROOT / "data").glob("*.db")] if (MAOP_ROOT / "data").exists() else []
@@ -223,11 +224,26 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]
                     show_r = subprocess.run([sys.executable, "-m", "pip", "show", ad.cli], capture_output=True, text=True, timeout=10)
                     if show_r.returncode == 0:
                         info["upgradable"] = True
-                        upgrade_r = subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", ad.cli], capture_output=True, text=True, timeout=120)
-                        info["upgrade_exit_code"] = upgrade_r.returncode
-                        if upgrade_r.returncode == 0:
+                        upgrade_proc = await asyncio.create_subprocess_exec(
+                            sys.executable, "-m", "pip", "install", "--upgrade", ad.cli,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE,
+                        )
+                        try:
+                            upgrade_stdout, upgrade_stderr = await asyncio.wait_for(
+                                upgrade_proc.communicate(), timeout=120
+                            )
+                        except asyncio.TimeoutError:
+                            upgrade_proc.kill()
+                            await upgrade_proc.wait()
+                            return {"ok": False, "error": "pip install upgrade timed out (120s)"}
+                        upgrade_r_stdout = upgrade_stdout.decode(errors="replace") if upgrade_stdout else ""
+                        upgrade_r_stderr = upgrade_stderr.decode(errors="replace") if upgrade_stderr else ""
+                        upgrade_r_returncode = upgrade_proc.returncode
+                        info["upgrade_exit_code"] = upgrade_r_returncode
+                        if upgrade_r_returncode == 0:
                             info["upgrade_status"] = "success"
-                            info["upgrade_output"] = upgrade_r.stdout[-500:]
+                            info["upgrade_output"] = upgrade_r_stdout[-500:]
                             try:
                                 v2 = subprocess.run([cli_path, "--version"], capture_output=True, text=True, timeout=10)  # type: ignore[list-item]
                                 info["new_version"] = (v2.stdout or v2.stderr).strip()[:200]
@@ -236,7 +252,7 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]
                                 info["new_version"] = "unknown"
                         else:
                             info["upgrade_status"] = "failed"
-                            info["upgrade_output"] = (upgrade_r.stderr or upgrade_r.stdout)[-500:]
+                            info["upgrade_output"] = (upgrade_r_stderr or upgrade_r_stdout)[-500:]
                     else:
                         info["upgradable"] = False
                         info["upgrade_status"] = "not_a_pip_package"
@@ -358,7 +374,7 @@ async def api_overview(request: Request) -> dict[str, Any]:
             test_files = _fc_cached["test_files"]
             tests_total = _fc_cached["tests_total"]
         else:
-            py_dir = MAOP_ROOT / "py" / "MAOP"
+            py_dir = MAOP_ROOT / "py" / "maop"
             source_files = sum(1 for p in py_dir.rglob("*.py") if "__pycache__" not in str(p))
             code_lines = 0
             for p in py_dir.rglob("*.py"):

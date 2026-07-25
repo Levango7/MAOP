@@ -36,6 +36,16 @@ def _handle_signal(signum: int, frame: object) -> None:
 
 def _setup_logging() -> None:
     level = os.environ.get("MAOP_LOG_LEVEL", "INFO").upper()
+    # O-4 fix: honor MAOP_JSON_LOG=1 (parity with maop.cli). Workers
+    # running in containers should emit JSON-structured logs so they can
+    # be ingested by ELK / Loki / CloudWatch without a regex parser.
+    if os.environ.get("MAOP_JSON_LOG", "0") == "1":
+        from maop.core.monitoring import setup_json_logging
+        setup_json_logging(
+            level=level,
+            log_file=os.environ.get("MAOP_JSON_LOG_FILE") or None,
+        )
+        return
     logging.basicConfig(
         level=level,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",

@@ -239,15 +239,97 @@ CREATE INDEX IF NOT EXISTS idx_mcp_resources_server ON mcp_resources(server_id);
 
 
 class _StdioTransport:
-    """Transport via local subprocess stdin/stdout."""
+    """Transport via local subprocess stdin/stdout.
+
+    Security (C-3 fix): the user-supplied ``command`` is validated against
+    a static whitelist of known MCP server runners. The first token of
+    ``command`` (after ``shlex`` splitting) must resolve to one of the
+    whitelisted binaries; otherwise ``start()`` raises ``ValueError`` and
+    no subprocess is spawned. This prevents command injection via a
+    malicious ``MCPServerConfig.command`` value (e.g. ``"rm -rf /"`` or
+    ``"bash -c '...'"``).
+
+    The whitelist is conservative by design — extend it only when a new
+    MCP server runtime genuinely requires a binary not already covered.
+    Operators who need an unlisted binary can set the
+    ``MAOP_MCP_STRICT_COMMAND_WHITELIST=0`` env var to fall back to a
+    warning-only mode (NOT recommended for production).
+    """
+
+    #: Whitelisted command basenames. The first token of
+    #: ``MCPServerConfig.command`` must resolve to one of these (after
+    #: ``shlex.split`` and ``shutil.which``).
+    ALLOWED_COMMANDS: tuple[str, ...] = (
+        "npx", "npm", "node", "deno", "bun",
+        "python", "python3", "py", "uv", "uvx", "poetry", "pipx",
+        "ruby", "bundle", "gem",
+        "go", "java", "javac",
+        "docker",
+    )
 
     def __init__(self, config: MCPServerConfig) -> None:
         self._config = config
         self._process: asyncio.subprocess.Process | None = None
         self._request_id = 0
 
+    @classmethod
+    def _validate_command(cls, command: str) -> list[str]:
+        """Split and validate ``command`` against the whitelist.
+
+        Returns the resolved argv list (executable + native args) ready
+        for :func:`asyncio.create_subprocess_exec`. Raises ``ValueError``
+        if the command is empty or its first token is not whitelisted.
+
+        When ``MAOP_MCP_STRICT_COMMAND_WHITELIST=0`` is set, the check
+        degrades to a logged warning and the command is allowed through
+        — this escape hatch exists for development only and MUST NOT be
+        used in production.
+        """
+        import os
+        import re
+        import shlex
+        import shutil
+
+        if not command or not command.strip():
+            raise ValueError("MCPServerConfig.command is empty; cannot start stdio transport")
+
+        try:
+            cmd_parts = shlex.split(command)
+        except ValueError as exc:
+            raise ValueError(f"Invalid command syntax '{command}': {exc}") from exc
+
+        if not cmd_parts:
+            raise ValueError("MCPServerConfig.command produced empty argv after shlex.split")
+
+        executable = cmd_parts[0]
+        # Resolve via PATH so ``npx`` matches /usr/local/bin/npx etc.
+        resolved = shutil.which(executable) or executable
+        basename = Path(resolved).name
+        # On Windows, ``shutil.which`` returns the full path including
+        # the ``.EXE`` / ``.CMD`` / ``.BAT`` extension (e.g. ``npx.CMD``).
+        # Strip these so the whitelist (``"npx"``, ``"node"``, ...) matches
+        # cross-platform. POSIX systems have no such extensions, so this
+        # is a no-op there.
+        basename = re.sub(r"\.(?:exe|cmd|bat)$", "", basename, flags=re.IGNORECASE)
+
+        strict = os.environ.get("MAOP_MCP_STRICT_COMMAND_WHITELIST", "1") != "0"
+        if basename not in cls.ALLOWED_COMMANDS:
+            msg = (
+                f"MCP stdio command '{executable}' (resolved to '{basename}') "
+                f"is not in the whitelist {cls.ALLOWED_COMMANDS}. "
+                f"Refusing to spawn subprocess."
+            )
+            if strict:
+                raise ValueError(msg)
+            logger.warning("[mcp_hub] %s (MAOP_MCP_STRICT_COMMAND_WHITELIST=0 — allowed)", msg)
+
+        # Return the original argv (don't replace executable with resolved
+        # path — the original may carry semantic meaning, e.g. ``npx`` vs
+        # the full path to node).
+        return cmd_parts
+
     async def start(self) -> None:
-        cmd_parts = self._config.command.split()
+        cmd_parts = self._validate_command(self._config.command)
         args = cmd_parts + self._config.args
         env = None
         if self._config.env:

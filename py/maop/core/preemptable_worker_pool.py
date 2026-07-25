@@ -92,6 +92,15 @@ class PreemptableWorkerPool:
         # Background dispatch loop is started lazily and stopped with the pool.
         self._dispatch_task: asyncio.Task | None = None
         self._stop_event: asyncio.Event | None = None
+        # Track watcher tasks so they can be cancelled on stop().
+        self._watchers: set[asyncio.Task] = set()
+        # Map enqueue token -> WorkerPool task id, for wait() support.
+        self._token_to_wp_id: dict[str, str] = {}
+        # Map token -> asyncio.Event, signalled on completion.
+        self._token_events: dict[str, asyncio.Event] = {}
+        # Map token -> result/exception, for wait() to return/raise.
+        self._token_results: dict[str, Any] = {}
+        self._token_errors: dict[str, BaseException] = {}
 
     # ── Lifecycle ───────────────────────────────────────────────
 
@@ -112,6 +121,12 @@ class PreemptableWorkerPool:
             except (asyncio.CancelledError, Exception):
                 pass
             self._dispatch_task = None
+        # Cancel any outstanding watchers so they don't linger after stop().
+        for watcher in list(self._watchers):
+            watcher.cancel()
+        if self._watchers:
+            await asyncio.gather(*self._watchers, return_exceptions=True)
+            self._watchers.clear()
         await self._pool.stop()
         # Flush queue gauges
         try:
@@ -167,7 +182,11 @@ class PreemptableWorkerPool:
         # Record queue size metric at enqueue time.
         self._record_queue_size_inc(priority)
         self._queue.push(pt)
-        return f"pt-{pt.enqueue_order}"
+        token = f"pt-{pt.enqueue_order}"
+        # Pre-register the completion event so wait() can be called
+        # before the dispatch loop has admitted the task.
+        self._token_events[token] = asyncio.Event()
+        return token
 
     async def submit_preemptable(
         self,
@@ -242,12 +261,16 @@ class PreemptableWorkerPool:
                     agent_name=agent_name,
                 )
                 pending_futures[wp_id] = pt
+                token = f"pt-{pt.enqueue_order}"
+                self._token_to_wp_id[token] = wp_id
                 async with self._running_lock:
                     self._running[wp_id] = pt
 
                 # Spawn a watcher to clean up the running map + record
                 # completion. We don't block the dispatch loop on it.
-                asyncio.ensure_future(self._watch_completion(wp_id, pt))
+                watcher = asyncio.ensure_future(self._watch_completion(wp_id, pt))
+                self._watchers.add(watcher)
+                watcher.add_done_callback(self._watchers.discard)
             except asyncio.CancelledError:
                 break
             except Exception as exc:
@@ -255,14 +278,68 @@ class PreemptableWorkerPool:
                 await asyncio.sleep(0.05)
 
     async def _watch_completion(self, wp_id: str, pt: PriorityTask) -> None:
-        """Wait for a WorkerPool task to finish, then clean up bookkeeping."""
+        """Wait for a WorkerPool task to finish, then clean up bookkeeping.
+
+        Records the result/exception so :meth:`wait` can return/raise,
+        and signals the token's completion event. Exceptions are logged
+        (not silently swallowed) so failures are observable.
+        """
+        token = f"pt-{pt.enqueue_order}"
         try:
-            await self._pool.wait(wp_id)
-        except Exception:
-            pass
+            result = await self._pool.wait(wp_id)
+            self._token_results[token] = result
+        except BaseException as exc:
+            self._token_errors[token] = exc
+            # CancelledError is expected during stop(); don't warn for it.
+            if not isinstance(exc, (KeyError, asyncio.CancelledError)):
+                logger.warning(
+                    "[preempt-pool] task %s (wp_id=%s) failed: %s",
+                    token, wp_id, exc,
+                    exc_info=not isinstance(exc, asyncio.TimeoutError),
+                )
         finally:
             async with self._running_lock:
                 self._running.pop(wp_id, None)
+            # Signal waiters regardless of success/failure.
+            event = self._token_events.get(token)
+            if event is not None:
+                event.set()
+
+    async def wait(self, token: str, timeout: float = 0) -> Any:
+        """Wait for a submitted task to complete and return its result.
+
+        Parameters
+        ----------
+        token : str
+            The task id returned by :meth:`submit`.
+        timeout : float
+            Maximum seconds to wait. ``0`` means wait indefinitely.
+
+        Raises
+        ------
+        KeyError
+            If ``token`` is unknown (never submitted or already cleaned up).
+        BaseException
+            Re-raises any exception the underlying task raised.
+        """
+        if token not in self._token_events:
+            # Maybe already completed and cleaned up; check results/errors.
+            if token in self._token_errors:
+                raise self._token_errors[token]
+            if token in self._token_results:
+                return self._token_results[token]
+            raise KeyError(f"Task token {token!r} not found")
+        event = self._token_events[token]
+        try:
+            if timeout > 0:
+                await asyncio.wait_for(event.wait(), timeout=timeout)
+            else:
+                await event.wait()
+        except asyncio.TimeoutError:
+            raise
+        if token in self._token_errors:
+            raise self._token_errors[token]
+        return self._token_results.get(token)
 
     def _maybe_record_soft_preemption(self, incoming: PriorityTask) -> None:
         """Record a would-be preemption event if applicable.

@@ -182,7 +182,15 @@ async def lifespan(app: FastAPI) -> Any:
 
 
 # ── App ────────────────────────────────────────────────────────────
-app = FastAPI(title="MAOP Dashboard", version=MAOP_VERSION, docs_url="/api/docs", lifespan=lifespan)
+_is_prod_env = os.environ.get("MAOP_ENV", "").lower() == "production"
+app = FastAPI(
+    title="MAOP Dashboard",
+    version=MAOP_VERSION,
+    docs_url=None if _is_prod_env else "/api/docs",
+    redoc_url=None if _is_prod_env else "/api/redoc",
+    openapi_url=None if _is_prod_env else "/api/openapi.json",
+    lifespan=lifespan,
+)
 
 # ── Global Exception Handler ──────────────────────────────────────
 # Catches unhandled exceptions: logs full details server-side,
