@@ -21,10 +21,11 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel
 
+from maop.config.edition import FeatureFlag, has_feature
 from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,12 @@ class LogoutRequest(BaseModel):
 @handle_api_errors
 async def authorize(request: Request, state: str = "") -> dict[str, Any]:
     """Redirect to the IdP's authorize URL."""
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.SSO):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SSO not available in this edition",
+        )
     mgr = _get_manager()
     url = mgr.get_authorize_url(state=state)
     return RedirectResponse(url=url, status_code=302)
@@ -78,6 +85,12 @@ async def callback(
     error: str = "",
 ) -> dict[str, Any]:
     """Handle OAuth callback — exchange code for session."""
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.SSO):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SSO not available in this edition",
+        )
     if error:
         return JSONResponse(
             status_code=400,
@@ -102,6 +115,12 @@ async def callback(
 @handle_api_errors
 async def logout(body: LogoutRequest, request: Request) -> dict[str, Any]:
     """Invalidate an SSO session."""
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.SSO):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SSO not available in this edition",
+        )
     mgr = _get_manager()
     logged_out = mgr.logout(body.session_id)
     return {"status": "ok" if logged_out else "not_found", "logged_out": logged_out}
@@ -111,6 +130,12 @@ async def logout(body: LogoutRequest, request: Request) -> dict[str, Any]:
 @handle_api_errors
 async def validate_session(request: Request, session_id: str = "") -> dict[str, Any]:
     """Validate an SSO session ID."""
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.SSO):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SSO not available in this edition",
+        )
     if not session_id:
         return {"status": "error", "error": "Missing session_id"}
     mgr = _get_manager()
@@ -133,6 +158,12 @@ async def get_config(request: Request) -> dict[str, Any]:
     Does NOT expose client_secret. Returns provider type, authorize URL,
     client_id, and scopes so the frontend can build the login redirect.
     """
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.SSO):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SSO not available in this edition",
+        )
     mgr = _get_manager()
     config = mgr.config()
     return {

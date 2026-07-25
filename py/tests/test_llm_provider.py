@@ -13,6 +13,7 @@ from maop.core.llm_provider import (
     OllamaProvider,
     LLMProviderFactory,
     LLMResponse,
+    FallbackResult,
     ProviderConfig,
     ModelConfig,
 )
@@ -441,21 +442,23 @@ class TestChatEngineProviderIntegration:
 
         mock_provider = AsyncMock(spec=BaseLLMProvider)
         mock_provider.is_configured = True
-        mock_provider.chat = AsyncMock(return_value=LLMResponse(
-            content="Provider response", model="yi-large", provider="stepfun",
-        ))
 
         mock_factory = MagicMock()
         mock_factory.get_provider.return_value = mock_provider
-        mock_factory.get_model_config.return_value = ModelConfig(
-            name="yi-large", provider="stepfun", model_id="yi-large",
-        )
+        # _call_llm 现在统一走 chat_with_fallback，需 mock 为 AsyncMock
+        mock_factory.chat_with_fallback = AsyncMock(return_value=FallbackResult(
+            response=LLMResponse(
+                content="Provider response", model="yi-large", provider="stepfun",
+            ),
+            used_model="yi-large",
+            original_model="yi-large",
+        ))
         engine._provider_factory = mock_factory
 
         request = ChatRequest(message="Hi", model="yi-large")
         result = await engine._call_llm("mavis", [{"role": "user", "content": "Hi"}], request)
         assert result == "Provider response"
-        mock_provider.chat.assert_called_once()
+        mock_factory.chat_with_fallback.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_call_llm_fallback_on_provider_error(self, tmp_path):
@@ -463,15 +466,15 @@ class TestChatEngineProviderIntegration:
 
         mock_provider = AsyncMock(spec=BaseLLMProvider)
         mock_provider.is_configured = True
-        mock_provider.chat = AsyncMock(return_value=LLMResponse(
-            content="[LLM Error] timeout", provider="stepfun",
-        ))
 
         mock_factory = MagicMock()
         mock_factory.get_provider.return_value = mock_provider
-        mock_factory.get_model_config.return_value = ModelConfig(
-            name="yi-large", provider="stepfun", model_id="yi-large",
-        )
+        # _call_llm 现在统一走 chat_with_fallback；返回错误响应触发 Dispatcher fallback
+        mock_factory.chat_with_fallback = AsyncMock(return_value=FallbackResult(
+            response=LLMResponse(
+                content="[LLM Error] timeout", provider="stepfun",
+            ),
+        ))
         engine._provider_factory = mock_factory
 
         with patch("maop.delegate.dispatcher.Dispatcher") as MockDispatcher:

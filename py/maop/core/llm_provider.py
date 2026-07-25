@@ -50,6 +50,8 @@ class LLMResponse(BaseModel):
     total_tokens: int = 0
     latency_ms: int = 0
     provider: str = ""
+    # 工具调用结果（OpenAI 兼容格式），供 ReactLoop 等编排器消费
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class FallbackResult(BaseModel):
@@ -289,6 +291,7 @@ class AnthropicProvider(BaseLLMProvider):
         *,
         temperature: float = 0.7,
         max_tokens: int = 4096,
+        tools: list[dict[str, Any]] | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         url = f"{self._config.base_url}/messages"
@@ -308,6 +311,26 @@ class AnthropicProvider(BaseLLMProvider):
         }
         if system_content:
             payload["system"] = system_content
+
+        # 转换 OpenAI 工具格式为 Anthropic 格式并注入 payload
+        if tools:
+            anthropic_tools: list[dict[str, Any]] = []
+            for t in tools:
+                if t.get("type") == "function":
+                    fn = t.get("function", {})
+                    anthropic_tools.append({
+                        "name": fn.get("name", ""),
+                        "description": fn.get("description", ""),
+                        "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
+                    })
+                else:
+                    # 已经是简化格式的工具定义
+                    anthropic_tools.append({
+                        "name": t.get("name", ""),
+                        "description": t.get("description", ""),
+                        "input_schema": t.get("input_schema") or t.get("parameters", {"type": "object", "properties": {}}),
+                    })
+            payload["tools"] = anthropic_tools
 
         start = time.perf_counter()
         client = self._get_client()
@@ -337,6 +360,19 @@ class AnthropicProvider(BaseLLMProvider):
         content = "".join(b.get("text", "") for b in content_blocks if b.get("type") == "text")
         usage = data.get("usage", {})
 
+        # 解析 Anthropic 响应中的 tool_use blocks，转换为 OpenAI 兼容格式
+        tool_calls: list[dict[str, Any]] = []
+        for block in content_blocks:
+            if block.get("type") == "tool_use":
+                tool_calls.append({
+                    "id": block.get("id", ""),
+                    "type": "function",
+                    "function": {
+                        "name": block.get("name", ""),
+                        "arguments": json.dumps(block.get("input", {})),
+                    },
+                })
+
         return LLMResponse(
             content=content,
             model=data.get("model", model),
@@ -346,6 +382,7 @@ class AnthropicProvider(BaseLLMProvider):
             total_tokens=usage.get("input_tokens", 0) + usage.get("output_tokens", 0),
             latency_ms=latency_ms,
             provider=self._config.name,
+            tool_calls=tool_calls,
         )
 
     async def chat_stream(

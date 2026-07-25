@@ -95,7 +95,7 @@ const api = useApiStore();
 const realtime = useRealtimeStore();
 const realtimeConnected = computed(() => realtime.connected);
 const isLight = ref(localStorage.getItem('maop_theme') !== 'dark');
-const version = ref('4.0.0');
+const version = ref(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown');
 const authExpired = ref(false);
 // F-P0-8 fix: login form state
 const loginUsername = ref('');
@@ -223,7 +223,7 @@ onMounted(async () => {
     const r = await fetch('/api/health', withAuth({}, {}));
     if (r.ok) {
       const d = await r.json();
-      version.value = d.version || '4.0.0';
+      version.value = d.version || (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown');
     } else if (r.status === 401) {
       // 未登录：保持默认版本号，不强制弹窗（用户可能尚未启用 auth）
     }

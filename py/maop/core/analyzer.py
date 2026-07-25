@@ -533,11 +533,13 @@ async def _semantic_analyze(
 
     - **Primary path (LLM)**: when ``enable_llm=True`` and ``llm_factory``
       is provided with a configured provider, call
-      ``provider.chat(messages=_build_llm_decomp_prompt(task, sub_tasks),
-      model=model_name, temperature=0.0, max_tokens=1024)`` and parse the
-      JSON response into (sub_tasks, dag, score). Real semantic
+      ``llm_factory.chat_with_fallback(messages=_build_llm_decomp_prompt(
+      task, sub_tasks), model_name, temperature=0.0, max_tokens=1024)``
+      and parse the JSON response into (sub_tasks, dag, score). Real semantic
       understanding — dependency edges, per-sub-task risk levels, and
       holistic complexity come from the LLM, not from regex keyword tables.
+      Routing through ``chat_with_fallback`` also triggers ``_record_cost``
+      so CostTracker captures token usage and latency.
     - **Fallback path (rule)**: when LLM is disabled, not configured, or
       raises/returns invalid JSON, delegates to ``_rule_based_semantic_analyze``
       (the original regex + 4-factor scoring logic).
@@ -550,14 +552,13 @@ async def _semantic_analyze(
         provider = llm_factory.get_provider(model_name) if model_name else None
         if provider is None or not provider.is_configured:
             return _rule_based_semantic_analyze(task, sub_tasks)
-        model_cfg = llm_factory.get_model_config(model_name) if model_name else None
-        model_id = model_cfg.model_id if model_cfg else model_name
         messages = _build_llm_decomp_prompt(task, sub_tasks)
-        response = await provider.chat(
-            messages=messages, model=model_id,
+        # 统一走 chat_with_fallback 以触发 _record_cost 成本记录与 fallback 链
+        fb_result = await llm_factory.chat_with_fallback(
+            messages, model_name,
             temperature=0.0, max_tokens=1024,
         )
-        result = _parse_llm_decomp(response.content, sub_tasks)
+        result = _parse_llm_decomp(fb_result.response.content, sub_tasks)
         if result is not None:
             return result
     except Exception as exc:

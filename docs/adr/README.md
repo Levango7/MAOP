@@ -11,7 +11,10 @@
 | [007](007-cache-warmup-fix.md) | Dashboard 缓存持久化 & Warm-Cache 修复 | Accepted (2026-07-10) |
 | [008](008-dual-arch-scheduling-audit.md) | MAOP 双版本架构 & 调度流程审计 | Accepted (2026-07-10) |
 | [009](009-python-primary-engine.md) | Python 主引擎 — 基于实证的架构转向 | Proposed (Supersedes ADR-005) |
-| [010](010-bugfix-batch.md) | Batch Bugfix — Critical/High/Medium Priority |  |
+| [010](010-bugfix-batch.md) | Batch Bugfix — Critical/High/Medium Priority | Accepted (2026-07-15) |
 | [011](011-state-unification.md) | P0-3 状态源真统一（队列/人工队列单一真源） | Proposed |
 | [012](012-routing-refactor.md) | 配置化路由重构评估（仅设计/不执行） | Proposed（评估结论：建议做，但列为 P1/P2 后续，非当前 P0 范围） |
 | [013](013-agent-llm-direct-cli-fallback.md) | Agent 机制 — LLM 直连主路径 + CLI 降级保留（双路径并存） | Accepted (2026-07-22) — Phase F 决策记录。 |
+| [014](014-ha-single-instance-status.md) | HA 单实例状态（Phase 3.2 基线） | Superseded by ADR-015 (2026-07-25) |
+| [015](015-distributed-ha-redis-lease.md) | 分布式 HA Redis 租约 + Fencing Token | Accepted (2026-07-25) |
+| [016](016-dual-edition-architecture.md) | 双版架构（Personal / Enterprise） | Accepted (2026-07-25) |

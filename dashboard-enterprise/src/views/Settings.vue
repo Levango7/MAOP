@@ -125,7 +125,7 @@
         <h3>About</h3>
         <div class="about-version">
           <span class="about-name">MAOP</span>
-          <span class="about-ver">v4.0.0</span>
+          <span class="about-ver">v{{ appVersion }}</span>
         </div>
         <div class="about-section">
           <div class="about-section-title">Tech Stack</div>
@@ -149,10 +149,10 @@
         <div class="about-section">
           <div class="about-section-title">Architecture Decisions</div>
           <ul class="adr-list">
-            <li v-for="a in adrs" :key="a.num">
-              <a :href="`/docs/adr/${a.file}`" target="_blank" rel="noopener">
-                <span class="adr-num">ADR-{{ a.num }}</span>
-                <span class="adr-title">{{ a.title }}</span>
+            <li v-for="adr in adrs" :key="adr.number">
+              <a :href="`/docs/adr/${adr.filename}`" target="_blank" rel="noopener">
+                <span class="adr-num">ADR-{{ adr.number }}</span>
+                <span class="adr-title">{{ adr.title }}</span>
               </a>
             </li>
           </ul>
@@ -170,23 +170,45 @@ const editionStore = useEditionStore();
 const edition = ref({});
 const config = ref({});
 
-// t21c: ADR index. Static to avoid an extra API round-trip; update here when
-// a new ADR is added. Linked from the About panel.
-const adrs = ref([
-  { num: '001', file: '001-python-yaml-bridge.md', title: 'Python ↔ YAML Bridge' },
-  { num: '002', file: '002-server-merge-orchestrator-deprecation.md', title: 'Server Merge / Orchestrator Deprecation' },
-  { num: '003', file: '003-mock-fallback-removal.md', title: 'Mock Fallback Removal' },
-  { num: '004', file: '004-security-hardening.md', title: 'Security Hardening' },
-  { num: '005', file: '005-powershell-retention.md', title: 'PowerShell Retention' },
-  { num: '006', file: '006-sse-removal-sync-architecture.md', title: 'SSE Retained (Superseded Removal)' },
-  { num: '007', file: '007-cache-warmup-fix.md', title: 'Cache Warmup Fix' },
-  { num: '008', file: '008-dual-arch-scheduling-audit.md', title: 'Dual-Arch Scheduling Audit' },
-  { num: '009', file: '009-python-primary-engine.md', title: 'Python Primary Engine' },
-  { num: '010', file: '010-bugfix-batch.md', title: 'Bugfix Batch' },
-  { num: '011', file: '011-state-unification.md', title: 'State Unification' },
-  { num: '012', file: '012-routing-refactor.md', title: 'Routing Refactor' },
-  { num: '013', file: '013-agent-llm-direct-cli-fallback.md', title: 'Agent LLM Direct + CLI Fallback' },
-]);
+// t22: 从 vite define 注入的全局常量读取版本号（vite.config.js 中由 package.json 注入）。
+// fallback 'unknown' 仅在未注入时使用（如单元测试环境）。
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown';
+
+// t21c: ADR index fallback. 当 /api/info/adrs 端点不可用时（如后端旧版本或网络故障），
+// 使用此硬编码列表作为兜底，确保 About 面板始终有内容显示。
+// 字段名与后端 /api/info/adrs 返回结构保持一致：number / filename / title。
+const adrsFallback = [
+  { number: '001', filename: '001-python-yaml-bridge.md', title: 'Python ↔ YAML Bridge' },
+  { number: '002', filename: '002-server-merge-orchestrator-deprecation.md', title: 'Server Merge / Orchestrator Deprecation' },
+  { number: '003', filename: '003-mock-fallback-removal.md', title: 'Mock Fallback Removal' },
+  { number: '004', filename: '004-security-hardening.md', title: 'Security Hardening' },
+  { number: '005', filename: '005-powershell-retention.md', title: 'PowerShell Retention' },
+  { number: '006', filename: '006-sse-removal-sync-architecture.md', title: 'SSE Retained (Superseded Removal)' },
+  { number: '007', filename: '007-cache-warmup-fix.md', title: 'Cache Warmup Fix' },
+  { number: '008', filename: '008-dual-arch-scheduling-audit.md', title: 'Dual-Arch Scheduling Audit' },
+  { number: '009', filename: '009-python-primary-engine.md', title: 'Python Primary Engine' },
+  { number: '010', filename: '010-bugfix-batch.md', title: 'Bugfix Batch' },
+  { number: '011', filename: '011-state-unification.md', title: 'State Unification' },
+  { number: '012', filename: '012-routing-refactor.md', title: 'Routing Refactor' },
+  { number: '013', filename: '013-agent-llm-direct-cli-fallback.md', title: 'Agent LLM Direct + CLI Fallback' },
+];
+
+// t22: ADR 列表初始用 fallback，onMounted 时尝试从后端动态加载完整列表（含 014+）。
+const adrs = ref(adrsFallback);
+
+async function loadAdrs() {
+  try {
+    const res = await fetch('/api/info/adrs');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        adrs.value = data;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load ADRs:', e);
+  }
+}
 
 async function load() {
   await editionStore.fetchEdition();
@@ -198,6 +220,7 @@ async function load() {
     enterprise_available: editionStore.isEnterprise,
   };
   try { config.value = await api.get('/api/info/config'); } catch { config.value = {}; }
+  loadAdrs();
 }
 
 onMounted(load);

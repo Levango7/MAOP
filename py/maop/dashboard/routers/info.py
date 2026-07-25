@@ -388,3 +388,52 @@ async def get_config() -> dict[str, Any]:
         }
     except Exception as exc:
         return {"error": str(exc)}
+
+
+@router.get("/adrs")
+async def list_adrs() -> list[dict[str, str]]:
+    """列出所有 Architecture Decision Records（来自 docs/adr/ 目录）。
+
+    解析每个 ADR Markdown 文件的编号、标题和状态，供前端 About 面板动态展示。
+    路径计算：info.py 位于 py/maop/dashboard/routers/，回到 MAOP 根需要 parents[4]。
+    """
+    import re
+    from pathlib import Path
+
+    # info.py 路径：MAOP/py/maop/dashboard/routers/info.py
+    # parents[0]=routers, [1]=dashboard, [2]=maop, [3]=py, [4]=MAOP 根
+    adr_dir = Path(__file__).resolve().parents[4] / "docs" / "adr"
+    adrs: list[dict[str, str]] = []
+    if not adr_dir.exists():
+        return adrs
+
+    for f in sorted(adr_dir.glob("*.md")):
+        if f.name == "README.md":
+            continue
+        # 解析 ADR 编号：NNN-xxx.md
+        match = re.match(r"(\d+)-(.+)\.md", f.name)
+        if not match:
+            continue
+        num = match.group(1)
+        file_content = f.read_text(encoding="utf-8")
+        # 标题：第一行去掉 "# ADR-NNN: " 前缀
+        first_line = file_content.split("\n", 1)[0]
+        title = re.sub(r"^#\s*ADR-\d+\s*:\s*", "", first_line).strip()
+        if not title:
+            title = first_line.lstrip("# ").strip()
+
+        # 状态：兼容两种格式 —— "**Status**: xxx" 或 "## Status\nxxx"
+        status = "Unknown"
+        m = re.search(r"\*\*Status\*\*:\s*(.+)", file_content)
+        if not m:
+            m = re.search(r"##\s*Status\s*\n\s*(.+)", file_content)
+        if m:
+            status = m.group(1).strip()
+
+        adrs.append({
+            "number": num,
+            "filename": f.name,
+            "title": title,
+            "status": status,
+        })
+    return adrs

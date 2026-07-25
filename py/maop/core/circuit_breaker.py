@@ -154,10 +154,12 @@ CREATE INDEX IF NOT EXISTS idx_be_ts ON breaker_events(timestamp);
 #     Action:    record new trip time (cooldown extended)
 #                advance failover chain if this agent is current
 #
-# Thread safety:
-#   - Sync methods use _sync_lock (threading.RLock)
-#   - Async methods use _async_lock (asyncio.Lock)
-#   - health_check acquires _async_lock before reading _data
+# 线程安全（统一单锁模型，P3-3 修复）：
+#   - 所有同步方法使用 _sync_lock (threading.RLock)
+#   - 所有异步方法通过 asyncio.to_thread 委托给同步方法，
+#     确保对 _data / _failover_chains 的访问全部经过同一把 _sync_lock
+#   - 不再使用独立的 _async_lock，避免同步/异步两条访问路径互不感知
+#     导致 failure count 丢失与状态翻转
 #
 # Failover:
 #   register_failover(name, agents: list) - registers primary -> fallback -> tertiary chain
@@ -194,8 +196,9 @@ class CircuitBreaker:
         self._path = Path(path)
         self._data: dict[str, BreakerEntry] = {}
         self._failover_chains: dict[str, FailoverChain] = {}
+        # 统一使用单把 _sync_lock：同步方法直接获取，异步方法通过
+        # asyncio.to_thread 委托给同步方法，避免双锁并发问题。
         self._sync_lock = threading.RLock()
-        self._async_lock = asyncio.Lock()
         # Short-TTL cache for all_states() snapshot (avoid re-copying _data
         # under the lock on every call). Accepts up to _STATES_CACHE_TTL of
         # staleness; mutating operations rely on the TTL for expiry.
@@ -507,6 +510,36 @@ class CircuitBreaker:
 
     # ── Health check ─────────────────────────────────────────
 
+    def _get_half_open_agents_sync(self) -> list[tuple[str, BreakerEntry]]:
+        """同步获取所有处于 HALF_OPEN 状态的 agent（持 _sync_lock）。"""
+        with self._sync_lock:
+            return [
+                (name, entry)
+                for name, entry in self._data.items()
+                if entry.state == BreakerState.HALF_OPEN
+            ]
+
+    def _get_all_states_sync(self) -> dict[str, BreakerState]:
+        """同步获取所有 agent 的当前状态快照（持 _sync_lock）。"""
+        with self._sync_lock:
+            return {name: entry.state for name, entry in self._data.items()}
+
+    def _recover_agent_sync(self, agent_name: str) -> bool:
+        """同步将 HALF_OPEN agent 恢复为 CLOSED（持 _sync_lock）。
+
+        Returns True if recovery happened, False if agent was missing or
+        not in HALF_OPEN state (可能被其他线程改动)。
+        """
+        with self._sync_lock:
+            entry = self._data.get(agent_name)
+            if entry is None or entry.state != BreakerState.HALF_OPEN:
+                return False
+            old_state = entry.state
+            entry.state = BreakerState.CLOSED
+            entry.failures = 0
+            self._save_agent(agent_name, entry, old_state=old_state)
+            return True
+
     async def health_check(self, probe: Any = None) -> dict[str, BreakerState]:
         """Probe all agents and recover half-open → closed if healthy.
 
@@ -526,20 +559,20 @@ class CircuitBreaker:
         always true. This bypassed the probe semantics. Now, without a
         probe, HALF_OPEN agents stay in HALF_OPEN until a real request
         tests them.
+
+        P3-3 fix: 统一单锁模型——所有对 _data 的访问通过 asyncio.to_thread
+        委托给持 _sync_lock 的同步辅助方法，不再使用 _async_lock。
         """
-        # P1-10 fix (R3 audit): use async_lock, probe outside lock
-        half_open_agents: list[tuple[str, BreakerEntry]] = []
-        async with self._async_lock:
-            for agent_name, entry in list(self._data.items()):
-                if entry.state == BreakerState.HALF_OPEN:
-                    half_open_agents.append((agent_name, entry))
+        # 通过 to_thread 获取 half-open agent 快照（持 _sync_lock）
+        half_open_agents: list[tuple[str, BreakerEntry]] = await asyncio.to_thread(
+            self._get_half_open_agents_sync
+        )
 
         if not half_open_agents:
-            async with self._async_lock:
-                return {name: entry.state for name, entry in self._data.items()}
+            return await asyncio.to_thread(self._get_all_states_sync)
 
         # Probe outside lock to avoid blocking other operations
-        for agent_name, entry in half_open_agents:
+        for agent_name, _entry in half_open_agents:
             if probe is None:
                 continue
             try:
@@ -551,17 +584,12 @@ class CircuitBreaker:
                 continue
             if not is_healthy:
                 continue
-            async with self._async_lock:
-                old_state = entry.state
-                entry.state = BreakerState.CLOSED
-                entry.failures = 0
-                await asyncio.get_running_loop().run_in_executor(
-                    None, partial(self._save_agent, agent_name, entry, old_state=old_state)
-                )
-            logger.info("[breaker] Health check: %s recovered to CLOSED (probed)", agent_name)
+            # 通过 to_thread 在 _sync_lock 下恢复 agent
+            recovered = await asyncio.to_thread(self._recover_agent_sync, agent_name)
+            if recovered:
+                logger.info("[breaker] Health check: %s recovered to CLOSED (probed)", agent_name)
 
-        async with self._async_lock:
-            return {name: entry.state for name, entry in self._data.items()}
+        return await asyncio.to_thread(self._get_all_states_sync)
 
     def get_open_agents(self) -> list[str]:
         """Return list of agents currently in OPEN state."""
@@ -651,68 +679,16 @@ class CircuitBreaker:
             return 0
 
     # ── Async wrappers ─────────────────────────────────────
+    #
+    # P3-3 修复：所有异步方法通过 asyncio.to_thread 委托给同步方法，
+    # 确保对 _data / _failover_chains 的访问全部经过同一把 _sync_lock，
+    # 避免同步/异步两条锁互不感知导致 failure count 丢失与状态翻转。
 
     async def arecord_success(self, agent_name: str) -> BreakerEntry:
-        async with self._async_lock:
-            entry = self._data.get(agent_name, BreakerEntry())
-            old_state = entry.state
-            entry.state = BreakerState.CLOSED
-            entry.failures = 0
-            entry.last_failure = None
-            self._data[agent_name] = entry
-            for name, chain in self._failover_chains.items():
-                if chain.current and chain.current == agent_name and chain.current_index > 0:
-                    chain.reset()
-                    await asyncio.get_running_loop().run_in_executor(
-                        None, partial(self._save_failover_chain, name, chain)
-                    )
-            await asyncio.get_running_loop().run_in_executor(
-                None, partial(self._save_agent, agent_name, entry, old_state=old_state)
-            )
-            return entry
+        return await asyncio.to_thread(self.record_success, agent_name)
 
     async def arecord_failure(self, agent_name: str) -> BreakerEntry:
-        async with self._async_lock:
-            entry = self._data.get(agent_name, BreakerEntry())
-            old_state = entry.state
-            entry.failures += 1
-            entry.last_failure = time.time()
-            if entry.state == BreakerState.HALF_OPEN:
-                entry.state = BreakerState.OPEN
-            elif entry.failures >= entry.threshold:
-                entry.state = BreakerState.OPEN
-            self._data[agent_name] = entry
-            for name, chain in self._failover_chains.items():
-                if chain.current == agent_name:
-                    next_agent = chain.advance()
-                    if next_agent:
-                        await asyncio.get_running_loop().run_in_executor(
-                            None, partial(self._save_failover_chain, name, chain)
-                        )
-                        logger.info("[breaker] Failover %s: %s → %s", name, agent_name, next_agent)
-            await asyncio.get_running_loop().run_in_executor(
-                None, partial(self._save_agent, agent_name, entry, old_state=old_state)
-            )
-            return entry
+        return await asyncio.to_thread(self.record_failure, agent_name)
 
     async def ais_available(self, agent_name: str) -> bool:
-        async with self._async_lock:
-            entry = self._data.get(agent_name)
-            if entry is None:
-                return True
-            if entry.state == BreakerState.CLOSED:
-                return True
-            if entry.state == BreakerState.HALF_OPEN:
-                return True
-            if entry.state == BreakerState.OPEN:
-                if entry.last_failure is not None:
-                    elapsed = time.time() - entry.last_failure
-                    if elapsed >= entry.cooldown_s:
-                        old_state = entry.state
-                        entry.state = BreakerState.HALF_OPEN
-                        await asyncio.get_running_loop().run_in_executor(
-                            None, lambda: self._save_agent(agent_name, entry, old_state=old_state)
-                        )
-                        return True
-                return False
-            return False
+        return await asyncio.to_thread(self.is_available, agent_name)

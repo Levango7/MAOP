@@ -58,7 +58,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.12", "3.13"]
+        # 与 pyproject.toml 的 requires-python = ">=3.10" 保持一致
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -108,17 +109,63 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard-enterprise/package-lock.json
 
+      - name: Install dependencies
+        working-directory: dashboard-enterprise
+        run: npm ci
+
+      - name: Run frontend tests
+        run: npm test
+        working-directory: dashboard-enterprise
+
       - name: Build enterprise dashboard
         working-directory: dashboard-enterprise
-        run: |
-          npm ci
-          npx vite build
+        run: npx vite build
 
       - name: Upload enterprise dist
         uses: actions/upload-artifact@v4
         with:
           name: dashboard-enterprise-dist
           path: dashboard/dist-enterprise/
+
+  # ── Migration Tests ─────────────────────────────────────────────
+  migrations:
+    name: Alembic migrations (upgrade/downgrade)
+    runs-on: ubuntu-latest
+    needs: [lint]
+    env:
+      MAOP_DATA_DIR: /tmp/maop-migration-test
+      # env.py 通过 MAOP_DB_URL 覆盖默认 sqlite 路径，使用临时库避免污染源码树
+      MAOP_DB_URL: sqlite:////tmp/maop-migration-test/maop.db
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r py/requirements.txt
+          pip install alembic
+
+      - name: Test upgrade then downgrade then upgrade
+        run: |
+          mkdir -p $MAOP_DATA_DIR
+          # alembic.ini 位于项目根目录，script_location 为相对路径，
+          # 必须在根目录运行 alembic（不能 cd 到 py/）
+          # 升级到 head
+          alembic upgrade head
+          # 降级到 base
+          alembic downgrade base
+          # 再次升级到 head 验证幂等性
+          alembic upgrade head
+
+      - name: Test with PostgreSQL
+        if: false  # 暂时禁用，需要 postgres service
+        run: |
+          # TODO: 加 postgres service container 后启用
+          echo "PostgreSQL migration test - pending postgres service setup"
 
   # ── Docker Build ────────────────────────────────────────────────
   docker:

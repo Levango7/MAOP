@@ -15,8 +15,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, status
 
+from maop.config.edition import FeatureFlag, has_feature
 from maop.dashboard.error_handler import handle_api_errors
 from maop.core.middleware import require_admin
 
@@ -81,6 +82,12 @@ async def list_events(
 ) -> dict[str, Any]:
     """List audit events with optional filters."""
     require_admin(request)
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.AUDIT_LOG):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="audit log not available in this edition",
+        )
     mgr = _get_logger()
     events = _list_events(
         mgr,
@@ -121,6 +128,12 @@ async def get_summary(
 ) -> dict[str, Any]:
     """Get audit event summary (counts by action, critical count)."""
     require_admin(request)
+    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    if not has_feature(FeatureFlag.AUDIT_LOG):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="audit log not available in this edition",
+        )
     mgr = _get_logger()
     summary = mgr.summary(tenant_id=tenant_id, hours=hours)
     return {"status": "ok", "summary": summary}

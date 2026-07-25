@@ -227,15 +227,15 @@ class ChatEngine:
         provider = self.provider_factory.get_provider(model_name) if model_name else None
 
         if provider and provider.is_configured:
-            model_cfg = self.provider_factory.get_model_config(model_name)
-            model_id = model_cfg.model_id if model_cfg else model_name
             try:
-                response = await provider.chat(
-                    messages=messages,
-                    model=model_id,
+                # 统一走 chat_with_fallback 以触发 _record_cost 成本记录与 fallback 链
+                result = await self.provider_factory.chat_with_fallback(
+                    messages, model_name,
                     temperature=request.temperature,
                     max_tokens=request.max_tokens,
+                    agent=agent,
                 )
+                response = result.response
                 if response.content and not response.content.startswith("["):
                     return response.content
                 logger.warning("[chat_engine] Provider returned error, falling back: %s", response.content)
