@@ -13,6 +13,7 @@ import json
 import logging
 import re
 import threading
+from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
@@ -168,7 +169,6 @@ def setup_json_logging(
 
     # Optional file handler.
     if log_file is not None:
-        from pathlib import Path
         log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(log_path, encoding="utf-8")
@@ -208,7 +208,6 @@ class StructuredLogger:
         self.span_id = span_id
         self._logger = logging.getLogger(name)
         if log_dir is not None:
-            from pathlib import Path
             log_dir_path = Path(log_dir)
             log_dir_path.mkdir(parents=True, exist_ok=True)
             fh = logging.FileHandler(log_dir_path / "MAOP-structured.log", encoding="utf-8")

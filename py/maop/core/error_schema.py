@@ -6,10 +6,14 @@ Uses Pydantic v2 for validation and serialization.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
+
+# L12 fix (Phase R7): TraceID 正则，允许空或 [a-zA-Z0-9_-]+
+_TRACE_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class MaopResult(BaseModel):
@@ -30,6 +34,16 @@ class MaopResult(BaseModel):
     task: str
     trace_id: str = ""
     routing_key: str = ""
+
+    @field_validator("trace_id")
+    @classmethod
+    def _validate_trace_id(cls, v: str) -> str:
+        """L12 fix: TraceID 必须为空或匹配 [a-zA-Z0-9_-]+，防止注入攻击。"""
+        if v and not _TRACE_ID_RE.match(v):
+            raise ValueError(
+                f"trace_id must match [a-zA-Z0-9_-]+ or be empty, got: {v!r}"
+            )
+        return v
     driver: str | None = None
     start_time: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     model: str | None = None

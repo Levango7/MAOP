@@ -23,6 +23,7 @@ and simple analysis in loop_analyzer.py.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
@@ -128,8 +129,9 @@ class MaopLoop(ExecuteMixin):
         if self._hook_mgr:
             try:
                 self._hook_mgr.bridge_event_bus(self._bus)
-            except Exception:
-                pass
+            except Exception as exc:
+                # H10 fix (Phase R7): 不再静默吞异常，记录警告便于排查
+                logger.warning("bridge_event_bus failed: %s", exc, exc_info=True)
 
         # P0: WorkerPool
         self._worker_pool = self._svc.get("worker_pool", raise_on_failure=False) if lc.enable_parallel else None
@@ -376,7 +378,6 @@ class MaopLoop(ExecuteMixin):
             )
             ctx.analysis_dict = simple_result.model_dump()
 
-        import asyncio
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(self._bus.publish(Event(topic="loop.analyze", data={
@@ -454,8 +455,9 @@ class MaopLoop(ExecuteMixin):
                 if cached is not None:
                     self._log("execute", "INFO", "Cache hit", trace_id=ctx.trace_id)
                     exec_result = cached
-            except Exception:
-                pass
+            except Exception as exc:
+                # H10 fix (Phase R7): 缓存读取失败不应静默，记录警告
+                logger.warning("cache lookup failed: %s", exc, exc_info=True)
 
         ctx.parallel_executed = False
         if exec_result is None:
@@ -689,7 +691,6 @@ class MaopLoop(ExecuteMixin):
                        f"Loop {'succeeded' if success else 'failed'}",
                        trace_id=ctx.trace_id, duration_ms=total_ms, feedback_cycles=ctx.feedback_cycles)
 
-        import asyncio
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(self._bus.publish(Event(topic="loop.complete", data={

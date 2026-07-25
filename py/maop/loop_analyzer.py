@@ -16,6 +16,7 @@ This dual-path design follows ADR-013 ("LLM direct primary + CLI fallback").
 
 from __future__ import annotations
 
+import re
 import json
 import logging
 from typing import Any
@@ -55,7 +56,6 @@ _TECH_KEYWORDS_ZH: tuple[str, ...] = (
 def _detect_action_verbs(task_lower: str) -> list[str]:
     """Return the set of action verbs detected in the task (lowercased)."""
     detected: list[str] = []
-    import re
     for verb in _ACTION_VERBS_EN:
         # Word-boundary prefix match for English verbs to avoid false positives
         # (e.g. "fix" inside "suffix") while allowing inflections
@@ -78,7 +78,6 @@ def _detect_action_verbs(task_lower: str) -> list[str]:
 def _detect_tech_stack(task_lower: str) -> list[str]:
     """Return the set of tech-stack keywords detected in the task."""
     detected: list[str] = []
-    import re
     for kw in _TECH_KEYWORDS_EN:
         # Word-boundary prefix match to allow inflections
         # ("databases", "configs", "deployments" ...).

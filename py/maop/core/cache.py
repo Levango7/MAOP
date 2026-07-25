@@ -42,6 +42,9 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+# M7 fix (Phase R7): SingleFlight 等待超时提取为命名常量
+_SINGLEFLIGHT_WAIT_TIMEOUT_S = 30.0
+
 K = TypeVar("K")
 V = TypeVar("V")
 
@@ -353,7 +356,7 @@ class LRUCache:
 
         if flight_event is not None:
             # Wait for the computing thread
-            flight_event.wait(timeout=30.0)
+            flight_event.wait(timeout=_SINGLEFLIGHT_WAIT_TIMEOUT_S)
             # Now the value should be in cache
             result = self.get(key)
             if result is not None:

@@ -21,6 +21,30 @@ import uuid as _uuid
 
 logger = logging.getLogger(__name__)
 
+
+async def _run_subprocess(cmd: list[str], timeout: int = 10) -> tuple[int, str, str]:
+    """M21 fix (Phase R7): async subprocess 替代 subprocess.run，避免阻塞事件循环。
+
+    返回 (returncode, stdout, stderr)，超时或异常返回 (-1, "", error_msg)。
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout_b, stderr_b = await asyncio.wait_for(
+                proc.communicate(), timeout=timeout
+            )
+            return proc.returncode, stdout_b.decode("utf-8", errors="replace"), stderr_b.decode("utf-8", errors="replace")
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            return -1, "", f"timeout after {timeout}s"
+    except Exception as exc:
+        return -1, "", str(exc)
+
 _HARDENED_ALLOWED_PACKAGES = frozenset({
     "MAOP", "MAOP-core", "openai", "anthropic", "sentence-transformers",
     "pydantic", "pydantic-settings", "fastapi", "uvicorn", "httpx",
@@ -208,8 +232,8 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]
                 "driver": ad.driver, "model": getattr(ad, "model", ""), "capabilities": ad.capabilities}
         if cli_path:
             try:
-                v = subprocess.run([cli_path, "--version"], capture_output=True, text=True, timeout=10)
-                info["current_version"] = (v.stdout or v.stderr).strip()[:200]
+                _rc, _out, _err = await _run_subprocess([cli_path, "--version"], timeout=10)
+                info["current_version"] = (_out or _err).strip()[:200]
             except Exception as exc:
                 logger.warning("Failed to get current version: %s", exc)
                 info["current_version"] = "unknown"
@@ -221,8 +245,8 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]
                 info["upgrade_error"] = f"Package {ad.cli!r} not in allowed list"
             else:
                 try:
-                    show_r = subprocess.run([sys.executable, "-m", "pip", "show", ad.cli], capture_output=True, text=True, timeout=10)
-                    if show_r.returncode == 0:
+                    _rc, _out, _err = await _run_subprocess([sys.executable, "-m", "pip", "show", ad.cli], timeout=10)
+                    if _rc == 0:
                         info["upgradable"] = True
                         upgrade_proc = await asyncio.create_subprocess_exec(
                             sys.executable, "-m", "pip", "install", "--upgrade", ad.cli,
@@ -245,8 +269,8 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]
                             info["upgrade_status"] = "success"
                             info["upgrade_output"] = upgrade_r_stdout[-500:]
                             try:
-                                v2 = subprocess.run([cli_path, "--version"], capture_output=True, text=True, timeout=10)  # type: ignore[list-item]
-                                info["new_version"] = (v2.stdout or v2.stderr).strip()[:200]
+                                _rc, _out, _err = await _run_subprocess([cli_path, "--version"], timeout=10)
+                                info["new_version"] = (_out or _err).strip()[:200]
                             except Exception as exc:
                                 logger.warning("Failed to get new version: %s", exc)
                                 info["new_version"] = "unknown"
@@ -282,16 +306,16 @@ async def api_agent_upgrade_get(agent: str = "") -> dict[str, Any]:
             current = ""
             if cli_path:
                 try:
-                    r = subprocess.run([ad.cli, "--version"], capture_output=True, text=True, timeout=5)
-                    current = (r.stdout or r.stderr).strip()[:100]
+                    _rc, _out, _err = await _run_subprocess([ad.cli, "--version"], timeout=5)
+                    current = (_out or _err).strip()[:100]
                 except Exception as exc:
                     logger.warning('Failed to get CLI version: %s', exc)
             latest = "?"
             if ad.cli:
                 try:
-                    r2 = subprocess.run([sys.executable, "-m", "pip", "show", ad.cli], capture_output=True, text=True, timeout=10)
-                    if r2.returncode == 0:
-                        for line in r2.stdout.split("\n"):
+                    _rc, _out, _err = await _run_subprocess([sys.executable, "-m", "pip", "show", ad.cli], timeout=10)
+                    if _rc == 0:
+                        for line in _out.split("\n"):
                             if line.startswith("Version:"):
                                 latest = line.split(":", 1)[1].strip()
                                 break
