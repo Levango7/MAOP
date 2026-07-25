@@ -53,6 +53,7 @@ class FeatureFlag(str, Enum):
     BUDGET_GUARD = "budget_guard"
     TLS_AUTO = "tls_auto"
     AUTH_AUTO = "auth_auto"
+    N8N_INTEGRATION = "n8n_integration"
 
 
 _PERSONAL_FEATURES: frozenset[FeatureFlag] = frozenset({
@@ -83,6 +84,7 @@ _ENTERPRISE_FEATURES: frozenset[FeatureFlag] = frozenset({
     FeatureFlag.TENANT_ISOLATION,
     FeatureFlag.TLS_AUTO,
     FeatureFlag.AUTH_AUTO,
+    FeatureFlag.N8N_INTEGRATION,
 })
 
 _FEATURE_MAP: dict[Edition, frozenset[FeatureFlag]] = {

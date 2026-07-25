@@ -286,6 +286,27 @@ services:
       retries: 5
     profiles: ["redis"]
 
+  # ── Optional: n8n workflow automation (Enterprise, --profile n8n) ──
+  n8n:
+    image: n8nio/n8n:latest
+    profiles: ["n8n"]
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=${MAOP_TIMEZONE:-Asia/Shanghai}
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:?Set N8N_PASSWORD in .env}
+      - N8N_API_KEY=${N8N_API_KEY:-}
+    volumes:
+      - n8n-data:/home/node/.n8n
+    depends_on:
+      - dashboard
+    restart: unless-stopped
+
 volumes:
   maop-data:
     driver: local
@@ -296,4 +317,6 @@ volumes:
   pg-data:
     driver: local
   redis-data:
+    driver: local
+  n8n-data:
     driver: local
