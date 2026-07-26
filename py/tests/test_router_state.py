@@ -1,4 +1,4 @@
-﻿"""Unit tests for MAOP.dashboard.routers.state module."""
+"""Unit tests for MAOP.dashboard.routers.state module."""
 
 from __future__ import annotations
 
@@ -17,22 +17,22 @@ from maop.dashboard.routers import state as st
 def test_get_bridge_lazy_singleton(monkeypatch):
     """get_bridge() should return the same instance on repeated calls."""
     st._bridge = None  # reset
-    fake = MagicMock(name="DataBridge")
-    with patch.object(st, "DataBridge", return_value=fake):
+    fake = MagicMock(name="DataProxy")
+    with patch.object(st, "DataProxy", return_value=fake):
         b1 = st.get_bridge()
         b2 = st.get_bridge()
     assert b1 is b2 is fake
 
 
 def test_get_bridge_constructs_with_maop_root(monkeypatch):
-    """First call constructs DataBridge(root_dir=MAOP_ROOT)."""
+    """First call constructs DataProxy(root_dir=MAOP_ROOT)."""
     st._bridge = None
     fake = MagicMock()
     captured = {}
     def fake_ctor(root_dir=None):
         captured["root_dir"] = root_dir
         return fake
-    with patch.object(st, "DataBridge", side_effect=fake_ctor):
+    with patch.object(st, "DataProxy", side_effect=fake_ctor):
         st.get_bridge()
     assert captured["root_dir"] is st.MAOP_ROOT
     st._bridge = None  # cleanup
