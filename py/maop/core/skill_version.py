@@ -96,6 +96,7 @@ class SkillVersionManager:
                 subprocess.run(
                     ["git", "init"], cwd=str(self._skills_dir),
                     capture_output=True, timeout=10,
+                    check=True,
                 )
                 gitignore = self._skills_dir / ".gitignore"
                 if not gitignore.exists():
@@ -162,7 +163,7 @@ class SkillVersionManager:
 
         if version and self._git_available:
             try:
-                result = subprocess.run(
+                result = subprocess.run(  # noqa: PLW1510
                     ["git", "show", f"{version}:{safe_name}.md"],
                     cwd=str(self._skills_dir),
                     capture_output=True, text=True, timeout=10,
@@ -182,7 +183,7 @@ class SkillVersionManager:
             return []
 
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: PLW1510
                 ["git", "log", f"--max-count={limit}", "--pretty=format:%H|%ai|%s", "--", f"{safe_name}.md"],
                 cwd=str(self._skills_dir),
                 capture_output=True, text=True, timeout=10,
@@ -232,10 +233,11 @@ class SkillVersionManager:
         if not self._git_available:
             return
         try:
-            subprocess.run(["git", "add", "-A"], cwd=str(self._skills_dir), capture_output=True, timeout=10)
+            subprocess.run(["git", "add", "-A"], cwd=str(self._skills_dir), capture_output=True, timeout=10, check=True)
             subprocess.run(
                 ["git", "commit", "-m", message, "--allow-empty"],
                 cwd=str(self._skills_dir), capture_output=True, timeout=10,
+                check=True,
             )
         except Exception as exc:
             logger.debug("[skill_version] Git commit failed: %s", exc)
@@ -326,7 +328,7 @@ class SkillVersionManager:
                 cmd_template = cmd_template.replace(f"{{{key}}}", str(val))
             try:
                 args_list = shlex.split(cmd_template, posix=True)
-                proc = subprocess.run(
+                proc = subprocess.run(  # noqa: PLW1510
                     args_list, shell=False, capture_output=True, text=True, timeout=step.timeout_s,
                 )
                 return SkillStepResult(

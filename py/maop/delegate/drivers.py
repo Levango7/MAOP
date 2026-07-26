@@ -179,7 +179,7 @@ async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout + 10)
+        stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout + 10)
         duration_ms = int((time.monotonic() - start) * 1000)
 
         ansi_re = re.compile(r"\x1b\[[0-9;]*m")

@@ -198,7 +198,7 @@ class ProjectContext:
     def _detect_recent_changes(self) -> str:
         try:
             import subprocess
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: PLW1510
                 ["git", "status", "--short"],
                 capture_output=True, text=True, timeout=5,
                 cwd=str(self._workdir),

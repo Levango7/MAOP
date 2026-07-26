@@ -155,16 +155,15 @@ class MCPPermissionChecker:
         roles = list((ctx or {}).get("roles", []) or [])
 
         # 3. User whitelist (only enforced when we have a user_id to test).
-        if server_config.allowed_users is not None:
-            if not user_id or user_id not in server_config.allowed_users:
-                return MCPPermissionDecision(
-                    allowed=False,
-                    reason=(
-                        f"User '{user_id or '<anonymous>'}' not in allowed_users "
-                        f"whitelist of server '{server_config.name}'"
-                    ),
-                    matched_rule=_RULE.ALLOWED_USERS,
-                )
+        if server_config.allowed_users is not None and (not user_id or user_id not in server_config.allowed_users):
+            return MCPPermissionDecision(
+                allowed=False,
+                reason=(
+                    f"User '{user_id or '<anonymous>'}' not in allowed_users "
+                    f"whitelist of server '{server_config.name}'"
+                ),
+                matched_rule=_RULE.ALLOWED_USERS,
+            )
 
         # 4. Role whitelist — any overlap with caller roles is sufficient.
         if server_config.allowed_roles is not None:
@@ -231,32 +230,30 @@ class MCPPermissionChecker:
                     )
 
         # 2. Allow glob patterns.
-        if server_config.allowed_tools is not None:
-            if not any(_glob_match(pat, resource_uri) for pat in server_config.allowed_tools):
-                return MCPPermissionDecision(
-                    allowed=False,
-                    reason=(
-                        f"Resource '{resource_uri}' matches no entry in allowed_tools "
-                        f"whitelist of server '{server_config.name}'"
-                    ),
-                    matched_rule=_RULE.ALLOWED_TOOLS,
-                )
+        if server_config.allowed_tools is not None and not any(_glob_match(pat, resource_uri) for pat in server_config.allowed_tools):
+            return MCPPermissionDecision(
+                allowed=False,
+                reason=(
+                    f"Resource '{resource_uri}' matches no entry in allowed_tools "
+                    f"whitelist of server '{server_config.name}'"
+                ),
+                matched_rule=_RULE.ALLOWED_TOOLS,
+            )
 
         ctx = self._resolve_user_context(user_context)
         user_id = str((ctx or {}).get("user_id", "") or "")
         roles = list((ctx or {}).get("roles", []) or [])
 
         # 3. User whitelist.
-        if server_config.allowed_users is not None:
-            if not user_id or user_id not in server_config.allowed_users:
-                return MCPPermissionDecision(
-                    allowed=False,
-                    reason=(
-                        f"User '{user_id or '<anonymous>'}' not in allowed_users "
-                        f"whitelist of server '{server_config.name}'"
-                    ),
-                    matched_rule=_RULE.ALLOWED_USERS,
-                )
+        if server_config.allowed_users is not None and (not user_id or user_id not in server_config.allowed_users):
+            return MCPPermissionDecision(
+                allowed=False,
+                reason=(
+                    f"User '{user_id or '<anonymous>'}' not in allowed_users "
+                    f"whitelist of server '{server_config.name}'"
+                ),
+                matched_rule=_RULE.ALLOWED_USERS,
+            )
 
         # 4. Role whitelist.
         if server_config.allowed_roles is not None:

@@ -1,4 +1,4 @@
-﻿"""MAOP Worktree Manager — git-worktree style task branching.
+"""MAOP Worktree Manager — git-worktree style task branching.
 
 Allows complex tasks to fork into multiple parallel branches (approaches),
 then selectively merge results, diff branches, and rollback.
@@ -263,13 +263,12 @@ class WorktreeManager:
             merged_result = src.get("result", "")
             used_strategy = strategy
 
-            if tgt.get("result") and src.get("result") and strategy == MergeStrategy.AUTO:
-                if tgt["result"] != src["result"]:
-                    conflicts.append(
-                        f"Result conflict: target='{tgt['result'][:50]}', source='{src['result'][:50]}'"
-                    )
-                    merged_result = src["result"]
-                    used_strategy = MergeStrategy.MANUAL
+            if tgt.get("result") and src.get("result") and strategy == MergeStrategy.AUTO and tgt["result"] != src["result"]:
+                conflicts.append(
+                    f"Result conflict: target='{tgt['result'][:50]}', source='{src['result'][:50]}'"
+                )
+                merged_result = src["result"]
+                used_strategy = MergeStrategy.MANUAL
 
             now = time.time()
             conn.execute(

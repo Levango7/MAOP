@@ -458,7 +458,7 @@ class ToolManager:
         cmd_parts = shlex.split(tool.command) + (args or [])
         start = time.monotonic()
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: PLW1510
                 cmd_parts, capture_output=True, text=True,
                 timeout=timeout_seconds, shell=False,
             )

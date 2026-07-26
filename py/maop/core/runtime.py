@@ -1,4 +1,4 @@
-﻿"""MAOP Runtime - Unified execution environment abstraction.
+"""MAOP Runtime - Unified execution environment abstraction.
 
 Provides a common interface for running commands in different environments:
   - Local: Direct subprocess execution on the host
@@ -143,7 +143,7 @@ class LocalRuntime(BaseRuntime):
         t0 = time.monotonic()
 
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: PLW1510
                 cmd_list,
                 shell=False,
                 capture_output=True,
@@ -237,7 +237,7 @@ class IsolatedRuntime(BaseRuntime):
         t0 = time.monotonic()
 
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: PLW1510
                 cmd_list,
                 shell=False,
                 capture_output=True,
@@ -288,7 +288,7 @@ class ContainerRuntime(BaseRuntime):
     def is_available(self) -> bool:
         """Check if Docker is available."""
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: PLW1510
                 ["docker", "--version"],
                 capture_output=True, text=True, timeout=5,
             )
@@ -304,6 +304,7 @@ class ContainerRuntime(BaseRuntime):
                 result = subprocess.run(
                     ["docker", "--version"],
                     capture_output=True, text=True, timeout=5,
+                    check=True,
                 )
                 version = result.stdout.strip()
             except Exception:
@@ -352,7 +353,7 @@ class ContainerRuntime(BaseRuntime):
         t0 = time.monotonic()
 
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: PLW1510
                 docker_cmd,
                 capture_output=True,
                 text=True,

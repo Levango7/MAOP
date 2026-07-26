@@ -1,4 +1,4 @@
-﻿"""MAOP File Lock — file-based locking with orphan cleanup.
+"""MAOP File Lock — file-based locking with orphan cleanup.
 
 
 Uses ``fcntl`` on POSIX / ``msvcrt`` on Windows for atomic lock acquisition.
@@ -16,6 +16,8 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import TypeVar
+
+from typing_extensions import Self
 
 T = TypeVar("T")
 
@@ -142,7 +144,7 @@ class FileLock:
         self._lock_file = _lock_path(self._target)
         self._acquired = False
 
-    def __enter__(self) -> FileLock:
+    def __enter__(self) -> Self:
         # Reuse the functional impl but with a no-op callable
         self._acquired = False
         deadline = time.monotonic() + self._timeout

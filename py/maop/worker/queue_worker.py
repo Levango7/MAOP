@@ -143,10 +143,8 @@ def _execute_task(payload: dict) -> None:
             asyncio.run(pool.wait(task_id, timeout=300))
         finally:
             asyncio.run(pool.stop())
-    except Exception as exc:
-        logger.exception(
-            "[queue-worker] task execution failed: %s", exc,
-        )
+    except Exception:
+        logger.exception("[queue-worker] task execution failed")
         raise
 
 
@@ -174,10 +172,8 @@ def _run_maintenance(payload: dict) -> None:
             mq = MessageQueue(db_path=str(DATA_DIR / "queue.db"))
             removed = mq.purge_acked(older_than_s=payload.get("older_than_s", 3600.0))
             logger.info("[queue-worker] purge_acked removed %d messages", removed)
-        except Exception as exc:
-            logger.exception(
-                "[queue-worker] purge_acked failed: %s", exc,
-            )
+        except Exception:
+            logger.exception("[queue-worker] purge_acked failed")
             raise
     elif job == "cleanup_dead_letters":
         try:
@@ -189,10 +185,8 @@ def _run_maintenance(payload: dict) -> None:
             logger.info(
                 "[queue-worker] cleanup_dead_letters removed %d entries", removed,
             )
-        except Exception as exc:
-            logger.exception(
-                "[queue-worker] cleanup_dead_letters failed: %s", exc,
-            )
+        except Exception:
+            logger.exception("[queue-worker] cleanup_dead_letters failed")
             raise
     else:
         logger.info(
@@ -243,8 +237,8 @@ def _consume_messages() -> int:
                 # NACK so the message is re-queued or dead-lettered by the MQ
                 # rather than lingering in 'processing' until ack_timeout_s.
                 logger.exception(
-                    "[queue-worker] failed to process message %s on %s: %s",
-                    getattr(msg, "id", "?"), topic, exc,
+                    "[queue-worker] failed to process message %s on %s",
+                    getattr(msg, "id", "?"), topic,
                 )
                 try:
                     mq.nack(msg.id, error=str(exc))
@@ -287,8 +281,8 @@ def run() -> None:
 
             time.sleep(5)
 
-        except Exception as exc:
-            logger.exception("Worker error: %s", exc)
+        except Exception:
+            logger.exception("Worker error")
             time.sleep(5)
 
     logger.info("Queue Worker shut down.")

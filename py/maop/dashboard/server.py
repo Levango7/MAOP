@@ -117,7 +117,7 @@ async def _ws_push_loop() -> Any:
         except asyncio.CancelledError:
             raise
         except Exception as e:
-            logging.warning("WS push error: %s", e)
+            logger.warning("WS push error: %s", e)
 
 
 @asynccontextmanager

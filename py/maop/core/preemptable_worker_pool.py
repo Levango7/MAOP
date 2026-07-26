@@ -327,13 +327,10 @@ class PreemptableWorkerPool:
                 return self._token_results[token]
             raise KeyError(f"Task token {token!r} not found")
         event = self._token_events[token]
-        try:
-            if timeout > 0:
-                await asyncio.wait_for(event.wait(), timeout=timeout)
-            else:
-                await event.wait()
-        except asyncio.TimeoutError:
-            raise
+        if timeout > 0:
+            await asyncio.wait_for(event.wait(), timeout=timeout)
+        else:
+            await event.wait()
         if token in self._token_errors:
             raise self._token_errors[token]
         return self._token_results.get(token)

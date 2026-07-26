@@ -383,7 +383,7 @@ def stop(root_dir: str | Path = ".") -> SystemStatus:
     try:
         if sys.platform == "win32":
             # On Windows, kill the process tree
-            subprocess.run(
+            subprocess.run(  # noqa: PLW1510
                 ["taskkill", "/F", "/T", "/PID", str(pid)],
                 capture_output=True, timeout=10,
             )

@@ -111,15 +111,15 @@ def run() -> None:
             except Exception as exc:
                 # P0 fix: NACK on dispatch failure so the message is re-queued
                 # or dead-lettered instead of lingering in 'processing'.
-                logger.exception("Dispatch failed for task id=%s: %s", msg.id, exc)
+                logger.exception("Dispatch failed for task id=%s", msg.id)
                 try:
                     queue.nack(msg.id, error=str(exc))
                 except Exception as nack_exc:
                     logger.warning("Failed to NACK message %s: %s", msg.id, nack_exc)
                 time.sleep(1)
 
-        except Exception as exc:
-            logger.exception("Worker error: %s", exc)
+        except Exception:
+            logger.exception("Worker error")
             time.sleep(1)
     logger.info("Agent Executor Worker shut down.")
 

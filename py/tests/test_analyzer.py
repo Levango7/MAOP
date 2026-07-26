@@ -250,7 +250,7 @@ class TestConfigEnrich:
 class TestSemanticAnalyze:
     async def test_single_task_no_edges(self):
         tasks = [SubTask(id="s1", description="do thing")]
-        result_tasks, dag, score = await _semantic_analyze("do thing", tasks)
+        _result_tasks, dag, score = await _semantic_analyze("do thing", tasks)
         assert dag.edges == []
         assert 0 <= score <= 100
 
@@ -260,12 +260,12 @@ class TestSemanticAnalyze:
             SubTask(id="s2", description="step two"),
             SubTask(id="s3", description="step three"),
         ]
-        result_tasks, dag, score = await _semantic_analyze("do steps", tasks)
+        _result_tasks, dag, _score = await _semantic_analyze("do steps", tasks)
         assert len(dag.edges) >= 2  # sequential deps
 
     async def test_risk_keywords_detected(self):
         tasks = [SubTask(id="s1", description="delete production data")]
-        result_tasks, dag, score = await _semantic_analyze("delete production data", tasks)
+        result_tasks, _dag, _score = await _semantic_analyze("delete production data", tasks)
         assert result_tasks[0].risk_level == "high"
 
     async def test_score_bounded(self):

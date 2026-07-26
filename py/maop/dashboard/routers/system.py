@@ -209,9 +209,9 @@ async def api_agent_config_update(request: Request) -> dict[str, Any]:
         return {"status": "ok", "agent": agent_name, "config": agent_cfg}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         import logging
-        logging.getLogger(__name__).exception("[system] Config update failed: %s", e)
+        logging.getLogger(__name__).exception("[system] Config update failed")
         return {"status": "error", "error": "Config update failed"}
 
 # ── Agent Upgrade ─────────────────────────────────────────────────

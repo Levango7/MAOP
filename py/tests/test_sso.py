@@ -12,6 +12,7 @@ import time
 from typing import Any
 
 import pytest
+from typing_extensions import Self
 
 from maop.config.edition import Edition, reset_edition, set_edition
 from maop.enterprise.sso import (
@@ -60,7 +61,7 @@ class _FakeResponse:
     def read(self, n: int = -1) -> bytes:
         return self._buf.read(n if n != -1 else -1)
 
-    def __enter__(self) -> _FakeResponse:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:

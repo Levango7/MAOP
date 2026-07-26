@@ -10,6 +10,7 @@ Aggregates all read-only data endpoints organized by domain:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 import time
