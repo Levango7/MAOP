@@ -9,14 +9,17 @@ Modules:
   - budget: BudgetGuard (cost tracking and enforcement)
 """
 
-from maop.model.registry import ModelRegistry, ProviderRegistry
-from maop.model.selector import ModelSelector
+from maop.model.budget import BudgetGuard
 from maop.model.fallback import FallbackManager
 from maop.model.quota import QuotaEnforcer
-from maop.model.budget import BudgetGuard
+from maop.model.registry import ModelRegistry, ProviderRegistry
+from maop.model.selector import ModelSelector
 
 __all__ = [
-    "ModelRegistry", "ProviderRegistry",
-    "ModelSelector", "FallbackManager",
-    "QuotaEnforcer", "BudgetGuard",
+    "BudgetGuard",
+    "FallbackManager",
+    "ModelRegistry",
+    "ModelSelector",
+    "ProviderRegistry",
+    "QuotaEnforcer",
 ]

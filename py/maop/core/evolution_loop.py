@@ -27,6 +27,7 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import time
@@ -531,10 +532,8 @@ class EvolutionLoop:
             ).fetchall()
         reports = []
         for row in rows:
-            try:
+            with contextlib.suppress(Exception):
                 reports.append(LoopReport.model_validate_json(row[0]))
-            except Exception:
-                pass
         return reports
 
     def get_stats(self) -> dict[str, Any]:

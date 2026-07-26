@@ -7,11 +7,11 @@ from unittest.mock import patch
 from maop.core.otel import (
     _NoopSpan,
     _NoopTracer,
+    extract_trace_context,
     get_tracer,
     inject_trace_context,
     is_enabled,
     span,
-    extract_trace_context,
 )
 
 

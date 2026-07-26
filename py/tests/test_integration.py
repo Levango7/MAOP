@@ -5,20 +5,18 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
-
-from maop.core.error_schema import new_result
-from maop.core.event_bus import EventBus, Event
+from maop.concurrency import Priority, Task, TaskPool
+from maop.config.loader import AgentDef, MaopConfig
 from maop.core.circuit_breaker import CircuitBreaker
-from maop.config.loader import MaopConfig, AgentDef
+from maop.core.error_schema import new_result
+from maop.core.event_bus import Event, EventBus
+from maop.dashboard import DashboardProvider
 from maop.delegate.dispatcher import Dispatcher
-from maop.memory.store import MemoryStore
+from maop.engine import Engine, StepType, WorkflowStep
+from maop.evolve import EvolveEngine
 from maop.maop_plan import maop_plan
 from maop.maop_verify import VerifyEngine
-from maop.engine import Engine, WorkflowStep, StepType
-from maop.evolve import EvolveEngine
-from maop.concurrency import TaskPool, Task, Priority
-from maop.dashboard import DashboardProvider
-
+from maop.memory.store import MemoryStore
 
 # ═══════════════════════════════════════════════════════════════
 # Plan -> Verify workflow

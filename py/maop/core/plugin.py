@@ -25,6 +25,7 @@ Plugin directory layout::
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib.util
 import logging
@@ -642,10 +643,8 @@ class PluginManager:
     def _row_to_info(row: sqlite3.Row) -> PluginInfo:
         import json
         config: dict[str, Any] = {}
-        try:
+        with contextlib.suppress(json.JSONDecodeError, TypeError):
             config = json.loads(row["config"]) if row["config"] else {}
-        except (json.JSONDecodeError, TypeError):
-            pass
         return PluginInfo(
             id=row["id"], name=row["name"], version=row["version"],
             description=row["description"], author=row["author"],

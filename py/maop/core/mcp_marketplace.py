@@ -268,7 +268,7 @@ class MCPMarketplace:
         except socket.gaierror as exc:
             raise ValueError(f"Could not resolve host '{host}': {exc}") from exc
 
-        for family, _stype, _proto, _canon, sockaddr in infos:
+        for _family, _stype, _proto, _canon, sockaddr in infos:
             addr_str = sockaddr[0]
             try:
                 ip = ipaddress.ip_address(addr_str)

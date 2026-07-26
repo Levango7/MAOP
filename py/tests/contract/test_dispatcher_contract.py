@@ -1,8 +1,9 @@
 ﻿"""Contract tests for Dispatcher — verify ModelSelector integration contract."""
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 pytestmark = pytest.mark.contract
 
@@ -12,8 +13,9 @@ class TestDispatcherModelIntegration:
 
     def test_dispatcher_accepts_model_selector(self):
         """Dispatcher.__init__ must accept model_selector parameter."""
-        from maop.delegate.dispatcher import Dispatcher
         import inspect
+
+        from maop.delegate.dispatcher import Dispatcher
         sig = inspect.signature(Dispatcher.__init__)
         assert "model_selector" in sig.parameters
 
@@ -49,8 +51,8 @@ class TestModelSelectorContract:
 
     def test_select_returns_effective_model(self, tmp_path):
         from maop.model.registry import ModelRegistry
-        from maop.model.selector import ModelSelector
         from maop.model.schema import EffectiveModel
+        from maop.model.selector import ModelSelector
 
         reg = ModelRegistry(project_root=str(
             Path(__file__).resolve().parent.parent.parent.parent

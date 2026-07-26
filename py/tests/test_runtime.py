@@ -7,7 +7,10 @@ import sys
 import pytest
 
 from maop.core.runtime import (
-    LocalRuntime, IsolatedRuntime, RuntimeConfig, RuntimeType,
+    IsolatedRuntime,
+    LocalRuntime,
+    RuntimeConfig,
+    RuntimeType,
     _resolve_cmd,
 )
 

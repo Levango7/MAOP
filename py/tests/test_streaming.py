@@ -7,7 +7,7 @@ import asyncio
 import pytest
 
 from maop.concurrency import TokenStreamer
-from maop.core.streaming import SubprocessStreamer, StreamRegistry, get_stream_registry
+from maop.core.streaming import StreamRegistry, SubprocessStreamer, get_stream_registry
 
 
 class TestSubprocessStreamer:

@@ -30,10 +30,11 @@ import logging
 import os
 import time
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 from enum import Enum
 from functools import partial
-from typing import Any, Callable
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -113,9 +114,7 @@ class WorkerPool:
         self._cpu_active = 0
 
         # Worker tracking
-        self._worker_status: dict[int, WorkerStatus] = {
-            i: WorkerStatus.IDLE for i in range(self._max_workers)
-        }
+        self._worker_status: dict[int, WorkerStatus] = dict.fromkeys(range(self._max_workers), WorkerStatus.IDLE)
 
         self._running = False
 

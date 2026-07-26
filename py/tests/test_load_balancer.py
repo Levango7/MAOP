@@ -9,7 +9,6 @@ from maop.core.load_balancer import (
     get_load_balancer,
 )
 
-
 # ── AgentMetrics ───────────────────────────────────────────────
 
 class TestAgentMetrics:

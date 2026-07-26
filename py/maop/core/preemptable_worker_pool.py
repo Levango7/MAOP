@@ -43,6 +43,7 @@ when omitted.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from typing import Any
@@ -116,10 +117,8 @@ class PreemptableWorkerPool:
             self._stop_event.set()
         if self._dispatch_task is not None:
             self._dispatch_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._dispatch_task
-            except (asyncio.CancelledError, Exception):
-                pass
             self._dispatch_task = None
         # Cancel any outstanding watchers so they don't linger after stop().
         for watcher in list(self._watchers):
@@ -129,10 +128,8 @@ class PreemptableWorkerPool:
             self._watchers.clear()
         await self._pool.stop()
         # Flush queue gauges
-        try:
+        with contextlib.suppress(Exception):
             MAOP_PRIORITY_QUEUE_SIZE.set(0.0, labels={"priority": "all"})
-        except Exception:
-            pass
 
     @property
     def is_running(self) -> bool:
@@ -378,16 +375,12 @@ class PreemptableWorkerPool:
     # ── Metrics helpers ─────────────────────────────────────────
 
     def _record_queue_size_inc(self, priority: int) -> None:
-        try:
+        with contextlib.suppress(Exception):
             MAOP_PRIORITY_QUEUE_SIZE.inc(labels={"priority": str(priority)})
-        except Exception:
-            pass
 
     def _record_queue_size_dec(self, priority: int) -> None:
-        try:
+        with contextlib.suppress(Exception):
             MAOP_PRIORITY_QUEUE_SIZE.dec(labels={"priority": str(priority)})
-        except Exception:
-            pass
 
     def _record_admit(self, pt: PriorityTask) -> None:
         """Record wait-time + queue-size decrement when a task is admitted."""

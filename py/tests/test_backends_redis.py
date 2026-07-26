@@ -14,7 +14,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # FakeRedis — dict-backed Redis mock
 # ═══════════════════════════════════════════════════════════════════════
@@ -46,7 +45,7 @@ class FakeRedis:
         self._msg_counter = 0
 
     @classmethod
-    def from_url(cls, url: str = "") -> "FakeRedis":
+    def from_url(cls, url: str = "") -> FakeRedis:
         return cls()
 
     def ping(self) -> None:

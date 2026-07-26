@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from maop.core.dynamic_router import DynamicRouter, AgentScore
+from maop.core.dynamic_router import AgentScore, DynamicRouter
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ class TestDynamicRouter:
         assert "chat" in scores
         assert "review" in scores
         # Each routing key has a list of AgentScore
-        for rk, agent_scores in scores.items():
+        for agent_scores in scores.values():
             assert isinstance(agent_scores, list)
             for s in agent_scores:
                 assert isinstance(s, AgentScore)
@@ -63,7 +63,7 @@ class TestDynamicRouter:
     def test_route_sorted_by_score_desc(self, project_root):
         router = DynamicRouter(project_root)
         scores = router.route(refresh=True)
-        for rk, agent_scores in scores.items():
+        for agent_scores in scores.values():
             for i in range(len(agent_scores) - 1):
                 assert agent_scores[i].score >= agent_scores[i + 1].score
 

@@ -61,7 +61,7 @@ class ObjectiveWeights:
     cost: float = 0.2
     quota_headroom: float = 0.1
 
-    def normalize(self) -> "ObjectiveWeights":
+    def normalize(self) -> ObjectiveWeights:
         """Return a copy re-scaled so the four weights sum to 1.0.
 
         If all weights are zero (degenerate input), returns the default
@@ -158,9 +158,9 @@ class MultiObjectiveScorer:
         dominant: list[str] = []
         dominated: list[str] = []
 
-        for name_a, vec_a in candidates.items():
+        for name_a in candidates:
             dominated_by_some = False
-            for name_b, vec_b in candidates.items():
+            for name_b in candidates:
                 if name_a == name_b:
                     continue
                 if self.is_dominated(normalized[name_a], normalized[name_b]):

@@ -11,7 +11,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from maop.core.error_schema import MaopResult
 
-
 # ── Models ────────────────────────────────────────────────────
 
 class AgentConfig(BaseModel):

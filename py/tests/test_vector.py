@@ -16,7 +16,6 @@ from maop.core.vector import (
     cosine_similarity,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────
 
 @pytest.fixture

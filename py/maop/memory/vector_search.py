@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-
 from pydantic import BaseModel
 
 from maop.core.db_utils import get_db_path, sqlite_connect

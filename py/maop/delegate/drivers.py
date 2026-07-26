@@ -390,8 +390,8 @@ async def _run_cmd(config: AgentConfig, prompt: str, timeout: int,
 async def _run_python(config: AgentConfig, prompt: str, timeout: int,
                      workdir: str, trace_id: str, streamer: Any = None) -> MaopResult:
     """Execute via Python module driver (e.g. doc-pipeline adapter)."""
-    import sys
     import shlex
+    import sys
     cli = config.cli
     if not cli or not cli.strip():
         return new_result(

@@ -41,6 +41,12 @@ set_edition(Edition.ENTERPRISE)
 logger.info("[enterprise] MAOP Enterprise extension loaded — all enterprise features enabled")
 
 __all__: list[str] = [
-    "rbac", "tenant", "audit", "sso",
-    "tls_auto", "container", "ha", "n8n",
+    "audit",
+    "container",
+    "ha",
+    "n8n",
+    "rbac",
+    "sso",
+    "tenant",
+    "tls_auto",
 ]

@@ -22,8 +22,9 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncGenerator
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from maop.core.llm_provider import LLMProviderFactory
@@ -97,14 +98,14 @@ class ChatEngine:
             "You help users with coding, debugging, architecture, and project management tasks. "
             "Use the provided memory context to give informed, contextual responses."
         )
-        self._provider_factory: "LLMProviderFactory | None" = None
+        self._provider_factory: LLMProviderFactory | None = None
 
     @property
     def memory(self) -> MemoryManager:
         return self._memory_mgr
 
     @property
-    def provider_factory(self) -> "LLMProviderFactory":
+    def provider_factory(self) -> LLMProviderFactory:
         if self._provider_factory is None:
             from maop.core.llm_provider import LLMProviderFactory
             self._provider_factory = LLMProviderFactory(root_dir=self._root)
@@ -252,8 +253,8 @@ class ChatEngine:
     ) -> str:
         """Fallback: call LLM via the Dispatcher/CLI system."""
         try:
-            from maop.delegate.dispatcher import Dispatcher
             from maop.config.loader import ConfigLoader
+            from maop.delegate.dispatcher import Dispatcher
 
             loader = ConfigLoader()
             config = loader.load()
@@ -309,8 +310,8 @@ class ChatEngine:
     ) -> AsyncGenerator[str, None]:
         """Fallback: stream via Dispatcher (simulated chunking)."""
         try:
-            from maop.delegate.dispatcher import Dispatcher
             from maop.config.loader import ConfigLoader
+            from maop.delegate.dispatcher import Dispatcher
 
             loader = ConfigLoader()
             config = loader.load()
@@ -343,12 +344,7 @@ class ChatEngine:
 
         parts: list[dict[str, Any]] = [{"type": "text", "text": request.message}]
         for img_ref in request.images:
-            if img_ref.startswith("data:"):
-                parts.append({
-                    "type": "image_url",
-                    "image_url": {"url": img_ref},
-                })
-            elif img_ref.startswith("http"):
+            if img_ref.startswith(("data:", "http")):
                 parts.append({
                     "type": "image_url",
                     "image_url": {"url": img_ref},

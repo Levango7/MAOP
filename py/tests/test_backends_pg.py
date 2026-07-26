@@ -18,7 +18,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ── Test-time psycopg + psycopg_pool stubs ───────────────────
 # backends_pg.py does `import psycopg` and `from psycopg_pool import
 # ConnectionPool` inside __init__. We inject fake modules into sys.modules
@@ -123,8 +122,8 @@ def test_build_dsn_defaults_when_no_env():
 
 def test_backend_is_storage_backend_subclass(fake_psycopg):
     """PostgreSQLStorageBackend must subclass StorageBackend."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
     from maop.core.backends import StorageBackend
+    from maop.core.backends_pg import PostgreSQLStorageBackend
     assert issubclass(PostgreSQLStorageBackend, StorageBackend)
 
 

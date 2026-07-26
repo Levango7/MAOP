@@ -24,7 +24,6 @@ from maop.model.schema import (
     SelectionStrategy,
 )
 
-
 # ── Fakes ───────────────────────────────────────────────────────────
 
 class FakeAgentDef:

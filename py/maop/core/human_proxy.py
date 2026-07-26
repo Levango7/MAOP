@@ -6,6 +6,7 @@ Actions: request, approve, reject, list, pending, resolve, notify, config.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import sqlite3
@@ -224,10 +225,8 @@ class HumanProxy:
 
     def _row_to_request(self, row: sqlite3.Row) -> ApprovalRequest:
         meta = {}
-        try:
+        with contextlib.suppress(json.JSONDecodeError, ValueError):
             meta = json.loads(row["metadata"] or "{}")
-        except (json.JSONDecodeError, ValueError):
-            pass
         return ApprovalRequest(
             id=row["id"],
             task=row["task"],

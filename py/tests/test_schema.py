@@ -5,11 +5,18 @@ from __future__ import annotations
 import pytest
 
 from maop.model.schema import (
-    ProviderType, LatencyTier, QualityTier, SelectionStrategy,
-    ProviderDef, ModelDef, ModelPolicy, BudgetConfig, QuotaConfig,
-    ModelRegistryConfig, EffectiveModel,
+    BudgetConfig,
+    EffectiveModel,
+    LatencyTier,
+    ModelDef,
+    ModelPolicy,
+    ModelRegistryConfig,
+    ProviderDef,
+    ProviderType,
+    QualityTier,
+    QuotaConfig,
+    SelectionStrategy,
 )
-
 
 # ── Enum Tests ────────────────────────────────────────────────
 
@@ -100,7 +107,7 @@ class TestProviderDef:
         assert p.enabled is False
 
     def test_from_dict_with_string_type(self):
-        p = ProviderDef(**{"type": "builtin", "api_key_env": "KEY"})
+        p = ProviderDef(type="builtin", api_key_env="KEY")
         assert p.type == ProviderType.BUILTIN
 
     def test_serialization(self):
@@ -148,11 +155,7 @@ class TestModelDef:
         assert m2.capabilities == []  # independent lists
 
     def test_from_dict_with_string_enums(self):
-        m = ModelDef(**{
-            "name": "test",
-            "quality_tier": "excellent",
-            "latency_tier": "fast",
-        })
+        m = ModelDef(name="test", quality_tier="excellent", latency_tier="fast")
         assert m.quality_tier == QualityTier.EXCELLENT
         assert m.latency_tier == LatencyTier.FAST
 

@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import json
 import logging
-
 import time
 import uuid
 from enum import Enum
@@ -46,6 +45,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.cache import LRUCache
 from maop.core.db_utils import sqlite_connect
+
 # 共享 DB 路径与术语映射（统一 ThreeLayerMemory 与 MemoryManager 的 DB 文件）
 from maop.memory.shared_db import (
     get_memory_db_path,
@@ -1080,10 +1080,7 @@ class ThreeLayerMemory:
         for item in items:
             item_chars = len(json.dumps(item.data, default=str))
             item_tokens = item_chars // 4
-            if used_tokens + item_tokens <= token_budget:
-                budget_items.append(item)
-                used_tokens += item_tokens
-            elif item.layer == "working":
+            if used_tokens + item_tokens <= token_budget or item.layer == "working":
                 budget_items.append(item)
                 used_tokens += item_tokens
         items = budget_items
@@ -1323,7 +1320,7 @@ _DEFAULT_FOCUS_CONFIGS: dict[FocusMode, FocusConfig] = {
 
 _NEGATIVE_KEYWORDS = frozenset({
     "bad", "wrong", "incorrect", "broken", "failed", "terrible",
-    "awful", "poor", "unacceptable", "useless", "broken", "error",
+    "awful", "poor", "unacceptable", "useless", "error",
     "bug", "crash", "slow", "missing", "incomplete",
 })
 

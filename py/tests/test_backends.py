@@ -1,17 +1,18 @@
 """Tests for maop.core.backends — pluggable backend abstraction layer."""
 
 import pytest
+
 from maop.core.backends import (
-    SQLiteStorageBackend,
-    MemoryCacheBackend,
-    SQLiteQueueBackend,
-    SQLiteKVBackend,
     LocalSecretBackend,
-    get_storage_backend,
+    MemoryCacheBackend,
+    SQLiteKVBackend,
+    SQLiteQueueBackend,
+    SQLiteStorageBackend,
     get_cache_backend,
-    get_queue_backend,
     get_kv_backend,
+    get_queue_backend,
     get_secret_backend,
+    get_storage_backend,
     reset_backends,
 )
 

@@ -8,12 +8,14 @@ are unavailable.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import logging
 import os
 import time
-import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 
@@ -140,17 +142,15 @@ class FileLock:
         self._lock_file = _lock_path(self._target)
         self._acquired = False
 
-    def __enter__(self) -> "FileLock":
+    def __enter__(self) -> FileLock:
         # Reuse the functional impl but with a no-op callable
         self._acquired = False
         deadline = time.monotonic() + self._timeout
 
         while True:
             if _is_orphan(self._lock_file):
-                try:
+                with contextlib.suppress(FileNotFoundError):
                     self._lock_file.unlink()
-                except FileNotFoundError:
-                    pass
 
             try:
                 fd = os.open(str(self._lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY)

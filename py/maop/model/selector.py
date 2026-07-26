@@ -9,6 +9,7 @@ capability/strategy/health-based behaviour.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import time
 from typing import TYPE_CHECKING, Any
@@ -16,10 +17,11 @@ from typing import TYPE_CHECKING, Any
 from maop.core.monitoring import (
     MAOP_MODEL_SELECTION_LOAD_AWARE,
     MAOP_MODEL_SELECTION_QUOTA_REJECTED,
-    MAOP_ROUTING_DECISION_TOTAL,
     MAOP_ROUTING_DECISION_DURATION_MS,
+    MAOP_ROUTING_DECISION_TOTAL,
 )
-from maop.core.otel import get_tracer, span as otel_span
+from maop.core.otel import get_tracer
+from maop.core.otel import span as otel_span
 from maop.core.routing_decision import (
     RoutingDecisionRecord,
     get_active_span_context,
@@ -27,7 +29,10 @@ from maop.core.routing_decision import (
 )
 from maop.model.registry import ModelRegistry
 from maop.model.schema import (
-    ModelDef, EffectiveModel, QualityTier, LatencyTier,
+    EffectiveModel,
+    LatencyTier,
+    ModelDef,
+    QualityTier,
 )
 
 if TYPE_CHECKING:
@@ -68,8 +73,8 @@ class ModelSelector:
         self,
         registry: ModelRegistry,
         *,
-        load_balancer: "LoadBalancer | None" = None,
-        quota_enforcer: "QuotaEnforcer | None" = None,
+        load_balancer: LoadBalancer | None = None,
+        quota_enforcer: QuotaEnforcer | None = None,
     ) -> None:
         self._registry = registry
         self._load_balancer = load_balancer
@@ -432,10 +437,8 @@ class ModelSelector:
 
 def _set_span_attr(s: Any, key: str, value: Any) -> None:
     """Best-effort ``set_attribute`` on a (possibly no-op) span."""
-    try:
+    with contextlib.suppress(Exception):
         s.set_attribute(key, value)
-    except Exception:
-        pass
 
 
 def _record_selector_decision(

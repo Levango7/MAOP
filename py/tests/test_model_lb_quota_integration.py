@@ -30,11 +30,14 @@ from maop.core.monitoring import (
 )
 from maop.model.quota import QuotaEnforcer
 from maop.model.schema import (
-    ModelDef, ModelPolicy, QuotaConfig, SelectionStrategy,
-    QualityTier, LatencyTier,
+    LatencyTier,
+    ModelDef,
+    ModelPolicy,
+    QualityTier,
+    QuotaConfig,
+    SelectionStrategy,
 )
 from maop.model.selector import ModelSelector
-
 
 # ── Fixtures ──────────────────────────────────────────────────
 

@@ -77,10 +77,7 @@ class MCPServerConcurrency:
         """
         cond = self._ensure_server(server_id)
         deadline: float | None
-        if timeout_s is None or timeout_s <= 0:
-            deadline = None
-        else:
-            deadline = time.monotonic() + timeout_s
+        deadline = None if timeout_s is None or timeout_s <= 0 else time.monotonic() + timeout_s
         with cond:
             limit = self._limits.get(server_id, self._default)
             while self._active.get(server_id, 0) >= limit:

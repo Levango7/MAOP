@@ -1,19 +1,21 @@
 """MAOP Dashboard — Cost Tracker API endpoints."""
 
 from __future__ import annotations
+
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from maop.dashboard.error_handler import handle_api_errors
 from maop.core.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 router = APIRouter(prefix="/api/cost", tags=["cost"])
 
 
 def _get_cost_tracker():
-    from maop.core.cost_tracker import CostTracker
     from pathlib import Path
+
+    from maop.core.cost_tracker import CostTracker
     root = Path(__file__).resolve().parent.parent.parent.parent
     return CostTracker(root_dir=str(root))
 

@@ -20,6 +20,7 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import uuid
@@ -288,10 +289,8 @@ class ConversationManager:
 
     def _row_to_message(self, row: Any) -> Message:
         metadata = {}
-        try:
+        with contextlib.suppress(json.JSONDecodeError, TypeError):
             metadata = json.loads(row["metadata"])
-        except (json.JSONDecodeError, TypeError):
-            pass
         return Message(
             id=row["id"],
             session_id=row["session_id"],

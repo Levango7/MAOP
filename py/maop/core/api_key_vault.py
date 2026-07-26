@@ -17,10 +17,11 @@ Usage::
 from __future__ import annotations
 
 import base64
+import contextlib
 import logging
 import os
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from maop.core.db_utils import get_db_path, sqlite_connect
 
@@ -125,10 +126,8 @@ class ApiKeyVault:
             key = Fernet.generate_key()
             key_path.parent.mkdir(parents=True, exist_ok=True)
             key_path.write_bytes(key)
-            try:
+            with contextlib.suppress(Exception):
                 os.chmod(str(key_path), 0o600)
-            except Exception:
-                pass
             logger.info("[api_key_vault] Generated new encryption key at %s", key_path)
             return key
         except Exception as exc:
@@ -155,7 +154,7 @@ class ApiKeyVault:
                 )
         logger.info("[api_key_vault] Stored key for provider '%s'", provider)
 
-    def retrieve(self, provider: str) -> Optional[str]:
+    def retrieve(self, provider: str) -> str | None:
         with sqlite_connect(self._db_path) as conn:
             row = conn.execute(
                 "SELECT encrypted_key FROM api_keys WHERE provider=?", (provider,)
@@ -275,10 +274,8 @@ class ApiKeyVault:
         try:
             key_path.parent.mkdir(parents=True, exist_ok=True)
             key_path.write_bytes(new_key)
-            try:
+            with contextlib.suppress(Exception):
                 os.chmod(str(key_path), 0o600)
-            except Exception:
-                pass
         except Exception as exc:
             # DB is already committed with the new key, so we must keep the
             # new Fernet in memory or the DB becomes unreadable to this process.

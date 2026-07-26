@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-
-from maop.core.react_loop import ReactLoop, ReactConfig, ReactResult, ReactStep, ReactPhase
-from maop.core.change_tracker import ChangeTracker
 from maop.core.artifact_store import ArtifactStore
-
+from maop.core.change_tracker import ChangeTracker
+from maop.core.react_loop import ReactConfig, ReactLoop, ReactPhase, ReactResult, ReactStep
 
 # ── ReactLoop (unit tests, no real LLM) ────────────────────────
 

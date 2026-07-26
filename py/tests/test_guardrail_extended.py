@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 
 from maop.core.guardrail import (
-    Guardrail, RuleType, fnmatch_simple, DEFAULT_RULES, _default_config,
+    DEFAULT_RULES,
+    Guardrail,
+    RuleType,
+    _default_config,
+    fnmatch_simple,
 )
 
 

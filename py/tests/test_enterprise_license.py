@@ -14,10 +14,10 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 import maop.enterprise.license as _license_mod
 from maop.enterprise.license import (
-    LicenseValidator,
     LicenseExpiredError,
-    LicenseSignatureError,
     LicenseFormatError,
+    LicenseSignatureError,
+    LicenseValidator,
 )
 
 _TEST_KEY_DIR = Path(tempfile.mkdtemp(prefix="maop_test_keys_"))
@@ -42,10 +42,14 @@ _license_mod._PUBLIC_KEY_PATH = _TEST_PUBLIC_PATH
 _DEV_PRIVATE_KEY = _TEST_PRIVATE_PATH
 
 
+import tempfile
+
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-import tempfile
+
 import maop.enterprise.license as _license_mod
+
+
 def _generate_test_license(
     customer: str = "Test Customer",
     expires_at: datetime | None = None,
@@ -148,7 +152,7 @@ class TestLicenseValidator:
 
     def test_wrong_signing_key_raises(self):
         """A license signed by a different key should fail signature verification."""
-    
+
         # Generate a rogue key pair
         rogue_key = Ed25519PrivateKey.generate()
         rogue_pem = rogue_key.private_bytes(

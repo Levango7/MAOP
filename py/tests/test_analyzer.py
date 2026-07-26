@@ -13,8 +13,8 @@ algorithms) remain plain ``def``.
 from __future__ import annotations
 
 from unittest.mock import MagicMock
-import pytest
 
+import pytest
 
 from maop.core.analyzer import (
     AnalysisResult,
@@ -31,7 +31,6 @@ from maop.core.analyzer import (
     _semantic_analyze,
     analyze,
 )
-
 
 # ── Model tests ───────────────────────────────────────────────────
 

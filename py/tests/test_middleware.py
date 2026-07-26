@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from fastapi import Request as _Request
 
 from maop.core.middleware import AuthMiddleware, RateLimitMiddleware, setup_middleware
-from fastapi import Request as _Request
 
 
 class TestRateLimitMiddleware:
@@ -124,6 +124,7 @@ class TestCSPMiddleware:
         """Integration: HSTS header appears on actual HTTP response."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.core.middleware import CSPMiddleware
 
         app = FastAPI()
@@ -136,9 +137,9 @@ class TestCSPMiddleware:
         client = TestClient(app)
         resp = client.get("/test")
         assert resp.status_code == 200
-        assert "strict-transport-security" in {k.lower() for k in resp.headers.keys()}
-        assert "x-dns-prefetch-control" in {k.lower() for k in resp.headers.keys()}
-        assert "cross-origin-opener-policy" in {k.lower() for k in resp.headers.keys()}
+        assert "strict-transport-security" in {k.lower() for k in resp.headers}
+        assert "x-dns-prefetch-control" in {k.lower() for k in resp.headers}
+        assert "cross-origin-opener-policy" in {k.lower() for k in resp.headers}
 
     def test_report_only_mode(self):
         from maop.core.middleware import CSPMiddleware
@@ -159,6 +160,7 @@ class TestCSPMiddleware:
         """Integration: verify CSP header appears on actual HTTP response."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.core.middleware import CSPMiddleware
 
         app = FastAPI()
@@ -171,7 +173,7 @@ class TestCSPMiddleware:
         client = TestClient(app)
         resp = client.get("/test")
         assert resp.status_code == 200
-        assert "content-security-policy" in {k.lower() for k in resp.headers.keys()}
+        assert "content-security-policy" in {k.lower() for k in resp.headers}
         csp = resp.headers["content-security-policy"]
         assert "default-src 'self'" in csp
         assert resp.headers["x-content-type-options"] == "nosniff"
@@ -181,6 +183,7 @@ class TestCSPMiddleware:
         """When disabled, no CSP header should be present."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.core.middleware import CSPMiddleware
 
         app = FastAPI()
@@ -192,12 +195,13 @@ class TestCSPMiddleware:
 
         client = TestClient(app)
         resp = client.get("/test")
-        assert "content-security-policy" not in {k.lower() for k in resp.headers.keys()}
+        assert "content-security-policy" not in {k.lower() for k in resp.headers}
 
     def test_report_only_uses_correct_header_name(self):
         """Report-only mode uses Content-Security-Policy-Report-Only."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.core.middleware import CSPMiddleware
 
         app = FastAPI()
@@ -209,7 +213,7 @@ class TestCSPMiddleware:
 
         client = TestClient(app)
         resp = client.get("/test")
-        header_keys_lower = {k.lower() for k in resp.headers.keys()}
+        header_keys_lower = {k.lower() for k in resp.headers}
         assert "content-security-policy-report-only" in header_keys_lower
         assert "content-security-policy" not in header_keys_lower
 

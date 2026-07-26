@@ -5,6 +5,7 @@ that was previously hardcoded in app-info.js.  Now the frontend fetches it via A
 making it easy to update without redeploying JS.
 """
 from __future__ import annotations
+
 from typing import Any
 
 from fastapi import APIRouter

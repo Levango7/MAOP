@@ -86,7 +86,7 @@ class KnowledgeGraph:
 
         current_frontier = {entity_name}
 
-        for depth in range(max_depth):
+        for _depth in range(max_depth):
             next_frontier: set[str] = set()
             for node_name in current_frontier:
                 edges = self._get_edges_for(node_name, direction=direction, relation_type=relation_type)

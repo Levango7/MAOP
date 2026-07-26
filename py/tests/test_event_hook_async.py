@@ -1,10 +1,9 @@
 """Tests for EventHook async webhook delivery (asyncio.Queue + aiohttp)."""
 import os
 import sys
-import time
 import threading
+import time
 from pathlib import Path
-
 
 # Ensure doc-pipeline is importable (configurable via env var, fallback to default)
 DOC_PIPELINE_ROOT = Path(os.environ.get("DOC_PIPELINE_ROOT", r"F:\Nexus\Workflow\doc-pipeline"))
@@ -108,9 +107,10 @@ class TestAsyncWebhookEngine:
 
     def test_actual_webhook_delivery(self):
         """Verify actual webhook delivery using a local HTTP server."""
-        from pipeline_core.event_hook import get_hook_manager, shutdown_webhook
-        from http.server import HTTPServer, BaseHTTPRequestHandler
         import json as _json
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        from pipeline_core.event_hook import get_hook_manager, shutdown_webhook
 
         received_bodies = []
 

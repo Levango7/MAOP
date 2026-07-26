@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import MagicMock, patch
 
-
 from maop.core.error_schema import new_result
 from maop.delegate.dispatcher import (
-    DispatchResult, Dispatcher,
-    _escape_for_cmd, _escape_for_ps_command, _DRIVERS,
+    _DRIVERS,
+    Dispatcher,
+    DispatchResult,
+    _escape_for_cmd,
+    _escape_for_ps_command,
 )
 
 
@@ -220,7 +222,7 @@ class TestSubagentResolution:
     """Test Dispatcher._resolve_agent() with parent/child format."""
 
     def _make_config_with_subagents(self):
-        from maop.config.loader import AgentDef, SubagentDef, MaopConfig
+        from maop.config.loader import AgentDef, MaopConfig, SubagentDef
         parent = AgentDef(
             cli="mavis",
             cli_args="{task}",

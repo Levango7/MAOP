@@ -18,10 +18,10 @@ from maop.core.agent_registry import AgentRegistry, RegisteredAgent
 from maop.core.capability_matcher import CapabilityMatcher, MatcherConfig
 from maop.core.chat_engine import ChatEngine, ChatRequest
 from maop.core.config_mutator import ConfigMutator
-from maop.core.evolution_strategies import StrategyEngine, BalancedStrategy
+from maop.core.evolution_strategies import BalancedStrategy, StrategyEngine
 from maop.core.knowledge_extractor import KnowledgeExtractor, Relation
 from maop.core.knowledge_graph import KnowledgeGraph
-from maop.core.llm_provider import LLMResponse, BaseLLMProvider, ModelConfig
+from maop.core.llm_provider import BaseLLMProvider, LLMResponse, ModelConfig
 from maop.delegate.dispatcher import Dispatcher
 from maop.memory.vector_search import VectorSearch
 
@@ -257,7 +257,8 @@ class TestE2EEvolution:
 
     def test_multi_strategy_comparison(self, tmp_path):
         from maop.core.evolution_strategies import (
-            ConservativeStrategy, AggressiveStrategy,
+            AggressiveStrategy,
+            ConservativeStrategy,
         )
 
         suggestion = {"id": "S1", "severity": "MEDIUM", "auto_applicable": True, "type": "slow_agent"}
@@ -320,7 +321,7 @@ class TestE2ECrossVendorRouting:
             "plan the sprint": "planning",
         }
 
-        for task, expected_cap in tasks.items():
+        for task in tasks:
             scores = matcher.match(task=task, top_k=3)
             assert len(scores) > 0, f"No agents matched for task: {task}"
             best = scores[0]

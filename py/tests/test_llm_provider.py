@@ -6,19 +6,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from maop.core.chat_engine import ChatEngine, ChatRequest
 from maop.core.llm_provider import (
-    BaseLLMProvider,
-    OpenAICompatibleProvider,
     AnthropicProvider,
-    OllamaProvider,
+    BaseLLMProvider,
+    FallbackResult,
     LLMProviderFactory,
     LLMResponse,
-    FallbackResult,
-    ProviderConfig,
     ModelConfig,
+    OllamaProvider,
+    OpenAICompatibleProvider,
+    ProviderConfig,
 )
-from maop.core.chat_engine import ChatEngine, ChatRequest
-
 
 # ═══════════════════════════════════════════════════════════════════
 # Pydantic Model Tests

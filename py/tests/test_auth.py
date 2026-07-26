@@ -16,7 +16,6 @@ from maop.core.auth import (
     JWTHandler,
 )
 
-
 # ── Models ────────────────────────────────────────────────────────
 
 

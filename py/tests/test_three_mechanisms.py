@@ -6,17 +6,16 @@ Tests:
   3. context_compressor.py — ContextCompressor
 """
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
+from maop.core.context_compressor import ContextCompressor
 from maop.core.state_classifier import (
     TaskState,
     TaskStateClassifier,
 )
-from maop.core.context_compressor import ContextCompressor
 from maop.memory.consolidator import DreamConsolidator
 from maop.memory.store import MemoryStore
-
 
 # ── 1. State Classifier Tests ────────────────────────────────
 

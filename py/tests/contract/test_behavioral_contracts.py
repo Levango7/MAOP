@@ -7,8 +7,9 @@ Three behavioral contracts:
 """
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 pytestmark = pytest.mark.contract
 
@@ -33,8 +34,8 @@ class TestModelFallbackBehavior:
 
     def test_fallback_chain_includes_primary_first(self):
         """Primary model must always be first in the chain."""
-        from maop.model.schema import EffectiveModel
         from maop.model.fallback import FallbackManager
+        from maop.model.schema import EffectiveModel
 
         registry = _make_registry()
         fm = FallbackManager(registry)
@@ -48,8 +49,8 @@ class TestModelFallbackBehavior:
 
     def test_fallback_chain_excludes_high_failure_models(self):
         """Models with >=5 consecutive failures must be excluded."""
-        from maop.model.schema import EffectiveModel
         from maop.model.fallback import FallbackManager
+        from maop.model.schema import EffectiveModel
 
         registry = _make_registry()
         fm = FallbackManager(registry)
@@ -105,7 +106,7 @@ class TestControlActionAuditBehavior:
 
     def test_successful_action_produces_audit(self, tmp_path):
         """A real (non-stub) action must create an audit event with SUCCESS status."""
-        from maop.control.plane import ControlPlane, ActionStatus
+        from maop.control.plane import ActionStatus, ControlPlane
 
         plane = ControlPlane(root_dir=str(tmp_path))
 
@@ -125,8 +126,8 @@ class TestControlActionAuditBehavior:
 
     def test_failed_action_produces_error_audit(self, tmp_path):
         """An unknown action must produce an ERROR-level audit event."""
-        from maop.control.plane import ControlPlane, ActionStatus
         from maop.control.audit import AuditLevel
+        from maop.control.plane import ActionStatus, ControlPlane
 
         plane = ControlPlane(root_dir=str(tmp_path))
         result = plane.execute(
@@ -152,7 +153,7 @@ class TestControlActionAuditBehavior:
 
     def test_model_switch_produces_audit_with_detail(self, tmp_path):
         """Model switch must produce audit with model info in detail and SUCCESS status."""
-        from maop.control.plane import ControlPlane, ActionStatus
+        from maop.control.plane import ActionStatus, ControlPlane
 
         plane = ControlPlane(root_dir=str(tmp_path))
         result = plane.execute(
@@ -177,8 +178,8 @@ class TestModelSwitchRuntimeEffect:
         if MAOP_ROOT not in sys.path:
             sys.path.insert(0, MAOP_ROOT)
 
-        from maop.delegate.dispatcher import Dispatcher
         from maop.core.circuit_breaker import CircuitBreaker
+        from maop.delegate.dispatcher import Dispatcher
 
         # No model_selector — should use agent's model as-is
         d = Dispatcher(MAOP_config=None, breaker=CircuitBreaker(), model_selector=None)
@@ -186,8 +187,8 @@ class TestModelSwitchRuntimeEffect:
 
     def test_dispatch_result_has_model_resolved_flag(self):
         """DispatchResult must expose model_resolved flag."""
-        from maop.delegate.dispatcher import DispatchResult
         from maop.core.error_schema import new_result
+        from maop.delegate.dispatcher import DispatchResult
 
         r = new_result(agent="test", task="t", exit_code=0)
         dr = DispatchResult(result=r)
@@ -196,9 +197,9 @@ class TestModelSwitchRuntimeEffect:
 
     def test_selector_resolution_changes_effective_model(self):
         """When ModelSelector resolves, effective_model must be set on dispatcher."""
-        from maop.model.selector import ModelSelector
-        from maop.delegate.dispatcher import Dispatcher
         from maop.core.circuit_breaker import CircuitBreaker
+        from maop.delegate.dispatcher import Dispatcher
+        from maop.model.selector import ModelSelector
 
         registry = _make_registry()
         selector = ModelSelector(registry)

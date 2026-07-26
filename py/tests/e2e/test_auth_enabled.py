@@ -11,9 +11,9 @@ These tests prevent regression of R4 audit P0 fixes.
 
 from __future__ import annotations
 
-import os
-import json
 import asyncio
+import json
+import os
 
 # Set auth enabled BEFORE importing app
 os.environ["MAOP_AUTH"] = "1"
@@ -21,12 +21,14 @@ os.environ["MAOP_ENV"] = "test"
 os.environ.setdefault("MAOP_ADMIN_PASSWORD", "TestAdminPass123!")
 
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
+from maop.dashboard import server as _server_mod
 
 # Verify auth was enabled at import time (skip if app was already
 # imported without MAOP_AUTH=1 by another test module)
 from maop.dashboard.routers import auth as _auth_mod
-from maop.dashboard import server as _server_mod
+
 if not (_auth_mod._auth_enabled and _server_mod._auth_enabled):
     pytest.skip(
         "MAOP_AUTH=1 must be set before app import; run this test in isolation",

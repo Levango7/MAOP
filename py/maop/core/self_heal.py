@@ -29,9 +29,9 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
-from typing import Callable
 
 from pydantic import BaseModel, Field
 

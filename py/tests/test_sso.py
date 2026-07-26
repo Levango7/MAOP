@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from maop.config.edition import Edition, set_edition, reset_edition
+from maop.config.edition import Edition, reset_edition, set_edition
 from maop.enterprise.sso import (
     SSOConfig,
     SSOError,
@@ -60,10 +60,10 @@ class _FakeResponse:
     def read(self, n: int = -1) -> bytes:
         return self._buf.read(n if n != -1 else -1)
 
-    def __enter__(self) -> "_FakeResponse":
+    def __enter__(self) -> _FakeResponse:
         return self
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(self, *args: object) -> None:
         self._closed = True
 
 

@@ -51,9 +51,9 @@ _webhook_secret_warned: bool = False
 
 __all__ = [
     "N8nClient",
-    "N8nWorkflowExecution",
-    "N8nWebhookPayload",
     "N8nIntegrationError",
+    "N8nWebhookPayload",
+    "N8nWorkflowExecution",
     "require_n8n_feature",
 ]
 
@@ -218,7 +218,7 @@ class N8nClient:
             self._client.close()
             self._client = None
 
-    def __enter__(self) -> "N8nClient":
+    def __enter__(self) -> N8nClient:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:

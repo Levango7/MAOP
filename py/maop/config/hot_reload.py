@@ -8,16 +8,17 @@ emits a "config.reloaded" event on the event bus.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from pydantic import BaseModel
 
 from maop.config.loader import ConfigLoader, MaopConfig
-from maop.core.event_bus import EventBus, Event, get_event_bus
+from maop.core.event_bus import Event, EventBus, get_event_bus
 
 logger = logging.getLogger(__name__)
 
@@ -126,10 +127,8 @@ class ConfigHotReload:
         self._state.running = False
         if self._task and not self._task.done():
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
         self._task = None
 
     def stop_sync(self) -> None:

@@ -6,15 +6,15 @@ plan/agent/dag/verify/condition/terminal step types.
 
 from __future__ import annotations
 
-from typing import Any, Callable
-
 import ast
 import asyncio
 import json
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -109,7 +109,6 @@ def safe_eval(expr: str, context: dict) -> Any:
     return _safe_eval_node(tree, context)
 
 from maop.core.event_bus import EventBus, get_event_bus
-
 
 # ── Step types ────────────────────────────────────────────────
 
@@ -281,7 +280,7 @@ class Engine:
         results: dict[str, StepResult] = {}
         layers = _topological_sort(steps)
 
-        for layer_idx, layer in enumerate(layers):
+        for _layer_idx, layer in enumerate(layers):
             # Check if any previous step requested abort
             aborted = any(
                 results.get(s.id, StepResult(id=s.id)).status == StepStatus.FAILED

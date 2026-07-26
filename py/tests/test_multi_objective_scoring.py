@@ -20,7 +20,6 @@ from maop.core.multi_objective_scorer import (
 )
 from maop.core.route_scorer import RouteScorer
 
-
 # ── TestObjectiveWeights ─────────────────────────────────────────
 
 class TestObjectiveWeights:

@@ -30,7 +30,6 @@ import time
 import uuid
 from pathlib import Path
 
-
 from pydantic import BaseModel, Field
 
 from maop.core.db_utils import get_db_path, sqlite_connect

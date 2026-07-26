@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import time
 from unittest.mock import MagicMock
@@ -10,12 +11,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from maop.config.hot_reload import (
-    ReloadEvent, HotReloadState, ConfigHotReload,
+    ConfigHotReload,
+    HotReloadState,
+    ReloadEvent,
     _file_hash,
 )
 from maop.config.loader import ConfigLoader, MaopConfig
-from maop.core.event_bus import EventBus, Event
-
+from maop.core.event_bus import Event, EventBus
 
 # ── Helper Tests ─────────────────────────────────────────────
 
@@ -342,9 +344,7 @@ class TestWatchLoop:
         await asyncio.sleep(0.2)
         wr._state.running = False
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
         assert wr._state.reload_count >= 1

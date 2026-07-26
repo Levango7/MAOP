@@ -63,9 +63,9 @@ def run() -> None:
     logger.info("Agent Executor Worker starting (root=%s)", ROOT)
 
     try:
+        from maop.config.loader import ConfigLoader
         from maop.core.message_queue import MessageQueue
         from maop.delegate.dispatcher import Dispatcher
-        from maop.config.loader import ConfigLoader
     except ImportError as exc:
         logger.error("Failed to import MAOP modules: %s", exc)
         sys.exit(1)

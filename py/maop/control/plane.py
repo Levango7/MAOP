@@ -45,10 +45,7 @@ class ControlPlane:
 
     def __init__(self, root_dir: str | None = None) -> None:
         from pathlib import Path
-        if root_dir:
-            audit_path = Path(root_dir) / "logs" / "audit.jsonl"
-        else:
-            audit_path = None
+        audit_path = Path(root_dir) / "logs" / "audit.jsonl" if root_dir else None
         self._audit = AuditLog(audit_path)
         self._root_dir = root_dir
         self._handlers: dict[str, Any] = {}

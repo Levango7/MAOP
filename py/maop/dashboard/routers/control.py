@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import asyncio
+import logging
 import sys
 import time
+import uuid as _uuid
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .state import MAOP_ROOT, active_jobs, cache, cache_lock
 from maop.core.middleware import require_admin
-import uuid as _uuid
-import logging
+
+from .state import MAOP_ROOT, active_jobs, cache, cache_lock
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class MaintainRequest(BaseModel):
 @router.get("/api/control/status")
 async def control_status() -> dict[str, Any]:
     jobs = []
-    for jid, job in active_jobs.items():
+    for job in active_jobs.values():
         proc = job.get("process")
         if proc is not None:
             if proc.returncode is not None:
@@ -67,7 +67,7 @@ async def control_pause(request: Request) -> dict[str, Any]:
     pause_file.parent.mkdir(parents=True, exist_ok=True)
     pause_file.write_text("paused")
     paused = 0
-    for jid, job in active_jobs.items():
+    for job in active_jobs.values():
         proc = job.get("process")
         if proc and proc.returncode is None and job.get("status") == "running":
             job["status"] = "paused"
@@ -81,7 +81,7 @@ async def control_resume(request: Request) -> dict[str, Any]:
     if pause_file.exists():
         pause_file.unlink()
     resumed = 0
-    for jid, job in active_jobs.items():
+    for job in active_jobs.values():
         if job.get("status") == "paused":
             job["status"] = "running"
             resumed += 1
@@ -91,7 +91,7 @@ async def control_resume(request: Request) -> dict[str, Any]:
 async def control_stop(request: Request) -> dict[str, Any]:
     require_admin(request)
     stopped = 0
-    for jid, job in active_jobs.items():
+    for job in active_jobs.values():
         proc = job.get("process")
         if proc and proc.returncode is None:
             proc.terminate()

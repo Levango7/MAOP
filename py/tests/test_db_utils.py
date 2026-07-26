@@ -77,9 +77,8 @@ class TestSqliteConnect:
         with sqlite_connect(db) as conn:
             conn.execute("CREATE TABLE t (id INTEGER UNIQUE)")
             conn.execute("INSERT INTO t VALUES (1)")
-        with pytest.raises(sqlite3.IntegrityError):
-            with sqlite_connect(db) as conn:
-                conn.execute("INSERT INTO t VALUES (1)")
+        with pytest.raises(sqlite3.IntegrityError), sqlite_connect(db) as conn:
+            conn.execute("INSERT INTO t VALUES (1)")
         with sqlite_connect(db) as conn:
             count = conn.execute("SELECT COUNT(*) FROM t").fetchone()[0]
             assert count == 1

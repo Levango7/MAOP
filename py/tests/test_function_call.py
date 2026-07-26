@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+
 import pytest
 
 from maop.core.function_call import (
@@ -12,7 +13,6 @@ from maop.core.function_call import (
     ToolProvider,
 )
 from maop.core.tool_schema import ToolSchemaDef, ToolSchemaGenerator
-
 
 # ── FunctionCallBridge: parse_response ──────────────────────────
 

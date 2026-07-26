@@ -19,7 +19,6 @@ from maop.memory.store import (
     expand_keywords,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────
 
 @pytest.fixture
@@ -417,7 +416,7 @@ class TestPrune:
         # Insert an entry, then manually backdate its timestamp
         eid = store.store(agent="a", task="old", content="old content")
         # Update timestamp to 100 days ago
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
         old_ts = (datetime.now(timezone.utc) - timedelta(days=100)).isoformat()
         with store._connect() as conn:
             conn.execute("UPDATE memory_entries SET timestamp = ? WHERE id = ?", (old_ts, eid))

@@ -13,27 +13,29 @@ Architecture (split for maintainability):
 from __future__ import annotations
 
 import asyncio
-import time
 import logging
+import time
 from typing import Any
 
 from maop.core.circuit_breaker import CircuitBreaker
 from maop.core.error_schema import new_result
-from maop.core.otel import get_tracer, span as otel_span
 from maop.core.monitoring import (
+    MAOP_ROUTING_DECISION_DURATION_MS,
+    MAOP_ROUTING_DECISION_TOTAL,
     MAOP_TASK_DEADLINE_SECONDS,
-    MAOP_TASK_SLA_VIOLATION_TOTAL,
+    MAOP_TASK_PREEMPTION_TOTAL,
     MAOP_TASK_PRIORITY_DISTRIBUTION,
     MAOP_TASK_SLA_TIER_DISTRIBUTION,
-    MAOP_TASK_PREEMPTION_TOTAL,
-    MAOP_ROUTING_DECISION_TOTAL,
-    MAOP_ROUTING_DECISION_DURATION_MS,
+    MAOP_TASK_SLA_VIOLATION_TOTAL,
 )
+from maop.core.otel import get_tracer
+from maop.core.otel import span as otel_span
 from maop.core.routing_decision import (
     RoutingDecisionRecord,
     get_active_span_context,
     record_decision_safe,
 )
+from maop.delegate.drivers import DRIVERS as _DRIVERS
 
 # Re-export for backward compatibility — callers importing from
 # MAOP.delegate.dispatcher still get these symbols.
@@ -43,7 +45,6 @@ from maop.delegate.models import (  # noqa: F401
     _escape_for_cmd,
     _escape_for_ps_command,
 )
-from maop.delegate.drivers import DRIVERS as _DRIVERS
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ def _get_load_balancer():
 def _get_runtime(config=None):
     """Lazy import Runtime."""
     try:
-        from maop.core.runtime import create_runtime, RuntimeConfig, RuntimeType
+        from maop.core.runtime import RuntimeConfig, RuntimeType, create_runtime
         if config:
             return create_runtime(config)
         return create_runtime(RuntimeConfig(type=RuntimeType.LOCAL))

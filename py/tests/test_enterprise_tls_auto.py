@@ -15,7 +15,7 @@ from maop.enterprise import tls_auto
 @pytest.fixture(autouse=True)
 def enterprise_mode():
     """Enable enterprise edition so require_feature(FeatureFlag.TLS_AUTO) passes."""
-    from maop.config.edition import set_edition, Edition, reset_edition
+    from maop.config.edition import Edition, reset_edition, set_edition
     set_edition(Edition.ENTERPRISE)
     yield
     reset_edition()

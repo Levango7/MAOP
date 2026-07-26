@@ -1,7 +1,6 @@
 ﻿"""Tests for MAOP ↔ doc-pipeline workflow adapter and event hooks."""
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
+from unittest.mock import MagicMock, patch
 
 # ── Adapter import & path resolution ──────────────────────
 
@@ -9,7 +8,7 @@ class TestAdapterImport:
     """Test that the adapter module imports correctly."""
 
     def test_module_importable(self):
-        from maop.delegate.doc_pipeline_adapter import run_pipeline, run_plan, get_status
+        from maop.delegate.doc_pipeline_adapter import get_status, run_pipeline, run_plan
         assert callable(run_pipeline)
         assert callable(run_plan)
         assert callable(get_status)
@@ -22,8 +21,13 @@ class TestAdapterImport:
 
     def test_adapter_functions_exist(self):
         from maop.delegate.doc_pipeline_adapter import (
-            get_orchestrator, register_maop_event_hooks,
-            list_hooks, shutdown, run_pipeline, run_plan, get_status
+            get_orchestrator,
+            get_status,
+            list_hooks,
+            register_maop_event_hooks,
+            run_pipeline,
+            run_plan,
+            shutdown,
         )
         assert all(callable(f) for f in [
             get_orchestrator, register_maop_event_hooks,

@@ -17,7 +17,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 
-from maop.config.edition import require_feature, FeatureFlag
+from maop.config.edition import FeatureFlag, require_feature
 
 logger = logging.getLogger(__name__)
 

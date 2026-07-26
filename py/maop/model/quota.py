@@ -57,10 +57,7 @@ class QuotaEnforcer:
 
         # Check token rate
         current_tokens = sum(t for _, t in self._token_log[provider])
-        if current_tokens + tokens > quota.tokens_per_minute:
-            return False
-
-        return True
+        return not current_tokens + tokens > quota.tokens_per_minute
 
     def consume(self, provider: str, tokens: int = 0) -> None:
         """Record a request consumption."""

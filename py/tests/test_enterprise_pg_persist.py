@@ -8,7 +8,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def enterprise_mode():
     """Enable enterprise edition so the PostgreSQL feature flag is available."""
-    from maop.config.edition import set_edition, Edition, reset_edition
+    from maop.config.edition import Edition, reset_edition, set_edition
     set_edition(Edition.ENTERPRISE)
     yield
     reset_edition()

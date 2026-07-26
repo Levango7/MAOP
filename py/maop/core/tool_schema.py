@@ -22,7 +22,8 @@ from __future__ import annotations
 import inspect
 import logging
 import re
-from typing import Any, Callable, get_type_hints
+from collections.abc import Callable
+from typing import Any, get_type_hints
 
 from pydantic import BaseModel, Field
 
@@ -249,9 +250,9 @@ class ToolSchemaGenerator:
         desc_lines = []
         for line in lines:
             stripped = line.strip()
-            if stripped.startswith(":param") or stripped.startswith(":type") or stripped.startswith(":return"):
+            if stripped.startswith((":param", ":type", ":return")):
                 break
-            if stripped.startswith("Args:") or stripped.startswith("Returns:") or stripped.startswith("Raises:"):
+            if stripped.startswith(("Args:", "Returns:", "Raises:")):
                 break
             desc_lines.append(stripped)
         return " ".join(desc_lines).strip()

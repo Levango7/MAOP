@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from maop.maop_execute import Delegate, maop_execute, Observability
 from maop.core.error_schema import new_result
 from maop.delegate.dispatcher import DispatchResult
+from maop.maop_execute import Delegate, Observability, maop_execute
 
 
 def make_dispatch_result(exit_code=0, stdout="ok", stderr=""):

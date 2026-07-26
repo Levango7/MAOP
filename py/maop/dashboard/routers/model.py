@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import logging
 import shutil
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from .state import MAOP_ROOT
-from .error_handler import handle_api_errors
 from maop.core.middleware import require_admin
+
+from .error_handler import handle_api_errors
+from .state import MAOP_ROOT
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ async def api_model_switch(request: Request) -> dict[str, Any]:
     if not ypath.exists():
         return {"status": "error", "error": "agents.yaml not found"}
     import yaml
-    with open(ypath, "r", encoding="utf-8") as f:
+    with open(ypath, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     agents = data.get("agents", {})
     if agent_name not in agents:
@@ -70,7 +70,7 @@ async def api_model_switch(request: Request) -> dict[str, Any]:
         mpath = MAOP_ROOT / "config" / "models.yaml"
     if mpath.exists():
         import yaml as _yaml
-        with open(mpath, "r", encoding="utf-8") as _f:
+        with open(mpath, encoding="utf-8") as _f:
             mdata = _yaml.safe_load(_f)
         valid_models = set(mdata.get("models", {}).keys()) if isinstance(mdata, dict) else set()
         if valid_models and new_model not in valid_models:

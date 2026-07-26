@@ -32,8 +32,9 @@ import logging
 import os
 import time
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Any, AsyncGenerator
+from typing import Any
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field

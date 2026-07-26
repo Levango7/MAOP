@@ -26,7 +26,8 @@ to work; callers may opt into the unified schema by raising
 import functools
 import logging
 import types
-from typing import Any, Callable, Union
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
@@ -66,7 +67,7 @@ def error_response(
 
 
 def handle_api_errors(
-    operation: Union[str, Callable[..., Any]] = "",
+    operation: str | Callable[..., Any] = "",
     *,
     error_value: Any = None,
 ) -> Any:

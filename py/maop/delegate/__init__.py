@@ -6,4 +6,4 @@ with circuit-breaker protection and unified error schema.
 
 from maop.delegate.dispatcher import Dispatcher, DispatchResult
 
-__all__ = ["Dispatcher", "DispatchResult"]
+__all__ = ["DispatchResult", "Dispatcher"]

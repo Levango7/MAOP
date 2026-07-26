@@ -18,7 +18,7 @@ from maop.enterprise.ha import (
 @pytest.fixture(autouse=True)
 def enterprise_mode():
     """Enable enterprise edition so require_feature(FeatureFlag.MULTI_USER) passes."""
-    from maop.config.edition import set_edition, Edition, reset_edition
+    from maop.config.edition import Edition, reset_edition, set_edition
     set_edition(Edition.ENTERPRISE)
     yield
     reset_edition()

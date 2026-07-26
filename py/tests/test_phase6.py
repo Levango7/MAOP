@@ -6,9 +6,13 @@ import json
 import pytest
 
 from maop.concurrency import (
-    Priority, TaskStatus, Task, TaskQueue, TaskPool, SSEStreamer,
+    Priority,
+    SSEStreamer,
+    Task,
+    TaskPool,
+    TaskQueue,
+    TaskStatus,
 )
-
 
 # ═══════════════════════════════════════════════════════════════
 # TaskQueue tests

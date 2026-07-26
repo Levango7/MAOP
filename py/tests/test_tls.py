@@ -16,6 +16,7 @@ def _generate_self_signed_cert(cert_path: Path, key_path: Path) -> None:
     Replaces the old openssl CLI approach that skipped on Windows.
     """
     from datetime import datetime, timedelta, timezone
+
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa

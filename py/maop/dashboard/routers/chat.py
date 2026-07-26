@@ -15,15 +15,15 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, File, Request, UploadFile
 from fastapi.responses import StreamingResponse
-
 from pydantic import BaseModel
 
-from .error_handler import handle_api_errors
 from maop.core.middleware import require_admin
+
+from .error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +206,7 @@ async def memory_stats() -> dict[str, Any]:
 @handle_api_errors("image upload")
 async def upload_image(
     session_id: str = "",
-    file: Optional[UploadFile] = File(None),
+    file: UploadFile | None = File(None),
     request: Request = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """Upload an image for multimodal chat."""

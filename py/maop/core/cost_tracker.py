@@ -14,6 +14,7 @@ Integration points:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import sqlite3
 import uuid
@@ -353,10 +354,8 @@ class CostTracker:
     def _row_to_entry(row: sqlite3.Row) -> CostEntry:
         import json
         metadata: dict[str, Any] = {}
-        try:
+        with contextlib.suppress(json.JSONDecodeError, TypeError):
             metadata = json.loads(row["metadata"]) if row["metadata"] else {}
-        except (json.JSONDecodeError, TypeError):
-            pass
         return CostEntry(
             id=row["id"], session_id=row["session_id"], agent=row["agent"],
             model=row["model"], prompt_tokens=row["prompt_tokens"],

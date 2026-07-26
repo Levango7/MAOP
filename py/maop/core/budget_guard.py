@@ -20,6 +20,7 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -186,12 +187,11 @@ class BudgetGuard:
         if budget_exceeded:
             try:
                 import asyncio
+
                 from maop.core.hook_manager import HookManager
                 hm = HookManager(root_dir=str(self._root))
-                try:
+                with contextlib.suppress(RuntimeError):
                     asyncio.get_running_loop()
-                except RuntimeError:
-                    pass
                 asyncio.run(hm.trigger("on_budget_exceed", {
                     "date": today,
                     "tokens_used": tokens_used,

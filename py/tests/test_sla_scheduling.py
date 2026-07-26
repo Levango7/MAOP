@@ -15,16 +15,15 @@ import time
 
 import pytest
 
-from maop.maop_plan import Plan
-from maop.delegate.dispatcher import Dispatcher, _tier_from_priority
 from maop.core.monitoring import (
-    metrics,
     MAOP_TASK_DEADLINE_SECONDS,
-    MAOP_TASK_SLA_VIOLATION_TOTAL,
     MAOP_TASK_PRIORITY_DISTRIBUTION,
     MAOP_TASK_SLA_TIER_DISTRIBUTION,
+    MAOP_TASK_SLA_VIOLATION_TOTAL,
+    metrics,
 )
-
+from maop.delegate.dispatcher import Dispatcher, _tier_from_priority
+from maop.maop_plan import Plan
 
 # ── Plan SLA fields ───────────────────────────────────────────────
 
@@ -225,9 +224,9 @@ class TestSLAMetrics:
         """Metric objects are importable as module-level constants."""
         from maop.core.monitoring import (
             MAOP_TASK_DEADLINE_SECONDS,
-            MAOP_TASK_SLA_VIOLATION_TOTAL,
             MAOP_TASK_PRIORITY_DISTRIBUTION,
             MAOP_TASK_SLA_TIER_DISTRIBUTION,
+            MAOP_TASK_SLA_VIOLATION_TOTAL,
         )
         assert MAOP_TASK_DEADLINE_SECONDS.name == "MAOP_task_deadline_seconds"
         assert MAOP_TASK_SLA_VIOLATION_TOTAL.name == "MAOP_task_sla_violation_total"

@@ -69,8 +69,8 @@ class TestErrorLedger:
 
 class TestDAGWorkflow:
     def test_topological_sort_linear(self):
-        from maop.maop_plan import _topological_sort
         from maop.config.loader import WorkflowStepDef
+        from maop.maop_plan import _topological_sort
 
         steps = [
             WorkflowStepDef(agent="a", task="step0", depends_on=[]),
@@ -84,8 +84,8 @@ class TestDAGWorkflow:
         assert levels[2] == [2]
 
     def test_topological_sort_parallel(self):
-        from maop.maop_plan import _topological_sort
         from maop.config.loader import WorkflowStepDef
+        from maop.maop_plan import _topological_sort
 
         steps = [
             WorkflowStepDef(agent="a", task="step0", depends_on=[]),

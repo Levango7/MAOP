@@ -22,7 +22,7 @@ import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
 from maop.config.edition import FeatureFlag, has_feature
@@ -38,7 +38,7 @@ _sso_manager: Any = None
 def _get_manager() -> Any:
     global _sso_manager
     if _sso_manager is None:
-        from maop.enterprise.sso import SSOManager, SSOConfig, SSOProvider
+        from maop.enterprise.sso import SSOConfig, SSOManager, SSOProvider
         provider = SSOProvider(os.getenv("MAOP_SSO_PROVIDER", "oidc"))
         config = SSOConfig(
             provider=provider,

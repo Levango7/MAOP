@@ -35,8 +35,9 @@ import random
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
@@ -125,7 +126,7 @@ class LRUCache:
         max_size: int = 256,
         default_ttl_s: float = 0.0,
         ttl_jitter: float = 0.1,
-        on_evict: "Callable[[str, Any], None] | None" = None,
+        on_evict: Callable[[str, Any], None] | None = None,
     ) -> None:
         self._max_size = max(1, max_size)
         self._default_ttl = default_ttl_s

@@ -188,7 +188,7 @@ class MAOPSettings(BaseSettings):
         Delegates to ``config.edition.backend_defaults()`` and maps
         to MAOP_*_BACKEND env var keys.
         """
-        from maop.config.edition import backend_defaults, has_feature, FeatureFlag
+        from maop.config.edition import FeatureFlag, backend_defaults, has_feature
         defaults = backend_defaults()
         result = {f"MAOP_{k.upper()}_BACKEND": v for k, v in defaults.items()}
         if has_feature(FeatureFlag.AUTH_AUTO):
@@ -200,7 +200,7 @@ class MAOPSettings(BaseSettings):
     def to_env_dict(self) -> dict[str, str]:
         """Export settings as environment variable dict (MAOP_ prefix)."""
         result = {}
-        for field_name, field_info in self.__class__.model_fields.items():
+        for field_name in self.__class__.model_fields:
             value = getattr(self, field_name)
             env_key = f"MAOP_{field_name.upper()}"
             if isinstance(value, bool):

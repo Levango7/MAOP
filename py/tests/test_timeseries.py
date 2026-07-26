@@ -15,7 +15,6 @@ from maop.core.timeseries import (
     TimeSeriesStore,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────
 
 @pytest.fixture

@@ -25,6 +25,7 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import math
 import random
@@ -36,7 +37,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.otel import get_tracer, span as otel_span
+from maop.core.otel import get_tracer
+from maop.core.otel import span as otel_span
 from maop.core.routing_decision import (
     RoutingDecisionRecord,
     get_active_span_context,
@@ -540,10 +542,8 @@ def get_load_balancer(algorithm: LBAlgorithm = LBAlgorithm.ADAPTIVE) -> LoadBala
 
 def _set_span_attr(s: Any, key: str, value: Any) -> None:
     """Best-effort ``set_attribute`` on a (possibly no-op) span."""
-    try:
+    with contextlib.suppress(Exception):
         s.set_attribute(key, value)
-    except Exception:
-        pass
 
 
 def _set_lb_span_attrs(
@@ -596,8 +596,8 @@ def _record_lb_decision(
 
     try:
         from maop.core.monitoring import (
-            MAOP_ROUTING_DECISION_TOTAL,
             MAOP_ROUTING_DECISION_DURATION_MS,
+            MAOP_ROUTING_DECISION_TOTAL,
         )
         MAOP_ROUTING_DECISION_TOTAL.inc(labels={"stage": "load_balancer"})
         MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)

@@ -6,11 +6,15 @@ import pytest
 
 from maop.core.error_schema import new_result
 from maop.maop_verify import (
-    VerifyEngine, GateResult,
-    _gate_exit_code, _gate_output, _gate_content_safety,
-    _gate_syntax_check, _gate_lint, _gate_dry_run,
+    GateResult,
+    VerifyEngine,
+    _gate_content_safety,
+    _gate_dry_run,
+    _gate_exit_code,
+    _gate_lint,
+    _gate_output,
+    _gate_syntax_check,
 )
-
 
 # ── Gate function tests ──────────────────────────────────────
 

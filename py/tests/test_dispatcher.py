@@ -5,12 +5,13 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import MagicMock
 
-
 from maop.core.circuit_breaker import CircuitBreaker
 from maop.core.error_schema import new_result
 from maop.delegate.dispatcher import (
-    AgentConfig, Dispatcher,
-    _escape_for_cmd, _escape_for_ps_command,
+    AgentConfig,
+    Dispatcher,
+    _escape_for_cmd,
+    _escape_for_ps_command,
 )
 
 

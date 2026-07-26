@@ -15,7 +15,7 @@ from maop.enterprise.rbac import (
 @pytest.fixture(autouse=True)
 def enterprise_mode():
     """Enable enterprise edition so require_feature(FeatureFlag.RBAC) passes."""
-    from maop.config.edition import set_edition, Edition, reset_edition
+    from maop.config.edition import Edition, reset_edition, set_edition
     set_edition(Edition.ENTERPRISE)
     yield
     reset_edition()

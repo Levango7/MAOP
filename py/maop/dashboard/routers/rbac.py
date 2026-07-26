@@ -19,8 +19,8 @@ from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
 
 from maop.config.edition import FeatureFlag, has_feature
-from maop.dashboard.error_handler import handle_api_errors
 from maop.core.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +147,10 @@ async def list_roles(request: Request) -> dict[str, Any]:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="RBAC not available in this edition",
         )
-    from maop.enterprise.rbac import Role, ROLE_PERMISSIONS  # noqa: F401 (re-exported for router use)
+    from maop.enterprise.rbac import (
+        ROLE_PERMISSIONS,
+        Role,
+    )
     roles_info = []
     for role in Role:
         perms = ROLE_PERMISSIONS.get(role, frozenset())

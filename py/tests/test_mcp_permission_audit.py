@@ -25,8 +25,8 @@ from maop.core.mcp_audit import (
 )
 from maop.core.mcp_hub import (
     MCPHub,
-    MCPServerConfig,
     MCPPermissionDeniedError,
+    MCPServerConfig,
     TransportType,
 )
 from maop.core.mcp_permission import (
@@ -38,7 +38,6 @@ from maop.core.monitoring import (
     MAOP_MCP_CALL_AUDITED_TOTAL,
     MAOP_MCP_CALL_DENIED_TOTAL,
 )
-
 
 # ─────────────────────────────────────────────────────────────────
 # MCPServerConfig permission fields
@@ -768,8 +767,8 @@ class TestMetrics:
 
 # ── Regression tests for security Critical fixes (C-4 user_context) ──
 
-import asyncio
 import inspect
+
 from maop.dashboard.routers import mcp as mcp_router
 
 

@@ -16,7 +16,6 @@ from maop.core.monitoring import (
     StructuredLogger,
 )
 
-
 # ── StructuredLogger ──────────────────────────────────────────────
 
 

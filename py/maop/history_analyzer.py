@@ -207,7 +207,7 @@ class HistoryAnalyzer:
 
             for row in rows:
                 # Create pattern from error type + agent
-                error = row["stderr"] if row["stderr"] else "unknown"
+                error = row["stderr"] or "unknown"
                 error_type = error.split(":")[0][:50]  # First part of error
                 pattern = f"{error_type}:agent={row['agent']}"
 
@@ -362,4 +362,4 @@ class HistoryAnalyzer:
             if driver.total_cost > 1.0:  # $1 threshold
                 recs.append(f"Review {driver.dimension}={driver.dimension_value}: ${driver.total_cost:.2f} total, ${driver.avg_cost_per_call:.4f}/call")
 
-        return recs if recs else ["No critical issues identified in the analysis period"]
+        return recs or ["No critical issues identified in the analysis period"]

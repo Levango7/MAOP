@@ -6,11 +6,10 @@ import time
 
 import pytest
 
-from maop.core.agent_lifecycle import AgentLifecycle, AgentState, AgentLifecycleManager
-from maop.core.semantic_cache import SemanticCache
-from maop.core.hybrid_search import rrf_fuse, HybridSearch
+from maop.core.agent_lifecycle import AgentLifecycle, AgentLifecycleManager, AgentState
+from maop.core.hybrid_search import HybridSearch, rrf_fuse
 from maop.core.pipeline_checkpoint import PipelineCheckpoint
-
+from maop.core.semantic_cache import SemanticCache
 
 # ── P1: Agent Lifecycle ───────────────────────────────────────
 

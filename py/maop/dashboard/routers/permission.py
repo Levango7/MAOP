@@ -8,9 +8,9 @@ from typing import Any
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 
+from maop.core.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.routers.state import MAOP_ROOT
-from maop.core.middleware import require_admin
 
 logger = logging.getLogger(__name__)
 

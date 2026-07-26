@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
+import contextlib
 import shutil
 import tempfile
 from pathlib import Path
 
 import pytest
 
-
 # Keep track of all created dirs so we can clean up at session end.
 _tmp_dirs: list[str] = []
 
 
 @pytest.fixture
-def tmp_path() -> Path:  # noqa: F811 — intentionally override built-in
+def tmp_path() -> Path:
     """Provide a temporary directory that does **not** rely on pytest's
     ``pytest-of-<user>`` base directory.
 
@@ -44,8 +44,6 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Clean up all temp directories created by our ``tmp_path`` override."""
     for d in _tmp_dirs:
-        try:
+        with contextlib.suppress(Exception):
             shutil.rmtree(d, ignore_errors=True)
-        except Exception:
-            pass
     _tmp_dirs.clear()

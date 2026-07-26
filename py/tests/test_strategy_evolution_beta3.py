@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 from maop.agent_strategy_learner import (
     AgentStrategyAdjustment,
     AgentStrategyLearner,
@@ -11,8 +10,8 @@ from maop.agent_strategy_learner import (
     StrategyLearnReport,
 )
 from maop.cache_evolver import (
-    CacheEvolveReport,
     CacheEvolver,
+    CacheEvolveReport,
     CacheStrategyAdjustment,
 )
 from maop.core.cache import LRUCache

@@ -19,7 +19,7 @@ def server_routes():
     if MAOP_ROOT not in sys.path:
         sys.path.insert(0, MAOP_ROOT)
     routes = set()
-    from maop.dashboard.routers import data, control, model, evolve, memory, system
+    from maop.dashboard.routers import control, data, evolve, memory, model, system
     for mod in (data, control, model, evolve, memory, system):
         r = getattr(mod, "router", None)
         if r:

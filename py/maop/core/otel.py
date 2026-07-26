@@ -24,17 +24,18 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _OTELE_AVAILABLE = False
 try:
     from opentelemetry import trace as otel_trace
-    from opentelemetry.trace import SpanKind
-    from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.trace import SpanKind
 
     _OTELE_AVAILABLE = True
 except ImportError:
@@ -98,7 +99,7 @@ def setup_provider() -> None:
     exporter_type = os.getenv("MAOP_OTEL_EXPORTER", "none").lower()
 
     if exporter_type == "console":
-        from opentelemetry.sdk.trace.export import ConsoleSpanExporter, BatchSpanProcessor
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
         provider = TracerProvider(resource=resource)
         provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
     elif exporter_type == "otlp":
@@ -110,13 +111,15 @@ def setup_provider() -> None:
             provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
         except ImportError:
             try:
-                from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter as HTLPSpanExporter
+                from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                    OTLPSpanExporter as HTLPSpanExporter,
+                )
                 from opentelemetry.sdk.trace.export import BatchSpanProcessor
                 provider = TracerProvider(resource=resource)
                 provider.add_span_processor(BatchSpanProcessor(HTLPSpanExporter(endpoint=endpoint)))
             except ImportError:
                 logger.warning("[otel] No OTLP exporter available, using console fallback")
-                from opentelemetry.sdk.trace.export import ConsoleSpanExporter, BatchSpanProcessor
+                from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
                 provider = TracerProvider(resource=resource)
                 provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
     else:
@@ -130,10 +133,10 @@ def setup_provider() -> None:
     # with the metrics extra; if unavailable, logs a warning and
     # continues with traces only.
     try:
+        from opentelemetry import metrics as otel_metrics
+        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
         from opentelemetry.sdk.metrics import MeterProvider as SDKMeterProvider
         from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-        from opentelemetry import metrics as otel_metrics
 
         metric_endpoint = os.getenv("MAOP_OTEL_ENDPOINT", "http://localhost:4317")
         metric_exporter = OTLPMetricExporter(endpoint=metric_endpoint)
@@ -170,7 +173,7 @@ class _NoopSpan:
     def __enter__(self) -> Any:
         return self
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(self, *args: object) -> None:
         pass
 
     def set_attribute(self, *args: Any) -> None:

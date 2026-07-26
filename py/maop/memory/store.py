@@ -22,28 +22,30 @@ import json
 import logging
 import sqlite3
 import uuid
+from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 from maop.core.db_utils import get_db_path
 
 # ── Re-exports from models.py (backward compatibility) ───────
 from maop.memory.models import (  # noqa: F401
+    _FTS5_DDL,
+    _MEMORY_DDL,
+    SYNONYM_MAP,
+    FacetResult,
     MemoryEntry,
-    TraceEntry,
-    TrajectoryStep,
     MemoryStats,
     SearchResult,
-    FacetResult,
-    _new_id,
+    TraceEntry,
+    TrajectoryStep,
     _is_valid_id,
+    _new_id,
     expand_keywords,
-    SYNONYM_MAP,
-    _MEMORY_DDL,
-    _FTS5_DDL,
 )
+
 # ── Search logic from search.py ──────────────────────────────
 from maop.memory.search import SearchMixin
 
@@ -346,7 +348,7 @@ class MemoryStore(SearchMixin):
                             (",".join(agent_list), ts, trace_id),
                         )
                     else:
-                        agents_str = agent if agent else ""
+                        agents_str = agent or ""
                         conn.execute(
                             """INSERT INTO memory_traces
                                (trace_id, parent_trace_id, session_id, task,
@@ -357,7 +359,7 @@ class MemoryStore(SearchMixin):
                         )
                 else:
                     trace_id = uuid.uuid4().hex
-                    agents_str = agent if agent else ""
+                    agents_str = agent or ""
                     conn.execute(
                         """INSERT INTO memory_traces
                            (trace_id, parent_trace_id, session_id, task,

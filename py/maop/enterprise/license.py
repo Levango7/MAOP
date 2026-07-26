@@ -42,12 +42,12 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "LicenseInfo",
-    "LicenseValidator",
     "LicenseError",
     "LicenseExpiredError",
-    "LicenseSignatureError",
     "LicenseFormatError",
+    "LicenseInfo",
+    "LicenseSignatureError",
+    "LicenseValidator",
 ]
 
 # Grace period after expiry before hard degradation (days)

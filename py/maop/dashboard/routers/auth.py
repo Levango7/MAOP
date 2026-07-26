@@ -7,8 +7,6 @@ Uses PBKDF2-HMAC-SHA256 for password hashing, JWT for tokens.
 
 from __future__ import annotations
 
-from typing import Any
-
 import asyncio
 import base64
 import hashlib
@@ -18,6 +16,7 @@ import logging
 import os
 import threading
 import time
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ from .state import MAOP_ROOT
 router = APIRouter()
 
 # ── Auth config ────────────────────────────────────────────────────
-from maop.core.auth import AuthManager, APIKeyStore, AuthConfig, JWTConfig, load_jwt_secret
+from maop.core.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig, load_jwt_secret
 from maop.core.db_utils import sqlite_connect
 
 _env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
@@ -45,11 +44,7 @@ def _hash_password(password: str) -> str:
 
     salt = os.urandom(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, _AUTH_PBKDF2_ITERATIONS)
-    return "pbkdf2_sha256${}${}${}".format(
-        _AUTH_PBKDF2_ITERATIONS,
-        base64.b64encode(salt).decode(),
-        base64.b64encode(digest).decode(),
-    )
+    return f"pbkdf2_sha256${_AUTH_PBKDF2_ITERATIONS}${base64.b64encode(salt).decode()}${base64.b64encode(digest).decode()}"
 
 
 def _verify_password(password: str, stored_hash: str) -> bool:

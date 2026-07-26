@@ -47,7 +47,8 @@ if "pydantic_settings" in sys.modules:
 # "Task was destroyed but it is pending!". This fixture ensures
 # shutdown_webhook() runs once at session end.
 
-import pytest  # noqa: E402
+import pytest
+
 
 @pytest.fixture(scope="session", autouse=True)
 def _cleanup_webhook_session():

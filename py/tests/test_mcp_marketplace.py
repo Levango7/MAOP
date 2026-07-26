@@ -20,12 +20,11 @@ import yaml
 
 from maop.core.mcp_hub import MCPServerConfig, TransportType
 from maop.core.mcp_marketplace import (
-    MCPMarketplace,
     MarketplaceConfig,
     MarketplaceRegistry,
     MarketplaceServer,
+    MCPMarketplace,
 )
-
 
 # ── Helpers ───────────────────────────────────────────────────
 
@@ -520,9 +519,8 @@ class TestMCPMarketplaceInstall:
             mp, "_fetch_url", side_effect=_make_fetch_side_effect({
                 "https://r.example.com": _catalog_bytes([{"name": "other"}]),
             }),
-        ):
-            with pytest.raises(ValueError, match="not found"):
-                mp.install("nonexistent")
+        ), pytest.raises(ValueError, match="not found"):
+            mp.install("nonexistent")
 
     def test_install_transport_type_sse(self, mp: MCPMarketplace):
         mp.add_registry("official", "https://r.example.com", trusted=True)
@@ -630,9 +628,8 @@ class TestMarketplaceSecurity:
             mp, "_fetch_url", side_effect=_make_fetch_side_effect({
                 "https://c.example.com": catalog,
             }),
-        ):
-            with pytest.raises(ValueError, match="untrusted"):
-                mp.install("risky")
+        ), pytest.raises(ValueError, match="untrusted"):
+            mp.install("risky")
         # Nothing should be written.
         assert mp.list_installed() == []
 
@@ -689,9 +686,8 @@ class TestMarketplaceSecurity:
                 "https://r.example.com": catalog,
                 "https://r.example.com/d/t.tar.gz": payload,
             }),
-        ):
-            with pytest.raises(ValueError, match="Checksum mismatch"):
-                mp.install("tampered")
+        ), pytest.raises(ValueError, match="Checksum mismatch"):
+            mp.install("tampered")
         assert mp.list_installed() == []
 
     def test_checksum_case_insensitive(self, mp: MCPMarketplace):
@@ -745,19 +741,17 @@ class TestMarketplaceSecurity:
                 "https://r.example.com": catalog,
                 "https://r.example.com/d/fail.tar.gz": urllib.error.URLError("net error"),
             }),
-        ):
-            with pytest.raises(ValueError, match="Failed to download"):
-                mp.install("dl-fail")
+        ), pytest.raises(ValueError, match="Failed to download"):
+            mp.install("dl-fail")
         assert mp.list_installed() == []
 
     def test_network_timeout_skips_registry(self, mp: MCPMarketplace):
         """A URLError (e.g. timeout) on one registry doesn't abort the aggregate fetch."""
-        import socket
         mp.add_registry("slow", "https://slow.example.com")
         mp.add_registry("fast", "https://fast.example.com", trusted=True)
         with patch.object(
             mp, "_fetch_url", side_effect=_make_fetch_side_effect({
-                "https://slow.example.com": socket.timeout("timed out"),
+                "https://slow.example.com": TimeoutError("timed out"),
                 "https://fast.example.com": _catalog_bytes([{"name": "ok"}]),
             }),
         ):
@@ -781,7 +775,6 @@ class TestMarketplaceSecurity:
 # ── Regression tests for security Critical fixes (C-2 SSRF) ──
 
 import pytest
-from maop.core.mcp_marketplace import MCPMarketplace
 
 
 class TestSSRFProtection:

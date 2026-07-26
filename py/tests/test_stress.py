@@ -148,7 +148,7 @@ class TestCircuitBreakerConcurrency:
     """100 concurrent calls with 50% failure rate — verify state transitions."""
 
     def test_concurrent_mixed_success_failure(self, tmp_path):
-        from maop.core.circuit_breaker import CircuitBreaker, BreakerState
+        from maop.core.circuit_breaker import BreakerState, CircuitBreaker
 
         db_path = tmp_path / "cb_stress.db"
         cb = CircuitBreaker(path=db_path)
@@ -187,7 +187,7 @@ class TestCircuitBreakerConcurrency:
 
     def test_concurrent_failures_trigger_open(self, tmp_path):
         """Enough concurrent failures must trip the breaker to OPEN."""
-        from maop.core.circuit_breaker import CircuitBreaker, BreakerState
+        from maop.core.circuit_breaker import BreakerState, CircuitBreaker
 
         db_path = tmp_path / "cb_open.db"
         cb = CircuitBreaker(path=db_path)
@@ -220,7 +220,7 @@ class TestCircuitBreakerConcurrency:
 
     def test_state_transitions_no_corruption(self, tmp_path):
         """Rapid open→half_open→closed transitions must not corrupt state."""
-        from maop.core.circuit_breaker import CircuitBreaker, BreakerState
+        from maop.core.circuit_breaker import BreakerState, CircuitBreaker
 
         db_path = tmp_path / "cb_transitions.db"
         cb = CircuitBreaker(path=db_path)
@@ -234,7 +234,7 @@ class TestCircuitBreakerConcurrency:
         def worker():
             try:
                 barrier.wait(timeout=5)
-                for i in range(iterations):
+                for _i in range(iterations):
                     cb.record_failure("codex")
                     entry = cb.get("codex")
                     if entry and entry.state == BreakerState.OPEN:
@@ -530,6 +530,7 @@ class TestDashboardHealthStress:
         monkeypatch.setenv("MAOP_AUTH", "0")
 
         from fastapi.testclient import TestClient
+
         from maop.dashboard import server
 
         with TestClient(server.app) as client:

@@ -11,7 +11,7 @@ import asyncio
 import logging
 import re
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from maop.concurrency import SSEStreamer, TokenStreamer
 

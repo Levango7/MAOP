@@ -13,7 +13,6 @@ hook_calls: list[str] = []
 def top_level_hook(event: str, data: dict) -> None:
     """A reloadable hook: callable via 'tests.test_hook_manager_helpers.top_level_hook'."""
     hook_calls.append(event)
-    return None
 
 
 def top_level_hook_deny(event: str, data: dict) -> dict:

@@ -25,6 +25,7 @@ DASH_DIR = MAOP_ROOT / "dashboard"
 
 # ── Data Bridge ────────────────────────────────────────────────────
 from maop.dashboard.data_bridge import DataBridge
+
 _bridge: DataBridge | None = None
 
 def get_bridge() -> DataBridge:

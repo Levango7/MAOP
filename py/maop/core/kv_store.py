@@ -17,6 +17,7 @@ Features:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import time
@@ -101,10 +102,8 @@ class KVStore:
         self._pool.close_all()
 
     def __del__(self) -> None:
-        try:
+        with contextlib.suppress(Exception):
             self.close()
-        except Exception:
-            pass
 
     def _now(self) -> float:
         return time.time()

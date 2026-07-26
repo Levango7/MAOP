@@ -14,9 +14,7 @@ import logging
 import os
 from unittest import mock
 
-
 from maop.core.monitoring import JsonLogFormatter, setup_json_logging
-
 
 # ── Helpers ────────────────────────────────────────────────────────
 

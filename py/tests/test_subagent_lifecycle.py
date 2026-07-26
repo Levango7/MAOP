@@ -14,11 +14,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from maop.core.subagent_lifecycle import (
-    SubAgentManager,
     AgentConfig,
     AgentResult,
-    AgentStatus,
     AgentRole,
+    AgentStatus,
+    SubAgentManager,
     TranscriptEntry,
 )
 

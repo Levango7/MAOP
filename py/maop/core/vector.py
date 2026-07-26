@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from pydantic import BaseModel, Field
+
 from maop.core.db_utils import sqlite_connect
 
 logger = logging.getLogger(__name__)

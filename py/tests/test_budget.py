@@ -12,7 +12,6 @@ import pytest
 from maop.model.budget import BudgetGuard
 from maop.model.schema import BudgetConfig
 
-
 # ── Fixtures ──────────────────────────────────────────────────
 
 @pytest.fixture

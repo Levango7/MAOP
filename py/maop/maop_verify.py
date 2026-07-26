@@ -13,7 +13,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from maop.core.error_schema import MaopResult
-from maop.core.state_classifier import TaskStateClassifier, ClassificationResult
+from maop.core.state_classifier import ClassificationResult, TaskStateClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -194,9 +194,7 @@ def _gate_dry_run(plan: dict, result: MaopResult | None) -> GateResult:
     has_structured_signal = False
     structured = result.structured_output
     if isinstance(structured, dict):
-        if structured.get("dry_run"):
-            has_structured_signal = True
-        elif "dry_run_artifacts" in structured and isinstance(
+        if structured.get("dry_run") or "dry_run_artifacts" in structured and isinstance(
             structured["dry_run_artifacts"], list
         ) and structured["dry_run_artifacts"]:
             has_structured_signal = True

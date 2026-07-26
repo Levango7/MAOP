@@ -47,6 +47,7 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import time as _time
@@ -470,10 +471,8 @@ class _WebSocketTransport:
 
     async def stop(self) -> None:
         if self._ws is not None:
-            try:
+            with contextlib.suppress(Exception):
                 await self._ws.close()
-            except Exception:
-                pass
             self._ws = None
 
     @property
@@ -655,8 +654,7 @@ class _StreamableHttpTransport:
             if line.startswith("data:"):
                 # Per SSE spec: strip a single leading space after the colon.
                 payload = line[5:]
-                if payload.startswith(" "):
-                    payload = payload[1:]
+                payload = payload.removeprefix(" ")
                 data_buf.append(payload)
             # Lines starting with ":" are comments; "event:" / "id:" /
             # "retry:" are SSE control fields we don't need for JSON-RPC.
@@ -768,7 +766,7 @@ class MCPHub:
         self._init_db()
         self._transports: dict[
             str,
-            "_StdioTransport | _SSETransport | _WebSocketTransport | _StreamableHttpTransport",
+            _StdioTransport | _SSETransport | _WebSocketTransport | _StreamableHttpTransport,
         ] = {}
         self._configs: dict[str, MCPServerConfig] = {}
         # δ-3: optional permission + audit hooks. Kept as attributes so
@@ -807,7 +805,7 @@ class MCPHub:
             server_id = uuid.uuid4().hex[:16]
             now = _time.time()
 
-            transport: "_StdioTransport | _SSETransport | _WebSocketTransport | _StreamableHttpTransport"
+            transport: _StdioTransport | _SSETransport | _WebSocketTransport | _StreamableHttpTransport
             if config.transport == TransportType.STDIO:
                 transport = _StdioTransport(config)
             elif config.transport == TransportType.SSE:

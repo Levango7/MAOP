@@ -31,7 +31,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.config.edition import require_feature, FeatureFlag
+from maop.config.edition import FeatureFlag, require_feature
 from maop.core.backends_redis import RedisDistributedLock
 
 logger = logging.getLogger(__name__)
@@ -276,10 +276,7 @@ class HAManager:
             self._leader_id = ""
             self._fencing_token = 0
         # Redis 锁释放在 _state_lock 外执行
-        if redis_lock is not None:
-            released = redis_lock.release()
-        else:
-            released = True
+        released = redis_lock.release() if redis_lock is not None else True
         logger.info("[ha] Released leadership")
         return released
 

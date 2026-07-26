@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from maop.core.state_classifier import (
     ClassificationResult,
     TaskState,

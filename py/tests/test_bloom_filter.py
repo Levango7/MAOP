@@ -3,7 +3,6 @@
 
 from maop.core.bloom_filter import BloomFilter, _BitArray, _hash_i, _mmh3_hash32
 
-
 # ── BitArray tests ─────────────────────────────────────────────
 
 class TestBitArray:

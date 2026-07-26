@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-import time
-import tempfile
+import contextlib
 import shutil
+import tempfile
+import time
 from pathlib import Path
 
 import pytest
 
 from maop.core.message_queue import (
-    MessagePriority, MessageQueue,
+    MessagePriority,
+    MessageQueue,
 )
 
 
@@ -21,10 +23,8 @@ def mq() -> MessageQueue:
     db_path = Path(tmp) / "queue.db"
     queue = MessageQueue(db_path=db_path)
     yield queue
-    try:
+    with contextlib.suppress(Exception):
         shutil.rmtree(tmp, ignore_errors=True)
-    except Exception:
-        pass
 
 
 class TestEnqueueDequeue:

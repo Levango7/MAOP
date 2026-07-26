@@ -15,8 +15,7 @@ import time
 import pytest
 
 from maop.config.loader import AgentDef, MaopConfig, RouteEntry
-from maop.core.route_scorer import RouteScorer, _COOLDOWN_SEC
-
+from maop.core.route_scorer import _COOLDOWN_SEC, RouteScorer
 
 # ── Fixtures ──────────────────────────────────────────────────
 

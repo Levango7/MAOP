@@ -4,18 +4,23 @@ from __future__ import annotations
 
 import json
 
-
-from maop.core.knowledge_extractor import (
-    KnowledgeExtractor, Entity, Relation, Fact,
-)
-from maop.core.knowledge_graph import KnowledgeGraph
 from maop.core.config_mutator import ConfigMutator, MutationResult
 from maop.core.evolution_strategies import (
-    StrategyEngine, BalancedStrategy, ConservativeStrategy,
-    AggressiveStrategy, CostAwareStrategy, StrategyConfig,
+    AggressiveStrategy,
+    BalancedStrategy,
+    ConservativeStrategy,
+    CostAwareStrategy,
+    StrategyConfig,
+    StrategyEngine,
 )
-from maop.memory.vector_search import VectorSearch, VectorResult
-
+from maop.core.knowledge_extractor import (
+    Entity,
+    Fact,
+    KnowledgeExtractor,
+    Relation,
+)
+from maop.core.knowledge_graph import KnowledgeGraph
+from maop.memory.vector_search import VectorResult, VectorSearch
 
 # ═══════════════════════════════════════════════════════════════════
 # B1: Knowledge Extractor

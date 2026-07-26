@@ -16,9 +16,9 @@ This dual-path design follows ADR-013 ("LLM direct primary + CLI fallback").
 
 from __future__ import annotations
 
-import re
 import json
 import logging
+import re
 from typing import Any
 
 from maop.loop_models import RequirementAnalysis
@@ -301,8 +301,7 @@ def _parse_llm_extraction(content: str, task: str) -> RequirementAnalysis | None
         first_newline = text.find("\n")
         if first_newline != -1:
             text = text[first_newline + 1:]
-        if text.endswith("```"):
-            text = text[:-3]
+        text = text.removesuffix("```")
         text = text.strip()
     try:
         data: Any = json.loads(text)

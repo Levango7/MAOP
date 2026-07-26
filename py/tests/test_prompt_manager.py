@@ -13,7 +13,6 @@ from maop.prompt_manager import (
     RenderResult,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────
 
 @pytest.fixture

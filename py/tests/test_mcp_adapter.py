@@ -17,7 +17,6 @@ import pytest
 from maop.core.agent_bridge import AgentAdapter
 from maop.core.mcp_adapter import MCPAdapter, _BackgroundLoop
 
-
 # ── Helpers ──────────────────────────────────────────────────────
 
 

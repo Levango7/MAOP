@@ -5,13 +5,12 @@ import asyncio
 import pytest
 
 from maop.core.worker_pool import (
+    PoolStats,
     WorkerPool,
     WorkerStatus,
     WorkerTask,
-    PoolStats,
     get_worker_pool,
 )
-
 
 # ── WorkerPool lifecycle ───────────────────────────────────────
 

@@ -20,11 +20,11 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Request
-
 from pydantic import BaseModel
 
-from .error_handler import handle_api_errors
 from maop.core.middleware import require_admin
+
+from .error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 

@@ -135,10 +135,7 @@ class CapabilityMatcher:
         matched = agent_caps & req_set
         missing = req_set - agent_caps
 
-        if req_set:
-            cap_score = len(matched) / len(req_set)
-        else:
-            cap_score = 1.0
+        cap_score = len(matched) / len(req_set) if req_set else 1.0
 
         health_score = self._health_score(agent)
         latency_score = self._latency_score(agent)
