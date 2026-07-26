@@ -279,7 +279,7 @@ class DataProxy:
                     "name": a.get("agent", ""),
                     "healthy": a.get("circuit_breaker", "closed") == "closed",
                     "queue": queue_depth,
-                    "load": min(100, max(0, int(round(100 - a.get("success_rate", 100.0))))),
+                    "load": min(100, max(0, round(100 - a.get("success_rate", 100.0)))),
                 }
                 for a in agent_rows
             ]

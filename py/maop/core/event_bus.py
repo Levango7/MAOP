@@ -1,4 +1,4 @@
-﻿"""MAOP Event Bus — decoupled pub/sub with ACK, retry, and dead-letter support.
+"""MAOP Event Bus — decoupled pub/sub with ACK, retry, and dead-letter support.
 
 Replaces direct function calls between modules with async event dispatch.
 Supports sync and async subscribers, wildcard topics, error isolation,
@@ -17,7 +17,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class DeadLetterEntry:
 
 SyncHandler = Callable[[Event], None]
 AsyncHandler = Callable[[Event], Awaitable[None]]
-Handler = Union[SyncHandler, AsyncHandler]
+Handler = SyncHandler | AsyncHandler
 
 
 @dataclass

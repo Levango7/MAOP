@@ -41,6 +41,7 @@ from urllib.parse import urlparse
 
 import httpx
 from pydantic import BaseModel, Field, field_validator
+from typing_extensions import Self
 
 from maop.config.edition import FeatureFlag, require_feature
 
@@ -218,7 +219,7 @@ class N8nClient:
             self._client.close()
             self._client = None
 
-    def __enter__(self) -> N8nClient:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:

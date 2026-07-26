@@ -149,7 +149,6 @@ def detect_edition() -> Edition:
       importable = enterprise). If a key is present but invalid,
       edition degrades to PERSONAL with an error log.
     """
-    global _current_edition
     if _current_edition is not None:
         return _current_edition
 
@@ -206,10 +205,10 @@ def _detect_with_license_check(requested: Edition) -> Edition:
         # we only get here when enterprise package is installed, but handle gracefully
         logger.warning("[edition] License module not available, honoring package detection")
         return Edition.ENTERPRISE
-    except Exception as exc:
+    except Exception:
         logger.exception(
-            "[edition] Unexpected error during license validation: %s. "
-            "Degrading to PERSONAL.", exc,
+            "[edition] Unexpected error during license validation. "
+            "Degrading to PERSONAL.",
         )
         record_degradation("license", "enterprise", "personal", "license_error")
         return Edition.PERSONAL

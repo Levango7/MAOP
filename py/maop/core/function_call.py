@@ -210,7 +210,7 @@ class FunctionCallBridge:
         hub = self._get_mcp_registry()
         if hub is None:
             return None
-        server_id, tool_name = hub.find_tool(call.name)
+        server_id, _tool_name = hub.find_tool(call.name)
         if server_id is None:
             return None  # tool not registered in MCP, fall through to ToolManager
         # call_tool_by_name checks connection internally and returns ToolResult

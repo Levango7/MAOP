@@ -1,4 +1,4 @@
-﻿"""Unit tests for MAOP.core.db_utils module."""
+"""Unit tests for MAOP.core.db_utils module."""
 
 from __future__ import annotations
 
@@ -103,5 +103,5 @@ class TestSqliteConnect:
         db = tmp_path / "test.db"
         with sqlite_connect(db) as conn:
             conn.execute("CREATE TABLE t (id INTEGER)")
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             conn.execute("SELECT 1")

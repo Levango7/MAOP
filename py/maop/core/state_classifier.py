@@ -1,4 +1,4 @@
-﻿"""Task State Classifier — classify verification results into actionable states.
+"""Task State Classifier — classify verification results into actionable states.
 
 Inspired by Claude Code's background-task state taxonomy. Instead of a binary
 passed/not-passed, every verify result gets one of four states:
@@ -220,9 +220,8 @@ class TaskStateClassifier:
         """Find the highest-confidence pattern that matches text."""
         best: tuple[str, float] | None = None
         for pattern, score in patterns:
-            if re.search(pattern, text, re.IGNORECASE):
-                if best is None or score > best[1]:
-                    best = (pattern, score)
+            if re.search(pattern, text, re.IGNORECASE) and (best is None or score > best[1]):
+                best = (pattern, score)
         return best
 
     @staticmethod

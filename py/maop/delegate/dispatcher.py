@@ -79,9 +79,9 @@ def _get_load_balancer():
         return get_load_balancer()
     except ImportError:
         return None
-    except Exception as exc:
+    except Exception:
         # P2-6 fix: upgrade to error — runtime init failures should be visible
-        logger.exception("Failed to load driver LoadBalancer: %s", exc)
+        logger.exception("Failed to load driver LoadBalancer")
         return None
 
 def _get_runtime(config=None):
@@ -93,8 +93,8 @@ def _get_runtime(config=None):
         return create_runtime(RuntimeConfig(type=RuntimeType.LOCAL))
     except ImportError:
         return None
-    except Exception as exc:
-        logger.exception("Failed to load driver Runtime: %s", exc)
+    except Exception:
+        logger.exception("Failed to load driver Runtime")
         return None
 
 def _get_sandbox_manager(root_dir=None):
@@ -104,8 +104,8 @@ def _get_sandbox_manager(root_dir=None):
         return SandboxManager(root_dir=root_dir)
     except ImportError:
         return None
-    except Exception as exc:
-        logger.exception("Failed to load driver SandboxManager: %s", exc)
+    except Exception:
+        logger.exception("Failed to load driver SandboxManager")
         return None
 
 def _get_subagent_manager(root_dir=None):
@@ -115,8 +115,8 @@ def _get_subagent_manager(root_dir=None):
         return SubagentManager(root_dir=root_dir)
     except ImportError:
         return None
-    except Exception as exc:
-        logger.exception("Failed to load driver SubagentManager: %s", exc)
+    except Exception:
+        logger.exception("Failed to load driver SubagentManager")
         return None
 
 def _get_agent_registry(root_dir=None):
@@ -126,8 +126,8 @@ def _get_agent_registry(root_dir=None):
         return AgentRegistry(root_dir=root_dir or "data")
     except ImportError:
         return None
-    except Exception as exc:
-        logger.exception("Failed to load driver AgentRegistry: %s", exc)
+    except Exception:
+        logger.exception("Failed to load driver AgentRegistry")
         return None
 
 def _get_capability_matcher(root_dir=None):
@@ -139,8 +139,8 @@ def _get_capability_matcher(root_dir=None):
         return CapabilityMatcher(registry=registry)
     except ImportError:
         return None
-    except Exception as exc:
-        logger.exception("Failed to load driver CapabilityMatcher: %s", exc)
+    except Exception:
+        logger.exception("Failed to load driver CapabilityMatcher")
         return None
 
 

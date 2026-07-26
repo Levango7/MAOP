@@ -1,4 +1,4 @@
-﻿"""Comprehensive tests for MAOP.model.schema — Pydantic models & enums."""
+"""Comprehensive tests for MAOP.model.schema — Pydantic models & enums."""
 
 from __future__ import annotations
 
@@ -292,5 +292,5 @@ class TestEffectiveModel:
         assert m2.fallback_chain == []
 
     def test_missing_required_field(self):
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             EffectiveModel(provider="openai")  # missing model_name

@@ -1,4 +1,4 @@
-﻿"""MAOP Agent Scanner — Auto-discover agent CLIs in the local environment.
+"""MAOP Agent Scanner — Auto-discover agent CLIs in the local environment.
 
 Scans $PATH (and common install locations) for known agent CLI binaries,
 reports their availability, version, and capabilities.
@@ -239,6 +239,7 @@ class AgentScanner:
                 [cli_path] + version_args,
                 capture_output=True, text=True, timeout=10,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                check=True,
             )
             output = (result.stdout or result.stderr or "").strip()
             first_line = output.split("\n")[0].strip() if output else ""

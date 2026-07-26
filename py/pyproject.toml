@@ -66,7 +66,10 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-ignore = ["E402"]
+# BLE001: MAOP 高容错设计, except Exception 是有意的防御性兜底
+# S110: 非关键路径(metrics/span)的静默兜底, 关键路径已在 R7 阶段改为 logger
+# E402: 模块导入顺序灵活(条件导入、副作用模块)
+ignore = ["E402", "BLE001", "S110"]
 
 [tool.mypy]
 python_version = "3.10"

@@ -1,4 +1,4 @@
-﻿"""MAOP Cache — LRU + TTL in-memory cache with statistics and three-protection.
+"""MAOP Cache — LRU + TTL in-memory cache with statistics and three-protection.
 
 Provides a thread-safe, generic cache for:
   - ConfigLoader: avoid re-parsing YAML on every access
@@ -662,10 +662,7 @@ class CacheGuard:
         ttl: float | None,
     ) -> Any:
         """Load a value and store it in cache."""
-        try:
-            value = loader()
-        except Exception:
-            raise
+        value = loader()
 
         effective_ttl = ttl
         if ttl is not None and self._config.enable_jitter:

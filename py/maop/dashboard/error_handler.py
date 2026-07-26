@@ -115,9 +115,9 @@ def handle_api_errors(
                     code=f"HTTP_{exc.status_code}",
                     status_code=exc.status_code,
                 )
-            except Exception as exc:
+            except Exception:
                 op = op_name or fn.__name__
-                logger.exception("%s failed: %s", op, exc)
+                logger.exception("%s failed", op)
                 if error_value is not None:
                     return error_value
                 return _error_response(

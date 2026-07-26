@@ -327,10 +327,9 @@ def _rule_based_semantic_analyze(task: str, sub_tasks: list[SubTask]) -> tuple[l
         for dep_hint in dep_matches:
             dep_hint_lower = dep_hint.strip().lower()
             for other in sub_tasks:
-                if other.id != st.id and dep_hint_lower in other.description.lower():
-                    if (other.id, st.id) not in edges:
-                        edges.append((other.id, st.id))
-                        st.dependencies.append(other.id)
+                if other.id != st.id and dep_hint_lower in other.description.lower() and (other.id, st.id) not in edges:
+                    edges.append((other.id, st.id))
+                    st.dependencies.append(other.id)
 
     dag = DependencyDAG(
         nodes=[st.id for st in sub_tasks],
@@ -485,9 +484,8 @@ def _parse_llm_decomp(
     # Re-derive per-node dependency list from the edge list
     deps_by_node: dict[str, list[str]] = {st.id: [] for st in sub_tasks}
     for src, dst in edges:
-        if src in deps_by_node and dst in deps_by_node and src != dst:
-            if src not in deps_by_node[dst]:
-                deps_by_node[dst].append(src)
+        if src in deps_by_node and dst in deps_by_node and src != dst and src not in deps_by_node[dst]:
+            deps_by_node[dst].append(src)
     for st in sub_tasks:
         st.dependencies = deps_by_node.get(st.id, [])
 

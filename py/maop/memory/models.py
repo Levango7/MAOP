@@ -1,4 +1,4 @@
-﻿"""MAOP Memory Models — Pydantic models, helpers, and DDL for the memory store.
+"""MAOP Memory Models — Pydantic models, helpers, and DDL for the memory store.
 
 Extracted from store.py for single-responsibility separation.
 All symbols are re-exported from store.py for backward compatibility.
@@ -18,7 +18,7 @@ def _new_id() -> str:
     import random
     import string
     rand = "".join(random.choices(string.ascii_letters, k=6))
-    return f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{rand}"
+    return f"{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{rand}"
 
 
 # ── Models ────────────────────────────────────────────────────

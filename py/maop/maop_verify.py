@@ -193,11 +193,13 @@ def _gate_dry_run(plan: dict, result: MaopResult | None) -> GateResult:
 
     has_structured_signal = False
     structured = result.structured_output
-    if isinstance(structured, dict):
-        if structured.get("dry_run") or "dry_run_artifacts" in structured and isinstance(
-            structured["dry_run_artifacts"], list
-        ) and structured["dry_run_artifacts"]:
-            has_structured_signal = True
+    if isinstance(structured, dict) and (
+        structured.get("dry_run")
+        or "dry_run_artifacts" in structured
+        and isinstance(structured["dry_run_artifacts"], list)
+        and structured["dry_run_artifacts"]
+    ):
+        has_structured_signal = True
 
     if not (has_stdout_signal or has_structured_signal):
         return GateResult(

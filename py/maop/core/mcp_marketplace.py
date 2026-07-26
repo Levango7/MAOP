@@ -499,13 +499,12 @@ class MCPMarketplace:
         server, registry = found
 
         # Security gate: untrusted + no checksum + no opt-in → refuse.
-        if not registry.trusted:
-            if verify_checksum and server.checksum is None and not confirm_untrusted:
-                raise ValueError(
-                    f"Server '{name}' is from untrusted registry '{registry.name}' "
-                    f"and has no SHA-256 checksum. Pass confirm_untrusted=True to "
-                    f"install anyway, or install from a trusted registry."
-                )
+        if not registry.trusted and verify_checksum and server.checksum is None and not confirm_untrusted:
+            raise ValueError(
+                f"Server '{name}' is from untrusted registry '{registry.name}' "
+                f"and has no SHA-256 checksum. Pass confirm_untrusted=True to "
+                f"install anyway, or install from a trusted registry."
+            )
 
         # Checksum verification (only when a checksum is present and requested).
         if verify_checksum and server.checksum is not None and server.download_url:

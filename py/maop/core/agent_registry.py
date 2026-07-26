@@ -1,4 +1,4 @@
-﻿"""MAOP Agent Registry — Unified agent registration, health probes, and connectivity.
+"""MAOP Agent Registry — Unified agent registration, health probes, and connectivity.
 
 Builds on AgentScanner for discovery, adds:
   - Health probes (ping CLI with --version or --help)
@@ -243,7 +243,7 @@ class AgentRegistry:
 
         start = time.monotonic()
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: PLW1510
                 [agent.cli_path, "--version"],
                 capture_output=True, text=True, timeout=10,
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,

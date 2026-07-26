@@ -108,7 +108,7 @@ class FakeRedis:
             self._streams[stream] = []
         key = (stream, group)
         if key in self._groups:
-            raise Exception("BUSYGROUP Consumer Group name already exists")
+            raise RuntimeError("BUSYGROUP Consumer Group name already exists")
         self._groups.add(key)
         self._pending[key] = {}
 

@@ -96,7 +96,7 @@ class TestCmdStart:
         }):
             cli.cmd_start(port=8080, host="localhost")
             mock_uvicorn.run.assert_called_once()
-            args, kwargs = mock_uvicorn.run.call_args
+            _args, kwargs = mock_uvicorn.run.call_args
             assert kwargs["host"] == "localhost"
             assert kwargs["port"] == 8080
 

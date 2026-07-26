@@ -355,8 +355,7 @@ def _topological_sort(steps: list[Any]) -> list[list[int]]:
                 level.append(i)
         if not level:
             remaining = [i for i in range(len(steps)) if str(i) not in completed]
-            for i in remaining:
-                level.append(i)
+            level = remaining.copy()
             if not level:
                 break
         for i in level:

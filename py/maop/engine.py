@@ -345,13 +345,12 @@ class Engine:
         # Check dependencies
         for dep_id in step.depends_on:
             dep_result = results.get(dep_id)
-            if dep_result and dep_result.status == StepStatus.FAILED:
-                if step.on_failure == "skip" or step.type == StepType.TERMINAL:
-                    return StepResult(
-                        id=step.id, status=StepStatus.SKIPPED,
-                        error=f"Dependency {dep_id} failed",
-                        agent=step.agent,
-                    )
+            if dep_result and dep_result.status == StepStatus.FAILED and (step.on_failure == "skip" or step.type == StepType.TERMINAL):
+                return StepResult(
+                    id=step.id, status=StepStatus.SKIPPED,
+                    error=f"Dependency {dep_id} failed",
+                    agent=step.agent,
+                )
 
         # Resolve templates in task
         resolved_task = _resolve_template(step.task, context)

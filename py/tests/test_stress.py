@@ -438,8 +438,8 @@ class TestMessageQueueConcurrency:
         assert not produce_errors, f"Producer errors: {produce_errors}"
         assert not consume_errors, f"Consumer errors: {consume_errors}"
 
-        # Verify no duplicates (set ensures uniqueness)
-        assert len(consumed_ids) == len(consumed_ids), "Duplicate detection failed"
+        # Verify no duplicates (set ensures uniqueness); sanity-check count
+        assert len(consumed_ids) <= total_messages, "Duplicate detection failed"
 
         # Drain any remaining messages. Require 2 consecutive None results
         # instead of 1 so a transient SQLite "database is locked" error in

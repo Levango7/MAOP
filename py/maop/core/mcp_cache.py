@@ -224,7 +224,7 @@ class MCPCache:
             else:
                 # Evict LRU when at capacity.
                 while len(self._store) >= self._max_entries:
-                    evicted_key, _ = self._store.popitem(last=False)
+                    _evicted_key, _ = self._store.popitem(last=False)
                     self._evictions += 1
                     self._record_eviction()
 

@@ -78,9 +78,9 @@ class TestMAOPSettings:
 
     def test_port_validation(self):
         from maop.config.settings import MAOPSettings
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             MAOPSettings(dash_port=0)
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             MAOPSettings(dash_port=70000)
 
 

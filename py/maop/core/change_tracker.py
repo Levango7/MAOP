@@ -208,7 +208,8 @@ class ChangeTracker:
                             shutil.copy2(fpath, backup_path)
                         file_count += 1
                         total_size += fsize
-                    except Exception:
+                    except Exception as exc:
+                        logger.debug("[change_tracker] Skip file during snapshot: %s", exc)
                         continue
             conn.execute(
                 "UPDATE snapshots SET file_count=?, total_size=? WHERE id=?",

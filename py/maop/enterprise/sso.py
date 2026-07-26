@@ -230,7 +230,7 @@ class SSOManager:
             ) from exc
 
         if not isinstance(parsed, dict):
-            raise RuntimeError(
+            raise TypeError(
                 f"SSO token endpoint returned non-object JSON: {type(parsed).__name__}"
             )
         if "error" in parsed:

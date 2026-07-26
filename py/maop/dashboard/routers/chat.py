@@ -17,7 +17,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, File, Request, UploadFile
+from fastapi import APIRouter, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -206,7 +206,7 @@ async def memory_stats() -> dict[str, Any]:
 @handle_api_errors("image upload")
 async def upload_image(
     session_id: str = "",
-    file: UploadFile | None = File(None),
+    file: UploadFile | None = None,
     request: Request = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """Upload an image for multimodal chat."""

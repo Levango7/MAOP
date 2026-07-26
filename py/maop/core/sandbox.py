@@ -144,7 +144,7 @@ class SandboxManager:
         exec_dir = Path(work_dir) if work_dir else Path(sb.path)
         exec_dir.mkdir(parents=True, exist_ok=True)
 
-        log_file = exec_dir / f"sandbox-run-{datetime.now().strftime('%H%M%S')}.log"
+        log_file = exec_dir / f"sandbox-run-{datetime.now(timezone.utc).strftime('%H%M%S')}.log"
         start = time.monotonic()
 
         try:
@@ -167,7 +167,7 @@ class SandboxManager:
                 cwd=str(exec_dir),
             )
             try:
-                stdout, stderr = await asyncio.wait_for(
+                stdout, _stderr = await asyncio.wait_for(
                     proc.communicate(), timeout=timeout_seconds
                 )
             except asyncio.TimeoutError:
@@ -220,7 +220,7 @@ class SandboxManager:
         exec_dir = Path(work_dir) if work_dir else Path(sb.path)
         exec_dir.mkdir(parents=True, exist_ok=True)
 
-        log_file = exec_dir / f"sandbox-run-{datetime.now().strftime('%H%M%S')}.log"
+        log_file = exec_dir / f"sandbox-run-{datetime.now(timezone.utc).strftime('%H%M%S')}.log"
         start = time.monotonic()
 
         try:
@@ -239,7 +239,7 @@ class SandboxManager:
                     # instead of plain " ".join which doesn't handle special chars
                     cmd_parts = ["cmd.exe", "/c", subprocess.list2cmdline(cmd_parts)]
 
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: PLW1510
                 cmd_parts,
                 capture_output=True,
                 text=True,
