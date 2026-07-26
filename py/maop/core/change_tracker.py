@@ -27,7 +27,7 @@ import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from pydantic import BaseModel, Field
 
@@ -75,7 +75,7 @@ class ChangeTracker:
         changes = tracker.diff("/project", since_label="before")
     """
 
-    SKIP_DIRS = {
+    SKIP_DIRS: ClassVar[set[str]] = {
         ".git", "__pycache__", "node_modules", ".venv", "venv",
         ".mypy_cache", ".pytest_cache", ".ruff_cache",
         "dist", "dist-enterprise", "build", ".tox",
@@ -83,7 +83,7 @@ class ChangeTracker:
         ".maop-worktrees", ".maop-snapshots", "data",
     }
 
-    SKIP_EXTENSIONS = {
+    SKIP_EXTENSIONS: ClassVar[set[str]] = {
         ".pyc", ".pyo", ".so", ".dll", ".dylib", ".exe", ".obj", ".o",
         ".log", ".tmp", ".cache", ".db", ".sqlite",
     }

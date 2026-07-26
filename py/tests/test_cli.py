@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.cli — argument parsing and command dispatch."""
+"""Tests for MAOP.cli — argument parsing and command dispatch."""
 
 from __future__ import annotations
 
@@ -18,65 +18,62 @@ class TestArgParsing:
             mock_start.assert_called_once_with(9079, "127.0.0.1")
 
     def test_explicit_start_with_port_host(self):
-        with patch.object(sys, "argv", ["MAOP", "start", "--port", "8080", "--host", "0.0.0.0"]):
-            with patch("maop.cli.cmd_start") as mock_start:
-                cli.main()
-                mock_start.assert_called_once_with(8080, "0.0.0.0")
+        with patch.object(sys, "argv", ["MAOP", "start", "--port", "8080", "--host", "0.0.0.0"]), \
+             patch("maop.cli.cmd_start") as mock_start:
+            cli.main()
+            mock_start.assert_called_once_with(8080, "0.0.0.0")
 
     def test_stop_action(self):
-        with patch.object(sys, "argv", ["MAOP", "stop"]):
-            with patch("maop.cli.cmd_stop") as mock_stop:
-                cli.main()
-                mock_stop.assert_called_once()
+        with patch.object(sys, "argv", ["MAOP", "stop"]), patch("maop.cli.cmd_stop") as mock_stop:
+            cli.main()
+            mock_stop.assert_called_once()
 
     def test_status_action(self):
-        with patch.object(sys, "argv", ["MAOP", "status"]):
-            with patch("maop.cli.cmd_status") as mock_status:
-                cli.main()
-                mock_status.assert_called_once()
+        with patch.object(sys, "argv", ["MAOP", "status"]), \
+             patch("maop.cli.cmd_status") as mock_status:
+            cli.main()
+            mock_status.assert_called_once()
 
     def test_run_action_with_task(self):
-        with patch.object(sys, "argv", ["MAOP", "run", "--task", "fix bug"]):
-            with patch("maop.cli.cmd_run") as mock_run:
-                cli.main()
-                mock_run.assert_called_once_with("fix bug")
+        with patch.object(sys, "argv", ["MAOP", "run", "--task", "fix bug"]), \
+             patch("maop.cli.cmd_run") as mock_run:
+            cli.main()
+            mock_run.assert_called_once_with("fix bug")
 
     def test_run_action_without_task_exits(self):
-        with patch.object(sys, "argv", ["MAOP", "run"]):
-            with patch("maop.cli.cmd_run") as mock_run:
-                with pytest.raises(SystemExit) as exc_info:
-                    cli.main()
-                assert exc_info.value.code == 1
-                mock_run.assert_not_called()
+        with patch.object(sys, "argv", ["MAOP", "run"]), patch("maop.cli.cmd_run") as mock_run:
+            with pytest.raises(SystemExit) as exc_info:
+                cli.main()
+            assert exc_info.value.code == 1
+            mock_run.assert_not_called()
 
     def test_validate_action(self):
-        with patch.object(sys, "argv", ["MAOP", "validate"]):
-            with patch("maop.cli.cmd_validate") as mock_validate:
-                cli.main()
-                mock_validate.assert_called_once()
+        with patch.object(sys, "argv", ["MAOP", "validate"]), \
+             patch("maop.cli.cmd_validate") as mock_validate:
+            cli.main()
+            mock_validate.assert_called_once()
 
     def test_health_action(self):
-        with patch.object(sys, "argv", ["MAOP", "health"]):
-            with patch("maop.cli.cmd_health") as mock_health:
-                cli.main()
-                mock_health.assert_called_once()
+        with patch.object(sys, "argv", ["MAOP", "health"]), \
+             patch("maop.cli.cmd_health") as mock_health:
+            cli.main()
+            mock_health.assert_called_once()
 
     def test_invalid_action_exits(self):
-        with patch.object(sys, "argv", ["MAOP", "invalid_action"]):
-            with pytest.raises(SystemExit):
-                cli.main()
+        with patch.object(sys, "argv", ["MAOP", "invalid_action"]), pytest.raises(SystemExit):
+            cli.main()
 
     def test_short_task_flag(self):
-        with patch.object(sys, "argv", ["MAOP", "run", "-t", "do something"]):
-            with patch("maop.cli.cmd_run") as mock_run:
-                cli.main()
-                mock_run.assert_called_once_with("do something")
+        with patch.object(sys, "argv", ["MAOP", "run", "-t", "do something"]), \
+             patch("maop.cli.cmd_run") as mock_run:
+            cli.main()
+            mock_run.assert_called_once_with("do something")
 
     def test_short_port_flag(self):
-        with patch.object(sys, "argv", ["MAOP", "start", "-p", "9999"]):
-            with patch("maop.cli.cmd_start") as mock_start:
-                cli.main()
-                mock_start.assert_called_once_with(9999, "127.0.0.1")
+        with patch.object(sys, "argv", ["MAOP", "start", "-p", "9999"]), \
+             patch("maop.cli.cmd_start") as mock_start:
+            cli.main()
+            mock_start.assert_called_once_with(9999, "127.0.0.1")
 
 
 # ── cmd_start ────────────────────────────────────────────────

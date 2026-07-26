@@ -61,10 +61,10 @@ class TestGetTracer:
             assert isinstance(tracer, _NoopTracer)
 
     def test_returns_noop_when_otel_not_installed(self):
-        with patch.dict(os.environ, {"MAOP_OTEL_ENABLED": "1"}):
-            with patch("maop.core.otel._OTELE_AVAILABLE", False):
-                tracer = get_tracer("test")
-                assert isinstance(tracer, _NoopTracer)
+        with patch.dict(os.environ, {"MAOP_OTEL_ENABLED": "1"}), \
+             patch("maop.core.otel._OTELE_AVAILABLE", False):
+            tracer = get_tracer("test")
+            assert isinstance(tracer, _NoopTracer)
 
 
 class TestSpan:

@@ -1,4 +1,4 @@
-﻿"""MAOP Project Context — Automatic project context injection for conversations.
+"""MAOP Project Context — Automatic project context injection for conversations.
 
 .. deprecated::
     This module is not used by any production code and may be removed in a
@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
@@ -54,26 +55,26 @@ class ProjectContext:
         summary = ctx.build()
     """
 
-    SKIP_DIRS = {
+    SKIP_DIRS: ClassVar[set[str]] = {
         ".git", "__pycache__", "node_modules", ".venv", "venv",
         ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox",
         "dist", "build", ".eggs", "*.egg-info", ".next",
         ".cache", ".sass-cache", "target", "bin", "obj",
     }
 
-    CONFIG_FILES = [
+    CONFIG_FILES: ClassVar[list[str]] = [
         "pyproject.toml", "setup.py", "setup.cfg", "requirements.txt",
         "package.json", "Cargo.toml", "go.mod", "pom.xml",
         "Makefile", "Dockerfile", "docker-compose.yml",
         ".env.example", "tsconfig.json",
     ]
 
-    INSTRUCTION_FILES = [
+    INSTRUCTION_FILES: ClassVar[list[str]] = [
         "CLAUDE.md", "AGENTS.md", ".maop-context.md",
         "CONTRIBUTING.md", ".cursorrules", ".windsurfrules",
     ]
 
-    TECH_MARKERS = {
+    TECH_MARKERS: ClassVar[dict[str, str]] = {
         "pyproject.toml": "python",
         "setup.py": "python",
         "requirements.txt": "python",

@@ -388,8 +388,8 @@ class DataProxy:
         if config_path.exists():
             try:
                 import yaml
-                with open(config_path, encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
+                _text = await asyncio.to_thread(Path(config_path).read_text, encoding="utf-8")
+                data = yaml.safe_load(_text)
                 rules = data.get("rules", []) if isinstance(data, dict) else []
             except Exception as exc:
                 # H1: log instead of silently swallowing

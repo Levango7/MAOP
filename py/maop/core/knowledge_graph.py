@@ -1,4 +1,4 @@
-﻿"""MAOP Knowledge Graph — Entity-Relation graph with traversal and inference.
+"""MAOP Knowledge Graph — Entity-Relation graph with traversal and inference.
 
 Built on top of KnowledgeExtractor's SQLite tables, provides:
   - Graph traversal (neighbors, paths, subgraphs)
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 
@@ -57,7 +57,7 @@ class KnowledgeGraph:
     Provides graph operations for context assembly and inference.
     """
 
-    TRANSITIVE_TYPES = {"uses", "depends_on", "extends", "implements", "imports"}
+    TRANSITIVE_TYPES: ClassVar[set[str]] = {"uses", "depends_on", "extends", "implements", "imports"}
 
     def __init__(self, root_dir: str | Path) -> None:
         self._root = Path(root_dir)

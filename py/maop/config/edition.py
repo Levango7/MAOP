@@ -207,9 +207,9 @@ def _detect_with_license_check(requested: Edition) -> Edition:
         logger.warning("[edition] License module not available, honoring package detection")
         return Edition.ENTERPRISE
     except Exception as exc:
-        logger.error(
+        logger.exception(
             "[edition] Unexpected error during license validation: %s. "
-            "Degrading to PERSONAL.", exc, exc_info=True,
+            "Degrading to PERSONAL.", exc,
         )
         record_degradation("license", "enterprise", "personal", "license_error")
         return Edition.PERSONAL

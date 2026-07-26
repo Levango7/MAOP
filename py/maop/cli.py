@@ -42,7 +42,7 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
                 if ssl_ctx:
                     uvicorn_kwargs["ssl"] = ssl_ctx
 
-        _proto = "https" if "ssl" in uvicorn_kwargs else "http"  # noqa: F841
+        _proto = "https" if "ssl" in uvicorn_kwargs else "http"
 
     uvicorn.run(app, host=host, port=port, **uvicorn_kwargs)
 
@@ -117,7 +117,7 @@ def cmd_health() -> Any:
         results = health_check(MAOP_ROOT)
         all_healthy = True
         for r in results:
-            _status_icon = {"healthy": "+", "degraded": "~", "unhealthy": "!"}[r.status.value]  # noqa: F841
+            _status_icon = {"healthy": "+", "degraded": "~", "unhealthy": "!"}[r.status.value]
             if r.status.value != "healthy":
                 all_healthy = False
         if not all_healthy:
@@ -187,11 +187,11 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
         if not regs:
             pass
         for r in regs:
-            _trust = "trusted" if r.trusted else "untrusted"  # noqa: F841
-            _status = "enabled" if r.enabled else "disabled"  # noqa: F841
+            _trust = "trusted" if r.trusted else "untrusted"
+            _status = "enabled" if r.enabled else "disabled"
     elif parsed.subcommand == "add-registry":
         mp.add_registry(parsed.name, parsed.url, trusted=parsed.trusted)
-        _trust = "trusted" if parsed.trusted else "untrusted"  # noqa: F841
+        _trust = "trusted" if parsed.trusted else "untrusted"
     elif parsed.subcommand == "remove-registry":
         mp.remove_registry(parsed.name)
     elif parsed.subcommand == "search":
@@ -203,7 +203,7 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
         if not results:
             pass
         for s in results:
-            _verified = " [verified]" if s.verified else ""  # noqa: F841
+            _verified = " [verified]" if s.verified else ""
             _tags_str = f" tags={','.join(s.tags)}" if s.tags else ""
     elif parsed.subcommand == "install":
         try:

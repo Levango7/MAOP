@@ -409,6 +409,13 @@ async def api_providers() -> Any:
     return await get_bridge().providers_report()
 
 
+def _read_log_tail(path, limit: int) -> list[str]:
+    """Read last `limit` lines from a log file (bounded read, P2-9 fix)."""
+    import collections
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        return list(collections.deque(fh, maxlen=limit))
+
+
 @router.get("/api/logs")
 async def api_logs(type: str = "", limit: int = Query(500, ge=1, le=5000)) -> Any:
     """Read log files with bounded size (P2-9 fix: prevents unbounded read_text).
@@ -428,9 +435,7 @@ async def api_logs(type: str = "", limit: int = Query(500, ge=1, le=5000)) -> An
         for f in sorted(log_dir.glob(f"*{log_name}*"), reverse=True):
             try:
                 # P2-9 fix: bounded read — only tail last `limit` lines
-                import collections
-                with open(f, encoding="utf-8", errors="replace") as fh:
-                    tail = collections.deque(fh, maxlen=limit)
+                tail = await asyncio.to_thread(_read_log_tail, f, limit)
                 content = "\n".join(tail)
                 if content:
                     import re

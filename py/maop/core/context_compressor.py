@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from pydantic import BaseModel, Field
 
@@ -74,7 +74,7 @@ class ContextCompressor:
     """
 
     # Section titles (in priority order)
-    SECTION_TITLES = [
+    SECTION_TITLES: ClassVar[list[str]] = [
         "Primary Request",
         "Working Assumptions",
         "Files Modified",
@@ -87,7 +87,7 @@ class ContextCompressor:
     ]
 
     # Patterns for extracting user corrections
-    _CORRECTION_PATTERNS = [
+    _CORRECTION_PATTERNS: ClassVar[list[str]] = [
         r"(?:no|stop|don't|wrong|incorrect|actually|wait)[,!]\s.*",
         r"(?:that's not|this is wrong|you messed up|fix this)[.!].*",
         r"(?:I meant|I wanted|not what I asked).*",
@@ -95,13 +95,13 @@ class ContextCompressor:
     ]
 
     # Patterns for extracting file modifications
-    _FILE_PATTERNS = [
+    _FILE_PATTERNS: ClassVar[list[str]] = [
         r"(?:modified|edited|created|updated|deleted|wrote)\s+[:`]?([^\s:`]+)[:`]?",
         r"([^\s]+\.(?:py|js|ts|json|yaml|yml|md|txt|html|css|sql))",
     ]
 
     # Patterns for extracting errors
-    _ERROR_PATTERNS = [
+    _ERROR_PATTERNS: ClassVar[list[str]] = [
         r"(?:error|exception|failed|traceback|syntax\s*error)[:\s].*",
     ]
 

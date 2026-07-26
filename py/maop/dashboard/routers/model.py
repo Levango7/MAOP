@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import shutil
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -60,8 +62,8 @@ async def api_model_switch(request: Request) -> dict[str, Any]:
     if not ypath.exists():
         return {"status": "error", "error": "agents.yaml not found"}
     import yaml
-    with open(ypath, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+    _text = await asyncio.to_thread(Path(ypath).read_text, encoding="utf-8")
+    data = yaml.safe_load(_text)
     agents = data.get("agents", {})
     if agent_name not in agents:
         return {"status": "error", "error": f"Unknown agent: {agent_name}"}
@@ -70,14 +72,14 @@ async def api_model_switch(request: Request) -> dict[str, Any]:
         mpath = MAOP_ROOT / "config" / "models.yaml"
     if mpath.exists():
         import yaml as _yaml
-        with open(mpath, encoding="utf-8") as _f:
-            mdata = _yaml.safe_load(_f)
+        _mtext = await asyncio.to_thread(Path(mpath).read_text, encoding="utf-8")
+        mdata = _yaml.safe_load(_mtext)
         valid_models = set(mdata.get("models", {}).keys()) if isinstance(mdata, dict) else set()
         if valid_models and new_model not in valid_models:
             return {"status": "error", "error": f"Unknown model: {new_model}. Valid: {sorted(valid_models)}"}
     agents[agent_name]["model"] = new_model
-    with open(ypath, "w", encoding="utf-8") as f:
-        yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+    _dumped = yaml.dump(data, allow_unicode=True, default_flow_style=False)
+    await asyncio.to_thread(Path(ypath).write_text, _dumped, encoding="utf-8")
     return {"status": "ok", "agent": agent_name, "model": new_model}
 
 # ── Model Management v2 (ModelRegistry-backed) ────────────────────
