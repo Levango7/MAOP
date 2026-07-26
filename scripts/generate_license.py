@@ -4,15 +4,15 @@
 Usage:
     python scripts/generate_license.py \
         --customer "ACME Corp" \
-        --expires 2027-07-25 \
-        --private-key scripts/dev_private_key.pem
+        --expires 2027-07-25
 
 The license key is printed to stdout and optionally saved to a file
 with --output.
 
-NOTE: This script uses the DEVELOPMENT private key by default.
-Production licenses MUST be signed with the MAOP commercial team's
-private key (never committed to the repository).
+NOTE: This script uses the DEVELOPMENT private key by default, resolved
+in order: --private-key > ~/.maop/keys/dev_private_key.pem > legacy
+scripts/dev_private_key.pem. Production licenses MUST be signed with
+the MAOP commercial team's private key (never committed to the repository).
 """
 
 from __future__ import annotations
@@ -80,12 +80,30 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate MAOP Enterprise license")
     parser.add_argument("--customer", required=True, help="Customer name")
     parser.add_argument("--expires", required=True, help="Expiry date (YYYY-MM-DD)")
-    parser.add_argument("--private-key", default="scripts/dev_private_key.pem",
-                        help="Path to Ed25519 private key PEM file")
+    parser.add_argument("--private-key", default=None,
+                        help="Path to Ed25519 private key PEM file (default: ~/.maop/keys/dev_private_key.pem)")
     parser.add_argument("--max-users", type=int, default=None, help="Max concurrent users")
     parser.add_argument("--fingerprint", default=None, help="Machine fingerprint binding")
     parser.add_argument("--output", default=None, help="Output file (default: stdout)")
     args = parser.parse_args()
+
+    # Resolve private key path: CLI arg > ~/.maop/keys/ > legacy scripts/
+    if args.private_key:
+        key_path = Path(args.private_key)
+    else:
+        key_path = Path.home() / ".maop" / "keys" / "dev_private_key.pem"
+        if not key_path.exists():
+            # Fallback to legacy location
+            legacy = Path("scripts/dev_private_key.pem")
+            if legacy.exists():
+                key_path = legacy
+                print("WARNING: Using legacy key location scripts/dev_private_key.pem", file=sys.stderr)
+                print("  Move to ~/.maop/keys/ for security: mv scripts/dev_private_key.pem ~/.maop/keys/", file=sys.stderr)
+
+    if not key_path.exists():
+        print(f"ERROR: Private key not found: {key_path}", file=sys.stderr)
+        print("  Expected at ~/.maop/keys/dev_private_key.pem or specify --private-key", file=sys.stderr)
+        return 1
 
     expires_at = datetime.strptime(args.expires, "%Y-%m-%d").replace(
         hour=23, minute=59, second=59, tzinfo=timezone.utc
@@ -94,7 +112,7 @@ def main() -> int:
     license_key = generate_license(
         customer=args.customer,
         expires_at=expires_at,
-        private_key_path=Path(args.private_key),
+        private_key_path=key_path,
         max_users=args.max_users,
         fingerprint=args.fingerprint,
     )
