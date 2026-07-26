@@ -26,7 +26,6 @@ from maop.history_analyzer import (
     HistoryAnalyzer,
 )
 
-
 # ── Helpers ────────────────────────────────────────────────────────
 
 def _make_delegations_db(db_path: Path, rows: list[dict]) -> None:

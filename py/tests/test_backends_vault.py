@@ -20,7 +20,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-
 # ── Helpers ───────────────────────────────────────────────────────
 
 VAULT_ENV_VARS = (
@@ -239,7 +238,7 @@ class TestVaultClose:
 class TestVaultDegradation:
     def test_get_secret_backend_vault_degrades(self, monkeypatch):
         """When hvac cannot be imported, get_secret_backend() falls back to LocalSecretBackend."""
-        from maop.core.backends import get_secret_backend, reset_backends, LocalSecretBackend
+        from maop.core.backends import LocalSecretBackend, get_secret_backend, reset_backends
         # Ensure hvac is NOT importable (real state: hvac not installed)
         monkeypatch.delitem(sys.modules, "hvac", raising=False)
         monkeypatch.delitem(sys.modules, "maop.core.backends_vault", raising=False)

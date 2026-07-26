@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import asyncio
 import importlib
 import logging
@@ -11,12 +9,14 @@ import platform
 import shutil
 import sys
 import time
+import uuid as _uuid
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from .state import MAOP_ROOT, get_bridge, active_jobs, init_subsystems, get_subsystems, start_time
 from maop.core.middleware import require_admin
-import uuid as _uuid
+
+from .state import MAOP_ROOT, active_jobs, get_bridge, get_subsystems, init_subsystems, start_time
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +164,7 @@ async def api_agent_config_update(request: Request) -> dict[str, Any]:
         if not ypath.exists():
             return {"status": "error", "error": "agents.yaml not found"}
         import yaml
-        with open(ypath, "r", encoding="utf-8") as f:
+        with open(ypath, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         agents = data.get("agents", {})
         if agent_name not in agents:
@@ -285,7 +285,7 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]
                     info["upgrade_status"] = "error"
                     info["upgrade_error"] = "Agent upgrade failed"
         try:
-            from maop.control.audit import AuditLog, AuditLevel
+            from maop.control.audit import AuditLevel, AuditLog
             AuditLog(MAOP_ROOT / "logs" / "audit.jsonl").log(action="agent.upgrade", actor="dashboard", target=agent_name, level=AuditLevel.INFO, detail=info)
         except Exception as exc:
             logger.warning('Failed to log audit event: %s', exc)
@@ -358,7 +358,7 @@ async def api_workflow_run(request: Request) -> dict[str, Any]:
     # Use a proper Python module approach instead of injecting code into -c
     proc = await asyncio.create_subprocess_exec(
         sys.executable, "-m", "maop.cli", "run",
-        "--task", wf_name if not task else task,
+        "--task", task or wf_name,
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
     active_jobs[job_id] = {"action": "workflow", "status": "running", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": wf_name, "process": proc}
@@ -490,7 +490,7 @@ async def api_routing_v4() -> dict[str, Any]:
 @router.get("/api/security/config")
 async def api_security_config_v4() -> dict[str, Any]:
     result = {}
-    for mod_name, mod_path, cls_name in [("tls", "maop.core.tls", "TLSSettings"), ("auth", "maop.core.auth", "AuthManager"),
+    for mod_name, mod_path, _cls_name in [("tls", "maop.core.tls", "TLSSettings"), ("auth", "maop.core.auth", "AuthManager"),
         ("rate_limit", "maop.core.rate_limiter", "RateLimiter"), ("guardrail", "maop.core.guardrail", "Guardrail"), ("sandbox", "maop.core.sandbox", "SandboxManager")]:
         try:
             importlib.import_module(mod_path)

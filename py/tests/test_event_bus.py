@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import asyncio
 
-
 from maop.core.event_bus import (
-    Event, EventBus, EventPriority,
+    Event,
+    EventBus,
+    EventPriority,
 )
 
 
@@ -283,7 +284,7 @@ class TestAckAndRetry:
 
         bus.subscribe("cap.topic", handler, max_retries=0)
 
-        for i in range(10):
+        for _i in range(10):
             asyncio.run(bus.publish(Event(topic="cap.topic", ack_required=True)))
 
         assert bus.dead_letter_count() == 5

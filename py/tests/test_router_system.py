@@ -15,7 +15,6 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-
 # ── Fakes ───────────────────────────────────────────────────────────
 
 class FakeAgentDef:
@@ -131,7 +130,7 @@ class TestSubsystems:
 
     def test_subsystem_has_available_and_module(self, client):
         data = client.get("/api/subsystems").json()
-        for name, info in data["subsystems"].items():
+        for info in data["subsystems"].values():
             assert "available" in info
             assert "module" in info
             assert "error" in info
@@ -213,7 +212,7 @@ class TestFrameworkConfig:
 
     def test_agents_have_cli_and_driver(self, client):
         data = client.get("/api/framework/config").json()
-        for name, ad in data["agents"].items():
+        for ad in data["agents"].values():
             assert "cli" in ad
             assert "driver" in ad
             assert "model" in ad
@@ -248,7 +247,7 @@ class TestAgentConfig:
         monkeypatch.setattr("maop.dashboard.routers.system.init_subsystems",
                             MagicMock())
         monkeypatch.setattr("maop.dashboard.routers.system.get_subsystems",
-                            lambda: {})
+                            dict)
         monkeypatch.setattr("maop.dashboard.routers.system.get_bridge",
                             lambda: AsyncMock())
         monkeypatch.setattr("maop.dashboard.routers.system.active_jobs", {})
@@ -396,7 +395,7 @@ class TestRouting:
         monkeypatch.setattr("maop.dashboard.routers.system.init_subsystems",
                             MagicMock())
         monkeypatch.setattr("maop.dashboard.routers.system.get_subsystems",
-                            lambda: {})
+                            dict)
         monkeypatch.setattr("maop.dashboard.routers.system.get_bridge",
                             lambda: AsyncMock())
         monkeypatch.setattr("maop.dashboard.routers.system.active_jobs", {})

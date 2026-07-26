@@ -22,6 +22,8 @@ warning is logged.
 from __future__ import annotations
 
 import asyncio
+import builtins
+import contextlib
 import json
 import logging
 import shlex
@@ -29,11 +31,11 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, List, cast
-
-from maop.core.db_utils import get_db_path, sqlite_connect
+from typing import Any, cast
 
 from pydantic import BaseModel, Field
+
+from maop.core.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +254,7 @@ class ToolManager:
             )
         return tool_id
 
-    def list(self, category: str = "") -> List[dict[str, Any]]:
+    def list(self, category: str = "") -> builtins.list[dict[str, Any]]:
         """List tools grouped by category."""
         with self._connect() as conn:
             if category:
@@ -280,7 +282,7 @@ class ToolManager:
 
         return [{"category": cat, "tools": tools} for cat, tools in sorted(by_category.items())]
 
-    def find(self, query: str) -> List[ToolDef]:
+    def find(self, query: str) -> builtins.list[ToolDef]:
         """Find tools by free-text query (matches id, name, description, category)."""
         pattern = f"%{query}%"
         with self._connect() as conn:
@@ -313,7 +315,7 @@ class ToolManager:
     async def call(
         self,
         tool_id: str,
-        args: List[str] | None = None,
+        args: builtins.list[str] | None = None,
         timeout_seconds: int = 30,
     ) -> ToolCallResult:
         """Invoke a registered tool.
@@ -359,10 +361,8 @@ class ToolManager:
                 )
             except asyncio.TimeoutError:
                 # Kill the timed-out process to avoid orphaned children
-                try:
+                with contextlib.suppress(ProcessLookupError):
                     proc.kill()
-                except ProcessLookupError:
-                    pass
                 await proc.wait()
                 elapsed_ms = int((time.monotonic() - start) * 1000)
                 return ToolCallResult(
@@ -407,7 +407,7 @@ class ToolManager:
     def call_sync(
         self,
         tool_id: str,
-        args: List[str] | None = None,
+        args: builtins.list[str] | None = None,
         timeout_seconds: int = 30,
     ) -> ToolCallResult:
         """Backward-compatible sync wrapper around ``call()``.
@@ -432,7 +432,7 @@ class ToolManager:
     def _call_sync_fallback(
         self,
         tool_id: str,
-        args: List[str] | None,
+        args: builtins.list[str] | None,
         timeout_seconds: int,
     ) -> ToolCallResult:
         """Legacy synchronous subprocess.run path — used only when a
@@ -526,10 +526,8 @@ class ToolManager:
         rows (or non-migrated DBs) do not raise KeyError.
         """
         params = {}
-        try:
+        with contextlib.suppress(json.JSONDecodeError, ValueError):
             params = json.loads(row["params"] or "{}")
-        except (json.JSONDecodeError, ValueError):
-            pass
         cols = set(row.keys()) if hasattr(row, "keys") else set()
         return ToolDef(
             id=row["id"],

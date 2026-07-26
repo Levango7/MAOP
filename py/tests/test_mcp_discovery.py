@@ -13,10 +13,8 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-
-from maop.core.mcp_discovery import MCPDiscovery, DiscoveryReport, _claude_desktop_config_path
+from maop.core.mcp_discovery import DiscoveryReport, MCPDiscovery, _claude_desktop_config_path
 from maop.core.mcp_hub import TransportType
-
 
 # ── _claude_desktop_config_path ────────────────────────────────
 

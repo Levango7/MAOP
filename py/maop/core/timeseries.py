@@ -172,7 +172,7 @@ class TimeSeriesStore:
                 count += 1
             conn.commit()
 
-            metrics = set(dp.metric for dp in points)
+            metrics = {dp.metric for dp in points}
             for m in metrics:
                 cnt = conn.execute(
                     "SELECT COUNT(*) as c FROM ts_raw WHERE metric = ?",
@@ -208,10 +208,7 @@ class TimeSeriesStore:
                     for r in rows
                 ]
 
-            if q.interval_s <= 300:
-                table = "ts_5min"
-            else:
-                table = "ts_1hour"
+            table = "ts_5min" if q.interval_s <= 300 else "ts_1hour"
 
             agg_map = {
                 "avg": "avg_value", "min": "min_value",

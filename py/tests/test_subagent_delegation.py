@@ -11,10 +11,10 @@ from __future__ import annotations
 import pytest
 
 from maop.core.subagent_delegation import (
-    SubagentManager,
-    SubagentInfo,
     AgentMessage,
     AgentTreeNode,
+    SubagentInfo,
+    SubagentManager,
 )
 
 

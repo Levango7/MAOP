@@ -54,9 +54,8 @@ def _compress_file(source: Path) -> bool:
     """Gzip-compress a file, replacing it with .gz."""
     dest = Path(str(source) + ".gz")
     try:
-        with open(source, "rb") as f_in:
-            with gzip.open(dest, "wb") as f_out:
-                f_out.writelines(f_in)
+        with open(source, "rb") as f_in, gzip.open(dest, "wb") as f_out:
+            f_out.writelines(f_in)
         source.unlink()
         return True
     except Exception as exc:
@@ -96,9 +95,8 @@ def _rotate_file(
         logger.info("Rotated %s -> %s", file_path.name, rotated_name)
 
         # Optionally compress
-        if compress:
-            if _compress_file(rotated_path):
-                logger.info("Compressed -> %s.gz", rotated_name)
+        if compress and _compress_file(rotated_path):
+            logger.info("Compressed -> %s.gz", rotated_name)
 
         # Recreate empty file so append operations don't fail
         if file_path.suffix in (".jsonl", ".log"):
@@ -262,13 +260,13 @@ class LogRotateScheduler:
         data_dir: str | Path | None = None,
     ) -> None:
         self._interval = max(60, interval_s)  # floor at 1 min
-        self._kwargs = dict(
-            max_size_kb=max_size_kb,
-            retain_count=retain_count,
-            compress=compress,
-            log_dir=log_dir,
-            data_dir=data_dir,
-        )
+        self._kwargs = {
+            "max_size_kb": max_size_kb,
+            "retain_count": retain_count,
+            "compress": compress,
+            "log_dir": log_dir,
+            "data_dir": data_dir,
+        }
         self._thread: threading.Thread | None = None
         self._running = False
 

@@ -10,6 +10,7 @@ Builds on AgentScanner for discovery, adds:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import sqlite3
 import subprocess
@@ -170,7 +171,7 @@ class AgentRegistry:
             return 0
 
         try:
-            with open(cfg_path, "r", encoding="utf-8") as f:
+            with open(cfg_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
         except Exception as exc:
             logger.warning("[registry] Failed to parse %s: %s", cfg_path, exc)
@@ -414,10 +415,8 @@ class AgentRegistry:
     def _row_to_agent(row: sqlite3.Row) -> RegisteredAgent:
         import json
         capabilities: list[Any] = []
-        try:
+        with contextlib.suppress(json.JSONDecodeError, TypeError):
             capabilities = json.loads(row["capabilities"]) if row["capabilities"] else []
-        except (json.JSONDecodeError, TypeError):
-            pass
 
         def _get_bool(key: str, default: bool = False) -> bool:
             """从 sqlite3.Row 安全读取布尔列（兼容旧库无此列的情况）。"""

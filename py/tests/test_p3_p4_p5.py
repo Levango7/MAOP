@@ -5,10 +5,9 @@ import tempfile
 
 import pytest
 
+from maop.core.agent_bridge import AgentAdapter, AgentBridge
 from maop.core.three_layer_memory import ThreeLayerMemory
 from maop.core.tool_audit import ToolAuditLog
-from maop.core.agent_bridge import AgentAdapter, AgentBridge
-
 
 # ── P3: Access-Count Consolidation ────────────────────────────
 

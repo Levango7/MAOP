@@ -25,7 +25,6 @@ from maop.core.monitoring import (
 )
 from maop.core.priority_queue import PriorityTask, PriorityTaskQueue
 
-
 # ── PriorityTaskQueue ──────────────────────────────────────────
 
 
@@ -550,6 +549,7 @@ class TestCheckpointCompleteness:
         scheduler can be upgraded to true preemption.
         """
         import inspect
+
         from maop.core.worker_pool import WorkerPool
         src = inspect.getsource(WorkerPool)
         assert "PipelineCheckpoint" not in src

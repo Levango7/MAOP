@@ -380,9 +380,7 @@ class CircuitBreaker:
             entry.failures += 1
             entry.last_failure = time.time()
 
-            if entry.state == BreakerState.HALF_OPEN:
-                entry.state = BreakerState.OPEN
-            elif entry.failures >= entry.threshold:
+            if entry.state == BreakerState.HALF_OPEN or entry.failures >= entry.threshold:
                 entry.state = BreakerState.OPEN
 
             self._data[agent_name] = entry

@@ -9,7 +9,6 @@ import pytest
 
 from maop.core.plugin import (
     PluginManager,
-
     PluginSandbox,
     SandboxViolation,
 )

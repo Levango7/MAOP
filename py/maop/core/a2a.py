@@ -28,7 +28,6 @@ Usage::
 """
 from __future__ import annotations
 
-
 import json
 import logging
 import uuid
@@ -350,7 +349,7 @@ class A2AClient:
                     headers={"Content-Type": "application/json"},
                 )
                 data = resp.json()
-                if "error" in data and data["error"]:
+                if data.get("error"):
                     return None
                 return A2ACard(**data.get("result", {}))
         except Exception:

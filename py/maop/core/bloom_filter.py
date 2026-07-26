@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 import math
 import struct
-from typing import Iterator
+from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class _BitArray:
         """Count number of set bits (popcount)."""
         n = 0
         for byte in self._data:
-            n += bin(byte).count("1")
+            n += (byte).bit_count()
         return n
 
     def to_bytes(self) -> bytes:
@@ -119,15 +119,14 @@ class BloomFilter:
         Desired false-positive rate (0 < fp_rate < 1).
     """
 
-    __slots__ = ("_bits", "_k", "_m", "_count", "_fp_rate")
+    __slots__ = ("_bits", "_count", "_fp_rate", "_k", "_m")
 
     def __init__(
         self,
         expected_items: int = 100_000,
         fp_rate: float = 0.01,
     ) -> None:
-        if expected_items < 1:
-            expected_items = 1
+        expected_items = max(expected_items, 1)
         if not 0 < fp_rate < 1:
             fp_rate = 0.01
 
@@ -153,10 +152,7 @@ class BloomFilter:
     def __contains__(self, item: str) -> bool:
         """Test if item *might* be in the set (may false-positive)."""
         key = item.encode("utf-8")
-        for i in range(self._k):
-            if not self._bits.test(_hash_i(key, i, self._m)):
-                return False
-        return True
+        return all(self._bits.test(_hash_i(key, i, self._m)) for i in range(self._k))
 
     def __len__(self) -> int:
         """Number of items added (approximate — no removal)."""

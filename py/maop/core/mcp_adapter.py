@@ -33,6 +33,7 @@ See ``docs/adr/013-agent-llm-direct-cli-fallback.md``.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import threading
 from pathlib import Path
@@ -78,10 +79,8 @@ class _BackgroundLoop:
         try:
             self._loop.run_forever()
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 self._loop.close()
-            except Exception:
-                pass
 
     def run(self, coro: Any, timeout: float = 30.0) -> Any:
         """Submit ``coro`` to the background loop and block on its result."""

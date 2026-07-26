@@ -10,7 +10,6 @@ from maop.core.context_compressor import (
     ContextSection,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────
 
 @pytest.fixture

@@ -34,21 +34,24 @@ if TYPE_CHECKING:
     from maop.core.llm_provider import LLMProviderFactory
 
 from maop.config.loader import ConfigLoader, MaopConfig
-from maop.core.analyzer import analyze as requirement_analyze, ExecutionStrategy
+from maop.core.analyzer import ExecutionStrategy
+from maop.core.analyzer import analyze as requirement_analyze
 from maop.core.cache import SingleFlight
 from maop.core.error_schema import MaopResult
-from maop.core.event_bus import EventBus, Event, get_event_bus
+from maop.core.event_bus import Event, EventBus, get_event_bus
 from maop.core.log_rotate import rotate_logs
-from maop.core.monitoring import StructuredLogger, MetricsCollector
-from maop.maop_plan import maop_plan
-from maop.maop_verify import VerifyResult
+from maop.core.monitoring import MetricsCollector, StructuredLogger
+from maop.core.otel import get_tracer
+from maop.core.otel import setup_provider as otel_setup
+from maop.core.otel import span as otel_span
+from maop.core.phases import PhaseContext, PhaseResult
+from maop.loop_analyzer import simple_analyze
+from maop.loop_executor import ExecuteMixin
 
 # Re-export models for backward compatibility (maop_loop.py is the canonical import path)
-from maop.loop_models import LoopResult, RequirementAnalysis, LoopConfig
-from maop.loop_executor import ExecuteMixin
-from maop.loop_analyzer import simple_analyze
-from maop.core.phases import PhaseContext, PhaseResult
-from maop.core.otel import get_tracer, span as otel_span, setup_provider as otel_setup
+from maop.loop_models import LoopConfig, LoopResult, RequirementAnalysis
+from maop.maop_plan import maop_plan
+from maop.maop_verify import VerifyResult
 
 logger = logging.getLogger(__name__)
 

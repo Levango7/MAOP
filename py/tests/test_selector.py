@@ -6,12 +6,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from maop.model.selector import ModelSelector
 from maop.model.schema import (
-    ModelDef, EffectiveModel, ModelPolicy,
-    SelectionStrategy, QualityTier, LatencyTier,
+    EffectiveModel,
+    LatencyTier,
+    ModelDef,
+    ModelPolicy,
+    QualityTier,
+    SelectionStrategy,
 )
-
+from maop.model.selector import ModelSelector
 
 # ── Fixtures ──────────────────────────────────────────────────
 

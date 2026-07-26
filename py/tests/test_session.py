@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-
-from maop.core.session import SessionManager, SessionStatus
 from maop.core.conversation import ConversationManager
 from maop.core.project_context import ProjectContext
-
+from maop.core.session import SessionManager, SessionStatus
 
 # ── SessionManager ──────────────────────────────────────────────
 

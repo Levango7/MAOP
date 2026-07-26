@@ -5,7 +5,14 @@ from __future__ import annotations
 import pytest
 
 from maop.engine import (
-    StepType, StepStatus, WorkflowStep, Engine, _topological_sort, _resolve_template, _find_step, json_dumps_safe,
+    Engine,
+    StepStatus,
+    StepType,
+    WorkflowStep,
+    _find_step,
+    _resolve_template,
+    _topological_sort,
+    json_dumps_safe,
 )
 
 

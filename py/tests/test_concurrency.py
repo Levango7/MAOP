@@ -17,7 +17,6 @@ from maop.concurrency import (
     TokenStreamer,
 )
 
-
 # ── Helpers ───────────────────────────────────────────────────
 
 def _run(coro):

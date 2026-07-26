@@ -14,7 +14,6 @@ from maop.memory.consolidator import (
 )
 from maop.memory.store import MemoryStore
 
-
 # ── Fixtures ──────────────────────────────────────────────────
 
 @pytest.fixture

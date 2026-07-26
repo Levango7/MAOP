@@ -9,14 +9,15 @@ Provides:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import time
 import uuid
+from collections.abc import AsyncIterator, Callable
 from enum import Enum, IntEnum
-from typing import Any, AsyncIterator, Callable
+from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ── Task priority ─────────────────────────────────────────────
 
@@ -298,10 +299,8 @@ class SSEStreamer:
 
     def close(self) -> None:
         """Signal end of stream."""
-        try:
+        with contextlib.suppress(asyncio.QueueFull):
             self._queue.put_nowait(None)
-        except asyncio.QueueFull:
-            pass
 
     async def stream(self) -> AsyncIterator[str]:
         """Yield SSE-formatted chunks."""
@@ -366,14 +365,10 @@ class TokenStreamer:
         try:
             self._queue.put_nowait(token)
         except asyncio.QueueFull:
-            try:
+            with contextlib.suppress(asyncio.QueueEmpty):
                 self._queue.get_nowait()
-            except asyncio.QueueEmpty:
-                pass
-            try:
+            with contextlib.suppress(asyncio.QueueFull):
                 self._queue.put_nowait(token)
-            except asyncio.QueueFull:
-                pass
 
     def push_tokens(self, tokens: list[str]) -> None:
         """Push multiple tokens at once."""
@@ -383,10 +378,8 @@ class TokenStreamer:
     def end(self) -> None:
         """Signal end of token stream."""
         self._ended = True
-        try:
+        with contextlib.suppress(asyncio.QueueFull):
             self._queue.put_nowait(None)
-        except asyncio.QueueFull:
-            pass
 
     async def token_stream(self) -> AsyncIterator[str]:
         """Yield individual tokens as SSE data chunks."""

@@ -13,10 +13,11 @@ import logging
 import re
 import time
 from collections import defaultdict
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Awaitable, Callable, Union
+from typing import Any, Union
 
 logger = logging.getLogger(__name__)
 

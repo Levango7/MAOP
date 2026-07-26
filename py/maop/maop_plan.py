@@ -152,8 +152,9 @@ def _adaptive_agent_select(route: RouteEntry, rk: str) -> str:
         return route.primary
 
     try:
-        from maop.core.agent_performance import AgentPerformanceTracker
         import os
+
+        from maop.core.agent_performance import AgentPerformanceTracker
         root = os.environ.get("MAOP_ROOT_DIR", ".")
         tracker = AgentPerformanceTracker(root_dir=root)
         best = tracker.best_agent(agents=candidates, routing_key=rk, default=route.primary)

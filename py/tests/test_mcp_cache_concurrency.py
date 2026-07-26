@@ -39,7 +39,6 @@ from maop.core.monitoring import (
     MAOP_MCP_RATE_LIMITED_TOTAL,
 )
 
-
 # ─────────────────────────────────────────────────────────────────
 # Shared helpers (mirrors the _FakeTransport pattern from
 # test_mcp_observability.py / test_mcp_permission_audit.py)

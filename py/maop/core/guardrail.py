@@ -333,7 +333,7 @@ def fnmatch_simple(name: str, pattern: str) -> bool:
     # Split on * and check sequential containment
     parts = pattern.split("*")
     idx = 0
-    for i, part in enumerate(parts):
+    for _i, part in enumerate(parts):
         if not part:
             continue
         found = name.find(part, idx)

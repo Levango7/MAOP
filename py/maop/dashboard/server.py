@@ -48,8 +48,9 @@ DASH_VUE3_SRC_DIR = MAOP_ROOT / "dashboard-enterprise"
 # Unified Vue3 serve directory (both personal & enterprise):
 #   dist-enterprise (Vite build) > dashboard-enterprise (dev source)
 #   Legacy native JS dashboard archived to archive/js-dashboard/
+from maop.config.edition import FeatureFlag, get_edition, has_feature
 from maop.config.settings import get_settings as _get_settings
-from maop.config.edition import has_feature, FeatureFlag, get_edition
+
 _edition_cfg = _get_settings()
 if DASH_VUE3_DIST_DIR.exists():
     _SERVE_DIR = DASH_VUE3_DIST_DIR
@@ -66,13 +67,12 @@ else:
     logger.warning("[server] Vue3 dashboard not found, falling back to legacy dashboard/")
 
 # ── Shared state (imported by routers) ─────────────────────────────
-from maop.dashboard.routers import state as _state
-from maop.dashboard.routers.routing_preview import router as routing_preview_router
-
 from maop import __version__ as MAOP_VERSION
 
 # ── Auth module (imported early for lifespan & WS) ─────────────────
 from maop.dashboard.routers import auth as _auth_mod
+from maop.dashboard.routers import state as _state
+from maop.dashboard.routers.routing_preview import router as routing_preview_router
 
 # ── WebSocket real-time push ───────────────────────────────────────
 _ws_clients: set[WebSocket] = set()
@@ -198,13 +198,15 @@ app = FastAPI(
 from fastapi import Request as _Req
 from fastapi.responses import JSONResponse as _JResp
 
+
 @app.exception_handler(Exception)
 async def _global_exception_handler(request: _Req, exc: Exception) -> Any:
-    logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+    logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
     return _JResp(status_code=500, content={"status": "error", "error": "Internal server error"})
 
 # ── CORS ───────────────────────────────────────────────────────────
 from fastapi.middleware.cors import CORSMiddleware
+
 _cors_origins = os.environ.get("MAOP_CORS_ORIGINS", "").split(",")
 _cors_origins = [o.strip() for o in _cors_origins if o.strip()]
 if not _cors_origins:
@@ -212,7 +214,8 @@ if not _cors_origins:
 app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # ── Rate Limit + Auth + CSP Middleware ─────────────────────────────
-from maop.core.middleware import RateLimitMiddleware, AuthMiddleware, CSPMiddleware
+from maop.core.middleware import AuthMiddleware, CSPMiddleware, RateLimitMiddleware
+
 _rl_enabled = os.environ.get("MAOP_RATE_LIMIT", "1") == "1"
 _rl_rate = float(os.environ.get("MAOP_RATE_LIMIT_RPS", "30"))
 _rl_burst = int(os.environ.get("MAOP_RATE_LIMIT_BURST", "60"))
@@ -250,7 +253,8 @@ app.add_middleware(
 )
 
 # ── Include routers ────────────────────────────────────────────────
-from maop.dashboard.routers import data, control, model, evolve, memory, system
+from maop.dashboard.routers import control, data, evolve, memory, model, system
+
 app.include_router(data.router)
 app.include_router(control.router)
 app.include_router(model.router)
@@ -259,59 +263,76 @@ app.include_router(memory.router)
 app.include_router(system.router)
 app.include_router(_auth_mod.router)
 
-from maop.dashboard.routers import subagent, worktree, protocol
+from maop.dashboard.routers import protocol, subagent, worktree
+
 app.include_router(subagent.router)
 app.include_router(worktree.router)
 app.include_router(protocol.router)
 
 from maop.dashboard.routers import hook as hook_router
+
 app.include_router(hook_router.router)
 
 from maop.dashboard.routers import stream as stream_router
+
 app.include_router(stream_router.router)
 
 from maop.dashboard.routers import permission as perm_router
+
 app.include_router(perm_router.router)
 
 from maop.dashboard.routers import mcp as mcp_router
+
 app.include_router(mcp_router.router)
 
 from maop.dashboard.routers import session as session_router
+
 app.include_router(session_router.router)
 
 from maop.dashboard.routers import react as react_router
+
 app.include_router(react_router.router)
 
 from maop.dashboard.routers import plugin as plugin_router
+
 app.include_router(plugin_router.router)
 
 from maop.dashboard.routers import cost as cost_router
+
 app.include_router(cost_router.router)
 
 from maop.dashboard.routers import agents as agents_router
+
 app.include_router(agents_router.router)
 
 from maop.dashboard.routers import chat as chat_router
+
 app.include_router(chat_router.router)
 
 from maop.dashboard.routers import knowledge as knowledge_router
+
 app.include_router(knowledge_router.router)
 
 from maop.dashboard.routers import info as info_router
+
 app.include_router(info_router.router)
 
 from maop.dashboard.routers import budget as budget_router
+
 app.include_router(budget_router.router)
 
 from maop.dashboard.routers import tool_audit as tool_audit_router
+
 app.include_router(tool_audit_router.router)
 
 from maop.dashboard.routers import agent_bridge as agent_bridge_router
+
 app.include_router(agent_bridge_router.router)
 app.include_router(routing_preview_router)
 
 # Phase γ-4: scheduling decision trace API (read-only GET endpoints).
 from maop.dashboard.routers import routing as routing_router
+
 app.include_router(routing_router.router)
 
 # ── A2A protocol endpoint (JSON-RPC /a2a) ─────────────────────────
@@ -322,8 +343,9 @@ app.include_router(routing_router.router)
 # every ``tasks/send`` is forwarded via ``WorkerPool.submit(agent_name=...)``
 # to ``MaopLoop.run(agent=...)`` so the caller-pinned agent actually
 # executes the task. See ADR-013.
-from maop.core.services import ServiceContainer as _A2AContainer
 from maop.core.a2a import create_a2a_router as _create_a2a_router
+from maop.core.services import ServiceContainer as _A2AContainer
+
 try:
     _a2a_container = _A2AContainer(root_dir=MAOP_ROOT)
     _a2a_manager = _a2a_container.get("a2a_manager", raise_on_failure=False)
@@ -552,8 +574,9 @@ async def prometheus_metrics() -> Any:
             static_configs:
               - targets: ['localhost:9079']
     """
-    from maop.core.monitoring import metrics as _metrics
     from fastapi import Response
+
+    from maop.core.monitoring import metrics as _metrics
     text = _metrics.to_prometheus()
     return Response(content=text, media_type="text/plain; version=0.0.4; charset=utf-8")
 

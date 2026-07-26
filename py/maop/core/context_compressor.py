@@ -29,7 +29,6 @@ from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
-
 # ── Models ────────────────────────────────────────────────────
 
 class ContextSection(BaseModel):

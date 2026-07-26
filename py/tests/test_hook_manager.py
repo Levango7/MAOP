@@ -6,7 +6,8 @@ from unittest.mock import patch
 import pytest
 
 from maop.core.hook_manager import (
-    HookManager, HookType,
+    HookManager,
+    HookType,
     LifecycleEvent,
 )
 
@@ -444,7 +445,7 @@ class TestPersistedCallbackReload:
     def test_persisted_callback_reloads_after_recreate(self, tmp_path):
         """A registered top-level hook should be callable after HookManager
         is rebuilt from the same DB."""
-        from tests.test_hook_manager_helpers import top_level_hook, hook_calls
+        from tests.test_hook_manager_helpers import hook_calls, top_level_hook
 
         # Create manager, register top-level hook, trigger it once.
         mgr1 = HookManager(root_dir=str(tmp_path))

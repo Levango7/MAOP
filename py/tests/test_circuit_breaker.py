@@ -1,14 +1,17 @@
 """Tests for MAOP.core.circuit_breaker — SQLite-backed with failover and health-check."""
 
 import asyncio
-import time
-import tempfile
+import contextlib
 import shutil
+import tempfile
+import time
 from pathlib import Path
 
 import pytest
+
 from maop.core.circuit_breaker import (
-    BreakerState, CircuitBreaker,
+    BreakerState,
+    CircuitBreaker,
 )
 
 
@@ -19,10 +22,8 @@ def breaker() -> CircuitBreaker:
     db_path = Path(tmp) / "maop.db"
     cb = CircuitBreaker(path=db_path)
     yield cb
-    try:
+    with contextlib.suppress(Exception):
         shutil.rmtree(tmp, ignore_errors=True)
-    except Exception:
-        pass
 
 
 class TestCircuitBreaker:

@@ -3,18 +3,20 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-
 from maop.core.error_schema import new_result
-from maop.engine import (
-    Engine, StepStatus, StepType,
-    WorkflowStep, _topological_sort, _resolve_template,
-)
-from maop.maop_execute import maop_execute, Delegate
-from maop.maop_plan import Plan, maop_plan, _route_by_keyword
-from maop.maop_verify import VerifyEngine, GateResult
-from maop.maop_loop import MaopLoop, LoopConfig, LoopResult
 from maop.core.permission import PermissionCheck
-
+from maop.engine import (
+    Engine,
+    StepStatus,
+    StepType,
+    WorkflowStep,
+    _resolve_template,
+    _topological_sort,
+)
+from maop.maop_execute import Delegate, maop_execute
+from maop.maop_loop import LoopConfig, LoopResult, MaopLoop
+from maop.maop_plan import Plan, _route_by_keyword, maop_plan
+from maop.maop_verify import GateResult, VerifyEngine
 
 # ═══════════════════════════════════════════════════════════════
 # maop_plan tests
@@ -354,7 +356,7 @@ class TestMaopLoop:
         assert chain == ["claude"]
 
     def test_build_fallback_chain_with_config(self):
-        from maop.config.loader import MaopConfig, RouteEntry, AgentDef
+        from maop.config.loader import AgentDef, MaopConfig, RouteEntry
 
         config = MaopConfig(
             agents={"claude": AgentDef(), "codex": AgentDef()},

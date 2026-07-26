@@ -8,10 +8,12 @@ from pathlib import Path
 import pytest
 
 from maop.dashboard import (
-    DashboardProvider, DashboardState, AgentStatus,
-    create_app, _render_html,
+    AgentStatus,
+    DashboardProvider,
+    DashboardState,
+    _render_html,
+    create_app,
 )
-
 
 # ═══════════════════════════════════════════════════════════════
 # DashboardState tests

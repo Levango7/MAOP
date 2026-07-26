@@ -29,10 +29,10 @@ Produces an AnalysisResult with:
 
 from __future__ import annotations
 
-import json
-import re
 import hashlib
+import json
 import logging
+import re
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
@@ -77,7 +77,7 @@ class DependencyDAG(BaseModel):
 
     def topological_order(self) -> list[str]:
         """Kahn's algorithm for topological sort."""
-        in_degree: dict[str, int] = {n: 0 for n in self.nodes}
+        in_degree: dict[str, int] = dict.fromkeys(self.nodes, 0)
         adj: dict[str, list[str]] = {n: [] for n in self.nodes}
         for src, dst in self.edges:
             adj[src].append(dst)
@@ -107,7 +107,7 @@ class DependencyDAG(BaseModel):
     def parallel_groups(self) -> list[list[str]]:
         """Group nodes that can execute in parallel (by dependency level)."""
         order = self.topological_order()
-        in_degree: dict[str, int] = {n: 0 for n in self.nodes}
+        in_degree: dict[str, int] = dict.fromkeys(self.nodes, 0)
         for _, dst in self.edges:
             in_degree[dst] = in_degree.get(dst, 0) + 1
 
@@ -440,8 +440,7 @@ def _parse_llm_decomp(
         first_newline = text.find("\n")
         if first_newline != -1:
             text = text[first_newline + 1:]
-        if text.endswith("```"):
-            text = text[:-3]
+        text = text.removesuffix("```")
         text = text.strip()
     try:
         data: Any = json.loads(text)

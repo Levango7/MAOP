@@ -383,13 +383,13 @@ class CacheEvolver:
                 if cache is None:
                     return False
                 if adj.parameter == "default_ttl_s":
-                    setattr(cache, "_default_ttl", float(adj.new_value))
+                    cache._default_ttl = float(adj.new_value)
                 elif adj.parameter == "max_size":
                     new_max = int(adj.new_value)
-                    setattr(cache, "_max_size", new_max)
+                    cache._max_size = new_max
                     # Evict if shrinking
                     while len(getattr(cache, "_store", {})) > new_max:
-                        store = getattr(cache, "_store")
+                        store = cache._store
                         if store:
                             store.popitem(last=False)
                 logger.info(
@@ -403,9 +403,9 @@ class CacheEvolver:
                 if cache is None:
                     return False
                 if adj.parameter == "similarity_threshold":
-                    setattr(cache, "_threshold", float(adj.new_value))
+                    cache._threshold = float(adj.new_value)
                 elif adj.parameter == "default_ttl_s":
-                    setattr(cache, "_default_ttl", float(adj.new_value))
+                    cache._default_ttl = float(adj.new_value)
                 logger.info(
                     "[cache_evolver] Applied %s=%s to semantic cache '%s'",
                     adj.parameter, adj.new_value, adj.cache_name,

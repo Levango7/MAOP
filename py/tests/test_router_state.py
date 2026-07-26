@@ -48,7 +48,7 @@ def test_init_subsystems_populates_dict():
     # Should have a sizable number of subsystem entries
     assert len(subs) >= 15
     # Each entry should have 'available' key
-    for name, info in subs.items():
+    for info in subs.values():
         assert "available" in info
         assert "module" in info
 

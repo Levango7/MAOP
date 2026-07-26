@@ -152,7 +152,6 @@ def _load_yaml(path: Path) -> dict[str, Any] | None:
 
 from maop.core.db_utils import find_project_root
 
-
 # === Config loading cache ============================================
 #
 # High-frequency call point: every dispatch re-reads agent config. Cache the

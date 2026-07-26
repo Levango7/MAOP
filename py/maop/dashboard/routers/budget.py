@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Request
 
-from .state import MAOP_ROOT
-from .error_handler import handle_api_errors
 from maop.core.middleware import require_admin
+
+from .error_handler import handle_api_errors
+from .state import MAOP_ROOT
 
 logger = logging.getLogger(__name__)
 

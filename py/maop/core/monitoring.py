@@ -13,11 +13,10 @@ import json
 import logging
 import re
 import threading
-from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -373,7 +372,7 @@ class Histogram:
         self.name = name
         self.help_text = help_text
         self.buckets = buckets or self.DEFAULT_BUCKETS
-        self._counts: dict[float, int] = {b: 0 for b in self.buckets}
+        self._counts: dict[float, int] = dict.fromkeys(self.buckets, 0)
         self._sum: float = 0.0
         self._total: int = 0
         self._lock = threading.Lock()
@@ -555,7 +554,7 @@ MAOP_PRIORITY_QUEUE_SIZE = metrics.gauge(
 _MAOP_PRIORITY_WAIT_HISTOGRAMS: dict[int, Histogram] = {}
 
 
-def get_priority_wait_histogram(priority: int) -> "Histogram":
+def get_priority_wait_histogram(priority: int) -> Histogram:
     """Return (creating if needed) the wait-time histogram for a priority level."""
     if priority not in _MAOP_PRIORITY_WAIT_HISTOGRAMS:
         _MAOP_PRIORITY_WAIT_HISTOGRAMS[priority] = metrics.histogram(

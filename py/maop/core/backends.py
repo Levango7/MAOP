@@ -39,8 +39,8 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, cast
 
-from maop.core.db_utils import sqlite_connect
 from maop.config.edition import get_edition, record_degradation
+from maop.core.db_utils import sqlite_connect
 
 logger = logging.getLogger(__name__)
 

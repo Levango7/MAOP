@@ -13,7 +13,7 @@ import logging
 import os
 from typing import Any
 
-from maop.config.edition import require_feature, FeatureFlag
+from maop.config.edition import FeatureFlag, require_feature
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +52,12 @@ def _ensure_dev_certs() -> tuple[str, str]:
 
     try:
         os.makedirs(cert_dir, exist_ok=True)
+        import datetime
+
         from cryptography import x509
-        from cryptography.x509.oid import NameOID
         from cryptography.hazmat.primitives import hashes, serialization
         from cryptography.hazmat.primitives.asymmetric import rsa
-        import datetime
+        from cryptography.x509.oid import NameOID
 
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         subject = issuer = x509.Name([

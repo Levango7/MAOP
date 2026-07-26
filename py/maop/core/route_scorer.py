@@ -17,6 +17,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 import threading
@@ -25,13 +26,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from maop.config.loader import MaopConfig, RouteEntry
-from maop.core.otel import get_tracer, span as otel_span
+from maop.core.multi_objective_scorer import ObjectiveWeights  # R8-F821 fix
+from maop.core.otel import get_tracer
+from maop.core.otel import span as otel_span
 from maop.core.routing_decision import (
     RoutingDecisionRecord,
     get_active_span_context,
     record_decision_safe,
 )
-from maop.core.multi_objective_scorer import ObjectiveWeights  # R8-F821 fix
 
 logger = logging.getLogger(__name__)
 
@@ -98,12 +100,12 @@ class RouteScorer:
         # Off by default for full backward compatibility; flip via
         # ``enable_multi_objective()``.
         self._use_multi_objective: bool = False
-        self._mo_weights: "ObjectiveWeights | None" = None
+        self._mo_weights: ObjectiveWeights | None = None
 
     # ── Public API ───────────────────────────────────────────
 
     def enable_multi_objective(
-        self, weights: "ObjectiveWeights | None" = None
+        self, weights: ObjectiveWeights | None = None
     ) -> None:
         """Switch agent selection to the Pareto + TOPSIS scorer.
 
@@ -388,8 +390,7 @@ class RouteScorer:
                 pos = task_lower.find(kw_lower)
                 if pos >= 0:
                     matched_count += 1
-                    if pos < best_position:
-                        best_position = pos
+                    best_position = min(best_position, pos)
 
             if matched_count > 0:
                 keyword_score = min(1.0, matched_count / 3) * _KEYWORD_BASE
@@ -415,9 +416,8 @@ class RouteScorer:
         if not self.config or not route.primary:
             return 0.0
         agent = self.config.agents.get(route.primary)
-        if agent and hasattr(agent, "capabilities"):
-            if routing_key in agent.capabilities:
-                return _CAPABILITY_BONUS
+        if agent and hasattr(agent, "capabilities") and routing_key in agent.capabilities:
+            return _CAPABILITY_BONUS
         return 0.0
 
     # ── Internal: Multi-Objective Agent Selection (Phase γ-3) ─
@@ -449,14 +449,14 @@ class RouteScorer:
 
         # Lazy imports keep the module import-cost low when the multi-
         # objective path is never enabled.
+        import os
+
         from maop.core.agent_performance import AgentPerformanceTracker
         from maop.core.multi_objective_scorer import (
             AgentObjectiveVector,
             MultiObjectiveScorer,
             ObjectiveWeights,
         )
-
-        import os
         root = os.environ.get("MAOP_ROOT_DIR", ".")
         tracker = AgentPerformanceTracker(root_dir=root)
 
@@ -493,8 +493,8 @@ class RouteScorer:
         # Record metrics for observability.
         try:
             from maop.core.monitoring import (
-                MAOP_ROUTE_PARETO_FRONTIER_SIZE,
                 MAOP_ROUTE_MULTI_OBJECTIVE_SCORE,
+                MAOP_ROUTE_PARETO_FRONTIER_SIZE,
             )
             frontier_size = scorer.compute_pareto_frontier(vectors).frontier_size
             MAOP_ROUTE_PARETO_FRONTIER_SIZE.set(float(frontier_size))
@@ -552,8 +552,9 @@ class RouteScorer:
         # Try adaptive selection first (performance-based)
         if adaptive and len(candidates) > 1:
             try:
-                from maop.core.agent_performance import AgentPerformanceTracker
                 import os
+
+                from maop.core.agent_performance import AgentPerformanceTracker
                 root = os.environ.get("MAOP_ROOT_DIR", ".")
                 tracker = AgentPerformanceTracker(root_dir=root)
                 best = tracker.best_agent(
@@ -655,17 +656,15 @@ def get_route_scorer(config: MaopConfig | None = None) -> RouteScorer:
 
 def _set_span_attr(s: Any, key: str, value: Any) -> None:
     """Best-effort ``set_attribute`` on a (possibly no-op) span."""
-    try:
+    with contextlib.suppress(Exception):
         s.set_attribute(key, value)
-    except Exception:
-        pass
 
 
 def _record_route_scorer_decision(
     *,
     trace_id: str,
     task: str,
-    result: "RouteMatch | None",
+    result: RouteMatch | None,
     candidate_count: int,
     decision_mode: str,
     duration_ms: float,
@@ -701,8 +700,8 @@ def _record_route_scorer_decision(
 
     try:
         from maop.core.monitoring import (
-            MAOP_ROUTING_DECISION_TOTAL,
             MAOP_ROUTING_DECISION_DURATION_MS,
+            MAOP_ROUTING_DECISION_TOTAL,
         )
         MAOP_ROUTING_DECISION_TOTAL.inc(labels={"stage": "route_scorer"})
         MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)

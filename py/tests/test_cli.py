@@ -9,15 +9,13 @@ import pytest
 
 from maop import cli
 
-
 # ── Argument parsing ──────────────────────────────────────────
 
 class TestArgParsing:
     def test_default_action_is_start(self):
-        with patch.object(sys, "argv", ["MAOP"]):
-            with patch("maop.cli.cmd_start") as mock_start:
-                cli.main()
-                mock_start.assert_called_once_with(9079, "127.0.0.1")
+        with patch.object(sys, "argv", ["MAOP"]), patch("maop.cli.cmd_start") as mock_start:
+            cli.main()
+            mock_start.assert_called_once_with(9079, "127.0.0.1")
 
     def test_explicit_start_with_port_host(self):
         with patch.object(sys, "argv", ["MAOP", "start", "--port", "8080", "--host", "0.0.0.0"]):

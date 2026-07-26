@@ -20,6 +20,7 @@ Usage::
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import logging
 import uuid
@@ -195,10 +196,8 @@ class ImageStore:
         with sqlite_connect(self._db_path) as conn:
             cursor = conn.execute("DELETE FROM images WHERE id=?", (image_id,))
         if cursor.rowcount > 0 and path:
-            try:
+            with contextlib.suppress(Exception):
                 Path(path).unlink(missing_ok=True)
-            except Exception:
-                pass
             return True
         return False
 
@@ -230,9 +229,8 @@ class ImageStore:
         for img in images_meta:
             try:
                 created = datetime.fromisoformat(img.created_at)
-                if (cutoff - created).days > max_age_days:
-                    if self.delete(img.id):
-                        count += 1
+                if (cutoff - created).days > max_age_days and self.delete(img.id):
+                    count += 1
             except (ValueError, TypeError):
                 pass
         return count

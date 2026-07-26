@@ -90,7 +90,7 @@ class TestRetention:
         by_db = {}
         for e in backup._manifest:
             by_db.setdefault(e.db_name, []).append(e)
-        for db_name, entries in by_db.items():
+        for entries in by_db.values():
             assert len(entries) == 1
 
 
@@ -202,6 +202,7 @@ class TestADR011StateSourceTruth:
 
     def test_human_proxy_uses_sqlite_not_json(self):
         import inspect
+
         from maop.core.human_proxy import HumanProxy
         src = inspect.getsource(HumanProxy)
         assert "get_db_path" in src or "sqlite" in src.lower()
@@ -210,11 +211,12 @@ class TestADR011StateSourceTruth:
     def test_no_json_truth_sources_in_core(self):
         import inspect
         import pkgutil
+
         import maop.core as core_pkg
         json_truth_patterns = [
             "circuit-breaker.json", "human-queue.json", "message_queue.json"
         ]
-        for importer, modname, ispkg in pkgutil.walk_packages(
+        for _importer, modname, _ispkg in pkgutil.walk_packages(
             core_pkg.__path__, core_pkg.__name__ + "."
         ):
             try:

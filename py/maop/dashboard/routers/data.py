@@ -17,8 +17,9 @@ from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from .state import MAOP_ROOT, get_bridge
 from maop.core.middleware import require_admin
+
+from .state import MAOP_ROOT, get_bridge
 
 logger = logging.getLogger(__name__)
 

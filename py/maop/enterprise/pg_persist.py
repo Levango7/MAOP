@@ -21,7 +21,7 @@ import os
 import time
 from typing import Any, cast
 
-from maop.config.edition import has_feature, FeatureFlag, record_degradation
+from maop.config.edition import FeatureFlag, has_feature, record_degradation
 
 logger = logging.getLogger(__name__)
 

@@ -11,9 +11,12 @@ from unittest.mock import patch
 import pytest
 
 from maop.dashboard.provider import (
-    AgentStatus, DashboardState, DashboardProvider, create_app, _render_html,
+    AgentStatus,
+    DashboardProvider,
+    DashboardState,
+    _render_html,
+    create_app,
 )
-
 
 # ── Data Model Tests ─────────────────────────────────────────
 

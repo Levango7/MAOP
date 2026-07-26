@@ -28,14 +28,16 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import time
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
@@ -544,14 +546,12 @@ class HookManager:
         """
         self._event_bus = bus
         for le in LifecycleEvent:
-            try:
+            with contextlib.suppress(Exception):
                 bus.subscribe(
                     le.value,
                     self._make_bus_subscriber(le.value),
                     max_retries=0,
                 )
-            except Exception:
-                pass
         logger.info("[hook] Bridged with EventBus")
 
     def _make_bus_subscriber(self, event: str) -> Callable[..., Any]:

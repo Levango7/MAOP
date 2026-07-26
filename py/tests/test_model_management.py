@@ -1,17 +1,23 @@
 ﻿"""Tests for MAOP.model module — Model Management Phase 1."""
 
-import pytest
 from pathlib import Path
 
-from maop.model.schema import (
-    ModelDef, ProviderDef, BudgetConfig, EffectiveModel, ProviderType, QualityTier, SelectionStrategy,
-)
-from maop.model.registry import ModelRegistry
-from maop.model.selector import ModelSelector
+import pytest
+
+from maop.model.budget import BudgetGuard
 from maop.model.fallback import FallbackManager
 from maop.model.quota import QuotaEnforcer
-from maop.model.budget import BudgetGuard
-
+from maop.model.registry import ModelRegistry
+from maop.model.schema import (
+    BudgetConfig,
+    EffectiveModel,
+    ModelDef,
+    ProviderDef,
+    ProviderType,
+    QualityTier,
+    SelectionStrategy,
+)
+from maop.model.selector import ModelSelector
 
 # Fixtures
 

@@ -4,16 +4,19 @@ import json
 import tempfile
 from pathlib import Path
 
-
-from maop.evolve import (
-    EvolveEngine, EvolutionStats,
-    AgentStats, AgentKeyStats,
-    Suggestion, _compute_stats, _generate_suggestions,
-)
 from maop.config.hot_reload import (
-    ConfigHotReload, _file_hash,
+    ConfigHotReload,
+    _file_hash,
 )
-
+from maop.evolve import (
+    AgentKeyStats,
+    AgentStats,
+    EvolutionStats,
+    EvolveEngine,
+    Suggestion,
+    _compute_stats,
+    _generate_suggestions,
+)
 
 # ═══════════════════════════════════════════════════════════════
 # Evolve engine tests

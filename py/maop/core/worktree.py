@@ -185,7 +185,7 @@ class WorktreeManager:
             ).fetchone()
             if not row:
                 raise ValueError(f"Parent node '{parent_id}' not found")
-            root_id = row[0] if row[0] else parent_id
+            root_id = row[0] or parent_id
 
             node_id = uuid.uuid4().hex[:16]
             conn.execute(

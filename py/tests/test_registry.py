@@ -6,13 +6,17 @@ from pathlib import Path
 
 import pytest
 
-from maop.model.registry import ProviderRegistry, ModelRegistry
 from maop.core.db_utils import find_project_root
+from maop.model.registry import ModelRegistry, ProviderRegistry
 from maop.model.schema import (
-    ProviderDef, ModelDef, ModelRegistryConfig, ProviderType, QualityTier, LatencyTier,
+    LatencyTier,
+    ModelDef,
+    ModelRegistryConfig,
+    ProviderDef,
+    ProviderType,
+    QualityTier,
     SelectionStrategy,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────────
 

@@ -4,7 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from maop.maop_plan import Plan, maop_plan, _route_by_keyword, execute_workflow, _interpolate_vars, _evaluate_condition
+from maop.maop_plan import (
+    Plan,
+    _evaluate_condition,
+    _interpolate_vars,
+    _route_by_keyword,
+    execute_workflow,
+    maop_plan,
+)
 
 
 class TestRouteByKeyword:

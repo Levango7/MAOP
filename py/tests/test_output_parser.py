@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-
-from maop.core.output_parser import OutputParser
 from maop.core.error_schema import new_result
-from maop.maop_verify import VerifyEngine, GATE_REGISTRY
-
+from maop.core.output_parser import OutputParser
+from maop.maop_verify import GATE_REGISTRY, VerifyEngine
 
 # ── OutputParser: extract_json ──────────────────────────────────
 

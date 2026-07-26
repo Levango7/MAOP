@@ -15,6 +15,7 @@ Usage::
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import shutil
@@ -117,10 +118,8 @@ class SkillVersionManager:
 
         existing_meta: dict[str, Any] = {}
         if meta_file.exists():
-            try:
+            with contextlib.suppress(Exception):
                 existing_meta = SkillMeta(**json.loads(meta_file.read_text(encoding="utf-8"))).model_dump()
-            except Exception:
-                pass
 
         version = existing_meta.get("version", "1.0.0")
         if existing_meta:

@@ -11,8 +11,8 @@ import re
 from typing import Any
 
 from maop.memory.models import (
-    SearchResult,
     FacetResult,
+    SearchResult,
     expand_keywords,
 )
 

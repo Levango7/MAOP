@@ -168,6 +168,7 @@ class TestMonitorLiveContract:
         """Monitor.vue reads requests_per_min/queue_depth/cost_per_hour/agents."""
         import asyncio
         from unittest.mock import AsyncMock
+
         from maop.dashboard.data_bridge import DataBridge
 
         bridge = DataBridge(root_dir=str(tmp_path))
@@ -188,6 +189,7 @@ class TestMonitorLiveContract:
         """agents field must be a list (Monitor.vue iterates it)."""
         import asyncio
         from unittest.mock import AsyncMock
+
         from maop.dashboard.data_bridge import DataBridge
 
         bridge = DataBridge(root_dir=str(tmp_path))
@@ -211,6 +213,7 @@ class TestHealthContract:
     def test_health_has_active_agents(self):
         """Monitor.vue reads h.active_agents."""
         import asyncio
+
         from maop.dashboard.server import health
 
         try:
@@ -234,6 +237,7 @@ class TestAgentsRoutesContract:
         """Agents.vue uses route.name/provider/enabled, not pattern/agent/weight."""
         import asyncio
         from unittest.mock import MagicMock, patch
+
         from maop.dashboard.routers import agents as agents_mod
 
         # Fake agent returned by the registry — only attributes read by the handler.
@@ -270,6 +274,7 @@ class TestLogsContract:
     def test_logs_returns_logs_array(self):
         """Overview.vue expects {logs: [...], count: N}."""
         import inspect
+
         from maop.dashboard.routers import data as data_mod
 
         src = inspect.getsource(data_mod.api_logs)
@@ -298,6 +303,7 @@ class TestReportContract:
     def test_report_accepts_hours_param(self):
         """Frontend sends ?hours=24, backend must accept it."""
         import inspect
+
         from maop.dashboard.routers import data as data_mod
 
         sig = inspect.signature(data_mod.api_report)
@@ -315,6 +321,7 @@ class TestEvolveContract:
     def test_evolve_status_has_data_wrapper(self):
         """Backend wraps in {status, data}, frontend reads data.data.total_evolutions."""
         import asyncio
+
         from maop.dashboard.routers import evolve as evolve_mod
 
         try:

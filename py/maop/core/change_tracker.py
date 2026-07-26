@@ -158,9 +158,7 @@ class ChangeTracker:
         if path.is_symlink():
             return True
         # Skip if not a regular file (directories are handled by rglob caller)
-        if path.exists() and not path.is_file():
-            return True
-        return False
+        return bool(path.exists() and not path.is_file())
 
     def _hash_file(self, path: Path) -> str:
         try:

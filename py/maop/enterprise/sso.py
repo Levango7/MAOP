@@ -12,19 +12,20 @@ Provides enterprise identity provider integration:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import secrets
 import time
-from enum import Enum
-from typing import Any
 import urllib.error
 import urllib.parse
 import urllib.request
+from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.config.edition import require_feature, FeatureFlag
+from maop.config.edition import FeatureFlag, require_feature
 
 logger = logging.getLogger(__name__)
 
@@ -210,10 +211,8 @@ class SSOManager:
                 payload = resp.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             detail = ""
-            try:
+            with contextlib.suppress(Exception):
                 detail = exc.read().decode("utf-8", errors="replace")
-            except Exception:
-                pass
             raise RuntimeError(
                 f"SSO token endpoint returned HTTP {exc.code}: {detail}"
             ) from exc

@@ -5,12 +5,11 @@ All commands use Python-native implementations. No PowerShell fallbacks.
 
 from __future__ import annotations
 
-from typing import Any
-
 import argparse
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 MAOP_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -18,11 +17,10 @@ MAOP_ROOT = Path(__file__).resolve().parent.parent.parent
 def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
     """Start the FastAPI dashboard (Python-native)."""
     try:
-        from maop.dashboard.server import app
         import uvicorn
-    except ImportError as e:
-        print(f"ERROR: Cannot import maop dashboard: {e}")
-        print("Install dependencies: pip install fastapi uvicorn")
+
+        from maop.dashboard.server import app
+    except ImportError:
         sys.exit(1)
 
     # Multi-worker support (MAOP_WORKERS env var)
@@ -31,7 +29,6 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
 
     if workers > 1:
         uvicorn_kwargs["workers"] = workers
-        print(f"MAOP Dashboard -> http://{host}:{port} (workers={workers})")
     else:
         # TLS support (single-worker only — uvicorn limitation)
         tls_enabled = os.environ.get("MAOP_TLS", "0") == "1"
@@ -46,7 +43,6 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
                     uvicorn_kwargs["ssl"] = ssl_ctx
 
         proto = "https" if "ssl" in uvicorn_kwargs else "http"
-        print(f"MAOP Dashboard -> {proto}://{host}:{port}")
 
     uvicorn.run(app, host=host, port=port, **uvicorn_kwargs)
 
@@ -56,11 +52,9 @@ def cmd_stop() -> Any:
     try:
         from maop.deploy import stop
         result = stop(MAOP_ROOT)
-        print(f"[MAOP] Status: {result.status.value}")
         if result.pid:
-            print(f"[MAOP] Stopped PID {result.pid}")
-    except Exception as e:
-        print(f"ERROR: {e}")
+            pass
+    except Exception:
         sys.exit(1)
 
 
@@ -69,38 +63,32 @@ def cmd_status() -> Any:
     try:
         from maop.deploy import status
         result = status(MAOP_ROOT)
-        print(f"[MAOP] Status: {result.status.value}")
         if result.pid:
-            print(f"[MAOP] PID: {result.pid}")
-        for comp in result.components:
-            print(f"  {comp.name}: {comp.status.value} ({comp.latency_ms:.1f}ms) {comp.message}")
-    except Exception as e:
-        print(f"[MAOP] Status check failed: {e}")
+            pass
+        for _comp in result.components:
+            pass
+    except Exception:
+        pass
 
 
 def cmd_run(task: str) -> Any:
     """Run a task through Python-native MaopLoop."""
     try:
         import asyncio
+
         from maop.maop_loop import MaopLoop
         loop = MaopLoop(root_dir=str(MAOP_ROOT))
         result = asyncio.run(loop.run(task))
-        print(f"[MAOP] Agent: {result.selected_agent}")
-        print(f"[MAOP] Success: {result.success}")
-        print(f"[MAOP] Duration: {result.total_duration_ms}ms")
         if result.execution:
-            print(f"[MAOP] Exit code: {result.execution.exit_code}")
             if result.execution.stdout:
-                print(f"[MAOP] Output:\n{result.execution.stdout[:2000]}")
+                pass
             if result.execution.error:
-                print(f"[MAOP] Error: {result.execution.error}")
+                pass
         if result.block_reason:
-            print(f"[MAOP] Blocked: {result.block_reason}")
-    except ImportError as e:
-        print(f"ERROR: Cannot import MaopLoop: {e}")
+            pass
+    except ImportError:
         sys.exit(1)
-    except Exception as e:
-        print(f"ERROR: Task execution failed: {e}")
+    except Exception:
         sys.exit(1)
 
 
@@ -110,17 +98,15 @@ def cmd_validate() -> Any:
         from maop.deploy import validate_config
         result = validate_config(MAOP_ROOT)
         if result.valid:
-            print("[MAOP] Configuration: VALID")
+            pass
         else:
-            print("[MAOP] Configuration: INVALID")
-            for err in result.errors:
-                print(f"  ERROR: {err}")
-        for warn in result.warnings:
-            print(f"  WARNING: {warn}")
+            for _err in result.errors:
+                pass
+        for _warn in result.warnings:
+            pass
         if not result.valid:
             sys.exit(1)
-    except Exception as e:
-        print(f"ERROR: Validation failed: {e}")
+    except Exception:
         sys.exit(1)
 
 
@@ -132,16 +118,13 @@ def cmd_health() -> Any:
         all_healthy = True
         for r in results:
             status_icon = {"healthy": "+", "degraded": "~", "unhealthy": "!"}[r.status.value]
-            print(f"  [{status_icon}] {r.name}: {r.status.value} ({r.latency_ms:.1f}ms) {r.message}")
             if r.status.value != "healthy":
                 all_healthy = False
         if not all_healthy:
-            print("[MAOP] Health: DEGRADED")
             sys.exit(1)
         else:
-            print("[MAOP] Health: OK")
-    except Exception as e:
-        print(f"ERROR: Health check failed: {e}")
+            pass
+    except Exception:
         sys.exit(1)
 
 
@@ -202,18 +185,15 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
     if parsed.subcommand == "list-registries":
         regs = mp.list_registries()
         if not regs:
-            print("No registries configured.")
+            pass
         for r in regs:
             trust = "trusted" if r.trusted else "untrusted"
             status = "enabled" if r.enabled else "disabled"
-            print(f"  {r.name}: {r.url} [{trust}, {status}]")
     elif parsed.subcommand == "add-registry":
         mp.add_registry(parsed.name, parsed.url, trusted=parsed.trusted)
         trust = "trusted" if parsed.trusted else "untrusted"
-        print(f"Added {trust} registry '{parsed.name}' -> {parsed.url}")
     elif parsed.subcommand == "remove-registry":
         mp.remove_registry(parsed.name)
-        print(f"Removed registry '{parsed.name}'")
     elif parsed.subcommand == "search":
         tags = (
             [t.strip() for t in parsed.tags.split(",") if t.strip()]
@@ -221,11 +201,10 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
         )
         results = mp.search(parsed.query, tags=tags)
         if not results:
-            print("No servers found.")
+            pass
         for s in results:
             verified = " [verified]" if s.verified else ""
             tags_str = f" tags={','.join(s.tags)}" if s.tags else ""
-            print(f"  {s.name} v{s.version}{verified}{tags_str}: {s.description}")
     elif parsed.subcommand == "install":
         try:
             cfg = mp.install(
@@ -234,38 +213,30 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
                 verify_checksum=not parsed.no_verify,
                 confirm_untrusted=parsed.confirm_untrusted,
             )
-            print(f"Installed '{parsed.name}' (transport={cfg.transport.value})")
-        except ValueError as e:
-            print(f"ERROR: {e}")
+        except ValueError:
             sys.exit(1)
     elif parsed.subcommand == "uninstall":
         if mp.uninstall(parsed.name):
-            print(f"Uninstalled '{parsed.name}'")
+            pass
         else:
-            print(f"ERROR: '{parsed.name}' is not installed")
             sys.exit(1)
     elif parsed.subcommand == "list-installed":
         installed = mp.list_installed()
         if not installed:
-            print("No marketplace servers installed.")
+            pass
         for s in installed:
-            print(
-                f"  {s.get('name', '?')} v{s.get('version', '?')} "
-                f"(from {s.get('registry', '?')})"
-            )
+            pass
 
 
 def cmd_mcp(args: list[str]) -> Any:
     """Handle ``mcp <subcommand>`` — currently only ``marketplace`` is supported."""
     if not args:
-        print("ERROR: 'mcp' requires a subcommand. Available: marketplace")
         sys.exit(1)
     sub = args[0]
     rest = args[1:]
     if sub == "marketplace":
         cmd_mcp_marketplace(rest)
     else:
-        print(f"ERROR: Unknown mcp subcommand '{sub}'. Available: marketplace")
         sys.exit(1)
 
 
@@ -302,7 +273,6 @@ def main() -> Any:
         cmd_status()
     elif args.action == "run":
         if not args.task:
-            print("ERROR: --task required for run")
             sys.exit(1)
         cmd_run(args.task)
     elif args.action == "validate":

@@ -120,7 +120,7 @@ def test_cost_tracker_auto_record():
 def test_cost_tracker_singleton():
     """Verify get_cost_tracker returns a singleton instance."""
     import maop.core.cost_tracker as ct_mod
-    from maop.core.cost_tracker import get_cost_tracker, CostTracker
+    from maop.core.cost_tracker import CostTracker, get_cost_tracker
 
     original = ct_mod._cost_tracker_instance
     ct_mod._cost_tracker_instance = None

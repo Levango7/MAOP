@@ -86,15 +86,15 @@ class TestMAOPSettings:
 
 class TestSettingsSingleton:
     def test_get_settings(self):
-        from maop.config.settings import get_settings
         import maop.config.settings as mod
+        from maop.config.settings import get_settings
         mod._settings = None  # Reset
         s = get_settings()
         assert s.project_name == "MAOP"
 
     def test_reload_settings(self, monkeypatch):
-        from maop.config.settings import reload_settings
         import maop.config.settings as mod
+        from maop.config.settings import reload_settings
         mod._settings = None
         monkeypatch.setenv("MAOP_DEBUG", "1")
         s = reload_settings()

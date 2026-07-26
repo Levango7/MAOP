@@ -179,7 +179,7 @@ def _detect_with_license_check(requested: Edition) -> Edition:
         return requested
 
     try:
-        from maop.enterprise.license import LicenseValidator, LicenseError
+        from maop.enterprise.license import LicenseError, LicenseValidator
         validator = LicenseValidator()
         info = validator.validate_from_env()
         if info is None:

@@ -121,7 +121,7 @@ async def maop_execute(
     # ReAct mode: delegate to ReactLoop for Thought→Action→Observation cycling
     if react_mode:
         try:
-            from maop.core.react_loop import ReactLoop, ReactConfig
+            from maop.core.react_loop import ReactConfig, ReactLoop
             react_config = ReactConfig(
                 max_iterations=react_max_iterations,
                 provider=provider,
@@ -157,8 +157,9 @@ async def maop_execute(
 
     # Permission check — consult PermissionManager before dispatch
     try:
-        from maop.core.permission import PermissionManager
         from pathlib import Path as _Path
+
+        from maop.core.permission import PermissionManager
         _root = _Path(__file__).resolve().parent.parent.parent
         pm = permission_manager if permission_manager is not None else PermissionManager(root_dir=str(_root))
         perm = pm.check(agent=agent, action=routing_key or "execute")
@@ -195,7 +196,7 @@ async def maop_execute(
 
     # Hook: agent.pre_dispatch — hooks can veto dispatch by returning decision="deny"
     try:
-        from maop.core.hook_manager import get_hook_manager, LifecycleEvent
+        from maop.core.hook_manager import LifecycleEvent, get_hook_manager
         mgr = get_hook_manager()
         hook_results = await mgr.trigger(LifecycleEvent.AGENT_PRE_DISPATCH, {
             "agent": agent, "task": task, "routing_key": routing_key, "trace_id": trace_id,
@@ -300,7 +301,7 @@ async def maop_execute(
 
     # Hook: agent.post_dispatch / agent.on_error / agent.on_timeout
     try:
-        from maop.core.hook_manager import get_hook_manager, LifecycleEvent
+        from maop.core.hook_manager import LifecycleEvent, get_hook_manager
         mgr = get_hook_manager()
         if result.is_success():
             await mgr.trigger(LifecycleEvent.AGENT_POST_DISPATCH, {

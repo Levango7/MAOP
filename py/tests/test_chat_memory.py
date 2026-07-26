@@ -2,24 +2,22 @@
 
 from __future__ import annotations
 
-
 import pytest
 
-from maop.memory.manager import (
-    MemoryManager,
-    MemoryManagerConfig,
-    MemoryContext,
-    MemoryLayer,
-    ConsolidationTrigger,
-)
 from maop.core.chat_engine import (
     ChatEngine,
+    ChatMessage,
     ChatRequest,
     ChatResponse,
-    ChatMessage,
     _sse_event,
 )
-
+from maop.memory.manager import (
+    ConsolidationTrigger,
+    MemoryContext,
+    MemoryLayer,
+    MemoryManager,
+    MemoryManagerConfig,
+)
 
 # ═══════════════════════════════════════════════════════════════════
 # MemoryManager Tests

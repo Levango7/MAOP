@@ -5,13 +5,13 @@ from __future__ import annotations
 import pytest
 
 from maop.engine import (
-    safe_eval,
-    StepType,
-    StepStatus,
-    WorkflowStep,
-    StepResult,
-    EngineResult,
     Engine,
+    EngineResult,
+    StepResult,
+    StepStatus,
+    StepType,
+    WorkflowStep,
+    safe_eval,
 )
 
 

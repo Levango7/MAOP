@@ -156,7 +156,7 @@ class ProjectContext:
         except PermissionError:
             return
         for i, entry in enumerate(entries[:30]):
-            if entry.name.startswith(".") and entry.name not in (".env.example",):
+            if entry.name.startswith(".") and entry.name != ".env.example":
                 continue
             if entry.name in self.SKIP_DIRS:
                 continue

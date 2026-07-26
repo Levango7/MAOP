@@ -10,16 +10,20 @@ from pathlib import Path
 import yaml
 
 from maop.model.schema import (
-    ModelDef, ProviderDef, ModelRegistryConfig,
-    ProviderType, QualityTier, LatencyTier,
-    ProtocolType, EffectiveModel,
+    EffectiveModel,
+    LatencyTier,
+    ModelDef,
+    ModelRegistryConfig,
+    ProtocolType,
+    ProviderDef,
+    ProviderType,
+    QualityTier,
 )
 
 logger = logging.getLogger(__name__)
 
 
 from maop.core.db_utils import find_project_root
-
 
 # ── ProviderRegistry ──────────────────────────────────────────
 

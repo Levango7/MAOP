@@ -359,7 +359,7 @@ class DbBackup:
     def stats(self) -> BackupStats:
         """Get backup statistics."""
         total_size = sum(e.size_bytes for e in self._manifest)
-        db_names = sorted(set(e.db_name for e in self._manifest))
+        db_names = sorted({e.db_name for e in self._manifest})
         last_at = max((e.created_at for e in self._manifest), default="")
         return BackupStats(
             total_backups=len(self._manifest),

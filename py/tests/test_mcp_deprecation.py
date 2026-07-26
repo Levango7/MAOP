@@ -14,7 +14,6 @@ import sys
 
 import pytest
 
-
 # ── Stack B modules that must NOT be importable ─────────────────────────
 REMOVED_MODULES = [
     "maop.core.mcp_transport",
@@ -37,7 +36,7 @@ class TestStackBRemoved:
     def test_stack_b_classes_not_exported(self) -> None:
         """Stack B class names must not be importable from maop.core."""
         # These names lived in the removed Stack B modules.
-        from maop.core import mcp_hub  # noqa: F401  — canonical module must import
+        from maop.core import mcp_hub
 
         # Importing the canonical module must not re-expose Stack B classes.
         assert not hasattr(mcp_hub, "MCPRegistry"), (

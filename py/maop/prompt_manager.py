@@ -5,19 +5,20 @@ Actions: create, get, list, delete, render, test, search, export, import.
 """
 
 from __future__ import annotations
-from maop.core.db_utils import get_db_path
 
 import json
 import logging
 import re
 import sqlite3
-from contextlib import contextmanager
-from typing import Generator
+from collections.abc import Generator
+from contextlib import contextmanager, suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from maop.core.db_utils import get_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -370,10 +371,8 @@ class PromptManager:
 
     def _row_to_template(self, row: sqlite3.Row) -> PromptTemplate:
         tags = []
-        try:
+        with suppress(json.JSONDecodeError, ValueError):
             tags = json.loads(row["tags"] or "[]")
-        except (json.JSONDecodeError, ValueError):
-            pass
         return PromptTemplate(
             id=row["id"],
             name=row["name"],
@@ -384,10 +383,8 @@ class PromptManager:
 
     def _row_to_version(self, row: sqlite3.Row) -> PromptVersion:
         variables = {}
-        try:
+        with suppress(json.JSONDecodeError, ValueError):
             variables = json.loads(row["variables"] or "{}")
-        except (json.JSONDecodeError, ValueError):
-            pass
         return PromptVersion(
             version=row["version"],
             content=row["content"],

@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from maop.dashboard.error_handler import handle_api_errors
 from maop.core.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -48,8 +48,8 @@ def _get_registry():
 
 def _get_matcher():
     if "matcher" not in _instance_cache:
-        from maop.core.capability_matcher import CapabilityMatcher
         from maop.core.agent_registry import AgentRegistry
+        from maop.core.capability_matcher import CapabilityMatcher
         root = Path(__file__).resolve().parent.parent.parent.parent
         registry = AgentRegistry(root_dir=str(root))
         _instance_cache["matcher"] = CapabilityMatcher(registry=registry)

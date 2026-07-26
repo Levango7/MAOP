@@ -16,7 +16,6 @@ import os
 
 import pytest
 
-
 # ── MAOPSettings env-var loading ──────────────────────────────────
 
 class TestSettingsFromEnv:
@@ -254,8 +253,9 @@ class TestValidatorRejection:
             assert s.tls_min_version == ver
 
     def test_insecure_tls_versions_rejected(self):
-        from maop.config.settings import MAOPSettings
         import pydantic
+
+        from maop.config.settings import MAOPSettings
 
         for ver in ("TLSv1", "TLSv1_1"):
             with pytest.raises(pydantic.ValidationError, match="insecure"):

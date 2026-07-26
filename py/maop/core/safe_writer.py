@@ -29,7 +29,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["safe_write_text", "safe_write_bytes", "safe_write_json"]
+__all__ = ["safe_write_bytes", "safe_write_json", "safe_write_text"]
 
 
 def _fsync_dir(dir_path: Path) -> None:

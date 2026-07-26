@@ -20,6 +20,7 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import uuid
@@ -198,10 +199,8 @@ class ArtifactStore:
         result = []
         for r in rows:
             metadata = {}
-            try:
+            with contextlib.suppress(json.JSONDecodeError, TypeError):
                 metadata = json.loads(r["metadata"])
-            except (json.JSONDecodeError, TypeError):
-                pass
             result.append(ArtifactVersion(
                 id=r["id"],
                 artifact_name=r["artifact_name"],

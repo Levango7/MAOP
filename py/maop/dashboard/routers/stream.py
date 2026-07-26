@@ -11,8 +11,8 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
-from maop.dashboard.error_handler import handle_api_errors
 from maop.core.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 

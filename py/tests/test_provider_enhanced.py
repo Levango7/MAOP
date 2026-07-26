@@ -4,12 +4,16 @@ from pathlib import Path
 
 import pytest
 
-from maop.model.schema import (
-    ProviderType, ProtocolType, ProviderDef, ModelDef,
-    thinking_to_api_params, ThinkingLevel,
-)
-from maop.model.registry import ModelRegistry, ProviderRegistry
 from maop.core.api_key_vault import ApiKeyVault
+from maop.model.registry import ModelRegistry, ProviderRegistry
+from maop.model.schema import (
+    ModelDef,
+    ProtocolType,
+    ProviderDef,
+    ProviderType,
+    ThinkingLevel,
+    thinking_to_api_params,
+)
 
 
 class TestOllamaProviderType:
@@ -163,16 +167,18 @@ class TestApiKeyVault:
 
 class TestProviderHealthChecker:
     def test_check_no_registry(self):
-        from maop.core.provider_health import ProviderHealthChecker
         import asyncio
+
+        from maop.core.provider_health import ProviderHealthChecker
         checker = ProviderHealthChecker(registry=None)
         result = asyncio.run(checker.check("openai"))
         assert result.healthy is False
         assert "No registry" in result.error
 
     def test_check_builtin_provider(self):
-        from maop.core.provider_health import ProviderHealthChecker
         import asyncio
+
+        from maop.core.provider_health import ProviderHealthChecker
         reg = ModelRegistry(project_root=str(Path(__file__).parent.parent.parent / "config" / ".."))
         pdef = ProviderDef(type=ProviderType.BUILTIN, enabled=True)
         reg.add_provider("test-builtin", pdef)

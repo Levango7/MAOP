@@ -13,8 +13,6 @@ import tempfile
 import time
 from pathlib import Path
 
-
-
 # ═══════════════════════════════════════════════════════════════
 # Analyzer tests (async — analyze() is now async per ADR-013)
 # ═══════════════════════════════════════════════════════════════
@@ -53,7 +51,7 @@ class TestAnalyzer:
         assert len(groups) >= 2  # a first, then b+c or b then c
 
     async def test_complexity_levels(self):
-        from maop.core.analyzer import analyze, Complexity
+        from maop.core.analyzer import Complexity, analyze
         # Trivial
         r1 = await analyze("say hello")
         assert r1.complexity_level in (Complexity.TRIVIAL, Complexity.SIMPLE)
@@ -202,7 +200,7 @@ class TestRuntime:
             assert "isolated" in result.stdout
 
     def test_create_runtime_local(self):
-        from maop.core.runtime import create_runtime, RuntimeConfig, RuntimeType, LocalRuntime
+        from maop.core.runtime import LocalRuntime, RuntimeConfig, RuntimeType, create_runtime
         rt = create_runtime(RuntimeConfig(type=RuntimeType.LOCAL))
         assert isinstance(rt, LocalRuntime)
 
@@ -243,7 +241,6 @@ class TestCacheGuard:
         def loader():
             nonlocal call_count
             call_count += 1
-            return None
         guard.get("null_key", loader)
         guard.get("null_key", loader)
         assert call_count == 1  # Null should be cached
@@ -271,7 +268,7 @@ class TestCacheGuard:
 
 class TestTimeSeries:
     def test_record_and_query(self):
-        from maop.core.timeseries import TimeSeriesStore, TimeSeriesQuery
+        from maop.core.timeseries import TimeSeriesQuery, TimeSeriesStore
         with tempfile.TemporaryDirectory() as tmp:
             store = TimeSeriesStore(Path(tmp) / "ts.db")
             now = time.time()
@@ -283,7 +280,7 @@ class TestTimeSeries:
             store.close()
 
     def test_batch_record(self):
-        from maop.core.timeseries import TimeSeriesStore, DataPoint
+        from maop.core.timeseries import DataPoint, TimeSeriesStore
         with tempfile.TemporaryDirectory() as tmp:
             store = TimeSeriesStore(Path(tmp) / "ts.db")
             points = [DataPoint(timestamp=time.time() - i, metric="req_rate", value=float(i)) for i in range(10)]
@@ -379,7 +376,7 @@ class TestAuth:
             store.close()
 
     def test_jwt_create_and_validate(self):
-        from maop.core.auth import JWTHandler, JWTConfig
+        from maop.core.auth import JWTConfig, JWTHandler
         handler = JWTHandler(JWTConfig(secret="test-secret"))
         token = handler.create_token("user1", roles=["admin"])
         result = handler.validate_token(token)
@@ -387,7 +384,7 @@ class TestAuth:
         assert result.identity == "user1"
 
     def test_jwt_expired(self):
-        from maop.core.auth import JWTHandler, JWTConfig
+        from maop.core.auth import JWTConfig, JWTHandler
         handler = JWTHandler(JWTConfig(secret="test-secret"))
         token = handler.create_token("user1", ttl_s=-1)  # Already expired
         result = handler.validate_token(token)
@@ -395,7 +392,7 @@ class TestAuth:
         assert "expired" in result.error.lower()
 
     def test_auth_manager(self):
-        from maop.core.auth import AuthManager, AuthConfig
+        from maop.core.auth import AuthConfig, AuthManager
         with tempfile.TemporaryDirectory() as tmp:
             from maop.core.auth import APIKeyStore
             key_store = APIKeyStore(Path(tmp) / "auth.db")
@@ -453,7 +450,7 @@ class TestMonitoring:
         sl.info("test message", extra_key="extra_value")
 
     def test_global_metrics(self):
-        from maop.core.monitoring import MAOP_DELEGATIONS_TOTAL, MAOP_ACTIVE_AGENTS
+        from maop.core.monitoring import MAOP_ACTIVE_AGENTS, MAOP_DELEGATIONS_TOTAL
         MAOP_DELEGATIONS_TOTAL.inc()
         assert MAOP_DELEGATIONS_TOTAL.get() >= 1
         MAOP_ACTIVE_AGENTS.set(5)

@@ -19,6 +19,7 @@ Usage in agents.yaml:
 """
 from __future__ import annotations
 
+import contextlib
 import logging
 import sys
 import time
@@ -255,8 +256,6 @@ def shutdown():
     """Shutdown the orchestrator."""
     global _ORCHESTRATOR
     if _ORCHESTRATOR is not None:
-        try:
+        with contextlib.suppress(Exception):
             _ORCHESTRATOR.shutdown()
-        except Exception:
-            pass
         _ORCHESTRATOR = None

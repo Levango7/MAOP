@@ -7,11 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.image_store import ImageStore, ImageMeta, MAX_IMAGE_SIZE
-from maop.core.chat_engine import ChatEngine, ChatRequest, ContentPart, ChatMessage
+from maop.core.chat_engine import ChatEngine, ChatMessage, ChatRequest, ContentPart
+from maop.core.image_store import MAX_IMAGE_SIZE, ImageMeta, ImageStore
 from maop.core.subagent import SubagentManager
 from maop.delegate.models import AgentConfig
-
 
 # ═══════════════════════════════════════════════════════════════════
 # ImageStore Tests
@@ -160,7 +159,7 @@ class TestChatRequestMultimodal:
 
 class TestChatEngineMultimodal:
     def test_build_user_content_text_only(self, tmp_path):
-        from maop.memory.manager import MemoryManagerConfig, ConsolidationTrigger
+        from maop.memory.manager import ConsolidationTrigger, MemoryManagerConfig
         engine = ChatEngine(root_dir=str(tmp_path), config=MemoryManagerConfig(
             consolidation=ConsolidationTrigger(auto_trigger=False),
         ))
@@ -170,7 +169,7 @@ class TestChatEngineMultimodal:
         assert content == "Hello"
 
     def test_build_user_content_with_url(self, tmp_path):
-        from maop.memory.manager import MemoryManagerConfig, ConsolidationTrigger
+        from maop.memory.manager import ConsolidationTrigger, MemoryManagerConfig
         engine = ChatEngine(root_dir=str(tmp_path), config=MemoryManagerConfig(
             consolidation=ConsolidationTrigger(auto_trigger=False),
         ))
@@ -185,7 +184,7 @@ class TestChatEngineMultimodal:
         assert content[1]["type"] == "image_url"
 
     def test_build_user_content_with_data_uri(self, tmp_path):
-        from maop.memory.manager import MemoryManagerConfig, ConsolidationTrigger
+        from maop.memory.manager import ConsolidationTrigger, MemoryManagerConfig
         engine = ChatEngine(root_dir=str(tmp_path), config=MemoryManagerConfig(
             consolidation=ConsolidationTrigger(auto_trigger=False),
         ))

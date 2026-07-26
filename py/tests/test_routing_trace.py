@@ -35,8 +35,8 @@ from fastapi.testclient import TestClient
 
 from maop.core import otel as otel_module
 from maop.core.monitoring import (
-    MAOP_ROUTING_DECISION_TOTAL,
     MAOP_ROUTING_DECISION_DURATION_MS,
+    MAOP_ROUTING_DECISION_TOTAL,
     metrics,
 )
 from maop.core.routing_decision import (
@@ -44,7 +44,6 @@ from maop.core.routing_decision import (
     RoutingDecisionStore,
     get_active_span_context,
 )
-
 
 # ─────────────────────────────────────────────────────────────────
 # Shared span-recording helpers (mirrors test_mcp_observability.py)
@@ -88,10 +87,10 @@ def recording_spans():
     modules, freezing the original binding).
     """
     _span_calls.clear()
-    import maop.core.route_scorer as _rs
     import maop.core.load_balancer as _lb
-    import maop.model.selector as _sel
+    import maop.core.route_scorer as _rs
     import maop.delegate.dispatcher as _disp
+    import maop.model.selector as _sel
     with patch.object(otel_module, "span", _recording_span), \
          patch.object(_rs, "otel_span", _recording_span), \
          patch.object(_lb, "otel_span", _recording_span), \
@@ -487,11 +486,14 @@ class TestModelSelectorTrace:
         recording_spans: list[dict[str, Any]],
         isolated_store: RoutingDecisionStore,
     ):
-        from maop.model.selector import ModelSelector
-        from maop.model.schema import (
-            ModelDef, QualityTier, LatencyTier,
-        )
         from unittest.mock import MagicMock
+
+        from maop.model.schema import (
+            LatencyTier,
+            ModelDef,
+            QualityTier,
+        )
+        from maop.model.selector import ModelSelector
 
         reg = MagicMock()
         models = {
@@ -550,6 +552,7 @@ class TestDispatcherTrace:
         isolated_store: RoutingDecisionStore,
     ):
         import asyncio
+
         from maop.delegate.dispatcher import Dispatcher
 
         dispatcher = Dispatcher()

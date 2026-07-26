@@ -125,7 +125,6 @@ class TestCacheGuardBasic:
         def loader():
             nonlocal call_count
             call_count += 1
-            return None
 
         cg.get("k", loader, ttl=100)
         cg.get("k", loader, ttl=100)
@@ -141,7 +140,6 @@ class TestCacheGuardBasic:
         def loader():
             nonlocal call_count
             call_count += 1
-            return None
 
         cg.get("k", loader, ttl=100)
         cg.get("k", loader, ttl=100)

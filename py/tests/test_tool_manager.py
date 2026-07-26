@@ -11,7 +11,6 @@ See ADR-013.
 
 from __future__ import annotations
 
-
 import pytest
 
 from maop.core.tool_manager import ToolCallResult, ToolDef, ToolManager

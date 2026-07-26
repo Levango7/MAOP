@@ -1,13 +1,14 @@
 """MAOP Dashboard — ReAct Loop & Change Tracker API endpoints."""
 
 from __future__ import annotations
-from typing import Any
+
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from maop.dashboard.error_handler import handle_api_errors
 from maop.core.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 router = APIRouter(prefix="/api/react", tags=["react"])
 

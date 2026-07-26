@@ -25,9 +25,9 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from maop.core.db_utils import sqlite_connect
-
 from pydantic import BaseModel
+
+from maop.core.db_utils import sqlite_connect
 
 logger = logging.getLogger(__name__)
 

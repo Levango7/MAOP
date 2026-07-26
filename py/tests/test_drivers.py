@@ -14,7 +14,7 @@ from maop.delegate.models import AgentConfig
 
 
 def _config(**overrides) -> AgentConfig:
-    defaults = dict(name="test-agent", cli="echo", driver="cli", model="test-model")
+    defaults = {"name": "test-agent", "cli": "echo", "driver": "cli", "model": "test-model"}
     defaults.update(overrides)
     return AgentConfig(**defaults)
 

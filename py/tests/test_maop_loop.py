@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 import pytest
 
 
@@ -93,7 +92,7 @@ class TestMaopLoopInit:
         assert loop._memory is not None
 
     def test_init_with_custom_loop_config(self, tmp_path):
-        from maop.maop_loop import MaopLoop, LoopConfig
+        from maop.maop_loop import LoopConfig, MaopLoop
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         (config_dir / "agents.yaml").write_text("agents: {}\n")
@@ -106,7 +105,7 @@ class TestMaopLoopInit:
         assert loop._loop_config.enable_evolve is False
 
     def test_init_disables_optional_subsystems(self, tmp_path):
-        from maop.maop_loop import MaopLoop, LoopConfig
+        from maop.maop_loop import LoopConfig, MaopLoop
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         (config_dir / "agents.yaml").write_text("agents: {}\n")
@@ -133,7 +132,7 @@ class TestMaopLoopRun:
 
     @pytest.mark.asyncio
     async def test_run_returns_loop_result(self, tmp_path):
-        from maop.maop_loop import MaopLoop, LoopConfig, LoopResult
+        from maop.maop_loop import LoopConfig, LoopResult, MaopLoop
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         (config_dir / "agents.yaml").write_text("agents: {}\n")
@@ -167,7 +166,7 @@ class TestMaopLoopRun:
 
     @pytest.mark.asyncio
     async def test_run_generates_trace_id(self, tmp_path):
-        from maop.maop_loop import MaopLoop, LoopConfig
+        from maop.maop_loop import LoopConfig, MaopLoop
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         (config_dir / "agents.yaml").write_text("agents: {}\n")
@@ -224,8 +223,9 @@ class TestBudgetReconciliation:
     async def test_budget_uses_registry_pricing(self, tmp_path):
         """When model is in registry, provider and estimated_cost must be populated."""
         from unittest.mock import AsyncMock, MagicMock, patch
-        from maop.maop_loop import MaopLoop, LoopConfig
+
         from maop.core.error_schema import MaopResult
+        from maop.maop_loop import LoopConfig, MaopLoop
 
         config_dir = tmp_path / "config"
         config_dir.mkdir()
@@ -281,8 +281,9 @@ class TestBudgetReconciliation:
     async def test_budget_fallback_when_model_not_in_registry(self, tmp_path):
         """When model is not in registry, provider="" and estimated_cost=0.0."""
         from unittest.mock import AsyncMock, MagicMock, patch
-        from maop.maop_loop import MaopLoop, LoopConfig
+
         from maop.core.error_schema import MaopResult
+        from maop.maop_loop import LoopConfig, MaopLoop
 
         config_dir = tmp_path / "config"
         config_dir.mkdir()

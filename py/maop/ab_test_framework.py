@@ -353,7 +353,7 @@ class ABTestFramework:
         if not self._experiments_file.exists():
             return []
         try:
-            with open(self._experiments_file, "r", encoding="utf-8") as f:
+            with open(self._experiments_file, encoding="utf-8") as f:
                 data = json.load(f)
             experiments = []
             for d in data:

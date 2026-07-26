@@ -19,6 +19,7 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import uuid
@@ -253,15 +254,11 @@ class SessionManager:
 
     def _row_to_session(self, row: Any) -> Session:
         tags = []
-        try:
+        with contextlib.suppress(json.JSONDecodeError, TypeError):
             tags = json.loads(row["tags"])
-        except (json.JSONDecodeError, TypeError):
-            pass
         metadata = {}
-        try:
+        with contextlib.suppress(json.JSONDecodeError, TypeError):
             metadata = json.loads(row["metadata"])
-        except (json.JSONDecodeError, TypeError):
-            pass
         return Session(
             id=row["id"],
             agent=row["agent"],

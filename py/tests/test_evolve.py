@@ -20,7 +20,6 @@ from maop.evolve import (
     _load_observability_data_from_db,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────
 
 def _delegation(agent: str, exit_code: int = 0, routing_key: str = "default",

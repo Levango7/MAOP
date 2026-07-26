@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Type, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -77,7 +77,7 @@ class OutputParser:
 
     def _try_raw_json(self, text: str) -> ParseResult | None:
         stripped = text.strip()
-        if stripped.startswith("{") or stripped.startswith("["):
+        if stripped.startswith(("{", "[")):
             try:
                 data = json.loads(stripped)
                 return ParseResult(success=True, data=data, format="raw")
@@ -161,7 +161,7 @@ class OutputParser:
 
         return results
 
-    def validate(self, data: Any, model: Type[T]) -> tuple[T | None, str]:
+    def validate(self, data: Any, model: type[T]) -> tuple[T | None, str]:
         """Validate data against a Pydantic model.
 
         Returns (model_instance, error_message).  On success, error is "".
@@ -184,7 +184,7 @@ class OutputParser:
         except (json.JSONDecodeError, ValueError) as exc:
             return None, f"JSON parse error: {exc}"
 
-    def extract_and_validate(self, text: str, model: Type[T]) -> tuple[T | None, ParseResult]:
+    def extract_and_validate(self, text: str, model: type[T]) -> tuple[T | None, ParseResult]:
         """Convenience: extract JSON from text and validate against model."""
         pr = self.extract_json(text)
         if not pr.success:

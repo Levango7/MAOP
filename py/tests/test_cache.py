@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 
-
 from maop.core.cache import LRUCache, get_cache
 
 

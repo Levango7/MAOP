@@ -28,7 +28,6 @@ from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
-
 logger = logging.getLogger(__name__)
 
 

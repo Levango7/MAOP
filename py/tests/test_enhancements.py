@@ -12,13 +12,12 @@ from __future__ import annotations
 
 import json
 import math
-import tempfile
 import shutil
+import tempfile
 import time
 from pathlib import Path
 
 import pytest
-
 
 # ── P1-2: Circuit breaker events ─────────────────────────────
 
@@ -164,7 +163,7 @@ class TestTaskDecomposition:
     """Test engine._decompose_task heuristics."""
 
     def setup_method(self):
-        from maop.engine import Engine, WorkflowStep, StepType
+        from maop.engine import Engine, StepType, WorkflowStep
         self.engine = Engine()
         self.StepType = StepType
         self.WorkflowStep = WorkflowStep
@@ -269,7 +268,7 @@ class TestVectorSearch:
         assert results[0].id in ("d1", "d2", "d3")
 
     def test_vector_store_search_by_vector(self):
-        from maop.core.vector import VectorStore, HashEmbedding
+        from maop.core.vector import HashEmbedding, VectorStore
         emb = HashEmbedding(dim=64)
         vs = VectorStore(db_path=Path(self.tmp) / "vec2.db", embedding=emb)
 

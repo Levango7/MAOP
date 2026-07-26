@@ -14,7 +14,6 @@ from maop.core.kv_store import (
     KVStore,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────
 
 @pytest.fixture

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 import pytest
 
 from maop.core.human_proxy import ApprovalRequest, HumanProxy, HumanProxyConfig

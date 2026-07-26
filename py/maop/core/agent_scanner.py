@@ -27,8 +27,7 @@ Usage::
 
 from __future__ import annotations
 
-from typing import Any
-
+import contextlib
 import logging
 import os
 import shutil
@@ -37,6 +36,7 @@ import subprocess
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -384,10 +384,8 @@ class AgentScanner:
     def _row_to_agent(row: sqlite3.Row) -> ScannedAgent:
         import json
         capabilities: list[Any] = []
-        try:
+        with contextlib.suppress(json.JSONDecodeError, TypeError):
             capabilities = json.loads(row["capabilities"]) if row["capabilities"] else []
-        except (json.JSONDecodeError, TypeError):
-            pass
         return ScannedAgent(
             name=row["name"], cli_path=row["cli_path"], version=row["version"],
             source=AgentSource(row["source"]), status=AgentStatus(row["status"]),

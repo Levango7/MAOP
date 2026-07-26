@@ -1,12 +1,22 @@
 ﻿"""MAOP Memory — Persistent memory store with synonym expansion."""
 
+from maop.memory.models import SYNONYM_MAP, FacetResult, SearchResult, expand_keywords
 from maop.memory.store import (
-    MemoryEntry, TraceEntry, TrajectoryStep, MemoryStats,
+    MemoryEntry,
+    MemoryStats,
     MemoryStore,
+    TraceEntry,
+    TrajectoryStep,
 )
-from maop.memory.models import SearchResult, FacetResult, expand_keywords, SYNONYM_MAP
 
 __all__ = [
-    "MemoryEntry", "TraceEntry", "TrajectoryStep", "SearchResult", "FacetResult", "MemoryStats",
-    "MemoryStore", "expand_keywords", "SYNONYM_MAP",
+    "SYNONYM_MAP",
+    "FacetResult",
+    "MemoryEntry",
+    "MemoryStats",
+    "MemoryStore",
+    "SearchResult",
+    "TraceEntry",
+    "TrajectoryStep",
+    "expand_keywords",
 ]

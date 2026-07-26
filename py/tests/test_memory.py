@@ -2,29 +2,31 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 
 import pytest
 
 from maop.memory.store import (
-    MemoryStore, expand_keywords, _new_id, _is_valid_id,
+    MemoryStore,
+    _is_valid_id,
+    _new_id,
+    expand_keywords,
 )
 
 
 @pytest.fixture
 def mem_store() -> MemoryStore:
     """Create a MemoryStore with a temp root directory."""
-    import tempfile
     import shutil
+    import tempfile
     tmp = tempfile.mkdtemp(prefix="MAOP_mem_")
     (Path(tmp) / "data").mkdir(parents=True, exist_ok=True)
     store = MemoryStore(root_dir=tmp)
     yield store
-    try:
+    with contextlib.suppress(Exception):
         shutil.rmtree(tmp, ignore_errors=True)
-    except Exception:
-        pass
 
 
 class TestHelpers:

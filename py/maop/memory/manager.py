@@ -28,6 +28,7 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -511,8 +512,6 @@ class MemoryManager:
         for row in rows:
             for field in json_fields:
                 if field in row and isinstance(row[field], str):
-                    try:
+                    with contextlib.suppress(ValueError, TypeError):
                         row[field] = _json.loads(row[field])
-                    except (ValueError, TypeError):
-                        pass
         return rows

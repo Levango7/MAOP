@@ -181,7 +181,6 @@ class TestToolResult:
 # ── Regression tests for security Critical fixes (C-3 command whitelist) ──
 
 import pytest
-from maop.core.mcp_hub import _StdioTransport, MCPServerConfig, TransportType
 
 
 class TestStdioCommandWhitelist:

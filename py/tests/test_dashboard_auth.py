@@ -15,7 +15,6 @@ import sqlite3
 import time
 
 import httpx
-
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

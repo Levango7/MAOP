@@ -28,13 +28,13 @@ def run_migrations(root_dir: str | Path, db_name: str = "maop.db") -> list[str]:
     data_dir = root / "data"
     migrations_dir = data_dir / "migrations"
     db_path = data_dir / db_name
-    
+
     if not migrations_dir.exists():
         logger.warning("[migrations] No migrations directory found at %s", migrations_dir)
         return []
-    
+
     applied: list[str] = []
-    
+
     with sqlite_connect(db_path, timeout=30) as conn:
         # Ensure schema_migrations table exists
         conn.execute("""
@@ -45,30 +45,30 @@ def run_migrations(root_dir: str | Path, db_name: str = "maop.db") -> list[str]:
             )
         """)
         conn.commit()
-        
+
         # Find all migration files
         migration_files = sorted(migrations_dir.glob("*.sql"))
-        
+
         for mf in migration_files:
             version = mf.stem.split("_")[0]
             name = mf.stem
-            
+
             # Check if already applied
             row = conn.execute(
                 "SELECT version FROM schema_migrations WHERE version = ?", (version,)
             ).fetchone()
-            
+
             if row is not None:
                 logger.debug("[migrations] Skip %s (already applied)", name)
                 continue
-            
+
             # Read and execute migration
             sql = mf.read_text(encoding="utf-8")
-            
+
             # Remove DOWN section if present
             if "-- DOWN:" in sql:
                 sql = sql.split("-- DOWN:")[0]
-            
+
             try:
                 conn.executescript(sql)
                 conn.execute(
@@ -91,10 +91,10 @@ def run_migrations(root_dir: str | Path, db_name: str = "maop.db") -> list[str]:
                 else:
                     logger.error("[migrations] Failed to apply %s: %s", name, exc)
                     raise
-    
+
     if applied:
         logger.info("[migrations] Applied %d migrations: %s", len(applied), applied)
-    
+
     # Note: For Alembic-managed migrations, use:
     #   alembic upgrade head
     # This SQL runner and Alembic can coexist (dual-track).
@@ -106,10 +106,10 @@ def get_applied_migrations(root_dir: str | Path, db_name: str = "maop.db") -> li
     """Get list of applied migration versions."""
     root = Path(root_dir)
     db_path = root / "data" / db_name
-    
+
     if not db_path.exists():
         return []
-    
+
     try:
         with sqlite_connect(db_path, timeout=10) as conn:
             rows = conn.execute(

@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from maop.maop_loop import MaopLoop, LoopConfig, LoopResult
+from maop.maop_loop import LoopConfig, LoopResult, MaopLoop
 from maop.maop_verify import VerifyResult
 
 

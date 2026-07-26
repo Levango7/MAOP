@@ -201,10 +201,7 @@ def _has_not_null_conflict(cols_info: list[sqlite3.Row]) -> bool:
     - 旧 delegation schema: ``parent_agent/child_agent TEXT NOT NULL``
       （SubAgentManager.spawn 不传 parent_agent/child_agent 会失败）
     """
-    for row in cols_info:
-        if row["notnull"] and row["name"] in _NULLABLE_IN_NEW_SCHEMA:
-            return True
-    return False
+    return any(row["notnull"] and row["name"] in _NULLABLE_IN_NEW_SCHEMA for row in cols_info)
 
 
 def _rebuild_subagents_table(

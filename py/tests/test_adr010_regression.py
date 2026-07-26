@@ -60,7 +60,7 @@ class TestBug3RoutingKeyDefault:
         assert lc.lb_algorithm != "codegen"
 
     def test_plan_fallback_uses_chat(self, tmp_path):
-        from maop.maop_loop import MaopLoop, LoopConfig
+        from maop.maop_loop import LoopConfig, MaopLoop
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         (config_dir / "agents.yaml").write_text("agents: {}\n")
@@ -82,7 +82,7 @@ class TestH4DagConditionBranch:
 
     @pytest.mark.asyncio
     async def test_condition_step_skips_when_false(self):
-        from maop.engine import Engine, WorkflowStep, StepType, StepStatus
+        from maop.engine import Engine, StepStatus, StepType, WorkflowStep
         engine = Engine()
         step = WorkflowStep(id="c1", type=StepType.CONDITION, params={"expr": "False"})
         result = await engine.run(steps=[step])
@@ -90,7 +90,7 @@ class TestH4DagConditionBranch:
 
     @pytest.mark.asyncio
     async def test_condition_step_succeeds_when_true(self):
-        from maop.engine import Engine, WorkflowStep, StepType, StepStatus
+        from maop.engine import Engine, StepStatus, StepType, WorkflowStep
         engine = Engine()
         step = WorkflowStep(id="c1", type=StepType.CONDITION, params={"expr": "True"})
         result = await engine.run(steps=[step])
@@ -128,16 +128,19 @@ class TestM2DashboardTokenAuth:
     """M-2: Dashboard token auth via MAOP_DASH_TOKEN env var."""
 
     def test_require_admin_passes_with_admin_role(self):
-        from maop.core.middleware import require_admin
         from unittest.mock import MagicMock
+
+        from maop.core.middleware import require_admin
         request = MagicMock()
         request.state.auth_roles = ["admin"]
         require_admin(request)
 
     def test_require_admin_rejects_without_admin_role(self):
-        from maop.core.middleware import require_admin
-        from fastapi import HTTPException
         from unittest.mock import MagicMock
+
+        from fastapi import HTTPException
+
+        from maop.core.middleware import require_admin
         request = MagicMock()
         request.state.auth_roles = []
         with pytest.raises(HTTPException) as exc_info:
