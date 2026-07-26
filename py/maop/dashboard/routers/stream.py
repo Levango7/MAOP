@@ -61,7 +61,7 @@ async def global_state_stream(request: Request) -> Any:
                 # Gather live system state
                 state = {"ts": time.time()}
                 try:
-                    from maop.dashboard.data_bridge import get_bridge
+                    from maop.dashboard.routers.state import get_bridge
                     bridge = get_bridge()
                     # F-P0-1 fix: call async snapshot() properly
                     snap = await bridge.snapshot() if bridge else {}
