@@ -43,8 +43,6 @@ from maop.core.routing_decision import (
     RoutingDecisionRecord,
     RoutingDecisionStore,
     get_active_span_context,
-    get_routing_decision_store,
-    reset_routing_decision_store,
 )
 
 

@@ -9,7 +9,6 @@ import importlib
 import logging
 import platform
 import shutil
-import subprocess
 import sys
 import time
 

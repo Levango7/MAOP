@@ -297,7 +297,7 @@ def create_app(root_dir: str | Path | None = None) -> Any:
     """
     try:
         from fastapi import FastAPI
-        from fastapi.responses import HTMLResponse, StreamingResponse
+        from fastapi.responses import StreamingResponse
     except ImportError:
         return None
 

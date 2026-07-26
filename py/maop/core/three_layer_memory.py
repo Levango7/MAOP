@@ -48,8 +48,6 @@ from maop.core.cache import LRUCache
 from maop.core.db_utils import sqlite_connect
 # 共享 DB 路径与术语映射（统一 ThreeLayerMemory 与 MemoryManager 的 DB 文件）
 from maop.memory.shared_db import (
-    LAYER_ALIASES,
-    denormalize_layer_name,
     get_memory_db_path,
     migrate_legacy_episodic_db,
     normalize_layer_name,

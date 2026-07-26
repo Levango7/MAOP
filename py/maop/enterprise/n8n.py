@@ -42,7 +42,7 @@ from urllib.parse import urlparse
 import httpx
 from pydantic import BaseModel, Field, field_validator
 
-from maop.config.edition import FeatureFlag, has_feature, require_feature
+from maop.config.edition import FeatureFlag, require_feature
 
 logger = logging.getLogger(__name__)
 

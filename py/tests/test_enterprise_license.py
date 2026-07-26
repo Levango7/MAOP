@@ -1,38 +1,57 @@
-"""Tests for MAOP Enterprise license validation."""
+"""Tests for maop.enterprise.license."""
 
 from __future__ import annotations
 
-import json
 import base64
-import os
+import json
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+import maop.enterprise.license as _license_mod
 from maop.enterprise.license import (
-    LicenseInfo,
     LicenseValidator,
-    LicenseError,
     LicenseExpiredError,
     LicenseSignatureError,
     LicenseFormatError,
 )
 
+_TEST_KEY_DIR = Path(tempfile.mkdtemp(prefix="maop_test_keys_"))
+_TEST_PRIVATE_PATH = _TEST_KEY_DIR / "private.pem"
+_TEST_PUBLIC_PATH = _TEST_KEY_DIR / "public.pem"
 
-# Path to the dev private key (for generating test licenses)
-_DEV_PRIVATE_KEY = Path(__file__).resolve().parents[2] / "scripts" / "dev_private_key.pem"
+_test_private_key = Ed25519PrivateKey.generate()
+_TEST_PRIVATE_PATH.write_bytes(
+    _test_private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+)
+_TEST_PUBLIC_PATH.write_bytes(
+    _test_private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+)
+_license_mod._PUBLIC_KEY_PATH = _TEST_PUBLIC_PATH
+_DEV_PRIVATE_KEY = _TEST_PRIVATE_PATH
 
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+import tempfile
+import maop.enterprise.license as _license_mod
 def _generate_test_license(
     customer: str = "Test Customer",
     expires_at: datetime | None = None,
     private_key_path: Path | None = None,
 ) -> str:
-    """Generate a test license key using the dev private key."""
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
+    """Generate a test license key using the test private key."""
     if expires_at is None:
         expires_at = datetime.now(timezone.utc) + timedelta(days=365)
     if private_key_path is None:
@@ -57,6 +76,7 @@ def _generate_test_license(
     sig_b64 = base64.urlsafe_b64encode(signature).rstrip(b"=").decode("ascii")
 
     return f"MAOP-ENT-{payload_b64}.{sig_b64}"
+
 
 
 class TestLicenseValidator:
@@ -128,9 +148,7 @@ class TestLicenseValidator:
 
     def test_wrong_signing_key_raises(self):
         """A license signed by a different key should fail signature verification."""
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-        from cryptography.hazmat.primitives import serialization
-
+    
         # Generate a rogue key pair
         rogue_key = Ed25519PrivateKey.generate()
         rogue_pem = rogue_key.private_bytes(
@@ -150,11 +168,9 @@ class TestLicenseValidator:
 
     def test_payload_with_optional_fields(self):
         """License with max_users and fingerprint should parse correctly."""
-        from cryptography.hazmat.primitives import serialization
 
+        # Use module-level test private key so the signature matches LicenseValidator default public key
         key_data = _DEV_PRIVATE_KEY.read_bytes()
-        if key_data.startswith(b"DEVELOPMENT"):
-            key_data = b"\n".join(key_data.split(b"\n")[1:])
         private_key = serialization.load_pem_private_key(key_data, password=None)
 
         payload = {

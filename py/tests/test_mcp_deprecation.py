@@ -109,12 +109,7 @@ class TestMCPHubCanonical:
     def test_mcp_hub_exposes_canonical_models(self) -> None:
         """Canonical Stack A model names must be importable from mcp_hub."""
         from maop.core.mcp_hub import (
-            MCPHub,
             MCPTool,
-            MCPServerConfig,
-            MCPResource,
-            ToolResult,
-            TransportType,
         )
 
         # Sanity-check that these are real types (not Stack B aliases).

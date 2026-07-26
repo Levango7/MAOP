@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request
 
 from maop.core.middleware import require_admin
 from maop.config.edition import FeatureFlag, has_feature
@@ -21,7 +21,6 @@ from maop.enterprise.n8n import (
     N8nClient,
     N8nIntegrationError,
     handle_n8n_webhook,
-    require_n8n_feature,
 )
 
 router = APIRouter(prefix="/api/n8n", tags=["n8n"])

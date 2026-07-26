@@ -66,10 +66,10 @@ if TYPE_CHECKING:
     # Imported lazily at runtime inside MCPHub.call_tool to avoid a
     # circular import: mcp_permission.py imports MCPServerConfig from
     # this module, so we cannot import it at module load time.
-    from maop.core.mcp_audit import MCPAuditLogger, MCPAuditRecord
+    from maop.core.mcp_audit import MCPAuditLogger
     from maop.core.mcp_cache import MCPCache
     from maop.core.mcp_concurrency import MCPServerConcurrency, MCPServerRateLimiter
-    from maop.core.mcp_permission import MCPPermissionChecker, MCPPermissionDecision
+    from maop.core.mcp_permission import MCPPermissionChecker
 
 logger = logging.getLogger(__name__)
 

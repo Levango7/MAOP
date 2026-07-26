@@ -557,7 +557,7 @@ class TestStreamableHttpTransport:
             headers={"Mcp-Session-Id": "sess-123"},
         )
 
-        with patch("urllib.request.urlopen", return_value=resp) as mock_open:
+        with patch("urllib.request.urlopen", return_value=resp):
             await t.send_request("initialize", {})
 
         # The captured session id should now be sent on subsequent requests.
