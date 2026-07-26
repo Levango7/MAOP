@@ -1,7 +1,7 @@
 """MAOP MCP Adapter — bridges MCP servers to the AgentAdapter ABC.
 
 F5a (2026-07-22, Phase F): provides a single-server MCP adapter so an
-MCP server can be registered with ``AgentBridge`` and dispatched via
+MCP server can be registered with ``AgentProxy`` and dispatched via
 the unified ``bridge.call(name, task)`` API alongside other agent
 backends (Claude CLI, OpenAI, A2A, etc.).
 
@@ -39,7 +39,7 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from maop.core.agent_bridge import AgentAdapter
+from maop.core.agent_proxy import AgentAdapter
 
 if TYPE_CHECKING:
     from maop.core.mcp_hub import MCPHub, MCPServerConfig
@@ -106,7 +106,7 @@ class MCPAdapter(AgentAdapter):
     """Adapter that exposes an MCP server as an ``AgentAdapter``.
 
     Wraps a single MCP server connection (via ``MCPHub``) so it can be
-    registered with ``AgentBridge`` and dispatched through the unified
+    registered with ``AgentProxy`` and dispatched through the unified
     sync ``bridge.call(name, task)`` API.
 
     Parameters
@@ -123,9 +123,9 @@ class MCPAdapter(AgentAdapter):
     Usage::
 
         from maop.core.mcp_adapter import MCPAdapter
-        from maop.core.agent_bridge import AgentBridge
+        from maop.core.agent_proxy import AgentProxy
 
-        bridge = AgentBridge(root_dir="/path/to/MAOP")
+        bridge = AgentProxy(root_dir="/path/to/MAOP")
         bridge.register("fs", MCPAdapter({
             "name": "filesystem",
             "transport": "stdio",
@@ -283,7 +283,7 @@ class MCPAdapter(AgentAdapter):
 
         After ``disconnect()``, the adapter cannot be reused —
         construct a new ``MCPAdapter`` to reconnect. This matches
-        ``AgentBridge.unregister``'s expectation that ``disconnect()``
+        ``AgentProxy.unregister``'s expectation that ``disconnect()``
         fully releases resources.
         """
         if self._server_id is not None:

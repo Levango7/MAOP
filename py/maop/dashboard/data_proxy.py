@@ -9,7 +9,7 @@ the same JSON structure for backward compatibility.
 
 Usage::
 
-    bridge = DataBridge(root_dir="/path/to/MAOP")
+    bridge = DataProxy(root_dir="/path/to/MAOP")
     report = await bridge.report(hours=48)
     agents = await bridge.agent_stats()
     live = await bridge.live()
@@ -36,16 +36,16 @@ logger = logging.getLogger(__name__)
 
 # ── Models ──────────────────────────────────────────────────────
 
-class BridgeStats(BaseModel):
+class ProxyStats(BaseModel):
     """Data bridge statistics."""
     queries: int = 0
     cache_hits: int = 0
     total_latency_ms: float = 0.0
 
 
-# ── DataBridge ────────────────────────────────────────────────
+# ── DataProxy ────────────────────────────────────────────────
 
-class DataBridge:
+class DataProxy:
     """Pure Python data bridge for Dashboard — replaces PS scripts.
 
     Parameters
@@ -723,13 +723,13 @@ class DataBridge:
         self._queries += 1
         self._total_latency += (time.monotonic() - start) * 1000
 
-    def stats(self) -> BridgeStats:
+    def stats(self) -> ProxyStats:
         """Get bridge statistics."""
-        return BridgeStats(
+        return ProxyStats(
             queries=self._queries,
             cache_hits=self._cache_hits,
             total_latency_ms=round(self._total_latency, 1),
         )
 
     def __repr__(self) -> str:
-        return f"DataBridge(queries={self._queries})"
+        return f"DataProxy(queries={self._queries})"

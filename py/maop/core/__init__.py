@@ -9,7 +9,7 @@ Key modules:
   - llm_provider: LLM provider factory with fallback chain
   - budget_guard: Daily token/cost budget enforcement
   - tool_audit: Tool invocation audit logging
-  - agent_bridge: Adapter pattern for external agent integration
+  - agent_proxy: Adapter pattern for external agent integration
   - worktree: Branch management for parallel task execution
   - subagent_manager: Async SubAgent spawn/wait/cancel
   - mcp_hub: MCP Hub with stdio/SSE/WebSocket transport
