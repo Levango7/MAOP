@@ -1,6 +1,6 @@
 """
 MAOP Dashboard - FastAPI replacement for dashboard/server-v2.ps1.
-Async, non-blocking, with pure-Python DataBridge (replaces PS subprocess).
+Async, non-blocking, with pure-Python DataProxy (replaces PS subprocess).
 
 Production features:
   - TLS/HTTPS support via MAOP.core.tls
@@ -325,9 +325,9 @@ from maop.dashboard.routers import tool_audit as tool_audit_router
 
 app.include_router(tool_audit_router.router)
 
-from maop.dashboard.routers import agent_bridge as agent_bridge_router
+from maop.dashboard.routers import agent_proxy as agent_proxy_router
 
-app.include_router(agent_bridge_router.router)
+app.include_router(agent_proxy_router.router)
 app.include_router(routing_preview_router)
 
 # Phase γ-4: scheduling decision trace API (read-only GET endpoints).

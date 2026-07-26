@@ -2,7 +2,7 @@
 
 All router modules import from here to access shared resources:
   - MAOP_ROOT, DASH_DIR, SRC_DIR: path constants
-  - get_bridge(): lazy DataBridge singleton
+  - get_bridge(): lazy DataProxy singleton
   - cache, cache_lock: in-memory cache
   - active_jobs: running job registry
   - start_time: server start timestamp
@@ -24,15 +24,15 @@ SRC_DIR = MAOP_ROOT / "src"
 DASH_DIR = MAOP_ROOT / "dashboard"
 
 # ── Data Bridge ────────────────────────────────────────────────────
-from maop.dashboard.data_bridge import DataBridge
+from maop.dashboard.data_proxy import DataProxy
 
-_bridge: DataBridge | None = None
+_bridge: DataProxy | None = None
 
-def get_bridge() -> DataBridge:
-    """Lazy-init DataBridge singleton."""
+def get_bridge() -> DataProxy:
+    """Lazy-init DataProxy singleton."""
     global _bridge
     if _bridge is None:
-        _bridge = DataBridge(root_dir=MAOP_ROOT)
+        _bridge = DataProxy(root_dir=MAOP_ROOT)
     return _bridge
 
 # ── Shared cache ───────────────────────────────────────────────────
@@ -79,7 +79,7 @@ def init_subsystems() -> None:
     _lazy_import("hook_manager", "maop.core.hook_manager", "HookManager")
     _lazy_import("budget_guard", "maop.core.budget_guard", "BudgetGuard")
     _lazy_import("tool_audit", "maop.core.tool_audit", "ToolAuditLog")
-    _lazy_import("agent_bridge", "maop.core.agent_bridge", "AgentBridge")
+    _lazy_import("agent_proxy", "maop.core.agent_proxy", "AgentProxy")
     _lazy_import("mcp_hub", "maop.core.mcp_hub", "MCPHub")
     _lazy_import("skill_version", "maop.core.skill_version", "SkillVersionManager")
 

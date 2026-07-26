@@ -6,7 +6,7 @@ AutoGen, CrewAI, etc.) through a unified API.
 
 Usage::
 
-    from maop.core.agent_bridge import AgentAdapter, AgentBridge
+    from maop.core.agent_proxy import AgentAdapter, AgentProxy
 
     class MyAdapter(AgentAdapter):
         def connect(self) -> bool: ...
@@ -15,7 +15,7 @@ Usage::
         def sync_config(self, config: dict) -> None: ...
         def disconnect(self) -> None: ...
 
-    bridge = AgentBridge(root_dir="/path/to/MAOP")
+    bridge = AgentProxy(root_dir="/path/to/MAOP")
     bridge.register("my_agent", MyAdapter())
     result = bridge.call("my_agent", "Analyze this code")
 """
@@ -89,7 +89,7 @@ class AgentAdapter(ABC):
 
 
 _ADAPTER_DDL = """
-CREATE TABLE IF NOT EXISTS agent_bridge_state (
+CREATE TABLE IF NOT EXISTS agent_proxy_state (
     adapter_name TEXT PRIMARY KEY,
     adapter_type TEXT DEFAULT '',
     connected INTEGER DEFAULT 0,
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS agent_bridge_state (
 """
 
 
-class AgentBridge:
+class AgentProxy:
     """Registry and dispatcher for agent adapters.
 
     Provides a unified interface to call any registered agent adapter
@@ -119,7 +119,7 @@ class AgentBridge:
         self._root = Path(root_dir)
         self._data_dir = self._root / "data"
         self._data_dir.mkdir(parents=True, exist_ok=True)
-        self._db_path = get_db_path("agent_bridge")
+        self._db_path = get_db_path("agent_proxy")
         self._adapters: dict[str, AgentAdapter] = {}
         self._init_db()
 
@@ -136,13 +136,13 @@ class AgentBridge:
         now = time.time()
         with self._connect() as conn:
             conn.execute(
-                """INSERT OR REPLACE INTO agent_bridge_state
+                """INSERT OR REPLACE INTO agent_proxy_state
                    (adapter_name, adapter_type, connected, config, last_call_at,
                     call_count, error_count, created_at, updated_at)
                    VALUES (?, ?, 0, '{}', 0, 0, 0, ?, ?)""",
                 (name, type(adapter).__name__, now, now),
             )
-        logger.info("[agent_bridge] Registered adapter: %s (%s)", name, type(adapter).__name__)
+        logger.info("[agent_proxy] Registered adapter: %s (%s)", name, type(adapter).__name__)
 
     def unregister(self, name: str) -> None:
         """Unregister an agent adapter and disconnect it."""
@@ -153,7 +153,7 @@ class AgentBridge:
             except Exception as exc:
                 logger.warning("Disconnect failed for %s: %s", name, exc)
         with self._connect() as conn:
-            conn.execute("DELETE FROM agent_bridge_state WHERE adapter_name = ?", (name,))
+            conn.execute("DELETE FROM agent_proxy_state WHERE adapter_name = ?", (name,))
 
     def get(self, name: str) -> AgentAdapter | None:
         """Get a registered adapter by name."""
@@ -180,7 +180,7 @@ class AgentBridge:
             result = adapter.execute(task, **kwargs)
             with self._connect() as conn:
                 conn.execute(
-                    """UPDATE agent_bridge_state
+                    """UPDATE agent_proxy_state
                        SET last_call_at = ?, call_count = call_count + 1,
                            updated_at = ?, connected = 1
                        WHERE adapter_name = ?""",
@@ -190,12 +190,12 @@ class AgentBridge:
         except Exception as exc:
             with self._connect() as conn:
                 conn.execute(
-                    """UPDATE agent_bridge_state
+                    """UPDATE agent_proxy_state
                        SET error_count = error_count + 1, updated_at = ?
                        WHERE adapter_name = ?""",
                     (now, name),
                 )
-            logger.error("[agent_bridge] Call failed for %s: %s", name, exc)
+            logger.error("[agent_proxy] Call failed for %s: %s", name, exc)
             raise
 
     def connect_all(self) -> dict[str, bool]:
@@ -207,12 +207,12 @@ class AgentBridge:
                 results[name] = ok
                 with self._connect() as conn:
                     conn.execute(
-                        "UPDATE agent_bridge_state SET connected = ?, updated_at = ? WHERE adapter_name = ?",
+                        "UPDATE agent_proxy_state SET connected = ?, updated_at = ? WHERE adapter_name = ?",
                         (1 if ok else 0, time.time(), name),
                     )
             except Exception as exc:
                 results[name] = False
-                logger.warning("[agent_bridge] Connect failed for %s: %s", name, exc)
+                logger.warning("[agent_proxy] Connect failed for %s: %s", name, exc)
         return results
 
     def health_check_all(self) -> dict[str, bool]:
@@ -233,7 +233,7 @@ class AgentBridge:
         adapter.sync_config(config)
         with self._connect() as conn:
             conn.execute(
-                "UPDATE agent_bridge_state SET config = ?, updated_at = ? WHERE adapter_name = ?",
+                "UPDATE agent_proxy_state SET config = ?, updated_at = ? WHERE adapter_name = ?",
                 (json.dumps(config, default=str), time.time(), name),
             )
 
@@ -241,7 +241,7 @@ class AgentBridge:
         """Get the status of a registered adapter."""
         with self._connect() as conn:
             cursor = conn.execute(
-                "SELECT * FROM agent_bridge_state WHERE adapter_name = ?", (name,)
+                "SELECT * FROM agent_proxy_state WHERE adapter_name = ?", (name,)
             )
             cols = [d[0] for d in cursor.description] if cursor.description else []
             row = cursor.fetchone()
@@ -275,8 +275,8 @@ class AgentBridge:
                 adapter.disconnect()
                 with self._connect() as conn:
                     conn.execute(
-                        "UPDATE agent_bridge_state SET connected = 0, updated_at = ? WHERE adapter_name = ?",
+                        "UPDATE agent_proxy_state SET connected = 0, updated_at = ? WHERE adapter_name = ?",
                         (time.time(), name),
                     )
             except Exception as exc:
-                logger.warning("[agent_bridge] Disconnect failed for %s: %s", name, exc)
+                logger.warning("[agent_proxy] Disconnect failed for %s: %s", name, exc)

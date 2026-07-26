@@ -9,7 +9,7 @@ F7 (2026-07-22, Phase F): ``call()`` is now ``async`` and uses
 ``subprocess.run``. ``stderr`` is now captured into
 ``ToolCallResult.error`` for debugging. A backward-compatible sync
 wrapper ``call_sync()`` is preserved for non-async callers (e.g.
-dashboard data_bridge). See ``docs/adr/013-agent-llm-direct-cli-fallback.md``.
+dashboard data_proxy). See ``docs/adr/013-agent-llm-direct-cli-fallback.md``.
 
 Version compatibility (2026-07-24): ``ToolDef`` now carries ``version``
 and ``min_platform_version`` fields. ``register()`` rejects tools whose
@@ -413,7 +413,7 @@ class ToolManager:
         """Backward-compatible sync wrapper around ``call()``.
 
         F7 (2026-07-22, Phase F): for non-async callers (e.g. dashboard
-        data_bridge). Internally runs the async ``call()`` via
+        data_proxy). Internally runs the async ``call()`` via
         ``asyncio.run()``. Prefer ``await mgr.call(...)`` in async code.
         """
         try:
@@ -493,7 +493,7 @@ class ToolManager:
         F7 (2026-07-22, Phase F): preserved the pre-Phase-F return
         schema (``total / enabled / disabled / total_calls /
         by_category``) for backward compatibility with dashboard
-        data_bridge and existing tests.
+        data_proxy and existing tests.
         """
         with self._connect() as conn:
             total = conn.execute("SELECT COUNT(*) as cnt FROM tools").fetchone()["cnt"]
@@ -519,7 +519,7 @@ class ToolManager:
 
         F7 (2026-07-22, Phase F): renamed from ``_row_to_model`` to
         preserve the pre-Phase-F method name (callers in dashboard
-        data_bridge rely on it).
+        data_proxy rely on it).
 
         Version compatibility (2026-07-24): populates ``version`` and
         ``min_platform_version``; uses ``dict(row)`` lookup so legacy

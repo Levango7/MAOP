@@ -16,14 +16,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_agent_bridge = None
+_agent_proxy = None
 
 def _get_bridge() -> Any:
-    global _agent_bridge
-    if _agent_bridge is None:
-        from maop.core.agent_bridge import AgentBridge
-        _agent_bridge = AgentBridge(root_dir=str(MAOP_ROOT))
-    return _agent_bridge
+    global _agent_proxy
+    if _agent_proxy is None:
+        from maop.core.agent_proxy import AgentProxy
+        _agent_proxy = AgentProxy(root_dir=str(MAOP_ROOT))
+    return _agent_proxy
 
 
 @router.get("/api/bridge/adapters")
