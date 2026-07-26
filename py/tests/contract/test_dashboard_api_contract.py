@@ -136,14 +136,14 @@ class TestResponseSchemas:
             f"AuditEvent missing keys: {expected_keys - set(d.keys())}"
 
     def test_bridge_stats_schema(self):
-        """BridgeStats must have queries/cache_hits/total_latency_ms."""
-        from maop.dashboard.data_bridge import BridgeStats
+        """ProxyStats must have queries/cache_hits/total_latency_ms."""
+        from maop.dashboard.data_proxy import ProxyStats
 
-        s = BridgeStats(queries=0, cache_hits=0, total_latency_ms=0.0)
+        s = ProxyStats(queries=0, cache_hits=0, total_latency_ms=0.0)
         d = s.model_dump()
         expected_keys = {"queries", "cache_hits", "total_latency_ms"}
         assert expected_keys.issubset(set(d.keys())), \
-            f"BridgeStats missing keys: {expected_keys - set(d.keys())}"
+            f"ProxyStats missing keys: {expected_keys - set(d.keys())}"
 
 
 
@@ -169,9 +169,9 @@ class TestMonitorLiveContract:
         import asyncio
         from unittest.mock import AsyncMock
 
-        from maop.dashboard.data_bridge import DataBridge
+        from maop.dashboard.data_proxy import DataProxy
 
-        bridge = DataBridge(root_dir=str(tmp_path))
+        bridge = DataProxy(root_dir=str(tmp_path))
         # Stub DB-dependent methods so live() runs without a real database.
         bridge._query_maop = AsyncMock(return_value=[])
         bridge._queue_stats_sync = lambda: {"pending": 0}
@@ -180,7 +180,7 @@ class TestMonitorLiveContract:
         try:
             result = asyncio.run(bridge.live())
         except Exception as exc:  # pragma: no cover - env-dependent
-            pytest.skip(f"DataBridge.live() unavailable in this environment: {exc}")
+            pytest.skip(f"DataProxy.live() unavailable in this environment: {exc}")
 
         missing = self.EXPECTED_LIVE_FIELDS - set(result.keys())
         assert not missing, f"/api/live missing fields Monitor.vue expects: {missing}"
@@ -190,9 +190,9 @@ class TestMonitorLiveContract:
         import asyncio
         from unittest.mock import AsyncMock
 
-        from maop.dashboard.data_bridge import DataBridge
+        from maop.dashboard.data_proxy import DataProxy
 
-        bridge = DataBridge(root_dir=str(tmp_path))
+        bridge = DataProxy(root_dir=str(tmp_path))
         bridge._query_maop = AsyncMock(return_value=[])
         bridge._queue_stats_sync = lambda: {"pending": 0}
         bridge.agent_stats = AsyncMock(return_value=[])
@@ -200,7 +200,7 @@ class TestMonitorLiveContract:
         try:
             result = asyncio.run(bridge.live())
         except Exception as exc:  # pragma: no cover - env-dependent
-            pytest.skip(f"DataBridge.live() unavailable in this environment: {exc}")
+            pytest.skip(f"DataProxy.live() unavailable in this environment: {exc}")
 
         assert "agents" in result, "/api/live missing 'agents' field"
         assert isinstance(result["agents"], list), \

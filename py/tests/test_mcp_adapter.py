@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from maop.core.agent_bridge import AgentAdapter
+from maop.core.agent_proxy import AgentAdapter
 from maop.core.mcp_adapter import MCPAdapter, _BackgroundLoop
 
 # ── Helpers ──────────────────────────────────────────────────────

@@ -90,7 +90,7 @@ def test_cost_tracker_auto_record():
 
     # 1: record called with correct args
     resp = LLMResponse(
-        content="Hello world", model="gpt-4o",
+        content="Hello world", model="gpt-4o", provider="openai",
         prompt_tokens=10, completion_tokens=20, total_tokens=30, latency_ms=500,
     )
     mock_tracker = MagicMock()
@@ -112,9 +112,10 @@ def test_cost_tracker_auto_record():
     with patch("maop.core.cost_tracker.get_cost_tracker", return_value=mock_tracker2):
         _record_cost(LLMResponse(content="Hi", model="claude-3.5-sonnet", provider="anthropic"), {})
     mock_tracker2.record.assert_called_once_with(
-        model="claude-3.5-sonnet", provider="anthropic",
+        model="claude-3.5-sonnet",
         prompt_tokens=0, completion_tokens=0, total_tokens=0, latency_ms=0,
         session_id="", agent="",
+        metadata={"provider": "anthropic"},
     )
 
 
