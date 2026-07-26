@@ -239,7 +239,6 @@ class TestN8nClient:
 
     def test_api_key_in_headers(self):
         """Test that API key is included in headers when provided."""
-        import httpx
 
         client = N8nClient(api_key="secret-key")
         http_client = client._get_client()

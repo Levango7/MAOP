@@ -309,7 +309,6 @@ class LoadBalancer:
 
     def _record_sticky(self, session_id: str, agent: str) -> None:
         """Record (or refresh) a sticky session entry. Caller holds ``self._lock``."""
-        from maop.core.monitoring import MAOP_STICKY_SESSION_ACTIVE
 
         is_new = session_id not in self._sticky_map
         self._sticky_map[session_id] = (agent, time.time() + self._sticky_ttl)

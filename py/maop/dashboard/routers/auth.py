@@ -283,7 +283,6 @@ async def auth_login(request: Request) -> dict[str, Any]:
             _login_failures[username] = failures
             # P1-18 fix: periodic cleanup to prevent unbounded growth
             if len(_login_failures) > _MAX_TRACKED_USERS:
-                cutoff = now - _LOCKOUT_SECONDS
                 _login_failures.clear()
                 _login_failures[username] = failures
         if len(failures) >= _MAX_LOGIN_FAILURES:

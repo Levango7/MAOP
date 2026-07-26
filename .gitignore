@@ -108,3 +108,14 @@ config/agents.yaml.bak2
 
 # Alembic cache
 py/maop/migrations/alembic/__pycache__/
+
+# -- Security: Keys and Certificates (P0 fix: prevent private key leakage) --
+# P0 fix: development Ed25519 private key leaked to history - cached removed above
+*.pem
+*.key
+*.p12
+*.pfx
+scripts/dev_*
+scripts/*_private_*
+data/*_secret*
+*.private

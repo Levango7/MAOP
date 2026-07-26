@@ -9,7 +9,6 @@ The FakeRedis simulates the subset of Redis operations used by the backends:
 
 from __future__ import annotations
 
-import pickle
 import sys
 from unittest.mock import MagicMock, patch
 

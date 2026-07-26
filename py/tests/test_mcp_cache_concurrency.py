@@ -30,7 +30,6 @@ from maop.core.mcp_hub import (
     MCPHub,
     MCPRateLimitedError,
     MCPServerConfig,
-    ToolResult,
 )
 from maop.core.monitoring import (
     MAOP_MCP_CACHE_EVICTION_TOTAL,

@@ -22,7 +22,6 @@ import logging
 import threading
 import time
 from enum import Enum
-from functools import partial
 from pathlib import Path
 from typing import Any
 

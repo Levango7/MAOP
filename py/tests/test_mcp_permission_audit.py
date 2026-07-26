@@ -27,7 +27,6 @@ from maop.core.mcp_hub import (
     MCPHub,
     MCPServerConfig,
     MCPPermissionDeniedError,
-    ToolResult,
     TransportType,
 )
 from maop.core.mcp_permission import (

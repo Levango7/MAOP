@@ -97,7 +97,6 @@ class TestResponseSchemas:
     def test_agent_config_schema(self):
         """AgentDef model must have required fields."""
         from maop.config.loader import AgentDef
-        import inspect
 
         fields = AgentDef.model_fields
         required_fields = {"description", "enabled", "capabilities", "model"}

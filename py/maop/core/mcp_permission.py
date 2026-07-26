@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import fnmatch
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable
 
 from maop.core.mcp_hub import MCPServerConfig

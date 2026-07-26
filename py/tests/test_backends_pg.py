@@ -376,7 +376,7 @@ def test_pg_backend_with_dsn_env(fake_psycopg):
     from maop.core.backends_pg import PostgreSQLStorageBackend
     env_dsn = "postgresql://envuser:envpass@envhost:5432/envdb"
     with patch.dict("os.environ", {"MAOP_PG_DSN": env_dsn}):
-        backend = PostgreSQLStorageBackend(dsn="")
+        PostgreSQLStorageBackend(dsn="")
     call_kwargs = fake_psycopg._pool_mod.ConnectionPool.call_args.kwargs
     assert call_kwargs["conninfo"] == env_dsn
 

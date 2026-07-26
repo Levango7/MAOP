@@ -31,6 +31,7 @@ from maop.core.routing_decision import (
     get_active_span_context,
     record_decision_safe,
 )
+from maop.core.multi_objective_scorer import ObjectiveWeights  # R8-F821 fix
 
 logger = logging.getLogger(__name__)
 

@@ -254,8 +254,6 @@ class TestCSPMiddleware:
 
 # ── Regression tests for security Critical fixes ──
 
-import os
-import importlib
 from fastapi import FastAPI, Request
 from starlette.testclient import TestClient
 

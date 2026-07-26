@@ -424,11 +424,11 @@ class TestStickySessions:
         lb = LoadBalancer(sticky_sessions=False)
         lb.register("a", weight=10)
         lb.register("b", weight=10)
-        first = lb.select(session_id="sess-1")
+        lb.select(session_id="sess-1")
         # No sticky entry should be recorded.
         assert lb.get_sticky_session("sess-1") is None
         # Repeated calls exercise the normal algorithm path.
-        second = lb.select(session_id="sess-1")
+        lb.select(session_id="sess-1")
         # With WRR/adaptive both could legitimately be selected; the
         # point is the sticky map stays empty.
         assert lb._sticky_map == {}

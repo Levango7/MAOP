@@ -1,10 +1,8 @@
 """Tests for Phase beta.3: Agent Strategy Learning + Cache Strategy Evolution."""
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
-import pytest
 
 from maop.agent_strategy_learner import (
     AgentStrategyAdjustment,
@@ -251,7 +249,6 @@ class TestCacheEvolver:
         cache = LRUCache(max_size=100, default_ttl_s=300.0)
         cache._hits = 90
         cache._misses = 10
-        original_ttl = cache._default_ttl
         evolver = CacheEvolver(min_samples=20)
         report = evolver.evolve(apply=False)
         assert isinstance(report.applied_count, int)

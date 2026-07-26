@@ -36,12 +36,9 @@ from typing import Any, cast
 from pydantic import BaseModel, Field
 
 from maop.core.conversation import ConversationManager, MessageRole
-from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.core.db_utils import sqlite_connect
 from maop.memory.shared_db import (
-    LAYER_ALIASES,
-    denormalize_layer_name,
     get_memory_db_path,
-    normalize_layer_name,
 )
 from maop.memory.store import MemoryStore
 

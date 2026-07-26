@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import time
 import urllib.error
 from pathlib import Path
 from unittest.mock import patch
