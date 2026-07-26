@@ -310,7 +310,7 @@ async def auth_login(request: Request) -> dict[str, Any]:
             "expires_in": 7200,
         }
     except Exception as e:
-        logger.error("Login error: %s", e, exc_info=True)
+        logger.exception("Login error: %s", e)
         return JSONResponse({"status": "error", "error": "Login failed"}, status_code=401)
 
 
@@ -356,7 +356,7 @@ async def auth_register(request: Request) -> dict[str, Any]:
             logger.info("[auth] New user registered: %s (roles: %s)", username, roles)
         return result
     except Exception as e:
-        logger.error("[auth] Registration failed: %s", e, exc_info=True)
+        logger.exception("[auth] Registration failed: %s", e)
         return JSONResponse({"status": "error", "error": "Registration failed"}, status_code=400)
 
 
@@ -373,7 +373,7 @@ async def auth_users(request: Request) -> dict[str, Any]:
         )
         return {"status": "ok", "users": users}
     except Exception as e:
-        logger.error("[auth] List users failed: %s", e, exc_info=True)
+        logger.exception("[auth] List users failed: %s", e)
         return JSONResponse({"status": "error", "error": "Failed to list users"}, status_code=500)
 
 
@@ -389,7 +389,7 @@ async def auth_delete_user(username: str, request: Request) -> dict[str, Any]:
             None, _db_delete_user, str(db_path), username
         )
     except Exception as e:
-        logger.error("[auth] Delete user %s failed: %s", username, e, exc_info=True)
+        logger.exception("[auth] Delete user %s failed: %s", username, e)
         return JSONResponse({"status": "error", "error": "Failed to delete user"}, status_code=500)
 
 
@@ -404,5 +404,5 @@ async def auth_update_user(username: str, request: Request) -> dict[str, Any]:
             None, _db_update_user, str(db_path), username, body
         )
     except Exception as e:
-        logger.error("[auth] User update failed: %s", e, exc_info=True)
+        logger.exception("[auth] User update failed: %s", e)
         return JSONResponse({"status": "error", "error": "Update failed"}, status_code=500)

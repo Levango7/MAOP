@@ -10,6 +10,7 @@ import shutil
 import sys
 import time
 import uuid as _uuid
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -19,6 +20,12 @@ from maop.core.middleware import require_admin
 from .state import MAOP_ROOT, active_jobs, get_bridge, get_subsystems, init_subsystems, start_time
 
 logger = logging.getLogger(__name__)
+
+
+def _count_file_lines(path) -> int:
+    """Count lines in a file (sync helper for asyncio.to_thread)."""
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        return sum(1 for _ in fh)
 
 
 async def _run_subprocess(cmd: list[str], timeout: int = 10) -> tuple[int, str, str]:
@@ -164,8 +171,8 @@ async def api_agent_config_update(request: Request) -> dict[str, Any]:
         if not ypath.exists():
             return {"status": "error", "error": "agents.yaml not found"}
         import yaml
-        with open(ypath, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+        _text = await asyncio.to_thread(Path(ypath).read_text, encoding="utf-8")
+        data = yaml.safe_load(_text)
         agents = data.get("agents", {})
         if agent_name not in agents:
             return {"status": "error", "error": f"Unknown agent: {agent_name}"}
@@ -197,14 +204,14 @@ async def api_agent_config_update(request: Request) -> dict[str, Any]:
                 agent_cfg[key] = body[key]
         if "capabilities" in body:
             agent_cfg["capabilities"] = body["capabilities"]
-        with open(ypath, "w", encoding="utf-8") as f:
-            yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+        _dumped = yaml.dump(data, allow_unicode=True, default_flow_style=False)
+        await asyncio.to_thread(Path(ypath).write_text, _dumped, encoding="utf-8")
         return {"status": "ok", "agent": agent_name, "config": agent_cfg}
     except HTTPException:
         raise
     except Exception as e:
         import logging
-        logging.getLogger(__name__).error("[system] Config update failed: %s", e, exc_info=True)
+        logging.getLogger(__name__).exception("[system] Config update failed: %s", e)
         return {"status": "error", "error": "Config update failed"}
 
 # ── Agent Upgrade ─────────────────────────────────────────────────
@@ -404,7 +411,7 @@ async def api_overview(request: Request) -> dict[str, Any]:
                 if "__pycache__" in str(p):
                     continue
                 try:
-                    code_lines += sum(1 for _ in open(p, encoding="utf-8", errors="replace"))
+                    code_lines += await asyncio.to_thread(_count_file_lines, p)
                 except Exception as exc:
                     logger.warning('Failed to count code lines: %s', exc)
             test_dir = MAOP_ROOT / "py" / "tests"

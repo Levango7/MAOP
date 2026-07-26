@@ -24,7 +24,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 
@@ -203,7 +203,7 @@ class PersonaSimulator:
     and evaluates agent responses for satisfaction and goal achievement.
     """
 
-    PERSONA_TEMPLATES: dict[str, dict[str, str | list[str]]] = {
+    PERSONA_TEMPLATES: ClassVar[dict[str, dict[str, str | list[str]]]] = {
         "junior_dev": {
             "role": "Junior developer",
             "expertise": "beginner",

@@ -144,8 +144,8 @@ def _execute_task(payload: dict) -> None:
         finally:
             asyncio.run(pool.stop())
     except Exception as exc:
-        logger.error(
-            "[queue-worker] task execution failed: %s", exc, exc_info=True,
+        logger.exception(
+            "[queue-worker] task execution failed: %s", exc,
         )
         raise
 
@@ -175,8 +175,8 @@ def _run_maintenance(payload: dict) -> None:
             removed = mq.purge_acked(older_than_s=payload.get("older_than_s", 3600.0))
             logger.info("[queue-worker] purge_acked removed %d messages", removed)
         except Exception as exc:
-            logger.error(
-                "[queue-worker] purge_acked failed: %s", exc, exc_info=True,
+            logger.exception(
+                "[queue-worker] purge_acked failed: %s", exc,
             )
             raise
     elif job == "cleanup_dead_letters":
@@ -190,8 +190,8 @@ def _run_maintenance(payload: dict) -> None:
                 "[queue-worker] cleanup_dead_letters removed %d entries", removed,
             )
         except Exception as exc:
-            logger.error(
-                "[queue-worker] cleanup_dead_letters failed: %s", exc, exc_info=True,
+            logger.exception(
+                "[queue-worker] cleanup_dead_letters failed: %s", exc,
             )
             raise
     else:
@@ -242,9 +242,9 @@ def _consume_messages() -> int:
             except Exception as exc:
                 # NACK so the message is re-queued or dead-lettered by the MQ
                 # rather than lingering in 'processing' until ack_timeout_s.
-                logger.error(
+                logger.exception(
                     "[queue-worker] failed to process message %s on %s: %s",
-                    getattr(msg, "id", "?"), topic, exc, exc_info=True,
+                    getattr(msg, "id", "?"), topic, exc,
                 )
                 try:
                     mq.nack(msg.id, error=str(exc))
@@ -288,7 +288,7 @@ def run() -> None:
             time.sleep(5)
 
         except Exception as exc:
-            logger.error("Worker error: %s", exc, exc_info=True)
+            logger.exception("Worker error: %s", exc)
             time.sleep(5)
 
     logger.info("Queue Worker shut down.")

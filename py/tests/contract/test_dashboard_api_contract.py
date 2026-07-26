@@ -5,6 +5,8 @@ dashboard API endpoints, with response schema assertions for key endpoints.
 """
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 pytestmark = pytest.mark.contract
@@ -158,7 +160,7 @@ class TestResponseSchemas:
 class TestMonitorLiveContract:
     """Verify /api/live response fields match Monitor.vue expectations (R4 P1 fix)."""
 
-    EXPECTED_LIVE_FIELDS = {
+    EXPECTED_LIVE_FIELDS: ClassVar[set[str]] = {
         "requests_per_min", "queue_depth", "cost_per_hour", "agents",
         # Backward-compatible fields (also present)
         "recent_delegations", "open_circuit_breakers", "timestamp",
@@ -230,8 +232,8 @@ class TestHealthContract:
 class TestAgentsRoutesContract:
     """Verify /api/agents/routes response fields (R4 P1 fix)."""
 
-    EXPECTED_ROUTE_FIELDS = {"name", "provider", "enabled"}
-    DEPRECATED_FIELDS = {"pattern", "agent", "weight"}
+    EXPECTED_ROUTE_FIELDS: ClassVar[set[str]] = {"name", "provider", "enabled"}
+    DEPRECATED_FIELDS: ClassVar[set[str]] = {"pattern", "agent", "weight"}
 
     def test_routes_use_correct_field_names(self):
         """Agents.vue uses route.name/provider/enabled, not pattern/agent/weight."""

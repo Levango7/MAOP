@@ -16,7 +16,7 @@ import threading
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class JsonLogFormatter(logging.Formatter):
     # protect the schema contract.
     # H3 fix: 敏感数据脱敏正则模式（与 guardrail.py sensitive-patterns 对齐）
     # 匹配常见密钥格式，命中时替换为 [REDACTED:<type>]
-    _SENSITIVE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    _SENSITIVE_PATTERNS: ClassVar[list[tuple[re.Pattern[str], str]]] = [
         (re.compile(r"sk-[a-zA-Z0-9]{20,}"), "[REDACTED:openai_key]"),
         (re.compile(r"AKIA[0-9A-Z]{16}"), "[REDACTED:aws_key]"),
         (re.compile(r"(?i)(api[_-]?key|apikey)\s*[:=]\s*[\"\']?[A-Za-z0-9_\-]{16,}"), "[REDACTED:api_key]"),

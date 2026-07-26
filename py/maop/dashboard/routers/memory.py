@@ -129,7 +129,7 @@ async def api_neural_status() -> dict[str, Any]:
             emb = vs._embedder
             info["embedding"] = {"enabled": True, "dim": getattr(emb, "dim", 0), "model": getattr(emb, "model_name", "unknown")}
     except Exception:
-        logger.error("Neural vector store check failed", exc_info=True)
+        logger.exception("Neural vector store check failed")
         info["vector_store"]["error"] = "Vector store unavailable"
     try:
         from maop.memory.store import MemoryStore

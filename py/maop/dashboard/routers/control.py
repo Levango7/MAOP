@@ -109,7 +109,7 @@ async def control_validate(request: Request) -> dict[str, Any]:
         active_jobs[job_id] = {"action": "validate", "status": "completed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "config validation", "result": result.model_dump()}
         return {"job_id": job_id, "status": "completed", "result": result.model_dump()}
     except Exception:
-        logger.error("Validate failed", exc_info=True)
+        logger.exception("Validate failed")
         active_jobs[job_id] = {"action": "validate", "status": "failed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "config validation", "error": "Validate failed"}
         return {"job_id": job_id, "status": "failed", "error": "Validate failed"}
 
@@ -123,7 +123,7 @@ async def control_doctor(request: Request) -> dict[str, Any]:
         active_jobs[job_id] = {"action": "doctor", "status": "completed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "system diagnostics", "result": [r.model_dump() for r in results]}
         return {"job_id": job_id, "status": "completed", "result": [r.model_dump() for r in results]}
     except Exception:
-        logger.error("Doctor check failed", exc_info=True)
+        logger.exception("Doctor check failed")
         active_jobs[job_id] = {"action": "doctor", "status": "failed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "system diagnostics", "error": "Doctor check failed"}
         return {"job_id": job_id, "status": "failed", "error": "Doctor check failed"}
 
@@ -163,7 +163,7 @@ async def control_provider_health(request: Request) -> dict[str, Any]:
         results = health_check(MAOP_ROOT)
         return {"status": "ok", "components": [r.model_dump() for r in results]}
     except Exception:
-        logger.error("Provider health check failed", exc_info=True)
+        logger.exception("Provider health check failed")
         return {"status": "error", "error": "Provider health check failed"}
 
 @router.post("/api/control/maintain")
@@ -179,7 +179,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
                 result = rotate_logs(log_dir=MAOP_ROOT / "logs", data_dir=MAOP_ROOT / "data")
                 return {"status": "ok", "action": "log-rotate", "msg": "Logs rotated", "rotated": result.rotated, "deleted": result.deleted}
             except Exception:
-                logger.error("Log rotate failed", exc_info=True)
+                logger.exception("Log rotate failed")
                 return {"status": "ok", "action": "log-rotate", "msg": "Skipped: log rotate unavailable"}
         elif action == "prune":
             try:
@@ -209,7 +209,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
                 total_after = stats_dict_after.get("total_entries", 0)
                 return {"status": "ok", "action": "prune", "pruned": pruned_count, "remaining": total_after, "total_before": total_before, "pruned_ids": list(pruned_ids)[:20]}
             except Exception:
-                logger.error("Prune failed", exc_info=True)
+                logger.exception("Prune failed")
                 return {"status": "error", "action": "prune", "msg": "Failed: prune unavailable"}
         elif action == "health":
             try:
@@ -218,7 +218,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
                 healthy = all(r.status == "ok" for r in results)
                 return {"status": "ok", "action": "health", "healthy": healthy, "components": [r.model_dump() for r in results]}
             except Exception:
-                logger.error("Health check failed", exc_info=True)
+                logger.exception("Health check failed")
                 return {"status": "ok", "action": "health", "healthy": True, "msg": "Skipped: health check unavailable"}
         elif action == "backup":
             try:
@@ -228,7 +228,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
                 path = entries[0].backup_path if entries else "N/A"
                 return {"status": "ok", "action": "backup", "path": str(path)}
             except Exception:
-                logger.error("Backup failed", exc_info=True)
+                logger.exception("Backup failed")
                 return {"status": "ok", "action": "backup", "msg": "Skipped: backup unavailable"}
         elif action == "cache-clear":
             async with cache_lock:
@@ -241,7 +241,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
                 reloader.reload() if hasattr(reloader, "reload") else None
                 return {"status": "ok", "action": "reload", "msg": "Config reloaded"}
             except Exception:
-                logger.error("Config reload failed", exc_info=True)
+                logger.exception("Config reload failed")
                 return {"status": "ok", "action": "reload", "msg": "Skipped: reload unavailable"}
         elif action == "reindex":
             try:
@@ -252,7 +252,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
                     return {"status": "ok", "action": "reindex", "msg": "Vector index rebuilt"}
                 return {"status": "ok", "action": "reindex", "msg": "Skipped: vector store unavailable"}
             except Exception:
-                logger.error("Vector reindex failed", exc_info=True)
+                logger.exception("Vector reindex failed")
                 return {"status": "ok", "action": "reindex", "msg": "Skipped: reindex unavailable"}
         elif action == "vacuum":
             try:
@@ -261,9 +261,9 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
                     conn.execute("VACUUM")
                 return {"status": "ok", "action": "vacuum", "msg": "Database compacted"}
             except Exception:
-                logger.error("Database vacuum failed", exc_info=True)
+                logger.exception("Database vacuum failed")
                 return {"status": "ok", "action": "vacuum", "msg": "Skipped: vacuum unavailable"}
         return {"status": "ok", "action": action or "noop"}
     except Exception:
-        logger.error("Maintain action failed", exc_info=True)
+        logger.exception("Maintain action failed")
         return {"status": "error", "error": "Maintain action failed"}

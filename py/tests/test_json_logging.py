@@ -1,4 +1,4 @@
-﻿"""Tests for JSON structured logging (P2-2).
+"""Tests for JSON structured logging (P2-2).
 
 Covers:
   * ``JsonLogFormatter`` produces valid JSON with the expected schema.
@@ -220,10 +220,10 @@ class TestEnvVarToggle:
         original_handlers = list(root.handlers)
         root.handlers = []  # clean slate
         try:
-            with mock.patch.dict(os.environ, {"MAOP_JSON_LOG": "0"}, clear=False):
-                with mock.patch("sys.argv", ["MAOP", "status"]):
-                    with mock.patch("maop.cli.cmd_status", lambda: None):
-                        main()
+            with mock.patch.dict(os.environ, {"MAOP_JSON_LOG": "0"}, clear=False), \
+                 mock.patch("sys.argv", ["MAOP", "status"]), \
+                 mock.patch("maop.cli.cmd_status", lambda: None):
+                main()
             # No JsonLogFormatter should have been installed.
             for h in root.handlers:
                 assert not isinstance(h.formatter, JsonLogFormatter), (
@@ -238,10 +238,10 @@ class TestEnvVarToggle:
         root = logging.getLogger()
         original_handlers = list(root.handlers)
         try:
-            with mock.patch.dict(os.environ, {"MAOP_JSON_LOG": "1"}, clear=False):
-                with mock.patch("sys.argv", ["MAOP", "status"]):
-                    with mock.patch("maop.cli.cmd_status", lambda: None):
-                        main()
+            with mock.patch.dict(os.environ, {"MAOP_JSON_LOG": "1"}, clear=False), \
+                 mock.patch("sys.argv", ["MAOP", "status"]), \
+                 mock.patch("maop.cli.cmd_status", lambda: None):
+                main()
             # At least one handler should have JsonLogFormatter.
             assert any(
                 isinstance(h.formatter, JsonLogFormatter) for h in root.handlers
@@ -257,10 +257,10 @@ class TestEnvVarToggle:
         log_file = tmp_path / "env.log"
         try:
             env = {"MAOP_JSON_LOG": "1", "MAOP_JSON_LOG_FILE": str(log_file)}
-            with mock.patch.dict(os.environ, env, clear=False):
-                with mock.patch("sys.argv", ["MAOP", "status"]):
-                    with mock.patch("maop.cli.cmd_status", lambda: None):
-                        main()
+            with mock.patch.dict(os.environ, env, clear=False), \
+                 mock.patch("sys.argv", ["MAOP", "status"]), \
+                 mock.patch("maop.cli.cmd_status", lambda: None):
+                main()
             file_handlers = [
                 h for h in root.handlers if isinstance(h, logging.FileHandler)
             ]

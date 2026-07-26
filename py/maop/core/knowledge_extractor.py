@@ -1,4 +1,4 @@
-﻿"""MAOP Knowledge Extractor — Extract structured knowledge from conversations.
+"""MAOP Knowledge Extractor — Extract structured knowledge from conversations.
 
 Bridges the gap between DreamConsolidator (which only compresses) and
 true long-term memory (which should store reusable knowledge).
@@ -24,7 +24,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 
@@ -78,7 +78,7 @@ class KnowledgeExtractor:
       - Configuration values (key=value patterns)
     """
 
-    _RELATION_PATTERNS: list[tuple[str, str]] = [
+    _RELATION_PATTERNS: ClassVar[list[tuple[str, str]]] = [
         (r"(\w[\w.\-]+)\s+uses?\s+(\w[\w.\-]+)", "uses"),
         (r"(\w[\w.\-]+)\s+depends?\s+on\s+(\w[\w.\-]+)", "depends_on"),
         (r"(\w[\w.\-]+)\s+extends?\s+(\w[\w.\-]+)", "extends"),
@@ -89,7 +89,7 @@ class KnowledgeExtractor:
         (r"(\w[\w.\-]+)\s+contains?\s+(\w[\w.\-]+)", "contains"),
     ]
 
-    _FACT_PATTERNS: list[tuple[str, str]] = [
+    _FACT_PATTERNS: ClassVar[list[tuple[str, str]]] = [
         (r"(\w[\w.\-]+)\s+is\s+(?:a\s+|an\s+)?(\w[\w.\-]+(?:\s+\w[\w.\-]+){0,3})", "is_a"),
         (r"(\w[\w.\-]+)\s+does\s+(\w[\w.\-]+(?:\s+\w[\w.\-]+){0,2})", "does"),
         (r"(\w[\w.\-]+)\s+returns?\s+(\w[\w.\-]+(?:\s+\w[\w.\-]+){0,2})", "returns"),

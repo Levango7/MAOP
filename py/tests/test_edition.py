@@ -63,10 +63,10 @@ class TestFeatureFlag:
 
 class TestDetectEdition:
     def test_default_is_personal(self):
-        with patch.dict(os.environ, {}, clear=True):
-            with patch("maop.config.edition._is_enterprise_package_installed", return_value=False):
-                reset_edition()
-                assert get_edition() is Edition.PERSONAL
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("maop.config.edition._is_enterprise_package_installed", return_value=False):
+            reset_edition()
+            assert get_edition() is Edition.PERSONAL
 
     def test_env_enterprise(self):
         with patch.dict(os.environ, {"MAOP_EDITION": "enterprise"}):

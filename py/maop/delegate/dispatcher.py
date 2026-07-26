@@ -81,7 +81,7 @@ def _get_load_balancer():
         return None
     except Exception as exc:
         # P2-6 fix: upgrade to error — runtime init failures should be visible
-        logger.error("Failed to load driver LoadBalancer: %s", exc, exc_info=True)
+        logger.exception("Failed to load driver LoadBalancer: %s", exc)
         return None
 
 def _get_runtime(config=None):
@@ -94,7 +94,7 @@ def _get_runtime(config=None):
     except ImportError:
         return None
     except Exception as exc:
-        logger.error("Failed to load driver Runtime: %s", exc, exc_info=True)
+        logger.exception("Failed to load driver Runtime: %s", exc)
         return None
 
 def _get_sandbox_manager(root_dir=None):
@@ -105,7 +105,7 @@ def _get_sandbox_manager(root_dir=None):
     except ImportError:
         return None
     except Exception as exc:
-        logger.error("Failed to load driver SandboxManager: %s", exc, exc_info=True)
+        logger.exception("Failed to load driver SandboxManager: %s", exc)
         return None
 
 def _get_subagent_manager(root_dir=None):
@@ -116,7 +116,7 @@ def _get_subagent_manager(root_dir=None):
     except ImportError:
         return None
     except Exception as exc:
-        logger.error("Failed to load driver SubagentManager: %s", exc, exc_info=True)
+        logger.exception("Failed to load driver SubagentManager: %s", exc)
         return None
 
 def _get_agent_registry(root_dir=None):
@@ -127,7 +127,7 @@ def _get_agent_registry(root_dir=None):
     except ImportError:
         return None
     except Exception as exc:
-        logger.error("Failed to load driver AgentRegistry: %s", exc, exc_info=True)
+        logger.exception("Failed to load driver AgentRegistry: %s", exc)
         return None
 
 def _get_capability_matcher(root_dir=None):
@@ -140,7 +140,7 @@ def _get_capability_matcher(root_dir=None):
     except ImportError:
         return None
     except Exception as exc:
-        logger.error("Failed to load driver CapabilityMatcher: %s", exc, exc_info=True)
+        logger.exception("Failed to load driver CapabilityMatcher: %s", exc)
         return None
 
 
