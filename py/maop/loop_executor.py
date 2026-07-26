@@ -1,4 +1,4 @@
-﻿"""MAOP Loop Executor — Execution strategies for the MAOP Loop.
+"""MAOP Loop Executor — Execution strategies for the MAOP Loop.
 
 Extracted from maop_loop.py for single-responsibility separation.
 Provides a Mixin that MaopLoop inherits to gain execution methods.
@@ -153,7 +153,7 @@ class ExecuteMixin:
                         )
                         continue
                     st_id, result = gr  # type: ignore[misc]
-                    subtask_results[st_id] = result  # type: ignore[assignment]
+                    subtask_results[st_id] = result
 
             self._log("execute", "INFO",
                       f"Group {group_idx+1}/{len(groups)} completed: {len(group)} subtasks",

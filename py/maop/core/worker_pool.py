@@ -218,7 +218,7 @@ class WorkerPool:
                 from maop.maop_loop import MaopLoop
                 # P2-2 fix: reuse shared MaopLoop to avoid re-opening 5 SQLite
                 # connections per task (was causing connection exhaustion)
-                if not hasattr(self, '_shared_loop') or self._shared_loop is None:
+                if not hasattr(self, '_shared_loop') or self._shared_loop is None:  # type: ignore[has-type]
                     self._shared_loop = MaopLoop(root_dir=self._root_dir)
                 loop = self._shared_loop
                 result = await loop.run(

@@ -90,16 +90,17 @@ def test_cost_tracker_auto_record():
 
     # 1: record called with correct args
     resp = LLMResponse(
-        content="Hello world", model="gpt-4o", provider="openai",
+        content="Hello world", model="gpt-4o",
         prompt_tokens=10, completion_tokens=20, total_tokens=30, latency_ms=500,
     )
     mock_tracker = MagicMock()
     with patch("maop.core.cost_tracker.get_cost_tracker", return_value=mock_tracker):
         _record_cost(resp, {"session_id": "sess-123", "agent": "claude"})
     mock_tracker.record.assert_called_once_with(
-        model="gpt-4o", provider="openai",
+        model="gpt-4o",
         prompt_tokens=10, completion_tokens=20, total_tokens=30, latency_ms=500,
         session_id="sess-123", agent="claude",
+        metadata={"provider": "openai"},
     )
 
     # 2: CostTracker failure does not raise

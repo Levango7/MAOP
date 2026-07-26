@@ -454,7 +454,7 @@ class MaopLoop(ExecuteMixin):
         exec_result = None
         if cache_enabled:
             try:
-                cached = self._result_cache.get(cache_key)
+                cached = self._result_cache.get(cache_key)  # type: ignore[union-attr]
                 if cached is not None:
                     self._log("execute", "INFO", "Cache hit", trace_id=ctx.trace_id)
                     exec_result = cached
@@ -479,7 +479,7 @@ class MaopLoop(ExecuteMixin):
 
             if cache_enabled and exec_result and exec_result.is_success():
                 try:
-                    self._result_cache.put(cache_key, exec_result)
+                    self._result_cache.put(cache_key, exec_result)  # type: ignore[union-attr]
                 except Exception as exc:
                     logger.debug("[MAOP-loop] Cache put failed: %s", exc)
 

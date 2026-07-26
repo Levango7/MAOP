@@ -268,7 +268,7 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]
                             info["upgrade_status"] = "success"
                             info["upgrade_output"] = upgrade_r_stdout[-500:]
                             try:
-                                _rc, _out, _err = await _run_subprocess([cli_path, "--version"], timeout=10)
+                                _rc, _out, _err = await _run_subprocess([cli_path, "--version"], timeout=10)  # type: ignore[list-item]
                                 info["new_version"] = (_out or _err).strip()[:200]
                             except Exception as exc:
                                 logger.warning("Failed to get new version: %s", exc)
@@ -576,7 +576,7 @@ async def api_system_resources(request: Request) -> dict[str, Any]:
     mem_used_mb = 0.0
     mem_error: str | None = None
     try:
-        import psutil  # type: ignore[import-not-found]
+        import psutil
         proc = psutil.Process()
         mem_used_mb = proc.memory_info().rss / 1024 / 1024
     except ImportError:
@@ -731,7 +731,7 @@ async def api_system_diagnostics(request: Request) -> dict[str, Any]:
 
     # ── Audit Log: try import maop.enterprise.audit；Personal 版降级 ──
     try:
-        from maop.enterprise.audit import AuditLog as _EntAudit  # noqa: F401
+        from maop.enterprise.audit import EnterpriseAuditLogger as _EntAudit  # noqa: F401
         result["audit_log"] = {"ok": True, "result": "OK (enterprise)"}
     except ImportError:
         result["audit_log"] = {"ok": True, "result": "N/A (personal edition)"}

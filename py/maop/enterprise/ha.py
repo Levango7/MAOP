@@ -261,7 +261,7 @@ class HAManager:
         refreshed = self._lock.refresh()
         if refreshed:
             logger.debug("[ha] Renewed leadership node=%s", self._node_id)
-        return refreshed
+        return refreshed  # type: ignore[no-any-return]
 
     def release_leadership(self) -> bool:
         """Release the leader lease (graceful shutdown)."""

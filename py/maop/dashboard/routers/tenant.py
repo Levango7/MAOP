@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from maop.config.edition import FeatureFlag, has_feature
@@ -67,7 +67,7 @@ async def list_tenants(
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.TENANT_ISOLATION):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=404,
             detail="tenant isolation not available in this edition",
         )
     mgr = _get_manager()
@@ -97,7 +97,7 @@ async def create_tenant(body: CreateTenantRequest, request: Request) -> dict[str
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.TENANT_ISOLATION):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=404,
             detail="tenant isolation not available in this edition",
         )
     from maop.enterprise.tenant import TenantQuota
@@ -118,7 +118,7 @@ async def get_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.TENANT_ISOLATION):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=404,
             detail="tenant isolation not available in this edition",
         )
     mgr = _get_manager()
@@ -136,7 +136,7 @@ async def suspend_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.TENANT_ISOLATION):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=404,
             detail="tenant isolation not available in this edition",
         )
     mgr = _get_manager()
@@ -152,7 +152,7 @@ async def activate_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.TENANT_ISOLATION):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=404,
             detail="tenant isolation not available in this edition",
         )
     mgr = _get_manager()
@@ -168,7 +168,7 @@ async def delete_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.TENANT_ISOLATION):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=404,
             detail="tenant isolation not available in this edition",
         )
     mgr = _get_manager()
@@ -184,7 +184,7 @@ async def get_usage(tenant_id: str, request: Request) -> dict[str, Any]:
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.TENANT_ISOLATION):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=404,
             detail="tenant isolation not available in this edition",
         )
     mgr = _get_manager()

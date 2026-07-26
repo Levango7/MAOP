@@ -301,7 +301,7 @@ class ModelSelector:
         lb = self._load_balancer
         load_sorted = sorted(
             candidates,
-            key=lambda m: (self._strategy_key(m, strategy), lb.get_load(m.provider)),
+            key=lambda m: (self._strategy_key(m, strategy), lb.get_load(m.provider) if lb else 0),
         )
         load_winner = load_sorted[0]
 

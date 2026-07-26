@@ -957,7 +957,7 @@ class Dispatcher:
         except Exception as exc:
             logger.debug("LoadBalancer record failed: %s", exc)
         try:
-            result = await driver_fn(config, task, timeout, workdir, trace_id, streamer=streamer)  # type: ignore[call-arg]
+            result = await driver_fn(config, task, timeout, workdir, trace_id, streamer=streamer)
             result.routing_key = routing_key
         except Exception as exc:
             result = new_result(

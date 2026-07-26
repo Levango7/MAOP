@@ -36,7 +36,7 @@ try:
     import mmh3 as _mmh3
     _HAS_MMH3 = True
 except Exception:
-    _mmh3 = None
+    _mmh3 = None  # type: ignore[assignment]
     _HAS_MMH3 = False
 
 # ── Hash functions ──────────────────────────────────────────────

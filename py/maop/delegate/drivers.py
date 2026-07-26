@@ -1,4 +1,4 @@
-﻿"""MAOP Delegate Drivers — Subprocess driver implementations for each agent type.
+"""MAOP Delegate Drivers — Subprocess driver implementations for each agent type.
 
 Extracted from dispatcher.py for single-responsibility separation.
 Drivers: cli, wrapper (PowerShell .ps1), powershell (inline), cmd, python.
@@ -457,7 +457,7 @@ async def _run_python(config: AgentConfig, prompt: str, timeout: int,
 # ── Driver dispatch table ────────────────────────────────────
 
 DRIVERS = {
-    "cli": _run_cli,
+    "cli": _run_cli,  # type: ignore[dict-item]
     "wrapper": _run_wrapper,
     "powershell": _run_powershell,
     "cmd": _run_cmd,

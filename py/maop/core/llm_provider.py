@@ -796,13 +796,13 @@ def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
         from maop.core.cost_tracker import get_cost_tracker
         get_cost_tracker().record(
             model=resp.model,
-            provider=resp.provider,
             prompt_tokens=resp.prompt_tokens,
             completion_tokens=resp.completion_tokens,
             total_tokens=resp.total_tokens,
             latency_ms=resp.latency_ms,
             session_id=str(kwargs.get("session_id", "")),
             agent=str(kwargs.get("agent", "")),
+            metadata={"provider": resp.provider} if resp.provider else None,
         )
     except Exception as exc:
         logger.warning("[llm_provider] CostTracker record failed: %s", exc)

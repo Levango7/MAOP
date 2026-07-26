@@ -42,7 +42,7 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
                 if ssl_ctx:
                     uvicorn_kwargs["ssl"] = ssl_ctx
 
-        proto = "https" if "ssl" in uvicorn_kwargs else "http"
+        _proto = "https" if "ssl" in uvicorn_kwargs else "http"  # noqa: F841
 
     uvicorn.run(app, host=host, port=port, **uvicorn_kwargs)
 
@@ -117,7 +117,7 @@ def cmd_health() -> Any:
         results = health_check(MAOP_ROOT)
         all_healthy = True
         for r in results:
-            status_icon = {"healthy": "+", "degraded": "~", "unhealthy": "!"}[r.status.value]
+            _status_icon = {"healthy": "+", "degraded": "~", "unhealthy": "!"}[r.status.value]  # noqa: F841
             if r.status.value != "healthy":
                 all_healthy = False
         if not all_healthy:
@@ -187,11 +187,11 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
         if not regs:
             pass
         for r in regs:
-            trust = "trusted" if r.trusted else "untrusted"
-            status = "enabled" if r.enabled else "disabled"
+            _trust = "trusted" if r.trusted else "untrusted"  # noqa: F841
+            _status = "enabled" if r.enabled else "disabled"  # noqa: F841
     elif parsed.subcommand == "add-registry":
         mp.add_registry(parsed.name, parsed.url, trusted=parsed.trusted)
-        trust = "trusted" if parsed.trusted else "untrusted"
+        _trust = "trusted" if parsed.trusted else "untrusted"  # noqa: F841
     elif parsed.subcommand == "remove-registry":
         mp.remove_registry(parsed.name)
     elif parsed.subcommand == "search":
@@ -203,11 +203,11 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
         if not results:
             pass
         for s in results:
-            verified = " [verified]" if s.verified else ""
-            tags_str = f" tags={','.join(s.tags)}" if s.tags else ""
+            _verified = " [verified]" if s.verified else ""  # noqa: F841
+            _tags_str = f" tags={','.join(s.tags)}" if s.tags else ""
     elif parsed.subcommand == "install":
         try:
-            cfg = mp.install(
+            _cfg = mp.install(
                 parsed.name,
                 registry_name=parsed.registry,
                 verify_checksum=not parsed.no_verify,
@@ -224,7 +224,7 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
         installed = mp.list_installed()
         if not installed:
             pass
-        for s in installed:
+        for s in installed:  # type: ignore[assignment]
             pass
 
 

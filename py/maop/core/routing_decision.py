@@ -331,11 +331,11 @@ class RoutingDecisionStore:
 
         def _loads(value: Any, default: Any) -> dict[str, Any]:
             if not value:
-                return default
+                return default  # type: ignore[no-any-return]
             try:
-                return json.loads(value)
+                return json.loads(value)  # type: ignore[no-any-return]
             except (TypeError, ValueError):
-                return default
+                return default  # type: ignore[no-any-return]
 
         return RoutingDecisionRecord(
             trace_id=str(_get("trace_id", "") or ""),
