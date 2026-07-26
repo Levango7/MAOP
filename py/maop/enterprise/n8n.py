@@ -108,7 +108,7 @@ def is_safe_callback_url(url: str) -> bool:
     if not host:
         return False
 
-    def _ip_unsafe(ip: ipaddress._BaseAddress) -> bool:
+    def _ip_unsafe(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
         return (
             ip.is_private
             or ip.is_loopback
@@ -318,7 +318,7 @@ class N8nClient:
         try:
             resp = client.get("/workflows", params={"limit": limit})
             resp.raise_for_status()
-            return resp.json().get("data", [])
+            return resp.json().get("data", [])  # type: ignore[no-any-return]
         except httpx.HTTPStatusError as exc:
             raise N8nIntegrationError(
                 f"n8n API returned {exc.response.status_code}: {exc.response.text}"

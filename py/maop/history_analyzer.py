@@ -97,7 +97,7 @@ class HistoryAnalyzer:
         if self._timeseries is None:
             from maop.core.timeseries import TimeSeriesStore
             # TimeSeriesStore expects a file path, not a directory.
-            self._timeseries = TimeSeriesStore(
+            self._timeseries = TimeSeriesStore(  # type: ignore[assignment]
                 db_path=self._root / "data" / "timeseries.db"
             )
         return self._timeseries
@@ -106,7 +106,7 @@ class HistoryAnalyzer:
         if self._cost_tracker is None:
             try:
                 from maop.core.cost_tracker import get_cost_tracker
-                self._cost_tracker = get_cost_tracker()
+                self._cost_tracker = get_cost_tracker()  # type: ignore[assignment]
             except Exception:
                 self._cost_tracker = None
         return self._cost_tracker

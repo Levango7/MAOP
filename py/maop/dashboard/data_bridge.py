@@ -435,7 +435,7 @@ class DataBridge:
             pending = qstats.get("pending", 0)
             queue_health = max(0, 100 - pending * 5)
         except Exception:
-            queue_health = 100.0
+            queue_health = 100
 
         # Memory usage (approximate from memory_stats)
         try:

@@ -138,10 +138,10 @@ class CacheEvolver:
         applied = 0
         skipped = 0
         if apply:
-            for adj in adjustments:
-                if adj.auto_applicable:
-                    if self._apply_adjustment(adj, lru_caches, semantic_caches or {}):
-                        adj.applied = True
+            for item in adjustments:
+                if item.auto_applicable:
+                    if self._apply_adjustment(item, lru_caches, semantic_caches or {}):
+                        item.applied = True
                         applied += 1
                     else:
                         skipped += 1
