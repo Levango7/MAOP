@@ -20,6 +20,18 @@ from maop.enterprise.license import (
     LicenseValidator,
 )
 
+
+@pytest.fixture(autouse=True)
+def _clean_crl_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """清除 CRL 相关环境变量，避免 test_license_crl.py 的测试污染本模块。
+
+    LicenseValidator.__init__ 会读取 MAOP_CRL_URL 决定是否启用 CRL 检查，
+    如果 CRL 被启用，篡改签名的 license 可能抛 CRLError 而非
+    LicenseSignatureError，导致 test_tampered_signature_raises 失败。
+    """
+    for var in ("MAOP_CRL_URL", "MAOP_CRL_CACHE_TTL_S", "MAOP_CRL_STRICT"):
+        monkeypatch.delenv(var, raising=False)
+
 _TEST_KEY_DIR = Path(tempfile.mkdtemp(prefix="maop_test_keys_"))
 _TEST_PRIVATE_PATH = _TEST_KEY_DIR / "private.pem"
 _TEST_PUBLIC_PATH = _TEST_KEY_DIR / "public.pem"

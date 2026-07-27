@@ -461,9 +461,9 @@ def get_queue_backend(db_path: str = "") -> QueueBackend:
                 _queue = RedisQueueBackend()
                 logger.info("[backends] Queue: Redis (RabbitMQ fallback)")
                 return _queue
-            except ImportError:
-                logger.warning("[backends] Redis queue backend not available, falling back to SQLite")
-                record_degradation("queue", "redis", "sqlite", "import_error_redis")
+            except (ImportError, Exception) as exc:
+                logger.warning("[backends] Redis queue backend not available (%s), falling back to SQLite", exc)
+                record_degradation("queue", "redis", "sqlite", "redis_unavailable")
     elif backend_type == "redis":
         try:
             from maop.core.backends_redis import RedisQueueBackend

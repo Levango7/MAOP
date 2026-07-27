@@ -26,12 +26,11 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
 
 # 顶层导入 etcd3 —— 未安装时抛出带清晰提示的 ImportError，
 # 由 backends.py 工厂函数的 try/except ImportError 捕获后降级。
 try:
-    import etcd3  # type: ignore
+    import etcd3
 except ImportError as _e:  # pragma: no cover - 仅在缺包时触发
     raise ImportError(
         "etcd3 is required for EtcdKVBackend. "

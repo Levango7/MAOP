@@ -105,7 +105,7 @@ class SSOManager:
         if self._config.provider == SSOProvider.SAML:
             SAMLHandler = _get_saml_handler()
             handler = SAMLHandler(self._config)
-            return handler.get_authorize_url(state=state)
+            return handler.get_authorize_url(state=state)  # type: ignore[no-any-return]
         if self._config.provider == SSOProvider.OIDC:
             params = {
                 "client_id": self._config.client_id,
@@ -361,7 +361,7 @@ class SSOManager:
             "[sso] SAML session=%s user=%s",
             session.session_id, session.user.external_id,
         )
-        return session
+        return session  # type: ignore[no-any-return]
 
     def validate_session(self, session_id: str) -> SSOSession | None:
         session = self._sessions.get(session_id)

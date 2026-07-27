@@ -142,14 +142,14 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 ### 负面
 
 - ⚠️ 企业版代码在个人版仓库中可见（虽然受 Commercial 许可约束）
-- ⚠️ 无在线 license 撤销机制（依赖客户配合删除 key）
+- ⚠️ ~~无在线 license 撤销机制~~（已通过 CRL 实现，见 `maop/enterprise/crl.py`）
 - ⚠️ Edition 检测有轻微运行时开销（首次 import 时）
 - ⚠️ FeatureFlag 枚举膨胀风险（需定期审查）
 
 ### 缓解措施
 
 - 企业版代码可见性：通过 Commercial 许可条款法律约束 + 未来可考虑代码混淆
-- License 撤销：未来实现 CRL（Certificate Revocation List）机制
+- License 撤销：已实现 CRL（Certificate Revocation List）机制（`maop/enterprise/crl.py`）
 - 性能：edition 检测结果缓存（`_current_edition` 全局变量）
 - FeatureFlag 膨胀：定期审查，合并相似 flag
 
@@ -177,8 +177,8 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 | SAML SSO 完整实现 | Medium | fail-closed 拒绝（OIDC 已完整支持） |
 | RabbitMQ 队列后端 | Done | 已实现（需 pika，企业版可选依赖） |
 | etcd/Consul KV 后端 | Done | 已实现（需 etcd3，企业版可选依赖） |
-| License 在线撤销（CRL） | Low | 未来增强 |
-| 前端 edition 切换 UI | Low | 当前需手动配置环境变量 |
+| License 在线撤销（CRL） | Done | 已实现（HTTP CRL + 本地缓存 + 离线降级） |
+| 前端 edition 切换 UI | Done | 已实现（Settings 页面，需 admin 权限） |
 
 ## References
 

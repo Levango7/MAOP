@@ -14,6 +14,12 @@ Validation logic:
     2. Verify the Ed25519 signature against the bundled public key
     3. Check that expires_at has not passed
     4. Optionally check machine fingerprint if present in the license
+    5. Check CRL (Certificate Revocation List) if MAOP_CRL_URL is configured
+
+CRL (在线撤销) 支持:
+    当设置了 MAOP_CRL_URL 环境变量时，LicenseValidator 会初始化
+    CRLChecker，在签名+过期检查通过后查询 CRL。CRL 检查支持本地缓存
+    和离线降级（详见 maop.enterprise.crl 模块）。
 
 Degrade gracefully:
     - No license key configured → honor system (enterprise package
@@ -104,13 +110,13 @@ class LicenseExpiredError(LicenseError):
         )
 
 
-# L21/L22 (Phase R6): License 在线撤销（CRL）机制未实现。
-# 当前 license 验证仅检查签名 + 过期时间 + 宽限期。
-# 未来实现 CRL 需要：
-#   1. 在线撤销列表服务（或离线 CRL 文件分发）
-#   2. 客户端定期检查撤销状态
-#   3. 离线降级策略（无法连接 CRL 服务时）
-# 缓解措施：license 过期后自动降级为 Personal 版本，7 天宽限期后强制限制。
+# L21/L22 (Phase R6): License 在线撤销（CRL）机制已实现。
+# CRL 检查在签名验证 + 过期检查之后执行，仅当配置了 MAOP_CRL_URL 时启用。
+# 实现细节：
+#   1. HTTP 拉取 CRL 撤销列表（urllib，无额外依赖）
+#   2. 本地缓存 + TTL（避免每次验证都网络请求）
+#   3. 离线降级：拉取失败时使用缓存；无缓存时根据 MAOP_CRL_STRICT 决定行为
+# 详见 maop.enterprise.crl 模块。
 
 
 class LicenseValidator:
@@ -120,11 +126,16 @@ class LicenseValidator:
     ``keys/public_key.pem`` file. License keys are verified against
     this key; the corresponding private key is held by the MAOP
     commercial team and used to sign licenses at issuance time.
+
+    If ``MAOP_CRL_URL`` is set, a :class:`CRLChecker` is initialized
+    to perform online revocation checks after signature + expiry
+    validation.
     """
 
     def __init__(self, public_key_path: Path | None = None) -> None:
         self._public_key_path = public_key_path or _PUBLIC_KEY_PATH
         self._public_key = self._load_public_key()
+        self._crl_checker = self._init_crl_checker()
 
     def _load_public_key(self):
         """Load the Ed25519 public key from PEM file."""
@@ -149,6 +160,29 @@ class LicenseValidator:
         except Exception as exc:
             raise LicenseError(f"Failed to load public key: {exc}") from exc
 
+    def _init_crl_checker(self):
+        """初始化 CRL 检查器（lazy，仅当配置了 MAOP_CRL_URL 时启用）。
+
+        Returns:
+            CRLChecker 实例或 None（未配置 CRL URL 时）
+        """
+        crl_url = os.getenv("MAOP_CRL_URL", "").strip()
+        if not crl_url:
+            return None
+        try:
+            from maop.enterprise.crl import CRLChecker
+
+            checker = CRLChecker()
+            logger.info(
+                "[license] CRL revocation check enabled (url=%s, strict=%s)",
+                checker.crl_url,
+                checker.strict,
+            )
+            return checker
+        except Exception as exc:
+            logger.warning("[license] Failed to init CRL checker: %s", exc)
+            return None
+
     def validate(self, license_key: str) -> LicenseInfo:
         """Validate a license key and return its info.
 
@@ -170,11 +204,17 @@ class LicenseValidator:
             If the signature verification fails (tampered or wrong signing key).
         LicenseExpiredError
             If the license has expired beyond the grace period.
+        LicenseRevokedError
+            If the license has been revoked via CRL (only when MAOP_CRL_URL
+            is configured).
+        CRLError
+            If strict CRL mode is enabled and the CRL cannot be obtained.
         """
         payload, signature = self._parse_key(license_key)
         self._verify_signature(payload, signature)
         info = self._parse_payload(payload)
         self._check_expiry(info)
+        self._check_revocation(info)
         return info
 
     def validate_from_env(self) -> LicenseInfo | None:
@@ -316,3 +356,8 @@ class LicenseValidator:
             )
         elif info.is_expired:
             raise LicenseExpiredError(info)
+
+    def _check_revocation(self, info: LicenseInfo) -> None:
+        """检查 license 是否被撤销（CRL）。仅当配置了 CRL URL 时启用。"""
+        if self._crl_checker:
+            self._crl_checker.check_license(info)
