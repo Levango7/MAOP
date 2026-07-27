@@ -1,4 +1,4 @@
-# MAOP — Multi-Agent Orchestration Platform
+﻿# MAOP — Multi-Agent Orchestration Platform
 
 > Python-first agent orchestration framework with Plan-Execute-Verify loop,
 > model management, control plane, and real-time dashboard.
@@ -43,7 +43,7 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 | 热重载 (Hot Reload) | ✓ | ✓ |
 | 插件系统 (Plugin System) | ✓ | ✓ |
 | RBAC 角色权限 | ✗ | ✓ |
-| SSO / SAML 单点登录 | ✗ | ✓ |
+| SSO (OIDC) 单点登录 | ✗ | ✓ |
 | PostgreSQL 持久化 | ✗ | ✓ |
 | Redis 高可用缓存 | ✗ | ✓ |
 | Vault 密钥管理 | ✗ | ✓ |
@@ -102,8 +102,8 @@ License 颁发指南见 [docs/enterprise/license-issuance-guide.md](docs/enterpr
 |----------|----------|------------|
 | storage | sqlite | postgresql |
 | cache | memory | redis |
-| queue | sqlite | rabbitmq |
-| kv | sqlite | etcd |
+| queue | sqlite | rabbitmq (Planned) |
+| kv | sqlite | etcd (Planned) |
 | secret | local | vault |
 
 企业版后端不可用时自动降级到个人版后端（通过 `record_degradation()` 记录）。
@@ -167,7 +167,7 @@ maop run --task "refactor auth module to use JWT"
 
 # Monitor real-time progress via dashboard
 # Open http://localhost:9079 -> Overview tab shows live delegation
-# SSE stream at /api/stream/trace/{trace_id} shows token-by-token output
+# Real-time updates via WebSocket at /ws (SSE removed per ADR-006)
 ```
 
 **Key features used:**
@@ -224,14 +224,14 @@ maop start
 curl -X POST http://localhost:9079/api/chat `
   -H "Content-Type: application/json" `
   -d '{"message": "Analyze the routing algorithm", "stream": true}'
-# Returns SSE stream with real-time token output
+# Returns streaming response with real-time output
 ```
 
 **Key features used:**
-- MCP integration: Stdio/SSE/WebSocket transports
+- MCP integration: Stdio/WebSocket transports (SSE removed per ADR-006)
 - Three-layer memory: Working (current turn) -> Episodic (conversation) -> Semantic (knowledge graph)
 - Tool lifecycle: register -> enable -> call -> disable
-- Streaming: SSE for token-by-token output, WebSocket for bidirectional
+- Streaming: WebSocket for bidirectional real-time output (SSE removed per ADR-006)
 
 ## Cost Tracking
 
@@ -297,12 +297,14 @@ Web dashboard at `http://localhost:9079` with:
 - Agent status & monitoring with availability charts
 - Performance metrics with latency distribution & radar charts
 - Cost tracking with trend analysis & agent cost breakdown
-- Real-time SSE streaming for task execution
+- Real-time streaming for task execution (WebSocket, per ADR-006)
 - Memory search & knowledge graph visualization
 - Self-evolution suggestions & analysis
 - Multi-tenant support with per-tenant quotas
 
-前端源码位于 `dashboard-enterprise/`（Vue 3 + Vite），构建产物输出到 `dashboard/dist-enterprise/`。
+前端源码位于 `dashboard-enterprise/`（Vue 3 + Vite），构建产物输出到 `dashboard/dist-enterprise/`。原生JS版本已归档至 `archive/js-dashboard/`。
+
+> **技术栈说明**：Vue 3 是前端框架（声明式 UI、组件化、响应式数据），Vite 是构建工具（dev server + 生产打包）。两者配合使用，无冲突。详见 [DESIGN_RULES.md 第 10 节](DESIGN_RULES.md)。
 
 ## Core Modules
 
@@ -320,7 +322,7 @@ Web dashboard at `http://localhost:9079` with:
 | `core/event_bus.py` | Async event bus |
 | `core/circuit_breaker.py` | Circuit breaker pattern |
 | `core/vector.py` | Vector store for semantic search |
-| `core/streaming.py` | SSE streaming infrastructure |
+| `core/streaming.py` | Streaming infrastructure (WebSocket; SSE removed per ADR-006) |
 | `config/edition.py` | Dual-edition 注册表与 FeatureFlag gate（[ADR-016](docs/adr/016-dual-edition-architecture.md)） |
 | `enterprise/` | 企业版扩展模块（rbac/tenant/audit/sso/ha/license/n8n 等，仅 `maop-enterprise` 包含） |
 

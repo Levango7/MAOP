@@ -211,7 +211,8 @@ _cors_origins = os.environ.get("MAOP_CORS_ORIGINS", "").split(",")
 _cors_origins = [o.strip() for o in _cors_origins if o.strip()]
 if not _cors_origins:
     _cors_origins = ["http://localhost:9079", "http://127.0.0.1:9079", "http://localhost:8080"]
-app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+# #9 fix: CORS narrowed — explicit methods/headers instead of wildcard
+app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credentials=True, allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-Trace-Id", "X-Request-Id"])
 
 # ── Rate Limit + Auth + CSP Middleware ─────────────────────────────
 from maop.core.middleware import AuthMiddleware, CSPMiddleware, RateLimitMiddleware
@@ -586,7 +587,18 @@ async def websocket_endpoint(ws: WebSocket) -> Any:
     # Auth must be validated BEFORE accept() — BaseHTTPMiddleware cannot
     # intercept WebSocket scope, so we enforce it here directly.
     if _auth_mod._auth_enabled:
+        # #5 fix: token via Sec-WebSocket-Protocol subprotocol (not URL query)
+        # Browser: new WebSocket(url, [token]). Avoids URL/access-log exposure.
+        # Fallback: query param kept for non-browser clients (curl, CLI).
         token = ws.query_params.get("token", "")
+        if not token:
+            # Try Sec-WebSocket-Protocol header (browser subprotocol)
+            protocols = ws.headers.get("sec-websocket-protocol", "")
+            if protocols:
+                # Format: "token, <actual_token>" or just "<actual_token>"
+                parts = [p.strip() for p in protocols.split(",") if p.strip()]
+                if parts:
+                    token = parts[-1]  # last protocol identifier
         if not token:
             await ws.close(code=4401, reason="Authentication required")
             return

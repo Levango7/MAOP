@@ -1,4 +1,4 @@
-﻿"""MAOP DB Utilities — Shared SQLite connection management and project root detection.
+"""MAOP DB Utilities — Shared SQLite connection management and project root detection.
 
 Eliminates duplicated _connect() and _find_project_root() implementations
 across 9+ modules.
@@ -67,7 +67,10 @@ def sqlite_connect(
         conn.execute("PRAGMA journal_mode=WAL")
     if foreign_keys:
         conn.execute("PRAGMA foreign_keys=ON")
-    conn.execute("PRAGMA busy_timeout=5000")
+    # T2-10: Multi-container SQLite coordination — WAL allows 1 writer + N readers.
+    # busy_timeout increased to 10s (env-override: MAOP_SQLITE_BUSY_TIMEOUT_MS).
+    _busy_ms = int(os.environ.get("MAOP_SQLITE_BUSY_TIMEOUT_MS", "10000"))
+    conn.execute(f"PRAGMA busy_timeout={_busy_ms}")
     try:
         yield conn
         conn.commit()
@@ -111,7 +114,10 @@ class ConnectionPool:
         conn = sqlite3.connect(self._db_path, timeout=10, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=5000")
+        # T2-10: Multi-container SQLite coordination — WAL allows 1 writer + N readers.
+        # busy_timeout increased to 10s (env-override: MAOP_SQLITE_BUSY_TIMEOUT_MS).
+        _busy_ms = int(os.environ.get("MAOP_SQLITE_BUSY_TIMEOUT_MS", "10000"))
+        conn.execute(f"PRAGMA busy_timeout={_busy_ms}")
         return conn
 
     def release(self, conn: sqlite3.Connection) -> None:

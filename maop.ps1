@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     MAOP (Plan-Execute-Verify) Main Entry Point
 .DESCRIPTION
@@ -43,12 +43,12 @@ $logDir = "$MAOP\logs"
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
 
 # -- Python-first routing + deprecation notice --
-$pyEntry = Join-Path $MAOP "py\MAOP\cli.py"
+$pyEntry = Join-Path $MAOP "py\maop\cli.py"
 if (Test-Path $pyEntry) {
     if ($Action -eq "run") {
         Write-Host "[MAOP] Python engine (PS layer deprecated, EOL: v4.0)" -ForegroundColor DarkYellow
         $pyDir = Join-Path $MAOP "py"
-        $pyArgs = @("-m", "MAOP.cli", "run", "--task", $Task)
+        $pyArgs = @("-m", "maop.cli", "run", "--task", $Task)
         if ($Mode -eq "pipeline") { $pyArgs += "--mode"; $pyArgs += "pipeline" }
         if ($PlanAgent) { $pyArgs += "--plan-agent"; $pyArgs += $PlanAgent }
         if ($WorkerAgent) { $pyArgs += "--worker-agent"; $pyArgs += $WorkerAgent }
@@ -62,20 +62,20 @@ if (Test-Path $pyEntry) {
     if ($Action -eq "validate") {
         Write-Host "[MAOP] Python config validation" -ForegroundColor DarkYellow
         Push-Location (Join-Path $MAOP "py")
-        & python -m MAOP.cli validate-config
+        & python -m maop.cli validate-config
         Pop-Location
         return
     }
     if ($Action -eq "doctor") {
         Write-Host "[MAOP] Python health check" -ForegroundColor DarkYellow
         Push-Location (Join-Path $MAOP "py")
-        & python -m MAOP.cli health-check
+        & python -m maop.cli health-check
         Pop-Location
         return
     }
 } else {
     Write-Host "[MAOP] ERROR: Python engine not found at $pyEntry. PS scripts have been archived to archive/ps-legacy/." -ForegroundColor Red
-    Write-Host "[MAOP] Install Python 3.10+ and ensure py/MAOP/ is accessible." -ForegroundColor Red
+    Write-Host "[MAOP] Install Python 3.10+ and ensure py/maop/ is accessible." -ForegroundColor Red
     exit 1
 }
 
@@ -98,19 +98,19 @@ switch ($Action) {
   "status" {
     $dash = Get-WmiObject Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match "MAOP\.dashboard\.server" }
     if ($dash) { Write-Host "[MAOP] Dashboard: RUNNING (PID $($dash.ProcessId))" } else { Write-Host "[MAOP] Dashboard: STOPPED" }
-    $files = @("config\agents.yaml","py\MAOP\dashboard\server.py","py\MAOP\maop_loop.py","py\MAOP\cli.py")
+    $files = @("config\agents.yaml","py\maop\dashboard\server.py","py\maop\maop_loop.py","py\maop\cli.py")
     $missing = @(); foreach ($f in $files) { if (-not (Test-Path "$MAOP\$f")) { $missing += $f } }
     if ($missing.Count -eq 0) { Write-Host "[MAOP] Files: ALL PRESENT" } else { Write-Host "[MAOP] Files: MISSING $($missing -join ', ')" }
   }
   "restart" { & $MyInvocation.MyCommand.Path -Action stop; Start-Sleep 2; & $MyInvocation.MyCommand.Path -Action start }
   "validate" {
-    Write-Host "[MAOP] PS validate-config.ps1 archived. Use: python -m MAOP.cli validate-config" -ForegroundColor Yellow
+    Write-Host "[MAOP] PS validate-config.ps1 archived. Use: python -m maop.cli validate-config" -ForegroundColor Yellow
   }
   "doctor" {
-    Write-Host "[MAOP] PS doctor.ps1 archived. Use: python -m MAOP.cli health-check" -ForegroundColor Yellow
+    Write-Host "[MAOP] PS doctor.ps1 archived. Use: python -m maop.cli health-check" -ForegroundColor Yellow
   }
   "run" {
     if (-not $Task) { Write-Error "Task is required for run action"; exit 1 }
-    Write-Host "[MAOP] PS MAOP-loop.ps1 archived. Use: python -m MAOP.cli run --task `"$Task`"" -ForegroundColor Yellow
+    Write-Host "[MAOP] PS MAOP-loop.ps1 archived. Use: python -m maop.cli run --task `"$Task`"" -ForegroundColor Yellow
   }
 }

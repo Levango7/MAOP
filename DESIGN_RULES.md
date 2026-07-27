@@ -1,4 +1,4 @@
-# MAOP Dashboard Design Rules
+﻿# MAOP Dashboard Design Rules
 
 > **权威设计规范** — 所有 UI 改动必须遵循此文档。最后更新: 2026-07-16
 
@@ -206,5 +206,6 @@
 - ❌ 禁止使用 `alert()` / `confirm()` — 用页面内联状态提示 (`showCtrlMsg()`)
 - ❌ 禁止直接显示原始 JSON — 转为结构化展示
 - ❌ 禁止硬编码魔法数字 — 从后端 API 获取真实数据
-- ❌ 禁止上构建框架 (Vue/Lit/React) — 拆多文件 + `<script>` 顺序加载
+- ✅ 主前端使用 Vue 3 + Vite（源码 `dashboard-enterprise/`，构建产物 `dashboard/dist-enterprise/`）
+- ❌ 禁止引入第二套前端框架（Lit/React/Svelte 等）— 单一 Vue 3 技术栈
 - ❌ 禁止在 dashboard/ 放调试截图 — 截图是临时文件，用完即删

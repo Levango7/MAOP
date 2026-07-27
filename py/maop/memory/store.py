@@ -202,108 +202,22 @@ class MemoryStore(SearchMixin):
         return entry.id
 
     def _flush_json(self) -> None:
-        """Flush dirty entries to wiki.json and memory.json."""
-        if not self._dirty:
-            return
-        try:
-            entries = self._query("SELECT * FROM memory_entries ORDER BY timestamp DESC")
-            wiki_file = self._data_dir / "wiki.json"
-            wiki: dict[str, Any] = {"entries": []}
-            for e in entries:
-                wiki["entries"].append({
-                    "id": e["id"], "title": e["task"],
-                    "content": e["content"], "category": e["topic"],
-                    "tags": e.get("tags", "").split(",") if e.get("tags") else [],
-                    "source": f"memory:{e['agent']}",
-                    "added": e["timestamp"],
-                })
-            try:
-                from maop.core.filelock import with_file_lock
-                with_file_lock(wiki_file, lambda: wiki_file.write_text(
-                    json.dumps(wiki, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"))
-            except Exception as exc:
-                logger.warning("[mem] wiki flush failed: %s", exc)
-
-            index_file = self._data_dir / "memory.json"
-            index = []
-            for e in entries:
-                index.append({
-                    "id": e["id"], "agent": e["agent"], "task": e["task"],
-                    "tags": e.get("tags", "").split(",") if e.get("tags") else [],
-                    "topic": e["topic"], "trace_id": e.get("trace_id", ""),
-                    "timestamp": e["timestamp"],
-                })
-            try:
-                from maop.core.filelock import with_file_lock
-                with_file_lock(index_file, lambda: index_file.write_text(
-                    json.dumps(index, ensure_ascii=False), encoding="utf-8"))
-            except Exception as exc:
-                logger.warning("[mem] memory index flush failed: %s", exc)
-
-            self._dirty = False
-            self._dirty_count = 0
-        except Exception as exc:
-            logger.warning("[mem] JSON flush failed: %s", exc)
-
+        """No-op: JSON dual-write removed (T3-1, ADR-011 single source of truth).
+        SQLite memory_entries table is the canonical store. Kept for backward compat.
+        """
+        self._dirty = False
+        self._dirty_count = 0
+        return
     def close(self) -> None:
         """Flush pending JSON writes and clean up."""
         self._flush_json()
 
     def _sync_to_wiki(self, entry: MemoryEntry, skip_dedup: bool = False) -> None:
-        """Append entry to data/wiki.json (backward compat)."""
-        wiki_file = self._data_dir / "wiki.json"
-
-        def _write():
-            wiki: dict[str, Any] = {"entries": []}
-            if wiki_file.exists():
-                try:
-                    wiki = json.loads(wiki_file.read_text(encoding="utf-8"))
-                except (json.JSONDecodeError, ValueError):
-                    wiki = {"entries": []}
-            if not isinstance(wiki.get("entries"), list):
-                wiki["entries"] = []
-
-            if not skip_dedup:
-                wiki["entries"] = [e for e in wiki["entries"] if e.get("id") != entry.id]
-            wiki["entries"].append({
-                "id": entry.id, "title": entry.task,
-                "content": entry.content, "category": entry.topic,
-                "tags": entry.tags, "source": f"memory:{entry.agent}",
-                "added": entry.timestamp,
-            })
-            wiki_file.write_text(json.dumps(wiki, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-
-        try:
-            from maop.core.filelock import with_file_lock
-            with_file_lock(wiki_file, _write)
-        except Exception as exc:
-            logger.warning("[mem] wiki sync failed: %s", exc)
-
+        """No-op: wiki.json dual-write removed (T3-1, ADR-011). SQLite is single source."""
+        return
     def _sync_to_memory_index(self, entry: MemoryEntry, skip_dedup: bool = False) -> None:
-        """Append entry summary to data/memory.json (backward compat)."""
-        index_file = self._data_dir / "memory.json"
-
-        def _write():
-            index = []
-            if index_file.exists():
-                try:
-                    index = json.loads(index_file.read_text(encoding="utf-8"))
-                except (json.JSONDecodeError, ValueError):
-                    index = []
-            if not isinstance(index, list):
-                index = []
-
-            if not skip_dedup:
-                index = [e for e in index if e.get("id") != entry.id]
-            index.append(entry.model_dump(include={"id", "agent", "task", "tags", "topic", "trace_id", "timestamp"}))
-            index_file.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
-
-        try:
-            from maop.core.filelock import with_file_lock
-            with_file_lock(index_file, _write)
-        except Exception as exc:
-            logger.warning("[mem] memory index sync failed: %s", exc)
-
+        """No-op: memory.json dual-write removed (T3-1, ADR-011). SQLite is single source."""
+        return
     def _query(self, sql: str, params: tuple | list = ()) -> list[dict[str, Any]]:
         """Execute a SELECT query and return rows as dicts."""
         try:

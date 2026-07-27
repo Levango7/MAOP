@@ -106,6 +106,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # Check Authorization header (Bearer JWT)
         auth_header = request.headers.get(self.auth_header, "")
+        # #4 fix: fallback to httpOnly cookie if no Authorization header
+        if not auth_header.startswith("Bearer ") and "maop_token" in request.cookies:
+            auth_header = "Bearer " + request.cookies["maop_token"]
         if auth_header.startswith("Bearer "):
             try:
                 token = auth_header[7:]

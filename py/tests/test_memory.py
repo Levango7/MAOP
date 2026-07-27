@@ -74,22 +74,29 @@ class TestStore:
         assert mem_store._db_path.exists()
 
     def test_store_syncs_wiki(self, mem_store: MemoryStore):
+        """T3-1: JSON dual-write removed; verify entry persisted in SQLite."""
         entry_id = mem_store.store(
             agent="claude", task="wiki task", content="some content",
         )
-        mem_store._flush_json()
-        wiki_file = mem_store._data_dir / "wiki.json"
-        assert wiki_file.exists()
-        wiki = json.loads(wiki_file.read_text(encoding="utf-8"))
-        assert any(e["id"] == entry_id for e in wiki["entries"])
+        mem_store._flush_json()  # no-op now, kept for backward compat
+        rows = mem_store._query(
+            "SELECT id, agent, task FROM memory_entries WHERE id = ?",
+            (entry_id,),
+        )
+        assert len(rows) == 1, "Entry should be persisted in SQLite"
+        assert rows[0]["id"] == entry_id
+        assert rows[0]["agent"] == "claude"
 
     def test_store_syncs_memory_index(self, mem_store: MemoryStore):
+        """T3-1: JSON dual-write removed; verify entry queryable via SQLite."""
         entry_id = mem_store.store(agent="claude", task="index task")
         mem_store._flush_json()
-        index_file = mem_store._data_dir / "memory.json"
-        assert index_file.exists()
-        index = json.loads(index_file.read_text(encoding="utf-8"))
-        assert any(e["id"] == entry_id for e in index)
+        rows = mem_store._query(
+            "SELECT id FROM memory_entries WHERE id = ?",
+            (entry_id,),
+        )
+        assert len(rows) == 1, "Entry should be queryable from SQLite"
+        assert rows[0]["id"] == entry_id
 
     def test_store_tags_as_list(self, mem_store: MemoryStore):
         entry_id = mem_store.store(agent="claude", task="tagged", tags=["a", "b"])

@@ -4,7 +4,7 @@
 #   dashboard     — FastAPI web UI + API gateway
 #   agent-exec    — Agent execution worker (dispatches to LLM drivers)
 #   queue-worker  — Background queue consumer (human approval, async tasks)
-#   db            — Shared SQLite volume (single-writer via NFS/FUSE or sidecar)
+#   db            — Storage: SQLite (Personal, single-process) | PostgreSQL (Enterprise, --profile postgres)
 #
 # Quick start:  docker compose up -d
 # With OTel:    docker compose --profile otel up -d
@@ -18,6 +18,12 @@
 # (its build context and volume paths were broken when launched from py/
 # because ./config and ./nginx.conf are relative to the compose file).
 # Always run `docker compose` from the repo root.
+
+# Storage architecture (T2-10 revised 2026-07-27):
+#   Personal (no license) → SQLite, single-process or this multi-service demo compose.
+#     SQLite WAL supports 1 writer + N readers; for multi-container demo only.
+#   Enterprise (with license) → PostgreSQL via --profile postgres.
+#     Production multi-writer workloads MUST use PostgreSQL, not SQLite coordination layers.
 
 services:
   # ── PostgreSQL (optional, --profile postgres) ──────────────────────────────────────────────────────────────
@@ -101,6 +107,10 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     deploy:
       resources:
         limits:
@@ -141,6 +151,10 @@ services:
       dashboard:
         condition: service_healthy
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     deploy:
       resources:
         limits:
@@ -178,6 +192,10 @@ services:
       dashboard:
         condition: service_healthy
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     deploy:
       resources:
         limits:
@@ -202,14 +220,18 @@ services:
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-      - "8889:8889"   # Prometheus metrics
+      - "127.0.0.1:4317:4317"   # OTLP gRPC (T2-9: localhost only)
+      - "127.0.0.1:4318:4318"   # OTLP HTTP (T2-9: localhost only)
+      - "127.0.0.1:8889:8889"   # Prometheus metrics (T2-9: localhost only)
     # t15: MAOP_OTEL_* env vars removed from otel-collector service — the
     # collector reads its own config file (--config=/etc/otel-collector-config.yaml)
     # and does not consume these. They now live on the dashboard service so
     # the app actually exports traces to the collector via its service name.
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   # ── Optional: Nginx TLS termination ─────────────────────────────
   nginx:
@@ -227,6 +249,10 @@ services:
       dashboard:
         condition: service_healthy
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   # ── Optional: Prometheus + AlertManager ─────────────────────────
   prometheus:
@@ -253,6 +279,10 @@ services:
     depends_on:
       - otel-collector
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
@@ -264,6 +294,10 @@ services:
     ports:
       - "9093:9093"
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   # ── Optional: HashiCorp Vault (dev server, --profile vault) ──────
   vault:
@@ -311,6 +345,10 @@ services:
     depends_on:
       - dashboard
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   maop-data:

@@ -28,6 +28,7 @@ function withAuth(extra, headers) {
   const token = getAuthToken();
   if (token) h['Authorization'] = 'Bearer ' + token;
   init.headers = h;
+  init.headers = h;init.credentials = 'include';  // #4 fix: send httpOnly cookie
   return init;
 }
 

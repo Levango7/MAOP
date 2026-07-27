@@ -396,7 +396,13 @@ class DbBackup:
             entries.sort(key=lambda e: e.created_at, reverse=True)
             backup_path = entries[0].backup_path
 
-        source = Path(backup_path)
+        # #6 fix: path traversal prevention
+        source = Path(backup_path).resolve()
+        try:
+            source.relative_to(self._backup_dir.resolve())
+        except ValueError:
+            logger.warning("[backup] Path traversal blocked: %s", backup_path)
+            return False
         target = self._data_dir / db_name
 
         if not source.exists():
