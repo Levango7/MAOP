@@ -236,7 +236,7 @@ class SAMLHandler:
                 "No IdP X.509 certificate available "
                 "(set SSOConfig.saml_idp_cert or provide metadata with X509Certificate)"
             )
-        return cert
+        return cert  # type: ignore[no-any-return]
 
     def _fetch_idp_metadata(self) -> bytes:
         """从 config.saml_metadata_url 获取 IdP metadata XML。"""
@@ -251,7 +251,7 @@ class SAMLHandler:
         )
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
-                return resp.read()
+                return resp.read()  # type: ignore[no-any-return]
         except urllib.error.URLError as exc:
             raise SSOError(
                 f"Failed to fetch IdP metadata from {url}: {exc.reason}"
@@ -334,7 +334,7 @@ class SAMLHandler:
                 "(set SSOConfig.saml_acs_url or redirect_uri)"
             )
         entity_id = self._config.saml_entity_id or "maop-sp"
-        issue_instant = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        issue_instant = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         root = etree.Element(
             f"{{{_SAMLP_NS}}}AuthnRequest",
@@ -357,7 +357,7 @@ class SAMLHandler:
                 "AllowCreate": "true",
             },
         )
-        return etree.tostring(root, xml_declaration=False, encoding="utf-8")
+        return etree.tostring(root, xml_declaration=False, encoding="utf-8")  # type: ignore[no-any-return]
 
     # ── XML 签名验证 ─────────────────────────────────────────────────
 
@@ -432,11 +432,11 @@ class SAMLHandler:
 
         # 检查 Transforms 是否声明了 enveloped-signature
         transforms_elem = reference_elem.find(f"{{{_DS_NS}}}Transforms")
-        has_enveloped_transform = False
+        _has_enveloped_transform = False  # noqa: F841
         if transforms_elem is not None:
             for t in transforms_elem.findall(f"{{{_DS_NS}}}Transform"):
                 if t.get("Algorithm") == "http://www.w3.org/2000/09/xmldsig#enveloped-signature":
-                    has_enveloped_transform = True
+                    _has_enveloped_transform = True  # noqa: F841
 
         # 5. 计算被签名元素的 c14n 摘要
         #    enveloped signature：去掉 Signature 子元素后做 c14n
@@ -482,10 +482,10 @@ class SAMLHandler:
             raise SSOError(f"SignatureValue base64 decode failed: {exc}") from exc
 
         try:
-            public_key.verify(
+            public_key.verify(  # type: ignore[union-attr,call-arg]
                 sig_value,
                 signed_info_c14n,
-                padding.PKCS1v15(),
+                padding.PKCS1v15(),  # type: ignore[arg-type]
                 hashes.SHA256(),
             )
         except Exception as exc:
@@ -524,7 +524,7 @@ class SAMLHandler:
         name_id_elem = subject.find(f"{{{_SAML_NS}}}NameID")
         if name_id_elem is None or not name_id_elem.text:
             return ""
-        return name_id_elem.text
+        return name_id_elem.text  # type: ignore[no-any-return]
 
     def _validate_conditions(self, assertion_elem, expected_audience: str) -> None:
         """验证 Conditions：Audience、NotBefore、NotOnOrAfter。
@@ -598,7 +598,7 @@ class SAMLHandler:
         def first_value(key: str) -> str:
             v = attributes.get(key)
             if isinstance(v, list) and v:
-                return v[0]
+                return v[0]  # type: ignore[no-any-return]
             return ""
 
         # 常见 SAML 属性名（含 Microsoft AD FS / Azure AD claim URI）

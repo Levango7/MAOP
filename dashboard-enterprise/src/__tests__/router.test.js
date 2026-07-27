@@ -19,7 +19,8 @@ describe('Router', () => {
     expect(route?.path).toBe('/');
   });
 
-  it('has 17 routes total', () => {
-    expect(router.getRoutes().length).toBe(17);
+  it('has 18 routes total', () => {
+    // 17 业务路由 + 1 个 catch-all 重定向 (:pathMatch(.*)*)
+    expect(router.getRoutes().length).toBe(18);
   });
 });

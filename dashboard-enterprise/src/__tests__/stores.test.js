@@ -4,9 +4,14 @@ import { useEditionStore } from '../stores/edition.js';
 import { useApiStore } from '../stores/api.js';
 
 describe('useEditionStore', () => {
+  let originalFetch;
   beforeEach(() => {
     setActivePinia(createPinia());
     try { localStorage.clear(); } catch {}
+    originalFetch = global.fetch;
+  });
+  afterEach(() => {
+    if (originalFetch !== undefined) global.fetch = originalFetch;
   });
 
   it('has correct defaults', () => {
@@ -61,6 +66,97 @@ describe('useEditionStore', () => {
     await store.fetchEdition();
     expect(store.loading).toBe(false);
     expect(store.edition).toBe('enterprise');
+  });
+
+  // ── switchEdition action 测试 ──
+  it('switchEdition has correct default state', () => {
+    const store = useEditionStore();
+    expect(store.switching).toBe(false);
+    expect(store.switchError).toBe('');
+  });
+
+  it('switchEdition updates state on success', async () => {
+    const store = useEditionStore();
+    // mock fetch：POST 返回切换结果，GET（fetchEdition）返回新状态
+    global.fetch = vi.fn().mockImplementation((url, init) => {
+      if (init && init.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({
+            status: 'ok',
+            edition: 'personal',
+            previous: 'enterprise',
+            requested: 'personal',
+            degraded: false,
+          }),
+        });
+      }
+      // GET (fetchEdition refresh)
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          edition: 'personal',
+          features: { cache: true },
+          backends: { storage: 'sqlite' },
+          degradations: [],
+        }),
+      });
+    });
+    const result = await store.switchEdition('personal');
+    expect(result.edition).toBe('personal');
+    expect(result.previous).toBe('enterprise');
+    expect(store.switching).toBe(false);
+    expect(store.switchError).toBe('');
+    // fetchEdition 应已被调用，edition 已刷新
+    expect(store.edition).toBe('personal');
+    expect(store.features).toEqual({ cache: true });
+  });
+
+  it('switchEdition throws on error status and sets switchError', async () => {
+    const store = useEditionStore();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: () => Promise.resolve({ detail: 'Admin role required' }),
+    });
+    await expect(store.switchEdition('enterprise')).rejects.toThrow('Admin role required');
+    expect(store.switching).toBe(false);
+    expect(store.switchError).toBe('Admin role required');
+  });
+
+  it('switchEdition handles 401 unauthorized', async () => {
+    const store = useEditionStore();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+    });
+    await expect(store.switchEdition('personal')).rejects.toThrow('401 Unauthorized');
+    expect(store.switching).toBe(false);
+  });
+
+  it('switchEdition sets switching flag during operation', async () => {
+    const store = useEditionStore();
+    let resolveFn;
+    global.fetch = vi.fn().mockReturnValue(new Promise(resolve => { resolveFn = resolve; }));
+    const promise = store.switchEdition('personal');
+    // 进行中时 switching 应为 true
+    expect(store.switching).toBe(true);
+    resolveFn({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({
+        status: 'ok',
+        edition: 'personal',
+        previous: 'enterprise',
+        requested: 'personal',
+        degraded: false,
+      }),
+    });
+    await promise;
+    // 完成后 switching 应为 false
+    expect(store.switching).toBe(false);
   });
 });
 
@@ -164,12 +260,13 @@ describe('useApiStore auth header injection', () => {
     );
   });
 
-  it('setAuthToken / clearAuthToken manage localStorage', () => {
+  it('setAuthToken / clearAuthToken manage localStorage', async () => {
     const store = useApiStore();
     store.setAuthToken('abc', 'admin');
     expect(store.authToken()).toBe('abc');
     expect(localStorage.getItem('maop_user')).toBe('admin');
-    store.clearAuthToken();
+    // clearAuthToken 是 async（需 await fetch logout），必须 await
+    await store.clearAuthToken();
     expect(store.authToken()).toBe('');
     expect(localStorage.getItem('maop_user')).toBeNull();
   });

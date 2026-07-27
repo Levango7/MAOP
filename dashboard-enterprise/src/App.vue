@@ -170,6 +170,9 @@ async function doLogin() {
     const data = await r.json();
     if (r.ok && data.status === 'ok' && data.token) {
       localStorage.setItem('maop_token', data.token);
+      // 保存 username 和 roles，供 Settings 等页面判断 admin 权限
+      if (data.username) localStorage.setItem('maop_user', data.username);
+      if (data.roles) localStorage.setItem('maop_roles', JSON.stringify(data.roles));
       authExpired.value = false;
       loginPassword.value = '';
       // Reload to re-initialize stores with new token

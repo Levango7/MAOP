@@ -56,6 +56,25 @@ threat model, and operational guidelines.
 - If an optional backend is unavailable (dependency missing or connection failed), MAOP
   automatically degrades to the local default and records the event via `record_degradation()`
 
+### License CRL (Certificate Revocation List)
+- Enterprise license validation supports online revocation checks via CRL
+- Implemented in `maop/enterprise/crl.py` + integrated into `maop/enterprise/license.py`
+- CRL is fetched via HTTP, cached locally to avoid per-validation network requests
+- **Fail-safe offline degradation**: when CRL service is unreachable, cached CRL is used;
+  if no cache exists, behavior depends on strict mode
+- Environment variables:
+  - `MAOP_CRL_URL` — CRL service URL (e.g. `https://crl.maop.example.com/list.json`).
+    When unset, CRL checking is disabled (license validation relies on signature + expiry only).
+  - `MAOP_CRL_CACHE_TTL_S` — Cache time-to-live in seconds (default `3600`). Controls how
+    often the client refetches the CRL. Set lower for faster revocation propagation.
+  - `MAOP_CRL_STRICT` — Strict mode flag (`1`/`0`, default `0`).
+    - `0` (lax, default): if no CRL is available (fetch failed + no cache), licenses are
+      allowed (rely on signature + expiry checks only).
+    - `1` (strict): if no CRL is available, all license validations raise `CRLError` and
+      are rejected. Use this in high-security deployments where revocation must be enforced.
+- Cache file: `data/crl_cache.json` (atomic write via temp file + rename)
+- CRL JSON format: `{ "version": 1, "updated_at": "...", "expires_at": "...", "revoked": [...] }`
+
 ## Threat Model
 
 | Threat | Mitigation |
@@ -67,6 +86,8 @@ threat model, and operational guidelines.
 | Brute force | Rate limiting (per-IP + per-key) |
 | MITM | TLS 1.2+ enforcement |
 | Unauthorized access | API Key / JWT auth middleware |
+| License tampering | Ed25519 signature verification |
+| License revocation bypass | CRL online check + strict mode fail-safe |
 
 ## Security Audit
 

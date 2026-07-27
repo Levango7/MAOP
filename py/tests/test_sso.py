@@ -110,8 +110,8 @@ def _generate_test_cert():
         .issuer_name(issuer)
         .public_key(key.public_key())
         .serial_number(1)
-        .not_valid_before(datetime.datetime.utcnow())
-        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
+        .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
+        .not_valid_after(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365))
         .sign(key, hashes.SHA256())
     )
     cert_der = cert.public_bytes(serialization.Encoding.DER)
@@ -154,7 +154,7 @@ def _build_signed_saml_response(
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     if not_before is None:
         not_before = now - datetime.timedelta(minutes=5)
     if not_on_or_after is None:
@@ -656,7 +656,7 @@ class TestSAMLHandler:
         config = _make_saml_config(saml_idp_cert=cert_b64)
         handler = SAMLHandler(config)
 
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc)
         saml_response_b64 = _build_signed_saml_response(
             key,
             not_before=now - datetime.timedelta(hours=2),
@@ -673,7 +673,7 @@ class TestSAMLHandler:
         config = _make_saml_config(saml_idp_cert=cert_b64)
         handler = SAMLHandler(config)
 
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc)
         saml_response_b64 = _build_signed_saml_response(
             key,
             not_before=now + datetime.timedelta(hours=1),  # 1 小时后才生效
@@ -725,7 +725,7 @@ class TestSAMLHandler:
         handler = SAMLHandler(config)
 
         # 构造一个没有 Assertion 的 Response
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc)
         issue_instant = now.strftime("%Y-%m-%dT%H:%M:%SZ")
         response = etree.Element(
             f"{{{_SAMLP_NS}}}Response",

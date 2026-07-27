@@ -9,6 +9,36 @@
           <span class="setting-label">Current Edition</span>
           <span class="edition-badge" :class="edition.edition">{{ edition.edition || 'personal' }}</span>
         </div>
+        <div class="setting-row edition-switch-row">
+          <span class="setting-label">Switch Edition</span>
+          <div class="edition-switch-buttons">
+            <button
+              class="edition-btn"
+              :class="{ active: edition.edition === 'personal' }"
+              :disabled="!isAdmin || editionStore.switching || edition.edition === 'personal'"
+              @click="onSwitchClick('personal')"
+            >Personal</button>
+            <button
+              class="edition-btn"
+              :class="{ active: edition.edition === 'enterprise' }"
+              :disabled="!isAdmin || editionStore.switching || edition.edition === 'enterprise'"
+              @click="onSwitchClick('enterprise')"
+            >Enterprise</button>
+          </div>
+          <span class="switching-indicator" v-if="editionStore.switching">切换中…</span>
+        </div>
+        <div class="setting-row" v-if="!isAdmin">
+          <span class="setting-label"></span>
+          <span class="edition-perm-hint">需要管理员权限</span>
+        </div>
+        <div class="setting-row" v-if="editionStore.switchError">
+          <span class="setting-label"></span>
+          <span class="edition-error-msg">{{ editionStore.switchError }}</span>
+        </div>
+        <div class="setting-row" v-if="switchNotice">
+          <span class="setting-label"></span>
+          <span class="edition-notice" :class="{ degraded: switchNoticeDegraded }">{{ switchNotice }}</span>
+        </div>
         <div class="setting-row">
           <span class="setting-label">Enterprise Available</span>
           <span class="status-dot" :class="edition.enterprise_available ? 'on' : 'off'"></span>
@@ -169,6 +199,64 @@ const api = useApiStore();
 const editionStore = useEditionStore();
 const edition = ref({});
 const config = ref({});
+// edition 切换相关状态
+const isAdmin = ref(false);
+const switchNotice = ref('');
+const switchNoticeDegraded = ref(false);
+
+/**
+ * 检测当前登录用户是否拥有 admin 角色。
+ * 优先从 localStorage 读取 maop_roles（由 App.vue doLogin 保存），
+ * 回退到用户名 'admin' 判断（兼容旧版前端未保存 roles 的场景）。
+ */
+function detectAdmin() {
+  try {
+    const rolesStr = localStorage.getItem('maop_roles');
+    if (rolesStr) {
+      const roles = JSON.parse(rolesStr);
+      return Array.isArray(roles) && roles.some(r => r === 'admin' || r === 'superadmin');
+    }
+  } catch (e) { /* ignore malformed roles */ }
+  // fallback：用户名 'admin' 视为 admin
+  try {
+    return localStorage.getItem('maop_user') === 'admin';
+  } catch (e) { return false; }
+}
+
+/**
+ * 切换 edition 入口：弹确认框 -> 调用 store.switchEdition -> 更新 UI。
+ * @param {string} target 'personal' | 'enterprise'
+ */
+async function onSwitchClick(target) {
+  if (target === edition.value.edition) return;
+  const label = target === 'enterprise' ? 'Enterprise' : 'Personal';
+  const featureDesc = target === 'enterprise'
+    ? '将启用 SSO/RBAC/审计日志等企业级功能'
+    : '将关闭 SSO/RBAC/审计日志等企业级功能，回到精简模式';
+  const ok = confirm(`切换到 ${label} 版本${featureDesc}。确认切换？`);
+  if (!ok) return;
+  switchNotice.value = '';
+  switchNoticeDegraded.value = false;
+  try {
+    const result = await editionStore.switchEdition(target);
+    // 同步刷新本地 edition 视图
+    edition.value = {
+      edition: editionStore.edition,
+      features: editionStore.features,
+      backends: editionStore.backends,
+      degradations: editionStore.degradations,
+      enterprise_available: editionStore.isEnterprise,
+    };
+    if (result.degraded) {
+      switchNotice.value = `已请求切换到 ${result.requested}，但 license 无效，实际仍为 ${result.edition}`;
+      switchNoticeDegraded.value = true;
+    } else {
+      switchNotice.value = `已切换到 ${result.edition} 版本`;
+    }
+  } catch (e) {
+    // 错误信息已由 store 写入 switchError，这里无需重复设置
+  }
+}
 
 // t22: 从 vite define 注入的全局常量读取版本号（vite.config.js 中由 package.json 注入）。
 // fallback 'unknown' 仅在未注入时使用（如单元测试环境）。
@@ -211,6 +299,7 @@ async function loadAdrs() {
 }
 
 async function load() {
+  isAdmin.value = detectAdmin();
   await editionStore.fetchEdition();
   edition.value = {
     edition: editionStore.edition,
@@ -238,6 +327,57 @@ onMounted(load);
 .edition-badge { padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: capitalize; }
 .edition-badge.enterprise { background: rgba(0,113,227,.12); color: var(--accent); }
 .edition-badge.personal { background: rgba(34,197,94,.12); color: var(--success); }
+/* edition 切换 UI */
+.edition-switch-row { flex-wrap: wrap; }
+.edition-switch-buttons { display: inline-flex; gap: 6px; }
+.edition-btn {
+  padding: 4px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.edition-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.edition-btn.active {
+  background: rgba(0,113,227,.12);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.edition-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.edition-btn.active:disabled {
+  opacity: .8;
+}
+.switching-indicator {
+  font-size: 12px;
+  color: var(--text3);
+  margin-left: 4px;
+}
+.edition-perm-hint {
+  font-size: 12px;
+  color: var(--text3);
+  font-style: italic;
+}
+.edition-error-msg {
+  font-size: 12px;
+  color: var(--fail);
+}
+.edition-notice {
+  font-size: 12px;
+  color: var(--success);
+}
+.edition-notice.degraded {
+  color: var(--fail);
+}
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .status-dot.on { background: var(--success); }
 .status-dot.off { background: var(--text3); opacity: .4; }

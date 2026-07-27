@@ -44,8 +44,8 @@ from typing import Any
 # 顶层导入 pika —— 未安装时抛出带清晰提示的 ImportError，
 # 由 backends.py 工厂函数的 try/except ImportError 捕获后降级。
 try:
-    import pika  # type: ignore
-    from pika.exceptions import AMQPError  # type: ignore
+    import pika
+    from pika.exceptions import AMQPError
 except ImportError as _e:  # pragma: no cover - 仅在缺包时触发
     raise ImportError(
         "pika is required for RabbitMQQueueBackend. "
@@ -106,9 +106,9 @@ class RabbitMQQueueBackend(QueueBackend):
             try:
                 params = pika.URLParameters(self._url)
                 self._connection = pika.BlockingConnection(params)
-                self._channel = self._connection.channel()
+                self._channel = self._connection.channel()  # type: ignore[attr-defined]
                 # 非自动 ack，由业务调用 ack/nack 显式确认
-                self._channel.basic_qos(prefetch_count=1)
+                self._channel.basic_qos(prefetch_count=1)  # type: ignore[attr-defined]
             except AMQPError as e:
                 logger.error("[rabbitmq] 连接 RabbitMQ 失败 (url=%s): %s", self._url, e)
                 raise RuntimeError(
