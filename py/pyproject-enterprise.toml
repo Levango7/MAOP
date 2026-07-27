@@ -1,4 +1,4 @@
-[project]
+﻿[project]
 name = "maop-enterprise"
 version = "4.0.0"
 description = "MAOP Enterprise Extension — RBAC, multi-tenant, SSO, audit, HA, and cloud backends"
@@ -18,7 +18,7 @@ redis = [
     "redis[hiredis]>=5.0",
 ]
 rabbitmq = [
-    "aio-pika>=9.0",
+    "aio-pika>=9.0", "pika>=1.3.0",
 ]
 vault = [
     "hvac>=2.0",

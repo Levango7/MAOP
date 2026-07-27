@@ -1,4 +1,4 @@
-"""Tests for maop.enterprise.sso — t12 real OAuth code exchange.
+"""Tests for maop.enterprise.sso — t12 real OAuth code exchange + SAML SSO.
 
 Mocks urllib.request.urlopen via monkeypatch to avoid real network calls.
 Sets MAOP_EDITION=enterprise so require_feature(FeatureFlag.SSO) passes.
@@ -6,6 +6,9 @@ Sets MAOP_EDITION=enterprise so require_feature(FeatureFlag.SSO) passes.
 
 from __future__ import annotations
 
+import base64
+import datetime
+import hashlib
 import io
 import json
 import time
@@ -50,6 +53,20 @@ def _make_oidc_config(**overrides: Any) -> SSOConfig:
     return SSOConfig(**defaults)
 
 
+def _make_saml_config(**overrides: Any) -> SSOConfig:
+    """构造 SAML 测试用 SSOConfig。"""
+    defaults: dict[str, Any] = {
+        "provider": SSOProvider.SAML,
+        "saml_entity_id": "maop-sp",
+        "saml_acs_url": "https://maop.local/saml/acs",
+        "saml_metadata_url": "https://idp.example.com/metadata",
+        "redirect_uri": "https://maop.local/saml/acs",
+        "default_role": "viewer",
+    }
+    defaults.update(overrides)
+    return SSOConfig(**defaults)
+
+
 class _FakeResponse:
     """Minimal file-like response object compatible with urllib context mgr."""
 
@@ -66,6 +83,224 @@ class _FakeResponse:
 
     def __exit__(self, *args: object) -> None:
         self._closed = True
+
+
+# ── SAML 测试辅助：生成密钥对 + 构造签名 SAML Response ──────────────
+
+
+def _generate_test_cert():
+    """生成测试用 RSA 密钥对和自签名证书。
+
+    返回 (private_key, cert_b64)：
+      - private_key: cryptography RSA 私钥对象（用于签名 SAML Response）
+      - cert_b64: X.509 证书的 base64 DER 编码（用于 SSOConfig.saml_idp_cert）
+    """
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = issuer = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, "test-idp"),
+    ])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(1)
+        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
+        .sign(key, hashes.SHA256())
+    )
+    cert_der = cert.public_bytes(serialization.Encoding.DER)
+    cert_b64 = base64.b64encode(cert_der).decode("ascii")
+    return key, cert_b64
+
+
+# SAML 命名空间常量
+_SAML_NS = "urn:oasis:names:tc:SAML:2.0:assertion"
+_SAMLP_NS = "urn:oasis:names:tc:SAML:2.0:protocol"
+_DS_NS = "http://www.w3.org/2000/09/xmldsig#"
+
+
+def _build_signed_saml_response(
+    private_key,
+    *,
+    assertion_id: str = "_assertion_1",
+    name_id: str = "testuser@example.com",
+    audience: str = "maop-sp",
+    not_before: datetime.datetime | None = None,
+    not_on_or_after: datetime.datetime | None = None,
+    attributes: dict[str, list[str]] | None = None,
+    response_id: str = "_response_1",
+    tamper_signature: bool = False,
+) -> str:
+    """构造一个 RSA-SHA256 签名的 SAML Response XML，返回 base64 编码。
+
+    用于测试 SAMLHandler.handle_response()：
+      1. 构建 <saml:Assertion>（含 Subject/Conditions/AttributeStatement）
+      2. 对 Assertion 做 exclusive c14n + SHA256 摘要
+      3. 构建 <ds:Signature>（SignedInfo 含 Reference + DigestValue）
+      4. 对 SignedInfo 做 exclusive c14n + RSA-SHA256 签名
+      5. 将 Signature 插入 Assertion，再包装进 <samlp:Response>
+      6. base64 编码返回
+
+    Args:
+        tamper_signature: 若 True，将 SignatureValue 篡改一个字节（用于测试签名验证失败）。
+    """
+    from lxml import etree
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding
+
+    now = datetime.datetime.utcnow()
+    if not_before is None:
+        not_before = now - datetime.timedelta(minutes=5)
+    if not_on_or_after is None:
+        not_on_or_after = now + datetime.timedelta(minutes=55)
+    if attributes is None:
+        attributes = {
+            "email": ["testuser@example.com"],
+            "name": ["Test User"],
+            "roles": ["admin", "viewer"],
+        }
+
+    nb_str = not_before.strftime("%Y-%m-%dT%H:%M:%SZ")
+    noa_str = not_on_or_after.strftime("%Y-%m-%dT%H:%M:%SZ")
+    issue_instant = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # 1. 构建 Assertion（不含 Signature）
+    assertion = etree.Element(
+        f"{{{_SAML_NS}}}Assertion",
+        nsmap={"saml": _SAML_NS, "ds": _DS_NS},
+        attrib={
+            "ID": assertion_id,
+            "IssueInstant": issue_instant,
+            "Version": "2.0",
+        },
+    )
+    issuer_elem = etree.SubElement(assertion, f"{{{_SAML_NS}}}Issuer")
+    issuer_elem.text = "test-idp"
+
+    subject = etree.SubElement(assertion, f"{{{_SAML_NS}}}Subject")
+    name_id_elem = etree.SubElement(subject, f"{{{_SAML_NS}}}NameID")
+    name_id_elem.text = name_id
+    subject_confirmation = etree.SubElement(
+        subject,
+        f"{{{_SAML_NS}}}SubjectConfirmation",
+        attrib={"Method": "urn:oasis:names:tc:SAML:2.0:cm:bearer"},
+    )
+    etree.SubElement(
+        subject_confirmation,
+        f"{{{_SAML_NS}}}SubjectConfirmationData",
+        attrib={
+            "NotOnOrAfter": noa_str,
+            "Recipient": "https://maop.local/saml/acs",
+            "InResponseTo": "_authn_request_1",
+        },
+    )
+
+    conditions = etree.SubElement(
+        assertion,
+        f"{{{_SAML_NS}}}Conditions",
+        attrib={"NotBefore": nb_str, "NotOnOrAfter": noa_str},
+    )
+    audience_restriction = etree.SubElement(
+        conditions, f"{{{_SAML_NS}}}AudienceRestriction"
+    )
+    audience_elem = etree.SubElement(audience_restriction, f"{{{_SAML_NS}}}Audience")
+    audience_elem.text = audience
+
+    attr_stmt = etree.SubElement(assertion, f"{{{_SAML_NS}}}AttributeStatement")
+    for attr_name, values in attributes.items():
+        attr = etree.SubElement(
+            attr_stmt, f"{{{_SAML_NS}}}Attribute", attrib={"Name": attr_name}
+        )
+        for v in values:
+            av = etree.SubElement(attr, f"{{{_SAML_NS}}}AttributeValue")
+            av.text = v
+
+    # 2. 计算 Assertion 的 exclusive c14n + SHA256 摘要
+    assertion_c14n = etree.tostring(
+        assertion, method="c14n", exclusive=True, with_comments=False
+    )
+    digest = hashlib.sha256(assertion_c14n).digest()
+    digest_b64 = base64.b64encode(digest).decode("ascii")
+
+    # 3. 构建 Signature 元素（含 SignedInfo）
+    signature = etree.Element(f"{{{_DS_NS}}}Signature", nsmap={"ds": _DS_NS})
+    signed_info = etree.SubElement(signature, f"{{{_DS_NS}}}SignedInfo")
+    etree.SubElement(
+        signed_info,
+        f"{{{_DS_NS}}}CanonicalizationMethod",
+        attrib={"Algorithm": "http://www.w3.org/2001/10/xml-exc-c14n#"},
+    )
+    etree.SubElement(
+        signed_info,
+        f"{{{_DS_NS}}}SignatureMethod",
+        attrib={"Algorithm": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"},
+    )
+    reference = etree.SubElement(
+        signed_info, f"{{{_DS_NS}}}Reference", attrib={"URI": f"#{assertion_id}"}
+    )
+    transforms = etree.SubElement(reference, f"{{{_DS_NS}}}Transforms")
+    etree.SubElement(
+        transforms,
+        f"{{{_DS_NS}}}Transform",
+        attrib={"Algorithm": "http://www.w3.org/2000/09/xmldsig#enveloped-signature"},
+    )
+    etree.SubElement(
+        transforms,
+        f"{{{_DS_NS}}}Transform",
+        attrib={"Algorithm": "http://www.w3.org/2001/10/xml-exc-c14n#"},
+    )
+    etree.SubElement(
+        reference,
+        f"{{{_DS_NS}}}DigestMethod",
+        attrib={"Algorithm": "http://www.w3.org/2001/04/xmlenc#sha256"},
+    )
+    digest_value_elem = etree.SubElement(reference, f"{{{_DS_NS}}}DigestValue")
+    digest_value_elem.text = digest_b64
+
+    # 4. 对 SignedInfo 做 exclusive c14n + RSA-SHA256 签名
+    signed_info_c14n = etree.tostring(
+        signed_info, method="c14n", exclusive=True, with_comments=False
+    )
+    sig_value = private_key.sign(
+        signed_info_c14n, padding.PKCS1v15(), hashes.SHA256()
+    )
+
+    if tamper_signature:
+        # 篡改签名值：翻转第一个字节，使签名验证失败
+        sig_bytes = bytearray(sig_value)
+        sig_bytes[0] ^= 0xFF
+        sig_value = bytes(sig_bytes)
+
+    sig_value_b64 = base64.b64encode(sig_value).decode("ascii")
+    signature_value_elem = etree.SubElement(signature, f"{{{_DS_NS}}}SignatureValue")
+    signature_value_elem.text = sig_value_b64
+
+    # 5. 将 Signature 插入 Assertion 作为第一个子元素
+    assertion.insert(0, signature)
+
+    # 6. 构建 Response
+    response = etree.Element(
+        f"{{{_SAMLP_NS}}}Response",
+        nsmap={"samlp": _SAMLP_NS, "saml": _SAML_NS},
+        attrib={
+            "ID": response_id,
+            "IssueInstant": issue_instant,
+            "Version": "2.0",
+            "Destination": "https://maop.local/saml/acs",
+            "InResponseTo": "_authn_request_1",
+        },
+    )
+    response.append(assertion)
+
+    # 7. 序列化 + base64 编码
+    response_xml = etree.tostring(response, xml_declaration=False, encoding="utf-8")
+    return base64.b64encode(response_xml).decode("ascii")
 
 
 # ── handle_callback OIDC real exchange ──────────────────────────────
@@ -275,23 +510,272 @@ class TestHandleCallbackOIDC:
         assert abs((session.expires_at - session.created_at) - 3600) < 5
 
 
-# ── handle_callback SAML — 显式拒绝（不再返回 stub session） ─────────
+# ── handle_callback SAML — 通过 SSOManager 集成测试 ─────────────────
 
 
 class TestHandleCallbackSAML:
-    def test_saml_callback_raises_sso_error(self):
-        # SAML 未实现，handle_callback 应显式抛 SSOError 而非返回 stub session。
-        config = _make_oidc_config(provider=SSOProvider.SAML)
+    def test_saml_callback_with_valid_response_returns_session(self):
+        # SAML 回调：handle_callback 接收 base64 SAMLResponse，返回真实 SSOSession。
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
         mgr = SSOManager(config)
-        with pytest.raises(SSOError, match="SAML SSO is not yet implemented"):
-            mgr.handle_callback("SAML_CODE")
+
+        saml_response_b64 = _build_signed_saml_response(key)
+        session = mgr.handle_callback(saml_response_b64, state="relay-state")
+
+        assert isinstance(session, SSOSession)
+        assert session.user.provider == SSOProvider.SAML
+        assert session.user.external_id == "saml:testuser@example.com"
+        assert session.user.email == "testuser@example.com"
+        assert session.user.display_name == "Test User"
+        assert session.user.roles == ["admin", "viewer"]
+        assert session.session_id.startswith("sess_")
 
     def test_saml_empty_code_still_raises(self):
         # Even SAML must reject empty code (fail-closed).
-        config = _make_oidc_config(provider=SSOProvider.SAML)
+        config = _make_saml_config()
         mgr = SSOManager(config)
         with pytest.raises(ValueError):
             mgr.handle_callback("")
+
+    def test_saml_callback_invalid_signature_rejected(self):
+        # 签名篡改后，handle_callback 应抛 SSOError。
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
+        mgr = SSOManager(config)
+
+        saml_response_b64 = _build_signed_saml_response(key, tamper_signature=True)
+        with pytest.raises(SSOError, match="signature|digest|verification"):
+            mgr.handle_callback(saml_response_b64)
+
+
+# ── SAMLHandler 单元测试 ────────────────────────────────────────────
+
+
+class TestSAMLHandler:
+    """测试 SAMLHandler 的核心功能：AuthnRequest 构造、Response 验证。"""
+
+    def test_get_authorize_url_returns_redirect_url(self, monkeypatch):
+        # get_authorize_url 应返回 {sso_url}?SAMLRequest=...&RelayState=...
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
+        handler = SAMLHandler(config)
+
+        # Monkeypatch _get_idp_metadata 以避免网络请求，直接返回带 sso_url 的 metadata
+        handler._idp_metadata = {
+            "entity_id": "https://idp.example.com",
+            "sso_url": "https://idp.example.com/sso",
+            "slo_url": "https://idp.example.com/slo",
+            "x509_cert": cert_b64,
+        }
+
+        url = handler.get_authorize_url(state="relay123")
+
+        assert url.startswith("https://idp.example.com/sso?SAMLRequest=")
+        assert "RelayState=relay123" in url
+        # SAMLRequest 参数非空
+        from urllib.parse import parse_qs, urlparse
+        parsed = urlparse(url)
+        params = parse_qs(parsed.query)
+        assert "SAMLRequest" in params
+        assert len(params["SAMLRequest"][0]) > 0
+
+    def test_get_authorize_url_without_state(self, monkeypatch):
+        # 不传 state 时，URL 不应包含 RelayState
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
+        handler = SAMLHandler(config)
+        handler._idp_metadata = {
+            "entity_id": "https://idp.example.com",
+            "sso_url": "https://idp.example.com/sso",
+            "slo_url": "",
+            "x509_cert": cert_b64,
+        }
+
+        url = handler.get_authorize_url()
+        assert "SAMLRequest=" in url
+        assert "RelayState" not in url
+
+    def test_handle_valid_response_returns_session(self):
+        # 有效签名的 SAML Response 应返回 SSOSession
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(
+            saml_idp_cert=cert_b64,
+            saml_entity_id="maop-sp",
+        )
+        handler = SAMLHandler(config)
+
+        saml_response_b64 = _build_signed_saml_response(key, audience="maop-sp")
+        session = handler.handle_response(saml_response_b64, relay_state="state")
+
+        assert isinstance(session, SSOSession)
+        assert session.user.provider == SSOProvider.SAML
+        assert session.user.external_id == "saml:testuser@example.com"
+        assert session.user.email == "testuser@example.com"
+        assert session.user.display_name == "Test User"
+        assert session.user.roles == ["admin", "viewer"]
+        # session 应有过期时间（来自 Conditions.NotOnOrAfter 或默认 8h）
+        assert session.expires_at > session.created_at
+
+    def test_handle_response_invalid_signature_rejected(self):
+        # 签名篡改后应抛 SSOError（fail-closed）
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
+        handler = SAMLHandler(config)
+
+        saml_response_b64 = _build_signed_saml_response(key, tamper_signature=True)
+        with pytest.raises(SSOError, match="signature|digest|verification"):
+            handler.handle_response(saml_response_b64)
+
+    def test_handle_response_wrong_cert_rejected(self):
+        # 用 key A 签名，但配置 key B 的证书 → 验证失败
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        key_a, _ = _generate_test_cert()
+        _, cert_b64_b = _generate_test_cert()  # 不同的密钥对
+        config = _make_saml_config(saml_idp_cert=cert_b64_b)
+        handler = SAMLHandler(config)
+
+        saml_response_b64 = _build_signed_saml_response(key_a)
+        with pytest.raises(SSOError, match="signature|digest|verification"):
+            handler.handle_response(saml_response_b64)
+
+    def test_handle_response_expired_rejected(self):
+        # NotOnOrAfter 已过期 → 抛 SSOError
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
+        handler = SAMLHandler(config)
+
+        now = datetime.datetime.utcnow()
+        saml_response_b64 = _build_signed_saml_response(
+            key,
+            not_before=now - datetime.timedelta(hours=2),
+            not_on_or_after=now - datetime.timedelta(hours=1),  # 1 小时前过期
+        )
+        with pytest.raises(SSOError, match="NotOnOrAfter.*passed|expired"):
+            handler.handle_response(saml_response_b64)
+
+    def test_handle_response_future_notbefore_rejected(self):
+        # NotBefore 在未来 → 抛 SSOError
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
+        handler = SAMLHandler(config)
+
+        now = datetime.datetime.utcnow()
+        saml_response_b64 = _build_signed_saml_response(
+            key,
+            not_before=now + datetime.timedelta(hours=1),  # 1 小时后才生效
+            not_on_or_after=now + datetime.timedelta(hours=2),
+        )
+        with pytest.raises(SSOError, match="NotBefore.*future"):
+            handler.handle_response(saml_response_b64)
+
+    def test_handle_response_wrong_audience_rejected(self):
+        # Audience 不匹配 → 抛 SSOError
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        key, cert_b64 = _generate_test_cert()
+        # SP entity_id 是 "maop-sp"，但 Response 中 Audience 是 "other-sp"
+        config = _make_saml_config(saml_idp_cert=cert_b64, saml_entity_id="maop-sp")
+        handler = SAMLHandler(config)
+
+        saml_response_b64 = _build_signed_saml_response(key, audience="other-sp")
+        with pytest.raises(SSOError, match="Audience mismatch"):
+            handler.handle_response(saml_response_b64)
+
+    def test_handle_response_empty_rejected(self):
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
+        handler = SAMLHandler(config)
+
+        with pytest.raises(SSOError, match="empty"):
+            handler.handle_response("")
+
+    def test_handle_response_malformed_xml_rejected(self):
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
+        handler = SAMLHandler(config)
+
+        bad_b64 = base64.b64encode(b"<not valid xml<").decode("ascii")
+        with pytest.raises(SSOError, match="XML parse|parse failed"):
+            handler.handle_response(bad_b64)
+
+    def test_handle_response_missing_assertion_rejected(self):
+        from maop.enterprise.saml_handler import SAMLHandler
+        from lxml import etree
+
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
+        handler = SAMLHandler(config)
+
+        # 构造一个没有 Assertion 的 Response
+        now = datetime.datetime.utcnow()
+        issue_instant = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        response = etree.Element(
+            f"{{{_SAMLP_NS}}}Response",
+            nsmap={"samlp": _SAMLP_NS, "saml": _SAML_NS},
+            attrib={
+                "ID": "_response_1",
+                "IssueInstant": issue_instant,
+                "Version": "2.0",
+            },
+        )
+        response_xml = etree.tostring(response, encoding="utf-8")
+        response_b64 = base64.b64encode(response_xml).decode("ascii")
+
+        with pytest.raises(SSOError, match="missing.*Assertion"):
+            handler.handle_response(response_b64)
+
+    def test_parse_idp_metadata_extracts_sso_url_and_cert(self):
+        # 测试 _parse_idp_metadata 能从 metadata XML 提取 SSO URL 和证书
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
+        handler = SAMLHandler(config)
+
+        # 构造 IdP metadata XML
+        metadata_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+    xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+    entityID="https://idp.example.com">
+  <md:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:KeyDescriptor use="signing">
+      <ds:KeyInfo>
+        <ds:X509Certificate>{cert_b64}</ds:X509Certificate>
+      </ds:KeyInfo>
+    </md:KeyDescriptor>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+      Location="https://idp.example.com/sso/redirect"/>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+      Location="https://idp.example.com/sso/post"/>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+      Location="https://idp.example.com/slo"/>
+  </md:IDPSSODescriptor>
+</md:EntityDescriptor>""".encode("utf-8")
+
+        parsed = handler._parse_idp_metadata(metadata_xml)
+        assert parsed["entity_id"] == "https://idp.example.com"
+        # 应优先选择 Redirect binding
+        assert parsed["sso_url"] == "https://idp.example.com/sso/redirect"
+        assert parsed["slo_url"] == "https://idp.example.com/slo"
+        assert parsed["x509_cert"] == cert_b64
 
 
 # ── _roles_from_claims ────────────────────────────────────────────────
@@ -333,11 +817,30 @@ class TestGetAuthorizeUrl:
         assert "scope=openid profile email" in url
         assert "state=rand123" in url
 
-    def test_saml_authorize_url_raises_sso_error(self):
-        # SAML 未实现，get_authorize_url 应在重定向前就抛 SSOError。
-        mgr = SSOManager(_make_oidc_config(provider=SSOProvider.SAML))
-        with pytest.raises(SSOError, match="SAML SSO is not yet implemented"):
-            mgr.get_authorize_url()
+    def test_saml_authorize_url_returns_redirect_url(self, monkeypatch):
+        # SAML get_authorize_url 应返回带 SAMLRequest 参数的重定向 URL。
+        key, cert_b64 = _generate_test_cert()
+        config = _make_saml_config(saml_idp_cert=cert_b64)
+        mgr = SSOManager(config)
+
+        # Monkeypatch SAMLHandler._get_idp_metadata 以避免网络请求
+        from maop.enterprise import saml_handler as _sh_module
+
+        def _mock_get_idp_metadata(self):
+            return {
+                "entity_id": "https://idp.example.com",
+                "sso_url": "https://idp.example.com/sso",
+                "slo_url": "",
+                "x509_cert": cert_b64,
+            }
+
+        monkeypatch.setattr(
+            _sh_module.SAMLHandler, "_get_idp_metadata", _mock_get_idp_metadata
+        )
+
+        url = mgr.get_authorize_url(state="relay-state")
+        assert url.startswith("https://idp.example.com/sso?SAMLRequest=")
+        assert "RelayState=relay-state" in url
 
 
 # ── validate_session / logout ─────────────────────────────────────────
