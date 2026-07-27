@@ -174,9 +174,9 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 
 | 项 | 优先级 | 说明 |
 |----|--------|------|
-| SAML SSO 完整实现 | Medium | 当前仅 stub session |
-| RabbitMQ 队列后端 | Low | Phase 3.4 规划 |
-| etcd/Consul KV 后端 | Low | Phase 3.4 规划 |
+| SAML SSO 完整实现 | Medium | fail-closed 拒绝（OIDC 已完整支持） |
+| RabbitMQ 队列后端 | Done | 已实现（需 pika，企业版可选依赖） |
+| etcd/Consul KV 后端 | Done | 已实现（需 etcd3，企业版可选依赖） |
 | License 在线撤销（CRL） | Low | 未来增强 |
 | 前端 edition 切换 UI | Low | 当前需手动配置环境变量 |
 

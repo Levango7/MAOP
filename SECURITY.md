@@ -42,6 +42,20 @@ threat model, and operational guidelines.
 - Configurable origins via `MAOP_CORS_ORIGINS`
 - Default: `http://localhost:9079,http://127.0.0.1:9079`
 
+### Backend Configuration (Distributed Backends)
+- Distributed backends are **optional** — local SQLite/Memory backends are used by default
+- Selection env vars: `MAOP_STORAGE_BACKEND`, `MAOP_CACHE_BACKEND`, `MAOP_QUEUE_BACKEND`, `MAOP_KV_BACKEND`, `MAOP_SECRET_BACKEND`
+- RabbitMQ queue backend (requires `pika`):
+  - `MAOP_RABBITMQ_URL` — AMQP connection URL, e.g. `amqp://user:pass@host:5672/vhost`
+  - **Security**: credentials in URL must be protected via secrets backend; broker should enforce TLS
+- etcd KV backend (requires `etcd3`):
+  - `MAOP_ETCD_HOST` — etcd host (default `localhost`)
+  - `MAOP_ETCD_PORT` — etcd port (default `2379`)
+  - `MAOP_ETCD_NAMESPACE` — key namespace prefix (default `maop`)
+  - **Security**: enable etcd TLS (`--cert-file`/`--key-file`) and mTLS auth in production
+- If an optional backend is unavailable (dependency missing or connection failed), MAOP
+  automatically degrades to the local default and records the event via `record_degradation()`
+
 ## Threat Model
 
 | Threat | Mitigation |

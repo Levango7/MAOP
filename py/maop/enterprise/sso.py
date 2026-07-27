@@ -1,11 +1,9 @@
 """MAOP Enterprise SSO — SAML/OIDC Single Sign-On Integration.
 
-SAML provider is currently disabled. OIDC is fully supported.
-
 Provides enterprise identity provider integration:
   - OpenID Connect (via authlib) — 完整支持，含 token exchange 与 userinfo
-  - SAML 2.0 — **当前未实现**，显式拒绝以避免 stub session 安全风险。
-    如需 SAML 支持，请安装 pysaml2 并实现 IdP metadata 解析与 XML 签名验证。
+  - SAML 2.0 — 完整支持（SP-initiated SSO + XML 签名验证），
+    实现在 maop.enterprise.saml_handler.SAMLHandler（lxml + cryptography）。
   - Automatic user provisioning from IdP claims
   - Session management and token refresh
 """
@@ -53,6 +51,8 @@ class SSOConfig(BaseModel):
     userinfo_url: str = ""
     saml_metadata_url: str = ""
     saml_entity_id: str = ""
+    saml_acs_url: str = ""  # Assertion Consumer Service URL（SP 端回调）
+    saml_idp_cert: str = ""  # 直接配置 IdP X.509 证书 base64 DER（可选，优先于 metadata_url）
     redirect_uri: str = ""
     scopes: list[str] = Field(default_factory=lambda: ["openid", "profile", "email"])
     auto_provision: bool = True
@@ -78,6 +78,16 @@ class SSOSession(BaseModel):
     created_at: float = 0.0
 
 
+def _get_saml_handler():
+    """Lazy import SAML handler to avoid lxml dependency in Personal edition.
+
+    SAMLHandler 依赖 lxml + cryptography，仅在 Enterprise + SAML provider
+    实际使用时才导入，避免 Personal 版因缺少 lxml 而无法 import maop.enterprise.sso。
+    """
+    from maop.enterprise.saml_handler import SAMLHandler
+    return SAMLHandler
+
+
 class SSOManager:
     """Enterprise SSO integration manager."""
 
@@ -91,11 +101,11 @@ class SSOManager:
         return self._config
 
     def get_authorize_url(self, state: str = "") -> str:
-        # SAML 当前未实现，在重定向前就显式拒绝，避免用户跳转后才失败。
+        # SAML：构造 AuthnRequest 重定向 URL（由 SAMLHandler 实现）
         if self._config.provider == SSOProvider.SAML:
-            raise SSOError(
-                "SAML SSO is not yet implemented. Please configure OIDC instead."
-            )
+            SAMLHandler = _get_saml_handler()
+            handler = SAMLHandler(self._config)
+            return handler.get_authorize_url(state=state)
         if self._config.provider == SSOProvider.OIDC:
             params = {
                 "client_id": self._config.client_id,
@@ -118,13 +128,13 @@ class SSOManager:
         ``userinfo_url`` with Bearer auth, then build a real ``SSOSession``
         with the returned tokens and expiry.
 
-        For SAML: raises ``SSOError`` — SAML is not yet implemented.
-        Full SAML requires XML signature verification and IdP metadata
-        handling (python3-saml / pysaml2),工作量较大故当前显式禁用。
+        For SAML: ``code`` 是 base64 编码的 SAMLResponse，``state`` 是 RelayState。
+        委托给 SAMLHandler.handle_response() 验证 XML 签名、Conditions，
+        提取 NameID/Attributes 后构造 SSOSession。
 
         Args:
-            code: Authorization code received at the redirect_uri.
-            state: Optional OAuth state value (echoed, not yet validated).
+            code: Authorization code (OIDC) 或 base64 SAMLResponse (SAML)。
+            state: Optional OAuth state value / SAML RelayState。
 
         Returns:
             A new SSOSession persisted in ``self._sessions``.
@@ -134,13 +144,13 @@ class SSOManager:
                 ``token_url``.
             RuntimeError: Token endpoint returned an error response, a
                 non-JSON body, or was unreachable.
-            SSOError: Provider is SAML (not yet implemented).
+            SSOError: SAML 验证失败（签名错误、过期、Audience 不匹配等）。
         """
         if not code:
             raise ValueError("handle_callback: 'code' must not be empty")
 
         if self._config.provider == SSOProvider.SAML:
-            return self._handle_saml_callback(code)
+            return self._handle_saml_callback(code, state)
 
         # OIDC: real OAuth authorization_code exchange.
         if not self._config.token_url:
@@ -327,23 +337,31 @@ class SSOManager:
                 return [v.strip()]
         return []
 
-    def _handle_saml_callback(self, code: str) -> SSOSession:
+    def _handle_saml_callback(self, code: str, state: str = "") -> SSOSession:
         """处理 SAML 回调。
 
-        注意：SAML 完整实现需要 python3-saml 或 pysaml2 库。
-        当前版本未集成，显式拒绝以避免 stub session 安全风险
-        （原实现返回无 token 的占位 session，可被绕过认证）。
-        如需 SAML 支持，请安装 pysaml2 并实现 IdP metadata 解析与
-        XML 签名验证。
+        ``code`` 是 base64 编码的 SAMLResponse（HTTP-POST binding），
+        ``state`` 是 RelayState（透传回 SP，不参与验证）。
+
+        委托给 SAMLHandler.handle_response()：
+          - base64 解码 → 解析 XML
+          - 验证 XML 签名（enveloped signature, exclusive c14n, RSA-SHA256）
+          - 验证 Conditions（Audience、NotBefore/NotOnOrAfter，±60s 容差）
+          - 提取 NameID 和 AttributeStatement
+          - 构造 SSOSession
 
         Raises:
-            SSOError: 始终抛出，SAML 当前未实现。
+            SSOError: 任何验证失败（fail-closed，绝不返回 stub session）。
         """
-        raise SSOError(
-            "SAML SSO is not yet implemented. "
-            "Use OIDC provider instead, or install pysaml2 and implement "
-            "SAML response parsing with XML signature verification."
+        SAMLHandler = _get_saml_handler()
+        handler = SAMLHandler(self._config)
+        session = handler.handle_response(code, relay_state=state)
+        self._sessions[session.session_id] = session
+        logger.info(
+            "[sso] SAML session=%s user=%s",
+            session.session_id, session.user.external_id,
         )
+        return session
 
     def validate_session(self, session_id: str) -> SSOSession | None:
         session = self._sessions.get(session_id)

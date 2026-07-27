@@ -102,8 +102,8 @@ License 颁发指南见 [docs/enterprise/license-issuance-guide.md](docs/enterpr
 |----------|----------|------------|
 | storage | sqlite | postgresql |
 | cache | memory | redis |
-| queue | sqlite | rabbitmq (Planned) |
-| kv | sqlite | etcd (Planned) |
+| queue | sqlite | rabbitmq (已实现，可选依赖 pika) |
+| kv | sqlite | etcd (已实现，可选依赖 etcd3) |
 | secret | local | vault |
 
 企业版后端不可用时自动降级到个人版后端（通过 `record_degradation()` 记录）。
