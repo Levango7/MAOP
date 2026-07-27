@@ -302,13 +302,19 @@ async def auth_login(request: Request) -> dict[str, Any]:
         with _login_failures_lock:
             _login_failures.pop(username, None)
 
-        return {
+        # #4 fix: set JWT as httpOnly cookie (XSS-proof) + return token for API clients
+        response = JSONResponse({
             "status": "ok",
             "token": token,
             "username": result["username"],
             "roles": result["roles"],
             "expires_in": 7200,
-        }
+        })
+        response.set_cookie(
+            key="maop_token", value=token, max_age=7200,
+            httponly=True, secure=True, samesite="strict", path="/",
+        )
+        return response
     except Exception:
         logger.exception("Login error")
         return JSONResponse({"status": "error", "error": "Login failed"}, status_code=401)

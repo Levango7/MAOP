@@ -16,7 +16,7 @@ threat model, and operational guidelines.
 
 ### TLS / Transport Security
 - TLS 1.2+ enforced via `maop/core/tls.py`
-- Configurable via `MAOP_TLS_ENABLED=1`, `MAOP_TLS_CERT_FILE`, `MAOP_TLS_KEY_FILE`
+- Configurable via `MAOP_TLS=1`, `MAOP_TLS_CERT`, `MAOP_TLS_KEY`
 - Minimum version: `MAOP_TLS_MIN_VERSION=TLSv1_2`
 
 ### Rate Limiting

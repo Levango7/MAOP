@@ -276,7 +276,7 @@ agents:
     - quickfix
     cli: mimo
     cli_args: --print {task}
-    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check)'
+    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7: driver migrated powershell -> cli per ADR-009'
     driver: cli
     model: mimo-v2.5
     model_display: MiMo-V2.5 (built-in)
@@ -365,7 +365,7 @@ agents:
     - refactor
     cli: qoderclicn
     cli_args: -p {task}
-    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check)'
+    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7: driver migrated powershell -> cli per ADR-009'
     driver: cli
     model: auto
     model_display: auto (QoderCN built-in)
@@ -380,10 +380,9 @@ agents:
     - review
     - explain
     - chat
-    cli: powershell -NoProfile -Command "qwen -p '{{safePrompt}}' -o json --safe-mode
-      2>$null"
-    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check)'
-    driver: powershell
+    cli: qwen -p '{{safePrompt}}' -o json --safe-mode
+    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7: driver migrated powershell -> cli per ADR-009'
+    driver: cli
     model: qwen3.5-plus
     model_display: qwen/qwen3.5-plus (built-in)
     timeout_s: 120

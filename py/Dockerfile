@@ -13,11 +13,16 @@ COPY py/requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Stage 2: Runtime
+# NOTE: For production, pin digest: python:3.13-slim@sha256:<digest>
+# Automate digest updates via Renovate/Dependabot. Tag-only acceptable for dev.
 FROM python:3.13-slim AS runtime
+
+# tini: proper PID 1 — reaps zombie processes, handles signals correctly
+RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf /var/lib/apt/lists/*
 
 LABEL maintainer="MAOP Team"
 LABEL description="MAOP Agent Orchestration Platform"
-LABEL version="4.0.0"
+LABEL version="4.3.0"
 
 # Create non-root user
 RUN groupadd -r maop && useradd -r -g maop -d /app -s /sbin/nologin maop
@@ -63,6 +68,9 @@ EXPOSE 9079
 
 # Switch to non-root user
 USER maop
+
+# tini as init (PID 1) — proper signal handling + zombie reaping
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Default: start dashboard. Override via docker-compose entrypoint.
 CMD ["python", "-m", "maop.dashboard.server"]

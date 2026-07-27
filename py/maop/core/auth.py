@@ -353,6 +353,16 @@ class JWTHandler:
             if payload.get("iss") != self.config.issuer:
                 return AuthResult(authenticated=False, error="Invalid issuer")
 
+            # #7 fix: validate iat (issued-at), nbf (not-before), sub (subject)
+            iat = payload.get("iat")
+            if iat is None or not isinstance(iat, (int, float)) or iat > time.time() + 60:
+                return AuthResult(authenticated=False, error="Invalid iat (token issued in future or missing)")
+            nbf = payload.get("nbf")
+            if nbf is not None and time.time() < nbf:
+                return AuthResult(authenticated=False, error="Token not yet valid (nbf)")
+            if not payload.get("sub"):
+                return AuthResult(authenticated=False, error="Token missing subject (sub)")
+
             # P1 fix: check revocation blacklist
             self._cleanup_revoked()
             if sig_b64 in self._revoked:

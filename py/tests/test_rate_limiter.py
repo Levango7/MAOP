@@ -128,10 +128,11 @@ class TestSlidingWindow:
         assert sw.consume().allowed is False
 
     def test_window_expiry(self):
-        sw = SlidingWindow(max_requests=1, window_s=0.05)
+        # Use 0.2s window to avoid flaky timing on Windows/CI
+        sw = SlidingWindow(max_requests=1, window_s=0.2)
         assert sw.consume().allowed is True
         assert sw.consume().allowed is False
-        time.sleep(0.06)
+        time.sleep(0.25)
         assert sw.consume().allowed is True
 
     def test_remaining_decreases(self):
