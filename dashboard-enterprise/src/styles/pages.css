@@ -269,17 +269,17 @@
 }
 
 /* Tone modifiers for action buttons — full palette matching ControlPanel template */
-.tone-green, .tone-success { --tone-bg: rgba(52,211,153,.10); --tone-border: rgba(52,211,153,.35); --tone-text: #34d399; }
-.tone-orange, .tone-warn { --tone-bg: rgba(251,146,60,.10); --tone-border: rgba(251,146,60,.35); --tone-text: #fbbf24; }
-.tone-blue, .tone-info { --tone-bg: var(--brand-soft); --tone-border: rgba(96,165,250,.35); --tone-text: #93c5fd; }
-.tone-red, .tone-danger, .tone-fail { --tone-bg: rgba(239,68,68,.08); --tone-border: rgba(239,68,68,.35); --tone-text: #fca5a5; }
-.tone-purple { --tone-bg: rgba(167,139,250,.10); --tone-border: rgba(167,139,250,.35); --tone-text: #c4b5fd; }
-.tone-teal { --tone-bg: rgba(20,184,166,.10); --tone-border: rgba(20,184,166,.35); --tone-text: #5eead4; }
-.tone-cyan { --tone-bg: rgba(34,211,238,.10); --tone-border: rgba(34,211,238,.35); --tone-text: #67e8f9; }
-.tone-pink { --tone-bg: rgba(244,114,182,.10); --tone-border: rgba(244,114,182,.35); --tone-text: #f9a8d4; }
-.tone-lime { --tone-bg: rgba(190,242,100,.10); --tone-border: rgba(190,242,100,.35); --tone-text: #bef264; }
-.tone-sky { --tone-bg: rgba(125,211,252,.10); --tone-border: rgba(125,211,252,.35); --tone-text: #7dd3fc; }
-.tone-slate { --tone-bg: rgba(148,163,184,.10); --tone-border: rgba(148,163,184,.30); --tone-text: #94a3b8; }
+.tone-green, .tone-success { --tone-bg: var(--success-soft); --tone-border: rgba(22,163,74,.35); --tone-text: var(--success); }
+.tone-orange, .tone-warn { --tone-bg: var(--warn-soft); --tone-border: rgba(217,119,6,.35); --tone-text: var(--warn); }
+.tone-blue, .tone-info { --tone-bg: var(--brand-soft); --tone-border: rgba(79,70,229,.35); --tone-text: var(--brand); }
+.tone-red, .tone-danger, .tone-fail { --tone-bg: var(--fail-soft); --tone-border: rgba(220,38,38,.35); --tone-text: var(--fail); }
+.tone-purple { --tone-bg: rgba(124,58,237,.10); --tone-border: rgba(124,58,237,.35); --tone-text: #8b5cf6; }
+.tone-teal { --tone-bg: rgba(13,148,136,.10); --tone-border: rgba(13,148,136,.35); --tone-text: #14b8a6; }
+.tone-cyan { --tone-bg: rgba(8,145,178,.10); --tone-border: rgba(8,145,178,.35); --tone-text: #06b6d4; }
+.tone-pink { --tone-bg: rgba(219,39,119,.10); --tone-border: rgba(219,39,119,.35); --tone-text: #ec4899; }
+.tone-lime { --tone-bg: rgba(101,163,13,.10); --tone-border: rgba(101,163,13,.35); --tone-text: #65a30d; }
+.tone-sky { --tone-bg: var(--info-soft); --tone-border: rgba(2,132,199,.35); --tone-text: var(--info, #38bdf8); }
+.tone-slate { --tone-bg: rgba(100,116,139,.10); --tone-border: rgba(100,116,139,.30); --tone-text: var(--text-muted); }
 .tone-amber { --tone-bg: rgba(245,158,11,.10); --tone-border: rgba(245,158,11,.35); --tone-text: #fcd34d; }
 
 .ctrl-btn {

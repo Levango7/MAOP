@@ -171,7 +171,7 @@ function openGrant() {
 
 async function grantRole() {
   if (!newGrant.value.user_id.trim() || !newGrant.value.role) {
-    toast.warn('User ID and role are required');
+    toast.warn(t('view.rbac.userIdRequired'));
     return;
   }
   saving.value = true;
@@ -181,7 +181,7 @@ async function grantRole() {
       role: newGrant.value.role,
       tenant_id: newGrant.value.tenant_id.trim(),
     });
-    toast.success(`Granted ${newGrant.value.role} to ${newGrant.value.user_id}`);
+    toast.success(t('view.rbac.granted', { role: newGrant.value.role, user: newGrant.value.user_id }));
     showGrant.value = false;
     await loadGrants();
   } catch (e) {
@@ -193,7 +193,7 @@ async function grantRole() {
 async function revoke(g) {
   try {
     await api.post('/api/rbac/revoke', { user_id: g.user_id, role: g.role, tenant_id: g.tenant_id || '' });
-    toast.success(`Revoked ${g.role} from ${g.user_id}`);
+    toast.success(t('view.rbac.revoked', { role: g.role, user: g.user_id }));
     await loadGrants();
   } catch (e) {
     toast.error(e.message || 'Revoke failed');

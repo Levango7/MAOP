@@ -123,10 +123,10 @@ async function triggerEvolve() {
   evolving.value = true;
   try {
     await api.post('/api/evolve/analyze', { strategies: 'all' });
-    toast.success('Evolution analysis triggered');
+    toast.success(t('view.evolve.triggered'));
     await loadStatus();
   } catch (e) {
-    toast.error(e.message || 'Evolution failed');
+    toast.error(e.message || t('view.evolve.failed'));
   } finally {
     evolving.value = false;
   }

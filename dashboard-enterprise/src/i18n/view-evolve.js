@@ -24,6 +24,8 @@ export const messages = {
     'view.evolve.colFail': 'Fail',
     'view.evolve.colRate': 'Rate %',
     'view.evolve.colAvgMs': 'Avg ms',
+    'view.evolve.triggered': 'Evolution analysis triggered',
+    'view.evolve.failed': 'Evolution failed',
   },
   zh: {
     'view.evolve.title': '自我演进',
@@ -50,5 +52,7 @@ export const messages = {
     'view.evolve.colFail': '失败',
     'view.evolve.colRate': '成功率 %',
     'view.evolve.colAvgMs': '平均耗时(ms)',
+    'view.evolve.triggered': '演化分析已触发',
+    'view.evolve.failed': '演化分析失败',
   },
 };

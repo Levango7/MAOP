@@ -25,6 +25,10 @@ export const messages = {
     'view.control.noUpgradeInfoDesc': 'Click “Check for Upgrades” to scan agent CLIs.',
     'view.control.current': 'current',
     'view.control.latest': 'latest',
+    'view.control.actionCompleted': '{action} completed',
+    'view.control.actionFailed': '{action} failed',
+    'view.control.upgradeTriggered': 'Upgrade triggered for {name}',
+    'view.control.upgradeFailed': 'Upgrade failed',
   },
   zh: {
     'view.control.title': '控制台',
@@ -52,5 +56,9 @@ export const messages = {
     'view.control.noUpgradeInfoDesc': '点击“检查更新”以扫描智能体 CLI。',
     'view.control.current': '当前',
     'view.control.latest': '最新',
+    'view.control.actionCompleted': '{action} 已完成',
+    'view.control.actionFailed': '{action} 失败',
+    'view.control.upgradeTriggered': '已为 {name} 触发升级',
+    'view.control.upgradeFailed': '升级失败',
   },
 };

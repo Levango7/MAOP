@@ -250,15 +250,15 @@ function selectAgent(a) {
 }
 
 async function switchModel(a) {
-  toast.info(`Model switching for "${a.name}" is not yet supported. Edit config/agents.yaml to change the model.`);
+  toast.info(t('view.agents.switchNotSupported', { name: a.name }));
 }
 async function healthCheck(a) {
-  try { await api.post(`/api/agents/${a.name}/health-check`, {}); await loadAgents(); toast.success(`Health check sent to ${a.name}`); }
-  catch (e) { toast.error(`Health check failed: ${e.message || 'error'}`); }
+  try { await api.post(`/api/agents/${a.name}/health-check`, {}); await loadAgents(); toast.success(t('view.agents.healthCheckSent', { name: a.name })); }
+  catch (e) { toast.error(t('view.agents.healthCheckFailed') + (e.message ? ': ' + e.message : '')); }
 }
 async function restartAgent(a) {
-  try { await api.post(`/api/agents/${a.name}/health-check`, {}); await loadAgents(); toast.success(`${a.name} restarted`); }
-  catch (e) { toast.error(`Restart failed: ${e.message || 'error'}`); }
+  try { await api.post(`/api/agents/${a.name}/health-check`, {}); await loadAgents(); toast.success(t('view.agents.restarted', { name: a.name })); }
+  catch (e) { toast.error(t('view.agents.restartFailed') + (e.message ? ': ' + e.message : '')); }
 }
 
 // Local agent scan — hits POST /api/agents/scan which probes the environment
@@ -288,7 +288,7 @@ async function loadAgents() {
     agents.value = toList(data);
   } catch (e) {
     ok = false;
-    toast.error(`Failed to load agents: ${e.message || 'error'}`);
+    toast.error(t('view.agents.loadFailed') + (e.message ? ': ' + e.message : ''));
   }
   try {
     const r = await api.get('/api/agents/routes');

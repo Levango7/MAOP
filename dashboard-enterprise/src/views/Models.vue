@@ -105,7 +105,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
 import { Card, StatCard, Badge, DataTable, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
@@ -117,6 +117,7 @@ const loading = ref(true);
 const switching = ref(false);
 const switchForm = reactive({ agent: '', model: '' });
 const switchResult = ref(null);
+let _switchTimer = null;
 
 const models = ref([]);
 const modelsError = ref('');
@@ -275,10 +276,12 @@ async function doSwitch() {
     switchResult.value = { ok: false, msg: e.message || t('view.models.switchFailed') };
   }
   switching.value = false;
-  setTimeout(() => { switchResult.value = null; }, 4000);
+  _switchTimer = setTimeout(() => { switchResult.value = null; }, 4000);
 }
 
 onMounted(loadAll);
+
+onUnmounted(() => { if (_switchTimer) clearTimeout(_switchTimer); });
 </script>
 
 <style scoped>

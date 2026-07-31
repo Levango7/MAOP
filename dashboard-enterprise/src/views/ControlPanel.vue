@@ -154,7 +154,7 @@ async function execAction(action, task) {
     await loadJobs();
   } catch (e) {
     execResult.value = { ok: false, msg: e.message || `${action} failed` };
-    toast.error(e.message || `${action} failed`);
+    toast.error(e.message || t('view.control.actionFailed', { action }));
   } finally {
     loading.value = false;
   }
@@ -166,10 +166,10 @@ async function maintainAction(action) {
   try {
     const r = await api.post('/api/control/maintain', { action });
     maintResult.value = { ok: true, msg: r.msg || r.message || r.detail || `${action} completed` };
-    toast.success(`${action} completed`);
+    toast.success(t('view.control.actionCompleted', { action }));
   } catch (e) {
     maintResult.value = { ok: false, msg: e.message || `${action} failed` };
-    toast.error(e.message || `${action} failed`);
+    toast.error(e.message || t('view.control.actionFailed', { action }));
   } finally {
     loading.value = false;
   }
@@ -211,10 +211,10 @@ async function upgradeAgent(name) {
   loading.value = true;
   try {
     await api.post('/api/agent/upgrade?agent=' + encodeURIComponent(name), {});
-    toast.success(`Upgrade triggered for ${name}`);
+    toast.success(t('view.control.upgradeTriggered', { name }));
     await checkUpgrade();
   } catch (e) {
-    toast.error(e.message || 'Upgrade failed');
+    toast.error(e.message || t('view.control.upgradeFailed'));
   } finally {
     loading.value = false;
   }

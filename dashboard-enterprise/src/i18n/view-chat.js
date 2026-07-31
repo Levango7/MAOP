@@ -23,6 +23,7 @@ export const messages = {
     'view.chat.loadingSessions': 'Loading sessions…',
     'view.chat.newConversation': 'New conversation',
     'view.chat.selectAgentToStart': 'Select an agent to start chatting',
+    'view.chat.imageTooLarge': 'Image must be under 5MB',
   },
   zh: {
     'view.chat.title': '对话',
@@ -48,5 +49,6 @@ export const messages = {
     'view.chat.loadingSessions': '加载会话中…',
     'view.chat.newConversation': '新对话',
     'view.chat.selectAgentToStart': '选择一个智能体即可开始对话',
+    'view.chat.imageTooLarge': '图片不能超过 5MB',
   },
 };

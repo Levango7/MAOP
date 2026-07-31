@@ -17,6 +17,7 @@ export const messages = {
     'view.tenants.planStarter': 'Starter',
     'view.tenants.planPro': 'Pro',
     'view.tenants.planEnterprise': 'Enterprise',
+    'view.tenants.idAndNameRequired': 'Tenant ID and name are required',
   },
   zh: {
     'view.tenants.subtitle': '隔离的工作空间与资源配额',
@@ -36,5 +37,6 @@ export const messages = {
     'view.tenants.planEnterprise': '企业版',
     'view.tenants.deleteConfirm': '删除租户“{id}”？此操作不可恢复。',
     'view.tenants.deleted': '已删除 {id}',
+    'view.tenants.idAndNameRequired': '租户 ID 和名称为必填项',
   },
 };
