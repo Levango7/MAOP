@@ -19,6 +19,7 @@ const routes = [
   { path: '/rbac', name: 'rbac', component: () => import('../views/RBAC.vue'), meta: { requiresEnterprise: true } },
   { path: '/tenants', name: 'tenants', component: () => import('../views/Tenants.vue'), meta: { requiresEnterprise: true } },
   { path: '/settings', name: 'settings', component: () => import('../views/Settings.vue') },
+  { path: '/users', name: 'users', component: () => import('../views/Users.vue') },
   // P2-10 fix: catch-all 404 route — redirect unknown paths to overview
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ];
