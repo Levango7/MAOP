@@ -68,13 +68,15 @@ class BudgetGuard:
             logger.warning("Failed to load budget ledger: %s", exc)
 
     def _save_ledger(self) -> None:
-        """Persist ledger to disk."""
+        """Persist ledger to disk atomically (write temp + rename)."""
         path = self._ledger_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
             import json
             data = {"entries": self._ledger[-1000:]}  # keep last 1000
-            path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            tmp.replace(path)  # atomic on same filesystem
         except Exception as exc:
             logger.warning("Failed to save budget ledger: %s", exc)
 

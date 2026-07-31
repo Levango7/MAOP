@@ -4,7 +4,8 @@
 # ──────────────────────────────────────────────────────────────────
 
 # Stage 1: Builder
-FROM python:3.13-slim AS builder
+ARG PYTHON_IMAGE=python:3.13-slim
+FROM ${PYTHON_IMAGE} AS builder
 
 WORKDIR /build
 
@@ -13,9 +14,8 @@ COPY py/requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Stage 2: Runtime
-# NOTE: For production, pin digest: python:3.13-slim@sha256:<digest>
-# Automate digest updates via Renovate/Dependabot. Tag-only acceptable for dev.
-FROM python:3.13-slim AS runtime
+# PYTHON_IMAGE ARG allows CI to pin digest: --build-arg PYTHON_IMAGE=python:3.13-slim@sha256:xxx
+FROM ${PYTHON_IMAGE} AS runtime
 
 # tini: proper PID 1 — reaps zombie processes, handles signals correctly
 RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf /var/lib/apt/lists/*
@@ -55,11 +55,11 @@ ENV MAOP_ROOT=/app \
     MAOP_AUTH=1 \
     MAOP_TLS=0 \
     MAOP_CORS_ORIGINS=http://localhost:9079 \
-    MAOP_BACKEND_STORAGE=sqlite \
-    MAOP_BACKEND_CACHE=local \
-    MAOP_BACKEND_QUEUE=local \
-    MAOP_BACKEND_KV=local \
-    MAOP_BACKEND_SECRET=local
+    MAOP_STORAGE_BACKEND=sqlite \
+    MAOP_CACHE_BACKEND=local \
+    MAOP_QUEUE_BACKEND=local \
+    MAOP_KV_BACKEND=local \
+    MAOP_SECRET_BACKEND=local
 
 # Health check (dashboard only — other services use entrypoint)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

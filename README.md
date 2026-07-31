@@ -51,7 +51,7 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 | Audit Log 审计日志 | ✗ | ✓ |
 | n8n 集成 | ✗ | ✓ |
 | RabbitMQ 消息队列 | ✗ | ✓ (可选依赖 pika) |
-| etcd 分布式 KV | ✗ | ✓ (可选依赖 etcd3) |
+| etcd 分布式 KV | ✗ | ○ (planned, 可选依赖 etcd3) |
 | License CRL 在线撤销 | ✗ | ✓ |
 | Vue Dashboard 企业版路由 | ✗ | ✓ |
 

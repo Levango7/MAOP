@@ -384,6 +384,12 @@ class VectorStore:
         if not self._cache:
             return []
 
+        # Try sqlite-vec ANN index (fastest, optional dep)
+        try:
+            return self._search_vector_sqlite_vec(query_vector, top, threshold)
+        except Exception:
+            pass
+
         # Try numpy-accelerated batch similarity
         try:
             import numpy as np
@@ -393,6 +399,38 @@ class VectorStore:
 
         # Fallback: pure Python
         return self._search_vector_python(query_vector, top, threshold)
+
+    def _search_vector_sqlite_vec(
+        self,
+        query_vector: list[float],
+        top: int,
+        threshold: float,
+    ) -> list[VectorSearchResult]:
+        """sqlite-vec ANN search (optional, ~100x faster than brute-force).
+
+        Requires the ``sqlite-vec`` package. If not installed, raises
+        ImportError which is caught by the caller to fall back to NumPy.
+        """
+        import sqlite_vec  # noqa: F401 — optional dep, ImportError expected if missing
+        with sqlite_connect(self._path, timeout=10, wal=True) as conn:
+            conn.enable_load_extension(True)
+            sqlite_vec.load(conn)
+            # Use virtual table if it exists, else raise to fall back
+            cursor = conn.execute(
+                "SELECT id, text, metadata, distance FROM vec_vectors "
+                "WHERE embedding MATCH ? AND k = ? ORDER BY distance",
+                (json.dumps(query_vector), top),
+            )
+            rows = cursor.fetchall()
+        results: list[VectorSearchResult] = []
+        for row in rows:
+            eid, text, meta_json, dist = row
+            score = max(0.0, 1.0 - float(dist))
+            if score < threshold:
+                continue
+            meta = json.loads(meta_json) if meta_json else {}
+            results.append(VectorSearchResult(id=eid, text=text, score=score, metadata=meta))
+        return results
 
     def _search_vector_numpy(
         self,
