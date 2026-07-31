@@ -127,7 +127,7 @@ function openCreate() {
 }
 async function createTenant() {
   if (!newTenant.value.tenant_id.trim() || !newTenant.value.name.trim()) {
-    toast.warn('Tenant ID and name are required');
+    toast.warn(t('view.tenants.idAndNameRequired'));
     return;
   }
   saving.value = true;

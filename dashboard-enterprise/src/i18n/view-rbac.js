@@ -27,6 +27,9 @@ export const messages = {
     'view.rbac.role.editor': 'Editor',
     'view.rbac.role.viewer': 'Viewer',
     'view.rbac.role.user': 'User',
+    'view.rbac.userIdRequired': 'User ID and role are required',
+    'view.rbac.granted': 'Granted {role} to {user}',
+    'view.rbac.revoked': 'Revoked {role} from {user}',
   },
   zh: {
     'view.rbac.subtitle': '基于 Role 的访问控制',
@@ -55,5 +58,8 @@ export const messages = {
     'view.rbac.role.editor': '编辑者',
     'view.rbac.role.viewer': '查看者',
     'view.rbac.role.user': '用户',
+    'view.rbac.userIdRequired': '用户 ID 和角色为必填项',
+    'view.rbac.granted': '已授予 {user} 角色 {role}',
+    'view.rbac.revoked': '已撤销 {user} 的角色 {role}',
   },
 };
