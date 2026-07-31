@@ -1,7 +1,8 @@
 import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, r"F:\Nexus\MAOP\py")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 os.environ["PYTHONUNBUFFERED"] = "1"
 
 import uvicorn
