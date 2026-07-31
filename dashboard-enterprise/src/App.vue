@@ -5,7 +5,6 @@
 
     <nav class="sidebar">
       <div class="logo">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
         <span>MAOP</span>
         <button class="rail-btn" @click="toggleRail" :title="ui.rail ? t('action.expandSidebar') : t('action.collapseSidebar')" aria-label="Toggle sidebar">
           <AppIcon name="panelleft" :size="16" />
@@ -21,20 +20,10 @@
           </router-link>
         </template>
       </div>
-
-      <div class="nav-footer">
-        <!-- Sidebar footer is minimal now; user info moved to PageHeader -->
-        <div class="nf-group nf-status">
-          <span class="live-indicator" :class="{ connected: realtimeConnected }">
-            <AppIcon class="live-dot" name="radio" :size="12" />
-            {{ realtimeConnected ? t('status.live') : t('status.offline') }}
-          </span>
-          <span class="version">v{{ version }}</span>
-        </div>
-      </div>
     </nav>
 
     <main class="content">
+      <TopBar />
       <button
         class="hamburger-btn"
         @click="toggleSidebar"
@@ -82,6 +71,7 @@ import { useApiStore, withAuth } from './stores/api.js';
 import { useRealtimeStore } from './stores/realtime.js';
 import { useUiStore } from './stores/ui.js';
 import AppIcon from './components/AppIcon.vue';
+import TopBar from './components/TopBar.vue';
 import Toast from './components/Toast.vue';
 import AppFooter from './components/AppFooter.vue';
 import { useI18n } from './i18n/index.js';
@@ -313,22 +303,14 @@ onUnmounted(() => {
 .nf-group { display: flex; flex-direction: column; gap: 6px; }
 .nf-group.nf-status { flex-direction: row; align-items: center; justify-content: space-between; }
 .nf-label { font-size: 10px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .06em; }
-.live-indicator { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-faint); }
-.live-indicator .live-dot { color: var(--text-faint); }
-.live-indicator.connected { color: var(--success); }
-.live-indicator.connected .live-dot { color: var(--success); }
-.version { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); }
 
 /* ── Rail (collapsed) state ─────────────────────────────────────── */
 .app-layout.rail .sidebar { width: var(--rail-w); }
 .app-layout.rail .logo span,
 .app-layout.rail .nav-label,
-.app-layout.rail .nav-section,
-.app-layout.rail .nf-status .version,
-.app-layout.rail .nf-label { display: none; }
+.app-layout.rail .nav-section { display: none; }
 .app-layout.rail .logo { justify-content: center; padding: 4px 0 14px; }
 .app-layout.rail .nav-link { justify-content: center; padding: 10px 0; gap: 0; }
-.app-layout.rail .nav-footer { align-items: center; padding: 12px 8px; }
 
 /* ── Content (scroll area) ─────────────────────────────────────── */
 .content { flex: 1; overflow-y: auto; min-width: 0; position: relative; z-index: 1; display: flex; flex-direction: column; }
