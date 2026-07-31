@@ -106,4 +106,4 @@ _env_is_dev = os.environ.get("MAOP_ENV", "").strip().lower() in (
     "dev", "development", "local", "test",
 )
 auth_enabled = os.environ.get("MAOP_AUTH", "0" if _env_is_dev else "1") == "1"
-rl_enabled = os.environ.get("MAOP_RATE_LIMIT", "1") == "1"
+rl_enabled = os.environ.get("MAOP_RATE_LIMIT", os.environ.get("MAOP_RATE_LIMIT_ENABLED", "1")) == "1"

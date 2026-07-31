@@ -233,7 +233,7 @@ app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credential
 # ── Rate Limit + Auth + CSP Middleware ─────────────────────────────
 from maop.core.middleware import AuthMiddleware, CSPMiddleware, RateLimitMiddleware
 
-_rl_enabled = os.environ.get("MAOP_RATE_LIMIT", "1") == "1"
+_rl_enabled = os.environ.get("MAOP_RATE_LIMIT", os.environ.get("MAOP_RATE_LIMIT_ENABLED", "1")) == "1"
 _rl_rate = float(os.environ.get("MAOP_RATE_LIMIT_RPS", "30"))
 _rl_burst = int(os.environ.get("MAOP_RATE_LIMIT_BURST", "60"))
 app.add_middleware(RateLimitMiddleware, rate=_rl_rate, burst=_rl_burst, enabled=_rl_enabled)
