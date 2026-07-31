@@ -179,6 +179,7 @@ class ProjectContext:
                     content = fpath.read_text(encoding="utf-8", errors="replace")[:1000]
                     result[name] = content
                 except Exception:
+                    logger.debug("Silent exception in core/project_context.py:181", exc_info=True)
                     pass
         return result
 
@@ -192,6 +193,7 @@ class ProjectContext:
                     if content:
                         parts.append(f"### {name}\n{content[:2000]}")
                 except Exception:
+                    logger.debug("Silent exception in core/project_context.py:194", exc_info=True)
                     pass
         return "\n\n".join(parts)
 
@@ -207,6 +209,7 @@ class ProjectContext:
                 lines = result.stdout.strip().splitlines()[:20]
                 return "\n".join(lines)
         except Exception:
+            logger.debug("Silent exception in core/project_context.py:209", exc_info=True)
             pass
         try:
             recent = []
@@ -216,10 +219,12 @@ class ProjectContext:
                         mtime = f.stat().st_mtime
                         recent.append((mtime, str(f.relative_to(self._workdir))))
                     except Exception:
+                        logger.debug("Silent exception in core/project_context.py:218", exc_info=True)
                         pass
             recent.sort(reverse=True)
             if recent:
                 return "\n".join(f"  {name}" for _, name in recent[:10])
         except Exception:
+            logger.debug("Silent exception in core/project_context.py:223", exc_info=True)
             pass
         return ""

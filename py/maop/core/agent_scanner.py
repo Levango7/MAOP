@@ -246,6 +246,7 @@ class AgentScanner:
             first_line = output.split("\n")[0].strip() if output else ""
             return first_line[:80]
         except Exception:
+            logger.debug("Silent exception in core/agent_scanner.py:248", exc_info=True)
             return ""
 
     def scan(self) -> list[ScannedAgent]:

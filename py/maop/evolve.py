@@ -418,6 +418,7 @@ class EvolveEngine:
             raw = json.loads(self._suggestions_file.read_text(encoding="utf-8"))
             return [Suggestion(**s) for s in raw]
         except Exception:
+            logger.debug("Silent exception in evolve.py:420", exc_info=True)
             return []
 
     def auto_evolve(self, hours: int = 24) -> dict[str, Any]:

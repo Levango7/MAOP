@@ -199,6 +199,7 @@ class BudgetGuard:
                     "reason": reason,
                 }))
             except Exception:
+                logger.debug("Silent exception in core/budget_guard.py:201", exc_info=True)
                 pass
 
         return BudgetStatus(

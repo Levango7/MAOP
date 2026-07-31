@@ -204,6 +204,7 @@ class HookManager:
                 if "callback_path" not in cols:
                     conn.execute("ALTER TABLE hooks ADD COLUMN callback_path TEXT DEFAULT ''")
             except Exception:
+                logger.debug("Silent exception in core/hook_manager.py:206", exc_info=True)
                 pass
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS hook_logs (
@@ -441,6 +442,7 @@ class HookManager:
                     source="hook_manager",
                 ))
             except Exception:
+                logger.debug("Silent exception in core/hook_manager.py:443", exc_info=True)
                 pass
 
         return results
@@ -632,6 +634,7 @@ class HookManager:
             mod = importlib.import_module(parts[0])
             return cast(Callable[..., Any] | None, getattr(mod, parts[1]))
         except Exception:
+            logger.debug("Silent exception in core/hook_manager.py:634", exc_info=True)
             return None
 
     # ── Internal helpers ───────────────────────────────────────
@@ -678,6 +681,7 @@ class HookManager:
                      result.duration_ms, now),
                 )
         except Exception:
+            logger.debug("Silent exception in core/hook_manager.py:680", exc_info=True)
             pass
 
 

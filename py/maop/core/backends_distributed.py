@@ -272,4 +272,5 @@ class EtcdKVBackend(KVBackend):
                 try:
                     transport.close()
                 except Exception:  # noqa: BLE001
+                    logger.debug("Silent exception in core/backends_distributed.py:274", exc_info=True)
                     pass

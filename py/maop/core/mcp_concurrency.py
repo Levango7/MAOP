@@ -139,6 +139,7 @@ class MCPServerConcurrency:
         try:
             from maop.core.monitoring import MAOP_MCP_CONCURRENT_ACTIVE
         except Exception:
+            logger.debug("Silent exception in core/mcp_concurrency.py:141", exc_info=True)
             return
         try:
             MAOP_MCP_CONCURRENT_ACTIVE.set(

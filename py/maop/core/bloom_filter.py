@@ -47,6 +47,7 @@ def _mmh3_hash32(key: bytes, seed: int = 0) -> int:
         try:
             return _mmh3.hash(key, seed, signed=False)
         except Exception:
+            logger.debug("Silent exception in core/bloom_filter.py:49", exc_info=True)
             pass
     # Pure-Python fallback (FNV-1a variant with seed mixing)
     h = 2166136261 ^ seed

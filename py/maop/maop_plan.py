@@ -328,6 +328,7 @@ def _evaluate_condition(condition: str, variables: dict[str, Any]) -> bool:
         from maop.engine import safe_eval
         return bool(safe_eval(condition, variables))
     except Exception:
+        logger.debug("Silent exception in maop_plan.py:330", exc_info=True)
         return False
 
 

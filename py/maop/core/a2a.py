@@ -353,6 +353,7 @@ class A2AClient:
                     return None
                 return A2ACard(**data.get("result", {}))
         except Exception:
+            logger.debug("Silent exception in core/a2a.py:355", exc_info=True)
             return None
 
 

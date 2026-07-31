@@ -289,6 +289,7 @@ class KnowledgeGraph:
                     params,
                 ).fetchall()
             except Exception:
+                logger.debug("Silent exception in core/knowledge_graph.py:291", exc_info=True)
                 return []
 
         return [GraphEdge(
@@ -328,6 +329,7 @@ class KnowledgeGraph:
                     in_degree=in_deg, out_degree=out_deg,
                 )
             except Exception:
+                logger.debug("Silent exception in core/knowledge_graph.py:330", exc_info=True)
                 return None
 
     def _get_facts_for(self, entity_name: str, limit: int = 10) -> list[dict[str, Any]]:
@@ -340,6 +342,7 @@ class KnowledgeGraph:
                     (f"%{entity_name}%", limit),
                 ).fetchall()
             except Exception:
+                logger.debug("Silent exception in core/knowledge_graph.py:342", exc_info=True)
                 return []
         return [dict(r) for r in rows]
 

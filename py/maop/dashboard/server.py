@@ -754,11 +754,16 @@ if __name__ == "__main__":
             logger.warning("MAOP_TLS=1 but MAOP_TLS_CERT/MAOP_TLS_KEY not set, starting without TLS")
 
     proto = "https" if ssl_kwargs else "http"
+    workers = int(os.environ.get("MAOP_DASH_WORKERS", os.environ.get("MAOP_WORKERS", "1")))
     logger.info(f'MAOP Dashboard v{MAOP_VERSION} (FastAPI) -> {proto}://{host}:{port}')
     logger.info(f'  CORS origins: {_cors_origins}')
     logger.info(f"  Auth: {('enabled' if _auth_enabled else 'disabled')}")
     logger.info(f"  Rate limit: {('enabled' if _rl_enabled else 'disabled')} ({_rl_rate} rps, burst={_rl_burst})")
     logger.info(f"  TLS: {('enabled' if ssl_kwargs else 'disabled')}")
     logger.info(f"  CSP: {('enabled' if _csp_enabled else 'disabled')}{' (report-only)' if _csp_report_only else ''} connect-src={_csp_connect_src}")
+    logger.info(f"  Workers: {workers}")
 
-    uvicorn.run(app, host=host, port=port, log_level="info", **ssl_kwargs)
+    if workers > 1:
+        uvicorn.run("maop.dashboard.server:app", host=host, port=port, workers=workers, log_level="info")
+    else:
+        uvicorn.run(app, host=host, port=port, log_level="info", **ssl_kwargs)

@@ -1,7 +1,12 @@
 """Tests for delegate drivers — CLI, PowerShell, cmd, Python, and wrapper drivers."""
 from __future__ import annotations
 
+import shutil
+import sys
+
 import pytest
+
+_HAS_POWERSHELL = sys.platform == "win32" or bool(shutil.which("pwsh")) or bool(shutil.which("powershell"))
 
 from maop.delegate.drivers import (
     _run_cli,
@@ -60,7 +65,9 @@ class TestRunCmd:
 
 
 class TestRunPowershell:
+
     @pytest.mark.asyncio
+    @pytest.mark.skipif(not _HAS_POWERSHELL, reason="PowerShell not available on this platform")
     async def test_powershell_success(self):
         config = _config(cli="Write-Output", driver="powershell", command="Write-Output")
         result = await _run_powershell(config, "hello", 10, ".", "t3")
@@ -68,6 +75,7 @@ class TestRunPowershell:
         assert result.driver == "powershell"
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(not _HAS_POWERSHELL, reason="PowerShell not available on this platform")
     async def test_powershell_unsafe_cli_args(self):
         config = _config(
             cli="Write-Output", driver="powershell",

@@ -9,6 +9,12 @@ from pathlib import Path
 
 import pytest
 
+try:
+    import cryptography  # noqa: F401
+    _has_cryptography = True
+except ImportError:
+    _has_cryptography = False
+
 from maop.enterprise import tls_auto
 
 
@@ -56,6 +62,7 @@ def _generate_self_signed_cert(cert_path: Path, key_path: Path) -> None:
     )
 
 
+@pytest.mark.skipif(not _has_cryptography, reason="cryptography package not installed")
 def test_auto_configure_with_provided_certs(tmp_path, monkeypatch):
     """auto_configure_tls() uses provided cert/key files from env vars."""
     cert_path = tmp_path / "server.crt"
