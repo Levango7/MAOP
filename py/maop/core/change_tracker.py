@@ -165,6 +165,7 @@ class ChangeTracker:
             content = path.read_bytes()
             return hashlib.sha256(content).hexdigest()[:16]
         except Exception:
+            logger.debug("Silent exception in core/change_tracker.py:167", exc_info=True)
             return ""
 
     def snapshot(self, workdir: str, label: str = "") -> str:

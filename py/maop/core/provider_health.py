@@ -46,6 +46,7 @@ def _safe_enum_value(val: Any) -> str:
             return ""
         return s
     except Exception:
+        logger.debug("Silent exception in core/provider_health.py:48", exc_info=True)
         return ""
 
 

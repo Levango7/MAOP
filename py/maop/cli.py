@@ -23,8 +23,8 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
     except ImportError:
         sys.exit(1)
 
-    # Multi-worker support (MAOP_WORKERS env var)
-    workers = int(os.environ.get("MAOP_WORKERS", "1"))
+    # Multi-worker support (MAOP_DASH_WORKERS / MAOP_WORKERS env var)
+    workers = int(os.environ.get("MAOP_DASH_WORKERS", os.environ.get("MAOP_WORKERS", "1")))
     uvicorn_kwargs: dict[str, Any] = {"log_level": "info"}
 
     if workers > 1:

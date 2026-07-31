@@ -1277,6 +1277,7 @@ class MCPHub:
                 MAOP_MCP_CALL_DENIED_TOTAL,
             )
         except Exception:
+            logger.debug("Silent exception in core/mcp_hub.py:1279", exc_info=True)
             return
         MAOP_MCP_CALL_AUDITED_TOTAL.inc()
         if allowed:
@@ -1291,6 +1292,7 @@ class MCPHub:
         try:
             from maop.core.monitoring import MAOP_MCP_CALLS_TOTAL
         except Exception:
+            logger.debug("Silent exception in core/mcp_hub.py:1293", exc_info=True)
             return
         MAOP_MCP_CALLS_TOTAL.inc(labels={"server": server_name, "tool": tool_name})
 
@@ -1299,6 +1301,7 @@ class MCPHub:
         try:
             from maop.core.monitoring import MAOP_MCP_CALL_ERRORS_TOTAL
         except Exception:
+            logger.debug("Silent exception in core/mcp_hub.py:1301", exc_info=True)
             return
         MAOP_MCP_CALL_ERRORS_TOTAL.inc(labels={"server": server_name, "tool": tool_name})
 
@@ -1308,6 +1311,7 @@ class MCPHub:
         try:
             from maop.core.monitoring import MAOP_MCP_CALL_DURATION_SECONDS
         except Exception:
+            logger.debug("Silent exception in core/mcp_hub.py:1310", exc_info=True)
             return
         elapsed = _time.monotonic() - started_monotonic
         if elapsed < 0:
@@ -1319,6 +1323,7 @@ class MCPHub:
         try:
             from maop.core.monitoring import MAOP_MCP_HEALTH_CHECK_TOTAL
         except Exception:
+            logger.debug("Silent exception in core/mcp_hub.py:1321", exc_info=True)
             return
         MAOP_MCP_HEALTH_CHECK_TOTAL.inc(
             labels={"server": server_name, "result": "healthy" if healthy else "unhealthy"},
@@ -1329,6 +1334,7 @@ class MCPHub:
         try:
             from maop.core.monitoring import MAOP_MCP_SERVERS_CONNECTED
         except Exception:
+            logger.debug("Silent exception in core/mcp_hub.py:1331", exc_info=True)
             return
         MAOP_MCP_SERVERS_CONNECTED.inc()
 
@@ -1337,6 +1343,7 @@ class MCPHub:
         try:
             from maop.core.monitoring import MAOP_MCP_SERVERS_CONNECTED
         except Exception:
+            logger.debug("Silent exception in core/mcp_hub.py:1339", exc_info=True)
             return
         MAOP_MCP_SERVERS_CONNECTED.dec()
 
@@ -1347,6 +1354,7 @@ class MCPHub:
         try:
             from maop.core.monitoring import MAOP_MCP_CACHE_HIT_TOTAL
         except Exception:
+            logger.debug("Silent exception in core/mcp_hub.py:1349", exc_info=True)
             return
         MAOP_MCP_CACHE_HIT_TOTAL.inc(labels={"server": server_name})
 
@@ -1355,6 +1363,7 @@ class MCPHub:
         try:
             from maop.core.monitoring import MAOP_MCP_CACHE_MISS_TOTAL
         except Exception:
+            logger.debug("Silent exception in core/mcp_hub.py:1357", exc_info=True)
             return
         MAOP_MCP_CACHE_MISS_TOTAL.inc(labels={"server": server_name})
 
@@ -1363,6 +1372,7 @@ class MCPHub:
         try:
             from maop.core.monitoring import MAOP_MCP_RATE_LIMITED_TOTAL
         except Exception:
+            logger.debug("Silent exception in core/mcp_hub.py:1365", exc_info=True)
             return
         MAOP_MCP_RATE_LIMITED_TOTAL.inc(labels={"server": server_name})
 
@@ -1592,6 +1602,7 @@ class MCPHub:
         try:
             return MCPServerConfig.model_validate_json(row["config"])
         except Exception:
+            logger.debug("Silent exception in core/mcp_hub.py:1594", exc_info=True)
             return None
 
     def find_server_id_by_name(self, name: str) -> str | None:

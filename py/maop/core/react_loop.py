@@ -170,6 +170,7 @@ class ReactLoop:
                 from maop.core.change_tracker import ChangeTracker
                 self._change_tracker = ChangeTracker(root_dir=self._root_dir)
             except Exception:
+                logger.debug("Silent exception in core/react_loop.py:172", exc_info=True)
                 pass
         return self._change_tracker
 

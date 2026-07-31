@@ -168,6 +168,7 @@ def detect_edition() -> Edition:
         if _is_enterprise_package_installed():
             return _detect_with_license_check(Edition.ENTERPRISE)
     except Exception:
+        logger.debug("Silent exception in config/edition.py:170", exc_info=True)
         pass
 
     return Edition.PERSONAL

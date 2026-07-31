@@ -138,6 +138,7 @@ class RedisQueueBackend(QueueBackend):
             self._client.xclaim(stream, "maop_group", self._consumer_name, min_idle_time=0, message_ids=[message_id])
             return True
         except Exception:
+            logger.debug("Silent exception in core/backends_redis.py:140", exc_info=True)
             return False
 
     def topic_stats(self, topic: str) -> dict[str, Any]:

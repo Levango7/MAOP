@@ -55,6 +55,7 @@ def _file_hash(path: Path) -> str | None:
     try:
         return hashlib.sha256(path.read_bytes()).hexdigest()
     except Exception:
+        logger.debug("Silent exception in config/hot_reload.py:57", exc_info=True)
         return None
 
 

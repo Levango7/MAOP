@@ -117,4 +117,5 @@ def get_applied_migrations(root_dir: str | Path, db_name: str = "maop.db") -> li
             ).fetchall()
             return [r[0] for r in rows]
     except Exception:
+        logger.debug("Silent exception in core/migrations.py:119", exc_info=True)
         return []
