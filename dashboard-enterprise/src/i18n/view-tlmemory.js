@@ -45,6 +45,10 @@ export const messages = {
     'view.tlmemory.submitting': 'Submitting…',
     'view.tlmemory.searchFailed': 'Search failed',
     'view.tlmemory.storeFailed': 'Memory store failed',
+    'view.tlmemory.episodicCount': 'Episodic',
+    'view.tlmemory.episodicByOutcome': 'Episodic by Outcome',
+    'view.tlmemory.noOutcomes': 'No outcomes',
+    'view.tlmemory.noOutcomeDesc': 'No episodic outcome data yet.',
   },
   zh: {
     'view.tlmemory.title': '三层记忆',
@@ -92,5 +96,9 @@ export const messages = {
     'view.tlmemory.submitting': '提交中…',
     'view.tlmemory.searchFailed': '搜索失败',
     'view.tlmemory.storeFailed': '记忆录入失败',
+    'view.tlmemory.episodicCount': '情景记忆',
+    'view.tlmemory.episodicByOutcome': '情景记忆按结果',
+    'view.tlmemory.noOutcomes': '暂无结果',
+    'view.tlmemory.noOutcomeDesc': '尚无情景记忆结果数据。',
   },
 };

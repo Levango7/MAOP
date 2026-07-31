@@ -33,7 +33,7 @@ class FakeMemoryStore:
     def stats(self) -> FakeStats:
         return FakeStats()
 
-    def search(self, query: str = "", top: int = 10) -> list[dict]:
+    def search(self, query: str = "", top: int = 10, agent: str = "", **kwargs) -> list[dict]:
         if not query:
             return []
         return [

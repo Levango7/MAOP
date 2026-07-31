@@ -41,6 +41,7 @@
       <StatCard :label="t('view.tlmemory.totalEntries')" :value="stats.total_entries" icon="database" tone="brand" :loading="loading" />
       <StatCard :label="t('view.tlmemory.totalTraces')" :value="stats.total_traces" icon="route" tone="info" :loading="loading" />
       <StatCard :label="t('view.tlmemory.trajectorySteps')" :value="stats.total_trajectory_steps" icon="activity" tone="warn" :loading="loading" />
+      <StatCard :label="t('view.tlmemory.episodicCount')" :value="stats.episodic_count" icon="layers" tone="success" :loading="loading" />
     </div>
 
     <div v-if="memError" class="mem-error-banner">
@@ -65,6 +66,14 @@
         </div>
         <EmptyState v-else icon="bot" :title="t('view.tlmemory.noAgents')" :description="t('view.tlmemory.noAgentDesc')" />
       </Card>
+      <Card :title="t('view.tlmemory.episodicByOutcome')" icon="activity" :marginBottom="16">
+        <div v-if="outcomeEntries.length" class="chip-list">
+          <span v-for="o in outcomeEntries" :key="o.key" class="chip chip--static">
+            {{ o.key }} <span class="chip-count">{{ o.value }}</span>
+          </span>
+        </div>
+        <EmptyState v-else icon="activity" :title="t('view.tlmemory.noOutcomes')" :description="t('view.tlmemory.noOutcomeDesc')" />
+      </Card>
     </div>
 
     <Card :title="t('view.tlmemory.memoryEntries')" icon="search" :marginBottom="16">
@@ -81,6 +90,8 @@
           <div class="entry-header">
             <Badge tone="brand">{{ e.agent || 'system' }}</Badge>
             <Badge tone="info">{{ e.topic || '—' }}</Badge>
+            <Badge v-if="e.layer" tone="warn">{{ e.layer }}</Badge>
+            <Badge v-if="e.outcome" tone="success">{{ e.outcome }}</Badge>
             <span class="entry-score">{{ t('view.tlmemory.score') }} {{ formatScore(e.score) }}</span>
             <span class="entry-time">{{ formatTime(e.timestamp) }}</span>
           </div>
@@ -165,7 +176,7 @@ const loading = ref(false);
 const query = ref('');
 const entries = ref([]);
 const memError = ref('');
-const stats = reactive({ total_entries: 0, total_traces: 0, total_trajectory_steps: 0, by_agent: {}, by_topic: {} });
+const stats = reactive({ total_entries: 0, total_traces: 0, total_trajectory_steps: 0, by_agent: {}, by_topic: {}, episodic_count: 0, episodic_by_agent: {}, episodic_by_outcome: {} });
 
 // ── Add Memory ──
 const showAdd = ref(false);
@@ -196,6 +207,7 @@ async function submitMemory() {
 
 const topicEntries = computed(() => Object.entries(stats.by_topic || {}).map(([k, v]) => ({ key: k, value: v })));
 const agentEntries = computed(() => Object.entries(stats.by_agent || {}).map(([k, v]) => ({ key: k, value: v })));
+const outcomeEntries = computed(() => Object.entries(stats.episodic_by_outcome || {}).map(([k, v]) => ({ key: k, value: v })));
 
 function formatScore(s) {
   if (s === null) return '—';
@@ -222,12 +234,16 @@ async function loadStats() {
     stats.total_trajectory_steps = s.total_trajectory_steps || 0;
     stats.by_agent = s.by_agent || {};
     stats.by_topic = s.by_topic || {};
+    stats.episodic_count = s.episodic_count || 0;
+    stats.episodic_by_agent = s.episodic_by_agent || {};
+    stats.episodic_by_outcome = s.episodic_by_outcome || {};
     memError.value = '';
   } catch (e) {
     console.error('[memory] loadStats failed:', e);
     memError.value = (e && e.message) ? e.message : String(e);
     stats.total_entries = 0; stats.total_traces = 0; stats.total_trajectory_steps = 0;
     stats.by_agent = {}; stats.by_topic = {};
+    stats.episodic_count = 0; stats.episodic_by_agent = {}; stats.episodic_by_outcome = {};
   }
 }
 
@@ -247,6 +263,8 @@ async function runSearch() {
       tags: splitTags(r.tags),
       score: r.score,
       timestamp: r.timestamp,
+      layer: r.layer || r.type || '',
+      outcome: r.outcome || '',
     }));
   } catch (e) {
     console.error('[memory] runSearch failed:', e);

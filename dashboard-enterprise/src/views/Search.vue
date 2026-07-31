@@ -210,7 +210,7 @@ async function doSearch() {
       case 'memory': {
         const d = await api.get(`/api/memory/search?q=${enc(query.value)}&topk=${memoryTopK.value}`);
         let res = d.results || [];
-        if (memoryType.value !== 'all') res = res.filter(r => r.type === memoryType.value);
+        if (memoryType.value !== 'all') res = res.filter(r => (r.layer || r.type) === memoryType.value);
         results.value = res; break;
       }
       case 'vector': {
