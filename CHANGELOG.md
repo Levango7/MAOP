@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.4.5] — 2026-07-31
+
+### Fixed
+
+- **后端 P0-P3 修复（24 项）**
+  - 恢复 `data/migrations/` SQL 文件；Docker 环境变量名统一（`MAOP_*_BACKEND`）
+  - 依赖 CVE 升级（cryptography<49, python-dotenv>=1.2.2, fastapi>=0.115）
+  - 移除私钥 `enterprise/keys/private_key.pem`；audit 路由冲突修复
+  - 10 个文件 36 处硬编码 .db 路径统一到 `get_db_path()`
+  - Ruff 6 个 unused import + Mypy 15 个类型错误修复
+  - 生产 compose 补充 `cap_drop: ALL` + `no-new-privileges`
+  - CI 覆盖率阈值 60→80；`GRAFANA_PASSWORD` 弱默认值修复
+
+- **前后端交互修复（6 项）**
+  - Audit summary 嵌套结构对齐（`d.summary.total` / `d.summary.total_events`）
+  - Audit events 字段映射（time/timestamp, level/severity, target/resource）
+  - Settings config 补充 6 个缺失字段（dash_workers/root_dir/data_dir/db_path/memory_db_path/rate_limit_burst）
+  - Tenants list 补充 usage 数据；Chat mapMsg 从 metadata 提取 image/model/tokens
+  - SSE done 事件补充 tokens 和 model 字段
+
+- **前端深度修复（72 项）**
+  - P0: useToast 解构错误修复（6 个视图 toast 功能恢复）
+  - P0: Models.vue reactive→ref 误用修复（下拉框恢复可用）
+  - P0: i18n `t()` 支持插值参数 `{var}` 替换
+  - P0: Card overflow 裁剪、z-index 断裂、未定义 token（--sp-10/--r/--info/--z-*）
+  - P0: section/feature-grid/edition-* CSS 类冲突修复
+  - P1: PageHeader 顶层 await import 改同步 import
+  - P1: Chat button 嵌套修复（HTML 规范合规）
+  - P1: 浅色主题 15+ 处硬编码颜色替换为语义 token
+  - P1: CSP 添加到 index.html；对比度修复（--text-faint/--text3 加深）
+  - P1: img alt 补充；图片上传 5MB 大小限制
+  - P2: computed sort 缓存修改修复；WebSocket 重连计数重置
+  - P2: Cost.vue NaN 防御；Monitor.vue diagnostics 空值防御
+  - P2: useToast timer 清理；Chat AbortController + onUnmounted
+  - P3: 10 处 `== null` → `=== null`；console.log 清理
+
+### Added
+
+- 5 个新测试文件（i18n/useToast/Audit/Chat/Models），32 个用例
+- 覆盖率 ≥ 80%
+
 ## [4.4.0] — 2026-07-31
 
 ### Added
