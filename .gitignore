@@ -103,8 +103,22 @@ scripts/rename_pev_to_maop.py
 security-audit.md
 # Ad-hoc inspection/debug scripts (root-level, underscore-prefixed)
 /_*.py
+py/_*.py
 config/agents.yaml.bak
 config/agents.yaml.bak2
+
+# -- Audit artifacts / temp scripts (not source) --
+dashboard-enterprise/api_audit.json
+dashboard-enterprise/orphan_audit.json
+dashboard-enterprise/audit_api.py
+dashboard-enterprise/audit_orphans.py
+dashboard-enterprise/coverage/
+dashboard-enterprise/frontend_dev.log
+
+# -- Credentials / runtime secrets --
+data/.admin_initial_password
+data/.write_test
+data/backend_run.log
 
 # Alembic cache
 py/maop/migrations/alembic/__pycache__/
