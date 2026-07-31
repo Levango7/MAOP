@@ -19,6 +19,7 @@ from typing import Any
 from fastapi import APIRouter, Query, Request
 
 from maop.core.middleware import require_admin
+from maop.core.db_utils import get_db_path
 
 from .state import MAOP_ROOT, get_bridge
 
@@ -79,7 +80,7 @@ async def api_metrics(request: Request) -> dict[str, Any]:
         result["load_balancer"] = {"status": "error", "error": "Load balancer stats unavailable"}
     try:
         from maop.core.timeseries import TimeSeriesStore
-        ts = TimeSeriesStore(db_path=MAOP_ROOT / "data" / "timeseries.db")
+        ts = TimeSeriesStore(db_path=get_db_path("timeseries"))
         recent = ts.read_recent(hours=24)
         result["timeseries"] = recent if isinstance(recent, list) else []
     except Exception as exc:
@@ -87,7 +88,7 @@ async def api_metrics(request: Request) -> dict[str, Any]:
         result["timeseries"] = {"status": "error", "error": "Timeseries data unavailable"}
     try:
         from maop.core.circuit_breaker import CircuitBreaker
-        cb = CircuitBreaker(MAOP_ROOT / "data" / "maop.db")
+        cb = CircuitBreaker(get_db_path())
         result["circuit_breaker"] = {
             name: {"state": entry.state.value, "failures": entry.failures}
             for name, entry in cb.all_states().items()
@@ -229,7 +230,7 @@ async def api_vector_stats() -> Any:
 async def api_vector_list() -> dict[str, Any]:
     try:
         from maop.core.vector import VectorStore
-        vs = VectorStore(db_path=str(MAOP_ROOT / "data" / "vectors.db"))
+        vs = VectorStore(db_path=str(get_db_path("vectors")))
         items = vs.list_all() if hasattr(vs, "list_all") else []
         return {"vectors": items, "count": len(items)}
     except Exception as exc:
@@ -241,7 +242,7 @@ async def api_vector_list() -> dict[str, Any]:
 async def api_vector_search(q: str = Query(...), k: int = Query(5, alias="topk")) -> dict[str, Any]:
     try:
         from maop.core.vector import VectorStore
-        vs = VectorStore(db_path=str(MAOP_ROOT / "data" / "vectors.db"))
+        vs = VectorStore(db_path=str(get_db_path("vectors")))
         raw_results = vs.search(query=q, top=k)
         results = [r.model_dump() if hasattr(r, 'model_dump') else (r if isinstance(r, dict) else {"content": str(r)}) for r in raw_results]
         return {"query": q, "results": results, "count": len(results)}
@@ -262,7 +263,7 @@ async def api_wiki_stats() -> dict[str, Any]:
     base = await get_bridge().memory_stats()
     try:
         from maop.core.vector import VectorStore
-        vs = VectorStore(db_path=str(MAOP_ROOT / "data" / "vectors.db"))
+        vs = VectorStore(db_path=str(get_db_path("vectors")))
         base["vector_count"] = vs.count() if hasattr(vs, "count") else 0
     except Exception as exc:
         logger.warning("Failed to get vector count: %s", exc)
@@ -427,9 +428,11 @@ async def api_logs(type: str = "", limit: int = Query(500, ge=1, le=5000)) -> An
     """
     log_name = type if type and type != "all" else "dashboard"
     if log_name == "delegations":
-        return await get_bridge().logs_get(name="delegations", limit=limit)
-    elif log_name == "checker":
-        return await get_bridge().logs_get(name="checker", limit=limit)
+        entries = await get_bridge().logs_get(name="delegations", limit=limit)
+        return {"logs": entries, "count": len(entries), "source": "logs/delegations.json", "type": "delegations"}
+    if log_name == "checker":
+        entries = await get_bridge().logs_get(name="checker", limit=limit)
+        return {"logs": entries, "count": len(entries), "source": "logs/checker_*.log", "type": "checker"}
     result = await get_bridge().logs_get(name=log_name, limit=limit)
     log_dir = MAOP_ROOT / "logs"
     if log_dir.exists():
@@ -462,7 +465,7 @@ async def api_logs(type: str = "", limit: int = Query(500, ge=1, le=5000)) -> An
                     return {"logs": entries, "count": len(entries), "source": str(f), "type": log_name}
             except Exception as exc:
                 logger.warning('Failed to read log file: %s', exc)
-    return result
+    return {"logs": result, "count": len(result), "source": f"error_log:{log_name}", "type": log_name}
 
 
 @router.get("/api/logs/delegations")
@@ -478,7 +481,7 @@ async def api_logs_checker(limit: int = Query(500, ge=1, le=5000)) -> Any:
 @router.get("/api/logs/analysis")
 async def api_logs_analysis() -> dict[str, Any]:
     try:
-        logs = await get_bridge().logs_get(name="delegations")
+        logs = await get_bridge().logs_get(name="delegations", limit=10000)
         if not isinstance(logs, list):
             logs = []
         total = len(logs)
@@ -490,13 +493,20 @@ async def api_logs_analysis() -> dict[str, Any]:
                 continue
             ag = e.get("agent", "unknown")
             by_agent[ag] = by_agent.get(ag, 0) + 1
-            st = e.get("status", "other")
+            res = e.get("result") if isinstance(e.get("result"), dict) else {}
+            ec = res.get("exit_code") if res else None
+            if ec == 0:
+                st = "success"
+            elif ec is not None:
+                st = "failure"
+            else:
+                st = e.get("status", "other")
             if st in by_status:
                 by_status[st] += 1
             else:
                 by_status["other"] += 1
             if st == "failure":
-                ek = str(e.get("error", "unknown"))[:80]
+                ek = str((res or {}).get("error") or e.get("error") or "unknown")[:80]
                 error_patterns[ek] = error_patterns.get(ek, 0) + 1
         return {"total": total, "by_agent": by_agent, "by_status": by_status,
                 "error_patterns": sorted(error_patterns.items(), key=lambda x: -x[1])[:10]}

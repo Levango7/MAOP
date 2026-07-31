@@ -48,13 +48,28 @@ class TestBYOKGateway:
 
     @pytest.mark.asyncio
     async def test_resolve_tenant_key(self):
+        # High-round fix: tenant sources are fail-closed — allowed_tenants
+        # must be configured explicitly (or ["*"] wildcard).
         gw = BYOKGateway()
-        gw.register_source(KeySource(provider="openai", source_type="tenant", key_ref=""))
+        gw.register_source(KeySource(
+            provider="openai", source_type="tenant", key_ref="",
+            metadata={"allowed_tenants": ["acme"]},
+        ))
         with pytest.MonkeyPatch.context() as mp:
             mp.setenv("MAOP_KEY_ACME_OPENAI", "sk-tenant-key")
             result = await gw.resolve("openai", tenant_id="acme")
             assert result is not None
             assert result.source == "tenant"
+
+    @pytest.mark.asyncio
+    async def test_resolve_tenant_key_fail_closed_without_allowlist(self):
+        # High-round fix: no allowed_tenants configured -> deny (fail-closed)
+        gw = BYOKGateway()
+        gw.register_source(KeySource(provider="openai", source_type="tenant", key_ref=""))
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setenv("MAOP_KEY_ACME_OPENAI", "sk-tenant-key")
+            result = await gw.resolve("openai", tenant_id="acme")
+            assert result is None
 
     @pytest.mark.asyncio
     async def test_resolve_direct_key(self):

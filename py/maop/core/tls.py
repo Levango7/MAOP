@@ -42,10 +42,21 @@ def create_ssl_context(settings: TLSSettings) -> ssl.SSLContext | None:
         "TLSv1_2": ssl.TLSVersion.TLSv1_2,
         "TLSv1_3": ssl.TLSVersion.TLSv1_3,
     }
-    # Deprecated versions — only available with explicit opt-in and a warning
+    # High 安全修复 (2.6): 废弃协议版本默认拒绝（BEAST/POODLE 风险），
+    # 仅在显式设置 MAOP_TLS_ALLOW_DEPRECATED=1 时允许（并保留告警）。
+    # 旧行为只 warning 就继续执行，等于没有防线。
     if settings.min_version in ("TLSv1", "TLSv1_1"):
+        import os as _os
+        if _os.environ.get("MAOP_TLS_ALLOW_DEPRECATED", "0") != "1":
+            raise ValueError(
+                f"SECURITY: TLS min_version={settings.min_version} is "
+                f"deprecated and insecure (BEAST/POODLE). Use TLSv1_2 or "
+                f"TLSv1_3, or set MAOP_TLS_ALLOW_DEPRECATED=1 to explicitly "
+                f"accept the risk."
+            )
         logger.warning(
-            "[tls] %s is deprecated and insecure. Use TLSv1_2 or TLSv1_3 instead.",
+            "[tls] %s is deprecated and insecure (allowed via "
+            "MAOP_TLS_ALLOW_DEPRECATED=1). Use TLSv1_2 or TLSv1_3 instead.",
             settings.min_version,
         )
         _deprecated_map = {
@@ -85,7 +96,14 @@ def create_ssl_context(settings: TLSSettings) -> ssl.SSLContext | None:
             ctx.load_verify_locations(str(settings.ca_file))
             ctx.verify_mode = ssl.CERT_REQUIRED
         else:
-            ctx.verify_mode = ssl.CERT_OPTIONAL
+            # High 安全修复 (2.6): verify_client=True 但无 CA 文件时，
+            # 旧行为静默降级为 CERT_OPTIONAL（客户端可不带证书通过）。
+            # 改为 fail-fast——要求 mTLS 却无法验证客户端就是配置错误。
+            raise ValueError(
+                "SECURITY: verify_client=True requires a valid ca_file to "
+                f"verify client certificates (got: {settings.ca_file!r}). "
+                "Provide ca_file or set verify_client=False."
+            )
     else:
         ctx.verify_mode = ssl.CERT_NONE
 

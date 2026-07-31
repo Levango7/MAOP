@@ -1,0 +1,139 @@
+/* =========================================================================
+ * MAOP Enterprise Dashboard — Layout unification
+ * Single source of truth for page-header alignment so every view presents a
+ * consistent title + actions row regardless of which header class it uses
+ * (.topbar / .view-title / .page-head). Scoped per-view rules may fine-tune,
+ * but the baseline below guarantees visual parity across the console.
+ * ========================================================================= */
+
+/* ── Page header baseline ─────────────────────────────────────────────── */
+.topbar,
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-6);
+  flex-wrap: wrap;
+}
+.topbar h1,
+.page-head__title h1,
+.view-title {
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.view-title { display: block; margin-bottom: var(--sp-6); }
+
+/* Title cluster (icon + text) */
+.topbar__title,
+.page-head__title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.topbar__meta { display: flex; align-items: center; gap: var(--sp-3); }
+
+/* Action cluster (buttons / segmented / status) */
+.topbar-tools,
+.topbar__actions,
+.page-head__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* Subtitle under a page title */
+.page-head__sub {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* ── CJK typography when language is set to Chinese ───────────────────── */
+[data-lang="zh"] body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', var(--font-sans);
+  letter-spacing: 0;
+}
+
+/* ── Reusable layout utilities ──────────────────────────────────────────
+ * Every view should pull spacing/rhythm from these so the console reads as
+ * one coherent product instead of 17 independently-tuned pages. Views may
+ * keep their own scoped class names, but should match these values:
+ *   - section rhythm  → var(--sp-6) (24px / 20px compact)
+ *   - inner gaps      → var(--sp-4) (16px / 12px compact)
+ *   - tight inline    → var(--sp-3) (12px)
+ *   - radius          → var(--r-lg) for cards, var(--r-md) for controls
+ * Grids use align-items: stretch so sibling cards stay the same height.
+ * ─────────────────────────────────────────────────────────────────────── */
+.section { margin-bottom: var(--sp-6); }
+
+.grid-cards {
+  display: grid;
+  gap: var(--sp-6);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-items: stretch;
+}
+.grid-2 { display: grid; gap: var(--sp-6); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+.grid-3 { display: grid; gap: var(--sp-6); grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+.grid-4 { display: grid; gap: var(--sp-6); grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; }
+
+/* Vertical stack with consistent inner gap */
+.stack { display: flex; flex-direction: column; gap: var(--sp-4); }
+.row-tight { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+
+/* Labeled form row: fixed-width label keeps controls aligned across rows */
+.field-row { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.field-row > .field-label { min-width: 150px; color: var(--text-muted); font-size: var(--fs-sm); flex-shrink: 0; }
+.field-row > .field-control { flex: 1; min-width: 0; }
+
+/* Responsive: collapse multi-column grids to a single column on phones */
+@media (max-width: 700px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .field-row { flex-direction: column; align-items: stretch; }
+  .field-row > .field-label { min-width: 0; }
+}
+
+/* ── Responsive step ladder (tablet → phone, density-independent) ─────────
+ * Grids step down gracefully so the same view reads well at any width — from
+ * a wide desktop down to a phone in portrait or landscape. */
+@media (max-width: 1200px) {
+  .grid-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Phones (portrait & landscape): single column, full-width cards */
+@media (max-width: 700px) {
+  .grid-cards { grid-template-columns: 1fr; }
+  .content-shell { padding: 16px; }
+}
+
+/* ── Short / landscape viewports: compress vertical rhythm ────────────────
+ * On landscape phones height is tight; shrink header + footer + shell padding
+ * so the whole console fits without awkward scrolling. */
+@media (max-height: 540px) and (orientation: landscape) {
+  .content-shell { padding-top: var(--sp-4); padding-bottom: var(--sp-4); }
+  .topbar, .page-head, .view-title { margin-bottom: var(--sp-4); }
+  .app-footer { padding-top: var(--sp-4); padding-bottom: var(--sp-4); }
+}
+
+/* ── Content width ladder: scale the max content width with the viewport ──
+ * The content-shell (not individual views) owns this max-width, so every
+ * page benefits. On large desktop / 2K / 4K monitors the console now uses
+ * the available width instead of sitting in a narrow centered column.
+ *   - ≤1599px (laptop/FHD)          → 1440px (token default)
+ *   - ≥1600px                       → 1760px
+ *   - ≥1920px (FHD full / 2K@150%)  → 2080px
+ *   - ≥2560px (2K 2560×1440)        → 2400px (content fills the area)
+ *   - ≥3200px (ultrawide 2K)        → 3000px */
+@media (min-width: 1600px) { :root { --maxw: 1760px; } }
+@media (min-width: 1920px) { :root { --maxw: 2080px; } }
+@media (min-width: 2560px) { :root { --maxw: 2400px; } }
+@media (min-width: 3200px) { :root { --maxw: 3000px; } }

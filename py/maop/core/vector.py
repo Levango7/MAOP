@@ -1,4 +1,4 @@
-﻿"""MAOP Vector Search — Pure Python vector similarity search.
+"""MAOP Vector Search — Pure Python vector similarity search.
 
 Provides semantic search capability using cosine similarity without
 external dependencies (no FAISS, no Annoy, no pinecone).
@@ -195,6 +195,7 @@ class VectorStore:
         self._path = Path(db_path)
         self._embedding = embedding or HashEmbedding()
         self._cache: dict[str, list[float]] = {}  # id → vector cache
+        self._cache_max_size = 50000  # P2 fix: prevent unbounded memory growth
         self._text_cache: dict[str, str] = {}  # id → text cache
         self._meta_cache: dict[str, dict[str, Any]] = {}  # id → metadata cache
         self._init_db()
@@ -445,6 +446,9 @@ class VectorStore:
 
     def _load_cache(self) -> None:
         """Load all vectors, text, and metadata from SQLite into memory cache.
+
+        P2 fix: Added cache size limit to prevent unbounded memory growth.
+        For datasets > 50K vectors, consider using sqlite-vec or faiss for ANN indexing.
 
         Batch-loads all columns in a single query to avoid N+1 per-entry lookups
         during search_vector(). Also populates _text_cache and _meta_cache.

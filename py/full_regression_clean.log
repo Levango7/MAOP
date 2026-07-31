@@ -1,0 +1,15 @@
+
+maop\core\regression.py:34
+  F:\Nexus\MAOP\py\maop\core\regression.py:34: PytestCollectionWarning: cannot collect test class 'TestCase' because it has a __init__ constructor (from: tests/test_regression.py)
+    class TestCase(BaseModel):
+
+maop\core\regression.py:45
+  F:\Nexus\MAOP\py\maop\core\regression.py:45: PytestCollectionWarning: cannot collect test class 'TestResult' because it has a __init__ constructor (from: tests/test_regression.py)
+    class TestResult(BaseModel):
+
+tests/e2e/test_routing_rbac_tenant.py::TestAuthCookie::test_cookie_based_auth_works
+  C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\site-packages\httpx\_client.py:1768: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return await self.request(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+4212 passed, 5 skipped, 14 deselected, 4 warnings in 235.28s (0:03:55)

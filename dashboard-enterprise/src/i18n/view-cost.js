@@ -1,0 +1,83 @@
+export const messages = {
+  en: {
+    'view.cost.title': 'Cost Tracking',
+    'view.cost.subtitle': 'Token spend, budget headroom and recent cost entries.',
+
+    'view.cost.stat.totalCost': 'Total Cost',
+    'view.cost.stat.totalTokens': 'Total Tokens',
+    'view.cost.stat.totalCalls': 'Total Calls',
+    'view.cost.stat.avgLatency': 'Avg Latency',
+
+    'view.cost.budgetStatus': 'Budget Status',
+    'view.cost.overBudget': 'Over budget',
+    'view.cost.withinBudget': 'Within budget',
+    'view.cost.daily': 'Daily',
+    'view.cost.monthly': 'Monthly',
+    'view.cost.noLimit': 'no limit',
+
+    'view.cost.costByModel': 'Cost by Model',
+    'view.cost.noModelSpend': 'No model spend',
+    'view.cost.noModelSpendDesc': 'Cost entries will appear here once agents run.',
+
+    'view.cost.costByAgent': 'Cost by Agent',
+    'view.cost.noAgentSpend': 'No agent spend',
+    'view.cost.noAgentSpendDesc': 'Per-agent cost attribution will appear here.',
+    'view.cost.unknown': 'unknown',
+    'view.cost.tokens': 'tokens',
+    'view.cost.calls': 'calls',
+
+    'view.cost.recentEntries': 'Recent Entries',
+    'view.cost.shown': 'shown',
+    'view.cost.noEntries': 'No cost entries in this period',
+
+    'view.cost.period7d': '7 days',
+    'view.cost.period30d': '30 days',
+    'view.cost.period90d': '90 days',
+
+    'view.cost.col.time': 'Time',
+    'view.cost.col.agent': 'Agent',
+    'view.cost.col.tokens': 'Tokens',
+    'view.cost.col.cost': 'Cost',
+  },
+
+  zh: {
+    'view.cost.title': '成本追踪',
+    'view.cost.subtitle': '令牌消耗、预算余量与近期成本明细。',
+
+    'view.cost.stat.totalCost': '总成本',
+    'view.cost.stat.totalTokens': '总令牌数',
+    'view.cost.stat.totalCalls': '总调用次数',
+    'view.cost.stat.avgLatency': '平均延迟',
+
+    'view.cost.budgetStatus': '预算状态',
+    'view.cost.overBudget': '超出预算',
+    'view.cost.withinBudget': '预算内',
+    'view.cost.daily': '每日',
+    'view.cost.monthly': '每月',
+    'view.cost.noLimit': '无限制',
+
+    'view.cost.costByModel': '按模型成本',
+    'view.cost.noModelSpend': '暂无模型消耗',
+    'view.cost.noModelSpendDesc': '智能体运行后将在此显示成本明细。',
+
+    'view.cost.costByAgent': '按智能体成本',
+    'view.cost.noAgentSpend': '暂无智能体消耗',
+    'view.cost.noAgentSpendDesc': '将在此显示按智能体的成本归集。',
+    'view.cost.unknown': '未知',
+    'view.cost.tokens': '令牌',
+    'view.cost.calls': '次调用',
+
+    'view.cost.recentEntries': '近期明细',
+    'view.cost.shown': '条已显示',
+    'view.cost.noEntries': '当前周期内暂无成本明细',
+
+    'view.cost.period7d': '7 天',
+    'view.cost.period30d': '30 天',
+    'view.cost.period90d': '90 天',
+
+    'view.cost.col.time': '时间',
+    'view.cost.col.agent': '智能体',
+    'view.cost.col.tokens': '令牌',
+    'view.cost.col.cost': '成本',
+  },
+};

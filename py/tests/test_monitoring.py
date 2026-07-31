@@ -322,3 +322,69 @@ class TestMetricsCollector:
         h.observe(0.5)
         out = h.to_prometheus()
         assert 'le="1.0"' in out
+
+
+class TestMetricConcurrencySafety:
+    """OPS-27: concurrent inc()/observe() + export must not raise RuntimeError."""
+
+    def test_counter_concurrent_export(self):
+        import random
+
+        c = Counter("ops27_counter_total", "test")
+        errors: list[Exception] = []
+
+        def writer() -> None:
+            try:
+                for _ in range(2000):
+                    c.inc(labels={"k": str(random.randint(0, 20))})
+            except Exception as e:  # noqa: BLE001
+                errors.append(e)
+
+        def reader() -> None:
+            try:
+                for _ in range(2000):
+                    _ = c.to_prometheus()
+                    _ = c.get(labels={"k": "1"})
+            except Exception as e:  # noqa: BLE001
+                errors.append(e)
+
+        threads = [threading.Thread(target=writer) for _ in range(4)] + [
+            threading.Thread(target=reader) for _ in range(2)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert not errors, f"concurrent export raised: {errors[:3]}"
+
+    def test_collector_concurrent_export(self):
+        import random
+
+        mc = MetricsCollector()
+        errors: list[Exception] = []
+
+        def writer() -> None:
+            try:
+                for _ in range(1000):
+                    mc.counter("c").inc(labels={"k": str(random.randint(0, 10))})
+                    mc.gauge("g").set(random.random())
+                    mc.histogram("h").observe(random.random())
+            except Exception as e:  # noqa: BLE001
+                errors.append(e)
+
+        def reader() -> None:
+            try:
+                for _ in range(1000):
+                    _ = mc.to_prometheus()
+                    _ = mc.to_json()
+            except Exception as e:  # noqa: BLE001
+                errors.append(e)
+
+        threads = [threading.Thread(target=writer) for _ in range(4)] + [
+            threading.Thread(target=reader) for _ in range(2)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert not errors, f"concurrent collector export raised: {errors[:3]}"

@@ -1,174 +1,290 @@
 <template>
   <div class="memory-page">
-    <div class="topbar">
-      <h1>Three-Layer Memory</h1>
-      <div class="layer-tabs">
-        <button v-for="l in layers" :key="l.key" :class="['tab-btn', { active: activeLayer === l.key }]" @click="activeLayer = l.key">
-          <span class="tab-icon">{{ l.icon }}</span>{{ l.label }}
+    <PageHeader>
+      <button class="btn-refresh" @click="refreshAll" :disabled="loading">
+        <AppIcon name="refresh" :size="15" :class="{ spinning: loading }" /> {{ t('common.refresh') }}
+      </button>
+      <button class="btn-primary" @click="showAdd = true">
+        <AppIcon name="plus" :size="15" /> {{ t('view.tlmemory.addMemory') }}
+      </button>
+    </PageHeader>
+
+    <div class="layers">
+      <div class="layer-card layer-card--1">
+        <div class="layer-card__head">
+          <AppIcon name="zap" :size="18" />
+          <span class="layer-card__meta">{{ t('view.tlmemory.layer1Meta') }}</span>
+        </div>
+        <h3 class="layer-card__name">{{ t('view.tlmemory.layer1Name') }}</h3>
+        <p class="layer-card__desc">{{ t('view.tlmemory.layer1Desc') }}</p>
+      </div>
+      <div class="layer-card layer-card--2">
+        <div class="layer-card__head">
+          <AppIcon name="clock" :size="18" />
+          <span class="layer-card__meta">{{ t('view.tlmemory.layer2Meta') }}</span>
+        </div>
+        <h3 class="layer-card__name">{{ t('view.tlmemory.layer2Name') }}</h3>
+        <p class="layer-card__desc">{{ t('view.tlmemory.layer2Desc') }}</p>
+      </div>
+      <div class="layer-card layer-card--3">
+        <div class="layer-card__head">
+          <AppIcon name="archive" :size="18" />
+          <span class="layer-card__meta">{{ t('view.tlmemory.layer3Meta') }}</span>
+        </div>
+        <h3 class="layer-card__name">{{ t('view.tlmemory.layer3Name') }}</h3>
+        <p class="layer-card__desc">{{ t('view.tlmemory.layer3Desc') }}</p>
+      </div>
+    </div>
+    <p class="layers-note">{{ t('view.tlmemory.layersNote') }}</p>
+
+    <div class="stats-row">
+      <StatCard :label="t('view.tlmemory.totalEntries')" :value="stats.total_entries" icon="database" tone="brand" :loading="loading" />
+      <StatCard :label="t('view.tlmemory.totalTraces')" :value="stats.total_traces" icon="route" tone="info" :loading="loading" />
+      <StatCard :label="t('view.tlmemory.trajectorySteps')" :value="stats.total_trajectory_steps" icon="activity" tone="warn" :loading="loading" />
+    </div>
+
+    <div v-if="memError" class="mem-error-banner">
+      <AppIcon name="alert-triangle" :size="14" /> {{ memError }}
+    </div>
+
+    <div class="breakdown">
+      <Card :title="t('view.tlmemory.byTopic')" icon="scroll" :marginBottom="16">
+        <div v-if="topicEntries.length" class="chip-list">
+          <button v-for="t in topicEntries" :key="t.key" class="chip" :class="{ active: query === t.key }"
+                  @click="searchTopic(t.key)">
+            {{ t.key }} <span class="chip-count">{{ t.value }}</span>
+          </button>
+        </div>
+        <EmptyState v-else icon="scroll" :title="t('view.tlmemory.noTopics')" :description="t('view.tlmemory.noTopicDesc')" />
+      </Card>
+      <Card :title="t('view.tlmemory.byAgent')" icon="bot" :marginBottom="16">
+        <div v-if="agentEntries.length" class="chip-list">
+          <span v-for="a in agentEntries" :key="a.key" class="chip chip--static">
+            {{ a.key }} <span class="chip-count">{{ a.value }}</span>
+          </span>
+        </div>
+        <EmptyState v-else icon="bot" :title="t('view.tlmemory.noAgents')" :description="t('view.tlmemory.noAgentDesc')" />
+      </Card>
+    </div>
+
+    <Card :title="t('view.tlmemory.memoryEntries')" icon="search" :marginBottom="16">
+      <div class="search-bar">
+        <span class="search-icon"><AppIcon name="search" :size="16" /></span>
+        <input v-model="query" :placeholder="t('view.tlmemory.searchPlaceholder')" @keyup.enter="runSearch" />
+        <button class="search-btn" @click="runSearch" :disabled="loading">
+          <AppIcon name="search" :size="15" /> {{ t('common.search') }}
         </button>
       </div>
-      <button class="btn-action" @click="consolidate">🔄 Consolidate</button>
-    </div>
 
-    <div class="layer-overview">
-      <div v-for="l in layerStats" :key="l.key" class="layer-card" :class="{ active: activeLayer === l.key }" @click="activeLayer = l.key">
-        <div class="layer-icon" :style="{ background: l.bg }">{{ l.icon }}</div>
-        <div class="layer-info">
-          <span class="layer-name">{{ l.label }}</span>
-          <span class="layer-desc">{{ l.desc }}</span>
-        </div>
-        <div class="layer-stat">
-          <span class="stat-num">{{ l.count }}</span>
-          <span class="stat-unit">entries</span>
-        </div>
-        <div class="layer-bar"><div class="bar-fill" :style="{ width: l.pct + '%', background: l.color }"></div></div>
-      </div>
-    </div>
-
-    <div class="memory-content">
-      <div class="search-bar">
-        <input v-model="searchQuery" placeholder="Search memories..." @input="onSearch" />
-        <select v-model="sortBy">
-          <option value="recent">Most Recent</option>
-          <option value="relevance">Relevance</option>
-          <option value="importance">Importance</option>
-        </select>
-      </div>
-
-      <div class="entries-list">
-        <div v-for="e in filteredEntries" :key="e.id" class="entry-card">
+      <div v-if="entries.length" class="entries-list">
+        <div v-for="e in entries" :key="e.id" class="entry-card">
           <div class="entry-header">
-            <span class="entry-agent">{{ e.agent || 'system' }}</span>
-            <span class="entry-layer" :style="{ background: layerColor(e.layer) }">{{ e.layer }}</span>
-            <span class="entry-time">{{ e.timestamp }}</span>
+            <Badge tone="brand">{{ e.agent || 'system' }}</Badge>
+            <Badge tone="info">{{ e.topic || '—' }}</Badge>
+            <span class="entry-score">{{ t('view.tlmemory.score') }} {{ formatScore(e.score) }}</span>
+            <span class="entry-time">{{ formatTime(e.timestamp) }}</span>
           </div>
-          <div class="entry-body">{{ e.content }}</div>
-          <div class="entry-footer">
-            <span class="entry-tags" v-if="e.tags">
-              <span v-for="t in (Array.isArray(e.tags) ? e.tags : e.tags.split(','))" :key="t" class="tag">{{ t }}</span>
-            </span>
-            <span class="entry-importance" v-if="e.importance">⭐ {{ e.importance }}</span>
+          <div class="entry-task" v-if="e.task">{{ e.task }}</div>
+          <div class="entry-body">{{ e.snippet || e.content || '' }}</div>
+          <div class="entry-footer" v-if="e.tags">
+            <span v-for="t in e.tags" :key="t" class="tag">{{ t }}</span>
           </div>
-        </div>
-        <div v-if="filteredEntries.length === 0" class="empty-state">
-          <p>No memories found</p>
         </div>
       </div>
-    </div>
+      <EmptyState v-else-if="!loading" icon="search" :title="t('view.tlmemory.noMemories')"
+                  :description="query ? t('view.tlmemory.noResults') + ' “' + query + '”.' : t('view.tlmemory.runSearchHint')" />
+      <Skeleton v-else height="200px" />
+    </Card>
+
+    <!-- Add Memory Modal -->
+    <Teleport to="body">
+      <div v-if="showAdd" class="modal-mask" @click.self="showAdd = false">
+        <div class="modal" role="dialog" aria-modal="true">
+          <div class="modal__head">
+            <h3>{{ t('view.tlmemory.addMemoryTitle') }}</h3>
+            <button class="modal__x" type="button" @click="showAdd = false" aria-label="Close">×</button>
+          </div>
+          <div class="modal__body">
+            <label class="field">
+              <span class="field__label">{{ t('view.tlmemory.layer') }}</span>
+              <select v-model="addForm.layer" class="field__input">
+                <option value="working">{{ t('view.tlmemory.layer1Name') }}</option>
+                <option value="episodic">{{ t('view.tlmemory.layer2Name') }}</option>
+                <option value="semantic">{{ t('view.tlmemory.layer3Name') }}</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">{{ t('view.tlmemory.content') }} *</span>
+              <textarea v-model="addForm.content" class="field__input" rows="4"
+                :placeholder="t('view.tlmemory.contentPlaceholder')"></textarea>
+            </label>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-4);">
+              <label class="field">
+                <span class="field__label">{{ t('view.tlmemory.topic') }}</span>
+                <input v-model="addForm.topic" class="field__input" :placeholder="t('view.tlmemory.topicPlaceholder')" />
+              </label>
+              <label class="field">
+                <span class="field__label">{{ t('view.tlmemory.agent') }}</span>
+                <input v-model="addForm.agent" class="field__input" :placeholder="t('view.tlmemory.agentPlaceholder')" />
+              </label>
+            </div>
+            <label class="field">
+              <span class="field__label">{{ t('view.tlmemory.tags') }}</span>
+              <input v-model="addForm.tags" class="field__input" :placeholder="t('view.tlmemory.tagsPlaceholder')" />
+            </label>
+          </div>
+          <div class="modal__foot">
+            <button class="btn-ghost" type="button" @click="showAdd = false">{{ t('common.cancel') }}</button>
+            <button class="btn-primary" type="button" :disabled="!addForm.content.trim() || adding" @click="submitMemory">
+              {{ adding ? t('view.tlmemory.submitting') : t('common.submit') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
+import { useI18n } from '../i18n';
 import { useApiStore } from '../stores/api.js';
+import { useToast } from '../composables/useToast.js';
+import AppIcon from '../components/AppIcon.vue';
+import PageHeader from '../components/PageHeader.vue';
+import Card from '../components/Card.vue';
+import StatCard from '../components/StatCard.vue';
+import Badge from '../components/Badge.vue';
+import Skeleton from '../components/Skeleton.vue';
+import EmptyState from '../components/EmptyState.vue';
 
+const { t } = useI18n();
 const api = useApiStore();
-const activeLayer = ref('all');
-const searchQuery = ref('');
-const sortBy = ref('recent');
+const toast = useToast();
+const loading = ref(false);
+const query = ref('');
 const entries = ref([]);
-const stats = ref({ short_term: 0, mid_term: 0, long_term: 0 });
+const memError = ref('');
+const stats = reactive({ total_entries: 0, total_traces: 0, total_trajectory_steps: 0, by_agent: {}, by_topic: {} });
 
-const layers = [
-  { key: 'all', label: 'All', icon: '🧠' },
-  { key: 'short', label: 'Short-Term', icon: '⚡' },
-  { key: 'mid', label: 'Mid-Term', icon: '📝' },
-  { key: 'long', label: 'Long-Term', icon: '🏛️' },
-];
+// ── Add Memory ──
+const showAdd = ref(false);
+const adding = ref(false);
+const addForm = reactive({ layer: 'episodic', content: '', topic: '', agent: 'admin', tags: '' });
 
-const layerStats = computed(() => [
-  { key: 'short', label: 'Short-Term', icon: '⚡', desc: 'Working context, recent interactions', count: stats.value.short_term, pct: Math.min(100, stats.value.short_term), color: '#3b82f6', bg: 'rgba(59,130,246,.12)' },
-  { key: 'mid', label: 'Mid-Term', icon: '📝', desc: 'Consolidated patterns, session summaries', count: stats.value.mid_term, pct: Math.min(100, stats.value.mid_term), color: '#a78bfa', bg: 'rgba(167,139,250,.12)' },
-  { key: 'long', label: 'Long-Term', icon: '🏛️', desc: 'Core knowledge, persistent facts', count: stats.value.long_term, pct: Math.min(100, stats.value.long_term), color: '#22c55e', bg: 'rgba(34,197,94,.12)' },
-]);
-
-const filteredEntries = computed(() => {
-  let list = entries.value;
-  if (activeLayer.value !== 'all') list = list.filter(e => e.layer === activeLayer.value);
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase();
-    list = list.filter(e => (e.content || '').toLowerCase().includes(q) || (e.agent || '').toLowerCase().includes(q));
-  }
-  return list;
-});
-
-function layerColor(layer) {
-  const m = { short: '#3b82f6', mid: '#a78bfa', long: '#22c55e' };
-  return m[layer] || '#64748b';
-}
-
-let searchTimer;
-function onSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(loadEntries, 300); }
-
-async function consolidate() {
-  try { await api.post('/api/memory/consolidate', {}); loadEntries(); } catch {}
-}
-
-async function loadEntries() {
+async function submitMemory() {
+  const content = addForm.content.trim();
+  if (!content) return;
+  adding.value = true;
   try {
-    const data = await api.get('/api/memory/search?query=*&limit=50');
-    entries.value = (data.results || data.entries || []).map(e => ({
-      id: e.id || Math.random().toString(36).slice(2),
-      agent: e.agent || '',
-      content: e.content || e.text || '',
-      layer: e.layer || e.topic || 'mid',
-      tags: e.tags || [],
-      importance: e.importance || e.score || null,
-      timestamp: e.timestamp || e.created_at || '',
-    }));
-  } catch {}
+    await api.post('/api/memory/store', {
+      layer: addForm.layer,
+      content,
+      topic: addForm.topic.trim(),
+      agent: addForm.agent.trim() || 'admin',
+      tags: addForm.tags.trim(),
+    });
+    showAdd.value = false;
+    addForm.content = ''; addForm.topic = ''; addForm.tags = '';
+    await refreshAll();
+  } catch (e) {
+    toast.error(t('view.tlmemory.storeFailed') + ((e && e.message) ? ': ' + e.message : ''));
+  } finally {
+    adding.value = false;
+  }
+}
+
+const topicEntries = computed(() => Object.entries(stats.by_topic || {}).map(([k, v]) => ({ key: k, value: v })));
+const agentEntries = computed(() => Object.entries(stats.by_agent || {}).map(([k, v]) => ({ key: k, value: v })));
+
+function formatScore(s) {
+  if (s === null) return '—';
+  const n = Number(s);
+  if (isNaN(n)) return '—';
+  return n < 0.001 ? n.toExponential(1) : n.toFixed(3);
+}
+function formatTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(String(ts));
+  if (isNaN(d.getTime())) return String(ts);
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function splitTags(t) {
+  if (!t) return [];
+  return String(t).split(',').map((x) => x.trim()).filter(Boolean);
+}
+
+async function loadStats() {
   try {
     const s = await api.get('/api/memory/stats');
-    stats.value = {
-      short_term: s.short_term_count || s.short_term || 0,
-      mid_term: s.mid_term_count || s.mid_term || 0,
-      long_term: s.long_term_count || s.long_term || 0,
-    };
-  } catch {}
+    stats.total_entries = s.total_entries || 0;
+    stats.total_traces = s.total_traces || 0;
+    stats.total_trajectory_steps = s.total_trajectory_steps || 0;
+    stats.by_agent = s.by_agent || {};
+    stats.by_topic = s.by_topic || {};
+    memError.value = '';
+  } catch (e) {
+    console.error('[memory] loadStats failed:', e);
+    memError.value = (e && e.message) ? e.message : String(e);
+    stats.total_entries = 0; stats.total_traces = 0; stats.total_trajectory_steps = 0;
+    stats.by_agent = {}; stats.by_topic = {};
+  }
 }
 
-onMounted(loadEntries);
+async function runSearch() {
+  loading.value = true;
+  try {
+    const q = query.value.trim();
+    const data = await api.get(`/api/memory/search?q=${encodeURIComponent(q)}&topk=50`);
+    const results = (data && data.results) || [];
+    entries.value = results.map((r) => ({
+      id: r.id,
+      agent: r.agent,
+      topic: r.topic,
+      task: r.task,
+      content: r.content,
+      snippet: r.snippet || r.content || '',
+      tags: splitTags(r.tags),
+      score: r.score,
+      timestamp: r.timestamp,
+    }));
+  } catch (e) {
+    console.error('[memory] runSearch failed:', e);
+    toast.error(t('view.tlmemory.searchFailed') + (e && e.message ? ': ' + e.message : ''));
+    entries.value = [];
+  } finally {
+    loading.value = false;
+  }
+}
+
+function searchTopic(topic) {
+  query.value = topic;
+  runSearch();
+}
+
+async function refreshAll() {
+  loading.value = true;
+  await loadStats();
+  // Default: search the dominant topic so the list populates with real data.
+  const topTopic = [...topicEntries.value].sort((a, b) => b.value - a.value)[0];
+  if (topTopic) {
+    query.value = topTopic.key;
+    await runSearch();
+  } else {
+    await runSearch();
+  }
+  loading.value = false;
+}
+
+onMounted(refreshAll);
 </script>
 
 <style scoped>
-.memory-page { }
-.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-.topbar h1 { font-size: 24px; font-weight: 700; }
-.layer-tabs { display: flex; gap: 4px; background: var(--bg2); border-radius: 10px; padding: 3px; }
-.tab-btn { background: none; border: none; padding: 6px 14px; border-radius: 8px; font-size: 13px; color: var(--text2); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all .15s; }
-.tab-btn.active { background: var(--accent); color: #fff; }
-.tab-icon { font-size: 14px; }
-.btn-action { margin-left: auto; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 6px 14px; font-size: 13px; color: var(--text2); cursor: pointer; }
-.btn-action:hover { border-color: var(--accent); color: var(--accent); }
-
-.layer-overview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
-.layer-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; cursor: pointer; transition: all .15s; }
-.layer-card:hover, .layer-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.layer-card { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.layer-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-.layer-info { flex: 1; min-width: 100px; }
-.layer-name { font-size: 14px; font-weight: 600; display: block; }
-.layer-desc { font-size: 11px; color: var(--text3); display: block; margin-top: 2px; }
-.layer-stat { text-align: right; }
-.stat-num { font-size: 22px; font-weight: 700; display: block; }
-.stat-unit { font-size: 11px; color: var(--text3); }
-.layer-bar { width: 100%; height: 4px; background: var(--bg3); border-radius: 2px; margin-top: 4px; }
-.bar-fill { height: 100%; border-radius: 2px; transition: width .3s; }
-
-.search-bar { display: flex; gap: 8px; margin-bottom: 16px; }
-.search-bar input { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; font-size: 14px; color: var(--text); outline: none; }
-.search-bar input:focus { border-color: var(--accent); }
-.search-bar select { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; font-size: 13px; color: var(--text2); }
-
-.entry-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; }
-.entry-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.entry-agent { font-size: 12px; font-weight: 600; color: var(--accent); }
-.entry-layer { font-size: 10px; padding: 2px 8px; border-radius: 4px; color: #fff; font-weight: 600; text-transform: uppercase; }
-.entry-time { margin-left: auto; font-size: 11px; color: var(--text3); }
-.entry-body { font-size: 14px; line-height: 1.6; color: var(--text); }
-.entry-footer { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-.entry-tags { display: flex; gap: 4px; flex-wrap: wrap; }
-.tag { font-size: 11px; background: var(--bg); padding: 2px 8px; border-radius: 4px; color: var(--text3); }
-.entry-importance { font-size: 12px; color: var(--warn); margin-left: auto; }
-.empty-state { text-align: center; padding: 40px; color: var(--text3); }
+.mem-error-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; margin-bottom: 16px;
+  background: var(--fail-soft); border: 1px solid var(--fail);
+  border-radius: var(--r-md); color: var(--fail, #ef4444);
+  font-size: 12px; font-family: var(--font-mono); word-break: break-word;
+}
 </style>

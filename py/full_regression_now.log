@@ -1,0 +1,50 @@
+  File "C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\asyncio\__init__.py", line 43, in <module>
+    from .windows_events import *
+  File "C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\asyncio\windows_events.py", line 8, in <module>
+    import _overlapped
+OSError: [WinError 10106] 无法加载或初始化请求的服务提供程序。
+{"ts": "2026-07-30T11:48:19.486049+00:00", "level": "INFO", "logger": "maop.core.worker_pool", "msg": "WorkerPool stopped", "module": "worker_pool", "func": "stop", "line": 150}
+------------------------------ Captured log call ------------------------------
+INFO     maop.core.worker_pool:worker_pool.py:127 WorkerPool started: io_workers=2, cpu_workers=2
+INFO     maop.core.worker_pool:worker_pool.py:150 WorkerPool stopped
+============================== warnings summary ===============================
+C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+maop\core\regression.py:34
+  F:\Nexus\MAOP\py\maop\core\regression.py:34: PytestCollectionWarning: cannot collect test class 'TestCase' because it has a __init__ constructor (from: tests/test_regression.py)
+    class TestCase(BaseModel):
+
+maop\core\regression.py:45
+  F:\Nexus\MAOP\py\maop\core\regression.py:45: PytestCollectionWarning: cannot collect test class 'TestResult' because it has a __init__ constructor (from: tests/test_regression.py)
+    class TestResult(BaseModel):
+
+tests/e2e/test_routing_rbac_tenant.py::TestAuthCookie::test_cookie_based_auth_works
+  C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\site-packages\httpx\_client.py:1768: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return await self.request(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_backends_pg.py::test_build_dsn_uses_maoP_pg_dsn_when_set - ...
+FAILED tests/test_doc_pipeline_adapter.py::TestAdapterImport::test_resolve_doc_pipeline_root
+FAILED tests/test_drivers.py::TestRunPowershell::test_powershell_success - As...
+FAILED tests/test_enterprise_integration.py::TestCRLIntegration::test_crl_revoked_customer_rejected
+FAILED tests/test_enterprise_license.py::TestLicenseValidator::test_tampered_signature_raises
+FAILED tests/test_enterprise_n8n.py::TestN8nClient::test_api_key_in_headers
+FAILED tests/test_enterprise_n8n.py::TestN8nClient::test_no_api_key_no_header
+FAILED tests/test_enterprise_tls_auto.py::test_auto_configure_with_provided_certs
+FAILED tests/test_enterprise_tls_auto.py::test_auto_configure_generates_dev_certs
+FAILED tests/test_enterprise_tls_auto.py::test_build_ssl_kwargs - AssertionEr...
+FAILED tests/test_event_hook_async.py::TestAsyncWebhookEngine::test_actual_webhook_delivery
+FAILED tests/test_mcp_discovery.py::test_discover_no_config_files_returns_empty
+FAILED tests/test_mcp_discovery.py::test_scan_paths_includes_project_yaml_and_yml
+FAILED tests/test_mcp_discovery.py::test_scan_paths_includes_user_global_config
+FAILED tests/test_mcp_discovery.py::test_scan_paths_includes_claude_desktop_on_supported_os
+FAILED tests/test_tls.py::TestCreateSSLContext::test_raises_when_cert_missing
+FAILED tests/test_tls.py::TestCreateSSLContext::test_creates_context_with_valid_cert
+FAILED tests/test_tls.py::TestCreateSSLContext::test_tls13_version - ssl.SSLE...
+FAILED tests/test_worker_pool.py::TestCPUBound::test_run_cpu - concurrent.fut...
+FAILED tests/test_worker_pool.py::TestCPUBound::test_run_cpu_concurrent - con...
+FAILED tests/test_worker_pool.py::TestWorkerPoolStats::test_stats_after_cpu_work
+21 failed, 4189 passed, 7 skipped, 14 deselected, 4 warnings in 164.10s (0:02:44)

@@ -13,10 +13,8 @@ import http.server
 import json
 import threading
 import time
-import zlib
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
 
 import pytest
 from cryptography import x509

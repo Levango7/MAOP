@@ -22,8 +22,11 @@ from maop.core.monitoring import (
     MAOP_TASK_SLA_VIOLATION_TOTAL,
     metrics,
 )
-from maop.delegate.dispatcher import Dispatcher, _tier_from_priority
+from maop.delegate.dispatcher import Dispatcher
+from maop.delegate.sla_monitor import SLAMonitor
 from maop.maop_plan import Plan
+
+_tier_from_priority = SLAMonitor.tier_from_priority
 
 # ── Plan SLA fields ───────────────────────────────────────────────
 

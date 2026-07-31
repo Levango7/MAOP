@@ -28,7 +28,7 @@ function withAuth(extra, headers) {
   const token = getAuthToken();
   if (token) h['Authorization'] = 'Bearer ' + token;
   init.headers = h;
-  init.headers = h;init.credentials = 'include';  // #4 fix: send httpOnly cookie
+  init.credentials = 'include'; // #4 fix: send httpOnly cookie
   return init;
 }
 
@@ -46,10 +46,52 @@ function fetchWithTimeout(url, init) {
 }
 
 /**
- * 统一处理 401：清除登录态并跳转登录页。
+ * Token refresh state — prevents concurrent refresh requests.
+ */
+let _refreshPromise = null;
+
+/**
+ * Attempt to refresh the current JWT token via /api/auth/refresh.
+ * Returns true if refresh succeeded and token was updated, false otherwise.
+ */
+async function tryRefreshToken() {
+  // Prevent multiple simultaneous refresh attempts
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = (async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) return false;
+      const res = await fetchWithTimeout('/api/auth/refresh', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (data.status === 'ok' && data.token) {
+        try { localStorage.setItem(TOKEN_KEY, data.token); } catch (e) { /* ignore */ }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    } finally {
+      _refreshPromise = null;
+    }
+  })();
+  return _refreshPromise;
+}
+
+/**
+ * 统一处理 401：先尝试 refresh token，失败才清除登录态。
  * 仅在企业版前端环境中触发（避免在 Vitest 中触发路由跳转）。
  */
-function handleUnauthorized() {
+async function handleUnauthorized() {
+  // L2: Try token refresh before giving up
+  const refreshed = await tryRefreshToken();
+  if (refreshed) return;  // Caller should retry the original request
+
+  // Refresh failed — clear auth state
   try {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -61,39 +103,6 @@ function handleUnauthorized() {
   }
 }
 
-/**
- * API versioning infrastructure (incremental migration).
- *
- * Migration plan:
- *   1. Current: v1Url() helper is ready but all calls still use unversioned /api/* paths
- *   2. Next: new code calls v1Url("/api/agents") to get "/api/v1/agents"
- *   3. Final: switch default to /api/v1 and remove old path aliases
- *
- * Exempt endpoints (no version prefix, for infrastructure compatibility):
- *   - /api/health    K8s/Docker liveness & readiness probes
- *   - /api/stream    SSE stream (token validated via query param)
- *   - /api/auth/*    authentication flow itself (login/logout/refresh)
- */
-const API_V1_PREFIX = '/api/v1';
-
-/**
- * Convert an /api/* path to the versioned /api/v1/* path.
- * Exempt endpoints (health/stream/auth) are returned unchanged.
- * @param {string} path - original path, e.g. "/api/agents"
- * @returns {string} versioned path, e.g. "/api/v1/agents"
- */
-function v1Url(path) {
-  if (
-    path.startsWith('/api/') &&
-    !path.startsWith('/api/health') &&
-    !path.startsWith('/api/stream') &&
-    !path.startsWith('/api/auth')
-  ) {
-    return API_V1_PREFIX + path.slice(4); // /api/agents -> /api/v1/agents
-  }
-  return path;
-}
-
 export const useApiStore = defineStore('api', {
   actions: {
     /**
@@ -102,10 +111,15 @@ export const useApiStore = defineStore('api', {
      * @param {object} [opts] { headers } 可选额外 headers
      */
     async get(url, opts) {
-      const res = await fetchWithTimeout(url, withAuth({}, (opts && opts.headers) || {}));
+      let res = await fetchWithTimeout(url, withAuth({}, (opts && opts.headers) || {}));
       if (res.status === 401) {
-        handleUnauthorized();
-        throw new Error(`API ${url}: 401 Unauthorized`);
+        await handleUnauthorized();
+        // Retry once if refresh succeeded (new token is now in localStorage)
+        res = await fetchWithTimeout(url, withAuth({}, (opts && opts.headers) || {}));
+        if (res.status === 401) {
+          handleUnauthorized();  // refresh didn't help or no token
+          throw new Error(`API ${url}: 401 Unauthorized`);
+        }
       }
       if (!res.ok) throw new Error(`API ${url}: ${res.status}`);
       return res.json();
@@ -121,13 +135,20 @@ export const useApiStore = defineStore('api', {
         { 'Content-Type': 'application/json' },
         (opts && opts.headers) || {}
       );
-      const res = await fetchWithTimeout(url, withAuth(
+      let res = await fetchWithTimeout(url, withAuth(
         { method: 'POST', body: JSON.stringify(body || {}) },
         headers
       ));
       if (res.status === 401) {
-        handleUnauthorized();
-        throw new Error(`API ${url}: 401 Unauthorized`);
+        await handleUnauthorized();
+        res = await fetchWithTimeout(url, withAuth(
+          { method: 'POST', body: JSON.stringify(body || {}) },
+          headers
+        ));
+        if (res.status === 401) {
+          handleUnauthorized();
+          throw new Error(`API ${url}: 401 Unauthorized`);
+        }
       }
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
@@ -137,11 +158,18 @@ export const useApiStore = defineStore('api', {
     },
     /** PUT 请求，自动注入 Bearer token */
     async put(url, body) {
-      const res = await fetchWithTimeout(url, withAuth(
+      let res = await fetchWithTimeout(url, withAuth(
         { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) },
         { 'Content-Type': 'application/json' }
       ));
-      if (res.status === 401) { handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+      if (res.status === 401) {
+        await handleUnauthorized();
+        res = await fetchWithTimeout(url, withAuth(
+          { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) },
+          { 'Content-Type': 'application/json' }
+        ));
+        if (res.status === 401) { handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+      }
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         throw new Error(errBody.error || `API ${url}: ${res.status}`);
@@ -150,8 +178,12 @@ export const useApiStore = defineStore('api', {
     },
     /** DELETE 请求，自动注入 Bearer token */
     async delete(url) {
-      const res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
-      if (res.status === 401) { handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+      let res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
+      if (res.status === 401) {
+        await handleUnauthorized();
+        res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
+        if (res.status === 401) { handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+      }
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         throw new Error(errBody.error || `API ${url}: ${res.status}`);
@@ -192,4 +224,4 @@ export const useApiStore = defineStore('api', {
 });
 
 // 模块级导出（便于非 Pinia 上下文使用，如 App.vue 直接 import）
-export { getAuthToken, withAuth, handleUnauthorized, v1Url };
+export { getAuthToken, withAuth, handleUnauthorized };

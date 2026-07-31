@@ -103,13 +103,18 @@ def handle_api_errors(
         # fn.__globals__) can still resolve them at call time.
         _HTTPException = HTTPException
         _error_response = error_response
+        # Capture logger in the closure too: the types.FunctionType rebuild below
+        # rebinds wrapper.__globals__ to fn.__globals__ (the endpoint module),
+        # which does NOT define `logger`. Referencing a closure cell avoids the
+        # NameError that previously turned every handled error into a 500.
+        _logger = logger
         @functools.wraps(fn)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return await fn(*args, **kwargs)
             except _HTTPException as exc:
                 op = op_name or fn.__name__
-                logger.warning("%s raised HTTPException: %s", op, exc.detail)
+                _logger.warning("%s raised HTTPException: %s", op, exc.detail)
                 return _error_response(
                     error=str(exc.detail) if exc.detail is not None else "",
                     code=f"HTTP_{exc.status_code}",
@@ -117,7 +122,7 @@ def handle_api_errors(
                 )
             except Exception:
                 op = op_name or fn.__name__
-                logger.exception("%s failed", op)
+                _logger.exception("%s failed", op)
                 if error_value is not None:
                     return error_value
                 return _error_response(

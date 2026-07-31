@@ -67,12 +67,35 @@ def upgrade() -> None:
     _exec_section(up_sql)
 
 
+def _require_destructive_ack(revision_name: str) -> None:
+    """OPS-31 fix: guard destructive downgrades.
+
+    ``alembic downgrade`` for this revision DROPS operational tables and
+    ALL their data. That is fine in CI/dev (idempotency tests) but
+    catastrophic in production. Allowed only when:
+    - MAOP_ENV is a dev/test environment, or
+    - MAOP_ALLOW_DESTRUCTIVE_DOWNGRADE=1 is explicitly set.
+    """
+    env = os.environ.get("MAOP_ENV", "").strip().lower()
+    if env in ("dev", "development", "local", "test", "ci"):
+        return
+    if os.environ.get("MAOP_ALLOW_DESTRUCTIVE_DOWNGRADE", "") == "1":
+        return
+    raise RuntimeError(
+        f"SAFETY: downgrade of {revision_name} DROPS tables and permanently "
+        "deletes data. Refusing outside dev/test environments. Set "
+        "MAOP_ALLOW_DESTRUCTIVE_DOWNGRADE=1 to override (make a backup first)."
+    )
+
+
 def downgrade() -> None:
     """Drop all tables created by upgrade.
 
     按 001_init.sql 中 -- DOWN: 段定义的逆序依赖关系 DROP 所有表。
     CI 测试环境需要 downgrade base 以验证 upgrade→downgrade→upgrade 幂等性。
+    OPS-31 fix: 生产环境默认拒绝（见 _require_destructive_ack）。
     """
+    _require_destructive_ack("001_init (all core tables)")
     sql_path = _find_sql_file()
     sql = sql_path.read_text(encoding="utf-8")
     if "-- DOWN:" in sql:

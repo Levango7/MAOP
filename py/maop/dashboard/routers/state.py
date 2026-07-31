@@ -100,5 +100,10 @@ start_time = time.time()
 # ── Config flags ───────────────────────────────────────────────────
 tls_enabled = os.environ.get("MAOP_TLS", "0") == "1"
 _env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
-auth_enabled = os.environ.get("MAOP_AUTH", "1" if _env_is_prod else "0") == "1"
+# High 安全修复 (2.3): secure-by-default，与 routers/auth.py 和
+# settings._default_auth_enabled 保持一致。
+_env_is_dev = os.environ.get("MAOP_ENV", "").strip().lower() in (
+    "dev", "development", "local", "test",
+)
+auth_enabled = os.environ.get("MAOP_AUTH", "0" if _env_is_dev else "1") == "1"
 rl_enabled = os.environ.get("MAOP_RATE_LIMIT", "1") == "1"

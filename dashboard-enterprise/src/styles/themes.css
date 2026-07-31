@@ -1,0 +1,64 @@
+/* =========================================================================
+ * MAOP Enterprise Dashboard — Light Theme
+ * Neutral white / slate-grey base + single indigo brand accent.
+ * Replaces the old pale-blue (!important) hardcode with token-driven theming.
+ * Activated by [data-theme="light"] on <html>.
+ * ========================================================================= */
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Legacy aliases */
+  --bg: #e9edf4;          /* deepened so white cards visibly float */
+  --bg2: #f4f7fb;
+  --bg3: #e2e8f1;
+  --bg4: #ffffff;
+  --border: #d2dae6;       /* stronger than before — clearly separated from bg */
+  --border-strong: #b4c0d2;
+  --text: #1a2332;
+  --text2: #3d4f65;
+  --text3: #5b6b82;
+  --accent: #4f46e5;
+  --accent2: #6366f1;
+  --success: #16a34a;
+  --warn: #d97706;
+  --fail: #dc2626;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(15, 23, 42, .08);
+
+  /* Semantic surface tokens */
+  --surface: #ffffff;
+  --surface-2: #f4f7fb;
+  --surface-3: #eef2f8;
+  --text-muted: #5b6b82;
+  --text-faint: #6b7d94;
+  --brand: #4f46e5;
+  --brand-strong: #6366f1;
+  --brand-faint: rgba(79, 70, 229, .06);
+  --brand-soft: rgba(79, 70, 229, .10);
+  --brand-contrast: #ffffff;
+
+  --border-subtle: rgba(100, 116, 139, .16);
+
+  /* Chart palette — light-tuned (slightly deeper for contrast on white) */
+  --chart-1: #4f46e5;  --chart-2: #0284c7;  --chart-3: #16a34a;
+  --chart-4: #d97706;  --chart-5: #7c3aed;  --chart-6: #0d9488;
+  --chart-7: #db2777;  --chart-8: #0891b2;  --chart-9: #65a30d;
+  --chart-10: #e11d48;
+  --chart-warn: #d97706;
+  --chart-fail: #dc2626;
+
+  --success-soft: rgba(22, 163, 74, .10);
+  --warn-soft: rgba(217, 119, 6, .12);
+  --fail-soft: rgba(220, 38, 38, .10);
+  --info: #0284c7;
+  --info-soft: rgba(2, 132, 199, .10);
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06);
+  --shadow-md: 0 6px 18px rgba(15, 23, 42, .10);
+  --shadow-lg: 0 14px 36px rgba(15, 23, 42, .14);
+
+  --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 48%);
+  --card-hairline: rgba(15, 23, 42, .08);
+  --app-ambient: radial-gradient(900px 520px at 100% 0%, rgba(79, 70, 229, .07), transparent 60%);
+}

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import threading
 from collections import defaultdict
@@ -265,6 +266,27 @@ class StructuredLogger:
 
 # ── Metrics ─────────────────────────────────────────────────────
 
+# OPS-25 fix: cap per-metric label cardinality. Unbounded label values
+# (e.g. task ids, user ids) would grow _values forever — a memory leak and
+# a Prometheus scrape-size explosion. New label sets beyond the cap are
+# folded into a single overflow series.
+_MAX_LABEL_CARDINALITY = int(os.environ.get("MAOP_METRIC_MAX_CARDINALITY", "1000"))
+_OVERFLOW_KEY = 'overflow="true"'
+
+
+def _bounded_key(values: dict[str, float], key: str, metric_name: str) -> str:
+    """Return key, or the overflow key if adding it would exceed the cap."""
+    if key in values or len(values) < _MAX_LABEL_CARDINALITY:
+        return key
+    if _OVERFLOW_KEY not in values:
+        logger.warning(
+            "Metric %s exceeded max label cardinality (%d); folding new "
+            "label sets into overflow series",
+            metric_name, _MAX_LABEL_CARDINALITY,
+        )
+    return _OVERFLOW_KEY
+
+
 class Counter:
     """A monotonically increasing counter (Prometheus counter)."""
 
@@ -279,13 +301,16 @@ class Counter:
         """Increment the counter."""
         key = self._label_key(labels)
         with self._lock:
+            # OPS-25 fix: bound label cardinality
+            key = _bounded_key(self._values, key, self.name)
             self._values[key] += value
 
     def get(self, labels: dict[str, str] | None = None) -> float:
         """Get the current value."""
         key = self._label_key(labels)
         with self._lock:
-            return self._values[key]
+            # OPS-25 fix: read must not insert (defaultdict side effect)
+            return self._values.get(key, 0.0)
 
     def _label_key(self, labels: dict[str, str] | None) -> str:
         if not labels:
@@ -298,11 +323,15 @@ class Counter:
         if self.help_text:
             lines.append(f"# HELP {self.name} {self.help_text}")
         lines.append(f"# TYPE {self.name} counter")
-        for key, value in self._values.items():
-            if key:
-                lines.append(f"{self.name}{{{key}}} {value}")
-            else:
-                lines.append(f"{self.name} {value}")
+        # OPS-27 fix: iterate under the same lock as inc()/set()/dec() so a
+        # concurrent metric update cannot raise RuntimeError during dict
+        # iteration (which would 500 the /api/prometheus endpoint).
+        with self._lock:
+            for key, value in list(self._values.items()):
+                if key:
+                    lines.append(f"{self.name}{{{key}}} {value}")
+                else:
+                    lines.append(f"{self.name} {value}")
         return "\n".join(lines)
 
 
@@ -320,22 +349,26 @@ class Gauge:
         """Set the gauge value."""
         key = self._label_key(labels)
         with self._lock:
+            key = _bounded_key(self._values, key, self.name)  # OPS-25 fix
             self._values[key] = value
 
     def inc(self, value: float = 1.0, labels: dict[str, str] | None = None) -> None:
         key = self._label_key(labels)
         with self._lock:
+            key = _bounded_key(self._values, key, self.name)  # OPS-25 fix
             self._values[key] += value
 
     def dec(self, value: float = 1.0, labels: dict[str, str] | None = None) -> None:
         key = self._label_key(labels)
         with self._lock:
+            key = _bounded_key(self._values, key, self.name)  # OPS-25 fix
             self._values[key] -= value
 
     def get(self, labels: dict[str, str] | None = None) -> float:
         key = self._label_key(labels)
         with self._lock:
-            return self._values[key]
+            # OPS-25 fix: read must not insert (defaultdict side effect)
+            return self._values.get(key, 0.0)
 
     def _label_key(self, labels: dict[str, str] | None) -> str:
         if not labels:
@@ -347,11 +380,13 @@ class Gauge:
         if self.help_text:
             lines.append(f"# HELP {self.name} {self.help_text}")
         lines.append(f"# TYPE {self.name} gauge")
-        for key, value in self._values.items():
-            if key:
-                lines.append(f"{self.name}{{{key}}} {value}")
-            else:
-                lines.append(f"{self.name} {value}")
+        # OPS-27 fix: iterate under the same lock as inc()/set()/dec().
+        with self._lock:
+            for key, value in list(self._values.items()):
+                if key:
+                    lines.append(f"{self.name}{{{key}}} {value}")
+                else:
+                    lines.append(f"{self.name} {value}")
         return "\n".join(lines)
 
 
@@ -392,14 +427,16 @@ class Histogram:
             lines.append(f"# HELP {self.name} {self.help_text}")
         lines.append(f"# TYPE {self.name} histogram")
 
-        for b in self.buckets:
-            if b == float("inf"):
-                lines.append(f"{self.name}_bucket{{le=\"+Inf\"}} {self._total}")
-            else:
-                lines.append(f"{self.name}_bucket{{le=\"{b}\"}} {self._counts[b]}")
+        # OPS-27 fix: read consistent snapshot under the observe() lock.
+        with self._lock:
+            for b in self.buckets:
+                if b == float("inf"):
+                    lines.append(f"{self.name}_bucket{{le=\"+Inf\"}} {self._total}")
+                else:
+                    lines.append(f"{self.name}_bucket{{le=\"{b}\"}} {self._counts[b]}")
 
-        lines.append(f"{self.name}_sum {self._sum}")
-        lines.append(f"{self.name}_count {self._total}")
+            lines.append(f"{self.name}_sum {self._sum}")
+            lines.append(f"{self.name}_count {self._total}")
         return "\n".join(lines)
 
 
@@ -442,29 +479,46 @@ class MetricsCollector:
 
     def to_prometheus(self) -> str:
         """Export all metrics in Prometheus text format."""
+        # OPS-27 fix: snapshot the metric collections under the registry lock
+        # so a concurrent counter()/gauge()/histogram() registration cannot
+        # mutate the dict mid-iteration.
+        with self._lock:
+            counters = list(self._counters.values())
+            gauges = list(self._gauges.values())
+            histograms = list(self._histograms.values())
         parts = []
-        for c in self._counters.values():
+        for c in counters:
             parts.append(c.to_prometheus())
-        for g in self._gauges.values():
+        for g in gauges:
             parts.append(g.to_prometheus())
-        for h in self._histograms.values():
+        for h in histograms:
             parts.append(h.to_prometheus())
         return "\n".join(parts)
 
     def to_json(self) -> dict[str, Any]:
         """Export metrics as JSON (for Dashboard)."""
+        # OPS-27 fix: snapshot collections under the registry lock, then copy
+        # each metric's internal dict under its own lock to avoid RuntimeError
+        # from concurrent inc()/observe() updates.
+        with self._lock:
+            counter_items = list(self._counters.items())
+            gauge_items = list(self._gauges.items())
+            hist_items = list(self._histograms.items())
         result: dict[str, Any] = {}
-        for name, c in self._counters.items():
-            result[name] = {"type": "counter", "values": dict(c._values)}
-        for name, g in self._gauges.items():
-            result[name] = {"type": "gauge", "values": dict(g._values)}
-        for name, h in self._histograms.items():
-            result[name] = {
-                "type": "histogram",
-                "sum": h._sum,
-                "count": h._total,
-                "buckets": {str(b): c for b, c in h._counts.items()},
-            }
+        for name, c in counter_items:
+            with c._lock:
+                result[name] = {"type": "counter", "values": dict(c._values)}
+        for name, g in gauge_items:
+            with g._lock:
+                result[name] = {"type": "gauge", "values": dict(g._values)}
+        for name, h in hist_items:
+            with h._lock:
+                result[name] = {
+                    "type": "histogram",
+                    "sum": h._sum,
+                    "count": h._total,
+                    "buckets": {str(b): c for b, c in h._counts.items()},
+                }
         return result
 
 

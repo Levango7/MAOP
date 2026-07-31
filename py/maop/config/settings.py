@@ -19,13 +19,18 @@ from pydantic_settings import BaseSettings
 
 
 def _default_auth_enabled() -> bool:
-    """生产环境默认启用认证（与 server.py 历史行为保持一致）。
+    """默认认证策略（High 安全修复：secure-by-default）。
 
-    当 MAOP_ENV=production 且未显式设置 MAOP_AUTH / MAOP_AUTH_ENABLED 时，
-    默认启用认证以保护写接口。非生产环境默认禁用便于本地开发。
-    显式设置 MAOP_AUTH=0 仍可禁用（会触发 server.py 中的安全告警）。
+    旧行为：仅 MAOP_ENV == "production" 时默认启用 —— staging/QA/demo、
+    或运维拼错/忘记设置 MAOP_ENV 时认证完全禁用（CVSS 8.6）。
+
+    新行为：只有显式声明为本地开发环境（dev/development/local/test）时
+    才默认禁用认证；其他任何值（含未设置、staging、qa、demo、拼写错误）
+    一律按生产标准默认启用。显式设置 MAOP_AUTH=0 仍可禁用
+    （会触发 server.py 中的安全告警）。
     """
-    return os.environ.get("MAOP_ENV", "").strip().lower() == "production"
+    env = os.environ.get("MAOP_ENV", "").strip().lower()
+    return env not in ("dev", "development", "local", "test")
 
 
 class MAOPSettings(BaseSettings):
@@ -47,9 +52,20 @@ class MAOPSettings(BaseSettings):
     dash_workers: int = Field(default=1, description="Uvicorn worker count", ge=1)
 
     # ── TLS ───────────────────────────────────────────────────────
+    # 支持 MAOP_TLS_CERT / MAOP_TLS_KEY（短名，.env.example 与 docker 使用）
+    # 和 MAOP_TLS_CERT_FILE / MAOP_TLS_KEY_FILE（长名，pydantic 默认映射）
+    # 两种环境变量；AliasChoices 按声明顺序匹配，先短名再长名。
     tls_enabled: bool = Field(default=False, description="Enable TLS/HTTPS")
-    tls_cert_file: str = Field(default="", description="Path to TLS certificate PEM")
-    tls_key_file: str = Field(default="", description="Path to TLS private key PEM")
+    tls_cert_file: str = Field(
+        default="",
+        description="Path to TLS certificate PEM (env: MAOP_TLS_CERT or MAOP_TLS_CERT_FILE)",
+        validation_alias=AliasChoices("MAOP_TLS_CERT", "MAOP_TLS_CERT_FILE"),
+    )
+    tls_key_file: str = Field(
+        default="",
+        description="Path to TLS private key PEM (env: MAOP_TLS_KEY or MAOP_TLS_KEY_FILE)",
+        validation_alias=AliasChoices("MAOP_TLS_KEY", "MAOP_TLS_KEY_FILE"),
+    )
     tls_min_version: str = Field(default="TLSv1_2", description="Minimum TLS version")
 
     # ── Auth ──────────────────────────────────────────────────────
@@ -89,6 +105,23 @@ class MAOPSettings(BaseSettings):
 
     # ── Worker Pool ───────────────────────────────────────────────
     worker_count: int = Field(default=4, description="Worker pool size", ge=1, le=64)
+
+    # ── Dispatcher ────────────────────────────────────────────────
+    dispatch_concurrency: int = Field(default=10, description="Max concurrent dispatches", ge=1, le=100)
+    dispatch_retry_max: int = Field(default=3, description="Max retry attempts for dispatch", ge=0, le=10)
+    dispatch_retry_base_ms: int = Field(default=500, description="Base retry delay in ms", ge=100)
+
+    # ── Security / Auth ───────────────────────────────────────────
+    jwt_secret: str = Field(default="", description="JWT signing secret (required in production)")
+    admin_password: str = Field(default="", description="Initial admin password (auto-generated if empty)")
+    api_key: str = Field(default="", description="API key for external services")
+    key_file: str = Field(default="", description="Path to API key file")
+
+    # ── Logging ───────────────────────────────────────────────────
+    json_log_file: str = Field(default="", description="Path to JSON log file (default: stdout)")
+
+    # ── External Services ─────────────────────────────────────────
+    doc_pipeline_root: str = Field(default="", description="Path to doc-pipeline project")
 
     # ── Monitoring ────────────────────────────────────────────────
     metrics_enabled: bool = Field(default=True, description="Enable Prometheus metrics")

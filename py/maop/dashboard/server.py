@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import signal
 import sys
 import time
@@ -83,15 +84,30 @@ _WS_SNAPSHOT_TTL = 5.0  # seconds — cache snapshot to avoid redundant DB queri
 _ws_push_task: asyncio.Task | None = None
 
 
+_WS_SEND_TIMEOUT = 5.0  # OPS-3 fix: cap per-client send time
+
+
 async def _ws_broadcast(msg: dict) -> Any:
-    dead = set()
+    # OPS-3 fix: snapshot clients under the lock, but send OUTSIDE the lock
+    # (concurrently, with a per-client timeout) so one slow client can no
+    # longer block all broadcasts and new connections.
     async with _ws_lock:
-        for ws in _ws_clients:
-            try:
-                await ws.send_json(msg)
-            except Exception:
-                dead.add(ws)
-        _ws_clients.difference_update(dead)
+        clients = list(_ws_clients)
+    if not clients:
+        return
+
+    async def _send(ws: WebSocket) -> WebSocket | None:
+        try:
+            await asyncio.wait_for(ws.send_json(msg), timeout=_WS_SEND_TIMEOUT)
+            return None
+        except Exception:
+            return ws
+
+    results = await asyncio.gather(*(_send(ws) for ws in clients))
+    dead = {ws for ws in results if ws is not None}
+    if dead:
+        async with _ws_lock:
+            _ws_clients.difference_update(dead)
 
 
 async def _ws_push_loop() -> Any:
@@ -375,6 +391,18 @@ has_tenant_router: bool = False
 has_audit_router: bool = False
 has_rbac_router: bool = False
 has_sso_router: bool = False
+
+# ── Audit router (always registered — unified for both editions) ──
+# audit.py handles enterprise (EnterpriseAuditLogger) and personal
+# (control.audit.AuditLog) editions with FeatureFlag gating internally.
+try:
+    from maop.dashboard.routers import audit as audit_router
+    app.include_router(audit_router.router)
+    has_audit_router = True
+    logger.info("[server] Router: audit enabled (edition=%s)", get_edition().value)
+except ImportError as _e:
+    logger.warning("[server] Router MISSING: audit (import error: %s)", _e)
+
 if has_feature(FeatureFlag.MULTI_USER):
     try:
         # `# type: ignore[attr-defined]` is required because mypy cannot
@@ -392,19 +420,6 @@ if has_feature(FeatureFlag.MULTI_USER):
             "[server] Enterprise router MISSING: tenant (import error: %s). "
             "ENTERPRISE mode will return 404 on /api/tenant/* — Phase C will "
             "add routers/tenant.py to fix this.",
-            _e,
-        )
-    try:
-        # See note on tenant_router import above re: type: ignore[attr-defined].
-        from maop.dashboard.routers import audit as audit_router
-        app.include_router(audit_router.router)
-        has_audit_router = True
-        logger.info("[server] Enterprise router: audit enabled")
-    except ImportError as _e:
-        logger.warning(
-            "[server] Enterprise router MISSING: audit (import error: %s). "
-            "ENTERPRISE mode will return 404 on /api/audit/* — Phase C will "
-            "add routers/audit.py to fix this.",
             _e,
         )
     try:
@@ -453,15 +468,21 @@ if has_feature(FeatureFlag.N8N_INTEGRATION):
 # leaking route existence or causing confusing 500 errors.
 _ENTERPRISE_API_PREFIXES = (
     "/api/tenant",
-    "/api/audit",
     "/api/sso",
     "/api/rbac",
+    "/api/n8n",
 )
+# OPS-7 fix: a version-prefixed path such as /api/v1/tenant/... previously
+# bypassed the guard because it does not start with "/api/tenant". Normalize
+# away an optional /vN segment so both forms are treated identically.
+_API_VERSION_RE = re.compile(r"^/api/v\d+/")
+def _normalize_api_path(path: str) -> str:
+    return _API_VERSION_RE.sub("/api/", path, count=1)
 
 if not has_feature(FeatureFlag.MULTI_USER):
     @app.middleware("http")
     async def enterprise_api_guard(request: _Req, call_next: Any) -> Any:
-        path = request.url.path
+        path = _normalize_api_path(request.url.path)
         if path.startswith("/api/rbac/grants"):
             return _JResp(content={"grants": [], "hint": "Enterprise only"})
         if path.startswith("/api/tenant/list"):
@@ -683,20 +704,32 @@ async def spa_fallback(full_path: str) -> Any:
     return HTMLResponse("<h1>index.html not found</h1>", status_code=404)
 
 # ── Graceful Shutdown ──────────────────────────────────────────────
+# OPS-1 fix: do NOT raise SystemExit(0) from signal context — that bypasses
+# uvicorn's graceful shutdown (in-flight requests dropped, lifespan shutdown
+# skipped). Instead, log and CHAIN to the previously installed handler
+# (uvicorn's, or Python's default which raises KeyboardInterrupt for SIGINT —
+# both trigger uvicorn's graceful shutdown path).
 _shutting_down = False
+_prev_handlers: dict[int, Any] = {}
 
 def _signal_handler(signum: int, frame: Any) -> None:
     global _shutting_down
-    if _shutting_down:
-        return
-    _shutting_down = True
-    sig_name = signal.Signals(signum).name
-    logger.info("Received %s, initiating graceful shutdown...", sig_name)
-    raise SystemExit(0)
+    if not _shutting_down:
+        _shutting_down = True
+        sig_name = signal.Signals(signum).name
+        logger.info("Received %s, initiating graceful shutdown...", sig_name)
+    prev = _prev_handlers.get(signum)
+    if callable(prev):
+        prev(signum, frame)
+    elif prev == signal.SIG_DFL:
+        # Restore default and re-send so default semantics apply
+        signal.signal(signum, signal.SIG_DFL)
+        signal.raise_signal(signum)
+    # SIG_IGN or None: nothing else to do
 
 if sys.platform != "win32":
-    signal.signal(signal.SIGTERM, _signal_handler)
-signal.signal(signal.SIGINT, _signal_handler)
+    _prev_handlers[signal.SIGTERM] = signal.signal(signal.SIGTERM, _signal_handler)
+_prev_handlers[signal.SIGINT] = signal.signal(signal.SIGINT, _signal_handler)
 
 # ── Start ──────────────────────────────────────────────────────────
 _tls_enabled = os.environ.get("MAOP_TLS", "0") == "1"

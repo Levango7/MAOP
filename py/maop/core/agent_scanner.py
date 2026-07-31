@@ -27,6 +27,7 @@ Usage::
 
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import logging
 import os
@@ -248,12 +249,20 @@ class AgentScanner:
             return ""
 
     def scan(self) -> list[ScannedAgent]:
-        """Scan for all known agent CLIs."""
-        found = []
+        """Scan for all known agent CLIs.
+
+        Two phases: locate every CLI (fast, no subprocess), then probe each
+        installed CLI's version concurrently via a thread pool (subprocess is
+        I/O bound, so threads give a large speed-up over the old serial loop).
+        """
+        found: list[ScannedAgent] = []
         now = datetime.now(timezone.utc).isoformat()
+        known_names: set[str] = set()
+        # (agent, version_args) for installed CLIs whose version we must probe
+        pending: list[tuple[ScannedAgent, list[str]]] = []
 
         for known in KNOWN_AGENTS:
-            cli_path = ""
+            cli_path: str | None = ""
             for cli_name in known.cli_names:
                 cli_path = self._find_cli(cli_name) or ""
                 if cli_path:
@@ -267,21 +276,115 @@ class AgentScanner:
                     model=known.model, driver=known.driver, cli_args=known.cli_args,
                     timeout_s=known.timeout_s, last_checked=now,
                 )
+                # Regression fix: UNAVAILABLE agents must also be persisted —
+                # list_agents() reads from the DB, and callers rely on seeing
+                # known-but-not-installed agents (pre-refactor behaviour).
+                self._upsert_db(agent)
+                found.append(agent)
+                known_names.add(known.name)
             else:
-                version = self._probe_version(cli_path, known.version_args)
                 agent = ScannedAgent(
-                    name=known.name, cli_path=cli_path, version=version,
+                    name=known.name, cli_path=cli_path,
                     source=AgentSource.SCANNED, status=AgentStatus.AVAILABLE,
                     provider=known.provider, description=known.description,
                     capabilities=known.capabilities, model=known.model,
                     driver=known.driver, cli_args=known.cli_args,
                     timeout_s=known.timeout_s, last_checked=now,
                 )
+                pending.append((agent, known.version_args))
 
+        # Config-driven discovery: surface any *enabled* CLI agent defined in
+        # config/agents.yaml that is actually installed (present in PATH), so
+        # the scan reflects every locally-installed agent CLI — not just the
+        # hard-coded KNOWN_AGENTS whitelist. Agents that are not installed are
+        # skipped (we don't add unavailable noise to the registry).
+        for name, (cli_exec, caps, desc) in self._config_cli_agents().items():
+            if name in known_names:
+                continue
+            cli_path = self._find_cli(cli_exec)
+            if not cli_path:
+                continue
+            agent = ScannedAgent(
+                name=name, cli_path=cli_path,
+                source=AgentSource.YAML, status=AgentStatus.AVAILABLE,
+                provider="", description=desc, capabilities=caps or [],
+                last_checked=now,
+            )
+            pending.append((agent, ["--version"]))
+            known_names.add(name)
+
+        # Phase 2: probe versions concurrently (subprocess is I/O bound).
+        if pending:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=min(len(pending), 12)
+            ) as ex:
+                futures = {
+                    ex.submit(self._probe_version, ag.cli_path, args): ag
+                    for ag, args in pending
+                }
+                for fut in concurrent.futures.as_completed(futures):
+                    ag = futures[fut]
+                    try:
+                        ag.version = fut.result() or ""
+                    except Exception:
+                        ag.version = ""
+
+        for agent, _ in pending:
             self._upsert_db(agent)
             found.append(agent)
 
         return found
+
+    def _find_config(self) -> "Path | None":
+        """Locate config/agents.yaml relative to the project root."""
+        candidates = [
+            self._root / "config" / "agents.yaml",
+            Path(__file__).resolve().parents[3] / "config" / "agents.yaml",
+            Path.cwd() / "config" / "agents.yaml",
+        ]
+        for c in candidates:
+            if c.exists():
+                return c
+        return None
+
+    def _config_cli_agents(self) -> "dict[str, tuple[str, list[str], str]]":
+        """Return {agent_name: (executable, capabilities, description)} for every
+        enabled CLI agent declared in config/agents.yaml (skips disabled agents
+        and MAOP-internal python wrappers like doc-pipeline / MAOP itself)."""
+        result: dict[str, tuple[str, list[str], str]] = {}
+        try:
+            import yaml
+        except Exception:
+            return result
+        cfg_path = self._find_config()
+        if not cfg_path:
+            return result
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as fh:
+                data = yaml.safe_load(fh) or {}
+        except Exception:
+            return result
+        agents = data.get("agents") if isinstance(data, dict) else None
+        if not isinstance(agents, dict):
+            return result
+        for name, spec in agents.items():
+            if not isinstance(spec, dict):
+                continue
+            if spec.get("enabled") is False:
+                continue
+            cli = (spec.get("cli") or "").strip()
+            if not cli:
+                continue
+            exec_name = cli.split()[0]
+            # Skip MAOP-internal python wrappers (e.g. doc-pipeline, MAOP).
+            if exec_name.lower() in ("python", "python3", "python.exe"):
+                continue
+            if os.name == "nt":
+                exec_name = exec_name[:-4] if exec_name.lower().endswith((".cmd", ".exe", ".bat")) else exec_name
+            caps = spec.get("capabilities") or []
+            desc = spec.get("description") or ""
+            result[name] = (exec_name, list(caps), desc)
+        return result
 
     def check_agent(self, name: str) -> ScannedAgent | None:
         """Re-check a single agent's availability."""

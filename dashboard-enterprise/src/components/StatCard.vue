@@ -1,160 +1,106 @@
 <template>
-  <!--
-    D4 (2026-07-22, Phase D): Reusable StatCard component.
-    Merges three naming variants (stat-card / metric-card / summary-card)
-    into one component. The root class "stat-card" is preserved so
-    App.vue's light-theme override (.light-theme .stat-card) continues
-    to apply without any global CSS changes.
-
-    Layouts:
-      - With icon   → icon + info (horizontal, Overview/Monitor pattern)
-      - Without icon → value + label only (Cost/Logs pattern)
-      - centered=true → text-align:center (Logs pattern)
-
-    Variants (border-left color):
-      - default → transparent (or accent if provided)
-      - success/fail/warn/info → themed colors
-  -->
-  <div
-    class="stat-card"
-    :class="[variant, { 'has-accent': accent, 'centered': centered }]"
-    :style="cardStyle"
-  >
-    <div v-if="icon || $slots.icon" class="stat-icon" :style="{ background: iconBg }">
-      <slot name="icon">{{ icon }}</slot>
+  <div class="stat" :class="{ 'is-loading': loading, 'is-accent': accent }" :style="accent ? { '--accent': accent } : null">
+    <div v-if="icon" class="stat__icon" :style="{ background: toneSoft, color: toneColor }">
+      <AppIcon :name="icon" :size="18" />
     </div>
-    <div class="stat-info">
-      <span class="stat-value"><slot name="value">{{ value }}</slot></span>
-      <span class="stat-label">{{ label }}</span>
+    <div class="stat__body">
+      <div class="stat__label">{{ label }}</div>
+      <template v-if="loading">
+        <Skeleton width="72%" height="22px" />
+      </template>
+      <template v-else>
+        <div class="stat__value">
+          {{ value }}<span v-if="unit" class="stat__unit">{{ unit }}</span>
+        </div>
+        <div v-if="delta !== null && delta !== undefined" class="stat__delta" :class="deltaClass">
+          <AppIcon :name="delta >= 0 ? 'chevron-right' : 'chevron-right'" :size="11" class="stat__delta-arrow" />
+          {{ Math.abs(delta) }}{{ deltaSuffix }}
+        </div>
+        <div v-if="(yoy !== null && yoy !== undefined) || (mom !== null && mom !== undefined)" class="stat__trends">
+          <span v-if="yoy !== null && yoy !== undefined" class="trend" :class="trendClass(yoy)">
+            <AppIcon :name="yoy >= 0 ? 'arrow-up' : 'arrow-down'" :size="10" /> {{ yoyLabel }} {{ Math.abs(yoy) }}{{ trendSuffix }}
+          </span>
+          <span v-if="mom !== null && mom !== undefined" class="trend" :class="trendClass(mom)">
+            <AppIcon :name="mom >= 0 ? 'arrow-up' : 'arrow-down'" :size="10" /> {{ momLabel }} {{ Math.abs(mom) }}{{ trendSuffix }}
+          </span>
+        </div>
+      </template>
     </div>
-    <div v-if="sparkline || $slots.sparkline" class="sparkline">
-      <slot name="sparkline">
-        <svg v-if="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none">
-          <polyline :points="sparkline" fill="none" :stroke="sparklineColor" stroke-width="1.5" />
-        </svg>
-      </slot>
-    </div>
-    <div v-if="$slots.footer" class="stat-footer"><slot name="footer" /></div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue';
+import AppIcon from './AppIcon.vue';
+import Skeleton from './Skeleton.vue';
 
-// Note: defineProps + computed are compiler macros / Vue APIs.
-// No need for additional imports beyond `computed`.
 const props = defineProps({
-  /** Label text (required). */
   label: { type: String, required: true },
-  /** Primary value (required). */
-  value: { type: [String, Number], required: true },
-  /** Emoji or single-character icon. When provided, renders the icon-left layout. */
+  value: { type: [String, Number], default: '—' },
+  unit: { type: String, default: '' },
+  delta: { type: Number, default: null },
+  deltaSuffix: { type: String, default: '%' },
+  yoy: { type: Number, default: null }, // year-over-year change (%)
+  mom: { type: Number, default: null }, // month-over-month change (%)
+  yoyLabel: { type: String, default: 'YoY' },
+  momLabel: { type: String, default: 'MoM' },
+  trendSuffix: { type: String, default: '%' },
   icon: { type: String, default: '' },
-  /** Background color for the icon tile (CSS string). */
-  iconBg: { type: String, default: 'rgba(59,130,246,.12)' },
-  /** Left border color (CSS string like 'var(--accent)'). Overrides variant. */
-  accent: { type: String, default: '' },
-  /** Color variant for the left border. */
-  variant: {
-    type: String,
-    default: 'default',
-    validator: (v) => ['default', 'success', 'fail', 'warn', 'info'].includes(v),
-  },
-  /** When true, centers the value/label text (Logs.vue pattern). */
-  centered: { type: Boolean, default: false },
-  /** SVG polyline points string for the sparkline trend. */
-  sparkline: { type: String, default: '' },
-  /** Stroke color for the sparkline. */
-  sparklineColor: { type: String, default: 'var(--accent)' },
+  tone: { type: String, default: 'brand' }, // brand|success|warn|fail|info|neutral
+  accent: { type: String, default: '' }, // optional explicit left-border color (dedup palette)
+  loading: { type: Boolean, default: false },
 });
 
-const cardStyle = computed(() => {
-  if (props.accent) {
-    return { borderLeftColor: props.accent };
-  }
-  return {};
+const TONE = {
+  brand:   { soft: 'var(--brand-soft)',     color: 'var(--brand-strong)' },
+  success: { soft: 'var(--success-soft)',    color: 'var(--success)' },
+  warn:    { soft: 'var(--warn-soft)',       color: 'var(--warn)' },
+  fail:    { soft: 'var(--fail-soft)',        color: 'var(--fail)' },
+  info:    { soft: 'var(--info-soft)',       color: 'var(--info, #38bdf8)' },
+  neutral: { soft: 'var(--surface-2)',        color: 'var(--text-muted)' },
+};
+const toneSoft = computed(() => (TONE[props.tone] || TONE.neutral).soft);
+const toneColor = computed(() => (TONE[props.tone] || TONE.neutral).color);
+const deltaClass = computed(() => {
+  if (props.delta === null || props.delta === undefined) return '';
+  if (props.delta > 0) return 'is-up';
+  if (props.delta < 0) return 'is-down';
+  return 'is-flat';
 });
+const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
 </script>
 
 <style scoped>
-.stat-card {
-  background: var(--bg2);
+.stat {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  background: var(--card-sheen), var(--surface);
   border: 1px solid var(--border);
-  border-left: 3px solid transparent;
-  border-radius: var(--radius);
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 140px;
-  box-shadow: var(--shadow);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--motion) var(--ease), transform var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
 }
-
-/* Variant colors (border-left). */
-.stat-card.has-accent { border-left-color: var(--accent); }
-.stat-card.success { border-left-color: var(--success); }
-.stat-card.fail { border-left-color: var(--fail); }
-.stat-card.warn { border-left-color: var(--warn); }
-.stat-card.info { border-left-color: var(--accent); }
-
-/* Centered layout (Logs.vue pattern). */
-.stat-card.centered {
-  text-align: center;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 8px;
-  background: var(--bg3);
-  min-width: 0;
+.stat:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.stat.is-accent { border-left: 3px solid var(--accent); }
+.stat__icon {
+  width: 38px; height: 38px; border-radius: var(--r-md);
+  display: grid; place-items: center; flex-shrink: 0;
 }
-
-/* Icon tile. */
-.stat-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-/* Info column. */
-.stat-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.stat-card.centered .stat-info { align-items: center; }
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1.2;
-}
-.stat-card.centered .stat-value { font-size: 22px; }
-
-.stat-label {
-  font-size: 12px;
-  color: var(--text2);
-}
-
-/* Sparkline trend. */
-.sparkline {
-  width: 60px;
-  height: 24px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.sparkline svg { width: 100%; height: 100%; }
-
-/* Footer slot. */
-.stat-footer {
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--text3);
-  width: 100%;
-}
+.stat__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.stat__label { font-size: var(--fs-xs); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.stat__value { font-size: var(--fs-xl); font-weight: 700; color: var(--text); line-height: 1.1; }
+.stat__unit { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); margin-left: 3px; }
+.stat__delta { display: inline-flex; align-items: center; gap: 2px; font-size: var(--fs-xs); font-weight: 600; }
+.stat__delta.is-up { color: var(--success); }
+.stat__delta.is-down { color: var(--fail); }
+.stat__delta.is-flat { color: var(--text-faint); }
+.stat__delta-arrow { transform: rotate(-90deg); }
+.stat__delta.is-down .stat__delta-arrow { transform: rotate(90deg); }
+.stat__trends { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.trend { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: var(--r-full); line-height: 1.4; }
+.trend.is-up { color: var(--success); background: var(--success-soft); }
+.trend.is-down { color: var(--fail); background: var(--fail-soft); }
+.trend.is-flat { color: var(--text-faint); background: var(--surface-2); }
 </style>

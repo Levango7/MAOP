@@ -1,8 +1,7 @@
 /**
  * useStreamingFetch — POST + SSE streaming via ReadableStream.
  *
- * Unlike useSSE (which uses EventSource, GET-only), this composable supports
- * POST requests with a JSON body and parses the SSE response stream.
+ * Supports POST requests with a JSON body and parses the SSE response stream.
  * Automatically injects JWT token for auth.
  *
  * @returns {{ stream: Function }}

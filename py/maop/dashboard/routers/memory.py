@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from maop.core.middleware import require_admin
+from maop.core.db_utils import get_db_path
 
 from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
@@ -55,7 +56,7 @@ async def api_memory_deep(request: Request) -> dict[str, Any]:
         logger.debug("Failed to check bloom filter availability", exc_info=True)
     try:
         from maop.core.vector import VectorStore
-        vs = VectorStore(db_path=str(MAOP_ROOT / "data" / "vectors.db"))
+        vs = VectorStore(db_path=str(get_db_path("vectors")))
         stats["vector_index"] = True
         stats["vector_count"] = vs.count() if hasattr(vs, "count") else 0
     except Exception:
@@ -123,7 +124,7 @@ async def api_neural_status() -> dict[str, Any]:
             "embedding": {"enabled": False, "dim": 0, "model": "N/A"}, "vector_store": {"enabled": False, "count": 0}}
     try:
         from maop.core.vector import VectorStore
-        vs = VectorStore(db_path=str(MAOP_ROOT / "data" / "vectors.db"))
+        vs = VectorStore(db_path=str(get_db_path("vectors")))
         info["vector_store"] = {"enabled": True, "count": vs.count() if hasattr(vs, "count") else 0}
         if hasattr(vs, "_embedder"):
             emb = vs._embedder
@@ -198,3 +199,42 @@ async def api_neural_attention_get(q: str = "") -> dict[str, Any]:
     else:
         weights = []
     return {"query": q, "results": results, "attention_weights": weights, "count": len(results)}
+
+# ── Memory Write (manual entry) ────────────────────────────────────────
+@router.post("/api/memory/store")
+@handle_api_errors("Memory store", error_value={"status": "error", "error": "Failed to store memory", "id": None})
+async def api_memory_store(request: Request) -> dict[str, Any]:
+    """Write a manual memory entry into the three-layer system.
+    Body: { layer: "working"|"episodic"|"semantic", content: str,
+            agent?: str, topic?: str, task?: str, tags?: str, ttl_s?: int }
+    """
+    require_admin(request)
+    body = await request.json()
+    layer = body.get("layer", "episodic")
+    content = body.get("content", "").strip()
+    if not content:
+        raise HTTPException(400, "content is required")
+
+    try:
+        from maop.core.three_layer_memory import ThreeLayerMemory
+        raw_tags = body.get("tags")
+        if isinstance(raw_tags, str):
+            tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
+        elif isinstance(raw_tags, (list, tuple)):
+            tags = [str(t).strip() for t in raw_tags if str(t).strip()]
+        else:
+            tags = []
+        mem = ThreeLayerMemory(root_dir=str(MAOP_ROOT))
+        entry_id = mem.store(
+            layer=layer,
+            content=content,
+            agent=body.get("agent", "admin"),
+            topic=body.get("topic", ""),
+            task=body.get("task", ""),
+            tags=tags,
+            ttl_s=body.get("ttl_s"),
+        )
+        return {"status": "ok", "id": entry_id, "layer": layer}
+    except Exception as exc:
+        logger.exception("memory store failed")
+        raise HTTPException(500, f"Store failed: {exc}")

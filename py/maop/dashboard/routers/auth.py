@@ -29,10 +29,16 @@ router = APIRouter()
 
 # ── Auth config ────────────────────────────────────────────────────
 from maop.core.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig, load_jwt_secret
-from maop.core.db_utils import sqlite_connect
+from maop.core.db_utils import get_db_path, sqlite_connect
 
 _env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
-_auth_enabled = os.environ.get("MAOP_AUTH", "1" if _env_is_prod else "0") == "1"
+# High 安全修复 (2.3): secure-by-default。只有显式声明本地开发环境
+# (dev/development/local/test) 才默认禁用认证；staging/QA/demo/未设置/
+# 拼写错误一律默认启用。与 settings._default_auth_enabled 保持一致。
+_env_is_dev = os.environ.get("MAOP_ENV", "").strip().lower() in (
+    "dev", "development", "local", "test",
+)
+_auth_enabled = os.environ.get("MAOP_AUTH", "0" if _env_is_dev else "1") == "1"
 # M6 fix (Phase R5): OWASP 2023 推荐 600k 迭代 for PBKDF2-HMAC-SHA256
 _AUTH_PBKDF2_ITERATIONS = 600_000
 _auth_mgr: AuthManager | None = None
@@ -82,7 +88,7 @@ def get_auth_mgr() -> AuthManager:
             enabled=True,
             jwt=JWTConfig(secret=jwt_secret, default_ttl_s=7200.0),
         )
-        db_path = MAOP_ROOT / "data" / "auth.db"
+        db_path = get_db_path("auth")
         _auth_mgr = AuthManager(
             config=cfg,
             key_store=APIKeyStore(db_path=str(db_path)),
@@ -94,7 +100,7 @@ def get_auth_mgr() -> AuthManager:
 def _ensure_default_user() -> None:
     """Create default admin user on first run if none exists."""
     try:
-        db_path = MAOP_ROOT / "data" / "auth.db"
+        db_path = get_db_path("auth")
         with sqlite_connect(str(db_path)) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -147,7 +153,7 @@ from maop.core.middleware import require_admin as _require_admin
 
 
 # ── Sync DB helpers (for run_in_executor) ──────────────────────────
-def _db_login_user(db_path_str: str, username: str, password: str) -> dict:
+def _db_login_user(db_path_str: str, username: str, password: str) -> Any:
     """Sync: validate user credentials, return result dict."""
 
     with sqlite_connect(db_path_str) as conn:
@@ -174,7 +180,7 @@ def _db_login_user(db_path_str: str, username: str, password: str) -> dict:
     return {"status": "ok", "username": username, "roles": roles}
 
 
-def _db_register_user(db_path_str: str, username: str, password: str, roles: list) -> dict:
+def _db_register_user(db_path_str: str, username: str, password: str, roles: list) -> Any:
     """Sync: register a new user."""
 
     with sqlite_connect(db_path_str) as conn:
@@ -201,7 +207,7 @@ def _db_list_users(db_path_str: str) -> list:
              "created_at": r["created_at"], "enabled": bool(r["enabled"])} for r in rows]
 
 
-def _db_delete_user(db_path_str: str, username: str) -> dict:
+def _db_delete_user(db_path_str: str, username: str) -> Any:
     """Sync: delete a user."""
     with sqlite_connect(db_path_str) as conn:
         result = conn.execute("DELETE FROM users WHERE username = ?", (username,))
@@ -212,7 +218,7 @@ def _db_delete_user(db_path_str: str, username: str) -> dict:
     return {"status": "ok", "message": f"User {username} deleted"}
 
 
-def _db_update_user(db_path_str: str, username: str, body: dict) -> dict:
+def _db_update_user(db_path_str: str, username: str, body: dict) -> Any:
     """Sync: update user roles, enabled, or password."""
 
     with sqlite_connect(db_path_str) as conn:
@@ -240,7 +246,7 @@ _LOCKOUT_SECONDS = 900.0
 _MAX_TRACKED_USERS = 10_000  # P1-18 fix: prevent unbounded growth
 
 @router.get("/api/auth/status")
-async def auth_status(request: Request) -> dict[str, Any]:
+async def auth_status(request: Request) -> Any:
     """Check if auth is enabled and whether user is logged in."""
     # F-P0-8 fix: check actual token from Authorization header
     has_token = False
@@ -262,7 +268,7 @@ async def auth_status(request: Request) -> dict[str, Any]:
 
 
 @router.post("/api/auth/login")
-async def auth_login(request: Request) -> dict[str, Any]:
+async def auth_login(request: Request) -> Any:
     """Login with username/password, returns JWT token."""
     try:
         body = await request.json()
@@ -276,14 +282,36 @@ async def auth_login(request: Request) -> dict[str, Any]:
             failures = _login_failures.get(username, [])
             failures = [t for t in failures if now - t < _LOCKOUT_SECONDS]
             _login_failures[username] = failures
-            # P1-18 fix: periodic cleanup to prevent unbounded growth
+            # P1-18 fix: periodic cleanup to prevent unbounded growth.
+            # High 安全修复 (2.5): 不再整表 clear() —— 攻击者可用 1 万个不同
+            # 用户名触发 clear 来重置目标账户的锁定计数（暴力破解绕过）。
+            # 改为：先清理已过期条目；仍超限时仅淘汰"未锁定"的最旧条目，
+            # 已锁定账户的计数永不被淘汰。
             if len(_login_failures) > _MAX_TRACKED_USERS:
-                _login_failures.clear()
-                _login_failures[username] = failures
+                for user in list(_login_failures):
+                    recent = [
+                        t for t in _login_failures[user]
+                        if now - t < _LOCKOUT_SECONDS
+                    ]
+                    if recent:
+                        _login_failures[user] = recent
+                    else:
+                        del _login_failures[user]
+                if len(_login_failures) > _MAX_TRACKED_USERS:
+                    evictable = sorted(
+                        (
+                            u for u, ts in _login_failures.items()
+                            if len(ts) < _MAX_LOGIN_FAILURES and u != username
+                        ),
+                        key=lambda u: max(_login_failures[u], default=0.0),
+                    )
+                    excess = len(_login_failures) - _MAX_TRACKED_USERS
+                    for u in evictable[:excess]:
+                        del _login_failures[u]
         if len(failures) >= _MAX_LOGIN_FAILURES:
             return JSONResponse({"status": "error", "error": "Account locked. Try again later."}, status_code=429)
 
-        db_path = MAOP_ROOT / "data" / "auth.db"
+        db_path = get_db_path("auth")
         if not db_path.exists():
             get_auth_mgr()
 
@@ -320,8 +348,61 @@ async def auth_login(request: Request) -> dict[str, Any]:
         return JSONResponse({"status": "error", "error": "Login failed"}, status_code=401)
 
 
+@router.post("/api/auth/refresh")
+async def auth_refresh(request: Request):
+    """Refresh an existing JWT token before it expires.
+
+    Requires a valid (non-expired) token in the Authorization header.
+    Returns a new token with the same identity and roles, extended TTL.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return JSONResponse(
+            {"status": "error", "error": "Missing or invalid Authorization header"},
+            status_code=401,
+        )
+    token = auth_header[7:]
+    try:
+        mgr = get_auth_mgr()
+        result = mgr.jwt_handler.validate_token(token)
+        if not result.authenticated:
+            return JSONResponse(
+                {"status": "error", "error": result.error or "Token invalid or expired"},
+                status_code=401,
+            )
+        # Issue new token with same identity + roles
+        new_token = mgr.jwt_handler.create_token(
+            result.identity,
+            roles=result.roles,
+            ttl_s=7200.0,
+        )
+        response = JSONResponse({
+            "status": "ok",
+            "token": new_token,
+            "username": result.identity,
+            "roles": result.roles or [],
+            "expires_in": 7200,
+        })
+        response.set_cookie(
+            key="maop_token", value=new_token, max_age=7200,
+            httponly=True, secure=True, samesite="strict", path="/",
+        )
+        # Revoke old token so it can't be used after refresh
+        try:
+            mgr.jwt_handler.revoke_token(token)
+        except Exception:
+            pass  # best-effort revocation
+        return response
+    except Exception as exc:
+        logger.exception("[auth] Token refresh failed")
+        return JSONResponse(
+            {"status": "error", "error": f"Refresh failed: {exc}"},
+            status_code=500,
+        )
+
+
 @router.post("/api/auth/logout")
-async def auth_logout(request: Request) -> dict[str, Any]:
+async def auth_logout(request: Request) -> Any:
     """Logout - revoke JWT token server-side (P1 fix)."""
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
@@ -337,7 +418,7 @@ async def auth_logout(request: Request) -> dict[str, Any]:
 
 
 @router.post("/api/auth/register")
-async def auth_register(request: Request) -> dict[str, Any]:
+async def auth_register(request: Request) -> Any:
     """Register a new user (admin only)."""
     try:
         _require_admin(request)
@@ -351,7 +432,7 @@ async def auth_register(request: Request) -> dict[str, Any]:
         if len(password) < 8:
             return JSONResponse({"status": "error", "error": "Password must be at least 8 characters"}, status_code=400)
 
-        db_path = MAOP_ROOT / "data" / "auth.db"
+        db_path = get_db_path("auth")
         if not db_path.exists():
             get_auth_mgr()
 
@@ -367,11 +448,11 @@ async def auth_register(request: Request) -> dict[str, Any]:
 
 
 @router.get("/api/auth/users")
-async def auth_users(request: Request) -> dict[str, Any]:
+async def auth_users(request: Request) -> Any:
     """List all users (admin only)."""
     try:
         _require_admin(request)
-        db_path = MAOP_ROOT / "data" / "auth.db"
+        db_path = get_db_path("auth")
         if not db_path.exists():
             get_auth_mgr()
         users = await asyncio.get_running_loop().run_in_executor(
@@ -384,13 +465,13 @@ async def auth_users(request: Request) -> dict[str, Any]:
 
 
 @router.delete("/api/auth/users/{username}")
-async def auth_delete_user(username: str, request: Request) -> dict[str, Any]:
+async def auth_delete_user(username: str, request: Request) -> Any:
     """Delete a user (admin only, cannot delete admin)."""
     try:
         _require_admin(request)
         if username == "admin":
             return JSONResponse({"status": "error", "error": "Cannot delete admin user"}, status_code=403)
-        db_path = MAOP_ROOT / "data" / "auth.db"
+        db_path = get_db_path("auth")
         return await asyncio.get_running_loop().run_in_executor(
             None, _db_delete_user, str(db_path), username
         )
@@ -400,12 +481,12 @@ async def auth_delete_user(username: str, request: Request) -> dict[str, Any]:
 
 
 @router.put("/api/auth/users/{username}")
-async def auth_update_user(username: str, request: Request) -> dict[str, Any]:
+async def auth_update_user(username: str, request: Request) -> Any:
     """Update user roles, enabled status, or password (admin only)."""
     try:
         _require_admin(request)
         body = await request.json()
-        db_path = MAOP_ROOT / "data" / "auth.db"
+        db_path = get_db_path("auth")
         return await asyncio.get_running_loop().run_in_executor(
             None, _db_update_user, str(db_path), username, body
         )

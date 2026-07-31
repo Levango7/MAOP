@@ -21,15 +21,17 @@ All endpoints use SQLite-backed Python queries — the Python layer
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel
 
-from maop.core.db_utils import get_pool
+from maop.core.db_utils import get_db_path, get_pool
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +75,7 @@ class DataProxy:
         """Create maop.db tables if they don't exist (idempotent)."""
         try:
             from maop.core.data import MaopDatabase
-            db = MaopDatabase(self._data_dir / "maop.db")
+            db = MaopDatabase(get_db_path())
             db.init()
         except Exception as exc:
             # H1 (2026-07-22, Phase H): log the exception instead of silently
@@ -84,13 +86,13 @@ class DataProxy:
     # ── Connection helpers (pool-based) ────────────────────────
 
     def _pool_maop(self):
-        return get_pool(self._data_dir / "maop.db")
+        return get_pool(get_db_path())
 
     def _pool_memory(self):
-        return get_pool(self._data_dir / "memory.db")
+        return get_pool(get_db_path("memory"))
 
     def _pool_queue(self):
-        return get_pool(self._data_dir / "queue.db")
+        return get_pool(get_db_path("queue"))
 
     def _query_maop_sync(self, sql: str, params: tuple = ()) -> list[dict]:
         """Execute a SELECT on maop.db (sync — for run_in_executor)."""
@@ -342,6 +344,101 @@ class DataProxy:
 
         self._record_latency(start)
         return rows
+
+    async def delegation_period_stats(self, now: "datetime | None" = None) -> dict[str, Any]:
+        """Compute MoM / YoY trend for delegation volume and success rate.
+
+        The genuine delegation history lives in ``logs/delegations.json``
+        (the SQL ``delegations`` table is not populated by the current
+        pipeline). This method reads that file and returns, for the trailing
+        30-day window (the natural base for 环比/MoM) and the trailing 365-day
+        window (同比/YoY):
+          - ``total`` / ``success_rate`` for the current window
+          - ``delegations_mom`` / ``delegations_yoy`` : % change vs previous
+            window (None when the previous window has no data)
+          - ``success_rate_mom`` / ``success_rate_yoy`` : percentage-point delta
+
+        Returning None (not 0) for a missing previous period lets the UI skip
+        the trend pill instead of showing a misleading 0%.
+        """
+        import re
+
+        def _parse_ts(s: str) -> "datetime | None":
+            if not s:
+                return None
+            s = str(s).strip()
+            if s.endswith("Z"):
+                s = s[:-1] + "+00:00"
+            m = re.match(r"^(.*\.\d+)([+\-]\d{2}:?\d{2})$", s)
+            if m:
+                frac = m.group(1)
+                dot = frac.rfind(".")
+                frac6 = frac[: dot + 1] + frac[dot + 1 : dot + 7].ljust(6, "0")[:6]
+                s = frac6 + m.group(2)
+            try:
+                return datetime.fromisoformat(s)
+            except Exception:
+                return None
+
+        now_dt = now or datetime.now(timezone.utc)
+        empty = {
+            "total": 0, "success_rate": 0.0,
+            "delegations_mom": None, "delegations_yoy": None,
+            "success_rate_mom": None, "success_rate_yoy": None,
+        }
+        log_path = Path(self._root) / "logs" / "delegations.json"
+        if not log_path.exists():
+            return empty
+        try:
+            with open(log_path, encoding="utf-8") as fh:
+                records = json.load(fh)
+        except Exception as exc:
+            logger.warning("[bridge] delegation_period_stats read failed: %s", exc)
+            return empty
+        if not isinstance(records, list):
+            return empty
+
+        from datetime import timedelta
+
+        def _window(since: datetime, until: datetime) -> "tuple[int, float]":
+            total = 0
+            succ = 0
+            for rec in records:
+                if not isinstance(rec, dict):
+                    continue
+                ts = _parse_ts(cast(str, rec.get("timestamp")))
+                if ts is None or not (since <= ts < until):
+                    continue
+                total += 1
+                ec = rec.get("exit_code")
+                if ec is None:
+                    ec = (rec.get("result") or {}).get("exit_code")
+                if ec == 0:
+                    succ += 1
+            rate = round(succ / total * 100, 1) if total else 0.0
+            return total, rate
+
+        cur30_s, cur30_e = now_dt - timedelta(days=30), now_dt
+        prev30_s, prev30_e = now_dt - timedelta(days=60), now_dt - timedelta(days=30)
+        cur365_s, cur365_e = now_dt - timedelta(days=365), now_dt
+        prev365_s, prev365_e = now_dt - timedelta(days=730), now_dt - timedelta(days=365)
+
+        cur30_t, cur30_r = _window(cur30_s, cur30_e)
+        prev30_t, prev30_r = _window(prev30_s, prev30_e)
+        cur365_t, cur365_r = _window(cur365_s, cur365_e)
+        prev365_t, prev365_r = _window(prev365_s, prev365_e)
+
+        def _pct(cur: int, prev: int) -> "float | None":
+            return round((cur - prev) / prev * 100, 1) if prev else None
+
+        return {
+            "total": cur30_t,
+            "success_rate": cur30_r,
+            "delegations_mom": _pct(cur30_t, prev30_t),
+            "delegations_yoy": _pct(cur365_t, prev365_t),
+            "success_rate_mom": round(cur30_r - prev30_r, 1) if prev30_r else None,
+            "success_rate_yoy": round(cur365_r - prev365_r, 1) if prev365_r else None,
+        }
 
     async def chain(self) -> list[dict[str, Any]]:
         """Fallback chain info — replaces correlation.ps1 -Action chain."""
@@ -708,14 +805,83 @@ class DataProxy:
         return result
 
     async def logs_get(self, name: str = "dashboard", limit: int = 50) -> list[dict[str, Any]]:
-        """Get log entries — from error_log table."""
+        """Get log entries for the named log stream.
+
+        Routes by ``name`` to the correct source. Previously every call
+        returned the ``error_log`` table regardless of ``name``, so
+        ``logs_get(name="delegations")`` returned the wrong data.
+
+        * ``delegations`` → ``logs/delegations.json`` (the genuine delegation history)
+        * ``checker``     → ``logs/checker_*.log`` parsed into structured entries
+        * anything else (default ``dashboard``) → ``error_log`` table
+        """
         start = time.monotonic()
-        result = await self._query_maop(
-            "SELECT * FROM error_log ORDER BY timestamp DESC LIMIT ?",
-            (limit,),
-        )
+        if name == "delegations":
+            result = await asyncio.to_thread(self._read_delegations_json, limit)
+        elif name == "checker":
+            result = await asyncio.to_thread(self._read_checker_logs, limit)
+        else:
+            result = await self._query_maop(
+                "SELECT * FROM error_log ORDER BY timestamp DESC LIMIT ?",
+                (limit,),
+            )
         self._record_latency(start)
         return result
+
+    # ── log readers ───────────────────────────────────────────
+
+    def _read_delegations_json(self, limit: int) -> list[dict[str, Any]]:
+        """Read the genuine delegation history from logs/delegations.json."""
+        path = self._root / "logs" / "delegations.json"
+        if not path.exists():
+            return []
+        try:
+            data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        except Exception:
+            return []
+        if not isinstance(data, list):
+            return []
+        if limit and limit > 0:
+            return data[-limit:]
+        return data
+
+    def _read_checker_logs(self, limit: int) -> list[dict[str, Any]]:
+        """Read and parse checker log files into structured entries."""
+        log_dir = self._root / "logs"
+        if not log_dir.is_dir():
+            return []
+        files = sorted(log_dir.glob("checker_*.log"), reverse=True)
+        entries: list[dict[str, Any]] = []
+        _log_re = re.compile(
+            r"^\[(?P<ts>\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})(?:\.\d+)?\]\s*"
+            r"\[(?P<agent>[^\]]+)\]\s*"
+            r"(?P<level>\w+):?\s*"
+            r"(?P<msg>.*)$"
+        )
+        for f in files:
+            try:
+                text = f.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+            for raw in text.splitlines():
+                line = raw.rstrip("\r\n")
+                if not line:
+                    continue
+                m = _log_re.match(line)
+                if m:
+                    entries.append({
+                        "ts": m.group("ts"),
+                        "level": (m.group("level") or "info").lower(),
+                        "agent": m.group("agent") or "checker",
+                        "msg": m.group("msg") or line,
+                    })
+                else:
+                    entries.append({"ts": None, "level": "info", "agent": "checker", "msg": line})
+                if limit and len(entries) >= limit:
+                    break
+            if limit and len(entries) >= limit:
+                break
+        return entries[:limit] if limit else entries
 
     # ── Internal ─────────────────────────────────────────────
 

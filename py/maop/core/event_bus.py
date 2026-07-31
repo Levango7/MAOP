@@ -11,6 +11,7 @@ import asyncio
 import inspect
 import logging
 import re
+import threading
 import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
@@ -129,6 +130,13 @@ class EventBus:
         self._max_dead_letters = _DEFAULT_MAX_DEAD_LETTERS
         # Track in-flight retry tasks so we can await them on close
         self._retry_tasks: list[asyncio.Task] = []
+        # High fix: protect _subs/_history/_dead_letters/_counter against
+        # concurrent mutation (subscribe from any thread vs. publish loop).
+        # RLock so internal helpers can re-enter while already held.
+        self._lock = threading.RLock()
+        # High fix: keep strong references to fire-and-forget publish tasks
+        # created by publish_sync so they are not garbage-collected mid-flight.
+        self._pending_publish_tasks: set[asyncio.Task] = set()
 
     # ── Subscribe ─────────────────────────────────────────────
 
@@ -170,16 +178,18 @@ class EventBus:
             max_retries=max_retries,
             retry_delay_s=retry_delay_s,
         )
-        self._subs[topic].append(sub)
-        # Keep sorted by priority descending
-        self._subs[topic].sort(key=lambda s: s.priority.value, reverse=True)
+        with self._lock:
+            self._subs[topic].append(sub)
+            # Keep sorted by priority descending
+            self._subs[topic].sort(key=lambda s: s.priority.value, reverse=True)
 
     def unsubscribe(self, topic: str, handler: Handler) -> None:
         """Remove a handler from a topic."""
-        if topic in self._subs:
-            self._subs[topic] = [
-                s for s in self._subs[topic] if s.handler is not handler
-            ]
+        with self._lock:
+            if topic in self._subs:
+                self._subs[topic] = [
+                    s for s in self._subs[topic] if s.handler is not handler
+                ]
 
     # ── Publish ───────────────────────────────────────────────
 
@@ -188,15 +198,17 @@ class EventBus:
 
         Returns the number of handlers that succeeded.
         """
-        self._counter += 1
-        event._id = self._counter
+        # High fix: counter increment + history append under lock
+        with self._lock:
+            self._counter += 1
+            event._id = self._counter
 
-        # Record in history
-        self._history.append(event)
-        if len(self._history) > self._max_history:
-            self._history = self._history[-self._max_history:]
+            # Record in history
+            self._history.append(event)
+            if len(self._history) > self._max_history:
+                self._history = self._history[-self._max_history:]
 
-        matching_subs = self._find_matching_subs(event)
+            matching_subs = self._find_matching_subs(event)
         handlers_succeeded = 0
 
         for sub in matching_subs:
@@ -288,9 +300,10 @@ class EventBus:
             error=error,
             attempts=attempts,
         )
-        self._dead_letters.append(entry)
-        if len(self._dead_letters) > self._max_dead_letters:
-            self._dead_letters = self._dead_letters[-self._max_dead_letters:]
+        with self._lock:
+            self._dead_letters.append(entry)
+            if len(self._dead_letters) > self._max_dead_letters:
+                self._dead_letters = self._dead_letters[-self._max_dead_letters:]
         logger.warning(
             "Dead letter: event %d on %s handler %s after %d attempts: %s",
             event_id, topic, handler_name, attempts, error,
@@ -332,7 +345,12 @@ class EventBus:
             loop = None
 
         if loop and loop.is_running():
-            asyncio.ensure_future(self.publish(event))
+            # High fix: keep a strong reference to the task so it is not
+            # garbage-collected before completion (asyncio only holds weak
+            # references to tasks). Discard on completion.
+            task = asyncio.ensure_future(self.publish(event))
+            self._pending_publish_tasks.add(task)
+            task.add_done_callback(self._pending_publish_tasks.discard)
             return 0  # best-effort
         else:
             return asyncio.run(self.publish(event))
@@ -345,7 +363,8 @@ class EventBus:
         limit: int = 50,
     ) -> list[Event]:
         """Return recent events, optionally filtered by topic prefix."""
-        events = self._history
+        with self._lock:
+            events = list(self._history)
         if topic:
             events = [e for e in events if e.topic.startswith(topic)]
         return events[-limit:]
@@ -356,7 +375,8 @@ class EventBus:
         limit: int = 50,
     ) -> list[DeadLetterEntry]:
         """Return dead letter entries, optionally filtered by topic."""
-        entries = self._dead_letters
+        with self._lock:
+            entries = list(self._dead_letters)
         if topic:
             entries = [e for e in entries if e.topic == topic]
         return entries[-limit:]
@@ -367,25 +387,31 @@ class EventBus:
 
     def subscriber_count(self, topic: str | None = None) -> int:
         """Count subscribers, optionally for a specific topic."""
-        if topic:
-            return len(self._subs.get(topic, []))
-        return sum(len(subs) for subs in self._subs.values())
+        with self._lock:
+            if topic:
+                return len(self._subs.get(topic, []))
+            return sum(len(subs) for subs in self._subs.values())
 
     def clear(self) -> None:
         """Remove all subscriptions, history, and dead letters."""
-        self._subs.clear()
-        self._history.clear()
-        self._dead_letters.clear()
+        with self._lock:
+            self._subs.clear()
+            self._history.clear()
+            self._dead_letters.clear()
 
 
 # ── Global singleton ──────────────────────────────────────────
 
 _global_bus: EventBus | None = None
+# High fix: guard singleton creation against TOCTOU races between threads
+_global_bus_lock = threading.Lock()
 
 
 def get_event_bus() -> EventBus:
-    """Get the global event bus singleton."""
+    """Get the global event bus singleton (thread-safe)."""
     global _global_bus
     if _global_bus is None:
-        _global_bus = EventBus()
+        with _global_bus_lock:
+            if _global_bus is None:
+                _global_bus = EventBus()
     return _global_bus

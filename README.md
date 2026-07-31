@@ -1,4 +1,4 @@
-﻿# MAOP — Multi-Agent Orchestration Platform
+# MAOP — Multi-Agent Orchestration Platform
 
 > Python-first agent orchestration framework with Plan-Execute-Verify loop,
 > model management, control plane, and real-time dashboard.
@@ -20,7 +20,7 @@ Entry (maop.ps1 / cli.py)
 | Entry | `maop.ps1`, `cli.py` | CLI & startup |
 | Orchestration | `maop_loop.py`, `engine.py` | Phase pipeline & DAG workflows |
 | Dispatch | `dispatcher.py`, `maop_plan.py` | Config-driven agent routing |
-| Infrastructure | `core/` (30+ modules) | Shared services & utilities |
+| Infrastructure | `core/` (107+ modules) | Shared services & utilities |
 | Data | SQLite, JSON, YAML | Persistence & configuration |
 
 ## 双版架构（Dual Edition）
@@ -43,13 +43,16 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 | 热重载 (Hot Reload) | ✓ | ✓ |
 | 插件系统 (Plugin System) | ✓ | ✓ |
 | RBAC 角色权限 | ✗ | ✓ |
-| SSO (OIDC) 单点登录 | ✗ | ✓ |
+| SSO (OIDC + SAML) 单点登录 | ✗ | ✓ |
 | PostgreSQL 持久化 | ✗ | ✓ |
 | Redis 高可用缓存 | ✗ | ✓ |
 | Vault 密钥管理 | ✗ | ✓ |
 | 多租户隔离 (Tenant Isolation) | ✗ | ✓ |
 | Audit Log 审计日志 | ✗ | ✓ |
 | n8n 集成 | ✗ | ✓ |
+| RabbitMQ 消息队列 | ✗ | ✓ (可选依赖 pika) |
+| etcd 分布式 KV | ✗ | ✓ (可选依赖 etcd3) |
+| License CRL 在线撤销 | ✗ | ✓ |
 | Vue Dashboard 企业版路由 | ✗ | ✓ |
 
 > Enterprise = Personal ∪ Enterprise 独占能力；企业版包含所有功能。
@@ -102,8 +105,8 @@ License 颁发指南见 [docs/enterprise/license-issuance-guide.md](docs/enterpr
 |----------|----------|------------|
 | storage | sqlite | postgresql |
 | cache | memory | redis |
-| queue | sqlite | rabbitmq (已实现，可选依赖 pika) |
-| kv | sqlite | etcd (已实现，可选依赖 etcd3) |
+| queue | sqlite | redis（默认；rabbitmq 可通过 `MAOP_QUEUE_BACKEND=rabbitmq` 启用，可选依赖 pika） |
+| kv | sqlite | sqlite（默认；etcd 可通过 `MAOP_KV_BACKEND=etcd` 启用，可选依赖 etcd3） |
 | secret | local | vault |
 
 企业版后端不可用时自动降级到个人版后端（通过 `record_degradation()` 记录）。
@@ -167,7 +170,9 @@ maop run --task "refactor auth module to use JWT"
 
 # Monitor real-time progress via dashboard
 # Open http://localhost:9079 -> Overview tab shows live delegation
-# Real-time updates via WebSocket at /ws (SSE removed per ADR-006)
+# Real-time updates via WebSocket at /ws
+# (HTTP SSE transport endpoint removed per ADR-006; the internal SSEStreamer
+#  primitive is still used as a streaming abstraction for server-side events)
 ```
 
 **Key features used:**
@@ -205,6 +210,18 @@ maop start --port 9079
 - Audit logging (all write operations recorded)
 - TLS support for production (MAOP_TLS=1)
 
+> **Optional backends (RabbitMQ / etcd):** these are documented capabilities
+> but are **off by default**. Enable them in production by adding the matching
+> Compose profile and the corresponding env override:
+> ```bash
+> # RabbitMQ queue backend (needs optional `pika` dep, MAOP_QUEUE_BACKEND=rabbitmq)
+> docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+>   --profile rabbitmq up -d
+> # etcd distributed KV backend (needs optional `etc3` dep, MAOP_KV_BACKEND=etcd)
+> docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+>   --profile etcd up -d
+> ```
+
 ### 3. Tool Calling + Memory-Augmented Chat
 
 Build a knowledge-augmented assistant:
@@ -228,10 +245,10 @@ curl -X POST http://localhost:9079/api/chat `
 ```
 
 **Key features used:**
-- MCP integration: Stdio/WebSocket transports (SSE removed per ADR-006)
+- MCP integration: Stdio/WebSocket transports (HTTP SSE endpoint removed per ADR-006; internal SSEStreamer primitive retained)
 - Three-layer memory: Working (current turn) -> Episodic (conversation) -> Semantic (knowledge graph)
 - Tool lifecycle: register -> enable -> call -> disable
-- Streaming: WebSocket for bidirectional real-time output (SSE removed per ADR-006)
+- Streaming: WebSocket for bidirectional real-time output (HTTP SSE endpoint removed per ADR-006; internal SSEStreamer primitive retained)
 
 ## Cost Tracking
 
@@ -322,7 +339,7 @@ Web dashboard at `http://localhost:9079` with:
 | `core/event_bus.py` | Async event bus |
 | `core/circuit_breaker.py` | Circuit breaker pattern |
 | `core/vector.py` | Vector store for semantic search |
-| `core/streaming.py` | Streaming infrastructure (WebSocket; SSE removed per ADR-006) |
+| `core/streaming.py` | Streaming infrastructure (WebSocket; HTTP SSE endpoint removed per ADR-006, internal SSEStreamer primitive retained) |
 | `config/edition.py` | Dual-edition 注册表与 FeatureFlag gate（[ADR-016](docs/adr/016-dual-edition-architecture.md)） |
 | `enterprise/` | 企业版扩展模块（rbac/tenant/audit/sso/ha/license/n8n 等，仅 `maop-enterprise` 包含） |
 

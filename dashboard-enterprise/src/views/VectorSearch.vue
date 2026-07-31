@@ -1,98 +1,161 @@
 <template>
-  <div class="vector-page">
-    <div class="topbar">
-      <h1>Vector Search</h1>
-      <div class="search-mode">
-        <button v-for="m in modes" :key="m.key" :class="['mode-btn', { active: mode === m.key }]" @click="mode = m.key">{{ m.label }}</button>
+  <div class="vs-page">
+    <PageHeader />
+
+    <Card :title="t('view.vector.query')" icon="search" :marginBottom="16">
+      <textarea
+        v-model="query"
+        class="query-input"
+        rows="3"
+        :placeholder="t('view.vector.queryPlaceholder')"
+        @keydown.ctrl.enter="doSearch"
+      ></textarea>
+      <div class="query-controls">
+        <div class="ctrl">
+          <label>{{ t('view.vector.topK') }}</label>
+          <input type="number" v-model.number="topK" min="1" max="100" class="num-input" />
+        </div>
+        <div class="ctrl ctrl--grow" v-if="hasScores">
+          <label>{{ t('view.vector.minScore') }} <span class="muted">{{ minScore.toFixed(2) }}</span></label>
+          <input type="range" v-model.number="minScore" min="0" max="1" step="0.05" class="range" />
+        </div>
+        <button class="btn btn--primary" @click="doSearch" :disabled="searching || !query.trim()">
+          <AppIcon name="search" :size="15" /> {{ searching ? t('view.vector.searching') : t('common.search') }}
+        </button>
+      </div>
+    </Card>
+
+    <div v-if="searching" class="results-area">
+      <div class="result-card" v-for="n in 3" :key="n">
+        <Skeleton height="14px" />
+        <Skeleton height="38px" />
       </div>
     </div>
-
-    <div class="search-panel">
-      <div class="search-input-area">
-        <textarea v-model="query" placeholder="Enter text to search semantically..." rows="3" @keydown.ctrl.enter="doSearch"></textarea>
-        <div class="search-controls">
-          <div class="control-group">
-            <label>Top K</label>
-            <input type="number" v-model.number="topK" min="1" max="100" />
+    <template v-else>
+      <div class="results-area" v-if="filteredResults.length">
+        <div class="results-meta">
+          <span>{{ filteredResults.length }} result{{ filteredResults.length === 1 ? '' : 's' }}</span>
+          <span class="muted" v-if="searchTime">in {{ searchTime }} ms</span>
+        </div>
+        <div class="result-card" v-for="(r, i) in filteredResults" :key="i">
+          <div class="result-head">
+            <span class="rank">#{{ i + 1 }}</span>
+            <Badge v-if="r.score != null" :tone="scoreTone(r.score)">{{ Math.round(r.score * 100) }}%</Badge>
+            <span class="rid">{{ r.id || r.entry_id || r.vector_id || shortId(r) }}</span>
+            <Badge v-if="r.agent" tone="info">{{ r.agent }}</Badge>
           </div>
-          <div class="control-group">
-            <label>Threshold</label>
-            <input type="range" v-model.number="threshold" min="0" max="1" step="0.05" />
-            <span class="range-val">{{ threshold.toFixed(2) }}</span>
+          <div class="result-body">{{ r.content || r.text || r.chunk || r.payload || '—' }}</div>
+          <div class="result-foot" v-if="r.tags || r.timestamp">
+            <span class="tags" v-if="r.tags">
+              <Badge v-for="t in normTags(r.tags)" :key="t" tone="neutral">{{ t }}</Badge>
+            </span>
+            <span class="muted" v-if="r.timestamp">{{ fmt(r.timestamp) }}</span>
           </div>
-          <button class="search-btn" @click="doSearch" :disabled="searching || !query.trim()">
-            {{ searching ? 'Searching...' : '🔍 Search' }}
-          </button>
         </div>
       </div>
-    </div>
+      <EmptyState
+        v-else-if="searched"
+        icon="search"
+        :title="t('view.vector.noMatches')"
+        :description="`No vectors matched “${lastQuery}”.`"
+      />
+    </template>
 
-    <div class="results-area" v-if="results.length > 0">
-      <div class="results-header">
-        <span>{{ results.length }} results</span>
-        <span class="query-time" v-if="searchTime">in {{ searchTime }}ms</span>
+    <Card :title="t('view.vector.indexStats')" icon="database" :marginBottom="16">
+      <div class="stat-grid" v-if="!statsLoading">
+        <StatCard :label="t('view.vector.stat.totalEntries')" :value="stats.total_entries ?? 0" icon="database" tone="brand" />
+        <StatCard :label="t('view.vector.stat.totalTraces')" :value="stats.total_traces ?? 0" icon="route" tone="info" />
+        <StatCard :label="t('view.vector.stat.trajectorySteps')" :value="stats.total_trajectory_steps ?? 0" icon="activity" tone="warn" />
+        <StatCard :label="t('view.vector.stat.indexedAgents')" :value="agentCount" icon="bot" tone="success" />
       </div>
-      <div class="result-card" v-for="(r, i) in results" :key="i">
-        <div class="result-header">
-          <span class="result-rank">#{{ i + 1 }}</span>
-          <span class="result-score" :style="{ background: scoreColor(r.score) }">{{ (r.score * 100).toFixed(1) }}%</span>
-          <span class="result-id">{{ r.id || r.entry_id || '' }}</span>
-          <span class="result-meta" v-if="r.agent">{{ r.agent }}</span>
-        </div>
-        <div class="result-content">{{ r.content || r.text || r.chunk || '' }}</div>
-        <div class="result-footer">
-          <span class="result-tags" v-if="r.tags">
-            <span v-for="t in (typeof r.tags === 'string' ? r.tags.split(',') : r.tags)" :key="t" class="tag">{{ t }}</span>
-          </span>
-          <span class="result-ts" v-if="r.timestamp">{{ r.timestamp }}</span>
-        </div>
+      <div class="stat-grid" v-else>
+        <Skeleton height="66px" v-for="n in 4" :key="n" />
       </div>
-    </div>
+      <p class="inline-error" v-if="statsError">{{ statsError }}</p>
+    </Card>
 
-    <div class="empty-state" v-else-if="searched">
-      <p>No results found for "{{ lastQuery }}"</p>
-    </div>
-
-    <div class="vector-stats">
-      <div class="panel">
-        <h3>Index Statistics</h3>
-        <div class="stat-grid">
-          <div class="vstat"><span class="vstat-val">{{ indexStats.total_vectors }}</span><span class="vstat-lbl">Vectors</span></div>
-          <div class="vstat"><span class="vstat-val">{{ indexStats.dimensions }}</span><span class="vstat-lbl">Dimensions</span></div>
-          <div class="vstat"><span class="vstat-val">{{ indexStats.index_type }}</span><span class="vstat-lbl">Index Type</span></div>
-          <div class="vstat"><span class="vstat-val">{{ indexStats.last_indexed }}</span><span class="vstat-lbl">Last Indexed</span></div>
-        </div>
-      </div>
-    </div>
+    <Card :title="t('view.vector.indexedVectors')" icon="box" :marginBottom="16">
+      <DataTable
+        v-if="vectors.length"
+        :columns="vectorCols"
+        :rows="vectors"
+        :loading="vecLoading"
+        row-key="id"
+        :empty-text="t('view.vector.noIndexedVectors')"
+      />
+      <EmptyState v-else-if="!vecLoading" icon="database" :title="t('view.vector.noIndexedVectors')" :description="t('view.vector.vectorStoreEmpty')" />
+      <Skeleton v-else height="120px" />
+    </Card>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
+import { useI18n } from '../i18n';
+import Card from '../components/Card.vue';
+import PageHeader from '../components/PageHeader.vue';
+import StatCard from '../components/StatCard.vue';
+import Badge from '../components/Badge.vue';
+import DataTable from '../components/DataTable.vue';
+import Skeleton from '../components/Skeleton.vue';
+import EmptyState from '../components/EmptyState.vue';
+import AppIcon from '../components/AppIcon.vue';
 
 const api = useApiStore();
+const { t } = useI18n();
+
 const query = ref('');
 const topK = ref(10);
-const threshold = ref(0.5);
-const mode = ref('semantic');
+const minScore = ref(0);
 const searching = ref(false);
 const searched = ref(false);
 const lastQuery = ref('');
 const results = ref([]);
 const searchTime = ref(0);
-const indexStats = ref({ total_vectors: 0, dimensions: 384, index_type: 'Flat', last_indexed: '--' });
 
-const modes = [
-  { key: 'semantic', label: 'Semantic' },
-  { key: 'keyword', label: 'Keyword' },
-  { key: 'hybrid', label: 'Hybrid' },
+const stats = ref({});
+const statsLoading = ref(true);
+const statsError = ref('');
+
+const vectors = ref([]);
+const vecLoading = ref(true);
+
+const hasScores = computed(() => results.value.some((r) => r.score != null));
+const filteredResults = computed(() => {
+  if (!hasScores.value) return results.value;
+  return results.value.filter((r) => (r.score ?? 0) >= minScore.value);
+});
+const agentCount = computed(() => {
+  const ba = stats.value.by_agent;
+  return ba && typeof ba === 'object' ? Object.keys(ba).length : 0;
+});
+
+const vectorCols = [
+  { key: 'id', label: 'ID' },
+  { key: 'agent', label: t('view.vector.col.agent') },
+  { key: 'score', label: t('view.vector.col.score'), type: 'num' },
+  { key: 'timestamp', label: t('view.vector.col.timestamp') },
 ];
 
-function scoreColor(s) {
-  if (s >= 0.8) return 'rgba(34,197,94,.15)';
-  if (s >= 0.5) return 'rgba(59,130,246,.15)';
-  return 'rgba(239,68,68,.15)';
+function normTags(t) {
+  if (!t) return [];
+  if (Array.isArray(t)) return t.map(String);
+  return String(t).split(',').map((s) => s.trim()).filter(Boolean);
+}
+function shortId(r) {
+  const c = r.content || r.text || '';
+  return c ? c.slice(0, 8) + '…' : '#' + (results.value.indexOf(r) + 1);
+}
+function scoreTone(s) {
+  if (s >= 0.8) return 'success';
+  if (s >= 0.5) return 'info';
+  return 'warn';
+}
+function fmt(ts) {
+  if (ts === null) return '—';
+  const d = new Date(typeof ts === 'number' ? ts * 1000 : ts);
+  return isNaN(d.getTime()) ? String(ts) : d.toLocaleString();
 }
 
 async function doSearch() {
@@ -102,8 +165,8 @@ async function doSearch() {
   lastQuery.value = query.value;
   const start = performance.now();
   try {
-    const data = await api.get(`/api/vector/search?query=${encodeURIComponent(query.value)}&top_k=${topK.value}&mode=${mode.value}`);
-    results.value = data.results || data.entries || [];
+    const data = await api.get(`/api/vector/search?q=${encodeURIComponent(query.value)}&topk=${topK.value}`);
+    results.value = data.results || [];
     searchTime.value = Math.round(performance.now() - start);
   } catch {
     results.value = [];
@@ -114,58 +177,22 @@ async function doSearch() {
 
 onMounted(async () => {
   try {
-    const s = await api.get('/api/vector/stats');
-    indexStats.value = {
-      total_vectors: s.total_vectors || s.count || 0,
-      dimensions: s.dimensions || 384,
-      index_type: s.index_type || 'Flat',
-      last_indexed: s.last_indexed || '--',
-    };
-  } catch {}
+    stats.value = await api.get('/api/vector/stats');
+  } catch {
+    statsError.value = t('view.vector.statsError');
+  } finally {
+    statsLoading.value = false;
+  }
+  try {
+    const v = await api.get('/api/vector/list');
+    vectors.value = v.vectors || [];
+  } catch {
+    vectors.value = [];
+  } finally {
+    vecLoading.value = false;
+  }
 });
 </script>
 
 <style scoped>
-.vector-page { }
-.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-.topbar h1 { font-size: 24px; font-weight: 700; }
-.search-mode { display: flex; gap: 4px; background: var(--bg2); border-radius: 10px; padding: 3px; margin-left: 16px; }
-.mode-btn { background: none; border: none; padding: 6px 14px; border-radius: 8px; font-size: 13px; color: var(--text2); cursor: pointer; transition: all .15s; }
-.mode-btn.active { background: var(--accent); color: #fff; }
-
-.search-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 24px; }
-.search-input-area textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 14px; color: var(--text); resize: none; outline: none; font-family: inherit; line-height: 1.5; }
-.search-input-area textarea:focus { border-color: var(--accent); }
-.search-controls { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
-.control-group { display: flex; align-items: center; gap: 6px; }
-.control-group label { font-size: 12px; color: var(--text3); font-weight: 600; }
-.control-group input[type="number"] { width: 60px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 13px; color: var(--text); text-align: center; }
-.control-group input[type="range"] { width: 100px; }
-.range-val { font-size: 12px; color: var(--text3); font-family: monospace; min-width: 32px; }
-.search-btn { margin-left: auto; background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 8px 20px; font-size: 14px; cursor: pointer; }
-.search-btn:disabled { opacity: .5; }
-
-.results-area { margin-bottom: 24px; }
-.results-header { display: flex; justify-content: space-between; font-size: 13px; color: var(--text3); margin-bottom: 12px; }
-.query-time { font-family: monospace; }
-.result-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; }
-.result-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.result-rank { font-size: 13px; font-weight: 700; color: var(--text3); }
-.result-score { font-size: 12px; padding: 2px 10px; border-radius: 6px; font-weight: 700; }
-.result-id { font-size: 11px; color: var(--text3); font-family: monospace; }
-.result-meta { margin-left: auto; font-size: 12px; color: var(--accent); }
-.result-content { font-size: 14px; line-height: 1.6; color: var(--text); }
-.result-footer { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-.result-tags { display: flex; gap: 4px; }
-.tag { font-size: 11px; background: var(--bg); padding: 2px 8px; border-radius: 4px; color: var(--text3); }
-.result-ts { margin-left: auto; font-size: 11px; color: var(--text3); }
-.empty-state { text-align: center; padding: 40px; color: var(--text3); }
-
-.vector-stats { }
-.panel { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
-.panel h3 { font-size: 14px; font-weight: 600; color: var(--text2); margin-bottom: 16px; }
-.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.vstat { text-align: center; }
-.vstat-val { font-size: 22px; font-weight: 700; display: block; }
-.vstat-lbl { font-size: 11px; color: var(--text3); }
 </style>

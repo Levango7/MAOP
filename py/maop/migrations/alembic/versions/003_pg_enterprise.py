@@ -27,6 +27,22 @@ def upgrade() -> None:
     bind = op.get_bind()
     # 003 是 PostgreSQL 专用企业表（含 JSONB 类型），SQLite 等非 PG 方言直接跳过
     if bind.dialect.name != "postgresql":
+        # OPS-36 fix: alembic still stamps this revision as applied even
+        # though nothing ran. If this database's schema is later migrated
+        # to PostgreSQL (e.g. dump/restore + repointing alembic), the
+        # enterprise tables will be MISSING while alembic believes 003 is
+        # applied. Remediation on the new PG database:
+        #   alembic stamp 002 && alembic upgrade head
+        # (or run this file's DDL manually). Emit a loud warning so the
+        # skip is visible in migration logs instead of silent.
+        import logging
+        logging.getLogger("alembic.runtime.migration").warning(
+            "003_pg_enterprise SKIPPED on dialect %r (PostgreSQL-only DDL) "
+            "but will be stamped as applied. If you later move this "
+            "database to PostgreSQL, run `alembic stamp 002 && alembic "
+            "upgrade head` there to actually create the enterprise tables.",
+            bind.dialect.name,
+        )
         return
     inspector = sa.inspect(bind)
 
@@ -123,7 +139,32 @@ def upgrade() -> None:
     op.execute("CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_events(action)")
 
 
+def _require_destructive_ack(revision_name: str) -> None:
+    """OPS-35 fix: guard destructive downgrades (see 001_init.py).
+
+    Downgrading 003 DROPS audit_events (compliance/audit trail), tenants
+    and RBAC grants. Refuse outside dev/test unless explicitly overridden.
+    """
+    import os
+    env = os.environ.get("MAOP_ENV", "").strip().lower()
+    if env in ("dev", "development", "local", "test", "ci"):
+        return
+    if os.environ.get("MAOP_ALLOW_DESTRUCTIVE_DOWNGRADE", "") == "1":
+        return
+    raise RuntimeError(
+        f"SAFETY: downgrade of {revision_name} DROPS audit_events "
+        "(compliance data), tenants and rbac_grants. Refusing outside "
+        "dev/test. Set MAOP_ALLOW_DESTRUCTIVE_DOWNGRADE=1 to override "
+        "(make a backup first)."
+    )
+
+
 def downgrade() -> None:
+    bind = op.get_bind()
+    if bind.dialect.name != "postgresql":
+        # upgrade() was a no-op on this dialect; nothing to drop.
+        return
+    _require_destructive_ack("003_pg_enterprise (audit_events, tenants, rbac_grants)")
     op.execute("DROP INDEX IF EXISTS idx_audit_action")
     op.execute("DROP INDEX IF EXISTS idx_audit_tenant")
     op.execute("DROP INDEX IF EXISTS idx_audit_actor")

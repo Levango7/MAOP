@@ -1,0 +1,127 @@
+........................................................................ [  1%]
+....................................................s......ss........... [  3%]
+........................................................................ [  5%]
+........................................................................ [  6%]
+........................................................................ [  8%]
+........................................................................ [ 10%]
+........................................................................ [ 11%]
+........................................................................ [ 13%]
+........................................................................ [ 15%]
+........................................................................ [ 17%]
+........................................................................ [ 18%]
+........................................................................ [ 20%]
+........................................................................ [ 22%]
+........................................................................ [ 23%]
+........................................................................ [ 25%]
+........................................................................ [ 27%]
+........................................................................ [ 29%]
+........................................................................ [ 30%]
+........................................................................ [ 32%]
+........................................................................ [ 34%]
+........................................................................ [ 35%]
+........................................................................ [ 37%]
+........................................................................ [ 39%]
+........................................................................ [ 40%]
+........................................................................ [ 42%]
+........................................................................ [ 44%]
+........................................................................ [ 46%]
+........................................................................ [ 47%]
+........................................................................ [ 49%]
+........................................................................ [ 51%]
+........................................................................ [ 52%]
+........................................................................ [ 54%]
+........................................................................ [ 56%]
+........................................................................ [ 58%]
+........................................................................ [ 59%]
+........................................................................ [ 61%]
+........................................................................ [ 63%]
+........................................................................ [ 64%]
+........................................................................ [ 66%]
+......................................................s................. [ 68%]
+........................................................................ [ 69%]
+........................................................................ [ 71%]
+........................................................................ [ 73%]
+........................................................................ [ 75%]
+........................................................................ [ 76%]
+........................................................................ [ 78%]
+........................................................................ [ 80%]
+........................................................................ [ 81%]
+........................................................................ [ 83%]
+........................................................................ [ 85%]
+........................................................................ [ 87%]
+........................................................................ [ 88%]
+........................................................................ [ 90%]
+........................................................................ [ 92%]
+........................................................................ [ 93%]
+........................................................................ [ 95%]
+........................................................................ [ 97%]
+........................................................................ [ 98%]
+............................................                             [100%]
+============================== warnings summary ===============================
+C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+maop\core\regression.py:34
+  F:\Nexus\MAOP\py\maop\core\regression.py:34: PytestCollectionWarning: cannot collect test class 'TestCase' because it has a __init__ constructor (from: tests/test_regression.py)
+    class TestCase(BaseModel):
+
+maop\core\regression.py:45
+  F:\Nexus\MAOP\py\maop\core\regression.py:45: PytestCollectionWarning: cannot collect test class 'TestResult' because it has a __init__ constructor (from: tests/test_regression.py)
+    class TestResult(BaseModel):
+
+tests/e2e/test_routing_rbac_tenant.py::TestAuthCookie::test_cookie_based_auth_works
+  C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\site-packages\httpx\_client.py:1768: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return await self.request(
+
+tests/test_event_hook_async.py::TestAsyncWebhookEngine::test_concurrent_emits_thread_safety
+  C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\site-packages\_pytest\threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread event-hook-async-loop
+  
+  Traceback (most recent call last):
+    File "C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\asyncio\windows_events.py", line 807, in _poll
+      value = callback(transferred, key, ov)
+    File "C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\asyncio\windows_events.py", line 600, in finish_connect
+      ov.getresult()
+      ~~~~~~~~~~~~^^
+  OSError: [WinError 995] 由于线程退出或应用程序请求，已中止 I/O 操作。
+  
+  During handling of the above exception, another exception occurred:
+  
+  Traceback (most recent call last):
+    File "C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\threading.py", line 1044, in _bootstrap_inner
+      self.run()
+      ~~~~~~~~^^
+    File "C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\threading.py", line 995, in run
+      self._target(*self._args, **self._kwargs)
+      ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "F:\Nexus\Workflow\doc-pipeline\pipeline_core\event_hook.py", line 143, in _run_loop
+      _webhook_loop.run_forever()
+      ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+    File "C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\asyncio\base_events.py", line 683, in run_forever
+      self._run_once()
+      ~~~~~~~~~~~~~~^^
+    File "C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\asyncio\base_events.py", line 2022, in _run_once
+      event_list = self._selector.select(timeout)
+    File "C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\asyncio\windows_events.py", line 446, in select
+      self._poll(timeout)
+      ~~~~~~~~~~^^^^^^^^^
+    File "C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\asyncio\windows_events.py", line 809, in _poll
+      f.set_exception(e)
+      ~~~~~~~~~~~~~~~^^^
+    File "C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\asyncio\windows_events.py", line 89, in set_exception
+      super().set_exception(exception)
+      ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  asyncio.exceptions.InvalidStateError: invalid state
+  
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+tests/test_maop_loop_extended.py::TestSimpleAnalyzeSemantic::test_word_boundary_avoids_false_positive_substrings
+  C:\Users\winge\.workbuddy\binaries\python\versions\3.13.12\Lib\asyncio\base_events.py:750: RuntimeWarning: coroutine 'ClientSession.close' was never awaited
+    self._ready.clear()
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+4216 passed, 4 skipped, 6 warnings in 1398.16s (0:23:18)

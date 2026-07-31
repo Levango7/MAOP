@@ -364,11 +364,23 @@ class CircuitBreaker:
             self._data[agent_name] = entry
             self._save_agent(agent_name, entry, old_state=old_state)
 
-            # If this agent is in a failover chain, reset chain back to primary
+            # If this agent is in a failover chain, reset chain back to primary.
+            # Two reset paths (C1 fix adds the second):
+            #   1. The current (fallback) agent succeeds — optimistic reset;
+            #      resolve_failover skips OPEN agents, so this is safe and is
+            #      the original, test-covered behaviour.
+            #   2. The PRIMARY agent (agents[0]) recovers while the chain has
+            #      advanced past it — previously this never matched because
+            #      chain.current was the fallback, so a recovered primary was
+            #      never restored until the fallback happened to succeed.
             for name, chain in self._failover_chains.items():
-                if chain.current and chain.current == agent_name and chain.current_index > 0:
+                if chain.current_index > 0 and (
+                    chain.current == agent_name
+                    or (chain.agents and chain.agents[0] == agent_name)
+                ):
                     chain.reset()
                     self._save_failover_chain(name, chain)
+                    logger.info("[breaker] Failover chain '%s' reset to primary (trigger=%s)", name, agent_name)
 
             return entry
 
@@ -502,8 +514,20 @@ class CircuitBreaker:
             return None
 
     def get_failover_chain(self, name: str) -> FailoverChain | None:
-        """Get a failover chain by name."""
-        return self._failover_chains.get(name)
+        """Get a failover chain by name (thread-safe snapshot).
+
+        High fix: read under _sync_lock and return a copy so callers never
+        observe a chain mid-mutation (resolve_failover/record_success mutate
+        current_index under the lock).
+        """
+        with self._sync_lock:
+            chain = self._failover_chains.get(name)
+            if chain is None:
+                return None
+            return FailoverChain(
+                agents=list(chain.agents),
+                current_index=chain.current_index,
+            )
 
     # ── Health check ─────────────────────────────────────────
 

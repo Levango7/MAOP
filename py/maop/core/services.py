@@ -15,9 +15,12 @@ Usage::
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+from maop.core.db_utils import get_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +32,19 @@ class ServiceContainer:
         self._root = Path(root_dir)
         self._instances: dict[str, Any] = {}
         self._factories: dict[str, Callable[[], Any]] = {}
+        # C6 fix: RLock (factories call self.get() recursively, e.g.
+        # dispatcher → circuit_breaker) guards against double-init races;
+        # _constructing detects circular factory dependencies.
+        self._lock = threading.RLock()
+        self._constructing: set[str] = set()
         self._register_defaults()
 
     def _register_defaults(self) -> None:
         self.register("circuit_breaker", self._make_circuit_breaker)
+        # High fix: "config" was referenced by _make_dispatcher but never
+        # registered — get("config") always returned None, silently degrading
+        # the Dispatcher to registry-only agent resolution.
+        self.register("config", self._make_config)
         self.register("dispatcher", self._make_dispatcher)
         self.register("guardrail", self._make_guardrail)
         self.register("verify_engine", self._make_verify_engine)
@@ -61,35 +73,63 @@ class ServiceContainer:
         self._factories[name] = factory
 
     def get(self, name: str, *, raise_on_failure: bool = True) -> Any | None:
+        # Fast path without lock for already-built singletons.
         if name in self._instances:
             return self._instances[name]
-        factory = self._factories.get(name)
-        if factory is None:
-            return None
-        try:
-            instance = factory()
-            self._instances[name] = instance
-            return instance
-        except Exception as exc:
-            logger.error("Service %s init failed: %s", name, exc)
-            if raise_on_failure:
-                raise RuntimeError(f"Service '{name}' initialization failed: {exc}") from exc
-            return None
+        with self._lock:
+            # Re-check under lock (another thread may have built it).
+            if name in self._instances:
+                return self._instances[name]
+            factory = self._factories.get(name)
+            if factory is None:
+                return None
+            # C6 fix: circular dependency guard — a factory that (transitively)
+            # calls get() for a service already under construction would
+            # previously recurse until RecursionError with no useful message.
+            if name in self._constructing:
+                chain = " → ".join([*self._constructing, name])
+                msg = f"Circular service dependency detected: {chain}"
+                logger.error(msg)
+                if raise_on_failure:
+                    raise RuntimeError(msg)
+                return None
+            self._constructing.add(name)
+            try:
+                instance = factory()
+                self._instances[name] = instance
+                return instance
+            except Exception as exc:
+                logger.error("Service %s init failed: %s", name, exc)
+                if raise_on_failure:
+                    raise RuntimeError(f"Service '{name}' initialization failed: {exc}") from exc
+                return None
+            finally:
+                self._constructing.discard(name)
 
     def set(self, name: str, instance: Any) -> None:
-        self._instances[name] = instance
+        with self._lock:
+            self._instances[name] = instance
 
     def has(self, name: str) -> bool:
         return name in self._instances or name in self._factories
 
     def _make_circuit_breaker(self):
         from maop.core.circuit_breaker import CircuitBreaker
-        return CircuitBreaker(self._root / "data" / "maop.db")
+        return CircuitBreaker(get_db_path())
+
+    def _make_config(self):
+        from maop.config.loader import load_config
+        return load_config(project_root=self._root)
 
     def _make_dispatcher(self):
+        # Intentional lazy import (audit item 4.5): avoids a top-level
+        # core->delegate dependency that would introduce a circular import,
+        # preserving the strict downward layering.
         from maop.delegate.dispatcher import Dispatcher
         breaker = self.get("circuit_breaker")
-        config = self.get("config")
+        # High fix: don't hard-fail dispatcher construction if config load
+        # fails — Dispatcher supports config=None (registry fallback).
+        config = self.get("config", raise_on_failure=False)
         return Dispatcher(MAOP_config=config, breaker=breaker)
 
     def _make_guardrail(self):
@@ -122,11 +162,11 @@ class ServiceContainer:
 
     def _make_timeseries(self):
         from maop.core.timeseries import TimeSeriesStore
-        return TimeSeriesStore(db_path=self._root / "data" / "timeseries.db")
+        return TimeSeriesStore(db_path=get_db_path("timeseries"))
 
     def _make_message_queue(self):
         from maop.core.message_queue import MessageQueue
-        return MessageQueue(db_path=self._root / "data" / "queue.db")
+        return MessageQueue(db_path=get_db_path("queue"))
 
     def _make_hot_reload(self):
         from maop.config.hot_reload import ConfigHotReload
@@ -134,7 +174,7 @@ class ServiceContainer:
 
     def _make_kv_store(self):
         from maop.core.kv_store import KVStore
-        return KVStore(db_path=self._root / "data" / "kv_store.db")
+        return KVStore(db_path=get_db_path("kv_store"))
 
     def _make_prompt_manager(self):
         from maop.prompt_manager import PromptManager
@@ -142,7 +182,7 @@ class ServiceContainer:
 
     def _make_migration(self):
         from maop.core.migration import MigrationManager
-        return MigrationManager(db_path=self._root / "data" / "maop.db")
+        return MigrationManager(db_path=get_db_path())
 
     def _make_consolidator(self):
         from maop.memory.consolidator import DreamConsolidator

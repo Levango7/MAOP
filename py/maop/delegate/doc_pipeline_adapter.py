@@ -15,12 +15,13 @@ Usage in agents.yaml:
     timeout: 600
     config:
       pipeline_name: technical-doc
-      agents_dir: F:\Nexus\Workflow\doc-pipeline\agents
+      agents_dir: ${DOC_PIPELINE_ROOT}/agents  # Set DOC_PIPELINE_ROOT env var
 """
 from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import sys
 import time
 from pathlib import Path
@@ -38,16 +39,20 @@ def _resolve_doc_pipeline_root() -> Path:
     global _DOC_PIPELINE_ROOT
     if _DOC_PIPELINE_ROOT is not None:
         return _DOC_PIPELINE_ROOT
-    # Try standard location
+    # Try standard locations. Besides $HOME, also derive from this repo's own
+    # location (…/Nexus/MAOP/py/maop/delegate/ -> …/Nexus/Workflow/doc-pipeline)
+    # so hosts whose code lives on a different drive than $HOME still resolve.
+    repo_nexus = Path(__file__).resolve().parents[4]  # …/Nexus (MAOP's parent)
     candidates = [
-        Path(r"F:\Nexus\Workflow\doc-pipeline"),
+        Path(os.environ.get("DOC_PIPELINE_ROOT", "")) if os.environ.get("DOC_PIPELINE_ROOT") else Path.home() / "Nexus" / "Workflow" / "doc-pipeline",
         Path.home() / "Nexus" / "Workflow" / "doc-pipeline",
+        repo_nexus / "Workflow" / "doc-pipeline",
     ]
     for p in candidates:
         if (p / "pipeline_core" / "__init__.py").exists():
             _DOC_PIPELINE_ROOT = p
             return p
-    raise FileNotFoundError("doc-pipeline not found. Expected at F:\\Nexus\\Workflow\\doc-pipeline")
+    raise FileNotFoundError("doc-pipeline not found. Set DOC_PIPELINE_ROOT env var or place at ~/Nexus/Workflow/doc-pipeline")
 
 
 def _ensure_importable():

@@ -364,14 +364,37 @@ class _StdioTransport:
         if self._process.stdout is None:
             return {"error": {"message": "stdout not available"}}
 
-        line = await asyncio.wait_for(self._process.stdout.readline(), timeout=30)
-        if not line:
-            return {"error": {"message": "Empty response"}}
+        # C3 fix: a bare readline() returned whatever line came next on stdout,
+        # which may be a server notification or a response to a DIFFERENT
+        # request. Read lines until we find the response whose "id" matches
+        # this request, skipping notifications (no "id") and stale responses,
+        # within an overall 30s deadline.
+        deadline = asyncio.get_event_loop().time() + 30
+        while True:
+            remaining = deadline - asyncio.get_event_loop().time()
+            if remaining <= 0:
+                return {"error": {"message": f"Timeout waiting for response to request id={self._request_id}"}}
 
-        try:
-            return cast(dict[str, Any], json.loads(line.decode()))
-        except json.JSONDecodeError as exc:
-            return {"error": {"message": f"Invalid JSON: {exc}"}}
+            line = await asyncio.wait_for(self._process.stdout.readline(), timeout=remaining)
+            if not line:
+                return {"error": {"message": "Empty response (EOF from server)"}}
+
+            try:
+                message = cast(dict[str, Any], json.loads(line.decode()))
+            except json.JSONDecodeError as exc:
+                logger.debug("[mcp_hub] Skipping non-JSON stdout line: %s", exc)
+                continue
+
+            msg_id = message.get("id")
+            if msg_id is None:
+                # JSON-RPC notification (e.g. progress/log) — not our response.
+                logger.debug("[mcp_hub] Skipping notification: %s", message.get("method", "?"))
+                continue
+            if msg_id != self._request_id:
+                # Response to an earlier/other request — skip.
+                logger.debug("[mcp_hub] Skipping stale response id=%s (want %s)", msg_id, self._request_id)
+                continue
+            return message
 
     async def stop(self) -> None:
         if self._process and self._process.returncode is None:
@@ -438,17 +461,31 @@ class _WebSocketTransport:
         self._ws: Any = None
 
     async def start(self) -> None:
+        # High fix: do NOT swallow exceptions here. Previously start()
+        # caught everything, so MCPHub.connect() interpreted "no exception"
+        # as success, marked the server CONNECTED, and every subsequent
+        # call_tool failed with "WebSocket not connected". Callers
+        # (connect()/health_check) already handle exceptions properly.
         try:
             import websockets
+        except ImportError as exc:
+            logger.warning(
+                "[mcp_hub] websockets package not installed, "
+                "WebSocket transport unavailable"
+            )
+            raise RuntimeError(
+                "websockets package not installed — "
+                "install 'websockets' to use the WebSocket transport"
+            ) from exc
 
+        try:
             self._ws = await websockets.connect(
                 self._config.url,
                 additional_headers=self._config.headers,
             )
-        except ImportError:
-            logger.warning("[mcp_hub] websockets package not installed, WebSocket transport unavailable")
         except Exception as exc:
             logger.warning("[mcp_hub] WebSocket connect failed: %s", exc)
+            raise
 
     async def send_request(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         if self._ws is None:
@@ -769,6 +806,9 @@ class MCPHub:
             _StdioTransport | _SSETransport | _WebSocketTransport | _StreamableHttpTransport,
         ] = {}
         self._configs: dict[str, MCPServerConfig] = {}
+        # High fix: strong references to in-flight transport.stop() tasks
+        # (asyncio only keeps weak refs — tasks could be GC'd mid-flight).
+        self._stop_tasks: set[asyncio.Task] = set()
         # δ-3: optional permission + audit hooks. Kept as attributes so
         # tests / dashboard can also inject them post-construction.
         self._permission_checker = permission_checker
@@ -818,26 +858,34 @@ class MCPHub:
             self._transports[server_id] = transport
             self._configs[server_id] = config
 
+            # C2 fix: the row does not exist yet, so calling
+            # _update_server_status() before the INSERT was a silent no-op
+            # (UPDATE matched 0 rows) and the INSERT hard-coded CONNECTED even
+            # when transport.start() failed. Track the real status/error and
+            # persist them in the INSERT itself.
+            connect_status = ServerStatus.CONNECTED
+            connect_error = ""
             try:
                 await transport.start()
-                self._update_server_status(server_id, ServerStatus.CONNECTED)
             except Exception as exc:
-                self._update_server_status(server_id, ServerStatus.ERROR, error=str(exc))
+                connect_status = ServerStatus.ERROR
+                connect_error = str(exc)
                 logger.warning("[mcp_hub] Connect failed for '%s': %s", config.name, exc)
 
             with self._connect() as conn:
                 conn.execute(
-                    """INSERT INTO mcp_servers (id, name, transport, status, config, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    """INSERT INTO mcp_servers (id, name, transport, status, config, error, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     (server_id, config.name, config.transport.value,
-                     ServerStatus.CONNECTED.value, config.model_dump_json(),
-                     now, now),
+                     connect_status.value, config.model_dump_json(),
+                     connect_error, now, now),
                 )
 
-            try:
-                await self._discover_capabilities(server_id)
-            except Exception as exc:
-                logger.warning("[mcp_hub] Capability discovery failed for '%s': %s", config.name, exc)
+            if connect_status == ServerStatus.CONNECTED:
+                try:
+                    await self._discover_capabilities(server_id)
+                except Exception as exc:
+                    logger.warning("[mcp_hub] Capability discovery failed for '%s': %s", config.name, exc)
 
             # δ-4: bump the connected-servers gauge so operators can
             # alert on drops. We only count successful connects — the
@@ -1579,9 +1627,26 @@ class MCPHub:
         if transport is not None:
             try:
                 loop = asyncio.get_running_loop()
-                loop.create_task(transport.stop())
             except RuntimeError:
-                pass
+                loop = None
+            if loop is not None:
+                # High fix: keep a strong reference to the stop task so it
+                # is not garbage-collected before it runs.
+                task = loop.create_task(transport.stop())
+                self._stop_tasks.add(task)
+                task.add_done_callback(self._stop_tasks.discard)
+            else:
+                # High fix: previously the RuntimeError path silently
+                # skipped stop(), leaking the transport (for stdio: a
+                # permanently running orphan child process). Run stop()
+                # to completion on a fresh event loop instead.
+                try:
+                    asyncio.run(transport.stop())
+                except Exception as exc:
+                    logger.warning(
+                        "[mcp_hub] transport.stop() failed during "
+                        "remove_server('%s'): %s", name, exc,
+                    )
         self._configs.pop(server_id, None)
         with self._connect() as conn:
             conn.execute("DELETE FROM mcp_servers WHERE id = ?", (server_id,))

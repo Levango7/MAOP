@@ -56,6 +56,12 @@ class LBAlgorithm(str, Enum):
     ADAPTIVE = "adaptive"
 
 
+# LB-3 fix: EWMA smoothing factor for windowed metrics used by ADAPTIVE.
+# alpha=0.2 gives an effective window of roughly the last ~10 samples,
+# so agents can recover from bad history instead of being penalized forever.
+_EWMA_ALPHA = 0.2
+
+
 @dataclass
 class AgentMetrics:
     """Per-agent load metrics for routing decisions."""
@@ -69,6 +75,10 @@ class AgentMetrics:
     # Weighted round-robin state
     current_weight: float = 0.0
     effective_weight: int = 0
+    # LB-3 fix: windowed (EWMA) stats — decay old history so ADAPTIVE recovers
+    ewma_latency_ms: float = 0.0
+    ewma_error_rate: float = 0.0
+    ewma_initialized: bool = False
 
     @property
     def avg_latency_ms(self) -> float:
@@ -85,6 +95,31 @@ class AgentMetrics:
     @property
     def success_rate(self) -> float:
         return 1.0 - self.error_rate
+
+    # LB-3 fix: recent (windowed) views; fall back to lifetime stats until
+    # the first sample initializes the EWMA.
+    @property
+    def recent_latency_ms(self) -> float:
+        return self.ewma_latency_ms if self.ewma_initialized else self.avg_latency_ms
+
+    @property
+    def recent_error_rate(self) -> float:
+        return self.ewma_error_rate if self.ewma_initialized else self.error_rate
+
+    @property
+    def recent_success_rate(self) -> float:
+        return 1.0 - self.recent_error_rate
+
+    def record_sample(self, duration_ms: float, success: bool) -> None:
+        """Update EWMA windowed stats with one finished-request sample."""
+        err = 0.0 if success else 1.0
+        if not self.ewma_initialized:
+            self.ewma_latency_ms = duration_ms
+            self.ewma_error_rate = err
+            self.ewma_initialized = True
+        else:
+            self.ewma_latency_ms += _EWMA_ALPHA * (duration_ms - self.ewma_latency_ms)
+            self.ewma_error_rate += _EWMA_ALPHA * (err - self.ewma_error_rate)
 
 
 class LBStats(BaseModel):
@@ -424,11 +459,13 @@ class LoadBalancer:
             score /= (1.0 + m.active_tasks)
 
             # Penalize by error rate
-            score *= m.success_rate
+            # LB-3 fix: use windowed (EWMA) stats instead of lifetime averages
+            # so a temporarily degraded agent can recover its score.
+            score *= m.recent_success_rate
 
             # Penalize by latency (normalize: 1s = baseline)
-            if m.avg_latency_ms > 0:
-                latency_s = m.avg_latency_ms / 1000.0
+            if m.recent_latency_ms > 0:
+                latency_s = m.recent_latency_ms / 1000.0
                 score /= (1.0 + math.log1p(latency_s))
 
             # Small random jitter to break ties
@@ -471,6 +508,8 @@ class LoadBalancer:
                     m.total_successes += 1
                 else:
                     m.total_failures += 1
+                # LB-3 fix: feed windowed EWMA stats used by ADAPTIVE
+                m.record_sample(duration_ms, success)
 
     # ── Query ─────────────────────────────────────────────────
 

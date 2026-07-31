@@ -281,9 +281,21 @@ class LRUCache:
 
         Returns True if the key exists and was pinned.
         Pinned keys survive capacity-based eviction and Transform compression.
+
+        High fix (C-1): the number of pinned keys is capped at ``max_size``.
+        Without this cap the cache size is unbounded (eviction skips pinned
+        keys, so size can grow to len(pinned) + 1 indefinitely). When the cap
+        is reached, pin() refuses and returns False with a warning.
         """
         with self._lock:
             if key in self._store:
+                if key not in self._pinned and len(self._pinned) >= self._max_size:
+                    logger.warning(
+                        "[cache] pin('%s') refused: pinned key count reached "
+                        "max_size (%d); unpin keys before pinning more",
+                        key, self._max_size,
+                    )
+                    return False
                 self._pinned.add(key)
                 return True
             return False
@@ -339,31 +351,39 @@ class LRUCache:
         null_ttl_s : float
             TTL for null-cached entries (penetration protection).
         """
-        # First check: fast path (no lock contention)
-        value = self.get(key)
-        if value is not None:
-            return value
+        # High fix (C-3): loop instead of recursion. Under sustained
+        # contention the old code recursed on every wait timeout and could
+        # hit RecursionError (~1000 frames). The loop is semantically
+        # identical: retry until we either observe a cached value or win
+        # the flight registration and compute ourselves.
+        while True:
+            # First check: fast path (no lock contention)
+            value = self.get(key)
+            if value is not None:
+                return value
 
-        # SingleFlight: ensure only one thread computes for this key
-        with self._flight_lock:
-            if key in self._flights:
-                # Another thread is computing — wait for it
-                flight_event = self._flights[key]
-            else:
-                # We are the first — register our flight
-                flight_event = threading.Event()
-                self._flights[key] = flight_event
-                flight_event = None  # Signal that WE should compute
+            # SingleFlight: ensure only one thread computes for this key
+            with self._flight_lock:
+                if key in self._flights:
+                    # Another thread is computing — wait for it
+                    flight_event = self._flights[key]
+                else:
+                    # We are the first — register our flight
+                    flight_event = threading.Event()
+                    self._flights[key] = flight_event
+                    flight_event = None  # Signal that WE should compute
 
-        if flight_event is not None:
+            if flight_event is None:
+                break  # we are the computing thread
+
             # Wait for the computing thread
             flight_event.wait(timeout=_SINGLEFLIGHT_WAIT_TIMEOUT_S)
             # Now the value should be in cache
             result = self.get(key)
             if result is not None:
                 return result
-            # Fallback: compute ourselves if wait timed out
-            return self.get_or_compute(key, compute_fn, ttl_s=ttl_s, null_ttl_s=null_ttl_s)
+            # Wait timed out or compute failed — loop and try again
+            # (may become the computing thread on the next iteration).
 
         # We are the computing thread
         try:
