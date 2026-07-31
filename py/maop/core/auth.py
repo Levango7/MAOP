@@ -21,7 +21,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import ConnectionPool, get_pool
+from maop.core.db_utils import ConnectionPool, get_db_path, get_pool
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,9 @@ class AuthConfig(BaseModel):
 class APIKeyStore:
     """SQLite-backed API key store."""
 
-    def __init__(self, db_path: str | Path = "data/auth.db"):
+    def __init__(self, db_path: str | Path | None = None):
+        if db_path is None:
+            db_path = get_db_path("auth")
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._pool: ConnectionPool = get_pool(self.db_path)
@@ -433,7 +435,25 @@ def load_jwt_secret(data_dir: str | Path = "data") -> str:
             pass  # Windows
         logger.info("[auth] JWT secret generated and saved to %s", jwt_file)
     except Exception as exc:
-        logger.warning("[auth] Could not persist JWT secret to file: %s", exc)
+        # High 安全修复 (2.4): 持久化失败不再静默吞掉 —— secret 仅存内存时，
+        # 重启后会生成新 secret，所有已签发 token 全部失效。默认 fail-fast；
+        # 显式设置 MAOP_JWT_ALLOW_EPHEMERAL=1 可接受内存态 secret（如无状态
+        # 容器 + 外部注入 secret 的过渡场景）。
+        if os.environ.get("MAOP_JWT_ALLOW_EPHEMERAL", "0") == "1":
+            logger.warning(
+                "[auth] Could not persist JWT secret to %s (%s). "
+                "Running with EPHEMERAL secret (MAOP_JWT_ALLOW_EPHEMERAL=1) — "
+                "all tokens will be invalidated on restart.",
+                jwt_file, exc,
+            )
+        else:
+            raise RuntimeError(
+                f"SECURITY: failed to persist auto-generated JWT secret to "
+                f"{jwt_file}: {exc}. An in-memory-only secret would silently "
+                f"invalidate all tokens on restart. Fix the data directory "
+                f"permissions, set MAOP_JWT_SECRET explicitly, or set "
+                f"MAOP_JWT_ALLOW_EPHEMERAL=1 to accept an ephemeral secret."
+            ) from exc
     return secret
 
 

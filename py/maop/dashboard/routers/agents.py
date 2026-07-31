@@ -120,7 +120,7 @@ async def scan_agents(request: Request):
     scanner = _get_scanner()
     registry = _get_registry()
     found = scanner.scan()
-    synced = registry.sync_from_scanner(scanner)
+    synced = registry.sync_from_scanner(scanner, scanned=found)
     return {"scanned": len(found), "synced": synced, "agents": [a.model_dump() for a in found]}
 
 

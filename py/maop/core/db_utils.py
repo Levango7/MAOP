@@ -26,6 +26,26 @@ logger = logging.getLogger(__name__)
 _VALID_IDENTIFIER = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 
 
+def _get_busy_timeout_ms() -> int:
+    """Read MAOP_SQLITE_BUSY_TIMEOUT_MS with fault tolerance (C5 fix).
+
+    A malformed value (e.g. "abc") previously raised ValueError inside
+    every DB connect, killing all database access process-wide. Fall back
+    to the 10s default and log a warning instead.
+    """
+    raw = os.environ.get("MAOP_SQLITE_BUSY_TIMEOUT_MS", "10000")
+    try:
+        value = int(raw)
+        if value < 0:
+            raise ValueError("negative timeout")
+        return value
+    except (ValueError, TypeError):
+        logger.warning(
+            "Invalid MAOP_SQLITE_BUSY_TIMEOUT_MS=%r; falling back to 10000ms", raw,
+        )
+        return 10000
+
+
 def validate_identifier(name: str, context: str = "identifier") -> str:
     """Validate a SQL table/column name to prevent injection.
 
@@ -69,8 +89,7 @@ def sqlite_connect(
         conn.execute("PRAGMA foreign_keys=ON")
     # T2-10: Multi-container SQLite coordination — WAL allows 1 writer + N readers.
     # busy_timeout increased to 10s (env-override: MAOP_SQLITE_BUSY_TIMEOUT_MS).
-    _busy_ms = int(os.environ.get("MAOP_SQLITE_BUSY_TIMEOUT_MS", "10000"))
-    conn.execute(f"PRAGMA busy_timeout={_busy_ms}")
+    conn.execute(f"PRAGMA busy_timeout={_get_busy_timeout_ms()}")
     try:
         yield conn
         conn.commit()
@@ -85,13 +104,13 @@ def find_project_root() -> Path:
     """Find the MAOP project root directory.
 
     Walks up from this file's location until finding a directory
-    containing 'config/agents.yaml' or 'py/MAOP/__init__.py'.
+    containing 'config/agents.yaml' or 'py/maop/__init__.py'.
     """
     current = Path(__file__).resolve()
     for parent in current.parents:
         if (parent / "config" / "agents.yaml").exists():
             return parent
-        if (parent / "py" / "MAOP" / "__init__.py").exists():
+        if (parent / "py" / "maop" / "__init__.py").exists():
             return parent
     return current.parents[3]
 
@@ -106,18 +125,30 @@ class ConnectionPool:
         self._lock = threading.Lock()
 
     def acquire(self) -> sqlite3.Connection:
-        with self._lock:
-            if self._pool:
+        # C5 fix: pooled connections may be stale/broken (e.g. underlying
+        # file handle invalidated). Health-check with SELECT 1 before
+        # handing them out; discard broken ones instead of returning them.
+        while True:
+            with self._lock:
+                if not self._pool:
+                    break
                 conn = self._pool.pop()
+            try:
+                conn.execute("SELECT 1")
                 conn.row_factory = sqlite3.Row
                 return conn
+            except sqlite3.Error:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                logger.warning("Discarded broken pooled connection for %s", self._db_path)
         conn = sqlite3.connect(self._db_path, timeout=10, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         # T2-10: Multi-container SQLite coordination — WAL allows 1 writer + N readers.
         # busy_timeout increased to 10s (env-override: MAOP_SQLITE_BUSY_TIMEOUT_MS).
-        _busy_ms = int(os.environ.get("MAOP_SQLITE_BUSY_TIMEOUT_MS", "10000"))
-        conn.execute(f"PRAGMA busy_timeout={_busy_ms}")
+        conn.execute(f"PRAGMA busy_timeout={_get_busy_timeout_ms()}")
         return conn
 
     def release(self, conn: sqlite3.Connection) -> None:

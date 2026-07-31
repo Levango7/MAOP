@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { useEditionStore } from '../stores/edition.js';
 
 const routes = [
   { path: '/', name: 'overview', component: () => import('../views/Overview.vue') },
@@ -29,16 +30,21 @@ const router = createRouter({
 
 export default router;
 
-// P2-21: Enterprise edition route guard
-router.beforeEach((to, from, next) => {
-  if (to.meta.requiresEnterprise) {
-    try {
-      const edition = JSON.parse(localStorage.getItem('maop_edition') || '{}');
-      if (edition && edition.edition && edition.edition !== 'enterprise') {
-        next('/');
-        return;
-      }
-    } catch {}
-  }
-  next();
+// P2-21: Enterprise edition route guard.
+// Reads the live edition store (the single source of truth). Falls back to
+// a persisted localStorage snapshot for the cold-load case where navigation
+// runs before the async fetch completes.
+router.beforeEach((to) => {
+  if (!to.meta.requiresEnterprise) return true;
+  let editionVal = 'enterprise';
+  try {
+    const st = useEditionStore();
+    if (st && st.edition) editionVal = st.edition;
+    else {
+      const snap = JSON.parse(localStorage.getItem('maop_edition') || '{}');
+      editionVal = snap.edition || 'enterprise';
+    }
+  } catch {}
+  if (editionVal !== 'enterprise') return '/';
+  return true;
 });

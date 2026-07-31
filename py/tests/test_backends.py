@@ -152,7 +152,11 @@ class TestLocalSecretBackend:
 
 
 class TestFactoryFunctions:
-    def test_default_storage(self):
+    def test_default_storage(self, monkeypatch):
+        # Pin to personal edition: on hosts with an enterprise license the
+        # edition auto-detects enterprise -> default storage=postgresql,
+        # which now fail-fasts when psycopg is missing (fail-closed).
+        monkeypatch.setenv("MAOP_EDITION", "personal")
         backend = get_storage_backend()
         assert isinstance(backend, SQLiteStorageBackend)
 
@@ -173,7 +177,19 @@ class TestFactoryFunctions:
         assert isinstance(backend, LocalSecretBackend)
 
     def test_fallback_on_missing_pg(self, monkeypatch):
+        """Fail-closed: PG requested but unavailable -> RuntimeError unless
+        MAOP_STORAGE_ALLOW_FALLBACK=1 explicitly opts in to SQLite degrade."""
         monkeypatch.setenv("MAOP_STORAGE_BACKEND", "postgresql")
+        try:
+            import psycopg  # noqa: F401
+            pytest.skip("psycopg installed; fail-fast path not reachable")
+        except ImportError:
+            pass
+        with pytest.raises(RuntimeError, match="not importable"):
+            get_storage_backend()
+        # Explicit opt-in restores the legacy degrade behaviour
+        reset_backends()
+        monkeypatch.setenv("MAOP_STORAGE_ALLOW_FALLBACK", "1")
         backend = get_storage_backend()
         assert isinstance(backend, SQLiteStorageBackend)
 

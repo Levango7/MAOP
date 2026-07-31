@@ -32,9 +32,17 @@ from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import sqlite_connect
+from maop.core.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
+
+
+class EnqueueError(RuntimeError):
+    """MQ-1 fix: raised when a message cannot be persisted to the queue.
+
+    Previously enqueue() returned "" on failure, silently losing the
+    message; producers must now handle (or crash on) this exception.
+    """
 
 # ── DDL ───────────────────────────────────────────────────────
 
@@ -152,7 +160,7 @@ class MessageQueue:
 
     def __init__(self, db_path: Path | str | None = None) -> None:
         if db_path is None:
-            db_path = Path(__file__).resolve().parents[3] / "data" / "queue.db"
+            db_path = get_db_path("queue")
         self._path = Path(db_path)
         self._initialized = False
         self._init_db()
@@ -249,17 +257,36 @@ class MessageQueue:
                 logger.info("[mq] Enqueued %s on %s (prio=%d, delay=%.1fs)",
                             msg.id, topic, priority, delay_s)
                 return msg.id
+            except sqlite3.IntegrityError as exc:
+                # Idempotent race: with an explicit msg_id, concurrent
+                # check-then-insert losers hit the UNIQUE constraint — the
+                # message already exists, so this is idempotent success,
+                # NOT a lost message. Return msg_id like the fast path.
+                # (MQ-1's raise-on-failure only applies to real losses.)
+                if msg_id and "unique" in str(exc).lower():
+                    logger.debug(
+                        "[mq] Idempotent race: msg %s already inserted by "
+                        "concurrent producer, treating as success", msg_id)
+                    return msg_id
+                logger.error("[mq] Enqueue failed: %s", exc)
+                raise EnqueueError(
+                    f"enqueue to topic '{topic}' failed: {exc}") from exc
             except sqlite3.OperationalError as exc:
                 if "locked" in str(exc).lower() and attempt < max_attempts - 1:
                     time.sleep(0.05 * (attempt + 1))  # 50ms, 100ms, 150ms backoff
                     continue
-                logger.warning("[mq] Enqueue failed after %d attempts: %s",
-                               attempt + 1, exc)
-                return ""
+                # MQ-1 fix: returning "" silently dropped the message — the
+                # producer had no way to know it was lost. Raise so callers
+                # can retry / surface the failure.
+                logger.error("[mq] Enqueue failed after %d attempts: %s",
+                             attempt + 1, exc)
+                raise EnqueueError(
+                    f"enqueue to topic '{topic}' failed after {attempt + 1} attempts: {exc}"
+                ) from exc
             except Exception as exc:
-                logger.warning("[mq] Enqueue failed: %s", exc)
-                return ""
-        return ""
+                logger.error("[mq] Enqueue failed: %s", exc)
+                raise EnqueueError(f"enqueue to topic '{topic}' failed: {exc}") from exc
+        raise EnqueueError(f"enqueue to topic '{topic}' failed: retries exhausted")
 
     # ── Dequeue ───────────────────────────────────────────────
 
@@ -482,13 +509,32 @@ class MessageQueue:
             return
 
         now = time.time()
-        conn.execute(
+        # MQ-3 fix: INSERT OR IGNORE followed by an unconditional DELETE
+        # silently destroyed the message when the dead-letter row already
+        # existed (PK collision) — the insert was ignored AND the source row
+        # was deleted. Only delete from the queue when the dead-letter row
+        # was actually written (rowcount == 1) or already exists.
+        cur = conn.execute(
             """INSERT OR IGNORE INTO queue_dead_letters
                (id, topic, payload, priority, retries, consumer_group, error, dead_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (msg_id, row["topic"], row["payload"], row["priority"],
              row["retries"], row["consumer_group"], error, now),
         )
+        if cur.rowcount == 0:
+            # PK collision — verify a dead-letter copy really exists before
+            # removing the source message.
+            existing = conn.execute(
+                "SELECT 1 FROM queue_dead_letters WHERE id = ?", (msg_id,),
+            ).fetchone()
+            if existing is None:
+                logger.error(
+                    "[mq] Dead-letter insert for %s was ignored and no existing "
+                    "row found — keeping message in queue to avoid data loss",
+                    msg_id,
+                )
+                return
+            logger.warning("[mq] Dead letter %s already recorded; removing queue copy", msg_id)
         conn.execute("DELETE FROM queue_messages WHERE id = ?", (msg_id,))
         logger.warning("[mq] Dead letter: %s on %s (%s)", msg_id, row["topic"], error)
 

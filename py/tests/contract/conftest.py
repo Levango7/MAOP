@@ -12,22 +12,35 @@ def pytest_configure(config):
     )
 
 
+def _extract_all_routes(app_or_router) -> set[str]:
+    """Recursively extract all route paths, handling FastAPI 0.138+ _IncludedRouter."""
+    routes: set[str] = set()
+    raw_routes = getattr(app_or_router, "routes", None) or getattr(app_or_router, "router", None)
+    if raw_routes is None:
+        return routes
+    for route in raw_routes:
+        cls_name = type(route).__name__
+        if hasattr(route, "path"):
+            routes.add(route.path)
+        if cls_name == "_IncludedRouter" and hasattr(route, "original_router"):
+            routes |= _extract_all_routes(route.original_router)
+        if hasattr(route, "routes"):
+            routes |= _extract_all_routes(route)
+    return routes
+
+
 @pytest.fixture(scope="class")
 def server_routes():
     """Extract all registered routes from router modules + server.py."""
     MAOP_ROOT = str(Path(__file__).resolve().parent.parent.parent)
     if MAOP_ROOT not in sys.path:
         sys.path.insert(0, MAOP_ROOT)
-    routes = set()
+    routes: set[str] = set()
     from maop.dashboard.routers import control, data, evolve, memory, model, system
     for mod in (data, control, model, evolve, memory, system):
         r = getattr(mod, "router", None)
         if r:
-            for route in r.routes:
-                if hasattr(route, "path"):
-                    routes.add(route.path)
+            routes |= _extract_all_routes(r)
     from maop.dashboard.server import app
-    for route in app.routes:
-        if hasattr(route, "path"):
-            routes.add(route.path)
+    routes |= _extract_all_routes(app)
     return routes

@@ -157,7 +157,23 @@ class BYOKGateway:
         return None
 
     def _verify_tenant_caller(self, source: KeySource, tenant_id: str) -> bool:
+        """Verify the calling tenant may use this key source.
+
+        High 安全修复 (2.7): 由 Fail-Open 改为 Fail-Closed。旧行为在
+        ``allowed_tenants`` 未配置时返回 True——任何租户可访问任何其他
+        租户的 API key（租户隔离失效，CVSS 7.5）。新行为：未显式配置
+        allowed_tenants 时拒绝访问并给出修复提示；通配符 "*" 可显式
+        声明"所有租户可用"。
+        """
         allowed_tenants = source.metadata.get("allowed_tenants", [])
         if not allowed_tenants:
+            logger.warning(
+                "[byok] Tenant key source (provider=%s) has no "
+                "'allowed_tenants' configured — denying access (fail-closed). "
+                "Set allowed_tenants explicitly, or use ['*'] to allow all "
+                "tenants.", source.provider,
+            )
+            return False
+        if "*" in allowed_tenants:
             return True
         return tenant_id in allowed_tenants

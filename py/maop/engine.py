@@ -14,7 +14,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Callable
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
@@ -49,6 +49,22 @@ _SAFE_UNARYOPS = {
 }
 
 
+def _reject_unsafe_value(value: Any, accessor: str) -> Any:
+    """C7 fix: only plain data may flow out of attribute/subscript access.
+
+    Callables, classes and modules are the raw material of sandbox-escape
+    gadget chains (e.g. reaching __subclasses__ or os via a module attr).
+    safe_eval has no ast.Call handler, so rejecting them loses nothing.
+    """
+    import types as _types
+    if callable(value) or isinstance(value, (type, _types.ModuleType)):
+        raise ValueError(
+            f"Attribute access blocked: callable/type/module via {accessor!r} "
+            "is not allowed in safe_eval"
+        )
+    return value
+
+
 def _safe_eval_node(node: ast.AST, context: dict) -> Any:
     """Recursively evaluate an AST node safely."""
     if isinstance(node, ast.Expression):
@@ -79,23 +95,28 @@ def _safe_eval_node(node: ast.AST, context: dict) -> Any:
         return True
     if isinstance(node, ast.Subscript):
         obj = _safe_eval_node(node.value, context)
+        # C7 fix: restrict subscript to plain data containers — arbitrary
+        # objects with custom __getitem__ could execute code or expose
+        # internals.
+        if not isinstance(obj, (dict, list, tuple, str)):
+            raise ValueError(
+                f"Subscript only allowed on dict/list/tuple/str, got {type(obj).__name__}"
+            )
         key = _safe_eval_node(node.slice, context)
-        return obj[key]
+        if not isinstance(key, (str, int, bool)):
+            raise ValueError(f"Subscript key must be str/int, got {type(key).__name__}")
+        return _reject_unsafe_value(cast(Any, obj)[key], f"[{key!r}]")
     if isinstance(node, ast.Attribute):
         obj = _safe_eval_node(node.value, context)
-        # Only allow access to whitelisted safe attributes
         attr = node.attr
+        # C7 fix: default-deny hardening. The old blacklist missed escape
+        # vectors; now (1) any underscore-prefixed name is denied, and
+        # (2) the resolved value must be plain data — callables, types and
+        # modules are rejected outright (there is no ast.Call handler, so
+        # losing bound methods costs nothing but closes gadget chains).
         if attr.startswith('_'):
             raise ValueError(f"Attribute access to private members is not allowed: {attr}")
-        # Block dangerous method calls on strings/objects
-        _BLOCKED_ATTRS = frozenset({
-            'format', 'format_map', '__class__', '__subclasses__', '__bases__',
-            '__mro__', '__init__', '__new__', '__delattr__', '__setattr__',
-            '__import__', '__builtins__', '__globals__', '__code__', '__func__',
-        })
-        if attr in _BLOCKED_ATTRS:
-            raise ValueError(f"Attribute access blocked: {attr}")
-        return getattr(obj, attr)
+        return _reject_unsafe_value(getattr(obj, attr), attr)
     if isinstance(node, ast.List):
         return [_safe_eval_node(e, context) for e in node.elts]
     if isinstance(node, ast.Tuple):

@@ -12,6 +12,16 @@
 # See H-1 in audit report for rationale.
 # ─────────────────────────────────────────────────────────────────────
 
+# OPS-20 fix: single source of truth for container log rotation. Without an
+# explicit logging driver, Docker defaults to json-file with NO size limit,
+# which can fill the host disk and OOM-kill it. Every service below inherits
+# this via `<<: *maop_logging`.
+x-logging: &maop_logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   # ── PostgreSQL (production) ────────────────────────────────────────────────────────────
   postgres:
@@ -29,25 +39,80 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    # OPS-19 fix: bound Postgres memory so a runaway query cannot OOM-kill
+    # the host. OPS-20 fix: inherit log rotation.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    logging: *maop_logging
     networks:
       - maop-net
 
   # ── HashiCorp Vault (production secrets backend) ────────────────
+  # OPS-15 fix: TLS enabled (no more cleartext secrets on the docker
+  # network) + pinned image tag (no :latest supply-chain risk in prod).
+  # Generate certs before first start, e.g.:
+  #   mkdir -p certs/vault && openssl req -x509 -newkey rsa:4096 -nodes \
+  #     -keyout certs/vault/vault.key -out certs/vault/vault.crt \
+  #     -days 825 -subj "/CN=vault" -addext "subjectAltName=DNS:vault"
+  # OPS-16 fix: healthcheck via `vault status` (exit 0 only when
+  # initialized AND unsealed) + dashboard waits on service_healthy.
+  # First deployment still requires one-time manual init/unseal:
+  #   docker compose exec vault vault operator init
+  #   docker compose exec vault vault operator unseal   (x3)
+  # (Auto-unseal via cloud KMS is recommended for real production; see
+  #  Vault docs "seal" stanza.)
   vault:
-    image: hashicorp/vault:latest
+    image: hashicorp/vault:1.17
     environment:
       VAULT_LOCAL_CONFIG: |
         storage "file" { path = "/vault/data" }
-        listener "tcp" { address = "0.0.0.0:8200"; tls_disable = 1 }
-        api_addr = "http://vault:8200"
+        listener "tcp" {
+          address = "0.0.0.0:8200"
+          tls_cert_file = "/vault/certs/vault.crt"
+          tls_key_file = "/vault/certs/vault.key"
+        }
+        api_addr = "https://vault:8200"
+      VAULT_ADDR: https://127.0.0.1:8200
     volumes:
       - vault-data:/vault/data
       - vault-logs:/vault/logs
-    ports:
-      - "8200:8200"
+      - ./certs/vault:/vault/certs:ro
+    ports: []  # P2 fix: Vault internal only
+
+    healthcheck:
+      # exit 0 = initialized + unsealed; 2 = sealed; 1 = error
+      test: ["CMD", "vault", "status", "-tls-skip-verify"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+    # OPS-19 fix: bound Vault memory. OPS-20 fix: inherit log rotation.
+    cap_drop:
+      - ALL
     cap_add:
       - IPC_LOCK
-    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging: *maop_logging
     networks:
       - maop-net
 
@@ -63,17 +128,31 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    # OPS-19 fix: bound Redis memory (maxmemory policy set by upstream image
+    # is insufficient without a hard container limit). OPS-20 fix: inherit.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging: *maop_logging
     networks:
       - maop-net
 
-  maop:
+  dashboard:
     build:
       context: .
       dockerfile: py/Dockerfile
     container_name: maop-app
     restart: unless-stopped
-    ports:
-      - "${MAOP_PORT:-9079}:9079"
+    ports: []  # P2 fix: no direct port exposure, access via nginx only
     environment:
       - MAOP_ENV=production
       - MAOP_ROOT=/app
@@ -88,7 +167,10 @@ services:
       - MAOP_PG_USER=maop
       - MAOP_PG_PASSWORD=${MAOP_PG_PASSWORD:?Set MAOP_PG_PASSWORD in .env for production}
       - MAOP_SECRET_BACKEND=vault
-      - MAOP_VAULT_ADDR=http://vault:8200
+      # OPS-15 fix: Vault now serves TLS; CA/cert verification uses the
+      # mounted cert (self-signed) or a real CA in front of it.
+      - MAOP_VAULT_ADDR=https://vault:8200
+      - MAOP_VAULT_CACERT=/app/certs/vault/vault.crt
       - MAOP_VAULT_TOKEN=${MAOP_VAULT_TOKEN:?Set MAOP_VAULT_TOKEN in .env for production}
       - MAOP_CACHE_BACKEND=redis
       - MAOP_QUEUE_BACKEND=redis
@@ -99,6 +181,7 @@ services:
       - maop-data:/app/data
       - maop-config:/app/config
       - maop-logs:/app/logs
+      - ./certs/vault:/app/certs/vault:ro  # OPS-15 fix: Vault CA cert
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9079/api/health')"]
       interval: 30s
@@ -113,6 +196,8 @@ services:
         reservations:
           cpus: "0.5"
           memory: 512M
+    # OPS-20 fix: inherit log rotation.
+    logging: *maop_logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,7 +206,11 @@ services:
       prometheus:
         condition: service_started
       vault:
-        condition: service_started
+        # OPS-16 fix: wait until vault is initialized AND unsealed
+        # (healthcheck `vault status` exits 0 only in that state),
+        # instead of service_started which guaranteed a crash-loop
+        # on fresh deployments.
+        condition: service_healthy
     networks:
       - maop-net
 
@@ -129,6 +218,20 @@ services:
     image: nginx:alpine
     container_name: maop-nginx
     restart: unless-stopped
+    # OPS-19 fix: bound nginx. OPS-20 fix: inherit log rotation.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    logging: *maop_logging
     ports:
       - "80:80"
       - "443:443"
@@ -136,14 +239,28 @@ services:
       - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - nginx-certs:/etc/nginx/certs
     depends_on:
-      - maop
+      - dashboard  # fix: base compose service is "dashboard", not "maop"
     networks:
       - maop-net
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.53.0  # OPS-18 fix: pin tag (was :latest)
     container_name: maop-prometheus
     restart: unless-stopped
+    # OPS-19 fix: bound Prometheus (TSDB can grow large). OPS-20 fix: inherit.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging: *maop_logging
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -151,22 +268,119 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=30d"
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"  # P2 fix: bind to localhost only
     networks:
       - maop-net
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.1.0  # OPS-18 fix: pin tag (was :latest)
     container_name: maop-grafana
     restart: unless-stopped
+    # OPS-19 fix: bound Grafana. OPS-20 fix: inherit log rotation (was a
+    # per-service inline block; now references the shared anchor).
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging: *maop_logging
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?Set GRAFANA_PASSWORD in .env for production}
     volumes:
       - grafana-data:/var/lib/grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"  # P2 fix: bind to localhost only
     depends_on:
       - prometheus
+    networks:
+      - maop-net
+
+  # ── Optional: RabbitMQ queue backend (--profile rabbitmq) ───────
+  # 4.7 fix: README documents RabbitMQ as an optional queue backend
+  # (MAOP_QUEUE_BACKEND=rabbitmq, needs optional `pika` dep). Provide a
+  # pinned, resource-bounded service so the documented capability is
+  # actually deployable. Off by default — opt in with:
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  #     --profile rabbitmq up -d
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine  # pinned; :latest is a supply-chain risk
+    container_name: maop-rabbitmq
+    restart: unless-stopped
+    # OPS-19/OPS-20 fix: resource limit + inherited log rotation.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging: *maop_logging
+    environment:
+      - RABBITMQ_DEFAULT_USER=${MAOP_RABBITMQ_USER:-maop}
+      - RABBITMQ_DEFAULT_PASS=${MAOP_RABBITMQ_PASSWORD:?Set MAOP_RABBITMQ_PASSWORD in .env for production}
+    ports:
+      - "127.0.0.1:15672:15672"  # management UI, localhost only
+    volumes:
+      - mq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    profiles: ["rabbitmq"]
+    networks:
+      - maop-net
+
+  # ── Optional: etcd distributed KV backend (--profile etcd) ──────
+  # 4.7 fix: README documents etcd as an optional KV backend
+  # (MAOP_KV_BACKEND=etcd, needs optional `etcd3` dep). Off by default.
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.14  # pinned
+    container_name: maop-etcd
+    restart: unless-stopped
+    # OPS-19/OPS-20 fix: resource limit + inherited log rotation.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging: *maop_logging
+    environment:
+      ETCD_NAME: maop-etcd
+      ETCD_DATA_DIR: /etcd-data
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+    ports:
+      - "127.0.0.1:2379:2379"  # localhost only
+    volumes:
+      - etcd-data:/etcd-data
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    profiles: ["etcd"]
     networks:
       - maop-net
 
@@ -181,6 +395,8 @@ volumes:
   redis-data:
   vault-data:
   vault-logs:
+  mq-data:
+  etcd-data:
 
 networks:
   maop-net:

@@ -22,6 +22,8 @@ from typing import Any, cast
 import aiosqlite
 from pydantic import BaseModel
 
+from maop.core.db_utils import get_db_path
+
 logger = logging.getLogger(__name__)
 
 
@@ -94,7 +96,7 @@ class DashboardProvider:
             from maop.core.circuit_breaker import CircuitBreaker
             # P0-3: circuit-breaker truth source is maop.db
             # (circuit_breaker_state table), not circuit-breaker.json.
-            breaker = CircuitBreaker(self._root / "data" / "maop.db")
+            breaker = CircuitBreaker(get_db_path())
 
             for name, adef in config.agents.items():
                 entry = breaker.get(name)
@@ -113,7 +115,7 @@ class DashboardProvider:
 
     def _count_delegations(self) -> int:
         """Count total delegations from maop.db. (migrated from delegations.json)"""
-        db_path = self._root / "data" / "maop.db"
+        db_path = get_db_path()
         if not db_path.exists():
             return 0
         try:
@@ -130,7 +132,7 @@ class DashboardProvider:
 
     def _compute_success_rate(self) -> float:
         """Compute overall success rate from maop.db. (migrated from delegations.json)"""
-        db_path = self._root / "data" / "maop.db"
+        db_path = get_db_path()
         if not db_path.exists():
             return 0.0
         try:
@@ -183,7 +185,7 @@ class DashboardProvider:
 
     async def _async_count_delegations(self) -> int:
         """Async count of total delegations from maop.db."""
-        db_path = self._root / "data" / "maop.db"
+        db_path = get_db_path()
         if not db_path.exists():
             return 0
         try:
@@ -197,7 +199,7 @@ class DashboardProvider:
 
     async def _async_compute_success_rate(self) -> float:
         """Async compute of overall success rate from maop.db."""
-        db_path = self._root / "data" / "maop.db"
+        db_path = get_db_path()
         if not db_path.exists():
             return 0.0
         try:
@@ -238,7 +240,7 @@ class DashboardProvider:
             config = ConfigLoader(project_root=self._root).load()
             # P0-3: circuit-breaker truth source is maop.db
             # (circuit_breaker_state table), not circuit-breaker.json.
-            breaker = CircuitBreaker(self._root / "data" / "maop.db")
+            breaker = CircuitBreaker(get_db_path())
 
             if agent_name in config.agents:
                 adef = config.agents[agent_name]

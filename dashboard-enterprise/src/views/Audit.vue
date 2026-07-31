@@ -1,109 +1,121 @@
 <template>
-  <div>
-    <div class="topbar">
-      <h1>Audit Log</h1>
-      <span class="badge">Enterprise</span>
-      <div class="filters">
-        <select v-model="filters.action" class="input-sm" @change="loadEvents">
-          <option value="">All Actions</option>
-          <option v-for="a in actions" :key="a" :value="a">{{ a }}</option>
-        </select>
-        <select v-model="filters.severity" class="input-sm" @change="loadEvents">
-          <option value="">All Severity</option>
-          <option value="info">Info</option><option value="warning">Warning</option><option value="critical">Critical</option>
-        </select>
-        <input v-model="filters.actor" class="input-sm" placeholder="Filter by actor..." @change="loadEvents" />
-      </div>
+  <div class="audit-view">
+    <PageHeader>
+      <template #badges>
+        <Badge tone="brand" icon="shield">{{ t('view.audit.enterprise') }}</Badge>
+      </template>
+      <span class="last-updated" v-if="lastUpdated">{{ t('view.audit.updated') }} {{ lastUpdated }}</span>
+    </PageHeader>
+
+    <section class="stat-row" v-if="!summary.error">
+      <StatCard :label="t('view.audit.totalEvents')" :value="summary.data.total" icon="scroll" tone="brand" :loading="loading" />
+      <StatCard :label="t('view.audit.distinctActions')" :value="Object.keys(summary.data.by_action || {}).length" icon="clipboard" tone="info" :loading="loading" />
+      <StatCard :label="t('view.audit.distinctActors')" :value="Object.keys(summary.data.by_actor || {}).length" icon="bot" tone="warn" :loading="loading" />
+    </section>
+    <div v-if="summary.error" class="stat-row">
+      <EmptyState icon="alert-triangle" :title="t('view.audit.summaryError')" :description="summary.error" />
     </div>
-    <div class="summary-row">
-      <StatCard
-        v-for="s in summary"
-        :key="s.label"
-        :label="s.label"
-        :value="s.value"
-        :accent="s.color"
-      />
-    </div>
-    <Panel overflow="auto">
-      <table class="data-table">
-        <thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Tenant</th><th>Resource</th><th>Result</th><th>Severity</th></tr></thead>
-        <tbody>
-          <tr v-for="e in events" :key="e.event_id" :class="{ critical: e.severity === 'critical' }">
-            <td class="mono">{{ formatTime(e.timestamp) }}</td>
-            <td><span class="action-badge">{{ e.action }}</span></td>
-            <td>{{ e.actor || '—' }}</td>
-            <td>{{ e.tenant_id || '—' }}</td>
-            <td>{{ e.resource }}</td>
-            <td><span :class="e.result === 'success' ? 'text-success' : 'text-fail'">{{ e.result }}</span></td>
-            <td><span class="severity-badge" :class="e.severity">{{ e.severity }}</span></td>
-          </tr>
-          <tr v-if="!events.length"><td colspan="7" class="empty">No audit events found</td></tr>
-        </tbody>
-      </table>
-    </Panel>
+
+    <Card icon="scroll" :marginBottom="16">
+      <template #actions>
+        <select class="filter" v-model="filters.action">
+          <option value="">{{ t('view.audit.allActions') }}</option>
+          <option v-for="a in actionOptions" :key="a" :value="a">{{ a }}</option>
+        </select>
+        <select class="filter" v-model="filters.level">
+          <option value="">{{ t('view.audit.allLevels') }}</option>
+          <option value="info">{{ t('view.audit.info') }}</option>
+          <option value="warning">{{ t('view.audit.warning') }}</option>
+          <option value="critical">{{ t('view.audit.critical') }}</option>
+        </select>
+        <input class="filter filter--text" v-model="filters.actor" :placeholder="t('view.audit.filterActor')"
+          />
+      </template>
+
+      <div v-if="events.error"><EmptyState icon="alert-triangle" :title="t('view.audit.eventsError')" :description="events.error" /></div>
+      <Skeleton v-else-if="loading" :lines="7" block />
+      <DataTable v-else :columns="cols" :rows="filtered" :loading="false"
+        :empty-text="t('view.audit.noMatch')" />
+    </Card>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
-import { StatCard, Panel } from '../components/index.js';
+import { useI18n } from '../i18n';
+import { Card, StatCard, Badge, DataTable, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
+
+const { t } = useI18n();
 
 const api = useApiStore();
-const events = ref([]);
-const filters = ref({ action: '', severity: '', actor: '' });
-const summaryData = ref({ total_events: 0, by_action: {}, critical_count: 0 });
 
-const actions = ['login', 'logout', 'api_call', 'agent_execute', 'config_change', 'permission_change', 'tenant_create', 'data_export', 'secret_access', 'system_admin'];
+const loading = ref(true);
+const lastUpdated = ref('');
+const events = reactive({ value: [], error: '' });
+const summary = reactive({ data: { total: 0, by_action: {}, by_actor: {} }, error: '' });
+const filters = reactive({ action: '', level: '', actor: '' });
 
-const summary = computed(() => [
-  { label: 'Total Events', value: summaryData.value.total_events, color: 'var(--accent)' },
-  { label: 'Critical', value: summaryData.value.critical_count, color: 'var(--fail)' },
-  { label: 'Actions', value: Object.keys(summaryData.value.by_action || {}).length, color: 'var(--warn)' },
-]);
+const cols = [
+  { key: 'time', label: t('view.audit.time'), type: 'time' },
+  { key: 'action', label: t('common.actions') },
+  { key: 'actor', label: t('view.audit.actor') },
+  { key: 'target', label: t('view.audit.target') },
+  { key: 'level', label: t('view.audit.level'), type: 'badge' },
+];
 
-function formatTime(ts) {
-  if (!ts) return '—';
-  const d = new Date(ts * 1000);
-  return d.toLocaleTimeString();
+const actionOptions = computed(() => {
+  const set = new Set();
+  events.value.forEach(e => e.action && set.add(e.action));
+  return [...set].sort();
+});
+
+const filtered = computed(() => {
+  const fa = filters.action, fl = filters.level, fo = filters.actor.trim().toLowerCase();
+  return events.value.filter(e => {
+    if (fa && e.action !== fa) return false;
+    if (fl && (e.level || 'info') !== fl) return false;
+    if (fo && !(e.actor || '').toLowerCase().includes(fo)) return false;
+    return true;
+  });
+});
+
+async function loadSummary() {
+  try {
+    const d = await api.get('/api/audit/summary');
+    const s = d.summary || d;
+    summary.data = {
+      total: s.total || s.total_events || 0,
+      by_action: s.by_action || {},
+      by_actor: s.by_actor || {},
+    };
+    summary.error = '';
+  }
+  catch (e) { summary.error = e.message || 'Summary unavailable'; }
 }
-
 async function loadEvents() {
   try {
-    const params = new URLSearchParams();
-    if (filters.value.action) params.set('action', filters.value.action);
-    if (filters.value.severity) params.set('severity', filters.value.severity);
-    if (filters.value.actor) params.set('actor', filters.value.actor);
-    const data = await api.get('/api/audit/events?' + params.toString());
-    events.value = data.events || [];
-  } catch { events.value = []; }
-  try {
-    const s = await api.get('/api/audit/summary');
-    summaryData.value = s;
-  } catch {}
+    const d = await api.get('/api/audit/events');
+    events.value = (d.events || []).map(e => ({
+      ...e,
+      time: e.time || e.timestamp,
+      level: e.level || e.severity || 'info',
+      target: e.target || e.resource || '',
+    }));
+    events.error = '';
+  }
+  catch (e) { events.error = e.message || 'Events unavailable'; }
 }
 
-onMounted(loadEvents);
+async function loadAll() {
+  loading.value = true;
+  await Promise.allSettled([loadEvents(), loadSummary()]);
+  loading.value = false;
+  lastUpdated.value = new Date().toLocaleTimeString();
+}
+
+onMounted(loadAll);
 </script>
 
 <style scoped>
-.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
-.topbar h1 { font-size: 24px; font-weight: 700; }
-.badge { background: #7c3aed; color: #fff; padding: 2px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; }
-.filters { margin-left: auto; display: flex; gap: 8px; }
-.input-sm { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text); font-size: 12px; }
-.summary-row { display: flex; gap: 16px; margin-bottom: 24px; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; white-space: nowrap; }
-.data-table th { color: var(--text3); font-size: 11px; text-transform: uppercase; }
-.data-table tr.critical { background: rgba(239,68,68,.04); }
-.mono { font-family: 'SF Mono', monospace; font-size: 12px; color: var(--text3); }
-.action-badge { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: 11px; }
-.severity-badge { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.severity-badge.info { background: rgba(59,130,246,.1); color: var(--accent); }
-.severity-badge.warning { background: rgba(245,158,11,.1); color: var(--warn); }
-.severity-badge.critical { background: rgba(239,68,68,.1); color: var(--fail); }
-.text-success { color: var(--success); }
-.text-fail { color: var(--fail); }
-.empty { text-align: center; color: var(--text3); padding: 20px; }
 </style>

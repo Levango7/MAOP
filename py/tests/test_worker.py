@@ -9,6 +9,9 @@ Covers:
 from __future__ import annotations
 
 import os
+import types
+
+import pytest
 from unittest.mock import patch
 
 # ── agent_executor tests ─────────────────────────────────────
@@ -116,3 +119,32 @@ class TestQueueWorkerConstants:
         from maop.worker.queue_worker import DATA_DIR
 
         assert DATA_DIR is not None
+
+
+class TestQueueWorkerDispatch:
+    """OPS-12: an unknown topic must NOT be silently acked and dropped.
+
+    A mis-typed producer topic that still lands on a consumed topic used to
+    be logged at INFO and acked, losing the message permanently. It must now
+    raise so the caller NACKs it (retry -> dead-letter).
+    """
+
+    def test_unknown_topic_raises(self):
+        from maop.worker.queue_worker import (
+            _UnknownTopicError,
+            _dispatch_message,
+        )
+
+        msg = types.SimpleNamespace(
+            topic="definitely_not_a_real_topic", payload={}
+        )
+        with pytest.raises(_UnknownTopicError):
+            _dispatch_message(msg)
+
+    def test_human_approval_is_noop_not_unknown(self):
+        # human_approval is intentionally skipped (handled elsewhere) and must
+        # NOT be treated as an unknown topic.
+        from maop.worker.queue_worker import _dispatch_message
+
+        msg = types.SimpleNamespace(topic="human_approval", payload={})
+        _dispatch_message(msg)  # must not raise

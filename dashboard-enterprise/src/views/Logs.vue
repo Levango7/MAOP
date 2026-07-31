@@ -1,234 +1,178 @@
 <template>
-  <div class="logs-page">
-    <div class="topbar">
-      <h1>Logs & Analysis</h1>
-      <div class="type-bar">
-        <button v-for="t in logTypes" :key="t.key" :class="['type-btn', { active: logType === t.key }]" @click="logType = t.key">{{ t.label }}</button>
-      </div>
-      <button class="btn-action" @click="loadLogs">↻ Refresh</button>
-    </div>
+  <div class="logs-view">
+    <PageHeader>
+      <Segmented
+        :model-value="logType"
+        :options="typeOptions"
+        size="sm"
+        @update:model-value="onTypeChange"
+      />
+      <button class="btn-ghost" :class="{ 'is-busy': loading }" @click="load" :disabled="loading">
+        <AppIcon name="refresh" :size="15" />
+        <span>{{ t('common.refresh') }}</span>
+      </button>
+    </PageHeader>
 
     <div class="filter-bar">
-      <input class="filter-input" v-model="filter" placeholder="Filter logs..." />
-      <div class="time-range">
-        <label>Start</label>
-        <input type="datetime-local" v-model="startTime" />
-        <label>End</label>
-        <input type="datetime-local" v-model="endTime" />
+      <div class="filter-input">
+        <AppIcon name="search" :size="15" />
+        <input v-model="filter" :placeholder="t('view.logs.filterPlaceholder')" />
       </div>
+      <span v-if="!loading" class="filter-meta">{{ displayLogs.length }} / {{ logs.length }} {{ t('view.logs.lines') }}</span>
     </div>
 
-    <div class="two-col">
-      <Panel title="Log Output" :bodyPadding="0" class="log-panel">
+    <div class="grid-2">
+      <Card :title="t('view.logs.logOutput')" icon="scroll" :marginBottom="0" class="log-card">
         <template #actions>
-          <span class="line-count">{{ displayLines.length }} / {{ maxLines }}</span>
+          <Badge v-if="!loading && logs.length" :tone="errorLogs > 0 ? 'fail' : 'success'">
+            {{ errorLogs }} {{ t('view.logs.errors') }}
+          </Badge>
         </template>
-        <div class="log-content" ref="logContainer">
-          <div class="log-line" v-for="(line, i) in displayLines" :key="i" :class="lineClass(line)">{{ line }}</div>
-          <div class="log-empty" v-if="displayLines.length === 0">No logs to display</div>
-        </div>
-      </Panel>
-
-      <Panel title="Log Analysis" :bodyPadding="16" class="analysis-panel">
-        <div class="stat-cards">
-          <StatCard label="Total" :value="analysis.total" centered />
-          <StatCard label="Success" :value="analysis.by_status.success" centered variant="success" />
-          <StatCard label="Failure" :value="analysis.by_status.failure" centered variant="fail" />
-          <StatCard label="Timeout" :value="analysis.by_status.timeout" centered variant="warn" />
-        </div>
-
-        <div class="section">
-          <h4>By Agent</h4>
-          <div class="agent-dist">
-            <div class="dist-row" v-for="(count, name) in analysis.by_agent" :key="name">
-              <span class="dist-name">{{ name }}</span>
-              <div class="dist-bar"><div class="dist-fill" :style="{ width: agentPct(count) + '%' }"></div></div>
-              <span class="dist-count">{{ count }}</span>
-            </div>
-            <div class="empty-hint" v-if="Object.keys(analysis.by_agent).length === 0">No data</div>
+        <div v-if="loading" class="blk"><Skeleton block height="12px" /><Skeleton block height="12px" /><Skeleton block height="12px" /><Skeleton block height="12px" /></div>
+        <EmptyState v-else-if="error" icon="alert-triangle" tone="fail" :title="t('view.logs.failedLoad')" :description="error" />
+        <EmptyState v-else-if="!logs.length" icon="scroll" :title="t('view.logs.noLogOutput')" :description="t('view.logs.noLogOutputDesc')" />
+        <EmptyState v-else-if="!displayLogs.length" icon="search" :title="t('view.logs.noMatches')" :description="t('view.logs.noMatchesDesc')" />
+        <div v-else class="log-list" ref="logContainer">
+          <div v-for="(e, i) in displayLogs" :key="i" class="log-line" :class="'lvl-' + e.level">
+            <span class="log-line__ts">{{ e.ts || '—' }}</span>
+            <Badge :tone="levelTone(e.level)" class="log-line__lvl">{{ e.level }}</Badge>
+            <span class="log-line__agent">{{ e.agent }}</span>
+            <span class="log-line__msg">{{ e.msg }}</span>
           </div>
         </div>
+      </Card>
 
-        <div class="section">
-          <h4>Error Patterns (Top 10)</h4>
-          <div class="error-patterns">
-            <div class="err-row" v-for="(ep, i) in analysis.error_patterns" :key="i">
-              <span class="err-rank">{{ i + 1 }}</span>
-              <span class="err-msg">{{ ep[0] }}</span>
-              <span class="err-count">{{ ep[1] }}</span>
-            </div>
-            <div class="empty-hint" v-if="analysis.error_patterns.length === 0">No errors</div>
+      <Card :title="t('view.logs.logAnalysis')" icon="activity" :marginBottom="0" class="analysis-card">
+        <div v-if="loading" class="blk">
+          <div class="stat-row"><Skeleton height="56px" /><Skeleton height="56px" /><Skeleton height="56px" /><Skeleton height="56px" /></div>
+          <Skeleton block height="14px" /><Skeleton block height="14px" />
+        </div>
+        <EmptyState v-else-if="error" icon="alert-triangle" tone="fail" :title="t('view.logs.analysisUnavailable')" :description="error" />
+        <div v-else class="analysis">
+          <div class="stat-row">
+            <StatCard :label="t('view.logs.stat.total')" :value="formatNum(analysis.total)" icon="clipboard" tone="brand" />
+            <StatCard :label="t('view.logs.stat.success')" :value="formatNum(analysis.by_status.success)" icon="check-circle" tone="success" />
+            <StatCard :label="t('view.logs.stat.failure')" :value="formatNum(analysis.by_status.failure)" icon="x-circle" tone="fail" />
+            <StatCard :label="t('view.logs.stat.timeout')" :value="formatNum(analysis.by_status.timeout)" icon="alert-triangle" tone="warn" />
+          </div>
+
+          <div class="section">
+            <h4 class="section__title">{{ t('view.logs.byAgent') }}</h4>
+            <EmptyState v-if="!agentKeys.length" icon="bot" :title="t('common.noData')" :description="t('view.logs.noDataDesc')" />
+            <ul v-else class="dist">
+              <li v-for="a in agentKeys" :key="a" class="dist__item">
+                <span class="dist__name">{{ a }}</span>
+                <div class="dist__track"><div class="dist__fill" :style="{ width: agentPct(a) + '%' }" /></div>
+                <span class="dist__count">{{ analysis.by_agent[a] }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="section">
+            <h4 class="section__title">{{ t('view.logs.errorPatterns') }}</h4>
+            <EmptyState v-if="!analysis.error_patterns.length" icon="check-circle" :title="t('view.logs.noErrors')" :description="t('view.logs.noErrorsDesc')" />
+            <ul v-else class="errs">
+              <li v-for="(ep, i) in analysis.error_patterns" :key="i" class="errs__item">
+                <span class="errs__rank">{{ i + 1 }}</span>
+                <span class="errs__msg">{{ ep[0] }}</span>
+                <span class="errs__count">{{ ep[1] }}</span>
+              </li>
+            </ul>
           </div>
         </div>
-      </Panel>
+      </Card>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
-import { StatCard, Panel } from '../components/index.js';
 import { useApiStore } from '../stores/api.js';
+import { useI18n } from '../i18n';
+import { AppIcon, Card, StatCard, Badge, Segmented, Skeleton, EmptyState, PageHeader } from '../components/index.js';
 
 const api = useApiStore();
+const { t } = useI18n();
+
 const logType = ref('all');
 const filter = ref('');
-const startTime = ref('');
-const endTime = ref('');
-const rawLogs = ref('');
+const loading = ref(false);
+const error = ref(null);
+const logs = ref([]);
 const logContainer = ref(null);
-const maxLines = 500;
-
 const analysis = ref({
   total: 0,
-  by_status: { success: 0, failure: 0, timeout: 0 },
+  by_status: { success: 0, failure: 0, timeout: 0, other: 0 },
   by_agent: {},
   error_patterns: [],
 });
 
-const logTypes = [
-  { key: 'all', label: 'All' },
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'delegations', label: 'Delegations' },
-  { key: 'checker', label: 'Checker' },
+const typeOptions = [
+  { value: 'all', label: t('common.all'), icon: 'scroll' },
+  { value: 'dashboard', label: t('view.logs.type.dashboard'), icon: 'server' },
+  { value: 'delegations', label: t('view.logs.type.delegations'), icon: 'route' },
+  { value: 'checker', label: t('view.logs.type.checker'), icon: 'shield' },
 ];
 
-const allLines = computed(() => {
-  let text = '';
-  if (typeof rawLogs.value === 'string') {
-    text = rawLogs.value;
-  } else if (rawLogs.value && rawLogs.value.content) {
-    text = rawLogs.value.content;
-  } else if (Array.isArray(rawLogs.value)) {
-    text = rawLogs.value.map(l => (typeof l === 'string' ? l : JSON.stringify(l))).join('\n');
-  } else if (rawLogs.value && rawLogs.value.logs) {
-    text = rawLogs.value.logs.map(l => (typeof l === 'string' ? l : JSON.stringify(l))).join('\n');
-  }
-  return text.split('\n');
+const displayLogs = computed(() => {
+  const q = filter.value.trim().toLowerCase();
+  const list = q
+    ? logs.value.filter((l) => (l.msg || '').toLowerCase().includes(q) || (l.agent || '').toLowerCase().includes(q))
+    : logs.value;
+  return list.slice(-500);
 });
+const errorLogs = computed(() => logs.value.filter((l) => l.level === 'error' || /fail|exception/i.test(l.msg || '')).length);
+const agentKeys = computed(() => Object.keys(analysis.value.by_agent || {}));
 
-const displayLines = computed(() => {
-  let lines = allLines.value;
-  if (filter.value.trim()) {
-    const q = filter.value.toLowerCase();
-    lines = lines.filter(l => l.toLowerCase().includes(q));
-  }
-  if (startTime.value || endTime.value) {
-    lines = lines.filter(l => {
-      const ts = extractTimestamp(l);
-      if (!ts) return true;
-      if (startTime.value && ts < startTime.value) return false;
-      if (endTime.value && ts > endTime.value) return false;
-      return true;
-    });
-  }
-  return lines.slice(-maxLines);
-});
-
-function extractTimestamp(line) {
-  const m = line.match(/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/);
-  return m ? m[0].replace('T', ' ') : null;
+function levelTone(level) {
+  if (level === 'error') return 'fail';
+  if (level === 'warn') return 'warn';
+  if (level === 'debug') return 'neutral';
+  return 'info';
+}
+function agentPct(a) {
+  const max = Math.max(1, ...Object.values(analysis.value.by_agent));
+  return Math.round((analysis.value.by_agent[a] / max) * 100);
+}
+function formatNum(n) {
+  const v = Number(n) || 0;
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + 'M';
+  if (v >= 1_000) return (v / 1_000).toFixed(1) + 'K';
+  return String(v);
 }
 
-function lineClass(line) {
-  const l = line.toLowerCase();
-  if (l.includes('error') || l.includes('fail') || l.includes('exception')) return 'line-error';
-  if (l.includes('warn')) return 'line-warn';
-  if (l.includes('success') || l.includes('ok') || l.includes('done')) return 'line-success';
-  return '';
+function onTypeChange(v) {
+  logType.value = v;
+  load();
 }
 
-function agentPct(count) {
-  const max = Math.max(...Object.values(analysis.value.by_agent), 1);
-  return Math.round((count / max) * 100);
-}
-
-async function loadLogs() {
-  try {
-    const data = await api.get(`/api/logs?type=${logType.value}`);
-    rawLogs.value = data;
-  } catch {
-    rawLogs.value = '';
-  }
-  await nextTick();
-  if (logContainer.value) {
-    logContainer.value.scrollTop = logContainer.value.scrollHeight;
-  }
-}
-
-async function loadAnalysis() {
-  try {
-    const data = await api.get('/api/logs/analysis');
+async function load() {
+  loading.value = true;
+  error.value = null;
+  const [l, a] = await Promise.allSettled([
+    api.get(`/api/logs?type=${logType.value}`),
+    api.get('/api/logs/analysis'),
+  ]);
+  if (l.status === 'fulfilled') logs.value = l.value.logs || [];
+  else error.value = (l.reason && l.reason.message) || 'Log stream failed';
+  if (a.status === 'fulfilled') {
+    const d = a.value || {};
     analysis.value = {
-      total: data.total || 0,
-      by_status: {
-        success: data.by_status?.success || 0,
-        failure: data.by_status?.failure || 0,
-        timeout: data.by_status?.timeout || 0,
-      },
-      by_agent: data.by_agent || {},
-      error_patterns: data.error_patterns || [],
+      total: d.total || 0,
+      by_status: d.by_status || { success: 0, failure: 0, timeout: 0, other: 0 },
+      by_agent: d.by_agent || {},
+      error_patterns: d.error_patterns || [],
     };
-  } catch {}
+  } else {
+    error.value = error.value || ((a.reason && a.reason.message) || 'Analysis failed');
+  }
+  loading.value = false;
+  await nextTick();
+  if (logContainer.value) logContainer.value.scrollTop = logContainer.value.scrollHeight;
 }
 
-onMounted(() => {
-  loadLogs();
-  loadAnalysis();
-});
+onMounted(load);
 </script>
 
 <style scoped>
-.logs-page { }
-.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.topbar h1 { font-size: 24px; font-weight: 700; }
-.type-bar { display: flex; gap: 4px; background: var(--bg2); border-radius: 10px; padding: 3px; margin-left: 16px; }
-.type-btn { background: none; border: none; padding: 6px 14px; border-radius: 8px; font-size: 13px; color: var(--text2); cursor: pointer; }
-.type-btn.active { background: var(--accent); color: #fff; }
-.btn-action { margin-left: auto; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 6px 14px; font-size: 13px; color: var(--text2); cursor: pointer; }
-
-.filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.filter-input { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; font-size: 13px; color: var(--text1); outline: none; }
-.filter-input:focus { border-color: var(--accent); }
-.time-range { display: flex; align-items: center; gap: 6px; }
-.time-range label { font-size: 12px; color: var(--text2); font-weight: 600; }
-.time-range input { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px; color: var(--text1); }
-
-.two-col { display: grid; grid-template-columns: 1fr 380px; gap: 16px; }
-
-/* log-panel: Panel provides bg/border/radius; we add flex+max-height for scrollable log area */
-.log-panel { display: flex; flex-direction: column; max-height: 600px; }
-.log-panel :deep(.panel-header) { padding: 12px 16px; border-bottom: 1px solid var(--border); margin-bottom: 0; }
-.log-panel :deep(.panel-body) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-
-.line-count { font-size: 11px; color: var(--text2); font-family: monospace; }
-
-.log-content { flex: 1; overflow-y: auto; padding: 8px 0; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; font-size: 12px; line-height: 1.6; }
-.log-line { padding: 1px 16px; white-space: pre-wrap; word-break: break-all; color: var(--text2); }
-.log-line.line-error { color: var(--fail); }
-.log-line.line-warn { color: var(--warn); }
-.log-line.line-success { color: var(--success); }
-.log-empty { padding: 40px; text-align: center; color: var(--text2); font-family: inherit; }
-
-/* analysis-panel: Panel provides bg/border/radius/padding; we add max-height+overflow for scroll */
-.analysis-panel { max-height: 600px; overflow-y: auto; }
-
-.stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
-
-.section { margin-bottom: 16px; }
-.section h4 { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 10px; text-transform: uppercase; letter-spacing: .5px; }
-
-.agent-dist { }
-.dist-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.dist-name { width: 80px; font-size: 12px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dist-bar { flex: 1; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
-.dist-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s; }
-.dist-count { width: 36px; font-size: 12px; text-align: right; font-weight: 600; }
-
-.error-patterns { }
-.err-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
-.err-rank { width: 20px; font-size: 11px; color: var(--text2); font-weight: 700; text-align: center; }
-.err-msg { flex: 1; font-size: 12px; color: var(--text1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; }
-.err-count { font-size: 12px; font-weight: 600; color: var(--fail); }
-.empty-hint { font-size: 12px; color: var(--text2); padding: 8px 0; text-align: center; }
 </style>

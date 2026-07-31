@@ -1,0 +1,86 @@
+# MAOP Docker Ignore
+# 防止敏感文件进入镜像
+
+# Git
+.git
+.gitignore
+
+# Python 缓存
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+.eggs
+
+# 虚拟环境
+venv
+env
+.venv
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# 测试和覆盖率
+.pytest_cache
+.coverage
+htmlcov
+coverage.xml
+
+# 类型检查
+.mypy_cache
+.ruff_cache
+
+# 敏感密钥文件 - 绝对不能进入镜像
+**/private_key.pem
+**/keys/*.pem
+**/*.key
+**/jwt_secret
+**/.admin_initial_password
+**/.admin-password
+
+# 数据库文件
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# 日志
+logs/
+*.log
+
+# 数据目录（运行时生成）
+data/
+
+# 文档（不需要进入镜像）
+docs/
+*.md
+!README.md
+
+# 临时文件
+.tmp/
+*.tmp
+*.bak
+
+# 开发配置
+.env
+.env.local
+.env.*.local
+
+# 监控配置（通过 volume 挂载）
+monitoring/
+prometheus*.yml
+alertmanager.yml
+grafana/
+
+# 前端源码（只需要构建产物）
+dashboard-enterprise/node_modules
+dashboard-enterprise/src
+
+# 归档
+archive/

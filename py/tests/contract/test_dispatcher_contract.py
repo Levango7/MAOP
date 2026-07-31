@@ -32,6 +32,31 @@ class TestDispatcherModelIntegration:
         assert "driver_used" in fields
         assert "breaker_tripped" in fields
 
+    def test_dispatcher_constructs_without_model_selector(self):
+        """Behavioral (not just hasattr): Dispatcher() must actually
+        instantiate and expose a meaningful default state. 4.6 fix: moves the
+        contract from a bare interface-existence check toward a behavioral one.
+        """
+        from maop.delegate.dispatcher import Dispatcher
+
+        d = Dispatcher()  # must not raise
+        # Before any dispatch, effective_model reflects "no selection yet".
+        assert d.effective_model is None
+
+    def test_dispatch_returns_dispatch_result_annotation(self):
+        """The dispatch contract is a real return-type, not just a method.
+
+        `from __future__ import annotations` makes annotations strings, so we
+        resolve them via typing.get_type_hints rather than comparing to the
+        raw (string) annotation object.
+        """
+        from typing import get_type_hints
+
+        from maop.delegate.dispatcher import Dispatcher, DispatchResult
+
+        hints = get_type_hints(Dispatcher.dispatch)
+        assert hints.get("return") is DispatchResult
+
     def test_agent_config_has_model_field(self):
         from maop.delegate.dispatcher import AgentConfig
         fields = AgentConfig.model_fields

@@ -40,7 +40,6 @@ from abc import ABC, abstractmethod
 from typing import Any, cast
 
 from maop.config.edition import get_edition, record_degradation
-from maop.core.db_utils import sqlite_connect
 
 logger = logging.getLogger(__name__)
 
@@ -86,39 +85,80 @@ class StorageBackend(ABC):
 
 
 class SQLiteStorageBackend(StorageBackend):
-    """Default local storage using SQLite."""
+    """Default local storage using SQLite.
+
+    C10 fix: previously every execute() opened a fresh connection that was
+    committed and closed immediately, while commit()/rollback() were silent
+    no-ops — multi-statement transactions were impossible and a caller's
+    rollback() quietly did nothing. Now a persistent connection in
+    autocommit mode is used: standalone statements still auto-commit
+    (backwards compatible), and explicit ``BEGIN`` ... commit()/rollback()
+    sequences work as real transactions.
+    """
 
     def __init__(self, db_path: str = "") -> None:
         self._db_path = db_path
+        self._conn: Any = None
+        import threading
+        self._lock = threading.RLock()
 
     @staticmethod
     def _default_path() -> str:
         from pathlib import Path
         return str(Path(__file__).resolve().parent.parent.parent.parent / "data" / "maop.db")
 
+    def _get_conn(self):
+        import sqlite3
+        if self._conn is None:
+            conn = sqlite3.connect(
+                self._db_path or self._default_path(),
+                timeout=10,
+                check_same_thread=False,
+                isolation_level=None,  # autocommit; explicit BEGIN starts a txn
+            )
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA foreign_keys=ON")
+            try:
+                from maop.core.db_utils import _get_busy_timeout_ms
+                conn.execute(f"PRAGMA busy_timeout={_get_busy_timeout_ms()}")
+            except Exception:
+                conn.execute("PRAGMA busy_timeout=10000")
+            self._conn = conn
+        return self._conn
+
     def execute(self, sql: str, params: tuple[Any, ...] | None = None) -> None:
-        with sqlite_connect(self._db_path or self._default_path()) as conn:
-            conn.execute(sql, params or ())
+        with self._lock:
+            self._get_conn().execute(sql, params or ())
 
     def fetchone(self, sql: str, params: tuple[Any, ...] | None = None) -> dict[str, Any] | None:
-        with sqlite_connect(self._db_path or self._default_path()) as conn:
-            cur = conn.execute(sql, params or ())
+        with self._lock:
+            cur = self._get_conn().execute(sql, params or ())
             row = cur.fetchone()
             return dict(row) if row else None
 
     def fetchall(self, sql: str, params: tuple[Any, ...] | None = None) -> list[dict[str, Any]]:
-        with sqlite_connect(self._db_path or self._default_path()) as conn:
-            cur = conn.execute(sql, params or ())
+        with self._lock:
+            cur = self._get_conn().execute(sql, params or ())
             return [dict(r) for r in cur.fetchall()]
 
     def commit(self) -> None:
-        pass
+        with self._lock:
+            if self._conn is not None and self._conn.in_transaction:
+                self._conn.commit()
 
     def rollback(self) -> None:
-        pass
+        with self._lock:
+            if self._conn is not None and self._conn.in_transaction:
+                self._conn.rollback()
 
     def close(self) -> None:
-        pass
+        with self._lock:
+            if self._conn is not None:
+                try:
+                    self._conn.close()
+                finally:
+                    self._conn = None
 
     def table_exists(self, name: str) -> bool:
         row = self.fetchone(
@@ -296,8 +336,24 @@ class SQLiteKVBackend(KVBackend):
         return self._store.list_keys(prefix=prefix)
 
     def cas(self, key: str, expected: str, new_value: str) -> bool:
+        # C-2 fix: the old code passed a hard-coded version 0 and discarded
+        # ``expected`` entirely — any concurrent writer's value would be
+        # blindly overwritten (or the CAS would always fail once version>0).
+        # KVStore.cas is version-based, so implement value-CAS on top of it:
+        # read current value+version, compare value to ``expected``, then
+        # swap against that exact version (still atomic — a concurrent
+        # update bumps the version and our cas fails, as it should).
+        # Probe with version 0: KVStore versions start at 1, so this never
+        # writes — it just returns the current value+version atomically.
         result = self._store.cas(key, 0, new_value)
-        return bool(result.success if hasattr(result, 'success') else result)
+        current_value = getattr(result, "current_value", None)
+        current_version = getattr(result, "current_version", 0)
+        if current_value is None and current_version == 0:
+            return False  # key does not exist
+        if str(current_value) != str(expected):
+            return False  # value mismatch — CAS must fail
+        retry = self._store.cas(key, current_version, new_value)
+        return bool(getattr(retry, "success", retry))
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -389,9 +445,26 @@ def get_storage_backend(db_path: str = "") -> StorageBackend:
             _storage = PostgreSQLStorageBackend()
             logger.info("[backends] Storage: PostgreSQL (edition=%s)", get_edition().value)
             return _storage
-        except ImportError:
-            logger.warning("[backends] PostgreSQL backend not available, falling back to SQLite")
-            record_degradation("storage", "postgresql", "sqlite")
+        except ImportError as exc:
+            # C9 fix: silently degrading an explicitly-requested PostgreSQL
+            # backend to SQLite causes split-brain data (writes land in a
+            # local file while the rest of the fleet uses PG). Default is
+            # now fail-fast; set MAOP_STORAGE_ALLOW_FALLBACK=1 to opt in to
+            # the old degrade-with-warning behaviour.
+            if os.getenv("MAOP_STORAGE_ALLOW_FALLBACK", "0") == "1":
+                logger.warning(
+                    "[backends] PostgreSQL backend not available (%s); "
+                    "MAOP_STORAGE_ALLOW_FALLBACK=1 → degrading to SQLite", exc,
+                )
+                record_degradation("storage", "postgresql", "sqlite")
+            else:
+                raise RuntimeError(
+                    "PostgreSQL storage backend was requested "
+                    "(MAOP_STORAGE_BACKEND/edition) but is not importable: "
+                    f"{exc}. Install psycopg/backends_pg deps, or set "
+                    "MAOP_STORAGE_ALLOW_FALLBACK=1 to explicitly allow "
+                    "degrading to SQLite."
+                ) from exc
     _storage = SQLiteStorageBackend(db_path=db_path)
     logger.debug("[backends] Storage: SQLite")
     return _storage

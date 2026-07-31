@@ -64,9 +64,10 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 
 **禁止**：在其他模块直接检查 `get_edition() == ENTERPRISE`，必须通过 `has_feature()` / `require_feature()`。
 
-`FeatureFlag` 当前共 24 个枚举值，按 edition 分组：
+`FeatureFlag` 当前共 25 个枚举值，按 edition 分组：
 - **个人版独占**（10 个）：COST_TRACKING / CIRCUIT_BREAKER / MEMORY_STORE / HOT_RELOAD / HOOKS / PLUGIN_SYSTEM / MCP_HUB / VECTOR_SEARCH / REACT_LOOP / BUDGET_GUARD
-- **企业版独占**（15 个）：RBAC / AUDIT_LOG / MULTI_USER / SSO / DASHBOARD_ANALYTICS / VUE_DASHBOARD / POSTGRESQL / REDIS / RABBITMQ / VAULT / ETCD / TENANT_ISOLATION / TLS_AUTO / AUTH_AUTO / N8N_INTEGRATION
+- **企业版独占**（13 个）：RBAC / AUDIT_LOG / MULTI_USER / SSO / DASHBOARD_ANALYTICS / VUE_DASHBOARD / POSTGRESQL / REDIS / VAULT / TENANT_ISOLATION / TLS_AUTO / AUTH_AUTO / N8N_INTEGRATION
+- **可选后端**（2 个，不计入企业版默认捆绑）：RABBITMQ / ETCD（依赖可选 pika / etcd3，通过 MAOP_QUEUE_BACKEND / MAOP_KV_BACKEND 环境变量启用）
 - **企业版 = 个人版 ∪ 企业版独占**（即企业版包含所有功能）
 
 ### 3. License 校验三态降级
@@ -89,8 +90,8 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 |------|--------|--------|
 | storage | sqlite | postgresql |
 | cache | memory | redis |
-| queue | sqlite | rabbitmq |
-| kv | sqlite | etcd |
+| queue | sqlite | redis |
+| kv | sqlite | sqlite |
 | secret | local | vault |
 
 企业版后端不可用时自动降级到个人版后端（通过 `record_degradation()` 记录）。后端默认值由 `backend_defaults()` 返回。
@@ -160,7 +161,7 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 | 组件 | 状态 |
 |------|------|
 | `config/edition.py` Edition 注册表 | ✅ 完整 |
-| `enterprise/` 8 个企业模块（rbac/tenant/audit/sso/ha/container/tls_auto/pg_persist） | ✅ 完整 |
+| `enterprise/` 12 个企业模块（rbac/tenant/audit/sso/ha/container/tls_auto/pg_persist/saml_handler/crl/n8n/license） | ✅ 完整 |
 | `enterprise/license.py` Ed25519 license 校验 | ✅ 完整（2026-07-25） |
 | `enterprise/n8n.py` n8n 集成 | ✅ 完整（2026-07-25） |
 | Settings 集成（edition 字段 + defaults） | ✅ 完整 |
@@ -168,7 +169,7 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 | 前端 edition store | ✅ 完整 |
 | 双 pyproject 打包 | ✅ 完整 |
 | Docker profiles（postgres/redis/vault/n8n/...） | ✅ 完整 |
-| 测试套件（edition + 8 企业模块 + license + n8n） | ✅ 完整 |
+| 测试套件（edition + 12 企业模块 + license + n8n） | ✅ 完整 |
 
 ### 待完善
 

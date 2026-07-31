@@ -162,25 +162,24 @@ class TestLicenseValidator:
         with pytest.raises(LicenseFormatError):
             validator.validate("MAOP-ENT-!!!.!!!")
 
-    def test_wrong_signing_key_raises(self):
+    def test_wrong_signing_key_raises(self, tmp_path):
         """A license signed by a different key should fail signature verification."""
 
-        # Generate a rogue key pair
+        # Generate a rogue key pair (written to tmp_path, not the source tree:
+        # writing/deleting files inside tests/ trips sandbox file-protection
+        # on some hosts, and pytest cleans tmp_path automatically).
         rogue_key = Ed25519PrivateKey.generate()
         rogue_pem = rogue_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption(),
         )
-        rogue_path = Path(__file__).parent / "_rogue_key.pem"
+        rogue_path = tmp_path / "_rogue_key.pem"
         rogue_path.write_bytes(rogue_pem)
-        try:
-            key = _generate_test_license(private_key_path=rogue_path)
-            validator = LicenseValidator()
-            with pytest.raises(LicenseSignatureError):
-                validator.validate(key)
-        finally:
-            rogue_path.unlink(missing_ok=True)
+        key = _generate_test_license(private_key_path=rogue_path)
+        validator = LicenseValidator()
+        with pytest.raises(LicenseSignatureError):
+            validator.validate(key)
 
     def test_payload_with_optional_fields(self):
         """License with max_users and fingerprint should parse correctly."""

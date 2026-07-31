@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 import time
 import uuid
 from enum import Enum
@@ -515,25 +516,42 @@ class ThreeLayerMemory:
         Results are ranked by (score * decay_weight) descending.
         """
         with self._episodic_connect() as conn:
+            rows: list | None = None
+            cols: list[str] = []
             if query:
-                fts_query = " OR ".join(query.split())
+                # High fix (FTS5 injection): quote each token as an FTS5
+                # string literal (internal double quotes escaped by doubling)
+                # so user input cannot inject FTS5 syntax (*, -, NEAR, etc.).
+                tokens = [t.replace('"', '""') for t in query.split() if t]
+                fts_query = " OR ".join(f'"{t}"' for t in tokens)
+                sql = """SELECT em.* FROM episodic_memory em
+                         JOIN episodic_memory_fts fts ON em.rowid = fts.rowid
+                         WHERE episodic_memory_fts MATCH ?"""
+                params: list[Any] = [fts_query]
+                if agent:
+                    sql += " AND em.agent = ?"
+                    params.append(agent)
+                if outcome:
+                    sql += " AND em.outcome = ?"
+                    params.append(outcome)
+                if min_score > 0:
+                    sql += " AND em.score >= ?"
+                    params.append(min_score)
+                sql += " ORDER BY em.created_at DESC LIMIT ?"
+                params.append(top * 3)
+                # High fix: actually execute inside try so the LIKE fallback
+                # triggers when FTS5 is unavailable (previously the except
+                # branch was unreachable — only string building was wrapped).
                 try:
-                    sql = """SELECT em.* FROM episodic_memory em
-                             JOIN episodic_memory_fts fts ON em.rowid = fts.rowid
-                             WHERE episodic_memory_fts MATCH ?"""
-                    params: list[Any] = [fts_query]
-                    if agent:
-                        sql += " AND em.agent = ?"
-                        params.append(agent)
-                    if outcome:
-                        sql += " AND em.outcome = ?"
-                        params.append(outcome)
-                    if min_score > 0:
-                        sql += " AND em.score >= ?"
-                        params.append(min_score)
-                    sql += " ORDER BY em.created_at DESC LIMIT ?"
-                    params.append(top * 3)
-                except Exception:
+                    cursor = conn.execute(sql, params)
+                    cols = (
+                        [d[0] for d in cursor.description]
+                        if cursor.description else []
+                    )
+                    rows = cursor.fetchall()
+                except sqlite3.OperationalError:
+                    rows = None  # fall back to LIKE below
+                if rows is None:
                     sql = "SELECT * FROM episodic_memory WHERE task LIKE ?"
                     params = [f"%{query}%"]
                     if agent:
@@ -562,9 +580,13 @@ class ThreeLayerMemory:
                 sql += " ORDER BY created_at DESC LIMIT ?"
                 params.append(top * 3)
 
-            cursor = conn.execute(sql, params)
-            cols = [d[0] for d in cursor.description] if cursor.description else []
-            rows = cursor.fetchall()
+            if rows is None:
+                cursor = conn.execute(sql, params)
+                cols = (
+                    [d[0] for d in cursor.description]
+                    if cursor.description else []
+                )
+                rows = cursor.fetchall()
 
         results = []
         for row in rows:
@@ -856,14 +878,28 @@ class ThreeLayerMemory:
 
         if updated and (composite < 0.5 or _is_negative_feedback(user_feedback)):
             triggered_actions.append("evolution_reflection")
-            try:
-                from maop.core.evolution_loop import EvolutionLoop
-                loop = EvolutionLoop(root_dir=str(self._root))
-                loop.run_cycle()
-                triggered_actions.append("evolution_cycle_completed")
-            except Exception as exc:
-                logger.warning("Evolution reflection triggered but failed: %s", exc)
-                triggered_actions.append(f"evolution_cycle_failed: {exc}")
+            # High fix: run the evolution cycle in a background daemon thread
+            # instead of synchronously — run_cycle() may involve LLM API calls
+            # and DB writes with no timeout, which previously blocked the
+            # caller (e.g. an HTTP handler) indefinitely.
+            def _run_evolution_cycle(root: str) -> None:
+                try:
+                    from maop.core.evolution_loop import EvolutionLoop
+                    EvolutionLoop(root_dir=root).run_cycle()
+                    logger.info("Background evolution cycle completed")
+                except Exception as exc:
+                    logger.warning(
+                        "Evolution reflection triggered but failed: %s", exc
+                    )
+
+            import threading
+            threading.Thread(
+                target=_run_evolution_cycle,
+                args=(str(self._root),),
+                name="evolution-cycle",
+                daemon=True,
+            ).start()
+            triggered_actions.append("evolution_cycle_scheduled")
 
             try:
                 from maop.core.error_ledger import ErrorLedger
@@ -1041,10 +1077,20 @@ class ThreeLayerMemory:
         for item in items:
             text = _item_to_text(item)
             item.relevance_score = _text_relevance(query, text)
+            # C4 fix: decay_weight(time.time()) computed age=0 (always the top
+            # tier, recency factor constantly 1.0). Use the item's actual
+            # created_at from the episodic entry dump so older memories decay.
+            if item.layer == "episodic":
+                created_at = time.time()
+                if isinstance(item.data, dict):
+                    created_at = float(item.data.get("created_at") or created_at)
+                recency = decay_weight(created_at)
+            else:
+                recency = 1.0
             item.weight = (
                 item.relevance_score * cfg.relevance_weight
                 + item.weight * cfg.importance_weight
-                + (decay_weight(time.time()) if item.layer == "episodic" else 1.0) * cfg.recency_weight
+                + recency * cfg.recency_weight
             )
 
         # ── Step 2: focusAttention ──────────────────────────

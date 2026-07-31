@@ -199,12 +199,15 @@ class ChatEngine:
             return
 
         content = "".join(full_content)
+        token_count = len(content) // 4
+        model_name = request.model or self._default_model or ""
 
         # Store assistant response
         self._memory_mgr.conversation.add_message(
             session_id=session_id,
             role="assistant",
             content=content,
+            metadata={"model": model_name, "tokens": token_count},
         )
 
         # Store to L2 memory
@@ -215,7 +218,7 @@ class ChatEngine:
             agent=agent,
         )
 
-        yield _sse_event("done", {"session_id": session_id, "content_length": len(content)})
+        yield _sse_event("done", {"session_id": session_id, "content_length": len(content), "tokens": token_count, "model": model_name})
 
     async def _call_llm(
         self,
@@ -253,6 +256,11 @@ class ChatEngine:
     ) -> str:
         """Fallback: call LLM via the Dispatcher/CLI system."""
         try:
+            # Intentional lazy import: maop.delegate depends on maop.core at
+            # module load time, so importing it at the top of this module would
+            # create a circular import. The delayed binding keeps the strict
+            # downward dependency direction intact (core never top-level
+            # imports delegate); reviewed per audit item 4.5.
             from maop.config.loader import ConfigLoader
             from maop.delegate.dispatcher import Dispatcher
 

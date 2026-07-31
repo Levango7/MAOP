@@ -82,9 +82,17 @@ async def list_tenants(
                 "error": f"Invalid status '{status}'. Valid: {[s.value for s in TenantStatus]}",
             }
     tenants = mgr.list_tenants(status=status_filter)
+    result = []
+    for t in tenants:
+        d = t.model_dump()
+        try:
+            d["usage"] = mgr.get_usage(t.tenant_id).model_dump()
+        except Exception:
+            d["usage"] = {}
+        result.append(d)
     return {
         "status": "ok",
-        "tenants": [t.model_dump() for t in tenants],
+        "tenants": result,
         "count": len(tenants),
     }
 

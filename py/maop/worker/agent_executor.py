@@ -75,7 +75,12 @@ def run() -> None:
     config = loader.load()
     dispatcher = Dispatcher(config, root_dir=str(ROOT))
 
-    logger.info("Worker ready — consuming from queue...")
+    # C11 fix: consumer_id was hard-coded "worker-1" — running multiple
+    # workers made them indistinguishable (ack/reclaim confusion, double
+    # execution). Derive a unique id from hostname + pid.
+    import socket
+    consumer_id = f"worker-{socket.gethostname()}-{os.getpid()}"
+    logger.info("Worker ready — consuming from queue... (consumer_id=%s)", consumer_id)
 
     while not _shutdown:
         msg = None
@@ -83,7 +88,7 @@ def run() -> None:
             msg = queue.dequeue(
                 topic="agent_tasks",
                 consumer_group="agent-exec",
-                consumer_id="worker-1",
+                consumer_id=consumer_id,
                 timeout_s=5,
             )
             if msg is None:
@@ -107,7 +112,7 @@ def run() -> None:
                 # P0 fix: ACK on successful dispatch so the message is not
                 # reclaimed by _reclaim_unacked and re-executed (previously
                 # caused each task to run up to 4 times).
-                queue.ack(msg.id, consumer_id="worker-1")
+                queue.ack(msg.id, consumer_id=consumer_id)
             except Exception as exc:
                 # P0 fix: NACK on dispatch failure so the message is re-queued
                 # or dead-lettered instead of lingering in 'processing'.

@@ -9,7 +9,7 @@ Provides visibility into the multi-factor route matching process:
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Request
 
@@ -61,7 +61,7 @@ async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any
                 "fallback": route.fallback or None,
                 "tertiary": route.tertiary or None,
             })
-    all_scores.sort(key=lambda x: x["score"], reverse=True)
+    all_scores.sort(key=lambda x: cast(float, x["score"]), reverse=True)
 
     return {
         "task": task,
@@ -108,5 +108,5 @@ async def get_route_scores(request: Request, task: str = "") -> dict[str, Any]:
             "matched_by": matched_by or "none",
             "primary": route.primary,
         })
-    scores.sort(key=lambda x: x["score"], reverse=True)
+    scores.sort(key=lambda x: cast(float, x["score"]), reverse=True)
     return {"task": task, "scores": scores}

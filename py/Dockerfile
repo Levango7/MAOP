@@ -35,6 +35,8 @@ COPY --from=builder /install /usr/local
 # Copy application code
 # NOTE: Build context is the repo root (see CI: docker build -f py/Dockerfile . )
 COPY py/maop/ maop/
+COPY py/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 COPY config/ config/
 COPY dashboard/ dashboard/
 
@@ -70,7 +72,7 @@ EXPOSE 9079
 USER maop
 
 # tini as init (PID 1) — proper signal handling + zombie reaping
-ENTRYPOINT ["/usr/bin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
 
 # Default: start dashboard. Override via docker-compose entrypoint.
 CMD ["python", "-m", "maop.dashboard.server"]

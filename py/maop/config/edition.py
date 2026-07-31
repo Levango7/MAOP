@@ -12,20 +12,25 @@ Architecture:
   - ``has_feature()`` / ``require_feature()``: runtime gate
   - ``edition_info()``: structured metadata for /api/info/edition
 
-PLANNED features (declared but NOT implemented):
+OPTIONAL backends (implemented, gated by optional deps + env override):
   - ``FeatureFlag.RABBITMQ``: RabbitMQ queue backend
-    (``maop/core/backends_rabbitmq.py`` does not exist; runtime falls
-    back to Redis via ImportError degradation in ``core/backends.py``).
+    (``maop/core/backends_rabbitmq.py`` IS implemented; requires the
+    optional ``pika`` dependency).  Enable at runtime via
+    ``MAOP_QUEUE_BACKEND=rabbitmq``.  If ``pika`` is missing, the factory
+    in ``core/backends.py`` degrades to Redis and records a degradation.
   - ``FeatureFlag.ETCD``: etcd/Consul distributed KV backend
-    (``maop/core/backends_distributed.py`` does not exist; runtime
-    falls back to SQLite via ImportError degradation).
+    (``maop/core/backends_distributed.py`` IS implemented; requires the
+    optional ``etcd3`` dependency).  Enable via ``MAOP_KV_BACKEND=etcd``.
+    If ``etcd3`` is missing, the factory degrades to SQLite.
 
   These two flags are intentionally **excluded** from
   ``_ENTERPRISE_FEATURES`` to keep ``/api/info/edition`` honest about
-  what is actually shipped.  The enum values are retained for backward
+  what is bundled by default (the dependencies are optional extras, not
+  hard requirements).  The enum values are retained for backward
   compatibility (so existing string comparisons / config files do not
-  break).  Do NOT re-add them to ``_ENTERPRISE_FEATURES`` until the
-  corresponding backend modules are fully implemented.
+  break).  Enable them through the documented env overrides rather than
+  the feature flag.  Do NOT re-add them to ``_ENTERPRISE_FEATURES``
+  unless the optional dependencies become mandatory for the edition.
 """
 
 from __future__ import annotations
@@ -52,9 +57,9 @@ class FeatureFlag(str, Enum):
     VUE_DASHBOARD = "vue_dashboard"
     POSTGRESQL = "postgresql"
     REDIS = "redis"
-    RABBITMQ = "rabbitmq"  # PLANNED — backend not yet implemented, do not enable
+    RABBITMQ = "rabbitmq"  # OPTIONAL — backend implemented; enable via MAOP_QUEUE_BACKEND=rabbitmq (needs pika)
     VAULT = "vault"
-    ETCD = "etcd"  # PLANNED — backend not yet implemented, do not enable
+    ETCD = "etcd"  # OPTIONAL — backend implemented; enable via MAOP_KV_BACKEND=etcd (needs etcd3)
     TENANT_ISOLATION = "tenant_isolation"
     COST_TRACKING = "cost_tracking"
     CIRCUIT_BREAKER = "circuit_breaker"
@@ -84,9 +89,10 @@ _PERSONAL_FEATURES: frozenset[FeatureFlag] = frozenset({
     FeatureFlag.BUDGET_GUARD,
 })
 
-# 注意：RABBITMQ 和 ETCD 已从此集合中移除，因为对应 backend 模块
-# (backends_rabbitmq.py / backends_distributed.py) 尚未实现。
-# 详见模块 docstring 中的 PLANNED features 说明。
+# 注意：RABBITMQ 和 ETCD 未加入此集合，因为对应 backend 模块
+# (backends_rabbitmq.py / backends_distributed.py) 虽已实现，但依赖
+# 可选第三方包（pika / etcd3），不属于默认捆绑能力。
+# 详见模块 docstring 中的 OPTIONAL backends 说明。
 _ENTERPRISE_FEATURES: frozenset[FeatureFlag] = frozenset({
     FeatureFlag.RBAC,
     FeatureFlag.AUDIT_LOG,

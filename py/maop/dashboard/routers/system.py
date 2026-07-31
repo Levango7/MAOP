@@ -11,11 +11,13 @@ import sys
 import time
 import uuid as _uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from maop.core.middleware import require_admin
+from maop.core.db_utils import get_db_path
+from maop import __version__ as MAOP_VERSION
 
 from .state import MAOP_ROOT, active_jobs, get_bridge, get_subsystems, init_subsystems, start_time
 
@@ -43,7 +45,7 @@ async def _run_subprocess(cmd: list[str], timeout: int = 10) -> tuple[int, str, 
             stdout_b, stderr_b = await asyncio.wait_for(
                 proc.communicate(), timeout=timeout
             )
-            return proc.returncode, stdout_b.decode("utf-8", errors="replace"), stderr_b.decode("utf-8", errors="replace")
+            return cast(int, proc.returncode), stdout_b.decode("utf-8", errors="replace"), stderr_b.decode("utf-8", errors="replace")
         except asyncio.TimeoutError:
             proc.kill()
             await proc.wait()
@@ -393,7 +395,15 @@ async def api_overview(request: Request) -> dict[str, Any]:
         ts = await b.timeseries(hours=168)
         live = await b.live()
         fails = await b.failures()
+        # Real delegation trend (MoM/YoY) sourced from logs/delegations.json,
+        # which holds the genuine delegation history (the SQL delegations
+        # table is not populated by the current pipeline).
+        period = await b.delegation_period_stats()
         agent_count = len(agents.get("agents", [])) if isinstance(agents, dict) else (len(agents) if isinstance(agents, list) else 0)
+        # Use real delegation history (logs/delegations.json) for the KPI so the
+        # overview shows actual numbers instead of 0 from the empty SQL table.
+        deleg_total = period.get("total", 0)
+        deleg_sr = period.get("success_rate", 0.0)
         # P2-9 fix: cache file counts (10min TTL) to avoid per-request file traversal
         _fc_now = _time.monotonic()
         _fc_cached = _file_counts_cache.get("data")
@@ -431,8 +441,12 @@ async def api_overview(request: Request) -> dict[str, Any]:
         # Count actual API endpoints from FastAPI app routes
         api_endpoints = sum(1 for r in request.app.routes if getattr(r, 'path', '').startswith('/api/'))
         result = {"agents_total": agent_count, "modules_total": source_files, "tests_total": tests_total,
-                "success_rate": rpt.get("success_rate", 0) if isinstance(rpt, dict) else 0,
-                "delegations_total": rpt.get("total_delegations", rpt.get("total", 0)) if isinstance(rpt, dict) else 0,
+                "success_rate": deleg_sr,
+                "delegations_total": deleg_total,
+                "delegations_mom": period.get("delegations_mom"),
+                "delegations_yoy": period.get("delegations_yoy"),
+                "success_rate_mom": period.get("success_rate_mom"),
+                "success_rate_yoy": period.get("success_rate_yoy"),
                 "avg_latency_ms": rpt.get("avg_latency_ms", 0) if isinstance(rpt, dict) else 0,
                 "recent_delegations": live.get("recent_delegations", []) if isinstance(live, dict) else (live if isinstance(live, list) else []),
                 "fail_ranking": fails if isinstance(fails, list) else [],
@@ -440,7 +454,7 @@ async def api_overview(request: Request) -> dict[str, Any]:
                 "api_endpoints": api_endpoints,
                 "python_ver": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
                 "platform": f"{platform.system()} {platform.machine()}",
-                "version": "4.0", "uptime": f"{round(time.time() - start_time)}s",
+                "version": MAOP_VERSION, "uptime": f"{round(time.time() - start_time)}s",
                 "timeseries": ts if isinstance(ts, list) else None}
         _overview_cache["data"] = result
         _overview_cache["ts"] = now
@@ -507,42 +521,12 @@ async def api_security_config_v4() -> dict[str, Any]:
             result[mod_name] = False
     return result
 
-# ── Audit / Control Plane ─────────────────────────────────────────
-@router.get("/api/audit/events")
-async def api_audit_events(limit: int = Query(100)) -> dict[str, Any]:
-    try:
-        from maop.control.audit import AuditLog
-        events = AuditLog(MAOP_ROOT / "logs" / "audit.jsonl").read_recent(limit=limit)
-        return {"events": [e.model_dump() for e in events], "count": len(events)}
-    except Exception as exc:
-        logger.error('Audit events failed: %s', exc)
-        return {"events": [], "count": 0, "error": "Audit events failed"}
-
-@router.get("/api/audit/summary")
-async def api_audit_summary() -> dict[str, Any]:
-    try:
-        from maop.control.audit import AuditLog
-        log = AuditLog(MAOP_ROOT / "logs" / "audit.jsonl")
-        events = log.read_recent(limit=500)
-        by_action: dict[str, int] = {}
-        by_actor: dict[str, int] = {}
-        for e in events:
-            by_action[e.action] = by_action.get(e.action, 0) + 1
-            by_actor[e.actor] = by_actor.get(e.actor, 0) + 1
-        return {"total": len(events), "by_action": by_action, "by_actor": by_actor}
-    except Exception as exc:
-        logger.error('Audit summary failed: %s', exc)
-        return {"total": 0, "by_action": {}, "by_actor": {}, "error": str(exc)}
-
-@router.get("/api/audit/filter")
-async def api_audit_filter(action: str = "", actor: str = "", target: str = "", limit: int = Query(50)) -> dict[str, Any]:
-    try:
-        from maop.control.audit import AuditLog
-        events = AuditLog(MAOP_ROOT / "logs" / "audit.jsonl").filter(action=action, actor=actor, target=target, limit=limit)
-        return {"events": [e.model_dump() for e in events], "count": len(events)}
-    except Exception as exc:
-        logger.error('Audit filter failed: %s', exc)
-        return {"events": [], "count": 0, "error": "Audit filter failed"}
+# ── Audit endpoints moved to routers/audit.py (enterprise) ────────
+# The /api/audit/events, /api/audit/summary, /api/audit/filter endpoints
+# were previously defined here (always registered) which shadowed the
+# enterprise audit.py router. They have been moved to audit.py which
+# handles both enterprise (EnterpriseAuditLogger) and personal
+# (control.audit.AuditLog) editions with proper FeatureFlag gating.
 
 # ── System Resources & Diagnostics (C-7 修复) ─────────────────────
 def _dir_size_mb(path) -> float:
@@ -684,7 +668,7 @@ async def api_system_diagnostics(request: Request) -> dict[str, Any]:
     # ── Database: 尝试 SELECT 1 ──
     try:
         import sqlite3
-        db_path = MAOP_ROOT / "data" / "maop.db"
+        db_path = get_db_path()
         if not db_path.exists():
             data_dir = MAOP_ROOT / "data"
             db_files = list(data_dir.glob("*.db")) if data_dir.exists() else []

@@ -10,23 +10,22 @@ export function useWebSocket(url = '') {
   let reconnectTimer = null;
   let reconnectAttempts = 0;
 
-  function getWsUrl() {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const baseUrl = url || `${proto}//${location.host}/ws`;
-    // P1-10 fix: inject JWT token as query param for auth
-    try {
-      const token = localStorage.getItem('maop_token') || '';
-      if (token) {
-        const sep = baseUrl.includes('?') ? '&' : '?';
-        return `${baseUrl}${sep}token=${encodeURIComponent(token)}`;
-      }
-    } catch {}
-    return baseUrl;
+  function getWsToken() {
+    try { return localStorage.getItem('maop_token') || ''; } catch { return ''; }
   }
 
   function connect() {
+    reconnectAttempts = 0;
     try {
-      ws = new WebSocket(getWsUrl());
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const baseUrl = url || `${proto}//${location.host}/ws`;
+      const token = getWsToken();
+      // P1-10 fix: send JWT via Sec-WebSocket-Protocol subprotocol (not URL
+      // query) so the token never appears in access logs / browser history.
+      // The backend (server.py:612-623) accepts it from the subprotocol.
+      ws = token
+        ? new WebSocket(baseUrl, ['token', token])
+        : new WebSocket(baseUrl);
       ws.onopen = () => {
         connected.value = true;
         error.value = null;

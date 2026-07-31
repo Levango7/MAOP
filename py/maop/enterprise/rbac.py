@@ -102,17 +102,34 @@ class RBACManager:
                 expires_at=row.get("expires_at"),
             ))
 
-    def grant_role(self, user_id: str, role: Role, *, granted_by: str = "", tenant_id: str = "") -> RoleGrant:
+    def grant_role(
+        self,
+        user_id: str,
+        role: Role,
+        *,
+        granted_by: str = "",
+        tenant_id: str = "",
+        expires_at: float | None = None,
+    ) -> RoleGrant:
+        """Grant a role to a user.
+
+        C8 note: authorization is enforced at the HTTP layer
+        (dashboard/routers/rbac.py require_admin). Callers invoking this
+        method directly MUST perform their own authorization check.
+        """
         import time as _time
         now = _time.time()
+        # C8 fix: expires_at was accepted by the model but never settable
+        # here nor persisted — temporary grants silently became permanent.
         grant = RoleGrant(
             user_id=user_id, role=role, tenant_id=tenant_id,
-            granted_by=granted_by, granted_at=now,
+            granted_by=granted_by, granted_at=now, expires_at=expires_at,
         )
         self._grants.append(grant)
         if self._pg:
-            self._pg.save_grant(user_id, role.value, tenant_id, granted_by, now, None)
-        logger.info("[rbac] Granted %s to user=%s tenant=%s by=%s", role.value, user_id, tenant_id, granted_by)
+            self._pg.save_grant(user_id, role.value, tenant_id, granted_by, now, expires_at)
+        logger.info("[rbac] Granted %s to user=%s tenant=%s by=%s expires_at=%s",
+                    role.value, user_id, tenant_id, granted_by, expires_at)
         return grant
 
     def revoke_role(self, user_id: str, role: Role, tenant_id: str = "") -> bool:
@@ -128,10 +145,20 @@ class RBACManager:
             logger.info("[rbac] Revoked %s from user=%s tenant=%s", role.value, user_id, tenant_id)
         return removed > 0
 
+    @staticmethod
+    def _is_active(grant: RoleGrant) -> bool:
+        """C8 fix: expired grants must not confer roles/permissions."""
+        if grant.expires_at is None:
+            return True
+        import time as _time
+        return grant.expires_at > _time.time()
+
     def user_roles(self, user_id: str, tenant_id: str = "") -> list[Role]:
         return [
             g.role for g in self._grants
-            if g.user_id == user_id and (not tenant_id or g.tenant_id in ("", tenant_id))
+            if g.user_id == user_id
+            and (not tenant_id or g.tenant_id in ("", tenant_id))
+            and self._is_active(g)
         ]
 
     def user_permissions(self, user_id: str, tenant_id: str = "") -> frozenset[Permission]:
@@ -149,7 +176,8 @@ class RBACManager:
             raise PermissionDenied(user_id, permission, tenant_id)
 
     def list_grants(self, user_id: str = "", tenant_id: str = "") -> list[RoleGrant]:
-        result = self._grants
+        # C8 fix: filter out expired grants so admin views reflect reality.
+        result = [g for g in self._grants if self._is_active(g)]
         if user_id:
             result = [g for g in result if g.user_id == user_id]
         if tenant_id:

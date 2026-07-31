@@ -24,9 +24,29 @@ class TestMAOPSettings:
         assert s.log_level == "INFO"
         assert s.dash_port == 9079
         assert not s.tls_enabled
-        assert not s.auth_enabled
+        # High 安全修复 (2.3): MAOP_ENV 未设置时认证默认启用（secure-by-
+        # default）。只有显式 MAOP_ENV=dev/development/local/test 才默认禁用。
+        assert s.auth_enabled
         assert s.rate_limit_enabled
         assert s.rate_limit_rps == 30.0
+
+    def test_auth_default_disabled_in_dev_env(self, monkeypatch):
+        """MAOP_ENV 显式声明为本地开发环境时，认证默认禁用。"""
+        for var in ("MAOP_AUTH", "MAOP_AUTH_ENABLED"):
+            monkeypatch.delenv(var, raising=False)
+        from maop.config.settings import MAOPSettings
+        for env in ("dev", "development", "local", "test"):
+            monkeypatch.setenv("MAOP_ENV", env)
+            assert not MAOPSettings().auth_enabled, env
+
+    def test_auth_default_enabled_in_unknown_env(self, monkeypatch):
+        """staging/QA/拼写错误/未知环境一律按生产标准默认启用认证。"""
+        for var in ("MAOP_AUTH", "MAOP_AUTH_ENABLED"):
+            monkeypatch.delenv(var, raising=False)
+        from maop.config.settings import MAOPSettings
+        for env in ("production", "staging", "qa", "demo", "prod", "porduction"):
+            monkeypatch.setenv("MAOP_ENV", env)
+            assert MAOPSettings().auth_enabled, env
 
     def test_env_override(self, monkeypatch):
         from maop.config.settings import MAOPSettings

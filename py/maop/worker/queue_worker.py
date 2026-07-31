@@ -20,12 +20,23 @@ import sys
 import time
 from pathlib import Path
 
+from maop.core.db_utils import get_db_path
+
 logger = logging.getLogger("maop.worker.queue_worker")
 
 ROOT = Path(os.environ.get("MAOP_ROOT", "/app"))
 DATA_DIR = Path(os.environ.get("MAOP_DATA_DIR", str(ROOT / "data")))
 
 _shutdown = False
+
+
+class _UnknownTopicError(Exception):
+    """Raised when a dequeued message has a topic with no registered handler.
+
+    OPS-12 fix: surfacing this (instead of silently acking) lets the caller
+    NACK the message so it follows the normal retry → dead-letter path rather
+    than being permanently and silently dropped.
+    """
 
 
 def _handle_signal(signum: int, frame: object) -> None:
@@ -68,7 +79,7 @@ def _process_queue_stats() -> None:
     """Log queue statistics."""
     try:
         from maop.core.message_queue import MessageQueue
-        mq = MessageQueue(db_path=str(DATA_DIR / "queue.db"))
+        mq = MessageQueue(db_path=str(get_db_path("queue")))
         stats = mq.stats()
         logger.debug("Queue stats: %s", stats)
     except Exception as exc:
@@ -109,7 +120,16 @@ def _dispatch_message(msg) -> None:
     elif topic in ("maintenance", "async_bridge"):
         _run_maintenance(payload)
     else:
-        logger.info("[queue-worker] no handler for topic %r, acking", topic)
+        # OPS-12 fix: an unrecognized topic must NOT be silently acked and
+        # dropped (e.g. a producer typo that still lands on a consumed topic).
+        # Raise so the caller NACKs the message, giving the MQ its normal
+        # retry -> dead-letter path instead of permanent silent loss.
+        logger.warning(
+            "[queue-worker] no handler registered for topic %r; NACKing for "
+            "retry/dead-letter (possible producer topic typo or missing handler)",
+            topic,
+        )
+        raise _UnknownTopicError(f"no handler for topic {topic!r}")
 
 
 def _execute_task(payload: dict) -> None:
@@ -133,16 +153,22 @@ def _execute_task(payload: dict) -> None:
 
     from maop.core.worker_pool import WorkerPool
 
-    pool = WorkerPool(max_workers=1, root_dir=os.environ.get("MAOP_ROOT", ""))
-    try:
-        asyncio.run(pool.start())
+    # OPS-11 fix: run the whole lifecycle in ONE event loop instead of four
+    # separate asyncio.run() calls. Each asyncio.run() creates and destroys
+    # its own loop, so the pool's internal asyncio primitives (queues, tasks,
+    # locks) were created in one loop but used from another — undefined
+    # behaviour plus 4x loop setup/teardown overhead per message.
+    async def _lifecycle() -> None:
+        pool = WorkerPool(max_workers=1, root_dir=os.environ.get("MAOP_ROOT", ""))
+        await pool.start()
         try:
-            task_id = asyncio.run(
-                pool.submit(task, workdir=workdir, agent_name=agent_name)
-            )
-            asyncio.run(pool.wait(task_id, timeout=300))
+            task_id = await pool.submit(task, workdir=workdir, agent_name=agent_name)
+            await pool.wait(task_id, timeout=300)
         finally:
-            asyncio.run(pool.stop())
+            await pool.stop()
+
+    try:
+        asyncio.run(_lifecycle())
     except Exception:
         logger.exception("[queue-worker] task execution failed")
         raise
@@ -169,7 +195,7 @@ def _run_maintenance(payload: dict) -> None:
     if job == "purge_acked":
         try:
             from maop.core.message_queue import MessageQueue
-            mq = MessageQueue(db_path=str(DATA_DIR / "queue.db"))
+            mq = MessageQueue(db_path=str(get_db_path("queue")))
             removed = mq.purge_acked(older_than_s=payload.get("older_than_s", 3600.0))
             logger.info("[queue-worker] purge_acked removed %d messages", removed)
         except Exception:
@@ -178,7 +204,7 @@ def _run_maintenance(payload: dict) -> None:
     elif job == "cleanup_dead_letters":
         try:
             from maop.core.message_queue import MessageQueue
-            mq = MessageQueue(db_path=str(DATA_DIR / "queue.db"))
+            mq = MessageQueue(db_path=str(get_db_path("queue")))
             removed = mq.cleanup_dead_letters(
                 older_than_s=payload.get("older_than_s", 86400.0)
             )
@@ -204,7 +230,7 @@ def _consume_messages() -> int:
     processed = 0
     try:
         from maop.core.message_queue import MessageQueue
-        mq = MessageQueue(db_path=str(DATA_DIR / "queue.db"))
+        mq = MessageQueue(db_path=str(get_db_path("queue")))
     except Exception as exc:
         logger.warning("[queue-worker] cannot connect to message queue: %s", exc)
         return 0

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [4.4.0] — 2026-07-31
 
 ### Added
 
@@ -19,11 +19,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `LLMProviderFactory._get_default_model()` 辅助方法，`chat_with_fallback()` 在无 model 时使用默认 model。
   - `ModelRegistryConfig` 新增 `default_provider` / `default_model` Pydantic 字段。
 - Enterprise license validation (Ed25519 signature + 7-day grace period)
+- **前端统一 Vue3** — 原生 JS Dashboard 归档至 `archive/js-dashboard/`，个人版和企业版共享同一 Vue3 SPA（17 页面）
+- **统一审计路由** — `audit.py` 同时支持企业版（EnterpriseAuditLogger）和个人版（AuditLog），消除路由冲突
+- **`__main__.py`** — 支持 `python -m maop` 入口
+- **n8n 纳入企业版 API 守卫** — `/api/n8n` 加入 `_ENTERPRISE_API_PREFIXES`
 
 ### Changed
 
 - Expanded `omniroute-auto-coding` capabilities: +chat, quickfix, docgen, techdoc, verify
 - Expanded `omniroute-auto-reasoning` capabilities: +chat, verify
+- **Docker 环境变量名修正** — `MAOP_BACKEND_*` → `MAOP_*_BACKEND`（与代码一致）
+- **依赖升级** — `cryptography<49`（CVE 修复）、`python-dotenv>=1.2.2`、`fastapi>=0.115`
+- **生产 Docker compose 安全加固** — 所有服务补充 `cap_drop: ALL` + `no-new-privileges`
+- **36 处硬编码 .db 路径统一到 `get_db_path()`** — 10 个模块、36 处替换
+- **迁移 SQL 文件恢复** — `data/migrations/` 目录重建
+
+### Security
+
+- **移除 `enterprise/keys/private_key.pem`** — 私钥不再随包分发
+- **audit 路由冲突修复** — `system.py` 的 audit 端点移至 `audit.py`，企业版审计功能不再被覆盖
 
 ## [4.3.0] — 2026-07-25
 

@@ -63,7 +63,7 @@ class LogoutRequest(BaseModel):
 
 @router.get("/authorize")
 @handle_api_errors
-async def authorize(request: Request, state: str = "") -> dict[str, Any]:
+async def authorize(request: Request, state: str = "") -> Any:
     """Redirect to the IdP's authorize URL."""
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.SSO):
@@ -83,7 +83,7 @@ async def callback(
     code: str = "",
     state: str = "",
     error: str = "",
-) -> dict[str, Any]:
+) -> Any:
     """Handle OAuth callback — exchange code for session."""
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.SSO):

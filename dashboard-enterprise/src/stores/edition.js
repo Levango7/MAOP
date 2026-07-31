@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia';
 import { withAuth, handleUnauthorized } from './api.js';
 
+function persistEdition(edition, features, backends, degradations) {
+  try {
+    localStorage.setItem('maop_edition', JSON.stringify({
+      edition, features, backends, degradations,
+    }));
+  } catch {}
+}
+
 export const useEditionStore = defineStore('edition', {
   state: () => ({
     edition: 'enterprise',
@@ -24,6 +32,7 @@ export const useEditionStore = defineStore('edition', {
         this.features = data.features || {};
         this.backends = data.backends || {};
         this.degradations = data.degradations || [];
+        persistEdition(this.edition, this.features, this.backends, this.degradations);
       } catch (e) {
         console.error('Failed to fetch edition info:', e);
       } finally {
@@ -53,6 +62,7 @@ export const useEditionStore = defineStore('edition', {
         }
         // 刷新完整 edition 信息（features/backends/degradations 可能已变化）
         await this.fetchEdition();
+        persistEdition(this.edition, this.features, this.backends, this.degradations);
         return data;
       } catch (e) {
         this.switchError = e.message || String(e);

@@ -22,12 +22,9 @@ from maop.core.error_schema import new_result
 from maop.core.monitoring import (
     MAOP_ROUTING_DECISION_DURATION_MS,
     MAOP_ROUTING_DECISION_TOTAL,
-    MAOP_TASK_DEADLINE_SECONDS,
-    MAOP_TASK_PREEMPTION_TOTAL,
-    MAOP_TASK_PRIORITY_DISTRIBUTION,
-    MAOP_TASK_SLA_TIER_DISTRIBUTION,
-    MAOP_TASK_SLA_VIOLATION_TOTAL,
 )
+from maop.delegate.agent_resolver import AgentResolver
+from maop.delegate.sla_monitor import SLAMonitor
 from maop.core.otel import get_tracer
 from maop.core.otel import span as otel_span
 from maop.core.routing_decision import (
@@ -49,26 +46,49 @@ from maop.delegate.models import (  # noqa: F401
 logger = logging.getLogger(__name__)
 
 
-# ── SLA helpers (Phase γ-1) ───────────────────────────────────
+# ── Retry helpers (P2 fix: exponential backoff) ─────────────────
 
-def _tier_from_priority(priority: int) -> str:
-    """Derive a default SLA tier from a priority level.
+async def _retry_with_backoff(
+    coro_factory,
+    *,
+    max_retries: int = 3,
+    base_delay_ms: int = 500,
+    retryable_exceptions: tuple = (Exception,),
+) -> Any:
+    """Execute an async operation with exponential backoff retry.
 
-    Mapping:
-      - priority 1       -> ``critical``
-      - priority 2..3    -> ``standard``
-      - priority 4..5     -> ``best_effort``
+    Args:
+        coro_factory: A callable that returns a coroutine to execute.
+        max_retries: Maximum number of retry attempts.
+        base_delay_ms: Base delay in milliseconds (doubles each retry).
+        retryable_exceptions: Tuple of exception types that trigger retry.
 
-    This is a heuristic used only when the caller does not pass an
-    explicit ``sla_tier`` to dispatch (the dispatch API exposes
-    ``priority`` / ``deadline_ms`` but not ``sla_tier`` per Phase γ-1
-    contract; the Plan model carries the authoritative ``sla_tier``).
+    Returns:
+        The result of the coroutine.
+
+    Raises:
+        The last exception if all retries fail.
     """
-    if priority <= 1:
-        return "critical"
-    if priority <= 3:
-        return "standard"
-    return "best_effort"
+    last_exc = None
+    for attempt in range(max_retries + 1):
+        try:
+            return await coro_factory()
+        except retryable_exceptions as exc:
+            last_exc = exc
+            if attempt < max_retries:
+                delay_s = (base_delay_ms * (2 ** attempt)) / 1000.0
+                logger.warning(
+                    "[dispatch] Attempt %d/%d failed: %s. Retrying in %.1fs...",
+                    attempt + 1, max_retries + 1, exc, delay_s,
+                )
+                await asyncio.sleep(delay_s)
+            else:
+                logger.error(
+                    "[dispatch] All %d attempts failed. Last error: %s",
+                    max_retries + 1, exc,
+                )
+    raise last_exc  # type: ignore[misc]
+
 
 # ── Optional subsystems (lazy import to avoid hard deps) ──────
 
@@ -119,30 +139,6 @@ def _get_subagent_manager(root_dir=None):
         logger.exception("Failed to load driver SubagentManager")
         return None
 
-def _get_agent_registry(root_dir=None):
-    """Lazy import AgentRegistry."""
-    try:
-        from maop.core.agent_registry import AgentRegistry
-        return AgentRegistry(root_dir=root_dir or "data")
-    except ImportError:
-        return None
-    except Exception:
-        logger.exception("Failed to load driver AgentRegistry")
-        return None
-
-def _get_capability_matcher(root_dir=None):
-    """Lazy import CapabilityMatcher with AgentRegistry."""
-    try:
-        from maop.core.agent_registry import AgentRegistry
-        from maop.core.capability_matcher import CapabilityMatcher
-        registry = AgentRegistry(root_dir=root_dir or "data")
-        return CapabilityMatcher(registry=registry)
-    except ImportError:
-        return None
-    except Exception:
-        logger.exception("Failed to load driver CapabilityMatcher")
-        return None
-
 
 # ── Dispatcher ────────────────────────────────────────────────
 
@@ -181,21 +177,28 @@ class Dispatcher:
     ) -> None:
         self._config = MAOP_config
         self._breaker = breaker or CircuitBreaker()
-        self._agent_cache: dict[str, AgentConfig] = {}
-        self._cache_versions: dict[str, int] = {}
         self._model_selector = model_selector
         self._effective_model: Any | None = None
         self._root_dir = root_dir
         self._subagent_mgr = None
         self._registry = registry
         self._matcher = capability_matcher
-        self._agents_index: dict[str, Any] | None = None
-        self._workflows_index: dict[str, Any] | None = None
+        # Delegated subsystems (N2 refactor)
+        self._resolver = AgentResolver(
+            MAOP_config, root_dir,
+            registry=registry, capability_matcher=capability_matcher,
+        )
+        self._sla = SLAMonitor()
         # Phase γ-2: optional priority queue for priority-aware dispatch.
         # When None (default), dispatch() executes synchronously as before.
         # When set, dispatch_priority() enqueues and drain_pending() pops in
         # priority order. Kept optional to preserve backward compatibility.
         self._priority_queue = priority_queue
+        # P2 fix: global concurrency limiter to prevent overwhelming downstream LLM APIs.
+        # Uses settings.dispatch_concurrency (env: MAOP_DISPATCH_CONCURRENCY, default: 10).
+        from maop.config.settings import get_settings
+        _concurrency = get_settings().dispatch_concurrency
+        self._semaphore = asyncio.Semaphore(_concurrency)
 
     @property
     def effective_model(self) -> Any | None:
@@ -204,8 +207,7 @@ class Dispatcher:
 
     def clear_agent_cache(self) -> None:
         """Clear the agent config cache (call after config reload)."""
-        self._agent_cache.clear()
-        self._cache_versions.clear()
+        self._resolver.clear_cache()
 
     # ── Phase γ-2: priority queue integration ──────────────────
 
@@ -333,198 +335,18 @@ class Dispatcher:
     ) -> None:
         """Record a soft-preemption event for dispatcher-driven dispatch.
 
-        Exposed as a helper so that callers managing their own worker pool
-        can signal "a higher-priority dispatch arrived while lower-priority
-        dispatches are in flight". Under soft preemption the running
-        dispatches are not interrupted; the counter records demand only.
+        Delegates to :class:`SLAMonitor` (N2 refactor). Exposed as a helper
+        so that callers managing their own worker pool can signal "a
+        higher-priority dispatch arrived while lower-priority dispatches
+        are in flight". Under soft preemption the running dispatches are
+        not interrupted; the counter records demand only.
         """
-        try:
-            if not running_priorities:
-                return
-            if incoming_priority < min(running_priorities):
-                MAOP_TASK_PREEMPTION_TOTAL.inc()
-        except Exception as exc:
-            # H10 fix (Phase R7): metrics 记录失败不应静默
-            logger.debug("preemption metric record failed: %s", exc)
+        self._sla.record_preemption(incoming_priority, running_priorities)
 
     def _resolve_agent(self, agent_name: str) -> AgentConfig | None:
-        """Resolve agent config from the loaded MAOP config.
+        """Resolve agent config by name (delegates to AgentResolver)."""
+        return self._resolver.resolve(agent_name)
 
-        Supports ``parent/child`` format for subagents (e.g. ``mavis/verifier``).
-        The parent's *cli* is combined with the child's *cli_args* to build
-        the final AgentConfig.
-
-        P1-19 fix: cache entries now store config_version for invalidation
-        when ConfigLoader.reload() is called. Also re-checks enabled flag
-        on cache hit to respect runtime enable/disable changes.
-
-        Returns a copy of the cached config to prevent callers from
-        mutating the shared cache (e.g., dispatch() overrides model).
-        """
-        cached = self._agent_cache.get(agent_name)
-        if cached is not None:
-            # P1-19 fix: version-based cache invalidation
-            current_version = getattr(self._config, '_version', 0) if self._config else 0
-            cached_version = self._cache_versions.get(agent_name, 0)
-            if cached_version == current_version:
-                return cached.model_copy()
-            else:
-                # Config changed, invalidate cache entry
-                del self._agent_cache[agent_name]
-                self._cache_versions.pop(agent_name, None)
-
-        # Fallback: AgentRegistry lookup (works even without YAML config)
-        if self._config is None:
-            reg_cfg = self._resolve_from_registry(agent_name)
-            return reg_cfg
-
-        # ── Subagent resolution: parent/child ────────────────────
-        if "/" in agent_name:
-            parent_name, child_name = agent_name.split("/", 1)
-            parent_def = self._find_agent_def(parent_name)
-            if parent_def is None:
-                return None
-            subagents = getattr(parent_def, "subagents", None) or {}
-            child_def = subagents.get(child_name)
-            if child_def is None:
-                logger.warning(
-                    "Subagent '%s' not found under parent '%s'", child_name, parent_name,
-                )
-                return None
-            # F2c (2026-07-22, Phase F): propagate `provider` field through
-            # all 8 AgentConfig(...) construction sites (ADR-013). Child
-            # subagent may override provider; otherwise inherit parent's.
-            child_provider = getattr(child_def, 'provider', '') or getattr(parent_def, 'provider', '')
-            cfg = AgentConfig(
-                name=agent_name,
-                cli=parent_def.cli,
-                driver=parent_def.driver,
-                cli_args=child_def.cli_args,
-                capabilities=child_def.capabilities or parent_def.capabilities,
-                timeout_s=parent_def.timeout_s,
-                model=parent_def.model,
-                provider=child_provider,
-                wrapper=parent_def.wrapper,
-            )
-            self._agent_cache[agent_name] = cfg
-            self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
-            return cfg
-
-        # ── Regular agent resolution ─────────────────────────────
-        agents = getattr(self._config, "agents", None)
-        if agents:
-            if isinstance(agents, dict):
-                a = agents.get(agent_name)
-                if a is not None:
-                    # B-P0-4 fix: respect enabled: false (was silently ignored)
-                    if getattr(a, 'enabled', True) is False:
-                        logger.warning("Agent '%s' is disabled (enabled: false)", agent_name)
-                        return None
-                    cfg = AgentConfig(
-                        name=agent_name, cli=a.cli, driver=a.driver,
-                        cli_args=getattr(a, 'cli_args', ''),
-                        capabilities=a.capabilities,
-                        timeout_s=a.timeout_s, model=getattr(a, 'model', ''),
-                        provider=getattr(a, 'provider', ''),
-                        wrapper=a.wrapper, command=getattr(a, 'command', ''),
-                    )
-                    self._agent_cache[agent_name] = cfg
-                    self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
-                    return cfg
-            else:
-                agents_by_name = self._build_agents_index(agents)
-                a = agents_by_name.get(agent_name)
-                if a is not None:
-                    # B-P0-4 fix: respect enabled: false
-                    if getattr(a, 'enabled', True) is False:
-                        logger.warning("Agent '%s' is disabled (enabled: false)", agent_name)
-                        return None
-                    cfg = AgentConfig(
-                        name=a.name, cli=a.cli, driver=a.driver,
-                        cli_args=a.cli_args, capabilities=a.capabilities,
-                        timeout_s=a.timeout_s, model=a.model,
-                        provider=getattr(a, 'provider', ''),
-                        wrapper=a.wrapper, command=a.command,
-                    )
-                    self._agent_cache[agent_name] = cfg
-                    self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
-                    return cfg
-
-        # Try workflows section — supports both dict and list
-        workflows = getattr(self._config, "workflows", None)
-        if workflows:
-            if isinstance(workflows, dict):
-                w = workflows.get(agent_name)
-                if w is not None:
-                    cfg = AgentConfig(
-                        name=agent_name, cli=w.cli, driver=w.driver,
-                        timeout_s=w.timeout_s, model=getattr(w, 'model', ''),
-                        provider=getattr(w, 'provider', ''),
-                        wrapper=w.wrapper, command=getattr(w, 'command', ''),
-                    )
-                    self._agent_cache[agent_name] = cfg
-                    self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
-                    return cfg
-            else:
-                wf_by_name = self._build_workflows_index(workflows)
-                w = wf_by_name.get(agent_name)
-                if w is not None:
-                    cfg = AgentConfig(
-                        name=w.name, cli=w.cli, driver=w.driver,
-                        timeout_s=w.timeout_s, model=w.model,
-                        provider=getattr(w, 'provider', ''),
-                        wrapper=w.wrapper, command=w.command,
-                    )
-                    self._agent_cache[agent_name] = cfg
-                    self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
-                    return cfg
-
-        # Wildcard match
-        if agents:
-            if isinstance(agents, dict):
-                for a_name, a in agents.items():
-                    if agent_name != a_name and _wildcard_match(agent_name, a_name):
-                        cfg = AgentConfig(
-                            name=a_name, cli=a.cli, driver=a.driver,
-                            cli_args=getattr(a, 'cli_args', ''),
-                            capabilities=a.capabilities,
-                            timeout_s=a.timeout_s, model=getattr(a, 'model', ''),
-                            provider=getattr(a, 'provider', ''),
-                            wrapper=a.wrapper, command=getattr(a, 'command', ''),
-                        )
-                        self._agent_cache[agent_name] = cfg
-                        self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
-                        return cfg
-            else:
-                for a in agents:
-                    if agent_name != a.name and _wildcard_match(agent_name, a.name):
-                        cfg = AgentConfig(
-                            name=a.name, cli=a.cli, driver=a.driver,
-                            cli_args=a.cli_args, capabilities=a.capabilities,
-                            timeout_s=a.timeout_s, model=a.model,
-                            provider=getattr(a, 'provider', ''),
-                            wrapper=a.wrapper, command=a.command,
-                        )
-                        self._agent_cache[agent_name] = cfg
-                        self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
-                        return cfg
-
-        # Fallback: AgentRegistry lookup
-        reg_cfg = self._resolve_from_registry(agent_name)
-        if reg_cfg is not None:
-            return reg_cfg
-
-        return None
-
-    def _build_agents_index(self, agents: list) -> dict[str, Any]:
-        if self._agents_index is None:
-            self._agents_index = {a.name: a for a in agents}
-        return self._agents_index
-
-    def _build_workflows_index(self, workflows: list) -> dict[str, Any]:
-        if self._workflows_index is None:
-            self._workflows_index = {w.name: w for w in workflows}
-        return self._workflows_index
 
     def _notify_route_scorer(
         self,
@@ -559,18 +381,8 @@ class Dispatcher:
             logger.warning("[dispatch] RouteScorer notify failed: %s", exc)
 
     def _record_sla_dispatch_start(self, priority: int, sla_tier: str) -> None:
-        """Record SLA metrics at task dispatch start (Phase γ-1).
-
-        Increments the in-flight gauge for the task's priority level and
-        SLA tier. Failures are non-blocking — metric recording must never
-        prevent dispatch.
-        """
-        try:
-            priority_label = str(priority)
-            MAOP_TASK_PRIORITY_DISTRIBUTION.inc(labels={"priority": priority_label})
-            MAOP_TASK_SLA_TIER_DISTRIBUTION.inc(labels={"tier": sla_tier})
-        except Exception as exc:
-            logger.debug("[dispatch] SLA start-metric record failed: %s", exc)
+        """Record SLA metrics at task dispatch start (delegates to SLAMonitor)."""
+        self._sla.record_start(priority, sla_tier)
 
     def _record_sla_dispatch_end(
         self,
@@ -579,86 +391,14 @@ class Dispatcher:
         *,
         deadline_ms: int | None,
     ) -> None:
-        """Record SLA metrics at task dispatch completion (Phase γ-1).
+        """Record SLA metrics at task dispatch completion (delegates to SLAMonitor)."""
+        self._sla.record_end(priority, sla_tier, deadline_ms=deadline_ms)
 
-        Decrements the in-flight gauges incremented at start, and — when
-        ``deadline_ms`` is set — checks whether the deadline was violated.
-        On violation, increments ``MAOP_task_sla_violation_total`` and
-        observes the (negative) remaining seconds in
-        ``MAOP_task_deadline_seconds``.
-        """
-        try:
-            priority_label = str(priority)
-            MAOP_TASK_PRIORITY_DISTRIBUTION.dec(labels={"priority": priority_label})
-            MAOP_TASK_SLA_TIER_DISTRIBUTION.dec(labels={"tier": sla_tier})
 
-            if deadline_ms is not None:
-                now_ms = int(__import__("time").time() * 1000)
-                remaining_s = (deadline_ms - now_ms) / 1000.0
-                if now_ms > deadline_ms:
-                    MAOP_TASK_SLA_VIOLATION_TOTAL.inc()
-                    MAOP_TASK_DEADLINE_SECONDS.observe(remaining_s)
-                    logger.warning(
-                        "SLA violation: deadline_ms=%d now_ms=%d remaining_s=%.3fs",
-                        deadline_ms, now_ms, remaining_s,
-                    )
-        except Exception as exc:
-            logger.debug("[dispatch] SLA end-metric record failed: %s", exc)
-
-    def _find_agent_def(self, name: str):
-        """Look up an AgentDef by name from the config (dict form only)."""
-        agents = getattr(self._config, "agents", None)
-        if agents and isinstance(agents, dict):
-            return agents.get(name)
-        if agents:
-            for a in agents:
-                if a.name == name:
-                    return a
-        return None
-
-    def _resolve_from_registry(self, agent_name: str) -> AgentConfig | None:
-        """Try to resolve an agent from the AgentRegistry by name."""
-        registry = self._registry or _get_agent_registry(self._root_dir)
-        if registry is None:
-            return None
-
-        agent = registry.get_agent(agent_name)
-        if agent is None or not agent.enabled:
-            return None
-
-        # F2c (2026-07-22, Phase F): propagate `provider` from registry
-        # agent if available (ADR-013 dual-path). Use getattr for safety
-        # in case older registry entries lack the field.
-        cfg = AgentConfig(
-            name=agent.name,
-            cli=agent.cli_path,
-            driver=agent.driver or "cli",
-            cli_args=agent.cli_args,
-            capabilities=agent.capabilities,
-            timeout_s=agent.timeout_s,
-            model=agent.model,
-            provider=getattr(agent, 'provider', ''),
-        )
-        self._agent_cache[agent_name] = cfg
-        self._cache_versions[agent_name] = getattr(self._config, '_version', 0) if self._config else 0
-        logger.info("[dispatcher] Resolved '%s' from AgentRegistry", agent_name)
-        return cfg
 
     def match_agent(self, task: str, requirements: list[str] | None = None) -> AgentConfig | None:
-        """Use CapabilityMatcher to find the best agent for a task.
-
-        Returns the highest-scoring agent as an AgentConfig, or None.
-        """
-        matcher = self._matcher or _get_capability_matcher(self._root_dir)
-        if matcher is None:
-            return None
-
-        scores = matcher.match(task=task, requirements=requirements, top_k=1)
-        if not scores or scores[0].total_score <= 0:
-            return None
-
-        best = scores[0]
-        return self._resolve_agent(best.agent_name)
+        """Use CapabilityMatcher to find the best agent for a task (delegates to AgentResolver)."""
+        return self._resolver.match_agent(task, requirements)
 
     async def dispatch(
         self,
@@ -698,7 +438,7 @@ class Dispatcher:
         dashboard can explain the dispatch decision.
         """
         _start = time.monotonic()
-        sla_tier = _tier_from_priority(priority)
+        sla_tier = self._sla.tier_from_priority(priority)
         routing_tracer = get_tracer("maop.routing.dispatcher")
         with otel_span(
             routing_tracer, "routing.dispatcher.dispatch", trace_id=trace_id,
@@ -759,7 +499,7 @@ class Dispatcher:
         # Phase γ-1: derive SLA tier, log SLA context, and record
         # in-flight gauges. The finally block at the end of this method
         # decrements the gauges and checks for deadline violation.
-        sla_tier = _tier_from_priority(priority)
+        sla_tier = self._sla.tier_from_priority(priority)
         self._record_sla_dispatch_start(priority, sla_tier)
         logger.info(
             "SLA dispatch: agent=%s priority=%d sla_tier=%s deadline_ms=%s trace_id=%s",
@@ -957,7 +697,9 @@ class Dispatcher:
         except Exception as exc:
             logger.debug("LoadBalancer record failed: %s", exc)
         try:
-            result = await driver_fn(config, task, timeout, workdir, trace_id, streamer=streamer)
+            # P2 fix: acquire semaphore to limit concurrent dispatches
+            async with self._semaphore:
+                result = await driver_fn(config, task, timeout, workdir, trace_id, streamer=streamer)
             result.routing_key = routing_key
         except Exception as exc:
             result = new_result(
@@ -1037,16 +779,6 @@ class Dispatcher:
         self._subagent_mgr.terminate(sa_info.id, exit_code=exit_code)
 
         return dispatch_result
-
-
-def _wildcard_match(pattern: str, name: str) -> bool:
-    """Simple wildcard match using fnmatch-style * and ?.
-
-    pattern: the agent name being searched for (e.g. "codex-mini")
-    name: the config agent name which may contain wildcards (e.g. "codex*")
-    """
-    import fnmatch
-    return fnmatch.fnmatch(pattern, name)
 
 
 # ── Phase γ-4: decision-record helper ─────────────────────────

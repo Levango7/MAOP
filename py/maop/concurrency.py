@@ -19,6 +19,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+import logging
+
+logger = logging.getLogger("maop.concurrency")
+
 # ── Task priority ─────────────────────────────────────────────
 
 class Priority(IntEnum):
@@ -355,9 +359,16 @@ class TokenStreamer:
         self._total_chars = 0
         self._started_at: float = 0.0
         self._ended = False
+        # CC-6 fix: backpressure counters — coalesce instead of dropping
+        self._coalesced_count = 0
 
     def push_token(self, token: str) -> None:
-        """Push a single token into the stream (non-blocking)."""
+        """Push a single token into the stream (non-blocking).
+
+        CC-6 fix: under backpressure (queue full), tokens are no longer
+        silently DROPPED (which corrupted output). Instead the two oldest
+        tokens are coalesced into one slot, preserving content and order.
+        """
         if self._token_count == 0:
             self._started_at = time.perf_counter()
         self._token_count += 1
@@ -365,10 +376,40 @@ class TokenStreamer:
         try:
             self._queue.put_nowait(token)
         except asyncio.QueueFull:
-            with contextlib.suppress(asyncio.QueueEmpty):
-                self._queue.get_nowait()
+            self._coalesce_oldest_locked()
             with contextlib.suppress(asyncio.QueueFull):
                 self._queue.put_nowait(token)
+
+    def _coalesce_oldest_locked(self) -> None:
+        """CC-6 fix helper: merge the two oldest string tokens into one slot.
+
+        Drains the queue, merges items[0]+items[1] (preserving order and the
+        None end-marker), and re-enqueues everything in the original order —
+        freeing exactly one slot without losing content.
+        """
+        items: list[str | None] = []
+        with contextlib.suppress(asyncio.QueueEmpty):
+            while True:
+                items.append(self._queue.get_nowait())
+        # find the first pair of adjacent string tokens to merge
+        merged = False
+        for i in range(len(items) - 1):
+            if items[i] is not None and items[i + 1] is not None:
+                items[i] = items[i] + items[i + 1]  # type: ignore[operator]
+                del items[i + 1]
+                merged = True
+                break
+        for it in items:
+            with contextlib.suppress(asyncio.QueueFull):
+                self._queue.put_nowait(it)
+        if merged:
+            self._coalesced_count += 1
+            if self._coalesced_count in (1, 10, 100, 1000):
+                logger.warning(
+                    "TokenStreamer backpressure: coalesced %d time(s) "
+                    "(buffer full, consumer too slow)",
+                    self._coalesced_count,
+                )
 
     def push_tokens(self, tokens: list[str]) -> None:
         """Push multiple tokens at once."""
@@ -376,10 +417,19 @@ class TokenStreamer:
             self.push_token(t)
 
     def end(self) -> None:
-        """Signal end of token stream."""
+        """Signal end of token stream.
+
+        CC-6 fix: if the buffer is full, coalesce the two oldest tokens to
+        make room for the end marker instead of silently losing it (which
+        caused consumers to hang forever waiting for token_end).
+        """
         self._ended = True
-        with contextlib.suppress(asyncio.QueueFull):
+        try:
             self._queue.put_nowait(None)
+        except asyncio.QueueFull:
+            self._coalesce_oldest_locked()
+            with contextlib.suppress(asyncio.QueueFull):
+                self._queue.put_nowait(None)
 
     async def token_stream(self) -> AsyncIterator[str]:
         """Yield individual tokens as SSE data chunks."""
@@ -401,6 +451,11 @@ class TokenStreamer:
     @property
     def token_count(self) -> int:
         return self._token_count
+
+    @property
+    def coalesced_count(self) -> int:
+        """CC-6 fix: number of backpressure coalesce events (0 = no pressure)."""
+        return self._coalesced_count
 
     @property
     def total_chars(self) -> int:

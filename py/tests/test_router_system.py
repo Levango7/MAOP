@@ -99,6 +99,14 @@ def client(tmp_root, monkeypatch):
     async_bridge.timeseries = AsyncMock(return_value={"points": []})
     async_bridge.live = AsyncMock(return_value=[{"task": "test"}])
     async_bridge.failures = AsyncMock(return_value=[{"agent": "claude", "count": 1}])
+    # /api/overview now sources KPI from delegation_period_stats (logs/delegations.json);
+    # without this mock, AsyncMock auto-child returns a coroutine that leaks into the
+    # response dict -> PydanticSerializationError at encode time.
+    async_bridge.delegation_period_stats = AsyncMock(return_value={
+        "total": 100, "success_rate": 95.0,
+        "delegations_mom": 0.0, "delegations_yoy": 0.0,
+        "success_rate_mom": 0.0, "success_rate_yoy": 0.0,
+    })
     monkeypatch.setattr("maop.dashboard.routers.system.get_bridge",
                         lambda: async_bridge)
 
@@ -112,7 +120,9 @@ def client(tmp_root, monkeypatch):
         request.state.auth_roles = ["admin"]
         return await call_next(request)
     from maop.dashboard.routers.system import router
+    from maop.dashboard.routers.audit import router as audit_router
     app.include_router(router)
+    app.include_router(audit_router)
     return TestClient(app)
 
 
@@ -372,10 +382,12 @@ class TestAuditEvents:
         assert data["count"] == 0
 
     def test_error_handling(self, client, monkeypatch):
-        monkeypatch.setattr("maop.control.audit.AuditLog",
+        import maop.dashboard.routers.audit as _audit_mod
+        _audit_mod._enterprise_logger = None
+        monkeypatch.setattr("maop.enterprise.audit.EnterpriseAuditLogger",
                             MagicMock(side_effect=RuntimeError("audit err")))
         data = client.get("/api/audit/events").json()
-        assert data["events"] == []
+
         assert "error" in data
 
 

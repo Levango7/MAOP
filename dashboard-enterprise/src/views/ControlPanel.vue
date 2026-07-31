@@ -1,131 +1,160 @@
 <template>
   <div class="control-panel">
-    <div class="topbar">
-      <h1>Control Panel</h1>
-      <button class="btn-refresh" @click="refreshAll">↻ Refresh</button>
-    </div>
+    <PageHeader>
+      <button class="btn-refresh" @click="refreshAll" :disabled="loading">
+        <AppIcon name="refresh" :size="15" :class="{ spinning: loading }" /> {{ t('common.refresh') }}
+      </button>
+    </PageHeader>
 
-    <div class="section">
-      <h3>Execution Controls</h3>
+    <Card :title="t('view.control.executionControls')" icon="play" :marginBottom="16">
       <div class="btn-grid">
-        <button class="ctrl-btn green" @click="execAction('run')" :disabled="loading">▶ Run Task</button>
-        <button class="ctrl-btn orange" @click="execAction('pause')" :disabled="loading">⏸ Pause</button>
-        <button class="ctrl-btn blue" @click="execAction('resume')" :disabled="loading">⏵ Resume</button>
-        <button class="ctrl-btn red" @click="execAction('stop')" :disabled="loading">⏹ Stop</button>
-        <button class="ctrl-btn purple" @click="execAction('validate')" :disabled="loading">✓ Validate Config</button>
-        <button class="ctrl-btn blue" @click="execAction('status')" :disabled="loading">◉ View Status</button>
+        <button v-for="a in execActions" :key="a.action" class="ctrl-btn" :class="'tone-' + a.tone"
+                @click="execAction(a.action)" :disabled="loading">
+          <AppIcon :name="a.icon" :size="16" /> {{ t(a.label) }}
+        </button>
       </div>
-      <div v-if="execResult" class="result-bar" :class="execResult.ok ? 'ok' : 'err'">{{ execResult.msg }}</div>
-    </div>
+      <div v-if="execResult" class="result-bar" :class="execResult.ok ? 'ok' : 'err'">
+        <AppIcon :name="execResult.ok ? 'check-circle' : 'x-circle'" :size="14" /> {{ execResult.msg }}
+      </div>
+    </Card>
 
-    <div class="section">
-      <h3>Maintenance Actions</h3>
+    <Card :title="t('view.control.maintenanceActions')" icon="wrench" :marginBottom="16">
       <div class="btn-grid">
-        <button class="ctrl-btn" @click="maintainAction('log-rotate')" :disabled="loading">📄 Log Rotate</button>
-        <button class="ctrl-btn" @click="maintainAction('prune')" :disabled="loading">🧹 Memory Prune</button>
-        <button class="ctrl-btn" @click="maintainAction('health')" :disabled="loading">🩺 Health Check</button>
-        <button class="ctrl-btn" @click="maintainAction('backup')" :disabled="loading">💾 Backup</button>
-        <button class="ctrl-btn" @click="maintainAction('cache-clear')" :disabled="loading">🗑 Cache Clear</button>
-        <button class="ctrl-btn" @click="maintainAction('reload')" :disabled="loading">🔄 Config Reload</button>
+        <button v-for="m in maintActions" :key="m.action" class="ctrl-btn"
+                :class="m.tone ? 'tone-' + m.tone : ''"
+                @click="maintainAction(m.action)" :disabled="loading">
+          <AppIcon :name="m.icon" :size="16" /> {{ t(m.label) }}
+        </button>
       </div>
-      <div v-if="maintResult" class="result-bar" :class="maintResult.ok ? 'ok' : 'err'">{{ maintResult.msg }}</div>
-    </div>
+      <div v-if="maintResult" class="result-bar" :class="maintResult.ok ? 'ok' : 'err'">
+        <AppIcon :name="maintResult.ok ? 'check-circle' : 'x-circle'" :size="14" /> {{ maintResult.msg }}
+      </div>
+    </Card>
 
-    <div class="section">
-      <h3>Running Jobs</h3>
-      <div v-if="jobs.length === 0" class="empty">No running jobs</div>
-      <div v-else class="job-table">
-        <div class="jrow header">
-          <span>Job</span><span>Status</span><span>Started</span><span>Action</span>
-        </div>
-        <div class="jrow" v-for="j in jobs" :key="j.id || j.name">
-          <span class="job-name">{{ j.name || j.id }}</span>
-          <span class="status-badge" :class="statusClass(j.status)">{{ j.status || 'unknown' }}</span>
-          <span class="mono">{{ j.started_at || '—' }}</span>
-          <span class="actions-cell">
-            <button class="act-btn small" @click="execAction('stop', j.name || j.id)">⏹ Stop</button>
-          </span>
+    <Card :title="t('view.control.runningJobs')" icon="activity" :marginBottom="16">
+      <div v-if="jobs.length" class="row-list">
+        <div v-for="j in jobs" :key="j.id" class="row-item" :data-status="j.status">
+          <div class="row-main">
+            <div class="row-name">
+              <AppIcon name="activity" :size="14" /> {{ j.name }}
+              <Badge :tone="statusTone(j.status)">{{ j.status }}</Badge>
+            </div>
+            <span class="row-sub">{{ j.started_at }}</span>
+          </div>
+          <button class="act-btn small" @click="execAction('stop', j.name)" :disabled="loading">
+            <AppIcon name="square" :size="12" /> {{ t('view.control.stop') }}
+          </button>
         </div>
       </div>
-    </div>
+      <EmptyState v-else-if="!loading" icon="activity" :title="t('view.control.noRunningJobs')"
+                  :description="t('view.control.noRunningJobsDesc')" />
+      <Skeleton v-else height="80px" />
+    </Card>
 
-    <div class="section">
-      <h3>Agent Upgrade</h3>
-      <button class="btn-check" @click="checkUpgrade" :disabled="loading">Check for Upgrades</button>
-      <div v-if="agents.length === 0 && !loading" class="empty">No upgrade info available</div>
-      <div v-else class="upgrade-table">
-        <div class="jrow header">
-          <span>Agent</span><span>Current</span><span>Latest</span><span>Status</span><span>Action</span>
-        </div>
-        <div class="jrow" v-for="a in agents" :key="a.name">
-          <span class="job-name">{{ a.name }}</span>
-          <span class="mono">{{ a.current || '—' }}</span>
-          <span class="mono">{{ a.latest || '—' }}</span>
-          <span class="status-badge" :class="upgradeStatusClass(a.status)">{{ a.status || '—' }}</span>
-          <span class="actions-cell">
-            <button class="act-btn small" @click="upgradeAgent(a.name)" :disabled="a.status === 'up-to-date'">⬆ Upgrade</button>
-          </span>
+    <Card :title="t('view.control.agentUpgrade')" icon="refresh" :marginBottom="16">
+      <button class="btn-check" @click="checkUpgrade" :disabled="loading">
+        <AppIcon name="refresh" :size="15" :class="{ spinning: loading }" /> {{ t('view.control.checkUpgrades') }}
+      </button>
+      <div v-if="agents.length" class="row-list">
+        <div v-for="a in agents" :key="a.name" class="row-item" :data-status="a.status">
+          <div class="row-main">
+            <div class="row-name">
+              <AppIcon name="bot" :size="14" /> {{ a.name }}
+              <Badge :tone="upgradeTone(a.status)">{{ a.status }}</Badge>
+            </div>
+            <div class="agent-fields">
+              <span class="agent-field"><span class="field-label">{{ t('view.control.current') }}</span> <span class="field-val">{{ a.current }}</span></span>
+              <span class="agent-field">→</span>
+              <span class="agent-field"><span class="field-label">{{ t('view.control.latest') }}</span> <span class="field-val">{{ a.latest }}</span></span>
+            </div>
+          </div>
+          <button class="act-btn small" @click="upgradeAgent(a.name)"
+                  :disabled="loading || a.status === 'up-to-date'">
+            <AppIcon name="upload" :size="12" /> {{ t('view.control.upgrade') }}
+          </button>
         </div>
       </div>
-    </div>
+      <EmptyState v-else-if="!loading" icon="refresh" :title="t('view.control.noUpgradeInfo')"
+                  :description="t('view.control.noUpgradeInfoDesc')" />
+      <Skeleton v-else height="120px" />
+    </Card>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
+import { useToast } from '../composables/useToast.js';
+import AppIcon from '../components/AppIcon.vue';
+import PageHeader from '../components/PageHeader.vue';
+import Card from '../components/Card.vue';
+import Badge from '../components/Badge.vue';
+import Skeleton from '../components/Skeleton.vue';
+import EmptyState from '../components/EmptyState.vue';
+import { useI18n } from '../i18n';
 
+const { t } = useI18n();
 const api = useApiStore();
+const toast = useToast();
 const loading = ref(false);
 const jobs = ref([]);
 const agents = ref([]);
 const execResult = ref(null);
 const maintResult = ref(null);
 
-function statusClass(status) {
-  if (!status) return 'unknown';
-  const s = status.toLowerCase();
-  if (s === 'running' || s === 'active') return 'running';
-  if (s === 'paused') return 'paused';
-  if (s === 'completed' || s === 'success') return 'success';
-  if (s === 'failed' || s === 'error') return 'error';
-  if (s === 'pending' || s === 'queued') return 'pending';
-  return 'unknown';
-}
+const execActions = [
+  { action: 'run', label: 'view.control.runTask', icon: 'play', tone: 'green' },
+  { action: 'pause', label: 'view.control.pause', icon: 'pause', tone: 'orange' },
+  { action: 'resume', label: 'view.control.resume', icon: 'rotate-ccw', tone: 'blue' },
+  { action: 'stop', label: 'view.control.stop', icon: 'square', tone: 'red' },
+  { action: 'validate', label: 'view.control.validateConfig', icon: 'check', tone: 'purple' },
+  { action: 'status', label: 'view.control.viewStatus', icon: 'activity', tone: 'teal' },
+];
+const maintActions = [
+  { action: 'log-rotate', label: 'view.control.logRotate', icon: 'scroll', tone: 'cyan' },
+  { action: 'prune', label: 'view.control.memoryPrune', icon: 'trash', tone: 'pink' },
+  { action: 'health', label: 'view.control.healthCheck', icon: 'check-circle', tone: 'lime' },
+  { action: 'backup', label: 'view.control.backup', icon: 'database', tone: 'sky' },
+  { action: 'cache-clear', label: 'view.control.cacheClear', icon: 'x-circle', tone: 'slate' },
+  { action: 'reload', label: 'view.control.configReload', icon: 'refresh', tone: 'amber' },
+];
 
-function upgradeStatusClass(status) {
-  if (!status) return 'unknown';
-  const s = status.toLowerCase();
-  if (s === 'up-to-date') return 'success';
-  if (s === 'upgrade-available') return 'pending';
-  if (s === 'upgrading') return 'running';
-  if (s === 'error') return 'error';
-  return 'unknown';
+function statusTone(s) {
+  const v = (s || '').toLowerCase();
+  if (v === 'running' || v === 'active') return 'info';
+  if (v === 'paused') return 'warn';
+  if (v === 'completed' || v === 'success') return 'success';
+  if (v === 'failed' || v === 'error') return 'fail';
+  if (v === 'pending' || v === 'queued') return 'neutral';
+  return 'neutral';
+}
+function upgradeTone(s) {
+  const v = (s || '').toLowerCase();
+  if (v === 'up-to-date') return 'success';
+  if (v === 'upgrade-available') return 'warn';
+  if (v === 'upgrading') return 'info';
+  if (v === 'error' || v === 'unavailable') return 'fail';
+  return 'neutral';
 }
 
 async function execAction(action, task) {
   loading.value = true;
   execResult.value = null;
   try {
-    // F-P0-5 fix: dispatch to correct endpoint per action
-    const body = {};
-    if (task) body.task = task;
-    let r;
     if (action === 'status') {
-      // GET /api/control/status
-      r = await api.get('/api/control/status');
+      await api.get('/api/control/status');
+      execResult.value = { ok: true, msg: 'Status refreshed' };
     } else {
-      // POST /api/control/{action}
       const validActions = ['run', 'pause', 'resume', 'stop', 'validate', 'doctor'];
-      if (!validActions.includes(action)) {
-        throw new Error(`Unknown action: ${action}`);
-      }
-      r = await api.post(`/api/control/${action}`, body);
+      if (!validActions.includes(action)) throw new Error(`Unknown action: ${action}`);
+      const body = task ? { task } : {};
+      const r = await api.post(`/api/control/${action}`, body);
+      execResult.value = { ok: true, msg: r.msg || r.message || r.detail || `${action} executed` };
     }
-    execResult.value = { ok: true, msg: r.msg || r.message || r.detail || `${action} executed` };
     await loadJobs();
   } catch (e) {
     execResult.value = { ok: false, msg: e.message || `${action} failed` };
+    toast.error(e.message || `${action} failed`);
   } finally {
     loading.value = false;
   }
@@ -137,8 +166,10 @@ async function maintainAction(action) {
   try {
     const r = await api.post('/api/control/maintain', { action });
     maintResult.value = { ok: true, msg: r.msg || r.message || r.detail || `${action} completed` };
+    toast.success(`${action} completed`);
   } catch (e) {
     maintResult.value = { ok: false, msg: e.message || `${action} failed` };
+    toast.error(e.message || `${action} failed`);
   } finally {
     loading.value = false;
   }
@@ -147,7 +178,13 @@ async function maintainAction(action) {
 async function loadJobs() {
   try {
     const data = await api.get('/api/control/status');
-    jobs.value = Array.isArray(data) ? data : (data.jobs || []);
+    const arr = Array.isArray(data) ? data : (data.jobs || data.active_jobs || []);
+    jobs.value = arr.map((j) => ({
+      id: j.id || j.name || `job-${index}`,
+      name: j.name || j.id || '—',
+      status: j.status || 'unknown',
+      started_at: j.started_at || '—',
+    }));
   } catch {
     jobs.value = [];
   }
@@ -157,7 +194,12 @@ async function checkUpgrade() {
   loading.value = true;
   try {
     const data = await api.get('/api/agent/upgrade');
-    agents.value = data.agents || [];
+    agents.value = (data.agents || []).map((a) => ({
+      name: a.name,
+      current: a.current || '—',
+      latest: a.latest || '—',
+      status: a.status || '—',
+    }));
   } catch {
     agents.value = [];
   } finally {
@@ -169,8 +211,10 @@ async function upgradeAgent(name) {
   loading.value = true;
   try {
     await api.post('/api/agent/upgrade?agent=' + encodeURIComponent(name), {});
+    toast.success(`Upgrade triggered for ${name}`);
     await checkUpgrade();
-  } catch {
+  } catch (e) {
+    toast.error(e.message || 'Upgrade failed');
   } finally {
     loading.value = false;
   }
@@ -186,53 +230,4 @@ onMounted(refreshAll);
 </script>
 
 <style scoped>
-.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-.topbar h1 { font-size: 24px; font-weight: 700; }
-.btn-refresh { margin-left: auto; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 6px 14px; font-size: 13px; color: var(--text2); cursor: pointer; }
-.btn-refresh:hover { border-color: var(--accent); }
-
-.section { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
-.section h3 { font-size: 14px; font-weight: 600; color: var(--text2); margin-bottom: 14px; }
-
-.btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
-.ctrl-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: all .15s; text-align: center; }
-.ctrl-btn:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
-.ctrl-btn:disabled { opacity: .45; cursor: not-allowed; }
-.ctrl-btn.green { border-left: 3px solid var(--success); }
-.ctrl-btn.orange { border-left: 3px solid var(--warn); }
-.ctrl-btn.blue { border-left: 3px solid var(--accent); }
-.ctrl-btn.red { border-left: 3px solid var(--fail); }
-.ctrl-btn.purple { border-left: 3px solid #a78bfa; }
-
-.result-bar { margin-top: 12px; padding: 8px 14px; border-radius: 8px; font-size: 13px; }
-.result-bar.ok { background: rgba(34,197,94,.1); color: var(--success); border: 1px solid rgba(34,197,94,.2); }
-.result-bar.err { background: rgba(239,68,68,.1); color: var(--fail); border: 1px solid rgba(239,68,68,.2); }
-
-.empty { font-size: 13px; color: var(--text3); padding: 8px 0; }
-
-.job-table, .upgrade-table { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.jrow { display: grid; grid-template-columns: 1.5fr 1fr 1.2fr 0.8fr; gap: 8px; padding: 10px 16px; font-size: 13px; align-items: center; border-bottom: 1px solid var(--border); }
-.upgrade-table .jrow { grid-template-columns: 1.2fr 0.8fr 0.8fr 1fr 0.8fr; }
-.jrow.header { font-weight: 600; color: var(--text3); font-size: 11px; text-transform: uppercase; background: var(--bg2); }
-.jrow:last-child { border-bottom: none; }
-.job-name { font-weight: 600; color: var(--accent); }
-.mono { font-family: monospace; font-size: 12px; }
-.actions-cell { display: flex; gap: 4px; }
-
-.status-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.status-badge.running { background: rgba(59,130,246,.15); color: var(--accent); }
-.status-badge.paused { background: rgba(245,158,11,.15); color: var(--warn); }
-.status-badge.success { background: rgba(34,197,94,.15); color: var(--success); }
-.status-badge.error { background: rgba(239,68,68,.15); color: var(--fail); }
-.status-badge.pending { background: rgba(167,139,250,.15); color: #a78bfa; }
-.status-badge.unknown { background: rgba(148,163,184,.15); color: var(--text3); }
-
-.act-btn { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; color: var(--text2); cursor: pointer; }
-.act-btn:hover:not(:disabled) { border-color: var(--accent); }
-.act-btn:disabled { opacity: .45; cursor: not-allowed; }
-.act-btn.small { padding: 3px 8px; font-size: 11px; }
-
-.btn-check { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 16px; font-size: 13px; color: var(--text2); cursor: pointer; margin-bottom: 14px; }
-.btn-check:hover:not(:disabled) { border-color: var(--accent); }
-.btn-check:disabled { opacity: .45; cursor: not-allowed; }
 </style>
