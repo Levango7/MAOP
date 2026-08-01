@@ -54,11 +54,14 @@
   --info: #0284c7;
   --info-soft: rgba(2, 132, 199, .10);
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06);
-  --shadow-md: 0 6px 18px rgba(15, 23, 42, .10);
-  --shadow-lg: 0 14px 36px rgba(15, 23, 42, .14);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .05), 0 1px 1px rgba(15, 23, 42, .04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, .08), 0 2px 4px rgba(15, 23, 42, .05);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, .12), 0 4px 8px rgba(15, 23, 42, .06);
+  --shadow-topbar: 0 1px 0 rgba(15, 23, 42, .04), 0 4px 12px rgba(15, 23, 42, .06);
 
   --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 48%);
-  --card-hairline: rgba(15, 23, 42, .08);
-  --app-ambient: radial-gradient(900px 520px at 100% 0%, rgba(79, 70, 229, .07), transparent 60%);
+  --card-hairline: rgba(15, 23, 42, .06);
+  --app-ambient: radial-gradient(900px 520px at 100% 0%, rgba(79, 70, 229, .06), transparent 60%),
+                  radial-gradient(700px 400px at 0% 100%, rgba(20, 184, 166, .04), transparent 60%);
+  --topbar-glow: linear-gradient(90deg, rgba(79, 70, 229, .06), transparent 30%);
 }

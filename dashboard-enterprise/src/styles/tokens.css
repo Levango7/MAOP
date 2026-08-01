@@ -26,10 +26,10 @@
   --shadow: 0 1px 3px rgba(0, 0, 0, .3);
 
   /* ── Semantic surface tokens (new design system) ─────────────────────── */
-  --surface: #1e293b;
-  --surface-2: #243349;
-  --surface-3: #2b3b54;
-  --border-strong: #475569;
+  --surface: #1a2540;
+  --surface-2: #212d4a;
+  --surface-3: #293656;
+  --border-strong: #4d5e7d;
   --text-muted: #94a3b8;
   --text-faint: #64748b;
   --brand: #6366f1;
@@ -67,9 +67,10 @@
   --r: var(--r-md);
 
   /* ── Shadow scale ─────────────────────────────────────────────────────── */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .25);
-  --shadow-md: 0 4px 14px rgba(0, 0, 0, .30);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, .38);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .18), 0 1px 1px rgba(0, 0, 0, .12);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, .22), 0 2px 4px rgba(0, 0, 0, .14);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, .32), 0 4px 8px rgba(0, 0, 0, .18);
+  --shadow-topbar: 0 1px 0 rgba(255, 255, 255, .04), 0 4px 12px rgba(0, 0, 0, .18);
 
   /* ── Typography ───────────────────────────────────────────────────────── */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto,
@@ -95,15 +96,17 @@
   --content-pad: 28px;
   --maxw: 1440px;
   --row-h: 44px;
-  --topbar-h: 56px;
+  --topbar-h: 64px;
 
   /* ── z-index ──────────────────────────────────────────────────────────── */
   --z-sidebar: 40; --z-topbar: 50; --z-drawer: 60; --z-toast: 80; --z-modal: 90;
 
   /* ── Glass / sheen (approved in prototype) ────────────────────────────── */
-  --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 45%);
-  --card-hairline: rgba(255, 255, 255, .08);
-  --app-ambient: radial-gradient(900px 520px at 100% 0%, rgba(99, 102, 241, .10), transparent 60%);
+  --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, 0) 45%);
+  --card-hairline: rgba(255, 255, 255, .06);
+  --app-ambient: radial-gradient(900px 520px at 100% 0%, rgba(99, 102, 241, .10), transparent 60%),
+                  radial-gradient(700px 400px at 0% 100%, rgba(20, 184, 166, .05), transparent 60%);
+  --topbar-glow: linear-gradient(90deg, rgba(99, 102, 241, .08), transparent 30%);
 }
 
 /* ── Density 规范 ──────────────────────────────────────────────────────────
@@ -120,7 +123,7 @@
   --sp-1: 3px;   --sp-2: 6px;   --sp-3: 10px;  --sp-4: 12px;
   --sp-5: 16px;  --sp-6: 20px;  --sp-7: 24px;  --sp-8: 32px;
   /* Shell */
-  --content-pad: 20px;  --row-h: 36px;  --topbar-h: 48px;
+  --content-pad: 20px;  --row-h: 36px;  --topbar-h: 56px;
   /* Type: a slight step down for denser reading */
   --fs-base: 12px;  --fs-md: 13px;  --fs-lg: 15px;  --fs-xl: 18px;  --fs-2xl: 22px;
 }
