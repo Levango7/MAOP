@@ -52,10 +52,20 @@ const subtitleText = computed(() => props.subtitle || (meta.subtitle ? t(meta.su
   gap: var(--sp-4);
   margin-bottom: var(--sp-6);
   flex-wrap: wrap;
-  padding: var(--sp-3) var(--sp-5);
-  background: var(--surface);
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--card-sheen), var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+.page-header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: var(--card-hairline);
+  pointer-events: none;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
 }
 .page-header__main {
   display: flex;
@@ -66,12 +76,13 @@ const subtitleText = computed(() => props.subtitle || (meta.subtitle ? t(meta.su
 .page-header__icon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   flex-shrink: 0;
   border-radius: var(--r-md);
   background: var(--brand-soft);
   color: var(--brand-strong);
+  border: 1px solid var(--border-subtle);
 }
 .page-header__text { min-width: 0; }
 .page-header__titlerow {
@@ -84,6 +95,7 @@ const subtitleText = computed(() => props.subtitle || (meta.subtitle ? t(meta.su
   font-size: var(--fs-2xl, 22px);
   font-weight: 700;
   line-height: 1.2;
+  letter-spacing: -0.015em;
   color: var(--text);
   margin: 0;
 }
