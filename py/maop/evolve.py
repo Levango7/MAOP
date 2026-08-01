@@ -320,23 +320,54 @@ class EvolveEngine:
         return EvolveResult(action="analyze", stats=stats)
 
     def suggest(self) -> EvolveResult:
-        """Generate improvement suggestions."""
+        """Generate improvement suggestions. Merge with existing (保留已应用状态)。"""
         data = self._load_data()
         stats = _compute_stats(data)
         suggestions = _generate_suggestions(stats, data)
+        # Merge with existing suggestions, preserve applied state
+        existing = self._load_suggestions()
+        existing_applied = {s.id: s.applied for s in existing if s.applied}
+        for s in suggestions:
+            if s.id in existing_applied:
+                s.applied = True
+        # Merge: new suggestions + existing ones not in new set
+        new_ids = {s.id for s in suggestions}
+        for s in existing:
+            if s.id not in new_ids:
+                suggestions.append(s)
         self._save_suggestions(suggestions)
         return EvolveResult(action="suggest", stats=stats, suggestions=suggestions)
 
     def apply(self, suggestion_id: str = "") -> EvolveResult:
-        """Auto-apply a suggestion (if auto_applicable)."""
+        """Auto-apply a suggestion (if auto_applicable). 通过 ConfigMutator 安全应用。"""
         suggestions = self._load_suggestions()
         for s in suggestions:
             if s.id == suggestion_id:
+                if s.applied:
+                    return EvolveResult(action="apply", applied=s)
                 if not s.auto_applicable:
                     return EvolveResult(action="apply", applied=s)
-                s.applied = True
-                self._save_suggestions(suggestions)
-                self._apply_to_agents_yaml(s)
+                # 通过 ConfigMutator 安全应用 (有 FileLock + backup + 回读校验)
+                try:
+                    from maop.core.config_mutator import ConfigMutator
+                    mutator = ConfigMutator(root_dir=self._root)
+                    result = mutator.apply_suggestion(suggestion_id)
+                    if result.applied:
+                        s.applied = True
+                        self._save_suggestions(suggestions)
+                        return EvolveResult(action="apply", applied=s)
+                    else:
+                        logger.warning("[evolve] ConfigMutator failed: %s, falling back to direct", result.error)
+                        # Fallback: 直接应用 (向后兼容 — 测试环境无 agents.yaml 时)
+                        s.applied = True
+                        self._save_suggestions(suggestions)
+                        self._apply_to_agents_yaml(s)
+                except Exception as exc:
+                    logger.warning("[evolve] ConfigMutator apply failed, falling back to direct: %s", exc)
+                    # Fallback: 直接应用 (向后兼容)
+                    s.applied = True
+                    self._save_suggestions(suggestions)
+                    self._apply_to_agents_yaml(s)
                 return EvolveResult(action="apply", applied=s)
         return EvolveResult(action="apply")
 
@@ -354,7 +385,7 @@ class EvolveEngine:
         return EvolveResult(action="promote")
 
     def _apply_to_agents_yaml(self, suggestion: Suggestion) -> None:
-        """Write a suggestion's effect into agents.yaml."""
+        """Write a suggestion's effect into agents.yaml (使用安全写入 + 时间戳 backup)。"""
         try:
             import yaml
         except ImportError:
@@ -379,19 +410,37 @@ class EvolveEngine:
             logger.debug("[evolve] Agent '%s' not found in agents.yaml", suggestion.agent)
             return
 
+        # 修复: slow_agent 增加 timeout (而非减半), routing_mismatch 不禁用整个 agent
         if suggestion.type == "slow_agent":
             current = agent_cfg.get("timeout_s", 120)
-            agent_cfg["timeout_s"] = max(30, current // 2)
+            agent_cfg["timeout_s"] = min(600, int(current * 1.5))  # 增加 50%
         elif suggestion.type == "routing_mismatch":
-            agent_cfg["enabled"] = False
+            # 不禁用 agent，仅记录警告 (路由调整由 ConfigMutator._mutate_routing 处理)
+            logger.info("[evolve] routing_mismatch for %s — use ConfigMutator for safe routing change", suggestion.agent)
+            return
 
+        # 安全写入: 时间戳 backup + FileLock + safe_write + 回读校验
         try:
-            shutil.copy2(agents_yaml, str(agents_yaml) + ".bak")
-            with open(agents_yaml, "w", encoding="utf-8") as f:
-                yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
-            logger.info("[evolve] Updated agents.yaml for suggestion %s", suggestion.id)
+            from datetime import datetime, timezone
+            from maop.core.filelock import FileLock
+            from maop.core.safe_writer import safe_write_text
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+            backup = agents_yaml.with_name(f"agents.yaml.bak.{ts}")
+            shutil.copy2(agents_yaml, backup)
+            content = yaml.safe_dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            lock_path = str(agents_yaml) + ".lock"
+            with FileLock(lock_path, timeout_seconds=10):
+                safe_write_text(agents_yaml, content, encoding="utf-8")
+            logger.info("[evolve] Updated agents.yaml for suggestion %s (backup: %s)", suggestion.id, backup.name)
         except Exception as exc:
             logger.warning("[evolve] Failed to write agents.yaml: %s", exc)
+            # 尝试恢复 backup
+            if 'backup' in dir() and backup.exists():
+                try:
+                    shutil.copy2(backup, agents_yaml)
+                    logger.info("[evolve] Restored agents.yaml from backup")
+                except Exception:
+                    pass
 
     def status(self) -> EvolveResult:
         """Show current evolution status."""
@@ -422,18 +471,35 @@ class EvolveEngine:
             return []
 
     def auto_evolve(self, hours: int = 24) -> dict[str, Any]:
-        """Run automatic evolution based on execution history analysis.
+        """Run automatic evolution — 委托给 EvolutionLoop.run_full_evolution()。
 
-        Phase β: integrates HistoryAnalyzer to identify patterns and
-        generate actionable suggestions with auto-apply for safe ones.
-
-        Phase β.3: also integrates AgentStrategyLearner (agent routing
-        adjustments) and CacheEvolver (cache TTL/threshold tuning) for
-        a complete self-evolution loop.
-
-        Returns a dict with the analysis report summary, the number of
-        new suggestions created, and how many were auto-applied.
+        统一入口: 采集所有数据源 → 10 维度分析 → 策略评估 → 安全应用 → 验证
+        保留向后兼容的返回格式 (analysis_report / new_suggestions / auto_applied)。
         """
+        try:
+            from maop.core.evolution_loop import EvolutionLoop
+            loop = EvolutionLoop(root_dir=self._root)
+            result = loop.run_full_evolution(hours=hours)
+            # 向后兼容: 补充 EvolveEngine 历史返回字段
+            result.setdefault("analysis_report", {
+                "loop_report": result.get("loop_report", {}),
+                "history_analysis": result.get("history_analysis", {}),
+                "delegation_stats": result.get("delegation_stats", {}),
+                "strategy_learning": result.get("strategy_learning", {}),
+                "cache_evolution": result.get("cache_evolution", {}),
+            })
+            result.setdefault("new_suggestions", result.get("total_suggestions", 0))
+            # agent_strategy: 旧 EvolveEngine 字段名, 等价于 strategy_learning
+            result.setdefault("agent_strategy", result.get("strategy_learning", {
+                "total_combos": 0, "adjustments": [], "recommendations": [],
+            }))
+            return result
+        except Exception as exc:
+            logger.warning("[evolve] EvolutionLoop failed, falling back to legacy: %s", exc)
+            return self._auto_evolve_legacy(hours)
+
+    def _auto_evolve_legacy(self, hours: int = 24) -> dict[str, Any]:
+        """Legacy auto_evolve fallback (向后兼容)。"""
         from maop.history_analyzer import HistoryAnalyzer
 
         analyzer = HistoryAnalyzer(root_dir=self._root)

@@ -166,7 +166,7 @@ def _adaptive_agent_select(route: RouteEntry, rk: str) -> str:
         return route.primary
 
 
-def _route_by_config(task: str, config: MaopConfig | None, *, adaptive: bool = True) -> tuple[str, str] | None:
+def _route_by_config(task: str, config: MaopConfig | None, *, adaptive: bool = True, trace_id: str = "", scorer: Any = None) -> tuple[str, str] | None:
     """Route using config routing table with multi-factor scoring.
 
     Uses RouteScorer to evaluate ALL routes and pick the best match by score,
@@ -184,9 +184,10 @@ def _route_by_config(task: str, config: MaopConfig | None, *, adaptive: bool = T
     if config is None:
         return None
 
-    from maop.core.route_scorer import RouteScorer
-    scorer = RouteScorer(config=config)
-    match = scorer.match(task, adaptive=adaptive)
+    if scorer is None:
+        from maop.core.route_scorer import RouteScorer
+        scorer = RouteScorer(config=config)
+    match = scorer.match(task, adaptive=adaptive, trace_id=trace_id)
     if match:
         logger.debug(
             "Route config: rk=%s agent=%s score=%.2f confidence=%s matched_by=%s",
@@ -221,6 +222,7 @@ def maop_plan(
     workdir: str = "",
     routing_key: str = "",
     config: MaopConfig | None = None,
+    trace_id: str = "",
 ) -> Plan:
     """Execute Plan phase: route task to best agent.
 
@@ -251,7 +253,9 @@ def maop_plan(
                     break
     else:
         # Priority 2: config-based routing (match regex + keywords)
-        config_result = _route_by_config(task, config)
+        from maop.core.route_scorer import get_route_scorer
+        _scorer = get_route_scorer(config=config)
+        config_result = _route_by_config(task, config, trace_id=trace_id, scorer=_scorer)
         if config_result:
             rk, agent = config_result
         else:

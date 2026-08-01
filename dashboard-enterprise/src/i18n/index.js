@@ -62,6 +62,9 @@ export const coreMessages = {
     'nav.rbac.subtitle': 'Roles, permissions and access control',
     'nav.tenants.subtitle': 'Multi-tenant isolation and quotas',
     'nav.settings.subtitle': 'Appearance, edition and backend configuration',
+    'nav.help': 'Help',
+    'nav.docs': 'Documentation',
+    'nav.docs.subtitle': 'Guides, API reference and architecture decisions',
     'nav.edition': 'Edition',
     'nav.editionLocked': 'Admin permission required to switch edition',
     'nav.editionToEnterprise': 'Switch to Enterprise edition? This enables SSO / RBAC / Audit and other enterprise features.',
@@ -111,6 +114,12 @@ export const coreMessages = {
     'settings.collapsed': 'Collapsed',
     'settings.zh': '中文',
     'settings.en': 'English',
+
+    // ── Docs view ────────────────────────────────────────────────
+    'view.docs.gettingStarted': 'Getting Started',
+    'view.docs.guides': 'Guides',
+    'view.docs.enterprise': 'Enterprise',
+    'view.docs.integrations': 'Integrations',
 
     // ── Common reused words ─────────────────────────────────────
     'common.refresh': 'Refresh',
@@ -223,6 +232,9 @@ export const coreMessages = {
     'nav.rbac.subtitle': '角色、权限与访问控制',
     'nav.tenants.subtitle': '多租户隔离与配额',
     'nav.settings.subtitle': '外观、版本与后端配置',
+    'nav.help': '帮助',
+    'nav.docs': '文档',
+    'nav.docs.subtitle': '指南、API 参考与架构决策',
     'nav.edition': '版本',
     'nav.editionLocked': '切换版本需要管理员权限',
     'nav.editionToEnterprise': '切换到企业版？将启用 SSO / RBAC / 审计等企业级功能。',
@@ -269,6 +281,11 @@ export const coreMessages = {
     'settings.collapsed': '收起',
     'settings.zh': '中文',
     'settings.en': 'English',
+
+    'view.docs.gettingStarted': '快速入门',
+    'view.docs.guides': '使用指南',
+    'view.docs.enterprise': '企业版',
+    'view.docs.integrations': '集成',
 
     'common.refresh': '刷新',
     'common.loading': '加载中…',

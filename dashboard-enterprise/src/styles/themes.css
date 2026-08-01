@@ -30,6 +30,7 @@
   --surface: #ffffff;
   --surface-2: #f4f7fb;
   --surface-3: #eef2f8;
+  --surface-4: #e2e8f1;
   --text-muted: #5b6b82;
   --text-faint: #6b7d94;
   --brand: #4f46e5;
@@ -39,6 +40,7 @@
   --brand-contrast: #ffffff;
 
   --border-subtle: rgba(100, 116, 139, .16);
+  --border-faint: rgba(100, 116, 139, .08);
 
   /* Chart palette — light-tuned (slightly deeper for contrast on white) */
   --chart-1: #4f46e5;  --chart-2: #0284c7;  --chart-3: #16a34a;
@@ -56,12 +58,16 @@
 
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, .05), 0 1px 1px rgba(15, 23, 42, .04);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, .08), 0 2px 4px rgba(15, 23, 42, .05);
-  --shadow-lg: 0 12px 32px rgba(15, 23, 42, .12), 0 4px 8px rgba(15, 23, 42, .06);
-  --shadow-topbar: 0 1px 0 rgba(15, 23, 42, .04), 0 4px 12px rgba(15, 23, 42, .06);
+  --shadow-lg: 0 16px 40px rgba(15, 23, 42, .14), 0 4px 10px rgba(15, 23, 42, .06);
+  --shadow-topbar: 0 1px 0 rgba(15, 23, 42, .04), 0 6px 18px rgba(15, 23, 42, .08);
+  --shadow-pop: 0 8px 24px rgba(15, 23, 42, .14), 0 2px 6px rgba(15, 23, 42, .06);
+  --shadow-brand: 0 4px 14px rgba(79, 70, 229, .20), 0 1px 3px rgba(79, 70, 229, .10);
 
   --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 48%);
   --card-hairline: rgba(15, 23, 42, .06);
-  --app-ambient: radial-gradient(900px 520px at 100% 0%, rgba(79, 70, 229, .06), transparent 60%),
+  --app-ambient: radial-gradient(900px 520px at 100% 0%, rgba(79, 70, 229, .07), transparent 60%),
                   radial-gradient(700px 400px at 0% 100%, rgba(20, 184, 166, .04), transparent 60%);
-  --topbar-glow: linear-gradient(90deg, rgba(79, 70, 229, .06), transparent 30%);
+  --topbar-glow: linear-gradient(90deg, rgba(79, 70, 229, .07), transparent 30%);
+  --topbar-sheen: linear-gradient(180deg, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0) 50%);
+  --topbar-hairline: rgba(15, 23, 42, .08);
 }

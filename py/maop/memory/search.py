@@ -92,8 +92,8 @@ class SearchMixin:
                                     score=vr.score * 10,  # Scale vector score
                                     snippet=m["content"].replace("\n", " ")[:120],
                                 ))
-                    # Re-sort by score
-                    fts_results.sort(key=lambda r: r.score, reverse=True)
+                    # 不重排: FTS5 结果优先 (BM25 分数为负), 向量结果补充在后
+                    # 重排会破坏 FTS 优先级 (BM25 负分 vs 向量正分)
                     return fts_results[:top]
                 except Exception as exc:
                     logger.debug("[mem] Vector search supplement failed: %s", exc)

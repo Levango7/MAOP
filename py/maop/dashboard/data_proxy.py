@@ -458,6 +458,11 @@ class DataProxy:
         entry_count = await self._query_memory("SELECT COUNT(*) as cnt FROM memory_entries")
         trace_count = await self._query_memory("SELECT COUNT(*) as cnt FROM memory_traces")
         traj_count = await self._query_memory("SELECT COUNT(*) as cnt FROM memory_trajectory")
+        # 补充 episodic_memory 表统计 (之前缺失)
+        try:
+            episodic_count = await self._query_memory("SELECT COUNT(*) as cnt FROM episodic_memory")
+        except Exception:
+            episodic_count = []
 
         by_agent = await self._query_memory(
             "SELECT agent, COUNT(*) as cnt FROM memory_entries GROUP BY agent ORDER BY cnt DESC"
@@ -471,6 +476,7 @@ class DataProxy:
             "total_entries": entry_count[0]["cnt"] if entry_count else 0,
             "total_traces": trace_count[0]["cnt"] if trace_count else 0,
             "total_trajectory_steps": traj_count[0]["cnt"] if traj_count else 0,
+            "total_episodic": episodic_count[0]["cnt"] if episodic_count else 0,
             "by_agent": {r["agent"]: r["cnt"] for r in by_agent},
             "by_topic": {r["topic"]: r["cnt"] for r in by_topic},
         }

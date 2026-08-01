@@ -1,5 +1,5 @@
 <template>
-  <div class="segmented" :class="'seg--' + size" role="tablist">
+  <div class="segmented" :class="['seg--' + size, { 'seg--equal': equal }]" role="tablist">
     <button
       v-for="opt in options"
       :key="opt.value"
@@ -22,6 +22,7 @@ defineProps({
   modelValue: { type: [String, Number], default: '' },
   options: { type: Array, required: true }, // [{ value, label?, icon? }]
   size: { type: String, default: 'md' }, // sm | md
+  equal: { type: Boolean, default: false }, // equal-width buttons (language-independent)
 });
 defineEmits(['update:modelValue']);
 </script>
@@ -38,6 +39,7 @@ defineEmits(['update:modelValue']);
 .seg__item {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   border: none;
   background: transparent;
@@ -56,4 +58,7 @@ defineEmits(['update:modelValue']);
   color: var(--brand-strong);
   box-shadow: var(--shadow-sm);
 }
+/* Equal-width mode: all buttons share the same width regardless of label length */
+.seg--equal { display: inline-flex; }
+.seg--equal .seg__item { flex: 1 1 0; min-width: 0; }
 </style>

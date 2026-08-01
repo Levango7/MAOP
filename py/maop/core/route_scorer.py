@@ -631,11 +631,14 @@ def get_route_scorer(config: MaopConfig | None = None) -> RouteScorer:
                 _instance = RouteScorer(config=config)
                 return _instance
 
-    # Hot-reload: reinitialize if the passed config has a different version
+    # Hot-reload: reinitialize if the passed config is different
+    # 1. Identity check: different config object (test isolation / hot-reload)
+    # 2. Version check: same object but version changed (in-place reload)
     if config is not None and _instance.config is not None:
         new_ver = getattr(config, "_version", 0)
         cur_ver = getattr(_instance.config, "_version", 0)
-        if new_ver and new_ver != cur_ver:
+        config_changed = (config is not _instance.config) or (new_ver and new_ver != cur_ver)
+        if config_changed:
             with _singleton_lock:
                 # Re-check inside the lock to avoid duplicate reinit
                 cur_ver = getattr(_instance.config, "_version", 0)

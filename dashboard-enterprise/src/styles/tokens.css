@@ -25,13 +25,16 @@
   --radius: 12px;
   --shadow: 0 1px 3px rgba(0, 0, 0, .3);
 
-  /* ── Semantic surface tokens (new design system) ─────────────────────── */
-  --surface: #1a2540;
-  --surface-2: #212d4a;
-  --surface-3: #293656;
+  /* ── Semantic surface tokens (new design system) ───────────────────────
+   * Layered surfaces create depth: surface (base) → surface-2 (raised) →
+   * surface-3 (overlay). Subtle blue undertone keeps the palette cohesive. */
+  --surface: #161e36;
+  --surface-2: #1d2742;
+  --surface-3: #26324f;
+  --surface-4: #2f3d5e;
   --border-strong: #4d5e7d;
-  --text-muted: #94a3b8;
-  --text-faint: #64748b;
+  --text-muted: #9aa8c0;
+  --text-faint: #6b7a94;
   --brand: #6366f1;
   --brand-strong: #818cf8;
   --brand-faint: rgba(99, 102, 241, .07);
@@ -39,6 +42,7 @@
   --brand-contrast: #ffffff;
 
   --border-subtle: rgba(148, 163, 184, .14);
+  --border-faint: rgba(148, 163, 184, .08);
 
   /* ── Chart / data-viz palette (theme-aware) ────────────────────────────
    * Replaces scattered hardcoded hex in Overview/Agents so charts follow the
@@ -66,11 +70,15 @@
   --r-sm: 6px;  --r-md: 8px;  --r-lg: 12px;  --r-xl: 16px;  --r-full: 999px;
   --r: var(--r-md);
 
-  /* ── Shadow scale ─────────────────────────────────────────────────────── */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .18), 0 1px 1px rgba(0, 0, 0, .12);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, .22), 0 2px 4px rgba(0, 0, 0, .14);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, .32), 0 4px 8px rgba(0, 0, 0, .18);
-  --shadow-topbar: 0 1px 0 rgba(255, 255, 255, .04), 0 4px 12px rgba(0, 0, 0, .18);
+  /* ── Shadow scale ───────────────────────────────────────────────────────
+   * Multi-layer shadows mimic real light: a tight ambient contact shadow +
+   * a softer directional shadow. This gives cards/buttons a tangible float. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .20), 0 1px 1px rgba(0, 0, 0, .12);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, .28), 0 2px 4px rgba(0, 0, 0, .16);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, .40), 0 4px 10px rgba(0, 0, 0, .20);
+  --shadow-topbar: 0 1px 0 rgba(255, 255, 255, .05), 0 6px 18px rgba(0, 0, 0, .28);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, .36), 0 2px 6px rgba(0, 0, 0, .18);
+  --shadow-brand: 0 4px 14px rgba(99, 102, 241, .28), 0 1px 3px rgba(99, 102, 241, .14);
 
   /* ── Typography ───────────────────────────────────────────────────────── */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto,
@@ -96,17 +104,22 @@
   --content-pad: 28px;
   --maxw: 1440px;
   --row-h: 44px;
-  --topbar-h: 64px;
+  --topbar-h: 72px;
 
   /* ── z-index ──────────────────────────────────────────────────────────── */
   --z-sidebar: 40; --z-topbar: 50; --z-drawer: 60; --z-toast: 80; --z-modal: 90;
 
-  /* ── Glass / sheen (approved in prototype) ────────────────────────────── */
-  --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, 0) 45%);
-  --card-hairline: rgba(255, 255, 255, .06);
-  --app-ambient: radial-gradient(900px 520px at 100% 0%, rgba(99, 102, 241, .10), transparent 60%),
-                  radial-gradient(700px 400px at 0% 100%, rgba(20, 184, 166, .05), transparent 60%);
-  --topbar-glow: linear-gradient(90deg, rgba(99, 102, 241, .08), transparent 30%);
+  /* ── Glass / sheen (approved in prototype) ──────────────────────────────
+   * card-sheen gives cards a subtle top-down light gradient; hairline adds
+   * a 1px top border for crispness. ambient glows sit behind the app for
+   * depth without distracting from content. */
+  --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 42%);
+  --card-hairline: rgba(255, 255, 255, .07);
+  --app-ambient: radial-gradient(900px 520px at 100% 0%, rgba(99, 102, 241, .12), transparent 60%),
+                  radial-gradient(700px 400px at 0% 100%, rgba(20, 184, 166, .06), transparent 60%);
+  --topbar-glow: linear-gradient(90deg, rgba(99, 102, 241, .10), transparent 30%);
+  --topbar-sheen: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0) 50%);
+  --topbar-hairline: rgba(255, 255, 255, .08);
 }
 
 /* ── Density 规范 ──────────────────────────────────────────────────────────
@@ -123,7 +136,7 @@
   --sp-1: 3px;   --sp-2: 6px;   --sp-3: 10px;  --sp-4: 12px;
   --sp-5: 16px;  --sp-6: 20px;  --sp-7: 24px;  --sp-8: 32px;
   /* Shell */
-  --content-pad: 20px;  --row-h: 36px;  --topbar-h: 56px;
+  --content-pad: 20px;  --row-h: 36px;  --topbar-h: 64px;
   /* Type: a slight step down for denser reading */
   --fs-base: 12px;  --fs-md: 13px;  --fs-lg: 15px;  --fs-xl: 18px;  --fs-2xl: 22px;
 }

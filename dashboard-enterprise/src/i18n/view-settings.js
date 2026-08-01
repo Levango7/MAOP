@@ -30,6 +30,8 @@ export const messages = {
     'view.settings.no': 'No',
     'view.settings.readOnly': 'Read-only',
     'view.settings.readOnlyHint': 'Runtime values from the backend — not editable here',
+    'view.settings.editionDetermined': 'Edition-determined',
+    'view.settings.featureFlagsHint': 'Feature flags are determined by the current edition. Switch edition above to change the feature set.',
   },
   zh: {
     'view.settings.currentEdition': '当前版本',
@@ -62,5 +64,7 @@ export const messages = {
     'view.settings.no': '否',
     'view.settings.readOnly': '只读',
     'view.settings.readOnlyHint': '来自后端的运行时配置，此处不可编辑',
+    'view.settings.editionDetermined': '由版本决定',
+    'view.settings.featureFlagsHint': '功能开关由当前版本决定。切换上方版本即可变更功能集。',
   },
 };

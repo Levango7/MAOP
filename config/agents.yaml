@@ -1,4 +1,39 @@
 agents:
+  MAOP:
+    capabilities:
+    - codegen
+    - chat
+    - planning
+    - search
+    - review
+    - explain
+    - orchestrate
+    - verify
+    - memory
+    - mcp
+    - pipeline
+    - vision
+    - multimodal
+    cli: python
+    cli_args: -m maop.cli run --task "{task}"
+    description: MAOP v4.3 self-referential agent — can delegate to itself (max_self_ref_depth=3)
+    driver: cli
+    extracts_queries: true
+    model: auto
+    results_merge: true
+    subagents:
+      self:
+        capabilities:
+        - codegen
+        - chat
+        - planning
+        - orchestrate
+        - vision
+        - multimodal
+        cli_args: -m maop.cli run --task "{task}" --depth {depth}
+        description: MAOP self-delegation subagent
+    supports_regeneration: true
+    timeout_s: 180
   autoclaw:
     capabilities:
     - codegen
@@ -30,12 +65,11 @@ agents:
     cli: claude
     cli_args: -p '{task}'
     description: Claude Code v2.1.212 + StepFun step-3.7-flash
-    # AgentMeta: 编排语义元信息（驱动 PipelineOrchestrator 动态决策）
-    extracts_queries: true
-    supports_regeneration: true
-    results_merge: true
     driver: cli
-    model: yi-large
+    extracts_queries: true
+    model: mimo-v2.5
+    results_merge: true
+    supports_regeneration: true
     timeout_s: 120
   cline:
     capabilities:
@@ -72,7 +106,7 @@ agents:
     cli_args: --print '{task}'
     description: CodeBuddy v2.123.1 (腾讯, fastest cold-start ~123ms)
     driver: cli
-    model: auto
+    model: minimax-m2.7
     timeout_s: 60
   codewhale:
     capabilities:
@@ -95,12 +129,11 @@ agents:
     cli: codex
     cli_args: exec {task}
     description: Codex CLI v0.144.6 + StepFun proxy
-    # AgentMeta: 编排语义元信息（codegen agent，支持结果再生成）
-    extracts_queries: false
-    supports_regeneration: true
-    results_merge: false
     driver: cli
+    extracts_queries: false
     model: qwen3.5-plus
+    results_merge: false
+    supports_regeneration: true
     timeout_s: 120
   copilot:
     capabilities:
@@ -154,10 +187,27 @@ agents:
     cli: deepcode
     cli_args: -p {task}
     description: 'DISABLED: not registered / no auth (2026-07-22)'
-    enabled: false
     driver: cli
+    enabled: false
     model: yi-large
     timeout_s: 120
+  doc-pipeline:
+    capabilities:
+    - docgen
+    - pipeline
+    - techdoc
+    - research
+    - verify
+    cli: python
+    cli_args: -c "from maop.delegate.doc_pipeline_adapter import run_pipeline; import
+      json,sys; r=run_pipeline(pipeline_name=sys.argv[1], input_file=sys.argv[2]);
+      print(json.dumps(r))" "{pipeline_name}" "{input_file}"
+    description: doc-pipeline workflow adapter (DAG + quality gate + circuit breaker
+      + event hooks)
+    driver: python
+    model: n/a
+    routing_key: pipeline
+    timeout_s: 600
   forge:
     capabilities:
     - codegen
@@ -181,13 +231,12 @@ agents:
     cli: gemini
     cli_args: -p '{task}'
     description: 'DISABLED: no VPN/proxy for Google APIs (2026-07-22)'
-    # AgentMeta: 编排语义元信息（vision provider，不参与编排决策）
-    extracts_queries: false
-    supports_regeneration: false
-    results_merge: false
-    enabled: false
     driver: cli
+    enabled: false
+    extracts_queries: false
     model: auto
+    results_merge: false
+    supports_regeneration: false
     timeout_s: 120
   goose:
     capabilities:
@@ -202,8 +251,8 @@ agents:
     description: Goose v1.43.0 (agnes-2.0-flash via custom_agnes provider, ~1.3s)
     driver: cli
     model: agnes-2.0-flash
-    timeout_s: 120
     model_display: AgnesAI agnes-2.0-flash (via Goose)
+    timeout_s: 120
   hermes:
     capabilities:
     - codegen
@@ -217,7 +266,7 @@ agents:
     cli_args: -z {task}
     description: Hermes CLI v0.19.0 (AgnesAI backend, ~1.3s)
     driver: cli
-    model: agnes-2.0-flash
+    model: step-3.7-flash
     model_display: AgnesAI agnes-2.0-flash
     timeout_s: 120
   kilo:
@@ -245,6 +294,20 @@ agents:
     driver: cli
     model: step-3.7-flash
     model_display: step-3.7-flash (via StepFun OpenAI)
+    timeout_s: 120
+  langcli:
+    capabilities:
+    - codegen
+    - refactor
+    - explain
+    - search
+    - review
+    cli: langcli
+    cli_args: -p "{task}"
+    description: 'DISABLED: no Anthropic API key, no VPN (2026-07-22)'
+    driver: cli
+    enabled: false
+    model: auto
     timeout_s: 120
   lh:
     capabilities:
@@ -276,12 +339,39 @@ agents:
     - quickfix
     cli: mimo
     cli_args: --print {task}
-    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7: driver migrated powershell -> cli per ADR-009'
+    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
+      driver migrated powershell -> cli per ADR-009'
     driver: cli
+    enabled: false
     model: mimo-v2.5
     model_display: MiMo-V2.5 (built-in)
     timeout_s: 60
-    enabled: false
+  mmx:
+    capabilities:
+    - codegen
+    - chat
+    - planning
+    - search
+    - review
+    - explain
+    cli: mmx
+    cli_args: text chat --non-interactive --output text --message "{task}"
+    description: MiniMax CLI v1.0.18 (mmx, authenticated, global region)
+    driver: cli
+    model: MiniMax-M3
+    model_display: MiniMax-M3 (via mmx text chat)
+    timeout_s: 120
+  nanobot:
+    capabilities:
+    - chat
+    - search
+    - explain
+    cli: nanobot
+    cli_args: agent -m "{task}"
+    description: nanobot v0.2.2 (requires API key in ~/.nanobot/config.json)
+    driver: cli
+    model: auto
+    timeout_s: 60
   omniroute:
     capabilities:
     - codegen
@@ -292,17 +382,16 @@ agents:
     - search
     - reasoning
     - tool_use
-    cli: ""  # no CLI - pure LLM provider path (ADR-013 dual-path)
+    cli: ''
     description: OmniRoute local gateway - 160+ providers with auto failover
-    # AgentMeta: 编排语义元信息（纯 LLM provider，不参与编排决策）
-    extracts_queries: false
-    supports_regeneration: false
-    results_merge: false
     driver: cli
+    enabled: true
+    extracts_queries: false
     model: omniroute-auto-coding
     provider: omniroute
+    results_merge: false
+    supports_regeneration: false
     timeout_s: 120
-    enabled: true
   openclaw:
     capabilities:
     - codegen
@@ -365,12 +454,13 @@ agents:
     - refactor
     cli: qoderclicn
     cli_args: -p {task}
-    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7: driver migrated powershell -> cli per ADR-009'
+    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
+      driver migrated powershell -> cli per ADR-009'
     driver: cli
+    enabled: false
     model: auto
     model_display: auto (QoderCN built-in)
     timeout_s: 60
-    enabled: false
   qwen:
     capabilities:
     - codegen
@@ -380,13 +470,15 @@ agents:
     - review
     - explain
     - chat
-    cli: qwen -p '{{safePrompt}}' -o json --safe-mode
-    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7: driver migrated powershell -> cli per ADR-009'
+    cli: qwen
+    cli_args: "-p '{{safePrompt}}' -o json --safe-mode"
+    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
+      driver migrated powershell -> cli per ADR-009'
     driver: cli
+    enabled: false
     model: qwen3.5-plus
     model_display: qwen/qwen3.5-plus (built-in)
     timeout_s: 120
-    enabled: false
   qwenpaw:
     capabilities:
     - codegen
@@ -402,99 +494,6 @@ agents:
     driver: cli
     model: deepseek-v4-flash-free
     timeout_s: 120
-  doc-pipeline:
-    capabilities:
-    - docgen
-    - pipeline
-    - techdoc
-    - research
-    - verify
-    cli: python
-    cli_args: -c "from maop.delegate.doc_pipeline_adapter import run_pipeline; import
-      json,sys; r=run_pipeline(pipeline_name=sys.argv[1], input_file=sys.argv[2]);
-      print(json.dumps(r))" "{pipeline_name}" "{input_file}"
-    description: doc-pipeline workflow adapter (DAG + quality gate + circuit breaker
-      + event hooks)
-    driver: python
-    model: n/a
-    routing_key: pipeline
-    timeout_s: 600
-  mmx:
-    capabilities:
-    - codegen
-    - chat
-    - planning
-    - search
-    - review
-    - explain
-    cli: mmx
-    cli_args: text chat --non-interactive --output text --message "{task}"
-    description: MiniMax CLI v1.0.18 (mmx, authenticated, global region)
-    driver: cli
-    model: MiniMax-M3
-    model_display: MiniMax-M3 (via mmx text chat)
-    timeout_s: 120
-  nanobot:
-    capabilities:
-    - chat
-    - search
-    - explain
-    cli: nanobot
-    cli_args: agent -m "{task}"
-    description: nanobot v0.2.2 (requires API key in ~/.nanobot/config.json)
-    driver: cli
-    model: auto
-    timeout_s: 60
-  langcli:
-    capabilities:
-    - codegen
-    - refactor
-    - explain
-    - search
-    - review
-    cli: langcli
-    cli_args: -p "{task}"
-    description: 'DISABLED: no Anthropic API key, no VPN (2026-07-22)'
-    enabled: false
-    driver: cli
-    model: auto
-    timeout_s: 120
-  MAOP:
-    capabilities:
-    - codegen
-    - chat
-    - planning
-    - search
-    - review
-    - explain
-    - orchestrate
-    - verify
-    - memory
-    - mcp
-    - pipeline
-    - vision
-    - multimodal
-    cli: python
-    cli_args: -m maop.cli run --task "{task}"
-    description: MAOP v4.3 self-referential agent — can delegate to itself (max_self_ref_depth=3)
-    # AgentMeta: 编排语义元信息（驱动 PipelineOrchestrator 动态决策）
-    extracts_queries: true
-    supports_regeneration: true
-    results_merge: true
-    driver: cli
-    model: auto
-    timeout_s: 180
-    subagents:
-      self:
-        cli_args: -m maop.cli run --task "{task}" --depth {depth}
-        capabilities:
-        - codegen
-        - chat
-        - planning
-        - orchestrate
-        - vision
-        - multimodal
-        description: MAOP self-delegation subagent
 loops:
   iterative:
     backoff_ms: 2000
@@ -503,10 +502,28 @@ loops:
   routing:
     enabled: true
 routing:
+  chat:
+    fallback: omniroute
+    keywords:
+    - 聊天
+    - 对话
+    - 问答
+    - 闲聊
+    - chat
+    - 一般问题
+    - 随意
+    - 你好
+    - 打招呼
+    - 问候
+    - hi
+    - hello
+    - hey
+    - 在吗
+    - 介绍一下
+    primary: claude
+    tertiary: copilot
   codegen:
     fallback: omniroute
-    primary: mmx
-    tertiary: copilot
     keywords:
     - 编写
     - 写代码
@@ -533,30 +550,10 @@ routing:
     - 类
     - 模块
     - 项目
-  chat:
-    fallback: omniroute
-    primary: claude
+    primary: mmx
     tertiary: copilot
-    keywords:
-    - 聊天
-    - 对话
-    - 问答
-    - 闲聊
-    - chat
-    - 一般问题
-    - 随意
-    - 你好
-    - 打招呼
-    - 问候
-    - hi
-    - hello
-    - hey
-    - 在吗
-    - 介绍一下
   docgen:
     fallback: omniroute
-    primary: doc-pipeline
-    tertiary: claude
     keywords:
     - 生成文档
     - 文档
@@ -567,9 +564,10 @@ routing:
     - readme
     - api文档
     match: (?:document|doc|readme|guide|comment)
+    primary: doc-pipeline
+    tertiary: claude
   fileops:
     fallback: cline
-    primary: qwenpaw
     keywords:
     - 文件操作
     - 创建文件
@@ -580,9 +578,9 @@ routing:
     - read file
     - write file
     - 复制
+    primary: qwenpaw
   mcp:
     fallback: claude
-    primary: hermes
     keywords:
     - mcp
     - 工具调用
@@ -590,9 +588,9 @@ routing:
     - MCP
     - tool call
     - function call
+    primary: hermes
   memory:
     fallback: cline
-    primary: claude
     keywords:
     - 记忆
     - 记住
@@ -601,10 +599,32 @@ routing:
     - remember
     - 历史
     - 上下文
+    primary: claude
+  multimodal:
+    fallback: crush
+    keywords:
+    - 多模态
+    - multimodal
+    - 图文
+    - 音视频
+    - 混合输入
+    primary: claude
+    tertiary: MAOP
+  orchestrate:
+    fallback: claude
+    keywords:
+    - orchestrate
+    - 编排
+    - 协调
+    - multi-agent
+    - 多agent
+    - compose
+    - 调度
+    match: (?:orchestrat|编排|协调|compose|调度)
+    primary: MAOP
+    tertiary: claude
   pipeline:
     fallback: claude
-    primary: doc-pipeline
-    tertiary: MAOP
     keywords:
     - 流水线
     - pipeline
@@ -613,10 +633,10 @@ routing:
     - 自动化流程
     - ci/cd
     - 持续集成
+    primary: doc-pipeline
+    tertiary: MAOP
   planning:
     fallback: omniroute
-    primary: kimi
-    tertiary: claude
     keywords:
     - 规划
     - 计划
@@ -629,10 +649,10 @@ routing:
     - 策略
     - strategy
     match: (?:plan|architect|design|blueprint|strategy)
+    primary: kimi
+    tertiary: claude
   quickfix:
     fallback: omniroute
-    primary: cursor
-    tertiary: autoclaw
     keywords:
     - 修复
     - fix
@@ -645,10 +665,10 @@ routing:
     - patch
     - 问题
     match: (?:fix|bug|error|hotfix|patch|quick\s*fix)
+    primary: cursor
+    tertiary: autoclaw
   refactor:
     fallback: omniroute
-    primary: claude
-    tertiary: kimi
     keywords:
     - 重构
     - 重写
@@ -658,10 +678,10 @@ routing:
     - clean up
     - 优化结构
     match: (?:refactor|rewrite|restructure|clean\s+up)
+    primary: claude
+    tertiary: kimi
   review:
     fallback: omniroute
-    primary: kimi
-    tertiary: copilot
     keywords:
     - 审查
     - 审核
@@ -669,10 +689,10 @@ routing:
     - code review
     - 评审
     - 检查代码
+    primary: kimi
+    tertiary: copilot
   search:
     fallback: codex
-    primary: kimi
-    tertiary: hermes
     keywords:
     - 搜索
     - 检索
@@ -684,10 +704,10 @@ routing:
     - 查询
     - look up
     - 资料
+    primary: kimi
+    tertiary: hermes
   techdoc:
     fallback: omniroute
-    primary: doc-pipeline
-    tertiary: claude
     keywords:
     - 技术文档
     - 规范
@@ -697,9 +717,10 @@ routing:
     - tech doc
     - 架构文档
     - 白皮书
+    primary: doc-pipeline
+    tertiary: claude
   verify:
     fallback: omniroute
-    primary: claude
     keywords:
     - 验证
     - verify
@@ -710,11 +731,10 @@ routing:
     - assert
     - 断言
     match: (?:verify|test|assert|spec|unit\s+test|integration)
+    primary: claude
     tertiary: kimi
   vision:
     fallback: crush
-    primary: claude
-    tertiary: MAOP
     keywords:
     - 图片
     - 图像
@@ -724,29 +744,8 @@ routing:
     - 截图
     - screenshot
     - 识别
-  multimodal:
-    fallback: crush
     primary: claude
     tertiary: MAOP
-    keywords:
-    - 多模态
-    - multimodal
-    - 图文
-    - 音视频
-    - 混合输入
-  orchestrate:
-    fallback: claude
-    primary: MAOP
-    tertiary: claude
-    keywords:
-    - orchestrate
-    - 编排
-    - 协调
-    - multi-agent
-    - 多agent
-    - compose
-    - 调度
-    match: (?:orchestrat|编排|协调|compose|调度)
 workflows:
   doc-pipeline:
     capabilities:

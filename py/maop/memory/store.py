@@ -186,7 +186,7 @@ class MemoryStore(SearchMixin):
             try:
                 index_text = f"{entry.task} {entry.content}"
                 self._vector_store.index(
-                    doc_id=entry.id,
+                    entry_id=entry.id,
                     text=index_text[:500],
                     metadata={"agent": entry.agent, "topic": entry.topic, "tags": tags_str},
                 )

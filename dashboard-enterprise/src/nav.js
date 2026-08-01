@@ -32,6 +32,8 @@ export const nav = [
   { to: '/tenants', label: 'nav.tenants', icon: 'building', subtitle: 'nav.tenants.subtitle' },
   { to: '/users', label: 'nav.users', icon: 'user', subtitle: 'nav.users.subtitle' },
   { to: '/settings', label: 'nav.settings', icon: 'gear', subtitle: 'nav.settings.subtitle' },
+  { section: 'nav.help' },
+  { to: '/docs', label: 'nav.docs', icon: 'book-open', subtitle: 'nav.docs.subtitle' },
 ];
 
 /**

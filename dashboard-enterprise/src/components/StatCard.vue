@@ -9,20 +9,22 @@
         <Skeleton width="72%" height="22px" />
       </template>
       <template v-else>
-        <div class="stat__value">
-          {{ value }}<span v-if="unit" class="stat__unit">{{ unit }}</span>
+        <div class="stat__main-row">
+          <div class="stat__value">
+            {{ value }}<span v-if="unit" class="stat__unit">{{ unit }}</span>
+          </div>
+          <div v-if="(yoy !== null && yoy !== undefined) || (mom !== null && mom !== undefined)" class="stat__trends">
+            <span v-if="yoy !== null && yoy !== undefined" class="trend" :class="trendClass(yoy)">
+              <AppIcon :name="yoy >= 0 ? 'arrow-up' : 'arrow-down'" :size="10" /> {{ yoyLabel }} {{ Math.abs(yoy) }}{{ trendSuffix }}
+            </span>
+            <span v-if="mom !== null && mom !== undefined" class="trend" :class="trendClass(mom)">
+              <AppIcon :name="mom >= 0 ? 'arrow-up' : 'arrow-down'" :size="10" /> {{ momLabel }} {{ Math.abs(mom) }}{{ trendSuffix }}
+            </span>
+          </div>
         </div>
         <div v-if="delta !== null && delta !== undefined" class="stat__delta" :class="deltaClass">
           <AppIcon :name="delta >= 0 ? 'chevron-right' : 'chevron-right'" :size="11" class="stat__delta-arrow" />
           {{ Math.abs(delta) }}{{ deltaSuffix }}
-        </div>
-        <div v-if="(yoy !== null && yoy !== undefined) || (mom !== null && mom !== undefined)" class="stat__trends">
-          <span v-if="yoy !== null && yoy !== undefined" class="trend" :class="trendClass(yoy)">
-            <AppIcon :name="yoy >= 0 ? 'arrow-up' : 'arrow-down'" :size="10" /> {{ yoyLabel }} {{ Math.abs(yoy) }}{{ trendSuffix }}
-          </span>
-          <span v-if="mom !== null && mom !== undefined" class="trend" :class="trendClass(mom)">
-            <AppIcon :name="mom >= 0 ? 'arrow-up' : 'arrow-down'" :size="10" /> {{ momLabel }} {{ Math.abs(mom) }}{{ trendSuffix }}
-          </span>
         </div>
       </template>
     </div>
@@ -78,19 +80,41 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
   background: var(--card-sheen), var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
   box-shadow: var(--shadow-sm);
   transition: border-color var(--motion) var(--ease), transform var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+  position: relative;
 }
-.stat:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+/* 顶部 hairline */
+.stat::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--card-hairline) 20%, var(--card-hairline) 80%, transparent);
+  pointer-events: none;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.stat:hover { border-color: var(--border-strong); transform: translateY(-2px); box-shadow: var(--shadow-pop); }
 .stat.is-accent { border-left: 3px solid var(--accent); }
-.stat__icon {
-  width: 38px; height: 38px; border-radius: var(--r-md);
-  display: grid; place-items: center; flex-shrink: 0;
+.stat.is-accent::after {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  border-radius: var(--r-lg) 0 0 var(--r-lg);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
 }
-.stat__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.stat__label { font-size: var(--fs-xs); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.stat__value { font-size: var(--fs-xl); font-weight: 700; color: var(--text); line-height: 1.1; }
+.stat__icon {
+  width: 42px; height: 42px; border-radius: var(--r-md);
+  display: grid; place-items: center; flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.stat__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.stat__label { font-size: var(--fs-xs); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.stat__main-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.stat__value { font-size: var(--fs-xl); font-weight: 700; color: var(--text); line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .stat__unit { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); margin-left: 3px; }
 .stat__delta { display: inline-flex; align-items: center; gap: 2px; font-size: var(--fs-xs); font-weight: 600; }
 .stat__delta.is-up { color: var(--success); }
@@ -98,8 +122,8 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
 .stat__delta.is-flat { color: var(--text-faint); }
 .stat__delta-arrow { transform: rotate(-90deg); }
 .stat__delta.is-down .stat__delta-arrow { transform: rotate(90deg); }
-.stat__trends { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.trend { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: var(--r-full); line-height: 1.4; }
+.stat__trends { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.trend { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: var(--r-full); line-height: 1.4; white-space: nowrap; }
 .trend.is-up { color: var(--success); background: var(--success-soft); }
 .trend.is-down { color: var(--fail); background: var(--fail-soft); }
 .trend.is-flat { color: var(--text-faint); background: var(--surface-2); }

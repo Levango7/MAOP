@@ -86,7 +86,7 @@ providers:
     api_key_env: OPENROUTER_API_KEY
     timeout_s: 120
     max_retries: 3
-    enabled: false
+    enabled: true
 
   # ── Anthropic Claude (example for claude_code protocol) ──
   anthropic:
@@ -124,6 +124,90 @@ providers:
     health_check_url: "http://localhost:20128/v1/models"
     enabled: true
     description: "OmniRoute local AI gateway - 160+ providers, auto failover, MCP/A2A"
+
+  # ── 智谱 (Zhipu / GLM) ──
+  zhipu:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://open.bigmodel.cn/api/paas/v4"
+    api_key_env: ZHIPU_API_KEY
+    timeout_s: 120
+    max_retries: 3
+    health_check_url: "https://open.bigmodel.cn/api/paas/v4/models"
+    enabled: true
+
+  # ── 硅基流动 (SiliconFlow) ──
+  siliconflow:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://api.siliconflow.cn/v1"
+    api_key_env: SILICONFLOW_API_KEY
+    timeout_s: 120
+    max_retries: 3
+    health_check_url: "https://api.siliconflow.cn/v1/models"
+    enabled: true
+
+  # ── 魔搭 (ModelScope) ──
+  modelscope:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://api-inference.modelscope.cn/v1"
+    api_key_env: MODELSCOPE_API_KEY
+    timeout_s: 120
+    max_retries: 3
+    enabled: true
+
+  # ── 商汤 SenseNova ──
+  sensenova:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://api.sensenova.cn/compatible-mode/v1"
+    api_key_env: SENSENOVA_API_KEY
+    timeout_s: 120
+    max_retries: 3
+    enabled: true
+
+  # ── Cloudflare Workers AI ──
+  # Official OpenAI-compatible endpoint. Note: the /ai/run path is for
+  # direct model invocation; OpenAI-compatible chat completions use /ai/v1.
+  # Model IDs must be prefixed with "@cf/" (e.g. @cf/meta/llama-3.1-8b-instruct)
+  cloudflare:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://api.cloudflare.com/client/v4/accounts/cac1cb45605e48a6810828169610af41/ai/v1"
+    api_key_env: CLOUDFLARE_API_KEY
+    timeout_s: 60
+    max_retries: 2
+    health_check_url: ""  # Cloudflare 无 list models 端点，跳过健康检查
+    enabled: true
+
+  # ── OpenCode Zen (premium tier of OpenCode) ──
+  # Separate from the free `opencode` provider; uses its own API key.
+  # If Zen shares the same endpoint as the free tier, only the key differs.
+  opencode-zen:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://api.opencode.ai/v1"
+    api_key_env: OPENCODE_ZEN_API_KEY
+    timeout_s: 120
+    max_retries: 3
+    health_check_url: "https://api.opencode.ai/v1/models"
+    enabled: true
+
+  # ── Kilo (OpenAI-compatible coding plan endpoint) ──
+  # Kilo Code is primarily a VS Code extension, but it can expose a
+  # provider endpoint. Common backends used by Kilo Code include
+  # Zhipu GLM Coding Plan, Aliyun Coding Plan, and TokenHub.
+  # If you have a specific Kilo endpoint, update base_url accordingly.
+  kilo:
+    type: openai-compatible
+    protocol: openai_completions
+    base_url: "https://api.kilo.ai/api/gateway"
+    api_key_env: KILO_API_KEY
+    timeout_s: 120
+    max_retries: 3
+    health_check_url: "https://api.kilo.ai/api/gateway/models"
+    enabled: true
 
 # ── Models ─────────────────────────────────────────────────────
 models:
@@ -444,7 +528,7 @@ models:
     max_temperature: 2.0
     latency_tier: medium
     quality_tier: excellent
-    fallback_model: yi-large  # OmniRoute unavailable -> fall back to stepfun
+    fallback_model: glm-4.7-flash  # OmniRoute unavailable -> fall back to zhipu (free)
     enabled: true
     description: "OmniRoute best coding model (auto-routed to best coding provider)"
 
@@ -477,9 +561,521 @@ models:
     max_temperature: 2.0
     latency_tier: medium
     quality_tier: excellent
-    fallback_model: yi-large
+    fallback_model: glm-4.7-flash  # OmniRoute unavailable -> fall back to zhipu (free)
     enabled: true
     description: "OmniRoute best reasoning model (auto-routed to best reasoning provider)"
+
+  # ── 智谱 GLM models ──
+  glm-4.7-flash:
+    provider: zhipu
+    model_id: "glm-4-flash"
+    family: glm
+    context_window: 131072
+    max_output: 4096
+    cost_per_1k_input: 0.0  # GLM-4-Flash 免费
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, quickfix, explain, search, planning, review]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: false
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: fast
+    quality_tier: good
+    enabled: true
+
+  # ── 硅基流动 models ──
+  siliconflow-deepseek-v3:
+    provider: siliconflow
+    model_id: "deepseek-ai/DeepSeek-V3"
+    family: deepseek
+    context_window: 65536
+    max_output: 8192
+    cost_per_1k_input: 0.001
+    cost_per_1k_output: 0.004
+    capabilities: [codegen, chat, planning, review, explain, search, refactor, verify]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: true
+      default_level: medium
+      available_levels: [low, medium, high]
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    enabled: true
+
+  siliconflow-qwen-72b:
+    provider: siliconflow
+    model_id: "Qwen/Qwen2.5-72B-Instruct"
+    family: qwen
+    context_window: 131072
+    max_output: 8192
+    cost_per_1k_input: 0.002
+    cost_per_1k_output: 0.006
+    capabilities: [codegen, chat, planning, review, explain, search, refactor, fileops]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: false
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    enabled: true
+
+  # ── 魔搭 ModelScope models ──
+  modelscope-qwen-72b:
+    provider: modelscope
+    model_id: "Qwen/Qwen2.5-72B-Instruct"
+    family: qwen
+    context_window: 131072
+    max_output: 8192
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, planning, review, explain, search]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: false
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: good
+    enabled: true
+
+  # ── 商汤 SenseNova models ──
+  sensenova-nova:
+    provider: sensenova
+    model_id: "SenseChat-5"
+    family: nova
+    context_window: 32768
+    max_output: 4096
+    cost_per_1k_input: 0.002
+    cost_per_1k_output: 0.006
+    capabilities: [codegen, chat, planning, review, explain, search]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: false
+    thinking:
+      supported: false
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: good
+    enabled: true
+
+  # ── OpenRouter models ──
+  openrouter-auto:
+    provider: openrouter
+    model_id: "openrouter/auto"
+    family: openrouter
+    context_window: 131072
+    max_output: 8192
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, planning, review, explain, search, refactor, verify]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: false
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: good
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  # ── OpenCode Zen models ──
+  opencode-zen-auto:
+    provider: opencode-zen
+    model_id: "auto"  # Zen tier auto-routing
+    family: opencode
+    context_window: 65536
+    max_output: 8192
+    cost_per_1k_input: 0.0  # Zen plan typically subscription-based
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, planning, review, explain, search, refactor, verify, quickfix]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: true
+      default_level: medium
+      available_levels: [low, medium, high]
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  zen-big-pickle:
+    provider: opencode-zen
+    model_id: "big-pickle"
+    family: pickle
+    context_window: 65536
+    max_output: 8192
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, planning, review, explain, search, refactor, verify, quickfix]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: true
+      default_level: medium
+      available_levels: [low, medium, high]
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  zen-mimo-v2.5:
+    provider: opencode-zen
+    model_id: "mimo-v2.5-free"
+    family: mimo
+    context_window: 32768
+    max_output: 4096
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, quickfix, explain, search]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: false
+    thinking:
+      supported: false
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: fast
+    quality_tier: fair
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  zen-laguna-s-2.1:
+    provider: opencode-zen
+    model_id: "laguna-s-2.1-free"
+    family: laguna
+    context_window: 65536
+    max_output: 8192
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, planning, review, explain, search, refactor, verify]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: true
+      default_level: medium
+      available_levels: [low, medium, high]
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  zen-ling-3.0-flash:
+    provider: opencode-zen
+    model_id: "ling-3.0-flash-free"
+    family: ling
+    context_window: 32768
+    max_output: 4096
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, quickfix, explain, search, planning]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: false
+    thinking:
+      supported: false
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: fast
+    quality_tier: good
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  zen-north-mini-code:
+    provider: opencode-zen
+    model_id: "north-mini-code-free"
+    family: north
+    context_window: 32768
+    max_output: 4096
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, quickfix, explain, search, refactor, fileops]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: false
+    thinking:
+      supported: false
+    default_temperature: 0.5
+    max_temperature: 2.0
+    latency_tier: fast
+    quality_tier: good
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  zen-nemotron-3-ultra:
+    provider: opencode-zen
+    model_id: "nemotron-3-ultra-free"
+    family: nemotron
+    context_window: 131072
+    max_output: 8192
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, planning, review, explain, search, refactor, verify, reasoning]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: true
+      default_level: high
+      available_levels: [low, medium, high]
+      token_budget_low: 512
+      token_budget_medium: 3072
+      token_budget_high: 12288
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  zen-deepseek-v4-flash:
+    provider: opencode-zen
+    model_id: "deepseek-v4-flash-free"
+    family: deepseek
+    context_window: 16384
+    max_output: 4096
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, quickfix, explain, search, fileops, planning, review]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: false
+    thinking:
+      supported: true
+      default_level: low
+      available_levels: [low, medium]
+      token_budget_low: 512
+      token_budget_medium: 2048
+    default_temperature: 0.5
+    max_temperature: 2.0
+    latency_tier: fast
+    quality_tier: fair
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  # ── Kilo models (free tier via kilo gateway) ──
+  kilo-step-3.7-flash:
+    provider: kilo
+    model_id: "stepfun/step-3.7-flash:free"
+    family: step
+    context_window: 32768
+    max_output: 8192
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, quickfix, explain, search, planning, review]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: false
+    thinking:
+      supported: false
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: fast
+    quality_tier: good
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  kilo-laguna-m.1:
+    provider: kilo
+    model_id: "poolside/laguna-m.1:free"
+    family: laguna
+    context_window: 65536
+    max_output: 8192
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, planning, review, explain, search, refactor, verify]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: true
+      default_level: medium
+      available_levels: [low, medium, high]
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  kilo-nemotron-3-ultra:
+    provider: kilo
+    model_id: "nvidia/nemotron-3-ultra-550b-a55b:free"
+    family: nemotron
+    context_window: 131072
+    max_output: 8192
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, planning, review, explain, search, refactor, verify, reasoning]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: true
+      default_level: high
+      available_levels: [low, medium, high]
+      token_budget_low: 512
+      token_budget_medium: 3072
+      token_budget_high: 12288
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: excellent
+    fallback_model: glm-4.7-flash
+    enabled: true
+
+  kilo-openrouter-free:
+    provider: kilo
+    model_id: "openrouter/free"
+    family: openrouter
+    context_window: 131072
+    max_output: 8192
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+    capabilities: [codegen, chat, planning, review, explain, search, refactor, verify]
+    capability_matrix:
+      text_chat: true
+      multimodal_understanding: false
+      image_generation: false
+      tool_calling: true
+      streaming: true
+      code_execution: false
+      web_search: false
+      long_context: true
+    thinking:
+      supported: false
+    default_temperature: 0.7
+    max_temperature: 2.0
+    latency_tier: medium
+    quality_tier: good
+    fallback_model: glm-4.7-flash
+    enabled: true
 
 # ── Policies ──────────────────────────────────────────────────
 policies:
@@ -539,3 +1135,27 @@ quota:
   opencode:
     requests_per_minute: 10
     tokens_per_minute: 10000
+  zhipu:
+    requests_per_minute: 60
+    tokens_per_minute: 100000
+  siliconflow:
+    requests_per_minute: 60
+    tokens_per_minute: 100000
+  modelscope:
+    requests_per_minute: 30
+    tokens_per_minute: 50000
+  sensenova:
+    requests_per_minute: 30
+    tokens_per_minute: 50000
+  openrouter:
+    requests_per_minute: 20
+    tokens_per_minute: 50000
+  opencode-zen:
+    requests_per_minute: 30
+    tokens_per_minute: 60000
+  kilo:
+    requests_per_minute: 30
+    tokens_per_minute: 60000
+  cloudflare:
+    requests_per_minute: 50  # Workers AI free tier: 10000 req/day
+    tokens_per_minute: 30000

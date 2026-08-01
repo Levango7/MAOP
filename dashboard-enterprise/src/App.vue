@@ -48,11 +48,18 @@
 
     <div v-if="authExpired" class="auth-overlay">
       <div class="auth-card">
+        <div class="auth-card__icon"><AppIcon name="bot" :size="26" /></div>
         <h3>{{ loginTitle }}</h3>
         <p v-if="loginError" class="login-error">{{ loginError }}</p>
         <form @submit.prevent="doLogin">
-          <input v-model="loginUsername" type="text" :placeholder="t('auth.username')" autocomplete="username" :disabled="loginLoading" />
-          <input v-model="loginPassword" type="password" :placeholder="t('auth.password')" autocomplete="current-password" :disabled="loginLoading" />
+          <div>
+            <label>{{ t('auth.username') }}</label>
+            <input v-model="loginUsername" type="text" :placeholder="t('auth.username')" autocomplete="username" :disabled="loginLoading" />
+          </div>
+          <div>
+            <label>{{ t('auth.password') }}</label>
+            <input v-model="loginPassword" type="password" :placeholder="t('auth.password')" autocomplete="current-password" :disabled="loginLoading" />
+          </div>
           <button type="submit" :disabled="loginLoading || !loginUsername || !loginPassword">
             {{ loginLoading ? t('auth.signingIn') : t('auth.signIn') }}
           </button>
@@ -165,10 +172,26 @@ function onSidebarClick(e) {
 // ── Navigation ────────────────────────────────────────────────────────────
 // `nav` is imported from ./nav.js (single source of truth shared with PageHeader).
 
-// ── Auth flows (unchanged behavior) ──────────────────────────────────────
+// ── Auth flows ───────────────────────────────────────────────────────────
+// Proactive: when auth is enabled and no token exists, show the login
+// overlay immediately with a "Sign In" title — don't wait for 401 errors
+// to trickle in and flash empty pages at the user.
+function showLoginIfRequired() {
+  if (authEnabled.value && !api.authToken()) {
+    authExpired.value = true;
+    loginTitle.value = t('auth.signIn');
+    loginError.value = '';
+    return true;
+  }
+  return false;
+}
+// Reactive: a 401 was intercepted by the api store. Only say "Session
+// Expired" when the user actually had a token before; otherwise it's a
+// first-visit sign-in.
 function onUnauthorized() {
+  const hadToken = !!api.authToken();
   authExpired.value = true;
-  loginTitle.value = t('auth.sessionExpired');
+  loginTitle.value = hadToken ? t('auth.sessionExpired') : t('auth.signIn');
   loginError.value = '';
 }
 async function doLogin() {
@@ -205,6 +228,15 @@ async function checkAuthEnabled() {
     const d = await api.get('/api/auth/status');
     authEnabled.value = d && d.auth_enabled === true;
     try { localStorage.setItem('maop_auth_enabled', String(authEnabled.value)); } catch {}
+    // If backend says auth is enabled but our token is invalid (has_token:false),
+    // clear the stale local token so showLoginIfRequired() can trigger the
+    // login overlay immediately — instead of waiting for 401 errors from
+    // every subsequent authenticated endpoint.
+    // Direct localStorage removal (not api.clearAuthToken) to avoid triggering
+    // /api/auth/logout which would itself 401 and cause a retry loop.
+    if (authEnabled.value && d && d.has_token === false && api.authToken()) {
+      try { localStorage.removeItem('maop_token'); localStorage.removeItem('maop_user'); } catch { /* ignore */ }
+    }
   } catch { authEnabled.value = false; }
 }
 async function doLogout() {
@@ -221,8 +253,11 @@ onMounted(async () => {
   userName.value = getStoredUser();
   userRoles.value = getStoredRoles();
   checkMobile();
-  await edition.fetchEdition();
+  // Check auth status FIRST — if login is required, show the overlay
+  // immediately and skip the data-fetching calls that would just 401.
   await checkAuthEnabled();
+  if (showLoginIfRequired()) return;
+  await edition.fetchEdition();
   computeAdmin();
   try {
     const d = await api.get('/api/health');
@@ -254,8 +289,8 @@ onUnmounted(() => {
 /* ── Sidebar ─────────────────────────────────────────────────────── */
 .sidebar {
   width: var(--sidebar-w);
-  background: var(--surface);
-  padding: 14px 0;
+  background: var(--card-sheen), var(--surface);
+  padding: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
@@ -264,50 +299,109 @@ onUnmounted(() => {
   z-index: var(--z-sidebar);
   transition: width var(--motion) var(--ease);
 }
+/* Sidebar 内右侧的微光带，强化视觉层次 */
+.sidebar::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    var(--border) 15%,
+    var(--brand-faint) 50%,
+    var(--border) 85%,
+    transparent 100%);
+  pointer-events: none;
+}
 .logo {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 18px 16px; font-size: 15px; font-weight: 700; color: var(--text);
+  display: flex; align-items: center; gap: 10px;
+  height: var(--topbar-h);
+  padding: 0 18px;
+  font-size: 16px; font-weight: 700; color: var(--text);
   letter-spacing: .01em;
-  border-bottom: 1px solid var(--border-subtle, var(--border));
-  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  flex-shrink: 0;
+}
+.logo > span:first-child {
+  background: linear-gradient(135deg, var(--brand-strong) 0%, var(--chart-6) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: .02em;
 }
 .logo .rail-btn {
   margin-left: auto; background: none; border: none; color: var(--text-faint);
   display: grid; place-items: center; padding: 5px; border-radius: var(--r-sm);
-  transition: color var(--motion) var(--ease), background var(--motion) var(--ease);
+  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), transform var(--motion) var(--ease);
 }
-.logo .rail-btn:hover { color: var(--brand-strong); background: var(--brand-soft); }
+.logo .rail-btn:hover {
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+  transform: scale(1.05);
+}
 
 .nav-scroll { flex: 1; overflow-y: auto; padding-bottom: 8px; }
 .nav-section {
   font-size: 10px; font-weight: 700; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: .08em;
-  padding: 14px 18px 4px; border-top: 1px solid var(--border);
-}
-.nav-section:first-of-type { border-top: none; }
-.nav-link {
-  display: flex; align-items: center; gap: 11px;
-  padding: 9px 18px; color: var(--text-muted); text-decoration: none;
-  font-size: 13px; font-weight: 500; border-radius: 0;
-  border-left: 3px solid transparent;
-  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), border-color var(--motion) var(--ease);
+  padding: 16px 18px 6px;
   position: relative;
 }
-.nav-link:hover { color: var(--text); background: var(--surface-2); }
+.nav-section::after {
+  content: "";
+  position: absolute;
+  left: 18px; right: 18px;
+  bottom: 0;
+  height: 1px;
+  background: var(--border-subtle);
+  opacity: 0;
+}
+.nav-section:not(:first-of-type) {
+  border-top: 1px solid var(--border-subtle, var(--border));
+  margin-top: 6px;
+}
+.nav-link {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 18px; color: var(--text-muted); text-decoration: none;
+  font-size: 13px; font-weight: 500; border-radius: 0;
+  border-left: 3px solid transparent;
+  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), border-color var(--motion) var(--ease), padding-left var(--motion) var(--ease);
+  position: relative;
+  margin: 1px 0;
+}
+.nav-link:hover {
+  color: var(--text); background: var(--surface-2);
+  padding-left: 20px;
+}
 .nav-link.router-link-active {
   color: var(--brand-strong); background: var(--brand-soft);
   border-left-color: var(--brand);
   font-weight: 600;
+  padding-left: 18px;
+}
+.nav-link.router-link-active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--brand-strong), var(--brand));
+  box-shadow: 0 0 8px rgba(99, 102, 241, .5);
 }
 .nav-link.router-link-active::after {
   content: '';
   position: absolute;
-  right: 12px;
-  width: 4px; height: 4px;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px; height: 5px;
   border-radius: 50%;
   background: var(--brand);
+  box-shadow: 0 0 6px rgba(99, 102, 241, .6);
 }
-.nav-icon { flex-shrink: 0; color: inherit; }
+.nav-icon { flex-shrink: 0; color: inherit; transition: transform var(--motion) var(--ease); }
+.nav-link:hover .nav-icon { transform: scale(1.08); }
+.nav-link.router-link-active .nav-icon { color: var(--brand-strong); }
 
 .nav-footer {
   margin-top: auto; padding: 12px 16px; border-top: 1px solid var(--border);
@@ -322,26 +416,77 @@ onUnmounted(() => {
 .app-layout.rail .logo span,
 .app-layout.rail .nav-label,
 .app-layout.rail .nav-section { display: none; }
-.app-layout.rail .logo { justify-content: center; padding: 4px 0 14px; }
+.app-layout.rail .logo { justify-content: center; padding: 0; }
 .app-layout.rail .nav-link { justify-content: center; padding: 10px 0; gap: 0; }
 
 /* ── Content (scroll area) ─────────────────────────────────────── */
 .content { flex: 1; overflow-y: auto; min-width: 0; position: relative; z-index: 1; display: flex; flex-direction: column; }
 /* Centered, max-width shell so content aligns consistently on wide screens;
    the footer is pinned to the bottom via margin-top:auto inside this shell. */
-.content-shell { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: var(--maxw); margin: 0 auto; padding: var(--content-pad); }
+.content-shell { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: var(--maxw); margin: 0 auto; padding: var(--sp-2) var(--content-pad) var(--content-pad); }
 
 /* ── Auth overlay ───────────────────────────────────────────────── */
-.auth-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: var(--z-modal); }
-.auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 24px; max-width: 360px; width: calc(100% - 32px); text-align: center; box-shadow: var(--shadow-lg); }
-.auth-card h3 { margin-bottom: 12px; color: var(--text); }
-.auth-card p { color: var(--text-muted); font-size: 13px; margin-bottom: 16px; }
-.auth-card button { background: var(--brand); color: #fff; border: none; border-radius: var(--r-md); padding: 8px 16px; font-size: 13px; width: 100%; margin-top: 8px; }
-.auth-card button:disabled { opacity: .5; cursor: not-allowed; }
-.auth-card form { display: flex; flex-direction: column; gap: 8px; }
-.auth-card input { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); padding: 8px 12px; color: var(--text); font-size: 13px; }
-.auth-card input:focus { outline: none; border-color: var(--brand); }
-.login-error { color: var(--fail); font-size: 12px; margin-bottom: 8px; }
+.auth-overlay {
+  position: fixed; inset: 0; z-index: var(--z-modal);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--overlay-scrim, rgba(15, 23, 42, .65));
+  backdrop-filter: blur(8px);
+  animation: maop-view-in var(--motion) var(--ease) both;
+}
+.auth-card {
+  position: relative;
+  background: var(--card-sheen), var(--surface);
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--r-xl);
+  padding: var(--sp-6);
+  max-width: 420px; width: calc(100% - 32px);
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  animation: maop-view-in var(--motion) var(--ease-out) both;
+}
+.auth-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brand-faint) 30%, var(--brand) 50%, var(--brand-faint) 70%, transparent);
+  border-radius: var(--r-xl) var(--r-xl) 0 0; pointer-events: none;
+}
+.auth-card__icon {
+  display: grid; place-items: center;
+  width: 52px; height: 52px; margin: 0 auto var(--sp-4);
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, var(--brand-soft), var(--brand-faint));
+  border: 1px solid var(--brand-faint);
+  color: var(--brand-strong);
+}
+.auth-card h3 { margin-bottom: var(--sp-2); color: var(--text); font-size: var(--fs-lg); font-weight: 700; letter-spacing: -0.01em; }
+.auth-card p { color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: var(--sp-4); line-height: 1.5; }
+.auth-card button[type="submit"] {
+  background: var(--brand); color: var(--brand-contrast);
+  border: 1px solid var(--brand); border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4); font-size: var(--fs-sm); font-weight: 600;
+  width: 100%; margin-top: var(--sp-3); cursor: pointer;
+  transition: background var(--motion) var(--ease), box-shadow var(--motion) var(--ease), transform var(--motion) var(--ease);
+}
+.auth-card button[type="submit"]:hover:not(:disabled) {
+  background: var(--brand-strong); border-color: var(--brand-strong);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--brand) 35%, transparent);
+  transform: translateY(-1px);
+}
+.auth-card button[type="submit"]:disabled { opacity: .5; cursor: not-allowed; }
+.auth-card form { display: flex; flex-direction: column; gap: var(--sp-3); text-align: left; }
+.auth-card form label { display: block; font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.auth-card input {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4); color: var(--text); font-size: var(--fs-sm); font-family: inherit;
+  transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+}
+.auth-card input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.auth-card input::placeholder { color: var(--text-faint); }
+.login-error {
+  color: var(--fail); font-size: var(--fs-xs); margin-bottom: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm);
+  background: var(--fail-soft); border: 1px solid color-mix(in srgb, var(--fail) 25%, transparent);
+}
 
 /* ── Responsive: sidebar becomes a slide-in drawer ──────────────── */
 .hamburger-btn {
