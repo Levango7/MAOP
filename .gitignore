@@ -114,6 +114,8 @@ dashboard-enterprise/audit_api.py
 dashboard-enterprise/audit_orphans.py
 dashboard-enterprise/coverage/
 dashboard-enterprise/frontend_dev.log
+test_full.log
+test_*.log
 
 # -- Credentials / runtime secrets --
 data/.admin_initial_password
