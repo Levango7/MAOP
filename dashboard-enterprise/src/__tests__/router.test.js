@@ -8,6 +8,7 @@ describe('Router', () => {
       'overview', 'control', 'chat', 'agents', 'memory', 'evolve',
       'search', 'vector', 'tools', 'models',
       'logs', 'monitor', 'cost', 'audit', 'rbac', 'tenants', 'settings',
+      'users', 'docs',
     ];
     for (const name of expected) {
       expect(names).toContain(name);
@@ -19,8 +20,8 @@ describe('Router', () => {
     expect(route?.path).toBe('/');
   });
 
-  it('has 18 routes total', () => {
-    // 17 业务路由 + 1 个 catch-all 重定向 (:pathMatch(.*)*)
-    expect(router.getRoutes().length).toBe(18);
+  it('has 20 routes total', () => {
+    // 19 业务路由 + 1 个 catch-all 重定向 (:pathMatch(.*)*)
+    expect(router.getRoutes().length).toBe(20);
   });
 });

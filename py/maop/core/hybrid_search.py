@@ -30,6 +30,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from maop.core.db_utils import sqlite_connect
+from maop.memory.shared_db import get_memory_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +209,7 @@ class HybridSearch:
 
     def _keyword_search(self, query: str, top: int = 30) -> list[tuple[str, float]]:
         """Search using FTS5 (keyword)."""
-        episodic_path = self._data_dir / "episodic.db"
+        episodic_path = get_memory_db_path()
         if not episodic_path.exists():
             return []
 

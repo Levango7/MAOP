@@ -639,6 +639,17 @@ class ThreeLayerMemory:
             return key
         if normalized == "short_term":
             # episodic_store 不接受 content 参数，把 content 拼到 summary
+            # 合并 topic/tags 到 metadata (修复: 之前 topic/tags 被静默丢弃)
+            meta = dict(kwargs.get("metadata") or {})
+            topic = kwargs.get("topic", "")
+            tags = kwargs.get("tags", "")
+            if topic:
+                meta["topic"] = topic
+            if tags:
+                meta["tags"] = tags if isinstance(tags, str) else ",".join(str(t) for t in tags)
+            trace_id = kwargs.get("trace_id", "")
+            if trace_id:
+                meta["trace_id"] = trace_id
             return self.episodic_store(
                 task=kwargs.get("task", content[:80]),
                 agent=kwargs.get("agent", ""),
@@ -649,7 +660,7 @@ class ThreeLayerMemory:
                 summary=content,
                 key_decisions=kwargs.get("key_decisions"),
                 files_touched=kwargs.get("files_touched"),
-                metadata=kwargs.get("metadata"),
+                metadata=meta,
             )
         if normalized == "long_term":
             doc_id = kwargs.get("doc_id", f"doc-{int(time.time() * 1000)}")

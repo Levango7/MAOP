@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf 
 
 LABEL maintainer="MAOP Team"
 LABEL description="MAOP Agent Orchestration Platform"
-LABEL version="4.3.0"
+LABEL version="4.4.1"
 
 # Create non-root user
 RUN groupadd -r maop && useradd -r -g maop -d /app -s /sbin/nologin maop
@@ -56,7 +56,7 @@ ENV MAOP_ROOT=/app \
     MAOP_TLS=0 \
     MAOP_CORS_ORIGINS=http://localhost:9079 \
     MAOP_STORAGE_BACKEND=sqlite \
-    MAOP_CACHE_BACKEND=local \
+    MAOP_CACHE_BACKEND=memory \
     MAOP_QUEUE_BACKEND=local \
     MAOP_KV_BACKEND=local \
     MAOP_SECRET_BACKEND=local

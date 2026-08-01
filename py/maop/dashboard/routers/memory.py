@@ -146,7 +146,7 @@ async def api_memory_deep(request: Request) -> dict[str, Any]:
         logger.debug("Failed to check bloom filter availability", exc_info=True)
     try:
         from maop.core.vector import VectorStore
-        vs = VectorStore(db_path=str(get_db_path("vectors")))
+        vs = VectorStore(db_path=str(MAOP_ROOT / "data" / "vectors.db"))
         stats["vector_index"] = True
         stats["vector_count"] = vs.count() if hasattr(vs, "count") else 0
     except Exception:
@@ -160,17 +160,21 @@ async def api_memory_deep(request: Request) -> dict[str, Any]:
     try:
         from maop.core.three_layer_memory import ThreeLayerMemory
         mem = ThreeLayerMemory(root_dir=str(MAOP_ROOT))
-        ep_all = mem.episodic_search(query="", top=10000)
-        stats["episodic_count"] = len(ep_all)
-        ep_by_agent: dict[str, int] = {}
-        ep_by_outcome: dict[str, int] = {}
-        for r in ep_all:
-            ag = r.entry.agent or "unknown"
-            ep_by_agent[ag] = ep_by_agent.get(ag, 0) + 1
-            oc = r.entry.outcome or "unknown"
-            ep_by_outcome[oc] = ep_by_outcome.get(oc, 0) + 1
-        stats["episodic_by_agent"] = ep_by_agent
-        stats["episodic_by_outcome"] = ep_by_outcome
+        ep_stats = mem.episodic_stats()
+        stats["episodic_count"] = ep_stats.get("total", 0)
+        stats["episodic_by_outcome"] = ep_stats.get("by_outcome", {})
+        stats["episodic_avg_score"] = ep_stats.get("avg_score", 0)
+        stats["episodic_consolidated"] = ep_stats.get("consolidated", 0)
+        # by_agent 需要从 episodic_stats 之外获取 (episodic_stats 不含 by_agent)
+        try:
+            from maop.core.db_utils import sqlite_connect
+            with sqlite_connect(str(MAOP_ROOT / "data" / "maop.db"), foreign_keys=False) as conn:
+                rows = conn.execute(
+                    "SELECT agent, COUNT(*) as cnt FROM episodic_memory GROUP BY agent ORDER BY cnt DESC"
+                ).fetchall()
+            stats["episodic_by_agent"] = {r[0] or "unknown": r[1] for r in rows}
+        except Exception:
+            stats["episodic_by_agent"] = {}
     except Exception:
         logger.debug("Failed to get episodic stats", exc_info=True)
         stats.setdefault("episodic_count", 0)

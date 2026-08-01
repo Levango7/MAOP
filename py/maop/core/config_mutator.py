@@ -80,12 +80,24 @@ class ConfigMutator:
                 error="Suggestion already applied",
             )
 
-        mutation_type = suggestion.get("type", "")
+        mutation_type = suggestion.get("mutation_type", "") or suggestion.get("type", "")
         handler = {
-            "routing_mismatch": self._mutate_routing,
-            "slow_agent": self._mutate_timeout,
-            "agent_low_success": self._mutate_disable_agent,
-            "empty_routing_key": self._mutate_empty_routing,
+            "change_routing": self._mutate_routing,
+            "routing_mismatch": self._mutate_routing,  # 向后兼容
+            "adjust_timeout": self._mutate_timeout,
+            "slow_agent": self._mutate_timeout,  # 向后兼容
+            "disable_agent": self._mutate_disable_agent,
+            "agent_low_success": self._mutate_disable_agent,  # 向后兼容
+            "change_routing_empty": self._mutate_empty_routing,
+            "empty_routing_key": self._mutate_empty_routing,  # 向后兼容
+            "add_capability": self._mutate_add_capability,
+            "adjust_retries": self._mutate_adjust_retries,
+            "adjust_cache": self._mutate_adjust_cache,
+            "switch_model": self._mutate_switch_model,
+            "record_lesson": self._mutate_record_lesson,
+            "record_preference": self._mutate_record_preference,
+            "error_pattern_rule": self._mutate_record_lesson,
+            "recurring_failure": self._mutate_record_lesson,  # 向后兼容 (旧 EvolveEngine 类型名)
         }.get(mutation_type)
 
         if not handler:
@@ -186,66 +198,89 @@ class ConfigMutator:
         try:
             from maop.config.hot_reload import ConfigHotReload
             reloader = ConfigHotReload(root_dir=str(self._root))
-            reloader.reload()  # type: ignore[attr-defined]
+            reloader.force_reload()
             return True
         except Exception as exc:
             logger.debug("[mutator] Hot reload failed: %s", exc)
             return False
 
     def _mutate_routing(self, suggestion: dict[str, Any]) -> list[str]:
-        """Change routing configuration for a routing key."""
+        """调整路由配置: 将表现不佳的 agent 降级为 fallback，而非禁用。
+
+        如果提供了 suggested_agent 则切换 primary；
+        否则仅将当前 agent 从 primary 降为 fallback。
+        """
         data = self._load_yaml()
         changes: list[str] = []
 
         routing = data.get("routing", {})
-        key = suggestion.get("routing_key", "")
-        new_agent = suggestion.get("suggested_agent", "")
+        params = suggestion.get("mutation_params", {})
+        key = params.get("routing_key", "") or suggestion.get("routing_key", "")
+        new_agent = params.get("suggested_agent", "") or suggestion.get("suggested_agent", "")
+        current_agent = params.get("agent", "") or suggestion.get("agent", "")
 
-        if not key or not new_agent:
+        if not key:
             return changes
 
         if key in routing:
             old_primary = routing[key].get("primary", "")
-            if old_primary != new_agent:
+            if new_agent and old_primary != new_agent:
                 routing[key]["fallback"] = old_primary
                 routing[key]["primary"] = new_agent
                 changes.append(f"routing.{key}.primary: {old_primary} → {new_agent}")
                 changes.append(f"routing.{key}.fallback: → {old_primary}")
+            elif current_agent and old_primary == current_agent:
+                # 将表现不佳的 agent 降为 fallback，提升原 fallback
+                old_fallback = routing[key].get("fallback", "")
+                if old_fallback:
+                    routing[key]["primary"] = old_fallback
+                    routing[key]["fallback"] = current_agent
+                    changes.append(f"routing.{key}.primary: {old_primary} → {old_fallback} (demoted {current_agent})")
         else:
-            routing[key] = {"primary": new_agent}
-            changes.append(f"routing.{key}.primary: (new) → {new_agent}")
+            if new_agent:
+                routing[key] = {"primary": new_agent}
+                changes.append(f"routing.{key}.primary: (new) → {new_agent}")
 
         data["routing"] = routing
         self._save_yaml(data)
         return changes
 
     def _mutate_timeout(self, suggestion: dict[str, Any]) -> list[str]:
-        """Adjust timeout for a slow agent."""
+        """增加慢 agent 的 timeout (而非减半)。"""
         data = self._load_yaml()
         changes: list[str] = []
 
-        agent_name = suggestion.get("agent", "")
-        new_timeout = suggestion.get("suggested_timeout", 120)
+        params = suggestion.get("mutation_params", {})
+        agent_name = params.get("agent", "") or suggestion.get("agent", "")
+        new_timeout = params.get("suggested_timeout", 0) or suggestion.get("suggested_timeout", 0)
+
+        if not agent_name:
+            return changes
 
         agents = data.get("agents", {})
         if agent_name in agents:
             old_timeout = agents[agent_name].get("timeout_s", 60)
-            agents[agent_name]["timeout_s"] = new_timeout
-            changes.append(f"agents.{agent_name}.timeout_s: {old_timeout} → {new_timeout}")
-            data["agents"] = agents
-            self._save_yaml(data)
+            if new_timeout <= 0:
+                # 如果未提供 suggested_timeout，增加 50%
+                new_timeout = min(600, int(old_timeout * 1.5))
+            if new_timeout > old_timeout:
+                agents[agent_name]["timeout_s"] = new_timeout
+                changes.append(f"agents.{agent_name}.timeout_s: {old_timeout} → {new_timeout}")
+                data["agents"] = agents
+                self._save_yaml(data)
 
         return changes
 
     def _mutate_disable_agent(self, suggestion: dict[str, Any]) -> list[str]:
-        """Disable an agent with low success rate."""
+        """禁用成功率极低的 agent。"""
         data = self._load_yaml()
         changes: list[str] = []
 
-        agent_name = suggestion.get("agent", "")
+        params = suggestion.get("mutation_params", {})
+        agent_name = params.get("agent", "") or suggestion.get("agent", "")
         agents = data.get("agents", {})
 
-        if agent_name in agents:
+        if agent_name in agents and agents[agent_name].get("enabled", True):
             agents[agent_name]["enabled"] = False
             changes.append(f"agents.{agent_name}.enabled: True → False")
             data["agents"] = agents
@@ -254,12 +289,13 @@ class ConfigMutator:
         return changes
 
     def _mutate_empty_routing(self, suggestion: dict[str, Any]) -> list[str]:
-        """Assign a default agent to an empty routing key."""
+        """为空路由键分配默认 agent。"""
         data = self._load_yaml()
         changes: list[str] = []
 
-        key = suggestion.get("routing_key", "")
-        agent = suggestion.get("suggested_agent", "")
+        params = suggestion.get("mutation_params", {})
+        key = params.get("routing_key", "") or suggestion.get("routing_key", "")
+        agent = params.get("suggested_agent", "") or suggestion.get("suggested_agent", "")
 
         if key and agent:
             routing = data.get("routing", {})
@@ -267,5 +303,139 @@ class ConfigMutator:
             changes.append(f"routing.{key}.primary: (empty) → {agent}")
             data["routing"] = routing
             self._save_yaml(data)
+
+        return changes
+
+    def _mutate_add_capability(self, suggestion: dict[str, Any]) -> list[str]:
+        """为 agent 添加新能力标签 (只增不删)。"""
+        data = self._load_yaml()
+        changes: list[str] = []
+
+        params = suggestion.get("mutation_params", {})
+        agent_name = params.get("agent", "") or suggestion.get("agent", "")
+        new_cap = params.get("suggested_capability", "")
+
+        if not agent_name or not new_cap:
+            return changes
+
+        agents = data.get("agents", {})
+        if agent_name in agents:
+            caps = agents[agent_name].get("capabilities", [])
+            if new_cap not in caps:
+                caps.append(new_cap)
+                agents[agent_name]["capabilities"] = caps
+                changes.append(f"agents.{agent_name}.capabilities: +{new_cap}")
+                data["agents"] = agents
+                self._save_yaml(data)
+
+        # 同时记录到 agent 记忆
+        try:
+            from maop.core.agent_memory import AgentMemory
+            mem = AgentMemory(root_dir=str(self._root))
+            mem.store(agent_name=agent_name, memory_type="lesson",
+                      content={"type": "capability_added", "capability": new_cap},
+                      importance=0.7)
+        except Exception:
+            pass
+
+        return changes
+
+    def _mutate_adjust_retries(self, suggestion: dict[str, Any]) -> list[str]:
+        """调整 agent 的 max_retries。"""
+        data = self._load_yaml()
+        changes: list[str] = []
+
+        params = suggestion.get("mutation_params", {})
+        agent_name = params.get("agent", "") or suggestion.get("agent", "")
+        new_retries = params.get("suggested_max_retries", 5)
+
+        if not agent_name:
+            return changes
+
+        agents = data.get("agents", {})
+        if agent_name in agents:
+            old_retries = agents[agent_name].get("max_retries", 3)
+            agents[agent_name]["max_retries"] = new_retries
+            changes.append(f"agents.{agent_name}.max_retries: {old_retries} → {new_retries}")
+            data["agents"] = agents
+            self._save_yaml(data)
+
+        return changes
+
+    def _mutate_adjust_cache(self, suggestion: dict[str, Any]) -> list[str]:
+        """调整缓存参数 (TTL/max_size/similarity_threshold)。"""
+        changes: list[str] = []
+        params = suggestion.get("mutation_params", {})
+        cache_name = params.get("cache_name", "")
+        parameter = params.get("parameter", "")
+        new_value = params.get("new_value", 0)
+
+        if not cache_name or not parameter:
+            return changes
+
+        try:
+            from maop.core.cache import get_cache
+            cache = get_cache(cache_name)
+            if cache and hasattr(cache, parameter):
+                old_value = getattr(cache, parameter)
+                setattr(cache, parameter, new_value)
+                changes.append(f"cache.{cache_name}.{parameter}: {old_value} → {new_value}")
+        except Exception as exc:
+            logger.debug("[mutator] Cache adjustment failed: %s", exc)
+
+        return changes
+
+    def _mutate_switch_model(self, suggestion: dict[str, Any]) -> list[str]:
+        """切换 agent 使用的模型 (需要手动确认)。"""
+        changes: list[str] = []
+        # 模型切换是高风险操作，只记录建议不自动执行
+        params = suggestion.get("mutation_params", {})
+        model = params.get("model", "")
+        total_cost = params.get("total_cost", 0)
+        logger.info("[mutator] Model switch suggestion: %s (cost $%.2f) — manual review required", model, total_cost)
+        return changes
+
+    def _mutate_record_lesson(self, suggestion: dict[str, Any]) -> list[str]:
+        """记录教训到 agent 记忆 (不修改配置文件)。"""
+        changes: list[str] = []
+        params = suggestion.get("mutation_params", {})
+        agent_name = params.get("agent", "")
+        pattern = params.get("pattern", "")
+        error = params.get("error", "")
+        root_cause = params.get("root_cause", "")
+
+        try:
+            from maop.core.agent_memory import AgentMemory
+            mem = AgentMemory(root_dir=str(self._root))
+            if agent_name:
+                mem.store(agent_name=agent_name, memory_type="lesson",
+                          content={"type": "error_lesson", "pattern": pattern, "error": error,
+                                   "root_cause": root_cause, "description": suggestion.get("description", "")},
+                          importance=0.8)
+            changes.append(f"Recorded lesson for agent '{agent_name}': {pattern or error}")
+        except Exception as exc:
+            logger.debug("[mutator] Record lesson failed: %s", exc)
+
+        return changes
+
+    def _mutate_record_preference(self, suggestion: dict[str, Any]) -> list[str]:
+        """记录用户偏好到 agent 记忆 (不直接修改配置)。"""
+        changes: list[str] = []
+        params = suggestion.get("mutation_params", {})
+        agent_name = params.get("agent", "")
+        parameter = params.get("parameter", "")
+        suggested_value = params.get("suggested_default", "")
+
+        try:
+            from maop.core.agent_memory import AgentMemory
+            mem = AgentMemory(root_dir=str(self._root))
+            if agent_name:
+                mem.store(agent_name=agent_name, memory_type="preference",
+                          content={"type": "suggested_default", "parameter": parameter,
+                                   "value": suggested_value, "auto_generated": True},
+                          importance=0.6)
+            changes.append(f"Recorded preference for agent '{agent_name}': {parameter}={suggested_value}")
+        except Exception as exc:
+            logger.debug("[mutator] Record preference failed: %s", exc)
 
         return changes

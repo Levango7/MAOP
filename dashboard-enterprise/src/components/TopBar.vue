@@ -1,51 +1,71 @@
 <template>
   <header class="topbar">
+    <!-- 顶部细线 hairline，强化视觉边界 -->
+    <div class="topbar__hairline" aria-hidden="true"></div>
+
     <!-- ① 系统标识（居左） -->
     <div class="topbar__brand">
-      <div class="topbar__logo">
-        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2">
+      <div class="topbar__logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
         </svg>
       </div>
       <div class="topbar__brandtext">
-        <div class="topbar__brandname">{{ t('topbar.systemName') }}</div>
+        <div class="topbar__brandname-row">
+          <span class="topbar__brandname">{{ t('topbar.systemName') }}</span>
+          <span class="topbar__brandedition">{{ editionLabel }}</span>
+        </div>
         <div class="topbar__branddesc">{{ isZh ? t('topbar.systemNameZh') : t('topbar.systemNameEn') }}</div>
         <div class="topbar__statusline">
           <span class="topbar__live" :class="{ connected: realtimeOk }">
             <span class="topbar__livedot"></span>{{ realtimeOk ? t('status.live') : t('status.offline') }}
           </span>
-          <span class="topbar__ver">v{{ appVersion }} · {{ editionLabel }}</span>
+          <span class="topbar__ver">v{{ appVersion }}</span>
         </div>
       </div>
     </div>
+
+    <!-- 分隔符 -->
+    <div class="topbar__divider" aria-hidden="true"></div>
 
     <!-- ② 刷新按钮 + 时间（标识右侧） -->
     <div class="topbar__refresh">
       <button class="topbar__refresh-btn" @click="doRefresh" :title="t('common.refresh')" aria-label="Refresh">
         <AppIcon name="refresh" :size="15" />
       </button>
-      <span class="topbar__refreshtime">{{ formattedRefreshTime }}</span>
+      <div class="topbar__refreshmeta">
+        <span class="topbar__refreshtime">{{ formattedRefreshTime }}</span>
+        <span class="topbar__refreshlabel">{{ t('common.refresh') }}</span>
+      </div>
     </div>
 
     <div class="topbar__spacer"></div>
 
     <!-- ③ 布局/主题（用户左侧） -->
     <div class="topbar__prefs">
-      <div class="topbar__pref-group">
+      <div class="topbar__pref-group" :title="t('settings.density')">
         <Segmented :model-value="densityVal" :options="densityOpts" size="sm" @update:model-value="onDensityChange" />
       </div>
-      <div class="topbar__pref-group">
+      <div class="topbar__pref-group" :title="t('settings.theme')">
         <Segmented :model-value="themeVal" :options="themeOpts" size="sm" @update:model-value="onThemeChange" />
       </div>
     </div>
 
+    <!-- 分隔符 -->
+    <div class="topbar__divider" aria-hidden="true"></div>
+
     <!-- ④ 用户区（居右） -->
     <div class="topbar__user">
       <button class="topbar__avatar-btn" @click="goToUsers" :title="t('nav.users')" aria-label="User profile">
-        <div class="topbar__avatar">{{ userInitial }}</div>
+        <div class="topbar__avatar">
+          <span class="topbar__avatar-letter">{{ userInitial }}</span>
+          <span class="topbar__avatar-ring" aria-hidden="true"></span>
+        </div>
         <div class="topbar__usermeta">
           <span class="topbar__username">{{ userName || '—' }}</span>
-          <span class="topbar__userrole">{{ roleLabel }}</span>
+          <span class="topbar__userrole">
+            <span class="topbar__roledot" aria-hidden="true"></span>{{ roleLabel }}
+          </span>
         </div>
       </button>
       <button v-if="authOn" class="topbar__logout-btn" @click="onLogout" :title="t('action.logout')" aria-label="Sign out">
@@ -80,7 +100,7 @@ const isZh = computed(() => locale.value === 'zh');
 const densityVal = computed(() => ui.density);
 const themeVal = computed(() => ui.theme);
 const realtimeOk = computed(() => realtime.connected);
-const editionLabel = computed(() => edition.edition?.value === 'enterprise' ? 'Enterprise' : 'Personal');
+const editionLabel = computed(() => edition.edition === 'enterprise' ? 'Enterprise' : 'Personal');
 
 function onDensityChange(v) { ui.setDensity(v); }
 function onThemeChange(v) { ui.setTheme(v); }
@@ -154,9 +174,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--sp-4);
-  padding: 0 var(--sp-5);
+  padding: 0 var(--sp-6);
   height: var(--topbar-h);
-  background: var(--card-sheen), var(--surface);
+  background: var(--topbar-sheen), var(--card-sheen), var(--surface);
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow-topbar);
   position: sticky;
@@ -164,75 +184,139 @@ onMounted(() => {
   z-index: var(--z-topbar, 50);
   flex-shrink: 0;
 }
+/* 顶部细线：强化顶栏边界感 */
+.topbar__hairline {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--topbar-hairline) 12%,
+    var(--brand-faint) 50%,
+    var(--topbar-hairline) 88%,
+    transparent 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+/* 右上品牌微光 */
 .topbar::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   background: var(--topbar-glow);
-  opacity: .6;
+  opacity: .7;
 }
 
 /* ① 品牌区 */
-.topbar__brand { display: flex; align-items: center; gap: 11px; flex-shrink: 0; position: relative; }
+.topbar__brand { display: flex; align-items: center; gap: 12px; flex-shrink: 0; position: relative; }
 .topbar__logo {
   display: grid; place-items: center;
-  width: 38px; height: 38px;
+  width: 42px; height: 42px;
   border-radius: var(--r-md);
-  background: linear-gradient(135deg, var(--brand), var(--chart-6));
+  background: linear-gradient(135deg, var(--brand) 0%, var(--chart-6) 100%);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, .35);
+  box-shadow: var(--shadow-brand), inset 0 1px 0 rgba(255, 255, 255, .25);
+  position: relative;
 }
-.topbar__brandtext { display: flex; flex-direction: column; line-height: 1.15; }
+.topbar__logo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .15), transparent 50%);
+  pointer-events: none;
+}
+.topbar__brandtext { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.topbar__brandname-row { display: flex; align-items: baseline; gap: 8px; }
 .topbar__brandname {
   font-size: 16px; font-weight: 700; color: var(--text);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
 }
-.topbar__branddesc { font-size: 10.5px; color: var(--text-muted); letter-spacing: .02em; }
+.topbar__brandedition {
+  font-size: 9.5px; font-weight: 700;
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-faint);
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.topbar__branddesc {
+  font-size: 10.5px; color: var(--text-muted);
+  letter-spacing: .015em; margin-top: 1px;
+}
 .topbar__statusline {
   display: flex; align-items: center; gap: 8px; margin-top: 3px;
   font-size: 10px; color: var(--text-faint);
 }
-.topbar__live { display: inline-flex; align-items: center; gap: 4px; }
+.topbar__live { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
 .topbar__livedot {
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--text-faint);
+  transition: background var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
 }
 .topbar__live.connected { color: var(--success); }
 .topbar__live.connected .topbar__livedot {
   background: var(--success);
-  box-shadow: 0 0 6px rgba(34, 197, 94, .5);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, .2), 0 0 6px rgba(34, 197, 94, .5);
+  animation: topbar-pulse 2s var(--ease) infinite;
+}
+@keyframes topbar-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(34, 197, 94, .2), 0 0 6px rgba(34, 197, 94, .5); }
+  50% { box-shadow: 0 0 0 4px rgba(34, 197, 94, .12), 0 0 8px rgba(34, 197, 94, .6); }
 }
 .topbar__ver {
   font-family: var(--font-mono);
   padding-left: 8px;
   border-left: 1px solid var(--border-subtle);
+  color: var(--text-faint);
+}
+
+/* 分隔符 */
+.topbar__divider {
+  width: 1px;
+  height: 36px;
+  background: linear-gradient(180deg, transparent, var(--border) 25%, var(--border) 75%, transparent);
+  flex-shrink: 0;
 }
 
 /* ② 刷新区 */
 .topbar__refresh {
-  display: flex; align-items: center; gap: 8px;
-  margin-left: var(--sp-4);
-  padding: 4px 10px 4px 4px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 12px 5px 5px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-full);
   position: relative;
+  transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease);
 }
+.topbar__refresh:hover { border-color: var(--border-strong); background: var(--surface-3); }
 .topbar__refresh-btn {
   display: grid; place-items: center;
-  width: 28px; height: 28px;
-  background: transparent; border: none;
-  border-radius: var(--r-sm); color: var(--text-muted);
+  width: 30px; height: 30px;
+  background: var(--surface-3); border: 1px solid var(--border-subtle);
+  border-radius: var(--r-full); color: var(--text-muted);
   cursor: pointer;
-  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), transform var(--motion-slow) var(--ease);
+  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), transform var(--motion-slow) var(--ease), border-color var(--motion) var(--ease);
 }
-.topbar__refresh-btn:hover { color: var(--brand-strong); background: var(--brand-soft); }
+.topbar__refresh-btn:hover {
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+  border-color: var(--brand);
+}
 .topbar__refresh-btn:active { transform: rotate(180deg); }
+.topbar__refreshmeta { display: flex; flex-direction: column; line-height: 1.1; }
 .topbar__refreshtime {
-  font-size: 11px; color: var(--text-faint);
+  font-size: 12px; color: var(--text);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.topbar__refreshlabel {
+  font-size: 9.5px; color: var(--text-faint);
+  letter-spacing: .02em;
 }
 
 /* 弹性分隔 */
@@ -244,58 +328,81 @@ onMounted(() => {
 /* ④ 用户区 */
 .topbar__user { display: flex; align-items: center; gap: 10px; flex-shrink: 0; position: relative; }
 .topbar__avatar-btn {
-  display: flex; align-items: center; gap: 9px;
-  padding: 5px 12px 5px 5px;
-  background: var(--surface-2); border: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 14px 5px 5px;
+  background: var(--surface-2); border: 1px solid var(--border-subtle);
   border-radius: var(--r-full);
   cursor: pointer;
   transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+  position: relative;
 }
 .topbar__avatar-btn:hover {
   border-color: var(--brand);
   background: var(--surface-3);
-  box-shadow: 0 0 0 3px var(--brand-soft);
+  box-shadow: 0 0 0 3px var(--brand-soft), var(--shadow-sm);
 }
 .topbar__avatar {
-  width: 32px; height: 32px; flex-shrink: 0;
+  width: 34px; height: 34px; flex-shrink: 0;
   border-radius: var(--r-full);
-  background: linear-gradient(135deg, var(--brand), var(--chart-6));
+  background: linear-gradient(135deg, var(--brand) 0%, var(--chart-6) 100%);
   color: #fff; font-size: 13px; font-weight: 700;
   display: grid; place-items: center;
-  box-shadow: 0 2px 6px rgba(99, 102, 241, .3);
+  box-shadow: var(--shadow-brand), inset 0 1px 0 rgba(255, 255, 255, .25);
   font-family: var(--font-sans);
+  position: relative;
 }
-.topbar__usermeta { display: flex; flex-direction: column; line-height: 1.2; text-align: left; }
+.topbar__avatar-ring {
+  position: absolute;
+  inset: -2px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--brand-faint);
+  pointer-events: none;
+}
+.topbar__avatar-btn:hover .topbar__avatar-ring {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+.topbar__usermeta { display: flex; flex-direction: column; line-height: 1.2; text-align: left; min-width: 0; }
 .topbar__username {
-  font-size: 12.5px; font-weight: 600; color: var(--text);
-  max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 13px; font-weight: 600; color: var(--text);
+  max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  letter-spacing: -0.005em;
 }
 .topbar__userrole {
+  display: inline-flex; align-items: center; gap: 4px;
   font-size: 10px; color: var(--brand-strong);
   font-weight: 600; letter-spacing: .02em;
+  margin-top: 1px;
+}
+.topbar__roledot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--brand-strong);
+  box-shadow: 0 0 4px rgba(129, 140, 248, .6);
 }
 
 .topbar__logout-btn {
-  display: flex; align-items: center; gap: 5px;
-  padding: 7px 11px;
-  background: var(--surface-2); border: 1px solid var(--border);
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px;
+  background: var(--surface-2); border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
   color: var(--fail); font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--motion) var(--ease), border-color var(--motion) var(--ease), transform var(--motion) var(--ease);
+  transition: background var(--motion) var(--ease), border-color var(--motion) var(--ease), transform var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
 }
 .topbar__logout-btn:hover {
   background: var(--fail-soft); border-color: var(--fail);
   transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, .25);
 }
 .topbar__logout-btn:active { transform: translateY(0); }
 .topbar__logout-text { font-weight: 600; }
 
 @media (max-width: 1100px) {
+  .topbar { padding: 0 var(--sp-5); }
   .topbar__branddesc { display: none; }
-  .topbar__refreshtime { display: none; }
-  .topbar__refresh { padding: 4px; }
+  .topbar__refreshlabel { display: none; }
+  .topbar__refreshmeta { flex-direction: row; align-items: center; }
 }
 
 @media (max-width: 900px) {
@@ -304,8 +411,11 @@ onMounted(() => {
   .topbar__prefs { display: none; }
   .topbar__usermeta { display: none; }
   .topbar__logout-text { display: none; }
-  .topbar__refresh { margin-left: var(--sp-2); }
+  .topbar__refresh { padding: 4px; }
+  .topbar__refreshmeta { display: none; }
+  .topbar__divider { display: none; }
   .topbar__avatar-btn { padding: 4px; }
+  .topbar__brandedition { display: none; }
 }
 
 @media (max-width: 600px) {

@@ -1,23 +1,27 @@
 <template>
   <footer class="app-footer">
     <div class="footer-inner">
-      <div class="footer-left">
+      <!-- 左：品牌 + 状态 -->
+      <div class="footer-brand-zone">
         <span class="footer-brand">MAOP</span>
         <span class="footer-ver">v{{ version }}</span>
-        <span class="footer-tag">{{ t('footer.tagline') }}</span>
-      </div>
-
-      <nav class="footer-right" aria-label="footer">
         <span class="footer-status" :class="{ on: realtimeConnected }">
           <span class="footer-dot" :class="{ on: realtimeConnected }"></span>
           {{ realtimeConnected ? t('footer.online') : t('footer.offline') }}
         </span>
-        <router-link to="/settings" class="footer-link">{{ t('nav.settings') }}</router-link>
-        <router-link to="/audit" class="footer-link">{{ t('nav.audit') }}</router-link>
+      </div>
+
+      <!-- 中：快速链接（分组，参考云厂商 footer 的 link columns） -->
+      <nav class="footer-links" aria-label="footer">
+        <router-link to="/docs" class="footer-link">{{ t('nav.docs') }}</router-link>
+        <span class="footer-sep">·</span>
         <router-link to="/monitor" class="footer-link">{{ t('nav.monitor') }}</router-link>
         <span class="footer-sep">·</span>
-        <span class="footer-copy">{{ t('footer.copyright') }}</span>
+        <router-link to="/settings" class="footer-link">{{ t('nav.settings') }}</router-link>
       </nav>
+
+      <!-- 右：版权 -->
+      <span class="footer-copy">{{ t('footer.copyright') }}</span>
     </div>
   </footer>
 </template>
@@ -38,48 +42,45 @@ const realtimeConnected = computed(() => realtime.connected);
 
 <style scoped>
 .app-footer {
-  margin-top: auto; /* pin to the bottom of the content area */
+  margin-top: auto;
   border-top: 1px solid var(--border);
   background: var(--surface);
-  /* Full-width band: spans the entire content area (from the sidebar edge
-     to the scrollbar), not just the centered content-shell. Horizontal
-     padding matches the content shell so the footer text lines up with the
-     cards' outer edge. */
-  padding: var(--sp-6) var(--content-pad);
+  padding: var(--sp-3) var(--content-pad);
   flex-shrink: 0;
 }
 .footer-inner {
   width: 100%;
+  max-width: var(--maxw);
+  margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between; /* two balanced zones: brand ← → meta */
+  justify-content: space-between;
   gap: var(--sp-4);
   flex-wrap: wrap;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-faint);
 }
-.footer-left { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
-.footer-brand { font-weight: 700; color: var(--brand-strong); letter-spacing: .3px; }
+.footer-brand-zone { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.footer-brand { font-weight: 700; color: var(--brand-strong); letter-spacing: .3px; font-size: var(--fs-sm); }
 .footer-ver { font-family: var(--font-mono); color: var(--text-muted); }
-.footer-tag { color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.footer-right { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
-.footer-status { display: inline-flex; align-items: center; gap: 6px; color: var(--text-faint); }
+.footer-status { display: inline-flex; align-items: center; gap: 5px; color: var(--text-faint); }
 .footer-status.on { color: var(--success); }
 .footer-dot {
-  width: 7px; height: 7px; border-radius: 50%;
+  width: 6px; height: 6px; border-radius: 50%;
   background: var(--text-faint); opacity: .5;
   transition: background var(--motion) var(--ease), opacity var(--motion) var(--ease);
 }
 .footer-dot.on { background: var(--success); opacity: 1; }
+
+.footer-links { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .footer-link { color: var(--text-muted); text-decoration: none; transition: color var(--motion) var(--ease); }
 .footer-link:hover { color: var(--brand-strong); }
-.footer-sep { color: var(--border-strong); }
-.footer-copy { color: var(--text-faint); }
+.footer-sep { color: var(--border-strong); opacity: .6; }
+.footer-copy { color: var(--text-faint); white-space: nowrap; }
 
 @media (max-width: 899px) {
-  .app-footer { padding: var(--sp-5) 16px; }
-  .footer-tag { display: none; }
-  .footer-right { width: 100%; justify-content: flex-start; }
+  .app-footer { padding: var(--sp-2) 16px; }
+  .footer-inner { justify-content: center; gap: var(--sp-1); }
+  .footer-copy { width: 100%; text-align: center; }
 }
 </style>

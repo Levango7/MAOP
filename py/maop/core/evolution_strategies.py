@@ -76,12 +76,12 @@ class ConservativeStrategy(BaseStrategy):
     """Only auto-apply HIGH severity suggestions. Everything else requires approval."""
 
     def evaluate(self, suggestion: dict[str, Any], history: list[dict[str, Any]]) -> EvolutionDecision:
-        severity = suggestion.get("severity", "MEDIUM")
+        severity = str(suggestion.get("severity", "MEDIUM")).upper()
         should = severity == "HIGH" and suggestion.get("auto_applicable", False)
 
         return EvolutionDecision(
             suggestion_id=suggestion.get("id", ""),
-            suggestion_type=suggestion.get("type", ""),
+            suggestion_type=suggestion.get("mutation_type", "") or suggestion.get("type", "") or suggestion.get("category", ""),
             severity=severity,
             should_apply=should,
             reason="Auto-apply HIGH severity only" if should else "Requires manual approval",
@@ -94,8 +94,8 @@ class AggressiveStrategy(BaseStrategy):
     def evaluate(self, suggestion: dict[str, Any], history: list[dict[str, Any]]) -> EvolutionDecision:
         return EvolutionDecision(
             suggestion_id=suggestion.get("id", ""),
-            suggestion_type=suggestion.get("type", ""),
-            severity=suggestion.get("severity", "MEDIUM"),
+            suggestion_type=suggestion.get("mutation_type", "") or suggestion.get("type", "") or suggestion.get("category", ""),
+            severity=str(suggestion.get("severity", "MEDIUM")).upper(),
             should_apply=suggestion.get("auto_applicable", False),
             reason="Auto-apply all applicable suggestions",
             estimated_impact="medium",
@@ -106,9 +106,9 @@ class BalancedStrategy(BaseStrategy):
     """Auto-apply MEDIUM+ with cooldown periods and rate limiting."""
 
     def evaluate(self, suggestion: dict[str, Any], history: list[dict[str, Any]]) -> EvolutionDecision:
-        severity = suggestion.get("severity", "MEDIUM")
+        severity = str(suggestion.get("severity", "MEDIUM")).upper()
         auto = suggestion.get("auto_applicable", False)
-        stype = suggestion.get("type", "")
+        stype = suggestion.get("mutation_type", "") or suggestion.get("type", "") or suggestion.get("category", "")
 
         if not auto:
             return EvolutionDecision(
@@ -121,10 +121,10 @@ class BalancedStrategy(BaseStrategy):
 
         should = severity in ("HIGH", "MEDIUM")
 
-        if self._config.require_approval_for_routing and stype == "routing_mismatch":
+        if self._config.require_approval_for_routing and stype in ("change_routing", "routing_mismatch"):
             should = False
 
-        if self._config.require_approval_for_disable and stype == "agent_low_success":
+        if self._config.require_approval_for_disable and stype in ("disable_agent", "agent_low_success"):
             should = False
 
         recent_count = self._count_recent_mutations(history, hours=1)
@@ -177,9 +177,9 @@ class CostAwareStrategy(BaseStrategy):
     """Consider cost impact before applying suggestions."""
 
     def evaluate(self, suggestion: dict[str, Any], history: list[dict[str, Any]]) -> EvolutionDecision:
-        severity = suggestion.get("severity", "MEDIUM")
+        severity = str(suggestion.get("severity", "MEDIUM")).upper()
         auto = suggestion.get("auto_applicable", False)
-        cost_impact = suggestion.get("estimated_cost_impact", 0.0)
+        cost_impact = suggestion.get("estimated_cost_impact", 0.0) or suggestion.get("mutation_params", {}).get("total_cost", 0.0)
 
         should = auto and cost_impact <= self._config.cost_threshold_usd
 
@@ -188,7 +188,7 @@ class CostAwareStrategy(BaseStrategy):
 
         return EvolutionDecision(
             suggestion_id=suggestion.get("id", ""),
-            suggestion_type=suggestion.get("type", ""),
+            suggestion_type=suggestion.get("mutation_type", "") or suggestion.get("type", "") or suggestion.get("category", ""),
             severity=severity,
             should_apply=should,
             reason=f"Cost impact ${cost_impact:.4f} vs threshold ${self._config.cost_threshold_usd:.4f}",

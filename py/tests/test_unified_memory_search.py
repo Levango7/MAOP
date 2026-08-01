@@ -56,6 +56,21 @@ class FakeThreeLayerMemory:
         FakeThreeLayerMemory._store_data.append(entry)
         return entry.id
 
+    def episodic_stats(self):
+        total = len(FakeThreeLayerMemory._store_data)
+        by_outcome: dict = {}
+        score_sum = 0.0
+        for e in FakeThreeLayerMemory._store_data:
+            by_outcome[e.outcome] = by_outcome.get(e.outcome, 0) + 1
+            score_sum += getattr(e, "score", 0.0) or 0.0
+        return {
+            "total": total,
+            "by_outcome": by_outcome,
+            "avg_score": round(score_sum / total, 3) if total else 0.0,
+            "consolidated": 0,
+            "unconsolidated": total,
+        }
+
 
 class FakeMemoryStore:
     def __init__(self, root_dir=None):

@@ -70,6 +70,7 @@ class ProviderConfig(BaseModel):
     protocol: str = "openai_completions"
     base_url: str = ""
     api_key_env: str = ""
+    api_key: str = ""  # 直接配置的 key（如 omniroute 的 "dummy"），优先级低于 env 和 vault
     timeout_s: int = 120
     max_retries: int = 3
     enabled: bool = True
@@ -95,11 +96,23 @@ class ModelConfig(BaseModel):
 
 
 class BaseLLMProvider(ABC):
-    """Abstract base class for LLM providers."""
+    """Abstract base class for LLM providers.
+
+    API Key resolution order (highest priority first):
+      1. Environment variable named by ``api_key_env``
+      2. ``api_key`` field on ProviderConfig (set from YAML or injected by vault)
+      3. Empty string (provider marked as not configured)
+
+    The vault injection happens in ``LLMProviderFactory._create_provider``:
+    it retrieves the encrypted key from ``ApiKeyVault`` and writes it into
+    ``ProviderConfig.api_key`` before constructing the provider, so this
+    constructor only needs to fall back to that field.
+    """
 
     def __init__(self, provider_config: ProviderConfig) -> None:
         self._config = provider_config
-        self._api_key = os.environ.get(provider_config.api_key_env, "")
+        env_key = os.environ.get(provider_config.api_key_env, "")
+        self._api_key = env_key or provider_config.api_key
         self._client: httpx.AsyncClient | None = None
 
     def _get_client(self) -> httpx.AsyncClient:
@@ -534,7 +547,11 @@ class LLMProviderFactory:
     appropriate provider instance, and caches them for reuse.
     """
 
-    def __init__(self, root_dir: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        root_dir: str | Path | None = None,
+        vault: Any = None,
+    ) -> None:
         self._root = Path(root_dir) if root_dir else Path(".")
         self._providers: dict[str, BaseLLMProvider] = {}
         self._provider_configs: dict[str, ProviderConfig] = {}
@@ -542,6 +559,9 @@ class LLMProviderFactory:
         self._default_provider: str = ""
         self._default_model: str = ""
         self._loaded = False
+        # Vault is optional; if not supplied we try to construct one lazily
+        # from root_dir so that dashboard-stored keys are picked up.
+        self._vault = vault
 
     def _ensure_loaded(self) -> None:
         if self._loaded:
@@ -572,6 +592,7 @@ class LLMProviderFactory:
                 protocol=pdata.get("protocol", "openai_completions"),
                 base_url=pdata.get("base_url", ""),
                 api_key_env=pdata.get("api_key_env", ""),
+                api_key=pdata.get("api_key", ""),
                 timeout_s=pdata.get("timeout_s", 120),
                 max_retries=pdata.get("max_retries", 3),
                 enabled=pdata.get("enabled", True),
@@ -641,6 +662,23 @@ class LLMProviderFactory:
         return providers
 
     def _create_provider(self, cfg: ProviderConfig) -> BaseLLMProvider | None:
+        # Inject API key from vault if env var is not set and no static key
+        # is configured in YAML. This closes the gap between the dashboard
+        # key-store endpoint (which writes to ApiKeyVault) and the runtime
+        # provider (which previously only read environment variables).
+        if cfg.api_key_env and not os.environ.get(cfg.api_key_env) and not cfg.api_key:
+            vault = self._get_vault()
+            if vault is not None:
+                try:
+                    stored = vault.retrieve(cfg.name)
+                except Exception as exc:
+                    logger.debug(
+                        "[llm_provider] vault.retrieve(%s) failed: %s",
+                        cfg.name, exc,
+                    )
+                    stored = None
+                if stored:
+                    cfg.api_key = stored
         ptype = cfg.provider_type
         if ptype in ("openai-compatible", "custom"):
             if cfg.protocol == "claude_code":
@@ -652,6 +690,23 @@ class LLMProviderFactory:
             return None
         logger.warning("[llm_provider] Unknown provider type: %s", ptype)
         return None
+
+    def _get_vault(self) -> Any:
+        """Lazily construct an ApiKeyVault rooted at the project root.
+
+        Returns ``None`` if the vault cannot be initialised (e.g. the
+        ``cryptography`` package is missing). The instance is cached on
+        ``self._vault`` so subsequent calls reuse it.
+        """
+        if self._vault is not None:
+            return self._vault
+        try:
+            from maop.core.api_key_vault import ApiKeyVault
+            self._vault = ApiKeyVault(root_dir=str(self._root))
+        except Exception as exc:
+            logger.debug("[llm_provider] ApiKeyVault init failed: %s", exc)
+            self._vault = None
+        return self._vault
 
     def _get_default_model(self) -> str:
         """Return the configured default model name, if any.

@@ -12,7 +12,7 @@
           >
             <span class="dt__th">
               {{ col.label }}
-              <AppIcon v-if="sortable && col.sortable !== false" :name="sortKey === col.key ? (sortDir === 'asc' ? 'chevrondown' : 'chevrondown') : 'chevrondown'" :size="12" class="dt__sort" :class="{ 'is-active': sortKey === col.key }" />
+              <AppIcon v-if="sortable && col.sortable !== false" name="chevrondown" :size="12" class="dt__sort" :class="{ 'is-active': sortKey === col.key, 'is-desc': sortKey === col.key && sortDir === 'desc' }" />
             </span>
           </th>
         </tr>
@@ -123,21 +123,23 @@ function formatRel(ts) {
   text-transform: uppercase;
   letter-spacing: .03em;
   font-size: var(--fs-xs);
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--border);
+  padding: var(--sp-3) var(--sp-3);
+  border-bottom: 1px solid var(--border-strong, var(--border));
   white-space: nowrap;
   user-select: none;
+  transition: color var(--motion-fast) var(--ease);
 }
 .dt th.sortable { cursor: pointer; }
-.dt th.sortable:hover { color: var(--text); }
+.dt th.sortable:hover { color: var(--brand-strong); }
 .dt__th { display: inline-flex; align-items: center; gap: 4px; }
-.dt__sort { opacity: .35; transition: opacity var(--motion) var(--ease), transform var(--motion) var(--ease); }
-.dt__sort.is-active { opacity: 1; color: var(--brand-strong); }
-.dt__sort.is-active { transform: rotate(180deg); }
-.dt tbody td { padding: var(--sp-3); border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+.dt__sort { opacity: .3; transition: opacity var(--motion) var(--ease), transform var(--motion) var(--ease); }
+.dt__sort.is-active { opacity: 1; color: var(--brand-strong); transform: rotate(180deg); }
+.dt__sort.is-active.is-desc { transform: rotate(0deg); }
+.dt tbody td { padding: var(--sp-3); border-bottom: 1px solid var(--border-subtle, var(--border)); color: var(--text); vertical-align: middle; }
 .dt--compact tbody td { padding: var(--sp-2) var(--sp-3); }
 .dt tbody tr { transition: background var(--motion) var(--ease); }
 .dt tbody tr:hover { background: var(--surface-2); }
+.dt tbody tr:last-child td { border-bottom: none; }
 .dt__num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
 .dt__time { color: var(--text-muted); white-space: nowrap; }
 .dt__text { overflow: hidden; text-overflow: ellipsis; }

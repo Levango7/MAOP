@@ -41,8 +41,9 @@ async def api_evolve_analyze(request: Request) -> dict[str, Any]:
     except Exception:
         logger.debug("Failed to parse request body", exc_info=True)
     if action == "apply":
+        suggestion_id = body.get("suggestion_id", "")
         try:
-            result: Any = eng.apply("") if hasattr(eng, "apply") else eng.analyze()
+            result: Any = eng.apply(suggestion_id) if hasattr(eng, "apply") else eng.analyze()
         except TypeError:
             result = eng.apply() if hasattr(eng, "apply") else eng.analyze()
         if hasattr(result, 'model_dump'):
@@ -54,6 +55,14 @@ async def api_evolve_analyze(request: Request) -> dict[str, Any]:
             if sf and sf.exists():
                 sf.unlink()
         return {"status": "ok", "action": "reset", "msg": "Suggestions cleared"}
+    elif action == "auto_evolve":
+        try:
+            hours = body.get("hours", 24)
+            result = eng.auto_evolve(hours=hours) if hasattr(eng, "auto_evolve") else eng.analyze()
+        except Exception as exc:
+            logger.warning("auto_evolve failed: %s", exc)
+            result = {"error": str(exc)}
+        return {"status": "ok", "action": "auto_evolve", "result": result}
     else:
         analyze_result: Any = eng.analyze()
         if hasattr(analyze_result, 'model_dump'):
@@ -108,3 +117,60 @@ async def api_evolve_report_v4() -> dict[str, Any]:
             "fail_count": fail, "total_count": total,
             "tags": ",".join(a.get("tags", [])) if isinstance(a.get("tags"), list) else ""})
     return {"performance": perf}
+
+
+@router.get("/api/evolve/strategies")
+@handle_api_errors("Evolve strategies", error_value={"status": "error", "strategies": []})
+async def api_evolve_strategies() -> dict[str, Any]:
+    """返回可用进化策略列表。"""
+    from maop.core.evolution_strategies import STRATEGY_MAP
+    strategies = [
+        {"name": name, "description": cls.__doc__ or cls.__name__}
+        for name, cls in STRATEGY_MAP.items()
+    ]
+    return {"status": "ok", "strategies": strategies}
+
+@router.get("/api/evolve/history")
+@handle_api_errors("Evolve history", error_value={"status": "error", "history": []})
+async def api_evolve_history() -> dict[str, Any]:
+    """返回进化循环历史。"""
+    try:
+        from maop.core.evolution_loop import EvolutionLoop
+        loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
+        history = loop.get_cycle_history(limit=20)
+        stats = loop.get_stats()
+        return {
+            "status": "ok",
+            "history": [h.model_dump() for h in history],
+            "stats": stats,
+        }
+    except Exception:
+        return {"status": "ok", "history": [], "stats": {}}
+
+@router.get("/api/evolve/suggestions-list")
+@handle_api_errors("Evolve suggestions list", error_value={"status": "error", "suggestions": []})
+async def api_evolve_suggestions_list() -> dict[str, Any]:
+    """返回所有进化建议列表 (含已应用状态)。"""
+    from maop.evolve import EvolveEngine
+    eng = EvolveEngine(root_dir=str(MAOP_ROOT))
+    suggestions = eng._load_suggestions()
+    return {
+        "status": "ok",
+        "suggestions": [s.model_dump() for s in suggestions],
+        "total": len(suggestions),
+        "applied": sum(1 for s in suggestions if s.applied),
+    }
+
+@router.post("/api/evolve/apply-suggestion")
+@handle_api_errors("Evolve apply suggestion", error_value={"status": "error", "error": "Apply failed"})
+async def api_evolve_apply_suggestion(request: Request) -> dict[str, Any]:
+    """手动应用指定进化建议。"""
+    require_admin(request)
+    from maop.evolve import EvolveEngine
+    eng = EvolveEngine(root_dir=str(MAOP_ROOT))
+    body = await request.json()
+    suggestion_id = body.get("suggestion_id", "")
+    result: Any = eng.apply(suggestion_id)
+    if hasattr(result, 'model_dump'):
+        result = result.model_dump()
+    return {"status": "ok", "result": result}

@@ -78,27 +78,31 @@
     <!-- Model switch -->
     <Card :title="t('view.models.modelSwitch')" icon="refresh" :subtitle="t('view.models.modelSwitchSub')">
       <form class="switch-form" @submit.prevent="doSwitch">
-        <div class="field">
-          <label>{{ t('view.models.agent') }}</label>
-          <select v-model="switchForm.agent" :disabled="loading">
-            <option value="" disabled>{{ t('view.models.selectAgent') }}</option>
-            <option v-for="a in agents" :key="a.name" :value="a.name">{{ a.name }}</option>
-          </select>
+        <div class="switch-fields">
+          <div class="field">
+            <label>{{ t('view.models.agent') }}</label>
+            <select v-model="switchForm.agent" :disabled="loading" class="switch-select">
+              <option value="" disabled>{{ t('view.models.selectAgent') }}</option>
+              <option v-for="a in agents" :key="a.name" :value="a.name">{{ a.name }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>{{ t('common.model') }}</label>
+            <select v-model="switchForm.model" :disabled="loading" class="switch-select">
+              <option value="" disabled>{{ t('view.models.selectModel') }}</option>
+              <option v-for="m in models" :key="m.name" :value="m.name">{{ m.name }} · {{ m.provider }}</option>
+            </select>
+          </div>
         </div>
-        <div class="field">
-          <label>{{ t('common.model') }}</label>
-          <select v-model="switchForm.model" :disabled="loading">
-            <option value="" disabled>{{ t('view.models.selectModel') }}</option>
-            <option v-for="m in models" :key="m.name" :value="m.name">{{ m.name }} · {{ m.provider }}</option>
-          </select>
+        <div class="switch-actions">
+          <button type="submit" class="btn btn--primary" :disabled="switching || !switchForm.agent || !switchForm.model">
+            <AppIcon v-if="switching" name="refresh" :size="14" :class="{ spinning: switching }" />
+            {{ switching ? t('view.models.switching') : t('view.models.switchModel') }}
+          </button>
+          <span v-if="switchResult" class="switch-result" :class="switchResult.ok ? 'is-ok' : 'is-fail'">
+            <AppIcon :name="switchResult.ok ? 'check-circle' : 'x-circle'" :size="14" /> {{ switchResult.msg }}
+          </span>
         </div>
-        <button type="submit" class="btn-primary" :disabled="switching || !switchForm.agent || !switchForm.model">
-          <AppIcon v-if="switching" name="refresh" :size="14" />
-          {{ switching ? t('view.models.switching') : t('view.models.switchModel') }}
-        </button>
-        <span v-if="switchResult" class="switch-result" :class="switchResult.ok ? 'is-ok' : 'is-fail'">
-          <AppIcon :name="switchResult.ok ? 'check-circle' : 'x-circle'" :size="14" /> {{ switchResult.msg }}
-        </span>
       </form>
     </Card>
   </div>

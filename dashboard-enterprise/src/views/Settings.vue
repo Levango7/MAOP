@@ -4,10 +4,11 @@
 
     <div class="settings-grid">
       <!-- Appearance: theme / density / sidebar rail / language, all wired to the shared ui store -->
-      <Card :title="t('settings.appearance')" icon="gear" :subtitle="t('settings.appearanceSub')">
+      <Card :title="t('settings.appearance')" icon="gear">
         <div class="setting-row">
           <span class="setting-label">{{ t('settings.theme') }}</span>
           <Segmented
+            equal
             :model-value="ui.theme"
             :options="[{ value: 'light', label: t('settings.light') }, { value: 'dark', label: t('settings.dark') }]"
             @update:model-value="ui.setTheme"
@@ -16,6 +17,7 @@
         <div class="setting-row">
           <span class="setting-label">{{ t('settings.density') }}</span>
           <Segmented
+            equal
             :model-value="ui.density"
             :options="[{ value: 'comfortable', label: t('settings.comfortable') }, { value: 'compact', label: t('settings.compact') }]"
             @update:model-value="ui.setDensity"
@@ -24,6 +26,7 @@
         <div class="setting-row">
           <span class="setting-label">{{ t('settings.sidebar') }}</span>
           <Segmented
+            equal
             :model-value="ui.rail ? 'collapsed' : 'expanded'"
             :options="[{ value: 'expanded', label: t('settings.expanded') }, { value: 'collapsed', label: t('settings.collapsed') }]"
             @update:model-value="ui.setRail($event === 'collapsed')"
@@ -32,6 +35,7 @@
         <div class="setting-row">
           <span class="setting-label">{{ t('settings.language') }}</span>
           <Segmented
+            equal
             :model-value="ui.locale"
             :options="[{ value: 'zh', label: t('settings.zh') }, { value: 'en', label: t('settings.en') }]"
             @update:model-value="ui.setLocale"
@@ -162,7 +166,8 @@
         </div>
       </Card>
 
-      <Card :title="t('settings.featureFlags')" :badge="t('view.settings.readOnly')" badge-tone="neutral">
+      <Card :title="t('settings.featureFlags')" :badge="t('view.settings.editionDetermined')" badge-tone="neutral">
+        <p class="feature-hint">{{ t('view.settings.featureFlagsHint') }}</p>
         <div class="feature-grid">
           <div class="feature-item" v-for="(enabled, name) in edition.features" :key="name">
             <span class="status-dot small" :class="enabled ? 'on' : 'off'"></span>

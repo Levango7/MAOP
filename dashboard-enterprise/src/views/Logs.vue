@@ -14,9 +14,9 @@
     </PageHeader>
 
     <div class="filter-bar">
-      <div class="filter-input">
-        <AppIcon name="search" :size="15" />
-        <input v-model="filter" :placeholder="t('view.logs.filterPlaceholder')" />
+      <div class="filter-input-wrap">
+        <AppIcon name="search" :size="15" class="filter-input-icon" />
+        <input v-model="filter" class="filter-input" :placeholder="t('view.logs.filterPlaceholder')" />
       </div>
       <span v-if="!loading" class="filter-meta">{{ displayLogs.length }} / {{ logs.length }} {{ t('view.logs.lines') }}</span>
     </div>

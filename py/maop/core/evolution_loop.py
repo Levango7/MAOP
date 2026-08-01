@@ -31,6 +31,7 @@ import contextlib
 import json
 import logging
 import time
+from datetime import datetime, timezone
 import uuid
 from enum import Enum
 from pathlib import Path
@@ -62,13 +63,44 @@ class PhaseResult(BaseModel):
 
 
 class EvolutionSuggestion(BaseModel):
+    """统一进化建议模型 — 兼容三套历史实现。
+
+    字段映射:
+      - category: 进化维度 (performance/reliability/capability/routing/error/cost/cache/bottleneck/preference)
+      - mutation_type: 具体动作 (adjust_timeout/change_routing/disable_agent/add_capability/adjust_retries/record_lesson/record_preference/adjust_cache/switch_model/error_pattern_rule)
+      - severity: 统一大写 HIGH/MEDIUM/LOW
+      - type: 向后兼容别名，等于 mutation_type
+      - suggestion_type: 向后兼容别名，等于 category
+    """
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:8])
     source: str = ""
-    suggestion_type: str = ""
+    category: str = ""
+    mutation_type: str = ""
     severity: str = "MEDIUM"
     description: str = ""
     auto_applicable: bool = False
+    applied: bool = False
+    target_type: str = ""
+    target_name: str = ""
+    mutation_params: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    @property
+    def type(self) -> str:
+        """向后兼容: ConfigMutator 通过 type 查找 handler。"""
+        return self.mutation_type
+
+    @property
+    def suggestion_type(self) -> str:
+        """向后兼容: EvolutionLoop 历史字段。"""
+        return self.category
+
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["type"] = self.mutation_type
+        d["suggestion_type"] = self.category
+        return d
 
 
 class LoopReport(BaseModel):
@@ -313,10 +345,13 @@ class EvolutionLoop:
             for rule in promoted:
                 suggestions.append(EvolutionSuggestion(
                     source="error_ledger",
-                    suggestion_type="error_pattern_rule",
+                    category="error",
+                    mutation_type="error_pattern_rule",
                     severity="HIGH" if rule.count >= 5 else "MEDIUM",
                     description=f"Recurring pattern '{rule.pattern}' (count={rule.count}) → auto-promoted rule",
                     auto_applicable=True,
+                    target_type="system",
+                    target_name=rule.pattern,
                     metadata={"pattern": rule.pattern, "count": rule.count, "rule": rule.rule},
                 ).model_dump())
 
@@ -325,12 +360,16 @@ class EvolutionLoop:
                     errors = ledger.find_by_pattern(pattern)
                     if errors:
                         latest = errors[0]
-                        suggestions.append(EvolutionSuggestion(
+                        is_routing = "routing" in pattern
+                    suggestions.append(EvolutionSuggestion(
                             source="error_ledger",
-                            suggestion_type="routing_mismatch" if "routing" in pattern else "agent_low_success",
+                            category="routing" if is_routing else "reliability",
+                            mutation_type="change_routing" if is_routing else "disable_agent",
                             severity="MEDIUM",
                             description=f"Unhealed error pattern '{pattern}' needs config adjustment",
                             auto_applicable=False,
+                            target_type="routing" if is_routing else "agent",
+                            target_name=pattern,
                             metadata={"pattern": pattern, "error_type": latest.error_type, "context": latest.context},
                         ).model_dump())
 
@@ -415,7 +454,7 @@ class EvolutionLoop:
             from maop.core.error_ledger import ErrorLedger
             ledger = ErrorLedger(root_dir=str(self._root))
             current_hotspots = ledger.get_hotspots(top=20)
-            current_unhealed = sum(h.count for h in current_hotspots if h.count >= self._heal_threshold)
+            current_unhealed = len([h for h in current_hotspots if h.count >= self._heal_threshold])
             improved = current_unhealed < baseline_errors
 
             if improved:
@@ -491,7 +530,513 @@ class EvolutionLoop:
             logger.error("[evo-loop] rollback_cycle failed: %s", exc)
             return 0
 
+
+    # ── 统一数据采集器 ────────────────────────────────────────
+
+    def _collect_delegation_stats(self) -> dict[str, Any]:
+        """采集 delegation 历史统计 (来自 EvolveEngine)。"""
+        try:
+            from maop.evolve import _compute_stats, _load_observability_data_from_db
+            db_path = self._root / "data" / "maop.db"
+            data = _load_observability_data_from_db(db_path)
+            if not data:
+                data = _load_observability_data_from_db(self._root / "logs")
+            stats = _compute_stats(data)
+            return {
+                "stats": stats.model_dump(),
+                "raw_data": data,
+            }
+        except Exception as exc:
+            logger.debug("[evo-loop] Delegation stats collection failed: %s", exc)
+            return {"stats": {}, "raw_data": []}
+
+    def _collect_agent_memory(self, agent_name: str = "") -> dict[str, Any]:
+        """采集 agent 记忆数据 (来自 AgentEvolution)。"""
+        try:
+            from maop.core.agent_memory import AgentMemory
+            mem = AgentMemory(root_dir=str(self._root))
+            if agent_name:
+                summary = mem.summarize(agent_name)
+                return {
+                    "agent": agent_name,
+                    "summary": summary,
+                    "performances": mem.retrieve(agent_name, "performance", limit=100),
+                    "error_patterns": mem.retrieve(agent_name, "error_pattern", limit=50),
+                    "interactions": mem.retrieve(agent_name, "interaction", limit=100),
+                    "preferences": mem.retrieve(agent_name, "preference", limit=20),
+                    "lessons": mem.retrieve(agent_name, "lesson", limit=20),
+                }
+            return {"agent": "", "summary": {}, "performances": [], "error_patterns": [], "interactions": [], "preferences": [], "lessons": []}
+        except Exception as exc:
+            logger.debug("[evo-loop] Agent memory collection failed: %s", exc)
+            return {"agent": agent_name, "summary": {}, "performances": [], "error_patterns": [], "interactions": [], "preferences": [], "lessons": []}
+
+    def _collect_history_analysis(self, hours: int = 24) -> dict[str, Any]:
+        """采集历史分析数据 (来自 HistoryAnalyzer)。"""
+        try:
+            from maop.history_analyzer import HistoryAnalyzer
+            analyzer = HistoryAnalyzer(root_dir=self._root)
+            report = analyzer.analyze(hours=hours)
+            return {
+                "failure_clusters": [{"pattern": c.pattern, "count": c.count, "agents": c.agents, "root_cause_hypothesis": c.root_cause_hypothesis} for c in report.failure_clusters],
+                "bottlenecks": [{"component": b.component, "avg_duration_ms": b.avg_duration_ms, "impact_score": b.impact_score} for b in report.bottlenecks],
+                "cost_drivers": [{"dimension": d.dimension, "dimension_value": d.dimension_value, "total_cost": d.total_cost, "total_tokens": d.total_tokens, "call_count": d.call_count} for d in report.cost_drivers],
+                "recommendations": report.recommendations,
+            }
+        except Exception as exc:
+            logger.debug("[evo-loop] History analysis failed: %s", exc)
+            return {"failure_clusters": [], "bottlenecks": [], "cost_drivers": [], "recommendations": []}
+
+    def _collect_strategy_learning(self, hours: int = 24) -> dict[str, Any]:
+        """采集 agent 策略学习数据 (来自 AgentStrategyLearner)。"""
+        try:
+            from maop.agent_strategy_learner import AgentStrategyLearner
+            learner = AgentStrategyLearner(root_dir=self._root)
+            report = learner.learn(hours=hours)
+            return {
+                "total_combos": report.total_combos,
+                "reliable_combos": report.reliable_combos,
+                "underperformers": report.underperformers,
+                "routing_winners": report.routing_winners,
+                "adjustments": [
+                    {"agent": a.agent, "routing_key": a.routing_key, "action": a.action,
+                     "confidence": a.confidence, "reason": a.reason,
+                     "suggested_alternative": a.suggested_alternative,
+                     "auto_applicable": a.auto_applicable}
+                    for a in report.adjustments
+                ],
+                "recommendations": report.recommendations,
+            }
+        except Exception as exc:
+            logger.debug("[evo-loop] Strategy learning failed: %s", exc)
+            return {"total_combos": 0, "adjustments": [], "routing_winners": {}, "recommendations": []}
+
+    def _collect_cache_evolution(self) -> dict[str, Any]:
+        """采集缓存进化数据 (来自 CacheEvolver)。"""
+        try:
+            from maop.cache_evolver import CacheEvolver
+            evolver = CacheEvolver()
+            report = evolver.evolve(apply=False)
+            return {
+                "total_caches": report.total_caches,
+                "adjustments": [
+                    {"cache_name": a.cache_name, "cache_type": a.cache_type,
+                     "parameter": a.parameter, "old_value": a.old_value,
+                     "new_value": a.new_value, "reason": a.reason,
+                     "auto_applicable": a.auto_applicable}
+                    for a in report.adjustments
+                ],
+                "recommendations": report.recommendations,
+            }
+        except Exception as exc:
+            logger.debug("[evo-loop] Cache evolution failed: %s", exc)
+            return {"total_caches": 0, "adjustments": [], "recommendations": []}
+
+    # ── 统一分析器 (10 维度) ──────────────────────────────────
+
+    def _analyze_delegation_stats(self, stats_data: dict[str, Any]) -> list[dict[str, Any]]:
+        """从 delegation 统计生成建议 (合并 EvolveEngine 的 4 种规则)。"""
+        suggestions: list[dict[str, Any]] = []
+        stats = stats_data.get("stats", {})
+        raw_data = stats_data.get("raw_data", [])
+
+        # 1. agent 成功率低
+        for a in stats.get("by_agent", []):
+            if a.get("total", 0) >= 3 and a.get("rate", 100) < 60:
+                suggestions.append(EvolutionSuggestion(
+                    source="delegation_stats",
+                    category="reliability",
+                    mutation_type="disable_agent",
+                    severity="HIGH",
+                    description=f"{a['agent']}: {a['rate']}% success ({a['success']}/{a['total']})",
+                    auto_applicable=False,
+                    target_type="agent",
+                    target_name=a["agent"],
+                    mutation_params={"agent": a["agent"], "success_rate": a["rate"]},
+                ).model_dump())
+
+        # 2. 路由不匹配 — 修改路由而非禁用 agent
+        for ak in stats.get("by_agent_key", []):
+            if ak.get("total", 0) >= 3 and ak.get("rate", 100) < 50:
+                suggestions.append(EvolutionSuggestion(
+                    source="delegation_stats",
+                    category="routing",
+                    mutation_type="change_routing",
+                    severity="HIGH",
+                    description=f"{ak['agent']}/{ak['routing_key']}: {ak['rate']}% ({ak['success']}/{ak['total']})",
+                    auto_applicable=True,
+                    target_type="routing",
+                    target_name=ak["routing_key"],
+                    mutation_params={"agent": ak["agent"], "routing_key": ak["routing_key"], "success_rate": ak["rate"]},
+                ).model_dump())
+
+        # 3. agent 慢 — 增加 timeout 而非减半
+        for a in stats.get("by_agent", []):
+            if a.get("total", 0) >= 2 and a.get("avg_duration_ms", 0) > 60000:
+                suggested_timeout = min(600, int(a["avg_duration_ms"] / 1000 * 1.5))
+                suggestions.append(EvolutionSuggestion(
+                    source="delegation_stats",
+                    category="performance",
+                    mutation_type="adjust_timeout",
+                    severity="MEDIUM",
+                    description=f"{a['agent']}: avg {a['avg_duration_ms']}ms",
+                    auto_applicable=True,
+                    target_type="agent",
+                    target_name=a["agent"],
+                    mutation_params={"agent": a["agent"], "suggested_timeout": suggested_timeout},
+                ).model_dump())
+
+        # 4. 空路由键
+        no_key = [d for d in raw_data if not d.get("routing_key")]
+        if no_key:
+            suggestions.append(EvolutionSuggestion(
+                source="delegation_stats",
+                category="routing",
+                mutation_type="change_routing",
+                severity="LOW",
+                description=f"{len(no_key)} delegations with empty routing_key",
+                auto_applicable=False,
+                target_type="system",
+                target_name="empty_routing_key",
+            ).model_dump())
+
+        return suggestions
+
+    def _analyze_agent_dimensions(self, mem_data: dict[str, Any]) -> list[dict[str, Any]]:
+        """5 维度 agent 进化分析 (合并 AgentEvolution)。"""
+        suggestions: list[dict[str, Any]] = []
+        agent_name = mem_data.get("agent", "")
+        if not agent_name:
+            return suggestions
+
+        performances = mem_data.get("performances", [])
+        error_patterns = mem_data.get("error_patterns", [])
+        interactions = mem_data.get("interactions", [])
+        preferences = mem_data.get("preferences", [])
+
+
+        # 1. 性能维度
+        latencies = [p.get("content", {}).get("latency_ms", 0) for p in performances
+                     if isinstance(p.get("content", {}).get("latency_ms"), (int, float))]
+        if latencies:
+            avg_latency = sum(latencies) / len(latencies)
+            if avg_latency > 10000:
+                suggested_timeout = min(600, int(avg_latency / 1000 * 1.5))
+                suggestions.append(EvolutionSuggestion(
+                    source="agent_memory",
+                    category="performance",
+                    mutation_type="adjust_timeout",
+                    severity="HIGH",
+                    description=f"Average latency {avg_latency:.0f}ms exceeds 10000ms threshold",
+                    auto_applicable=False,
+                    target_type="agent",
+                    target_name=agent_name,
+                    mutation_params={"agent": agent_name, "suggested_timeout": suggested_timeout, "avg_latency_ms": round(avg_latency)},
+                ).model_dump())
+
+        # 2. 可靠性维度
+        total = len(performances)
+        failures = sum(1 for p in performances if p.get("content", {}).get("success") is False)
+        failure_rate = failures / total if total > 0 else 0
+        if failure_rate > 0.3:
+            suggestions.append(EvolutionSuggestion(
+                source="agent_memory",
+                category="reliability",
+                mutation_type="adjust_retries",
+                severity="HIGH",
+                description=f"Failure rate {failure_rate:.1%} exceeds 30% threshold",
+                auto_applicable=True,
+                target_type="agent",
+                target_name=agent_name,
+                mutation_params={"agent": agent_name, "suggested_max_retries": 5, "failure_rate": round(failure_rate, 3)},
+            ).model_dump())
+
+        # 3. 能力维度
+        task_type_counts: dict[str, int] = {}
+        for interaction in interactions:
+            task_type = interaction.get("content", {}).get("task_type", "")
+            if task_type:
+                task_type_counts[task_type] = task_type_counts.get(task_type, 0) + 1
+        for task_type, count in task_type_counts.items():
+            if count >= 3:
+                suggestions.append(EvolutionSuggestion(
+                    source="agent_memory",
+                    category="capability",
+                    mutation_type="add_capability",
+                    severity="MEDIUM",
+                    description=f"Agent frequently used for '{task_type}' ({count} times) but not declared",
+                    auto_applicable=True,
+                    target_type="agent",
+                    target_name=agent_name,
+                    mutation_params={"agent": agent_name, "suggested_capability": task_type},
+                ).model_dump())
+
+        # 4. 偏好维度
+        param_adjustments: dict[str, list] = {}
+        for pref in preferences:
+            content = pref.get("content", {})
+            param = content.get("parameter", "")
+            if param:
+                param_adjustments.setdefault(param, []).append(content.get("value"))
+        for param, values in param_adjustments.items():
+            if len(values) >= 5:
+                from collections import Counter
+                most_common = Counter(str(v) for v in values if v is not None).most_common(1)
+                if most_common:
+                    suggestions.append(EvolutionSuggestion(
+                        source="agent_memory",
+                        category="preference",
+                        mutation_type="record_preference",
+                        severity="LOW",
+                        description=f"Parameter '{param}' adjusted {len(values)} times, most common: '{most_common[0][0]}'",
+                        auto_applicable=True,
+                        target_type="agent",
+                        target_name=agent_name,
+                        mutation_params={"agent": agent_name, "parameter": param, "suggested_default": most_common[0][0]},
+                    ).model_dump())
+
+        # 5. 错误学习维度
+        error_freq: dict[str, int] = {}
+        for ep in error_patterns:
+            error_msg = ep.get("content", {}).get("error", "")[:100]
+            if error_msg:
+                error_freq[error_msg] = error_freq.get(error_msg, 0) + 1
+        for error_msg, freq in error_freq.items():
+            if freq >= 3:
+                suggestions.append(EvolutionSuggestion(
+                    source="agent_memory",
+                    category="error",
+                    mutation_type="record_lesson",
+                    severity="MEDIUM",
+                    description=f"Recurring error ({freq} times): '{error_msg[:80]}'",
+                    auto_applicable=False,
+                    target_type="agent",
+                    target_name=agent_name,
+                    mutation_params={"agent": agent_name, "error": error_msg, "frequency": freq},
+                ).model_dump())
+
+        return suggestions
+
+    def _analyze_history(self, history_data: dict[str, Any]) -> list[dict[str, Any]]:
+        """从历史分析生成建议 (成本/失败/瓶颈)。"""
+        suggestions: list[dict[str, Any]] = []
+
+        for driver in history_data.get("cost_drivers", []):
+            if driver.get("total_cost", 0) > 5.0:
+                suggestions.append(EvolutionSuggestion(
+                    source="history_analyzer",
+                    category="cost",
+                    mutation_type="switch_model",
+                    severity="MEDIUM",
+                    description=f"Model {driver.get('dimension_value', '')} cost ${driver.get('total_cost', 0):.2f}",
+                    auto_applicable=False,
+                    target_type="system",
+                    target_name=driver.get("dimension_value", ""),
+                    mutation_params={"model": driver.get("dimension_value", ""), "total_cost": driver.get("total_cost", 0)},
+                ).model_dump())
+
+        for cluster in history_data.get("failure_clusters", []):
+            if cluster.get("count", 0) >= 3:
+                suggestions.append(EvolutionSuggestion(
+                    source="history_analyzer",
+                    category="error",
+                    mutation_type="recurring_failure",
+                    severity="HIGH",
+                    description=f"Failure pattern '{cluster.get('pattern', '')}' occurred {cluster.get('count', 0)} times",
+                    auto_applicable=False,
+                    target_type="system",
+                    target_name=cluster.get("pattern", ""),
+                    mutation_params={"pattern": cluster.get("pattern", ""), "count": cluster.get("count", 0), "root_cause": cluster.get("root_cause_hypothesis", "")},
+                ).model_dump())
+
+        for bottleneck in history_data.get("bottlenecks", []):
+            if bottleneck.get("avg_duration_ms", 0) > 30000:
+                suggestions.append(EvolutionSuggestion(
+                    source="history_analyzer",
+                    category="bottleneck",
+                    mutation_type="adjust_timeout",
+                    severity="MEDIUM",
+                    description=f"{bottleneck.get('component', '')} avg {bottleneck.get('avg_duration_ms', 0):.0f}ms",
+                    auto_applicable=False,
+                    target_type="system",
+                    target_name=bottleneck.get("component", ""),
+                    mutation_params={"component": bottleneck.get("component", ""), "avg_duration_ms": bottleneck.get("avg_duration_ms", 0)},
+                ).model_dump())
+
+        return suggestions
+
+    def _analyze_strategy_learning(self, strategy_data: dict[str, Any]) -> list[dict[str, Any]]:
+        """从策略学习生成建议。"""
+        suggestions: list[dict[str, Any]] = []
+        for adj in strategy_data.get("adjustments", []):
+            action = adj.get("action", "")
+            mutation_map = {
+                "disable": "disable_agent",
+                "reroute": "change_routing",
+                "reduce_timeout": "adjust_timeout",
+                "prefer": "change_routing",
+                "demote": "change_routing",
+            }
+            mutation_type = mutation_map.get(action, "record_lesson")
+            severity = "HIGH" if action == "disable" else "MEDIUM"
+            suggestions.append(EvolutionSuggestion(
+                source="strategy_learner",
+                category="routing" if action in ("reroute", "prefer", "demote") else "reliability",
+                mutation_type=mutation_type,
+                severity=severity,
+                description=adj.get("reason", ""),
+                auto_applicable=adj.get("auto_applicable", False),
+                target_type="agent" if action in ("disable", "reduce_timeout") else "routing",
+                target_name=adj.get("agent", ""),
+                mutation_params={
+                    "agent": adj.get("agent", ""),
+                    "routing_key": adj.get("routing_key", ""),
+                    "suggested_agent": adj.get("suggested_alternative", ""),
+                },
+            ).model_dump())
+        return suggestions
+
+    def _analyze_cache_evolution(self, cache_data: dict[str, Any]) -> list[dict[str, Any]]:
+        """从缓存进化生成建议。"""
+        suggestions: list[dict[str, Any]] = []
+        for adj in cache_data.get("adjustments", []):
+            suggestions.append(EvolutionSuggestion(
+                source="cache_evolver",
+                category="cache",
+                mutation_type="adjust_cache",
+                severity="LOW",
+                description=f"{adj.get('cache_name', '')}: {adj.get('parameter', '')} {adj.get('old_value', 0)}→{adj.get('new_value', 0)} ({adj.get('reason', '')})",
+                auto_applicable=adj.get("auto_applicable", False),
+                target_type="cache",
+                target_name=adj.get("cache_name", ""),
+                mutation_params={
+                    "cache_name": adj.get("cache_name", ""),
+                    "parameter": adj.get("parameter", ""),
+                    "new_value": adj.get("new_value", 0),
+                },
+            ).model_dump())
+        return suggestions
+
+    # ── Agent 专属进化 ────────────────────────────────────────
+
+    def evolve_agent(self, agent_name: str, agent_config: Any = None) -> dict[str, Any]:
+        """对指定 agent 执行 5 维度进化分析 (AgentEvolution.evolve 的统一替代)。"""
+        mem_data = self._collect_agent_memory(agent_name)
+        suggestions = self._analyze_agent_dimensions(mem_data)
+
+        # 自动应用安全的建议
+        auto_applied = []
+        for s in suggestions:
+            if s.get("auto_applicable") and not s.get("applied"):
+                try:
+                    from maop.core.config_mutator import ConfigMutator
+                    mutator = ConfigMutator(root_dir=str(self._root))
+                    mut_result = mutator.apply_suggestion(s.get("id", ""))
+                    if getattr(mut_result, "applied", False):
+                        auto_applied.append(s)
+                except Exception as exc:
+                    logger.debug("[evo-loop] Auto-apply failed for %s: %s", s.get("id", ""), exc)
+
+        # 记录进化事件到记忆
+        try:
+            from maop.core.agent_memory import AgentMemory
+            mem = AgentMemory(root_dir=str(self._root))
+            mem.record_evolution(
+                agent_name=agent_name,
+                evolution_type="full_analysis",
+                description=f"Generated {len(suggestions)} suggestions, auto-applied {len(auto_applied)}.",
+                changes={"suggestions_count": len(suggestions), "auto_applied_count": len(auto_applied)},
+                success=True,
+            )
+        except Exception as exc:
+            logger.debug("[evo-loop] Record evolution failed: %s", exc)
+
+        return {
+            "agent_name": agent_name,
+            "suggestions": suggestions,
+            "auto_applied": auto_applied,
+            "summary": f"Generated {len(suggestions)} suggestions, auto-applied {len(auto_applied)}.",
+        }
+
+    def get_agent_status(self, agent_name: str) -> dict[str, Any]:
+        """获取 agent 进化状态 (AgentEvolution.get_status 的统一替代)。"""
+        mem_data = self._collect_agent_memory(agent_name)
+        summary = mem_data.get("summary", {})
+        return {
+            "agent_name": agent_name,
+            "total_memories": summary.get("total_memories", 0),
+            "memory_by_type": summary.get("by_type", {}),
+            "evolution_count": summary.get("evolution_count", 0),
+            "top_error_patterns": summary.get("top_error_patterns", []),
+            "avg_importance": summary.get("avg_importance", 0),
+            "ready_for_evolution": summary.get("total_memories", 0) >= 10,
+        }
+
+    # ── 统一全量进化 ──────────────────────────────────────────
+
+    def run_full_evolution(self, hours: int = 24, dry_run: bool = False, auto_rollback: bool = True) -> dict[str, Any]:
+        """运行全量进化 (合并 EvolveEngine.auto_evolve 的能力)。
+
+        采集所有数据源 → 10 维度分析 → 策略评估 → 安全应用 → 验证
+        """
+        # 1. 采集所有数据源
+        delegation_stats = self._collect_delegation_stats()
+        history_data = self._collect_history_analysis(hours=hours)
+        strategy_data = self._collect_strategy_learning(hours=hours)
+        cache_data = self._collect_cache_evolution()
+
+        # 2. 生成所有建议
+        all_suggestions: list[dict[str, Any]] = []
+        all_suggestions.extend(self._analyze_delegation_stats(delegation_stats))
+        all_suggestions.extend(self._analyze_history(history_data))
+        all_suggestions.extend(self._analyze_strategy_learning(strategy_data))
+        all_suggestions.extend(self._analyze_cache_evolution(cache_data))
+
+        # 3. 持久化建议
+        self._write_suggestions(all_suggestions)
+
+        # 4. 运行标准循环 (含 ErrorLedger + Heal + Strategy + Apply + Validate + Consolidate)
+        loop_report = self.run_cycle(dry_run=dry_run, auto_rollback=auto_rollback)
+
+        # 5. 策略评估并应用可自动应用的建议
+        auto_applied = 0
+        if not dry_run:
+            from maop.core.evolution_strategies import StrategyEngine
+            engine = StrategyEngine(root_dir=str(self._root), strategy_name=self._strategy_name)
+            decisions = engine.evaluate(all_suggestions)
+            for d in decisions:
+                if d.should_apply:
+                    result = engine.apply(d.suggestion_id)
+                    if result.get("applied"):
+                        auto_applied += 1
+
+        return {
+            "loop_report": loop_report.model_dump(),
+            "total_suggestions": len(all_suggestions),
+            "auto_applied": auto_applied,
+            "delegation_stats": delegation_stats.get("stats", {}),
+            "history_analysis": {
+                "failure_clusters": len(history_data.get("failure_clusters", [])),
+                "bottlenecks": len(history_data.get("bottlenecks", [])),
+                "cost_drivers": len(history_data.get("cost_drivers", [])),
+            },
+            "strategy_learning": {
+                "total_combos": strategy_data.get("total_combos", 0),
+                "adjustments": len(strategy_data.get("adjustments", [])),
+                "reliable_combos": strategy_data.get("reliable_combos", []),
+                "underperformers": strategy_data.get("underperformers", []),
+                "routing_winners": strategy_data.get("routing_winners", {}),
+                "recommendations": strategy_data.get("recommendations", []),
+            },
+            "cache_evolution": {
+                "total_caches": cache_data.get("total_caches", 0),
+                "adjustments": len(cache_data.get("adjustments", [])),
+                "recommendations": cache_data.get("recommendations", []),
+            },
+        }
+
     def _write_suggestions(self, suggestions: list[dict[str, Any]]) -> None:
+        """原子写入建议文件，保留已应用状态。"""
         path = self._data_dir / "evolve-suggestions.json"
         existing: list[dict[str, Any]] = []
         if path.exists():
@@ -500,12 +1045,26 @@ class EvolutionLoop:
                     existing = json.load(f)
             except (json.JSONDecodeError, OSError):
                 existing = []
+        # 保留已应用的建议状态，merge 而非覆盖
+        existing_applied = {s.get("id"): s.get("applied", False) for s in existing if s.get("applied")}
         existing_ids = {s.get("id") for s in existing}
         for s in suggestions:
-            if s.get("id") not in existing_ids:
+            sid = s.get("id", "")
+            if sid not in existing_ids:
+                # 保留之前的 applied 状态
+                if sid in existing_applied:
+                    s["applied"] = True
                 existing.append(s)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(existing[-200:], f, indent=2, ensure_ascii=False)
+        # 原子写入
+        try:
+            from maop.core.filelock import FileLock
+            from maop.core.safe_writer import safe_write_text
+            lock_path = str(path) + ".lock"
+            with FileLock(lock_path, timeout_seconds=5):
+                safe_write_text(path, json.dumps(existing[-200:], indent=2, ensure_ascii=False), encoding="utf-8")
+        except ImportError:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(existing[-200:], f, indent=2, ensure_ascii=False)
 
     def _save_report(self, report: LoopReport) -> None:
         with self._db_connect() as conn:

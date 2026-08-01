@@ -20,6 +20,10 @@ export default defineConfig({
   },
   server: {
     port: 5174,
+    // 允许 import.meta.glob 访问项目根目录外的 docs/ 目录（文档页内联渲染）
+    fs: {
+      allow: ['..'],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:9079',
