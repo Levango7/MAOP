@@ -1,0 +1,1 @@
+"""MAOP stability test suite — crash recovery, long-run, and boundary input tests."""
