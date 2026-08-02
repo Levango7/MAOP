@@ -276,7 +276,7 @@ class ChatEngine:
             )
 
             if result.result and result.result.is_success():
-                return getattr(result.result, "output", None) or result.result.error or "No response"
+                return result.result.stdout or result.result.error or "No response"
             return result.result.error if result.result else "Dispatch failed"  # type: ignore[return-value]
         except Exception as exc:
             logger.warning("[chat_engine] LLM call failed: %s", exc)
