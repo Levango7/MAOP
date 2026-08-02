@@ -135,3 +135,5 @@ scripts/dev_*
 scripts/*_private_*
 data/*_secret*
 *.private
+# -- Scrubbed backup dirs (must NEVER be committed) --
+data_bak_*/

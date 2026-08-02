@@ -361,17 +361,17 @@ class EvolutionLoop:
                     if errors:
                         latest = errors[0]
                         is_routing = "routing" in pattern
-                    suggestions.append(EvolutionSuggestion(
-                            source="error_ledger",
-                            category="routing" if is_routing else "reliability",
-                            mutation_type="change_routing" if is_routing else "disable_agent",
-                            severity="MEDIUM",
-                            description=f"Unhealed error pattern '{pattern}' needs config adjustment",
-                            auto_applicable=False,
-                            target_type="routing" if is_routing else "agent",
-                            target_name=pattern,
-                            metadata={"pattern": pattern, "error_type": latest.error_type, "context": latest.context},
-                        ).model_dump())
+                        suggestions.append(EvolutionSuggestion(
+                                source="error_ledger",
+                                category="routing" if is_routing else "reliability",
+                                mutation_type="change_routing" if is_routing else "disable_agent",
+                                severity="MEDIUM",
+                                description=f"Unhealed error pattern '{pattern}' needs config adjustment",
+                                auto_applicable=False,
+                                target_type="routing" if is_routing else "agent",
+                                target_name=pattern,
+                                metadata={"pattern": pattern, "error_type": latest.error_type, "context": latest.context},
+                            ).model_dump())
 
             self._write_suggestions(suggestions)
 
