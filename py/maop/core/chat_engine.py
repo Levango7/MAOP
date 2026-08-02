@@ -140,7 +140,7 @@ class ChatEngine:
             messages.append({"role": "user", "content": request.message})
 
         # Call LLM via dispatcher
-        content = await self._call_llm(agent, messages, request)
+        content = await self._call_llm(agent, messages, request) or ""
         latency_ms = int((time.perf_counter() - start) * 1000)
 
         # Store assistant response

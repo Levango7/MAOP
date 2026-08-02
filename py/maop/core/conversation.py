@@ -1,4 +1,4 @@
-﻿"""MAOP Conversation Manager — Multi-turn conversation history with context window.
+"""MAOP Conversation Manager — Multi-turn conversation history with context window.
 
 Provides:
   - Message history per session (user/assistant/system/tool roles)
@@ -282,7 +282,9 @@ class ConversationManager:
         return result
 
     @staticmethod
-    def _estimate_tokens(text: str) -> int:
+    def _estimate_tokens(text: str | None) -> int:
+        if not text:
+            return 1
         cjk = sum(1 for c in text if '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf')
         non_cjk = len(text) - cjk
         return max(1, int(cjk / 1.5 + non_cjk / 4))
