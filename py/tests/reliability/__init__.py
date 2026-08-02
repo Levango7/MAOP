@@ -1,0 +1,1 @@
+"""MAOP reliability test suite — cascade degradation and PEV pipeline integrity."""
