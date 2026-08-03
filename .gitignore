@@ -116,6 +116,9 @@ dashboard-enterprise/coverage/
 dashboard-enterprise/frontend_dev.log
 test_full.log
 test_*.log
+# -- Python runtime/test logs accidentally committed under py/ (see audit D7) --
+py/*.log
+py/**/*.log
 
 # -- Credentials / runtime secrets --
 data/.admin_initial_password

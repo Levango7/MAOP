@@ -714,18 +714,11 @@ class MessageQueue:
                 """).fetchall()
 
                 for row in exhausted:
-                    conn.execute("""
-                        INSERT OR IGNORE INTO queue_dead_letters
-                        (id, topic, payload, priority, retries, error, consumer_group, dead_at)
-                        VALUES (?, ?, ?, ?, ?, 'exhausted_retries', ?, ?)
-                    """, (
-                        row[0], row[1], row[2], row[3], row[4], row[5], now,
-                    ))
-
-                conn.execute("""
-                    DELETE FROM queue_messages
-                    WHERE status = 'pending' AND retries >= max_retries
-                """)
+                    # D4 fix: reuse the MQ-3-safe dead-letter move (it confirms
+                    # the DLQ row exists before deleting the source) instead of
+                    # an unconditional DELETE that could drop a message on a PK
+                    # clash between runs.
+                    self._move_to_dead_letter(conn, row[0], "exhausted_retries")
 
                 recovered = cursor.rowcount
                 if recovered > 0:
