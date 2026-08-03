@@ -117,27 +117,23 @@ def _ensure_default_user() -> None:
                 if not admin_pwd:
                     import secrets
                     admin_pwd = secrets.token_urlsafe(16)
-                    # P2-12 fix: write password to file for first-run access
-                    pwd_file = MAOP_ROOT / "data" / ".admin_initial_password"
-                    try:
-                        pwd_file.parent.mkdir(parents=True, exist_ok=True)
-                        pwd_file.write_text(admin_pwd, encoding="utf-8")
-                        try:
-                            import os as _os
-                            _os.chmod(str(pwd_file), 0o600)
-                        except Exception:
-                            pass  # chmod may fail on Windows
-                        logger.warning(
-                            "MAOP_ADMIN_PASSWORD not set — generated random admin password "
-                            "and wrote to %s (delete after first login)",
-                            pwd_file,
+                    # S4 fix: DO NOT persist the plaintext password to disk.
+                    # Surface it once via the log so the operator can read it
+                    # from stdout/logs, and require an explicit
+                    # MAOP_ADMIN_PASSWORD in production (fail-fast).
+                    env = os.environ.get("MAOP_ENV", "").strip().lower()
+                    if env == "production":
+                        raise RuntimeError(
+                            "SECURITY: MAOP_ADMIN_PASSWORD must be set explicitly in "
+                            "production (MAOP_ENV=production). Refusing to start with a "
+                            "random, non-persisted admin password."
                         )
-                    except Exception as exc:
-                        logger.error(
-                            "Failed to write admin password file: %s. "
-                            "Set MAOP_ADMIN_PASSWORD env var manually.",
-                            exc,
-                        )
+                    logger.warning(
+                        "MAOP_ADMIN_PASSWORD not set — generated a ONE-TIME random admin "
+                        "password (shown below). Set MAOP_ADMIN_PASSWORD to persist it "
+                        "across restarts. First-run admin password: %s",
+                        admin_pwd,
+                    )
                 pwd_hash = _hash_password(admin_pwd)
                 conn.execute(
                     "INSERT INTO users (username, password_hash, roles, created_at, enabled) VALUES (?, ?, ?, ?, 1)",

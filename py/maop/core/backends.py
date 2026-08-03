@@ -489,7 +489,7 @@ def get_cache_backend() -> CacheBackend:
             _cache = RedisCacheBackend()
             logger.info("[backends] Cache: Redis (edition=%s)", get_edition().value)
             return _cache
-        except (ImportError, Exception) as exc:
+        except ImportError as exc:
             logger.warning("[backends] Redis backend not available (%s), falling back to memory", exc)
             record_degradation("cache", "redis", "memory")
     _cache = MemoryCacheBackend()
@@ -534,7 +534,7 @@ def get_queue_backend(db_path: str = "") -> QueueBackend:
                 _queue = RedisQueueBackend()
                 logger.info("[backends] Queue: Redis (RabbitMQ fallback)")
                 return _queue
-            except (ImportError, Exception) as exc:
+            except ImportError as exc:
                 logger.warning("[backends] Redis queue backend not available (%s), falling back to SQLite", exc)
                 record_degradation("queue", "redis", "sqlite", "redis_unavailable")
     elif backend_type == "redis":
@@ -543,7 +543,7 @@ def get_queue_backend(db_path: str = "") -> QueueBackend:
             _queue = RedisQueueBackend()
             logger.info("[backends] Queue: Redis")
             return _queue
-        except (ImportError, Exception) as exc:
+        except ImportError as exc:
             logger.warning("[backends] Redis queue backend not available (%s), falling back to SQLite", exc)
             record_degradation("queue", "redis", "sqlite")
     _queue = SQLiteQueueBackend(db_path=db_path)

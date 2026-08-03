@@ -567,7 +567,7 @@ class MaopLoop(ExecuteMixin):
         verify_result = ctx.verify_result
         exec_result = ctx.execution_result
 
-        while (verify_result and not verify_result.passed
+        while (verify_result and not verify_result.errored and not verify_result.passed
                and ctx.feedback_cycles < lc.feedback_max_cycles
                and not should_skip):
             v_state = getattr(verify_result, "state", "working")
@@ -739,13 +739,11 @@ class MaopLoop(ExecuteMixin):
             plan = maop_plan(task=task, workdir=workdir, config=self._config)
             return plan.model_dump()
         except Exception as exc:
-            logger.warning("Plan phase failed: %s", exc)
-            return {
-                "phase": "plan", "task": task,
-                "selected_agent": "claude", "routing_key": "chat",
-                "gates": ["exit_code", "output"],
-                "budget": {"timeout_s": self._loop_config.default_timeout_s, "max_retries": 1},
-            }
+            # C2 fix: do NOT silently degrade to a hardcoded default route,
+            # which would mask a real misconfiguration as a successful plan.
+            # Fail loud so the caller marks the task as failed/errored.
+            logger.error("Plan phase failed: %s", exc)
+            raise
 
     async def _verify(
         self,
@@ -768,9 +766,12 @@ class MaopLoop(ExecuteMixin):
                 return cast(VerifyResult | None, self._verify_engine.verify(plan=plan, result=result, workdir=workdir))
             return None
         except Exception as exc:
-            logger.warning("Verify phase exception: %s", exc)
+            # C3 fix: distinguish an engine error from a real verification
+            # failure. Mark `errored=True` so finalize does NOT count this as
+            # the task failing verification (which would falsely fail the task).
+            logger.error("Verify phase exception (engine error, not a task failure): %s", exc)
             self._log("verify", "ERROR", f"Verify exception: {exc}", trace_id=trace_id)
-            return VerifyResult(passed=False, summary=f"Verify error: {exc}")
+            return VerifyResult(passed=False, errored=True, summary=f"Verify engine error: {exc}")
 
     # ── Fallback chain ─────────────────────────────────────
 

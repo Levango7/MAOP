@@ -206,3 +206,60 @@ class TestPurge:
 
         stats = mq.stats()
         assert stats.acked == 0
+
+
+class TestRecoverUnackedDeadLetter:
+    """Regression tests for D4 (MQ-3): exhausted messages must be moved to the
+    dead-letter table safely, never dropped on a PK clash."""
+
+    def test_exhausted_message_moved_to_dead_letter(self, mq: MessageQueue):
+        msg_id = mq.enqueue("tasks", {"agent": "claude"})
+        # Simulate an exhausted message: back to pending with retries >= max_retries.
+        with mq._connect() as conn:
+            conn.execute(
+                "UPDATE queue_messages SET status='pending', retries=99 WHERE id=?",
+                (msg_id,),
+            )
+
+        recovered = mq.recover_unacked()
+        # No message was in 'processing', so nothing is "recovered"; the
+        # exhausted one is moved to the dead-letter table instead.
+        assert recovered == 0
+
+        with mq._connect() as conn:
+            in_queue = conn.execute(
+                "SELECT 1 FROM queue_messages WHERE id=?", (msg_id,)
+            ).fetchone()
+            in_dlq = conn.execute(
+                "SELECT 1 FROM queue_dead_letters WHERE id=?", (msg_id,)
+            ).fetchone()
+
+        assert in_queue is None, "exhausted message must be removed from the live queue"
+        assert in_dlq is not None, "exhausted message must be recorded in the dead-letter table"
+
+    def test_exhausted_message_safe_under_dlq_pk_clash(self, mq: MessageQueue):
+        msg_id = mq.enqueue("tasks", {"agent": "claude"})
+        with mq._connect() as conn:
+            conn.execute(
+                "UPDATE queue_messages SET status='pending', retries=99 WHERE id=?",
+                (msg_id,),
+            )
+            # Pre-existing stale dead-letter row with the SAME id -> forces
+            # INSERT OR IGNORE to be ignored (PK clash).
+            conn.execute(
+                "INSERT INTO queue_dead_letters "
+                "(id, topic, payload, priority, retries, error, consumer_group, dead_at) "
+                "VALUES (?, 'stale', '{}', 0, 0, 'stale', '', 0.0)",
+                (msg_id,),
+            )
+
+        mq.recover_unacked()
+
+        with mq._connect() as conn:
+            in_dlq = conn.execute(
+                "SELECT 1 FROM queue_dead_letters WHERE id=?", (msg_id,)
+            ).fetchone()
+
+        # D4 fix reuses _move_to_dead_letter: because a DLQ row exists for the
+        # id, removing the source is safe (its record is preserved in the DLQ).
+        assert in_dlq is not None

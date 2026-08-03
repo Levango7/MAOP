@@ -34,6 +34,7 @@ class VerifyResult(BaseModel):
     phase: str = "verify"
     passed: bool = False
     summary: str = ""
+    errored: bool = False  # True when verification could not run (engine error), not a real task failure
     gates: list[GateResult] = Field(default_factory=list)
     feedback: str = ""  # Suggested fix when failed
     # ── State classification (Claude Code-inspired) ──
