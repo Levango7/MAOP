@@ -160,19 +160,23 @@ class TestFactoryFunctions:
         backend = get_storage_backend()
         assert isinstance(backend, SQLiteStorageBackend)
 
-    def test_default_cache(self):
+    def test_default_cache(self, monkeypatch):
+        monkeypatch.setenv("MAOP_EDITION", "personal")
         backend = get_cache_backend()
         assert isinstance(backend, MemoryCacheBackend)
 
-    def test_default_queue(self):
+    def test_default_queue(self, monkeypatch):
+        monkeypatch.setenv("MAOP_EDITION", "personal")
         backend = get_queue_backend()
         assert isinstance(backend, SQLiteQueueBackend)
 
-    def test_default_kv(self):
+    def test_default_kv(self, monkeypatch):
+        monkeypatch.setenv("MAOP_EDITION", "personal")
         backend = get_kv_backend()
         assert isinstance(backend, SQLiteKVBackend)
 
-    def test_default_secret(self):
+    def test_default_secret(self, monkeypatch):
+        monkeypatch.setenv("MAOP_EDITION", "personal")
         backend = get_secret_backend()
         assert isinstance(backend, LocalSecretBackend)
 
@@ -194,26 +198,57 @@ class TestFactoryFunctions:
         assert isinstance(backend, SQLiteStorageBackend)
 
     def test_fallback_on_missing_redis(self, monkeypatch):
+        """Fail-closed: Redis cache requested but unavailable → RuntimeError
+        unless MAOP_CACHE_ALLOW_FALLBACK=1 explicitly opts in."""
+        from unittest.mock import patch
         monkeypatch.setenv("MAOP_CACHE_BACKEND", "redis")
-        backend = get_cache_backend()
+        monkeypatch.delenv("MAOP_CACHE_ALLOW_FALLBACK", raising=False)
+        with patch("maop.core.backends_redis.RedisCacheBackend",
+                   side_effect=ImportError("mocked: redis unavailable")):
+            with pytest.raises(RuntimeError, match="not importable"):
+                get_cache_backend()
+        # Explicit opt-in restores the legacy degrade behaviour
+        reset_backends()
+        monkeypatch.setenv("MAOP_CACHE_ALLOW_FALLBACK", "1")
+        with patch("maop.core.backends_redis.RedisCacheBackend",
+                   side_effect=ImportError("mocked: redis unavailable")):
+            backend = get_cache_backend()
         assert isinstance(backend, MemoryCacheBackend)
 
     def test_fallback_on_missing_rabbitmq(self, monkeypatch):
+        """Fail-closed: RabbitMQ queue requested but unavailable → RuntimeError
+        unless MAOP_QUEUE_ALLOW_FALLBACK=1 explicitly opts in."""
+        from unittest.mock import patch
         monkeypatch.setenv("MAOP_QUEUE_BACKEND", "rabbitmq")
-        backend = get_queue_backend()
+        monkeypatch.delenv("MAOP_QUEUE_ALLOW_FALLBACK", raising=False)
+        with pytest.raises(RuntimeError, match="pika"):
+            get_queue_backend()
+        # Explicit opt-in restores the legacy degrade behaviour
+        reset_backends()
+        monkeypatch.setenv("MAOP_QUEUE_ALLOW_FALLBACK", "1")
+        with patch("maop.core.backends_redis.RedisQueueBackend",
+                   side_effect=ImportError("mocked: redis unavailable")):
+            backend = get_queue_backend()
         assert isinstance(backend, SQLiteQueueBackend)
 
     def test_fallback_on_missing_vault(self, monkeypatch):
+        """Vault secret backend degrades to local when vault unavailable.
+
+        Note: vault backend does not have fail-fast (D1/D2 scope was
+        cache/queue/kv/storage only). ImportError → graceful degrade.
+        """
         monkeypatch.setenv("MAOP_SECRET_BACKEND", "vault")
         backend = get_secret_backend()
         assert isinstance(backend, LocalSecretBackend)
 
-    def test_singleton_caching(self):
+    def test_singleton_caching(self, monkeypatch):
+        monkeypatch.setenv("MAOP_CACHE_BACKEND", "memory")
         b1 = get_cache_backend()
         b2 = get_cache_backend()
         assert b1 is b2
 
-    def test_reset_clears_singletons(self):
+    def test_reset_clears_singletons(self, monkeypatch):
+        monkeypatch.setenv("MAOP_CACHE_BACKEND", "memory")
         b1 = get_cache_backend()
         reset_backends()
         b2 = get_cache_backend()

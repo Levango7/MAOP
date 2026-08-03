@@ -63,10 +63,14 @@ class TestRabbitMQBackendImportError:
         """``MAOP_QUEUE_BACKEND=rabbitmq`` 但 pika 未安装时，降级到 SQLite。
 
         降级链路：rabbitmq → (ImportError) → redis → (ImportError) → sqlite。
-        本环境 pika 与 redis 均未安装，最终应得到 SQLiteQueueBackend。
+        需 ``MAOP_QUEUE_ALLOW_FALLBACK=1`` 显式启用降级（D1/D2 fail-fast）。
+        Mock RedisQueueBackend 也抛 ImportError 以模拟 redis 不可用。
         """
         monkeypatch.setenv("MAOP_QUEUE_BACKEND", "rabbitmq")
-        backend = get_queue_backend()
+        monkeypatch.setenv("MAOP_QUEUE_ALLOW_FALLBACK", "1")
+        with patch("maop.core.backends_redis.RedisQueueBackend",
+                   side_effect=ImportError("mocked: redis unavailable")):
+            backend = get_queue_backend()
         assert isinstance(backend, SQLiteQueueBackend)
 
     def test_rabbitmq_degradation_recorded(self, monkeypatch: pytest.MonkeyPatch):
@@ -74,13 +78,13 @@ class TestRabbitMQBackendImportError:
         from maop.config.edition import degradation_log
 
         monkeypatch.setenv("MAOP_QUEUE_BACKEND", "rabbitmq")
-        # 触发降级
-        get_queue_backend()
-        # 至少记录了一条 queue 后端的降级
+        monkeypatch.setenv("MAOP_QUEUE_ALLOW_FALLBACK", "1")
+        with patch("maop.core.backends_redis.RedisQueueBackend",
+                   side_effect=ImportError("mocked: redis unavailable")):
+            get_queue_backend()
         log = degradation_log()
         queue_entries = [e for e in log if e.get("backend") == "queue"]
         assert len(queue_entries) >= 1
-        # 应包含 rabbitmq → redis 的降级
         assert any(
             e.get("requested") == "rabbitmq" and e.get("fallback") == "redis"
             for e in queue_entries
@@ -95,6 +99,7 @@ class TestEtcdBackendImportError:
     ):
         """``MAOP_KV_BACKEND=etcd`` 但 etcd3 未安装时，降级到 SQLite。"""
         monkeypatch.setenv("MAOP_KV_BACKEND", "etcd")
+        monkeypatch.setenv("MAOP_KV_ALLOW_FALLBACK", "1")
         backend = get_kv_backend()
         assert isinstance(backend, SQLiteKVBackend)
 
@@ -103,6 +108,7 @@ class TestEtcdBackendImportError:
     ):
         """``MAOP_KV_BACKEND=consul`` 同样走 etcd 实现分支并降级到 SQLite。"""
         monkeypatch.setenv("MAOP_KV_BACKEND", "consul")
+        monkeypatch.setenv("MAOP_KV_ALLOW_FALLBACK", "1")
         backend = get_kv_backend()
         assert isinstance(backend, SQLiteKVBackend)
 
@@ -111,6 +117,7 @@ class TestEtcdBackendImportError:
         from maop.config.edition import degradation_log
 
         monkeypatch.setenv("MAOP_KV_BACKEND", "etcd")
+        monkeypatch.setenv("MAOP_KV_ALLOW_FALLBACK", "1")
         get_kv_backend()
         log = degradation_log()
         kv_entries = [e for e in log if e.get("backend") == "kv"]

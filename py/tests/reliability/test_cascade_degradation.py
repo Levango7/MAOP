@@ -75,11 +75,12 @@ def test_cache_redis_to_memory_degradation(monkeypatch: pytest.MonkeyPatch) -> N
     """Redis cache requested but unavailable → degrade to MemoryCacheBackend.
 
     Sets ``MAOP_CACHE_BACKEND=redis`` and mocks ``RedisCacheBackend``
-    to raise ``ImportError``.  Verifies the factory falls back to
-    ``MemoryCacheBackend``, records a degradation event, and the
-    degraded backend remains functional for set/get/exists.
+    to raise ``ImportError``.  With ``MAOP_CACHE_ALLOW_FALLBACK=1``,
+    the factory falls back to ``MemoryCacheBackend``, records a
+    degradation event, and the degraded backend remains functional.
     """
     monkeypatch.setenv("MAOP_CACHE_BACKEND", "redis")
+    monkeypatch.setenv("MAOP_CACHE_ALLOW_FALLBACK", "1")
 
     with patch("maop.core.backends_redis.RedisCacheBackend",
                side_effect=ImportError("mocked: redis unavailable")):
@@ -102,18 +103,29 @@ def test_cache_redis_to_memory_degradation(monkeypatch: pytest.MonkeyPatch) -> N
     assert backend.get("k1") is None
 
 
+def test_cache_redis_fail_fast_without_allow_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without MAOP_CACHE_ALLOW_FALLBACK, Redis ImportError → RuntimeError."""
+    monkeypatch.setenv("MAOP_CACHE_BACKEND", "redis")
+    monkeypatch.delenv("MAOP_CACHE_ALLOW_FALLBACK", raising=False)
+
+    with patch("maop.core.backends_redis.RedisCacheBackend",
+               side_effect=ImportError("mocked: redis unavailable")):
+        with pytest.raises(RuntimeError, match="not importable"):
+            get_cache_backend()
+
+
 # ── 2. Queue: Redis → SQLite ───────────────────────────────────
 
 
 def test_queue_redis_to_sqlite_degradation(monkeypatch: pytest.MonkeyPatch) -> None:
     """Redis queue requested but unavailable → degrade to SQLiteQueueBackend.
 
-    Sets ``MAOP_QUEUE_BACKEND=redis`` and mocks ``RedisQueueBackend``
-    to raise ``ImportError``.  Verifies the factory falls back to
+    With ``MAOP_QUEUE_ALLOW_FALLBACK=1``, the factory falls back to
     ``SQLiteQueueBackend``, records a degradation event, and the
     degraded backend supports publish/consume.
     """
     monkeypatch.setenv("MAOP_QUEUE_BACKEND", "redis")
+    monkeypatch.setenv("MAOP_QUEUE_ALLOW_FALLBACK", "1")
 
     with patch("maop.core.backends_redis.RedisQueueBackend",
                side_effect=ImportError("mocked: redis unavailable")):
@@ -141,12 +153,12 @@ def test_queue_redis_to_sqlite_degradation(monkeypatch: pytest.MonkeyPatch) -> N
 def test_kv_etcd_to_sqlite_degradation(monkeypatch: pytest.MonkeyPatch) -> None:
     """etcd KV requested but unavailable → degrade to SQLiteKVBackend.
 
-    Sets ``MAOP_KV_BACKEND=etcd`` and makes the
-    ``maop.core.backends_distributed`` module unimportable.  Verifies
-    the factory falls back to ``SQLiteKVBackend``, records a
-    degradation event, and the degraded backend supports set/get.
+    With ``MAOP_KV_ALLOW_FALLBACK=1``, the factory falls back to
+    ``SQLiteKVBackend``, records a degradation event, and the
+    degraded backend supports set/get.
     """
     monkeypatch.setenv("MAOP_KV_BACKEND", "etcd")
+    monkeypatch.setenv("MAOP_KV_ALLOW_FALLBACK", "1")
 
     with _module_unavailable("maop.core.backends_distributed"):
         backend = get_kv_backend()
@@ -171,13 +183,15 @@ def test_kv_etcd_to_sqlite_degradation(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_multiple_backend_cascade(monkeypatch: pytest.MonkeyPatch) -> None:
     """All distributed backends unavailable simultaneously → all degrade.
 
-    Sets cache=redis, queue=redis, kv=etcd and mocks all three to be
-    unavailable.  Verifies every backend degrades to its local fallback,
-    each degradation is recorded, and CRUD works on all degraded backends.
+    With ``MAOP_*_ALLOW_FALLBACK=1``, every backend degrades to its
+    local fallback, each degradation is recorded, and CRUD works.
     """
     monkeypatch.setenv("MAOP_CACHE_BACKEND", "redis")
     monkeypatch.setenv("MAOP_QUEUE_BACKEND", "redis")
     monkeypatch.setenv("MAOP_KV_BACKEND", "etcd")
+    monkeypatch.setenv("MAOP_CACHE_ALLOW_FALLBACK", "1")
+    monkeypatch.setenv("MAOP_QUEUE_ALLOW_FALLBACK", "1")
+    monkeypatch.setenv("MAOP_KV_ALLOW_FALLBACK", "1")
 
     with (
         patch("maop.core.backends_redis.RedisCacheBackend",
