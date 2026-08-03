@@ -669,7 +669,10 @@ class MaopLoop(ExecuteMixin):
         total_ms = int((time.monotonic() - start) * 1000)
         exec_result = ctx.execution_result
         verify_result = ctx.verify_result
-        success = exec_result is not None and exec_result.is_success() and (verify_result.passed if verify_result else True)
+        verify_ok = True
+        if verify_result and not verify_result.errored:
+            verify_ok = verify_result.passed
+        success = exec_result is not None and exec_result.is_success() and verify_ok
 
         try:
             if self._memory is not None:

@@ -258,13 +258,64 @@ class TestVerifyPhase:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_verify_exception_returns_failed(self, tmp_path):
+    async def test_verify_exception_returns_errored(self, tmp_path):
         loop = _make_loop(tmp_path)
         with patch.object(loop._verify_engine, 'verify', side_effect=RuntimeError("boom")):
             result = await loop._verify({}, None, str(tmp_path), skip=False, trace_id="test")
             assert result is not None
             assert result.passed is False
+            assert result.errored is True
             assert "boom" in result.summary
+
+
+class TestBuildLoopResultVerifyErrored:
+    """C3 residual fix: when verify engine errors, _build_loop_result must NOT
+    count it as a task failure (errored=True → verify_ok=True)."""
+
+    def test_verify_errored_does_not_fail_task(self, tmp_path):
+        from maop.core.error_schema import MaopResult
+        from maop.core.phases import PhaseContext
+
+        loop = _make_loop(tmp_path)
+        ctx = PhaseContext(
+            original_task="test-task",
+            plan_result={},
+            execution_result=MaopResult(agent="a", task="t", exit_code=0),
+            verify_result=VerifyResult(passed=False, errored=True, summary="engine error"),
+            trace_id="test",
+        )
+        result = loop._build_loop_result(ctx, start=__import__("time").monotonic())
+        assert result.success is True
+
+    def test_verify_real_failure_fails_task(self, tmp_path):
+        from maop.core.error_schema import MaopResult
+        from maop.core.phases import PhaseContext
+
+        loop = _make_loop(tmp_path)
+        ctx = PhaseContext(
+            original_task="test-task",
+            plan_result={},
+            execution_result=MaopResult(agent="a", task="t", exit_code=0),
+            verify_result=VerifyResult(passed=False, errored=False, summary="real failure"),
+            trace_id="test",
+        )
+        result = loop._build_loop_result(ctx, start=__import__("time").monotonic())
+        assert result.success is False
+
+    def test_no_verify_does_not_fail_task(self, tmp_path):
+        from maop.core.error_schema import MaopResult
+        from maop.core.phases import PhaseContext
+
+        loop = _make_loop(tmp_path)
+        ctx = PhaseContext(
+            original_task="test-task",
+            plan_result={},
+            execution_result=MaopResult(agent="a", task="t", exit_code=0),
+            verify_result=None,
+            trace_id="test",
+        )
+        result = loop._build_loop_result(ctx, start=__import__("time").monotonic())
+        assert result.success is True
 
 
 class TestLoopResultFields:
