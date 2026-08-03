@@ -162,7 +162,7 @@ def _adaptive_agent_select(route: RouteEntry, rk: str) -> str:
             logger.info("Adaptive routing: rk=%s primary=%s → %s (performance-based)", rk, route.primary, best)
         return best
     except Exception as exc:
-        logger.debug("Adaptive routing fallback: %s", exc)
+        logger.warning("Adaptive routing failed (%s); falling back to primary agent %s", exc, route.primary)
         return route.primary
 
 
@@ -332,7 +332,7 @@ def _evaluate_condition(condition: str, variables: dict[str, Any]) -> bool:
         from maop.engine import safe_eval
         return bool(safe_eval(condition, variables))
     except Exception:
-        logger.debug("Silent exception in maop_plan.py:330", exc_info=True)
+        logger.warning("Condition evaluation failed in maop_plan.py: %r → treating as False (step skipped)", condition, exc_info=True)
         return False
 
 

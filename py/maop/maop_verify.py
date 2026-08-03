@@ -340,6 +340,7 @@ class VerifyEngine:
             requested_gates = ["exit_code", "output"]
 
         gate_results: list[GateResult] = []
+        engine_errored = False
         for gate_name in requested_gates:
             gate_fn = self._gates.get(gate_name)
             if gate_fn is None:
@@ -347,15 +348,18 @@ class VerifyEngine:
                     name=gate_name, passed=False,
                     reason=f"Unknown gate: {gate_name}",
                 ))
+                engine_errored = True
                 continue
 
             try:
                 gr = gate_fn(plan, result)
                 gate_results.append(gr)
             except Exception as exc:
+                engine_errored = True
+                logger.error("Gate %s raised an exception (engine bug, not a task failure): %s", gate_name, exc, exc_info=True)
                 gate_results.append(GateResult(
                     name=gate_name, passed=False,
-                    reason=f"Gate exception: {exc}",
+                    reason=f"Gate engine error (not a task failure): {exc}",
                 ))
 
         all_passed = all(gr.passed for gr in gate_results)
@@ -385,6 +389,7 @@ class VerifyEngine:
         return VerifyResult(
             passed=all_passed,
             summary=summary,
+            errored=engine_errored,
             gates=gate_results,
             feedback=feedback,
             state=classification.state.value,
