@@ -330,6 +330,10 @@ async function sendMessage(overrideText) {
   streaming.value = true;
   streamContent.value = '';
 
+  // Cancel any in-flight stream before starting a new one
+  if (streamAbort) { streamAbort.abort(); streamAbort = null; }
+  streamAbort = new AbortController();
+
   try {
     // P0-1 fix: use /api/chat/stream (SSE) instead of /api/chat (JSON)
     // F-P0-3 fix: stream() is now initialized at setup top level
@@ -343,6 +347,7 @@ async function sendMessage(overrideText) {
     let msgMeta = {};
 
     await stream('/api/chat/stream', body, {
+      signal: streamAbort.signal,
       onData: async (fullContent) => {
         streamContent.value = fullContent;
         await nextTick();
@@ -357,6 +362,7 @@ async function sendMessage(overrideText) {
       },
       onDone: () => {
         streaming.value = false;
+        streamAbort = null;
         messages.value.push({
           role: 'assistant',
           content: streamContent.value,
@@ -367,6 +373,7 @@ async function sendMessage(overrideText) {
       },
       onError: (errMsg) => {
         streaming.value = false;
+        streamAbort = null;
         messages.value.push({ role: 'assistant', content: `Error: ${errMsg}`, time: now() });
       },
     });

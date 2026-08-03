@@ -428,9 +428,13 @@ class AgentStrategyLearner:
 
         if changed:
             import shutil
-            shutil.copy2(agents_yaml, str(agents_yaml) + ".bak")
-            with open(agents_yaml, "w", encoding="utf-8") as f:
-                yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
+            from maop.core.filelock import FileLock
+            from maop.core.safe_writer import safe_write_text
+            _lock = str(agents_yaml) + ".lock"
+            with FileLock(_lock, timeout_seconds=10):
+                shutil.copy2(agents_yaml, str(agents_yaml) + ".bak")
+                _content = yaml.dump(data, default_flow_style=False, allow_unicode=True)
+                safe_write_text(agents_yaml, _content, encoding="utf-8")
             logger.info(
                 "[strategy_learner] Applied %s for %s/%s",
                 adj.action, adj.agent, adj.routing_key or "*",

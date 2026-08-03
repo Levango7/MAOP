@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -109,7 +110,11 @@ class ConfigMutator:
 
         backup = self._backup_yaml()
         try:
-            changes = handler(suggestion)
+            # C4/C5 fix: hold FileLock for the entire read-modify-write cycle
+            # to prevent concurrent lost-update on agents.yaml.
+            _lock_path = str(self._agents_yaml) + ".lock"
+            with FileLock(_lock_path, timeout_seconds=10):
+                changes = handler(suggestion)
             self._mark_applied(suggestion_id)
             reloaded = self._trigger_reload()
             return MutationResult(
@@ -151,12 +156,38 @@ class ConfigMutator:
             sort_keys=False,
             default_flow_style=False,
         )
-        lock_path = self._agents_yaml.with_suffix(self._agents_yaml.suffix + ".lock")
-        with FileLock(str(lock_path), timeout_seconds=10):
+        safe_write_text(self._agents_yaml, content, encoding="utf-8")
+        with open(self._agents_yaml, encoding="utf-8") as f:
+            yaml.safe_load(f)  # readback validate (caller holds FileLock)
+
+    def _atomic_yaml_update(
+        self,
+        apply_fn: Callable[[dict[str, Any]], list[str]],
+    ) -> list[str]:
+        """C4/C5 fix: atomically read-modify-write agents.yaml under one FileLock.
+
+        Previous _load_yaml() + _save_yaml() only locked the write phase.
+        Two concurrent callers could both read the same old data, modify
+        different fields, and write sequentially — the second write overwrites
+        the first (lost update). This method does read-modify-write under
+        a single FileLock.
+        """
+        import yaml
+        lock_path = str(self._agents_yaml) + ".lock"
+        with FileLock(lock_path, timeout_seconds=10):
+            if self._agents_yaml.exists():
+                with open(self._agents_yaml, encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+            else:
+                data = {}
+            changes = apply_fn(data)
+            if not changes:
+                return changes
+            content = yaml.safe_dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False)
             safe_write_text(self._agents_yaml, content, encoding="utf-8")
-            # 回读校验：确保写入的 YAML 可正常解析
             with open(self._agents_yaml, encoding="utf-8") as f:
-                yaml.safe_load(f)  # 解析失败会抛异常，触发上层 backup 恢复
+                yaml.safe_load(f)
+            return changes
 
     def _backup_yaml(self) -> Path | None:
         """Create a timestamped backup of agents.yaml."""

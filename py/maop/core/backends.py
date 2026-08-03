@@ -490,8 +490,15 @@ def get_cache_backend() -> CacheBackend:
             logger.info("[backends] Cache: Redis (edition=%s)", get_edition().value)
             return _cache
         except ImportError as exc:
-            logger.warning("[backends] Redis backend not available (%s), falling back to memory", exc)
-            record_degradation("cache", "redis", "memory")
+            if os.getenv("MAOP_CACHE_ALLOW_FALLBACK", "0") == "1":
+                logger.warning("[backends] Redis cache not available (%s), falling back to memory", exc)
+                record_degradation("cache", "redis", "memory")
+            else:
+                raise RuntimeError(
+                    f"Redis cache backend was requested (MAOP_CACHE_BACKEND={backend_type}) "
+                    f"but is not importable: {exc}. Install redis/backends_redis deps, "
+                    "or set MAOP_CACHE_ALLOW_FALLBACK=1 to allow degrading to memory."
+                ) from exc
     _cache = MemoryCacheBackend()
     logger.debug("[backends] Cache: Memory")
     return _cache
@@ -527,8 +534,15 @@ def get_queue_backend(db_path: str = "") -> QueueBackend:
             logger.info("[backends] Queue: RabbitMQ (edition=%s)", get_edition().value)
             return _queue
         except ImportError:
-            logger.warning("[backends] RabbitMQ backend not available, trying Redis fallback")
-            record_degradation("queue", "rabbitmq", "redis", "import_error_rabbitmq")
+            if os.getenv("MAOP_QUEUE_ALLOW_FALLBACK", "0") == "1":
+                logger.warning("[backends] RabbitMQ not available, trying Redis fallback")
+                record_degradation("queue", "rabbitmq", "redis", "import_error_rabbitmq")
+            else:
+                raise RuntimeError(
+                    f"RabbitMQ queue backend was requested (MAOP_QUEUE_BACKEND={backend_type}) "
+                    "but pika is not installed. Install pika, or set "
+                    "MAOP_QUEUE_ALLOW_FALLBACK=1 to allow degrading to Redis/SQLite."
+                )
             try:
                 from maop.core.backends_redis import RedisQueueBackend
                 _queue = RedisQueueBackend()
@@ -544,8 +558,15 @@ def get_queue_backend(db_path: str = "") -> QueueBackend:
             logger.info("[backends] Queue: Redis")
             return _queue
         except ImportError as exc:
-            logger.warning("[backends] Redis queue backend not available (%s), falling back to SQLite", exc)
-            record_degradation("queue", "redis", "sqlite")
+            if os.getenv("MAOP_QUEUE_ALLOW_FALLBACK", "0") == "1":
+                logger.warning("[backends] Redis queue not available (%s), falling back to SQLite", exc)
+                record_degradation("queue", "redis", "sqlite")
+            else:
+                raise RuntimeError(
+                    f"Redis queue backend was requested (MAOP_QUEUE_BACKEND={backend_type}) "
+                    f"but is not importable: {exc}. Install redis deps, or set "
+                    "MAOP_QUEUE_ALLOW_FALLBACK=1 to allow degrading to SQLite."
+                ) from exc
     _queue = SQLiteQueueBackend(db_path=db_path)
     logger.debug("[backends] Queue: SQLite")
     return _queue
@@ -581,8 +602,15 @@ def get_kv_backend(db_path: str = "") -> KVBackend:
             logger.info("[backends] KV: %s (edition=%s)", backend_type, get_edition().value)
             return _kv
         except ImportError:
-            logger.warning("[backends] %s KV backend not available, falling back to SQLite", backend_type)
-            record_degradation("kv", backend_type, "sqlite")
+            if os.getenv("MAOP_KV_ALLOW_FALLBACK", "0") == "1":
+                logger.warning("[backends] %s KV backend not available, falling back to SQLite", backend_type)
+                record_degradation("kv", backend_type, "sqlite")
+            else:
+                raise RuntimeError(
+                    f"{backend_type} KV backend was requested (MAOP_KV_BACKEND={backend_type}) "
+                    "but etcd3 is not installed. Install etcd3, or set "
+                    "MAOP_KV_ALLOW_FALLBACK=1 to allow degrading to SQLite."
+                )
     _kv = SQLiteKVBackend(db_path=db_path)
     logger.debug("[backends] KV: SQLite")
     return _kv

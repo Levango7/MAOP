@@ -34,11 +34,18 @@ export function useStreamingFetch() {
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
+    // AbortController for cancellable streaming (prevents leak on unmount/renavigate)
+    const controller = new AbortController();
+    if (callbacks.signal) {
+      callbacks.signal.addEventListener('abort', () => controller.abort());
+    }
+
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify(body || {}),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
