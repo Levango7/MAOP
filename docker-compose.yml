@@ -38,7 +38,7 @@ services:
       # in .env to preserve the previous behavior.
       POSTGRES_PASSWORD: ${MAOP_PG_PASSWORD:?Set MAOP_PG_PASSWORD in .env (use "maop_dev" for local dev)}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
@@ -273,7 +273,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=7d"
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     depends_on:
       - otel-collector
     restart: unless-stopped
@@ -290,7 +290,7 @@ services:
     volumes:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     ports:
-      - "9093:9093"
+      - "127.0.0.1:9093:9093"
     restart: unless-stopped
     cap_drop:
       - ALL
@@ -328,7 +328,7 @@ services:
 
   # ── Optional: n8n workflow automation (Enterprise, --profile n8n) ──
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:1.45.0
     profiles: ["n8n"]
     ports:
       - "5678:5678"
