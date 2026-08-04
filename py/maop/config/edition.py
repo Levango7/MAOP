@@ -115,8 +115,8 @@ _FEATURE_MAP: dict[Edition, frozenset[FeatureFlag]] = {
 }
 
 # Enterprise 默认 backend 与实际实现保持一致：
-# - queue: "redis"（非 rabbitmq，因 backends_rabbitmq.py 未实现）
-# - kv: "sqlite"（非 etcd，因 backends_distributed.py 未实现）
+# - queue: "redis"（rabbitmq 已实现但为可选依赖，需 pika）
+# - kv: "sqlite"（etcd 已实现但为可选依赖，需 etcd3）
 _BACKEND_DEFAULTS: dict[Edition, dict[str, str]] = {
     Edition.PERSONAL: {
         "storage": "sqlite",
@@ -167,9 +167,10 @@ def detect_edition() -> Edition:
     try:
         if _is_enterprise_package_installed():
             return _detect_with_license_check(Edition.ENTERPRISE)
+    except ImportError:
+        logger.debug("Enterprise package not available")
     except Exception:
-        logger.debug("Silent exception in config/edition.py:170", exc_info=True)
-        pass
+        logger.exception("[edition] Unexpected error during edition detection")
 
     return Edition.PERSONAL
 
@@ -189,10 +190,16 @@ def _detect_with_license_check(requested: Edition) -> Edition:
         validator = LicenseValidator()
         info = validator.validate_from_env()
         if info is None:
-            # Honor-system mode: no license key, but package is installed
+            if os.getenv("MAOP_ENV", "development").lower() == "production":
+                logger.error(
+                    "[edition] MAOP_LICENSE_KEY is required in production. "
+                    "Degrading to PERSONAL."
+                )
+                record_degradation("license", "enterprise", "personal", "no_license_key_prod")
+                return Edition.PERSONAL
             logger.warning(
-                "[edition] Enterprise package installed but no license key found. "
-                "Running in honor-system mode. Set MAOP_LICENSE_KEY for production."
+                "[edition] Honor-system mode (development only). "
+                "Set MAOP_LICENSE_KEY for production."
             )
             return Edition.ENTERPRISE
         # License validated successfully
@@ -268,7 +275,10 @@ def set_feature_override(flag: FeatureFlag | str, enabled: bool) -> None:
     """Override a single feature flag regardless of edition.
 
     Useful for testing or for gradual rollouts.
+    Blocked in production to prevent runtime tampering.
     """
+    if os.getenv("MAOP_ENV", "development").lower() == "production":
+        raise RuntimeError("Feature overrides are not allowed in production")
     if isinstance(flag, str):
         flag = FeatureFlag(flag)
     _feature_overrides[flag] = enabled
@@ -291,18 +301,32 @@ def all_features() -> dict[str, bool]:
 
 
 def record_degradation(backend: str, requested: str, fallback: str, reason: str = "import_error") -> None:
-    """Record a backend degradation event (enterprise → personal fallback)."""
+    """Record a backend degradation event (enterprise → personal fallback).
+
+    Persists to data/degradation.log (JSONL) for audit trail across restarts.
+    """
+    from datetime import datetime, timezone
+
     entry = {
         "backend": backend,
         "requested": requested,
         "fallback": fallback,
         "reason": reason,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     _degradation_log.append(entry)
     logger.warning(
         "[edition] Degradation: %s backend '%s' unavailable, falling back to '%s' (%s)",
         backend, requested, fallback, reason,
     )
+    try:
+        import json
+        log_path = os.path.join(os.getenv("MAOP_ROOT", "."), "data", "degradation.log")
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError:
+        pass
 
 
 def degradation_log() -> list[dict[str, str]]:
