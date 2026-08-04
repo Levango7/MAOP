@@ -37,12 +37,9 @@ import json
 import logging
 import sqlite3
 import time
-import uuid
-from enum import Enum
 from pathlib import Path
 from typing import Any, cast
 
-from pydantic import BaseModel, Field
 
 from maop.core.cache import LRUCache
 from maop.core.db_utils import sqlite_connect
@@ -69,140 +66,27 @@ LAYER_NAME_MAP: dict[str, str] = {
 
 # ── Models ────────────────────────────────────────────────────
 
-class QualityDimensions(BaseModel):
-    """Multi-dimensional quality scores for an episodic entry.
-
-    Each dimension is 0.0 - 1.0. The composite score is the weighted average.
-    """
-    correctness: float = 0.0
-    completeness: float = 0.0
-    efficiency: float = 0.0
-    clarity: float = 0.0
-    safety: float = 0.0
-
-    def composite(self) -> float:
-        return round(
-            (self.correctness * 0.35 + self.completeness * 0.25
-             + self.efficiency * 0.20 + self.clarity * 0.10 + self.safety * 0.10),
-            3,
-        )
-
-
-class EpisodicEntry(BaseModel):
-    """A single episodic memory entry (task experience)."""
-    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:16])
-    task: str = ""
-    agent: str = ""
-    outcome: str = ""  # success | partial | failure
-    score: float = 0.0  # 0.0 - 1.0
-    lessons: list[str] = Field(default_factory=list)
-    user_feedback: str = ""
-    quality_dimensions: QualityDimensions = Field(default_factory=QualityDimensions)
-    summary: str = ""
-    key_decisions: list[str] = Field(default_factory=list)
-    files_touched: list[str] = Field(default_factory=list)
-    metadata: dict[str, Any] = Field(default_factory=dict)
-    created_at: float = Field(default_factory=time.time)
-    access_count: int = 0
-
-
-class EpisodicSearchResult(BaseModel):
-    """A retrieved episodic memory with decay-adjusted weight."""
-    entry: EpisodicEntry
-    retrieval_weight: float = 1.0
-
-
-class ConsolidationReport(BaseModel):
-    """Result of a consolidation pass."""
-    candidates: int = 0
-    consolidated: int = 0
-    skipped: int = 0
-    errors: int = 0
-
-
-class FocusMode(str, Enum):
-    """Transform focus modes."""
-    DEEP_FOCUS = "deep_focus"
-    BROAD_SCAN = "broad_scan"
-    EXPLORATORY = "exploratory"
-
-
-class ContextHead(str, Enum):
-    """Multi-head context analysis perspectives.
-
-    Inspired by Transformer multi-head attention: each head analyzes
-    the same context from a different angle, then results are fused.
-    """
-    FACTS = "facts"
-    INTENT = "intent"
-    CONSTRAINTS = "constraints"
-
-
-class HeadResult(BaseModel):
-    """Result from a single context head analysis."""
-    head: ContextHead
-    items: list[ContextItem] = Field(default_factory=list)
-    summary: str = ""
-    token_estimate: int = 0
-
-
-class MultiHeadResult(BaseModel):
-    """Fused result from multi-head context analysis."""
-    heads: list[HeadResult] = Field(default_factory=list)
-    fused_context: list[dict[str, Any]] = Field(default_factory=list)
-    total_tokens_estimate: int = 0
-    fusion_strategy: str = "weighted_merge"
-
-
-class FocusConfig(BaseModel):
-    """Configuration for a focus mode."""
-    mode: FocusMode = FocusMode.DEEP_FOCUS
-    relevance_weight: float = 0.5
-    importance_weight: float = 0.3
-    recency_weight: float = 0.2
-    memory_budget: float = 0.75
-    input_budget: float = 0.20
-    margin_budget: float = 0.05
-    max_results: int = 10
-
-
-class TransformResult(BaseModel):
-    """Result of a Transform focus operation."""
-    mode: FocusMode
-    context_parts: list[dict[str, Any]] = Field(default_factory=list)
-    total_tokens_estimate: int = 0
-    memory_ratio: float = 0.0
-    input_ratio: float = 0.0
-    pipeline_stats: dict[str, int] = Field(default_factory=dict)
-
-
-class ContextItem(BaseModel):
-    """A single context item for Transform pipeline processing."""
-    layer: str = ""
-    source: str = ""
-    data: Any = None
-    weight: float = 1.0
-    relevance_score: float = 0.0
-    compressed: bool = False
-
-
-# ── Decay Policy ─────────────────────────────────────────────
-
-DECAY_TIERS = [
-    (7, 1.0),      # 0-7 days: full weight
-    (30, 0.7),     # 7-30 days: 70%
-    (90, 0.4),     # 30-90 days: 40%
-    (365, 0.2),    # 90-365 days: 20%
-]
-
-
-def decay_weight(created_at: float) -> float:
-    """Compute retrieval weight based on age (time-decay)."""
-    age_days = (time.time() - created_at) / 86400
-    for threshold, weight in DECAY_TIERS:
-        if age_days <= threshold:
-            return weight
-    return 0.1  # > 1 year: minimal weight
+from maop.core.three_layer_memory_types import (
+    ConsolidationReport,
+    ContextHead,
+    ContextItem,
+    EpisodicEntry,
+    EpisodicSearchResult,
+    FocusConfig,
+    FocusMode,
+    HeadResult,
+    MultiHeadResult,
+    QualityDimensions,
+    TransformResult,
+    decay_weight,
+)
+from maop.core.three_layer_memory_utils import (
+    _DEFAULT_FOCUS_CONFIGS,
+    _compress_text,
+    _is_negative_feedback,
+    _item_to_text,
+    _text_relevance,
+)
 
 
 # ── Episodic DDL ─────────────────────────────────────────────
@@ -1303,88 +1187,3 @@ class ThreeLayerMemory:
 
 # ── Transform Helpers ─────────────────────────────────────────
 
-def _text_relevance(query: str, text: str) -> float:
-    """Compute simple text relevance score (0.0 - 1.0).
-
-    Uses token overlap ratio between query and text.
-    """
-    q_tokens = set(query.lower().split())
-    t_tokens = set(text.lower().split())
-    if not q_tokens or not t_tokens:
-        return 0.0
-    overlap = len(q_tokens & t_tokens)
-    return min(overlap / len(q_tokens), 1.0)
-
-
-def _item_to_text(item: ContextItem) -> str:
-    """Extract searchable text from a ContextItem."""
-    data = item.data
-    if isinstance(data, str):
-        return data
-    if isinstance(data, dict):
-        return data.get("task", "") or data.get("content", "") or json.dumps(data, default=str)
-    return json.dumps(data, default=str)
-
-
-def _compress_text(text: str, max_len: int = 300) -> str:
-    """Compress long text to a summary (first/last sentences + ellipsis)."""
-    if len(text) <= max_len:
-        return text
-    sentences = text.replace("\n", ". ").split(". ")
-    if len(sentences) <= 2:
-        return text[:max_len] + "..."
-    head = sentences[0]
-    tail = sentences[-1]
-    result = f"{head}. ... {tail}."
-    if len(result) > max_len:
-        result = text[:max_len // 2] + " ... " + text[-max_len // 2:]
-    return result
-
-
-_DEFAULT_FOCUS_CONFIGS: dict[FocusMode, FocusConfig] = {
-    FocusMode.DEEP_FOCUS: FocusConfig(
-        mode=FocusMode.DEEP_FOCUS,
-        relevance_weight=0.6,
-        importance_weight=0.3,
-        recency_weight=0.1,
-        memory_budget=0.75,
-        input_budget=0.20,
-        margin_budget=0.05,
-        max_results=3,
-    ),
-    FocusMode.BROAD_SCAN: FocusConfig(
-        mode=FocusMode.BROAD_SCAN,
-        relevance_weight=0.3,
-        importance_weight=0.2,
-        recency_weight=0.5,
-        memory_budget=0.50,
-        input_budget=0.40,
-        margin_budget=0.10,
-        max_results=20,
-    ),
-    FocusMode.EXPLORATORY: FocusConfig(
-        mode=FocusMode.EXPLORATORY,
-        relevance_weight=0.4,
-        importance_weight=0.3,
-        recency_weight=0.3,
-        memory_budget=0.60,
-        input_budget=0.30,
-        margin_budget=0.10,
-        max_results=10,
-    ),
-}
-
-
-_NEGATIVE_KEYWORDS = frozenset({
-    "bad", "wrong", "incorrect", "broken", "failed", "terrible",
-    "awful", "poor", "unacceptable", "useless", "error",
-    "bug", "crash", "slow", "missing", "incomplete",
-})
-
-
-def _is_negative_feedback(feedback: str) -> bool:
-    """Check if user feedback text indicates negative sentiment."""
-    if not feedback:
-        return False
-    words = set(feedback.lower().split())
-    return bool(words & _NEGATIVE_KEYWORDS)
