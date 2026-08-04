@@ -93,7 +93,7 @@ services:
     environment:
       POSTGRES_DB: maop
       POSTGRES_USER: maop
-      POSTGRES_PASSWORD: maop_dev
+      POSTGRES_PASSWORD: ${{MAOP_PG_PASSWORD:?Set MAOP_PG_PASSWORD environment variable}}
     volumes:
       - pg-data:/var/lib/postgresql/data
 
