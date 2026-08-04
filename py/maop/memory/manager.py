@@ -32,11 +32,12 @@ import contextlib
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, Field
 
-from maop.core.conversation import ConversationManager, MessageRole
+if TYPE_CHECKING:
+    from maop.core.conversation import ConversationManager
 from maop.core.db_utils import sqlite_connect
 from maop.memory.shared_db import (
     get_memory_db_path,
@@ -97,6 +98,8 @@ class MemoryManager:
     ) -> None:
         self._root = Path(root_dir)
         self._config = config or MemoryManagerConfig()
+        from maop.core.conversation import ConversationManager
+
         self._conversation = ConversationManager(
             root_dir=root_dir,
             max_context_tokens=self._config.max_working_tokens,
@@ -151,6 +154,8 @@ class MemoryManager:
         result: dict[str, str] = {}
 
         # L1: Working memory (conversation)
+        from maop.core.conversation import MessageRole
+
         user_id = self._conversation.add_message(
             session_id=session_id, role=MessageRole.USER,
             content=user_msg, metadata=metadata,
