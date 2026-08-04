@@ -1231,8 +1231,8 @@ class ThreeLayerMemory:
                     layer="semantic", source=getattr(sr, "id", ""),
                     data=str(sr), weight=0.6,
                 ))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ignored: %s", e, exc_info=True)
 
         return items
 

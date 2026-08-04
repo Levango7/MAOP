@@ -212,8 +212,8 @@ class WorkerPool:
                         wt_mgr = WorktreeManager(root_dir=self._root_dir or ".")
                         worktree_info = wt_mgr.create_root(task_id=wt.id)  # type: ignore[call-arg]
                         actual_workdir = str(worktree_info)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("ignored: %s", e, exc_info=True)
 
                 from maop.maop_loop import MaopLoop
                 # P2-2 fix: reuse shared MaopLoop to avoid re-opening 5 SQLite
@@ -251,8 +251,8 @@ class WorkerPool:
                         from maop.core.worktree import WorktreeManager
                         wt_mgr = WorktreeManager(root_dir=self._root_dir or ".")
                         wt_mgr.cleanup(worktree_info)  # type: ignore[attr-defined]
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("ignored: %s", e, exc_info=True)
 
     def _find_idle_worker(self) -> int:
         """Find an idle worker slot."""

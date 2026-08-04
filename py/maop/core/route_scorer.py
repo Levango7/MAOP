@@ -201,8 +201,8 @@ class RouteScorer:
                     1.0 if self._use_multi_objective else 0.0,
                     labels={"mode": "multi_objective" if self._use_multi_objective else "weighted_sum"},
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("ignored: %s", e, exc_info=True)
 
             logger.debug(
                 "Route match: rk=%s agent=%s score=%.2f confidence=%s matched_by=%s "
@@ -708,8 +708,8 @@ def _record_route_scorer_decision(
         )
         MAOP_ROUTING_DECISION_TOTAL.inc(labels={"stage": "route_scorer"})
         MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("ignored: %s", e, exc_info=True)
 
     record_decision_safe(RoutingDecisionRecord(
         trace_id=effective_trace,

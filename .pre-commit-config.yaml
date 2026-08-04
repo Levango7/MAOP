@@ -1,0 +1,51 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^py/
+      - id: ruff-format
+        files: ^py/
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        files: ^py/maop/
+        additional_dependencies:
+          - pydantic>=2.9
+          - types-PyYAML>=6.0
+        args: [--ignore-missing-imports, --no-error-summary]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+        exclude: \.md$
+      - id: check-yaml
+        files: \.(yml|yaml)$
+      - id: check-json
+        files: \.json$
+      - id: check-toml
+        files: \.toml$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: detect-private-key
+        files: ^py/
+      - id: check-ast
+        files: ^py/.*\.py$
+
+  - repo: local
+    hooks:
+      - id: pytest-fast
+        name: pytest (fast subset)
+        entry: python -m pytest tests/ -q -x --ignore=tests/contract --ignore=tests/integration -k "not slow" --timeout=30
+        language: system
+        types: [python]
+        files: ^py/tests/
+        pass_filenames: false
+        stages: [push]

@@ -199,7 +199,8 @@ class SkillVersionManager:
                 if len(parts) >= 3:
                     entries.append({"commit": parts[0][:12], "date": parts[1], "message": parts[2]})
             return entries
-        except Exception:
+        except Exception as e:
+            logger.debug("ignored: %s", e, exc_info=True)
             return []
 
     def list_skills(self) -> list[SkillMeta]:
@@ -249,7 +250,8 @@ class SkillVersionManager:
             return None
         try:
             return SkillMeta(**json.loads(meta_file.read_text(encoding="utf-8")))
-        except Exception:
+        except Exception as e:
+            logger.debug("ignored: %s", e, exc_info=True)
             return None
 
     def execute_skill(

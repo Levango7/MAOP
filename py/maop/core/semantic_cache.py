@@ -92,7 +92,8 @@ class SemanticCache:
     def _embed(self, text: str) -> list[float]:
         try:
             return cast(list[float], self._get_embedder().embed(text))
-        except Exception:
+        except Exception as e:
+            logger.debug("ignored: %s", e, exc_info=True)
             return []
 
     @staticmethod

@@ -73,8 +73,8 @@ class TenantManager:
             if pg.available:
                 self._pg = pg
                 self._load_from_pg()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ignored: %s", e, exc_info=True)
 
     def _load_from_pg(self) -> None:
         if not self._pg:

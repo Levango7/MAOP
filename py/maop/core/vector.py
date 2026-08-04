@@ -387,8 +387,8 @@ class VectorStore:
         # Try sqlite-vec ANN index (fastest, optional dep)
         try:
             return self._search_vector_sqlite_vec(query_vector, top, threshold)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ignored: %s", e, exc_info=True)
 
         # Try numpy-accelerated batch similarity
         try:
@@ -520,8 +520,8 @@ class VectorStore:
                     self._text_cache[entry_id] = text
                     self._meta_cache[entry_id] = meta
                     return text, meta
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ignored: %s", e, exc_info=True)
         return "", {}
 
     # ── Maintenance ───────────────────────────────────────────
