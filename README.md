@@ -145,6 +145,12 @@ maop health
 pytest py/tests
 ```
 
+> **⚠️ Security Notes for Development:**
+> - `start.sh` defaults to `127.0.0.1` — do NOT set `MAOP_HOST=0.0.0.0` without `MAOP_AUTH=1`
+> - Never commit `.env` files (see `.gitignore`)
+> - Run `make lint` before committing (includes ruff + mypy)
+> - For production: use `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
+
 **Choose your starting point:**
 
 | Goal | Command | Learn more |

@@ -203,8 +203,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      prometheus:
-        condition: service_started
+
       vault:
         # OPS-16 fix: wait until vault is initialized AND unsealed
         # (healthcheck `vault status` exits 0 only in that state),
