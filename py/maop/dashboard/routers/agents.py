@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from maop.core.middleware import require_admin
@@ -112,7 +112,7 @@ async def list_agents(
 
 @router.get("/routes")
 @handle_api_errors
-async def get_agent_routes():
+async def get_agent_routes() -> dict[str, Any]:
     """返回路由配置 (capability → primary/fallback/tertiary)，合并 agent 信息。
 
     数据来源:
@@ -244,7 +244,7 @@ async def match_agents(
 
 @router.get("/{name}")
 @handle_api_errors
-async def get_agent(name: str):
+async def get_agent(name: str) -> Response:
     registry = _get_registry()
     agent = registry.get_agent(name)
     if agent is None:
@@ -254,7 +254,7 @@ async def get_agent(name: str):
 
 @router.post("/scan")
 @handle_api_errors
-async def scan_agents(request: Request):
+async def scan_agents(request: Request) -> dict[str, Any]:
     require_admin(request)
     scanner = _get_scanner()
     registry = _get_registry()
@@ -265,7 +265,7 @@ async def scan_agents(request: Request):
 
 @router.post("/{name}/health-check")
 @handle_api_errors
-async def check_agent_health(name: str, request: Request):
+async def check_agent_health(name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     registry = _get_registry()
     result = registry.health_check(name)
@@ -274,7 +274,7 @@ async def check_agent_health(name: str, request: Request):
 
 @router.post("/health-check-all")
 @handle_api_errors
-async def check_all_health(request: Request):
+async def check_all_health(request: Request) -> dict[str, Any]:
     require_admin(request)
     registry = _get_registry()
     results = registry.health_check_all()
@@ -283,7 +283,7 @@ async def check_all_health(request: Request):
 
 @router.post("/{name}/enable")
 @handle_api_errors
-async def enable_agent(name: str, request: Request):
+async def enable_agent(name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     registry = _get_registry()
     ok = registry.enable(name)
@@ -292,7 +292,7 @@ async def enable_agent(name: str, request: Request):
 
 @router.post("/{name}/disable")
 @handle_api_errors
-async def disable_agent(name: str, request: Request):
+async def disable_agent(name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     registry = _get_registry()
     ok = registry.disable(name)
@@ -301,7 +301,7 @@ async def disable_agent(name: str, request: Request):
 
 @router.post("/register")
 @handle_api_errors
-async def register_agent(body: RegisterAgentRequest, request: Request):
+async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[str, Any]:
     """注册新 agent——同时写入 registry 数据库和 config/agents.yaml。
 
     这样扫描到的 agent 也能使用升级/诊断/修复/自进化等依赖 yaml 的功能。
@@ -360,7 +360,7 @@ async def register_agent(body: RegisterAgentRequest, request: Request):
 
 @router.delete("/{name}")
 @handle_api_errors
-async def unregister_agent(name: str, request: Request):
+async def unregister_agent(name: str, request: Request) -> dict[str, Any]:
     """从注册表、扫描表和 agents.yaml 中移除 agent。
 
     清理范围：
@@ -420,7 +420,7 @@ async def unregister_agent(name: str, request: Request):
 
 @router.get("/{name}/health-log")
 @handle_api_errors
-async def get_health_log(name: str, limit: int = Query(50, ge=1, le=200)):
+async def get_health_log(name: str, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
     registry = _get_registry()
     log = registry.get_health_log(agent_name=name, limit=limit)
     return {"log": log}
@@ -430,7 +430,7 @@ async def get_health_log(name: str, limit: int = Query(50, ge=1, le=200)):
 
 @router.get("/{name}/diagnose")
 @handle_api_errors
-async def diagnose_agent(name: str, request: Request):
+async def diagnose_agent(name: str, request: Request) -> dict[str, Any]:
     """诊断 agent CLI 的状态（CLI 存在性、依赖、配置）。"""
     require_admin(request)
     repair = _get_repair()
@@ -441,7 +441,7 @@ async def diagnose_agent(name: str, request: Request):
 
 @router.post("/{name}/repair")
 @handle_api_errors
-async def repair_agent(name: str, request: Request):
+async def repair_agent(name: str, request: Request) -> dict[str, Any]:
     """修复 agent CLI（安装缺失依赖、修复权限、重装 CLI）。"""
     require_admin(request)
     repair = _get_repair()
@@ -467,7 +467,7 @@ async def repair_agent(name: str, request: Request):
 
 @router.get("/upgrade/status")
 @handle_api_errors
-async def get_upgrade_status(request: Request):
+async def get_upgrade_status(request: Request) -> dict[str, Any]:
     """获取所有 agent 的升级状态（当前版本 vs 最新版本）。"""
     require_admin(request)
     import asyncio
@@ -551,7 +551,7 @@ async def get_upgrade_status(request: Request):
 
 @router.get("/{name}/upgrade/check")
 @handle_api_errors
-async def check_upgrade(name: str, request: Request):
+async def check_upgrade(name: str, request: Request) -> dict[str, Any]:
     """检查 agent 的当前版本和最新版本（升级前调用，不执行实际升级）。
 
     返回：
@@ -689,7 +689,7 @@ async def check_upgrade(name: str, request: Request):
 
 @router.post("/{name}/upgrade")
 @handle_api_errors
-async def upgrade_agent(name: str, request: Request):
+async def upgrade_agent(name: str, request: Request) -> dict[str, Any]:
     """升级 agent CLI（自动检测安装方式：pip/npm/二进制）。"""
     require_admin(request)
     import asyncio
@@ -831,7 +831,7 @@ async def get_agent_memory(
 
 @router.post("/{name}/memory")
 @handle_api_errors
-async def store_agent_memory(name: str, body: MemoryStoreRequest, request: Request):
+async def store_agent_memory(name: str, body: MemoryStoreRequest, request: Request) -> dict[str, Any]:
     """存储一条 agent 记忆。"""
     require_admin(request)
     memory = _get_memory()
@@ -864,7 +864,7 @@ async def clear_agent_memory(
 
 @router.get("/{name}/memory/summary")
 @handle_api_errors
-async def get_memory_summary(name: str):
+async def get_memory_summary(name: str) -> dict[str, Any]:
     """获取 agent 记忆的统计摘要。"""
     memory = _get_memory()
     summary = memory.summarize(name)
@@ -875,7 +875,7 @@ async def get_memory_summary(name: str):
 
 @router.post("/{name}/evolve")
 @handle_api_errors
-async def evolve_agent(name: str, request: Request):
+async def evolve_agent(name: str, request: Request) -> dict[str, Any]:
     """触发 agent 自进化分析。"""
     require_admin(request)
     evolution = _get_evolution()
@@ -899,7 +899,7 @@ async def evolve_agent(name: str, request: Request):
 
 @router.get("/{name}/evolution-status")
 @handle_api_errors
-async def get_evolution_status(name: str):
+async def get_evolution_status(name: str) -> dict[str, Any]:
     """获取 agent 的自进化状态。"""
     evolution = _get_evolution()
     status = evolution.get_status(name)

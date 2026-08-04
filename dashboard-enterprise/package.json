@@ -12,7 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/ --ext .js,.vue",
     "lint:fix": "eslint src/ --ext .js,.vue --fix",
-    "format": "prettier --write src/"
+    "format": "prettier --write src/",
+    "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
@@ -31,7 +32,9 @@
     "eslint-plugin-vue": "^9.28.0",
     "jsdom": "^26.0.0",
     "prettier": "^3.4.0",
+    "typescript": "^5.6.0",
     "vite": "^8.1.1",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "vue-tsc": "^2.1.0"
   }
 }
