@@ -172,7 +172,7 @@ class AgentEvolution:
             description=result.summary,
             changes={
                 "suggestions_count": total,
-                "auto_applied_count": applied,
+                "auto_applied_count": applied_count,
                 "categories": list({s.category for s in result.suggestions}),
             },
             success=True,
