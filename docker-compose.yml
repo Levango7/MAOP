@@ -92,7 +92,7 @@ services:
       # MUST set MAOP_VAULT_TOKEN explicitly. The previous default "dev-token"
       # is the well-known Vault dev-mode root token — unacceptable in prod.
       # Local dev: set MAOP_VAULT_TOKEN=dev-token in .env when using --profile vault.
-      - MAOP_VAULT_TOKEN=${MAOP_VAULT_TOKEN:?Set MAOP_VAULT_TOKEN when using vault profile}
+      - MAOP_VAULT_TOKEN=${MAOP_VAULT_TOKEN:-}
       # t15: OTEL exporter wired into dashboard container so traces can reach
       # the otel-collector service via its service name (not localhost, which
       # would resolve to the dashboard container itself).
@@ -298,13 +298,15 @@ services:
       - no-new-privileges:true
 
   # ── Optional: HashiCorp Vault (dev server, --profile vault) ──────
+  # WARNING: This is a DEV-ONLY configuration. For production, use:
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
   vault:
-    image: hashicorp/vault:latest
+    image: hashicorp/vault:1.17
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: dev-token
+      VAULT_DEV_ROOT_TOKEN_ID: ${MAOP_VAULT_TOKEN:-dev-token}
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
     ports:
-      - "8200:8200"
+      - "127.0.0.1:8200:8200"
     cap_add:
       - IPC_LOCK
     profiles: ["vault"]
@@ -312,12 +314,13 @@ services:
   # ── Optional: Redis (cache/queue/HA, --profile redis) ───────────
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass ${MAOP_REDIS_PASSWORD:-maop_dev}
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${MAOP_REDIS_PASSWORD:-maop_dev}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
