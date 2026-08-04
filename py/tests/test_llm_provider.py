@@ -479,7 +479,7 @@ class TestChatEngineProviderIntegration:
         with patch("maop.delegate.dispatcher.Dispatcher") as MockDispatcher:
             mock_result = MagicMock()
             mock_result.result.is_success.return_value = True
-            mock_result.result.output = "Fallback response"
+            mock_result.result.stdout = "Fallback response"
             MockDispatcher.return_value.dispatch = AsyncMock(return_value=mock_result)
 
             request = ChatRequest(message="Hi", model="yi-large")
@@ -493,7 +493,7 @@ class TestChatEngineProviderIntegration:
         with patch("maop.delegate.dispatcher.Dispatcher") as MockDispatcher:
             mock_result = MagicMock()
             mock_result.result.is_success.return_value = True
-            mock_result.result.output = "Dispatch response"
+            mock_result.result.stdout = "Dispatch response"
             MockDispatcher.return_value.dispatch = AsyncMock(return_value=mock_result)
 
             request = ChatRequest(message="Hi")

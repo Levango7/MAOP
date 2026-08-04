@@ -127,6 +127,20 @@ from maop.maop_plan import _route_by_config
 class TestADR012ConfigRouting:
     """Verify ADR-012: config routing (match + keywords) takes precedence."""
 
+    @pytest.fixture(autouse=True)
+    def _reset_route_scorer_singleton(self):
+        """Reset RouteScorer singleton for test isolation.
+
+        Without this, a prior test calling maop_plan without config
+        initializes the singleton with config=None. The hot-reload guard
+        then refuses to reinitialize, so the config fixture is ignored.
+        """
+        from maop.core.route_scorer import RouteScorer
+
+        RouteScorer.reset()
+        yield
+        RouteScorer.reset()
+
     @pytest.fixture
     def config(self):
         return MaopConfig(routing={
