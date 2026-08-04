@@ -1,7 +1,7 @@
 # ADR-011: P0-3 状态源真统一（队列/人工队列单一真源）
 
 ## Status
-Proposed
+Accepted (2026-08-05). queue.db is the single source for message queue; human_queue.db for human approval queue. PS-era human-queue.json retired.
 
 ## Context
 项目从 PS 引擎迁移到 Python。当前在「队列/人工队列」状态上存在多真源隐患，经核查实际比任务书描述更复杂（已通过 Grep/Read 实测）：

@@ -1,0 +1,43 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "globals": {
+    "defineProps": "readonly",
+    "defineEmits": "readonly",
+    "defineExpose": "readonly",
+    "withDefaults": "readonly",
+    "import.meta": "readonly"
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:vue/vue3-recommended",
+    "prettier"
+  ],
+  "plugins": ["vue"],
+  "rules": {
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-debugger": "error",
+    "prefer-const": "error",
+    "no-var": "error",
+    "vue/multi-word-component-names": "off",
+    "vue/no-v-html": "off",
+    "vue/require-default-prop": "warn",
+    "vue/attribute-hyphenation": "error",
+    "vue/v-on-event-hyphenation": "error",
+    "eqeqeq": ["error", "always"]
+  },
+  "ignorePatterns": [
+    "dist/",
+    "node_modules/",
+    "*.config.js"
+  ]
+}
