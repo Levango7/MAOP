@@ -383,7 +383,8 @@ def get_active_span_context() -> tuple[str, str, str | None]:
             except (AttributeError, TypeError):
                 parent_span_id = None
         return (trace_id, span_id, parent_span_id)
-    except Exception:
+    except Exception as e:
+        logger.debug("ignored: %s", e, exc_info=True)
         return ("", "", None)
 
 

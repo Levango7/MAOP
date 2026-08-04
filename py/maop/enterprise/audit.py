@@ -71,8 +71,8 @@ class EnterpriseAuditLogger:
             pg = PgAuditStore()
             if pg.available:
                 self._pg = pg
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ignored: %s", e, exc_info=True)
 
     def log(
         self,

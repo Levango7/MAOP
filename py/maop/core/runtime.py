@@ -307,8 +307,8 @@ class ContainerRuntime(BaseRuntime):
                     check=True,
                 )
                 version = result.stdout.strip()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("ignored: %s", e, exc_info=True)
 
         return RuntimeInfo(
             type=RuntimeType.CONTAINER,

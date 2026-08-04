@@ -188,7 +188,8 @@ class SelfHealEngine:
                 with sqlite_connect(db_path) as conn:
                     conn.execute("SELECT 1")
                 return True
-            except Exception:
+            except Exception as e:
+                logger.debug("ignored: %s", e, exc_info=True)
                 return False
         if verify == "cache_accessible":
             return True

@@ -254,8 +254,8 @@ class AgentMemory:
                 try:
                     content = json.loads(row["content"])
                     error_patterns.append({"pattern": content, "frequency": row["freq"]})
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("ignored: %s", e, exc_info=True)
 
             # 进化历史计数
             evo_row = conn.execute(

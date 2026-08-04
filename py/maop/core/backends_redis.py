@@ -150,7 +150,8 @@ class RedisQueueBackend(QueueBackend):
                 "length": length,
                 "pending": pending.get("pending", 0) if isinstance(pending, dict) else 0,
             }
-        except Exception:
+        except Exception as e:
+            logger.debug("ignored: %s", e, exc_info=True)
             return {"length": 0, "pending": 0}
 
 
