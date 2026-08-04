@@ -140,3 +140,5 @@ data/*_secret*
 *.private
 # -- Scrubbed backup dirs (must NEVER be committed) --
 data_bak_*/
+# -- Runtime error logs --
+*.err
