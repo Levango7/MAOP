@@ -39,8 +39,12 @@ from maop.config.edition import Edition, set_edition
 
 logger = logging.getLogger(__name__)
 
+logger.warning(
+    "[enterprise] MAOP Enterprise extension detected — "
+    "ENTERPRISE edition activated. "
+    "Set MAOP_EDITION=personal to override."
+)
 set_edition(Edition.ENTERPRISE)
-logger.info("[enterprise] MAOP Enterprise extension loaded — all enterprise features enabled")
 
 __all__: list[str] = [
     "audit",
