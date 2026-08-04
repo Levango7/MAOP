@@ -18,7 +18,7 @@ if [ "$HOST" = "0.0.0.0" ] && [ "${MAOP_ENV:-development}" = "development" ]; th
 fi
 
 # Check Python
-if ! command -v python3 &>/dev/null; then
+if ! command -v python3 >/dev/null 2>&1; then
     echo "ERROR: python3 not found"
     exit 1
 fi
@@ -30,7 +30,7 @@ if [ -z "${VIRTUAL_ENV:-}" ] && [ -d "${MAOP_ROOT}/.venv" ]; then
 fi
 
 # Install if needed
-if ! python3 -c "import maop" &>/dev/null; then
+if ! python3 -c "import maop" >/dev/null 2>&1; then
     echo "ERROR: MAOP package not installed."
     echo "Please run: cd ${MAOP_ROOT}/py && pip install -e ."
     echo "Auto-installation is disabled for security."

@@ -20,6 +20,7 @@ CRL JSON 格式:
     MAOP_CRL_URL            CRL 服务 URL（设置后启用 CRL 检查）
     MAOP_CRL_CACHE_TTL_S    缓存有效期秒数（默认 3600）
     MAOP_CRL_STRICT         严格模式（1=无 CRL 时拒绝 license，0=允许，默认 0）
+    MAOP_CRL_MAX_CACHE_AGE_S 缓存最大过期秒数（默认 604800=7天，超过后即使 lax 模式也警告）
 
 离线降级策略:
     - 优先使用新鲜缓存（未过 TTL）
@@ -55,6 +56,8 @@ __all__ = [
 
 # HTTP 拉取 CRL 的超时秒数
 _HTTP_TIMEOUT_S = 10.0
+# 缓存最大过期秒数（7 天），超过后即使 lax 模式也记录 WARNING
+_DEFAULT_MAX_CACHE_AGE_S = 86400.0 * 7.0
 
 
 class CRLError(RuntimeError):
@@ -217,14 +220,34 @@ class CRLChecker:
             return None
 
     def _load_cached_crl_raw(self) -> dict | None:
-        """加载本地缓存的 CRL（忽略 TTL，用于离线降级）。"""
+        """加载本地缓存的 CRL（忽略 TTL，用于离线降级）。
+
+        如果缓存超过最大过期时间（默认 7 天），记录 WARNING。
+        """
         if not self.cache_path.exists():
             return None
         try:
+            mtime = self.cache_path.stat().st_mtime
+            age = time.time() - mtime
+            max_age_s = float(
+                os.getenv("MAOP_CRL_MAX_CACHE_AGE_S", str(_DEFAULT_MAX_CACHE_AGE_S))
+            )
+            if age > max_age_s:
+                logger.warning(
+                    "[crl] Cache is stale (>%.0f days). Revocation status may be outdated.",
+                    max_age_s / 86400.0,
+                )
+                if self.strict:
+                    raise CRLError(
+                        f"CRL cache expired (>{max_age_s / 86400.0:.0f} days) "
+                        "and CRL service unreachable while strict mode is enabled"
+                    )
             data = json.loads(self.cache_path.read_text(encoding="utf-8"))
             if not self._validate_crl(data):
                 return None
             return data  # type: ignore[no-any-return]
+        except CRLError:
+            raise
         except Exception as exc:
             logger.debug("[crl] Failed to load cached CRL (raw): %s", exc)
             return None
