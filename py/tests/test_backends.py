@@ -18,10 +18,20 @@ from maop.core.backends import (
 
 
 @pytest.fixture(autouse=True)
-def _reset():
+def _reset(monkeypatch):
+    # Edition isolation: importing maop.enterprise (e.g. via dashboard
+    # server in other test modules) calls set_edition(ENTERPRISE), a
+    # programmatic override that outranks the MAOP_EDITION env var.
+    # Without this reset, any test module that ran earlier can silently
+    # flip this module's defaults to enterprise backends (PostgreSQL /
+    # Redis), making results depend on pytest collection order.
+    from maop.config.edition import reset_edition
+    reset_edition()
+    monkeypatch.setenv("MAOP_EDITION", "personal")
     reset_backends()
     yield
     reset_backends()
+    reset_edition()
 
 
 class TestSQLiteStorageBackend:

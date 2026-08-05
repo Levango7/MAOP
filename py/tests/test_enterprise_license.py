@@ -145,7 +145,17 @@ class TestLicenseValidator:
         """A tampered signature should raise LicenseSignatureError."""
         key = _generate_test_license()
         # Flip the last char of the signature
-        tampered = key[:-1] + ("A" if key[-1] != "A" else "B")
+        # Flip one bit of the DECODED signature bytes, then re-encode.
+        # Flipping the last base64 char of the raw key is unreliable: a
+        # 64-byte Ed25519 signature encodes to 86 base64url chars whose
+        # final char carries only 2 real bits + 4 padding bits, so an
+        # A<->B flip on it is a no-op ~25% of the time and the test
+        # would spuriously pass validation.
+        payload_b64, sig_b64 = key[len("MAOP-ENT-"):].rsplit(".", 1)
+        sig = bytearray(base64.urlsafe_b64decode(sig_b64 + "=="))
+        sig[0] ^= 0x01
+        tampered_sig_b64 = base64.urlsafe_b64encode(bytes(sig)).rstrip(b"=").decode("ascii")
+        tampered = f"MAOP-ENT-{payload_b64}.{tampered_sig_b64}"
         validator = LicenseValidator()
         with pytest.raises(LicenseSignatureError):
             validator.validate(tampered)

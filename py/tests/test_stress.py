@@ -329,8 +329,13 @@ class TestRateLimiterBurst:
         """Multi-key RateLimiter under concurrent access."""
         from maop.core.rate_limiter import RateLimiter, RateLimiterConfig
 
-        config = RateLimiterConfig(algorithm="token_bucket", rate=100.0, burst=10)
+        rate = 100.0
+        burst = 10
+        config = RateLimiterConfig(algorithm="token_bucket", rate=rate, burst=burst)
         rl = RateLimiter(config=config)
+        # Refill accounting starts at bucket construction; measure from here
+        # so the allowed cap below can be derived from the real elapsed time.
+        start = time.monotonic()
 
         n_keys = 10
         n_threads_per_key = 20
@@ -353,13 +358,21 @@ class TestRateLimiterBurst:
             t.start()
         for t in threads:
             t.join(timeout=30)
+        elapsed = time.monotonic() - start
 
         assert not errors, f"Rate limiter errors: {errors}"
-        # Each key allows at most burst (10) + small refill
+        # Each key allows at most burst + legitimately refilled tokens.
+        # The old fixed cap (burst + 2) was timing-sensitive: at rate=100/s
+        # a slow machine can legitimately refill 3+ tokens during the test,
+        # causing spurious failures. Derive the cap from elapsed time instead.
+        max_allowed = burst + int(elapsed * rate) + 1
         for k in range(n_keys):
             key_results = [results[i] for i in range(total_threads) if i % n_keys == k]
             allowed = sum(key_results)
-            assert allowed <= 12, f"Key user-{k}: allowed {allowed} > 12"
+            assert allowed <= max_allowed, (
+                f"Key user-{k}: allowed {allowed} > max {max_allowed} "
+                f"(burst={burst}, elapsed={elapsed:.3f}s)"
+            )
 
 
 # ════════════════════════════════════════════════════════════════════
