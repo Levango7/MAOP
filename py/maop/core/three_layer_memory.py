@@ -40,7 +40,6 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
-
 from maop.core.cache import LRUCache
 from maop.core.db_utils import sqlite_connect
 
@@ -87,7 +86,6 @@ from maop.core.three_layer_memory_utils import (
     _item_to_text,
     _text_relevance,
 )
-
 
 # ── Episodic DDL ─────────────────────────────────────────────
 

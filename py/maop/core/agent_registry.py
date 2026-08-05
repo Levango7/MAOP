@@ -363,7 +363,7 @@ class AgentRegistry:
                 ).fetchall()
         return [dict(r) for r in rows]
 
-    def sync_from_scanner(self, scanner: Any, scanned: "list | None" = None) -> int:
+    def sync_from_scanner(self, scanner: Any, scanned: list | None = None) -> int:
         if scanned is None:
             scanned = scanner.scan()
         synced = 0

@@ -54,7 +54,6 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-
 from maop.core import otel
 from maop.core.db_utils import get_db_path, sqlite_connect
 
@@ -70,6 +69,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+from maop.core.mcp_hub_transport import (
+    _SSETransport,
+    _StdioTransport,
+    _StreamableHttpTransport,
+    _WebSocketTransport,
+)
 from maop.core.mcp_hub_types import (
     MCPPermissionDeniedError,
     MCPRateLimitedError,
@@ -82,13 +87,6 @@ from maop.core.mcp_hub_types import (
     ToolResult,
     TransportType,
 )
-from maop.core.mcp_hub_transport import (
-    _SSETransport,
-    _StdioTransport,
-    _StreamableHttpTransport,
-    _WebSocketTransport,
-)
-
 
 _MCP_DDL = """
 CREATE TABLE IF NOT EXISTS mcp_servers (

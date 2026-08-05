@@ -356,7 +356,7 @@ class VerifyEngine:
                 gate_results.append(gr)
             except Exception as exc:
                 engine_errored = True
-                logger.error("Gate %s raised an exception (engine bug, not a task failure): %s", gate_name, exc, exc_info=True)
+                logger.exception("Gate %s raised an exception (engine bug, not a task failure)", gate_name)
                 gate_results.append(GateResult(
                     name=gate_name, passed=False,
                     reason=f"Gate engine error (not a task failure): {exc}",

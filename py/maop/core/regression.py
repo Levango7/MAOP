@@ -112,7 +112,6 @@ class RegressionTestRunner:
                 dispatcher = svc.get("dispatcher", raise_on_failure=False)
             except Exception:
                 logger.debug("Silent exception in core/regression.py:113", exc_info=True)
-                pass
 
         if dispatcher is None:
             result.error = "No dispatcher available"

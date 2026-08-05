@@ -23,8 +23,6 @@ from maop.core.monitoring import (
     MAOP_ROUTING_DECISION_DURATION_MS,
     MAOP_ROUTING_DECISION_TOTAL,
 )
-from maop.delegate.agent_resolver import AgentResolver
-from maop.delegate.sla_monitor import SLAMonitor
 from maop.core.otel import get_tracer
 from maop.core.otel import span as otel_span
 from maop.core.routing_decision import (
@@ -32,6 +30,7 @@ from maop.core.routing_decision import (
     get_active_span_context,
     record_decision_safe,
 )
+from maop.delegate.agent_resolver import AgentResolver
 from maop.delegate.drivers import DRIVERS as _DRIVERS
 
 # Re-export for backward compatibility — callers importing from
@@ -42,6 +41,7 @@ from maop.delegate.models import (  # noqa: F401
     _escape_for_cmd,
     _escape_for_ps_command,
 )
+from maop.delegate.sla_monitor import SLAMonitor
 
 logger = logging.getLogger(__name__)
 

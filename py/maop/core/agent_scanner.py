@@ -336,7 +336,7 @@ class AgentScanner:
 
         return found
 
-    def _find_config(self) -> "Path | None":
+    def _find_config(self) -> Path | None:
         """Locate config/agents.yaml relative to the project root."""
         candidates = [
             self._root / "config" / "agents.yaml",
@@ -348,7 +348,7 @@ class AgentScanner:
                 return c
         return None
 
-    def _config_cli_agents(self) -> "dict[str, tuple[str, list[str], str]]":
+    def _config_cli_agents(self) -> dict[str, tuple[str, list[str], str]]:
         """Return {agent_name: (executable, capabilities, description)} for every
         enabled CLI agent declared in config/agents.yaml (skips disabled agents
         and MAOP-internal python wrappers like doc-pipeline / MAOP itself)."""

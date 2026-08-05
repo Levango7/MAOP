@@ -99,9 +99,13 @@ class RabbitMQQueueBackend(QueueBackend):
         """
         with self._lock:
             # 已有连接且未关闭则直接复用
-            if self._connection is not None and not self._connection.is_closed:
-                if self._channel is not None and not self._channel.is_closed:
-                    return self._channel
+            if (
+                self._connection is not None
+                and not self._connection.is_closed
+                and self._channel is not None
+                and not self._channel.is_closed
+            ):
+                return self._channel
             # 需要新建连接
             try:
                 params = pika.URLParameters(self._url)

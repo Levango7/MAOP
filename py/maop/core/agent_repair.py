@@ -261,7 +261,7 @@ class AgentRepair:
                 result.actions_taken.append(
                     f"Attempting npm install: {' '.join(install_cmd)}"
                 )
-                rc, out, err = await self._run_subprocess(install_cmd, timeout=120)
+                rc, _, err = await self._run_subprocess(install_cmd, timeout=120)
                 if rc == 0:
                     result.actions_taken.append("npm install succeeded")
                 else:
@@ -271,7 +271,7 @@ class AgentRepair:
                 pip_name = _PIP_PACKAGE_MAP.get(cli_name, cli_name)
                 cmd = [sys.executable, "-m", "pip", "install", "--upgrade", pip_name]
                 result.actions_taken.append(f"Attempting pip install: {pip_name}")
-                rc, out, err = await self._run_subprocess(cmd, timeout=120)
+                rc, _, err = await self._run_subprocess(cmd, timeout=120)
                 if rc == 0:
                     result.actions_taken.append("pip install succeeded")
                 else:
@@ -287,14 +287,14 @@ class AgentRepair:
                 pip_name = _PIP_PACKAGE_MAP.get(cli_name, cli_name)
                 cmd = [sys.executable, "-m", "pip", "install", "--upgrade", pip_name]
                 result.actions_taken.append(f"Attempting pip install (fallback): {pip_name}")
-                rc, out, err = await self._run_subprocess(cmd, timeout=120)
+                rc, _, err = await self._run_subprocess(cmd, timeout=120)
                 if rc != 0:
                     result.errors.append(f"pip install failed: {err[:200]}")
 
         # 2. 修复缺失的依赖
         for dep in before.missing_dependencies:
             result.actions_taken.append(f"Installing missing dependency: {dep}")
-            rc, out, err = await self._run_subprocess(
+            rc, _, err = await self._run_subprocess(
                 [sys.executable, "-m", "pip", "install", dep], timeout=60
             )
             if rc == 0:

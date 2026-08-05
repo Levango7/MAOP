@@ -642,7 +642,6 @@ def _record_lb_decision(
         MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)
     except Exception:
         logger.debug("Silent exception in core/load_balancer.py:643", exc_info=True)
-        pass
 
     record_decision_safe(RoutingDecisionRecord(
         trace_id=effective_trace,

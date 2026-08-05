@@ -34,7 +34,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-
 from maop.core.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
@@ -46,7 +45,6 @@ from maop.core.evolution_loop_types import (
     LoopReport,
     PhaseResult,
 )
-
 
 _EVOLUTION_LOOP_DDL = """
 CREATE TABLE IF NOT EXISTS evolution_cycles (

@@ -180,7 +180,6 @@ class ProjectContext:
                     result[name] = content
                 except Exception:
                     logger.debug("Silent exception in core/project_context.py:181", exc_info=True)
-                    pass
         return result
 
     def _read_instructions(self) -> str:
@@ -194,7 +193,6 @@ class ProjectContext:
                         parts.append(f"### {name}\n{content[:2000]}")
                 except Exception:
                     logger.debug("Silent exception in core/project_context.py:194", exc_info=True)
-                    pass
         return "\n\n".join(parts)
 
     def _detect_recent_changes(self) -> str:
@@ -210,7 +208,6 @@ class ProjectContext:
                 return "\n".join(lines)
         except Exception:
             logger.debug("Silent exception in core/project_context.py:209", exc_info=True)
-            pass
         try:
             recent = []
             for f in self._workdir.rglob("*"):
@@ -220,11 +217,9 @@ class ProjectContext:
                         recent.append((mtime, str(f.relative_to(self._workdir))))
                     except Exception:
                         logger.debug("Silent exception in core/project_context.py:218", exc_info=True)
-                        pass
             recent.sort(reverse=True)
             if recent:
                 return "\n".join(f"  {name}" for _, name in recent[:10])
         except Exception:
             logger.debug("Silent exception in core/project_context.py:223", exc_info=True)
-            pass
         return ""

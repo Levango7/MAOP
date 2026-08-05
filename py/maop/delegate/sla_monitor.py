@@ -21,11 +21,11 @@ def _import_metrics():
     """Import monitoring counters; return None if unavailable."""
     try:
         from maop.core.monitoring import (
+            MAOP_TASK_DEADLINE_SECONDS,
+            MAOP_TASK_PREEMPTION_TOTAL,
             MAOP_TASK_PRIORITY_DISTRIBUTION,
             MAOP_TASK_SLA_TIER_DISTRIBUTION,
             MAOP_TASK_SLA_VIOLATION_TOTAL,
-            MAOP_TASK_DEADLINE_SECONDS,
-            MAOP_TASK_PREEMPTION_TOTAL,
         )
         return {
             "priority_dist": MAOP_TASK_PRIORITY_DISTRIBUTION,

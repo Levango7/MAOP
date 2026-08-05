@@ -15,9 +15,9 @@ from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from maop.core.middleware import require_admin
-from maop.core.db_utils import get_db_path
 from maop import __version__ as MAOP_VERSION
+from maop.core.db_utils import get_db_path
+from maop.core.middleware import require_admin
 
 from .state import MAOP_ROOT, active_jobs, get_bridge, get_subsystems, init_subsystems, start_time
 

@@ -205,7 +205,6 @@ class HookManager:
                     conn.execute("ALTER TABLE hooks ADD COLUMN callback_path TEXT DEFAULT ''")
             except Exception:
                 logger.debug("Silent exception in core/hook_manager.py:206", exc_info=True)
-                pass
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS hook_logs (
                     id TEXT PRIMARY KEY,
@@ -443,7 +442,6 @@ class HookManager:
                 ))
             except Exception:
                 logger.debug("Silent exception in core/hook_manager.py:443", exc_info=True)
-                pass
 
         return results
 
@@ -682,7 +680,6 @@ class HookManager:
                 )
         except Exception:
             logger.debug("Silent exception in core/hook_manager.py:680", exc_info=True)
-            pass
 
 
 # ── Global singleton ──────────────────────────────────────────────

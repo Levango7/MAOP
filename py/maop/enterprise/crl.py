@@ -49,8 +49,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "CRLError",
     "CRLChecker",
+    "CRLError",
     "LicenseRevokedError",
 ]
 
@@ -276,11 +276,9 @@ class CRLChecker:
         if not isinstance(data, dict):
             return False
         revoked = data.get("revoked")
-        if not isinstance(revoked, list):
-            return False
-        return True
+        return isinstance(revoked, list)
 
-    def check_license(self, info: "LicenseInfo") -> None:
+    def check_license(self, info: LicenseInfo) -> None:
         """检查 license 是否被撤销（集成点）。
 
         Args:

@@ -58,7 +58,9 @@ def _reject_unsafe_value(value: Any, accessor: str) -> Any:
     """
     import types as _types
     if callable(value) or isinstance(value, (type, _types.ModuleType)):
-        raise ValueError(
+        # NOTE: ValueError (not TypeError) is deliberate — it is safe_eval's
+        # API for "rejected value"; callers (condition gates) catch Exception.
+        raise ValueError(  # noqa: TRY004
             f"Attribute access blocked: callable/type/module via {accessor!r} "
             "is not allowed in safe_eval"
         )
@@ -99,12 +101,12 @@ def _safe_eval_node(node: ast.AST, context: dict) -> Any:
         # objects with custom __getitem__ could execute code or expose
         # internals.
         if not isinstance(obj, (dict, list, tuple, str)):
-            raise ValueError(
+            raise TypeError(
                 f"Subscript only allowed on dict/list/tuple/str, got {type(obj).__name__}"
             )
         key = _safe_eval_node(node.slice, context)
         if not isinstance(key, (str, int, bool)):
-            raise ValueError(f"Subscript key must be str/int, got {type(key).__name__}")
+            raise TypeError(f"Subscript key must be str/int, got {type(key).__name__}")
         return _reject_unsafe_value(cast(Any, obj)[key], f"[{key!r}]")
     if isinstance(node, ast.Attribute):
         obj = _safe_eval_node(node.value, context)

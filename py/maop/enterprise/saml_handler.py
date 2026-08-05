@@ -24,10 +24,10 @@ import urllib.parse
 import urllib.request
 import zlib
 
-from lxml import etree
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.x509 import load_der_x509_certificate
+from lxml import etree
 
 from maop.enterprise.sso import (
     SSOConfig,
@@ -432,11 +432,11 @@ class SAMLHandler:
 
         # 检查 Transforms 是否声明了 enveloped-signature
         transforms_elem = reference_elem.find(f"{{{_DS_NS}}}Transforms")
-        _has_enveloped_transform = False  # noqa: F841
+        _has_enveloped_transform = False
         if transforms_elem is not None:
             for t in transforms_elem.findall(f"{{{_DS_NS}}}Transform"):
                 if t.get("Algorithm") == "http://www.w3.org/2000/09/xmldsig#enveloped-signature":
-                    _has_enveloped_transform = True  # noqa: F841
+                    _has_enveloped_transform = True
 
         # 5. 计算被签名元素的 c14n 摘要
         #    enveloped signature：去掉 Signature 子元素后做 c14n

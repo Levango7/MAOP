@@ -206,7 +206,6 @@ class MemoryStore(SearchMixin):
         """
         self._dirty = False
         self._dirty_count = 0
-        return
     def close(self) -> None:
         """Flush pending JSON writes and clean up."""
         self._flush_json()

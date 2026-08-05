@@ -411,7 +411,7 @@ class VectorStore:
         Requires the ``sqlite-vec`` package. If not installed, raises
         ImportError which is caught by the caller to fall back to NumPy.
         """
-        import sqlite_vec  # noqa: F401 — optional dep, ImportError expected if missing
+        import sqlite_vec
         with sqlite_connect(self._path, timeout=10, wal=True) as conn:
             conn.enable_load_extension(True)
             sqlite_vec.load(conn)

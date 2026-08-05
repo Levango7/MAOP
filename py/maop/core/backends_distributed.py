@@ -271,6 +271,5 @@ class EtcdKVBackend(KVBackend):
             if transport is not None and hasattr(transport, "close"):
                 try:
                     transport.close()
-                except Exception:  # noqa: BLE001
+                except Exception:
                     logger.debug("Silent exception in core/backends_distributed.py:274", exc_info=True)
-                    pass

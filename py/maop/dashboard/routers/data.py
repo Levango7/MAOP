@@ -18,8 +18,8 @@ from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from maop.core.middleware import require_admin
 from maop.core.db_utils import get_db_path
+from maop.core.middleware import require_admin
 
 from .state import MAOP_ROOT, get_bridge
 

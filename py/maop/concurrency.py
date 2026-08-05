@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -18,8 +19,6 @@ from enum import Enum, IntEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
-import logging
 
 logger = logging.getLogger("maop.concurrency")
 
