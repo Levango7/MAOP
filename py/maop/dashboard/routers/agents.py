@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
@@ -299,6 +299,68 @@ async def disable_agent(name: str, request: Request) -> dict[str, Any]:
     return {"disabled": ok}
 
 
+def _agents_yaml_path():
+    return MAOP_ROOT / "config" / "agents.yaml"
+
+
+def _sync_agent_to_yaml(body) -> bool:
+    """Register sync: write agent entry into config/agents.yaml (blocking I/O).
+
+    Runs in a worker thread via asyncio.to_thread — never call directly
+    from an async route.
+    """
+    import os
+
+    import yaml as _yaml
+
+    yaml_path = _agents_yaml_path()
+    if not yaml_path.exists():
+        return False
+    with open(yaml_path, "r", encoding="utf-8") as f:
+        data = _yaml.safe_load(f) or {}
+    agents_dict = data.get("agents", {})
+    if body.name in agents_dict:
+        return False
+    # 使用 CLI 可执行文件名而非完整路径 (约定: cli 字段是名称不是路径)
+    cli_name = os.path.basename(body.cli_path) if body.cli_path else body.name
+    agents_dict[body.name] = {
+        "cli": cli_name,
+        "cli_args": body.cli_args or '--task "{task}"',
+        "capabilities": body.capabilities,
+        "description": body.description or f"{body.name} agent",
+        "driver": body.driver,
+        "model": body.model or "auto",
+        "timeout_s": body.timeout_s,
+    }
+    if body.provider:
+        agents_dict[body.name]["provider"] = body.provider
+    data["agents"] = agents_dict
+    with open(yaml_path, "w", encoding="utf-8") as f:
+        _yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+    return True
+
+
+def _remove_agent_from_yaml(name: str) -> None:
+    """Unregister sync: remove agent entry from config/agents.yaml (blocking I/O).
+
+    Runs in a worker thread via asyncio.to_thread — never call directly
+    from an async route.
+    """
+    import yaml as _yaml
+
+    yaml_path = _agents_yaml_path()
+    if not yaml_path.exists():
+        return
+    with open(yaml_path, "r", encoding="utf-8") as f:
+        data = _yaml.safe_load(f) or {}
+    agents_dict = data.get("agents", {})
+    if name in agents_dict:
+        del agents_dict[name]
+        data["agents"] = agents_dict
+        with open(yaml_path, "w", encoding="utf-8") as f:
+            _yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+
 @router.post("/register")
 @handle_api_errors
 async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[str, Any]:
@@ -307,7 +369,7 @@ async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[s
     这样扫描到的 agent 也能使用升级/诊断/修复/自进化等依赖 yaml 的功能。
     """
     require_admin(request)
-    import yaml as _yaml
+
     from maop.core.agent_registry import RegisteredAgent
 
     registry = _get_registry()
@@ -325,35 +387,13 @@ async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[s
     )
     registry.register(agent)
 
-    # 同步写入 agents.yaml，让 upgrade/diagnose/repair/evolve 等端点可用
+    # 同步写入 agents.yaml，让 upgrade/diagnose/repair/evolve 等端点可用。
+    # 文件读写放线程池执行，避免阻塞事件循环（ASYNC230）。
     synced_to_yaml = False
-    yaml_path = MAOP_ROOT / "config" / "agents.yaml"
-    if yaml_path.exists():
-        try:
-            with open(yaml_path, "r", encoding="utf-8") as f:
-                data = _yaml.safe_load(f) or {}
-            agents_dict = data.get("agents", {})
-            if body.name not in agents_dict:
-                # 使用 CLI 可执行文件名而非完整路径 (约定: cli 字段是名称不是路径)
-                import os
-                cli_name = os.path.basename(body.cli_path) if body.cli_path else body.name
-                agents_dict[body.name] = {
-                    "cli": cli_name,
-                    "cli_args": body.cli_args or '--task "{task}"',
-                    "capabilities": body.capabilities,
-                    "description": body.description or f"{body.name} agent",
-                    "driver": body.driver,
-                    "model": body.model or "auto",
-                    "timeout_s": body.timeout_s,
-                }
-                if body.provider:
-                    agents_dict[body.name]["provider"] = body.provider
-                data["agents"] = agents_dict
-                with open(yaml_path, "w", encoding="utf-8") as f:
-                    _yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-                synced_to_yaml = True
-        except Exception:
-            pass  # registry 已写入，yaml 写入失败不阻塞
+    try:
+        synced_to_yaml = await asyncio.to_thread(_sync_agent_to_yaml, body)
+    except Exception:
+        pass  # registry 已写入，yaml 写入失败不阻塞
 
     return {"agent": agent.model_dump(), "synced_to_yaml": synced_to_yaml}
 
@@ -384,20 +424,9 @@ async def unregister_agent(name: str, request: Request) -> dict[str, Any]:
     except Exception as exc:
         errors.append(f"scanner cleanup: {exc}")
 
-    # 3. 从 agents.yaml 移除
+    # 3. 从 agents.yaml 移除（文件读写在线程池执行，不阻塞事件循环）
     try:
-        import yaml as _yaml
-        root = MAOP_ROOT
-        yaml_path = root / "config" / "agents.yaml"
-        if yaml_path.exists():
-            with open(yaml_path, "r", encoding="utf-8") as f:
-                data = _yaml.safe_load(f) or {}
-            agents_dict = data.get("agents", {})
-            if name in agents_dict:
-                del agents_dict[name]
-                data["agents"] = agents_dict
-                with open(yaml_path, "w", encoding="utf-8") as f:
-                    _yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        await asyncio.to_thread(_remove_agent_from_yaml, name)
     except Exception as exc:
         errors.append(f"yaml cleanup: {exc}")
 
@@ -718,7 +747,7 @@ async def upgrade_agent(name: str, request: Request) -> dict[str, Any]:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        out_b, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+        await asyncio.wait_for(proc.communicate(), timeout=10)
         if proc.returncode == 0:
             info["install_method"] = "pip"
             # 执行 pip 升级

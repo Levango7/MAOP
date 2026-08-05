@@ -345,7 +345,13 @@ class DataProxy:
         self._record_latency(start)
         return rows
 
-    async def delegation_period_stats(self, now: "datetime | None" = None) -> dict[str, Any]:
+    @staticmethod
+    def _read_delegations_file(log_path: Path) -> Any:
+        """Read logs/delegations.json — blocking I/O, run via asyncio.to_thread."""
+        with open(log_path, encoding="utf-8") as fh:
+            return json.load(fh)
+
+    async def delegation_period_stats(self, now: datetime | None = None) -> dict[str, Any]:
         """Compute MoM / YoY trend for delegation volume and success rate.
 
         The genuine delegation history lives in ``logs/delegations.json``
@@ -363,7 +369,7 @@ class DataProxy:
         """
         import re
 
-        def _parse_ts(s: str) -> "datetime | None":
+        def _parse_ts(s: str) -> datetime | None:
             if not s:
                 return None
             s = str(s).strip()
@@ -390,8 +396,8 @@ class DataProxy:
         if not log_path.exists():
             return empty
         try:
-            with open(log_path, encoding="utf-8") as fh:
-                records = json.load(fh)
+            # 文件读取放线程池执行，避免阻塞事件循环（ASYNC230）。
+            records = await asyncio.to_thread(self._read_delegations_file, log_path)
         except Exception as exc:
             logger.warning("[bridge] delegation_period_stats read failed: %s", exc)
             return empty
@@ -400,7 +406,7 @@ class DataProxy:
 
         from datetime import timedelta
 
-        def _window(since: datetime, until: datetime) -> "tuple[int, float]":
+        def _window(since: datetime, until: datetime) -> tuple[int, float]:
             total = 0
             succ = 0
             for rec in records:
@@ -428,7 +434,7 @@ class DataProxy:
         cur365_t, cur365_r = _window(cur365_s, cur365_e)
         prev365_t, prev365_r = _window(prev365_s, prev365_e)
 
-        def _pct(cur: int, prev: int) -> "float | None":
+        def _pct(cur: int, prev: int) -> float | None:
             return round((cur - prev) / prev * 100, 1) if prev else None
 
         return {
@@ -867,7 +873,8 @@ class DataProxy:
         for f in files:
             try:
                 text = f.read_text(encoding="utf-8", errors="replace")
-            except Exception:
+            except Exception as exc:
+                logger.debug("[bridge] log scan: failed to read %s: %s", f.name, exc)
                 continue
             for raw in text.splitlines():
                 line = raw.rstrip("\r\n")

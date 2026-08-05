@@ -542,9 +542,11 @@ async def get_activity(request: Request, limit: int = 10) -> dict[str, Any]:
                             age_str = _fmt_age_ago(age_s)
                         elif isinstance(ts, str):
                             # ISO format or similar
-                            from datetime import datetime
+                            from datetime import datetime, timezone
                             dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                            age_s = (datetime.utcnow() - dt.replace(tzinfo=None)).total_seconds()
+                            if dt.tzinfo is None:
+                                dt = dt.replace(tzinfo=timezone.utc)
+                            age_s = (datetime.now(timezone.utc) - dt).total_seconds()
                             age_str = _fmt_age_ago(max(0, age_s))
                     except Exception:
                         age_str = "最近"
