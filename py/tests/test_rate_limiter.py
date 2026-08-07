@@ -1,10 +1,10 @@
-﻿"""Tests for MAOP.core.rate_limiter — TokenBucket, SlidingWindow, RateLimiter."""
+"""Tests for MAOP.core.rate_limiter — TokenBucket, SlidingWindow, RateLimiter."""
 
 from __future__ import annotations
 
 import time
 
-from maop.core.rate_limiter import (
+from maop.core.reliability.rate_limiter import (
     RateLimiter,
     RateLimiterConfig,
     RateLimitResult,

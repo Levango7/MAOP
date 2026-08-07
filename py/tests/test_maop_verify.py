@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from maop.core.error_schema import new_result
+from maop.core.reliability.error_schema import new_result
 from maop.maop_verify import (
     GateResult,
     VerifyEngine,

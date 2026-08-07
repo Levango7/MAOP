@@ -7,20 +7,20 @@ from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 router = APIRouter(prefix="/api/session", tags=["session"])
 
 
 def _get_session_mgr():
-    from maop.core.session import SessionManager
+    from maop.core.security.session import SessionManager
     root = Path(__file__).resolve().parent.parent.parent.parent
     return SessionManager(root_dir=str(root))
 
 
 def _get_conversation_mgr():
-    from maop.core.conversation import ConversationManager
+    from maop.core.agent.llm_chat.conversation import ConversationManager
     root = Path(__file__).resolve().parent.parent.parent.parent
     return ConversationManager(root_dir=str(root))
 

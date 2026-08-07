@@ -6,12 +6,31 @@ function persistEdition(edition, features, backends, degradations) {
     localStorage.setItem('maop_edition', JSON.stringify({
       edition, features, backends, degradations,
     }));
-  } catch {}
+  } catch { /* ignore */ }
+}
+
+// Cold-load helper: read the persisted localStorage snapshot so the pinia
+// store is hydrated with the last known edition at construction time.
+// This makes the very first router.beforeEach (which runs before App.vue
+// onMounted / fetchEdition) observe the real edition rather than a hardcoded
+// default, so the localStorage snapshot branch in the guard is no longer dead
+// code on a cold page.goto. SSR-safe via try/catch.
+//
+// P1-H1: 安全失败默认改为 'personal'。冷加载时若无 localStorage 快照，绝不对
+// 企业版路由放行——个人版用户无法绕过企业版路由守卫。后端 /api/info/config
+// 就绪后由 fetchEdition() hydrate 真实 edition。
+function loadInitialEdition() {
+  try {
+    const snap = JSON.parse(localStorage.getItem('maop_edition') || '{}');
+    return snap.edition || 'personal';
+  } catch {
+    return 'personal';
+  }
 }
 
 export const useEditionStore = defineStore('edition', {
   state: () => ({
-    edition: 'enterprise',
+    edition: loadInitialEdition(),
     features: {},
     backends: {},
     degradations: [],
@@ -28,7 +47,8 @@ export const useEditionStore = defineStore('edition', {
         if (res.status === 401) { handleUnauthorized(); return; }
         if (!res.ok) { console.error('Failed to fetch edition info: HTTP', res.status); return; }
         const data = await res.json();
-        this.edition = data.edition || 'enterprise';
+        // P1-H1: 后端未返回有效 edition 时 fallback 'personal'（安全失败）
+        this.edition = data.edition || 'personal';
         this.features = data.features || {};
         this.backends = data.backends || {};
         this.degradations = data.degradations || [];

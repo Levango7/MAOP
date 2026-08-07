@@ -34,12 +34,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from maop.core import otel as otel_module
-from maop.core.monitoring import (
+from maop.core.monitoring.monitoring import (
     MAOP_ROUTING_DECISION_DURATION_MS,
     MAOP_ROUTING_DECISION_TOTAL,
     metrics,
 )
-from maop.core.routing_decision import (
+from maop.core.routing.routing_decision import (
     RoutingDecisionRecord,
     RoutingDecisionStore,
     get_active_span_context,
@@ -78,7 +78,7 @@ def recording_spans():
     the test, returning the shared call list (cleared first).
 
     Each subsystem module (route_scorer / load_balancer / selector /
-    dispatcher) does ``from maop.core.otel import span as otel_span`` at
+    dispatcher) does ``from maop.core.monitoring.otel import span as otel_span`` at
     import time, binding the original function into its own namespace.
     Patching only ``maop.core.otel.span`` wouldn't affect those bound
     references — so we patch the ``otel_span`` attribute on each
@@ -87,8 +87,8 @@ def recording_spans():
     modules, freezing the original binding).
     """
     _span_calls.clear()
-    import maop.core.load_balancer as _lb
-    import maop.core.route_scorer as _rs
+    import maop.core.routing.load_balancer as _lb
+    import maop.core.routing.route_scorer as _rs
     import maop.delegate.dispatcher as _disp
     import maop.model.selector as _sel
     with patch.object(otel_module, "span", _recording_span), \
@@ -109,7 +109,7 @@ def isolated_store(tmp_path: Path) -> RoutingDecisionStore:
     """
     store = RoutingDecisionStore(db_path=tmp_path / "routing_decisions.db")
     with patch(
-        "maop.core.routing_decision.get_routing_decision_store",
+        "maop.core.routing.routing_decision.get_routing_decision_store",
         return_value=store,
     ):
         yield store
@@ -327,7 +327,7 @@ class TestRouteScorerTrace:
         isolated_store: RoutingDecisionStore,
     ):
         from maop.config.loader import AgentDef, MaopConfig, RouteEntry
-        from maop.core.route_scorer import RouteScorer
+        from maop.core.routing.route_scorer import RouteScorer
 
         config = MaopConfig(
             agents={
@@ -375,7 +375,7 @@ class TestRouteScorerTrace:
         isolated_store: RoutingDecisionStore,
     ):
         from maop.config.loader import AgentDef, MaopConfig, RouteEntry
-        from maop.core.route_scorer import RouteScorer
+        from maop.core.routing.route_scorer import RouteScorer
 
         config = MaopConfig(
             agents={
@@ -412,7 +412,7 @@ class TestLoadBalancerTrace:
         recording_spans: list[dict[str, Any]],
         isolated_store: RoutingDecisionStore,
     ):
-        from maop.core.load_balancer import LBAlgorithm, LoadBalancer
+        from maop.core.routing.load_balancer import LBAlgorithm, LoadBalancer
 
         lb = LoadBalancer(algorithm=LBAlgorithm.ADAPTIVE)
         lb.register("claude", weight=10)
@@ -439,7 +439,7 @@ class TestLoadBalancerTrace:
         recording_spans: list[dict[str, Any]],
         isolated_store: RoutingDecisionStore,
     ):
-        from maop.core.load_balancer import LoadBalancer
+        from maop.core.routing.load_balancer import LoadBalancer
 
         lb = LoadBalancer()
         result = lb.select(trace_id="trace-lb-empty")
@@ -455,7 +455,7 @@ class TestLoadBalancerTrace:
         recording_spans: list[dict[str, Any]],
         isolated_store: RoutingDecisionStore,
     ):
-        from maop.core.load_balancer import LoadBalancer
+        from maop.core.routing.load_balancer import LoadBalancer
 
         lb = LoadBalancer(sticky_sessions=True, sticky_session_ttl_s=60.0)
         lb.register("claude", weight=10)
@@ -733,7 +733,7 @@ class TestRoutingDecisionMetrics:
         self, recording_spans, isolated_store: RoutingDecisionStore,
     ):
         from maop.config.loader import AgentDef, MaopConfig, RouteEntry
-        from maop.core.route_scorer import RouteScorer
+        from maop.core.routing.route_scorer import RouteScorer
 
         config = MaopConfig(
             agents={

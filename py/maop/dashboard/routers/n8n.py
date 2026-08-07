@@ -16,7 +16,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from maop.config.edition import FeatureFlag, has_feature
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 from maop.enterprise.n8n import (
     N8nClient,
     N8nIntegrationError,

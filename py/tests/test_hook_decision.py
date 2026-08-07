@@ -1,10 +1,10 @@
-﻿"""Tests for Hook decision influence — deny, modify, and new lifecycle events."""
+"""Tests for Hook decision influence — deny, modify, and new lifecycle events."""
 
 from __future__ import annotations
 
 import pytest
 
-from maop.core.hook_manager import HookManager, HookResult, LifecycleEvent
+from maop.core.agent.plugins_hooks.hook_manager import HookManager, HookResult, LifecycleEvent
 
 
 def _fresh_mgr(tmp_path):

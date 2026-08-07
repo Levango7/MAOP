@@ -19,10 +19,10 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.backends import MemoryCacheBackend
-from maop.core.circuit_breaker import CircuitBreaker
-from maop.core.db_utils import sqlite_connect
-from maop.core.message_queue import MessageQueue
+from maop.core.backends.backends import MemoryCacheBackend
+from maop.core.reliability.circuit_breaker import CircuitBreaker
+from maop.core.backends.db_utils import sqlite_connect
+from maop.core.reliability.message_queue import MessageQueue
 from maop.delegate.dispatcher import Dispatcher
 
 slow = pytest.mark.slow

@@ -12,13 +12,13 @@ from __future__ import annotations
 import pytest
 
 from maop.config.loader import AgentDef, MaopConfig, RouteEntry
-from maop.core.multi_objective_scorer import (
+from maop.core.routing.multi_objective_scorer import (
     AgentObjectiveVector,
     MultiObjectiveScorer,
     ObjectiveWeights,
     ParetoFrontierResult,
 )
-from maop.core.route_scorer import RouteScorer
+from maop.core.routing.route_scorer import RouteScorer
 
 # ── TestObjectiveWeights ─────────────────────────────────────────
 

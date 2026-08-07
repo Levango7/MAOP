@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
@@ -21,7 +21,7 @@ _protocol_reg = None
 def _get_protocol_reg() -> Any:
     global _protocol_reg
     if _protocol_reg is None:
-        from maop.core.protocol import ProtocolRegistry
+        from maop.core.agent.plugins_hooks.protocol import ProtocolRegistry
         _protocol_reg = ProtocolRegistry(root_dir=str(MAOP_ROOT))
     return _protocol_reg
 

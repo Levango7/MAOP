@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.streaming — SubprocessStreamer + StreamRegistry."""
+"""Tests for MAOP.core.streaming — SubprocessStreamer + StreamRegistry."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import asyncio
 import pytest
 
 from maop.concurrency import TokenStreamer
-from maop.core.streaming import StreamRegistry, SubprocessStreamer, get_stream_registry
+from maop.core.reliability.streaming import StreamRegistry, SubprocessStreamer, get_stream_registry
 
 
 class TestSubprocessStreamer:

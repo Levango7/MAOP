@@ -6,7 +6,7 @@ import sqlite3
 
 import pytest
 
-from maop.core.db_utils import sqlite_connect, validate_identifier
+from maop.core.backends.db_utils import sqlite_connect, validate_identifier
 
 
 class TestValidateIdentifier:

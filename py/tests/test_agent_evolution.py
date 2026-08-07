@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from maop.core.agent_evolution import (
+from maop.core.agent.evolution.agent_evolution import (
     AgentEvolution,
     EvolutionResult,
     EvolutionSuggestion,
@@ -23,7 +23,7 @@ def evolution(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AgentEvolution
     def fake_get_db_path(module_name: str = "", *, legacy_fallback: str = "") -> Path:
         return db_path
 
-    monkeypatch.setattr("maop.core.agent_memory.get_db_path", fake_get_db_path)
+    monkeypatch.setattr("maop.core.agent.memory_ctx.agent_memory.get_db_path", fake_get_db_path)
     return AgentEvolution(root_dir=tmp_path)
 
 
@@ -277,7 +277,7 @@ class TestEvolveDelegation:
         self, evolution: AgentEvolution
     ) -> None:
         """If EvolutionLoop raises, evolve falls back to legacy."""
-        with patch("maop.core.evolution_loop.EvolutionLoop") as MockLoop:
+        with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as MockLoop:
             MockLoop.return_value.evolve_agent.side_effect = RuntimeError("fail")
             result = await evolution.evolve("claude")
             assert result.agent_name == "claude"
@@ -288,7 +288,7 @@ class TestEvolveDelegation:
         self, evolution: AgentEvolution
     ) -> None:
         """Evolve with a working EvolutionLoop returns converted suggestions."""
-        with patch("maop.core.evolution_loop.EvolutionLoop") as MockLoop:
+        with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as MockLoop:
             MockLoop.return_value.evolve_agent.return_value = {
                 "suggestions": [
                     {

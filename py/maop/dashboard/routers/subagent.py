@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 from .error_handler import handle_api_errors
 from .state import MAOP_ROOT

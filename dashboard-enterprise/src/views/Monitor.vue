@@ -79,6 +79,31 @@
           </div>
         </div>
       </Card>
+
+      <!-- v4.5.0: DAG execution progress streaming -->
+      <Card title="DAG Execution Progress" icon="network" class="mt">
+        <template #actions>
+          <input
+            v-model="dagExecutionId"
+            class="dag-exec-input"
+            placeholder="execution_id (trace_id)"
+            @keyup.enter="dagExecInput = dagExecutionId"
+          />
+        </template>
+        <DagGraph
+          v-if="dagExecutionId"
+          :execution-id="dagExecutionId"
+          :nodes="dagNodes"
+          :edges="dagEdges"
+          transport="sse"
+        />
+        <EmptyState
+          v-else
+          icon="network"
+          title="No DAG subscription"
+          hint="Enter an execution_id above to stream real-time DAG node status."
+        />
+      </Card>
     </div>
 
     <div v-if="activeTab === 'maintenance'">
@@ -118,7 +143,7 @@ import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useRealtimeStore } from '../stores/realtime.js';
 import { useI18n } from '../i18n';
-import { StatCard, Card, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
+import { StatCard, Card, Skeleton, EmptyState, AppIcon, PageHeader, DagGraph } from '../components/index.js';
 
 const api = useApiStore();
 const realtime = useRealtimeStore();
@@ -128,6 +153,11 @@ const activeTab = ref('monitor');
 const eventList = ref(null);
 let pollTimer = null;
 const firstLoad = ref(true);
+
+// v4.5.0: DAG progress streaming — user enters an execution_id to subscribe.
+const dagExecutionId = ref('');
+const dagNodes = ref([]);   // populated if DAG structure is known; auto-discovered from events otherwise
+const dagEdges = ref([]);
 
 const sseEvents = ref([]);
 let sseEventCounter = 0;
@@ -331,5 +361,20 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   font-family: var(--font-mono);
   margin-top: 4px;
   word-break: break-word;
+}
+/* v4.5.0: DAG execution input */
+.dag-exec-input {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 4px;
+  background: var(--bg-card, #fff);
+  color: var(--text, #334155);
+  width: 200px;
+  outline: none;
+}
+.dag-exec-input:focus {
+  border-color: var(--brand, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 </style>

@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
 
 from maop.config.edition import FeatureFlag, has_feature
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)

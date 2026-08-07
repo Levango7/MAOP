@@ -1,11 +1,11 @@
-﻿"""Tests for Worktree Manager — git-worktree style task branching."""
+"""Tests for Worktree Manager — git-worktree style task branching."""
 
 import shutil
 import tempfile
 
 import pytest
 
-from maop.core.worktree import (
+from maop.core.agent.memory_ctx.worktree import (
     BranchStatus,
     MergeStrategy,
     WorktreeManager,

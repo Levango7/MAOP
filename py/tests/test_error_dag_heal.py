@@ -5,8 +5,8 @@ import tempfile
 
 import pytest
 
-from maop.core.error_ledger import ErrorLedger
-from maop.core.self_heal import HealAction, HealRule, HealStatus, SelfHealEngine
+from maop.core.reliability.error_ledger import ErrorLedger
+from maop.core.reliability.self_heal import HealAction, HealRule, HealStatus, SelfHealEngine
 
 
 @pytest.fixture
@@ -162,6 +162,6 @@ class TestSelfHeal:
         assert result.status in (HealStatus.REPAIRED, HealStatus.REPAIR_FAILED)
 
     def test_heal_result_model(self):
-        from maop.core.self_heal import HealResult
+        from maop.core.reliability.self_heal import HealResult
         r = HealResult(rule_name="test", status=HealStatus.REPAIRED, message="ok")
         assert r.status == HealStatus.REPAIRED

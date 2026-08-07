@@ -5,8 +5,8 @@ import tempfile
 
 import pytest
 
-from maop.core.ab_test import ABTestManager
-from maop.core.prompt_version import PromptVersionManager
+from maop.core.evolution.ab_test import ABTestManager
+from maop.core.evolution.prompt_version import PromptVersionManager
 
 
 @pytest.fixture

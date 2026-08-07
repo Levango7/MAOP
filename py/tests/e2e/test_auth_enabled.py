@@ -203,7 +203,7 @@ class TestMessageQueueACK:
 
     def test_task_not_duplicated_after_ack(self, tmp_path):
         """Verify that a dispatched task is not re-executed after ACK."""
-        from maop.core.message_queue import MessageQueue
+        from maop.core.reliability.message_queue import MessageQueue
 
         mq = MessageQueue(db_path=tmp_path / "queue.db")
         msg_id = mq.enqueue("test-topic", {"task": "do-work"}, max_retries=3)
@@ -224,7 +224,7 @@ class TestMessageQueueACK:
 
     def test_nack_requeues_message(self, tmp_path):
         """Verify that NACK requeues the message for retry."""
-        from maop.core.message_queue import MessageQueue
+        from maop.core.reliability.message_queue import MessageQueue
 
         mq = MessageQueue(db_path=tmp_path / "queue.db")
         msg_id = mq.enqueue("test-topic", {"task": "retry-me"}, max_retries=3)
@@ -241,7 +241,7 @@ class TestMessageQueueACK:
 
     def test_nack_dead_letters_after_max_retries(self, tmp_path):
         """After max_retries+1 NACKs, the message is moved to dead letter."""
-        from maop.core.message_queue import MessageQueue
+        from maop.core.reliability.message_queue import MessageQueue
 
         mq = MessageQueue(db_path=tmp_path / "queue.db")
         msg_id = mq.enqueue("test-topic", {"task": "always-fails"}, max_retries=2)

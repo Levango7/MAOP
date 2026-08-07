@@ -71,7 +71,7 @@ class ABTestFramework:
     """Framework for running A/B tests on prompt versions."""
 
     def __init__(self, root_dir: str | Path | None = None) -> None:
-        from maop.core.db_utils import find_project_root
+        from maop.core.backends.db_utils import find_project_root
         self._root = Path(root_dir or find_project_root())
         self._experiments_file = self._root / "data" / "ab_experiments.json"
         self._prompt_manager = None
@@ -79,7 +79,7 @@ class ABTestFramework:
     def _get_prompt_manager(self):
         if self._prompt_manager is None:
             try:
-                from maop.core.services import ServiceContainer
+                from maop.core.reliability.services import ServiceContainer
                 svc = ServiceContainer(root_dir=self._root)
                 self._prompt_manager = svc.get("prompt_manager", raise_on_failure=False)
             except Exception as exc:
@@ -220,7 +220,7 @@ class ABTestFramework:
             return False
 
         try:
-            from maop.core.db_utils import get_db_path
+            from maop.core.backends.db_utils import get_db_path
             db_path = get_db_path("prompt_manager")
             if not db_path.exists():
                 logger.warning("[ab_test] Prompt DB not found at %s", db_path)

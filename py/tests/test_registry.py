@@ -1,4 +1,4 @@
-﻿"""Comprehensive tests for MAOP.model.registry — ProviderRegistry & ModelRegistry."""
+"""Comprehensive tests for MAOP.model.registry — ProviderRegistry & ModelRegistry."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.db_utils import find_project_root
+from maop.core.backends.db_utils import find_project_root
 from maop.model.registry import ModelRegistry, ProviderRegistry
 from maop.model.schema import (
     LatencyTier,

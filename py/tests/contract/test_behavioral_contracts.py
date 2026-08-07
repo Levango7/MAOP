@@ -1,4 +1,4 @@
-﻿"""Behavioral contract tests — verify runtime behavior, not just schema/existence.
+"""Behavioral contract tests — verify runtime behavior, not just schema/existence.
 
 Three behavioral contracts:
 1. Model fallback: FallbackManager builds correct chain, filters by failure count.
@@ -178,7 +178,7 @@ class TestModelSwitchRuntimeEffect:
         if MAOP_ROOT not in sys.path:
             sys.path.insert(0, MAOP_ROOT)
 
-        from maop.core.circuit_breaker import CircuitBreaker
+        from maop.core.reliability.circuit_breaker import CircuitBreaker
         from maop.delegate.dispatcher import Dispatcher
 
         # No model_selector — should use agent's model as-is
@@ -187,7 +187,7 @@ class TestModelSwitchRuntimeEffect:
 
     def test_dispatch_result_has_model_resolved_flag(self):
         """DispatchResult must expose model_resolved flag."""
-        from maop.core.error_schema import new_result
+        from maop.core.reliability.error_schema import new_result
         from maop.delegate.dispatcher import DispatchResult
 
         r = new_result(agent="test", task="t", exit_code=0)
@@ -197,7 +197,7 @@ class TestModelSwitchRuntimeEffect:
 
     def test_selector_resolution_changes_effective_model(self):
         """When ModelSelector resolves, effective_model must be set on dispatcher."""
-        from maop.core.circuit_breaker import CircuitBreaker
+        from maop.core.reliability.circuit_breaker import CircuitBreaker
         from maop.delegate.dispatcher import Dispatcher
         from maop.model.selector import ModelSelector
 

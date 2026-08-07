@@ -198,7 +198,7 @@ class CacheEvolver:
     def _collect_lru_caches(self) -> dict[str, Any]:
         """Collect all registered named LRUCache instances."""
         try:
-            from maop.core.cache import _caches
+            from maop.core.reliability.cache import _caches
             # Return a snapshot copy to avoid mutation during iteration
             return dict(_caches)
         except Exception as exc:

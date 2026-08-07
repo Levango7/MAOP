@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.data — SQLite persistence layer."""
+"""Tests for MAOP.core.data — SQLite persistence layer."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.data import MaopDatabase
+from maop.core.backends.data import MaopDatabase
 
 
 @pytest.fixture

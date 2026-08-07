@@ -1,4 +1,4 @@
-﻿"""Tests for G5: Multi-vendor end-to-end integration.
+"""Tests for G5: Multi-vendor end-to-end integration.
 
 Validates the complete chain with mock agents:
   AgentScanner → AgentRegistry → CapabilityMatcher → Dispatcher
@@ -14,14 +14,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import yaml
 
-from maop.core.agent_registry import AgentRegistry, RegisteredAgent
-from maop.core.capability_matcher import CapabilityMatcher, MatcherConfig
-from maop.core.chat_engine import ChatEngine, ChatRequest
-from maop.core.config_mutator import ConfigMutator
-from maop.core.evolution_strategies import BalancedStrategy, StrategyEngine
-from maop.core.knowledge_extractor import KnowledgeExtractor, Relation
-from maop.core.knowledge_graph import KnowledgeGraph
-from maop.core.llm_provider import BaseLLMProvider, LLMResponse, ModelConfig
+from maop.core.agent.lifecycle.agent_registry import AgentRegistry, RegisteredAgent
+from maop.core.agent.tools.capability_matcher import CapabilityMatcher, MatcherConfig
+from maop.core.agent.llm_chat.chat_engine import ChatEngine, ChatRequest
+from maop.core.reliability.config_mutator import ConfigMutator
+from maop.core.evolution.evolution_strategies import BalancedStrategy, StrategyEngine
+from maop.core.memory.knowledge_extractor import KnowledgeExtractor, Relation
+from maop.core.memory.knowledge_graph import KnowledgeGraph
+from maop.core.agent.llm_chat.llm_provider import BaseLLMProvider, LLMResponse, ModelConfig
 from maop.delegate.dispatcher import Dispatcher
 from maop.memory.vector_search import VectorSearch
 
@@ -256,7 +256,7 @@ class TestE2EEvolution:
         assert len(high_decisions) >= 1
 
     def test_multi_strategy_comparison(self, tmp_path):
-        from maop.core.evolution_strategies import (
+        from maop.core.evolution.evolution_strategies import (
             AggressiveStrategy,
             ConservativeStrategy,
         )

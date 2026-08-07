@@ -240,7 +240,8 @@ class TestAgentsRoutesContract:
         import asyncio
         from unittest.mock import MagicMock, patch
 
-        from maop.dashboard.routers import agents as agents_mod
+        from maop.dashboard.routers.agents import routes as routes_mod
+        from maop.dashboard.routers.agents import _deps as _deps_mod
 
         # Fake agent returned by the registry — only attributes read by the handler.
         fake_agent = MagicMock()
@@ -254,8 +255,8 @@ class TestAgentsRoutesContract:
         fake_registry = MagicMock()
         fake_registry.list_agents.return_value = [fake_agent]
 
-        with patch.object(agents_mod, "_get_registry", return_value=fake_registry):
-            result = asyncio.run(agents_mod.get_agent_routes())
+        with patch.object(_deps_mod, "_get_registry", return_value=fake_registry):
+            result = asyncio.run(routes_mod.get_agent_routes())
 
         assert "routes" in result, "/api/agents/routes must return {routes: [...]}"
         routes = result["routes"]

@@ -33,7 +33,7 @@ def _wildcard_match(pattern: str, name: str) -> bool:
 def _get_agent_registry(root_dir=None):
     """Lazy import AgentRegistry."""
     try:
-        from maop.core.agent_registry import AgentRegistry
+        from maop.core.agent.lifecycle.agent_registry import AgentRegistry
         return AgentRegistry(root_dir=root_dir or "data")
     except ImportError:
         return None
@@ -45,8 +45,8 @@ def _get_agent_registry(root_dir=None):
 def _get_capability_matcher(root_dir=None):
     """Lazy import CapabilityMatcher with AgentRegistry."""
     try:
-        from maop.core.agent_registry import AgentRegistry
-        from maop.core.capability_matcher import CapabilityMatcher
+        from maop.core.agent.lifecycle.agent_registry import AgentRegistry
+        from maop.core.agent.tools.capability_matcher import CapabilityMatcher
         registry = AgentRegistry(root_dir=root_dir or "data")
         return CapabilityMatcher(registry=registry)
     except ImportError:

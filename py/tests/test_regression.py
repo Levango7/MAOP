@@ -1,9 +1,13 @@
 """Tests for regression and simulation testing framework."""
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
 import pytest
 
-from maop.core.regression import (
+from maop.core.reliability.error_schema import new_result
+from maop.core.evolution.regression import (
     PersonaConfig,
     PersonaSimulator,
     RegressionReport,
@@ -124,3 +128,109 @@ class TestRegressionTestRunner:
     def test_init(self, tmp_path):
         runner = RegressionTestRunner(root_dir=tmp_path)
         assert runner._results_dir.exists()
+
+
+# --- Merged from test_core_coverage2.py (Regression part) ---
+
+# ── Regression runner ───────────────────────────────────────────────
+
+def _dispatch_result(exit_code: int = 0, stdout: str = ""):
+    return SimpleNamespace(result=new_result(
+        agent="a", task="t", exit_code=exit_code, stdout=stdout,
+    ))
+
+
+class TestRegressionRunner:
+    @pytest.mark.asyncio
+    async def test_run_test_success_with_keywords(self, tmp_path):
+        runner = RegressionTestRunner(root_dir=tmp_path)
+        dispatcher = AsyncMock()
+        dispatcher.dispatch = AsyncMock(return_value=_dispatch_result(0, "hello world"))
+        test = TestCase(prompt="say hello", expected_keywords=["hello"], agent="claude")
+        result = await runner.run_test(test, dispatcher=dispatcher)
+        assert result.passed is True
+        assert "hello" in result.keyword_matches
+
+    @pytest.mark.asyncio
+    async def test_run_test_keyword_miss_fails(self, tmp_path):
+        runner = RegressionTestRunner(root_dir=tmp_path)
+        dispatcher = AsyncMock()
+        dispatcher.dispatch = AsyncMock(return_value=_dispatch_result(0, "goodbye"))
+        test = TestCase(prompt="say hello", expected_keywords=["hello"])
+        result = await runner.run_test(test, dispatcher=dispatcher)
+        assert result.passed is False
+        assert "hello" in result.keyword_misses
+
+    @pytest.mark.asyncio
+    async def test_run_test_exit_code_mismatch(self, tmp_path):
+        runner = RegressionTestRunner(root_dir=tmp_path)
+        dispatcher = AsyncMock()
+        dispatcher.dispatch = AsyncMock(return_value=_dispatch_result(1))
+        test = TestCase(prompt="x", expected_exit_code=0)
+        result = await runner.run_test(test, dispatcher=dispatcher)
+        assert result.passed is False
+
+    @pytest.mark.asyncio
+    async def test_run_test_no_dispatcher(self, tmp_path, monkeypatch):
+        # Force ServiceContainer to fail so dispatcher stays None.
+        original_import = __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
+
+        def _fake_import(name, *args, **kwargs):
+            if name == "maop.core.reliability.services":
+                raise ImportError("blocked for test")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr("builtins.__import__", _fake_import)
+        runner = RegressionTestRunner(root_dir=tmp_path)
+        test = TestCase(prompt="x")
+        result = await runner.run_test(test, dispatcher=None)
+        assert result.error == "No dispatcher available"
+        assert result.passed is False
+
+    @pytest.mark.asyncio
+    async def test_run_test_dispatch_exception(self, tmp_path):
+        runner = RegressionTestRunner(root_dir=tmp_path)
+        dispatcher = AsyncMock()
+        dispatcher.dispatch = AsyncMock(side_effect=RuntimeError("boom"))
+        test = TestCase(prompt="x")
+        result = await runner.run_test(test, dispatcher=dispatcher)
+        assert result.passed is False
+        assert "boom" in result.error
+
+    @pytest.mark.asyncio
+    async def test_run_suite(self, tmp_path):
+        runner = RegressionTestRunner(root_dir=tmp_path)
+        dispatcher = AsyncMock()
+        dispatcher.dispatch = AsyncMock(return_value=_dispatch_result(0, "ok"))
+        tests = [TestCase(prompt="a"), TestCase(prompt="b")]
+        results = await runner.run_suite(tests, dispatcher=dispatcher)
+        assert len(results) == 2
+
+    @pytest.mark.asyncio
+    async def test_compare_detects_regression(self, tmp_path):
+        runner = RegressionTestRunner(root_dir=tmp_path)
+        baseline = AsyncMock()
+        baseline.dispatch = AsyncMock(return_value=_dispatch_result(0, "ok"))
+        candidate = AsyncMock()
+        candidate.dispatch = AsyncMock(return_value=_dispatch_result(1))
+        tests = [TestCase(prompt="x", name="t1")]
+        report = await runner.compare(
+            tests, baseline_dispatcher=baseline, candidate_dispatcher=candidate,
+        )
+        assert isinstance(report, RegressionReport)
+        assert report.baseline_passed == 1
+        assert report.candidate_passed == 0
+        assert "t1" in report.regressions
+
+    @pytest.mark.asyncio
+    async def test_compare_detects_improvement(self, tmp_path):
+        runner = RegressionTestRunner(root_dir=tmp_path)
+        baseline = AsyncMock()
+        baseline.dispatch = AsyncMock(return_value=_dispatch_result(1))
+        candidate = AsyncMock()
+        candidate.dispatch = AsyncMock(return_value=_dispatch_result(0, "ok"))
+        tests = [TestCase(prompt="x", name="t1")]
+        report = await runner.compare(
+            tests, baseline_dispatcher=baseline, candidate_dispatcher=candidate,
+        )
+        assert "t1" in report.improvements

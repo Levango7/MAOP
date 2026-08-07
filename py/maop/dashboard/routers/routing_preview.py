@@ -1,4 +1,4 @@
-﻿"""Route scoring and cooldown API endpoints.
+"""Route scoring and cooldown API endpoints.
 
 Provides visibility into the multi-factor route matching process:
 - POST /api/routing/match: Preview which route a task would match and why
@@ -14,8 +14,8 @@ from typing import Any, cast
 from fastapi import APIRouter, Request
 
 from maop.config.loader import load_config
-from maop.core.middleware import require_admin
-from maop.core.route_scorer import get_route_scorer
+from maop.core.security.middleware import require_admin
+from maop.core.routing.route_scorer import get_route_scorer
 
 logger = logging.getLogger(__name__)
 

@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.5.0] — 2026-08-06
+
+### Added
+
+- **core/ 子包重构（Phase D-1）**：将 `core/`（116 模块）拆分为 9 个职责清晰的子包（`persistence`、`llm`、`vector`、`mcp`、`observability`、`security`、`config`、`runtime`、`utils`），保留 `core/__init__.py` re-export shim，现有 `from maop.core.xxx import yyy` 调用零改动通过。
+- **流式 DAG 执行进度推送（Phase D-2）**：新增 `DagProgressEmitter`，在 DAG 节点状态变更时通过 EventBus 推送增量事件；新增 SSE 端点 `/api/stream/dag/{execution_id}`（支持 Last-Event-ID 断线重连）；前端 `useDagProgress.js` composable 实时渲染节点状态（pending/running/success/failed/skipped）。
+- **知识图谱可视化前端（Phase D-3）**：新增 `/api/knowledge-graph` 端点聚合三层记忆（short/long/vector）实体-关系数据；新增 `KnowledgeGraphView.vue` 基于 vis-network 渲染交互式知识图谱，支持节点筛选与路径高亮。
+- 新增测试套件：`test_dag_progress.py`、`test_knowledge_graph_v2.py`、`test_dag_sse_endpoint.py`、`e2e/knowledge-graph.spec.js`。
+
+### Fixed
+
+- **`_execute_with_retry` 源码 bug**：`py/maop/loop_executor.py` 中 `_execute_with_retry` 方法被错误定义在 `_NoopEmitter` 类中，导致 `ExecuteMixin`（`MaopLoop` 继承）调用时 `AttributeError`。已将方法移至 `ExecuteMixin` 类，修复 17 个测试失败。
+- **`test_dag_sse_endpoint.py` 测试间污染**：`_disable_auth` patch `maop.core.middleware.require_admin` 模块属性，但 `stream.py` 通过 `from ... import require_admin` 在模块加载时已绑定函数引用，全量测试中 stream 模块被先前测试加载后 patch 失效。改为直接 patch `stream` 模块的 `require_admin` 引用，修复 7 个测试失败。
+
+### Changed
+
+- 整体测试覆盖率从 85% 提升至 87%（34234 stmts, 4556 missing, 6130 passed, 0 failed）。
+- 前端 vitest 160 passed（21 files）。
+
+## [4.4.2] — 2026-08-06
+
+### Added
+
+- 新增 `ROADMAP.md`：MAOP 版本规划单一真相源，覆盖 v4.4.2 / v4.5.0 / v5.0.0 方向与验收标准。
+- 新增 `deliverables/engineering-assurance/v4.4.1-fix-report.md`：归档 v4.4.1 修复清单（102 项，后端 24 + 交互 6 + 前端 72 + 测试 32 用例）。
+- 新增 `deliverables/engineering-assurance/env-audit-4.4.2.md`：`.env.example` 与代码实际环境变量对齐审计报告。
+- 新增 `deliverables/engineering-assurance/_extract_env.py`：env 审计可复现脚本。
+- 前端 e2e 测试实跑通过（`enterprise-route-guard.spec.js` 12 用例，Playwright + chromium 安装并执行）。
+- 后端覆盖率测试套件扩充（新增约 800 个测试用例，覆盖路由端点、core 模块、memory 模块等），整体覆盖率从 75% 提升至 85%。
+- 前端单元测试 `vitest` 138 passed（20 files）。
+
+### Changed
+
+- 同步 `docs/adr/016-dual-edition-architecture.md` 待完善表：SAML SSO 状态由 `Medium / fail-closed 拒绝` 更新为 `Done`（已实现 SP-initiated SSO + XML 签名验证，见 `docs/enterprise/saml-sso-guide.md`）。
+- 整体测试覆盖率从 75% 提升至 85%（33187 stmts, 5099 missing, 5744 passed, 0 failed）。
+- `py/maop/core/vector.py` `EmbeddingProvider` → ABC + `@abstractmethod`（文档化抽象接口）。
+- `py/maop/core/runtime.py` `BaseRuntime` → ABC + `@abstractmethod`（文档化抽象接口）。
+- `py/maop/dashboard/routers/agents.py` `get_agent` 统一返回 `JSONResponse`（mypy return-value 修复）。
+
+### Fixed
+
+- `.env.example` 与代码实际环境变量对齐：补齐 5 个代码直接读取但未文档化的 `MAOP_*` 变量，差异归零。
+  - `MAOP_KEY` / `MAOP_KEY_FILE`（API key vault 主密钥，`core/api_key_vault.py`）
+  - `MAOP_TLS_ALLOW_DEPRECATED`（允许废弃 TLS 版本开关，`core/tls.py`，默认 fail-closed）
+  - `MAOP_DB_URL`（Alembic 迁移 SQLAlchemy URL 覆盖，`migrations/alembic/env.py`）
+  - `MAOP_PLUGIN_STRICT_CHECKSUM`（插件校验和严格模式，`core/plugin.py`，默认 fail-closed）
+- 经审计核实 `.env.example` 中 16 个未被 `os.getenv` 直接读取的 `MAOP_*` 变量均为 pydantic `MAOPSettings` 间接读取或向后兼容别名，非僵尸变量，保留。
+- `dashboard-enterprise/playwright.config.js` baseURL/port 不一致修复（baseURL 9079→5174, webServer.port 5173→5174，与 `vite.config.js` 实际端口对齐）。
+- `dashboard-enterprise/package.json` 补 `@playwright/test` devDependency。
+- `dashboard-enterprise/src/stores/edition.js` 冷加载缺陷修复：新增 `loadInitialEdition()` 从 localStorage 快照读初始值，修复路由守卫死代码（首次 page.goto 守卫总看到硬编码 'enterprise' 放行）。
+- `config/models.yaml` 恢复为纯 YAML 格式（被 `yaml.dump` 覆盖产生 Python 对象标签，导致 `yaml.safe_load` 加载失败）。
+- `py/tests/test_circuit_breaker.py` fixture 隔离：monkeypatch `_load_agent_names_from_config` 返回空列表，强制 fallback 到 DEFAULT_AGENTS，不依赖全局 agents.yaml 配置。
+
 ## [4.4.1] — 2026-07-31
 
 ### Fixed

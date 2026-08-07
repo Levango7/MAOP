@@ -1,10 +1,10 @@
-﻿"""Tests for MAOP.core.worker_pool — Multi-loop parallel execution."""
+"""Tests for MAOP.core.worker_pool — Multi-loop parallel execution."""
 
 import asyncio
 
 import pytest
 
-from maop.core.worker_pool import (
+from maop.core.reliability.worker_pool import (
     PoolStats,
     WorkerPool,
     WorkerStatus,

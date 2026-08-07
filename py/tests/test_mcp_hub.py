@@ -5,7 +5,7 @@ import tempfile
 
 import pytest
 
-from maop.core.mcp_hub import (
+from maop.core.mcp.mcp_hub import (
     MCPHub,
     MCPServerConfig,
     MCPTool,
@@ -235,7 +235,7 @@ class TestStdioCommandWhitelist:
         """MAOP_MCP_STRICT_COMMAND_WHITELIST=0 degrades to warning."""
         monkeypatch.setenv("MAOP_MCP_STRICT_COMMAND_WHITELIST", "0")
         import logging
-        with caplog.at_level(logging.WARNING, logger="maop.core.mcp_hub"):
+        with caplog.at_level(logging.WARNING, logger="maop.core.mcp.mcp_hub"):
             argv = _StdioTransport._validate_command("rm -rf /")
         assert argv[0] == "rm"
         assert any("whitelist" in rec.message for rec in caplog.records)

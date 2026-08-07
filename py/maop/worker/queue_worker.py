@@ -20,7 +20,7 @@ import sys
 import time
 from pathlib import Path
 
-from maop.core.db_utils import get_db_path
+from maop.core.backends.db_utils import get_db_path
 
 logger = logging.getLogger("maop.worker.queue_worker")
 
@@ -51,7 +51,7 @@ def _setup_logging() -> None:
     # running in containers should emit JSON-structured logs so they can
     # be ingested by ELK / Loki / CloudWatch without a regex parser.
     if os.environ.get("MAOP_JSON_LOG", "0") == "1":
-        from maop.core.monitoring import setup_json_logging
+        from maop.core.monitoring.monitoring import setup_json_logging
         setup_json_logging(
             level=level,
             log_file=os.environ.get("MAOP_JSON_LOG_FILE") or None,
@@ -67,7 +67,7 @@ def _setup_logging() -> None:
 def _process_human_approvals() -> int:
     """Auto-expire stale human approval requests. Returns count expired."""
     try:
-        from maop.core.human_proxy import HumanProxy
+        from maop.core.agent.delegation.human_proxy import HumanProxy
         proxy = HumanProxy(root_dir=ROOT)
         return proxy.expire_old()
     except Exception as exc:
@@ -78,7 +78,7 @@ def _process_human_approvals() -> int:
 def _process_queue_stats() -> None:
     """Log queue statistics."""
     try:
-        from maop.core.message_queue import MessageQueue
+        from maop.core.reliability.message_queue import MessageQueue
         mq = MessageQueue(db_path=str(get_db_path("queue")))
         stats = mq.stats()
         logger.debug("Queue stats: %s", stats)
@@ -151,7 +151,7 @@ def _execute_task(payload: dict) -> None:
 
     import asyncio
 
-    from maop.core.worker_pool import WorkerPool
+    from maop.core.reliability.worker_pool import WorkerPool
 
     # OPS-11 fix: run the whole lifecycle in ONE event loop instead of four
     # separate asyncio.run() calls. Each asyncio.run() creates and destroys
@@ -194,7 +194,7 @@ def _run_maintenance(payload: dict) -> None:
 
     if job == "purge_acked":
         try:
-            from maop.core.message_queue import MessageQueue
+            from maop.core.reliability.message_queue import MessageQueue
             mq = MessageQueue(db_path=str(get_db_path("queue")))
             removed = mq.purge_acked(older_than_s=payload.get("older_than_s", 3600.0))
             logger.info("[queue-worker] purge_acked removed %d messages", removed)
@@ -203,7 +203,7 @@ def _run_maintenance(payload: dict) -> None:
             raise
     elif job == "cleanup_dead_letters":
         try:
-            from maop.core.message_queue import MessageQueue
+            from maop.core.reliability.message_queue import MessageQueue
             mq = MessageQueue(db_path=str(get_db_path("queue")))
             removed = mq.cleanup_dead_letters(
                 older_than_s=payload.get("older_than_s", 86400.0)
@@ -229,7 +229,7 @@ def _consume_messages() -> int:
     """
     processed = 0
     try:
-        from maop.core.message_queue import MessageQueue
+        from maop.core.reliability.message_queue import MessageQueue
         mq = MessageQueue(db_path=str(get_db_path("queue")))
     except Exception as exc:
         logger.warning("[queue-worker] cannot connect to message queue: %s", exc)

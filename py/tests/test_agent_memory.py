@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.agent_memory import (
+from maop.core.agent.memory_ctx.agent_memory import (
     MAX_RECORDS_PER_TYPE,
     MEMORY_TYPES,
     AgentMemory,
@@ -21,7 +21,7 @@ def memory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AgentMemory:
     def fake_get_db_path(module_name: str = "", *, legacy_fallback: str = "") -> Path:
         return db_path
 
-    monkeypatch.setattr("maop.core.agent_memory.get_db_path", fake_get_db_path)
+    monkeypatch.setattr("maop.core.agent.memory_ctx.agent_memory.get_db_path", fake_get_db_path)
     return AgentMemory(root_dir=tmp_path)
 
 

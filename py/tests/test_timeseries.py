@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.timeseries — Status logging with automatic downsampling."""
+"""Tests for MAOP.core.timeseries — Status logging with automatic downsampling."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.timeseries import (
+from maop.core.monitoring.timeseries import (
     DataPoint,
     RetentionPolicy,
     TimeSeriesQuery,

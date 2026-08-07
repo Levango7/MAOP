@@ -12,7 +12,7 @@ import pytest
 class TestHumanProxy:
     def setup_method(self):
         self._tmp = tempfile.mkdtemp()
-        from maop.core.human_proxy import HumanProxy
+        from maop.core.agent.delegation.human_proxy import HumanProxy
         self.proxy = HumanProxy(root_dir=self._tmp)
 
     def test_request(self):
@@ -84,7 +84,7 @@ class TestHumanProxy:
 class TestSandboxManager:
     def setup_method(self):
         self._tmp = tempfile.mkdtemp()
-        from maop.core.sandbox import SandboxManager
+        from maop.core.security.sandbox import SandboxManager
         self.mgr = SandboxManager(root_dir=self._tmp)
 
     def test_create(self):
@@ -146,7 +146,7 @@ class TestSandboxManager:
 class TestToolManager:
     def setup_method(self):
         self._tmp = tempfile.mkdtemp()
-        from maop.core.tool_manager import ToolManager
+        from maop.core.agent.tools.tool_manager import ToolManager
         self.mgr = ToolManager(root_dir=self._tmp)
 
     def test_register(self):

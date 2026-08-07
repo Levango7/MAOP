@@ -1,10 +1,10 @@
-﻿"""Tests for MAOP.core.session, MAOP.core.conversation, and MAOP.core.project_context."""
+"""Tests for MAOP.core.session, MAOP.core.conversation, and MAOP.core.project_context."""
 
 from __future__ import annotations
 
-from maop.core.conversation import ConversationManager
-from maop.core.project_context import ProjectContext
-from maop.core.session import SessionManager, SessionStatus
+from maop.core.agent.llm_chat.conversation import ConversationManager
+from maop.core.agent.memory_ctx.project_context import ProjectContext
+from maop.core.security.session import SessionManager, SessionStatus
 
 # ── SessionManager ──────────────────────────────────────────────
 

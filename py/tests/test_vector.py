@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.vector — Pure Python vector similarity search."""
+"""Tests for MAOP.core.vector — Pure Python vector similarity search."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from maop.core.vector import (
+from maop.core.memory.vector import (
     EmbeddingProvider,
     HashEmbedding,
     VectorSearchResult,
@@ -70,21 +70,34 @@ class TestCosineSimilarity:
 
 # ── EmbeddingProvider base class ──────────────────────────────────
 
+class _ConcreteEmbedding(EmbeddingProvider):
+    """Concrete subclass for testing base-class behavior.
+
+    ``EmbeddingProvider`` is now an abstract class (inherits ``abc.ABC``)
+    and cannot be instantiated directly. This subclass implements the
+    abstract ``embed`` method while preserving base-class defaults
+    (``embed_batch`` delegation, ``dimension == 0``).
+    """
+
+    def embed(self, text: str) -> list[float]:
+        raise NotImplementedError
+
+
 class TestEmbeddingProvider:
     def test_base_embed_raises(self):
-        provider = EmbeddingProvider()
+        provider = _ConcreteEmbedding()
         with pytest.raises(NotImplementedError):
             provider.embed("test")
 
     def test_base_embed_batch_delegates(self):
-        provider = EmbeddingProvider()
+        provider = _ConcreteEmbedding()
         provider.embed = MagicMock(return_value=[0.1, 0.2])
         result = provider.embed_batch(["a", "b"])
         assert result == [[0.1, 0.2], [0.1, 0.2]]
         assert provider.embed.call_count == 2
 
     def test_base_dimension_zero(self):
-        provider = EmbeddingProvider()
+        provider = _ConcreteEmbedding()
         assert provider.dimension == 0
 
 

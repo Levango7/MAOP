@@ -22,7 +22,7 @@
     </div>
 
     <div class="grid-2">
-      <Card :title="t('view.logs.logOutput')" icon="scroll" :marginBottom="0" class="log-card">
+      <Card :title="t('view.logs.logOutput')" icon="scroll" :margin-bottom="0" class="log-card">
         <template #actions>
           <Badge v-if="!loading && logs.length" :tone="errorLogs > 0 ? 'fail' : 'success'">
             {{ errorLogs }} {{ t('view.logs.errors') }}
@@ -42,7 +42,7 @@
         </div>
       </Card>
 
-      <Card :title="t('view.logs.logAnalysis')" icon="activity" :marginBottom="0" class="analysis-card">
+      <Card :title="t('view.logs.logAnalysis')" icon="activity" :margin-bottom="0" class="analysis-card">
         <div v-if="loading" class="blk">
           <div class="stat-row"><Skeleton height="56px" /><Skeleton height="56px" /><Skeleton height="56px" /><Skeleton height="56px" /></div>
           <Skeleton block height="14px" /><Skeleton block height="14px" />

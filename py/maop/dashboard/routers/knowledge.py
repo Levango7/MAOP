@@ -19,10 +19,10 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 from .error_handler import handle_api_errors
 
@@ -50,7 +50,7 @@ class VectorSearchRequest(BaseModel):
 @handle_api_errors("knowledge stats")
 async def knowledge_stats() -> dict[str, Any]:
     """Get knowledge base statistics."""
-    from maop.core.knowledge_extractor import KnowledgeExtractor
+    from maop.core.memory.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
     return {"status": "ok", "data": ext.stats()}
 
@@ -64,7 +64,7 @@ async def query_facts(
     top: int = 20,
 ) -> dict[str, Any]:
     """Query facts from the knowledge base."""
-    from maop.core.knowledge_extractor import KnowledgeExtractor
+    from maop.core.memory.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
     facts = ext.query_facts(subject=subject, predicate=predicate, topic=topic, top=top)
     return {"status": "ok", "data": [f.model_dump() for f in facts]}
@@ -74,7 +74,7 @@ async def query_facts(
 @handle_api_errors("knowledge entity")
 async def get_entity(name: str) -> dict[str, Any]:
     """Get a specific entity by name."""
-    from maop.core.knowledge_extractor import KnowledgeExtractor
+    from maop.core.memory.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
     entity = ext.get_entity(name)
     if entity:
@@ -91,7 +91,7 @@ async def query_relations(
     top: int = 20,
 ) -> dict[str, Any]:
     """Query relations from the knowledge base."""
-    from maop.core.knowledge_extractor import KnowledgeExtractor
+    from maop.core.memory.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
     relations = ext.query_relations(source=source, target=target, relation_type=relation_type, top=top)
     return {"status": "ok", "data": [r.model_dump() for r in relations]}
@@ -105,7 +105,7 @@ async def get_graph(
     max_nodes: int = 50,
 ) -> dict[str, Any]:
     """Get graph data for visualization."""
-    from maop.core.knowledge_graph import KnowledgeGraph
+    from maop.core.memory.knowledge_graph import KnowledgeGraph
     kg = KnowledgeGraph(root_dir=str(MAOP_ROOT))
     if center:
         subgraph = kg.get_neighbors(center, max_depth=2)
@@ -124,7 +124,7 @@ async def build_context(
     max_depth: int = 2,
 ) -> dict[str, Any]:
     """Build LLM context for an entity from the knowledge graph."""
-    from maop.core.knowledge_graph import KnowledgeGraph
+    from maop.core.memory.knowledge_graph import KnowledgeGraph
     kg = KnowledgeGraph(root_dir=str(MAOP_ROOT))
     context = kg.build_context(entity, max_depth=max_depth)
     return {"status": "ok", "data": {"entity": entity, "context": context}}
@@ -135,7 +135,7 @@ async def build_context(
 async def extract_knowledge(request_body: ExtractRequest, request: Request) -> dict[str, Any]:
     """Extract knowledge from text and store to the knowledge base."""
     require_admin(request)
-    from maop.core.knowledge_extractor import KnowledgeExtractor
+    from maop.core.memory.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
     result = ext.extract_from_text(
         request_body.text,
@@ -177,3 +177,45 @@ async def vector_index(request: Request) -> dict[str, Any]:
     vs = VectorSearch(root_dir=str(MAOP_ROOT))
     count = vs.index_all()
     return {"status": "ok", "data": {"indexed": count, "is_semantic": vs.is_semantic}}
+
+
+# ── Knowledge Graph v2 router (/api/knowledge-graph) ──────────────
+
+kg_router = APIRouter(prefix="/api/knowledge-graph", tags=["knowledge-graph"])
+
+
+@kg_router.get("")
+async def get_knowledge_graph_v2(
+    limit: int = Query(500),
+    type: str = Query(""),  # noqa: A002  # shadows builtin intentionally for API
+    time_range: str = Query(""),
+) -> dict[str, Any]:
+    """Return the full knowledge graph with optional type/time/limit filtering.
+
+    Query params (spec 6.4):
+      - limit: 1–10000 (default 500)
+      - type: comma-separated node types to filter (e.g. "agent,task")
+      - time_range: "start,end" ISO-8601 lexicographic comparison
+    """
+    # ── Parameter validation ──
+    if limit < 1 or limit > 10000:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 10000")
+    if time_range:
+        parts = time_range.split(",")
+        if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+            raise HTTPException(status_code=400, detail="Invalid time_range format")
+        start, end = parts[0].strip(), parts[1].strip()
+        if start > end:
+            raise HTTPException(status_code=400, detail="time_range start must be <= end")
+
+    from maop.core.memory.knowledge_graph import KnowledgeGraph, KnowledgeGraphQuery
+
+    kg = KnowledgeGraph(root_dir=str(MAOP_ROOT))
+    query = KnowledgeGraphQuery(type=type, time_range=time_range, limit=limit)
+    response = kg.query_graph(query)
+    data = response.model_dump()
+    data["stats"] = {
+        "node_count": len(response.nodes),
+        "edge_count": len(response.edges),
+    }
+    return {"status": "ok", "data": data}

@@ -2,7 +2,7 @@
   <div class="vs-page">
     <PageHeader />
 
-    <Card :title="t('view.vector.query')" icon="search" :marginBottom="16">
+    <Card :title="t('view.vector.query')" icon="search" :margin-bottom="16">
       <textarea
         v-model="query"
         class="query-input"
@@ -61,7 +61,7 @@
       />
     </template>
 
-    <Card :title="t('view.vector.indexStats')" icon="database" :marginBottom="16">
+    <Card :title="t('view.vector.indexStats')" icon="database" :margin-bottom="16">
       <div class="stat-grid" v-if="!statsLoading">
         <StatCard :label="t('view.vector.stat.totalEntries')" :value="stats.total_entries ?? 0" icon="database" tone="brand" />
         <StatCard :label="t('view.vector.stat.totalTraces')" :value="stats.total_traces ?? 0" icon="route" tone="info" />
@@ -74,7 +74,7 @@
       <p class="inline-error" v-if="statsError">{{ statsError }}</p>
     </Card>
 
-    <Card :title="t('view.vector.indexedVectors')" icon="box" :marginBottom="16">
+    <Card :title="t('view.vector.indexedVectors')" icon="box" :margin-bottom="16">
       <DataTable
         v-if="vectors.length"
         :columns="vectorCols"
@@ -121,7 +121,7 @@ const statsError = ref('');
 const vectors = ref([]);
 const vecLoading = ref(true);
 
-const hasScores = computed(() => results.value.some((r) => r.score != null));
+const hasScores = computed(() => results.value.some((r) => r.score !== null && r.score !== undefined));
 const filteredResults = computed(() => {
   if (!hasScores.value) return results.value;
   return results.value.filter((r) => (r.score ?? 0) >= minScore.value);

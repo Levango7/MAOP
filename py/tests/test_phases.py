@@ -1,7 +1,7 @@
 """Tests for PhaseContext and PhaseResult from core/phases.py."""
 from __future__ import annotations
 
-from maop.core.phases import PhaseContext, PhaseResult
+from maop.core.agent.evolution.phases import PhaseContext, PhaseResult
 
 
 class TestPhaseContext:

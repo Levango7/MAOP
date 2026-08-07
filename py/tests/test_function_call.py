@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.function_call and MAOP.core.tool_schema."""
+"""Tests for MAOP.core.function_call and MAOP.core.tool_schema."""
 
 from __future__ import annotations
 
@@ -6,13 +6,13 @@ import json
 
 import pytest
 
-from maop.core.function_call import (
+from maop.core.agent.llm_chat.function_call import (
     FunctionCallBridge,
     ToolCall,
     ToolCallResult,
     ToolProvider,
 )
-from maop.core.tool_schema import ToolSchemaDef, ToolSchemaGenerator
+from maop.core.agent.tools.tool_schema import ToolSchemaDef, ToolSchemaGenerator
 
 # ── FunctionCallBridge: parse_response ──────────────────────────
 
@@ -270,7 +270,7 @@ class TestFromPythonFunction:
 class TestFromMCPTool:
     def test_mcp_tool_conversion(self):
         # δ-1: migrated from MCPToolDef (Stack B) to MCPTool (Stack A)
-        from maop.core.mcp_hub import MCPTool
+        from maop.core.mcp.mcp_hub import MCPTool
         gen = ToolSchemaGenerator()
         mcp_tool = MCPTool(
             name="read_file",

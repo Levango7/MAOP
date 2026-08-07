@@ -9,7 +9,7 @@
       <StatCard :label="t('view.search.stat.graphEdges')" :value="graphStats.edges" icon="link" tone="success" :loading="statsLoading" />
     </section>
 
-    <Card icon="search" :marginBottom="16">
+    <Card icon="search" :margin-bottom="16">
       <Segmented v-model="activeTab" :options="tabOptions" />
       <div class="search-bar">
         <div class="input-wrap">
@@ -58,7 +58,7 @@
       </div>
     </Card>
 
-    <Card icon="clipboard" :title="resultTitle" :marginBottom="0"
+    <Card icon="clipboard" :title="resultTitle" :margin-bottom="0"
       :subtitle="searched && !searching ? `${resultRows.length} result(s)${searchTime ? ' in ' + searchTime + 'ms' : ''}` : ''">
       <div v-if="searchError" class="err"><EmptyState icon="alert-triangle" :title="t('view.search.searchFailed')" :description="searchError" /></div>
       <Skeleton v-else-if="searching" :lines="6" block />
@@ -126,7 +126,7 @@ const graphStats = reactive({ nodes: 0, edges: 0 });
 async function loadStats() {
   statsLoading.value = true;
   const get = async (url, sink, keys) => {
-    try { const d = await api.get(url); keys.forEach(k => { if (d[k] != null) sink[k] = d[k]; }); }
+    try { const d = await api.get(url); keys.forEach(k => { if (d[k] !== null && d[k] !== undefined) sink[k] = d[k]; }); }
     catch (e) { console.warn('[search] stats load failed for', url, e && e.message); }
   };
   await Promise.all([
@@ -170,7 +170,7 @@ const resultRows = computed(() => {
   if (tab === 'graph' && graphMode.value === 'neighbors') {
     return r.map(n => typeof n === 'string'
       ? { name: n, detail: '' }
-      : { name: n.id || n.name || n.label || '—', detail: n.weight != null ? ('weight ' + n.weight) : (n.detail || '') });
+      : { name: n.id || n.name || n.label || '—', detail: n.weight !== null && n.weight !== undefined ? ('weight ' + n.weight) : (n.detail || '') });
   }
   if (tab === 'graph' && graphMode.value === 'edges') {
     return r.map(e => Array.isArray(e)
@@ -190,7 +190,7 @@ const resultRows = computed(() => {
   if (tab === 'memory') {
     return r.map(x => ({
       id: x.id, agent: x.agent || '—', task: x.task || '—', tags: x.tags || '—',
-      score: x.score != null ? Number(x.score).toFixed(3) : '—',
+      score: x.score !== null && x.score !== undefined ? Number(x.score).toFixed(3) : '—',
     }));
   }
   return r;

@@ -41,7 +41,7 @@ def _setup_logging() -> None:
     # running in containers should emit JSON-structured logs so they can
     # be ingested by ELK / Loki / CloudWatch without a regex parser.
     if os.environ.get("MAOP_JSON_LOG", "0") == "1":
-        from maop.core.monitoring import setup_json_logging
+        from maop.core.monitoring.monitoring import setup_json_logging
         setup_json_logging(
             level=level,
             log_file=os.environ.get("MAOP_JSON_LOG_FILE") or None,
@@ -64,7 +64,7 @@ def run() -> None:
 
     try:
         from maop.config.loader import ConfigLoader
-        from maop.core.message_queue import MessageQueue
+        from maop.core.reliability.message_queue import MessageQueue
         from maop.delegate.dispatcher import Dispatcher
     except ImportError as exc:
         logger.error("Failed to import MAOP modules: %s", exc)

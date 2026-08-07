@@ -1,10 +1,15 @@
-﻿"""Tests for MAOP.core.react_loop, MAOP.core.change_tracker, and MAOP.core.artifact_store."""
+"""Tests for MAOP.core.react_loop, MAOP.core.change_tracker, and MAOP.core.artifact_store."""
 
 from __future__ import annotations
 
-from maop.core.artifact_store import ArtifactStore
-from maop.core.change_tracker import ChangeTracker
-from maop.core.react_loop import ReactConfig, ReactLoop, ReactPhase, ReactResult, ReactStep
+import json
+from unittest.mock import patch, MagicMock, AsyncMock
+
+import pytest
+
+from maop.core.backends.artifact_store import ArtifactStore
+from maop.core.reliability.change_tracker import ChangeTracker
+from maop.core.agent.llm_chat.react_loop import ReactConfig, ReactLoop, ReactPhase, ReactResult, ReactStep
 
 # ── ReactLoop (unit tests, no real LLM) ────────────────────────
 
@@ -284,3 +289,453 @@ class TestArtifactTag:
         store = ArtifactStore(root_dir=str(tmp_path))
         store.save("main.py", content="hello")
         assert store.get_by_tag("main.py", "nonexistent") is None
+
+
+# --- Merged from test_react_loop_coverage3.py ---
+# Coverage tests (round 3) for maop.core.agent.react_loop.
+#
+# Targets: provider_factory, _get_bridge, _get_change_tracker,
+# _estimate_tokens, _trim_conversation, _call_llm, run() branches.
+
+# ── provider_factory property ───────────────────────────────────────
+
+
+class TestProviderFactory:
+    def test_factory_init_failure(self):
+        """Cover LLMProviderFactory init failure (154-155)."""
+        loop = ReactLoop()
+        with patch(
+            "maop.core.agent.llm_chat.llm_provider.LLMProviderFactory",
+            side_effect=ImportError("no provider"),
+        ):
+            result = loop.provider_factory
+        assert result is None
+
+    def test_factory_cached(self):
+        """Cover cached factory."""
+        loop = ReactLoop()
+        mock_factory = MagicMock()
+        loop._provider_factory = mock_factory
+        assert loop.provider_factory is mock_factory
+
+
+# ── _get_bridge and _get_change_tracker ─────────────────────────────
+
+
+class TestLazyInit:
+    def test_get_bridge_cached(self):
+        loop = ReactLoop()
+        mock_bridge = MagicMock()
+        loop._bridge = mock_bridge
+        assert loop._get_bridge() is mock_bridge
+
+    def test_get_change_tracker_no_root(self):
+        """Cover _get_change_tracker with no root_dir (168)."""
+        loop = ReactLoop(root_dir=None)
+        result = loop._get_change_tracker()
+        assert result is None
+
+    def test_get_change_tracker_cached(self):
+        loop = ReactLoop()
+        mock_tracker = MagicMock()
+        loop._change_tracker = mock_tracker
+        assert loop._get_change_tracker() is mock_tracker
+
+    def test_get_change_tracker_init_failure(self):
+        """Cover _get_change_tracker init failure (172-173)."""
+        loop = ReactLoop(root_dir="/nonexistent")
+        with patch(
+            "maop.core.reliability.change_tracker.ChangeTracker",
+            side_effect=ImportError("no tracker"),
+        ):
+            result = loop._get_change_tracker()
+        assert result is None
+
+
+# ── _estimate_tokens ────────────────────────────────────────────────
+
+
+class TestEstimateTokens:
+    def test_string_content(self):
+        messages = [{"role": "user", "content": "hello world"}]
+        result = ReactLoop._estimate_tokens(messages)
+        assert result > 0
+
+    def test_list_content(self):
+        """Cover list content blocks (183-186)."""
+        messages = [
+            {"role": "user", "content": [{"type": "text", "text": "hello"}, {"type": "text", "text": "world"}]}
+        ]
+        result = ReactLoop._estimate_tokens(messages)
+        assert result > 0
+
+    def test_with_tool_calls(self):
+        """Cover tool_calls token estimation (187)."""
+        messages = [
+            {"role": "assistant", "content": "", "tool_calls": [{"id": "1", "function": {"name": "tool"}}]}
+        ]
+        result = ReactLoop._estimate_tokens(messages)
+        assert result > 0
+
+
+# ── _trim_conversation ──────────────────────────────────────────────
+
+
+class TestTrimConversation:
+    def test_short_conversation(self):
+        """Cover short conversation (193-194)."""
+        loop = ReactLoop()
+        msgs = [{"role": "user", "content": "hi"}]
+        result = loop._trim_conversation(msgs)
+        assert result is msgs
+
+    def test_under_limit(self):
+        """Cover conversation under token limit (196-197)."""
+        loop = ReactLoop(config=ReactConfig(max_total_tokens=100000))
+        msgs = [
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": "hi"},
+            {"role": "user", "content": "bye"},
+        ]
+        result = loop._trim_conversation(msgs)
+        assert result is msgs
+
+    def test_over_limit_trimming(self):
+        """Cover conversation trimming (198-211)."""
+        loop = ReactLoop(config=ReactConfig(max_total_tokens=10))
+        msgs = [
+            {"role": "system", "content": "system prompt"},
+            {"role": "user", "content": "x" * 100},
+            {"role": "assistant", "content": "y" * 100},
+            {"role": "user", "content": "z" * 100},
+            {"role": "assistant", "content": "final"},
+        ]
+        result = loop._trim_conversation(msgs)
+        assert len(result) < len(msgs)
+        # Should keep system messages
+        assert any(m.get("role") == "system" for m in result)
+
+    def test_over_limit_few_non_system(self):
+        """Cover trimming with <= 2 non-system messages (204-205)."""
+        loop = ReactLoop(config=ReactConfig(max_total_tokens=10))
+        msgs = [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "x" * 100},
+            {"role": "assistant", "content": "y" * 100},
+        ]
+        result = loop._trim_conversation(msgs)
+        # Only 2 non-system → return as-is
+        assert result is msgs
+
+
+# ── _call_llm ───────────────────────────────────────────────────────
+
+
+class TestCallLlm:
+    @pytest.mark.asyncio
+    async def test_factory_none(self):
+        """Cover _call_llm with factory=None (245-250)."""
+        loop = ReactLoop()
+        loop._provider_factory = None
+        with patch.object(type(loop), "provider_factory", None):
+            result = await loop._call_llm([], "model", "trace")
+        assert result.exit_code == -1
+        assert "not available" in (result.error or "")
+
+    @pytest.mark.asyncio
+    async def test_llm_success(self):
+        """Cover _call_llm success (262-269)."""
+        loop = ReactLoop()
+        mock_factory = MagicMock()
+        mock_fb_result = MagicMock()
+        mock_fb_result.response.content = "LLM response"
+        mock_fb_result.response.latency_ms = 100
+        mock_factory.chat_with_fallback = AsyncMock(return_value=mock_fb_result)
+        loop._provider_factory = mock_factory
+
+        result = await loop._call_llm(
+            [{"role": "user", "content": "hi"}], "model", "trace",
+            tools=[{"name": "tool1"}],
+        )
+        assert result.exit_code == 0
+        assert result.stdout == "LLM response"
+
+    @pytest.mark.asyncio
+    async def test_llm_exception(self):
+        """Cover _call_llm exception (270-279)."""
+        loop = ReactLoop()
+        mock_factory = MagicMock()
+        mock_factory.chat_with_fallback = AsyncMock(side_effect=RuntimeError("boom"))
+        loop._provider_factory = mock_factory
+
+        result = await loop._call_llm([], "model", "trace")
+        assert result.exit_code == -1
+        assert "LLM call failed" in (result.error or "")
+
+
+# ── run() — CLI path ────────────────────────────────────────────────
+
+
+def _mock_dispatch_result(stdout="", error=None, success=True, exit_code=0, duration_ms=0):
+    """Create a mock dispatch result."""
+    mock_result = MagicMock()
+    mock_result.is_success.return_value = success
+    mock_result.stdout = stdout
+    mock_result.error = error
+    mock_result.exit_code = exit_code
+    mock_result.trace_id = ""
+    mock_result.duration_ms = duration_ms
+    mock_dispatch = MagicMock()
+    mock_dispatch.result = mock_result
+    return mock_dispatch
+
+
+class TestRunCliPath:
+    @pytest.mark.asyncio
+    async def test_final_answer_text(self):
+        """Cover run() with text final answer (non-JSON stdout) (404-409)."""
+        loop = ReactLoop(config=ReactConfig(max_iterations=1, enable_change_tracking=False))
+        mock_dispatcher = MagicMock()
+        mock_dispatcher.dispatch = AsyncMock(
+            return_value=_mock_dispatch_result(stdout="This is the final answer")
+        )
+        result = await loop.run("task", "agent", mock_dispatcher)
+        assert result.success is True
+        assert result.final_answer == "This is the final answer"
+
+    @pytest.mark.asyncio
+    async def test_final_answer_no_tool_calls(self):
+        """Cover run() with JSON but no tool calls (414-430)."""
+        loop = ReactLoop(config=ReactConfig(max_iterations=1, enable_change_tracking=False))
+        mock_dispatcher = MagicMock()
+        mock_dispatcher.dispatch = AsyncMock(
+            return_value=_mock_dispatch_result(
+                stdout=json.dumps({"choices": [{"message": {"content": "final"}}]})
+            )
+        )
+        with patch("maop.core.agent.llm_chat.function_call.FunctionCallBridge") as MockBridge:
+            mock_bridge = MagicMock()
+            mock_bridge.parse_response.return_value = []
+            MockBridge.return_value = mock_bridge
+            result = await loop.run("task", "agent", mock_dispatcher)
+        assert result.success is True
+        assert result.final_answer == "final"
+
+    @pytest.mark.asyncio
+    async def test_final_answer_anthropic_content(self):
+        """Cover Anthropic content blocks (423-427)."""
+        loop = ReactLoop(config=ReactConfig(max_iterations=1, enable_change_tracking=False))
+        mock_dispatcher = MagicMock()
+        mock_dispatcher.dispatch = AsyncMock(
+            return_value=_mock_dispatch_result(
+                stdout=json.dumps({
+                    "content": [
+                        {"type": "text", "text": "line1"},
+                        {"type": "text", "text": "line2"},
+                    ]
+                })
+            )
+        )
+        with patch("maop.core.agent.llm_chat.function_call.FunctionCallBridge") as MockBridge:
+            mock_bridge = MagicMock()
+            mock_bridge.parse_response.return_value = []
+            MockBridge.return_value = mock_bridge
+            result = await loop.run("task", "agent", mock_dispatcher, provider="anthropic")
+        assert result.success is True
+        assert "line1" in result.final_answer
+
+    @pytest.mark.asyncio
+    async def test_dispatch_error(self):
+        """Cover dispatch exception (382-388)."""
+        loop = ReactLoop(config=ReactConfig(max_iterations=1, enable_change_tracking=False))
+        mock_dispatcher = MagicMock()
+        mock_dispatcher.dispatch = AsyncMock(side_effect=RuntimeError("dispatch boom"))
+        result = await loop.run("task", "agent", mock_dispatcher)
+        assert result.success is False
+        assert "Dispatch error" in result.error
+
+    @pytest.mark.asyncio
+    async def test_execution_failure(self):
+        """Cover execution failure (390-396)."""
+        loop = ReactLoop(config=ReactConfig(max_iterations=1, enable_change_tracking=False))
+        mock_dispatcher = MagicMock()
+        mock_dispatcher.dispatch = AsyncMock(
+            return_value=_mock_dispatch_result(success=False, error="exec failed", exit_code=1)
+        )
+        result = await loop.run("task", "agent", mock_dispatcher)
+        assert result.success is False
+        assert "exec failed" in result.error
+
+    @pytest.mark.asyncio
+    async def test_max_iterations_exhausted(self):
+        """Cover max iterations exhausted (502-504)."""
+        loop = ReactLoop(config=ReactConfig(max_iterations=2, enable_change_tracking=False))
+        mock_dispatcher = MagicMock()
+        # Return JSON with tool calls to keep the loop going
+        mock_dispatcher.dispatch = AsyncMock(
+            return_value=_mock_dispatch_result(
+                stdout=json.dumps({"choices": [{"message": {"tool_calls": [{"id": "1", "function": {"name": "tool"}}]}}]})
+            )
+        )
+        with patch("maop.core.agent.llm_chat.function_call.FunctionCallBridge") as MockBridge:
+            mock_bridge = MagicMock()
+            mock_call = MagicMock()
+            mock_call.name = "tool"
+            mock_call.arguments = {}
+            mock_call.id = "1"
+            mock_bridge.parse_response.return_value = [mock_call]
+            mock_bridge.execute = AsyncMock(return_value=MagicMock(output="result", error="", success=True, duration_ms=0))
+            mock_bridge.format_result.return_value = {"role": "tool", "content": "result"}
+            MockBridge.return_value = mock_bridge
+            result = await loop.run("task", "agent", mock_dispatcher, provider="openai")
+        assert result.success is False
+        assert "exhausted" in (result.error or "")
+
+    @pytest.mark.asyncio
+    async def test_max_tool_calls_reached(self):
+        """Cover max tool calls reached (444-447)."""
+        loop = ReactLoop(config=ReactConfig(max_iterations=5, max_tool_calls=1, enable_change_tracking=False))
+        mock_dispatcher = MagicMock()
+        mock_dispatcher.dispatch = AsyncMock(
+            return_value=_mock_dispatch_result(
+                stdout=json.dumps({"choices": [{"message": {"tool_calls": [{"id": "1", "function": {"name": "tool"}}]}}]})
+            )
+        )
+        with patch("maop.core.agent.llm_chat.function_call.FunctionCallBridge") as MockBridge:
+            mock_bridge = MagicMock()
+            mock_call = MagicMock()
+            mock_call.name = "tool"
+            mock_call.arguments = {}
+            mock_call.id = "1"
+            mock_bridge.parse_response.return_value = [mock_call]
+            mock_bridge.execute = AsyncMock(return_value=MagicMock(output="result", error="", success=True, duration_ms=0))
+            mock_bridge.format_result.return_value = {"role": "tool", "content": "result"}
+            MockBridge.return_value = mock_bridge
+            result = await loop.run("task", "agent", mock_dispatcher, provider="openai")
+        assert result.success is False
+        assert "Max tool calls" in (result.error or "")
+
+
+# ── run() — LLM path ────────────────────────────────────────────────
+
+
+class TestRunLlmPath:
+    @pytest.mark.asyncio
+    async def test_llm_path_success(self):
+        """Cover LLM direct call path (341-361)."""
+        config = ReactConfig(max_iterations=1, enable_change_tracking=False, enable_llm=True, llm_model="gpt-4")
+        loop = ReactLoop(config=config)
+
+        mock_factory = MagicMock()
+        mock_fb_result = MagicMock()
+        mock_fb_result.response.content = "LLM final answer"
+        mock_fb_result.response.latency_ms = 50
+        mock_factory.chat_with_fallback = AsyncMock(return_value=mock_fb_result)
+        loop._provider_factory = mock_factory
+
+        result = await loop.run("task", "agent", MagicMock())
+        assert result.success is True
+        assert result.final_answer == "LLM final answer"
+
+    @pytest.mark.asyncio
+    async def test_llm_path_fallback_to_cli(self):
+        """Cover LLM failure → CLI fallback (362-381)."""
+        config = ReactConfig(max_iterations=1, enable_change_tracking=False, enable_llm=True, llm_model="gpt-4")
+        loop = ReactLoop(config=config)
+
+        # LLM factory returns None → _call_llm returns error → falls back to CLI
+        loop._provider_factory = None
+        with patch.object(type(loop), "provider_factory", None):
+            mock_dispatcher = MagicMock()
+            mock_dispatcher.dispatch = AsyncMock(
+                return_value=_mock_dispatch_result(stdout="CLI answer")
+            )
+            result = await loop.run("task", "agent", mock_dispatcher)
+        assert result.success is True
+        assert result.final_answer == "CLI answer"
+
+
+# ── run() — tool execution ─────────────────────────────────────────
+
+
+class TestRunToolExecution:
+    @pytest.mark.asyncio
+    async def test_tool_execution_success(self):
+        """Cover tool execution with observation (443-489)."""
+        loop = ReactLoop(config=ReactConfig(max_iterations=2, enable_change_tracking=False))
+        # First dispatch returns tool calls, second returns final answer
+        mock_dispatcher = MagicMock()
+        mock_dispatcher.dispatch = AsyncMock(
+            side_effect=[
+                _mock_dispatch_result(
+                    stdout=json.dumps({"choices": [{"message": {"tool_calls": [{"id": "1", "function": {"name": "tool"}}]}}]})
+                ),
+                _mock_dispatch_result(stdout="final after tool"),
+            ]
+        )
+        with patch("maop.core.agent.llm_chat.function_call.FunctionCallBridge") as MockBridge:
+            mock_bridge = MagicMock()
+            mock_call = MagicMock()
+            mock_call.name = "tool"
+            mock_call.arguments = {}
+            mock_call.id = "1"
+            mock_bridge.parse_response.return_value = [mock_call]
+            mock_bridge.execute = AsyncMock(return_value=MagicMock(output="tool result", error="", success=True, duration_ms=10))
+            mock_bridge.format_result.return_value = {"role": "tool", "content": "tool result"}
+            MockBridge.return_value = mock_bridge
+            result = await loop.run("task", "agent", mock_dispatcher, provider="openai")
+        assert result.success is True
+        assert result.final_answer == "final after tool"
+
+    @pytest.mark.asyncio
+    async def test_tool_execution_error(self):
+        """Cover tool execution exception (475-482)."""
+        loop = ReactLoop(config=ReactConfig(max_iterations=2, enable_change_tracking=False))
+        mock_dispatcher = MagicMock()
+        mock_dispatcher.dispatch = AsyncMock(
+            side_effect=[
+                _mock_dispatch_result(
+                    stdout=json.dumps({"choices": [{"message": {"tool_calls": [{"id": "1", "function": {"name": "tool"}}]}}]})
+                ),
+                _mock_dispatch_result(stdout="final"),
+            ]
+        )
+        with patch("maop.core.agent.llm_chat.function_call.FunctionCallBridge") as MockBridge:
+            mock_bridge = MagicMock()
+            mock_call = MagicMock()
+            mock_call.name = "tool"
+            mock_call.arguments = {}
+            mock_call.id = "1"
+            mock_bridge.parse_response.return_value = [mock_call]
+            mock_bridge.execute = AsyncMock(side_effect=RuntimeError("tool boom"))
+            mock_bridge.format_result.return_value = {"role": "tool", "content": "error"}
+            MockBridge.return_value = mock_bridge
+            result = await loop.run("task", "agent", mock_dispatcher, provider="openai")
+        assert result.success is True
+        assert result.final_answer == "final"
+
+    @pytest.mark.asyncio
+    async def test_anthropic_provider_tool_calls(self):
+        """Cover Anthropic provider conversation append (440-441)."""
+        loop = ReactLoop(config=ReactConfig(max_iterations=2, enable_change_tracking=False))
+        mock_dispatcher = MagicMock()
+        mock_dispatcher.dispatch = AsyncMock(
+            side_effect=[
+                _mock_dispatch_result(
+                    stdout=json.dumps({"content": [{"type": "text", "text": "thinking"}]})
+                ),
+                _mock_dispatch_result(stdout="final"),
+            ]
+        )
+        with patch("maop.core.agent.llm_chat.function_call.FunctionCallBridge") as MockBridge:
+            mock_bridge = MagicMock()
+            mock_call = MagicMock()
+            mock_call.name = "tool"
+            mock_call.arguments = {}
+            mock_call.id = "1"
+            mock_bridge.parse_response.return_value = [mock_call]
+            mock_bridge.execute = AsyncMock(return_value=MagicMock(output="result", error="", success=True, duration_ms=0))
+            mock_bridge.format_result.return_value = {"role": "tool", "content": "result"}
+            MockBridge.return_value = mock_bridge
+            result = await loop.run("task", "agent", mock_dispatcher, provider="anthropic")
+        assert result.success is True

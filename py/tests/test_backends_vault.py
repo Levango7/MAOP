@@ -62,7 +62,7 @@ class TestVaultImport:
     def test_vault_backend_import(self, monkeypatch):
         """VaultSecretBackend imports and constructs without error when hvac is mocked."""
         _install_mock_hvac(monkeypatch)
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         assert backend is not None
         assert hasattr(backend, "get_secret")
@@ -78,7 +78,7 @@ class TestVaultInit:
         monkeypatch.setenv("MAOP_VAULT_MOUNT", "kv")
         monkeypatch.setenv("MAOP_VAULT_PATH", "myapp")
         _install_mock_hvac(monkeypatch)
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         assert backend._addr == "http://vault:8200"
         assert backend._token == "my-token"
@@ -88,7 +88,7 @@ class TestVaultInit:
     def test_vault_init_not_authenticated_raises(self, monkeypatch):
         """When is_authenticated() returns False, RuntimeError is raised."""
         _install_mock_hvac(monkeypatch, authenticated=False)
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         with pytest.raises(RuntimeError, match="Vault authentication failed"):
             VaultSecretBackend()
 
@@ -102,7 +102,7 @@ class TestVaultGetSecret:
         mock_client.secrets.kv.v2.read_secret_version.return_value = {
             "data": {"data": {"value": "sk-test-123"}}
         }
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         assert backend.get_secret("openai") == "sk-test-123"
         mock_client.secrets.kv.v2.read_secret_version.assert_called_once_with(
@@ -113,7 +113,7 @@ class TestVaultGetSecret:
         """get_secret returns None when the secret does not exist (read raises)."""
         mock_client = _install_mock_hvac(monkeypatch)
         mock_client.secrets.kv.v2.read_secret_version.side_effect = Exception("not found")
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         assert backend.get_secret("missing") is None
 
@@ -124,7 +124,7 @@ class TestVaultSetSecret:
     def test_vault_set_secret(self, monkeypatch):
         """set_secret writes {value: ...} to the KV v2 path."""
         mock_client = _install_mock_hvac(monkeypatch)
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         backend.set_secret("openai", "sk-new")
         mock_client.secrets.kv.v2.create_or_update_secret.assert_called_once_with(
@@ -138,7 +138,7 @@ class TestVaultDeleteSecret:
     def test_vault_delete_secret(self, monkeypatch):
         """delete_secret returns True and calls delete_metadata_and_all_versions."""
         mock_client = _install_mock_hvac(monkeypatch)
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         assert backend.delete_secret("openai") is True
         mock_client.secrets.kv.v2.delete_metadata_and_all_versions.assert_called_once_with(
@@ -149,7 +149,7 @@ class TestVaultDeleteSecret:
         """delete_secret returns False when the secret does not exist."""
         mock_client = _install_mock_hvac(monkeypatch)
         mock_client.secrets.kv.v2.delete_metadata_and_all_versions.side_effect = Exception("not found")
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         assert backend.delete_secret("missing") is False
 
@@ -163,7 +163,7 @@ class TestVaultListSecrets:
         mock_client.secrets.kv.v2.list_secrets.return_value = {
             "data": {"keys": ["openai", "anthropic"]}
         }
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         assert backend.list_secrets() == ["openai", "anthropic"]
 
@@ -173,7 +173,7 @@ class TestVaultListSecrets:
         mock_client.secrets.kv.v2.list_secrets.return_value = {
             "data": {"keys": ["openai", "subdir/"]}
         }
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         result = backend.list_secrets()
         assert "subdir" in result
@@ -183,7 +183,7 @@ class TestVaultListSecrets:
         """An empty keys list returns []."""
         mock_client = _install_mock_hvac(monkeypatch)
         mock_client.secrets.kv.v2.list_secrets.return_value = {"data": {"keys": []}}
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         assert backend.list_secrets() == []
 
@@ -196,14 +196,14 @@ class TestVaultEnsureMount:
         mock_client = _install_mock_hvac(
             monkeypatch, mounts={"secret/": {"type": "kv"}}
         )
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         VaultSecretBackend()
         mock_client.sys.enable_secrets_engine.assert_not_called()
 
     def test_vault_ensure_mount_creates_new(self, monkeypatch):
         """When the KV mount is missing, enable_secrets_engine is called with kv v2."""
         mock_client = _install_mock_hvac(monkeypatch, mounts={})
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         VaultSecretBackend()
         mock_client.sys.enable_secrets_engine.assert_called_once_with(
             backend_type="kv", path="secret", options={"version": "2"},
@@ -216,7 +216,7 @@ class TestVaultFullPath:
     def test_vault_full_path(self, monkeypatch):
         """_full_path joins base_path and key with a single slash."""
         _install_mock_hvac(monkeypatch)
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         assert backend._full_path("openai") == "maop/openai"
 
@@ -227,7 +227,7 @@ class TestVaultClose:
     def test_vault_close(self, monkeypatch):
         """close() delegates to the hvac adapter's close()."""
         mock_client = _install_mock_hvac(monkeypatch)
-        from maop.core.backends_vault import VaultSecretBackend
+        from maop.core.backends.backends_vault import VaultSecretBackend
         backend = VaultSecretBackend()
         backend.close()
         mock_client.adapter.close.assert_called_once()
@@ -238,10 +238,10 @@ class TestVaultClose:
 class TestVaultDegradation:
     def test_get_secret_backend_vault_degrades(self, monkeypatch):
         """When hvac cannot be imported, get_secret_backend() falls back to LocalSecretBackend."""
-        from maop.core.backends import LocalSecretBackend, get_secret_backend, reset_backends
+        from maop.core.backends.backends import LocalSecretBackend, get_secret_backend, reset_backends
         # Ensure hvac is NOT importable (real state: hvac not installed)
         monkeypatch.delitem(sys.modules, "hvac", raising=False)
-        monkeypatch.delitem(sys.modules, "maop.core.backends_vault", raising=False)
+        monkeypatch.delitem(sys.modules, "maop.core.backends.backends_vault", raising=False)
         monkeypatch.setenv("MAOP_SECRET_BACKEND", "vault")
         reset_backends()
         try:

@@ -5,7 +5,7 @@ import tempfile
 
 import pytest
 
-from maop.core.subagent_manager import (
+from maop.core.agent.delegation.subagent_lifecycle import (
     AgentConfig,
     AgentResult,
     AgentStatus,

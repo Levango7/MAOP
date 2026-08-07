@@ -1,11 +1,11 @@
-﻿"""Tests for Iterations B+C+D: Knowledge, Vector Search, Config Mutator, Evolution Strategies."""
+"""Tests for Iterations B+C+D: Knowledge, Vector Search, Config Mutator, Evolution Strategies."""
 
 from __future__ import annotations
 
 import json
 
-from maop.core.config_mutator import ConfigMutator, MutationResult
-from maop.core.evolution_strategies import (
+from maop.core.reliability.config_mutator import ConfigMutator, MutationResult
+from maop.core.evolution.evolution_strategies import (
     AggressiveStrategy,
     BalancedStrategy,
     ConservativeStrategy,
@@ -13,13 +13,13 @@ from maop.core.evolution_strategies import (
     StrategyConfig,
     StrategyEngine,
 )
-from maop.core.knowledge_extractor import (
+from maop.core.memory.knowledge_extractor import (
     Entity,
     Fact,
     KnowledgeExtractor,
     Relation,
 )
-from maop.core.knowledge_graph import KnowledgeGraph
+from maop.core.memory.knowledge_graph import KnowledgeGraph
 from maop.memory.vector_search import VectorResult, VectorSearch
 
 # ═══════════════════════════════════════════════════════════════════

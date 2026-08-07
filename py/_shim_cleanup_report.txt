@@ -1,0 +1,1902 @@
+Total shims: 149
+Total references: 1511
+
+=== Shim mapping ===
+maop.core.a2a -> maop.core.agent.a2a  (refs: 4)
+maop.core.ab_test -> maop.core.evolution.ab_test  (refs: 2)
+maop.core.agent.a2a -> maop.core.agent.delegation.a2a  (refs: 0)
+maop.core.agent.agent_evolution -> maop.core.agent.evolution.agent_evolution  (refs: 0)
+maop.core.agent.agent_lifecycle -> maop.core.agent.lifecycle.agent_lifecycle  (refs: 0)
+maop.core.agent.agent_memory -> maop.core.agent.memory_ctx.agent_memory  (refs: 0)
+maop.core.agent.agent_performance -> maop.core.agent.lifecycle.agent_performance  (refs: 0)
+maop.core.agent.agent_proxy -> maop.core.agent.delegation.agent_proxy  (refs: 0)
+maop.core.agent.agent_registry -> maop.core.agent.lifecycle.agent_registry  (refs: 0)
+maop.core.agent.agent_repair -> maop.core.agent.lifecycle.agent_repair  (refs: 0)
+maop.core.agent.agent_scanner -> maop.core.agent.lifecycle.agent_scanner  (refs: 0)
+maop.core.agent.analyzer.__init__ -> maop.core.agent.analyzer.__init__.analyzer  (refs: 0)
+maop.core.agent.capability_matcher -> maop.core.agent.tools.capability_matcher  (refs: 0)
+maop.core.agent.chat_engine -> maop.core.agent.llm_chat.chat_engine  (refs: 0)
+maop.core.agent.context_compressor -> maop.core.agent.llm_chat.context_compressor  (refs: 0)
+maop.core.agent.conversation -> maop.core.agent.llm_chat.conversation  (refs: 0)
+maop.core.agent.dag_progress_emitter -> maop.core.agent.dag.dag_progress_emitter  (refs: 9)
+maop.core.agent.delegation.subagent_delegation -> maop.core.agent.delegation.subagent_lifecycle  (refs: 0)
+maop.core.agent.function_call -> maop.core.agent.llm_chat.function_call  (refs: 0)
+maop.core.agent.hook_manager -> maop.core.agent.plugins_hooks.hook_manager  (refs: 0)
+maop.core.agent.human_proxy -> maop.core.agent.delegation.human_proxy  (refs: 0)
+maop.core.agent.llm_provider -> maop.core.agent.llm_chat.llm_provider  (refs: 0)
+maop.core.agent.output_parser -> maop.core.agent.llm_chat.output_parser  (refs: 0)
+maop.core.agent.phases -> maop.core.agent.evolution.phases  (refs: 0)
+maop.core.agent.plugin -> maop.core.agent.plugins_hooks.plugin  (refs: 0)
+maop.core.agent.project_context -> maop.core.agent.memory_ctx.project_context  (refs: 0)
+maop.core.agent.protocol -> maop.core.agent.plugins_hooks.protocol  (refs: 0)
+maop.core.agent.react_loop -> maop.core.agent.llm_chat.react_loop  (refs: 1)
+maop.core.agent.runtime -> maop.core.agent.lifecycle.runtime  (refs: 0)
+maop.core.agent.state_classifier -> maop.core.agent.lifecycle.state_classifier  (refs: 0)
+maop.core.agent.subagent_db -> maop.core.agent.delegation.subagent_db  (refs: 0)
+maop.core.agent.subagent_delegation -> maop.core.agent.delegation.subagent_delegation  (refs: 4)
+maop.core.agent.subagent_lifecycle -> maop.core.agent.delegation.subagent_lifecycle  (refs: 6)
+maop.core.agent.tool_audit -> maop.core.agent.tools.tool_audit  (refs: 0)
+maop.core.agent.tool_manager -> maop.core.agent.tools.tool_manager  (refs: 10)
+maop.core.agent.tool_schema -> maop.core.agent.tools.tool_schema  (refs: 0)
+maop.core.agent.worktree -> maop.core.agent.memory_ctx.worktree  (refs: 0)
+maop.core.agent_evolution -> maop.core.agent.agent_evolution  (refs: 3)
+maop.core.agent_lifecycle -> maop.core.agent.agent_lifecycle  (refs: 2)
+maop.core.agent_memory -> maop.core.agent.agent_memory  (refs: 11)
+maop.core.agent_performance -> maop.core.agent.agent_performance  (refs: 14)
+maop.core.agent_proxy -> maop.core.agent.agent_proxy  (refs: 7)
+maop.core.agent_registry -> maop.core.agent.agent_registry  (refs: 10)
+maop.core.agent_repair -> maop.core.agent.agent_repair  (refs: 4)
+maop.core.agent_scanner -> maop.core.agent.agent_scanner  (refs: 3)
+maop.core.analyzer -> maop.core.agent.analyzer  (refs: 18)
+maop.core.api_key_vault -> maop.core.security.api_key_vault  (refs: 7)
+maop.core.artifact_store -> maop.core.backends.artifact_store  (refs: 3)
+maop.core.auth -> maop.core.security.auth  (refs: 18)
+maop.core.backends -> maop.core.backends.backends  (refs: 64)
+maop.core.backends_distributed -> maop.core.backends.backends_distributed  (refs: 36)
+maop.core.backends_pg -> maop.core.backends.backends_pg  (refs: 31)
+maop.core.backends_rabbitmq -> maop.core.backends.backends_rabbitmq  (refs: 19)
+maop.core.backends_redis -> maop.core.backends.backends_redis  (refs: 21)
+maop.core.backends_vault -> maop.core.backends.backends_vault  (refs: 17)
+maop.core.bloom_filter -> maop.core.memory.bloom_filter  (refs: 3)
+maop.core.budget_guard -> maop.core.monitoring.budget_guard  (refs: 4)
+maop.core.byok -> maop.core.security.byok  (refs: 2)
+maop.core.cache -> maop.core.reliability.cache  (refs: 17)
+maop.core.cache_guard -> maop.core.cache  (refs: 7)
+maop.core.capability_matcher -> maop.core.agent.capability_matcher  (refs: 5)
+maop.core.change_tracker -> maop.core.reliability.change_tracker  (refs: 9)
+maop.core.chat_engine -> maop.core.agent.chat_engine  (refs: 9)
+maop.core.circuit_breaker -> maop.core.reliability.circuit_breaker  (refs: 20)
+maop.core.config_mutator -> maop.core.reliability.config_mutator  (refs: 38)
+maop.core.context_compressor -> maop.core.agent.context_compressor  (refs: 4)
+maop.core.conversation -> maop.core.agent.conversation  (refs: 7)
+maop.core.cost_tracker -> maop.core.monitoring.cost_tracker  (refs: 13)
+maop.core.dag_progress_emitter -> maop.core.agent.dag_progress_emitter  (refs: 0)
+maop.core.data -> maop.core.backends.data  (refs: 9)
+maop.core.db_backup -> maop.core.backends.db_backup  (refs: 4)
+maop.core.db_utils -> maop.core.backends.db_utils  (refs: 95)
+maop.core.dynamic_router -> maop.core.routing.dynamic_router  (refs: 2)
+maop.core.error_ledger -> maop.core.reliability.error_ledger  (refs: 16)
+maop.core.error_schema -> maop.core.reliability.error_schema  (refs: 33)
+maop.core.event_bus -> maop.core.reliability.event_bus  (refs: 8)
+maop.core.evolution_loop -> maop.core.evolution.evolution_loop  (refs: 18)
+maop.core.evolution_loop_types -> maop.core.evolution.evolution_loop_types  (refs: 1)
+maop.core.evolution_strategies -> maop.core.evolution.evolution_strategies  (refs: 8)
+maop.core.filelock -> maop.core.reliability.filelock  (refs: 5)
+maop.core.function_call -> maop.core.agent.function_call  (refs: 14)
+maop.core.guardrail -> maop.core.security.guardrail  (refs: 10)
+maop.core.hook_manager -> maop.core.agent.hook_manager  (refs: 15)
+maop.core.human_proxy -> maop.core.agent.human_proxy  (refs: 15)
+maop.core.hybrid_search -> maop.core.memory.hybrid_search  (refs: 2)
+maop.core.image_store -> maop.core.backends.image_store  (refs: 6)
+maop.core.knowledge_extractor -> maop.core.memory.knowledge_extractor  (refs: 11)
+maop.core.knowledge_graph -> maop.core.memory.knowledge_graph  (refs: 11)
+maop.core.kv_store -> maop.core.backends.kv_store  (refs: 13)
+maop.core.llm_provider -> maop.core.agent.llm_provider  (refs: 21)
+maop.core.load_balancer -> maop.core.routing.load_balancer  (refs: 13)
+maop.core.log_rotate -> maop.core.reliability.log_rotate  (refs: 4)
+maop.core.mcp_adapter -> maop.core.mcp.mcp_adapter  (refs: 3)
+maop.core.mcp_audit -> maop.core.mcp.mcp_audit  (refs: 6)
+maop.core.mcp_cache -> maop.core.mcp.mcp_cache  (refs: 6)
+maop.core.mcp_concurrency -> maop.core.mcp.mcp_concurrency  (refs: 4)
+maop.core.mcp_discovery -> maop.core.mcp.mcp_discovery  (refs: 7)
+maop.core.mcp_hub -> maop.core.mcp.mcp_hub  (refs: 46)
+maop.core.mcp_hub_transport -> maop.core.mcp.mcp_hub_transport  (refs: 2)
+maop.core.mcp_hub_types -> maop.core.mcp.mcp_hub_types  (refs: 2)
+maop.core.mcp_marketplace -> maop.core.mcp.mcp_marketplace  (refs: 3)
+maop.core.mcp_permission -> maop.core.mcp.mcp_permission  (refs: 4)
+maop.core.message_queue -> maop.core.reliability.message_queue  (refs: 52)
+maop.core.middleware -> maop.core.security.middleware  (refs: 56)
+maop.core.migration -> maop.core.backends.migration  (refs: 4)
+maop.core.monitoring -> maop.core.monitoring.monitoring  (refs: 51)
+maop.core.multi_objective_scorer -> maop.core.routing.multi_objective_scorer  (refs: 4)
+maop.core.otel -> maop.core.monitoring.otel  (refs: 46)
+maop.core.output_parser -> maop.core.agent.output_parser  (refs: 3)
+maop.core.permission -> maop.core.security.permission  (refs: 18)
+maop.core.phases -> maop.core.agent.phases  (refs: 5)
+maop.core.pipeline_checkpoint -> maop.core.reliability.pipeline_checkpoint  (refs: 4)
+maop.core.plugin -> maop.core.agent.plugin  (refs: 11)
+maop.core.preemptable_worker_pool -> maop.core.reliability.preemptable_worker_pool  (refs: 12)
+maop.core.priority_queue -> maop.core.reliability.priority_queue  (refs: 12)
+maop.core.project_context -> maop.core.agent.project_context  (refs: 2)
+maop.core.prompt_version -> maop.core.evolution.prompt_version  (refs: 2)
+maop.core.protocol -> maop.core.agent.protocol  (refs: 4)
+maop.core.provider_health -> maop.core.routing.provider_health  (refs: 8)
+maop.core.rate_limiter -> maop.core.reliability.rate_limiter  (refs: 12)
+maop.core.react_loop -> maop.core.agent.react_loop  (refs: 10)
+maop.core.regression -> maop.core.evolution.regression  (refs: 3)
+maop.core.route_scorer -> maop.core.routing.route_scorer  (refs: 15)
+maop.core.routing_decision -> maop.core.routing.routing_decision  (refs: 10)
+maop.core.runtime -> maop.core.agent.runtime  (refs: 11)
+maop.core.safe_writer -> maop.core.reliability.safe_writer  (refs: 8)
+maop.core.sandbox -> maop.core.security.sandbox  (refs: 19)
+maop.core.self_heal -> maop.core.reliability.self_heal  (refs: 4)
+maop.core.semantic_cache -> maop.core.memory.semantic_cache  (refs: 4)
+maop.core.services -> maop.core.reliability.services  (refs: 26)
+maop.core.session -> maop.core.security.session  (refs: 4)
+maop.core.skill_version -> maop.core.evolution.skill_version  (refs: 12)
+maop.core.state_classifier -> maop.core.agent.state_classifier  (refs: 3)
+maop.core.streaming -> maop.core.reliability.streaming  (refs: 7)
+maop.core.subagent -> maop.core.agent.subagent_delegation  (refs: 3)
+maop.core.subagent_db -> maop.core.agent.subagent_db  (refs: 2)
+maop.core.subagent_manager -> maop.core.agent.subagent_lifecycle  (refs: 1)
+maop.core.tenant -> maop.core.security.tenant  (refs: 2)
+maop.core.three_layer_memory -> maop.core.memory.three_layer_memory  (refs: 42)
+maop.core.three_layer_memory_types -> maop.core.memory.three_layer_memory_types  (refs: 7)
+maop.core.three_layer_memory_utils -> maop.core.memory.three_layer_memory_utils  (refs: 1)
+maop.core.timeseries -> maop.core.monitoring.timeseries  (refs: 11)
+maop.core.tls -> maop.core.security.tls  (refs: 6)
+maop.core.tool_audit -> maop.core.agent.tool_audit  (refs: 6)
+maop.core.tool_manager -> maop.core.agent.tool_manager  (refs: 41)
+maop.core.tool_schema -> maop.core.agent.tool_schema  (refs: 3)
+maop.core.vector -> maop.core.memory.vector  (refs: 43)
+maop.core.worker_pool -> maop.core.reliability.worker_pool  (refs: 16)
+maop.core.worktree -> maop.core.agent.worktree  (refs: 6)
+
+=== References detail ===
+
+--- maop.core.a2a -> maop.core.agent.a2a ---
+  maop\dashboard\server.py:244: from maop.core.a2a import create_a2a_router as _create_a2a_router
+  maop\core\reliability\services.py:215: from maop.core.a2a import A2AManager
+  maop\core\agent\delegation\a2a.py:16: from maop.core.a2a import A2ACard, A2AServer, A2AClient
+  tests\test_a2a.py:6: from maop.core.a2a import (
+
+--- maop.core.ab_test -> maop.core.evolution.ab_test ---
+  maop\core\evolution\ab_test.py:11: from maop.core.ab_test import ABTestManager
+  tests\test_ab_prompt_version.py:8: from maop.core.ab_test import ABTestManager
+
+--- maop.core.agent.dag_progress_emitter -> maop.core.agent.dag.dag_progress_emitter ---
+  maop\loop_executor.py:363: from maop.core.agent.dag_progress_emitter import DagProgressEmitter
+  maop\dashboard\ws_dag.py:33: from maop.core.agent.dag_progress_emitter import get_emitter
+  maop\dashboard\ws_dag.py:164: from maop.core.agent.dag_progress_emitter import get_emitter
+  tests\test_dag_latency.py:22: from maop.core.agent.dag_progress_emitter import DagProgressEmitter, NodeStatus
+  tests\test_dag_latency.py:206: from maop.core.agent.dag_progress_emitter import NodeStatusEvent
+  tests\test_dag_progress_emitter.py:18: from maop.core.agent.dag_progress_emitter import (
+  tests\test_dag_sse_endpoint.py:23: from maop.core.agent.dag_progress_emitter import DagProgressEmitter
+  tests\test_dag_ws_endpoint.py:19: from maop.core.agent.dag_progress_emitter import (
+  tests\test_dag_ws_endpoint.py:39: from maop.core.agent.dag_progress_emitter import get_emitter as _ge
+
+--- maop.core.agent.react_loop -> maop.core.agent.llm_chat.react_loop ---
+  tests\test_react_loop_coverage3.py:13: from maop.core.agent.react_loop import (
+
+--- maop.core.agent.subagent_delegation -> maop.core.agent.delegation.subagent_delegation ---
+  tests\test_dispatcher_coverage.py:171: if name == "maop.core.agent.subagent_delegation":
+  tests\test_dispatcher_coverage.py:184: with patch("maop.core.agent.subagent_delegation.SubagentManager", _fake_subagent):
+  tests\test_subagent_delegation.py:1: """Tests for maop.core.agent.subagent_delegation.SubagentManager.
+  tests\test_subagent_delegation.py:16: from maop.core.agent.subagent_delegation import (
+
+--- maop.core.agent.subagent_lifecycle -> maop.core.agent.delegation.subagent_lifecycle ---
+  maop\delegate\dispatcher.py:139: from maop.core.agent.subagent_lifecycle import SubAgentManager
+  maop\dashboard\routers\state.py:74: _lazy_import("subagent", "maop.core.agent.subagent_lifecycle", "SubAgentManager")
+  maop\dashboard\routers\subagent.py:24: from maop.core.agent.subagent_lifecycle import SubAgentManager
+  maop\dashboard\routers\subagent.py:45: from maop.core.agent.subagent_lifecycle import AgentConfig
+  tests\test_subagent_lifecycle.py:1: """Tests for maop.core.agent.subagent_lifecycle.SubAgentManager.
+  tests\test_subagent_lifecycle.py:16: from maop.core.agent.subagent_lifecycle import (
+
+--- maop.core.agent.tool_manager -> maop.core.agent.tools.tool_manager ---
+  tests\test_tool_manager_coverage3.py:16: import maop.core.agent.tool_manager as _tm
+  tests\test_tool_manager_coverage3.py:17: from maop.core.agent.tool_manager import ToolManager
+  tests\test_tool_manager_coverage3.py:117: with patch("maop.core.agent.tool_manager._get_maop_version", return_value=""):
+  tests\test_tool_manager_coverage3.py:122: with patch("maop.core.agent.tool_manager._get_maop_version", return_value="2.0"):
+  tests\test_tool_manager_coverage3.py:127: with patch("maop.core.agent.tool_manager._get_maop_version", return_value="1.0"):
+  tests\test_tool_manager_coverage3.py:134: "maop.core.agent.tool_manager._parse_version",
+  tests\test_tool_manager_coverage3.py:137: "maop.core.agent.tool_manager._get_maop_version", return_value="1.0"
+  tests\test_tool_manager_coverage3.py:195: "maop.core.agent.tool_manager._is_version_compatible", return_value=False
+  tests\test_tool_manager_coverage3.py:212: "maop.core.agent.tool_manager._is_version_compatible", return_value=False
+  tests\test_tool_manager_coverage3.py:336: "maop.core.agent.tool_manager._is_version_compatible", return_value=False
+
+--- maop.core.agent_evolution -> maop.core.agent.agent_evolution ---
+  maop\dashboard\routers\agents\_deps.py:75: from maop.core.agent_evolution import AgentEvolution
+  maop\core\agent\evolution\agent_evolution.py:15: from maop.core.agent_evolution import AgentEvolution
+  tests\test_agent_evolution.py:10: from maop.core.agent_evolution import (
+
+--- maop.core.agent_lifecycle -> maop.core.agent.agent_lifecycle ---
+  maop\core\agent\lifecycle\agent_lifecycle.py:12: from maop.core.agent_lifecycle import AgentLifecycle, AgentState
+  tests\test_agentforge_r3.py:9: from maop.core.agent_lifecycle import AgentLifecycle, AgentLifecycleManager, AgentState
+
+--- maop.core.agent_memory -> maop.core.agent.agent_memory ---
+  maop\dashboard\routers\agents\_deps.py:66: from maop.core.agent_memory import AgentMemory
+  maop\core\evolution\evolution_loop.py:468: from maop.core.agent_memory import AgentMemory
+  maop\core\evolution\evolution_loop.py:854: from maop.core.agent_memory import AgentMemory
+  maop\core\reliability\config_mutator.py:364: from maop.core.agent_memory import AgentMemory
+  maop\core\reliability\config_mutator.py:439: from maop.core.agent_memory import AgentMemory
+  maop\core\reliability\config_mutator.py:461: from maop.core.agent_memory import AgentMemory
+  maop\core\agent\evolution\agent_evolution.py:29: from maop.core.agent_memory import AgentMemory
+  maop\core\agent\memory_ctx\agent_memory.py:15: from maop.core.agent_memory import AgentMemory
+  tests\test_agent_evolution.py:26: monkeypatch.setattr("maop.core.agent_memory.get_db_path", fake_get_db_path)
+  tests\test_agent_memory.py:9: from maop.core.agent_memory import (
+  tests\test_agent_memory.py:24: monkeypatch.setattr("maop.core.agent_memory.get_db_path", fake_get_db_path)
+
+--- maop.core.agent_performance -> maop.core.agent.agent_performance ---
+  maop\agent_strategy_learner.py:34: from maop.core.agent_performance import AgentPerformanceTracker
+  maop\maop_plan.py:157: from maop.core.agent_performance import AgentPerformanceTracker
+  maop\core\routing\route_scorer.py:454: from maop.core.agent_performance import AgentPerformanceTracker
+  maop\core\routing\route_scorer.py:557: from maop.core.agent_performance import AgentPerformanceTracker
+  maop\core\agent\lifecycle\agent_performance.py:15: from maop.core.agent_performance import AgentPerformanceTracker
+  tests\test_agent_performance.py:10: from maop.core.agent_performance import AgentPerformanceTracker, AgentScore, AgentStats
+  tests\test_strategy_evolution_beta3.py:41: from maop.core.agent_performance import AgentPerformanceTracker
+  tests\test_strategy_evolution_beta3.py:57: from maop.core.agent_performance import AgentPerformanceTracker
+  tests\test_strategy_evolution_beta3.py:72: from maop.core.agent_performance import AgentPerformanceTracker
+  tests\test_strategy_evolution_beta3.py:84: from maop.core.agent_performance import AgentPerformanceTracker
+  tests\test_strategy_evolution_beta3.py:95: from maop.core.agent_performance import AgentPerformanceTracker
+  tests\test_strategy_evolution_beta3.py:105: from maop.core.agent_performance import AgentPerformanceTracker
+  tests\test_strategy_evolution_beta3.py:125: from maop.core.agent_performance import AgentPerformanceTracker
+  tests\test_strategy_evolution_beta3.py:287: from maop.core.agent_performance import AgentPerformanceTracker
+
+--- maop.core.agent_proxy -> maop.core.agent.agent_proxy ---
+  maop\dashboard\routers\agent_proxy.py:24: from maop.core.agent_proxy import AgentProxy
+  maop\dashboard\routers\state.py:82: _lazy_import("agent_proxy", "maop.core.agent_proxy", "AgentProxy")
+  maop\core\mcp\mcp_adapter.py:42: from maop.core.agent_proxy import AgentAdapter
+  maop\core\mcp\mcp_adapter.py:126: from maop.core.agent_proxy import AgentProxy
+  maop\core\agent\delegation\agent_proxy.py:9: from maop.core.agent_proxy import AgentAdapter, AgentProxy
+  tests\test_agent_proxy_coverage.py:7: from maop.core.agent_proxy import (
+  tests\test_mcp_adapter.py:17: from maop.core.agent_proxy import AgentAdapter
+
+--- maop.core.agent_registry -> maop.core.agent.agent_registry ---
+  maop\delegate\agent_resolver.py:36: from maop.core.agent_registry import AgentRegistry
+  maop\delegate\agent_resolver.py:48: from maop.core.agent_registry import AgentRegistry
+  maop\dashboard\routers\agents\crud.py:204: from maop.core.agent_registry import RegisteredAgent
+  maop\dashboard\routers\agents\_deps.py:37: from maop.core.agent_registry import AgentRegistry
+  maop\dashboard\routers\agents\_deps.py:46: from maop.core.agent_registry import AgentRegistry
+  maop\dashboard\routers\system\overview.py:278: from maop.core.agent_registry import AgentRegistry
+  tests\test_agent_platform.py:7: from maop.core.agent_registry import (
+  tests\test_agent_registry_whitebox.py:14: from maop.core.agent_registry import AgentRegistry, RegisteredAgent
+  tests\test_e2e_multivendor.py:17: from maop.core.agent_registry import AgentRegistry, RegisteredAgent
+  tests\test_router_agents_coverage.py:18: from maop.core.agent_registry import HealthCheckResult, RegisteredAgent
+
+--- maop.core.agent_repair -> maop.core.agent.agent_repair ---
+  maop\dashboard\routers\agents\_deps.py:57: from maop.core.agent_repair import AgentRepair
+  maop\core\agent\lifecycle\agent_repair.py:17: from maop.core.agent_repair import AgentRepair
+  tests\test_agent_repair.py:9: from maop.core.agent_repair import (
+  tests\test_router_agents_coverage.py:19: from maop.core.agent_repair import DiagnosisResult, RepairResult
+
+--- maop.core.agent_scanner -> maop.core.agent.agent_scanner ---
+  maop\dashboard\routers\agents\_deps.py:28: from maop.core.agent_scanner import AgentScanner
+  maop\core\agent\lifecycle\agent_scanner.py:20: from maop.core.agent_scanner import AgentScanner
+  tests\test_agent_platform.py:11: from maop.core.agent_scanner import (
+
+--- maop.core.analyzer -> maop.core.agent.analyzer ---
+  maop\loop_executor.py:13: from maop.core.analyzer import AnalysisResult, ExecutionStrategy
+  maop\maop_loop.py:37: from maop.core.analyzer import ExecutionStrategy
+  maop\maop_loop.py:38: from maop.core.analyzer import analyze as requirement_analyze
+  maop\dashboard\routers\state.py:52: _lazy_import("analyzer", "maop.core.analyzer", "analyze")
+  tests\test_analyzer.py:19: from maop.core.analyzer import (
+  tests\test_analyzer_coverage.py:11: from maop.core.analyzer import (
+  tests\test_loop_executor.py:10: from maop.core.analyzer import AnalysisResult, DependencyDAG, ExecutionStrategy, SubTask
+  tests\test_new_modules.py:3: G2 (2026-07-22, Phase G): ``maop.core.analyzer.analyze`` is now ``async``
+  tests\test_new_modules.py:22: from maop.core.analyzer import analyze
+  tests\test_new_modules.py:29: from maop.core.analyzer import analyze
+  tests\test_new_modules.py:35: from maop.core.analyzer import analyze
+  tests\test_new_modules.py:40: from maop.core.analyzer import analyze
+  tests\test_new_modules.py:48: from maop.core.analyzer import DependencyDAG
+  tests\test_new_modules.py:54: from maop.core.analyzer import Complexity, analyze
+  tests\test_new_modules.py:63: from maop.core.analyzer import analyze
+  tests\test_new_modules.py:68: from maop.core.analyzer import analyze
+  tests\test_new_modules.py:76: from maop.core.analyzer import analyze
+  tests\test_router_system.py:90: "analyzer": {"available": True, "module": "maop.core.analyzer"},
+
+--- maop.core.api_key_vault -> maop.core.security.api_key_vault ---
+  maop\dashboard\routers\model.py:222: from maop.core.api_key_vault import ApiKeyVault
+  maop\dashboard\routers\state.py:77: _lazy_import("api_key_vault", "maop.core.api_key_vault", "ApiKeyVault")
+  maop\core\backends\backends.py:391: from maop.core.api_key_vault import ApiKeyVault
+  maop\core\security\api_key_vault.py:9: from maop.core.api_key_vault import ApiKeyVault
+  maop\core\agent\llm_chat\llm_provider.py:704: from maop.core.api_key_vault import ApiKeyVault
+  tests\test_api_key_vault_coverage.py:7: from maop.core.api_key_vault import ApiKeyVault
+  tests\test_provider_enhanced.py:7: from maop.core.api_key_vault import ApiKeyVault
+
+--- maop.core.artifact_store -> maop.core.backends.artifact_store ---
+  maop\dashboard\routers\react.py:23: from maop.core.artifact_store import ArtifactStore
+  maop\core\backends\artifact_store.py:12: from maop.core.artifact_store import ArtifactStore
+  tests\test_react_loop.py:5: from maop.core.artifact_store import ArtifactStore
+
+--- maop.core.auth -> maop.core.security.auth ---
+  maop\dashboard\routers\auth.py:31: from maop.core.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig, load_jwt_secret
+  maop\dashboard\routers\state.py:73: _lazy_import("auth", "maop.core.auth", "AuthManager")
+  maop\dashboard\routers\system\v4_misc.py:96: ("auth", "maop.core.auth", "AuthManager"),
+  tests\test_auth.py:9: from maop.core.auth import (
+  tests\test_dashboard_auth.py:21: from maop.core.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig
+  tests\test_new_modules.py:350: from maop.core.auth import APIKeyStore
+  tests\test_new_modules.py:361: from maop.core.auth import APIKeyStore
+  tests\test_new_modules.py:369: from maop.core.auth import APIKeyStore
+  tests\test_new_modules.py:379: from maop.core.auth import JWTConfig, JWTHandler
+  tests\test_new_modules.py:387: from maop.core.auth import JWTConfig, JWTHandler
+  tests\test_new_modules.py:395: from maop.core.auth import AuthConfig, AuthManager
+  tests\test_new_modules.py:397: from maop.core.auth import APIKeyStore
+  tests\test_routers_batch_coverage.py:23: from maop.core.auth import AuthResult
+  tests\test_routers_smoke_coverage.py:22: from maop.core.auth import AuthResult
+  tests\test_secrets.py:92: from maop.core.auth import load_jwt_secret
+  tests\test_secrets.py:105: from maop.core.auth import load_jwt_secret
+  tests\test_secrets.py:117: from maop.core.auth import load_jwt_secret
+  tests\test_secrets.py:133: from maop.core.auth import load_jwt_secret
+
+--- maop.core.backends -> maop.core.backends.backends ---
+  maop\core\backends\backends.py:24: from maop.core.backends import get_storage_backend
+  maop\core\backends\backends_distributed.py:40: from maop.core.backends import KVBackend
+  maop\core\backends\backends_pg.py:27: from maop.core.backends import StorageBackend
+  maop\core\backends\backends_rabbitmq.py:55: from maop.core.backends import QueueBackend
+  maop\core\backends\backends_redis.py:27: from maop.core.backends import CacheBackend, QueueBackend
+  maop\core\backends\backends_vault.py:21: from maop.core.backends import SecretBackend
+  tests\test_backends.py:5: from maop.core.backends import (
+  tests\test_backends_distributed.py:30: from maop.core.backends import (
+  tests\test_backends_distributed.py:304: # 否则 from maop.core.backends import backends_rabbitmq 会复用旧模块（mock 未生效）
+  tests\test_backends_distributed.py:305: import maop.core.backends as _bp
+  tests\test_backends_distributed.py:325: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:349: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:354: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:370: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:375: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:398: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:403: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:428: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:433: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:442: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:447: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:459: sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:503: # 否则 from maop.core.backends import backends_distributed 会复用旧模块（mock 未生效）
+  tests\test_backends_distributed.py:504: import maop.core.backends as _bp
+  tests\test_backends_distributed.py:517: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:532: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:537: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:555: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:560: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:575: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:580: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:591: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:596: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:610: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:615: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:628: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:633: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:653: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:658: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:671: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:676: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:688: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:693: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:705: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:710: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_distributed.py:723: sys.modules.pop("maop.core.backends.backends_distributed", None)
+  tests\test_backends_pg.py:125: from maop.core.backends import StorageBackend
+  tests\test_backends_vault.py:241: from maop.core.backends import LocalSecretBackend, get_secret_backend, reset_backends
+  tests\test_edition.py:319: from maop.core.backends import get_storage_backend, reset_backends
+  tests\test_edition.py:322: from maop.core.backends import SQLiteStorageBackend
+  tests\test_edition.py:328: from maop.core.backends import get_storage_backend, reset_backends
+  tests\test_edition.py:332: from maop.core.backends import SQLiteStorageBackend
+  tests\test_pg_migration.py:11: * Backend selection: :func:`maop.core.backends.db_utils.get_db_engine`
+  tests\test_pg_migration.py:448: from maop.core.backends import db_utils
+  tests\test_pg_migration.py:461: from maop.core.backends import db_utils
+  tests\test_pg_migration.py:473: from maop.core.backends import db_utils
+  tests\test_pg_migration.py:485: from maop.core.backends import db_utils
+  tests\test_pg_migration.py:494: from maop.core.backends import db_utils
+  tests\test_pg_migration.py:511: from maop.core.backends import db_utils
+  tests\test_pg_migration.py:522: from maop.core.backends import db_utils
+  tests\test_tool_manager_coverage3.py:18: from maop.core.backends.db_utils import get_db_path, sqlite_connect
+  tests\reliability\test_cascade_degradation.py:24: from maop.core.backends import (
+  tests\stability\test_boundary_inputs.py:16: from maop.core.backends import MemoryCacheBackend
+  tests\stability\test_long_run.py:22: from maop.core.backends import MemoryCacheBackend
+
+--- maop.core.backends_distributed -> maop.core.backends.backends_distributed ---
+  maop\core\backends\backends.py:619: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:516: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:519: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:531: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:536: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:539: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:554: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:559: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:562: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:574: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:579: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:582: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:590: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:595: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:598: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:609: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:614: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:617: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:627: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:632: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:635: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:652: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:657: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:660: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:670: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:675: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:678: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:687: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:692: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:695: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:704: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:709: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\test_backends_distributed.py:712: from maop.core.backends_distributed import EtcdKVBackend
+  tests\test_backends_distributed.py:722: sys.modules.pop("maop.core.backends_distributed", None)
+  tests\reliability\test_cascade_degradation.py:163: with _module_unavailable("maop.core.backends_distributed"):
+  tests\reliability\test_cascade_degradation.py:201: _module_unavailable("maop.core.backends_distributed"),
+
+--- maop.core.backends_pg -> maop.core.backends.backends_pg ---
+  maop\enterprise\pg_persist.py:36: from maop.core.backends_pg import PostgreSQLStorageBackend
+  maop\core\backends\backends.py:444: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:1: """Tests for maop.core.backends_pg.PostgreSQLStorageBackend.
+  tests\test_backends_pg.py:66: from maop.core.backends_pg import _build_dsn
+  tests\test_backends_pg.py:76: from maop.core.backends_pg import _build_dsn
+  tests\test_backends_pg.py:96: from maop.core.backends_pg import _build_dsn
+  tests\test_backends_pg.py:126: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:132: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:147: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:148: with patch("maop.core.backends_pg._build_dsn", return_value="built-dsn"):
+  tests\test_backends_pg.py:160: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:169: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:178: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:189: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:199: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:212: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:225: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:235: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:247: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:257: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:272: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:286: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:299: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:311: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:324: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:338: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:348: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:358: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:375: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_backends_pg.py:401: from maop.core.backends_pg import PostgreSQLStorageBackend
+  tests\test_pg_persist_coverage.py:298: if name == "maop.core.backends_pg":
+
+--- maop.core.backends_rabbitmq -> maop.core.backends.backends_rabbitmq ---
+  maop\core\backends\backends.py:539: from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+  tests\test_backends_distributed.py:324: sys.modules.pop("maop.core.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:327: from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+  tests\test_backends_distributed.py:348: sys.modules.pop("maop.core.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:353: sys.modules.pop("maop.core.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:356: from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+  tests\test_backends_distributed.py:369: sys.modules.pop("maop.core.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:374: sys.modules.pop("maop.core.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:377: from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+  tests\test_backends_distributed.py:397: sys.modules.pop("maop.core.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:402: sys.modules.pop("maop.core.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:405: from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+  tests\test_backends_distributed.py:427: sys.modules.pop("maop.core.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:432: sys.modules.pop("maop.core.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:435: from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+  tests\test_backends_distributed.py:441: sys.modules.pop("maop.core.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:446: sys.modules.pop("maop.core.backends_rabbitmq", None)
+  tests\test_backends_distributed.py:449: from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+  tests\test_backends_distributed.py:458: sys.modules.pop("maop.core.backends_rabbitmq", None)
+
+--- maop.core.backends_redis -> maop.core.backends.backends_redis ---
+  maop\enterprise\ha.py:35: from maop.core.backends_redis import RedisDistributedLock
+  maop\core\backends\backends.py:491: from maop.core.backends_redis import RedisCacheBackend
+  maop\core\backends\backends.py:560: from maop.core.backends_redis import RedisQueueBackend
+  maop\core\backends\backends.py:571: from maop.core.backends_redis import RedisQueueBackend
+  tests\test_backends.py:216: with patch("maop.core.backends_redis.RedisCacheBackend",
+  tests\test_backends.py:223: with patch("maop.core.backends_redis.RedisCacheBackend",
+  tests\test_backends.py:239: with patch("maop.core.backends_redis.RedisQueueBackend",
+  tests\test_backends_distributed.py:71: with patch("maop.core.backends_redis.RedisQueueBackend",
+  tests\test_backends_distributed.py:82: with patch("maop.core.backends_redis.RedisQueueBackend",
+  tests\test_backends_redis.py:181: from maop.core.backends_redis import RedisCacheBackend
+  tests\test_backends_redis.py:187: from maop.core.backends_redis import RedisQueueBackend
+  tests\test_backends_redis.py:193: from maop.core.backends_redis import RedisDistributedLock
+  tests\test_backends_redis.py:271: from maop.core.backends_redis import RedisDistributedLock
+  tests\test_backends_redis.py:286: from maop.core.backends_redis import RedisDistributedLock
+  tests\test_backends_redis.py:295: from maop.core.backends_redis import RedisDistributedLock
+  tests\test_backends_redis.py:320: from maop.core.backends_redis import RedisCacheBackend
+  tests\reliability\test_cascade_degradation.py:85: with patch("maop.core.backends_redis.RedisCacheBackend",
+  tests\reliability\test_cascade_degradation.py:111: with patch("maop.core.backends_redis.RedisCacheBackend",
+  tests\reliability\test_cascade_degradation.py:130: with patch("maop.core.backends_redis.RedisQueueBackend",
+  tests\reliability\test_cascade_degradation.py:197: patch("maop.core.backends_redis.RedisCacheBackend",
+  tests\reliability\test_cascade_degradation.py:199: patch("maop.core.backends_redis.RedisQueueBackend",
+
+--- maop.core.backends_vault -> maop.core.backends.backends_vault ---
+  maop\core\backends\backends.py:662: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:65: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:81: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:91: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:105: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:116: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:127: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:141: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:152: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:166: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:176: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:186: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:199: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:206: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:219: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:230: from maop.core.backends_vault import VaultSecretBackend
+  tests\test_backends_vault.py:244: monkeypatch.delitem(sys.modules, "maop.core.backends_vault", raising=False)
+
+--- maop.core.bloom_filter -> maop.core.memory.bloom_filter ---
+  maop\memory\store.py:112: from maop.core.bloom_filter import BloomFilter
+  maop\dashboard\routers\state.py:62: _lazy_import("bloom_filter", "maop.core.bloom_filter", "BloomFilter")
+  tests\test_bloom_filter.py:4: from maop.core.bloom_filter import BloomFilter, _BitArray, _hash_i, _mmh3_hash32
+
+--- maop.core.budget_guard -> maop.core.monitoring.budget_guard ---
+  maop\dashboard\routers\budget.py:24: from maop.core.budget_guard import BudgetGuard
+  maop\dashboard\routers\state.py:80: _lazy_import("budget_guard", "maop.core.budget_guard", "BudgetGuard")
+  maop\core\monitoring\budget_guard.py:9: from maop.core.budget_guard import BudgetGuard
+  tests\test_budget_guard.py:8: from maop.core.budget_guard import BudgetGuard, BudgetStatus
+
+--- maop.core.byok -> maop.core.security.byok ---
+  maop\core\security\byok.py:9: from maop.core.byok import BYOKGateway
+  tests\test_t2_modules.py:6: from maop.core.byok import BYOKGateway, KeyRoute, KeySource
+
+--- maop.core.cache -> maop.core.reliability.cache ---
+  maop\cache_evolver.py:69: ``maop.core.cache._caches`` registry) and any ``SemanticCache``
+  maop\cache_evolver.py:201: from maop.core.cache import _caches
+  maop\maop_loop.py:39: from maop.core.cache import SingleFlight
+  maop\dashboard\routers\data.py:105: from maop.core.cache import get_cache
+  maop\dashboard\routers\data.py:149: from maop.core.cache import get_cache
+  maop\dashboard\routers\state.py:54: _lazy_import("cache_lru", "maop.core.cache", "get_cache")
+  maop\dashboard\routers\system\overview.py:288: from maop.core.cache import get_cache  # noqa: F401
+  maop\core\backends\backends.py:206: from maop.core.cache import LRUCache
+  maop\core\memory\three_layer_memory.py:43: from maop.core.cache import LRUCache
+  maop\core\reliability\config_mutator.py:408: from maop.core.cache import get_cache
+  maop\core\reliability\services.py:156: from maop.core.cache import CacheGuard, CacheGuardConfig
+  maop\core\reliability\services.py:160: from maop.core.cache import get_cache
+  tests\test_cache.py:7: from maop.core.cache import LRUCache, get_cache
+  tests\test_strategy_evolution_beta3.py:17: from maop.core.cache import LRUCache
+  tests\test_stress.py:38: from maop.core.cache import LRUCache
+  tests\test_stress.py:77: from maop.core.cache import LRUCache
+  tests\test_stress.py:107: from maop.core.cache import LRUCache
+
+--- maop.core.cache_guard -> maop.core.cache ---
+  maop\dashboard\routers\state.py:53: _lazy_import("cache_guard", "maop.core.cache_guard", "CacheGuard")
+  tests\test_cache_guard.py:10: from maop.core.cache_guard import (
+  tests\test_new_modules.py:220: from maop.core.cache_guard import CacheGuard
+  tests\test_new_modules.py:226: from maop.core.cache_guard import CacheGuard
+  tests\test_new_modules.py:238: from maop.core.cache_guard import CacheGuard, CacheGuardConfig
+  tests\test_new_modules.py:249: from maop.core.cache_guard import CacheGuard
+  tests\test_new_modules.py:256: from maop.core.cache_guard import CacheGuard
+
+--- maop.core.capability_matcher -> maop.core.agent.capability_matcher ---
+  maop\delegate\agent_resolver.py:49: from maop.core.capability_matcher import CapabilityMatcher
+  maop\dashboard\routers\agents\_deps.py:47: from maop.core.capability_matcher import CapabilityMatcher
+  maop\core\agent\tools\capability_matcher.py:12: from maop.core.capability_matcher import CapabilityMatcher
+  tests\test_agent_platform.py:19: from maop.core.capability_matcher import (
+  tests\test_e2e_multivendor.py:18: from maop.core.capability_matcher import CapabilityMatcher, MatcherConfig
+
+--- maop.core.change_tracker -> maop.core.reliability.change_tracker ---
+  maop\dashboard\routers\react.py:17: from maop.core.change_tracker import ChangeTracker
+  maop\core\evolution\evolution_loop.py:160: from maop.core.change_tracker import ChangeTracker
+  maop\core\evolution\evolution_loop.py:433: from maop.core.change_tracker import ChangeTracker
+  maop\core\reliability\change_tracker.py:12: from maop.core.change_tracker import ChangeTracker
+  maop\core\agent\llm_chat\react_loop.py:170: from maop.core.change_tracker import ChangeTracker
+  tests\test_change_tracker.py:9: from maop.core.change_tracker import ChangeTracker
+  tests\test_evolution_loop.py:251: from maop.core.change_tracker import ChangeTracker
+  tests\test_react_loop.py:6: from maop.core.change_tracker import ChangeTracker
+  tests\test_react_loop_coverage3.py:67: "maop.core.change_tracker.ChangeTracker",
+
+--- maop.core.chat_engine -> maop.core.agent.chat_engine ---
+  maop\dashboard\routers\chat.py:36: from maop.core.chat_engine import ChatEngine
+  maop\dashboard\routers\chat.py:66: from maop.core.chat_engine import ChatRequest
+  maop\dashboard\routers\chat.py:88: from maop.core.chat_engine import ChatRequest
+  maop\core\agent\llm_chat\chat_engine.py:11: from maop.core.chat_engine import ChatEngine
+  tests\test_chat_engine_whitebox.py:21: from maop.core.chat_engine import ChatEngine, ChatRequest, ChatResponse
+  tests\test_chat_memory.py:7: from maop.core.chat_engine import (
+  tests\test_e2e_multivendor.py:19: from maop.core.chat_engine import ChatEngine, ChatRequest
+  tests\test_llm_provider.py:9: from maop.core.chat_engine import ChatEngine, ChatRequest
+  tests\test_v4_3.py:10: from maop.core.chat_engine import ChatEngine, ChatMessage, ChatRequest, ContentPart
+
+--- maop.core.circuit_breaker -> maop.core.reliability.circuit_breaker ---
+  maop\dashboard\provider.py:97: from maop.core.circuit_breaker import CircuitBreaker
+  maop\dashboard\provider.py:239: from maop.core.circuit_breaker import CircuitBreaker
+  maop\delegate\dispatcher.py:20: from maop.core.circuit_breaker import CircuitBreaker
+  maop\dashboard\routers\data.py:95: from maop.core.circuit_breaker import CircuitBreaker
+  maop\dashboard\routers\state.py:70: _lazy_import("circuit_breaker", "maop.core.circuit_breaker", "CircuitBreaker")
+  maop\core\reliability\services.py:117: from maop.core.circuit_breaker import CircuitBreaker
+  tests\test_circuit_breaker.py:12: from maop.core.circuit_breaker import (
+  tests\test_db_backup.py:199: from maop.core.circuit_breaker import CircuitBreaker
+  tests\test_dispatcher.py:8: from maop.core.circuit_breaker import CircuitBreaker
+  tests\test_enhancements.py:29: from maop.core.circuit_breaker import CircuitBreaker
+  tests\test_integration.py:10: from maop.core.circuit_breaker import CircuitBreaker
+  tests\test_stress.py:151: from maop.core.circuit_breaker import BreakerState, CircuitBreaker
+  tests\test_stress.py:190: from maop.core.circuit_breaker import BreakerState, CircuitBreaker
+  tests\test_stress.py:223: from maop.core.circuit_breaker import BreakerState, CircuitBreaker
+  tests\contract\test_behavioral_contracts.py:181: from maop.core.circuit_breaker import CircuitBreaker
+  tests\contract\test_behavioral_contracts.py:200: from maop.core.circuit_breaker import CircuitBreaker
+  tests\reliability\test_cascade_degradation.py:33: from maop.core.circuit_breaker import BreakerState, CircuitBreaker
+  tests\reliability\test_pev_pipeline.py:19: from maop.core.circuit_breaker import BreakerState, CircuitBreaker
+  tests\stability\test_crash_recovery.py:20: from maop.core.circuit_breaker import BreakerState, CircuitBreaker
+  tests\stability\test_long_run.py:23: from maop.core.circuit_breaker import CircuitBreaker
+
+--- maop.core.config_mutator -> maop.core.reliability.config_mutator ---
+  maop\evolve.py:352: from maop.core.config_mutator import ConfigMutator
+  maop\core\evolution\evolution_loop.py:844: from maop.core.config_mutator import ConfigMutator
+  maop\core\evolution\evolution_strategies.py:250: from maop.core.config_mutator import ConfigMutator
+  maop\core\reliability\config_mutator.py:15: from maop.core.config_mutator import ConfigMutator
+  maop\core\agent\evolution\agent_evolution.py:463: from maop.core.config_mutator import ConfigMutator
+  tests\test_bcd_iterations.py:7: from maop.core.config_mutator import ConfigMutator, MutationResult
+  tests\test_config_mutator_coverage.py:8: from maop.core.config_mutator import ConfigMutator, MutationResult
+  tests\test_config_mutator_whitebox.py:17: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:16: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:21: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:28: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:41: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:53: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:65: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:71: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:81: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:86: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:98: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:108: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:113: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:124: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:131: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:137: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:149: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:155: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:164: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:170: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:181: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:187: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:193: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:199: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:205: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:211: from maop.core.config_mutator import ConfigMutator
+  tests\test_config_plugin_cli_coverage.py:220: from maop.core.config_mutator import ConfigMutator
+  tests\test_e2e_multivendor.py:20: from maop.core.config_mutator import ConfigMutator
+  tests\test_evolve_coverage3.py:103: with patch("maop.core.config_mutator.ConfigMutator") as MockMut:
+  tests\test_evolve_coverage3.py:117: with patch("maop.core.config_mutator.ConfigMutator") as MockMut:
+  tests\test_evolve_coverage3.py:131: with patch("maop.core.config_mutator.ConfigMutator") as MockMut:
+
+--- maop.core.context_compressor -> maop.core.agent.context_compressor ---
+  maop\dashboard\routers\state.py:66: _lazy_import("context_compressor", "maop.core.context_compressor", "ContextCompressor")
+  maop\core\agent\llm_chat\conversation.py:208: from maop.core.context_compressor import ContextCompressor
+  tests\test_context_compressor.py:7: from maop.core.context_compressor import (
+  tests\test_three_mechanisms.py:12: from maop.core.context_compressor import ContextCompressor
+
+--- maop.core.conversation -> maop.core.agent.conversation ---
+  maop\memory\manager.py:40: from maop.core.conversation import ConversationManager
+  maop\memory\manager.py:101: from maop.core.conversation import ConversationManager
+  maop\memory\manager.py:157: from maop.core.conversation import MessageRole
+  maop\dashboard\routers\session.py:23: from maop.core.conversation import ConversationManager
+  maop\core\agent\llm_chat\conversation.py:12: from maop.core.conversation import ConversationManager
+  tests\test_conversation_whitebox.py:16: from maop.core.conversation import ConversationManager
+  tests\test_session.py:5: from maop.core.conversation import ConversationManager
+
+--- maop.core.cost_tracker -> maop.core.monitoring.cost_tracker ---
+  maop\history_analyzer.py:108: from maop.core.cost_tracker import get_cost_tracker
+  maop\dashboard\data_proxy.py:291: from maop.core.cost_tracker import CostTracker
+  maop\dashboard\routers\cost.py:18: from maop.core.cost_tracker import CostTracker
+  maop\core\agent\llm_chat\llm_provider.py:851: from maop.core.cost_tracker import get_cost_tracker
+  tests\test_cost_tracker_whitebox.py:17: from maop.core.cost_tracker import CostTracker
+  tests\test_data_proxy_coverage3.py:162: with patch("maop.core.cost_tracker.CostTracker") as MockCT:
+  tests\test_evolution_beta.py:72: import maop.core.cost_tracker as ct
+  tests\test_observability.py:97: with patch("maop.core.cost_tracker.get_cost_tracker", return_value=mock_tracker):
+  tests\test_observability.py:107: with patch("maop.core.cost_tracker.get_cost_tracker", side_effect=RuntimeError("DB error")):
+  tests\test_observability.py:112: with patch("maop.core.cost_tracker.get_cost_tracker", return_value=mock_tracker2):
+  tests\test_observability.py:124: import maop.core.cost_tracker as ct_mod
+  tests\test_observability.py:125: from maop.core.cost_tracker import CostTracker, get_cost_tracker
+  tests\test_plugin_cost.py:9: from maop.core.cost_tracker import BudgetStatus, CostEntry, CostSummary, CostTracker, ModelPricing
+
+--- maop.core.data -> maop.core.backends.data ---
+  maop\dashboard\data_proxy.py:77: from maop.core.data import MaopDatabase
+  tests\test_data.py:9: from maop.core.data import MaopDatabase
+  tests\test_data_proxy_coverage3.py:30: from maop.core.data import MaopDatabase
+  tests\test_data_proxy_coverage3.py:55: with patch("maop.core.data.MaopDatabase") as MockDb:
+  tests\test_data_proxy_coverage3.py:281: from maop.core.data import MaopDatabase
+  tests\test_data_proxy_coverage3.py:795: from maop.core.data import MaopDatabase
+  tests\test_data_proxy_coverage3.py:814: from maop.core.data import MaopDatabase
+  tests\test_enhancements.py:331: from maop.core.data import MaopDatabase
+  tests\test_enhancements.py:377: from maop.core.data import MaopDatabase
+
+--- maop.core.db_backup -> maop.core.backends.db_backup ---
+  maop\dashboard\lifespan.py:53: from maop.core.db_backup import DbBackup
+  maop\dashboard\routers\control.py:225: from maop.core.db_backup import DbBackup
+  tests\test_db_backup.py:9: from maop.core.db_backup import DbBackup
+  tests\test_db_backup.py:195: from maop.core.db_backup import DEFAULT_DATABASES
+
+--- maop.core.db_utils -> maop.core.backends.db_utils ---
+  maop\ab_test_framework.py:74: from maop.core.db_utils import find_project_root
+  maop\ab_test_framework.py:223: from maop.core.db_utils import get_db_path
+  maop\history_analyzer.py:88: from maop.core.db_utils import find_project_root
+  maop\maop_loop.py:101: from maop.core.db_utils import find_project_root
+  maop\prompt_manager.py:21: from maop.core.db_utils import get_db_path
+  maop\config\loader.py:153: from maop.core.db_utils import find_project_root
+  maop\control\plane.py:190: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\dashboard\data_proxy.py:34: from maop.core.db_utils import get_db_path, get_pool
+  maop\memory\manager.py:41: from maop.core.db_utils import sqlite_connect
+  maop\memory\shared_db.py:43: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\memory\store.py:30: from maop.core.db_utils import get_db_path
+  maop\memory\store.py:69: from maop.core.db_utils import find_project_root
+  maop\memory\store.py:88: from maop.core.db_utils import sqlite_connect
+  maop\memory\vector_search.py:32: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\model\registry.py:26: from maop.core.db_utils import find_project_root
+  maop\worker\queue_worker.py:23: from maop.core.db_utils import get_db_path
+  maop\dashboard\routers\auth.py:32: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\dashboard\routers\control.py:259: from maop.core.db_utils import sqlite_connect
+  maop\dashboard\routers\data.py:21: from maop.core.db_utils import get_db_path
+  maop\dashboard\routers\memory.py:12: from maop.core.db_utils import get_db_path
+  maop\dashboard\routers\memory.py:170: from maop.core.db_utils import sqlite_connect
+  maop\dashboard\routers\system\_deps.py:24: from maop.core.db_utils import get_db_path  # noqa: F401  — re-exported
+  maop\core\backends\artifact_store.py:33: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\backends\backends.py:123: from maop.core.db_utils import _get_busy_timeout_ms
+  maop\core\backends\data.py:17: from maop.core.db_utils import sqlite_connect, validate_identifier
+  maop\core\backends\data.py:119: from maop.core.db_utils import find_project_root
+  maop\core\backends\db_backup.py:39: from maop.core.db_utils import sqlite_connect
+  maop\core\backends\image_store.py:32: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\backends\kv_store.py:29: from maop.core.db_utils import ConnectionPool, get_pool
+  maop\core\backends\migration.py:28: from maop.core.db_utils import sqlite_connect
+  maop\core\backends\migration.py:292: from maop.core.db_utils import get_db_path
+  maop\core\evolution\ab_test.py:43: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\evolution\evolution_loop.py:37: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\evolution\prompt_version.py:35: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\mcp\mcp_audit.py:19: Persistence uses SQLite via :func:`maop.core.db_utils.get_db_path` so
+  maop\core\mcp\mcp_audit.py:57: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\mcp\mcp_audit.py:166: resolved via :func:`maop.core.db_utils.get_db_path("mcp_audit")`
+  maop\core\mcp\mcp_hub.py:58: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\memory\hybrid_search.py:32: from maop.core.db_utils import sqlite_connect
+  maop\core\memory\knowledge_extractor.py:31: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\memory\knowledge_graph.py:32: from maop.core.db_utils import get_db_path, sqlite_connect, validate_identifier
+  maop\core\memory\three_layer_memory.py:44: from maop.core.db_utils import sqlite_connect
+  maop\core\memory\vector.py:48: from maop.core.db_utils import sqlite_connect
+  maop\core\monitoring\budget_guard.py:30: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\monitoring\cost_tracker.py:27: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\monitoring\timeseries.py:26: from maop.core.db_utils import ConnectionPool, get_pool
+  maop\core\reliability\change_tracker.py:34: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\reliability\circuit_breaker.py:30: from maop.core.db_utils import sqlite_connect
+  maop\core\reliability\error_ledger.py:44: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\reliability\log_rotate.py:50: from maop.core.db_utils import find_project_root
+  maop\core\reliability\message_queue.py:35: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\reliability\pipeline_checkpoint.py:40: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\reliability\self_heal.py:38: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\reliability\services.py:23: from maop.core.db_utils import get_db_path
+  maop\core\routing\routing_decision.py:25: Persistence uses SQLite via :func:`maop.core.db_utils.get_db_path` so
+  maop\core\routing\routing_decision.py:65: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\routing\routing_decision.py:174: resolved via :func:`maop.core.db_utils.get_db_path("routing_decisions")`
+  maop\core\security\api_key_vault.py:26: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\security\auth.py:24: from maop.core.db_utils import ConnectionPool, get_db_path, get_pool
+  maop\core\security\permission.py:18: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\security\sandbox.py:30: from maop.core.db_utils import sqlite_connect
+  maop\core\security\session.py:32: from maop.core.db_utils import get_db_path, sqlite_connect, validate_identifier
+  maop\core\security\tenant.py:26: from maop.core.db_utils import sqlite_connect, validate_identifier
+  maop\core\agent\delegation\a2a.py:113: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\delegation\a2a.py:127: from maop.core.db_utils import sqlite_connect
+  maop\core\agent\delegation\a2a.py:140: from maop.core.db_utils import sqlite_connect
+  maop\core\agent\delegation\a2a.py:154: from maop.core.db_utils import sqlite_connect
+  maop\core\agent\delegation\agent_proxy.py:34: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\delegation\human_proxy.py:20: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\delegation\subagent_db.py:42: from maop.core.db_utils import get_db_path
+  maop\core\agent\delegation\subagent_lifecycle.py:49: from maop.core.db_utils import sqlite_connect
+  maop\core\agent\lifecycle\agent_performance.py:32: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\lifecycle\agent_registry.py:24: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\lifecycle\agent_scanner.py:44: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\llm_chat\conversation.py:33: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\memory_ctx\agent_memory.py:31: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\memory_ctx\worktree.py:44: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\plugins_hooks\hook_manager.py:44: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\plugins_hooks\plugin.py:42: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\plugins_hooks\protocol.py:31: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\tools\tool_audit.py:40: from maop.core.db_utils import get_db_path, sqlite_connect
+  maop\core\agent\tools\tool_manager.py:38: from maop.core.db_utils import get_db_path, sqlite_connect
+  tests\test_data_proxy_coverage3.py:765: from maop.core.db_utils import get_db_path
+  tests\test_db_utils.py:9: from maop.core.db_utils import sqlite_connect, validate_identifier
+  tests\test_human_proxy.py:35: from maop.core.db_utils import get_db_path
+  tests\test_knowledge_graph.py:14: from maop.core.db_utils import get_db_path
+  tests\test_knowledge_graph_v2.py:37: from maop.core.db_utils import get_db_path
+  tests\test_knowledge_graph_v2.py:264: from maop.core.db_utils import get_db_path
+  tests\test_loader.py:24: from maop.core.db_utils import find_project_root
+  tests\test_memory_manager_search_coverage3.py:378: from maop.core.db_utils import sqlite_connect
+  tests\test_memory_manager_search_coverage3.py:425: from maop.core.db_utils import sqlite_connect
+  tests\test_registry.py:9: from maop.core.db_utils import find_project_root
+  tests\test_store.py:165: from maop.core.db_utils import find_project_root
+  tests\stability\test_boundary_inputs.py:17: from maop.core.db_utils import sqlite_connect
+  tests\stability\test_long_run.py:24: from maop.core.db_utils import sqlite_connect
+
+--- maop.core.dynamic_router -> maop.core.routing.dynamic_router ---
+  maop\core\routing\dynamic_router.py:12: from maop.core.dynamic_router import DynamicRouter
+  tests\test_dynamic_router.py:9: from maop.core.dynamic_router import AgentScore, DynamicRouter
+
+--- maop.core.error_ledger -> maop.core.reliability.error_ledger ---
+  maop\core\evolution\evolution_loop.py:208: from maop.core.error_ledger import ErrorLedger
+  maop\core\evolution\evolution_loop.py:253: from maop.core.error_ledger import ErrorLedger
+  maop\core\evolution\evolution_loop.py:366: from maop.core.error_ledger import ErrorLedger
+  maop\core\memory\three_layer_memory.py:798: from maop.core.error_ledger import ErrorLedger
+  maop\core\reliability\error_ledger.py:11: from maop.core.error_ledger import ErrorLedger
+  tests\test_error_dag_heal.py:8: from maop.core.error_ledger import ErrorLedger
+  tests\test_error_ledger_whitebox.py:18: from maop.core.error_ledger import ErrorLedger
+  tests\test_evolution_loop.py:67: from maop.core.error_ledger import ErrorLedger
+  tests\test_evolution_loop.py:96: from maop.core.error_ledger import ErrorLedger
+  tests\test_evolution_loop.py:105: from maop.core.error_ledger import ErrorLedger
+  tests\test_evolution_loop.py:166: from maop.core.error_ledger import ErrorLedger
+  tests\test_evolution_loop.py:201: from maop.core.error_ledger import ErrorLedger
+  tests\test_evolution_loop.py:222: from maop.core.error_ledger import ErrorLedger
+  tests\test_evolution_loop.py:235: from maop.core.error_ledger import ErrorLedger
+  tests\test_three_layer_memory_coverage3.py:236: with patch("maop.core.error_ledger.ErrorLedger") as MockLedger:
+  tests\test_three_layer_memory_coverage3.py:247: with patch("maop.core.error_ledger.ErrorLedger") as MockLedger:
+
+--- maop.core.error_schema -> maop.core.reliability.error_schema ---
+  maop\loop_executor.py:14: from maop.core.error_schema import MaopResult, new_result
+  maop\loop_models.py:13: from maop.core.error_schema import MaopResult
+  maop\maop_execute.py:23: from maop.core.error_schema import MaopResult, new_result
+  maop\maop_loop.py:41: from maop.core.error_schema import MaopResult
+  maop\maop_verify.py:15: from maop.core.error_schema import MaopResult
+  maop\delegate\dispatcher.py:21: from maop.core.error_schema import new_result
+  maop\delegate\drivers.py:24: from maop.core.error_schema import MaopResult, new_result
+  maop\delegate\models.py:12: from maop.core.error_schema import MaopResult
+  maop\core\agent\llm_chat\react_loop.py:49: from maop.core.error_schema import MaopResult, new_result
+  tests\test_adr010_regression.py:44: from maop.core.error_schema import new_result
+  tests\test_adr010_regression.py:49: from maop.core.error_schema import new_result
+  tests\test_chat_engine_whitebox.py:22: from maop.core.error_schema import MaopResult
+  tests\test_core_coverage2.py:15: from maop.core.error_schema import new_result
+  tests\test_dispatcher.py:9: from maop.core.error_schema import new_result
+  tests\test_dispatcher_coverage.py:27: from maop.core.error_schema import new_result
+  tests\test_dispatcher_extended.py:8: from maop.core.error_schema import new_result
+  tests\test_error_schema.py:3: from maop.core.error_schema import MaopResult, new_result
+  tests\test_integration.py:11: from maop.core.error_schema import new_result
+  tests\test_loop_executor.py:11: from maop.core.error_schema import MaopResult, new_result
+  tests\test_maop_execute.py:9: from maop.core.error_schema import new_result
+  tests\test_maop_loop.py:227: from maop.core.error_schema import MaopResult
+  tests\test_maop_loop.py:285: from maop.core.error_schema import MaopResult
+  tests\test_maop_loop_extended.py:184: from maop.core.error_schema import new_result
+  tests\test_maop_loop_extended.py:202: from maop.core.error_schema import new_result
+  tests\test_maop_loop_extended.py:223: from maop.core.error_schema import new_result
+  tests\test_maop_loop_extended.py:276: from maop.core.error_schema import MaopResult
+  tests\test_maop_loop_extended.py:291: from maop.core.error_schema import MaopResult
+  tests\test_maop_loop_extended.py:306: from maop.core.error_schema import MaopResult
+  tests\test_maop_verify.py:7: from maop.core.error_schema import new_result
+  tests\test_output_parser.py:5: from maop.core.error_schema import new_result
+  tests\test_phase4.py:6: from maop.core.error_schema import new_result
+  tests\contract\test_behavioral_contracts.py:190: from maop.core.error_schema import new_result
+  tests\reliability\test_pev_pipeline.py:20: from maop.core.error_schema import MaopResult, new_result
+
+--- maop.core.event_bus -> maop.core.reliability.event_bus ---
+  maop\engine.py:134: from maop.core.event_bus import EventBus, get_event_bus
+  maop\maop_loop.py:42: from maop.core.event_bus import Event, EventBus, get_event_bus
+  maop\config\hot_reload.py:21: from maop.core.event_bus import Event, EventBus, get_event_bus
+  maop\core\agent\plugins_hooks\hook_manager.py:437: from maop.core.event_bus import Event
+  tests\test_event_bus.py:7: from maop.core.event_bus import (
+  tests\test_hook_manager.py:254: from maop.core.event_bus import EventBus
+  tests\test_hot_reload.py:20: from maop.core.event_bus import Event, EventBus
+  tests\test_integration.py:12: from maop.core.event_bus import Event, EventBus
+
+--- maop.core.evolution_loop -> maop.core.evolution.evolution_loop ---
+  maop\evolve.py:481: from maop.core.evolution_loop import EvolutionLoop
+  maop\dashboard\routers\evolve.py:138: from maop.core.evolution_loop import EvolutionLoop
+  maop\core\evolution\evolution_loop.py:21: from maop.core.evolution_loop import EvolutionLoop
+  maop\core\memory\three_layer_memory.py:780: from maop.core.evolution_loop import EvolutionLoop
+  maop\core\agent\evolution\agent_evolution.py:81: from maop.core.evolution_loop import EvolutionLoop
+  maop\core\agent\evolution\agent_evolution.py:468: from maop.core.evolution_loop import EvolutionSuggestion
+  tests\test_agent_evolution.py:280: with patch("maop.core.evolution_loop.EvolutionLoop") as MockLoop:
+  tests\test_agent_evolution.py:291: with patch("maop.core.evolution_loop.EvolutionLoop") as MockLoop:
+  tests\test_evolution_loop.py:10: from maop.core.evolution_loop import EvolutionLoop, LoopPhase, LoopReport, PhaseResult
+  tests\test_evolution_loop.py:271: from maop.core.evolution_loop import LoopReport
+  tests\test_evolve_coverage3.py:262: with patch("maop.core.evolution_loop.EvolutionLoop") as MockLoop:
+  tests\test_evolve_coverage3.py:272: with patch("maop.core.evolution_loop.EvolutionLoop") as MockLoop:
+  tests\test_evolve_loop_coverage.py:122: import maop.core.evolution_loop
+  tests\test_three_layer_memory_coverage.py:208: import maop.core.evolution_loop
+  tests\test_three_layer_memory_coverage3.py:216: with patch("maop.core.evolution_loop.EvolutionLoop") as MockLoop:
+  tests\test_three_layer_memory_coverage3.py:225: with patch("maop.core.evolution_loop.EvolutionLoop") as MockLoop:
+  tests\test_three_layer_memory_coverage3.py:234: with patch("maop.core.evolution_loop.EvolutionLoop") as MockLoop:
+  tests\test_three_layer_memory_coverage3.py:245: with patch("maop.core.evolution_loop.EvolutionLoop") as MockLoop:
+
+--- maop.core.evolution_loop_types -> maop.core.evolution.evolution_loop_types ---
+  maop\core\evolution\evolution_loop.py:42: from maop.core.evolution_loop_types import (
+
+--- maop.core.evolution_strategies -> maop.core.evolution.evolution_strategies ---
+  maop\dashboard\routers\evolve.py:126: from maop.core.evolution_strategies import STRATEGY_MAP
+  maop\core\evolution\evolution_loop.py:304: from maop.core.evolution_strategies import StrategyEngine
+  maop\core\evolution\evolution_loop.py:331: from maop.core.evolution_strategies import StrategyEngine
+  maop\core\evolution\evolution_loop.py:916: from maop.core.evolution_strategies import StrategyEngine
+  maop\core\evolution\evolution_strategies.py:14: from maop.core.evolution_strategies import StrategyEngine, BalancedStrategy
+  tests\test_bcd_iterations.py:8: from maop.core.evolution_strategies import (
+  tests\test_e2e_multivendor.py:21: from maop.core.evolution_strategies import BalancedStrategy, StrategyEngine
+  tests\test_e2e_multivendor.py:259: from maop.core.evolution_strategies import (
+
+--- maop.core.filelock -> maop.core.reliability.filelock ---
+  maop\agent_strategy_learner.py:432: from maop.core.filelock import FileLock
+  maop\evolve.py:426: from maop.core.filelock import FileLock
+  maop\core\evolution\evolution_loop.py:972: from maop.core.filelock import FileLock
+  maop\core\reliability\config_mutator.py:33: from maop.core.filelock import FileLock
+  tests\test_filelock.py:7: from maop.core.filelock import FileLock, with_file_lock
+
+--- maop.core.function_call -> maop.core.agent.function_call ---
+  maop\maop_execute.py:349: from maop.core.function_call import FunctionCallBridge
+  maop\core\agent\llm_chat\function_call.py:11: from maop.core.function_call import FunctionCallBridge
+  maop\core\agent\llm_chat\react_loop.py:163: from maop.core.function_call import FunctionCallBridge
+  tests\test_function_call.py:9: from maop.core.function_call import (
+  tests\test_maop_execute_coverage3.py:400: "maop.core.function_call.FunctionCallBridge", return_value=mock_bridge
+  tests\test_maop_execute_coverage3.py:435: "maop.core.function_call.FunctionCallBridge", return_value=mock_bridge
+  tests\test_maop_execute_coverage3.py:466: "maop.core.function_call.FunctionCallBridge"
+  tests\test_react_loop_coverage3.py:235: with patch("maop.core.function_call.FunctionCallBridge") as MockBridge:
+  tests\test_react_loop_coverage3.py:258: with patch("maop.core.function_call.FunctionCallBridge") as MockBridge:
+  tests\test_react_loop_coverage3.py:299: with patch("maop.core.function_call.FunctionCallBridge") as MockBridge:
+  tests\test_react_loop_coverage3.py:323: with patch("maop.core.function_call.FunctionCallBridge") as MockBridge:
+  tests\test_react_loop_coverage3.py:395: with patch("maop.core.function_call.FunctionCallBridge") as MockBridge:
+  tests\test_react_loop_coverage3.py:422: with patch("maop.core.function_call.FunctionCallBridge") as MockBridge:
+  tests\test_react_loop_coverage3.py:449: with patch("maop.core.function_call.FunctionCallBridge") as MockBridge:
+
+--- maop.core.guardrail -> maop.core.security.guardrail ---
+  maop\maop_execute.py:24: from maop.core.guardrail import Guardrail
+  maop\delegate\dispatcher.py:577: from maop.core.guardrail import Guardrail
+  maop\dashboard\routers\state.py:71: _lazy_import("guardrail", "maop.core.guardrail", "Guardrail")
+  maop\dashboard\routers\system\v4_misc.py:98: ("guardrail", "maop.core.guardrail", "Guardrail"),
+  maop\core\reliability\services.py:136: from maop.core.guardrail import Guardrail
+  tests\test_dispatcher_extended.py:49: with patch("maop.core.guardrail.Guardrail") as MockGuardrail:
+  tests\test_dispatcher_extended.py:84: with patch("maop.core.guardrail.Guardrail", side_effect=RuntimeError("guardrail crashed")):
+  tests\test_guardrail.py:7: from maop.core.guardrail import Guardrail
+  tests\test_guardrail_extended.py:9: from maop.core.guardrail import (
+  tests\test_maop_execute.py:125: from maop.core.guardrail import Guardrail
+
+--- maop.core.hook_manager -> maop.core.agent.hook_manager ---
+  maop\maop_execute.py:200: from maop.core.hook_manager import LifecycleEvent, get_hook_manager
+  maop\maop_execute.py:305: from maop.core.hook_manager import LifecycleEvent, get_hook_manager
+  maop\dashboard\routers\hook.py:24: from maop.core.hook_manager import HookManager
+  maop\dashboard\routers\hook.py:135: from maop.core.hook_manager import LifecycleEvent
+  maop\dashboard\routers\state.py:79: _lazy_import("hook_manager", "maop.core.hook_manager", "HookManager")
+  maop\core\monitoring\budget_guard.py:191: from maop.core.hook_manager import HookManager
+  maop\core\reliability\services.py:195: from maop.core.hook_manager import get_hook_manager
+  maop\core\agent\plugins_hooks\hook_manager.py:12: from maop.core.hook_manager import HookManager, LifecycleEvent
+  tests\test_hook_decision.py:7: from maop.core.hook_manager import HookManager, HookResult, LifecycleEvent
+  tests\test_hook_manager.py:8: from maop.core.hook_manager import (
+  tests\test_maop_execute_coverage3.py:38: return patch("maop.core.hook_manager.get_hook_manager", return_value=mock_mgr)
+  tests\test_maop_execute_coverage3.py:194: "maop.core.hook_manager.get_hook_manager", return_value=mock_mgr
+  tests\test_maop_execute_coverage3.py:210: "maop.core.hook_manager.get_hook_manager", return_value=mock_mgr
+  tests\test_maop_execute_coverage3.py:300: "maop.core.hook_manager.get_hook_manager", return_value=mock_mgr
+  tests\test_maop_execute_coverage3.py:339: "maop.core.hook_manager.get_hook_manager", return_value=mock_mgr
+
+--- maop.core.human_proxy -> maop.core.agent.human_proxy ---
+  maop\maop_execute.py:175: from maop.core.human_proxy import HumanProxy
+  maop\maop_loop.py:587: from maop.core.human_proxy import HumanProxy
+  maop\dashboard\data_proxy.py:658: from maop.core.human_proxy import HumanProxy
+  maop\worker\queue_worker.py:70: from maop.core.human_proxy import HumanProxy
+  maop\dashboard\routers\permission.py:70: from maop.core.human_proxy import HumanProxy
+  maop\dashboard\routers\permission.py:80: from maop.core.human_proxy import HumanProxy
+  maop\dashboard\routers\permission.py:90: from maop.core.human_proxy import HumanProxy
+  tests\test_data_proxy_coverage3.py:405: with patch("maop.core.human_proxy.HumanProxy") as MockHP:
+  tests\test_db_backup.py:206: from maop.core.human_proxy import HumanProxy
+  tests\test_human_proxy.py:7: from maop.core.human_proxy import ApprovalRequest, HumanProxy, HumanProxyConfig
+  tests\test_maop_execute_coverage3.py:155: "maop.core.human_proxy.HumanProxy", return_value=mock_hp
+  tests\test_missing_modules.py:15: from maop.core.human_proxy import HumanProxy
+  tests\test_queue_worker_coverage.py:263: with patch("maop.core.human_proxy.HumanProxy") as mock_proxy_cls:
+  tests\test_queue_worker_coverage.py:272: with patch("maop.core.human_proxy.HumanProxy", side_effect=RuntimeError("no db")):
+  tests\test_router_misc_coverage.py:475: monkeypatch.setattr("maop.core.human_proxy.HumanProxy", lambda **kw: mock_hp)
+
+--- maop.core.hybrid_search -> maop.core.memory.hybrid_search ---
+  maop\core\memory\hybrid_search.py:14: from maop.core.hybrid_search import HybridSearch
+  tests\test_agentforge_r3.py:10: from maop.core.hybrid_search import HybridSearch, rrf_fuse
+
+--- maop.core.image_store -> maop.core.backends.image_store ---
+  maop\dashboard\routers\chat.py:214: from maop.core.image_store import ImageStore
+  maop\dashboard\routers\chat.py:234: from maop.core.image_store import ImageStore
+  maop\dashboard\routers\chat.py:245: from maop.core.image_store import ImageStore
+  maop\core\backends\image_store.py:13: from maop.core.image_store import ImageStore
+  maop\core\agent\llm_chat\chat_engine.py:362: from maop.core.image_store import ImageStore
+  tests\test_v4_3.py:11: from maop.core.image_store import MAX_IMAGE_SIZE, ImageMeta, ImageStore
+
+--- maop.core.knowledge_extractor -> maop.core.memory.knowledge_extractor ---
+  maop\memory\consolidator.py:327: from maop.core.knowledge_extractor import KnowledgeExtractor
+  maop\memory\manager.py:413: from maop.core.knowledge_extractor import KnowledgeExtractor
+  maop\dashboard\routers\knowledge.py:60: from maop.core.knowledge_extractor import KnowledgeExtractor
+  maop\dashboard\routers\knowledge.py:74: from maop.core.knowledge_extractor import KnowledgeExtractor
+  maop\dashboard\routers\knowledge.py:84: from maop.core.knowledge_extractor import KnowledgeExtractor
+  maop\dashboard\routers\knowledge.py:101: from maop.core.knowledge_extractor import KnowledgeExtractor
+  maop\dashboard\routers\knowledge.py:145: from maop.core.knowledge_extractor import KnowledgeExtractor
+  maop\core\memory\knowledge_extractor.py:13: from maop.core.knowledge_extractor import KnowledgeExtractor
+  tests\test_bcd_iterations.py:16: from maop.core.knowledge_extractor import (
+  tests\test_e2e_multivendor.py:22: from maop.core.knowledge_extractor import KnowledgeExtractor, Relation
+  tests\test_memory_manager_search_coverage3.py:205: "maop.core.knowledge_extractor.KnowledgeExtractor",
+
+--- maop.core.knowledge_graph -> maop.core.memory.knowledge_graph ---
+  maop\memory\manager.py:423: from maop.core.knowledge_graph import KnowledgeGraph
+  maop\dashboard\routers\knowledge.py:115: from maop.core.knowledge_graph import KnowledgeGraph
+  maop\dashboard\routers\knowledge.py:134: from maop.core.knowledge_graph import KnowledgeGraph
+  maop\dashboard\routers\knowledge.py:245: from maop.core.knowledge_graph import KnowledgeGraph, KnowledgeGraphQuery
+  maop\core\memory\knowledge_graph.py:12: from maop.core.knowledge_graph import KnowledgeGraph
+  maop\core\memory\knowledge_graph.py:19: from maop.core.knowledge_graph import KnowledgeGraphQuery
+  tests\test_bcd_iterations.py:22: from maop.core.knowledge_graph import KnowledgeGraph
+  tests\test_e2e_multivendor.py:23: from maop.core.knowledge_graph import KnowledgeGraph
+  tests\test_knowledge_graph.py:9: from maop.core.knowledge_graph import GraphEdge, GraphNode, KnowledgeGraph, Subgraph
+  tests\test_knowledge_graph_v2.py:23: from maop.core.knowledge_graph import (
+  tests\test_memory_manager_search_coverage3.py:215: "maop.core.knowledge_graph.KnowledgeGraph",
+
+--- maop.core.kv_store -> maop.core.backends.kv_store ---
+  maop\dashboard\routers\state.py:63: _lazy_import("kv_store", "maop.core.kv_store", "KVStore")
+  maop\core\backends\backends.py:323: from maop.core.kv_store import KVStore
+  maop\core\reliability\services.py:176: from maop.core.kv_store import KVStore
+  tests\test_kv_store.py:10: from maop.core.kv_store import (
+  tests\test_new_modules.py:88: from maop.core.kv_store import KVStore
+  tests\test_new_modules.py:96: from maop.core.kv_store import KVStore
+  tests\test_new_modules.py:103: from maop.core.kv_store import KVStore
+  tests\test_new_modules.py:113: from maop.core.kv_store import KVStore
+  tests\test_new_modules.py:123: from maop.core.kv_store import KVStore
+  tests\test_new_modules.py:132: from maop.core.kv_store import KVStore
+  tests\test_new_modules.py:142: from maop.core.kv_store import KVStore
+  tests\test_new_modules.py:151: from maop.core.kv_store import KVStore
+  tests\test_new_modules.py:160: from maop.core.kv_store import KVStore
+
+--- maop.core.llm_provider -> maop.core.agent.llm_provider ---
+  maop\maop_loop.py:34: from maop.core.llm_provider import LLMProviderFactory
+  maop\maop_loop.py:227: from maop.core.llm_provider import LLMProviderFactory
+  maop\dashboard\routers\chat.py:121: from maop.core.llm_provider import LLMProviderFactory
+  maop\core\agent\delegation\subagent_lifecycle.py:391: from maop.core.llm_provider import LLMProviderFactory
+  maop\core\agent\llm_chat\chat_engine.py:30: from maop.core.llm_provider import LLMProviderFactory
+  maop\core\agent\llm_chat\chat_engine.py:110: from maop.core.llm_provider import LLMProviderFactory
+  maop\core\agent\llm_chat\llm_provider.py:15: from maop.core.llm_provider import LLMProviderFactory
+  maop\core\agent\llm_chat\react_loop.py:52: from maop.core.llm_provider import LLMProviderFactory
+  maop\core\agent\llm_chat\react_loop.py:152: from maop.core.llm_provider import LLMProviderFactory
+  tests\test_e2e_multivendor.py:24: from maop.core.llm_provider import BaseLLMProvider, LLMResponse, ModelConfig
+  tests\test_evolve_loop_coverage.py:138: import maop.core.llm_provider
+  tests\test_llm_provider.py:10: from maop.core.llm_provider import (
+  tests\test_llm_provider_fallback.py:5: from maop.core.llm_provider import (
+  tests\test_maop_loop_coverage3.py:62: with patch("maop.core.llm_provider.LLMProviderFactory", side_effect=RuntimeError("llm boom")):
+  tests\test_observability.py:89: from maop.core.llm_provider import LLMResponse, _record_cost
+  tests\test_omniroute_default.py:309: from maop.core.llm_provider import LLMProviderFactory
+  tests\test_omniroute_default.py:316: from maop.core.llm_provider import LLMProviderFactory
+  tests\test_omniroute_default.py:323: from maop.core.llm_provider import LLMProviderFactory
+  tests\test_omniroute_default.py:337: from maop.core.llm_provider import LLMProviderFactory
+  tests\test_react_loop_coverage3.py:27: "maop.core.llm_provider.LLMProviderFactory",
+  tests\test_three_layer_memory_coverage.py:176: import maop.core.llm_provider
+
+--- maop.core.load_balancer -> maop.core.routing.load_balancer ---
+  maop\delegate\dispatcher.py:98: from maop.core.load_balancer import get_load_balancer
+  maop\model\selector.py:39: from maop.core.load_balancer import LoadBalancer
+  maop\dashboard\routers\data.py:79: from maop.core.load_balancer import get_load_balancer
+  maop\dashboard\routers\state.py:57: _lazy_import("load_balancer", "maop.core.load_balancer", "LoadBalancer")
+  maop\core\reliability\services.py:152: from maop.core.load_balancer import get_load_balancer
+  tests\test_dispatcher_coverage.py:108: if name == "maop.core.load_balancer":
+  tests\test_dispatcher_coverage.py:121: with patch("maop.core.load_balancer.get_load_balancer", _fake_get_lb):
+  tests\test_load_balancer.py:5: from maop.core.load_balancer import (
+  tests\test_model_lb_quota_integration.py:22: from maop.core.load_balancer import LBAlgorithm, LoadBalancer
+  tests\test_routing_trace.py:90: import maop.core.load_balancer as _lb
+  tests\test_routing_trace.py:415: from maop.core.load_balancer import LBAlgorithm, LoadBalancer
+  tests\test_routing_trace.py:442: from maop.core.load_balancer import LoadBalancer
+  tests\test_routing_trace.py:458: from maop.core.load_balancer import LoadBalancer
+
+--- maop.core.log_rotate -> maop.core.reliability.log_rotate ---
+  maop\maop_loop.py:43: from maop.core.log_rotate import rotate_logs
+  maop\dashboard\lifespan.py:63: from maop.core.log_rotate import LogRotateScheduler
+  maop\dashboard\routers\control.py:178: from maop.core.log_rotate import rotate_logs
+  tests\test_log_rotate.py:9: from maop.core.log_rotate import LogRotateConfig, rotate_logs
+
+--- maop.core.mcp_adapter -> maop.core.mcp.mcp_adapter ---
+  maop\core\mcp\mcp_adapter.py:125: from maop.core.mcp_adapter import MCPAdapter
+  tests\test_mcp_adapter.py:1: """Tests for maop.core.mcp_adapter.MCPAdapter.
+  tests\test_mcp_adapter.py:18: from maop.core.mcp_adapter import MCPAdapter, _BackgroundLoop
+
+--- maop.core.mcp_audit -> maop.core.mcp.mcp_audit ---
+  maop\dashboard\routers\mcp.py:92: "maop.core.mcp_audit", "MCPAuditLogger",
+  maop\core\mcp\mcp_audit.py:27: from maop.core.mcp_audit import MCPAuditLogger, MCPAuditRecord
+  maop\core\mcp\mcp_hub.py:64: from maop.core.mcp_audit import MCPAuditLogger
+  maop\core\mcp\mcp_hub.py:614: from maop.core.mcp_audit import MCPAuditRecord, hash_arguments
+  maop\core\routing\routing_decision.py:91: :class:`maop.core.mcp_audit.MCPAuditRecord`.
+  tests\test_mcp_permission_audit.py:21: from maop.core.mcp_audit import (
+
+--- maop.core.mcp_cache -> maop.core.mcp.mcp_cache ---
+  maop\dashboard\routers\mcp.py:96: "maop.core.mcp_cache", "MCPCache",
+  maop\core\mcp\mcp_cache.py:22: from maop.core.mcp_cache import MCPCache, MCPCacheKey
+  maop\core\mcp\mcp_hub.py:65: from maop.core.mcp_cache import MCPCache
+  maop\core\mcp\mcp_hub.py:411: from maop.core.mcp_cache import MCPCacheKey
+  maop\core\mcp\mcp_hub.py:578: from maop.core.mcp_cache import MCPCacheKey
+  tests\test_mcp_cache_concurrency.py:27: from maop.core.mcp_cache import MCPCache, MCPCacheEntry, MCPCacheKey, MCPCacheStats
+
+--- maop.core.mcp_concurrency -> maop.core.mcp.mcp_concurrency ---
+  maop\dashboard\routers\mcp.py:99: "maop.core.mcp_concurrency", "MCPServerConcurrency",
+  maop\dashboard\routers\mcp.py:102: "maop.core.mcp_concurrency", "MCPServerRateLimiter",
+  maop\core\mcp\mcp_hub.py:66: from maop.core.mcp_concurrency import MCPServerConcurrency, MCPServerRateLimiter
+  tests\test_mcp_cache_concurrency.py:28: from maop.core.mcp_concurrency import MCPServerConcurrency, MCPServerRateLimiter
+
+--- maop.core.mcp_discovery -> maop.core.mcp.mcp_discovery ---
+  maop\core\mcp\mcp_discovery.py:13: from maop.core.mcp_discovery import MCPDiscovery
+  tests\test_mcp_discovery.py:1: """Tests for maop.core.mcp_discovery.MCPDiscovery.
+  tests\test_mcp_discovery.py:16: from maop.core.mcp_discovery import DiscoveryReport, MCPDiscovery, _claude_desktop_config_path
+  tests\test_mcp_discovery.py:24: with patch("maop.core.mcp_discovery.platform.system", return_value="UnknownOS"):
+  tests\test_mcp_discovery.py:30: with patch("maop.core.mcp_discovery.platform.system", return_value="Windows"), \
+  tests\test_mcp_discovery.py:40: with patch("maop.core.mcp_discovery.platform.system", return_value="Windows"), \
+  tests\test_mcp_discovery.py:298: with patch("maop.core.mcp_discovery.platform.system", return_value="Linux"):
+
+--- maop.core.mcp_hub -> maop.core.mcp.mcp_hub ---
+  maop\dashboard\routers\mcp.py:85: from maop.core.mcp_hub import MCPHub
+  maop\dashboard\routers\mcp.py:161: from maop.core.mcp_hub import MCPServerConfig, TransportType
+  maop\dashboard\routers\state.py:83: _lazy_import("mcp_hub", "maop.core.mcp_hub", "MCPHub")
+  maop\core\mcp\mcp_adapter.py:45: from maop.core.mcp_hub import MCPHub, MCPServerConfig
+  maop\core\mcp\mcp_adapter.py:146: from maop.core.mcp_hub import MCPHub, MCPServerConfig, TransportType
+  maop\core\mcp\mcp_concurrency.py:4: :class:`maop.core.mcp_hub.MCPHub` to protect external MCP servers from
+  maop\core\mcp\mcp_discovery.py:78: from maop.core.mcp_hub import MCPServerConfig
+  maop\core\mcp\mcp_discovery.py:127: from maop.core.mcp_hub import MCPServerConfig, TransportType
+  maop\core\mcp\mcp_discovery.py:187: from maop.core.mcp_hub import MCPServerConfig, TransportType
+  maop\core\mcp\mcp_hub.py:29: from maop.core.mcp_hub import MCPHub, MCPServerConfig, TransportType
+  maop\core\mcp\mcp_marketplace.py:43: from maop.core.mcp_hub import MCPServerConfig, TransportType
+  maop\core\mcp\mcp_permission.py:17: from maop.core.mcp_hub import MCPServerConfig
+  maop\core\mcp\mcp_permission.py:41: from maop.core.mcp_hub import MCPServerConfig
+  maop\core\agent\llm_chat\function_call.py:84: from maop.core.mcp_hub import MCPHub
+  maop\core\agent\llm_chat\function_call.py:324: from maop.core.mcp_hub import MCPTool
+  maop\core\agent\tools\tool_schema.py:141: from maop.core.mcp_hub import MCPTool
+  maop\core\agent\tools\tool_schema.py:200: from maop.core.mcp_hub import MCPHub
+  tests\test_function_call.py:273: from maop.core.mcp_hub import MCPTool
+  tests\test_mcp_adapter.py:41: with patch("maop.core.mcp_hub.MCPHub") as mock_cls:
+  tests\test_mcp_adapter.py:88: from maop.core.mcp_hub import MCPServerConfig, TransportType
+  tests\test_mcp_adapter.py:98: from maop.core.mcp_hub import TransportType
+  tests\test_mcp_adapter.py:113: from maop.core.mcp_hub import MCPServerConfig
+  tests\test_mcp_adapter.py:122: with patch("maop.core.mcp_hub.MCPHub") as mock_cls:
+  tests\test_mcp_adapter.py:134: with patch("maop.core.mcp_hub.MCPHub") as mock_cls:
+  tests\test_mcp_adapter.py:205: from maop.core.mcp_hub import ToolResult
+  tests\test_mcp_adapter.py:228: from maop.core.mcp_hub import ToolResult
+  tests\test_mcp_adapter.py:248: from maop.core.mcp_hub import ToolResult
+  tests\test_mcp_adapter.py:264: from maop.core.mcp_hub import ToolResult
+  tests\test_mcp_adapter.py:300: from maop.core.mcp_hub import ToolResult
+  tests\test_mcp_adapter.py:469: from maop.core.mcp_hub import MCPServerConfig
+  tests\test_mcp_cache_concurrency.py:29: from maop.core.mcp_hub import (
+  tests\test_mcp_deprecation.py:71: sys.modules.pop("maop.core.mcp_hub", None)
+  tests\test_mcp_deprecation.py:74: importlib.import_module("maop.core.mcp_hub")
+  tests\test_mcp_deprecation.py:101: from maop.core.mcp_hub import MCPHub
+  tests\test_mcp_deprecation.py:110: from maop.core.mcp_hub import (
+  tests\test_mcp_deprecation.py:135: assert "from maop.core.mcp_hub import" in src, (
+  tests\test_mcp_deprecation.py:193: assert "from maop.core.mcp_hub import MCPHub" in src, (
+  tests\test_mcp_deprecation.py:216: assert "from maop.core.mcp_hub import" in src, (
+  tests\test_mcp_discovery.py:17: from maop.core.mcp_hub import TransportType
+  tests\test_mcp_hub.py:8: from maop.core.mcp_hub import (
+  tests\test_mcp_hub.py:238: with caplog.at_level(logging.WARNING, logger="maop.core.mcp_hub"):
+  tests\test_mcp_marketplace.py:21: from maop.core.mcp_hub import MCPServerConfig, TransportType
+  tests\test_mcp_observability.py:38: from maop.core.mcp_hub import (
+  tests\test_mcp_permission_audit.py:26: from maop.core.mcp_hub import (
+  tests\test_mcp_permission_audit.py:806: from maop.core.mcp_hub import MCPHub
+  tests\test_tool_mq_mcp_coverage.py:271: import maop.core.mcp_hub
+
+--- maop.core.mcp_hub_transport -> maop.core.mcp.mcp_hub_transport ---
+  maop\core\mcp\mcp_hub.py:72: from maop.core.mcp_hub_transport import (
+  tests\test_tool_mq_mcp_coverage.py:279: import maop.core.mcp_hub_transport
+
+--- maop.core.mcp_hub_types -> maop.core.mcp.mcp_hub_types ---
+  maop\core\mcp\mcp_hub.py:78: from maop.core.mcp_hub_types import (
+  maop\core\mcp\mcp_hub_transport.py:18: from maop.core.mcp_hub_types import (
+
+--- maop.core.mcp_marketplace -> maop.core.mcp.mcp_marketplace ---
+  maop\cli.py:179: from maop.core.mcp_marketplace import MCPMarketplace
+  maop\core\mcp\mcp_marketplace.py:21: from maop.core.mcp_marketplace import MCPMarketplace
+  tests\test_mcp_marketplace.py:22: from maop.core.mcp_marketplace import (
+
+--- maop.core.mcp_permission -> maop.core.mcp.mcp_permission ---
+  maop\dashboard\routers\mcp.py:89: "maop.core.mcp_permission", "MCPPermissionChecker",
+  maop\core\mcp\mcp_hub.py:67: from maop.core.mcp_permission import MCPPermissionChecker
+  maop\core\mcp\mcp_permission.py:16: from maop.core.mcp_permission import MCPPermissionChecker
+  tests\test_mcp_permission_audit.py:32: from maop.core.mcp_permission import (
+
+--- maop.core.message_queue -> maop.core.reliability.message_queue ---
+  maop\worker\agent_executor.py:67: from maop.core.message_queue import MessageQueue
+  maop\worker\queue_worker.py:81: from maop.core.message_queue import MessageQueue
+  maop\worker\queue_worker.py:197: from maop.core.message_queue import MessageQueue
+  maop\worker\queue_worker.py:206: from maop.core.message_queue import MessageQueue
+  maop\worker\queue_worker.py:232: from maop.core.message_queue import MessageQueue
+  maop\dashboard\routers\state.py:61: _lazy_import("message_queue", "maop.core.message_queue", "MessageQueue")
+  maop\core\backends\backends.py:261: from maop.core.message_queue import MessageQueue
+  maop\core\reliability\services.py:168: from maop.core.message_queue import MessageQueue
+  tests\test_config_plugin_cli_coverage.py:344: import maop.core.message_queue
+  tests\test_message_queue.py:13: from maop.core.message_queue import (
+  tests\test_queue_worker_coverage.py:123: with patch("maop.core.message_queue.MessageQueue") as mock_mq_cls:
+  tests\test_queue_worker_coverage.py:129: with patch("maop.core.message_queue.MessageQueue") as mock_mq_cls:
+  tests\test_queue_worker_coverage.py:136: with patch("maop.core.message_queue.MessageQueue", return_value=mq):
+  tests\test_queue_worker_coverage.py:143: with patch("maop.core.message_queue.MessageQueue", return_value=mq):
+  tests\test_queue_worker_coverage.py:150: with patch("maop.core.message_queue.MessageQueue", return_value=mq):
+  tests\test_queue_worker_coverage.py:157: with patch("maop.core.message_queue.MessageQueue", return_value=mq):
+  tests\test_queue_worker_coverage.py:164: with patch("maop.core.message_queue.MessageQueue", return_value=mq):
+  tests\test_queue_worker_coverage.py:171: with patch("maop.core.message_queue.MessageQueue", return_value=mq):
+  tests\test_queue_worker_coverage.py:181: with patch("maop.core.message_queue.MessageQueue", side_effect=RuntimeError("no db")):
+  tests\test_queue_worker_coverage.py:189: with patch("maop.core.message_queue.MessageQueue", return_value=mq):
+  tests\test_queue_worker_coverage.py:202: with patch("maop.core.message_queue.MessageQueue", return_value=mq), \
+  tests\test_queue_worker_coverage.py:217: with patch("maop.core.message_queue.MessageQueue", return_value=mq), \
+  tests\test_queue_worker_coverage.py:231: with patch("maop.core.message_queue.MessageQueue", return_value=mq), \
+  tests\test_queue_worker_coverage.py:241: with patch("maop.core.message_queue.MessageQueue", return_value=mq):
+  tests\test_queue_worker_coverage.py:251: with patch("maop.core.message_queue.MessageQueue", return_value=mq):
+  tests\test_queue_worker_coverage.py:280: with patch("maop.core.message_queue.MessageQueue", return_value=mq):
+  tests\test_queue_worker_coverage.py:284: with patch("maop.core.message_queue.MessageQueue", side_effect=RuntimeError("no db")):
+  tests\test_stress.py:388: from maop.core.message_queue import MessageQueue
+  tests\test_stress.py:490: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:144: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:149: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:155: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:161: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:168: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:174: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:180: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:188: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:195: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:204: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:210: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:218: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:224: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:231: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:239: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:245: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:251: from maop.core.message_queue import MessageQueue
+  tests\test_tool_mq_mcp_coverage.py:257: from maop.core.message_queue import MessageQueue, MessagePriority
+  tests\e2e\test_auth_enabled.py:206: from maop.core.message_queue import MessageQueue
+  tests\e2e\test_auth_enabled.py:227: from maop.core.message_queue import MessageQueue
+  tests\e2e\test_auth_enabled.py:244: from maop.core.message_queue import MessageQueue
+  tests\stability\test_crash_recovery.py:21: from maop.core.message_queue import MessageQueue
+  tests\stability\test_long_run.py:25: from maop.core.message_queue import MessageQueue
+
+--- maop.core.middleware -> maop.core.security.middleware ---
+  maop\dashboard\server.py:113: from maop.core.middleware import AuthMiddleware, CSPMiddleware, RateLimitMiddleware
+  maop\dashboard\routers\agent_proxy.py:10: from maop.core.middleware import require_admin
+  maop\dashboard\routers\audit.py:23: from maop.core.middleware import require_admin
+  maop\dashboard\routers\auth.py:148: from maop.core.middleware import require_admin as _require_admin
+  maop\dashboard\routers\budget.py:10: from maop.core.middleware import require_admin
+  maop\dashboard\routers\chat.py:24: from maop.core.middleware import require_admin
+  maop\dashboard\routers\control.py:15: from maop.core.middleware import require_admin
+  maop\dashboard\routers\cost.py:9: from maop.core.middleware import require_admin
+  maop\dashboard\routers\data.py:22: from maop.core.middleware import require_admin
+  maop\dashboard\routers\evolve.py:10: from maop.core.middleware import require_admin
+  maop\dashboard\routers\hook.py:10: from maop.core.middleware import require_admin
+  maop\dashboard\routers\knowledge.py:27: from maop.core.middleware import require_admin
+  maop\dashboard\routers\mcp.py:12: from maop.core.middleware import require_admin
+  maop\dashboard\routers\memory.py:13: from maop.core.middleware import require_admin
+  maop\dashboard\routers\model.py:13: from maop.core.middleware import require_admin
+  maop\dashboard\routers\n8n.py:19: from maop.core.middleware import require_admin
+  maop\dashboard\routers\permission.py:11: from maop.core.middleware import require_admin
+  maop\dashboard\routers\plugin.py:9: from maop.core.middleware import require_admin
+  maop\dashboard\routers\protocol.py:10: from maop.core.middleware import require_admin
+  maop\dashboard\routers\rbac.py:22: from maop.core.middleware import require_admin
+  maop\dashboard\routers\react.py:10: from maop.core.middleware import require_admin
+  maop\dashboard\routers\routing_preview.py:17: from maop.core.middleware import require_admin
+  maop\dashboard\routers\session.py:10: from maop.core.middleware import require_admin
+  maop\dashboard\routers\stream.py:16: from maop.core.middleware import require_admin
+  maop\dashboard\routers\subagent.py:10: from maop.core.middleware import require_admin
+  maop\dashboard\routers\tenant.py:20: from maop.core.middleware import require_admin
+  maop\dashboard\routers\tool_audit.py:10: from maop.core.middleware import require_admin
+  maop\dashboard\routers\worktree.py:10: from maop.core.middleware import require_admin
+  maop\dashboard\routers\agents\crud.py:16: from maop.core.middleware import require_admin
+  maop\dashboard\routers\agents\evolution.py:18: from maop.core.middleware import require_admin
+  maop\dashboard\routers\agents\memory.py:10: from maop.core.middleware import require_admin
+  maop\dashboard\routers\info\admin.py:16: from maop.core.middleware import require_admin
+  maop\dashboard\routers\system\agent_admin.py:21: from maop.core.middleware import require_admin
+  maop\dashboard\routers\system\overview.py:21: from maop.core.middleware import require_admin
+  maop\dashboard\routers\system\workflow.py:21: from maop.core.middleware import require_admin
+  maop\dashboard\routers\system\_deps.py:25: from maop.core.middleware import require_admin  # noqa: F401  — re-exported
+  tests\test_adr010_regression.py:133: from maop.core.middleware import require_admin
+  tests\test_adr010_regression.py:143: from maop.core.middleware import require_admin
+  tests\test_dashboard_auth.py:22: from maop.core.middleware import AuthMiddleware
+  tests\test_middleware.py:7: from maop.core.middleware import AuthMiddleware, RateLimitMiddleware, setup_middleware
+  tests\test_middleware.py:70: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:77: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:82: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:96: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:106: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:115: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:128: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:145: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:150: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:155: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:164: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:187: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:205: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:222: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:228: from maop.core.middleware import CSPMiddleware
+  tests\test_middleware.py:274: from maop.core.middleware import AuthMiddleware
+
+--- maop.core.migration -> maop.core.backends.migration ---
+  maop\dashboard\routers\state.py:64: _lazy_import("migration", "maop.core.migration", "MigrationManager")
+  maop\core\backends\migration.py:231: from maop.core.migration import get_migration_backend
+  maop\core\reliability\services.py:184: from maop.core.migration import MigrationManager
+  tests\test_migration.py:9: from maop.core.migration import Migration, MigrationManager
+
+--- maop.core.monitoring -> maop.core.monitoring.monitoring ---
+  maop\cli.py:371: from maop.core.monitoring import setup_json_logging
+  maop\maop_loop.py:44: from maop.core.monitoring import MetricsCollector, StructuredLogger
+  maop\dashboard\static.py:150: from maop.core.monitoring import metrics as _metrics
+  maop\delegate\dispatcher.py:22: from maop.core.monitoring import (
+  maop\delegate\doc_pipeline_adapter.py:100: from maop.core.monitoring import metrics
+  maop\delegate\sla_monitor.py:23: from maop.core.monitoring import (
+  maop\model\selector.py:17: from maop.core.monitoring import (
+  maop\worker\agent_executor.py:44: from maop.core.monitoring import setup_json_logging
+  maop\worker\queue_worker.py:54: from maop.core.monitoring import setup_json_logging
+  maop\dashboard\routers\state.py:59: _lazy_import("monitoring", "maop.core.monitoring", "MetricsCollector")
+  maop\core\mcp\mcp_cache.py:281: from maop.core.monitoring import MAOP_MCP_CACHE_EVICTION_TOTAL
+  maop\core\mcp\mcp_concurrency.py:140: from maop.core.monitoring import MAOP_MCP_CONCURRENT_ACTIVE
+  maop\core\mcp\mcp_hub.py:645: from maop.core.monitoring import (
+  maop\core\mcp\mcp_hub.py:664: from maop.core.monitoring import MAOP_MCP_CALLS_TOTAL
+  maop\core\mcp\mcp_hub.py:673: from maop.core.monitoring import MAOP_MCP_CALL_ERRORS_TOTAL
+  maop\core\mcp\mcp_hub.py:683: from maop.core.monitoring import MAOP_MCP_CALL_DURATION_SECONDS
+  maop\core\mcp\mcp_hub.py:695: from maop.core.monitoring import MAOP_MCP_HEALTH_CHECK_TOTAL
+  maop\core\mcp\mcp_hub.py:706: from maop.core.monitoring import MAOP_MCP_SERVERS_CONNECTED
+  maop\core\mcp\mcp_hub.py:715: from maop.core.monitoring import MAOP_MCP_SERVERS_CONNECTED
+  maop\core\mcp\mcp_hub.py:726: from maop.core.monitoring import MAOP_MCP_CACHE_HIT_TOTAL
+  maop\core\mcp\mcp_hub.py:735: from maop.core.monitoring import MAOP_MCP_CACHE_MISS_TOTAL
+  maop\core\mcp\mcp_hub.py:744: from maop.core.monitoring import MAOP_MCP_RATE_LIMITED_TOTAL
+  maop\core\reliability\preemptable_worker_pool.py:51: from maop.core.monitoring import (
+  maop\core\routing\load_balancer.py:326: from maop.core.monitoring import (
+  maop\core\routing\load_balancer.py:357: from maop.core.monitoring import MAOP_STICKY_SESSION_ACTIVE
+  maop\core\routing\load_balancer.py:637: from maop.core.monitoring import (
+  maop\core\routing\route_scorer.py:199: from maop.core.monitoring import MAOP_ROUTE_DECISION_MODE
+  maop\core\routing\route_scorer.py:495: from maop.core.monitoring import (
+  maop\core\routing\route_scorer.py:705: from maop.core.monitoring import (
+  tests\test_json_logging.py:17: from maop.core.monitoring import JsonLogFormatter, setup_json_logging
+  tests\test_mcp_cache_concurrency.py:34: from maop.core.monitoring import (
+  tests\test_mcp_observability.py:46: from maop.core.monitoring import (
+  tests\test_mcp_permission_audit.py:36: from maop.core.monitoring import (
+  tests\test_model_lb_quota_integration.py:23: from maop.core.monitoring import (
+  tests\test_model_lb_quota_integration.py:457: from maop.core.monitoring import metrics as m
+  tests\test_model_lb_quota_integration.py:467: from maop.core.monitoring import metrics as m
+  tests\test_model_lb_quota_integration.py:475: from maop.core.monitoring import metrics as m
+  tests\test_model_lb_quota_integration.py:482: from maop.core.monitoring import metrics as m
+  tests\test_model_lb_quota_integration.py:490: from maop.core.monitoring import metrics as m
+  tests\test_monitoring.py:11: from maop.core.monitoring import (
+  tests\test_new_modules.py:412: from maop.core.monitoring import Counter
+  tests\test_new_modules.py:419: from maop.core.monitoring import Gauge
+  tests\test_new_modules.py:429: from maop.core.monitoring import Histogram
+  tests\test_new_modules.py:438: from maop.core.monitoring import MetricsCollector
+  tests\test_new_modules.py:447: from maop.core.monitoring import StructuredLogger
+  tests\test_new_modules.py:453: from maop.core.monitoring import MAOP_ACTIVE_AGENTS, MAOP_DELEGATIONS_TOTAL
+  tests\test_observability.py:60: from maop.core.monitoring import metrics
+  tests\test_preemption.py:21: from maop.core.monitoring import (
+  tests\test_routing_trace.py:37: from maop.core.monitoring import (
+  tests\test_sla_scheduling.py:18: from maop.core.monitoring import (
+  tests\test_sla_scheduling.py:228: from maop.core.monitoring import (
+
+--- maop.core.multi_objective_scorer -> maop.core.routing.multi_objective_scorer ---
+  maop\core\routing\multi_objective_scorer.py:27: from maop.core.multi_objective_scorer import (
+  maop\core\routing\route_scorer.py:29: from maop.core.multi_objective_scorer import ObjectiveWeights  # R8-F821 fix
+  maop\core\routing\route_scorer.py:455: from maop.core.multi_objective_scorer import (
+  tests\test_multi_objective_scoring.py:15: from maop.core.multi_objective_scorer import (
+
+--- maop.core.otel -> maop.core.monitoring.otel ---
+  maop\maop_loop.py:45: from maop.core.otel import get_tracer
+  maop\maop_loop.py:46: from maop.core.otel import setup_provider as otel_setup
+  maop\maop_loop.py:47: from maop.core.otel import span as otel_span
+  maop\dashboard\lifespan.py:41: from maop.core.otel import setup_provider
+  maop\delegate\dispatcher.py:26: from maop.core.otel import get_tracer
+  maop\delegate\dispatcher.py:27: from maop.core.otel import span as otel_span
+  maop\model\selector.py:23: from maop.core.otel import get_tracer
+  maop\model\selector.py:24: from maop.core.otel import span as otel_span
+  maop\core\monitoring\otel.py:11: from maop.core.otel import get_tracer, span
+  maop\core\routing\load_balancer.py:40: from maop.core.otel import get_tracer
+  maop\core\routing\load_balancer.py:41: from maop.core.otel import span as otel_span
+  maop\core\routing\route_scorer.py:30: from maop.core.otel import get_tracer
+  maop\core\routing\route_scorer.py:31: from maop.core.otel import span as otel_span
+  maop\core\routing\routing_decision.py:7: :func:`maop.core.otel.span`) — exported to the OTel backend for
+  tests\test_core_coverage2.py:28: from maop.core.otel import is_enabled
+  tests\test_core_coverage2.py:33: from maop.core.otel import is_enabled
+  tests\test_core_coverage2.py:38: from maop.core.otel import get_tracer, _NoopTracer
+  tests\test_core_coverage2.py:43: from maop.core.otel import get_tracer, span, _NoopSpan
+  tests\test_core_coverage2.py:50: from maop.core.otel import setup_provider
+  tests\test_core_coverage2.py:55: from maop.core.otel import inject_trace_context
+  tests\test_core_coverage2.py:62: from maop.core.otel import extract_trace_context
+  tests\test_core_coverage2.py:66: from maop.core.otel import _NoopSpan
+  tests\test_mcp_observability.py:18: The span tests patch :func:`maop.core.otel.span` with a recording
+  tests\test_mcp_observability.py:111: # Span-recording context manager. Patch ``maop.core.otel.span`` with
+  tests\test_mcp_observability.py:134: """Patch ``maop.core.otel.span`` with ``_recording_span`` for the
+  tests\test_mem_vector_otel_saml_coverage.py:399: from maop.core.otel import is_enabled
+  tests\test_mem_vector_otel_saml_coverage.py:404: from maop.core.otel import is_enabled
+  tests\test_mem_vector_otel_saml_coverage.py:409: from maop.core.otel import is_enabled
+  tests\test_mem_vector_otel_saml_coverage.py:414: from maop.core.otel import is_enabled
+  tests\test_mem_vector_otel_saml_coverage.py:419: from maop.core.otel import get_tracer, _NoopTracer
+  tests\test_mem_vector_otel_saml_coverage.py:425: from maop.core.otel import get_tracer, span, _NoopSpan
+  tests\test_mem_vector_otel_saml_coverage.py:432: from maop.core.otel import get_tracer, span
+  tests\test_mem_vector_otel_saml_coverage.py:439: from maop.core.otel import setup_provider
+  tests\test_mem_vector_otel_saml_coverage.py:446: from maop.core.otel import setup_provider
+  tests\test_mem_vector_otel_saml_coverage.py:455: from maop.core.otel import inject_trace_context
+  tests\test_mem_vector_otel_saml_coverage.py:463: from maop.core.otel import extract_trace_context
+  tests\test_mem_vector_otel_saml_coverage.py:468: from maop.core.otel import _NoopTracer, _NoopSpan
+  tests\test_mem_vector_otel_saml_coverage.py:474: from maop.core.otel import _NoopSpan
+  tests\test_mem_vector_otel_saml_coverage.py:485: from maop.core.otel import _NoopSpan
+  tests\test_observability.py:142: from maop.core.otel import setup_provider
+  tests\test_otel.py:7: from maop.core.otel import (
+  tests\test_otel.py:65: patch("maop.core.otel._OTELE_AVAILABLE", False):
+  tests\test_routing_trace.py:19: The span tests patch :func:`maop.core.otel.span` with a recording
+  tests\test_routing_trace.py:59: """Recording stand-in for :func:`maop.core.otel.span`.
+  tests\test_routing_trace.py:81: dispatcher) does ``from maop.core.otel import span as otel_span`` at
+  tests\test_routing_trace.py:83: Patching only ``maop.core.otel.span`` wouldn't affect those bound
+
+--- maop.core.output_parser -> maop.core.agent.output_parser ---
+  maop\maop_verify.py:253: from maop.core.output_parser import OutputParser
+  maop\core\agent\llm_chat\output_parser.py:11: from maop.core.output_parser import OutputParser
+  tests\test_output_parser.py:6: from maop.core.output_parser import OutputParser
+
+--- maop.core.permission -> maop.core.security.permission ---
+  maop\maop_execute.py:163: from maop.core.permission import PermissionManager
+  maop\dashboard\routers\permission.py:32: from maop.core.permission import PermissionManager
+  maop\dashboard\routers\permission.py:43: from maop.core.permission import PermissionManager
+  maop\dashboard\routers\permission.py:52: from maop.core.permission import PermissionManager
+  maop\dashboard\routers\permission.py:61: from maop.core.permission import PermissionManager
+  tests\test_maop_execute.py:53: with patch("maop.core.permission.PermissionManager", return_value=_mock_perm_allow()):
+  tests\test_maop_execute.py:64: with patch("maop.core.permission.PermissionManager", return_value=_mock_perm_allow()):
+  tests\test_maop_execute.py:80: with patch("maop.core.permission.PermissionManager", return_value=_mock_perm_allow()):
+  tests\test_maop_execute.py:93: with patch("maop.core.permission.PermissionManager", return_value=_mock_perm_allow()):
+  tests\test_maop_execute.py:103: with patch("maop.core.permission.PermissionManager", return_value=_mock_perm_allow()):
+  tests\test_maop_execute.py:112: with patch("maop.core.permission.PermissionManager", return_value=_mock_perm_allow()):
+  tests\test_maop_execute.py:128: with patch("maop.core.permission.PermissionManager", return_value=_mock_perm_allow()):
+  tests\test_maop_execute.py:144: with patch("maop.core.permission.PermissionManager", return_value=pm):
+  tests\test_permission.py:5: from maop.core.permission import PermissionManager
+  tests\test_phase4.py:7: from maop.core.permission import PermissionCheck
+  tests\test_router_misc_coverage.py:474: monkeypatch.setattr("maop.core.permission.PermissionManager", lambda **kw: mock_pm)
+  tests\reliability\test_pev_pipeline.py:125: with patch("maop.core.permission.PermissionManager",
+  tests\reliability\test_pev_pipeline.py:190: with patch("maop.core.permission.PermissionManager",
+
+--- maop.core.phases -> maop.core.agent.phases ---
+  maop\maop_loop.py:48: from maop.core.phases import PhaseContext, PhaseResult
+  tests\test_maop_loop_extended.py:277: from maop.core.phases import PhaseContext
+  tests\test_maop_loop_extended.py:292: from maop.core.phases import PhaseContext
+  tests\test_maop_loop_extended.py:307: from maop.core.phases import PhaseContext
+  tests\test_phases.py:4: from maop.core.phases import PhaseContext, PhaseResult
+
+--- maop.core.pipeline_checkpoint -> maop.core.reliability.pipeline_checkpoint ---
+  maop\core\reliability\pipeline_checkpoint.py:10: from maop.core.pipeline_checkpoint import PipelineCheckpoint
+  maop\core\reliability\preemptable_worker_pool.py:11: :class:`maop.core.pipeline_checkpoint.PipelineCheckpoint` is not wired
+  tests\test_agentforge_r3.py:11: from maop.core.pipeline_checkpoint import PipelineCheckpoint
+  tests\test_preemption.py:535: from maop.core.pipeline_checkpoint import StepCheckpoint
+
+--- maop.core.plugin -> maop.core.agent.plugin ---
+  maop\dashboard\routers\plugin.py:18: from maop.core.plugin import PluginManager
+  maop\dashboard\routers\plugin.py:26: from maop.core.plugin import PluginState
+  tests\test_config_plugin_cli_coverage.py:232: from maop.core.plugin import PluginManager
+  tests\test_config_plugin_cli_coverage.py:237: from maop.core.plugin import PluginManager
+  tests\test_config_plugin_cli_coverage.py:244: from maop.core.plugin import PluginManager
+  tests\test_config_plugin_cli_coverage.py:253: from maop.core.plugin import PluginManager
+  tests\test_config_plugin_cli_coverage.py:261: from maop.core.plugin import PluginSandbox
+  tests\test_config_plugin_cli_coverage.py:266: from maop.core.plugin import SandboxViolation
+  tests\test_config_plugin_cli_coverage.py:273: from maop.core.plugin import PluginManifest
+  tests\test_plugin_cost.py:10: from maop.core.plugin import PluginInfo, PluginManager, PluginManifest, PluginState
+  tests\test_plugin_sandbox.py:10: from maop.core.plugin import (
+
+--- maop.core.preemptable_worker_pool -> maop.core.reliability.preemptable_worker_pool ---
+  maop\core\reliability\priority_queue.py:21: (:class:`maop.core.preemptable_worker_pool.PreemptableWorkerPool`). True
+  tests\test_config_plugin_cli_coverage.py:336: import maop.core.preemptable_worker_pool
+  tests\test_preemptable_worker_pool_coverage3.py:17: from maop.core.preemptable_worker_pool import PreemptableWorkerPool
+  tests\test_preemptable_worker_pool_coverage3.py:68: "maop.core.preemptable_worker_pool.get_priority_wait_histogram",
+  tests\test_preemptable_worker_pool_coverage3.py:210: from maop.core.preemptable_worker_pool import PreemptableWorkerPool
+  tests\test_preemptable_worker_pool_coverage3.py:212: with patch("maop.core.preemptable_worker_pool.WorkerPool") as MockWP:
+  tests\test_preemptable_worker_pool_coverage3.py:241: from maop.core.preemptable_worker_pool import PreemptableWorkerPool
+  tests\test_preemptable_worker_pool_coverage3.py:243: with patch("maop.core.preemptable_worker_pool.WorkerPool") as MockWP:
+  tests\test_preemptable_worker_pool_coverage3.py:272: from maop.core.preemptable_worker_pool import PreemptableWorkerPool
+  tests\test_preemptable_worker_pool_coverage3.py:274: with patch("maop.core.preemptable_worker_pool.WorkerPool") as MockWP:
+  tests\test_preemption.py:270: from maop.core.preemptable_worker_pool import PreemptableWorkerPool
+  tests\test_tool_mq_mcp_coverage.py:287: import maop.core.preemptable_worker_pool
+
+--- maop.core.priority_queue -> maop.core.reliability.priority_queue ---
+  maop\delegate\dispatcher.py:254: :class:`~maop.core.priority_queue.PriorityTask` and pushed; the
+  maop\delegate\dispatcher.py:275: from maop.core.priority_queue import PriorityTask
+  maop\core\reliability\preemptable_worker_pool.py:4: :class:`maop.core.priority_queue.PriorityTaskQueue` so that pending tasks
+  maop\core\reliability\preemptable_worker_pool.py:56: from maop.core.priority_queue import PriorityTask, PriorityTaskQueue
+  tests\test_preemptable_worker_pool_coverage3.py:57: from maop.core.priority_queue import PriorityTask
+  tests\test_preemptable_worker_pool_coverage3.py:63: from maop.core.priority_queue import PriorityTask
+  tests\test_preemptable_worker_pool_coverage3.py:79: from maop.core.priority_queue import PriorityTask
+  tests\test_preemptable_worker_pool_coverage3.py:87: from maop.core.priority_queue import PriorityTask
+  tests\test_preemptable_worker_pool_coverage3.py:98: from maop.core.priority_queue import PriorityTask
+  tests\test_preemptable_worker_pool_coverage3.py:105: from maop.core.priority_queue import PriorityTask
+  tests\test_preemption.py:4: - :class:`maop.core.priority_queue.PriorityTaskQueue` — ordering, deadline
+  tests\test_preemption.py:26: from maop.core.priority_queue import PriorityTask, PriorityTaskQueue
+
+--- maop.core.project_context -> maop.core.agent.project_context ---
+  maop\core\agent\memory_ctx\project_context.py:18: from maop.core.project_context import ProjectContext
+  tests\test_session.py:6: from maop.core.project_context import ProjectContext
+
+--- maop.core.prompt_version -> maop.core.evolution.prompt_version ---
+  maop\core\evolution\prompt_version.py:11: from maop.core.prompt_version import PromptVersionManager
+  tests\test_ab_prompt_version.py:9: from maop.core.prompt_version import PromptVersionManager
+
+--- maop.core.protocol -> maop.core.agent.protocol ---
+  maop\dashboard\routers\protocol.py:24: from maop.core.protocol import ProtocolRegistry
+  maop\dashboard\routers\state.py:76: _lazy_import("protocol", "maop.core.protocol", "ProtocolRegistry")
+  maop\core\agent\plugins_hooks\protocol.py:11: from maop.core.protocol import ProtocolRegistry
+  tests\test_protocol.py:6: from maop.core.protocol import ProtocolRegistry
+
+--- maop.core.provider_health -> maop.core.routing.provider_health ---
+  maop\dashboard\routers\model.py:267: from maop.core.provider_health import ProviderHealthChecker
+  maop\dashboard\routers\state.py:78: _lazy_import("provider_health", "maop.core.provider_health", "ProviderHealthChecker")
+  maop\core\routing\provider_health.py:8: from maop.core.provider_health import ProviderHealthChecker
+  tests\test_core_modules2_coverage.py:255: from maop.core.provider_health import ProviderHealthChecker
+  tests\test_core_modules2_coverage.py:263: from maop.core.provider_health import ProviderHealthChecker
+  tests\test_provider_enhanced.py:172: from maop.core.provider_health import ProviderHealthChecker
+  tests\test_provider_enhanced.py:181: from maop.core.provider_health import ProviderHealthChecker
+  tests\test_provider_health.py:8: from maop.core.provider_health import HealthResult, ProviderHealthChecker
+
+--- maop.core.rate_limiter -> maop.core.reliability.rate_limiter ---
+  maop\dashboard\routers\state.py:72: _lazy_import("rate_limiter", "maop.core.rate_limiter", "RateLimiter")
+  maop\dashboard\routers\system\v4_misc.py:97: ("rate_limit", "maop.core.rate_limiter", "RateLimiter"),
+  maop\core\security\guardrail.py:243: from maop.core.rate_limiter import RateLimiter, RateLimiterConfig
+  tests\test_new_modules.py:308: from maop.core.rate_limiter import TokenBucket
+  tests\test_new_modules.py:314: from maop.core.rate_limiter import TokenBucket
+  tests\test_new_modules.py:322: from maop.core.rate_limiter import SlidingWindow
+  tests\test_new_modules.py:330: from maop.core.rate_limiter import RateLimiter, RateLimiterConfig
+  tests\test_new_modules.py:337: from maop.core.rate_limiter import RateLimiter, RateLimiterConfig
+  tests\test_rate_limiter.py:7: from maop.core.rate_limiter import (
+  tests\test_stress.py:270: from maop.core.rate_limiter import TokenBucket
+  tests\test_stress.py:305: from maop.core.rate_limiter import TokenBucket
+  tests\test_stress.py:330: from maop.core.rate_limiter import RateLimiter, RateLimiterConfig
+
+--- maop.core.react_loop -> maop.core.agent.react_loop ---
+  maop\maop_execute.py:125: from maop.core.react_loop import ReactConfig, ReactLoop
+  maop\core\agent\llm_chat\react_loop.py:28: from maop.core.react_loop import ReactLoop, ReactConfig
+  tests\test_evolve_loop_coverage.py:130: import maop.core.react_loop
+  tests\test_maop_execute_coverage3.py:69: "maop.core.react_loop.ReactLoop", return_value=mock_loop
+  tests\test_maop_execute_coverage3.py:71: "maop.core.react_loop.ReactConfig"
+  tests\test_maop_execute_coverage3.py:84: "maop.core.react_loop.ReactLoop",
+  tests\test_maop_execute_coverage3.py:116: "maop.core.react_loop.ReactLoop", return_value=mock_loop
+  tests\test_maop_execute_coverage3.py:118: "maop.core.react_loop.ReactConfig"
+  tests\test_react_loop.py:7: from maop.core.react_loop import ReactConfig, ReactLoop, ReactPhase, ReactResult, ReactStep
+  tests\test_three_layer_memory_coverage.py:184: import maop.core.react_loop
+
+--- maop.core.regression -> maop.core.evolution.regression ---
+  maop\core\evolution\regression.py:10: from maop.core.regression import RegressionTestRunner, PersonaSimulator
+  tests\test_core_coverage2.py:16: from maop.core.regression import (
+  tests\test_regression.py:6: from maop.core.regression import (
+
+--- maop.core.route_scorer -> maop.core.routing.route_scorer ---
+  maop\maop_plan.py:188: from maop.core.route_scorer import RouteScorer
+  maop\maop_plan.py:256: from maop.core.route_scorer import get_route_scorer
+  maop\delegate\dispatcher.py:377: from maop.core.route_scorer import get_route_scorer
+  maop\dashboard\routers\routing_preview.py:18: from maop.core.route_scorer import get_route_scorer
+  maop\core\routing\route_scorer.py:12: from maop.core.route_scorer import RouteScorer
+  tests\test_dispatcher_coverage.py:288: with patch("maop.core.route_scorer.get_route_scorer", _fake_get_scorer):
+  tests\test_maop_plan.py:138: from maop.core.route_scorer import RouteScorer
+  tests\test_multi_objective_scoring.py:21: from maop.core.route_scorer import RouteScorer
+  tests\test_route_scorer.py:18: from maop.core.route_scorer import _COOLDOWN_SEC, RouteScorer
+  tests\test_route_scorer.py:233: from maop.core.route_scorer import get_route_scorer
+  tests\test_route_scorer.py:238: from maop.core.route_scorer import get_route_scorer
+  tests\test_routing_trace.py:91: import maop.core.route_scorer as _rs
+  tests\test_routing_trace.py:330: from maop.core.route_scorer import RouteScorer
+  tests\test_routing_trace.py:378: from maop.core.route_scorer import RouteScorer
+  tests\test_routing_trace.py:736: from maop.core.route_scorer import RouteScorer
+
+--- maop.core.routing_decision -> maop.core.routing.routing_decision ---
+  maop\delegate\dispatcher.py:28: from maop.core.routing_decision import (
+  maop\model\selector.py:25: from maop.core.routing_decision import (
+  maop\dashboard\routers\routing.py:3: Phase γ-4: exposes the :class:`~maop.core.routing_decision.RoutingDecisionStore`
+  maop\dashboard\routers\routing.py:40: from maop.core.routing_decision import RoutingDecisionStore
+  maop\core\routing\load_balancer.py:42: from maop.core.routing_decision import (
+  maop\core\routing\route_scorer.py:32: from maop.core.routing_decision import (
+  maop\core\routing\routing_decision.py:33: from maop.core.routing_decision import (
+  tests\test_routing_decision_whitebox.py:18: from maop.core.routing_decision import RoutingDecisionRecord, RoutingDecisionStore
+  tests\test_routing_trace.py:42: from maop.core.routing_decision import (
+  tests\test_routing_trace.py:112: "maop.core.routing_decision.get_routing_decision_store",
+
+--- maop.core.runtime -> maop.core.agent.runtime ---
+  maop\delegate\dispatcher.py:110: from maop.core.runtime import RuntimeConfig, RuntimeType, create_runtime
+  maop\dashboard\routers\state.py:69: _lazy_import("runtime", "maop.core.runtime", "create_runtime")
+  tests\test_dispatcher_coverage.py:129: if name == "maop.core.runtime":
+  tests\test_dispatcher_coverage.py:142: with patch("maop.core.runtime.create_runtime", _fake_create_runtime):
+  tests\test_new_modules.py:178: from maop.core.runtime import LocalRuntime, RuntimeConfig, RuntimeType
+  tests\test_new_modules.py:185: from maop.core.runtime import LocalRuntime, RuntimeConfig, RuntimeType
+  tests\test_new_modules.py:192: from maop.core.runtime import IsolatedRuntime, RuntimeConfig, RuntimeType
+  tests\test_new_modules.py:203: from maop.core.runtime import LocalRuntime, RuntimeConfig, RuntimeType, create_runtime
+  tests\test_new_modules.py:208: from maop.core.runtime import LocalRuntime, RuntimeConfig
+  tests\test_runtime.py:9: from maop.core.runtime import (
+  tests\test_runtime_coverage.py:13: from maop.core.runtime import (
+
+--- maop.core.safe_writer -> maop.core.reliability.safe_writer ---
+  maop\agent_strategy_learner.py:433: from maop.core.safe_writer import safe_write_text
+  maop\evolve.py:427: from maop.core.safe_writer import safe_write_text
+  maop\core\backends\artifact_store.py:34: from maop.core.safe_writer import safe_write_text
+  maop\core\evolution\evolution_loop.py:973: from maop.core.safe_writer import safe_write_text
+  maop\core\reliability\config_mutator.py:34: from maop.core.safe_writer import safe_write_text
+  maop\core\reliability\safe_writer.py:14: from maop.core.safe_writer import safe_write_text, safe_write_json
+  tests\test_evolve_coverage3.py:234: with patch("maop.core.safe_writer.safe_write_text", side_effect=RuntimeError("write boom")):
+  tests\test_safe_writer.py:9: from maop.core.safe_writer import safe_write_bytes, safe_write_json, safe_write_text
+
+--- maop.core.sandbox -> maop.core.security.sandbox ---
+  maop\dashboard\data_proxy.py:643: from maop.core.sandbox import SandboxManager
+  maop\delegate\dispatcher.py:123: from maop.core.sandbox import SandboxManager
+  maop\dashboard\routers\state.py:68: _lazy_import("sandbox", "maop.core.sandbox", "SandboxManager")
+  maop\dashboard\routers\system\v4_misc.py:99: ("sandbox", "maop.core.sandbox", "SandboxManager"),
+  tests\test_core_modules_coverage.py:299: from maop.core.sandbox import SandboxManager
+  tests\test_core_modules_coverage.py:304: from maop.core.sandbox import SandboxManager
+  tests\test_core_modules_coverage.py:311: from maop.core.sandbox import SandboxManager
+  tests\test_core_modules_coverage.py:317: from maop.core.sandbox import SandboxManager
+  tests\test_core_modules_coverage.py:322: from maop.core.sandbox import SandboxManager
+  tests\test_core_modules_coverage.py:330: from maop.core.sandbox import SandboxManager
+  tests\test_core_modules_coverage.py:337: from maop.core.sandbox import SandboxManager
+  tests\test_core_modules_coverage.py:343: from maop.core.sandbox import SandboxManager
+  tests\test_core_modules_coverage.py:348: from maop.core.sandbox import SandboxManager
+  tests\test_core_modules_coverage.py:354: from maop.core.sandbox import SandboxManager
+  tests\test_data_proxy_coverage3.py:398: with patch("maop.core.sandbox.SandboxManager") as MockSM:
+  tests\test_dispatcher_coverage.py:150: if name == "maop.core.sandbox":
+  tests\test_dispatcher_coverage.py:163: with patch("maop.core.sandbox.SandboxManager", _fake_sandbox):
+  tests\test_missing_modules.py:87: from maop.core.sandbox import SandboxManager
+  tests\test_sandbox.py:7: from maop.core.sandbox import SandboxManager
+
+--- maop.core.self_heal -> maop.core.reliability.self_heal ---
+  maop\core\evolution\evolution_loop.py:232: from maop.core.self_heal import SelfHealEngine
+  maop\core\reliability\self_heal.py:11: from maop.core.self_heal import SelfHealEngine
+  tests\test_error_dag_heal.py:9: from maop.core.self_heal import HealAction, HealRule, HealStatus, SelfHealEngine
+  tests\test_error_dag_heal.py:165: from maop.core.self_heal import HealResult
+
+--- maop.core.semantic_cache -> maop.core.memory.semantic_cache ---
+  maop\core\memory\semantic_cache.py:11: from maop.core.semantic_cache import SemanticCache
+  tests\test_agentforge_r3.py:12: from maop.core.semantic_cache import SemanticCache
+  tests\test_semantic_cache_whitebox.py:15: from maop.core.semantic_cache import SemanticCache
+  tests\test_strategy_evolution_beta3.py:18: from maop.core.semantic_cache import SemanticCache
+
+--- maop.core.services -> maop.core.reliability.services ---
+  maop\ab_test_framework.py:82: from maop.core.services import ServiceContainer
+  maop\maop_loop.py:120: from maop.core.services import ServiceContainer
+  maop\dashboard\server.py:245: from maop.core.services import ServiceContainer as _A2AContainer
+  maop\core\evolution\regression.py:111: from maop.core.services import ServiceContainer
+  maop\core\reliability\services.py:8: from maop.core.services import ServiceContainer
+  tests\test_core_coverage2.py:122: if name == "maop.core.services":
+  tests\test_services.py:1: """Tests for maop.core.services.ServiceContainer."""
+  tests\test_services.py:19: from maop.core.services import ServiceContainer
+  tests\test_services.py:26: from maop.core.services import ServiceContainer
+  tests\test_services.py:35: from maop.core.services import ServiceContainer
+  tests\test_services.py:41: from maop.core.services import ServiceContainer
+  tests\test_services.py:49: from maop.core.services import ServiceContainer
+  tests\test_services.py:60: from maop.core.services import ServiceContainer
+  tests\test_services.py:71: from maop.core.services import ServiceContainer
+  tests\test_services.py:80: from maop.core.services import ServiceContainer
+  tests\test_services.py:90: from maop.core.services import ServiceContainer
+  tests\test_services.py:104: from maop.core.services import ServiceContainer
+  tests\test_services.py:111: from maop.core.services import ServiceContainer
+  tests\test_services.py:118: from maop.core.services import ServiceContainer
+  tests\test_services.py:125: from maop.core.services import ServiceContainer
+  tests\test_services.py:132: from maop.core.services import ServiceContainer
+  tests\test_services.py:139: from maop.core.services import ServiceContainer
+  tests\test_services.py:146: from maop.core.services import ServiceContainer
+  tests\test_services.py:153: from maop.core.services import ServiceContainer
+  tests\test_services.py:160: from maop.core.services import ServiceContainer
+  tests\test_services.py:167: from maop.core.services import ServiceContainer
+
+--- maop.core.session -> maop.core.security.session ---
+  maop\dashboard\routers\chat.py:140: from maop.core.session import SessionManager
+  maop\dashboard\routers\session.py:17: from maop.core.session import SessionManager
+  maop\core\security\session.py:12: from maop.core.session import SessionManager
+  tests\test_session.py:7: from maop.core.session import SessionManager, SessionStatus
+
+--- maop.core.skill_version -> maop.core.evolution.skill_version ---
+  maop\dashboard\routers\state.py:84: _lazy_import("skill_version", "maop.core.skill_version", "SkillVersionManager")
+  maop\core\evolution\skill_version.py:9: from maop.core.skill_version import SkillVersionManager
+  tests\test_core_modules_coverage.py:251: from maop.core.skill_version import SkillVersionManager
+  tests\test_core_modules_coverage.py:256: from maop.core.skill_version import SkillVersionManager
+  tests\test_core_modules_coverage.py:262: from maop.core.skill_version import SkillVersionManager
+  tests\test_core_modules_coverage.py:267: from maop.core.skill_version import SkillVersionManager
+  tests\test_core_modules_coverage.py:272: from maop.core.skill_version import SkillVersionManager
+  tests\test_core_modules_coverage.py:278: from maop.core.skill_version import SkillVersionManager
+  tests\test_core_modules_coverage.py:283: from maop.core.skill_version import SkillVersionManager
+  tests\test_core_modules_coverage.py:289: from maop.core.skill_version import SkillVersionManager
+  tests\test_skill_steps.py:9: from maop.core.skill_version import (
+  tests\test_t2_modules.py:7: from maop.core.skill_version import SkillVersionManager
+
+--- maop.core.state_classifier -> maop.core.agent.state_classifier ---
+  maop\maop_verify.py:16: from maop.core.state_classifier import ClassificationResult, TaskStateClassifier
+  tests\test_state_classifier.py:5: from maop.core.state_classifier import (
+  tests\test_three_mechanisms.py:13: from maop.core.state_classifier import (
+
+--- maop.core.streaming -> maop.core.reliability.streaming ---
+  maop\maop_execute.py:244: from maop.core.streaming import SubprocessStreamer, get_stream_registry
+  maop\delegate\drivers.py:91: from maop.core.streaming import SubprocessStreamer
+  maop\dashboard\routers\stream.py:95: from maop.core.streaming import get_stream_registry
+  maop\dashboard\routers\stream.py:214: from maop.core.streaming import get_stream_registry
+  tests\test_maop_execute_coverage3.py:44: patch("maop.core.streaming.SubprocessStreamer"),
+  tests\test_maop_execute_coverage3.py:45: patch("maop.core.streaming.get_stream_registry"),
+  tests\test_streaming.py:10: from maop.core.streaming import StreamRegistry, SubprocessStreamer, get_stream_registry
+
+--- maop.core.subagent -> maop.core.agent.subagent_delegation ---
+  maop\core\agent\delegation\subagent_lifecycle.py:614: # （如 maop.core.subagent.SubagentManager、delegate.dispatcher 等）。
+  tests\test_subagent.py:10: from maop.core.subagent import SubagentManager
+  tests\test_v4_3.py:12: from maop.core.subagent import SubagentManager
+
+--- maop.core.subagent_db -> maop.core.agent.subagent_db ---
+  maop\core\agent\delegation\subagent_lifecycle.py:50: from maop.core.subagent_db import get_subagent_db_path, migrate_legacy_subagent_db
+  tests\test_core_modules2_coverage.py:290: from maop.core.subagent_db import init_subagent_db
+
+--- maop.core.subagent_manager -> maop.core.agent.subagent_lifecycle ---
+  tests\test_subagent_manager.py:8: from maop.core.subagent_manager import (
+
+--- maop.core.tenant -> maop.core.security.tenant ---
+  maop\core\security\tenant.py:11: from maop.core.tenant import TenantManager
+  tests\test_t2_modules.py:8: from maop.core.tenant import TenantManager
+
+--- maop.core.three_layer_memory -> maop.core.memory.three_layer_memory ---
+  maop\dashboard\routers\memory.py:107: from maop.core.three_layer_memory import ThreeLayerMemory
+  maop\dashboard\routers\memory.py:161: from maop.core.three_layer_memory import ThreeLayerMemory
+  maop\dashboard\routers\memory.py:312: from maop.core.three_layer_memory import ThreeLayerMemory
+  maop\core\evolution\evolution_loop.py:390: from maop.core.three_layer_memory import ThreeLayerMemory
+  maop\core\memory\three_layer_memory.py:13: from maop.core.three_layer_memory import ThreeLayerMemory
+  maop\core\agent\lifecycle\agent_performance.py:250: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_p3_p4_p5.py:8: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_router_mcp_evolve_memory_coverage.py:266: monkeypatch.setattr("maop.core.three_layer_memory.ThreeLayerMemory", lambda **kw: mock_tlm)
+  tests\test_three_layer_memory.py:9: from maop.core.three_layer_memory import (
+  tests\test_three_layer_memory_coverage.py:15: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:20: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:26: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:31: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:38: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:46: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:54: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:60: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:71: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:77: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:84: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:91: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:97: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:103: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:109: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:115: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:122: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:129: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:135: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:141: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:147: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:153: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:159: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage.py:165: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage3.py:20: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage3.py:29: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage3.py:35: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage3.py:42: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage3.py:48: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage3.py:53: from maop.core.three_layer_memory import ThreeLayerMemory
+  tests\test_three_layer_memory_coverage3.py:64: with patch("maop.core.three_layer_memory.migrate_legacy_episodic_db", return_value=5):
+  tests\test_three_layer_memory_coverage3.py:71: "maop.core.three_layer_memory.migrate_legacy_episodic_db",
+  tests\test_unified_memory_search.py:100: monkeypatch.setattr("maop.core.three_layer_memory.ThreeLayerMemory", FakeThreeLayerMemory)
+
+--- maop.core.three_layer_memory_types -> maop.core.memory.three_layer_memory_types ---
+  maop\core\memory\three_layer_memory.py:68: from maop.core.three_layer_memory_types import (
+  maop\core\memory\three_layer_memory_utils.py:11: from maop.core.three_layer_memory_types import ContextItem, FocusConfig, FocusMode
+  tests\test_three_layer_memory_coverage3.py:30: from maop.core.three_layer_memory_types import QualityDimensions
+  tests\test_three_layer_memory_coverage3.py:36: from maop.core.three_layer_memory_types import QualityDimensions
+  tests\test_three_layer_memory_coverage3.py:43: from maop.core.three_layer_memory_types import QualityDimensions
+  tests\test_three_layer_memory_coverage3.py:183: from maop.core.three_layer_memory_types import QualityDimensions
+  tests\test_three_layer_memory_coverage3.py:211: from maop.core.three_layer_memory_types import QualityDimensions
+
+--- maop.core.three_layer_memory_utils -> maop.core.memory.three_layer_memory_utils ---
+  maop\core\memory\three_layer_memory.py:82: from maop.core.three_layer_memory_utils import (
+
+--- maop.core.timeseries -> maop.core.monitoring.timeseries ---
+  maop\history_analyzer.py:98: from maop.core.timeseries import TimeSeriesStore
+  maop\history_analyzer.py:144: from maop.core.timeseries import TimeSeriesQuery
+  maop\history_analyzer.py:258: from maop.core.timeseries import TimeSeriesQuery
+  maop\dashboard\routers\data.py:87: from maop.core.timeseries import TimeSeriesStore
+  maop\dashboard\routers\state.py:60: _lazy_import("timeseries", "maop.core.timeseries", "TimeSeriesStore")
+  maop\core\reliability\services.py:164: from maop.core.timeseries import TimeSeriesStore
+  tests\test_evolution_beta.py:187: from maop.core.timeseries import TimeSeriesStore
+  tests\test_new_modules.py:271: from maop.core.timeseries import TimeSeriesQuery, TimeSeriesStore
+  tests\test_new_modules.py:283: from maop.core.timeseries import DataPoint, TimeSeriesStore
+  tests\test_new_modules.py:292: from maop.core.timeseries import TimeSeriesStore
+  tests\test_timeseries.py:10: from maop.core.timeseries import (
+
+--- maop.core.tls -> maop.core.security.tls ---
+  maop\cli.py:36: from maop.core.tls import TLSSettings, create_ssl_context
+  maop\dashboard\server.py:463: from maop.core.tls import TLSSettings, create_ssl_context
+  maop\enterprise\tls_auto.py:96: from maop.core.tls import TLSSettings, create_ssl_context
+  maop\dashboard\routers\system\v4_misc.py:95: ("tls", "maop.core.tls", "TLSSettings"),
+  tests\test_core_modules_coverage.py:11: from maop.core.tls import TLSSettings, create_ssl_context, generate_self_signed
+  tests\test_tls.py:10: from maop.core.tls import TLSSettings, create_ssl_context
+
+--- maop.core.tool_audit -> maop.core.agent.tool_audit ---
+  maop\dashboard\routers\state.py:81: _lazy_import("tool_audit", "maop.core.tool_audit", "ToolAuditLog")
+  maop\dashboard\routers\tool_audit.py:24: from maop.core.tool_audit import ToolAuditLog
+  maop\core\mcp\mcp_audit.py:3: Phase δ-3: The existing :class:`~maop.core.tool_audit.ToolAuditLog`
+  maop\core\mcp\mcp_audit.py:73: :class:`maop.core.tool_audit.ToolAuditEntry`.
+  maop\core\agent\tools\tool_audit.py:9: from maop.core.tool_audit import ToolAuditLog
+  tests\test_p3_p4_p5.py:9: from maop.core.tool_audit import ToolAuditLog
+
+--- maop.core.tool_manager -> maop.core.agent.tool_manager ---
+  maop\dashboard\data_proxy.py:613: from maop.core.tool_manager import ToolManager
+  maop\dashboard\data_proxy.py:628: from maop.core.tool_manager import ToolManager
+  maop\dashboard\data_proxy.py:726: from maop.core.tool_manager import ToolManager
+  maop\core\agent\llm_chat\function_call.py:97: from maop.core.tool_manager import ToolManager
+  maop\core\agent\tools\tool_schema.py:217: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:13: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:18: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:24: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:30: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:35: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:40: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:45: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:50: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:56: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:63: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:71: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:77: from maop.core.tool_manager import ToolManager
+  tests\test_core_modules2_coverage.py:83: from maop.core.tool_manager import ToolManager
+  tests\test_data_proxy_coverage3.py:384: with patch("maop.core.tool_manager.ToolManager") as MockTM:
+  tests\test_data_proxy_coverage3.py:391: with patch("maop.core.tool_manager.ToolManager") as MockTM:
+  tests\test_data_proxy_coverage3.py:443: with patch("maop.core.tool_manager.ToolManager") as MockTM:
+  tests\test_data_proxy_coverage3.py:451: with patch("maop.core.tool_manager.ToolManager") as MockTM:
+  tests\test_missing_modules.py:149: from maop.core.tool_manager import ToolManager
+  tests\test_tool_manager.py:16: from maop.core.tool_manager import ToolCallResult, ToolDef, ToolManager
+  tests\test_tool_mq_mcp_coverage.py:17: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:27: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:33: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:39: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:48: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:56: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:63: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:69: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:75: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:83: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:89: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:97: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:108: from maop.core.tool_manager import ToolManager
+  tests\test_tool_mq_mcp_coverage.py:117: from maop.core.tool_manager import _get_maop_version
+  tests\test_tool_mq_mcp_coverage.py:122: from maop.core.tool_manager import _parse_version
+  tests\test_tool_mq_mcp_coverage.py:128: from maop.core.tool_manager import _is_version_compatible
+  tests\test_tool_mq_mcp_coverage.py:135: from maop.core.tool_manager import _is_version_compatible
+
+--- maop.core.tool_schema -> maop.core.agent.tool_schema ---
+  maop\core\agent\tools\tool_schema.py:14: from maop.core.tool_schema import ToolSchemaGenerator
+  tests\test_core_modules_coverage.py:12: from maop.core.tool_schema import ToolSchemaDef, ToolSchemaGenerator
+  tests\test_function_call.py:15: from maop.core.tool_schema import ToolSchemaDef, ToolSchemaGenerator
+
+--- maop.core.vector -> maop.core.memory.vector ---
+  maop\memory\store.py:126: from maop.core.vector import VectorStore
+  maop\dashboard\routers\control.py:248: from maop.core.vector import VectorStore
+  maop\dashboard\routers\data.py:260: from maop.core.vector import VectorStore
+  maop\dashboard\routers\data.py:274: from maop.core.vector import VectorStore
+  maop\dashboard\routers\data.py:296: from maop.core.vector import VectorStore
+  maop\dashboard\routers\memory.py:148: from maop.core.vector import VectorStore
+  maop\dashboard\routers\memory.py:219: from maop.core.vector import VectorStore
+  maop\dashboard\routers\state.py:55: _lazy_import("vector", "maop.core.vector", "VectorStore")
+  maop\dashboard\routers\system\overview.py:295: from maop.core.vector import VectorStore  # noqa: F401
+  maop\core\memory\hybrid_search.py:182: from maop.core.vector import (
+  maop\core\memory\semantic_cache.py:88: from maop.core.vector import HashEmbedding
+  maop\core\memory\three_layer_memory.py:824: from maop.core.vector import VectorStore
+  tests\test_core_modules2_coverage.py:222: from maop.core.vector import VectorStore
+  tests\test_core_modules2_coverage.py:227: from maop.core.vector import VectorStore
+  tests\test_core_modules2_coverage.py:233: from maop.core.vector import VectorStore
+  tests\test_core_modules2_coverage.py:242: from maop.core.vector import VectorStore
+  tests\test_enhancements.py:228: from maop.core.vector import cosine_similarity
+  tests\test_enhancements.py:239: from maop.core.vector import HashEmbedding
+  tests\test_enhancements.py:248: from maop.core.vector import HashEmbedding
+  tests\test_enhancements.py:255: from maop.core.vector import VectorStore
+  tests\test_enhancements.py:271: from maop.core.vector import HashEmbedding, VectorStore
+  tests\test_enhancements.py:285: from maop.core.vector import VectorStore
+  tests\test_enhancements.py:293: from maop.core.vector import VectorStore
+  tests\test_enhancements.py:304: from maop.core.vector import VectorStore
+  tests\test_enhancements.py:315: from maop.core.vector import VectorStore
+  tests\test_mem_vector_otel_saml_coverage.py:287: from maop.core.vector import VectorStore
+  tests\test_mem_vector_otel_saml_coverage.py:295: from maop.core.vector import VectorStore
+  tests\test_mem_vector_otel_saml_coverage.py:301: from maop.core.vector import VectorStore
+  tests\test_mem_vector_otel_saml_coverage.py:311: from maop.core.vector import VectorStore
+  tests\test_mem_vector_otel_saml_coverage.py:321: from maop.core.vector import VectorStore
+  tests\test_mem_vector_otel_saml_coverage.py:328: from maop.core.vector import VectorStore
+  tests\test_mem_vector_otel_saml_coverage.py:335: from maop.core.vector import VectorStore
+  tests\test_mem_vector_otel_saml_coverage.py:343: from maop.core.vector import VectorStore
+  tests\test_mem_vector_otel_saml_coverage.py:351: from maop.core.vector import VectorStore
+  tests\test_mem_vector_otel_saml_coverage.py:357: from maop.core.vector import VectorStore
+  tests\test_mem_vector_otel_saml_coverage.py:367: from maop.core.vector import HashEmbedding
+  tests\test_mem_vector_otel_saml_coverage.py:374: from maop.core.vector import HashEmbedding
+  tests\test_mem_vector_otel_saml_coverage.py:380: from maop.core.vector import HashEmbedding
+  tests\test_mem_vector_otel_saml_coverage.py:385: from maop.core.vector import SentenceTransformerEmbedding
+  tests\test_router_memory.py:87: monkeypatch.setattr("maop.core.vector.VectorStore", FakeVectorStore)
+  tests\test_router_system.py:91: "vector": {"available": False, "module": "maop.core.vector",
+  tests\test_unified_memory_search.py:101: monkeypatch.setattr("maop.core.vector.VectorStore", FakeVectorStore)
+  tests\test_vector.py:11: from maop.core.vector import (
+
+--- maop.core.worker_pool -> maop.core.reliability.worker_pool ---
+  maop\worker\queue_worker.py:154: from maop.core.worker_pool import WorkerPool
+  maop\dashboard\routers\state.py:56: _lazy_import("worker_pool", "maop.core.worker_pool", "WorkerPool")
+  maop\core\reliability\preemptable_worker_pool.py:3: Wraps :class:`maop.core.worker_pool.WorkerPool` with a
+  maop\core\reliability\preemptable_worker_pool.py:57: from maop.core.worker_pool import PoolStats, WorkerPool
+  maop\core\reliability\services.py:148: from maop.core.worker_pool import get_worker_pool
+  tests\test_preemption.py:276: from maop.core.worker_pool import PoolStats
+  tests\test_preemption.py:553: from maop.core.worker_pool import WorkerPool
+  tests\test_queue_worker_coverage.py:62: with patch("maop.core.worker_pool.WorkerPool") as mock_pool_cls:
+  tests\test_queue_worker_coverage.py:67: with patch("maop.core.worker_pool.WorkerPool") as mock_pool_cls:
+  tests\test_queue_worker_coverage.py:72: with patch("maop.core.worker_pool.WorkerPool") as mock_pool_cls:
+  tests\test_queue_worker_coverage.py:84: with patch("maop.core.worker_pool.WorkerPool", return_value=pool):
+  tests\test_queue_worker_coverage.py:98: with patch("maop.core.worker_pool.WorkerPool", return_value=pool):
+  tests\test_queue_worker_coverage.py:111: with patch("maop.core.worker_pool.WorkerPool", return_value=pool):
+  tests\test_worker_pool.py:7: from maop.core.worker_pool import (
+  tests\test_worker_pool_coverage.py:9: from maop.core.worker_pool import (
+  tests\test_worker_pool_coverage.py:206: import maop.core.worker_pool as wp_mod
+
+--- maop.core.worktree -> maop.core.agent.worktree ---
+  maop\dashboard\routers\state.py:75: _lazy_import("worktree", "maop.core.worktree", "WorktreeManager")
+  maop\dashboard\routers\worktree.py:24: from maop.core.worktree import WorktreeManager
+  maop\core\reliability\worker_pool.py:211: from maop.core.worktree import WorktreeManager
+  maop\core\reliability\worker_pool.py:251: from maop.core.worktree import WorktreeManager
+  maop\core\agent\memory_ctx\worktree.py:11: from maop.core.worktree import WorktreeManager
+  tests\test_worktree.py:8: from maop.core.worktree import (

@@ -10,8 +10,8 @@ import asyncio
 import logging
 from typing import Any, cast
 
-from maop.core.analyzer import AnalysisResult, ExecutionStrategy
-from maop.core.error_schema import MaopResult, new_result
+from maop.core.agent.analyzer import AnalysisResult, ExecutionStrategy
+from maop.core.reliability.error_schema import MaopResult, new_result
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,26 @@ class ExecuteMixin:
     _worker_pool: Any
     _loop_config: Any
     _log: Any
+
+    @staticmethod
+    def _get_downstream(node: str, dag: Any) -> list[str]:
+        """Return all transitive downstream (successor) nodes of *node* in *dag*.
+
+        Uses BFS over the DAG edges to collect every node reachable from
+        *node* via one or more edges.
+        """
+        adj: dict[str, list[str]] = {}
+        for src, dst in dag.edges:
+            adj.setdefault(src, []).append(dst)
+        visited: set[str] = set()
+        queue = list(adj.get(node, []))
+        while queue:
+            current = queue.pop(0)
+            if current in visited:
+                continue
+            visited.add(current)
+            queue.extend(adj.get(current, []))
+        return list(visited)
 
     async def _execute_with_strategy(
         self,

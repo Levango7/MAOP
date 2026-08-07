@@ -159,7 +159,7 @@ function doRefresh() {
 function goToUsers() { router.push('/users'); }
 
 async function onLogout() {
-  try { await api.clearAuthToken(); } catch {}
+  try { await api.clearAuthToken(); } catch { /* ignore */ }
   if (typeof window !== 'undefined' && window.location) window.location.reload();
 }
 

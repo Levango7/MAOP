@@ -12,7 +12,7 @@ import time
 
 import pytest
 
-from maop.core.semantic_cache import SemanticCache
+from maop.core.memory.semantic_cache import SemanticCache
 
 
 # ── 1. Cache hit ────────────────────────────────────────────────

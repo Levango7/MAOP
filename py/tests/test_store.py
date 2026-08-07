@@ -162,7 +162,7 @@ class TestMemoryStoreInit:
 
     def test_find_root_fallback(self, tmp_path: Path, monkeypatch):
         # When no config/agents.yaml exists up the tree, find_project_root returns cwd
-        from maop.core.db_utils import find_project_root
+        from maop.core.backends.db_utils import find_project_root
         monkeypatch.chdir(tmp_path)
         root = find_project_root()
         assert isinstance(root, Path)

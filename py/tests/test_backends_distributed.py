@@ -27,7 +27,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from maop.core.backends import (
+from maop.core.backends.backends import (
     SQLiteKVBackend,
     SQLiteQueueBackend,
     get_kv_backend,
@@ -68,7 +68,7 @@ class TestRabbitMQBackendImportError:
         """
         monkeypatch.setenv("MAOP_QUEUE_BACKEND", "rabbitmq")
         monkeypatch.setenv("MAOP_QUEUE_ALLOW_FALLBACK", "1")
-        with patch("maop.core.backends_redis.RedisQueueBackend",
+        with patch("maop.core.backends.backends_redis.RedisQueueBackend",
                    side_effect=ImportError("mocked: redis unavailable")):
             backend = get_queue_backend()
         assert isinstance(backend, SQLiteQueueBackend)
@@ -79,7 +79,7 @@ class TestRabbitMQBackendImportError:
 
         monkeypatch.setenv("MAOP_QUEUE_BACKEND", "rabbitmq")
         monkeypatch.setenv("MAOP_QUEUE_ALLOW_FALLBACK", "1")
-        with patch("maop.core.backends_redis.RedisQueueBackend",
+        with patch("maop.core.backends.backends_redis.RedisQueueBackend",
                    side_effect=ImportError("mocked: redis unavailable")):
             get_queue_backend()
         log = degradation_log()
@@ -316,9 +316,9 @@ class TestRabbitMQBackendWithMock:
     def test_enqueue_publishes_message(self, fake_pika_module):
         """publish() 应通过 channel.basic_publish 投递消息。"""
         # 注意：必须先清理可能已缓存的模块，确保下次 import 时使用 mock pika
-        sys.modules.pop("maop.core.backends_rabbitmq", None)
+        sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
         try:
-            from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+            from maop.core.backends.backends_rabbitmq import RabbitMQQueueBackend
 
             backend = RabbitMQQueueBackend(url="amqp://guest:guest@localhost:5672/")
             message_id = backend.publish("test_topic", {"hello": "world"})
@@ -339,13 +339,13 @@ class TestRabbitMQBackendWithMock:
             assert "hello" in body and "world" in body
         finally:
             # 清理缓存，避免影响后续测试
-            sys.modules.pop("maop.core.backends_rabbitmq", None)
+            sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
 
     def test_publish_with_delay_uses_delay_queue(self, fake_pika_module):
         """publish(delay>0) 应使用延迟队列（TTL+DLX 模式）。"""
-        sys.modules.pop("maop.core.backends_rabbitmq", None)
+        sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
         try:
-            from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+            from maop.core.backends.backends_rabbitmq import RabbitMQQueueBackend
 
             backend = RabbitMQQueueBackend(url="amqp://guest:guest@localhost:5672/")
             backend.publish("delayed_topic", {"x": 1}, delay=5.0)
@@ -358,13 +358,13 @@ class TestRabbitMQBackendWithMock:
                 f"延迟投递应声明 delayed_topic.delayed 队列，实际: {queue_names}"
             )
         finally:
-            sys.modules.pop("maop.core.backends_rabbitmq", None)
+            sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
 
     def test_consume_returns_messages(self, fake_pika_module):
         """consume() 应返回从 basic_get 拉取到的消息。"""
-        sys.modules.pop("maop.core.backends_rabbitmq", None)
+        sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
         try:
-            from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+            from maop.core.backends.backends_rabbitmq import RabbitMQQueueBackend
 
             backend = RabbitMQQueueBackend(url="amqp://guest:guest@localhost:5672/")
 
@@ -384,13 +384,13 @@ class TestRabbitMQBackendWithMock:
             # 验证 basic_get 用了 auto_ack=False
             assert channel.basic_get.call_args.kwargs.get("auto_ack") is False
         finally:
-            sys.modules.pop("maop.core.backends_rabbitmq", None)
+            sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
 
     def test_ack_removes_pending_entry(self, fake_pika_module):
         """ack() 应调用 channel.basic_ack 并清除 pending 映射。"""
-        sys.modules.pop("maop.core.backends_rabbitmq", None)
+        sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
         try:
-            from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+            from maop.core.backends.backends_rabbitmq import RabbitMQQueueBackend
 
             backend = RabbitMQQueueBackend(url="amqp://guest:guest@localhost:5672/")
 
@@ -412,25 +412,25 @@ class TestRabbitMQBackendWithMock:
             assert "msg-ack-1" not in backend._pending
             channel.basic_ack.assert_called_once_with(delivery_tag=42)
         finally:
-            sys.modules.pop("maop.core.backends_rabbitmq", None)
+            sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
 
     def test_ack_unknown_message_id_returns_false(self, fake_pika_module):
         """ack() 在 message_id 不在 pending 中时应返回 False。"""
-        sys.modules.pop("maop.core.backends_rabbitmq", None)
+        sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
         try:
-            from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+            from maop.core.backends.backends_rabbitmq import RabbitMQQueueBackend
 
             backend = RabbitMQQueueBackend(url="amqp://guest:guest@localhost:5672/")
             ok = backend.ack("t", "nonexistent-id")
             assert ok is False
         finally:
-            sys.modules.pop("maop.core.backends_rabbitmq", None)
+            sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
 
     def test_connection_failure_raises_runtime_error(self, fake_pika_module):
         """pika.BlockingConnection 抛出 AMQPError 时应转为 RuntimeError。"""
-        sys.modules.pop("maop.core.backends_rabbitmq", None)
+        sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
         try:
-            from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+            from maop.core.backends.backends_rabbitmq import RabbitMQQueueBackend
 
             # 让 BlockingConnection 抛出 AMQPError
             fake_pika_module.BlockingConnection.side_effect = _FakeAMQPError("conn refused")
@@ -439,7 +439,7 @@ class TestRabbitMQBackendWithMock:
         finally:
             # 恢复 side_effect
             fake_pika_module.BlockingConnection.side_effect = None
-            sys.modules.pop("maop.core.backends_rabbitmq", None)
+            sys.modules.pop("maop.core.backends.backends_rabbitmq", None)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -491,9 +491,9 @@ class TestEtcdBackendWithMock:
 
     def test_set_stores_key_value(self, fake_etcd3_module):
         """set() 应调用 client.put 写入 key/value。"""
-        sys.modules.pop("maop.core.backends_distributed", None)
+        sys.modules.pop("maop.core.backends.backends_distributed", None)
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
 
             backend = EtcdKVBackend(host="localhost", port=2379)
             backend.set("foo", "bar")
@@ -505,13 +505,13 @@ class TestEtcdBackendWithMock:
             assert call_args[0] == "/maop/foo"
             assert call_args[1] == "bar"
         finally:
-            sys.modules.pop("maop.core.backends_distributed", None)
+            sys.modules.pop("maop.core.backends.backends_distributed", None)
 
     def test_set_with_ttl_creates_lease(self, fake_etcd3_module):
         """set(ttl>0) 应创建 lease 并绑定到 put。"""
-        sys.modules.pop("maop.core.backends_distributed", None)
+        sys.modules.pop("maop.core.backends.backends_distributed", None)
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
 
             backend = EtcdKVBackend(host="localhost", port=2379)
             fake_lease = MagicMock()
@@ -526,13 +526,13 @@ class TestEtcdBackendWithMock:
             put_kwargs = client.put.call_args.kwargs
             assert put_kwargs.get("lease") is fake_lease
         finally:
-            sys.modules.pop("maop.core.backends_distributed", None)
+            sys.modules.pop("maop.core.backends.backends_distributed", None)
 
     def test_get_returns_decoded_string(self, fake_etcd3_module):
         """get() 应将 bytes 值解码为 str 返回。"""
-        sys.modules.pop("maop.core.backends_distributed", None)
+        sys.modules.pop("maop.core.backends.backends_distributed", None)
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
 
             backend = EtcdKVBackend(host="localhost", port=2379)
             # 模拟 etcd 返回 bytes 值
@@ -544,13 +544,13 @@ class TestEtcdBackendWithMock:
             # 验证调用时使用了带前缀的 key
             client.get.assert_called_once_with("/maop/greet")
         finally:
-            sys.modules.pop("maop.core.backends_distributed", None)
+            sys.modules.pop("maop.core.backends.backends_distributed", None)
 
     def test_get_missing_key_returns_none(self, fake_etcd3_module):
         """get() 在 key 不存在时应返回 None。"""
-        sys.modules.pop("maop.core.backends_distributed", None)
+        sys.modules.pop("maop.core.backends.backends_distributed", None)
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
 
             backend = EtcdKVBackend(host="localhost", port=2379)
             client = fake_etcd3_module._client
@@ -558,13 +558,13 @@ class TestEtcdBackendWithMock:
 
             assert backend.get("missing") is None
         finally:
-            sys.modules.pop("maop.core.backends_distributed", None)
+            sys.modules.pop("maop.core.backends.backends_distributed", None)
 
     def test_delete_existing_key_returns_true(self, fake_etcd3_module):
         """delete() 在 key 存在时应调用 client.delete 并返回 True。"""
-        sys.modules.pop("maop.core.backends_distributed", None)
+        sys.modules.pop("maop.core.backends.backends_distributed", None)
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
 
             backend = EtcdKVBackend(host="localhost", port=2379)
             client = fake_etcd3_module._client
@@ -575,13 +575,13 @@ class TestEtcdBackendWithMock:
             assert ok is True
             client.delete.assert_called_once_with("/maop/k")
         finally:
-            sys.modules.pop("maop.core.backends_distributed", None)
+            sys.modules.pop("maop.core.backends.backends_distributed", None)
 
     def test_delete_missing_key_returns_false(self, fake_etcd3_module):
         """delete() 在 key 不存在时应返回 False，且不调用 client.delete。"""
-        sys.modules.pop("maop.core.backends_distributed", None)
+        sys.modules.pop("maop.core.backends.backends_distributed", None)
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
 
             backend = EtcdKVBackend(host="localhost", port=2379)
             client = fake_etcd3_module._client
@@ -591,13 +591,13 @@ class TestEtcdBackendWithMock:
             assert ok is False
             client.delete.assert_not_called()
         finally:
-            sys.modules.pop("maop.core.backends_distributed", None)
+            sys.modules.pop("maop.core.backends.backends_distributed", None)
 
     def test_list_keys_strips_namespace_prefix(self, fake_etcd3_module):
         """list_keys() 应剥离命名空间前缀返回逻辑 key。"""
-        sys.modules.pop("maop.core.backends_distributed", None)
+        sys.modules.pop("maop.core.backends.backends_distributed", None)
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
 
             backend = EtcdKVBackend(host="localhost", port=2379)
             client = fake_etcd3_module._client
@@ -614,13 +614,13 @@ class TestEtcdBackendWithMock:
             keys = backend.list_keys()
             assert keys == ["a", "b"]
         finally:
-            sys.modules.pop("maop.core.backends_distributed", None)
+            sys.modules.pop("maop.core.backends.backends_distributed", None)
 
     def test_cas_success_returns_true(self, fake_etcd3_module):
         """cas() 在 etcd 事务成功时应返回 True。"""
-        sys.modules.pop("maop.core.backends_distributed", None)
+        sys.modules.pop("maop.core.backends.backends_distributed", None)
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
 
             backend = EtcdKVBackend(host="localhost", port=2379)
             client = fake_etcd3_module._client
@@ -630,13 +630,13 @@ class TestEtcdBackendWithMock:
             assert ok is True
             client.transaction.assert_called_once()
         finally:
-            sys.modules.pop("maop.core.backends_distributed", None)
+            sys.modules.pop("maop.core.backends.backends_distributed", None)
 
     def test_cas_failure_returns_false(self, fake_etcd3_module):
         """cas() 在 etcd 事务失败时应返回 False。"""
-        sys.modules.pop("maop.core.backends_distributed", None)
+        sys.modules.pop("maop.core.backends.backends_distributed", None)
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
 
             backend = EtcdKVBackend(host="localhost", port=2379)
             client = fake_etcd3_module._client
@@ -645,13 +645,13 @@ class TestEtcdBackendWithMock:
             ok = backend.cas("k", "wrong", "new")
             assert ok is False
         finally:
-            sys.modules.pop("maop.core.backends_distributed", None)
+            sys.modules.pop("maop.core.backends.backends_distributed", None)
 
     def test_connection_failure_raises_runtime_error(self, fake_etcd3_module):
         """etcd3.client 或 status() 抛异常时应转为 RuntimeError。"""
-        sys.modules.pop("maop.core.backends_distributed", None)
+        sys.modules.pop("maop.core.backends.backends_distributed", None)
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
 
             # 让 status() 抛异常
             client = fake_etcd3_module._client
@@ -660,13 +660,13 @@ class TestEtcdBackendWithMock:
                 EtcdKVBackend(host="bad", port=9999)
         finally:
             client.status.side_effect = None
-            sys.modules.pop("maop.core.backends_distributed", None)
+            sys.modules.pop("maop.core.backends.backends_distributed", None)
 
     def test_namespace_prefix_applied_to_keys(self, fake_etcd3_module):
         """所有 key 应被加上 /maop 命名空间前缀。"""
-        sys.modules.pop("maop.core.backends_distributed", None)
+        sys.modules.pop("maop.core.backends.backends_distributed", None)
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
 
             backend = EtcdKVBackend(host="localhost", port=2379, namespace="custom")
             backend.set("k", "v")
@@ -676,4 +676,4 @@ class TestEtcdBackendWithMock:
             call_args = client.put.call_args.args
             assert call_args[0] == "/custom/k"
         finally:
-            sys.modules.pop("maop.core.backends_distributed", None)
+            sys.modules.pop("maop.core.backends.backends_distributed", None)

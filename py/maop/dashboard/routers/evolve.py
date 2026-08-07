@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
@@ -123,7 +123,7 @@ async def api_evolve_report_v4() -> dict[str, Any]:
 @handle_api_errors("Evolve strategies", error_value={"status": "error", "strategies": []})
 async def api_evolve_strategies() -> dict[str, Any]:
     """返回可用进化策略列表。"""
-    from maop.core.evolution_strategies import STRATEGY_MAP
+    from maop.core.evolution.evolution_strategies import STRATEGY_MAP
     strategies = [
         {"name": name, "description": cls.__doc__ or cls.__name__}
         for name, cls in STRATEGY_MAP.items()
@@ -135,7 +135,7 @@ async def api_evolve_strategies() -> dict[str, Any]:
 async def api_evolve_history() -> dict[str, Any]:
     """返回进化循环历史。"""
     try:
-        from maop.core.evolution_loop import EvolutionLoop
+        from maop.core.evolution.evolution_loop import EvolutionLoop
         loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
         history = loop.get_cycle_history(limit=20)
         stats = loop.get_stats()

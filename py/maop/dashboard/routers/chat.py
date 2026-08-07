@@ -21,7 +21,7 @@ from fastapi import APIRouter, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 from .error_handler import handle_api_errors
 
@@ -33,7 +33,7 @@ MAOP_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 
 
 def _get_engine():
-    from maop.core.chat_engine import ChatEngine
+    from maop.core.agent.llm_chat.chat_engine import ChatEngine
     return ChatEngine(root_dir=str(MAOP_ROOT))
 
 
@@ -63,7 +63,7 @@ class MemorySearchRequest(BaseModel):
 async def chat(request_body: ChatRequestBody, request: Request) -> dict[str, Any]:
     """Send a chat message and get a full response."""
     require_admin(request)
-    from maop.core.chat_engine import ChatRequest
+    from maop.core.agent.llm_chat.chat_engine import ChatRequest
     engine = _get_engine()
     chat_req = ChatRequest(
         session_id=request_body.session_id,
@@ -85,7 +85,7 @@ async def chat(request_body: ChatRequestBody, request: Request) -> dict[str, Any
 async def chat_stream(request_body: ChatRequestBody, request: Request) -> Any:
     """Send a chat message and get an SSE streaming response."""
     require_admin(request)
-    from maop.core.chat_engine import ChatRequest
+    from maop.core.agent.llm_chat.chat_engine import ChatRequest
     engine = _get_engine()
     chat_req = ChatRequest(
         session_id=request_body.session_id,
@@ -118,7 +118,7 @@ async def chat_stream(request_body: ChatRequestBody, request: Request) -> Any:
 @handle_api_errors("list models")
 async def list_models() -> dict[str, Any]:
     """List available LLM models from models.yaml."""
-    from maop.core.llm_provider import LLMProviderFactory
+    from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
     factory = LLMProviderFactory(root_dir=str(MAOP_ROOT))
     models = factory.list_models(enabled_only=True)
     providers = factory.list_providers(enabled_only=True)
@@ -137,7 +137,7 @@ async def list_models() -> dict[str, Any]:
 @handle_api_errors("list chat sessions")
 async def list_sessions() -> dict[str, Any]:
     """List all chat sessions."""
-    from maop.core.session import SessionManager
+    from maop.core.security.session import SessionManager
     mgr = SessionManager(root_dir=str(MAOP_ROOT))
     sessions = mgr.list()
     return {"status": "ok", "data": [s.model_dump() for s in sessions]}
@@ -211,7 +211,7 @@ async def upload_image(
 ) -> dict[str, Any]:
     """Upload an image for multimodal chat."""
     require_admin(request)
-    from maop.core.image_store import ImageStore
+    from maop.core.backends.image_store import ImageStore
 
     if file is None:
         return {"status": "error", "error": "No file provided"}
@@ -231,7 +231,7 @@ async def upload_image(
 @handle_api_errors("list session images")
 async def list_session_images(session_id: str) -> dict[str, Any]:
     """List all images for a chat session."""
-    from maop.core.image_store import ImageStore
+    from maop.core.backends.image_store import ImageStore
     store = ImageStore(root_dir=str(MAOP_ROOT))
     images = store.list_session_images(session_id)
     return {"status": "ok", "data": [img.model_dump() for img in images]}
@@ -242,7 +242,7 @@ async def list_session_images(session_id: str) -> dict[str, Any]:
 async def delete_image(image_id: str, request: Request) -> dict[str, Any]:
     """Delete an uploaded image."""
     require_admin(request)
-    from maop.core.image_store import ImageStore
+    from maop.core.backends.image_store import ImageStore
     store = ImageStore(root_dir=str(MAOP_ROOT))
     deleted = store.delete(image_id)
     return {"status": "ok" if deleted else "not_found", "deleted": deleted}

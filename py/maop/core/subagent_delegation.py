@@ -8,7 +8,7 @@ Provides:
 
 Usage::
 
-    from maop.core.subagent import SubagentManager
+    from maop.core.agent.delegation.subagent_lifecycle import SubagentManager
 
     mgr = SubagentManager(root_dir="/path/to/MAOP")
     child = mgr.spawn(parent="orchestrator", agent="coder", task="fix bug")
@@ -26,8 +26,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import sqlite_connect
-from maop.core.subagent_db import get_subagent_db_path, migrate_legacy_subagent_db
+from maop.core.backends.db_utils import sqlite_connect
+from maop.core.agent.delegation.subagent_db import get_subagent_db_path, migrate_legacy_subagent_db
 
 logger = logging.getLogger(__name__)
 

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from maop.core.conversation import ConversationManager
+from maop.core.agent.llm_chat.conversation import ConversationManager
 
 
 # ═══════════════════════════════════════════════════════════════════

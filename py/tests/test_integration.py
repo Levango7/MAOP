@@ -1,4 +1,4 @@
-﻿"""Integration tests — Cross-module workflows for MAOP Python package."""
+"""Integration tests — Cross-module workflows for MAOP Python package."""
 
 import asyncio
 import sqlite3
@@ -7,9 +7,9 @@ from pathlib import Path
 
 from maop.concurrency import Priority, Task, TaskPool
 from maop.config.loader import AgentDef, MaopConfig
-from maop.core.circuit_breaker import CircuitBreaker
-from maop.core.error_schema import new_result
-from maop.core.event_bus import Event, EventBus
+from maop.core.reliability.circuit_breaker import CircuitBreaker
+from maop.core.reliability.error_schema import new_result
+from maop.core.reliability.event_bus import Event, EventBus
 from maop.dashboard import DashboardProvider
 from maop.delegate.dispatcher import Dispatcher
 from maop.engine import Engine, StepType, WorkflowStep

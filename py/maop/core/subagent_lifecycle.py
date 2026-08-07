@@ -5,7 +5,7 @@ lifecycle, and collect results — with support for parallel execution.
 
 Usage::
 
-    from maop.core.subagent_manager import SubAgentManager, AgentConfig
+    from maop.core.agent.delegation.subagent_lifecycle import SubAgentManager, AgentConfig
 
     mgr = SubAgentManager(root_dir="/path/to/MAOP")
 
@@ -39,8 +39,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import sqlite_connect
-from maop.core.subagent_db import get_subagent_db_path, migrate_legacy_subagent_db
+from maop.core.backends.db_utils import sqlite_connect
+from maop.core.agent.delegation.subagent_db import get_subagent_db_path, migrate_legacy_subagent_db
 
 logger = logging.getLogger(__name__)
 
@@ -331,7 +331,7 @@ class SubAgentManager:
         })
 
         try:
-            from maop.core.llm_provider import LLMProviderFactory
+            from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
             factory = LLMProviderFactory(root_dir=str(self._root))
             provider = factory.get_provider(config.model)
             if provider is None:

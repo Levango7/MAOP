@@ -306,21 +306,21 @@ class TestLLMProviderFactoryDefaultModel:
     """Test LLMProviderFactory._get_default_model() helper."""
 
     def test_get_default_model_returns_configured(self):
-        from maop.core.llm_provider import LLMProviderFactory
+        from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
         factory = LLMProviderFactory()
         factory._loaded = True  # bypass _ensure_loaded
         factory._default_model = "omniroute-auto-coding"
         assert factory._get_default_model() == "omniroute-auto-coding"
 
     def test_get_default_model_returns_empty_when_not_configured(self):
-        from maop.core.llm_provider import LLMProviderFactory
+        from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
         factory = LLMProviderFactory()
         factory._loaded = True
         assert factory._get_default_model() == ""
 
     def test_parse_models_yaml_loads_defaults(self):
         """_parse_models_yaml loads default_provider/default_model from yaml data."""
-        from maop.core.llm_provider import LLMProviderFactory
+        from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
         factory = LLMProviderFactory()
         data = {
             "default_provider": "omniroute",
@@ -334,7 +334,7 @@ class TestLLMProviderFactoryDefaultModel:
 
     def test_parse_models_yaml_defaults_to_empty(self):
         """_parse_models_yaml defaults to empty strings when fields absent."""
-        from maop.core.llm_provider import LLMProviderFactory
+        from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
         factory = LLMProviderFactory()
         factory._parse_models_yaml({"providers": {}, "models": {}})
         assert factory._default_provider == ""

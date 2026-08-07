@@ -34,7 +34,7 @@
       </div>
 
       <template v-for="sec in skillSections" :key="sec.key">
-        <Card v-if="skillFilter === 'all' || skillFilter === sec.key" :title="sec.title" icon="sparkles" :marginBottom="16">
+        <Card v-if="skillFilter === 'all' || skillFilter === sec.key" :title="sec.title" icon="sparkles" :margin-bottom="16">
           <div v-if="loading" class="blk"><Skeleton block height="48px" /><Skeleton block height="48px" /><Skeleton block height="48px" /></div>
           <EmptyState v-else-if="errors.skills" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadSkills')" :description="errors.skills" />
           <div v-else-if="sec.items.length" class="skill-grid">
@@ -61,7 +61,7 @@
     <!-- MCP -->
     <div v-show="activeTab === 'mcp'">
       <div class="grid-2">
-        <Card :title="t('view.tools.mcpServers')" icon="wrench" :marginBottom="0">
+        <Card :title="t('view.tools.mcpServers')" icon="wrench" :margin-bottom="0">
           <div v-if="loading" class="blk"><Skeleton block height="40px" /><Skeleton block height="40px" /></div>
           <EmptyState v-else-if="errors.mcp" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadMcp')" :description="errors.mcp" />
           <EmptyState v-else-if="!servers.length" icon="wrench" :title="t('view.tools.noMcp')" :description="t('view.tools.noMcpHint')" />
@@ -79,7 +79,7 @@
           </ul>
         </Card>
 
-        <Card :title="t('view.tools.toolInventory')" icon="box" :marginBottom="0">
+        <Card :title="t('view.tools.toolInventory')" icon="box" :margin-bottom="0">
           <div v-if="loading" class="blk"><Skeleton block height="40px" /></div>
           <div v-else class="inv">
             <div class="inv__stat">
@@ -95,9 +95,21 @@
       </div>
     </div>
 
+    <!-- P2-11: MCP Topology -->
+    <div v-show="activeTab === 'topology'">
+      <Card :title="t('view.tools.topo.title')" icon="share2" :margin-bottom="0">
+        <McpTopology
+          :data="topology"
+          :loading="topologyLoading"
+          :error="errors.topology || ''"
+          @refresh="loadTopology"
+        />
+      </Card>
+    </div>
+
     <!-- Routing -->
     <div v-show="activeTab === 'routing'">
-      <Card :title="t('view.tools.routingTable')" icon="route" :marginBottom="0">
+      <Card :title="t('view.tools.routingTable')" icon="route" :margin-bottom="0">
         <div v-if="loading" class="blk"><Skeleton block height="32px" /><Skeleton block height="32px" /></div>
         <EmptyState v-else-if="errors.routing" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadRouting')" :description="errors.routing" />
         <DataTable
@@ -112,7 +124,7 @@
 
     <!-- Prompts -->
     <div v-show="activeTab === 'prompts'">
-      <Card :title="t('view.tools.promptTemplates')" icon="scroll" :marginBottom="0">
+      <Card :title="t('view.tools.promptTemplates')" icon="scroll" :margin-bottom="0">
         <div v-if="loading" class="blk"><Skeleton block height="32px" /><Skeleton block height="32px" /></div>
         <EmptyState v-else-if="errors.prompts" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadPrompts')" :description="errors.prompts" />
         <DataTable
@@ -127,7 +139,7 @@
 
     <!-- Security -->
     <div v-show="activeTab === 'security'">
-      <Card :title="t('view.tools.securityConfig')" icon="shield" :marginBottom="0">
+      <Card :title="t('view.tools.securityConfig')" icon="shield" :margin-bottom="0">
         <div v-if="loading" class="blk"><Skeleton block height="32px" /><Skeleton block height="32px" /><Skeleton block height="32px" /></div>
         <EmptyState v-else-if="errors.security" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadConfig')" :description="errors.security" />
         <div v-else class="sec-grid">
@@ -178,13 +190,14 @@ import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
 import { AppIcon, Card, Badge, DataTable, Segmented, Skeleton, EmptyState, PageHeader } from '../components/index.js';
+import McpTopology from '../components/McpTopology.vue';
 
 const api = useApiStore();
 const { t } = useI18n();
 
 const activeTab = ref('skills');
 const loading = ref(false);
-const errors = ref({ skills: null, mcp: null, routing: null, prompts: null, security: null });
+const errors = ref({ skills: null, mcp: null, routing: null, prompts: null, security: null, topology: null });
 
 const skills = ref([]);
 const servers = ref([]);
@@ -193,6 +206,10 @@ const toolCount = ref(0);
 const routes = ref([]);
 const prompts = ref([]);
 const security = ref({});
+
+// P2-11: MCP topology state
+const topology = ref({ servers: [], tools: [], agents: [], edges: [] });
+const topologyLoading = ref(false);
 
 // ── Skills: three functional areas (built-in / imported / custom) ──────
 // Backend /api/skills does not tag a source today, so we derive one from
@@ -312,6 +329,7 @@ async function submitCreate() {
 const tabOptions = [
   { value: 'skills', label: t('view.tools.tab.skills'), icon: 'sparkles' },
   { value: 'mcp', label: t('view.tools.tab.mcp'), icon: 'wrench' },
+  { value: 'topology', label: t('view.tools.tab.topology'), icon: 'share2' },
   { value: 'routing', label: t('view.tools.tab.routing'), icon: 'route' },
   { value: 'prompts', label: t('view.tools.tab.prompts'), icon: 'scroll' },
   { value: 'security', label: t('view.tools.tab.security'), icon: 'shield' },
@@ -390,7 +408,29 @@ async function load() {
   loading.value = false;
 }
 
-onMounted(load);
+// P2-11: 加载 MCP 拓扑（servers ↔ tools ↔ agents）
+async function loadTopology() {
+  topologyLoading.value = true;
+  try {
+    const data = await api.get('/api/mcp/topology');
+    topology.value = {
+      servers: data.servers || [],
+      tools: data.tools || [],
+      agents: data.agents || [],
+      edges: data.edges || [],
+    };
+    errors.value = { ...errors.value, topology: null };
+  } catch (err) {
+    errors.value = { ...errors.value, topology: (err && err.message) || t('view.tools.failedLoadTopology') };
+  } finally {
+    topologyLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  load();
+  loadTopology();
+});
 </script>
 
 <style scoped>

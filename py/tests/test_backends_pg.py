@@ -63,7 +63,7 @@ def _pool_cursor(backend):
 
 def test_build_dsn_uses_maoP_pg_dsn_when_set():
     """When MAOP_PG_DSN is set, it takes priority over individual vars."""
-    from maop.core.backends_pg import _build_dsn
+    from maop.core.backends.backends_pg import _build_dsn
     with patch.dict("os.environ", {
         "MAOP_PG_DSN": "postgresql://user:pass@host:5432/db",
         "MAOP_PG_HOST": "ignored",
@@ -73,7 +73,7 @@ def test_build_dsn_uses_maoP_pg_dsn_when_set():
 
 def test_build_dsn_assembles_from_individual_vars():
     """Without MAOP_PG_DSN, the DSN is assembled from individual env vars."""
-    from maop.core.backends_pg import _build_dsn
+    from maop.core.backends.backends_pg import _build_dsn
     env = {
         "MAOP_PG_DSN": "",
         "MAOP_PG_HOST": "db.example.com",
@@ -93,7 +93,7 @@ def test_build_dsn_assembles_from_individual_vars():
 
 def test_build_dsn_defaults_when_no_env():
     """With no env vars set, defaults are used (localhost:5432/maop)."""
-    from maop.core.backends_pg import _build_dsn
+    from maop.core.backends.backends_pg import _build_dsn
     env = {
         "MAOP_PG_DSN": "",
         "MAOP_PG_HOST": "",
@@ -122,14 +122,14 @@ def test_build_dsn_defaults_when_no_env():
 
 def test_backend_is_storage_backend_subclass(fake_psycopg):
     """PostgreSQLStorageBackend must subclass StorageBackend."""
-    from maop.core.backends import StorageBackend
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends import StorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     assert issubclass(PostgreSQLStorageBackend, StorageBackend)
 
 
 def test_backend_init_creates_pool_and_schema(fake_psycopg):
     """__init__ creates a ConnectionPool and runs _ensure_schema (CREATE TABLE)."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="postgresql://test@host/db")
     fake_psycopg._pool_mod.ConnectionPool.assert_called_once()
     call_kwargs = fake_psycopg._pool_mod.ConnectionPool.call_args.kwargs
@@ -144,8 +144,8 @@ def test_backend_init_creates_pool_and_schema(fake_psycopg):
 
 def test_backend_init_uses_build_dsn_when_no_dsn_arg(fake_psycopg):
     """When dsn="" is passed, _build_dsn() is used as the pool conninfo."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
-    with patch("maop.core.backends_pg._build_dsn", return_value="built-dsn"):
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
+    with patch("maop.core.backends.backends_pg._build_dsn", return_value="built-dsn"):
         PostgreSQLStorageBackend(dsn="")
     fake_psycopg._pool_mod.ConnectionPool.assert_called_once()
     call_kwargs = fake_psycopg._pool_mod.ConnectionPool.call_args.kwargs
@@ -157,7 +157,7 @@ def test_backend_init_uses_build_dsn_when_no_dsn_arg(fake_psycopg):
 
 def test_execute_delegates_to_cursor(fake_psycopg):
     """execute(sql, params) calls cursor.execute with the SQL and params."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     cursor = _pool_cursor(backend)
     backend.execute("INSERT INTO t VALUES (%s)", ("value",))
@@ -166,7 +166,7 @@ def test_execute_delegates_to_cursor(fake_psycopg):
 
 def test_execute_with_no_params_passes_empty_tuple(fake_psycopg):
     """execute(sql) with no params passes an empty tuple."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     cursor = _pool_cursor(backend)
     backend.execute("DELETE FROM t")
@@ -175,7 +175,7 @@ def test_execute_with_no_params_passes_empty_tuple(fake_psycopg):
 
 def test_fetchone_returns_dict_or_none(fake_psycopg):
     """fetchone() returns a dict (column→value) or None."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     cursor = _pool_cursor(backend)
     cursor.description = [("id",), ("name",)]
@@ -186,7 +186,7 @@ def test_fetchone_returns_dict_or_none(fake_psycopg):
 
 def test_fetchone_returns_none_when_no_row(fake_psycopg):
     """fetchone() returns None when the query yields no rows."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     cursor = _pool_cursor(backend)
     cursor.description = [("id",)]
@@ -196,7 +196,7 @@ def test_fetchone_returns_none_when_no_row(fake_psycopg):
 
 def test_fetchall_returns_list_of_dicts(fake_psycopg):
     """fetchall() returns a list of dicts."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     cursor = _pool_cursor(backend)
     cursor.description = [("id",), ("name",)]
@@ -209,7 +209,7 @@ def test_fetchall_returns_list_of_dicts(fake_psycopg):
 
 def test_fetchall_returns_empty_list_when_no_rows(fake_psycopg):
     """fetchall() returns [] when the query yields no rows."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     cursor = _pool_cursor(backend)
     cursor.description = [("id",)]
@@ -222,7 +222,7 @@ def test_fetchall_returns_empty_list_when_no_rows(fake_psycopg):
 
 def test_commit_is_noop_with_pool(fake_psycopg):
     """commit() is a no-op with pool + autocommit (each execute auto-commits)."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     # Should not raise and should not touch the pool.
     backend._pool.commit = MagicMock()
@@ -232,7 +232,7 @@ def test_commit_is_noop_with_pool(fake_psycopg):
 
 def test_rollback_is_noop_with_pool(fake_psycopg):
     """rollback() is a no-op with pool + autocommit."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     backend._pool.rollback = MagicMock()
     backend.rollback()
@@ -244,7 +244,7 @@ def test_rollback_is_noop_with_pool(fake_psycopg):
 
 def test_close_closes_pool_and_clears_reference(fake_psycopg):
     """close() closes the pool and sets _pool to None."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     pool_ref = backend._pool
     backend.close()
@@ -254,7 +254,7 @@ def test_close_closes_pool_and_clears_reference(fake_psycopg):
 
 def test_close_noop_when_already_closed(fake_psycopg):
     """close() is a no-op when _pool is already None."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     pool_ref = backend._pool
     backend.close()
@@ -269,7 +269,7 @@ def test_close_noop_when_already_closed(fake_psycopg):
 
 def test_table_exists_returns_true_when_found(fake_psycopg):
     """table_exists() returns True when the table is found."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     cursor = _pool_cursor(backend)
     cursor.description = [("?column?",)]
@@ -283,7 +283,7 @@ def test_table_exists_returns_true_when_found(fake_psycopg):
 
 def test_table_exists_returns_false_when_not_found(fake_psycopg):
     """table_exists() returns False when the table is not found."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     cursor = _pool_cursor(backend)
     cursor.description = [("?column?",)]
@@ -296,7 +296,7 @@ def test_table_exists_returns_false_when_not_found(fake_psycopg):
 
 def test_ensure_schema_creates_kv_and_meta_tables(fake_psycopg):
     """_ensure_schema() runs CREATE TABLE for maop_kv and maop_meta."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     cursor = _pool_cursor(backend)
     # __init__ already called _ensure_schema once; inspect its calls.
@@ -308,7 +308,7 @@ def test_ensure_schema_creates_kv_and_meta_tables(fake_psycopg):
 
 def test_ensure_schema_uses_if_not_exists(fake_psycopg):
     """_ensure_schema() uses CREATE TABLE IF NOT EXISTS (idempotent)."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     cursor = _pool_cursor(backend)
     execute_calls = [str(c) for c in cursor.execute.call_args_list]
@@ -321,7 +321,7 @@ def test_ensure_schema_uses_if_not_exists(fake_psycopg):
 
 def test_pool_initialization(fake_psycopg):
     """ConnectionPool is created with correct min/max size and autocommit kwargs."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     assert backend._pool is not None
     assert backend._pool is fake_psycopg._pool_mock
@@ -335,7 +335,7 @@ def test_pool_initialization(fake_psycopg):
 
 def test_pool_connection_acquired(fake_psycopg):
     """execute() acquires a connection from the pool via pool.connection()."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     # Reset mock to clear calls from __init__/_ensure_schema.
     backend._pool.connection.reset_mock()
@@ -345,7 +345,7 @@ def test_pool_connection_acquired(fake_psycopg):
 
 def test_pool_closed_on_close(fake_psycopg):
     """close() closes the connection pool (not just a single connection)."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     pool_ref = backend._pool
     backend.close()
@@ -355,7 +355,7 @@ def test_pool_closed_on_close(fake_psycopg):
 
 def test_pool_reused_across_calls(fake_psycopg):
     """Multiple execute/fetchone/fetchall calls reuse the same pool instance."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     backend = PostgreSQLStorageBackend(dsn="test-dsn")
     # __init__ already called ConnectionPool once.
     initial_call_count = fake_psycopg._pool_mod.ConnectionPool.call_count
@@ -372,7 +372,7 @@ def test_pool_reused_across_calls(fake_psycopg):
 
 def test_pg_backend_with_dsn_env(fake_psycopg):
     """MAOP_PG_DSN environment variable takes priority for DSN construction."""
-    from maop.core.backends_pg import PostgreSQLStorageBackend
+    from maop.core.backends.backends_pg import PostgreSQLStorageBackend
     env_dsn = "postgresql://envuser:envpass@envhost:5432/envdb"
     with patch.dict("os.environ", {"MAOP_PG_DSN": env_dsn}):
         PostgreSQLStorageBackend(dsn="")
@@ -398,7 +398,7 @@ def test_pg_backend_without_psycopg_degrades():
 
     try:
         builtins.__import__ = failing_import
-        from maop.core.backends_pg import PostgreSQLStorageBackend
+        from maop.core.backends.backends_pg import PostgreSQLStorageBackend
         with pytest.raises(ImportError):
             PostgreSQLStorageBackend(dsn="test-dsn")
     finally:

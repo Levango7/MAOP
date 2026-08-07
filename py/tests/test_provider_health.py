@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from maop.core.provider_health import HealthResult, ProviderHealthChecker
+from maop.core.routing.provider_health import HealthResult, ProviderHealthChecker
 
 
 def _make_registry(providers_data: dict | None = None, has_vault: bool = False):

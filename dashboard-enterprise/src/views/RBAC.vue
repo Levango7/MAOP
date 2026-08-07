@@ -7,7 +7,7 @@
       </button>
     </PageHeader>
 
-    <Card :title="t('view.rbac.roles')" icon="shield" :marginBottom="16">
+    <Card :title="t('view.rbac.roles')" icon="shield" :margin-bottom="16">
       <div class="role-grid" v-if="!rolesLoading">
         <div class="role-card" v-for="r in roles" :key="r.role">
           <div class="role-card__head">
@@ -26,7 +26,7 @@
       <p class="inline-error" v-if="rolesError">{{ rolesError }}</p>
     </Card>
 
-    <Card :title="t('view.rbac.activeGrants')" icon="clipboard" :marginBottom="16">
+    <Card :title="t('view.rbac.activeGrants')" icon="clipboard" :margin-bottom="16">
       <div class="grant-list" v-if="grants.length">
         <div class="grant-row" v-for="g in grants" :key="g.__key">
           <div class="grant-meta">
@@ -47,7 +47,7 @@
       <Skeleton v-else height="120px" />
     </Card>
 
-    <Card :title="t('view.rbac.permissionCatalog')" icon="lock" :marginBottom="16">
+    <Card :title="t('view.rbac.permissionCatalog')" icon="lock" :margin-bottom="16">
       <DataTable
         v-if="permissions.length"
         :columns="permCols"
@@ -106,6 +106,7 @@ const rolesError = ref('');
 
 const grants = ref([]);
 const grantsLoading = ref(true);
+const grantsError = ref('');
 
 const permissions = ref([]);
 const permsLoading = ref(true);

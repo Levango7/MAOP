@@ -1,10 +1,10 @@
-﻿"""Tests for MAOP.core.guardrail."""
+"""Tests for MAOP.core.guardrail."""
 
 from pathlib import Path
 
 import pytest
 
-from maop.core.guardrail import Guardrail
+from maop.core.security.guardrail import Guardrail
 
 
 @pytest.fixture

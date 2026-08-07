@@ -17,8 +17,8 @@ from pathlib import Path
 import aiosqlite
 import pytest
 
-from maop.core.circuit_breaker import BreakerState, CircuitBreaker
-from maop.core.message_queue import MessageQueue
+from maop.core.reliability.circuit_breaker import BreakerState, CircuitBreaker
+from maop.core.reliability.message_queue import MessageQueue
 from maop.memory.store import MemoryStore
 from maop.model.budget import BudgetGuard
 

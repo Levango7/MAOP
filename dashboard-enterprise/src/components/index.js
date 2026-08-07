@@ -10,3 +10,6 @@ export { default as Skeleton } from './Skeleton.vue';
 export { default as EmptyState } from './EmptyState.vue';
 export { default as Toast } from './Toast.vue';
 export { default as PageHeader } from './PageHeader.vue';
+// v4.5.0: DAG progress streaming components
+export { default as DagGraph } from './DagGraph.vue';
+export { default as NodeDetailPanel } from './NodeDetailPanel.vue';

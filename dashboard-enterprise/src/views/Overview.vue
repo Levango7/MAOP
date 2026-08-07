@@ -192,26 +192,26 @@ const stats = computed(() => {
   return [
     { label: t('view.overview.statActiveAgents'), value: d.agents_total ?? '—', icon: 'bot', tone: 'brand', accent: ACCENTS[0] },
     { label: t('view.overview.statDelegations'), value: d.delegations_total ?? '—', icon: 'activity', tone: 'info', accent: ACCENTS[1], yoy: d.delegations_yoy ?? null, mom: d.delegations_mom ?? null, yoyLabel: yl, momLabel: ml },
-    { label: t('view.overview.statSuccessRate'), value: d.success_rate != null ? Number(d.success_rate).toFixed(1) : '—', unit: '%', icon: 'check-circle', tone: 'success', accent: ACCENTS[2], yoy: d.success_rate_yoy ?? null, mom: d.success_rate_mom ?? null, yoyLabel: yl, momLabel: ml },
-    { label: t('view.overview.statAvgLatency'), value: d.avg_latency_ms != null ? Math.round(d.avg_latency_ms) : '—', unit: 'ms', icon: 'gauge', tone: 'warn', accent: ACCENTS[3] },
+    { label: t('view.overview.statSuccessRate'), value: d.success_rate !== null && d.success_rate !== undefined ? Number(d.success_rate).toFixed(1) : '—', unit: '%', icon: 'check-circle', tone: 'success', accent: ACCENTS[2], yoy: d.success_rate_yoy ?? null, mom: d.success_rate_mom ?? null, yoyLabel: yl, momLabel: ml },
+    { label: t('view.overview.statAvgLatency'), value: d.avg_latency_ms !== null && d.avg_latency_ms !== undefined ? Math.round(d.avg_latency_ms) : '—', unit: 'ms', icon: 'gauge', tone: 'warn', accent: ACCENTS[3] },
     { label: t('view.overview.statTests'), value: d.tests_total ?? '—', icon: 'clipboard', tone: 'neutral', accent: ACCENTS[4] },
     { label: t('view.overview.statModules'), value: d.modules_total ?? '—', icon: 'box', tone: 'brand', accent: ACCENTS[5] },
-    { label: t('view.overview.statCodeLines'), value: d.code_lines != null ? formatNum(d.code_lines) : '—', icon: 'code', tone: 'neutral', accent: ACCENTS[6] },
+    { label: t('view.overview.statCodeLines'), value: d.code_lines !== null && d.code_lines !== undefined ? formatNum(d.code_lines) : '—', icon: 'code', tone: 'neutral', accent: ACCENTS[6] },
     { label: t('view.overview.statApiEndpoints'), value: d.api_endpoints ?? '—', icon: 'server', tone: 'info', accent: ACCENTS[7] },
-    { label: t('view.overview.statSourceFiles'), value: d.source_files != null ? formatNum(d.source_files) : '—', icon: 'file', tone: 'neutral', accent: ACCENTS[8] },
-    { label: t('view.overview.statTestFiles'), value: d.test_files != null ? formatNum(d.test_files) : '—', icon: 'beaker', tone: 'neutral', accent: ACCENTS[9] },
+    { label: t('view.overview.statSourceFiles'), value: d.source_files !== null && d.source_files !== undefined ? formatNum(d.source_files) : '—', icon: 'file', tone: 'neutral', accent: ACCENTS[8] },
+    { label: t('view.overview.statTestFiles'), value: d.test_files !== null && d.test_files !== undefined ? formatNum(d.test_files) : '—', icon: 'beaker', tone: 'neutral', accent: ACCENTS[9] },
   ];
 });
 
 const healthScore = computed(() => {
   const r = data.value?.success_rate;
-  return r != null ? Math.round(r) : 0;
+  return r !== null && r !== undefined ? Math.round(r) : 0;
 });
 const healthTone = computed(() => (healthScore.value >= 95 ? 'success' : healthScore.value >= 80 ? 'warn' : 'fail'));
 const healthMetrics = computed(() => {
   const d = data.value || {};
-  const sr = d.success_rate != null ? Math.round(d.success_rate) : 0;
-  const lat = d.avg_latency_ms != null ? Math.round(d.avg_latency_ms) : 0;
+  const sr = d.success_rate !== null && d.success_rate !== undefined ? Math.round(d.success_rate) : 0;
+  const lat = d.avg_latency_ms !== null && d.avg_latency_ms !== undefined ? Math.round(d.avg_latency_ms) : 0;
   return [
     { label: t('view.overview.statSuccessRate'), display: sr + '%', pct: sr, color: 'var(--success)' },
     { label: t('view.overview.statAvgLatency'), display: lat + ' ms', pct: Math.min(100, Math.round(lat / 10)), color: 'var(--warn)' },
@@ -233,7 +233,7 @@ function normalizeTimeseries(ts) {
   const first = ts[0];
   if (typeof first === 'number') return { labels: ts.map((_, i) => '#' + i), values: ts };
   if (first && typeof first === 'object') {
-    const tKey = ['ts', 't', 'time', 'timestamp'].find((k) => first[k] != null);
+    const tKey = ['ts', 't', 'time', 'timestamp'].find((k) => first[k] !== null && first[k] !== undefined);
     const vKey = ['count', 'value', 'throughput', 'n', 'total', 'delegations'].find((k) => typeof first[k] === 'number');
     if (tKey && vKey) {
       return { labels: ts.map((r) => fmtTick(r[tKey])), values: ts.map((r) => r[vKey]) };

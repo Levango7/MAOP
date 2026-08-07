@@ -1,4 +1,4 @@
-﻿"""Tests for Iteration A: LLM Provider abstraction + ChatEngine integration."""
+"""Tests for Iteration A: LLM Provider abstraction + ChatEngine integration."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from maop.core.chat_engine import ChatEngine, ChatRequest
-from maop.core.llm_provider import (
+from maop.core.agent.llm_chat.chat_engine import ChatEngine, ChatRequest
+from maop.core.agent.llm_chat.llm_provider import (
     AnthropicProvider,
     BaseLLMProvider,
     FallbackResult,

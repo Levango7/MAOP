@@ -7,7 +7,7 @@ result in the provider's expected format for re-injection.
 
 Usage::
 
-    from maop.core.function_call import FunctionCallBridge
+    from maop.core.agent.llm_chat.function_call import FunctionCallBridge
 
     bridge = FunctionCallBridge(root_dir="/path/to/MAOP")
     calls = bridge.parse_response(response_json, provider="openai")
@@ -78,7 +78,7 @@ class FunctionCallBridge:
         # δ-1: migrated from MCPRegistry (Stack B) to MCPHub (Stack A)
         if self._mcp_registry is None:
             try:
-                from maop.core.mcp_hub import MCPHub
+                from maop.core.mcp.mcp_hub import MCPHub
                 root = self._root_dir
                 if root is None:
                     from pathlib import Path
@@ -91,7 +91,7 @@ class FunctionCallBridge:
     def _get_tool_manager(self):
         if self._tool_manager is None and self._root_dir:
             try:
-                from maop.core.tool_manager import ToolManager
+                from maop.core.agent.tools.tool_manager import ToolManager
                 self._tool_manager = ToolManager(root_dir=self._root_dir)
             except Exception as exc:
                 logger.debug("[fn_call] ToolManager unavailable: %s", exc)
@@ -318,7 +318,7 @@ class FunctionCallBridge:
 
     def _mcp_tool_to_openai(self, mcp_tool: Any) -> dict[str, Any]:
         # δ-1: migrated from MCPToolDef (Stack B) to MCPTool (Stack A)
-        from maop.core.mcp_hub import MCPTool
+        from maop.core.mcp.mcp_hub import MCPTool
         if isinstance(mcp_tool, MCPTool):
             name = f"{mcp_tool.server_name}.{mcp_tool.name}" if mcp_tool.server_name else mcp_tool.name
             return {

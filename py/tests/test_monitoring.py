@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.monitoring — StructuredLogger, metrics, MetricsCollector."""
+"""Tests for MAOP.core.monitoring — StructuredLogger, metrics, MetricsCollector."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import threading
 
 import pytest
 
-from maop.core.monitoring import (
+from maop.core.monitoring.monitoring import (
     Counter,
     Gauge,
     Histogram,

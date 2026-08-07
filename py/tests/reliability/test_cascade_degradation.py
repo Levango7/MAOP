@@ -21,7 +21,7 @@ from unittest.mock import patch
 import pytest
 
 from maop.config.edition import degradation_log, reset_edition
-from maop.core.backends import (
+from maop.core.backends.backends import (
     MemoryCacheBackend,
     SQLiteKVBackend,
     SQLiteQueueBackend,
@@ -30,7 +30,7 @@ from maop.core.backends import (
     get_queue_backend,
     reset_backends,
 )
-from maop.core.circuit_breaker import BreakerState, CircuitBreaker
+from maop.core.reliability.circuit_breaker import BreakerState, CircuitBreaker
 from maop.model.budget import BudgetGuard
 from maop.model.schema import BudgetConfig
 
@@ -82,7 +82,7 @@ def test_cache_redis_to_memory_degradation(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("MAOP_CACHE_BACKEND", "redis")
     monkeypatch.setenv("MAOP_CACHE_ALLOW_FALLBACK", "1")
 
-    with patch("maop.core.backends_redis.RedisCacheBackend",
+    with patch("maop.core.backends.backends_redis.RedisCacheBackend",
                side_effect=ImportError("mocked: redis unavailable")):
         backend = get_cache_backend()
 
@@ -108,7 +108,7 @@ def test_cache_redis_fail_fast_without_allow_fallback(monkeypatch: pytest.Monkey
     monkeypatch.setenv("MAOP_CACHE_BACKEND", "redis")
     monkeypatch.delenv("MAOP_CACHE_ALLOW_FALLBACK", raising=False)
 
-    with patch("maop.core.backends_redis.RedisCacheBackend",
+    with patch("maop.core.backends.backends_redis.RedisCacheBackend",
                side_effect=ImportError("mocked: redis unavailable")):
         with pytest.raises(RuntimeError, match="not importable"):
             get_cache_backend()
@@ -127,7 +127,7 @@ def test_queue_redis_to_sqlite_degradation(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("MAOP_QUEUE_BACKEND", "redis")
     monkeypatch.setenv("MAOP_QUEUE_ALLOW_FALLBACK", "1")
 
-    with patch("maop.core.backends_redis.RedisQueueBackend",
+    with patch("maop.core.backends.backends_redis.RedisQueueBackend",
                side_effect=ImportError("mocked: redis unavailable")):
         backend = get_queue_backend()
 
@@ -160,7 +160,7 @@ def test_kv_etcd_to_sqlite_degradation(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MAOP_KV_BACKEND", "etcd")
     monkeypatch.setenv("MAOP_KV_ALLOW_FALLBACK", "1")
 
-    with _module_unavailable("maop.core.backends_distributed"):
+    with _module_unavailable("maop.core.backends.backends_distributed"):
         backend = get_kv_backend()
 
     assert isinstance(backend, SQLiteKVBackend)
@@ -194,11 +194,11 @@ def test_multiple_backend_cascade(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MAOP_KV_ALLOW_FALLBACK", "1")
 
     with (
-        patch("maop.core.backends_redis.RedisCacheBackend",
+        patch("maop.core.backends.backends_redis.RedisCacheBackend",
               side_effect=ImportError("mocked: redis unavailable")),
-        patch("maop.core.backends_redis.RedisQueueBackend",
+        patch("maop.core.backends.backends_redis.RedisQueueBackend",
               side_effect=ImportError("mocked: redis unavailable")),
-        _module_unavailable("maop.core.backends_distributed"),
+        _module_unavailable("maop.core.backends.backends_distributed"),
     ):
         cache = get_cache_backend()
         queue = get_queue_backend()

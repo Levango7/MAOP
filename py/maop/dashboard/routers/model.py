@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
@@ -219,7 +219,7 @@ _api_key_vault = None
 def _get_api_key_vault() -> Any:
     global _api_key_vault
     if _api_key_vault is None:
-        from maop.core.api_key_vault import ApiKeyVault
+        from maop.core.security.api_key_vault import ApiKeyVault
         _api_key_vault = ApiKeyVault(root_dir=str(MAOP_ROOT))
     return _api_key_vault
 
@@ -264,7 +264,7 @@ async def api_health_check(request: Request) -> dict[str, Any]:
     provider = body.get("provider", "")
     reg = _get_model_registry()
     vault = _get_api_key_vault()
-    from maop.core.provider_health import ProviderHealthChecker
+    from maop.core.routing.provider_health import ProviderHealthChecker
     checker = ProviderHealthChecker(registry=reg, vault=vault)
     if provider:
         result = await checker.check(provider)

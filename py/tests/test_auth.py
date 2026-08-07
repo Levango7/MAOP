@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.auth — APIKeyStore, JWTHandler, AuthManager."""
+"""Tests for MAOP.core.auth — APIKeyStore, JWTHandler, AuthManager."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from maop.core.auth import (
+from maop.core.security.auth import (
     APIKey,
     APIKeyStore,
     AuthConfig,

@@ -1,10 +1,10 @@
-﻿"""Unit tests for MAOP.core.sandbox module."""
+"""Unit tests for MAOP.core.sandbox module."""
 
 from __future__ import annotations
 
 import pytest
 
-from maop.core.sandbox import SandboxManager
+from maop.core.security.sandbox import SandboxManager
 
 
 @pytest.fixture

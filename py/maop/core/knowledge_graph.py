@@ -8,7 +8,7 @@ Built on top of KnowledgeExtractor's SQLite tables, provides:
 
 Usage::
 
-    from maop.core.knowledge_graph import KnowledgeGraph
+    from maop.core.memory.knowledge_graph import KnowledgeGraph
 
     kg = KnowledgeGraph(root_dir="/path/to/MAOP")
     neighbors = kg.get_neighbors("AuthService")
@@ -23,7 +23,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import get_db_path, sqlite_connect, validate_identifier
+from maop.core.backends.db_utils import get_db_path, sqlite_connect, validate_identifier
 
 logger = logging.getLogger(__name__)
 

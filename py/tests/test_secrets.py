@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP Secrets Management — environment variable loading, JWT secret
+"""Tests for MAOP Secrets Management — environment variable loading, JWT secret
 priority, admin password, env-dict export, and validator rejection.
 
 Covers:
@@ -89,7 +89,7 @@ class TestJwtSecretPriority:
 
     def test_env_var_takes_priority(self, monkeypatch, tmp_path):
         """MAOP_JWT_SECRET env var wins over file and auto-generation."""
-        from maop.core.auth import load_jwt_secret
+        from maop.core.security.auth import load_jwt_secret
 
         data_dir = tmp_path / "data"
         data_dir.mkdir()
@@ -102,7 +102,7 @@ class TestJwtSecretPriority:
 
     def test_file_used_when_no_env(self, monkeypatch, tmp_path):
         """Fall back to data/jwt_secret file when env var is absent."""
-        from maop.core.auth import load_jwt_secret
+        from maop.core.security.auth import load_jwt_secret
 
         data_dir = tmp_path / "data"
         data_dir.mkdir()
@@ -114,7 +114,7 @@ class TestJwtSecretPriority:
 
     def test_auto_generate_and_persist(self, monkeypatch, tmp_path):
         """Auto-generate a secret and persist to data/jwt_secret."""
-        from maop.core.auth import load_jwt_secret
+        from maop.core.security.auth import load_jwt_secret
 
         data_dir = tmp_path / "data"
         monkeypatch.delenv("MAOP_JWT_SECRET", raising=False)
@@ -130,7 +130,7 @@ class TestJwtSecretPriority:
 
     def test_env_var_empty_falls_through(self, monkeypatch, tmp_path):
         """Empty MAOP_JWT_SECRET string should fall through to file."""
-        from maop.core.auth import load_jwt_secret
+        from maop.core.security.auth import load_jwt_secret
 
         data_dir = tmp_path / "data"
         data_dir.mkdir()

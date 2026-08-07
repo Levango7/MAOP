@@ -32,7 +32,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from maop.config.edition import FeatureFlag, require_feature
-from maop.core.backends_redis import RedisDistributedLock
+from maop.core.backends.backends_redis import RedisDistributedLock
 
 logger = logging.getLogger(__name__)
 

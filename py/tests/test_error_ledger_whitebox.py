@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.error_ledger import ErrorLedger
+from maop.core.reliability.error_ledger import ErrorLedger
 
 
 @pytest.fixture

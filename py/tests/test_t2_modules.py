@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import pytest
 
-from maop.core.byok import BYOKGateway, KeyRoute, KeySource
-from maop.core.skill_version import SkillVersionManager
-from maop.core.tenant import TenantManager
+from maop.core.security.byok import BYOKGateway, KeyRoute, KeySource
+from maop.core.evolution.skill_version import SkillVersionManager
+from maop.core.security.tenant import TenantManager
 
 
 class TestBYOKGateway:

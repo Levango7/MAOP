@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 router = APIRouter(prefix="/api/plugins", tags=["plugins"])
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/plugins", tags=["plugins"])
 def _get_plugin_manager():
     from pathlib import Path
 
-    from maop.core.plugin import PluginManager
+    from maop.core.agent.plugins_hooks.plugin import PluginManager
     root = Path(__file__).resolve().parent.parent.parent.parent
     return PluginManager(root_dir=str(root))
 
@@ -23,7 +23,7 @@ def _get_plugin_manager():
 @router.get("")
 @handle_api_errors
 async def list_plugins(state: str = Query("", description="Filter by state")) -> dict[str, Any]:
-    from maop.core.plugin import PluginState
+    from maop.core.agent.plugins_hooks.plugin import PluginState
     mgr = _get_plugin_manager()
     filter_state = PluginState(state) if state else None
     plugins = mgr.list_plugins(state=filter_state)

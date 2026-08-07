@@ -386,7 +386,7 @@ export function useI18n() {
     if (val === null || val === undefined) val = messages.en[key];
     if (val === null || val === undefined) return key;
     if (params && typeof val === 'string') {
-      return val.replace(/\{(\w+)\}/g, (_, k) => (params[k] != null ? String(params[k]) : `{${k}}`));
+      return val.replace(/\{(\w+)\}/g, (_, k) => (params[k] !== null && params[k] !== undefined ? String(params[k]) : `{${k}}`));
     }
     return val;
   }

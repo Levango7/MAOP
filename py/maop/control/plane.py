@@ -1,4 +1,4 @@
-﻿"""Control Plane — unified control interface with audit logging.
+"""Control Plane — unified control interface with audit logging.
 
 All control actions (run/pause/resume/stop/validate/doctor/model-switch/etc.)
 go through this plane, ensuring every action is audited.
@@ -187,7 +187,7 @@ class ControlPlane:
         max_age_days = detail.get("max_age_days", 30)
         pruned: dict[str, int] = {}
         try:
-            from maop.core.db_utils import get_db_path, sqlite_connect
+            from maop.core.backends.db_utils import get_db_path, sqlite_connect
             db_path = get_db_path("memory")
             with sqlite_connect(db_path) as conn:
                 cur = conn.execute(

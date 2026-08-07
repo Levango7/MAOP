@@ -1,7 +1,7 @@
-﻿"""Tests for MAOP.core.bloom_filter — Bloom filter for deduplication."""
+"""Tests for MAOP.core.bloom_filter — Bloom filter for deduplication."""
 
 
-from maop.core.bloom_filter import BloomFilter, _BitArray, _hash_i, _mmh3_hash32
+from maop.core.memory.bloom_filter import BloomFilter, _BitArray, _hash_i, _mmh3_hash32
 
 # ── BitArray tests ─────────────────────────────────────────────
 

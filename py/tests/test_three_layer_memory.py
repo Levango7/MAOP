@@ -3,10 +3,12 @@
 import shutil
 import tempfile
 import time
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from maop.core.three_layer_memory import (
+from maop.core.memory.three_layer_memory import (
     ContextHead,
     FocusMode,
     QualityDimensions,
@@ -509,3 +511,524 @@ class TestOverflowToEpisodic:
             if r.entry.outcome == "overflow" and "pinned_key" in r.entry.task
         ]
         assert len(overflow_for_pinned) == 0
+
+
+# --- Merged from test_three_layer_memory_coverage.py (TestThreeLayerMemory only, 5 module-import tests dropped) ---
+
+# ── Three Layer Memory ──────────────────────────────────────────────
+
+class TestThreeLayerMemory:
+    def test_init(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        assert mem is not None
+
+    def test_working_put_get(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        mem.working_put("k1", "value1")
+        assert mem.working_get("k1") == "value1"
+
+    def test_working_get_missing(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        assert mem.working_get("nonexistent") is None
+
+    def test_working_delete(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        mem.working_put("k1", "value1")
+        mem.working_delete("k1")
+        assert mem.working_get("k1") is None
+
+    def test_working_clear(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        mem.working_put("k1", "v1")
+        mem.working_put("k2", "v2")
+        mem.working_clear()
+        assert mem.working_get("k1") is None
+
+    def test_working_pin_unpin(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        mem.working_put("k1", "v1")
+        assert mem.working_pin("k1") is True
+        mem.working_unpin("k1")
+        assert mem.working_pinned_keys() == []
+
+    def test_episodic_store(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        entry_id = mem.episodic_store(task="test task", agent="a1", outcome="success", score=0.9)
+        assert entry_id
+
+    def test_episodic_store_with_lessons(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        entry_id = mem.episodic_store(
+            task="test", agent="a", outcome="failure",
+            lessons=["lesson1", "lesson2"], user_feedback="bad",
+            summary="test summary", key_decisions=["d1"],
+            files_touched=["f1"], metadata={"k": "v"},
+        )
+        assert entry_id
+
+    def test_episodic_search_empty(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        results = mem.episodic_search(query="", top=10)
+        assert isinstance(results, list)
+
+    def test_episodic_search_with_query(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        mem.episodic_store(task="fix bug", agent="a", summary="bug fix")
+        results = mem.episodic_search(query="bug", top=10)
+        assert isinstance(results, list)
+
+    def test_episodic_search_with_filters(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        mem.episodic_store(task="t1", agent="alice", outcome="success", score=0.9)
+        results = mem.episodic_search(agent="alice", outcome="success", min_score=0.5)
+        assert isinstance(results, list)
+
+    def test_store_working(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        key = mem.store(layer="working", content="value", key="k1")
+        assert key == "k1"
+
+    def test_store_short_term(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        entry_id = mem.store(layer="short_term", content="test content", task="t1")
+        assert entry_id
+
+    def test_store_long_term(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        doc_id = mem.store(layer="long_term", content="test doc", doc_id="d1")
+        assert doc_id
+
+    def test_store_unknown_layer(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        with pytest.raises(ValueError):
+            mem.store(layer="unknown", content="c")
+
+    def test_retrieve_working(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        mem.working_put("k1", "value1")
+        results = mem.retrieve(layer="working", query="k1")
+        assert isinstance(results, list)
+
+    def test_retrieve_short_term(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        mem.episodic_store(task="t1", summary="hello")
+        results = mem.retrieve(layer="short_term", query="hello")
+        assert isinstance(results, list)
+
+    def test_retrieve_long_term(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        results = mem.retrieve(layer="long_term", query="test")
+        assert isinstance(results, list)
+
+    def test_retrieve_unknown_layer(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        with pytest.raises(ValueError):
+            mem.retrieve(layer="unknown")
+
+    def test_query_memory_entries_empty(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        results = mem.query_memory_entries(query="", top=10)
+        assert isinstance(results, list)
+
+    def test_query_memory_entries_with_query(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        results = mem.query_memory_entries(query="test", top=10)
+        assert isinstance(results, list)
+
+    def test_episodic_stats(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        stats = mem.episodic_stats()
+        assert isinstance(stats, dict)
+
+    def test_semantic_index(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        doc_id = mem.semantic_index("d1", "test document")
+        assert doc_id == "d1"
+
+    def test_semantic_search(self, tmp_path):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        mem = ThreeLayerMemory(root_dir=str(tmp_path))
+        mem.semantic_index("d1", "hello world")
+        results = mem.semantic_search("hello", top=5)
+        assert isinstance(results, list)
+
+# ── Coverage tests (merged from test_three_layer_memory_coverage3.py) ──
+
+# ── Helpers ─────────────────────────────────────────────────────────
+
+
+def _make_mem(tmp_path: Path):
+    from maop.core.memory.three_layer_memory import ThreeLayerMemory
+    return ThreeLayerMemory(root_dir=str(tmp_path))
+
+
+# ── _parse_qd branches (322, 324, 328-329) ──────────────────────────
+
+
+class TestParseQd:
+    def test_none_returns_default(self):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        from maop.core.memory.three_layer_memory_types import QualityDimensions
+        result = ThreeLayerMemory._parse_qd(None)
+        assert isinstance(result, QualityDimensions)
+
+    def test_quality_dimensions_passthrough(self):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        from maop.core.memory.three_layer_memory_types import QualityDimensions
+        qd = QualityDimensions(correctness=0.9)
+        result = ThreeLayerMemory._parse_qd(qd)
+        assert result is qd
+
+    def test_invalid_json_returns_default(self):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        from maop.core.memory.three_layer_memory_types import QualityDimensions
+        result = ThreeLayerMemory._parse_qd("not valid json{{{")
+        assert isinstance(result, QualityDimensions)
+
+    def test_dict_input(self):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        result = ThreeLayerMemory._parse_qd({"correctness": 0.8})
+        assert result.correctness == 0.8
+
+    def test_json_string(self):
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        result = ThreeLayerMemory._parse_qd('{"correctness": 0.7}')
+        assert result.correctness == 0.7
+
+
+# ── migrate_legacy_episodic_db branches (229-234) ───────────────────
+
+
+class TestMigrateLegacy:
+    def test_migration_success(self, tmp_path):
+        """Cover branch where migration succeeds and logs info (229-232)."""
+        with patch("maop.core.memory.three_layer_memory.migrate_legacy_episodic_db", return_value=5):
+            mem = _make_mem(tmp_path)
+        assert mem is not None
+
+    def test_migration_exception(self, tmp_path):
+        """Cover branch where migration raises (233-234)."""
+        with patch(
+            "maop.core.memory.three_layer_memory.migrate_legacy_episodic_db",
+            side_effect=RuntimeError("migrate boom"),
+        ):
+            mem = _make_mem(tmp_path)
+        assert mem is not None
+
+
+# ── _on_evict exception (295-296) ───────────────────────────────────
+
+
+class TestOnEvictException:
+    def test_evict_overflow_exception(self, tmp_path):
+        """Cover branch where overflow fails (295-296)."""
+        mem = _make_mem(tmp_path)
+        # Make episodic_store raise
+        with patch.object(mem, "episodic_store", side_effect=RuntimeError("store boom")):
+            # Trigger eviction by filling working memory beyond capacity
+            # Working memory capacity is limited; put many items to force eviction
+            for i in range(200):
+                mem.working_put(f"k{i}", f"v{i}" * 100)
+        # Should not raise
+
+
+# ─– episodic_search FTS5 fallback (434-449) ────────────────────────
+
+
+class TestEpisodicSearchFtsFallback:
+    def test_fts_fallback_to_like(self, tmp_path):
+        """Cover FTS5 OperationalError fallback to LIKE query (434-449)."""
+        mem = _make_mem(tmp_path)
+        mem.episodic_store(task="fix bug", agent="alice", outcome="success", score=0.9)
+        mem.episodic_store(task="fix issue", agent="bob", outcome="failure", score=0.5)
+        # Drop the FTS table to force fallback to LIKE
+        import sqlite3
+        from maop.memory.shared_db import get_memory_db_path
+        db_path = get_memory_db_path()
+        with sqlite3.connect(str(db_path)) as conn:
+            try:
+                conn.execute("DROP TABLE IF EXISTS episodic_memory_fts")
+                conn.commit()
+            except Exception:
+                pass
+        # Mock _increment_access_counts to avoid FTS dependency in post-search step
+        with patch.object(mem, "_increment_access_counts"):
+            results = mem.episodic_search(query="fix", top=10)
+        assert isinstance(results, list)
+
+    def test_search_with_all_filters(self, tmp_path):
+        """Cover agent/outcome/min_score filter branches (417-421)."""
+        mem = _make_mem(tmp_path)
+        mem.episodic_store(task="task1", agent="alice", outcome="success", score=0.9)
+        mem.episodic_store(task="task2", agent="bob", outcome="failure", score=0.3)
+        # Use all filters
+        results = mem.episodic_search(
+            query="task", agent="alice", outcome="success", min_score=0.5, top=10,
+        )
+        assert isinstance(results, list)
+
+
+# ── store() branches (496, 529, 531, 534) ───────────────────────────
+
+
+class TestStoreBranches:
+    def test_short_term_with_topic_tags_trace(self, tmp_path):
+        """Cover topic/tags/trace_id metadata merge (529, 531, 534)."""
+        mem = _make_mem(tmp_path)
+        entry_id = mem.store(
+            layer="short_term", content="test", task="t1",
+            topic="bugs", tags=["tag1", "tag2"], trace_id="tr1",
+        )
+        assert entry_id
+
+    def test_short_term_with_string_tags(self, tmp_path):
+        """Cover tags as string branch (531)."""
+        mem = _make_mem(tmp_path)
+        entry_id = mem.store(
+            layer="short_term", content="test", task="t1",
+            tags="single_tag",
+        )
+        assert entry_id
+
+    def test_long_term_without_doc_id(self, tmp_path):
+        """Cover long_term branch where doc_id is auto-generated (496)."""
+        mem = _make_mem(tmp_path)
+        doc_id = mem.store(layer="long_term", content="auto id doc")
+        assert doc_id  # auto-generated
+
+
+# ── query_memory_entries success (602-603) ──────────────────────────
+
+
+class TestQueryMemoryEntriesSuccess:
+    def test_with_data(self, tmp_path):
+        """Cover success path with actual memory_entries data (602-603)."""
+        mem = _make_mem(tmp_path)
+        # Use MemoryManager to write a memory entry
+        from maop.memory.manager import MemoryManager
+        mgr = MemoryManager(root_dir=str(tmp_path))
+        mgr.add_exchange(
+            agent="claude", session_id="s1",
+            user_msg="fix bug", assistant_msg="fixed the bug",
+        )
+        results = mem.query_memory_entries(query="bug", top=10)
+        assert isinstance(results, list)
+
+
+# ─– episodic_update_feedback branches (657, 741) ───────────────────
+
+
+class TestEpisodicUpdateFeedback:
+    def test_update_with_quality_dimensions_score(self, tmp_path):
+        """Cover branch where new_score > 0 (657)."""
+        from maop.core.memory.three_layer_memory_types import QualityDimensions
+        mem = _make_mem(tmp_path)
+        entry_id = mem.episodic_store(task="t1", agent="a", score=0.5)
+        qd = QualityDimensions(correctness=0.9, completeness=0.8)
+        result = mem.episodic_update_feedback(entry_id, user_feedback="good", quality_dimensions=qd)
+        assert result is True
+
+    def test_update_with_no_changes(self, tmp_path):
+        """Cover branch where sets is empty (741)."""
+        mem = _make_mem(tmp_path)
+        entry_id = mem.episodic_store(task="t1", agent="a")
+        # Call with no feedback and no quality_dimensions
+        result = mem.episodic_update_feedback(entry_id)
+        assert result is True
+
+    def test_update_nonexistent_entry(self, tmp_path):
+        """Cover branch where entry not found."""
+        mem = _make_mem(tmp_path)
+        result = mem.episodic_update_feedback("nonexistent-id", user_feedback="x")
+        assert result is False
+
+
+# ─– submit_feedback evolution cycle (783-784, 809-810) ─────────────
+
+
+class TestSubmitFeedbackCoverage:
+    def test_low_quality_triggers_evolution(self, tmp_path):
+        """Cover evolution reflection trigger (783-784)."""
+        from maop.core.memory.three_layer_memory_types import QualityDimensions
+        mem = _make_mem(tmp_path)
+        entry_id = mem.episodic_store(task="t1", agent="a", score=0.9)
+        # Low composite score triggers evolution
+        qd = QualityDimensions(correctness=0.1)
+        with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as MockLoop:
+            MockLoop.return_value.run_cycle.return_value = None
+            result = mem.submit_feedback(entry_id, user_feedback="bad", quality_dimensions=qd)
+        assert "evolution_reflection" in result["triggered_actions"]
+
+    def test_negative_feedback_triggers_evolution(self, tmp_path):
+        """Cover negative feedback detection (783-784)."""
+        mem = _make_mem(tmp_path)
+        entry_id = mem.episodic_store(task="t1", agent="a", score=0.9)
+        with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as MockLoop:
+            MockLoop.return_value.run_cycle.return_value = None
+            result = mem.submit_feedback(entry_id, user_feedback="this is terrible and broken")
+        assert "evolution_reflection" in result["triggered_actions"]
+
+    def test_error_ledger_recording(self, tmp_path):
+        """Cover error ledger recording branch (809-810)."""
+        mem = _make_mem(tmp_path)
+        entry_id = mem.episodic_store(task="t1", agent="a", score=0.9)
+        with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as MockLoop:
+            MockLoop.return_value.run_cycle.return_value = None
+            with patch("maop.core.reliability.error_ledger.ErrorLedger") as MockLedger:
+                MockLedger.return_value.record.return_value = None
+                result = mem.submit_feedback(entry_id, user_feedback="terrible")
+        assert "error_ledger_recorded" in result["triggered_actions"]
+
+    def test_error_ledger_exception(self, tmp_path):
+        """Cover error ledger exception branch (809-810)."""
+        mem = _make_mem(tmp_path)
+        entry_id = mem.episodic_store(task="t1", agent="a", score=0.9)
+        with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as MockLoop:
+            MockLoop.return_value.run_cycle.return_value = None
+            with patch("maop.core.reliability.error_ledger.ErrorLedger") as MockLedger:
+                MockLedger.side_effect = RuntimeError("ledger boom")
+                result = mem.submit_feedback(entry_id, user_feedback="terrible")
+        assert "error_ledger_recorded" not in result["triggered_actions"]
+
+
+# ─– consolidate branches (878, 880, 899-901) ───────────────────────
+
+
+class TestConsolidateBranches:
+    def test_consolidate_with_lessons_and_feedback(self, tmp_path):
+        """Cover lessons and user_feedback branches (878, 880)."""
+        mem = _make_mem(tmp_path)
+        mem.episodic_store(
+            task="t1", agent="a", outcome="success", score=0.9,
+            lessons=["lesson1", "lesson2"], user_feedback="great work",
+        )
+        report = mem.consolidate(min_score=0.5, limit=10)
+        assert report.candidates >= 1
+        assert report.consolidated >= 1
+
+    def test_consolidate_index_exception(self, tmp_path):
+        """Cover consolidation index exception (899-901)."""
+        mem = _make_mem(tmp_path)
+        mem.episodic_store(task="t1", agent="a", score=0.9)
+        # Make vector store index raise
+        with patch.object(mem, "_get_vector_store") as MockVS:
+            MockVS.return_value.index.side_effect = RuntimeError("vs boom")
+            report = mem.consolidate(min_score=0.5, limit=10)
+        assert report.errors >= 1
+
+
+# ─– access-count consolidation (678-680) ───────────────────────────
+
+
+class TestAccessConsolidation:
+    def test_consolidation_exception(self, tmp_path):
+        """Cover access-consolidation exception branch (678-680)."""
+        mem = _make_mem(tmp_path)
+        # Store an entry with high access count
+        entry_id = mem.episodic_store(task="t1", agent="a", score=0.9)
+        # Manually bump access_count to trigger consolidation
+        import sqlite3
+        from maop.memory.shared_db import get_memory_db_path
+        db_path = get_memory_db_path()
+        with sqlite3.connect(str(db_path)) as conn:
+            conn.execute(
+                "UPDATE episodic_memory SET access_count = 10 WHERE id = ?",
+                (entry_id,),
+            )
+            conn.commit()
+        # Make vector store index raise to trigger exception branch
+        with patch.object(mem, "_get_vector_store") as MockVS:
+            MockVS.return_value.index.side_effect = RuntimeError("vs boom")
+            # Call the access-count consolidation method
+            report = mem.consolidate_by_access(min_access_count=5, limit=10)
+        assert report.errors >= 1
+
+
+# ─– transform branches (960-965, 1012-1013) ────────────────────────
+
+
+class TestTransformBranches:
+    def test_transform_with_semantic_search_exception(self, tmp_path):
+        """Cover semantic_search exception in transform (960-965)."""
+        mem = _make_mem(tmp_path)
+        mem.episodic_store(task="fix bug", agent="a", score=0.9)
+        with patch.object(mem, "semantic_search", side_effect=RuntimeError("ss boom")):
+            result = mem.transform(query="fix bug")
+        assert result is not None
+        assert hasattr(result, "context_parts")
+
+    def test_transform_with_compression(self, tmp_path):
+        """Cover text compression branch (1012-1013)."""
+        mem = _make_mem(tmp_path)
+        # Store a large episodic entry that will trigger compression
+        mem.episodic_store(
+            task="fix bug", agent="a", score=0.9,
+            summary="x" * 1000,
+        )
+        result = mem.transform(query="fix bug", token_budget=100)
+        assert result is not None
+        # Something should be compressed
+        assert result.pipeline_stats.get("compressed", 0) >= 0
+
+
+# ─– _gather_context_items (1100, 1112-1117) ────────────────────────
+
+
+class TestGatherContextItems:
+    def test_with_working_and_semodic(self, tmp_path):
+        """Cover working + semantic branches (1100, 1112-1115)."""
+        mem = _make_mem(tmp_path)
+        mem.working_put("query1", "working value")
+        mem.episodic_store(task="query1", agent="a", score=0.9)
+        items = mem._gather_context_items("query1")
+        assert isinstance(items, list)
+
+    def test_with_semantic_search_exception(self, tmp_path):
+        """Cover semantic_search exception branch (1116-1117)."""
+        mem = _make_mem(tmp_path)
+        mem.working_put("q", "v")
+        with patch.object(mem, "semantic_search", side_effect=RuntimeError("ss boom")):
+            items = mem._gather_context_items("q")
+        assert isinstance(items, list)
+
+
+# ─– transform_multi_head (exercises _gather_context_items) ─────────
+
+
+class TestTransformMultiHead:
+    def test_default_heads(self, tmp_path):
+        mem = _make_mem(tmp_path)
+        mem.working_put("q", "v")
+        mem.episodic_store(task="q", agent="a", score=0.9)
+        result = mem.transform_multi_head(query="q")
+        assert result is not None
+        assert hasattr(result, "heads")
+
+    def test_with_semantic_exception(self, tmp_path):
+        mem = _make_mem(tmp_path)
+        with patch.object(mem, "semantic_search", side_effect=RuntimeError("boom")):
+            result = mem.transform_multi_head(query="q")
+        assert result is not None

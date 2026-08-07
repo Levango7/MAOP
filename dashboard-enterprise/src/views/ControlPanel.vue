@@ -6,7 +6,7 @@
       </button>
     </PageHeader>
 
-    <Card :title="t('view.control.executionControls')" icon="play" :marginBottom="16">
+    <Card :title="t('view.control.executionControls')" icon="play" :margin-bottom="16">
       <div class="btn-grid">
         <button v-for="a in execActions" :key="a.action" class="ctrl-btn" :class="'tone-' + a.tone"
                 @click="execAction(a.action)" :disabled="loading">
@@ -18,7 +18,7 @@
       </div>
     </Card>
 
-    <Card :title="t('view.control.maintenanceActions')" icon="wrench" :marginBottom="16">
+    <Card :title="t('view.control.maintenanceActions')" icon="wrench" :margin-bottom="16">
       <div class="btn-grid">
         <button v-for="m in maintActions" :key="m.action" class="ctrl-btn"
                 :class="m.tone ? 'tone-' + m.tone : ''"
@@ -31,7 +31,7 @@
       </div>
     </Card>
 
-    <Card :title="t('view.control.runningJobs')" icon="activity" :marginBottom="16">
+    <Card :title="t('view.control.runningJobs')" icon="activity" :margin-bottom="16">
       <div v-if="jobs.length" class="row-list">
         <div v-for="j in jobs" :key="j.id" class="row-item" :data-status="j.status">
           <div class="row-main">
@@ -51,7 +51,7 @@
       <Skeleton v-else height="80px" />
     </Card>
 
-    <Card :title="t('view.control.agentUpgrade')" icon="refresh" :marginBottom="16">
+    <Card :title="t('view.control.agentUpgrade')" icon="refresh" :margin-bottom="16">
       <button class="btn-check" @click="checkUpgrade" :disabled="loading">
         <AppIcon name="refresh" :size="15" :class="{ spinning: loading }" /> {{ t('view.control.checkUpgrades') }}
       </button>
@@ -179,7 +179,7 @@ async function loadJobs() {
   try {
     const data = await api.get('/api/control/status');
     const arr = Array.isArray(data) ? data : (data.jobs || data.active_jobs || []);
-    jobs.value = arr.map((j) => ({
+    jobs.value = arr.map((j, index) => ({
       id: j.id || j.name || `job-${index}`,
       name: j.name || j.id || '—',
       status: j.status || 'unknown',

@@ -20,6 +20,8 @@ export const nav = [
   { section: 'nav.searchTools' },
   { to: '/search', label: 'nav.search', icon: 'search', subtitle: 'nav.search.subtitle' },
   { to: '/vector', label: 'nav.vector', icon: 'box', subtitle: 'nav.vector.subtitle' },
+  // v4.5.0: Knowledge graph visualization entry (spec 5.3.1 rule 2)
+  { to: '/knowledge-graph', label: 'nav.knowledgeGraph', icon: 'share2', subtitle: 'nav.knowledgeGraph.subtitle' },
   { to: '/tools', label: 'nav.tools', icon: 'wrench', subtitle: 'nav.tools.subtitle' },
   { to: '/models', label: 'nav.models', icon: 'gauge', subtitle: 'nav.models.subtitle' },
   { section: 'nav.ops' },

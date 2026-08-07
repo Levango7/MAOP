@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from maop.core.analyzer import (
+from maop.core.agent.analyzer import (
     AnalysisResult,
     Complexity,
     DependencyDAG,

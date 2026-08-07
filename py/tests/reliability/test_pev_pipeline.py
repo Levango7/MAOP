@@ -16,8 +16,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
-from maop.core.circuit_breaker import BreakerState, CircuitBreaker
-from maop.core.error_schema import MaopResult, new_result
+from maop.core.reliability.circuit_breaker import BreakerState, CircuitBreaker
+from maop.core.reliability.error_schema import MaopResult, new_result
 from maop.delegate.dispatcher import DispatchResult, Dispatcher
 from maop.maop_execute import maop_execute
 from maop.maop_plan import Plan, maop_plan
@@ -122,7 +122,7 @@ async def test_execute_phase_runs_plan() -> None:
         return_value=_success_dispatch_result(stdout="hello")
     )
 
-    with patch("maop.core.permission.PermissionManager",
+    with patch("maop.core.security.permission.PermissionManager",
                return_value=_mock_permission_allow()):
         result = await maop_execute(
             agent="test-agent",
@@ -187,7 +187,7 @@ async def test_full_pev_cycle() -> None:
         )
     )
 
-    with patch("maop.core.permission.PermissionManager",
+    with patch("maop.core.security.permission.PermissionManager",
                return_value=_mock_permission_allow()):
         exec_result = await maop_execute(
             agent=plan.selected_agent,

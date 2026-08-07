@@ -1,9 +1,9 @@
-﻿"""Tests for MAOP.core.subagent — Hierarchical agent delegation."""
+"""Tests for MAOP.core.subagent — Hierarchical agent delegation."""
 
 
 import pytest
 
-from maop.core.subagent import SubagentManager
+from maop.core.agent.delegation.subagent_lifecycle import SubagentManager
 
 
 @pytest.fixture
@@ -13,7 +13,7 @@ def mgr(tmp_path):
 
 class TestSubagentSpawn:
     def test_spawn_basic(self, mgr):
-        info = mgr.spawn(parent="orchestrator", agent="coder", task="fix bug")
+        info = mgr.spawn_child(parent="orchestrator", agent="coder", task="fix bug")
         assert info.id.startswith("sa-")
         assert info.parent_agent == "orchestrator"
         assert info.child_agent == "coder"
@@ -21,28 +21,28 @@ class TestSubagentSpawn:
         assert info.depth == 1
 
     def test_spawn_nested(self, mgr):
-        mgr.spawn(parent="orchestrator", agent="coder")
-        info2 = mgr.spawn(parent="coder", agent="reviewer", task="review code")
+        mgr.spawn_child(parent="orchestrator", agent="coder")
+        info2 = mgr.spawn_child(parent="coder", agent="reviewer", task="review code")
         assert info2.depth == 2
 
     def test_spawn_max_depth_exceeded(self, mgr):
-        mgr.spawn(parent="a", agent="b")
-        mgr.spawn(parent="b", agent="c")
-        mgr.spawn(parent="c", agent="d")
-        mgr.spawn(parent="d", agent="e")
+        mgr.spawn_child(parent="a", agent="b")
+        mgr.spawn_child(parent="b", agent="c")
+        mgr.spawn_child(parent="c", agent="d")
+        mgr.spawn_child(parent="d", agent="e")
         with pytest.raises(ValueError, match="Max subagent depth"):
-            mgr.spawn(parent="e", agent="f", max_depth=4)
+            mgr.spawn_child(parent="e", agent="f", max_depth=4)
 
 
 class TestSubagentTerminate:
     def test_terminate_success(self, mgr):
-        info = mgr.spawn(parent="orchestrator", agent="coder")
+        info = mgr.spawn_child(parent="orchestrator", agent="coder")
         result = mgr.terminate(info.id, exit_code=0)
         assert result.status == "completed"
         assert result.exit_code == 0
 
     def test_terminate_failure(self, mgr):
-        info = mgr.spawn(parent="orchestrator", agent="coder")
+        info = mgr.spawn_child(parent="orchestrator", agent="coder")
         result = mgr.terminate(info.id, exit_code=1)
         assert result.status == "failed"
         assert result.exit_code == 1
@@ -54,7 +54,7 @@ class TestSubagentTerminate:
 
 class TestSubagentGet:
     def test_get_existing(self, mgr):
-        info = mgr.spawn(parent="orchestrator", agent="coder")
+        info = mgr.spawn_child(parent="orchestrator", agent="coder")
         fetched = mgr.get(info.id)
         assert fetched is not None
         assert fetched.id == info.id
@@ -65,13 +65,13 @@ class TestSubagentGet:
 
 class TestSubagentListChildren:
     def test_list_children(self, mgr):
-        mgr.spawn(parent="orchestrator", agent="coder")
-        mgr.spawn(parent="orchestrator", agent="reviewer")
+        mgr.spawn_child(parent="orchestrator", agent="coder")
+        mgr.spawn_child(parent="orchestrator", agent="reviewer")
         children = mgr.list_children("orchestrator")
         assert len(children) == 2
 
     def test_list_children_by_status(self, mgr):
-        info = mgr.spawn(parent="orchestrator", agent="coder")
+        info = mgr.spawn_child(parent="orchestrator", agent="coder")
         mgr.terminate(info.id, exit_code=0)
         active = mgr.list_children("orchestrator", status="spawned")
         completed = mgr.list_children("orchestrator", status="completed")
@@ -81,7 +81,7 @@ class TestSubagentListChildren:
 
 class TestSubagentTree:
     def test_get_tree(self, mgr):
-        mgr.spawn(parent="orchestrator", agent="coder")
+        mgr.spawn_child(parent="orchestrator", agent="coder")
         tree = mgr.get_tree("orchestrator")
         assert tree.agent_name == "orchestrator"
         assert "coder" in tree.children

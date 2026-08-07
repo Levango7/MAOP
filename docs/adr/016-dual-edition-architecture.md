@@ -175,7 +175,7 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 
 | 项 | 优先级 | 说明 |
 |----|--------|------|
-| SAML SSO 完整实现 | Medium | fail-closed 拒绝（OIDC 已完整支持） |
+| SAML SSO 完整实现 | Done | 已实现（lxml+cryptography，SP-initiated SSO + XML 签名验证，见 docs/enterprise/saml-sso-guide.md） |
 | RabbitMQ 队列后端 | Done | 已实现（需 pika，企业版可选依赖） |
 | etcd/Consul KV 后端 | Done | 已实现（需 etcd3，企业版可选依赖） |
 | License 在线撤销（CRL） | Done | 已实现（HTTP CRL + 本地缓存 + 离线降级） |

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.circuit_breaker import (
+from maop.core.reliability.circuit_breaker import (
     BreakerState,
     CircuitBreaker,
 )

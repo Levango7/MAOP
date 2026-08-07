@@ -1,10 +1,10 @@
-﻿"""Tests for MAOP.core.event_bus — pub/sub with ACK, retry, and dead-letter."""
+"""Tests for MAOP.core.event_bus — pub/sub with ACK, retry, and dead-letter."""
 
 from __future__ import annotations
 
 import asyncio
 
-from maop.core.event_bus import (
+from maop.core.reliability.event_bus import (
     Event,
     EventBus,
     EventPriority,

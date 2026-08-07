@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.change_tracker import ChangeTracker
+from maop.core.reliability.change_tracker import ChangeTracker
 
 
 @pytest.fixture

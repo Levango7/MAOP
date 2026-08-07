@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.dynamic_router - Dynamic agent routing by health + performance."""
+"""Tests for MAOP.core.dynamic_router - Dynamic agent routing by health + performance."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from maop.core.dynamic_router import AgentScore, DynamicRouter
+from maop.core.routing.dynamic_router import AgentScore, DynamicRouter
 
 
 @pytest.fixture

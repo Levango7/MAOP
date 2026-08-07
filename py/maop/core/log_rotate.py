@@ -47,7 +47,7 @@ class LogRotateConfig(BaseModel):
 # ── Core functions ────────────────────────────────────────────
 
 
-from maop.core.db_utils import find_project_root
+from maop.core.backends.db_utils import find_project_root
 
 
 def _compress_file(source: Path) -> bool:

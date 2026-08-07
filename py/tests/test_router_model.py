@@ -375,3 +375,293 @@ class TestModelPolicies:
         data = client.get("/api/model/policies").json()
         for p in data["policies"]:
             assert isinstance(p["strategy"], str)
+
+
+# --- Merged from test_router_model_coverage.py (client->client_coverage, TestModelSwitch->TestModelSwitchCoverage) ---
+
+@pytest.fixture
+def model_env(tmp_path, monkeypatch):
+    """Isolate MAOP_ROOT for model router and create minimal config."""
+    cfg_dir = tmp_path / "config"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    # agents.yaml with one agent
+    (cfg_dir / "agents.yaml").write_text(
+        "agents:\n  claude:\n    cli: claude\n    model: claude-3\n    driver: cli\n"
+        "    timeout_s: 120\n    capabilities: [code]\n    description: test\n",
+        encoding="utf-8",
+    )
+    # models.yaml with valid models
+    (cfg_dir / "models.yaml").write_text(
+        "models:\n  claude-3:\n    provider: anthropic\n    family: claude-3\n"
+        "    context_window: 200000\n    max_output: 4096\n"
+        "    cost_per_1k_input: 0.01\n    cost_per_1k_output: 0.03\n"
+        "    capabilities: [code]\n    latency_tier: fast\n"
+        "    quality_tier: excellent\n    enabled: true\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "data").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr("maop.dashboard.routers.model.MAOP_ROOT", tmp_path)
+    monkeypatch.setattr("maop.dashboard.routers.state.MAOP_ROOT", tmp_path)
+
+    # Reset model registry + api key vault singletons
+    import maop.dashboard.routers.model as model_mod
+    model_mod._model_registry = None
+    model_mod._api_key_vault = None
+
+    return tmp_path
+
+
+@pytest.fixture
+def client_coverage(model_env, monkeypatch):
+    """TestClient with admin role injected and model router mounted."""
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        request.state.auth_identity = "admin"
+        return await call_next(request)
+
+    from maop.dashboard.routers.model import router
+    app.include_router(router)
+    return TestClient(app)
+
+
+class TestModelSwitchCoverage:
+    def test_missing_fields(self, client_coverage):
+        """Switch with missing fields returns 400 or error."""
+        resp = client_coverage.post("/api/model/switch", json={})
+        assert resp.status_code in (400, 422)
+
+    def test_agents_yaml_not_found(self, model_env, client_coverage):
+        """Switch when agents.yaml doesn't exist returns error."""
+        (model_env / "config" / "agents.yaml").unlink()
+        resp = client_coverage.post(
+            "/api/model/switch",
+            json={"agent": "claude", "model": "claude-3"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "error"
+
+    def test_unknown_agent(self, client_coverage):
+        """Switch with unknown agent returns error."""
+        resp = client_coverage.post(
+            "/api/model/switch",
+            json={"agent": "nonexistent", "model": "claude-3"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "error"
+
+    def test_unknown_model(self, client_coverage):
+        """Switch with unknown model returns error."""
+        resp = client_coverage.post(
+            "/api/model/switch",
+            json={"agent": "claude", "model": "nonexistent-model"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "error"
+
+    def test_switch_happy(self, client_coverage):
+        """Switch with valid agent + model succeeds."""
+        resp = client_coverage.post(
+            "/api/model/switch",
+            json={"agent": "claude", "model": "claude-3"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+
+class TestModelProviderAdd:
+    def test_missing_name(self, client_coverage):
+        """Provider add with no name returns 400."""
+        resp = client_coverage.post("/api/model/provider/add", json={})
+        assert resp.status_code == 400
+
+    def test_add_happy(self, client_coverage):
+        """Provider add with valid name succeeds."""
+        resp = client_coverage.post(
+            "/api/model/provider/add",
+            json={"name": "testprov", "kind": "anthropic"},
+        )
+        # May fail if ProviderDef requires more fields — accept 200 or 422
+        assert resp.status_code in (200, 422)
+
+
+class TestModelProviderDelete:
+    def test_missing_name(self, client_coverage):
+        """Provider delete with no name returns 400."""
+        resp = client_coverage.post("/api/model/provider/delete", json={})
+        assert resp.status_code == 400
+
+    def test_delete_nonexistent(self, client_coverage):
+        """Provider delete with unknown name returns 409 or 200."""
+        resp = client_coverage.post(
+            "/api/model/provider/delete",
+            json={"name": "nonexistent-prov"},
+        )
+        # remove_provider raises ValueError → 409, or handle_api_errors wraps
+        assert resp.status_code in (200, 409, 422, 500)
+
+
+class TestModelAdd:
+    def test_missing_name(self, client_coverage):
+        """Model add with no name returns 400."""
+        resp = client_coverage.post("/api/model/add", json={})
+        assert resp.status_code == 400
+
+    def test_add_happy(self, client_coverage):
+        """Model add with valid fields succeeds."""
+        resp = client_coverage.post(
+            "/api/model/add",
+            json={
+                "name": "test-model-1", "provider": "anthropic",
+                "family": "claude-3", "context_window": 200000,
+                "max_output": 4096, "cost_per_1k_input": 0.01,
+                "cost_per_1k_output": 0.03, "capabilities": ["code"],
+                "latency_tier": "fast", "quality_tier": "excellent", "enabled": True,
+            },
+        )
+        assert resp.status_code in (200, 422)
+
+
+class TestModelDelete:
+    def test_missing_name(self, client_coverage):
+        """Model delete with no name returns 400."""
+        resp = client_coverage.post("/api/model/delete", json={})
+        assert resp.status_code == 400
+
+    def test_delete_nonexistent(self, client_coverage):
+        """Model delete with unknown name returns 404."""
+        resp = client_coverage.post(
+            "/api/model/delete",
+            json={"name": "nonexistent-model"},
+        )
+        assert resp.status_code in (404, 500)
+
+
+class TestApiKeyStore:
+    def test_missing_fields(self, client_coverage):
+        """Key store with missing fields returns 400."""
+        resp = client_coverage.post("/api/model/key/store", json={})
+        assert resp.status_code == 400
+
+    def test_store_happy(self, client_coverage):
+        """Key store with valid provider + key succeeds."""
+        resp = client_coverage.post(
+            "/api/model/key/store",
+            json={"provider": "anthropic", "api_key": "sk-test-123"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+
+class TestApiKeyDelete:
+    def test_missing_provider(self, client_coverage):
+        """Key delete with no provider returns 400."""
+        resp = client_coverage.post("/api/model/key/delete", json={})
+        assert resp.status_code == 400
+
+    def test_delete_nonexistent(self, client_coverage):
+        """Key delete with unknown provider returns not_found."""
+        resp = client_coverage.post(
+            "/api/model/key/delete",
+            json={"provider": "nonexistent-key"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "not_found"
+
+    def test_delete_existing(self, client_coverage):
+        """Key delete after store returns ok."""
+        client_coverage.post(
+            "/api/model/key/store",
+            json={"provider": "testprov", "api_key": "sk-test"},
+        )
+        resp = client_coverage.post(
+            "/api/model/key/delete",
+            json={"provider": "testprov"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+
+class TestApiKeyList:
+    def test_list_empty(self, client_coverage):
+        """Key list when no keys returns empty."""
+        resp = client_coverage.get("/api/model/key/list")
+        assert resp.status_code == 200
+        assert "providers" in resp.json()
+
+    def test_list_after_store(self, client_coverage):
+        """Key list after storing a key."""
+        client_coverage.post(
+            "/api/model/key/store",
+            json={"provider": "listprov", "api_key": "sk-test"},
+        )
+        resp = client_coverage.get("/api/model/key/list")
+        assert resp.status_code == 200
+        assert "listprov" in resp.json()["providers"]
+
+
+class TestModelHealthCheck:
+    def test_missing_provider(self, client_coverage):
+        """Health check with no provider checks all providers."""
+        resp = client_coverage.post("/api/model/health/check", json={})
+        # May fail if no providers configured — accept 200 or 500
+        assert resp.status_code in (200, 500)
+
+    def test_with_provider(self, client_coverage):
+        """Health check with specific provider."""
+        resp = client_coverage.post(
+            "/api/model/health/check",
+            json={"provider": "anthropic"},
+        )
+        assert resp.status_code in (200, 500)
+
+
+class TestModelGetEndpoints:
+    def test_model_agents(self, client_coverage):
+        """GET /api/model/agents returns agent list."""
+        resp = client_coverage.get("/api/model/agents")
+        assert resp.status_code == 200
+        assert "agents" in resp.json()
+
+    def test_model_quota(self, client_coverage):
+        """GET /api/model/quota returns quota info."""
+        resp = client_coverage.get("/api/model/quota")
+        assert resp.status_code == 200
+
+    def test_model_registry(self, client_coverage):
+        """GET /api/model/registry returns registry stats."""
+        resp = client_coverage.get("/api/model/registry")
+        assert resp.status_code == 200
+
+    def test_model_list(self, client_coverage):
+        """GET /api/model/list returns model list."""
+        resp = client_coverage.get("/api/model/list")
+        assert resp.status_code == 200
+
+    def test_model_providers(self, client_coverage):
+        """GET /api/model/providers returns provider list."""
+        resp = client_coverage.get("/api/model/providers")
+        assert resp.status_code == 200
+
+    def test_model_select(self, client_coverage):
+        """GET /api/model/select returns selected model."""
+        resp = client_coverage.get("/api/model/select")
+        assert resp.status_code in (200, 500)
+
+    def test_model_budget(self, client_coverage):
+        """GET /api/model/budget returns budget info."""
+        resp = client_coverage.get("/api/model/budget")
+        assert resp.status_code == 200
+
+    def test_model_quota_status(self, client_coverage):
+        """GET /api/model/quota/status returns quota status."""
+        resp = client_coverage.get("/api/model/quota/status")
+        assert resp.status_code == 200
+
+    def test_model_policies(self, client_coverage):
+        """GET /api/model/policies returns policy list."""
+        resp = client_coverage.get("/api/model/policies")
+        assert resp.status_code == 200

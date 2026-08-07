@@ -18,7 +18,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import get_db_path
+from maop.core.backends.db_utils import get_db_path
 
 logger = logging.getLogger(__name__)
 

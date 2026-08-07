@@ -154,7 +154,7 @@ def _adaptive_agent_select(route: RouteEntry, rk: str) -> str:
     try:
         import os
 
-        from maop.core.agent_performance import AgentPerformanceTracker
+        from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
         root = os.environ.get("MAOP_ROOT_DIR", ".")
         tracker = AgentPerformanceTracker(root_dir=root)
         best = tracker.best_agent(agents=candidates, routing_key=rk, default=route.primary)
@@ -185,7 +185,7 @@ def _route_by_config(task: str, config: MaopConfig | None, *, adaptive: bool = T
         return None
 
     if scorer is None:
-        from maop.core.route_scorer import RouteScorer
+        from maop.core.routing.route_scorer import RouteScorer
         scorer = RouteScorer(config=config)
     match = scorer.match(task, adaptive=adaptive, trace_id=trace_id)
     if match:
@@ -253,7 +253,7 @@ def maop_plan(
                     break
     else:
         # Priority 2: config-based routing (match regex + keywords)
-        from maop.core.route_scorer import get_route_scorer
+        from maop.core.routing.route_scorer import get_route_scorer
         _scorer = get_route_scorer(config=config)
         config_result = _route_by_config(task, config, trace_id=trace_id, scorer=_scorer)
         if config_result:

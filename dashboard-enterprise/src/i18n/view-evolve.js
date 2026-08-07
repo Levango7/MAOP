@@ -26,6 +26,21 @@ export const messages = {
     'view.evolve.colAvgMs': 'Avg ms',
     'view.evolve.triggered': 'Evolution analysis triggered',
     'view.evolve.failed': 'Evolution failed',
+
+    // ── P2-12: Evolution metrics visualization ───────────────────
+    'view.evolve.timeseries.title': 'Evolution Metrics Trend',
+    'view.evolve.timeseries.desc': 'Success rate / duration / suggestions applied over recent cycles',
+    'view.evolve.heatmap.title': 'Strategy Effectiveness Heatmap',
+    'view.evolve.heatmap.desc': 'Which strategies produced positive gains on which agents',
+    'view.evolve.lineage.title': 'Agent Configuration Lineage',
+    'view.evolve.lineage.desc': 'Version chain of agent config changes applied by the evolution loop',
+    'view.evolve.lineage.empty': 'No config changes recorded yet',
+    'view.evolve.colTimestamp': 'Time',
+    'view.evolve.colStrategy': 'Strategy',
+    'view.evolve.colGain': 'Gain',
+    'view.evolve.colVersion': 'Version',
+    'view.evolve.colChange': 'Change',
+    'view.evolve.colImproved': 'Improved',
   },
   zh: {
     'view.evolve.title': '自我演进',
@@ -54,5 +69,20 @@ export const messages = {
     'view.evolve.colAvgMs': '平均耗时(ms)',
     'view.evolve.triggered': '演化分析已触发',
     'view.evolve.failed': '演化分析失败',
+
+    // ── P2-12: 演化指标可视化 ───────────────────────────────────
+    'view.evolve.timeseries.title': '演化指标趋势',
+    'view.evolve.timeseries.desc': '最近若干轮次的成功率 / 耗时 / 已应用建议数',
+    'view.evolve.heatmap.title': '策略生效热力图',
+    'view.evolve.heatmap.desc': '哪些策略在哪些智能体上产生了正向收益',
+    'view.evolve.lineage.title': '智能体配置世系',
+    'view.evolve.lineage.desc': '演化循环应用的智能体配置变更版本链',
+    'view.evolve.lineage.empty': '暂无配置变更记录',
+    'view.evolve.colTimestamp': '时间',
+    'view.evolve.colStrategy': '策略',
+    'view.evolve.colGain': '收益',
+    'view.evolve.colVersion': '版本',
+    'view.evolve.colChange': '变更',
+    'view.evolve.colImproved': '是否改善',
   },
 };

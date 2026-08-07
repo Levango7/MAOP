@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from maop.core.db_backup import DbBackup
+from maop.core.backends.db_backup import DbBackup
 
 
 @pytest.fixture
@@ -192,18 +192,18 @@ class TestADR011StateSourceTruth:
     """Verify ADR-011: all state is in SQLite, no JSON truth sources remain."""
 
     def test_default_databases_includes_human_queue(self):
-        from maop.core.db_backup import DEFAULT_DATABASES
+        from maop.core.backends.db_backup import DEFAULT_DATABASES
         assert "human_queue.db" in DEFAULT_DATABASES
 
     def test_circuit_breaker_default_path_is_maop_db(self):
-        from maop.core.circuit_breaker import CircuitBreaker
+        from maop.core.reliability.circuit_breaker import CircuitBreaker
         cb = CircuitBreaker()
         assert cb._path.name == "maop.db"
 
     def test_human_proxy_uses_sqlite_not_json(self):
         import inspect
 
-        from maop.core.human_proxy import HumanProxy
+        from maop.core.agent.delegation.human_proxy import HumanProxy
         src = inspect.getsource(HumanProxy)
         assert "get_db_path" in src or "sqlite" in src.lower()
         assert "human-queue.json" not in src

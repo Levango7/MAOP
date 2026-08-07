@@ -1,4 +1,4 @@
-﻿"""Extended tests for MAOP.core.guardrail — all rule types, edge cases, persistence."""
+"""Extended tests for MAOP.core.guardrail — all rule types, edge cases, persistence."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.guardrail import (
+from maop.core.security.guardrail import (
     DEFAULT_RULES,
     Guardrail,
     RuleType,

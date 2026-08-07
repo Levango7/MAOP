@@ -35,7 +35,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from maop.core import otel as otel_module
-from maop.core.mcp_hub import (
+from maop.core.mcp.mcp_hub import (
     MCPHub,
     MCPServerConfig,
     ResourceContent,
@@ -43,7 +43,7 @@ from maop.core.mcp_hub import (
     TransportType,
     _StreamableHttpTransport,
 )
-from maop.core.monitoring import (
+from maop.core.monitoring.monitoring import (
     MAOP_MCP_CALL_DURATION_SECONDS,
     MAOP_MCP_CALL_ERRORS_TOTAL,
     MAOP_MCP_CALLS_TOTAL,

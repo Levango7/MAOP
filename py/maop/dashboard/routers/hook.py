@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
@@ -21,7 +21,7 @@ _hook_mgr = None
 def _get_hook_mgr() -> Any:
     global _hook_mgr
     if _hook_mgr is None:
-        from maop.core.hook_manager import HookManager
+        from maop.core.agent.plugins_hooks.hook_manager import HookManager
         _hook_mgr = HookManager(root_dir=str(MAOP_ROOT))
     return _hook_mgr
 
@@ -132,6 +132,6 @@ async def api_hook_logs(event: str = "", limit: int = 100) -> dict[str, Any]:
 @router.get("/api/hook/events")
 @handle_api_errors("Hook events", error_value={"events": [], "error": "Events failed"})
 async def api_hook_events() -> dict[str, Any]:
-    from maop.core.hook_manager import LifecycleEvent
+    from maop.core.agent.plugins_hooks.hook_manager import LifecycleEvent
     events = [{"name": e.value, "phase": e.value.split(".")[-1], "domain": e.value.split(".")[0]} for e in LifecycleEvent]
     return {"events": events, "count": len(events)}

@@ -18,12 +18,12 @@ import threading
 
 import pytest
 
-from maop.core.monitoring import (
+from maop.core.monitoring.monitoring import (
     MAOP_PRIORITY_QUEUE_SIZE,
     MAOP_TASK_PREEMPTION_TOTAL,
     get_priority_wait_histogram,
 )
-from maop.core.priority_queue import PriorityTask, PriorityTaskQueue
+from maop.core.reliability.priority_queue import PriorityTask, PriorityTaskQueue
 
 # ── PriorityTaskQueue ──────────────────────────────────────────
 
@@ -267,13 +267,13 @@ class TestSoftPreemption:
     """
 
     def _make_pool(self):
-        from maop.core.preemptable_worker_pool import PreemptableWorkerPool
+        from maop.core.reliability.preemptable_worker_pool import PreemptableWorkerPool
         pool = PreemptableWorkerPool(max_workers=1)
         return pool
 
     def _stub_idle(self, pool, idle: int):
         """Replace the underlying WorkerPool.stats() to report a fixed idle count."""
-        from maop.core.worker_pool import PoolStats
+        from maop.core.reliability.worker_pool import PoolStats
 
         def fake_stats() -> PoolStats:
             return PoolStats(
@@ -532,7 +532,7 @@ class TestCheckpointCompleteness:
     """
 
     def test_step_checkpoint_has_required_fields(self):
-        from maop.core.pipeline_checkpoint import StepCheckpoint
+        from maop.core.reliability.pipeline_checkpoint import StepCheckpoint
         sc = StepCheckpoint()
         # The 4 fields the project_memory.md constraint requires.
         assert hasattr(sc, "status")
@@ -550,7 +550,7 @@ class TestCheckpointCompleteness:
         """
         import inspect
 
-        from maop.core.worker_pool import WorkerPool
+        from maop.core.reliability.worker_pool import WorkerPool
         src = inspect.getsource(WorkerPool)
         assert "PipelineCheckpoint" not in src
         assert "pipeline_checkpoint" not in src

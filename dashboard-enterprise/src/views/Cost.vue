@@ -46,7 +46,7 @@
     </div>
 
     <div class="grid-2">
-      <Card :title="t('view.cost.budgetStatus')" icon="shield" :marginBottom="0">
+      <Card :title="t('view.cost.budgetStatus')" icon="shield" :margin-bottom="0">
         <template #actions>
           <Badge v-if="!loading" :tone="budget.daily_over_budget || budget.monthly_over_budget ? 'fail' : 'success'">
             {{ budget.daily_over_budget || budget.monthly_over_budget ? t('view.cost.overBudget') : t('view.cost.withinBudget') }}
@@ -70,7 +70,7 @@
         </div>
       </Card>
 
-      <Card :title="t('view.cost.costByModel')" icon="cpu" :marginBottom="0">
+      <Card :title="t('view.cost.costByModel')" icon="cpu" :margin-bottom="0">
         <div v-if="loading" class="blk"><Skeleton block height="14px" /><Skeleton block height="14px" /><Skeleton block height="14px" /></div>
         <EmptyState v-else-if="!modelKeys.length" icon="cpu" :title="t('view.cost.noModelSpend')" :description="t('view.cost.noModelSpendDesc')" />
         <ul v-else class="breakdown">
@@ -83,7 +83,7 @@
       </Card>
     </div>
 
-    <Card :title="t('view.cost.costByAgent')" icon="bot" marginBottom="16px" class="margin-top">
+    <Card :title="t('view.cost.costByAgent')" icon="bot" margin-bottom="16px" class="margin-top">
       <div v-if="loading" class="blk"><Skeleton block height="14px" /><Skeleton block height="14px" /></div>
       <EmptyState v-else-if="!agentKeys.length" icon="bot" :title="t('view.cost.noAgentSpend')" :description="t('view.cost.noAgentSpendDesc')" />
       <div v-else class="agent-grid">
@@ -95,7 +95,7 @@
       </div>
     </Card>
 
-    <Card :title="t('view.cost.recentEntries')" icon="clipboard" marginBottom="0">
+    <Card :title="t('view.cost.recentEntries')" icon="clipboard" margin-bottom="0">
       <template #actions>
         <Badge v-if="!loading" tone="neutral">{{ entries.length }} {{ t('view.cost.shown') }}</Badge>
       </template>

@@ -1,8 +1,8 @@
-﻿"""Tests for MAOP.core.state_classifier — TaskStateClassifier pattern matching."""
+"""Tests for MAOP.core.state_classifier — TaskStateClassifier pattern matching."""
 
 from __future__ import annotations
 
-from maop.core.state_classifier import (
+from maop.core.agent.lifecycle.state_classifier import (
     ClassificationResult,
     TaskState,
     TaskStateClassifier,

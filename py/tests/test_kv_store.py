@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.kv_store — Lightweight SQLite-backed KV storage."""
+"""Tests for MAOP.core.kv_store — Lightweight SQLite-backed KV storage."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.kv_store import (
+from maop.core.backends.kv_store import (
     CASResult,
     KVEntry,
     KVStats,

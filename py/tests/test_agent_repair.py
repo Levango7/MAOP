@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.agent_repair import (
+from maop.core.agent.lifecycle.agent_repair import (
     AgentRepair,
     DiagnosisResult,
     RepairResult,

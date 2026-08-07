@@ -11,9 +11,14 @@ See ADR-013.
 
 from __future__ import annotations
 
+import asyncio
+from unittest.mock import patch
+
 import pytest
 
-from maop.core.tool_manager import ToolCallResult, ToolDef, ToolManager
+import maop.core.agent.tools.tool_manager as _tm
+from maop.core.agent.tools.tool_manager import ToolCallResult, ToolDef, ToolManager
+from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 
 @pytest.fixture
@@ -276,3 +281,379 @@ class TestCallSyncWrapper:
         result = mgr.call_sync("nope")
         assert result.ok is False
         assert "not found" in result.error
+
+
+# --- Merged from test_tool_manager_coverage3.py ---
+# Coverage tests (round 3) for maop.core.tool_manager.
+#
+# Targets missing lines: 45-47 (_get_maop_version exc), 60-79
+# (_parse_version fallback), 92-113 (_is_version_compatible branches),
+# 193/197 (migration ALTER), 225/227/229-233 (register validation),
+# 340 (call version incompatible), 393-402 (call exceptions),
+# 427-430 (call_sync fallback), 444-482 (_call_sync_fallback).
+
+_get_maop_version = _tm._get_maop_version
+_is_version_compatible = _tm._is_version_compatible
+_parse_version = _tm._parse_version
+
+
+# ── _get_maop_version ───────────────────────────────────────────────
+
+
+class TestGetMaopVersion:
+    def test_version_import_failure(self):
+        """Cover _get_maop_version exception branch (45-47)."""
+        import builtins
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "maop":
+                raise ImportError("boom")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fake_import):
+            result = _get_maop_version()
+        assert result == ""
+
+
+# ── _parse_version ──────────────────────────────────────────────────
+
+
+class TestParseVersion:
+    def test_empty_string(self):
+        assert _parse_version("") == (0,)
+
+    def test_packaging_available(self):
+        """Normal path: packaging.version.Version succeeds."""
+        result = _parse_version("1.2.3")
+        # Should be a Version object, not a tuple
+        assert str(result) == "1.2.3"
+
+    def test_packaging_import_error(self):
+        """Cover ImportError fallback (65-66) → tuple path (70-79)."""
+        import builtins
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "packaging.version":
+                raise ImportError("no packaging")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fake_import):
+            result = _parse_version("1.2.3")
+        assert result == (1, 2, 3)
+
+    def test_packaging_parse_error(self):
+        """Cover parse exception fallback (67-68) → tuple path (70-79)."""
+        # Force Version() to raise by mocking the import
+        with patch("packaging.version.Version", side_effect=Exception("parse boom")):
+            result = _parse_version("1.2.3")
+        assert result == (1, 2, 3)
+
+    def test_fallback_with_non_digit_suffix(self):
+        """Cover tuple fallback stripping non-digit suffix (73-78)."""
+        import builtins
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "packaging.version":
+                raise ImportError("no packaging")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fake_import):
+            result = _parse_version("1.2rc1")
+        assert result == (1, 2)
+
+    def test_fallback_all_non_digit(self):
+        """Cover segment with no digits → 0 (78)."""
+        import builtins
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "packaging.version":
+                raise ImportError("no packaging")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fake_import):
+            result = _parse_version("abc.def")
+        assert result == (0, 0)
+
+
+# ── _is_version_compatible ──────────────────────────────────────────
+
+
+class TestIsVersionCompatible:
+    def test_empty_requirement(self):
+        """Cover empty min_platform_version (90-91)."""
+        assert _is_version_compatible("") is True
+
+    def test_unknown_maop_version(self):
+        """Cover unknown MAOP version branch (93-99)."""
+        with patch("maop.core.agent.tools.tool_manager._get_maop_version", return_value=""):
+            assert _is_version_compatible("2.0") is True
+
+    def test_compatible(self):
+        """Cover compatible version (101-102)."""
+        with patch("maop.core.agent.tools.tool_manager._get_maop_version", return_value="2.0"):
+            assert _is_version_compatible("1.0") is True
+
+    def test_incompatible(self):
+        """Cover incompatible version (103-107)."""
+        with patch("maop.core.agent.tools.tool_manager._get_maop_version", return_value="1.0"):
+            assert _is_version_compatible("2.0") is False
+
+    def test_comparison_exception(self):
+        """Cover comparison exception (108-113)."""
+        # Make _parse_version raise to trigger the except branch
+        with patch(
+            "maop.core.agent.tools.tool_manager._parse_version",
+            side_effect=TypeError("cannot compare"),
+        ), patch(
+            "maop.core.agent.tools.tool_manager._get_maop_version", return_value="1.0"
+        ):
+            assert _is_version_compatible("2.0") is True
+
+
+# ── ToolManager migration & register validation ─────────────────────
+
+
+class TestToolManagerMigrationAndValidation:
+    def test_migration_adds_version_columns(self, tmp_path):
+        """Cover ALTER TABLE migration (193, 197)."""
+        # Create a legacy DB without version/min_platform_version columns
+        db_path = get_db_path("tool_manager")
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite_connect(db_path, foreign_keys=False) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS tools (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    command TEXT NOT NULL,
+                    category TEXT DEFAULT 'general',
+                    params TEXT DEFAULT '{}',
+                    enabled INTEGER DEFAULT 1,
+                    created TEXT NOT NULL,
+                    last_called TEXT,
+                    call_count INTEGER DEFAULT 0
+                )
+            """)
+            conn.execute("""
+                INSERT INTO tools (id, name, description, command, category, params,
+                                   enabled, created, last_called, call_count)
+                VALUES ('legacy', 'legacy', '', 'echo hi', 'general', '{}', 1, '2024', NULL, 0)
+            """)
+
+        # Now init ToolManager — should trigger migration
+        mgr = ToolManager(root_dir=str(tmp_path))
+        tool = mgr.info("legacy")
+        assert tool is not None
+        assert tool.version == "1.0"
+        assert tool.min_platform_version == ""
+
+    def test_register_empty_tool_id(self, tmp_path):
+        """Cover empty tool_id validation (225)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        with pytest.raises(ValueError, match="tool_id"):
+            mgr.register("", command="echo hi")
+
+    def test_register_empty_command(self, tmp_path):
+        """Cover empty command validation (227)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        with pytest.raises(ValueError, match="command"):
+            mgr.register("t1", command="")
+
+    def test_register_version_incompatible(self, tmp_path):
+        """Cover version incompatible rejection (229-233)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        with patch(
+            "maop.core.agent.tools.tool_manager._is_version_compatible", return_value=False
+        ):
+            with pytest.raises(ValueError, match="incompatible"):
+                mgr.register("t1", command="echo hi", min_platform_version="99.0")
+
+
+# ── call() exception branches ───────────────────────────────────────
+
+
+class TestCallExceptions:
+    @pytest.mark.asyncio
+    async def test_call_version_incompatible(self, tmp_path):
+        """Cover call() version incompatible return (340)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        # Register with a compatible version, then mock to make call fail
+        mgr.register("t1", command="echo hi")
+        with patch(
+            "maop.core.agent.tools.tool_manager._is_version_compatible", return_value=False
+        ):
+            result = await mgr.call("t1")
+        assert result.ok is False
+        assert "incompatible" in result.error
+
+    @pytest.mark.asyncio
+    async def test_call_file_not_found(self, tmp_path):
+        """Cover FileNotFoundError branch (393-399)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        mgr.register("t1", command="nonexistent_cmd_xyz")
+        result = await mgr.call("t1")
+        assert result.ok is False
+        assert result.exit_code == -2
+        assert "not found" in result.error
+
+    @pytest.mark.asyncio
+    async def test_call_generic_exception(self, tmp_path):
+        """Cover generic Exception branch (400-405)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        mgr.register("t1", command="echo hi")
+
+        # Mock create_subprocess_exec to raise a generic exception
+        with patch(
+            "asyncio.create_subprocess_exec",
+            side_effect=OSError("boom"),
+        ):
+            result = await mgr.call("t1")
+        assert result.ok is False
+        assert result.exit_code == -3
+
+    @pytest.mark.asyncio
+    async def test_call_timeout(self, tmp_path):
+        """Cover timeout branch (362-371)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        # Use a command that sleeps longer than the timeout
+        mgr.register("sleeper", command='python -c "import time; time.sleep(10)"')
+        result = await mgr.call("sleeper", timeout_seconds=1)
+        assert result.ok is False
+        assert result.error == "timeout"
+
+    @pytest.mark.asyncio
+    async def test_call_with_stderr(self, tmp_path):
+        """Cover stderr capture when returncode != 0 (391)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        # python command that writes to stderr and exits 1
+        mgr.register(
+            "err",
+            command='python -c "import sys; sys.stderr.write(\'err msg\'); sys.exit(1)"',
+        )
+        result = await mgr.call("err")
+        assert result.ok is False
+        assert "err msg" in result.error
+
+    @pytest.mark.asyncio
+    async def test_call_disabled(self, tmp_path):
+        """Cover disabled tool branch (337-338)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        mgr.register("t1", command="echo hi")
+        mgr.disable("t1")
+        result = await mgr.call("t1")
+        assert result.ok is False
+        assert "disabled" in result.error
+
+
+# ── call_sync() fallback ────────────────────────────────────────────
+
+
+class TestCallSyncFallback:
+    def test_call_sync_normal(self, tmp_path):
+        """Cover call_sync normal path."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        mgr.register("t1", command="python -c print(42)")
+        result = mgr.call_sync("t1")
+        assert result.ok is True
+        assert "42" in result.output
+
+    def test_call_sync_with_running_loop(self, tmp_path):
+        """Cover call_sync RuntimeError → _call_sync_fallback (427-430)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        mgr.register("t1", command="python -c print(42)")
+
+        # Simulate being inside a running event loop
+        async def _run():
+            # new_event_loop() will succeed, but run_until_complete
+            # inside a coroutine raises RuntimeError
+            return mgr.call_sync("t1")
+
+        result = asyncio.run(_run())
+        assert result.ok is True
+        assert "42" in result.output
+
+    def test_call_sync_fallback_not_found(self, tmp_path):
+        """Cover _call_sync_fallback tool not found (444-446)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+
+        # Force the fallback path by mocking asyncio.new_event_loop to
+        # raise RuntimeError
+        async def _run():
+            return mgr.call_sync("nonexistent")
+
+        result = asyncio.run(_run())
+        assert result.ok is False
+        assert "not found" in result.error
+
+    def test_call_sync_fallback_disabled(self, tmp_path):
+        """Cover _call_sync_fallback disabled tool (447-448)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        mgr.register("t1", command="echo hi")
+        mgr.disable("t1")
+
+        async def _run():
+            return mgr.call_sync("t1")
+
+        result = asyncio.run(_run())
+        assert result.ok is False
+        assert "disabled" in result.error
+
+    def test_call_sync_fallback_version_incompatible(self, tmp_path):
+        """Cover _call_sync_fallback version incompatible (449-456)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        mgr.register("t1", command="echo hi")
+
+        with patch(
+            "maop.core.agent.tools.tool_manager._is_version_compatible", return_value=False
+        ):
+            async def _run():
+                return mgr.call_sync("t1")
+
+            result = asyncio.run(_run())
+        assert result.ok is False
+        assert "incompatible" in result.error
+
+    def test_call_sync_fallback_timeout(self, tmp_path):
+        """Cover _call_sync_fallback subprocess timeout (479-480)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        mgr.register("sleeper", command='python -c "import time; time.sleep(10)"')
+
+        async def _run():
+            return mgr.call_sync("sleeper", timeout_seconds=1)
+
+        result = asyncio.run(_run())
+        assert result.ok is False
+        assert result.error == "timeout"
+
+    def test_call_sync_fallback_exception(self, tmp_path):
+        """Cover _call_sync_fallback generic exception (481-482)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        mgr.register("t1", command="echo hi")
+
+        # Mock subprocess.run to raise a generic exception
+        with patch("subprocess.run", side_effect=OSError("boom")):
+            async def _run():
+                return mgr.call_sync("t1")
+
+            result = asyncio.run(_run())
+        assert result.ok is False
+        assert "boom" in result.error
+
+    def test_call_sync_fallback_with_stderr(self, tmp_path):
+        """Cover _call_sync_fallback stderr capture (477)."""
+        mgr = ToolManager(root_dir=str(tmp_path))
+        mgr.register(
+            "err",
+            command='python -c "import sys; sys.stderr.write(\'err\'); sys.exit(1)"',
+        )
+
+        async def _run():
+            return mgr.call_sync("err")
+
+        result = asyncio.run(_run())
+        assert result.ok is False
+        assert "err" in result.error

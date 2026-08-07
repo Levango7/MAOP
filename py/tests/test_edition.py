@@ -316,20 +316,20 @@ class TestSettingsIntegration:
 
 class TestBackendSelection:
     def test_personal_storage_is_sqlite(self):
-        from maop.core.backends import get_storage_backend, reset_backends
+        from maop.core.backends.backends import get_storage_backend, reset_backends
         reset_backends()
         set_edition(Edition.PERSONAL)
-        from maop.core.backends import SQLiteStorageBackend
+        from maop.core.backends.backends import SQLiteStorageBackend
         backend = get_storage_backend(db_path=":memory:")
         assert isinstance(backend, SQLiteStorageBackend)
         reset_backends()
 
     def test_explicit_override_wins(self):
-        from maop.core.backends import get_storage_backend, reset_backends
+        from maop.core.backends.backends import get_storage_backend, reset_backends
         reset_backends()
         set_edition(Edition.ENTERPRISE)
         with patch.dict(os.environ, {"MAOP_STORAGE_BACKEND": "sqlite"}, clear=False):
-            from maop.core.backends import SQLiteStorageBackend
+            from maop.core.backends.backends import SQLiteStorageBackend
             backend = get_storage_backend(db_path=":memory:")
             assert isinstance(backend, SQLiteStorageBackend)
         reset_backends()

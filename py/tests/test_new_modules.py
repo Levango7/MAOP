@@ -19,25 +19,25 @@ from pathlib import Path
 
 class TestAnalyzer:
     async def test_single_task(self):
-        from maop.core.analyzer import analyze
+        from maop.core.agent.analyzer import analyze
         result = await analyze("fix the authentication bug")
         assert len(result.sub_tasks) >= 1
         assert result.complexity_score >= 0
         assert result.primary_category in ("code", "general", "debug")
 
     async def test_multi_step_decomposition(self):
-        from maop.core.analyzer import analyze
+        from maop.core.agent.analyzer import analyze
         result = await analyze("1. Write unit tests\n2. Fix the bug\n3. Update documentation")
         assert len(result.sub_tasks) == 3
         assert result.dag.nodes == ["st-000", "st-001", "st-002"]
 
     async def test_conjunction_splitting(self):
-        from maop.core.analyzer import analyze
+        from maop.core.agent.analyzer import analyze
         result = await analyze("refactor the module and add tests")
         assert len(result.sub_tasks) >= 2
 
     async def test_dag_topological_order(self):
-        from maop.core.analyzer import analyze
+        from maop.core.agent.analyzer import analyze
         result = await analyze("1. Design API\n2. Implement backend\n3. Write tests")
         order = result.dag.topological_order()
         assert len(order) == 3
@@ -45,13 +45,13 @@ class TestAnalyzer:
         assert order.index("st-000") < order.index("st-001")
 
     def test_dag_parallel_groups(self):
-        from maop.core.analyzer import DependencyDAG
+        from maop.core.agent.analyzer import DependencyDAG
         dag = DependencyDAG(nodes=["a", "b", "c"], edges=[("a", "b")])
         groups = dag.parallel_groups()
         assert len(groups) >= 2  # a first, then b+c or b then c
 
     async def test_complexity_levels(self):
-        from maop.core.analyzer import Complexity, analyze
+        from maop.core.agent.analyzer import Complexity, analyze
         # Trivial
         r1 = await analyze("say hello")
         assert r1.complexity_level in (Complexity.TRIVIAL, Complexity.SIMPLE)
@@ -60,12 +60,12 @@ class TestAnalyzer:
         assert r2.complexity_score > r1.complexity_score
 
     async def test_risk_detection(self):
-        from maop.core.analyzer import analyze
+        from maop.core.agent.analyzer import analyze
         result = await analyze("drop the production database and remove all backups")
         assert result.requires_human_review
 
     async def test_task_hash(self):
-        from maop.core.analyzer import analyze
+        from maop.core.agent.analyzer import analyze
         r1 = await analyze("fix bug")
         r2 = await analyze("fix bug")
         assert r1.task_hash == r2.task_hash
@@ -73,7 +73,7 @@ class TestAnalyzer:
         assert r1.task_hash != r3.task_hash
 
     async def test_analysis_layers(self):
-        from maop.core.analyzer import analyze
+        from maop.core.agent.analyzer import analyze
         result = await analyze("write tests")
         assert "rule" in result.analysis_layers
         assert "semantic" in result.analysis_layers
@@ -85,7 +85,7 @@ class TestAnalyzer:
 
 class TestKVStore:
     def test_set_and_get(self):
-        from maop.core.kv_store import KVStore
+        from maop.core.backends.kv_store import KVStore
         with tempfile.TemporaryDirectory() as tmp:
             store = KVStore(Path(tmp) / "kv.db")
             store.set("key1", "value1")
@@ -93,14 +93,14 @@ class TestKVStore:
             store.close()
 
     def test_get_default(self):
-        from maop.core.kv_store import KVStore
+        from maop.core.backends.kv_store import KVStore
         with tempfile.TemporaryDirectory() as tmp:
             store = KVStore(Path(tmp) / "kv.db")
             assert store.get("missing", default="fallback") == "fallback"
             store.close()
 
     def test_ttl_expiration(self):
-        from maop.core.kv_store import KVStore
+        from maop.core.backends.kv_store import KVStore
         with tempfile.TemporaryDirectory() as tmp:
             store = KVStore(Path(tmp) / "kv.db")
             store.set("temp_key", "temp_value", ttl=0.1)
@@ -110,7 +110,7 @@ class TestKVStore:
             store.close()
 
     def test_namespaces(self):
-        from maop.core.kv_store import KVStore
+        from maop.core.backends.kv_store import KVStore
         with tempfile.TemporaryDirectory() as tmp:
             store = KVStore(Path(tmp) / "kv.db")
             store.set("key", "v1", namespace="ns1")
@@ -120,7 +120,7 @@ class TestKVStore:
             store.close()
 
     def test_delete(self):
-        from maop.core.kv_store import KVStore
+        from maop.core.backends.kv_store import KVStore
         with tempfile.TemporaryDirectory() as tmp:
             store = KVStore(Path(tmp) / "kv.db")
             store.set("key", "value")
@@ -129,7 +129,7 @@ class TestKVStore:
             store.close()
 
     def test_cas(self):
-        from maop.core.kv_store import KVStore
+        from maop.core.backends.kv_store import KVStore
         with tempfile.TemporaryDirectory() as tmp:
             store = KVStore(Path(tmp) / "kv.db")
             entry = store.set("key", "v1")
@@ -139,7 +139,7 @@ class TestKVStore:
             store.close()
 
     def test_cas_conflict(self):
-        from maop.core.kv_store import KVStore
+        from maop.core.backends.kv_store import KVStore
         with tempfile.TemporaryDirectory() as tmp:
             store = KVStore(Path(tmp) / "kv.db")
             store.set("key", "v1")
@@ -148,7 +148,7 @@ class TestKVStore:
             store.close()
 
     def test_bulk_operations(self):
-        from maop.core.kv_store import KVStore
+        from maop.core.backends.kv_store import KVStore
         with tempfile.TemporaryDirectory() as tmp:
             store = KVStore(Path(tmp) / "kv.db")
             store.set_many({"a": 1, "b": 2, "c": 3})
@@ -157,7 +157,7 @@ class TestKVStore:
             store.close()
 
     def test_stats(self):
-        from maop.core.kv_store import KVStore
+        from maop.core.backends.kv_store import KVStore
         with tempfile.TemporaryDirectory() as tmp:
             store = KVStore(Path(tmp) / "kv.db")
             store.set("k1", "v1")
@@ -175,21 +175,21 @@ class TestKVStore:
 
 class TestRuntime:
     def test_local_execute(self):
-        from maop.core.runtime import LocalRuntime, RuntimeConfig, RuntimeType
+        from maop.core.agent.lifecycle.runtime import LocalRuntime, RuntimeConfig, RuntimeType
         rt = LocalRuntime(RuntimeConfig(type=RuntimeType.LOCAL))
         result = rt.execute("echo hello")
         assert result.exit_code == 0
         assert "hello" in result.stdout
 
     def test_local_info(self):
-        from maop.core.runtime import LocalRuntime, RuntimeConfig, RuntimeType
+        from maop.core.agent.lifecycle.runtime import LocalRuntime, RuntimeConfig, RuntimeType
         rt = LocalRuntime(RuntimeConfig())
         info = rt.info()
         assert info.available
         assert info.type == RuntimeType.LOCAL
 
     def test_isolated_execute(self):
-        from maop.core.runtime import IsolatedRuntime, RuntimeConfig, RuntimeType
+        from maop.core.agent.lifecycle.runtime import IsolatedRuntime, RuntimeConfig, RuntimeType
         with tempfile.TemporaryDirectory() as tmp:
             rt = IsolatedRuntime(RuntimeConfig(
                 type=RuntimeType.ISOLATED,
@@ -200,12 +200,12 @@ class TestRuntime:
             assert "isolated" in result.stdout
 
     def test_create_runtime_local(self):
-        from maop.core.runtime import LocalRuntime, RuntimeConfig, RuntimeType, create_runtime
+        from maop.core.agent.lifecycle.runtime import LocalRuntime, RuntimeConfig, RuntimeType, create_runtime
         rt = create_runtime(RuntimeConfig(type=RuntimeType.LOCAL))
         assert isinstance(rt, LocalRuntime)
 
     def test_timeout(self):
-        from maop.core.runtime import LocalRuntime, RuntimeConfig
+        from maop.core.agent.lifecycle.runtime import LocalRuntime, RuntimeConfig
         rt = LocalRuntime(RuntimeConfig(timeout_s=0.5))
         result = rt.execute("ping -n 5 127.0.0.1")
         assert result.timed_out
@@ -217,13 +217,13 @@ class TestRuntime:
 
 class TestCacheGuard:
     def test_basic_get(self):
-        from maop.core.cache_guard import CacheGuard
+        from maop.core.reliability.cache import CacheGuard
         guard = CacheGuard()
         result = guard.get("key1", lambda: "loaded_value")
         assert result == "loaded_value"
 
     def test_cache_hit(self):
-        from maop.core.cache_guard import CacheGuard
+        from maop.core.reliability.cache import CacheGuard
         guard = CacheGuard()
         call_count = 0
         def loader():
@@ -235,7 +235,7 @@ class TestCacheGuard:
         assert call_count == 1  # Second call should hit cache
 
     def test_null_caching(self):
-        from maop.core.cache_guard import CacheGuard, CacheGuardConfig
+        from maop.core.reliability.cache import CacheGuard, CacheGuardConfig
         guard = CacheGuard(config=CacheGuardConfig(null_ttl=0.1))
         call_count = 0
         def loader():
@@ -246,14 +246,14 @@ class TestCacheGuard:
         assert call_count == 1  # Null should be cached
 
     def test_invalidate(self):
-        from maop.core.cache_guard import CacheGuard
+        from maop.core.reliability.cache import CacheGuard
         guard = CacheGuard()
         guard.get("key1", lambda: "value")
         assert guard.invalidate("key1") is True
         assert guard.get("key1", lambda: "new_value") == "new_value"
 
     def test_stats(self):
-        from maop.core.cache_guard import CacheGuard
+        from maop.core.reliability.cache import CacheGuard
         guard = CacheGuard()
         guard.get("key1", lambda: "v1")
         guard.get("key1", lambda: "v1")  # hit
@@ -268,7 +268,7 @@ class TestCacheGuard:
 
 class TestTimeSeries:
     def test_record_and_query(self):
-        from maop.core.timeseries import TimeSeriesQuery, TimeSeriesStore
+        from maop.core.monitoring.timeseries import TimeSeriesQuery, TimeSeriesStore
         with tempfile.TemporaryDirectory() as tmp:
             store = TimeSeriesStore(Path(tmp) / "ts.db")
             now = time.time()
@@ -280,7 +280,7 @@ class TestTimeSeries:
             store.close()
 
     def test_batch_record(self):
-        from maop.core.timeseries import DataPoint, TimeSeriesStore
+        from maop.core.monitoring.timeseries import DataPoint, TimeSeriesStore
         with tempfile.TemporaryDirectory() as tmp:
             store = TimeSeriesStore(Path(tmp) / "ts.db")
             points = [DataPoint(timestamp=time.time() - i, metric="req_rate", value=float(i)) for i in range(10)]
@@ -289,7 +289,7 @@ class TestTimeSeries:
             store.close()
 
     def test_stats(self):
-        from maop.core.timeseries import TimeSeriesStore
+        from maop.core.monitoring.timeseries import TimeSeriesStore
         with tempfile.TemporaryDirectory() as tmp:
             store = TimeSeriesStore(Path(tmp) / "ts.db")
             store.record("test_metric", 1.0)
@@ -305,13 +305,13 @@ class TestTimeSeries:
 
 class TestRateLimiter:
     def test_token_bucket_allows(self):
-        from maop.core.rate_limiter import TokenBucket
+        from maop.core.reliability.rate_limiter import TokenBucket
         tb = TokenBucket(rate=10, burst=5)
         result = tb.consume()
         assert result.allowed
 
     def test_token_bucket_limits(self):
-        from maop.core.rate_limiter import TokenBucket
+        from maop.core.reliability.rate_limiter import TokenBucket
         tb = TokenBucket(rate=1, burst=2)
         tb.consume()
         tb.consume()
@@ -319,7 +319,7 @@ class TestRateLimiter:
         assert not result.allowed
 
     def test_sliding_window(self):
-        from maop.core.rate_limiter import SlidingWindow
+        from maop.core.reliability.rate_limiter import SlidingWindow
         sw = SlidingWindow(max_requests=3, window_s=60.0)
         assert sw.consume().allowed
         assert sw.consume().allowed
@@ -327,14 +327,14 @@ class TestRateLimiter:
         assert not sw.consume().allowed
 
     def test_multi_key_limiter(self):
-        from maop.core.rate_limiter import RateLimiter, RateLimiterConfig
+        from maop.core.reliability.rate_limiter import RateLimiter, RateLimiterConfig
         rl = RateLimiter(RateLimiterConfig(algorithm="token_bucket", rate=1, burst=2))
         assert rl.consume("user1").allowed
         assert rl.consume("user2").allowed  # Different key, separate limit
         assert "user1" in rl.active_keys()
 
     def test_reset(self):
-        from maop.core.rate_limiter import RateLimiter, RateLimiterConfig
+        from maop.core.reliability.rate_limiter import RateLimiter, RateLimiterConfig
         rl = RateLimiter(RateLimiterConfig(rate=1, burst=1))
         rl.consume("key1")
         rl.reset("key1")
@@ -347,7 +347,7 @@ class TestRateLimiter:
 
 class TestAuth:
     def test_api_key_create_and_validate(self):
-        from maop.core.auth import APIKeyStore
+        from maop.core.security.auth import APIKeyStore
         with tempfile.TemporaryDirectory() as tmp:
             store = APIKeyStore(Path(tmp) / "auth.db")
             raw_key = store.create_key("test-service", roles=["read"])
@@ -358,7 +358,7 @@ class TestAuth:
             store.close()
 
     def test_api_key_invalid(self):
-        from maop.core.auth import APIKeyStore
+        from maop.core.security.auth import APIKeyStore
         with tempfile.TemporaryDirectory() as tmp:
             store = APIKeyStore(Path(tmp) / "auth.db")
             result = store.validate_key("invalid_key")
@@ -366,7 +366,7 @@ class TestAuth:
             store.close()
 
     def test_api_key_revoke(self):
-        from maop.core.auth import APIKeyStore
+        from maop.core.security.auth import APIKeyStore
         with tempfile.TemporaryDirectory() as tmp:
             store = APIKeyStore(Path(tmp) / "auth.db")
             raw_key = store.create_key("revoke-me")
@@ -376,7 +376,7 @@ class TestAuth:
             store.close()
 
     def test_jwt_create_and_validate(self):
-        from maop.core.auth import JWTConfig, JWTHandler
+        from maop.core.security.auth import JWTConfig, JWTHandler
         handler = JWTHandler(JWTConfig(secret="test-secret"))
         token = handler.create_token("user1", roles=["admin"])
         result = handler.validate_token(token)
@@ -384,7 +384,7 @@ class TestAuth:
         assert result.identity == "user1"
 
     def test_jwt_expired(self):
-        from maop.core.auth import JWTConfig, JWTHandler
+        from maop.core.security.auth import JWTConfig, JWTHandler
         handler = JWTHandler(JWTConfig(secret="test-secret"))
         token = handler.create_token("user1", ttl_s=-1)  # Already expired
         result = handler.validate_token(token)
@@ -392,9 +392,9 @@ class TestAuth:
         assert "expired" in result.error.lower()
 
     def test_auth_manager(self):
-        from maop.core.auth import AuthConfig, AuthManager
+        from maop.core.security.auth import AuthConfig, AuthManager
         with tempfile.TemporaryDirectory() as tmp:
-            from maop.core.auth import APIKeyStore
+            from maop.core.security.auth import APIKeyStore
             key_store = APIKeyStore(Path(tmp) / "auth.db")
             raw_key = key_store.create_key("svc", roles=["read"])
             mgr = AuthManager(AuthConfig(enabled=True), key_store=key_store)
@@ -409,14 +409,14 @@ class TestAuth:
 
 class TestMonitoring:
     def test_counter(self):
-        from maop.core.monitoring import Counter
+        from maop.core.monitoring.monitoring import Counter
         c = Counter("test_counter", "Test")
         c.inc()
         c.inc(5)
         assert c.get() == 6.0
 
     def test_gauge(self):
-        from maop.core.monitoring import Gauge
+        from maop.core.monitoring.monitoring import Gauge
         g = Gauge("test_gauge", "Test")
         g.set(42)
         assert g.get() == 42
@@ -426,7 +426,7 @@ class TestMonitoring:
         assert g.get() == 40
 
     def test_histogram(self):
-        from maop.core.monitoring import Histogram
+        from maop.core.monitoring.monitoring import Histogram
         h = Histogram("test_hist", "Test")
         h.observe(0.1)
         h.observe(0.5)
@@ -435,7 +435,7 @@ class TestMonitoring:
         assert abs(h._sum - 2.1) < 0.01
 
     def test_prometheus_export(self):
-        from maop.core.monitoring import MetricsCollector
+        from maop.core.monitoring.monitoring import MetricsCollector
         mc = MetricsCollector()
         mc.counter("c1", "Help").inc()
         mc.gauge("g1", "Help").set(42)
@@ -444,13 +444,13 @@ class TestMonitoring:
         assert "g1" in output
 
     def test_structured_logger(self):
-        from maop.core.monitoring import StructuredLogger
+        from maop.core.monitoring.monitoring import StructuredLogger
         sl = StructuredLogger("test", trace_id="abc123")
         # Just verify it doesn't crash
         sl.info("test message", extra_key="extra_value")
 
     def test_global_metrics(self):
-        from maop.core.monitoring import MAOP_ACTIVE_AGENTS, MAOP_DELEGATIONS_TOTAL
+        from maop.core.monitoring.monitoring import MAOP_ACTIVE_AGENTS, MAOP_DELEGATIONS_TOTAL
         MAOP_DELEGATIONS_TOTAL.inc()
         assert MAOP_DELEGATIONS_TOTAL.get() >= 1
         MAOP_ACTIVE_AGENTS.set(5)

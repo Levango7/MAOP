@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.error_schema import MaopResult
+from maop.core.reliability.error_schema import MaopResult
 from maop.maop_verify import VerifyResult
 
 

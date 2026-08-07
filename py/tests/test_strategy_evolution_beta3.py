@@ -14,8 +14,8 @@ from maop.cache_evolver import (
     CacheEvolveReport,
     CacheStrategyAdjustment,
 )
-from maop.core.cache import LRUCache
-from maop.core.semantic_cache import SemanticCache
+from maop.core.reliability.cache import LRUCache
+from maop.core.memory.semantic_cache import SemanticCache
 
 
 class TestAgentStrategyLearner:
@@ -38,7 +38,7 @@ class TestAgentStrategyLearner:
         assert report.routing_winners == {}
 
     def test_learn_with_performance_data(self, tmp_path: Path) -> None:
-        from maop.core.agent_performance import AgentPerformanceTracker
+        from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
         tracker = AgentPerformanceTracker(root_dir=tmp_path)
         for _ in range(8):
             tracker.record(agent="agent_a", routing_key="code", outcome="success")
@@ -54,7 +54,7 @@ class TestAgentStrategyLearner:
         assert report.routing_winners.get("code") == "agent_a"
 
     def test_underperformer_triggers_reroute(self, tmp_path: Path) -> None:
-        from maop.core.agent_performance import AgentPerformanceTracker
+        from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
         tracker = AgentPerformanceTracker(root_dir=tmp_path)
         for _ in range(10):
             tracker.record(agent="good_agent", routing_key="test", outcome="success")
@@ -69,7 +69,7 @@ class TestAgentStrategyLearner:
         assert any(a.agent == "poor_agent" for a in reroute_adjs)
 
     def test_severe_underperformer_triggers_disable(self, tmp_path: Path) -> None:
-        from maop.core.agent_performance import AgentPerformanceTracker
+        from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
         tracker = AgentPerformanceTracker(root_dir=tmp_path)
         for _ in range(15):
             tracker.record(agent="bad_agent", routing_key="task", outcome="failure")
@@ -81,7 +81,7 @@ class TestAgentStrategyLearner:
         assert disable_adjs[0].auto_applicable is False
 
     def test_slow_reliable_agent_triggers_reduce_timeout(self, tmp_path: Path) -> None:
-        from maop.core.agent_performance import AgentPerformanceTracker
+        from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
         tracker = AgentPerformanceTracker(root_dir=tmp_path)
         for _ in range(10):
             tracker.record(agent="slow_agent", routing_key="work", outcome="success", latency_ms=90000)
@@ -92,7 +92,7 @@ class TestAgentStrategyLearner:
         assert timeout_adjs[0].auto_applicable is True
 
     def test_reliable_winner_gets_prefer(self, tmp_path: Path) -> None:
-        from maop.core.agent_performance import AgentPerformanceTracker
+        from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
         tracker = AgentPerformanceTracker(root_dir=tmp_path)
         for _ in range(20):
             tracker.record(agent="star_agent", routing_key="key1", outcome="success")
@@ -102,7 +102,7 @@ class TestAgentStrategyLearner:
         assert len(prefer_adjs) >= 1
 
     def test_adjustments_sorted_by_confidence(self, tmp_path: Path) -> None:
-        from maop.core.agent_performance import AgentPerformanceTracker
+        from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
         tracker = AgentPerformanceTracker(root_dir=tmp_path)
         for _ in range(20):
             tracker.record(agent="a1", routing_key="k", outcome="success")
@@ -122,7 +122,7 @@ class TestAgentStrategyLearner:
         assert learner.apply_adjustment(adj) is False
 
     def test_recommendations_generated(self, tmp_path: Path) -> None:
-        from maop.core.agent_performance import AgentPerformanceTracker
+        from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
         tracker = AgentPerformanceTracker(root_dir=tmp_path)
         for _ in range(10):
             tracker.record(agent="a", routing_key="k", outcome="success")
@@ -284,7 +284,7 @@ class TestAutoEvolveBeta3Integration:
         assert "auto_applied" in result
 
     def test_auto_evolve_agent_strategy_with_data(self, tmp_path: Path) -> None:
-        from maop.core.agent_performance import AgentPerformanceTracker
+        from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
         from maop.evolve import EvolveEngine
         tracker = AgentPerformanceTracker(root_dir=tmp_path)
         for _ in range(10):

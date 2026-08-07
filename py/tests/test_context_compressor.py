@@ -1,10 +1,10 @@
-﻿"""Tests for MAOP.core.context_compressor — Nine-section context compaction."""
+"""Tests for MAOP.core.context_compressor — Nine-section context compaction."""
 
 from __future__ import annotations
 
 import pytest
 
-from maop.core.context_compressor import (
+from maop.core.agent.llm_chat.context_compressor import (
     CompressionResult,
     ContextCompressor,
     ContextSection,

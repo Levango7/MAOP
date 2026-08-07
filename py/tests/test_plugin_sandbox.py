@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from maop.core.plugin import (
+from maop.core.agent.plugins_hooks.plugin import (
     PluginManager,
     PluginSandbox,
     SandboxViolation,

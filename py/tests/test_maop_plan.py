@@ -1,4 +1,4 @@
-﻿"""Tests for maop_plan.py — Task routing to agents."""
+"""Tests for maop_plan.py — Task routing to agents."""
 
 from __future__ import annotations
 
@@ -135,7 +135,7 @@ class TestADR012ConfigRouting:
         initializes the singleton with config=None. The hot-reload guard
         then refuses to reinitialize, so the config fixture is ignored.
         """
-        from maop.core.route_scorer import RouteScorer
+        from maop.core.routing.route_scorer import RouteScorer
 
         RouteScorer.reset()
         yield

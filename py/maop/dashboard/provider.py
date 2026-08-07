@@ -94,7 +94,7 @@ class DashboardProvider:
             loader = ConfigLoader(project_root=self._root)
             config = loader.load()
 
-            from maop.core.circuit_breaker import CircuitBreaker
+            from maop.core.reliability.circuit_breaker import CircuitBreaker
             # P0-3: circuit-breaker truth source is maop.db
             # (circuit_breaker_state table), not circuit-breaker.json.
             breaker = CircuitBreaker(self._db_path)
@@ -236,7 +236,7 @@ class DashboardProvider:
 
         try:
             from maop.config.loader import ConfigLoader
-            from maop.core.circuit_breaker import CircuitBreaker
+            from maop.core.reliability.circuit_breaker import CircuitBreaker
 
             config = ConfigLoader(project_root=self._root).load()
             # P0-3: circuit-breaker truth source is maop.db

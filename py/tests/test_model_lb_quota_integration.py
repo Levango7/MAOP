@@ -19,8 +19,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from maop.core.load_balancer import LBAlgorithm, LoadBalancer
-from maop.core.monitoring import (
+from maop.core.routing.load_balancer import LBAlgorithm, LoadBalancer
+from maop.core.monitoring.monitoring import (
     MAOP_MODEL_SELECTION_LOAD_AWARE,
     MAOP_MODEL_SELECTION_QUOTA_REJECTED,
     MAOP_STICKY_SESSION_ACTIVE,
@@ -454,7 +454,7 @@ class TestMetrics:
     """Verify the five new metrics are registered and recordable."""
 
     def test_quota_rejected_counter_registered(self):
-        from maop.core.monitoring import metrics as m
+        from maop.core.monitoring.monitoring import metrics as m
         assert "MAOP_model_selection_quota_rejected_total" in m._counters
         c = m._counters["MAOP_model_selection_quota_rejected_total"]
         c.inc(labels={"provider": "openai"})
@@ -464,7 +464,7 @@ class TestMetrics:
         assert c.get(labels={"provider": "anthropic"}) == 1.0
 
     def test_load_aware_counter_registered(self):
-        from maop.core.monitoring import metrics as m
+        from maop.core.monitoring.monitoring import metrics as m
         assert "MAOP_model_selection_load_aware_total" in m._counters
         c = m._counters["MAOP_model_selection_load_aware_total"]
         c.inc()
@@ -472,14 +472,14 @@ class TestMetrics:
         assert c.get() == 2.0
 
     def test_sticky_hit_counter_registered(self):
-        from maop.core.monitoring import metrics as m
+        from maop.core.monitoring.monitoring import metrics as m
         assert "MAOP_sticky_session_hit_total" in m._counters
         c = m._counters["MAOP_sticky_session_hit_total"]
         c.inc()
         assert c.get() == 1.0
 
     def test_sticky_miss_counter_registered(self):
-        from maop.core.monitoring import metrics as m
+        from maop.core.monitoring.monitoring import metrics as m
         assert "MAOP_sticky_session_miss_total" in m._counters
         c = m._counters["MAOP_sticky_session_miss_total"]
         c.inc()
@@ -487,7 +487,7 @@ class TestMetrics:
         assert c.get() == 2.0
 
     def test_sticky_active_gauge_registered(self):
-        from maop.core.monitoring import metrics as m
+        from maop.core.monitoring.monitoring import metrics as m
         assert "MAOP_sticky_session_active" in m._gauges
         g = m._gauges["MAOP_sticky_session_active"]
         g.set(5.0)

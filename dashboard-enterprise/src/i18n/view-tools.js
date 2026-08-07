@@ -5,6 +5,7 @@ export const messages = {
 
     'view.tools.tab.skills': 'Skills',
     'view.tools.tab.mcp': 'MCP',
+    'view.tools.tab.topology': 'Topology',
     'view.tools.tab.routing': 'Routing',
     'view.tools.tab.prompts': 'Prompts',
     'view.tools.tab.security': 'Security',
@@ -61,6 +62,21 @@ export const messages = {
     'view.tools.securityConfig': 'Security Configuration',
     'view.tools.failedLoadConfig': 'Failed to load config',
 
+    // ── P2-11: MCP Topology ──────────────────────────────────────
+    'view.tools.topo.title': 'MCP Topology',
+    'view.tools.topo.servers': 'Servers',
+    'view.tools.topo.tools': 'Tools',
+    'view.tools.topo.agents': 'Agents',
+    'view.tools.topo.edges': 'Edges',
+    'view.tools.topo.fit': 'Fit view',
+    'view.tools.topo.loading': 'Loading topology…',
+    'view.tools.topo.empty.title': 'No topology data',
+    'view.tools.topo.empty.desc': 'Connect MCP servers and register agents to see the topology.',
+    'view.tools.topo.legend.server': 'MCP Server',
+    'view.tools.topo.legend.tool': 'Tool',
+    'view.tools.topo.legend.agent': 'Agent',
+    'view.tools.failedLoadTopology': 'Failed to load topology',
+
     'view.tools.col.pattern': 'Pattern',
     'view.tools.col.target': 'Target',
     'view.tools.col.priority': 'Priority',
@@ -84,6 +100,7 @@ export const messages = {
 
     'view.tools.tab.skills': '技能',
     'view.tools.tab.mcp': 'MCP',
+    'view.tools.tab.topology': '拓扑',
     'view.tools.tab.routing': '路由',
     'view.tools.tab.prompts': '提示词',
     'view.tools.tab.security': '安全',
@@ -138,6 +155,21 @@ export const messages = {
 
     'view.tools.securityConfig': '安全配置',
     'view.tools.failedLoadConfig': '加载配置失败',
+
+    // ── P2-11: MCP 拓扑 ─────────────────────────────────────────
+    'view.tools.topo.title': 'MCP 拓扑',
+    'view.tools.topo.servers': '服务',
+    'view.tools.topo.tools': '工具',
+    'view.tools.topo.agents': '智能体',
+    'view.tools.topo.edges': '连接',
+    'view.tools.topo.fit': '适配视图',
+    'view.tools.topo.loading': '加载拓扑中…',
+    'view.tools.topo.empty.title': '暂无拓扑数据',
+    'view.tools.topo.empty.desc': '连接 MCP 服务并注册智能体后即可查看拓扑。',
+    'view.tools.topo.legend.server': 'MCP 服务',
+    'view.tools.topo.legend.tool': '工具',
+    'view.tools.topo.legend.agent': '智能体',
+    'view.tools.failedLoadTopology': '加载拓扑失败',
 
     'view.tools.col.pattern': '匹配模式',
     'view.tools.col.target': '目标',

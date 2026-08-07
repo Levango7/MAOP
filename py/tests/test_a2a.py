@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from maop.core.a2a import (
+from maop.core.agent.delegation.a2a import (
     A2ACard,
     A2AManager,
     A2AMessage,

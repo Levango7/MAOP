@@ -178,19 +178,19 @@ def fake_redis_module():
 
 @pytest.fixture
 def cache_backend(fake_redis_module):
-    from maop.core.backends_redis import RedisCacheBackend
+    from maop.core.backends.backends_redis import RedisCacheBackend
     return RedisCacheBackend()
 
 
 @pytest.fixture
 def queue_backend(fake_redis_module):
-    from maop.core.backends_redis import RedisQueueBackend
+    from maop.core.backends.backends_redis import RedisQueueBackend
     return RedisQueueBackend()
 
 
 @pytest.fixture
 def lock(fake_redis_module):
-    from maop.core.backends_redis import RedisDistributedLock
+    from maop.core.backends.backends_redis import RedisDistributedLock
     return RedisDistributedLock("test_lock", ttl=30)
 
 
@@ -268,7 +268,7 @@ class TestRedisDistributedLock:
 
     def test_redis_lock_fencing_token(self, fake_redis_module):
         # Two locks sharing the same Redis client → fencing token monotonic
-        from maop.core.backends_redis import RedisDistributedLock
+        from maop.core.backends.backends_redis import RedisDistributedLock
         shared = FakeRedis()
         lock1 = RedisDistributedLock("mylock", ttl=30, client=shared)
         lock1.acquire()
@@ -283,7 +283,7 @@ class TestRedisDistributedLock:
 
     def test_redis_lock_non_blocking(self, fake_redis_module):
         # Two locks sharing the same Redis client → second acquire fails
-        from maop.core.backends_redis import RedisDistributedLock
+        from maop.core.backends.backends_redis import RedisDistributedLock
         shared = FakeRedis()
         lock1 = RedisDistributedLock("nb_lock", ttl=30, client=shared)
         lock2 = RedisDistributedLock("nb_lock", ttl=30, client=shared)
@@ -292,7 +292,7 @@ class TestRedisDistributedLock:
         lock1.release()
 
     def test_redis_lock_context_manager(self, fake_redis_module):
-        from maop.core.backends_redis import RedisDistributedLock
+        from maop.core.backends.backends_redis import RedisDistributedLock
         lock = RedisDistributedLock("ctx_lock", ttl=30)
         with lock:
             assert lock.fencing_token > 0
@@ -317,6 +317,6 @@ def test_redis_backend_degrades(monkeypatch):
     """
     # Setting sys.modules['redis'] = None makes `import redis` raise ImportError
     monkeypatch.setitem(sys.modules, "redis", None)
-    from maop.core.backends_redis import RedisCacheBackend
+    from maop.core.backends.backends_redis import RedisCacheBackend
     with pytest.raises(ImportError):
         RedisCacheBackend()

@@ -28,7 +28,7 @@
           <div class="users-cell users-cell--login">{{ t('users.lastLogin') }}</div>
           <div class="users-cell users-cell--actions">{{ t('common.actions') }}</div>
         </div>
-        <div v-for="(u, i) in users" :key="u.username" class="users-row">
+        <div v-for="u in users" :key="u.username" class="users-row">
           <div class="users-cell users-cell--avatar">
             <div class="users-avatar">{{ getInitial(u.username) }}</div>
           </div>
@@ -121,7 +121,7 @@ const isAdmin = computed(() => {
   try {
     const roles = JSON.parse(localStorage.getItem('maop_roles') || '[]');
     if (Array.isArray(roles) && roles.some((r) => r === 'admin' || r === 'superadmin')) return true;
-  } catch {}
+  } catch { /* ignore */ }
   return currentName.value === 'admin';
 });
 

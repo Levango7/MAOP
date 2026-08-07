@@ -1,10 +1,10 @@
-﻿"""Tests for MAOP.core.filelock."""
+"""Tests for MAOP.core.filelock."""
 
 from pathlib import Path
 
 import pytest
 
-from maop.core.filelock import FileLock, with_file_lock
+from maop.core.reliability.filelock import FileLock, with_file_lock
 
 
 @pytest.fixture

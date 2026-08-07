@@ -1,23 +1,60 @@
-﻿"""MAOP core modules.
+"""MAOP core package — lazy symbol & submodule lookup.
 
-Infrastructure layer for the MAOP agent orchestration platform.
+v4.5.0: modules reorganized into 9 subpackages.
+P0-3 (2026-08-07): shim modules removed; ``from maop.core import xxx``
+now resolves via lazy lookup in subpackages (symbols and submodules).
 
-Key modules:
-  - cache: LRU+TTL in-memory cache with pin/unpin and three-protection
-  - db_utils: SQLite connection management (sqlite_connect)
-  - three_layer_memory: Working/Episodic/Semantic memory with FTS5 and access-count consolidation
-  - llm_provider: LLM provider factory with fallback chain
-  - budget_guard: Daily token/cost budget enforcement
-  - tool_audit: Tool invocation audit logging
-  - agent_proxy: Adapter pattern for external agent integration
-  - worktree: Branch management for parallel task execution
-  - subagent_manager: Async SubAgent spawn/wait/cancel
-  - mcp_hub: MCP Hub with stdio/SSE/WebSocket transport
-  - skill_version: Skill versioning with hot-reload and intent matching
-  - hook_manager: Event hook system
-  - evolution_loop: Self-evolution reflection cycle
-  - error_ledger: Error pattern tracking
-  - self_heal: Self-healing engine
-  - vector: Vector store for semantic search
-  - cost_tracker: LLM cost tracking
+Subpackages:
+    mcp, agent, memory, backends, routing, reliability,
+    security, evolution, monitoring
 """
+from __future__ import annotations
+
+import importlib
+
+# 9 子包（查找顺序：先子包符号，再子包子模块）
+_SUBPACKAGES = (
+    "mcp",
+    "memory",
+    "backends",
+    "routing",
+    "reliability",
+    "security",
+    "evolution",
+    "monitoring",
+    "agent",
+)
+
+
+def __getattr__(name: str):
+    """惰性查找符号或子模块，避免循环导入。
+
+    1. 在各子包 ``__all__`` 中查找符号（``from maop.core import Symbol``）
+    2. 在各子包中查找同名子模块（``from maop.core import module_name``）
+    """
+    # 1. 在各子包中查找符号
+    for subpkg in _SUBPACKAGES:
+        try:
+            submod = importlib.import_module(f".{subpkg}", __name__)
+        except ImportError:
+            continue
+        if name in getattr(submod, "__all__", ()):
+            value = getattr(submod, name)
+            globals()[name] = value  # 缓存
+            return value
+    # 2. 在各子包中查找同名子模块
+    for subpkg in _SUBPACKAGES:
+        try:
+            mod = importlib.import_module(f".{subpkg}.{name}", __name__)
+        except ImportError:
+            continue
+        globals()[name] = mod  # 缓存
+        return mod
+    # 3. 在本包目录下查找同名模块（如 maop/core/llm_provider.py）
+    try:
+        mod = importlib.import_module(f".{name}", __name__)
+        globals()[name] = mod  # 缓存
+        return mod
+    except ImportError:
+        pass
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

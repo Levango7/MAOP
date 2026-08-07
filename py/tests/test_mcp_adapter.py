@@ -14,8 +14,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from maop.core.agent_proxy import AgentAdapter
-from maop.core.mcp_adapter import MCPAdapter, _BackgroundLoop
+from maop.core.agent.delegation.agent_proxy import AgentAdapter
+from maop.core.mcp.mcp_adapter import MCPAdapter, _BackgroundLoop
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ def mock_hub():
     that constructs an MCPAdapter must use this fixture, otherwise a
     real MCPHub would try to open a SQLite DB and start subprocesses.
     """
-    with patch("maop.core.mcp_hub.MCPHub") as mock_cls:
+    with patch("maop.core.mcp.mcp_hub.MCPHub") as mock_cls:
         mock_instance = mock_cls.return_value
         # Default all hub methods to AsyncMock so coroutines resolve cleanly.
         mock_instance.connect = AsyncMock(return_value="srv-001")
@@ -85,7 +85,7 @@ def test_background_loop_shutdown_stops_thread():
 
 def test_dict_config_is_coerced_to_mcpserverconfig(mock_hub):
     """A plain dict config (transport as str) must be coerced to MCPServerConfig."""
-    from maop.core.mcp_hub import MCPServerConfig, TransportType
+    from maop.core.mcp.mcp_hub import MCPServerConfig, TransportType
 
     adapter = MCPAdapter(_config_dict(), root_dir="/tmp")
     assert isinstance(adapter.server_config, MCPServerConfig)
@@ -95,7 +95,7 @@ def test_dict_config_is_coerced_to_mcpserverconfig(mock_hub):
 
 def test_dict_config_with_sse_transport(mock_hub):
     """A dict with transport='sse' is coerced to TransportType.SSE."""
-    from maop.core.mcp_hub import TransportType
+    from maop.core.mcp.mcp_hub import TransportType
 
     cfg = {"name": "remote", "transport": "sse", "url": "http://localhost:8080"}
     adapter = MCPAdapter(cfg, root_dir="/tmp")
@@ -110,7 +110,7 @@ def test_invalid_config_raises_typeerror(mock_hub):
 
 def test_mcpserverconfig_instance_accepted(mock_hub):
     """An MCPServerConfig instance is accepted as-is (no coercion)."""
-    from maop.core.mcp_hub import MCPServerConfig
+    from maop.core.mcp.mcp_hub import MCPServerConfig
 
     cfg = MCPServerConfig(name="fs", command="npx")
     adapter = MCPAdapter(cfg, root_dir="/tmp")
@@ -119,7 +119,7 @@ def test_mcpserverconfig_instance_accepted(mock_hub):
 
 def test_root_dir_forwarded_to_mcphub(mock_hub):
     """When root_dir is provided, MCPHub is constructed with it."""
-    with patch("maop.core.mcp_hub.MCPHub") as mock_cls:
+    with patch("maop.core.mcp.mcp_hub.MCPHub") as mock_cls:
         mock_instance = mock_cls.return_value
         mock_instance.connect = AsyncMock(return_value="srv-x")
         mock_instance.disconnect = AsyncMock(return_value=True)
@@ -131,7 +131,7 @@ def test_root_dir_forwarded_to_mcphub(mock_hub):
 
 def test_no_root_dir_uses_default_constructor(mock_hub):
     """When root_dir is None, MCPHub is constructed with Path.cwd() as root_dir."""
-    with patch("maop.core.mcp_hub.MCPHub") as mock_cls:
+    with patch("maop.core.mcp.mcp_hub.MCPHub") as mock_cls:
         mock_instance = mock_cls.return_value
         mock_instance.connect = AsyncMock(return_value="srv-y")
         mock_instance.disconnect = AsyncMock(return_value=True)
@@ -202,7 +202,7 @@ def test_connect_is_idempotent(mock_hub):
 
 def test_execute_returns_text_content_on_success(mock_hub):
     """execute() extracts text from ToolResult.content on the success path."""
-    from maop.core.mcp_hub import ToolResult
+    from maop.core.mcp.mcp_hub import ToolResult
 
     mock_hub.call_tool = AsyncMock(
         return_value=ToolResult(content=[{"type": "text", "text": "hello world"}])
@@ -225,7 +225,7 @@ def test_execute_returns_text_content_on_success(mock_hub):
 
 def test_execute_joins_multiple_text_items(mock_hub):
     """Multiple text content items are joined with newlines."""
-    from maop.core.mcp_hub import ToolResult
+    from maop.core.mcp.mcp_hub import ToolResult
 
     mock_hub.call_tool = AsyncMock(
         return_value=ToolResult(
@@ -245,7 +245,7 @@ def test_execute_joins_multiple_text_items(mock_hub):
 
 def test_execute_returns_error_prefix_on_is_error(mock_hub):
     """When ToolResult.is_error is True, execute() returns '[MCP error] ...'."""
-    from maop.core.mcp_hub import ToolResult
+    from maop.core.mcp.mcp_hub import ToolResult
 
     mock_hub.call_tool = AsyncMock(
         return_value=ToolResult(is_error=True, error_message="file not found")
@@ -261,7 +261,7 @@ def test_execute_returns_error_prefix_on_is_error(mock_hub):
 
 def test_execute_returns_empty_string_for_empty_content(mock_hub):
     """An empty content list yields an empty string (not '[MCP error]')."""
-    from maop.core.mcp_hub import ToolResult
+    from maop.core.mcp.mcp_hub import ToolResult
 
     mock_hub.call_tool = AsyncMock(return_value=ToolResult(content=[]))
     adapter = MCPAdapter(_config_dict(), root_dir="/tmp")
@@ -297,7 +297,7 @@ def test_execute_raises_runtimeerror_when_not_connected(mock_hub):
 
 def test_execute_forwards_kwargs_as_arguments_dict(mock_hub):
     """**kwargs are collected and passed as the arguments dict to call_tool."""
-    from maop.core.mcp_hub import ToolResult
+    from maop.core.mcp.mcp_hub import ToolResult
 
     mock_hub.call_tool = AsyncMock(
         return_value=ToolResult(content=[{"type": "text", "text": "ok"}])
@@ -466,7 +466,7 @@ def test_server_name_reflects_config(mock_hub):
 
 def test_server_config_property_returns_stored_config(mock_hub):
     """server_config property returns the stored MCPServerConfig."""
-    from maop.core.mcp_hub import MCPServerConfig
+    from maop.core.mcp.mcp_hub import MCPServerConfig
 
     adapter = MCPAdapter(_config_dict(), root_dir="/tmp")
     try:

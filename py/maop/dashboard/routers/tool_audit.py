@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
@@ -21,7 +21,7 @@ _tool_audit = None
 def _get_tool_audit() -> Any:
     global _tool_audit
     if _tool_audit is None:
-        from maop.core.tool_audit import ToolAuditLog
+        from maop.core.agent.tools.tool_audit import ToolAuditLog
         _tool_audit = ToolAuditLog(root_dir=str(MAOP_ROOT))
     return _tool_audit
 

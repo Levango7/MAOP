@@ -5,11 +5,12 @@ import tempfile
 import time
 
 import pytest
+from unittest.mock import patch
 
-from maop.core.agent_lifecycle import AgentLifecycle, AgentLifecycleManager, AgentState
-from maop.core.hybrid_search import HybridSearch, rrf_fuse
-from maop.core.pipeline_checkpoint import PipelineCheckpoint
-from maop.core.semantic_cache import SemanticCache
+from maop.core.agent.lifecycle.agent_lifecycle import AgentLifecycle, AgentLifecycleManager, AgentState
+from maop.core.memory.hybrid_search import HybridSearch, rrf_fuse
+from maop.core.reliability.pipeline_checkpoint import PipelineCheckpoint
+from maop.core.memory.semantic_cache import SemanticCache
 
 # ── P1: Agent Lifecycle ───────────────────────────────────────
 
@@ -225,8 +226,14 @@ class TestHybridSearch:
     def test_search_no_data(self):
         tmpdir = tempfile.mkdtemp()
         try:
-            hs = HybridSearch(root_dir=tmpdir)
-            results = hs.search("test query")
+            # Force HashEmbedding by making SentenceTransformerEmbedding
+            # unavailable (avoids network model download in CI/offline).
+            with patch(
+                "maop.core.memory.vector.SentenceTransformerEmbedding",
+                side_effect=ImportError("offline"),
+            ):
+                hs = HybridSearch(root_dir=tmpdir)
+                results = hs.search("test query")
             assert isinstance(results, list)
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)

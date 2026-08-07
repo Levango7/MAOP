@@ -16,7 +16,7 @@
       <EmptyState icon="alert-triangle" :title="t('view.audit.summaryError')" :description="summary.error" />
     </div>
 
-    <Card icon="scroll" :marginBottom="16">
+    <Card icon="scroll" :margin-bottom="16">
       <template #actions>
         <select class="filter" v-model="filters.action">
           <option value="">{{ t('view.audit.allActions') }}</option>

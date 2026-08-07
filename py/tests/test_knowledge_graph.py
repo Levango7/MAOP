@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.knowledge_graph import GraphEdge, GraphNode, KnowledgeGraph, Subgraph
+from maop.core.memory.knowledge_graph import GraphEdge, GraphNode, KnowledgeGraph, Subgraph
 
 
 @pytest.fixture
 def kg_db(tmp_path: Path) -> KnowledgeGraph:
-    from maop.core.db_utils import get_db_path
+    from maop.core.backends.db_utils import get_db_path
     db_path = get_db_path("knowledge_graph")
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))

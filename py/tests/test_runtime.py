@@ -1,4 +1,4 @@
-﻿"""Unit tests for MAOP.core.runtime module."""
+"""Unit tests for MAOP.core.runtime module."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from maop.core.runtime import (
+from maop.core.agent.lifecycle.runtime import (
     IsolatedRuntime,
     LocalRuntime,
     RuntimeConfig,

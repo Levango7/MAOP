@@ -12,7 +12,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 from .state import MAOP_ROOT, active_jobs, cache, cache_lock
 
@@ -175,7 +175,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
     try:
         if action == "log-rotate":
             try:
-                from maop.core.log_rotate import rotate_logs
+                from maop.core.reliability.log_rotate import rotate_logs
                 result = rotate_logs(log_dir=MAOP_ROOT / "logs", data_dir=MAOP_ROOT / "data")
                 return {"status": "ok", "action": "log-rotate", "msg": "Logs rotated", "rotated": result.rotated, "deleted": result.deleted}
             except Exception:
@@ -222,7 +222,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
                 return {"status": "ok", "action": "health", "healthy": True, "msg": "Skipped: health check unavailable"}
         elif action == "backup":
             try:
-                from maop.core.db_backup import DbBackup
+                from maop.core.backends.db_backup import DbBackup
                 backup = DbBackup(root_dir=str(MAOP_ROOT))
                 entries = backup.run() if hasattr(backup, "run") else []
                 path = entries[0].backup_path if entries else "N/A"
@@ -245,7 +245,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
                 return {"status": "ok", "action": "reload", "msg": "Skipped: reload unavailable"}
         elif action == "reindex":
             try:
-                from maop.core.vector import VectorStore
+                from maop.core.memory.vector import VectorStore
                 store = VectorStore() if hasattr(VectorStore, '__init__') else None  # type: ignore[assignment]
                 if store and hasattr(store, 'reindex'):
                     store.reindex()
@@ -256,7 +256,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
                 return {"status": "ok", "action": "reindex", "msg": "Skipped: reindex unavailable"}
         elif action == "vacuum":
             try:
-                from maop.core.db_utils import sqlite_connect
+                from maop.core.backends.db_utils import sqlite_connect
                 with sqlite_connect() as conn:  # type: ignore[call-arg]
                     conn.execute("VACUUM")
                 return {"status": "ok", "action": "vacuum", "msg": "Database compacted"}

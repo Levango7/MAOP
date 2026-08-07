@@ -31,20 +31,20 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from maop.core.llm_provider import LLMProviderFactory
+    from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
 
 from maop.config.loader import ConfigLoader, MaopConfig
-from maop.core.analyzer import ExecutionStrategy
-from maop.core.analyzer import analyze as requirement_analyze
-from maop.core.cache import SingleFlight
-from maop.core.error_schema import MaopResult
-from maop.core.event_bus import Event, EventBus, get_event_bus
-from maop.core.log_rotate import rotate_logs
-from maop.core.monitoring import MetricsCollector, StructuredLogger
-from maop.core.otel import get_tracer
-from maop.core.otel import setup_provider as otel_setup
-from maop.core.otel import span as otel_span
-from maop.core.phases import PhaseContext, PhaseResult
+from maop.core.agent.analyzer import ExecutionStrategy
+from maop.core.agent.analyzer import analyze as requirement_analyze
+from maop.core.reliability.cache import SingleFlight
+from maop.core.reliability.error_schema import MaopResult
+from maop.core.reliability.event_bus import Event, EventBus, get_event_bus
+from maop.core.reliability.log_rotate import rotate_logs
+from maop.core.monitoring.monitoring import MetricsCollector, StructuredLogger
+from maop.core.monitoring.otel import get_tracer
+from maop.core.monitoring.otel import setup_provider as otel_setup
+from maop.core.monitoring.otel import span as otel_span
+from maop.core.agent.evolution.phases import PhaseContext, PhaseResult
 from maop.loop_analyzer import simple_analyze
 from maop.loop_executor import ExecuteMixin
 
@@ -97,7 +97,7 @@ class MaopLoop(ExecuteMixin):
         event_bus: EventBus | None = None,
     ) -> None:
         if root_dir is None:
-            from maop.core.db_utils import find_project_root
+            from maop.core.backends.db_utils import find_project_root
             root_dir = find_project_root()
         self._root = Path(root_dir)
 
@@ -116,7 +116,7 @@ class MaopLoop(ExecuteMixin):
         lc = self._loop_config
 
         # Service Container — lazy-initialized subsystems
-        from maop.core.services import ServiceContainer
+        from maop.core.reliability.services import ServiceContainer
         self._svc = ServiceContainer(root_dir=self._root)
         self._svc.set("config", config)
 
@@ -217,7 +217,7 @@ class MaopLoop(ExecuteMixin):
         """
         if self._llm_factory is None:
             try:
-                from maop.core.llm_provider import LLMProviderFactory
+                from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
                 self._llm_factory = LLMProviderFactory(root_dir=self._root)
             except Exception as exc:
                 logger.warning("[maop_loop] LLMProviderFactory init failed: %s", exc)
@@ -577,7 +577,7 @@ class MaopLoop(ExecuteMixin):
                 self._log("verify-feedback", "WARN",
                               f"Blocked: {ctx.block_reason}", trace_id=ctx.trace_id)
                 try:
-                    from maop.core.human_proxy import HumanProxy
+                    from maop.core.agent.delegation.human_proxy import HumanProxy
                     hp = HumanProxy(root_dir=str(self._root))
                     hp.request(
                         task=ctx.original_task,

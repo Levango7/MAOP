@@ -1,10 +1,10 @@
-﻿"""Tests for MAOP.core.middleware - Auth and Rate Limit middleware."""
+"""Tests for MAOP.core.middleware - Auth and Rate Limit middleware."""
 
 from __future__ import annotations
 
 from fastapi import Request as _Request
 
-from maop.core.middleware import AuthMiddleware, RateLimitMiddleware, setup_middleware
+from maop.core.security.middleware import AuthMiddleware, RateLimitMiddleware, setup_middleware
 
 
 class TestRateLimitMiddleware:
@@ -67,19 +67,19 @@ class TestCSPMiddleware:
     """Tests for CSPMiddleware — Content-Security-Policy & security headers."""
 
     def test_default_config(self):
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
         mw = CSPMiddleware(app=None)
         assert mw.enabled
         assert not mw.report_only
         assert mw.report_uri is None
 
     def test_disabled(self):
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
         mw = CSPMiddleware(app=None, enabled=False)
         assert not mw.enabled
 
     def test_csp_value_contains_required_directives(self):
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
         mw = CSPMiddleware(app=None)
         csp = mw._csp_value
         assert "default-src 'self'" in csp
@@ -93,7 +93,7 @@ class TestCSPMiddleware:
         assert "form-action 'self'" in csp
 
     def test_security_headers_present(self):
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
         mw = CSPMiddleware(app=None)
         headers = mw._security_headers
         assert headers["X-Content-Type-Options"] == "nosniff"
@@ -103,7 +103,7 @@ class TestCSPMiddleware:
 
     def test_hsts_header_present(self):
         """HSTS (Strict-Transport-Security) header is set for HTTPS enforcement."""
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
         mw = CSPMiddleware(app=None)
         hsts = mw._security_headers["Strict-Transport-Security"]
         assert "max-age=31536000" in hsts
@@ -112,7 +112,7 @@ class TestCSPMiddleware:
 
     def test_additional_security_headers(self):
         """Additional restrictive security headers are present."""
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
         mw = CSPMiddleware(app=None)
         headers = mw._security_headers
         assert headers["X-DNS-Prefetch-Control"] == "off"
@@ -125,7 +125,7 @@ class TestCSPMiddleware:
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
 
         app = FastAPI()
         app.add_middleware(CSPMiddleware, enabled=True)
@@ -142,17 +142,17 @@ class TestCSPMiddleware:
         assert "cross-origin-opener-policy" in {k.lower() for k in resp.headers}
 
     def test_report_only_mode(self):
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
         mw = CSPMiddleware(app=None, report_only=True)
         assert mw.report_only
 
     def test_report_uri_added_to_directives(self):
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
         mw = CSPMiddleware(app=None, report_uri="/api/csp-report")
         assert "report-uri /api/csp-report" in mw._csp_value
 
     def test_extra_directives_appended(self):
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
         mw = CSPMiddleware(app=None, extra_directives="upgrade-insecure-requests")
         assert "upgrade-insecure-requests" in mw._csp_value
 
@@ -161,7 +161,7 @@ class TestCSPMiddleware:
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
 
         app = FastAPI()
         app.add_middleware(CSPMiddleware, enabled=True)
@@ -184,7 +184,7 @@ class TestCSPMiddleware:
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
 
         app = FastAPI()
         app.add_middleware(CSPMiddleware, enabled=False)
@@ -202,7 +202,7 @@ class TestCSPMiddleware:
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
 
         app = FastAPI()
         app.add_middleware(CSPMiddleware, enabled=True, report_only=True)
@@ -219,13 +219,13 @@ class TestCSPMiddleware:
 
     def test_custom_connect_src(self):
         """connect_src parameter allows cross-origin WebSocket/API."""
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
         mw = CSPMiddleware(app=None, connect_src="'self' wss://other.host:9079")
         assert "connect-src 'self' wss://other.host:9079" in mw._csp_value
 
     def test_default_connect_src_is_self(self):
         """Default connect-src should be 'self'."""
-        from maop.core.middleware import CSPMiddleware
+        from maop.core.security.middleware import CSPMiddleware
         mw = CSPMiddleware(app=None)
         assert "connect-src 'self'" in mw._csp_value
 
@@ -271,7 +271,7 @@ class TestAuthDisabledDefaultRole:
     """
 
     def _make_app(self, *, enabled: bool) -> FastAPI:
-        from maop.core.middleware import AuthMiddleware
+        from maop.core.security.middleware import AuthMiddleware
         app = FastAPI()
 
         @app.get("/api/whoami")

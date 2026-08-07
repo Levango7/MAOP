@@ -33,7 +33,7 @@ def _get_pg_backend() -> Any | None:
     if backend_type != "postgresql":
         return None
     try:
-        from maop.core.backends_pg import PostgreSQLStorageBackend
+        from maop.core.backends.backends_pg import PostgreSQLStorageBackend
         return PostgreSQLStorageBackend()
     except ImportError:
         record_degradation("storage", "postgresql", "memory")

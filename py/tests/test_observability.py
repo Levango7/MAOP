@@ -57,7 +57,7 @@ def test_timeseries_record_metric():
 
 def test_prometheus_metrics_endpoint():
     """Verify /api/prometheus returns valid Prometheus text format."""
-    from maop.core.monitoring import metrics
+    from maop.core.monitoring.monitoring import metrics
 
     # Verify metrics output format
     c = metrics.counter("MAOP_test_obs_counter", "Test counter for observability")
@@ -86,7 +86,7 @@ def test_prometheus_metrics_endpoint():
 
 def test_cost_tracker_auto_record():
     """Verify LLM calls auto-record to CostTracker."""
-    from maop.core.llm_provider import LLMResponse, _record_cost
+    from maop.core.agent.llm_chat.llm_provider import LLMResponse, _record_cost
 
     # 1: record called with correct args
     resp = LLMResponse(
@@ -94,7 +94,7 @@ def test_cost_tracker_auto_record():
         prompt_tokens=10, completion_tokens=20, total_tokens=30, latency_ms=500,
     )
     mock_tracker = MagicMock()
-    with patch("maop.core.cost_tracker.get_cost_tracker", return_value=mock_tracker):
+    with patch("maop.core.monitoring.cost_tracker.get_cost_tracker", return_value=mock_tracker):
         _record_cost(resp, {"session_id": "sess-123", "agent": "claude"})
     mock_tracker.record.assert_called_once_with(
         model="gpt-4o",
@@ -104,12 +104,12 @@ def test_cost_tracker_auto_record():
     )
 
     # 2: CostTracker failure does not raise
-    with patch("maop.core.cost_tracker.get_cost_tracker", side_effect=RuntimeError("DB error")):
+    with patch("maop.core.monitoring.cost_tracker.get_cost_tracker", side_effect=RuntimeError("DB error")):
         _record_cost(resp, {})  # should not raise
 
     # 3: missing kwargs default to empty strings
     mock_tracker2 = MagicMock()
-    with patch("maop.core.cost_tracker.get_cost_tracker", return_value=mock_tracker2):
+    with patch("maop.core.monitoring.cost_tracker.get_cost_tracker", return_value=mock_tracker2):
         _record_cost(LLMResponse(content="Hi", model="claude-3.5-sonnet", provider="anthropic"), {})
     mock_tracker2.record.assert_called_once_with(
         model="claude-3.5-sonnet",
@@ -121,8 +121,8 @@ def test_cost_tracker_auto_record():
 
 def test_cost_tracker_singleton():
     """Verify get_cost_tracker returns a singleton instance."""
-    import maop.core.cost_tracker as ct_mod
-    from maop.core.cost_tracker import CostTracker, get_cost_tracker
+    import maop.core.monitoring.cost_tracker as ct_mod
+    from maop.core.monitoring.cost_tracker import CostTracker, get_cost_tracker
 
     original = ct_mod._cost_tracker_instance
     ct_mod._cost_tracker_instance = None
@@ -139,7 +139,7 @@ def test_cost_tracker_singleton():
 
 def test_otel_metric_provider():
     """Verify setup_provider configures metric pipeline."""
-    from maop.core.otel import setup_provider
+    from maop.core.monitoring.otel import setup_provider
 
     # Source-level: metric pipeline code is present
     src = inspect.getsource(setup_provider)

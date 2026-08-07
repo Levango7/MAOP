@@ -24,7 +24,7 @@ import time
 import uuid
 from typing import Any
 
-from maop.core.backends import CacheBackend, QueueBackend
+from maop.core.backends.backends import CacheBackend, QueueBackend
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ Provides:
 
 Usage::
 
-    from maop.core.tenant import TenantManager
+    from maop.core.security.tenant import TenantManager
 
     mgr = TenantManager(root_dir="/path/to/MAOP")
     mgr.create_tenant("acme", display_name="Acme Corp", quota_tokens=100000)
@@ -23,7 +23,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import sqlite_connect, validate_identifier
+from maop.core.backends.db_utils import sqlite_connect, validate_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +178,26 @@ class TenantManager:
             )
 
         return True
+
+    async def check_quota_async(
+        self,
+        tenant_id: str,
+        *,
+        tokens_used: int = 0,
+        requests_used: int = 0,
+    ) -> bool:
+        """Async version of check_quota() — wraps sync sqlite3 via asyncio.to_thread.
+
+        P2-P3 fix (M5): 避免在 async 路径中阻塞事件循环。
+        在 async 上下文中调用此方法而非 check_quota()。
+        """
+        import asyncio
+        return await asyncio.to_thread(
+            self.check_quota,
+            tenant_id,
+            tokens_used=tokens_used,
+            requests_used=requests_used,
+        )
 
     def check_agent_access(self, tenant_id: str, agent: str) -> bool:
         config = self.get_tenant(tenant_id)

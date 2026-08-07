@@ -150,7 +150,7 @@ def _load_yaml(path: Path) -> dict[str, Any] | None:
         return None
 
 
-from maop.core.db_utils import find_project_root
+from maop.core.backends.db_utils import find_project_root
 
 # === Config loading cache ============================================
 #

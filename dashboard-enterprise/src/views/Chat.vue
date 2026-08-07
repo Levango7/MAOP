@@ -131,6 +131,7 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useStreamingFetch } from '../composables/useStreamingFetch.js';
+import { useToast } from '../composables/useToast.js';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import { EmptyState } from '../components/index.js';
@@ -141,6 +142,8 @@ const { t } = useI18n();
 const api = useApiStore();
 // F-P0-3 fix: composable must be called at setup top level, not inside function
 const { stream } = useStreamingFetch();
+// G1c fix: toast 用于 onImageAttach 中的图片大小校验提示
+const toast = useToast();
 const agents = ref([]);
 const selectedAgent = ref('');
 const sessionId = ref('');
@@ -344,7 +347,7 @@ async function sendMessage(overrideText) {
       images: userMsg.image ? [userMsg.image] : undefined,  // P1-11 fix: images (plural list)
     };
 
-    let msgMeta = {};
+    const msgMeta = {};
 
     await stream('/api/chat/stream', body, {
       signal: streamAbort.signal,

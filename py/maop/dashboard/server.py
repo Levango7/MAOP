@@ -141,11 +141,20 @@ async def lifespan(app: FastAPI) -> Any:
     global _ws_push_task
     if _auth_mod._auth_enabled:
         app.state.auth_manager = _auth_mod.get_auth_mgr()
-    _ws_push_task = asyncio.create_task(_ws_push_loop())
+
+    # ── Background tasks gate (multi-worker safe) ──────────────
+    # Each uvicorn worker runs its own lifespan; without a gate the backup
+    # scheduler, log-rotate scheduler and WS push task would start in every
+    # worker, causing duplicate backups and duplicate pushes. main() sets
+    # MAOP_BACKGROUND_TASKS=0 automatically when workers>1; override with
+    # MAOP_BACKGROUND_TASKS=1 to force-enable (e.g. a single dedicated worker).
+    _bg_enabled = os.environ.get("MAOP_BACKGROUND_TASKS", "1") == "1"
+    if _bg_enabled:
+        _ws_push_task = asyncio.create_task(_ws_push_loop())
 
     # ── Initialize OTel tracing (if enabled) ────────────────────
     try:
-        from maop.core.otel import setup_provider
+        from maop.core.monitoring.otel import setup_provider
         setup_provider()
     except Exception as exc:
         logger.debug("[lifespan] OTel setup skipped: %s", exc)
@@ -153,10 +162,10 @@ async def lifespan(app: FastAPI) -> Any:
     # ── Auto-start backup & log-rotation schedulers ────────────
     _backup_scheduler = None
     _log_rotate_scheduler = None
-    _sched_enabled = os.environ.get("MAOP_AUTO_SCHED", "1") == "1"
+    _sched_enabled = os.environ.get("MAOP_AUTO_SCHED", "1") == "1" and _bg_enabled
     if _sched_enabled:
         try:
-            from maop.core.db_backup import DbBackup
+            from maop.core.backends.db_backup import DbBackup
             _backup_scheduler = DbBackup(root_dir=str(MAOP_ROOT))
             _backup_scheduler.start_scheduler(
                 interval_s=float(os.environ.get("MAOP_BACKUP_INTERVAL", "3600"))
@@ -165,7 +174,7 @@ async def lifespan(app: FastAPI) -> Any:
         except Exception as exc:
             logger.warning("[lifespan] Failed to start backup scheduler: %s", exc)
         try:
-            from maop.core.log_rotate import LogRotateScheduler
+            from maop.core.reliability.log_rotate import LogRotateScheduler
             _log_rotate_scheduler = LogRotateScheduler(
                 interval_s=float(os.environ.get("MAOP_LOGROTATE_INTERVAL", "600")),
                 log_dir=str(MAOP_ROOT / "logs"),
@@ -231,7 +240,7 @@ if not _cors_origins:
 app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credentials=True, allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-Trace-Id", "X-Request-Id"])
 
 # ── Rate Limit + Auth + CSP Middleware ─────────────────────────────
-from maop.core.middleware import AuthMiddleware, CSPMiddleware, RateLimitMiddleware
+from maop.core.security.middleware import AuthMiddleware, CSPMiddleware, RateLimitMiddleware
 
 _rl_enabled = os.environ.get("MAOP_RATE_LIMIT", os.environ.get("MAOP_RATE_LIMIT_ENABLED", "1")) == "1"
 _rl_rate = float(os.environ.get("MAOP_RATE_LIMIT_RPS", "30"))
@@ -360,8 +369,8 @@ app.include_router(routing_router.router)
 # every ``tasks/send`` is forwarded via ``WorkerPool.submit(agent_name=...)``
 # to ``MaopLoop.run(agent=...)`` so the caller-pinned agent actually
 # executes the task. See ADR-013.
-from maop.core.a2a import create_a2a_router as _create_a2a_router
-from maop.core.services import ServiceContainer as _A2AContainer
+from maop.core.agent.delegation.a2a import create_a2a_router as _create_a2a_router
+from maop.core.reliability.services import ServiceContainer as _A2AContainer
 
 try:
     _a2a_container = _A2AContainer(root_dir=MAOP_ROOT)
@@ -598,7 +607,7 @@ async def prometheus_metrics() -> Any:
     """
     from fastapi import Response
 
-    from maop.core.monitoring import metrics as _metrics
+    from maop.core.monitoring.monitoring import metrics as _metrics
     text = _metrics.to_prometheus()
     return Response(content=text, media_type="text/plain; version=0.0.4; charset=utf-8")
 
@@ -741,7 +750,7 @@ if __name__ == "__main__":
 
     ssl_kwargs: dict[str, Any] = {}
     if _tls_enabled:
-        from maop.core.tls import TLSSettings, create_ssl_context
+        from maop.core.security.tls import TLSSettings, create_ssl_context
         cert_file = os.environ.get("MAOP_TLS_CERT", "")
         key_file = os.environ.get("MAOP_TLS_KEY", "")
         if cert_file and key_file:
@@ -764,6 +773,31 @@ if __name__ == "__main__":
     logger.info(f"  Workers: {workers}")
 
     if workers > 1:
-        uvicorn.run("maop.dashboard.server:app", host=host, port=port, workers=workers, log_level="info")
+        # Multi-worker mode imports the app by string path; an SSLContext
+        # object cannot be pickled across worker processes (spawn on Win32),
+        # so pass cert/key file paths via ssl_certfile/ssl_keyfile instead.
+        multi_ssl_kwargs: dict[str, Any] = {}
+        if _tls_enabled:
+            _mw_cert = os.environ.get("MAOP_TLS_CERT", "")
+            _mw_key = os.environ.get("MAOP_TLS_KEY", "")
+            if _mw_cert and _mw_key:
+                multi_ssl_kwargs["ssl_certfile"] = _mw_cert
+                multi_ssl_kwargs["ssl_keyfile"] = _mw_key
+            else:
+                logger.warning("Multi-worker + TLS requested but MAOP_TLS_CERT/MAOP_TLS_KEY not set; starting without TLS")
+        # Disable per-worker background tasks (backup/log-rotate/WS push) to
+        # avoid duplicate backups and duplicate pushes. Override by exporting
+        # MAOP_BACKGROUND_TASKS=1 before launch.
+        if os.environ.get("MAOP_BACKGROUND_TASKS") is None:
+            os.environ["MAOP_BACKGROUND_TASKS"] = "0"
+            logger.warning(
+                "Multi-worker mode: background tasks (backup, log-rotate, WS push) "
+                "disabled to avoid duplicates. Set MAOP_BACKGROUND_TASKS=1 to force-enable."
+            )
+        uvicorn.run(
+            "maop.dashboard.server:app",
+            host=host, port=port, workers=workers, log_level="info",
+            **multi_ssl_kwargs,
+        )
     else:
         uvicorn.run(app, host=host, port=port, log_level="info", **ssl_kwargs)

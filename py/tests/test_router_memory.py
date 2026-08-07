@@ -1,4 +1,4 @@
-﻿"""Unit tests for MAOP.dashboard.routers.memory module.
+"""Unit tests for MAOP.dashboard.routers.memory module.
 
 Tests memory and neural mechanism endpoints:
   - /api/memory/deep, /api/memory/search, /api/memory/trace, /api/memory/stats
@@ -84,7 +84,7 @@ def tmp_root(tmp_path, monkeypatch):
 def client(tmp_root, monkeypatch):
     """TestClient with mocked MemoryStore and VectorStore."""
     monkeypatch.setattr("maop.memory.store.MemoryStore", FakeMemoryStore)
-    monkeypatch.setattr("maop.core.vector.VectorStore", FakeVectorStore)
+    monkeypatch.setattr("maop.core.memory.vector.VectorStore", FakeVectorStore)
     # BloomFilter import is optional; let it succeed or fail naturally.
     app = FastAPI()
     @app.middleware("http")

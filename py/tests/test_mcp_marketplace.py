@@ -18,8 +18,8 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from maop.core.mcp_hub import MCPServerConfig, TransportType
-from maop.core.mcp_marketplace import (
+from maop.core.mcp.mcp_hub import MCPServerConfig, TransportType
+from maop.core.mcp.mcp_marketplace import (
     MarketplaceConfig,
     MarketplaceRegistry,
     MarketplaceServer,

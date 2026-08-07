@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.tls - TLS/SSL context management."""
+"""Tests for MAOP.core.tls - TLS/SSL context management."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.tls import TLSSettings, create_ssl_context
+from maop.core.security.tls import TLSSettings, create_ssl_context
 
 
 def _generate_self_signed_cert(cert_path: Path, key_path: Path) -> None:

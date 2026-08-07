@@ -18,8 +18,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from maop.core.chat_engine import ChatEngine, ChatRequest, ChatResponse
-from maop.core.error_schema import MaopResult
+from maop.core.agent.llm_chat.chat_engine import ChatEngine, ChatRequest, ChatResponse
+from maop.core.reliability.error_schema import MaopResult
 from maop.delegate.models import DispatchResult
 from maop.memory.manager import ConsolidationTrigger, MemoryManagerConfig
 

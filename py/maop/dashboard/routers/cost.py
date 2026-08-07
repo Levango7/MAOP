@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 router = APIRouter(prefix="/api/cost", tags=["cost"])
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/cost", tags=["cost"])
 def _get_cost_tracker():
     from pathlib import Path
 
-    from maop.core.cost_tracker import CostTracker
+    from maop.core.monitoring.cost_tracker import CostTracker
     root = Path(__file__).resolve().parent.parent.parent.parent
     return CostTracker(root_dir=str(root))
 
@@ -64,7 +64,10 @@ async def get_cost_summary(
 @handle_api_errors
 async def get_budget_status() -> dict[str, Any]:
     tracker = _get_cost_tracker()
-    status = tracker.budget_status()
+    if hasattr(tracker, "budget_status_async"):
+        status = await tracker.budget_status_async()
+    else:
+        status = tracker.budget_status()
     return {"budget": status.model_dump()}
 
 
@@ -93,14 +96,26 @@ async def update_pricing(model: str, body: dict, request: Request) -> dict[str, 
 async def record_cost(body: dict, request: Request) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_cost_tracker()
-    entry = tracker.record(
-        session_id=body.get("session_id", ""),
-        agent=body.get("agent", ""),
-        model=body.get("model", ""),
-        prompt_tokens=body.get("prompt_tokens", 0),
-        completion_tokens=body.get("completion_tokens", 0),
-        total_tokens=body.get("total_tokens", 0),
-        latency_ms=body.get("latency_ms", 0),
-        metadata=body.get("metadata"),
-    )
+    if hasattr(tracker, "record_async"):
+        entry = await tracker.record_async(
+            session_id=body.get("session_id", ""),
+            agent=body.get("agent", ""),
+            model=body.get("model", ""),
+            prompt_tokens=body.get("prompt_tokens", 0),
+            completion_tokens=body.get("completion_tokens", 0),
+            total_tokens=body.get("total_tokens", 0),
+            latency_ms=body.get("latency_ms", 0),
+            metadata=body.get("metadata"),
+        )
+    else:
+        entry = tracker.record(
+            session_id=body.get("session_id", ""),
+            agent=body.get("agent", ""),
+            model=body.get("model", ""),
+            prompt_tokens=body.get("prompt_tokens", 0),
+            completion_tokens=body.get("completion_tokens", 0),
+            total_tokens=body.get("total_tokens", 0),
+            latency_ms=body.get("latency_ms", 0),
+            metadata=body.get("metadata"),
+        )
     return {"entry": entry.model_dump()}

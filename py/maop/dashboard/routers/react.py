@@ -7,20 +7,20 @@ from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 router = APIRouter(prefix="/api/react", tags=["react"])
 
 
 def _get_change_tracker():
-    from maop.core.change_tracker import ChangeTracker
+    from maop.core.reliability.change_tracker import ChangeTracker
     root = Path(__file__).resolve().parent.parent.parent.parent
     return ChangeTracker(root_dir=str(root))
 
 
 def _get_artifact_store():
-    from maop.core.artifact_store import ArtifactStore
+    from maop.core.backends.artifact_store import ArtifactStore
     root = Path(__file__).resolve().parent.parent.parent.parent
     return ArtifactStore(root_dir=str(root))
 

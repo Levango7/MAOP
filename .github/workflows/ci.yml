@@ -70,12 +70,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: py/requirements.txt
+          cache-dependency-path: py/requirements.lock
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.lock
           pip install -e .
           pip install pytest pytest-asyncio pytest-cov pydantic-settings mmh3 httpx python-multipart aiosqlite pytest-timeout
 
@@ -115,6 +115,10 @@ jobs:
         working-directory: dashboard-enterprise
         run: npm ci
 
+      - name: Lint frontend
+        run: npm run lint
+        working-directory: dashboard-enterprise
+
       - name: Run frontend tests
         run: npm test
         working-directory: dashboard-enterprise
@@ -138,6 +142,21 @@ jobs:
       MAOP_DATA_DIR: /tmp/maop-migration-test
       # env.py 通过 MAOP_DB_URL 覆盖默认 sqlite 路径，使用临时库避免污染源码树
       MAOP_DB_URL: sqlite:////tmp/maop-migration-test/maop.db
+    services:
+      # G5: PostgreSQL service container for PG integration smoke tests.
+      # 健康检查确保 CI 步骤执行前 PG 已就绪，避免连接被拒。
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: maop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -164,10 +183,12 @@ jobs:
           alembic upgrade head
 
       - name: Test with PostgreSQL
-        if: false  # 暂时禁用，需要 postgres service
+        working-directory: py
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/maop_test
         run: |
-          # TODO: 加 postgres service container 后启用
-          echo "PostgreSQL migration test - pending postgres service setup"
+          pip install pytest psycopg2-binary
+          python -m pytest tests/test_backends_pg_integration.py -v -m integration
 
   # ── Docker Build ────────────────────────────────────────────────
   docker:

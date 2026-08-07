@@ -6,7 +6,7 @@ import tempfile
 
 import pytest
 
-from maop.core.skill_version import (
+from maop.core.evolution.skill_version import (
     SkillExecutionResult,
     SkillMeta,
     SkillStep,

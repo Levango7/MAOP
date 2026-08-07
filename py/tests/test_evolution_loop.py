@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.evolution_loop import EvolutionLoop, LoopPhase, LoopReport, PhaseResult
+from maop.core.evolution.evolution_loop import EvolutionLoop, LoopPhase, LoopReport, PhaseResult
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ class TestEvolutionLoopObserve:
         assert result.details.get("hotspot_count", 0) >= 0
 
     def test_observe_with_errors(self, loop: EvolutionLoop, tmp_root: Path):
-        from maop.core.error_ledger import ErrorLedger
+        from maop.core.reliability.error_ledger import ErrorLedger
         ledger = ErrorLedger(root_dir=str(tmp_root))
         for _ in range(3):
             ledger.record(error_type="test_err", pattern="test_pattern")
@@ -93,7 +93,7 @@ class TestEvolutionLoopSuggest:
         assert result.details["count"] == 0
 
     def test_suggest_with_promoted_rules(self, loop: EvolutionLoop, tmp_root: Path):
-        from maop.core.error_ledger import ErrorLedger
+        from maop.core.reliability.error_ledger import ErrorLedger
         ledger = ErrorLedger(root_dir=str(tmp_root))
         for _ in range(4):
             ledger.record(error_type="routing_err", pattern="routing_mismatch")
@@ -102,7 +102,7 @@ class TestEvolutionLoopSuggest:
         assert result.details["count"] >= 1
 
     def test_suggest_writes_json(self, loop: EvolutionLoop, tmp_root: Path):
-        from maop.core.error_ledger import ErrorLedger
+        from maop.core.reliability.error_ledger import ErrorLedger
         ledger = ErrorLedger(root_dir=str(tmp_root))
         for _ in range(4):
             ledger.record(error_type="test_err", pattern="unique_test_pattern")
@@ -163,7 +163,7 @@ class TestEvolutionLoopFullCycle:
         assert len(report.phases) >= 1  # at least observe
 
     def test_full_cycle_with_errors(self, loop: EvolutionLoop, tmp_root: Path):
-        from maop.core.error_ledger import ErrorLedger
+        from maop.core.reliability.error_ledger import ErrorLedger
         ledger = ErrorLedger(root_dir=str(tmp_root))
         for _ in range(3):
             ledger.record(error_type="test_error", pattern="test_pattern_full")
@@ -198,7 +198,7 @@ class TestEvolutionLoopPersistence:
         assert stats["total_cycles"] == 3
 
     def test_suggestions_dedup(self, loop: EvolutionLoop, tmp_root: Path):
-        from maop.core.error_ledger import ErrorLedger
+        from maop.core.reliability.error_ledger import ErrorLedger
         ledger = ErrorLedger(root_dir=str(tmp_root))
         for _ in range(4):
             ledger.record(error_type="dedup_test", pattern="dedup_pattern")
@@ -219,7 +219,7 @@ class TestDryRunMode:
 
     def test_run_cycle_dry_run_returns_report(self, loop: EvolutionLoop, tmp_root: Path):
         # Seed an error so the cycle has work to do.
-        from maop.core.error_ledger import ErrorLedger
+        from maop.core.reliability.error_ledger import ErrorLedger
         ledger = ErrorLedger(root_dir=str(tmp_root))
         for _ in range(3):
             ledger.record(error_type="TestError", pattern="routing.timeout", context="dry_run")
@@ -232,7 +232,7 @@ class TestDryRunMode:
         assert "proposed" in apply_phase.details
 
     def test_dry_run_does_not_snapshot(self, loop: EvolutionLoop, tmp_root: Path):
-        from maop.core.error_ledger import ErrorLedger
+        from maop.core.reliability.error_ledger import ErrorLedger
         ledger = ErrorLedger(root_dir=str(tmp_root))
         for _ in range(3):
             ledger.record(error_type="TestError", pattern="routing.timeout", context="dry_run")
@@ -248,7 +248,7 @@ class TestRollbackCycle:
 
     def test_rollback_cycle_with_explicit_snapshot(self, loop: EvolutionLoop, tmp_root: Path):
         # Manually create a ChangeTracker snapshot, then call rollback_cycle.
-        from maop.core.change_tracker import ChangeTracker
+        from maop.core.reliability.change_tracker import ChangeTracker
         ct = ChangeTracker(root_dir=str(tmp_root))
         # Create a sample file so snapshot has something to back up.
         (tmp_root / "config.yaml").write_text("version: 1\n", encoding="utf-8")
@@ -268,7 +268,7 @@ class TestRollbackCycle:
 
     def test_rollback_cycle_no_snapshot_returns_zero(self, loop: EvolutionLoop, tmp_root: Path):
         # Persist a cycle with no snapshot_id; rollback should return 0.
-        from maop.core.evolution_loop import LoopReport
+        from maop.core.evolution.evolution_loop import LoopReport
         empty_report = LoopReport(cycle_id="no-snap-cycle")
         loop._save_report(empty_report)
         restored = loop.rollback_cycle("no-snap-cycle")

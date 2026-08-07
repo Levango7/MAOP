@@ -1,8 +1,8 @@
-﻿"""Tests for MAOP.core.permission — PermissionManager."""
+"""Tests for MAOP.core.permission — PermissionManager."""
 
 from __future__ import annotations
 
-from maop.core.permission import PermissionManager
+from maop.core.security.permission import PermissionManager
 
 
 class TestPermissionManager:

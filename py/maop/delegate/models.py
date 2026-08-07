@@ -9,7 +9,7 @@ import re
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from maop.core.error_schema import MaopResult
+from maop.core.reliability.error_schema import MaopResult
 
 # ── Models ────────────────────────────────────────────────────
 

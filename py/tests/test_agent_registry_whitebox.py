@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.agent_registry import AgentRegistry, RegisteredAgent
+from maop.core.agent.lifecycle.agent_registry import AgentRegistry, RegisteredAgent
 
 
 # ── Fixtures ─────────────────────────────────────────────────────

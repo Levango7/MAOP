@@ -324,7 +324,7 @@ class DreamConsolidator:
             return
 
         try:
-            from maop.core.knowledge_extractor import KnowledgeExtractor
+            from maop.core.memory.knowledge_extractor import KnowledgeExtractor
             extractor = KnowledgeExtractor(root_dir=self._root_dir)
 
             for i, summary in enumerate(summaries):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from maop.core.human_proxy import ApprovalRequest, HumanProxy, HumanProxyConfig
+from maop.core.agent.delegation.human_proxy import ApprovalRequest, HumanProxy, HumanProxyConfig
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ class TestHumanProxyConfig:
 class TestHumanProxyInit:
     def test_creates_db(self, tmp_path):
         HumanProxy(root_dir=tmp_path)
-        from maop.core.db_utils import get_db_path
+        from maop.core.backends.db_utils import get_db_path
         db = get_db_path("human_proxy")
         assert db.name == "maop.db"
 

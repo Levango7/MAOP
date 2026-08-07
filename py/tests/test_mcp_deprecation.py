@@ -68,10 +68,10 @@ class TestMCPHubCanonical:
         """The canonical mcp_hub module must import without warnings."""
         import warnings
 
-        sys.modules.pop("maop.core.mcp_hub", None)
+        sys.modules.pop("maop.core.mcp.mcp_hub", None)
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            importlib.import_module("maop.core.mcp_hub")
+            importlib.import_module("maop.core.mcp.mcp_hub")
         deps = [
             w for w in caught
             if issubclass(w.category, DeprecationWarning)
@@ -98,7 +98,7 @@ class TestMCPHubCanonical:
         ],
     )
     def test_mcp_hub_has_compat_shim(self, attr: str) -> None:
-        from maop.core.mcp_hub import MCPHub
+        from maop.core.mcp.mcp_hub import MCPHub
 
         assert hasattr(MCPHub, attr), (
             f"MCPHub must expose compat shim '{attr}' for legacy callers "
@@ -107,7 +107,7 @@ class TestMCPHubCanonical:
 
     def test_mcp_hub_exposes_canonical_models(self) -> None:
         """Canonical Stack A model names must be importable from mcp_hub."""
-        from maop.core.mcp_hub import (
+        from maop.core.mcp.mcp_hub import (
             MCPTool,
         )
 
@@ -132,7 +132,7 @@ class TestDashboardUsesMCPHub:
         src = router_path.read_text(encoding="utf-8")
 
         # Must reference the canonical Stack A implementation.
-        assert "from maop.core.mcp_hub import" in src, (
+        assert "from maop.core.mcp.mcp_hub import" in src, (
             "Dashboard MCP router must import from maop.core.mcp_hub (Stack A)"
         )
         assert "MCPHub" in src, "Dashboard MCP router must use MCPHub class"
@@ -190,7 +190,7 @@ class TestCallersMigrated:
         )
         src = path.read_text(encoding="utf-8")
 
-        assert "from maop.core.mcp_hub import MCPHub" in src, (
+        assert "from maop.core.mcp.mcp_hub import MCPHub" in src, (
             "function_call.py must import MCPHub from maop.core.mcp_hub (Stack A)"
         )
         # Must not import Stack B modules at runtime.
@@ -213,7 +213,7 @@ class TestCallersMigrated:
         )
         src = path.read_text(encoding="utf-8")
 
-        assert "from maop.core.mcp_hub import" in src, (
+        assert "from maop.core.mcp.mcp_hub import" in src, (
             "tool_schema.py must import from maop.core.mcp_hub (Stack A)"
         )
         assert "MCPTool" in src, (

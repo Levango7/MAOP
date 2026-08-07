@@ -1,8 +1,8 @@
-﻿"""Tests for MAOP.core.load_balancer — Dynamic weighted routing."""
+"""Tests for MAOP.core.load_balancer — Dynamic weighted routing."""
 
 
 
-from maop.core.load_balancer import (
+from maop.core.routing.load_balancer import (
     AgentMetrics,
     LBAlgorithm,
     LoadBalancer,

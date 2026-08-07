@@ -1,6 +1,6 @@
-﻿"""Tests for MAOP.core.error_schema."""
+"""Tests for MAOP.core.error_schema."""
 
-from maop.core.error_schema import MaopResult, new_result
+from maop.core.reliability.error_schema import MaopResult, new_result
 
 
 class TestNewResult:

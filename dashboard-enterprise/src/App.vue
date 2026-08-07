@@ -227,7 +227,7 @@ async function checkAuthEnabled() {
   try {
     const d = await api.get('/api/auth/status');
     authEnabled.value = d && d.auth_enabled === true;
-    try { localStorage.setItem('maop_auth_enabled', String(authEnabled.value)); } catch {}
+    try { localStorage.setItem('maop_auth_enabled', String(authEnabled.value)); } catch { /* ignore */ }
     // If backend says auth is enabled but our token is invalid (has_token:false),
     // clear the stale local token so showLoginIfRequired() can trigger the
     // login overlay immediately — instead of waiting for 401 errors from
@@ -263,9 +263,9 @@ onMounted(async () => {
     const d = await api.get('/api/health');
     if (d) {
       version.value = d.version || (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown');
-      try { localStorage.setItem('maop_version', version.value); } catch {}
+      try { localStorage.setItem('maop_version', version.value); } catch { /* ignore */ }
     }
-  } catch {}
+  } catch { /* ignore */ }
   realtime.connect();
 });
 

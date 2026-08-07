@@ -41,12 +41,12 @@ class TestBug2ExitCodeHandling:
     """BUG-2: Dispatcher should handle missing ExitCode gracefully."""
 
     def test_dispatcher_returns_exit_code_on_success(self):
-        from maop.core.error_schema import new_result
+        from maop.core.reliability.error_schema import new_result
         r = new_result(agent="test", task="t", exit_code=0, stdout="ok")
         assert r.exit_code == 0
 
     def test_dispatcher_returns_negative_on_failure(self):
-        from maop.core.error_schema import new_result
+        from maop.core.reliability.error_schema import new_result
         r = new_result(agent="test", task="t", exit_code=-1, error="fail")
         assert r.exit_code == -1
 
@@ -130,7 +130,7 @@ class TestM2DashboardTokenAuth:
     def test_require_admin_passes_with_admin_role(self):
         from unittest.mock import MagicMock
 
-        from maop.core.middleware import require_admin
+        from maop.core.security.middleware import require_admin
         request = MagicMock()
         request.state.auth_roles = ["admin"]
         require_admin(request)
@@ -140,7 +140,7 @@ class TestM2DashboardTokenAuth:
 
         from fastapi import HTTPException
 
-        from maop.core.middleware import require_admin
+        from maop.core.security.middleware import require_admin
         request = MagicMock()
         request.state.auth_roles = []
         with pytest.raises(HTTPException) as exc_info:

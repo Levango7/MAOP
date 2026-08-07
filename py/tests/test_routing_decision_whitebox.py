@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.routing_decision import RoutingDecisionRecord, RoutingDecisionStore
+from maop.core.routing.routing_decision import RoutingDecisionRecord, RoutingDecisionStore
 
 
 def _make_decision(

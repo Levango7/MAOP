@@ -1,9 +1,9 @@
-﻿"""Tests for MAOP.core.protocol — Dynamic agent communication protocol registry."""
+"""Tests for MAOP.core.protocol — Dynamic agent communication protocol registry."""
 
 
 import pytest
 
-from maop.core.protocol import ProtocolRegistry
+from maop.core.agent.plugins_hooks.protocol import ProtocolRegistry
 
 
 @pytest.fixture

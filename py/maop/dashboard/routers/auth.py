@@ -28,8 +28,8 @@ from .state import MAOP_ROOT
 router = APIRouter()
 
 # ── Auth config ────────────────────────────────────────────────────
-from maop.core.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig, load_jwt_secret
-from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.core.security.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig, load_jwt_secret
+from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 _env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
 # High 安全修复 (2.3): secure-by-default。只有显式声明本地开发环境
@@ -145,7 +145,7 @@ def _ensure_default_user() -> None:
 
 
 # ── Admin guard ────────────────────────────────────────────────────
-from maop.core.middleware import require_admin as _require_admin
+from maop.core.security.middleware import require_admin as _require_admin
 
 
 # ── Sync DB helpers (for run_in_executor) ──────────────────────────
@@ -236,10 +236,29 @@ def _db_update_user(db_path_str: str, username: str, body: dict) -> Any:
 
 # ── Endpoints ──────────────────────────────────────────────────────
 _login_failures: dict[str, list[float]] = {}
+# H6 fix: IP 维度限流。攻击者可用单一密码遍历用户名绕过 username lockout，
+# 增加 IP 维度记录，对同一 IP 的失败登录次数进行限制。
+_login_failures_by_ip: dict[str, list[float]] = {}
 _login_failures_lock = threading.Lock()
 _MAX_LOGIN_FAILURES = 5
 _LOCKOUT_SECONDS = 900.0
 _MAX_TRACKED_USERS = 10_000  # P1-18 fix: prevent unbounded growth
+_MAX_TRACKED_IPS = 10_000  # H6 fix: prevent unbounded growth for IP tracking
+
+
+def _get_client_ip(request: Request) -> str:
+    """Extract client IP for login rate limiting.
+
+    When MAOP_TRUST_PROXY is enabled, use X-Forwarded-For header
+    to get the real client IP behind a reverse proxy.
+    Mirrors RateLimitMiddleware._default_key logic.
+    """
+    if os.environ.get("MAOP_TRUST_PROXY", "0") == "1":
+        xff = request.headers.get("x-forwarded-for", "")
+        if xff:
+            # XFF can contain multiple IPs, take the first (original client)
+            return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 @router.get("/api/auth/status")
 async def auth_status(request: Request) -> Any:
@@ -274,6 +293,8 @@ async def auth_login(request: Request) -> Any:
             return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
 
         now = time.monotonic()
+        # H6 fix: 提取客户端 IP 用于 IP 维度限流
+        client_ip = _get_client_ip(request)
         with _login_failures_lock:
             failures = _login_failures.get(username, [])
             failures = [t for t in failures if now - t < _LOCKOUT_SECONDS]
@@ -304,8 +325,39 @@ async def auth_login(request: Request) -> Any:
                     excess = len(_login_failures) - _MAX_TRACKED_USERS
                     for u in evictable[:excess]:
                         del _login_failures[u]
+            # H6 fix: IP 维度限流检查与清理（与 username lockout 逻辑一致）
+            ip_failures = _login_failures_by_ip.get(client_ip, [])
+            ip_failures = [t for t in ip_failures if now - t < _LOCKOUT_SECONDS]
+            _login_failures_by_ip[client_ip] = ip_failures
+            if len(_login_failures_by_ip) > _MAX_TRACKED_IPS:
+                for ip in list(_login_failures_by_ip):
+                    recent = [
+                        t for t in _login_failures_by_ip[ip]
+                        if now - t < _LOCKOUT_SECONDS
+                    ]
+                    if recent:
+                        _login_failures_by_ip[ip] = recent
+                    else:
+                        del _login_failures_by_ip[ip]
+                if len(_login_failures_by_ip) > _MAX_TRACKED_IPS:
+                    evictable_ip = sorted(
+                        (
+                            ip for ip, ts in _login_failures_by_ip.items()
+                            if len(ts) < _MAX_LOGIN_FAILURES and ip != client_ip
+                        ),
+                        key=lambda ip: max(_login_failures_by_ip[ip], default=0.0),
+                    )
+                    excess_ip = len(_login_failures_by_ip) - _MAX_TRACKED_IPS
+                    for ip in evictable_ip[:excess_ip]:
+                        del _login_failures_by_ip[ip]
         if len(failures) >= _MAX_LOGIN_FAILURES:
             return JSONResponse({"status": "error", "error": "Account locked. Try again later."}, status_code=429)
+        # H6 fix: IP 维度限流 —— 同一 IP 15 分钟内失败超过 5 次则锁定
+        if len(ip_failures) >= _MAX_LOGIN_FAILURES:
+            return JSONResponse(
+                {"status": "error", "error": "Too many login attempts from this IP. Try again later."},
+                status_code=429,
+            )
 
         db_path = get_db_path("auth")
         if not db_path.exists():
@@ -318,6 +370,7 @@ async def auth_login(request: Request) -> Any:
         if result["status"] != "ok":
             with _login_failures_lock:
                 _login_failures.setdefault(username, []).append(now)
+                _login_failures_by_ip.setdefault(client_ip, []).append(now)  # H6 fix
             return JSONResponse(result, status_code=401)
 
         mgr = get_auth_mgr()
@@ -325,6 +378,7 @@ async def auth_login(request: Request) -> Any:
         # P1-18 fix: clear failures on successful login
         with _login_failures_lock:
             _login_failures.pop(username, None)
+            _login_failures_by_ip.pop(client_ip, None)  # H6 fix
 
         # #4 fix: set JWT as httpOnly cookie (XSS-proof) + return token for API clients
         response = JSONResponse({

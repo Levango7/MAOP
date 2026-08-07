@@ -93,7 +93,7 @@ def _ensure_dev_certs() -> tuple[str, str]:
 
 def _build_ssl_kwargs(cert_file: str, key_file: str) -> dict[str, Any]:
     try:
-        from maop.core.tls import TLSSettings, create_ssl_context
+        from maop.core.security.tls import TLSSettings, create_ssl_context
         min_ver = os.getenv("MAOP_TLS_MIN_VERSION", "TLSv1_2")
         ssl_ctx = create_ssl_context(TLSSettings(
             enabled=True, cert_file=cert_file, key_file=key_file, min_version=min_ver,

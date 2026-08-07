@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.cache_guard — penetration/breakdown/avalanche protection."""
+"""Tests for MAOP.core.cache_guard — penetration/breakdown/avalanche protection."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from maop.core.cache_guard import (
+from maop.core.reliability.cache import (
     CacheGuard,
     CacheGuardConfig,
     CacheGuardStats,

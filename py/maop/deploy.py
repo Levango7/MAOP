@@ -292,10 +292,25 @@ def start(
     host: str = "127.0.0.1",
     log_level: str = "INFO",
     dashboard: bool = True,
+    wait_ready: bool = False,
+    ready_timeout_s: float = 30.0,
+    ready_interval_s: float = 0.5,
 ) -> SystemStatus:
     """Start the MAOP system (dashboard server).
 
     Returns SystemStatus with the current state.
+
+    P2-P3 fix (M8): 启动后可选轮询 health_check 直到就绪或超时。
+
+    Parameters
+    ----------
+    wait_ready : bool
+        是否等待服务就绪。默认 False（保持原行为，立即返回 STARTING）。
+        True 时轮询 health_check 直到 dashboard 健康或超时。
+    ready_timeout_s : float
+        就绪检查超时秒数。默认 30.0。
+    ready_interval_s : float
+        就绪检查轮询间隔秒数。默认 0.5。
     """
     root = Path(root_dir).resolve()
 
@@ -347,6 +362,68 @@ def start(
         _write_pid(root, proc.pid)
         logger.info("MAOP started: pid=%d, dashboard=%s:%d", proc.pid, host, port)
 
+        # P2-P3 fix (M8): 就绪检查 — 轮询 health_check 直到成功或超时
+        if wait_ready:
+            components = _wait_for_ready(
+                root,
+                timeout_s=ready_timeout_s,
+                interval_s=ready_interval_s,
+            )
+
+            # 检查子进程是否已退出（启动失败）
+            if proc.poll() is not None:
+                # 子进程已退出，读取 stderr 获取错误信息
+                stderr_output = ""
+                try:
+                    if proc.stderr is not None:
+                        stderr_output = proc.stderr.read().decode("utf-8", errors="replace")[-500:]
+                except Exception:
+                    pass
+                _remove_pid(root)
+                logger.error("MAOP subprocess exited prematurely: %s", stderr_output)
+                return SystemStatus(
+                    status=ServiceStatus.ERROR,
+                    pid=proc.pid,
+                    config=DeployConfig(root_dir=str(root), dashboard_port=port),
+                    components=[ComponentHealth(
+                        name="subprocess",
+                        status=HealthStatus.UNHEALTHY,
+                        message=f"Process exited: {stderr_output}",
+                    )],
+                )
+
+            # 评估就绪状态
+            dashboard_healthy = any(
+                c.name == "dashboard" and c.status == HealthStatus.HEALTHY
+                for c in components
+            )
+
+            if dashboard_healthy:
+                final_status = ServiceStatus.RUNNING
+                logger.info("MAOP ready: pid=%d", proc.pid)
+            else:
+                # Dashboard 未就绪但进程仍在运行 — 超时返回 ERROR + 健康检查结果
+                final_status = ServiceStatus.ERROR
+                logger.warning(
+                    "MAOP not ready after %.1fs: pid=%d, components=%s",
+                    ready_timeout_s, proc.pid,
+                    [(c.name, c.status.value) for c in components],
+                )
+
+            return SystemStatus(
+                status=final_status,
+                pid=proc.pid,
+                started_at=datetime.now(timezone.utc).isoformat(),
+                components=components,
+                config=DeployConfig(
+                    root_dir=str(root),
+                    dashboard_port=port,
+                    dashboard_host=host,
+                    log_level=log_level,
+                ),
+            )
+
+        # 不等待就绪 — 保持原行为
         return SystemStatus(
             status=ServiceStatus.STARTING,
             pid=proc.pid,
@@ -367,6 +444,36 @@ def start(
         started_at=datetime.now(timezone.utc).isoformat(),
         config=DeployConfig(root_dir=str(root)),
     )
+
+
+def _wait_for_ready(
+    root_dir: str | Path,
+    *,
+    timeout_s: float = 30.0,
+    interval_s: float = 0.5,
+) -> list[ComponentHealth]:
+    """轮询 health_check 直到 dashboard 就绪或超时。
+
+    P2-P3 fix (M8): start() 后的就绪检查辅助函数。
+    返回最后一次 health_check 的结果（无论是否就绪）。
+    """
+    deadline = time.monotonic() + timeout_s
+    last_components: list[ComponentHealth] = []
+
+    while time.monotonic() < deadline:
+        last_components = health_check(root_dir, timeout_s=interval_s)
+
+        # 检查 dashboard 组件是否 HEALTHY
+        dashboard_healthy = any(
+            c.name == "dashboard" and c.status == HealthStatus.HEALTHY
+            for c in last_components
+        )
+        if dashboard_healthy:
+            return last_components
+
+        time.sleep(interval_s)
+
+    return last_components
 
 
 def stop(root_dir: str | Path = ".") -> SystemStatus:

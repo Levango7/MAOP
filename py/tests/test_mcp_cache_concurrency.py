@@ -24,14 +24,14 @@ from typing import Any
 
 import pytest
 
-from maop.core.mcp_cache import MCPCache, MCPCacheEntry, MCPCacheKey, MCPCacheStats
-from maop.core.mcp_concurrency import MCPServerConcurrency, MCPServerRateLimiter
-from maop.core.mcp_hub import (
+from maop.core.mcp.mcp_cache import MCPCache, MCPCacheEntry, MCPCacheKey, MCPCacheStats
+from maop.core.mcp.mcp_concurrency import MCPServerConcurrency, MCPServerRateLimiter
+from maop.core.mcp.mcp_hub import (
     MCPHub,
     MCPRateLimitedError,
     MCPServerConfig,
 )
-from maop.core.monitoring import (
+from maop.core.monitoring.monitoring import (
     MAOP_MCP_CACHE_EVICTION_TOTAL,
     MAOP_MCP_CACHE_HIT_TOTAL,
     MAOP_MCP_CACHE_MISS_TOTAL,

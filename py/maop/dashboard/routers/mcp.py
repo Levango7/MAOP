@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.routers.state import MAOP_ROOT
 
@@ -82,24 +82,24 @@ def _get_hub() -> Any:
     with _mcp_hub_lock:
         if _mcp_hub is not None:  # double-checked locking
             return _mcp_hub
-        from maop.core.mcp_hub import MCPHub
+        from maop.core.mcp.mcp_hub import MCPHub
 
         # δ-3: permission gate + audit trail
         permission_checker = _try_init_delta_component(
-            "maop.core.mcp_permission", "MCPPermissionChecker",
+            "maop.core.mcp.mcp_permission", "MCPPermissionChecker",
         )
         audit_logger = _try_init_delta_component(
-            "maop.core.mcp_audit", "MCPAuditLogger",
+            "maop.core.mcp.mcp_audit", "MCPAuditLogger",
         )
         # δ-5: resilience hooks — cache, per-server concurrency, RPM limiter
         cache = _try_init_delta_component(
-            "maop.core.mcp_cache", "MCPCache",
+            "maop.core.mcp.mcp_cache", "MCPCache",
         )
         concurrency = _try_init_delta_component(
-            "maop.core.mcp_concurrency", "MCPServerConcurrency",
+            "maop.core.mcp.mcp_concurrency", "MCPServerConcurrency",
         )
         rate_limiter = _try_init_delta_component(
-            "maop.core.mcp_concurrency", "MCPServerRateLimiter",
+            "maop.core.mcp.mcp_concurrency", "MCPServerRateLimiter",
         )
 
         _mcp_hub = MCPHub(
@@ -158,7 +158,7 @@ async def list_servers() -> dict[str, Any]:
 @handle_api_errors
 async def add_server(body: ServerCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
-    from maop.core.mcp_hub import MCPServerConfig, TransportType
+    from maop.core.mcp.mcp_hub import MCPServerConfig, TransportType
     hub = _get_hub()
     config = MCPServerConfig(
         name=body.name,

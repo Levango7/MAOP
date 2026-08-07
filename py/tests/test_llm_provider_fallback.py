@@ -2,7 +2,7 @@
 
 import pytest
 
-from maop.core.llm_provider import (
+from maop.core.agent.llm_chat.llm_provider import (
     BaseLLMProvider,
     FallbackResult,
     LLMProviderFactory,

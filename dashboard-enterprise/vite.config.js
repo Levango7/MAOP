@@ -17,6 +17,30 @@ export default defineConfig({
   build: {
     outDir: '../dashboard/dist-enterprise',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // P1-4: vendor 分包优化，将第三方依赖按职责拆分为独立 chunk，
+        // 减小入口 chunk 体积并提升缓存命中率（vendor chunk 命中后无需重复下载）。
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          // Vue 全家桶：核心框架 + 路由 + 状态管理
+          if (/[\\/]node_modules[\\/](vue|vue-router|pinia)[\\/]/.test(id)) {
+            return 'vendor-vue';
+          }
+          // 可视化：vis-network + vis-data（知识图谱、MCP 拓扑共用）
+          if (/[\\/]node_modules[\\/](vis-network|vis-data)[\\/]/.test(id)) {
+            return 'vendor-vis';
+          }
+          // 图表：chart.js + vue-chartjs
+          if (/[\\/]node_modules[\\/](chart\.js|vue-chartjs)[\\/]/.test(id)) {
+            return 'vendor-chart';
+          }
+          // 其余第三方依赖统一归入 vendor
+          return 'vendor';
+        },
+      },
+    },
+    chunkSizeWarningLimit: 800,
   },
   server: {
     port: 5174,
@@ -41,10 +65,7 @@ export default defineConfig({
       '@': '/src',
     },
   },
-  test: {
-    environment: 'jsdom',
-    globals: true,
-  },
+
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },

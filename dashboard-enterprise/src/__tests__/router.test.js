@@ -9,6 +9,7 @@ describe('Router', () => {
       'search', 'vector', 'tools', 'models',
       'logs', 'monitor', 'cost', 'audit', 'rbac', 'tenants', 'settings',
       'users', 'docs',
+      'knowledge-graph',  // v4.5.0: knowledge graph visualization
     ];
     for (const name of expected) {
       expect(names).toContain(name);
@@ -20,8 +21,15 @@ describe('Router', () => {
     expect(route?.path).toBe('/');
   });
 
-  it('has 20 routes total', () => {
-    // 19 业务路由 + 1 个 catch-all 重定向 (:pathMatch(.*)*)
-    expect(router.getRoutes().length).toBe(20);
+  it('has 21 routes total', () => {
+    // 20 业务路由 (incl. v4.5.0 /knowledge-graph) + 1 个 catch-all 重定向 (:pathMatch(.*)*)
+    expect(router.getRoutes().length).toBe(21);
+  });
+
+  it('knowledge-graph route has no enterprise guard', () => {
+    // v4.5.0: /knowledge-graph is general-availability (spec 5.3.1 rule 1)
+    const route = router.getRoutes().find((r) => r.name === 'knowledge-graph');
+    expect(route?.path).toBe('/knowledge-graph');
+    expect(route?.meta?.requiresEnterprise).toBeFalsy();
   });
 });

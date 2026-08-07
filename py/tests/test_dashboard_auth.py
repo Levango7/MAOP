@@ -1,4 +1,4 @@
-﻿"""Regression tests for dashboard authentication wiring and password storage.
+"""Regression tests for dashboard authentication wiring and password storage.
 
 httpx compatibility note:
   FastAPI's TestClient internally uses httpx.  Between httpx 0.27 and 0.28
@@ -18,8 +18,8 @@ import httpx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from maop.core.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig
-from maop.core.middleware import AuthMiddleware
+from maop.core.security.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig
+from maop.core.security.middleware import AuthMiddleware
 from maop.dashboard.routers import auth as auth_mod
 
 # Defensive: verify the installed httpx version is compatible.

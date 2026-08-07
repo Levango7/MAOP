@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from maop.core.agent_registry import (
+from maop.core.agent.lifecycle.agent_registry import (
     AgentRegistry,
     RegisteredAgent,
 )
-from maop.core.agent_scanner import (
+from maop.core.agent.lifecycle.agent_scanner import (
     KNOWN_AGENTS,
     AgentScanner,
     AgentSource,
@@ -16,7 +16,7 @@ from maop.core.agent_scanner import (
     KnownAgentDef,
     ScannedAgent,
 )
-from maop.core.capability_matcher import (
+from maop.core.agent.tools.capability_matcher import (
     TASK_KEYWORD_MAP,
     CapabilityMatcher,
     MatcherConfig,

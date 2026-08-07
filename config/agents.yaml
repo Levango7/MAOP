@@ -45,32 +45,6 @@ agents:
     driver: cli
     model: built-in
     timeout_s: 30
-  claude:
-    capabilities:
-    - codegen
-    - refactor
-    - explain
-    - search
-    - planning
-    - review
-    - techdoc
-    - verify
-    - docgen
-    - quickfix
-    - fileops
-    - chat
-    - memory
-    - vision
-    - multimodal
-    cli: claude
-    cli_args: -p '{task}'
-    description: Claude Code v2.1.212 + StepFun step-3.7-flash
-    driver: cli
-    extracts_queries: true
-    model: mimo-v2.5
-    results_merge: true
-    supports_regeneration: true
-    timeout_s: 120
   cline:
     capabilities:
     - codegen
@@ -471,7 +445,7 @@ agents:
     - explain
     - chat
     cli: qwen
-    cli_args: "-p '{{safePrompt}}' -o json --safe-mode"
+    cli_args: -p '{{safePrompt}}' -o json --safe-mode
     description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
       driver migrated powershell -> cli per ADR-009'
     driver: cli

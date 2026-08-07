@@ -20,7 +20,7 @@
     </div>
 
     <!-- Model registry -->
-    <Card :title="t('view.models.modelRegistry')" icon="cpu" :marginBottom="16"
+    <Card :title="t('view.models.modelRegistry')" icon="cpu" :margin-bottom="16"
       :subtitle="`${models.length} ` + t('view.models.registeredModels')">
       <div v-if="modelsError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadModels')" :description="modelsError.value" /></div>
       <Skeleton v-else-if="loading" :lines="6" block />
@@ -29,7 +29,7 @@
     </Card>
 
     <!-- Providers -->
-    <Card :title="t('view.models.providerHealth')" icon="activity" :marginBottom="16"
+    <Card :title="t('view.models.providerHealth')" icon="activity" :margin-bottom="16"
       :subtitle="`${providers.length} ` + t('view.models.providersLabel')">
       <div v-if="providersError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadProviders')" :description="providersError.value" /></div>
       <Skeleton v-else-if="loading && !providers.length" :lines="5" block />
@@ -37,7 +37,7 @@
     </Card>
 
     <!-- Agents -->
-    <Card :title="t('view.models.agentDrivers')" icon="bot" :marginBottom="16"
+    <Card :title="t('view.models.agentDrivers')" icon="bot" :margin-bottom="16"
       :subtitle="`${agents.length} ` + t('view.models.agentsLabel')">
       <div v-if="agentsError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAgents')" :description="agentsError.value" /></div>
       <Skeleton v-else-if="loading && !agents.length" :lines="5" block />
@@ -46,7 +46,7 @@
 
     <div class="grid-2">
       <!-- Budget -->
-      <Card :title="t('view.models.budget')" icon="dollar" :marginBottom="16">
+      <Card :title="t('view.models.budget')" icon="dollar" :margin-bottom="16">
         <div v-if="budgetError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadBudget')" :description="budgetError.value" /></div>
         <Skeleton v-else-if="loading && !budget.data" :lines="5" block />
         <div v-else-if="budget.data" class="metric-grid">
@@ -60,7 +60,7 @@
       </Card>
 
       <!-- CLI availability (real /api/model/quota shape) -->
-      <Card :title="t('view.models.agentCliAvailability')" icon="wrench" :marginBottom="16">
+      <Card :title="t('view.models.agentCliAvailability')" icon="wrench" :margin-bottom="16">
         <div v-if="quotaError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAvailability')" :description="quotaError.value" /></div>
         <Skeleton v-else-if="loading && !quota.rows.length" :lines="5" block />
         <DataTable v-else :columns="quotaCols" :rows="quota.rows" :empty-text="t('view.models.noAvailability')" />
@@ -68,7 +68,7 @@
     </div>
 
     <!-- Routing policies -->
-    <Card :title="t('view.models.routingPolicies')" icon="route" :marginBottom="16"
+    <Card :title="t('view.models.routingPolicies')" icon="route" :margin-bottom="16"
       :subtitle="`${policies.length} ` + t('view.models.policiesLabel')">
       <div v-if="policiesError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadPolicies')" :description="policiesError.value" /></div>
       <Skeleton v-else-if="loading && !policies.length" :lines="4" block />
@@ -210,7 +210,7 @@ const agentRows = computed(() => agents.value.map(a => ({
 const policyRows = computed(() => policies.value.map(p => ({
   name: p.name,
   strategy: p.strategy || '—',
-  max_cost_per_task: p.max_cost_per_task != null ? `$${Number(p.max_cost_per_task).toFixed(3)}` : '—',
+  max_cost_per_task: p.max_cost_per_task !== null && p.max_cost_per_task !== undefined ? `$${Number(p.max_cost_per_task).toFixed(3)}` : '—',
   prefer_low_latency: p.prefer_low_latency ? 'yes' : 'no',
   fallback_on_error: p.fallback_on_error ? 'yes' : 'no',
 })));

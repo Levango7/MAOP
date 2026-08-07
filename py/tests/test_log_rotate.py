@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.log_rotate — log file rotation."""
+"""Tests for MAOP.core.log_rotate — log file rotation."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.log_rotate import LogRotateConfig, rotate_logs
+from maop.core.reliability.log_rotate import LogRotateConfig, rotate_logs
 
 
 @pytest.fixture

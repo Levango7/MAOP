@@ -1,4 +1,4 @@
-﻿"""Tests for v4.3: ImageStore, multimodal ChatEngine, self-referential SubagentManager."""
+"""Tests for v4.3: ImageStore, multimodal ChatEngine, self-referential SubagentManager."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.chat_engine import ChatEngine, ChatMessage, ChatRequest, ContentPart
-from maop.core.image_store import MAX_IMAGE_SIZE, ImageMeta, ImageStore
-from maop.core.subagent import SubagentManager
+from maop.core.agent.llm_chat.chat_engine import ChatEngine, ChatMessage, ChatRequest, ContentPart
+from maop.core.backends.image_store import MAX_IMAGE_SIZE, ImageMeta, ImageStore
+from maop.core.agent.delegation.subagent_lifecycle import SubagentManager
 from maop.delegate.models import AgentConfig
 
 # ═══════════════════════════════════════════════════════════════════
@@ -204,7 +204,7 @@ class TestChatEngineMultimodal:
 class TestSubagentSelfReference:
     def test_spawn_with_call_chain(self, tmp_path):
         mgr = SubagentManager(root_dir=str(tmp_path))
-        info = mgr.spawn(
+        info = mgr.spawn_child(
             parent="MAOP", agent="mavis", task="test",
             call_chain=["MAOP"],
         )
@@ -212,7 +212,7 @@ class TestSubagentSelfReference:
 
     def test_spawn_deep_chain(self, tmp_path):
         mgr = SubagentManager(root_dir=str(tmp_path))
-        info = mgr.spawn(
+        info = mgr.spawn_child(
             parent="mavis", agent="claude", task="test",
             call_chain=["MAOP", "mavis"],
         )
@@ -221,7 +221,7 @@ class TestSubagentSelfReference:
     def test_self_ref_limit(self, tmp_path):
         mgr = SubagentManager(root_dir=str(tmp_path))
         with pytest.raises(ValueError, match="Self-reference limit"):
-            mgr.spawn(
+            mgr.spawn_child(
                 parent="MAOP", agent="MAOP", task="test",
                 call_chain=["MAOP", "MAOP", "MAOP"],
                 max_self_ref_depth=3,
@@ -229,7 +229,7 @@ class TestSubagentSelfReference:
 
     def test_self_ref_allowed_within_limit(self, tmp_path):
         mgr = SubagentManager(root_dir=str(tmp_path))
-        info = mgr.spawn(
+        info = mgr.spawn_child(
             parent="MAOP", agent="MAOP", task="test",
             call_chain=["MAOP", "mavis"],
             max_self_ref_depth=3,
@@ -239,7 +239,7 @@ class TestSubagentSelfReference:
     def test_max_depth_with_call_chain(self, tmp_path):
         mgr = SubagentManager(root_dir=str(tmp_path))
         with pytest.raises(ValueError, match="Max subagent depth"):
-            mgr.spawn(
+            mgr.spawn_child(
                 parent="a", agent="b", task="test",
                 call_chain=["x", "y", "z", "w", "v"],
                 max_depth=4,
@@ -247,7 +247,7 @@ class TestSubagentSelfReference:
 
     def test_fallback_db_depth_without_chain(self, tmp_path):
         mgr = SubagentManager(root_dir=str(tmp_path))
-        info = mgr.spawn(parent="root", agent="child", task="test")
+        info = mgr.spawn_child(parent="root", agent="child", task="test")
         assert info.depth >= 1
 
 

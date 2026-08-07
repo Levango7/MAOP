@@ -97,7 +97,7 @@ def register_maop_event_hooks() -> int:
     def _on_task_event(event: str, payload: dict):
         logger.info("[doc-pipeline→MAOP] %s: %s", event, payload.get("task_id", "?"))
         try:
-            from maop.core.monitoring import metrics
+            from maop.core.monitoring.monitoring import metrics
             if event == "task.completed":
                 getattr(metrics, "increment", lambda *a: None)("MAOP_doc_pipeline_completed", 1)
             elif event == "task.failed":

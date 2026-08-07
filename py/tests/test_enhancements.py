@@ -1,4 +1,4 @@
-﻿"""Tests for P1-P2 architecture enhancements.
+"""Tests for P1-P2 architecture enhancements.
 
 Covers:
   - P1-2: Circuit breaker time-series events
@@ -26,7 +26,7 @@ class TestBreakerEvents:
 
     def setup_method(self):
         self.tmp = tempfile.mkdtemp()
-        from maop.core.circuit_breaker import CircuitBreaker
+        from maop.core.reliability.circuit_breaker import CircuitBreaker
         self.cb = CircuitBreaker(path=Path(self.tmp) / "cb.db")
 
     def teardown_method(self):
@@ -225,7 +225,7 @@ class TestVectorSearch:
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def test_cosine_similarity(self):
-        from maop.core.vector import cosine_similarity
+        from maop.core.memory.vector import cosine_similarity
         # Identical vectors → 1.0
         assert abs(cosine_similarity([1, 0, 0], [1, 0, 0]) - 1.0) < 1e-6
         # Orthogonal → 0.0
@@ -236,7 +236,7 @@ class TestVectorSearch:
         assert cosine_similarity([], []) == 0.0
 
     def test_hash_embedding(self):
-        from maop.core.vector import HashEmbedding
+        from maop.core.memory.vector import HashEmbedding
         emb = HashEmbedding(dim=64)
         v = emb.embed("hello world")
         assert len(v) == 64
@@ -245,14 +245,14 @@ class TestVectorSearch:
         assert abs(norm - 1.0) < 1e-6
 
     def test_hash_embedding_consistency(self):
-        from maop.core.vector import HashEmbedding
+        from maop.core.memory.vector import HashEmbedding
         emb = HashEmbedding(dim=32)
         v1 = emb.embed("test")
         v2 = emb.embed("test")
         assert v1 == v2  # Deterministic
 
     def test_vector_store_index_and_search(self):
-        from maop.core.vector import VectorStore
+        from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=Path(self.tmp) / "vec.db")
 
         vs.index("d1", "Fix login timeout bug", metadata={"agent": "claude"})
@@ -268,7 +268,7 @@ class TestVectorSearch:
         assert results[0].id in ("d1", "d2", "d3")
 
     def test_vector_store_search_by_vector(self):
-        from maop.core.vector import HashEmbedding, VectorStore
+        from maop.core.memory.vector import HashEmbedding, VectorStore
         emb = HashEmbedding(dim=64)
         vs = VectorStore(db_path=Path(self.tmp) / "vec2.db", embedding=emb)
 
@@ -282,7 +282,7 @@ class TestVectorSearch:
         assert results[0].score > 0.9  # Same text → very high similarity
 
     def test_vector_store_delete(self):
-        from maop.core.vector import VectorStore
+        from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=Path(self.tmp) / "vec3.db")
         vs.index("del1", "to be deleted")
         assert vs.count() == 1
@@ -290,7 +290,7 @@ class TestVectorSearch:
         assert vs.count() == 0
 
     def test_vector_store_batch_index(self):
-        from maop.core.vector import VectorStore
+        from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=Path(self.tmp) / "vec4.db")
         entries = [
             {"id": f"b{i}", "text": f"Document number {i}"}
@@ -301,7 +301,7 @@ class TestVectorSearch:
         assert vs.count() == 10
 
     def test_vector_store_threshold(self):
-        from maop.core.vector import VectorStore
+        from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=Path(self.tmp) / "vec5.db")
         vs.index("t1", "alpha beta gamma")
         vs.index("t2", "delta epsilon zeta")
@@ -312,7 +312,7 @@ class TestVectorSearch:
         assert all(r.score >= 0.99 for r in results)
 
     def test_vector_store_clear(self):
-        from maop.core.vector import VectorStore
+        from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=Path(self.tmp) / "vec6.db")
         vs.index("c1", "content 1")
         vs.index("c2", "content 2")
@@ -328,7 +328,7 @@ class TestJson1Queries:
 
     def setup_method(self):
         self.tmp = tempfile.mkdtemp()
-        from maop.core.data import MaopDatabase
+        from maop.core.backends.data import MaopDatabase
         self.db = MaopDatabase(db_path=Path(self.tmp) / "test.db")
         self.db.init()
 
@@ -374,7 +374,7 @@ class TestFts5Search:
 
     def setup_method(self):
         self.tmp = tempfile.mkdtemp()
-        from maop.core.data import MaopDatabase
+        from maop.core.backends.data import MaopDatabase
         self.db = MaopDatabase(db_path=Path(self.tmp) / "fts.db")
         self.db.init()
 

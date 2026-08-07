@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from maop.core.error_schema import MaopResult, new_result
+from maop.core.reliability.error_schema import MaopResult, new_result
 from maop.delegate.models import AgentConfig, _escape_for_cmd, _escape_for_ps_command
 
 logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
         )
 
         if streamer is not None:
-            from maop.core.streaming import SubprocessStreamer
+            from maop.core.reliability.streaming import SubprocessStreamer
             if isinstance(streamer, SubprocessStreamer):
                 try:
                     exit_code = await streamer.pipe(proc, timeout=timeout)

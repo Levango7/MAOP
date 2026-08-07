@@ -1,4 +1,4 @@
-﻿"""MAOP Config Hot-Reload — Watch config files and reload on change.
+"""MAOP Config Hot-Reload — Watch config files and reload on change.
 
 Monitors agents.yaml and rules.yaml for modifications.
 When a change is detected, triggers ConfigLoader.reload() and
@@ -18,7 +18,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from maop.config.loader import ConfigLoader, MaopConfig
-from maop.core.event_bus import Event, EventBus, get_event_bus
+from maop.core.reliability.event_bus import Event, EventBus, get_event_bus
 
 logger = logging.getLogger(__name__)
 

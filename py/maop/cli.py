@@ -33,7 +33,7 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
         # TLS support (single-worker only — uvicorn limitation)
         tls_enabled = os.environ.get("MAOP_TLS", "0") == "1"
         if tls_enabled:
-            from maop.core.tls import TLSSettings, create_ssl_context
+            from maop.core.security.tls import TLSSettings, create_ssl_context
             cert_file = os.environ.get("MAOP_TLS_CERT", "")
             key_file = os.environ.get("MAOP_TLS_KEY", "")
             if cert_file and key_file:
@@ -176,7 +176,7 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
 
     parsed = parser.parse_args(args)
 
-    from maop.core.mcp_marketplace import MCPMarketplace
+    from maop.core.mcp.mcp_marketplace import MCPMarketplace
     # Use the project-root config dir so reads/writes stay local to the project
     # (not the package-shipped default, which is read-only).
     config_path = MAOP_ROOT / "config" / "mcp_marketplace.yaml"
@@ -240,10 +240,60 @@ def cmd_mcp(args: list[str]) -> Any:
         sys.exit(1)
 
 
+# ── migrate subcommand ──────────────────────────────────────────
+
+def cmd_migrate_pg_init() -> None:
+    """Run alembic upgrade head against the PG ini."""
+    import subprocess
+    from pathlib import Path
+
+    pg_ini = Path(__file__).resolve().parent / "migrations" / "pg" / "alembic.ini"
+    subprocess.call(["alembic", "-c", str(pg_ini), "upgrade", "head"])
+
+
+def cmd_migrate_sqlite_to_pg(args: list[str]) -> None:
+    """Dispatch sqlite-to-pg migration with parsed args."""
+    dry_run = "--dry-run" in args
+    tables: list[str] = []
+    if "--tables" in args:
+        idx = args.index("--tables")
+        if idx + 1 < len(args):
+            tables = [t.strip() for t in args[idx + 1].split(",") if t.strip()]
+
+    from maop.migrations.sqlite_to_pg import migrate
+    migrate(dry_run=dry_run, tables=tables)
+
+
+def cmd_migrate(args: list[str]) -> None:
+    """`maop migrate <subcommand>` dispatcher."""
+    if not args:
+        import sys as _sys
+        _sys.stderr.write(
+            "usage: maop migrate <subcommand>\n"
+            "  pg-init        Initialize PostgreSQL schema via Alembic\n"
+            "  sqlite-to-pg   Migrate SQLite data to PostgreSQL\n"
+            "  status         Show migration status\n"
+        )
+        _sys.exit(1)
+
+    sub = args[0]
+    if sub == "pg-init":
+        cmd_migrate_pg_init()
+    elif sub == "sqlite-to-pg":
+        cmd_migrate_sqlite_to_pg(args[1:])
+    elif sub == "status":
+        from maop.core.backends.db_utils import get_db_path
+        print(f"SQLite DB: {get_db_path('maop')}")
+    else:
+        import sys as _sys
+        _sys.stderr.write(f"Unknown migrate subcommand: {sub}\n")
+        _sys.exit(1)
+
+
 def main() -> Any:
     # Enable JSON structured logging when MAOP_JSON_LOG=1 (for ELK / Loki).
     if os.environ.get("MAOP_JSON_LOG", "0") == "1":
-        from maop.core.monitoring import setup_json_logging
+        from maop.core.monitoring.monitoring import setup_json_logging
         setup_json_logging(
             level=os.environ.get("MAOP_LOG_LEVEL", "INFO"),
             log_file=os.environ.get("MAOP_JSON_LOG_FILE") or None,
@@ -255,6 +305,9 @@ def main() -> Any:
     argv = sys.argv[1:]
     if argv and argv[0] == "mcp":
         cmd_mcp(argv[1:])
+        return
+    if argv and argv[0] == "migrate":
+        cmd_migrate(argv[1:])
         return
 
     parser = argparse.ArgumentParser(description="MAOP - Agent Orchestration Framework")

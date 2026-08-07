@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.migration - DB migration tool."""
+"""Tests for MAOP.core.migration - DB migration tool."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import sqlite3
 
 import pytest
 
-from maop.core.migration import Migration, MigrationManager
+from maop.core.backends.migration import Migration, MigrationManager
 
 
 class TestMigration:

@@ -21,7 +21,7 @@ export const messages = {
     'view.rbac.constant': 'Constant',
     'view.rbac.noPermissions': 'No permissions',
     'view.rbac.noPermissionsDesc': 'No permissions are defined.',
-    'view.rbac.userId': 'User ID',
+
     'view.rbac.role.admin': 'Admin',
     'view.rbac.role.superadmin': 'Super Admin',
     'view.rbac.role.editor': 'Editor',

@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from maop.core.backends import MemoryCacheBackend
-from maop.core.db_utils import sqlite_connect
+from maop.core.backends.backends import MemoryCacheBackend
+from maop.core.backends.db_utils import sqlite_connect
 
 
 # ════════════════════════════════════════════════════════════════════

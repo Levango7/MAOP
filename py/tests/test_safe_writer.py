@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 
-from maop.core.safe_writer import safe_write_bytes, safe_write_json, safe_write_text
+from maop.core.reliability.safe_writer import safe_write_bytes, safe_write_json, safe_write_text
 
 
 class TestSafeWriteBytes:

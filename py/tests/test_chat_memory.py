@@ -1,10 +1,10 @@
-﻿"""Tests for v4.2: MemoryManager, ChatEngine, Chat Router."""
+"""Tests for v4.2: MemoryManager, ChatEngine, Chat Router."""
 
 from __future__ import annotations
 
 import pytest
 
-from maop.core.chat_engine import (
+from maop.core.agent.llm_chat.chat_engine import (
     ChatEngine,
     ChatMessage,
     ChatRequest,

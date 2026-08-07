@@ -85,7 +85,7 @@ class HistoryAnalyzer:
     """Analyzes execution history to identify patterns and bottlenecks."""
 
     def __init__(self, root_dir: str | Path | None = None) -> None:
-        from maop.core.db_utils import find_project_root
+        from maop.core.backends.db_utils import find_project_root
         self._root = Path(root_dir or find_project_root())
 
         # Lazy-loaded data sources
@@ -95,7 +95,7 @@ class HistoryAnalyzer:
 
     def _get_timeseries(self):
         if self._timeseries is None:
-            from maop.core.timeseries import TimeSeriesStore
+            from maop.core.monitoring.timeseries import TimeSeriesStore
             # TimeSeriesStore expects a file path, not a directory.
             self._timeseries = TimeSeriesStore(  # type: ignore[assignment]
                 db_path=self._root / "data" / "timeseries.db"
@@ -105,7 +105,7 @@ class HistoryAnalyzer:
     def _get_cost_tracker(self):
         if self._cost_tracker is None:
             try:
-                from maop.core.cost_tracker import get_cost_tracker
+                from maop.core.monitoring.cost_tracker import get_cost_tracker
                 self._cost_tracker = get_cost_tracker()  # type: ignore[assignment]
             except Exception:
                 self._cost_tracker = None
@@ -141,7 +141,7 @@ class HistoryAnalyzer:
         """Query loop-level statistics from timeseries."""
         try:
             ts = self._get_timeseries()
-            from maop.core.timeseries import TimeSeriesQuery
+            from maop.core.monitoring.timeseries import TimeSeriesQuery
 
             # Query loop duration
             query = TimeSeriesQuery(
@@ -255,7 +255,7 @@ class HistoryAnalyzer:
         bottlenecks = []
         try:
             ts = self._get_timeseries()
-            from maop.core.timeseries import TimeSeriesQuery
+            from maop.core.monitoring.timeseries import TimeSeriesQuery
 
             # Check each phase duration
             for phase in ["plan_duration_ms", "exec_duration_ms", "verify_duration_ms", "loop_duration_ms"]:

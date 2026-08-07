@@ -7,7 +7,7 @@ describe('useEditionStore', () => {
   let originalFetch;
   beforeEach(() => {
     setActivePinia(createPinia());
-    try { localStorage.clear(); } catch {}
+    try { localStorage.clear(); } catch { /* ignore */ }
     originalFetch = global.fetch;
   });
   afterEach(() => {
@@ -16,7 +16,8 @@ describe('useEditionStore', () => {
 
   it('has correct defaults', () => {
     const store = useEditionStore();
-    expect(store.edition).toBe('enterprise');
+    // P1-H1: cold-load fail-safe default is 'personal' (no enterprise bypass)
+    expect(store.edition).toBe('personal');
     expect(store.features).toEqual({});
     expect(store.degradations).toEqual([]);
     expect(store.loading).toBe(false);
@@ -24,8 +25,9 @@ describe('useEditionStore', () => {
 
   it('isEnterprise getter works', () => {
     const store = useEditionStore();
-    expect(store.isEnterprise).toBe(true);
-    expect(store.isPersonal).toBe(false);
+    // P1-H1: default 'personal' → isEnterprise false, isPersonal true
+    expect(store.isEnterprise).toBe(false);
+    expect(store.isPersonal).toBe(true);
   });
 
   it('hasFeature getter works', () => {
@@ -65,7 +67,8 @@ describe('useEditionStore', () => {
     global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
     await store.fetchEdition();
     expect(store.loading).toBe(false);
-    expect(store.edition).toBe('enterprise');
+    // P1-H1: on fetch failure edition stays at fail-safe default 'personal'
+    expect(store.edition).toBe('personal');
   });
 
   // ── switchEdition action 测试 ──
@@ -164,7 +167,7 @@ describe('useApiStore auth header injection', () => {
   let originalFetch;
   beforeEach(() => {
     setActivePinia(createPinia());
-    try { localStorage.clear(); } catch {}
+    try { localStorage.clear(); } catch { /* ignore */ }
     originalFetch = global.fetch;
     // Mark vitest env so handleUnauthorized won't dispatch CustomEvent
     global.__VITEST__ = true;
@@ -174,7 +177,7 @@ describe('useApiStore auth header injection', () => {
     global.fetch = originalFetch;
     delete global.__VITEST__;
     if (typeof window !== 'undefined') delete window.__VITEST__;
-    try { localStorage.clear(); } catch {}
+    try { localStorage.clear(); } catch { /* ignore */ }
   });
 
   it('get injects Authorization header when token present', async () => {

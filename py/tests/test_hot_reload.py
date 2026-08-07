@@ -1,4 +1,4 @@
-﻿"""Comprehensive tests for MAOP.config.hot_reload — ConfigHotReload."""
+"""Comprehensive tests for MAOP.config.hot_reload — ConfigHotReload."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from maop.config.hot_reload import (
     _file_hash,
 )
 from maop.config.loader import ConfigLoader, MaopConfig
-from maop.core.event_bus import Event, EventBus
+from maop.core.reliability.event_bus import Event, EventBus
 
 # ── Helper Tests ─────────────────────────────────────────────
 

@@ -18,22 +18,22 @@ from typing import Any
 
 import pytest
 
-from maop.core.mcp_audit import (
+from maop.core.mcp.mcp_audit import (
     MCPAuditLogger,
     MCPAuditRecord,
     hash_arguments,
 )
-from maop.core.mcp_hub import (
+from maop.core.mcp.mcp_hub import (
     MCPHub,
     MCPPermissionDeniedError,
     MCPServerConfig,
     TransportType,
 )
-from maop.core.mcp_permission import (
+from maop.core.mcp.mcp_permission import (
     MCPPermissionChecker,
     MCPPermissionDecision,
 )
-from maop.core.monitoring import (
+from maop.core.monitoring.monitoring import (
     MAOP_MCP_CALL_ALLOWED_TOTAL,
     MAOP_MCP_CALL_AUDITED_TOTAL,
     MAOP_MCP_CALL_DENIED_TOTAL,
@@ -803,7 +803,7 @@ class TestUserContextForwarding:
 
     def test_call_tool_by_name_accepts_user_context(self):
         """MCPHub.call_tool_by_name must accept a user_context kwarg."""
-        from maop.core.mcp_hub import MCPHub
+        from maop.core.mcp.mcp_hub import MCPHub
         sig = inspect.signature(MCPHub.call_tool_by_name)
         assert "user_context" in sig.parameters, (
             "MCPHub.call_tool_by_name must accept user_context kwarg"

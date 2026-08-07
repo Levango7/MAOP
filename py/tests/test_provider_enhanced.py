@@ -1,10 +1,10 @@
-﻿"""Tests for LLM Provider enhancements — Ollama, CRUD, API Key Vault, Health Check."""
+"""Tests for LLM Provider enhancements — Ollama, CRUD, API Key Vault, Health Check."""
 
 from pathlib import Path
 
 import pytest
 
-from maop.core.api_key_vault import ApiKeyVault
+from maop.core.security.api_key_vault import ApiKeyVault
 from maop.model.registry import ModelRegistry, ProviderRegistry
 from maop.model.schema import (
     ModelDef,
@@ -169,7 +169,7 @@ class TestProviderHealthChecker:
     def test_check_no_registry(self):
         import asyncio
 
-        from maop.core.provider_health import ProviderHealthChecker
+        from maop.core.routing.provider_health import ProviderHealthChecker
         checker = ProviderHealthChecker(registry=None)
         result = asyncio.run(checker.check("openai"))
         assert result.healthy is False
@@ -178,7 +178,7 @@ class TestProviderHealthChecker:
     def test_check_builtin_provider(self):
         import asyncio
 
-        from maop.core.provider_health import ProviderHealthChecker
+        from maop.core.routing.provider_health import ProviderHealthChecker
         reg = ModelRegistry(project_root=str(Path(__file__).parent.parent.parent / "config" / ".."))
         pdef = ProviderDef(type=ProviderType.BUILTIN, enabled=True)
         reg.add_provider("test-builtin", pdef)

@@ -37,7 +37,7 @@ def _get_store() -> Any:
     """Lazy-init the global :class:`RoutingDecisionStore` singleton."""
     global _decision_store
     if _decision_store is None:
-        from maop.core.routing_decision import RoutingDecisionStore
+        from maop.core.routing.routing_decision import RoutingDecisionStore
         _decision_store = RoutingDecisionStore()
     return _decision_store
 

@@ -36,7 +36,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import sqlite_connect
+from maop.core.backends.db_utils import sqlite_connect
 
 logger = logging.getLogger(__name__)
 

@@ -5,8 +5,8 @@ import tempfile
 
 import pytest
 
-from maop.core.three_layer_memory import ThreeLayerMemory
-from maop.core.tool_audit import ToolAuditLog
+from maop.core.memory.three_layer_memory import ThreeLayerMemory
+from maop.core.agent.tools.tool_audit import ToolAuditLog
 
 # ── P3: Access-Count Consolidation ────────────────────────────
 

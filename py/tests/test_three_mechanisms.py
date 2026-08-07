@@ -1,4 +1,4 @@
-﻿"""Tests for the three Claude Code-inspired mechanisms.
+"""Tests for the three Claude Code-inspired mechanisms.
 
 Tests:
   1. state_classifier.py — TaskStateClassifier
@@ -9,8 +9,8 @@ Tests:
 import tempfile
 from pathlib import Path
 
-from maop.core.context_compressor import ContextCompressor
-from maop.core.state_classifier import (
+from maop.core.agent.llm_chat.context_compressor import ContextCompressor
+from maop.core.agent.lifecycle.state_classifier import (
     TaskState,
     TaskStateClassifier,
 )

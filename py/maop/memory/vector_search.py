@@ -1,4 +1,4 @@
-﻿"""MAOP Semantic Vector Search — sentence-transformers powered semantic search.
+"""MAOP Semantic Vector Search — sentence-transformers powered semantic search.
 
 Upgrades from HashEmbedding (non-semantic) to sentence-transformers for
 true semantic similarity. Falls back gracefully when the library is unavailable.
@@ -29,7 +29,7 @@ from typing import Any
 import numpy as np
 from pydantic import BaseModel
 
-from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
@@ -21,7 +21,7 @@ _agent_proxy = None
 def _get_bridge() -> Any:
     global _agent_proxy
     if _agent_proxy is None:
-        from maop.core.agent_proxy import AgentProxy
+        from maop.core.agent.delegation.agent_proxy import AgentProxy
         _agent_proxy = AgentProxy(root_dir=str(MAOP_ROOT))
     return _agent_proxy
 

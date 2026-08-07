@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from maop.core.monitoring import (
+from maop.core.monitoring.monitoring import (
     MAOP_TASK_DEADLINE_SECONDS,
     MAOP_TASK_PRIORITY_DISTRIBUTION,
     MAOP_TASK_SLA_TIER_DISTRIBUTION,
@@ -225,7 +225,7 @@ class TestSLAMetrics:
 
     def test_metric_module_constants_exposed(self):
         """Metric objects are importable as module-level constants."""
-        from maop.core.monitoring import (
+        from maop.core.monitoring.monitoring import (
             MAOP_TASK_DEADLINE_SECONDS,
             MAOP_TASK_PRIORITY_DISTRIBUTION,
             MAOP_TASK_SLA_TIER_DISTRIBUTION,

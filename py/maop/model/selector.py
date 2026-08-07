@@ -14,15 +14,15 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
-from maop.core.monitoring import (
+from maop.core.monitoring.monitoring import (
     MAOP_MODEL_SELECTION_LOAD_AWARE,
     MAOP_MODEL_SELECTION_QUOTA_REJECTED,
     MAOP_ROUTING_DECISION_DURATION_MS,
     MAOP_ROUTING_DECISION_TOTAL,
 )
-from maop.core.otel import get_tracer
-from maop.core.otel import span as otel_span
-from maop.core.routing_decision import (
+from maop.core.monitoring.otel import get_tracer
+from maop.core.monitoring.otel import span as otel_span
+from maop.core.routing.routing_decision import (
     RoutingDecisionRecord,
     get_active_span_context,
     record_decision_safe,
@@ -36,7 +36,7 @@ from maop.model.schema import (
 )
 
 if TYPE_CHECKING:
-    from maop.core.load_balancer import LoadBalancer
+    from maop.core.routing.load_balancer import LoadBalancer
     from maop.model.quota import QuotaEnforcer
 
 logger = logging.getLogger(__name__)

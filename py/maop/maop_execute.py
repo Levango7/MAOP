@@ -19,8 +19,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from maop.core.error_schema import MaopResult, new_result
-from maop.core.guardrail import Guardrail
+from maop.core.reliability.error_schema import MaopResult, new_result
+from maop.core.security.guardrail import Guardrail
 from maop.delegate.dispatcher import Dispatcher
 
 logger = logging.getLogger(__name__)
@@ -121,7 +121,7 @@ async def maop_execute(
     # ReAct mode: delegate to ReactLoop for Thought→Action→Observation cycling
     if react_mode:
         try:
-            from maop.core.react_loop import ReactConfig, ReactLoop
+            from maop.core.agent.llm_chat.react_loop import ReactConfig, ReactLoop
             react_config = ReactConfig(
                 max_iterations=react_max_iterations,
                 provider=provider,
@@ -159,7 +159,7 @@ async def maop_execute(
     try:
         from pathlib import Path as _Path
 
-        from maop.core.permission import PermissionManager
+        from maop.core.security.permission import PermissionManager
         _root = _Path(__file__).resolve().parent.parent.parent
         pm = permission_manager if permission_manager is not None else PermissionManager(root_dir=str(_root))
         perm = pm.check(agent=agent, action=routing_key or "execute")
@@ -171,7 +171,7 @@ async def maop_execute(
                 trace_id=trace_id, routing_key=routing_key,
             )
         if perm.decision == "ask":
-            from maop.core.human_proxy import HumanProxy
+            from maop.core.agent.delegation.human_proxy import HumanProxy
             hp = HumanProxy(root_dir=str(_root))
             req_id = hp.request(
                 task=task, agent=agent,
@@ -196,7 +196,7 @@ async def maop_execute(
 
     # Hook: agent.pre_dispatch — hooks can veto dispatch by returning decision="deny"
     try:
-        from maop.core.hook_manager import LifecycleEvent, get_hook_manager
+        from maop.core.agent.plugins_hooks.hook_manager import LifecycleEvent, get_hook_manager
         mgr = get_hook_manager()
         hook_results = await mgr.trigger(LifecycleEvent.AGENT_PRE_DISPATCH, {
             "agent": agent, "task": task, "routing_key": routing_key, "trace_id": trace_id,
@@ -240,7 +240,7 @@ async def maop_execute(
 
     # Dispatch
     try:
-        from maop.core.streaming import SubprocessStreamer, get_stream_registry
+        from maop.core.reliability.streaming import SubprocessStreamer, get_stream_registry
         streamer = SubprocessStreamer(trace_id=trace_id)
         registry = get_stream_registry()
         registry.register(trace_id, streamer)
@@ -301,7 +301,7 @@ async def maop_execute(
 
     # Hook: agent.post_dispatch / agent.on_error / agent.on_timeout
     try:
-        from maop.core.hook_manager import LifecycleEvent, get_hook_manager
+        from maop.core.agent.plugins_hooks.hook_manager import LifecycleEvent, get_hook_manager
         mgr = get_hook_manager()
         if result.is_success():
             await mgr.trigger(LifecycleEvent.AGENT_POST_DISPATCH, {
@@ -345,7 +345,7 @@ async def _handle_function_calls(
     enriched conversation until the LLM produces a final text answer
     or ``max_tool_rounds`` is exhausted.
     """
-    from maop.core.function_call import FunctionCallBridge
+    from maop.core.agent.llm_chat.function_call import FunctionCallBridge
 
     bridge = FunctionCallBridge(root_dir=None)
     conversation: list[dict[str, object]] = [

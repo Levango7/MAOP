@@ -3,8 +3,8 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from maop.core.error_schema import new_result
-from maop.core.permission import PermissionCheck
+from maop.core.reliability.error_schema import new_result
+from maop.core.security.permission import PermissionCheck
 from maop.engine import (
     Engine,
     StepStatus,

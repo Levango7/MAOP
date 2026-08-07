@@ -37,8 +37,8 @@ from typing import TYPE_CHECKING, Any, cast
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from maop.core.conversation import ConversationManager
-from maop.core.db_utils import sqlite_connect
+    from maop.core.agent.llm_chat.conversation import ConversationManager
+from maop.core.backends.db_utils import sqlite_connect
 from maop.memory.shared_db import (
     get_memory_db_path,
 )
@@ -98,7 +98,7 @@ class MemoryManager:
     ) -> None:
         self._root = Path(root_dir)
         self._config = config or MemoryManagerConfig()
-        from maop.core.conversation import ConversationManager
+        from maop.core.agent.llm_chat.conversation import ConversationManager
 
         self._conversation = ConversationManager(
             root_dir=root_dir,
@@ -113,6 +113,7 @@ class MemoryManager:
         self._knowledge_extractor: Any = None
         self._knowledge_graph: Any = None
         self._vector_search: Any = None
+        self._working_cache: dict[str, Any] = {}
         self._ensure_db()
 
     def _ensure_db(self) -> None:
@@ -154,7 +155,7 @@ class MemoryManager:
         result: dict[str, str] = {}
 
         # L1: Working memory (conversation)
-        from maop.core.conversation import MessageRole
+        from maop.core.agent.llm_chat.conversation import MessageRole
 
         user_id = self._conversation.add_message(
             session_id=session_id, role=MessageRole.USER,
@@ -405,7 +406,7 @@ class MemoryManager:
     def knowledge_extractor(self):
         if self._knowledge_extractor is None:
             try:
-                from maop.core.knowledge_extractor import KnowledgeExtractor
+                from maop.core.memory.knowledge_extractor import KnowledgeExtractor
                 self._knowledge_extractor = KnowledgeExtractor(root_dir=self._root)
             except Exception as exc:
                 logger.warning("[memory_manager] Failed to init KnowledgeExtractor: %s", exc)
@@ -415,7 +416,7 @@ class MemoryManager:
     def knowledge_graph(self):
         if self._knowledge_graph is None:
             try:
-                from maop.core.knowledge_graph import KnowledgeGraph
+                from maop.core.memory.knowledge_graph import KnowledgeGraph
                 self._knowledge_graph = KnowledgeGraph(root_dir=self._root)
             except Exception as exc:
                 logger.warning("[memory_manager] Failed to init KnowledgeGraph: %s", exc)
@@ -520,3 +521,112 @@ class MemoryManager:
                     with contextlib.suppress(ValueError, TypeError):
                         row[field] = _json.loads(row[field])
         return rows
+
+    # ── UnifiedMemoryProtocol adapter methods ─────────────
+    # 以下方法将统一术语 API (working/short_term/long_term) 映射到
+    # MemoryManager 的现有方法，使 MemoryManager 实现 UnifiedMemoryProtocol。
+    # 详见 maop/memory/unified.py 与 maop/memory/facade.py。
+
+    def working_put(self, key: str, value: Any, ttl_s: float | None = None) -> None:
+        """写入 Working Memory（临时键值缓存）。"""
+        self._working_cache[key] = value
+
+    def working_get(self, key: str) -> Any:
+        """读取 Working Memory。"""
+        return self._working_cache.get(key)
+
+    def working_clear(self) -> None:
+        """清空 Working Memory。"""
+        self._working_cache.clear()
+
+    def short_term_store(
+        self,
+        content: str,
+        *,
+        task: str = "",
+        agent: str = "",
+        topic: str = "",
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """写入 Short-term Memory（映射到 MemoryStore.store）。"""
+        entry_id = self._memory.store(
+            agent=agent or "user",
+            task=task or content[:80],
+            content=content,
+            tags=tags or [],
+            topic=topic or "general",
+        )
+        return entry_id or ""
+
+    def short_term_search(
+        self,
+        query: str = "",
+        *,
+        top: int = 10,
+        agent: str = "",
+    ) -> list[dict[str, Any]]:
+        """检索 Short-term Memory（映射到 MemoryStore.search）。"""
+        try:
+            results = self._memory.search(query=query, agent=agent, top=top)
+            return [
+                r.model_dump() if hasattr(r, "model_dump") else dict(r)
+                for r in results
+            ]
+        except Exception as exc:
+            logger.warning("[memory_manager] short_term_search failed: %s", exc)
+            return []
+
+    def short_term_get(self, entry_id: str) -> dict[str, Any] | None:
+        """按 ID 获取单条 Short-term Memory 条目。"""
+        try:
+            with sqlite_connect(self._db_path) as conn:
+                row = conn.execute(
+                    "SELECT * FROM memory_entries WHERE id = ?", (entry_id,)
+                ).fetchone()
+                if row is None:
+                    return None
+                cols = [d[0] for d in conn.execute(
+                    "SELECT * FROM memory_entries LIMIT 0").description]
+                return dict(zip(cols, row))
+        except Exception as exc:
+            logger.warning("[memory_manager] short_term_get failed: %s", exc)
+            return None
+
+    def short_term_stats(self) -> dict[str, Any]:
+        """Short-term Memory 统计信息。"""
+        try:
+            result = self._memory.stats()
+            if hasattr(result, "model_dump"):
+                return result.model_dump()
+            if isinstance(result, dict):
+                return result
+            return dict(result)
+        except Exception as exc:
+            logger.warning("[memory_manager] short_term_stats failed: %s", exc)
+            return {}
+
+    def long_term_index(
+        self,
+        doc_id: str,
+        text: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """索引文档到 Long-term Memory（映射到 VectorSearch.index）。"""
+        if self.vector_search is None:
+            return ""
+        try:
+            self.vector_search.index(doc_id, text)
+            return doc_id
+        except Exception as exc:
+            logger.warning("[memory_manager] long_term_index failed: %s", exc)
+            return ""
+
+    def long_term_search(
+        self,
+        query: str,
+        *,
+        top: int = 5,
+    ) -> list[dict[str, Any]]:
+        """检索 Long-term Memory（映射到 semantic_search）。"""
+        return self.semantic_search(query, top=top)

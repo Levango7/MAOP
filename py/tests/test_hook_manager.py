@@ -1,11 +1,11 @@
-﻿"""Tests for MAOP.core.hook_manager — Unified lifecycle hook framework."""
+"""Tests for MAOP.core.hook_manager — Unified lifecycle hook framework."""
 
 import asyncio
 from unittest.mock import patch
 
 import pytest
 
-from maop.core.hook_manager import (
+from maop.core.agent.plugins_hooks.hook_manager import (
     HookManager,
     HookType,
     LifecycleEvent,
@@ -251,7 +251,7 @@ hooks:
 
 class TestEventBusBridge:
     def test_bridge_event_bus(self, mgr):
-        from maop.core.event_bus import EventBus
+        from maop.core.reliability.event_bus import EventBus
         bus = EventBus()
         mgr.bridge_event_bus(bus)
         assert mgr._event_bus is bus

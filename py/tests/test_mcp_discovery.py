@@ -13,21 +13,21 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from maop.core.mcp_discovery import DiscoveryReport, MCPDiscovery, _claude_desktop_config_path
-from maop.core.mcp_hub import TransportType
+from maop.core.mcp.mcp_discovery import DiscoveryReport, MCPDiscovery, _claude_desktop_config_path
+from maop.core.mcp.mcp_hub import TransportType
 
 # ── _claude_desktop_config_path ────────────────────────────────
 
 
 def test_claude_desktop_config_path_returns_none_on_unknown_os():
     """On an unknown OS, the path helper returns None."""
-    with patch("maop.core.mcp_discovery.platform.system", return_value="UnknownOS"):
+    with patch("maop.core.mcp.mcp_discovery.platform.system", return_value="UnknownOS"):
         assert _claude_desktop_config_path() is None
 
 
 def test_claude_desktop_config_path_windows_uses_appdata():
     """On Windows, the path is derived from %APPDATA%."""
-    with patch("maop.core.mcp_discovery.platform.system", return_value="Windows"), \
+    with patch("maop.core.mcp.mcp_discovery.platform.system", return_value="Windows"), \
          patch.dict("os.environ", {"APPDATA": "C:/Users/test/AppData/Roaming"}):
         p = _claude_desktop_config_path()
         assert p is not None
@@ -37,7 +37,7 @@ def test_claude_desktop_config_path_windows_uses_appdata():
 
 def test_claude_desktop_config_path_windows_no_appdata_returns_none():
     """On Windows without %APPDATA%, returns None."""
-    with patch("maop.core.mcp_discovery.platform.system", return_value="Windows"), \
+    with patch("maop.core.mcp.mcp_discovery.platform.system", return_value="Windows"), \
          patch.dict("os.environ", {"APPDATA": ""}, clear=True):
         # Re-import to pick up patched env (module-level reads at call time).
         assert _claude_desktop_config_path() is None
@@ -295,7 +295,7 @@ def test_scan_paths_includes_user_global_config(tmp_path):
 def test_scan_paths_includes_claude_desktop_on_supported_os(tmp_path):
     """On Windows/macOS/Linux, the Claude Desktop config path is included."""
     disc = MCPDiscovery(root_dir=tmp_path)
-    with patch("maop.core.mcp_discovery.platform.system", return_value="Linux"):
+    with patch("maop.core.mcp.mcp_discovery.platform.system", return_value="Linux"):
         paths = disc._scan_paths()
     claude_path = Path.home() / ".config" / "Claude" / "claude_desktop_config.json"
     assert claude_path in paths

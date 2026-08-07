@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
@@ -21,7 +21,7 @@ _worktree_mgr = None
 def _get_worktree_mgr() -> Any:
     global _worktree_mgr
     if _worktree_mgr is None:
-        from maop.core.worktree import WorktreeManager
+        from maop.core.agent.memory_ctx.worktree import WorktreeManager
         _worktree_mgr = WorktreeManager(root_dir=str(MAOP_ROOT))
     return _worktree_mgr
 

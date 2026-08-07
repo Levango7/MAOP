@@ -1,4 +1,4 @@
-﻿"""Comprehensive tests for MAOP.config.loader — ConfigLoader & Pydantic models."""
+"""Comprehensive tests for MAOP.config.loader — ConfigLoader & Pydantic models."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from maop.config.loader import (
     _load_yaml,
     load_config,
 )
-from maop.core.db_utils import find_project_root
+from maop.core.backends.db_utils import find_project_root
 
 # ── Pydantic Model Tests ─────────────────────────────────────
 

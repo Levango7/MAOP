@@ -1,4 +1,4 @@
-﻿"""Tests for MAOP.core.message_queue — SQLite-backed persistent message queue."""
+"""Tests for MAOP.core.message_queue — SQLite-backed persistent message queue."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.message_queue import (
+from maop.core.reliability.message_queue import (
     MessagePriority,
     MessageQueue,
 )

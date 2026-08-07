@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.agent_performance import AgentPerformanceTracker, AgentScore, AgentStats
+from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker, AgentScore, AgentStats
 
 
 @pytest.fixture

@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 import yaml
 
-from maop.core.config_mutator import ConfigMutator
+from maop.core.reliability.config_mutator import ConfigMutator, MutationResult
 
 
 # ── Helpers ──────────────────────────────────────────────────────
@@ -139,3 +139,239 @@ def test_two_non_conflicting_suggestions_both_apply(tmp_path: Path) -> None:
     data = yaml.safe_load((tmp_path / "config" / "agents.yaml").read_text(encoding="utf-8"))
     assert data["agents"]["agent_a"]["timeout_s"] == 120
     assert data["agents"]["agent_b"]["max_retries"] == 5
+
+# --- Merged from test_config_mutator_coverage.py ---
+
+class TestApplySuggestionErrors:
+    def test_suggestion_not_found(self, tmp_path):
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S999")
+        assert result.applied is False
+        assert "not found" in result.error
+
+    def test_suggestion_not_auto_applicable(self, tmp_path):
+        _write_suggestions(tmp_path, [{"id": "S1", "auto_applicable": False, "type": "change_routing"}])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is False
+        assert "not auto-applicable" in result.error
+
+    def test_suggestion_already_applied(self, tmp_path):
+        _write_suggestions(tmp_path, [{"id": "S1", "auto_applicable": True, "applied": True, "type": "change_routing"}])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is False
+        assert "already applied" in result.error
+
+    def test_unknown_mutation_type(self, tmp_path):
+        _write_suggestions(tmp_path, [{"id": "S1", "auto_applicable": True, "type": "unknown_type"}])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is False
+        assert "Unknown mutation type" in result.error
+
+
+class TestMutateRouting:
+    def test_change_primary_agent(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"routing": {"codegen": {"primary": "claude", "fallback": "gpt"}}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "change_routing",
+            "mutation_params": {"routing_key": "codegen", "suggested_agent": "gemini"},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert any("primary" in c for c in result.changes)
+
+    def test_demote_current_agent(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"routing": {"codegen": {"primary": "claude", "fallback": "gpt"}}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "change_routing",
+            "mutation_params": {"routing_key": "codegen", "agent": "claude"},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+
+    def test_new_routing_key(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"routing": {}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "change_routing",
+            "mutation_params": {"routing_key": "new_key", "suggested_agent": "agent1"},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+
+    def test_no_routing_key_returns_empty(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"routing": {}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "change_routing",
+            "mutation_params": {},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert result.changes == []
+
+
+class TestMutateTimeout:
+    def test_increase_timeout(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"agents": {"claude": {"timeout_s": 60}}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "adjust_timeout",
+            "mutation_params": {"agent": "claude", "suggested_timeout": 120},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert any("timeout_s" in c for c in result.changes)
+
+    def test_auto_increase_50_percent(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"agents": {"claude": {"timeout_s": 60}}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "adjust_timeout",
+            "mutation_params": {"agent": "claude"},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+
+    def test_agent_not_found(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"agents": {}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "adjust_timeout",
+            "mutation_params": {"agent": "nonexistent", "suggested_timeout": 100},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert result.changes == []
+
+
+class TestMutateDisableAgent:
+    def test_disable_agent(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"agents": {"claude": {"enabled": True}}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "disable_agent",
+            "mutation_params": {"agent": "claude"},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert any("enabled" in c for c in result.changes)
+
+    def test_already_disabled(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"agents": {"claude": {"enabled": False}}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "disable_agent",
+            "mutation_params": {"agent": "claude"},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert result.changes == []
+
+
+class TestMutateEmptyRouting:
+    def test_assign_agent(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"routing": {}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "change_routing_empty",
+            "mutation_params": {"routing_key": "empty_key", "suggested_agent": "agent1"},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert any("empty" in c for c in result.changes)
+
+    def test_no_key_or_agent(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"routing": {}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "change_routing_empty",
+            "mutation_params": {},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert result.changes == []
+
+
+class TestMutateAddCapability:
+    def test_add_new_capability(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"agents": {"claude": {"capabilities": ["code"]}}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "add_capability",
+            "mutation_params": {"agent": "claude", "suggested_capability": "review"},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert any("capabilities" in c for c in result.changes)
+
+    def test_capability_already_exists(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"agents": {"claude": {"capabilities": ["code"]}}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "add_capability",
+            "mutation_params": {"agent": "claude", "suggested_capability": "code"},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert result.changes == []
+
+    def test_no_agent_or_capability(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"agents": {}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "add_capability",
+            "mutation_params": {},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert result.changes == []
+
+
+class TestMutateAdjustRettries:
+    def test_adjust_retries(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"agents": {"claude": {"max_retries": 3}}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "adjust_retries",
+            "mutation_params": {"agent": "claude", "suggested_max_retries": 5},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert any("max_retries" in c for c in result.changes)
+
+    def test_no_agent(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"agents": {}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "adjust_retries",
+            "mutation_params": {},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert result.changes == []
+
+
+class TestMutateSwitchModel:
+    def test_switch_model_no_changes(self, tmp_path):
+        _write_agents_yaml(tmp_path, {"agents": {}})
+        _write_suggestions(tmp_path, [{
+            "id": "S1", "auto_applicable": True, "type": "switch_model",
+            "mutation_params": {"model": "gpt-4", "total_cost": 10.5},
+        }])
+        mutator = ConfigMutator(root_dir=tmp_path)
+        result = mutator.apply_suggestion("S1")
+        assert result.applied is True
+        assert result.changes == []
+
+
+class TestMutationResultModel:
+    def test_defaults(self):
+        r = MutationResult()
+        assert r.applied is False
+        assert r.changes == []
+        assert r.error == ""
