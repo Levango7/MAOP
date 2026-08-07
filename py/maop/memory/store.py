@@ -27,7 +27,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from maop.core.db_utils import get_db_path
+from maop.core.backends.db_utils import get_db_path
 
 # ── Re-exports from models.py (backward compatibility) ───────
 from maop.memory.models import (  # noqa: F401
@@ -66,7 +66,7 @@ class MemoryStore(SearchMixin):
 
     def __init__(self, root_dir: str | Path | None = None) -> None:
         if root_dir is None:
-            from maop.core.db_utils import find_project_root
+            from maop.core.backends.db_utils import find_project_root
             root_dir = find_project_root()
         self._root = Path(root_dir)
         self._data_dir = self._root / "data"
@@ -85,7 +85,7 @@ class MemoryStore(SearchMixin):
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
-        from maop.core.db_utils import sqlite_connect
+        from maop.core.backends.db_utils import sqlite_connect
         with sqlite_connect(self._db_path, timeout=10, wal=True, foreign_keys=True) as conn:
             yield conn
 
@@ -109,7 +109,7 @@ class MemoryStore(SearchMixin):
     def _init_bloom(self):
         """Initialize bloom filter with existing entry IDs for fast dedup."""
         try:
-            from maop.core.bloom_filter import BloomFilter
+            from maop.core.memory.bloom_filter import BloomFilter
             bf = BloomFilter(expected_items=50_000, fp_rate=0.01)
             rows = self._query("SELECT id FROM memory_entries")
             for r in rows:
@@ -123,7 +123,7 @@ class MemoryStore(SearchMixin):
     def _init_vector_store(self):
         """Initialize VectorStore for hybrid FTS5 + semantic search."""
         try:
-            from maop.core.vector import VectorStore
+            from maop.core.memory.vector import VectorStore
             vs = VectorStore(db_path=self._data_dir / "vectors.db")
             logger.info("[mem] VectorStore initialized for hybrid search")
             return vs

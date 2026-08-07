@@ -14,7 +14,7 @@
 
 Usage::
 
-    from maop.core.agent_repair import AgentRepair
+    from maop.core.agent.lifecycle.agent_repair import AgentRepair
 
     repair = AgentRepair(root_dir="/path/to/MAOP")
     diagnosis = await repair.diagnose("claude")

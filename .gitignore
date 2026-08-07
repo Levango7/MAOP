@@ -26,6 +26,8 @@ env/
 .ruff_cache/
 .coverage
 htmlcov/
+# Coverage temp files
+_cov*.txt
 .tox/
 
 # t16 (2026-07-21): ad-hoc test runners with hardcoded absolute paths — should
@@ -142,3 +144,17 @@ data/*_secret*
 data_bak_*/
 # -- Runtime error logs --
 *.err
+# -- Test baseline/result artifacts --
+py/test_baseline_*.txt
+py/test_final_*.txt
+py/test_precommit_*.txt
+py/tests/_baseline_cov*.txt
+py/tests/_final_cov*.txt
+py/.maop-snapshots/
+dashboard-enterprise/test-results/
+# -- Runtime degradation log --
+data/degradation.log
+data/jwt_revoked.json
+# -- Agent tool internal --
+.codeartsdoer/
+deliverables/

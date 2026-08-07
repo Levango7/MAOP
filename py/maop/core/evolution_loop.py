@@ -18,7 +18,7 @@ Loop phases:
 
 Usage::
 
-    from maop.core.evolution_loop import EvolutionLoop
+    from maop.core.evolution.evolution_loop import EvolutionLoop
 
     loop = EvolutionLoop(root_dir="/path/to/MAOP")
     report = loop.run_cycle()
@@ -34,12 +34,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
 
 
-from maop.core.evolution_loop_types import (
+from maop.core.evolution.evolution_loop_types import (
     EvolutionSuggestion,
     LoopPhase,
     LoopReport,
@@ -157,7 +157,7 @@ class EvolutionLoop:
         # Pre-APPLY snapshot: capture file state so we can rollback if needed.
         if not dry_run:
             try:
-                from maop.core.change_tracker import ChangeTracker
+                from maop.core.reliability.change_tracker import ChangeTracker
                 ct = ChangeTracker(root_dir=str(self._root))
                 snap_id = ct.snapshot(str(self._root), label=f"pre-apply-{report.cycle_id}")
                 report.snapshot_id = snap_id
@@ -205,7 +205,7 @@ class EvolutionLoop:
     def _phase_observe(self) -> PhaseResult:
         start = time.time()
         try:
-            from maop.core.error_ledger import ErrorLedger
+            from maop.core.reliability.error_ledger import ErrorLedger
             ledger = ErrorLedger(root_dir=str(self._root))
             hotspots = ledger.get_hotspots(top=20)
             unhealed = [h for h in hotspots if h.count >= self._heal_threshold]
@@ -229,7 +229,7 @@ class EvolutionLoop:
         attempts = 0
         successes = 0
         try:
-            from maop.core.self_heal import SelfHealEngine
+            from maop.core.reliability.self_heal import SelfHealEngine
             engine = SelfHealEngine(root_dir=str(self._root))
             for pattern in patterns:
                 attempts += 1
@@ -250,7 +250,7 @@ class EvolutionLoop:
         start = time.time()
         suggestions: list[dict[str, Any]] = []
         try:
-            from maop.core.error_ledger import ErrorLedger
+            from maop.core.reliability.error_ledger import ErrorLedger
             ledger = ErrorLedger(root_dir=str(self._root))
             promoted = ledger.auto_promote(threshold=self._suggest_threshold)
 
@@ -301,7 +301,7 @@ class EvolutionLoop:
         start = time.time()
         approved: list[dict[str, Any]] = []
         try:
-            from maop.core.evolution_strategies import StrategyEngine
+            from maop.core.evolution.evolution_strategies import StrategyEngine
             engine = StrategyEngine(root_dir=str(self._root), strategy_name=self._strategy_name)
             decisions = engine.evaluate(suggestions)
             for decision in decisions:
@@ -328,7 +328,7 @@ class EvolutionLoop:
         applied = 0
         proposed: list[dict[str, Any]] = []
         try:
-            from maop.core.evolution_strategies import StrategyEngine
+            from maop.core.evolution.evolution_strategies import StrategyEngine
             engine = StrategyEngine(root_dir=str(self._root), strategy_name=self._strategy_name)
             for item in approved:
                 sid = item.get("suggestion_id", "")
@@ -363,7 +363,7 @@ class EvolutionLoop:
     def _phase_validate(self, baseline_errors: int) -> PhaseResult:
         start = time.time()
         try:
-            from maop.core.error_ledger import ErrorLedger
+            from maop.core.reliability.error_ledger import ErrorLedger
             ledger = ErrorLedger(root_dir=str(self._root))
             current_hotspots = ledger.get_hotspots(top=20)
             current_unhealed = len([h for h in current_hotspots if h.count >= self._heal_threshold])
@@ -387,7 +387,7 @@ class EvolutionLoop:
     def _phase_consolidate(self) -> PhaseResult:
         start = time.time()
         try:
-            from maop.core.three_layer_memory import ThreeLayerMemory
+            from maop.core.memory.three_layer_memory import ThreeLayerMemory
             mem = ThreeLayerMemory(root_dir=str(self._root))
             report = mem.consolidate(min_score=0.6, limit=50)
             return PhaseResult(
@@ -430,7 +430,7 @@ class EvolutionLoop:
             logger.info("[evo-loop] rollback_cycle: no snapshot_id recorded for cycle %s", cycle_id)
             return 0
         try:
-            from maop.core.change_tracker import ChangeTracker
+            from maop.core.reliability.change_tracker import ChangeTracker
             ct = ChangeTracker(root_dir=str(self._root))
             restored = ct.rollback(str(self._root), to_id=snap)
             logger.info(
@@ -465,7 +465,7 @@ class EvolutionLoop:
     def _collect_agent_memory(self, agent_name: str = "") -> dict[str, Any]:
         """采集 agent 记忆数据 (来自 AgentEvolution)。"""
         try:
-            from maop.core.agent_memory import AgentMemory
+            from maop.core.agent.memory_ctx.agent_memory import AgentMemory
             mem = AgentMemory(root_dir=str(self._root))
             if agent_name:
                 summary = mem.summarize(agent_name)
@@ -841,7 +841,7 @@ class EvolutionLoop:
         for s in suggestions:
             if s.get("auto_applicable") and not s.get("applied"):
                 try:
-                    from maop.core.config_mutator import ConfigMutator
+                    from maop.core.reliability.config_mutator import ConfigMutator
                     mutator = ConfigMutator(root_dir=str(self._root))
                     mut_result = mutator.apply_suggestion(s.get("id", ""))
                     if getattr(mut_result, "applied", False):
@@ -851,7 +851,7 @@ class EvolutionLoop:
 
         # 记录进化事件到记忆
         try:
-            from maop.core.agent_memory import AgentMemory
+            from maop.core.agent.memory_ctx.agent_memory import AgentMemory
             mem = AgentMemory(root_dir=str(self._root))
             mem.record_evolution(
                 agent_name=agent_name,
@@ -913,7 +913,7 @@ class EvolutionLoop:
         # 5. 策略评估并应用可自动应用的建议
         auto_applied = 0
         if not dry_run:
-            from maop.core.evolution_strategies import StrategyEngine
+            from maop.core.evolution.evolution_strategies import StrategyEngine
             engine = StrategyEngine(root_dir=str(self._root), strategy_name=self._strategy_name)
             decisions = engine.evaluate(all_suggestions)
             for d in decisions:
@@ -969,8 +969,8 @@ class EvolutionLoop:
                 existing.append(s)
         # 原子写入
         try:
-            from maop.core.filelock import FileLock
-            from maop.core.safe_writer import safe_write_text
+            from maop.core.reliability.filelock import FileLock
+            from maop.core.reliability.safe_writer import safe_write_text
             lock_path = str(path) + ".lock"
             with FileLock(lock_path, timeout_seconds=5):
                 safe_write_text(path, json.dumps(existing[-200:], indent=2, ensure_ascii=False), encoding="utf-8")

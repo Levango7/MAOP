@@ -36,7 +36,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import sqlite_connect
+from maop.core.backends.db_utils import sqlite_connect
 
 logger = logging.getLogger(__name__)
 
@@ -483,19 +483,45 @@ class VectorStore:
         ) for score, eid, text, meta in scored[:top]]
 
     def _load_cache(self) -> None:
-        """Load all vectors, text, and metadata from SQLite into memory cache.
+        """Load vectors, text, and metadata from SQLite into memory cache.
 
-        P2 fix: Added cache size limit to prevent unbounded memory growth.
-        For datasets > 50K vectors, consider using sqlite-vec or faiss for ANN indexing.
+        P2-P3 fix: 分页加载，遵守 _cache_max_size 限制，防止大数据集 OOM。
+        - 当总条数 <= _cache_max_size 时，全量加载（保持原行为）
+        - 当总条数 > _cache_max_size 时，仅加载最近的 _cache_max_size 条
+          （按 created_at DESC 排序，优先保留新数据）
+        - sqlite-vec/HNSW 路径不依赖 _cache，不受此限制影响
+        - NumPy/Python 回退路径仅搜索缓存中的向量（已知限制）
 
         Batch-loads all columns in a single query to avoid N+1 per-entry lookups
         during search_vector(). Also populates _text_cache and _meta_cache.
         """
         try:
             with self._connect() as conn:
-                for row in conn.execute(
-                    "SELECT id, vector, text, metadata FROM vector_entries"
-                ).fetchall():
+                # 先查总数，决定是否分页
+                total = conn.execute(
+                    "SELECT COUNT(*) AS cnt FROM vector_entries"
+                ).fetchone()["cnt"]
+
+                if total <= self._cache_max_size:
+                    # 小数据集：全量加载（保持原行为）
+                    rows = conn.execute(
+                        "SELECT id, vector, text, metadata FROM vector_entries"
+                    ).fetchall()
+                else:
+                    # 大数据集：仅加载最近的 _cache_max_size 条
+                    logger.warning(
+                        "[vector] Dataset %d > cache_max_size %d, "
+                        "loading only recent %d entries "
+                        "(use sqlite-vec/HNSW for full search)",
+                        total, self._cache_max_size, self._cache_max_size,
+                    )
+                    rows = conn.execute(
+                        "SELECT id, vector, text, metadata FROM vector_entries "
+                        "ORDER BY created_at DESC LIMIT ?",
+                        (self._cache_max_size,),
+                    ).fetchall()
+
+                for row in rows:
                     self._cache[row["id"]] = json.loads(row["vector"])
                     self._text_cache[row["id"]] = row["text"] or ""
                     self._meta_cache[row["id"]] = json.loads(row["metadata"] or "{}")

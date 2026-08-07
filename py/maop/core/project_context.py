@@ -15,7 +15,7 @@ gets prepended to conversation messages, giving the agent awareness of:
 
 Usage::
 
-    from maop.core.project_context import ProjectContext
+    from maop.core.agent.memory_ctx.project_context import ProjectContext
 
     ctx = ProjectContext(workdir="/path/to/project")
     summary = ctx.build()

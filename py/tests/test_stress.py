@@ -35,7 +35,7 @@ class TestCacheConcurrency:
     """20 threads simultaneously get/set/delete the same key."""
 
     def test_concurrent_get_set_delete_no_exceptions(self):
-        from maop.core.cache import LRUCache
+        from maop.core.reliability.cache import LRUCache
 
         cache = LRUCache(max_size=100, default_ttl_s=0.0)
         key = "stress-key"
@@ -74,7 +74,7 @@ class TestCacheConcurrency:
 
     def test_concurrent_different_keys_data_consistency(self):
         """Each thread writes its own key — all values must survive."""
-        from maop.core.cache import LRUCache
+        from maop.core.reliability.cache import LRUCache
 
         cache = LRUCache(max_size=2000, default_ttl_s=0.0)
         n_threads = 20
@@ -104,7 +104,7 @@ class TestCacheConcurrency:
 
     def test_concurrent_get_or_compute_singleflight(self):
         """SingleFlight: only one compute call for concurrent same-key requests."""
-        from maop.core.cache import LRUCache
+        from maop.core.reliability.cache import LRUCache
 
         cache = LRUCache(max_size=10, default_ttl_s=0.0)
         compute_count = 0
@@ -148,7 +148,7 @@ class TestCircuitBreakerConcurrency:
     """100 concurrent calls with 50% failure rate — verify state transitions."""
 
     def test_concurrent_mixed_success_failure(self, tmp_path):
-        from maop.core.circuit_breaker import BreakerState, CircuitBreaker
+        from maop.core.reliability.circuit_breaker import BreakerState, CircuitBreaker
 
         db_path = tmp_path / "cb_stress.db"
         cb = CircuitBreaker(path=db_path)
@@ -187,7 +187,7 @@ class TestCircuitBreakerConcurrency:
 
     def test_concurrent_failures_trigger_open(self, tmp_path):
         """Enough concurrent failures must trip the breaker to OPEN."""
-        from maop.core.circuit_breaker import BreakerState, CircuitBreaker
+        from maop.core.reliability.circuit_breaker import BreakerState, CircuitBreaker
 
         db_path = tmp_path / "cb_open.db"
         cb = CircuitBreaker(path=db_path)
@@ -220,7 +220,7 @@ class TestCircuitBreakerConcurrency:
 
     def test_state_transitions_no_corruption(self, tmp_path):
         """Rapid open→half_open→closed transitions must not corrupt state."""
-        from maop.core.circuit_breaker import BreakerState, CircuitBreaker
+        from maop.core.reliability.circuit_breaker import BreakerState, CircuitBreaker
 
         db_path = tmp_path / "cb_transitions.db"
         cb = CircuitBreaker(path=db_path)
@@ -267,7 +267,7 @@ class TestRateLimiterBurst:
     """200 requests arriving within 0.1s — verify token bucket limits."""
 
     def test_burst_does_not_exceed_limit(self):
-        from maop.core.rate_limiter import TokenBucket
+        from maop.core.reliability.rate_limiter import TokenBucket
 
         burst = 20
         rate = 10.0  # 10 tokens/sec
@@ -302,7 +302,7 @@ class TestRateLimiterBurst:
 
     def test_token_bucket_recovery(self):
         """After burst is exhausted, tokens recover over time."""
-        from maop.core.rate_limiter import TokenBucket
+        from maop.core.reliability.rate_limiter import TokenBucket
 
         burst = 10
         rate = 50.0  # 50 tokens/sec → 20ms per token
@@ -327,7 +327,7 @@ class TestRateLimiterBurst:
 
     def test_concurrent_rate_limiter_multi_key(self):
         """Multi-key RateLimiter under concurrent access."""
-        from maop.core.rate_limiter import RateLimiter, RateLimiterConfig
+        from maop.core.reliability.rate_limiter import RateLimiter, RateLimiterConfig
 
         rate = 100.0
         burst = 10
@@ -385,7 +385,7 @@ class TestMessageQueueConcurrency:
     """10 producers + 10 consumers, 100 messages each — no loss, no dup."""
 
     def test_concurrent_producers_consumers(self, tmp_path):
-        from maop.core.message_queue import MessageQueue
+        from maop.core.reliability.message_queue import MessageQueue
 
         db_path = tmp_path / "mq_stress.db"
         mq = MessageQueue(db_path=db_path)
@@ -487,7 +487,7 @@ class TestMessageQueueConcurrency:
         UNIQUE-constraint collision.  The guarantee we verify is that exactly
         one message with the given ID exists in the queue afterward.
         """
-        from maop.core.message_queue import MessageQueue
+        from maop.core.reliability.message_queue import MessageQueue
 
         db_path = tmp_path / "mq_idem.db"
         mq = MessageQueue(db_path=db_path)

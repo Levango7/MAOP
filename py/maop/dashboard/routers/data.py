@@ -18,8 +18,8 @@ from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from maop.core.db_utils import get_db_path
-from maop.core.middleware import require_admin
+from maop.core.backends.db_utils import get_db_path
+from maop.core.security.middleware import require_admin
 
 from .state import MAOP_ROOT, get_bridge
 
@@ -71,7 +71,7 @@ async def api_metrics(request: Request) -> dict[str, Any]:
     """Real-time metrics from LoadBalancer, TimeSeries, and CircuitBreaker."""
     result: dict[str, Any] = {}
     try:
-        from maop.core.load_balancer import get_load_balancer
+        from maop.core.routing.load_balancer import get_load_balancer
         lb = get_load_balancer()
         stats = lb.stats()
         result["load_balancer"] = stats.model_dump()
@@ -79,7 +79,7 @@ async def api_metrics(request: Request) -> dict[str, Any]:
         logger.error('Load balancer stats failed: %s', exc)
         result["load_balancer"] = {"status": "error", "error": "Load balancer stats unavailable"}
     try:
-        from maop.core.timeseries import TimeSeriesStore
+        from maop.core.monitoring.timeseries import TimeSeriesStore
         ts = TimeSeriesStore(db_path=get_db_path("timeseries"))
         recent = ts.read_recent(hours=24)
         result["timeseries"] = recent if isinstance(recent, list) else []
@@ -87,7 +87,7 @@ async def api_metrics(request: Request) -> dict[str, Any]:
         logger.error('Timeseries read failed: %s', exc)
         result["timeseries"] = {"status": "error", "error": "Timeseries data unavailable"}
     try:
-        from maop.core.circuit_breaker import CircuitBreaker
+        from maop.core.reliability.circuit_breaker import CircuitBreaker
         cb = CircuitBreaker(get_db_path())
         result["circuit_breaker"] = {
             name: {"state": entry.state.value, "failures": entry.failures}
@@ -97,7 +97,7 @@ async def api_metrics(request: Request) -> dict[str, Any]:
         logger.error('Circuit breaker stats failed: %s', exc)
         result["circuit_breaker"] = {"status": "error", "error": "Circuit breaker stats unavailable"}
     try:
-        from maop.core.cache import get_cache
+        from maop.core.reliability.cache import get_cache
         c = get_cache(name="metrics")
         result["cache"] = {"hits": getattr(c, "hits", 0), "misses": getattr(c, "misses", 0)}
     except Exception as exc:
@@ -136,7 +136,7 @@ async def api_optimizer(request: Request) -> dict[str, Any]:
         report = await bridge.report()
         cache_stats = {}
         try:
-            from maop.core.cache import get_cache
+            from maop.core.reliability.cache import get_cache
             c = get_cache(name="optimizer")
             cache_stats = {"hits": c.hits if hasattr(c, "hits") else 0, "misses": c.misses if hasattr(c, "misses") else 0}
         except Exception as exc:
@@ -227,21 +227,42 @@ async def api_vector_stats() -> Any:
 
 
 @router.get("/api/vector/list")
-async def api_vector_list() -> dict[str, Any]:
+async def api_vector_list(
+    limit: int = Query(1000, ge=1, le=10000, description="最大返回条数 (1..10000)"),
+    offset: int = Query(0, ge=0, description="跳过条数 (>=0)"),
+) -> dict[str, Any]:
+    """列出已索引向量（分页）。
+
+    P2-P3 fix (M4): 暴露 limit/offset 分页参数，避免全量加载。
+    - limit: 1..10000，默认 1000
+    - offset: >=0，默认 0
+    - 返回 total 字段，便于前端分页控件计算总页数
+    """
     try:
-        from maop.core.vector import VectorStore
+        from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=str(get_db_path("vectors")))
-        items = vs.list_all() if hasattr(vs, "list_all") else []
-        return {"vectors": items, "count": len(items)}
+        if hasattr(vs, "list_all"):
+            items = vs.list_all(limit=limit, offset=offset)
+            total = vs.count() if hasattr(vs, "count") else len(items)
+        else:
+            items = []
+            total = 0
+        return {
+            "vectors": items,
+            "count": len(items),
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
     except Exception as exc:
         logger.error('Vector list failed: %s', exc)
-        return {"vectors": [], "count": 0, "status": "error", "error": "Vector list unavailable"}
+        return {"vectors": [], "count": 0, "total": 0, "status": "error", "error": "Vector list unavailable"}
 
 
 @router.get("/api/vector/search")
 async def api_vector_search(q: str = Query(...), k: int = Query(5, alias="topk")) -> dict[str, Any]:
     try:
-        from maop.core.vector import VectorStore
+        from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=str(get_db_path("vectors")))
         raw_results = vs.search(query=q, top=k)
         results = [r.model_dump() if hasattr(r, 'model_dump') else (r if isinstance(r, dict) else {"content": str(r)}) for r in raw_results]
@@ -262,7 +283,7 @@ async def api_vector_search(q: str = Query(...), k: int = Query(5, alias="topk")
 async def api_wiki_stats() -> dict[str, Any]:
     base = await get_bridge().memory_stats()
     try:
-        from maop.core.vector import VectorStore
+        from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=str(get_db_path("vectors")))
         base["vector_count"] = vs.count() if hasattr(vs, "count") else 0
     except Exception as exc:

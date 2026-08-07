@@ -6,7 +6,7 @@ and a hook event is triggered.
 
 Usage::
 
-    from maop.core.budget_guard import BudgetGuard
+    from maop.core.monitoring.budget_guard import BudgetGuard
 
     guard = BudgetGuard(root_dir="/path/to/MAOP", daily_token_limit=500000, daily_cost_limit=5.0)
 
@@ -27,7 +27,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +188,7 @@ class BudgetGuard:
             try:
                 import asyncio
 
-                from maop.core.hook_manager import HookManager
+                from maop.core.agent.plugins_hooks.hook_manager import HookManager
                 hm = HookManager(root_dir=str(self._root))
                 with contextlib.suppress(RuntimeError):
                     asyncio.get_running_loop()

@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -465,13 +465,24 @@ async def set_edition_endpoint(request: Request) -> dict[str, Any]:
 
 @router.get("/config")
 async def get_config() -> dict[str, Any]:
-    """Return current runtime configuration (non-sensitive)."""
+    """Return current runtime configuration (non-sensitive).
+
+    P1-H1: ``edition`` 字段优先返回运行时 edition（反映切换后的真实状态），
+    fallback 到配置文件静态值。前端路由守卫从此端点获取 edition，冷加载时
+    前端默认 ``personal``（安全失败），后端就绪后用此值 hydrate。
+    """
     try:
         from maop.config.settings import MAOPSettings
         s = MAOPSettings()
+        # 优先取运行时 edition（与 /api/info/edition 一致），失败回退静态配置
+        try:
+            from maop.config.edition import get_edition
+            runtime_edition = get_edition().value
+        except Exception:
+            runtime_edition = s.edition
         return {
             "project_name": s.project_name,
-            "edition": s.edition,
+            "edition": runtime_edition,
             "debug": s.debug,
             "log_level": s.log_level,
             "dash_host": s.dash_host,

@@ -2,7 +2,7 @@
 
 import pytest
 
-from maop.core.backends import (
+from maop.core.backends.backends import (
     LocalSecretBackend,
     MemoryCacheBackend,
     SQLiteKVBackend,
@@ -213,14 +213,14 @@ class TestFactoryFunctions:
         from unittest.mock import patch
         monkeypatch.setenv("MAOP_CACHE_BACKEND", "redis")
         monkeypatch.delenv("MAOP_CACHE_ALLOW_FALLBACK", raising=False)
-        with patch("maop.core.backends_redis.RedisCacheBackend",
+        with patch("maop.core.backends.backends_redis.RedisCacheBackend",
                    side_effect=ImportError("mocked: redis unavailable")):
             with pytest.raises(RuntimeError, match="not importable"):
                 get_cache_backend()
         # Explicit opt-in restores the legacy degrade behaviour
         reset_backends()
         monkeypatch.setenv("MAOP_CACHE_ALLOW_FALLBACK", "1")
-        with patch("maop.core.backends_redis.RedisCacheBackend",
+        with patch("maop.core.backends.backends_redis.RedisCacheBackend",
                    side_effect=ImportError("mocked: redis unavailable")):
             backend = get_cache_backend()
         assert isinstance(backend, MemoryCacheBackend)
@@ -236,7 +236,7 @@ class TestFactoryFunctions:
         # Explicit opt-in restores the legacy degrade behaviour
         reset_backends()
         monkeypatch.setenv("MAOP_QUEUE_ALLOW_FALLBACK", "1")
-        with patch("maop.core.backends_redis.RedisQueueBackend",
+        with patch("maop.core.backends.backends_redis.RedisQueueBackend",
                    side_effect=ImportError("mocked: redis unavailable")):
             backend = get_queue_backend()
         assert isinstance(backend, SQLiteQueueBackend)

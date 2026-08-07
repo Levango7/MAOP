@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from maop.core.agent_performance import AgentPerformanceTracker
+from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
 
 logger = logging.getLogger(__name__)
 
@@ -429,8 +429,8 @@ class AgentStrategyLearner:
         if changed:
             import shutil
 
-            from maop.core.filelock import FileLock
-            from maop.core.safe_writer import safe_write_text
+            from maop.core.reliability.filelock import FileLock
+            from maop.core.reliability.safe_writer import safe_write_text
             _lock = str(agents_yaml) + ".lock"
             with FileLock(_lock, timeout_seconds=10):
                 shutil.copy2(agents_yaml, str(agents_yaml) + ".bak")

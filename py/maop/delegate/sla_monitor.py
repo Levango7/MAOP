@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 def _import_metrics():
     """Import monitoring counters; return None if unavailable."""
     try:
-        from maop.core.monitoring import (
+        from maop.core.monitoring.monitoring import (
             MAOP_TASK_DEADLINE_SECONDS,
             MAOP_TASK_PREEMPTION_TOTAL,
             MAOP_TASK_PRIORITY_DISTRIBUTION,

@@ -1,4 +1,4 @@
-﻿"""MAOP Hook Manager — Unified, pluggable lifecycle hook framework.
+"""MAOP Hook Manager — Unified, pluggable lifecycle hook framework.
 
 Provides:
   - HookManager: register/trigger hooks at key lifecycle points
@@ -9,7 +9,7 @@ Provides:
 
 Usage::
 
-    from maop.core.hook_manager import HookManager, LifecycleEvent
+    from maop.core.agent.plugins_hooks.hook_manager import HookManager, LifecycleEvent
 
     mgr = HookManager()
 
@@ -41,7 +41,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
 
@@ -434,7 +434,7 @@ class HookManager:
 
         if self._event_bus:
             try:
-                from maop.core.event_bus import Event
+                from maop.core.reliability.event_bus import Event
                 await self._event_bus.publish(Event(
                     topic=f"hook.{event}",
                     data={"event": event, "results": [r.model_dump() for r in results], "final_payload": payload},

@@ -349,7 +349,7 @@ class EvolveEngine:
                     return EvolveResult(action="apply", applied=s)
                 # 通过 ConfigMutator 安全应用 (有 FileLock + backup + 回读校验)
                 try:
-                    from maop.core.config_mutator import ConfigMutator
+                    from maop.core.reliability.config_mutator import ConfigMutator
                     mutator = ConfigMutator(root_dir=self._root)
                     result = mutator.apply_suggestion(suggestion_id)
                     if result.applied:
@@ -423,8 +423,8 @@ class EvolveEngine:
         try:
             from datetime import datetime, timezone
 
-            from maop.core.filelock import FileLock
-            from maop.core.safe_writer import safe_write_text
+            from maop.core.reliability.filelock import FileLock
+            from maop.core.reliability.safe_writer import safe_write_text
             ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
             backup = agents_yaml.with_name(f"agents.yaml.bak.{ts}")
             shutil.copy2(agents_yaml, backup)
@@ -478,7 +478,7 @@ class EvolveEngine:
         保留向后兼容的返回格式 (analysis_report / new_suggestions / auto_applied)。
         """
         try:
-            from maop.core.evolution_loop import EvolutionLoop
+            from maop.core.evolution.evolution_loop import EvolutionLoop
             loop = EvolutionLoop(root_dir=self._root)
             result = loop.run_full_evolution(hours=hours)
             # 向后兼容: 补充 EvolveEngine 历史返回字段

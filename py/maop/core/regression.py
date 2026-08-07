@@ -7,7 +7,7 @@ Provides:
 
 Usage::
 
-    from maop.core.regression import RegressionTestRunner, PersonaSimulator
+    from maop.core.evolution.regression import RegressionTestRunner, PersonaSimulator
 
     # Regression testing
     runner = RegressionTestRunner(root_dir="/path/to/MAOP")
@@ -107,7 +107,7 @@ class RegressionTestRunner:
 
         if dispatcher is None:
             try:
-                from maop.core.services import ServiceContainer
+                from maop.core.reliability.services import ServiceContainer
                 svc = ServiceContainer(root_dir=self._root)
                 dispatcher = svc.get("dispatcher", raise_on_failure=False)
             except Exception:

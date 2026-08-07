@@ -1,6 +1,6 @@
 [project]
 name = "maop"
-version = "4.4.1"
+version = "4.5.0"
 description = "MAOP - Multi-Agent Orchestration Framework (Python-first, Plan-Execute-Verify)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,6 +28,10 @@ dependencies = [
     "websockets>=12.0,<15",
     "PyJWT>=2.8.0",
     "packaging>=24.0",
+    # P1-5 fix: sqlite-vec is now a default dependency (was optional).
+    # Provides ~100x faster ANN vector search via SQLite virtual table extension.
+    # Falls back to NumPy → pure-Python cosine if the extension fails to load.
+    "sqlite-vec>=0.1.6",
 ]
 
 [project.optional-dependencies]
@@ -47,6 +51,10 @@ dev = [
 ]
 ml = [
     "sentence-transformers>=2.0",
+    # P1-5: HNSW index for ≥100K-vector datasets. Optional because the
+    # native build (hnswlib) requires a C++ toolchain at install time.
+    # When absent, VectorStore falls back to sqlite-vec → NumPy → pure Python.
+    "hnswlib>=0.8.0",
 ]
 otel = [
     "opentelemetry-api>=1.20",
@@ -64,6 +72,18 @@ enterprise = [
     "etcd3>=0.12",
     # SAML SSO (enterprise/saml_handler.py) + sso integration tests require lxml.
     "lxml>=4.9.0",
+]
+# P1-6: SQLite→PostgreSQL migration tooling. Adds the PG driver stack needed
+# by maop.migrations.pg (Alembic), maop.migrations.sqlite_to_pg (SQLAlchemy
+# 2.0 sync engines), and the pgvector extension for ANN vector search.
+# SQLAlchemy is pulled in via the main deps' alembic transitive, but we pin
+# it explicitly here so the [postgresql] extra is self-contained.
+postgresql = [
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.29",
+    "psycopg2-binary>=2.9",
+    "alembic>=1.13",
+    "pgvector>=0.3",
 ]
 
 [project.scripts]
@@ -108,7 +128,11 @@ disable_error_code = ["arg-type"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# H3: 与 CI 命令对齐——覆盖率门槛 80%。本地不加 --cov-report=xml（CI 专用）
+# 也不加 --ignore=tests/contract（保持本地能跑全部测试）。
+addopts = "--cov=maop --cov-report=term-missing --cov-fail-under=80"
 markers = [
     "contract: API contract tests between frontend and backend",
     "slow: stress / concurrency / load tests (exclude with -m 'not slow')",
+    "integration: integration tests requiring external services (e.g. PostgreSQL)",
 ]

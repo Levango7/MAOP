@@ -31,7 +31,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
-from maop.core.db_utils import get_db_path, get_pool
+from maop.core.backends.db_utils import get_db_path, get_pool
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class DataProxy:
     def _ensure_db_schema(self) -> None:
         """Create maop.db tables if they don't exist (idempotent)."""
         try:
-            from maop.core.data import MaopDatabase
+            from maop.core.backends.data import MaopDatabase
             db = MaopDatabase(get_db_path())
             db.init()
         except Exception as exc:
@@ -289,7 +289,7 @@ class DataProxy:
             agents_list = []
         cost_per_hour = 0.0
         try:
-            from maop.core.cost_tracker import CostTracker
+            from maop.core.monitoring.cost_tracker import CostTracker
             ct = CostTracker(root_dir=str(self._root))
             hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
             csum = ct.summary(start_date=hour_ago)
@@ -601,7 +601,7 @@ class DataProxy:
         start = time.monotonic()
         try:
             if self._tool_mgr is None:
-                from maop.core.tool_manager import ToolManager
+                from maop.core.agent.tools.tool_manager import ToolManager
                 self._tool_mgr = ToolManager(root_dir=self._root)
             assert self._tool_mgr is not None
             result: dict[str, Any] = self._tool_mgr.stats()
@@ -616,7 +616,7 @@ class DataProxy:
         start = time.monotonic()
         try:
             if self._tool_mgr is None:
-                from maop.core.tool_manager import ToolManager
+                from maop.core.agent.tools.tool_manager import ToolManager
                 self._tool_mgr = ToolManager(root_dir=self._root)
             assert self._tool_mgr is not None
             result: list[Any] = self._tool_mgr.list()
@@ -631,7 +631,7 @@ class DataProxy:
         start = time.monotonic()
         try:
             if self._sandbox_mgr is None:
-                from maop.core.sandbox import SandboxManager
+                from maop.core.security.sandbox import SandboxManager
                 self._sandbox_mgr = SandboxManager(root_dir=self._root)
             sandboxes = self._sandbox_mgr.list_all()
             result = [s.model_dump() for s in sandboxes]
@@ -646,7 +646,7 @@ class DataProxy:
         start = time.monotonic()
         try:
             if self._human_proxy is None:
-                from maop.core.human_proxy import HumanProxy
+                from maop.core.agent.delegation.human_proxy import HumanProxy
                 self._human_proxy = HumanProxy(root_dir=self._root)
             pending = self._human_proxy.pending()
             stats = self._human_proxy.stats()
@@ -714,7 +714,7 @@ class DataProxy:
         """Skills list — derived from tool_manager registry."""
         start = time.monotonic()
         try:
-            from maop.core.tool_manager import ToolManager
+            from maop.core.agent.tools.tool_manager import ToolManager
             mgr = ToolManager(root_dir=self._root)
             tools = mgr.list()
             result = []

@@ -21,7 +21,7 @@ chosen implementation, and cache it for the process lifetime.
 
 Usage::
 
-    from maop.core.backends import get_storage_backend
+    from maop.core.backends.backends import get_storage_backend
 
     backend = get_storage_backend()
     backend.execute("INSERT INTO delegations ...", params)
@@ -120,7 +120,7 @@ class SQLiteStorageBackend(StorageBackend):
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA foreign_keys=ON")
             try:
-                from maop.core.db_utils import _get_busy_timeout_ms
+                from maop.core.backends.db_utils import _get_busy_timeout_ms
                 conn.execute(f"PRAGMA busy_timeout={_get_busy_timeout_ms()}")
             except Exception:
                 conn.execute("PRAGMA busy_timeout=10000")
@@ -203,7 +203,7 @@ class MemoryCacheBackend(CacheBackend):
     """Default in-memory cache (delegates to maop.core.cache)."""
 
     def __init__(self) -> None:
-        from maop.core.cache import LRUCache
+        from maop.core.reliability.cache import LRUCache
         self._cache = LRUCache(max_size=1024, default_ttl_s=300.0)
 
     def get(self, key: str) -> Any | None:
@@ -258,7 +258,7 @@ class SQLiteQueueBackend(QueueBackend):
     """Default SQLite-backed message queue."""
 
     def __init__(self, db_path: str = "") -> None:
-        from maop.core.message_queue import MessageQueue
+        from maop.core.reliability.message_queue import MessageQueue
         self._queue = MessageQueue(db_path=db_path) if db_path else MessageQueue()
 
     def publish(self, topic: str, message: dict[str, Any], *, delay: float = 0) -> str:
@@ -320,7 +320,7 @@ class SQLiteKVBackend(KVBackend):
     """Default SQLite-backed KV store."""
 
     def __init__(self, db_path: str = "") -> None:
-        from maop.core.kv_store import KVStore
+        from maop.core.backends.kv_store import KVStore
         self._store = KVStore(db_path=db_path) if db_path else KVStore()
 
     def get(self, key: str) -> str | None:
@@ -388,7 +388,7 @@ class LocalSecretBackend(SecretBackend):
     """Default local encrypted vault (delegates to api_key_vault)."""
 
     def __init__(self, root_dir: str = "") -> None:
-        from maop.core.api_key_vault import ApiKeyVault
+        from maop.core.security.api_key_vault import ApiKeyVault
         self._vault = ApiKeyVault(root_dir=root_dir) if root_dir else ApiKeyVault()
 
     def get_secret(self, key: str) -> str | None:
@@ -441,7 +441,7 @@ def get_storage_backend(db_path: str = "") -> StorageBackend:
     backend_type = os.getenv("MAOP_STORAGE_BACKEND", defaults["storage"]).lower()
     if backend_type == "postgresql":
         try:
-            from maop.core.backends_pg import PostgreSQLStorageBackend
+            from maop.core.backends.backends_pg import PostgreSQLStorageBackend
             _storage = PostgreSQLStorageBackend()
             logger.info("[backends] Storage: PostgreSQL (edition=%s)", get_edition().value)
             return _storage
@@ -488,7 +488,7 @@ def get_cache_backend() -> CacheBackend:
     backend_type = os.getenv("MAOP_CACHE_BACKEND", defaults["cache"]).lower()
     if backend_type == "redis":
         try:
-            from maop.core.backends_redis import RedisCacheBackend
+            from maop.core.backends.backends_redis import RedisCacheBackend
             _cache = RedisCacheBackend()
             logger.info("[backends] Cache: Redis (edition=%s)", get_edition().value)
             return _cache
@@ -536,7 +536,7 @@ def get_queue_backend(db_path: str = "") -> QueueBackend:
         # FeatureFlag.RABBITMQ 未加入 _ENTERPRISE_FEATURES，因 pika 为可选安装；
         # 缺失时 ImportError 触发降级到 Redis，再降级到 SQLite。
         try:
-            from maop.core.backends_rabbitmq import RabbitMQQueueBackend
+            from maop.core.backends.backends_rabbitmq import RabbitMQQueueBackend
             _queue = RabbitMQQueueBackend()
             logger.info("[backends] Queue: RabbitMQ (edition=%s)", get_edition().value)
             return _queue
@@ -557,7 +557,7 @@ def get_queue_backend(db_path: str = "") -> QueueBackend:
                     "Set MAOP_QUEUE_ALLOW_FALLBACK=1 to allow degrading to Redis/SQLite."
                 ) from exc
             try:
-                from maop.core.backends_redis import RedisQueueBackend
+                from maop.core.backends.backends_redis import RedisQueueBackend
                 _queue = RedisQueueBackend()
                 logger.info("[backends] Queue: Redis (RabbitMQ fallback)")
                 return _queue
@@ -568,7 +568,7 @@ def get_queue_backend(db_path: str = "") -> QueueBackend:
                 record_degradation("queue", "redis", "sqlite", "redis_unavailable")
     elif backend_type == "redis":
         try:
-            from maop.core.backends_redis import RedisQueueBackend
+            from maop.core.backends.backends_redis import RedisQueueBackend
             _queue = RedisQueueBackend()
             logger.info("[backends] Queue: Redis")
             return _queue
@@ -616,7 +616,7 @@ def get_kv_backend(db_path: str = "") -> KVBackend:
         # FeatureFlag.ETCD 未加入 _ENTERPRISE_FEATURES，因 etcd3 为可选安装；
         # 缺失时 ImportError 触发降级到 SQLite。
         try:
-            from maop.core.backends_distributed import EtcdKVBackend
+            from maop.core.backends.backends_distributed import EtcdKVBackend
             _kv = EtcdKVBackend()
             logger.info("[backends] KV: %s (edition=%s)", backend_type, get_edition().value)
             return _kv
@@ -659,7 +659,7 @@ def get_secret_backend(root_dir: str = "") -> SecretBackend:
     backend_type = os.getenv("MAOP_SECRET_BACKEND", defaults["secret"]).lower()
     if backend_type == "vault":
         try:
-            from maop.core.backends_vault import VaultSecretBackend
+            from maop.core.backends.backends_vault import VaultSecretBackend
             _secret = VaultSecretBackend()
             logger.info("[backends] Secrets: HashiCorp Vault (edition=%s)", get_edition().value)
             return _secret

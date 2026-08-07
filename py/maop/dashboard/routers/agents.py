@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from maop.core.middleware import require_admin
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.routers.state import MAOP_ROOT
 
@@ -33,7 +33,7 @@ _instance_cache: dict[str, Any] = {}
 
 def _get_scanner():
     if "scanner" not in _instance_cache:
-        from maop.core.agent_scanner import AgentScanner
+        from maop.core.agent.lifecycle.agent_scanner import AgentScanner
         root = MAOP_ROOT
         _instance_cache["scanner"] = AgentScanner(root_dir=str(root))
     return _instance_cache["scanner"]
@@ -41,7 +41,7 @@ def _get_scanner():
 
 def _get_registry():
     if "registry" not in _instance_cache:
-        from maop.core.agent_registry import AgentRegistry
+        from maop.core.agent.lifecycle.agent_registry import AgentRegistry
         root = MAOP_ROOT
         _instance_cache["registry"] = AgentRegistry(root_dir=str(root))
     return _instance_cache["registry"]
@@ -49,8 +49,8 @@ def _get_registry():
 
 def _get_matcher():
     if "matcher" not in _instance_cache:
-        from maop.core.agent_registry import AgentRegistry
-        from maop.core.capability_matcher import CapabilityMatcher
+        from maop.core.agent.lifecycle.agent_registry import AgentRegistry
+        from maop.core.agent.tools.capability_matcher import CapabilityMatcher
         root = MAOP_ROOT
         registry = AgentRegistry(root_dir=str(root))
         _instance_cache["matcher"] = CapabilityMatcher(registry=registry)
@@ -59,7 +59,7 @@ def _get_matcher():
 
 def _get_repair():
     if "repair" not in _instance_cache:
-        from maop.core.agent_repair import AgentRepair
+        from maop.core.agent.lifecycle.agent_repair import AgentRepair
         root = MAOP_ROOT
         _instance_cache["repair"] = AgentRepair(root_dir=str(root))
     return _instance_cache["repair"]
@@ -67,7 +67,7 @@ def _get_repair():
 
 def _get_memory():
     if "memory" not in _instance_cache:
-        from maop.core.agent_memory import AgentMemory
+        from maop.core.agent.memory_ctx.agent_memory import AgentMemory
         root = MAOP_ROOT
         _instance_cache["memory"] = AgentMemory(root_dir=str(root))
     return _instance_cache["memory"]
@@ -75,7 +75,7 @@ def _get_memory():
 
 def _get_evolution():
     if "evolution" not in _instance_cache:
-        from maop.core.agent_evolution import AgentEvolution
+        from maop.core.agent.evolution.agent_evolution import AgentEvolution
         root = MAOP_ROOT
         _instance_cache["evolution"] = AgentEvolution(root_dir=str(root))
     return _instance_cache["evolution"]
@@ -370,7 +370,7 @@ async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[s
     """
     require_admin(request)
 
-    from maop.core.agent_registry import RegisteredAgent
+    from maop.core.agent.lifecycle.agent_registry import RegisteredAgent
 
     registry = _get_registry()
     agent = RegisteredAgent(

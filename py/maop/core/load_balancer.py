@@ -37,9 +37,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.otel import get_tracer
-from maop.core.otel import span as otel_span
-from maop.core.routing_decision import (
+from maop.core.monitoring.otel import get_tracer
+from maop.core.monitoring.otel import span as otel_span
+from maop.core.routing.routing_decision import (
     RoutingDecisionRecord,
     get_active_span_context,
     record_decision_safe,
@@ -323,7 +323,7 @@ class LoadBalancer:
         here are read-only on a dict (CPython atomic) followed by a
         guarded prune.
         """
-        from maop.core.monitoring import (
+        from maop.core.monitoring.monitoring import (
             MAOP_STICKY_SESSION_HIT,
             MAOP_STICKY_SESSION_MISS,
         )
@@ -354,7 +354,7 @@ class LoadBalancer:
 
     def _refresh_sticky_gauge_locked(self) -> None:
         """Sync the active-sticky gauge with the map size. Caller holds ``self._lock``."""
-        from maop.core.monitoring import MAOP_STICKY_SESSION_ACTIVE
+        from maop.core.monitoring.monitoring import MAOP_STICKY_SESSION_ACTIVE
 
         MAOP_STICKY_SESSION_ACTIVE.set(float(len(self._sticky_map)))
 
@@ -634,7 +634,7 @@ def _record_lb_decision(
         )
 
     try:
-        from maop.core.monitoring import (
+        from maop.core.monitoring.monitoring import (
             MAOP_ROUTING_DECISION_DURATION_MS,
             MAOP_ROUTING_DECISION_TOTAL,
         )

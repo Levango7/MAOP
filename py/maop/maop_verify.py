@@ -12,8 +12,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from maop.core.error_schema import MaopResult
-from maop.core.state_classifier import ClassificationResult, TaskStateClassifier
+from maop.core.reliability.error_schema import MaopResult
+from maop.core.agent.lifecycle.state_classifier import ClassificationResult, TaskStateClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +250,7 @@ def _gate_schema(plan: dict, result: MaopResult | None) -> GateResult:
 
     data = result.structured_output
     if data is None and result.stdout:
-        from maop.core.output_parser import OutputParser
+        from maop.core.agent.llm_chat.output_parser import OutputParser
         parser = OutputParser()
         pr = parser.extract_json(result.stdout)
         if pr.success:

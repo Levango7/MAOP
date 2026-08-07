@@ -17,7 +17,7 @@ Known agents (extensible via KNOWN_AGENTS registry):
 
 Usage::
 
-    from maop.core.agent_scanner import AgentScanner
+    from maop.core.agent.lifecycle.agent_scanner import AgentScanner
 
     scanner = AgentScanner()
     found = scanner.scan()
@@ -41,7 +41,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
 

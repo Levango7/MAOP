@@ -9,8 +9,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from maop.core.db_utils import get_db_path
-from maop.core.middleware import require_admin
+from maop.core.backends.db_utils import get_db_path
+from maop.core.security.middleware import require_admin
 
 from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
@@ -104,7 +104,7 @@ def _unified_search(query: str, top: int, agent: str = "") -> list[dict[str, Any
 
     # 来源 2: ThreeLayerMemory → episodic_memory 表
     try:
-        from maop.core.three_layer_memory import ThreeLayerMemory
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
         mem = ThreeLayerMemory(root_dir=str(MAOP_ROOT))
         ep_results = mem.episodic_search(query=query, agent=agent, top=top)
         for ep in ep_results:
@@ -145,7 +145,7 @@ async def api_memory_deep(request: Request) -> dict[str, Any]:
     except Exception:
         logger.debug("Failed to check bloom filter availability", exc_info=True)
     try:
-        from maop.core.vector import VectorStore
+        from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=str(MAOP_ROOT / "data" / "vectors.db"))
         stats["vector_index"] = True
         stats["vector_count"] = vs.count() if hasattr(vs, "count") else 0
@@ -158,7 +158,7 @@ async def api_memory_deep(request: Request) -> dict[str, Any]:
 
     # 补充 episodic_memory 统计
     try:
-        from maop.core.three_layer_memory import ThreeLayerMemory
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
         mem = ThreeLayerMemory(root_dir=str(MAOP_ROOT))
         ep_stats = mem.episodic_stats()
         stats["episodic_count"] = ep_stats.get("total", 0)
@@ -167,7 +167,7 @@ async def api_memory_deep(request: Request) -> dict[str, Any]:
         stats["episodic_consolidated"] = ep_stats.get("consolidated", 0)
         # by_agent 需要从 episodic_stats 之外获取 (episodic_stats 不含 by_agent)
         try:
-            from maop.core.db_utils import sqlite_connect
+            from maop.core.backends.db_utils import sqlite_connect
             with sqlite_connect(str(MAOP_ROOT / "data" / "maop.db"), foreign_keys=False) as conn:
                 rows = conn.execute(
                     "SELECT agent, COUNT(*) as cnt FROM episodic_memory GROUP BY agent ORDER BY cnt DESC"
@@ -216,7 +216,7 @@ async def api_neural_status() -> dict[str, Any]:
     info: dict[str, Any] = {"attention": {"enabled": False, "mechanism": "N/A"}, "transform": {"enabled": False, "layers": 0},
             "embedding": {"enabled": False, "dim": 0, "model": "N/A"}, "vector_store": {"enabled": False, "count": 0}}
     try:
-        from maop.core.vector import VectorStore
+        from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=str(get_db_path("vectors")))
         info["vector_store"] = {"enabled": True, "count": vs.count() if hasattr(vs, "count") else 0}
         if hasattr(vs, "_embedder"):
@@ -309,7 +309,7 @@ async def api_memory_store(request: Request) -> dict[str, Any]:
         raise HTTPException(400, "content is required")
 
     try:
-        from maop.core.three_layer_memory import ThreeLayerMemory
+        from maop.core.memory.three_layer_memory import ThreeLayerMemory
         raw_tags = body.get("tags")
         if isinstance(raw_tags, str):
             tags = [t.strip() for t in raw_tags.split(",") if t.strip()]

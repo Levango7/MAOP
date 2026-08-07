@@ -10,7 +10,7 @@ Consolidation: Periodically extracts knowledge from Episodic → Semantic.
 
 Usage::
 
-    from maop.core.three_layer_memory import ThreeLayerMemory
+    from maop.core.memory.three_layer_memory import ThreeLayerMemory
 
     mem = ThreeLayerMemory(root_dir="/path/to/MAOP")
 
@@ -40,8 +40,8 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
-from maop.core.cache import LRUCache
-from maop.core.db_utils import sqlite_connect
+from maop.core.reliability.cache import LRUCache
+from maop.core.backends.db_utils import sqlite_connect
 
 # 共享 DB 路径与术语映射（统一 ThreeLayerMemory 与 MemoryManager 的 DB 文件）
 from maop.memory.shared_db import (
@@ -65,7 +65,7 @@ LAYER_NAME_MAP: dict[str, str] = {
 
 # ── Models ────────────────────────────────────────────────────
 
-from maop.core.three_layer_memory_types import (
+from maop.core.memory.three_layer_memory_types import (
     ConsolidationReport,
     ContextHead,
     ContextItem,
@@ -79,7 +79,7 @@ from maop.core.three_layer_memory_types import (
     TransformResult,
     decay_weight,
 )
-from maop.core.three_layer_memory_utils import (
+from maop.core.memory.three_layer_memory_utils import (
     _DEFAULT_FOCUS_CONFIGS,
     _compress_text,
     _is_negative_feedback,
@@ -777,7 +777,7 @@ class ThreeLayerMemory:
             # caller (e.g. an HTTP handler) indefinitely.
             def _run_evolution_cycle(root: str) -> None:
                 try:
-                    from maop.core.evolution_loop import EvolutionLoop
+                    from maop.core.evolution.evolution_loop import EvolutionLoop
                     EvolutionLoop(root_dir=root).run_cycle()
                     logger.info("Background evolution cycle completed")
                 except Exception as exc:
@@ -795,7 +795,7 @@ class ThreeLayerMemory:
             triggered_actions.append("evolution_cycle_scheduled")
 
             try:
-                from maop.core.error_ledger import ErrorLedger
+                from maop.core.reliability.error_ledger import ErrorLedger
                 ledger = ErrorLedger(root_dir=str(self._root))
                 entry = self.episodic_get(entry_id)
                 if entry:
@@ -821,7 +821,7 @@ class ThreeLayerMemory:
     def _get_vector_store(self):
         """Lazy-load VectorStore for Semantic Memory."""
         if self._vector_store is None:
-            from maop.core.vector import VectorStore
+            from maop.core.memory.vector import VectorStore
             self._vector_store = VectorStore(db_path=str(self._data_dir / "vectors.db"))
         return self._vector_store
 

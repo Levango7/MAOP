@@ -131,7 +131,7 @@ def safe_eval(expr: str, context: dict) -> Any:
     tree = ast.parse(expr, mode="eval")
     return _safe_eval_node(tree, context)
 
-from maop.core.event_bus import EventBus, get_event_bus
+from maop.core.reliability.event_bus import EventBus, get_event_bus
 
 # ── Step types ────────────────────────────────────────────────
 

@@ -17,15 +17,15 @@ import logging
 import time
 from typing import Any
 
-from maop.core.circuit_breaker import CircuitBreaker
-from maop.core.error_schema import new_result
-from maop.core.monitoring import (
+from maop.core.reliability.circuit_breaker import CircuitBreaker
+from maop.core.reliability.error_schema import new_result
+from maop.core.monitoring.monitoring import (
     MAOP_ROUTING_DECISION_DURATION_MS,
     MAOP_ROUTING_DECISION_TOTAL,
 )
-from maop.core.otel import get_tracer
-from maop.core.otel import span as otel_span
-from maop.core.routing_decision import (
+from maop.core.monitoring.otel import get_tracer
+from maop.core.monitoring.otel import span as otel_span
+from maop.core.routing.routing_decision import (
     RoutingDecisionRecord,
     get_active_span_context,
     record_decision_safe,
@@ -95,7 +95,7 @@ async def _retry_with_backoff(
 def _get_load_balancer():
     """Lazy import LoadBalancer."""
     try:
-        from maop.core.load_balancer import get_load_balancer
+        from maop.core.routing.load_balancer import get_load_balancer
         return get_load_balancer()
     except ImportError:
         return None
@@ -107,7 +107,7 @@ def _get_load_balancer():
 def _get_runtime(config=None):
     """Lazy import Runtime."""
     try:
-        from maop.core.runtime import RuntimeConfig, RuntimeType, create_runtime
+        from maop.core.agent.lifecycle.runtime import RuntimeConfig, RuntimeType, create_runtime
         if config:
             return create_runtime(config)
         return create_runtime(RuntimeConfig(type=RuntimeType.LOCAL))
@@ -120,7 +120,7 @@ def _get_runtime(config=None):
 def _get_sandbox_manager(root_dir=None):
     """Lazy import SandboxManager."""
     try:
-        from maop.core.sandbox import SandboxManager
+        from maop.core.security.sandbox import SandboxManager
         return SandboxManager(root_dir=root_dir)
     except ImportError:
         return None
@@ -131,7 +131,7 @@ def _get_sandbox_manager(root_dir=None):
 def _get_subagent_manager(root_dir=None):
     """Lazy import SubagentManager."""
     try:
-        from maop.core.subagent_delegation import SubagentManager
+        from maop.core.agent.delegation.subagent_lifecycle import SubAgentManager as SubagentManager
         return SubagentManager(root_dir=root_dir)
     except ImportError:
         return None
@@ -267,7 +267,7 @@ class Dispatcher:
 
         # Lazy import to avoid a hard import cycle in tests that stub
         # the queue with a duck-typed object.
-        from maop.core.priority_queue import PriorityTask
+        from maop.core.reliability.priority_queue import PriorityTask
 
         fut = asyncio.get_running_loop().create_future()
         pt = PriorityTask(
@@ -369,7 +369,7 @@ class Dispatcher:
         (e.g. shorter cooldown for critical tasks).
         """
         try:
-            from maop.core.route_scorer import get_route_scorer
+            from maop.core.routing.route_scorer import get_route_scorer
             scorer = get_route_scorer(self._config)
             if success:
                 scorer.mark_agent_success(agent)
@@ -569,7 +569,7 @@ class Dispatcher:
 
         # 1.1. Guardrail check — reject if input violates safety rules
         try:
-            from maop.core.guardrail import Guardrail
+            from maop.core.security.guardrail import Guardrail
             gr = Guardrail()
             check = gr.check(content=task, agent=agent, task=routing_key)
             if not check.passed:
@@ -761,12 +761,12 @@ class Dispatcher:
         if self._subagent_mgr is None:
             result = new_result(
                 agent=agent, task=task,
-                exit_code=-2, error="SubagentManager not available",
+                exit_code=-2, error="SubAgentManager not available",
                 trace_id=trace_id, routing_key=routing_key,
             )
             return DispatchResult(result=result, breaker_tripped=False)
 
-        sa_info = self._subagent_mgr.spawn(
+        sa_info = self._subagent_mgr.spawn_child(
             parent=parent, agent=agent, task=task, max_depth=max_depth,
         )
 

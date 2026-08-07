@@ -26,7 +26,7 @@ Features:
 
 Usage::
 
-    from maop.core.mcp_hub import MCPHub, MCPServerConfig, TransportType
+    from maop.core.mcp.mcp_hub import MCPHub, MCPServerConfig, TransportType
 
     hub = MCPHub(root_dir="/path/to/MAOP")
 
@@ -55,27 +55,27 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from maop.core import otel
-from maop.core.db_utils import get_db_path, sqlite_connect
+from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 if TYPE_CHECKING:
     # Imported lazily at runtime inside MCPHub.call_tool to avoid a
     # circular import: mcp_permission.py imports MCPServerConfig from
     # this module, so we cannot import it at module load time.
-    from maop.core.mcp_audit import MCPAuditLogger
-    from maop.core.mcp_cache import MCPCache
-    from maop.core.mcp_concurrency import MCPServerConcurrency, MCPServerRateLimiter
-    from maop.core.mcp_permission import MCPPermissionChecker
+    from maop.core.mcp.mcp_audit import MCPAuditLogger
+    from maop.core.mcp.mcp_cache import MCPCache
+    from maop.core.mcp.mcp_concurrency import MCPServerConcurrency, MCPServerRateLimiter
+    from maop.core.mcp.mcp_permission import MCPPermissionChecker
 
 logger = logging.getLogger(__name__)
 
 
-from maop.core.mcp_hub_transport import (
+from maop.core.mcp.mcp_hub_transport import (
     _SSETransport,
     _StdioTransport,
     _StreamableHttpTransport,
     _WebSocketTransport,
 )
-from maop.core.mcp_hub_types import (
+from maop.core.mcp.mcp_hub_types import (
     MCPPermissionDeniedError,
     MCPRateLimitedError,
     MCPResource,
@@ -408,7 +408,7 @@ class MCPHub:
             # when no cache was injected (preserves pre-δ-5 behaviour).
             mcp_cache = self._cache
             if mcp_cache is not None:
-                from maop.core.mcp_cache import MCPCacheKey
+                from maop.core.mcp.mcp_cache import MCPCacheKey
 
                 cache_key = MCPCacheKey.from_arguments(server_id, tool_name, arguments)
                 cached = mcp_cache.get(cache_key)
@@ -575,7 +575,7 @@ class MCPHub:
                 # cacheability (no error / no _mcp_nocache) so error
                 # results and opt-out tools are silently skipped.
                 if mcp_cache is not None and not is_error:
-                    from maop.core.mcp_cache import MCPCacheKey
+                    from maop.core.mcp.mcp_cache import MCPCacheKey
 
                     cache_key = MCPCacheKey.from_arguments(server_id, tool_name, arguments)
                     mcp_cache.put(
@@ -611,7 +611,7 @@ class MCPHub:
         if audit is None:
             return
         # Lazy import keeps the module-load graph acyclic.
-        from maop.core.mcp_audit import MCPAuditRecord, hash_arguments
+        from maop.core.mcp.mcp_audit import MCPAuditRecord, hash_arguments
 
         user_id = ""
         if user_context:
@@ -642,7 +642,7 @@ class MCPHub:
         them here.
         """
         try:
-            from maop.core.monitoring import (
+            from maop.core.monitoring.monitoring import (
                 MAOP_MCP_CALL_ALLOWED_TOTAL,
                 MAOP_MCP_CALL_AUDITED_TOTAL,
                 MAOP_MCP_CALL_DENIED_TOTAL,
@@ -661,7 +661,7 @@ class MCPHub:
     def _record_call_attempt(self, server_name: str, tool_name: str) -> None:
         """Increment MAOP_mcp_calls_total (label=server,tool)."""
         try:
-            from maop.core.monitoring import MAOP_MCP_CALLS_TOTAL
+            from maop.core.monitoring.monitoring import MAOP_MCP_CALLS_TOTAL
         except Exception:
             logger.debug("Silent exception in core/mcp_hub.py:1293", exc_info=True)
             return
@@ -670,7 +670,7 @@ class MCPHub:
     def _record_call_error(self, server_name: str, tool_name: str) -> None:
         """Increment MAOP_mcp_call_errors_total (label=server,tool)."""
         try:
-            from maop.core.monitoring import MAOP_MCP_CALL_ERRORS_TOTAL
+            from maop.core.monitoring.monitoring import MAOP_MCP_CALL_ERRORS_TOTAL
         except Exception:
             logger.debug("Silent exception in core/mcp_hub.py:1301", exc_info=True)
             return
@@ -680,7 +680,7 @@ class MCPHub:
         """Observe MAOP_mcp_call_duration_seconds (no labels; Histogram
         class in monitoring.py does not carry labels)."""
         try:
-            from maop.core.monitoring import MAOP_MCP_CALL_DURATION_SECONDS
+            from maop.core.monitoring.monitoring import MAOP_MCP_CALL_DURATION_SECONDS
         except Exception:
             logger.debug("Silent exception in core/mcp_hub.py:1310", exc_info=True)
             return
@@ -692,7 +692,7 @@ class MCPHub:
     def _record_health_check(self, server_name: str, *, healthy: bool) -> None:
         """Increment MAOP_mcp_health_check_total (label=server,result)."""
         try:
-            from maop.core.monitoring import MAOP_MCP_HEALTH_CHECK_TOTAL
+            from maop.core.monitoring.monitoring import MAOP_MCP_HEALTH_CHECK_TOTAL
         except Exception:
             logger.debug("Silent exception in core/mcp_hub.py:1321", exc_info=True)
             return
@@ -703,7 +703,7 @@ class MCPHub:
     def _inc_connected_servers(self) -> None:
         """+1 on MAOP_mcp_servers_connected (no labels)."""
         try:
-            from maop.core.monitoring import MAOP_MCP_SERVERS_CONNECTED
+            from maop.core.monitoring.monitoring import MAOP_MCP_SERVERS_CONNECTED
         except Exception:
             logger.debug("Silent exception in core/mcp_hub.py:1331", exc_info=True)
             return
@@ -712,7 +712,7 @@ class MCPHub:
     def _dec_connected_servers(self) -> None:
         """-1 on MAOP_mcp_servers_connected (no labels)."""
         try:
-            from maop.core.monitoring import MAOP_MCP_SERVERS_CONNECTED
+            from maop.core.monitoring.monitoring import MAOP_MCP_SERVERS_CONNECTED
         except Exception:
             logger.debug("Silent exception in core/mcp_hub.py:1339", exc_info=True)
             return
@@ -723,7 +723,7 @@ class MCPHub:
     def _record_cache_hit(self, server_name: str) -> None:
         """Increment MAOP_mcp_cache_hit_total (label=server)."""
         try:
-            from maop.core.monitoring import MAOP_MCP_CACHE_HIT_TOTAL
+            from maop.core.monitoring.monitoring import MAOP_MCP_CACHE_HIT_TOTAL
         except Exception:
             logger.debug("Silent exception in core/mcp_hub.py:1349", exc_info=True)
             return
@@ -732,7 +732,7 @@ class MCPHub:
     def _record_cache_miss(self, server_name: str) -> None:
         """Increment MAOP_mcp_cache_miss_total (label=server)."""
         try:
-            from maop.core.monitoring import MAOP_MCP_CACHE_MISS_TOTAL
+            from maop.core.monitoring.monitoring import MAOP_MCP_CACHE_MISS_TOTAL
         except Exception:
             logger.debug("Silent exception in core/mcp_hub.py:1357", exc_info=True)
             return
@@ -741,7 +741,7 @@ class MCPHub:
     def _record_rate_limited(self, server_name: str) -> None:
         """Increment MAOP_mcp_rate_limited_total (label=server)."""
         try:
-            from maop.core.monitoring import MAOP_MCP_RATE_LIMITED_TOTAL
+            from maop.core.monitoring.monitoring import MAOP_MCP_RATE_LIMITED_TOTAL
         except Exception:
             logger.debug("Silent exception in core/mcp_hub.py:1365", exc_info=True)
             return

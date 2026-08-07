@@ -25,7 +25,7 @@ path). On LLM failure or when disabled, it falls back to the original
 
 Usage::
 
-    from maop.core.react_loop import ReactLoop, ReactConfig
+    from maop.core.agent.llm_chat.react_loop import ReactLoop, ReactConfig
 
     loop = ReactLoop(config=ReactConfig(max_iterations=10))
     result = await loop.run(
@@ -46,10 +46,10 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.error_schema import MaopResult, new_result
+from maop.core.reliability.error_schema import MaopResult, new_result
 
 if TYPE_CHECKING:
-    from maop.core.llm_provider import LLMProviderFactory
+    from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ class ReactLoop:
         """
         if self._provider_factory is None:
             try:
-                from maop.core.llm_provider import LLMProviderFactory
+                from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
                 self._provider_factory = LLMProviderFactory(root_dir=self._root_dir)
             except Exception as exc:
                 logger.warning("[react_loop] LLMProviderFactory init failed: %s", exc)
@@ -160,14 +160,14 @@ class ReactLoop:
 
     def _get_bridge(self):
         if self._bridge is None:
-            from maop.core.function_call import FunctionCallBridge
+            from maop.core.agent.llm_chat.function_call import FunctionCallBridge
             self._bridge = FunctionCallBridge(root_dir=self._root_dir)
         return self._bridge
 
     def _get_change_tracker(self):
         if self._change_tracker is None and self._root_dir:
             try:
-                from maop.core.change_tracker import ChangeTracker
+                from maop.core.reliability.change_tracker import ChangeTracker
                 self._change_tracker = ChangeTracker(root_dir=self._root_dir)
             except Exception:
                 logger.debug("Silent exception in core/react_loop.py:172", exc_info=True)

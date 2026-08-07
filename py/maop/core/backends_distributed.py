@@ -37,7 +37,7 @@ except ImportError as _e:  # pragma: no cover - 仅在缺包时触发
         "Install the optional dependency with: pip install etcd3>=0.12.0"
     ) from _e
 
-from maop.core.backends import KVBackend
+from maop.core.backends.backends import KVBackend
 
 logger = logging.getLogger(__name__)
 

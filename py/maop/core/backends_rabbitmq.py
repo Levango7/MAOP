@@ -52,7 +52,7 @@ except ImportError as _e:  # pragma: no cover - 仅在缺包时触发
         "Install the optional dependency with: pip install pika>=1.3.0"
     ) from _e
 
-from maop.core.backends import QueueBackend
+from maop.core.backends.backends import QueueBackend
 
 logger = logging.getLogger(__name__)
 
