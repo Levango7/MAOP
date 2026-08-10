@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "maop-operator.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "maop-operator.labels" . | nindent 4 }}
+data:
+  controller.yaml: |
+    maxConcurrentReconciles: {{ .Values.controller.maxConcurrentReconciles }}
+    logLevel: {{ .Values.controller.logLevel }}
+    multiTenant:
+      enabled: {{ .Values.controller.multiTenant.enabled }}
+      defaultQuotas:
+        maxTokensPerDay: {{ .Values.controller.multiTenant.defaultQuotas.maxTokensPerDay }}
+        maxRequestsPerDay: {{ .Values.controller.multiTenant.defaultQuotas.maxRequestsPerDay }}
+        maxAgents: {{ .Values.controller.multiTenant.defaultQuotas.maxAgents }}
+        maxConcurrentTasks: {{ .Values.controller.multiTenant.defaultQuotas.maxConcurrentTasks }}
+    plugins:
+      enabled: {{ .Values.controller.plugins.enabled }}
+      strictApi: {{ .Values.controller.plugins.strictApi }}
+      allowlist:
+      {{- range .Values.controller.plugins.allowlist }}
+        - {{ . | quote }}
+      {{- end }}

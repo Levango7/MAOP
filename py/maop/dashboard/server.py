@@ -361,6 +361,16 @@ from maop.dashboard.routers import routing as routing_router
 
 app.include_router(routing_router.router)
 
+# F2-01: Agent 自演化闭环 — PerformanceEvaluator / ABTest(SPRT) / AutoDeployer.
+from maop.dashboard.routers import evolution as evolution_router
+
+app.include_router(evolution_router.router)
+
+# F1-04: Observability stack — tracing/metrics/logging status + Prometheus JSON.
+from maop.dashboard.routers import observability as observability_router
+
+app.include_router(observability_router.router)
+
 # ── A2A protocol endpoint (JSON-RPC /a2a) ─────────────────────────
 # F6b (2026-07-22, Phase F): mount the A2A protocol so external agents
 # (Google ADK / LangGraph / CrewAI / any A2A-compliant system) can

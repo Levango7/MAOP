@@ -1,0 +1,279 @@
+# MAOP Operator Controller — static deployment manifest.
+#
+# This file is a Helm-free, `kubectl apply -f controller.yaml`-ready deployment
+# for the MAOP operator controller. It mirrors the Helm chart templates/
+# rendered with default values (values.yaml). Use this for quick installs
+# without Helm; prefer the Helm chart for production (customizable RBAC,
+# replicas, multi-tenant quotas, plugin allowlist, etc.).
+#
+# Apply order: crd.yaml first, then controller.yaml.
+#
+#   kubectl apply -f crd.yaml
+#   kubectl apply -f controller.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: maop-system
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: maop-operator
+  namespace: maop-system
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: maop-operator
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+rules:
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["maop.io"]
+    resources:
+      - maopagents
+      - maopagents/status
+      - maopagents/finalizers
+      - maoptasks
+      - maoptasks/status
+      - maoptasks/finalizers
+      - maopworkflows
+      - maopworkflows/status
+      - maopworkflows/finalizers
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["services", "configmaps", "secrets", "pods", "events"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: maop-operator
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: maop-operator
+subjects:
+  - kind: ServiceAccount
+    name: maop-operator
+    namespace: maop-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maop-operator-config
+  namespace: maop-system
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+data:
+  controller.yaml: |
+    logLevel: info
+    maxConcurrentReconciles: 4
+    multiTenant:
+      enabled: true
+      defaultQuotas:
+        maxTokensPerDay: 100000
+        maxRequestsPerDay: 10000
+        maxAgents: 20
+        maxConcurrentTasks: 8
+    plugins:
+      enabled: true
+      allowlist: []
+      strictApi: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maop-operator
+  namespace: maop-system
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+    control-plane: controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: maop-operator
+      control-plane: controller-manager
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        app.kubernetes.io/name: maop-operator
+        control-plane: controller-manager
+    spec:
+      serviceAccountName: maop-operator
+      containers:
+        - name: manager
+          image: ghcr.io/maop/operator:4.5.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --leader-elect
+            - --max-concurrent-reconciles=4
+            - --log-level=info
+            - --multi-tenant=true
+            - --default-max-tokens=100000
+            - --default-max-requests=10000
+            - --default-max-agents=20
+            - --default-max-concurrent=8
+            - --plugins-enabled=true
+            - --plugins-strict-api=true
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MAOP_LOG_LEVEL
+              value: "info"
+          ports:
+            - name: webhook-server
+              containerPort: 8443
+              protocol: TCP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+            - name: config
+              mountPath: /etc/maop
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: webhook-certs
+          secret:
+            defaultMode: 420
+            secretName: maop-operator-webhook-tls
+        - name: config
+          configMap:
+            name: maop-operator-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: maop-operator
+  namespace: maop-system
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+spec:
+  type: ClusterIP
+  ports:
+    - name: webhook
+      port: 8443
+      targetPort: webhook-server
+      protocol: TCP
+    - name: metrics
+      port: 8080
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: maop-operator
+    control-plane: controller-manager
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: maop-operator
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+webhooks:
+  - name: maopagent.maop.io
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    rules:
+      - apiGroups: ["maop.io"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["maopagents", "maoptasks", "maopworkflows"]
+    clientConfig:
+      service:
+        name: maop-operator
+        namespace: maop-system
+        path: /mutate
+        port: 8443
+    namespaceSelector: {}
+    objectSelector: {}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: maop-operator
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+webhooks:
+  - name: maopagent.maop.io
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    rules:
+      - apiGroups: ["maop.io"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["maopagents", "maoptasks", "maopworkflows"]
+    clientConfig:
+      service:
+        name: maop-operator
+        namespace: maop-system
+        path: /validate
+        port: 8443
+    namespaceSelector: {}
+    objectSelector: {}

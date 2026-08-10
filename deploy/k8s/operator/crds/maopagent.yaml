@@ -1,0 +1,167 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: maopagents.maop.io
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+spec:
+  group: maop.io
+  names:
+    kind: MaopAgent
+    listKind: MaopAgentList
+    plural: maopagents
+    singular: maopagent
+    shortNames:
+      - maopa
+      - maa
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: >
+            MaopAgent declares the desired state of a MAOP agent workload.
+            The operator reconciles this into a Deployment + Service + RLS
+            policies scoped to the configured tenant.
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - model
+              properties:
+                model:
+                  type: string
+                  description: LLM model identifier (e.g. gpt-4o, claude-3.5-sonnet).
+                systemPrompt:
+                  type: string
+                  description: System prompt injected into every conversation.
+                tenant:
+                  type: string
+                  description: >
+                    Tenant ID for multi-tenant isolation. The operator enforces
+                    RLS scoping and per-tenant quotas against this value.
+                replicas:
+                  type: integer
+                  minimum: 0
+                  default: 1
+                  description: Desired agent pod replicas.
+                maxTurns:
+                  type: integer
+                  minimum: 1
+                  default: 20
+                  description: Maximum orchestration turns per task.
+                tools:
+                  type: array
+                  description: MCP tool names this agent may invoke.
+                  items:
+                    type: string
+                plugins:
+                  type: array
+                  description: Plugin names to load into this agent.
+                  items:
+                    type: string
+                quotas:
+                  type: object
+                  description: Per-agent quota overrides (per-tenant defaults apply otherwise).
+                  properties:
+                    maxTokensPerDay:
+                      type: integer
+                      minimum: 0
+                    maxRequestsPerDay:
+                      type: integer
+                      minimum: 0
+                    maxConcurrentTasks:
+                      type: integer
+                      minimum: 0
+                image:
+                  type: string
+                  description: Override the agent runtime image.
+                env:
+                  type: array
+                  description: Additional environment variables.
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                      valueFrom:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+            status:
+              type: object
+              description: Observed state reported by the controller.
+              properties:
+                observedGeneration:
+                  type: integer
+                  format: int64
+                ready:
+                  type: boolean
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Running
+                    - Degraded
+                    - Failed
+                    - QuotaExceeded
+                readyReplicas:
+                  type: integer
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                lastReconcileTime:
+                  type: string
+                  format: date-time
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Model
+          type: string
+          jsonPath: .spec.model
+        - name: Tenant
+          type: string
+          jsonPath: .spec.tenant
+        - name: Replicas
+          type: integer
+          jsonPath: .spec.replicas
+        - name: Ready
+          type: integer
+          jsonPath: .status.readyReplicas
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

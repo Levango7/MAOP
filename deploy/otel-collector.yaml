@@ -1,0 +1,143 @@
+# MAOP OpenTelemetry Collector Configuration (F1-04)
+#
+# Receives OTLP traces + metrics from the MAOP backend
+# (maop.core.observability.tracing) and exports them to:
+#   - Jaeger / Tempo  (traces)
+#   - Prometheus       (metrics, via a Prometheus exporter port)
+#   - Loki             (logs, optional)
+#
+# Usage:
+#   docker run --rm -p 4317:4317 -p 4318:4318 -p 8889:8889 \
+#     -v $(pwd)/deploy/otel-collector.yaml:/etc/otelcol/config.yaml \
+#     otel/opentelemetry-collector-contrib:latest
+#
+# Or via docker-compose (see docker-compose.yml --profile otel).
+#
+# W3C Trace Context propagation is handled by the SDK in the MAOP
+# backend (TraceContextMiddleware); the Collector just forwards the
+# already-contextualised spans.
+
+receivers:
+  # OTLP gRPC + HTTP — the MAOP backend exports via OTLP gRPC by default
+  # (MAOP_OTEL_EXPORTER=otlp, MAOP_OTEL_ENDPOINT=http://localhost:4317).
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        # Keep-alive + max recv size tuned for large agent-execution spans.
+        max_recv_msg_size_mib: 16
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Host metrics (CPU / mem / disk) — gives the Grafana dashboard a
+  # "system" row alongside the MAOP application metrics.
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+      memory:
+      disk:
+      network:
+
+processors:
+  # Batch spans/metrics before export — the standard OTel trade-off:
+  # higher throughput vs. slightly higher latency.
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+    send_batch_max_size: 8192
+
+  # Memory limiter — protects the Collector from OOM under burst load.
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  # Resource attributes — stamp every span/metric with the MAOP
+  # deployment metadata so Jaeger/Tempo can filter by environment.
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: ${env:MAOP_ENV:-development}
+        action: upsert
+      - key: service.namespace
+        value: maop
+        action: upsert
+
+  # Tail-sampling: keep 100% of error spans, sample the rest at 10%.
+  # This keeps Jaeger storage bounded while preserving all failures.
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    expected_new_traces_per_sec: 1000
+    policies:
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: sampled
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+
+exporters:
+  # Debug logging (warn level — only surface problems, not every span).
+  debug:
+    verbosity: basic
+
+  # Jaeger / Tempo via OTLP — uncomment and set endpoint to enable.
+  otlp/jaeger:
+    endpoint: ${env:JAEGER_ENDPOINT:-jaeger:4317}
+    tls:
+      insecure: true
+
+  # Prometheus exporter — exposes Collector-received metrics on :8889
+  # for Prometheus to scrape.  Complements the MAOP backend's own
+  # /api/prometheus endpoint (which exports the application metrics).
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: maop_otel
+    send_timestamps: true
+    metric_expiration: 5m
+    enable_open_metrics: true
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Loki exporter for structured logs (optional — requires the
+  # loggingpipeline extension in service.extensions).
+  loki:
+    endpoint: ${env:LOKI_ENDPOINT:-http://loki:3100/loki/api/v1/push}
+    default_labels_enabled:
+      exporter: true
+      job: true
+
+service:
+  extensions: [health_check]
+  pipelines:
+    # Trace pipeline: receive OTLP → sample → batch → export to Jaeger.
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, tail_sampling, batch]
+      exporters: [otlp/jaeger, debug]
+
+    # Metrics pipeline: receive OTLP + hostmetrics → batch → export to Prometheus.
+    metrics:
+      receivers: [otlp, hostmetrics]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheus, debug]
+
+    # Logs pipeline (optional — requires the MAOP backend to emit OTLP logs).
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [loki, debug]
+
+  telemetry:
+    logs:
+      level: warn
+    metrics:
+      address: 0.0.0.0:8888
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133

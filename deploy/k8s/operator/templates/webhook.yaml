@@ -1,0 +1,24 @@
+{{- if .Values.webhook.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "maop-operator.fullname" . }}-validating-webhook
+  labels:
+    {{- include "maop-operator.labels" . | nindent 4 }}
+webhooks:
+  - name: vmaopagent.kb.io
+    rules:
+      - apiGroups: ["maop.io"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["maopagents"]
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions: ["v1"]
+    clientConfig:
+      service:
+        name: {{ include "maop-operator.fullname" . }}
+        namespace: {{ .Release.Namespace }}
+        path: /validate-maop-io-v1alpha1-maopagent
+        port: {{ .Values.webhook.port }}
+{{- end }}

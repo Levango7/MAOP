@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -630,3 +631,115 @@ class MemoryManager:
     ) -> list[dict[str, Any]]:
         """检索 Long-term Memory（映射到 semantic_search）。"""
         return self.semantic_search(query, top=top)
+
+    # ── F1-03 统一 CRUD 入口 ──────────────────────────────────
+    # 实现 maop.memory.unified.UnifiedMemoryProtocol 的
+    # store / retrieve / search / delete 四个统一方法。
+
+    def store(self, layer: str, content: Any, **kwargs: Any) -> str:
+        """统一存储入口，按 ``layer`` 路由到 working/short_term/long_term。"""
+        from maop.memory.shared_db import normalize_layer_name
+
+        normalized = normalize_layer_name(layer)
+        if normalized == "working":
+            key = kwargs.pop("key", "") or f"mem-{int(time.time() * 1000)}"
+            self.working_put(key, content, ttl_s=kwargs.pop("ttl_s", None))
+            return key
+        if normalized == "short_term":
+            return self.short_term_store(
+                str(content),
+                task=kwargs.pop("task", ""),
+                agent=kwargs.pop("agent", ""),
+                topic=kwargs.pop("topic", ""),
+                tags=kwargs.pop("tags", None),
+                metadata=kwargs.pop("metadata", None),
+            )
+        if normalized == "long_term":
+            doc_id = kwargs.pop("doc_id", f"doc-{int(time.time() * 1000)}")
+            return self.long_term_index(
+                doc_id, str(content), metadata=kwargs.pop("metadata", None)
+            )
+        raise ValueError(f"Unknown layer: {layer!r}")
+
+    def retrieve(self, layer: str, query: str = "", top: int = 10, **kwargs: Any) -> Any:
+        """统一检索入口，按 ``layer`` 路由到对应层。"""
+        from maop.memory.shared_db import normalize_layer_name
+
+        normalized = normalize_layer_name(layer)
+        if normalized == "working":
+            return self.working_get(query) if query else None
+        if normalized == "short_term":
+            return self.short_term_search(query=query, top=top, agent=kwargs.get("agent", ""))
+        if normalized == "long_term":
+            return self.long_term_search(query, top=top)
+        raise ValueError(f"Unknown layer: {layer!r}")
+
+    def search(self, query: str, *, top: int = 10, **kwargs: Any) -> list[dict[str, Any]]:
+        """跨层搜索：合并 short_term + long_term，附带 ``layer`` 字段。"""
+        merged: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+
+        try:
+            for r in self.short_term_search(query=query, top=top, agent=kwargs.get("agent", "")):
+                if isinstance(r, dict):
+                    rid = str(r.get("id", ""))
+                    if rid and rid in seen_ids:
+                        continue
+                    if rid:
+                        seen_ids.add(rid)
+                    entry = dict(r)
+                    entry.setdefault("layer", "short_term")
+                    merged.append(entry)
+        except Exception as exc:
+            logger.debug("[memory_manager] search short_term failed: %s", exc)
+
+        try:
+            for r in self.long_term_search(query, top=top):
+                if isinstance(r, dict):
+                    rid = str(r.get("id", ""))
+                    if rid and rid in seen_ids:
+                        continue
+                    if rid:
+                        seen_ids.add(rid)
+                    entry = dict(r)
+                    entry.setdefault("layer", "long_term")
+                    merged.append(entry)
+        except Exception as exc:
+            logger.debug("[memory_manager] search long_term failed: %s", exc)
+
+        return merged[:top] if top > 0 else merged
+
+    def delete(self, layer: str, entry_id: str) -> bool:
+        """按 ID 删除指定层的条目。"""
+        from maop.memory.shared_db import normalize_layer_name
+
+        normalized = normalize_layer_name(layer)
+        if normalized == "working":
+            if entry_id in self._working_cache:
+                self._working_cache.pop(entry_id, None)
+                return True
+            return False
+        if normalized == "short_term":
+            try:
+                with sqlite_connect(self._db_path, foreign_keys=False) as conn:
+                    cur = conn.execute(
+                        "DELETE FROM memory_entries WHERE id = ?", (entry_id,)
+                    )
+                    return cur.rowcount > 0
+            except Exception as exc:
+                logger.warning("[memory_manager] delete short_term failed: %s", exc)
+                return False
+        if normalized == "long_term":
+            vs = self._vector_search
+            if vs is None:
+                vs = self.vector_search  # 触发 property 懒加载
+            delete_fn = getattr(vs, "delete", None)
+            if callable(delete_fn):
+                try:
+                    delete_fn(entry_id)
+                    return True
+                except Exception as exc:
+                    logger.debug("[memory_manager] vector delete failed: %s", exc)
+                    return False
+            return False
+        raise ValueError(f"Unknown layer: {layer!r}")

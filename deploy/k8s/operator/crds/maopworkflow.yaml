@@ -1,0 +1,200 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: maopworkflows.maop.io
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+spec:
+  group: maop.io
+  names:
+    kind: MaopWorkflow
+    listKind: MaopWorkflowList
+    plural: maopworkflows
+    singular: maopworkflow
+    shortNames:
+      - maopw
+      - mw
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: >
+            MaopWorkflow defines a multi-step agent orchestration as a DAG of
+            MaopTask nodes. The operator topologically sorts the steps, schedules
+            each as a MaopTask, and aggregates overall workflow status.
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - steps
+              properties:
+                tenant:
+                  type: string
+                  description: Tenant ID for RLS scoping and quota enforcement.
+                steps:
+                  type: array
+                  minItems: 1
+                  description: Ordered list of workflow steps (DAG nodes).
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - agent
+                      - prompt
+                    properties:
+                      name:
+                        type: string
+                        description: Unique step name within this workflow.
+                      agent:
+                        type: string
+                        description: MaopAgent CR name to run this step.
+                      prompt:
+                        type: string
+                        description: Prompt template; may reference outputs of upstream steps.
+                      dependsOn:
+                        type: array
+                        description: Names of steps that must complete before this one.
+                        items:
+                          type: string
+                      tools:
+                        type: array
+                        items:
+                          type: string
+                      plugins:
+                        type: array
+                        items:
+                          type: string
+                      maxTurns:
+                        type: integer
+                        minimum: 1
+                      timeoutSeconds:
+                        type: integer
+                        minimum: 0
+                      inputs:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                failureStrategy:
+                  type: string
+                  enum:
+                    - failFast
+                    - continue
+                    - retry
+                  default: failFast
+                  description: How to handle a step failure.
+                maxRetries:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                  description: Global retry count per step (when failureStrategy=retry).
+                timeoutSeconds:
+                  type: integer
+                  minimum: 0
+                  default: 7200
+                  description: Wall-clock timeout for the entire workflow.
+            status:
+              type: object
+              description: Observed state reported by the controller.
+              properties:
+                observedGeneration:
+                  type: integer
+                  format: int64
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Running
+                    - Succeeded
+                    - Failed
+                    - Cancelled
+                    - TimedOut
+                    - QuotaExceeded
+                stepStatuses:
+                  type: array
+                  description: Per-step status snapshot.
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                      phase:
+                        type: string
+                        enum:
+                          - Pending
+                          - Running
+                          - Succeeded
+                          - Failed
+                          - Skipped
+                      taskName:
+                        type: string
+                        description: Name of the spawned MaopTask CR.
+                      turns:
+                        type: integer
+                      tokensUsed:
+                        type: integer
+                      error:
+                        type: string
+                      startTime:
+                        type: string
+                        format: date-time
+                      completionTime:
+                        type: string
+                        format: date-time
+                totalTurns:
+                  type: integer
+                totalTokensUsed:
+                  type: integer
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                startTime:
+                  type: string
+                  format: date-time
+                completionTime:
+                  type: string
+                  format: date-time
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Tenant
+          type: string
+          jsonPath: .spec.tenant
+        - name: Steps
+          type: integer
+          jsonPath: .spec.steps
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

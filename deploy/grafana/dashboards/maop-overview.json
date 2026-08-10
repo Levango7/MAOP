@@ -1,0 +1,241 @@
+{
+  "title": "MAOP Observability Overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "uid": "maop-observability",
+  "tags": ["maop", "observability", "f1-04"],
+  "timezone": "browser",
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "15s",
+  "description": "MAOP F1-04 observability dashboard — request rate, latency, agent execution, errors, and OTel pipeline health. Sourced from the maop_requests_total / maop_request_duration_seconds / maop_agent_execution_seconds / maop_errors_total canonical metrics.",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0,
+        "label": "Datasource"
+      },
+      {
+        "name": "edition",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(maop_requests_total, edition)",
+        "refresh": 2,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" },
+        "label": "Edition"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request Rate (req/s)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(maop_requests_total[5m]))", "legendFormat": "total" },
+        { "refId": "B", "expr": "sum by (status) (rate(maop_requests_total[5m]))", "legendFormat": "{{status}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Request Duration P50/P95/P99",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, rate(maop_request_duration_seconds_bucket[5m]))", "legendFormat": "P50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, rate(maop_request_duration_seconds_bucket[5m]))", "legendFormat": "P95" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, rate(maop_request_duration_seconds_bucket[5m]))", "legendFormat": "P99" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Error Rate (errors/s)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 15 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(maop_errors_total[5m]))", "legendFormat": "total" },
+        { "refId": "B", "expr": "sum by (type) (rate(maop_errors_total[5m]))", "legendFormat": "{{type}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Agent Execution Duration P95",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, rate(maop_agent_execution_seconds_bucket[5m]))", "legendFormat": "P95" },
+        { "refId": "B", "expr": "histogram_quantile(0.50, rate(maop_agent_execution_seconds_bucket[5m]))", "legendFormat": "P50" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Active Spans",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "refId": "A", "expr": "max(maop_active_spans)", "legendFormat": "active" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Requests by Path (top 10)",
+      "type": "bargauge",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "displayMode": "gradient",
+        "orientation": "horizontal"
+      },
+      "targets": [
+        { "refId": "A", "expr": "topk(10, sum by (path) (rate(maop_requests_total[5m])))", "legendFormat": "{{path}}" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Errors by Type",
+      "type": "piechart",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "pieType": "donut"
+      },
+      "targets": [
+        { "refId": "A", "expr": "sum by (type) (increase(maop_errors_total[1h]))", "legendFormat": "{{type}}" }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Trace Export Throughput",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "green", "value": 0.1 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "refId": "A", "expr": "rate(maop_trace_export_total[5m])", "legendFormat": "exports/s" }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Request Latency Heatmap",
+      "type": "heatmap",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "color": {
+          "scheme": "Spectral",
+          "mode": "scheme",
+          "fill": "dark-orange",
+          "reverse": true
+        },
+        "yAxis": {
+          "unit": "s",
+          "decimals": 2
+        }
+      },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(maop_request_duration_seconds_bucket[5m]))", "legendFormat": "{{le}}", "format": "heatmap" }
+      ]
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  }
+}

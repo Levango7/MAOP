@@ -6,8 +6,11 @@ describe('Router', () => {
     const names = router.getRoutes().map((r) => r.name);
     const expected = [
       'overview', 'control', 'chat', 'agents', 'memory', 'evolve',
+      'evolution-history',  // Phase 1 F2-01: evolution history page
       'search', 'vector', 'tools', 'models',
-      'logs', 'monitor', 'cost', 'audit', 'rbac', 'tenants', 'settings',
+      'logs', 'monitor',
+      'observability',  // Phase 1 F1-04: observability dashboard
+      'cost', 'audit', 'rbac', 'tenants', 'settings',
       'users', 'docs',
       'knowledge-graph',  // v4.5.0: knowledge graph visualization
     ];
@@ -21,9 +24,9 @@ describe('Router', () => {
     expect(route?.path).toBe('/');
   });
 
-  it('has 21 routes total', () => {
-    // 20 业务路由 (incl. v4.5.0 /knowledge-graph) + 1 个 catch-all 重定向 (:pathMatch(.*)*)
-    expect(router.getRoutes().length).toBe(21);
+  it('has 23 routes total', () => {
+    // 22 业务路由 (incl. v4.5.0 /knowledge-graph, Phase 1 /observability + /evolution-history) + 1 个 catch-all 重定向 (:pathMatch(.*)*)
+    expect(router.getRoutes().length).toBe(23);
   });
 
   it('knowledge-graph route has no enterprise guard', () => {

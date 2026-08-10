@@ -1,0 +1,25 @@
+apiVersion: v2
+name: maop-operator
+description: |
+  Helm chart for the MAOP Kubernetes Operator — reconciles MaopAgent / MaopPipeline
+  custom resources into running agent workloads with multi-tenant isolation,
+  plugin loading, and RLS-aware data access.
+type: application
+version: 0.3.0
+appVersion: "4.5.0"
+keywords:
+  - maop
+  - multi-agent
+  - operator
+  - kubernetes
+  - ai-orchestration
+home: https://github.com/maop/maop
+maintainers:
+  - name: MAOP Team
+    email: maop-team@example.com
+sources:
+  - https://github.com/maop/maop
+dependencies: []
+annotations:
+  "operators.operatorframework.io/bundle.package.v1": "maop-operator"
+  "operators.operatorframework.io/bundle.channels.v1": "stable"

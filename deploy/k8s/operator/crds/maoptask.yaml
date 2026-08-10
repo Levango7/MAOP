@@ -1,0 +1,168 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: maoptasks.maop.io
+  labels:
+    app.kubernetes.io/name: maop-operator
+    app.kubernetes.io/part-of: maop
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+spec:
+  group: maop.io
+  names:
+    kind: MaopTask
+    listKind: MaopTaskList
+    plural: maoptasks
+    singular: maoptask
+    shortNames:
+      - maopt
+      - mt
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: >
+            MaopTask represents a single orchestration task submitted to a MAOP
+            agent. The operator creates a bounded execution (pod / job), enforces
+            the tenant quota, and reports completion status.
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - agent
+                - prompt
+              properties:
+                agent:
+                  type: string
+                  description: Name of the MaopAgent CR that should execute this task.
+                prompt:
+                  type: string
+                  description: User prompt / instruction for the agent.
+                tenant:
+                  type: string
+                  description: Tenant ID for RLS scoping and quota enforcement.
+                maxTurns:
+                  type: integer
+                  minimum: 1
+                  default: 20
+                  description: Override the agent's default max turns for this task.
+                tools:
+                  type: array
+                  description: Additional MCP tools enabled for this task only.
+                  items:
+                    type: string
+                plugins:
+                  type: array
+                  description: Additional plugins loaded for this task only.
+                  items:
+                    type: string
+                inputs:
+                  type: object
+                  description: Structured inputs passed to the agent.
+                  x-kubernetes-preserve-unknown-fields: true
+                timeoutSeconds:
+                  type: integer
+                  minimum: 0
+                  default: 3600
+                  description: Wall-clock timeout for the task execution.
+                priority:
+                  type: string
+                  enum:
+                    - low
+                    - normal
+                    - high
+                    - urgent
+                  default: normal
+                retryPolicy:
+                  type: object
+                  properties:
+                    maxRetries:
+                      type: integer
+                      minimum: 0
+                      default: 0
+                    backoffSeconds:
+                      type: integer
+                      minimum: 0
+                      default: 30
+            status:
+              type: object
+              description: Observed state reported by the controller.
+              properties:
+                observedGeneration:
+                  type: integer
+                  format: int64
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Running
+                    - Succeeded
+                    - Failed
+                    - Cancelled
+                    - TimedOut
+                    - QuotaExceeded
+                turns:
+                  type: integer
+                  description: Number of orchestration turns consumed.
+                tokensUsed:
+                  type: integer
+                  description: Total tokens consumed by this task.
+                result:
+                  type: string
+                  description: Final result / output of the task.
+                error:
+                  type: string
+                  description: Error message if the task failed.
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                startTime:
+                  type: string
+                  format: date-time
+                completionTime:
+                  type: string
+                  format: date-time
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Agent
+          type: string
+          jsonPath: .spec.agent
+        - name: Tenant
+          type: string
+          jsonPath: .spec.tenant
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Turns
+          type: integer
+          jsonPath: .status.turns
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

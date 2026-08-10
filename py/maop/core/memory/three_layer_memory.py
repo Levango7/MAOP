@@ -1316,6 +1316,78 @@ class ThreeLayerMemory:
             "short_term": self.episodic_stats(),
         }
 
+    # ── F1-03 统一 CRUD 入口（store/retrieve 已存在，补 search/delete） ──
+
+    def search(self, query: str, *, top: int = 10, **kwargs: Any) -> list[dict[str, Any]]:
+        """跨层搜索：合并 short_term + long_term 结果，附带 ``layer`` 字段。
+
+        F1-03 新增：实现 UnifiedMemoryProtocol.search。
+        """
+        merged: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+
+        try:
+            for r in self.short_term_search(query=query, top=top, agent=kwargs.get("agent", "")):
+                if isinstance(r, dict):
+                    rid = str(r.get("id", ""))
+                    if rid and rid in seen_ids:
+                        continue
+                    if rid:
+                        seen_ids.add(rid)
+                    entry = dict(r)
+                    entry.setdefault("layer", "short_term")
+                    merged.append(entry)
+        except Exception as exc:
+            logger.debug("[three_layer_memory] search short_term failed: %s", exc)
+
+        try:
+            for r in self.long_term_search(query, top=top):
+                if isinstance(r, dict):
+                    rid = str(r.get("id", ""))
+                    if rid and rid in seen_ids:
+                        continue
+                    if rid:
+                        seen_ids.add(rid)
+                    entry = dict(r)
+                    entry.setdefault("layer", "long_term")
+                    merged.append(entry)
+        except Exception as exc:
+            logger.debug("[three_layer_memory] search long_term failed: %s", exc)
+
+        return merged[:top] if top > 0 else merged
+
+    def delete(self, layer: str, entry_id: str) -> bool:
+        """按 ID 删除指定层的条目。
+
+        F1-03 新增：实现 UnifiedMemoryProtocol.delete。
+        """
+        normalized = normalize_layer_name(layer)
+        if normalized == "working":
+            self.working_delete(entry_id)
+            return True
+        if normalized == "short_term":
+            try:
+                with self._episodic_connect() as conn:
+                    cur = conn.execute(
+                        "DELETE FROM episodic_memory WHERE id = ?", (entry_id,)
+                    )
+                    return int(cur.rowcount or 0) > 0
+            except Exception as exc:
+                logger.warning("[three_layer_memory] delete short_term failed: %s", exc)
+                return False
+        if normalized == "long_term":
+            vs = self._get_vector_store()
+            delete_fn = getattr(vs, "delete", None)
+            if callable(delete_fn):
+                try:
+                    delete_fn(entry_id)
+                    return True
+                except Exception as exc:
+                    logger.debug("[three_layer_memory] vector delete failed: %s", exc)
+                    return False
+            return False
+        raise ValueError(f"Unknown layer: {layer!r}")
+
 
 # ── Transform Helpers ─────────────────────────────────────────
 

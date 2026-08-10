@@ -240,6 +240,93 @@ def cmd_mcp(args: list[str]) -> Any:
         sys.exit(1)
 
 
+# ── worker subcommand (F1-01 distributed execution) ──────────────
+
+def cmd_worker_start(
+    redis_url: str = "redis://localhost:6379/0",
+    concurrency: int = 4,
+    capabilities: str = "",
+    heartbeat_interval: float = 5.0,
+) -> None:
+    """Start a distributed worker that consumes tasks from Redis Streams.
+
+    F1-01 (分布式执行): the worker registers with the
+    :class:`~maop.core.scheduling.worker_pool.WorkerRegistry`, sends
+    periodic heartbeats, and executes DAG node tasks dispatched by the
+    :class:`~maop.core.scheduling.distributed_scheduler.DistributedScheduler`.
+
+    Parameters
+    ----------
+    redis_url : str
+        Redis connection URL.
+    concurrency : int
+        Maximum concurrent task executions.
+    capabilities : str
+        Comma-separated affinity tags (e.g. ``"gpu,linux"``).
+    heartbeat_interval : float
+        Seconds between heartbeat refreshes.
+    """
+    from maop.worker.distributed_worker import run_worker
+
+    caps = {t.strip() for t in capabilities.split(",") if t.strip()} if capabilities else set()
+    run_worker(
+        redis_url=redis_url,
+        concurrency=concurrency,
+        capabilities=caps,
+        heartbeat_interval=heartbeat_interval,
+    )
+
+
+def cmd_worker(args: list[str]) -> None:
+    """``maop worker <subcommand>`` dispatcher.
+
+    Subcommands
+    -----------
+        start   Start a distributed worker
+    """
+    if not args:
+        import sys as _sys
+        _sys.stderr.write(
+            "usage: maop worker <subcommand>\n"
+            "  start   Start a distributed worker (Redis Streams consumer)\n"
+        )
+        _sys.exit(1)
+
+    sub = args[0]
+    if sub == "start":
+        parser = argparse.ArgumentParser(
+            prog="maop worker start",
+            description="Start a distributed worker that consumes tasks from Redis Streams",
+        )
+        parser.add_argument(
+            "--redis-url", default="redis://localhost:6379/0",
+            help="Redis connection URL (default: redis://localhost:6379/0)",
+        )
+        parser.add_argument(
+            "--concurrency", type=int, default=4,
+            help="Maximum concurrent task executions (default: 4)",
+        )
+        parser.add_argument(
+            "--capabilities", default="",
+            help="Comma-separated affinity tags (e.g. 'gpu,linux')",
+        )
+        parser.add_argument(
+            "--heartbeat-interval", type=float, default=5.0,
+            help="Seconds between heartbeat refreshes (default: 5.0)",
+        )
+        parsed = parser.parse_args(args[1:])
+        cmd_worker_start(
+            redis_url=parsed.redis_url,
+            concurrency=parsed.concurrency,
+            capabilities=parsed.capabilities,
+            heartbeat_interval=parsed.heartbeat_interval,
+        )
+    else:
+        import sys as _sys
+        _sys.stderr.write(f"Unknown worker subcommand: {sub}\n")
+        _sys.exit(1)
+
+
 # ── migrate subcommand ──────────────────────────────────────────
 
 def cmd_migrate_pg_init() -> None:
@@ -308,6 +395,9 @@ def main() -> Any:
         return
     if argv and argv[0] == "migrate":
         cmd_migrate(argv[1:])
+        return
+    if argv and argv[0] == "worker":
+        cmd_worker(argv[1:])
         return
 
     parser = argparse.ArgumentParser(description="MAOP - Agent Orchestration Framework")

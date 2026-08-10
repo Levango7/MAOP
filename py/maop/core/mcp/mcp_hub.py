@@ -853,7 +853,9 @@ class MCPHub:
             self._record_health_check(server_name, healthy=True)
             return True
 
-    async def health_check_all(self) -> dict[str, bool]:
+    async def health_check_all(
+        self, *, timeout_s: float | None = None
+    ) -> dict[str, bool]:
         """Check health of all connected servers in parallel.
 
         P1-§4.3: each server's health check is independent — it only
@@ -862,14 +864,61 @@ class MCPHub:
         ``asyncio.gather``. ``gather`` preserves input order, so
         ``zip(server_ids, outcomes)`` keeps the key↔value mapping
         identical to the previous serial loop.
+
+        F2-03 enhancement — robust parallel health checking:
+
+          - ``return_exceptions=True``: a single server raising (e.g. a
+            transport bug) no longer cancels the whole batch; the
+            exception is recorded as ``unhealthy`` for that server and
+            the remaining checks still complete.
+          - ``timeout_s``: optional per-server wall-clock timeout.  When
+            set, each check is wrapped in ``asyncio.wait_for`` so a
+            hung server cannot stall the entire sweep.  A timeout is
+            treated as unhealthy (not an error) and logged at warning
+            level so operators can spot the slow server.
+
+        Parameters
+        ----------
+        timeout_s : float | None
+            Per-server timeout in seconds.  ``None`` (default) preserves
+            the original unbounded behaviour for backward compatibility.
         """
         server_ids = list(self._transports.keys())
         if not server_ids:
             return {}
+
+        async def _check(sid: str) -> bool:
+            if timeout_s is not None:
+                try:
+                    return await asyncio.wait_for(self.health_check(sid), timeout=timeout_s)
+                except TimeoutError:
+                    logger.warning(
+                        "[mcp_hub] Health check timed out for '%s' after %.1fs",
+                        sid, timeout_s,
+                    )
+                    config = self._configs.get(sid)
+                    server_name = config.name if config is not None else sid
+                    self._record_health_check(server_name, healthy=False)
+                    return False
+            return await self.health_check(sid)
+
         outcomes = await asyncio.gather(
-            *[self.health_check(sid) for sid in server_ids],
+            *[_check(sid) for sid in server_ids],
+            return_exceptions=True,
         )
-        return dict(zip(server_ids, outcomes))
+        result: dict[str, bool] = {}
+        for sid, outcome in zip(server_ids, outcomes):
+            if isinstance(outcome, Exception):
+                logger.warning(
+                    "[mcp_hub] Health check raised for '%s': %s", sid, outcome,
+                )
+                config = self._configs.get(sid)
+                server_name = config.name if config is not None else sid
+                self._record_health_check(server_name, healthy=False)
+                result[sid] = False
+            else:
+                result[sid] = bool(outcome)
+        return result
 
     def list_servers(self) -> list[ServerInfo]:
         """List all registered servers."""

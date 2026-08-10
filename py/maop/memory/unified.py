@@ -66,6 +66,10 @@ class UnifiedMemoryProtocol(Protocol):
     - L3 (long_term): 向量索引 / 知识图谱，永久存储
     - consolidate: L2 → L3 提炼
     - build_context: 跨层组装上下文（用于 LLM 调用）
+
+    F1-03 增强：新增 ``store`` / ``retrieve`` / ``search`` / ``delete``
+    四个统一入口方法，按 ``layer`` 参数自动路由到对应层。``MemoryFacade``
+    直接实现这四个方法并转发到底层，底层实现可选实现（缺失时由 Facade 兜底）。
     """
 
     # ── Layer 1: Working Memory ───────────────────────────────
@@ -178,6 +182,67 @@ class UnifiedMemoryProtocol(Protocol):
 
     def stats(self) -> dict[str, Any]:
         """跨层统计信息汇总。"""
+        ...
+
+    # ── F1-03 统一 CRUD 入口（可选实现） ──────────────────────
+    # 以下四个方法为 F1-03 新增的统一入口。底层实现可选实现；
+    # MemoryFacade 会兜底转发。Protocol 中声明以便 runtime_checkable
+    # 能识别真正实现统一 CRUD 的对象。
+
+    def store(self, layer: str, content: Any, **kwargs: Any) -> str:
+        """统一存储入口，按 ``layer`` 路由到 working/short_term/long_term。
+
+        Parameters
+        ----------
+        layer : str
+            ``"working"`` / ``"short_term"`` / ``"long_term"``（或别名
+            ``"episodic"`` / ``"semantic"``）。
+        content : Any
+            待存储内容。``working`` 层接受任意可序列化对象；
+            ``short_term`` / ``long_term`` 层接受 str。
+        **kwargs : Any
+            透传给对应层方法的额外参数（如 ``key``、``task``、``agent``、
+            ``topic``、``tags``、``metadata``、``doc_id``、``ttl_s``）。
+
+        Returns
+        -------
+        str
+            写入条目的 ID（working 层返回 ``key``，short_term/long_term
+            层返回底层生成的 ID）。
+        """
+        ...
+
+    def retrieve(self, layer: str, query: str = "", top: int = 10, **kwargs: Any) -> Any:
+        """统一检索入口，按 ``layer`` 路由到对应层。
+
+        Returns
+        -------
+        Any
+            ``working`` 层返回单值或 None；``short_term`` / ``long_term``
+            层返回 ``list[dict]``。
+        """
+        ...
+
+    def search(self, query: str, *, top: int = 10, **kwargs: Any) -> list[dict[str, Any]]:
+        """跨层搜索：同时检索 short_term + long_term，合并去重后返回。
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            合并后的搜索结果，每条带 ``layer`` 字段标识来源。
+        """
+        ...
+
+    def delete(self, layer: str, entry_id: str) -> bool:
+        """按 ID 删除指定层的条目。
+
+        Returns
+        -------
+        bool
+            True 表示删除成功，False 表示条目不存在或删除失败。
+            ``working`` 层删除内存中 key；``short_term`` 层删除
+            SQLite 行；``long_term`` 层删除向量索引条目。
+        """
         ...
 
 

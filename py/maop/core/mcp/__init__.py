@@ -1,10 +1,12 @@
 """MCP (Model Context Protocol) subpackage.
 
-MCP 协议相关：hub、传输、适配、缓存、并发、发现、市场、权限、审计。
+MCP 协议相关：hub、传输、适配、缓存、并发、发现、市场、权限、审计、
+工具签名（Ed25519）、工具发现（本地+远程 registry）。
 
 Modules:
     mcp_hub, mcp_hub_types, mcp_hub_transport, mcp_adapter, mcp_cache,
-    mcp_concurrency, mcp_discovery, mcp_marketplace, mcp_permission, mcp_audit
+    mcp_concurrency, mcp_discovery, mcp_marketplace, mcp_permission, mcp_audit,
+    tool_signing, tool_discovery
 """
 from __future__ import annotations
 
@@ -49,6 +51,16 @@ __all__ = [
     "MCPAuditRecord",
     "hash_arguments",
     "MCPAuditLogger",
+    "ToolSigner",
+    "ToolSignatureError",
+    "generate_keypair",
+    "sign_bytes",
+    "verify_bytes",
+    "canonical_bytes",
+    "DiscoverySource",
+    "DiscoveredTool",
+
+    "ToolDiscovery",
 ]
 
 # 符号 → 子模块名映射（惰性加载用，含私有符号）
@@ -96,6 +108,16 @@ _SYMBOL_TO_MODULE: dict[str, str] = {
     "_MCP_AUDIT_DDL": "mcp_audit",
     "hash_arguments": "mcp_audit",
     "MCPAuditLogger": "mcp_audit",
+    "ToolSigner": "tool_signing",
+    "ToolSignatureError": "tool_signing",
+    "generate_keypair": "tool_signing",
+    "sign_bytes": "tool_signing",
+    "verify_bytes": "tool_signing",
+    "canonical_bytes": "tool_signing",
+    "DiscoverySource": "tool_discovery",
+    "DiscoveredTool": "tool_discovery",
+
+    "ToolDiscovery": "tool_discovery",
 }
 
 

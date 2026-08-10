@@ -1,0 +1,98 @@
+# Default values for maop-operator.
+# This file is intentionally documented to guide production overrides.
+
+# ── Operator controller image ──────────────────────────────────────
+image:
+  repository: ghcr.io/maop/operator
+  tag: "4.5.0"
+  pullPolicy: IfNotPresent
+
+# ── Controller runtime settings ────────────────────────────────────
+controller:
+  # Number of controller replicas. >1 enables leader election.
+  replicas: 1
+  # Resources requested/limited for the controller pod.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Max concurrent reconciles per controller instance.
+  maxConcurrentReconciles: 4
+  # Leader-election lease name (only relevant when replicas > 1).
+  leaderElectionName: maop-operator-leader
+  # Log level: debug | info | warn | error
+  logLevel: info
+  # Namespaces to watch. Empty = all namespaces (cluster-scoped).
+  watchNamespaces: []
+  # Enable multi-tenant isolation (RLS + per-tenant quotas + audit).
+  multiTenant:
+    enabled: true
+    # Default per-tenant quotas applied to new MaopAgent CRs.
+    defaultQuotas:
+      maxTokensPerDay: 100000
+      maxRequestsPerDay: 10000
+      maxAgents: 20
+      maxConcurrentTasks: 8
+  # Plugin system configuration.
+  plugins:
+    enabled: true
+    # Comma-separated allowlist of plugin names; empty = all discovered.
+    allowlist: []
+    # Reject plugins whose declared api_version is incompatible.
+    strictApi: true
+
+# ── Service account & RBAC ─────────────────────────────────────────
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+rbac:
+  create: true
+  # If true, grant cluster-scoped permissions (needed when watchNamespaces is empty).
+  clusterScope: true
+
+# ── CRD installation ───────────────────────────────────────────────
+crds:
+  # Whether to install CRDs via this chart. Set to false if CRDs are managed
+  # out-of-band (e.g. by OLM) to avoid upgrade conflicts.
+  install: true
+  # Keep CRDs on chart uninstall (prevents accidental data loss).
+  keep: true
+
+# ── Service exposure (webhook + metrics) ───────────────────────────
+service:
+  enabled: true
+  type: ClusterIP
+  port: 8443
+  metricsPort: 8080
+
+# ── Admission webhook ──────────────────────────────────────────────
+webhook:
+  enabled: true
+  # Mutating + validating webhook for MaopAgent CRs.
+  port: 8443
+  # Certificate managed by cert-manager (recommended) or provided manually.
+  certManager:
+    enabled: true
+
+# ── Pod scheduling ─────────────────────────────────────────────────
+nodeSelector: {}
+tolerations: []
+affinity: {}
+priorityClassName: ""
+
+# ── Observability ──────────────────────────────────────────────────
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    interval: 30s
+
+# ── Image pull secrets ─────────────────────────────────────────────
+imagePullSecrets: []
+#  - name: my-registry-secret
