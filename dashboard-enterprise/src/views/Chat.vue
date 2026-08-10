@@ -90,6 +90,10 @@
         <div class="msg-bubble streaming">
           <div class="msg-text" v-html="renderMarkdown(streamContent)"></div>
           <span class="cursor">▊</span>
+          <div class="stream-meta" v-if="streamTokenCount > 0">
+            <span class="stream-tokens">{{ streamTokenCount }} tokens</span>
+            <span class="stream-speed" v-if="streamSpeed > 0">{{ streamSpeed }} tok/s</span>
+          </div>
         </div>
       </div>
     </div>
@@ -153,6 +157,9 @@ const pendingImage = ref(null);
 const streaming = ref(false);
 let streamAbort = null;
 const streamContent = ref('');
+const streamTokenCount = ref(0);
+const streamSpeed = ref(0);
+let streamStartTime = 0;
 const chatBody = ref(null);
 const inputEl = ref(null);
 
@@ -332,6 +339,9 @@ async function sendMessage(overrideText) {
 
   streaming.value = true;
   streamContent.value = '';
+  streamTokenCount.value = 0;
+  streamSpeed.value = 0;
+  streamStartTime = Date.now();
 
   // Cancel any in-flight stream before starting a new one
   if (streamAbort) { streamAbort.abort(); streamAbort = null; }
@@ -353,6 +363,12 @@ async function sendMessage(overrideText) {
       signal: streamAbort.signal,
       onData: async (fullContent) => {
         streamContent.value = fullContent;
+        // v5.0.0: token count + speed tracking
+        streamTokenCount.value = Math.ceil(fullContent.length / 4);
+        const elapsed = (Date.now() - streamStartTime) / 1000;
+        if (elapsed > 0.1) {
+          streamSpeed.value = Math.round(streamTokenCount.value / elapsed);
+        }
         await nextTick();
         scrollBottom();
       },
@@ -370,13 +386,18 @@ async function sendMessage(overrideText) {
           role: 'assistant',
           content: streamContent.value,
           time: now(),
+          tokens: streamTokenCount.value,
           ...msgMeta,
         });
         streamContent.value = '';
+        streamTokenCount.value = 0;
+        streamSpeed.value = 0;
       },
       onError: (errMsg) => {
         streaming.value = false;
         streamAbort = null;
+        streamTokenCount.value = 0;
+        streamSpeed.value = 0;
         messages.value.push({ role: 'assistant', content: `Error: ${errMsg}`, time: now() });
       },
     });
@@ -436,6 +457,16 @@ onMounted(async () => {
 /* 左右等高由 JS syncHeight 强制控制，CSS 只负责基本布局 */
 .chat-page {
   height: auto !important;
+}
+.stream-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-faint, #999);
+}
+.stream-tokens, .stream-speed {
+  font-variant-numeric: tabular-nums;
 }
 .chat-split {
   display: flex !important;

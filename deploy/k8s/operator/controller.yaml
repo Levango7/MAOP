@@ -135,7 +135,7 @@ spec:
       serviceAccountName: maop-operator
       containers:
         - name: manager
-          image: ghcr.io/maop/operator:4.5.0
+          image: ghcr.io/maop/operator:5.0.0
           imagePullPolicy: IfNotPresent
           args:
             - --leader-elect

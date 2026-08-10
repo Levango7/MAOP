@@ -1,6 +1,6 @@
 {
   "name": "maop-dashboard-enterprise",
-  "version": "4.5.0",
+  "version": "5.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
     "lint": "eslint src/ --ext .js,.vue",
     "lint:fix": "eslint src/ --ext .js,.vue --fix",
     "format": "prettier --write src/",

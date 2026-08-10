@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [5.0.0] — 2026-08-11
+
+### ⚠ Breaking Changes
+
+本版本为 major release，含不兼容变更。详见 [MIGRATION-5.0.md](MIGRATION-5.0.md)。
+
+#### Removed（废弃 ≥ 2 版本的 API）
+
+- **`maop.dashboard.provider.create_app()`**：自 v4.0.0 起废弃，现移除。生产代码应使用 `maop.dashboard.server:app`。该函数创建的隔离 FastAPI app 与主 server 路由冲突，是 v3.x 遗留。
+- **`maop.dashboard.provider._render_html()`**：自 v4.0.0 起废弃，现移除。v3.x 静态 HTML 渲染器，已被 Vue 3 SPA 取代。
+- **`maop_plan.py` legacy keyword routing**：`_fallback_keyword_route()` / `_route_by_keyword()` 及 `_ROUTING_RULES`，自 v4.0.0 起标记为 DEPRECATED fallback，现移除。路由统一走 config routing，miss 时回退到 `"chat"/"claude"` 默认值。
+- **`/api/batch` 端点**：`dashboard/routers/data.py` 中 `deprecated=True` 的批量端点，前端不再调用，现移除。
+
+#### Deferred（推迟到 v6.0.0）
+
+以下 API 虽已废弃，但因引用链复杂（多模块 re-export + 测试 mock.patch 路径绑定），在 v5.0.0 保留并加强 deprecation warning，将在 v6.0.0 移除：
+- `maop.core.agent.delegation.subagent_delegation` re-export shim → `subagent_lifecycle`
+- `maop.core.project_context` / `maop.core.agent.memory_ctx.project_context`
+
+#### Changed（配置收敛）
+
+- **短名环境变量加 DeprecationWarning**：以下短名仍可使用但会发出告警，推荐迁移到规范长名（将在 v6.0.0 移除短名）：
+  - `MAOP_PORT` → `MAOP_DASH_PORT`（dashboard 监听端口）
+  - `MAOP_WORKERS` → `MAOP_DASH_WORKERS`（uvicorn worker 数）
+  - `MAOP_TLS` → `MAOP_TLS_ENABLED`（TLS 开关）
+  - `MAOP_AUTH` → `MAOP_AUTH_ENABLED`（认证开关）
+- **`MAOP_PORT` 不再被直接读取**：`.env.example` 中 `MAOP_PORT` 标记为 deprecated alias，实际端口由 `MAOP_DASH_PORT` 控制。
+
+### Added
+
+- **流式 Agent token 响应增强**：
+  - 后端新增 `/api/stream/agent/{execution_id}` SSE 端点，支持 Agent 执行过程的 token-by-token 流式推送（区别于 `/api/chat/stream` 的 chat 流式，本端点针对 agent 任务执行）。
+  - 前端新增 `useAgentTokenStream.js` composable，封装 EventSource 连接、token 累积、自动重连、AbortController 清理。
+  - `Chat.vue` 集成增强：流式渲染时显示 token 计数与流速指示，`onMeta` 回调接收 `tokens` / `model` / `latency_ms` 元数据。
+- **迁移指南 `MIGRATION-5.0.md`**：覆盖后端 API 变更、配置环境变量迁移、Docker 部署变更、前端无变更说明。
+- **ROADMAP.md 状态更新**：v4.5.0 标记为已发布，v5.0.0 标记为当前版本。
+- **Phase 5b — 发布/性能/合规修复（G-08~G-17）**：
+  - **G-12 SLA/支持体系**：新增 `docs/sla.md`（服务等级协议，含可用性 SLO、延迟 SLO、违约补偿）与 `docs/support-policy.md`（三级支持体系 L1/L2/L3、工单优先级、版本支持策略）。
+  - **G-13 隐私政策/DPA**：新增 `docs/privacy-policy.md`（PIPL/GDPR/CCPA 合规）、`docs/terms-of-service.md`（双版许可条款）、`docs/dpa.md`（数据处理协议）、`docs/cla.md`（贡献者许可协议）。
+  - **G-14 PG 高可用**：新增 `deploy/patroni/`（Patroni 3 节点集群配置 + HAProxy 读写分离 + WAL-G 备份回调）；`docker-compose.prod.yml` 增加 `patroni1/2/3` + `pg-haproxy` 服务（`--profile patroni`）；新增 `docs/runbook.md`（故障切换运维手册）。
+  - **G-16 CI Playwright E2E**：`.github/workflows/ci.yml` 增加 `e2e` job（Playwright + chromium，浏览器缓存，HTML 报告上传）；`dashboard-enterprise/package.json` 增加 `test:e2e` 脚本。
+  - **G-17 K8s Operator 集成测试**：`py/tests/test_k8s_operator.py` 扩展支持 kind/k3s 集成测试（`TestKindIntegration` 启动临时 kind 集群、`TestK3sIntegration` 对接 k3s、`TestStaticCRValidation` 纯 Python CRD schema 验证、`TestKubectlDryRun` 客户端 dry-run）。
+  - **G-09 性能压测**：新增 `py/tests/performance/` 目录，含 `k6_maop_load.js`（k6 JavaScript 压测脚本，自定义指标 snake_case，SLO 门禁对齐 SLA）、`locust_maop_load.py`（Locust Python 压测脚本）、`test_performance_smoke.py`（压测脚本语法/SLO 对齐冒烟测试）；新增 `docs/capacity-planning.md`（容量规划与性能基准）。
+  - **G-10 LDAP 真实环境验证**：新增 `py/tests/test_ldap_real_env.py`（真实 OpenLDAP 联调测试 + Docker OpenLDAP 容器化测试 + mock 单元测试）；新增 `docs/ldap-integration-guide.md`（LDAP/AD 集成指南）。
+
+### Fixed
+
+- 版本号统一：`py/maop/__init__.py`、`py/pyproject.toml`、`py/Dockerfile`、`dashboard-enterprise/package.json`、`dashboard-enterprise/package-lock.json`、`deploy/k8s/operator/Chart.yaml`、`deploy/k8s/operator/values.yaml`、`deploy/k8s/operator/controller.yaml` 全部从 4.5.0 统一到 5.0.0。
+- `.env.example` 与代码实际环境变量对齐审计：补充 `MAOP_DASH_PORT` 规范名说明，标记 `MAOP_PORT` 为 deprecated alias。
+
 ## [4.5.0] — 2026-08-06
 
 ### Added

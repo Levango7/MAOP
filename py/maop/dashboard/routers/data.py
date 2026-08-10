@@ -150,31 +150,6 @@ async def api_optimizer(request: Request) -> dict[str, Any]:
         return {"status": "error", "error": "Optimizer report unavailable"}
 
 
-@router.get("/api/batch", deprecated=True, description="Deprecated: use individual /api/* endpoints. Frontend does not call this.")
-async def api_batch(request: Request, keys: str = Query("")) -> dict[str, Any]:
-    if not keys:
-        return {}
-    requested = [k.strip() for k in keys.split(",") if k.strip()]
-    bridge = get_bridge()
-    dispatch = {
-        "report": lambda: bridge.report(hours=48),
-        "live": lambda: bridge.live(),
-        "failures": lambda: bridge.failures(),
-        "timeseries": lambda: bridge.timeseries(hours=168),
-        "versions": lambda: bridge.versions_check(),
-        "skills": lambda: bridge.skills_list(),
-        "wiki": lambda: bridge.memory_stats(),
-        "prompts": lambda: bridge.prompts_list(),
-        "teams": lambda: bridge.coordination_report(),
-        "guardrails": lambda: bridge.guardrail_report(),
-        "providers": lambda: bridge.providers_report(),
-    }
-    result = {}
-    for key in requested:
-        if key in dispatch:
-            result[key] = await dispatch[key]()
-    return _tenant_filter(result, _request_tenant_id(request))
-
 
 # ── Graph ───────────────────────────────────────────────────────────────
 

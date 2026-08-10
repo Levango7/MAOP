@@ -8,6 +8,10 @@ ENTERPRISE mode because ``server.py`` silently swallowed the ImportError.
 All write operations (grant/revoke) require admin role via ``require_admin``.
 Read operations (list grants, roles, permissions) are available to any
 authenticated user so they can inspect their own permissions.
+
+G-07 security fix: ``tenant_id`` is always taken from the JWT-authenticated
+request state (``request.state.tenant_id``), never from the request body.
+This prevents cross-tenant privilege escalation via forged body parameters.
 """
 
 from __future__ import annotations
@@ -49,14 +53,24 @@ def _get_manager() -> Any:
 class GrantRequest(BaseModel):
     user_id: str
     role: str  # Role enum value: superadmin/admin/operator/viewer
-    tenant_id: str = ""
+    # G-07 fix: tenant_id is intentionally NOT accepted from the body.
+    # It is always taken from the JWT (request.state.tenant_id).
     granted_by: str = ""
 
 
 class RevokeRequest(BaseModel):
     user_id: str
     role: str
-    tenant_id: str = ""
+    # G-07 fix: tenant_id is intentionally NOT accepted from the body.
+
+
+def _tenant_id_from_jwt(request: Request) -> str:
+    """Extract tenant_id from JWT-authenticated request state.
+
+    G-07 fix: NEVER use body.tenant_id — always use the JWT claim.
+    Falls back to empty string for single-tenant deployments.
+    """
+    return getattr(request.state, "tenant_id", "") or ""
 
 
 # ── Endpoints ─────────────────────────────────────────────────────
@@ -67,15 +81,19 @@ class RevokeRequest(BaseModel):
 async def list_grants(
     request: Request,
     user_id: str = "",
-    tenant_id: str = "",
 ) -> dict[str, Any]:
-    """List all RBAC role grants, optionally filtered by user or tenant."""
+    """List all RBAC role grants, optionally filtered by user or tenant.
+
+    G-07: tenant_id is taken from JWT, not from query/body parameters.
+    """
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.RBAC):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="RBAC not available in this edition",
         )
+    # G-07: tenant_id from JWT, not from query param.
+    tenant_id = _tenant_id_from_jwt(request)
     mgr = _get_manager()
     grants = mgr.list_grants(user_id=user_id, tenant_id=tenant_id)
     return {
@@ -105,10 +123,12 @@ async def grant_role(body: GrantRequest, request: Request) -> dict[str, Any]:
             "error": f"Invalid role '{body.role}'. Valid: {[r.value for r in Role]}",
         }
     mgr = _get_manager()
+    # G-07: tenant_id from JWT, not from body.
+    tenant_id = _tenant_id_from_jwt(request)
     grant = mgr.grant_role(
         body.user_id, role,
         granted_by=body.granted_by or _current_user(request),
-        tenant_id=body.tenant_id,
+        tenant_id=tenant_id,
     )
     return {"status": "ok", "grant": grant.model_dump()}
 
@@ -133,7 +153,9 @@ async def revoke_role(body: RevokeRequest, request: Request) -> dict[str, Any]:
             "error": f"Invalid role '{body.role}'. Valid: {[r.value for r in Role]}",
         }
     mgr = _get_manager()
-    revoked = mgr.revoke_role(body.user_id, role, tenant_id=body.tenant_id)
+    # G-07: tenant_id from JWT, not from body.
+    tenant_id = _tenant_id_from_jwt(request)
+    revoked = mgr.revoke_role(body.user_id, role, tenant_id=tenant_id)
     return {"status": "ok" if revoked else "not_found", "revoked": revoked}
 
 

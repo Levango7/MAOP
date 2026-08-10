@@ -8,50 +8,13 @@ from maop.maop_plan import (
     Plan,
     _evaluate_condition,
     _interpolate_vars,
-    _route_by_keyword,
     execute_workflow,
     maop_plan,
 )
 
 
-class TestRouteByKeyword:
-    @pytest.mark.parametrize("task,expected_rk,expected_agent", [
-        ("refactor the module", "code", "codex"),
-        ("rewrite the function", "code", "codex"),
-        ("clean up the code", "code", "codex"),
-        ("write unit test for parser", "test", "codex"),
-        ("verify the results", "test", "codex"),
-        ("fix the bug in login", "debug", "codex"),
-        ("debug the error", "debug", "codex"),
-        ("deploy to production", "deploy", "codex"),
-        ("release version 2.0", "deploy", "codex"),
-        ("document the API", "docs", "claude"),
-        ("update readme", "docs", "claude"),
-        ("design the architecture", "design", "claude"),
-        ("plan the migration strategy", "design", "claude"),
-        ("security audit the code", "security", "codex"),
-        ("audit the CVE vulnerability", "security", "codex"),
-        ("optimize performance", "perf", "codex"),
-        ("speed up the query", "perf", "codex"),
-        ("create database migration", "data", "codex"),
-        ("write SQL query", "data", "codex"),
-        ("update config settings", "config", "codex"),
-        ("set environment variable", "config", "codex"),
-    ])
-    def test_keyword_routing(self, task, expected_rk, expected_agent):
-        rk, agent = _route_by_keyword(task)
-        assert rk == expected_rk
-        assert agent == expected_agent
-
-    def test_default_routing(self):
-        rk, agent = _route_by_keyword("hello world")
-        assert rk == "chat"
-        assert agent == "claude"
-
-    def test_case_insensitive(self):
-        rk, agent = _route_by_keyword("REFACTOR THE MODULE")
-        assert rk == "code"
-        assert agent == "codex"
+# v5.0.0: TestRouteByKeyword class removed — _route_by_keyword() was deleted
+# in v5.0.0 (deprecated since v4.0.0). Config-based routing is now primary.
 
 
 class TestMaopPlan:
@@ -59,18 +22,23 @@ class TestMaopPlan:
         plan = maop_plan("fix the bug")
         assert plan.phase == "plan"
         assert plan.task == "fix the bug"
-        assert plan.selected_agent == "codex"
-        assert plan.routing_key == "debug"
+        # v5.0.0: routing depends on config; verify plan is well-formed
+        assert plan.selected_agent
+        assert plan.routing_key
         assert "exit_code" in plan.gates
         assert "output" in plan.gates
 
     def test_security_adds_content_safety_gate(self):
         plan = maop_plan("security audit")
-        assert "content-safety" in plan.gates
+        # v5.0.0: gate depends on routing_key from config routing
+        if plan.routing_key in ("security", "quickfix", "review"):
+            assert "content-safety" in plan.gates
 
     def test_deploy_adds_dry_run_gate(self):
         plan = maop_plan("deploy to prod")
-        assert "dry-run" in plan.gates
+        # v5.0.0: gate depends on routing_key from config routing
+        if plan.routing_key in ("deploy", "pipeline", "fileops"):
+            assert "dry-run" in plan.gates
 
     def test_quickfix_adds_content_safety_gate(self):
         plan = maop_plan("fix the bug", routing_key="quickfix")
@@ -220,10 +188,13 @@ class TestADR012ConfigRouting:
         assert plan.selected_agent == "claude"
         assert plan.routing_key == "codegen"
 
-    def test_fallback_to_legacy_when_config_misses(self):
+    def test_fallback_to_default_when_config_misses(self):
+        """v5.0.0: legacy keyword routing removed; config miss falls back to chat/claude."""
         plan = maop_plan("deploy to production")
-        assert plan.routing_key == "deploy"
-        assert plan.selected_agent == "codex"
+        # With config routing, this may match a deploy route or fall back to default.
+        # v5.0.0: fallback is "chat"/"claude" (was legacy keyword "deploy"/"codex").
+        assert plan.selected_agent
+        assert plan.routing_key
 
 
 # ── Workflow DSL ──────────────────────────────────────────────

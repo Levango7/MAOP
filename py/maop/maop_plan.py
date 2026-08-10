@@ -3,14 +3,13 @@
 Task planning and routing rule application.: reads agents.yaml, applies routing rules,
 selects agent + routing_key + gates + budget.
 
-ADR-012: Config routing (match regex + keywords) takes precedence over
-hardcoded _ROUTING_RULES. Legacy rules kept as fallback only.
+ADR-012: Config routing (match regex + keywords) is the single source of truth.
+v5.0.0: Legacy hardcoded _ROUTING_RULES keyword fallback removed.
 """
 
 from __future__ import annotations
 
 import logging
-import re
 import time
 from typing import Any
 
@@ -107,35 +106,10 @@ class Plan(BaseModel):
         return 0.6 * priority_score + 0.4 * deadline_score
 
 
-# ── Legacy keyword routing rules (DEPRECATED) ────────────────
-# Kept as fallback when config is None or config routing misses.
-# Will be removed in a future cleanup after config routing is fully validated.
-_ROUTING_RULES: list[tuple[str, str, str]] = [
-    # (regex_pattern, routing_key, default_agent)
-    (r"(?:refactor|rewrite|restructure|clean\s+up)", "code", "codex"),
-    (r"(?:test|spec|verify|assert|unit\s+test|integration)", "test", "codex"),
-    (r"(?:debug|fix|bug|error|exception|traceback|repair)", "debug", "codex"),
-    (r"(?:deploy|release|publish|ship|rollout)", "deploy", "codex"),
-    (r"(?:document|docs?|readme|guide|explain|comment)", "docs", "claude"),
-    (r"(?:design|architect|plan|strategy|blueprint)", "design", "claude"),
-    (r"(?:security|audit|vuln|cve|hardening)", "security", "codex"),
-    (r"(?:performance|optim|speed|benchmark|latency)", "perf", "codex"),
-    (r"(?:data|database|sql|query|migration|schema)", "data", "codex"),
-    (r"(?:config|setting|env|variable|preference)", "config", "codex"),
-]
-
-
-def _route_by_keyword(task: str) -> tuple[str, str]:
-    """DEPRECATED: Fallback keyword matching when config routing is unavailable.
-
-    Will be removed once config routing is fully validated in production.
-    Note: returns legacy routing key space (code/test/debug/...), NOT config space.
-    """
-    task_lower = task.lower()
-    for pattern, routing_key, agent in _ROUTING_RULES:
-        if re.search(pattern, task_lower):
-            return routing_key, agent
-    return "chat", "claude"
+# ── Legacy keyword routing removed in v5.0.0 ──────────────────
+# Config-based routing is now the single source of truth. When config
+# routing misses, we fall back to a conservative default ("chat"/"claude")
+# instead of the removed _route_by_keyword() keyword matcher.
 
 
 def _adaptive_agent_select(route: RouteEntry, rk: str) -> str:
@@ -259,9 +233,9 @@ def maop_plan(
         if config_result:
             rk, agent = config_result
         else:
-            # Priority 3: legacy keyword routing (DEPRECATED — fallback only)
-            rk, agent = _route_by_keyword(task)
-            logger.warning("Route fallback to legacy keyword matching: rk=%s agent=%s — config routing did not match, check agents.yaml routing table", rk, agent)
+            # v5.0.0: legacy keyword routing removed; use conservative default.
+            rk, agent = "chat", "claude"
+            logger.warning("Config routing did not match task, using default: rk=%s agent=%s — check agents.yaml routing table", rk, agent)
 
     # Get agent budget
     agent_cfg = _get_agent_config(agent, config)

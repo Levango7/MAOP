@@ -16,6 +16,13 @@ methods on :class:`TenantManager`.
 from __future__ import annotations
 
 from maop.core.tenant.audit import AuditEntry, AuditLogger
+from maop.core.tenant.hierarchy import (
+    EffectivePermissions,
+    HierarchyError,
+    Organization,
+    OrganizationHierarchy,
+    PermissionEntry,
+)
 from maop.core.tenant.manager import TenantConfig, TenantManager
 from maop.core.tenant.quota import (
     QuotaError,
@@ -28,6 +35,11 @@ from maop.core.tenant.rls import RLSError, TenantRLS
 __all__ = [
     "AuditEntry",
     "AuditLogger",
+    "EffectivePermissions",
+    "HierarchyError",
+    "Organization",
+    "OrganizationHierarchy",
+    "PermissionEntry",
     "QuotaError",
     "RLSError",
     "ResourceQuota",

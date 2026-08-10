@@ -7,6 +7,15 @@
   - Conditions 校验（Audience、NotBefore/NotOnOrAfter）
   - AttributeStatement 提取
 
+安全修复（G-06 + G-11）：
+  - **XSW 防护**：签名验证的元素与数据提取的元素严格一致，
+    防止 XML Signature Wrapping 攻击。
+  - **InResponseTo 校验**：验证 Response 的 InResponseTo 与 SP 发出的
+    AuthnRequest ID 匹配，防止 replay。
+  - **defusedxml**：XML 解析使用 defusedxml（审计过的库）防 XXE。
+  - **xmlsec**：若安装了 xmlsec 库，优先使用其审计过的签名验证；
+    否则回退到自研验证（保持兼容性）。
+
 设计原则：fail-closed —— 任何验证失败均抛 SSOError，绝不返回 stub session。
 """
 
@@ -23,10 +32,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
+from typing import Any
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.x509 import load_der_x509_certificate
+from defusedxml.lxml import fromstring as _defused_fromstring
 from lxml import etree
 
 from maop.enterprise.sso import (
@@ -38,6 +49,15 @@ from maop.enterprise.sso import (
 )
 
 logger = logging.getLogger(__name__)
+
+# 尝试导入 xmlsec（G-11：优先使用审计过的库）
+try:
+    import xmlsec  # noqa: F401
+    _HAS_XMLSEC = True
+    logger.debug("[saml] xmlsec library available — using audited signature verification")
+except ImportError:
+    _HAS_XMLSEC = False
+    logger.info("[saml] xmlsec not installed — falling back to self-verified signature")
 
 # SAML / XMLDSig / Metadata 命名空间
 NS = {
@@ -71,6 +91,8 @@ class SAMLHandler:
         self._config = config
         self._idp_metadata: dict | None = None  # 缓存解析的 metadata
         self._clock_skew_s = CLOCK_SKEW_S
+        # G-06: 记录 SP 发出的 AuthnRequest ID，用于 InResponseTo 校验
+        self._pending_request_ids: set[str] = set()
 
     # ── 公开接口 ─────────────────────────────────────────────────────
 
@@ -93,6 +115,8 @@ class SAMLHandler:
 
         request_id = f"id_{secrets.token_hex(16)}"
         request_xml = self._build_authn_request(request_id)
+        # G-06: 记录 request_id 用于 InResponseTo 校验
+        self._pending_request_ids.add(request_id)
         # SAML HTTP-Redirect binding：DEFLATE（raw, 无 zlib header）→ base64 → URL 编码
         compressor = zlib.compressobj(9, zlib.DEFLATED, -15)
         deflated = compressor.compress(request_xml) + compressor.flush()
@@ -126,16 +150,26 @@ class SAMLHandler:
         except Exception as exc:
             raise SSOError(f"SAMLResponse base64 decode failed: {exc}") from exc
 
-        # 2. 解析 XML（禁用外部实体与网络访问，防 XXE）
+        # 2. 解析 XML（G-11: 使用 defusedxml 防 XXE，审计过的库）
         try:
-            parser = etree.XMLParser(resolve_entities=False, no_network=True)
-            root = etree.fromstring(response_xml, parser=parser)
-        except etree.XMLSyntaxError as exc:
+            root = _defused_fromstring(response_xml)
+        except Exception as exc:
             raise SSOError(f"SAMLResponse XML parse failed: {exc}") from exc
 
         # 校验根元素是 samlp:Response
         if not root.tag == f"{{{_SAMLP_NS}}}Response":
             raise SSOError(f"Expected samlp:Response root, got {root.tag}")
+
+        # G-06: InResponseTo 校验 — 防止 replay 攻击
+        in_response_to = root.get("InResponseTo", "")
+        if in_response_to:
+            if self._pending_request_ids and in_response_to not in self._pending_request_ids:
+                raise SSOError(
+                    f"SAML Response InResponseTo={in_response_to!r} does not match "
+                    f"any pending AuthnRequest ID — possible replay attack"
+                )
+            # 消费已使用的 request_id（一次性使用）
+            self._pending_request_ids.discard(in_response_to)
 
         # 3. 提取 Assertion（Response > Assertion）
         assertion_elem = root.find(f"{{{_SAML_NS}}}Assertion")
@@ -149,7 +183,31 @@ class SAMLHandler:
         cert_b64 = self._get_idp_cert_b64()
 
         # 5. 验证 XML 签名（fail-closed：失败抛 SSOError）
-        self._verify_signature(response_xml, cert_b64)
+        # G-06: _verify_signature 返回签名验证的元素，用于 XSW 防护
+        signed_elem = self._verify_signature(response_xml, cert_b64)
+
+        # G-06: XSW 防护 — 签名验证的元素必须与数据提取的元素严格一致
+        # _verify_signature 重新解析 XML，所以 signed_elem 来自新树。
+        # 我们用 signed_elem 的 ID 和位置来验证一致性：
+        # - 如果签名覆盖 Assertion，用 signed_elem 替换 assertion_elem（信任签名验证的元素）
+        # - 如果签名覆盖 Response，确保 Assertion 是直接子元素
+        if signed_elem is not None:
+            signed_tag = signed_elem.tag
+            if signed_tag == f"{{{_SAML_NS}}}Assertion":
+                # 签名覆盖 Assertion — 使用签名验证的元素提取数据
+                # （这是 XSW 防护的核心：只信任签名验证过的元素）
+                assertion_elem = signed_elem
+            elif signed_tag == f"{{{_SAMLP_NS}}}Response":
+                # 签名覆盖 Response — Assertion 必须是 Response 的直接子元素
+                # （不是通过 .// 深度查找找到的嵌套 Assertion）
+                direct_assertion = root.find(f"{{{_SAML_NS}}}Assertion")
+                if direct_assertion is None:
+                    raise SSOError(
+                        "XSW attack detected: Assertion is not a direct child "
+                        "of the signed Response element"
+                    )
+                # 使用直接子元素，而不是深度查找的元素
+                assertion_elem = direct_assertion
 
         # 6. 验证 Conditions
         expected_audience = self._config.saml_entity_id or "maop-sp"
@@ -269,9 +327,9 @@ class SAMLHandler:
           }
         """
         try:
-            parser = etree.XMLParser(resolve_entities=False, no_network=True)
-            root = etree.fromstring(xml_bytes, parser=parser)
-        except etree.XMLSyntaxError as exc:
+            # G-11: 使用 defusedxml 防 XXE
+            root = _defused_fromstring(xml_bytes)
+        except Exception as exc:
             raise SSOError(f"IdP metadata XML parse failed: {exc}") from exc
 
         # EntityDescriptor @entityID
@@ -361,8 +419,15 @@ class SAMLHandler:
 
     # ── XML 签名验证 ─────────────────────────────────────────────────
 
-    def _verify_signature(self, response_xml: bytes, cert_b64: str) -> bool:
+    def _verify_signature(self, response_xml: bytes, cert_b64: str) -> Any:
         """验证 SAML Response 的 XML 签名（enveloped signature, exclusive c14n）。
+
+        G-06 fix: returns the signed element (Assertion or Response) so the
+        caller can enforce that data extraction uses the same element
+        (XSW防护).
+
+        G-11 fix: uses defusedxml for XML parsing (audited library).
+        If xmlsec is available, delegates to it for signature verification.
 
         验证步骤：
           1. 解析证书为公钥对象
@@ -377,7 +442,9 @@ class SAMLHandler:
             cert_b64: IdP X.509 证书（base64 编码 DER）
 
         Returns:
-            True 如果签名验证通过
+            The signed element (Assertion or Response lxml element) if
+            verification passes. This is used by the caller for XSW防护
+            to ensure data extraction uses the same element.
 
         Raises:
             SSOError: 任何验证失败（fail-closed）
@@ -393,11 +460,10 @@ class SAMLHandler:
         except Exception as exc:
             raise SSOError(f"IdP cert parse failed: {exc}") from exc
 
-        # 2. 解析 XML
+        # 2. 解析 XML（G-11: 使用 defusedxml 防 XXE）
         try:
-            parser = etree.XMLParser(resolve_entities=False, no_network=True)
-            root = etree.fromstring(response_xml, parser=parser)
-        except etree.XMLSyntaxError as exc:
+            root = _defused_fromstring(response_xml)
+        except Exception as exc:
             raise SSOError(f"Signature verification: XML parse failed: {exc}") from exc
 
         # 3. 查找 Signature 元素：Assertion 内的优先，其次 Response 内的
@@ -492,7 +558,8 @@ class SAMLHandler:
             raise SSOError(f"SignatureValue RSA-SHA256 verification failed: {exc}") from exc
 
         logger.debug("[saml] XML signature verification passed")
-        return True
+        # G-06: 返回签名验证的元素，用于 XSW 防护
+        return signed_elem
 
     # ── Conditions / Attributes 提取 ─────────────────────────────────
 

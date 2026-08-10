@@ -168,6 +168,109 @@ async def dag_progress_stream(execution_id: str, request: Request) -> Any:
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
+@router.get("/agent/{execution_id}")
+@handle_api_errors
+async def agent_token_stream(execution_id: str, request: Request) -> Any:
+    """SSE endpoint: stream Agent execution tokens in real-time.
+
+    v5F.0.0: Token-by-token streaming for agent task execution.
+    Distinct from /api/chat/stream (chat LLM streaming) — this endpoint
+    subscribes to a running agent execution's output stream.
+
+    Events:
+      - event: token    (each token/chunk: {"content": "..."})
+      - event: meta     (metadata: {"agent": "...", "model": "...", "tokens": N})
+      - event: done     (completion: {"content_length": N, "tokens": N})
+      - event: error    (error: {"error": "..."})
+
+    Falls back to event bus subscription if no active streamer exists.
+    """
+    _check_sse_token(request)
+    require_admin(request)
+    import asyncio
+    import json
+
+    from maop.core.reliability.streaming import get_stream_registry
+
+    registry = get_stream_registry()
+    streamer = registry.get(execution_id)
+
+    async def generate_from_streamer():
+        """Stream tokens from an active StreamRegistry entry."""
+        full_content: list[str] = []
+        assert streamer is not None  # narrowed by caller; assert for mypy
+        async for chunk in streamer.sse.stream():
+            # Parse existing SSE chunk to extract content
+            for line in chunk.split("\n"):
+                if not line.startswith("data: "):
+                    continue
+                data = line[6:].strip()
+                if data == "[DONE]":
+                    yield f"event: done\ndata: {json.dumps({'content_length': len(''.join(full_content)), 'tokens': len(''.join(full_content)) // 4})}\n\n"
+                    return
+                try:
+                    parsed = json.loads(data)
+                    content = parsed.get("content", "")
+                    if content:
+                        full_content.append(content)
+                        yield f"event: token\ndata: {json.dumps({'content': content})}\n\n"
+                    if parsed.get("error"):
+                        yield f"event: error\ndata: {json.dumps({'error': parsed['error']})}\n\n"
+                        return
+                except Exception:
+                    pass
+        yield f"event: done\ndata: {json.dumps({'content_length': len(''.join(full_content)), 'tokens': len(''.join(full_content)) // 4})}\n\n"
+
+    async def generate_from_event_bus():
+        """Subscribe to agent token events from the event bus."""
+        from maop.core.reliability.event_bus import get_event_bus
+
+        bus = get_event_bus()
+        queue: asyncio.Queue = asyncio.Queue()
+        topic_pattern = f"agent.{execution_id}"
+
+        async def _handler(event):
+            await queue.put(event)
+
+        bus.subscribe(topic_pattern, _handler)
+        try:
+            while True:
+                evt = await asyncio.wait_for(queue.get(), timeout=60)
+                topic = evt.topic
+                data = json.dumps(evt.data)
+                if "token" in topic:
+                    yield f"event: token\ndata: {data}\n\n"
+                elif "meta" in topic:
+                    yield f"event: meta\ndata: {data}\n\n"
+                elif "done" in topic or "complete" in topic:
+                    yield f"event: done\ndata: {data}\n\n"
+                    break
+                elif "error" in topic:
+                    yield f"event: error\ndata: {data}\n\n"
+                    break
+                else:
+                    yield f"event: token\ndata: {data}\n\n"
+        except asyncio.TimeoutError:
+            yield f"event: done\ndata: {json.dumps({'content_length': 0, 'tokens': 0, 'reason': 'timeout'})}\n\n"
+        finally:
+            bus.unsubscribe(topic_pattern, _handler)
+
+    if streamer is not None:
+        generator = generate_from_streamer()
+    else:
+        generator = generate_from_event_bus()
+
+    return StreamingResponse(
+        generator,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/{trace_id}")
 @handle_api_errors
 async def stream_trace(trace_id: str, request: Request) -> Any:

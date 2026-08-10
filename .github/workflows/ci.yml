@@ -133,6 +133,69 @@ jobs:
           name: dashboard-enterprise-dist
           path: dashboard/dist-enterprise/
 
+  # ── Playwright E2E Tests ───────────────────────────────────────
+  # G-16: Real browser E2E tests via Playwright.
+  # Runs against the Vite dev server (webServer config in playwright.config.js).
+  # Browser binaries are cached via the playwright cache dependency path.
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    needs: frontend
+    defaults:
+      run:
+        working-directory: dashboard-enterprise
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: dashboard-enterprise/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system deps (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Run Playwright E2E tests
+        run: npx playwright test --reporter=github,html
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-report
+          path: dashboard-enterprise/playwright-report/
+          retention-days: 14
+
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-traces
+          path: dashboard-enterprise/test-results/
+          retention-days: 7
+
   # ── Migration Tests ─────────────────────────────────────────────
   migrations:
     name: Alembic migrations (upgrade/downgrade)
@@ -194,7 +257,7 @@ jobs:
   docker:
     name: Docker build
     runs-on: ubuntu-latest
-    needs: [test, frontend]
+    needs: [test, frontend, e2e]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     steps:
       - uses: actions/checkout@v4
@@ -326,7 +389,7 @@ jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: [test, frontend]
+    needs: [test, frontend, e2e]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       id-token: write
@@ -354,7 +417,7 @@ jobs:
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: [test, frontend, docker]
+    needs: [test, frontend, e2e, docker]
     if: github.ref == 'refs/heads/develop'
     environment: staging
     steps:

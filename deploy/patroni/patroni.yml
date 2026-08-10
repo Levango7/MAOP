@@ -1,0 +1,175 @@
+# ─────────────────────────────────────────────────────────────────────
+# MAOP Patroni 集群配置 — PostgreSQL 高可用
+#
+# 3 节点 Patroni 集群 + etcd DCS + HAProxy 负载均衡 + pg_rewind 自动修复
+#
+# 启动顺序：
+#   1. etcd（DCS，参见 docker-compose.prod.yml 的 etcd 服务）
+#   2. patroni1 / patroni2 / patroni3（依次启动，自动选举 primary）
+#   3. haproxy（读写分离，primary:5432 + replica:5433）
+#
+# 故障切换流程参见 docs/runbook.md
+# ─────────────────────────────────────────────────────────────────────
+
+scope: maop-cluster
+
+# ── DCS（Distributed Configuration Store）──────────────────────────
+etcd:
+  host: etcd:2379
+
+# ── 周期性 REST API 用于健康检查与 switchover ─────────────────────
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: $(POD_IP):8008
+  authentication:
+    username: patroni
+    password: ${PATRONI_API_PASSWORD:?Set PATRONI_API_PASSWORD}
+
+# ── PostgreSQL 配置 ───────────────────────────────────────────────
+postgresql:
+  bin_dir: /usr/lib/postgresql/16/bin
+  data_dir: /var/lib/postgresql/data
+  config_dir: /var/lib/postgresql/data
+  pgpass: /var/lib/postgresql/.pgpass
+
+  listen: 0.0.0.0:5432
+  connect_address: $(POD_IP):5432
+
+  authentication:
+    replication:
+      username: replicator
+      password: ${PATRONI_REPLICATION_PASSWORD:?Set PATRONI_REPLICATION_PASSWORD}
+    superuser:
+      username: maop
+      password: ${MAOP_PG_PASSWORD:?Set MAOP_PG_PASSWORD}
+    rewind:
+      username: rewinder
+      password: ${PATRONI_REWIND_PASSWORD:?Set PATRONI_REWIND_PASSWORD}
+
+  # ── 数据库参数 ───────────────────────────────────────────────
+  parameters:
+    # 连接
+    max_connections: 200
+    superuser_reserved_connections: 5
+    shared_buffers: 512MB
+    work_mem: 16MB
+    maintenance_work_mem: 128MB
+    effective_cache_size: 2GB
+
+    # WAL（Write-Ahead Log）
+    wal_level: replica
+    wal_buffers: 16MB
+    wal_keep_size: 1024MB          # 保留 1GB WAL 给 replica 追赶
+    max_wal_senders: 10
+    max_replication_slots: 10
+    hot_standby: on
+    hot_standby_feedback: on
+
+    # 检查点
+    checkpoint_timeout: 30s
+    checkpoint_completion_target: 0.9
+    min_wal_size: 1GB
+    max_wal_size: 4GB
+
+    # 自动 vacuum（防止 ID 暴涨与索引膨胀）
+    autovacuum: on
+    autovacuum_max_workers: 5
+    autovacuum_naptime: 30s
+    autovacuum_vacuum_scale_factor: 0.05
+    autovacuum_analyze_scale_factor: 0.025
+
+    # 日志（JSON 格式，便于 ELK 采集）
+    log_destination: jsonlog
+    logging_collector: on
+    log_directory: /var/lib/postgresql/log
+    log_filename: postgresql-%Y-%m-%d.json
+    log_rotation_age: 1d
+    log_rotation_size: 100MB
+    log_min_messages: warning
+    log_min_error_statement: error
+    log_statement: ddl              # 仅记录 DDL
+    log_lock_waits: on
+    log_temp_files: 100MB
+    log_autovacuum_min_duration: 1s
+
+    # 并行查询
+    max_worker_processes: 16
+    max_parallel_workers_per_gather: 4
+    max_parallel_workers: 8
+
+    # MAOP 业务相关
+    # RLS（Row-Level Security）依赖多租户隔离
+    row_security: on
+    # 向量检索（pgvector）相关
+    shared_preload_libraries: vector
+    # 连接池（PgBouncer 在前端，这里直连用于长事务）
+    tcp_keepalives_idle: 60
+    tcp_keepalives_interval: 10
+    tcp_keepalives_count: 3
+
+  # ── 启动时创建的数据库与用户 ─────────────────────────────────
+  initdb:
+    - encoding: UTF8
+    - locale: C.UTF-8
+    - data-checksums   # 启用 checksum，pg_rewind 依赖
+
+  # ── pg_hba.conf（客户端认证）──────────────────────────────────
+  pg_hba:
+    - host all all 0.0.0.0/0 scram-sha-256
+    - host replication replicator 0.0.0.0/0 scram-sha-256
+    - host replication rewinder 0.0.0.0/0 scram-sha-256
+
+  # ── 回调（角色变更时通知）────────────────────────────────────
+  callbacks:
+    on_start: /patroni/hooks/on_start.sh
+    on_stop: /patroni/hooks/on_stop.sh
+    on_role_change: /patroni/hooks/on_role_change.sh
+    on_reload: /patroni/hooks/on_reload.sh
+
+# ── 副本创建与同步 ───────────────────────────────────────────────
+  create_replica_methods:
+    - pg_basebackup
+    - wal_g
+
+  pg_basebackup:
+    checkpoint: fast
+
+  # wal-g 用于 PITR（Point-in-Time Recovery）备份
+  wal_g:
+    command: /patroni/hooks/wal_g_backup.sh
+    restore_command: /patroni/hooks/wal_g_restore.sh
+    archive_timeout: 60
+
+# ── 同步模式（数据零丢失）────────────────────────────────────────
+synchronous_mode: true
+synchronous_mode_strict: false     # primary 找不到 sync standby 时降级为 async（避免卡住）
+maximum_lag_on_failover: 1048576   # 1MB，超过此 lag 不切换
+
+# ── 自动故障切换 ─────────────────────────────────────────────────
+failover:
+  # 切换前等待 replica 追上的最大时间
+  candidate_sync_replica: 1
+  # 切换后等待新 primary 接受连接的超时
+  flaky_check_interval: 30
+  # 检测 primary 故障的超时（无心跳）
+  master_start_timeout: 300
+
+# ── TTL（DCS 中的 leader key 生命周期）──────────────────────────
+ttl: 30
+loop_wait: 10
+retry_timeout: 10
+
+# ── 日志 ─────────────────────────────────────────────────────────
+log:
+  level: INFO
+  format: json
+  dir: /var/lib/postgresql/patroni
+  file_num: 10
+  file_size: 10485760              # 10MB
+
+# ── 标签（用于 HAProxy 路由）────────────────────────────────────
+tags:
+  nofailover: false
+  clonefrom: false
+  noloadbalance: false
+  replicatefrom: ''

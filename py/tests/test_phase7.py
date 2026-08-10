@@ -5,14 +5,12 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
-import pytest
 
 from maop.dashboard import (
     AgentStatus,
     DashboardProvider,
     DashboardState,
-    _render_html,
-    create_app,
+
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -128,50 +126,7 @@ class TestDashboardProvider:
 
 
 # ═══════════════════════════════════════════════════════════════
-# HTML rendering tests
+# v5.0.0: TestRenderHtml and TestCreateApp classes removed.
+# _render_html() and create_app() were deleted in v5.0.0 (deprecated since v4.0.0).
+# Vue 3 SPA is the sole frontend; use maop.dashboard.server:app for production.
 # ═══════════════════════════════════════════════════════════════
-
-class TestRenderHtml:
-    """Test HTML dashboard rendering."""
-
-    def test_empty_state(self):
-        state = DashboardState()
-        with pytest.warns(DeprecationWarning, match="_render_html is deprecated"):
-            html = _render_html(state)
-        assert "MAOP Dashboard" in html
-        assert "Delegations" in html
-
-    def test_with_agents(self):
-        agents = [
-            AgentStatus(name="claude", driver="cli", available=True, breaker_state="closed"),
-            AgentStatus(name="codex", driver="cli", available=False, breaker_state="open"),
-        ]
-        state = DashboardState(agents=agents, total_delegations=42, success_rate=85.5)
-        with pytest.warns(DeprecationWarning, match="_render_html is deprecated"):
-            html = _render_html(state)
-        assert "claude" in html
-        assert "codex" in html
-        assert "42" in html
-        assert "85.5" in html
-
-
-# ═══════════════════════════════════════════════════════════════
-# FastAPI app tests
-# ═══════════════════════════════════════════════════════════════
-
-class TestCreateApp:
-    """Test FastAPI app creation — verifies deprecation warning is emitted."""
-
-    def test_create_app(self):
-        with pytest.warns(DeprecationWarning, match="create_app.*deprecated"):
-            app = create_app()
-        # May be None if FastAPI not installed, but in our env it should work
-        if app is not None:
-            assert app.title == "MAOP Dashboard"
-
-    def test_create_app_with_dir(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            with pytest.warns(DeprecationWarning, match="create_app.*deprecated"):
-                app = create_app(root_dir=tmp)
-            if app is not None:
-                assert app is not None

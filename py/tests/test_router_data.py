@@ -328,24 +328,4 @@ class TestLogs:
         assert data["total"] == 0
 
 
-# ── Batch ─────────────────────────────────────────────────────────
-class TestBatch:
-    def test_batch_empty_keys(self, client, mock_bridge):
-        resp = client.get("/api/batch")
-        assert resp.status_code == 200
-        assert resp.json() == {}
-
-    def test_batch_multiple_keys(self, client, mock_bridge):
-        resp = client.get("/api/batch?keys=report,live,failures")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "report" in data
-        assert "live" in data
-        assert "failures" in data
-
-    def test_batch_unknown_key_ignored(self, client, mock_bridge):
-        resp = client.get("/api/batch?keys=report,unknown_key")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "report" in data
-        assert "unknown_key" not in data
+# v5.0.0: /api/batch endpoint removed (was deprecated). Tests removed.

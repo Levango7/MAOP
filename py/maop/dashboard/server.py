@@ -40,6 +40,35 @@ from fastapi.staticfiles import StaticFiles
 
 logger = logging.getLogger(__name__)
 
+# ── v5.0.0: DeprecationWarning for short-name env vars ────────────
+# Short names still work but emit a warning. Will be removed in v6.0.0.
+# Canonical names: MAOP_DASH_PORT, MAOP_DASH_WORKERS, MAOP_TLS_ENABLED, MAOP_AUTH_ENABLED.
+import warnings as _warnings
+
+
+def _warn_deprecated_env_aliases() -> None:
+    """Emit DeprecationWarning for short-name env vars that have canonical long names."""
+    _aliases: list[tuple[str, str]] = [
+        ("MAOP_WORKERS", "MAOP_DASH_WORKERS"),
+        ("MAOP_TLS", "MAOP_TLS_ENABLED"),
+        ("MAOP_AUTH", "MAOP_AUTH_ENABLED"),
+    ]
+    for short, canonical in _aliases:
+        if short in os.environ and canonical not in os.environ:
+            _warnings.warn(
+                f"{short} is deprecated since v5.0.0; use {canonical} instead. "
+                f"Short name will be removed in v6.0.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            logger.warning(
+                "[config] %s is deprecated; use %s instead (will be removed in v6.0.0).",
+                short, canonical,
+            )
+
+
+_warn_deprecated_env_aliases()
+
 # ── Paths ──────────────────────────────────────────────────────────
 MAOP_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DASH_DIR = MAOP_ROOT / "dashboard"

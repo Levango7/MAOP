@@ -24,6 +24,7 @@ x-logging: &maop_logging
 
 services:
   # ── PostgreSQL (production) ────────────────────────────────────────────────────────────
+  # 单机 PG（默认）：向后兼容，无 HA。适用于小规模部署或 staging。
   postgres:
     image: postgres:16-alpine
     environment:
@@ -54,6 +55,223 @@ services:
           cpus: "0.5"
           memory: 512M
     logging: *maop_logging
+    networks:
+      - maop-net
+
+  # ── Patroni PG 高可用集群（--profile patroni）─────────────────────────────────────────
+  # G-14: 3 节点 Patroni + etcd DCS + HAProxy 读写分离。
+  # 启用：docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile patroni up -d
+  # 配置：deploy/patroni/patroni.yml + deploy/patroni/haproxy.cfg
+  # 故障切换文档：docs/runbook.md
+  # 注意：启用 patroni profile 后，上方单机 postgres 服务仍会启动（兼容），
+  #       但 MAOP 应用应连接 haproxy:5432 而非 postgres:5432。
+  patroni1:
+    image: ghcr.io/zalando/spilo-16:3.2-p3  # Patroni + PG16 多架构镜像
+    container_name: maop-patroni1
+    restart: unless-stopped
+    environment:
+      PATRONI_SCOPE: maop-cluster
+      PATRONI_NAME: patroni1
+      PATRONI_RESTAPI_USERNAME: patroni
+      PATRONI_RESTAPI_PASSWORD: ${PATRONI_API_PASSWORD:?Set PATRONI_API_PASSWORD in .env}
+      PATRONI_SUPERUSER_USERNAME: maop
+      PATRONI_SUPERUSER_PASSWORD: ${MAOP_PG_PASSWORD:?Set MAOP_PG_PASSWORD in .env}
+      PATRONI_REPLICATION_USERNAME: replicator
+      PATRONI_REPLICATION_PASSWORD: ${PATRONI_REPLICATION_PASSWORD:?Set PATRONI_REPLICATION_PASSWORD in .env}
+      PATRONI_rewind_USERNAME: rewinder
+      PATRONI_rewind_PASSWORD: ${PATRONI_REWIND_PASSWORD:?Set PATRONI_REWIND_PASSWORD in .env}
+      PATRONI_ETCD_HOST: etcd:2379
+      PATRONI_POSTGRESQL_DATA_DIR: /home/postgres/pgdata/pgroot/data
+      # MAOP 业务参数
+      PATRONI_POSTGRESQL_shared_preload_libraries: vector
+      PATRONI_POSTGRESQL_max_connections: "200"
+      PATRONI_POSTGRESQL_wal_level: replica
+      PATRONI_POSTGRESQL_hot_standby: "on"
+      PATRONI_POSTGRESQL_max_wal_senders: "10"
+      PATRONI_POSTGRESQL_max_replication_slots: "10"
+      # 同步复制（数据零丢失）
+      PATRONI_synchronous_mode: "true"
+      # 回调通知应用层
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${MAOP_REDIS_PASSWORD:-}
+      ALERTMANAGER_URL: ${ALERTMANAGER_URL:-}
+    volumes:
+      - patroni1-data:/home/postgres/pgdata
+      - ./deploy/patroni/hooks:/patroni/hooks:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8008/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    logging: *maop_logging
+    depends_on:
+      etcd:
+        condition: service_healthy
+    profiles: ["patroni"]
+    networks:
+      - maop-net
+
+  patroni2:
+    image: ghcr.io/zalando/spilo-16:3.2-p3
+    container_name: maop-patroni2
+    restart: unless-stopped
+    environment: &patroni-env
+      PATRONI_SCOPE: maop-cluster
+      PATRONI_NAME: patroni2
+      PATRONI_RESTAPI_USERNAME: patroni
+      PATRONI_RESTAPI_PASSWORD: ${PATRONI_API_PASSWORD:?Set PATRONI_API_PASSWORD in .env}
+      PATRONI_SUPERUSER_USERNAME: maop
+      PATRONI_SUPERUSER_PASSWORD: ${MAOP_PG_PASSWORD:?Set MAOP_PG_PASSWORD in .env}
+      PATRONI_REPLICATION_USERNAME: replicator
+      PATRONI_REPLICATION_PASSWORD: ${PATRONI_REPLICATION_PASSWORD:?Set PATRONI_REPLICATION_PASSWORD in .env}
+      PATRONI_rewind_USERNAME: rewinder
+      PATRONI_rewind_PASSWORD: ${PATRONI_REWIND_PASSWORD:?Set PATRONI_REWIND_PASSWORD in .env}
+      PATRONI_ETCD_HOST: etcd:2379
+      PATRONI_POSTGRESQL_DATA_DIR: /home/postgres/pgdata/pgroot/data
+      PATRONI_POSTGRESQL_shared_preload_libraries: vector
+      PATRONI_POSTGRESQL_max_connections: "200"
+      PATRONI_POSTGRESQL_wal_level: replica
+      PATRONI_POSTGRESQL_hot_standby: "on"
+      PATRONI_POSTGRESQL_max_wal_senders: "10"
+      PATRONI_POSTGRESQL_max_replication_slots: "10"
+      PATRONI_synchronous_mode: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${MAOP_REDIS_PASSWORD:-}
+      ALERTMANAGER_URL: ${ALERTMANAGER_URL:-}
+    volumes:
+      - patroni2-data:/home/postgres/pgdata
+      - ./deploy/patroni/hooks:/patroni/hooks:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8008/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    logging: *maop_logging
+    depends_on:
+      etcd:
+        condition: service_healthy
+    profiles: ["patroni"]
+    networks:
+      - maop-net
+
+  patroni3:
+    image: ghcr.io/zalando/spilo-16:3.2-p3
+    container_name: maop-patroni3
+    restart: unless-stopped
+    environment:
+      <<: *patroni-env
+      PATRONI_NAME: patroni3
+    volumes:
+      - patroni3-data:/home/postgres/pgdata
+      - ./deploy/patroni/hooks:/patroni/hooks:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8008/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    logging: *maop_logging
+    depends_on:
+      etcd:
+        condition: service_healthy
+    profiles: ["patroni"]
+    networks:
+      - maop-net
+
+  # HAProxy 读写分离 + Patroni REST API 代理
+  pg-haproxy:
+    image: haproxy:2.9-alpine
+    container_name: maop-pg-haproxy
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"   # 写（primary）
+      - "127.0.0.1:5433:5433"   # 读（primary + replica，轮询）
+      - "127.0.0.1:7000:7000"   # 统计面板
+    volumes:
+      - ./deploy/patroni/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    healthcheck:
+      test: ["CMD-SHELL", "haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    logging: *maop_logging
+    depends_on:
+      patroni1:
+        condition: service_healthy
+      patroni2:
+        condition: service_healthy
+      patroni3:
+        condition: service_healthy
+    profiles: ["patroni"]
     networks:
       - maop-net
 
@@ -346,6 +564,7 @@ services:
   # ── Optional: etcd distributed KV backend (--profile etcd) ──────
   # 4.7 fix: README documents etcd as an optional KV backend
   # (MAOP_KV_BACKEND=etcd, needs optional `etcd3` dep). Off by default.
+  # G-14: also serves as DCS for Patroni when --profile patroni is enabled.
   etcd:
     image: quay.io/coreos/etcd:v3.5.14  # pinned
     container_name: maop-etcd
@@ -369,6 +588,8 @@ services:
       ETCD_DATA_DIR: /etcd-data
       ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
       ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+      # Patroni 集群选举需要 v2 API（Patroni 兼容 v2 与 v3，默认 v3）
+      ALLOW_NONE_AUTHENTICATION: "yes"
     ports:
       - "127.0.0.1:2379:2379"  # localhost only
     volumes:
@@ -379,7 +600,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
-    profiles: ["etcd"]
+    # 同时支持 etcd KV backend 与 Patroni DCS 两个 profile
+    profiles: ["etcd", "patroni"]
     networks:
       - maop-net
 
@@ -391,6 +613,10 @@ volumes:
   prometheus-data:
   grafana-data:
   pg-data:
+  # G-14: Patroni 集群持久化卷
+  patroni1-data:
+  patroni2-data:
+  patroni3-data:
   redis-data:
   vault-data:
   vault-logs:

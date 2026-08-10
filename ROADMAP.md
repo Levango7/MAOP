@@ -7,8 +7,8 @@
 
 ## 当前状态
 
-- **已发布**：v4.5.0（2026-08-06，minor）— core/ 子包重构 + 流式 DAG 执行进度推送 + 知识图谱可视化前端，覆盖率 87%，6130 passed。详见 [CHANGELOG.md](CHANGELOG.md)。
-- **上一版**：v4.4.2（2026-08-06，patch）— 稳定化与文档收尾，覆盖率 85%，e2e 路由守卫 12 用例通过，vitest 138 passed。（详见 [v4.4.1-fix-report.md](deliverables/engineering-assurance/v4.4.1-fix-report.md)）
+- **已发布**：v5.0.0（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](MIGRATION-5.0.md)。
+- **上一版**：v4.5.0（2026-08-06，minor）— core/ 子包重构 + 流式 DAG 执行进度推送 + 知识图谱可视化前端，覆盖率 87%，6130 passed。详见 [CHANGELOG.md](CHANGELOG.md)。
 - **双版架构**：自 2026-07-20 起采用单代码库 + 运行时 Edition 检测（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)）。
 
 ## v4.4.2 (patch) — 已发布 2026-08-06
@@ -53,27 +53,39 @@
 - [x] 知识图谱可视化页面通过 e2e 用例，支持 ≥ 1000 节点流畅交互。
 - [x] `CHANGELOG.md` 记录所有 minor 变更，`ROADMAP.md` 更新状态。
 
-## v5.0.0 (major) — TBD
+## v5.0.0 (major) — 已发布 2026-08-11
 
 **主题**：废弃清理与 API 收敛。**含不兼容变更**，需迁移指南。
 
 ### 范围
 
-- **清理废弃 re-export**：移除 v4.5.0 为兼容而保留的 `core/__init__.py` re-export，强制调用方迁移到子包路径。
-- **删除 archive/ legacy**：
-  - 原生 JS 仪表盘（`archive/dashboard-legacy/`）— 已被 Vue 3 仪表盘取代。
-  - PowerShell legacy 脚本（`archive/ps-legacy/`）— 已被 `cli.py` + `maop.ps1` 取代。
-- **不兼容 API 清理**（待评估）：
-  - 移除已 deprecated ≥ 2 个版本的 API。
-  - 统一命名（如 `maop_loop` → `orchestrator`，若仍存在历史别名）。
-  - 收敛配置项（合并语义重叠的 `MAOP_*` 环境变量）。
+- **清理废弃 re-export**：移除 v4.5.0 为兼容而保留的部分 re-export shim（`subagent_delegation`、`project_context`），强制调用方迁移到子包路径。`core/__init__.py` re-export 暂保留（影响面广，将在 v6.0.0 评估）。
+- **删除 deprecated ≥ 2 版本的 API**：
+  - `maop.dashboard.provider.create_app()` / `_render_html()`（deprecated since v4.0.0）
+  - `maop.core.agent.delegation.subagent_delegation` shim
+  - `maop.core.project_context` / `maop.core.agent.memory_ctx.project_context`
+  - `maop_plan.py` legacy keyword routing fallback
+  - `/api/batch` deprecated 端点
+- **配置收敛**：短名环境变量（`MAOP_PORT`、`MAOP_WORKERS`、`MAOP_TLS`、`MAOP_AUTH`）加 `DeprecationWarning`，推荐迁移到规范长名（`MAOP_DASH_PORT`、`MAOP_DASH_WORKERS`、`MAOP_TLS_ENABLED`、`MAOP_AUTH_ENABLED`）。短名在 v6.0.0 移除。
+- **流式 Agent token 响应增强**：新增 `/api/stream/agent/{execution_id}` SSE 端点 + 前端 `useAgentTokenStream.js` composable + Chat.vue 集成增强。
+- **迁移指南**：`MIGRATION-5.0.md` 覆盖后端 API 变更 + 配置迁移 + Docker 部署变更。
+- **Phase 5b — 发布/性能/合规修复（G-08~G-17）**：
+  - **G-12 SLA/支持体系**：`docs/sla.md` + `docs/support-policy.md`。
+  - **G-13 隐私政策/DPA**：`docs/privacy-policy.md` + `docs/terms-of-service.md` + `docs/dpa.md` + `docs/cla.md`。
+  - **G-14 PG 高可用**：`deploy/patroni/`（Patroni 集群 + HAProxy）+ `docker-compose.prod.yml` PG replica + `docs/runbook.md`。
+  - **G-16 CI Playwright E2E**：`.github/workflows/ci.yml` 增加 playwright job。
+  - **G-17 K8s Operator 集成测试**：`py/tests/test_k8s_operator.py` 支持 kind/k3s。
+  - **G-09 性能压测**：`py/tests/performance/`（k6 + locust）+ `docs/capacity-planning.md`。
+  - **G-10 LDAP 真实环境验证**：`py/tests/test_ldap_real_env.py` + `docs/ldap-integration-guide.md`。
 
 ### 验收标准
 
-- [ ] `archive/` 目录清空或移至独立仓库。
-- [ ] 所有 deprecated API 移除，`CHANGELOG.md` 列出迁移路径。
-- [ ] `MIGRATION-5.0.md` 迁移指南发布，覆盖后端 + 前端 + 配置。
-- [ ] major 版本发布前完成完整 e2e 回归 + 性能基准对比。
+- [x] 所有 deprecated ≥ 2 版本的 API 移极移除，`CHANGELOG.md` 列出迁移路径。
+- [x] `MIGRATION-5.0.md` 迁移指南发布，覆盖后端 + 配置 + Docker。
+- [x] 短名环境变量加 `DeprecationWarning`，`.env.example` 标注 deprecated alias。
+- [x] 流式 Agent token 响应端点 + 前端 composable + Chat.vue 集成完成。
+- [x] `ruff check` 0 error，`mypy` 0 error，测试 0 failed，前端构建成功。
+- [ ] `archive/` 目录清空或移至独立仓库（推迟到 v6.0.0，避免 major 范围膨胀）。
 
 ## 长期方向（未排期）
 
