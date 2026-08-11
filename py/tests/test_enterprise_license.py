@@ -231,14 +231,19 @@ class TestEditionLicenseIntegration:
         monkeypatch.setenv("MAOP_LICENSE_KEY", "invalid-key")
         assert detect_edition().value == "personal"
 
-    def test_enterprise_without_license_honor_system(self, monkeypatch):
-        """Enterprise package installed but no license = honor system mode."""
+    def test_enterprise_without_license_degrades_to_personal(self, monkeypatch):
+        """Enterprise requested but no license key = degrade to personal (2026-08-11 hardening).
+
+        Pre-hardening behavior was honor-system (package importable = enterprise).
+        That was a trivial bypass (just delete the license file); now a missing
+        key always degrades, regardless of MAOP_ENV.
+        """
         from maop.config.edition import detect_edition, reset_edition
         reset_edition()
         monkeypatch.setenv("MAOP_EDITION", "enterprise")
         monkeypatch.delenv("MAOP_LICENSE_KEY", raising=False)
         monkeypatch.setenv("MAOP_ROOT_DIR", "/nonexistent")
-        assert detect_edition().value == "enterprise"
+        assert detect_edition().value == "personal"
 
     def test_enterprise_with_valid_license(self, monkeypatch):
         """Enterprise with valid license should be enterprise."""

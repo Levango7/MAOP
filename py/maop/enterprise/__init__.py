@@ -1,11 +1,17 @@
 """MAOP Enterprise Extension Package.
 
-When this package is importable, ``config.edition.detect_edition()`` will
-automatically detect ENTERPRISE edition and enable all enterprise features.
+授权模型（2026-08-11 防破解加固):
+  - 本包随 ``maop`` 主包一同发布（单发行 wheel),不再作为独立 wheel.
+  - 包被 importable **不等于** enterprise 激活——必须提供有效 license key.
+  - 真正的 edition 决策完全在 :func:`maop.config.edition.detect_edition`,
+    它会调用 ``maop.enterprise.license.LicenseValidator`` 验证
+    ``MAOP_LICENSE_KEY`` 或 ``data/license.key``.
+  - 原"importable = enterprise"的 honor-system 是公开绕过路径,已移除.
 
-This package is shipped separately as ``maop-enterprise`` (pip install)
-and depends on ``maop`` core.  It MUST NOT be present in the base
-``maop`` package — its mere existence is the edition signal.
+因此本模块的 import 副作用**不再调用** ``set_edition(ENTERPRISE)``,改为
+触发一次 ``detect_edition()``（内部会走 license 校验):
+  - license 有效   → ENTERPRISE
+  - license 缺失/无效 → 静默保持 PERSONAL
 
 Submodules:
   - rbac.py          Role-Based Access Control
@@ -35,16 +41,18 @@ from __future__ import annotations
 
 import logging
 
-from maop.config.edition import Edition, set_edition
+from maop.config.edition import Edition, get_edition
 
 logger = logging.getLogger(__name__)
 
-logger.warning(
-    "[enterprise] MAOP Enterprise extension detected — "
-    "ENTERPRISE edition activated. "
-    "Set MAOP_EDITION=personal to override."
-)
-set_edition(Edition.ENTERPRISE)
+_edition = get_edition()
+if _edition is Edition.ENTERPRISE:
+    logger.info("[enterprise] MAOP Enterprise edition activated (license valid).")
+else:
+    logger.debug(
+        "[enterprise] maop.enterprise importable but no valid license — "
+        "running as personal edition. Set MAOP_LICENSE_KEY to activate."
+    )
 
 __all__: list[str] = [
     "audit",

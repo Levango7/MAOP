@@ -145,42 +145,65 @@ def detect_edition() -> Edition:
     Priority:
       1. Explicitly set via ``set_edition()`` (programmatic override)
       2. ``MAOP_EDITION`` environment variable
-      3. ``maop.enterprise`` package importable → ENTERPRISE (with license check)
+      3. ``maop.enterprise`` package importable → ENTERPRISE candidate (license check required)
       4. Default → PERSONAL
 
-    License validation:
-      When enterprise is detected (via env or package import), the
-      license is validated if ``MAOP_LICENSE_KEY`` is set. If no key
-      is present, honor-system mode applies (enterprise package
-      importable = enterprise). If a key is present but invalid,
-      edition degrades to PERSONAL with an error log.
+    授权模型（2026-08-11 防破解加固）:
+      license 校验在 :func:`_detect_with_license_check` 中执行,缺失/无效降级为 PERSONAL。
+
+    结果缓存（2026-08-11 fix）:
+      首次调用后结果写入 ``_current_edition``,后续直接复用——避免每次
+      get_edition/has_feature/edition_info 都重复触发 license 校验、
+      重复追加 degradation 日志。若需刷新,显式调用 ``reset_edition()``.
     """
+    global _current_edition
     if _current_edition is not None:
         return _current_edition
 
+    # 重入保护 (2026-08-11): import maop.enterprise 时其 __init__ 会调
+    # get_edition(), 而此时 detect_edition() 正在执行、_current_edition 尚未赋值,
+    # 导致重复进入 _detect_with_license_check、重复记录 degradation。
+    # 先占位为 PERSONAL(保守值),检测完成后覆盖为真实结果。
+    _current_edition = Edition.PERSONAL
+
+    result: Edition
     env_val = os.getenv("MAOP_EDITION", "").lower().strip()
     if env_val in ("enterprise", "ent"):
-        return _detect_with_license_check(Edition.ENTERPRISE)
-    if env_val in ("personal", "pers", "community"):
-        return Edition.PERSONAL
+        result = _detect_with_license_check(Edition.ENTERPRISE)
+    elif env_val in ("personal", "pers", "community"):
+        result = Edition.PERSONAL
+    else:
+        try:
+            if _is_enterprise_package_installed():
+                # 二次重入保护: import maop.enterprise 触发递归调用时,
+                # 这里 _current_edition=PERSONAL 占位符已被该调用读到,
+                # 但本次(外层)detect 仍要继续走完 license 校验。
+                result = _detect_with_license_check(Edition.ENTERPRISE)
+            else:
+                result = Edition.PERSONAL
+        except ImportError:
+            logger.debug("Enterprise package not available")
+            result = Edition.PERSONAL
+        except Exception:
+            logger.exception("[edition] Unexpected error during edition detection")
+            result = Edition.PERSONAL
 
-    try:
-        if _is_enterprise_package_installed():
-            return _detect_with_license_check(Edition.ENTERPRISE)
-    except ImportError:
-        logger.debug("Enterprise package not available")
-    except Exception:
-        logger.exception("[edition] Unexpected error during edition detection")
-
-    return Edition.PERSONAL
+    _current_edition = result
+    return result
 
 
 def _detect_with_license_check(requested: Edition) -> Edition:
     """Verify license when enterprise is requested; degrade on failure.
 
-    If no license key is configured, honor-system mode applies
-    (enterprise package importable = enterprise) with a warning.
-    If a key is present but invalid, degrade to PERSONAL.
+    授权模型（2026-08-11 防破解加固）:
+      - 单发行包:maop 与 maop.enterprise 同一 wheel 发布（不再分离）.
+      - 认证才激活:enterprise 功能必须提供有效 license key,否则静默降级为 personal.
+      - 原 honor-system(企业包可导入即放行)视为安全漏洞,已移除.
+
+    行为:
+      - 有有效 license → ENTERPRISE
+      - 无 license 或无效 → PERSONAL(开发模式下日志 INFO,生产 ERROR)
+      - 验证器内部错误 → PERSONAL(保守失败)
     """
     if requested != Edition.ENTERPRISE:
         return requested
@@ -190,18 +213,19 @@ def _detect_with_license_check(requested: Edition) -> Edition:
         validator = LicenseValidator()
         info = validator.validate_from_env()
         if info is None:
-            if os.getenv("MAOP_ENV", "development").lower() == "production":
+            is_prod = os.getenv("MAOP_ENV", "development").lower() == "production"
+            if is_prod:
                 logger.error(
                     "[edition] MAOP_LICENSE_KEY is required in production. "
                     "Degrading to PERSONAL."
                 )
-                record_degradation("license", "enterprise", "personal", "no_license_key_prod")
-                return Edition.PERSONAL
-            logger.warning(
-                "[edition] Honor-system mode (development only). "
-                "Set MAOP_LICENSE_KEY for production."
-            )
-            return Edition.ENTERPRISE
+            else:
+                logger.info(
+                    "[edition] No license key; enterprise features disabled "
+                    "(personal edition). Set MAOP_LICENSE_KEY to activate."
+                )
+            record_degradation("license", "enterprise", "personal", "no_license_key")
+            return Edition.PERSONAL
         # License validated successfully
         logger.info(
             "[edition] Enterprise license valid for '%s' (expires %s)",
@@ -215,10 +239,15 @@ def _detect_with_license_check(requested: Edition) -> Edition:
         record_degradation("license", "enterprise", "personal", "license_invalid")
         return Edition.PERSONAL
     except ImportError:
-        # maop.enterprise.license not available — shouldn't happen since
-        # we only get here when enterprise package is installed, but handle gracefully
-        logger.warning("[edition] License module not available, honoring package detection")
-        return Edition.ENTERPRISE
+        # maop.enterprise.license not available — treat as no license.
+        # Prior behavior honored package detection; that is a bypass path
+        # (patch out the license module to get enterprise) — now degraded.
+        logger.info(
+            "[edition] License validation module unavailable; "
+            "enterprise features disabled (personal edition)."
+        )
+        record_degradation("license", "enterprise", "personal", "no_license_module")
+        return Edition.PERSONAL
     except Exception:
         logger.exception(
             "[edition] Unexpected error during license validation. "

@@ -389,6 +389,10 @@ class TestAuditEvents:
     def test_error_handling(self, client, monkeypatch):
         import maop.dashboard.routers.audit as _audit_mod
         _audit_mod._enterprise_logger = None
+        # 2026-08-11 hardening: 无 license 时 has_feature(AUDIT_LOG) 为 False,
+        # 端点会走 personal 分支(内部自捕获,不返回 error)。本测试意图是验证
+        # enterprise 分支的异常路径,故显式锁定 has_feature=True 而不依赖全局 edition。
+        monkeypatch.setattr(_audit_mod, "has_feature", lambda flag: True)
         monkeypatch.setattr("maop.enterprise.audit.EnterpriseAuditLogger",
                             MagicMock(side_effect=RuntimeError("audit err")))
         data = client.get("/api/audit/events").json()

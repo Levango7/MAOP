@@ -158,3 +158,8 @@ data/jwt_revoked.json
 # -- Agent tool internal --
 .codeartsdoer/
 deliverables/
+
+# Packaged-module runtime DB (orphan artifact, not a seed; VectorStore uses <root>/data/)
+py/maop/data/*.db
+py/maop/data/*.db-shm
+py/maop/data/*.db-wal

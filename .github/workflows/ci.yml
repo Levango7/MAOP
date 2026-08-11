@@ -80,7 +80,13 @@ jobs:
           pip install pytest pytest-asyncio pytest-cov pydantic-settings mmh3 httpx python-multipart aiosqlite pytest-timeout
 
       - name: Run unit tests
-        run: python -m pytest tests/ -q --ignore=tests/contract -m "not slow" --cov=maop --cov-report=xml --cov-report=term-missing --cov-fail-under=80
+        # P0 fix (2026-08-11): 移除 --cov-fail-under(让 pytest 仅对测试成败负责),
+        # 覆盖率门禁交给下一步的 ratchet 脚本,这样测试失败仍然会让 CI 失败,
+        # 覆盖率回归也会让 CI 失败,两者职责清晰。
+        run: python -m pytest tests/ -q --ignore=tests/contract -m "not slow" --cov=maop --cov-report=xml --cov-report=term-missing
+
+      - name: Coverage ratchet gate
+        run: python scripts/check_coverage_ratchet.py
 
       - name: Run edition tests
         run: python -m pytest tests/test_edition.py -v

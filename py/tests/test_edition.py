@@ -69,9 +69,12 @@ class TestDetectEdition:
             assert get_edition() is Edition.PERSONAL
 
     def test_env_enterprise(self):
-        with patch.dict(os.environ, {"MAOP_EDITION": "enterprise"}):
+        # 2026-08-11 hardening: env-only request degrades to PERSONAL without license
+        with patch.dict(os.environ, {"MAOP_EDITION": "enterprise", "MAOP_ROOT_DIR": "/nonexistent"}, clear=False), \
+             patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("MAOP_LICENSE_KEY", None)
             reset_edition()
-            assert get_edition() is Edition.ENTERPRISE
+            assert get_edition() is Edition.PERSONAL
 
     def test_env_personal(self):
         with patch.dict(os.environ, {"MAOP_EDITION": "personal"}):
@@ -79,9 +82,11 @@ class TestDetectEdition:
             assert get_edition() is Edition.PERSONAL
 
     def test_env_ent_alias(self):
-        with patch.dict(os.environ, {"MAOP_EDITION": "ent"}):
+        # 2026-08-11 hardening: env-only request degrades to PERSONAL without license
+        with patch.dict(os.environ, {"MAOP_EDITION": "ent", "MAOP_ROOT_DIR": "/nonexistent"}):
+            os.environ.pop("MAOP_LICENSE_KEY", None)
             reset_edition()
-            assert get_edition() is Edition.ENTERPRISE
+            assert get_edition() is Edition.PERSONAL
 
     def test_env_community_alias(self):
         with patch.dict(os.environ, {"MAOP_EDITION": "community"}):
@@ -253,7 +258,15 @@ class TestDegradation:
     def test_degradation_in_edition_info(self):
         record_degradation("queue", "rabbitmq", "sqlite")
         info = edition_info()
-        assert len(info["degradations"]) == 1
+        # 2026-08-11 hardening: 在无 license 环境下调用 edition_info() 会合法追加
+        # 一条 license→personal 的 degradation(由 detect_edition 触发)。
+        # 该测试应只断言"我们手动记录的那条"确实出现在 info 里。
+        queue_entries = [d for d in info["degradations"] if d["backend"] == "queue"]
+        assert len(queue_entries) == 1
+        assert queue_entries[0]["requested"] == "rabbitmq"
+        assert queue_entries[0]["fallback"] == "sqlite"
+        # license 降级也可能出现(若 _is_enterprise_package_installed 在测试环境中为真)
+        # —— 这是新授权模型的预期行为,不是泄漏。
 
     def test_reset_clears_degradations(self):
         record_degradation("storage", "postgresql", "sqlite")
