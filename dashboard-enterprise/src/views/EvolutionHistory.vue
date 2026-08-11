@@ -1,6 +1,6 @@
 <template>
   <div class="evo-history-page">
-    <PageHeader>
+    <PageHeader v-if="!embedded">
       <span class="subtitle muted">{{ t('view.evolutionHistory.subtitle') }}</span>
       <button class="btn-ghost" :class="{ 'is-busy': loading }" @click="loadAll" :disabled="loading">
         <AppIcon name="refresh" :size="15" />
@@ -123,6 +123,10 @@ import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
 
 const { t } = useI18n();
+// 嵌入式模式: 作为 Evolve.vue 的 history 子视图时, 隐藏自身 PageHeader
+defineProps({
+  embedded: { type: Boolean, default: false },
+});
 const api = useApiStore();
 const toast = useToast();
 

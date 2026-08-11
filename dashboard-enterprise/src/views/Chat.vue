@@ -1,6 +1,6 @@
 <template>
   <div class="chat-page">
-    <PageHeader>
+    <PageHeader v-if="!embedded">
       <button class="refresh-btn" @click="newSession" :title="t('view.chat.newSession')">
         <AppIcon name="plus" :size="15" />
         <span>{{ t('view.chat.newSession') }}</span>
@@ -143,6 +143,10 @@ import DOMPurify from 'dompurify';
 import { useI18n } from '../i18n';
 
 const { t } = useI18n();
+// 嵌入式模式: 作为 Run.vue 的 Tab 子视图时, 隐藏自身 PageHeader
+defineProps({
+  embedded: { type: Boolean, default: false },
+});
 const api = useApiStore();
 // F-P0-3 fix: composable must be called at setup top level, not inside function
 const { stream } = useStreamingFetch();

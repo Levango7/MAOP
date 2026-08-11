@@ -1,21 +1,24 @@
 <template>
   <div class="evolve-page">
     <PageHeader>
+      <Segmented v-model="tab" :options="tabOptions" size="sm" class="evolve-tabs" />
       <span class="status-badge" :class="evolving ? 'running' : 'idle'">
         <AppIcon :name="evolving ? 'refresh' : 'check-circle'" :size="13" :class="{ spinning: evolving }" />
         {{ evolving ? t('view.evolve.evolving') : t('view.evolve.idle') }}
       </span>
-      <button class="btn-action" @click="triggerEvolve" :disabled="evolving">
+      <button class="btn-action" :disabled="evolving" @click="triggerEvolve">
         <AppIcon name="sparkles" :size="15" /> {{ t('view.evolve.trigger') }}
       </button>
     </PageHeader>
 
-    <div class="stats-row">
-      <StatCard :label="t('view.evolve.totalEvolutions')" :value="totalEvolutions" icon="activity" tone="brand" :loading="loading" />
-      <StatCard :label="t('view.evolve.avgSuccessRate')" :value="successRate" unit="%" icon="check-circle" tone="success" :loading="loading" />
-      <StatCard :label="t('view.evolve.agentsTracked')" :value="agentsTracked" icon="bot" tone="info" :loading="loading" />
-      <StatCard :label="t('view.evolve.bestAgent')" :value="bestAgentLabel" icon="star" tone="warn" :loading="loading" />
-    </div>
+    <!-- Tab 容器: main=演化控制台 / history=演化历史(嵌入原 EvolutionHistory 页) -->
+    <div v-show="tab === 'main'" class="evolve-main">
+      <div class="stats-row">
+        <StatCard :label="t('view.evolve.totalEvolutions')" :value="totalEvolutions" icon="activity" tone="brand" :loading="loading" />
+        <StatCard :label="t('view.evolve.avgSuccessRate')" :value="successRate" unit="%" icon="check-circle" tone="success" :loading="loading" />
+        <StatCard :label="t('view.evolve.agentsTracked')" :value="agentsTracked" icon="bot" tone="info" :loading="loading" />
+        <StatCard :label="t('view.evolve.bestAgent')" :value="bestAgentLabel" icon="star" tone="warn" :loading="loading" />
+      </div>
 
     <Card :title="t('view.evolve.statsByAgent')" icon="gauge" :margin-bottom="16">
       <DataTable
@@ -26,7 +29,8 @@
         :loading="loading"
         :empty-text="t('view.evolve.noData')"
       />
-      <EmptyState v-else-if="!loading" icon="gauge" :title="t('view.evolve.noData')"
+      <EmptyState
+v-else-if="!loading" icon="gauge" :title="t('view.evolve.noData')"
                   :description="t('view.evolve.noDataDesc')" />
       <Skeleton v-else height="160px" />
     </Card>
@@ -83,24 +87,32 @@
 
     <div class="two-col">
       <Card :title="t('view.evolve.strategies')" icon="brain" :margin-bottom="16">
-        <EmptyState icon="brain" :title="t('view.evolve.notAvailable')"
+        <EmptyState
+icon="brain" :title="t('view.evolve.notAvailable')"
                     :description="t('view.evolve.strategiesNADesc')" />
       </Card>
       <Card :title="t('view.evolve.history')" icon="scroll" :margin-bottom="16">
-        <EmptyState icon="scroll" :title="t('view.evolve.notAvailable')"
+        <EmptyState
+icon="scroll" :title="t('view.evolve.notAvailable')"
                     :description="t('view.evolve.historyNADesc')" />
       </Card>
     </div>
 
     <Card :title="t('view.evolve.promptHistory')" icon="clipboard" :margin-bottom="16">
-      <EmptyState icon="clipboard" :title="t('view.evolve.notAvailable')"
+      <EmptyState
+icon="clipboard" :title="t('view.evolve.notAvailable')"
                   :description="t('view.evolve.promptNADesc')" />
     </Card>
+    </div><!-- /.evolve-main -->
+
+    <!-- 嵌入演化历史页: 仅当 tab=history 时渲染, 且自动隐藏其内部 PageHeader -->
+    <EvolutionHistory v-if="tab === 'history'" embedded />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { Line } from 'vue-chartjs';
 import {
   Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler, Legend,
@@ -109,11 +121,13 @@ import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
+import Segmented from '../components/Segmented.vue';
 import Card from '../components/Card.vue';
 import StatCard from '../components/StatCard.vue';
 import DataTable from '../components/DataTable.vue';
 import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
+import EvolutionHistory from './EvolutionHistory.vue';
 import { useI18n } from '../i18n';
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler, Legend);
@@ -121,9 +135,29 @@ ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip,
 const { t } = useI18n();
 const api = useApiStore();
 const toast = useToast();
+const route = useRoute();
+const router = useRouter();
 const loading = ref(false);
 const evolving = ref(false);
 const byAgent = ref([]);
+
+// ── Tab 状态: main(演化控制台) / history(嵌入演化历史页) ──
+// 惰性容错: 测试环境未挂 router 时, route.query 可能不存在 → 默认 'main'
+const VALID_TABS = new Set(['main', 'history']);
+const tab = ref(VALID_TABS.has(route?.query?.tab) ? route.query.tab : 'main');
+const tabOptions = computed(() => [
+  { value: 'main', label: t('view.evolve.tabMain'), icon: 'sparkles' },
+  { value: 'history', label: t('view.evolve.tabHistory'), icon: 'scroll' },
+]);
+watch(tab, (v) => {
+  if (!VALID_TABS.has(v)) return;
+  if (route?.query && route.query.tab !== v) {
+    router.replace({ query: { ...route.query, tab: v } }).catch(() => {});
+  }
+});
+watch(() => route?.query?.tab, (v) => {
+  if (VALID_TABS.has(v) && v !== tab.value) tab.value = v;
+});
 
 // P2-12: Evolution metrics state
 const timeseries = ref([]);

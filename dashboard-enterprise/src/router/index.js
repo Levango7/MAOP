@@ -3,12 +3,15 @@ import { useEditionStore } from '../stores/edition.js';
 
 const routes = [
   { path: '/', name: 'overview', component: () => import('../views/Overview.vue') },
-  { path: '/control', name: 'control', component: () => import('../views/ControlPanel.vue') },
-  { path: '/chat', name: 'chat', component: () => import('../views/Chat.vue') },
+  // 迭代 A (RFC-001): /run 合并 Control + Chat; /evolve 吸收 evolution-history
+  { path: '/run', name: 'run', component: () => import('../views/Run.vue') },
+  // 旧深链 301 重定向,保留书签/外部链接可用
+  { path: '/control', redirect: { path: '/run', query: { tab: 'structured' } } },
+  { path: '/chat', redirect: { path: '/run', query: { tab: 'chat' } } },
+  { path: '/evolution-history', redirect: { path: '/evolve', query: { tab: 'history' } } },
   { path: '/agents', name: 'agents', component: () => import('../views/Agents.vue') },
   { path: '/memory', name: 'memory', component: () => import('../views/ThreeLayerMemory.vue') },
   { path: '/evolve', name: 'evolve', component: () => import('../views/Evolve.vue') },
-  { path: '/evolution-history', name: 'evolution-history', component: () => import('../views/EvolutionHistory.vue') },
   { path: '/search', name: 'search', component: () => import('../views/Search.vue') },
   { path: '/vector', name: 'vector', component: () => import('../views/VectorSearch.vue') },
   { path: '/models', name: 'models', component: () => import('../views/Models.vue') },

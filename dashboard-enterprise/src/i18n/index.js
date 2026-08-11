@@ -23,6 +23,15 @@ import { useUiStore } from '../stores/ui.js';
 export const coreMessages = {
   en: {
     // ── Sidebar navigation ──────────────────────────────────────
+    // 2026-08-12 (RFC-001 迭代 A): 6-group journey-based IA
+    'nav.workbench': 'Workbench',
+    'nav.build': 'Build',
+    'nav.assets': 'Data Assets',
+    'nav.observe': 'Observe',
+    'nav.govern': 'Govern',
+    'nav.system': 'System',
+    'nav.run': 'Run',
+    // Legacy keys kept — old deep links still resolve via router redirects
     'nav.core': 'Core',
     'nav.searchTools': 'Search & Tools',
     'nav.ops': 'Ops',
@@ -47,6 +56,9 @@ export const coreMessages = {
     'nav.settings': 'Settings',
     // ── Page subtitles (one-line description under each page title) ──
     'nav.overview.subtitle': 'Platform-wide metrics and health at a glance',
+    'nav.run.subtitle': 'Run tasks and converse with agents',
+    'view.run.tabStructured': 'Structured',
+    'view.run.tabChat': 'Chat',
     'nav.control.subtitle': 'Start, stop and maintain platform services',
     'nav.chat.subtitle': 'Converse with agents and inspect sessions',
     'nav.agents.subtitle': 'Discovered and registered agent CLIs',
@@ -197,6 +209,15 @@ export const coreMessages = {
   },
 
   zh: {
+    // 2026-08-12 (RFC-001 迭代 A): 6 分组信息架构
+    'nav.workbench': '工作台',
+    'nav.build': '构建',
+    'nav.assets': '数据资产',
+    'nav.observe': '监控',
+    'nav.govern': '治理',
+    'nav.system': '系统',
+    'nav.run': '运行',
+    // 旧键保留——旧深链经路由重定向继续可用
     'nav.core': '核心',
     'nav.searchTools': '搜索与工具',
     'nav.ops': '运维',
@@ -221,6 +242,9 @@ export const coreMessages = {
     'nav.settings': '设置',
     // ── 页面副标题（页面标题下方的一行说明） ──
     'nav.overview.subtitle': '平台整体指标与健康状态一览',
+    'nav.run.subtitle': '运行任务并与智能体对话',
+    'view.run.tabStructured': '结构化',
+    'view.run.tabChat': '对话',
     'nav.control.subtitle': '启停与维护平台服务',
     'nav.chat.subtitle': '与智能体对话并查看会话',
     'nav.agents.subtitle': '已发现与已注册的智能体 CLI',

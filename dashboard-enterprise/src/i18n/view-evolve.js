@@ -1,6 +1,8 @@
 export const messages = {
   en: {
     'view.evolve.title': 'Self-Evolution',
+    'view.evolve.tabMain': 'Evolution',
+    'view.evolve.tabHistory': 'History',
     'view.evolve.evolving': 'Evolving…',
     'view.evolve.idle': 'Idle',
     'view.evolve.trigger': 'Trigger Evolution',
@@ -44,6 +46,8 @@ export const messages = {
   },
   zh: {
     'view.evolve.title': '自我演进',
+    'view.evolve.tabMain': '演化',
+    'view.evolve.tabHistory': '历史',
     'view.evolve.evolving': '演进中…',
     'view.evolve.idle': '空闲',
     'view.evolve.trigger': '触发演进',

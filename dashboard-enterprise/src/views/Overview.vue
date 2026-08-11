@@ -7,7 +7,7 @@
       <span v-if="lastUpdated" class="freshness" :class="{ stale: isStale }">
         {{ t('view.overview.updated') }} {{ freshnessText }}
       </span>
-      <button class="refresh-btn" :class="{ 'pulse-once': pulsing }" @click="refresh" :disabled="loading" :title="t('common.refresh')">
+      <button class="refresh-btn" :class="{ 'pulse-once': pulsing }" :disabled="loading" :title="t('common.refresh')" @click="refresh">
         <AppIcon name="refresh" :size="15" />
         <span>{{ t('common.refresh') }}</span>
       </button>
@@ -19,6 +19,26 @@
       <template #actions><button class="link-btn" @click="refresh">{{ t('common.retry') }}</button></template>
     </Card>
 
+    <!-- ── 层 1: Hero strip — 健康结论 + 关键运行态,一屏之内给答案 ── -->
+    <div v-if="!error" class="ov-hero" :class="heroTone">
+      <span class="ov-hero__dot" aria-hidden="true"></span>
+      <span class="ov-hero__status">{{ heroLabel }}</span>
+      <span class="ov-hero__sep" aria-hidden="true"></span>
+      <span class="ov-hero__kpi">
+        {{ data?.agents_total ?? '—' }} {{ t('view.overview.statActiveAgents').toLowerCase() }}
+        · {{ data?.delegations_total ?? '—' }} {{ t('view.overview.heroTasksRunning') }}
+      </span>
+      <span class="ov-hero__fresh muted">{{ t('view.overview.updated') }} {{ freshnessText }}</span>
+    </div>
+
+    <!-- ── 层 2: Action 磁贴 — 引导用户"下一步做什么" ── -->
+    <nav class="ov-actions" aria-label="Quick actions">
+      <router-link v-for="a in quickActions" :key="a.to" :to="a.to" class="ov-action">
+        <AppIcon :name="a.icon" :size="16" class="ov-action__icon" />
+        <span class="ov-action__label">{{ t(a.label) }}</span>
+      </router-link>
+    </nav>
+
     <!-- KPI grid -->
     <div class="stats-grid">
       <StatCard
@@ -28,29 +48,15 @@
       />
     </div>
 
-    <!-- Activity timeline (replaces redundant status-strip) -->
-    <div class="activity-feed" v-if="!error">
-      <div class="activity-item" v-for="(ev, i) in recentEvents" :key="i">
-        <div class="activity-dot"></div>
-        <div class="activity-body">
-          <div class="activity-header">
-            <span class="activity-title">{{ ev.title }}</span>
-            <span class="activity-time">{{ ev.time }}</span>
-          </div>
-          <p class="activity-desc">{{ ev.desc }}</p>
-        </div>
-      </div>
-    </div>
-
     <!-- Main rows -->
-    <div class="row" v-if="!error">
+    <div v-if="!error" class="row">
       <!-- System health -->
       <Card icon="cpu" :title="t('view.overview.systemHealth')" :badge="healthScore + '%'" :badge-tone="healthTone">
         <div v-if="loading" class="health-skel">
           <Skeleton v-for="n in 4" :key="n" height="14px" />
         </div>
         <template v-else>
-          <div class="metric" v-for="m in healthMetrics" :key="m.label">
+          <div v-for="m in healthMetrics" :key="m.label" class="metric">
             <div class="metric__head">
               <span class="metric__label">{{ m.label }}</span>
               <span class="metric__val">{{ m.display }}</span>
@@ -74,8 +80,8 @@
       </Card>
     </div>
 
-    <!-- Chart + System info -->
-    <div class="row" v-if="!error">
+    <!-- ── 层 3: 图表 (2/3) + 活动流 (1/3) 并排 — 上下文不再独占整行 ── -->
+    <div v-if="!error" class="ov-split">
       <Card icon="activity" :title="t('view.overview.throughput')" class="chart-card">
         <div class="chart-box">
           <Line v-if="chartData.labels.length" :data="chartData" :options="chartOptions" />
@@ -83,6 +89,22 @@
         </div>
       </Card>
 
+      <div class="activity-feed">
+        <div v-for="(ev, i) in recentEvents" :key="i" class="activity-item">
+          <div class="activity-dot"></div>
+          <div class="activity-body">
+            <div class="activity-header">
+              <span class="activity-title">{{ ev.title }}</span>
+              <span class="activity-time">{{ ev.time }}</span>
+            </div>
+            <p class="activity-desc">{{ ev.desc }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- System info -->
+    <div v-if="!error" class="row">
       <Card icon="server" :title="t('view.overview.runtime')">
         <div v-if="loading" class="info-skel"><Skeleton v-for="n in 5" :key="n" height="14px" /></div>
         <dl v-else class="info-list">
@@ -99,7 +121,7 @@
     </div>
 
     <!-- Failure ranking -->
-    <div class="row" v-if="!error && (data?.fail_ranking || []).length">
+    <div v-if="!error && (data?.fail_ranking || []).length" class="row">
       <Card icon="alert-triangle" :title="t('view.overview.failureRanking')" badge-tone="fail" :badge="(data.fail_ranking || []).length + ''">
         <DataTable
           :rows="data.fail_ranking"
@@ -113,7 +135,7 @@
 
     <!-- Degradations (real, from edition store) -->
     <Card v-if="edition.hasDegradations" icon="alert-triangle" :title="t('view.overview.activeDegradations')" badge-tone="warn">
-      <div class="degrade" v-for="d in edition.degradations" :key="d.backend">
+      <div v-for="d in edition.degradations" :key="d.backend" class="degrade">
         <Badge tone="warn">{{ d.backend }}</Badge>
         <span class="muted">{{ d.requested }} → {{ d.fallback }}</span>
         <span class="faint">· {{ d.reason }}</span>
@@ -150,7 +172,6 @@ let refreshTimer = null;
 
 // Activity timeline data — loaded from /api/info/activity
 const recentEvents = ref([]);
-const activityError = ref('');
 
 async function loadActivity() {
   try {
@@ -176,6 +197,31 @@ const freshnessText = computed(() => {
   if (s < 3600) return Math.floor(s / 60) + 'm ago';
   return Math.floor(s / 3600) + 'h ago';
 });
+
+// ── Hero strip: 健康结论 + 关键运行态 ──
+// 结论来自 degradation 日志 + success_rate,与 edition.degradations 联动
+const heroTone = computed(() => {
+  if (error.value) return 'ov-hero--down';
+  if (edition.hasDegradations && edition.degradations.length > 0) return 'ov-hero--degraded';
+  const sr = data.value?.success_rate;
+  if (sr !== null && sr !== undefined && sr < 80) return 'ov-hero--degraded';
+  return 'ov-hero--healthy';
+});
+const heroLabel = computed(() => {
+  switch (heroTone.value) {
+    case 'ov-hero--down': return t('view.overview.heroDown');
+    case 'ov-hero--degraded': return t('view.overview.heroDegraded');
+    default: return t('view.overview.heroHealthy');
+  }
+});
+
+// ── Quick actions: 4 个最高频入口,与 topbar 动作一一对应 ──
+const quickActions = [
+  { to: '/run?tab=structured', label: 'view.overview.actionRun', icon: 'play' },
+  { to: '/run?tab=chat', label: 'view.overview.actionChat', icon: 'chat' },
+  { to: '/agents', label: 'view.overview.actionAgents', icon: 'bot' },
+  { to: '/logs', label: 'view.overview.actionLogs', icon: 'scroll' },
+];
 
 // Dedup palette: 10 visually distinct accent colors, one per KPI, so the
 // colored left borders never repeat within the grid. Values reference theme

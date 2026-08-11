@@ -9,8 +9,8 @@ test.describe('MAOP Dashboard Core Flows', () => {
 
   test('navigation to all major routes works', async ({ page }) => {
     const routes = [
-      '/overview',
-      '/chat',
+      '/',
+      '/run',
       '/agents',
       '/models',
       '/memory',
@@ -22,6 +22,16 @@ test.describe('MAOP Dashboard Core Flows', () => {
       await page.goto(route)
       await expect(page.locator('body')).not.toBeEmpty()
     }
+  })
+
+  test('legacy routes redirect to merged pages', async ({ page }) => {
+    // RFC-001 迭代 A: /control /chat /evolution-history → /run 或 /evolve
+    await page.goto('/control')
+    await expect(page).toHaveURL(/\/run\?tab=structured/)
+    await page.goto('/chat')
+    await expect(page).toHaveURL(/\/run\?tab=chat/)
+    await page.goto('/evolution-history')
+    await expect(page).toHaveURL(/\/evolve\?tab=history/)
   })
 
   test('login page renders when auth enabled', async ({ page }) => {

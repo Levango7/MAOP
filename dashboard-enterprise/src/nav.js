@@ -10,33 +10,38 @@
  * page title. Keep these keys in src/i18n/index.js (coreMessages).
  */
 export const nav = [
-  { section: 'nav.core' },
+  // ── 迭代 A (RFC-001): 按用户旅程重排。合并 Control+Chat→/run,
+  // Evolve+EvolutionHistory→/evolve。旧路由在 router/index.js 做 301 重定向。
+  { section: 'nav.workbench' },
   { to: '/', label: 'nav.overview', icon: 'overview', subtitle: 'nav.overview.subtitle' },
-  { to: '/control', label: 'nav.control', icon: 'play', subtitle: 'nav.control.subtitle' },
-  { to: '/chat', label: 'nav.chat', icon: 'chat', subtitle: 'nav.chat.subtitle' },
+  { to: '/monitor', label: 'nav.monitor', icon: 'activity', subtitle: 'nav.monitor.subtitle' },
+
+  { section: 'nav.build' },
+  { to: '/run', label: 'nav.run', icon: 'play', subtitle: 'nav.run.subtitle' },
   { to: '/agents', label: 'nav.agents', icon: 'bot', subtitle: 'nav.agents.subtitle' },
+  { to: '/evolve', label: 'nav.evolve', icon: 'sparkles', subtitle: 'nav.evolve.subtitle', matchPaths: ['/evolution-history'] },
+
+  { section: 'nav.assets' },
   { to: '/memory', label: 'nav.memory', icon: 'brain', subtitle: 'nav.memory.subtitle' },
-  { to: '/evolve', label: 'nav.evolve', icon: 'sparkles', subtitle: 'nav.evolve.subtitle' },
-  { to: '/evolution-history', label: 'nav.evolutionHistory', icon: 'beaker', subtitle: 'nav.evolutionHistory.subtitle' },
-  { section: 'nav.searchTools' },
+  { to: '/knowledge-graph', label: 'nav.knowledgeGraph', icon: 'share2', subtitle: 'nav.knowledgeGraph.subtitle' },
   { to: '/search', label: 'nav.search', icon: 'search', subtitle: 'nav.search.subtitle' },
   { to: '/vector', label: 'nav.vector', icon: 'box', subtitle: 'nav.vector.subtitle' },
-  // v4.5.0: Knowledge graph visualization entry (spec 5.3.1 rule 2)
-  { to: '/knowledge-graph', label: 'nav.knowledgeGraph', icon: 'share2', subtitle: 'nav.knowledgeGraph.subtitle' },
   { to: '/tools', label: 'nav.tools', icon: 'wrench', subtitle: 'nav.tools.subtitle' },
-  { to: '/models', label: 'nav.models', icon: 'gauge', subtitle: 'nav.models.subtitle' },
-  { section: 'nav.ops' },
-  { to: '/logs', label: 'nav.logs', icon: 'scroll', subtitle: 'nav.logs.subtitle' },
-  { to: '/monitor', label: 'nav.monitor', icon: 'activity', subtitle: 'nav.monitor.subtitle' },
+
+  { section: 'nav.observe' },
   { to: '/observability', label: 'nav.observability', icon: 'share2', subtitle: 'nav.observability.subtitle' },
+  { to: '/logs', label: 'nav.logs', icon: 'scroll', subtitle: 'nav.logs.subtitle' },
   { to: '/cost', label: 'nav.cost', icon: 'dollar', subtitle: 'nav.cost.subtitle' },
-  { section: 'nav.enterprise' },
+
+  { section: 'nav.govern' },
+  { to: '/models', label: 'nav.models', icon: 'gauge', subtitle: 'nav.models.subtitle' },
   { to: '/audit', label: 'nav.audit', icon: 'clipboard', subtitle: 'nav.audit.subtitle' },
   { to: '/rbac', label: 'nav.rbac', icon: 'shield', subtitle: 'nav.rbac.subtitle' },
   { to: '/tenants', label: 'nav.tenants', icon: 'building', subtitle: 'nav.tenants.subtitle' },
   { to: '/users', label: 'nav.users', icon: 'user', subtitle: 'nav.users.subtitle' },
+
+  { section: 'nav.system' },
   { to: '/settings', label: 'nav.settings', icon: 'gear', subtitle: 'nav.settings.subtitle' },
-  { section: 'nav.help' },
   { to: '/docs', label: 'nav.docs', icon: 'book-open', subtitle: 'nav.docs.subtitle' },
 ];
 

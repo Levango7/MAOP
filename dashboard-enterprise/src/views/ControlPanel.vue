@@ -1,6 +1,7 @@
 <template>
   <div class="control-panel">
-    <PageHeader>
+    <!-- 嵌入式(被 Run.vue 托管 Tab)时隐藏自身页头,避免双层标题 -->
+    <PageHeader v-if="!embedded">
       <button class="btn-refresh" @click="refreshAll" :disabled="loading">
         <AppIcon name="refresh" :size="15" :class="{ spinning: loading }" /> {{ t('common.refresh') }}
       </button>
@@ -94,6 +95,10 @@ import EmptyState from '../components/EmptyState.vue';
 import { useI18n } from '../i18n';
 
 const { t } = useI18n();
+// 嵌入式模式: 作为 Run.vue 的 Tab 子视图时, 隐藏自身 PageHeader
+defineProps({
+  embedded: { type: Boolean, default: false },
+});
 const api = useApiStore();
 const toast = useToast();
 const loading = ref(false);
