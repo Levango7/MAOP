@@ -4,17 +4,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# P2-8: 使用 skipif 替代 --ignore 机制，当 pipeline_core 不可用时跳过整个文件。
+# 这样 `pytest tests/` 可以直接运行，无需 CI 传入 --ignore 参数。
+try:
+    import pipeline_core  # noqa: F401
+    HAS_PIPELINE_CORE = True
+except ImportError:
+    HAS_PIPELINE_CORE = False
 
-def _doc_pipeline_available() -> bool:
-    try:
-        from maop.delegate.doc_pipeline_adapter import _resolve_doc_pipeline_root
-        root = _resolve_doc_pipeline_root()
-        return root.exists() and (root / "pipeline_core" / "__init__.py").exists()
-    except Exception:
-        return False
-
-
-_DOC_PIPELINE_AVAILABLE = _doc_pipeline_available()
+pytestmark = pytest.mark.skipif(
+    not HAS_PIPELINE_CORE,
+    reason="pipeline_core module not available (external dependency)",
+)
 
 
 # ── Adapter import & path resolution ──────────────────────
@@ -28,7 +29,7 @@ class TestAdapterImport:
         assert callable(run_plan)
         assert callable(get_status)
 
-    @pytest.mark.skipif(not _DOC_PIPELINE_AVAILABLE, reason="doc-pipeline project not available")
+
     def test_resolve_doc_pipeline_root(self):
         from maop.delegate.doc_pipeline_adapter import _resolve_doc_pipeline_root
         root = _resolve_doc_pipeline_root()

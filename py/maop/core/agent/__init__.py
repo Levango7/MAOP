@@ -21,6 +21,7 @@ Note:
 from __future__ import annotations
 
 import importlib
+import warnings
 
 __all__ = [
     "logger",
@@ -428,5 +429,16 @@ def __getattr__(name: str):
         mod = importlib.import_module(f".{mod_name}", __name__)
         value = getattr(mod, name)
         globals()[name] = value  # 缓存，下次直接访问
+        # P2-5: ProjectContext 从顶层包 re-export 已废弃（v5.0.0 起），
+        # 应直接从 maop.core.agent.memory_ctx.project_context 导入。
+        # 计划在 v6.0.0 移除 re-export。因 globals() 缓存，仅首次访问时触发。
+        if name == "ProjectContext":
+            warnings.warn(
+                "Importing ProjectContext from maop.core.agent is deprecated since v5.0.0 "
+                "and will be removed in v6.0.0. "
+                "Use 'from maop.core.agent.memory_ctx.project_context import ProjectContext' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

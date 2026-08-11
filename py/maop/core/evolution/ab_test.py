@@ -31,9 +31,11 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import math
+import sqlite3
 import time
 from pathlib import Path
 from typing import cast
@@ -108,7 +110,7 @@ class ABTestManager:
         with self._db_connect() as conn:
             conn.executescript(_AB_TEST_DDL)
 
-    def _db_connect(self):
+    def _db_connect(self) -> contextlib.AbstractContextManager[sqlite3.Connection]:
         return sqlite_connect(self._db_path, foreign_keys=False)
 
     def create_experiment(

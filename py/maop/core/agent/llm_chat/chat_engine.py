@@ -58,6 +58,11 @@ class ChatRequest(BaseModel):
     stream: bool = True
     max_tokens: int = 4096
     temperature: float = 0.7
+    # P1-13: optional execution_id — when set, chat_stream emits each LLM
+    # token to the global EventBus on topic ``agent.{execution_id}.token``
+    # so /api/stream/agent/{execution_id} SSE subscribers receive the
+    # real-time token flow. Empty string disables emission (default).
+    execution_id: str = ""
 
 
 class ChatResponse(BaseModel):
@@ -170,6 +175,8 @@ class ChatEngine:
         """Streaming chat: yield SSE-formatted tokens."""
         session_id = request.session_id or f"chat-{uuid.uuid4().hex[:8]}"
         agent = request.agent or self._default_agent
+        # P1-13: when execution_id is set, emit token events to EventBus.
+        execution_id = request.execution_id
 
         # Build context
         messages = self._memory_mgr.get_messages_for_llm(
@@ -187,6 +194,9 @@ class ChatEngine:
 
         # Yield session info first
         yield _sse_event("session", {"session_id": session_id, "agent": agent})
+        # P1-13: emit meta event to EventBus (fire-and-forget).
+        if execution_id:
+            _emit_agent_token_event(execution_id, "meta", {"agent": agent, "type": "meta"})
 
         # Stream LLM response
         full_content = []
@@ -194,8 +204,15 @@ class ChatEngine:
             async for token in self._stream_llm(agent, messages, request):
                 full_content.append(token)
                 yield _sse_event("token", {"content": token})
+                # P1-13: forward each token to the EventBus.
+                if execution_id:
+                    _emit_agent_token_event(
+                        execution_id, "token", {"content": token, "type": "token"},
+                    )
         except Exception as exc:
             yield _sse_event("error", {"error": str(exc)})
+            if execution_id:
+                _emit_agent_token_event(execution_id, "error", {"error": str(exc)})
             return
 
         content = "".join(full_content)
@@ -219,6 +236,11 @@ class ChatEngine:
         )
 
         yield _sse_event("done", {"session_id": session_id, "content_length": len(content), "tokens": token_count, "model": model_name})
+        # P1-13: emit done event to EventBus.
+        if execution_id:
+            _emit_agent_token_event(execution_id, "done", {
+                "content_length": len(content), "tokens": token_count, "model": model_name,
+            })
 
     async def _call_llm(
         self,
@@ -377,3 +399,30 @@ class ChatEngine:
 def _sse_event(event: str, data: dict[str, Any]) -> str:
     """Format an SSE event."""
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+def _emit_agent_token_event(
+    execution_id: str,
+    event_type: str,
+    data: dict[str, Any],
+) -> None:
+    """Publish an agent token-stream event to the global EventBus (fire-and-forget).
+
+    P1-13: emits on topic ``agent.{execution_id}.{event_type}`` so the
+    /api/stream/agent/{execution_id} SSE endpoint can subscribe via the
+    ``agent.{execution_id}.*`` wildcard. Never raises — mirrors
+    DagProgressEmitter fail-safe semantics.
+    """
+    try:
+        from maop.core.reliability.event_bus import Event, get_event_bus
+
+        bus = get_event_bus()
+        bus.publish_sync(Event(
+            topic=f"agent.{execution_id}.{event_type}",
+            data=data,
+        ))
+    except Exception:
+        logger.debug(
+            "[chat_engine] agent token event emit failed for %s/%s",
+            execution_id, event_type, exc_info=True,
+        )

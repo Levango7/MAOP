@@ -5,10 +5,25 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
+
 # Ensure doc-pipeline is importable (configurable via env var, fallback to default)
 DOC_PIPELINE_ROOT = Path(os.environ.get("DOC_PIPELINE_ROOT", r"F:\Nexus\Workflow\doc-pipeline"))
 if DOC_PIPELINE_ROOT.is_dir() and str(DOC_PIPELINE_ROOT) not in sys.path:
     sys.path.insert(0, str(DOC_PIPELINE_ROOT))
+
+# P2-8: 使用 skipif 替代 --ignore 机制，当 pipeline_core 不可用时跳过整个文件。
+# 这样 `pytest tests/` 可以直接运行，无需 CI 传入 --ignore 参数。
+try:
+    import pipeline_core  # noqa: F401
+    HAS_PIPELINE_CORE = True
+except ImportError:
+    HAS_PIPELINE_CORE = False
+
+pytestmark = pytest.mark.skipif(
+    not HAS_PIPELINE_CORE,
+    reason="pipeline_core module not available (external dependency)",
+)
 
 
 class TestAsyncWebhookEngine:

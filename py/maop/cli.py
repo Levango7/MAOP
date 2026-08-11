@@ -377,6 +377,136 @@ def cmd_migrate(args: list[str]) -> None:
         _sys.exit(1)
 
 
+# ── config subcommand (v5.0.0 env var migration) ─────────────────
+
+# Short-name → long-name environment variable mappings (v5.0.0 migration).
+_CONFIG_MIGRATE_MAPPINGS: dict[str, str] = {
+    "MAOP_PORT": "MAOP_DASH_PORT",
+    "MAOP_WORKERS": "MAOP_DASH_WORKERS",
+    "MAOP_TLS": "MAOP_TLS_ENABLED",
+    "MAOP_AUTH": "MAOP_AUTH_ENABLED",
+}
+
+
+def cmd_config_migrate(dry_run: bool = False, file: str = ".env") -> None:
+    """Migrate deprecated short-name environment variables to long names.
+
+    Rewrites the given ``.env`` file in place, replacing deprecated
+    short names (``MAOP_PORT``, ``MAOP_WORKERS``, ``MAOP_TLS``,
+    ``MAOP_AUTH``) with their v5.0.0 canonical long names. A comment
+    recording the migration date is prepended. When *dry_run* is True
+    the changes are only printed, not written.
+
+    Parameters
+    ----------
+    dry_run : bool
+        Preview changes without modifying the file.
+    file : str
+        Path to the ``.env`` file (default: ``.env`` in CWD).
+    """
+    from datetime import date
+
+    env_path = Path(file)
+    if not env_path.is_file():
+        print(f"[config migrate] file not found: {env_path}")
+        sys.exit(1)
+
+    # utf-8-sig transparently strips a leading BOM if present.
+    text = env_path.read_text(encoding="utf-8-sig")
+    lines = text.splitlines()
+    changes: list[tuple[str, str, str]] = []  # (old_name, new_name, value)
+    new_lines: list[str] = []
+
+    # First pass: collect existing keys to avoid duplicate long-name entries.
+    existing_keys: set[str] = set()
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" in stripped:
+            key = stripped.split("=", 1)[0].strip()
+            existing_keys.add(key)
+
+    today = date.today().isoformat()
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" in stripped:
+            key, sep, value = stripped.partition("=")
+            key = key.strip()
+            if key in _CONFIG_MIGRATE_MAPPINGS:
+                new_key = _CONFIG_MIGRATE_MAPPINGS[key]
+                if new_key in existing_keys:
+                    # Long name already present; drop the short-name line
+                    # to avoid duplicate / conflicting values.
+                    changes.append((key, new_key, value))
+                    new_lines.append(
+                        f"# [migrated {today}] {key}={value}"
+                        f"  (superseded by existing {new_key})"
+                    )
+                    continue
+                changes.append((key, new_key, value))
+                new_lines.append(f"{new_key}{sep}{value}")
+                existing_keys.add(new_key)
+                continue
+        new_lines.append(line)
+
+    if not changes:
+        print(f"[config migrate] no deprecated variables found in {env_path}")
+        return
+
+    migration_header = (
+        f"# [migrated {today}] "
+        f"short-name env vars -> long names (maop config migrate)"
+    )
+    # Prepend header only if not already present.
+    if migration_header not in lines:
+        new_lines.insert(0, migration_header)
+
+    print(f"[config migrate] {len(changes)} variable(s) to migrate:")
+    for old, new, val in changes:
+        print(f"  {old}={val}  ->  {new}={val}")
+
+    if dry_run:
+        print("[config migrate] --dry-run: no changes written.")
+        return
+
+    env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    print(f"[config migrate] wrote {env_path}")
+
+
+def cmd_config(args: list[str]) -> None:
+    """``maop config <subcommand>`` dispatcher.
+
+    Subcommands
+    -----------
+        migrate   Migrate deprecated short-name env vars (.env)
+    """
+    if not args:
+        sys.stderr.write(
+            "usage: maop config <subcommand>\n"
+            "  migrate   Migrate deprecated short-name env vars (.env)\n"
+        )
+        sys.exit(1)
+
+    sub = args[0]
+    if sub == "migrate":
+        parser = argparse.ArgumentParser(
+            prog="maop config migrate",
+            description="Migrate deprecated short-name environment variables to long names",
+        )
+        parser.add_argument(
+            "--dry-run", action="store_true",
+            help="Preview changes without writing the file",
+        )
+        parser.add_argument(
+            "--file", default=".env",
+            help="Path to the .env file (default: .env)",
+        )
+        parsed = parser.parse_args(args[1:])
+        cmd_config_migrate(dry_run=parsed.dry_run, file=parsed.file)
+    else:
+        sys.stderr.write(f"Unknown config subcommand: {sub}\n")
+        sys.exit(1)
+
+
 def main() -> Any:
     # Enable JSON structured logging when MAOP_JSON_LOG=1 (for ELK / Loki).
     if os.environ.get("MAOP_JSON_LOG", "0") == "1":
@@ -395,6 +525,9 @@ def main() -> Any:
         return
     if argv and argv[0] == "migrate":
         cmd_migrate(argv[1:])
+        return
+    if argv and argv[0] == "config":
+        cmd_config(argv[1:])
         return
     if argv and argv[0] == "worker":
         cmd_worker(argv[1:])

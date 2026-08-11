@@ -24,8 +24,10 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
+import sqlite3
 import time
 import uuid
 from pathlib import Path
@@ -77,7 +79,7 @@ class PromptVersionManager:
         with self._db_connect() as conn:
             conn.executescript(_PROMPT_VER_DDL)
 
-    def _db_connect(self):
+    def _db_connect(self) -> contextlib.AbstractContextManager[sqlite3.Connection]:
         return sqlite_connect(self._db_path, foreign_keys=False)
 
     def create(

@@ -93,6 +93,8 @@ class SAMLHandler:
         self._clock_skew_s = CLOCK_SKEW_S
         # G-06: 记录 SP 发出的 AuthnRequest ID，用于 InResponseTo 校验
         self._pending_request_ids: set[str] = set()
+        # G-11: 标记是否已发出 xmlsec 缺失警告（仅首次 handle_response 调用时发一次）
+        self._xmlsec_warning_emitted: bool = False
 
     # ── 公开接口 ─────────────────────────────────────────────────────
 

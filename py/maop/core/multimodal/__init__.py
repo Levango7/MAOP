@@ -9,6 +9,7 @@ Modules:
 from __future__ import annotations
 
 import importlib
+from typing import Any
 
 __all__ = [
     "ModalityType",
@@ -50,7 +51,7 @@ _SYMBOL_TO_MODULE: dict[str, str] = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """惰性加载子模块符号，避免循环导入。"""
     if name in _SYMBOL_TO_MODULE:
         mod_name = _SYMBOL_TO_MODULE[name]

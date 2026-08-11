@@ -224,3 +224,121 @@ class PackageVerifier:
         sig = package["signature_hex"]
         payload = {k: v for k, v in package.items() if k != "signature_hex"}
         return self.verify(payload, sig)
+
+    def verify_with_key_management(
+        self,
+        payload: Any,
+        signature_hex: str,
+        tool_id: str,
+        key_mgmt: Any,
+    ) -> bool:
+        """Verify a payload using keys from a :class:`KeyManagement` store.
+
+        Fetches all active (non-expired, non-revoked) public keys for
+        *tool_id* from *key_mgmt*, skips any that are blacklisted, and
+        tries each remaining key in turn.  Returns ``True`` if any key
+        verifies the signature — this supports key rotation overlap
+        where multiple keys are simultaneously valid.
+
+        Parameters
+        ----------
+        payload : Any
+            The signed payload.
+        signature_hex : str
+            Hex-encoded Ed25519 signature.
+        tool_id : str
+            The tool whose keys should be tried.
+        key_mgmt : KeyManagement
+            A :class:`maop.core.marketplace.key_management.KeyManagement`
+            instance (typed as ``Any`` to avoid a circular import).
+
+        Returns
+        -------
+        bool
+            ``True`` if a non-blacklisted active key verifies.
+
+        Raises
+        ------
+        SignatureError
+            If no active keys exist for the tool, all are blacklisted,
+            or none of the candidate keys verify the signature.
+        """
+        active_keys = key_mgmt.get_active_keys(tool_id)
+        if not active_keys:
+            raise SignatureError(f"no active keys for tool {tool_id!r}")
+
+        candidate_keys: list[Ed25519PublicKey] = []
+        for info in active_keys:
+            if key_mgmt.is_blacklisted(tool_id, info.key_id):
+                logger.warning(
+                    "[marketplace] skipping blacklisted key %s for tool %s",
+                    info.key_id, tool_id,
+                )
+                continue
+            try:
+                candidate_keys.append(
+                    load_public_key_from_bytes(info.public_key.encode("utf-8")),
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "[marketplace] failed to load key %s: %s", info.key_id, exc,
+                )
+                continue
+
+        if not candidate_keys:
+            raise SignatureError(
+                f"all keys for tool {tool_id!r} are blacklisted or unloadable",
+            )
+
+        return verify_with_keys(payload, signature_hex, candidate_keys)
+
+
+# ── Multi-key verification (key management integration) ───────────
+
+
+def verify_with_keys(
+    payload: Any,
+    signature_hex: str,
+    public_keys: list[Ed25519PublicKey],
+) -> bool:
+    """Verify a signature against multiple public keys.
+
+    Tries each key in turn; returns ``True`` if any key verifies the
+    signature.  This supports key rotation overlap periods where
+    multiple keys are simultaneously valid.
+
+    Parameters
+    ----------
+    payload : Any
+        The signed payload.
+    signature_hex : str
+        Hex-encoded Ed25519 signature.
+    public_keys : list[Ed25519PublicKey]
+        Candidate public keys to try.
+
+    Returns
+    -------
+    bool
+        ``True`` if any key verifies.
+
+    Raises
+    ------
+    SignatureError
+        If *public_keys* is empty, *signature_hex* is malformed, or
+        no key verifies the signature.
+    """
+    if not public_keys:
+        raise SignatureError("no public keys provided for verification")
+
+    last_error: SignatureError | None = None
+    for pk in public_keys:
+        try:
+            verify(payload, signature_hex, pk)
+            return True
+        except SignatureError as exc:
+            last_error = exc
+
+    # All keys failed — raise a consolidated error.
+    raise SignatureError(
+        f"signature verification failed against all {len(public_keys)} key(s)",
+    ) from last_error

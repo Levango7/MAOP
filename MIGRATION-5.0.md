@@ -36,8 +36,21 @@ app = create_app()
 
 # ✅ v5.0.0
 from maop.dashboard.server import app
+# 直接使用 app，无需 create_app()
 # 或在 uvicorn 启动时使用字符串引用
 # uvicorn maop.dashboard.server:app
+```
+
+代码示例：直接使用 app 对象（Python）
+
+```python
+# v5.0.0 — 直接导入单例 app，可用于 TestClient 或自定义中间件挂载
+from maop.dashboard.server import app
+from starlette.testclient import TestClient
+
+client = TestClient(app)
+resp = client.get("/api/health")
+assert resp.status_code == 200
 ```
 
 #### `maop.dashboard.provider._render_html()`
@@ -126,6 +139,35 @@ MAOP_AUTH_ENABLED=1
 
 3. 启动时检查日志，如有 `[config] MAOP_XXX is deprecated` 告警，按提示迁移。
 
+### 2.3 自动迁移（`maop config migrate`）
+
+v5.0.0 提供 CLI 命令自动迁移 `.env` 文件中的短名变量：
+
+命令示例：预览迁移变更（不写入）
+
+```bash
+maop config migrate --dry-run
+```
+
+命令示例：执行迁移
+
+```bash
+maop config migrate
+```
+
+命令示例：指定 .env 文件路径
+
+```bash
+maop config migrate --file /path/to/.env --dry-run
+```
+
+迁移行为：
+
+- 扫描 `.env` 文件，将短名替换为规范长名（见 2.1 表格）。
+- 在文件首部添加 `# [migrated YYYY-MM-DD]` 注释记录迁移日期。
+- 若长名已存在，短名行被注释掉（保留原值供回溯，避免冲突）。
+- `--dry-run` 仅打印变更预览，不修改文件。
+
 ---
 
 ## 3. Docker 部署变更
@@ -201,3 +243,64 @@ Dockerfile 中的 `ENV` 指令已使用规范长名（`MAOP_DASH_HOST`、`MAOP_D
 - [ ] Docker / Helm：镜像 tag `4.5.0` → `5.0.0`
 - [ ] 启动后检查日志无 `[config] ... is deprecated` 告警
 - [ ] 运行测试套件确认无 `ImportError` / `AttributeError`
+
+---
+
+## 7. FAQ
+
+### Q1: 升级后 `create_app` 报 `ImportError`？
+
+`maop.dashboard.provider.create_app()` 已在 v5.0.0 移除。直接导入单例 app：
+
+```python
+from maop.dashboard.server import app
+```
+
+无需调用工厂函数。如需在 uvicorn 中启动：
+
+```bash
+uvicorn maop.dashboard.server:app --host 0.0.0.0 --port 9079
+```
+
+### Q2: `MAOP_PORT` 还能用吗？
+
+v5.0.0 仍可使用，但启动时会发出 `DeprecationWarning`。**v6.0.0 将移除短名支持。** 建议使用 `maop config migrate` 自动迁移：
+
+```bash
+maop config migrate --dry-run  # 预览
+maop config migrate            # 执行
+```
+
+迁移后 `.env` 中 `MAOP_PORT` 被替换为 `MAOP_DASH_PORT`。
+
+### Q3: `subagent_delegation` 还能用吗？
+
+v5.0.0 保留但会发出 `DeprecationWarning`，**v6.0.0 将移除。** 请迁移到 `subagent_lifecycle`：
+
+```python
+# ❌ v5.0.0 deprecated
+from maop.core.agent.delegation import subagent_delegation
+
+# ✅ v5.0.0+
+from maop.core.agent.delegation import subagent_lifecycle
+```
+
+### Q4: 升级后 `/api/batch` 返回 404？
+
+`/api/batch` 端点已移除。前端已改为独立 `/api/*` 调用。如自定义脚本依赖 `/api/batch`，改为并行请求各独立端点（见 1.1 节示例）。
+
+### Q5: 沙箱子进程拿不到环境变量？
+
+v5.0.0 沙箱采用白名单策略（G-02 安全修复），仅转发安全变量和 `MAOP_SANDBOX_*` 前缀变量。如需自定义白名单，编辑项目根目录 `.env.sandbox` 文件：
+
+```bash
+# .env.sandbox — 控制沙箱环境变量白名单
+MAOP_DASH_PORT=yes   # 转发到沙箱
+MAOP_API_KEY=no      # 不转发（默认）
+```
+
+或通过环境变量 `MAOP_SANDBOX_ENV_FILE` 指定配置文件路径。
+
+### Q6: `maop config migrate` 提示 "no deprecated variables found"？
+
+说明 `.env` 文件中已无短名变量（可能已迁移过）。检查是否已使用规范长名。如需重新迁移，确保 `.env` 中存在 `MAOP_PORT`、`MAOP_WORKERS`、`MAOP_TLS` 或 `MAOP_AUTH`。

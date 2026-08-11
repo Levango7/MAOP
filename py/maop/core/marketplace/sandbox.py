@@ -15,6 +15,14 @@ Additionally, a fixed set of "safe" variables (``PATH``, ``HOME``,
 subprocess can actually run basic commands. These safe variables do
 not include any secrets.
 
+Custom whitelist
+----------------
+A project-root ``.env.sandbox`` file (or the path pointed to by the
+``MAOP_SANDBOX_ENV_FILE`` environment variable) can override the
+built-in safe set. Each line is ``KEY=yes`` / ``KEY=no``; variables
+marked ``yes`` are forwarded, everything else is stripped. If the
+file is absent the built-in :data:`_SAFE_ENV_VARS` defaults apply.
+
 Usage
 -----
 ::
@@ -54,17 +62,27 @@ _SANDBOX_ENV_PREFIX = "MAOP_SANDBOX_"
 
 # A minimal set of "safe" variables required for the subprocess to run.
 # These are system-level variables that do not contain secrets.
+#
+# Classification (see .env.sandbox for user-tunable overrides):
+#   - 必需变量 (required): PATH, HOME, USER, SYSTEMROOT, TEMP, TMP
+#   - 安全变量 (safe):     LANG, LC_ALL, LC_CTYPE, TMPDIR, COMSPEC,
+#                          APPDATA, LOCALAPPDATA, PROGRAMDATA
+#   - 业务变量 (business): MAOP_* — forwarded only when listed in
+#                          .env.sandbox or matching MAOP_SANDBOX_*
 _SAFE_ENV_VARS: frozenset[str] = frozenset({
+    # ── 必需变量（系统运行必需，不建议禁用）──────────────────
     "PATH",
     "HOME",
+    "USER",
+    "SYSTEMROOT",
+    "TEMP",
+    "TMP",
+    # ── 安全变量（不影响安全性）──────────────────────────────
     "LANG",
     "LC_ALL",
     "LC_CTYPE",
     "TMPDIR",
-    "TMP",
-    "TEMP",
-    # Windows needs these for the C runtime and system DLL resolution.
-    "SYSTEMROOT",
+    # Windows runtime / system DLL resolution helpers (safe, no secrets).
     "COMSPEC",
     "APPDATA",
     "LOCALAPPDATA",
@@ -89,10 +107,84 @@ _BLOCKED_ENV_VARS: frozenset[str] = frozenset({
 })
 
 
+# ── Custom whitelist via .env.sandbox ──────────────────────────────
+
+# Module-level cache: {path: (mtime, whitelist_or_None)} to avoid
+# re-reading the config file on every build_sandbox_env() call.
+_whitelist_cache: dict[Path, tuple[float, frozenset[str] | None]] = {}
+
+
+def _resolve_sandbox_config_path(
+    config_file: str | Path | None = None,
+) -> Path:
+    """Resolve the path to the ``.env.sandbox`` config file.
+
+    Priority:
+      1. Explicit *config_file* argument.
+      2. ``MAOP_SANDBOX_ENV_FILE`` environment variable.
+      3. Project-root ``.env.sandbox`` (auto-discovered).
+    """
+    if config_file is not None:
+        return Path(config_file)
+    env_file = os.environ.get("MAOP_SANDBOX_ENV_FILE")
+    if env_file:
+        return Path(env_file)
+    # Auto-discover: sandbox.py lives at <root>/py/maop/core/marketplace/
+    project_root = Path(__file__).resolve().parents[4]
+    return project_root / ".env.sandbox"
+
+
+def _load_sandbox_whitelist(
+    config_file: str | Path | None = None,
+) -> frozenset[str] | None:
+    """Load a custom variable whitelist from ``.env.sandbox``.
+
+    Returns
+    -------
+    frozenset[str] | None
+        The set of variable names marked ``yes``/``true``/``1``, or
+        ``None`` when the file is absent (caller should fall back to
+        the built-in :data:`_SAFE_ENV_VARS`).
+    """
+    path = _resolve_sandbox_config_path(config_file)
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        # File does not exist or is inaccessible → use defaults.
+        return None
+
+    # Return cached result if the file hasn't changed.
+    cached = _whitelist_cache.get(path)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+
+    enabled: set[str] = set()
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().lower()
+            if val in ("yes", "true", "1", "on"):
+                enabled.add(key)
+        result: frozenset[str] | None = frozenset(enabled)
+    except OSError as exc:
+        logger.warning("[sandbox] failed to read %s: %s", path, exc)
+        result = None
+
+    _whitelist_cache[path] = (mtime, result)
+    return result
+
+
 def build_sandbox_env(
     base_env: dict[str, str] | None = None,
     *,
     extra_safe: frozenset[str] = frozenset(),
+    config_file: str | Path | None = None,
 ) -> dict[str, str]:
     """Build a sandbox-safe environment dict.
 
@@ -105,6 +197,12 @@ def build_sandbox_env(
     extra_safe : frozenset[str]
         Additional variable names to consider safe (merged with the
         default :data:`_SAFE_ENV_VARS`). Use sparingly.
+    config_file : str | Path | None
+        Path to a ``.env.sandbox`` file that overrides the built-in
+        safe set. When ``None`` the path is resolved via
+        :func:`_resolve_sandbox_config_path` (env var or project-root
+        auto-discovery). If the file does not exist the built-in
+        defaults are used.
 
     Returns
     -------
@@ -114,7 +212,12 @@ def build_sandbox_env(
     if base_env is None:
         base_env = dict(os.environ)
 
-    safe = _SAFE_ENV_VARS | extra_safe
+    # Use custom whitelist from .env.sandbox if available, else defaults.
+    custom_whitelist = _load_sandbox_whitelist(config_file)
+    if custom_whitelist is not None:
+        safe = custom_whitelist | extra_safe
+    else:
+        safe = _SAFE_ENV_VARS | extra_safe
     result: dict[str, str] = {}
 
     for key, value in base_env.items():

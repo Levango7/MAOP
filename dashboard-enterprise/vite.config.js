@@ -40,7 +40,10 @@ export default defineConfig({
         },
       },
     },
-    chunkSizeWarningLimit: 800,
+    // P1-15: chunk 体积告警阈值调整为 1000kB。
+    // vendor-vis (vis-network + vis-data) 单独拆分后体积约 600-800kB，
+    // 800kB 阈值会误报；提升至 1000kB 避免噪音，同时保留对超大 chunk 的告警。
+    chunkSizeWarningLimit: 1000,
   },
   server: {
     port: 5174,

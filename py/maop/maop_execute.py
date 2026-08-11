@@ -26,6 +26,67 @@ from maop.delegate.dispatcher import Dispatcher
 logger = logging.getLogger(__name__)
 
 
+# ── P1-13: Agent token-stream event emission ──────────────────────────
+# Helpers that publish agent execution tokens to the global EventBus so
+# the /api/stream/agent/{execution_id} SSE endpoint can forward them to
+# the frontend in real time. All helpers are fire-and-forget and never
+# raise — emitter failures are swallowed to keep the orchestration main
+# flow intact (mirrors DagProgressEmitter semantics in
+# maop/core/agent/dag/dag_progress_emitter.py).
+
+
+def _emit_agent_event(
+    execution_id: str,
+    event_type: str,
+    data: dict[str, Any],
+) -> None:
+    """Publish an agent token-stream event to the global EventBus.
+
+    Emits on topic ``agent.{execution_id}.{event_type}`` so the
+    ``/api/stream/agent/{execution_id}`` SSE endpoint can subscribe via
+    the ``agent.{execution_id}.*`` wildcard and forward tokens to the
+    frontend in real time.
+
+    Parameters
+    ----------
+    execution_id : str
+        The execution/trace id scoping the stream.
+    event_type : str
+        Event subtype: ``"meta"``, ``"token"``, ``"done"``, ``"error"``.
+    data : dict
+        Event payload. For token events: ``{"content": ..., "type": "token"}``.
+    """
+    try:
+        from maop.core.reliability.event_bus import Event, get_event_bus
+
+        bus = get_event_bus()
+        bus.publish_sync(Event(
+            topic=f"agent.{execution_id}.{event_type}",
+            data=data,
+        ))
+    except Exception:
+        logger.debug(
+            "[execute] agent event emit failed for %s/%s",
+            execution_id, event_type, exc_info=True,
+        )
+
+
+def _make_token_line_callback(execution_id: str) -> Any:
+    """Build a SubprocessStreamer line_callback that emits each stdout line as a token event.
+
+    P1-13: bridges subprocess stdout (the agent's streamed output) to the
+    EventBus so /api/stream/agent/{execution_id} receives real tokens
+    instead of only the final result after the process exits.
+    """
+    def _on_line(line: str) -> None:
+        if not line:
+            return
+        _emit_agent_event(
+            execution_id, "token", {"content": line, "type": "token"},
+        )
+    return _on_line
+
+
 class Observability(BaseModel):
     """Observability hooks for execution."""
     trace_id: str = ""
@@ -120,6 +181,8 @@ async def maop_execute(
 
     # ReAct mode: delegate to ReactLoop for Thought→Action→Observation cycling
     if react_mode:
+        # P1-13: emit meta event for react-mode execution stream.
+        _emit_agent_event(trace_id, "meta", {"agent": agent, "type": "meta", "mode": "react"})
         try:
             from maop.core.agent.llm_chat.react_loop import ReactConfig, ReactLoop
             react_config = ReactConfig(
@@ -134,6 +197,13 @@ async def maop_execute(
                 tools=tools, provider=provider,
             )
             duration_ms = int((time.monotonic() - start) * 1000)
+            # P1-13: emit done event with react result summary.
+            _emit_agent_event(trace_id, "done", {
+                "content_length": len(react_result.final_answer or ""),
+                "tokens": react_result.token_count,
+                "iterations": react_result.total_iterations,
+                "success": react_result.success,
+            })
             return new_result(
                 agent=agent, task=task,
                 exit_code=0 if react_result.success else 1,
@@ -149,6 +219,8 @@ async def maop_execute(
                 },
             )
         except Exception as exc:
+            # P1-13: emit error event so SSE subscribers terminate cleanly.
+            _emit_agent_event(trace_id, "error", {"error": f"ReAct loop error: {exc}"})
             return new_result(
                 agent=agent, task=task,
                 exit_code=-1, error=f"ReAct loop error: {exc}",
@@ -239,9 +311,15 @@ async def maop_execute(
         )
 
     # Dispatch
+    # P1-13: emit meta event so /api/stream/agent/{trace_id} subscribers
+    # receive a stream-start signal before the first token.
+    _emit_agent_event(trace_id, "meta", {"agent": agent, "type": "meta"})
     try:
         from maop.core.reliability.streaming import SubprocessStreamer, get_stream_registry
-        streamer = SubprocessStreamer(trace_id=trace_id)
+        token_callback = _make_token_line_callback(trace_id)
+        streamer = SubprocessStreamer(
+            trace_id=trace_id, line_callback=token_callback,
+        )
         registry = get_stream_registry()
         registry.register(trace_id, streamer)
 
@@ -254,12 +332,20 @@ async def maop_execute(
         result = dispatch_result.result
         result.trace_id = trace_id
         registry.unregister(trace_id)
+        # P1-13: emit done event with final content length / token count.
+        _emit_agent_event(trace_id, "done", {
+            "content_length": len(result.stdout or ""),
+            "tokens": len(result.stdout or "") // 4,
+            "exit_code": result.exit_code,
+        })
     except Exception as exc:
         result = new_result(
             agent=agent, task=task,
             exit_code=-1, error=f"Dispatch error: {exc}",
             trace_id=trace_id, routing_key=routing_key,
         )
+        # P1-13: emit error event so SSE subscribers terminate cleanly.
+        _emit_agent_event(trace_id, "error", {"error": str(exc)})
 
     # Function-call loop: if agent returned tool_calls, execute and re-dispatch
     if result.is_success() and tools is not None and result.stdout:

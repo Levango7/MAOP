@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,16 @@ from maop.core.backends.db_utils import sqlite_connect
 from maop.core.agent.delegation.subagent_db import get_subagent_db_path, migrate_legacy_subagent_db
 
 logger = logging.getLogger(__name__)
+
+# P2-5: 模块自 v5.0.0 起废弃，保留为向后兼容 shim。
+# 生产代码应改用 maop.core.agent.delegation.subagent_lifecycle（SubAgentManager）。
+# 计划在 v6.0.0 移除此模块。stacklevel=2 使警告指向 import 语句而非此行。
+warnings.warn(
+    "maop.core.subagent_delegation is deprecated since v5.0.0 and will be removed in v6.0.0. "
+    "Use maop.core.agent.delegation.subagent_lifecycle instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 # ── Models ──────────────────────────────────────────────────────
