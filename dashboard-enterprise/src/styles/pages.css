@@ -30,9 +30,16 @@
 .cost-view .card, .models-view .card, .tools-view .card, .tenant-card,
 .memory-page .card, .monitor-page .card, .rbac-page .card, .search-view .card,
 .settings-page .card, .logs-view .card, .evolve-page .card, .agents-page .card,
-.audit-view .card, .vs-page .card, .control-panel .card {
+.audit-view .card, .vs-page .card, .control-panel .card, .overview .card {
   margin-bottom: var(--sp-4);   /* JB 精修: 卡片节奏 16px, 不再是松散的 24px */
 }
+
+/* Overview 相邻块兜底间距 (2026-08-12):
+ * 猫头鹰选择器 .overview > * + * 保证页头/错误卡/指标网格/时间线等
+ * 任意相邻两个直接子块之间都有 16px,不依赖各组件的 margin-bottom
+ * 是否被纳入上面的全局选择器列表 (本次 bug 的根因就是 overview 漏了)。 */
+.overview > * + * { margin-top: var(--sp-4); }
+.overview > * + * { margin-bottom: 0; }
 .stats-grid:last-child, .status-strip:last-child, .row:last-child,
 .two-col:last-child { margin-bottom: 0; }
 
