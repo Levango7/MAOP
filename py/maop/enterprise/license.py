@@ -21,11 +21,13 @@ CRL (在线撤销) 支持:
     CRLChecker，在签名+过期检查通过后查询 CRL。CRL 检查支持本地缓存
     和离线降级（详见 maop.enterprise.crl 模块）。
 
-Degrade gracefully:
-    - No license key configured → honor system (enterprise package
-      importable = enterprise), log a warning
+Degrade gracefully (2026-08-11 hardening — honor system REMOVED):
+    - No license key configured → degrade to PERSONAL (previously honor-system
+      granted enterprise; that was a trivial bypass and has been removed)
     - License key present but invalid → degrade to PERSONAL, log error
-    - License key present and valid → ENTERPRISE
+    - License key present and valid but modules tampered → degrade to PERSONAL
+      (see verify_module_integrity below)
+    - License key present and valid + modules intact → ENTERPRISE
 
 Usage:
     validator = LicenseValidator()
@@ -361,3 +363,145 @@ class LicenseValidator:
         """检查 license 是否被撤销（CRL）。仅当配置了 CRL URL 时启用。"""
         if self._crl_checker:
             self._crl_checker.check_license(info)
+
+
+# ── Module integrity self-verification (anti-tamper hardening) ────────────
+
+_MANIFEST_PATH = Path(__file__).parent / "_integrity_manifest.json"
+
+
+class ModuleTamperError(LicenseError):
+    """Enterprise module files have been modified after signing."""
+
+
+def verify_module_integrity(*, strict: bool | None = None) -> tuple[bool, str]:
+    """Verify enterprise modules haven't been tampered with.
+
+    Reads ``_integrity_manifest.json`` (created at sign-time by
+    ``scripts/sign_enterprise_modules.py``) and checks every listed
+    file's SHA-256, then verifies the manifest's own Ed25519 signature
+    against the bundled public key.
+
+    Parameters
+    ----------
+    strict : bool | None
+        If True, any anomaly raises :class:`ModuleTamperError`.
+        If False, anomalies return ``(False, reason)`` without raising.
+        Either way, the result is logged. When ``strict`` is None, it
+        defaults to True in production (``MAOP_ENV=production``) and
+        False otherwise.
+
+    Returns
+    -------
+    (ok, reason):
+        ``ok=True`` → all modules verified against manifest.
+        ``ok=False`` → manifest missing/invalid/files modified; ``reason``
+        explains what failed.
+
+    Security model
+    --------------
+    This check assumes the * attacker modifies enterprise module files
+    *after* license activation. It catches:
+      - Direct edits to rbac.py / audit.py / etc.
+      - Manifest deletion (raises tamper-suspected in strict mode).
+      - Manifest signature forgery (needs the private key; without it,
+        signature verification fails).
+
+    It does NOT catch:
+      - Patching this very function out of ``license.py`` (attacker must
+        also edit the public key, breaking normal license validation).
+      - Memory-patching the module after import (defeats the point of
+        file-level signing).
+
+    This is a **raising-the-bar** control, not absolute protection. Pair
+    it with the PyArmor obfuscation pipeline for stronger guarantees.
+
+    Environment variables
+    ---------------------
+    ``MAOP_SKIP_INTEGRITY=1``: skip the check entirely (test/dev escape hatch,
+    e.g. when the on-disk manifest was signed with a production key but tests
+    patch ``_PUBLIC_KEY_PATH`` to a throwaway keypair). Must NOT be set in
+    production — the variable is honored silently by design so tests can
+    enable it without logging noise, but you can audit it externally.
+    """
+    if strict is None:
+        strict = os.getenv("MAOP_ENV", "development").lower() == "production"
+
+    # Test escape hatch: skip manifest verification if explicitly requested.
+    # This is intentionally silent — tests enable it to isolate license-key
+    # verification from code-signing concerns.
+    if os.getenv("MAOP_SKIP_INTEGRITY", "").strip().lower() in ("1", "true", "yes"):
+        return True, "skipped"
+
+    def _fail(reason: str, exc: Exception | None = None) -> tuple[bool, str]:
+        msg = f"enterprise module integrity check failed: {reason}"
+        logger.error("[integrity] %s", msg)
+        if strict:
+            if exc:
+                raise ModuleTamperError(msg) from exc
+            raise ModuleTamperError(msg)
+        return False, reason
+
+    if not _MANIFEST_PATH.exists():
+        return _fail(f"manifest not found: {_MANIFEST_PATH}")
+
+    try:
+        import json as _json
+        manifest = _json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return _fail(f"manifest unreadable: {exc}", exc)
+
+    expected_sig_b64 = manifest.get("signature")
+    files = manifest.get("files", {})
+    if not expected_sig_b64 or not files:
+        return _fail("manifest malformed (missing 'signature' or 'files')")
+
+    # 1. Verify manifest signature over canonical payload
+    # NOTE: reuse LicenseValidator to load the public key so tests that patch
+    # ``maop.enterprise.license._PUBLIC_KEY_PATH`` also patch this verification.
+    try:
+        import base64 as _b64
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+        pub = LicenseValidator()._public_key
+        if not isinstance(pub, Ed25519PublicKey):
+            return _fail("bundled public key is not Ed25519")
+
+        # Rebuild canonical payload EXACTLY as the signing tool did
+        signed_at = manifest.get("signed_at", "")
+        payload = _json.dumps(
+            {
+                "files": files,
+                "signed_at": signed_at,
+                "tool": "sign_enterprise_modules.py",
+                "version": manifest.get("version", 1),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        signature = _b64.urlsafe_b64decode(expected_sig_b64 + "==")
+        pub.verify(signature, payload)
+    except ModuleTamperError:
+        raise
+    except Exception as exc:
+        return _fail(f"manifest signature verification failed: {exc}", exc)
+
+    # 2. Hash-check each declared module
+    import hashlib as _hashlib
+
+    repo_root = _MANIFEST_PATH.parent  # maop/enterprise/
+    tampered: list[str] = []
+    for rel_filename, expected_hash in files.items():
+        target = repo_root / rel_filename.replace("maop/enterprise/", "")
+        if not target.exists():
+            tampered.append(f"{rel_filename} (missing)")
+            continue
+        actual = _hashlib.sha256(target.read_bytes()).hexdigest()
+        if actual != expected_hash:
+            tampered.append(rel_filename)
+
+    if tampered:
+        return _fail(f"modified modules detected: {tampered}")
+
+    logger.info("[integrity] %d enterprise modules verified", len(files))
+    return True, "ok"

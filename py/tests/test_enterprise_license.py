@@ -28,9 +28,17 @@ def _clean_crl_env(monkeypatch: pytest.MonkeyPatch) -> None:
     LicenseValidator.__init__ 会读取 MAOP_CRL_URL 决定是否启用 CRL 检查，
     如果 CRL 被启用，篡改签名的 license 可能抛 CRLError 而非
     LicenseSignatureError，导致 test_tampered_signature_raises 失败。
+
+    MAOP_SKIP_INTEGRITY=1 是本模块的通用隔离开关：这里 license 测试的目标是
+    验证 key 签名/过期/撤销逻辑，与模块完整性校验（由 prod key 签名的 manifest）
+    属于不同的防破解层，不应混测。
     """
     for var in ("MAOP_CRL_URL", "MAOP_CRL_CACHE_TTL_S", "MAOP_CRL_STRICT"):
         monkeypatch.delenv(var, raising=False)
+    # 本文件用临时 keypair patch 了 _PUBLIC_KEY_PATH,而磁盘 manifest 是用
+    # 生产/开发私钥签的——两套 keypair 不兼容,完整性校验会误报。本测试 suite
+    # 只关心 license-key 校验,不关心模块 code-signing。
+    monkeypatch.setenv("MAOP_SKIP_INTEGRITY", "1")
 
 _TEST_KEY_DIR = Path(tempfile.mkdtemp(prefix="maop_test_keys_"))
 _TEST_PRIVATE_PATH = _TEST_KEY_DIR / "private.pem"

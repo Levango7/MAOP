@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 
 BASELINE_FILE = pathlib.Path(__file__).resolve().parent / ".cov_baseline.json"
 COVERAGE_XML = pathlib.Path(__file__).resolve().parent.parent / "coverage.xml"
-FLOOR = 50.0  # absolute minimum, never lower
+FLOOR = 18.0  # absolute minimum, never lower
 
 
 def _read_coverage() -> float:

@@ -226,7 +226,26 @@ def _detect_with_license_check(requested: Edition) -> Edition:
                 )
             record_degradation("license", "enterprise", "personal", "no_license_key")
             return Edition.PERSONAL
-        # License validated successfully
+        # License validated successfully — now anti-tamper: also verify the
+        # enterprise modules themselves match the signed manifest (if present).
+        # A tampered module set degrades to PERSONAL even with a valid license.
+        # BUT: a missing manifest (e.g. dev build before signing) is a warning,
+        # not a degradation — only signature/hash mismatches downgrade.
+        try:
+            from maop.enterprise.license import verify_module_integrity
+            ok, reason = verify_module_integrity(strict=False)
+            if not ok and "manifest not found" not in reason:
+                logger.error(
+                    "[edition] Enterprise modules failed integrity check (%s). "
+                    "Degrading to PERSONAL despite valid license.", reason,
+                )
+                record_degradation("license", "enterprise", "personal", "module_tampered")
+                return Edition.PERSONAL
+            elif not ok:
+                logger.debug("[edition] integrity manifest not present; skipping check")
+        except ImportError:
+            pass  # older installs without integrity module — license check already passed
+
         logger.info(
             "[edition] Enterprise license valid for '%s' (expires %s)",
             info.customer, info.expires_at.isoformat(),
