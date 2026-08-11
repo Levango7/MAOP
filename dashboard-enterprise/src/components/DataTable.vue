@@ -21,6 +21,9 @@
         <tr v-for="(row, i) in sortedRows" :key="rowKey ? row[rowKey] : i">
           <td v-for="col in cols" :key="col.key" :style="{ textAlign: col.align || 'left' }">
             <Badge v-if="col.type === 'badge'" :tone="toneFor(row[col.key])">{{ row[col.key] }}</Badge>
+            <span v-else-if="col.type === 'bool-icon'" class="dt__bool" :class="row[col.key] ? 'is-true' : 'is-false'">
+              <AppIcon :name="row[col.key] ? 'check' : 'x'" :size="13" />
+            </span>
             <span v-else-if="col.type === 'num'" class="dt__num">{{ row[col.key] }}</span>
             <span v-else-if="col.type === 'time'" class="dt__time">{{ formatRel(row[col.key]) }}</span>
             <span v-else class="dt__text">{{ row[col.key] }}</span>
@@ -140,6 +143,9 @@ function formatRel(ts) {
 .dt tbody tr { transition: background var(--motion) var(--ease); }
 .dt tbody tr:hover { background: var(--surface-2); }
 .dt tbody tr:last-child td { border-bottom: none; }
+.dt__bool { display: inline-flex; align-items: center; }
+.dt__bool.is-true .app-icon { color: var(--success); }
+.dt__bool.is-false .app-icon { color: var(--fail); }
 .dt__num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
 .dt__time { color: var(--text-muted); white-space: nowrap; }
 .dt__text { overflow: hidden; text-overflow: ellipsis; }

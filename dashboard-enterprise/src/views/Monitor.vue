@@ -112,7 +112,11 @@
           <span class="maint-icon"><AppIcon :name="m.icon" :size="24" /></span>
           <h4>{{ t(m.titleKey) }}</h4>
           <p>{{ t(m.descKey) }}</p>
-          <span class="maint-status" :class="m.status">{{ m.statusText }}</span>
+          <span class="maint-status" :class="m.status">
+            <AppIcon v-if="m.status === 'done'" name="check" :size="12" />
+            <AppIcon v-else-if="m.status === 'error'" name="x" :size="12" />
+            {{ m.statusText }}
+          </span>
         </button>
       </div>
 
@@ -338,10 +342,10 @@ async function runMaint(m) {
       : m.titleKey === 'view.monitor.maintCompact' ? 'Compact Database'
       : 'Prune Memory'] || '/api/health', body);
     m.status = 'done';
-    m.statusText = t('view.monitor.statusDone') + ' ✓';
+    m.statusText = t('view.monitor.statusDone');
   } catch {
     m.status = 'error';
-    m.statusText = t('view.monitor.statusFailed') + ' ✗';
+    m.statusText = t('view.monitor.statusFailed');
   }
   setTimeout(() => { m.status = 'idle'; m.statusText = t('view.monitor.statusReady'); }, 3000);
 }

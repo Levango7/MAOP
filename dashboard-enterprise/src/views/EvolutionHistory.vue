@@ -182,14 +182,14 @@ const deployCols = computed(() => [
   { key: 'action', label: t('view.evolutionHistory.colAction'), type: 'badge' },
   { key: 'winner', label: t('view.evolutionHistory.colWinner') },
   { key: 'snapshot_id', label: t('view.evolutionHistory.colSnapshot') },
-  { key: 'success_label', label: t('view.evolutionHistory.colSuccess'), type: 'badge' },
+  { key: 'success_label', label: t('view.evolutionHistory.colSuccess'), type: 'bool-icon' },
   { key: 'time_label', label: t('view.evolutionHistory.colTime') },
 ]);
 
 const deployRows = computed(() =>
   deployments.value.map((d) => ({
     ...d,
-    success_label: d.success ? '✓' : '✗',
+    success_label: d.success,
     time_label: formatTs(d.created_at),
     snapshot_id: d.snapshot_id ? d.snapshot_id.slice(0, 12) : '—',
   })),

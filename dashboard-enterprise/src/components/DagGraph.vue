@@ -42,13 +42,18 @@
               text-anchor="middle"
               class="dag-node-label"
             >{{ node.label || node.id }}</text>
-            <!-- Status icon (simple text glyph) -->
-            <text
-              text-anchor="middle"
-              dy="4"
+            <!-- Status icon (SVG path, Lucide 同源,与全站图标一致) -->
+            <g
               class="dag-node-icon"
               :class="`status-${nodeStates[node.id] || 'pending'}`"
-            >{{ statusGlyph(nodeStates[node.id]) }}</text>
+              :transform="`translate(-7, -7) scale(${14/24})`"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              v-html="statusSvg(nodeStates[node.id])"
+            ></g>
           </g>
         </g>
       </svg>
@@ -231,16 +236,17 @@ function layeredLayout(nodes, edges) {
   return result;
 }
 
-// ── Status → visual mapping (spec 5.2.1 rule 7) ───────────
-const STATUS_GLYPH = {
-  pending: '○',
-  running: '◐',
-  success: '✓',
-  failed: '✕',
-  skipped: '–',
+// ── Status → visual mapping (Lucide path data,同源 AppIcon) ───────────
+// 024 viewport 与 AppIcon 一致; circle/running 用 loader 弧线, skipped 用 minus.
+const STATUS_PATH = {
+  pending: '<circle cx="12" cy="12" r="9"/>',
+  running: '<path d="M21 12a9 9 0 1 1-6.2-8.56"/>',
+  success: '<path d="M20 6 9 17l-5-5"/>',
+  failed: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  skipped: '<path d="M5 12h14"/>',
 };
-function statusGlyph(status) {
-  return STATUS_GLYPH[status] || STATUS_GLYPH.pending;
+function statusSvg(status) {
+  return STATUS_PATH[status] || STATUS_PATH.pending;
 }
 
 function edgeClass(edge) {
@@ -349,17 +355,15 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
   user-select: none;
 }
 .dag-node-icon {
-  font-size: 14px;
-  fill: #fff;
-  font-weight: bold;
+  color: #fff;
   user-select: none;
   pointer-events: none;
 }
-.dag-node-icon.status-pending { fill: #fff; }
-.dag-node-icon.status-running { fill: #fff; }
-.dag-node-icon.status-success { fill: #fff; }
-.dag-node-icon.status-failed { fill: #fff; }
-.dag-node-icon.status-skipped { fill: #fff; }
+.dag-node-icon.status-pending,
+.dag-node-icon.status-running,
+.dag-node-icon.status-success,
+.dag-node-icon.status-failed,
+.dag-node-icon.status-skipped { color: #fff; }
 
 /* Empty state */
 .dag-empty {

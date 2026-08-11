@@ -278,7 +278,7 @@ const lineageColDefs = [
   { key: 'version', label: 'view.evolve.colVersion', type: 'num' },
   { key: 'change', label: 'view.evolve.colChange' },
   { key: 'applied_at', label: 'view.evolve.colTimestamp' },
-  { key: 'improved', label: 'view.evolve.colImproved' },
+  { key: 'improved', label: 'view.evolve.colImproved', type: 'bool-icon' },
 ];
 const lineageCols = computed(() => lineageColDefs.map((c) => ({ ...c, label: t(c.label) })));
 const lineageRows = computed(() =>
@@ -288,7 +288,7 @@ const lineageRows = computed(() =>
     version: l.version,
     change: l.to_config || l.from_config || '—',
     applied_at: formatTs(l.applied_at),
-    improved: l.improved ? '✓' : '✗',
+    improved: l.improved,
   })),
 );
 
