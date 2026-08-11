@@ -48,33 +48,24 @@ const mbStyle = computed(() => {
 <style scoped>
 .card {
   position: relative;
-  background: var(--card-sheen), var(--surface);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm);
+  /* JB 精修: 卡片不再带常驻阴影 — 层级由 1px 描边 + 明度差承担 */
   overflow: visible;
-  transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease), transform var(--motion) var(--ease);
+  transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease);
 }
-/* 顶部 hairline 渐变线，强化卡片顶部边界 */
-.card::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--card-hairline) 15%, var(--brand-faint) 50%, var(--card-hairline) 85%, transparent);
-  pointer-events: none;
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
-}
-.card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+/* hover 只加深描边, 不再上浮/投影 — "静止感"是工具感与模板感的分水岭 */
+.card:hover { border-color: var(--border-strong); }
 .card--clickable { cursor: pointer; }
-.card--clickable:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); border-color: var(--brand); }
+.card--clickable:hover { border-color: var(--brand); background: var(--surface-2); }
 .card--bare .card__body { padding: 0; }
-.card:not(.card--bare) .card__body { padding: var(--sp-5); }
+.card:not(.card--bare) .card__body { padding: var(--sp-4); }
 .card__head {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  padding: var(--sp-4) var(--sp-5);
+  padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--border-subtle, var(--border));
   min-height: var(--row-h);
 }

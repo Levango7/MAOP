@@ -95,7 +95,8 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
   pointer-events: none;
   border-radius: var(--r-lg) var(--r-lg) 0 0;
 }
-.stat:hover { border-color: var(--border-strong); transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+/* JB 精修: hover 只改描边, 不要"飘浮"(translateY/shadow-pop 是模板感来源) */
+.stat:hover { border-color: var(--border-strong); }
 .stat.is-accent { border-left: 3px solid var(--accent); }
 .stat.is-accent::after {
   content: "";
@@ -104,7 +105,6 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
   width: 3px;
   background: var(--accent);
   border-radius: var(--r-lg) 0 0 var(--r-lg);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .stat__icon {
   width: 42px; height: 42px; border-radius: var(--r-md);

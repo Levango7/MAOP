@@ -6,26 +6,28 @@
  * but the baseline below guarantees visual parity across the console.
  * ========================================================================= */
 
-/* ── Page header baseline ─────────────────────────────────────────────── */
+/* ── Page header baseline — 2026-08-12 精修: 页头到内容 20px, 不再 24px ──
+ * JetBrains 规律: 标题区与首屏内容之间用 20px 建立"标题→内容"的从属关系,
+ * 而不是 24px 的均质空气。标题自身字号也下调到 22px(--fs-2xl 已改)避免压场。 */
 .topbar,
 .page-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--sp-3);
-  margin-bottom: var(--sp-6);
+  margin-bottom: var(--sp-5);
   flex-wrap: wrap;
 }
 .topbar h1,
 .page-head__title h1,
 .view-title {
   font-size: var(--fs-2xl);
-  font-weight: 700;
-  line-height: 1.2;
+  font-weight: 600;          /* JB: 页标题 600, 不是 700 — 700 太吵 */
+  line-height: 1.25;
   letter-spacing: -0.01em;
   margin: 0;
 }
-.view-title { display: block; margin-bottom: var(--sp-6); }
+.view-title { display: block; margin-bottom: var(--sp-5); }
 
 /* Title cluster (icon + text) */
 .topbar__title,
@@ -65,23 +67,28 @@
  * Every view should pull spacing/rhythm from these so the console reads as
  * one coherent product instead of 17 independently-tuned pages. Views may
  * keep their own scoped class names, but should match these values:
- *   - section rhythm  → var(--sp-6) (24px / 20px compact)
- *   - inner gaps      → var(--sp-4) (16px / 12px compact)
- *   - tight inline    → var(--sp-3) (12px)
+ *   - section rhythm  → var(--sp-4) (16px / 12px compact) — 精修自 24px
+ *   - inner gaps      → var(--sp-3) (12px) — 卡片内部亲密
+ *   - tight inline    → var(--sp-2) (8px)
  *   - radius          → var(--r-lg) for cards, var(--r-md) for controls
  * Grids use align-items: stretch so sibling cards stay the same height.
+ *
+ * 2026-08-12 精修: 间距缩一档(section 24→16)参考 JetBrains 的信息密度 —
+ * 原 24px 让卡片之间"飘", JB 的 16px 让区块形成清晰的视觉组块(grouping)。
+ * 组块之间的距离应该大于组块内部距离(完形心理学: 接近律)。此前这里 24
+ * 而卡片内 padding 也 20, 几乎相等, 视觉上无法分组。
  * ─────────────────────────────────────────────────────────────────────── */
-.section { margin-bottom: var(--sp-6); }
+.section { margin-bottom: var(--sp-4); }
 
 .grid-cards {
   display: grid;
-  gap: var(--sp-6);
+  gap: var(--sp-4);
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   align-items: stretch;
 }
-.grid-2 { display: grid; gap: var(--sp-6); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
-.grid-3 { display: grid; gap: var(--sp-6); grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
-.grid-4 { display: grid; gap: var(--sp-6); grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; }
+.grid-2 { display: grid; gap: var(--sp-4); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+.grid-3 { display: grid; gap: var(--sp-4); grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+.grid-4 { display: grid; gap: var(--sp-3); grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; }
 
 /* Vertical stack with consistent inner gap */
 .stack { display: flex; flex-direction: column; gap: var(--sp-4); }

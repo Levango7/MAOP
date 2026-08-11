@@ -212,20 +212,12 @@ onMounted(() => {
 .topbar__brand { display: flex; align-items: center; gap: 12px; flex-shrink: 0; position: relative; }
 .topbar__logo {
   display: grid; place-items: center;
-  width: 42px; height: 42px;
+  width: 34px; height: 34px;
   border-radius: var(--r-md);
-  background: linear-gradient(135deg, var(--brand) 0%, var(--chart-6) 100%);
+  background: var(--brand);
   color: #fff;
-  box-shadow: var(--shadow-brand), inset 0 1px 0 rgba(255, 255, 255, .25);
+  /* JB 精修: 移除双层渐变+内发光+外部投影 — 单一品牌色块, 克制 */
   position: relative;
-}
-.topbar__logo::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .15), transparent 50%);
-  pointer-events: none;
 }
 .topbar__brandtext { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
 .topbar__brandname-row { display: flex; align-items: baseline; gap: 8px; }
@@ -260,12 +252,7 @@ onMounted(() => {
 .topbar__live.connected { color: var(--success); }
 .topbar__live.connected .topbar__livedot {
   background: var(--success);
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, .2), 0 0 6px rgba(34, 197, 94, .5);
-  animation: topbar-pulse 2s var(--ease) infinite;
-}
-@keyframes topbar-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(34, 197, 94, .2), 0 0 6px rgba(34, 197, 94, .5); }
-  50% { box-shadow: 0 0 0 4px rgba(34, 197, 94, .12), 0 0 8px rgba(34, 197, 94, .6); }
+  /* 呼吸灯动画删除 — 常亮圆点即是状态, 不需要脉动吸引注意 */
 }
 .topbar__ver {
   font-family: var(--font-mono);

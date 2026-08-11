@@ -8,84 +8,86 @@
 :root {
   color-scheme: dark;
 
-  /* ── Legacy aliases (backward-compatible with existing views) ────────── */
-  --bg: #0f172a;
-  --bg2: #1e293b;
-  --bg3: #334155;
-  --bg4: #0f172a;
-  --border: #334155;
-  --text: #e2e8f0;
-  --text2: #94a3b8;
-  --text3: #64748b;
-  --accent: #6366f1;
-  --accent2: #818cf8;
-  --success: #22c55e;
-  --warn: #f59e0b;
-  --fail: #ef4444;
-  --radius: 12px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, .3);
+  /* ── MAOP "Workbench" 设计语言 (2026-08-12 精修) ─────────────────────────
+   * 参照 JetBrains New UI: 中性石墨灰底 × 克制信号蓝 × 1px 描边分隔 ×
+   * 小圆角(8px 上限) × 无辉光。弃用 AI 模板式靛紫(#6366f1)与满屏渐变,
+   * 把"科技感"交给内容本身(图表/图/DAG),外壳只做安静的容器。 */
 
-  /* ── Semantic surface tokens (new design system) ───────────────────────
-   * Layered surfaces create depth: surface (base) → surface-2 (raised) →
-   * surface-3 (overlay). Subtle blue undertone keeps the palette cohesive. */
-  --surface: #161e36;
-  --surface-2: #1d2742;
-  --surface-3: #26324f;
-  --surface-4: #2f3d5e;
-  --border-strong: #4d5e7d;
-  --text-muted: #9aa8c0;
-  --text-faint: #6b7a94;
-  --brand: #6366f1;
-  --brand-strong: #818cf8;
-  --brand-faint: rgba(99, 102, 241, .07);
-  --brand-soft: rgba(99, 102, 241, .14);
+  /* ── Legacy aliases (backward-compatible with existing views) ────────── */
+  --bg: #1b1d21;          /* workbench-100: 近黑石墨, 不带蓝紫倾向 */
+  --bg2: #24262b;         /* workbench-200 */
+  --bg3: #2e3138;         /* workbench-300 */
+  --bg4: #1b1d21;
+  --border: #3c4048;      /* 中性灰描边, 夜间可读性阈值之上 */
+  --text: #e8eaf0;
+  --text2: #adb4c2;
+  --text3: #7c8595;
+  --accent: #3574f0;      /* Azure-500 灵感: 工程感信号蓝, 非模板紫 */
+  --accent2: #5793f7;
+  --success: #3fb950;
+  --warn: #d29922;
+  --fail: #f85149;
+  --radius: 8px;          /* JB: 卡片 8px, 控件 6px */
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+
+  /* ── Semantic surface tokens ─────────────────────────────────────────────
+   * surface 层级差从 6-8% 亮度压缩到 3-4% —— 弱对比让界面"平"下来、静下来,
+   * 层级靠 1px 描边而非色块堆叠(JetBrains 核心手法)。 */
+  --surface: #22242a;     /* 卡片底: 比 bg 亮一档即可 */
+  --surface-2: #292b32;
+  --surface-3: #31343c;
+  --surface-4: #3a3e47;
+  --border-strong: #4e545f;
+  --text-muted: #9aa3b2;
+  --text-faint: #6e7686;
+  --brand: #3574f0;
+  --brand-strong: #5793f7;
+  --brand-faint: rgba(53, 116, 240, .10);
+  --brand-soft: rgba(53, 116, 240, .18);
   --brand-contrast: #ffffff;
 
-  --border-subtle: rgba(148, 163, 184, .14);
-  --border-faint: rgba(148, 163, 184, .08);
+  --border-subtle: rgba(163, 173, 190, .13);
+  --border-faint: rgba(163, 173, 190, .07);
 
-  /* ── Chart / data-viz palette (theme-aware) ────────────────────────────
-   * Replaces scattered hardcoded hex in Overview/Agents so charts follow the
-   * active dark/light theme instead of burning fixed colors into JS.
-   */
-  --chart-1: #6366f1;  --chart-2: #38bdf8;  --chart-3: #22c55e;
-  --chart-4: #f59e0b;  --chart-5: #a78bfa;  --chart-6: #14b8a6;
-  --chart-7: #ec4899;  --chart-8: #06b6d4;  --chart-9: #84cc16;
-  --chart-10: #f43f5e;
-  --chart-warn: #f59e0b;   /* perf-history busy / failures accent */
-  --chart-fail: #ef4444;   /* perf-history consecutive failures accent */
+  /* ── Chart / data-viz palette — 克制的高斯冷色谱,与品牌蓝同族 ─────────── */
+  --chart-1: #3574f0;  --chart-2: #4cc2ff;  --chart-3: #3fb950;
+  --chart-4: #d29922;  --chart-5: #9e8cfc;  --chart-6: #39c5cf;
+  --chart-7: #f778ba;  --chart-8: #56d4dd;  --chart-9: #7ee787;
+  --chart-10: #ff7b72;
+  --chart-warn: #d29922;
+  --chart-fail: #f85149;
 
-  --success-soft: rgba(34, 197, 94, .14);
-  --warn-soft: rgba(245, 158, 11, .14);
-  --fail-soft: rgba(239, 68, 68, .14);
-  --info: #38bdf8;
-  --info-soft: rgba(56, 189, 248, .14);
+  --success-soft: rgba(63, 185, 80, .15);
+  --warn-soft: rgba(210, 153, 34, .15);
+  --fail-soft: rgba(248, 81, 73, .15);
+  --info: #4cc2ff;
+  --info-soft: rgba(76, 194, 255, .13);
 
   /* ── Spacing scale ────────────────────────────────────────────────────── */
   --sp-1: 4px;  --sp-2: 8px;   --sp-3: 12px;  --sp-4: 16px;
   --sp-5: 20px; --sp-6: 24px;  --sp-7: 32px;  --sp-8: 40px;
   --sp-9: 48px;  --sp-10: 56px;
 
-  /* ── Radius scale ─────────────────────────────────────────────────────── */
-  --r-sm: 6px;  --r-md: 8px;  --r-lg: 12px;  --r-xl: 16px;  --r-full: 999px;
+  /* ── Radius scale — JB: 上限 8px, 控件 6px, 标签 4px ──────────────────── */
+  --r-sm: 4px;  --r-md: 6px;  --r-lg: 8px;  --r-xl: 10px;  --r-full: 999px;
   --r: var(--r-md);
 
-  /* ── Shadow scale ───────────────────────────────────────────────────────
-   * Multi-layer shadows mimic real light: a tight ambient contact shadow +
-   * a softer directional shadow. This gives cards/buttons a tangible float. */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .20), 0 1px 1px rgba(0, 0, 0, .12);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, .28), 0 2px 4px rgba(0, 0, 0, .16);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, .40), 0 4px 10px rgba(0, 0, 0, .20);
-  --shadow-topbar: 0 1px 0 rgba(255, 255, 255, .05), 0 6px 18px rgba(0, 0, 0, .28);
-  --shadow-pop: 0 8px 24px rgba(0, 0, 0, .36), 0 2px 6px rgba(0, 0, 0, .18);
-  --shadow-brand: 0 4px 14px rgba(99, 102, 241, .28), 0 1px 3px rgba(99, 102, 241, .14);
+  /* ── Shadow scale — JB 哲学: 阴影只服务浮层(popup/modal), 卡片不靠阴影抬升 ──
+   * 卡片层级来自 1px 描边 + 明度差, 阴影全部柔化收敛。 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .24);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, .30);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, .42);
+  --shadow-topbar: 0 1px 0 rgba(0, 0, 0, .30);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, .40);
+  --shadow-brand: 0 2px 10px rgba(53, 116, 240, .30);
 
-  /* ── Typography ───────────────────────────────────────────────────────── */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto,
+  /* ── Typography — Inter 优先(工程感), 数字 tabular-nums 由组件类负责 ──── */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --font-mono: 'SF Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, 'Cascadia Code',
+    Menlo, Consolas, monospace;
   --fs-xs: 11px;  --fs-sm: 12px;  --fs-base: 13px;  --fs-md: 14px;
-  --fs-lg: 16px;  --fs-xl: 20px;  --fs-2xl: 24px;
+  --fs-lg: 16px;  --fs-xl: 18px;  --fs-2xl: 22px;
 
   /* ── Z-index scale ───────────────────────────────────────────────────── */
   --z-base: 0;  --z-sticky: 30;  --z-drawer: 40;  --z-topbar: 50;
@@ -101,25 +103,23 @@
   /* ── Layout ───────────────────────────────────────────────────────────── */
   --sidebar-w: 232px;
   --rail-w: 64px;
-  --content-pad: 28px;
+  --content-pad: 24px;
   --maxw: 1440px;
-  --row-h: 44px;
-  --topbar-h: 72px;
+  --row-h: 36px;        /* JB 密度基准: 36px 行高而不是 44px */
+  --topbar-h: 56px;     /* 收窄顶栏, 让位给内容 */
 
   /* ── z-index ──────────────────────────────────────────────────────────── */
   --z-sidebar: 40; --z-topbar: 50; --z-drawer: 60; --z-toast: 80; --z-modal: 90;
 
-  /* ── Glass / sheen (approved in prototype) ──────────────────────────────
-   * card-sheen gives cards a subtle top-down light gradient; hairline adds
-   * a 1px top border for crispness. ambient glows sit behind the app for
-   * depth without distracting from content. */
-  --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 42%);
-  --card-hairline: rgba(255, 255, 255, .07);
-  --app-ambient: radial-gradient(900px 520px at 100% 0%, rgba(99, 102, 241, .12), transparent 60%),
-                  radial-gradient(700px 400px at 0% 100%, rgba(20, 184, 166, .06), transparent 60%);
-  --topbar-glow: linear-gradient(90deg, rgba(99, 102, 241, .10), transparent 30%);
-  --topbar-sheen: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0) 50%);
-  --topbar-hairline: rgba(255, 255, 255, .08);
+  /* ── 无辉光策略 — 全部置为 none/透明 ─────────────────────────────────────
+   * 辉光是"AI 模板感"的最大来源。JetBrains 式界面顶栏/卡片没有任何光晕,
+   * 分隔靠的是 1px 实线描边。保留变量名只是为了让旧组件代码不破。 */
+  --card-sheen: none;
+  --card-hairline: transparent;
+  --app-ambient: none;
+  --topbar-glow: none;
+  --topbar-sheen: none;
+  --topbar-hairline: transparent;
 }
 
 /* ── Density 规范 ──────────────────────────────────────────────────────────

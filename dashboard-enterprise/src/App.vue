@@ -384,20 +384,20 @@ onUnmounted(() => {
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  width: 3px;
-  background: linear-gradient(180deg, var(--brand-strong), var(--brand));
-  box-shadow: 0 0 8px rgba(99, 102, 241, .5);
+  width: 2px;
+  background: var(--brand);
+  /* JB 精修: 去掉 box-shadow 发光 — 纯粹的 1px 色条就是全部装饰 */
 }
 .nav-link.router-link-active::after {
   content: '';
   position: absolute;
-  right: 14px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  width: 5px; height: 5px;
+  width: 4px; height: 4px;
   border-radius: 50%;
   background: var(--brand);
-  box-shadow: 0 0 6px rgba(99, 102, 241, .6);
+  /* 同步去发光 */
 }
 .nav-icon { flex-shrink: 0; color: inherit; transition: transform var(--motion) var(--ease); }
 .nav-link:hover .nav-icon { transform: scale(1.08); }

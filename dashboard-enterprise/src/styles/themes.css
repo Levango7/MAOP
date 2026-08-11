@@ -8,66 +8,65 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  /* Legacy aliases */
-  --bg: #e9edf4;          /* deepened so white cards visibly float */
-  --bg2: #f4f7fb;
-  --bg3: #e2e8f1;
+  /* Legacy aliases — 亮色同套语言: 纸灰底 + 信号蓝 */
+  --bg: #f2f3f5;
+  --bg2: #e9ebee;
+  --bg3: #dfe2e8;
   --bg4: #ffffff;
-  --border: #d2dae6;       /* stronger than before — clearly separated from bg */
-  --border-strong: #b4c0d2;
-  --text: #1a2332;
-  --text2: #3d4f65;
-  --text3: #5b6b82;
-  --accent: #4f46e5;
-  --accent2: #6366f1;
-  --success: #16a34a;
-  --warn: #d97706;
-  --fail: #dc2626;
-  --radius: 12px;
-  --shadow: 0 1px 3px rgba(15, 23, 42, .08);
+  --border: #d4d8e0;
+  --border-strong: #b9bfcc;
+  --text: #1d2129;
+  --text2: #4e5566;
+  --text3: #6b7382;
+  --accent: #3574f0;
+  --accent2: #2d63c8;
+  --success: #1f883d;
+  --warn: #bf8700;
+  --fail: #d1242f;
+  --radius: 8px;
+  --shadow: 0 1px 2px rgba(29, 33, 41, .08);
 
   /* Semantic surface tokens */
   --surface: #ffffff;
-  --surface-2: #f4f7fb;
-  --surface-3: #eef2f8;
-  --surface-4: #e2e8f1;
-  --text-muted: #5b6b82;
-  --text-faint: #6b7d94;
-  --brand: #4f46e5;
-  --brand-strong: #6366f1;
-  --brand-faint: rgba(79, 70, 229, .06);
-  --brand-soft: rgba(79, 70, 229, .10);
+  --surface-2: #f6f7f9;
+  --surface-3: #eef0f4;
+  --surface-4: #e4e7ec;
+  --text-muted: #59616e;
+  --text-faint: #78808f;
+  --brand: #3574f0;
+  --brand-strong: #2d63c8;
+  --brand-faint: rgba(53, 116, 240, .08);
+  --brand-soft: rgba(53, 116, 240, .12);
   --brand-contrast: #ffffff;
 
-  --border-subtle: rgba(100, 116, 139, .16);
-  --border-faint: rgba(100, 116, 139, .08);
+  --border-subtle: rgba(89, 97, 110, .14);
+  --border-faint: rgba(89, 97, 110, .07);
 
-  /* Chart palette — light-tuned (slightly deeper for contrast on white) */
-  --chart-1: #4f46e5;  --chart-2: #0284c7;  --chart-3: #16a34a;
-  --chart-4: #d97706;  --chart-5: #7c3aed;  --chart-6: #0d9488;
-  --chart-7: #db2777;  --chart-8: #0891b2;  --chart-9: #65a30d;
-  --chart-10: #e11d48;
-  --chart-warn: #d97706;
-  --chart-fail: #dc2626;
+  /* Chart palette — light-tuned */
+  --chart-1: #3574f0;  --chart-2: #0a7ea4;  --chart-3: #1f883d;
+  --chart-4: #bf8700;  --chart-5: #7c63e0;  --chart-6: #0d9db8;
+  --chart-7: #d12470;  --chart-8: #0891b2;  --chart-9: #4e8000;
+  --chart-10: #cf222e;
+  --chart-warn: #bf8700;
+  --chart-fail: #d1242f;
 
-  --success-soft: rgba(22, 163, 74, .10);
-  --warn-soft: rgba(217, 119, 6, .12);
-  --fail-soft: rgba(220, 38, 38, .10);
-  --info: #0284c7;
-  --info-soft: rgba(2, 132, 199, .10);
+  --success-soft: rgba(31, 136, 61, .10);
+  --warn-soft: rgba(191, 135, 0, .12);
+  --fail-soft: rgba(209, 36, 47, .10);
+  --info: #0a7ea4;
+  --info-soft: rgba(10, 126, 164, .10);
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .05), 0 1px 1px rgba(15, 23, 42, .04);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, .08), 0 2px 4px rgba(15, 23, 42, .05);
-  --shadow-lg: 0 16px 40px rgba(15, 23, 42, .14), 0 4px 10px rgba(15, 23, 42, .06);
-  --shadow-topbar: 0 1px 0 rgba(15, 23, 42, .04), 0 6px 18px rgba(15, 23, 42, .08);
-  --shadow-pop: 0 8px 24px rgba(15, 23, 42, .14), 0 2px 6px rgba(15, 23, 42, .06);
-  --shadow-brand: 0 4px 14px rgba(79, 70, 229, .20), 0 1px 3px rgba(79, 70, 229, .10);
+  --shadow-sm: 0 1px 2px rgba(29, 33, 41, .06);
+  --shadow-md: 0 2px 8px rgba(29, 33, 41, .10);
+  --shadow-lg: 0 12px 28px rgba(29, 33, 41, .16);
+  --shadow-topbar: 0 1px 0 rgba(29, 33, 41, .08);
+  --shadow-pop: 0 8px 24px rgba(29, 33, 41, .14);
+  --shadow-brand: 0 2px 10px rgba(53, 116, 240, .22);
 
-  --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 48%);
-  --card-hairline: rgba(15, 23, 42, .06);
-  --app-ambient: radial-gradient(900px 520px at 100% 0%, rgba(79, 70, 229, .07), transparent 60%),
-                  radial-gradient(700px 400px at 0% 100%, rgba(20, 184, 166, .04), transparent 60%);
-  --topbar-glow: linear-gradient(90deg, rgba(79, 70, 229, .07), transparent 30%);
-  --topbar-sheen: linear-gradient(180deg, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0) 50%);
-  --topbar-hairline: rgba(15, 23, 42, .08);
+  --card-sheen: none;
+  --card-hairline: transparent;
+  --app-ambient: none;
+  --topbar-glow: none;
+  --topbar-sheen: none;
+  --topbar-hairline: transparent;
 }
