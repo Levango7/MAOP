@@ -44,75 +44,39 @@ const subtitleText = computed(() => props.subtitle || (meta.subtitle ? t(meta.su
 </script>
 
 <style>
-/* 页面级标题栏 — 只保留页面标题+操作槽，全局元素已迁移到 TopBar
- * 视觉层次：card-sheen + 顶部 hairline + 左侧装饰条 + brand 图标徽章 */
+/* 页面级标题栏 — 2026-08-12 精修,对齐"workbench"设计语言
+ * - margin-bottom: 16px(--sp-3 → --sp-4),与 .section/.card 节奏一致
+ * - 去掉渐变 hairline / 左侧品牌装饰条 / 图标渐变徽章+内发光
+ * - hover 无位移/无阴影 — 静止感
+ * - 图标回归 34px 单色块,与 TopBar logo 同一规格 */
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
-  margin-bottom: var(--sp-3);
+  margin-bottom: var(--sp-4);
   flex-wrap: wrap;
-  padding: var(--sp-3) var(--sp-5);
-  background: var(--card-sheen), var(--surface);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm);
   position: relative;
-  overflow: hidden;
-}
-/* 顶部 hairline 渐变线 */
-.page-header::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    var(--card-hairline) 15%,
-    var(--brand-faint) 50%,
-    var(--card-hairline) 85%,
-    transparent 100%);
-  pointer-events: none;
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
-}
-/* 左侧装饰条，强化页面身份 */
-.page-header::after {
-  content: '';
-  position: absolute;
-  left: 0; top: 20%; bottom: 20%;
-  width: 3px;
-  background: linear-gradient(180deg, var(--brand-strong), var(--brand));
-  border-radius: 0 3px 3px 0;
-  opacity: .7;
-  pointer-events: none;
 }
 .page-header__main {
   display: flex;
   align-items: center;
-  gap: var(--sp-4);
+  gap: var(--sp-3);
   min-width: 0;
-  padding-left: 4px;
 }
 .page-header__icon {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
   flex-shrink: 0;
   border-radius: var(--r-md);
-  background: linear-gradient(135deg, var(--brand-soft), var(--brand-faint));
-  color: var(--brand-strong);
-  border: 1px solid var(--brand-faint);
-  box-shadow: inset 0 1px 0 var(--card-hairline);
-  position: relative;
-}
-.page-header__icon::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .05), transparent 50%);
-  pointer-events: none;
+  background: var(--brand);
+  color: var(--brand-contrast);
 }
 .page-header__text { min-width: 0; }
 .page-header__titlerow {
@@ -123,9 +87,9 @@ const subtitleText = computed(() => props.subtitle || (meta.subtitle ? t(meta.su
 }
 .page-header__title {
   font-size: var(--fs-2xl, 22px);
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.018em;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.012em;
   color: var(--text);
   margin: 0;
 }
@@ -151,12 +115,10 @@ const subtitleText = computed(() => props.subtitle || (meta.subtitle ? t(meta.su
 }
 
 @media (max-width: 900px) {
-  .page-header { gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); }
-  .page-header__icon { width: 38px; height: 38px; }
+  .page-header { gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
 }
 
 @media (max-width: 700px) {
   .page-header__actions { width: 100%; justify-content: flex-start; }
-  .page-header::after { display: none; }
 }
 </style>

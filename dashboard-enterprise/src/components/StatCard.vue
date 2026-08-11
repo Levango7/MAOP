@@ -77,23 +77,13 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  background: var(--card-sheen), var(--surface);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: var(--sp-4) var(--sp-5);
-  box-shadow: var(--shadow-sm);
-  transition: border-color var(--motion) var(--ease), transform var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+  padding: var(--sp-4);
+  /* JB 精修: 去 sheen / hairline / 常驻阴影 — 描边与明度差承担层级 */
+  transition: border-color var(--motion) var(--ease);
   position: relative;
-}
-/* 顶部 hairline */
-.stat::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--card-hairline) 20%, var(--card-hairline) 80%, transparent);
-  pointer-events: none;
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
 }
 /* JB 精修: hover 只改描边, 不要"飘浮"(translateY/shadow-pop 是模板感来源) */
 .stat:hover { border-color: var(--border-strong); }
