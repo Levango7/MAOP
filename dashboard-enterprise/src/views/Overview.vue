@@ -374,4 +374,91 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 </script>
 
 <style scoped>
+/* ── Hero strip — 全宽状态条: 描边卡片风, 与全站 workbench 语言一致 ── */
+.ov-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.ov-hero__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ov-hero--healthy .ov-hero__dot { background: var(--success); }
+.ov-hero--degraded .ov-hero__dot { background: var(--warn); }
+.ov-hero--down .ov-hero__dot { background: var(--fail); }
+.ov-hero__status { font-size: var(--fs-md); font-weight: 600; color: var(--text); }
+.ov-hero__sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
+.ov-hero__kpi { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.ov-hero__fresh { margin-left: auto; font-size: var(--fs-xs); }
+
+/* ── Quick actions — 4 磁贴, 视觉上是明确的"按钮卡" ── */
+.ov-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+.ov-action {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-decoration: none;
+  transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease), color var(--motion) var(--ease);
+  min-height: 44px;
+}
+.ov-action:hover {
+  border-color: var(--brand);
+  color: var(--brand-strong);
+}
+.ov-action:hover .ov-action__icon { color: var(--brand-strong); }
+.ov-action:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.ov-action__icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--r-md);
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  transition: inherit;
+}
+.ov-action__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Split tier — 图表 2/3 + 活动流 1/3 ── */
+.ov-split {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--sp-4);
+  align-items: stretch;
+}
+.ov-split > * { min-width: 0; margin-bottom: 0; }
+.ov-split .activity-feed { margin-bottom: 0; }
+
+@media (max-width: 1200px) {
+  .ov-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .ov-split { grid-template-columns: 1fr; }
+  .ov-hero__kpi { display: none; }
+}
+@media (max-width: 520px) {
+  .ov-actions { grid-template-columns: 1fr; }
+}
 </style>
