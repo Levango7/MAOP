@@ -1,29 +1,25 @@
 <template>
-  <div class="app-layout" :class="{ 'rail': ui.rail && !isMobile, 'sidebar-open': sidebarOpen && isMobile }">
+  <!-- 上下通栏布局: 顶栏全宽置顶(含侧栏折叠钮), 下方为 侧栏+内容 横排 -->
+  <div class="app-layout app-layout--topdown" :class="{ 'rail': ui.rail && !isMobile, 'sidebar-open': sidebarOpen && isMobile }">
+    <TopBar @toggle-rail="toggleRail" :rail="ui.rail" />
+
     <!-- Mobile drawer backdrop -->
     <div v-if="sidebarOpen && isMobile" class="sidebar-backdrop" @click="closeSidebar" aria-hidden="true"></div>
 
-    <nav class="sidebar">
-      <div class="logo">
-        <span>MAOP</span>
-        <button class="rail-btn" @click="toggleRail" :title="ui.rail ? t('action.expandSidebar') : t('action.collapseSidebar')" aria-label="Toggle sidebar">
-          <AppIcon name="panelleft" :size="16" />
-        </button>
-      </div>
+    <div class="app-body">
+      <nav class="sidebar" @click="onSidebarClick">
+        <div class="nav-scroll">
+          <template v-for="(item, i) in nav" :key="i">
+            <div v-if="item.section" class="nav-section">{{ t(item.section) }}</div>
+            <router-link v-else :to="item.to" class="nav-link" :title="t(item.label)" :class="{ 'router-link-active': isActive(item) }">
+              <AppIcon class="nav-icon" :name="item.icon" :size="18" />
+              <span class="nav-label">{{ t(item.label) }}</span>
+            </router-link>
+          </template>
+        </div>
+      </nav>
 
-      <div class="nav-scroll">
-        <template v-for="(item, i) in nav" :key="i">
-          <div v-if="item.section" class="nav-section">{{ t(item.section) }}</div>
-          <router-link v-else :to="item.to" class="nav-link" :title="t(item.label)">
-            <AppIcon class="nav-icon" :name="item.icon" :size="18" />
-            <span class="nav-label">{{ t(item.label) }}</span>
-          </router-link>
-        </template>
-      </div>
-    </nav>
-
-    <main class="content">
-      <TopBar />
+      <main class="content">
       <button
         class="hamburger-btn"
         @click="toggleSidebar"
@@ -44,7 +40,8 @@
         </router-view>
       </div>
       <AppFooter :version="version" />
-    </main>
+      </main>
+    </div><!-- /.app-body -->
 
     <div v-if="authExpired" class="auth-overlay">
       <div class="auth-card">
@@ -169,6 +166,17 @@ function onSidebarClick(e) {
   if (isMobile.value && sidebarOpen.value && e.target.closest('.nav-link')) closeSidebar();
 }
 
+// Nav active state: matchPaths (e.g. /evolution-history highlights /evolve)
+import { useRoute } from 'vue-router';
+const route = useRoute();
+function isActive(item) {
+  if (!item.to) return false;
+  if (item.to === '/') return route.path === '/';
+  if (route.path === item.to || route.path.startsWith(item.to + '/')) return true;
+  if (Array.isArray(item.matchPaths) && item.matchPaths.some((p) => route.path === p || route.path.startsWith(p + '/'))) return true;
+  return false;
+}
+
 // ── Navigation ────────────────────────────────────────────────────────────
 // `nav` is imported from ./nav.js (single source of truth shared with PageHeader).
 
@@ -282,66 +290,38 @@ onUnmounted(() => {
 :root { color-scheme: dark; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-.app-layout { display: flex; min-height: 100vh; position: relative; z-index: 1; }
-
-/* ── User profile card (sidebar footer) — MOVED to PageHeader ───── */
+/* 上下通栏布局 (2026-08-12 重构):
+ * 顶栏独立成行置顶, 侧栏+内容在其下横排。
+ * 顶栏的折叠按钮永远可见, 不会被侧栏宽度变化压没。
+ */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+.app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
 
 /* ── Sidebar ─────────────────────────────────────────────────────── */
 .sidebar {
   width: var(--sidebar-w);
-  background: var(--card-sheen), var(--surface);
+  background: var(--surface);
   padding: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
-  position: sticky; top: 0; height: 100vh;
   flex-shrink: 0;
   z-index: var(--z-sidebar);
   transition: width var(--motion) var(--ease);
-}
-/* Sidebar 内右侧的微光带，强化视觉层次 */
-.sidebar::after {
-  content: "";
-  position: absolute;
-  top: 0; right: 0; bottom: 0;
-  width: 1px;
-  background: linear-gradient(180deg,
-    transparent 0%,
-    var(--border) 15%,
-    var(--brand-faint) 50%,
-    var(--border) 85%,
-    transparent 100%);
-  pointer-events: none;
-}
-.logo {
-  display: flex; align-items: center; gap: 10px;
-  height: var(--topbar-h);
-  padding: 0 18px;
-  font-size: 16px; font-weight: 700; color: var(--text);
-  letter-spacing: .01em;
-  border-bottom: 1px solid var(--border);
   position: relative;
-  flex-shrink: 0;
-}
-.logo > span:first-child {
-  background: linear-gradient(135deg, var(--brand-strong) 0%, var(--chart-6) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: .02em;
-}
-.logo .rail-btn {
-  margin-left: auto; background: none; border: none; color: var(--text-faint);
-  display: grid; place-items: center; padding: 5px; border-radius: var(--r-sm);
-  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), transform var(--motion) var(--ease);
-}
-.logo .rail-btn:hover {
-  color: var(--brand-strong);
-  background: var(--brand-soft);
-  transform: scale(1.05);
 }
 
-.nav-scroll { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+.nav-scroll { flex: 1; overflow-y: auto; padding: var(--sp-2) 0; }
 .nav-section {
   font-size: 10px; font-weight: 700; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: .08em;
@@ -413,10 +393,8 @@ onUnmounted(() => {
 
 /* ── Rail (collapsed) state ─────────────────────────────────────── */
 .app-layout.rail .sidebar { width: var(--rail-w); }
-.app-layout.rail .logo span,
 .app-layout.rail .nav-label,
 .app-layout.rail .nav-section { display: none; }
-.app-layout.rail .logo { justify-content: center; padding: 0; }
 .app-layout.rail .nav-link { justify-content: center; padding: 10px 0; gap: 0; }
 
 /* ── Content (scroll area) ─────────────────────────────────────── */

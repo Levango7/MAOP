@@ -3,6 +3,11 @@
     <!-- 顶部细线 hairline，强化视觉边界 -->
     <div class="topbar__hairline" aria-hidden="true"></div>
 
+    <!-- ⓪ 侧栏折叠按钮(全宽顶栏 → 永远在,不受侧栏宽度挤压) -->
+    <button class="topbar__siderail-btn" @click="$emit('toggle-rail')" :title="rail ? t('action.expandSidebar') : t('action.collapseSidebar')" :aria-label="rail ? 'Expand sidebar' : 'Collapse sidebar'">
+      <AppIcon :name="rail ? 'panelright' : 'panelleft'" :size="16" />
+    </button>
+
     <!-- ① 系统标识（居左） -->
     <div class="topbar__brand">
       <div class="topbar__logo" aria-hidden="true">
@@ -86,6 +91,9 @@ import { useUiStore } from '../stores/ui.js';
 import { useRealtimeStore } from '../stores/realtime.js';
 import { useEditionStore } from '../stores/edition.js';
 import { useApiStore } from '../stores/api.js';
+
+defineEmits(['toggle-rail']);
+defineProps({ rail: { type: Boolean, default: false } });
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -176,14 +184,33 @@ onMounted(() => {
   gap: var(--sp-4);
   padding: 0 var(--sp-6);
   height: var(--topbar-h);
-  background: var(--topbar-sheen), var(--card-sheen), var(--surface);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow-topbar);
-  position: sticky;
-  top: 0;
+  /* 通栏布局 (2026-08-12 重构): 顶栏作为 .app-layout 的第一个子元素, 已在顶端,
+     无需 sticky (外层不是滚动容器); 也用 .app-layout 的 flex 自然撑开 */
+  position: relative;
   z-index: var(--z-topbar, 50);
   flex-shrink: 0;
 }
+/* ⓪ 侧栏折叠按钮 — 在顶栏最左, 永远在, 不被 rail 状态影响 */
+.topbar__siderail-btn {
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), border-color var(--motion) var(--ease);
+}
+.topbar__siderail-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+.topbar__siderail-btn:active { transform: scale(.96); }
+
 /* 顶部细线：强化顶栏边界感 */
 .topbar__hairline {
   position: absolute;
