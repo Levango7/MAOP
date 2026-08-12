@@ -1,50 +1,55 @@
 <template>
   <div class="tenant-page">
-    <PageHeader>
-      <Badge tone="brand">{{ t('view.tenants.enterprise') }}</Badge>
-      <button class="btn btn--primary" @click="openCreate">
-        <AppIcon name="building" :size="15" /> {{ t('view.tenants.createTenant') }}
-      </button>
-    </PageHeader>
+    <ListPageLayout
+      :loading="loading"
+      :error="error"
+      :empty="!tenants.length"
+      :error-title="t('view.tenants.loadError')"
+      :empty-title="t('view.tenants.noTenants')"
+      :empty-desc="t('view.tenants.noTenantsDesc')"
+      :loading-lines="3"
+    >
+      <template #badges>
+        <Badge tone="brand">{{ t('view.tenants.enterprise') }}</Badge>
+      </template>
+      <template #actions>
+        <button class="btn btn--primary" @click="openCreate">
+          <AppIcon name="building" :size="15" /> {{ t('view.tenants.createTenant') }}
+        </button>
+      </template>
 
-    <div class="tenant-grid" v-if="tenants.length">
-      <div class="tenant-card" v-for="tenant in tenants" :key="tenant.tenant_id" :class="{ suspended: tenant.status === 'suspended' }">
-        <div class="tenant-card__head">
-          <div class="tenant-id">
-            <h3>{{ tenant.name || tenant.tenant_id }}</h3>
-            <span class="muted mono">{{ tenant.tenant_id }}</span>
+      <template #content>
+        <div class="tenant-grid">
+          <div v-for="tenant in tenants" :key="tenant.tenant_id" class="tenant-card" :class="{ suspended: tenant.status === 'suspended' }">
+            <div class="tenant-card__head">
+              <div class="tenant-id">
+                <h3>{{ tenant.name || tenant.tenant_id }}</h3>
+                <span class="muted mono">{{ tenant.tenant_id }}</span>
+              </div>
+              <Badge :tone="statusTone(tenant.status)">{{ tenant.status || t('view.tenants.unknown') }}</Badge>
+            </div>
+            <div class="tenant-meta">
+              <span class="muted">{{ t('view.tenants.plan') }}</span>
+              <b>{{ tenant.plan || '—' }}</b>
+            </div>
+            <div v-if="hasQuota(tenant)" class="quota">
+              <div v-for="q in quotaUsage(tenant)" :key="q.name" class="quota-row">
+                <span class="quota-name">{{ q.name }}</span>
+                <div class="bar"><div class="bar-fill" :class="{ 'is-high': q.pct > 80 }" :style="{ width: q.pct + '%' }"></div></div>
+                <span class="quota-val">{{ q.current }} / {{ q.max || '∞' }}</span>
+              </div>
+            </div>
+            <div class="tenant-actions">
+              <button v-if="tenant.status === 'suspended'" class="btn btn--sm" @click="activate(tenant.tenant_id)">{{ t('view.tenants.activate') }}</button>
+              <button v-if="tenant.status === 'active'" class="btn btn--sm btn--warn" @click="suspend(tenant.tenant_id)">{{ t('view.tenants.suspend') }}</button>
+              <button class="btn btn--sm btn--danger" @click="remove(tenant.tenant_id)">{{ t('common.delete') }}</button>
+            </div>
           </div>
-          <Badge :tone="statusTone(tenant.status)">{{ tenant.status || t('view.tenants.unknown') }}</Badge>
         </div>
-        <div class="tenant-meta">
-          <span class="muted">{{ t('view.tenants.plan') }}</span>
-          <b>{{ tenant.plan || '—' }}</b>
-        </div>
-        <div class="quota" v-if="hasQuota(tenant)">
-          <div class="quota-row" v-for="q in quotaUsage(tenant)" :key="q.name">
-            <span class="quota-name">{{ q.name }}</span>
-            <div class="bar"><div class="bar-fill" :class="{ 'is-high': q.pct > 80 }" :style="{ width: q.pct + '%' }"></div></div>
-            <span class="quota-val">{{ q.current }} / {{ q.max || '∞' }}</span>
-          </div>
-        </div>
-        <div class="tenant-actions">
-          <button v-if="tenant.status === 'suspended'" class="btn btn--sm" @click="activate(tenant.tenant_id)">{{ t('view.tenants.activate') }}</button>
-          <button v-if="tenant.status === 'active'" class="btn btn--sm btn--warn" @click="suspend(tenant.tenant_id)">{{ t('view.tenants.suspend') }}</button>
-          <button class="btn btn--sm btn--danger" @click="remove(tenant.tenant_id)">{{ t('common.delete') }}</button>
-        </div>
-      </div>
-    </div>
-    <EmptyState
-      v-else-if="!loading"
-      icon="building"
-      :title="t('view.tenants.noTenants')"
-      :description="t('view.tenants.noTenantsDesc')"
-    />
-    <div class="tenant-grid" v-else>
-      <Skeleton height="180px" v-for="n in 3" :key="n" />
-    </div>
+      </template>
+    </ListPageLayout>
 
-    <div class="modal-overlay" v-if="showCreate" v-modal-a11y @click.self="showCreate = false" @modal:escape="showCreate = false">
+    <div v-if="showCreate" v-modal-a11y class="modal-overlay" @click.self="showCreate = false" @modal:escape="showCreate = false">
       <div class="modal">
         <h3>{{ t('view.tenants.createTenant') }}</h3>
         <label>{{ t('view.tenants.tenantId') }}</label>
@@ -74,9 +79,7 @@ import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
 import { useI18n } from '../i18n';
 import Badge from '../components/Badge.vue';
-import PageHeader from '../components/PageHeader.vue';
-import Skeleton from '../components/Skeleton.vue';
-import EmptyState from '../components/EmptyState.vue';
+import ListPageLayout from '../components/ListPageLayout.vue';
 import AppIcon from '../components/AppIcon.vue';
 
 const { t } = useI18n();
@@ -86,6 +89,7 @@ const toast = useToast();
 
 const tenants = ref([]);
 const loading = ref(true);
+const error = ref('');
 const showCreate = ref(false);
 const saving = ref(false);
 const newTenant = ref({ tenant_id: '', name: '', plan: 'starter' });
@@ -114,7 +118,9 @@ async function load() {
   try {
     const d = await api.get('/api/tenant/list');
     tenants.value = d.tenants || [];
-  } catch {
+    error.value = '';
+  } catch (e) {
+    error.value = e.message || 'Failed to load tenants';
     tenants.value = [];
   } finally {
     loading.value = false;
@@ -175,4 +181,5 @@ onMounted(load);
 </script>
 
 <style scoped>
+.tenant-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--sp-4); }
 </style>
