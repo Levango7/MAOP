@@ -1,5 +1,7 @@
 // Vitest setup file - ensure localStorage is available and functional
 import { vi } from 'vitest';
+import { config as testConfig } from '@vue/test-utils';
+import { vModalA11y } from '../directives/modalA11y.js';
 
 // Create a functional localStorage mock
 const createLocalStorageMock = () => {
@@ -29,3 +31,10 @@ if (typeof window !== 'undefined') {
     configurable: true,
   });
 }
+
+// Register global directives (mirrors main.js so tests don't emit
+// "Failed to resolve directive" warnings for v-modal-a11y)
+testConfig.global.directives = {
+  ...testConfig.global.directives,
+  'modal-a11y': vModalA11y,
+};

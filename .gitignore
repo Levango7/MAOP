@@ -164,3 +164,9 @@ deliverables/
 py/maop/data/*.db
 py/maop/data/*.db-shm
 py/maop/data/*.db-wal
+
+# -- IDE: InsCode --
+.inscode/
+
+# -- Temporary attachments --
+attachments/
