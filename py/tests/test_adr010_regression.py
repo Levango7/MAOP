@@ -28,7 +28,8 @@ class TestBug1Ps1Path:
     r"""BUG-1: MAOP.ps1 should reference src\MAOP-loop.ps1, not src\src\MAOP-loop.ps1."""
 
     def test_maop_ps1_no_double_src(self):
-        MAOP_ROOT = Path(__file__).resolve().parents[3]
+        # tests/ → py/ → MAOP_ROOT
+        MAOP_ROOT = Path(__file__).resolve().parents[2]
         ps1 = MAOP_ROOT / "maop.ps1"
         if not ps1.exists():
             pytest.skip("maop.ps1 not found")
@@ -101,22 +102,31 @@ class TestM1NoPerAgentInRules:
     """M-1: Removed dead per_agent from rules.yaml."""
 
     def test_rules_yaml_no_per_agent(self):
-        MAOP_ROOT = Path(__file__).resolve().parents[3]
+        # tests/ → py/ → MAOP_ROOT
+        MAOP_ROOT = Path(__file__).resolve().parents[2]
         rules = MAOP_ROOT / "config" / "rules.yaml"
         if not rules.exists():
             pytest.skip("rules.yaml not found")
         content = rules.read_text(encoding="utf-8")
-        assert "per_agent" not in content
+        # Check that no non-comment line contains a per_agent YAML key.
+        # A comment line mentioning per_agent (e.g. explanatory note) is allowed.
+        for i, line in enumerate(content.splitlines()):
+            stripped = line.lstrip()
+            if stripped.startswith("#"):
+                continue
+            if "per_agent" in line:
+                pytest.fail(f"Found per_agent in rules.yaml at line {i+1}: {line.strip()}")
 
 
 class TestM1bNoCodegenFallback:
     """M-1b: All codegen fallbacks in MAOP-loop replaced with chat."""
 
     def test_maop_loop_no_codegen_fallback(self):
-        MAOP_ROOT = Path(__file__).resolve().parents[3]
-        loop_file = MAOP_ROOT / "py" / "MAOP" / "MAOP_loop.py"
+        # tests/ → py/ → MAOP_ROOT
+        MAOP_ROOT = Path(__file__).resolve().parents[2]
+        loop_file = MAOP_ROOT / "py" / "maop" / "maop_loop.py"
         if not loop_file.exists():
-            pytest.skip("MAOP_loop.py not found")
+            pytest.skip("maop_loop.py not found")
         content = loop_file.read_text(encoding="utf-8")
         lines = content.split("\n")
         for i, line in enumerate(lines):

@@ -2,7 +2,7 @@
   <div class="evo-history-page">
     <PageHeader v-if="!embedded">
       <span class="subtitle muted">{{ t('view.evolutionHistory.subtitle') }}</span>
-      <button class="btn-ghost" :class="{ 'is-busy': loading }" @click="loadAll" :disabled="loading">
+      <button class="btn-ghost" :class="{ 'is-busy': loading }" :disabled="loading" @click="loadAll">
         <AppIcon name="refresh" :size="15" />
         <span>{{ t('view.evolutionHistory.refresh') }}</span>
       </button>
@@ -50,7 +50,8 @@
         :loading="loading"
         :empty-text="t('view.evolutionHistory.noData')"
       />
-      <EmptyState v-else-if="!loading" icon="activity"
+      <EmptyState
+v-else-if="!loading" icon="activity"
         :title="t('view.evolutionHistory.noData')"
         :description="t('view.evolutionHistory.noDataDesc')" />
       <Skeleton v-else height="160px" />
@@ -66,7 +67,8 @@
         row-key="name"
         :empty-text="t('view.evolutionHistory.noData')"
       />
-      <EmptyState v-else icon="beaker"
+      <EmptyState
+v-else icon="beaker"
         :title="t('view.evolutionHistory.noData')"
         :description="t('view.evolutionHistory.noDataDesc')" />
     </Card>
@@ -81,7 +83,8 @@
         row-key="id"
         :empty-text="t('view.evolutionHistory.noData')"
       />
-      <EmptyState v-else icon="rotate-ccw"
+      <EmptyState
+v-else icon="rotate-ccw"
         :title="t('view.evolutionHistory.noData')"
         :description="t('view.evolutionHistory.noDataDesc')" />
     </Card>
@@ -96,13 +99,14 @@
             <span class="pending-item__cycle muted">{{ item.cycle_id }}</span>
           </div>
           <div class="pending-item__detail muted">{{ item.detail }}</div>
-          <button class="btn-action" @click="approve(item)" :disabled="approving === item.cycle_id">
+          <button class="btn-action" :disabled="approving === item.cycle_id" @click="approve(item)">
             <AppIcon name="check-circle" :size="14" />
             {{ t('view.evolutionHistory.approve') }}
           </button>
         </div>
       </div>
-      <EmptyState v-else icon="clock"
+      <EmptyState
+v-else icon="clock"
         :title="t('view.evolutionHistory.noData')"
         :description="t('view.evolutionHistory.pending.desc')" />
     </Card>

@@ -8,8 +8,8 @@
     </PageHeader>
 
     <Card :title="t('view.rbac.roles')" icon="shield" :margin-bottom="16">
-      <div class="role-grid" v-if="!rolesLoading">
-        <div class="role-card" v-for="r in roles" :key="r.role">
+      <div v-if="!rolesLoading" class="role-grid">
+        <div v-for="r in roles" :key="r.role" class="role-card">
           <div class="role-card__head">
             <AppIcon name="shield" :size="16" />
             <h3>{{ roleLabel(r.role) }}</h3>
@@ -20,20 +20,20 @@
           </div>
         </div>
       </div>
-      <div class="role-grid" v-else>
-        <Skeleton height="92px" v-for="n in 4" :key="n" />
+      <div v-else class="role-grid">
+        <Skeleton v-for="n in 4" :key="n" height="92px" />
       </div>
-      <p class="inline-error" v-if="rolesError">{{ rolesError }}</p>
+      <p v-if="rolesError" class="inline-error">{{ rolesError }}</p>
     </Card>
 
     <Card :title="t('view.rbac.activeGrants')" icon="clipboard" :margin-bottom="16">
-      <div class="grant-list" v-if="grants.length">
-        <div class="grant-row" v-for="g in grants" :key="g.__key">
+      <div v-if="grants.length" class="grant-list">
+        <div v-for="g in grants" :key="g.__key" class="grant-row">
           <div class="grant-meta">
             <span class="grant-user">{{ g.user_id }}</span>
             <Badge tone="brand">{{ g.role }}</Badge>
-            <span class="muted" v-if="g.tenant_id">{{ t('view.rbac.tenantLabel') }} {{ g.tenant_id }}</span>
-            <span class="muted" v-if="g.granted_by">{{ t('view.rbac.grantedBy') }} {{ g.granted_by }}</span>
+            <span v-if="g.tenant_id" class="muted">{{ t('view.rbac.tenantLabel') }} {{ g.tenant_id }}</span>
+            <span v-if="g.granted_by" class="muted">{{ t('view.rbac.grantedBy') }} {{ g.granted_by }}</span>
           </div>
           <button class="btn btn--sm btn--danger" @click="revoke(g)">{{ t('view.rbac.revoke') }}</button>
         </div>
@@ -60,7 +60,7 @@
       <Skeleton v-else height="120px" />
     </Card>
 
-    <div class="modal-overlay" v-if="showGrant" v-modal-a11y @click.self="showGrant = false" @modal:escape="showGrant = false">
+    <div v-if="showGrant" v-modal-a11y class="modal-overlay" @click.self="showGrant = false" @modal:escape="showGrant = false">
       <div class="modal">
         <h3>{{ t('view.rbac.grantRole') }}</h3>
         <label>{{ t('view.rbac.userId') }}</label>

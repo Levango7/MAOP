@@ -239,7 +239,7 @@ onMounted(() => {
   width: 34px; height: 34px;
   border-radius: var(--r-md);
   background: var(--brand);
-  color: #fff;
+  color: var(--brand-contrast);
   /* JB 精修: 移除双层渐变+内发光+外部投影 — 单一品牌色块, 克制 */
   position: relative;
 }
@@ -356,7 +356,7 @@ onMounted(() => {
   width: 34px; height: 34px; flex-shrink: 0;
   border-radius: var(--r-full);
   background: linear-gradient(135deg, var(--brand) 0%, var(--chart-6) 100%);
-  color: #fff; font-size: 13px; font-weight: 700;
+  color: var(--brand-contrast); font-size: 13px; font-weight: 700;
   display: grid; place-items: center;
   box-shadow: var(--shadow-brand), inset 0 1px 0 rgba(255, 255, 255, .25);
   font-family: var(--font-sans);

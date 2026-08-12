@@ -13,31 +13,31 @@
       <div class="query-controls">
         <div class="ctrl">
           <label>{{ t('view.vector.topK') }}</label>
-          <input type="number" v-model.number="topK" min="1" max="100" class="num-input" />
+          <input v-model.number="topK" type="number" min="1" max="100" class="num-input" />
         </div>
-        <div class="ctrl ctrl--grow" v-if="hasScores">
+        <div v-if="hasScores" class="ctrl ctrl--grow">
           <label>{{ t('view.vector.minScore') }} <span class="muted">{{ minScore.toFixed(2) }}</span></label>
-          <input type="range" v-model.number="minScore" min="0" max="1" step="0.05" class="range" />
+          <input v-model.number="minScore" type="range" min="0" max="1" step="0.05" class="range" />
         </div>
-        <button class="btn btn--primary" @click="doSearch" :disabled="searching || !query.trim()">
+        <button class="btn btn--primary" :disabled="searching || !query.trim()" @click="doSearch">
           <AppIcon name="search" :size="15" /> {{ searching ? t('view.vector.searching') : t('common.search') }}
         </button>
       </div>
     </Card>
 
     <div v-if="searching" class="results-area">
-      <div class="result-card" v-for="n in 3" :key="n">
+      <div v-for="n in 3" :key="n" class="result-card">
         <Skeleton height="14px" />
         <Skeleton height="38px" />
       </div>
     </div>
     <template v-else>
-      <div class="results-area" v-if="filteredResults.length">
+      <div v-if="filteredResults.length" class="results-area">
         <div class="results-meta">
           <span>{{ filteredResults.length }} result{{ filteredResults.length === 1 ? '' : 's' }}</span>
-          <span class="muted" v-if="searchTime">in {{ searchTime }} ms</span>
+          <span v-if="searchTime" class="muted">in {{ searchTime }} ms</span>
         </div>
-        <div class="result-card" v-for="(r, i) in filteredResults" :key="i">
+        <div v-for="(r, i) in filteredResults" :key="i" class="result-card">
           <div class="result-head">
             <span class="rank">#{{ i + 1 }}</span>
             <Badge v-if="r.score != null" :tone="scoreTone(r.score)">{{ Math.round(r.score * 100) }}%</Badge>
@@ -45,11 +45,11 @@
             <Badge v-if="r.agent" tone="info">{{ r.agent }}</Badge>
           </div>
           <div class="result-body">{{ r.content || r.text || r.chunk || r.payload || '—' }}</div>
-          <div class="result-foot" v-if="r.tags || r.timestamp">
-            <span class="tags" v-if="r.tags">
+          <div v-if="r.tags || r.timestamp" class="result-foot">
+            <span v-if="r.tags" class="tags">
               <Badge v-for="t in normTags(r.tags)" :key="t" tone="neutral">{{ t }}</Badge>
             </span>
-            <span class="muted" v-if="r.timestamp">{{ fmt(r.timestamp) }}</span>
+            <span v-if="r.timestamp" class="muted">{{ fmt(r.timestamp) }}</span>
           </div>
         </div>
       </div>
@@ -62,16 +62,16 @@
     </template>
 
     <Card :title="t('view.vector.indexStats')" icon="database" :margin-bottom="16">
-      <div class="stat-grid" v-if="!statsLoading">
+      <div v-if="!statsLoading" class="stat-grid">
         <StatCard :label="t('view.vector.stat.totalEntries')" :value="stats.total_entries ?? 0" icon="database" tone="brand" />
         <StatCard :label="t('view.vector.stat.totalTraces')" :value="stats.total_traces ?? 0" icon="route" tone="info" />
         <StatCard :label="t('view.vector.stat.trajectorySteps')" :value="stats.total_trajectory_steps ?? 0" icon="activity" tone="warn" />
         <StatCard :label="t('view.vector.stat.indexedAgents')" :value="agentCount" icon="bot" tone="success" />
       </div>
-      <div class="stat-grid" v-else>
-        <Skeleton height="66px" v-for="n in 4" :key="n" />
+      <div v-else class="stat-grid">
+        <Skeleton v-for="n in 4" :key="n" height="66px" />
       </div>
-      <p class="inline-error" v-if="statsError">{{ statsError }}</p>
+      <p v-if="statsError" class="inline-error">{{ statsError }}</p>
     </Card>
 
     <Card :title="t('view.vector.indexedVectors')" icon="box" :margin-bottom="16">

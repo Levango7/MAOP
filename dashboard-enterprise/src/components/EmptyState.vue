@@ -1,9 +1,9 @@
 <template>
   <div class="empty">
-    <div class="empty__icon" v-if="icon"><AppIcon :name="icon" :size="34" /></div>
-    <div class="empty__title" v-if="title">{{ title }}</div>
-    <div class="empty__desc" v-if="description"><slot>{{ description }}</slot></div>
-    <div class="empty__actions" v-if="$slots.actions"><slot name="actions" /></div>
+    <div v-if="icon" class="empty__icon"><AppIcon :name="icon" :size="34" /></div>
+    <div v-if="title" class="empty__title">{{ title }}</div>
+    <div v-if="description" class="empty__desc"><slot>{{ description }}</slot></div>
+    <div v-if="$slots.actions" class="empty__actions"><slot name="actions" /></div>
   </div>
 </template>
 

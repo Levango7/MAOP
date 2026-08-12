@@ -1,7 +1,7 @@
 <template>
   <div class="dag-graph">
     <!-- Progress bar -->
-    <div class="dag-progress-bar" v-if="totalNodes > 0">
+    <div v-if="totalNodes > 0" class="dag-progress-bar">
       <div class="dag-progress-track">
         <div class="dag-progress-fill" :style="{ width: progress + '%' }"></div>
       </div>
@@ -10,7 +10,7 @@
     </div>
 
     <!-- DAG visualization (SVG) -->
-    <div class="dag-canvas" ref="canvasRef">
+    <div ref="canvasRef" class="dag-canvas">
       <svg class="dag-svg" :width="svgWidth" :height="svgHeight">
         <!-- Edges -->
         <g class="dag-edges">
@@ -68,7 +68,7 @@
     </div>
 
     <!-- Node detail panel (modal overlay) -->
-    <div v-if="selectedNode" class="dag-detail-overlay" v-modal-a11y @click.self="selectedNode = null" @modal:escape="selectedNode = null">
+    <div v-if="selectedNode" v-modal-a11y class="dag-detail-overlay" @click.self="selectedNode = null" @modal:escape="selectedNode = null">
       <NodeDetailPanel :node="selectedNode" @close="selectedNode = null" />
     </div>
   </div>
@@ -337,15 +337,15 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 .dag-node-group { cursor: pointer; }
 .dag-node-circle {
   stroke-width: 2;
-  stroke: #fff;
-  fill: #6e7686; /* pending (default) */
+  stroke: var(--brand-contrast);
+  fill: var(--text-faint); /* pending (default) */
   transition: fill 0.2s ease;
 }
-.dag-node-circle.status-pending { fill: #6e7686; }
-.dag-node-circle.status-running { fill: #4cc2ff; }
-.dag-node-circle.status-success { fill: #3fb950; }
-.dag-node-circle.status-failed { fill: #f85149; }
-.dag-node-circle.status-skipped { fill: #d29922; }
+.dag-node-circle.status-pending { fill: var(--text-faint); }
+.dag-node-circle.status-running { fill: var(--info); }
+.dag-node-circle.status-success { fill: var(--success); }
+.dag-node-circle.status-failed { fill: var(--fail); }
+.dag-node-circle.status-skipped { fill: var(--warn); }
 .dag-node-group:hover .dag-node-circle { stroke: var(--brand, #3574f0); stroke-width: 3; }
 
 .dag-node-label {
@@ -355,7 +355,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
   user-select: none;
 }
 .dag-node-icon {
-  color: #fff;
+  color: var(--brand-contrast);
   user-select: none;
   pointer-events: none;
 }
@@ -363,7 +363,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 .dag-node-icon.status-running,
 .dag-node-icon.status-success,
 .dag-node-icon.status-failed,
-.dag-node-icon.status-skipped { color: #fff; }
+.dag-node-icon.status-skipped { color: var(--brand-contrast); }
 
 /* Empty state */
 .dag-empty {

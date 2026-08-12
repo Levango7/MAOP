@@ -31,7 +31,7 @@
       <!-- ── Pipeline status ─────────────────────────────────── -->
       <Card title="Observability Pipeline" icon="activity" :margin-bottom="0">
         <div class="pipeline-list">
-          <div class="pipeline-row" v-for="p in pipelineRows" :key="p.name">
+          <div v-for="p in pipelineRows" :key="p.name" class="pipeline-row">
             <span class="pipeline-dot" :class="p.ok ? 'ok' : 'bad'"></span>
             <span class="pipeline-name">{{ p.name }}</span>
             <span class="pipeline-detail">{{ p.detail }}</span>
@@ -46,7 +46,7 @@
           <Skeleton v-for="n in 5" :key="n" height="18px" />
         </div>
         <div v-else class="config-list">
-          <div class="config-row" v-for="c in configRows" :key="c.label">
+          <div v-for="c in configRows" :key="c.label" class="config-row">
             <span class="config-label">{{ c.label }}</span>
             <span class="config-value" :class="c.mono ? 'mono' : ''">{{ c.value }}</span>
           </div>
@@ -63,7 +63,7 @@
           <span class="col-value">Value</span>
           <span class="col-extra">Detail</span>
         </div>
-        <div class="metric-row" v-for="m in canonicalMetrics" :key="m.name">
+        <div v-for="m in canonicalMetrics" :key="m.name" class="metric-row">
           <span class="col-name mono">{{ m.name }}</span>
           <span class="col-type"><span class="type-tag" :class="m.type">{{ m.type }}</span></span>
           <span class="col-value">{{ m.value }}</span>
@@ -75,7 +75,7 @@
     <!-- ── Health checks ──────────────────────────────────────── -->
     <Card title="Pipeline Health Checks" icon="shield" class="mt">
       <template #actions>
-        <button class="refresh-btn" @click="loadHealth" :disabled="healthLoading">
+        <button class="refresh-btn" :disabled="healthLoading" @click="loadHealth">
           <AppIcon name="refresh" :size="14" />
         </button>
       </template>
@@ -83,7 +83,7 @@
         <Skeleton v-for="n in 4" :key="n" height="20px" />
       </div>
       <div v-else-if="healthChecks.length" class="health-list">
-        <div class="health-row" v-for="h in healthChecks" :key="h.name">
+        <div v-for="h in healthChecks" :key="h.name" class="health-row">
           <span class="health-dot" :class="h.ok ? 'ok' : 'bad'"></span>
           <span class="health-name">{{ h.name }}</span>
           <span class="health-detail">{{ h.detail }}</span>
@@ -501,11 +501,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .type-tag.histogram {
   background: rgba(168, 85, 247, 0.12);
-  color: #a855f7;
+  color: var(--chart-5);
 }
 .type-tag.gauge {
-  background: rgba(245, 158, 11, 0.12);
-  color: #d29922;
+  background: var(--warn-soft);
+  color: var(--warn);
 }
 
 /* ── Health & trace ─────────────────────────────────────────────── */

@@ -371,9 +371,9 @@ onUnmounted(() => {
 
 .nav-scroll { flex: 1; overflow-y: auto; padding: var(--sp-2) 0; }
 .nav-section {
-  font-size: 10px; font-weight: 700; color: var(--text-faint);
+  font-size: var(--fs-xs); font-weight: 700; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: .08em;
-  padding: 16px 18px 6px;
+  padding: var(--sp-4) var(--sp-4) var(--sp-2);
   position: relative;
 }
 .nav-section::after {
@@ -390,9 +390,9 @@ onUnmounted(() => {
   margin-top: 6px;
 }
 .nav-link {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 18px; color: var(--text-muted); text-decoration: none;
-  font-size: 13px; font-weight: 500; border-radius: 0;
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4); color: var(--text-muted); text-decoration: none;
+  font-size: var(--fs-base); font-weight: 500; border-radius: 0;
   border-left: 3px solid transparent;
   transition: color var(--motion) var(--ease), background var(--motion) var(--ease), border-color var(--motion) var(--ease), padding-left var(--motion) var(--ease);
   position: relative;
@@ -400,13 +400,13 @@ onUnmounted(() => {
 }
 .nav-link:hover {
   color: var(--text); background: var(--surface-2);
-  padding-left: 20px;
+  padding-left: var(--sp-5);
 }
 .nav-link.router-link-active {
   color: var(--brand-strong); background: var(--brand-soft);
   border-left-color: var(--brand);
   font-weight: 600;
-  padding-left: 18px;
+  padding-left: var(--sp-4);
 }
 .nav-link.router-link-active::before {
   content: '';
@@ -431,13 +431,14 @@ onUnmounted(() => {
 .nav-link:hover .nav-icon { transform: scale(1.08); }
 .nav-link.router-link-active .nav-icon { color: var(--brand-strong); }
 
+
 .nav-footer {
-  margin-top: auto; padding: 12px 16px; border-top: 1px solid var(--border);
-  display: flex; flex-direction: column; gap: 10px;
+  margin-top: auto; padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: var(--sp-2);
 }
-.nf-group { display: flex; flex-direction: column; gap: 6px; }
+.nf-group { display: flex; flex-direction: column; gap: var(--sp-1); }
 .nf-group.nf-status { flex-direction: row; align-items: center; justify-content: space-between; }
-.nf-label { font-size: 10px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .06em; }
+.nf-label { font-size: var(--fs-xs); font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .06em; }
 
 /* ── Rail (collapsed) state ─────────────────────────────────────── */
 .app-layout.rail .sidebar { width: var(--rail-w); }

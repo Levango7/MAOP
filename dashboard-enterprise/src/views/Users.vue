@@ -2,9 +2,9 @@
   <div class="users-view">
     <PageHeader>
       <template #badges>
-        <span class="users-count" v-if="users.length">{{ users.length }}</span>
+        <span v-if="users.length" class="users-count">{{ users.length }}</span>
       </template>
-      <button class="btn-primary" @click="openRegister" v-if="isAdmin">
+      <button v-if="isAdmin" class="btn-primary" @click="openRegister">
         <AppIcon name="plus" :size="14" /> {{ t('users.registerUser') }}
       </button>
     </PageHeader>
@@ -42,14 +42,14 @@
           <div class="users-cell users-cell--created">{{ formatDate(u.created_at) }}</div>
           <div class="users-cell users-cell--login">{{ u.last_login ? formatDate(u.last_login) : '—' }}</div>
           <div class="users-cell users-cell--actions">
-            <button class="btn-icon" @click="openEdit(u)" :title="t('common.edit')">
+            <button class="btn-icon" :title="t('common.edit')" @click="openEdit(u)">
               <AppIcon name="gear" :size="14" />
             </button>
             <button
               v-if="u.username !== 'admin' && u.username !== currentName"
               class="btn-icon btn-icon--danger"
-              @click="confirmDelete(u)"
               :title="t('users.deregisterUser')"
+              @click="confirmDelete(u)"
             >
               <AppIcon name="trash" :size="14" />
             </button>
@@ -59,7 +59,7 @@
     </div>
 
     <!-- 注册/编辑 弹窗 -->
-    <div v-if="dialogOpen" class="users-dialog-overlay" v-modal-a11y @click.self="closeDialog" @modal:escape="closeDialog">
+    <div v-if="dialogOpen" v-modal-a11y class="users-dialog-overlay" @click.self="closeDialog" @modal:escape="closeDialog">
       <div class="users-dialog">
         <h3>{{ dialogMode === 'register' ? t('users.registerUser') : t('users.updateProfile') }}</h3>
         <div class="users-form">
@@ -79,7 +79,7 @@
             <span>{{ t('users.roles') }}</span>
             <div class="users-roles-pick">
               <label v-for="r in roleOptions" :key="r" class="users-role-chip">
-                <input type="checkbox" :value="r" v-model="form.roles" />
+                <input v-model="form.roles" type="checkbox" :value="r" />
                 <span>{{ r }}</span>
               </label>
             </div>
@@ -87,7 +87,7 @@
         </div>
         <div class="users-dialog-actions">
           <button class="btn-secondary" @click="closeDialog">{{ t('common.cancel') }}</button>
-          <button class="btn-primary" @click="submitForm" :disabled="submitting">
+          <button class="btn-primary" :disabled="submitting" @click="submitForm">
             {{ submitting ? t('common.loading') : (dialogMode === 'register' ? t('common.submit') : t('common.save')) }}
           </button>
         </div>
@@ -226,7 +226,7 @@ onMounted(fetchUsers);
 
 .btn-primary {
   display: inline-flex; align-items: center; gap: 5px;
-  background: var(--brand); color: #fff; border: none;
+  background: var(--brand); color: var(--brand-contrast); border: none;
   border-radius: var(--r-md); padding: 7px 12px; font-size: 12px; font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
@@ -284,7 +284,7 @@ onMounted(fetchUsers);
 .users-avatar {
   width: 30px; height: 30px; border-radius: var(--r-full);
   background: linear-gradient(135deg, var(--brand), var(--chart-6));
-  color: #fff; font-size: 12px; font-weight: 700;
+  color: var(--brand-contrast); font-size: 12px; font-weight: 700;
   display: grid; place-items: center;
 }
 .users-uname { font-weight: 600; color: var(--text); }
@@ -298,10 +298,10 @@ onMounted(fetchUsers);
   border-radius: var(--r-sm); font-size: 10px; font-weight: 600;
   background: var(--surface-3); color: var(--text-muted);
 }
-.users-role--admin { background: var(--fail-soft, rgba(239,68,68,.16)); color: var(--fail, #f85149); }
-.users-role--superadmin { background: var(--brand-soft, rgba(168,85,247,.18)); color: var(--chart-6, #a78bfa); }
-.users-role--operator, .users-role--write { background: var(--info-soft, rgba(56,189,248,.16)); color: var(--info, #38bdf8); }
-.users-role--read { background: var(--border-subtle, rgba(148,163,184,.16)); color: var(--text-muted, #6e7686); }
+.users-role--admin { background: var(--fail-soft); color: var(--fail); }
+.users-role--superadmin { background: var(--brand-soft); color: var(--chart-6); }
+.users-role--operator, .users-role--write { background: var(--info-soft); color: var(--info); }
+.users-role--read { background: var(--surface-3); color: var(--text-muted); }
 
 /* 弹窗 */
 .users-dialog-overlay {

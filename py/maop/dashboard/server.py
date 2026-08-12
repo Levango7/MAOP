@@ -531,13 +531,27 @@ if not has_feature(FeatureFlag.MULTI_USER):
     @app.middleware("http")
     async def enterprise_api_guard(request: _Req, call_next: Any) -> Any:
         path = _normalize_api_path(request.url.path)
-        if path.startswith("/api/rbac/grants"):
+        # 判定是否为 enterprise-only API 路径（含 version-prefixed 变体）。
+        is_grants = path.startswith("/api/rbac/grants")
+        is_tenant_list = path.startswith("/api/tenant/list")
+        is_enterprise_api = (
+            is_grants
+            or is_tenant_list
+            or any(path.startswith(p) for p in _ENTERPRISE_API_PREFIXES)
+        )
+        if not is_enterprise_api:
+            return await call_next(request)
+        # 先放行让 AuthMiddleware 处理认证；未认证请求由 AuthMiddleware
+        # 返回 401（而非此处 404），避免泄露端点存在性并符合 RBAC 语义。
+        response = await call_next(request)
+        if response.status_code == 401:
+            return response
+        # 认证通过后，personal edition 对 enterprise API 返回软降级响应。
+        if is_grants:
             return _JResp(content={"grants": [], "hint": "Enterprise only"})
-        if path.startswith("/api/tenant/list"):
+        if is_tenant_list:
             return _JResp(content={"tenants": [], "hint": "Enterprise only"})
-        if any(path.startswith(p) for p in _ENTERPRISE_API_PREFIXES):
-            return _JResp(status_code=404, content={"status": "error", "error": "Not found", "hint": "This endpoint requires MAOP Enterprise edition"})
-        return await call_next(request)
+        return _JResp(status_code=404, content={"status": "error", "error": "Not found", "hint": "This endpoint requires MAOP Enterprise edition"})
 
 # ── Static files ───────────────────────────────────────────────────
 @app.get("/")

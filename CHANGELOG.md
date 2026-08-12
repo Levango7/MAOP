@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [5.0.1] — 2026-08-13
+
+### Fixed
+
+- **M5 回归修复**: `agent/llm_chat/llm_provider.py` 的 `_record_cost` 改为 async，与 `core/llm_provider.py` 保持一致
+- **enterprise_api_guard 中间件顺序**: 未认证请求现在返回 401 而非 404（guard 先放行让 AuthMiddleware 处理认证）
+- **ADR010 回归测试路径修正**: `parents[3]` → `parents[2]`，`py/MAOP/MAOP_loop.py` → `py/maop/maop_loop.py`
+- **enterprise guard 测试路径修正**: `/api/v1/tenant/list` → `/api/v1/tenant/create`（命中 404 分支）
+- **rules.yaml 断言改进**: 检查非注释行中的 `per_agent`，避免误匹配注释
+
+### Changed
+
+- **前端硬编码颜色 → CSS var token**: KnowledgeGraph/McpTopology/DagGraph/Agents/Users/Observability/pages.css 中的硬编码 hex 替换为 CSS 变量
+- **前端布局间距统一**: App.vue nav-section/nav-link 使用 `--sp` token 替代硬编码 px
+- **重复 CSS 规则清理**: pages.css 中 `.deg-reason` 和 `.status-dot` 重复定义去重
+- **ESLint warnings 自动修复**: 310 → 51（259 个属性排序等自动修复）
+
+### Removed
+
+- 6 个临时日志文件（docs/_review_*.log）
+
 ## [5.0.0] — 2026-08-11
 
 ### ⚠ Breaking Changes

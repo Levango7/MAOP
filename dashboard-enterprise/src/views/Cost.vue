@@ -7,7 +7,7 @@
         size="sm"
         @update:model-value="onPeriodChange"
       />
-      <button class="btn-ghost" :class="{ 'is-busy': loading }" @click="load" :disabled="loading">
+      <button class="btn-ghost" :class="{ 'is-busy': loading }" :disabled="loading" @click="load">
         <AppIcon name="refresh" :size="15" />
         <span>{{ t('common.refresh') }}</span>
       </button>

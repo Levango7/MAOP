@@ -1,13 +1,13 @@
 <template>
   <div class="models-view">
     <PageHeader>
-      <button class="btn-ghost" @click="loadAll" :disabled="loading">
+      <button class="btn-ghost" :disabled="loading" @click="loadAll">
         <AppIcon name="refresh" :size="15" /> {{ t('common.refresh') }}
       </button>
     </PageHeader>
 
     <!-- Registry overview -->
-    <section class="stat-row" v-if="!registryError.value">
+    <section v-if="!registryError.value" class="stat-row">
       <StatCard :label="t('view.models.stat.totalModels')" :value="registry.total_models" icon="cpu" tone="brand" :loading="loading" />
       <StatCard :label="t('view.models.enabled')" :value="registry.enabled_models" icon="check-circle" tone="success" :loading="loading" />
       <StatCard :label="t('view.models.stat.providers')" :value="registry.total_providers" icon="server" tone="info" :loading="loading" />
@@ -15,21 +15,25 @@
     </section>
 
     <div v-if="registryError.value" class="grid-2">
-      <EmptyState icon="alert-triangle" :title="t('view.models.couldNotLoadRegistry')"
+      <EmptyState
+icon="alert-triangle" :title="t('view.models.couldNotLoadRegistry')"
         :description="registryError.value" />
     </div>
 
     <!-- Model registry -->
-    <Card :title="t('view.models.modelRegistry')" icon="cpu" :margin-bottom="16"
+    <Card
+:title="t('view.models.modelRegistry')" icon="cpu" :margin-bottom="16"
       :subtitle="`${models.length} ` + t('view.models.registeredModels')">
       <div v-if="modelsError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadModels')" :description="modelsError.value" /></div>
       <Skeleton v-else-if="loading" :lines="6" block />
-      <DataTable v-else :columns="modelCols" :rows="modelRows" :loading="false"
+      <DataTable
+v-else :columns="modelCols" :rows="modelRows" :loading="false"
         :empty-text="t('view.models.noModels')" />
     </Card>
 
     <!-- Providers -->
-    <Card :title="t('view.models.providerHealth')" icon="activity" :margin-bottom="16"
+    <Card
+:title="t('view.models.providerHealth')" icon="activity" :margin-bottom="16"
       :subtitle="`${providers.length} ` + t('view.models.providersLabel')">
       <div v-if="providersError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadProviders')" :description="providersError.value" /></div>
       <Skeleton v-else-if="loading && !providers.length" :lines="5" block />
@@ -37,7 +41,8 @@
     </Card>
 
     <!-- Agents -->
-    <Card :title="t('view.models.agentDrivers')" icon="bot" :margin-bottom="16"
+    <Card
+:title="t('view.models.agentDrivers')" icon="bot" :margin-bottom="16"
       :subtitle="`${agents.length} ` + t('view.models.agentsLabel')">
       <div v-if="agentsError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAgents')" :description="agentsError.value" /></div>
       <Skeleton v-else-if="loading && !agents.length" :lines="5" block />
@@ -68,7 +73,8 @@
     </div>
 
     <!-- Routing policies -->
-    <Card :title="t('view.models.routingPolicies')" icon="route" :margin-bottom="16"
+    <Card
+:title="t('view.models.routingPolicies')" icon="route" :margin-bottom="16"
       :subtitle="`${policies.length} ` + t('view.models.policiesLabel')">
       <div v-if="policiesError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadPolicies')" :description="policiesError.value" /></div>
       <Skeleton v-else-if="loading && !policies.length" :lines="4" block />

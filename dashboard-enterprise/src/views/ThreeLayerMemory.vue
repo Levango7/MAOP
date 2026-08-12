@@ -1,7 +1,7 @@
 <template>
   <div class="memory-page">
     <PageHeader>
-      <button class="btn-refresh" @click="refreshAll" :disabled="loading">
+      <button class="btn-refresh" :disabled="loading" @click="refreshAll">
         <AppIcon name="refresh" :size="15" :class="{ spinning: loading }" /> {{ t('common.refresh') }}
       </button>
       <button class="btn-primary" @click="showAdd = true">
@@ -51,7 +51,8 @@
     <div class="breakdown">
       <Card :title="t('view.tlmemory.byTopic')" icon="scroll" :margin-bottom="16">
         <div v-if="topicEntries.length" class="chip-list">
-          <button v-for="t in topicEntries" :key="t.key" class="chip" :class="{ active: query === t.key }"
+          <button
+v-for="t in topicEntries" :key="t.key" class="chip" :class="{ active: query === t.key }"
                   @click="searchTopic(t.key)">
             {{ t.key }} <span class="chip-count">{{ t.value }}</span>
           </button>
@@ -80,7 +81,7 @@
       <div class="search-bar">
         <span class="search-icon"><AppIcon name="search" :size="16" /></span>
         <input v-model="query" :placeholder="t('view.tlmemory.searchPlaceholder')" @keyup.enter="runSearch" />
-        <button class="search-btn" @click="runSearch" :disabled="loading">
+        <button class="search-btn" :disabled="loading" @click="runSearch">
           <AppIcon name="search" :size="15" /> {{ t('common.search') }}
         </button>
       </div>
@@ -95,25 +96,26 @@
             <span class="entry-score">{{ t('view.tlmemory.score') }} {{ formatScore(e.score) }}</span>
             <span class="entry-time">{{ formatTime(e.timestamp) }}</span>
           </div>
-          <div class="entry-task" v-if="e.task">{{ e.task }}</div>
+          <div v-if="e.task" class="entry-task">{{ e.task }}</div>
           <div class="entry-body">{{ e.snippet || e.content || '' }}</div>
-          <div class="entry-footer" v-if="e.tags">
+          <div v-if="e.tags" class="entry-footer">
             <span v-for="t in e.tags" :key="t" class="tag">{{ t }}</span>
           </div>
         </div>
       </div>
-      <EmptyState v-else-if="!loading" icon="search" :title="t('view.tlmemory.noMemories')"
+      <EmptyState
+v-else-if="!loading" icon="search" :title="t('view.tlmemory.noMemories')"
                   :description="query ? t('view.tlmemory.noResults') + ' “' + query + '”.' : t('view.tlmemory.runSearchHint')" />
       <Skeleton v-else height="200px" />
     </Card>
 
     <!-- Add Memory Modal -->
     <Teleport to="body">
-      <div v-if="showAdd" class="modal-mask" v-modal-a11y @click.self="showAdd = false" @modal:escape="showAdd = false">
+      <div v-if="showAdd" v-modal-a11y class="modal-mask" @click.self="showAdd = false" @modal:escape="showAdd = false">
         <div class="modal" role="dialog" aria-modal="true">
           <div class="modal__head">
             <h3>{{ t('view.tlmemory.addMemoryTitle') }}</h3>
-            <button class="modal__x" type="button" @click="showAdd = false" aria-label="Close">×</button>
+            <button class="modal__x" type="button" aria-label="Close" @click="showAdd = false">×</button>
           </div>
           <div class="modal__body">
             <label class="field">
@@ -126,7 +128,8 @@
             </label>
             <label class="field">
               <span class="field__label">{{ t('view.tlmemory.content') }} *</span>
-              <textarea v-model="addForm.content" class="field__input" rows="4"
+              <textarea
+v-model="addForm.content" class="field__input" rows="4"
                 :placeholder="t('view.tlmemory.contentPlaceholder')"></textarea>
             </label>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-4);">

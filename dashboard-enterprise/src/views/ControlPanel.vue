@@ -2,15 +2,16 @@
   <div class="control-panel">
     <!-- 嵌入式(被 Run.vue 托管 Tab)时隐藏自身页头,避免双层标题 -->
     <PageHeader v-if="!embedded">
-      <button class="btn-refresh" @click="refreshAll" :disabled="loading">
+      <button class="btn-refresh" :disabled="loading" @click="refreshAll">
         <AppIcon name="refresh" :size="15" :class="{ spinning: loading }" /> {{ t('common.refresh') }}
       </button>
     </PageHeader>
 
     <Card :title="t('view.control.executionControls')" icon="play" :margin-bottom="16">
       <div class="btn-grid">
-        <button v-for="a in execActions" :key="a.action" class="ctrl-btn" :class="'tone-' + a.tone"
-                @click="execAction(a.action)" :disabled="loading">
+        <button
+v-for="a in execActions" :key="a.action" class="ctrl-btn" :class="'tone-' + a.tone"
+                :disabled="loading" @click="execAction(a.action)">
           <AppIcon :name="a.icon" :size="16" /> {{ t(a.label) }}
         </button>
       </div>
@@ -21,9 +22,10 @@
 
     <Card :title="t('view.control.maintenanceActions')" icon="wrench" :margin-bottom="16">
       <div class="btn-grid">
-        <button v-for="m in maintActions" :key="m.action" class="ctrl-btn"
+        <button
+v-for="m in maintActions" :key="m.action" class="ctrl-btn"
                 :class="m.tone ? 'tone-' + m.tone : ''"
-                @click="maintainAction(m.action)" :disabled="loading">
+                :disabled="loading" @click="maintainAction(m.action)">
           <AppIcon :name="m.icon" :size="16" /> {{ t(m.label) }}
         </button>
       </div>
@@ -42,18 +44,19 @@
             </div>
             <span class="row-sub">{{ j.started_at }}</span>
           </div>
-          <button class="act-btn small" @click="execAction('stop', j.name)" :disabled="loading">
+          <button class="act-btn small" :disabled="loading" @click="execAction('stop', j.name)">
             <AppIcon name="square" :size="12" /> {{ t('view.control.stop') }}
           </button>
         </div>
       </div>
-      <EmptyState v-else-if="!loading" icon="activity" :title="t('view.control.noRunningJobs')"
+      <EmptyState
+v-else-if="!loading" icon="activity" :title="t('view.control.noRunningJobs')"
                   :description="t('view.control.noRunningJobsDesc')" />
       <Skeleton v-else height="80px" />
     </Card>
 
     <Card :title="t('view.control.agentUpgrade')" icon="refresh" :margin-bottom="16">
-      <button class="btn-check" @click="checkUpgrade" :disabled="loading">
+      <button class="btn-check" :disabled="loading" @click="checkUpgrade">
         <AppIcon name="refresh" :size="15" :class="{ spinning: loading }" /> {{ t('view.control.checkUpgrades') }}
       </button>
       <div v-if="agents.length" class="row-list">
@@ -69,13 +72,15 @@
               <span class="agent-field"><span class="field-label">{{ t('view.control.latest') }}</span> <span class="field-val">{{ a.latest }}</span></span>
             </div>
           </div>
-          <button class="act-btn small" @click="upgradeAgent(a.name)"
-                  :disabled="loading || a.status === 'up-to-date'">
+          <button
+class="act-btn small" :disabled="loading || a.status === 'up-to-date'"
+                  @click="upgradeAgent(a.name)">
             <AppIcon name="upload" :size="12" /> {{ t('view.control.upgrade') }}
           </button>
         </div>
       </div>
-      <EmptyState v-else-if="!loading" icon="refresh" :title="t('view.control.noUpgradeInfo')"
+      <EmptyState
+v-else-if="!loading" icon="refresh" :title="t('view.control.noUpgradeInfo')"
                   :description="t('view.control.noUpgradeInfoDesc')" />
       <Skeleton v-else height="120px" />
     </Card>

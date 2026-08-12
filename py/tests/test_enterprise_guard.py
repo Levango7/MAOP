@@ -43,7 +43,12 @@ def test_normalize_api_path_non_api_unchanged():
     reason="enterprise_api_guard is only registered in personal edition",
 )
 def test_guard_blocks_versioned_enterprise_path():
-    """Force personal edition and verify /api/v1/tenant/* is blocked (404)."""
+    """Force personal edition and verify /api/v1/tenant/* is blocked (404).
+
+    Note: ``/api/tenant/list`` and ``/api/rbac/grants`` are special-cased in
+    the guard to return 200 with an empty payload (so the dashboard can render
+    gracefully).  To verify the 404 branch we request a non-special tenant path.
+    """
     import maop.config.edition as ed
     import maop.dashboard.server as server
     from fastapi.testclient import TestClient
@@ -53,10 +58,16 @@ def test_guard_blocks_versioned_enterprise_path():
     try:
         importlib.reload(server)
         client = TestClient(server.app)
-        resp = client.get("/api/v1/tenant/list")
+        # Use a non-special tenant path so the guard returns 404
+        # (list/grants are special-cased to 200 with empty payload).
+        resp = client.get("/api/v1/tenant/create")
         assert resp.status_code == 404
         body = resp.json()
         assert "Enterprise" in body.get("hint", "")
+    except AssertionError:
+        # Re-raise assertion failures so the test genuinely fails instead of
+        # being silently skipped — this preserves test integrity.
+        raise
     except Exception as exc:  # pragma: no cover - reload may be env-sensitive
         pytest.skip(f"server reload unsupported in this env: {exc}")
     finally:

@@ -9,10 +9,10 @@
         <Badge tone="neutral">{{ t('view.tools.topo.edges') }}: {{ stats.edges }}</Badge>
       </div>
       <div class="mcp-topo__actions">
-        <button class="btn-ghost" @click="fitView" :disabled="!ready">
+        <button class="btn-ghost" :disabled="!ready" @click="fitView">
           <AppIcon name="filter" :size="14" /> {{ t('view.tools.topo.fit') }}
         </button>
-        <button class="btn-ghost" @click="emit('refresh')" :disabled="loading">
+        <button class="btn-ghost" :disabled="loading" @click="emit('refresh')">
           <AppIcon name="refresh" :size="14" /> {{ t('common.refresh') }}
         </button>
       </div>
@@ -269,7 +269,7 @@ watch(
   border-radius: var(--r-md, 8px);
   font-size: 13px;
 }
-.mcp-topo__notice--error { background: #FFEBEE; border: 1px solid #FFCDD2; color: #a40e26; }
+.mcp-topo__notice--error { background: var(--fail-soft); border: 1px solid var(--fail); color: var(--fail-strong); }
 
 .mcp-topo__canvas-wrap {
   position: relative;
@@ -310,9 +310,9 @@ watch(
   border-radius: 50%;
   flex-shrink: 0;
 }
-.mcp-topo__dot--server { background: #3574f0; border-radius: 2px; }
-.mcp-topo__dot--tool { background: #039BE5; }
-.mcp-topo__dot--agent { background: #3fb950; transform: rotate(45deg); }
+.mcp-topo__dot--server { background: var(--brand); border-radius: 2px; }
+.mcp-topo__dot--tool { background: var(--info); }
+.mcp-topo__dot--agent { background: var(--success); transform: rotate(45deg); }
 
 .btn-ghost {
   display: inline-flex;

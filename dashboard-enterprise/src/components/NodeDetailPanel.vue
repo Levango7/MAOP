@@ -139,14 +139,14 @@ function formatTime(ts) {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.status-pending { color: #6e7686; }
-.status-pending .ndp-status-dot, .ndp-status-dot.status-pending { background: #6e7686; }
-.status-running { color: #4cc2ff; }
-.status-running .ndp-status-dot, .ndp-status-dot.status-running { background: #4cc2ff; }
-.status-success { color: #3fb950; }
-.status-success .ndp-status-dot, .ndp-status-dot.status-success { background: #3fb950; }
-.status-failed { color: #f85149; }
-.status-failed .ndp-status-dot, .ndp-status-dot.status-failed { background: #f85149; }
-.status-skipped { color: #d29922; }
-.status-skipped .ndp-status-dot, .ndp-status-dot.status-skipped { background: #d29922; }
+.status-pending { color: var(--text-faint); }
+.status-pending .ndp-status-dot, .ndp-status-dot.status-pending { background: var(--text-faint); }
+.status-running { color: var(--info); }
+.status-running .ndp-status-dot, .ndp-status-dot.status-running { background: var(--info); }
+.status-success { color: var(--success); }
+.status-success .ndp-status-dot, .ndp-status-dot.status-success { background: var(--success); }
+.status-failed { color: var(--fail); }
+.status-failed .ndp-status-dot, .ndp-status-dot.status-failed { background: var(--fail); }
+.status-skipped { color: var(--warn); }
+.status-skipped .ndp-status-dot, .ndp-status-dot.status-skipped { background: var(--warn); }
 </style>

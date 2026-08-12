@@ -41,7 +41,7 @@
         <Skeleton v-for="n in 4" :key="n" height="46px" radius="8px" />
       </div>
       <div v-else-if="routes.length" class="dispatch-grid">
-        <div class="dispatch-card" v-for="route in routes" :key="route.capability">
+        <div v-for="route in routes" :key="route.capability" class="dispatch-card">
           <div class="route-cap">
             <AppIcon name="route" :size="14" />
             <span class="route-cap-name">{{ route.capability }}</span>
@@ -49,21 +49,21 @@
           <div class="route-chain">
             <div class="route-node primary">
               <span class="route-agent">{{ route.primary || '—' }}</span>
-              <span class="route-model mono" v-if="route.primary_model">{{ route.primary_model }}</span>
+              <span v-if="route.primary_model" class="route-model mono">{{ route.primary_model }}</span>
             </div>
-            <div class="route-sep" v-if="route.fallback">→</div>
-            <div class="route-node fallback" v-if="route.fallback">
+            <div v-if="route.fallback" class="route-sep">→</div>
+            <div v-if="route.fallback" class="route-node fallback">
               <span class="route-agent">{{ route.fallback }}</span>
-              <span class="route-model mono" v-if="route.fallback_model">{{ route.fallback_model }}</span>
+              <span v-if="route.fallback_model" class="route-model mono">{{ route.fallback_model }}</span>
             </div>
-            <div class="route-sep" v-if="route.tertiary">→</div>
-            <div class="route-node tertiary" v-if="route.tertiary">
+            <div v-if="route.tertiary" class="route-sep">→</div>
+            <div v-if="route.tertiary" class="route-node tertiary">
               <span class="route-agent">{{ route.tertiary }}</span>
             </div>
           </div>
-          <div class="route-keywords" v-if="route.keywords && route.keywords.length">
-            <span class="kw-chip" v-for="kw in route.keywords.slice(0, 6)" :key="kw">{{ kw }}</span>
-            <span class="kw-more" v-if="route.keywords.length > 6">+{{ route.keywords.length - 6 }}</span>
+          <div v-if="route.keywords && route.keywords.length" class="route-keywords">
+            <span v-for="kw in route.keywords.slice(0, 6)" :key="kw" class="kw-chip">{{ kw }}</span>
+            <span v-if="route.keywords.length > 6" class="kw-more">+{{ route.keywords.length - 6 }}</span>
           </div>
         </div>
       </div>
@@ -72,18 +72,18 @@
       <!-- Section 2: 最近的实际路由执行记录 -->
       <h4 class="dispatch-section-title">
         {{ t('view.agents.recentDecisions') }}
-        <span class="dispatch-count" v-if="decisions.length">({{ decisions.length }})</span>
+        <span v-if="decisions.length" class="dispatch-count">({{ decisions.length }})</span>
       </h4>
       <div v-if="loadingDecisions" class="skeleton-grid">
         <Skeleton v-for="n in 3" :key="n" height="42px" radius="8px" />
       </div>
       <div v-else-if="decisions.length" class="decisions-list">
-        <div class="decision-row" v-for="d in decisions.slice(0, 20)" :key="d.trace_id + d.stage">
+        <div v-for="d in decisions.slice(0, 20)" :key="d.trace_id + d.stage" class="decision-row">
           <span class="dec-stage" :class="d.stage">{{ d.stage }}</span>
           <span class="dec-agent">
             {{ d.output_summary?.selected_agent || d.output_summary?.selected_model || '—' }}
           </span>
-          <span class="dec-reason" v-if="d.explanation">{{ d.explanation.slice(0, 80) }}{{ d.explanation.length > 80 ? '…' : '' }}</span>
+          <span v-if="d.explanation" class="dec-reason">{{ d.explanation.slice(0, 80) }}{{ d.explanation.length > 80 ? '…' : '' }}</span>
           <span class="dec-time">{{ formatDecTime(d.timestamp) }}</span>
         </div>
       </div>
@@ -104,24 +104,24 @@
         <Skeleton v-for="n in 4" :key="n" height="46px" radius="8px" />
       </div>
       <div v-else-if="scanned.length" class="scanned-grid">
-        <div class="scanned-card" v-for="s in scanned" :key="s.name">
+        <div v-for="s in scanned" :key="s.name" class="scanned-card">
           <div class="scanned-top">
             <div class="scanned-avatar" :class="s.status">{{ (s.name || '?').charAt(0).toUpperCase() }}</div>
             <div class="scanned-identity">
               <h3>{{ s.name }}</h3>
               <Badge :tone="s.status === 'available' ? 'success' : 'neutral'">{{ s.status === 'available' ? t('view.agents.available') : t('view.agents.unavailable') }}</Badge>
             </div>
-            <span class="scanned-version mono" v-if="s.version">{{ s.version }}</span>
+            <span v-if="s.version" class="scanned-version mono">{{ s.version }}</span>
           </div>
           <div class="scanned-meta">
             <div class="sm-row"><span class="sm-key">{{ t('common.provider') }}</span><span class="sm-val">{{ s.provider || '—' }}</span></div>
             <div class="sm-row"><span class="sm-key">{{ t('view.agents.cliPath') }}</span><span class="sm-val mono path">{{ s.cli_path || '—' }}</span></div>
           </div>
-          <div class="caps" v-if="(s.capabilities || []).length">
-            <span class="cap-chip" v-for="c in s.capabilities" :key="c">{{ c }}</span>
+          <div v-if="(s.capabilities || []).length" class="caps">
+            <span v-for="c in s.capabilities" :key="c" class="cap-chip">{{ c }}</span>
           </div>
-          <div class="scanned-actions" v-if="s.status === 'available'">
-            <button class="act-btn" @click="addToMaop(s)" :disabled="addingAgent[s.name]" :title="t('view.agents.addToMaop')">
+          <div v-if="s.status === 'available'" class="scanned-actions">
+            <button class="act-btn" :disabled="addingAgent[s.name]" :title="t('view.agents.addToMaop')" @click="addToMaop(s)">
               <AppIcon name="plus" :size="14" /> {{ addingAgent[s.name] ? t('common.loading') : t('view.agents.addToMaop') }}
             </button>
           </div>
@@ -154,25 +154,25 @@
           <div class="metric"><span class="metric-val">{{ a.last_latency_ms || 0 }}<small>ms</small></span><span class="metric-lbl">{{ t('common.latency') }}</span></div>
         </div>
         <div class="agent-actions">
-          <button class="act-btn" @click.stop="switchModel(a)" :title="t('view.agents.switchModel')">
+          <button class="act-btn" :title="t('view.agents.switchModel')" @click.stop="switchModel(a)">
             <AppIcon name="bot" :size="14" /> {{ t('common.model') }}
           </button>
-          <button class="act-btn" @click.stop="healthCheck(a)" :title="t('view.agents.healthCheck')">
+          <button class="act-btn" :title="t('view.agents.healthCheck')" @click.stop="healthCheck(a)">
             <AppIcon name="activity" :size="14" /> {{ t('view.agents.health') }}
           </button>
-          <button class="act-btn" @click.stop="repairAgent(a)" :disabled="repairing[a.name]" :title="t('view.agents.repair')">
+          <button class="act-btn" :disabled="repairing[a.name]" :title="t('view.agents.repair')" @click.stop="repairAgent(a)">
             <AppIcon name="wrench" :size="14" /> {{ repairing[a.name] ? t('common.loading') : t('view.agents.repair') }}
           </button>
-          <button class="act-btn" @click.stop="upgradeAgent(a)" :disabled="upgrading[a.name]" :title="t('view.agents.upgrade')">
+          <button class="act-btn" :disabled="upgrading[a.name]" :title="t('view.agents.upgrade')" @click.stop="upgradeAgent(a)">
             <AppIcon name="arrow-up" :size="14" /> {{ upgrading[a.name] ? t('common.loading') : t('view.agents.upgrade') }}
           </button>
-          <button class="act-btn" @click.stop="showMemory(a)" :title="t('view.agents.memory')">
+          <button class="act-btn" :title="t('view.agents.memory')" @click.stop="showMemory(a)">
             <AppIcon name="brain" :size="14" /> {{ t('view.agents.memory') }}
           </button>
-          <button class="act-btn" @click.stop="evolveAgent(a)" :disabled="evolving[a.name]" :title="t('view.agents.evolve')">
+          <button class="act-btn" :disabled="evolving[a.name]" :title="t('view.agents.evolve')" @click.stop="evolveAgent(a)">
             <AppIcon name="sparkles" :size="14" /> {{ evolving[a.name] ? t('common.loading') : t('view.agents.evolve') }}
           </button>
-          <button class="act-btn danger" @click.stop="confirmRemove(a)" :disabled="!isAdmin" :title="t('view.agents.remove')">
+          <button class="act-btn danger" :disabled="!isAdmin" :title="t('view.agents.remove')" @click.stop="confirmRemove(a)">
             <AppIcon name="trash" :size="14" /> {{ t('view.agents.remove') }}
           </button>
         </div>
@@ -184,7 +184,7 @@
         <div class="trow header">
           <span>{{ t('view.agents.colAgent') }}</span><span>{{ t('common.status') }}</span><span>{{ t('common.model') }}</span><span>{{ t('common.driver') }}</span><span>{{ t('common.caps') }}</span><span>{{ t('common.latency') }}</span><span>{{ t('common.actions') }}</span>
         </div>
-        <div class="trow" v-for="a in agents" :key="a.name">
+        <div v-for="a in agents" :key="a.name" class="trow">
           <span class="agent-name">{{ a.name }}</span>
           <span><Badge :tone="statusTone(agentStatus(a))">{{ agentStatus(a) }}</Badge></span>
           <span class="mono">{{ a.model || 'auto' }}</span>
@@ -192,13 +192,13 @@
           <span>{{ (a.capabilities || []).length }}</span>
           <span>{{ a.last_latency_ms || 0 }}ms</span>
           <span class="actions-cell">
-            <button class="act-btn small" @click="switchModel(a)" :title="t('common.model')"><AppIcon name="bot" :size="13" /></button>
-            <button class="act-btn small" @click="healthCheck(a)" :title="t('view.agents.healthCheck')"><AppIcon name="activity" :size="13" /></button>
-            <button class="act-btn small" @click="repairAgent(a)" :disabled="repairing[a.name]" :title="t('view.agents.repair')"><AppIcon name="wrench" :size="13" /></button>
-            <button class="act-btn small" @click="upgradeAgent(a)" :disabled="upgrading[a.name]" :title="t('view.agents.upgrade')"><AppIcon name="arrow-up" :size="13" /></button>
-            <button class="act-btn small" @click="showMemory(a)" :title="t('view.agents.memory')"><AppIcon name="brain" :size="13" /></button>
-            <button class="act-btn small" @click="evolveAgent(a)" :disabled="evolving[a.name]" :title="t('view.agents.evolve')"><AppIcon name="sparkles" :size="13" /></button>
-            <button class="act-btn small danger" @click="confirmRemove(a)" :disabled="!isAdmin" :title="t('view.agents.remove')"><AppIcon name="trash" :size="13" /></button>
+            <button class="act-btn small" :title="t('common.model')" @click="switchModel(a)"><AppIcon name="bot" :size="13" /></button>
+            <button class="act-btn small" :title="t('view.agents.healthCheck')" @click="healthCheck(a)"><AppIcon name="activity" :size="13" /></button>
+            <button class="act-btn small" :disabled="repairing[a.name]" :title="t('view.agents.repair')" @click="repairAgent(a)"><AppIcon name="wrench" :size="13" /></button>
+            <button class="act-btn small" :disabled="upgrading[a.name]" :title="t('view.agents.upgrade')" @click="upgradeAgent(a)"><AppIcon name="arrow-up" :size="13" /></button>
+            <button class="act-btn small" :title="t('view.agents.memory')" @click="showMemory(a)"><AppIcon name="brain" :size="13" /></button>
+            <button class="act-btn small" :disabled="evolving[a.name]" :title="t('view.agents.evolve')" @click="evolveAgent(a)"><AppIcon name="sparkles" :size="13" /></button>
+            <button class="act-btn small danger" :disabled="!isAdmin" :title="t('view.agents.remove')" @click="confirmRemove(a)"><AppIcon name="trash" :size="13" /></button>
           </span>
         </div>
         <EmptyState v-if="!agents.length" icon="bot" :title="t('view.agents.noAgentsFound')" :hint="t('view.agents.noAgentsFoundHint')" />
@@ -207,28 +207,28 @@
 
     <Card v-if="selectedAgent" :title="selectedAgent" :margin-bottom="24">
       <template #actions>
-        <button class="close-btn" @click="selectedAgent = null" :aria-label="t('common.close')"><AppIcon name="x" :size="14" /></button>
+        <button class="close-btn" :aria-label="t('common.close')" @click="selectedAgent = null"><AppIcon name="x" :size="14" /></button>
       </template>
       <div class="detail-body">
         <div class="detail-section">
           <h4>{{ t('common.configuration') }}</h4>
           <div class="config-grid">
-            <div class="cfg-item" v-for="(v, k) in agentConfig" :key="k">
+            <div v-for="(v, k) in agentConfig" :key="k" class="cfg-item">
               <span class="cfg-key">{{ k }}</span>
               <span class="cfg-val">{{ v }}</span>
             </div>
           </div>
-          <div class="caps-block" v-if="selectedCapabilities.length">
+          <div v-if="selectedCapabilities.length" class="caps-block">
             <h4>{{ t('common.capabilities') }}</h4>
             <div class="caps">
-              <span class="cap-chip" v-for="c in selectedCapabilities" :key="c">{{ c }}</span>
+              <span v-for="c in selectedCapabilities" :key="c" class="cap-chip">{{ c }}</span>
             </div>
           </div>
         </div>
         <div class="detail-section">
           <h4>{{ t('view.agents.runtime') }}</h4>
           <div class="perf-bars">
-            <div class="perf-row" v-for="(v, i) in perfHistory" :key="i">
+            <div v-for="(v, i) in perfHistory" :key="i" class="perf-row">
               <span class="perf-label">{{ v.label }}</span>
               <div class="perf-bar"><div class="perf-fill" :style="{ width: v.pct + '%', background: v.color }"></div></div>
               <span class="perf-val">{{ v.value }}</span>
@@ -241,15 +241,15 @@
     <EmptyState v-if="!loading && !agents.length" icon="bot" :title="t('view.agents.noAgents')" :hint="t('view.agents.noAgentsHint')" />
 
     <!-- 记忆面板 -->
-    <div v-if="memoryPanel.visible" class="modal-overlay" v-modal-a11y @click.self="memoryPanel.visible = false" @modal:escape="memoryPanel.visible = false">
+    <div v-if="memoryPanel.visible" v-modal-a11y class="modal-overlay" @click.self="memoryPanel.visible = false" @modal:escape="memoryPanel.visible = false">
       <div class="memory-panel">
         <div class="memory-panel__header">
           <h3>{{ t('view.agents.memoryFor', { name: memoryPanel.agentName }) }}</h3>
           <div class="memory-panel__toolbar">
-            <button class="act-btn small" @click="reloadMemory(memoryPanel.agentName)" :title="t('common.refresh')">
+            <button class="act-btn small" :title="t('common.refresh')" @click="reloadMemory(memoryPanel.agentName)">
               <AppIcon name="refresh" :size="14" />
             </button>
-            <button class="act-btn small" @click="memoryAddForm = !memoryAddForm" :title="t('view.agents.addMemory')">
+            <button class="act-btn small" :title="t('view.agents.addMemory')" @click="memoryAddForm = !memoryAddForm">
               <AppIcon name="plus" :size="14" />
             </button>
             <button class="close-btn" @click="memoryPanel.visible = false"><AppIcon name="x" :size="16" /></button>
@@ -265,22 +265,23 @@
             <option value="performance">performance</option>
             <option value="lesson">lesson</option>
           </select>
-          <textarea v-model="memoryAddContent" class="mem-add-textarea" rows="3"
+          <textarea
+v-model="memoryAddContent" class="mem-add-textarea" rows="3"
                     :aria-label="t('view.agents.memoryContentPlaceholder')"
                     :placeholder="t('view.agents.memoryContentPlaceholder')"></textarea>
           <div class="mem-add-row">
             <label class="mem-add-importance">
               {{ t('view.agents.importance') }}: {{ memoryAddImportance }}
-              <input type="range" min="0" max="1" step="0.1" v-model.number="memoryAddImportance" :aria-label="t('view.agents.importance')" />
+              <input v-model.number="memoryAddImportance" type="range" min="0" max="1" step="0.1" :aria-label="t('view.agents.importance')" />
             </label>
-            <button class="act-btn" @click="addMemory(memoryPanel.agentName)" :disabled="!memoryAddContent.trim()">
+            <button class="act-btn" :disabled="!memoryAddContent.trim()" @click="addMemory(memoryPanel.agentName)">
               {{ t('view.agents.addMemory') }}
             </button>
           </div>
         </div>
 
-        <div class="memory-panel__summary" v-if="memoryPanel.summary">
-          <div class="mem-stat" v-for="(val, key) in memoryPanel.summary.by_type" :key="key">
+        <div v-if="memoryPanel.summary" class="memory-panel__summary">
+          <div v-for="(val, key) in memoryPanel.summary.by_type" :key="key" class="mem-stat">
             <span class="mem-stat__label">{{ key }}</span>
             <span class="mem-stat__val">{{ val }}</span>
           </div>
@@ -293,8 +294,8 @@
             <span class="mem-stat__val">{{ memoryPanel.summary.evolution_count }}</span>
           </div>
         </div>
-        <div class="memory-panel__list" v-if="memoryPanel.records.length">
-          <div class="mem-record" v-for="r in memoryPanel.records" :key="r.id">
+        <div v-if="memoryPanel.records.length" class="memory-panel__list">
+          <div v-for="r in memoryPanel.records" :key="r.id" class="mem-record">
             <span class="mem-type" :class="r.memory_type">{{ r.memory_type }}</span>
             <span class="mem-content">{{ JSON.stringify(r.content).slice(0, 200) }}</span>
             <span class="mem-time">{{ r.created_at?.slice(0, 19) }}</span>
@@ -305,7 +306,7 @@
           <span>{{ t('view.agents.noMemories') }}</span>
         </div>
         <div class="memory-panel__actions">
-          <button class="act-btn danger" @click="clearMemory(memoryPanel.agentName)" :disabled="!isAdmin">
+          <button class="act-btn danger" :disabled="!isAdmin" @click="clearMemory(memoryPanel.agentName)">
             <AppIcon name="trash" :size="14" /> {{ t('view.agents.clearMemory') }}
           </button>
         </div>
@@ -313,25 +314,26 @@
     </div>
 
     <!-- 自进化结果面板 -->
-    <div v-if="evolutionPanel.visible" class="modal-overlay" v-modal-a11y @click.self="evolutionPanel.visible = false" @modal:escape="evolutionPanel.visible = false">
+    <div v-if="evolutionPanel.visible" v-modal-a11y class="modal-overlay" @click.self="evolutionPanel.visible = false" @modal:escape="evolutionPanel.visible = false">
       <div class="evolution-panel">
         <div class="evolution-panel__header">
           <h3>{{ t('view.agents.evolutionFor', { name: evolutionPanel.agentName }) }}</h3>
           <button class="close-btn" @click="evolutionPanel.visible = false"><AppIcon name="x" :size="16" /></button>
         </div>
-        <p class="evolution-summary" v-if="evolutionPanel.result">{{ evolutionPanel.result.summary }}</p>
-        <div class="evolution-suggestions" v-if="evolutionPanel.result?.suggestions?.length">
-          <div class="evo-suggestion" v-for="(s, i) in evolutionPanel.result.suggestions" :key="i"
+        <p v-if="evolutionPanel.result" class="evolution-summary">{{ evolutionPanel.result.summary }}</p>
+        <div v-if="evolutionPanel.result?.suggestions?.length" class="evolution-suggestions">
+          <div
+v-for="(s, i) in evolutionPanel.result.suggestions" :key="i" class="evo-suggestion"
                :class="['prio-' + s.priority, s.action === 'auto_applied' ? 'auto' : 'manual']">
             <span class="evo-cat">{{ s.category }}</span>
             <span class="evo-prio">{{ s.priority }}</span>
             <p class="evo-desc">{{ s.description }}</p>
-            <span class="evo-action" v-if="s.action === 'auto_applied'">{{ t('view.agents.autoApplied') }}</span>
+            <span v-if="s.action === 'auto_applied'" class="evo-action">{{ t('view.agents.autoApplied') }}</span>
           </div>
         </div>
-        <div class="evolution-applied" v-if="evolutionPanel.result?.auto_applied?.length">
+        <div v-if="evolutionPanel.result?.auto_applied?.length" class="evolution-applied">
           <h4>{{ t('view.agents.autoAppliedChanges') }}</h4>
-          <div class="applied-item" v-for="(a, i) in evolutionPanel.result.auto_applied" :key="i">
+          <div v-for="(a, i) in evolutionPanel.result.auto_applied" :key="i" class="applied-item">
             <span class="applied-cat">{{ a.category }}</span>
             <span class="applied-desc">{{ a.description }}</span>
           </div>
@@ -340,14 +342,14 @@
     </div>
 
     <!-- 移除确认对话框 -->
-    <div v-if="removeConfirm.visible" class="modal-overlay" v-modal-a11y @click.self="removeConfirm.visible = false" @modal:escape="removeConfirm.visible = false">
+    <div v-if="removeConfirm.visible" v-modal-a11y class="modal-overlay" @click.self="removeConfirm.visible = false" @modal:escape="removeConfirm.visible = false">
       <div class="confirm-dialog">
         <div class="confirm-dialog__icon"><AppIcon name="alert-triangle" :size="28" /></div>
         <h3>{{ t('view.agents.confirmRemove', { name: removeConfirm.agentName }) }}</h3>
         <p class="confirm-warning">{{ t('view.agents.removeWarning') }}</p>
         <div class="confirm-dialog__actions">
           <button class="act-btn" @click="removeConfirm.visible = false">{{ t('common.cancel') }}</button>
-          <button class="act-btn danger" @click="executeRemove" :disabled="removing">
+          <button class="act-btn danger" :disabled="removing" @click="executeRemove">
             {{ removing ? t('common.loading') : t('view.agents.confirmRemoveBtn') }}
           </button>
         </div>
@@ -355,34 +357,35 @@
     </div>
 
     <!-- 模型切换对话框 -->
-    <div v-if="modelSwitchPanel.visible" class="modal-overlay" v-modal-a11y @click.self="modelSwitchPanel.visible = false" @modal:escape="modelSwitchPanel.visible = false">
+    <div v-if="modelSwitchPanel.visible" v-modal-a11y class="modal-overlay" @click.self="modelSwitchPanel.visible = false" @modal:escape="modelSwitchPanel.visible = false">
       <div class="model-switch-panel">
         <div class="model-switch-panel__header">
           <h3>{{ t('view.agents.switchModelFor', { name: modelSwitchPanel.agentName }) }}</h3>
           <button class="close-btn" @click="modelSwitchPanel.visible = false"><AppIcon name="x" :size="16" /></button>
         </div>
-        <div class="model-switch-panel__current" v-if="modelSwitchPanel.currentModel">
+        <div v-if="modelSwitchPanel.currentModel" class="model-switch-panel__current">
           <span class="ms-label">{{ t('view.agents.currentModel') }}:</span>
           <span class="ms-value mono">{{ modelSwitchPanel.currentModel }}</span>
         </div>
-        <div class="model-switch-panel__list" v-if="modelSwitchPanel.loading">
+        <div v-if="modelSwitchPanel.loading" class="model-switch-panel__list">
           <Skeleton height="36px" radius="6px" />
           <Skeleton height="36px" radius="6px" />
           <Skeleton height="36px" radius="6px" />
         </div>
-        <div class="model-switch-panel__list" v-else-if="modelSwitchPanel.models.length">
-          <label class="model-option" v-for="m in modelSwitchPanel.models" :key="m.name"
+        <div v-else-if="modelSwitchPanel.models.length" class="model-switch-panel__list">
+          <label
+v-for="m in modelSwitchPanel.models" :key="m.name" class="model-option"
                  :class="{ selected: modelSwitchPanel.selectedModel === m.name, disabled: !m.enabled }">
-            <input type="radio" :value="m.name" v-model="modelSwitchPanel.selectedModel" :disabled="!m.enabled" :aria-label="t('view.agents.switchModelTo', { name: m.name })" />
+            <input v-model="modelSwitchPanel.selectedModel" type="radio" :value="m.name" :disabled="!m.enabled" :aria-label="t('view.agents.switchModelTo', { name: m.name })" />
             <span class="model-name mono">{{ m.name }}</span>
             <span class="model-provider">{{ m.provider }}</span>
-            <span class="model-status" v-if="!m.enabled">{{ t('common.disabled') }}</span>
+            <span v-if="!m.enabled" class="model-status">{{ t('common.disabled') }}</span>
           </label>
         </div>
         <EmptyState v-else icon="bot" :title="t('view.agents.noModelsAvailable')" />
         <div class="model-switch-panel__actions">
           <button class="act-btn" @click="modelSwitchPanel.visible = false">{{ t('common.cancel') }}</button>
-          <button class="act-btn" @click="executeModelSwitch" :disabled="!modelSwitchPanel.selectedModel || modelSwitchPanel.selectedModel === modelSwitchPanel.currentModel">
+          <button class="act-btn" :disabled="!modelSwitchPanel.selectedModel || modelSwitchPanel.selectedModel === modelSwitchPanel.currentModel" @click="executeModelSwitch">
             {{ t('view.agents.confirmSwitch') }}
           </button>
         </div>
@@ -390,7 +393,7 @@
     </div>
 
     <!-- 升级确认弹窗 -->
-    <div v-if="upgradePanel.visible" class="modal-overlay" v-modal-a11y @click.self="upgradePanel.visible = false" @modal:escape="upgradePanel.visible = false">
+    <div v-if="upgradePanel.visible" v-modal-a11y class="modal-overlay" @click.self="upgradePanel.visible = false" @modal:escape="upgradePanel.visible = false">
       <div class="upgrade-panel">
         <div class="upgrade-panel__header">
           <h3>{{ t('view.agents.upgradeFor', { name: upgradePanel.agentName }) }}</h3>
@@ -440,8 +443,8 @@
           <!-- 升级结果 -->
           <div v-if="upgradePanel.result" class="upgrade-result" :class="upgradePanel.result.upgrade_status">
             <span class="ur-status">{{ upgradePanel.result.upgrade_status }}</span>
-            <span class="ur-output" v-if="upgradePanel.result.output">{{ upgradePanel.result.output.slice(0, 200) }}</span>
-            <span class="ur-error" v-if="upgradePanel.result.error">{{ upgradePanel.result.error }}</span>
+            <span v-if="upgradePanel.result.output" class="ur-output">{{ upgradePanel.result.output.slice(0, 200) }}</span>
+            <span v-if="upgradePanel.result.error" class="ur-error">{{ upgradePanel.result.error }}</span>
           </div>
         </div>
 
@@ -452,21 +455,21 @@
         </div>
 
         <!-- 操作按钮 -->
-        <div class="upgrade-panel__actions" v-if="!upgradePanel.checking && !upgradePanel.result?.error">
+        <div v-if="!upgradePanel.checking && !upgradePanel.result?.error" class="upgrade-panel__actions">
           <button class="act-btn" @click="upgradePanel.visible = false">{{ t('common.cancel') }}</button>
           <button
             v-if="upgradePanel.installMethod !== 'binary' && upgradePanel.updateAvailable"
             class="act-btn"
-            @click="executeUpgrade"
             :disabled="upgradePanel.upgrading"
+            @click="executeUpgrade"
           >
             {{ upgradePanel.upgrading ? t('common.loading') : t('view.agents.confirmUpgrade') }}
           </button>
           <button
             v-else-if="upgradePanel.installMethod !== 'binary' && !upgradePanel.updateAvailable && upgradePanel.latestVersion !== 'unknown'"
             class="act-btn"
-            @click="executeUpgrade"
             :disabled="upgradePanel.upgrading"
+            @click="executeUpgrade"
           >
             {{ upgradePanel.upgrading ? t('common.loading') : t('view.agents.forceUpgrade') }}
           </button>
@@ -1167,10 +1170,10 @@ onMounted(() => {
   text-align: center; text-transform: uppercase;
   letter-spacing: .03em;
 }
-.dec-stage.route_scorer { background: color-mix(in srgb, #3574f0 15%, transparent); color: #3574f0; }
-.dec-stage.load_balancer { background: color-mix(in srgb, #d29922 15%, transparent); color: #d29922; }
-.dec-stage.model_selector { background: color-mix(in srgb, #9e8cfc 15%, transparent); color: #9e8cfc; }
-.dec-stage.dispatcher { background: color-mix(in srgb, #3fb950 15%, transparent); color: #3fb950; }
+.dec-stage.route_scorer { background: color-mix(in srgb, var(--brand) 15%, transparent); color: var(--brand); }
+.dec-stage.load_balancer { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
+.dec-stage.model_selector { background: color-mix(in srgb, var(--chart-5) 15%, transparent); color: var(--chart-5); }
+.dec-stage.dispatcher { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
 .dec-agent { font-weight: 600; color: var(--text); }
 .dec-reason { color: var(--text-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dec-time { color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -1260,22 +1263,22 @@ onMounted(() => {
   font-size: var(--fs-sm);
   margin: var(--sp-2) 0;
 }
-.upgrade-notice.ok { background: color-mix(in srgb, #3fb950 10%, var(--surface)); color: #3fb950; }
-.upgrade-notice.info { background: color-mix(in srgb, #3574f0 10%, var(--surface)); color: #3574f0; }
-.upgrade-notice.warn { background: color-mix(in srgb, #d29922 10%, var(--surface)); color: #d29922; }
+.upgrade-notice.ok { background: color-mix(in srgb, var(--success) 10%, var(--surface)); color: var(--success); }
+.upgrade-notice.info { background: color-mix(in srgb, var(--brand) 10%, var(--surface)); color: var(--brand); }
+.upgrade-notice.warn { background: color-mix(in srgb, var(--warn) 10%, var(--surface)); color: var(--warn); }
 .upgrade-result {
   margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-sm); background: var(--surface-2);
   font-size: 12px; display: flex; flex-direction: column; gap: 2px;
 }
-.upgrade-result.success { border-left: 3px solid #3fb950; }
-.upgrade-result.failed { border-left: 3px solid #f85149; }
-.upgrade-result.not_supported { border-left: 3px solid #d29922; }
+.upgrade-result.success { border-left: 3px solid var(--success); }
+.upgrade-result.failed { border-left: 3px solid var(--fail); }
+.upgrade-result.not_supported { border-left: 3px solid var(--warn); }
 .ur-status { font-weight: 600; text-transform: uppercase; }
 .ur-output, .ur-error { color: var(--text-muted); word-break: break-all; }
 .upgrade-error {
   display: flex; align-items: center; gap: var(--sp-2);
-  padding: var(--sp-3); color: var(--danger, #f85149);
+  padding: var(--sp-3); color: var(--fail);
 }
 .upgrade-panel__actions {
   display: flex; gap: var(--sp-3); justify-content: flex-end;

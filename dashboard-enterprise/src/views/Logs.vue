@@ -7,7 +7,7 @@
         size="sm"
         @update:model-value="onTypeChange"
       />
-      <button class="btn-ghost" :class="{ 'is-busy': loading }" @click="load" :disabled="loading">
+      <button class="btn-ghost" :class="{ 'is-busy': loading }" :disabled="loading" @click="load">
         <AppIcon name="refresh" :size="15" />
         <span>{{ t('common.refresh') }}</span>
       </button>
@@ -32,7 +32,7 @@
         <EmptyState v-else-if="error" icon="alert-triangle" tone="fail" :title="t('view.logs.failedLoad')" :description="error" />
         <EmptyState v-else-if="!logs.length" icon="scroll" :title="t('view.logs.noLogOutput')" :description="t('view.logs.noLogOutputDesc')" />
         <EmptyState v-else-if="!displayLogs.length" icon="search" :title="t('view.logs.noMatches')" :description="t('view.logs.noMatchesDesc')" />
-        <div v-else class="log-list" ref="logContainer">
+        <div v-else ref="logContainer" class="log-list">
           <div v-for="(e, i) in displayLogs" :key="i" class="log-line" :class="'lvl-' + e.level">
             <span class="log-line__ts">{{ e.ts || '—' }}</span>
             <Badge :tone="levelTone(e.level)" class="log-line__lvl">{{ e.level }}</Badge>

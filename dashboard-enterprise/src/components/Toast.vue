@@ -6,8 +6,8 @@
         :key="t.id"
         class="toast"
         :class="'toast--' + t.tone"
-        @click="dismiss(t.id)"
         role="status"
+        @click="dismiss(t.id)"
       >
         <AppIcon :name="iconFor(t.tone)" :size="16" />
         <span class="toast__msg">{{ t.message }}</span>

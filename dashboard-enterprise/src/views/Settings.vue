@@ -65,18 +65,18 @@
                 @click="onSwitchClick('enterprise')"
               >{{ t('view.settings.enterprise') }}</button>
             </div>
-            <span class="switching-indicator" v-if="editionStore.switching">{{ t('view.settings.switching') }}</span>
+            <span v-if="editionStore.switching" class="switching-indicator">{{ t('view.settings.switching') }}</span>
           </span>
         </div>
-        <div class="setting-row" v-if="!isAdmin">
+        <div v-if="!isAdmin" class="setting-row">
           <span class="setting-label"></span>
           <span class="edition-perm-hint">{{ t('view.settings.adminRequired') }}</span>
         </div>
-        <div class="setting-row" v-if="editionStore.switchError">
+        <div v-if="editionStore.switchError" class="setting-row">
           <span class="setting-label"></span>
           <span class="edition-error-msg">{{ editionStore.switchError }}</span>
         </div>
-        <div class="setting-row" v-if="switchNotice">
+        <div v-if="switchNotice" class="setting-row">
           <span class="setting-label"></span>
           <span class="edition-notice" :class="{ degraded: switchNoticeDegraded }">{{ switchNotice }}</span>
         </div>
@@ -87,12 +87,12 @@
             <span class="setting-value">{{ edition.enterprise_available ? t('view.settings.yes') : t('view.settings.no') }}</span>
           </span>
         </div>
-        <div class="setting-row" v-if="edition.degradations && edition.degradations.length > 0">
+        <div v-if="edition.degradations && edition.degradations.length > 0" class="setting-row">
           <span class="setting-label">{{ t('view.settings.degradations') }}</span>
           <span class="degradation-count">{{ edition.degradations.length }}</span>
         </div>
         <div v-if="edition.degradations && edition.degradations.length > 0" class="degradation-list">
-          <div class="degradation-item" v-for="(d, i) in edition.degradations" :key="i">
+          <div v-for="(d, i) in edition.degradations" :key="i" class="degradation-item">
             <span class="deg-backend">{{ d.backend }}</span>
             <span class="deg-arrow">→</span>
             <span class="deg-fallback">{{ d.fallback }}</span>
@@ -102,7 +102,7 @@
       </Card>
 
       <Card :title="t('settings.backends')" :badge="t('view.settings.readOnly')" badge-tone="neutral">
-        <div class="setting-row" v-for="(val, key) in edition.backends" :key="key">
+        <div v-for="(val, key) in edition.backends" :key="key" class="setting-row">
           <span class="setting-label">{{ key }}</span>
           <span class="backend-tag">{{ val }}</span>
         </div>
@@ -169,7 +169,7 @@
       <Card :title="t('settings.featureFlags')" :badge="t('view.settings.editionDetermined')" badge-tone="neutral">
         <p class="feature-hint">{{ t('view.settings.featureFlagsHint') }}</p>
         <div class="feature-grid">
-          <div class="feature-item" v-for="(enabled, name) in edition.features" :key="name">
+          <div v-for="(enabled, name) in edition.features" :key="name" class="feature-item">
             <span class="status-dot small" :class="enabled ? 'on' : 'off'"></span>
             <span class="feature-name">{{ name }}</span>
           </div>

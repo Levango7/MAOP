@@ -29,7 +29,7 @@
       <div class="two-col">
         <Card :title="t('view.monitor.liveAgentStatus')" icon="bot" :margin-bottom="0">
           <div v-if="agentStatuses.length" class="agent-status-list">
-            <div class="agent-row" v-for="a in agentStatuses" :key="a.name">
+            <div v-for="a in agentStatuses" :key="a.name" class="agent-row">
               <span class="agent-dot" :class="a.healthy ? 'ok' : 'bad'"></span>
               <span class="agent-name">{{ a.name }}</span>
               <span class="agent-queue">Queue: {{ a.queue }}</span>
@@ -51,8 +51,8 @@
             <AppIcon name="alert-triangle" :size="16" /> {{ t('view.monitor.failedResources') }}
             <div v-if="statsError" class="resource-err-detail">{{ statsError }}</div>
           </div>
-          <div class="resource-list" v-else>
-            <div class="resource-item" v-for="r in resources" :key="r.name">
+          <div v-else class="resource-list">
+            <div v-for="r in resources" :key="r.name" class="resource-item">
               <span class="res-name">{{ r.name }}</span>
               <div class="res-bar"><div class="res-fill" :style="{ width: r.pct + '%', background: r.pct > 80 ? 'var(--fail)' : r.pct > 60 ? 'var(--warn)' : 'var(--success)' }"></div></div>
               <span class="res-val">{{ r.used }} / {{ r.total }}</span>
@@ -66,7 +66,7 @@
         <template #actions>
           <span v-if="sseEvents.length" class="event-count">{{ sseEvents.length }}</span>
         </template>
-        <div class="event-list" ref="eventList">
+        <div ref="eventList" class="event-list">
           <div v-for="e in sseEvents" :key="e.id" class="event-row" :class="e.level">
             <span class="event-time">{{ e.time }}</span>
             <span class="event-level">{{ e.level }}</span>
@@ -108,7 +108,7 @@
 
     <div v-if="activeTab === 'maintenance'">
       <div class="maint-grid">
-        <button class="maint-card" v-for="m in maintActions" :key="m.titleKey" @click="runMaint(m)">
+        <button v-for="m in maintActions" :key="m.titleKey" class="maint-card" @click="runMaint(m)">
           <span class="maint-icon"><AppIcon :name="m.icon" :size="24" /></span>
           <h4>{{ t(m.titleKey) }}</h4>
           <p>{{ t(m.descKey) }}</p>
@@ -130,8 +130,8 @@
           <div v-else-if="!diagnostics.length" class="resource-fail">
             <AppIcon name="alert-triangle" :size="16" /> {{ t('view.monitor.failedDiag') }}
           </div>
-        <div class="diag-list" v-else>
-          <div class="diag-item" v-for="d in diagnostics" :key="d.name">
+        <div v-else class="diag-list">
+          <div v-for="d in diagnostics" :key="d.name" class="diag-item">
             <span class="diag-dot" :class="d.ok ? 'ok' : 'bad'"></span>
             <span class="diag-name">{{ d.name }}</span>
             <span class="diag-result" :class="{ 'diag-result-fail': !d.ok }">{{ d.result }}</span>

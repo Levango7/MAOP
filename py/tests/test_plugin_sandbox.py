@@ -43,7 +43,10 @@ class TestPluginSandboxPathValidation:
         try:
             link.symlink_to(tmp_path / "outside.txt")
         except OSError:
-            pytest.skip("symlinks not supported")
+            pytest.skip(
+                "symlinks not supported on this platform/Environment "
+                "(Windows requires admin privileges or Developer Mode enabled)"
+            )
         with pytest.raises(SandboxViolation, match="Path traversal"):
             sandbox.validate_path(link)
 

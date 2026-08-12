@@ -791,7 +791,7 @@ class LLMProviderFactory:
                 )
 
             if not _is_error_response(resp):
-                _record_cost(resp, kwargs)
+                await _record_cost(resp, kwargs)
                 return FallbackResult(
                     response=resp,
                     used_model=current,
@@ -825,7 +825,7 @@ class LLMProviderFactory:
         else:
             resp = LLMResponse(content="[LLM Error] All providers exhausted", provider="none")
 
-        _record_cost(resp, kwargs)
+        await _record_cost(resp, kwargs)
         return FallbackResult(
             response=resp,
             used_model=current,
@@ -841,23 +841,40 @@ def _is_error_response(resp: LLMResponse) -> bool:
         return True
     return resp.content.startswith(("[LLM Error]", "[Claude Error]", "[Ollama Error]"))
 
-def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
-    """Auto-record LLM call metrics to CostTracker (best-effort).
+async def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
+    """Auto-record LLM call metrics to CostTracker (best-effort, async).
+
+    P2-P3 fix (M5): 改为 async，通过 record_async() 避免阻塞事件循环。
+    若 tracker 无 record_async 方法则回退到同步 record()（向后兼容）。
 
     Extracts session_id/agent from kwargs when callers pass them.
     Failures are logged as warnings but never break the LLM call.
     """
     try:
         from maop.core.monitoring.cost_tracker import get_cost_tracker
-        get_cost_tracker().record(
-            model=resp.model,
-            prompt_tokens=resp.prompt_tokens,
-            completion_tokens=resp.completion_tokens,
-            total_tokens=resp.total_tokens,
-            latency_ms=resp.latency_ms,
-            session_id=str(kwargs.get("session_id", "")),
-            agent=str(kwargs.get("agent", "")),
-            metadata={"provider": resp.provider} if resp.provider else None,
-        )
+        tracker = get_cost_tracker()
+        if hasattr(tracker, "record_async"):
+            await tracker.record_async(
+                model=resp.model,
+                prompt_tokens=resp.prompt_tokens,
+                completion_tokens=resp.completion_tokens,
+                total_tokens=resp.total_tokens,
+                latency_ms=resp.latency_ms,
+                session_id=str(kwargs.get("session_id", "")),
+                agent=str(kwargs.get("agent", "")),
+                metadata={"provider": resp.provider} if resp.provider else None,
+            )
+        else:
+            # Fallback: 同步调用（tracker 无 async 版本时兼容）
+            tracker.record(
+                model=resp.model,
+                prompt_tokens=resp.prompt_tokens,
+                completion_tokens=resp.completion_tokens,
+                total_tokens=resp.total_tokens,
+                latency_ms=resp.latency_ms,
+                session_id=str(kwargs.get("session_id", "")),
+                agent=str(kwargs.get("agent", "")),
+                metadata={"provider": resp.provider} if resp.provider else None,
+            )
     except Exception as exc:
         logger.warning("[llm_provider] CostTracker record failed: %s", exc)

@@ -1,7 +1,7 @@
 <template>
   <div class="chat-page">
     <PageHeader v-if="!embedded">
-      <button class="refresh-btn" @click="newSession" :title="t('view.chat.newSession')">
+      <button class="refresh-btn" :title="t('view.chat.newSession')" @click="newSession">
         <AppIcon name="plus" :size="15" />
         <span>{{ t('view.chat.newSession') }}</span>
       </button>
@@ -16,8 +16,8 @@
         <div v-if="sessionsLoading" class="session-loading">{{ t('view.chat.loadingSessions') }}</div>
         <EmptyState v-else-if="!sessions.length" icon="message-square" :title="t('view.chat.noSessions')" :description="t('view.chat.noSessionsHint')" />
         <div
-          v-else
           v-for="s in sessions"
+          v-else
           :key="s.id"
           class="session-item"
           :class="{ active: sessionId === s.id }"
@@ -47,7 +47,7 @@
         <span class="chat-header__avatar"><AppIcon :name="selectedAgent ? 'bot' : 'chat'" :size="18" /></span>
         <div class="chat-header__titles">
           <div class="chat-header__title">{{ headerTitle }}</div>
-          <div class="chat-header__sub" v-if="headerSub">{{ headerSub }}</div>
+          <div v-if="headerSub" class="chat-header__sub">{{ headerSub }}</div>
         </div>
       </div>
       <div class="chat-header__actions">
@@ -61,8 +61,8 @@
       </div>
     </div>
 
-    <div class="chat-body" ref="chatBody">
-      <div class="welcome-msg" v-if="messages.length === 0">
+    <div ref="chatBody" class="chat-body">
+      <div v-if="messages.length === 0" class="welcome-msg">
         <div class="welcome-icon"><AppIcon name="chat" :size="40" /></div>
         <h2>{{ t('view.chat.startConversation') }}</h2>
         <p>{{ t('view.chat.welcomeHint') }}</p>
@@ -90,40 +90,40 @@
         <div class="msg-bubble streaming">
           <div class="msg-text" v-html="renderMarkdown(streamContent)"></div>
           <span class="cursor">▊</span>
-          <div class="stream-meta" v-if="streamTokenCount > 0">
+          <div v-if="streamTokenCount > 0" class="stream-meta">
             <span class="stream-tokens">{{ streamTokenCount }} tokens</span>
-            <span class="stream-speed" v-if="streamSpeed > 0">{{ streamSpeed }} tok/s</span>
+            <span v-if="streamSpeed > 0" class="stream-speed">{{ streamSpeed }} tok/s</span>
           </div>
         </div>
       </div>
     </div>
 
     <div class="chat-input-area">
-      <div class="image-preview" v-if="pendingImage">
+      <div v-if="pendingImage" class="image-preview">
         <img :src="pendingImage" :alt="t('view.chat.attachImage')" />
-        <button class="remove-img" @click="pendingImage = null" :aria-label="t('view.chat.removeImage')">
+        <button class="remove-img" :aria-label="t('view.chat.removeImage')" @click="pendingImage = null">
           <AppIcon name="x" :size="12" />
         </button>
       </div>
       <div class="input-row">
         <label class="attach-btn" :title="t('view.chat.attachImage')">
           <AppIcon name="paperclip" :size="20" />
-          <input type="file" accept="image/*" @change="onImageAttach" hidden />
+          <input type="file" accept="image/*" hidden @change="onImageAttach" />
         </label>
         <textarea
+          ref="inputEl"
           v-model="inputText"
-          @keydown.enter.exact="onEnter"
           :placeholder="t('view.chat.inputPlaceholder')"
           rows="1"
-          ref="inputEl"
+          @keydown.enter.exact="onEnter"
         ></textarea>
-        <button class="send-btn" @click="sendMessage()" :disabled="(!inputText.trim() && !pendingImage) || !selectedAgent || streaming">
+        <button class="send-btn" :disabled="(!inputText.trim() && !pendingImage) || !selectedAgent || streaming" @click="sendMessage()">
           <AppIcon :name="streaming ? 'refresh' : 'send'" :size="18" :class="{ spinning: streaming }" />
         </button>
       </div>
       <div class="input-footer">
         <span class="char-count">{{ inputText.length }} chars</span>
-        <span class="agent-hint" v-if="!selectedAgent"><AppIcon name="alert-triangle" :size="13" /> {{ t('view.chat.selectAgentFirst') }}</span>
+        <span v-if="!selectedAgent" class="agent-hint"><AppIcon name="alert-triangle" :size="13" /> {{ t('view.chat.selectAgentFirst') }}</span>
       </div>
     </div>
     </div>

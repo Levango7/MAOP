@@ -17,7 +17,7 @@
         <button v-if="clusteredMode" class="btn" @click="unfoldAll">
           <AppIcon name="filter" :size="14" /> {{ t('view.kg.cluster.unfold') }}
         </button>
-        <button class="btn" @click="refresh" :disabled="loading">
+        <button class="btn" :disabled="loading" @click="refresh">
           <AppIcon name="refresh" :size="14" /> {{ t('view.kg.refresh') }}
         </button>
       </div>
@@ -68,8 +68,8 @@
               max="1"
               step="0.05"
               :value="minConfidence"
-              @input="onConfidenceInput"
               class="kg-range"
+              @input="onConfidenceInput"
             />
           </div>
 
@@ -78,9 +78,9 @@
             <input
               type="text"
               :value="searchKeyword"
-              @input="onSearchInput"
               :placeholder="t('view.kg.filter.searchPlaceholder')"
               class="kg-input"
+              @input="onSearchInput"
             />
           </div>
 
@@ -91,13 +91,13 @@
               min="1"
               max="2000"
               :value="limit"
-              @input="onLimitInput"
               class="kg-input"
+              @input="onLimitInput"
             />
           </div>
 
           <div class="kg-filter-actions">
-            <button class="btn btn--primary" @click="applyServerFilter" :disabled="loading">
+            <button class="btn btn--primary" :disabled="loading" @click="applyServerFilter">
               {{ t('view.kg.filter.apply') }}
             </button>
             <button class="btn" @click="resetAll">{{ t('view.kg.filter.reset') }}</button>
@@ -112,8 +112,8 @@
               <input
                 type="datetime-local"
                 :value="timelineStart"
-                @input="onTimelineStart"
                 class="kg-input"
+                @input="onTimelineStart"
               />
             </div>
             <div class="kg-timeline-row">
@@ -121,8 +121,8 @@
               <input
                 type="datetime-local"
                 :value="timelineEnd"
-                @input="onTimelineEnd"
                 class="kg-input"
+                @input="onTimelineEnd"
               />
             </div>
             <div v-if="timelineError" class="kg-timeline-error">{{ timelineError }}</div>
@@ -132,8 +132,8 @@
                 min="0"
                 max="100"
                 :value="timelineProgress"
-                @input="onTimelineScrub"
                 class="kg-range"
+                @input="onTimelineScrub"
               />
             </div>
           </div>
@@ -162,7 +162,7 @@
       </main>
 
       <!-- Right: detail panel (T20) -->
-      <aside class="kg-detail" v-if="selectedNode">
+      <aside v-if="selectedNode" class="kg-detail">
         <Card :title="t('view.kg.detail.title')" icon="info">
           <div class="kg-detail-body">
             <div class="kg-detail-row">
@@ -185,7 +185,7 @@
               <span class="kg-detail-value">{{ ((selectedNode.confidence ?? 1) * 100).toFixed(0) }}%</span>
             </div>
 
-            <div class="kg-detail-section" v-if="selectedNode.properties && Object.keys(selectedNode.properties).length">
+            <div v-if="selectedNode.properties && Object.keys(selectedNode.properties).length" class="kg-detail-section">
               <div class="kg-detail-label">{{ t('view.kg.detail.properties') }}</div>
               <pre class="kg-detail-pre">{{ JSON.stringify(selectedNode.properties, null, 2) }}</pre>
             </div>
@@ -207,7 +207,7 @@
               <div v-else class="muted">{{ t('view.kg.detail.noRelations') }}</div>
             </div>
 
-            <div class="kg-detail-section" v-if="nodeDetails && nodeDetails.relatedNodes.length">
+            <div v-if="nodeDetails && nodeDetails.relatedNodes.length" class="kg-detail-section">
               <div class="kg-detail-label">{{ t('view.kg.detail.relatedNodes') }}</div>
               <div class="kg-related-list">
                 <Badge
@@ -218,7 +218,7 @@
               </div>
             </div>
 
-            <div class="kg-detail-section" v-if="selectedNode.type === 'memory' && memorySummary">
+            <div v-if="selectedNode.type === 'memory' && memorySummary" class="kg-detail-section">
               <div class="kg-detail-label">{{ t('view.kg.detail.memorySummary') }}</div>
               <div class="kg-memory-summary">{{ memorySummary }}</div>
             </div>
@@ -825,8 +825,8 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   border-radius: var(--r-md, 8px);
   font-size: 13px;
 }
-.kg-notice--warn { background: #FFF3E0; border: 1px solid #FFB74D; color: #d29922; }
-.kg-notice--error { background: #FFEBEE; border: 1px solid #FFCDD2; color: #a40e26; }
+.kg-notice--warn { background: var(--warn-soft); border: 1px solid var(--warn); color: var(--warn-strong); }
+.kg-notice--error { background: var(--fail-soft); border: 1px solid var(--fail); color: var(--fail-strong); }
 .kg-notice--error .btn { margin-left: auto; }
 
 /* ── Layout ── */
@@ -858,10 +858,10 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.kg-type-agent { background: #3574f0; }
-.kg-type-task { background: #d29922; }
-.kg-type-memory { background: #6A1B9A; }
-.kg-type-concept { background: #2E7D32; }
+.kg-type-agent { background: var(--brand); }
+.kg-type-task { background: var(--warn); }
+.kg-type-memory { background: var(--chart-5); }
+.kg-type-concept { background: var(--success); }
 .kg-range { width: 100%; }
 .kg-input {
   width: 100%;
@@ -879,7 +879,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
 .kg-timeline { display: flex; flex-direction: column; gap: 8px; }
 .kg-timeline-row { display: flex; flex-direction: column; gap: 4px; }
 .kg-timeline-row label { font-size: 12px; color: var(--text-muted); }
-.kg-timeline-error { color: #a40e26; font-size: 12px; }
+.kg-timeline-error { color: var(--fail-strong); font-size: 12px; }
 .kg-timeline-range { padding-top: 4px; }
 
 /* ── Canvas ── */
@@ -918,7 +918,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
 .kg-detail-pre {
   margin: 0;
   padding: 8px;
-  background: var(--bg-code, #f5f5f5);
+  background: var(--surface-3);
   border-radius: 4px;
   font-size: 11px;
   font-family: 'SF Mono', 'Fira Code', monospace;
@@ -930,8 +930,8 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
 .kg-rel-list { display: flex; flex-direction: column; gap: 4px; }
 .kg-rel-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .kg-rel-dir { font-weight: bold; color: var(--text-muted); }
-.kg-rel-dir.out { color: #3574f0; }
-.kg-rel-dir.in { color: #d29922; }
+.kg-rel-dir.out { color: var(--brand); }
+.kg-rel-dir.in { color: var(--warn); }
 .kg-rel-target { font-family: 'SF Mono', 'Fira Code', monospace; }
 .kg-related-list { display: flex; flex-wrap: wrap; gap: 4px; }
 .kg-memory-summary {
@@ -961,8 +961,8 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
 }
 .btn:hover { background: var(--bg-hover, rgba(148,163,184,.16)); border-color: var(--border-strong, rgba(148,163,184,.45)); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn--primary { background: var(--brand, #3574f0); color: #fff; border-color: var(--brand, #3574f0); }
-.btn--primary:hover { background: var(--brand-strong, #0D47A1); }
+.btn--primary { background: var(--brand); color: var(--brand-contrast); border-color: var(--brand); }
+.btn--primary:hover { background: var(--brand-strong); }
 
 .muted { color: var(--text-muted); font-weight: 400; }
 </style>

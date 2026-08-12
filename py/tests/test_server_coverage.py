@@ -196,7 +196,10 @@ class TestNormalizeApiPath:
 )
 class TestEnterpriseGuard:
     async def test_blocks_versioned_tenant_path(self, client):
-        resp = await client.get("/api/v1/tenant/list")
+        # /api/tenant/list is intentionally soft (200 + empty list) so the
+        # personal-edition frontend can render an empty tenant picker. Use
+        # /api/tenant/create instead to exercise the hard 404 branch.
+        resp = await client.get("/api/v1/tenant/create")
         assert resp.status_code == 404
         body = resp.json()
         assert "Enterprise" in body.get("hint", "")

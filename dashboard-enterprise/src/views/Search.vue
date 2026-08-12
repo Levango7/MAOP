@@ -2,7 +2,7 @@
   <div class="search-view">
     <PageHeader />
 
-    <section class="stat-row" v-if="!statsError">
+    <section v-if="!statsError" class="stat-row">
       <StatCard :label="t('view.search.stat.memoryEntries')" :value="memStats.total_entries" icon="brain" tone="brand" :loading="statsLoading" />
       <StatCard :label="t('view.search.stat.vectors')" :value="vecStats.total_entries" icon="database" tone="info" :loading="statsLoading" />
       <StatCard :label="t('view.search.stat.graphNodes')" :value="graphStats.nodes" icon="network" tone="warn" :loading="statsLoading" />
@@ -13,44 +13,45 @@
       <Segmented v-model="activeTab" :options="tabOptions" />
       <div class="search-bar">
         <div class="input-wrap">
-          <input class="search-input" v-model="query" :placeholder="placeholder"
-            @keydown.enter="doSearch" :disabled="searching" />
+          <input
+v-model="query" class="search-input" :placeholder="placeholder"
+            :disabled="searching" @keydown.enter="doSearch" />
           <AppIcon name="search" :size="16" class="input-icon-right" />
         </div>
-        <button class="btn-primary" @click="doSearch" :disabled="searching || (activeTab !== 'graph' && !query.trim())">
+        <button class="btn-primary" :disabled="searching || (activeTab !== 'graph' && !query.trim())" @click="doSearch">
           <AppIcon v-if="searching" name="refresh" :size="14" /> {{ searching ? t('view.search.searching') : t('common.search') }}
         </button>
       </div>
 
       <div class="opts">
         <template v-if="activeTab === 'memory'">
-          <select class="opt" v-model="memoryType">
+          <select v-model="memoryType" class="opt">
             <option value="all">{{ t('view.search.opt.allTypes') }}</option><option value="episode">{{ t('view.search.opt.episode') }}</option>
             <option value="skill">{{ t('view.search.opt.skill') }}</option><option value="config">{{ t('view.search.opt.config') }}</option>
             <option value="error">{{ t('view.search.opt.error') }}</option>
           </select>
-          <select class="opt" v-model.number="memoryTopK">
+          <select v-model.number="memoryTopK" class="opt">
             <option :value="10">{{ t('view.search.opt.top10') }}</option><option :value="20">{{ t('view.search.opt.top20') }}</option><option :value="50">{{ t('view.search.opt.top50') }}</option>
           </select>
         </template>
         <template v-if="activeTab === 'vector'">
-          <select class="opt" v-model.number="vectorTopK">
+          <select v-model.number="vectorTopK" class="opt">
             <option :value="5">{{ t('view.search.opt.vTop5') }}</option><option :value="10">{{ t('view.search.opt.vTop10') }}</option><option :value="20">{{ t('view.search.opt.vTop20') }}</option>
           </select>
         </template>
         <template v-if="activeTab === 'graph'">
-          <select class="opt" v-model="graphMode">
+          <select v-model="graphMode" class="opt">
             <option value="neighbors">{{ t('view.search.opt.neighbors') }}</option><option value="nodes">{{ t('view.search.opt.nodes') }}</option><option value="edges">{{ t('view.search.opt.edges') }}</option>
           </select>
         </template>
         <template v-if="activeTab === 'log'">
-          <select class="opt" v-model="logType">
+          <select v-model="logType" class="opt">
             <option value="all">{{ t('common.all') }}</option><option value="dashboard">{{ t('view.search.opt.dashboard') }}</option>
             <option value="delegations">{{ t('view.search.opt.delegations') }}</option><option value="checker">{{ t('view.search.opt.checker') }}</option>
           </select>
         </template>
         <template v-if="activeTab === 'agent'">
-          <select class="opt" v-model="agentStatus">
+          <select v-model="agentStatus" class="opt">
             <option value="all">{{ t('view.search.opt.allStatus') }}</option><option value="available">{{ t('view.search.opt.cliAvailable') }}</option>
             <option value="unavailable">{{ t('view.search.opt.cliMissing') }}</option>
           </select>
@@ -58,7 +59,8 @@
       </div>
     </Card>
 
-    <Card icon="clipboard" :title="resultTitle" :margin-bottom="0"
+    <Card
+icon="clipboard" :title="resultTitle" :margin-bottom="0"
       :subtitle="searched && !searching ? `${resultRows.length} result(s)${searchTime ? ' in ' + searchTime + 'ms' : ''}` : ''">
       <div v-if="searchError" class="err"><EmptyState icon="alert-triangle" :title="t('view.search.searchFailed')" :description="searchError" /></div>
       <Skeleton v-else-if="searching" :lines="6" block />

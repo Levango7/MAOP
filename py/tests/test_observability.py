@@ -10,11 +10,12 @@ Covers P0 fixes and enhancements:
 """
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import yaml
@@ -95,9 +96,10 @@ def test_cost_tracker_auto_record():
         prompt_tokens=10, completion_tokens=20, total_tokens=30, latency_ms=500,
     )
     mock_tracker = MagicMock()
+    mock_tracker.record_async = AsyncMock()
     with patch("maop.core.monitoring.cost_tracker.get_cost_tracker", return_value=mock_tracker):
-        _record_cost(resp, {"session_id": "sess-123", "agent": "claude"})
-    mock_tracker.record.assert_called_once_with(
+        asyncio.run(_record_cost(resp, {"session_id": "sess-123", "agent": "claude"}))
+    mock_tracker.record_async.assert_called_once_with(
         model="gpt-4o",
         prompt_tokens=10, completion_tokens=20, total_tokens=30, latency_ms=500,
         session_id="sess-123", agent="claude",
@@ -106,13 +108,14 @@ def test_cost_tracker_auto_record():
 
     # 2: CostTracker failure does not raise
     with patch("maop.core.monitoring.cost_tracker.get_cost_tracker", side_effect=RuntimeError("DB error")):
-        _record_cost(resp, {})  # should not raise
+        asyncio.run(_record_cost(resp, {}))  # should not raise
 
     # 3: missing kwargs default to empty strings
     mock_tracker2 = MagicMock()
+    mock_tracker2.record_async = AsyncMock()
     with patch("maop.core.monitoring.cost_tracker.get_cost_tracker", return_value=mock_tracker2):
-        _record_cost(LLMResponse(content="Hi", model="claude-3.5-sonnet", provider="anthropic"), {})
-    mock_tracker2.record.assert_called_once_with(
+        asyncio.run(_record_cost(LLMResponse(content="Hi", model="claude-3.5-sonnet", provider="anthropic"), {}))
+    mock_tracker2.record_async.assert_called_once_with(
         model="claude-3.5-sonnet",
         prompt_tokens=0, completion_tokens=0, total_tokens=0, latency_ms=0,
         session_id="", agent="",

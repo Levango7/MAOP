@@ -7,7 +7,7 @@
         size="sm"
         @update:model-value="activeTab = $event"
       />
-      <button class="btn-ghost" :class="{ 'is-busy': loading }" @click="load" :disabled="loading">
+      <button class="btn-ghost" :class="{ 'is-busy': loading }" :disabled="loading" @click="load">
         <AppIcon name="refresh" :size="15" />
         <span>{{ t('common.refresh') }}</span>
       </button>
@@ -47,7 +47,7 @@
                 </div>
               </div>
               <p class="skill-card__desc">{{ s.description || t('view.tools.noDescription') }}</p>
-              <div class="skill-card__meta" v-if="s.version || s.category">
+              <div v-if="s.version || s.category" class="skill-card__meta">
                 <Badge v-if="s.version" tone="neutral">v{{ s.version }}</Badge>
                 <Badge v-if="s.category" tone="info">{{ s.category }}</Badge>
               </div>
@@ -153,11 +153,11 @@
 
     <!-- Create skill modal -->
     <Teleport to="body">
-      <div v-if="showCreate" class="modal-mask" v-modal-a11y @click.self="closeCreate" @modal:escape="closeCreate">
+      <div v-if="showCreate" v-modal-a11y class="modal-mask" @click.self="closeCreate" @modal:escape="closeCreate">
         <div class="modal" role="dialog" aria-modal="true">
           <div class="modal__head">
             <h3>{{ t('view.tools.createSkillTitle') }}</h3>
-            <button class="modal__x" type="button" @click="closeCreate" aria-label="Close">×</button>
+            <button class="modal__x" type="button" aria-label="Close" @click="closeCreate">×</button>
           </div>
           <div class="modal__body">
             <label class="field">
