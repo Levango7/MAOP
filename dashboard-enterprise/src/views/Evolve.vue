@@ -229,6 +229,8 @@ const timeseriesChartData = computed(() => {
   };
 });
 
+// 双 y 轴时序图(特例, 不套用 baseLineOptions 单轴工厂);
+// hover 交互相约一律遵循 composables/chartOptions.js 的规范(mode:index)
 const timeseriesChartOptions = {
   responsive: true,
   maintainAspectRatio: false,

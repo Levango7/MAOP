@@ -157,6 +157,7 @@ import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import { Card, StatCard, Badge, DataTable, Skeleton, EmptyState } from '../components/index.js';
 import { cssVar, cssVarAlpha } from '../composables/chartTokens.js';
+import { baseLineOptions } from '../composables/chartOptions.js';
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler);
 
@@ -322,15 +323,10 @@ const chartData = computed(() => ({
     pointHoverRadius: 4,
   }],
 }));
-const chartOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  interaction: { intersect: false, mode: 'index' },
-  plugins: { legend: { display: false }, tooltip: { enabled: true } },
-  scales: {
-    x: { grid: { display: false }, ticks: { color: chartMuted(), maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
-    y: { grid: { color: chartGridColor() }, ticks: { color: chartMuted() }, beginAtZero: true },
-  },
+const chartOptions = computed(() => baseLineOptions({
+  muted: chartMuted(),
+  grid: chartGridColor(),
+  legendVisible: false,
 }));
 
 async function load() {

@@ -1,42 +1,37 @@
 <template>
   <div class="audit-view">
-    <PageHeader>
+    <ListPageLayout
+      v-model:filters="filters"
+      :loading="loading"
+      :error="events.error || summary.error"
+      :empty="!visibleRows.length"
+      :filter-schema="filterSchema"
+      search-key="actor"
+      :search-placeholder="t('view.audit.filterActor')"
+      :results-label="`${visibleRows.length} / ${events.value.length}`"
+      :error-title="t('view.audit.eventsError')"
+      :empty-title="t('view.audit.noMatch')"
+      class="audit-list"
+    >
       <template #badges>
         <Badge tone="brand" icon="shield">{{ t('view.audit.enterprise') }}</Badge>
       </template>
-      <span class="last-updated" v-if="lastUpdated">{{ t('view.audit.updated') }} {{ lastUpdated }}</span>
-    </PageHeader>
-
-    <section class="stat-row" v-if="!summary.error">
-      <StatCard :label="t('view.audit.totalEvents')" :value="summary.data.total" icon="scroll" tone="brand" :loading="loading" />
-      <StatCard :label="t('view.audit.distinctActions')" :value="Object.keys(summary.data.by_action || {}).length" icon="clipboard" tone="info" :loading="loading" />
-      <StatCard :label="t('view.audit.distinctActors')" :value="Object.keys(summary.data.by_actor || {}).length" icon="bot" tone="warn" :loading="loading" />
-    </section>
-    <div v-if="summary.error" class="stat-row">
-      <EmptyState icon="alert-triangle" :title="t('view.audit.summaryError')" :description="summary.error" />
-    </div>
-
-    <Card icon="scroll" :margin-bottom="16">
       <template #actions>
-        <select class="filter" v-model="filters.action" :aria-label="t('view.audit.allActions')">
-          <option value="">{{ t('view.audit.allActions') }}</option>
-          <option v-for="a in actionOptions" :key="a" :value="a">{{ a }}</option>
-        </select>
-        <select class="filter" v-model="filters.level" :aria-label="t('view.audit.allLevels')">
-          <option value="">{{ t('view.audit.allLevels') }}</option>
-          <option value="info">{{ t('view.audit.info') }}</option>
-          <option value="warning">{{ t('view.audit.warning') }}</option>
-          <option value="critical">{{ t('view.audit.critical') }}</option>
-        </select>
-        <input class="filter filter--text" v-model="filters.actor" :placeholder="t('view.audit.filterActor')"
-          :aria-label="t('view.audit.filterActor')" />
+        <span v-if="lastUpdated" class="last-updated">{{ t('view.audit.updated') }} {{ lastUpdated }}</span>
       </template>
 
-      <div v-if="events.error"><EmptyState icon="alert-triangle" :title="t('view.audit.eventsError')" :description="events.error" /></div>
-      <Skeleton v-else-if="loading" :lines="7" block />
-      <DataTable v-else :columns="cols" :rows="filtered" :loading="false"
-        :empty-text="t('view.audit.noMatch')" />
-    </Card>
+      <template #stats>
+        <StatCard :label="t('view.audit.totalEvents')" :value="summary.data.total" icon="scroll" tone="brand" :loading="loading" />
+        <StatCard :label="t('view.audit.distinctActions')" :value="Object.keys(summary.data.by_action || {}).length" icon="clipboard" tone="info" :loading="loading" />
+        <StatCard :label="t('view.audit.distinctActors')" :value="Object.keys(summary.data.by_actor || {}).length" icon="bot" tone="warn" :loading="loading" />
+      </template>
+
+      <template #content>
+        <DataTable
+:columns="cols" :rows="visibleRows" :loading="false"
+          :empty-text="t('view.audit.noMatch')" />
+      </template>
+    </ListPageLayout>
   </div>
 </template>
 
@@ -44,7 +39,8 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
-import { Card, StatCard, Badge, DataTable, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
+import { StatCard, Badge, DataTable } from '../components/index.js';
+import ListPageLayout from '../components/ListPageLayout.vue';
 
 const { t } = useI18n();
 
@@ -54,7 +50,26 @@ const loading = ref(true);
 const lastUpdated = ref('');
 const events = reactive({ value: [], error: '' });
 const summary = reactive({ data: { total: 0, by_action: {}, by_actor: {} }, error: '' });
+
+// filters 由 ListPageLayout 的 FilterBar 收集(声明式), 视图在此计算可见行
 const filters = reactive({ action: '', level: '', actor: '' });
+
+const filterSchema = computed(() => [
+  {
+    key: 'action',
+    label: t('view.audit.allActions'),
+    options: actionOptions.value.map((a) => ({ value: a, label: a })),
+  },
+  {
+    key: 'level',
+    label: t('view.audit.allLevels'),
+    options: [
+      { value: 'info', label: t('view.audit.info') },
+      { value: 'warning', label: t('view.audit.warning') },
+      { value: 'critical', label: t('view.audit.critical') },
+    ],
+  },
+]);
 
 const cols = [
   { key: 'time', label: t('view.audit.time'), type: 'time' },
@@ -70,8 +85,8 @@ const actionOptions = computed(() => {
   return [...set].sort();
 });
 
-const filtered = computed(() => {
-  const fa = filters.action, fl = filters.level, fo = filters.actor.trim().toLowerCase();
+const visibleRows = computed(() => {
+  const fa = filters.action, fl = filters.level, fo = (filters.actor || '').trim().toLowerCase();
   return events.value.filter(e => {
     if (fa && e.action !== fa) return false;
     if (fl && (e.level || 'info') !== fl) return false;

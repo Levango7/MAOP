@@ -2,7 +2,7 @@
   <header class="page-header">
     <!-- 左：页面图标 + 标题 -->
     <div class="page-header__main">
-      <span class="page-header__icon" v-if="iconName">
+      <span v-if="iconName" class="page-header__icon">
         <AppIcon :name="iconName" :size="22" />
       </span>
       <div class="page-header__text">
@@ -10,7 +10,7 @@
           <h1 class="page-header__title">{{ titleText }}</h1>
           <span class="page-header__badges"><slot name="badges" /></span>
         </div>
-        <p class="page-header__sub" v-if="subtitleText">{{ subtitleText }}</p>
+        <p v-if="subtitleText" class="page-header__sub">{{ subtitleText }}</p>
       </div>
     </div>
 
@@ -36,7 +36,8 @@ const props = defineProps({
 
 const { t } = useI18n();
 const route = useRoute();
-const meta = getPageMeta(route.path) || {};
+// 路由容错: 单元测试或未挂 router 的环境下, route 可能为 undefined
+const meta = (route && route.path ? getPageMeta(route.path) : null) || {};
 
 const iconName = computed(() => props.icon || meta.icon || '');
 const titleText = computed(() => props.title || (meta.label ? t(meta.label) : ''));
