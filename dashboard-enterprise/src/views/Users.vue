@@ -59,7 +59,7 @@
     </div>
 
     <!-- 注册/编辑 弹窗 -->
-    <div v-if="dialogOpen" class="users-dialog-overlay" @click.self="closeDialog">
+    <div v-if="dialogOpen" class="users-dialog-overlay" v-modal-a11y @click.self="closeDialog" @modal:escape="closeDialog">
       <div class="users-dialog">
         <h3>{{ dialogMode === 'register' ? t('users.registerUser') : t('users.updateProfile') }}</h3>
         <div class="users-form">
@@ -298,10 +298,10 @@ onMounted(fetchUsers);
   border-radius: var(--r-sm); font-size: 10px; font-weight: 600;
   background: var(--surface-3); color: var(--text-muted);
 }
-.users-role--admin { background: var(--fail-soft, rgba(239,68,68,.16)); color: var(--fail, #ef4444); }
+.users-role--admin { background: var(--fail-soft, rgba(239,68,68,.16)); color: var(--fail, #f85149); }
 .users-role--superadmin { background: var(--brand-soft, rgba(168,85,247,.18)); color: var(--chart-6, #a78bfa); }
 .users-role--operator, .users-role--write { background: var(--info-soft, rgba(56,189,248,.16)); color: var(--info, #38bdf8); }
-.users-role--read { background: var(--border-subtle, rgba(148,163,184,.16)); color: var(--text-muted, #94a3b8); }
+.users-role--read { background: var(--border-subtle, rgba(148,163,184,.16)); color: var(--text-muted, #6e7686); }
 
 /* 弹窗 */
 .users-dialog-overlay {

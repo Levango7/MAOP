@@ -44,7 +44,7 @@
       <Skeleton height="180px" v-for="n in 3" :key="n" />
     </div>
 
-    <div class="modal-overlay" v-if="showCreate" @click.self="showCreate = false">
+    <div class="modal-overlay" v-if="showCreate" v-modal-a11y @click.self="showCreate = false" @modal:escape="showCreate = false">
       <div class="modal">
         <h3>{{ t('view.tenants.createTenant') }}</h3>
         <label>{{ t('view.tenants.tenantId') }}</label>

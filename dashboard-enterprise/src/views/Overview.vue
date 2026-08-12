@@ -156,6 +156,7 @@ import { useI18n } from '../i18n';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import { Card, StatCard, Badge, DataTable, Skeleton, EmptyState } from '../components/index.js';
+import { cssVar, cssVarAlpha } from '../composables/chartTokens.js';
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler);
 
@@ -301,24 +302,12 @@ function formatNum(n) {
 
 const _ts = computed(() => normalizeTimeseries(data.value?.timeseries));
 
-// Theme-aware chart colors: read CSS token values at compute time so the
-// line chart follows dark/light theme switches.  Falls back to dark defaults.
-function token(name, fallback) {
-  try { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback; }
-  catch { return fallback; }
-}
-function chartBrand()   { return token('--chart-1', '#6366f1'); }
-function chartMuted()   { return token('--text-muted', '#94a3b8'); }
-function chartGridColor() { return token('--border-subtle', 'rgba(148,163,184,.15)'); }
-function chartBrandFill() {
-  const c = token('--chart-1', '#6366f1');
-  // Convert hex to rgba with 0.14 opacity
-  if (c.startsWith('#')) {
-    const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
-    return `rgba(${r},${g},${b},.14)`;
-  }
-  return 'rgba(99,102,241,.14)';
-}
+// Theme-aware chart colors: shared composable reads CSS vars at compute time,
+// so charts follow dark/light theme switches without a remount.
+function chartBrand()     { return cssVar('--chart-1', '#3574f0'); }
+function chartMuted()     { return cssVar('--text-muted', '#9aa3b2'); }
+function chartGridColor() { return cssVar('--border-subtle', 'rgba(163,173,190,.15)'); }
+function chartBrandFill() { return cssVarAlpha('--chart-1', .14); }
 
 const chartData = computed(() => ({
   labels: _ts.value.labels,

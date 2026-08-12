@@ -113,7 +113,7 @@ function buildVisNodes() {
       label: s.name,
       group: 'server',
       shape: 'box',
-      color: { background: '#1565C0', border: '#0D47A1', highlight: { background: '#1976D2', border: '#0D47A1' } },
+      color: { background: '#3574f0', border: '#0D47A1', highlight: { background: '#1976D2', border: '#0D47A1' } },
       font: { color: '#fff', size: 13, face: 'Inter, system-ui, sans-serif' },
       title: `${t('view.tools.topo.legend.server')}: ${s.name}\ntransport: ${s.transport}\nstatus: ${s.status}\ntools: ${s.tools_count}`,
     });
@@ -139,7 +139,7 @@ function buildVisNodes() {
       group: 'agent',
       shape: 'diamond',
       size: 14,
-      color: { background: '#43A047', border: '#2E7D32', highlight: { background: '#66BB6A', border: '#2E7D32' } },
+      color: { background: '#3fb950', border: '#2E7D32', highlight: { background: '#66BB6A', border: '#2E7D32' } },
       font: { color: '#fff', size: 12, face: 'Inter, system-ui, sans-serif' },
       title: `${t('view.tools.topo.legend.agent')}: ${a.name}\nprovider: ${a.provider || '—'}\nenabled: ${a.enabled}`,
     });
@@ -269,7 +269,7 @@ watch(
   border-radius: var(--r-md, 8px);
   font-size: 13px;
 }
-.mcp-topo__notice--error { background: #FFEBEE; border: 1px solid #FFCDD2; color: #C62828; }
+.mcp-topo__notice--error { background: #FFEBEE; border: 1px solid #FFCDD2; color: #a40e26; }
 
 .mcp-topo__canvas-wrap {
   position: relative;
@@ -310,9 +310,9 @@ watch(
   border-radius: 50%;
   flex-shrink: 0;
 }
-.mcp-topo__dot--server { background: #1565C0; border-radius: 2px; }
+.mcp-topo__dot--server { background: #3574f0; border-radius: 2px; }
 .mcp-topo__dot--tool { background: #039BE5; }
-.mcp-topo__dot--agent { background: #43A047; transform: rotate(45deg); }
+.mcp-topo__dot--agent { background: #3fb950; transform: rotate(45deg); }
 
 .btn-ghost {
   display: inline-flex;
@@ -327,6 +327,6 @@ watch(
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
-.btn-ghost:hover { background: var(--bg-hover, #f1f5f9); border-color: var(--border-strong, #cbd5e1); }
+.btn-ghost:hover { background: var(--bg-hover, rgba(148,163,184,.16)); border-color: var(--border-strong, rgba(148,163,184,.45)); }
 .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

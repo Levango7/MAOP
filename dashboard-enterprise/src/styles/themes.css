@@ -56,6 +56,18 @@
   --info: #0a7ea4;
   --info-soft: rgba(10, 126, 164, .10);
 
+  /* 语义状态对(亮色): 背景浅, 文字深 */
+  --success-strong: #116329;
+  --warn-strong: #7d4e00;
+  --fail-strong: #a40e26;
+  --info-strong: #0550ae;
+  --success-bg: rgba(31, 136, 61, .12);
+  --warn-bg: rgba(191, 135, 0, .14);
+  --fail-bg: rgba(209, 36, 47, .12);
+  --info-bg: rgba(10, 126, 164, .12);
+  --neutral-bg: rgba(89, 97, 110, .10);
+  --neutral-strong: var(--text-muted);
+
   --shadow-sm: 0 1px 2px rgba(29, 33, 41, .06);
   --shadow-md: 0 2px 8px rgba(29, 33, 41, .10);
   --shadow-lg: 0 12px 28px rgba(29, 33, 41, .16);

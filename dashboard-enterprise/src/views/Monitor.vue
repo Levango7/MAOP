@@ -370,15 +370,15 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .dag-exec-input {
   font-size: 12px;
   padding: 4px 8px;
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border, rgba(148,163,184,.35));
   border-radius: 4px;
   background: var(--bg-card, #fff);
-  color: var(--text, #334155);
+  color: var(--text, #e8eaf0);
   width: 200px;
   outline: none;
 }
 .dag-exec-input:focus {
-  border-color: var(--brand, #3b82f6);
+  border-color: var(--brand, #3574f0);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 </style>

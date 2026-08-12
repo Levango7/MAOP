@@ -309,7 +309,7 @@ onMounted(() => {
   gap: 4px 12px;
   align-items: center;
   padding: 10px 12px;
-  border: 1px solid var(--border-light, #e2e8f0);
+  border: 1px solid var(--border-light, rgba(148,163,184,.35));
   border-radius: 6px;
 }
 .pending-item__main {
@@ -328,14 +328,14 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border: 1px solid var(--border, #cbd5e1);
+  border: 1px solid var(--border, rgba(148,163,184,.45));
   background: var(--surface, #fff);
   border-radius: 5px;
   cursor: pointer;
   font-size: 13px;
 }
 .btn-action:hover:not(:disabled) {
-  background: var(--surface-2, #f1f5f9);
+  background: var(--surface-2, rgba(148,163,184,.16));
 }
 .btn-action:disabled {
   opacity: 0.6;
@@ -346,14 +346,14 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border: 1px solid var(--border, #cbd5e1);
+  border: 1px solid var(--border, rgba(148,163,184,.45));
   background: transparent;
   border-radius: 5px;
   cursor: pointer;
   font-size: 13px;
 }
 .btn-ghost:hover:not(:disabled) {
-  background: var(--surface-2, #f1f5f9);
+  background: var(--surface-2, rgba(148,163,184,.16));
 }
 .btn-ghost.is-busy {
   opacity: 0.6;

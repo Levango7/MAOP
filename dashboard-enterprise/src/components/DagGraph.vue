@@ -68,7 +68,7 @@
     </div>
 
     <!-- Node detail panel (modal overlay) -->
-    <div v-if="selectedNode" class="dag-detail-overlay" @click.self="selectedNode = null">
+    <div v-if="selectedNode" class="dag-detail-overlay" v-modal-a11y @click.self="selectedNode = null" @modal:escape="selectedNode = null">
       <NodeDetailPanel :node="selectedNode" @close="selectedNode = null" />
     </div>
   </div>
@@ -274,7 +274,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 <style scoped>
 .dag-graph {
   position: relative;
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border, rgba(148,163,184,.35));
   border-radius: 8px;
   background: var(--bg-card, #fff);
   padding: 12px;
@@ -290,19 +290,19 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 .dag-progress-track {
   flex: 1;
   height: 6px;
-  background: var(--bg-muted, #f1f5f9);
+  background: var(--bg-muted, rgba(148,163,184,.16));
   border-radius: 3px;
   overflow: hidden;
 }
 .dag-progress-fill {
   height: 100%;
-  background: var(--brand, #3b82f6);
+  background: var(--brand, #3574f0);
   border-radius: 3px;
   transition: width 0.3s ease;
 }
 .dag-progress-text {
   font-size: 12px;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #9aa3b2);
   white-space: nowrap;
 }
 .dag-conn-indicator {
@@ -311,8 +311,8 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
   border-radius: 50%;
   flex-shrink: 0;
 }
-.dag-conn-indicator.on { background: var(--success, #22c55e); }
-.dag-conn-indicator.off { background: var(--text-muted, #94a3b8); }
+.dag-conn-indicator.on { background: var(--success, #3fb950); }
+.dag-conn-indicator.off { background: var(--text-muted, #6e7686); }
 
 /* DAG canvas */
 .dag-canvas {
@@ -325,32 +325,32 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 
 /* Edges */
 .dag-edge {
-  stroke: var(--border, #cbd5e1);
+  stroke: var(--border, rgba(148,163,184,.45));
   stroke-width: 1.5;
   fill: none;
 }
-.dag-edge.edge-success { stroke: var(--success, #22c55e); stroke-width: 2; }
-.dag-edge.edge-failed { stroke: var(--fail, #ef4444); stroke-width: 2; stroke-dasharray: 4 3; }
-.dag-edge.edge-skipped { stroke: var(--warn, #f59e0b); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.dag-edge.edge-success { stroke: var(--success, #3fb950); stroke-width: 2; }
+.dag-edge.edge-failed { stroke: var(--fail, #f85149); stroke-width: 2; stroke-dasharray: 4 3; }
+.dag-edge.edge-skipped { stroke: var(--warn, #d29922); stroke-width: 1.5; stroke-dasharray: 3 3; }
 
 /* Nodes */
 .dag-node-group { cursor: pointer; }
 .dag-node-circle {
   stroke-width: 2;
   stroke: #fff;
-  fill: #9e9e9e; /* pending (default) */
+  fill: #6e7686; /* pending (default) */
   transition: fill 0.2s ease;
 }
-.dag-node-circle.status-pending { fill: #9e9e9e; }
-.dag-node-circle.status-running { fill: #1976d2; }
-.dag-node-circle.status-success { fill: #388e3c; }
-.dag-node-circle.status-failed { fill: #d32f2f; }
-.dag-node-circle.status-skipped { fill: #f57c00; }
-.dag-node-group:hover .dag-node-circle { stroke: var(--brand, #3b82f6); stroke-width: 3; }
+.dag-node-circle.status-pending { fill: #6e7686; }
+.dag-node-circle.status-running { fill: #4cc2ff; }
+.dag-node-circle.status-success { fill: #3fb950; }
+.dag-node-circle.status-failed { fill: #f85149; }
+.dag-node-circle.status-skipped { fill: #d29922; }
+.dag-node-group:hover .dag-node-circle { stroke: var(--brand, #3574f0); stroke-width: 3; }
 
 .dag-node-label {
   font-size: 11px;
-  fill: var(--text, #334155);
+  fill: var(--text, #e8eaf0);
   font-family: inherit;
   user-select: none;
 }
@@ -369,7 +369,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 .dag-empty {
   text-align: center;
   padding: 30px;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #6e7686);
   font-size: 13px;
 }
 

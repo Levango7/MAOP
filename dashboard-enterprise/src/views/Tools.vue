@@ -153,7 +153,7 @@
 
     <!-- Create skill modal -->
     <Teleport to="body">
-      <div v-if="showCreate" class="modal-mask" @click.self="closeCreate">
+      <div v-if="showCreate" class="modal-mask" v-modal-a11y @click.self="closeCreate" @modal:escape="closeCreate">
         <div class="modal" role="dialog" aria-modal="true">
           <div class="modal__head">
             <h3>{{ t('view.tools.createSkillTitle') }}</h3>

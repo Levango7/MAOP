@@ -109,7 +109,7 @@
 
     <!-- Add Memory Modal -->
     <Teleport to="body">
-      <div v-if="showAdd" class="modal-mask" @click.self="showAdd = false">
+      <div v-if="showAdd" class="modal-mask" v-modal-a11y @click.self="showAdd = false" @modal:escape="showAdd = false">
         <div class="modal" role="dialog" aria-modal="true">
           <div class="modal__head">
             <h3>{{ t('view.tlmemory.addMemoryTitle') }}</h3>
@@ -302,7 +302,7 @@ onMounted(refreshAll);
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px; margin-bottom: 16px;
   background: var(--fail-soft); border: 1px solid var(--fail);
-  border-radius: var(--r-md); color: var(--fail, #ef4444);
+  border-radius: var(--r-md); color: var(--fail, #f85149);
   font-size: 12px; font-family: var(--font-mono); word-break: break-word;
 }
 </style>

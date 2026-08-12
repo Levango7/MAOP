@@ -241,7 +241,7 @@
     <EmptyState v-if="!loading && !agents.length" icon="bot" :title="t('view.agents.noAgents')" :hint="t('view.agents.noAgentsHint')" />
 
     <!-- 记忆面板 -->
-    <div v-if="memoryPanel.visible" class="modal-overlay" @click.self="memoryPanel.visible = false">
+    <div v-if="memoryPanel.visible" class="modal-overlay" v-modal-a11y @click.self="memoryPanel.visible = false" @modal:escape="memoryPanel.visible = false">
       <div class="memory-panel">
         <div class="memory-panel__header">
           <h3>{{ t('view.agents.memoryFor', { name: memoryPanel.agentName }) }}</h3>
@@ -258,7 +258,7 @@
 
         <!-- 添加记忆表单 -->
         <div v-if="memoryAddForm" class="memory-add-form">
-          <select v-model="memoryAddType" class="mem-add-select">
+          <select v-model="memoryAddType" class="mem-add-select" :aria-label="t('view.agents.memoryType')">
             <option value="interaction">interaction</option>
             <option value="preference">preference</option>
             <option value="error_pattern">error_pattern</option>
@@ -266,11 +266,12 @@
             <option value="lesson">lesson</option>
           </select>
           <textarea v-model="memoryAddContent" class="mem-add-textarea" rows="3"
+                    :aria-label="t('view.agents.memoryContentPlaceholder')"
                     :placeholder="t('view.agents.memoryContentPlaceholder')"></textarea>
           <div class="mem-add-row">
             <label class="mem-add-importance">
               {{ t('view.agents.importance') }}: {{ memoryAddImportance }}
-              <input type="range" min="0" max="1" step="0.1" v-model.number="memoryAddImportance" />
+              <input type="range" min="0" max="1" step="0.1" v-model.number="memoryAddImportance" :aria-label="t('view.agents.importance')" />
             </label>
             <button class="act-btn" @click="addMemory(memoryPanel.agentName)" :disabled="!memoryAddContent.trim()">
               {{ t('view.agents.addMemory') }}
@@ -312,7 +313,7 @@
     </div>
 
     <!-- 自进化结果面板 -->
-    <div v-if="evolutionPanel.visible" class="modal-overlay" @click.self="evolutionPanel.visible = false">
+    <div v-if="evolutionPanel.visible" class="modal-overlay" v-modal-a11y @click.self="evolutionPanel.visible = false" @modal:escape="evolutionPanel.visible = false">
       <div class="evolution-panel">
         <div class="evolution-panel__header">
           <h3>{{ t('view.agents.evolutionFor', { name: evolutionPanel.agentName }) }}</h3>
@@ -339,7 +340,7 @@
     </div>
 
     <!-- 移除确认对话框 -->
-    <div v-if="removeConfirm.visible" class="modal-overlay" @click.self="removeConfirm.visible = false">
+    <div v-if="removeConfirm.visible" class="modal-overlay" v-modal-a11y @click.self="removeConfirm.visible = false" @modal:escape="removeConfirm.visible = false">
       <div class="confirm-dialog">
         <div class="confirm-dialog__icon"><AppIcon name="alert-triangle" :size="28" /></div>
         <h3>{{ t('view.agents.confirmRemove', { name: removeConfirm.agentName }) }}</h3>
@@ -354,7 +355,7 @@
     </div>
 
     <!-- 模型切换对话框 -->
-    <div v-if="modelSwitchPanel.visible" class="modal-overlay" @click.self="modelSwitchPanel.visible = false">
+    <div v-if="modelSwitchPanel.visible" class="modal-overlay" v-modal-a11y @click.self="modelSwitchPanel.visible = false" @modal:escape="modelSwitchPanel.visible = false">
       <div class="model-switch-panel">
         <div class="model-switch-panel__header">
           <h3>{{ t('view.agents.switchModelFor', { name: modelSwitchPanel.agentName }) }}</h3>
@@ -372,7 +373,7 @@
         <div class="model-switch-panel__list" v-else-if="modelSwitchPanel.models.length">
           <label class="model-option" v-for="m in modelSwitchPanel.models" :key="m.name"
                  :class="{ selected: modelSwitchPanel.selectedModel === m.name, disabled: !m.enabled }">
-            <input type="radio" :value="m.name" v-model="modelSwitchPanel.selectedModel" :disabled="!m.enabled" />
+            <input type="radio" :value="m.name" v-model="modelSwitchPanel.selectedModel" :disabled="!m.enabled" :aria-label="t('view.agents.switchModelTo', { name: m.name })" />
             <span class="model-name mono">{{ m.name }}</span>
             <span class="model-provider">{{ m.provider }}</span>
             <span class="model-status" v-if="!m.enabled">{{ t('common.disabled') }}</span>
@@ -389,7 +390,7 @@
     </div>
 
     <!-- 升级确认弹窗 -->
-    <div v-if="upgradePanel.visible" class="modal-overlay" @click.self="upgradePanel.visible = false">
+    <div v-if="upgradePanel.visible" class="modal-overlay" v-modal-a11y @click.self="upgradePanel.visible = false" @modal:escape="upgradePanel.visible = false">
       <div class="upgrade-panel">
         <div class="upgrade-panel__header">
           <h3>{{ t('view.agents.upgradeFor', { name: upgradePanel.agentName }) }}</h3>
@@ -1129,9 +1130,9 @@ onMounted(() => {
   border-radius: var(--r-sm);
   background: var(--surface-3);
 }
-.route-node.primary { border-left: 3px solid var(--ok, #22c55e); }
-.route-node.fallback { border-left: 3px solid var(--warn, #f59e0b); }
-.route-node.tertiary { border-left: 3px solid var(--text-faint, #94a3b8); }
+.route-node.primary { border-left: 3px solid var(--ok, #3fb950); }
+.route-node.fallback { border-left: 3px solid var(--warn, #d29922); }
+.route-node.tertiary { border-left: 3px solid var(--text-faint, #6e7686); }
 .route-agent { font-weight: 600; font-size: var(--fs-sm); }
 .route-model { font-size: 11px; color: var(--text-muted); }
 .route-sep { color: var(--text-faint); font-size: var(--fs-sm); }
@@ -1166,10 +1167,10 @@ onMounted(() => {
   text-align: center; text-transform: uppercase;
   letter-spacing: .03em;
 }
-.dec-stage.route_scorer { background: color-mix(in srgb, #3b82f6 15%, transparent); color: #3b82f6; }
-.dec-stage.load_balancer { background: color-mix(in srgb, #f59e0b 15%, transparent); color: #f59e0b; }
-.dec-stage.model_selector { background: color-mix(in srgb, #8b5cf6 15%, transparent); color: #8b5cf6; }
-.dec-stage.dispatcher { background: color-mix(in srgb, #22c55e 15%, transparent); color: #22c55e; }
+.dec-stage.route_scorer { background: color-mix(in srgb, #3574f0 15%, transparent); color: #3574f0; }
+.dec-stage.load_balancer { background: color-mix(in srgb, #d29922 15%, transparent); color: #d29922; }
+.dec-stage.model_selector { background: color-mix(in srgb, #9e8cfc 15%, transparent); color: #9e8cfc; }
+.dec-stage.dispatcher { background: color-mix(in srgb, #3fb950 15%, transparent); color: #3fb950; }
 .dec-agent { font-weight: 600; color: var(--text); }
 .dec-reason { color: var(--text-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dec-time { color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -1259,22 +1260,22 @@ onMounted(() => {
   font-size: var(--fs-sm);
   margin: var(--sp-2) 0;
 }
-.upgrade-notice.ok { background: color-mix(in srgb, #22c55e 10%, var(--surface)); color: #22c55e; }
-.upgrade-notice.info { background: color-mix(in srgb, #3b82f6 10%, var(--surface)); color: #3b82f6; }
-.upgrade-notice.warn { background: color-mix(in srgb, #f59e0b 10%, var(--surface)); color: #f59e0b; }
+.upgrade-notice.ok { background: color-mix(in srgb, #3fb950 10%, var(--surface)); color: #3fb950; }
+.upgrade-notice.info { background: color-mix(in srgb, #3574f0 10%, var(--surface)); color: #3574f0; }
+.upgrade-notice.warn { background: color-mix(in srgb, #d29922 10%, var(--surface)); color: #d29922; }
 .upgrade-result {
   margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-sm); background: var(--surface-2);
   font-size: 12px; display: flex; flex-direction: column; gap: 2px;
 }
-.upgrade-result.success { border-left: 3px solid #22c55e; }
-.upgrade-result.failed { border-left: 3px solid #ef4444; }
-.upgrade-result.not_supported { border-left: 3px solid #f59e0b; }
+.upgrade-result.success { border-left: 3px solid #3fb950; }
+.upgrade-result.failed { border-left: 3px solid #f85149; }
+.upgrade-result.not_supported { border-left: 3px solid #d29922; }
 .ur-status { font-weight: 600; text-transform: uppercase; }
 .ur-output, .ur-error { color: var(--text-muted); word-break: break-all; }
 .upgrade-error {
   display: flex; align-items: center; gap: var(--sp-2);
-  padding: var(--sp-3); color: var(--danger, #ef4444);
+  padding: var(--sp-3); color: var(--danger, #f85149);
 }
 .upgrade-panel__actions {
   display: flex; gap: var(--sp-3); justify-content: flex-end;

@@ -101,8 +101,10 @@ export const messages = {
     'view.agents.memoryAdded': 'Memory added',
     'view.agents.addMemoryFailed': 'Failed to add memory',
     'view.agents.memoryContentPlaceholder': 'Enter memory content (JSON or plain text)',
+    'view.agents.memoryType': 'Memory type',
     'view.agents.importance': 'Importance',
     'view.agents.noMemories': 'No memories yet',
+    'view.agents.switchModelTo': 'Switch to model {name}',
   },
   zh: {
     'view.agents.title': '智能体调度与管理',
@@ -206,7 +208,9 @@ export const messages = {
     'view.agents.memoryAdded': '记忆已添加',
     'view.agents.addMemoryFailed': '添加记忆失败',
     'view.agents.memoryContentPlaceholder': '输入记忆内容（JSON 或纯文本）',
+    'view.agents.memoryType': '记忆类型',
     'view.agents.importance': '重要性',
     'view.agents.noMemories': '暂无记忆数据',
+    'view.agents.switchModelTo': '切换到模型 {name}',
   },
 };

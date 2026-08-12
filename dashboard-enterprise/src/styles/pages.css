@@ -287,7 +287,7 @@
 .tone-orange, .tone-warn { --tone-bg: var(--warn-soft); --tone-border: rgba(217,119,6,.35); --tone-text: var(--warn); }
 .tone-blue, .tone-info { --tone-bg: var(--brand-soft); --tone-border: rgba(79,70,229,.35); --tone-text: var(--brand); }
 .tone-red, .tone-danger, .tone-fail { --tone-bg: var(--fail-soft); --tone-border: rgba(220,38,38,.35); --tone-text: var(--fail); }
-.tone-purple { --tone-bg: rgba(124,58,237,.10); --tone-border: rgba(124,58,237,.35); --tone-text: #8b5cf6; }
+.tone-purple { --tone-bg: rgba(124,58,237,.10); --tone-border: rgba(124,58,237,.35); --tone-text: #9e8cfc; }
 .tone-teal { --tone-bg: rgba(13,148,136,.10); --tone-border: rgba(13,148,136,.35); --tone-text: #14b8a6; }
 .tone-cyan { --tone-bg: rgba(8,145,178,.10); --tone-border: rgba(8,145,178,.35); --tone-text: #06b6d4; }
 .tone-pink { --tone-bg: rgba(219,39,119,.10); --tone-border: rgba(219,39,119,.35); --tone-text: #ec4899; }
@@ -788,7 +788,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .control-panel .row-item[data-status="active"] { border-left-color: var(--success); }
 .control-panel .row-item[data-status="failed"],
 .control-panel .row-item[data-status="error"] { border-left-color: #f87171; }
-.control-panel .row-item[data-status="paused"] { border-left-color: #fbbf24; }
+.control-panel .row-item[data-status="paused"] { border-left-color: #d29922; }
 .control-panel .row-item[data-status="upgrading"] { border-left-color: #93c5fd; }
 
 .control-panel .row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -904,7 +904,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .scanned-card:hover { border-color: var(--border-strong); }
 .scanned-top { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .scanned-avatar { width: 38px; height: 38px; border-radius: var(--r-full); flex-shrink: 0; display: grid; place-items: center; color: var(--brand-contrast); font-weight: 700; }
-.scanned-avatar.available { background: #22c55e; }
+.scanned-avatar.available { background: #3fb950; }
 .scanned-avatar.unavailable { background: var(--text-faint); }
 .scanned-identity { min-width: 0; flex: 1; }
 .scanned-identity h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; color: var(--text); }
@@ -1214,7 +1214,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .switch-result.is-fail { color: var(--fail); border-color: var(--fail); }
 
 /* ── Tenants view extras ────────────────────────────────────────────── */
-.bar-fill.is-high { background: linear-gradient(90deg, var(--warn), #fbbf24); }
+.bar-fill.is-high { background: linear-gradient(90deg, var(--warn), #d29922); }
 .tenant-card.suspended { border-color: rgba(239,68,68,.4); }
 .tenant-card.suspended .tenant-id h3 { color: var(--text-muted); }
 

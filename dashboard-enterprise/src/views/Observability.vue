@@ -330,12 +330,12 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   border-radius: 12px;
   font-size: 12px;
   font-weight: 600;
-  background: var(--bg-tag, #f1f5f9);
-  color: var(--text-muted, #64748b);
+  background: var(--bg-tag, rgba(148,163,184,.16));
+  color: var(--text-muted, #9aa3b2);
 }
 .edition-badge.enterprise {
   background: rgba(59, 130, 246, 0.12);
-  color: var(--brand, #3b82f6);
+  color: var(--brand, #3574f0);
 }
 .tracing-badge {
   display: inline-flex;
@@ -353,14 +353,14 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .tracing-badge.on {
   background: rgba(34, 197, 94, 0.12);
-  color: var(--success, #22c55e);
+  color: var(--success, #3fb950);
 }
-.tracing-badge.on .dot { background: var(--success, #22c55e); }
+.tracing-badge.on .dot { background: var(--success, #3fb950); }
 .tracing-badge.off {
-  background: var(--bg-tag, #f1f5f9);
-  color: var(--text-faint, #94a3b8);
+  background: var(--bg-tag, rgba(148,163,184,.16));
+  color: var(--text-faint, #6e7686);
 }
-.tracing-badge.off .dot { background: var(--text-faint, #94a3b8); }
+.tracing-badge.off .dot { background: var(--text-faint, #6e7686); }
 
 /* ── Layout ─────────────────────────────────────────────────────── */
 .metrics-grid {
@@ -393,7 +393,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   align-items: center;
   gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px solid var(--border-soft, #f1f5f9);
+  border-bottom: 1px solid var(--border-soft, rgba(148,163,184,.16));
 }
 .pipeline-row:last-child, .config-row:last-child, .health-row:last-child {
   border-bottom: none;
@@ -404,17 +404,17 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   border-radius: 50%;
   justify-self: center;
 }
-.pipeline-dot.ok, .health-dot.ok { background: var(--success, #22c55e); }
-.pipeline-dot.bad, .health-dot.bad { background: var(--fail, #ef4444); }
+.pipeline-dot.ok, .health-dot.ok { background: var(--success, #3fb950); }
+.pipeline-dot.bad, .health-dot.bad { background: var(--fail, #f85149); }
 .pipeline-name, .health-name {
   font-size: 13px;
-  color: var(--text, #334155);
+  color: var(--text, #e8eaf0);
   font-weight: 500;
 }
 .pipeline-detail, .health-detail {
   grid-column: 3;
   font-size: 12px;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #9aa3b2);
   font-family: var(--font-mono, monospace);
 }
 .pipeline-status {
@@ -426,11 +426,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .pipeline-status.ok {
   background: rgba(34, 197, 94, 0.12);
-  color: var(--success, #22c55e);
+  color: var(--success, #3fb950);
 }
 .pipeline-status.bad {
   background: rgba(239, 68, 68, 0.12);
-  color: var(--fail, #ef4444);
+  color: var(--fail, #f85149);
 }
 
 /* ── Config rows ────────────────────────────────────────────────── */
@@ -439,11 +439,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .config-label {
   font-size: 13px;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #9aa3b2);
 }
 .config-value {
   font-size: 13px;
-  color: var(--text, #334155);
+  color: var(--text, #e8eaf0);
   font-weight: 500;
 }
 .config-value.mono {
@@ -466,26 +466,26 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .metric-header {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-faint, #94a3b8);
+  color: var(--text-faint, #6e7686);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid var(--border, #e2e8f0);
+  border-bottom: 1px solid var(--border, rgba(148,163,184,.35));
 }
 .metric-row {
-  border-bottom: 1px solid var(--border-soft, #f1f5f9);
+  border-bottom: 1px solid var(--border-soft, rgba(148,163,184,.16));
 }
 .metric-row:last-child { border-bottom: none; }
 .mono { font-family: var(--font-mono, monospace); font-size: 12px; }
-.col-name { color: var(--text, #334155); }
+.col-name { color: var(--text, #e8eaf0); }
 .col-type { text-align: center; }
 .col-value {
   text-align: center;
   font-weight: 600;
-  color: var(--text, #334155);
+  color: var(--text, #e8eaf0);
 }
 .col-extra {
   font-size: 12px;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #9aa3b2);
   font-family: var(--font-mono, monospace);
 }
 .type-tag {
@@ -497,7 +497,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .type-tag.counter {
   background: rgba(59, 130, 246, 0.12);
-  color: var(--brand, #3b82f6);
+  color: var(--brand, #3574f0);
 }
 .type-tag.histogram {
   background: rgba(168, 85, 247, 0.12);
@@ -505,21 +505,21 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .type-tag.gauge {
   background: rgba(245, 158, 11, 0.12);
-  color: #f59e0b;
+  color: #d29922;
 }
 
 /* ── Health & trace ─────────────────────────────────────────────── */
 .refresh-btn {
   background: none;
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border, rgba(148,163,184,.35));
   border-radius: 4px;
   padding: 4px 8px;
   cursor: pointer;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #9aa3b2);
   display: inline-flex;
   align-items: center;
 }
-.refresh-btn:hover { color: var(--brand, #3b82f6); border-color: var(--brand, #3b82f6); }
+.refresh-btn:hover { color: var(--brand, #3574f0); border-color: var(--brand, #3574f0); }
 .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .health-skel, .config-skel {
@@ -538,22 +538,22 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: var(--text, #334155);
+  color: var(--text, #e8eaf0);
 }
-.trace-info.disabled .trace-row { color: var(--text-muted, #64748b); }
+.trace-info.disabled .trace-row { color: var(--text-muted, #9aa3b2); }
 .trace-hint {
   font-size: 12px;
-  color: var(--text-faint, #94a3b8);
+  color: var(--text-faint, #6e7686);
   padding-left: 24px;
 }
 .trace-enable {
   font-size: 12px;
   padding-left: 24px;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #9aa3b2);
 }
 .trace-enable code {
   font-family: var(--font-mono, monospace);
-  background: var(--bg-tag, #f1f5f9);
+  background: var(--bg-tag, rgba(148,163,184,.16));
   padding: 1px 6px;
   border-radius: 3px;
   font-size: 11px;

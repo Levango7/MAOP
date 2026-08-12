@@ -60,7 +60,7 @@
       <Skeleton v-else height="120px" />
     </Card>
 
-    <div class="modal-overlay" v-if="showGrant" @click.self="showGrant = false">
+    <div class="modal-overlay" v-if="showGrant" v-modal-a11y @click.self="showGrant = false" @modal:escape="showGrant = false">
       <div class="modal">
         <h3>{{ t('view.rbac.grantRole') }}</h3>
         <label>{{ t('view.rbac.userId') }}</label>

@@ -128,6 +128,7 @@ import DataTable from '../components/DataTable.vue';
 import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
 import EvolutionHistory from './EvolutionHistory.vue';
+import { cssVar, cssVarAlpha } from '../composables/chartTokens.js';
 import { useI18n } from '../i18n';
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler, Legend);
@@ -199,8 +200,8 @@ const timeseriesChartData = computed(() => {
       {
         label: t('view.evolve.colRate'),
         data: items.map((it) => it.success_rate),
-        borderColor: '#1565C0',
-        backgroundColor: 'rgba(21, 101, 192, 0.12)',
+        borderColor: cssVar('--chart-1'),
+        backgroundColor: cssVarAlpha('--chart-1', 0.12),
         tension: 0.3,
         fill: true,
         yAxisID: 'y',
@@ -208,16 +209,16 @@ const timeseriesChartData = computed(() => {
       {
         label: t('view.evolve.colAvgMs'),
         data: items.map((it) => it.duration_s),
-        borderColor: '#E65100',
-        backgroundColor: 'rgba(230, 81, 0, 0.08)',
+        borderColor: cssVar('--chart-4'),
+        backgroundColor: cssVarAlpha('--chart-4', 0.08),
         tension: 0.3,
         yAxisID: 'y1',
       },
       {
         label: t('view.evolve.colTotal'),
         data: items.map((it) => it.suggestions_applied),
-        borderColor: '#43A047',
-        backgroundColor: 'rgba(67, 160, 71, 0.08)',
+        borderColor: cssVar('--chart-3'),
+        backgroundColor: cssVarAlpha('--chart-3', 0.08),
         tension: 0.3,
         yAxisID: 'y1',
       },
@@ -409,7 +410,7 @@ onMounted(() => {
 }
 .heatmap__table th,
 .heatmap__table td {
-  border: 1px solid var(--border-light, #e2e8f0);
+  border: 1px solid var(--border-light, rgba(148,163,184,.35));
   padding: 4px 6px;
   text-align: center;
   white-space: nowrap;
@@ -417,14 +418,14 @@ onMounted(() => {
 .heatmap__corner,
 .heatmap__col-head,
 .heatmap__row-head {
-  background: var(--surface-2, #f8fafc);
+  background: var(--surface-2, rgba(148,163,184,.10));
   color: var(--text-muted);
   font-weight: 600;
 }
 .heatmap__cell--empty { background: var(--surface); color: var(--text-faint); }
-.heatmap__cell--hi { background: #C8E6C9; color: #1B5E20; font-weight: 600; }
-.heatmap__cell--mid { background: #DCEDC8; color: #33691E; }
-.heatmap__cell--lo { background: #FFCDD2; color: #B71C1C; }
+.heatmap__cell--hi { background: var(--success-bg); color: var(--success-strong); font-weight: 600; }
+.heatmap__cell--mid { background: var(--success-soft); color: var(--success); }
+.heatmap__cell--lo { background: var(--fail-bg); color: var(--fail-strong); }
 
 .muted { color: var(--text-muted); }
 </style>

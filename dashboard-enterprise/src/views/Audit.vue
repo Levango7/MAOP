@@ -18,18 +18,18 @@
 
     <Card icon="scroll" :margin-bottom="16">
       <template #actions>
-        <select class="filter" v-model="filters.action">
+        <select class="filter" v-model="filters.action" :aria-label="t('view.audit.allActions')">
           <option value="">{{ t('view.audit.allActions') }}</option>
           <option v-for="a in actionOptions" :key="a" :value="a">{{ a }}</option>
         </select>
-        <select class="filter" v-model="filters.level">
+        <select class="filter" v-model="filters.level" :aria-label="t('view.audit.allLevels')">
           <option value="">{{ t('view.audit.allLevels') }}</option>
           <option value="info">{{ t('view.audit.info') }}</option>
           <option value="warning">{{ t('view.audit.warning') }}</option>
           <option value="critical">{{ t('view.audit.critical') }}</option>
         </select>
         <input class="filter filter--text" v-model="filters.actor" :placeholder="t('view.audit.filterActor')"
-          />
+          :aria-label="t('view.audit.filterActor')" />
       </template>
 
       <div v-if="events.error"><EmptyState icon="alert-triangle" :title="t('view.audit.eventsError')" :description="events.error" /></div>

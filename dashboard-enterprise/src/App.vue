@@ -267,6 +267,9 @@ onMounted(async () => {
   if (typeof window !== 'undefined') {
     window.addEventListener('maop:unauthorized', onUnauthorized);
     window.addEventListener('resize', checkMobile);
+    // Global Esc: forward to the topmost open modal (a11y baseline — modals that
+    // use v-modal-a11y listen for this and close).
+    window.addEventListener('keydown', onGlobalEsc);
   }
   // Sync user profile from localStorage (may be pre-populated by prior session)
   userName.value = getStoredUser();
@@ -288,10 +291,22 @@ onMounted(async () => {
   realtime.connect();
 });
 
+// Global Esc handler: finds the currently open modal (marked by v-modal-a11y)
+// and dispatches a bubbling 'modal:escape' event on it. Views listen via
+// @modal:escape on the same overlay element to run their close logic.
+function onGlobalEsc(e) {
+  if (e.key !== 'Escape') return;
+  const openModals = document.querySelectorAll('[data-modal-root="true"]');
+  if (!openModals.length) return;
+  const topmost = openModals[openModals.length - 1];
+  topmost.dispatchEvent(new CustomEvent('modal:escape', { bubbles: true, cancelable: true }));
+}
+
 onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('maop:unauthorized', onUnauthorized);
     window.removeEventListener('resize', checkMobile);
+    window.removeEventListener('keydown', onGlobalEsc);
   }
   realtime.disconnect();
 });
