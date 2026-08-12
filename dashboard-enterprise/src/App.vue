@@ -1,30 +1,39 @@
 <template>
-  <!-- 上下通栏布局: 顶栏全宽置顶(含侧栏折叠钮), 下方为 侧栏+内容 横排 -->
-  <div class="app-layout app-layout--topdown" :class="{ 'rail': ui.rail && !isMobile, 'sidebar-open': sidebarOpen && isMobile }">
-    <TopBar @toggle-rail="toggleRail" :rail="ui.rail" />
-
+  <!-- 满高左侧栏布局: 侧栏纵贯页面从上至下, 折叠按钮固定在侧栏左上角;
+       折叠后侧栏变窄(--rail-w)但仍满高; 顶栏位于右侧内容区顶部 -->
+  <div class="app-layout" :class="{ 'rail': ui.rail && !isMobile, 'sidebar-open': sidebarOpen && isMobile }">
     <!-- Mobile drawer backdrop -->
-    <div v-if="sidebarOpen && isMobile" class="sidebar-backdrop" @click="closeSidebar" aria-hidden="true"></div>
+    <div v-if="sidebarOpen && isMobile" class="sidebar-backdrop" aria-hidden="true" @click="closeSidebar"></div>
 
-    <div class="app-body">
-      <nav class="sidebar" @click="onSidebarClick">
-        <div class="nav-scroll">
-          <template v-for="(item, i) in nav" :key="i">
-            <div v-if="item.section" class="nav-section">{{ t(item.section) }}</div>
-            <router-link v-else :to="item.to" class="nav-link" :title="t(item.label)" :class="{ 'router-link-active': isActive(item) }">
-              <AppIcon class="nav-icon" :name="item.icon" :size="18" />
-              <span class="nav-label">{{ t(item.label) }}</span>
-            </router-link>
-          </template>
-        </div>
-      </nav>
+    <nav class="sidebar" @click="onSidebarClick">
+      <div class="sidebar-head">
+        <button
+          class="sidebar-toggle"
+          :title="ui.rail ? t('action.expandSidebar') : t('action.collapseSidebar')"
+          :aria-label="ui.rail ? 'Expand sidebar' : 'Collapse sidebar'"
+          @click="toggleRail"
+        >
+          <AppIcon :name="ui.rail ? 'panelright' : 'panelleft'" :size="16" />
+        </button>
+      </div>
+      <div class="nav-scroll">
+        <template v-for="(item, i) in nav" :key="i">
+          <div v-if="item.section" class="nav-section">{{ t(item.section) }}</div>
+          <router-link v-else :to="item.to" class="nav-link" :title="t(item.label)" :class="{ 'router-link-active': isActive(item) }">
+            <AppIcon class="nav-icon" :name="item.icon" :size="18" />
+            <span class="nav-label">{{ t(item.label) }}</span>
+          </router-link>
+        </template>
+      </div>
+    </nav>
 
-      <main class="content">
+    <main class="content">
+      <TopBar />
       <button
         class="hamburger-btn"
-        @click="toggleSidebar"
         :aria-expanded="sidebarOpen"
         aria-label="Toggle navigation menu"
+        @click="toggleSidebar"
       >
         <span></span><span></span><span></span>
       </button>
@@ -40,8 +49,7 @@
         </router-view>
       </div>
       <AppFooter :version="version" />
-      </main>
-    </div><!-- /.app-body -->
+    </main>
 
     <div v-if="authExpired" class="auth-overlay">
       <div class="auth-card">
@@ -290,21 +298,18 @@ onUnmounted(() => {
 :root { color-scheme: dark; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-/* 上下通栏布局 (2026-08-12 重构):
- * 顶栏独立成行置顶, 侧栏+内容在其下横排。
- * 顶栏的折叠按钮永远可见, 不会被侧栏宽度变化压没。
+/* 满高左侧栏布局 (2026-08-12 按用户指定重构):
+ * 侧栏纵贯页面左侧——上至视口最上、下至最下(sticky + 100vh)。
+ * 收缩/扩展按钮固定在侧栏左上角 (.sidebar-head), 与侧栏宽度无关,
+ * rail 模式下侧栏收窄为 64px 但仍满高, 按钮居中保持可点。
+ * 顶栏 (TopBar) 回到右侧内容区顶部。
  */
 .app-layout {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   min-height: 100vh;
   position: relative;
   z-index: 1;
-}
-.app-body {
-  flex: 1;
-  display: flex;
-  min-height: 0;
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────── */
@@ -318,8 +323,40 @@ onUnmounted(() => {
   flex-shrink: 0;
   z-index: var(--z-sidebar);
   transition: width var(--motion) var(--ease);
-  position: relative;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  align-self: flex-start;
 }
+
+/* 侧栏头部: 仅放折叠按钮。展开时按钮靠左, rail 时居中。 */
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  height: var(--topbar-h);
+  padding: 0 var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sidebar-toggle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), border-color var(--motion) var(--ease);
+}
+.sidebar-toggle:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+.sidebar-toggle:active { transform: scale(.96); }
 
 .nav-scroll { flex: 1; overflow-y: auto; padding: var(--sp-2) 0; }
 .nav-section {
@@ -396,6 +433,7 @@ onUnmounted(() => {
 .app-layout.rail .nav-label,
 .app-layout.rail .nav-section { display: none; }
 .app-layout.rail .nav-link { justify-content: center; padding: 10px 0; gap: 0; }
+.app-layout.rail .sidebar-head { justify-content: center; padding: 0; }
 
 /* ── Content (scroll area) ─────────────────────────────────────── */
 .content { flex: 1; overflow-y: auto; min-width: 0; position: relative; z-index: 1; display: flex; flex-direction: column; }

@@ -3,12 +3,9 @@
     <!-- 顶部细线 hairline，强化视觉边界 -->
     <div class="topbar__hairline" aria-hidden="true"></div>
 
-    <!-- ⓪ 侧栏折叠按钮(全宽顶栏 → 永远在,不受侧栏宽度挤压) -->
-    <button class="topbar__siderail-btn" @click="$emit('toggle-rail')" :title="rail ? t('action.expandSidebar') : t('action.collapseSidebar')" :aria-label="rail ? 'Expand sidebar' : 'Collapse sidebar'">
-      <AppIcon :name="rail ? 'panelright' : 'panelleft'" :size="16" />
-    </button>
-
     <!-- ① 系统标识（居左） -->
+    <!-- 侧栏折叠按钮已移入侧栏自身头部(.sidebar-head/.sidebar-toggle),
+         顶栏不再重复提供 — 见 App.vue -->
     <div class="topbar__brand">
       <div class="topbar__logo" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -35,7 +32,7 @@
 
     <!-- ② 刷新按钮 + 时间（标识右侧） -->
     <div class="topbar__refresh">
-      <button class="topbar__refresh-btn" @click="doRefresh" :title="t('common.refresh')" aria-label="Refresh">
+      <button class="topbar__refresh-btn" :title="t('common.refresh')" aria-label="Refresh" @click="doRefresh">
         <AppIcon name="refresh" :size="15" />
       </button>
       <div class="topbar__refreshmeta">
@@ -61,7 +58,7 @@
 
     <!-- ④ 用户区（居右） -->
     <div class="topbar__user">
-      <button class="topbar__avatar-btn" @click="goToUsers" :title="t('nav.users')" aria-label="User profile">
+      <button class="topbar__avatar-btn" :title="t('nav.users')" aria-label="User profile" @click="goToUsers">
         <div class="topbar__avatar">
           <span class="topbar__avatar-letter">{{ userInitial }}</span>
           <span class="topbar__avatar-ring" aria-hidden="true"></span>
@@ -73,7 +70,7 @@
           </span>
         </div>
       </button>
-      <button v-if="authOn" class="topbar__logout-btn" @click="onLogout" :title="t('action.logout')" aria-label="Sign out">
+      <button v-if="authOn" class="topbar__logout-btn" :title="t('action.logout')" aria-label="Sign out" @click="onLogout">
         <AppIcon name="power" :size="14" />
         <span class="topbar__logout-text">{{ t('action.logout') }}</span>
       </button>
