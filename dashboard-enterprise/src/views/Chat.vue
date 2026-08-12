@@ -434,34 +434,14 @@ onMounted(async () => {
   } catch (e) {
     console.warn('[chat] agent list load failed:', e && e.message);
   }
-  // 强制左右等高：CSS stretch 在嵌套 flex/grid 中不可靠，用 JS 同步
-  nextTick(() => {
-    const syncHeight = () => {
-      const split = document.querySelector('.chat-split');
-      const sidebar = document.querySelector('.session-sidebar');
-      const main = document.querySelector('.chat-main');
-      if (!split || !sidebar || !main) return;
-      const h = split.offsetHeight;
-      if (h > 0) {
-        sidebar.style.height = h + 'px';
-        main.style.height = h + 'px';
-      }
-    };
-    syncHeight();
-    window.addEventListener('resize', syncHeight);
-    if (typeof ResizeObserver !== 'undefined') {
-      const split = document.querySelector('.chat-split');
-      if (split) new ResizeObserver(syncHeight).observe(split);
-    }
-  });
 });
 </script>
 
 <style scoped>
-/* 左右等高由 JS syncHeight 强制控制，CSS 只负责基本布局 */
-.chat-page {
-  height: auto !important;
-}
+/* 2026-08-12 重构说明:
+ * 高度/flex 等高链由全局 pages.css 统一管理(.chat-page/.chat-split/.chat-main/
+ * .chat-body 已在那儿定义), 本 scoped 块只保留组件私有样式, 不再重复声明布局,
+ * 避免两套规则互相覆盖导致分辨率抖动。JS ResizeObserver 强制同步已删除。 */
 .stream-meta {
   display: flex;
   gap: 8px;
@@ -471,31 +451,5 @@ onMounted(async () => {
 }
 .stream-tokens, .stream-speed {
   font-variant-numeric: tabular-nums;
-}
-.chat-split {
-  display: flex !important;
-  align-items: flex-start;
-  overflow: hidden;
-}
-.session-sidebar {
-  width: 280px;
-  flex-shrink: 0;
-  margin-bottom: 0 !important;
-  min-height: 0;
-  overflow: hidden;
-}
-.chat-main {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-@media (max-width: 1100px) {
-  .session-sidebar { width: 240px; }
-}
-@media (max-width: 900px) {
-  .chat-split { flex-direction: column !important; }
-  .session-sidebar { width: 100%; flex-shrink: 1; height: auto !important; }
-  .chat-main { height: auto !important; }
 }
 </style>

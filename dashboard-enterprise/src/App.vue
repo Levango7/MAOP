@@ -17,7 +17,7 @@
         </button>
       </div>
       <div class="nav-scroll">
-        <template v-for="(item, i) in nav" :key="i">
+        <template v-for="(item, i) in visibleNav" :key="i">
           <div v-if="item.section" class="nav-section">{{ t(item.section) }}</div>
           <router-link v-else :to="item.to" class="nav-link" :title="t(item.label)" :class="{ 'router-link-active': isActive(item) }">
             <AppIcon class="nav-icon" :name="item.icon" :size="18" />
@@ -87,7 +87,10 @@ import TopBar from './components/TopBar.vue';
 import Toast from './components/Toast.vue';
 import AppFooter from './components/AppFooter.vue';
 import { useI18n } from './i18n/index.js';
-import { nav } from './nav.js';
+import { nav, filterNavByEdition } from './nav.js';
+
+// 个人版隐藏企业版菜单项 (RFC-001 修正): 所见即所得, 不再"点了被弹走"
+const visibleNav = computed(() => filterNavByEdition(nav, edition.edition));
 
 const edition = useEditionStore();
 const api = useApiStore();
@@ -335,8 +338,20 @@ onUnmounted(() => {
   align-items: center;
   height: var(--topbar-h);
   padding: 0 var(--sp-3);
-  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  position: relative;
+}
+/* 柔和过渡带: 用渐变取代硬分割线, 侧栏头部与导航区视觉连续 */
+.sidebar-head::after {
+  content: '';
+  position: absolute;
+  left: var(--sp-3);
+  right: var(--sp-3);
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+  opacity: .5;
+  pointer-events: none;
 }
 .sidebar-toggle {
   display: grid;
