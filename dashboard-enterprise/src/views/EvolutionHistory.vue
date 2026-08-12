@@ -177,7 +177,7 @@ const abRows = computed(() =>
     decision_label: t(`view.evolutionHistory.decision.${e.decision || 'continue'}`),
     winner: e.winner || '—',
     samples: e.samples || 0,
-    success_rate: e.success_rate != null ? (e.success_rate * 100).toFixed(1) : '—',
+    success_rate: e.success_rate !== null ? (e.success_rate * 100).toFixed(1) : '—',
   })),
 );
 

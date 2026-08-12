@@ -73,19 +73,23 @@
     </div>
 
     <Toast />
+    <CoachMarks />
+    <CommandPalette />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, onErrorCaptured } from 'vue';
 import { useEditionStore } from './stores/edition.js';
-import { useApiStore, withAuth } from './stores/api.js';
+import { useApiStore } from './stores/api.js';
 import { useRealtimeStore } from './stores/realtime.js';
 import { useUiStore } from './stores/ui.js';
 import AppIcon from './components/AppIcon.vue';
 import TopBar from './components/TopBar.vue';
 import Toast from './components/Toast.vue';
 import AppFooter from './components/AppFooter.vue';
+import CoachMarks from './components/CoachMarks.vue';
+import CommandPalette from './components/CommandPalette.vue';
 import { useI18n } from './i18n/index.js';
 import { nav, filterNavByEdition } from './nav.js';
 
@@ -96,7 +100,6 @@ const edition = useEditionStore();
 const api = useApiStore();
 const realtime = useRealtimeStore();
 const ui = useUiStore();
-const realtimeConnected = computed(() => realtime.connected);
 const { t } = useI18n();
 
 // ── Global error boundary ──────────────────────────────────────────
@@ -126,13 +129,6 @@ function getStoredRoles() {
 }
 const userName = ref(getStoredUser());
 const userRoles = ref(getStoredRoles());
-const userInitial = computed(() => {
-  const n = userName.value;
-  if (!n) return '?';
-  // For Chinese names, take the last character (surname); for English, first letter
-  if (/[\u4e00-\u9fff]/.test(n)) return n.charAt(n.length - 1);
-  return n.charAt(0).toUpperCase();
-});
 
 // Admin detection: roles in localStorage OR auth-disabled runs (superuser).
 const isAdmin = ref(false);
@@ -143,23 +139,12 @@ function computeAdmin() {
       const roles = JSON.parse(rolesStr);
       if (Array.isArray(roles) && roles.some((r) => r === 'admin' || r === 'superadmin')) { isAdmin.value = true; return; }
     }
-  } catch (e) { /* ignore */ }
+  } catch { /* ignore */ }
   if (authEnabled.value === false) { isAdmin.value = true; return; }
   isAdmin.value = localStorage.getItem('maop_user') === 'admin';
 }
-async function onEditionChange(target) {
-  if (target === edition.edition) return;
-  if (!isAdmin.value) { window.alert(t('nav.editionLocked')); return; }
-  const msg = target === 'personal' ? t('nav.editionToPersonal') : t('nav.editionToEnterprise');
-  if (!window.confirm(msg)) return;
-  try {
-    await edition.switchEdition(target);
-  } catch (e) { /* error surfaced via store.switchError */ }
-}
 
 // ── Theme / density / rail now live in the shared ui store (stores/ui.js) ─
-const isLight = computed(() => ui.theme === 'light');
-function toggleTheme() { ui.toggleTheme(); }
 function toggleRail() { ui.toggleRail(); }
 
 // ── Mobile drawer ─────────────────────────────────────────────────────────
@@ -257,10 +242,6 @@ async function checkAuthEnabled() {
       try { localStorage.removeItem('maop_token'); localStorage.removeItem('maop_user'); } catch { /* ignore */ }
     }
   } catch { authEnabled.value = false; }
-}
-async function doLogout() {
-  try { await api.clearAuthToken(); } catch { /* ignore */ }
-  if (typeof window !== 'undefined' && window.location) window.location.reload();
 }
 
 onMounted(async () => {

@@ -75,6 +75,8 @@ v-else-if="!loading" icon="gauge" :title="t('view.evolve.noData')"
     <!-- P2-12: Agent configuration lineage -->
     <Card :title="t('view.evolve.lineage.title')" icon="git-branch" :margin-bottom="16">
       <div class="evolve-chart-desc muted">{{ t('view.evolve.lineage.desc') }}</div>
+      <!-- 迭代 B1: 世系时间线(故事化) + 明细表格(下钻)并存 -->
+      <EvolutionTimeline v-if="lineage.length" :items="lineage" class="evo-tl" />
       <DataTable
         v-if="lineageRows.length"
         :columns="lineageCols"
@@ -82,7 +84,7 @@ v-else-if="!loading" icon="gauge" :title="t('view.evolve.noData')"
         row-key="key"
         :empty-text="t('view.evolve.lineage.empty')"
       />
-      <EmptyState v-else icon="git-branch" :title="t('view.evolve.lineage.empty')" />
+      <EmptyState v-else-if="!lineage.length" icon="git-branch" :title="t('view.evolve.lineage.empty')" />
     </Card>
 
     <div class="two-col">
@@ -127,6 +129,7 @@ import StatCard from '../components/StatCard.vue';
 import DataTable from '../components/DataTable.vue';
 import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
+import EvolutionTimeline from '../components/EvolutionTimeline.vue';
 import EvolutionHistory from './EvolutionHistory.vue';
 import { cssVar, cssVarAlpha } from '../composables/chartTokens.js';
 import { useI18n } from '../i18n';
