@@ -10,12 +10,15 @@
       />
     </PageHeader>
 
-    <!-- keep-alive: 切 Tab 不销毁子组件,保留其内部表单/会话状态
-         embedded=true 让子视图隐藏自身 PageHeader,避免双层标题 -->
-    <KeepAlive>
-      <ControlPanel v-if="tab === 'structured'" embedded />
-      <Chat v-else embedded />
-    </KeepAlive>
+    <!-- 内容区独占剩余高度; PageHeader 保持自然高度,不参与拉伸 -->
+    <div class="run-body">
+      <!-- keep-alive: 切 Tab 不销毁子组件,保留其内部表单/会话状态
+           embedded=true 让子视图隐藏自身 PageHeader,避免双层标题 -->
+      <KeepAlive>
+        <ControlPanel v-if="tab === 'structured'" embedded />
+        <Chat v-else embedded />
+      </KeepAlive>
+    </div>
   </div>
 </template>
 
@@ -75,8 +78,15 @@ watch(
   flex: 1;
   min-height: 0;
 }
-/* 子视图在壳内同样撑满 */
-.run-view > * { flex: 1; min-height: 0; }
+/* 内容区填充剩余高度; 注意: flex:1 只给 .run-body,
+ * 绝不能给 .run-view > * —— 否则 PageHeader 也会被拉伸(上轮误伤) */
+.run-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.run-body > * { flex: 1; min-height: 0; }
 /* Segmented 内嵌进 PageHeader 操作区,不额外占行 */
 .run-tabs { margin-left: auto; }
 </style>
