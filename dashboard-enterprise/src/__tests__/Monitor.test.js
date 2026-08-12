@@ -10,7 +10,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import Monitor from '../views/Monitor.vue';
 import { useRealtimeStore } from '../stores/realtime.js';
-import { PageHeader, EmptyState } from '../components/index.js';
+import { EmptyState } from '../components/index.js';
 
 const mountOptions = { global: { stubs: { PageHeader: { template: '<slot />' } } } };
 

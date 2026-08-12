@@ -86,7 +86,7 @@ export function useDagProgress(executionId, options = {}) {
     nodeStates.value = { ...nodeStates.value, [data.node_id]: data.status };
   }
 
-  function _handleComplete(data) {
+  function _handleComplete(_data) {
     executionComplete.value = true;
     // Auto-disconnect after execution completes (spec 5.2.1 rule 11).
     disconnect();

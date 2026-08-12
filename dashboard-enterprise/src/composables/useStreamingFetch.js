@@ -6,7 +6,7 @@
  *
  * @returns {{ stream: Function }}
  */
-import { getCurrentInstance } from 'vue';
+
 
 const TOKEN_KEY = 'maop_token';
 

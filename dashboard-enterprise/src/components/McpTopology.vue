@@ -192,7 +192,7 @@ async function render() {
   }
   try {
     await loadVisLib();
-  } catch (e) {
+  } catch {
     // 渲染失败时静默处理，错误展示交给外层
     return;
   }

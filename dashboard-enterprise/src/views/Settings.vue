@@ -249,15 +249,15 @@ async function detectAdmin() {
       const roles = JSON.parse(rolesStr);
       if (Array.isArray(roles) && roles.some(r => r === 'admin' || r === 'superadmin')) return true;
     }
-  } catch (e) { /* ignore malformed roles */ }
+  } catch { /* ignore malformed roles */ }
   // Auth disabled (e.g. MAOP_AUTH_DISABLED_ADMIN) → treat the session as superuser.
   try {
     const d = await api.get('/api/auth/status');
     if (d && d.auth_enabled === false) return true;
-  } catch (e) { /* ignore */ }
+  } catch { /* ignore */ }
   try {
     return localStorage.getItem('maop_user') === 'admin';
-  } catch (e) { return false; }
+  } catch { return false; }
 }
 
 async function onSwitchClick(target) {
@@ -285,7 +285,7 @@ async function onSwitchClick(target) {
     } else {
       switchNotice.value = switchNoticeText(result);
     }
-  } catch (e) { /* error already in store.switchError */ }
+  } catch { /* error already in store.switchError */ }
 }
 
 function switchNoticeText(result) {
@@ -318,7 +318,7 @@ async function loadAdrs() {
   try {
     const data = await api.get('/api/info/adrs');
     if (Array.isArray(data) && data.length > 0) adrs.value = data;
-  } catch (e) { /* keep fallback list */ }
+  } catch { /* keep fallback list */ }
 }
 
 async function load() {

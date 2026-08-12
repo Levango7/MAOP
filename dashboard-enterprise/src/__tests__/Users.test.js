@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import Users from '../views/Users.vue';
-import { PageHeader } from '../components/index.js';
+
 
 const mountOptions = { global: { stubs: { PageHeader: { template: '<slot />' } } } };
 

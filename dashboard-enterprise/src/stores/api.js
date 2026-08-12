@@ -11,7 +11,7 @@ const USER_KEY = 'maop_user';
 function getAuthToken() {
   try {
     return localStorage.getItem(TOKEN_KEY) || '';
-  } catch (e) {
+  } catch {
     // localStorage 在某些隐私模式下不可用
     return '';
   }
@@ -69,11 +69,11 @@ async function tryRefreshToken() {
       if (!res.ok) return false;
       const data = await res.json();
       if (data.status === 'ok' && data.token) {
-        try { localStorage.setItem(TOKEN_KEY, data.token); } catch (e) { /* ignore */ }
+        try { localStorage.setItem(TOKEN_KEY, data.token); } catch { /* ignore */ }
         return true;
       }
       return false;
-    } catch (e) {
+    } catch {
       return false;
     } finally {
       _refreshPromise = null;
@@ -95,7 +95,7 @@ async function handleUnauthorized() {
   try {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-  } catch (e) { /* ignore */ }
+  } catch { /* ignore */ }
   // 仅在浏览器环境且非测试环境触发重定向，避免 vitest 中 jsdom 缺少路由
   if (typeof window !== 'undefined' && !window.__VITEST__ && window.location) {
     // 触发一个自定义事件，让 App.vue 决定如何展示登录态（不强制刷新整页）
@@ -205,7 +205,7 @@ export const useApiStore = defineStore('api', {
         else localStorage.removeItem(TOKEN_KEY);
         if (user) localStorage.setItem(USER_KEY, user);
         else localStorage.removeItem(USER_KEY);
-      } catch (e) { /* ignore */ }
+      } catch { /* ignore */ }
     },
     /**
      * 清除 token（登出）。P1 fix: 通知后端撤销 JWT token。
@@ -214,11 +214,11 @@ export const useApiStore = defineStore('api', {
       // Notify backend to revoke the token before clearing locally
       try {
         await fetchWithTimeout('/api/auth/logout', withAuth({ method: 'POST' }, {}));
-      } catch (e) { /* best-effort — clear locally anyway */ }
+      } catch { /* best-effort — clear locally anyway */ }
       try {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
-      } catch (e) { /* ignore */ }
+      } catch { /* ignore */ }
     },
   },
 });

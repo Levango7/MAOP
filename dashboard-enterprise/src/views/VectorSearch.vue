@@ -47,7 +47,7 @@
           <div class="result-body">{{ r.content || r.text || r.chunk || r.payload || '—' }}</div>
           <div v-if="r.tags || r.timestamp" class="result-foot">
             <span v-if="r.tags" class="tags">
-              <Badge v-for="t in normTags(r.tags)" :key="t" tone="neutral">{{ t }}</Badge>
+              <Badge v-for="tag in normTags(r.tags)" :key="tag" tone="neutral">{{ tag }}</Badge>
             </span>
             <span v-if="r.timestamp" class="muted">{{ fmt(r.timestamp) }}</span>
           </div>

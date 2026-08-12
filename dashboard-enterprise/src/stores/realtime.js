@@ -74,7 +74,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     if (ws) {
       try {
         ws.disconnect();
-      } catch (e) {
+      } catch {
         // ignore — best-effort teardown
       }
       ws = null;

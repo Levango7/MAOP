@@ -159,7 +159,9 @@ export async function progressiveLoad(items, onBatch, opts = {}) {
 
 /**
  * ric-aware scheduler shim for environments without requestIdleCallback.
+ * NOTE: kept for future use; currently unused to satisfy no-unused-vars.
  */
+// eslint-disable-next-line no-unused-vars
 function scheduleIdle(task) {
   if (typeof requestIdleCallback === 'function') requestIdleCallback(task);
   else setTimeout(task, 16);

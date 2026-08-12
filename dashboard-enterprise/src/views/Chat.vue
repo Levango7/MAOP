@@ -193,13 +193,13 @@ async function detectAdmin() {
       const roles = JSON.parse(rolesStr);
       if (Array.isArray(roles) && roles.some((r) => r === 'admin' || r === 'superadmin')) return true;
     }
-  } catch (e) { /* ignore */ }
+  } catch { /* ignore */ }
   // Auth disabled (e.g. MAOP_AUTH_DISABLED_ADMIN) → treat the session as superuser.
   try {
     const d = await api.get('/api/auth/status');
     if (d && d.auth_enabled === false) return true;
-  } catch (e) { /* ignore */ }
-  try { return localStorage.getItem('maop_user') === 'admin'; } catch (e) { return false; }
+  } catch { /* ignore */ }
+  try { return localStorage.getItem('maop_user') === 'admin'; } catch { return false; }
 }
 
 function fmtDate(iso) {
@@ -235,7 +235,7 @@ async function loadSessions() {
   try {
     const r = await api.get('/api/chat/sessions');
     sessions.value = (r && r.data) ? r.data : [];
-  } catch (e) {
+  } catch {
     sessions.value = [];
   } finally {
     sessionsLoading.value = false;
@@ -246,7 +246,7 @@ async function loadSessionMessages(id) {
     const r = await api.get(`/api/chat/${id}`);
     const msgs = (r && r.data && r.data.messages) || [];
     messages.value = msgs.map(mapMsg);
-  } catch (e) {
+  } catch {
     messages.value = [];
   }
   await nextTick();

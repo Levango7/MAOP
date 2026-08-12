@@ -75,7 +75,7 @@ icon="clipboard" :title="resultTitle" :margin-bottom="0"
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
-import { Card, StatCard, Badge, DataTable, Segmented, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
+import { Card, StatCard, DataTable, Segmented, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
 
 const api = useApiStore();
 const { t } = useI18n();

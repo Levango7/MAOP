@@ -13,7 +13,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import Models from '../views/Models.vue';
 import DataTable from '../components/DataTable.vue';
-import { PageHeader } from '../components/index.js';
+
 
 // PageHeader calls useRoute() which needs a router context; stub it with a
 // pass-through slot so the view's slot content (e.g. the refresh button) still

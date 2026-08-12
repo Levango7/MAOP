@@ -41,7 +41,7 @@ export const useUiStore = defineStore('ui', () => {
       localStorage.setItem('maop_density', density.value);
       localStorage.setItem('maop_rail', rail.value ? '1' : '0');
       localStorage.setItem('maop_locale', locale.value);
-    } catch (e) {
+    } catch {
       /* storage may be unavailable (private mode); ignore */
     }
   }

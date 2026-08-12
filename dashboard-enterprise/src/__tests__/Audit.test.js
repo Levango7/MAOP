@@ -14,7 +14,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import Audit from '../views/Audit.vue';
 import DataTable from '../components/DataTable.vue';
-import { PageHeader } from '../components/index.js';
+
 
 // PageHeader calls useRoute() which needs a router context; stub it so we can
 // mount the view without providing a full vue-router instance.

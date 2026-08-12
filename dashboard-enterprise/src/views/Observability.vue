@@ -117,11 +117,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
-import { useI18n } from '../i18n';
 import { StatCard, Card, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
 
 const api = useApiStore();
-const { t } = useI18n();
 
 const loading = ref(true);
 const configLoading = ref(true);
@@ -298,7 +296,7 @@ async function loadHealth() {
 async function loadTraces() {
   try {
     traceInfo.value = await api.get('/api/observability/traces?limit=5');
-  } catch (e) {
+  } catch {
     traceInfo.value = { enabled: false, hint: 'endpoint unavailable' };
   }
 }

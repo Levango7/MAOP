@@ -624,6 +624,7 @@ async function healthCheck(a) {
   try { await api.post(`/api/agents/${a.name}/health-check`, {}); await loadAgents(); toast.success(t('view.agents.healthCheckSent', { name: a.name })); }
   catch (e) { toast.error(t('view.agents.healthCheckFailed') + (e.message ? ': ' + e.message : '')); }
 }
+// eslint-disable-next-line no-unused-vars
 async function restartAgent(a) {
   // 真正的重启 = 修复 + 健康检查
   repairing[a.name] = true;
@@ -891,7 +892,7 @@ async function loadAgents() {
   try {
     const r = await api.get('/api/agents/routes');
     routes.value = toList(r);
-  } catch (e) {
+  } catch {
     routes.value = [];
   }
   loading.value = false;
@@ -904,7 +905,7 @@ async function loadDecisions() {
   try {
     const data = await api.get('/api/routing/decisions/recent?limit=20');
     decisions.value = data?.decisions || [];
-  } catch (e) {
+  } catch {
     decisions.value = [];
   } finally {
     loadingDecisions.value = false;
@@ -936,12 +937,12 @@ async function detectAdmin() {
       const roles = JSON.parse(rolesStr);
       if (Array.isArray(roles) && roles.some((r) => r === 'admin' || r === 'superadmin')) return true;
     }
-  } catch (e) { /* ignore */ }
+  } catch { /* ignore */ }
   try {
     const d = await api.get('/api/auth/status');
     if (d && d.auth_enabled === false) return true;
-  } catch (e) { /* ignore */ }
-  try { return localStorage.getItem('maop_user') === 'admin'; } catch (e) { return false; }
+  } catch { /* ignore */ }
+  try { return localStorage.getItem('maop_user') === 'admin'; } catch { return false; }
 }
 
 onMounted(() => {

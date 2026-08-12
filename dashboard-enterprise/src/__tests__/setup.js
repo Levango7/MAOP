@@ -1,5 +1,5 @@
 // Vitest setup file - ensure localStorage is available and functional
-import { vi } from 'vitest';
+
 import { config as testConfig } from '@vue/test-utils';
 import { vModalA11y } from '../directives/modalA11y.js';
 

@@ -201,7 +201,7 @@ describe('KnowledgeGraph.vue', () => {
   });
 
   it('clicking refresh re-fetches the graph', async () => {
-    const fetchFn = vi.fn((url) => {
+    const fetchFn = vi.fn((_url) => {
       const body = SAMPLE_GRAPH;
       return Promise.resolve({
         ok: true, status: 200,

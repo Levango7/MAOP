@@ -52,9 +52,9 @@
       <Card :title="t('view.tlmemory.byTopic')" icon="scroll" :margin-bottom="16">
         <div v-if="topicEntries.length" class="chip-list">
           <button
-v-for="t in topicEntries" :key="t.key" class="chip" :class="{ active: query === t.key }"
-                  @click="searchTopic(t.key)">
-            {{ t.key }} <span class="chip-count">{{ t.value }}</span>
+v-for="topic in topicEntries" :key="topic.key" class="chip" :class="{ active: query === topic.key }"
+                  @click="searchTopic(topic.key)">
+            {{ topic.key }} <span class="chip-count">{{ topic.value }}</span>
           </button>
         </div>
         <EmptyState v-else icon="scroll" :title="t('view.tlmemory.noTopics')" :description="t('view.tlmemory.noTopicDesc')" />
@@ -99,7 +99,7 @@ v-for="t in topicEntries" :key="t.key" class="chip" :class="{ active: query === 
           <div v-if="e.task" class="entry-task">{{ e.task }}</div>
           <div class="entry-body">{{ e.snippet || e.content || '' }}</div>
           <div v-if="e.tags" class="entry-footer">
-            <span v-for="t in e.tags" :key="t" class="tag">{{ t }}</span>
+            <span v-for="tag in e.tags" :key="tag" class="tag">{{ tag }}</span>
           </div>
         </div>
       </div>

@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import Search from '../views/Search.vue';
-import { PageHeader, EmptyState, DataTable } from '../components/index.js';
+import { DataTable } from '../components/index.js';
 
 const mountOptions = { global: { stubs: { PageHeader: { template: '<slot />' } } } };
 
