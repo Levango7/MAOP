@@ -79,7 +79,8 @@ describe('Users.vue', () => {
   it('shows empty state when no users', async () => {
     mockFetch(defaultRoutes());
     const wrapper = await mountUsers();
-    expect(wrapper.find('.users-empty').exists()).toBe(true);
+    // 空态交给 ListPageLayout 内部的 EmptyState 渲染(根类名 .empty)
+    expect(wrapper.find('.empty').exists()).toBe(true);
     wrapper.unmount();
   });
 

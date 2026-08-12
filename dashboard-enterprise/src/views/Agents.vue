@@ -241,105 +241,104 @@
     <EmptyState v-if="!loading && !agents.length" icon="bot" :title="t('view.agents.noAgents')" :hint="t('view.agents.noAgentsHint')" />
 
     <!-- 记忆面板 -->
-    <div v-if="memoryPanel.visible" v-modal-a11y class="modal-overlay" @click.self="memoryPanel.visible = false" @modal:escape="memoryPanel.visible = false">
-      <div class="memory-panel">
-        <div class="memory-panel__header">
-          <h3>{{ t('view.agents.memoryFor', { name: memoryPanel.agentName }) }}</h3>
-          <div class="memory-panel__toolbar">
-            <button class="act-btn small" :title="t('common.refresh')" @click="reloadMemory(memoryPanel.agentName)">
-              <AppIcon name="refresh" :size="14" />
-            </button>
-            <button class="act-btn small" :title="t('view.agents.addMemory')" @click="memoryAddForm = !memoryAddForm">
-              <AppIcon name="plus" :size="14" />
-            </button>
-            <button class="close-btn" @click="memoryPanel.visible = false"><AppIcon name="x" :size="16" /></button>
-          </div>
-        </div>
+    <DetailDrawer
+      :open="memoryPanel.visible"
+      :title="t('view.agents.memoryFor', { name: memoryPanel.agentName })"
+      icon="brain"
+      @close="memoryPanel.visible = false"
+    >
+      <div class="memory-panel__toolbar">
+        <button class="act-btn small" :title="t('common.refresh')" @click="reloadMemory(memoryPanel.agentName)">
+          <AppIcon name="refresh" :size="14" />
+        </button>
+        <button class="act-btn small" :title="t('view.agents.addMemory')" @click="memoryAddForm = !memoryAddForm">
+          <AppIcon name="plus" :size="14" />
+        </button>
+      </div>
 
-        <!-- 添加记忆表单 -->
-        <div v-if="memoryAddForm" class="memory-add-form">
-          <select v-model="memoryAddType" class="mem-add-select" :aria-label="t('view.agents.memoryType')">
-            <option value="interaction">interaction</option>
-            <option value="preference">preference</option>
-            <option value="error_pattern">error_pattern</option>
-            <option value="performance">performance</option>
-            <option value="lesson">lesson</option>
-          </select>
-          <textarea
+      <!-- 添加记忆表单 -->
+      <div v-if="memoryAddForm" class="memory-add-form">
+        <select v-model="memoryAddType" class="mem-add-select" :aria-label="t('view.agents.memoryType')">
+          <option value="interaction">interaction</option>
+          <option value="preference">preference</option>
+          <option value="error_pattern">error_pattern</option>
+          <option value="performance">performance</option>
+          <option value="lesson">lesson</option>
+        </select>
+        <textarea
 v-model="memoryAddContent" class="mem-add-textarea" rows="3"
-                    :aria-label="t('view.agents.memoryContentPlaceholder')"
-                    :placeholder="t('view.agents.memoryContentPlaceholder')"></textarea>
-          <div class="mem-add-row">
-            <label class="mem-add-importance">
-              {{ t('view.agents.importance') }}: {{ memoryAddImportance }}
-              <input v-model.number="memoryAddImportance" type="range" min="0" max="1" step="0.1" :aria-label="t('view.agents.importance')" />
-            </label>
-            <button class="act-btn" :disabled="!memoryAddContent.trim()" @click="addMemory(memoryPanel.agentName)">
-              {{ t('view.agents.addMemory') }}
-            </button>
-          </div>
-        </div>
-
-        <div v-if="memoryPanel.summary" class="memory-panel__summary">
-          <div v-for="(val, key) in memoryPanel.summary.by_type" :key="key" class="mem-stat">
-            <span class="mem-stat__label">{{ key }}</span>
-            <span class="mem-stat__val">{{ val }}</span>
-          </div>
-          <div class="mem-stat">
-            <span class="mem-stat__label">{{ t('view.agents.totalMemories') }}</span>
-            <span class="mem-stat__val">{{ memoryPanel.summary.total_memories }}</span>
-          </div>
-          <div class="mem-stat">
-            <span class="mem-stat__label">{{ t('view.agents.evolutionCount') }}</span>
-            <span class="mem-stat__val">{{ memoryPanel.summary.evolution_count }}</span>
-          </div>
-        </div>
-        <div v-if="memoryPanel.records.length" class="memory-panel__list">
-          <div v-for="r in memoryPanel.records" :key="r.id" class="mem-record">
-            <span class="mem-type" :class="r.memory_type">{{ r.memory_type }}</span>
-            <span class="mem-content">{{ JSON.stringify(r.content).slice(0, 200) }}</span>
-            <span class="mem-time">{{ r.created_at?.slice(0, 19) }}</span>
-          </div>
-        </div>
-        <div v-else class="memory-panel__empty">
-          <AppIcon name="brain" :size="24" />
-          <span>{{ t('view.agents.noMemories') }}</span>
-        </div>
-        <div class="memory-panel__actions">
-          <button class="act-btn danger" :disabled="!isAdmin" @click="clearMemory(memoryPanel.agentName)">
-            <AppIcon name="trash" :size="14" /> {{ t('view.agents.clearMemory') }}
+                  :aria-label="t('view.agents.memoryContentPlaceholder')"
+                  :placeholder="t('view.agents.memoryContentPlaceholder')"></textarea>
+        <div class="mem-add-row">
+          <label class="mem-add-importance">
+            {{ t('view.agents.importance') }}: {{ memoryAddImportance }}
+            <input v-model.number="memoryAddImportance" type="range" min="0" max="1" step="0.1" :aria-label="t('view.agents.importance')" />
+          </label>
+          <button class="act-btn" :disabled="!memoryAddContent.trim()" @click="addMemory(memoryPanel.agentName)">
+            {{ t('view.agents.addMemory') }}
           </button>
         </div>
       </div>
-    </div>
 
-    <!-- 自进化结果面板 -->
-    <div v-if="evolutionPanel.visible" v-modal-a11y class="modal-overlay" @click.self="evolutionPanel.visible = false" @modal:escape="evolutionPanel.visible = false">
-      <div class="evolution-panel">
-        <div class="evolution-panel__header">
-          <h3>{{ t('view.agents.evolutionFor', { name: evolutionPanel.agentName }) }}</h3>
-          <button class="close-btn" @click="evolutionPanel.visible = false"><AppIcon name="x" :size="16" /></button>
+      <div v-if="memoryPanel.summary" class="memory-panel__summary">
+        <div v-for="(val, key) in memoryPanel.summary.by_type" :key="key" class="mem-stat">
+          <span class="mem-stat__label">{{ key }}</span>
+          <span class="mem-stat__val">{{ val }}</span>
         </div>
-        <p v-if="evolutionPanel.result" class="evolution-summary">{{ evolutionPanel.result.summary }}</p>
-        <div v-if="evolutionPanel.result?.suggestions?.length" class="evolution-suggestions">
-          <div
-v-for="(s, i) in evolutionPanel.result.suggestions" :key="i" class="evo-suggestion"
-               :class="['prio-' + s.priority, s.action === 'auto_applied' ? 'auto' : 'manual']">
-            <span class="evo-cat">{{ s.category }}</span>
-            <span class="evo-prio">{{ s.priority }}</span>
-            <p class="evo-desc">{{ s.description }}</p>
-            <span v-if="s.action === 'auto_applied'" class="evo-action">{{ t('view.agents.autoApplied') }}</span>
-          </div>
+        <div class="mem-stat">
+          <span class="mem-stat__label">{{ t('view.agents.totalMemories') }}</span>
+          <span class="mem-stat__val">{{ memoryPanel.summary.total_memories }}</span>
         </div>
-        <div v-if="evolutionPanel.result?.auto_applied?.length" class="evolution-applied">
-          <h4>{{ t('view.agents.autoAppliedChanges') }}</h4>
-          <div v-for="(a, i) in evolutionPanel.result.auto_applied" :key="i" class="applied-item">
-            <span class="applied-cat">{{ a.category }}</span>
-            <span class="applied-desc">{{ a.description }}</span>
-          </div>
+        <div class="mem-stat">
+          <span class="mem-stat__label">{{ t('view.agents.evolutionCount') }}</span>
+          <span class="mem-stat__val">{{ memoryPanel.summary.evolution_count }}</span>
         </div>
       </div>
-    </div>
+      <div v-if="memoryPanel.records.length" class="memory-panel__list">
+        <div v-for="r in memoryPanel.records" :key="r.id" class="mem-record">
+          <span class="mem-type" :class="r.memory_type">{{ r.memory_type }}</span>
+          <span class="mem-content">{{ JSON.stringify(r.content).slice(0, 200) }}</span>
+          <span class="mem-time">{{ r.created_at?.slice(0, 19) }}</span>
+        </div>
+      </div>
+      <div v-else class="memory-panel__empty">
+        <AppIcon name="brain" :size="24" />
+        <span>{{ t('view.agents.noMemories') }}</span>
+      </div>
+
+      <template #footer>
+        <button class="act-btn danger" :disabled="!isAdmin" @click="clearMemory(memoryPanel.agentName)">
+          <AppIcon name="trash" :size="14" /> {{ t('view.agents.clearMemory') }}
+        </button>
+      </template>
+    </DetailDrawer>
+
+    <!-- 自进化结果面板 -->
+    <DetailDrawer
+      :open="evolutionPanel.visible"
+      :title="t('view.agents.evolutionFor', { name: evolutionPanel.agentName })"
+      icon="sparkles"
+      @close="evolutionPanel.visible = false"
+    >
+      <p v-if="evolutionPanel.result" class="evolution-summary">{{ evolutionPanel.result.summary }}</p>
+      <div v-if="evolutionPanel.result?.suggestions?.length" class="evolution-suggestions">
+        <div
+v-for="(s, i) in evolutionPanel.result.suggestions" :key="i" class="evo-suggestion"
+             :class="['prio-' + s.priority, s.action === 'auto_applied' ? 'auto' : 'manual']">
+          <span class="evo-cat">{{ s.category }}</span>
+          <span class="evo-prio">{{ s.priority }}</span>
+          <p class="evo-desc">{{ s.description }}</p>
+          <span v-if="s.action === 'auto_applied'" class="evo-action">{{ t('view.agents.autoApplied') }}</span>
+        </div>
+      </div>
+      <div v-if="evolutionPanel.result?.auto_applied?.length" class="evolution-applied">
+        <h4>{{ t('view.agents.autoAppliedChanges') }}</h4>
+        <div v-for="(a, i) in evolutionPanel.result.auto_applied" :key="i" class="applied-item">
+          <span class="applied-cat">{{ a.category }}</span>
+          <span class="applied-desc">{{ a.description }}</span>
+        </div>
+      </div>
+    </DetailDrawer>
 
     <!-- 移除确认对话框 -->
     <div v-if="removeConfirm.visible" v-modal-a11y class="modal-overlay" @click.self="removeConfirm.visible = false" @modal:escape="removeConfirm.visible = false">
@@ -486,6 +485,7 @@ import { useRealtimeStore } from '../stores/realtime.js';
 import { useToast } from '../composables/useToast.js';
 import { useI18n } from '../i18n';
 import { Card, Badge, Skeleton, EmptyState, Segmented, AppIcon, PageHeader } from '../components/index.js';
+import DetailDrawer from '../components/DetailDrawer.vue';
 
 const api = useApiStore();
 const realtime = useRealtimeStore();
@@ -972,21 +972,7 @@ onMounted(() => {
   animation: maop-view-in .2s ease both;
 }
 
-/* ── 记忆面板 ── */
-.memory-panel {
-  background: var(--card-sheen), var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  padding: var(--sp-6);
-  max-width: 700px; width: calc(100% - 32px);
-  max-height: 80vh; overflow-y: auto;
-  box-shadow: var(--shadow-lg);
-}
-.memory-panel__header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: var(--sp-4);
-}
-.memory-panel__header h3 { font-size: var(--fs-lg); font-weight: 700; }
+/* ── 记忆面板（DetailDrawer 内容样式） ── */
 .memory-panel__summary {
   display: flex; flex-wrap: wrap; gap: var(--sp-3);
   padding: var(--sp-3); background: var(--surface-2);
@@ -1014,23 +1000,8 @@ onMounted(() => {
 .mem-type.performance { background: color-mix(in srgb, var(--chart-4) 15%, transparent); color: var(--chart-4); }
 .mem-content { flex: 1; font-size: var(--fs-xs); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mem-time { font-size: 10px; color: var(--text-faint); flex-shrink: 0; }
-.memory-panel__actions { margin-top: var(--sp-4); display: flex; justify-content: flex-end; }
 
-/* ── 自进化面板 ── */
-.evolution-panel {
-  background: var(--card-sheen), var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  padding: var(--sp-6);
-  max-width: 700px; width: calc(100% - 32px);
-  max-height: 80vh; overflow-y: auto;
-  box-shadow: var(--shadow-lg);
-}
-.evolution-panel__header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: var(--sp-4);
-}
-.evolution-panel__header h3 { font-size: var(--fs-lg); font-weight: 700; }
+/* ── 自进化面板（DetailDrawer 内容样式） ── */
 .evolution-summary { color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: var(--sp-4); }
 .evolution-suggestions { display: flex; flex-direction: column; gap: var(--sp-2); }
 .evo-suggestion {

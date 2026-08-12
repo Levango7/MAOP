@@ -1,62 +1,68 @@
 <template>
   <div class="users-view">
-    <PageHeader>
-      <template #badges>
-        <span v-if="users.length" class="users-count">{{ users.length }}</span>
-      </template>
-      <button v-if="isAdmin" class="btn-primary" @click="openRegister">
-        <AppIcon name="plus" :size="14" /> {{ t('users.registerUser') }}
-      </button>
-    </PageHeader>
-
     <!-- 非管理员提示 -->
     <div v-if="!isAdmin" class="users-locked">
       <AppIcon name="shield" :size="32" />
       <p>{{ t('topbar.role.admin') }} {{ t('common.required') || 'required' }}</p>
     </div>
 
-    <!-- 用户列表 -->
-    <div v-else class="users-list">
-      <div v-if="loading" class="users-loading">{{ t('common.loading') }}</div>
-      <div v-else-if="!users.length" class="users-empty">{{ t('users.noUsers') }}</div>
-      <div v-else class="users-table">
-        <div class="users-row users-row--head">
-          <div class="users-cell users-cell--avatar">#</div>
-          <div class="users-cell users-cell--name">{{ t('users.username') }}</div>
-          <div class="users-cell users-cell--roles">{{ t('users.roles') }}</div>
-          <div class="users-cell users-cell--created">{{ t('users.created') }}</div>
-          <div class="users-cell users-cell--login">{{ t('users.lastLogin') }}</div>
-          <div class="users-cell users-cell--actions">{{ t('common.actions') }}</div>
+    <!-- 管理员视图 -->
+    <ListPageLayout
+      v-else
+      :loading="loading"
+      :empty="!users.length"
+      :empty-title="t('users.noUsers')"
+      :loading-lines="6"
+    >
+      <template #badges>
+        <span v-if="users.length" class="users-count">{{ users.length }}</span>
+      </template>
+      <template #actions>
+        <button class="btn-primary" @click="openRegister">
+          <AppIcon name="plus" :size="14" /> {{ t('users.registerUser') }}
+        </button>
+      </template>
+      <template #content>
+        <!-- 保留现有的 grid 表格(不支持 DataTable 自定义列渲染) -->
+        <div class="users-table">
+          <div class="users-row users-row--head">
+            <div class="users-cell users-cell--avatar">#</div>
+            <div class="users-cell users-cell--name">{{ t('users.username') }}</div>
+            <div class="users-cell users-cell--roles">{{ t('users.roles') }}</div>
+            <div class="users-cell users-cell--created">{{ t('users.created') }}</div>
+            <div class="users-cell users-cell--login">{{ t('users.lastLogin') }}</div>
+            <div class="users-cell users-cell--actions">{{ t('common.actions') }}</div>
+          </div>
+          <div v-for="u in users" :key="u.username" class="users-row">
+            <div class="users-cell users-cell--avatar">
+              <div class="users-avatar">{{ getInitial(u.username) }}</div>
+            </div>
+            <div class="users-cell users-cell--name">
+              <span class="users-uname">{{ u.username }}</span>
+              <span v-if="u.username === currentName" class="users-self">me</span>
+            </div>
+            <div class="users-cell users-cell--roles">
+              <span v-for="r in (u.roles || [])" :key="r" class="users-role" :class="'users-role--' + r">{{ r }}</span>
+            </div>
+            <div class="users-cell users-cell--created">{{ formatDate(u.created_at) }}</div>
+            <div class="users-cell users-cell--login">{{ u.last_login ? formatDate(u.last_login) : '—' }}</div>
+            <div class="users-cell users-cell--actions">
+              <button class="btn-icon" :title="t('common.edit')" @click="openEdit(u)">
+                <AppIcon name="gear" :size="14" />
+              </button>
+              <button
+                v-if="u.username !== 'admin' && u.username !== currentName"
+                class="btn-icon btn-icon--danger"
+                :title="t('users.deregisterUser')"
+                @click="confirmDelete(u)"
+              >
+                <AppIcon name="trash" :size="14" />
+              </button>
+            </div>
+          </div>
         </div>
-        <div v-for="u in users" :key="u.username" class="users-row">
-          <div class="users-cell users-cell--avatar">
-            <div class="users-avatar">{{ getInitial(u.username) }}</div>
-          </div>
-          <div class="users-cell users-cell--name">
-            <span class="users-uname">{{ u.username }}</span>
-            <span v-if="u.username === currentName" class="users-self">me</span>
-          </div>
-          <div class="users-cell users-cell--roles">
-            <span v-for="r in (u.roles || [])" :key="r" class="users-role" :class="'users-role--' + r">{{ r }}</span>
-          </div>
-          <div class="users-cell users-cell--created">{{ formatDate(u.created_at) }}</div>
-          <div class="users-cell users-cell--login">{{ u.last_login ? formatDate(u.last_login) : '—' }}</div>
-          <div class="users-cell users-cell--actions">
-            <button class="btn-icon" :title="t('common.edit')" @click="openEdit(u)">
-              <AppIcon name="gear" :size="14" />
-            </button>
-            <button
-              v-if="u.username !== 'admin' && u.username !== currentName"
-              class="btn-icon btn-icon--danger"
-              :title="t('users.deregisterUser')"
-              @click="confirmDelete(u)"
-            >
-              <AppIcon name="trash" :size="14" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+      </template>
+    </ListPageLayout>
 
     <!-- 注册/编辑 弹窗 -->
     <div v-if="dialogOpen" v-modal-a11y class="users-dialog-overlay" @click.self="closeDialog" @modal:escape="closeDialog">
@@ -99,7 +105,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import PageHeader from '../components/PageHeader.vue';
+import ListPageLayout from '../components/ListPageLayout.vue';
 import AppIcon from '../components/AppIcon.vue';
 import { useI18n } from '../i18n/index.js';
 import { useApiStore } from '../stores/api.js';
@@ -250,13 +256,6 @@ onMounted(fetchUsers);
 .users-locked {
   display: flex; flex-direction: column; align-items: center; gap: 12px;
   padding: 60px 20px; color: var(--text-faint); text-align: center;
-}
-
-.users-list { margin-top: var(--sp-4); }
-
-.users-loading, .users-empty {
-  padding: 40px; text-align: center; color: var(--text-muted);
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
 }
 
 .users-table {
