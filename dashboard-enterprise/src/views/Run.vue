@@ -67,7 +67,16 @@ watch(
 </script>
 
 <style scoped>
-.run-view { display: block; }
+/* 壳必须是 flex 列 + 撑满高度, 否则内嵌的 .chat-page(flex:1 + height:0)
+ * 高度链断掉, 聊天区会收缩成左上角一小块(2026-08-12 修复) */
+.run-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+/* 子视图在壳内同样撑满 */
+.run-view > * { flex: 1; min-height: 0; }
 /* Segmented 内嵌进 PageHeader 操作区,不额外占行 */
 .run-tabs { margin-left: auto; }
 </style>
