@@ -315,7 +315,7 @@ onUnmounted(() => {
 /* ── Sidebar ─────────────────────────────────────────────────────── */
 .sidebar {
   width: var(--sidebar-w);
-  background: var(--surface);
+  background: var(--bg2);
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -434,6 +434,11 @@ onUnmounted(() => {
 .app-layout.rail .nav-section { display: none; }
 .app-layout.rail .nav-link { justify-content: center; padding: 10px 0; gap: 0; }
 .app-layout.rail .sidebar-head { justify-content: center; padding: 0; }
+
+/* 层级分离: 顶栏与内容同明度(--surface), 侧栏下沉到 --bg2,
+   形成 "侧栏(最暗) < 卡片/顶栏(中) < hover(最亮)" 的视觉阶梯。
+   顶栏下沿与侧栏右缘的分界线让两个区域在第一眼就分开。 */
+.content > .topbar { border-bottom: 1px solid var(--border-strong); }
 
 /* ── Content (scroll area) ─────────────────────────────────────── */
 .content { flex: 1; overflow-y: auto; min-width: 0; position: relative; z-index: 1; display: flex; flex-direction: column; }
