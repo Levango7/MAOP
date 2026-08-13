@@ -363,6 +363,11 @@ from maop.dashboard.routers import hook as hook_router
 
 app.include_router(hook_router.router)
 
+# 任务199: Hook 可视化配置 CRUD API（/api/hooks 复数路径，与 /api/hook/* 互补）
+from maop.dashboard.routers import hooks as hooks_router
+
+app.include_router(hooks_router.router)
+
 from maop.dashboard.routers import stream as stream_router
 
 app.include_router(stream_router.router)
@@ -434,6 +439,23 @@ app.include_router(evolution_router.router)
 from maop.dashboard.routers import observability as observability_router
 
 app.include_router(observability_router.router)
+
+# F1-02 (异常自适应调度): scheduling failure-detector stats endpoint
+# (GET /api/scheduling/failure-stats + POST .../reset). Mounted
+# unconditionally — the detector is process-wide and available in both
+# personal and enterprise editions.
+try:
+    from maop.dashboard.routers import scheduling as scheduling_router
+
+    app.include_router(scheduling_router.router)
+    logger.info("[server] Router: scheduling enabled")
+except ImportError as _e:
+    logger.warning("[server] Router MISSING: scheduling (import error: %s)", _e)
+
+# t194 (2026-08-14): LLM 智能任务拆分 — 自然语言 → 子任务 DAG。
+from maop.dashboard.routers import dag as dag_router
+
+app.include_router(dag_router.router)
 
 # ── A2A protocol endpoint (JSON-RPC /a2a) ─────────────────────────
 # F6b (2026-07-22, Phase F): mount the A2A protocol so external agents
@@ -592,6 +614,17 @@ try:
     logger.info("[server] Router: notifications enabled (edition=%s)", get_edition().value)
 except ImportError as _e:
     logger.warning("[server] Router MISSING: notifications (import error: %s)", _e)
+
+# ── Config history & rollback router ────────────────────────────────
+# Provides /api/config/history + /api/config/rollback/{version} so operators
+# can inspect the configuration change timeline and restore a known-good
+# snapshot. All endpoints are admin-guarded inside the router.
+try:
+    from maop.dashboard.routers import config as config_router
+    app.include_router(config_router.router)
+    logger.info("[server] Router: config-history enabled")
+except ImportError as _e:
+    logger.warning("[server] Router MISSING: config-history (import error: %s)", _e)
 
 # ── Enterprise API 404 Guard ────────────────────────────────────────
 # In personal edition, enterprise-only API paths return 404 instead of

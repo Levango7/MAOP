@@ -53,6 +53,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from maop.core.scheduling.failure_detector import (
+    FailurePatternDetector,
+    get_failure_detector,
+)
 from maop.core.scheduling.worker_pool import WorkerRegistry
 
 if TYPE_CHECKING:
@@ -232,6 +236,7 @@ class DistributedScheduler:
         poll_interval: float = 0.1,
         failure_check_interval: float = 1.0,
         max_retries: int = 2,
+        failure_detector: FailurePatternDetector | None = None,
     ) -> None:
         self._redis = redis_client
         self._registry = registry or WorkerRegistry(redis_client)
@@ -240,6 +245,13 @@ class DistributedScheduler:
         self._poll_interval = max(0.01, float(poll_interval))
         self._failure_check_interval = max(0.1, float(failure_check_interval))
         self._max_retries = max(0, int(max_retries))
+        # F1-02 (异常自适应调度): failure-pattern detector. When the caller
+        # does not supply one, the process-wide singleton is used so
+        # weight adjustments survive across scheduler instances and are
+        # visible to the /api/scheduling/failure-stats endpoint.
+        self._failure_detector: FailurePatternDetector = (
+            failure_detector or get_failure_detector()
+        )
         # Ensure the consumer group exists for the task stream.
         self._ensure_task_group()
 
@@ -258,6 +270,58 @@ class DistributedScheduler:
 
     def _results_stream(self, run_id: str) -> str:
         return f"{self._results_prefix}:{run_id}"
+
+    # ── Worker selection (F1-02 异常自适应调度) ────────────────────
+
+    def _select_worker(
+        self,
+        required: str | set[str] | None = None,
+    ) -> str | None:
+        """Pick the best worker for the next dispatch.
+
+        Combines the registry's capability filter with the
+        :class:`FailurePatternDetector` weights:
+
+        1. Ask the registry for capable workers (affinity match).
+        2. Multiply each candidate's effective score by its
+           failure-detector weight (1.0 normal, 0.0 drained, 0.3/0.6
+           grey-recovery). Workers with weight 0 are dropped entirely.
+        3. Return the highest-scoring worker id. When all capable
+           workers are drained, fall back to the first capable worker
+           rather than failing the dispatch — the detector will keep
+           recording outcomes and re-drain as needed. This preserves
+           the existing "always dispatch" behaviour when no failure
+           data is available.
+
+        Returns ``None`` only when the registry has no capable workers
+        at all (same as the pre-F1-02 behaviour).
+        """
+        capable = self._registry.capable_workers(required)
+        if not capable:
+            return None
+        # Score each candidate by its detector weight. Workers never
+        # seen by the detector default to weight 1.0 (full traffic).
+        weighted = [
+            (wid, self._failure_detector.get_weight(wid)) for wid in capable
+        ]
+        # Drop fully-drained workers (weight == 0).
+        live = [(wid, w) for wid, w in weighted if w > 0.0]
+        if not live:
+            # All capable workers are drained. Fall back to the first
+            # capable worker so the dispatch still proceeds (better to
+            # try and record another outcome than to silently stall).
+            logger.warning(
+                "[dist-sched] all %d capable workers drained — falling back to %s",
+                len(capable), capable[0],
+            )
+            return capable[0]
+        # Pick the highest-weight worker; ties broken by registry order
+        # (capable_workers returns sorted ids) for determinism.
+        best_wid, best_w = live[0]
+        for wid, w in live[1:]:
+            if w > best_w:
+                best_wid, best_w = wid, w
+        return best_wid
 
     # ── Public API ───────────────────────────────────────────────
 
@@ -450,9 +514,10 @@ class DistributedScheduler:
         node: _NodeSpec,
     ) -> str:
         """Dispatch a single node to the task stream; return stream msg id."""
-        # Affinity check: find a capable worker. If none, we still dispatch
-        # (the worker-side consumer will skip nodes it cannot run and NACK),
-        # but log a warning so operators can see the affinity mismatch.
+        # F1-02 (异常自适应调度): pick the best worker via the failure
+        # detector's weighted selection. Falls back to the legacy
+        # "any capable worker" path when no detector is wired in.
+        selected = self._select_worker(node.affinity.required)
         capable = self._registry.capable_workers(node.affinity.required)
         if not capable and node.affinity.required:
             logger.warning(
@@ -460,6 +525,10 @@ class DistributedScheduler:
                 "dispatching anyway",
                 node.id, sorted(node.affinity.required),
             )
+        if selected is not None:
+            # Track the assignment so the failure detector can later
+            # attribute the result to the right agent.
+            self._registry.assign_task(selected, node.id)
 
         payload = {
             _F_NODE_ID: node.id,
@@ -469,13 +538,17 @@ class DistributedScheduler:
             _F_AFFINITY: ",".join(sorted(node.affinity.required)),
             _F_PAYLOAD: _json_dumps(node.payload),
         }
+        # Embed the selected worker id so the result-reading path can
+        # record the outcome against the right agent in the detector.
+        if selected is not None:
+            payload[_F_WORKER_ID] = selected
         # redis-py xadd accepts str→str fields; encode via str().
         fields = {k: str(v) for k, v in payload.items()}
         msg_id = self._redis.xadd(self._task_stream, fields)
         msg_id_str = msg_id.decode() if isinstance(msg_id, bytes) else msg_id
         logger.debug(
-            "[dist-sched] dispatched node %s (layer=%d, priority=%d) → msg %s",
-            node.id, layer_idx, node.priority, msg_id_str,
+            "[dist-sched] dispatched node %s (layer=%d, priority=%d, worker=%s) → msg %s",
+            node.id, layer_idx, node.priority, selected, msg_id_str,
         )
         return msg_id_str
 
@@ -526,6 +599,26 @@ class DistributedScheduler:
                 "duration_ms": int(duration_raw or 0),
                 "_msg_id": _decode(msg_id),
             }
+            # F1-02 (异常自适应调度): feed the outcome to the failure
+            # detector so the worker's weight is updated for the next
+            # dispatch. We treat any non-success status as a failure.
+            if worker_id:
+                try:
+                    self._failure_detector.record_result(
+                        worker_id,
+                        success=(out[node_id]["status"] == "success"),
+                        latency=(int(duration_raw or 0) / 1000.0),
+                    )
+                except Exception as exc:  # noqa: BLE001 — detector must never break scheduling
+                    logger.debug(
+                        "[dist-sched] failure_detector.record_result failed: %s", exc,
+                    )
+            # Free the in-flight slot in the registry.
+            if worker_id:
+                try:
+                    self._registry.complete_task(worker_id, node_id)
+                except Exception:  # noqa: BLE001
+                    pass
         return out
 
     # ── Failure detection loop ───────────────────────────────────
@@ -594,6 +687,11 @@ class DistributedScheduler:
     @property
     def task_stream(self) -> str:
         return self._task_stream
+
+    @property
+    def failure_detector(self) -> FailurePatternDetector:
+        """Return the wired :class:`FailurePatternDetector` (F1-02)."""
+        return self._failure_detector
 
     def __repr__(self) -> str:
         return (

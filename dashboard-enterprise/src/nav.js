@@ -20,6 +20,10 @@ export const nav = [
   { to: '/run', label: 'nav.run', icon: 'play', subtitle: 'nav.run.subtitle' },
   { to: '/agents', label: 'nav.agents', icon: 'bot', subtitle: 'nav.agents.subtitle' },
   { to: '/evolve', label: 'nav.evolve', icon: 'sparkles', subtitle: 'nav.evolve.subtitle', matchPaths: ['/evolution-history'] },
+  // v5.1.0: Workflow orchestration + Skill composer/market
+  { to: '/workflow-editor', label: 'nav.workflowEditor', icon: 'route', subtitle: 'nav.workflowEditor.subtitle' },
+  { to: '/skill-editor', label: 'nav.skillEditor', icon: 'beaker', subtitle: 'nav.skillEditor.subtitle' },
+  { to: '/skill-market', label: 'nav.skillMarket', icon: 'archive', subtitle: 'nav.skillMarket.subtitle' },
 
   { section: 'nav.assets' },
   { to: '/memory', label: 'nav.memory', icon: 'brain', subtitle: 'nav.memory.subtitle' },

@@ -80,6 +80,74 @@
         </div>
       </Card>
 
+      <!-- F1-02: Agent 健康度面板（异常自适应调度） -->
+      <Card title="Agent 健康度" icon="heart-pulse" class="mt">
+        <template #actions>
+          <button
+            class="agent-health-refresh"
+            :disabled="agentHealthLoading"
+            @click="loadAgentHealth"
+          >刷新</button>
+        </template>
+        <div v-if="agentHealthLoading && !agentHealth.length" class="resource-skel">
+          <Skeleton v-for="n in 3" :key="n" height="22px" />
+        </div>
+        <div v-else-if="!agentHealth.length" class="agent-health-empty">
+          <AppIcon name="heart-pulse" :size="16" />
+          <span>暂无 Agent 健康度数据（运行一次分布式任务后会出现）</span>
+        </div>
+        <div v-else class="agent-health-list">
+          <div class="agent-health-row agent-health-header">
+            <span class="ah-name">Agent</span>
+            <span class="ah-failure">失败率</span>
+            <span class="ah-latency">平均耗时</span>
+            <span class="ah-timeout">超时率</span>
+            <span class="ah-weight">权重</span>
+            <span class="ah-status">状态</span>
+          </div>
+          <div
+            v-for="a in agentHealth"
+            :key="a.agent_id"
+            class="agent-health-row"
+            :class="`row-${a.status}`"
+          >
+            <span class="ah-name" :title="a.agent_id">{{ a.agent_id }}</span>
+            <span class="ah-failure">
+              <div class="mini-bar">
+                <div
+                  class="mini-fill"
+                  :style="{ width: (a.failure_rate * 100) + '%', background: a.failure_rate > 0.3 ? 'var(--fail)' : a.failure_rate > 0.1 ? 'var(--warn)' : 'var(--success)' }"
+                ></div>
+              </div>
+              <span class="mini-val">{{ (a.failure_rate * 100).toFixed(1) }}%</span>
+            </span>
+            <span class="ah-latency">{{ a.avg_latency.toFixed(2) }}s</span>
+            <span class="ah-timeout">{{ (a.timeout_rate * 100).toFixed(1) }}%</span>
+            <span class="ah-weight">
+              <div class="mini-bar">
+                <div
+                  class="mini-fill"
+                  :style="{ width: (a.weight * 100) + '%', background: a.weight === 0 ? 'var(--fail)' : a.weight < 1 ? 'var(--warn)' : 'var(--success)' }"
+                ></div>
+              </div>
+              <span class="mini-val">{{ a.weight.toFixed(2) }}</span>
+            </span>
+            <span class="ah-status">
+              <span class="status-pill" :class="`pill-${a.status}`">
+                <span class="pill-dot"></span>
+                {{ statusLabel(a.status) }}
+              </span>
+            </span>
+          </div>
+          <div v-if="agentHealthConfig" class="agent-health-config">
+            <span>窗口: {{ agentHealthConfig.window_size }}</span>
+            <span>摘流阈值: {{ (agentHealthConfig.failure_rate_threshold * 100).toFixed(0) }}%</span>
+            <span>超时阈值: {{ agentHealthConfig.timeout_threshold }}s</span>
+            <span>恢复连续成功: {{ agentHealthConfig.recovery_consecutive_successes }}</span>
+          </div>
+        </div>
+      </Card>
+
       <!-- v4.5.0: DAG execution progress streaming -->
       <Card title="DAG Execution Progress" icon="network" class="mt">
         <template #actions>
@@ -166,6 +234,7 @@ const dagEdges = ref([]);
 const sseEvents = ref([]);
 let sseEventCounter = 0;
 const statsError = ref('');
+let agentHealthTimer = null;
 
 // api.get throws a plain Error whose message is "API <url>: <status>".
 // Detect 403 (admin role required) from either a .status field or the message.
@@ -216,6 +285,34 @@ const resourcesLoading = ref(true);
 
 const diagnostics = ref([]);
 const diagnosticsLoading = ref(true);
+
+// F1-02 (异常自适应调度): Agent 健康度面板状态
+const agentHealth = ref([]);
+const agentHealthConfig = ref(null);
+const agentHealthLoading = ref(false);
+
+function statusLabel(status) {
+  if (status === 'normal') return '正常';
+  if (status === 'drained') return '摘流';
+  if (status === 'recovering') return '灰度';
+  return status;
+}
+
+async function loadAgentHealth() {
+  agentHealthLoading.value = true;
+  try {
+    const data = await api.get('/api/scheduling/failure-stats');
+    if (data && !data.error) {
+      agentHealth.value = Array.isArray(data.agents) ? data.agents : [];
+      agentHealthConfig.value = data.config || null;
+    }
+  } catch (e) {
+    // 静默失败 — 健康度面板是辅助信息，不应弹错
+    console.warn('[monitor] agent health fetch failed:', e && e.message);
+  } finally {
+    agentHealthLoading.value = false;
+  }
+}
 
 // Set when a required endpoint returns 403 (admin role needed). Surfaced as a
 // clear "admin access required" state instead of a silent empty panel.
@@ -354,8 +451,14 @@ onMounted(() => {
   pollData();
   pollTimer = setInterval(pollData, 10000);
   loadSystemStats();
+  // F1-02: Agent 健康度面板 — 5s 轮询（轻量 GET，且权重变化需要近实时反映）
+  loadAgentHealth();
+  agentHealthTimer = setInterval(loadAgentHealth, 5000);
 });
-onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer);
+  if (agentHealthTimer) clearInterval(agentHealthTimer);
+});
 </script>
 
 <style scoped>
@@ -380,5 +483,139 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .dag-exec-input:focus {
   border-color: var(--brand, #3574f0);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+/* F1-02: Agent 健康度面板 */
+.agent-health-refresh {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--border, rgba(148,163,184,.35));
+  border-radius: 4px;
+  background: var(--bg-card, #fff);
+  color: var(--text, #e8eaf0);
+  cursor: pointer;
+}
+.agent-health-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.agent-health-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--text-faint, #94a3b8);
+  font-size: 12px;
+}
+.agent-health-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-size: 12px;
+}
+.agent-health-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1.6fr 0.9fr 0.8fr 1.6fr 0.9fr;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border-light, rgba(148,163,184,.12));
+}
+.agent-health-row:last-child {
+  border-bottom: none;
+}
+.agent-health-header {
+  font-weight: 600;
+  color: var(--text-faint, #94a3b8);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border, rgba(148,163,184,.25));
+}
+.row-drained .ah-name {
+  color: var(--fail, #ef4444);
+}
+.row-recovering .ah-name {
+  color: var(--warn, #f59e0b);
+}
+.ah-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ah-failure, .ah-weight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mini-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-elev, rgba(148,163,184,.15));
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mini-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.mini-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  min-width: 42px;
+  text-align: right;
+}
+.ah-latency, .ah-timeout {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.pill-normal {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--success, #22c55e);
+}
+.pill-normal .pill-dot {
+  background: var(--success, #22c55e);
+}
+.pill-drained {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--fail, #ef4444);
+}
+.pill-drained .pill-dot {
+  background: var(--fail, #ef4444);
+}
+.pill-recovering {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--warn, #f59e0b);
+}
+.pill-recovering .pill-dot {
+  background: var(--warn, #f59e0b);
+}
+.agent-health-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 4px 4px;
+  margin-top: 6px;
+  border-top: 1px dashed var(--border-light, rgba(148,163,184,.18));
+  font-size: 11px;
+  color: var(--text-faint, #94a3b8);
+  font-family: var(--font-mono);
 }
 </style>

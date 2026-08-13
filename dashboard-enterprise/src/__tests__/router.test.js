@@ -14,6 +14,8 @@ describe('Router', () => {
       'knowledge-graph',  // v4.5.0: knowledge graph visualization
       // v4.6.0: 企业版新功能 + 通知中心
       'licenses', 'sso', 'quotas', 'apikeys', 'notifications',
+      // v5.1.0: Workflow editor / Skill editor / Skill market
+      'workflow-editor', 'skill-editor', 'skill-market',
     ];
     for (const name of expected) {
       expect(names).toContain(name);
@@ -25,10 +27,11 @@ describe('Router', () => {
     expect(route?.path).toBe('/');
   });
 
-  it('has 29 route records total', () => {
-    // 拓扑: 25 个命名业务路由 (含 v4.6.0 新增 licenses/sso/quotas/apikeys/notifications)
+  it('has 32 route records total', () => {
+    // 拓扑: 28 个命名业务路由 (含 v4.6.0 新增 licenses/sso/quotas/apikeys/notifications
+    // + v5.1.0 新增 workflow-editor/config-history/skill-editor/skill-market/failure-detector/hook-config)
     // + 3 个匿名重定向(/control /chat /evolution-history) + 1 个 /:pathMatch(.*)* 兜底
-    expect(router.getRoutes().length).toBe(29);
+    expect(router.getRoutes().length).toBe(32);
   });
 
   it('legacy routes declare redirects to merged pages', () => {

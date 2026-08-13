@@ -35,6 +35,10 @@ const routes = [
   { path: '/docs', name: 'docs', component: () => import('../views/Docs.vue') },
   // v4.5.0: Knowledge graph visualization (general-availability, no enterprise guard)
   { path: '/knowledge-graph', name: 'knowledge-graph', component: () => import('../views/KnowledgeGraph.vue') },
+  // v5.1.0: Workflow editor / Skill editor / Skill market (general-availability)
+  { path: '/workflow-editor', name: 'workflow-editor', component: () => import('../views/WorkflowEditor.vue') },
+  { path: '/skill-editor', name: 'skill-editor', component: () => import('../views/SkillEditor.vue') },
+  { path: '/skill-market', name: 'skill-market', component: () => import('../views/SkillMarket.vue') },
   // P2-10 fix: catch-all 404 route — redirect unknown paths to overview
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ];

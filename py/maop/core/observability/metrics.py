@@ -53,6 +53,16 @@ M_ERRORS_TOTAL = "maop_errors_total"
 M_ACTIVE_SPANS = "maop_active_spans"
 M_TRACE_EXPORT_TOTAL = "maop_trace_export_total"
 
+# F1-02 (异常自适应调度): per-agent failure-detector gauges. The
+# FailurePatternDetector registers these against the global collector
+# lazily on first record_result() call; declaring the names here keeps
+# them discoverable from a single module and exported in metrics_summary.
+M_AGENT_FAILURE_RATE = "maop_agent_failure_rate"
+M_AGENT_WEIGHT = "maop_agent_weight"
+M_AGENT_STATUS = "maop_agent_status"
+M_AGENT_TIMEOUT_RATE = "maop_agent_timeout_rate"
+M_AGENT_AVG_LATENCY = "maop_agent_avg_latency_seconds"
+
 # Standard Prometheus histogram buckets for HTTP latency (seconds).
 _HTTP_BUCKETS = (
     0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, float("inf"),
@@ -277,7 +287,12 @@ def metrics_summary() -> dict[str, Any]:
 
 __all__ = [
     "M_ACTIVE_SPANS",
+    "M_AGENT_AVG_LATENCY",
     "M_AGENT_EXECUTION",
+    "M_AGENT_FAILURE_RATE",
+    "M_AGENT_STATUS",
+    "M_AGENT_TIMEOUT_RATE",
+    "M_AGENT_WEIGHT",
     "M_ERRORS_TOTAL",
     "M_REQUESTS_TOTAL",
     "M_REQUEST_DURATION",
