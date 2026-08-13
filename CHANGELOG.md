@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [5.0.2] — 2026-08-13
+
+### Added
+
+- 前端设计规范文档 `docs/frontend-style-guide.md`（10 章节，沉淀迭代 A-C 组件契约）
+- RFC-001 迭代 C 补全：DetailDrawer 迁移（Agents.vue memoryPanel + evolutionPanel）
+- Users.vue 升级到 ListPageLayout（三态交给组件）
+
+### Changed
+
+- 布局重构：flex 并排 → 层叠覆盖（顶栏全宽 fixed + 侧栏全高 fixed 覆盖顶-左侧）
+- 折叠时侧栏变窄，顶栏左侧品牌区自然露出，顶栏零抖动
+- z-index 层级：顶栏 10 < 侧栏 20 < 移动端 drawer 30 < 遮罩 80 < modal 90 < toast 100
+
+### Fixed
+
+- ESLint warnings 51→0（48 no-unused-vars + 3 vue/no-template-shadow）
+
 ## [5.0.1] — 2026-08-13
 
 ### Fixed
