@@ -77,10 +77,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return cast(Response, await call_next(request))
 
         auth_manager = getattr(request.app.state, "auth_manager", None)
+        # New structured ApiKeyManager (scopes / IP allow-list / rate limit / usage)
+        api_key_mgr = getattr(request.app.state, "api_key_manager", None)
 
-        # Check API Key header
+        # Check API Key header — prefer the new ApiKeyManager when available.
         api_key = request.headers.get(self.api_key_header, "")
         if api_key:
+            # New manager path: structured validation + usage recording.
+            if api_key_mgr is not None and hasattr(api_key_mgr, "validate_key"):
+                resp = await self._authenticate_with_api_key_manager(
+                    api_key_mgr, api_key, request, call_next
+                )
+                if resp is not None:
+                    return resp
+                # validate_key returned a non-None sentinel? fall through to legacy.
             try:
                 auth_checker = getattr(request.app.state, "api_key_auth", None)
                 if auth_checker is not None and hasattr(auth_checker, "validate"):
@@ -104,7 +114,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 logger.warning("Auth check failed: %s", e)
                 return JSONResponse(status_code=500, content={"error": "Auth check failed"})
 
-        # Check Authorization header (Bearer JWT)
+        # Check Authorization header (Bearer JWT or Bearer maop_{key_id}_{secret})
         auth_header = request.headers.get(self.auth_header, "")
         # #4 fix: fallback to httpOnly cookie if no Authorization header
         if not auth_header.startswith("Bearer ") and "maop_token" in request.cookies:
@@ -112,6 +122,19 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if auth_header.startswith("Bearer "):
             try:
                 token = auth_header[7:]
+                # If the bearer token looks like a structured API key
+                # (maop_{key_id}_{secret}), validate via ApiKeyManager.
+                if (
+                    token.startswith("maop_")
+                    and api_key_mgr is not None
+                    and hasattr(api_key_mgr, "validate_key")
+                ):
+                    resp = await self._authenticate_with_api_key_manager(
+                        api_key_mgr, token, request, call_next
+                    )
+                    if resp is not None:
+                        return resp
+
                 jwt_checker = getattr(request.app.state, "jwt_auth", None)
                 if jwt_checker is not None and hasattr(jwt_checker, "validate_token"):
                     result = jwt_checker.validate_token(token)
@@ -137,6 +160,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             getattr(request.app.state, "api_key_auth", None) is not None
             or getattr(request.app.state, "jwt_auth", None) is not None
             or getattr(request.app.state, "auth_manager", None) is not None
+            or api_key_mgr is not None
         )
         if has_auth:
             return JSONResponse(
@@ -146,6 +170,60 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # No auth configured = pass through
         return cast(Response, await call_next(request))
+
+    async def _authenticate_with_api_key_manager(
+        self,
+        mgr: Any,
+        plaintext: str,
+        request: Request,
+        call_next: Callable,
+    ) -> Response | None:
+        """Validate ``plaintext`` via the new ApiKeyManager and dispatch.
+
+        On success, injects ``auth_identity`` / ``auth_roles`` / ``auth_key_id``
+        / ``auth_scopes`` onto ``request.state`` and records usage after the
+        downstream handler completes. Returns ``None`` to signal "not handled
+        here, fall through to legacy path" — currently never used but kept
+        for future extensibility.
+        """
+        client_ip = request.client.host if request.client else ""
+        # Trust-proxy awareness for real client IP.
+        import os
+        if os.environ.get("MAOP_TRUST_PROXY", "0") == "1":
+            xff = request.headers.get("x-forwarded-for", "")
+            if xff:
+                client_ip = xff.split(",")[0].strip()
+
+        result = mgr.validate_key(plaintext, client_ip=client_ip)
+        if not result.valid:
+            status = 429 if result.rate_limit_exceeded else 401
+            return JSONResponse(
+                status_code=status,
+                content={"error": "Invalid API key", "detail": result.error},
+            )
+
+        # Inject auth state.
+        request.state.auth_identity = result.name or result.key_id
+        request.state.auth_roles = result.roles
+        request.state.auth_key_id = result.key_id
+        request.state.auth_scopes = result.scopes
+
+        # Dispatch and record usage after completion.
+        start = time.monotonic()
+        response = cast(Response, await call_next(request))
+        latency_ms = (time.monotonic() - start) * 1000.0
+        try:
+            mgr.record_usage(
+                result.key_id,
+                endpoint=request.url.path,
+                method=request.method,
+                ip_address=client_ip,
+                status_code=getattr(response, "status_code", 0),
+                latency_ms=latency_ms,
+            )
+        except Exception as exc:  # pragma: no cover — usage recording is best-effort
+            logger.debug("[auth] usage recording failed: %s", exc)
+        return response
 
 
 # ── Rate Limit Middleware ─────────────────────────────────────────

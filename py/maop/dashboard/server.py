@@ -170,6 +170,12 @@ async def lifespan(app: FastAPI) -> Any:
     global _ws_push_task
     if _auth_mod._auth_enabled:
         app.state.auth_manager = _auth_mod.get_auth_mgr()
+        # Structured API Key manager (scopes / IP allow-list / rate limit / usage).
+        try:
+            from maop.core.security.api_key_manager import get_api_key_manager
+            app.state.api_key_manager = get_api_key_manager()
+        except Exception as _exc:
+            logger.warning("[lifespan] ApiKeyManager init failed: %s", _exc)
 
     # ── Background tasks gate (multi-worker safe) ──────────────
     # Each uvicorn worker runs its own lifespan; without a gate the backup
@@ -275,6 +281,18 @@ _rl_enabled = os.environ.get("MAOP_RATE_LIMIT", os.environ.get("MAOP_RATE_LIMIT_
 _rl_rate = float(os.environ.get("MAOP_RATE_LIMIT_RPS", "30"))
 _rl_burst = int(os.environ.get("MAOP_RATE_LIMIT_BURST", "60"))
 app.add_middleware(RateLimitMiddleware, rate=_rl_rate, burst=_rl_burst, enabled=_rl_enabled)
+# ── Quota Middleware (Enterprise only, lazy-loaded) ───────────────
+# 注册顺序: 在 Auth 之前注册,使执行顺序为 CSP → Auth → Quota → RateLimit → CORS.
+# 这样 Auth 先注入 request.state.tenant_id,Quota 才能拿到租户上下文.
+# 中间件内部通过 has_feature(FeatureFlag.TENANT_ISOLATION) 守卫,Personal 版 no-op.
+# quota_manager=None 触发惰性加载(首次请求时从 routers.quotas 获取单例).
+try:
+    from maop.enterprise.quota_middleware import QuotaMiddleware
+    _quota_mw_enabled = os.environ.get("MAOP_QUOTA_MIDDLEWARE", "1") == "1"
+    app.add_middleware(QuotaMiddleware, quota_manager=None, enabled=_quota_mw_enabled)
+    logger.info("[server] QuotaMiddleware registered (enabled=%s)", _quota_mw_enabled)
+except ImportError as _e:
+    logger.warning("[server] QuotaMiddleware not registered (import error: %s)", _e)
 # C-P0-1 fix: production defaults to auth enabled for safety
 # 配置统一由 settings.py 的 MAOPSettings.auth_enabled 提供（支持 MAOP_AUTH_ENABLED
 # 和 MAOP_AUTH 两个 env alias），消除 server.py 直接读 os.getenv 的双真相源问题。
@@ -292,6 +310,15 @@ app.add_middleware(
         "/api/auth/status", "/api/auth/login",
         "/api/csp-report",
         "/api/stream",  # P0 fix: SSE token validated via _check_sse_token in handler
+        # SSO 公开端点（PRD 4.1）：登录跳转/回调/metadata/enabled 需在未认证下可访问
+        "/api/sso/enabled",
+        "/api/sso/oidc",  # /api/sso/oidc/{id}/login + /callback
+        "/api/sso/saml",  # /api/sso/saml/{id}/login + /acs
+        "/api/sso/providers",  # GET /providers/{id}/metadata 公开；CRUD 由 require_admin 守卫
+        "/api/v1/sso/enabled",
+        "/api/v1/sso/oidc",
+        "/api/v1/sso/saml",
+        "/api/v1/sso/providers",
     ],
 )
 # CSP & security headers (Content-Security-Policy, X-Frame-Options, etc.)
@@ -317,6 +344,14 @@ app.include_router(evolve.router)
 app.include_router(memory.router)
 app.include_router(system.router)
 app.include_router(_auth_mod.router)
+
+# API Key management router (structured keys with scopes, IP allow-list, rate limit, usage stats).
+try:
+    from maop.dashboard.routers import api_keys as _api_keys_router
+    app.include_router(_api_keys_router.router)
+    logger.info("[server] Router: api-keys enabled")
+except ImportError as _e:
+    logger.warning("[server] Router MISSING: api_keys (import error: %s)", _e)
 
 from maop.dashboard.routers import protocol, subagent, worktree
 
@@ -496,6 +531,18 @@ if has_feature(FeatureFlag.MULTI_USER):
             "add routers/sso.py to fix this.",
             _e,
         )
+    try:
+        # Multi-tenant resource quotas router — bridges QuotaManager to
+        # frontend. Implements PRD docs/prd-tenant-quota.md.
+        from maop.dashboard.routers import quotas as quotas_router
+        app.include_router(quotas_router.router)
+        logger.info("[server] Enterprise router: quotas enabled")
+    except ImportError as _e:
+        logger.warning(
+            "[server] Enterprise router MISSING: quotas (import error: %s). "
+            "ENTERPRISE mode will return 404 on /api/quotas/*.",
+            _e,
+        )
 
 # ── n8n integration router (Enterprise only, gated by FeatureFlag.N8N_INTEGRATION) ──
 has_n8n_router: bool = False
@@ -511,6 +558,41 @@ if has_feature(FeatureFlag.N8N_INTEGRATION):
             _e,
         )
 
+# ── License management router (Enterprise only, gated by FeatureFlag.LICENSE_MANAGEMENT) ──
+# Implements PRD docs/prd-license-management.md: CRUD + lifecycle (validate,
+# revoke, renew) + audit log for issued MAOP Enterprise licenses.
+has_licenses_router: bool = False
+if has_feature(FeatureFlag.LICENSE_MANAGEMENT):
+    try:
+        from maop.dashboard.routers import licenses as licenses_router
+        app.include_router(licenses_router.router)
+        has_licenses_router = True
+        logger.info("[server] Enterprise router: licenses enabled")
+    except ImportError as _e:
+        logger.warning(
+            "[server] Enterprise router MISSING: licenses (import error: %s).",
+            _e,
+        )
+
+# ── Notification Center router (available in both editions) ──
+# Implements PRD docs/prd-notification-center.md: channels (Email/Webhook/InApp),
+# rules, templates, event bus, async delivery with retry + dead-letter queue,
+# and WebSocket real-time push at /api/notifications/ws.
+has_notifications_router: bool = False
+try:
+    from maop.dashboard.routers import notifications as notifications_router
+    app.include_router(notifications_router.router)
+    has_notifications_router = True
+    # Wire the notification manager's broadcaster to the router's WS pool
+    # so InApp notifications are pushed to connected clients in real time.
+    try:
+        notifications_router.wire_broadcaster()
+    except Exception as _notif_wire_exc:
+        logger.warning("[server] Notification broadcaster wire failed: %s", _notif_wire_exc)
+    logger.info("[server] Router: notifications enabled (edition=%s)", get_edition().value)
+except ImportError as _e:
+    logger.warning("[server] Router MISSING: notifications (import error: %s)", _e)
+
 # ── Enterprise API 404 Guard ────────────────────────────────────────
 # In personal edition, enterprise-only API paths return 404 instead of
 # leaking route existence or causing confusing 500 errors.
@@ -519,6 +601,8 @@ _ENTERPRISE_API_PREFIXES = (
     "/api/sso",
     "/api/rbac",
     "/api/n8n",
+    "/api/licenses",
+    "/api/quotas",
 )
 # OPS-7 fix: a version-prefixed path such as /api/v1/tenant/... previously
 # bypassed the guard because it does not start with "/api/tenant". Normalize

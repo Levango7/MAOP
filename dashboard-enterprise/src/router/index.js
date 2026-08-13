@@ -23,7 +23,14 @@ const routes = [
   { path: '/audit', name: 'audit', component: () => import('../views/Audit.vue'), meta: { requiresEnterprise: true } },
   { path: '/rbac', name: 'rbac', component: () => import('../views/RBAC.vue'), meta: { requiresEnterprise: true } },
   { path: '/tenants', name: 'tenants', component: () => import('../views/Tenants.vue'), meta: { requiresEnterprise: true } },
+  // v4.6.0 企业版新功能路由（懒加载 + requiresEnterprise 守卫，personal 版重定向到 '/'）
+  { path: '/licenses', name: 'licenses', component: () => import('../views/Licenses.vue'), meta: { requiresEnterprise: true } },
+  { path: '/sso', name: 'sso', component: () => import('../views/SsoProviders.vue'), meta: { requiresEnterprise: true } },
+  { path: '/quotas', name: 'quotas', component: () => import('../views/Quotas.vue'), meta: { requiresEnterprise: true } },
+  { path: '/apikeys', name: 'apikeys', component: () => import('../views/ApiKeys.vue'), meta: { requiresEnterprise: true } },
   { path: '/settings', name: 'settings', component: () => import('../views/Settings.vue') },
+  // v4.6.0 通知中心（通用功能，不限定企业版）
+  { path: '/notifications', name: 'notifications', component: () => import('../views/Notifications.vue') },
   { path: '/users', name: 'users', component: () => import('../views/Users.vue') },
   { path: '/docs', name: 'docs', component: () => import('../views/Docs.vue') },
   // v4.5.0: Knowledge graph visualization (general-availability, no enterprise guard)

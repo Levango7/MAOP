@@ -53,6 +53,12 @@ export const coreMessages = {
     'nav.audit': 'Audit',
     'nav.rbac': 'RBAC',
     'nav.tenants': 'Tenants',
+    // v4.6.0 企业版新功能导航标签
+    'nav.licenses': 'Licenses',
+    'nav.sso': 'SSO',
+    'nav.quotas': 'Quotas',
+    'nav.apikeys': 'API Keys',
+    'nav.notifications': 'Notifications',
     'nav.settings': 'Settings',
     // ── Page subtitles (one-line description under each page title) ──
     'nav.overview.subtitle': 'Platform-wide metrics and health at a glance',
@@ -77,6 +83,12 @@ export const coreMessages = {
     'nav.audit.subtitle': 'Security and compliance event trail',
     'nav.rbac.subtitle': 'Roles, permissions and access control',
     'nav.tenants.subtitle': 'Multi-tenant isolation and quotas',
+    // v4.6.0 企业版新功能页面副标题
+    'nav.licenses.subtitle': 'License issuance, activation and compliance',
+    'nav.sso.subtitle': 'Single sign-on providers and federation',
+    'nav.quotas.subtitle': 'Resource quotas and usage limits',
+    'nav.apikeys.subtitle': 'API key creation, rotation and access scoping',
+    'nav.notifications.subtitle': 'Platform alerts and notification center',
     'nav.settings.subtitle': 'Appearance, edition and backend configuration',
     'nav.help': 'Help',
     'nav.docs': 'Documentation',
@@ -276,6 +288,12 @@ export const coreMessages = {
     'nav.audit': '审计',
     'nav.rbac': '权限',
     'nav.tenants': '租户',
+    // v4.6.0 企业版新功能导航标签
+    'nav.licenses': '许可证',
+    'nav.sso': '单点登录',
+    'nav.quotas': '资源配额',
+    'nav.apikeys': 'API 密钥',
+    'nav.notifications': '通知中心',
     'nav.settings': '设置',
     // ── 页面副标题（页面标题下方的一行说明） ──
     'nav.overview.subtitle': '平台整体指标与健康状态一览',
@@ -300,6 +318,12 @@ export const coreMessages = {
     'nav.audit.subtitle': '安全与合规事件审计',
     'nav.rbac.subtitle': '角色、权限与访问控制',
     'nav.tenants.subtitle': '多租户隔离与配额',
+    // v4.6.0 企业版新功能页面副标题
+    'nav.licenses.subtitle': '许可证发放、激活与合规',
+    'nav.sso.subtitle': '单点登录提供商与联邦配置',
+    'nav.quotas.subtitle': '资源配额与用量限制',
+    'nav.apikeys.subtitle': 'API 密钥创建、轮换与访问范围',
+    'nav.notifications.subtitle': '平台告警与通知中心',
     'nav.settings.subtitle': '外观、版本与后端配置',
     'nav.help': '帮助',
     'nav.docs': '文档',

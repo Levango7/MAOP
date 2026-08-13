@@ -223,6 +223,25 @@ class PgAuditStore:
         self._backend.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_events(actor)")
         self._backend.execute("CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_events(tenant_id)")
         self._backend.execute("CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_events(action)")
+        # ── Audit enhancement: add risk_level / category / tags columns ──
+        # Use try/except around ALTER TABLE ADD COLUMN since the column may
+        # already exist on upgraded schemas; the duplicate-column error is
+        # safe to swallow.
+        for col_def in (
+            "risk_level TEXT DEFAULT 'low'",
+            "category TEXT DEFAULT ''",
+            "tags JSONB DEFAULT '[]'",
+        ):
+            try:
+                self._backend.execute(f"ALTER TABLE audit_events ADD COLUMN {col_def}")
+            except Exception:
+                pass
+        self._backend.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_risk_level ON audit_events(risk_level)"
+        )
+        self._backend.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_category ON audit_events(category)"
+        )
 
     @property
     def available(self) -> bool:
@@ -232,13 +251,18 @@ class PgAuditStore:
         if not self._backend:
             return
         meta = json.dumps(event.get("metadata", {}))
+        tags = json.dumps(event.get("tags", []))
         self._backend.execute(
-            """INSERT INTO audit_events (event_id, timestamp, action, severity, actor, tenant_id, resource, detail, result, ip_address, user_agent, metadata)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            """INSERT INTO audit_events
+                  (event_id, timestamp, action, severity, actor, tenant_id,
+                   resource, detail, result, ip_address, user_agent, metadata,
+                   risk_level, category, tags)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (event.get("event_id", ""), event.get("timestamp", 0), event.get("action", ""),
              event.get("severity", "info"), event.get("actor", ""), event.get("tenant_id", ""),
              event.get("resource", ""), event.get("detail", ""), event.get("result", "success"),
-             event.get("ip_address", ""), event.get("user_agent", ""), meta),
+             event.get("ip_address", ""), event.get("user_agent", ""), meta,
+             event.get("risk_level", "low"), event.get("category", ""), tags),
         )
 
     def query_events(
@@ -250,10 +274,14 @@ class PgAuditStore:
         severity: str = "",
         since: float = 0.0,
         limit: int = 100,
+        risk_level: str = "",
+        category: str = "",
+        resource: str = "",
+        result: str = "",
     ) -> list[dict[str, Any]]:
         if not self._backend:
             return []
-        clauses = []
+        clauses: list[str] = []
         params: list[Any] = []
         if actor:
             clauses.append("actor=%s")
@@ -267,6 +295,18 @@ class PgAuditStore:
         if severity:
             clauses.append("severity=%s")
             params.append(severity)
+        if risk_level:
+            clauses.append("risk_level=%s")
+            params.append(risk_level)
+        if category:
+            clauses.append("category=%s")
+            params.append(category)
+        if resource:
+            clauses.append("resource=%s")
+            params.append(resource)
+        if result:
+            clauses.append("result=%s")
+            params.append(result)
         if since:
             clauses.append("timestamp >= %s")
             params.append(since)
@@ -288,14 +328,408 @@ class PgAuditStore:
             params.append(tenant_id)
         where = f"WHERE {' AND '.join(clauses)}"
         rows = self._backend.fetchall(
-            f"SELECT action, severity FROM audit_events {where}",
+            f"SELECT action, severity, risk_level, category FROM audit_events {where}",
             tuple(params),
         )
         by_action: dict[str, int] = {}
+        by_risk: dict[str, int] = {}
+        by_category: dict[str, int] = {}
         critical = 0
         for r in rows:
             a = r.get("action", "")
             by_action[a] = by_action.get(a, 0) + 1
+            rl = r.get("risk_level") or "low"
+            by_risk[rl] = by_risk.get(rl, 0) + 1
+            cat = r.get("category") or "uncategorised"
+            by_category[cat] = by_category.get(cat, 0) + 1
             if r.get("severity") == "critical":
                 critical += 1
-        return {"total_events": len(rows), "by_action": by_action, "critical_count": critical, "hours": hours}
+        return {
+            "total_events": len(rows),
+            "by_action": by_action,
+            "by_risk_level": by_risk,
+            "by_category": by_category,
+            "critical_count": critical,
+            "hours": hours,
+        }
+
+
+class PgAuditAlertStore:
+    """PostgreSQL-backed persistence for audit alert rules and history.
+
+    Schema (auto-created on first use):
+
+    - ``audit_alert_rules``: alert rule definitions (condition, action, etc.)
+    - ``audit_alert_history``: triggered alert records with acknowledgement state
+
+    Falls back to no-op (``available=False``) when PostgreSQL is unavailable;
+    callers should keep an in-memory mirror so personal edition still works.
+    """
+
+    def __init__(self) -> None:
+        self._backend = _get_pg_backend()
+        self._ensure_schema()
+
+    def _ensure_schema(self) -> None:
+        if not self._backend:
+            return
+        self._backend.execute("""
+            CREATE TABLE IF NOT EXISTS audit_alert_rules (
+                rule_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                enabled INTEGER DEFAULT 1,
+                condition_type TEXT NOT NULL,
+                condition JSONB NOT NULL DEFAULT '{}',
+                action TEXT DEFAULT 'notify',
+                action_config JSONB DEFAULT '{}',
+                severity TEXT DEFAULT 'warning',
+                tenant_id TEXT DEFAULT '',
+                created_at DOUBLE PRECISION DEFAULT 0,
+                updated_at DOUBLE PRECISION DEFAULT 0,
+                created_by TEXT DEFAULT ''
+            )
+        """)
+        self._backend.execute(
+            "CREATE INDEX IF NOT EXISTS idx_alert_rules_tenant ON audit_alert_rules(tenant_id)"
+        )
+        self._backend.execute(
+            "CREATE INDEX IF NOT EXISTS idx_alert_rules_enabled ON audit_alert_rules(enabled)"
+        )
+        self._backend.execute("""
+            CREATE TABLE IF NOT EXISTS audit_alert_history (
+                alert_id TEXT PRIMARY KEY,
+                rule_id TEXT NOT NULL,
+                triggered_at DOUBLE PRECISION NOT NULL,
+                event_id TEXT DEFAULT '',
+                severity TEXT DEFAULT 'warning',
+                message TEXT DEFAULT '',
+                acknowledged INTEGER DEFAULT 0,
+                acknowledged_by TEXT DEFAULT '',
+                acknowledged_at DOUBLE PRECISION DEFAULT NULL,
+                tenant_id TEXT DEFAULT '',
+                metadata JSONB DEFAULT '{}'
+            )
+        """)
+        self._backend.execute(
+            "CREATE INDEX IF NOT EXISTS idx_alert_history_rule ON audit_alert_history(rule_id)"
+        )
+        self._backend.execute(
+            "CREATE INDEX IF NOT EXISTS idx_alert_history_ts ON audit_alert_history(triggered_at)"
+        )
+        self._backend.execute(
+            "CREATE INDEX IF NOT EXISTS idx_alert_history_ack ON audit_alert_history(acknowledged)"
+        )
+
+    @property
+    def available(self) -> bool:
+        return self._backend is not None
+
+    # ── Rule CRUD ──────────────────────────────────────────────────
+    def save_rule(self, rule: dict[str, Any]) -> None:
+        if not self._backend:
+            return
+        self._backend.execute(
+            """INSERT INTO audit_alert_rules
+                  (rule_id, name, description, enabled, condition_type, condition,
+                   action, action_config, severity, tenant_id,
+                   created_at, updated_at, created_by)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               ON CONFLICT (rule_id) DO UPDATE SET
+                   name=EXCLUDED.name, description=EXCLUDED.description,
+                   enabled=EXCLUDED.enabled, condition_type=EXCLUDED.condition_type,
+                   condition=EXCLUDED.condition, action=EXCLUDED.action,
+                   action_config=EXCLUDED.action_config, severity=EXCLUDED.severity,
+                   updated_at=EXCLUDED.updated_at""",
+            (rule["rule_id"], rule.get("name", ""), rule.get("description", ""),
+             1 if rule.get("enabled", True) else 0, rule.get("condition_type", "threshold"),
+             json.dumps(rule.get("condition", {})), rule.get("action", "notify"),
+             json.dumps(rule.get("action_config", {})), rule.get("severity", "warning"),
+             rule.get("tenant_id", ""), rule.get("created_at", 0),
+             rule.get("updated_at", 0), rule.get("created_by", "")),
+        )
+
+    def delete_rule(self, rule_id: str) -> bool:
+        if not self._backend:
+            return False
+        self._backend.execute("DELETE FROM audit_alert_rules WHERE rule_id=%s", (rule_id,))
+        return True
+
+    def load_rules(self, tenant_id: str = "", enabled_only: bool = False) -> list[dict[str, Any]]:
+        if not self._backend:
+            return []
+        clauses: list[str] = []
+        params: list[Any] = []
+        if tenant_id:
+            clauses.append("tenant_id=%s")
+            params.append(tenant_id)
+        if enabled_only:
+            clauses.append("enabled=1")
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = cast(list[dict[str, Any]], self._backend.fetchall(
+            f"SELECT * FROM audit_alert_rules {where} ORDER BY created_at DESC",
+            tuple(params),
+        ))
+        return [_coerce_rule_row(r) for r in rows]
+
+    def load_rule(self, rule_id: str) -> dict[str, Any] | None:
+        if not self._backend:
+            return None
+        row = cast(dict[str, Any] | None, self._backend.fetchone(
+            "SELECT * FROM audit_alert_rules WHERE rule_id=%s", (rule_id,),
+        ))
+        if row is None:
+            return None
+        return _coerce_rule_row(row)
+
+    # ── Alert history ──────────────────────────────────────────────
+    def save_alert(self, alert: dict[str, Any]) -> None:
+        if not self._backend:
+            return
+        self._backend.execute(
+            """INSERT INTO audit_alert_history
+                  (alert_id, rule_id, triggered_at, event_id, severity, message,
+                   acknowledged, acknowledged_by, acknowledged_at, tenant_id, metadata)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (alert["alert_id"], alert.get("rule_id", ""), alert.get("triggered_at", 0),
+             alert.get("event_id", ""), alert.get("severity", "warning"),
+             alert.get("message", ""),
+             1 if alert.get("acknowledged", False) else 0,
+             alert.get("acknowledged_by", ""), alert.get("acknowledged_at"),
+             alert.get("tenant_id", ""), json.dumps(alert.get("metadata", {}))),
+        )
+
+    def load_alerts(
+        self,
+        *,
+        rule_id: str = "",
+        tenant_id: str = "",
+        acknowledged: bool | None = None,
+        since: float = 0.0,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        if not self._backend:
+            return []
+        clauses: list[str] = []
+        params: list[Any] = []
+        if rule_id:
+            clauses.append("rule_id=%s")
+            params.append(rule_id)
+        if tenant_id:
+            clauses.append("tenant_id=%s")
+            params.append(tenant_id)
+        if acknowledged is not None:
+            clauses.append("acknowledged=%s")
+            params.append(1 if acknowledged else 0)
+        if since:
+            clauses.append("triggered_at >= %s")
+            params.append(since)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(limit)
+        rows = cast(list[dict[str, Any]], self._backend.fetchall(
+            f"SELECT * FROM audit_alert_history {where} ORDER BY triggered_at DESC LIMIT %s",
+            tuple(params),
+        ))
+        return [_coerce_alert_row(r) for r in rows]
+
+    def acknowledge_alert(
+        self,
+        alert_id: str,
+        *,
+        acknowledged_by: str = "",
+    ) -> bool:
+        if not self._backend:
+            return False
+        self._backend.execute(
+            """UPDATE audit_alert_history
+               SET acknowledged=1, acknowledged_by=%s, acknowledged_at=%s
+               WHERE alert_id=%s""",
+            (acknowledged_by, time.time(), alert_id),
+        )
+        return True
+
+
+def _coerce_rule_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Convert a DB row into a serialisable alert-rule dict."""
+    out = dict(row)
+    if "enabled" in out and not isinstance(out["enabled"], bool):
+        out["enabled"] = bool(out["enabled"])
+    for k in ("condition", "action_config"):
+        v = out.get(k)
+        if isinstance(v, str):
+            try:
+                out[k] = json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                out[k] = {}
+        elif v is None:
+            out[k] = {}
+    return out
+
+
+def _coerce_alert_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Convert a DB row into a serialisable alert-history dict."""
+    out = dict(row)
+    if "acknowledged" in out and not isinstance(out["acknowledged"], bool):
+        out["acknowledged"] = bool(out["acknowledged"])
+    v = out.get("metadata")
+    if isinstance(v, str):
+        try:
+            out["metadata"] = json.loads(v)
+        except (json.JSONDecodeError, TypeError):
+            out["metadata"] = {}
+    elif v is None:
+        out["metadata"] = {}
+    return out
+
+
+class PgLicenseStore:
+    """PostgreSQL-backed license management persistence.
+
+    Stores issued licenses and audit logs for the License Management
+    feature (PRD: license-management). Schema is auto-created on first
+    use via ``CREATE TABLE IF NOT EXISTS``.
+
+    Tables:
+      - ``licenses``: one row per issued license (key + metadata)
+      - ``license_audit_logs``: append-only audit trail per license
+    """
+
+    def __init__(self) -> None:
+        self._backend = _get_pg_backend()
+        self._ensure_schema()
+
+    def _ensure_schema(self) -> None:
+        if not self._backend:
+            return
+        self._backend.execute("""
+            CREATE TABLE IF NOT EXISTS licenses (
+                license_id TEXT PRIMARY KEY,
+                customer TEXT NOT NULL,
+                edition TEXT NOT NULL DEFAULT 'enterprise',
+                max_users INTEGER,
+                fingerprint TEXT,
+                features JSONB DEFAULT '[]',
+                status TEXT NOT NULL DEFAULT 'active',
+                issued_at DOUBLE PRECISION NOT NULL,
+                expires_at DOUBLE PRECISION NOT NULL,
+                revoked_at DOUBLE PRECISION DEFAULT NULL,
+                revoked_reason TEXT DEFAULT '',
+                license_key TEXT NOT NULL,
+                issued_by TEXT DEFAULT '',
+                notes TEXT DEFAULT '',
+                created_at DOUBLE PRECISION DEFAULT 0,
+                updated_at DOUBLE PRECISION DEFAULT 0
+            )
+        """)
+        self._backend.execute("CREATE INDEX IF NOT EXISTS idx_licenses_customer ON licenses(customer)")
+        self._backend.execute("CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status)")
+        self._backend.execute("CREATE INDEX IF NOT EXISTS idx_licenses_expires ON licenses(expires_at)")
+        self._backend.execute("""
+            CREATE TABLE IF NOT EXISTS license_audit_logs (
+                log_id TEXT PRIMARY KEY,
+                license_id TEXT NOT NULL,
+                action TEXT NOT NULL,
+                actor TEXT DEFAULT '',
+                timestamp DOUBLE PRECISION NOT NULL,
+                detail TEXT DEFAULT '',
+                ip_address TEXT DEFAULT '',
+                metadata JSONB DEFAULT '{}',
+                FOREIGN KEY (license_id) REFERENCES licenses(license_id) ON DELETE CASCADE
+            )
+        """)
+        self._backend.execute("CREATE INDEX IF NOT EXISTS idx_license_audit_license ON license_audit_logs(license_id)")
+        self._backend.execute("CREATE INDEX IF NOT EXISTS idx_license_audit_action ON license_audit_logs(action)")
+        self._backend.execute("CREATE INDEX IF NOT EXISTS idx_license_audit_timestamp ON license_audit_logs(timestamp)")
+
+    @property
+    def available(self) -> bool:
+        return self._backend is not None
+
+    def save_license(self, data: dict[str, Any]) -> None:
+        if not self._backend:
+            return
+        features = json.dumps(data.get("features", []))
+        self._backend.execute(
+            """INSERT INTO licenses
+               (license_id, customer, edition, max_users, fingerprint, features, status,
+                issued_at, expires_at, revoked_at, revoked_reason, license_key,
+                issued_by, notes, created_at, updated_at)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               ON CONFLICT (license_id) DO UPDATE SET
+                 customer=EXCLUDED.customer, edition=EXCLUDED.edition,
+                 max_users=EXCLUDED.max_users, fingerprint=EXCLUDED.fingerprint,
+                 features=EXCLUDED.features, status=EXCLUDED.status,
+                 expires_at=EXCLUDED.expires_at, revoked_at=EXCLUDED.revoked_at,
+                 revoked_reason=EXCLUDED.revoked_reason, license_key=EXCLUDED.license_key,
+                 issued_by=EXCLUDED.issued_by, notes=EXCLUDED.notes,
+                 updated_at=EXCLUDED.updated_at""",
+            (data["license_id"], data["customer"], data.get("edition", "enterprise"),
+             data.get("max_users"), data.get("fingerprint"), features,
+             data.get("status", "active"), data["issued_at"], data["expires_at"],
+             data.get("revoked_at"), data.get("revoked_reason", ""),
+             data["license_key"], data.get("issued_by", ""), data.get("notes", ""),
+             data.get("created_at", 0), data.get("updated_at", 0)),
+        )
+
+    def delete_license(self, license_id: str) -> bool:
+        if not self._backend:
+            return False
+        self._backend.execute("DELETE FROM license_audit_logs WHERE license_id=%s", (license_id,))
+        self._backend.execute("DELETE FROM licenses WHERE license_id=%s", (license_id,))
+        return True
+
+    def load_licenses(self, status: str = "") -> list[dict[str, Any]]:
+        if not self._backend:
+            return []
+        if status:
+            return cast(list[dict[str, Any]], self._backend.fetchall(
+                "SELECT * FROM licenses WHERE status=%s ORDER BY created_at DESC",
+                (status,),
+            ))
+        return cast(list[dict[str, Any]], self._backend.fetchall(
+            "SELECT * FROM licenses ORDER BY created_at DESC",
+        ))
+
+    def load_license(self, license_id: str) -> dict[str, Any] | None:
+        if not self._backend:
+            return None
+        return cast(dict[str, Any] | None, self._backend.fetchone(
+            "SELECT * FROM licenses WHERE license_id=%s", (license_id,),
+        ))
+
+    def save_audit_log(self, event: dict[str, Any]) -> None:
+        if not self._backend:
+            return
+        meta = json.dumps(event.get("metadata", {}))
+        self._backend.execute(
+            """INSERT INTO license_audit_logs
+               (log_id, license_id, action, actor, timestamp, detail, ip_address, metadata)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+            (event["log_id"], event["license_id"], event["action"],
+             event.get("actor", ""), event["timestamp"], event.get("detail", ""),
+             event.get("ip_address", ""), meta),
+        )
+
+    def load_audit_logs(
+        self,
+        license_id: str = "",
+        action: str = "",
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        if not self._backend:
+            return []
+        clauses: list[str] = []
+        params: list[Any] = []
+        if license_id:
+            clauses.append("license_id=%s")
+            params.append(license_id)
+        if action:
+            clauses.append("action=%s")
+            params.append(action)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.extend([limit, offset])
+        return cast(list[dict[str, Any]], self._backend.fetchall(
+            f"SELECT * FROM license_audit_logs {where} ORDER BY timestamp DESC LIMIT %s OFFSET %s",
+            tuple(params),
+        ))

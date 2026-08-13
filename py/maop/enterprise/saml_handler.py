@@ -259,12 +259,13 @@ class SAMLHandler:
         if self._config.saml_idp_cert:
             self._idp_metadata = {
                 "entity_id": self._config.saml_entity_id,
-                "sso_url": "",  # 由 metadata URL 解析得到，或单独配置
-                "slo_url": "",
+                # 优先用直接配置的 sso_url（PRD 3.3 多 IdP 模式）
+                "sso_url": self._config.saml_sso_url,
+                "slo_url": self._config.saml_slo_url,
                 "x509_cert": self._config.saml_idp_cert,
             }
-            # 如果有 metadata_url，也拉取以补充 sso_url
-            if self._config.saml_metadata_url:
+            # 如果有 metadata_url，也拉取以补充 sso_url（若直接配置的为空）
+            if not self._idp_metadata["sso_url"] and self._config.saml_metadata_url:
                 try:
                     xml_bytes = self._fetch_idp_metadata()
                     parsed = self._parse_idp_metadata(xml_bytes)

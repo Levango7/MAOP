@@ -39,9 +39,16 @@ export const nav = [
   { to: '/rbac', label: 'nav.rbac', icon: 'shield', subtitle: 'nav.rbac.subtitle', enterprise: true },
   { to: '/tenants', label: 'nav.tenants', icon: 'building', subtitle: 'nav.tenants.subtitle', enterprise: true },
   { to: '/users', label: 'nav.users', icon: 'user', subtitle: 'nav.users.subtitle', enterprise: true },
+  // v4.6.0 企业版新功能导航项（personal 版经 filterNavByEdition 隐藏）
+  { to: '/licenses', label: 'nav.licenses', icon: 'shield', subtitle: 'nav.licenses.subtitle', enterprise: true },
+  { to: '/sso', label: 'nav.sso', icon: 'plug', subtitle: 'nav.sso.subtitle', enterprise: true },
+  { to: '/quotas', label: 'nav.quotas', icon: 'gauge', subtitle: 'nav.quotas.subtitle', enterprise: true },
+  { to: '/apikeys', label: 'nav.apikeys', icon: 'link', subtitle: 'nav.apikeys.subtitle', enterprise: true },
 
   { section: 'nav.system' },
   { to: '/settings', label: 'nav.settings', icon: 'gear', subtitle: 'nav.settings.subtitle' },
+  // v4.6.0 通知中心（通用功能，所有版本可见）
+  { to: '/notifications', label: 'nav.notifications', icon: 'message-square', subtitle: 'nav.notifications.subtitle' },
   { to: '/docs', label: 'nav.docs', icon: 'book-open', subtitle: 'nav.docs.subtitle' },
 ];
 

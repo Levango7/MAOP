@@ -23,10 +23,10 @@
           </th>
         </tr>
       </thead>
-      <tbody>
-        <tr v-for="(row, i) in sortedRows" :key="rowKey ? row[rowKey] : i">
+        <tbody>
+        <tr v-for="(row, i) in sortedRows" :key="rowKey ? row[rowKey] : i" :class="{ 'is-clickable': clickable }" @click="onRowClick(row)">
           <td v-for="col in cols" :key="col.key" :style="{ textAlign: col.align || 'left' }">
-            <Badge v-if="col.type === 'badge'" :tone="toneFor(row[col.key])">{{ row[col.key] }}</Badge>
+            <Badge v-if="col.type === 'badge'" :tone="badgeTone(col, row)">{{ row[col.key] }}</Badge>
             <span v-else-if="col.type === 'bool-icon'" class="dt__bool" :class="row[col.key] ? 'is-true' : 'is-false'" :aria-label="row[col.key] ? t('a11y.yes') : t('a11y.no')">
               <AppIcon :name="row[col.key] ? 'check' : 'x'" :size="13" aria-hidden="true" />
             </span>
@@ -56,14 +56,17 @@ import Skeleton from './Skeleton.vue';
 import { useI18n } from '../i18n';
 
 const props = defineProps({
-  columns: { type: Array, default: null }, // [{ key, label, align?, type?, width? }]
+  columns: { type: Array, default: null }, // [{ key, label, align?, type?, width?, tone? }]
   rows: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   rowKey: { type: String, default: 'id' },
   emptyText: { type: String, default: 'No data' },
   sortable: { type: Boolean, default: false },
   compact: { type: Boolean, default: false },
+  clickable: { type: Boolean, default: false },
 });
+
+const emit = defineEmits(['row-click']);
 
 const { t } = useI18n();
 
@@ -116,6 +119,12 @@ function toneFor(v) {
   if (/(info|running|active|blue|idle)/.test(s)) return 'info';
   return 'neutral';
 }
+function badgeTone(col, row) {
+  if (typeof col.tone === 'function') return col.tone(row[col.key], row);
+  if (col.tone) return col.tone;
+  return toneFor(row[col.key]);
+}
+function onRowClick(row) { emit('row-click', row); }
 function formatRel(ts) {
   if (ts === null || ts === undefined) return '—';
   const d = new Date(typeof ts === 'number' ? ts : String(ts));
@@ -155,6 +164,7 @@ function formatRel(ts) {
 .dt--compact tbody td { padding: var(--sp-2) var(--sp-3); }
 .dt tbody tr { transition: background var(--motion) var(--ease); }
 .dt tbody tr:hover { background: var(--surface-2); }
+.dt tbody tr.is-clickable { cursor: pointer; }
 .dt tbody tr:last-child td { border-bottom: none; }
 .dt__bool { display: inline-flex; align-items: center; }
 .dt__bool.is-true .app-icon { color: var(--success); }

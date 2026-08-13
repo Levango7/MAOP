@@ -12,6 +12,8 @@ describe('Router', () => {
       'cost', 'audit', 'rbac', 'tenants', 'settings',
       'users', 'docs',
       'knowledge-graph',  // v4.5.0: knowledge graph visualization
+      // v4.6.0: 企业版新功能 + 通知中心
+      'licenses', 'sso', 'quotas', 'apikeys', 'notifications',
     ];
     for (const name of expected) {
       expect(names).toContain(name);
@@ -23,10 +25,10 @@ describe('Router', () => {
     expect(route?.path).toBe('/');
   });
 
-  it('has 24 route records total', () => {
-    // 拓扑: 19 个命名业务路由 + 3 个匿名重定向(/control /chat /evolution-history)
-    // + 1 个 /run 命名路由 + 1 个 /:pathMatch(.*)* 兜底
-    expect(router.getRoutes().length).toBe(24);
+  it('has 29 route records total', () => {
+    // 拓扑: 25 个命名业务路由 (含 v4.6.0 新增 licenses/sso/quotas/apikeys/notifications)
+    // + 3 个匿名重定向(/control /chat /evolution-history) + 1 个 /:pathMatch(.*)* 兜底
+    expect(router.getRoutes().length).toBe(29);
   });
 
   it('legacy routes declare redirects to merged pages', () => {

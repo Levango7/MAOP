@@ -51,6 +51,7 @@
  * - searchKey 指定文本搜索字段; schema 里的选项列表渲染为 <select>。
  * - 纯表现层: 不请求数据, 不持有状态。
  */
+import { computed } from 'vue';
 import AppIcon from './AppIcon.vue';
 import { useI18n } from '../i18n';
 
@@ -64,9 +65,7 @@ const props = defineProps({
   resultsLabel: { type: String, default: '' },
 });
 
-const selectFilters = schemaWhere((f) => f.options && f.options.length);
-
-function schemaWhere(pred) { return props.schema.filter(pred); }
+const selectFilters = computed(() => props.schema.filter((f) => f.options && f.options.length));
 
 // 契约: modelValue 是"可写对象", 由父组件持有同一引用并预置空字段。
 // 组件只做字段级写入(非替换对象), 因此父组件的响应式状态同步更新,

@@ -6,11 +6,15 @@ Provides enterprise identity provider integration:
     实现在 maop.enterprise.saml_handler.SAMLHandler（lxml + cryptography）。
   - Automatic user provisioning from IdP claims
   - Session management and token refresh
+  - PKCE (Proof Key for Code Exchange) for OIDC Authorization Code Flow
+  - 可配置属性映射（IdP claims → 系统用户字段/角色）
 """
 
 from __future__ import annotations
 
+import base64
 import contextlib
+import hashlib
 import json
 import logging
 import secrets
@@ -26,6 +30,30 @@ from pydantic import BaseModel, Field
 from maop.config.edition import FeatureFlag, require_feature
 
 logger = logging.getLogger(__name__)
+
+
+# ── PKCE (RFC 7636) helpers ──────────────────────────────────────────
+def generate_pkce_pair() -> tuple[str, str]:
+    """生成 PKCE code_verifier + code_challenge (S256)。
+
+    Returns:
+        (code_verifier, code_challenge) — verifier 为 43-128 字符的
+        urlsafe-base64 字符串；challenge = BASE64URL(SHA256(verifier))。
+    """
+    verifier = secrets.token_urlsafe(64)  # ~85 字符，落在 43-128 范围内
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    return verifier, challenge
+
+
+# ── 默认属性映射 ─────────────────────────────────────────────────────
+DEFAULT_ATTRIBUTE_MAPPING: dict[str, Any] = {
+    "external_id": "sub",
+    "email": "email",
+    "display_name": "name",
+    "roles": "groups",
+    "tenant_id": "tid",
+}
 
 
 class SSOError(RuntimeError):
@@ -53,10 +81,18 @@ class SSOConfig(BaseModel):
     saml_entity_id: str = ""
     saml_acs_url: str = ""  # Assertion Consumer Service URL（SP 端回调）
     saml_idp_cert: str = ""  # 直接配置 IdP X.509 证书 base64 DER（可选，优先于 metadata_url）
+    saml_sso_url: str = ""  # IdP SingleSignOnService URL（直接配置，优先于 metadata 拉取）
+    saml_slo_url: str = ""  # IdP SingleLogoutService URL（直接配置）
     redirect_uri: str = ""
     scopes: list[str] = Field(default_factory=lambda: ["openid", "profile", "email"])
     auto_provision: bool = True
     default_role: str = "viewer"
+    # PRD 3.5.1: PKCE 支持（OIDC Authorization Code Flow + PKCE）
+    use_pkce: bool = True
+    # PRD 3.4: 属性映射（IdP claims → 系统字段），空表示用默认映射
+    attribute_mapping: dict[str, Any] = Field(default_factory=dict)
+    # PRD 3.4: 角色映射（IdP 角色 → 系统角色），可选
+    role_mapping: dict[str, str] = Field(default_factory=dict)
 
 
 class SSOUser(BaseModel):
@@ -100,14 +136,27 @@ class SSOManager:
     def config(self) -> SSOConfig:
         return self._config
 
-    def get_authorize_url(self, state: str = "") -> str:
+    def get_authorize_url(
+        self,
+        state: str = "",
+        code_challenge: str = "",
+    ) -> str:
+        """构造 IdP authorize URL。
+
+        Args:
+            state: OAuth state（防 CSRF），透传给 IdP 并在回调时校验。
+            code_challenge: PKCE code_challenge（S256）。若提供则附加
+                ``code_challenge_method=S256`` 与 ``code_challenge`` 参数。
+                由调用方通过 :func:`generate_pkce_pair` 生成并暂存
+                code_verifier（用于 ``handle_callback``）。
+        """
         # SAML：构造 AuthnRequest 重定向 URL（由 SAMLHandler 实现）
         if self._config.provider == SSOProvider.SAML:
             SAMLHandler = _get_saml_handler()
             handler = SAMLHandler(self._config)
             return handler.get_authorize_url(state=state)  # type: ignore[no-any-return]
         if self._config.provider == SSOProvider.OIDC:
-            params = {
+            params: dict[str, str] = {
                 "client_id": self._config.client_id,
                 "redirect_uri": self._config.redirect_uri,
                 "response_type": "code",
@@ -115,18 +164,28 @@ class SSOManager:
             }
             if state:
                 params["state"] = state
+            # PRD NFR-S03: PKCE 防截码攻击
+            if code_challenge:
+                params["code_challenge"] = code_challenge
+                params["code_challenge_method"] = "S256"
             query = "&".join(f"{k}={v}" for k, v in params.items())
             return f"{self._config.authorize_url}?{query}"
         return ""
 
-    def handle_callback(self, code: str, state: str = "") -> SSOSession:
+    def handle_callback(
+        self,
+        code: str,
+        state: str = "",
+        code_verifier: str = "",
+    ) -> SSOSession:
         """Exchange an OAuth authorization code for tokens and create a session.
 
         For OIDC: POST to ``SSOConfig.token_url`` with the standard
         ``authorization_code`` grant, parse ``{access_token, refresh_token,
         expires_in, id_token}``, optionally fetch userinfo from
         ``userinfo_url`` with Bearer auth, then build a real ``SSOSession``
-        with the returned tokens and expiry.
+        with the returned tokens and expiry. 当 ``code_verifier`` 非空时
+        附加 PKCE 参数（PRD NFR-S03）。
 
         For SAML: ``code`` 是 base64 编码的 SAMLResponse，``state`` 是 RelayState。
         委托给 SAMLHandler.handle_response() 验证 XML 签名、Conditions，
@@ -135,6 +194,8 @@ class SSOManager:
         Args:
             code: Authorization code (OIDC) 或 base64 SAMLResponse (SAML)。
             state: Optional OAuth state value / SAML RelayState。
+            code_verifier: PKCE code_verifier（与 authorize 阶段的
+                code_challenge 配对）。仅 OIDC 有效。
 
         Returns:
             A new SSOSession persisted in ``self._sessions``.
@@ -158,7 +219,7 @@ class SSOManager:
                 "SSOConfig.token_url is required for OIDC handle_callback"
             )
 
-        token_resp = self._exchange_code(code, state)
+        token_resp = self._exchange_code(code, state, code_verifier)
         access_token = str(token_resp.get("access_token", ""))
         refresh_token = str(token_resp.get("refresh_token", ""))
         try:
@@ -194,19 +255,29 @@ class SSOManager:
         )
         return session
 
-    def _exchange_code(self, code: str, state: str) -> dict[str, Any]:
+    def _exchange_code(
+        self,
+        code: str,
+        state: str,
+        code_verifier: str = "",
+    ) -> dict[str, Any]:
         """POST authorization_code grant to ``token_url``; return parsed JSON.
 
         Fail-closed on HTTP errors, network errors, non-JSON responses, and
         OAuth ``error`` fields in the response body.
+
+        当 ``code_verifier`` 非空时附加 PKCE 参数（RFC 7636）。
         """
-        body = urllib.parse.urlencode({
+        form: dict[str, str] = {
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": self._config.redirect_uri,
             "client_id": self._config.client_id,
             "client_secret": self._config.client_secret,
-        }).encode("utf-8")
+        }
+        if code_verifier:
+            form["code_verifier"] = code_verifier
+        body = urllib.parse.urlencode(form).encode("utf-8")
         req = urllib.request.Request(
             self._config.token_url,
             data=body,
@@ -279,7 +350,10 @@ class SSOManager:
     ) -> SSOUser:
         """Construct ``SSOUser`` from IdP claims + token response.
 
-        Claim precedence (first non-empty wins):
+        支持外部属性映射（PRD 3.4）：当 ``SSOConfig.attribute_mapping`` 非空时，
+        按映射从 claims 取值；否则使用默认 precedence（向后兼容）。
+
+        Claim precedence (first non-empty wins, 默认无映射时):
           - external_id: ``sub`` | ``user_id`` | first 16 chars of id_token
           - email: ``email`` | ``email_verified`` (bool -> "")
           - display_name: ``name`` | ``preferred_username`` | ``nickname``
@@ -287,6 +361,31 @@ class SSOManager:
           - tenant_id: ``tenant_id`` | ``tid``
         """
         now = time.time()
+        mapping = self._config.attribute_mapping or {}
+
+        if mapping:
+            sub = self._claim_first(claims, mapping.get("external_id", "sub")) or ""
+            if not sub and token_resp.get("id_token"):
+                sub = str(token_resp["id_token"])[:16]
+            if not sub:
+                sub = "unknown"
+            email = self._claim_first(claims, mapping.get("email", "email"))
+            name = self._claim_first(claims, mapping.get("display_name", "name"))
+            roles = self._mapped_roles(claims, mapping)
+            if not roles:
+                roles = [self._config.default_role]
+            tenant_id = self._claim_first(claims, mapping.get("tenant_id", "tid"))
+            return SSOUser(
+                external_id=f"{self._config.provider.value}:{sub}",
+                email=str(email or ""),
+                display_name=str(name or ""),
+                roles=roles,
+                tenant_id=str(tenant_id or ""),
+                provider=self._config.provider,
+                last_login=now,
+            )
+
+        # 默认 precedence（向后兼容）
         sub = (
             claims.get("sub")
             or claims.get("user_id")
@@ -321,6 +420,38 @@ class SSOManager:
             provider=self._config.provider,
             last_login=now,
         )
+
+    @staticmethod
+    def _claim_first(claims: dict[str, Any], key: str) -> str:
+        """按 key 从 claims 取首个非空字符串值（支持 list/tuple 取首元素）。"""
+        if not key:
+            return ""
+        v = claims.get(key)
+        if isinstance(v, list) and v:
+            return str(v[0])
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+        if v is not None:
+            return str(v)
+        return ""
+
+    def _mapped_roles(
+        self,
+        claims: dict[str, Any],
+        mapping: dict[str, Any],
+    ) -> list[str]:
+        """按映射从 claims 提取角色，再按 role_mapping 转换为系统角色。"""
+        roles_key = mapping.get("roles", "groups")
+        raw: list[str] = []
+        v = claims.get(roles_key)
+        if isinstance(v, list) and v:
+            raw = [str(r) for r in v]
+        elif isinstance(v, str) and v.strip():
+            raw = [v.strip()]
+        role_map = self._config.role_mapping or {}
+        if not role_map:
+            return raw
+        return [role_map.get(r, r) for r in raw]
 
     def _roles_from_claims(self, claims: dict[str, Any]) -> list[str]:
         """Extract roles from common claim shapes.
