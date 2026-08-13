@@ -176,6 +176,13 @@ onMounted(() => {
 
 <style scoped>
 .topbar {
+  /* 层叠覆盖布局 (2026-08-13 重构): 顶栏全宽 fixed, z-index:10 低于侧栏 (z-index:20),
+     侧栏展开时覆盖顶栏左侧品牌区, 折叠时品牌区自然露出 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: var(--sp-4);
@@ -183,11 +190,6 @@ onMounted(() => {
   height: var(--topbar-h);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  /* 通栏布局 (2026-08-12 重构): 顶栏作为 .app-layout 的第一个子元素, 已在顶端,
-     无需 sticky (外层不是滚动容器); 也用 .app-layout 的 flex 自然撑开 */
-  position: relative;
-  z-index: var(--z-topbar, 50);
-  flex-shrink: 0;
 }
 /* ⓪ 侧栏折叠按钮 — 在顶栏最左, 永远在, 不被 rail 状态影响 */
 .topbar__siderail-btn {

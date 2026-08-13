@@ -1,7 +1,10 @@
 <template>
-  <!-- 满高左侧栏布局: 侧栏纵贯页面从上至下, 折叠按钮固定在侧栏左上角;
-       折叠后侧栏变窄(--rail-w)但仍满高; 顶栏位于右侧内容区顶部 -->
+  <!-- 层叠覆盖布局: 顶栏全宽 fixed (z-index:10), 侧栏全高 fixed (z-index:20) 覆盖顶栏左侧;
+       折叠时侧栏变窄(--rail-w), 顶栏左侧品牌区自然露出; 内容区用 padding 腾位 -->
   <div class="app-layout" :class="{ 'rail': ui.rail && !isMobile, 'sidebar-open': sidebarOpen && isMobile }">
+    <!-- 顶栏: 全宽 fixed (z-index:10), 侧栏 (z-index:20) 展开时覆盖其左侧品牌区 -->
+    <TopBar />
+
     <!-- Mobile drawer backdrop -->
     <div v-if="sidebarOpen && isMobile" class="sidebar-backdrop" aria-hidden="true" @click="closeSidebar"></div>
 
@@ -28,7 +31,7 @@
     </nav>
 
     <main class="content">
-      <TopBar />
+
       <button
         class="hamburger-btn"
         :aria-expanded="sidebarOpen"
@@ -297,35 +300,33 @@ onUnmounted(() => {
 :root { color-scheme: dark; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-/* 满高左侧栏布局 (2026-08-12 按用户指定重构):
- * 侧栏纵贯页面左侧——上至视口最上、下至最下(sticky + 100vh)。
- * 收缩/扩展按钮固定在侧栏左上角 (.sidebar-head), 与侧栏宽度无关,
- * rail 模式下侧栏收窄为 64px 但仍满高, 按钮居中保持可点。
- * 顶栏 (TopBar) 回到右侧内容区顶部。
+/* 层叠覆盖布局 (2026-08-13 按用户指定重构):
+ * 顶栏全宽 fixed (z-index:10) 始终不动; 侧栏全高 fixed (z-index:20) 覆盖顶栏左侧,
+ * 展开时盖住顶栏左侧品牌区, 折叠 (rail) 时侧栏收窄为 64px, 品牌区自然露出。
+ * 内容区用 padding-top/padding-left 给顶栏与侧栏腾位, 过渡平滑。
  */
 .app-layout {
-  display: flex;
-  flex-direction: row;
+  /* 顶栏与侧栏均为 fixed, 不需要 flex row; 内容区用 padding 腾位 */
   min-height: 100vh;
   position: relative;
-  z-index: 1;
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────── */
+/* 侧栏: 全高 fixed, z-index:20 高于顶栏 (z-index:10), 覆盖顶栏左侧品牌区。
+   展开时宽 --sidebar-w 盖住品牌区, rail 时宽 --rail-w 品牌区露出。 */
 .sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
   width: var(--sidebar-w);
+  z-index: 20;
   background: var(--bg2);
   padding: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
-  flex-shrink: 0;
-  z-index: var(--z-sidebar);
   transition: width var(--motion) var(--ease);
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  align-self: flex-start;
 }
 
 /* 侧栏头部: 仅放折叠按钮。展开时按钮靠左, rail 时居中。 */
@@ -442,6 +443,7 @@ onUnmounted(() => {
 
 /* ── Rail (collapsed) state ─────────────────────────────────────── */
 .app-layout.rail .sidebar { width: var(--rail-w); }
+.app-layout.rail .content { padding-left: var(--rail-w); }
 .app-layout.rail .nav-label,
 .app-layout.rail .nav-section { display: none; }
 .app-layout.rail .nav-link { justify-content: center; padding: 10px 0; gap: 0; }
@@ -450,10 +452,21 @@ onUnmounted(() => {
 /* 层级分离: 顶栏与内容同明度(--surface), 侧栏下沉到 --bg2,
    形成 "侧栏(最暗) < 卡片/顶栏(中) < hover(最亮)" 的视觉阶梯。
    顶栏下沿与侧栏右缘的分界线让两个区域在第一眼就分开。 */
-.content > .topbar { border-bottom: 1px solid var(--border-strong); }
+.app-layout > .topbar { border-bottom: 1px solid var(--border-strong); }
 
-/* ── Content (scroll area) ─────────────────────────────────────── */
-.content { flex: 1; overflow-y: auto; min-width: 0; position: relative; z-index: 1; display: flex; flex-direction: column; }
+/* ── Content (padding 给顶栏与侧栏腾位) ─────────────────────────── */
+/* 顶栏 fixed 全宽 (z-index:10) + 侧栏 fixed 全高 (z-index:20) 均脱离文档流,
+   内容区用 padding-top/padding-left 腾位; rail 时 padding-left 随侧栏宽度收窄。 */
+.content {
+  padding-top: var(--topbar-h);
+  padding-left: var(--sidebar-w);
+  min-height: 100vh;
+  overflow-y: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: padding-left var(--motion) var(--ease);
+}
 /* Centered, max-width shell so content aligns consistently on wide screens;
    the footer is pinned to the bottom via margin-top:auto inside this shell. */
 .content-shell { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: var(--maxw); margin: 0 auto; padding: var(--sp-2) var(--content-pad) var(--content-pad); }
@@ -537,12 +550,17 @@ onUnmounted(() => {
 .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: var(--z-overlay, 98); animation: maop-view-in var(--motion) var(--ease); }
 
 @media (max-width: 899px) {
+  /* 侧栏变为 drawer: z-index:30 高于顶栏(10)与桌面侧栏(20), 滑入滑出。
+     position/top/left/bottom 已由桌面基类设为 fixed 全高, 此处仅覆盖 z-index 与 transform。 */
   .sidebar {
-    position: fixed; top: 0; left: 0; z-index: var(--z-drawer, 99);
-    transform: translateX(-100%); transition: transform var(--motion-slow) var(--ease);
+    z-index: 30;
+    transform: translateX(-100%);
+    transition: transform var(--motion-slow) var(--ease);
     box-shadow: var(--shadow-lg);
   }
   .sidebar-open .sidebar { transform: translateX(0); }
+  /* 移动端侧栏为浮层 drawer, 不占位, 内容区无需 padding-left */
+  .content { padding-left: 0; }
   .hamburger-btn { display: flex; }
   .content-shell { padding: 16px; }
 }
