@@ -4,7 +4,7 @@
 # ── Operator controller image ──────────────────────────────────────
 image:
   repository: ghcr.io/maop/operator
-  tag: "5.0.0"
+  tag: "5.1.0"
   pullPolicy: IfNotPresent
 
 # ── Controller runtime settings ────────────────────────────────────

@@ -31,7 +31,7 @@ const routes = [
   { path: '/settings', name: 'settings', component: () => import('../views/Settings.vue') },
   // v4.6.0 通知中心（通用功能，不限定企业版）
   { path: '/notifications', name: 'notifications', component: () => import('../views/Notifications.vue') },
-  { path: '/users', name: 'users', component: () => import('../views/Users.vue') },
+  { path: '/users', name: 'users', component: () => import('../views/Users.vue'), meta: { requiresEnterprise: true } },
   { path: '/docs', name: 'docs', component: () => import('../views/Docs.vue') },
   // v4.5.0: Knowledge graph visualization (general-availability, no enterprise guard)
   { path: '/knowledge-graph', name: 'knowledge-graph', component: () => import('../views/KnowledgeGraph.vue') },

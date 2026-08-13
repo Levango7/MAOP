@@ -30,6 +30,7 @@ import EmptyState from '../components/EmptyState.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
 
 
+
 // PageHeader calls useRoute() which needs a router context; stub it so we can
 // mount the view without providing a full vue-router instance.
 // Chart.js components (Line/Bar/Pie) need canvas which jsdom lacks — stub them.

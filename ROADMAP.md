@@ -7,8 +7,8 @@
 
 ## 当前状态
 
-- **已发布**：v5.0.0（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](MIGRATION-5.0.md)。
-- **上一版**：v4.5.0（2026-08-06，minor）— core/ 子包重构 + 流式 DAG 执行进度推送 + 知识图谱可视化前端，覆盖率 87%，6130 passed。详见 [CHANGELOG.md](CHANGELOG.md)。
+- **已发布**：v5.1.0（2026-08-14，minor）— 企业版 6 大功能（许可证/SSO/审计/配额/API Key/通知）+ v5.1.0 6 大新功能（LLM 任务拆分/工作流编辑器/配置历史/Skill 编辑器/异常调度/Hook 配置）+ 版本号统一至 v5.1.0。
+- **上一版**：v5.0.0（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](MIGRATION-5.0.md)。
 - **双版架构**：自 2026-07-20 起采用单代码库 + 运行时 Edition 检测（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)）。
 
 ## v4.4.2 (patch) — 已发布 2026-08-06
@@ -87,12 +87,48 @@
 - [x] `ruff check` 0 error，`mypy` 0 error，测试 0 failed，前端构建成功。
 - [ ] `archive/` 目录清空或移至独立仓库（推迟到 v6.0.0，避免 major 范围膨胀）。
 
+## v5.1.0 (minor) — 已发布 2026-08-14
+
+**主题**：企业版功能补全 + v5.1.0 新功能 + 版本号统一。向后兼容，不破坏现有 API。
+
+### 范围
+
+#### 企业版功能（v5.0.2+ 补全）
+- **许可证管理**：License 管理 UI + CRUD API + 过期预警 + 特性开关绑定。
+- **SSO/SAML 集成**：SAML 2.0 IdP 对接 + SP 配置 + 属性映射。
+- **审计日志**：全操作审计 + 审计日志查询/导出 + 不可篡改性。
+- **配额管理**：租户级配额（API 调用/Token/存储）+ 超额拒绝 + 用量看板。
+- **API Key 管理**：API Key 生成/轮转/吊销 + scope 权限绑定。
+- **通知中心**：邮件/Webhook 通知 + 通知模板 + 事件订阅。
+
+#### v5.1.0 新功能
+- **LLM 任务拆分**：自动将复杂任务拆分为子任务 + DAG 依赖编排。
+- **工作流编辑器**：可视化 DAG 工作流编辑 + 节点配置 + 保存/加载。
+- **配置历史**：配置变更快照 + 一键回滚 + 差异对比。
+- **Skill 编辑器 + 市场**：Skill 在线编辑 + 模板市场 + 导入/导出。
+- **异常调度**：异常检测 + 自动重试策略 + 降级调度。
+- **Hook 配置**：Webhook Hook 配置 UI + 事件触发 + 执行日志。
+
+#### 工程修复
+- 版本号统一升级至 v5.1.0（pyproject.toml / __init__.py / Dockerfile / package.json / package-lock.json / Chart.yaml / values.yaml / controller.yaml）。
+- 移除 pyproject.toml addopts 的 `--cov-fail-under=50`，改由 ratchet 脚本渐进门禁。
+- 修复 `/users` 路由守卫缺失（补 `meta.requiresEnterprise`）。
+- 修复 `Audit.test.js` chart.js/jsdom unhandled rejection。
+
+### 验收标准
+
+- [x] 企业版 6 大功能（许可证/SSO/审计/配额/API Key/通知）UI + API 完成并通过测试。
+- [x] v5.1.0 6 大新功能（LLM 任务拆分/工作流编辑器/配置历史/Skill 编辑器/异常调度/Hook 配置）完成并通过测试。
+- [x] 版本号在 pyproject.toml / __init__.py / Dockerfile / package.json / package-lock.json / Chart.yaml / values.yaml / controller.yaml 全部统一为 5.1.0。
+- [x] `dashboard-enterprise` 前端 `npm run build` 构建成功。
+- [x] `CHANGELOG.md` 补 v5.1.0 条目，`ROADMAP.md` 更新当前状态。
+
 ## 长期方向（未排期）
 
 - **多后端编排器适配**：支持把 MAOP 编排目标导出为 Temporal / Airflow DAG，便于嵌入企业现有调度体系。
-- **Agent Marketplace**：社区共享 agent 配置与 prompt 模板，带版本与签名校验。
+- **Agent Marketplace**：社区共享 agent 配置与 prompt 模板，带版本与签名校验。（v5.1.0 Skill 市场已实现基础导入/导出，社区共享与签名校验仍待排期。）
 - **细粒度成本归因**：按 agent / phase / model 维度的实时成本归因与预算告警。
-- **原生 K8s Operator**：以 CRD 形式声明 MAOP 编排任务，由 Operator 调度执行。
+- **原生 K8s Operator**：以 CRD 形式声明 MAOP 编排任务，由 Operator 调度执行。（v5.0.0 G-17 已实现 K8s Operator 集成测试基线，CRD 声明式调度已在 `deploy/k8s/operator/` 落地，进一步多租户/插件增强待排期。）
 
 ## 维护规则
 

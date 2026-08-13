@@ -6,7 +6,7 @@ description: |
   plugin loading, and RLS-aware data access.
 type: application
 version: 0.3.0
-appVersion: "5.0.0"
+appVersion: "5.1.0"
 keywords:
   - maop
   - multi-agent

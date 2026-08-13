@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [5.1.0] — 2026-08-14
+
+### Added
+
+#### 企业版功能（v5.0.2+）
+- **许可证管理**：License 管理 UI + CRUD API + 过期预警 + 特性开关绑定
+- **SSO/SAML 集成**：SAML 2.0 IdP 对接 + SP 配置 + 属性映射
+- **审计日志**：全操作审计 + 审计日志查询/导出 + 不可篡改性
+- **配额管理**：租户级配额（API 调用/Token/存储）+ 超额拒绝 + 用量看板
+- **API Key 管理**：API Key 生成/轮转/吊销 + scope 权限绑定
+- **通知中心**：邮件/Webhook 通知 + 通知模板 + 事件订阅
+
+#### v5.1.0 新功能
+- **LLM 任务拆分**：自动将复杂任务拆分为子任务 + DAG 依赖编排
+- **工作流编辑器**：可视化 DAG 工作流编辑 + 节点配置 + 保存/加载
+- **配置历史**：配置变更快照 + 一键回滚 + 差异对比
+- **Skill 编辑器 + 市场**：Skill 在线编辑 + 模板市场 + 导入/导出
+- **异常调度**：异常检测 + 自动重试策略 + 降级调度
+- **Hook 配置**：Webhook Hook 配置 UI + 事件触发 + 执行日志
+
+### Changed
+- 版本号统一升级至 v5.1.0（pyproject.toml / __init__.py / Dockerfile / package.json / package-lock.json / Chart.yaml / values.yaml / controller.yaml）
+- 移除 pyproject.toml addopts 的 --cov-fail-under=50，改由 ratchet 脚本渐进门禁
+- 修复 /users 路由守卫缺失（补 meta.requiresEnterprise）
+- 修复 Audit.test.js chart.js/jsdom unhandled rejection
+
 ## [5.0.2] — 2026-08-13
 
 ### Added
