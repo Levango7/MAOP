@@ -32,7 +32,7 @@
   --surface-3: #eef0f4;
   --surface-4: #e4e7ec;
   --text-muted: #59616e;
-  --text-faint: #78808f;
+  --text-faint: #6b7382;  /* a11y: 调深以满足 WCAG AA 4.5:1 on white (原 #78808f 仅 4.04:1) */
   --brand: #3574f0;
   --brand-strong: #2d63c8;
   --brand-faint: rgba(53, 116, 240, .08);

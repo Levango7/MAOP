@@ -6,14 +6,15 @@
     <TopBar />
 
     <!-- Mobile drawer backdrop -->
-    <div v-if="sidebarOpen && isMobile" class="sidebar-backdrop" aria-hidden="true" @click="closeSidebar"></div>
+    <div v-if="sidebarOpen && isMobile" class="sidebar-backdrop" @click="closeSidebar"></div>
 
-    <nav class="sidebar" @click="onSidebarClick">
+    <nav class="sidebar" :aria-label="t('a11y.mainNavigation')" @click="onSidebarClick">
       <div class="sidebar-head">
         <button
           class="sidebar-toggle"
           :title="ui.rail ? t('action.expandSidebar') : t('action.collapseSidebar')"
-          :aria-label="ui.rail ? 'Expand sidebar' : 'Collapse sidebar'"
+          :aria-label="ui.rail ? t('action.expandSidebar') : t('action.collapseSidebar')"
+          :aria-expanded="isMobile ? sidebarOpen : !ui.rail"
           @click="toggleRail"
         >
           <AppIcon :name="ui.rail ? 'panelright' : 'panelleft'" :size="16" />
@@ -22,7 +23,7 @@
       <div class="nav-scroll">
         <template v-for="(item, i) in visibleNav" :key="i">
           <div v-if="item.section" class="nav-section">{{ t(item.section) }}</div>
-          <router-link v-else :to="item.to" class="nav-link" :title="t(item.label)" :class="{ 'router-link-active': isActive(item) }">
+          <router-link v-else :to="item.to" class="nav-link" :title="t(item.label)" :class="{ 'router-link-active': isActive(item) }" :aria-current="isActive(item) ? 'page' : undefined">
             <AppIcon class="nav-icon" :name="item.icon" :size="18" />
             <span class="nav-label">{{ t(item.label) }}</span>
           </router-link>
@@ -33,9 +34,10 @@
     <main class="content">
 
       <button
+        v-if="isMobile"
         class="hamburger-btn"
         :aria-expanded="sidebarOpen"
-        aria-label="Toggle navigation menu"
+        :aria-label="t('a11y.toggleNavigation')"
         @click="toggleSidebar"
       >
         <span></span><span></span><span></span>
@@ -54,19 +56,19 @@
       <AppFooter :version="version" />
     </main>
 
-    <div v-if="authExpired" class="auth-overlay">
+    <div v-if="authExpired" class="auth-overlay" role="dialog" aria-modal="true" :aria-label="t('a11y.loginDialog')" @keydown.esc="authExpired = false">
       <div class="auth-card">
-        <div class="auth-card__icon"><AppIcon name="bot" :size="26" /></div>
+        <div class="auth-card__icon" aria-hidden="true"><AppIcon name="bot" :size="26" /></div>
         <h3>{{ loginTitle }}</h3>
-        <p v-if="loginError" class="login-error">{{ loginError }}</p>
+        <p v-if="loginError" class="login-error" role="alert">{{ loginError }}</p>
         <form @submit.prevent="doLogin">
           <div>
-            <label>{{ t('auth.username') }}</label>
-            <input v-model="loginUsername" type="text" :placeholder="t('auth.username')" autocomplete="username" :disabled="loginLoading" />
+            <label for="login-username">{{ t('auth.username') }}</label>
+            <input id="login-username" v-model="loginUsername" type="text" :placeholder="t('auth.username')" autocomplete="username" :disabled="loginLoading" />
           </div>
           <div>
-            <label>{{ t('auth.password') }}</label>
-            <input v-model="loginPassword" type="password" :placeholder="t('auth.password')" autocomplete="current-password" :disabled="loginLoading" />
+            <label for="login-password">{{ t('auth.password') }}</label>
+            <input id="login-password" v-model="loginPassword" type="password" :placeholder="t('auth.password')" autocomplete="current-password" :disabled="loginLoading" />
           </div>
           <button type="submit" :disabled="loginLoading || !loginUsername || !loginPassword">
             {{ loginLoading ? t('auth.signingIn') : t('auth.signIn') }}
@@ -561,7 +563,14 @@ onUnmounted(() => {
   .sidebar-open .sidebar { transform: translateX(0); }
   /* 移动端侧栏为浮层 drawer, 不占位, 内容区无需 padding-left */
   .content { padding-left: 0; }
-  .hamburger-btn { display: flex; }
+  /* hamburger: 粘在顶栏下方 12px 处 (而非视口顶部 12px), 避免滚动时浮在顶栏上
+     遮挡顶栏内容。z-index 35: 高于 sidebar drawer(30) 使 X 按钮可点击关闭,
+     低于 backdrop(80) 不干扰遮罩层。 */
+  .hamburger-btn {
+    display: flex;
+    top: calc(var(--topbar-h) + 12px);
+    z-index: 35;
+  }
   .content-shell { padding: 16px; }
 }
 </style>

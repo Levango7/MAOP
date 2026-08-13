@@ -52,8 +52,10 @@ import DOMPurify from 'dompurify';
 const { t, locale } = useI18n();
 const isZh = computed(() => locale.value === 'zh');
 
-// ── 通过 Vite 的 import.meta.glob 在构建时将 docs/*.md 作为原始字符串打包 ──
-const docRawModules = import.meta.glob('../../../docs/**/*.md', { query: '?raw', import: 'default', eager: true });
+// ── 通过 Vite 的 import.meta.glob 懒加载 docs/*.md ──
+// P1-4 性能优化: 改为非 eager（懒加载），每个 md 文件拆为独立小 chunk，
+// 按需加载，避免 68 个文档（~830KB）全部内联到 Docs chunk 导致首屏体积膨胀。
+const docRawModules = import.meta.glob('../../../docs/**/*.md', { query: '?raw', import: 'default' });
 
 const categories = [
   {
@@ -100,27 +102,30 @@ const selectedPath = ref('');
 const selectedHtml = ref('');
 const loading = ref(false);
 
-function resolveRaw(path) {
+function resolveRawLoader(path) {
   const key = `../../../docs/${path}`;
   return docRawModules[key] || null;
 }
 
-function selectDoc(doc) {
+async function selectDoc(doc) {
   if (selectedPath.value === doc.path) return;
   selectedPath.value = doc.path;
   loading.value = true;
   selectedHtml.value = '';
-  // 异步渲染，让 loading 态可见
-  requestAnimationFrame(() => {
-    const raw = resolveRaw(doc.path);
-    if (raw) {
+  try {
+    const loader = resolveRawLoader(doc.path);
+    if (loader) {
+      const raw = await loader();
       const html = renderMarkdown(raw);
       selectedHtml.value = DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
     } else {
       selectedHtml.value = `<p class="docs-not-found">${isZh.value ? '文档内容未找到。' : 'Document content not found.'}</p>`;
     }
+  } catch {
+    selectedHtml.value = `<p class="docs-not-found">${isZh.value ? '文档加载失败。' : 'Document failed to load.'}</p>`;
+  } finally {
     loading.value = false;
-  });
+  }
 }
 
 // 默认选中第一篇

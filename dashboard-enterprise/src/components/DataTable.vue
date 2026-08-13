@@ -8,11 +8,17 @@
             :key="col.key"
             :style="{ textAlign: col.align || 'left', width: col.width || null }"
             :class="{ sortable: sortable && col.sortable !== false }"
+            :tabindex="sortable && col.sortable !== false ? 0 : undefined"
+            :role="sortable && col.sortable !== false ? 'button' : undefined"
+            :aria-sort="sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : (sortable && col.sortable !== false ? 'none' : undefined)"
+            :aria-label="sortable && col.sortable !== false ? sortLabel(col.label) : undefined"
             @click="sortable && col.sortable !== false ? toggleSort(col.key) : null"
+            @keydown.enter.prevent="sortable && col.sortable !== false ? toggleSort(col.key) : null"
+            @keydown.space.prevent="sortable && col.sortable !== false ? toggleSort(col.key) : null"
           >
             <span class="dt__th">
               {{ col.label }}
-              <AppIcon v-if="sortable && col.sortable !== false" name="chevrondown" :size="12" class="dt__sort" :class="{ 'is-active': sortKey === col.key, 'is-desc': sortKey === col.key && sortDir === 'desc' }" />
+              <AppIcon v-if="sortable && col.sortable !== false" name="chevrondown" :size="12" class="dt__sort" :class="{ 'is-active': sortKey === col.key, 'is-desc': sortKey === col.key && sortDir === 'desc' }" aria-hidden="true" />
             </span>
           </th>
         </tr>
@@ -21,8 +27,8 @@
         <tr v-for="(row, i) in sortedRows" :key="rowKey ? row[rowKey] : i">
           <td v-for="col in cols" :key="col.key" :style="{ textAlign: col.align || 'left' }">
             <Badge v-if="col.type === 'badge'" :tone="toneFor(row[col.key])">{{ row[col.key] }}</Badge>
-            <span v-else-if="col.type === 'bool-icon'" class="dt__bool" :class="row[col.key] ? 'is-true' : 'is-false'">
-              <AppIcon :name="row[col.key] ? 'check' : 'x'" :size="13" />
+            <span v-else-if="col.type === 'bool-icon'" class="dt__bool" :class="row[col.key] ? 'is-true' : 'is-false'" :aria-label="row[col.key] ? t('a11y.yes') : t('a11y.no')">
+              <AppIcon :name="row[col.key] ? 'check' : 'x'" :size="13" aria-hidden="true" />
             </span>
             <span v-else-if="col.type === 'num'" class="dt__num">{{ row[col.key] }}</span>
             <span v-else-if="col.type === 'time'" class="dt__time">{{ formatRel(row[col.key]) }}</span>
@@ -47,6 +53,7 @@ import { computed, ref } from 'vue';
 import AppIcon from './AppIcon.vue';
 import Badge from './Badge.vue';
 import Skeleton from './Skeleton.vue';
+import { useI18n } from '../i18n';
 
 const props = defineProps({
   columns: { type: Array, default: null }, // [{ key, label, align?, type?, width? }]
@@ -57,6 +64,12 @@ const props = defineProps({
   sortable: { type: Boolean, default: false },
   compact: { type: Boolean, default: false },
 });
+
+const { t } = useI18n();
+
+function sortLabel(colLabel) {
+  return t('a11y.sortBy', { column: colLabel });
+}
 
 // Derive columns from the first row when not provided
 const cols = computed(() => {

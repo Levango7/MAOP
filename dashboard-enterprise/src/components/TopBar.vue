@@ -32,7 +32,7 @@
 
     <!-- ② 刷新按钮 + 时间（标识右侧） -->
     <div class="topbar__refresh">
-      <button class="topbar__refresh-btn" :title="t('common.refresh')" aria-label="Refresh" @click="doRefresh">
+      <button class="topbar__refresh-btn" :title="t('common.refresh')" :aria-label="t('common.refresh')" @click="doRefresh">
         <AppIcon name="refresh" :size="15" />
       </button>
       <div class="topbar__refreshmeta">
@@ -45,10 +45,10 @@
 
     <!-- ③ 布局/主题（用户左侧） -->
     <div class="topbar__prefs">
-      <div class="topbar__pref-group" :title="t('settings.density')">
+      <div class="topbar__pref-group" role="group" :aria-label="t('settings.density')" :title="t('settings.density')">
         <Segmented :model-value="densityVal" :options="densityOpts" size="sm" @update:model-value="onDensityChange" />
       </div>
-      <div class="topbar__pref-group" :title="t('settings.theme')">
+      <div class="topbar__pref-group" role="group" :aria-label="t('settings.theme')" :title="t('settings.theme')">
         <Segmented :model-value="themeVal" :options="themeOpts" size="sm" @update:model-value="onThemeChange" />
       </div>
     </div>
@@ -58,7 +58,7 @@
 
     <!-- ④ 用户区（居右） -->
     <div class="topbar__user">
-      <button class="topbar__avatar-btn" :title="t('nav.users')" aria-label="User profile" @click="goToUsers">
+      <button class="topbar__avatar-btn" :title="t('nav.users')" :aria-label="t('a11y.userProfile')" @click="goToUsers">
         <div class="topbar__avatar">
           <span class="topbar__avatar-letter">{{ userInitial }}</span>
           <span class="topbar__avatar-ring" aria-hidden="true"></span>
@@ -70,7 +70,7 @@
           </span>
         </div>
       </button>
-      <button v-if="authOn" class="topbar__logout-btn" :title="t('action.logout')" aria-label="Sign out" @click="onLogout">
+      <button v-if="authOn" class="topbar__logout-btn" :title="t('action.logout')" :aria-label="t('action.logout')" @click="onLogout">
         <AppIcon name="power" :size="14" />
         <span class="topbar__logout-text">{{ t('action.logout') }}</span>
       </button>

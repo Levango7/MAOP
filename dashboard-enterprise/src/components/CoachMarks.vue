@@ -3,7 +3,7 @@
     <Transition name="cm">
       <div v-if="active" class="coach-marks" data-coach-root>
         <!-- 半透明遮罩: 点击任意处跳到下一步, 但高亮区本身可点穿 -->
-        <div class="cm-scrim" aria-hidden="true" @click="next"></div>
+        <div class="cm-scrim" @click="next"></div>
 
         <!-- 高亮框(四个角标, 用 border 描出聚焦区域) -->
         <div v-if="current" class="cm-spotlight" :style="spotTop ? spotlightStyle : { display: 'none' }" aria-hidden="true"></div>
@@ -11,17 +11,20 @@
         <!-- 气泡 -->
         <div
           v-if="current"
+          ref="popoverEl"
           class="cm-popover"
           :style="popoverStyle"
           role="dialog"
+          aria-modal="true"
           aria-live="polite"
-          :aria-label="'Guide step ' + (step + 1)"
+          tabindex="-1"
+          :aria-label="t('a11y.guideStep', { n: step + 1 })"
         >
           <div class="cm-step">{{ step + 1 }} / {{ steps.length }}</div>
           <div class="cm-title">{{ current.title }}</div>
           <div class="cm-body" v-html="current.body"></div>
           <div class="cm-actions">
-            <button class="cm-skip" type="button" @click="finish">{{ t('action.skip') }}</button>
+            <button class="cm-skip" type="button" :aria-label="t('action.skip')" @click="finish">{{ t('action.skip') }}</button>
             <button class="cm-next" type="button" @click="next">
               {{ step === steps.length - 1 ? t('action.done') : t('action.next') }}
             </button>
@@ -66,6 +69,8 @@ const steps = [
 const active = ref(false);
 const step = ref(0);
 const spotTop = ref(0); // 记录当前高亮元素 rect(供计算)
+const popoverEl = ref(null);
+let previousFocus = null;
 
 // 目标元素最新几何: 每次 step 变化 + 短暂延时后测量
 const rect = ref({ top: 0, left: 0, width: 0, height: 0 });
@@ -112,6 +117,12 @@ function next() {
 function finish() {
   active.value = false;
   try { localStorage.setItem(STORAGE_KEY, '1'); } catch { /* ignore */ }
+  // 恢复焦点到引导开始前的元素 (a11y: 焦点还原)
+  if (previousFocus && typeof previousFocus.focus === 'function') {
+    nextTick(() => { previousFocus.focus({ preventScroll: true }); previousFocus = null; });
+  } else {
+    previousFocus = null;
+  }
 }
 
 function onKey(e) {
@@ -120,8 +131,16 @@ function onKey(e) {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); next(); }
 }
 
-// 目标 mount 后测量
-watch(active, (v) => { if (v) nextTick(measure); });
+// 目标 mount 后测量; 打开时把焦点移入气泡 (a11y: 焦点管理)
+watch(active, (v) => {
+  if (v) {
+    previousFocus = document.activeElement;
+    nextTick(() => {
+      measure();
+      popoverEl.value?.focus({ preventScroll: true });
+    });
+  }
+});
 
 onMounted(() => {
   // 只在从未完成引导时启动

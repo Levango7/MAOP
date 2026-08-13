@@ -3,10 +3,11 @@
     <Transition name="drawer">
       <div v-if="open" class="detail-drawer" @keydown.esc="onClose">
         <!-- 遮罩 -->
-        <div class="drawer__scrim" aria-hidden="true" @click="onClose"></div>
+        <div class="drawer__scrim" @click="onClose"></div>
 
         <!-- 面板 -->
         <aside
+          ref="panelRef"
           class="drawer__panel"
           role="dialog"
           aria-modal="true"

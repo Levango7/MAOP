@@ -192,13 +192,13 @@
           <span>{{ (a.capabilities || []).length }}</span>
           <span>{{ a.last_latency_ms || 0 }}ms</span>
           <span class="actions-cell">
-            <button class="act-btn small" :title="t('common.model')" @click="switchModel(a)"><AppIcon name="bot" :size="13" /></button>
-            <button class="act-btn small" :title="t('view.agents.healthCheck')" @click="healthCheck(a)"><AppIcon name="activity" :size="13" /></button>
-            <button class="act-btn small" :disabled="repairing[a.name]" :title="t('view.agents.repair')" @click="repairAgent(a)"><AppIcon name="wrench" :size="13" /></button>
-            <button class="act-btn small" :disabled="upgrading[a.name]" :title="t('view.agents.upgrade')" @click="upgradeAgent(a)"><AppIcon name="arrow-up" :size="13" /></button>
-            <button class="act-btn small" :title="t('view.agents.memory')" @click="showMemory(a)"><AppIcon name="brain" :size="13" /></button>
-            <button class="act-btn small" :disabled="evolving[a.name]" :title="t('view.agents.evolve')" @click="evolveAgent(a)"><AppIcon name="sparkles" :size="13" /></button>
-            <button class="act-btn small danger" :disabled="!isAdmin" :title="t('view.agents.remove')" @click="confirmRemove(a)"><AppIcon name="trash" :size="13" /></button>
+            <button class="act-btn small" :title="t('common.model')" :aria-label="t('view.agents.switchModel')" @click="switchModel(a)"><AppIcon name="bot" :size="13" aria-hidden="true" /></button>
+            <button class="act-btn small" :title="t('view.agents.healthCheck')" :aria-label="t('view.agents.healthCheck')" @click="healthCheck(a)"><AppIcon name="activity" :size="13" aria-hidden="true" /></button>
+            <button class="act-btn small" :disabled="repairing[a.name]" :title="t('view.agents.repair')" :aria-label="t('view.agents.repair')" @click="repairAgent(a)"><AppIcon name="wrench" :size="13" aria-hidden="true" /></button>
+            <button class="act-btn small" :disabled="upgrading[a.name]" :title="t('view.agents.upgrade')" :aria-label="t('view.agents.upgrade')" @click="upgradeAgent(a)"><AppIcon name="arrow-up" :size="13" aria-hidden="true" /></button>
+            <button class="act-btn small" :title="t('view.agents.memory')" :aria-label="t('view.agents.memory')" @click="showMemory(a)"><AppIcon name="brain" :size="13" aria-hidden="true" /></button>
+            <button class="act-btn small" :disabled="evolving[a.name]" :title="t('view.agents.evolve')" :aria-label="t('view.agents.evolve')" @click="evolveAgent(a)"><AppIcon name="sparkles" :size="13" aria-hidden="true" /></button>
+            <button class="act-btn small danger" :disabled="!isAdmin" :title="t('view.agents.remove')" :aria-label="t('view.agents.remove')" @click="confirmRemove(a)"><AppIcon name="trash" :size="13" aria-hidden="true" /></button>
           </span>
         </div>
         <EmptyState v-if="!agents.length" icon="bot" :title="t('view.agents.noAgentsFound')" :hint="t('view.agents.noAgentsFoundHint')" />
@@ -247,14 +247,14 @@
       icon="brain"
       @close="memoryPanel.visible = false"
     >
-      <div class="memory-panel__toolbar">
-        <button class="act-btn small" :title="t('common.refresh')" @click="reloadMemory(memoryPanel.agentName)">
-          <AppIcon name="refresh" :size="14" />
-        </button>
-        <button class="act-btn small" :title="t('view.agents.addMemory')" @click="memoryAddForm = !memoryAddForm">
-          <AppIcon name="plus" :size="14" />
-        </button>
-      </div>
+        <div class="memory-panel__toolbar">
+          <button class="act-btn small" :title="t('common.refresh')" :aria-label="t('common.refresh')" @click="reloadMemory(memoryPanel.agentName)">
+            <AppIcon name="refresh" :size="14" aria-hidden="true" />
+          </button>
+          <button class="act-btn small" :title="t('view.agents.addMemory')" :aria-label="t('view.agents.addMemory')" @click="memoryAddForm = !memoryAddForm">
+            <AppIcon name="plus" :size="14" aria-hidden="true" />
+          </button>
+        </div>
 
       <!-- 添加记忆表单 -->
       <div v-if="memoryAddForm" class="memory-add-form">
@@ -360,7 +360,7 @@ v-for="(s, i) in evolutionPanel.result.suggestions" :key="i" class="evo-suggesti
       <div class="model-switch-panel">
         <div class="model-switch-panel__header">
           <h3>{{ t('view.agents.switchModelFor', { name: modelSwitchPanel.agentName }) }}</h3>
-          <button class="close-btn" @click="modelSwitchPanel.visible = false"><AppIcon name="x" :size="16" /></button>
+          <button class="close-btn" :aria-label="t('common.close')" @click="modelSwitchPanel.visible = false"><AppIcon name="x" :size="16" aria-hidden="true" /></button>
         </div>
         <div v-if="modelSwitchPanel.currentModel" class="model-switch-panel__current">
           <span class="ms-label">{{ t('view.agents.currentModel') }}:</span>
@@ -396,7 +396,7 @@ v-for="m in modelSwitchPanel.models" :key="m.name" class="model-option"
       <div class="upgrade-panel">
         <div class="upgrade-panel__header">
           <h3>{{ t('view.agents.upgradeFor', { name: upgradePanel.agentName }) }}</h3>
-          <button class="close-btn" @click="upgradePanel.visible = false"><AppIcon name="x" :size="16" /></button>
+          <button class="close-btn" :aria-label="t('common.close')" @click="upgradePanel.visible = false"><AppIcon name="x" :size="16" aria-hidden="true" /></button>
         </div>
 
         <!-- 检查中 -->

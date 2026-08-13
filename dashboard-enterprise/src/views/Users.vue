@@ -24,39 +24,40 @@
       </template>
       <template #content>
         <!-- 保留现有的 grid 表格(不支持 DataTable 自定义列渲染) -->
-        <div class="users-table">
-          <div class="users-row users-row--head">
-            <div class="users-cell users-cell--avatar">#</div>
-            <div class="users-cell users-cell--name">{{ t('users.username') }}</div>
-            <div class="users-cell users-cell--roles">{{ t('users.roles') }}</div>
-            <div class="users-cell users-cell--created">{{ t('users.created') }}</div>
-            <div class="users-cell users-cell--login">{{ t('users.lastLogin') }}</div>
-            <div class="users-cell users-cell--actions">{{ t('common.actions') }}</div>
+        <div class="users-table" role="table" :aria-label="t('users.title')">
+          <div class="users-row users-row--head" role="row">
+            <div class="users-cell users-cell--avatar" role="columnheader">#</div>
+            <div class="users-cell users-cell--name" role="columnheader">{{ t('users.username') }}</div>
+            <div class="users-cell users-cell--roles" role="columnheader">{{ t('users.roles') }}</div>
+            <div class="users-cell users-cell--created" role="columnheader">{{ t('users.created') }}</div>
+            <div class="users-cell users-cell--login" role="columnheader">{{ t('users.lastLogin') }}</div>
+            <div class="users-cell users-cell--actions" role="columnheader">{{ t('common.actions') }}</div>
           </div>
-          <div v-for="u in users" :key="u.username" class="users-row">
-            <div class="users-cell users-cell--avatar">
+          <div v-for="u in users" :key="u.username" class="users-row" role="row">
+            <div class="users-cell users-cell--avatar" role="cell">
               <div class="users-avatar">{{ getInitial(u.username) }}</div>
             </div>
-            <div class="users-cell users-cell--name">
+            <div class="users-cell users-cell--name" role="cell">
               <span class="users-uname">{{ u.username }}</span>
               <span v-if="u.username === currentName" class="users-self">me</span>
             </div>
-            <div class="users-cell users-cell--roles">
+            <div class="users-cell users-cell--roles" role="cell">
               <span v-for="r in (u.roles || [])" :key="r" class="users-role" :class="'users-role--' + r">{{ r }}</span>
             </div>
-            <div class="users-cell users-cell--created">{{ formatDate(u.created_at) }}</div>
-            <div class="users-cell users-cell--login">{{ u.last_login ? formatDate(u.last_login) : '—' }}</div>
-            <div class="users-cell users-cell--actions">
-              <button class="btn-icon" :title="t('common.edit')" @click="openEdit(u)">
-                <AppIcon name="gear" :size="14" />
+            <div class="users-cell users-cell--created" role="cell">{{ formatDate(u.created_at) }}</div>
+            <div class="users-cell users-cell--login" role="cell">{{ u.last_login ? formatDate(u.last_login) : '—' }}</div>
+            <div class="users-cell users-cell--actions" role="cell">
+              <button class="btn-icon" :title="t('common.edit')" :aria-label="t('common.edit')" @click="openEdit(u)">
+                <AppIcon name="gear" :size="14" aria-hidden="true" />
               </button>
               <button
                 v-if="u.username !== 'admin' && u.username !== currentName"
                 class="btn-icon btn-icon--danger"
                 :title="t('users.deregisterUser')"
+                :aria-label="t('users.deregisterUser')"
                 @click="confirmDelete(u)"
               >
-                <AppIcon name="trash" :size="14" />
+                <AppIcon name="trash" :size="14" aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -66,7 +67,10 @@
 
     <!-- 注册/编辑 弹窗 -->
     <div v-if="dialogOpen" v-modal-a11y class="users-dialog-overlay" @click.self="closeDialog" @modal:escape="closeDialog">
-      <div class="users-dialog">
+      <div class="users-dialog" role="document">
+        <button class="users-dialog-close" type="button" :aria-label="t('common.close')" @click="closeDialog">
+          <AppIcon name="x" :size="16" aria-hidden="true" />
+        </button>
         <h3>{{ dialogMode === 'register' ? t('users.registerUser') : t('users.updateProfile') }}</h3>
         <div class="users-form">
           <label>
@@ -309,11 +313,21 @@ onMounted(fetchUsers);
   z-index: var(--z-modal, 200);
 }
 .users-dialog {
+  position: relative;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-lg); padding: 24px;
   width: calc(100% - 32px); max-width: 440px;
   box-shadow: var(--shadow-lg);
 }
+.users-dialog-close {
+  position: absolute; top: 12px; right: 12px;
+  display: grid; place-items: center;
+  width: 28px; height: 28px;
+  background: transparent; border: none; border-radius: var(--r-sm);
+  color: var(--text-muted); cursor: pointer;
+  transition: color var(--motion) var(--ease), background var(--motion) var(--ease);
+}
+.users-dialog-close:hover { color: var(--text); background: var(--surface-2); }
 .users-dialog h3 { margin: 0 0 16px; font-size: 16px; color: var(--text); }
 .users-form { display: flex; flex-direction: column; gap: 12px; }
 .users-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }

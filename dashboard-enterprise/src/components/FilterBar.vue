@@ -2,12 +2,13 @@
   <div class="filterbar" :class="{ 'has-results': resultsLabel }">
     <!-- 搜索框: 有 searchKey 时显示 -->
     <div v-if="searchKey" class="filterbar__search">
-      <AppIcon name="search" :size="14" class="filterbar__icon" />
+      <AppIcon name="search" :size="14" class="filterbar__icon" aria-hidden="true" />
       <input
         class="filterbar__input"
         :value="modelValue[searchKey]"
         type="search"
         :placeholder="searchPlaceholder"
+        :aria-label="searchPlaceholder || t('a11y.search')"
         @input="set(searchKey, $event.target.value)"
       />
     </div>
@@ -51,6 +52,9 @@
  * - 纯表现层: 不请求数据, 不持有状态。
  */
 import AppIcon from './AppIcon.vue';
+import { useI18n } from '../i18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },

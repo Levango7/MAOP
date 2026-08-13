@@ -3,14 +3,20 @@
     <Transition name="palette">
       <div v-if="open" class="cmdpal" @keydown.esc.prevent="close">
         <div class="cmdpal__scrim" aria-hidden="true" @click="close"></div>
-        <div class="cmdpal__panel" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="cmdpal__panel" role="dialog" aria-modal="true" :aria-label="t('a11y.commandPalette')">
           <div class="cmdpal__input-row">
-            <AppIcon name="search" :size="16" class="cmdpal__search-icon" />
+            <AppIcon name="search" :size="16" class="cmdpal__search-icon" aria-hidden="true" />
             <input
               ref="inputEl"
               v-model="query"
               class="cmdpal__input"
               type="text"
+              role="combobox"
+              :aria-expanded="results.length > 0"
+              aria-autocomplete="list"
+              :aria-controls="results.length ? 'cmdpal-results' : undefined"
+              :aria-activedescendant="results.length ? 'cmdpal-item-' + selected : undefined"
+              :aria-label="t('a11y.searchCommands')"
               :placeholder="t('palette.placeholder')"
               autocomplete="off"
               spellcheck="false"
@@ -18,28 +24,30 @@
               @keydown.up.prevent="move(-1)"
               @keydown.enter.prevent="run(selected)"
             />
-            <kbd class="cmdpal__esc">Esc</kbd>
+            <kbd class="cmdpal__esc" aria-hidden="true">Esc</kbd>
           </div>
 
-          <div v-if="results.length" class="cmdpal__results" role="listbox">
+          <div v-if="results.length" id="cmdpal-results" class="cmdpal__results" role="listbox" :aria-label="t('a11y.searchCommands')">
             <button
               v-for="(r, i) in results"
+              :id="'cmdpal-item-' + i"
               :key="r.to"
               type="button"
               class="cmdpal__item"
               :class="{ active: i === selected }"
               role="option"
+              tabindex="-1"
               :aria-selected="i === selected"
               @mouseenter="selected = i"
               @click="run(i)"
             >
-              <AppIcon :name="r.icon" :size="15" class="cmdpal__item-icon" />
+              <AppIcon :name="r.icon" :size="15" class="cmdpal__item-icon" aria-hidden="true" />
               <span class="cmdpal__item-label">{{ r.label }}</span>
               <span v-if="r.subtitle" class="cmdpal__item-sub">{{ r.subtitle }}</span>
-              <kbd v-if="r.kbd" class="cmdpal__item-kbd">{{ r.kbd }}</kbd>
+              <kbd v-if="r.kbd" class="cmdpal__item-kbd" aria-hidden="true">{{ r.kbd }}</kbd>
             </button>
           </div>
-          <div v-else class="cmdpal__empty">
+          <div v-else class="cmdpal__empty" role="status" aria-live="polite">
             <p>{{ t('palette.noResults') }}</p>
           </div>
         </div>
@@ -72,6 +80,7 @@ const open = ref(false);
 const query = ref('');
 const selected = ref(0);
 const inputEl = ref(null);
+let previousFocus = null;
 
 // 维度换算: 命令源来自 nav 的路由项(去 section/企业过滤由 nav 自身决定,
 // 这里统一展示全部, 个人版不显示 enterprise 项是 nav.js 的职责)
@@ -120,8 +129,22 @@ function parseQuery(path) {
   return Object.fromEntries(new URLSearchParams(qs));
 }
 
-function openPalette() { open.value = true; selected.value = 0; query.value = ''; nextTick(() => { inputEl.value?.focus(); }); }
-function close() { open.value = false; }
+function openPalette() {
+  previousFocus = document.activeElement;
+  open.value = true;
+  selected.value = 0;
+  query.value = '';
+  nextTick(() => { inputEl.value?.focus(); });
+}
+function close() {
+  open.value = false;
+  // 恢复焦点到打开命令面板之前的元素 (a11y: 焦点还原)
+  if (previousFocus && typeof previousFocus.focus === 'function') {
+    nextTick(() => { previousFocus.focus({ preventScroll: true }); previousFocus = null; });
+  } else {
+    previousFocus = null;
+  }
+}
 
 function onKey(e) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {

@@ -23,8 +23,10 @@
           :class="{ active: sessionId === s.id }"
           role="button"
           tabindex="0"
+          :aria-pressed="sessionId === s.id"
           @click="selectSession(s)"
-          @keydown.enter="selectSession(s)"
+          @keydown.enter.prevent="selectSession(s)"
+          @keydown.space.prevent="selectSession(s)"
         >
           <div class="session-item__main">
             <div class="session-item__title">{{ sessionTitle(s) }}</div>
@@ -34,8 +36,8 @@
               <span>{{ sessionTime(s) }}</span>
             </div>
           </div>
-          <button v-if="isAdmin" class="session-del" :title="t('view.chat.deleteSession')" @click.stop="deleteSession(s)">
-            <AppIcon name="trash" :size="14" />
+          <button v-if="isAdmin" class="session-del" :title="t('view.chat.deleteSession')" :aria-label="t('a11y.deleteSession')" @click.stop="deleteSession(s)">
+            <AppIcon name="trash" :size="14" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -52,8 +54,8 @@
       </div>
       <div class="chat-header__actions">
         <div class="agent-select">
-          <label>{{ t('view.chat.agent') }}</label>
-          <select v-model="selectedAgent" @change="onAgentChange">
+          <label for="chat-agent-select">{{ t('view.chat.agent') }}</label>
+          <select id="chat-agent-select" v-model="selectedAgent" @change="onAgentChange">
             <option value="">{{ t('view.chat.selectAgent') }}</option>
             <option v-for="a in agents" :key="a.name" :value="a.name">{{ a.name }}</option>
           </select>
@@ -102,23 +104,24 @@
       <div v-if="pendingImage" class="image-preview">
         <img :src="pendingImage" :alt="t('view.chat.attachImage')" />
         <button class="remove-img" :aria-label="t('view.chat.removeImage')" @click="pendingImage = null">
-          <AppIcon name="x" :size="12" />
+          <AppIcon name="x" :size="12" aria-hidden="true" />
         </button>
       </div>
       <div class="input-row">
-        <label class="attach-btn" :title="t('view.chat.attachImage')">
-          <AppIcon name="paperclip" :size="20" />
-          <input type="file" accept="image/*" hidden @change="onImageAttach" />
+        <label class="attach-btn" :title="t('view.chat.attachImage')" :aria-label="t('a11y.attachImage')">
+          <AppIcon name="paperclip" :size="20" aria-hidden="true" />
+          <input type="file" accept="image/*" class="sr-only" @change="onImageAttach" />
         </label>
         <textarea
           ref="inputEl"
           v-model="inputText"
           :placeholder="t('view.chat.inputPlaceholder')"
+          :aria-label="t('view.chat.inputPlaceholder')"
           rows="1"
           @keydown.enter.exact="onEnter"
         ></textarea>
-        <button class="send-btn" :disabled="(!inputText.trim() && !pendingImage) || !selectedAgent || streaming" @click="sendMessage()">
-          <AppIcon :name="streaming ? 'refresh' : 'send'" :size="18" :class="{ spinning: streaming }" />
+        <button class="send-btn" :disabled="(!inputText.trim() && !pendingImage) || !selectedAgent || streaming" :aria-label="streaming ? t('a11y.stop') : t('a11y.send')" @click="sendMessage()">
+          <AppIcon :name="streaming ? 'refresh' : 'send'" :size="18" :class="{ spinning: streaming }" aria-hidden="true" />
         </button>
       </div>
       <div class="input-footer">

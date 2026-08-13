@@ -12,7 +12,7 @@
       </div>
 
       <!-- 中：快速链接（分组，参考云厂商 footer 的 link columns） -->
-      <nav class="footer-links" aria-label="footer">
+      <nav class="footer-links" :aria-label="t('a11y.footerNavigation')">
         <router-link to="/docs" class="footer-link">{{ t('nav.docs') }}</router-link>
         <span class="footer-sep">·</span>
         <router-link to="/monitor" class="footer-link">{{ t('nav.monitor') }}</router-link>
