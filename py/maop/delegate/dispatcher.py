@@ -481,7 +481,45 @@ class Dispatcher:
                 selected_model=selected_model,
                 duration_ms=(time.monotonic() - _start) * 1000.0,
             )
+            # C1 fix: 主路径记录 agent 执行性能数据（此前 record() 从不被调用，
+            # 自适应路由/演化分析的 agent_performance 表长期为空）
+            self._record_agent_performance(agent, routing_key, result)
             return result
+
+    def _record_agent_performance(
+        self,
+        agent: str,
+        routing_key: str,
+        dispatch_result: Any,
+    ) -> None:
+        """C1 fix: 接线 ``AgentPerformanceTracker.record()`` 到主执行路径。
+
+        此前 ``record()`` 仅被 ``sync_from_episodic`` 手动触发，自适应路由与
+        演化分析读取的 ``agent_performance`` 表长期为空。此处统一在 dispatch
+        结果确定后记录（成功/部分成功/失败均记录）。记录失败仅 debug 日志，
+        不阻塞 dispatch。
+        """
+        try:
+            import os
+
+            from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
+
+            root = os.environ.get("MAOP_ROOT_DIR", ".") or "."
+            tracker = AgentPerformanceTracker(root_dir=root)
+            result = dispatch_result.result if dispatch_result else None
+            if result is None:
+                return
+            exit_code = getattr(result, "exit_code", -1)
+            outcome = "success" if exit_code == 0 else ("failure" if exit_code < 0 else "partial")
+            tracker.record(
+                agent=agent,
+                routing_key=routing_key or "",
+                outcome=outcome,
+                cost_usd=0.0,  # 成本由 cost_tracker 独立记录，避免重复记账
+                latency_ms=float(getattr(result, "duration_ms", 0) or 0),
+            )
+        except Exception as exc:
+            logger.debug("[dispatcher] agent performance record failed: %s", exc)
 
     async def _dispatch_impl(
         self,
