@@ -28,6 +28,18 @@ async def api_evolve_status() -> dict[str, Any]:
         data = data.dict()
     return {"status": "ok", "data": data}
 
+
+@router.get("/api/evolve/metrics")
+@handle_api_errors("Evolve metrics", error_value={"timeseries": [], "heatmap": [], "lineage": []})
+async def api_evolve_metrics() -> dict[str, Any]:
+    """演化指标聚合（时间序列 / 热力图 / 世系）。
+
+    TODO(P1): 当前后端无演化指标数据源，返回空结构以对齐前端契约。
+    待演化历史数据接入后从 evolve 引擎聚合真实时间序列/热力图/世系。
+    """
+    return {"timeseries": [], "heatmap": [], "lineage": []}
+
+
 @router.post("/api/evolve/analyze")
 @handle_api_errors("Evolve analyze", error_value={"status": "error", "error": "Evolve analyze unavailable"})
 async def api_evolve_analyze(request: Request) -> dict[str, Any]:

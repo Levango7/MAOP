@@ -251,3 +251,23 @@ async def api_evolution_approve(request: Request) -> dict[str, Any]:
         body["experiment"], candidate_config=body.get("candidate_config"),
     )
     return {"status": "ok", "result": result}
+
+
+# ── Skill 编辑器 ────────────────────────────────────────────────
+# TODO(P1): 后端尚无 Skill 原子/composite 的持久化数据源，以下端点返回空
+# 结构以对齐前端 SkillEditor.vue 契约（避免 404），待 skill 系统落地后接入。
+
+
+@router.get("/api/evolution/skills")
+@handle_api_errors("evolution skills", error_value={"skills": []})
+async def api_evolution_skills() -> dict[str, Any]:
+    """列出 Skill 原子（当前为空，Skill 系统待落地）。"""
+    return {"skills": []}
+
+
+@router.post("/api/evolution/skills/composite")
+@handle_api_errors("evolution skill composite", error_value={"status": "error"})
+async def api_evolution_skill_composite(request: Request) -> dict[str, Any]:
+    """保存 composite Skill（当前为空实现，Skill 系统待落地）。"""
+    require_admin(request)
+    return {"status": "ok", "saved": False, "message": "skill persistence not implemented"}

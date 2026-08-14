@@ -217,3 +217,23 @@ async def health_check() -> dict[str, Any]:
     hub = _get_hub()
     health = await hub.health_check_all()
     return {"health": health}
+
+
+# ── Marketplace ─────────────────────────────────────────────────
+# TODO(P1): 后端 marketplace 数据源待接入，以下端点返回空结构以对齐
+# SkillMarket.vue 契约（避免 404）。
+
+
+@router.get("/marketplace/tools")
+@handle_api_errors
+async def marketplace_tools() -> dict[str, Any]:
+    """列出 Marketplace 可安装工具（当前为空，Marketplace 数据源待落地）。"""
+    return {"tools": []}
+
+
+@router.post("/marketplace/tools/{tool_id}/install")
+@handle_api_errors
+async def marketplace_install(tool_id: str, request: Request) -> dict[str, Any]:
+    """安装 Marketplace 工具（当前为空实现）。"""
+    require_admin(request)
+    return {"status": "ok", "installed": False, "tool": tool_id, "message": "marketplace install not implemented"}
