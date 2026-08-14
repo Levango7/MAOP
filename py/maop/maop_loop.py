@@ -501,11 +501,16 @@ class MaopLoop(ExecuteMixin):
         return PhaseResult(ok=True)
 
     def _budget_reconciliation(self, exec_result: Any, trace_id: str) -> None:
-        """Record actual cost after execution (best-effort)."""
+        """Record actual cost after execution (best-effort).
+
+        P2-1 成本双写统一: writes to ``CostTracker`` (SQLite ``maop.db``)
+        directly instead of the legacy JSON ``budget_ledger.json`` via
+        ``model.budget.BudgetGuard``, eliminating the dual-write split.
+        """
         if not exec_result or not exec_result.model:
             return
         try:
-            from maop.model.budget import BudgetGuard
+            from maop.core.cost_tracker import CostTracker
             from maop.model.registry import ModelRegistry
 
             model_name = exec_result.model or ""
@@ -535,8 +540,8 @@ class MaopLoop(ExecuteMixin):
                     + model_def.cost_per_1k_output * est_tokens_out / 1000
                 )
 
-            bg = BudgetGuard(root_dir=self._root)
-            bg.record_actual_cost(
+            tracker = CostTracker(root_dir=self._root)
+            tracker.record_actual_cost(
                 trace_id=trace_id, model=model_name, provider=provider,
                 actual_tokens_in=est_tokens_in, actual_tokens_out=est_tokens_out,
                 estimated_cost=estimated_cost,

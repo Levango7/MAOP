@@ -386,6 +386,60 @@ class CostTracker:
     def update_pricing(self, model: str, prompt_per_1m: float, completion_per_1m: float) -> None:
         self._pricing[model] = ModelPricing(prompt_per_1m=prompt_per_1m, completion_per_1m=completion_per_1m)
 
+    # ── Cost Reconciliation (compat with model.budget.BudgetGuard) ──
+
+    def record_actual_cost(
+        self,
+        trace_id: str = "",
+        model: str = "",
+        provider: str = "",
+        actual_tokens_in: int = 0,
+        actual_tokens_out: int = 0,
+        estimated_cost: float = 0.0,
+    ) -> dict[str, Any]:
+        """Post-execution cost reconciliation.
+
+        Records actual token usage via :meth:`record` and returns a
+        reconciliation summary comparing estimated vs actual cost.
+
+        This method provides API compatibility with the legacy
+        ``maop.model.budget.BudgetGuard.record_actual_cost`` so that
+        ``maop_loop`` can use ``CostTracker`` as the single source of
+        truth for cost data (P2-1: 成本双写统一).
+        """
+        # Calculate actual cost from the pricing table; fall back to
+        # the caller's estimate when the model is not in the table.
+        actual_cost = self._calculate_cost(model, actual_tokens_in, actual_tokens_out)
+        if actual_cost == 0.0:
+            actual_cost = estimated_cost
+
+        self.record(
+            model=model,
+            prompt_tokens=actual_tokens_in,
+            completion_tokens=actual_tokens_out,
+            metadata={
+                "trace_id": trace_id,
+                "provider": provider,
+                "estimated_cost": estimated_cost,
+            },
+        )
+
+        discrepancy = round(actual_cost - estimated_cost, 6)
+        if estimated_cost > 0 and abs(discrepancy) > estimated_cost * 0.5:
+            logger.warning(
+                "Cost discrepancy for trace %s: estimated $%.6f, actual $%.6f (delta %+.6f)",
+                trace_id, estimated_cost, actual_cost, discrepancy,
+            )
+
+        return {
+            "trace_id": trace_id,
+            "estimated_cost": round(estimated_cost, 6),
+            "actual_cost": round(actual_cost, 6),
+            "discrepancy": discrepancy,
+            "tokens_in": actual_tokens_in,
+            "tokens_out": actual_tokens_out,
+        }
+
     # ── Internal ────────────────────────────────────────────────
 
     @staticmethod

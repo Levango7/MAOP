@@ -255,7 +255,7 @@ class TestBudgetReconciliation:
         )
 
         with patch.object(loop, '_execute_with_strategy', new_callable=AsyncMock, return_value=mock_result), \
-             patch('maop.model.budget.BudgetGuard') as MockBG, \
+             patch('maop.core.cost_tracker.CostTracker') as MockBG, \
              patch('maop.model.registry.ModelRegistry') as MockReg:
 
             mock_model_def = MagicMock()
@@ -312,7 +312,7 @@ class TestBudgetReconciliation:
         )
 
         with patch.object(loop, '_execute_with_strategy', new_callable=AsyncMock, return_value=mock_result), \
-             patch('maop.model.budget.BudgetGuard') as MockBG, \
+             patch('maop.core.cost_tracker.CostTracker') as MockBG, \
              patch('maop.model.registry.ModelRegistry') as MockReg:
 
             mock_registry = MagicMock()

@@ -1,4 +1,19 @@
-"""BudgetGuard — Cost tracking and budget enforcement."""
+"""BudgetGuard — Cost tracking and budget enforcement.
+
+.. deprecated:: P2-1
+    This JSON-backed ``BudgetGuard`` is superseded by the SQLite-backed
+    :class:`maop.core.cost_tracker.CostTracker` which is now the single
+    source of truth for cost data. New code should import ``CostTracker``
+    from :mod:`maop.core.cost_tracker` (or via the re-export below:
+    ``from maop.model.budget import CostTracker``).
+
+    The legacy ``BudgetGuard`` class is retained here so that existing
+    callers (``delegate/dispatcher.py`` read-only ``can_spend``,
+    ``dashboard/routers/model.py`` read-only ``stats``) and the test
+    suite (``tests/test_budget.py``) continue to work without changes.
+    The JSON ``budget_ledger.json`` write path is no longer used by the
+    main loop (``maop_loop.py`` now writes to ``CostTracker`` directly).
+"""
 
 from __future__ import annotations
 
@@ -9,6 +24,9 @@ from typing import Any
 
 from maop.model.schema import BudgetConfig
 
+# Re-export CostTracker as the canonical cost source (P2-1).
+from maop.core.cost_tracker import CostTracker  # noqa: F401  — re-exported for callers
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,9 +34,12 @@ logger = logging.getLogger(__name__)
 # NOTE: BudgetGuard (JSON-backed, this class) is one of two parallel
 # budget implementations. The other is BudgetGuard (SQLite-backed) in
 # maop/core/budget_guard.py. Both have production callers:
-#   - This class (JSON): used by maop_loop.py, delegate/dispatcher.py (main loop)
+#   - This class (JSON): used by delegate/dispatcher.py (can_spend, read-only),
+#     dashboard/routers/model.py (stats, read-only). maop_loop.py has been
+#     migrated to CostTracker (SQLite) — see P2-1 成本双写统一.
 #   - core/budget_guard.py BudgetGuard (SQLite): used by dashboard/routers/budget.py
-# Future work: consider merging into a single canonical implementation.
+# Future work: migrate remaining read-only callers to CostTracker and delete
+# this JSON implementation.
 
 class BudgetGuard:
     """Tracks spending and enforces budget limits.
