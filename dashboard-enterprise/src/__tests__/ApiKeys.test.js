@@ -1,8 +1,8 @@
 // Tests for ApiKeys.vue — list rendering, field mapping, empty/error states,
 // generate dialog flow and key-reveal-once behaviour.
 //
-// ApiKeys.onMounted calls load() which hits GET /api/auth/api-keys.
-// Generate posts to /api/auth/api-keys and reveals the full key once.
+// ApiKeys.onMounted calls load() which hits GET /api/api-keys.
+// Generate posts to /api/api-keys and reveals the full key once.
 // We mock global.fetch, stub PageHeader (it depends on vue-router), then
 // assert on the rendered key rows and dialog interactions.
 
@@ -52,7 +52,7 @@ describe('ApiKeys.vue', () => {
 
   function defaultRoutes(overrides = {}) {
     return {
-      '/api/auth/api-keys': {
+      '/api/api-keys': {
         keys: [
           {
             key_id: 'k_001',
@@ -132,7 +132,7 @@ describe('ApiKeys.vue', () => {
   });
 
   it('shows empty state when no keys are returned', async () => {
-    mockFetch({ '/api/auth/api-keys': { keys: [] } });
+    mockFetch({ '/api/api-keys': { keys: [] } });
     const wrapper = await mountApiKeys();
     expect(wrapper.findComponent(EmptyState).exists()).toBe(true);
     expect(wrapper.text()).not.toContain('CI Pipeline');
@@ -151,7 +151,7 @@ describe('ApiKeys.vue', () => {
     const wrapper = await mountApiKeys();
     // ListPageLayout renders EmptyState with the error title/description.
     expect(wrapper.findComponent(EmptyState).exists()).toBe(true);
-    expect(wrapper.text()).toContain('API /api/auth/api-keys: 500');
+    expect(wrapper.text()).toContain('API /api/api-keys: 500');
     wrapper.unmount();
   });
 
@@ -173,7 +173,7 @@ describe('ApiKeys.vue', () => {
     const fullKey = 'maop_a1b2_c3d4_e5f6_g7h8_fullsecret';
     mockFetch({
       ...defaultRoutes(),
-      'POST /api/auth/api-keys': { key: fullKey, key_id: 'k_003', status: 'ok' },
+      'POST /api/api-keys': { key: fullKey, key_id: 'k_003', status: 'ok' },
     });
     const wrapper = await mountApiKeys();
 
@@ -213,19 +213,17 @@ describe('ApiKeys.vue', () => {
   it('opens the detail drawer when the view-detail button is clicked', async () => {
     mockFetch({
       ...defaultRoutes(),
-      '/api/auth/api-keys/k_001': {
-        key: {
-          key_id: 'k_001',
-          name: 'CI Pipeline',
-          key_prefix: 'maop_a1b2_****',
-          scopes: ['agents:read', 'agents:execute'],
-          status: 'active',
-          rate_limit: 60,
-          ip_whitelist: '',
-          created_at: '2026-08-01T00:00:00Z',
-          last_used_at: '2026-08-12T10:00:00Z',
-          expires_at: null,
-        },
+      '/api/api-keys/k_001': {
+        key_id: 'k_001',
+        name: 'CI Pipeline',
+        key_prefix: 'maop_a1b2_****',
+        scopes: ['agents:read', 'agents:execute'],
+        status: 'active',
+        rate_limit: 60,
+        ip_whitelist: '',
+        created_at: '2026-08-01T00:00:00Z',
+        last_used_at: '2026-08-12T10:00:00Z',
+        expires_at: null,
         stats: {
           total_calls: 1200,
           success_rate: 98.5,

@@ -1,6 +1,6 @@
 // Tests for Licenses.vue — list rendering, filters, generate dialog, detail drawer, status tones.
 //
-// Licenses.onMounted calls load() which hits /api/license/list. We mock global.fetch,
+// Licenses.onMounted calls load() which hits /api/licenses/list. We mock global.fetch,
 // stub PageHeader, then assert on the rendered DataTable, StatCards, and interactions.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -57,7 +57,7 @@ describe('Licenses.vue', () => {
 
   function defaultRoutes(overrides = {}) {
     return {
-      '/api/license/list': { status: 'ok', licenses: [] },
+      '/api/licenses/list': { status: 'ok', licenses: [] },
       ...overrides,
     };
   }
@@ -79,7 +79,7 @@ describe('Licenses.vue', () => {
 
   it('renders DataTable with loaded licenses', async () => {
     mockFetch(defaultRoutes({
-      '/api/license/list': {
+      '/api/licenses/list': {
         status: 'ok',
         licenses: [makeLicense()],
       },
@@ -92,7 +92,7 @@ describe('Licenses.vue', () => {
 
   it('masks the license key in the table (maop_xxxx_****)', async () => {
     mockFetch(defaultRoutes({
-      '/api/license/list': {
+      '/api/licenses/list': {
         status: 'ok',
         licenses: [makeLicense({ license_id: 'maop_seg01_secret' })],
       },
@@ -113,7 +113,7 @@ describe('Licenses.vue', () => {
   it('shows inline error when list API fails', async () => {
     global.fetch = vi.fn((url) => {
       const u = String(url);
-      if (u === '/api/license/list') {
+      if (u === '/api/licenses/list') {
         return Promise.resolve({
           ok: false, status: 500,
           json: () => Promise.resolve({}), text: () => Promise.resolve(''),
@@ -133,7 +133,7 @@ describe('Licenses.vue', () => {
   // ── Stats ──────────────────────────────────────────────────
   it('renders three StatCards for totals', async () => {
     mockFetch(defaultRoutes({
-      '/api/license/list': {
+      '/api/licenses/list': {
         status: 'ok',
         licenses: [makeLicense(), makeLicense({ license_id: 'maop_2_y' })],
       },
@@ -168,9 +168,9 @@ describe('Licenses.vue', () => {
     wrapper.unmount();
   });
 
-  it('posts to /api/license/generate on valid submit', async () => {
+  it('posts to /api/licenses/create on valid submit', async () => {
     mockFetch(defaultRoutes({
-      '/api/license/generate': { status: 'ok', license: { license_id: 'maop_new_x' } },
+      '/api/licenses/create': { status: 'ok', license: { license_id: 'maop_new_x' } },
     }));
     const wrapper = await mountLicenses();
     await wrapper.find('.lic-btn--primary').trigger('click');
@@ -184,7 +184,7 @@ describe('Licenses.vue', () => {
     await saveBtn.trigger('click');
     await flushPromises();
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/license/generate',
+      '/api/licenses/create',
       expect.objectContaining({ method: 'POST' }),
     );
     wrapper.unmount();
@@ -194,8 +194,8 @@ describe('Licenses.vue', () => {
   it('opens detail drawer when a table row is clicked', async () => {
     const lic = makeLicense();
     mockFetch(defaultRoutes({
-      '/api/license/list': { status: 'ok', licenses: [lic] },
-      '/api/license/maop_abc123_secret': { status: 'ok', license: { ...lic, history: [] } },
+      '/api/licenses/list': { status: 'ok', licenses: [lic] },
+      '/api/licenses/maop_abc123_secret': { status: 'ok', license: { ...lic, history: [] } },
     }));
     const wrapper = await mountLicenses();
     // Click first data row in DataTable
@@ -212,7 +212,7 @@ describe('Licenses.vue', () => {
   // ── Status tones ───────────────────────────────────────────
   it('applies success tone (green) for trial status', async () => {
     mockFetch(defaultRoutes({
-      '/api/license/list': { status: 'ok', licenses: [makeLicense({ status: 'trial' })] },
+      '/api/licenses/list': { status: 'ok', licenses: [makeLicense({ status: 'trial' })] },
     }));
     const wrapper = await mountLicenses();
     const badge = wrapper.find('.badge--success');
@@ -222,7 +222,7 @@ describe('Licenses.vue', () => {
 
   it('applies info tone (blue) for active status', async () => {
     mockFetch(defaultRoutes({
-      '/api/license/list': { status: 'ok', licenses: [makeLicense({ status: 'active' })] },
+      '/api/licenses/list': { status: 'ok', licenses: [makeLicense({ status: 'active' })] },
     }));
     const wrapper = await mountLicenses();
     const badge = wrapper.find('.badge--info');
@@ -232,7 +232,7 @@ describe('Licenses.vue', () => {
 
   it('applies fail tone (red) for expired status', async () => {
     mockFetch(defaultRoutes({
-      '/api/license/list': { status: 'ok', licenses: [makeLicense({ status: 'expired' })] },
+      '/api/licenses/list': { status: 'ok', licenses: [makeLicense({ status: 'expired' })] },
     }));
     const wrapper = await mountLicenses();
     const badge = wrapper.find('.badge--fail');
@@ -242,7 +242,7 @@ describe('Licenses.vue', () => {
 
   it('applies warn tone (orange) for revoked status', async () => {
     mockFetch(defaultRoutes({
-      '/api/license/list': { status: 'ok', licenses: [makeLicense({ status: 'revoked' })] },
+      '/api/licenses/list': { status: 'ok', licenses: [makeLicense({ status: 'revoked' })] },
     }));
     const wrapper = await mountLicenses();
     const badge = wrapper.find('.badge--warn');

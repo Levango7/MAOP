@@ -254,8 +254,9 @@ describe('Quotas.vue', () => {
     await viewDetailBtn.trigger('click');
     await flushPromises();
     await flushPromises();
-    expect(wrapper.find('.history-item').exists()).toBe(true);
-    expect(wrapper.text()).toContain('max_agents');
+    // 后端暂无 quota history 端点 → 视图诚实降级为空态(EmptyState), 不渲染历史项
+    expect(wrapper.find('.history-item').exists()).toBe(false);
+    expect(wrapper.findComponent(EmptyState).exists()).toBe(true);
     wrapper.unmount();
   });
 
@@ -273,11 +274,11 @@ describe('Quotas.vue', () => {
     await saveBtn.trigger('click');
     await flushPromises();
     await flushPromises();
-    // Verify a POST request was made to /api/tenant/acme/quota
+    // Verify a POST request was made to /api/quotas/{id}/{resource} (new contract)
     const postCalls = global.fetch.mock.calls.filter(
       (c) => c[1] && c[1].method === 'POST',
     );
-    const quotaPost = postCalls.find((c) => String(c[0]).endsWith('/quota'));
+    const quotaPost = postCalls.find((c) => /\/api\/quotas\/acme\//.test(String(c[0])));
     expect(quotaPost).toBeTruthy();
     // Modal closed after successful save
     expect(wrapper.find('.modal').exists()).toBe(false);
