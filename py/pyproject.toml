@@ -19,11 +19,11 @@ dependencies = [
     # - numpy 3.0 changed the C ABI; pin below 3.0.
     "numpy>=1.24.0,<3.0",
     # - cryptography: widened to <49 to allow CVE fixes (46.x+).
-    "cryptography>=42.0,<49",
+    "cryptography>=44.0,<49",
     "aiosqlite>=0.20.0",
     "python-multipart>=0.0.9",
     "alembic>=1.13.0",
-    "aiohttp>=3.9.0",
+    "aiohttp>=3.10.0",
     # - websockets 14+ made breaking asyncio changes; cap below 15.
     "websockets>=12.0,<15",
     "PyJWT>=2.8.0",
@@ -73,7 +73,7 @@ enterprise = [
     "pika>=1.3",
     "etcd3>=0.12",
     # SAML SSO (enterprise/saml_handler.py) + sso integration tests require lxml.
-    "lxml>=4.9.0",
+    "lxml>=5.0.0",
 ]
 # P2-10: xmlsec for SAML XML signature verification/encryption.
 # Required by enterprise/saml_handler.py for production SSO deployments.

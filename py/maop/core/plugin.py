@@ -7,11 +7,17 @@ Provides:
   - PluginManager: discover/load/start/stop/reload plugins
   - Extension points via HookManager integration
 
-Security model:
+Security model (defense in depth):
   - Path whitelist: only files under ``plugins/`` may be loaded
   - SHA-256 checksum: mandatory integrity verification per manifest
-  - Restricted builtins: dangerous functions (exec, eval, open, __import__)
-    are blocked unless explicitly allowed
+  - Static AST scan: forbidden dunder attribute access
+    (__class__, __subclasses__, __globals__, __code__, ...) is rejected
+    at parse time, blocking the classic
+    ``().__class__.__bases__[0].__subclasses__()`` escape chain
+  - Restricted builtins (pure whitelist): only explicitly-listed safe
+    names are exposed; dangerous builtins (globals, locals, getattr,
+    type, vars, dir, eval, exec, compile, open, __import__, ...) are
+    either omitted or replaced with stubs that raise SandboxViolation
   - Import guard: plugin code may only import from a configurable allowlist
   - Timeout: plugin init functions are capped by a configurable wall-clock limit
 
@@ -25,6 +31,7 @@ Plugin directory layout::
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import hashlib
 import importlib.util
@@ -68,56 +75,114 @@ class PluginManifest(BaseModel):
     timeout_seconds: float = 30.0
 
 
-_BLOCKED_BUILTINS = frozenset({
-    "exec", "eval", "compile", "__import__",
-    "breakpoint", "exit", "quit", "open",
+# ── Sandbox: builtins whitelist + dunder AST scan ──────────────────────
+#
+# Defense in depth against sandbox escape:
+#   1. Static AST scan rejects forbidden dunder attribute access
+#      (__class__, __subclasses__, __globals__, __code__, ...) before the
+#      plugin source ever executes — blocks the classic
+#      ``().__class__.__bases__[0].__subclasses__()`` escape chain.
+#   2. Runtime __builtins__ *whitelist*: only explicitly-listed safe names
+#      are exposed; dangerous builtins (globals, locals, getattr, type,
+#      vars, dir, eval, exec, compile, open, __import__, ...) are either
+#      omitted or replaced with stubs that raise SandboxViolation.
+#   3. Import guard: __import__ is wrapped to only allow whitelisted
+#      top-level modules.
+#   4. Wall-clock timeout on init functions (threaded on Windows,
+#      multiprocessing on POSIX).
+
+# Builtins exposed to plugin code (pure whitelist — anything not listed
+# here is unavailable).  Chosen to be sufficient for ordinary data
+# processing without enabling sandbox escape.
+_SAFE_BUILTIN_NAMES = frozenset({
+    # ── types ──
+    "str", "int", "float", "bool", "list", "dict", "tuple", "set",
+    "frozenset", "bytes", "complex", "range", "slice",
+    # ── functional ──
+    "print", "len", "enumerate", "zip", "map", "filter", "sorted",
+    "reversed", "isinstance", "abs", "min", "max", "sum", "any", "all",
+    "round", "pow", "divmod", "hash", "repr", "format",
+    "chr", "ord", "hex", "oct", "bin", "ascii", "callable",
+    "iter", "next",
+    # ── exceptions (plugins may raise standard exceptions) ──
+    "BaseException", "Exception", "ArithmeticError", "AssertionError",
+    "AttributeError", "BlockingIOError", "BrokenPipeError",
+    "BytesWarning", "ChildProcessError", "ConnectionAbortedError",
+    "ConnectionError", "ConnectionRefusedError", "ConnectionResetError",
+    "DeprecationWarning", "EOFError", "EnvironmentError",
+    "FileExistsError", "FileNotFoundError", "FloatingPointError",
+    "FutureWarning", "GeneratorExit", "IOError", "ImportError",
+    "IndentationError", "IndexError", "InterruptedError",
+    "IsADirectoryError", "KeyError", "KeyboardInterrupt",
+    "LookupError", "MemoryError", "ModuleNotFoundError",
+    "NameError", "NotADirectoryError", "NotImplementedError",
+    "OSError", "OverflowError", "PendingDeprecationWarning",
+    "PermissionError", "ProcessLookupError", "RecursionError",
+    "ReferenceError", "ResourceWarning", "RuntimeError", "RuntimeWarning",
+    "StopAsyncIteration", "StopIteration", "SyntaxError", "SyntaxWarning",
+    "SystemError", "SystemExit", "TabError", "TimeoutError",
+    "TypeError", "UnboundLocalError", "UnicodeDecodeError",
+    "UnicodeEncodeError", "UnicodeError", "UnicodeTranslateError",
+    "UnicodeWarning", "UserWarning", "ValueError", "Warning",
+    "ZeroDivisionError",
 })
-_SAFE_BUILTINS_ADDITIONS = {
-    "print": print,
-    "len": len,
-    "range": range,
-    "enumerate": enumerate,
-    "zip": zip,
-    "map": map,
-    "filter": filter,
-    "sorted": sorted,
-    "reversed": reversed,
-    "isinstance": isinstance,
-    "type": type,
-    "str": str,
-    "int": int,
-    "float": float,
-    "bool": bool,
-    "list": list,
-    "dict": dict,
-    "set": set,
-    "tuple": tuple,
-    "bytes": bytes,
-    "None": None,
+
+# Safe builtin constants (singletons exposed as names).
+_SAFE_BUILTIN_CONSTS: dict[str, object] = {
     "True": True,
     "False": False,
-    "abs": abs,
-    "min": min,
-    "max": max,
-    "sum": sum,
-    "any": any,
-    "all": all,
-    "hasattr": hasattr,
-    "getattr": getattr,
-    "setattr": setattr,
-    "round": round,
-    "pow": pow,
-    "divmod": divmod,
-    "hash": hash,
-    "id": id,
-    "repr": repr,
-    "format": format,
-    "chr": chr,
-    "ord": ord,
-    "hex": hex,
-    "oct": oct,
-    "bin": bin,
+    "None": None,
+    "NotImplemented": NotImplemented,
+    "Ellipsis": ...,
 }
+
+# Builtins replaced with stubs that raise SandboxViolation (kept in the
+# namespace so plugins get a clear error instead of a bare NameError).
+# Note: ``__import__`` is handled separately via a guarded wrapper.
+_DANGEROUS_BUILTINS = frozenset({
+    # code execution / IO
+    "exec", "eval", "compile", "open", "breakpoint", "input",
+    "exit", "quit", "help", "copyright", "credits", "license",
+    # attribute reflection → enables sandbox escape
+    "getattr", "setattr", "delattr", "hasattr",
+    # namespace introspection → leaks real builtins
+    "globals", "locals", "vars", "dir",
+    # type / inheritance → enables __subclasses__ walk
+    "type", "object", "super",
+    # descriptors / metaclass helpers
+    "staticmethod", "classmethod", "property",
+    # mutable binary / memory view
+    "memoryview", "bytearray",
+})
+
+# Dunder attribute names rejected by the static AST scan.  Accessing any
+# of these as an attribute (``obj.__class__``) is blocked at parse time,
+# preventing the well-known ``().__class__.__bases__[0].__subclasses__()``
+# escape chain and its variants.
+_DUNDER_DENYLIST = frozenset({
+    # inheritance / type graph
+    "__class__", "__bases__", "__base__", "__mro__", "__subclasses__",
+    # namespace leakage
+    "__globals__", "__dict__", "__builtins__", "__closure__", "__code__",
+    # module loader state
+    "__loader__", "__spec__", "__import__", "__path__", "__file__",
+    # pickle / copy (can trigger arbitrary code)
+    "__reduce__", "__reduce_ex__", "__getstate__", "__setstate__",
+    "__getnewargs__", "__getinitargs__", "__deepcopy__", "__copy__",
+    # attribute descriptors
+    "__getattribute__", "__getattr__", "__setattr__", "__delattr__",
+    # bound-method internals
+    "__self__", "__func__", "__wrapped__",
+    # metaclass hooks
+    "__instancecheck__", "__subclasscheck__", "__subclasshook__",
+    "__init_subclass__", "__class_getitem__",
+    # descriptor owner / formatting / memory
+    "__objclass__", "__format__", "__buffer__", "__sizeof__",
+    # reflective naming
+    "__module__", "__qualname__", "__defaults__", "__kwdefaults__",
+    # exception chain (can leak traceback frames)
+    "__traceback__", "__context__", "__cause__",
+})
 
 _DEFAULT_ALLOWED_IMPORTS = frozenset({
     "json", "math", "re", "datetime", "collections",
@@ -172,15 +237,17 @@ class PluginSandbox:
     def _make_safe_builtins(self, allowed_imports: frozenset[str]) -> dict[str, Any]:
         import builtins as _builtins
 
-        safe = {}
-        for name in dir(_builtins):
-            if name in _BLOCKED_BUILTINS or name.startswith("_"):
-                continue
+        # Pure whitelist: only explicitly-listed safe names are exposed.
+        # Anything not in _SAFE_BUILTIN_NAMES / _SAFE_BUILTIN_CONSTS is
+        # simply absent from the plugin namespace.
+        safe: dict[str, Any] = {}
+        for name in _SAFE_BUILTIN_NAMES:
             val = getattr(_builtins, name, None)
             if val is not None:
                 safe[name] = val
-        safe.update(_SAFE_BUILTINS_ADDITIONS)
+        safe.update(_SAFE_BUILTIN_CONSTS)
 
+        # Controlled __import__: only whitelisted top-level modules.
         def _guarded_import(name: str, *args: Any, **kwargs: Any) -> Any:
             top_level = name.split(".")[0]
             if top_level not in allowed_imports:
@@ -191,38 +258,57 @@ class PluginSandbox:
 
         safe["__import__"] = _guarded_import
 
-        def _blocked_open(*args: Any, **kwargs: Any) -> Any:
-            raise SandboxViolation("open() is not allowed in plugin sandbox")
+        # Stubs for dangerous builtins — raise SandboxViolation with a
+        # clear, name-specific message so plugin authors get actionable
+        # diagnostics instead of a bare NameError.
+        def _make_blocker(name: str) -> Any:
+            def _raise(*args: Any, **kwargs: Any) -> Any:
+                raise SandboxViolation(
+                    f"{name}() is not allowed in plugin sandbox"
+                )
+            return _raise
 
-        safe["open"] = _blocked_open
-        safe["exec"] = _blocked_open
-        safe["eval"] = _blocked_open
-        safe["compile"] = _blocked_open
-
-        def _blocked_getattr(*args: Any, **kwargs: Any) -> Any:
-            raise SandboxViolation("getattr() is not allowed in plugin sandbox — use direct attribute access")
-
-        safe["getattr"] = _blocked_getattr
-
-        def _blocked_type(*args: Any, **kwargs: Any) -> Any:
-            raise SandboxViolation("type() is not allowed in plugin sandbox")
-
-        safe["type"] = _blocked_type
-
-        def _blocked_vars(*args: Any, **kwargs: Any) -> Any:
-            raise SandboxViolation("vars() is not allowed in plugin sandbox")
-
-        safe["vars"] = _blocked_vars
-
-        def _blocked_dir(*args: Any, **kwargs: Any) -> Any:
-            raise SandboxViolation("dir() is not allowed in plugin sandbox")
-
-        safe["dir"] = _blocked_dir
+        for danger in _DANGEROUS_BUILTINS:
+            safe[danger] = _make_blocker(danger)
 
         return safe
 
+    def _scan_source(self, path: Path) -> None:
+        """Static AST scan: reject forbidden dunder attribute access.
+
+        Blocks known sandbox-escape primitives such as ``__class__``,
+        ``__subclasses__``, ``__globals__``, ``__code__`` before the
+        plugin code ever executes.  This is a defense-in-depth layer on
+        top of the runtime ``__builtins__`` whitelist — it catches the
+        classic ``().__class__.__bases__[0].__subclasses__()`` chain
+        which does not rely on any builtin function.
+        """
+        try:
+            source = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise SandboxViolation(
+                f"Cannot read plugin source {path}: {exc}"
+            ) from exc
+        try:
+            tree = ast.parse(source, filename=str(path))
+        except SyntaxError as exc:
+            raise SandboxViolation(
+                f"Plugin source has invalid syntax: {exc}"
+            ) from exc
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr in _DUNDER_DENYLIST:
+                raise SandboxViolation(
+                    f"Forbidden attribute access '.{node.attr}' at "
+                    f"{path}:{node.lineno} — sandbox escape primitive blocked"
+                )
+
     def create_restricted_module(self, module_name: str, path: Path) -> Any:
         path = self.validate_path(path)
+        # Defense-in-depth: statically reject forbidden dunder attribute
+        # access (e.g. ``().__class__.__bases__[0].__subclasses__()``)
+        # before the plugin source is compiled and executed.
+        self._scan_source(path)
         spec = importlib.util.spec_from_file_location(module_name, str(path))
         if spec is None or spec.loader is None:
             raise ImportError(f"Cannot create module spec from {path}")

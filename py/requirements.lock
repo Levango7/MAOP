@@ -25,12 +25,12 @@ httpx>=0.27.0,<1.0
 python-dotenv==1.0.1
 mmh3==5.2.1
 numpy>=1.24.0,<3.0
-cryptography>=42.0,<49
-lxml>=4.9.0
+cryptography>=44.0,<49
+lxml>=5.0.0
 alembic>=1.13.0
 python-multipart>=0.0.9
 aiosqlite>=0.20.0
-aiohttp>=3.9.0
+aiohttp>=3.10.0
 websockets>=12.0,<15
 PyJWT>=2.8.0
 packaging>=24.0
@@ -45,7 +45,7 @@ etcd3>=0.12.0  # NOTE: upstream is effectively unmaintained (last release 2019) 
 # ── Runtime dependencies (transitive) ──────────────────────────────
 # These were frozen from an earlier environment and are kept as a reference.
 # Re-run `pip freeze` in a clean venv to refresh exact transitive pins.
-starlette>=0.38.6
+starlette>=0.40.0
 anyio>=4.6.2
 typing-extensions>=4.12.2
 python-multipart>=0.0.12

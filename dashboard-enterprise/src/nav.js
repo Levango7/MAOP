@@ -15,6 +15,8 @@ export const nav = [
   { section: 'nav.workbench' },
   { to: '/', label: 'nav.overview', icon: 'overview', subtitle: 'nav.overview.subtitle' },
   { to: '/monitor', label: 'nav.monitor', icon: 'activity', subtitle: 'nav.monitor.subtitle' },
+  // P1-3: 任务历史页 — 搜索/过滤/分页/重跑, 放在工作台分组
+  { to: '/tasks', label: 'nav.tasks', icon: 'scroll', subtitle: 'nav.tasks.subtitle' },
 
   { section: 'nav.build' },
   { to: '/run', label: 'nav.run', icon: 'play', subtitle: 'nav.run.subtitle' },

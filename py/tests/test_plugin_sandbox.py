@@ -369,3 +369,258 @@ class TestPluginChecksumDefault:
         info = mgr.load(pid)
         assert info.state.value == "errored"
         assert "checksum is mandatory" in info.error
+
+
+# ── Dunder escape chain hardening (P1-2) ──────────────────────────────
+
+
+class TestPluginSandboxDunderEscape:
+    """Verify that the classic ``__subclasses__`` escape chain and its
+    variants are blocked by the static AST scan + builtins whitelist."""
+
+    @staticmethod
+    def _make_sandbox(tmp_path):
+        plugins_dir = tmp_path / "plugins"
+        plugins_dir.mkdir()
+        return PluginSandbox(plugins_dir), plugins_dir
+
+    def test_subclasses_chain_blocked_at_parse_time(self, tmp_path):
+        """``().__class__.__bases__[0].__subclasses__()`` must be rejected
+        before execution — the canonical sandbox escape."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg):\n"
+            "    subs = ().__class__.__bases__[0].__subclasses__()\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(SandboxViolation, match="sandbox escape primitive"):
+            sandbox.create_restricted_module("evil_sub", target)
+
+    def test_class_attribute_blocked(self, tmp_path):
+        """Direct ``obj.__class__`` access is blocked."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg):\n"
+            "    cls = ().__class__\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(SandboxViolation, match="__class__"):
+            sandbox.create_restricted_module("evil_cls", target)
+
+    def test_globals_attribute_blocked(self, tmp_path):
+        """``fn.__globals__`` access is blocked (leaks real builtins)."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def _helper(): pass\n"
+            "def MAOP_plugin_init(cfg):\n"
+            "    g = _helper.__globals__\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(SandboxViolation, match="__globals__"):
+            sandbox.create_restricted_module("evil_g", target)
+
+    def test_code_object_blocked(self, tmp_path):
+        """``fn.__code__`` access is blocked (enables bytecode tricks)."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def _helper(): pass\n"
+            "def MAOP_plugin_init(cfg):\n"
+            "    c = _helper.__code__\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(SandboxViolation, match="__code__"):
+            sandbox.create_restricted_module("evil_code", target)
+
+    def test_dict_attribute_blocked(self, tmp_path):
+        """``obj.__dict__`` access is blocked (namespace leakage)."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "class _X: pass\n"
+            "def MAOP_plugin_init(cfg):\n"
+            "    d = _X().__dict__\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(SandboxViolation, match="__dict__"):
+            sandbox.create_restricted_module("evil_dict", target)
+
+    def test_mro_access_blocked(self, tmp_path):
+        """``cls.__mro__`` access is blocked."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg):\n"
+            "    m = str.__mro__\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(SandboxViolation, match="__mro__"):
+            sandbox.create_restricted_module("evil_mro", target)
+
+    def test_reduce_blocked(self, tmp_path):
+        """``obj.__reduce__`` access is blocked (pickle code execution)."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg):\n"
+            "    r = ().__reduce__()\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(SandboxViolation, match="__reduce__"):
+            sandbox.create_restricted_module("evil_reduce", target)
+
+
+class TestPluginSandboxDangerousBuiltins:
+    """Verify that dangerous builtins are blocked at runtime even when
+    the source passes the static AST scan (no dunder attributes)."""
+
+    @staticmethod
+    def _make_sandbox(tmp_path):
+        plugins_dir = tmp_path / "plugins"
+        plugins_dir.mkdir()
+        return PluginSandbox(plugins_dir), plugins_dir
+
+    def test_globals_builtin_blocked(self, tmp_path):
+        """``globals()`` must raise — it can recover the real builtins."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg): globals()\n", encoding="utf-8"
+        )
+        module, spec = sandbox.create_restricted_module("evil_g", target)
+        sandbox.exec_module(module, spec)
+        with pytest.raises(SandboxViolation, match="globals"):
+            module.MAOP_plugin_init({})
+
+    def test_locals_builtin_blocked(self, tmp_path):
+        """``locals()`` must raise — namespace introspection."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg): locals()\n", encoding="utf-8"
+        )
+        module, spec = sandbox.create_restricted_module("evil_l", target)
+        sandbox.exec_module(module, spec)
+        with pytest.raises(SandboxViolation, match="locals"):
+            module.MAOP_plugin_init({})
+
+    def test_setattr_builtin_blocked(self, tmp_path):
+        """``setattr()`` must raise — enables attribute injection."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg): setattr(cfg, 'x', 1)\n",
+            encoding="utf-8",
+        )
+        module, spec = sandbox.create_restricted_module("evil_sa", target)
+        sandbox.exec_module(module, spec)
+        with pytest.raises(SandboxViolation, match="setattr"):
+            module.MAOP_plugin_init({})
+
+    def test_hasattr_builtin_blocked(self, tmp_path):
+        """``hasattr()`` must raise — attribute probing."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg): hasattr(cfg, 'x')\n",
+            encoding="utf-8",
+        )
+        module, spec = sandbox.create_restricted_module("evil_ha", target)
+        sandbox.exec_module(module, spec)
+        with pytest.raises(SandboxViolation, match="hasattr"):
+            module.MAOP_plugin_init({})
+
+    def test_type_builtin_blocked(self, tmp_path):
+        """``type()`` must raise — enables inheritance graph walks."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg): type(cfg)\n", encoding="utf-8"
+        )
+        module, spec = sandbox.create_restricted_module("evil_t", target)
+        sandbox.exec_module(module, spec)
+        with pytest.raises(SandboxViolation, match="type"):
+            module.MAOP_plugin_init({})
+
+    def test_object_builtin_blocked(self, tmp_path):
+        """``object`` must raise — base of the inheritance graph."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg): object.__subclasses__()\n",
+            encoding="utf-8",
+        )
+        # Blocked at AST scan time (``__subclasses__``) before runtime.
+        with pytest.raises(SandboxViolation, match="__subclasses__"):
+            sandbox.create_restricted_module("evil_obj", target)
+
+    def test_vars_builtin_blocked(self, tmp_path):
+        """``vars()`` must raise — namespace introspection."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg): vars()\n", encoding="utf-8"
+        )
+        module, spec = sandbox.create_restricted_module("evil_v", target)
+        sandbox.exec_module(module, spec)
+        with pytest.raises(SandboxViolation, match="vars"):
+            module.MAOP_plugin_init({})
+
+    def test_dir_builtin_blocked(self, tmp_path):
+        """``dir()`` must raise — attribute enumeration."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "evil.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg): dir()\n", encoding="utf-8"
+        )
+        module, spec = sandbox.create_restricted_module("evil_d", target)
+        sandbox.exec_module(module, spec)
+        with pytest.raises(SandboxViolation, match="dir"):
+            module.MAOP_plugin_init({})
+
+
+class TestPluginSandboxWhitelistPreservesSafeCode:
+    """Verify that legitimate plugin code (no dunder, no dangerous
+    builtins) still loads and runs after the hardening."""
+
+    def test_safe_plugin_loads_and_runs(self, tmp_path):
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "good.py"
+        target.write_text(
+            "import json\n"
+            "def MAOP_plugin_init(cfg):\n"
+            "    data = json.dumps({'ok': True, 'n': len([1, 2, 3])})\n"
+            "    assert sorted([3, 1, 2]) == [1, 2, 3]\n"
+            "    assert sum([1, 2, 3]) == 6\n"
+            "    return data\n",
+            encoding="utf-8",
+        )
+        module, spec = sandbox.create_restricted_module("good", target)
+        sandbox.exec_module(module, spec)
+        result = module.MAOP_plugin_init({})
+        assert '"ok": true' in result
+
+    def test_safe_exceptions_available(self, tmp_path):
+        """Plugins can raise and catch standard exceptions."""
+        sandbox, plugins_dir = self._make_sandbox(tmp_path)
+        target = plugins_dir / "good.py"
+        target.write_text(
+            "def MAOP_plugin_init(cfg):\n"
+            "    try:\n"
+            "        raise ValueError('boom')\n"
+            "    except ValueError as e:\n"
+            "        return str(e)\n",
+            encoding="utf-8",
+        )
+        module, spec = sandbox.create_restricted_module("good_exc", target)
+        sandbox.exec_module(module, spec)
+        assert module.MAOP_plugin_init({}) == "boom"
+
+    @staticmethod
+    def _make_sandbox(tmp_path):
+        plugins_dir = tmp_path / "plugins"
+        plugins_dir.mkdir()
+        return PluginSandbox(plugins_dir), plugins_dir

@@ -16,6 +16,8 @@ describe('Router', () => {
       'licenses', 'sso', 'quotas', 'apikeys', 'notifications',
       // v5.1.0: Workflow editor / Skill editor / Skill market
       'workflow-editor', 'skill-editor', 'skill-market',
+      // P1-3: 任务历史页
+      'tasks',
     ];
     for (const name of expected) {
       expect(names).toContain(name);
@@ -27,11 +29,12 @@ describe('Router', () => {
     expect(route?.path).toBe('/');
   });
 
-  it('has 32 route records total', () => {
-    // 拓扑: 28 个命名业务路由 (含 v4.6.0 新增 licenses/sso/quotas/apikeys/notifications
-    // + v5.1.0 新增 workflow-editor/config-history/skill-editor/skill-market/failure-detector/hook-config)
+  it('has 33 route records total', () => {
+    // 拓扑: 29 个命名业务路由 (含 v4.6.0 新增 licenses/sso/quotas/apikeys/notifications
+    // + v5.1.0 新增 workflow-editor/skill-editor/skill-market
+    // + P1-3 新增 tasks)
     // + 3 个匿名重定向(/control /chat /evolution-history) + 1 个 /:pathMatch(.*)* 兜底
-    expect(router.getRoutes().length).toBe(32);
+    expect(router.getRoutes().length).toBe(33);
   });
 
   it('legacy routes declare redirects to merged pages', () => {

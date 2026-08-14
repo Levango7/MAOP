@@ -169,6 +169,96 @@ class SessionManager:
             ).fetchall()
         return [self._row_to_session(r) for r in rows]
 
+    # ── 任务历史页: 搜索 / 过滤 / 分页 / 排序 ───────────────────────
+    # P1-3: Overview「最近委托」只展示若干条, 用户无法回溯历史。
+    # list_paginated 在 SQL 层完成过滤+排序+分页, 避免全表读入内存。
+    # 搜索字段: agent / workdir / metadata.task / metadata.description /
+    # metadata.prompt — 用 LIKE 拼接, 命中任一即算匹配。
+    _SORTABLE_COLUMNS = {
+        "created_at": "created_at",
+        "updated_at": "updated_at",
+        "last_active_at": "last_active_at",
+        "agent": "agent",
+        "status": "status",
+        "name": "agent",  # 任务名称兜底映射到 agent
+    }
+
+    def list_paginated(
+        self,
+        *,
+        status: str = "",
+        search: str = "",
+        page: int = 1,
+        limit: int = 20,
+        sort: str = "created_at",
+        order: str = "desc",
+    ) -> dict[str, Any]:
+        """Return a paginated, filtered, searchable slice of sessions.
+
+        返回结构::
+
+            {
+              "items": [Session, ...],
+              "total": 100,
+              "page": 1,
+              "limit": 20,
+              "total_pages": 5,
+            }
+
+        - ``status`` 为 ``"all"`` 或空串时不按状态过滤; 否则按精确匹配。
+        - ``search`` 在 agent / workdir / metadata 文本上做 LIKE 模糊匹配。
+        - ``sort`` 仅允许白名单列(见 _SORTABLE_COLUMNS), 防止 SQL 注入。
+        - ``order`` 仅接受 ``asc`` / ``desc``。
+        """
+        # 参数归一化与裁剪
+        page = max(1, int(page))
+        limit = max(1, min(100, int(limit)))
+        order = "asc" if str(order).lower() == "asc" else "desc"
+        sort_col = self._SORTABLE_COLUMNS.get(sort, "created_at")
+
+        clauses: list[str] = []
+        params: list[Any] = []
+
+        # 状态过滤: running → active (会话状态枚举为 active/paused/completed/failed/archived)
+        if status and status != "all":
+            # 兼容前端语义: running 映射到 active
+            mapped = "active" if status == "running" else status
+            clauses.append("status=?")
+            params.append(mapped)
+
+        # 关键词搜索: agent / workdir / metadata 文本
+        if search:
+            kw = f"%{search}%"
+            clauses.append(
+                "(agent LIKE ? OR workdir LIKE ? OR metadata LIKE ? OR tags LIKE ?)"
+            )
+            params.extend([kw, kw, kw, kw])
+
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        offset = (page - 1) * limit
+
+        with self._connect() as conn:
+            total_row = conn.execute(
+                f"SELECT COUNT(*) AS c FROM sessions{where}", params
+            ).fetchone()
+            total = int(total_row["c"]) if total_row else 0
+
+            rows = conn.execute(
+                f"SELECT * FROM sessions{where} "
+                f"ORDER BY {sort_col} {order.upper()} LIMIT ? OFFSET ?",
+                (*params, limit, offset),
+            ).fetchall()
+
+        items = [self._row_to_session(r).model_dump() for r in rows]
+        total_pages = (total + limit - 1) // limit if total else 0
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+        }
+
     def update(
         self,
         session_id: str,
@@ -251,6 +341,30 @@ class SessionManager:
             "active": active,
             "by_status": {r["status"]: r["c"] for r in by_status},
         }
+
+    def rerun(self, session_id: str) -> Session | None:
+        """创建一个新会话作为指定会话的重跑副本。
+
+        复制原会话的 agent / workdir / tags / metadata / token_budget,
+        生成新的 session id 并以 ``active`` 状态入库。原会话保持不变。
+
+        返回新建的 Session; 若原会话不存在则返回 None。
+        """
+        origin = self.get(session_id)
+        if origin is None:
+            return None
+        # 在 metadata 中标记来源, 便于历史页展示「重跑自 xxx」
+        new_metadata = dict(origin.metadata)
+        new_metadata.setdefault("rerun_from", origin.id)
+        new_metadata.setdefault("rerun_at", datetime.now(timezone.utc).isoformat())
+        new_sid = self.create(
+            agent=origin.agent,
+            workdir=origin.workdir,
+            tags=list(origin.tags),
+            metadata=new_metadata,
+            token_budget=origin.token_budget,
+        )
+        return self.get(new_sid)
 
     def _row_to_session(self, row: Any) -> Session:
         tags = []

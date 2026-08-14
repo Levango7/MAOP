@@ -383,6 +383,8 @@ app.include_router(mcp_router.router)
 from maop.dashboard.routers import session as session_router
 
 app.include_router(session_router.router)
+# P1-3: 任务历史页 — /api/sessions (列表+分页) + /api/sessions/{id}/rerun
+app.include_router(session_router.tasks_router)
 
 from maop.dashboard.routers import react as react_router
 

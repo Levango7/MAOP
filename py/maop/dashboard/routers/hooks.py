@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.agent.plugins_hooks.hook_manager import LifecycleEvent
 from maop.core.security.middleware import require_admin
+from maop.core.security.url_validator import SSRFError, validate_webhook_url
 
 from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
@@ -190,6 +191,12 @@ async def api_hooks_create(request: Request) -> HookResponse:
     if body.method.upper() != "POST":
         raise HTTPException(400, f"Unsupported method: {body.method} (only POST supported)")
 
+    # SSRF 防护：拒绝指向内网/云元数据端点的 URL
+    try:
+        validate_webhook_url(body.url)
+    except SSRFError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
     mgr = _get_hook_mgr()
     hdef = mgr.register(
         event=body.event,
@@ -258,6 +265,12 @@ async def api_hooks_update(hook_id: str, request: Request) -> HookResponse:
         raise HTTPException(400, f"Invalid event type: {new_event}")
     if not new_url:
         raise HTTPException(400, "url must not be empty")
+
+    # SSRF 防护：拒绝指向内网/云元数据端点的 URL
+    try:
+        validate_webhook_url(new_url)
+    except SSRFError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
     # 删除旧 hook 并注册新 hook（保留原 id）
     mgr.unregister(hook_id)

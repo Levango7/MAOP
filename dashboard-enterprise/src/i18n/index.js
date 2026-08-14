@@ -40,6 +40,9 @@ export const coreMessages = {
     'nav.control': 'Control',
     'nav.chat': 'Chat',
     'nav.agents': 'Agents',
+    // P1-3: 任务历史页导航标签
+    'nav.tasks': 'Tasks',
+    'nav.tasks.subtitle': 'Task history: search, filter, rerun',
     'nav.memory': 'Memory',
     'nav.evolve': 'Evolution',
     'nav.evolutionHistory': 'Evolution History',
@@ -282,6 +285,9 @@ export const coreMessages = {
     'nav.control': '控制台',
     'nav.chat': '对话',
     'nav.agents': '智能体',
+    // P1-3: 任务历史页导航标签
+    'nav.tasks': '任务历史',
+    'nav.tasks.subtitle': '任务历史：搜索、过滤、重跑',
     'nav.memory': '记忆',
     'nav.evolve': '演进',
     'nav.evolutionHistory': '演化历史',

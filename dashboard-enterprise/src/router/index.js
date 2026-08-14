@@ -10,6 +10,8 @@ const routes = [
   { path: '/chat', redirect: { path: '/run', query: { tab: 'chat' } } },
   { path: '/evolution-history', redirect: { path: '/evolve', query: { tab: 'history' } } },
   { path: '/agents', name: 'agents', component: () => import('../views/Agents.vue') },
+  // P1-3: 任务历史页 — 搜索/过滤/分页/重跑
+  { path: '/tasks', name: 'tasks', component: () => import('../views/Tasks.vue') },
   { path: '/memory', name: 'memory', component: () => import('../views/ThreeLayerMemory.vue') },
   { path: '/evolve', name: 'evolve', component: () => import('../views/Evolve.vue') },
   { path: '/search', name: 'search', component: () => import('../views/Search.vue') },

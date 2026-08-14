@@ -477,6 +477,24 @@ class HookManager:
         return HookResult(hook_id=hdef.id, event=event, success=True)
 
     async def _invoke_webhook(self, hdef: HookDef, event: str, data: dict[str, Any]) -> HookResult:
+        # SSRF 防御性校验（defense-in-depth）：即使绕过 API 层校验，
+        # 在实际发送 HTTP 请求前再次拒绝内网/云元数据端点。
+        try:
+            from maop.core.security.url_validator import validate_webhook_url
+            validate_webhook_url(hdef.url)
+        except ImportError:
+            # url_validator 不可用时 fail-open（不阻塞已有 hook 链）
+            logger.warning("[hook] url_validator unavailable, skipping SSRF check for '%s'", hdef.id)
+        except ValueError as exc:
+            logger.warning(
+                "[hook] SSRF validation failed for hook '%s' url='%s': %s",
+                hdef.id, hdef.url, exc,
+            )
+            return HookResult(
+                hook_id=hdef.id, event=event,
+                success=False, error=f"SSRF blocked: {exc}",
+            )
+
         try:
             import httpx
         except ImportError:

@@ -12,6 +12,11 @@ from maop.dashboard.error_handler import handle_api_errors
 
 router = APIRouter(prefix="/api/session", tags=["session"])
 
+# P1-3: 任务历史页专用 router (复数 /api/sessions), 与现有单数 router 共存。
+# 现有 /api/session/* 端点保持不变, 新增 /api/sessions (列表+分页) 与
+# /api/sessions/{id}/rerun (重跑) 走此 router。
+tasks_router = APIRouter(prefix="/api/sessions", tags=["sessions"])
+
 
 def _get_session_mgr():
     from maop.core.security.session import SessionManager
@@ -156,3 +161,57 @@ async def clear_messages(session_id: str, request: Request) -> dict[str, Any]:
     cmgr = _get_conversation_mgr()
     count = cmgr.clear_session(session_id)
     return {"cleared": count}
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# P1-3: 任务历史页 API — /api/sessions (列表+搜索+过滤+分页+排序)
+#                            /api/sessions/{id}/rerun (重跑)
+# ════════════════════════════════════════════════════════════════════════════
+@tasks_router.get("")
+@handle_api_errors
+async def list_sessions_paginated(
+    status: str = Query("all", description="Filter by status: running/completed/failed/all"),
+    search: str = Query("", description="Search keyword (matches agent/workdir/metadata)"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    limit: int = Query(20, ge=1, le=100, description="Items per page (max 100)"),
+    sort: str = Query("created_at", description="Sort field: created_at/updated_at/name/status"),
+    order: str = Query("desc", description="Sort order: asc/desc"),
+) -> dict[str, Any]:
+    """列出所有任务/会话, 支持搜索、状态过滤、分页与排序。
+
+    返回::
+
+        {
+          "items": [...],
+          "total": 100,
+          "page": 1,
+          "limit": 20,
+          "total_pages": 5
+        }
+    """
+    mgr = _get_session_mgr()
+    return mgr.list_paginated(
+        status=status,
+        search=search,
+        page=page,
+        limit=limit,
+        sort=sort,
+        order=order,
+    )
+
+
+@tasks_router.post("/{session_id}/rerun")
+@handle_api_errors
+async def rerun_session(session_id: str, request: Request) -> dict[str, Any]:
+    """重跑指定任务/会话。
+
+    复制原会话的 agent / workdir / tags / metadata / token_budget 创建新会话,
+    新会话以 ``active`` 状态启动, metadata 中标记 ``rerun_from`` 来源。
+    返回新会话对象; 前端可据此跳转到 Run 页面继续执行。
+    """
+    require_admin(request)
+    mgr = _get_session_mgr()
+    new_session = mgr.rerun(session_id)
+    if new_session is None:
+        return {"error": "Session not found", "session": None}
+    return {"session": new_session.model_dump(), "rerun_from": session_id}
