@@ -53,6 +53,8 @@ class LLMResponse(BaseModel):
     provider: str = ""
     # 工具调用结果（OpenAI 兼容格式），供 ReactLoop 等编排器消费
     tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    # P1 fix: 异常信息结构化字段，调用方可据此判断失败（而非嗅探 content 前缀）
+    error: str = ""
 
 
 class FallbackResult(BaseModel):
@@ -205,17 +207,21 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 break
             except (httpx.HTTPStatusError, httpx.TimeoutException) as exc:
                 if attempt == self._config.max_retries - 1:
+                    logger.warning("[llm] %s request failed after %d attempts: %s", self._config.name, attempt + 1, exc)
                     return LLMResponse(
                         content=f"[LLM Error] {exc}",
                         provider=self._config.name,
                         latency_ms=int((time.perf_counter() - start) * 1000),
+                        error=str(exc),
                     )
                 await self._backoff(attempt)
             except Exception as exc:
+                logger.warning("[llm] %s request unexpected error: %s", self._config.name, exc)
                 return LLMResponse(
                     content=f"[LLM Error] {exc}",
                     provider=self._config.name,
                     latency_ms=int((time.perf_counter() - start) * 1000),
+                    error=str(exc),
                 )
 
         latency_ms = int((time.perf_counter() - start) * 1000)

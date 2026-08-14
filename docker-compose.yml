@@ -214,6 +214,7 @@ services:
     container_name: maop-otel-collector
     profiles:
       - otel
+      - monitoring  # P1 fix: prometheus(monitoring) depends_on 本服务，纳入 monitoring profile 避免单独 --profile monitoring 时依赖缺失
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro

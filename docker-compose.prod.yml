@@ -480,6 +480,9 @@ services:
     logging: *maop_logging
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # P1 fix: 挂载 rule_files 引用的告警规则，否则生产 Prometheus 加载规则失败
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./monitoring/slo-alerts.yml:/etc/prometheus/slo-alerts.yml:ro
       - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
