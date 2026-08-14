@@ -407,6 +407,10 @@ function formatAbs(ts) {
   if (isNaN(d.getTime())) return String(ts);
   return d.toLocaleString();
 }
+function expiresToTtl(v) {
+  const days = { '7d': 7, '30d': 30, '90d': 90 };
+  return days[v] ? days[v] * 86400 : null; // 'never' → null (永不过期)
+}
 function barHeight(count) {
   const max = Math.max(1, ...callTrend.value.map((p) => Number(p.count) || 0));
   return max ? Math.round(((Number(count) || 0) / max) * 100) : 0;
@@ -417,8 +421,8 @@ async function load() {
   loading.value = true;
   error.value = '';
   try {
-    const d = await api.get('/api/auth/api-keys');
-    keys.value = d.keys || [];
+    const d = await api.get('/api/api-keys');
+    keys.value = Array.isArray(d) ? d : (d.keys || []);
   } catch (e) {
     error.value = e.message || String(e);
     keys.value = [];
@@ -442,12 +446,12 @@ async function generate() {
   }
   saving.value = true;
   try {
-    const d = await api.post('/api/auth/api-keys', {
+    const d = await api.post('/api/api-keys', {
       name: form.value.name.trim(),
       scopes: form.value.scopes,
       rate_limit: Number(form.value.rate_limit) || 0,
-      ip_whitelist: form.value.ip_whitelist.trim(),
-      expires_in: form.value.expires_in,
+      ip_whitelist: (form.value.ip_whitelist || '').split(',').map((s) => s.trim()).filter(Boolean),
+      ttl_s: expiresToTtl(form.value.expires_in),
     });
     generatedKey.value = d.key || d.plaintext_key || d.api_key || '';
     showGenerate.value = false;
@@ -504,11 +508,11 @@ async function saveEdit() {
   }
   saving.value = true;
   try {
-    await api.put('/api/auth/api-keys/' + encodeURIComponent(editForm.value.key_id), {
+    await api.put('/api/api-keys/' + encodeURIComponent(editForm.value.key_id), {
       name: editForm.value.name.trim(),
       scopes: editForm.value.scopes,
       rate_limit: Number(editForm.value.rate_limit) || 0,
-      ip_whitelist: editForm.value.ip_whitelist.trim(),
+      ip_whitelist: (editForm.value.ip_whitelist || '').split(',').map((s) => s.trim()).filter(Boolean),
     });
     toast.success(t('view.apikeys.saved'));
     showEdit.value = false;
@@ -524,7 +528,7 @@ async function saveEdit() {
 async function revoke(k) {
   if (typeof confirm === 'function' && !confirm(t('view.apikeys.revokeConfirm', { name: k.name }))) return;
   try {
-    await api.post('/api/auth/api-keys/' + encodeURIComponent(k.key_id) + '/revoke', {});
+    await api.post('/api/api-keys/' + encodeURIComponent(k.key_id) + '/revoke', {});
     toast.success(t('view.apikeys.revoked', { name: k.name }));
     await load();
   } catch (e) {
@@ -537,8 +541,8 @@ async function openDetail(k) {
   showDetail.value = true;
   detail.value = { ...k };
   try {
-    const d = await api.get('/api/auth/api-keys/' + encodeURIComponent(k.key_id));
-    detail.value = d.key || d;
+    const d = await api.get('/api/api-keys/' + encodeURIComponent(k.key_id));
+    detail.value = d || detail.value;
   } catch {
     // 保留列表中的基础信息,统计区为空
   }

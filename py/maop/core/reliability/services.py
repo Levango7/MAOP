@@ -130,7 +130,23 @@ class ServiceContainer:
         # High fix: don't hard-fail dispatcher construction if config load
         # fails — Dispatcher supports config=None (registry fallback).
         config = self.get("config", raise_on_failure=False)
-        return Dispatcher(MAOP_config=config, breaker=breaker)
+        # P0-3 fix: 接入 ModelSelector。此前所有创建点均未传 model_selector，
+        # 导致 Dispatcher 内 `if self._model_selector is not None` 恒为 False，
+        # 模型选择/配额/降级三件套在主路径是死代码。
+        # 用 try/except 惰性构造，失败降级为 None（等价旧行为）；
+        # select 语义优先返回 agent 已配置且在 registry 中的 model，不改变现有行为。
+        model_selector = None
+        try:
+            from maop.model.registry import ModelRegistry
+            from maop.model.selector import ModelSelector
+            registry = ModelRegistry(project_root=self._root)
+            model_selector = ModelSelector(registry)
+        except Exception:
+            logger.warning(
+                "[services] ModelSelector init failed; dispatch falls back to agent-config model",
+                exc_info=True,
+            )
+        return Dispatcher(MAOP_config=config, breaker=breaker, model_selector=model_selector)
 
     def _make_guardrail(self):
         from maop.core.security.guardrail import Guardrail

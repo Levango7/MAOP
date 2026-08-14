@@ -1,7 +1,7 @@
 # MAOP Database Schema
 
 > Auto-generated from source code CREATE TABLE statements.
-> Total: **53 tables** across 32 source files (including 1 FTS5 virtual table).
+> ⚠️ 更正 2026-08-14：代码库实际含 **117 张 distinct 表**（`grep -ri "CREATE TABLE" py/maop` 统计）。本文档当前仅记录其中 53 张，其余约 64 张（enterprise / monitoring / evolution 等模块）待补全。
 
 ---
 
@@ -1683,4 +1683,4 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
 | 31 | Dashboard Auth | dashboard/routers/auth.py | users |
 | 32 | Prompt Manager | prompt_manager.py | prompt_templates, prompt_versions |
 
-**Total: 32 files, 53 tables (52 regular + 1 FTS5 virtual table)**
+**Total: 117 tables（本文档已记录 53 张，其余 64 张待补全）**

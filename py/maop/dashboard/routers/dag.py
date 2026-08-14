@@ -34,6 +34,13 @@ class AutoSplitRequest(BaseModel):
     max_subtasks: int = Field(default=10, ge=1, le=50, description="最大子任务数量")
 
 
+class ExecuteDagRequest(BaseModel):
+    """POST /api/dag/execute 请求体 — 前端工作流编辑器导出的 DAG。"""
+
+    nodes: list[dict[str, Any]] = Field(default_factory=list, description="DAG 节点列表")
+    edges: list[dict[str, Any]] = Field(default_factory=list, description="DAG 边列表 (source→target)")
+
+
 # ── 端点 ─────────────────────────────────────────────────────────
 
 @router.post("/api/dag/auto-split")
@@ -69,4 +76,64 @@ async def auto_split(
 @router.get("/api/dag/health")
 async def dag_health() -> dict[str, Any]:
     """DAG 模块健康检查（无需鉴权，用于前端探活）。"""
-    return {"status": "ok", "module": "dag", "features": ["auto-split"]}
+    return {"status": "ok", "module": "dag", "features": ["auto-split", "execute"]}
+
+
+@router.post("/api/dag/execute")
+async def execute_dag(
+    body: ExecuteDagRequest,
+    request: Request,
+) -> dict[str, Any]:
+    """执行前端工作流编辑器导出的 DAG，返回 trace_id。
+
+    将编辑器节点（agent/tool/condition/parallel）映射为 :class:`WorkflowStep`，
+    按 edges 推导依赖关系后调用 :class:`Engine` 执行。需要管理员权限。
+    """
+    require_admin(request)
+    if not body.nodes:
+        raise HTTPException(status_code=400, detail="DAG 无节点，无法执行")
+
+    try:
+        from maop.engine import Engine, StepType, WorkflowStep
+
+        # edges source→target 推导 depends_on
+        depends: dict[str, list[str]] = {}
+        for edge in body.edges:
+            src = edge.get("source", "")
+            tgt = edge.get("target", "")
+            if src and tgt:
+                depends.setdefault(tgt, []).append(src)
+
+        _type_map = {
+            "agent": StepType.AGENT,
+            "tool": StepType.AGENT,
+            "condition": StepType.CONDITION,
+            "parallel": StepType.DAG,
+        }
+        steps: list[WorkflowStep] = []
+        for node in body.nodes:
+            nid = node.get("id", "")
+            cfg = node.get("config") or {}
+            steps.append(
+                WorkflowStep(
+                    id=nid,
+                    type=_type_map.get(node.get("type", "agent"), StepType.AGENT),
+                    agent=cfg.get("agent") or cfg.get("tool") or "",
+                    task=node.get("label") or cfg.get("task") or cfg.get("predicate") or "",
+                    depends_on=depends.get(nid, []),
+                )
+            )
+
+        result = await Engine().run(steps)
+        return {
+            "status": "ok",
+            "run_id": result.trace_id,
+            "success": result.success,
+            "steps": [s.model_dump() for s in result.steps],
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # 防御性兜底：不泄露内部栈
+        logger.exception("[dag/execute] DAG 执行失败")
+        raise HTTPException(status_code=400, detail=f"DAG 执行失败: {exc}") from exc

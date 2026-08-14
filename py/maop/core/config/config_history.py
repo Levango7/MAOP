@@ -281,7 +281,7 @@ class ConfigHistory:
 
         # Fire event bus notification (lazy import avoids circular dep).
         try:
-            from maop.core.event_bus import Event, get_event_bus
+            from maop.core.reliability.event_bus import Event, get_event_bus
             bus = get_event_bus()
             event = Event(
                 topic=CONFIG_CHANGED_TOPIC,

@@ -61,6 +61,16 @@ class ApiKeyCreate(BaseModel):
     created_by: str = Field(default="", max_length=64)
 
 
+class ApiKeyUpdate(BaseModel):
+    """Request body for updating editable metadata of an API key (all optional)."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    scopes: list[str] | None = Field(default=None)
+    rate_limit: int | None = Field(default=None, ge=0)
+    ip_whitelist: list[str] | None = Field(default=None)
+    description: str | None = Field(default=None, max_length=500)
+
+
 class ApiKeyResponse(BaseModel):
     """API key metadata returned by list/get endpoints (never includes plaintext)."""
 
@@ -383,6 +393,40 @@ class ApiKeyManager:
         if updated:
             logger.info("[api_keys] Revoked key id=%s by=%s", key_id, revoked_by)
         return updated
+
+    def update_key(self, key_id: str, req: ApiKeyUpdate) -> ApiKeyResponse | None:
+        """Update editable metadata of an API key. Returns updated response or None if not found.
+
+        Only fields explicitly set in ``req`` are written; ``None`` means "leave unchanged".
+        """
+        updates: dict[str, Any] = {}
+        if req.name is not None:
+            updates["name"] = req.name
+        if req.scopes is not None:
+            updates["scopes"] = json.dumps(req.scopes)
+        if req.rate_limit is not None:
+            updates["rate_limit"] = req.rate_limit
+        if req.ip_whitelist is not None:
+            updates["ip_whitelist"] = json.dumps(req.ip_whitelist)
+        if req.description is not None:
+            updates["description"] = req.description
+
+        if updates:
+            # 字段名来自代码内硬编码的 dict key（非用户输入），无注入风险。
+            set_clause = ", ".join(f"{col} = ?" for col in updates)
+            conn = self._pool.acquire()
+            try:
+                cur = conn.execute(
+                    f"UPDATE api_keys SET {set_clause} WHERE key_id = ?",
+                    (*updates.values(), key_id),
+                )
+                conn.commit()
+                if cur.rowcount == 0:
+                    return None
+            finally:
+                self._pool.release(conn)
+            logger.info("[api_keys] Updated key id=%s fields=%s", key_id, list(updates))
+        return self.get_key(key_id)
 
     def delete_key(self, key_id: str) -> bool:
         """Hard-delete a key and its usage rows. Returns True if a row was deleted."""

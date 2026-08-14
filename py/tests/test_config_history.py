@@ -184,7 +184,7 @@ class TestRollback:
             history.rollback(999)
 
     def test_rollback_fires_config_changed_event(self, history: ConfigHistory):
-        from maop.core.event_bus import get_event_bus
+        from maop.core.reliability.event_bus import get_event_bus
 
         bus = get_event_bus()
         bus.clear()
@@ -202,7 +202,7 @@ class TestRollback:
         assert CONFIG_CHANGED_TOPIC in seen_topics
 
     def test_rollback_event_payload_carries_versions(self, history: ConfigHistory):
-        from maop.core.event_bus import get_event_bus
+        from maop.core.reliability.event_bus import get_event_bus
 
         bus = get_event_bus()
         bus.clear()

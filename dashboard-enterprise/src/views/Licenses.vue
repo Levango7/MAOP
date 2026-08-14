@@ -351,6 +351,10 @@ function formatDate(ts) {
   if (isNaN(d.getTime())) return String(ts);
   return d.toLocaleString();
 }
+function daysFromNow(days) {
+  const n = Number(days) || 365;
+  return new Date(Date.now() + n * 86400000).toISOString().slice(0, 10); // YYYY-MM-DD
+}
 
 function isExpired(lic) {
   if (!lic.expires_at) return false;
@@ -407,7 +411,7 @@ async function load() {
   loading.value = true;
   error.value = '';
   try {
-    const d = await api.get('/api/license/list');
+    const d = await api.get('/api/licenses/list');
     licenses.value = d.licenses || [];
   } catch (e) {
     error.value = e.message || 'Failed to load licenses';
@@ -425,13 +429,12 @@ async function generateLicense() {
   }
   saving.value = true;
   try {
-    await api.post('/api/license/generate', {
-      customer_name: form.value.customer_name.trim(),
-      customer_email: form.value.customer_email.trim(),
-      version: form.value.version,
-      max_agents: form.value.max_agents,
+    await api.post('/api/licenses/create', {
+      customer: form.value.customer_name.trim(),
+      expires_at: daysFromNow(form.value.valid_days),
       max_users: form.value.max_users,
-      valid_days: form.value.valid_days,
+      features: form.value.max_agents ? [`max_agents:${form.value.max_agents}`] : [],
+      notes: form.value.customer_email ? `email: ${form.value.customer_email.trim()}` : '',
     });
     toast.success(t('view.licenses.generated', { name: form.value.customer_name }));
     showGenerate.value = false;
@@ -449,7 +452,7 @@ async function openDetail(row) {
   // 懒加载完整详情（含操作历史）
   try {
     const id = row.license_id || row.license_key;
-    const d = await api.get(`/api/license/${encodeURIComponent(id)}`);
+    const d = await api.get(`/api/licenses/${encodeURIComponent(id)}`);
     if (d && d.license) {
       detail.value = { ...row, ...d.license };
     }
@@ -474,7 +477,7 @@ async function renewLicense() {
   saving.value = true;
   try {
     const id = renewTarget.value.license_id || renewTarget.value.license_key;
-    await api.post(`/api/license/${encodeURIComponent(id)}/renew`, { valid_days: renewDays.value });
+    await api.post(`/api/licenses/${encodeURIComponent(id)}/renew`, { new_expires_at: daysFromNow(renewDays.value) });
     toast.success(t('view.licenses.renewed', { id, days: renewDays.value }));
     showRenew.value = false;
     renewTarget.value = null;
@@ -482,7 +485,7 @@ async function renewLicense() {
     // 如详情面板打开，刷新详情
     if (showDetail.value && detail.value) {
       try {
-        const d = await api.get(`/api/license/${encodeURIComponent(detail.value.license_id || detail.value.license_key)}`);
+        const d = await api.get(`/api/licenses/${encodeURIComponent(detail.value.license_id || detail.value.license_key)}`);
         if (d && d.license) detail.value = { ...detail.value, ...d.license };
       } catch { /* ignore */ }
     }
@@ -497,7 +500,7 @@ async function revokeLicense(lic) {
   const id = lic.license_id || lic.license_key;
   if (typeof confirm === 'function' && !confirm(t('view.licenses.revokeConfirm', { id }))) return;
   try {
-    await api.post(`/api/license/${encodeURIComponent(id)}/revoke`, {});
+    await api.post(`/api/licenses/${encodeURIComponent(id)}/revoke`, { reason: '' });
     toast.success(t('view.licenses.revoked', { id }));
     await load();
     if (showDetail.value && detail.value && (detail.value.license_id || detail.value.license_key) === id) {

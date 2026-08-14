@@ -499,16 +499,8 @@ async function loadTenants() {
 }
 
 async function loadOverview() {
-  try {
-    const d = await api.get('/api/tenant/quotas/overview');
-    overview.value = {
-      heatmap: d.heatmap || [],
-      allocation: d.allocation || { labels: [], values: [] },
-    };
-  } catch {
-    // 概览失败不阻塞主列表,降级为空
-    overview.value = { heatmap: [], allocation: { labels: [], values: [] } };
-  }
+  // 后端暂无配额聚合概览端点；降级为空，allocation 饼图显示 EmptyState
+  overview.value = { heatmap: [], allocation: { labels: [], values: [] } };
 }
 
 async function loadAll() {
@@ -525,29 +517,21 @@ async function openDetail(tenant) {
   detailAlerts.value = [];
 
   const id = tenant.tenant_id;
-  // 并行加载详情数据,各自容错
-  const [trendRes, historyRes, alertsRes, usageRes] = await Promise.allSettled([
-    api.get(`/api/tenant/${id}/usage/trend`),
-    api.get(`/api/tenant/${id}/quota/history`),
-    api.get(`/api/tenant/${id}/alerts`),
-    api.get(`/api/tenant/${id}/usage`),
+  // 并行加载告警与使用量；trend/history 后端暂无端点，保持空状态
+  const [alertsRes, usageRes] = await Promise.allSettled([
+    api.get(`/api/quotas/${id}/alerts`),
+    api.get(`/api/quotas/${id}/usage`),
   ]);
 
-  if (trendRes.status === 'fulfilled') {
-    trendData.value = trendRes.value || { labels: [], series: [] };
-  }
-  if (historyRes.status === 'fulfilled') {
-    quotaHistory.value = historyRes.value.history || historyRes.value.changes || [];
-  }
   if (alertsRes.status === 'fulfilled') {
     detailAlerts.value = alertsRes.value.alerts || [];
   }
-  // 实时使用量更新到 detailTenant
+  // 实时使用量更新到 detailTenant（resource 维度映射）
   if (usageRes.status === 'fulfilled' && usageRes.value) {
-    detailTenant.value = {
-      ...tenant,
-      usage: { ...tenant.usage, ...(usageRes.value.usage || usageRes.value) },
-    };
+    const usages = usageRes.value.usages || [];
+    const usageMap = {};
+    usages.forEach((u) => { if (u && u.resource) usageMap[u.resource] = u.used; });
+    detailTenant.value = { ...tenant, usage: { ...(tenant.usage || {}), ...usageMap } };
   }
 }
 
@@ -581,7 +565,11 @@ async function saveAdjust() {
   saving.value = true;
   try {
     const id = adjustTarget.value.tenant_id;
-    await api.post(`/api/tenant/${id}/quota`, { quota: { ...adjustForm.value } });
+    // 后端按 resource 粒度设置配额，逐资源提交
+    for (const r of RESOURCES) {
+      const hardLimit = Number(adjustForm.value[r.quotaKey]) || 0;
+      await api.post(`/api/quotas/${encodeURIComponent(id)}/${r.key}`, { hard_limit: hardLimit });
+    }
     toast.success(t('view.quotas.adjustSuccess', { name: adjustTarget.value.name || id }));
     showAdjust.value = false;
     await loadTenants();
@@ -597,9 +585,9 @@ async function saveAdjust() {
 async function resolveAlert(alert) {
   if (!detailTenant.value) return;
   if (typeof confirm === 'function' && !confirm(t('view.quotas.resolveConfirm'))) return;
-  const id = detailTenant.value.tenant_id;
+  const alertId = alert.alert_id || alert.id;
   try {
-    await api.post(`/api/tenant/${id}/alerts/${alert.id}/resolve`, {});
+    await api.post(`/api/quotas/alerts/${encodeURIComponent(alertId)}/resolve`, {});
     alert.status = 'resolved';
     toast.success(t('view.quotas.resolved'));
   } catch (e) {

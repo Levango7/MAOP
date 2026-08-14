@@ -25,6 +25,7 @@ from maop.core.security.api_key_manager import (
     ApiKeyCreate,
     ApiKeyCreateResult,
     ApiKeyResponse,
+    ApiKeyUpdate,
     ApiKeyUsageResponse,
     get_api_key_manager,
 )
@@ -121,6 +122,20 @@ async def revoke_api_key(key_id: str, request: Request) -> dict[str, Any]:
             detail=f"API key not found or already revoked: {key_id}",
         )
     return {"status": "ok", "message": f"Key {key_id} revoked", "revoked_by": actor}
+
+
+# ── Update ────────────────────────────────────────────────────────
+
+
+@router.put("/{key_id}", response_model=ApiKeyResponse)
+async def update_api_key(key_id: str, body: ApiKeyUpdate, request: Request) -> ApiKeyResponse:
+    """Update editable metadata of an API key (name/scopes/rate_limit/ip_whitelist)."""
+    require_admin(request)
+    key = _get_manager(request).update_key(key_id, body)
+    if key is None:
+        raise HTTPException(status_code=404, detail=f"API key not found: {key_id}")
+    logger.info("[api-keys] Updated key id=%s", key_id)
+    return key
 
 
 # ── Delete ────────────────────────────────────────────────────────
