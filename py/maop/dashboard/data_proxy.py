@@ -295,6 +295,7 @@ class DataProxy:
             csum = ct.summary(start_date=hour_ago)
             cost_per_hour = round(getattr(csum, "total_cost_usd", 0.0), 4)
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass
         self._record_latency(start)
         return {

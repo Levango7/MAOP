@@ -53,6 +53,7 @@ def _check_sse_token(request: Request) -> None:
             request.state.auth_roles = result.roles
             request.state.auth_identity = result.identity
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass  # invalid token → require_admin will reject
 
 
@@ -100,6 +101,7 @@ async def global_state_stream(request: Request) -> Any:
                     logger.warning("[stream] snapshot failed: %s", exc)
                 yield f"event: state\ndata: {json.dumps(state)}\n\n"
             except Exception:
+                logger.debug('swallowed exception', exc_info=True)
                 pass
             await asyncio.sleep(2)
 
@@ -237,6 +239,7 @@ async def agent_token_stream(execution_id: str, request: Request) -> Any:
                         yield f"event: error\ndata: {json.dumps({'error': parsed['error']})}\n\n"
                         return
                 except Exception:
+                    logger.debug('swallowed exception', exc_info=True)
                     pass
         yield f"event: done\ndata: {json.dumps({'content_length': len(''.join(full_content)), 'tokens': len(''.join(full_content)) // 4})}\n\n"
 

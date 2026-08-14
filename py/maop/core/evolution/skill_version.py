@@ -171,6 +171,7 @@ class SkillVersionManager:
                 if result.returncode == 0:
                     return result.stdout
             except Exception:
+                logger.debug('swallowed exception', exc_info=True)
                 pass
 
         if skill_file.exists():
@@ -210,6 +211,7 @@ class SkillVersionManager:
                 meta = SkillMeta(**json.loads(meta_file.read_text(encoding="utf-8")))
                 skills.append(meta)
             except Exception:
+                logger.debug('swallowed exception', exc_info=True)
                 pass
         return skills
 

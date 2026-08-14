@@ -7,6 +7,9 @@ handler is ~117 lines and conceptually distinct from CRUD/evolution/memory.
 
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
 from typing import Any
 
 from fastapi import APIRouter
@@ -48,6 +51,7 @@ async def get_agent_routes() -> dict[str, Any]:
                 "capabilities": getattr(a, "capabilities", []) or [],
             }
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     # 2. 读 agents.yaml routing 配置
@@ -63,6 +67,7 @@ async def get_agent_routes() -> dict[str, Any]:
             agents_cfg = data.get("agents", {}) or {}
             routing_cfg = data.get("routing", {}) or {}
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass
 
     def _agent_model(agent_name: str) -> str:

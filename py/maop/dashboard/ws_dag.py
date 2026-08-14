@@ -91,12 +91,14 @@ async def dag_ws_endpoint(ws: WebSocket, execution_id: str) -> Any:
         try:
             queue.put_nowait(evt)
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass
 
     def _on_complete(evt: Any) -> None:
         try:
             queue.put_nowait(evt)
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass
 
     bus.subscribe(node_topic, _on_node)
@@ -199,8 +201,10 @@ async def dag_ws_endpoint(ws: WebSocket, execution_id: str) -> Any:
         try:
             bus.unsubscribe(node_topic, _on_node)
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass
         try:
             bus.unsubscribe(complete_topic, _on_complete)
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass

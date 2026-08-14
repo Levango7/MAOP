@@ -106,6 +106,7 @@ async def check_agent_upgrade(name: str, agent_cfg: Any) -> dict[str, Any]:
             except Exception:
                 latest_version = "unknown"
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     # 2. npm
@@ -194,6 +195,7 @@ async def upgrade_agent_cli(name: str, agent_cfg: Any, maop_root: Path) -> dict[
                 info["output"] = (up_err.decode(errors="replace") or up_out.decode(errors="replace"))[-500:]
             return {"status": "ok", "info": info}
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     # 2. 尝试 npm
@@ -239,6 +241,7 @@ async def upgrade_agent_cli(name: str, agent_cfg: Any, maop_root: Path) -> dict[
             target=name, level=AuditLevel.INFO, detail=info,
         )
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     return {"status": "ok", "info": info}

@@ -86,6 +86,7 @@ def create_ssl_context(settings: TLSSettings) -> ssl.SSLContext | None:
     except ValueError:
         raise
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     ctx.load_cert_chain(str(cert_path), str(key_path))

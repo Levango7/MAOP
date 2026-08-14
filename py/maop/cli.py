@@ -5,6 +5,9 @@ All commands use Python-native implementations. No PowerShell fallbacks.
 
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
 import argparse
 import os
 import sys
@@ -68,6 +71,7 @@ def cmd_status() -> Any:
         for _comp in result.components:
             pass
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
 

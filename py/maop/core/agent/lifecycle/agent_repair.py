@@ -205,6 +205,7 @@ class AgentRepair:
                     result.missing_dependencies.append(pip_name)
                     result.overall_status = "degraded"
             except Exception:
+                logger.debug('swallowed exception', exc_info=True)
                 pass  # 非关键
 
         # 5. 检查配置完整性

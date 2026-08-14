@@ -452,6 +452,7 @@ def run_worker(
         try:
             client.close()
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass
 
 

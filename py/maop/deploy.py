@@ -378,6 +378,7 @@ def start(
                     if proc.stderr is not None:
                         stderr_output = proc.stderr.read().decode("utf-8", errors="replace")[-500:]
                 except Exception:
+                    logger.debug('swallowed exception', exc_info=True)
                     pass
                 _remove_pid(root)
                 logger.error("MAOP subprocess exited prematurely: %s", stderr_output)

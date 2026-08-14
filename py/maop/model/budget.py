@@ -201,6 +201,7 @@ class BudgetGuard:
                     + m.cost_per_1k_output * actual_tokens_out / 1000
                 )
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass  # fall back to estimated
 
         self.record(

@@ -103,6 +103,7 @@ def register_maop_event_hooks() -> int:
             elif event == "task.failed":
                 getattr(metrics, "increment", lambda *a: None)("MAOP_doc_pipeline_failed", 1)
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass
 
     def _on_quality_gate(event: str, payload: dict):
@@ -157,6 +158,7 @@ def run_pipeline(
             if not mgr.list_hooks():
                 register_maop_event_hooks()
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass
 
         # Execute pipeline

@@ -156,6 +156,7 @@ class VectorSearch:
                 if row:
                     existing = row["text_hash"]
             except Exception:
+                logger.debug('swallowed exception', exc_info=True)
                 pass
 
         if existing == text_hash:
@@ -264,6 +265,7 @@ class VectorSearch:
                 if row:
                     return f"{row['task']}: {row['content']}"
             except Exception:
+                logger.debug('swallowed exception', exc_info=True)
                 pass
         return ""
 

@@ -74,6 +74,7 @@ async def health() -> Any:
         _agents = await _state.get_bridge().agent_stats()
         active_agents = len(_agents) if isinstance(_agents, list) else 0
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
     return {
         "status": "ok",

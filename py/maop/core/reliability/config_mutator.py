@@ -367,6 +367,7 @@ class ConfigMutator:
                       content={"type": "capability_added", "capability": new_cap},
                       importance=0.7)
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass
 
         return changes

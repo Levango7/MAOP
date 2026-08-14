@@ -639,6 +639,7 @@ async def notifications_ws(ws: WebSocket) -> Any:
                         count = mgr.unread_count(user_id)
                         await ws.send_json({"type": "unread_count", "count": count})
                 except Exception:
+                    logger.debug('swallowed exception', exc_info=True)
                     pass  # ignore malformed input
     except WebSocketDisconnect:
         pass

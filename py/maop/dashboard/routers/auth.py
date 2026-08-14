@@ -275,6 +275,7 @@ async def auth_status(request: Request) -> Any:
                 if result.authenticated:
                     has_token = True
             except Exception:
+                logger.debug('swallowed exception', exc_info=True)
                 pass
     return {
         "auth_enabled": _auth_enabled,
@@ -441,6 +442,7 @@ async def auth_refresh(request: Request):
         try:
             mgr.jwt_handler.revoke_token(token)
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass  # best-effort revocation
         return response
     except Exception as exc:

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
 import asyncio
 from typing import Any
 
@@ -140,6 +143,7 @@ async def get_agent_routes() -> dict[str, Any]:
                 "capabilities": getattr(a, "capabilities", []) or [],
             }
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     # 2. 读 agents.yaml routing 配置
@@ -155,6 +159,7 @@ async def get_agent_routes() -> dict[str, Any]:
             agents_cfg = data.get("agents", {}) or {}
             routing_cfg = data.get("routing", {}) or {}
         except Exception:
+            logger.debug('swallowed exception', exc_info=True)
             pass
 
     def _agent_model(agent_name: str) -> str:
@@ -393,6 +398,7 @@ async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[s
     try:
         synced_to_yaml = await asyncio.to_thread(_sync_agent_to_yaml, body)
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass  # registry 已写入，yaml 写入失败不阻塞
 
     return {"agent": agent.model_dump(), "synced_to_yaml": synced_to_yaml}
@@ -440,6 +446,7 @@ async def unregister_agent(name: str, request: Request) -> dict[str, Any]:
             detail={"registry": ok_registry, "errors": errors},
         )
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     return {"deleted": ok_registry, "errors": errors}
@@ -487,6 +494,7 @@ async def repair_agent(name: str, request: Request) -> dict[str, Any]:
             detail=result.model_dump(),
         )
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     return {"result": result.model_dump()}
@@ -545,6 +553,7 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
                             latest = line.split(":", 1)[1].strip()
                             break
             except Exception:
+                logger.debug('swallowed exception', exc_info=True)
                 pass
 
             # 尝试 npm
@@ -561,6 +570,7 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
                         install_method = "npm"
                         latest = "check npm"
                     except Exception:
+                        logger.debug('swallowed exception', exc_info=True)
                         pass
 
             # 二进制分发
@@ -654,6 +664,7 @@ async def check_upgrade(name: str, request: Request) -> dict[str, Any]:
             except Exception:
                 latest_version = "unknown"
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     # 2. npm
@@ -774,6 +785,7 @@ async def upgrade_agent(name: str, request: Request) -> dict[str, Any]:
                 info["output"] = (up_err.decode(errors="replace") or up_out.decode(errors="replace"))[-500:]
             return {"status": "ok", "info": info}
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     # 2. 尝试 npm
@@ -831,6 +843,7 @@ async def upgrade_agent(name: str, request: Request) -> dict[str, Any]:
             target=name, level=AuditLevel.INFO, detail=info,
         )
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     return {"status": "ok", "info": info}
@@ -921,6 +934,7 @@ async def evolve_agent(name: str, request: Request) -> dict[str, Any]:
             detail={"summary": result.summary, "auto_applied": len(result.auto_applied)},
         )
     except Exception:
+        logger.debug('swallowed exception', exc_info=True)
         pass
 
     return {"result": result.model_dump()}

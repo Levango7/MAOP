@@ -235,6 +235,7 @@ class PgAuditStore:
             try:
                 self._backend.execute(f"ALTER TABLE audit_events ADD COLUMN {col_def}")
             except Exception:
+                logger.debug('swallowed exception', exc_info=True)
                 pass
         self._backend.execute(
             "CREATE INDEX IF NOT EXISTS idx_audit_risk_level ON audit_events(risk_level)"
