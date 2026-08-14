@@ -103,6 +103,14 @@ class MAOPSettings(BaseSettings):
     cb_failure_threshold: int = Field(default=5, description="Failures before opening breaker", gt=0)
     cb_recovery_timeout_s: float = Field(default=30.0, description="Recovery timeout in seconds", gt=0)
 
+    # ── Budget / Cost ─────────────────────────────────────────────
+    # 成本预算限额与告警阈值（单位：USD）。默认 0 = 无限额（本地工具不强制预算）。
+    # 通过 MAOP_BUDGET_DAILY_LIMIT_USD / MAOP_BUDGET_MONTHLY_LIMIT_USD /
+    # MAOP_BUDGET_ALERT_THRESHOLD 环境变量覆盖，或在 Dashboard「成本追踪」页配置。
+    budget_daily_limit_usd: float = Field(default=0.0, description="Daily cost budget limit (USD, 0=unlimited)", ge=0)
+    budget_monthly_limit_usd: float = Field(default=0.0, description="Monthly cost budget limit (USD, 0=unlimited)", ge=0)
+    budget_alert_threshold: float = Field(default=0.8, description="Budget alert threshold as fraction of limit", ge=0, le=1)
+
     # ── Worker Pool ───────────────────────────────────────────────
     worker_count: int = Field(default=4, description="Worker pool size", ge=1, le=64)
 

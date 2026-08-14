@@ -64,9 +64,9 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 
 **禁止**：在其他模块直接检查 `get_edition() == ENTERPRISE`，必须通过 `has_feature()` / `require_feature()`。
 
-`FeatureFlag` 当前共 25 个枚举值，按 edition 分组：
+`FeatureFlag` 当前共 26 个枚举值，按 edition 分组：
 - **个人版独占**（10 个）：COST_TRACKING / CIRCUIT_BREAKER / MEMORY_STORE / HOT_RELOAD / HOOKS / PLUGIN_SYSTEM / MCP_HUB / VECTOR_SEARCH / REACT_LOOP / BUDGET_GUARD
-- **企业版独占**（13 个）：RBAC / AUDIT_LOG / MULTI_USER / SSO / DASHBOARD_ANALYTICS / VUE_DASHBOARD / POSTGRESQL / REDIS / VAULT / TENANT_ISOLATION / TLS_AUTO / AUTH_AUTO / N8N_INTEGRATION
+- **企业版独占**（14 个）：RBAC / AUDIT_LOG / MULTI_USER / SSO / DASHBOARD_ANALYTICS / VUE_DASHBOARD / POSTGRESQL / REDIS / VAULT / TENANT_ISOLATION / TLS_AUTO / AUTH_AUTO / N8N_INTEGRATION / LICENSE_MANAGEMENT
 - **可选后端**（2 个，不计入企业版默认捆绑）：RABBITMQ / ETCD（依赖可选 pika / etcd3，通过 MAOP_QUEUE_BACKEND / MAOP_KV_BACKEND 环境变量启用）
 - **企业版 = 个人版 ∪ 企业版独占**（即企业版包含所有功能）
 

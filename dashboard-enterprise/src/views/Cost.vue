@@ -48,6 +48,10 @@
     <div class="grid-2">
       <Card :title="t('view.cost.budgetStatus')" icon="shield" :margin-bottom="0">
         <template #actions>
+          <button v-if="!editing" class="btn-ghost" @click="startEdit">
+            <AppIcon name="gear" :size="14" />
+            <span>{{ t('view.cost.editBudget') }}</span>
+          </button>
           <Badge v-if="!loading" :tone="budget.daily_over_budget || budget.monthly_over_budget ? 'fail' : 'success'">
             {{ budget.daily_over_budget || budget.monthly_over_budget ? t('view.cost.overBudget') : t('view.cost.withinBudget') }}
           </Badge>
@@ -55,6 +59,25 @@
         <div v-if="loading" class="blk">
           <Skeleton block height="14px" />
           <Skeleton block height="14px" />
+        </div>
+        <div v-else-if="editing" class="budget-edit">
+          <div class="field">
+            <label>{{ t('view.cost.dailyLimit') }}</label>
+            <input v-model.number="form.daily_limit_usd" class="input" type="number" min="0" step="0.01" />
+          </div>
+          <div class="field">
+            <label>{{ t('view.cost.monthlyLimit') }}</label>
+            <input v-model.number="form.monthly_limit_usd" class="input" type="number" min="0" step="0.01" />
+          </div>
+          <div class="field">
+            <label>{{ t('view.cost.alertThreshold') }}</label>
+            <input v-model.number="form.alert_threshold" class="input" type="number" min="0" max="100" step="1" />
+          </div>
+          <p class="budget-edit__hint">{{ t('view.cost.unlimitedHint') }}</p>
+          <div class="budget-edit__actions">
+            <button class="btn-primary" :disabled="saving" @click="saveBudget">{{ t('view.cost.save') }}</button>
+            <button class="btn-ghost" :disabled="saving" @click="cancelEdit">{{ t('view.cost.cancel') }}</button>
+          </div>
         </div>
         <div v-else class="budget">
           <div class="budget__row">
@@ -119,10 +142,12 @@
 import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
+import { useToast } from '../composables/useToast.js';
 import { AppIcon, Card, StatCard, Badge, DataTable, Segmented, Skeleton, EmptyState, PageHeader } from '../components/index.js';
 
 const api = useApiStore();
 const { t } = useI18n();
+const toast = useToast();
 
 const period = ref('7d');
 const loading = ref(false);
@@ -133,6 +158,10 @@ const summary = ref({
 });
 const budget = ref({});
 const entries = ref([]);
+
+const editing = ref(false);
+const saving = ref(false);
+const form = ref({ daily_limit_usd: 0, monthly_limit_usd: 0, alert_threshold: 80 });
 
 const periodOptions = [
   { value: '7d', label: t('view.cost.period7d') },
@@ -189,6 +218,37 @@ function formatNum(n) {
   if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + 'M';
   if (v >= 1_000) return (v / 1_000).toFixed(1) + 'K';
   return String(v);
+}
+
+function startEdit() {
+  form.value = {
+    daily_limit_usd: budget.value.daily_limit_usd || 0,
+    monthly_limit_usd: budget.value.monthly_limit_usd || 0,
+    alert_threshold: Math.round((budget.value.alert_threshold ?? 0.8) * 100),
+  };
+  editing.value = true;
+}
+
+function cancelEdit() {
+  editing.value = false;
+}
+
+async function saveBudget() {
+  saving.value = true;
+  try {
+    const res = await api.put('/api/cost/budget', {
+      daily_limit_usd: Number(form.value.daily_limit_usd) || 0,
+      monthly_limit_usd: Number(form.value.monthly_limit_usd) || 0,
+      alert_threshold: (Number(form.value.alert_threshold) || 0) / 100,
+    });
+    budget.value = res.budget || budget.value;
+    editing.value = false;
+    toast.success(t('view.cost.saved'));
+  } catch (e) {
+    toast.error(t('view.cost.saveFailed') + ': ' + (e.message || ''));
+  } finally {
+    saving.value = false;
+  }
 }
 
 function onPeriodChange(v) {

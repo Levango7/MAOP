@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
+from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -13,11 +14,10 @@ router = APIRouter(prefix="/api/cost", tags=["cost"])
 
 
 def _get_cost_tracker():
-    from pathlib import Path
-
-    from maop.core.monitoring.cost_tracker import CostTracker
-    root = Path(__file__).resolve().parent.parent.parent.parent
-    return CostTracker(root_dir=str(root))
+    # 使用进程级单例，保证读写的预算配置与 llm_provider 的 auto-record
+    # 共享同一份限额/阈值状态（否则每次新建实例会导致配置丢失）。
+    from maop.core.monitoring.cost_tracker import get_cost_tracker
+    return get_cost_tracker()
 
 
 @router.get("/entries")
@@ -68,6 +68,31 @@ async def get_budget_status() -> dict[str, Any]:
         status = await tracker.budget_status_async()
     else:
         status = tracker.budget_status()
+    return {"budget": status.model_dump()}
+
+
+class BudgetConfigRequest(BaseModel):
+    """预算配置请求体（所有字段可选，缺省表示不修改）."""
+
+    daily_limit_usd: float | None = Field(default=None, ge=0)
+    monthly_limit_usd: float | None = Field(default=None, ge=0)
+    alert_threshold: float | None = Field(default=None, ge=0, le=1)
+
+
+@router.put("/budget")
+@handle_api_errors
+async def update_budget(body: BudgetConfigRequest, request: Request) -> dict[str, Any]:
+    """更新成本预算限额与告警阈值（管理员）。
+
+    未传入的字段保持不变；``0`` 表示无限额。
+    """
+    require_admin(request)
+    tracker = _get_cost_tracker()
+    status = tracker.set_budget(
+        daily_limit_usd=body.daily_limit_usd,
+        monthly_limit_usd=body.monthly_limit_usd,
+        alert_threshold=body.alert_threshold,
+    )
     return {"budget": status.model_dump()}
 
 

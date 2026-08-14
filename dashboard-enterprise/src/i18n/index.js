@@ -183,7 +183,7 @@ export const coreMessages = {
     'common.status': 'Status',
     'common.model': 'Model',
     'common.driver': 'Driver',
-    'common.caps': 'Caps',
+    'common.caps': 'Capabilities',
     'common.latency': 'Latency',
     'common.configuration': 'Configuration',
     'common.capabilities': 'Capabilities',

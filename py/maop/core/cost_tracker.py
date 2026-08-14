@@ -58,12 +58,15 @@ class CostSummary(BaseModel):
 class BudgetStatus(BaseModel):
     daily_limit_usd: float = 0.0
     monthly_limit_usd: float = 0.0
+    alert_threshold: float = 0.8
     daily_spent_usd: float = 0.0
     monthly_spent_usd: float = 0.0
     daily_remaining_usd: float = 0.0
     monthly_remaining_usd: float = 0.0
     daily_over_budget: bool = False
     monthly_over_budget: bool = False
+    daily_warned: bool = False
+    monthly_warned: bool = False
 
 
 class ModelPricing(BaseModel):
@@ -100,6 +103,7 @@ class CostTracker:
         hook_manager: Any = None,
         daily_limit_usd: float = 0.0,
         monthly_limit_usd: float = 0.0,
+        alert_threshold: float = 0.8,
         pricing: dict[str, ModelPricing] | None = None,
     ) -> None:
         self._root = Path(root_dir)
@@ -107,9 +111,12 @@ class CostTracker:
         self._hook_manager = hook_manager
         self._daily_limit = daily_limit_usd
         self._monthly_limit = monthly_limit_usd
+        self._alert_threshold = alert_threshold
         self._pricing = pricing or DEFAULT_PRICING
         self._budget_alerted_daily = False
         self._budget_alerted_monthly = False
+        self._budget_warned_daily = False
+        self._budget_warned_monthly = False
         self._init_db()
 
     def _init_db(self) -> None:
@@ -228,6 +235,20 @@ class CostTracker:
         if self._daily_limit <= 0 and self._monthly_limit <= 0:
             return
         status = self.budget_status()
+        # 软阈值预警（达到 alert_threshold 比例、尚未超限）
+        if status.daily_warned and not status.daily_over_budget and not self._budget_warned_daily:
+            self._budget_warned_daily = True
+            self._fire_budget_alert(
+                "daily", status.daily_spent_usd, self._daily_limit,
+                event="cost.budget_warning",
+            )
+        if status.monthly_warned and not status.monthly_over_budget and not self._budget_warned_monthly:
+            self._budget_warned_monthly = True
+            self._fire_budget_alert(
+                "monthly", status.monthly_spent_usd, self._monthly_limit,
+                event="cost.budget_warning",
+            )
+        # 超限告警（100%）
         if status.daily_over_budget and not self._budget_alerted_daily:
             self._budget_alerted_daily = True
             self._fire_budget_alert("daily", status.daily_spent_usd, self._daily_limit)
@@ -235,14 +256,15 @@ class CostTracker:
             self._budget_alerted_monthly = True
             self._fire_budget_alert("monthly", status.monthly_spent_usd, self._monthly_limit)
 
-    def _fire_budget_alert(self, period: str, spent: float, limit: float) -> None:
-        logger.warning("[cost] %s budget exceeded: $%.4f / $%.4f", period.capitalize(), spent, limit)
+    def _fire_budget_alert(self, period: str, spent: float, limit: float, event: str = "cost.budget_exceeded") -> None:
+        level = "exceeded" if event == "cost.budget_exceeded" else "warning"
+        logger.warning("[cost] %s budget %s: $%.4f / $%.4f", period.capitalize(), level, spent, limit)
         if self._hook_manager:
             try:
                 import asyncio
                 loop = asyncio.get_running_loop()
                 loop.create_task(
-                    self._hook_manager.trigger("cost.budget_exceeded", {
+                    self._hook_manager.trigger(event, {
                         "period": period, "spent_usd": spent, "limit_usd": limit,
                     })
                 )
@@ -270,12 +292,15 @@ class CostTracker:
         return BudgetStatus(
             daily_limit_usd=self._daily_limit,
             monthly_limit_usd=self._monthly_limit,
+            alert_threshold=self._alert_threshold,
             daily_spent_usd=round(daily_spent, 4),
             monthly_spent_usd=round(monthly_spent, 4),
             daily_remaining_usd=round(max(0, self._daily_limit - daily_spent), 4),
             monthly_remaining_usd=round(max(0, self._monthly_limit - monthly_spent), 4),
             daily_over_budget=self._daily_limit > 0 and daily_spent > self._daily_limit,
             monthly_over_budget=self._monthly_limit > 0 and monthly_spent > self._monthly_limit,
+            daily_warned=self._daily_limit > 0 and daily_spent >= self._daily_limit * self._alert_threshold,
+            monthly_warned=self._monthly_limit > 0 and monthly_spent >= self._monthly_limit * self._alert_threshold,
         )
 
     async def budget_status_async(self) -> BudgetStatus:
@@ -285,6 +310,31 @@ class CostTracker:
         """
         import asyncio
         return await asyncio.to_thread(self.budget_status)
+
+    def set_budget(
+        self,
+        daily_limit_usd: float | None = None,
+        monthly_limit_usd: float | None = None,
+        alert_threshold: float | None = None,
+    ) -> BudgetStatus:
+        """更新预算限额与告警阈值并返回最新状态。
+
+        未显式传入的字段保持不变（``None`` 表示"不修改"）。限额与阈值
+        被钳制到合法范围（限额 >= 0，阈值 [0, 1]）。更新后重置告警状态，
+        使新配置下的预算评估立即生效。这是成本告警配置通道的运行时入口，
+        供 Dashboard ``PUT /api/cost/budget`` 调用。
+        """
+        if daily_limit_usd is not None:
+            self._daily_limit = max(0.0, float(daily_limit_usd))
+        if monthly_limit_usd is not None:
+            self._monthly_limit = max(0.0, float(monthly_limit_usd))
+        if alert_threshold is not None:
+            self._alert_threshold = max(0.0, min(1.0, float(alert_threshold)))
+        self._budget_alerted_daily = False
+        self._budget_alerted_monthly = False
+        self._budget_warned_daily = False
+        self._budget_warned_monthly = False
+        return self.budget_status()
 
     # ── Query ───────────────────────────────────────────────────
 
@@ -466,8 +516,26 @@ def get_cost_tracker() -> CostTracker:
 
     Lazily initialized on first call. Used by llm_provider to auto-record
     token usage without creating a new tracker per call.
+
+    预算限额与告警阈值从 ``MAOPSettings`` 读取（env: ``MAOP_BUDGET_*``），
+    使成本告警无需改代码即可配置；运行时可通过 :meth:`CostTracker.set_budget`
+    （Dashboard ``PUT /api/cost/budget``）覆盖。
     """
     global _cost_tracker_instance
     if _cost_tracker_instance is None:
-        _cost_tracker_instance = CostTracker()
+        daily = monthly = 0.0
+        threshold = 0.8
+        try:
+            from maop.config.settings import get_settings
+            settings = get_settings()
+            daily = settings.budget_daily_limit_usd
+            monthly = settings.budget_monthly_limit_usd
+            threshold = settings.budget_alert_threshold
+        except Exception as exc:  # pragma: no cover - settings 加载失败时回退默认
+            logger.warning("[cost] Failed to load budget settings, using defaults: %s", exc)
+        _cost_tracker_instance = CostTracker(
+            daily_limit_usd=daily,
+            monthly_limit_usd=monthly,
+            alert_threshold=threshold,
+        )
     return _cost_tracker_instance
