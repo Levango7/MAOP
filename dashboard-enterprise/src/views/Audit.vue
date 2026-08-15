@@ -608,7 +608,7 @@ async function loadRules() {
     const d = await api.get('/api/audit/rules');
     rules.value = d.rules || [];
   } catch (e) {
-    rulesError.value = e.message || 'Rules unavailable';
+    rulesError.value = e.message || t('view.audit.rulesUnavailable');
   } finally {
     rulesLoading.value = false;
   }
@@ -634,7 +634,7 @@ async function saveRule() {
     ruleEditor.open = false;
     await loadRules();
   } catch (e) {
-    toast.error(e.message || 'Save failed');
+    toast.error(e.message || t('view.audit.saveFailed'));
   }
 }
 async function toggleRule(rule) {
@@ -643,7 +643,7 @@ async function toggleRule(rule) {
     toast.success(t('view.audit.ruleToggled', { state: !rule.enabled ? t('common.on') : t('common.off') }));
     await loadRules();
   } catch (e) {
-    toast.error(e.message || 'Toggle failed');
+    toast.error(e.message || t('view.audit.toggleFailed'));
   }
 }
 async function deleteRule(rule) {
@@ -653,7 +653,7 @@ async function deleteRule(rule) {
     toast.success(t('view.audit.ruleDeleted'));
     await loadRules();
   } catch (e) {
-    toast.error(e.message || 'Delete failed');
+    toast.error(e.message || t('view.audit.deleteFailed'));
   }
 }
 
@@ -676,7 +676,7 @@ async function loadHistory() {
     const d = await api.get('/api/audit/alerts');
     history.value = d.alerts || d.history || [];
   } catch (e) {
-    historyError.value = e.message || 'History unavailable';
+    historyError.value = e.message || t('view.audit.historyUnavailable');
   } finally {
     historyLoading.value = false;
   }
@@ -694,7 +694,7 @@ async function loadSummary() {
     };
     summary.error = '';
   } catch (e) {
-    summary.error = e.message || 'Summary unavailable';
+    summary.error = e.message || t('view.audit.summaryUnavailable');
   }
 }
 async function loadEvents() {
@@ -708,7 +708,7 @@ async function loadEvents() {
     }));
     events.error = '';
   } catch (e) {
-    events.error = e.message || 'Events unavailable';
+    events.error = e.message || t('view.audit.eventsUnavailable');
   }
 }
 

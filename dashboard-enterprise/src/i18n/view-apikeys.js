@@ -74,6 +74,10 @@ export const messages = {
     'view.apikeys.noScopes': 'No scopes assigned',
     'view.apikeys.ms': 'ms',
     'view.apikeys.reqPerMin': 'req/min',
+    'view.apikeys.generateFailed': 'Generate failed',
+    'view.apikeys.copyFailed': 'Copy failed',
+    'view.apikeys.saveFailed': 'Save failed',
+    'view.apikeys.revokeFailed': 'Revoke failed',
   },
   zh: {
     'view.apikeys.subtitle': '用于智能体、CI 与外部集成的编程访问令牌',
@@ -150,5 +154,9 @@ export const messages = {
     'view.apikeys.noScopes': '未分配权限范围',
     'view.apikeys.ms': '毫秒',
     'view.apikeys.reqPerMin': '请求/分钟',
+    'view.apikeys.generateFailed': '生成失败',
+    'view.apikeys.copyFailed': '复制失败',
+    'view.apikeys.saveFailed': '保存失败',
+    'view.apikeys.revokeFailed': '吊销失败',
   },
 };

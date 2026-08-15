@@ -39,7 +39,8 @@ export const messages = {
     'view.evolutionHistory.decision.continue': 'Sampling',
     'view.evolutionHistory.decision.accept_h1': 'Significant',
     'view.evolutionHistory.decision.accept_h0': 'No Diff',
-  },
+  },    'view.evolutionHistory.approve failed': 'Approve failed',
+
   zh: {
     'view.evolutionHistory.title': '演化历史',
     'view.evolutionHistory.subtitle': '性能驱动的自演化闭环',
@@ -80,5 +81,6 @@ export const messages = {
     'view.evolutionHistory.decision.continue': '采样中',
     'view.evolutionHistory.decision.accept_h1': '显著',
     'view.evolutionHistory.decision.accept_h0': '无差异',
+    'view.evolutionHistory.approve failed': '批准失败',
   },
 };

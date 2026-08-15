@@ -186,7 +186,7 @@ async function grantRole() {
     showGrant.value = false;
     await loadGrants();
   } catch (e) {
-    toast.error(e.message || 'Grant failed');
+    toast.error(e.message || t('view.rbac.grantFailed'));
   } finally {
     saving.value = false;
   }
@@ -197,7 +197,7 @@ async function revoke(g) {
     toast.success(t('view.rbac.revoked', { role: g.role, user: g.user_id }));
     await loadGrants();
   } catch (e) {
-    toast.error(e.message || 'Revoke failed');
+    toast.error(e.message || t('view.rbac.revokeFailed'));
   }
 }
 

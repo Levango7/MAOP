@@ -412,7 +412,7 @@ async function loadAll() {
     notifications.value = normalizeList(d);
     hasMore.value = !!(d.has_more || (d.total && d.total > notifications.value.length));
   } catch (e) {
-    error.value = e.message || 'Notifications unavailable';
+    error.value = e.message || t('view.notifications.notificationsUnavailable');
     notifications.value = [];
   } finally {
     loading.value = false;
@@ -433,7 +433,7 @@ async function loadMore() {
     offset.value = next;
     hasMore.value = !!(d.has_more || (d.total && d.total > notifications.value.length));
   } catch (e) {
-    toast.error(e.message || 'Load more failed');
+    toast.error(e.message || t('view.notifications.loadMoreFailed'));
   } finally {
     loadingMore.value = false;
   }
@@ -460,7 +460,7 @@ async function markRead(n) {
     n.read = true;
     toast.success(t('view.notifications.markedRead'));
   } catch (e) {
-    toast.error(e.message || 'Mark read failed');
+    toast.error(e.message || t('view.notifications.markReadFailed'));
   }
 }
 
@@ -471,7 +471,7 @@ async function markAllRead() {
     notifications.value.forEach((n) => { n.read = true; });
     toast.success(t('view.notifications.allMarkedRead'));
   } catch (e) {
-    toast.error(e.message || 'Mark all read failed');
+    toast.error(e.message || t('view.notifications.markAllReadFailed'));
   }
 }
 
@@ -482,7 +482,7 @@ async function removeNotification(n) {
     notifications.value = notifications.value.filter((x) => x.id !== n.id);
     toast.success(t('view.notifications.deleted'));
   } catch (e) {
-    toast.error(e.message || 'Delete failed');
+    toast.error(e.message || t('view.notifications.deleteFailed'));
   }
 }
 
@@ -521,7 +521,7 @@ async function savePreferences() {
     toast.success(t('view.notifications.prefSaved'));
     prefOpen.value = false;
   } catch (e) {
-    toast.error(e.message || 'Save failed');
+    toast.error(e.message || t('view.notifications.saveFailed'));
   } finally {
     prefSaving.value = false;
   }

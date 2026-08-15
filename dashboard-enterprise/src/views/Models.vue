@@ -230,19 +230,19 @@ async function loadRegistry() {
     registry.total_providers = s.total_providers ?? 0;
     registry.thinking_capable = s.thinking_capable ?? 0;
     registryError.value = '';
-  } catch (e) { registryError.value = e.message || 'Registry unavailable'; }
+  } catch (e) { registryError.value = e.message || t('view.models.registryUnavailable'); }
 }
 async function loadModels() {
   try { const d = await api.get('/api/model/list'); models.value = d.models || []; modelsError.value = ''; }
-  catch (e) { modelsError.value = e.message || 'Models unavailable'; }
+  catch (e) { modelsError.value = e.message || t('view.models.modelsUnavailable'); }
 }
 async function loadProviders() {
   try { const d = await api.get('/api/model/providers'); providers.value = d.providers || []; providersError.value = ''; }
-  catch (e) { providersError.value = e.message || 'Providers unavailable'; }
+  catch (e) { providersError.value = e.message || t('view.models.providersUnavailable'); }
 }
 async function loadAgents() {
   try { const d = await api.get('/api/model/agents'); agents.value = d.agents || []; agentsError.value = ''; }
-  catch (e) { agentsError.value = e.message || 'Agents unavailable'; }
+  catch (e) { agentsError.value = e.message || t('view.models.agentsUnavailable'); }
 }
 async function loadQuota() {
   try {
@@ -255,15 +255,15 @@ async function loadQuota() {
       available: a.available ? 'ok' : 'fail',
     }));
     quotaError.value = '';
-  } catch (e) { quotaError.value = e.message || 'Availability unavailable'; }
+  } catch (e) { quotaError.value = e.message || t('view.models.availabilityUnavailable'); }
 }
 async function loadPolicies() {
   try { const d = await api.get('/api/model/policies'); policies.value = d.policies || []; policiesError.value = ''; }
-  catch (e) { policiesError.value = e.message || 'Policies unavailable'; }
+  catch (e) { policiesError.value = e.message || t('view.models.policiesUnavailable'); }
 }
 async function loadBudget() {
   try { const d = await api.get('/api/model/budget'); budget.data = d.budget || null; budgetError.value = ''; }
-  catch (e) { budgetError.value = e.message || 'Budget unavailable'; }
+  catch (e) { budgetError.value = e.message || t('view.models.budgetUnavailable'); }
 }
 
 async function loadAll() {

@@ -458,7 +458,7 @@ async function generate() {
     showKeyResult.value = true;
     await load();
   } catch (e) {
-    toast.error(e.message || 'Generate failed');
+    toast.error(e.message || t('view.apikeys.generateFailed'));
   } finally {
     saving.value = false;
   }
@@ -483,7 +483,7 @@ async function copyKey() {
     }
     toast.success(t('view.apikeys.copied'));
   } catch {
-    toast.error('Copy failed');
+    toast.error(t('view.apikeys.copyFailed'));
   }
 }
 
@@ -518,7 +518,7 @@ async function saveEdit() {
     showEdit.value = false;
     await load();
   } catch (e) {
-    toast.error(e.message || 'Save failed');
+    toast.error(e.message || t('view.apikeys.saveFailed'));
   } finally {
     saving.value = false;
   }
@@ -532,7 +532,7 @@ async function revoke(k) {
     toast.success(t('view.apikeys.revoked', { name: k.name }));
     await load();
   } catch (e) {
-    toast.error(e.message || 'Revoke failed');
+    toast.error(e.message || t('view.apikeys.revokeFailed'));
   }
 }
 

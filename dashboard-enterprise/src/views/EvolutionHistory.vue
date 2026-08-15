@@ -279,7 +279,7 @@ async function approve(item) {
     toast.success(t('view.evolutionHistory.approved'));
     await loadAll();
   } catch (e) {
-    toast.error(e.message || 'approve failed');
+    toast.error(e.message || t('view.evolutionHistory.approveFailed'));
   } finally {
     approving.value = '';
   }

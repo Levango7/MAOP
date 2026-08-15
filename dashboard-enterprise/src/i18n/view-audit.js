@@ -126,7 +126,14 @@ export const messages = {
     'view.audit.result': 'Result',
     'view.audit.success': 'success',
     'view.audit.failure': 'failure',
-  },
+  },    'view.audit.Rules unavailable': 'Rules unavailable',
+    'view.audit.Save failed': 'Save failed',
+    'view.audit.Toggle failed': 'Toggle failed',
+    'view.audit.Delete failed': 'Delete failed',
+    'view.audit.History unavailable': 'History unavailable',
+    'view.audit.Summary unavailable': 'Summary unavailable',
+    'view.audit.Events unavailable': 'Events unavailable',
+
   zh: {
     'view.audit.title': '审计日志',
     'view.audit.enterprise': '企业版',
@@ -254,5 +261,12 @@ export const messages = {
     'view.audit.result': '结果',
     'view.audit.success': '成功',
     'view.audit.failure': '失败',
+    'view.audit.Rules unavailable': '规则不可用',
+    'view.audit.Save failed': '保存失败',
+    'view.audit.Toggle failed': '切换失败',
+    'view.audit.Delete failed': '删除失败',
+    'view.audit.History unavailable': '历史记录不可用',
+    'view.audit.Summary unavailable': '摘要不可用',
+    'view.audit.Events unavailable': '事件不可用',
   },
 };

@@ -83,6 +83,12 @@ export const messages = {
     'view.notifications.bellViewAll': 'View all',
     'view.notifications.bellEmpty': 'No unread notifications',
   },
+    'view.notifications.Notifications unavailable': 'Notifications unavailable',
+    'view.notifications.Load more failed': 'Load more failed',
+    'view.notifications.Mark read failed': 'Mark read failed',
+    'view.notifications.Mark all read failed': 'Mark all read failed',
+    'view.notifications.Delete failed': 'Delete failed',
+    'view.notifications.Save failed': 'Save failed',
 
   zh: {
     'view.notifications.title': '通知中心',
@@ -167,5 +173,11 @@ export const messages = {
     'view.notifications.bellTitle': '通知',
     'view.notifications.bellViewAll': '查看全部',
     'view.notifications.bellEmpty': '暂无未读通知',
+    'view.notifications.Notifications unavailable': '通知不可用',
+    'view.notifications.Load more failed': '加载更多失败',
+    'view.notifications.Mark read failed': '标记已读失败',
+    'view.notifications.Mark all read failed': '全部标记已读失败',
+    'view.notifications.Delete failed': '删除失败',
+    'view.notifications.Save failed': '保存失败',
   },
 };

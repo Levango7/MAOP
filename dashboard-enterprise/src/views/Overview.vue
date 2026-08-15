@@ -337,7 +337,7 @@ async function load() {
     data.value = d;
     lastUpdated.value = new Date();
   } catch (e) {
-    if (!data.value) error.value = e.message || 'Failed to load overview';
+    if (!data.value) error.value = e.message || t('view.overview.loadFailed');
   } finally {
     loading.value = false;
   }

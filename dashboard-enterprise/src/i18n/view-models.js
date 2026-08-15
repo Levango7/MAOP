@@ -68,6 +68,13 @@ export const messages = {
 
     'view.models.couldNotLoadRegistry': 'Could not load registry',
   },
+    'view.models.Registry unavailable': 'Registry unavailable',
+    'view.models.Models unavailable': 'Models unavailable',
+    'view.models.Providers unavailable': 'Providers unavailable',
+    'view.models.Agents unavailable': 'Agents unavailable',
+    'view.models.Availability unavailable': 'Availability unavailable',
+    'view.models.Policies unavailable': 'Policies unavailable',
+    'view.models.Budget unavailable': 'Budget unavailable',
 
   zh: {
     'view.models.title': '模型与性能',
@@ -137,5 +144,12 @@ export const messages = {
     'view.models.col.fallback': '失败回退',
 
     'view.models.couldNotLoadRegistry': '无法加载注册表',
+    'view.models.Registry unavailable': '模型注册表不可用',
+    'view.models.Models unavailable': '模型不可用',
+    'view.models.Providers unavailable': '供应商不可用',
+    'view.models.Agents unavailable': 'Agent 不可用',
+    'view.models.Availability unavailable': '可用性不可用',
+    'view.models.Policies unavailable': '策略不可用',
+    'view.models.Budget unavailable': '预算不可用',
   },
 };

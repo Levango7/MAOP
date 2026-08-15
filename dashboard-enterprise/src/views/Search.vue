@@ -253,7 +253,7 @@ async function doSearch() {
     }
     searchTime.value = Math.round(performance.now() - start);
   } catch (e) {
-    searchError.value = e.message || 'Search failed';
+    searchError.value = e.message || t('view.search.searchFailed');
     results.value = [];
   }
   searching.value = false;

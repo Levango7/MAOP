@@ -696,7 +696,7 @@ async function upgradeAgent(a) {
     upgradePanel.updateAvailable = data?.update_available || false;
     upgradePanel.releaseNotes = data?.release_notes || '';
   } catch (e) {
-    upgradePanel.result = { error: e.message || 'check failed' };
+    upgradePanel.result = { error: e.message || t('view.agents.checkFailed') };
     toast.error(t('view.agents.upgradeFailed', { name: a.name }) + (e.message ? ': ' + e.message : ''));
   } finally {
     upgradePanel.checking = false;
@@ -723,7 +723,7 @@ async function executeUpgrade() {
       toast.error(t('view.agents.upgradeFailed', { name: agentName }) + ': ' + err);
     }
   } catch (e) {
-    upgradePanel.result = { error: e.message || 'upgrade failed' };
+    upgradePanel.result = { error: e.message || t('view.agents.upgradeFailed') };
     toast.error(t('view.agents.upgradeFailed', { name: agentName }) + (e.message ? ': ' + e.message : ''));
   } finally {
     upgradePanel.upgrading = false;

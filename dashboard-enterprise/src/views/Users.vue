@@ -193,19 +193,19 @@ async function submitForm() {
         password: form.value.password,
         roles: form.value.roles,
       });
-      if (d.status !== 'ok') formError.value = d.error || 'Failed';
+      if (d.status !== 'ok') formError.value = d.error || t('view.users.failed');
     } else {
       const body = { roles: form.value.roles };
       if (form.value.password) body.password = form.value.password;
       const d = await api.put('/api/auth/users/' + encodeURIComponent(form.value.username), body);
-      if (d.status !== 'ok') formError.value = d.error || 'Failed';
+      if (d.status !== 'ok') formError.value = d.error || t('view.users.failed');
     }
     if (!formError.value) {
       closeDialog();
       await fetchUsers();
     }
   } catch (e) {
-    formError.value = e.message || 'Network error';
+    formError.value = e.message || t('view.users.networkError');
   } finally {
     submitting.value = false;
   }
@@ -217,7 +217,7 @@ async function confirmDelete(u) {
     await api.delete('/api/auth/users/' + encodeURIComponent(u.username));
     await fetchUsers();
   } catch (e) {
-    window.alert(e.message || 'Failed');
+    window.alert(e.message || t('view.users.failed'));
   }
 }
 

@@ -120,7 +120,7 @@ async function load() {
     tenants.value = d.tenants || [];
     error.value = '';
   } catch (e) {
-    error.value = e.message || 'Failed to load tenants';
+    error.value = e.message || t('view.tenants.loadFailed');
     tenants.value = [];
   } finally {
     loading.value = false;
@@ -143,7 +143,7 @@ async function createTenant() {
     showCreate.value = false;
     await load();
   } catch (e) {
-    toast.error(e.message || 'Create failed');
+    toast.error(e.message || t('view.tenants.createFailed'));
   } finally {
     saving.value = false;
   }
@@ -154,7 +154,7 @@ async function suspend(id) {
     toast.success(`Suspended ${id}`);
     await load();
   } catch (e) {
-    toast.error(e.message || 'Suspend failed');
+    toast.error(e.message || t('view.tenants.suspendFailed'));
   }
 }
 async function activate(id) {
@@ -163,7 +163,7 @@ async function activate(id) {
     toast.success(`Activated ${id}`);
     await load();
   } catch (e) {
-    toast.error(e.message || 'Activate failed');
+    toast.error(e.message || t('view.tenants.activateFailed'));
   }
 }
 async function remove(id) {
@@ -173,7 +173,7 @@ async function remove(id) {
     toast.success(t('view.tenants.deleted', { id }));
     await load();
   } catch (e) {
-    toast.error(e.message || 'Delete failed');
+    toast.error(e.message || t('view.tenants.deleteFailed'));
   }
 }
 

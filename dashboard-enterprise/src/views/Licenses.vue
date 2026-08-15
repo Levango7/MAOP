@@ -414,7 +414,7 @@ async function load() {
     const d = await api.get('/api/licenses/list');
     licenses.value = d.licenses || [];
   } catch (e) {
-    error.value = e.message || 'Failed to load licenses';
+    error.value = e.message || t('view.licenses.loadFailed');
     licenses.value = [];
   } finally {
     loading.value = false;
@@ -490,7 +490,7 @@ async function renewLicense() {
       } catch { /* ignore */ }
     }
   } catch (e) {
-    toast.error(e.message || 'Renew failed');
+    toast.error(e.message || t('view.licenses.renewFailed'));
   } finally {
     saving.value = false;
   }
@@ -507,7 +507,7 @@ async function revokeLicense(lic) {
       closeDetail();
     }
   } catch (e) {
-    toast.error(e.message || 'Revoke failed');
+    toast.error(e.message || t('view.licenses.revokeFailed'));
   }
 }
 

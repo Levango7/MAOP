@@ -19,7 +19,12 @@ export const messages = {
     'view.tenants.planPro': 'Pro',
     'view.tenants.planEnterprise': 'Enterprise',
     'view.tenants.idAndNameRequired': 'Tenant ID and name are required',
-  },
+  },    'view.tenants.Failed to load tenants': 'Failed to load tenants',
+    'view.tenants.Create failed': 'Create failed',
+    'view.tenants.Suspend failed': 'Suspend failed',
+    'view.tenants.Activate failed': 'Activate failed',
+    'view.tenants.Delete failed': 'Delete failed',
+
   zh: {
     'view.tenants.subtitle': '隔离的工作空间与资源配额',
     'view.tenants.enterprise': '企业版',
@@ -40,5 +45,10 @@ export const messages = {
     'view.tenants.deleteConfirm': '删除租户“{id}”？此操作不可恢复。',
     'view.tenants.deleted': '已删除 {id}',
     'view.tenants.idAndNameRequired': '租户 ID 和名称为必填项',
+    'view.tenants.Failed to load tenants': '加载租户失败',
+    'view.tenants.Create failed': '创建失败',
+    'view.tenants.Suspend failed': '暂停失败',
+    'view.tenants.Activate failed': '激活失败',
+    'view.tenants.Delete failed': '删除失败',
   },
 };

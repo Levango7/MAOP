@@ -71,6 +71,7 @@ export const messages = {
     'view.search.col.message': 'Message',
     // 'Detail' reuses common.details; 'Name'/'Model'/'Driver'/'Capabilities' reuse common.*
   },
+    'view.search.Search failed': 'Search failed',
 
   zh: {
     'view.search.title': '统一搜索',
@@ -141,5 +142,6 @@ export const messages = {
     'view.search.col.time': '时间',
     'view.search.col.level': '级别',
     'view.search.col.message': '消息',
+    'view.search.Search failed': '搜索失败',
   },
 };

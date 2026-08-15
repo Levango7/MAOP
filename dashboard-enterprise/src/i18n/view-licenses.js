@@ -72,7 +72,10 @@ export const messages = {
     'view.licenses.totalLicenses': 'Total Licenses',
     'view.licenses.activeLicenses': 'Active',
     'view.licenses.expiringSoon': 'Expiring Soon',
-  },
+  },    'view.licenses.Failed to load licenses': 'Failed to load licenses',
+    'view.licenses.Renew failed': 'Renew failed',
+    'view.licenses.Revoke failed': 'Revoke failed',
+
   zh: {
     'view.licenses.subtitle': '签发、续期与吊销企业版 License',
     'view.licenses.enterprise': '企业版',
@@ -146,5 +149,8 @@ export const messages = {
     'view.licenses.totalLicenses': 'License 总数',
     'view.licenses.activeLicenses': '正式生效',
     'view.licenses.expiringSoon': '即将过期',
+    'view.licenses.Failed to load licenses': '加载许可证失败',
+    'view.licenses.Renew failed': '续期失败',
+    'view.licenses.Revoke failed': '吊销失败',
   },
 };

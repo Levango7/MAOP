@@ -45,7 +45,8 @@ export const messages = {
     'view.overview.colError': 'Error',
     'view.overview.colCount': 'Count',
     'view.overview.colRate': 'Rate',
-  },
+  },    'view.overview.Failed to load overview': 'Failed to load overview',
+
   zh: {
     'view.overview.title': '概览',
     'view.overview.updated': '更新于',
@@ -92,5 +93,6 @@ export const messages = {
     'view.overview.colError': '错误',
     'view.overview.colCount': '次数',
     'view.overview.colRate': '比率',
+    'view.overview.Failed to load overview': '加载概览失败',
   },
 };
