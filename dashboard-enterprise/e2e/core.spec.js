@@ -8,7 +8,7 @@ test.describe('MAOP Dashboard Core Flows', () => {
     await page.goto('/')
     await expect(page).toHaveTitle(/MAOP/)
     // 页面渲染断言（stat-card 渲染依赖后端数据结构，stub 空数据时仅保证页面骨架可用）
-    await expect(page.locator('#app, .page, main, body')).first().toBeVisible()
+    await expect(page.locator('#app')).toBeVisible()
   })
 
   test('navigation to all major routes works', async ({ page }) => {

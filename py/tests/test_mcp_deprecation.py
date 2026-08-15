@@ -186,7 +186,7 @@ class TestCallersMigrated:
 
         path = (
             Path(__file__).resolve().parent.parent
-            / "maop" / "core" / "function_call.py"
+            / "maop" / "core" / "agent" / "llm_chat" / "function_call.py"
         )
         src = path.read_text(encoding="utf-8")
 
@@ -209,7 +209,7 @@ class TestCallersMigrated:
 
         path = (
             Path(__file__).resolve().parent.parent
-            / "maop" / "core" / "tool_schema.py"
+            / "maop" / "core" / "agent" / "tools" / "tool_schema.py"
         )
         src = path.read_text(encoding="utf-8")
 

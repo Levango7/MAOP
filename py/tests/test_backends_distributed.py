@@ -35,8 +35,8 @@ from maop.core.backends.backends import (
     reset_backends,
 )
 
-# 模块源码路径
-_BACKENDS_DIR = Path(__file__).resolve().parent.parent / "maop" / "core"
+# 模块源码路径（P0-4 扁平 core 清理后迁移至 core/backends 子包）
+_BACKENDS_DIR = Path(__file__).resolve().parent.parent / "maop" / "core" / "backends"
 _RABBITMQ_MODULE_PATH = _BACKENDS_DIR / "backends_rabbitmq.py"
 _ETCD_MODULE_PATH = _BACKENDS_DIR / "backends_distributed.py"
 

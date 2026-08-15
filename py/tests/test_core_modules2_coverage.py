@@ -279,11 +279,8 @@ class TestSubagentDb:
         # Force data dir to tmp_path so the DB path is isolated.
         monkeypatch.setenv("MAOP_DATA_DIR", str(tmp_path))
         # Reload module to pick up env override via get_db_path.
-        import importlib
-
-        from maop.core import subagent_db
-        importlib.reload(subagent_db)
-        path = subagent_db.get_subagent_db_path()
+        from maop.core.agent.delegation.subagent_db import get_subagent_db_path
+        path = get_subagent_db_path()
         assert path is not None
 
     def test_init_subagent_db(self, tmp_path):
@@ -302,9 +299,6 @@ class TestSubagentDb:
     def test_migrate_legacy_no_existing(self, tmp_path, monkeypatch):
         # When no legacy DB exists, migrate should be a no-op (just create schema).
         monkeypatch.setenv("MAOP_DATA_DIR", str(tmp_path))
-        import importlib
-
-        from maop.core import subagent_db
-        importlib.reload(subagent_db)
+        from maop.core.agent.delegation.subagent_db import migrate_legacy_subagent_db
         # Should not raise.
-        subagent_db.migrate_legacy_subagent_db()
+        migrate_legacy_subagent_db()

@@ -127,8 +127,8 @@ class TestEvolutionLoop:
 
 class TestReactLoop:
     def test_module_import(self):
-        import maop.core.agent.llm_chat.react_loop
-        assert maop.core.react_loop is not None
+        from maop.core.agent.llm_chat import react_loop
+        assert react_loop is not None
 
 
 # ── LLM Provider ───────────────────────────────────────────────────

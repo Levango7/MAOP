@@ -41,7 +41,7 @@ class FakeEpisodicResult:
 class FakeThreeLayerMemory:
     _store_data: list = []  # noqa: RUF012
 
-    def __init__(self, root_dir=None):
+    def __init__(self, root_dir=None, working_max=None, working_ttl=None, **kwargs):
         pass
 
     def episodic_search(self, query="", agent="", outcome="", min_score=0.0,
@@ -54,6 +54,22 @@ class FakeThreeLayerMemory:
                 continue
             results.append(FakeEpisodicResult(entry))
         return results[:top]
+
+    def short_term_search(self, query="", top=10, agent=""):
+        """T3: facade.short_term_search 转发到该别名（与真实底层输出形态一致：dict 列表）。"""
+        results = self.episodic_search(query=query, agent=agent, top=top)
+        return [
+            {
+                "id": r.entry.id,
+                "agent": r.entry.agent,
+                "task": r.entry.task,
+                "metadata": r.entry.metadata or {},
+                "outcome": r.entry.outcome,
+                "score": r.entry.score,
+                "created_at": getattr(r.entry, "created_at", None),
+            }
+            for r in results
+        ]
 
     def store(self, layer, content, **kwargs):
         entry = FakeEpisodicEntry(
@@ -78,6 +94,10 @@ class FakeThreeLayerMemory:
             "consolidated": 0,
             "unconsolidated": total,
         }
+
+    def short_term_stats(self):
+        """T3: facade.short_term_stats 转发到该别名（与 episodic_stats 输出一致）。"""
+        return self.episodic_stats()
 
 
 class FakeMemoryStore:
