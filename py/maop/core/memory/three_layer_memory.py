@@ -45,6 +45,7 @@ from maop.core.memory.working_memory import WorkingMemoryMixin
 from maop.core.memory.semantic import SemanticMixin
 from maop.core.memory.transform import TransformMixin
 from maop.core.memory.episodic_store import EpisodicStoreMixin
+from maop.core.memory.episodic_consolidation import EpisodicConsolidationMixin
 from maop.core.backends.db_utils import sqlite_connect
 
 # 共享 DB 路径与术语映射（统一 ThreeLayerMemory 与 MemoryManager 的 DB 文件）
@@ -139,7 +140,7 @@ from maop.core.memory.three_layer_memory_utils import (
 #   3. No Bloom filter or knowledge graph in this module - those live in
 #      DreamConsolidator (maop.memory.consolidator) and MemoryStore.
 
-class ThreeLayerMemory(WorkingMemoryMixin, SemanticMixin, TransformMixin, EpisodicStoreMixin):
+class ThreeLayerMemory(WorkingMemoryMixin, SemanticMixin, TransformMixin, EpisodicStoreMixin, EpisodicConsolidationMixin):
     """Three-layer memory: Working (LRU) + Episodic (SQLite) + Semantic (Vector).
 
     Parameters
@@ -310,146 +311,12 @@ class ThreeLayerMemory(WorkingMemoryMixin, SemanticMixin, TransformMixin, Episod
             return []
 
 
-    def consolidate_by_access(self, min_access_count: int = 3, limit: int = 50) -> ConsolidationReport:
-        """Auto-promote frequently recalled episodic entries to Semantic Memory.
-
-        Entries with access_count >= min_access_count that haven't been
-        consolidated yet are automatically promoted to long-term (Semantic) memory.
-
-        Returns a ConsolidationReport with promotion stats.
-        """
-        report = ConsolidationReport()
-
-        with self._episodic_connect() as conn:
-            cursor = conn.execute(
-                """SELECT * FROM episodic_memory
-                   WHERE consolidated = 0 AND access_count >= ?
-                   ORDER BY access_count DESC LIMIT ?""",
-                (min_access_count, limit),
-            )
-            cols = [d[0] for d in cursor.description] if cursor.description else []
-            rows = cursor.fetchall()
-            report.candidates = len(rows)
-
-            if not rows:
-                return report
-
-            vs = self._get_vector_store()
-
-            for row in rows:
-                d = dict(zip(cols, row))
-                entry_id = d["id"]
-                task = d["task"]
-                agent = d["agent"]
-                outcome = d["outcome"]
-                score = d["score"]
-                lessons = json.loads(d.get("lessons", "[]"))
-                access_count = d.get("access_count", 0)
-
-                parts = [f"Task: {task}", f"Agent: {agent}", f"Outcome: {outcome}"]
-                if lessons:
-                    parts.append(f"Lessons: {'; '.join(lessons)}")
-                parts.append(f"AccessCount: {access_count}")
-                text = " | ".join(parts)
-
-                try:
-                    vs.index(
-                        entry_id=f"access_consolidated:{entry_id}",
-                        text=text,
-                        metadata={
-                            "source": "access_consolidation",
-                            "agent": agent,
-                            "outcome": outcome,
-                            "score": score,
-                            "access_count": access_count,
-                        },
-                    )
-                    conn.execute(
-                        "UPDATE episodic_memory SET consolidated = 1 WHERE id = ?",
-                        (entry_id,),
-                    )
-                    report.consolidated += 1
-                except Exception as exc:
-                    logger.warning("Access-consolidation failed for %s: %s", entry_id[:8], exc)
-                    report.errors += 1
-
-        logger.info(
-            "Access-consolidation: %d/%d promoted, %d errors",
-            report.consolidated, report.candidates, report.errors,
-        )
-        return report
 
 
 
 
     # ── Consolidation (Episodic → Semantic) ──────────────────
 
-    def consolidate(self, min_score: float = 0.7, limit: int = 50) -> ConsolidationReport:
-        """Extract high-value episodic memories into Semantic Memory.
-
-        Only consolidates entries with score >= min_score that haven't
-        been consolidated yet.
-        """
-        report = ConsolidationReport()
-
-        with self._episodic_connect() as conn:
-            cursor = conn.execute(
-                """SELECT * FROM episodic_memory
-                   WHERE consolidated = 0 AND score >= ?
-                   ORDER BY score DESC LIMIT ?""",
-                (min_score, limit),
-            )
-            cols = [d[0] for d in cursor.description] if cursor.description else []
-            rows = cursor.fetchall()
-            report.candidates = len(rows)
-
-            if not rows:
-                return report
-
-            vs = self._get_vector_store()
-
-            for row in rows:
-                d = dict(zip(cols, row))
-                entry_id = d["id"]
-                task = d["task"]
-                agent = d["agent"]
-                outcome = d["outcome"]
-                score = d["score"]
-                lessons = json.loads(d.get("lessons", "[]"))
-
-                # Build consolidation text
-                parts = [f"Task: {task}", f"Agent: {agent}", f"Outcome: {outcome}"]
-                if lessons:
-                    parts.append(f"Lessons: {'; '.join(lessons)}")
-                if d.get("user_feedback"):
-                    parts.append(f"Feedback: {d['user_feedback']}")
-                text = " | ".join(parts)
-
-                try:
-                    vs.index(
-                        entry_id=f"episodic:{entry_id}",
-                        text=text,
-                        metadata={
-                            "source": "episodic",
-                            "agent": agent,
-                            "outcome": outcome,
-                            "score": score,
-                        },
-                    )
-                    conn.execute(
-                        "UPDATE episodic_memory SET consolidated = 1 WHERE id = ?",
-                        (entry_id,),
-                    )
-                    report.consolidated += 1
-                except Exception as exc:
-                    logger.warning("Consolidation failed for %s: %s", entry_id[:8], exc)
-                    report.errors += 1
-
-        logger.info(
-            "Consolidation: %d/%d consolidated, %d errors",
-            report.consolidated, report.candidates, report.errors,
-        )
-        return report
 
     # ── UnifiedMemoryProtocol 别名（统一术语: short_term / long_term） ──
     # 让 ThreeLayerMemory 实现 maop.memory.unified.UnifiedMemoryProtocol。
