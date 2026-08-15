@@ -67,6 +67,9 @@ if TYPE_CHECKING:
     from maop.core.mcp.mcp_permission import MCPPermissionChecker
 
 logger = logging.getLogger(__name__)
+from maop.core.mcp.mcp_hub_metrics import MCPHubMetricsMixin
+from maop.core.mcp.mcp_hub_ops import MCPHubOpsMixin
+from maop.core.mcp.mcp_hub_compat import MCPHubCompatMixin
 
 
 from maop.core.mcp.mcp_hub_transport import (
@@ -127,7 +130,7 @@ CREATE INDEX IF NOT EXISTS idx_mcp_resources_server ON mcp_resources(server_id);
 """
 
 
-class MCPHub:
+class MCPHub(MCPHubMetricsMixin, MCPHubOpsMixin, MCPHubCompatMixin):
     """MCP Protocol Center — manage MCP server connections and tools.
 
     Supports four transport types: stdio, SSE, WebSocket, streamable_http.
@@ -299,35 +302,6 @@ class MCPHub:
             logger.info("[mcp_hub] Disconnected: %s", server_id[:8])
             return True
 
-    async def list_tools(self, server_id: str = "") -> list[MCPTool]:
-        """List tools from a specific server or all servers."""
-        config = self._configs.get(server_id) if server_id else None
-        server_name = config.name if config is not None else (server_id or "all")
-        with otel.span(
-            self._tracer,
-            "mcp.list_tools",
-            attributes={"mcp.server_name": server_name},
-        ):
-            with self._connect() as conn:
-                if server_id:
-                    cursor = conn.execute(
-                        "SELECT * FROM mcp_tools WHERE server_id = ?", (server_id,),
-                    )
-                else:
-                    cursor = conn.execute("SELECT * FROM mcp_tools")
-
-                cols = [d[0] for d in cursor.description] if cursor.description else []
-                rows = cursor.fetchall()
-
-            return [
-                MCPTool(
-                    name=r["name"],
-                    description=r.get("description", ""),
-                    input_schema=json.loads(r.get("input_schema", "{}")),
-                    server_name=r.get("server_name", ""),
-                )
-                for r in (dict(zip(cols, row)) for row in rows)
-            ]
 
     async def call_tool(
         self,
@@ -593,427 +567,27 @@ class MCPHub:
 
     # ── δ-3: permission + audit helpers ──────────────────────────
 
-    def _record_audit(
-        self,
-        *,
-        server_name: str,
-        tool_name: str,
-        user_context: dict[str, Any] | None,
-        arguments: dict[str, Any] | None,
-        allowed: bool,
-        decision_reason: str,
-        success: bool,
-        duration_ms: float,
-        error: str | None,
-    ) -> None:
-        """Write one MCP audit record (if an audit_logger is injected)."""
-        audit = self._audit_logger
-        if audit is None:
-            return
-        # Lazy import keeps the module-load graph acyclic.
-        from maop.core.mcp.mcp_audit import MCPAuditRecord, hash_arguments
 
-        user_id = ""
-        if user_context:
-            user_id = str(user_context.get("user_id", "") or "")
-        record = MCPAuditRecord(
-            timestamp=_time.time(),
-            server_name=server_name,
-            tool_name=tool_name,
-            user_id=user_id,
-            arguments_hash=hash_arguments(arguments),
-            allowed=allowed,
-            decision_reason=decision_reason,
-            success=success,
-            duration_ms=duration_ms,
-            error=error,
-        )
-        try:
-            audit.log_call(record)
-        except Exception as exc:  # pragma: no cover — defensive
-            logger.warning("[mcp_hub] audit log_call failed: %s", exc)
-
-    def _inc_metrics(self, *, allowed: bool, reason: str) -> None:
-        """Update the δ-3 MCP metrics counters.
-
-        Imports are local so a missing/optional monitoring module never
-        breaks the call_tool hot path. The three counters are
-        pre-registered in monitoring.py at module load; we just increment
-        them here.
-        """
-        try:
-            from maop.core.monitoring.monitoring import (
-                MAOP_MCP_CALL_ALLOWED_TOTAL,
-                MAOP_MCP_CALL_AUDITED_TOTAL,
-                MAOP_MCP_CALL_DENIED_TOTAL,
-            )
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1279", exc_info=True)
-            return
-        MAOP_MCP_CALL_AUDITED_TOTAL.inc()
-        if allowed:
-            MAOP_MCP_CALL_ALLOWED_TOTAL.inc()
-        else:
-            MAOP_MCP_CALL_DENIED_TOTAL.inc(labels={"reason": reason or "unknown"})
 
     # ── δ-4: OTel + metrics helpers ──────────────────────────────
 
-    def _record_call_attempt(self, server_name: str, tool_name: str) -> None:
-        """Increment MAOP_mcp_calls_total (label=server,tool)."""
-        try:
-            from maop.core.monitoring.monitoring import MAOP_MCP_CALLS_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1293", exc_info=True)
-            return
-        MAOP_MCP_CALLS_TOTAL.inc(labels={"server": server_name, "tool": tool_name})
 
-    def _record_call_error(self, server_name: str, tool_name: str) -> None:
-        """Increment MAOP_mcp_call_errors_total (label=server,tool)."""
-        try:
-            from maop.core.monitoring.monitoring import MAOP_MCP_CALL_ERRORS_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1301", exc_info=True)
-            return
-        MAOP_MCP_CALL_ERRORS_TOTAL.inc(labels={"server": server_name, "tool": tool_name})
 
-    def _record_call_duration(self, started_monotonic: float) -> None:
-        """Observe MAOP_mcp_call_duration_seconds (no labels; Histogram
-        class in monitoring.py does not carry labels)."""
-        try:
-            from maop.core.monitoring.monitoring import MAOP_MCP_CALL_DURATION_SECONDS
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1310", exc_info=True)
-            return
-        elapsed = _time.monotonic() - started_monotonic
-        if elapsed < 0:
-            elapsed = 0.0
-        MAOP_MCP_CALL_DURATION_SECONDS.observe(elapsed)
 
-    def _record_health_check(self, server_name: str, *, healthy: bool) -> None:
-        """Increment MAOP_mcp_health_check_total (label=server,result)."""
-        try:
-            from maop.core.monitoring.monitoring import MAOP_MCP_HEALTH_CHECK_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1321", exc_info=True)
-            return
-        MAOP_MCP_HEALTH_CHECK_TOTAL.inc(
-            labels={"server": server_name, "result": "healthy" if healthy else "unhealthy"},
-        )
 
-    def _inc_connected_servers(self) -> None:
-        """+1 on MAOP_mcp_servers_connected (no labels)."""
-        try:
-            from maop.core.monitoring.monitoring import MAOP_MCP_SERVERS_CONNECTED
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1331", exc_info=True)
-            return
-        MAOP_MCP_SERVERS_CONNECTED.inc()
 
-    def _dec_connected_servers(self) -> None:
-        """-1 on MAOP_mcp_servers_connected (no labels)."""
-        try:
-            from maop.core.monitoring.monitoring import MAOP_MCP_SERVERS_CONNECTED
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1339", exc_info=True)
-            return
-        MAOP_MCP_SERVERS_CONNECTED.dec()
 
     # ── δ-5: cache / concurrency / rate-limit helpers ──────────
 
-    def _record_cache_hit(self, server_name: str) -> None:
-        """Increment MAOP_mcp_cache_hit_total (label=server)."""
-        try:
-            from maop.core.monitoring.monitoring import MAOP_MCP_CACHE_HIT_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1349", exc_info=True)
-            return
-        MAOP_MCP_CACHE_HIT_TOTAL.inc(labels={"server": server_name})
 
-    def _record_cache_miss(self, server_name: str) -> None:
-        """Increment MAOP_mcp_cache_miss_total (label=server)."""
-        try:
-            from maop.core.monitoring.monitoring import MAOP_MCP_CACHE_MISS_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1357", exc_info=True)
-            return
-        MAOP_MCP_CACHE_MISS_TOTAL.inc(labels={"server": server_name})
 
-    def _record_rate_limited(self, server_name: str) -> None:
-        """Increment MAOP_mcp_rate_limited_total (label=server)."""
-        try:
-            from maop.core.monitoring.monitoring import MAOP_MCP_RATE_LIMITED_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1365", exc_info=True)
-            return
-        MAOP_MCP_RATE_LIMITED_TOTAL.inc(labels={"server": server_name})
 
-    async def list_resources(self, server_id: str = "") -> list[MCPResource]:
-        """List resources from a specific server or all servers."""
-        config = self._configs.get(server_id) if server_id else None
-        server_name = config.name if config is not None else (server_id or "all")
-        with otel.span(
-            self._tracer,
-            "mcp.list_resources",
-            attributes={"mcp.server_name": server_name},
-        ):
-            with self._connect() as conn:
-                if server_id:
-                    cursor = conn.execute(
-                        "SELECT * FROM mcp_resources WHERE server_id = ?", (server_id,),
-                    )
-                else:
-                    cursor = conn.execute("SELECT * FROM mcp_resources")
 
-                cols = [d[0] for d in cursor.description] if cursor.description else []
-                rows = cursor.fetchall()
 
-            return [
-                MCPResource(
-                    uri=r["uri"],
-                    name=r.get("name", ""),
-                    description=r.get("description", ""),
-                    mime_type=r.get("mime_type", ""),
-                    server_name=r.get("server_name", ""),
-                )
-                for r in (dict(zip(cols, row)) for row in rows)
-            ]
 
-    async def read_resource(self, server_id: str, uri: str) -> ResourceContent:
-        """Read an MCP resource from a specific server."""
-        config = self._configs.get(server_id)
-        server_name = config.name if config is not None else server_id
-        with otel.span(
-            self._tracer,
-            "mcp.read_resource",
-            attributes={
-                "mcp.server_name": server_name,
-                "mcp.resource_uri": uri,
-            },
-        ):
-            transport = self._transports.get(server_id)
-            if transport is None:
-                return ResourceContent(uri=uri, text=f"Error: Server '{server_id}' not connected")
 
-            response = await transport.send_request(
-                "resources/read",
-                {"uri": uri},
-            )
 
-            if "error" in response:
-                error_msg = response["error"].get("message", str(response["error"]))
-                return ResourceContent(uri=uri, text=f"Error: {error_msg}")
 
-            contents = response.get("result", {}).get("contents", [])
-            if contents:
-                first = contents[0]
-                return ResourceContent(
-                    uri=first.get("uri", uri),
-                    mime_type=first.get("mimeType", ""),
-                    text=first.get("text", ""),
-                )
-
-            return ResourceContent(uri=uri, text="")
-
-    async def health_check(self, server_id: str) -> bool:
-        """Check if a server is healthy by sending a ping."""
-        config = self._configs.get(server_id)
-        server_name = config.name if config is not None else server_id
-        with otel.span(
-            self._tracer,
-            "mcp.health_check",
-            attributes={"mcp.server_name": server_name},
-        ):
-            transport = self._transports.get(server_id)
-            if transport is None:
-                self._record_health_check(server_name, healthy=False)
-                return False
-
-            if not transport.is_alive:
-                if config and config.auto_reconnect:
-                    try:
-                        await transport.start()
-                        await self._discover_capabilities(server_id)
-                        self._update_server_status(server_id, ServerStatus.CONNECTED)
-                        self._record_health_check(server_name, healthy=True)
-                        return True
-                    except Exception:
-                        self._update_server_status(server_id, ServerStatus.ERROR)
-                        self._record_health_check(server_name, healthy=False)
-                        return False
-                self._record_health_check(server_name, healthy=False)
-                return False
-
-            response = await transport.send_request("ping", {})
-            if "error" in response:
-                self._update_server_status(server_id, ServerStatus.ERROR, error=response["error"].get("message", ""))
-                self._record_health_check(server_name, healthy=False)
-                return False
-
-            self._update_server_status(server_id, ServerStatus.CONNECTED)
-            self._record_health_check(server_name, healthy=True)
-            return True
-
-    async def health_check_all(
-        self, *, timeout_s: float | None = None
-    ) -> dict[str, bool]:
-        """Check health of all connected servers in parallel.
-
-        P1-§4.3: each server's health check is independent — it only
-        touches that server's own transport and DB rows, so the checks
-        have no cross-server dependency and can run concurrently via
-        ``asyncio.gather``. ``gather`` preserves input order, so
-        ``zip(server_ids, outcomes)`` keeps the key↔value mapping
-        identical to the previous serial loop.
-
-        F2-03 enhancement — robust parallel health checking:
-
-          - ``return_exceptions=True``: a single server raising (e.g. a
-            transport bug) no longer cancels the whole batch; the
-            exception is recorded as ``unhealthy`` for that server and
-            the remaining checks still complete.
-          - ``timeout_s``: optional per-server wall-clock timeout.  When
-            set, each check is wrapped in ``asyncio.wait_for`` so a
-            hung server cannot stall the entire sweep.  A timeout is
-            treated as unhealthy (not an error) and logged at warning
-            level so operators can spot the slow server.
-
-        Parameters
-        ----------
-        timeout_s : float | None
-            Per-server timeout in seconds.  ``None`` (default) preserves
-            the original unbounded behaviour for backward compatibility.
-        """
-        server_ids = list(self._transports.keys())
-        if not server_ids:
-            return {}
-
-        async def _check(sid: str) -> bool:
-            if timeout_s is not None:
-                try:
-                    return await asyncio.wait_for(self.health_check(sid), timeout=timeout_s)
-                except TimeoutError:
-                    logger.warning(
-                        "[mcp_hub] Health check timed out for '%s' after %.1fs",
-                        sid, timeout_s,
-                    )
-                    config = self._configs.get(sid)
-                    server_name = config.name if config is not None else sid
-                    self._record_health_check(server_name, healthy=False)
-                    return False
-            return await self.health_check(sid)
-
-        outcomes = await asyncio.gather(
-            *[_check(sid) for sid in server_ids],
-            return_exceptions=True,
-        )
-        result: dict[str, bool] = {}
-        for sid, outcome in zip(server_ids, outcomes):
-            if isinstance(outcome, Exception):
-                logger.warning(
-                    "[mcp_hub] Health check raised for '%s': %s", sid, outcome,
-                )
-                config = self._configs.get(sid)
-                server_name = config.name if config is not None else sid
-                self._record_health_check(server_name, healthy=False)
-                result[sid] = False
-            else:
-                result[sid] = bool(outcome)
-        return result
-
-    def list_servers(self) -> list[ServerInfo]:
-        """List all registered servers."""
-        with self._connect() as conn:
-            cursor = conn.execute("SELECT * FROM mcp_servers ORDER BY created_at DESC")
-            cols = [d[0] for d in cursor.description] if cursor.description else []
-            rows = cursor.fetchall()
-
-        infos: list[ServerInfo] = []
-        for r in (dict(zip(cols, row)) for row in rows):
-            sid = r["id"]
-            tools_count = 0
-            resources_count = 0
-            with self._connect() as conn:
-                tools_count = conn.execute(
-                    "SELECT COUNT(*) FROM mcp_tools WHERE server_id = ?", (sid,),
-                ).fetchone()[0]
-                resources_count = conn.execute(
-                    "SELECT COUNT(*) FROM mcp_resources WHERE server_id = ?", (sid,),
-                ).fetchone()[0]
-
-            infos.append(ServerInfo(
-                id=sid,
-                name=r.get("name", ""),
-                transport=TransportType(r.get("transport", "stdio")),
-                status=ServerStatus(r.get("status", "disconnected")),
-                tools_count=tools_count,
-                resources_count=resources_count,
-                error=r.get("error", ""),
-            ))
-        return infos
-
-    async def _discover_capabilities(self, server_id: str) -> None:
-        """Discover tools and resources from a connected server."""
-        transport = self._transports.get(server_id)
-        config = self._configs.get(server_id)
-        if transport is None or config is None:
-            return
-
-        # Discover tools
-        try:
-            response = await transport.send_request("tools/list", {})
-            if "result" in response and "tools" in response["result"]:
-                with self._connect() as conn:
-                    conn.execute("DELETE FROM mcp_tools WHERE server_id = ?", (server_id,))
-                    for tool_def in response["result"]["tools"]:
-                        tool_id = uuid.uuid4().hex[:16]
-                        conn.execute(
-                            """INSERT INTO mcp_tools (id, server_id, server_name, name, description, input_schema)
-                               VALUES (?, ?, ?, ?, ?, ?)""",
-                            (tool_id, server_id, config.name,
-                             tool_def.get("name", ""),
-                             tool_def.get("description", ""),
-                             json.dumps(tool_def.get("inputSchema", {}))),
-                        )
-        except Exception as exc:
-            logger.debug("[mcp_hub] Tool discovery failed: %s", exc)
-
-        # Discover resources
-        try:
-            response = await transport.send_request("resources/list", {})
-            if "result" in response and "resources" in response["result"]:
-                with self._connect() as conn:
-                    conn.execute("DELETE FROM mcp_resources WHERE server_id = ?", (server_id,))
-                    for res_def in response["result"]["resources"]:
-                        res_id = uuid.uuid4().hex[:16]
-                        conn.execute(
-                            """INSERT INTO mcp_resources (id, server_id, server_name, uri, name, description, mime_type)
-                               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                            (res_id, server_id, config.name,
-                             res_def.get("uri", ""),
-                             res_def.get("name", ""),
-                             res_def.get("description", ""),
-                             res_def.get("mimeType", "")),
-                        )
-        except Exception as exc:
-            logger.debug("[mcp_hub] Resource discovery failed: %s", exc)
-
-    def _update_server_status(
-        self,
-        server_id: str,
-        status: ServerStatus,
-        error: str = "",
-    ) -> None:
-        now = _time.time()
-        with self._connect() as conn:
-            sets = ["status = ?", "updated_at = ?"]
-            params: list[Any] = [status.value, now]
-            if error:
-                sets.append("error = ?")
-                params.append(error)
-            params.append(server_id)
-            conn.execute(
-                f"UPDATE mcp_servers SET {', '.join(sets)} WHERE id = ?", params,
-            )
 
     # ── δ-1: Name-based compat shims (Stack A/B unification) ──────
     # These methods support callers (dashboard routers, function_call.py,
@@ -1021,131 +595,9 @@ class MCPHub:
     # They translate name-based operations to MCPHub's id-based core API
     # (connect/disconnect/call_tool which are server-id based).
 
-    def get_server_config(self, name: str) -> MCPServerConfig | None:
-        """Look up a stored server config by name."""
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT config FROM mcp_servers WHERE name = ? ORDER BY updated_at DESC LIMIT 1",
-                (name,),
-            ).fetchone()
-        if row is None:
-            return None
-        try:
-            return MCPServerConfig.model_validate_json(row["config"])
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1594", exc_info=True)
-            return None
 
-    def find_server_id_by_name(self, name: str) -> str | None:
-        """Look up a server_id by name (most recent record)."""
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT id FROM mcp_servers WHERE name = ? ORDER BY updated_at DESC LIMIT 1",
-                (name,),
-            ).fetchone()
-        return row["id"] if row else None
 
-    def add_server(self, config: MCPServerConfig) -> bool:
-        """Register a server config without connecting (compat shim)."""
-        now = _time.time()
-        with self._connect() as conn:
-            conn.execute("DELETE FROM mcp_servers WHERE name = ?", (config.name,))
-            server_id = uuid.uuid4().hex[:16]
-            conn.execute(
-                """INSERT INTO mcp_servers (id, name, transport, status, config, error, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (server_id, config.name, config.transport.value,
-                 ServerStatus.DISCONNECTED.value, config.model_dump_json(),
-                 "", now, now),
-            )
-        return True
 
-    def remove_server(self, name: str) -> bool:
-        """Remove a registered server by name (compat shim)."""
-        server_id = self.find_server_id_by_name(name)
-        if server_id is None:
-            return False
-        transport = self._transports.pop(server_id, None)
-        if transport is not None:
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-            if loop is not None:
-                # High fix: keep a strong reference to the stop task so it
-                # is not garbage-collected before it runs.
-                task = loop.create_task(transport.stop())
-                self._stop_tasks.add(task)
-                task.add_done_callback(self._stop_tasks.discard)
-            else:
-                # High fix: previously the RuntimeError path silently
-                # skipped stop(), leaking the transport (for stdio: a
-                # permanently running orphan child process). Run stop()
-                # to completion on a fresh event loop instead.
-                try:
-                    asyncio.run(transport.stop())
-                except Exception as exc:
-                    logger.warning(
-                        "[mcp_hub] transport.stop() failed during "
-                        "remove_server('%s'): %s", name, exc,
-                    )
-        self._configs.pop(server_id, None)
-        with self._connect() as conn:
-            conn.execute("DELETE FROM mcp_servers WHERE id = ?", (server_id,))
-            conn.execute("DELETE FROM mcp_tools WHERE server_id = ?", (server_id,))
-            conn.execute("DELETE FROM mcp_resources WHERE server_id = ?", (server_id,))
-        return True
 
-    def all_tools(self) -> list[MCPTool]:
-        """Return all tools across all servers (sync, compat shim)."""
-        with self._connect() as conn:
-            cursor = conn.execute("SELECT * FROM mcp_tools")
-            cols = [d[0] for d in cursor.description] if cursor.description else []
-            rows = cursor.fetchall()
-        return [
-            MCPTool(
-                name=r["name"],
-                description=r.get("description", ""),
-                input_schema=json.loads(r.get("input_schema", "{}")),
-                server_name=r.get("server_name", ""),
-            )
-            for r in (dict(zip(cols, row)) for row in rows)
-        ]
 
-    def find_tool(self, qualified_name: str) -> tuple[str | None, str]:
-        """Find a tool by qualified name. Returns (server_id, tool_name)."""
-        with self._connect() as conn:
-            if "." in qualified_name:
-                server_name, tool_name = qualified_name.split(".", 1)
-                row = conn.execute(
-                    "SELECT server_id FROM mcp_tools WHERE server_name = ? AND name = ? LIMIT 1",
-                    (server_name, tool_name),
-                ).fetchone()
-                if row:
-                    return row["server_id"], tool_name
-            row = conn.execute(
-                "SELECT server_id, name FROM mcp_tools WHERE name = ? LIMIT 1",
-                (qualified_name,),
-            ).fetchone()
-            if row:
-                return row["server_id"], row["name"]
-        return None, qualified_name
 
-    async def call_tool_by_name(
-        self,
-        qualified_name: str,
-        arguments: dict[str, Any] | None = None,
-        *,
-        user_context: dict[str, Any] | None = None,
-    ) -> ToolResult:
-        """Call a tool by qualified name 'server.tool' (compat shim).
-
-        δ-3: Forwards the optional ``user_context`` to :meth:`call_tool`
-        so the dashboard router can pass the authenticated caller through
-        to the permission checker without restructuring its existing
-        name-based call sites.
-        """
-        server_id, tool_name = self.find_tool(qualified_name)
-        if server_id is None:
-            return ToolResult(is_error=True, error_message=f"Tool '{qualified_name}' not found")
-        return await self.call_tool(server_id, tool_name, arguments or {}, user_context=user_context)
