@@ -1235,6 +1235,7 @@ class ThreeLayerMemory:
                 "user_feedback": r.entry.user_feedback,
                 "retrieval_weight": r.retrieval_weight,
                 "created_at": r.entry.created_at,
+                "metadata": r.entry.metadata,
             }
             for r in results
         ]

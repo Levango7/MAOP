@@ -12,12 +12,14 @@ See ADR-013.
 from __future__ import annotations
 
 import asyncio
+import logging
 from unittest.mock import patch
 
 import pytest
 
 import maop.core.agent.tools.tool_manager as _tm
 from maop.core.agent.tools.tool_manager import ToolCallResult, ToolDef, ToolManager
+from maop.core.agent.tools.tool_policy import ToolPolicy
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 
@@ -657,3 +659,141 @@ class TestCallSyncFallback:
         result = asyncio.run(_run())
         assert result.ok is False
         assert "err" in result.error
+
+
+# ── 工具白名单策略（T1） ───────────────────────────────────────
+
+class TestToolPolicyUnit:
+    """ToolPolicy 决策逻辑单测（deny/allow/mode/env/fail-open）。"""
+
+    @staticmethod
+    def _write_policy(tmp_path, text: str) -> ToolPolicy:
+        cfg = tmp_path / "tool_whitelist.yaml"
+        cfg.write_text(text, encoding="utf-8")
+        return ToolPolicy(config_path=cfg)
+
+    def test_id_exact_match(self, tmp_path):
+        policy = self._write_policy(
+            tmp_path, "mode: enforce\nallow:\n  - id: lint\n"
+        )
+        assert policy.check("lint", "ruff check").allowed is True
+        assert policy.check("linter", "ruff check").allowed is False
+
+    def test_pattern_matches_id_and_command(self, tmp_path):
+        policy = self._write_policy(
+            tmp_path, "mode: enforce\nallow:\n  - pattern: 'ruff*'\n"
+        )
+        # id 命中
+        assert policy.check("ruff-check", "ruff check src/").allowed is True
+        # command 命中
+        assert policy.check("lint", "ruff check src/").allowed is True
+        # 均未命中
+        assert policy.check("lint", "pylint src/").allowed is False
+
+    def test_deny_overrides_allow(self, tmp_path):
+        policy = self._write_policy(
+            tmp_path,
+            "mode: enforce\nallow:\n  - id: t1\ndeny:\n  - id: t1\n",
+        )
+        decision = policy.check("t1", "echo hi")
+        assert decision.allowed is False
+        assert decision.matched == "deny"
+
+    def test_enforce_denies_unlisted(self, tmp_path):
+        policy = self._write_policy(tmp_path, "mode: enforce\nallow: []\n")
+        decision = policy.check("t1", "echo hi")
+        assert decision.allowed is False
+        assert "not in allow list" in decision.reason
+
+    def test_audit_allows_unlisted_with_warning(self, tmp_path, caplog):
+        policy = self._write_policy(tmp_path, "mode: audit\nallow: []\n")
+        with caplog.at_level(logging.WARNING, logger="maop.core.agent.tools.tool_policy"):
+            decision = policy.check("t1", "echo hi")
+        assert decision.allowed is True
+        assert any("not in whitelist" in r.message for r in caplog.records)
+
+    def test_env_mode_overrides_config(self, tmp_path, monkeypatch):
+        policy = self._write_policy(tmp_path, "mode: audit\nallow: []\n")
+        assert policy.mode == "audit"
+        monkeypatch.setenv("MAOP_TOOL_POLICY_MODE", "enforce")
+        assert policy.mode == "enforce"
+        assert policy.check("t1", "echo hi").allowed is False
+
+    def test_fail_open_missing_config(self, tmp_path, caplog):
+        policy = ToolPolicy(config_path=tmp_path / "nope.yaml")
+        assert policy.mode == "audit"
+        with caplog.at_level(logging.WARNING, logger="maop.core.agent.tools.tool_policy"):
+            decision = policy.check("t1", "echo hi")
+        assert decision.allowed is True
+        assert any("fail-open" in r.message for r in caplog.records)
+
+    def test_fail_open_invalid_yaml(self, tmp_path):
+        cfg = tmp_path / "tool_whitelist.yaml"
+        cfg.write_text("mode: [unclosed", encoding="utf-8")
+        policy = ToolPolicy(config_path=cfg)
+        assert policy.mode == "audit"
+        assert policy.check("t1", "echo hi").allowed is True
+
+    def test_invalid_mode_falls_back_to_audit(self, tmp_path):
+        policy = self._write_policy(tmp_path, "mode: banana\nallow: []\n")
+        assert policy.mode == "audit"
+        assert policy.check("t1", "echo hi").allowed is True
+
+
+class TestToolPolicyIntegration:
+    """ToolManager.call() / call_sync() / _call_sync_fallback() 策略拦截。"""
+
+    async def test_enforce_blocks_call_no_subprocess(self, mgr, monkeypatch):
+        """enforce 下未放行工具 call() 返回 ok=False 且 create_subprocess_exec 零调用。"""
+        monkeypatch.setenv("MAOP_TOOL_POLICY_MODE", "enforce")
+        mgr.register("t1", command="python -c print(1)")
+        with patch("asyncio.create_subprocess_exec") as mock_exec:
+            result = await mgr.call("t1")
+        assert result.ok is False
+        assert result.error.startswith("tool not allowed: t1:")
+        mock_exec.assert_not_called()
+
+    async def test_audit_allows_with_warning(self, mgr, caplog):
+        """audit 放行但 warning。"""
+        mgr.register("t1", command="python -c print(1)")
+        with caplog.at_level(logging.WARNING, logger="maop.core.agent.tools.tool_policy"):
+            result = await mgr.call("t1")
+        assert result.ok is True
+        assert any("not in whitelist" in r.message for r in caplog.records)
+
+    async def test_deny_overrides_allow_through_call(self, tmp_path):
+        """deny 优先于 allow（经 call() 全链路）。"""
+        cfg = tmp_path / "tool_whitelist.yaml"
+        cfg.write_text(
+            "mode: enforce\nallow:\n  - id: t1\ndeny:\n  - id: t1\n",
+            encoding="utf-8",
+        )
+        mgr = ToolManager(root_dir=tmp_path, tool_policy=ToolPolicy(config_path=cfg))
+        mgr.register("t1", command="python -c print(1)")
+        with patch("asyncio.create_subprocess_exec") as mock_exec:
+            result = await mgr.call("t1")
+        assert result.ok is False
+        assert "tool not allowed" in result.error
+        mock_exec.assert_not_called()
+
+    def test_call_sync_blocked_enforce(self, mgr, monkeypatch):
+        """call_sync 正常路径（内部走 call()）被策略拦。"""
+        monkeypatch.setenv("MAOP_TOOL_POLICY_MODE", "enforce")
+        mgr.register("t1", command="python -c print(1)")
+        result = mgr.call_sync("t1")
+        assert result.ok is False
+        assert "tool not allowed" in result.error
+
+    def test_call_sync_fallback_blocked(self, tmp_path, monkeypatch):
+        """_call_sync_fallback 双路径均被拦（subprocess.run 零调用）。"""
+        monkeypatch.setenv("MAOP_TOOL_POLICY_MODE", "enforce")
+        mgr = ToolManager(root_dir=str(tmp_path))
+        mgr.register("t1", command="python -c print(1)")
+        with patch("subprocess.run") as mock_run:
+            async def _run():
+                return mgr.call_sync("t1")
+
+            result = asyncio.run(_run())
+        assert result.ok is False
+        assert "tool not allowed" in result.error
+        mock_run.assert_not_called()

@@ -35,6 +35,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
+from maop.core.agent.tools.tool_policy import ToolPolicy
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
@@ -153,9 +154,14 @@ class ToolManager:
         result = await mgr.call("lint", args=["src/"])  # F7: now async
     """
 
-    def __init__(self, root_dir: str | Path) -> None:
+    def __init__(
+        self,
+        root_dir: str | Path,
+        tool_policy: ToolPolicy | None = None,
+    ) -> None:
         self._root = Path(root_dir)
         self._db_path = get_db_path("tool_manager")
+        self._policy = tool_policy or ToolPolicy()
         self._ensure_db()
 
     def _ensure_db(self) -> None:
@@ -345,6 +351,11 @@ class ToolManager:
                 ),
             )
 
+        # 工具白名单策略拦截（audit 模式放行+warning；enforce 模式拒绝）。
+        policy_block = self._enforce_policy(tool)
+        if policy_block is not None:
+            return policy_block
+
         # Parse command safely with shlex (no shell injection) and append args as list elements
         cmd_parts = shlex.split(tool.command) + (args or [])
         start = time.monotonic()
@@ -455,6 +466,11 @@ class ToolManager:
                 ),
             )
 
+        # 工具白名单策略拦截（与 call() 保持一致的双路径拦截）。
+        policy_block = self._enforce_policy(tool)
+        if policy_block is not None:
+            return policy_block
+
         cmd_parts = shlex.split(tool.command) + (args or [])
         start = time.monotonic()
         try:
@@ -480,6 +496,29 @@ class ToolManager:
             return ToolCallResult(ok=False, error="timeout")
         except Exception as exc:
             return ToolCallResult(ok=False, error=str(exc))
+
+    def _enforce_policy(self, tool: ToolDef) -> ToolCallResult | None:
+        """工具白名单策略拦截（``call()`` 与 ``_call_sync_fallback()`` 共用）。
+
+        返回 ``ToolCallResult`` 表示应拒绝（调用方直接返回该结果，不抛异常，
+        ``function_call.py`` 只读 ``ok`` / ``error`` 字段）；返回 ``None``
+        表示策略放行，调用方继续执行。
+
+        - deny 命中            -> 拒绝
+        - allow 命中           -> 放行
+        - 均未命中 + enforce   -> 拒绝
+        - 均未命中 + audit     -> 放行（ToolPolicy 已记录 warning）
+        """
+        decision = self._policy.check(tool.id, tool.command)
+        if decision.allowed:
+            return None
+        logger.warning(
+            "[tool_manager] tool %r blocked by policy: %s", tool.id, decision.reason,
+        )
+        return ToolCallResult(
+            ok=False,
+            error=f"tool not allowed: {tool.id}: {decision.reason}",
+        )
 
     def delete(self, tool_id: str) -> bool:
         """Delete a registered tool."""

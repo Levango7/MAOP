@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import logging
 import shutil
 import tempfile
 from pathlib import Path
@@ -375,3 +376,93 @@ class TestBackwardCompatibility:
         )
         assert "working_user_id" in result
         assert "short_term_id" in result
+
+
+# ── Chat 场景透传（T3-A） ─────────────────────────────────────
+
+class TestChatPassthrough:
+    """T3-A: MemoryFacade 的 chat 专属透传 API。
+
+    - ``chat_get_messages_for_llm`` 与直连 MemoryManager 结果一致
+    - ``chat_add_exchange`` 写入三层记忆
+    - ``conversation`` 只读属性透传 ConversationManager
+    - mode="agent" 时告警并抛 NotImplementedError
+    """
+
+    def test_chat_get_messages_for_llm_delegates(self, chat_facade):
+        """透传结果与底层 impl 完全一致（同一实例）。"""
+        chat_facade.chat_add_exchange(
+            session_id="s1", user_msg="hello", assistant_msg="hi there",
+        )
+        expected = chat_facade.impl.get_messages_for_llm(
+            session_id="s1", query="hello", system_prompt="sys",
+        )
+        actual = chat_facade.chat_get_messages_for_llm(
+            session_id="s1", query="hello", system_prompt="sys",
+        )
+        assert actual == expected
+        # 至少包含 system prompt + 历史消息
+        assert len(actual) >= 2
+        assert actual[0]["role"] == "system"
+
+    def test_chat_get_messages_for_llm_matches_direct(self, tmp_root):
+        """验收：facade 透传与直连 MemoryManager 结果一致。"""
+        facade = MemoryFacade(root_dir=tmp_root, mode="chat")
+        _mock_heavy_deps(facade.impl)
+        facade.chat_add_exchange(
+            session_id="s1", user_msg="hello", assistant_msg="hi there",
+        )
+
+        direct = MemoryManager(root_dir=tmp_root)
+        _mock_heavy_deps(direct)
+        direct.add_exchange(
+            session_id="s1", user_msg="hello", assistant_msg="hi there",
+        )
+
+        assert facade.chat_get_messages_for_llm(
+            session_id="s1", query="hello", system_prompt="sys",
+        ) == direct.get_messages_for_llm(
+            session_id="s1", query="hello", system_prompt="sys",
+        )
+
+    def test_chat_add_exchange_stores(self, chat_facade):
+        """chat_add_exchange 写入 working/short_term，conversation 可读。"""
+        result = chat_facade.chat_add_exchange(
+            session_id="s1", user_msg="hello", assistant_msg="hi there", agent="user",
+        )
+        assert "working_user_id" in result
+        assert "working_asst_id" in result
+        assert "short_term_id" in result
+
+        msgs = chat_facade.conversation.get_context_window("s1").messages
+        contents = [m.content for m in msgs]
+        assert "hello" in contents
+        assert "hi there" in contents
+
+    def test_conversation_property_returns_manager(self, chat_facade):
+        """conversation 只读属性透传 MemoryManager.conversation。"""
+        conv = chat_facade.conversation
+        assert conv is chat_facade.impl.conversation
+        assert hasattr(conv, "add_message")
+        assert hasattr(conv, "get_context_window")
+
+    def test_agent_mode_chat_get_messages_raises(self, agent_facade, caplog):
+        """mode=agent 时 chat API 告警并抛 NotImplementedError。"""
+        with caplog.at_level(logging.WARNING, logger="maop.memory.facade"):
+            with pytest.raises(NotImplementedError, match="chat-only"):
+                agent_facade.chat_get_messages_for_llm(session_id="s1")
+        assert any("chat-only" in r.message for r in caplog.records)
+
+    def test_agent_mode_chat_add_exchange_raises(self, agent_facade, caplog):
+        with caplog.at_level(logging.WARNING, logger="maop.memory.facade"):
+            with pytest.raises(NotImplementedError, match="chat-only"):
+                agent_facade.chat_add_exchange(
+                    session_id="s1", user_msg="u", assistant_msg="a",
+                )
+        assert any("chat-only" in r.message for r in caplog.records)
+
+    def test_agent_mode_conversation_raises(self, agent_facade, caplog):
+        with caplog.at_level(logging.WARNING, logger="maop.memory.facade"):
+            with pytest.raises(NotImplementedError, match="chat-only"):
+                _ = agent_facade.conversation
+        assert any("chat-only" in r.message for r in caplog.records)

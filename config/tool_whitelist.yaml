@@ -1,0 +1,47 @@
+# MAOP 工具白名单 — ToolManager 命令级权限校验配置
+#
+# 背景：ToolManager.call() 对任意已入库 tool 直接执行（shlex.split +
+# create_subprocess_exec），此前无命令级权限校验。本文件为 ToolPolicy
+# （py/maop/core/agent/tools/tool_policy.py）提供 deny/allow 规则。
+#
+# 三阶段过渡策略（项目总监已拍板）：
+#   阶段一（audit，当前默认）：所有未命中 deny/allow 规则的工具仍可执行，
+#       但每次调用记录 warning 日志，用于收集实际工具调用清单。
+#   阶段二（导出初始 allow）：根据审计日志观察到的工具 id/命令，把确需
+#       放行的工具写入下方 allow 列表。
+#   阶段三（enforce）：将 mode 改为 enforce，未命中 allow 的工具将被拒绝
+#       执行（返回 ToolCallResult(ok=False, error="tool not allowed: ...")）。
+#
+# 决策顺序：deny 命中 -> 拒绝；allow 命中 -> 放行；均未命中 -> 按 mode：
+#   audit   -> 放行 + warning（当前阶段）
+#   enforce -> 拒绝
+#
+# 规则格式（每条规则二选一，可混用）：
+#   - id: "lint"        精确匹配 tool id
+#   - pattern: "ruff*"  fnmatch 通配，同时匹配 tool id 与命令
+#
+# 环境变量覆盖：
+#   MAOP_TOOL_POLICY_MODE    覆盖 mode（audit | enforce）
+#   MAOP_TOOL_POLICY_CONFIG  覆盖配置文件路径
+#
+# 注意：配置文件缺失或解析失败时 ToolPolicy 会 fail-open 到 audit+warning，
+# 避免策略文件损坏导致全平台工具瘫痪。
+
+mode: audit
+
+# 显式允许执行的工具（当前阶段为空，由审计结果填充）。
+# 示例：
+# allow:
+#   - id: "lint"
+#   - pattern: "ruff*"
+allow: []
+
+# 显式禁止执行的工具（deny 优先于 allow）。
+# 示例（危险命令，切勿在生产移除）：
+# deny:
+#   - pattern: "rm*"
+#   - pattern: "mkfs*"
+#   - pattern: "dd*"
+#   - pattern: "shutdown*"
+#   - pattern: "reboot*"
+deny: []

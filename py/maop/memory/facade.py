@@ -265,6 +265,99 @@ class MemoryFacade:
         """跨层统计信息汇总。"""
         return self._impl.stats()  # type: ignore[no-any-return]
 
+    # ── Chat 场景透传（chat_engine 迁移入口） ───────────────────
+    # 以下 API 为 chat 场景专属（MemoryManager / ConversationManager），
+    # 供 chat_engine 从直连 MemoryManager 迁移到 MemoryFacade 时使用。
+    # mode="agent" 时底层是 ThreeLayerMemory（LRU + episodic 任务经验），
+    # 无会话消息/对话上下文概念，调用这些 API 会告警并抛 NotImplementedError。
+
+    def _ensure_chat(self, what: str) -> None:
+        """Chat 专属 API 守卫：mode 非 chat 时告警并快速失败。
+
+        Raises
+        ------
+        NotImplementedError
+            当 ``mode="agent"`` 时抛出，避免静默返回空结果掩盖接线错误。
+        """
+        if self._mode != "chat":
+            logger.warning(
+                "[memory_facade] %s is chat-only; current mode=%r; "
+                "use mode='chat' to access conversation APIs",
+                what, self._mode,
+            )
+            raise NotImplementedError(
+                f"{what} is chat-only; current mode is {self._mode!r}"
+            )
+
+    def chat_get_messages_for_llm(
+        self,
+        session_id: str,
+        query: str = "",
+        *,
+        system_prompt: str = "",
+        max_tokens: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """构建最终 LLM 消息列表（透传 ``MemoryManager.get_messages_for_llm``）。
+
+        等价于 chat_engine 中 ``self._memory_mgr.get_messages_for_llm(...)`` 的调用。
+
+        Raises
+        ------
+        NotImplementedError
+            当 ``mode="agent"`` 时抛出（ThreeLayerMemory 无会话上下文）。
+        """
+        self._ensure_chat("chat_get_messages_for_llm")
+        return self._impl.get_messages_for_llm(
+            session_id=session_id,
+            query=query,
+            system_prompt=system_prompt,
+            max_tokens=max_tokens,
+        )
+
+    def chat_add_exchange(
+        self,
+        session_id: str,
+        user_msg: str,
+        assistant_msg: str,
+        *,
+        agent: str = "",
+        task: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """存储一轮 user/assistant 对话（透传 ``MemoryManager.add_exchange``）。
+
+        等价于 chat_engine 中 ``self._memory_mgr.add_exchange(...)`` 的调用。
+
+        Raises
+        ------
+        NotImplementedError
+            当 ``mode="agent"`` 时抛出（ThreeLayerMemory 无对话交换概念）。
+        """
+        self._ensure_chat("chat_add_exchange")
+        return self._impl.add_exchange(
+            session_id=session_id,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            agent=agent,
+            task=task,
+            metadata=metadata,
+        )
+
+    @property
+    def conversation(self) -> Any:
+        """只读访问会话上下文管理器（透传 ``MemoryManager.conversation``）。
+
+        返回 ``ConversationManager``（``add_message`` / ``get_context_window``），
+        等价于 chat_engine 中 ``self._memory_mgr.conversation`` 的用法。
+
+        Raises
+        ------
+        NotImplementedError
+            当 ``mode="agent"`` 时抛出（ThreeLayerMemory 无会话窗口）。
+        """
+        self._ensure_chat("conversation")
+        return self._impl.conversation
+
     # ── 跨实现通信（透传到底层） ───────────────────────────────
 
     def query_episodic(self, query: str = "", top: int = 10) -> list[dict[str, Any]]:

@@ -1032,3 +1032,46 @@ class TestTransformMultiHead:
         with patch.object(mem, "semantic_search", side_effect=RuntimeError("boom")):
             result = mem.transform_multi_head(query="q")
         assert result is not None
+
+
+# ── short_term_search metadata 字段（T3-A） ─────────────────────
+
+class TestShortTermSearchMetadata:
+    """T3-A: ``short_term_search`` dict 输出必须包含 ``metadata`` 字段。"""
+
+    def test_metadata_preserved(self, tmp_path):
+        mem = _make_mem(tmp_path)
+        entry_id = mem.short_term_store(
+            "content with metadata",
+            task="meta_task",
+            agent="claude",
+            metadata={"source": "test", "priority": 3},
+        )
+        results = mem.short_term_search(query="", top=10)
+        found = [r for r in results if r.get("id") == entry_id]
+        assert len(found) == 1
+        assert found[0]["metadata"] == {"source": "test", "priority": 3}
+
+    def test_metadata_defaults_to_dict(self, tmp_path):
+        mem = _make_mem(tmp_path)
+        entry_id = mem.short_term_store("plain content", task="plain_task")
+        results = mem.short_term_search(query="", top=10)
+        found = [r for r in results if r.get("id") == entry_id]
+        assert len(found) == 1
+        assert found[0]["metadata"] == {}
+
+    def test_facade_search_keeps_metadata(self, tmp_path):
+        """facade.search 合并 short_term 时不再丢失 metadata。"""
+        from maop.memory.facade import MemoryFacade
+
+        facade = MemoryFacade(root_dir=tmp_path, mode="agent")
+        facade.short_term_store(
+            "facade metadata",
+            task="facade_meta_task",
+            agent="claude",
+            metadata={"source": "facade"},
+        )
+        results = facade.search("facade_meta_task", top=10)
+        short = [r for r in results if r.get("layer") == "short_term"]
+        assert short, "expected short_term results from facade.search"
+        assert any(r.get("metadata") == {"source": "facade"} for r in short)
