@@ -1,6 +1,7 @@
 # MAOP 技术白皮书
 
 > Multi Agents Orchestration Platform — 架构、设计、性能技术白皮书
+> 定位：编排与治理**外部 CLI agent** 的框架层（内置 31 个第三方 CLI 适配器）；内置 LLM 用于对话/分析/建议，不承担 agent 执行引擎角色。
 
 ## 第1章 架构概览
 

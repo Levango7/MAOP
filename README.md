@@ -3,6 +3,8 @@
 > Python-first agent orchestration framework with Plan-Execute-Verify loop,
 > model management, control plane, and real-time dashboard.
 
+> **定位说明**：MAOP 是**多 Agent 编排与治理层**——通过 Plan-Execute-Verify 循环编排**外部 CLI agent**（内置 31 个第三方 CLI 适配器），而非自研 agent 运行时。内置 LLM provider 用于对话、分析与建议生成，不承担 agent 执行引擎角色。
+
 ## Architecture
 
 ```
@@ -34,7 +36,7 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 
 | 能力 | Personal | Enterprise |
 |------|----------|------------|
-| 多代理编排 (Multi-Agent Orchestration) | ✓ | ✓ |
+| 多代理编排 (Multi-Agent Orchestration) | ✓ | ✓ | 编排外部 CLI agent（31 个适配器），非自研运行时 |
 | MCP Hub | ✓ | ✓ |
 | 三层记忆 (Three-Layer Memory) | ✓ | ✓ |
 | 向量检索 (Vector Search) | ✓ | ✓ |
