@@ -263,6 +263,9 @@ jobs:
       MAOP_DATA_DIR: /tmp/maop-migration-test
       # env.py 通过 MAOP_DB_URL 覆盖默认 sqlite 路径，使用临时库避免污染源码树
       MAOP_DB_URL: sqlite:////tmp/maop-migration-test/maop.db
+      # 002_schema_sync 的 downgrade 有破坏性守卫（防 jwt_revoked 等表被删）；
+      # 测试库是 /tmp 临时 sqlite，放行降级以验证 upgrade→downgrade→upgrade 链。
+      MAOP_ALLOW_DESTRUCTIVE_DOWNGRADE: "1"
     services:
       # G5: PostgreSQL service container for PG integration smoke tests.
       # 健康检查确保 CI 步骤执行前 PG 已就绪，避免连接被拒。
