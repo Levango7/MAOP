@@ -49,6 +49,21 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self.auth_header = auth_header
         self.enabled = enabled
 
+    def _is_public_path(self, path: str) -> bool:
+        """Exact match, or prefix match for non-root public paths.
+
+        ``"/api/stream"`` therefore also exempts ``/api/stream/agent/{id}``
+        (SSE endpoints that validate their own token via ``_check_sse_token``
+        + ``require_admin`` in the handler). The root ``"/"`` stays exact so
+        no other route is accidentally exempted.
+        """
+        for p in self.public_paths:
+            if path == p:
+                return True
+            if p != "/" and path.startswith(p.rstrip("/") + "/"):
+                return True
+        return False
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # P0-1 FIX (R3 audit): restore if-guard that was lost in P2-3 fix.
         # Without this guard, ALL auth logic below is dead code and every
@@ -67,9 +82,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.auth_identity = "anonymous"
             return cast(Response, await call_next(request))
 
-        # Skip public paths
+        # Skip public paths — prefix match so subtree endpoints (e.g.
+        # /api/stream/agent/{id}, /api/auth/login/*) inherit the public
+        # status of their mount point. Per-handler auth (require_admin /
+        # _check_sse_token) still applies inside the route.
         path = request.url.path
-        if path in self.public_paths:
+        if self._is_public_path(path):
             return cast(Response, await call_next(request))
 
         # Skip static assets

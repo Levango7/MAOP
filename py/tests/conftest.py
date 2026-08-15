@@ -28,6 +28,18 @@ os.environ.setdefault("MAOP_AUTH_DISABLED_ADMIN", "1")
 os.environ.setdefault("MAOP_RATE_LIMIT", "0")
 os.environ.setdefault("MAOP_RATE_LIMIT_ENABLED", "0")
 
+# ── 锁定 auth 固化值（防 e2e 模块级 env 篡改）────────────────────────
+# tests/e2e/test_auth_enabled.py / test_edition_switch.py /
+# test_routing_rbac_tenant.py 在模块级执行 os.environ["MAOP_AUTH"]="1"
+# （收集阶段即生效且不恢复）。若其中任一在 maop.dashboard.server 首次
+# import 之前运行 → server._auth_enabled / auth._auth_enabled 固化为 True
+# → AuthMiddleware 启用 → 所有无凭据测试请求 401（CI #98 的
+# test_agent_token_stream 3 个 SSE 失败即此根因）。
+# 这里在收集任何 test 模块之前先 import，锁定 auth=off 固化值；
+# 三个 e2e 文件随后会按自身 skip 逻辑（run in isolation）跳过。
+import maop.dashboard.routers.auth as _auth_mod  # noqa: F401,E402
+import maop.dashboard.server as _server_mod     # noqa: F401,E402
+
 
 # ── Disable sentence_transformers in test environment ──────────────
 # Importing sentence_transformers pulls in torch (~30s) and tries to
