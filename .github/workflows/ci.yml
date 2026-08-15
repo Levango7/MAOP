@@ -79,7 +79,7 @@ jobs:
           # 新 Python 无法安装）与 ML 依赖（sentence-transformers→torch）。
           # editable install 自动装 [project].dependencies（base）。
           pip install -e .
-          pip install pytest pytest-asyncio pytest-cov pydantic-settings mmh3 httpx python-multipart aiosqlite pytest-timeout
+          pip install pytest pytest-asyncio pytest-cov pydantic-settings mmh3 httpx python-multipart aiosqlite pytest-timeout pytest-xdist
 
       - name: Run unit tests
         # P0 fix (2026-08-11): 移除 --cov-fail-under(让 pytest 仅对测试成败负责),
