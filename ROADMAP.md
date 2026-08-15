@@ -19,7 +19,7 @@
 
 - **ADR-016 状态同步**：将 SAML SSO 从 `Medium / fail-closed 拒绝` 更新为 `Done`，与代码实际状态（`py/maop/enterprise/sso.py` + `saml_handler.py` + `docs/enterprise/saml-sso-guide.md`）对齐。
 - **mypy 告警清理**：修复 `agents.py:252` return-value 类型错误；将 `vector.py` / `runtime.py` 的 `NotImplementedError` 文档化为 `@abstractmethod`，消除 mypy 误报。
-- **覆盖率 80% → 85%**：补齐 `py/tests/` 关键路径用例，CI 阈值同步上调。
+- **覆盖率 80% → 85%**：补齐 `py/tests/` 关键路径用例，CI 阈值同步上调。（⚠️ 更正 2026-08-14：实际基线约 18.5%，85% 为历史目标未达成，见 `py/scripts/check_coverage_ratchet.py` 的 `FLOOR=18.0`；2026-08-15 子 agent 误回退此更正，已恢复）
 - **engineering-assurance 交付物补齐**：归档 v4.4.1 修复清单（`v4.4.1-fix-report.md`）；`.env.example` 与代码实际环境变量对齐审计（`env-audit-4.4.2.md`）。
 - **`.env.example` 审计**：对比 `py/maop/` 中 `os.environ.get("MAOP_*")` / `os.getenv("MAOP_*")` 实际使用，补齐缺失变量、移除僵尸变量。
 - **e2e 路由守卫用例**：`dashboard-enterprise/e2e/` 补企业版路由守卫用例（`/audit` `/rbac` `/tenants` 在 personal 版重定向 `/`）。
@@ -29,7 +29,7 @@
 
 - [x] ADR-016 待完善表中 SAML 行状态为 `Done`，且引用 `docs/enterprise/saml-sso-guide.md`。
 - [x] `mypy py/maop` 零 error，`ruff check` 零告警。
-- [x] CI 覆盖率阈值 ≥ 85%，`pytest --cov` 实测达标。
+- [ ] CI 覆盖率阈值 ≥ 85%：⚠️ 未达成，实际约 18.5%（ratchet 基线 `FLOOR=18.0`），原"实测达标"记录不实，已更正；2026-08-15 子 agent 误回退此更正，已恢复。
 - [x] `deliverables/engineering-assurance/` 包含 `v4.4.1-fix-report.md` 与 `env-audit-4.4.2.md`。
 - [x] `.env.example` 与代码 `MAOP_*` 变量集合差异为零（或差异均有明确注释说明）。
 - [x] `dashboard-enterprise/e2e/` 路由守卫用例通过。
