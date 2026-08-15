@@ -25,6 +25,19 @@
 
 所有列表/管理类页面统一使用 `ListPageLayout` 作为页面骨架，包括但不限于 Tenants、Audit、Users 等管理视图。它收敛了原本散落在各视图手写的「页头 / 统计条 / 过滤器 / 三态主体」结构，提供唯一模板。
 
+### 2.1.1 例外（不适合 ListPageLayout 的场景）
+
+以下页面形态**不强行套用** ListPageLayout（2026-08-15 实测结论，强行迁移会造成功能回归）：
+
+| 页面形态 | 反例视图 | 原因 |
+|----------|---------|------|
+| 多区块仪表盘（2+ 个并列数据 Card） | RBAC（roles/grants/permissions 三 Card） | ListPageLayout 的 content 是单一主体，无法表达并列多区块 |
+| 统计概览 + 列表混合 | Models（StatCard 概览行 + registry） | stats slot 是"整行"语义，与多 StatCard 布局语义不符 |
+| 多 Tab 页面 | Tools（skills/tools tab） | ListPageLayout 无 tab 语义 |
+| 复杂排序/顺序过滤（超出 filterSchema 能力） | Tasks（FilterBar 带 sort/order select） | filterSchema 只支持粗粒度过滤，排序/顺序需视图自持 |
+
+判定原则：**ListPageLayout 服务于"单一列表 + 粗粒度过滤 + 三态"的页面**；凡是需要多区块 / 统计概览 / tab / 复杂排序的页面，保留自定义脚手架，不因复用率指标强行迁移。
+
 ### 2.2 API 速查
 
 #### 2.2.1 Props
