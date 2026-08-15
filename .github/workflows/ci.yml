@@ -129,9 +129,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           # 同 test job：不装 requirements.lock 全量（etcd3/torch 无法在新 Python 安装）。
-          # pytest-xdist 必须装：pyproject addopts 有 -n auto，缺失会 unrecognized arguments。
+          # pytest-xdist + pytest-cov 必须装：pyproject addopts 有 -n auto --cov。
           pip install -e .
-          pip install pytest pytest-asyncio pytest-timeout pytest-xdist
+          pip install pytest pytest-asyncio pytest-timeout pytest-xdist pytest-cov
 
       - name: Run performance smoke tests
         run: python -m pytest tests/performance/ -q -m slow --timeout=120
@@ -314,7 +314,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:test@localhost:5432/maop_test
         run: |
-          pip install pytest pytest-asyncio pytest-timeout pytest-xdist psycopg2-binary
+          pip install pytest pytest-asyncio pytest-timeout pytest-xdist pytest-cov psycopg2-binary
           python -m pytest tests/test_backends_pg_integration.py -v -m integration
 
   # ── Docker Build ────────────────────────────────────────────────
