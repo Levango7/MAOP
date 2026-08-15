@@ -129,8 +129,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           # 同 test job：不装 requirements.lock 全量（etcd3/torch 无法在新 Python 安装）。
+          # pytest-xdist 必须装：pyproject addopts 有 -n auto，缺失会 unrecognized arguments。
           pip install -e .
-          pip install pytest pytest-asyncio pytest-timeout
+          pip install pytest pytest-asyncio pytest-timeout pytest-xdist
 
       - name: Run performance smoke tests
         run: python -m pytest tests/performance/ -q -m slow --timeout=120
@@ -291,7 +292,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r py/requirements.txt
+          # 不用 requirements.txt（含 etcd3>=0.12.0，2019 停更+CVE，新 Python 装不上）。
+          # editable 安装自动解析 pyproject [project.dependencies]。
+          pip install -e py/
           pip install alembic
 
       - name: Test upgrade then downgrade then upgrade
@@ -311,7 +314,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:test@localhost:5432/maop_test
         run: |
-          pip install pytest psycopg2-binary
+          pip install pytest pytest-asyncio pytest-timeout pytest-xdist psycopg2-binary
           python -m pytest tests/test_backends_pg_integration.py -v -m integration
 
   # ── Docker Build ────────────────────────────────────────────────
