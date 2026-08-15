@@ -31,7 +31,8 @@ if TYPE_CHECKING:
 
 from pydantic import BaseModel, Field
 
-from maop.memory.manager import MemoryManager, MemoryManagerConfig
+from maop.memory.facade import MemoryFacade
+from maop.memory.manager import MemoryManagerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,8 @@ class ChatEngine:
         default_system_prompt: str = "",
     ) -> None:
         self._root = Path(root_dir)
-        self._memory_mgr = MemoryManager(root_dir=root_dir, config=config)
+        # T3: 收敛到 MemoryFacade（mode="chat"），透传 MemoryManager 行为。
+        self._memory_mgr = MemoryFacade(root_dir=root_dir, mode="chat", config=config)
         self._default_agent = default_agent
         self._default_model = default_model
         self._default_system_prompt = default_system_prompt or (
@@ -106,7 +108,7 @@ class ChatEngine:
         self._provider_factory: LLMProviderFactory | None = None
 
     @property
-    def memory(self) -> MemoryManager:
+    def memory(self) -> MemoryFacade:
         return self._memory_mgr
 
     @property
@@ -123,7 +125,7 @@ class ChatEngine:
         start = time.perf_counter()
 
         # Build context with memory injection
-        messages = self._memory_mgr.get_messages_for_llm(
+        messages = self._memory_mgr.chat_get_messages_for_llm(
             session_id=session_id,
             query=request.message,
             system_prompt=request.system_prompt or self._default_system_prompt,
@@ -156,7 +158,7 @@ class ChatEngine:
         )
 
         # Store to L2 memory
-        self._memory_mgr.add_exchange(
+        self._memory_mgr.chat_add_exchange(
             session_id=session_id,
             user_msg=request.message,
             assistant_msg=content,
@@ -179,7 +181,7 @@ class ChatEngine:
         execution_id = request.execution_id
 
         # Build context
-        messages = self._memory_mgr.get_messages_for_llm(
+        messages = self._memory_mgr.chat_get_messages_for_llm(
             session_id=session_id,
             query=request.message,
             system_prompt=request.system_prompt or self._default_system_prompt,
@@ -228,7 +230,7 @@ class ChatEngine:
         )
 
         # Store to L2 memory
-        self._memory_mgr.add_exchange(
+        self._memory_mgr.chat_add_exchange(
             session_id=session_id,
             user_msg=request.message,
             assistant_msg=content,

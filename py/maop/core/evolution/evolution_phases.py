@@ -217,14 +217,19 @@ class EvolutionPhasesMixin:
     def _phase_consolidate(self) -> PhaseResult:
         start = time.time()
         try:
-            from maop.core.memory.three_layer_memory import ThreeLayerMemory
-            mem = ThreeLayerMemory(root_dir=str(self._root))
-            report = mem.consolidate(min_score=0.6, limit=50)
+            # T3: 收敛到 MemoryFacade（mode="agent"），consolidate 统一返回 dict。
+            from maop.memory.facade import MemoryFacade
+            mem = MemoryFacade(root_dir=str(self._root), mode="agent")
+            report = mem.consolidate(min_score=0.6, limit=50) or {}
             return PhaseResult(
                 phase=LoopPhase.CONSOLIDATE,
                 success=True,
                 duration_s=round(time.time() - start, 3),
-                details={"candidates": report.candidates, "consolidated": report.consolidated, "errors": report.errors},
+                details={
+                    "candidates": report.get("candidates", 0),
+                    "consolidated": report.get("consolidated", 0),
+                    "errors": report.get("errors", 0),
+                },
             )
         except Exception as exc:
             logger.warning("[evo-loop] Consolidate phase failed: %s", exc)

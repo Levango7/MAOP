@@ -44,11 +44,44 @@ def _tenant_filter(data: Any, tenant_id: str) -> Any:
 
 
 def _episodic_to_dict(result: Any) -> dict[str, Any]:
-    """把 EpisodicSearchResult 转成与 SearchResult 兼容的 dict。
+    """把 EpisodicSearchResult（对象）或 facade dict 转成与 SearchResult 兼容的 dict。
 
     EpisodicSearchResult.entry 包含: id, task, agent, outcome, score,
     lessons, summary, metadata, created_at, access_count 等。
+    facade.short_term_search 返回同字段的 dict 形态。
     """
+    if isinstance(result, dict):
+        # facade.short_term_search 输出（T3 迁移后主路径）
+        meta = result.get("metadata") or {}
+        ts = ""
+        created_at = result.get("created_at")
+        if created_at:
+            try:
+                ts = datetime.fromtimestamp(created_at, tz=timezone.utc).isoformat()
+            except (OSError, ValueError, OverflowError):
+                ts = str(created_at)
+        tags = meta.get("tags", "")
+        lessons = result.get("lessons") or []
+        if not tags and lessons:
+            tags = ",".join(lessons[:5])
+        summary = result.get("summary") or ""
+        task = result.get("task") or ""
+        return {
+            "id": result.get("id", ""),
+            "agent": result.get("agent", ""),
+            "task": task,
+            "tags": tags,
+            "topic": meta.get("topic", ""),
+            "trace_id": meta.get("trace_id", ""),
+            "timestamp": ts,
+            "score": round(
+                (result.get("score") or 0.0) * (result.get("retrieval_weight") or 1.0), 4
+            ),
+            "snippet": (summary or task)[:200],
+            "highlighted": "",
+            "outcome": result.get("outcome", ""),
+            "layer": "episodic",
+        }
     entry = result.entry
     meta = entry.metadata or {}
     ts = ""
@@ -102,15 +135,15 @@ def _unified_search(query: str, top: int, agent: str = "") -> list[dict[str, Any
     except Exception:
         logger.debug("Unified search: MemoryStore failed", exc_info=True)
 
-    # 来源 2: ThreeLayerMemory → episodic_memory 表
+    # 来源 2: MemoryFacade → episodic_memory 表（T3: 收敛统一入口）
     try:
-        from maop.core.memory.three_layer_memory import ThreeLayerMemory
-        mem = ThreeLayerMemory(root_dir=str(MAOP_ROOT))
-        ep_results = mem.episodic_search(query=query, agent=agent, top=top)
+        from maop.memory.facade import MemoryFacade
+        mem = MemoryFacade(root_dir=str(MAOP_ROOT), mode="agent")
+        ep_results = mem.short_term_search(query=query, top=top, agent=agent)
         for ep in ep_results:
             results.append(_episodic_to_dict(ep))
     except Exception:
-        logger.debug("Unified search: ThreeLayerMemory.episodic_search failed", exc_info=True)
+        logger.debug("Unified search: MemoryFacade.short_term_search failed", exc_info=True)
 
     # 合并去重（按 id）并按 score 降序
     seen: set[str] = set()
@@ -158,9 +191,10 @@ async def api_memory_deep(request: Request) -> dict[str, Any]:
 
     # 补充 episodic_memory 统计
     try:
-        from maop.core.memory.three_layer_memory import ThreeLayerMemory
-        mem = ThreeLayerMemory(root_dir=str(MAOP_ROOT))
-        ep_stats = mem.episodic_stats()
+        # T3: 收敛到 MemoryFacade（mode="agent"），short_term_stats == episodic_stats。
+        from maop.memory.facade import MemoryFacade
+        mem = MemoryFacade(root_dir=str(MAOP_ROOT), mode="agent")
+        ep_stats = mem.short_term_stats()
         stats["episodic_count"] = ep_stats.get("total", 0)
         stats["episodic_by_outcome"] = ep_stats.get("by_outcome", {})
         stats["episodic_avg_score"] = ep_stats.get("avg_score", 0)
@@ -309,7 +343,8 @@ async def api_memory_store(request: Request) -> dict[str, Any]:
         raise HTTPException(400, "content is required")
 
     try:
-        from maop.core.memory.three_layer_memory import ThreeLayerMemory
+        # T3: 收敛到 MemoryFacade（mode="agent"），store 按 layer 路由到同一底层。
+        from maop.memory.facade import MemoryFacade
         raw_tags = body.get("tags")
         if isinstance(raw_tags, str):
             tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
@@ -317,7 +352,7 @@ async def api_memory_store(request: Request) -> dict[str, Any]:
             tags = [str(t).strip() for t in raw_tags if str(t).strip()]
         else:
             tags = []
-        mem = ThreeLayerMemory(root_dir=str(MAOP_ROOT))
+        mem = MemoryFacade(root_dir=str(MAOP_ROOT), mode="agent")
         entry_id = mem.store(
             layer=layer,
             content=content,

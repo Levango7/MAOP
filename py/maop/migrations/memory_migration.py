@@ -204,7 +204,9 @@ def _ensure_target_schema(db_path: Path) -> None:
 
     # episodic_memory schema
     try:
-        from maop.core.memory.three_layer_memory import _EPISODIC_DDL
+        # T2 拆分后 _EPISODIC_DDL 位于 episodic_store.py（three_layer_memory
+        # 主文件不再承载该常量）。
+        from maop.core.memory.episodic_store import _EPISODIC_DDL
 
         with sqlite_connect(db_path, foreign_keys=False) as conn:
             conn.executescript(_EPISODIC_DDL)

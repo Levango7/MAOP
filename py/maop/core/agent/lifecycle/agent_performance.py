@@ -247,19 +247,23 @@ class AgentPerformanceTracker:
         Returns the number of records synced.
         """
         try:
-            from maop.core.memory.three_layer_memory import ThreeLayerMemory
-            mem = ThreeLayerMemory(root_dir=str(self._root))
-            results = mem.episodic_search(top=200, apply_decay=False)
+            # T3: 收敛到 MemoryFacade（mode="agent"）。short_term_search 返回
+            # dict 列表（原 episodic_search 返回对象）；apply_decay 不参与
+            # agent/metadata/outcome 读取，结果集合差异可忽略。
+            from maop.memory.facade import MemoryFacade
+            mem = MemoryFacade(root_dir=str(self._root), mode="agent")
+            results = mem.short_term_search("", top=200)
             synced = 0
             for r in results:
-                e = r.entry
-                if e.agent:
+                agent = r.get("agent", "")
+                meta = r.get("metadata") or {}
+                if agent:
                     self.record(
-                        agent=e.agent,
-                        routing_key=e.metadata.get("routing_key", ""),
-                        outcome=e.outcome,
-                        cost_usd=e.metadata.get("cost_usd", 0.0),
-                        latency_ms=e.metadata.get("latency_ms", 0.0),
+                        agent=agent,
+                        routing_key=meta.get("routing_key", ""),
+                        outcome=r.get("outcome", ""),
+                        cost_usd=meta.get("cost_usd", 0.0),
+                        latency_ms=meta.get("latency_ms", 0.0),
                     )
                     synced += 1
             logger.info("[perf] Synced %d records from episodic memory", synced)
