@@ -427,17 +427,19 @@ class ToolManager:
         data_proxy). Internally runs the async ``call()`` via
         ``asyncio.run()``. Prefer ``await mgr.call(...)`` in async code.
         """
+        coro = self.call(tool_id, args=args, timeout_seconds=timeout_seconds)
         try:
             loop = asyncio.new_event_loop()
             try:
-                return loop.run_until_complete(
-                    self.call(tool_id, args=args, timeout_seconds=timeout_seconds)
-                )
+                return loop.run_until_complete(coro)
             finally:
                 loop.close()
         except RuntimeError:
             # Already inside a running loop (e.g. called from sync within async)
             # — fall back to direct subprocess.run to avoid nested loop errors.
+            # Close the un-awaited coroutine to avoid
+            # "coroutine was never awaited" ResourceWarning leaks.
+            coro.close()
             return self._call_sync_fallback(tool_id, args, timeout_seconds)
 
     def _call_sync_fallback(

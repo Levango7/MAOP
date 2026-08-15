@@ -69,7 +69,7 @@ def tmp_path() -> Path:
 
 
 @pytest.fixture(autouse=True)
-def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Set MAOP_DATA_DIR to tmp_path/data so each test gets an isolated DB.
 
     Also relaxes plugin checksum strictness (MAOP_PLUGIN_STRICT_CHECKSUM=0) so
@@ -86,11 +86,22 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MAOP_PLUGIN_STRICT_CHECKSUM", "0")
     monkeypatch.setenv("HF_HUB_OFFLINE", "1")
     monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
+    yield
+    # 每个测试后清空 ConnectionPool 单例池：每个测试独立 MAOP_DATA_DIR 产生
+    # 独立 db_path → 独立池 → 连接句柄跨测试累积，进程 GC 时才回收 →
+    # ResourceWarning: unclosed database 洪泛（xdist 全量下耗尽 worker 句柄）。
+    from maop.core.backends.db_utils import close_all_pools
+    close_all_pools()
 
 
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Clean up all temp directories created by our ``tmp_path`` override."""
+    # 清空 ConnectionPool 模块级单例池：池连接 release() 回池不关闭，每个测试
+    # 独立 MAOP_DATA_DIR 会产生大量池与连接句柄，进程退出时 GC 才回收 →
+    # ResourceWarning: unclosed database 洪泛（xdist 全量下耗尽 worker 句柄）。
+    from maop.core.backends.db_utils import close_all_pools
+    close_all_pools()
     for d in _tmp_dirs:
         with contextlib.suppress(Exception):
             shutil.rmtree(d, ignore_errors=True)

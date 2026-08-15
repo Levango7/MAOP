@@ -187,6 +187,23 @@ def get_pool(db_path: str | Path, max_size: int = 5) -> ConnectionPool:
         return _pools[key]
 
 
+def close_all_pools() -> None:
+    """Close and drop every cached ConnectionPool.
+
+    测试/进程收尾时调用：池连接默认 ``release()`` 回池不关闭，跨测试存活。
+    每个测试用独立 ``MAOP_DATA_DIR`` 会产生大量池，连接句柄累积触发
+    ``ResourceWarning: unclosed database`` 并在 xdist 全量下耗尽 worker 句柄。
+    """
+    with _pools_lock:
+        pools = list(_pools.values())
+        _pools.clear()
+    for pool in pools:
+        try:
+            pool.close_all()
+        except Exception:
+            logger.debug("ignored pool close error", exc_info=True)
+
+
 _UNIFIED_DB_NAME = "maop.db"
 
 
