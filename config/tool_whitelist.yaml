@@ -37,11 +37,17 @@ mode: audit
 allow: []
 
 # 显式禁止执行的工具（deny 优先于 allow）。
-# 示例（危险命令，切勿在生产移除）：
-# deny:
-#   - pattern: "rm*"
-#   - pattern: "mkfs*"
-#   - pattern: "dd*"
-#   - pattern: "shutdown*"
-#   - pattern: "reboot*"
-deny: []
+# 阶段二（2026-08-15）启用：破坏性命令即使处于 audit 模式也立即拦截
+# （ToolPolicy.check 决策链 deny 优先，见 tool_policy.py:200-205）。
+# 取舍说明：不拦 curl/wget/chmod/chown——工具命令可能是合法 HTTP/权限操作，
+# 误伤面大于收益；以下 8 类均为不可逆破坏性命令，按命令 pattern 双通道
+# （匹配 tool id 与 command）拦截。
+deny:
+  - pattern: "rm*"       # 删除（含 rm -rf / rmdir）
+  - pattern: "mkfs*"     # 磁盘格式化
+  - pattern: "dd*"       # 块级覆写
+  - pattern: "shutdown*" # 关机
+  - pattern: "reboot*"   # 重启
+  - pattern: "halt*"     # 停机
+  - pattern: "poweroff*" # 断电
+  - pattern: "sudo*"     # 提权
