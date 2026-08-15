@@ -239,7 +239,8 @@ class AgentScanner:
             result = subprocess.run(
                 [cli_path] + version_args,
                 capture_output=True, text=True, timeout=10,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                # Windows 专属常量，POSIX 无——getattr 默认值跨平台安全（mypy 两端不报）
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
                 check=True,
             )
             output = (result.stdout or result.stderr or "").strip()

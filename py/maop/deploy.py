@@ -357,7 +357,8 @@ def start(
             cwd=str(root),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+            # Windows 专属常量，POSIX 无——getattr 默认值跨平台安全（mypy 两端不报）
+            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if sys.platform == "win32" else 0,
         )
         _write_pid(root, proc.pid)
         logger.info("MAOP started: pid=%d, dashboard=%s:%d", proc.pid, host, port)

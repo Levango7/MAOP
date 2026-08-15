@@ -189,6 +189,9 @@ test.describe('Knowledge Graph visualization', () => {
 
   test('refresh button re-fetches the graph', async ({ page }) => {
     let fetchCount = 0;
+    // 兜底 route 必须先注册（Playwright 后注册优先匹配），
+    // 否则会吞掉下方具体路由的请求（fetchCount 恒为 0 的根因）。
+    await page.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
     await page.route('**/api/knowledge-graph**', (route) => {
       fetchCount++;
       return route.fulfill({
@@ -204,7 +207,6 @@ test.describe('Knowledge Graph visualization', () => {
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ auth_enabled: false, has_token: false }),
     }));
-    await page.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
 
     await page.goto('/knowledge-graph');
     await expect(page.locator('.kg-canvas-wrap')).toBeVisible();
@@ -218,15 +220,17 @@ test.describe('Knowledge Graph visualization', () => {
   test('empty graph shows empty state', async ({ page }) => {
     await stubApi(page, { status: 'ok', data: { nodes: [], edges: [], stats: { node_count: 0, edge_count: 0 } } });
     await page.goto('/knowledge-graph');
-    // The empty state should be visible.
-    await expect(page.locator('.empty, .empty__title')).toBeVisible({ timeout: 5000 });
+    // 空态容器（.empty 含 .empty__title 子元素，用 .first() 避免 strict mode 冲突）。
+    await expect(page.locator('.empty').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('error banner appears when API fails', async ({ page }) => {
+    // 兜底 route 必须先注册（后注册优先匹配），否则 knowledge-graph 的
+    // 500 响应会被兜底 200 吞掉，error banner 永不出现。
+    await page.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
     await page.route('**/api/knowledge-graph**', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"server"}' }));
     await page.route('**/api/info/edition', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ edition: 'enterprise', features: {}, backends: {}, degradations: [] }) }));
     await page.route('**/api/auth/status', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ auth_enabled: false, has_token: false }) }));
-    await page.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
     await page.goto('/knowledge-graph');
     await expect(page.locator('.kg-notice--error')).toBeVisible({ timeout: 5000 });
   });
