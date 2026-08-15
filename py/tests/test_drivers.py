@@ -7,6 +7,9 @@ import sys
 import pytest
 
 _HAS_POWERSHELL = sys.platform == "win32" or bool(shutil.which("pwsh")) or bool(shutil.which("powershell"))
+# cmd.exe driver 是 Windows 专属语义（create_subprocess_exec("cmd", "/c", ...)），
+# 非 Windows 平台无 cmd.exe → FileNotFoundError。仅 Windows 上运行。
+_IS_WINDOWS = sys.platform == "win32"
 
 from maop.delegate.drivers import (
     _run_cli,
@@ -51,6 +54,7 @@ class TestRunCli:
 
 class TestRunCmd:
     @pytest.mark.asyncio
+    @pytest.mark.skipif(not _IS_WINDOWS, reason="cmd.exe driver is Windows-only")
     async def test_cmd_success(self):
         config = _config(cli="echo", driver="cmd")
         result = await _run_cmd(config, "hello world", 10, ".", "t2")
@@ -58,6 +62,7 @@ class TestRunCmd:
         assert result.driver == "cmd"
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(not _IS_WINDOWS, reason="cmd.exe driver is Windows-only")
     async def test_cmd_not_found(self):
         config = _config(cli="nonexistent_cmd_xyz", driver="cmd")
         result = await _run_cmd(config, "test", 10, ".", "t2")

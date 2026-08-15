@@ -17,6 +17,7 @@ import logging
 import re
 import shlex
 import shutil
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -275,8 +276,11 @@ async def _run_powershell(config: AgentConfig, prompt: str, timeout: int,
     start = time.monotonic()
     proc = None
     try:
+        # Windows: powershell.exe；POSIX（GitHub Actions runner 预装 pwsh）: pwsh。
+        # 固定找 "powershell" 在 ubuntu/macos 会 FileNotFoundError。
+        ps_bin = "powershell" if sys.platform == "win32" else "pwsh"
         proc = await asyncio.create_subprocess_exec(
-            "powershell", "-NoProfile", "-Command",
+            ps_bin, "-NoProfile", "-Command",
             full_command,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

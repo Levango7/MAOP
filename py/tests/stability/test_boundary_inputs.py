@@ -8,6 +8,7 @@ and zero-byte files. All tests are Windows-compatible.
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -172,11 +173,12 @@ def test_path_traversal_attempt(tmp_path: Path) -> None:
             raise ValueError(f"Path traversal detected: {user_input!r}")
         return resolved
 
-    traversal_inputs = [
-        "../../../etc/passwd",
-        "..\\..\\..\\windows\\system32\\config\\sam",
-        "../../../../tmp/evil",
-    ]
+    # Windows 风格反斜杠输入仅在 Windows 上是路径分隔符；POSIX 上反斜杠是
+    # 合法文件名字符，`..\..\..\...` 不会触发穿越（resolve 视作普通文件名）。
+    # 故反斜杠用例仅 Windows 平台保留，避免 CI(Linux/macOS) 误报 DID NOT RAISE。
+    traversal_inputs = ["../../../etc/passwd", "../../../../tmp/evil"]
+    if os.name == "nt":
+        traversal_inputs.append("..\\..\\..\\windows\\system32\\config\\sam")
     for inp in traversal_inputs:
         with pytest.raises(ValueError, match="traversal"):
             safe_resolve(data_dir, inp)

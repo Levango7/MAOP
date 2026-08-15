@@ -144,13 +144,13 @@ class TestControlPause:
         data = resp.json()
         assert data["status"] == "ok"
         assert data["action"] == "pause"
-        assert (temp_maop_root / "logs" / ".MAOP_pause").exists()
+        assert (temp_maop_root / "logs" / ".maop_pause").exists()
 
 
 # ── POST /api/control/resume ──────────────────────────────────────
 class TestControlResume:
     def test_resume_removes_file(self, client, temp_maop_root, clean_jobs):
-        pause_file = temp_maop_root / "logs" / ".MAOP_pause"
+        pause_file = temp_maop_root / "logs" / ".maop_pause"
         pause_file.write_text("paused")
         resp = client.post("/api/control/resume")
         assert resp.status_code == 200

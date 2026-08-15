@@ -3,12 +3,30 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import shutil
 import sys
 import tempfile
 from pathlib import Path
 
 import pytest
+
+# ── Force test environment BEFORE any maop import ──────────────────
+# server.py import 时固化 _auth_enabled / _rl_enabled（get_settings 单例、
+# 模块级 os.environ 读取）。若 MAOP_ENV 未设置，_default_auth_enabled()
+# 按 secure-by-default 返回 True → AuthMiddleware 启用。
+# MAOP_AUTH_DISABLED_ADMIN=1：auth 关闭（MAOP_AUTH=0）时中间件仍授予 admin
+# 角色（middleware.py:65），兼容两类测试：token_stream（需 auth=0 避免 401）
+# 与 routers smoke/batch（require_admin 需 admin 角色）。生产不设此值。
+os.environ.setdefault("MAOP_ENV", "test")
+os.environ.setdefault("MAOP_AUTH", "0")
+os.environ.setdefault("MAOP_AUTH_DISABLED_ADMIN", "1")
+# 批量路由测试（test_routers_smoke/batch_coverage）连打数十个真实端点，
+# app 单例的 RateLimitMiddleware._buckets 跨测试共享计数 → 偶发 429。
+# 限流逻辑有专属测试（test_stress 等用 MAOP_RATE_LIMIT=0 单独验证），
+# 全局禁用避免批量 smoke 被限流误伤（同 test_secrets.py 的 MAOP_RATE_LIMIT_ENABLED=0）。
+os.environ.setdefault("MAOP_RATE_LIMIT", "0")
+os.environ.setdefault("MAOP_RATE_LIMIT_ENABLED", "0")
 
 
 # ── Disable sentence_transformers in test environment ──────────────
