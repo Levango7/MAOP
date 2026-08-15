@@ -84,7 +84,7 @@ def generate_key_pair() -> tuple[Ed25519PrivateKey, Ed25519PublicKey]:
 
 def private_key_to_pem(private_key: Ed25519PrivateKey) -> bytes:
     """Serialise an Ed25519 private key to PKCS8 PEM bytes."""
-    return private_key.private_bytes(
+    return private_key.private_bytes(  # type: ignore[no-any-return]
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
@@ -93,7 +93,7 @@ def private_key_to_pem(private_key: Ed25519PrivateKey) -> bytes:
 
 def public_key_to_pem(public_key: Ed25519PublicKey) -> bytes:
     """Serialise an Ed25519 public key to SubjectPublicKeyInfo PEM bytes."""
-    return public_key.public_bytes(
+    return public_key.public_bytes(  # type: ignore[no-any-return]
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
@@ -102,12 +102,12 @@ def public_key_to_pem(public_key: Ed25519PublicKey) -> bytes:
 def load_public_key(pem_path: str | Path) -> Ed25519PublicKey:
     """Load an Ed25519 public key from a PEM file on disk."""
     pem_bytes = Path(pem_path).read_bytes()
-    return serialization.load_pem_public_key(pem_bytes)  # type: ignore[return-value]
+    return serialization.load_pem_public_key(pem_bytes)
 
 
 def load_public_key_from_bytes(pem_bytes: bytes) -> Ed25519PublicKey:
     """Load an Ed25519 public key from PEM bytes in memory."""
-    return serialization.load_pem_public_key(pem_bytes)  # type: ignore[return-value]
+    return serialization.load_pem_public_key(pem_bytes)
 
 
 # ── Sign / verify ──────────────────────────────────────────────────
@@ -120,7 +120,7 @@ def sign_payload(payload: Any, private_key: Ed25519PrivateKey) -> str:
     """
     digest = _payload_digest(payload)
     signature = private_key.sign(digest)
-    return signature.hex()
+    return signature.hex()  # type: ignore[no-any-return]
 
 
 def verify(
@@ -279,7 +279,7 @@ class PackageVerifier:
                 candidate_keys.append(
                     load_public_key_from_bytes(info.public_key.encode("utf-8")),
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(
                     "[marketplace] failed to load key %s: %s", info.key_id, exc,
                 )

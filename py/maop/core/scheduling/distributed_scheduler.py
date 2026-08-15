@@ -480,7 +480,7 @@ class DistributedScheduler:
         while pending:
             # Drain any reschedule requests from the failure detector.
             while not reschedule_queue.empty():
-                old_msg_id, node_id = reschedule_queue.get_nowait()
+                _old_msg_id, node_id = reschedule_queue.get_nowait()
                 r_node = pending.get(node_id)
                 if r_node is None:
                     continue  # already completed
@@ -609,7 +609,7 @@ class DistributedScheduler:
                         success=(out[node_id]["status"] == "success"),
                         latency=(int(duration_raw or 0) / 1000.0),
                     )
-                except Exception as exc:  # noqa: BLE001 — detector must never break scheduling
+                except Exception as exc:
                     logger.debug(
                         "[dist-sched] failure_detector.record_result failed: %s", exc,
                     )
@@ -617,7 +617,7 @@ class DistributedScheduler:
             if worker_id:
                 try:
                     self._registry.complete_task(worker_id, node_id)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     pass
         return out
 

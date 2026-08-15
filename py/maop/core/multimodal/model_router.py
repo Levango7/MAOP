@@ -187,10 +187,10 @@ class ModelRouter:
             return False, f"missing modalities: {sorted(m.value for m in missing)}"
         if criteria.task_type not in cap.tasks and TaskType.MULTIMODAL not in cap.tasks:
             return False, f"task {criteria.task_type.value} not supported"
-        if criteria.max_cost_per_1k is not None:
+        if criteria.max_cost_per_1k is not None:  # noqa: SIM102
             if cap.cost_per_1k_total > criteria.max_cost_per_1k:
                 return False, f"cost {cap.cost_per_1k_total} > {criteria.max_cost_per_1k}"
-        if criteria.max_latency_ms is not None and cap.avg_latency_ms > 0:
+        if criteria.max_latency_ms is not None and cap.avg_latency_ms > 0:  # noqa: SIM102
             if cap.avg_latency_ms > criteria.max_latency_ms:
                 return False, f"latency {cap.avg_latency_ms} > {criteria.max_latency_ms}"
         if criteria.min_context is not None and cap.max_context < criteria.min_context:

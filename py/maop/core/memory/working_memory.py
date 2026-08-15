@@ -10,8 +10,6 @@ import json
 import logging
 from typing import Any
 
-from maop.core.reliability.cache import LRUCache
-
 logger = logging.getLogger(__name__)
 
 
@@ -44,7 +42,7 @@ class WorkingMemoryMixin:
 
     def working_pin(self, key: str) -> bool:
         """Pin a Working Memory key so it is never evicted by LRU or compression."""
-        return self._working.pin(key)
+        return self._working.pin(key)  # type: ignore[no-any-return]
 
     def working_unpin(self, key: str) -> None:
         """Unpin a Working Memory key, allowing normal eviction."""
@@ -52,7 +50,7 @@ class WorkingMemoryMixin:
 
     def working_pinned_keys(self) -> list[str]:
         """Return all pinned Working Memory keys."""
-        return self._working.pinned_keys()
+        return self._working.pinned_keys()  # type: ignore[no-any-return]
 
     def _overflow_to_episodic(self, key: str, value: Any) -> None:
         """Overflow an evicted Working Memory entry to Episodic Memory (L1).

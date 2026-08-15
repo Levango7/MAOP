@@ -5,12 +5,10 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
-
 from maop.dashboard import (
     AgentStatus,
     DashboardProvider,
     DashboardState,
-
 )
 
 # ═══════════════════════════════════════════════════════════════

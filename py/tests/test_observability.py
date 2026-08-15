@@ -251,9 +251,8 @@ def test_observability_package_import():
 
 def test_observability_submodules_import():
     """Each sub-module imports without side effects."""
-    import maop.core.observability.tracing as tracing
-    import maop.core.observability.metrics as metrics
     import maop.core.observability.logging as logging_mod
+    from maop.core.observability import metrics, tracing
     assert tracing.W3C_TRACEPARENT == "traceparent"
     assert metrics.M_REQUESTS_TOTAL == "maop_requests_total"
     assert logging_mod.TraceCorrelationFilter is not None
@@ -271,8 +270,8 @@ class TestTracing:
 
     def test_get_tracer_returns_noop_when_disabled(self, monkeypatch):
         """In Personal mode without MAOP_OTEL_ENABLED, tracer is a no-op."""
-        from maop.core.observability.tracing import get_tracer, setup_tracing
         from maop.core.monitoring.otel import _NoopTracer
+        from maop.core.observability.tracing import get_tracer, setup_tracing
         monkeypatch.delenv("MAOP_OTEL_ENABLED", raising=False)
         monkeypatch.setenv("MAOP_EDITION", "personal")
         from maop.config.edition import reset_edition
@@ -293,6 +292,7 @@ class TestTracing:
     def test_auto_span_decorator_async(self):
         """auto_span decorates an async function and preserves return value."""
         import asyncio
+
         from maop.core.observability.tracing import auto_span
 
         @auto_span("test.async")
@@ -342,7 +342,8 @@ class TestTracing:
     def test_inject_extract_trace_context(self):
         """inject/extract are callable (no-op when disabled)."""
         from maop.core.observability.tracing import (
-            extract_trace_context, inject_trace_context,
+            extract_trace_context,
+            inject_trace_context,
         )
         carrier: dict[str, str] = {}
         inject_trace_context(carrier)
@@ -353,7 +354,8 @@ class TestTracing:
     def test_is_enterprise_personal_mode(self, monkeypatch):
         """Edition mode helpers return bools."""
         from maop.core.observability.tracing import (
-            is_enterprise_mode, is_personal_mode,
+            is_enterprise_mode,
+            is_personal_mode,
         )
         assert isinstance(is_enterprise_mode(), bool)
         assert isinstance(is_personal_mode(), bool)
@@ -373,8 +375,11 @@ class TestMetrics:
     def test_canonical_metric_names(self):
         """The four F1-04 canonical metrics are registered."""
         from maop.core.observability.metrics import (
-            M_AGENT_EXECUTION, M_ERRORS_TOTAL, M_REQUESTS_TOTAL,
-            M_REQUEST_DURATION, get_metrics,
+            M_AGENT_EXECUTION,
+            M_ERRORS_TOTAL,
+            M_REQUEST_DURATION,
+            M_REQUESTS_TOTAL,
+            get_metrics,
         )
         m = get_metrics()
         assert M_REQUESTS_TOTAL in m.collector._counters
@@ -431,7 +436,9 @@ class TestMetrics:
     def test_to_prometheus_includes_canonical_metrics(self):
         """Prometheus export includes the canonical metric names."""
         from maop.core.observability.metrics import (
-            M_ERRORS_TOTAL, M_REQUESTS_TOTAL, get_metrics,
+            M_ERRORS_TOTAL,
+            M_REQUESTS_TOTAL,
+            get_metrics,
         )
         m = get_metrics()
         m.record_request("GET", "/test", 200, 0.01)
@@ -481,6 +488,7 @@ class TestLogging:
     def test_trace_correlation_filter(self):
         """TraceCorrelationFilter is a logging.Filter subclass."""
         import logging
+
         from maop.core.observability.logging import TraceCorrelationFilter
         f = TraceCorrelationFilter()
         assert isinstance(f, logging.Filter)
@@ -517,6 +525,7 @@ class TestObservabilityRouter:
         """GET /api/observability/status returns the stack status."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
@@ -532,6 +541,7 @@ class TestObservabilityRouter:
         """GET /api/observability/metrics returns a JSON summary."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
@@ -546,6 +556,7 @@ class TestObservabilityRouter:
         """GET /api/observability/config returns the OTel config."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
@@ -561,6 +572,7 @@ class TestObservabilityRouter:
         """GET /api/observability/traces returns enabled flag."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
@@ -575,6 +587,7 @@ class TestObservabilityRouter:
         """POST /api/observability/record accepts kind=request."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
@@ -594,6 +607,7 @@ class TestObservabilityRouter:
         """POST /api/observability/record accepts kind=error."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
@@ -610,6 +624,7 @@ class TestObservabilityRouter:
         """POST /api/observability/record rejects unknown kind."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
@@ -622,6 +637,7 @@ class TestObservabilityRouter:
         """GET /api/observability/health runs pipeline checks."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
@@ -637,6 +653,7 @@ class TestObservabilityRouter:
         """GET /api/observability/metrics/prometheus returns text format."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
@@ -830,6 +847,7 @@ class TestAsgiMiddleware:
     def test_metrics_middleware_records_request(self):
         """MetricsMiddleware records a request on completion."""
         import asyncio
+
         from maop.core.observability.metrics import MetricsMiddleware
 
         async def dummy_app(scope, receive, send):

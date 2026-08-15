@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import os
 import types
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from maop.worker import queue_worker
 
@@ -133,8 +133,8 @@ class TestQueueWorkerDispatch:
 
     def test_unknown_topic_raises(self):
         from maop.worker.queue_worker import (
-            _UnknownTopicError,
             _dispatch_message,
+            _UnknownTopicError,
         )
 
         msg = types.SimpleNamespace(
@@ -240,7 +240,7 @@ class TestExecuteTask:
         pool.start = AsyncMock(side_effect=RuntimeError("start failed"))
         pool.stop = AsyncMock()
 
-        with patch("maop.core.reliability.worker_pool.WorkerPool", return_value=pool):
+        with patch("maop.core.reliability.worker_pool.WorkerPool", return_value=pool):  # noqa: SIM117
             with pytest.raises(RuntimeError, match="start failed"):
                 queue_worker._execute_task({"task": "t", "agent_name": "a"})
 
@@ -253,7 +253,7 @@ class TestExecuteTask:
         pool.stop = AsyncMock()
         pool.submit = AsyncMock(side_effect=RuntimeError("submit failed"))
 
-        with patch("maop.core.reliability.worker_pool.WorkerPool", return_value=pool):
+        with patch("maop.core.reliability.worker_pool.WorkerPool", return_value=pool):  # noqa: SIM117
             with pytest.raises(RuntimeError, match="submit failed"):
                 queue_worker._execute_task({"task": "t", "agent_name": "a"})
 
@@ -292,7 +292,7 @@ class TestRunMaintenance:
     def test_purge_acked_failure_raises(self):
         mq = MagicMock()
         mq.purge_acked = MagicMock(side_effect=RuntimeError("db locked"))
-        with patch("maop.core.reliability.message_queue.MessageQueue", return_value=mq):
+        with patch("maop.core.reliability.message_queue.MessageQueue", return_value=mq):  # noqa: SIM117
             with pytest.raises(RuntimeError, match="db locked"):
                 queue_worker._run_maintenance({"job": "purge_acked"})
 
@@ -313,7 +313,7 @@ class TestRunMaintenance:
     def test_cleanup_dead_letters_failure_raises(self):
         mq = MagicMock()
         mq.cleanup_dead_letters = MagicMock(side_effect=RuntimeError("boom"))
-        with patch("maop.core.reliability.message_queue.MessageQueue", return_value=mq):
+        with patch("maop.core.reliability.message_queue.MessageQueue", return_value=mq):  # noqa: SIM117
             with pytest.raises(RuntimeError, match="boom"):
                 queue_worker._run_maintenance({"job": "cleanup_dead_letters"})
 

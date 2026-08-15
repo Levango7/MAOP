@@ -15,7 +15,6 @@ import pytest
 
 from maop.core.agent.llm_chat.conversation import ConversationManager
 
-
 # ═══════════════════════════════════════════════════════════════════
 # Bug 2: _estimate_tokens must handle None / empty
 # ═══════════════════════════════════════════════════════════════════

@@ -319,7 +319,7 @@ def control_env(tmp_path, monkeypatch):
     monkeypatch.setattr("maop.dashboard.routers.state.MAOP_ROOT", tmp_path)
 
     # Clear active jobs
-    import maop.dashboard.routers.state as state
+    from maop.dashboard.routers import state
     state.active_jobs.clear()
 
     return tmp_path

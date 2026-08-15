@@ -7,12 +7,10 @@ import from ``maop.core.monitoring.budget_guard``.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from maop.core.budget_guard import (
+    _BUDGET_DDL,  # noqa: F401  — re-exported for monitoring/__init__ lazy lookup
     BudgetGuard,
     BudgetStatus,
-    _BUDGET_DDL,  # noqa: F401  — re-exported for monitoring/__init__ lazy lookup
 )
 
 __all__ = [
@@ -20,6 +18,3 @@ __all__ = [
     "BudgetStatus",
 ]
 
-if TYPE_CHECKING:
-    # Expose private symbol for static analysis.
-    pass

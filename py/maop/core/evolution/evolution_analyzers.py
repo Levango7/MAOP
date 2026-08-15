@@ -5,23 +5,11 @@ T2 架构债治理：从 ``evolution_loop.py`` 拆分。公开 API 不变。
 
 from __future__ import annotations
 
-import contextlib
-import json
 import logging
-import sqlite3
-import time
-from pathlib import Path
 from typing import Any
-
-from pydantic import BaseModel, Field
-
-from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 from maop.core.evolution.evolution_loop_types import (
     EvolutionSuggestion,
-    LoopPhase,
-    LoopReport,
-    PhaseResult,
 )
 
 logger = logging.getLogger(__name__)

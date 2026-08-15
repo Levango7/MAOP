@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -1030,7 +1030,7 @@ class TestAutoEvolveLegacy:
                         total_caches=0, adjustments=[], applied_count=0,
                         skipped_count=0, recommendations=[],
                     )
-                    with patch.object(engine, "apply", side_effect=RuntimeError("apply boom")):
+                    with patch.object(engine, "apply", side_effect=RuntimeError("apply boom")):  # noqa: SIM117
                         with patch.object(engine, "_load_suggestions", return_value=[auto_s]):
                             result = engine._auto_evolve_legacy(hours=24)
         assert "auto_applied" in result

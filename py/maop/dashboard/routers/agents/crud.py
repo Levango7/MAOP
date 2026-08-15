@@ -7,6 +7,7 @@ disable / health-check(-all) / health-log / diagnose / repair.
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 import asyncio
@@ -228,7 +229,7 @@ async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[s
         synced_to_yaml = await asyncio.to_thread(_sync_agent_to_yaml, body)
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass  # registry 已写入，yaml 写入失败不阻塞
+        # registry 已写入，yaml 写入失败不阻塞
 
     return {"agent": agent.model_dump(), "synced_to_yaml": synced_to_yaml}
 
@@ -277,7 +278,6 @@ async def unregister_agent(name: str, request: Request) -> dict[str, Any]:
         )
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     return {"deleted": ok_registry, "errors": errors}
 
@@ -325,6 +325,5 @@ async def repair_agent(name: str, request: Request) -> dict[str, Any]:
         )
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     return {"result": result.model_dump()}

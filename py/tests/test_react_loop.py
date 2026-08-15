@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from maop.core.agent.llm_chat.react_loop import (
+    ReactConfig,
+    ReactLoop,
+    ReactPhase,
+    ReactResult,
+    ReactStep,
+)
 from maop.core.backends.artifact_store import ArtifactStore
 from maop.core.reliability.change_tracker import ChangeTracker
-from maop.core.agent.llm_chat.react_loop import ReactConfig, ReactLoop, ReactPhase, ReactResult, ReactStep
 
 # ── ReactLoop (unit tests, no real LLM) ────────────────────────
 

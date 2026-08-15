@@ -67,7 +67,7 @@ class SqliteVectorBackend(VectorBackend):
             hnsw_threshold=hnsw_threshold,
             enable_hnsw=enable_hnsw,
         )
-        self._embedding = self._store._embedding  # noqa: SLF001 — share provider with store
+        self._embedding = self._store._embedding
 
     # ── Search ──────────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ class SqliteVectorBackend(VectorBackend):
         if hnsw is not None:
             try:
                 hnsw.invalidate()
-            except Exception as exc:  # noqa: BLE001 — best-effort
+            except Exception as exc:
                 logger.debug("[sqlite-vector] HNSW invalidate failed: %s", exc)
         return True
 

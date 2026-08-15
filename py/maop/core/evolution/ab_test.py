@@ -258,7 +258,7 @@ class SPRTConfig(BaseModel):
     p1: float = 0.65  # H1: treatment 成功率（期望改进）
     max_samples: int = 10000  # 安全上限，避免无限采样
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, __context: Any) -> None:  # noqa: PYI063
         if not (0 < self.alpha < 1):
             raise ValueError(f"alpha must be in (0,1), got {self.alpha}")
         if not (0 < self.beta < 1):
@@ -419,7 +419,7 @@ class ABTestFramework:
 
     # 委托底层 manager
     def _db_connect(self) -> contextlib.AbstractContextManager[sqlite3.Connection]:
-        return self._manager._db_connect()  # noqa: SLF001
+        return self._manager._db_connect()
 
     def create_experiment(
         self,

@@ -16,7 +16,6 @@ from maop.core.plugins import (
     PluginState,
 )
 
-
 # ── test fixtures: minimal plugin implementations ─────────────────────
 
 

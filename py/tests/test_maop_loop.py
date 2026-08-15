@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -354,8 +354,8 @@ class TestMaopLoopInitCoverage:
 
     def test_init_with_explicit_config(self, tmp_path):
         """Cover branch where config is explicitly provided."""
-        from maop.maop_loop import MaopLoop
         from maop.config.loader import MaopConfig
+        from maop.maop_loop import MaopLoop
         cfg = MaopConfig()
         loop = MaopLoop(root_dir=str(tmp_path), config=cfg)
         assert loop._config is cfg
@@ -832,8 +832,8 @@ class TestBuildLoopResultVerifyErrored:
     count it as a task failure (errored=True → verify_ok=True)."""
 
     def test_verify_errored_does_not_fail_task(self, tmp_path):
-        from maop.core.reliability.error_schema import MaopResult
         from maop.core.agent.evolution.phases import PhaseContext
+        from maop.core.reliability.error_schema import MaopResult
 
         loop = _make_loop(tmp_path)
         ctx = PhaseContext(
@@ -847,8 +847,8 @@ class TestBuildLoopResultVerifyErrored:
         assert result.success is True
 
     def test_verify_real_failure_fails_task(self, tmp_path):
-        from maop.core.reliability.error_schema import MaopResult
         from maop.core.agent.evolution.phases import PhaseContext
+        from maop.core.reliability.error_schema import MaopResult
 
         loop = _make_loop(tmp_path)
         ctx = PhaseContext(
@@ -862,8 +862,8 @@ class TestBuildLoopResultVerifyErrored:
         assert result.success is False
 
     def test_no_verify_does_not_fail_task(self, tmp_path):
-        from maop.core.reliability.error_schema import MaopResult
         from maop.core.agent.evolution.phases import PhaseContext
+        from maop.core.reliability.error_schema import MaopResult
 
         loop = _make_loop(tmp_path)
         ctx = PhaseContext(

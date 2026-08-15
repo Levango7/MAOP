@@ -442,7 +442,6 @@ class EvolveEngine:
                     logger.info("[evolve] Restored agents.yaml from backup")
                 except Exception:
                     logger.debug('swallowed exception', exc_info=True)
-                    pass
 
     def status(self) -> EvolveResult:
         """Show current evolution status."""

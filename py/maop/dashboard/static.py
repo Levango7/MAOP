@@ -75,7 +75,6 @@ async def health() -> Any:
         active_agents = len(_agents) if isinstance(_agents, list) else 0
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
     return {
         "status": "ok",
         "version": MAOP_VERSION,

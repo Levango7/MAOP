@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import os
 
-
 import pytest
 
 # Mark every test in this module as an integration test.
@@ -33,7 +32,7 @@ def _get_dsn() -> str:
 def _can_connect() -> bool:
     """Return True iff psycopg2 is importable and a server connection succeeds."""
     try:
-        import psycopg2  # noqa: F401
+        import psycopg2
     except ImportError:
         return False
     try:
@@ -63,10 +62,9 @@ def test_pg_connection() -> None:
     """A bare connection to PostgreSQL succeeds and reports a server version."""
     import psycopg2
 
-    with psycopg2.connect(_get_dsn()) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT version();")
-            (version,) = cur.fetchone()
+    with psycopg2.connect(_get_dsn()) as conn, conn.cursor() as cur:
+        cur.execute("SELECT version();")
+        (version,) = cur.fetchone()
     assert version and "PostgreSQL" in version
 
 

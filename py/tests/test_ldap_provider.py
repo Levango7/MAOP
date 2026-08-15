@@ -29,7 +29,6 @@ from maop.core.security.ldap_provider import (
     sync_users_async,
 )
 
-
 # ── Mock 连接 ────────────────────────────────────────────────
 
 

@@ -23,10 +23,9 @@ from maop.memory.unified import (
     LAYER_LONG_TERM,
     LAYER_SHORT_TERM,
     LAYER_WORKING,
-    UnifiedMemoryProtocol,
     VALID_LAYERS,
+    UnifiedMemoryProtocol,
 )
-
 
 # ── Fixtures ────────────────────────────────────────────────────
 
@@ -448,13 +447,13 @@ class TestChatPassthrough:
 
     def test_agent_mode_chat_get_messages_raises(self, agent_facade, caplog):
         """mode=agent 时 chat API 告警并抛 NotImplementedError。"""
-        with caplog.at_level(logging.WARNING, logger="maop.memory.facade"):
+        with caplog.at_level(logging.WARNING, logger="maop.memory.facade"):  # noqa: SIM117
             with pytest.raises(NotImplementedError, match="chat-only"):
                 agent_facade.chat_get_messages_for_llm(session_id="s1")
         assert any("chat-only" in r.message for r in caplog.records)
 
     def test_agent_mode_chat_add_exchange_raises(self, agent_facade, caplog):
-        with caplog.at_level(logging.WARNING, logger="maop.memory.facade"):
+        with caplog.at_level(logging.WARNING, logger="maop.memory.facade"):  # noqa: SIM117
             with pytest.raises(NotImplementedError, match="chat-only"):
                 agent_facade.chat_add_exchange(
                     session_id="s1", user_msg="u", assistant_msg="a",
@@ -462,7 +461,7 @@ class TestChatPassthrough:
         assert any("chat-only" in r.message for r in caplog.records)
 
     def test_agent_mode_conversation_raises(self, agent_facade, caplog):
-        with caplog.at_level(logging.WARNING, logger="maop.memory.facade"):
+        with caplog.at_level(logging.WARNING, logger="maop.memory.facade"):  # noqa: SIM117
             with pytest.raises(NotImplementedError, match="chat-only"):
                 _ = agent_facade.conversation
         assert any("chat-only" in r.message for r in caplog.records)

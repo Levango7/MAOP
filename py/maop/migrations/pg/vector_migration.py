@@ -43,10 +43,10 @@ from sqlalchemy.engine import Engine
 logger = logging.getLogger("maop.migrations.pg.vector_migration")
 
 __all__ = [
-    "migrate_vectors",
-    "get_sqlite_engine",
-    "get_pg_engine",
     "VectorMigrationResult",
+    "get_pg_engine",
+    "get_sqlite_engine",
+    "migrate_vectors",
 ]
 
 
@@ -142,8 +142,8 @@ def get_pg_engine(url: str | None = None) -> Engine:
 def _sqlite_has_vector_table(engine: Engine) -> bool:
     """Return True iff the SQLite DB has a ``vector_entries`` table."""
     try:
-        return inspect(engine).has_table("vector_entries")
-    except Exception as exc:  # noqa: BLE001
+        return inspect(engine).has_table("vector_entries")  # type: ignore[no-any-return]
+    except Exception as exc:
         logger.warning("SQLite introspection failed: %s", exc)
         return False
 
@@ -319,7 +319,7 @@ def _run_concurrently(
         finally:
             raw.close()
         return True
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         if tolerate_missing and "does not exist" in str(exc).lower():
             return True
         logger.warning("%s failed: %s", label, exc)
@@ -443,7 +443,7 @@ def migrate_vectors(
             continue
         try:
             written += _write_batch(dst, batch)
-        except Exception as exc:  # noqa: BLE001 — log + continue
+        except Exception as exc:
             logger.error("batch write failed: %s", exc)
             skipped += len(batch)
 

@@ -14,8 +14,8 @@ from maop.cache_evolver import (
     CacheEvolveReport,
     CacheStrategyAdjustment,
 )
-from maop.core.reliability.cache import LRUCache
 from maop.core.memory.semantic_cache import SemanticCache
+from maop.core.reliability.cache import LRUCache
 
 
 class TestAgentStrategyLearner:

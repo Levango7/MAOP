@@ -11,7 +11,6 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
-
 # ── Data Proxy ──────────────────────────────────────────────────────
 
 class TestDataProxy:
@@ -277,7 +276,7 @@ class TestEnsureDbSchemaError:
 
 class TestReportWithData:
     def test_report_with_delegations(self, tmp_path):
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
         now = datetime.now(timezone.utc)
         ts1 = (now - timedelta(hours=1)).isoformat()
         ts2 = (now - timedelta(hours=2)).isoformat()

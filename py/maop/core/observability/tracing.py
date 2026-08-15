@@ -32,7 +32,6 @@ see :func:`install_auto_spans`.
 """
 from __future__ import annotations
 
-
 import functools
 import inspect
 import logging
@@ -45,11 +44,23 @@ from maop.config.edition import Edition, FeatureFlag, get_edition, has_feature
 from maop.core.monitoring.otel import (
     _NoopSpan,
     _NoopTracer,
+)
+from maop.core.monitoring.otel import (
     extract_trace_context as _otel_extract,
+)
+from maop.core.monitoring.otel import (
     get_tracer as _otel_get_tracer,
+)
+from maop.core.monitoring.otel import (
     inject_trace_context as _otel_inject,
+)
+from maop.core.monitoring.otel import (
     is_enabled as _otel_is_enabled,
+)
+from maop.core.monitoring.otel import (
     setup_provider as _otel_setup_provider,
+)
+from maop.core.monitoring.otel import (
     span as _otel_span,
 )
 
@@ -126,7 +137,7 @@ def setup_tracing(
 
     try:
         _otel_setup_provider()
-    except Exception as exc:  # noqa: BLE001 — defensive: never crash startup
+    except Exception as exc:
         logger.warning("[observability.tracing] OTel setup failed: %s", exc)
 
     _tracer = _otel_get_tracer("maop.observability")
@@ -216,7 +227,7 @@ def _stamp_caller_attrs(span_obj: Any, fn: Callable[..., Any], args: tuple) -> N
         span_obj.set_attribute("code.module", fn.__module__)
         if args and hasattr(args[0], "__class__"):
             span_obj.set_attribute("code.class", args[0].__class__.__name__)
-    except Exception:  # noqa: BLE001 — span attr stamping must never crash
+    except Exception:
         pass
 
 
@@ -228,10 +239,10 @@ def _record_exception(span_obj: Any, exc: BaseException) -> None:
         span_obj.record_exception(exc)
         from opentelemetry.trace import Status, StatusCode
         span_obj.set_status(Status(StatusCode.ERROR, str(exc)))
-    except Exception:  # noqa: BLE001 — opentelemetry not installed
+    except Exception:
         try:
             span_obj.set_status("ERROR")
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
 
@@ -289,7 +300,7 @@ def attach_trace_context(carrier: dict[str, str]) -> Any:
         return None
     try:
         from opentelemetry import trace as otel_trace
-        return otel_trace.set_span_in_context(None)  # type: ignore[arg-type]  # placeholder; real attach below
+        return otel_trace.set_span_in_context(None)
     except ImportError:
         return None
 
@@ -351,7 +362,7 @@ class TraceContextMiddleware:
                     token = otel_context.attach(ctx)
             except ImportError:
                 pass
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
 
         # Wrap send so we can inject traceparent on egress.
@@ -365,7 +376,7 @@ class TraceContextMiddleware:
                         for k, v in out_carrier.items():
                             msg_headers.append((k.encode(), v.encode("latin-1")))
                         message["headers"] = msg_headers
-                except Exception:  # noqa: BLE001 — never break the response
+                except Exception:
                     pass
             await send(message)
 
@@ -378,7 +389,7 @@ class TraceContextMiddleware:
                     otel_context.detach(token)
                 except ImportError:
                     pass
-                except Exception:  # noqa: BLE001
+                except Exception:
                     pass
 
 
@@ -422,7 +433,7 @@ def install_auto_spans() -> int:
             logger.debug("[observability.tracing] auto-span installed: %s.%s", cls_name, meth_name)
         except ImportError:
             continue
-        except Exception as exc:  # noqa: BLE001 — never crash startup
+        except Exception as exc:
             logger.warning(
                 "[observability.tracing] auto-span failed for %s.%s: %s",
                 cls_name, meth_name, exc,

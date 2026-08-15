@@ -766,6 +766,7 @@ class TestEpisodicSearchFtsFallback:
         mem.episodic_store(task="fix issue", agent="bob", outcome="failure", score=0.5)
         # Drop the FTS table to force fallback to LIKE
         import sqlite3
+
         from maop.memory.shared_db import get_memory_db_path
         db_path = get_memory_db_path()
         with sqlite3.connect(str(db_path)) as conn:
@@ -951,6 +952,7 @@ class TestAccessConsolidation:
         entry_id = mem.episodic_store(task="t1", agent="a", score=0.9)
         # Manually bump access_count to trigger consolidation
         import sqlite3
+
         from maop.memory.shared_db import get_memory_db_path
         db_path = get_memory_db_path()
         with sqlite3.connect(str(db_path)) as conn:

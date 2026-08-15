@@ -39,7 +39,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
-from maop.core.mcp.tool_signing import ToolSigner, ToolSignatureError
+from maop.core.mcp.tool_signing import ToolSignatureError, ToolSigner
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ class ToolDiscovery:
     def _fetch_url(self, url: str) -> bytes:
         """Fetch *url* with a timeout; raises ``urllib.error.URLError`` on failure."""
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=self._timeout) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=self._timeout) as resp:
             data: bytes = resp.read()
             return data
 

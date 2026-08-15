@@ -349,7 +349,7 @@ class SSOProviderRegistry:
 
         ok_auth, lat_auth, err_auth = self._probe_url(authorize_url)
         ok_tok, lat_tok, err_tok = self._probe_url(token_url)
-        ok_user, lat_user, err_user = (
+        ok_user, _lat_user, _err_user = (
             self._probe_url(userinfo_url) if userinfo_url else (True, 0.0, "")
         )
 
@@ -420,7 +420,7 @@ class SSOProviderRegistry:
         """转换为脱敏的 dict（用于 API 响应）。"""
         d = resp.model_dump()
         d["config"] = mask_sensitive_fields(d["config"])
-        return d
+        return d  # type: ignore[no-any-return]
 
     # ── state GC ─────────────────────────────────────────────────
     def _gc_pending(self) -> None:

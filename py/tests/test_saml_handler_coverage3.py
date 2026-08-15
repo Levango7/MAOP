@@ -8,24 +8,23 @@ Targets missing lines: 138, 208-239, 249-256, 302-317, 393-461, 481-482,
 from __future__ import annotations
 
 import base64
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ── Helpers ─────────────────────────────────────────────────────────
 
 
 def _make_handler(**kwargs):
-    from maop.enterprise.sso import SSOConfig
     from maop.enterprise.saml_handler import SAMLHandler
-    defaults = dict(
-        client_id="sp",
-        client_secret="secret",
-        redirect_uri="https://sp.example.com/acs",
-        saml_entity_id="maop-sp",
-        saml_acs_url="https://sp.example.com/acs",
-    )
+    from maop.enterprise.sso import SSOConfig
+    defaults = {
+        "client_id": "sp",
+        "client_secret": "secret",
+        "redirect_uri": "https://sp.example.com/acs",
+        "saml_entity_id": "maop-sp",
+        "saml_acs_url": "https://sp.example.com/acs",
+    }
     defaults.update(kwargs)
     cfg = SSOConfig(**defaults)
     return SAMLHandler(cfg)
@@ -133,9 +132,10 @@ class TestFetchIdpMetadata:
     def test_fetch_url_error(self):
         """Cover URLError branch (255-258)."""
         import urllib.error
+
         from maop.enterprise.sso import SSOError
         handler = _make_handler(saml_metadata_url="https://idp.example.com/metadata")
-        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("conn refused")):
+        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("conn refused")):  # noqa: SIM117
             with pytest.raises(SSOError, match="Failed to fetch"):
                 handler._fetch_idp_metadata()
 
@@ -251,9 +251,8 @@ class TestVerifySignatureBranches:
         from maop.enterprise.sso import SSOError
         handler = _make_handler(saml_idp_cert="dummy")
         cert_b64 = base64.b64encode(b"dummy-cert-bytes").decode()
-        with self._patch_cert():
-            with pytest.raises(SSOError, match="XML parse failed"):
-                handler._verify_signature(b"not valid xml <<<>", cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="XML parse failed"):
+            handler._verify_signature(b"not valid xml <<<>", cert_b64)
 
     def test_no_signature_element(self):
         """Cover missing Signature element (406-411)."""
@@ -261,9 +260,8 @@ class TestVerifySignatureBranches:
         handler = _make_handler(saml_idp_cert="dummy")
         cert_b64 = base64.b64encode(b"dummy-cert-bytes").decode()
         xml = b'<Response xmlns="urn:oasis:names:tc:SAML:2.0:protocol"/>'
-        with self._patch_cert():
-            with pytest.raises(SSOError, match="missing.*Signature"):
-                handler._verify_signature(xml, cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="missing.*Signature"):
+            handler._verify_signature(xml, cert_b64)
 
     def test_missing_signed_info(self):
         """Cover missing SignedInfo (422)."""
@@ -275,9 +273,8 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with self._patch_cert():
-            with pytest.raises(SSOError, match="missing SignedInfo"):
-                handler._verify_signature(xml, cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="missing SignedInfo"):
+            handler._verify_signature(xml, cert_b64)
 
     def test_missing_reference(self):
         """Cover missing Reference (426)."""
@@ -292,9 +289,8 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with self._patch_cert():
-            with pytest.raises(SSOError, match="missing Reference"):
-                handler._verify_signature(xml, cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="missing Reference"):
+            handler._verify_signature(xml, cert_b64)
 
     def test_missing_digest_value(self):
         """Cover missing DigestValue (430)."""
@@ -311,9 +307,8 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with self._patch_cert():
-            with pytest.raises(SSOError, match="missing DigestValue"):
-                handler._verify_signature(xml, cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="missing DigestValue"):
+            handler._verify_signature(xml, cert_b64)
 
     def test_digest_value_decode_failed(self):
         """Cover DigestValue base64 decode failure (460-461)."""
@@ -331,9 +326,8 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with self._patch_cert():
-            with pytest.raises(SSOError, match="DigestValue base64 decode"):
-                handler._verify_signature(xml, cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="DigestValue base64 decode"):
+            handler._verify_signature(xml, cert_b64)
 
 
 # ─– _extract_attributes / _extract_name_id branches (507-526) ──────
@@ -405,6 +399,7 @@ class TestValidateConditionsBranches:
     def test_not_before_parse_exception(self):
         """Cover NotBefore parse failure (547-548)."""
         from lxml import etree
+
         from maop.enterprise.sso import SSOError
         handler = _make_handler()
         xml = b"""<Assertion xmlns="urn:oasis:names:tc:SAML:2.0:assertion">
@@ -417,6 +412,7 @@ class TestValidateConditionsBranches:
     def test_not_on_or_after_parse_exception(self):
         """Cover NotOnOrAfter parse failure (560-561)."""
         from lxml import etree
+
         from maop.enterprise.sso import SSOError
         handler = _make_handler()
         xml = b"""<Assertion xmlns="urn:oasis:names:tc:SAML:2.0:assertion">
@@ -429,6 +425,7 @@ class TestValidateConditionsBranches:
     def test_audience_restriction_no_audience(self):
         """Cover AudienceRestriction with no Audience (573)."""
         from lxml import etree
+
         from maop.enterprise.sso import SSOError
         handler = _make_handler()
         xml = b"""<Assertion xmlns="urn:oasis:names:tc:SAML:2.0:assertion">

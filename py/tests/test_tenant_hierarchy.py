@@ -18,7 +18,6 @@ from maop.core.tenant.hierarchy import (
     OrganizationHierarchy,
 )
 
-
 # ── fixtures ─────────────────────────────────────────────────
 
 

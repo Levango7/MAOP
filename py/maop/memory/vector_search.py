@@ -140,7 +140,7 @@ class VectorSearch:
 
     def _vec_to_blob(self, vec: np.ndarray) -> bytes:
         """Convert numpy array to SQLite BLOB."""
-        return vec.astype(np.float32).tobytes()
+        return vec.astype(np.float32).tobytes()  # type: ignore[no-any-return]
 
     def index_entry(self, entry_id: str, text: str) -> bool:
         """Index a single entry by its ID and text content."""
@@ -157,7 +157,6 @@ class VectorSearch:
                     existing = row["text_hash"]
             except Exception:
                 logger.debug('swallowed exception', exc_info=True)
-                pass
 
         if existing == text_hash:
             return False
@@ -266,7 +265,6 @@ class VectorSearch:
                     return f"{row['task']}: {row['content']}"
             except Exception:
                 logger.debug('swallowed exception', exc_info=True)
-                pass
         return ""
 
     def stats(self) -> dict[str, Any]:

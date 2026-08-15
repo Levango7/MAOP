@@ -25,10 +25,8 @@ from maop.core.security.api_key_manager import (
     ApiKeyCreate,
     ApiKeyManager,
     ApiKeyValidationResult,
-
     reset_api_key_manager,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────────────
 

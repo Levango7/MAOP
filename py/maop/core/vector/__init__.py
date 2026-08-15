@@ -45,13 +45,13 @@ from maop.core.memory.vector import (
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "DEFAULT_HNSW_THRESHOLD",
+    "EmbeddingProvider",
+    "HashEmbedding",
     "VectorBackend",
     "VectorEntry",
     "VectorSearchResult",
-    "EmbeddingProvider",
-    "HashEmbedding",
     "cosine_similarity",
-    "DEFAULT_HNSW_THRESHOLD",
 ]
 
 
@@ -214,4 +214,4 @@ class VectorBackend(ABC):
         Default implementation is a no-op; backends holding external
         resources should override.
         """
-        return None
+        return

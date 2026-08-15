@@ -22,7 +22,6 @@ from maop.core.agent.analyzer import (
     analyze,
 )
 
-
 # ── DependencyDAG cycle handling ──────────────────────────────
 
 class TestDependencyDAGCycle:
@@ -80,7 +79,7 @@ class TestParseLlmDecomp:
         content = '```json\n{"dependencies": [], "risk_levels": {"st-000": "low"}, "complexity_score": 10}\n```'
         result = _parse_llm_decomp(content, sub_tasks)
         assert result is not None
-        _, dag, score = result
+        _, _dag, score = result
         assert score == 10
 
     def test_valid_json_with_dependencies(self):
@@ -236,7 +235,7 @@ class TestSemanticAnalyzeLlm:
             "task", sub_tasks, enable_llm=True,
             llm_factory=llm_factory, model_name="gpt-4",
         )
-        parsed_tasks, dag, score = result
+        _parsed_tasks, dag, score = result
         assert score == 50
         assert ("st-000", "st-001") in dag.edges
 

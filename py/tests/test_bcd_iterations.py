@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 
-from maop.core.reliability.config_mutator import ConfigMutator, MutationResult
 from maop.core.evolution.evolution_strategies import (
     AggressiveStrategy,
     BalancedStrategy,
@@ -20,6 +19,7 @@ from maop.core.memory.knowledge_extractor import (
     Relation,
 )
 from maop.core.memory.knowledge_graph import KnowledgeGraph
+from maop.core.reliability.config_mutator import ConfigMutator, MutationResult
 from maop.memory.vector_search import VectorResult, VectorSearch
 
 # ═══════════════════════════════════════════════════════════════════

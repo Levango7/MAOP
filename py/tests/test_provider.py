@@ -7,14 +7,12 @@ import sqlite3
 import time
 from pathlib import Path
 
-
 import pytest
 
 from maop.dashboard.provider import (
     AgentStatus,
     DashboardProvider,
     DashboardState,
-
 )
 
 # ── Data Model Tests ─────────────────────────────────────────

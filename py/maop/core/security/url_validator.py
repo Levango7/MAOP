@@ -34,7 +34,6 @@ logger = logging.getLogger(__name__)
 
 class SSRFError(ValueError):
     """Webhook URL failed SSRF validation."""
-    pass
 
 
 # 已知内网/元数据域名别名（小写匹配）。

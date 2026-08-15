@@ -20,7 +20,7 @@ import time
 import pytest
 
 from maop.core.agent.dag.dag_progress_emitter import DagProgressEmitter, NodeStatus
-from maop.core.reliability.event_bus import EventBus, Event
+from maop.core.reliability.event_bus import Event, EventBus
 
 
 def _percentile(values: list[float], pct: float) -> float:
@@ -203,6 +203,7 @@ class TestDagEventLatency:
     async def test_sse_serialization_latency(self):
         """JSON serialization of NodeStatusEvent is < 1ms (design 2.3.6)."""
         import json
+
         from maop.core.agent.dag.dag_progress_emitter import NodeStatusEvent
 
         evt = NodeStatusEvent(

@@ -593,7 +593,7 @@ class NotificationManager:
             await self._broadcast({"type": "notification", "data": rec})
 
         # Dispatch delivery in the background (don't block the caller).
-        asyncio.create_task(self._deliver(notif_id, channel_id))  # noqa: RUF006 — fire-and-forget
+        asyncio.create_task(self._deliver(notif_id, channel_id))
         return response
 
     async def _deliver(self, notif_id: str, channel_id: str) -> None:

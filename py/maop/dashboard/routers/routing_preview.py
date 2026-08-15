@@ -14,8 +14,8 @@ from typing import Any, cast
 from fastapi import APIRouter, Request
 
 from maop.config.loader import load_config
-from maop.core.security.middleware import require_admin
 from maop.core.routing.route_scorer import get_route_scorer
+from maop.core.security.middleware import require_admin
 
 logger = logging.getLogger(__name__)
 

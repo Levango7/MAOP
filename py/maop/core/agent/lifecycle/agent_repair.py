@@ -206,7 +206,7 @@ class AgentRepair:
                     result.overall_status = "degraded"
             except Exception:
                 logger.debug('swallowed exception', exc_info=True)
-                pass  # 非关键
+                # 非关键
 
         # 5. 检查配置完整性
         if agent_config:

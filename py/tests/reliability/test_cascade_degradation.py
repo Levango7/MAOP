@@ -34,7 +34,6 @@ from maop.core.reliability.circuit_breaker import BreakerState, CircuitBreaker
 from maop.model.budget import BudgetGuard
 from maop.model.schema import BudgetConfig
 
-
 # ── Helpers ────────────────────────────────────────────────────
 
 
@@ -108,7 +107,7 @@ def test_cache_redis_fail_fast_without_allow_fallback(monkeypatch: pytest.Monkey
     monkeypatch.setenv("MAOP_CACHE_BACKEND", "redis")
     monkeypatch.delenv("MAOP_CACHE_ALLOW_FALLBACK", raising=False)
 
-    with patch("maop.core.backends.backends_redis.RedisCacheBackend",
+    with patch("maop.core.backends.backends_redis.RedisCacheBackend",  # noqa: SIM117
                side_effect=ImportError("mocked: redis unavailable")):
         with pytest.raises(RuntimeError, match="not importable"):
             get_cache_backend()

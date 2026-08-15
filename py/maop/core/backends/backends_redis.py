@@ -108,7 +108,7 @@ class RedisQueueBackend(QueueBackend):
         msg = {"data": json.dumps(message, default=str).encode().hex()}
         if delay > 0:
             msg["scheduled_at"] = str(time.time() + delay)
-        msg_id = self._client.xadd(stream, msg)  # type: ignore[arg-type]
+        msg_id = self._client.xadd(stream, msg)
         return msg_id.decode() if isinstance(msg_id, bytes) else msg_id
 
     def consume(self, topic: str, consumer_group: str = "", limit: int = 1) -> list[dict[str, Any]]:
@@ -118,9 +118,9 @@ class RedisQueueBackend(QueueBackend):
         consumer = self._consumer_name
         results = self._client.xreadgroup(group, consumer, {stream: ">"}, count=limit)
         messages = []
-        for _stream, entries in results:  # type: ignore[str-unpack]
-            for msg_id, fields in entries:  # type: ignore[str-unpack,union-attr]
-                data_hex = fields.get(b"data", b"").decode()  # type: ignore[union-attr]
+        for _stream, entries in results:
+            for msg_id, fields in entries:
+                data_hex = fields.get(b"data", b"").decode()
                 if data_hex:
                     msg = json.loads(bytes.fromhex(data_hex).decode())
                     msg["_msg_id"] = msg_id.decode() if isinstance(msg_id, bytes) else msg_id

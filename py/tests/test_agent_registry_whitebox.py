@@ -13,7 +13,6 @@ import pytest
 
 from maop.core.agent.lifecycle.agent_registry import AgentRegistry, RegisteredAgent
 
-
 # ── Fixtures ─────────────────────────────────────────────────────
 
 

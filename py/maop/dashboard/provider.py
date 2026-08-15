@@ -11,7 +11,6 @@ FastAPI-based dashboard with:
 
 from __future__ import annotations
 
-
 import json
 import logging
 import sqlite3
@@ -206,13 +205,13 @@ class DashboardProvider:
         try:
             async with aiosqlite.connect(str(db_path), timeout=5) as db:
                 cursor = await db.execute("SELECT COUNT(*) FROM delegations")
-                total = (await cursor.fetchone())[0]  # type: ignore[index]
+                total = (await cursor.fetchone())[0]
                 if total == 0:
                     return 0.0
                 cursor = await db.execute(
                     "SELECT COUNT(*) FROM delegations WHERE exit_code = 0"
                 )
-                success = (await cursor.fetchone())[0]  # type: ignore[index]
+                success = (await cursor.fetchone())[0]
                 return cast(float, round((success / total) * 100, 1))
         except Exception as exc:
             logger.warning("[provider] _async_compute_success_rate failed: %s", exc)

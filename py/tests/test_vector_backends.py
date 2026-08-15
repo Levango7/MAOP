@@ -26,7 +26,7 @@ _PY_ROOT = Path(__file__).resolve().parent.parent
 if str(_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(_PY_ROOT))
 
-from maop.core.vector import (  # noqa: E402
+from maop.core.vector import (
     DEFAULT_HNSW_THRESHOLD,
     HashEmbedding,
     VectorBackend,
@@ -34,10 +34,9 @@ from maop.core.vector import (  # noqa: E402
     VectorSearchResult,
     cosine_similarity,
 )
-from maop.core.vector.factory import get_vector_backend, resolve_backend_name  # noqa: E402
-from maop.core.vector.pg_backend import PgVectorBackend  # noqa: E402
-from maop.core.vector.sqlite_backend import SqliteVectorBackend  # noqa: E402
-
+from maop.core.vector.factory import get_vector_backend, resolve_backend_name
+from maop.core.vector.pg_backend import PgVectorBackend
+from maop.core.vector.sqlite_backend import SqliteVectorBackend
 
 # ────────────────────────────────────────────────────────────────────────────
 # 1. Shared models & helpers (re-exports)
@@ -199,9 +198,9 @@ class TestSqliteVectorBackend:
     def test_close_clears_caches(self, sqlite_backend: SqliteVectorBackend) -> None:
         b = sqlite_backend
         b.insert("c1", "c1", [1.0] * 32)
-        assert b._store._cache  # noqa: SLF001
+        assert b._store._cache
         b.close()
-        assert not b._store._cache  # noqa: SLF001
+        assert not b._store._cache
 
     def test_empty_query_returns_empty(self, sqlite_backend: SqliteVectorBackend) -> None:
         assert sqlite_backend.search([], top=5) == []
@@ -245,7 +244,7 @@ class TestPgVectorBackend:
     def test_owns_engine_flag_with_explicit_engine(self) -> None:
         eng = _make_mock_engine()
         b = PgVectorBackend(engine=eng)
-        assert b._owns_engine is False  # noqa: SLF001
+        assert b._owns_engine is False
 
     def test_insert_calls_upsert_sql(self) -> None:
         eng = _make_mock_engine()
@@ -521,6 +520,7 @@ class TestVectorMigration:
     def test_dimension_filter_skips_mismatched(self, tmp_path: Path) -> None:
         """Rows whose vector length != dimension are skipped."""
         import sqlite3
+
         from maop.migrations.pg.vector_migration import migrate_vectors
 
         db_path = tmp_path / "mixed.db"

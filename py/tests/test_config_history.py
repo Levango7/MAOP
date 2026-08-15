@@ -23,7 +23,6 @@ from maop.core.config.config_history import (
     reset_config_history,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────
 
 

@@ -23,7 +23,7 @@ from typing import cast
 from maop import __version__ as MAOP_VERSION  # noqa: F401  — re-exported
 from maop.core.backends.db_utils import get_db_path  # noqa: F401  — re-exported
 from maop.core.security.middleware import require_admin  # noqa: F401  — re-exported
-
+from maop.dashboard.error_handler import handle_api_errors  # noqa: F401  — re-exported
 from maop.dashboard.routers.state import (  # noqa: F401  — re-exported
     MAOP_ROOT,
     active_jobs,
@@ -32,7 +32,6 @@ from maop.dashboard.routers.state import (  # noqa: F401  — re-exported
     init_subsystems,
     start_time,
 )
-from maop.dashboard.error_handler import handle_api_errors  # noqa: F401  — re-exported
 
 logger = logging.getLogger("maop.dashboard.routers.system")
 

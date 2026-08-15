@@ -260,7 +260,7 @@ class StrategyEngine:
                 })
                 self._save_history()
 
-            return result.model_dump()
+            return result.model_dump()  # type: ignore[no-any-return]
         except Exception as exc:
             logger.error("[strategy] Apply failed for %s: %s", suggestion_id, exc)
             return {"applied": False, "error": str(exc)}

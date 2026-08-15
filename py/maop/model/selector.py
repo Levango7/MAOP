@@ -490,7 +490,6 @@ def _record_selector_decision(
         MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     record_decision_safe(RoutingDecisionRecord(
         trace_id=effective_trace,

@@ -224,7 +224,7 @@ class TestStaticCRValidation:
         crd = _load_yaml(CHART_DIR / "crds" / "maopagent.yaml")  # type: ignore[return-value]
         return crd["spec"]["versions"][0]["schema"]["openAPIV3Schema"]
 
-    SAMPLE_CR = {
+    SAMPLE_CR = {  # noqa: RUF012
         "apiVersion": "maop.io/v1alpha1",
         "kind": "MaopAgent",
         "metadata": {"name": "test-agent", "namespace": "default"},

@@ -52,7 +52,7 @@ def _enable_extensions(connection) -> None:
     for ext in ("vector", "pg_trgm"):
         try:
             connection.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
-        except Exception:  # noqa: BLE001 — extension may be pre-installed or unsupported
+        except Exception:
             pass
 
 

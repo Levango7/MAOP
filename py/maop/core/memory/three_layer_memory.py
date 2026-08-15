@@ -33,27 +33,36 @@ Usage::
 
 from __future__ import annotations
 
-import json
 import logging
-import sqlite3
-import time
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
-from maop.core.reliability.cache import LRUCache
-from maop.core.memory.working_memory import WorkingMemoryMixin
-from maop.core.memory.semantic import SemanticMixin
-from maop.core.memory.transform import TransformMixin
-from maop.core.memory.episodic_store import EpisodicStoreMixin
 from maop.core.memory.episodic_consolidation import EpisodicConsolidationMixin
+from maop.core.memory.episodic_store import EpisodicStoreMixin
 from maop.core.memory.protocol_aliases import ProtocolMixin
-from maop.core.backends.db_utils import sqlite_connect
+from maop.core.memory.semantic import SemanticMixin
+
+# T2 拆分后 types/utils 常量移至子模块；主文件保留 re-export 兼容
+# `from maop.core.memory.three_layer_memory import X` 的既有引用。
+from maop.core.memory.three_layer_memory_types import (  # noqa: F401  # re-export 兼容
+    ContextHead,
+    FocusMode,
+    QualityDimensions,
+    decay_weight,
+)
+from maop.core.memory.three_layer_memory_utils import (  # noqa: F401  # re-export 兼容
+    _compress_text,
+    _is_negative_feedback,
+    _text_relevance,
+)
+from maop.core.memory.transform import TransformMixin
+from maop.core.memory.working_memory import WorkingMemoryMixin
+from maop.core.reliability.cache import LRUCache
 
 # 共享 DB 路径与术语映射（统一 ThreeLayerMemory 与 MemoryManager 的 DB 文件）
 from maop.memory.shared_db import (
     get_memory_db_path,
     migrate_legacy_episodic_db,
-    normalize_layer_name,
 )
 
 logger = logging.getLogger(__name__)
@@ -71,27 +80,6 @@ LAYER_NAME_MAP: dict[str, str] = {
 
 # ── Models ────────────────────────────────────────────────────
 
-from maop.core.memory.three_layer_memory_types import (
-    ConsolidationReport,
-    ContextHead,
-    ContextItem,
-    EpisodicEntry,
-    EpisodicSearchResult,
-    FocusConfig,
-    FocusMode,
-    HeadResult,
-    MultiHeadResult,
-    QualityDimensions,
-    TransformResult,
-    decay_weight,
-)
-from maop.core.memory.three_layer_memory_utils import (
-    _DEFAULT_FOCUS_CONFIGS,
-    _compress_text,
-    _is_negative_feedback,
-    _item_to_text,
-    _text_relevance,
-)
 
 # ── Episodic DDL ─────────────────────────────────────────────
 

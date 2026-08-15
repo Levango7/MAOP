@@ -204,8 +204,9 @@ class TestDagWsEndpoint:
         and sends ping by checking the ws_dag.py endpoint structure.
         """
         # Verify the ws_dag.py endpoint has heartbeat logic.
-        import maop.dashboard.ws_dag as ws_dag_mod
         import inspect
+
+        import maop.dashboard.ws_dag as ws_dag_mod
         source = inspect.getsource(ws_dag_mod.dag_ws_endpoint)
         assert "heartbeat" in source.lower() or "ping" in source.lower()
         assert "asyncio.sleep(30)" in source or "sleep(30)" in source
@@ -216,8 +217,9 @@ class TestDagWsEndpoint:
         We verify by checking that ws_broadcast.py still has the original /ws
         endpoint with its hello + ping/pong logic.
         """
-        import maop.dashboard.ws_broadcast as ws_broadcast_mod
         import inspect
+
+        import maop.dashboard.ws_broadcast as ws_broadcast_mod
         source = inspect.getsource(ws_broadcast_mod)
         # Original /ws endpoint should still exist.
         assert '@router.websocket("/ws")' in source

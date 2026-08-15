@@ -252,4 +252,4 @@ def _load_yaml(path: Path) -> Any:
         return yaml.safe_load(fh)
 
 
-__all__ = ["ToolPolicy", "PolicyDecision", "ENV_POLICY_MODE", "ENV_POLICY_CONFIG"]
+__all__ = ["ENV_POLICY_CONFIG", "ENV_POLICY_MODE", "PolicyDecision", "ToolPolicy"]

@@ -305,8 +305,7 @@ def _parse_json_array(content: str) -> list[dict[str, Any]]:
     # 去除 markdown fence
     if text.startswith("```"):
         text = text.split("```", 2)[1] if text.count("```") >= 2 else text
-        if text.startswith("json"):
-            text = text[4:]
+        text = text.removeprefix("json")
         text = text.strip()
     # 截取第一个 [ 到最后一个 ]
     start = text.find("[")

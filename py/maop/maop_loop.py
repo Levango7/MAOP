@@ -36,15 +36,15 @@ if TYPE_CHECKING:
 from maop.config.loader import ConfigLoader, MaopConfig
 from maop.core.agent.analyzer import ExecutionStrategy
 from maop.core.agent.analyzer import analyze as requirement_analyze
-from maop.core.reliability.cache import SingleFlight
-from maop.core.reliability.error_schema import MaopResult
-from maop.core.reliability.event_bus import Event, EventBus, get_event_bus
-from maop.core.reliability.log_rotate import rotate_logs
+from maop.core.agent.evolution.phases import PhaseContext, PhaseResult
 from maop.core.monitoring.monitoring import MetricsCollector, StructuredLogger
 from maop.core.monitoring.otel import get_tracer
 from maop.core.monitoring.otel import setup_provider as otel_setup
 from maop.core.monitoring.otel import span as otel_span
-from maop.core.agent.evolution.phases import PhaseContext, PhaseResult
+from maop.core.reliability.cache import SingleFlight
+from maop.core.reliability.error_schema import MaopResult
+from maop.core.reliability.event_bus import Event, EventBus, get_event_bus
+from maop.core.reliability.log_rotate import rotate_logs
 from maop.loop_analyzer import simple_analyze
 from maop.loop_executor import ExecuteMixin
 
@@ -745,7 +745,7 @@ class MaopLoop(ExecuteMixin):
         """Execute Plan phase — route task to agent."""
         try:
             plan = maop_plan(task=task, workdir=workdir, config=self._config)
-            return plan.model_dump()
+            return plan.model_dump()  # type: ignore[no-any-return]
         except Exception as exc:
             # C2 fix: do NOT silently degrade to a hardcoded default route,
             # which would mask a real misconfiguration as a successful plan.

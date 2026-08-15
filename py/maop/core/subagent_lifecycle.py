@@ -8,4 +8,4 @@ preserve backward-compatible import paths
 """
 from __future__ import annotations
 
-from maop.core.agent.delegation.subagent_lifecycle import *  # noqa: F401,F403
+from maop.core.agent.delegation.subagent_lifecycle import *

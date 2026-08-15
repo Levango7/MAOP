@@ -452,7 +452,7 @@ class FailurePatternDetector:
             else:
                 status_code = _STATUS_NORMAL
             self._status_gauge.set(status_code, labels=labels)
-        except Exception as exc:  # noqa: BLE001 — metrics must never break scheduling
+        except Exception as exc:
             logger.debug("[failure-detector] metric update failed: %s", exc)
 
     def _publish_event(
@@ -484,12 +484,12 @@ class FailurePatternDetector:
                 asyncio.get_running_loop()
                 # A loop is running — schedule fire-and-forget so the
                 # synchronous caller is not blocked.
-                asyncio.ensure_future(coro)  # noqa: RUF006
+                asyncio.ensure_future(coro)
             except RuntimeError:
                 # No running loop — run to completion on a fresh loop so
                 # tests / sync callers still see the event in history.
                 asyncio.run(coro)
-        except Exception as exc:  # noqa: BLE001 — notification must never break scheduling
+        except Exception as exc:
             logger.debug("[failure-detector] event publish failed: %s", exc)
 
 
@@ -520,13 +520,13 @@ def set_failure_detector(detector: FailurePatternDetector | None) -> None:
 
 
 __all__ = [
-    "AgentHealth",
-    "FailurePatternDetector",
     "M_AGENT_AVG_LATENCY",
     "M_AGENT_FAILURE_RATE",
     "M_AGENT_STATUS",
     "M_AGENT_TIMEOUT_RATE",
     "M_AGENT_WEIGHT",
+    "AgentHealth",
+    "FailurePatternDetector",
     "get_failure_detector",
     "set_failure_detector",
 ]

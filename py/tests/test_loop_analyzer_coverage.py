@@ -13,7 +13,6 @@ from maop.loop_analyzer import (
     simple_analyze,
 )
 
-
 # ── _build_llm_extraction_prompt ──────────────────────────────
 
 class TestBuildLlmExtractionPrompt:

@@ -1,7 +1,6 @@
 """Coverage tests for maop.core.api_key_vault — store/retrieve/delete/rotate."""
 from __future__ import annotations
 
-
 import pytest
 
 from maop.core.security.api_key_vault import ApiKeyVault

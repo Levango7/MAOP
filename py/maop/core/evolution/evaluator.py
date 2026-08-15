@@ -24,7 +24,8 @@ from __future__ import annotations
 import logging
 import math
 import statistics
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -55,7 +56,7 @@ class PerformanceMetrics(BaseModel):
     by_model: dict[str, dict[str, float]] = Field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return self.model_dump()
+        return self.model_dump()  # type: ignore[no-any-return]
 
 
 class MetricDelta(BaseModel):
@@ -71,7 +72,7 @@ class MetricDelta(BaseModel):
     summary: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return self.model_dump()
+        return self.model_dump()  # type: ignore[no-any-return]
 
 
 # ── 评估器 ────────────────────────────────────────────────────────

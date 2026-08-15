@@ -28,8 +28,8 @@ from .state import MAOP_ROOT
 router = APIRouter()
 
 # ── Auth config ────────────────────────────────────────────────────
-from maop.core.security.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig, load_jwt_secret
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
+from maop.core.security.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig, load_jwt_secret
 
 _env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
 # High 安全修复 (2.3): secure-by-default。只有显式声明本地开发环境
@@ -276,7 +276,6 @@ async def auth_status(request: Request) -> Any:
                     has_token = True
             except Exception:
                 logger.debug('swallowed exception', exc_info=True)
-                pass
     return {
         "auth_enabled": _auth_enabled,
         "has_token": has_token,
@@ -443,7 +442,7 @@ async def auth_refresh(request: Request):
             mgr.jwt_handler.revoke_token(token)
         except Exception:
             logger.debug('swallowed exception', exc_info=True)
-            pass  # best-effort revocation
+            # best-effort revocation
         return response
     except Exception as exc:
         logger.exception("[auth] Token refresh failed")

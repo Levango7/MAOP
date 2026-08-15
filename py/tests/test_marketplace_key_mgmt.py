@@ -32,7 +32,6 @@ from maop.core.marketplace.signing import (
     verify_with_keys,
 )
 
-
 # ── Fixtures ───────────────────────────────────────────────────────
 
 

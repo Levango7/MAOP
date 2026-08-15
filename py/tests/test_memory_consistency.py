@@ -49,10 +49,9 @@ from maop.memory.unified import (
     LAYER_LONG_TERM,
     LAYER_SHORT_TERM,
     LAYER_WORKING,
-    UnifiedMemoryProtocol,
     VALID_LAYERS,
+    UnifiedMemoryProtocol,
 )
-
 
 # ── Fixtures ────────────────────────────────────────────────────
 
@@ -1188,7 +1187,6 @@ class TestMigrationIdempotent:
     def test_migrate_with_legacy_memory_db(self, tmp_root):
         """构造 legacy memory.db 并迁移。"""
         from maop.migrations.memory_migration import (
-
             migrate_legacy_memory_db,
         )
 
@@ -1396,7 +1394,7 @@ class TestConfigCompatibility:
         # 重新 import 以读取新 env
         import importlib
 
-        import maop.memory.shared_db as shared_db
+        from maop.memory import shared_db
         importlib.reload(shared_db)
         path = shared_db.get_memory_db_path()
         assert path.name == "memory.db"
@@ -1770,8 +1768,8 @@ class TestModuleExports:
 
     def test_unified_exports(self):
         from maop.memory.unified import (
-            UnifiedMemoryProtocol,
             VALID_LAYERS,
+            UnifiedMemoryProtocol,
         )
 
         assert UnifiedMemoryProtocol is not None

@@ -12,7 +12,6 @@ from maop.maop_plan import (
     maop_plan,
 )
 
-
 # v5.0.0: TestRouteByKeyword class removed — _route_by_keyword() was deleted
 # in v5.0.0 (deprecated since v4.0.0). Config-based routing is now primary.
 

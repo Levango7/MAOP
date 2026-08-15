@@ -7,8 +7,8 @@ Uses isolated tmp_path + real instances where possible.
 from __future__ import annotations
 
 import asyncio
-import pytest
 
+import pytest
 
 # ── Tool Manager (extended) ─────────────────────────────────────────
 
@@ -36,9 +36,9 @@ class TestToolManagerExtended:
             mgr.register("t1", command="")
 
     def test_register_incompatible_version(self, tmp_path, monkeypatch):
-        from maop.core.agent.tools.tool_manager import ToolManager
         # Force MAOP version to be lower than required.
         import maop
+        from maop.core.agent.tools.tool_manager import ToolManager
         monkeypatch.setattr(maop, "__version__", "1.0.0")
         mgr = ToolManager(root_dir=str(tmp_path))
         with pytest.raises(ValueError):
@@ -254,7 +254,7 @@ class TestMessageQueue:
         assert result is False
 
     def test_enqueue_with_priority(self, tmp_path):
-        from maop.core.reliability.message_queue import MessageQueue, MessagePriority
+        from maop.core.reliability.message_queue import MessagePriority, MessageQueue
         mq = MessageQueue(db_path=str(tmp_path / "queue.db"))
         mq.enqueue("t1", {"k": "v"}, priority=MessagePriority.HIGH)
         mq.enqueue("t1", {"k": "v"}, priority=MessagePriority.LOW)

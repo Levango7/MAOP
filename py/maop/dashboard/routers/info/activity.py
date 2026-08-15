@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 
-from maop.dashboard.error_handler import handle_api_errors  # noqa: F401
+from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 

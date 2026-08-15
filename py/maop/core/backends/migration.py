@@ -262,7 +262,7 @@ class AlembicBridge:
         engine = create_engine(self._db_url or "")
         with engine.connect() as conn:
             context = MigrationContext.configure(conn)
-            return context.get_current_revision()
+            return context.get_current_revision()  # type: ignore[no-any-return]
 
     def status(self) -> dict[str, Any]:
         try:

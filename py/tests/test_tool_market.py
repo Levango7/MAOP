@@ -18,7 +18,6 @@ import yaml
 
 from maop.core.mcp.tool_discovery import (
     DiscoveredTool,
-
     DiscoverySource,
     ToolDiscovery,
 )
@@ -30,7 +29,6 @@ from maop.core.mcp.tool_signing import (
     sign_bytes,
     verify_bytes,
 )
-
 
 # ── TestToolSigning ───────────────────────────────────────────
 
@@ -325,7 +323,7 @@ class TestToolDiscoveryAll:
         config_path = tmp_path / "config" / "mcp_servers.yaml"
         _write_local_config(config_path, [{"name": "local1"}, {"name": "local2"}])
         td = ToolDiscovery(root_dir=tmp_path)
-        tools, report = td.discover_all()
+        _tools, report = td.discover_all()
         assert report.verified_count == 2
         assert report.unverified_count == 0
 

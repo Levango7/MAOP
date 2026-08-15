@@ -31,7 +31,6 @@ from maop.core.scheduling.failure_detector import (
     set_failure_detector,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────
 
 
@@ -356,7 +355,7 @@ def test_concurrent_record_result_is_safe(detector: FailurePatternDetector):
         try:
             for i in range(n):
                 detector.record_result(agent_id, success=(i % 2 == 0), latency=0.1)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             errors.append(exc)
 
     threads = [
@@ -381,7 +380,7 @@ def test_select_worker_prefers_high_weight(detector: FailurePatternDetector):
 
     class _FakeRedis:
         def xgroup_create(self, *a, **k):
-            raise Exception("BUSYGROUP")
+            raise Exception("BUSYGROUP")  # noqa: TRY002
 
         def xadd(self, *a, **k):
             return b"0-0"

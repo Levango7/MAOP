@@ -37,7 +37,6 @@ from maop.enterprise.sso_store import (
     mask_sensitive_fields,
 )
 
-
 # ── Edition fixture ──────────────────────────────────────────────────
 
 

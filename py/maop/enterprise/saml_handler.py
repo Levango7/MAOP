@@ -551,10 +551,10 @@ class SAMLHandler:
             raise SSOError(f"SignatureValue base64 decode failed: {exc}") from exc
 
         try:
-            public_key.verify(  # type: ignore[union-attr,call-arg]
+            public_key.verify(
                 sig_value,
                 signed_info_c14n,
-                padding.PKCS1v15(),  # type: ignore[arg-type]
+                padding.PKCS1v15(),
                 hashes.SHA256(),
             )
         except Exception as exc:

@@ -18,7 +18,6 @@ from fastapi.testclient import TestClient
 from maop.core.agent.lifecycle.agent_registry import HealthCheckResult, RegisteredAgent
 from maop.core.agent.lifecycle.agent_repair import DiagnosisResult, RepairResult
 
-
 # ── Fakes ───────────────────────────────────────────────────────────
 
 class FakeProc:
@@ -40,15 +39,15 @@ class FakeProc:
 
 
 def _agent(name: str = "claude", **kw) -> RegisteredAgent:
-    defaults = dict(
-        cli_path="/usr/bin/claude",
-        provider="anthropic",
-        capabilities=["code"],
-        description="Claude agent",
-        model="claude-3",
-        driver="cli",
-        enabled=True,
-    )
+    defaults = {
+        "cli_path": "/usr/bin/claude",
+        "provider": "anthropic",
+        "capabilities": ["code"],
+        "description": "Claude agent",
+        "model": "claude-3",
+        "driver": "cli",
+        "enabled": True,
+    }
     defaults.update(kw)
     return RegisteredAgent(name=name, **defaults)
 
@@ -338,7 +337,7 @@ class TestUpgradeStatus:
             cli = "claude"
 
         class FakeCfg:
-            agents = {"claude": FakeAD()}
+            agents = {"claude": FakeAD()}  # noqa: RUF012
 
         class FakeLoader:
             def __init__(self, project_root=None):

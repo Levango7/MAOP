@@ -14,7 +14,6 @@ instance. They cover:
 """
 from __future__ import annotations
 
-
 import os
 import sys
 from collections.abc import Sequence
@@ -23,6 +22,7 @@ from typing import Any
 from unittest import mock
 
 import pytest
+from typing_extensions import Self
 
 # Ensure the py/ root is on sys.path so `import maop...` works from the
 # tests directory regardless of how pytest is invoked.
@@ -174,7 +174,7 @@ def test_initial_schema_upgrade_requires_pg_dialect() -> None:
         def execute(self, *_args: Any, **_kwargs: Any) -> Any:
             pytest.fail("execute should not be called on non-PG dialect")
 
-    with mock.patch.object(mod.op, "get_bind", return_value=FakeBind()):
+    with mock.patch.object(mod.op, "get_bind", return_value=FakeBind()):  # noqa: SIM117
         with pytest.raises(RuntimeError, match="PostgreSQL-only"):
             mod.upgrade()
 
@@ -201,7 +201,7 @@ def test_initial_schema_downgrade_guard_prod_env() -> None:
     # Strip MAOP_ENV and the override flag to simulate prod.
     env = {k: v for k, v in os.environ.items()
            if k not in ("MAOP_ENV", "MAOP_ALLOW_DESTRUCTIVE_DOWNGRADE")}
-    with mock.patch.dict(os.environ, env, clear=True):
+    with mock.patch.dict(os.environ, env, clear=True):  # noqa: SIM117
         with pytest.raises(RuntimeError, match="SAFETY"):
             mod.downgrade()
 
@@ -337,10 +337,10 @@ def _make_fake_engine(table_columns: dict[str, list[str]], table_rows: dict[str,
                 return mock.MagicMock(fetchall=mock.MagicMock(return_value=rows))
             return mock.MagicMock()
 
-        def __enter__(self) -> "FakeConn":
+        def __enter__(self) -> Self:
             return self
 
-        def __exit__(self, *args: Any) -> None:
+        def __exit__(self, *args: object) -> None:
             pass
 
     class FakeBeginConn(FakeConn):

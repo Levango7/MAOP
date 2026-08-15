@@ -1,7 +1,6 @@
 """Coverage tests for maop.core.agent_proxy — AgentProxy registry/dispatcher."""
 from __future__ import annotations
 
-
 import pytest
 
 from maop.core.agent.delegation.agent_proxy import (

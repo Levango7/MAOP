@@ -9,6 +9,6 @@ uses a whitelist environment variable policy (G-02 security fix).
 from __future__ import annotations
 
 __all__: list[str] = [
-    "signing",
     "sandbox",
+    "signing",
 ]

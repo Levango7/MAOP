@@ -216,8 +216,10 @@ class TestEnterpriseGuard:
 class TestGlobalExceptionHandler:
     async def test_handler_returns_500(self):
         """Invoke the handler directly with a raised exception."""
-        from fastapi import Request
         from unittest.mock import MagicMock
+
+        from fastapi import Request
+
         from maop.dashboard.server import _global_exception_handler
 
         mock_request = MagicMock(spec=Request)

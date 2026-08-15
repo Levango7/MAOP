@@ -187,7 +187,7 @@ kg_router = APIRouter(prefix="/api/knowledge-graph", tags=["knowledge-graph"])
 @kg_router.get("")
 async def get_knowledge_graph_v2(
     limit: int = Query(500),
-    type: str = Query(""),  # noqa: A002  # shadows builtin intentionally for API
+    type: str = Query(""),  # shadows builtin intentionally for API
     time_range: str = Query(""),
 ) -> dict[str, Any]:
     """Return the full knowledge graph with optional type/time/limit filtering.

@@ -16,10 +16,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from typing_extensions import Self
 
-from maop.enterprise.crl import CRLError, CRLChecker, LicenseRevokedError
+from maop.enterprise.crl import CRLChecker, CRLError, LicenseRevokedError
 from maop.enterprise.license import LicenseInfo
-
 
 # -- 辅助函数 ---------------------------------------------------------------
 
@@ -59,7 +59,7 @@ class _FakeResponse:
     def read(self, n: int = -1) -> bytes:
         return self._buf.read(n if n != -1 else -1)
 
-    def __enter__(self) -> "_FakeResponse":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:

@@ -558,7 +558,7 @@ def _audit(
 ) -> None:
     """记录审计事件到 EnterpriseAuditLogger（若可用）。"""
     try:
-        from maop.enterprise.audit import EnterpriseAuditLogger, AuditSeverity
+        from maop.enterprise.audit import AuditSeverity, EnterpriseAuditLogger
         logger_ = EnterpriseAuditLogger()
         actor = getattr(getattr(request, "state", None), "auth_identity", "") or ""
         tenant_id = getattr(getattr(request, "state", None), "tenant_id", "") or ""

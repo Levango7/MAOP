@@ -12,8 +12,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from maop.core.reliability.error_schema import MaopResult
 from maop.core.agent.lifecycle.state_classifier import ClassificationResult, TaskStateClassifier
+from maop.core.reliability.error_schema import MaopResult
 
 logger = logging.getLogger(__name__)
 

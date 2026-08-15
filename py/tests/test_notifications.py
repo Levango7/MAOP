@@ -48,11 +48,10 @@ from maop.enterprise.notification.models import (
 )
 from maop.enterprise.notification.store import (
     NotificationStore,
+    _mask_config,
     decrypt_secret,
     encrypt_secret,
-    _mask_config,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────────────
 
@@ -290,7 +289,7 @@ class TestWebhookChannel:
             ch.send(title="t", body="b")
             req = mock_open.call_args[0][0]
             # urllib normalises header names to lowercase — check case-insensitively
-            header_keys = {k.lower() for k in req.headers.keys()}
+            header_keys = {k.lower() for k in req.headers}
             assert "x-maop-signature" in header_keys
 
 

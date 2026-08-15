@@ -30,8 +30,9 @@ import re
 import time
 import uuid
 from collections import defaultdict, deque
+from collections.abc import Callable, Iterable
 from enum import Enum
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -611,7 +612,7 @@ def compute_heatmap(events: list[AuditEvent]) -> list[AuditHeatmapCell]:
         try:
             dt = _dt.datetime.fromtimestamp(e.timestamp, _dt.UTC)
         except AttributeError:  # Python < 3.11
-            dt = _dt.datetime.utcfromtimestamp(e.timestamp)
+            dt = _dt.datetime.utcfromtimestamp(e.timestamp)  # noqa: DTZ004
         day = dt.weekday()
         hour = dt.hour
         grid[(day, hour)]["count"] += 1

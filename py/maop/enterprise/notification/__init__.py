@@ -56,25 +56,25 @@ from maop.enterprise.notification.models import (
 __all__: list[str] = [
     # Channels
     "BaseChannel",
-    "EmailChannel",
-    "WebhookChannel",
-    "InAppChannel",
-    "get_channel_class",
-    "register_channel",
-    # Event bus
-    "EventBus",
-    # Manager
-    "NotificationManager",
     # Pydantic models
     "ChannelCreate",
-    "ChannelUpdate",
     "ChannelResponse",
+    "ChannelUpdate",
+    "EmailChannel",
+    # Event bus
+    "EventBus",
+    "InAppChannel",
+    # Manager
+    "NotificationManager",
+    "NotificationResponse",
+    "PreferenceResponse",
+    "PreferenceUpdate",
     "RuleCreate",
-    "RuleUpdate",
     "RuleResponse",
+    "RuleUpdate",
     "TemplateCreate",
     "TemplateResponse",
-    "NotificationResponse",
-    "PreferenceUpdate",
-    "PreferenceResponse",
+    "WebhookChannel",
+    "get_channel_class",
+    "register_channel",
 ]

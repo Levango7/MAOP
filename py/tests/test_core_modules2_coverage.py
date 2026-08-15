@@ -4,8 +4,6 @@ Uses isolated tmp_path + real instances where possible.
 """
 from __future__ import annotations
 
-
-
 # ── Tool Manager ────────────────────────────────────────────────────
 
 class TestToolManager:
@@ -252,16 +250,18 @@ class TestVectorStore:
 
 class TestProviderHealth:
     def test_init(self, tmp_path, monkeypatch):
-        from maop.core.routing.provider_health import ProviderHealthChecker
         from unittest.mock import MagicMock
+
+        from maop.core.routing.provider_health import ProviderHealthChecker
         mock_registry = MagicMock()
         mock_vault = MagicMock()
         checker = ProviderHealthChecker(registry=mock_registry, vault=mock_vault)
         assert checker is not None
 
     def test_check_nonexistent(self, tmp_path, monkeypatch):
-        from maop.core.routing.provider_health import ProviderHealthChecker
         from unittest.mock import MagicMock
+
+        from maop.core.routing.provider_health import ProviderHealthChecker
         mock_registry = MagicMock()
         mock_vault = MagicMock()
         mock_vault.get = MagicMock(return_value=None)
@@ -278,15 +278,17 @@ class TestSubagentDb:
     def test_get_path(self, tmp_path, monkeypatch):
         # Force data dir to tmp_path so the DB path is isolated.
         monkeypatch.setenv("MAOP_DATA_DIR", str(tmp_path))
-        from maop.core import subagent_db
         # Reload module to pick up env override via get_db_path.
         import importlib
+
+        from maop.core import subagent_db
         importlib.reload(subagent_db)
         path = subagent_db.get_subagent_db_path()
         assert path is not None
 
     def test_init_subagent_db(self, tmp_path):
         import sqlite3
+
         from maop.core.agent.delegation.subagent_db import init_subagent_db
         conn = sqlite3.connect(":memory:")
         conn.row_factory = sqlite3.Row
@@ -300,8 +302,9 @@ class TestSubagentDb:
     def test_migrate_legacy_no_existing(self, tmp_path, monkeypatch):
         # When no legacy DB exists, migrate should be a no-op (just create schema).
         monkeypatch.setenv("MAOP_DATA_DIR", str(tmp_path))
-        from maop.core import subagent_db
         import importlib
+
+        from maop.core import subagent_db
         importlib.reload(subagent_db)
         # Should not raise.
         subagent_db.migrate_legacy_subagent_db()

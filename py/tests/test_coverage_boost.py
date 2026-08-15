@@ -15,7 +15,6 @@ from typing import Any
 
 import pytest
 
-
 # ── server.py: _signal_handler ──────────────────────────────────────
 
 class TestServerSignalHandler:
@@ -68,6 +67,7 @@ class TestServerCspOverflow:
     async def test_csp_violation_buffer_trims(self):
         """Overflow past _CSP_VIOLATION_MAX trims oldest entries (line 578)."""
         from httpx import ASGITransport, AsyncClient
+
         from maop.dashboard import server as srv
 
         # Pre-fill the buffer to the cap so the next append triggers pop(0).
@@ -103,10 +103,9 @@ class TestServerLifespan:
     """
 
     def test_lifespan_startup_shutdown(self, monkeypatch):
-        from maop.dashboard import server as srv
-
         # Stub schedulers so no real threads/timers start.
         from maop.core import db_backup, log_rotate
+        from maop.dashboard import server as srv
 
         class _StubBackup:
             def start_scheduler(self, interval_s: float = 3600) -> None:
@@ -200,7 +199,7 @@ class TestSystemRunSubprocess:
     async def test_success(self):
         from maop.dashboard.routers.system import _run_subprocess
 
-        rc, out, err = await _run_subprocess(
+        rc, out, _err = await _run_subprocess(
             ["python", "-c", "print('hi')"], timeout=10
         )
         assert rc == 0
@@ -209,7 +208,7 @@ class TestSystemRunSubprocess:
     async def test_timeout(self):
         from maop.dashboard.routers.system import _run_subprocess
 
-        rc, out, err = await _run_subprocess(
+        rc, _out, err = await _run_subprocess(
             ["python", "-c", "import time; time.sleep(5)"], timeout=1
         )
         assert rc == -1
@@ -218,7 +217,7 @@ class TestSystemRunSubprocess:
     async def test_exception(self):
         from maop.dashboard.routers.system import _run_subprocess
 
-        rc, out, err = await _run_subprocess(
+        rc, _out, _err = await _run_subprocess(
             ["__nonexistent_binary_xyz__"], timeout=5
         )
         assert rc == -1

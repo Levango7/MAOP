@@ -26,9 +26,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from maop.config.loader import MaopConfig, RouteEntry
-from maop.core.routing.multi_objective_scorer import ObjectiveWeights  # R8-F821 fix
 from maop.core.monitoring.otel import get_tracer
 from maop.core.monitoring.otel import span as otel_span
+from maop.core.routing.multi_objective_scorer import ObjectiveWeights  # R8-F821 fix
 from maop.core.routing.routing_decision import (
     RoutingDecisionRecord,
     get_active_span_context,

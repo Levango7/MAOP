@@ -303,7 +303,8 @@ async def advanced_query(request: Request, body: dict[str, Any]) -> dict[str, An
     """
     require_admin(request)
     _require_audit_feature()
-    from maop.enterprise.audit_enhanced import AuditEventQuery, filter_events as _filter
+    from maop.enterprise.audit_enhanced import AuditEventQuery
+    from maop.enterprise.audit_enhanced import filter_events as _filter
 
     query = AuditEventQuery(**body)
     events = _collect_enterprise_events(

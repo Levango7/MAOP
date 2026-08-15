@@ -16,7 +16,6 @@ import pytest
 from maop.core.backends.backends import MemoryCacheBackend
 from maop.core.backends.db_utils import sqlite_connect
 
-
 # ════════════════════════════════════════════════════════════════════
 # 1. Empty database — operations return empty results, not exceptions
 # ════════════════════════════════════════════════════════════════════
@@ -62,9 +61,9 @@ async def test_extremely_long_prompt(
     Acceptable outcomes: 200 (processed), 400/413 (rejected by policy),
     422 (validation). A 500 indicates an unhandled exception — a bug.
     """
-    import maop.dashboard.routers.chat as chat_mod
     from httpx import ASGITransport, AsyncClient
 
+    import maop.dashboard.routers.chat as chat_mod
     from maop.dashboard.server import app
 
     # Bypass admin auth check

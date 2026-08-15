@@ -198,8 +198,9 @@ class LDAPProvider:
     def _default_connect(self) -> Any:
         """使用 ldap3 或 ldap 库建立连接。"""
         try:
-            from ldap3 import Server, Connection, ALL, Tls
             import ssl as ssl_module
+
+            from ldap3 import ALL, Connection, Server, Tls
         except ImportError:
             try:
                 return self._connect_legacy_ldap()
@@ -230,7 +231,7 @@ class LDAPProvider:
 
     def _connect_legacy_ldap(self) -> Any:
         """使用 python-ldap 建立连接（Unix only）。"""
-        import ldap as legacy_ldap  # noqa: F401
+        import ldap as legacy_ldap
 
         conn = legacy_ldap.initialize(self.config.server_url)
         if self.config.use_tls:
@@ -352,7 +353,7 @@ class LDAPProvider:
         attributes: list[str],
     ) -> list[Any]:
         """python-ldap 分页搜索。"""
-        import ldap as legacy_ldap  # noqa: F401
+        import ldap as legacy_ldap
 
         results: list[Any] = []
         page_cookie = ""
@@ -366,7 +367,7 @@ class LDAPProvider:
                     ),
                 ],
             )
-            rtype, rdata, rmsgid, rctrls = conn.result3(msg_id)
+            _rtype, rdata, _rmsgid, rctrls = conn.result3(msg_id)
             results.extend(rdata)
             # 解析分页 cookie
             page_ctrls = [
@@ -415,7 +416,7 @@ class LDAPProvider:
         """从属性字典构造 :class:`LDAPUser`。"""
         def _first(key: str, *aliases: str) -> str:
             for k in (key, *aliases):
-                if k in attrs and attrs[k]:
+                if attrs.get(k):
                     val = attrs[k][0] if isinstance(attrs[k], list) else attrs[k]
                     return val.decode() if isinstance(val, bytes) else str(val)
             return ""
@@ -527,7 +528,7 @@ class LDAPProvider:
                 active_dns = {u.dn for u in users}
                 if hasattr(user_store, "list_active_dns"):
                     for dn in user_store.list_active_dns():
-                        if dn not in active_dns:
+                        if dn not in active_dns:  # noqa: SIM102
                             if user_store.deactivate_user(dn):
                                 result.deactivated += 1
             except Exception as exc:
@@ -643,10 +644,10 @@ class LDAPProvider:
 
         # 真实 LDAP
         try:
-            from ldap3 import Server, Connection
+            from ldap3 import Connection, Server
         except ImportError:
             try:
-                import ldap as legacy_ldap  # noqa: F401
+                import ldap as legacy_ldap
                 conn = legacy_ldap.initialize(self.config.server_url)
                 if self.config.use_tls:
                     conn.start_tls_s()
@@ -689,7 +690,7 @@ class LDAPProvider:
             for mapping in self.group_mappings:
                 if mapping.is_default:
                     continue
-                if self._match_group(group_dn, mapping):
+                if self._match_group(group_dn, mapping):  # noqa: SIM102
                     if mapping.role not in seen:
                         roles.append(mapping.role)
                         seen.add(mapping.role)

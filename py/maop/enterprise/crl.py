@@ -269,7 +269,6 @@ class CRLChecker:
                 tmp_path.unlink(missing_ok=True)
             except Exception:
                 logger.debug('swallowed exception', exc_info=True)
-                pass
 
     @staticmethod
     def _validate_crl(data: object) -> bool:

@@ -107,7 +107,6 @@ async def check_agent_upgrade(name: str, agent_cfg: Any) -> dict[str, Any]:
                 latest_version = "unknown"
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     # 2. npm
     if install_method == "unknown":
@@ -196,7 +195,6 @@ async def upgrade_agent_cli(name: str, agent_cfg: Any, maop_root: Path) -> dict[
             return {"status": "ok", "info": info}
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     # 2. 尝试 npm
     npm_path = shutil.which("npm")
@@ -242,6 +240,5 @@ async def upgrade_agent_cli(name: str, agent_cfg: Any, maop_root: Path) -> dict[
         )
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     return {"status": "ok", "info": info}

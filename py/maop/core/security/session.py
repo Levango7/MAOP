@@ -174,7 +174,7 @@ class SessionManager:
     # list_paginated 在 SQL 层完成过滤+排序+分页, 避免全表读入内存。
     # 搜索字段: agent / workdir / metadata.task / metadata.description /
     # metadata.prompt — 用 LIKE 拼接, 命中任一即算匹配。
-    _SORTABLE_COLUMNS = {
+    _SORTABLE_COLUMNS = {  # noqa: RUF012
         "created_at": "created_at",
         "updated_at": "updated_at",
         "last_active_at": "last_active_at",

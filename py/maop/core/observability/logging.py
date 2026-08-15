@@ -22,7 +22,6 @@ from typing import Any
 
 from maop.config.edition import Edition, get_edition
 from maop.core.monitoring.monitoring import (
-
     StructuredLogger,
     setup_json_logging,
 )
@@ -58,7 +57,7 @@ def _current_otel_ids() -> tuple[str, str]:
             return f"{ctx.trace_id:032x}", f"{ctx.span_id:016x}"
     except ImportError:
         pass
-    except Exception:  # noqa: BLE001 — logging must never crash
+    except Exception:
         pass
     return "", ""
 

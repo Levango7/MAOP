@@ -5,7 +5,6 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-
 from maop.memory.shared_db import (
     LAYER_ALIASES,
     MEMORY_DB_NAME,
@@ -14,7 +13,6 @@ from maop.memory.shared_db import (
     migrate_legacy_episodic_db,
     normalize_layer_name,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # Layer name normalization

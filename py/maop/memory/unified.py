@@ -39,7 +39,6 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-
 # ── 统一术语常量 ────────────────────────────────────────────────
 # 公开 API 使用 working / short_term / long_term
 # 内部由各实现映射到自己的术语（episodic / semantic）
@@ -247,9 +246,9 @@ class UnifiedMemoryProtocol(Protocol):
 
 
 __all__ = [
-    "UnifiedMemoryProtocol",
-    "LAYER_WORKING",
-    "LAYER_SHORT_TERM",
     "LAYER_LONG_TERM",
+    "LAYER_SHORT_TERM",
+    "LAYER_WORKING",
     "VALID_LAYERS",
+    "UnifiedMemoryProtocol",
 ]

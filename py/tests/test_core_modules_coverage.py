@@ -8,9 +8,8 @@ import ssl
 
 import pytest
 
-from maop.core.security.tls import TLSSettings, create_ssl_context, generate_self_signed
 from maop.core.agent.tools.tool_schema import ToolSchemaDef, ToolSchemaGenerator
-
+from maop.core.security.tls import TLSSettings, create_ssl_context, generate_self_signed
 
 # ── TLS ──────────────────────────────────────────────────────────────
 
@@ -145,7 +144,6 @@ class TestToolSchemaGenerator:
             :param x: the x value
             :param y: the y value
             """
-            pass
 
         schema = gen.from_python_function(my_func)
         assert schema.name == "my_func"
@@ -164,7 +162,6 @@ class TestToolSchemaGenerator:
                 x: the x value
                 y: the y value
             """
-            pass
 
         schema = gen.from_python_function(my_func)
         assert schema.parameters["properties"]["x"]["description"] == "the x value"
@@ -174,7 +171,6 @@ class TestToolSchemaGenerator:
 
         def my_func(x: int):
             """Test."""
-            pass
 
         schema = gen.from_python_function(my_func, name="custom_name")
         assert schema.name == "custom_name"
@@ -358,4 +354,4 @@ class TestSandboxManager:
 
 
 # Need MagicMock import
-from unittest.mock import MagicMock  # noqa: E402
+from unittest.mock import MagicMock

@@ -11,7 +11,6 @@ from maop.core.agent.analyzer import AnalysisResult, DependencyDAG, ExecutionStr
 from maop.core.reliability.error_schema import MaopResult, new_result
 from maop.loop_executor import ExecuteMixin
 
-
 # ── Helpers ──────────────────────────────────────────────────────────
 
 def _make_result(*, success: bool, agent: str = "a", task: str = "t") -> MaopResult:

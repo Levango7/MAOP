@@ -17,14 +17,14 @@ import logging
 import time
 from typing import Any
 
-from maop.core.reliability.circuit_breaker import CircuitBreaker
-from maop.core.reliability.error_schema import new_result
 from maop.core.monitoring.monitoring import (
     MAOP_ROUTING_DECISION_DURATION_MS,
     MAOP_ROUTING_DECISION_TOTAL,
 )
 from maop.core.monitoring.otel import get_tracer
 from maop.core.monitoring.otel import span as otel_span
+from maop.core.reliability.circuit_breaker import CircuitBreaker
+from maop.core.reliability.error_schema import new_result
 from maop.core.routing.routing_decision import (
     RoutingDecisionRecord,
     get_active_span_context,

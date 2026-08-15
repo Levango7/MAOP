@@ -104,7 +104,6 @@ def register_maop_event_hooks() -> int:
                 getattr(metrics, "increment", lambda *a: None)("MAOP_doc_pipeline_failed", 1)
         except Exception:
             logger.debug('swallowed exception', exc_info=True)
-            pass
 
     def _on_quality_gate(event: str, payload: dict):
         logger.info("[doc-pipeline→MAOP] quality_gate: score=%s passed=%s",
@@ -159,7 +158,6 @@ def run_pipeline(
                 register_maop_event_hooks()
         except Exception:
             logger.debug('swallowed exception', exc_info=True)
-            pass
 
         # Execute pipeline
         task = orch.run(

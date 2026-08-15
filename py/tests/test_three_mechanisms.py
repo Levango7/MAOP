@@ -9,11 +9,11 @@ Tests:
 import tempfile
 from pathlib import Path
 
-from maop.core.agent.llm_chat.context_compressor import ContextCompressor
 from maop.core.agent.lifecycle.state_classifier import (
     TaskState,
     TaskStateClassifier,
 )
+from maop.core.agent.llm_chat.context_compressor import ContextCompressor
 from maop.memory.consolidator import DreamConsolidator
 from maop.memory.store import MemoryStore
 

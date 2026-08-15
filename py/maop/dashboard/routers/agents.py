@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 import asyncio
@@ -144,7 +145,6 @@ async def get_agent_routes() -> dict[str, Any]:
             }
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     # 2. 读 agents.yaml routing 配置
     yaml_path = MAOP_ROOT / "config" / "agents.yaml"
@@ -160,7 +160,6 @@ async def get_agent_routes() -> dict[str, Any]:
             routing_cfg = data.get("routing", {}) or {}
         except Exception:
             logger.debug('swallowed exception', exc_info=True)
-            pass
 
     def _agent_model(agent_name: str) -> str:
         ad = agents_cfg.get(agent_name, {})
@@ -399,7 +398,7 @@ async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[s
         synced_to_yaml = await asyncio.to_thread(_sync_agent_to_yaml, body)
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass  # registry 已写入，yaml 写入失败不阻塞
+        # registry 已写入，yaml 写入失败不阻塞
 
     return {"agent": agent.model_dump(), "synced_to_yaml": synced_to_yaml}
 
@@ -447,7 +446,6 @@ async def unregister_agent(name: str, request: Request) -> dict[str, Any]:
         )
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     return {"deleted": ok_registry, "errors": errors}
 
@@ -495,7 +493,6 @@ async def repair_agent(name: str, request: Request) -> dict[str, Any]:
         )
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     return {"result": result.model_dump()}
 
@@ -554,7 +551,6 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
                             break
             except Exception:
                 logger.debug('swallowed exception', exc_info=True)
-                pass
 
             # 尝试 npm
             if install_method == "unknown":
@@ -571,7 +567,6 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
                         latest = "check npm"
                     except Exception:
                         logger.debug('swallowed exception', exc_info=True)
-                        pass
 
             # 二进制分发
             if install_method == "unknown" and cli_path:
@@ -665,7 +660,6 @@ async def check_upgrade(name: str, request: Request) -> dict[str, Any]:
                 latest_version = "unknown"
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     # 2. npm
     if install_method == "unknown":
@@ -786,7 +780,6 @@ async def upgrade_agent(name: str, request: Request) -> dict[str, Any]:
             return {"status": "ok", "info": info}
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     # 2. 尝试 npm
     npm_path = _shutil.which("npm")
@@ -844,7 +837,6 @@ async def upgrade_agent(name: str, request: Request) -> dict[str, Any]:
         )
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     return {"status": "ok", "info": info}
 
@@ -935,7 +927,6 @@ async def evolve_agent(name: str, request: Request) -> dict[str, Any]:
         )
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     return {"result": result.model_dump()}
 

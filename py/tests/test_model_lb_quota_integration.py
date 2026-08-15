@@ -19,7 +19,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from maop.core.routing.load_balancer import LBAlgorithm, LoadBalancer
 from maop.core.monitoring.monitoring import (
     MAOP_MODEL_SELECTION_LOAD_AWARE,
     MAOP_MODEL_SELECTION_QUOTA_REJECTED,
@@ -28,6 +27,7 @@ from maop.core.monitoring.monitoring import (
     MAOP_STICKY_SESSION_MISS,
     metrics,
 )
+from maop.core.routing.load_balancer import LBAlgorithm, LoadBalancer
 from maop.model.quota import QuotaEnforcer
 from maop.model.schema import (
     LatencyTier,

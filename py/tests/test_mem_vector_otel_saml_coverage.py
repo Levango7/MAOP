@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import pytest
 
-
 # ── Memory Search (via real MemoryStore) ────────────────────────────
 
 class TestMemorySearch:
@@ -109,6 +108,7 @@ class TestMemorySearch:
 
     def test_search_json(self, tmp_path):
         import json
+
         from maop.memory.store import MemoryStore
         store = MemoryStore(root_dir=str(tmp_path))
         store.store(agent="a", task="t1", content=json.dumps({"type": "bug_report"}))
@@ -273,7 +273,7 @@ class TestMemoryManager:
         assert mgr.memory is not None
 
     def test_maybe_consolidate_below_threshold(self, tmp_path):
-        from maop.memory.manager import MemoryManager, MemoryManagerConfig, ConsolidationTrigger
+        from maop.memory.manager import ConsolidationTrigger, MemoryManager, MemoryManagerConfig
         cfg = MemoryManagerConfig(consolidation=ConsolidationTrigger(entry_threshold=10000))
         mgr = MemoryManager(root_dir=str(tmp_path), config=cfg)
         # Below threshold — should be no-op.
@@ -414,13 +414,13 @@ class TestOtel:
 
     def test_get_tracer_disabled(self, monkeypatch):
         monkeypatch.delenv("MAOP_OTEL_ENABLED", raising=False)
-        from maop.core.monitoring.otel import get_tracer, _NoopTracer
+        from maop.core.monitoring.otel import _NoopTracer, get_tracer
         tracer = get_tracer("test")
         assert isinstance(tracer, _NoopTracer)
 
     def test_span_noop(self, monkeypatch):
         monkeypatch.delenv("MAOP_OTEL_ENABLED", raising=False)
-        from maop.core.monitoring.otel import get_tracer, span, _NoopSpan
+        from maop.core.monitoring.otel import _NoopSpan, get_tracer, span
         tracer = get_tracer("test")
         with span(tracer, "test_span", attributes={"key": "value"}) as s:
             assert isinstance(s, _NoopSpan)
@@ -463,7 +463,7 @@ class TestOtel:
         assert result is None
 
     def test_noop_tracer_start_span(self):
-        from maop.core.monitoring.otel import _NoopTracer, _NoopSpan
+        from maop.core.monitoring.otel import _NoopSpan, _NoopTracer
         tracer = _NoopTracer()
         span = tracer.start_span("name")
         assert isinstance(span, _NoopSpan)
@@ -490,8 +490,8 @@ class TestOtel:
 
 class TestSamlHandler:
     def test_init(self):
-        from maop.enterprise.sso import SSOConfig
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -504,8 +504,8 @@ class TestSamlHandler:
         assert handler is not None
 
     def test_get_idp_metadata_direct_cert(self):
-        from maop.enterprise.sso import SSOConfig
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -520,8 +520,8 @@ class TestSamlHandler:
         assert metadata["x509_cert"] == "dummy-cert-base64"
 
     def test_get_idp_cert_b64_direct(self):
-        from maop.enterprise.sso import SSOConfig
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -535,8 +535,8 @@ class TestSamlHandler:
         assert cert == "dummy-cert-base64"
 
     def test_get_idp_cert_b64_missing(self):
-        from maop.enterprise.sso import SSOConfig, SSOError
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig, SSOError
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -547,8 +547,8 @@ class TestSamlHandler:
             handler._get_idp_cert_b64()
 
     def test_fetch_idp_metadata_no_url(self):
-        from maop.enterprise.sso import SSOConfig, SSOError
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig, SSOError
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -559,8 +559,8 @@ class TestSamlHandler:
             handler._fetch_idp_metadata()
 
     def test_parse_idp_metadata_minimal(self):
-        from maop.enterprise.sso import SSOConfig
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -590,8 +590,8 @@ class TestSamlHandler:
         assert "dummycertdata" in parsed["x509_cert"]
 
     def test_parse_idp_metadata_invalid_xml(self):
-        from maop.enterprise.sso import SSOConfig, SSOError
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig, SSOError
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -602,8 +602,8 @@ class TestSamlHandler:
             handler._parse_idp_metadata(b"not valid xml <<<>")
 
     def test_build_authn_request(self):
-        from maop.enterprise.sso import SSOConfig
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -618,8 +618,8 @@ class TestSamlHandler:
         assert b"id_test123" in xml
 
     def test_build_authn_request_no_acs(self):
-        from maop.enterprise.sso import SSOConfig, SSOError
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig, SSOError
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -631,8 +631,8 @@ class TestSamlHandler:
             handler._build_authn_request("id_test")
 
     def test_get_authorize_url(self):
-        from maop.enterprise.sso import SSOConfig
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -655,8 +655,8 @@ class TestSamlHandler:
         assert "RelayState=abc" in url
 
     def test_get_authorize_url_no_state(self):
-        from maop.enterprise.sso import SSOConfig
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -677,8 +677,8 @@ class TestSamlHandler:
         assert "SAMLRequest" in url
 
     def test_get_authorize_url_no_sso_url(self):
-        from maop.enterprise.sso import SSOConfig, SSOError
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig, SSOError
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -698,8 +698,8 @@ class TestSamlHandler:
             handler.get_authorize_url()
 
     def test_handle_response_empty(self):
-        from maop.enterprise.sso import SSOConfig, SSOError
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig, SSOError
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -711,8 +711,8 @@ class TestSamlHandler:
             handler.handle_response("")
 
     def test_handle_response_invalid_b64(self):
-        from maop.enterprise.sso import SSOConfig, SSOError
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig, SSOError
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -725,8 +725,9 @@ class TestSamlHandler:
 
     def test_handle_response_invalid_xml(self):
         import base64
-        from maop.enterprise.sso import SSOConfig, SSOError
+
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig, SSOError
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",
@@ -739,8 +740,8 @@ class TestSamlHandler:
             handler.handle_response(bad_xml_b64)
 
     def test_verify_signature_invalid_cert(self):
-        from maop.enterprise.sso import SSOConfig, SSOError
         from maop.enterprise.saml_handler import SAMLHandler
+        from maop.enterprise.sso import SSOConfig, SSOError
         cfg = SSOConfig(
             client_id="sp",
             client_secret="secret",

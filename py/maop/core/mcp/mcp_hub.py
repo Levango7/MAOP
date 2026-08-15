@@ -47,7 +47,6 @@ Usage::
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import time as _time
 import uuid
@@ -67,18 +66,16 @@ if TYPE_CHECKING:
     from maop.core.mcp.mcp_permission import MCPPermissionChecker
 
 logger = logging.getLogger(__name__)
+from maop.core.mcp.mcp_hub_compat import MCPHubCompatMixin
 from maop.core.mcp.mcp_hub_metrics import MCPHubMetricsMixin
 from maop.core.mcp.mcp_hub_ops import MCPHubOpsMixin
-from maop.core.mcp.mcp_hub_compat import MCPHubCompatMixin
-
-
 from maop.core.mcp.mcp_hub_transport import (
     _SSETransport,
     _StdioTransport,
     _StreamableHttpTransport,
     _WebSocketTransport,
 )
-from maop.core.mcp.mcp_hub_types import (
+from maop.core.mcp.mcp_hub_types import (  # noqa: F401  # 类型 re-export（测试与外部经 mcp_hub 引用）
     MCPPermissionDeniedError,
     MCPRateLimitedError,
     MCPResource,

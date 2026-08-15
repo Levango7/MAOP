@@ -23,7 +23,6 @@ from maop.core.reliability.error_schema import MaopResult
 from maop.delegate.models import DispatchResult
 from maop.memory.manager import ConsolidationTrigger, MemoryManagerConfig
 
-
 # ── Helpers ──────────────────────────────────────────────────────
 
 

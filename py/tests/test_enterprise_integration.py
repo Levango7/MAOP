@@ -21,9 +21,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
-
 from lxml import etree
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # Helpers: generate real X.509 cert + RSA key for SAML tests
@@ -263,7 +261,7 @@ class TestSAMLIntegration:
 class _CRLHandler(http.server.BaseHTTPRequestHandler):
     """Simple HTTP handler that serves a CRL JSON response."""
 
-    crl_data: dict[str, Any] = {
+    crl_data: dict[str, Any] = {  # noqa: RUF012
         "revoked": [
             {"customer": "revoked-corp", "reason": "license_violation", "revoked_at": "2026-01-01T00:00:00Z"}
         ],
@@ -305,7 +303,7 @@ class TestCRLIntegration:
 
         url, cache_dir = crl_server
         checker = CRLChecker(crl_url=url, cache_path=cache_dir / "crl.json", cache_ttl_s=60)
-        is_revoked, reason = checker.is_revoked("valid-corp")
+        is_revoked, _reason = checker.is_revoked("valid-corp")
         assert is_revoked is False
 
     def test_crl_revoked_customer_rejected(self, crl_server):

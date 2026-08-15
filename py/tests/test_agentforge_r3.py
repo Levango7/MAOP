@@ -3,14 +3,18 @@
 import shutil
 import tempfile
 import time
-
-import pytest
 from unittest.mock import patch
 
-from maop.core.agent.lifecycle.agent_lifecycle import AgentLifecycle, AgentLifecycleManager, AgentState
+import pytest
+
+from maop.core.agent.lifecycle.agent_lifecycle import (
+    AgentLifecycle,
+    AgentLifecycleManager,
+    AgentState,
+)
 from maop.core.memory.hybrid_search import HybridSearch, rrf_fuse
-from maop.core.reliability.pipeline_checkpoint import PipelineCheckpoint
 from maop.core.memory.semantic_cache import SemanticCache
+from maop.core.reliability.pipeline_checkpoint import PipelineCheckpoint
 
 # ── P1: Agent Lifecycle ───────────────────────────────────────
 

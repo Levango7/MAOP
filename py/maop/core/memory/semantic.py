@@ -19,7 +19,7 @@ class SemanticMixin:
 
     def _get_vector_store(self):
         """Lazy-load VectorStore for Semantic Memory."""
-        if self._vector_store is None:
+        if self._vector_store is None:  # type: ignore[has-type]
             from maop.core.memory.vector import VectorStore
             self._vector_store = VectorStore(db_path=str(self._data_dir / "vectors.db"))
         return self._vector_store

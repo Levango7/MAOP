@@ -552,7 +552,7 @@ async def delete_notification(notification_id: str, request: Request) -> dict[st
 
 _ws_clients: set[WebSocket] = set()
 
-import asyncio  # noqa: E402
+import asyncio
 
 _ws_lock = asyncio.Lock()
 
@@ -640,7 +640,7 @@ async def notifications_ws(ws: WebSocket) -> Any:
                         await ws.send_json({"type": "unread_count", "count": count})
                 except Exception:
                     logger.debug('swallowed exception', exc_info=True)
-                    pass  # ignore malformed input
+                    # ignore malformed input
     except WebSocketDisconnect:
         pass
     finally:

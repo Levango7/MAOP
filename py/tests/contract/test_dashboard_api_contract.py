@@ -240,8 +240,8 @@ class TestAgentsRoutesContract:
         import asyncio
         from unittest.mock import MagicMock, patch
 
-        from maop.dashboard.routers.agents import routes as routes_mod
         from maop.dashboard.routers.agents import _deps as _deps_mod
+        from maop.dashboard.routers.agents import routes as routes_mod
 
         # Fake agent returned by the registry — only attributes read by the handler.
         fake_agent = MagicMock()

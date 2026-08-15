@@ -294,7 +294,7 @@ class WebhookChannel(BaseChannel):
             req = urllib.request.Request(
                 url, data=body_bytes, headers=headers, method=method
             )
-            with urllib.request.urlopen(req, timeout=timeout_s) as resp:  # noqa: S310 — user-configured URL
+            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
                 status = resp.status
                 resp_body = resp.read().decode("utf-8", errors="replace")
             if 200 <= status < 300:

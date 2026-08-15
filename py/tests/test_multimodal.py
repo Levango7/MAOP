@@ -39,7 +39,6 @@ from maop.core.multimodal.unified_interface import (
     UnifiedModelInterface,
 )
 
-
 # ── Mock provider ─────────────────────────────────────────────
 
 
@@ -350,7 +349,7 @@ class TestUnifiedModelInterface:
             ModalityInput(modality=ModalityType.TEXT, data="a"),
             ModalityInput(modality=ModalityType.IMAGE, data="https://x.com/a.png"),
         ]
-        ui, req = UnifiedModelInterface.from_inputs(provider, inputs, model="m")
+        _ui, req = UnifiedModelInterface.from_inputs(provider, inputs, model="m")
         assert len(req.inputs) == 2
 
     def test_supported_modalities(self):
@@ -434,7 +433,7 @@ class TestModelRouter:
 
     def test_latency_constraint_filters(self):
         router = self._make_router()
-        best, ranked = router.route(RoutingCriteria(
+        _best, ranked = router.route(RoutingCriteria(
             task_type=TaskType.IMAGE_UNDERSTANDING,
             modalities={ModalityType.IMAGE, ModalityType.TEXT},
             max_latency_ms=600,
@@ -457,7 +456,7 @@ class TestModelRouter:
         cap = router.get("cheap-text")
         assert cap is not None
         cap.enabled = False
-        best, ranked = router.route(RoutingCriteria(
+        _best, ranked = router.route(RoutingCriteria(
             task_type=TaskType.TEXT_GENERATION,
             modalities={ModalityType.TEXT},
         ))

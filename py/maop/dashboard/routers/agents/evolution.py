@@ -9,6 +9,7 @@ parse params, resolve the agent config, and delegate to the service.
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 import asyncio
@@ -80,7 +81,6 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
                             break
             except Exception:
                 logger.debug('swallowed exception', exc_info=True)
-                pass
 
             # 尝试 npm
             if install_method == "unknown":
@@ -97,7 +97,6 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
                         latest = "check npm"
                     except Exception:
                         logger.debug('swallowed exception', exc_info=True)
-                        pass
 
             # 二进制分发
             if install_method == "unknown" and cli_path:
@@ -175,7 +174,6 @@ async def evolve_agent(name: str, request: Request) -> dict[str, Any]:
         )
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     return {"result": result.model_dump()}
 

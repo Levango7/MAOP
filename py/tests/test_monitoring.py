@@ -337,7 +337,7 @@ class TestMetricConcurrencySafety:
             try:
                 for _ in range(2000):
                     c.inc(labels={"k": str(random.randint(0, 20))})
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 errors.append(e)
 
         def reader() -> None:
@@ -345,7 +345,7 @@ class TestMetricConcurrencySafety:
                 for _ in range(2000):
                     _ = c.to_prometheus()
                     _ = c.get(labels={"k": "1"})
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 errors.append(e)
 
         threads = [threading.Thread(target=writer) for _ in range(4)] + [
@@ -369,7 +369,7 @@ class TestMetricConcurrencySafety:
                     mc.counter("c").inc(labels={"k": str(random.randint(0, 10))})
                     mc.gauge("g").set(random.random())
                     mc.histogram("h").observe(random.random())
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 errors.append(e)
 
         def reader() -> None:
@@ -377,7 +377,7 @@ class TestMetricConcurrencySafety:
                 for _ in range(1000):
                     _ = mc.to_prometheus()
                     _ = mc.to_json()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 errors.append(e)
 
         threads = [threading.Thread(target=writer) for _ in range(4)] + [

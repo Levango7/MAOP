@@ -13,12 +13,13 @@ API 响应时通过 :func:`mask_sensitive_fields` 脱敏（PRD NFR-S07）。
 
 from __future__ import annotations
 
+import builtins
 import json
 import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -379,7 +380,7 @@ class SSOProviderStore:
             )
             return cur.rowcount > 0
 
-    def list_enabled(self) -> List[SSOProviderResponse]:
+    def list_enabled(self) -> builtins.list[SSOProviderResponse]:
         """列出所有启用的 IdP（用于登录页渲染按钮，PRD 4.2.5）。"""
         rows, _ = self.list(enabled=True, limit=500)
         return rows
@@ -477,12 +478,12 @@ def import_env_provider_if_present(store: SSOProviderStore) -> int | None:
 
 
 __all__ = [
-    "SSOProviderCreate",
-    "SSOProviderUpdate",
-    "SSOProviderResponse",
-    "SSOProviderStore",
-    "mask_sensitive_fields",
-    "import_env_provider_if_present",
     "SENSITIVE_KEYS",
     "SENSITIVE_MASK",
+    "SSOProviderCreate",
+    "SSOProviderResponse",
+    "SSOProviderStore",
+    "SSOProviderUpdate",
+    "import_env_provider_if_present",
+    "mask_sensitive_fields",
 ]

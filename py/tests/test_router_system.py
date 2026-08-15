@@ -115,7 +115,7 @@ def client(tmp_root, monkeypatch):
     monkeypatch.setattr("maop.dashboard.routers.system._deps.start_time", 0.0)
 
     # Clear overview caches between tests to prevent stale data
-    from maop.dashboard.routers.system.overview import _overview_cache, _file_counts_cache
+    from maop.dashboard.routers.system.overview import _file_counts_cache, _overview_cache
     _overview_cache.clear()
     _file_counts_cache.clear()
 
@@ -124,8 +124,8 @@ def client(tmp_root, monkeypatch):
     async def _inject_admin(request, call_next):
         request.state.auth_roles = ["admin"]
         return await call_next(request)
-    from maop.dashboard.routers.system import router
     from maop.dashboard.routers.audit import router as audit_router
+    from maop.dashboard.routers.system import router
     app.include_router(router)
     app.include_router(audit_router)
     return TestClient(app)
@@ -469,7 +469,7 @@ def system_env(tmp_path, monkeypatch):
     monkeypatch.setattr("maop.dashboard.routers.state.MAOP_ROOT", tmp_path)
 
     # Reset subsystem cache so init_subsystems re-runs
-    import maop.dashboard.routers.state as state
+    from maop.dashboard.routers import state
     state._SUBSYSTEMS.clear()
 
     # Reset overview cache

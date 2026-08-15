@@ -453,7 +453,6 @@ def run_worker(
             client.close()
         except Exception:
             logger.debug('swallowed exception', exc_info=True)
-            pass
 
 
 async def _wait_for_stop(worker: DistributedWorker) -> None:

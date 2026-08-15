@@ -32,8 +32,8 @@ if not (_auth_mod._auth_enabled and _server_mod._auth_enabled):
         allow_module_level=True,
     )
 
-from maop.dashboard.server import app
 from maop.config.edition import reset_edition
+from maop.dashboard.server import app
 
 _TEST_PASSWORD = os.environ.get("MAOP_ADMIN_PASSWORD", "TestAdminPass123!")
 _VIEWER_PASSWORD = "ViewerPass123!"

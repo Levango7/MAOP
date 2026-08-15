@@ -22,10 +22,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from maop.model.schema import BudgetConfig
-
 # Re-export CostTracker as the canonical cost source (P2-1).
 from maop.core.cost_tracker import CostTracker  # noqa: F401  — re-exported for callers
+from maop.model.schema import BudgetConfig
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +201,7 @@ class BudgetGuard:
                 )
         except Exception:
             logger.debug('swallowed exception', exc_info=True)
-            pass  # fall back to estimated
+            # fall back to estimated
 
         self.record(
             model=model, provider=provider, cost=actual_cost,

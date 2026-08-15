@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 
-
 from fastapi import WebSocket
 
 # Connected WebSocket clients (dashboard real-time push).
@@ -34,11 +33,11 @@ _WS_SEND_TIMEOUT: float = 5.0
 
 
 __all__ = [
+    "_WS_SEND_TIMEOUT",
+    "_WS_SNAPSHOT_TTL",
     "_ws_clients",
     "_ws_lock",
+    "_ws_push_task",
     "_ws_snapshot_cache",
     "_ws_snapshot_ts",
-    "_WS_SNAPSHOT_TTL",
-    "_ws_push_task",
-    "_WS_SEND_TIMEOUT",
 ]

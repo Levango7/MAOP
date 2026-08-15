@@ -6,29 +6,9 @@ T2 架构债治理：从 ``mcp_hub.py`` 拆分。公开 API 不变。
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
 import time as _time
-import uuid
-from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-from maop.core import otel
-from maop.core.backends.db_utils import get_db_path, sqlite_connect
-
-from maop.core.mcp.mcp_hub_types import (
-    MCPPermissionDeniedError,
-    MCPRateLimitedError,
-    MCPResource,
-    MCPServerConfig,
-    MCPTool,
-    ResourceContent,
-    ServerInfo,
-    ServerStatus,
-    ToolResult,
-    TransportType,
-)
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

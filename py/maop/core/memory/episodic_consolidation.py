@@ -9,34 +9,9 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
-import time
-from pathlib import Path
-from typing import Any, cast
-
-from maop.core.backends.db_utils import sqlite_connect
-from maop.memory.shared_db import get_memory_db_path, migrate_legacy_episodic_db, normalize_layer_name
 
 from maop.core.memory.three_layer_memory_types import (
     ConsolidationReport,
-    ContextHead,
-    ContextItem,
-    EpisodicEntry,
-    EpisodicSearchResult,
-    FocusConfig,
-    FocusMode,
-    HeadResult,
-    MultiHeadResult,
-    QualityDimensions,
-    TransformResult,
-    decay_weight,
-)
-from maop.core.memory.three_layer_memory_utils import (
-    _DEFAULT_FOCUS_CONFIGS,
-    _compress_text,
-    _is_negative_feedback,
-    _item_to_text,
-    _text_relevance,
 )
 
 logger = logging.getLogger(__name__)

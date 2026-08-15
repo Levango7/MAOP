@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
+from maop.core.agent.delegation.subagent_lifecycle import SubagentManager
 from maop.core.agent.llm_chat.chat_engine import ChatEngine, ChatMessage, ChatRequest, ContentPart
 from maop.core.backends.image_store import MAX_IMAGE_SIZE, ImageMeta, ImageStore
-from maop.core.agent.delegation.subagent_lifecycle import SubagentManager
 from maop.delegate.models import AgentConfig
 
 # ═══════════════════════════════════════════════════════════════════

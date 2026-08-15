@@ -29,9 +29,7 @@ from maop.enterprise.license_manager import (
     LicenseRevokeRequest,
     LicenseUpdateRequest,
     LicenseValidateRequest,
-
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────────────
 
@@ -89,11 +87,11 @@ class TestPydanticModels:
         assert req.features == ["rbac", "audit_log"]
 
     def test_license_create_request_rejects_empty_customer(self):
-        with pytest.raises(Exception):  # noqa: PT011 — pydantic.ValidationError
+        with pytest.raises(Exception):  # noqa: B017
             LicenseCreateRequest(customer="", expires_at="2027-12-31")
 
     def test_license_create_request_rejects_invalid_max_users(self):
-        with pytest.raises(Exception):  # noqa: PT011
+        with pytest.raises(Exception):  # noqa: B017
             LicenseCreateRequest(customer="ACME", expires_at="2027-12-31", max_users=0)
 
     def test_license_update_request_all_none(self):
@@ -474,6 +472,7 @@ class TestLicensesRouter:
     @pytest.mark.asyncio
     async def test_get_nonexistent_returns_404(self, admin_request):
         from fastapi.responses import JSONResponse
+
         from maop.dashboard.routers.licenses import get_license
         result = await get_license("nonexistent", admin_request)
         # handle_api_errors catches HTTPException and returns JSONResponse.
@@ -531,6 +530,7 @@ class TestLicensesRouter:
     @pytest.mark.asyncio
     async def test_delete_endpoint(self, admin_request):
         from fastapi.responses import JSONResponse
+
         from maop.dashboard.routers.licenses import create_license, delete_license, get_license
         body = {"customer": "ACME", "expires_at": _future_iso(365)}
         created = await create_license(admin_request, body)
@@ -581,6 +581,7 @@ class TestLicensesRouter:
     @pytest.mark.asyncio
     async def test_non_admin_gets_403(self, non_admin_request):
         from fastapi.responses import JSONResponse
+
         from maop.dashboard.routers.licenses import list_licenses
         result = await list_licenses(non_admin_request, status="")
         # require_admin raises HTTPException(403); handle_api_errors
@@ -591,6 +592,7 @@ class TestLicensesRouter:
     @pytest.mark.asyncio
     async def test_feature_disabled_returns_404(self, admin_request, monkeypatch):
         from fastapi.responses import JSONResponse
+
         from maop.config.edition import FeatureFlag, set_feature_override
         set_feature_override(FeatureFlag.LICENSE_MANAGEMENT, False)
         from maop.dashboard.routers.licenses import list_licenses
@@ -632,7 +634,7 @@ class TestDatetimeParsing:
         assert dt == original
 
     def test_parse_naive_datetime_assumed_utc(self):
-        original = datetime(2027, 12, 31, 10, 0, 0)
+        original = datetime(2027, 12, 31, 10, 0, 0)  # noqa: DTZ001
         dt = LicenseManager._parse_datetime(original)
         assert dt.tzinfo == timezone.utc
         assert dt.hour == 10

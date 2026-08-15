@@ -19,13 +19,17 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+# Sub-routers — each declares its own routes with full paths (no prefix
+# doubling) so include_router below just merges them.
+from . import agent_admin, framework, overview, v4_misc, workflow
+
 # Re-export shared deps for backward compatibility (tests / external code
 # that reference maop.dashboard.routers.system.xxx).
 from ._deps import (
-    MAOP_ROOT,
-    MAOP_VERSION,
     _ALLOWED_PIP_PACKAGES,
     _HARDENED_ALLOWED_PACKAGES,
+    MAOP_ROOT,
+    MAOP_VERSION,
     _count_file_lines,
     _dir_size_mb,
     _get_allowed_packages,
@@ -42,10 +46,6 @@ from ._deps import (
     start_time,
 )
 
-# Sub-routers — each declares its own routes with full paths (no prefix
-# doubling) so include_router below just merges them.
-from . import agent_admin, framework, overview, v4_misc, workflow
-
 # Re-export overview caches for backward compatibility (tests clear them
 # between runs via maop.dashboard.routers.system._overview_cache).
 from .overview import _file_counts_cache, _overview_cache
@@ -59,25 +59,25 @@ for _sub in (framework.router, agent_admin.router, overview.router, workflow.rou
         router.routes.append(_route)
 
 __all__ = [
-    "router",
-    "logger",
     "MAOP_ROOT",
     "MAOP_VERSION",
-    "active_jobs",
-    "start_time",
-    "get_bridge",
-    "get_subsystems",
-    "init_subsystems",
-    "get_db_path",
-    "handle_api_errors",
-    "require_admin",
-    "_count_file_lines",
-    "_run_subprocess",
-    "_HARDENED_ALLOWED_PACKAGES",
     "_ALLOWED_PIP_PACKAGES",
-    "_get_allowed_packages",
+    "_HARDENED_ALLOWED_PACKAGES",
+    "_count_file_lines",
     "_dir_size_mb",
-    "_pct",
-    "_overview_cache",
     "_file_counts_cache",
+    "_get_allowed_packages",
+    "_overview_cache",
+    "_pct",
+    "_run_subprocess",
+    "active_jobs",
+    "get_bridge",
+    "get_db_path",
+    "get_subsystems",
+    "handle_api_errors",
+    "init_subsystems",
+    "logger",
+    "require_admin",
+    "router",
+    "start_time",
 ]

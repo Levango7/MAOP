@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from maop.core.reliability.error_schema import new_result
 from maop.core.evolution.regression import (
     PersonaConfig,
     PersonaSimulator,
@@ -16,6 +15,7 @@ from maop.core.evolution.regression import (
     TestCase,
     TestResult,
 )
+from maop.core.reliability.error_schema import new_result
 
 
 class TestTestCase:

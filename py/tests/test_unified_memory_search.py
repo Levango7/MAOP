@@ -4,16 +4,16 @@ can be found via /api/memory/search (now queries both tables).
 from __future__ import annotations
 
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from maop.memory.manager import (
+    ConsolidationTrigger,
     MemoryManager,
     MemoryManagerConfig,
-    ConsolidationTrigger,
 )
 from maop.memory.store import MemoryStore
 
@@ -39,7 +39,7 @@ class FakeEpisodicResult:
 
 
 class FakeThreeLayerMemory:
-    _store_data: list = []
+    _store_data: list = []  # noqa: RUF012
 
     def __init__(self, root_dir=None):
         pass
@@ -531,8 +531,8 @@ class TestQueryEpisodic:
         mgr = MemoryManager(root_dir=str(tmp_path))
 
         # Insert test data into episodic_memory table
-        from maop.memory.shared_db import get_memory_db_path
         from maop.core.backends.db_utils import sqlite_connect
+        from maop.memory.shared_db import get_memory_db_path
 
         db_path = get_memory_db_path()
         db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -578,8 +578,8 @@ class TestQueryEpisodic:
         """Cover query_episodic with search query."""
         mgr = MemoryManager(root_dir=str(tmp_path))
 
-        from maop.memory.shared_db import get_memory_db_path
         from maop.core.backends.db_utils import sqlite_connect
+        from maop.memory.shared_db import get_memory_db_path
 
         db_path = get_memory_db_path()
         db_path.parent.mkdir(parents=True, exist_ok=True)

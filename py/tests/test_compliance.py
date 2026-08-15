@@ -18,7 +18,6 @@ import pytest
 
 from maop.core.tenant.compliance import ComplianceManager
 
-
 # ── Test fixtures ───────────────────────────────────────────────────
 
 
@@ -122,7 +121,7 @@ class TestDeleteUserData:
 
     def test_delete_cascades_all_data_sources(self, compliance_db):
         """delete_user_data removes data from all stores."""
-        tmp_path, mgr = compliance_db
+        _tmp_path, mgr = compliance_db
         report = mgr.delete_user_data("user1", tenant_id="tenant1")
 
         assert report.success is True
@@ -141,7 +140,7 @@ class TestDeleteUserData:
 
     def test_delete_retains_audit_by_default(self, compliance_db):
         """Audit entries are retained by default (compliance requirement)."""
-        tmp_path, mgr = compliance_db
+        _tmp_path, mgr = compliance_db
         report = mgr.delete_user_data("user1", tenant_id="tenant1")
 
         assert "audit_logs" in report.items_retained
@@ -176,7 +175,7 @@ class TestDeleteUserData:
 
     def test_delete_nonexistent_user(self, compliance_db):
         """Deleting a non-existent user returns success with 0 deletions."""
-        tmp_path, mgr = compliance_db
+        _tmp_path, mgr = compliance_db
         report = mgr.delete_user_data("nonexistent", tenant_id="tenant1")
 
         assert report.success is True
@@ -184,7 +183,7 @@ class TestDeleteUserData:
 
     def test_delete_without_tenant_id(self, compliance_db):
         """delete_user_data without tenant_id deletes across all tenants."""
-        tmp_path, mgr = compliance_db
+        _tmp_path, mgr = compliance_db
         report = mgr.delete_user_data("user1")
 
         assert report.success is True
@@ -202,7 +201,7 @@ class TestExportUserData:
 
     def test_export_all_data_sources(self, compliance_db):
         """export_user_data exports from all stores."""
-        tmp_path, mgr = compliance_db
+        _tmp_path, mgr = compliance_db
         report = mgr.export_user_data("user1", tenant_id="tenant1")
 
         assert report.success is True
@@ -223,7 +222,7 @@ class TestExportUserData:
 
     def test_export_tenant_filtering(self, compliance_db):
         """export_user_data only exports within the specified tenant."""
-        tmp_path, mgr = compliance_db
+        _tmp_path, mgr = compliance_db
         report = mgr.export_user_data("user1", tenant_id="tenant1")
 
         # Only tenant1 sessions exported.
@@ -233,7 +232,7 @@ class TestExportUserData:
 
     def test_export_without_tenant_id(self, compliance_db):
         """export_user_data without tenant_id exports across all tenants."""
-        tmp_path, mgr = compliance_db
+        _tmp_path, mgr = compliance_db
         report = mgr.export_user_data("user1")
 
         assert report.success is True
@@ -242,7 +241,7 @@ class TestExportUserData:
 
     def test_export_nonexistent_user(self, compliance_db):
         """Exporting a non-existent user returns success with empty data."""
-        tmp_path, mgr = compliance_db
+        _tmp_path, mgr = compliance_db
         report = mgr.export_user_data("nonexistent", tenant_id="tenant1")
 
         assert report.success is True
@@ -250,7 +249,7 @@ class TestExportUserData:
 
     def test_export_memory_has_source_table(self, compliance_db):
         """Exported memory entries include _source_table for traceability."""
-        tmp_path, mgr = compliance_db
+        _tmp_path, mgr = compliance_db
         report = mgr.export_user_data("user1", tenant_id="tenant1")
 
         for entry in report.data.get("memory", []):
@@ -320,8 +319,9 @@ class TestComplianceTenantIdFromJWT:
 
     def test_tenant_id_from_jwt_raises_when_missing(self):
         """_tenant_id_from_jwt raises 403 when tenant_id is missing."""
-        from maop.dashboard.routers.compliance import _tenant_id_from_jwt
         from fastapi import HTTPException
+
+        from maop.dashboard.routers.compliance import _tenant_id_from_jwt
 
         request = MagicMock()
         del request.state.tenant_id

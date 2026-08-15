@@ -200,7 +200,12 @@ class TestRuntime:
             assert "isolated" in result.stdout
 
     def test_create_runtime_local(self):
-        from maop.core.agent.lifecycle.runtime import LocalRuntime, RuntimeConfig, RuntimeType, create_runtime
+        from maop.core.agent.lifecycle.runtime import (
+            LocalRuntime,
+            RuntimeConfig,
+            RuntimeType,
+            create_runtime,
+        )
         rt = create_runtime(RuntimeConfig(type=RuntimeType.LOCAL))
         assert isinstance(rt, LocalRuntime)
 

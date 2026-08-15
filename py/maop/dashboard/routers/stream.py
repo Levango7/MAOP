@@ -30,7 +30,7 @@ def _classify_agent_event(topic: str, data: dict[str, Any]) -> tuple[str, dict[s
         return "token", data
     if topic.endswith(".meta"):
         return "meta", data
-    if topic.endswith(".done") or topic.endswith(".complete"):
+    if topic.endswith((".done", ".complete")):
         return "done", data
     if topic.endswith(".error"):
         return "error", data
@@ -54,7 +54,7 @@ def _check_sse_token(request: Request) -> None:
             request.state.auth_identity = result.identity
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass  # invalid token → require_admin will reject
+        # invalid token → require_admin will reject
 
 
 @router.get("")
@@ -102,7 +102,6 @@ async def global_state_stream(request: Request) -> Any:
                 yield f"event: state\ndata: {json.dumps(state)}\n\n"
             except Exception:
                 logger.debug('swallowed exception', exc_info=True)
-                pass
             await asyncio.sleep(2)
 
     return StreamingResponse(generate(), media_type="text/event-stream")
@@ -240,7 +239,6 @@ async def agent_token_stream(execution_id: str, request: Request) -> Any:
                         return
                 except Exception:
                     logger.debug('swallowed exception', exc_info=True)
-                    pass
         yield f"event: done\ndata: {json.dumps({'content_length': len(''.join(full_content)), 'tokens': len(''.join(full_content)) // 4})}\n\n"
 
     async def generate_from_event_bus():

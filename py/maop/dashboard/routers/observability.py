@@ -66,8 +66,8 @@ async def status() -> Any:
     """
     try:
         return observability_status()
-    except Exception as exc:  # noqa: BLE001 — API must never 500 silently
-        logger.exception("[observability] status failed: %s", exc)
+    except Exception as exc:
+        logger.exception("[observability] status failed: %s", exc)  # noqa: TRY401
         return JSONResponse(
             status_code=500,
             content={"status": "error", "error": str(exc)},
@@ -150,8 +150,8 @@ async def record(payload: RecordRequestModel) -> Any:
                 content={"status": "error", "error": f"unknown kind: {payload.kind}"},
             )
         return {"status": "ok", "kind": payload.kind}
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("[observability] record failed: %s", exc)
+    except Exception as exc:
+        logger.exception("[observability] record failed: %s", exc)  # noqa: TRY401
         return JSONResponse(
             status_code=500,
             content={"status": "error", "error": str(exc)},
@@ -173,7 +173,7 @@ async def health() -> Any:
 
     # OTel SDK
     try:
-        import opentelemetry  # noqa: F401
+        import opentelemetry
         checks["otel_sdk"] = {"ok": True, "version": getattr(opentelemetry, "__version__", "unknown")}
     except ImportError:
         checks["otel_sdk"] = {"ok": False, "error": "opentelemetry-api not installed"}
@@ -186,7 +186,7 @@ async def health() -> Any:
             "ok": True,
             "type": type(provider).__name__,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         checks["tracer_provider"] = {"ok": False, "error": str(exc)}
 
     # MeterProvider
@@ -197,7 +197,7 @@ async def health() -> Any:
             "ok": True,
             "type": type(meter_provider).__name__,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         checks["meter_provider"] = {"ok": False, "error": str(exc)}
 
     # deploy/ configs

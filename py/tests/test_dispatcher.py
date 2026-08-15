@@ -10,15 +10,14 @@ import pytest
 from maop.core.reliability.circuit_breaker import CircuitBreaker
 from maop.core.reliability.error_schema import new_result
 from maop.delegate.dispatcher import (
+    _DRIVERS,
     AgentConfig,
     Dispatcher,
     DispatchResult,
-    _DRIVERS,
     _escape_for_cmd,
     _escape_for_ps_command,
     _retry_with_backoff,
 )
-
 
 
 class TestSecurityEscaping:

@@ -139,9 +139,9 @@ class MigrationReport(BaseModel):
     def summary(self) -> str:
         lines = [
             f"MigrationReport(root={self.root_dir}, dry_run={self.dry_run})",
-            f"  total: {self.total_migrated}/{self.total_candidates} migrated, "
+            (f"  total: {self.total_migrated}/{self.total_candidates} migrated, "
             f"{self.total_skipped} skipped, {self.total_errors} errors "
-            f"({self.duration_s:.2f}s)",
+            f"({self.duration_s:.2f}s)"),
         ]
         for t in self.tables:
             lines.append(t.summary())
@@ -156,7 +156,7 @@ ProgressCallback = Callable[[str, int, int], None]
 
 def _noop_progress(table: str, current: int, total: int) -> None:
     """默认 no-op 进度回调。"""
-    return None
+    return
 
 
 # ── 通用工具 ────────────────────────────────────────────────────
@@ -171,13 +171,13 @@ def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
 
 
 def _table_columns(conn: sqlite3.Connection, table: str) -> list[str]:
-    cur = conn.execute(f"SELECT * FROM {table} LIMIT 0")  # noqa: S608
+    cur = conn.execute(f"SELECT * FROM {table} LIMIT 0")
     return [d[0] for d in cur.description] if cur.description else []
 
 
 def _count_rows(conn: sqlite3.Connection, table: str) -> int:
     try:
-        return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])  # noqa: S608
+        return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
     except sqlite3.Error:
         return 0
 
@@ -261,7 +261,7 @@ def _migrate_table(
             src_cols = _table_columns(src, table)
 
             # 读取所有行（小表足够；大表可改用分页）
-            cursor = src.execute(f"SELECT * FROM {table}")  # noqa: S608
+            cursor = src.execute(f"SELECT * FROM {table}")
             rows = cursor.fetchall()
     except sqlite3.Error as exc:
         result.errors = 1
@@ -298,7 +298,7 @@ def _migrate_table(
             placeholders = ",".join("?" * len(common_cols))
             cols_csv = ",".join(common_cols)
             sql = (
-                f"INSERT OR IGNORE INTO {table} ({cols_csv}) "  # noqa: S608
+                f"INSERT OR IGNORE INTO {table} ({cols_csv}) "
                 f"VALUES ({placeholders})"
             )
 
@@ -488,7 +488,7 @@ def migrate_legacy_json_files(
                     placeholders = ",".join("?" * len(common))
                     cols_csv = ",".join(common)
                     sql = (
-                        f"INSERT OR IGNORE INTO {table} ({cols_csv}) "  # noqa: S608
+                        f"INSERT OR IGNORE INTO {table} ({cols_csv}) "
                         f"VALUES ({placeholders})"
                     )
                     try:
@@ -634,11 +634,11 @@ if __name__ == "__main__":
 
 __all__ = [
     "MigrationReport",
-    "TableMigrationResult",
     "ProgressCallback",
-    "migrate_legacy_memory_db",
+    "TableMigrationResult",
+    "main",
+    "migrate_all",
     "migrate_legacy_episodic_db",
     "migrate_legacy_json_files",
-    "migrate_all",
-    "main",
+    "migrate_legacy_memory_db",
 ]

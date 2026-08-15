@@ -248,7 +248,7 @@ def _columns(engine: Engine, table: str) -> list[str]:
 
 
 def _pg_has_table(engine: Engine, table: str) -> bool:
-    return inspect(engine).has_table(table)
+    return inspect(engine).has_table(table)  # type: ignore[no-any-return]
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -501,7 +501,7 @@ def migrate(
                 sqlite_engine, pg_engine, table,
                 batch_size=batch_size, dry_run=dry_run, progress=progress,
             )
-        except Exception as exc:  # noqa: BLE001 — log and continue with other tables
+        except Exception as exc:
             logger.error("Failed to copy table %r: %s", table, exc)
             results[table] = -1
 
@@ -509,7 +509,7 @@ def migrate(
     if "vector_entries" in results and results["vector_entries"] >= 0:
         try:
             _backfill_embeddings(pg_engine, dry_run=dry_run, progress=progress)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Embedding backfill failed: %s", exc)
 
     return results

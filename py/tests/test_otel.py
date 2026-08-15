@@ -112,12 +112,12 @@ class TestOtelDisabled:
 
     def test_get_tracer_returns_noop_when_disabled(self, monkeypatch):
         monkeypatch.delenv("MAOP_OTEL_ENABLED", raising=False)
-        from maop.core.monitoring.otel import get_tracer, _NoopTracer
+        from maop.core.monitoring.otel import _NoopTracer, get_tracer
         assert isinstance(get_tracer("maop"), _NoopTracer)
 
     def test_span_with_noop_tracer(self, monkeypatch):
         monkeypatch.delenv("MAOP_OTEL_ENABLED", raising=False)
-        from maop.core.monitoring.otel import get_tracer, span, _NoopSpan
+        from maop.core.monitoring.otel import _NoopSpan, get_tracer, span
         tracer = get_tracer("maop")
         with span(tracer, "op", attributes={"a": 1}, trace_id="t1") as s:
             assert isinstance(s, _NoopSpan)

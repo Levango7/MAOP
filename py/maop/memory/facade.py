@@ -47,7 +47,6 @@ import logging
 from pathlib import Path
 from typing import Any, Literal
 
-
 logger = logging.getLogger(__name__)
 
 MemoryMode = Literal["chat", "agent"]
@@ -307,7 +306,7 @@ class MemoryFacade:
             当 ``mode="agent"`` 时抛出（ThreeLayerMemory 无会话上下文）。
         """
         self._ensure_chat("chat_get_messages_for_llm")
-        return self._impl.get_messages_for_llm(
+        return self._impl.get_messages_for_llm(  # type: ignore[no-any-return]
             session_id=session_id,
             query=query,
             system_prompt=system_prompt,
@@ -334,7 +333,7 @@ class MemoryFacade:
             当 ``mode="agent"`` 时抛出（ThreeLayerMemory 无对话交换概念）。
         """
         self._ensure_chat("chat_add_exchange")
-        return self._impl.add_exchange(
+        return self._impl.add_exchange(  # type: ignore[no-any-return]
             session_id=session_id,
             user_msg=user_msg,
             assistant_msg=assistant_msg,
@@ -396,7 +395,7 @@ class MemoryFacade:
         """
         # 优先透传给底层实现（若底层已提供统一 store 方法）
         impl = self._impl
-        if hasattr(impl, "store") and callable(getattr(impl, "store")):
+        if hasattr(impl, "store") and callable(impl.store):
             try:
                 return impl.store(layer, content, **kwargs)  # type: ignore[no-any-return]
             except (TypeError, ValueError):
@@ -460,7 +459,7 @@ class MemoryFacade:
         :meth:`maop.memory.unified.UnifiedMemoryProtocol.search`
         """
         impl = self._impl
-        if hasattr(impl, "search") and callable(getattr(impl, "search")):
+        if hasattr(impl, "search") and callable(impl.search):
             try:
                 result = impl.search(query, top=top, **kwargs)
                 if isinstance(result, list):
@@ -512,7 +511,7 @@ class MemoryFacade:
         :meth:`maop.memory.unified.UnifiedMemoryProtocol.delete`
         """
         impl = self._impl
-        if hasattr(impl, "delete") and callable(getattr(impl, "delete")):
+        if hasattr(impl, "delete") and callable(impl.delete):
             try:
                 result = impl.delete(layer, entry_id)
                 if isinstance(result, bool):
@@ -532,10 +531,9 @@ class MemoryFacade:
                     return False
             # MemoryManager 没有 working_delete，直接 pop
             cache = getattr(impl, "_working_cache", None)
-            if isinstance(cache, dict):
-                if entry_id in cache:
-                    cache.pop(entry_id, None)
-                    return True
+            if isinstance(cache, dict) and entry_id in cache:
+                cache.pop(entry_id, None)
+                return True
             return False
         if normalized == "short_term":
             return self._delete_short_term(entry_id)
@@ -548,7 +546,6 @@ class MemoryFacade:
     def _delete_short_term(self, entry_id: str) -> bool:
         """删除 short_term 条目（memory_entries 或 episodic_memory 表）。"""
         from maop.core.backends.db_utils import sqlite_connect
-
         from maop.memory.shared_db import get_memory_db_path
 
         db_path = get_memory_db_path()

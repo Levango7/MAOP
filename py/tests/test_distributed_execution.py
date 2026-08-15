@@ -30,7 +30,6 @@ from maop.core.scheduling import (
     WorkerStatus,
 )
 from maop.core.scheduling.distributed_scheduler import (
-
     _NodeSpec,
     node_spec_from_step,
 )
@@ -41,7 +40,6 @@ from maop.worker.distributed_worker import (
     WorkerConfig,
     default_executor,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────────────
 
@@ -642,7 +640,7 @@ class TestWorkerCLI:
     def test_main_dispatches_worker(self) -> None:
         """``maop worker start`` is dispatched by main()."""
         from maop.cli import main
-        with patch("sys.argv", ["maop", "worker", "start", "--concurrency", "2"]):
+        with patch("sys.argv", ["maop", "worker", "start", "--concurrency", "2"]):  # noqa: SIM117
             with patch("maop.worker.distributed_worker.run_worker") as mock_rw:
                 main()
                 mock_rw.assert_called_once()

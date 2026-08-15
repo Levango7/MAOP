@@ -6,8 +6,19 @@ import json
 
 import pytest
 
-from maop.core.monitoring.cost_tracker import BudgetStatus, CostEntry, CostSummary, CostTracker, ModelPricing
-from maop.core.agent.plugins_hooks.plugin import PluginInfo, PluginManager, PluginManifest, PluginState
+from maop.core.agent.plugins_hooks.plugin import (
+    PluginInfo,
+    PluginManager,
+    PluginManifest,
+    PluginState,
+)
+from maop.core.monitoring.cost_tracker import (
+    BudgetStatus,
+    CostEntry,
+    CostSummary,
+    CostTracker,
+    ModelPricing,
+)
 
 # ═══════════════════════════════════════════════════════════════════
 # PluginManager Tests

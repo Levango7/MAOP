@@ -22,7 +22,6 @@ from maop.core.reliability.message_queue import MessageQueue
 from maop.memory.store import MemoryStore
 from maop.model.budget import BudgetGuard
 
-
 # ════════════════════════════════════════════════════════════════════
 # 1. WAL replay — un-checkpointed data survives reopen
 # ════════════════════════════════════════════════════════════════════

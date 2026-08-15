@@ -368,7 +368,6 @@ class ConfigMutator:
                       importance=0.7)
         except Exception:
             logger.debug('swallowed exception', exc_info=True)
-            pass
 
         return changes
 

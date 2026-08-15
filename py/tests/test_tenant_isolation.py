@@ -11,12 +11,11 @@ from maop.core.backends.db_utils import sqlite_connect
 from maop.core.tenant import (
     AuditLogger,
     QuotaError,
-    RLSError,
     ResourceQuotaManager,
+    RLSError,
     TenantManager,
     TenantRLS,
 )
-
 
 # ── fixtures ──────────────────────────────────────────────────────────
 

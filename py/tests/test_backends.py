@@ -213,7 +213,7 @@ class TestFactoryFunctions:
         from unittest.mock import patch
         monkeypatch.setenv("MAOP_CACHE_BACKEND", "redis")
         monkeypatch.delenv("MAOP_CACHE_ALLOW_FALLBACK", raising=False)
-        with patch("maop.core.backends.backends_redis.RedisCacheBackend",
+        with patch("maop.core.backends.backends_redis.RedisCacheBackend",  # noqa: SIM117
                    side_effect=ImportError("mocked: redis unavailable")):
             with pytest.raises(RuntimeError, match="not importable"):
                 get_cache_backend()

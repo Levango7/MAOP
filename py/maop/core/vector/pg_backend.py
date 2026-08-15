@@ -37,8 +37,10 @@ from typing import Any
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-from . import VectorBackend
-from . import VectorSearchResult  # noqa: F401 — re-export for type-checkers
+from . import (
+    VectorBackend,
+    VectorSearchResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +204,7 @@ class PgVectorBackend(VectorBackend):
         try:
             with self._engine.begin() as conn:
                 conn.execute(text('CREATE EXTENSION IF NOT EXISTS "vector"'))
-        except Exception as exc:  # noqa: BLE001 — surface clear error
+        except Exception as exc:
             raise RuntimeError(
                 f"pgvector extension could not be created on {self._engine.url}: "
                 f"{exc}. Install pgvector and retry."
@@ -240,7 +242,7 @@ class PgVectorBackend(VectorBackend):
                 )
                 # ALTER outside a transaction is fine; commit explicitly.
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001 — best-effort
+        except Exception as exc:
             logger.warning("[pg-vector] dimension check/alter failed: %s", exc)
 
     # ── Search ──────────────────────────────────────────────────
@@ -262,7 +264,7 @@ class PgVectorBackend(VectorBackend):
                     _SEARCH_SQL,
                     {"q": q_lit, "top": int(top)},
                 ).fetchall()
-        except Exception as exc:  # noqa: BLE001 — degrade gracefully
+        except Exception as exc:
             logger.warning("[pg-vector] search failed: %s", exc)
             return []
 
@@ -305,7 +307,7 @@ class PgVectorBackend(VectorBackend):
             with self._engine.begin() as conn:
                 conn.execute(_UPSERT_SQL, params)
             return True
-        except Exception as exc:  # noqa: BLE001 — log + signal failure
+        except Exception as exc:
             logger.warning("[pg-vector] insert %r failed: %s", entry_id, exc)
             return False
 
@@ -336,7 +338,7 @@ class PgVectorBackend(VectorBackend):
             with self._engine.begin() as conn:
                 conn.execute(_UPSERT_SQL, rows)
             return len(rows)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("[pg-vector] batch insert failed: %s", exc)
             return 0
 
@@ -351,7 +353,7 @@ class PgVectorBackend(VectorBackend):
                 # follow-up COUNT when ambiguous.
                 rc = getattr(result, "rowcount", -1)
                 return rc > 0
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("[pg-vector] delete %r failed: %s", entry_id, exc)
             return False
 
@@ -423,7 +425,7 @@ class PgVectorBackend(VectorBackend):
                     str(r[0]) for r in conn.execute(_LIST_INDEXES_SQL).fetchall()
                 ]
                 out["indexes"] = idxs
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("[pg-vector] stats failed: %s", exc)
             out["count"] = -1
             out["indexes"] = []
@@ -436,7 +438,7 @@ class PgVectorBackend(VectorBackend):
         if self._owns_engine:
             try:
                 self._engine.dispose()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug("[pg-vector] engine dispose failed: %s", exc)
 
     # ── Helpers ─────────────────────────────────────────────────
@@ -497,7 +499,7 @@ class PgVectorBackend(VectorBackend):
             finally:
                 raw.close()
             return True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if tolerate_missing and "does not exist" in str(exc).lower():
                 return True
             logger.warning("[pg-vector] %s failed: %s", label, exc)

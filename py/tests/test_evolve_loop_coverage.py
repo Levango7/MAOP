@@ -5,8 +5,6 @@ Uses isolated tmp_path + real instances where possible.
 """
 from __future__ import annotations
 
-
-
 # ── Evolve ─────────────────────────────────────────────────────────
 
 class TestEvolveEngine:
@@ -47,18 +45,20 @@ class TestEvolveEngine:
 class TestEvolveFunctions:
     def test_load_observability_data_from_db_nonexistent(self, tmp_path):
         from pathlib import Path
+
         from maop.evolve import _load_observability_data_from_db
         result = _load_observability_data_from_db(Path(tmp_path / "nonexistent.db"))
         assert result == []
 
     def test_load_observability_data_nonexistent(self, tmp_path):
         from pathlib import Path
+
         from maop.evolve import _load_observability_data
         result = _load_observability_data(Path(tmp_path))
         assert result == []
 
     def test_compute_stats_empty(self):
-        from maop.evolve import _compute_stats, EvolutionStats
+        from maop.evolve import EvolutionStats, _compute_stats
         result = _compute_stats([])
         assert isinstance(result, EvolutionStats)
 
@@ -73,7 +73,7 @@ class TestEvolveFunctions:
         assert result is not None
 
     def test_generate_suggestions_empty(self):
-        from maop.evolve import _generate_suggestions, EvolutionStats
+        from maop.evolve import EvolutionStats, _generate_suggestions
         stats = EvolutionStats()
         result = _generate_suggestions(stats, [])
         assert isinstance(result, list)

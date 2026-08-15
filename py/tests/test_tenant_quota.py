@@ -25,7 +25,6 @@ from maop.enterprise.quota import (
     UsageResponse,
 )
 
-
 # ── fixtures ──────────────────────────────────────────────────────────
 
 
@@ -548,9 +547,10 @@ class TestQuotaMiddleware:
 
     def test_soft_limit_warns_but_allows(self, db_path: Path):
         """软限制触发 → 200 + X-Quota-Warning 头."""
-        from maop.enterprise.quota_middleware import QuotaMiddleware
         from fastapi import Request as _Req
         from starlette.middleware.base import BaseHTTPMiddleware
+
+        from maop.enterprise.quota_middleware import QuotaMiddleware
 
         qm = QuotaManager(db_path, cache_ttl_s=0.0)
         qm.set_quota("t1", "api_calls", 100, soft_limit=80)

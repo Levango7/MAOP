@@ -20,7 +20,6 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-
 from maop.core.security.api_key_manager import (
     ApiKeyCreate,
     ApiKeyCreateResult,

@@ -30,7 +30,6 @@ from maop.core.evolution_loop import (
     PerformanceEvolutionLoop,
 )
 
-
 # ════════════════════════════════════════════════════════════════════
 # PerformanceEvaluator
 # ════════════════════════════════════════════════════════════════════

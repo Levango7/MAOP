@@ -470,9 +470,8 @@ class TestToolManagerMigrationAndValidation:
         mgr = ToolManager(root_dir=str(tmp_path))
         with patch(
             "maop.core.agent.tools.tool_manager._is_version_compatible", return_value=False
-        ):
-            with pytest.raises(ValueError, match="incompatible"):
-                mgr.register("t1", command="echo hi", min_platform_version="99.0")
+        ), pytest.raises(ValueError, match="incompatible"):
+            mgr.register("t1", command="echo hi", min_platform_version="99.0")
 
 
 # ── call() exception branches ───────────────────────────────────────

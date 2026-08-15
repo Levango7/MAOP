@@ -531,7 +531,6 @@ async def get_activity(request: Request, limit: int = 10) -> dict[str, Any]:
                 })
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
     # 2. Delegation log entries (most recent N)
     try:

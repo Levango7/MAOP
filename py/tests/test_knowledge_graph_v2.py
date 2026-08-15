@@ -28,7 +28,6 @@ from maop.core.memory.knowledge_graph import (
     KnowledgeGraphResponse,
 )
 
-
 # ── Fixture: isolated KG database with v4.5.0 test data ─────────────
 
 @pytest.fixture
@@ -334,6 +333,7 @@ class TestKnowledgeGraphEndpoint:
     def app_and_client(self, kg_v2_db: KnowledgeGraph, monkeypatch):
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from maop.dashboard.routers import knowledge as knowledge_router
 
         # Stub require_admin to no-op (test runs without auth middleware).

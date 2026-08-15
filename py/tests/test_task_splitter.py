@@ -21,7 +21,6 @@ from httpx import ASGITransport, AsyncClient
 
 from maop.core.scheduling.task_splitter import TaskSplitError, TaskSplitter
 
-
 # ── 辅助：构造 mock LLM provider ────────────────────────────────
 
 def _make_mock_provider(response_content: str) -> MagicMock:

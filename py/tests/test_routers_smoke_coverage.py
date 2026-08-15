@@ -21,7 +21,6 @@ from httpx import ASGITransport, AsyncClient
 
 from maop.core.security.auth import AuthResult
 
-
 # Admin JWT validator stub — any token yields an authenticated admin.
 _ADMIN_RESULT = AuthResult(authenticated=True, identity="admin", roles=["admin"])
 
@@ -120,7 +119,7 @@ async def admin_client():
 
 
 @pytest.mark.parametrize("path", _API_GET_PATHS)
-async def test_get_endpoint_reachable(admin_client, path):  # noqa: D401
+async def test_get_endpoint_reachable(admin_client, path):
     """Every parameter-less GET /api/* endpoint must be reachable under admin.
 
     Acceptable statuses: 200 (happy), 400/422 (bad input), 404 (not found),

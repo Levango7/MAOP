@@ -46,8 +46,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.backends.db_utils import sqlite_connect
 from maop.core.agent.delegation.subagent_db import get_subagent_db_path, migrate_legacy_subagent_db
+from maop.core.backends.db_utils import sqlite_connect
 
 logger = logging.getLogger(__name__)
 

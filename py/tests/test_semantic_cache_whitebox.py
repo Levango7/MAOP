@@ -14,7 +14,6 @@ import pytest
 
 from maop.core.memory.semantic_cache import SemanticCache
 
-
 # ── 1. Cache hit ────────────────────────────────────────────────
 
 

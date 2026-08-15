@@ -172,7 +172,6 @@ class SkillVersionManager:
                     return result.stdout
             except Exception:
                 logger.debug('swallowed exception', exc_info=True)
-                pass
 
         if skill_file.exists():
             return skill_file.read_text(encoding="utf-8")
@@ -212,7 +211,6 @@ class SkillVersionManager:
                 skills.append(meta)
             except Exception:
                 logger.debug('swallowed exception', exc_info=True)
-                pass
         return skills
 
     def delete_skill(self, name: str) -> bool:

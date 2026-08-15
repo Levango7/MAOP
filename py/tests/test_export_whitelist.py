@@ -7,7 +7,6 @@
 """
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -19,8 +18,9 @@ PY_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 sys.path.insert(0, str(PY_DIR))
 
-import export_tool_whitelist as exp  # noqa: E402
-from maop.core.agent.tools.tool_manager import ToolManager  # noqa: E402
+import export_tool_whitelist as exp
+
+from maop.core.agent.tools.tool_manager import ToolManager
 
 
 @pytest.fixture()
@@ -32,8 +32,9 @@ def tool_db(tmp_path, monkeypatch):
     mgr.register("fmt", command="ruff format", name="Formatter", category="quality")
     mgr.register("disabled_tool", command="echo skip", name="Disabled", category="general")
     # 禁用第三个工具
-    from maop.core.backends.db_utils import get_db_path
     import sqlite3
+
+    from maop.core.backends.db_utils import get_db_path
 
     db = get_db_path("tool_manager")
     conn = sqlite3.connect(str(db))

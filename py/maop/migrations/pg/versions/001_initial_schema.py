@@ -32,7 +32,6 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-
 # revision identifiers, used by Alembic.
 revision: str = "001_initial_schema"
 down_revision: str | None = None
@@ -907,7 +906,7 @@ def upgrade() -> None:
         )
     try:
         bind.execute(sa.text('CREATE EXTENSION IF NOT EXISTS "vector"'))
-    except Exception as exc:  # noqa: BLE001 — surface a clear error
+    except Exception as exc:
         raise RuntimeError(
             "pgvector extension is required but could not be created. "
             "Install pgvector (https://github.com/pgvector/pgvector) and "

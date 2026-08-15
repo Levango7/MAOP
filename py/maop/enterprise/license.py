@@ -461,6 +461,7 @@ def verify_module_integrity(*, strict: bool | None = None) -> tuple[bool, str]:
     # ``maop.enterprise.license._PUBLIC_KEY_PATH`` also patch this verification.
     try:
         import base64 as _b64
+
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
         pub = LicenseValidator()._public_key

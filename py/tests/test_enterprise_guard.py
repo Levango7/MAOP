@@ -49,9 +49,10 @@ def test_guard_blocks_versioned_enterprise_path():
     the guard to return 200 with an empty payload (so the dashboard can render
     gracefully).  To verify the 404 branch we request a non-special tenant path.
     """
-    import maop.config.edition as ed
-    import maop.dashboard.server as server
     from fastapi.testclient import TestClient
+
+    import maop.config.edition as ed
+    from maop.dashboard import server
 
     original = ed.has_feature
     ed.has_feature = lambda flag: False  # type: ignore[assignment]

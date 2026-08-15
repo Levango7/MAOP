@@ -50,7 +50,6 @@ from maop.enterprise.audit_enhanced import (
     filter_events,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────
 
 

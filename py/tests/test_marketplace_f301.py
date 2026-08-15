@@ -13,7 +13,6 @@ F-301 Marketplace security tests:
 from __future__ import annotations
 
 import os
-
 from pathlib import Path
 
 import pytest
@@ -35,7 +34,6 @@ from maop.core.marketplace.signing import (
     sign_payload,
     verify,
 )
-
 
 # ── G-01: Ed25519 signing tests ─────────────────────────────────────
 

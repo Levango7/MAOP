@@ -15,8 +15,8 @@ from maop.delegate.drivers import (
     DRIVERS,
     _run_cli,
     _run_cmd,
-    _run_python,
     _run_powershell,
+    _run_python,
     _run_wrapper,
 )
 from maop.delegate.models import AgentConfig

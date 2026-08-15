@@ -8,10 +8,10 @@ from unittest.mock import patch
 import pytest
 
 from maop.core.agent.evolution.agent_evolution import (
+    HIGH_LATENCY_THRESHOLD_MS,
     AgentEvolution,
     EvolutionResult,
     EvolutionSuggestion,
-    HIGH_LATENCY_THRESHOLD_MS,
 )
 
 

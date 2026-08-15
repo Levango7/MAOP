@@ -12,23 +12,28 @@ import logging
 import sqlite3
 import time
 import uuid as _uuid
-
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
-
-from maop.core.evolution.ab_test import ABTestFramework as _ABTestFramework, SPRTConfig as _SPRTConfig
+from maop.core.evolution.ab_test import ABTestFramework as _ABTestFramework
+from maop.core.evolution.ab_test import SPRTConfig as _SPRTConfig
 from maop.core.evolution.auto_deployer import AutoDeployer as _AutoDeployer
 from maop.core.evolution.evaluator import (
     MetricDelta as _MetricDelta,
+)
+from maop.core.evolution.evaluator import (
     PerformanceEvaluator as _PerformanceEvaluator,
+)
+from maop.core.evolution.evaluator import (
     PerformanceMetrics as _PerformanceMetrics,
 )
 from maop.core.evolution.suggester import (
     ImprovementSuggester as _ImprovementSuggester,
+)
+from maop.core.evolution.suggester import (
     SuggestionContext as _SuggestionContext,
 )
 
@@ -238,7 +243,7 @@ class PerformanceEvolutionLoop:
     ) -> dict[str, Any]:
         """人工 gate 批准后调用：提升指定实验的 treatment。"""
         result = self._deployer.promote(experiment, "treatment", config=candidate_config)
-        return result.model_dump()
+        return result.model_dump()  # type: ignore[no-any-return]
 
     # ── 持续运行 ───────────────────────────────────────────────
 
@@ -258,7 +263,7 @@ class PerformanceEvolutionLoop:
                         base, cand, experiment=name or f"{experiment_prefix}-{int(time.time())}",
                     )
                 except Exception as exc:
-                    logger.exception("[perf-evo] run_forever iteration failed: %s", exc)
+                    logger.exception("[perf-evo] run_forever iteration failed: %s", exc)  # noqa: TRY401
                 time.sleep(self._interval_s)
 
         t = threading.Thread(target=_loop, daemon=True, name="perf-evo-loop")

@@ -38,6 +38,8 @@ from maop.core.monitoring.monitoring import (
     Gauge,
     Histogram,
     MetricsCollector,
+)
+from maop.core.monitoring.monitoring import (
     metrics as _global_metrics,
 )
 
@@ -185,9 +187,7 @@ def _normalise_path(path: str) -> str:
         if not part:
             continue
         # UUID-like or long hex → :id
-        if len(part) > 16 or "-" in part and len(part) >= 8:
-            normalised.append(":id")
-        elif part.isdigit():
+        if len(part) > 16 or "-" in part and len(part) >= 8 or part.isdigit():
             normalised.append(":id")
         else:
             normalised.append(part)
@@ -254,7 +254,7 @@ class MetricsMiddleware:
             duration = time.monotonic() - start
             try:
                 self._metrics.record_request(method, path, status_code, duration)
-            except Exception:  # noqa: BLE001 — metrics must never break the request
+            except Exception:
                 pass
 
 

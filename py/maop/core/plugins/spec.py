@@ -41,8 +41,9 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -133,7 +134,7 @@ def _semver_compatible(required: str, host: str) -> bool:
         return True
 
 
-class PluginContext(BaseModel, arbitrary_types_allowed=True):
+class PluginContext(BaseModel, arbitrary_types_allowed=True):  # type: ignore[call-arg]
     """Runtime context handed to a plugin during ``on_load``.
 
     Provides controlled access to host services without exposing internals.
@@ -206,7 +207,7 @@ class PluginSpec(ABC):
         implement custom recovery or alerting.
         """
         md = self.metadata()
-        logger.error("plugin %s caught error: %s", md.name, exc, exc_info=True)
+        logger.error("plugin %s caught error: %s", md.name, exc)
 
     def get_hooks(self) -> dict[str, HookCallback]:
         """Return a mapping of hook-point name → callback.

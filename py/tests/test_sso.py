@@ -95,9 +95,9 @@ def _generate_test_cert():
       - private_key: cryptography RSA 私钥对象（用于签名 SAML Response）
       - cert_b64: X.509 证书的 base64 DER 编码（用于 SSOConfig.saml_idp_cert）
     """
+    from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
-    from cryptography import x509
     from cryptography.x509.oid import NameOID
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -150,9 +150,9 @@ def _build_signed_saml_response(
     Args:
         tamper_signature: 若 True，将 SignatureValue 篡改一个字节（用于测试签名验证失败）。
     """
-    from lxml import etree
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding
+    from lxml import etree
 
     now = datetime.datetime.now(datetime.timezone.utc)
     if not_before is None:
@@ -559,7 +559,7 @@ class TestSAMLHandler:
         # get_authorize_url 应返回 {sso_url}?SAMLRequest=...&RelayState=...
         from maop.enterprise.saml_handler import SAMLHandler
 
-        key, cert_b64 = _generate_test_cert()
+        _key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         handler = SAMLHandler(config)
 
@@ -586,7 +586,7 @@ class TestSAMLHandler:
         # 不传 state 时，URL 不应包含 RelayState
         from maop.enterprise.saml_handler import SAMLHandler
 
-        key, cert_b64 = _generate_test_cert()
+        _key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         handler = SAMLHandler(config)
         handler._idp_metadata = {
@@ -698,7 +698,7 @@ class TestSAMLHandler:
     def test_handle_response_empty_rejected(self):
         from maop.enterprise.saml_handler import SAMLHandler
 
-        key, cert_b64 = _generate_test_cert()
+        _key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         handler = SAMLHandler(config)
 
@@ -708,7 +708,7 @@ class TestSAMLHandler:
     def test_handle_response_malformed_xml_rejected(self):
         from maop.enterprise.saml_handler import SAMLHandler
 
-        key, cert_b64 = _generate_test_cert()
+        _key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         handler = SAMLHandler(config)
 
@@ -717,10 +717,11 @@ class TestSAMLHandler:
             handler.handle_response(bad_b64)
 
     def test_handle_response_missing_assertion_rejected(self):
-        from maop.enterprise.saml_handler import SAMLHandler
         from lxml import etree
 
-        key, cert_b64 = _generate_test_cert()
+        from maop.enterprise.saml_handler import SAMLHandler
+
+        _key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         handler = SAMLHandler(config)
 
@@ -746,7 +747,7 @@ class TestSAMLHandler:
         # 测试 _parse_idp_metadata 能从 metadata XML 提取 SSO URL 和证书
         from maop.enterprise.saml_handler import SAMLHandler
 
-        key, cert_b64 = _generate_test_cert()
+        _key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         handler = SAMLHandler(config)
 
@@ -768,7 +769,7 @@ class TestSAMLHandler:
     <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
       Location="https://idp.example.com/slo"/>
   </md:IDPSSODescriptor>
-</md:EntityDescriptor>""".encode("utf-8")
+</md:EntityDescriptor>""".encode()
 
         parsed = handler._parse_idp_metadata(metadata_xml)
         assert parsed["entity_id"] == "https://idp.example.com"
@@ -819,7 +820,7 @@ class TestGetAuthorizeUrl:
 
     def test_saml_authorize_url_returns_redirect_url(self, monkeypatch):
         # SAML get_authorize_url 应返回带 SAMLRequest 参数的重定向 URL。
-        key, cert_b64 = _generate_test_cert()
+        _key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         mgr = SSOManager(config)
 

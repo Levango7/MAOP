@@ -21,7 +21,7 @@ from maop.core.agent.dag.dag_progress_emitter import (
     NodeStatusEvent,
     get_emitter,
 )
-from maop.core.reliability.event_bus import EventBus, Event
+from maop.core.reliability.event_bus import Event, EventBus
 
 
 class TestNodeStatusEvent:
@@ -68,7 +68,7 @@ class TestNodeStatusEvent:
 
     def test_status_must_be_valid_enum(self):
         """status field rejects invalid values."""
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             NodeStatusEvent(node_id="n1", status="invalid_status")
 
 
@@ -266,8 +266,8 @@ class TestGetDownstreamHelper:
 
     def test_get_downstream_traverses_edges(self):
         """_get_downstream returns transitive successors."""
-        from maop.loop_executor import ExecuteMixin
         from maop.core.agent.analyzer import DependencyDAG
+        from maop.loop_executor import ExecuteMixin
 
         # n1 → n2 → n3, n1 → n4
         dag = DependencyDAG(
@@ -279,8 +279,8 @@ class TestGetDownstreamHelper:
 
     def test_get_downstream_no_successors(self):
         """_get_downstream returns empty for leaf node."""
-        from maop.loop_executor import ExecuteMixin
         from maop.core.agent.analyzer import DependencyDAG
+        from maop.loop_executor import ExecuteMixin
 
         dag = DependencyDAG(
             nodes=["n1", "n2"],
@@ -290,8 +290,8 @@ class TestGetDownstreamHelper:
 
     def test_get_downstream_empty_dag(self):
         """_get_downstream handles empty DAG gracefully."""
-        from maop.loop_executor import ExecuteMixin
         from maop.core.agent.analyzer import DependencyDAG
+        from maop.loop_executor import ExecuteMixin
 
         dag = DependencyDAG(nodes=[], edges=[])
         assert ExecuteMixin()._get_downstream("n1", dag) == []

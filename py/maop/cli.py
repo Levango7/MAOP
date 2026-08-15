@@ -6,6 +6,7 @@ All commands use Python-native implementations. No PowerShell fallbacks.
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 import argparse
@@ -72,7 +73,6 @@ def cmd_status() -> Any:
             pass
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
-        pass
 
 
 def cmd_run(task: str) -> Any:
@@ -429,7 +429,7 @@ def cmd_config_migrate(dry_run: bool = False, file: str = ".env") -> None:
             key = stripped.split("=", 1)[0].strip()
             existing_keys.add(key)
 
-    today = date.today().isoformat()
+    today = date.today().isoformat()  # noqa: DTZ011
     for line in lines:
         stripped = line.strip()
         if stripped and not stripped.startswith("#") and "=" in stripped:

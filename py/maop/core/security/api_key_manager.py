@@ -483,11 +483,10 @@ class ApiKeyManager:
 
         # IP allow-list
         ip_list = json.loads(row["ip_whitelist"] or "[]")
-        if ip_list and client_ip:
-            if not self._ip_allowed(client_ip, ip_list):
-                return ApiKeyValidationResult(
-                    valid=False, error="IP not allowed", key_id=key_id, scopes=scopes, roles=roles
-                )
+        if ip_list and client_ip and not self._ip_allowed(client_ip, ip_list):
+            return ApiKeyValidationResult(
+                valid=False, error="IP not allowed", key_id=key_id, scopes=scopes, roles=roles
+            )
 
         # Scope check (supports "*" wildcard via check_scope)
         if required_scope and not self.check_scope(scopes, required_scope):

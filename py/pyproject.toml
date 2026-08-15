@@ -125,6 +125,27 @@ warn_no_return = true
 strict_optional = true
 ignore_missing_imports = true
 
+# T2 Mixin 拆分后：Mixin 类通过组合类（ThreeLayerMemory/EvolutionLoop/MCPHub）
+# 获得宿主属性（self._root/_db_connect 等），mypy 无法静态推断这些属性。
+# 对 Mixin 模块豁免 attr-defined（组合模式的已知限制，宿主属性由 __init__ 保证）。
+[[tool.mypy.overrides]]
+module = [
+    "maop.core.memory.working_memory",
+    "maop.core.memory.semantic",
+    "maop.core.memory.transform",
+    "maop.core.memory.episodic_store",
+    "maop.core.memory.episodic_consolidation",
+    "maop.core.memory.protocol_aliases",
+    "maop.core.evolution.evolution_collectors",
+    "maop.core.evolution.evolution_analyzers",
+    "maop.core.evolution.evolution_agent",
+    "maop.core.evolution.evolution_phases",
+    "maop.core.mcp.mcp_hub_metrics",
+    "maop.core.mcp.mcp_hub_ops",
+    "maop.core.mcp.mcp_hub_compat",
+]
+disable_error_code = ["attr-defined"]
+
 [[tool.mypy.overrides]]
 module = "maop.dashboard.routers.*"
 disable_error_code = ["arg-type", "return-value", "no-any-return"]

@@ -28,37 +28,33 @@ Usage::
 from __future__ import annotations
 
 import contextlib
-import json
 import logging
 import sqlite3
 import time
-
 from pathlib import Path
 from typing import Any
-
-from pydantic import BaseModel, Field
 
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
 
 
-from maop.core.evolution.evolution_loop_types import (
+from maop.core.evolution.evolution_agent import EvolutionAgentMixin
+from maop.core.evolution.evolution_analyzers import EvolutionAnalyzersMixin
+
+# T2: PerformanceEvolutionLoop / EvolutionCycleReport 已拆分至
+# maop.core.evolution.evolution_perf_loop，此处 re-export 保持 API。
+from maop.core.evolution.evolution_collectors import EvolutionCollectorsMixin
+from maop.core.evolution.evolution_loop_types import (  # noqa: F401  # re-export 保持 API（测试经 evolution_loop 引用）
     EvolutionSuggestion,
     LoopPhase,
     LoopReport,
     PhaseResult,
 )
-
-# T2: PerformanceEvolutionLoop / EvolutionCycleReport 已拆分至
-# maop.core.evolution.evolution_perf_loop，此处 re-export 保持 API。
-from maop.core.evolution.evolution_perf_loop import (
+from maop.core.evolution.evolution_perf_loop import (  # noqa: F401  # re-export 保持 API
     EvolutionCycleReport,
     PerformanceEvolutionLoop,
 )
-from maop.core.evolution.evolution_collectors import EvolutionCollectorsMixin
-from maop.core.evolution.evolution_analyzers import EvolutionAnalyzersMixin
-from maop.core.evolution.evolution_agent import EvolutionAgentMixin
 from maop.core.evolution.evolution_phases import EvolutionPhasesMixin
 
 _EVOLUTION_LOOP_DDL = """

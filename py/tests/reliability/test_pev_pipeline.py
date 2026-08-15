@@ -15,16 +15,14 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-
 from maop.core.reliability.circuit_breaker import BreakerState, CircuitBreaker
 from maop.core.reliability.error_schema import MaopResult, new_result
-from maop.delegate.dispatcher import DispatchResult, Dispatcher
+from maop.delegate.dispatcher import Dispatcher, DispatchResult
 from maop.maop_execute import maop_execute
 from maop.maop_plan import Plan, maop_plan
 from maop.maop_verify import VerifyEngine, VerifyResult
 from maop.model.budget import BudgetGuard
 from maop.model.schema import BudgetConfig
-
 
 # ── Helpers ────────────────────────────────────────────────────
 
