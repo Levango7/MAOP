@@ -21,6 +21,7 @@ Usage::
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -96,6 +97,13 @@ class AgentEvolution:
                 {"category": s.get("category", ""), "description": s.get("description", ""), "changes": s.get("mutation_params", {})}
                 for s in result.get("auto_applied", [])
             ]
+            # C2 fix: 可选 LLM 建议器（默认关闭，失败降级，规则建议不受影响）
+            try:
+                llm_extra = await self._llm_suggest(agent_name)
+                if llm_extra:
+                    suggestions.extend(llm_extra)
+            except Exception as exc:
+                logger.warning("[agent_evolution] LLM suggest merge failed: %s", exc)
             return EvolutionResult(
                 agent_name=agent_name,
                 suggestions=suggestions,
@@ -105,6 +113,83 @@ class AgentEvolution:
         except Exception as exc:
             logger.warning("[agent_evolution] EvolutionLoop failed, falling back to legacy: %s", exc)
             return await self._evolve_legacy(agent_name, agent_config)
+
+    async def _llm_suggest(self, agent_name: str) -> list[EvolutionSuggestion]:
+        """C2 fix: 可选 LLM 建议器。
+
+        通过环境变量 ``MAOP_EVOLVE_LLM_SUGGEST=1`` 开启（默认关闭，零行为变更）。
+        调用 LLM 生成 agent 改进建议；解析失败或异常时降级返回空列表，
+        规则引擎建议不受影响。
+        """
+        import os
+
+        if os.environ.get("MAOP_EVOLVE_LLM_SUGGEST", "0") != "1":
+            return []
+        try:
+            from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
+
+            factory = LLMProviderFactory(root_dir=self._root)
+            result = await factory.chat_with_fallback(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a senior agent-tuning expert. Analyze the agent "
+                            "and return a JSON array of improvement suggestions, each "
+                            "with fields: category (capability|preference|reliability), "
+                            "description (string), severity (low|medium|high), "
+                            "suggested_change (string). Return ONLY valid JSON."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Agent name: {agent_name}\n"
+                            "Recent performance summary is unavailable in this context; "
+                            "infer from the agent name and general agent-tuning best "
+                            "practices. Keep it to at most 3 suggestions."
+                        ),
+                    },
+                ],
+                model_name="",
+                temperature=0.3,
+                max_tokens=800,
+            )
+            content = (result.response.content or "").strip()
+            # 容忍 markdown 代码块包裹
+            if content.startswith("```"):
+                parts = content.split("```")
+                content = parts[1] if len(parts) >= 3 else content
+            data = json.loads(content)
+            if isinstance(data, dict):
+                data = data.get("suggestions", [])
+            if not isinstance(data, list):
+                return []
+            suggestions: list[EvolutionSuggestion] = []
+            for item in data[:3]:
+                if not isinstance(item, dict):
+                    continue
+                suggestions.append(
+                    EvolutionSuggestion(
+                        category=str(item.get("category", "")),
+                        priority=str(item.get("severity", "low")).lower(),
+                        description=str(item.get("description", "")),
+                        action=str(item.get("suggested_change", "")),
+                        changes={"llm": True, "suggestion": str(item.get("suggested_change", ""))},
+                        confidence=0.6,  # LLM 建议置信度保守取值
+                    )
+                )
+            logger.info(
+                "[agent_evolution] LLM suggester generated %d suggestions for '%s'",
+                len(suggestions), agent_name,
+            )
+            return suggestions
+        except Exception as exc:
+            logger.warning(
+                "[agent_evolution] LLM suggester failed for '%s', rules only: %s",
+                agent_name, exc,
+            )
+            return []
 
     async def _evolve_legacy(self, agent_name: str, agent_config: Any = None) -> EvolutionResult:
         """对指定 agent 执行自进化分析。
