@@ -50,6 +50,13 @@ dev = [
     "aiosqlite>=0.20.0",
     "pytest-timeout>=2.3",
     "mypy>=1.10",
+    # Test-only hard deps: tests/test_distributed_execution.py imports fakeredis
+    # (mock Redis, no real server); tests/test_enterprise_integration.py imports
+    # lxml + defusedxml for SAML XML handling. All were implicit via
+    # requirements.lock but must be declared here since CI installs editable.
+    "fakeredis>=2.23",
+    "lxml>=5.0.0",
+    "defusedxml>=0.7.1",
 ]
 ml = [
     "sentence-transformers>=2.0",

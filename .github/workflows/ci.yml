@@ -75,11 +75,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # 不装 requirements.lock 全量：含 enterprise 驱动（etcd3 2019 停更+CVE，
-          # 新 Python 无法安装）与 ML 依赖（sentence-transformers→torch）。
-          # editable install 自动装 [project].dependencies（base）。
+          # 不装 requirements.lock 全量：含 etcd3（2019 停更+CVE，新 Python 无法安装）。
+          # editable 自动装 [project].dependencies（base）；test 依赖显式装。
+          # fakeredis/lxml 为测试硬依赖（distributed_execution/enterprise_integration
+          # 集合需要），原 requirements.lock 隐式提供，改 editable 后必须显式补。
           pip install -e .
-          pip install pytest pytest-asyncio pytest-cov pydantic-settings mmh3 httpx python-multipart aiosqlite pytest-timeout pytest-xdist
+          pip install pytest pytest-asyncio pytest-cov pydantic-settings mmh3 httpx python-multipart aiosqlite pytest-timeout pytest-xdist fakeredis lxml defusedxml
 
       - name: Run unit tests
         # P0 fix (2026-08-11): 移除 --cov-fail-under(让 pytest 仅对测试成败负责),
