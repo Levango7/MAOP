@@ -1,4 +1,8 @@
-"""Coverage ratchet — allow gradual improvement, block regression.
+"""Coverage ratchet - allow gradual improvement, block regression.
+
+Note: keep this file ASCII-only. The GOOD branch printed an arrow (U+2192)
+which crashed on Windows CI (cp1252 stdout): UnicodeEncodeError. All output
+must be encodable in cp1252, or stdout must be reconfigured to UTF-8.
 
 Reads ``coverage.xml`` and enforces that total coverage does not drop
 below the stored baseline. If coverage improves, the baseline file is
@@ -15,6 +19,11 @@ import json
 import pathlib
 import sys
 import xml.etree.ElementTree as ET
+
+# Windows CI runner 默认 cp1252 stdout，print 非 ASCII（如箭头 →）会抛
+# UnicodeEncodeError（曾导致 ratchet 误报失败）。强制 UTF-8 + replace 兜底。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 BASELINE_FILE = pathlib.Path(__file__).resolve().parent / ".cov_baseline.json"
 COVERAGE_XML = pathlib.Path(__file__).resolve().parent.parent / "coverage.xml"
@@ -56,7 +65,11 @@ def main() -> int:
 
     if current > baseline:
         _write_baseline(current)
-        print(f"GOOD: coverage rose {baseline:.2f}% → {current:.2f}%. Baseline updated.")
+        # ASCII-only: U+2192 arrow crashed Windows CI (cp1252 cannot encode it).
+        print(
+            f"GOOD: coverage rose {baseline:.2f}% -> {current:.2f}%. "
+            "Baseline updated."
+        )
     else:
         print(f"OK: coverage {current:.2f}% meets baseline {effective_floor:.2f}%.")
     return 0
