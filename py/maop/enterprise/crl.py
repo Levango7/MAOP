@@ -209,7 +209,11 @@ class CRLChecker:
         try:
             mtime = self.cache_path.stat().st_mtime
             age = time.time() - mtime
-            if age >= self.cache_ttl_s:
+            # age < 0（mtime 超前/文件系统时间精度不足，Windows 上 Python
+            # os.stat 的 st_mtime 可能被进位到未来）→ 不信任缓存，视为过期。
+            # 否则 TTL=0 时 test_crl_cache_used_when_fetch_fails 会误判缓存
+            # 新鲜而跳过重新拉取（windows 3.10 CI 失败：assert 1 == 2）。
+            if age >= self.cache_ttl_s or age < 0:
                 return None  # 缓存已过期
             data = json.loads(self.cache_path.read_text(encoding="utf-8"))
             if not self._validate_crl(data):
