@@ -44,7 +44,21 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install "ruff==0.16.3" "mypy==2.3.1"
       - run: ruff check maop/ tests/
-      - run: mypy maop/ --ignore-missing-imports
+      # 显式 --no-warn-unused-ignores：不依赖 pyproject [tool.mypy] 读取
+      # （CI 依赖缺失环境下 type:ignore 大量 unused，pyproject 配置若未
+      # 生效会误报红）。真实类型错误仍正常拦截。
+      - name: mypy (diagnostic)
+        run: |
+          set +e
+          mypy maop/ --ignore-missing-imports --no-warn-unused-ignores 2>&1 | tee /tmp/mypy-ci.log
+          status=${PIPESTATUS[0]}
+          {
+            echo "### mypy output (exit=$status)"
+            echo '```'
+            tail -80 /tmp/mypy-ci.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
       - name: Config drift audit
         run: python scripts/check_config_drift.py
 
