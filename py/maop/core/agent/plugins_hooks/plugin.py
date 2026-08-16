@@ -369,10 +369,21 @@ class PluginSandbox:
         import multiprocessing as mp
         result_queue: mp.Queue = mp.Queue()
 
-        # 模块级函数而非局部闭包：macOS/Windows 的 multiprocessing 默认 spawn
-        # 启动方式需要 pickle target，局部 _target 会抛
-        # "Can't pickle local object"（此前 macOS CI 全挂）。
-        proc = mp.Process(
+        # 关键：spawn（macOS/某些环境默认）需要 pickle target 与 args。
+        # 插件 init_fn 是从 importlib 动态加载的模块函数（__module__ 不可重新
+        # import），spawn 下永远不可 pickle —— "Can't pickle local object"
+        # 或 "module not found"（macOS CI 插件测试全挂的根因）。测试传入
+        # lambda/局部函数同样中招。
+        # 修复：非 win32 用 fork context —— fork 复制内存，target/args 不
+        # 序列化，动态模块函数/lambda/局部函数全部可用。macOS Python 3.12+
+        # 对 fork 有 DeprecationWarning（项目未开 -W error，无害）；win32 走
+        # _run_init_threaded 分支不经过这里。
+        ctx = (
+            mp.get_context("fork")
+            if "fork" in mp.get_all_start_methods()
+            else mp.get_context()
+        )
+        proc = ctx.Process(
             target=_mp_init_target,
             args=(init_fn, config, result_queue),
             daemon=True,

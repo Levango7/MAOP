@@ -14,6 +14,19 @@ from maop.core.agent.plugins_hooks.plugin import (
 )
 
 
+def _noop_init(cfg: dict) -> None:
+    """模块级 no-op init。
+
+    必须模块级：macOS 的 multiprocessing 默认 spawn 需要 pickle target/args，
+    lambda/局部函数会抛 "Can't pickle local object"（此前 macos CI 全挂）。
+    """
+
+
+def _slow_init(cfg: dict) -> None:
+    """模块级慢 init（sleep 10s 供超时测试用）。"""
+    time.sleep(10)
+
+
 class TestPluginSandboxPathValidation:
     def test_valid_path_inside_plugins(self, tmp_path):
         plugins_dir = tmp_path / "plugins"
@@ -174,24 +187,21 @@ class TestPluginSandboxTimeout:
         plugins_dir = tmp_path / "plugins"
         plugins_dir.mkdir()
         sandbox = PluginSandbox(plugins_dir, timeout_seconds=5.0)
-        sandbox.run_init_with_timeout(lambda cfg: None, {}, timeout=5.0)
+        sandbox.run_init_with_timeout(_noop_init, {}, timeout=5.0)
 
     def test_init_exceeds_timeout(self, tmp_path):
         plugins_dir = tmp_path / "plugins"
         plugins_dir.mkdir()
         sandbox = PluginSandbox(plugins_dir, timeout_seconds=1.0)
 
-        def slow_init(cfg: dict) -> None:
-            time.sleep(10)
-
         with pytest.raises(SandboxViolation, match="timeout"):
-            sandbox.run_init_with_timeout(slow_init, {}, timeout=1.0)
+            sandbox.run_init_with_timeout(_slow_init, {}, timeout=1.0)
 
     def test_zero_timeout_no_limit(self, tmp_path):
         plugins_dir = tmp_path / "plugins"
         plugins_dir.mkdir()
         sandbox = PluginSandbox(plugins_dir, timeout_seconds=0)
-        sandbox.run_init_with_timeout(lambda cfg: None, {}, timeout=0)
+        sandbox.run_init_with_timeout(_noop_init, {}, timeout=0)
 
 
 class TestPluginManagerSandboxIntegration:
