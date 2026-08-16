@@ -442,7 +442,11 @@ class TestGetPgBackendImportError:
         original_import = __import__
 
         def _fake_import(name, *args, **kwargs):
-            if name == "maop.core.backends.backends.backends.backends_pg":
+            # 注意：pg_persist.py:36 的延迟 import 是
+            # `from maop.core.backends.backends_pg import PostgreSQLStorageBackend`，
+            # 模块名是 maop.core.backends.backends_pg（此前多写 backends. 前缀
+            # 导致 mock 不生效 → 真实连 PostgreSQL → PoolTimeout，CI 12 平台全挂）。
+            if name == "maop.core.backends.backends_pg":
                 raise ImportError("simulated")
             return original_import(name, *args, **kwargs)
 
