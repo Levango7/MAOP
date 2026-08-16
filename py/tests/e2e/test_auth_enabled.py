@@ -185,14 +185,18 @@ class TestSSEWithAuth:
             pass
 
     async def test_sse_trace_requires_auth(self, client):
-        """SSE /api/stream/{trace_id} returns 401 without token.
+        """SSE /api/stream/{trace_id} requires auth (403 without token).
 
-        Unlike /api/stream (exact match in public_paths), the trace
-        endpoint is NOT in public_paths, so AuthMiddleware blocks
-        unauthenticated requests with 401.
+        All /api/stream/* endpoints (including /{trace_id} and
+        /agent/{id}) are middleware-exempt because EventSource cannot
+        send an Authorization header — the JWT is passed via ?token=
+        query param and validated in the handler (_check_sse_token +
+        require_admin). Without a token the handler raises 403, matching
+        the /api/stream root endpoint behavior (see
+        test_sse_global_stream_requires_token).
         """
         resp = await client.get("/api/stream/nonexistent-trace-id")
-        assert resp.status_code == 401
+        assert resp.status_code == 403
 
 
 # -- Test: Message Queue ACK ----------------------------------------
