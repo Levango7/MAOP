@@ -134,7 +134,7 @@ def _semver_compatible(required: str, host: str) -> bool:
         return True
 
 
-class PluginContext(BaseModel, arbitrary_types_allowed=True):  # type: ignore[call-arg]
+class PluginContext(BaseModel, arbitrary_types_allowed=True):  # type: ignore
     """Runtime context handed to a plugin during ``on_load``.
 
     Provides controlled access to host services without exposing internals.

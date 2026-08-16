@@ -110,9 +110,9 @@ class RabbitMQQueueBackend(QueueBackend):
             try:
                 params = pika.URLParameters(self._url)
                 self._connection = pika.BlockingConnection(params)
-                self._channel = self._connection.channel()  # type: ignore[attr-defined]
+                self._channel = self._connection.channel()  # type: ignore
                 # 非自动 ack，由业务调用 ack/nack 显式确认
-                self._channel.basic_qos(prefetch_count=1)  # type: ignore[attr-defined]
+                self._channel.basic_qos(prefetch_count=1)  # type: ignore
             except AMQPError as e:
                 logger.error("[rabbitmq] 连接 RabbitMQ 失败 (url=%s): %s", self._url, e)
                 raise RuntimeError(

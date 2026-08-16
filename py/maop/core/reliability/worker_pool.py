@@ -210,7 +210,7 @@ class WorkerPool:
                     try:
                         from maop.core.agent.memory_ctx.worktree import WorktreeManager
                         wt_mgr = WorktreeManager(root_dir=self._root_dir or ".")
-                        worktree_info = wt_mgr.create_root(task_id=wt.id)  # type: ignore[call-arg]
+                        worktree_info = wt_mgr.create_root(task_id=wt.id)  # type: ignore
                         actual_workdir = str(worktree_info)
                     except Exception as e:
                         logger.debug("ignored: %s", e, exc_info=True)
@@ -218,7 +218,7 @@ class WorkerPool:
                 from maop.maop_loop import MaopLoop
                 # P2-2 fix: reuse shared MaopLoop to avoid re-opening 5 SQLite
                 # connections per task (was causing connection exhaustion)
-                if not hasattr(self, '_shared_loop') or self._shared_loop is None:  # type: ignore[has-type]
+                if not hasattr(self, '_shared_loop') or self._shared_loop is None:  # type: ignore
                     self._shared_loop = MaopLoop(root_dir=self._root_dir)
                 loop = self._shared_loop
                 result = await loop.run(
@@ -250,7 +250,7 @@ class WorkerPool:
                     try:
                         from maop.core.agent.memory_ctx.worktree import WorktreeManager
                         wt_mgr = WorktreeManager(root_dir=self._root_dir or ".")
-                        wt_mgr.cleanup(worktree_info)  # type: ignore[attr-defined]
+                        wt_mgr.cleanup(worktree_info)  # type: ignore
                     except Exception as e:
                         logger.debug("ignored: %s", e, exc_info=True)
 

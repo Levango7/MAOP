@@ -297,7 +297,7 @@ class SAMLHandler:
                 "No IdP X.509 certificate available "
                 "(set SSOConfig.saml_idp_cert or provide metadata with X509Certificate)"
             )
-        return cert  # type: ignore[no-any-return]
+        return cert  # type: ignore
 
     def _fetch_idp_metadata(self) -> bytes:
         """从 config.saml_metadata_url 获取 IdP metadata XML。"""
@@ -312,7 +312,7 @@ class SAMLHandler:
         )
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
-                return resp.read()  # type: ignore[no-any-return]
+                return resp.read()  # type: ignore
         except urllib.error.URLError as exc:
             raise SSOError(
                 f"Failed to fetch IdP metadata from {url}: {exc.reason}"
@@ -418,7 +418,7 @@ class SAMLHandler:
                 "AllowCreate": "true",
             },
         )
-        return etree.tostring(root, xml_declaration=False, encoding="utf-8")  # type: ignore[no-any-return]
+        return etree.tostring(root, xml_declaration=False, encoding="utf-8")  # type: ignore
 
     # ── XML 签名验证 ─────────────────────────────────────────────────
 
@@ -598,7 +598,7 @@ class SAMLHandler:
         name_id_elem = subject.find(f"{{{_SAML_NS}}}NameID")
         if name_id_elem is None or not name_id_elem.text:
             return ""
-        return name_id_elem.text  # type: ignore[no-any-return]
+        return name_id_elem.text  # type: ignore
 
     def _validate_conditions(self, assertion_elem, expected_audience: str) -> None:
         """验证 Conditions：Audience、NotBefore、NotOnOrAfter。
@@ -672,7 +672,7 @@ class SAMLHandler:
         def first_value(key: str) -> str:
             v = attributes.get(key)
             if isinstance(v, list) and v:
-                return v[0]  # type: ignore[no-any-return]
+                return v[0]  # type: ignore
             return ""
 
         # 常见 SAML 属性名（含 Microsoft AD FS / Azure AD claim URI）

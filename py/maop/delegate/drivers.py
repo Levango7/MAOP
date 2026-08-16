@@ -461,7 +461,7 @@ async def _run_python(config: AgentConfig, prompt: str, timeout: int,
 # ── Driver dispatch table ────────────────────────────────────
 
 DRIVERS = {
-    "cli": _run_cli,  # type: ignore[dict-item]
+    "cli": _run_cli,  # type: ignore
     "wrapper": _run_wrapper,
     "powershell": _run_powershell,
     "cmd": _run_cmd,

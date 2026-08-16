@@ -427,7 +427,7 @@ def install_auto_spans() -> int:
             if original is None or getattr(original, "__maop_otel_wrapped__", False):
                 continue
             decorated = auto_span(span_name)(original)
-            decorated.__maop_otel_wrapped__ = True  # type: ignore[attr-defined]
+            decorated.__maop_otel_wrapped__ = True  # type: ignore
             setattr(cls, meth_name, decorated)
             wrapped += 1
             logger.debug("[observability.tracing] auto-span installed: %s.%s", cls_name, meth_name)

@@ -273,7 +273,7 @@ def _gate_schema(plan: dict, result: MaopResult | None) -> GateResult:
             if expected_type:
                 type_map = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "array": list, "object": dict}
                 py_type = type_map.get(expected_type)
-                if py_type and not isinstance(data[key], py_type):  # type: ignore[arg-type]
+                if py_type and not isinstance(data[key], py_type):  # type: ignore
                     return GateResult(name="schema", passed=False, reason=f"Type mismatch for '{key}': expected {expected_type}")
 
     return GateResult(name="schema", passed=True)

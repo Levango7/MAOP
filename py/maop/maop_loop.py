@@ -454,7 +454,7 @@ class MaopLoop(ExecuteMixin):
         exec_result = None
         if cache_enabled:
             try:
-                cached = self._result_cache.get(cache_key)  # type: ignore[union-attr]
+                cached = self._result_cache.get(cache_key)  # type: ignore
                 if cached is not None:
                     self._log("execute", "INFO", "Cache hit", trace_id=ctx.trace_id)
                     exec_result = cached
@@ -479,7 +479,7 @@ class MaopLoop(ExecuteMixin):
 
             if cache_enabled and exec_result and exec_result.is_success():
                 try:
-                    self._result_cache.put(cache_key, exec_result)  # type: ignore[union-attr]
+                    self._result_cache.put(cache_key, exec_result)  # type: ignore
                 except Exception as exc:
                     logger.debug("[MAOP-loop] Cache put failed: %s", exc)
 
@@ -745,7 +745,7 @@ class MaopLoop(ExecuteMixin):
         """Execute Plan phase — route task to agent."""
         try:
             plan = maop_plan(task=task, workdir=workdir, config=self._config)
-            return plan.model_dump()  # type: ignore[no-any-return]
+            return plan.model_dump()  # type: ignore
         except Exception as exc:
             # C2 fix: do NOT silently degrade to a hardcoded default route,
             # which would mask a real misconfiguration as a successful plan.

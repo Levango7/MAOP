@@ -283,7 +283,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             xff = request.headers.get("x-forwarded-for", "")
             if xff:
                 # XFF can contain multiple IPs, take the first (original client)
-                return xff.split(",")[0].strip()  # type: ignore[no-any-return]
+                return xff.split(",")[0].strip()  # type: ignore
         return request.client.host if request.client else "unknown"
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:

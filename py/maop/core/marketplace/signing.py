@@ -84,7 +84,7 @@ def generate_key_pair() -> tuple[Ed25519PrivateKey, Ed25519PublicKey]:
 
 def private_key_to_pem(private_key: Ed25519PrivateKey) -> bytes:
     """Serialise an Ed25519 private key to PKCS8 PEM bytes."""
-    return private_key.private_bytes(  # type: ignore[no-any-return]
+    return private_key.private_bytes(  # type: ignore
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
@@ -93,7 +93,7 @@ def private_key_to_pem(private_key: Ed25519PrivateKey) -> bytes:
 
 def public_key_to_pem(public_key: Ed25519PublicKey) -> bytes:
     """Serialise an Ed25519 public key to SubjectPublicKeyInfo PEM bytes."""
-    return public_key.public_bytes(  # type: ignore[no-any-return]
+    return public_key.public_bytes(  # type: ignore
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
@@ -126,7 +126,7 @@ def sign_payload(payload: Any, private_key: Ed25519PrivateKey) -> str:
     """
     digest = _payload_digest(payload)
     signature = private_key.sign(digest)
-    return signature.hex()  # type: ignore[no-any-return]
+    return signature.hex()  # type: ignore
 
 
 def verify(

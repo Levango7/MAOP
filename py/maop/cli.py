@@ -228,7 +228,7 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
         installed = mp.list_installed()
         if not installed:
             pass
-        for s in installed:  # type: ignore[assignment]
+        for s in installed:  # type: ignore
             pass
 
 

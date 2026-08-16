@@ -243,7 +243,7 @@ class PerformanceEvolutionLoop:
     ) -> dict[str, Any]:
         """人工 gate 批准后调用：提升指定实验的 treatment。"""
         result = self._deployer.promote(experiment, "treatment", config=candidate_config)
-        return result.model_dump()  # type: ignore[no-any-return]
+        return result.model_dump()  # type: ignore
 
     # ── 持续运行 ───────────────────────────────────────────────
 

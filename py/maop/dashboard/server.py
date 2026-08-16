@@ -487,7 +487,7 @@ except Exception as _a2a_exc:
 # and the duplicate import triggered ruff F811.
 #
 # B1 (2026-07-22): replaced silent `except ImportError: logger.debug(...)`
-# (which used `# type: ignore[attr-defined]` to mask missing modules) with
+# (which used `# type: ignore` to mask missing modules) with
 # explicit `logger.warning` + a `has_<name>_router` flag. The previous
 # behavior silently degraded ENTERPRISE mode to "router enabled but 404
 # on every call" because the missing module was treated as a non-event.
@@ -512,7 +512,7 @@ except ImportError as _e:
 
 if has_feature(FeatureFlag.MULTI_USER):
     try:
-        # `# type: ignore[attr-defined]` is required because mypy cannot
+        # `# type: ignore` is required because mypy cannot
         # statically verify that routers/tenant.py exists — it is created
         # in Phase C. The runtime `except ImportError` below emits a
         # warning if the file is missing, so the silent-swallow problem

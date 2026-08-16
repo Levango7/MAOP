@@ -85,16 +85,16 @@ def _safe_eval_node(node: ast.AST, context: dict) -> Any:
         op_fn = _SAFE_UNARYOPS[type(node.op)]
         return op_fn(_safe_eval_node(node.operand, context))
     if isinstance(node, ast.BinOp):
-        op_fn = _SAFE_BINOPS.get(type(node.op))  # type: ignore[assignment]
+        op_fn = _SAFE_BINOPS.get(type(node.op))  # type: ignore
         if op_fn is None:
             raise ValueError(f"Unsupported binary op: {type(node.op).__name__}")
-        return op_fn(_safe_eval_node(node.left, context), _safe_eval_node(node.right, context))  # type: ignore[call-arg]
+        return op_fn(_safe_eval_node(node.left, context), _safe_eval_node(node.right, context))  # type: ignore
     if isinstance(node, ast.Compare):
         left = _safe_eval_node(node.left, context)
         for op, comparator in zip(node.ops, node.comparators):
-            op_fn = _SAFE_CMPOPS[type(op)]  # type: ignore[assignment]
+            op_fn = _SAFE_CMPOPS[type(op)]  # type: ignore
             right = _safe_eval_node(comparator, context)
-            if not op_fn(left, right):  # type: ignore[call-arg]
+            if not op_fn(left, right):  # type: ignore
                 return False
             left = right
         return True
@@ -488,7 +488,7 @@ class Engine:
                         error=str(lr), agent=step.agent,
                     )
                 else:
-                    sr = lr  # type: ignore[assignment]
+                    sr = lr  # type: ignore
                 results[step.id] = sr
 
                 # Update context with step output

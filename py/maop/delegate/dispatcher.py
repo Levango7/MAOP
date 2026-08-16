@@ -87,7 +87,7 @@ async def _retry_with_backoff(
                     "[dispatch] All %d attempts failed. Last error: %s",
                     max_retries + 1, exc,
                 )
-    raise last_exc  # type: ignore[misc]
+    raise last_exc  # type: ignore
 
 
 # ── Optional subsystems (lazy import to avoid hard deps) ──────

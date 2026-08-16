@@ -599,7 +599,7 @@ class MemoryManager:
         try:
             result = self._memory.stats()
             if hasattr(result, "model_dump"):
-                return result.model_dump()  # type: ignore[no-any-return]
+                return result.model_dump()  # type: ignore
             if isinstance(result, dict):
                 return result
             return dict(result)

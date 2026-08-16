@@ -279,7 +279,7 @@ class LogRotateScheduler:
         def _loop():
             while self._running:
                 try:
-                    rotate_logs(**self._kwargs)  # type: ignore[arg-type]
+                    rotate_logs(**self._kwargs)  # type: ignore
                 except Exception as exc:
                     logger.warning("[log-rotate] Scheduler error: %s", exc)
                 time.sleep(self._interval)

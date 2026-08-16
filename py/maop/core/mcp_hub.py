@@ -971,7 +971,7 @@ class MCPHub:
         if row is None:
             return None
         try:
-            return MCPServerConfig.model_validate_json(row["config"])  # type: ignore[no-any-return]
+            return MCPServerConfig.model_validate_json(row["config"])  # type: ignore
         except Exception:
             logger.debug("Silent exception in core/mcp_hub.py:1594", exc_info=True)
             return None

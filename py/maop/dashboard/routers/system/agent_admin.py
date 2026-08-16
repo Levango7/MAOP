@@ -180,7 +180,7 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]
                             info["upgrade_output"] = upgrade_r_stdout[-500:]
                             try:
                                 _rc, _out, _err = await _deps._run_subprocess(
-                                    [cli_path, "--version"], timeout=10  # type: ignore[list-item]
+                                    [cli_path, "--version"], timeout=10  # type: ignore
                                 )
                                 info["new_version"] = (_out or _err).strip()[:200]
                             except Exception as exc:

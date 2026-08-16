@@ -246,7 +246,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
         elif action == "reindex":
             try:
                 from maop.core.memory.vector import VectorStore
-                store = VectorStore() if hasattr(VectorStore, '__init__') else None  # type: ignore[assignment]
+                store = VectorStore() if hasattr(VectorStore, '__init__') else None  # type: ignore
                 if store and hasattr(store, 'reindex'):
                     store.reindex()
                     return {"status": "ok", "action": "reindex", "msg": "Vector index rebuilt"}
@@ -257,7 +257,7 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
         elif action == "vacuum":
             try:
                 from maop.core.backends.db_utils import sqlite_connect
-                with sqlite_connect() as conn:  # type: ignore[call-arg]
+                with sqlite_connect() as conn:  # type: ignore
                     conn.execute("VACUUM")
                 return {"status": "ok", "action": "vacuum", "msg": "Database compacted"}
             except Exception:

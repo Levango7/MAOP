@@ -313,7 +313,7 @@ class PluginSandbox:
         if spec is None or spec.loader is None:
             raise ImportError(f"Cannot create module spec from {path}")
         module = importlib.util.module_from_spec(spec)
-        module.__builtins__ = self._make_safe_builtins(self._allowed_imports)  # type: ignore[attr-defined]
+        module.__builtins__ = self._make_safe_builtins(self._allowed_imports)  # type: ignore
         return module, spec
 
     def exec_module(self, module: Any, spec: Any) -> None:

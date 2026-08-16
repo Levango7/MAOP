@@ -197,7 +197,7 @@ class CRLChecker:
                 self.crl_url,
                 revoked_count,
             )
-            return data  # type: ignore[no-any-return]
+            return data  # type: ignore
         except Exception as exc:
             logger.warning("[crl] Failed to fetch CRL from %s: %s", self.crl_url, exc)
             return None
@@ -214,7 +214,7 @@ class CRLChecker:
             data = json.loads(self.cache_path.read_text(encoding="utf-8"))
             if not self._validate_crl(data):
                 return None
-            return data  # type: ignore[no-any-return]
+            return data  # type: ignore
         except Exception as exc:
             logger.debug("[crl] Failed to load cached CRL: %s", exc)
             return None
@@ -245,7 +245,7 @@ class CRLChecker:
             data = json.loads(self.cache_path.read_text(encoding="utf-8"))
             if not self._validate_crl(data):
                 return None
-            return data  # type: ignore[no-any-return]
+            return data  # type: ignore
         except CRLError:
             raise
         except Exception as exc:

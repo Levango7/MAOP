@@ -251,7 +251,7 @@ class SSOProviderStore:
                     ) from exc
                 raise
             new_id = int(cur.lastrowid or 0)
-        return self.get(new_id)  # type: ignore[return-value]
+        return self.get(new_id)  # type: ignore
 
     def get(self, provider_id: int) -> SSOProviderResponse | None:
         """按 ID 查询；返回明文 config（已解密）。"""

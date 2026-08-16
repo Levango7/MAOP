@@ -132,7 +132,7 @@ class ExecuteMixin:
                             agent=st_agent, task=st.description, exit_code=1,
                             error=f"Exception: {exc}", trace_id=trace_id,
                         )
-                    subtask_results[st_id] = result  # type: ignore[assignment]
+                    subtask_results[st_id] = result  # type: ignore
             else:
                 # Multiple independent subtasks — execute in parallel with concurrency limit
                 async def _run_subtask(st_id: str, st_desc: str, st_agent: str) -> tuple[str, MaopResult]:
@@ -150,7 +150,7 @@ class ExecuteMixin:
                                 agent=st_agent, task=st_desc, exit_code=1,
                                 error=f"Exception: {exc}", trace_id=trace_id,
                             )
-                    return st_id, r  # type: ignore[return-value]
+                    return st_id, r  # type: ignore
 
                 coros = []
                 for st_id in group:
@@ -172,7 +172,7 @@ class ExecuteMixin:
                             error=f"Exception: {gr}", trace_id=trace_id,
                         )
                         continue
-                    st_id, result = gr  # type: ignore[misc]
+                    st_id, result = gr  # type: ignore
                     subtask_results[st_id] = result
 
             self._log("execute", "INFO",

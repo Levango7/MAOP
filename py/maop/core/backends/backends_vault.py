@@ -60,7 +60,7 @@ class VaultSecretBackend(SecretBackend):
                 path=self._full_path(key), mount_point=self._mount,
             )
             if resp and "data" in resp and "data" in resp["data"]:
-                return resp["data"]["data"].get("value")  # type: ignore[no-any-return]
+                return resp["data"]["data"].get("value")  # type: ignore
         except Exception as exc:
             logger.debug("[vault] get_secret(%s) failed: %s", key, exc)
         return None

@@ -319,7 +319,7 @@ class N8nClient:
         try:
             resp = client.get("/workflows", params={"limit": limit})
             resp.raise_for_status()
-            return resp.json().get("data", [])  # type: ignore[no-any-return]
+            return resp.json().get("data", [])  # type: ignore
         except httpx.HTTPStatusError as exc:
             raise N8nIntegrationError(
                 f"n8n API returned {exc.response.status_code}: {exc.response.text}"
@@ -332,7 +332,7 @@ class N8nClient:
         try:
             client = self._get_client()
             resp = client.get("/workflows", params={"limit": 1})
-            return resp.status_code == 200  # type: ignore[no-any-return]
+            return resp.status_code == 200  # type: ignore
         except Exception:
             return False
 

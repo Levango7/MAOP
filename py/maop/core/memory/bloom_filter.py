@@ -36,7 +36,7 @@ try:
     import mmh3 as _mmh3
     _HAS_MMH3 = True
 except Exception:
-    _mmh3 = None  # type: ignore[assignment]  # import 失败时回退 None，_mmh3_hash32 走内置 hash
+    _mmh3 = None  # type: ignore  # import 失败时回退 None，_mmh3_hash32 走内置 hash
     _HAS_MMH3 = False
 
 # ── Hash functions ──────────────────────────────────────────────
@@ -45,7 +45,7 @@ def _mmh3_hash32(key: bytes, seed: int = 0) -> int:
     """MurmurHash3 x86_32 — fast, good distribution."""
     if _HAS_MMH3 and _mmh3 is not None:
         try:
-            return _mmh3.hash(key, seed, signed=False)  # type: ignore[no-any-return]
+            return _mmh3.hash(key, seed, signed=False)  # type: ignore
         except Exception:
             logger.debug("Silent exception in core/bloom_filter.py:49", exc_info=True)
     # Pure-Python fallback (FNV-1a variant with seed mixing)

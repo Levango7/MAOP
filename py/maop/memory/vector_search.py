@@ -140,7 +140,7 @@ class VectorSearch:
 
     def _vec_to_blob(self, vec: np.ndarray) -> bytes:
         """Convert numpy array to SQLite BLOB."""
-        return vec.astype(np.float32).tobytes()  # type: ignore[no-any-return]
+        return vec.astype(np.float32).tobytes()  # type: ignore
 
     def index_entry(self, entry_id: str, text: str) -> bool:
         """Index a single entry by its ID and text content."""

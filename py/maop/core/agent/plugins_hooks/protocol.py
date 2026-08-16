@@ -263,4 +263,4 @@ def _check_type(value: Any, expected: str) -> bool:
     py_type = type_map.get(expected)
     if py_type is None:
         return True
-    return isinstance(value, py_type)  # type: ignore[arg-type]
+    return isinstance(value, py_type)  # type: ignore

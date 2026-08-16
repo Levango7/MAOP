@@ -207,7 +207,7 @@ async def memory_stats() -> dict[str, Any]:
 async def upload_image(
     session_id: str = "",
     file: UploadFile | None = None,
-    request: Request = None,  # type: ignore[assignment]  # FastAPI 注入，运行时永不 None
+    request: Request = None,  # type: ignore  # FastAPI 注入，运行时永不 None
 ) -> dict[str, Any]:
     """Upload an image for multimodal chat."""
     require_admin(request)

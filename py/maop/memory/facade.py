@@ -174,7 +174,7 @@ class MemoryFacade:
         metadata: dict[str, Any] | None = None,
     ) -> str:
         """写入 Short-term Memory，返回条目 ID。"""
-        return self._impl.short_term_store(  # type: ignore[no-any-return]
+        return self._impl.short_term_store(  # type: ignore
             content,
             task=task,
             agent=agent,
@@ -191,15 +191,15 @@ class MemoryFacade:
         agent: str = "",
     ) -> list[dict[str, Any]]:
         """检索 Short-term Memory，返回 dict 列表。"""
-        return self._impl.short_term_search(query, top=top, agent=agent)  # type: ignore[no-any-return]
+        return self._impl.short_term_search(query, top=top, agent=agent)  # type: ignore
 
     def short_term_get(self, entry_id: str) -> dict[str, Any] | None:
         """按 ID 获取单条 Short-term Memory 条目。"""
-        return self._impl.short_term_get(entry_id)  # type: ignore[no-any-return]
+        return self._impl.short_term_get(entry_id)  # type: ignore
 
     def short_term_stats(self) -> dict[str, Any]:
         """Short-term Memory 统计信息。"""
-        return self._impl.short_term_stats()  # type: ignore[no-any-return]
+        return self._impl.short_term_stats()  # type: ignore
 
     # ── Layer 3: Long-term Memory ─────────────────────────────
 
@@ -210,7 +210,7 @@ class MemoryFacade:
         metadata: dict[str, Any] | None = None,
     ) -> str:
         """索引文档到 Long-term Memory。"""
-        return self._impl.long_term_index(doc_id, text, metadata=metadata)  # type: ignore[no-any-return]
+        return self._impl.long_term_index(doc_id, text, metadata=metadata)  # type: ignore
 
     def long_term_search(
         self,
@@ -219,7 +219,7 @@ class MemoryFacade:
         top: int = 5,
     ) -> list[dict[str, Any]]:
         """检索 Long-term Memory。"""
-        return self._impl.long_term_search(query, top=top)  # type: ignore[no-any-return]
+        return self._impl.long_term_search(query, top=top)  # type: ignore
 
     # ── 跨层操作 ───────────────────────────────────────────────
 
@@ -235,7 +235,7 @@ class MemoryFacade:
         if isinstance(result, dict):
             return result
         if hasattr(result, "model_dump"):
-            return result.model_dump()  # type: ignore[no-any-return]
+            return result.model_dump()  # type: ignore
         # 兜底：尝试 dict() 转换或字符串包装
         try:
             return dict(result)
@@ -262,7 +262,7 @@ class MemoryFacade:
 
     def stats(self) -> dict[str, Any]:
         """跨层统计信息汇总。"""
-        return self._impl.stats()  # type: ignore[no-any-return]
+        return self._impl.stats()  # type: ignore
 
     # ── Chat 场景透传（chat_engine 迁移入口） ───────────────────
     # 以下 API 为 chat 场景专属（MemoryManager / ConversationManager），
@@ -306,7 +306,7 @@ class MemoryFacade:
             当 ``mode="agent"`` 时抛出（ThreeLayerMemory 无会话上下文）。
         """
         self._ensure_chat("chat_get_messages_for_llm")
-        return self._impl.get_messages_for_llm(  # type: ignore[no-any-return]
+        return self._impl.get_messages_for_llm(  # type: ignore
             session_id=session_id,
             query=query,
             system_prompt=system_prompt,
@@ -333,7 +333,7 @@ class MemoryFacade:
             当 ``mode="agent"`` 时抛出（ThreeLayerMemory 无对话交换概念）。
         """
         self._ensure_chat("chat_add_exchange")
-        return self._impl.add_exchange(  # type: ignore[no-any-return]
+        return self._impl.add_exchange(  # type: ignore
             session_id=session_id,
             user_msg=user_msg,
             assistant_msg=assistant_msg,
@@ -368,7 +368,7 @@ class MemoryFacade:
         """
         impl = self._impl
         if hasattr(impl, "query_episodic"):
-            return impl.query_episodic(query=query, top=top)  # type: ignore[no-any-return]
+            return impl.query_episodic(query=query, top=top)  # type: ignore
         logger.warning("[memory_facade] impl has no query_episodic method")
         return []
 
@@ -376,7 +376,7 @@ class MemoryFacade:
         """查询 MemoryManager 写入的 memory_entries 表。"""
         impl = self._impl
         if hasattr(impl, "query_memory_entries"):
-            return impl.query_memory_entries(query=query, top=top)  # type: ignore[no-any-return]
+            return impl.query_memory_entries(query=query, top=top)  # type: ignore
         logger.warning("[memory_facade] impl has no query_memory_entries method")
         return []
 
@@ -397,7 +397,7 @@ class MemoryFacade:
         impl = self._impl
         if hasattr(impl, "store") and callable(impl.store):
             try:
-                return impl.store(layer, content, **kwargs)  # type: ignore[no-any-return]
+                return impl.store(layer, content, **kwargs)  # type: ignore
             except (TypeError, ValueError):
                 # 底层 store 签名不兼容（如 MemoryManager.store 不存在），
                 # 落到下面的 Facade 兜底路由。

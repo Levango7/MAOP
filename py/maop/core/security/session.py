@@ -266,7 +266,7 @@ class SessionManager:
         status: str | None = None,
         agent: str | None = None,
         workdir: str | None = None,
-        tags: list[str] | None = None,  # type: ignore[valid-type]
+        tags: list[str] | None = None,  # type: ignore
         metadata: dict[str, Any] | None = None,
         token_count: int | None = None,
         token_budget: int | None = None,

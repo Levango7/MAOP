@@ -246,7 +246,7 @@ class EventBus:
         """Invoke handler once. Returns True on success, False on failure."""
         try:
             if sub.is_async:
-                await sub.handler(event)  # type: ignore[misc]
+                await sub.handler(event)  # type: ignore
             else:
                 sub.handler(event)
             return True

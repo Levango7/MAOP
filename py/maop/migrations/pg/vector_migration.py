@@ -142,7 +142,7 @@ def get_pg_engine(url: str | None = None) -> Engine:
 def _sqlite_has_vector_table(engine: Engine) -> bool:
     """Return True iff the SQLite DB has a ``vector_entries`` table."""
     try:
-        return inspect(engine).has_table("vector_entries")  # type: ignore[no-any-return]
+        return inspect(engine).has_table("vector_entries")  # type: ignore
     except Exception as exc:
         logger.warning("SQLite introspection failed: %s", exc)
         return False

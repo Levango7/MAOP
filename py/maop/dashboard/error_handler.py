@@ -130,12 +130,12 @@ def handle_api_errors(
                     code="INTERNAL",
                     status_code=500,
                 )
-        wrapper = types.FunctionType(  # type: ignore[assignment]
-            wrapper.__code__,  # type: ignore[attr-defined]
+        wrapper = types.FunctionType(  # type: ignore
+            wrapper.__code__,  # type: ignore
             fn.__globals__,
             name=wrapper.__name__,
-            argdefs=wrapper.__defaults__,  # type: ignore[attr-defined]
-            closure=wrapper.__closure__,  # type: ignore[attr-defined]
+            argdefs=wrapper.__defaults__,  # type: ignore
+            closure=wrapper.__closure__,  # type: ignore
         )
         functools.update_wrapper(wrapper, fn)
         return wrapper

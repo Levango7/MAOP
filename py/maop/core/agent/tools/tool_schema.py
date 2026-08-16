@@ -263,7 +263,7 @@ class ToolSchemaGenerator:
         for m in pattern.finditer(docstring):
             result[m.group(1)] = m.group(2).strip()
         args_pattern = re.compile(r"Args:\s*\n((?:\s+\w+.*\n?)+)", re.MULTILINE)
-        m = args_pattern.search(docstring)  # type: ignore[assignment]
+        m = args_pattern.search(docstring)  # type: ignore
         if m:
             for line in m.group(1).strip().splitlines():
                 parts = line.strip().split(None, 1)

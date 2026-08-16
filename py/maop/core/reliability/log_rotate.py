@@ -279,7 +279,7 @@ class LogRotateScheduler:
         def _loop():
             while self._running:
                 try:
-                    rotate_logs(**self._kwargs)  # type: ignore[arg-type]
+                    rotate_logs(**self._kwargs)  # type: ignore
                 except Exception as exc:
                     logger.warning("[log-rotate] Scheduler error: %s", exc)
                 # P0-§4.2: 保留 time.sleep — _loop 运行在独立 daemon 线程中，

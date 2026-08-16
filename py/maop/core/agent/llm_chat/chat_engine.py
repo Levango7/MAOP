@@ -301,7 +301,7 @@ class ChatEngine:
 
             if result.result and result.result.is_success():
                 return result.result.stdout or result.result.error or "No response"
-            return result.result.error if result.result else "Dispatch failed"  # type: ignore[return-value]
+            return result.result.error if result.result else "Dispatch failed"  # type: ignore
         except Exception as exc:
             logger.warning("[chat_engine] LLM call failed: %s", exc)
             return f"[MAOP] Unable to reach agent '{agent}': {exc}"

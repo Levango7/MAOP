@@ -50,7 +50,7 @@ class ProtocolMixin:
             trace_id = kwargs.get("trace_id", "")
             if trace_id:
                 meta["trace_id"] = trace_id
-            return self.episodic_store(  # type: ignore[no-any-return]
+            return self.episodic_store(  # type: ignore
                 task=kwargs.get("task", content[:80]),
                 agent=kwargs.get("agent", ""),
                 outcome=kwargs.get("outcome", ""),
@@ -64,7 +64,7 @@ class ProtocolMixin:
             )
         if normalized == "long_term":
             doc_id = kwargs.get("doc_id", f"doc-{int(time.time() * 1000)}")
-            return self.semantic_index(doc_id, content, metadata=kwargs.get("metadata"))  # type: ignore[no-any-return]
+            return self.semantic_index(doc_id, content, metadata=kwargs.get("metadata"))  # type: ignore
         raise ValueError(f"Unknown layer: {layer!r}")
 
     def retrieve(self, layer: str, query: str = "", top: int = 10, **kwargs: Any) -> list[Any]:
@@ -82,7 +82,7 @@ class ProtocolMixin:
             val = self.working_get(query) if query else None
             return [val] if val is not None else []
         if normalized == "short_term":
-            return self.episodic_search(  # type: ignore[no-any-return]
+            return self.episodic_search(  # type: ignore
                 query=query, top=top,
                 agent=kwargs.get("agent", ""),
                 outcome=kwargs.get("outcome", ""),
@@ -90,7 +90,7 @@ class ProtocolMixin:
                 apply_decay=kwargs.get("apply_decay", True),
             )
         if normalized == "long_term":
-            return self.semantic_search(query, top=top)  # type: ignore[no-any-return]
+            return self.semantic_search(query, top=top)  # type: ignore
         raise ValueError(f"Unknown layer: {layer!r}")
 
     def short_term_store(
@@ -113,7 +113,7 @@ class ProtocolMixin:
             meta["topic"] = topic
         if tags:
             meta["tags"] = tags if isinstance(tags, str) else ",".join(str(t) for t in tags)
-        return self.episodic_store(  # type: ignore[no-any-return]
+        return self.episodic_store(  # type: ignore
             task=task or content[:80],
             agent=agent,
             summary=content,
@@ -151,11 +151,11 @@ class ProtocolMixin:
         entry = self.episodic_get(entry_id)
         if entry is None:
             return None
-        return entry.model_dump()  # type: ignore[no-any-return]
+        return entry.model_dump()  # type: ignore
 
     def short_term_stats(self) -> dict[str, Any]:
         """Short-term Memory 统计信息（等价于 episodic_stats）。"""
-        return self.episodic_stats()  # type: ignore[no-any-return]
+        return self.episodic_stats()  # type: ignore
 
     def long_term_index(
         self,
@@ -164,7 +164,7 @@ class ProtocolMixin:
         metadata: dict[str, Any] | None = None,
     ) -> str:
         """索引文档到 Long-term Memory（等价于 semantic_index）。"""
-        return self.semantic_index(doc_id, text, metadata=metadata)  # type: ignore[no-any-return]
+        return self.semantic_index(doc_id, text, metadata=metadata)  # type: ignore
 
     def long_term_search(
         self,

@@ -394,7 +394,7 @@ class TokenStreamer:
         merged = False
         for i in range(len(items) - 1):
             if items[i] is not None and items[i + 1] is not None:
-                items[i] = items[i] + items[i + 1]  # type: ignore[operator]
+                items[i] = items[i] + items[i + 1]  # type: ignore
                 del items[i + 1]
                 merged = True
                 break

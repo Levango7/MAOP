@@ -36,7 +36,7 @@ class MCPHubCompatMixin:
         if row is None:
             return None
         try:
-            return MCPServerConfig.model_validate_json(row["config"])  # type: ignore[no-any-return]
+            return MCPServerConfig.model_validate_json(row["config"])  # type: ignore
         except Exception:
             logger.debug("Silent exception in core/mcp_hub.py:1594", exc_info=True)
             return None
@@ -153,5 +153,5 @@ class MCPHubCompatMixin:
         server_id, tool_name = self.find_tool(qualified_name)
         if server_id is None:
             return ToolResult(is_error=True, error_message=f"Tool '{qualified_name}' not found")
-        return await self.call_tool(server_id, tool_name, arguments or {}, user_context=user_context)  # type: ignore[no-any-return]
+        return await self.call_tool(server_id, tool_name, arguments or {}, user_context=user_context)  # type: ignore
 
