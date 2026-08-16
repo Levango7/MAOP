@@ -98,6 +98,13 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("MAOP_PLUGIN_STRICT_CHECKSUM", "0")
     monkeypatch.setenv("HF_HUB_OFFLINE", "1")
     monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
+    # settings 单例在 conftest import server 时已固化（当时 MAOP_DATA_DIR 未设
+    # → data_dir 指向仓库根 data/），monkeypatch.setenv 不刷新单例 → 所有测试
+    # 共享仓库 data/maop.db → xdist 并发 sqlite3.OperationalError: database
+    # is locked（test_three_layer_memory 等）。每个测试刷新单例让
+    # MAOP_DATA_DIR 真正生效（get_db_path/get_memory_db_path 读 settings）。
+    from maop.config.settings import reload_settings
+    reload_settings()
     yield
     # 每个测试后清空 ConnectionPool 单例池：每个测试独立 MAOP_DATA_DIR 产生
     # 独立 db_path → 独立池 → 连接句柄跨测试累积，进程 GC 时才回收 →

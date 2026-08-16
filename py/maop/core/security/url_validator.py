@@ -86,28 +86,33 @@ def validate_webhook_url(url: str) -> None:
         if hostname.lower() in _INTERNAL_HOSTNAMES:
             raise SSRFError(f"Internal hostname not allowed: {hostname}") from None
     else:
+        # IPv4-mapped IPv6（::ffff:x.x.x.x）：按映射的 IPv4 部分判断，
+        # 否则 ::ffff:127.0.0.1 的 IPv6 层面 is_loopback=False、
+        # is_reserved=True → 误报 Reserved（测试期望 Loopback/Private）。
+        mapped4 = ip.ipv4_mapped if isinstance(ip, ipaddress.IPv6Address) else None
+        check = mapped4 if mapped4 is not None else ip
         # Reject loopback (127.0.0.0/8, ::1)
-        if ip.is_loopback:
+        if check.is_loopback:
             raise SSRFError(f"Loopback address not allowed: {hostname}")
         # Reject link-local (169.254.0.0/16, fe80::/10) - includes cloud metadata
         # Must check before is_private (Python treats link-local as private too)
-        if ip.is_link_local:
+        if check.is_link_local:
             raise SSRFError(f"Link-local address not allowed: {hostname}")
         # Reject unspecified (0.0.0.0, ::)
         # Must check before is_private (Python treats unspecified as private too)
-        if ip.is_unspecified:
+        if check.is_unspecified:
             raise SSRFError(f"Unspecified address not allowed: {hostname}")
         # Reject multicast
-        if ip.is_multicast:
+        if check.is_multicast:
             raise SSRFError(f"Multicast address not allowed: {hostname}")
         # Reject reserved (240.0.0.0/4, 255.255.255.255/32 etc.)
         # Must check before is_private (Python treats some reserved as private too)
-        if ip.is_reserved:
+        if check.is_reserved:
             raise SSRFError(f"Reserved address not allowed: {hostname}")
         # Reject private (10.x, 172.16-31.x, 192.168.x, fc00::/7)
         # Checked last as a catch-all, since Python's is_private overlaps with
         # link-local, unspecified, and reserved ranges.
-        if ip.is_private:
+        if check.is_private:
             raise SSRFError(f"Private address not allowed: {hostname}")
 
     # 3. Cloud metadata endpoint check

@@ -212,7 +212,11 @@ class TestRuntime:
     def test_timeout(self):
         from maop.core.agent.lifecycle.runtime import LocalRuntime, RuntimeConfig
         rt = LocalRuntime(RuntimeConfig(timeout_s=0.5))
-        result = rt.execute("ping -n 5 127.0.0.1")
+        # `ping -n 5` 是 Windows 语法（macOS/Linux 的 ping 用 -c 且行为不同，
+        # macOS 下立即 usage 错误退出 → 不超时）。用平台无关的长命令验证超时。
+        import sys
+        cmd = f'"{sys.executable}" -c "import time; time.sleep(10)"'
+        result = rt.execute(cmd)
         assert result.timed_out
 
 

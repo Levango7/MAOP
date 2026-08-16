@@ -197,6 +197,20 @@ class SandboxViolation(Exception):
     """Raised when plugin code attempts a blocked operation."""
 
 
+def _mp_init_target(fn: Any, cfg: dict[str, Any], q: Any) -> None:
+    """模块级 multiprocessing target（PluginSandbox 的 init 超时沙箱）。
+
+    必须是模块级函数：macOS/Windows 的 multiprocessing 用 spawn 启动子进程，
+    target 需可 pickle；局部闭包（此前 _run_init_multiprocess 内的 _target）
+    在 spawn 下抛 "Can't pickle local object"（macOS CI 全挂）。
+    """
+    try:
+        fn(cfg)
+        q.put(None)
+    except Exception as exc:
+        q.put(exc)
+
+
 class PluginSandbox:
     """Restricted execution environment for plugin code.
 
@@ -355,14 +369,14 @@ class PluginSandbox:
         import multiprocessing as mp
         result_queue: mp.Queue = mp.Queue()
 
-        def _target(fn, cfg, q):
-            try:
-                fn(cfg)
-                q.put(None)
-            except Exception as exc:
-                q.put(exc)
-
-        proc = mp.Process(target=_target, args=(init_fn, config, result_queue), daemon=True)
+        # 模块级函数而非局部闭包：macOS/Windows 的 multiprocessing 默认 spawn
+        # 启动方式需要 pickle target，局部 _target 会抛
+        # "Can't pickle local object"（此前 macOS CI 全挂）。
+        proc = mp.Process(
+            target=_mp_init_target,
+            args=(init_fn, config, result_queue),
+            daemon=True,
+        )
         proc.start()
         proc.join(timeout=deadline)
         if proc.is_alive():
