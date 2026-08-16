@@ -343,7 +343,7 @@ class TestBackendContracts:
     def test_rabbitmq_backend_has_required_methods(self):
         """RabbitMQQueueBackend must implement publish/consume/ack/nack/topic_stats."""
         import ast
-        source = (Path(__file__).parent.parent / "maop" / "core" / "backends" / "backends_rabbitmq.py").read_text()
+        source = (Path(__file__).parent.parent / "maop" / "core" / "backends" / "backends_rabbitmq.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
         classes = [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "RabbitMQQueueBackend"]
         assert len(classes) == 1
@@ -354,7 +354,7 @@ class TestBackendContracts:
     def test_etcd_backend_has_required_methods(self):
         """EtcdKVBackend must implement get/set/delete/list_keys/cas."""
         import ast
-        source = (Path(__file__).parent.parent / "maop" / "core" / "backends" / "backends_distributed.py").read_text()
+        source = (Path(__file__).parent.parent / "maop" / "core" / "backends" / "backends_distributed.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
         classes = [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "EtcdKVBackend"]
         assert len(classes) == 1
@@ -365,7 +365,7 @@ class TestBackendContracts:
     def test_rabbitmq_backend_inherits_queue_backend(self):
         """RabbitMQQueueBackend should inherit from QueueBackend."""
         import ast
-        source = (Path(__file__).parent.parent / "maop" / "core" / "backends" / "backends_rabbitmq.py").read_text()
+        source = (Path(__file__).parent.parent / "maop" / "core" / "backends" / "backends_rabbitmq.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
         classes = [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "RabbitMQQueueBackend"]
         assert len(classes) == 1
@@ -375,7 +375,7 @@ class TestBackendContracts:
     def test_etcd_backend_inherits_kv_backend(self):
         """EtcdKVBackend should inherit from KVBackend."""
         import ast
-        source = (Path(__file__).parent.parent / "maop" / "core" / "backends" / "backends_distributed.py").read_text()
+        source = (Path(__file__).parent.parent / "maop" / "core" / "backends" / "backends_distributed.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
         classes = [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "EtcdKVBackend"]
         assert len(classes) == 1

@@ -75,7 +75,9 @@ class TestRunPowershell:
     @pytest.mark.skipif(not _HAS_POWERSHELL, reason="PowerShell not available on this platform")
     async def test_powershell_success(self):
         config = _config(cli="Write-Output", driver="powershell", command="Write-Output")
-        result = await _run_powershell(config, "hello", 10, ".", "t3")
+        # CI Windows runner 的 PowerShell 冷启动可达 >10s（hostedtoolcache 首次
+        # 初始化 profile），10s 超时误报 TIMEOUT。给 60s 余量（正常毫秒级）。
+        result = await _run_powershell(config, "hello", 60, ".", "t3")
         assert result.exit_code == 0
         assert result.driver == "powershell"
 
