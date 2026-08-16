@@ -295,9 +295,14 @@ class A2AManager:
             # t11: if a WorkerPool is configured, dispatch the task for real execution.
             if self._worker_pool is not None:
                 self._spawn_dispatch(task.task_id, agent_name, task_msg)
+            # A2A 协议语义：tasks/send 提交即返回 submitted（fire-and-forget）。
+            # 不能读 task.status —— _spawn_dispatch 的 daemon 线程可能已抢先执行
+            # dispatch_task 的 update_task("working")，导致响应反映执行中状态
+            # （CI xdist 下偶发 AssertionError: 'working' != 'submitted'）。
+            # 状态流转由客户端通过 tasks/get 查询。
             return A2AResponse(
                 id=message.id,
-                result={"task_id": task.task_id, "status": task.status},
+                result={"task_id": task.task_id, "status": "submitted"},
             )
 
         if method == "tasks/get":
