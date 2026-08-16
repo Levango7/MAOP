@@ -37,8 +37,8 @@ os.environ.setdefault("MAOP_RATE_LIMIT_ENABLED", "0")
 # test_agent_token_stream 3 个 SSE 失败即此根因）。
 # 这里在收集任何 test 模块之前先 import，锁定 auth=off 固化值；
 # 三个 e2e 文件随后会按自身 skip 逻辑（run in isolation）跳过。
-import maop.dashboard.routers.auth as _auth_mod  # noqa: F401,E402
-import maop.dashboard.server as _server_mod     # noqa: F401,E402
+import maop.dashboard.routers.auth as _auth_mod  # noqa: F401
+import maop.dashboard.server as _server_mod  # noqa: F401
 
 
 # ── Disable sentence_transformers in test environment ──────────────
