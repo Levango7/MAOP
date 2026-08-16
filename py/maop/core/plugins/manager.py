@@ -57,7 +57,7 @@ class PluginState(str, Enum):
     ERRORED = "errored"         # last transition raised
 
 
-class PluginRecord(BaseModel, arbitrary_types_allowed=True):  # type: ignore[call-arg]
+class PluginRecord(BaseModel, arbitrary_types_allowed=True):
     """Internal bookkeeping for one plugin instance."""
 
     spec: Any = None            # PluginSpec instance (arbitrary type for mypy)

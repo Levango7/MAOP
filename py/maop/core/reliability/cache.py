@@ -726,7 +726,7 @@ class CacheGuard:
 
     def stats(self) -> CacheGuardStats:
         """Get cache guard statistics."""
-        return self._stats.model_copy()  # type: ignore[no-any-return]
+        return self._stats.model_copy()
 
     def clear(self) -> None:
         """Clear all cache entries."""

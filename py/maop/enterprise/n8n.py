@@ -332,7 +332,7 @@ class N8nClient:
         try:
             client = self._get_client()
             resp = client.get("/workflows", params={"limit": 1})
-            return resp.status_code == 200  # type: ignore[no-any-return]
+            return resp.status_code == 200
         except Exception:
             return False
 

@@ -35,7 +35,7 @@ import zlib
 from typing import Any
 
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.x509 import load_der_x509_certificate
 from defusedxml.lxml import fromstring as _defused_fromstring
 from lxml import etree
@@ -551,6 +551,10 @@ class SAMLHandler:
             raise SSOError(f"SignatureValue base64 decode failed: {exc}") from exc
 
         try:
+            # SAML XML-DSig 使用 RSA-SHA256；联合类型（X25519 等）无 verify，
+            # 先做 isinstance 守卫避免运行时 AttributeError 与 mypy union-attr。
+            if not isinstance(public_key, rsa.RSAPublicKey):
+                raise SSOError("Signature verification requires an RSA public key")
             public_key.verify(
                 sig_value,
                 signed_info_c14n,

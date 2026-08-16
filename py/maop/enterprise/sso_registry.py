@@ -420,7 +420,7 @@ class SSOProviderRegistry:
         """转换为脱敏的 dict（用于 API 响应）。"""
         d = resp.model_dump()
         d["config"] = mask_sensitive_fields(d["config"])
-        return d  # type: ignore[no-any-return]
+        return d
 
     # ── state GC ─────────────────────────────────────────────────
     def _gc_pending(self) -> None:

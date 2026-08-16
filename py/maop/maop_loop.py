@@ -745,7 +745,7 @@ class MaopLoop(ExecuteMixin):
         """Execute Plan phase — route task to agent."""
         try:
             plan = maop_plan(task=task, workdir=workdir, config=self._config)
-            return plan.model_dump()  # type: ignore[no-any-return]
+            return plan.model_dump()
         except Exception as exc:
             # C2 fix: do NOT silently degrade to a hardcoded default route,
             # which would mask a real misconfiguration as a successful plan.

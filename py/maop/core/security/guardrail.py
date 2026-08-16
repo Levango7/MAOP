@@ -289,9 +289,9 @@ class Guardrail:
         if rule_id:
             for r in self._config.rules:
                 if r.id == rule_id:
-                    return r.model_dump(mode="json")  # type: ignore[no-any-return]
+                    return r.model_dump(mode="json")
             return {}
-        return self._config.model_dump(mode="json")  # type: ignore[no-any-return]
+        return self._config.model_dump(mode="json")
 
     def report(self) -> dict[str, Any]:
         """Summary of all rules."""

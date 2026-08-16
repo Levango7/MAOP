@@ -108,7 +108,7 @@ class AgentResolver:
             current_version = getattr(self._config, '_version', 0) if self._config else 0
             cached_version = self._cache_versions.get(agent_name, 0)
             if cached_version == current_version:
-                return cached.model_copy()  # type: ignore[no-any-return]
+                return cached.model_copy()
             else:
                 del self._cache[agent_name]
                 self._cache_versions.pop(agent_name, None)

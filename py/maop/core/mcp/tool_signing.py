@@ -99,7 +99,7 @@ def _load_public(pem: str | bytes) -> Ed25519PublicKey:
 def sign_bytes(data: bytes, private_pem: str | bytes) -> bytes:
     """Sign *data* with the Ed25519 private key → 64-byte signature."""
     key = _load_private(private_pem)
-    return key.sign(data)  # type: ignore[no-any-return]
+    return key.sign(data)
 
 
 def verify_bytes(data: bytes, signature: bytes, public_pem: str | bytes) -> bool:

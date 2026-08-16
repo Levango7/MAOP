@@ -105,10 +105,10 @@ class RedisQueueBackend(QueueBackend):
     def publish(self, topic: str, message: dict[str, Any], *, delay: float = 0) -> str:
         stream = self._stream_key(topic)
         # Redis Streams doesn't natively support delay; for delay>0 we store scheduled time
-        msg = {"data": json.dumps(message, default=str).encode().hex()}
+        msg: dict[str, Any] = {"data": json.dumps(message, default=str).encode().hex()}
         if delay > 0:
             msg["scheduled_at"] = str(time.time() + delay)
-        msg_id = self._client.xadd(stream, msg)
+        msg_id = self._client.xadd(stream, msg)  # type: ignore[arg-type]  # redis stub 对 dict[str,Any] 的 key 类型过严
         return msg_id.decode() if isinstance(msg_id, bytes) else msg_id
 
     def consume(self, topic: str, consumer_group: str = "", limit: int = 1) -> list[dict[str, Any]]:
@@ -118,9 +118,10 @@ class RedisQueueBackend(QueueBackend):
         consumer = self._consumer_name
         results = self._client.xreadgroup(group, consumer, {stream: ">"}, count=limit)
         messages = []
-        for _stream, entries in results:
-            for msg_id, fields in entries:
-                data_hex = fields.get(b"data", b"").decode()
+        # redis stub 对 xreadgroup 返回类型标注不完整（entries 被推断为 str）
+        for _stream, entries in results:  # type: ignore[str-unpack]
+            for msg_id, fields in entries:  # type: ignore[str-unpack, union-attr]
+                data_hex = fields.get(b"data", b"").decode()  # type: ignore[union-attr]
                 if data_hex:
                     msg = json.loads(bytes.fromhex(data_hex).decode())
                     msg["_msg_id"] = msg_id.decode() if isinstance(msg_id, bytes) else msg_id

@@ -129,7 +129,7 @@ class ApiKeyVault:
             with contextlib.suppress(Exception):
                 os.chmod(str(key_path), 0o600)
             logger.info("[api_key_vault] Generated new encryption key at %s", key_path)
-            return key  # type: ignore[no-any-return]
+            return key
         except Exception as exc:
             logger.warning("[api_key_vault] Failed to generate encryption key: %s", exc)
             return None

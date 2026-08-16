@@ -57,7 +57,7 @@ def _get_fernet() -> Any:
     secret_env = os.getenv("MAOP_NOTIFICATION_SECRET")
     if secret_env:
         key = secret_env.encode("utf-8")
-        if not Fernet.is_valid_key(key):
+        if not Fernet.is_valid_key(key):  # type: ignore[attr-defined]  # cryptography stub 未标 classmethod
             # Derive a valid Fernet key from the env secret via SHA256 → base64
             import base64
             import hashlib
@@ -67,7 +67,7 @@ def _get_fernet() -> Any:
         key_env = os.getenv("MAOP_KEY")
         if key_env:
             key = key_env.encode("utf-8")
-            if not Fernet.is_valid_key(key):
+            if not Fernet.is_valid_key(key):  # type: ignore[attr-defined]
                 import base64
                 import hashlib
                 key = base64.urlsafe_b64encode(hashlib.sha256(key).digest())
@@ -75,7 +75,7 @@ def _get_fernet() -> Any:
         key_file = os.getenv("MAOP_KEY_FILE")
         if key_file and Path(key_file).exists():
             key = Path(key_file).read_bytes().strip()
-            if not Fernet.is_valid_key(key):
+            if not Fernet.is_valid_key(key):  # type: ignore[attr-defined]
                 import base64
                 import hashlib
                 key = base64.urlsafe_b64encode(hashlib.sha256(key).digest())

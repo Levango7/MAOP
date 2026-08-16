@@ -69,7 +69,7 @@ class EvolutionSuggestion(BaseModel):
         d = super().model_dump(**kwargs)
         d["type"] = self.mutation_type
         d["suggestion_type"] = self.category
-        return d  # type: ignore[no-any-return]
+        return d
 
 
 class LoopReport(BaseModel):

@@ -384,7 +384,7 @@ def create_a2a_router(manager: A2AManager) -> Any:
     async def get_task(task_id: str) -> dict[str, Any]:
         task = manager.get_task(task_id)
         if task:
-            return task.model_dump()  # type: ignore[no-any-return]
+            return task.model_dump()
         return {"error": "not found"}
 
     return router
