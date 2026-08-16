@@ -1,0 +1,76 @@
+{{/* MAOP AlertManager message templates */}}
+{{/* Loaded from alertmanager/templates/ via `templates:` in alertmanager.yml */}}
+
+{{/* ── Email templates ───────────────────────────────────────── */}}
+
+{{ define "email.html" }}
+<html>
+<head>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; }
+    .header { background: {{ .Status | toUpper | eq "RESOLVED" | ternary "#28a745" "#dc3545" }}; color: #fff; padding: 12px 20px; border-radius: 4px; }
+    .header h1 { margin: 0; font-size: 18px; }
+    .meta { background: #f8f9fa; padding: 10px 20px; border-radius: 4px; margin: 12px 0; font-size: 13px; }
+    .alerts { margin-top: 12px; }
+    .alert { border-left: 3px solid {{ .Status | toUpper | eq "RESOLVED" | ternary "#28a745" "#dc3545" }}; padding: 8px 16px; margin-bottom: 8px; background: #fafafa; }
+    .alert-name { font-weight: 600; color: #1a1a1a; }
+    .alert-desc { color: #555; font-size: 13px; margin-top: 4px; }
+    .label { display: inline-block; background: #e9ecef; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin: 2px; }
+    .footer { margin-top: 20px; font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>[MAOP] {{ .Status | toUpper }} — {{ .CommonLabels.alertname }}</h1>
+  </div>
+  <div class="meta">
+    <strong>Severity:</strong> {{ .CommonLabels.severity }} |
+    <strong>Alerts:</strong> {{ .Alerts | len }} |
+    <strong>Group:</strong> {{ .GroupLabels.alertname }}
+    {{ if .CommonAnnotations.summary }}<br><strong>Summary:</strong> {{ .CommonAnnotations.summary }}{{ end }}
+  </div>
+  <div class="alerts">
+    {{ range .Alerts }}
+    <div class="alert">
+      <div class="alert-name">{{ .Labels.alertname }}</div>
+      <div class="alert-desc">{{ .Annotations.description }}</div>
+      <div>
+        {{ range .Labels.SortedPairs }}<span class="label">{{ .Name }}={{ .Value }}</span>{{ end }}
+      </div>
+      <div class="alert-desc">Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}{{ if .EndsAt }} | Ends: {{ .EndsAt.Format "2006-01-02 15:04:05" }}{{ end }}</div>
+    </div>
+    {{ end }}
+  </div>
+  <div class="footer">
+    Sent by MAOP AlertManager | <a href="http://maop-app:9079">Dashboard</a>
+  </div>
+</body>
+</html>
+{{ end }}
+
+{{ define "email.text" }}
+[MAOP] {{ .Status | toUpper }} — {{ .CommonLabels.alertname }}
+Severity: {{ .CommonLabels.severity }}
+Alerts: {{ .Alerts | len }}
+{{ if .CommonAnnotations.summary }}Summary: {{ .CommonAnnotations.summary }}{{ end }}
+
+{{ range .Alerts }}
+- Alert: {{ .Labels.alertname }}
+  Description: {{ .Annotations.description }}
+  Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+  Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}{{ if .EndsAt }} | Ends: {{ .EndsAt.Format "2006-01-02 15:04:05" }}{{ end }}
+{{ end }}
+
+Sent by MAOP AlertManager
+{{ end }}
+
+{{/* ── Slack templates ───────────────────────────────────────── */}}
+
+{{ define "slack.text" }}
+{{ range .Alerts }}
+• *{{ .Labels.alertname }}* ({{ .Labels.severity }})
+  {{ .Annotations.description }}
+  {{ if .Annotations.runbook_url }}<{{ .Annotations.runbook_url }}|Runbook>{{ end }}
+{{ end }}
+{{ if .CommonAnnotations.summary }}_{{ .CommonAnnotations.summary }}_{{ end }}
+{{ end }}

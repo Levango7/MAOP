@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import shutil
 import threading
@@ -71,6 +72,83 @@ DEFAULT_DATABASES = ["maop.db", "memory.db", "queue.db", "human_queue.db"]
 # Default retention: keep 10 most recent backups per database
 DEFAULT_RETENTION = 10
 
+# P2 安全修复: VACUUM INTO 路径白名单校验
+# 备份文件名只允许字母、数字、下划线、连字符、点（防止 SQL 注入和路径遍历）
+_BACKUP_FILENAME_RE = re.compile(r"^[a-zA-Z0-9_.\-]+$")
+
+
+def _get_allowed_backup_dirs(default_dir: Path) -> list[Path]:
+    """读取允许的备份目录白名单。
+
+    优先从 ``MAOP_BACKUP_DIR`` 环境变量读取（多个目录用 ``os.pathsep`` 分隔），
+    未配置时回退到 ``default_dir``。所有目录均解析为绝对路径。
+
+    Parameters
+    ----------
+    default_dir : Path
+        默认备份目录（通常是 ``<root>/data/backups``）。
+
+    Returns
+    -------
+    list[Path]
+        允许的备份目录绝对路径列表（已 resolve）。
+    """
+    raw = os.environ.get("MAOP_BACKUP_DIR", "").strip()
+    if not raw:
+        return [default_dir.resolve()]
+    dirs: list[Path] = []
+    for part in raw.split(os.pathsep):
+        part = part.strip()
+        if part:
+            dirs.append(Path(part).resolve())
+    return dirs or [default_dir.resolve()]
+
+
+def _validate_backup_path(backup_path: Path, allowed_dirs: list[Path]) -> None:
+    """校验备份路径安全性，不合法抛出 ``ValueError``。
+
+    校验规则：
+
+    1. 文件名只允许字母、数字、下划线、连字符、点
+       （``^[a-zA-Z0-9_.\\-]+$``）。
+    2. 路径 resolve 后必须落在 ``allowed_dirs`` 之一内
+       （防止路径遍历 ``../`` 和绝对路径逃逸）。
+    3. 拒绝包含单引号的路径（VACUUM INTO 用单引号包裹路径，防止 SQL 注入）。
+
+    Parameters
+    ----------
+    backup_path : Path
+        待校验的备份文件路径。
+    allowed_dirs : list[Path]
+        允许的备份目录白名单（已 resolve 的绝对路径）。
+
+    Raises
+    ------
+    ValueError
+        路径不合法时抛出，调用方应记录日志并跳过该备份。
+    """
+    name = backup_path.name
+    if not _BACKUP_FILENAME_RE.match(name):
+        raise ValueError(
+            f"Invalid backup filename (only [a-zA-Z0-9_.-] allowed): {name!r}"
+        )
+    # 路径遍历 / 绝对路径逃逸检查：resolve 后必须在白名单目录内
+    resolved = backup_path.resolve()
+    for allowed in allowed_dirs:
+        try:
+            resolved.relative_to(allowed)
+            break
+        except ValueError:
+            continue
+    else:
+        raise ValueError(
+            f"Backup path {resolved} is outside allowed backup directories "
+            f"{[str(d) for d in allowed_dirs]}"
+        )
+    # 拒绝单引号（VACUUM INTO 'path' 用单引号包裹，含引号会破坏 SQL 语法）
+    if "'" in str(backup_path):
+        raise ValueError(f"Backup path contains single quote: {backup_path}")
+
 
 # ── DbBackup ───────────────────────────────────────────────────
 
@@ -103,6 +181,8 @@ class DbBackup:
         self._manifest: list[BackupEntry] = []
         self._scheduler_thread: threading.Thread | None = None
         self._scheduler_running = False
+        # P2 安全修复: VACUUM INTO 路径白名单（从 MAOP_BACKUP_DIR 读取或回退默认）
+        self._allowed_backup_dirs = _get_allowed_backup_dirs(self._backup_dir)
 
         # Load existing manifest
         self._load_manifest()
@@ -141,7 +221,12 @@ class DbBackup:
                 logger.debug("[backup] Skip %s: not found", db_name)
                 continue
 
-            entry = self._backup_one(db_name, db_path, wal_checkpoint=wal_checkpoint)
+            try:
+                entry = self._backup_one(db_name, db_path, wal_checkpoint=wal_checkpoint)
+            except ValueError as ve:
+                # P2 安全修复: 路径白名单校验失败，跳过该 db 但继续备份其他
+                logger.warning("[backup] Rejected %s: %s", db_name, ve)
+                continue
             if entry is not None:
                 results.append(entry)
                 self._manifest.append(entry)
@@ -180,9 +265,9 @@ class DbBackup:
             suffix += 1
             backup_name = f"{db_name}.{timestamp}_{suffix}.bak"
             backup_path = self._backup_dir / backup_name
-        if "'" in str(backup_path):
-            logger.warning("[backup] Rejected backup_path with quote: %s", backup_path)
-            return None
+        # P2 安全修复: VACUUM INTO 路径白名单校验
+        # 校验文件名字符集 + 路径遍历 + 单引号注入，不合法抛出 ValueError
+        _validate_backup_path(backup_path, self._allowed_backup_dirs)
 
         start = time.monotonic()
         try:

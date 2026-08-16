@@ -94,11 +94,14 @@ class TestJwtSecretPriority:
         data_dir = tmp_path / "data"
         data_dir.mkdir()
         # Pre-existing file should be ignored when env var is set
-        (data_dir / "jwt_secret").write_text("file_secret_value", encoding="utf-8")
-        monkeypatch.setenv("MAOP_JWT_SECRET", "env_secret_value")
+        # P2 安全修复: 密钥强度校验要求 ≥32 字符，使用足够长的测试密钥
+        (data_dir / "jwt_secret").write_text(
+            "file_secret_value_at_least_32_chars_long", encoding="utf-8"
+        )
+        monkeypatch.setenv("MAOP_JWT_SECRET", "env_secret_value_at_least_32_chars_long")
 
         result = load_jwt_secret(data_dir)
-        assert result == "env_secret_value"
+        assert result == "env_secret_value_at_least_32_chars_long"
 
     def test_file_used_when_no_env(self, monkeypatch, tmp_path):
         """Fall back to data/jwt_secret file when env var is absent."""
@@ -106,11 +109,14 @@ class TestJwtSecretPriority:
 
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        (data_dir / "jwt_secret").write_text("persisted_secret_123", encoding="utf-8")
+        # P2 安全修复: 密钥强度校验要求 ≥32 字符
+        (data_dir / "jwt_secret").write_text(
+            "persisted_secret_123_at_least_32_chars_long", encoding="utf-8"
+        )
         monkeypatch.delenv("MAOP_JWT_SECRET", raising=False)
 
         result = load_jwt_secret(data_dir)
-        assert result == "persisted_secret_123"
+        assert result == "persisted_secret_123_at_least_32_chars_long"
 
     def test_auto_generate_and_persist(self, monkeypatch, tmp_path):
         """Auto-generate a secret and persist to data/jwt_secret."""
@@ -134,11 +140,74 @@ class TestJwtSecretPriority:
 
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        (data_dir / "jwt_secret").write_text("file_fallback_secret", encoding="utf-8")
+        # P2 安全修复: 密钥强度校验要求 ≥32 字符
+        (data_dir / "jwt_secret").write_text(
+            "file_fallback_secret_at_least_32_chars_long", encoding="utf-8"
+        )
         monkeypatch.setenv("MAOP_JWT_SECRET", "")
 
         result = load_jwt_secret(data_dir)
-        assert result == "file_fallback_secret"
+        assert result == "file_fallback_secret_at_least_32_chars_long"
+
+
+# ── JWT secret strength validation (P2 安全修复) ──────────────────
+
+class TestJwtSecretStrength:
+    """_validate_jwt_secret_strength() rejects weak/short/empty secrets."""
+
+    def test_empty_secret_rejected(self):
+        from maop.core.security.auth import _validate_jwt_secret_strength
+
+        with pytest.raises(RuntimeError, match="empty"):
+            _validate_jwt_secret_strength("", "test")
+
+    def test_short_secret_rejected(self):
+        from maop.core.security.auth import _validate_jwt_secret_strength
+
+        with pytest.raises(RuntimeError, match="too short"):
+            _validate_jwt_secret_strength("short_key_only_20_chars", "test")
+
+    def test_weak_secret_rejected(self):
+        from maop.core.security.auth import _validate_jwt_secret_strength
+
+        # 弱密钥黑名单中的值（弱密钥检查在长度检查之前，所以短弱密钥也会被拒绝）
+        for weak in ("secret", "changeme", "password", "default", "maop"):
+            with pytest.raises(RuntimeError, match="weak"):
+                _validate_jwt_secret_strength(weak, "test")
+
+    def test_strong_secret_accepted(self):
+        from maop.core.security.auth import _validate_jwt_secret_strength
+
+        # 64-char hex string (secrets.token_hex(32) output)
+        strong = "a" * 64
+        _validate_jwt_secret_strength(strong, "test")  # should not raise
+
+    def test_env_var_weak_secret_rejected_at_load(self, monkeypatch, tmp_path):
+        """load_jwt_secret() rejects weak MAOP_JWT_SECRET from env var."""
+        from maop.core.security.auth import load_jwt_secret
+
+        monkeypatch.setenv("MAOP_JWT_SECRET", "secret")
+        with pytest.raises(RuntimeError, match="weak"):
+            load_jwt_secret(tmp_path)
+
+    def test_env_var_short_secret_rejected_at_load(self, monkeypatch, tmp_path):
+        """load_jwt_secret() rejects short MAOP_JWT_SECRET from env var."""
+        from maop.core.security.auth import load_jwt_secret
+
+        monkeypatch.setenv("MAOP_JWT_SECRET", "too_short_only_18_chars")
+        with pytest.raises(RuntimeError, match="too short"):
+            load_jwt_secret(tmp_path)
+
+    def test_file_weak_secret_rejected_at_load(self, monkeypatch, tmp_path):
+        """load_jwt_secret() rejects weak secret from file."""
+        from maop.core.security.auth import load_jwt_secret
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        (data_dir / "jwt_secret").write_text("password", encoding="utf-8")
+        monkeypatch.delenv("MAOP_JWT_SECRET", raising=False)
+        with pytest.raises(RuntimeError, match="weak"):
+            load_jwt_secret(data_dir)
 
 
 # ── Admin password env var ───────────────────────────────────────

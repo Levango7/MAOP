@@ -1,116 +1,120 @@
 <template>
   <div class="models-view">
-    <PageHeader>
-      <button class="btn-ghost" :disabled="loading" @click="loadAll">
-        <AppIcon name="refresh" :size="15" /> {{ t('common.refresh') }}
-      </button>
-    </PageHeader>
-
-    <!-- Registry overview -->
-    <section v-if="!registryError.value" class="stat-row">
-      <StatCard :label="t('view.models.stat.totalModels')" :value="registry.total_models" icon="cpu" tone="brand" :loading="loading" />
-      <StatCard :label="t('view.models.enabled')" :value="registry.enabled_models" icon="check-circle" tone="success" :loading="loading" />
-      <StatCard :label="t('view.models.stat.providers')" :value="registry.total_providers" icon="server" tone="info" :loading="loading" />
-      <StatCard :label="t('view.models.stat.thinkingCapable')" :value="registry.thinking_capable" icon="sparkles" tone="warn" :loading="loading" />
-    </section>
-
-    <div v-if="registryError.value" class="grid-2">
-      <EmptyState
+    <ListPageLayout>
+      <template #actions>
+        <button class="btn-ghost" :disabled="loading" @click="loadAll">
+          <AppIcon name="refresh" :size="15" /> {{ t('common.refresh') }}
+        </button>
+      </template>
+      <template #stats>
+        <!-- Registry overview -->
+        <section v-if="!registryError.value" class="stat-row">
+          <StatCard :label="t('view.models.stat.totalModels')" :value="registry.total_models" icon="cpu" tone="brand" :loading="loading" />
+          <StatCard :label="t('view.models.enabled')" :value="registry.enabled_models" icon="check-circle" tone="success" :loading="loading" />
+          <StatCard :label="t('view.models.stat.providers')" :value="registry.total_providers" icon="server" tone="info" :loading="loading" />
+          <StatCard :label="t('view.models.stat.thinkingCapable')" :value="registry.thinking_capable" icon="sparkles" tone="warn" :loading="loading" />
+        </section>
+      </template>
+      <template #content>
+        <div v-if="registryError.value" class="grid-2">
+          <EmptyState
 icon="alert-triangle" :title="t('view.models.couldNotLoadRegistry')"
-        :description="registryError.value" />
-    </div>
+            :description="registryError.value" />
+        </div>
 
-    <!-- Model registry -->
-    <Card
+        <!-- Model registry -->
+        <Card
 :title="t('view.models.modelRegistry')" icon="cpu" :margin-bottom="16"
-      :subtitle="`${models.length} ` + t('view.models.registeredModels')">
-      <div v-if="modelsError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadModels')" :description="modelsError.value" /></div>
-      <Skeleton v-else-if="loading" :lines="6" block />
-      <DataTable
+          :subtitle="`${models.length} ` + t('view.models.registeredModels')">
+          <div v-if="modelsError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadModels')" :description="modelsError.value" /></div>
+          <Skeleton v-else-if="loading" :lines="6" block />
+          <DataTable
 v-else :columns="modelCols" :rows="modelRows" :loading="false"
-        :empty-text="t('view.models.noModels')" />
-    </Card>
+            :empty-text="t('view.models.noModels')" />
+        </Card>
 
-    <!-- Providers -->
-    <Card
+        <!-- Providers -->
+        <Card
 :title="t('view.models.providerHealth')" icon="activity" :margin-bottom="16"
-      :subtitle="`${providers.length} ` + t('view.models.providersLabel')">
-      <div v-if="providersError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadProviders')" :description="providersError.value" /></div>
-      <Skeleton v-else-if="loading && !providers.length" :lines="5" block />
-      <DataTable v-else :columns="providerCols" :rows="providerRows" :empty-text="t('view.models.noProviders')" />
-    </Card>
+          :subtitle="`${providers.length} ` + t('view.models.providersLabel')">
+          <div v-if="providersError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadProviders')" :description="providersError.value" /></div>
+          <Skeleton v-else-if="loading && !providers.length" :lines="5" block />
+          <DataTable v-else :columns="providerCols" :rows="providerRows" :empty-text="t('view.models.noProviders')" />
+        </Card>
 
-    <!-- Agents -->
-    <Card
+        <!-- Agents -->
+        <Card
 :title="t('view.models.agentDrivers')" icon="bot" :margin-bottom="16"
-      :subtitle="`${agents.length} ` + t('view.models.agentsLabel')">
-      <div v-if="agentsError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAgents')" :description="agentsError.value" /></div>
-      <Skeleton v-else-if="loading && !agents.length" :lines="5" block />
-      <DataTable v-else :columns="agentCols" :rows="agentRows" :empty-text="t('view.models.noAgents')" />
-    </Card>
+          :subtitle="`${agents.length} ` + t('view.models.agentsLabel')">
+          <div v-if="agentsError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAgents')" :description="agentsError.value" /></div>
+          <Skeleton v-else-if="loading && !agents.length" :lines="5" block />
+          <DataTable v-else :columns="agentCols" :rows="agentRows" :empty-text="t('view.models.noAgents')" />
+        </Card>
 
-    <div class="grid-2">
-      <!-- Budget -->
-      <Card :title="t('view.models.budget')" icon="dollar" :margin-bottom="16">
-        <div v-if="budgetError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadBudget')" :description="budgetError.value" /></div>
-        <Skeleton v-else-if="loading && !budget.data" :lines="5" block />
-        <div v-else-if="budget.data" class="metric-grid">
-          <div class="metric"><span class="metric-k">{{ t('view.models.metric.daily') }}</span><span class="metric-v">${{ fmt(budget.data.daily_spend) }} <em>/ ${{ fmt(budget.data.daily_limit) }}</em></span></div>
-          <div class="metric"><span class="metric-k">{{ t('view.models.metric.monthly') }}</span><span class="metric-v">${{ fmt(budget.data.monthly_spend) }} <em>/ ${{ fmt(budget.data.monthly_limit) }}</em></span></div>
-          <div class="metric"><span class="metric-k">{{ t('view.models.metric.utilization') }}</span><span class="metric-v">{{ pct(budget.data.daily_utilization) }}%</span></div>
-          <div class="metric"><span class="metric-k">{{ t('view.models.metric.alertAt') }}</span><span class="metric-v">{{ pct(budget.data.alert_threshold) }}%</span></div>
-          <div class="metric"><span class="metric-k">{{ t('view.models.metric.hardStop') }}</span><span class="metric-v"><Badge :tone="budget.data.hard_stop ? 'fail' : 'neutral'">{{ budget.data.hard_stop ? t('view.models.enabled') : t('view.models.disabled') }}</Badge></span></div>
+        <div class="grid-2">
+          <!-- Budget -->
+          <Card :title="t('view.models.budget')" icon="dollar" :margin-bottom="16">
+            <div v-if="budgetError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadBudget')" :description="budgetError.value" /></div>
+            <Skeleton v-else-if="loading && !budget.data" :lines="5" block />
+            <div v-else-if="budget.data" class="metric-grid">
+              <div class="metric"><span class="metric-k">{{ t('view.models.metric.daily') }}</span><span class="metric-v">${{ fmt(budget.data.daily_spend) }} <em>/ ${{ fmt(budget.data.daily_limit) }}</em></span></div>
+              <div class="metric"><span class="metric-k">{{ t('view.models.metric.monthly') }}</span><span class="metric-v">${{ fmt(budget.data.monthly_spend) }} <em>/ ${{ fmt(budget.data.monthly_limit) }}</em></span></div>
+              <div class="metric"><span class="metric-k">{{ t('view.models.metric.utilization') }}</span><span class="metric-v">{{ pct(budget.data.daily_utilization) }}%</span></div>
+              <div class="metric"><span class="metric-k">{{ t('view.models.metric.alertAt') }}</span><span class="metric-v">{{ pct(budget.data.alert_threshold) }}%</span></div>
+              <div class="metric"><span class="metric-k">{{ t('view.models.metric.hardStop') }}</span><span class="metric-v"><Badge :tone="budget.data.hard_stop ? 'fail' : 'neutral'">{{ budget.data.hard_stop ? t('view.models.enabled') : t('view.models.disabled') }}</Badge></span></div>
+            </div>
+            <EmptyState v-else icon="info" :title="t('view.models.noBudgetData')" />
+          </Card>
+
+          <!-- CLI availability (real /api/model/quota shape) -->
+          <Card :title="t('view.models.agentCliAvailability')" icon="wrench" :margin-bottom="16">
+            <div v-if="quotaError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAvailability')" :description="quotaError.value" /></div>
+            <Skeleton v-else-if="loading && !quota.rows.length" :lines="5" block />
+            <DataTable v-else :columns="quotaCols" :rows="quota.rows" :empty-text="t('view.models.noAvailability')" />
+          </Card>
         </div>
-        <EmptyState v-else icon="info" :title="t('view.models.noBudgetData')" />
-      </Card>
 
-      <!-- CLI availability (real /api/model/quota shape) -->
-      <Card :title="t('view.models.agentCliAvailability')" icon="wrench" :margin-bottom="16">
-        <div v-if="quotaError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAvailability')" :description="quotaError.value" /></div>
-        <Skeleton v-else-if="loading && !quota.rows.length" :lines="5" block />
-        <DataTable v-else :columns="quotaCols" :rows="quota.rows" :empty-text="t('view.models.noAvailability')" />
-      </Card>
-    </div>
-
-    <!-- Routing policies -->
-    <Card
+        <!-- Routing policies -->
+        <Card
 :title="t('view.models.routingPolicies')" icon="route" :margin-bottom="16"
-      :subtitle="`${policies.length} ` + t('view.models.policiesLabel')">
-      <div v-if="policiesError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadPolicies')" :description="policiesError.value" /></div>
-      <Skeleton v-else-if="loading && !policies.length" :lines="4" block />
-      <DataTable v-else :columns="policyCols" :rows="policyRows" :empty-text="t('view.models.noPolicies')" />
-    </Card>
+          :subtitle="`${policies.length} ` + t('view.models.policiesLabel')">
+          <div v-if="policiesError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadPolicies')" :description="policiesError.value" /></div>
+          <Skeleton v-else-if="loading && !policies.length" :lines="4" block />
+          <DataTable v-else :columns="policyCols" :rows="policyRows" :empty-text="t('view.models.noPolicies')" />
+        </Card>
 
-    <!-- Model switch -->
-    <Card :title="t('view.models.modelSwitch')" icon="refresh" :subtitle="t('view.models.modelSwitchSub')">
-      <form class="switch-form" @submit.prevent="doSwitch">
-        <div class="switch-fields">
-          <div class="field">
-            <label>{{ t('view.models.agent') }}</label>
-            <select v-model="switchForm.agent" :disabled="loading" class="switch-select">
-              <option value="" disabled>{{ t('view.models.selectAgent') }}</option>
-              <option v-for="a in agents" :key="a.name" :value="a.name">{{ a.name }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>{{ t('common.model') }}</label>
-            <select v-model="switchForm.model" :disabled="loading" class="switch-select">
-              <option value="" disabled>{{ t('view.models.selectModel') }}</option>
-              <option v-for="m in models" :key="m.name" :value="m.name">{{ m.name }} · {{ m.provider }}</option>
-            </select>
-          </div>
-        </div>
-        <div class="switch-actions">
-          <button type="submit" class="btn btn--primary" :disabled="switching || !switchForm.agent || !switchForm.model">
-            <AppIcon v-if="switching" name="refresh" :size="14" :class="{ spinning: switching }" />
-            {{ switching ? t('view.models.switching') : t('view.models.switchModel') }}
-          </button>
-          <span v-if="switchResult" class="switch-result" :class="switchResult.ok ? 'is-ok' : 'is-fail'">
-            <AppIcon :name="switchResult.ok ? 'check-circle' : 'x-circle'" :size="14" /> {{ switchResult.msg }}
-          </span>
-        </div>
-      </form>
-    </Card>
+        <!-- Model switch -->
+        <Card :title="t('view.models.modelSwitch')" icon="refresh" :subtitle="t('view.models.modelSwitchSub')">
+          <form class="switch-form" @submit.prevent="doSwitch">
+            <div class="switch-fields">
+              <div class="field">
+                <label>{{ t('view.models.agent') }}</label>
+                <select v-model="switchForm.agent" :disabled="loading" class="switch-select">
+                  <option value="" disabled>{{ t('view.models.selectAgent') }}</option>
+                  <option v-for="a in agents" :key="a.name" :value="a.name">{{ a.name }}</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>{{ t('common.model') }}</label>
+                <select v-model="switchForm.model" :disabled="loading" class="switch-select">
+                  <option value="" disabled>{{ t('view.models.selectModel') }}</option>
+                  <option v-for="m in models" :key="m.name" :value="m.name">{{ m.name }} · {{ m.provider }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="switch-actions">
+              <button type="submit" class="btn btn--primary" :disabled="switching || !switchForm.agent || !switchForm.model">
+                <AppIcon v-if="switching" name="refresh" :size="14" :class="{ spinning: switching }" />
+                {{ switching ? t('view.models.switching') : t('view.models.switchModel') }}
+              </button>
+              <span v-if="switchResult" class="switch-result" :class="switchResult.ok ? 'is-ok' : 'is-fail'">
+                <AppIcon :name="switchResult.ok ? 'check-circle' : 'x-circle'" :size="14" /> {{ switchResult.msg }}
+              </span>
+            </div>
+          </form>
+        </Card>
+      </template>
+    </ListPageLayout>
   </div>
 </template>
 
@@ -118,7 +122,8 @@ v-else :columns="modelCols" :rows="modelRows" :loading="false"
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
-import { Card, StatCard, Badge, DataTable, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
+import ListPageLayout from '../components/ListPageLayout.vue';
+import { Card, StatCard, Badge, DataTable, Skeleton, EmptyState, AppIcon } from '../components/index.js';
 
 const api = useApiStore();
 const { t } = useI18n();

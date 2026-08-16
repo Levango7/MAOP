@@ -8,7 +8,7 @@ MAOP v5.0.0 是一个 major release，包含不兼容变更、配置收敛、流
 
 ### ⚠ 不兼容变更
 
-详见 [MIGRATION-5.0.md](MIGRATION-5.0.md)。主要变更：
+详见 [MIGRATION-5.0.md](./migration-5.0.md)。主要变更：
 
 - 移除 deprecated ≥ 2 版本的 API（`create_app()`、`_render_html()`、legacy keyword routing、`/api/batch`）。
 - 短名环境变量加 `DeprecationWarning`（`MAOP_PORT` → `MAOP_DASH_PORT` 等）。

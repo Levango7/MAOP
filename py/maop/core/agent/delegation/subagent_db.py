@@ -36,6 +36,7 @@ SQLite 列声明为 TEXT 即可同时容纳两种格式 —— 同一行不会�
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 
@@ -173,6 +174,83 @@ _NON_MIGRATABLE_COLUMNS = {"id"}
 # 这些列的 NOT NULL 约束会阻止另一套 manager 的 INSERT（不传该列），必须通过
 # 重建表来放宽约束。
 _NULLABLE_IN_NEW_SCHEMA = {"name", "parent_agent", "child_agent"}
+
+# P2 安全修复: ALTER TABLE ADD COLUMN 列名/类型白名单校验
+# 列名只允许字母/下划线开头 + 字母/数字/下划线（防 SQL 注入）
+_COLUMN_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+# 允许的 SQLite 列基础类型（不区分大小写）。
+# 参考 https://www.sqlite.org/datatype3.html 亲和类型 + 常见派生类型
+_SAFE_COLUMN_TYPES = frozenset({
+    # SQLite 亲和类型
+    "TEXT", "INTEGER", "REAL", "BLOB", "NUMERIC",
+    # 常见布尔/时间类型
+    "BOOLEAN", "TIMESTAMP", "DATETIME", "DATE", "TIME",
+    # 数值派生类型
+    "INT", "TINYINT", "SMALLINT", "BIGINT", "FLOAT", "DOUBLE",
+    "DECIMAL",
+    # 字符串派生类型
+    "CHAR", "VARCHAR", "NCHAR", "NVARCHAR",
+    # JSON 类型（SQLite 3.38+）
+    "JSON", "JSONB",
+})
+
+
+def _validate_column_def(col: str, col_def: str) -> None:
+    """校验 ``ALTER TABLE ADD COLUMN`` 的列名和类型定义安全性。
+
+    防御性校验：即使 ``REQUIRED_COLUMNS`` 是模块级常量，也确保未来若从
+    用户输入/配置读取列名时不会引入 SQL 注入。
+
+    校验规则：
+
+    1. 列名只允许 ``^[a-zA-Z_][a-zA-Z0-9_]*$``（字母/下划线开头）。
+    2. 列定义的基础类型（第一个 token，大写）必须在 ``_SAFE_COLUMN_TYPES`` 内。
+    3. 列定义不允许包含分号 ``;``（防多语句注入）和 SQL 行注释 ``--``。
+       单引号 / 双引号允许出现（``DEFAULT ''`` 等合法用法），但必须成对。
+
+    Parameters
+    ----------
+    col : str
+        列名。
+    col_def : str
+        列类型定义，形如 ``"TEXT DEFAULT ''"`` 或 ``"INTEGER"``。
+
+    Raises
+    ------
+    ValueError
+        列名或类型不合法时抛出，调用方应记录日志并跳过该列。
+    """
+    if not _COLUMN_NAME_RE.match(col):
+        raise ValueError(
+            f"Invalid column name (only [a-zA-Z_][a-zA-Z0-9_]* allowed): {col!r}"
+        )
+    stripped = col_def.strip()
+    if not stripped:
+        raise ValueError(f"Empty column definition for column {col!r}")
+    # 提取基础类型（第一个 token，大写）
+    base_type = stripped.split()[0].upper()
+    if base_type not in _SAFE_COLUMN_TYPES:
+        raise ValueError(
+            f"Unsafe column type {base_type!r} for column {col!r}; "
+            f"allowed: {sorted(_SAFE_COLUMN_TYPES)}"
+        )
+    # 拒绝分号（防多语句注入）和 SQL 行注释（--）
+    if ";" in col_def:
+        raise ValueError(
+            f"Column definition for {col!r} contains semicolon: {col_def!r}"
+        )
+    if "--" in col_def:
+        raise ValueError(
+            f"Column definition for {col!r} contains SQL comment '--': {col_def!r}"
+        )
+    # 单引号 / 双引号必须成对（防破坏 SQL 引号上下文）
+    for quote_char in ("'", '"'):
+        if col_def.count(quote_char) % 2 != 0:
+            raise ValueError(
+                f"Column definition for {col!r} has unbalanced {quote_char!r}: "
+                f"{col_def!r}"
+            )
 
 
 def get_subagent_db_path() -> Path:
@@ -323,6 +401,8 @@ def migrate_legacy_subagent_db() -> None:
                     continue
                 # ALTER TABLE ADD COLUMN 接受简单类型 + DEFAULT，不接受 PRIMARY KEY/NOT NULL
                 # col_def 形如 "TEXT DEFAULT ''" 已经是合法的 ADD COLUMN 子句
+                # P2 安全修复: 列名/类型白名单校验，防 SQL 注入
+                _validate_column_def(col, col_def)
                 conn.execute(f"ALTER TABLE subagents ADD COLUMN {col} {col_def}")
 
         # 确保索引和附属表也存在（旧库可能只有 subagents 表）

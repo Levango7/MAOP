@@ -735,8 +735,8 @@ py/tests/test_core_coverage2.py
 ### 6.2 更新文档
 
 合并完成后，更新以下文档：
-- `docs/h2-merge-feasibility-check-report.md` — 标记 14 项为"已合并"
-- `docs/h2-patch-test-merge-plan.md` — 更新合并进度
+- `docs/archive/merge-plans/h2-merge-feasibility-check-report.md` — 标记 14 项为"已合并"
+- `docs/archive/merge-plans/h2-patch-test-merge-plan.md` — 更新合并进度
 
 ## 第7章 总结
 

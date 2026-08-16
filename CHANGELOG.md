@@ -76,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ⚠ Breaking Changes
 
-本版本为 major release，含不兼容变更。详见 [MIGRATION-5.0.md](MIGRATION-5.0.md)。
+本版本为 major release，含不兼容变更。详见 [MIGRATION-5.0.md](docs/migration-5.0.md)。
 
 #### Removed（废弃 ≥ 2 版本的 API）
 
@@ -106,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 后端新增 `/api/stream/agent/{execution_id}` SSE 端点，支持 Agent 执行过程的 token-by-token 流式推送（区别于 `/api/chat/stream` 的 chat 流式，本端点针对 agent 任务执行）。
   - 前端新增 `useAgentTokenStream.js` composable，封装 EventSource 连接、token 累积、自动重连、AbortController 清理。
   - `Chat.vue` 集成增强：流式渲染时显示 token 计数与流速指示，`onMeta` 回调接收 `tokens` / `model` / `latency_ms` 元数据。
-- **迁移指南 `MIGRATION-5.0.md`**：覆盖后端 API 变更、配置环境变量迁移、Docker 部署变更、前端无变更说明。
+- **迁移指南 `docs/migration-5.0.md`**：覆盖后端 API 变更、配置环境变量迁移、Docker 部署变更、前端无变更说明。
 - **ROADMAP.md 状态更新**：v4.5.0 标记为已发布，v5.0.0 标记为当前版本。
 - **Phase 5b — 发布/性能/合规修复（G-08~G-17）**：
   - **G-12 SLA/支持体系**：新增 `docs/sla.md`（服务等级协议，含可用性 SLO、延迟 SLO、违约补偿）与 `docs/support-policy.md`（三级支持体系 L1/L2/L3、工单优先级、版本支持策略）。

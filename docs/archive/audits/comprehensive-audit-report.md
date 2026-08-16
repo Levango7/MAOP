@@ -228,11 +228,11 @@ dependencies = [
 - `README.md` — 项目概述和快速开始
 - `py/README.md` — Python 包说明
 - `docs/adr/` — 7 个架构决策记录
-- `docs/plan/routing-refactor-plan.md` — 重构计划
+- `docs/archive/plans/routing-refactor-plan.md` — 重构计划
 - `CHANGELOG.md` — 变更日志
-- `DESIGN_RULES.md` — 设计规则
+- `docs/DESIGN_RULES.md` — 设计规则
 - `security-audit.md` — 安全审计报告
-- `docs/comprehensive-audit-report.md` — 本次全面审查报告
+- `docs/archive/audits/comprehensive-audit-report.md` — 本次全面审查报告
 
 ### ❌ 缺失文档
 - API 参考文档

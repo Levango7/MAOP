@@ -482,7 +482,7 @@ onUnmounted(() => {
 }
 .dag-exec-input:focus {
   border-color: var(--brand, #3574f0);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 2px var(--brand-soft);
 }
 
 /* F1-02: Agent 健康度面板 */
@@ -587,21 +587,21 @@ onUnmounted(() => {
   border-radius: 50%;
 }
 .pill-normal {
-  background: rgba(34, 197, 94, 0.12);
+  background: var(--success-soft);
   color: var(--success, #22c55e);
 }
 .pill-normal .pill-dot {
   background: var(--success, #22c55e);
 }
 .pill-drained {
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--fail-soft);
   color: var(--fail, #ef4444);
 }
 .pill-drained .pill-dot {
   background: var(--fail, #ef4444);
 }
 .pill-recovering {
-  background: rgba(245, 158, 11, 0.12);
+  background: var(--warn-soft);
   color: var(--warn, #f59e0b);
 }
 .pill-recovering .pill-dot {

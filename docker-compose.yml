@@ -79,6 +79,15 @@ services:
       - MAOP_TLS=${MAOP_TLS:-0}
       - MAOP_TLS_CERT=${MAOP_TLS_CERT:-}
       - MAOP_TLS_KEY=${MAOP_TLS_KEY:-}
+      # P2 安全修复: JWT 签名密钥。
+      # - production (MAOP_ENV=production): 必须在 .env 中显式设置
+      #   MAOP_JWT_SECRET，否则启动时 load_jwt_secret() 抛 RuntimeError 拒绝启动。
+      # - 非生产环境: 留空时 auth.py 会用 secrets.token_hex(32) 自动生成
+      #   64 字符随机密钥并持久化到 data/jwt_secret（mode 0o600），
+      #   同时打印 SECURITY 警告日志。
+      # - 弱密钥（"secret"/"changeme"/"password"/<32 字符）会被
+      #   load_jwt_secret() 的强度校验拒绝。
+      # 切勿在此硬编码真实密钥；请通过 .env 文件注入。
       - MAOP_JWT_SECRET=${MAOP_JWT_SECRET:-}
       - MAOP_LICENSE_KEY=${MAOP_LICENSE_KEY:-}
       - MAOP_CORS_ORIGINS=${MAOP_CORS_ORIGINS:-http://localhost:9079,http://127.0.0.1:9079}

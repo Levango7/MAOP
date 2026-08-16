@@ -11,7 +11,7 @@
 | 状态 | Draft - Pending Review |
 | 适用范围 | MAOP Personal Edition + Enterprise Edition |
 | 评审人 | TBD（待指定产品委员会 + 架构委员会） |
-| 关联文档 | [ROADMAP.md](../ROADMAP.md)、[hld-three-phase-roadmap.md](./hld-three-phase-roadmap.md)、[platform-evolution.md](./platform-evolution.md) |
+| 关联文档 | [ROADMAP.md](../../ROADMAP.md)、[hld-three-phase-roadmap.md](./hld-three-phase-roadmap.md)、[platform-evolution.md](../../platform-evolution.md) |
 | 文档约定 | Markdown heading：H1 文档名 / H2 章 / H3 节 / H4 子节 / H5 子子节；图表使用 Mermaid 语法 |
 
 ---

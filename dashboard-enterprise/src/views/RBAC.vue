@@ -1,64 +1,69 @@
 <template>
   <div class="rbac-page">
-    <PageHeader>
-      <Badge tone="brand">{{ t('view.rbac.enterprise') }}</Badge>
-      <button class="btn btn--primary" @click="openGrant">
-        <AppIcon name="shield" :size="15" /> {{ t('view.rbac.grantRole') }}
-      </button>
-    </PageHeader>
-
-    <Card :title="t('view.rbac.roles')" icon="shield" :margin-bottom="16">
-      <div v-if="!rolesLoading" class="role-grid">
-        <div v-for="r in roles" :key="r.role" class="role-card">
-          <div class="role-card__head">
-            <AppIcon name="shield" :size="16" />
-            <h3>{{ roleLabel(r.role) }}</h3>
-            <Badge tone="brand">{{ r.permission_count }} {{ t('view.rbac.perms') }}</Badge>
+    <ListPageLayout>
+      <template #badges>
+        <Badge tone="brand">{{ t('view.rbac.enterprise') }}</Badge>
+      </template>
+      <template #actions>
+        <button class="btn btn--primary" @click="openGrant">
+          <AppIcon name="shield" :size="15" /> {{ t('view.rbac.grantRole') }}
+        </button>
+      </template>
+      <template #content>
+        <Card :title="t('view.rbac.roles')" icon="shield" :margin-bottom="16">
+          <div v-if="!rolesLoading" class="role-grid">
+            <div v-for="r in roles" :key="r.role" class="role-card">
+              <div class="role-card__head">
+                <AppIcon name="shield" :size="16" />
+                <h3>{{ roleLabel(r.role) }}</h3>
+                <Badge tone="brand">{{ r.permission_count }} {{ t('view.rbac.perms') }}</Badge>
+              </div>
+              <div class="perm-wrap">
+                <Badge v-for="p in r.permissions" :key="p" tone="neutral">{{ p }}</Badge>
+              </div>
+            </div>
           </div>
-          <div class="perm-wrap">
-            <Badge v-for="p in r.permissions" :key="p" tone="neutral">{{ p }}</Badge>
+          <div v-else class="role-grid">
+            <Skeleton v-for="n in 4" :key="n" height="92px" />
           </div>
-        </div>
-      </div>
-      <div v-else class="role-grid">
-        <Skeleton v-for="n in 4" :key="n" height="92px" />
-      </div>
-      <p v-if="rolesError" class="inline-error">{{ rolesError }}</p>
-    </Card>
+          <p v-if="rolesError" class="inline-error">{{ rolesError }}</p>
+        </Card>
 
-    <Card :title="t('view.rbac.activeGrants')" icon="clipboard" :margin-bottom="16">
-      <div v-if="grants.length" class="grant-list">
-        <div v-for="g in grants" :key="g.__key" class="grant-row">
-          <div class="grant-meta">
-            <span class="grant-user">{{ g.user_id }}</span>
-            <Badge tone="brand">{{ g.role }}</Badge>
-            <span v-if="g.tenant_id" class="muted">{{ t('view.rbac.tenantLabel') }} {{ g.tenant_id }}</span>
-            <span v-if="g.granted_by" class="muted">{{ t('view.rbac.grantedBy') }} {{ g.granted_by }}</span>
+        <Card :title="t('view.rbac.activeGrants')" icon="clipboard" :margin-bottom="16">
+          <div v-if="grants.length" class="grant-list">
+            <div v-for="g in grants" :key="g.__key" class="grant-row">
+              <div class="grant-meta">
+                <span class="grant-user">{{ g.user_id }}</span>
+                <Badge tone="brand">{{ g.role }}</Badge>
+                <span v-if="g.tenant_id" class="muted">{{ t('view.rbac.tenantLabel') }} {{ g.tenant_id }}</span>
+                <span v-if="g.granted_by" class="muted">{{ t('view.rbac.grantedBy') }} {{ g.granted_by }}</span>
+              </div>
+              <button class="btn btn--sm btn--danger" @click="revoke(g)">{{ t('view.rbac.revoke') }}</button>
+            </div>
           </div>
-          <button class="btn btn--sm btn--danger" @click="revoke(g)">{{ t('view.rbac.revoke') }}</button>
-        </div>
-      </div>
-      <EmptyState
-        v-else-if="!grantsLoading"
-        icon="clipboard"
-        :title="t('view.rbac.noGrants')"
-        :description="grantsError || t('view.rbac.noGrantsDesc')"
-      />
-      <Skeleton v-else height="120px" />
-    </Card>
+          <EmptyState
+            v-else-if="!grantsLoading"
+            icon="clipboard"
+            :title="t('view.rbac.noGrants')"
+            :description="grantsError || t('view.rbac.noGrantsDesc')"
+          />
+          <Skeleton v-else height="120px" />
+        </Card>
 
-    <Card :title="t('view.rbac.permissionCatalog')" icon="lock" :margin-bottom="16">
-      <DataTable
-        v-if="permissions.length"
-        :columns="permCols"
-        :rows="permissions"
-        :loading="permsLoading"
-        row-key="value"
-        :empty-text="t('view.rbac.noPermissions')"
-      />
-      <EmptyState v-else-if="!permsLoading" icon="shield" :title="t('view.rbac.noPermissions')" :description="t('view.rbac.noPermissionsDesc')" />
-      <Skeleton v-else height="120px" />
-    </Card>
+        <Card :title="t('view.rbac.permissionCatalog')" icon="lock" :margin-bottom="16">
+          <DataTable
+            v-if="permissions.length"
+            :columns="permCols"
+            :rows="permissions"
+            :loading="permsLoading"
+            row-key="value"
+            :empty-text="t('view.rbac.noPermissions')"
+          />
+          <EmptyState v-else-if="!permsLoading" icon="shield" :title="t('view.rbac.noPermissions')" :description="t('view.rbac.noPermissionsDesc')" />
+          <Skeleton v-else height="120px" />
+        </Card>
+      </template>
+    </ListPageLayout>
 
     <div v-if="showGrant" v-modal-a11y class="modal-overlay" @click.self="showGrant = false" @modal:escape="showGrant = false">
       <div class="modal">
@@ -87,8 +92,8 @@ import { ref, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
 import { useI18n } from '../i18n';
+import ListPageLayout from '../components/ListPageLayout.vue';
 import Card from '../components/Card.vue';
-import PageHeader from '../components/PageHeader.vue';
 import Badge from '../components/Badge.vue';
 import DataTable from '../components/DataTable.vue';
 import Skeleton from '../components/Skeleton.vue';

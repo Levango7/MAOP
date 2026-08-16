@@ -329,7 +329,7 @@ Web dashboard at `http://localhost:9079` with:
 
 前端源码位于 `dashboard-enterprise/`（Vue 3 + Vite），构建产物输出到 `dashboard/dist-enterprise/`。原生JS版本已归档至 `archive/js-dashboard/`。
 
-> **技术栈说明**：Vue 3 是前端框架（声明式 UI、组件化、响应式数据），Vite 是构建工具（dev server + 生产打包）。两者配合使用，无冲突。详见 [DESIGN_RULES.md 第 10 节](DESIGN_RULES.md)。
+> **技术栈说明**：Vue 3 是前端框架（声明式 UI、组件化、响应式数据），Vite 是构建工具（dev server + 生产打包）。两者配合使用，无冲突。详见 [DESIGN_RULES.md 第 10 节](docs/DESIGN_RULES.md)。
 
 ## Core Modules
 

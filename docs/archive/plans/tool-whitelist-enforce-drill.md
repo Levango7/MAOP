@@ -69,4 +69,4 @@ allow 裁掉 `probe`，仅放行 `lint`；`mode` 改为 `enforce`。
 1. **机制已验证**：导出 → 评审 → enforce 三类行为（放行 / deny 拦截 / 未放行拒绝）全部正确
 2. **观测通道**：拒绝时 `ToolCallResult.error` + `[tool_manager] tool ... blocked by policy` 日志双通道
 3. **安全特性**：deny 优先于 allow（cleanup 即使进 allow 也无效）；拒绝不抛异常（进程稳定）
-4. **生产注意**：enforce 拒绝静默降级，**必须**按检查清单第 4 步盯防日志；当前本地 tools 表为空，切 enforce 无破坏风险但无实际拦截对象——生产在部署环境按 `docs/tool-whitelist-enforce-checklist.md` 五步执行即可
+4. **生产注意**：enforce 拒绝静默降级，**必须**按检查清单第 4 步盯防日志；当前本地 tools 表为空，切 enforce 无破坏风险但无实际拦截对象——生产在部署环境按 `docs/archive/plans/tool-whitelist-enforce-checklist.md` 五步执行即可

@@ -623,7 +623,7 @@ MAOP 4.3.0+ 自动脱敏以下密钥格式，原始值不会出现在日志中�
 
 - **GitHub Issues**: https://github.com/Levango7/MAOP/issues
 - **架构决策记录（ADR）**: `docs/adr/`，重点参考 004-security-hardening、012-routing-refactor、016-dual-edition-architecture。
-- **综合审计报告**: `docs/comprehensive-audit-report.md`
+- **综合审计报告**: `docs/archive/audits/comprehensive-audit-report.md`
 - **企业版 license 签发**: `docs/enterprise/license-issuance-guide.md`
 
 ### 提交 Issue 时请附带以下信息

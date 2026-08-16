@@ -8,7 +8,7 @@
 ## 当前状态
 
 - **已发布**：v5.1.0（2026-08-14，minor）— 企业版 6 大功能（许可证/SSO/审计/配额/API Key/通知）+ v5.1.0 6 大新功能（LLM 任务拆分/工作流编辑器/配置历史/Skill 编辑器/异常调度/Hook 配置）+ 版本号统一至 v5.1.0。
-- **上一版**：v5.0.0（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](MIGRATION-5.0.md)。
+- **上一版**：v5.0.0（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](docs/migration-5.0.md)。
 - **双版架构**：自 2026-07-20 起采用单代码库 + 运行时 Edition 检测（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)）。
 
 ## v4.4.2 (patch) — 已发布 2026-08-06
@@ -68,7 +68,7 @@
   - `/api/batch` deprecated 端点
 - **配置收敛**：短名环境变量（`MAOP_PORT`、`MAOP_WORKERS`、`MAOP_TLS`、`MAOP_AUTH`）加 `DeprecationWarning`，推荐迁移到规范长名（`MAOP_DASH_PORT`、`MAOP_DASH_WORKERS`、`MAOP_TLS_ENABLED`、`MAOP_AUTH_ENABLED`）。短名在 v6.0.0 移除。
 - **流式 Agent token 响应增强**：新增 `/api/stream/agent/{execution_id}` SSE 端点 + 前端 `useAgentTokenStream.js` composable + Chat.vue 集成增强。
-- **迁移指南**：`MIGRATION-5.0.md` 覆盖后端 API 变更 + 配置迁移 + Docker 部署变更。
+- **迁移指南**：`docs/migration-5.0.md` 覆盖后端 API 变更 + 配置迁移 + Docker 部署变更。
 - **Phase 5b — 发布/性能/合规修复（G-08~G-17）**：
   - **G-12 SLA/支持体系**：`docs/sla.md` + `docs/support-policy.md`。
   - **G-13 隐私政策/DPA**：`docs/privacy-policy.md` + `docs/terms-of-service.md` + `docs/dpa.md` + `docs/cla.md`。
@@ -81,7 +81,7 @@
 ### 验收标准
 
 - [x] 所有 deprecated ≥ 2 版本的 API 移极移除，`CHANGELOG.md` 列出迁移路径。
-- [x] `MIGRATION-5.0.md` 迁移指南发布，覆盖后端 + 配置 + Docker。
+- [x] `docs/migration-5.0.md` 迁移指南发布，覆盖后端 + 配置 + Docker。
 - [x] 短名环境变量加 `DeprecationWarning`，`.env.example` 标注 deprecated alias。
 - [x] 流式 Agent token 响应端点 + 前端 composable + Chat.vue 集成完成。
 - [x] `ruff check` 0 error，`mypy` 0 error，测试 0 failed，前端构建成功。

@@ -1,155 +1,158 @@
 <template>
   <div class="tools-view">
-    <PageHeader>
-      <Segmented
-        :model-value="activeTab"
-        :options="tabOptions"
-        size="sm"
-        @update:model-value="activeTab = $event"
-      />
-      <button class="btn-ghost" :class="{ 'is-busy': loading }" :disabled="loading" @click="load">
-        <AppIcon name="refresh" :size="15" />
-        <span>{{ t('common.refresh') }}</span>
-      </button>
-    </PageHeader>
-
-    <!-- Skills -->
-    <div v-show="activeTab === 'skills'">
-      <div class="skills-head">
+    <ListPageLayout>
+      <template #actions>
         <Segmented
-          :model-value="skillFilter"
-          :options="skillFilterOptions"
+          :model-value="activeTab"
+          :options="tabOptions"
           size="sm"
-          @update:model-value="skillFilter = $event"
+          @update:model-value="activeTab = $event"
         />
-        <div class="skills-actions">
-          <button class="btn-ghost" @click="openCreate">
-            <AppIcon name="plus" :size="15" /><span>{{ t('view.tools.createSkill') }}</span>
-          </button>
-          <button class="btn-ghost" @click="triggerImport">
-            <AppIcon name="download" :size="15" /><span>{{ t('view.tools.importSkill') }}</span>
-            <input ref="importInput" type="file" accept=".json,application/json" hidden @change="onImport" />
-          </button>
-        </div>
-      </div>
+        <button class="btn-ghost" :class="{ 'is-busy': loading }" :disabled="loading" @click="load">
+          <AppIcon name="refresh" :size="15" />
+          <span>{{ t('common.refresh') }}</span>
+        </button>
+      </template>
+      <template #content>
+        <!-- Skills -->
+        <div v-show="activeTab === 'skills'">
+          <div class="skills-head">
+            <Segmented
+              :model-value="skillFilter"
+              :options="skillFilterOptions"
+              size="sm"
+              @update:model-value="skillFilter = $event"
+            />
+            <div class="skills-actions">
+              <button class="btn-ghost" @click="openCreate">
+                <AppIcon name="plus" :size="15" /><span>{{ t('view.tools.createSkill') }}</span>
+              </button>
+              <button class="btn-ghost" @click="triggerImport">
+                <AppIcon name="download" :size="15" /><span>{{ t('view.tools.importSkill') }}</span>
+                <input ref="importInput" type="file" accept=".json,application/json" hidden @change="onImport" />
+              </button>
+            </div>
+          </div>
 
-      <template v-for="sec in skillSections" :key="sec.key">
-        <Card v-if="skillFilter === 'all' || skillFilter === sec.key" :title="sec.title" icon="sparkles" :margin-bottom="16">
-          <div v-if="loading" class="blk"><Skeleton block height="48px" /><Skeleton block height="48px" /><Skeleton block height="48px" /></div>
-          <EmptyState v-else-if="errors.skills" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadSkills')" :description="errors.skills" />
-          <div v-else-if="sec.items.length" class="skill-grid">
-            <div v-for="s in sec.items" :key="s.name || s.id" class="skill-card">
-              <div class="skill-card__top">
-                <div class="skill-card__icon"><AppIcon name="sparkles" :size="16" /></div>
-                <div class="skill-card__id">
-                  <h4>{{ s.name || s.id || t('view.tools.unknown') }}</h4>
-                  <Badge :tone="skillTone(s)">{{ skillLabel(s) }}</Badge>
+          <template v-for="sec in skillSections" :key="sec.key">
+            <Card v-if="skillFilter === 'all' || skillFilter === sec.key" :title="sec.title" icon="sparkles" :margin-bottom="16">
+              <div v-if="loading" class="blk"><Skeleton block height="48px" /><Skeleton block height="48px" /><Skeleton block height="48px" /></div>
+              <EmptyState v-else-if="errors.skills" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadSkills')" :description="errors.skills" />
+              <div v-else-if="sec.items.length" class="skill-grid">
+                <div v-for="s in sec.items" :key="s.name || s.id" class="skill-card">
+                  <div class="skill-card__top">
+                    <div class="skill-card__icon"><AppIcon name="sparkles" :size="16" /></div>
+                    <div class="skill-card__id">
+                      <h4>{{ s.name || s.id || t('view.tools.unknown') }}</h4>
+                      <Badge :tone="skillTone(s)">{{ skillLabel(s) }}</Badge>
+                    </div>
+                  </div>
+                  <p class="skill-card__desc">{{ s.description || t('view.tools.noDescription') }}</p>
+                  <div v-if="s.version || s.category" class="skill-card__meta">
+                    <Badge v-if="s.version" tone="neutral">v{{ s.version }}</Badge>
+                    <Badge v-if="s.category" tone="info">{{ s.category }}</Badge>
+                  </div>
                 </div>
               </div>
-              <p class="skill-card__desc">{{ s.description || t('view.tools.noDescription') }}</p>
-              <div v-if="s.version || s.category" class="skill-card__meta">
-                <Badge v-if="s.version" tone="neutral">v{{ s.version }}</Badge>
-                <Badge v-if="s.category" tone="info">{{ s.category }}</Badge>
+              <EmptyState v-else :icon="sec.emptyIcon" :title="sec.emptyTitle" :description="sec.emptyHint" />
+            </Card>
+          </template>
+        </div>
+
+        <!-- MCP -->
+        <div v-show="activeTab === 'mcp'">
+          <div class="grid-2">
+            <Card :title="t('view.tools.mcpServers')" icon="wrench" :margin-bottom="0">
+              <div v-if="loading" class="blk"><Skeleton block height="40px" /><Skeleton block height="40px" /></div>
+              <EmptyState v-else-if="errors.mcp" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadMcp')" :description="errors.mcp" />
+              <EmptyState v-else-if="!servers.length" icon="wrench" :title="t('view.tools.noMcp')" :description="t('view.tools.noMcpHint')" />
+              <ul v-else class="mcp-list">
+                <li v-for="s in servers" :key="s.name" class="mcp-row">
+                  <div class="mcp-row__head">
+                    <span class="mcp-row__name">{{ s.name }}</span>
+                    <Badge :tone="s.enabled === false ? 'neutral' : 'success'">{{ s.enabled === false ? t('common.disable') : t('common.enable') }}</Badge>
+                  </div>
+                  <div class="mcp-row__meta">
+                    <span class="mono">{{ s.transport || '—' }}</span>
+                    <span class="muted">{{ s.url || '' }}</span>
+                  </div>
+                </li>
+              </ul>
+            </Card>
+
+            <Card :title="t('view.tools.toolInventory')" icon="box" :margin-bottom="0">
+              <div v-if="loading" class="blk"><Skeleton block height="40px" /></div>
+              <div v-else class="inv">
+                <div class="inv__stat">
+                  <span class="inv__num">{{ serverCount }}</span>
+                  <span class="inv__lbl">{{ t('view.tools.servers') }}</span>
+                </div>
+                <div class="inv__stat">
+                  <span class="inv__num">{{ toolCount }}</span>
+                  <span class="inv__lbl">{{ t('view.tools.exposedTools') }}</span>
+                </div>
               </div>
-            </div>
-          </div>
-          <EmptyState v-else :icon="sec.emptyIcon" :title="sec.emptyTitle" :description="sec.emptyHint" />
-        </Card>
-      </template>
-    </div>
-
-    <!-- MCP -->
-    <div v-show="activeTab === 'mcp'">
-      <div class="grid-2">
-        <Card :title="t('view.tools.mcpServers')" icon="wrench" :margin-bottom="0">
-          <div v-if="loading" class="blk"><Skeleton block height="40px" /><Skeleton block height="40px" /></div>
-          <EmptyState v-else-if="errors.mcp" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadMcp')" :description="errors.mcp" />
-          <EmptyState v-else-if="!servers.length" icon="wrench" :title="t('view.tools.noMcp')" :description="t('view.tools.noMcpHint')" />
-          <ul v-else class="mcp-list">
-            <li v-for="s in servers" :key="s.name" class="mcp-row">
-              <div class="mcp-row__head">
-                <span class="mcp-row__name">{{ s.name }}</span>
-                <Badge :tone="s.enabled === false ? 'neutral' : 'success'">{{ s.enabled === false ? t('common.disable') : t('common.enable') }}</Badge>
-              </div>
-              <div class="mcp-row__meta">
-                <span class="mono">{{ s.transport || '—' }}</span>
-                <span class="muted">{{ s.url || '' }}</span>
-              </div>
-            </li>
-          </ul>
-        </Card>
-
-        <Card :title="t('view.tools.toolInventory')" icon="box" :margin-bottom="0">
-          <div v-if="loading" class="blk"><Skeleton block height="40px" /></div>
-          <div v-else class="inv">
-            <div class="inv__stat">
-              <span class="inv__num">{{ serverCount }}</span>
-              <span class="inv__lbl">{{ t('view.tools.servers') }}</span>
-            </div>
-            <div class="inv__stat">
-              <span class="inv__num">{{ toolCount }}</span>
-              <span class="inv__lbl">{{ t('view.tools.exposedTools') }}</span>
-            </div>
-          </div>
-        </Card>
-      </div>
-    </div>
-
-    <!-- P2-11: MCP Topology -->
-    <div v-show="activeTab === 'topology'">
-      <Card :title="t('view.tools.topo.title')" icon="share2" :margin-bottom="0">
-        <McpTopology
-          :data="topology"
-          :loading="topologyLoading"
-          :error="errors.topology || ''"
-          @refresh="loadTopology"
-        />
-      </Card>
-    </div>
-
-    <!-- Routing -->
-    <div v-show="activeTab === 'routing'">
-      <Card :title="t('view.tools.routingTable')" icon="route" :margin-bottom="0">
-        <div v-if="loading" class="blk"><Skeleton block height="32px" /><Skeleton block height="32px" /></div>
-        <EmptyState v-else-if="errors.routing" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadRouting')" :description="errors.routing" />
-        <DataTable
-          v-else
-          :columns="routeCols"
-          :rows="routeRows"
-          :empty-text="t('view.tools.noRoutingEntries')"
-          compact
-        />
-      </Card>
-    </div>
-
-    <!-- Prompts -->
-    <div v-show="activeTab === 'prompts'">
-      <Card :title="t('view.tools.promptTemplates')" icon="scroll" :margin-bottom="0">
-        <div v-if="loading" class="blk"><Skeleton block height="32px" /><Skeleton block height="32px" /></div>
-        <EmptyState v-else-if="errors.prompts" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadPrompts')" :description="errors.prompts" />
-        <DataTable
-          v-else
-          :columns="promptCols"
-          :rows="prompts"
-          :empty-text="t('view.tools.noPromptTemplates')"
-          compact
-        />
-      </Card>
-    </div>
-
-    <!-- Security -->
-    <div v-show="activeTab === 'security'">
-      <Card :title="t('view.tools.securityConfig')" icon="shield" :margin-bottom="0">
-        <div v-if="loading" class="blk"><Skeleton block height="32px" /><Skeleton block height="32px" /><Skeleton block height="32px" /></div>
-        <EmptyState v-else-if="errors.security" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadConfig')" :description="errors.security" />
-        <div v-else class="sec-grid">
-          <div v-for="k in securityKeys" :key="k" class="sec-item">
-            <span class="sec-item__key">{{ labelize(k) }}</span>
-            <Badge :tone="security[k] ? 'success' : 'fail'">{{ security[k] ? t('common.enable') : t('common.disable') }}</Badge>
+            </Card>
           </div>
         </div>
-      </Card>
-    </div>
+
+        <!-- P2-11: MCP Topology -->
+        <div v-show="activeTab === 'topology'">
+          <Card :title="t('view.tools.topo.title')" icon="share2" :margin-bottom="0">
+            <McpTopology
+              :data="topology"
+              :loading="topologyLoading"
+              :error="errors.topology || ''"
+              @refresh="loadTopology"
+            />
+          </Card>
+        </div>
+
+        <!-- Routing -->
+        <div v-show="activeTab === 'routing'">
+          <Card :title="t('view.tools.routingTable')" icon="route" :margin-bottom="0">
+            <div v-if="loading" class="blk"><Skeleton block height="32px" /><Skeleton block height="32px" /></div>
+            <EmptyState v-else-if="errors.routing" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadRouting')" :description="errors.routing" />
+            <DataTable
+              v-else
+              :columns="routeCols"
+              :rows="routeRows"
+              :empty-text="t('view.tools.noRoutingEntries')"
+              compact
+            />
+          </Card>
+        </div>
+
+        <!-- Prompts -->
+        <div v-show="activeTab === 'prompts'">
+          <Card :title="t('view.tools.promptTemplates')" icon="scroll" :margin-bottom="0">
+            <div v-if="loading" class="blk"><Skeleton block height="32px" /><Skeleton block height="32px" /></div>
+            <EmptyState v-else-if="errors.prompts" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadPrompts')" :description="errors.prompts" />
+            <DataTable
+              v-else
+              :columns="promptCols"
+              :rows="prompts"
+              :empty-text="t('view.tools.noPromptTemplates')"
+              compact
+            />
+          </Card>
+        </div>
+
+        <!-- Security -->
+        <div v-show="activeTab === 'security'">
+          <Card :title="t('view.tools.securityConfig')" icon="shield" :margin-bottom="0">
+            <div v-if="loading" class="blk"><Skeleton block height="32px" /><Skeleton block height="32px" /><Skeleton block height="32px" /></div>
+            <EmptyState v-else-if="errors.security" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadConfig')" :description="errors.security" />
+            <div v-else class="sec-grid">
+              <div v-for="k in securityKeys" :key="k" class="sec-item">
+                <span class="sec-item__key">{{ labelize(k) }}</span>
+                <Badge :tone="security[k] ? 'success' : 'fail'">{{ security[k] ? t('common.enable') : t('common.disable') }}</Badge>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </template>
+    </ListPageLayout>
 
     <!-- Create skill modal -->
     <Teleport to="body">
@@ -189,7 +192,8 @@
 import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
-import { AppIcon, Card, Badge, DataTable, Segmented, Skeleton, EmptyState, PageHeader } from '../components/index.js';
+import ListPageLayout from '../components/ListPageLayout.vue';
+import { AppIcon, Card, Badge, DataTable, Segmented, Skeleton, EmptyState } from '../components/index.js';
 import McpTopology from '../components/McpTopology.vue';
 
 const api = useApiStore();

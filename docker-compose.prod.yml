@@ -522,6 +522,87 @@ services:
     networks:
       - maop-net
 
+  # ── AlertManager (production override) ─────────────────────────
+  # P2 fix: wire real alert receivers (webhook/email/slack) + config
+  # rendering + resource limits + healthcheck + maop-net network.
+  #
+  # The base docker-compose.yml alertmanager mounts alertmanager.yml
+  # read-only with no env var substitution. This override:
+  #   1. Mounts alertmanager.yml as a *template* (.tmpl)
+  #   2. Mounts render-config.sh which renders ${VAR:default} placeholders
+  #      to actual values from environment variables at startup
+  #   3. Mounts custom message templates (alertmanager/templates/)
+  #   4. Passes all credentials via env vars (never hardcoded)
+  #
+  # Configure receivers via .env:
+  #   WEBHOOK_URL=https://your-webhook.example.com/alerts
+  #   ALERT_EMAIL_TO=ops@example.com
+  #   SMTP_HOST=smtp.example.com:587
+  #   SMTP_USER=alertmanager@example.com
+  #   SMTP_PASSWORD=secret        # use Vault or .env (gitignored)
+  #   SLACK_WEBHOOK_URL=https://hooks.slack.com/services/XXX  # optional
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: maop-alertmanager
+    restart: unless-stopped
+    # Render ${VAR:default} placeholders then start alertmanager.
+    # render-config.sh writes the rendered config to /etc/alertmanager/alertmanager.yml
+    # and execs alertmanager with the rendered config.
+    entrypoint:
+      - /bin/sh
+      - /usr/local/bin/render-config.sh
+      - /etc/alertmanager/alertmanager.yml.tmpl
+      - /etc/alertmanager/alertmanager.yml
+    environment:
+      # ── Webhook receiver (default) ─────────────────────────────
+      # MAOP dashboard webhook endpoint. Override for external systems
+      # (PagerDuty, n8n, custom integration).
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://maop-app:9079/api/alerts/webhook}
+      # ── Email receiver (critical alerts) ───────────────────────
+      - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-admin@example.com}
+      - ALERT_EMAIL_FROM=${ALERT_EMAIL_FROM:-alertmanager@example.com}
+      - SMTP_HOST=${SMTP_HOST:-localhost:587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_AUTH_SECRET=${SMTP_AUTH_SECRET:-}
+      - SMTP_AUTH_IDENTITY=${SMTP_AUTH_IDENTITY:-}
+      # ── Slack receiver (optional) ──────────────────────────────
+      # Leave SLACK_WEBHOOK_URL empty to disable slack.
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - SLACK_CHANNEL=${SLACK_CHANNEL:-#alerts}
+    volumes:
+      # Template (rendered at startup by render-config.sh)
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml.tmpl:ro
+      # Render script (entrypoint)
+      - ./alertmanager/render-config.sh:/usr/local/bin/render-config.sh:ro
+      # Custom message templates (email.html, slack.text, etc.)
+      - ./alertmanager/templates:/etc/alertmanager/templates:ro
+      # Persistent state (notification log, silences)
+      - alertmanager-data:/alertmanager
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    logging: *maop_logging
+    depends_on:
+      - prometheus
+    networks:
+      - maop-net
+
   # ── Optional: RabbitMQ queue backend (--profile rabbitmq) ───────
   # 4.7 fix: README documents RabbitMQ as an optional queue backend
   # (MAOP_QUEUE_BACKEND=rabbitmq, needs optional `pika` dep). Provide a
@@ -615,6 +696,7 @@ volumes:
   nginx-certs:
   prometheus-data:
   grafana-data:
+  alertmanager-data:
   pg-data:
   # G-14: Patroni 集群持久化卷
   patroni1-data:

@@ -15,7 +15,7 @@
 | 前端路由 | `/sso` |
 | 导航分组 | Govern |
 | i18n key 前缀 | `view.sso.*` |
-| 关联文档 | [project-structure-analysis.md](./project-structure-analysis.md)、[saml-sso-guide.md](./enterprise/saml-sso-guide.md)、[database-schema.md](./database-schema.md) |
+| 关联文档 | [project-structure-analysis.md](./archive/audits/project-structure-analysis.md)、[saml-sso-guide.md](./enterprise/saml-sso-guide.md)、[database-schema.md](./database-schema.md) |
 | 文档约定 | Markdown heading：H1 文档名 / H2 章 / H3 节 / H4 子节 / H5 子子节；中文撰写，技术术语保留英文 |
 
 ---
@@ -1017,7 +1017,7 @@ MAOP_SSO_SAML_IDP_CERT=
 
 ### 8.5 PRD 编写检查清单
 
-依据 `project-structure-analysis.md` 第 10.10 节检查清单：
+依据 `docs/archive/audits/project-structure-analysis.md` 第 10.10 节检查清单：
 
 - [x] 功能名称（SSO 集成）与 FeatureFlag 名称（`SSO`）
 - [x] 路由前缀（`/api/v1/sso`）

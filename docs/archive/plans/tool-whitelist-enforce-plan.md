@@ -31,7 +31,7 @@
 - **立即生效**（本仓）：`deny` 填充高危命令清单（audit 模式下 deny 同样拦截，风险面立即收敛）
 - **新增**：`py/scripts/export_tool_whitelist.py`（部署环境跑一次 → 从 DB 导出 id+command 生成 allow 段 yaml）
 - **新增**：`config/tool_whitelist.enforce.example.yaml`（enforce 模板：mode: enforce + deny 高危 + allow 占位说明）
-- **文档**：`docs/tool-whitelist-enforce-checklist.md`（切 enforce 五步检查清单）
+- **文档**：`docs/archive/plans/tool-whitelist-enforce-checklist.md`（切 enforce 五步检查清单）
 - **仓库 yaml 保持 `mode: audit`**：切 enforce 是部署方的受控动作（改 yaml 或设 env），避免仓库默认 enforce 造成部署方未生成 allow 时全平台工具瘫痪
 - 新增测试：导出脚本单测（临时 DB 生成正确 yaml）+ enforce 模式集成测试
 
@@ -91,7 +91,7 @@ deny:
 
 **为什么 allow 用 id 精确而非 pattern 通配**：工具 id 稳定、可审计；命令变更（升级）不破坏 allow 匹配。
 
-### 3.3 enforce 切换检查清单（docs/tool-whitelist-enforce-checklist.md）
+### 3.3 enforce 切换检查清单（docs/archive/plans/tool-whitelist-enforce-checklist.md）
 
 ```
 切 enforce 五步：
@@ -137,7 +137,7 @@ deny:
 
 1. `config/tool_whitelist.yaml` deny 高危 8 类填充，`mode: audit` 保持
 2. `py/scripts/export_tool_whitelist.py` 存在，临时 DB 导出正确（allow 仅 enabled 工具 + 高危标注 + review 模式）
-3. `docs/tool-whitelist-enforce-checklist.md` 存在（五步清单）
+3. `docs/archive/plans/tool-whitelist-enforce-checklist.md` 存在（五步清单）
 4. 新增测试全绿 + 现有 `test_tool_manager.py` / `test_tool_market.py` / `test_tool_mq_mcp_coverage.py` 零回归
 5. `python -m py_compile` 新脚本通过
 

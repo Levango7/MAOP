@@ -1,25 +1,29 @@
 <template>
   <div class="tasks-view">
-    <PageHeader>
-      <template #badges>
-        <Badge tone="brand" icon="scroll">{{ t('view.tasks.count', { n: total }) }}</Badge>
-      </template>
-      <span v-if="lastUpdated" class="last-updated">{{ t('view.tasks.updated') }} {{ lastUpdated }}</span>
-      <button class="act-btn" :disabled="loading" :title="t('common.refresh')" @click="loadTasks">
-        <AppIcon name="refresh" :size="14" :class="{ spinning: loading }" aria-hidden="true" />
-      </button>
-    </PageHeader>
-
-    <!-- 搜索栏 + 状态过滤 + 排序选择 -->
-    <FilterBar
-      :model-value="filters"
-      :schema="filterSchema"
+    <ListPageLayout
+      :loading="loading"
+      :error="error"
+      :empty="!tasks.length"
+      :filter-schema="filterSchema"
       search-key="search"
       :search-placeholder="t('view.tasks.searchPlaceholder')"
       :results-label="`${total} / ${total}`"
-      class="tasks-filterbar"
+      :error-title="t('view.tasks.loadError')"
+      :empty-title="t('view.tasks.empty')"
+      :empty-desc="t('view.tasks.emptyDesc')"
+      :loading-lines="8"
+      :filters="filters"
     >
-      <template #extra>
+      <template #badges>
+        <Badge tone="brand" icon="scroll">{{ t('view.tasks.count', { n: total }) }}</Badge>
+      </template>
+      <template #actions>
+        <span v-if="lastUpdated" class="last-updated">{{ t('view.tasks.updated') }} {{ lastUpdated }}</span>
+        <button class="act-btn" :disabled="loading" :title="t('common.refresh')" @click="loadTasks">
+          <AppIcon name="refresh" :size="14" :class="{ spinning: loading }" aria-hidden="true" />
+        </button>
+      </template>
+      <template #filterExtra>
         <select v-model="filters.sort" class="filterbar__select" :aria-label="t('view.tasks.sortLabel')" @change="onFilterChange">
           <option value="created_at">{{ t('view.tasks.sortCreated') }}</option>
           <option value="updated_at">{{ t('view.tasks.sortUpdated') }}</option>
@@ -31,78 +35,69 @@
           <option value="asc">{{ t('view.tasks.orderAsc') }}</option>
         </select>
       </template>
-    </FilterBar>
+      <template #content>
+        <Card :title="t('view.tasks.title')" icon="scroll" :margin-bottom="16">
+          <template #actions>
+            <span class="muted">{{ t('view.tasks.pageInfo', { page, total: totalPages || 1 }) }}</span>
+          </template>
+          <div class="tasks-table-wrap">
+            <table class="tasks-table">
+              <thead>
+                <tr>
+                  <th>{{ t('view.tasks.colName') }}</th>
+                  <th>{{ t('view.tasks.colStatus') }}</th>
+                  <th>{{ t('view.tasks.colCreated') }}</th>
+                  <th>{{ t('view.tasks.colDuration') }}</th>
+                  <th class="tasks-table__actions-head">{{ t('view.tasks.colActions') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="task in tasks" :key="task.id">
+                  <td class="tasks-table__name">
+                    <div class="task-name">{{ taskDisplayName(task) }}</div>
+                    <div class="task-id">{{ task.id }}</div>
+                  </td>
+                  <td>
+                    <Badge :tone="statusTone(task.status)">{{ statusLabel(task.status) }}</Badge>
+                  </td>
+                  <td class="tasks-table__time">{{ formatTime(task.created_at) }}</td>
+                  <td class="tasks-table__duration">{{ formatDuration(task) }}</td>
+                  <td class="tasks-table__actions">
+                    <button
+                      class="act-btn small"
+                      :title="t('view.tasks.viewDetail')"
+                      :aria-label="t('view.tasks.viewDetail')"
+                      @click="viewDetail(task)"
+                    >
+                      <AppIcon name="file-text" :size="13" />
+                    </button>
+                    <button
+                      class="act-btn small"
+                      :title="t('view.tasks.rerun')"
+                      :aria-label="t('view.tasks.rerun')"
+                      @click="confirmRerun(task)"
+                    >
+                      <AppIcon name="refresh" :size="13" />
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </Card>
 
-    <!-- 三态主体: 错误 → 加载 → 内容 -->
-    <Card :title="t('view.tasks.title')" icon="scroll" :margin-bottom="16">
-      <template #actions>
-        <span class="muted">{{ t('view.tasks.pageInfo', { page, total: totalPages || 1 }) }}</span>
+        <!-- 分页控件 -->
+        <div v-if="totalPages > 1" class="tasks-pagination">
+          <button class="act-btn small" :disabled="page <= 1 || loading" @click="goPage(page - 1)">
+            {{ t('view.tasks.prevPage') }}
+          </button>
+          <span class="page-info">{{ page }} / {{ totalPages }}</span>
+          <button class="act-btn small" :disabled="page >= totalPages || loading" @click="goPage(page + 1)">
+            {{ t('view.tasks.nextPage') }}
+          </button>
+        </div>
       </template>
-      <div v-if="error" class="tasks-error">
-        <EmptyState icon="alert-triangle" tone="fail" :title="t('view.tasks.loadError')" :description="error" />
-      </div>
-      <div v-else-if="loading" class="tasks-loading">
-        <Skeleton :lines="8" block />
-      </div>
-      <div v-else-if="!tasks.length" class="tasks-empty">
-        <EmptyState icon="scroll" :title="t('view.tasks.empty')" :description="t('view.tasks.emptyDesc')" />
-      </div>
-      <div v-else class="tasks-table-wrap">
-        <table class="tasks-table">
-          <thead>
-            <tr>
-              <th>{{ t('view.tasks.colName') }}</th>
-              <th>{{ t('view.tasks.colStatus') }}</th>
-              <th>{{ t('view.tasks.colCreated') }}</th>
-              <th>{{ t('view.tasks.colDuration') }}</th>
-              <th class="tasks-table__actions-head">{{ t('view.tasks.colActions') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="task in tasks" :key="task.id">
-              <td class="tasks-table__name">
-                <div class="task-name">{{ taskDisplayName(task) }}</div>
-                <div class="task-id">{{ task.id }}</div>
-              </td>
-              <td>
-                <Badge :tone="statusTone(task.status)">{{ statusLabel(task.status) }}</Badge>
-              </td>
-              <td class="tasks-table__time">{{ formatTime(task.created_at) }}</td>
-              <td class="tasks-table__duration">{{ formatDuration(task) }}</td>
-              <td class="tasks-table__actions">
-                <button
-                  class="act-btn small"
-                  :title="t('view.tasks.viewDetail')"
-                  :aria-label="t('view.tasks.viewDetail')"
-                  @click="viewDetail(task)"
-                >
-                  <AppIcon name="file-text" :size="13" />
-                </button>
-                <button
-                  class="act-btn small"
-                  :title="t('view.tasks.rerun')"
-                  :aria-label="t('view.tasks.rerun')"
-                  @click="confirmRerun(task)"
-                >
-                  <AppIcon name="refresh" :size="13" />
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </Card>
-
-    <!-- 分页控件 -->
-    <div v-if="totalPages > 1" class="tasks-pagination">
-      <button class="act-btn small" :disabled="page <= 1 || loading" @click="goPage(page - 1)">
-        {{ t('view.tasks.prevPage') }}
-      </button>
-      <span class="page-info">{{ page }} / {{ totalPages }}</span>
-      <button class="act-btn small" :disabled="page >= totalPages || loading" @click="goPage(page + 1)">
-        {{ t('view.tasks.nextPage') }}
-      </button>
-    </div>
+    </ListPageLayout>
 
     <!-- 重跑确认对话框 -->
     <DetailDrawer
@@ -140,13 +135,10 @@ import { useRouter } from 'vue-router';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
 import { useI18n } from '../i18n';
+import ListPageLayout from '../components/ListPageLayout.vue';
 import AppIcon from '../components/AppIcon.vue';
-import PageHeader from '../components/PageHeader.vue';
-import FilterBar from '../components/FilterBar.vue';
 import Card from '../components/Card.vue';
 import Badge from '../components/Badge.vue';
-import Skeleton from '../components/Skeleton.vue';
-import EmptyState from '../components/EmptyState.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
 
 const { t } = useI18n();

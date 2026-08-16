@@ -228,3 +228,105 @@ class TestADR011StateSourceTruth:
                     )
             except Exception:
                 pass
+
+
+# ── P2 安全修复: VACUUM INTO 路径白名单校验 ──────────────────────
+
+class TestBackupPathValidation:
+    """_validate_backup_path() rejects invalid/traversal/quote paths."""
+
+    def test_valid_path_accepted(self, tmp_path):
+
+        from maop.core.backends.db_backup import _validate_backup_path
+
+        allowed = [tmp_path.resolve()]
+        backup_path = tmp_path / "maop.db.2026-08-16_030000.bak"
+        _validate_backup_path(backup_path, allowed)  # should not raise
+
+    def test_invalid_filename_rejected(self, tmp_path):
+
+        from maop.core.backends.db_backup import _validate_backup_path
+
+        allowed = [tmp_path.resolve()]
+        # 含空格和特殊字符的文件名
+        bad_path = tmp_path / "maop db; DROP.db.bak"
+        with pytest.raises(ValueError, match="Invalid backup filename"):
+            _validate_backup_path(bad_path, allowed)
+
+    def test_path_traversal_rejected(self, tmp_path):
+
+        from maop.core.backends.db_backup import _validate_backup_path
+
+        allowed = [tmp_path.resolve()]
+        # 路径遍历：尝试逃逸到上级目录
+        bad_path = tmp_path / ".." / "evil.bak"
+        with pytest.raises(ValueError, match="outside allowed"):
+            _validate_backup_path(bad_path, allowed)
+
+    def test_absolute_path_outside_rejected(self, tmp_path):
+        from pathlib import Path
+
+        from maop.core.backends.db_backup import _validate_backup_path
+
+        allowed = [tmp_path.resolve()]
+        # 绝对路径在白名单外
+        bad_path = Path("/tmp/evil.bak") if Path("/tmp").exists() else Path("C:/evil.bak")
+        with pytest.raises(ValueError, match="outside allowed"):
+            _validate_backup_path(bad_path, allowed)
+
+    def test_single_quote_rejected(self, tmp_path):
+
+        from maop.core.backends.db_backup import _validate_backup_path
+
+        allowed = [tmp_path.resolve()]
+        # 文件名含单引号（但文件名正则会先拒绝，因为单引号不在 [a-zA-Z0-9_.-]）
+        bad_path = tmp_path / "it's.bak"
+        with pytest.raises(ValueError, match="Invalid backup filename"):
+            _validate_backup_path(bad_path, allowed)
+
+    def test_multiple_allowed_dirs(self, tmp_path):
+
+        from maop.core.backends.db_backup import _validate_backup_path
+
+        dir1 = (tmp_path / "dir1").resolve()
+        dir2 = (tmp_path / "dir2").resolve()
+        dir1.mkdir()
+        dir2.mkdir()
+        allowed = [dir1, dir2]
+        # 在 dir2 中的合法路径应该通过
+        backup_path = dir2 / "maop.db.2026-08-16_030000.bak"
+        _validate_backup_path(backup_path, allowed)  # should not raise
+
+
+class TestAllowedBackupDirs:
+    """_get_allowed_backup_dirs() reads MAOP_BACKUP_DIR env var."""
+
+    def test_default_when_env_unset(self, monkeypatch, tmp_path):
+        from maop.core.backends.db_backup import _get_allowed_backup_dirs
+
+        monkeypatch.delenv("MAOP_BACKUP_DIR", raising=False)
+        result = _get_allowed_backup_dirs(tmp_path)
+        assert result == [tmp_path.resolve()]
+
+    def test_env_override(self, monkeypatch, tmp_path):
+
+        from maop.core.backends.db_backup import _get_allowed_backup_dirs
+
+        custom = tmp_path / "custom"
+        custom.mkdir()
+        monkeypatch.setenv("MAOP_BACKUP_DIR", str(custom))
+        result = _get_allowed_backup_dirs(tmp_path)
+        assert result == [custom.resolve()]
+
+    def test_multiple_dirs_from_env(self, monkeypatch, tmp_path):
+        import os
+
+        from maop.core.backends.db_backup import _get_allowed_backup_dirs
+
+        d1 = tmp_path / "d1"
+        d2 = tmp_path / "d2"
+        d1.mkdir()
+        d2.mkdir()
+        monkeypatch.setenv("MAOP_BACKUP_DIR", f"{d1}{os.pathsep}{d2}")
+        result = _get_allowed_backup_dirs(tmp_path)
+        assert result == [d1.resolve(), d2.resolve()]

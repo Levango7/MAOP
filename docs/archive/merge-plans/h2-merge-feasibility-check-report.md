@@ -4,7 +4,7 @@
 > 核对范围：H2 补丁测试合并计划中标记为"可合并"的 26 个文件
 > 核对目的：在执行实际合并前，逐一验证每个可合并项是否真的安全
 > 核对维度：类名冲突 / Fixture 冲突 / 辅助函数冲突 / Import 冲突 / 主测试文件存在性
-> 关联文档：`docs/h2-patch-test-merge-plan.md`
+> 关联文档：`docs/archive/merge-plans/h2-patch-test-merge-plan.md`
 
 ## 第1章 核对方法
 

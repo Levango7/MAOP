@@ -383,6 +383,54 @@ class JWTHandler:
 
 # ── JWT Secret Loading ──────────────────────────────────────────
 
+# P2 安全修复: JWT 密钥强度校验
+# HS256 推荐 ≥32 字节密钥；此处要求 ≥32 字符（略保守，兼容 base64/hex 编码）
+_JWT_SECRET_MIN_LEN = 32
+
+# 已知弱密钥黑名单（不区分大小写）
+_WEAK_JWT_SECRETS = frozenset({
+    "secret", "changeme", "change-me", "changeit", "change_it",
+    "password", "passwd", "admin", "root", "user",
+    "key", "jwt", "token", "maop", "test", "dev", "development",
+    "example", "sample", "default", "placeholder", "todo", "fixme",
+    "your-secret-key", "your_secret_key", "my-secret", "my_secret",
+    "super-secret", "super_secret", "not-so-secret",
+})
+
+
+def _validate_jwt_secret_strength(secret: str, source: str) -> None:
+    """校验 JWT 密钥强度，不合法抛出 ``RuntimeError``。
+
+    Parameters
+    ----------
+    secret : str
+        待校验的密钥（已 strip）。
+    source : str
+        密钥来源描述（用于错误消息），如 ``"MAOP_JWT_SECRET env var"``。
+
+    Raises
+    ------
+    RuntimeError
+        密钥为空、过短或属于已知弱密钥时抛出。
+    """
+    if not secret:
+        raise RuntimeError(f"SECURITY: JWT secret from {source} is empty")
+    # 先检查弱密钥（更具体），再检查长度（更普遍）
+    if secret.lower() in _WEAK_JWT_SECRETS:
+        raise RuntimeError(
+            f"SECURITY: JWT secret from {source} is a known weak value. "
+            f"Use a cryptographically random string of at least "
+            f"{_JWT_SECRET_MIN_LEN} characters (e.g. python -c "
+            f"\"import secrets; print(secrets.token_hex(32))\")."
+        )
+    if len(secret) < _JWT_SECRET_MIN_LEN:
+        raise RuntimeError(
+            f"SECURITY: JWT secret from {source} is too short "
+            f"({len(secret)} chars < {_JWT_SECRET_MIN_LEN} required). "
+            f"Use at least {_JWT_SECRET_MIN_LEN} characters."
+        )
+
+
 def load_jwt_secret(data_dir: str | Path = "data") -> str:
     """Load JWT signing secret with a 3-tier priority:
 
@@ -391,6 +439,10 @@ def load_jwt_secret(data_dir: str | Path = "data") -> str:
     3. Auto-generate a cryptographically random secret and persist it
 
     The auto-generated file is created with mode 0o600 on POSIX systems.
+
+    P2 安全修复: 从环境变量/文件读取的密钥会经过强度校验
+    （``_validate_jwt_secret_strength``），拒绝空、过短（<32 字符）
+    或已知弱密钥（如 "secret"/"changeme"/"password"）。
 
     Args:
         data_dir: Directory for the ``jwt_secret`` file (default: ``data``).
@@ -403,6 +455,7 @@ def load_jwt_secret(data_dir: str | Path = "data") -> str:
     # 1) Environment variable
     secret = os.environ.get("MAOP_JWT_SECRET", "").strip()
     if secret:
+        _validate_jwt_secret_strength(secret, "MAOP_JWT_SECRET env var")
         logger.debug("[auth] JWT secret loaded from MAOP_JWT_SECRET env var")
         return secret
 
@@ -411,6 +464,7 @@ def load_jwt_secret(data_dir: str | Path = "data") -> str:
     if jwt_file.exists():
         file_secret = jwt_file.read_text(encoding="utf-8").strip()
         if file_secret:
+            _validate_jwt_secret_strength(file_secret, str(jwt_file))
             logger.info("[auth] JWT secret loaded from %s", jwt_file)
             return file_secret
 

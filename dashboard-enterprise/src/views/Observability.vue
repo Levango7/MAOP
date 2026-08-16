@@ -332,7 +332,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   color: var(--text-muted, #9aa3b2);
 }
 .edition-badge.enterprise {
-  background: rgba(59, 130, 246, 0.12);
+  background: var(--brand-soft);
   color: var(--brand, #3574f0);
 }
 .tracing-badge {
@@ -350,7 +350,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   border-radius: 50%;
 }
 .tracing-badge.on {
-  background: rgba(34, 197, 94, 0.12);
+  background: var(--success-soft);
   color: var(--success, #3fb950);
 }
 .tracing-badge.on .dot { background: var(--success, #3fb950); }
@@ -423,11 +423,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   border-radius: 8px;
 }
 .pipeline-status.ok {
-  background: rgba(34, 197, 94, 0.12);
+  background: var(--success-soft);
   color: var(--success, #3fb950);
 }
 .pipeline-status.bad {
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--fail-soft);
   color: var(--fail, #f85149);
 }
 
@@ -494,11 +494,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   font-weight: 600;
 }
 .type-tag.counter {
-  background: rgba(59, 130, 246, 0.12);
+  background: var(--brand-soft);
   color: var(--brand, #3574f0);
 }
 .type-tag.histogram {
-  background: rgba(168, 85, 247, 0.12);
+  background: var(--chart-5-soft);
   color: var(--chart-5);
 }
 .type-tag.gauge {

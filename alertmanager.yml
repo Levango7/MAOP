@@ -1,31 +1,142 @@
 # MAOP AlertManager Configuration
-# Used with: docker compose --profile monitoring up -d
+# Used with: docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile monitoring up -d
+#
+# This file uses ${VAR:default} placeholders for environment variable
+# substitution. The placeholders are rendered at container startup by
+# alertmanager/render-config.sh (mounted via docker-compose.prod.yml).
+# Set environment variables in .env or docker-compose.prod.yml to override
+# defaults. Never hardcode real credentials (SMTP passwords, Slack tokens)
+# in this file — always use placeholders.
 #
 # Alert rules are based on MAOP's Prometheus metrics:
 #   MAOP_delegations_total, MAOP_delegations_success, MAOP_delegations_failed
 #   MAOP_active_agents, MAOP_memory_entries, MAOP_queue_pending
 #   MAOP_circuit_breaker_state
+#
+# Alert severity labels (from monitoring/alerts.yml + slo-alerts.yml):
+#   critical — page immediately (MAOPDown, MAOPNoActiveAgents, ...)
+#   warning  — ticket queue (MAOPHighMemory, MAOPHighLatency, ...)
+#   info     — informational (MAOPMemoryStoreGrowing)
 
+global:
+  resolve_timeout: 5m
+
+# ── Templates ──────────────────────────────────────────────────
+# Custom message templates for email/slack (see alertmanager/templates/).
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# ── Routing ────────────────────────────────────────────────────
+# Default route: webhook. Critical alerts also go to email.
+# Warning/info alerts only go to webhook (avoid email noise).
 route:
-  receiver: "maop-default"
-  group_by: ["alertname", "agent"]
+  receiver: 'webhook'
+  group_by: ['alertname', 'agent', 'severity']
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
+  routes:
+    # Critical alerts: webhook + email (multi-channel fan-out)
+    - matchers:
+        - severity = "critical"
+      receiver: 'critical'
+      continue: false
+    # Warning alerts: webhook only
+    - matchers:
+        - severity = "warning"
+      receiver: 'webhook'
+      continue: false
+    # Info alerts: webhook only (no email noise)
+    - matchers:
+        - severity = "info"
+      receiver: 'webhook'
+      continue: false
 
+# ── Receivers ──────────────────────────────────────────────────
 receivers:
-  - name: "maop-default"
-    # Uncomment one or more integrations:
-    # webhook_configs:
-    #   - url: "http://maop-dashboard:9079/api/alerts/webhook"
-    # slack_configs:
-    #   - api_url: "https://hooks.slack.com/services/XXX"
-    #     channel: "#maop-alerts"
+  # ── a) webhook receiver (default, recommended) ───────────────
+  # Sends POST to MAOP dashboard webhook endpoint (or any custom URL).
+  # Set WEBHOOK_URL to override the default dashboard endpoint.
+  - name: 'webhook'
+    webhook_configs:
+      - url: '${WEBHOOK_URL:http://maop-app:9079/api/alerts/webhook}'
+        send_resolved: true
+        max_alerts: 0
+
+  # ── b) email receiver ────────────────────────────────────────
+  # Used for critical alerts. Configure SMTP via environment variables.
+  # All credentials come from env vars — never hardcoded.
+  - name: 'email'
+    email_configs:
+      - to: '${ALERT_EMAIL_TO:admin@example.com}'
+        from: '${ALERT_EMAIL_FROM:alertmanager@example.com}'
+        smarthost: '${SMTP_HOST:localhost:587}'
+        auth_username: '${SMTP_USER:}'
+        auth_password: '${SMTP_PASSWORD:}'
+        auth_secret: '${SMTP_AUTH_SECRET:}'
+        auth_identity: '${SMTP_AUTH_IDENTITY:}'
+        require_tls: true
+        send_resolved: true
+        headers:
+          Subject: '[MAOP Alert] {{ .CommonLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        html: '{{ template "email.html" . }}'
+        text: '{{ template "email.text" . }}'
+
+  # ── c) slack receiver (optional) ─────────────────────────────
+  # Set SLACK_WEBHOOK_URL to enable. If empty, this receiver is a no-op
+  # (alertmanager skips slack_configs with empty api_url).
+  - name: 'slack'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL:}'
+        channel: '${SLACK_CHANNEL:#alerts}'
+        send_resolved: true
+        title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: '{{ template "slack.text" . }}'
+        color: '{{ if eq .Status "firing" }}{{ if eq .CommonLabels.severity "critical" }}danger{{ else }}warning{{ end }}{{ else }}good{{ end }}'
+
+  # ── critical receiver: webhook + email (multi-channel) ───────
+  # Fans out critical alerts to both webhook and email simultaneously.
+  - name: 'critical'
+    webhook_configs:
+      - url: '${WEBHOOK_URL:http://maop-app:9079/api/alerts/webhook}'
+        send_resolved: true
+        max_alerts: 0
+    email_configs:
+      - to: '${ALERT_EMAIL_TO:admin@example.com}'
+        from: '${ALERT_EMAIL_FROM:alertmanager@example.com}'
+        smarthost: '${SMTP_HOST:localhost:587}'
+        auth_username: '${SMTP_USER:}'
+        auth_password: '${SMTP_PASSWORD:}'
+        require_tls: true
+        send_resolved: true
+        headers:
+          Subject: '[CRITICAL][MAOP] {{ .CommonLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        html: '{{ template "email.html" . }}'
+        text: '{{ template "email.text" . }}'
 
 # ── Inhibition rules ──────────────────────────────────────────
+# Prevent alert storms by suppressing lower-priority or child alerts
+# when a higher-priority or parent alert is already active.
 inhibit_rules:
-  - source_match:
-      severity: "critical"
-    target_match:
-      severity: "warning"
-    equal: ["agent"]
+  # 1. Critical alerts suppress warning alerts for the same component.
+  #    Avoids duplicate noise when both critical and warning fire together.
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ['alertname', 'agent']
+
+  # 2. Service-down alerts suppress child alerts for that service.
+  #    If MAOP is down, no point alerting on sub-components.
+  - source_matchers:
+      - alertname = "MAOPDown"
+    target_matchers:
+      - alertname =~ "MAOP.*"
+    equal: ['agent']
+
+  # 3. No-active-agents suppresses individual circuit-breaker alerts.
+  #    If all agents are down, individual CB alerts are redundant.
+  - source_matchers:
+      - alertname = "MAOPNoActiveAgents"
+    target_matchers:
+      - alertname =~ "MAOPCircuitBreaker.*"

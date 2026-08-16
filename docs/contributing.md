@@ -486,7 +486,7 @@ License 校验：Ed25519 签名（`scripts/generate_license.py`）
 | GitHub Issues | https://github.com/Levango7/MAOP/issues |
 | GitHub Discussions | https://github.com/Levango7/MAOP/discussions |
 | 架构演进 | `docs/adr/` |
-| 项目现状 | `docs/comprehensive-audit-report.md` |
-| 设计原则 | `DESIGN_RULES.md` |
+| 项目现状 | `docs/archive/audits/comprehensive-audit-report.md` |
+| 设计原则 | `docs/DESIGN_RULES.md` |
 
-欢迎贡献代码、提交 issue、参与讨论。请先阅读本指南与 `DESIGN_RULES.md`，确保贡献符合项目方向。
+欢迎贡献代码、提交 issue、参与讨论。请先阅读本指南与 `docs/DESIGN_RULES.md`，确保贡献符合项目方向。

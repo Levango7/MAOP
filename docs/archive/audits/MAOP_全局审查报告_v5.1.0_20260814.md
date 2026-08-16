@@ -24,7 +24,7 @@ MAOP 是一个**"外壳扎实、核心偏薄、文档先行"**的项目。安全
 
 - **双版架构**（ADR-016）：单代码库 + 运行时 Edition 检测，Personal（MIT/SQLite/开箱即用）+ Enterprise（Commercial/RBAC/SSO/审计/PG/Redis/Vault）。架构设计本身清晰、FeatureFlag 统一 gate，是加分项。
 - **版本演进**：v5.0.0（废弃清理）→ v5.1.0（今日发布，企业版 6 功能 + 6 新功能，一次性塞入 12 个功能）。
-- **路线图**：`ROADMAP.md`（版本单一真相源）+ `prd-three-phase-roadmap.md`（21 个月三阶段，Draft）+ `product-design-rfc-001.md`（前端产品设计演进，Draft）。
+- **路线图**：`ROADMAP.md`（版本单一真相源）+ `docs/archive/plans/prd-three-phase-roadmap.md`（21 个月三阶段，Draft）+ `docs/product-design-rfc-001.md`（前端产品设计演进，Draft）。
 
 ### 2.2 四个核心产品问题
 

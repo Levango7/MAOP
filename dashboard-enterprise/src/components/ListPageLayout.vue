@@ -19,7 +19,9 @@
       :search-placeholder="searchPlaceholder"
       :results-label="resultsLabel"
       class="filterbar-embed"
-    />
+    >
+      <template v-if="$slots.filterExtra" #extra><slot name="filterExtra" /></template>
+    </FilterBar>
 
     <!-- 三态主体: 错误 → 加载 → 空态(自定义/兜底) → 表格 -->
     <div v-if="error">
