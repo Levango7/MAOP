@@ -15,7 +15,9 @@ import sys
 # 2026-08-15: 148→226。8-01 后两周迭代新增的直接 env 读取
 # （server.py 31 / sso_store 12 / backends 10 等存量配置读取 + T1 工具白名单
 # 有意设计的 MAOP_TOOL_POLICY_* 覆盖接口）。门禁语义：只允许减少，防未来新增。
-BASELINE = 226
+# 2026-08-17: 226→227。628dd56 的 P2 安全修复（db_backup.py VACUUM INTO 路径
+# 白名单）新增 MAOP_BACKUP_DIR 读取 —— 有意配置，非 drift。
+BASELINE = 227
 
 
 def count_getenv_calls(root: pathlib.Path) -> int:
