@@ -133,7 +133,11 @@ disallow_incomplete_defs = false
 check_untyped_defs = true
 no_implicit_optional = true
 warn_redundant_casts = true
-warn_unused_ignores = true
+# P0-2 fix (2026-08-16): warn_unused_ignores 关闭 —— mypy 结果随依赖 stub
+# 版本浮动（pip 解析时间不同 → cryptography/redis types 变化），未使用的
+# ignore 在不同环境下时有时无。关闭后 ignore 只在"确实多余"时不报错，
+# 真实类型错误仍正常拦截（22 处真实修复保留）。
+warn_unused_ignores = false
 warn_no_return = true
 strict_optional = true
 ignore_missing_imports = true

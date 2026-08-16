@@ -56,7 +56,7 @@ class PerformanceMetrics(BaseModel):
     by_model: dict[str, dict[str, float]] = Field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return self.model_dump()
+        return self.model_dump()  # type: ignore[no-any-return]
 
 
 class MetricDelta(BaseModel):
@@ -72,7 +72,7 @@ class MetricDelta(BaseModel):
     summary: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return self.model_dump()
+        return self.model_dump()  # type: ignore[no-any-return]
 
 
 # ── 评估器 ────────────────────────────────────────────────────────

@@ -248,7 +248,7 @@ def _columns(engine: Engine, table: str) -> list[str]:
 
 
 def _pg_has_table(engine: Engine, table: str) -> bool:
-    return inspect(engine).has_table(table)
+    return inspect(engine).has_table(table)  # type: ignore[no-any-return]
 
 
 # ────────────────────────────────────────────────────────────────────────────

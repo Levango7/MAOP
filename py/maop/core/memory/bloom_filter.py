@@ -45,7 +45,7 @@ def _mmh3_hash32(key: bytes, seed: int = 0) -> int:
     """MurmurHash3 x86_32 — fast, good distribution."""
     if _HAS_MMH3 and _mmh3 is not None:
         try:
-            return _mmh3.hash(key, seed, signed=False)
+            return _mmh3.hash(key, seed, signed=False)  # type: ignore[no-any-return]
         except Exception:
             logger.debug("Silent exception in core/bloom_filter.py:49", exc_info=True)
     # Pure-Python fallback (FNV-1a variant with seed mixing)
