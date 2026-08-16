@@ -92,13 +92,13 @@ jobs:
         run: python scripts/check_coverage_ratchet.py
 
       - name: Run edition tests
-        run: python -m pytest tests/test_edition.py -v
+        run: python -m pytest tests/test_edition.py -v --no-cov
 
       - name: Run contract tests
-        run: python -m pytest tests/contract/ -q -m contract
+        run: python -m pytest tests/contract/ -q -m contract --no-cov
 
       - name: Run e2e tests
-        run: python -m pytest tests/e2e/ -q --timeout=15 -p no:cacheprovider
+        run: python -m pytest tests/e2e/ -q --timeout=15 -p no:cacheprovider --no-cov -p no:xdist
 
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
