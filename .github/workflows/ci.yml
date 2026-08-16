@@ -118,7 +118,10 @@ jobs:
         run: python -m pytest tests/contract/ -q -m contract --no-cov
 
       - name: Run e2e tests
-        run: python -m pytest tests/e2e/ -q --timeout=15 -p no:cacheprovider --no-cov -p no:xdist
+        # 不能用 `-p no:xdist`：pyproject addopts 有 `-n auto`（xdist 并行），
+        # 禁用 xdist 插件后 `-n auto` 变 unrecognized → exit 4（CI 12 平台
+        # pytest job 全挂的真凶之一）。`-n 0` 显式覆盖为单进程，xdist 保持启用。
+        run: python -m pytest tests/e2e/ -q --timeout=15 -p no:cacheprovider --no-cov -n 0
 
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
