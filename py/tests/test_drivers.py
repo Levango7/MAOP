@@ -79,11 +79,21 @@ class TestRunPowershell:
         # 不可用则 skip，避免每次 CI 空等 60s 后失败。
         import asyncio
 
-        probe = await asyncio.create_subprocess_exec(
-            "powershell", "-NoProfile", "-Command", "exit 0",
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
+        # 与 maop.delegate.drivers._run_powershell 相同的解析逻辑：Windows →
+        # powershell.exe；POSIX（ubuntu-latest 预装 PowerShell Core）→ pwsh。
+        # 写死 "powershell" 在 ubuntu 上 FileNotFoundError → 测试 ERROR
+        # （_HAS_POWERSHELL 因 shutil.which("pwsh") 为 True 不会 skip）。
+        ps_bin = "powershell" if sys.platform == "win32" else "pwsh"
+        if not shutil.which(ps_bin):
+            pytest.skip(f"PowerShell binary '{ps_bin}' not found")
+        try:
+            probe = await asyncio.create_subprocess_exec(
+                ps_bin, "-NoProfile", "-Command", "exit 0",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+        except FileNotFoundError:
+            pytest.skip(f"PowerShell binary '{ps_bin}' not found")
         try:
             await asyncio.wait_for(probe.wait(), timeout=15)
         except asyncio.TimeoutError:
