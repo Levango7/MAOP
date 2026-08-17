@@ -106,7 +106,9 @@ class CostTracker:
         alert_threshold: float = 0.8,
         pricing: dict[str, ModelPricing] | None = None,
     ) -> None:
-        self._root = Path(root_dir)
+        # root_dir 兼容 None（dispatcher 等调用方可能不传）；db 路径实际由
+        # get_db_path("cost_tracker") 决定，_root 仅作参数占位。
+        self._root = Path(root_dir) if root_dir else Path("data")
         self._db_path = get_db_path("cost_tracker")
         self._hook_manager = hook_manager
         self._daily_limit = daily_limit_usd

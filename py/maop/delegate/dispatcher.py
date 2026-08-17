@@ -684,20 +684,35 @@ class Dispatcher:
         # Non-blocking: any failure in BudgetGuard itself must NOT prevent
         # normal dispatch (only log a warning).
         try:
-            from maop.model.budget import BudgetGuard
-            _bg_config = getattr(self._config, "budget", None)
-            _budget_guard = BudgetGuard(root_dir=self._root_dir, config=_bg_config)
-            if not _budget_guard.can_spend(estimated_cost=0.0):
-                logger.warning(
-                    "[dispatch] Budget EXCEEDED for agent='%s' - rejecting task (trace_id=%s)",
-                    agent, trace_id,
+            # P0-3 止血（remediation-plan-v5.1.0）：原实现读 JSON
+            # budget_ledger.json，但该账本已无写入方（maop_loop 迁移至
+            # CostTracker SQLite，model/budget.py docstring 自述废弃）→ 花费恒 0
+            # → 准入拦截静默失效（对外宣称的预算管控实际永远放行）。
+            # 改用 CostTracker 聚合 SQLite cost_entries 当日/当月真实花费对比
+            # 限额（与 maop_loop 同一 get_db_path("cost_tracker") 库）。
+            # 限额仍取自 self._config.budget（BudgetConfig），与原实现同配置源。
+            from maop.core.cost_tracker import CostTracker
+            from maop.model.schema import BudgetConfig
+            _bg_config = getattr(self._config, "budget", None) or BudgetConfig()
+            if _bg_config.hard_stop:
+                _tracker = CostTracker(
+                    root_dir=self._root_dir,
+                    daily_limit_usd=_bg_config.daily_limit,
+                    monthly_limit_usd=_bg_config.monthly_limit,
+                    alert_threshold=_bg_config.alert_threshold,
                 )
-                result = new_result(
-                    agent=agent, task=task,
-                    exit_code=-6, error="Budget EXCEEDED - daily or monthly limit reached",
-                    trace_id=trace_id, routing_key=routing_key,
-                )
-                return DispatchResult(result=result, breaker_tripped=False)
+                _budget_status = _tracker.budget_status()
+                if _budget_status.daily_over_budget or _budget_status.monthly_over_budget:
+                    logger.warning(
+                        "[dispatch] Budget EXCEEDED for agent='%s' - rejecting task (trace_id=%s)",
+                        agent, trace_id,
+                    )
+                    result = new_result(
+                        agent=agent, task=task,
+                        exit_code=-6, error="Budget EXCEEDED - daily or monthly limit reached",
+                        trace_id=trace_id, routing_key=routing_key,
+                    )
+                    return DispatchResult(result=result, breaker_tripped=False)
         except Exception as exc:
             # Conservative: budget check failure must not block dispatch.
             logger.warning("[dispatch] BudgetGuard check unavailable (non-blocking): %s", exc)
