@@ -152,7 +152,7 @@ class SandboxManager:
             import shlex
             cmd_parts = shlex.split(command)
             if not cmd_parts:
-                return SandboxResult(ok=False, error="Empty command", duration_ms=int((time.monotonic() - start) * 1000))
+                return SandboxResult(ok=False, error="Empty command", duration_ms=max(1, int((time.monotonic() - start) * 1000)))
             if sys.platform == "win32":
                 _win_builtins = {"echo", "dir", "type", "copy", "move", "del", "mkdir", "md",
                     "rmdir", "rd", "cd", "chdir", "set", "path", "ver", "cls", "ren", "rename",
@@ -173,10 +173,10 @@ class SandboxManager:
             except asyncio.TimeoutError:
                 proc.kill()
                 await proc.wait()
-                elapsed_ms = int((time.monotonic() - start) * 1000)
+                elapsed_ms = max(1, int((time.monotonic() - start) * 1000))
                 return SandboxResult(ok=False, error="timeout", duration_ms=elapsed_ms)
 
-            elapsed_ms = int((time.monotonic() - start) * 1000)
+            elapsed_ms = max(1, int((time.monotonic() - start) * 1000))
             output = stdout.decode("utf-8", errors="replace")
             lines = output.splitlines()
             if len(lines) > max_output_lines:
@@ -201,7 +201,7 @@ class SandboxManager:
                 log=str(log_file),
             )
         except Exception as exc:
-            elapsed_ms = int((time.monotonic() - start) * 1000)
+            elapsed_ms = max(1, int((time.monotonic() - start) * 1000))
             return SandboxResult(ok=False, error=str(exc), duration_ms=elapsed_ms)
 
     def run(
@@ -229,7 +229,7 @@ class SandboxManager:
             import shlex
             cmd_parts = shlex.split(command)
             if not cmd_parts:
-                return SandboxResult(ok=False, error="Empty command", duration_ms=int((time.monotonic() - start) * 1000))
+                return SandboxResult(ok=False, error="Empty command", duration_ms=max(1, int((time.monotonic() - start) * 1000)))
             if sys.platform == "win32":
                 _win_builtins = {"echo", "dir", "type", "copy", "move", "del", "mkdir", "md",
                     "rmdir", "rd", "cd", "chdir", "set", "path", "ver", "cls", "ren", "rename",
@@ -246,7 +246,7 @@ class SandboxManager:
                 timeout=timeout_seconds,
                 cwd=str(exec_dir),
             )
-            elapsed_ms = int((time.monotonic() - start) * 1000)
+            elapsed_ms = max(1, int((time.monotonic() - start) * 1000))
             output = proc.stdout
             lines = output.splitlines()
             if len(lines) > max_output_lines:
@@ -269,10 +269,10 @@ class SandboxManager:
                 log=str(log_file),
             )
         except subprocess.TimeoutExpired:
-            elapsed_ms = int((time.monotonic() - start) * 1000)
+            elapsed_ms = max(1, int((time.monotonic() - start) * 1000))
             return SandboxResult(ok=False, error="timeout", duration_ms=elapsed_ms)
         except Exception as exc:
-            elapsed_ms = int((time.monotonic() - start) * 1000)
+            elapsed_ms = max(1, int((time.monotonic() - start) * 1000))
             return SandboxResult(ok=False, error=str(exc), duration_ms=elapsed_ms)
 
     def cleanup(self, sandbox_id: str) -> bool:
