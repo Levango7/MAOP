@@ -65,16 +65,15 @@ class TestBudgetGuardInit:
         g = BudgetGuard()
         assert g._root == Path.cwd()
 
-    def test_ledger_path(self, tmp_path):
-        g = BudgetGuard(root_dir=tmp_path)
-        assert g._ledger_path() == tmp_path / "data" / "budget_ledger.json"
-
     def test_load_ledger_nonexistent(self, tmp_path):
+        # JSON ledger path removed (P2-1); guard starts empty in-memory.
         g = BudgetGuard(root_dir=tmp_path)
         assert g._daily_spend == 0.0
         assert g._ledger == []
 
     def test_load_ledger_with_entries(self, tmp_path):
+        # JSON ledger load removed (P2-1). Guard now starts empty regardless
+        # of any leftover budget_ledger.json on disk — verify it is ignored.
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         ledger_data = {
             "entries": [
@@ -88,13 +87,13 @@ class TestBudgetGuardInit:
         (data_dir / "budget_ledger.json").write_text(json.dumps(ledger_data), encoding="utf-8")
 
         g = BudgetGuard(root_dir=tmp_path)
-        # Today's entries: 0.5 + 0.3 = 0.8
-        assert g._daily_spend == pytest.approx(0.8)
-        # Monthly includes today's entries (same month)
-        assert g._monthly_spend == pytest.approx(0.8)
-        assert len(g._ledger) == 3
+        # In-memory shim ignores on-disk ledger; starts at zero.
+        assert g._daily_spend == 0.0
+        assert g._monthly_spend == 0.0
+        assert g._ledger == []
 
     def test_load_ledger_corrupt(self, tmp_path):
+        # JSON ledger load removed (P2-1); corrupt file is simply ignored.
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
         (data_dir / "budget_ledger.json").write_text("not json", encoding="utf-8")
@@ -159,13 +158,13 @@ class TestRecord:
         assert guard._daily_spend == pytest.approx(0.5)
         assert len(guard._ledger) == 2
 
-    def test_record_persists_to_disk(self, guard, tmp_path):
+    def test_record_no_json_persistence(self, guard, tmp_path):
+        # P2-1: JSON budget_ledger.json persistence removed.
+        # record() now only updates in-memory accumulators.
         guard.record("gpt-4", "openai", 0.5)
         ledger_path = tmp_path / "data" / "budget_ledger.json"
-        assert ledger_path.exists()
-        data = json.loads(ledger_path.read_text(encoding="utf-8"))
-        assert len(data["entries"]) == 1
-        assert data["entries"][0]["cost"] == 0.5
+        assert not ledger_path.exists()
+        assert guard._daily_spend == pytest.approx(0.5)
 
     def test_record_triggers_alert(self, guard):
         # alert_threshold=0.8, daily_limit=1.0 → alert at 0.8

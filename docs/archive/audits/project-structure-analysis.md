@@ -1381,5 +1381,5 @@ if has_feature(FeatureFlag.<FEATURE>):
 | 环境变量示例 | `.env.example` |
 | 数据库 schema 文档 | `docs/database-schema.md` |
 | 企业版文档 | `docs/enterprise/` |
-| 设计系统 | `docs/design-system.md` |
+| 设计系统（已归档） | `docs/archive/audits/design-system-legacy.md` |
 | 前端风格指南 | `docs/frontend-style-guide.md` |

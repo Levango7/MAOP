@@ -325,7 +325,7 @@ class TestEvolveContract:
         """Backend wraps in {status, data}, frontend reads data.data.total_evolutions."""
         import asyncio
 
-        from maop.dashboard.routers import evolve as evolve_mod
+        from maop.dashboard.routers import evolve_insights as evolve_mod
 
         try:
             result = asyncio.run(evolve_mod.api_evolve_status())

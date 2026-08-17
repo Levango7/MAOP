@@ -1,3 +1,8 @@
+> **⚠️ 已归档文档**
+> 本文档描述的是旧版 JavaScript 仪表盘设计系统，已被 Vue 3 + Element Plus 方案取代。
+> 当前设计规范请参考 `DESIGN_RULES.md` 和 `docs/frontend-style-guide.md`。
+> 归档时间：2026-08-17
+
 # MAOP Dashboard — Design System v4.1
 
 ## 一、卡片三层嵌套（背景+边框联动）

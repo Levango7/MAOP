@@ -310,33 +310,26 @@ def test_circuit_breaker_degradation_integration(tmp_path: Path) -> None:
 
 
 def test_budget_guard_under_degradation(tmp_path: Path) -> None:
-    """BudgetGuard gracefully handles a corrupted ledger file.
+    """BudgetGuard (deprecated in-memory shim) remains functional.
 
-    Creates a JSON-backed ``BudgetGuard``, records 80 USD of spending,
-    corrupts the ledger file with invalid JSON, then re-creates the
-    guard.  The guard must not crash — it logs a warning and resets
-    its in-memory spend to zero.  The guard remains functional after
-    corruption.
+    P2-1: JSON ``budget_ledger.json`` persistence has been removed.
+    The guard now keeps in-memory accumulators only.  This test verifies
+    the guard still enforces limits correctly without any on-disk ledger.
     """
     config = BudgetConfig(daily_limit=100.0, monthly_limit=1000.0, hard_stop=True)
     guard = BudgetGuard(root_dir=tmp_path, config=config)
 
-    # Normal spending
+    # Normal spending (in-memory only; no JSON file written)
     guard.record(model="test-model", provider="test", cost=80.0)
     assert guard._daily_spend == 80.0
-
-    # Corrupt the ledger file
     ledger_path = tmp_path / "data" / "budget_ledger.json"
-    assert ledger_path.exists()
-    ledger_path.write_text("{invalid json <<< corrupted", encoding="utf-8")
+    assert not ledger_path.exists()  # P2-1: no JSON persistence
 
-    # Re-create — must not crash, gracefully handles corruption
+    # Re-create — fresh in-memory state (no on-disk ledger to read)
     guard2 = BudgetGuard(root_dir=tmp_path, config=config)
-    # _load_ledger catches the JSONDecodeError and logs a warning;
-    # _daily_spend resets to 0.0 because load failed
     assert guard2._daily_spend == 0.0
 
-    # Guard is still functional after corruption
+    # Guard is still functional
     assert guard2.can_spend(estimated_cost=10.0) is True
     guard2.record(model="test", provider="test", cost=10.0)
     assert guard2._daily_spend == 10.0

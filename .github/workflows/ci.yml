@@ -471,7 +471,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install cyclonedx-bom
-      - run: cyclonedx-py requirements -o sbom.json -i requirements.txt
+      - run: cyclonedx-py requirements -o sbom.json -i requirements.lock
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
@@ -529,9 +529,9 @@ jobs:
         with:
           packages-dir: dist/
 
-  # ── CD: Deploy to staging ──────────────────────────────────────
-  deploy-staging:
-    name: Deploy to Staging
+  # ── Compose Smoke Test ─────────────────────────────────────────
+  compose-smoke:
+    name: Compose Smoke
     runs-on: ubuntu-latest
     needs: [test, frontend, e2e, docker]
     if: github.ref == 'refs/heads/develop'

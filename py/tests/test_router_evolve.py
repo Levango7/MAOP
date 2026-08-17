@@ -1,4 +1,4 @@
-﻿"""Unit tests for MAOP.dashboard.routers.evolve module."""
+"""Unit tests for MAOP.dashboard.routers.evolve_insights module."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from maop.dashboard.routers import evolve as ev
+from maop.dashboard.routers import evolve_insights as ev
 from maop.dashboard.routers import state as st
 
 

@@ -209,9 +209,14 @@ class TestResolveTemplate:
 class TestEngine:
     """Test unified engine execution."""
 
+    @staticmethod
+    async def _success_executor(step, **kw):
+        """Mock executor that always succeeds — keeps tests focused on flow logic."""
+        return new_result(agent=step.agent or "mock", task=step.task or "", exit_code=0, stdout="ok")
+
     def test_single_agent_step(self):
         steps = [WorkflowStep(id="s1", type=StepType.AGENT, agent="claude", task="hello")]
-        engine = Engine()
+        engine = Engine(step_executor=self._success_executor)
         result = asyncio.run(engine.run(steps, context={"task": "hello"}))
         assert result.success
         assert len(result.steps) == 1
@@ -229,7 +234,7 @@ class TestEngine:
             WorkflowStep(id="s1", type=StepType.AGENT, agent="claude", task="do work"),
             WorkflowStep(id="v1", type=StepType.VERIFY, depends_on=["s1"]),
         ]
-        engine = Engine()
+        engine = Engine(step_executor=self._success_executor)
         result = asyncio.run(engine.run(steps))
         assert result.success
 
@@ -239,7 +244,7 @@ class TestEngine:
             WorkflowStep(id="verify", type=StepType.VERIFY, depends_on=["agent"]),
             WorkflowStep(id="done", type=StepType.TERMINAL, depends_on=["verify"]),
         ]
-        engine = Engine()
+        engine = Engine(step_executor=self._success_executor)
         result = asyncio.run(engine.run(steps))
         assert result.success
         assert len(result.steps) == 3
@@ -280,7 +285,7 @@ class TestEngine:
             WorkflowStep(id="s2", type=StepType.AGENT, agent="a2", task="t2"),
             WorkflowStep(id="done", type=StepType.TERMINAL, depends_on=["s1", "s2"]),
         ]
-        engine = Engine()
+        engine = Engine(step_executor=self._success_executor)
         result = asyncio.run(engine.run(steps))
         assert result.success
         assert len(result.steps) == 3

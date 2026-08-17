@@ -265,9 +265,26 @@ async def test_pev_with_budget_exceeded(tmp_path: Path) -> None:
         MAOP_config=config, breaker=breaker, root_dir=str(tmp_path),
     )
 
-    # Pre-spend to exceed the 0.01 budget
-    guard = BudgetGuard(root_dir=str(tmp_path), config=budget_config)
-    guard.record(model="test", provider="test", cost=0.02)
+    # Pre-spend to exceed the 0.01 budget.
+    # Dispatcher reads from CostTracker (SQLite) — not the legacy JSON
+    # BudgetGuard — so we pre-spend via CostTracker to make the limit
+    # visible to the dispatcher's budget check.
+    from maop.core.cost_tracker import CostTracker
+    tracker = CostTracker(
+        root_dir=str(tmp_path),
+        daily_limit_usd=budget_config.daily_limit,
+        monthly_limit_usd=budget_config.monthly_limit,
+        alert_threshold=budget_config.alert_threshold,
+    )
+    tracker.record(model="test", prompt_tokens=0, completion_tokens=0)
+    # Force a cost entry that exceeds the 0.01 daily limit.
+    import sqlite3
+    from maop.core.backends.db_utils import get_db_path
+    with sqlite3.connect(get_db_path("cost_tracker")) as conn:
+        conn.execute(
+            "UPDATE cost_entries SET cost_usd = 0.02 WHERE model = 'test'"
+        )
+        conn.commit()
 
     # Driver should never be called — budget check rejects before execution
     from maop.delegate import dispatcher as disp_mod

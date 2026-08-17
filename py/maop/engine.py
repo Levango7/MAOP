@@ -640,10 +640,13 @@ class Engine:
                         duration_ms=int((time.monotonic() - start) * 1000),
                     )
                 else:
-                    # No executor: mark as success (placeholder)
+                    # No executor configured: cannot actually run agent/DAG step.
+                    # Reporting SUCCESS here would be a false positive — fail fast
+                    # so callers know an executor must be wired up.
                     return StepResult(
-                        id=step.id, status=StepStatus.SUCCESS,
-                        output=f"[{step.type.value}] {resolved_task[:100]}",
+                        id=step.id, status=StepStatus.FAILED,
+                        error=f"No step executor configured for {step.type.value} step '{step.id}'; "
+                              f"cannot run agent/DAG step. Set engine._step_executor before dispatch.",
                         agent=step.agent,
                         duration_ms=int((time.monotonic() - start) * 1000),
                     )

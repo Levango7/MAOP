@@ -65,7 +65,7 @@ const categories = [
       { name: 'Deployment Guide', path: 'deployment.md' },
       { name: 'API Reference', path: 'api-reference.md' },
       { name: 'Database Schema', path: 'database-schema.md' },
-      { name: 'Design System', path: 'design-system.md' },
+      { name: 'Design System (Legacy)', path: 'archive/audits/design-system-legacy.md' },
     ],
   },
   {

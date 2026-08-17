@@ -13,7 +13,7 @@ Architecture: routes split into routers/ subpackage by domain.
   - routers/data.py:    query/read endpoints
   - routers/control.py: action endpoints
   - routers/model.py:   model management
-  - routers/evolve.py:  self-evolution
+  - routers/evolve_insights.py:  self-evolution
   - routers/memory.py:  memory + neural mechanisms
   - routers/system.py:  framework/audit/config/overview
 
@@ -335,12 +335,12 @@ app.add_middleware(
 )
 
 # ── Include routers ────────────────────────────────────────────────
-from maop.dashboard.routers import control, data, evolve, memory, model, system
+from maop.dashboard.routers import control, data, evolve_insights, memory, model, system
 
 app.include_router(data.router)
 app.include_router(control.router)
 app.include_router(model.router)
-app.include_router(evolve.router)
+app.include_router(evolve_insights.router)
 app.include_router(memory.router)
 app.include_router(system.router)
 app.include_router(_auth_mod.router)
@@ -433,7 +433,7 @@ from maop.dashboard.routers import routing as routing_router
 app.include_router(routing_router.router)
 
 # F2-01: Agent 自演化闭环 — PerformanceEvaluator / ABTest(SPRT) / AutoDeployer.
-from maop.dashboard.routers import evolution as evolution_router
+from maop.dashboard.routers import evolution_experiment as evolution_router
 
 app.include_router(evolution_router.router)
 

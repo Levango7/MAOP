@@ -135,7 +135,7 @@ class TestMcpHealth:
 
 @pytest.fixture
 def evolve_env(tmp_path, monkeypatch):
-    monkeypatch.setattr("maop.dashboard.routers.evolve.MAOP_ROOT", tmp_path)
+    monkeypatch.setattr("maop.dashboard.routers.evolve_insights.MAOP_ROOT", tmp_path)
     return tmp_path
 
 
@@ -161,7 +161,7 @@ def evolve_client(evolve_env, monkeypatch):
     mock_bridge.agent_stats = AsyncMock(return_value={"agents": []})
     monkeypatch.setattr("maop.dashboard.routers.state.get_bridge", lambda: mock_bridge)
 
-    from maop.dashboard.routers.evolve import router
+    from maop.dashboard.routers.evolve_insights import router
     return _make_app(router)
 
 

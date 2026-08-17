@@ -304,7 +304,9 @@ class TestEngineAbortOnFailure:
         result = await engine.run(steps=steps)
         step2 = next((r for r in result.steps if r.id == "s2"), None)
         assert step2 is not None
-        assert step2.status in (StepStatus.SUCCESS, StepStatus.SKIPPED)
+        # step2 ran (not aborted). Without an executor wired up, agent step
+        # now fails fast (FAILED) instead of returning a placeholder SUCCESS.
+        assert step2.status in (StepStatus.SUCCESS, StepStatus.SKIPPED, StepStatus.FAILED)
 
 
 class TestEngineDecomposition:

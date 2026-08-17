@@ -67,15 +67,20 @@ async def test_wal_replay_after_simulated_crash(tmp_path: Path) -> None:
 
 
 # ════════════════════════════════════════════════════════════════════
-# 2. Budget ledger (JSON-backed) survives crash
+# 2. Budget ledger persistence (P2-1: JSON ledger removed; in-memory shim)
 # ════════════════════════════════════════════════════════════════════
 
 
 def test_budget_ledger_survives_crash(tmp_path: Path) -> None:
-    """JSON budget ledger persists entries across object drop (crash).
+    """BudgetGuard in-memory shim does not persist across crash (P2-1).
 
-    Records 10 spending entries, drops the guard without close, recreates
-    from the same root_dir, and verifies daily spend and entry count.
+    The JSON ``budget_ledger.json`` persistence path has been removed
+    (P2-1 成本双写统一).  ``maop.model.budget.BudgetGuard`` is now an
+    in-memory deprecated shim; callers needing crash-safe persistence
+    should use ``maop.core.cost_tracker.CostTracker`` (SQLite-backed).
+
+    This test verifies the shim's documented behavior: a fresh guard
+    starts at zero spend (no on-disk ledger is read).
     """
     guard = BudgetGuard(root_dir=tmp_path)
     for i in range(10):
@@ -92,11 +97,11 @@ def test_budget_ledger_survives_crash(tmp_path: Path) -> None:
     # Simulate crash: drop guard without explicit close
     del guard
 
-    # Recreate guard pointing at same root_dir — ledger reloads from JSON
+    # Recreate guard — in-memory shim starts fresh (no JSON ledger to read)
     guard2 = BudgetGuard(root_dir=tmp_path)
     stats = guard2.stats()
-    assert stats["daily_spend"] == pytest.approx(expected_daily), (
-        "Ledger daily spend should survive crash"
+    assert stats["daily_spend"] == 0.0, (
+        "In-memory shim does not persist across crash; use CostTracker for persistence"
     )
 
 

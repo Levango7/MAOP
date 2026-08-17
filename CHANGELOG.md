@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 移除 pyproject.toml addopts 的 --cov-fail-under=50，改由 ratchet 脚本渐进门禁
 - 修复 /users 路由守卫缺失（补 meta.requiresEnterprise）
 - 修复 Audit.test.js chart.js/jsdom unhandled rejection
+- **统一错误响应格式对齐 `ErrorSchema`**：所有经 `handle_api_errors` 装饰器（含 `HTTPException`）的端点错误响应采用扁平结构 `{status, error, code, detail, request_id}`（全部 string 类型，`status` 默认 `"error"`，其余默认空串），取代历史嵌套 `{"error":{code,message}}` 描述。权威定义见 `py/maop/dashboard/error_handler.py` `ErrorSchema`。
 
 ## [5.0.2] — 2026-08-13
 

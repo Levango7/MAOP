@@ -1,6 +1,6 @@
 ﻿# MAOP API Reference
 
-MAOP（Model Agent Orchestration Platform）是基于 FastAPI 实现的智能体编排框架，采用 Plan-Execute-Verify 范式。本文档覆盖 `dashboard` 模块暴露的全部 HTTP 与 WebSocket 端点，版本 4.3.0，供使用方、集成方与运维人员查阅。所有示例可直接复制运行，默认服务地址为 `http://127.0.0.1:9079`。
+MAOP（Model Agent Orchestration Platform）是基于 FastAPI 实现的智能体编排框架，采用 Plan-Execute-Verify 范式。本文档覆盖 `dashboard` 模块暴露的全部 HTTP 与 WebSocket 端点，版本 5.1.0，供使用方、集成方与运维人员查阅。所有示例可直接复制运行，默认服务地址为 `http://127.0.0.1:9079`。
 
 ---
 
@@ -781,4 +781,4 @@ curl http://127.0.0.1:9079/api/report -H "Authorization: Bearer $TOKEN"
 
 ---
 
-**MAOP v4.3.0** · API Reference
+**MAOP v5.1.0** · API Reference

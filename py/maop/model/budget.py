@@ -1,4 +1,4 @@
-"""BudgetGuard — Cost tracking and budget enforcement.
+"""BudgetGuard — Cost tracking and budget enforcement (deprecated shim).
 
 .. deprecated:: P2-1
     This JSON-backed ``BudgetGuard`` is superseded by the SQLite-backed
@@ -7,17 +7,24 @@
     from :mod:`maop.core.cost_tracker` (or via the re-export below:
     ``from maop.model.budget import CostTracker``).
 
-    The legacy ``BudgetGuard`` class is retained here so that existing
-    callers (``delegate/dispatcher.py`` read-only ``can_spend``,
-    ``dashboard/routers/model.py`` read-only ``stats``) and the test
-    suite (``tests/test_budget.py``) continue to work without changes.
-    The JSON ``budget_ledger.json`` write path is no longer used by the
-    main loop (``maop_loop.py`` now writes to ``CostTracker`` directly).
+    The legacy ``BudgetGuard`` class is retained here as a **deprecated
+    in-memory shim** so that existing callers (``delegate/dispatcher.py``
+    read-only ``can_spend``, ``dashboard/routers/model.py`` read-only
+    ``stats``) and the test suite (``tests/test_budget.py``) continue to
+    work without changes. The JSON ``budget_ledger.json`` read/write path
+    has been **removed** — the main loop (``maop_loop.py``) now writes to
+    ``CostTracker`` directly, and the dispatcher reads budget status from
+    ``CostTracker`` as well. This shim only keeps in-memory accumulators
+    for backward-compatible ``can_spend`` / ``record`` / ``stats`` semantics.
+
+    For SQLite-backed daily token/cost enforcement (with hook events), use
+    :class:`maop.core.budget_guard.BudgetGuard` instead.
 """
 
 from __future__ import annotations
 
 import logging
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -28,22 +35,25 @@ from maop.model.schema import BudgetConfig
 
 logger = logging.getLogger(__name__)
 
+# Emit a DeprecationWarning at import time so callers know to migrate.
+warnings.warn(
+    "maop.model.budget is deprecated since P2-1; use maop.core.cost_tracker.CostTracker "
+    "or maop.core.budget_guard.BudgetGuard instead. The JSON budget_ledger.json path "
+    "has been removed; this module now only provides an in-memory BudgetGuard shim.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-# ── Parallel Implementation Note ──────────────────────────────
-# NOTE: BudgetGuard (JSON-backed, this class) is one of two parallel
-# budget implementations. The other is BudgetGuard (SQLite-backed) in
-# maop/core/budget_guard.py. Both have production callers:
-#   - This class (JSON): used by delegate/dispatcher.py (can_spend, read-only),
-#     dashboard/routers/model.py (stats, read-only). maop_loop.py has been
-#     migrated to CostTracker (SQLite) — see P2-1 成本双写统一.
-#   - core/budget_guard.py BudgetGuard (SQLite): used by dashboard/routers/budget.py
-# Future work: migrate remaining read-only callers to CostTracker and delete
-# this JSON implementation.
 
 class BudgetGuard:
-    """Tracks spending and enforces budget limits.
+    """Deprecated in-memory budget guard shim.
 
-    Usage::
+    Tracks spending and enforces budget limits **in memory only**.
+    The former JSON ``budget_ledger.json`` persistence has been removed
+    (P2-1 成本双写统一) — callers needing persistence should use
+    :class:`maop.core.cost_tracker.CostTracker` instead.
+
+    Usage (deprecated)::
 
         guard = BudgetGuard(root_dir="/path/to/MAOP")
         if guard.can_spend(estimated_cost=0.005):
@@ -55,50 +65,20 @@ class BudgetGuard:
 
     def __init__(self, root_dir: Path | str | None = None,
                  config: BudgetConfig | None = None) -> None:
+        warnings.warn(
+            "maop.model.budget.BudgetGuard is deprecated; use "
+            "maop.core.cost_tracker.CostTracker or "
+            "maop.core.budget_guard.BudgetGuard instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._root = Path(root_dir) if root_dir else Path.cwd()
         self._config = config or BudgetConfig()
         self._daily_spend: float = 0.0
         self._monthly_spend: float = 0.0
-        self._ledger: list[dict] = []  # cost records
+        self._ledger: list[dict] = []  # in-memory cost records (no longer persisted to JSON)
         self._alerted: bool = False
         self._registry: Any = None  # cached ModelRegistry
-        self._load_ledger()
-
-    def _ledger_path(self) -> Path:
-        return self._root / "data" / "budget_ledger.json"
-
-    def _load_ledger(self) -> None:
-        """Load today's ledger from disk."""
-        path = self._ledger_path()
-        if not path.exists():
-            return
-        try:
-            import json
-            data = json.loads(path.read_text(encoding="utf-8"))
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            this_month = today[:7]
-            for entry in data.get("entries", []):
-                ts = entry.get("timestamp", "")
-                if ts.startswith(today):
-                    self._daily_spend += entry.get("cost", 0)
-                if ts.startswith(this_month):
-                    self._monthly_spend += entry.get("cost", 0)
-                self._ledger.append(entry)
-        except Exception as exc:
-            logger.warning("Failed to load budget ledger: %s", exc)
-
-    def _save_ledger(self) -> None:
-        """Persist ledger to disk atomically (write temp + rename)."""
-        path = self._ledger_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            import json
-            data = {"entries": self._ledger[-1000:]}  # keep last 1000
-            tmp = path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-            tmp.replace(path)  # atomic on same filesystem
-        except Exception as exc:
-            logger.warning("Failed to save budget ledger: %s", exc)
 
     def can_spend(self, estimated_cost: float = 0.0) -> bool:
         """Check if spending estimated_cost is within budget."""
@@ -120,7 +100,7 @@ class BudgetGuard:
 
     def record(self, model: str, provider: str, cost: float,
                tokens_in: int = 0, tokens_out: int = 0) -> None:
-        """Record an actual cost."""
+        """Record an actual cost (in-memory only; no JSON persistence)."""
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "model": model, "provider": provider,
@@ -130,7 +110,6 @@ class BudgetGuard:
         self._ledger.append(entry)
         self._daily_spend += cost
         self._monthly_spend += cost
-        self._save_ledger()
 
         # Check alert threshold
         if not self._alerted and self._daily_spend >= self._config.daily_limit * self._config.alert_threshold:
@@ -169,23 +148,15 @@ class BudgetGuard:
         actual_tokens_out: int = 0,
         estimated_cost: float = 0.0,
     ) -> dict:
-        """Post-execution cost reconciliation.
+        """Post-execution cost reconciliation (in-memory; deprecated).
 
         Compares estimated cost with actual token usage and records
         the real cost.  Returns a reconciliation summary so the
         caller (e.g. MaopLoop) can log or act on discrepancies.
 
-        Usage::
-
-            # after agent CLI returns
-            guard.record_actual_cost(
-                trace_id=trace_id,
-                model=effective.model_name,
-                provider=effective.provider,
-                actual_tokens_in=usage["input"],
-                actual_tokens_out=usage["output"],
-                estimated_cost=effective.cost_estimate,
-            )
+        .. deprecated::
+            Use :meth:`maop.core.cost_tracker.CostTracker.record_actual_cost`
+            instead — that persists to SQLite and is the canonical path.
         """
         # Look up model pricing for actual cost calculation
         actual_cost = estimated_cost

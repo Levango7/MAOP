@@ -53,13 +53,18 @@ class TestPlanVerifyWorkflow:
 class TestEngineDAGWorkflow:
     """Test multi-step DAG execution."""
 
+    @staticmethod
+    async def _success_executor(step, **kw):
+        """Mock executor that always succeeds — keeps tests focused on DAG flow."""
+        return new_result(agent=step.agent or "mock", task=step.task or "", exit_code=0, stdout="ok")
+
     def test_codegen_pipeline(self):
         steps = [
             WorkflowStep(id="codegen", type=StepType.AGENT, agent="codex", task="write code"),
             WorkflowStep(id="verify", type=StepType.VERIFY, depends_on=["codegen"]),
             WorkflowStep(id="done", type=StepType.TERMINAL, depends_on=["verify"]),
         ]
-        engine = Engine()
+        engine = Engine(step_executor=self._success_executor)
         result = asyncio.run(engine.run(steps, context={"task": "refactor"}))
         assert result.success
         assert len(result.steps) == 3
@@ -70,7 +75,7 @@ class TestEngineDAGWorkflow:
             WorkflowStep(id="agent2", type=StepType.AGENT, agent="codex", task="task2"),
             WorkflowStep(id="merge", type=StepType.TERMINAL, depends_on=["agent1", "agent2"]),
         ]
-        engine = Engine()
+        engine = Engine(step_executor=self._success_executor)
         result = asyncio.run(engine.run(steps))
         assert result.success
 
