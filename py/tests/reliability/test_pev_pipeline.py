@@ -21,7 +21,6 @@ from maop.delegate.dispatcher import Dispatcher, DispatchResult
 from maop.maop_execute import maop_execute
 from maop.maop_plan import Plan, maop_plan
 from maop.maop_verify import VerifyEngine, VerifyResult
-from maop.model.budget import BudgetGuard
 from maop.model.schema import BudgetConfig
 
 # ── Helpers ────────────────────────────────────────────────────
@@ -279,6 +278,7 @@ async def test_pev_with_budget_exceeded(tmp_path: Path) -> None:
     tracker.record(model="test", prompt_tokens=0, completion_tokens=0)
     # Force a cost entry that exceeds the 0.01 daily limit.
     import sqlite3
+
     from maop.core.backends.db_utils import get_db_path
     with sqlite3.connect(get_db_path("cost_tracker")) as conn:
         conn.execute(
