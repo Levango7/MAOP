@@ -99,7 +99,7 @@ class CostTracker:
 
     def __init__(
         self,
-        root_dir: str | Path = "data",
+        root_dir: str | Path | None = "data",
         hook_manager: Any = None,
         daily_limit_usd: float = 0.0,
         monthly_limit_usd: float = 0.0,
