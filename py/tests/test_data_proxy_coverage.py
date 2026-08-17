@@ -1,5 +1,5 @@
 """Coverage tests for dashboard/data_proxy.py + dashboard/routers/data.py
-+ dashboard/routers/system.py (extended) + dashboard/routers/agents.py (extended).
++ dashboard/routers/system.py (extended) + dashboard/routers/agents/ (extended package).
 
 Uses isolated tmp_path + real instances where possible.
 """
