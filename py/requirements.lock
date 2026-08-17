@@ -16,16 +16,16 @@
 # 5.1 fix: these were missing from the lock entirely (aiohttp, PyJWT,
 # alembic, aiosqlite) or used bare `>=` ranges. They now mirror pyproject.toml
 # as narrow ranges so the lock cannot claim a pin it does not enforce.
-fastapi==0.115.0
+fastapi>=0.141.1,<0.142
 uvicorn[standard]==0.30.6
 pydantic>=2.9.0,<3.0
 pydantic-settings==2.5.2
 pyyaml==6.0.2
 httpx>=0.27.0,<1.0
-python-dotenv==1.0.1
+python-dotenv>=1.2.2
 mmh3==5.2.1
 numpy>=1.24.0,<3.0
-cryptography>=44.0,<49
+cryptography>=44.0,<51
 lxml>=5.0.0
 alembic>=1.13.0
 python-multipart>=0.0.9
@@ -46,7 +46,10 @@ pika>=1.3.0
 # ── Runtime dependencies (transitive) ──────────────────────────────
 # These were frozen from an earlier environment and are kept as a reference.
 # Re-run `pip freeze` in a clean venv to refresh exact transitive pins.
-starlette>=0.40.0
+# starlette 需 >=1.3.1 才能覆盖全部已知 CVE（PYSEC-2026-161/248/249/2280/2281
+# fix 1.0.1~1.3.1；fastapi 0.141.1 依赖 starlette>=0.46.0 无上限，可解析到 1.x）。
+# 此前 fastapi==0.115.0 卡死 starlette<0.39（0.38.6 有 9 个 CVE）。
+starlette>=1.3.1
 anyio>=4.6.2
 typing-extensions>=4.12.2
 python-multipart>=0.0.12

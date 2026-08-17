@@ -366,7 +366,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to Container Registry
-        if: github.event_name != 'pull_request'
+        # 仅当仓库配置了 registry secrets 才登录；未配置（如公开仓库/无
+        # 发布计划）时跳过登录且只构建不推送，避免 "Username and password
+        # required" 失败（9c01b38 首次真正执行 docker job 时暴露）。
+        if: github.event_name != 'pull_request' && secrets.REGISTRY_URL != ''
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.REGISTRY_URL || '' }}
@@ -377,7 +380,7 @@ jobs:
         with:
           context: .
           file: py/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && secrets.REGISTRY_URL != '' }}
           tags: |
             ${{ secrets.REGISTRY_URL || 'maop' }}/maop:latest
             ${{ secrets.REGISTRY_URL || 'maop' }}/maop:${{ github.sha }}
