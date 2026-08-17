@@ -134,6 +134,7 @@ def test_dispatcher_uses_cost_tracker_not_json_ledger() -> None:
     """契约：dispatcher 的预算检查必须走 CostTracker（SQLite 真数据源），
     不得再 import / 实例化已断写的 JSON BudgetGuard（防止账本再次断写）。"""
     import inspect
+
     import maop.delegate.dispatcher as disp
 
     src = inspect.getsource(disp)
