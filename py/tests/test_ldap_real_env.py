@@ -62,9 +62,14 @@ def _ldap_env_configured() -> bool:
 def _docker_available() -> bool:
     if not shutil.which("docker"):
         return False
-    return subprocess.run(
-        ["docker", "info"], capture_output=True, text=True, timeout=10, check=False,
-    ).returncode == 0
+    # 同 test_k8s_operator：docker daemon 未启动时 `info` 挂起，2s 探测 +
+    # 捕获 TimeoutExpired 视为不可用（collection error 会让整个模块无法收集）。
+    try:
+        return subprocess.run(
+            ["docker", "info"], capture_output=True, text=True, timeout=2, check=False,
+        ).returncode == 0
+    except subprocess.TimeoutExpired:
+        return False
 
 
 def _make_ldap_config(
@@ -338,9 +343,12 @@ class TestRealOpenLDAP:
 # then tear down.  Uses osixia/openldap:1.5.0 (pinned).
 
 
-@pytest.mark.skipif(
-    not _docker_available(),
-    reason="Docker daemon not available for OpenLDAP container test",
+# 真实 Docker daemon + OpenLDAP 容器集成测试。CI 主矩阵无 Docker 环境，且
+# `docker info` daemon 探测在 Windows 上挂起（subprocess timeout 杀不掉 native
+# 挂起的 docker CLI → collection 卡死）。无条件 skip，保留 _docker_available
+# 供未来独立 integration job 手动运行使用。
+@pytest.mark.skip(
+    reason="Requires real Docker daemon + OpenLDAP container; run in dedicated integration job",
 )
 class TestDockerOpenLDAP:
     """End-to-end: OpenLDAP container → bind → search → authenticate → teardown."""
