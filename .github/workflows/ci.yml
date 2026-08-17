@@ -529,7 +529,7 @@ jobs:
         with:
           packages-dir: dist/
 
-  # ── Compose Smoke Test ─────────────────────────────────────────
+  # ── Compose Smoke Test（仅冒烟，非部署；真实部署能力待建，见 P1-3 方案 B）─────────────────────────────────────────
   compose-smoke:
     name: Compose Smoke
     runs-on: ubuntu-latest
@@ -539,7 +539,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy via docker-compose
+      - name: Compose up (smoke)
         run: |
           docker compose -f docker-compose.yml up -d --build
           sleep 10
@@ -549,8 +549,8 @@ jobs:
         run: |
           curl -sf http://localhost:9079/api/health | grep -q '"status"'
           curl -sf http://localhost:9079/api/info | grep -q '"version"'
-          echo "Staging smoke tests passed."
+          echo "Compose smoke tests passed."
 
       - name: Notify on failure
         if: failure()
-        run: echo "::warning::Staging deployment failed — check logs."
+        run: echo "::warning::Compose smoke failed — check logs."

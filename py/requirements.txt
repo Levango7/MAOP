@@ -1,8 +1,12 @@
-# MAOP Python service layer — pinned dependencies.
+# MAOP Python service layer — 本地开发快速安装指引（非权威锁文件）。
 #
-# For fully reproducible builds, use requirements.lock (generated via pip freeze).
-# This file is maintained for CI and quick install.
-# Aligned with pyproject.toml [project.dependencies].
+# ⚠️ 本文件是「开发指引子集」：刻意排除企业版驱动 etcd3（2019 停更 + CVE + Python≥3.13 装不上，
+#    需要时 `pip install "maop[etcd]"` 显式安装）。请勿据此做 SBOM / 漏洞审计。
+#
+# ✅ 权威锁文件是 requirements.lock（pip freeze 生成）：CI 的 SBOM(cyclonedx) 与 pip-audit
+#    均以它为唯一输入。本地 `make install` 用本文件仅为避开 etcd3/torch 等重依赖，便于快速起环境。
+#
+# 与 pyproject.toml [project.dependencies] 对齐。
 
 fastapi==0.141.1
 uvicorn[standard]==0.30.6

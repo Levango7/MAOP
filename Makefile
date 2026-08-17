@@ -5,7 +5,7 @@
 # and runs the pytest suite.
 #
 # Usage:
-#   make install   # create .venv + install deps (requirements.txt) + pytest
+#   make install   # 建 .venv + 装本地开发依赖(requirements.txt 指引子集, 避开 etcd3/torch) + pytest
 #   make test      # run the python test suite (pytest ./py/tests)
 #   make lint      # run ruff linter
 #   make clean     # remove .venv and pytest cache
@@ -14,6 +14,8 @@
 #   * PYTHON defaults to `python3`; override with `make PYTHON=python3.13 install`.
 #   * The venv is created at the repo root (.venv) so it is not committed.
 #   * Tests are run from py/ so `import maop` resolves without an editable install.
+#   * `make install` 用 py/requirements.txt（开发指引子集，避开 etcd3/torch 重依赖）；
+#     权威锁文件 py/requirements.lock 仅用于 CI 的 SBOM 与 pip-audit，不在此安装。
 
 PYTHON  ?= python3
 VENV    ?= .venv
