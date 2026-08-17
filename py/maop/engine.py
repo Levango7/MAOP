@@ -276,6 +276,15 @@ class Engine:
     ) -> None:
         self._bus = event_bus or get_event_bus()
         self._step_executor = step_executor  # Optional custom executor
+        if step_executor is None:
+            # P2-1 (Breaking): without an executor, AGENT/DAG/PLAN steps cannot
+            # actually run and will fail fast (see _execute_step). Surfacing this
+            # at construction time helps callers wire one up before dispatch.
+            logger.warning(
+                "Engine constructed without step_executor: AGENT/DAG/PLAN steps "
+                "will fail fast (StepStatus.FAILED) because no executor is wired "
+                "to actually run them. Set step_executor=<callable> to enable."
+            )
         # F1-01 分布式执行: Redis client for DistributedScheduler.
         # When None (Personal edition / no Redis), run() uses single-process
         # execution. When provided, run(distributed=True) dispatches DAG
@@ -618,9 +627,13 @@ class Engine:
                         duration_ms=int((time.monotonic() - start) * 1000),
                     )
                 else:
+                    # No executor configured: this PLAN step has no sub-steps and
+                    # no executor to run it as an agent step. Reporting SUCCESS
+                    # here would be a false positive (P2-1) — fail fast instead.
                     return StepResult(
-                        id=step.id, status=StepStatus.SUCCESS,
-                        output=f"[{step.type.value}] {resolved_task[:100]}",
+                        id=step.id, status=StepStatus.FAILED,
+                        error=f"No step executor configured for {step.type.value} step '{step.id}'; "
+                              f"cannot run plan/agent step. Set engine._step_executor before dispatch.",
                         agent=step.agent,
                         duration_ms=int((time.monotonic() - start) * 1000),
                     )

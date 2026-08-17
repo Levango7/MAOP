@@ -1,7 +1,7 @@
 export const messages = {
   en: {
     'view.evolutionHistory.title': 'Tuning History',
-    'view.evolutionHistory.subtitle': 'Performance-driven rule-based auto-tuning closed loop',
+    'view.evolutionHistory.subtitle': 'A/B experiments (SPRT) + deployment promotion/rollback — live release control that changes agents (distinct from Evolve page analysis)',
     'view.evolutionHistory.stat.totalCycles': 'Total Cycles',
     'view.evolutionHistory.stat.promotions': 'Promotions',
     'view.evolutionHistory.stat.rollbacks': 'Rollbacks',
@@ -44,7 +44,7 @@ export const messages = {
 
   zh: {
     'view.evolutionHistory.title': '调优历史',
-    'view.evolutionHistory.subtitle': '性能驱动的规则化自动调优闭环',
+    'view.evolutionHistory.subtitle': 'A/B 实验（SPRT）+ 部署提升/回滚：改变线上智能体的发布控制（区别于 Evolve 页的只读分析）',
     'view.evolutionHistory.stat.totalCycles': '循环总数',
     'view.evolutionHistory.stat.promotions': '提升次数',
     'view.evolutionHistory.stat.rollbacks': '回滚次数',

@@ -216,18 +216,50 @@ curl -X POST http://127.0.0.1:9079/api/model/switch \
   -d '{"agent":"planner","model":"doubao-pro"}'
 ```
 
-### 3.4 Evolve（自演化）— `evolve.py`
+### 3.4 Evolve（自演化分析建议）— `evolve_insights.py`
+
+> **概念区分（P2-2）**：MAOP 有两组极易混淆的「演化」API 族。
+> - **`/api/evolve/*`（本族）** = *自演化分析建议*：读执行历史 → 生成 Prompt / 策略改进建议（只读分析 + 可选 apply），**不改线上行为**。对应前端 `Evolve.vue`。
+> - **`/api/evolution/*`（见下节）** = *AB 实验 + 部署晋升*：在真实流量上跑 A/B（SPRT 早停），经人工 gate 批准后**自动提升 / 回滚**线上 Agent。对应前端 `EvolutionHistory.vue`。
+> 两者职责正交：**evolve 出「点子」，evolution 决定「是否上线」**。
 
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |
 | GET | `/api/evolve/status` | 演化状态 | | |
+| GET | `/api/evolve/metrics` | 演化指标 | | |
 | POST | `/api/evolve/analyze` | 触发分析 | | |
 | GET | `/api/evolve/suggestions` | 建议列表 | | |
+| GET | `/api/evolve/suggestions-list` | 建议清单（分页） | | |
 | GET | `/api/evolve/report` | 演化报告 | | |
+| GET | `/api/evolve/strategies` | 策略列表 | | |
+| GET | `/api/evolve/history` | 演化历史 | | |
+| POST | `/api/evolve/apply-suggestion` | 应用某条建议 | Admin | 写操作 |
 
 ```bash
 curl -X POST http://127.0.0.1:9079/api/evolve/analyze -H "Authorization: Bearer $TOKEN"
 ```
+
+### Evolution（AB 实验 + 部署晋升）— `evolution_experiment.py`
+
+> 见上方 §3.4 概念区分。`/api/evolution/*` 在真实流量上做 A/B 实验（SPRT 早停），经人工 gate 批准后自动提升或回滚线上 Agent；本族是**写操作 + 发布动作**，与 `/api/evolve/*` 的只读分析严格区分。
+
+| Method | Path | Description | Admin | Notes |
+| --- | --- | --- | --- | --- |
+| POST | `/api/evolution/evaluate` | 评估一组 trace 性能指标 | | |
+| POST | `/api/evolution/suggest` | 生成候选改进 | | |
+| POST | `/api/evolution/ab/create` | 创建 AB 实验 | Admin | |
+| POST | `/api/evolution/ab/record` | 记录实验样本 | | |
+| GET | `/api/evolution/ab/evaluate/{experiment}` | 实验统计（SPRT） | | |
+| GET | `/api/evolution/ab/list` | 实验列表 | | |
+| POST | `/api/evolution/deploy/promote` | 自动提升 | Admin | |
+| POST | `/api/evolution/deploy/rollback` | 回滚 | Admin | |
+| GET | `/api/evolution/deploy/history` | 晋升历史 | | |
+| POST | `/api/evolution/run` | 触发一轮演化循环 | Admin | |
+| GET | `/api/evolution/cycles` | 演化循环历史 | | |
+| GET | `/api/evolution/pending` | 待批准列表 | Admin | |
+| POST | `/api/evolution/approve` | 人工 gate 批准提升 | Admin | |
+| GET | `/api/evolution/skills` | 技能列表 | | |
+| POST | `/api/evolution/skills/composite` | 组合技能 | | |
 
 ### 3.5 Memory（记忆 + 神经机制）— `memory.py`
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
@@ -33,7 +34,16 @@ from maop.core.scheduling.distributed_scheduler import (
     _NodeSpec,
     node_spec_from_step,
 )
-from maop.engine import Engine, EngineResult, StepType, WorkflowStep
+from maop.engine import Engine, EngineResult, StepStatus, StepType, WorkflowStep
+
+
+async def _mock_step_executor(step, context, workdir, trace_id):
+    """P2-1: stand-in for a real agent executor so AGENT steps succeed.
+
+    The Engine fails fast (StepStatus.FAILED) when constructed without a
+    step_executor; tests that exercise AGENT execution must wire one up.
+    """
+    return SimpleNamespace(output=f"mock-output:{step.id}", exit_code=0)
 from maop.worker.distributed_worker import (
     DistributedWorker,
     TaskResult,
@@ -520,7 +530,7 @@ class TestEngineDistributedIntegration:
     @pytest.mark.asyncio
     async def test_single_process_default(self) -> None:
         """Without distributed=True, engine uses single-process (backward-compat)."""
-        engine = Engine()
+        engine = Engine(step_executor=_mock_step_executor)
         steps = [
             WorkflowStep(id="s1", type=StepType.AGENT, agent="claude", task="hello"),
             WorkflowStep(id="s2", type=StepType.TERMINAL, depends_on=["s1"]),
@@ -528,11 +538,13 @@ class TestEngineDistributedIntegration:
         result = await engine.run(steps)
         assert isinstance(result, EngineResult)
         assert len(result.steps) == 2
+        # P2-1: with a wired executor, the AGENT step actually succeeds.
+        assert result.steps[0].status == StepStatus.SUCCESS
 
     @pytest.mark.asyncio
     async def test_distributed_without_redis_falls_back(self) -> None:
         """distributed=True with no Redis client → single-process fallback."""
-        engine = Engine()  # no redis_client
+        engine = Engine(step_executor=_mock_step_executor)  # no redis_client
         steps = [
             WorkflowStep(id="s1", type=StepType.AGENT, agent="claude", task="hello"),
         ]
@@ -540,6 +552,7 @@ class TestEngineDistributedIntegration:
         assert isinstance(result, EngineResult)
         # Should have executed via single-process (fallback).
         assert len(result.steps) == 1
+        assert result.steps[0].status == StepStatus.SUCCESS
 
     @pytest.mark.asyncio
     async def test_distributed_with_redis(

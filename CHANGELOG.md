@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 修复 /users 路由守卫缺失（补 meta.requiresEnterprise）
 - 修复 Audit.test.js chart.js/jsdom unhandled rejection
 - **统一错误响应格式对齐 `ErrorSchema`**：所有经 `handle_api_errors` 装饰器（含 `HTTPException`）的端点错误响应采用扁平结构 `{status, error, code, detail, request_id}`（全部 string 类型，`status` 默认 `"error"`，其余默认空串），取代历史嵌套 `{"error":{code,message}}` 描述。权威定义见 `py/maop/dashboard/error_handler.py` `ErrorSchema`。
+- **⚠ Breaking（P2-1）：Engine 无 `step_executor` 时不再返回假成功**。AGENT/DAG/PLAN 步骤在未注入执行器时一律返回 `StepStatus.FAILED` + `error="No step executor configured..."`（此前 PLAN 回落路径与 AGENT/DAG 在无执行器时错误地返回 `SUCCESS` 占位文本，构成监控假阳性）。构造 `Engine()` 未传入 `step_executor` 会在日志打印 warning。下游测试改为注入 mock executor（如 `test_integration.py` 的 `_success_executor`、`test_distributed_execution.py` 的 `_mock_step_executor`）。
 
 ## [5.0.2] — 2026-08-13
 

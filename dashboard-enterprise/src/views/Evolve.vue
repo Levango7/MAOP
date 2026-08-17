@@ -1,6 +1,7 @@
 <template>
   <div class="evolve-page">
     <PageHeader>
+      <span class="subtitle muted">{{ t('view.evolve.subtitle') }}</span>
       <Segmented v-model="tab" :options="tabOptions" size="sm" class="evolve-tabs" />
       <span class="status-badge" :class="evolving ? 'running' : 'idle'">
         <AppIcon :name="evolving ? 'refresh' : 'check-circle'" :size="13" :class="{ spinning: evolving }" />

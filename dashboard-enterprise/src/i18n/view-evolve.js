@@ -1,6 +1,7 @@
 export const messages = {
   en: {
     'view.evolve.title': 'Rule-Driven Auto-Tuning',
+    'view.evolve.subtitle': 'Self-evolution analysis — read-only insights & suggestions (does NOT change live agents)',
     'view.evolve.tabMain': 'Auto-Tuning',
     'view.evolve.tabHistory': 'History',
     'view.evolve.evolving': 'Tuning…',
@@ -46,6 +47,7 @@ export const messages = {
   },
   zh: {
     'view.evolve.title': '规则驱动自动调优',
+    'view.evolve.subtitle': '自演化分析建议：只读洞察与改进建议，不改变线上智能体（区别于 Evolution 页的 AB 实验+部署晋升）',
     'view.evolve.tabMain': '自动调优',
     'view.evolve.tabHistory': '历史',
     'view.evolve.evolving': '调优中…',
