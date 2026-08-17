@@ -232,7 +232,28 @@ class PluginSandbox:
         self._timeout = timeout_seconds
 
     def validate_path(self, path: Path) -> Path:
-        resolved = path.resolve()
+        # 跨平台软链逃逸检测：Windows（py<3.13）的 realpath 不跟随悬空符号
+        # 链接（目标不存在时直接返回链接自身路径），会漏检「软链指向
+        # plugins/ 之外」的越界（test_symlink_escape_blocked 在 Windows 矩阵
+        # 挂掉 + 真实安全缺口）。故手动沿 readlink 链解析目标并逐一校验
+        # 是否仍在 plugins_dir 内，再叠加 realpath 终检。
+        cur = Path(path)
+        seen: set[str] = set()
+        while cur.is_symlink():
+            target = os.readlink(cur)
+            t = Path(target)
+            if not t.is_absolute():
+                t = cur.parent / target
+            cur = Path(os.path.abspath(t))
+            key = str(cur)
+            if key in seen:
+                break
+            seen.add(key)
+            if not str(cur).startswith(str(self._plugins_dir)):
+                raise SandboxViolation(
+                    f"Path traversal blocked: {path} escapes plugins directory via symlink"
+                )
+        resolved = Path(os.path.realpath(cur))
         if not str(resolved).startswith(str(self._plugins_dir)):
             raise SandboxViolation(
                 f"Path traversal blocked: {path} is outside plugins directory"

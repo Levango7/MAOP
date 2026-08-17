@@ -60,6 +60,13 @@ class TestPluginSandboxPathValidation:
                 "symlinks not supported on this platform/Environment "
                 "(Windows requires admin privileges or Developer Mode enabled)"
             )
+        # 防御：部分环境 symlink_to 静默创建非符号链接文件（无特权/受限沙箱），
+        # 此时 is_symlink() 为 False —— 跳过而非误报失败（真实 CI Windows
+        # runner 支持软链，会走下面的断言分支）。
+        if not link.is_symlink():
+            pytest.skip(
+                "symlink not actually created (environment lacks symlink support)"
+            )
         with pytest.raises(SandboxViolation, match="Path traversal"):
             sandbox.validate_path(link)
 
