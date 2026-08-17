@@ -106,7 +106,10 @@ jobs:
         # P0 fix (2026-08-11): 移除 --cov-fail-under(让 pytest 仅对测试成败负责),
         # 覆盖率门禁交给下一步的 ratchet 脚本,这样测试失败仍然会让 CI 失败,
         # 覆盖率回归也会让 CI 失败,两者职责清晰。
-        run: python -m pytest tests/ -q --ignore=tests/contract -m "not slow" --cov=maop --cov-report=xml --cov-report=term-missing
+        # --timeout=60: 防挂起测试无限等待(历史: pg_persist 池重试/PowerShell
+        # 冷启动曾让 windows job 卡 25-30 分钟)。任何单测挂起 60s 即失败,
+        # 错误定位到具体测试而非整个 job 卡死。
+        run: python -m pytest tests/ -q --ignore=tests/contract -m "not slow" --cov=maop --cov-report=xml --cov-report=term-missing --timeout=60
 
       - name: Coverage ratchet gate
         run: python scripts/check_coverage_ratchet.py
