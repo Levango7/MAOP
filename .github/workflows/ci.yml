@@ -94,7 +94,7 @@ jobs:
           # fakeredis/lxml 为测试硬依赖（distributed_execution/enterprise_integration
           # 集合需要），原 requirements.lock 隐式提供，改 editable 后必须显式补。
           pip install -e .
-          pip install pytest pytest-asyncio pytest-cov pydantic-settings mmh3 httpx python-multipart aiosqlite pytest-timeout pytest-xdist fakeredis lxml defusedxml
+          pip install pytest pytest-asyncio pytest-cov pydantic-settings mmh3 httpx python-multipart aiosqlite pytest-timeout pytest-xdist pytest-rerunfailures fakeredis lxml defusedxml
 
       - name: Enterprise extra smoke (P0-2)
         # 审计 P0-2：`pip install maop[enterprise]` 必须可装（此前 etcd3 在
@@ -109,7 +109,20 @@ jobs:
         # --timeout=60: 防挂起测试无限等待(历史: pg_persist 池重试/PowerShell
         # 冷启动曾让 windows job 卡 25-30 分钟)。任何单测挂起 60s 即失败,
         # 错误定位到具体测试而非整个 job 卡死。
-        run: python -m pytest tests/ -q --ignore=tests/contract -m "not slow" --cov=maop --cov-report=xml --cov-report=term-missing --timeout=60
+        # --reruns=3 --reruns-delay=2: auto-retry flaky tests up to 3 times
+        # with 2s delay. Evidence: CI #136 all-green, #137 (lint-only change)
+        # Ubuntu 3.10 failed, #138 Win 3.11 failed — classic flaky pattern
+        # where failures randomly appear on different platforms across runs.
+        # --junitxml: export results for artifact upload (debugging future flakes).
+        run: python -m pytest tests/ -q --ignore=tests/contract -m "not slow" --cov=maop --cov-report=xml --cov-report=term-missing --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: py/test-results.xml
+          retention-days: 7
 
       - name: Coverage ratchet gate
         run: python scripts/check_coverage_ratchet.py
