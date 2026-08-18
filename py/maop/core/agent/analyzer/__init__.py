@@ -17,4 +17,4 @@ from . import analyzer as _real_mod
 sys.modules[__name__] = _real_mod
 
 if TYPE_CHECKING:
-    from .analyzer import *  # noqa: F403
+    from .analyzer import *
