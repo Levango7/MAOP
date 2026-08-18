@@ -97,7 +97,7 @@ def test_cost_tracker_auto_record():
     )
     mock_tracker = MagicMock()
     mock_tracker.record_async = AsyncMock()
-    with patch("maop.core.monitoring.cost_tracker.get_cost_tracker", return_value=mock_tracker):
+    with patch("maop.core.cost_tracker.get_cost_tracker", return_value=mock_tracker):
         asyncio.run(_record_cost(resp, {"session_id": "sess-123", "agent": "claude"}))
     mock_tracker.record_async.assert_called_once_with(
         model="gpt-4o",
@@ -107,13 +107,13 @@ def test_cost_tracker_auto_record():
     )
 
     # 2: CostTracker failure does not raise
-    with patch("maop.core.monitoring.cost_tracker.get_cost_tracker", side_effect=RuntimeError("DB error")):
+    with patch("maop.core.cost_tracker.get_cost_tracker", side_effect=RuntimeError("DB error")):
         asyncio.run(_record_cost(resp, {}))  # should not raise
 
     # 3: missing kwargs default to empty strings
     mock_tracker2 = MagicMock()
     mock_tracker2.record_async = AsyncMock()
-    with patch("maop.core.monitoring.cost_tracker.get_cost_tracker", return_value=mock_tracker2):
+    with patch("maop.core.cost_tracker.get_cost_tracker", return_value=mock_tracker2):
         asyncio.run(_record_cost(LLMResponse(content="Hi", model="claude-3.5-sonnet", provider="anthropic"), {}))
     mock_tracker2.record_async.assert_called_once_with(
         model="claude-3.5-sonnet",
@@ -125,8 +125,8 @@ def test_cost_tracker_auto_record():
 
 def test_cost_tracker_singleton():
     """Verify get_cost_tracker returns a singleton instance."""
-    import maop.core.monitoring.cost_tracker as ct_mod
-    from maop.core.monitoring.cost_tracker import CostTracker, get_cost_tracker
+    import maop.core.cost_tracker as ct_mod
+    from maop.core.cost_tracker import CostTracker, get_cost_tracker
 
     original = ct_mod._cost_tracker_instance
     ct_mod._cost_tracker_instance = None

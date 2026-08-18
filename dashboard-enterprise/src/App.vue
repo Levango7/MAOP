@@ -477,7 +477,7 @@ onUnmounted(() => {
 .auth-overlay {
   position: fixed; inset: 0; z-index: var(--z-modal);
   display: flex; align-items: center; justify-content: center;
-  background: var(--overlay-scrim, rgba(15, 23, 42, .65));
+  background: var(--overlay-scrim);
   backdrop-filter: blur(8px);
   animation: maop-view-in var(--motion) var(--ease) both;
 }
@@ -549,7 +549,7 @@ onUnmounted(() => {
 .sidebar-open .hamburger-btn span:nth-child(2) { opacity: 0; }
 .sidebar-open .hamburger-btn span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
-.sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: var(--z-overlay, 98); animation: maop-view-in var(--motion) var(--ease); }
+.sidebar-backdrop { position: fixed; inset: 0; background: var(--overlay-scrim); z-index: var(--z-overlay, 98); animation: maop-view-in var(--motion) var(--ease); }
 
 @media (max-width: 899px) {
   /* 侧栏变为 drawer: z-index:30 高于顶栏(10)与桌面侧栏(20), 滑入滑出。

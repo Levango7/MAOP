@@ -857,7 +857,7 @@ async def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
     Failures are logged as warnings but never break the LLM call.
     """
     try:
-        from maop.core.monitoring.cost_tracker import get_cost_tracker
+        from maop.core.cost_tracker import get_cost_tracker
         tracker = get_cost_tracker()
         if hasattr(tracker, "record_async"):
             await tracker.record_async(

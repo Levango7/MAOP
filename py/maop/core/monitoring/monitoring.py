@@ -557,24 +557,12 @@ MAOP_TASK_SLA_TIER_DISTRIBUTION = metrics.gauge(
     "In-flight task count per SLA tier (label=tier)",
 )
 
-# Phase γ-3: multi-objective routing metrics.
-# MAOP_route_pareto_frontier_size — number of Pareto-optimal agents in the
-#   most recent routing decision (smaller frontier ⇒ clearer winner).
-# MAOP_route_multi_objective_score — TOPSIS relative-closeness score
-#   distribution (1 = ideal agent, 0 = nadir).
-# MAOP_route_decision_mode — 1 when the multi-objective path was used,
-#   0 when the legacy weighted-sum path was used (label=mode).
-MAOP_ROUTE_PARETO_FRONTIER_SIZE = metrics.gauge(
-    "MAOP_route_pareto_frontier_size",
-    "Number of Pareto-optimal agents in the most recent routing decision",
-)
-MAOP_ROUTE_MULTI_OBJECTIVE_SCORE = metrics.histogram(
-    "MAOP_route_multi_objective_score",
-    "TOPSIS relative-closeness score (1=ideal, 0=nadir)",
-)
+# Routing decision-mode metric (set by RouteScorer).
+# MAOP_route_decision_mode — label=mode, currently always "weighted_sum"
+#   (the multi-objective TOPSIS path was removed in the P0-3 cleanup).
 MAOP_ROUTE_DECISION_MODE = metrics.gauge(
     "MAOP_route_decision_mode",
-    "Routing decision mode (1=multi_objective, 0=weighted_sum)",
+    "Routing decision mode (currently only weighted_sum)",
 )
 
 # Phase γ-2: Priority queue + soft preemption metrics.

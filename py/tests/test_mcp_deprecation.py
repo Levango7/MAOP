@@ -36,7 +36,7 @@ class TestStackBRemoved:
     def test_stack_b_classes_not_exported(self) -> None:
         """Stack B class names must not be importable from maop.core."""
         # These names lived in the removed Stack B modules.
-        from maop.core import mcp_hub
+        from maop.core.mcp import mcp_hub
 
         # Importing the canonical module must not re-expose Stack B classes.
         assert not hasattr(mcp_hub, "MCPRegistry"), (
@@ -133,7 +133,7 @@ class TestDashboardUsesMCPHub:
 
         # Must reference the canonical Stack A implementation.
         assert "from maop.core.mcp.mcp_hub import" in src, (
-            "Dashboard MCP router must import from maop.core.mcp_hub (Stack A)"
+            "Dashboard MCP router must import from maop.core.mcp.mcp_hub (Stack A)"
         )
         assert "MCPHub" in src, "Dashboard MCP router must use MCPHub class"
 
@@ -191,7 +191,7 @@ class TestCallersMigrated:
         src = path.read_text(encoding="utf-8")
 
         assert "from maop.core.mcp.mcp_hub import MCPHub" in src, (
-            "function_call.py must import MCPHub from maop.core.mcp_hub (Stack A)"
+            "function_call.py must import MCPHub from maop.core.mcp.mcp_hub (Stack A)"
         )
         # Must not import Stack B modules at runtime.
         forbidden = [
@@ -214,7 +214,7 @@ class TestCallersMigrated:
         src = path.read_text(encoding="utf-8")
 
         assert "from maop.core.mcp.mcp_hub import" in src, (
-            "tool_schema.py must import from maop.core.mcp_hub (Stack A)"
+            "tool_schema.py must import from maop.core.mcp.mcp_hub (Stack A)"
         )
         assert "MCPTool" in src, (
             "tool_schema.py must reference canonical MCPTool (not MCPToolDef)"

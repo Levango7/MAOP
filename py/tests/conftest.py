@@ -111,6 +111,8 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # ResourceWarning: unclosed database 洪泛（xdist 全量下耗尽 worker 句柄）。
     from maop.core.backends.db_utils import close_all_pools
     close_all_pools()
+    from maop.core.backends.backends import reset_backends
+    reset_backends()
 
 
 @pytest.hookimpl(trylast=True)
@@ -121,6 +123,8 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     # ResourceWarning: unclosed database 洪泛（xdist 全量下耗尽 worker 句柄）。
     from maop.core.backends.db_utils import close_all_pools
     close_all_pools()
+    from maop.core.backends.backends import reset_backends
+    reset_backends()
     for d in _tmp_dirs:
         with contextlib.suppress(Exception):
             shutil.rmtree(d, ignore_errors=True)

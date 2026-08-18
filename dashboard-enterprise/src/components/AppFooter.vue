@@ -3,7 +3,7 @@
     <div class="footer-inner">
       <!-- 左：品牌 + 状态 -->
       <div class="footer-brand-zone">
-        <span class="footer-brand">MAOP</span>
+        <span class="footer-brand">{{ t('topbar.systemName') }}</span>
         <span class="footer-ver">v{{ version }}</span>
         <span class="footer-status" :class="{ on: realtimeConnected }">
           <span class="footer-dot" :class="{ on: realtimeConnected }"></span>

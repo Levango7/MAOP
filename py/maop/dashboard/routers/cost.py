@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/cost", tags=["cost"])
 def _get_cost_tracker():
     # 使用进程级单例，保证读写的预算配置与 llm_provider 的 auto-record
     # 共享同一份限额/阈值状态（否则每次新建实例会导致配置丢失）。
-    from maop.core.monitoring.cost_tracker import get_cost_tracker
+    from maop.core.cost_tracker import get_cost_tracker
     return get_cost_tracker()
 
 

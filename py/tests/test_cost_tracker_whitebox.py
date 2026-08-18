@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.monitoring.cost_tracker import CostTracker
+from maop.core.cost_tracker import CostTracker
 
 # ── Fixtures ─────────────────────────────────────────────────────
 

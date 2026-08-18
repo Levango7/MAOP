@@ -625,7 +625,7 @@ onMounted(loadAll);
 /* ── Preferences modal ── */
 .modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(10,12,16,.45);
+  background: var(--overlay-scrim);
   display: flex; align-items: center; justify-content: center;
   z-index: calc(var(--z-modal, 90) + 5);
 }

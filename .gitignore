@@ -108,6 +108,8 @@ security-audit.md
 # Ad-hoc inspection/debug scripts (root-level, underscore-prefixed)
 /_*.py
 py/_*.py
+# Ad-hoc cleanup/audit reports (large generated artifacts, not source)
+py/_shim_cleanup_report.txt
 config/agents.yaml.bak
 config/agents.yaml.bak2
 

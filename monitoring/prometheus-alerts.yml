@@ -1,5 +1,17 @@
 # MAOP Prometheus Alert Rules
 # Metrics source: maop.core.monitoring (MetricsCollector)
+#
+# NOTE: every metric below is DEFINED in maop.core.monitoring.monitoring
+# (e.g. MAOP_delegations_total, MAOP_active_agents, MAOP_queue_pending,
+# MAOP_circuit_breaker_state, MAOP_memory_entries). The metric *names* are
+# valid, so these rules evaluate correctly once the counters/gauges start
+# being incremented by the runtime. Until then they stay at 0 and the
+# alerts simply will not fire — that is expected (see audit: core MAOP_*
+# metrics are defined but not yet emitted by production code).
+#
+# This file is loaded by monitoring/prometheus.yml (rule_files). It is
+# complementary to alerts.yml / slo-alerts.yml; alert *names* here are
+# distinct (Agent*, No*, Queue*, Memory*) so there is no collision.
 
 groups:
   - name: maop-agent
@@ -18,13 +30,15 @@ groups:
           description: "More than half of delegations are failing (current: {{ $value | humanizePercentage }})."
 
       - alert: AgentCircuitBreakerOpen
+        # MAOP_circuit_breaker_state is registered WITHOUT labels, so there is
+        # no per-agent `agent` label — do not reference $labels.agent here.
         expr: MAOP_circuit_breaker_state == 0
         for: 2m
         labels:
           severity: critical
         annotations:
-          summary: "Circuit breaker is OPEN for agent {{ $labels.agent }}"
-          description: "The agent has been circuit-broken and is not accepting requests."
+          summary: "Circuit breaker is OPEN"
+          description: "An agent circuit breaker is OPEN and not accepting requests."
 
   - name: maop-system
     rules:

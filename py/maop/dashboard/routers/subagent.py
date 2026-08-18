@@ -8,8 +8,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
-from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ _subagent_mgr = None
 def _get_subagent_mgr() -> Any:
     global _subagent_mgr
     if _subagent_mgr is None:
-        from maop.core.subagent_lifecycle import SubAgentManager
+        from maop.core.agent.delegation.subagent_lifecycle import SubAgentManager
         _subagent_mgr = SubAgentManager(root_dir=str(MAOP_ROOT))
     return _subagent_mgr
 
@@ -42,7 +42,7 @@ async def api_subagent_spawn(request: Request) -> dict[str, Any]:
     # ``config={"agent": agent_name}`` raised a Pydantic validation
     # error at runtime. Build the proper AgentConfig with the caller's
     # agent name (and optional model if provided in the body).
-    from maop.core.subagent_lifecycle import AgentConfig
+    from maop.core.agent.delegation.subagent_lifecycle import AgentConfig
     model = body.get("model", "")
     config = AgentConfig(name=agent_name, model=model)
     agent_id = await mgr.spawn(config=config, task=task, context=context)

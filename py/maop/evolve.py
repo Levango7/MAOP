@@ -281,7 +281,7 @@ def _generate_suggestions(stats: EvolutionStats, data: list[dict]) -> list[Sugge
 
 # ── Parallel Implementation Note ──────────────────────────────
 # NOTE: EvolveEngine is one of two parallel self-evolution implementations.
-# The other is EvolutionLoop in maop/core/evolution_loop.py.
+# The other is EvolutionLoop in maop/core/evolution/evolution_loop.py.
 # Both have production callers:
 #   - EvolveEngine (this class): used by maop_loop.py (main loop), dashboard/routers/evolve.py
 #   - EvolutionLoop: used by core/three_layer_memory.py (consolidation)

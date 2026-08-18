@@ -249,7 +249,7 @@ onBeforeUnmount(() => {
   min-width: 16px; height: 16px;
   padding: 0 4px;
   background: var(--fail);
-  color: #fff;
+  color: var(--brand-contrast);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;

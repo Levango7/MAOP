@@ -6,7 +6,7 @@ and a hook event is triggered.
 
 Usage::
 
-    from maop.core.monitoring.budget_guard import BudgetGuard
+    from maop.core.budget_guard import BudgetGuard
 
     guard = BudgetGuard(root_dir="/path/to/MAOP", daily_token_limit=500000, daily_cost_limit=5.0)
 

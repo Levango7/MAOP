@@ -22,8 +22,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
-
-from .error_handler import handle_api_errors
+from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 

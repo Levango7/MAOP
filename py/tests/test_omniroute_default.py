@@ -3,7 +3,7 @@
 Phase 2: OmniRoute upgraded to default LLM exit.
 Tests cover:
   - ModelRegistryConfig stores default_provider / default_model fields
-  - ModelRegistry.get_default_model() / get_default_provider() accessors
+  - ModelRegistry.get_default_provider() accessor
   - ModelSelector Step 1.5: default provider preference
   - LLMProviderFactory._get_default_model() helper
 """
@@ -105,7 +105,6 @@ def _build_registry(
         return candidates[0] if candidates else None
 
     reg.get_default_provider = lambda: default_provider
-    reg.get_default_model = lambda name="": models.get(default_model) if default_model else None
     reg.get_model = lambda n: models.get(n)
     reg.get_policy = lambda n="default": _POLICIES.get(n) or _POLICIES.get("default")
     reg.resolve_agent_model = lambda agent_model, model_ref="": None
@@ -255,7 +254,7 @@ class TestDefaultProviderPreference:
         assert result.model_name == "other-coder"
 
 
-# ── ModelRegistry.get_default_model / get_default_provider ──
+# ── ModelRegistry.get_default_provider ──
 
 class TestRegistryDefaultAccessors:
     """Test ModelRegistry default provider/model accessor methods.
@@ -274,30 +273,6 @@ class TestRegistryDefaultAccessors:
         reg = ModelRegistry.__new__(ModelRegistry)
         reg._config = ModelRegistryConfig()
         assert reg.get_default_provider() == ""
-
-    def test_get_default_model_returns_configured(self):
-        from maop.model.registry import ModelRegistry
-        reg = ModelRegistry.__new__(ModelRegistry)
-        m = _make_model("omniroute-auto-coding", provider="omniroute", capabilities=["codegen"])
-        reg._config = ModelRegistryConfig(
-            default_model="omniroute-auto-coding",
-            models={"omniroute-auto-coding": m},
-        )
-        result = reg.get_default_model()
-        assert result is not None
-        assert result.name == "omniroute-auto-coding"
-
-    def test_get_default_model_returns_none_when_not_configured(self):
-        from maop.model.registry import ModelRegistry
-        reg = ModelRegistry.__new__(ModelRegistry)
-        reg._config = ModelRegistryConfig()
-        assert reg.get_default_model() is None
-
-    def test_get_default_model_returns_none_when_model_not_found(self):
-        from maop.model.registry import ModelRegistry
-        reg = ModelRegistry.__new__(ModelRegistry)
-        reg._config = ModelRegistryConfig(default_model="nonexistent-model")
-        assert reg.get_default_model() is None
 
 
 # ── LLMProviderFactory._get_default_model ───────────────────

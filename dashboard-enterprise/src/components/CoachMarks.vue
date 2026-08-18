@@ -176,13 +176,13 @@ onBeforeUnmount(() => {
 .cm-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(10, 12, 16, .55);
+  background: var(--overlay-scrim);
   cursor: pointer;
 }
 .cm-spotlight {
   position: absolute;
   border-radius: var(--r-md);
-  box-shadow: 0 0 0 9999px rgba(10, 12, 16, .55), 0 0 0 2px var(--brand), 0 4px 24px rgba(0,0,0,.5);
+  box-shadow: 0 0 0 9999px var(--overlay-scrim), 0 0 0 2px var(--brand), 0 4px 24px rgba(0,0,0,.5);
   pointer-events: none;
   transition: top .25s var(--ease), left .25s var(--ease), width .25s var(--ease), height .25s var(--ease);
 }

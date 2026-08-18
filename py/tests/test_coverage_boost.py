@@ -104,7 +104,8 @@ class TestServerLifespan:
 
     def test_lifespan_startup_shutdown(self, monkeypatch):
         # Stub schedulers so no real threads/timers start.
-        from maop.core import db_backup, log_rotate
+        from maop.core.backends import db_backup
+        from maop.core.reliability import log_rotate
         from maop.dashboard import server as srv
 
         class _StubBackup:

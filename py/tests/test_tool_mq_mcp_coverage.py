@@ -269,7 +269,7 @@ class TestMessageQueue:
 class TestMcpHub:
     def test_module_import(self):
         import maop.core.mcp.mcp_hub
-        assert maop.core.mcp_hub is not None
+        assert maop.core.mcp.mcp_hub is not None
 
 
 # ── MCP Hub Transport ───────────────────────────────────────────────

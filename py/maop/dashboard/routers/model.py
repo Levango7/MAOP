@@ -11,8 +11,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
-from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
 
 logger = logging.getLogger(__name__)

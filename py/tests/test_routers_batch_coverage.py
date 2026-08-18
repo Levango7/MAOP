@@ -20,6 +20,11 @@ from typing import Any
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+# 标记本模块全部用例串行运行（对应 ci.yml 的 serial 步骤）：
+# 本文件用 admin AsyncClient 批量打 POST/PUT/DELETE 真实端点，共享 app/
+# 中间件单例状态，在 xdist（-n auto）并行下会随机失败。以 -n 0 串行可消除碰撞。
+pytestmark = pytest.mark.serial
+
 from maop.core.security.auth import AuthResult
 
 # Admin JWT validator stub — any token yields an authenticated admin.

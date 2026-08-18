@@ -8,8 +8,8 @@ from typing import Any
 from fastapi import APIRouter, Request
 
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
-from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ _budget_guard = None
 def _get_budget_guard() -> Any:
     global _budget_guard
     if _budget_guard is None:
-        from maop.core.monitoring.budget_guard import BudgetGuard
+        from maop.core.budget_guard import BudgetGuard
         _budget_guard = BudgetGuard(root_dir=str(MAOP_ROOT))
     return _budget_guard
 

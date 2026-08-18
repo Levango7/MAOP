@@ -967,7 +967,7 @@ onMounted(() => {
 .modal-overlay {
   position: fixed; inset: 0; z-index: var(--z-modal);
   display: flex; align-items: center; justify-content: center;
-  background: rgba(15, 23, 42, .65);
+  background: var(--overlay-scrim);
   backdrop-filter: blur(8px);
   animation: maop-view-in .2s ease both;
 }

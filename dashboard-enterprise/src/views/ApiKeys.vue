@@ -611,7 +611,7 @@ onMounted(load);
 
 /* ── 模态 ── */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  position: fixed; inset: 0; background: var(--overlay-scrim);
   display: flex; align-items: center; justify-content: center;
   z-index: var(--z-modal, 200);
 }

@@ -386,8 +386,8 @@ class MaopLoop(ExecuteMixin):
             loop.create_task(self._bus.publish(Event(topic="loop.analyze", data={
                 "trace_id": ctx.trace_id, "analysis": ctx.analysis_dict,
             })))
-        except RuntimeError:
-            pass
+        except RuntimeError as exc:
+            logger.debug("maop_loop: no running loop for loop.analyze publish: %s", exc)
 
         return PhaseResult(ok=True)
 
@@ -707,8 +707,8 @@ class MaopLoop(ExecuteMixin):
             loop.create_task(self._bus.publish(Event(topic="loop.complete", data={
                 "trace_id": ctx.trace_id, "success": success, "duration_ms": total_ms,
             })))
-        except RuntimeError:
-            pass
+        except RuntimeError as exc:
+            logger.debug("maop_loop: no running loop for loop.complete publish: %s", exc)
 
         return LoopResult(
             task=ctx.original_task, trace_id=ctx.trace_id,

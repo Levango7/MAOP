@@ -6,7 +6,7 @@ import logging
 import threading
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
@@ -234,6 +234,14 @@ async def marketplace_tools() -> dict[str, Any]:
 @router.post("/marketplace/tools/{tool_id}/install")
 @handle_api_errors
 async def marketplace_install(tool_id: str, request: Request) -> dict[str, Any]:
-    """安装 Marketplace 工具（当前为空实现）。"""
+    """安装 Marketplace 工具。
+
+    后端 ``MCPMarketplace`` 已具备安装能力，但 Dashboard API 的安装通道尚未
+    接入；如实返回 501，避免此前 ``"status": "ok"`` 的假成功误导前端。
+    需要安装时请使用 CLI：``maop mcp marketplace install <server>``。
+    """
     require_admin(request)
-    return {"status": "ok", "installed": False, "tool": tool_id, "message": "marketplace install not implemented"}
+    raise HTTPException(
+        status_code=501,
+        detail="marketplace install not available via API yet; use `maop mcp marketplace install` CLI",
+    )

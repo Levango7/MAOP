@@ -199,8 +199,8 @@ async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,
                     duration_ms=wrapper_result.get("duration_ms", duration_ms),
                     trace_id=trace_id, driver="wrapper", model=config.model,
                 )
-        except (json.JSONDecodeError, ValueError):
-            pass
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.debug("drivers: wrapper JSON parse failed, falling back to raw output: %s", exc)
 
         # Fallback: raw output
         return new_result(

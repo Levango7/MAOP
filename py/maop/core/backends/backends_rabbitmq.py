@@ -370,11 +370,11 @@ class RabbitMQQueueBackend(QueueBackend):
             try:
                 if self._channel is not None and not self._channel.is_closed:
                     self._channel.close()
-            except AMQPError:
-                pass
+            except AMQPError as exc:
+                logger.debug("rabbitmq: close channel failed: %s", exc)
             try:
                 if self._connection is not None and not self._connection.is_closed:
                     self._connection.close()
-            except AMQPError:
-                pass
+            except AMQPError as exc:
+                logger.debug("rabbitmq: close connection failed: %s", exc)
             self._pending.clear()

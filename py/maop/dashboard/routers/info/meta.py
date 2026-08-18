@@ -91,7 +91,7 @@ ROLES = [
         "title": "核心编排 (5角色)", "en": "Core", "cn": "核心编排", "icon": "CO", "count": 5,
         "color": "#3b82f6", "bg": "rgba(59,130,246,.15)",
         "roles": [
-            {"en": "Router", "cn": "路由器", "desc": "根据任务特征匹配最优Agent，决定任务由谁处理。", "mods": ["MAOP_plan.py", "core/dynamic_router.py"]},
+            {"en": "Router", "cn": "路由器", "desc": "根据任务特征匹配最优Agent，决定任务由谁处理。", "mods": ["MAOP_plan.py", "core/routing/route_scorer.py"]},
             {"en": "Planner", "cn": "规划器", "desc": "生成执行计划：决定并行/串行调度顺序、重试次数、降级策略。", "mods": ["MAOP_plan.py", "engine.py"]},
             {"en": "Orchestrator", "cn": "编排器", "desc": "驱动Plan-Execute-Verify主循环，协调各阶段流转。", "mods": ["MAOP_loop.py", "concurrency.py"]},
             {"en": "Worker", "cn": "执行器", "desc": "调用Agent CLI执行具体任务，收集输出、状态和延迟统计。", "mods": ["MAOP_execute.py", "delegate/dispatcher.py"]},
@@ -201,7 +201,6 @@ MODULES = [
             {"name": "context_compressor.py", "cn": "上下文压缩", "desc": "结构化上下文压缩", "exports": "ContextCompressor"},
             {"name": "data.py", "cn": "数据层", "desc": "SQLite+FTS5全文+JSON1扩展", "exports": "DataLayer"},
             {"name": "db_backup.py", "cn": "数据库备份", "desc": "增量备份+全量备份+自动恢复", "exports": "DBBackup"},
-            {"name": "dynamic_router.py", "cn": "动态路由器", "desc": "按健康数据动态评分Agent", "exports": "DynamicRouter"},
             {"name": "error_schema.py", "cn": "错误模式", "desc": "错误分类+结果封装", "exports": "MaopResult, ErrorSchema"},
             {"name": "event_bus.py", "cn": "事件总线", "desc": "发布订阅+事件溯源", "exports": "EventBus"},
             {"name": "filelock.py", "cn": "文件锁", "desc": "跨进程互斥锁", "exports": "FileLock"},
@@ -265,7 +264,7 @@ MODULES = [
 ]
 
 WORKFLOWS = [
-    {"en": "Router", "cn": "路由器", "color": "#3b82f6", "bg": "rgba(59,130,246,.15)", "mod": "MAOP_plan.py, core/dynamic_router.py",
+    {"en": "Router", "cn": "路由器", "color": "#3b82f6", "bg": "rgba(59,130,246,.15)", "mod": "MAOP_plan.py, core/routing/route_scorer.py",
      "steps": [{"t": "接收任务", "d": "从CLI/API/工作流接收任务描述"}, {"t": "特征提取", "d": "解析任务关键词、类型和优先级"}, {"t": "Agent匹配", "d": "按正则/通配符/语义匹配最优Agent"}, {"t": "路由决策", "d": "考虑健康度、负载和降级链，确定目标Agent"}]},
     {"en": "Planner", "cn": "规划器", "color": "#3b82f6", "bg": "rgba(59,130,246,.15)", "mod": "MAOP_plan.py, engine.py",
      "steps": [{"t": "需求分析", "d": "语义拆解+依赖DAG构建"}, {"t": "策略生成", "d": "决定并行/串行/重试/降级策略"}, {"t": "计划输出", "d": "生成可执行的DAG执行计划"}, {"t": "资源评估", "d": "预估Token消耗和执行时间"}]},

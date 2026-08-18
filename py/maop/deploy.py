@@ -266,7 +266,8 @@ def _read_pid(root_dir: str | Path) -> int | None:
     if pid_file.is_file():
         try:
             return int(pid_file.read_text().strip())
-        except (ValueError, OSError):
+        except (ValueError, OSError) as exc:
+            logger.debug("deploy: invalid pid file: %s", exc)
             return None
     return None
 

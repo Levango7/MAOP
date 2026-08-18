@@ -1,9 +1,8 @@
 """Behavioral contract tests — verify runtime behavior, not just schema/existence.
 
-Three behavioral contracts:
-1. Model fallback: FallbackManager builds correct chain, filters by failure count.
-2. Control action audit: every control action produces an audit event.
-3. Model switch runtime effect: switching model changes effective_model in dispatcher.
+Two behavioral contracts:
+1. Control action audit: every control action produces an audit event.
+2. Model switch runtime effect: switching model changes effective_model in dispatcher.
 """
 from __future__ import annotations
 
@@ -27,79 +26,7 @@ def _make_registry():
     return ModelRegistry(project_root=MAOP_ROOT)
 
 
-# ── 1. Model Fallback Behavioral Contract ──────────────────────
-
-class TestModelFallbackBehavior:
-    """Verify FallbackManager correctly builds and filters fallback chains."""
-
-    def test_fallback_chain_includes_primary_first(self):
-        """Primary model must always be first in the chain."""
-        from maop.model.fallback import FallbackManager
-        from maop.model.schema import EffectiveModel
-
-        registry = _make_registry()
-        fm = FallbackManager(registry)
-
-        em = EffectiveModel(
-            model_name="gpt-4", provider="openai",
-            fallback_chain=["gpt-3.5", "local-mini"],
-        )
-        chain = fm.get_chain(em)
-        assert chain[0] == "gpt-4", "Primary must be first"
-
-    def test_fallback_chain_excludes_high_failure_models(self):
-        """Models with >=5 consecutive failures must be excluded."""
-        from maop.model.fallback import FallbackManager
-        from maop.model.schema import EffectiveModel
-
-        registry = _make_registry()
-        fm = FallbackManager(registry)
-
-        # Record 5 failures for gpt-3.5
-        for _ in range(5):
-            fm.record_failure("gpt-3.5")
-
-        em = EffectiveModel(
-            model_name="gpt-4", provider="openai",
-            fallback_chain=["gpt-3.5", "local-mini"],
-        )
-        chain = fm.get_chain(em)
-        assert "gpt-3.5" not in chain, "Model with 5+ failures must be excluded"
-        assert "gpt-4" in chain, "Primary must still be present"
-        assert "local-mini" in chain, "Healthy fallback must still be present"
-
-    def test_should_fallback_on_timeout(self):
-        """Timeout errors must trigger fallback when policy allows."""
-        from maop.model.fallback import FallbackManager
-
-        registry = _make_registry()
-        fm = FallbackManager(registry)
-        assert fm.should_fallback("TIMEOUT after 30s") is True
-
-    def test_should_not_fallback_when_policy_disables(self):
-        """When fallback_on_error=False, should not fallback."""
-        from maop.model.fallback import FallbackManager
-
-        registry = _make_registry()
-        fm = FallbackManager(registry)
-        assert fm.should_fallback("some error", policy_fallback_on_error=False) is False
-
-    def test_record_success_resets_failure_count(self):
-        """Recording success must reset failure count to 0."""
-        from maop.model.fallback import FallbackManager
-
-        registry = _make_registry()
-        fm = FallbackManager(registry)
-
-        fm.record_failure("gpt-3.5")
-        fm.record_failure("gpt-3.5")
-        assert fm.get_failure_stats()["gpt-3.5"] == 2
-
-        fm.record_success("gpt-3.5")
-        assert "gpt-3.5" not in fm.get_failure_stats(), "Success must reset failures"
-
-
-# ── 2. Control Action Audit Behavioral Contract ────────────────
+# ── 1. Control Action Audit Behavioral Contract ────────────────
 
 class TestControlActionAuditBehavior:
     """Every control action must produce an audit event."""
@@ -166,7 +93,7 @@ class TestControlActionAuditBehavior:
         assert "model" in result.audit.detail, "Audit detail must contain model info"
 
 
-# ── 3. Model Switch Runtime Effect Contract ────────────────────
+# ── 2. Model Switch Runtime Effect Contract ────────────────────
 
 class TestModelSwitchRuntimeEffect:
     """Model switch must affect the effective model in dispatcher runtime state."""

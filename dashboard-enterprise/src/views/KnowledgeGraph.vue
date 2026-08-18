@@ -241,6 +241,7 @@ import Card from '../components/Card.vue';
 import Badge from '../components/Badge.vue';
 import EmptyState from '../components/EmptyState.vue';
 import AppIcon from '../components/AppIcon.vue';
+import { cssVar } from '../composables/chartTokens.js';
 
 const { t } = useI18n();
 const kg = useKnowledgeGraph();
@@ -702,7 +703,7 @@ function applyHighlightVisual() {
     return {
       id: e.id,
       width: isPath ? 3 : 1,
-      color: isPath ? { color: '#ff7b72', highlight: '#ff7b72' } : { color: '#CCCCCC', opacity: 0.4 },
+      color: isPath ? { color: cssVar('--fail'), highlight: cssVar('--fail') } : { color: cssVar('--text-faint'), opacity: 0.4 },
     };
   });
   visEdgesDS.update(edgeUpdates);

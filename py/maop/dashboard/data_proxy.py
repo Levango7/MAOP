@@ -289,7 +289,7 @@ class DataProxy:
             agents_list = []
         cost_per_hour = 0.0
         try:
-            from maop.core.monitoring.cost_tracker import CostTracker
+            from maop.core.cost_tracker import CostTracker
             ct = CostTracker(root_dir=str(self._root))
             hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
             csum = ct.summary(start_date=hour_ago)
@@ -383,7 +383,8 @@ class DataProxy:
                 s = frac6 + m.group(2)
             try:
                 return datetime.fromisoformat(s)
-            except Exception:
+            except Exception as exc:
+                logger.warning("data_proxy._parse_ts failed: %s", exc)
                 return None
 
         now_dt = now or datetime.now(timezone.utc)
@@ -580,7 +581,8 @@ class DataProxy:
                 "SELECT COUNT(*) as cnt FROM queue_dead_letters"
             ).fetchone()["cnt"]
             return {"pending": counts.get("pending", 0), "processing": counts.get("processing", 0), "dead_letters": dead}
-        except Exception:
+        except Exception as exc:
+            logger.warning("data_proxy._queue_stats_sync failed: %s", exc)
             return {"pending": 0, "processing": 0, "dead_letters": 0}
         finally:
             pool.release(conn)
@@ -849,7 +851,8 @@ class DataProxy:
             return []
         try:
             data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-        except Exception:
+        except Exception as exc:
+            logger.warning("data_proxy._read_delegations_json failed: %s", exc)
             return []
         if not isinstance(data, list):
             return []

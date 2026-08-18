@@ -353,20 +353,12 @@ class Dispatcher:
         agent: str,
         *,
         success: bool,
-        priority: int | None = None,
-        deadline_ms: int | None = None,
     ) -> None:
         """Notify RouteScorer of agent success/failure for cooldown tracking.
 
         P0-3 fix: RouteScorer.cooldown was never populated because
         mark_agent_failed/mark_agent_success had no callers. Now invoked
         alongside circuit-breaker recording in _dispatch_impl.
-
-        Phase γ-1: ``priority`` / ``deadline_ms`` are accepted to plumb
-        the SLA parameter chain through to the RouteScorer call site.
-        The current RouteScorer API does not yet consume these kwargs —
-        they are reserved for a future SLA-aware cooldown policy
-        (e.g. shorter cooldown for critical tasks).
         """
         try:
             from maop.core.routing.route_scorer import get_route_scorer
@@ -579,9 +571,8 @@ class Dispatcher:
 
         Split out from ``_dispatch_impl`` so the outer method can wrap
         the call in a ``try/finally`` for SLA metric cleanup. SLA params
-        are in scope at every call site that touches LoadBalancer /
-        RouteScorer — see ``lb.record_start`` below and
-        ``_notify_route_scorer`` calls for the plumbed parameter chain.
+        are in scope for LoadBalancer SLA recording — see ``lb.record_start``
+        below.
         """
         # 1. Resolve agent config
         config = self._resolve_agent(agent)
@@ -729,9 +720,7 @@ class Dispatcher:
                 trace_id=trace_id, routing_key=routing_key,
             )
             await self._breaker.arecord_failure(agent)
-            self._notify_route_scorer(
-                agent, success=False, priority=priority, deadline_ms=deadline_ms,
-            )
+            self._notify_route_scorer(agent, success=False)
             return DispatchResult(result=result, breaker_tripped=False)
 
         # 4. Execute via driver — wrap in try/except to ensure failures are recorded
@@ -778,14 +767,10 @@ class Dispatcher:
         if result.is_success():
             # P1-16 fix: use async breaker methods to avoid blocking event loop
             await self._breaker.arecord_success(agent)
-            self._notify_route_scorer(
-                agent, success=True, priority=priority, deadline_ms=deadline_ms,
-            )
+            self._notify_route_scorer(agent, success=True)
         else:
             await self._breaker.arecord_failure(agent)
-            self._notify_route_scorer(
-                agent, success=False, priority=priority, deadline_ms=deadline_ms,
-            )
+            self._notify_route_scorer(agent, success=False)
 
         return DispatchResult(
             result=result,

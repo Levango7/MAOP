@@ -66,6 +66,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useI18n } from '../i18n';
 import { AppIcon, Badge, EmptyState } from './index.js';
+import { cssVar } from '../composables/chartTokens.js';
 
 const props = defineProps({
   data: {
@@ -113,8 +114,8 @@ function buildVisNodes() {
       label: s.name,
       group: 'server',
       shape: 'box',
-      color: { background: '#3574f0', border: '#0D47A1', highlight: { background: '#1976D2', border: '#0D47A1' } },
-      font: { color: '#fff', size: 13, face: 'Inter, system-ui, sans-serif' },
+      color: { background: cssVar('--brand'), border: cssVar('--brand-strong'), highlight: { background: cssVar('--brand-strong'), border: cssVar('--brand-strong') } },
+      font: { color: cssVar('--brand-contrast'), size: 13, face: 'Inter, system-ui, sans-serif' },
       title: `${t('view.tools.topo.legend.server')}: ${s.name}\ntransport: ${s.transport}\nstatus: ${s.status}\ntools: ${s.tools_count}`,
     });
   }
@@ -126,7 +127,7 @@ function buildVisNodes() {
       group: 'tool',
       shape: 'dot',
       size: 10,
-      color: { background: '#039BE5', border: '#0277BD' },
+      color: { background: cssVar('--chart-2'), border: cssVar('--chart-6') },
       font: { size: 11, face: 'Inter, system-ui, sans-serif' },
       title: `${t('view.tools.topo.legend.tool')}: ${tl.name}\nserver: ${tl.server_name}\n${tl.description || ''}`,
     });
@@ -139,8 +140,8 @@ function buildVisNodes() {
       group: 'agent',
       shape: 'diamond',
       size: 14,
-      color: { background: '#3fb950', border: '#2E7D32', highlight: { background: '#66BB6A', border: '#2E7D32' } },
-      font: { color: '#fff', size: 12, face: 'Inter, system-ui, sans-serif' },
+      color: { background: cssVar('--success'), border: cssVar('--success-strong'), highlight: { background: cssVar('--success-strong'), border: cssVar('--success-strong') } },
+      font: { color: cssVar('--brand-contrast'), size: 12, face: 'Inter, system-ui, sans-serif' },
       title: `${t('view.tools.topo.legend.agent')}: ${a.name}\nprovider: ${a.provider || '—'}\nenabled: ${a.enabled}`,
     });
   }
@@ -152,7 +153,7 @@ function buildVisEdges() {
     id: e.id,
     from: e.source,
     to: e.target,
-    color: e.type === 'server-agent' ? { color: '#66BB6A', opacity: 0.7 } : { color: '#90A4AE', opacity: 0.7 },
+    color: e.type === 'server-agent' ? { color: cssVar('--success-strong'), opacity: 0.7 } : { color: cssVar('--text-faint'), opacity: 0.7 },
     width: 1,
     arrows: { to: { enabled: true, scaleFactor: 0.5 } },
     smooth: { type: 'continuous', roundness: 0.4 },

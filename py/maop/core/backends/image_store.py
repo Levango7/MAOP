@@ -231,8 +231,8 @@ class ImageStore:
                 created = datetime.fromisoformat(img.created_at)
                 if (cutoff - created).days > max_age_days and self.delete(img.id):
                     count += 1
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as exc:
+                logger.debug("image_store: skip invalid image meta %s: %s", img.id, exc)
         return count
 
     @staticmethod

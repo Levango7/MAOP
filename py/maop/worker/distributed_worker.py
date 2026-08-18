@@ -227,8 +227,8 @@ class DistributedWorker:
                 task.cancel()
                 try:
                     await task
-                except (asyncio.CancelledError, Exception):
-                    pass
+                except (asyncio.CancelledError, Exception) as exc:
+                    logger.debug("distributed_worker: await stopped task raised: %s", exc)
         # Wait briefly for in-flight tasks to drain (best-effort).
         if self._in_flight:
             logger.info(

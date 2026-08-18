@@ -293,8 +293,9 @@ class SSEStreamer:
         self._event_count += 1
         try:
             self._queue.put_nowait(sse)
-        except asyncio.QueueFull:
-            pass  # Drop oldest under backpressure
+        except asyncio.QueueFull as exc:
+            logger.debug("concurrency: SSE queue full, dropping event: %s", exc)
+            # Drop oldest under backpressure
 
     def send_json(self, event: str = "message", **data: Any) -> None:
         """Send a JSON-encoded SSE event."""

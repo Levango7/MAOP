@@ -243,12 +243,19 @@ async def lifespan(app: FastAPI) -> Any:
 
 # ── App ────────────────────────────────────────────────────────────
 _is_prod_env = os.environ.get("MAOP_ENV", "").lower() == "production"
+# Fail-closed docs exposure: API docs (Swagger / ReDoc / OpenAPI) are hidden in
+# production unless MAOP_EXPOSE_DOCS=1 is set explicitly. Non-production keeps
+# docs on by default. Never expose docs in production without a clear reason.
+_expose_docs = os.environ.get("MAOP_EXPOSE_DOCS", "0") == "1"
+_docs_enabled = (not _is_prod_env) or _expose_docs
+if _is_prod_env and _expose_docs:
+    logger.warning("[security] MAOP_EXPOSE_DOCS=1 in production — Swagger/OpenAPI endpoints are publicly exposed")
 app = FastAPI(
     title="MAOP Dashboard",
     version=MAOP_VERSION,
-    docs_url=None if _is_prod_env else "/api/docs",
-    redoc_url=None if _is_prod_env else "/api/redoc",
-    openapi_url=None if _is_prod_env else "/api/openapi.json",
+    docs_url="/api/docs" if _docs_enabled else None,
+    redoc_url="/api/redoc" if _docs_enabled else None,
+    openapi_url="/api/openapi.json" if _docs_enabled else None,
     lifespan=lifespan,
 )
 
@@ -271,6 +278,15 @@ _cors_origins = os.environ.get("MAOP_CORS_ORIGINS", "").split(",")
 _cors_origins = [o.strip() for o in _cors_origins if o.strip()]
 if not _cors_origins:
     _cors_origins = ["http://localhost:9079", "http://127.0.0.1:9079", "http://localhost:8080"]
+# Fail-closed: reject wildcard origins. With allow_credentials=True a "*"
+# origin lets any site make authenticated cross-origin requests, so in production
+# we refuse and fall back to an empty allow-list.
+if "*" in _cors_origins:
+    if _is_prod_env:
+        logger.warning("CORS allow_origins is wildcard '*' in production — rejecting; falling back to empty allow-list")
+        _cors_origins = []
+    else:
+        logger.warning("CORS allow_origins contains '*' — any origin will be allowed (non-production only)")
 # #9 fix: CORS narrowed — explicit methods/headers instead of wildcard
 app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credentials=True, allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-Trace-Id", "X-Request-Id"])
 
@@ -309,6 +325,7 @@ app.add_middleware(
         "/api/docs", "/openapi.json",
         "/api/auth/status", "/api/auth/login",
         "/api/csp-report",
+        "/api/alerts/webhook",  # Alertmanager webhook receiver (server-to-server, no auth)
         "/api/stream",  # P0 fix: SSE token validated via _check_sse_token in handler
         # SSO 公开端点（PRD 4.1）：登录跳转/回调/metadata/enabled 需在未认证下可访问
         "/api/sso/enabled",
@@ -441,6 +458,12 @@ app.include_router(evolution_router.router)
 from maop.dashboard.routers import observability as observability_router
 
 app.include_router(observability_router.router)
+
+# Alertmanager webhook receiver (POST /api/alerts/webhook). Minimal sink so the
+# Prometheus → Alertmanager → dashboard notification chain is fully wired.
+from maop.dashboard.routers import alerts as alerts_router
+
+app.include_router(alerts_router.router)
 
 # F1-02 (异常自适应调度): scheduling failure-detector stats endpoint
 # (GET /api/scheduling/failure-stats + POST .../reset). Mounted
@@ -713,12 +736,41 @@ if _public_dir.exists():
 # ── Health ─────────────────────────────────────────────────────────
 @app.get("/api/health")
 async def health() -> Any:
+    # Minimal critical-dependency probe: the metadata storage (SQLite/PostgreSQL)
+    # that backs the dashboard. A lightweight `SELECT 1` forces a real round-trip
+    # without scanning tables, so the endpoint stays cheap and is safe to call
+    # from Docker/K8s probes. If storage is unreachable the process is unhealthy
+    # and we return 503 so orchestrators stop routing traffic / alert.
+    storage_ok = True
+    try:
+        from maop.core.backends.db_utils import get_db_path, get_pool
+        pool = get_pool(get_db_path())
+        conn = pool.acquire()
+        try:
+            conn.execute("SELECT 1")
+        finally:
+            pool.release(conn)
+    except Exception as exc:
+        storage_ok = False
+        logger.warning("[health] storage dependency check failed: %s", exc)
+
     active_agents = 0
     try:
         _agents = await _state.get_bridge().agent_stats()
         active_agents = len(_agents) if isinstance(_agents, list) else 0
     except Exception:
         logger.debug('swallowed exception', exc_info=True)
+
+    if not storage_ok:
+        return _JResp(
+            status_code=503,
+            content={
+                "status": "error",
+                "reason": "storage_unavailable",
+                "version": MAOP_VERSION,
+                "edition": get_edition().value,
+            },
+        )
     return {"status": "ok", "version": MAOP_VERSION, "edition": get_edition().value,
             "dashboard": f"MAOP Dashboard v{MAOP_VERSION} (FastAPI)",
             "uptime_ms": round((time.time() - _state.start_time) * 1000),

@@ -58,10 +58,10 @@
     <Card title="Canonical Metrics (F1-04)" icon="gauge" class="mt">
       <div class="metric-table">
         <div class="metric-header">
-          <span class="col-name">Metric</span>
-          <span class="col-type">Type</span>
-          <span class="col-value">Value</span>
-          <span class="col-extra">Detail</span>
+          <span class="col-name">{{ t('view.observability.metric') }}</span>
+          <span class="col-type">{{ t('view.observability.type') }}</span>
+          <span class="col-value">{{ t('view.observability.value') }}</span>
+          <span class="col-extra">{{ t('view.observability.detail') }}</span>
         </div>
         <div v-for="m in canonicalMetrics" :key="m.name" class="metric-row">
           <span class="col-name mono">{{ m.name }}</span>
@@ -118,6 +118,9 @@
 import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { StatCard, Card, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
+import { useI18n } from '../i18n';
+
+const { t } = useI18n();
 
 const api = useApiStore();
 

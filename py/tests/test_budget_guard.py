@@ -5,7 +5,7 @@ import tempfile
 
 import pytest
 
-from maop.core.monitoring.budget_guard import BudgetGuard, BudgetStatus
+from maop.core.budget_guard import BudgetGuard, BudgetStatus
 
 
 @pytest.fixture

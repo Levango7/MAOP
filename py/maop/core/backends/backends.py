@@ -663,9 +663,16 @@ def get_secret_backend(root_dir: str = "") -> SecretBackend:
             _secret = VaultSecretBackend()
             logger.info("[backends] Secrets: HashiCorp Vault (edition=%s)", get_edition().value)
             return _secret
-        except ImportError:
-            logger.warning("[backends] Vault backend not available, falling back to local")
-            record_degradation("secret", "vault", "local")
+        except (ImportError, RuntimeError, OSError) as exc:
+            # Secret backend degrades to the local encrypted vault by default
+            # (unlike KV, which is fail-fast unless MAOP_KV_ALLOW_FALLBACK=1).
+            # A missing Vault server, failed auth, or unresolvable address must
+            # not break secret access — fall back to local and record it.
+            logger.warning(
+                "[backends] Vault secrets backend unavailable (%s: %s), falling back to local",
+                type(exc).__name__, exc,
+            )
+            record_degradation("secret", "vault", "local", "unavailable_vault")
     _secret = LocalSecretBackend(root_dir=root_dir)
     logger.debug("[backends] Secrets: Local")
     return _secret

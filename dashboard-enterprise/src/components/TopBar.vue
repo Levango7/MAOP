@@ -390,7 +390,6 @@ onMounted(() => {
 .topbar__roledot {
   width: 4px; height: 4px; border-radius: 50%;
   background: var(--brand-strong);
-  box-shadow: 0 0 4px rgba(129, 140, 248, .6);
 }
 
 .topbar__logout-btn {
@@ -406,7 +405,6 @@ onMounted(() => {
 .topbar__logout-btn:hover {
   background: var(--fail-soft); border-color: var(--fail);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(239, 68, 68, .25);
 }
 .topbar__logout-btn:active { transform: translateY(0); }
 .topbar__logout-text { font-weight: 600; }

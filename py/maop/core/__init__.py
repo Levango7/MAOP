@@ -50,7 +50,7 @@ def __getattr__(name: str):
             continue
         globals()[name] = mod  # 缓存
         return mod
-    # 3. 在本包目录下查找同名模块（如 maop/core/llm_provider.py）
+    # 3. 在本包目录下查找同名模块（如 maop/core/budget_guard.py）
     try:
         mod = importlib.import_module(f".{name}", __name__)
         globals()[name] = mod  # 缓存

@@ -183,8 +183,8 @@ def _config_signature(config_dir: Path) -> float:
         try:
             if p.exists():
                 mtimes.append(p.stat().st_mtime)
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.debug("config.loader: stat failed for %s: %s", p, exc)
     return max(mtimes) if mtimes else 0.0
 
 

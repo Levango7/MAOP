@@ -10,7 +10,6 @@ from pathlib import Path
 import yaml
 
 from maop.model.schema import (
-    EffectiveModel,
     LatencyTier,
     ModelDef,
     ModelRegistryConfig,
@@ -200,41 +199,6 @@ class ModelRegistry:
     def get_model(self, name: str) -> ModelDef | None:
         return self._config.models.get(name)
 
-    def get_model_id(self, name: str) -> str:
-        """Resolve the actual API model ID (falls back to name if model_id is empty)."""
-        m = self._config.models.get(name)
-        if m and m.model_id:
-            return m.model_id
-        return name
-
-    def build_effective_model(
-        self,
-        model_name: str,
-        policy_name: str = "default",
-        fallback_chain: list[str] | None = None,
-    ) -> EffectiveModel | None:
-        """Build an EffectiveModel from a model name, enriching with provider info."""
-        m = self._config.models.get(model_name)
-        if not m:
-            return None
-        provider = self._config.providers.get(m.provider)
-        protocol = provider.protocol if provider else ProtocolType.OPENAI_COMPLETIONS
-        base_url = provider.base_url if provider else ""
-        api_key = self._provider_registry.get_api_key(m.provider) or ""
-        return EffectiveModel(
-            model_name=model_name,
-            provider=m.provider,
-            model_id=m.model_id or model_name,
-            protocol=protocol,
-            cli_model_arg=m.model_id or model_name,
-            fallback_chain=fallback_chain or [],
-            policy_name=policy_name,
-            capability_matrix=m.capability_matrix,
-            thinking=m.thinking,
-            base_url=base_url,
-            api_key=api_key,
-        )
-
     def list_models(self, enabled_only: bool = True) -> list[ModelDef]:
         return [m for m in self._config.models.values()
                 if not enabled_only or m.enabled]
@@ -246,12 +210,6 @@ class ModelRegistry:
     def models_by_provider(self, provider: str) -> list[ModelDef]:
         return [m for m in self._config.models.values()
                 if m.enabled and m.provider == provider]
-
-    def get_default_model(self) -> ModelDef | None:
-        """Return the configured default model, if any."""
-        if not self._config.default_model:
-            return None
-        return self._config.models.get(self._config.default_model)
 
     def get_default_provider(self) -> str:
         """Return the configured default provider name, if any."""

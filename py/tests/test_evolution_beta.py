@@ -69,7 +69,7 @@ def _make_delegations_db(db_path: Path, rows: list[dict]) -> None:
 
 def _reset_cost_tracker_singleton() -> None:
     """Reset the process-wide CostTracker singleton so tests are isolated."""
-    import maop.core.monitoring.cost_tracker as ct
+    import maop.core.cost_tracker as ct
     ct._cost_tracker_instance = None
 
 

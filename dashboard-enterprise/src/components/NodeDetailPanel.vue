@@ -9,31 +9,31 @@
     </div>
     <div class="ndp-body">
       <div class="ndp-row">
-        <span class="ndp-label">Status</span>
+        <span class="ndp-label">{{ t('view.nodedetailpanel.status') }}</span>
         <span class="ndp-value" :class="`status-${node.status}`">{{ node.status }}</span>
       </div>
       <div class="ndp-row">
-        <span class="ndp-label">Timestamp</span>
+        <span class="ndp-label">{{ t('view.nodedetailpanel.timestamp') }}</span>
         <span class="ndp-value">{{ formatTime(node.timestamp) }}</span>
       </div>
       <div v-if="meta.assigned_agent" class="ndp-row">
-        <span class="ndp-label">Agent</span>
+        <span class="ndp-label">{{ t('view.nodedetailpanel.agent') }}</span>
         <span class="ndp-value">{{ meta.assigned_agent }}</span>
       </div>
       <div v-if="meta.duration_ms" class="ndp-row">
-        <span class="ndp-label">Duration</span>
+        <span class="ndp-label">{{ t('view.nodedetailpanel.duration') }}</span>
         <span class="ndp-value">{{ meta.duration_ms }} ms</span>
       </div>
       <div v-if="meta.error" class="ndp-row ndp-error">
-        <span class="ndp-label">Error</span>
+        <span class="ndp-label">{{ t('view.nodedetailpanel.error') }}</span>
         <span class="ndp-value ndp-mono">{{ meta.error }}</span>
       </div>
       <div v-if="meta.traceback" class="ndp-row ndp-traceback">
-        <span class="ndp-label">Traceback</span>
+        <span class="ndp-label">{{ t('view.nodedetailpanel.traceback') }}</span>
         <pre class="ndp-traceback-pre">{{ meta.traceback }}</pre>
       </div>
       <div v-if="meta.reason" class="ndp-row">
-        <span class="ndp-label">Reason</span>
+        <span class="ndp-label">{{ t('view.nodedetailpanel.reason') }}</span>
         <span class="ndp-value">{{ meta.reason }}</span>
       </div>
     </div>
@@ -43,6 +43,9 @@
 <script setup>
 import { computed } from 'vue';
 import { AppIcon } from './index.js';
+import { useI18n } from '../i18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
   node: { type: Object, default: null },

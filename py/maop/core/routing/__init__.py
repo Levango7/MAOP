@@ -1,10 +1,9 @@
 """Routing subpackage.
 
-路由评分、决策、动态配置、负载均衡、provider 健康、多目标评分。
+路由评分、决策、负载均衡、provider 健康。
 
 Modules:
-    route_scorer, routing_decision, dynamic_router, multi_objective_scorer,
-    load_balancer, provider_health
+    route_scorer, routing_decision, load_balancer, provider_health
 """
 from __future__ import annotations
 
@@ -12,16 +11,10 @@ import importlib
 
 __all__ = [
     "AgentMetrics",
-    "AgentObjectiveVector",
-    "AgentScore",
-    "DynamicRouter",
     "HealthResult",
     "LBAlgorithm",
     "LBStats",
     "LoadBalancer",
-    "MultiObjectiveScorer",
-    "ObjectiveWeights",
-    "ParetoFrontierResult",
     "ProviderHealthChecker",
     "RouteMatch",
     "RouteScorer",
@@ -40,14 +33,6 @@ __all__ = [
 _SYMBOL_TO_MODULE: dict[str, str] = {
     # 注: 多个子模块均导出同名符号（如 logger），
     # 按字典构造语义仅最后一个映射生效，与重构前运行时行为一致。
-    "_CACHE_TTL_SEC": "dynamic_router",
-    "_SPEED_NORMALIZATION_MS": "dynamic_router",
-    "_DEFAULT_SUCCESS_RATE": "dynamic_router",
-    "_DEFAULT_SPEED_SCORE": "dynamic_router",
-    "_DEAD_AGENT_SCORE": "dynamic_router",
-    "_RECENT_DELEGATION_LIMIT": "dynamic_router",
-    "AgentScore": "dynamic_router",
-    "DynamicRouter": "dynamic_router",
     "LBAlgorithm": "load_balancer",
     "_EWMA_ALPHA": "load_balancer",
     "AgentMetrics": "load_balancer",
@@ -57,10 +42,6 @@ _SYMBOL_TO_MODULE: dict[str, str] = {
     "get_load_balancer": "load_balancer",
     "_set_lb_span_attrs": "load_balancer",
     "_record_lb_decision": "load_balancer",
-    "ObjectiveWeights": "multi_objective_scorer",
-    "AgentObjectiveVector": "multi_objective_scorer",
-    "ParetoFrontierResult": "multi_objective_scorer",
-    "MultiObjectiveScorer": "multi_objective_scorer",
     "HealthResult": "provider_health",
     "_safe_enum_value": "provider_health",
     "ProviderHealthChecker": "provider_health",

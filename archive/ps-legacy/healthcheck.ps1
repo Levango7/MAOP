@@ -92,7 +92,18 @@ if ($Agent -eq "all") {
           "kimi*" { $output = & powershell -NoProfile -Command "echo '$($Task -replace "'","''")' | kimi --print" 2>&1 | Out-String }
           "codex*" { $output = & powershell -NoProfile -Command "`$env:CODEX_BASE_URL='http://127.0.0.1:18080/v1'; echo '$($Task -replace "'","''")' | codex exec --skip-git-repo-check --model step-3.7-flash" 2>&1 | Out-String }
           "autoclaw*" { $output = & powershell -NoProfile -Command "echo '$($Task -replace "'","''")' | autoclaw -n -y" 2>&1 | Out-String }
-          "qoder*" { $output = & powershell -NoProfile -Command "`$env:QODERCN_PERSONAL_ACCESS_TOKEN = 'pt-zDIDIXoMabdSC3DlbiDcEK0f_019f1025-aac1-70ef-899c-1b58db89e992'; qoderclicn -q -p '$($Task -replace "'","''")' --output-format json --yolo" 2>&1 | Out-String }
+          "qoder*" {
+            # SECURITY: never hardcode the QoderCN Personal Access Token. The token
+            # must be supplied via the MAOP_QODERCN_PAT environment variable, sourced
+            # from a secret manager. The previously hardcoded token
+            # (pt-zDIDIXoMabdSC3DlbiDcEK0f_019f1025-...) is now considered leaked and
+            # MUST be rotated in the QoderCN account.
+            $qoderToken = $env:MAOP_QODERCN_PAT
+            if (-not $qoderToken) {
+              throw "MAOP_QODERCN_PAT environment variable (QoderCN PAT) is not set — refusing to run with a hardcoded token."
+            }
+            $output = & powershell -NoProfile -Command "`$env:QODERCN_PERSONAL_ACCESS_TOKEN = '$qoderToken'; qoderclicn -q -p '$($Task -replace "'","''")' --output-format json --yolo" 2>&1 | Out-String
+          }
           "mimo*" { $output = & powershell -NoProfile -Command "echo '$($Task -replace "'","''")' | mimo run -" 2>&1 | Out-String }
           "mavis*" { 
             $m = "C:\Users\winge\.mavis\bin\mavis.cmd"

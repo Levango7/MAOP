@@ -105,7 +105,7 @@ class HistoryAnalyzer:
     def _get_cost_tracker(self):
         if self._cost_tracker is None:
             try:
-                from maop.core.monitoring.cost_tracker import get_cost_tracker
+                from maop.core.cost_tracker import get_cost_tracker
                 self._cost_tracker = get_cost_tracker()  # type: ignore
             except Exception:
                 self._cost_tracker = None

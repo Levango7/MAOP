@@ -12,7 +12,7 @@ from maop.core.agent.plugins_hooks.plugin import (
     PluginManifest,
     PluginState,
 )
-from maop.core.monitoring.cost_tracker import (
+from maop.core.cost_tracker import (
     BudgetStatus,
     CostEntry,
     CostSummary,

@@ -430,7 +430,7 @@ const dagLayout = computed(() => {
 .split-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -507,7 +507,7 @@ const dagLayout = computed(() => {
 .split-form__input:focus {
   outline: none;
   border-color: var(--brand);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 2px var(--brand-soft);
 }
 .split-form__input { width: 80px; }
 
@@ -516,10 +516,10 @@ const dagLayout = computed(() => {
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: var(--fail-soft);
+  border: 1px solid var(--fail);
   border-radius: var(--r-md, 8px);
-  color: #dc2626;
+  color: var(--fail);
   font-size: var(--fs-sm, 13px);
   margin-bottom: 12px;
 }

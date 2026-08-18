@@ -203,4 +203,5 @@ markers = [
     "contract: API contract tests between frontend and backend",
     "slow: stress / concurrency / load tests (exclude with -m 'not slow')",
     "integration: integration tests requiring external services (e.g. PostgreSQL)",
+    "serial: tests that bind a fixed port or hammer shared server/app state; must run serially (no -n). Selected by CI's serial step (-n 0).",
 ]

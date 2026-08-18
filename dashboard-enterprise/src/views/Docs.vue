@@ -36,7 +36,7 @@
 
         <div v-else class="docs-empty">
           <AppIcon name="book-open" :size="32" />
-          <p>{{ isZh ? '从左侧选择一份文档开始阅读' : 'Select a document from the left to start reading' }}</p>
+          <p>{{ t('view.docs.empty') }}</p>
         </div>
       </section>
     </div>
@@ -44,13 +44,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { useI18n } from '../i18n';
 import { AppIcon, PageHeader } from '../components/index.js';
 import DOMPurify from 'dompurify';
 
-const { t, locale } = useI18n();
-const isZh = computed(() => locale.value === 'zh');
+const { t } = useI18n();
 
 // ── 通过 Vite 的 import.meta.glob 懒加载 docs/*.md ──
 // P1-4 性能优化: 改为非 eager（懒加载），每个 md 文件拆为独立小 chunk，
@@ -119,10 +118,10 @@ async function selectDoc(doc) {
       const html = renderMarkdown(raw);
       selectedHtml.value = DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
     } else {
-      selectedHtml.value = `<p class="docs-not-found">${isZh.value ? '文档内容未找到。' : 'Document content not found.'}</p>`;
+      selectedHtml.value = `<p class="docs-not-found">${t('view.docs.notFound')}</p>`;
     }
   } catch {
-    selectedHtml.value = `<p class="docs-not-found">${isZh.value ? '文档加载失败。' : 'Document failed to load.'}</p>`;
+    selectedHtml.value = `<p class="docs-not-found">${t('view.docs.loadFailed')}</p>`;
   } finally {
     loading.value = false;
   }

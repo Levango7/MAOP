@@ -1,7 +1,7 @@
 """MAOP MCP Concurrency Control + Per-Server RPM Rate Limiting.
 
 Phase δ-5: provides two coordinating primitives used by
-:class:`maop.core.mcp_hub.MCPHub` to protect external MCP servers from
+:class:`maop.core.mcp.mcp_hub.MCPHub` to protect external MCP servers from
 being overwhelmed:
 
   * :class:`MCPServerConcurrency` — per-server bounded-concurrency

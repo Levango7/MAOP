@@ -20,11 +20,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
-from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
 
 logger = logging.getLogger(__name__)
@@ -33,13 +33,13 @@ router = APIRouter()
 
 
 def _perf_loop() -> Any:
-    from maop.core.evolution_loop import PerformanceEvolutionLoop
+    from maop.core.evolution.evolution_perf_loop import PerformanceEvolutionLoop
 
     return PerformanceEvolutionLoop(root_dir=str(MAOP_ROOT))
 
 
 def _ab_fw() -> Any:
-    from maop.core.ab_test import ABTestFramework
+    from maop.core.evolution.ab_test import ABTestFramework
 
     return ABTestFramework(root_dir=str(MAOP_ROOT))
 
@@ -112,7 +112,7 @@ async def api_evolution_suggest(request: Request) -> dict[str, Any]:
 async def api_ab_create(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
-    from maop.core.ab_test import SPRTConfig
+    from maop.core.evolution.ab_test import SPRTConfig
 
     sprt_cfg = None
     if body.get("sprt"):
@@ -268,6 +268,13 @@ async def api_evolution_skills() -> dict[str, Any]:
 @router.post("/api/evolution/skills/composite")
 @handle_api_errors("evolution skill composite", error_value={"status": "error"})
 async def api_evolution_skill_composite(request: Request) -> dict[str, Any]:
-    """保存 composite Skill（当前为空实现，Skill 系统待落地）。"""
+    """保存 composite Skill。
+
+    Skill 持久化后端尚未落地，此前返回 ``"status": "ok", "saved": False`` 属于
+    假成功；现如实返回 501，待 Skill 系统后端接入后再实现。
+    """
     require_admin(request)
-    return {"status": "ok", "saved": False, "message": "skill persistence not implemented"}
+    raise HTTPException(
+        status_code=501,
+        detail="skill persistence not implemented; Skill system backend pending",
+    )

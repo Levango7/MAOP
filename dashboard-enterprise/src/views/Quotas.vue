@@ -282,6 +282,7 @@ import EmptyState from '../components/EmptyState.vue';
 import ListPageLayout from '../components/ListPageLayout.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
 import { baseLineOptions } from '../composables/chartOptions.js';
+import { cssVar } from '../composables/chartTokens.js';
 
 ChartJS.register(
   LineElement, PointElement, LinearScale, CategoryScale,
@@ -441,7 +442,8 @@ const totalActiveAlerts = computed(() =>
 const allocationChartData = computed(() => {
   const alloc = overview.value.allocation || { labels: [], values: [] };
   const palette = [
-    '#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6', '#a855f7', '#14b8a6', '#ec4899',
+    cssVar('--chart-1'), cssVar('--chart-2'), cssVar('--chart-3'), cssVar('--chart-4'),
+    cssVar('--chart-5'), cssVar('--chart-6'), cssVar('--chart-7'), cssVar('--chart-8'),
   ];
   return {
     labels: alloc.labels || [],
@@ -465,7 +467,10 @@ const allocationChartOptions = {
 /** 使用量趋势折线图 */
 const trendChartData = computed(() => {
   const td = trendData.value || { labels: [], series: [] };
-  const palette = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6', '#a855f7'];
+  const palette = [
+    cssVar('--chart-1'), cssVar('--chart-2'), cssVar('--chart-3'),
+    cssVar('--chart-4'), cssVar('--chart-5'), cssVar('--chart-6'),
+  ];
   return {
     labels: td.labels || [],
     datasets: (td.series || []).map((s, i) => ({
@@ -821,7 +826,7 @@ onMounted(loadAll);
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-modal, 90) + 10);
-  background: rgba(10, 12, 16, 0.45);
+  background: var(--overlay-scrim);
   display: flex;
   align-items: center;
   justify-content: center;

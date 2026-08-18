@@ -1,0 +1,11 @@
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # Resolves inside the docker network when both services are started with
+    # the `monitoring` profile (docker compose ... --profile monitoring up -d).
+    # For an externally-hosted Prometheus, replace with its reachable URL.
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true

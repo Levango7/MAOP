@@ -138,7 +138,8 @@ def _validate_backup_path(backup_path: Path, allowed_dirs: list[Path]) -> None:
         try:
             resolved.relative_to(allowed)
             break
-        except ValueError:
+        except ValueError as exc:
+            logger.debug("db_backup: %s not under an allowed backup dir: %s", resolved, exc)
             continue
     else:
         raise ValueError(

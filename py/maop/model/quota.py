@@ -1,4 +1,19 @@
-﻿"""QuotaEnforcer — Per-provider rate limiting and quota enforcement."""
+﻿"""QuotaEnforcer — Per-provider rate limiting and quota enforcement.
+
+WARNING — NOT WIRED INTO THE DISPATCH PATH
+==========================================
+The QuotaEnforcer class is currently *dead code* from the perspective of
+the live model-selection / routing dispatch path. ``ModelSelector`` no longer
+calls ``check`` / ``consume`` / ``check_and_consume`` when picking or routing
+to a model (the quota-fallback branch was removed as part of the P0-3 cleanup),
+so no inbound request is actually gated or throttled by this module.
+
+The only entry point that is still expected to be reachable is
+``usage_all()`` (used by the dashboard / observability to *report* quota
+utilisation). Do not delete this module and do not repurpose its enforce
+methods as the real throttle without first wiring them into
+``maop.model.selector.ModelSelector`` and ``maop.delegate.dispatcher``.
+"""
 
 from __future__ import annotations
 

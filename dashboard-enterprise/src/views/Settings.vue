@@ -154,14 +154,14 @@
           </span>
         </div>
         <div class="setting-row">
-          <span class="setting-label">Auth</span>
+          <span class="setting-label">{{ t('view.settings.auth') }}</span>
           <span class="setting-value-group">
             <span class="status-dot" :class="config.auth_enabled ? 'on' : 'off'"></span>
             <span class="setting-value">{{ config.auth_enabled ? t('view.settings.enabled') : t('view.settings.disabled') }}</span>
           </span>
         </div>
         <div class="setting-row">
-          <span class="setting-label">Debug</span>
+          <span class="setting-label">{{ t('view.settings.debug') }}</span>
           <span class="setting-value-group">
             <span class="status-dot" :class="config.debug ? 'on' : 'off'"></span>
             <span class="setting-value">{{ config.debug ? t('common.on') : t('common.off') }}</span>
@@ -172,7 +172,7 @@
           <span class="setting-value">{{ config.log_level || 'INFO' }}</span>
         </div>
         <div class="setting-row">
-          <span class="setting-label">Workers</span>
+          <span class="setting-label">{{ t('view.settings.workers') }}</span>
           <span class="setting-value">{{ config.dash_workers || 1 }}</span>
         </div>
       </Card>
@@ -226,18 +226,18 @@
 
       <Card :title="t('settings.about')">
         <div class="about-version">
-          <span class="about-name">MAOP</span>
+          <span class="about-name">{{ t('topbar.systemName') }}</span>
           <span class="about-ver">v{{ appVersion }}</span>
         </div>
         <div class="about-section">
           <div class="about-section-title">{{ t('view.settings.techStack') }}</div>
           <div class="about-tags">
-            <span class="about-tag">FastAPI</span>
-            <span class="about-tag">Vue 3.5</span>
-            <span class="about-tag">Vite</span>
-            <span class="about-tag">Pinia</span>
-            <span class="about-tag">Vitest</span>
-            <span class="about-tag">pytest</span>
+            <span class="about-tag">{{ t('view.settings.techFastapi') }}</span>
+            <span class="about-tag">{{ t('view.settings.techVue') }}</span>
+            <span class="about-tag">{{ t('view.settings.techVite') }}</span>
+            <span class="about-tag">{{ t('view.settings.techPinia') }}</span>
+            <span class="about-tag">{{ t('view.settings.techVitest') }}</span>
+            <span class="about-tag">{{ t('view.settings.techPytest') }}</span>
           </div>
         </div>
         <div class="about-section">
@@ -382,7 +382,7 @@
           <div class="hooks-form-row">
             <label class="hooks-form-label">{{ t('view.hooks.fieldMethod') }}</label>
             <select v-model="hookForm.method" class="hooks-form-input">
-              <option value="POST">POST</option>
+              <option value="POST">{{ t('view.settings.methodPost') }}</option>
             </select>
           </div>
           <div class="hooks-form-row">
@@ -900,7 +900,7 @@ async function onTestHook(hook) {
 .history-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1089,7 +1089,7 @@ async function onTestHook(hook) {
 .hooks-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay-scrim);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -1,0 +1,16 @@
+apiVersion: 1
+providers:
+  - name: maop
+    orgId: 1
+    folder: MAOP
+    type: file
+    disableDeletion: false
+    allowUi: true
+    editable: true
+    options:
+      # Dashboards are mounted from monitoring/grafana (see docker-compose.prod.yml
+      # grafana service: ./monitoring/grafana -> /etc/grafana/dashboards).
+      path: /etc/grafana/dashboards
+      # Only load the populated overview dashboard. maop-slo.json is currently an
+      # empty placeholder and is intentionally excluded to avoid a parse error.
+      include: ["maop-overview.json"]

@@ -278,6 +278,9 @@ services:
       # prometheus.yml's `rule_files` block resolve inside the container.
       - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
       - ./monitoring/slo-alerts.yml:/etc/prometheus/slo-alerts.yml:ro
+      # P1 fix: also mount prometheus-alerts.yml — prometheus.yml's rule_files
+      # now references it; without this mount Prometheus fails to load rules.
+      - ./monitoring/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
       - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"

@@ -8,7 +8,7 @@
       </div>
       <span class="sse-indicator" :class="realtimeConnected ? 'on' : 'off'" :title="realtimeConnected ? t('view.monitor.sseConnected') : t('view.monitor.sseDisconnected')">
         <span class="sse-dot"></span>
-        <span class="sse-text">LIVE</span>
+        <span class="sse-text">{{ t('status.live') }}</span>
       </span>
     </PageHeader>
 
@@ -81,29 +81,29 @@
       </Card>
 
       <!-- F1-02: Agent 健康度面板（异常自适应调度） -->
-      <Card title="Agent 健康度" icon="heart-pulse" class="mt">
+      <Card :title="t('view.monitor.healthTitle')" icon="heart-pulse" class="mt">
         <template #actions>
           <button
             class="agent-health-refresh"
             :disabled="agentHealthLoading"
             @click="loadAgentHealth"
-          >刷新</button>
+          >{{ t('common.refresh') }}</button>
         </template>
         <div v-if="agentHealthLoading && !agentHealth.length" class="resource-skel">
           <Skeleton v-for="n in 3" :key="n" height="22px" />
         </div>
         <div v-else-if="!agentHealth.length" class="agent-health-empty">
           <AppIcon name="heart-pulse" :size="16" />
-          <span>暂无 Agent 健康度数据（运行一次分布式任务后会出现）</span>
+          <span>{{ t('view.monitor.noHealthData') }}</span>
         </div>
         <div v-else class="agent-health-list">
           <div class="agent-health-row agent-health-header">
             <span class="ah-name">Agent</span>
-            <span class="ah-failure">失败率</span>
-            <span class="ah-latency">平均耗时</span>
-            <span class="ah-timeout">超时率</span>
-            <span class="ah-weight">权重</span>
-            <span class="ah-status">状态</span>
+            <span class="ah-failure">{{ t('view.monitor.healthFailureRate') }}</span>
+            <span class="ah-latency">{{ t('view.monitor.healthLatency') }}</span>
+            <span class="ah-timeout">{{ t('view.monitor.healthTimeoutRate') }}</span>
+            <span class="ah-weight">{{ t('view.monitor.healthWeight') }}</span>
+            <span class="ah-status">{{ t('view.monitor.healthStatus') }}</span>
           </div>
           <div
             v-for="a in agentHealth"
@@ -140,10 +140,10 @@
             </span>
           </div>
           <div v-if="agentHealthConfig" class="agent-health-config">
-            <span>窗口: {{ agentHealthConfig.window_size }}</span>
-            <span>摘流阈值: {{ (agentHealthConfig.failure_rate_threshold * 100).toFixed(0) }}%</span>
-            <span>超时阈值: {{ agentHealthConfig.timeout_threshold }}s</span>
-            <span>恢复连续成功: {{ agentHealthConfig.recovery_consecutive_successes }}</span>
+            <span>{{ t('view.monitor.healthWindow') }}: {{ agentHealthConfig.window_size }}</span>
+            <span>{{ t('view.monitor.healthDrainThreshold') }}: {{ (agentHealthConfig.failure_rate_threshold * 100).toFixed(0) }}%</span>
+            <span>{{ t('view.monitor.healthTimeoutThreshold') }}: {{ agentHealthConfig.timeout_threshold }}s</span>
+            <span>{{ t('view.monitor.healthRecoverySuccesses') }}: {{ agentHealthConfig.recovery_consecutive_successes }}</span>
           </div>
         </div>
       </Card>
@@ -292,9 +292,9 @@ const agentHealthConfig = ref(null);
 const agentHealthLoading = ref(false);
 
 function statusLabel(status) {
-  if (status === 'normal') return '正常';
-  if (status === 'drained') return '摘流';
-  if (status === 'recovering') return '灰度';
+  if (status === 'normal') return t('view.monitor.healthStatusNormal');
+  if (status === 'drained') return t('view.monitor.healthStatusDrained');
+  if (status === 'recovering') return t('view.monitor.healthStatusRecovering');
   return status;
 }
 

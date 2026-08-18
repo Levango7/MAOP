@@ -33,5 +33,5 @@ defineProps({
 .badge--success { background: var(--success-soft); color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
 .badge--warn    { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
 .badge--fail    { background: var(--fail-soft); color: var(--fail); border-color: color-mix(in srgb, var(--fail) 30%, transparent); }
-.badge--info    { background: var(--info-soft); color: var(--info, #38bdf8); border-color: color-mix(in srgb, #38bdf8 30%, transparent); }
+.badge--info    { background: var(--info-soft); color: var(--info); border-color: color-mix(in srgb, var(--info) 30%, transparent); }
 </style>

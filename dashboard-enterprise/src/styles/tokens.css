@@ -147,6 +147,28 @@
   --topbar-glow: none;
   --topbar-sheen: none;
   --topbar-hairline: transparent;
+
+  /* ── Backward-compat extension tokens (P2-1) ─────────────────────────────
+   * Previously only reachable via inline var(--x, #fallback) fallbacks which
+   * drifted per-site and were live in production. Defining them here (identical
+   * literal value in both :root and [data-theme="light"]) stabilizes resolution
+   * with zero visual change. Exception: --bg-card maps to --surface on purpose
+   * (the #fff fallback was a leftover white-on-dark default). */
+  --bg-card: var(--surface);
+  --bg-muted: rgba(148, 163, 184, .16);
+  --bg-hover: rgba(148, 163, 184, .16);
+  --bg-code: #1e293b;
+  --text-code: rgba(148, 163, 184, .35);
+  --bg-elev: rgba(148, 163, 184, .15);
+  --bg-tag: rgba(148, 163, 184, .16);
+  --border-light: rgba(148, 163, 184, .16);
+  --border-soft: rgba(148, 163, 184, .16);
+  --surface-hover: rgba(0, 0, 0, .04);
+  --surface-alt: rgba(0, 0, 0, .02);
+  --danger: #c0392b;
+  --danger-soft: rgba(192, 57, 43, .08);
+  --ok: #3fb950;
+  --overlay-scrim: rgba(15, 23, 42, .65);
 }
 
 /* ── Density 规范 ──────────────────────────────────────────────────────────

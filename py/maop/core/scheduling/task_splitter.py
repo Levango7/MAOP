@@ -31,7 +31,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from maop.core.llm_provider import BaseLLMProvider, LLMProviderFactory
+    from maop.core.agent.llm_chat.llm_provider import BaseLLMProvider, LLMProviderFactory
 
 logger = logging.getLogger(__name__)
 
@@ -384,7 +384,7 @@ class TaskSplitter:
         if self._llm_provider is not None:
             return self._llm_provider
         try:
-            from maop.core.llm_provider import LLMProviderFactory
+            from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
             if self._factory is None:
                 self._factory = LLMProviderFactory()
             # 优先用指定 model，否则用 default_model

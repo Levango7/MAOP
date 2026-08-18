@@ -15,8 +15,6 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from maop.core.monitoring.monitoring import (
-    MAOP_MODEL_SELECTION_LOAD_AWARE,
-    MAOP_MODEL_SELECTION_QUOTA_REJECTED,
     MAOP_ROUTING_DECISION_DURATION_MS,
     MAOP_ROUTING_DECISION_TOTAL,
 )
@@ -191,14 +189,9 @@ class ModelSelector:
 
         # Step 2: If not found, select by capability
         if primary_model is None and capability:
-            if self._load_balancer is not None:
-                primary_model = self._select_load_aware(
-                    capability, strategy, max_cost,
-                )
-            else:
-                primary_model = self._registry.best_model(
-                    capability, strategy=strategy, max_cost=max_cost,
-                )
+            primary_model = self._registry.best_model(
+                capability, strategy=strategy, max_cost=max_cost,
+            )
 
         # Step 3: If still not found, try default model
         if primary_model is None:
@@ -213,22 +206,11 @@ class ModelSelector:
             )
 
         # Step 4 (Phase γ-5): Quota-aware fallback.
-        # If the primary's provider quota is exhausted, walk fallback
-        # candidates for the first provider with remaining quota. If
-        # none qualify, degrade to the original primary.
-        total_tokens = task_input_tokens + task_output_tokens
+        # QuotaEnforcer is not wired into the dispatch path (see
+        # maop.model.quota.QuotaEnforcer for the disconnected-but-designed
+        # enforcement API), so quota checks remain a no-op here.
         quota_check_result = "skipped"
         fallback_used = False
-        if self._quota_enforcer is not None:
-            quota_check_result = "ok" if self._quota_enforcer.check(
-                primary_model.provider, tokens=total_tokens,
-            ) else "exhausted"
-            new_primary = self._apply_quota_fallback(
-                primary_model, capability, strategy, max_cost, total_tokens,
-            )
-            if new_primary.name != primary_model.name:
-                fallback_used = True
-                primary_model = new_primary
 
         # Estimate cost
         cost_estimate = (
@@ -254,66 +236,6 @@ class ModelSelector:
             policy_name=policy_name,
         )
 
-    # ── Phase γ-5: load-aware selection ──────────────────────
-
-    def _select_load_aware(
-        self,
-        capability: str,
-        strategy: str,
-        max_cost: float | None,
-    ) -> ModelDef | None:
-        """Select best model by strategy, using load as a tie-breaker.
-
-        Mirrors ``ModelRegistry.best_model`` filtering (capability →
-        cost → health) but, among candidates tied on the strategy key,
-        prefers the one whose provider currently has the lowest
-        ``LoadBalancer.get_load``. Increments
-        ``MAOP_model_selection_load_aware_total`` whenever the
-        load-aware pick differs from the strategy-only winner.
-        """
-        candidates = self._registry.models_by_capability(capability)
-        if not candidates:
-            return None
-
-        # Filter by cost
-        if max_cost is not None:
-            candidates = [m for m in candidates
-                          if m.cost_per_1k_input + m.cost_per_1k_output <= max_cost]
-            if not candidates:
-                return None
-
-        # Filter by provider health
-        healthy = [m for m in candidates
-                   if self._registry.providers.is_healthy(m.provider)]
-        if healthy:
-            candidates = healthy
-        if not candidates:
-            return None
-
-        # Strategy-only winner (stable sort preserves insertion order
-        # for ties — this is what best_model would return).
-        strategy_sorted = sorted(
-            candidates, key=lambda m: self._strategy_key(m, strategy),
-        )
-        strategy_only_winner = strategy_sorted[0]
-
-        # Load-aware winner: tie-break by provider load.
-        lb = self._load_balancer
-        load_sorted = sorted(
-            candidates,
-            key=lambda m: (self._strategy_key(m, strategy), lb.get_load(m.provider) if lb else 0),
-        )
-        load_winner = load_sorted[0]
-
-        if load_winner.name != strategy_only_winner.name:
-            MAOP_MODEL_SELECTION_LOAD_AWARE.inc()
-            logger.debug(
-                "[selector] load-aware switch: %s -> %s (capability=%s)",
-                strategy_only_winner.name, load_winner.name, capability,
-            )
-
-        return load_winner
-
     def _strategy_key(self, model: ModelDef, strategy: str) -> tuple:
         """Return a sort key for the strategy (smaller = better)."""
         if strategy == "cheapest":
@@ -327,67 +249,6 @@ class ModelSelector:
             -_QUALITY_SCORE.get(model.quality_tier, 0),
             -_LATENCY_SCORE.get(model.latency_tier, 0),
         )
-
-    # ── Phase γ-5: quota-aware fallback ──────────────────────
-
-    def _apply_quota_fallback(
-        self,
-        primary: ModelDef,
-        capability: str,
-        strategy: str,
-        max_cost: float | None,
-        total_tokens: int,
-    ) -> ModelDef:
-        """Return ``primary`` unless its provider quota is exhausted.
-
-        On exhaustion, walk ``models_by_capability`` (excluding the
-        primary) and return the first healthy, cost-feasible candidate
-        whose provider still has quota. If none qualify, the original
-        primary is returned (graceful degradation — the caller will
-        surface the quota error at dispatch time).
-        """
-        if self._quota_enforcer is None:
-            return primary
-
-        if self._quota_enforcer.check(primary.provider, tokens=total_tokens):
-            return primary
-
-        # Quota exhausted — record and attempt fallback.
-        MAOP_MODEL_SELECTION_QUOTA_REJECTED.inc(
-            labels={"provider": primary.provider},
-        )
-        logger.info(
-            "[selector] quota exhausted for provider=%s (model=%s); "
-            "searching fallback chain",
-            primary.provider, primary.name,
-        )
-
-        if not capability:
-            return primary
-
-        candidates = self._registry.models_by_capability(capability)
-        for m in candidates:
-            if m.name == primary.name:
-                continue
-            if not self._registry.providers.is_healthy(m.provider):
-                continue
-            if max_cost is not None and (
-                m.cost_per_1k_input + m.cost_per_1k_output > max_cost
-            ):
-                continue
-            if self._quota_enforcer.check(m.provider, tokens=total_tokens):
-                logger.info(
-                    "[selector] quota fallback: %s (%s) -> %s (%s)",
-                    primary.name, primary.provider, m.name, m.provider,
-                )
-                return m
-
-        # No fallback with quota — degrade to primary.
-        logger.warning(
-            "[selector] no quota-available fallback for capability=%s; "
-            "degrading to primary %s", capability, primary.name,
-        )
-        return primary
 
     def _build_fallback_chain(
         self,

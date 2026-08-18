@@ -31,8 +31,8 @@ from pydantic import BaseModel, Field
 from maop.core.agent.plugins_hooks.hook_manager import LifecycleEvent
 from maop.core.security.middleware import require_admin
 from maop.core.security.url_validator import SSRFError, validate_webhook_url
+from maop.dashboard.error_handler import handle_api_errors
 
-from .error_handler import handle_api_errors
 from .state import MAOP_ROOT
 
 logger = logging.getLogger(__name__)

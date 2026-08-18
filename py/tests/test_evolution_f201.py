@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from maop.core.ab_test import (
+from maop.core.evolution.ab_test import (
     ABTestFramework,
     SPRTConfig,
     SPRTDecision,
@@ -24,11 +24,11 @@ from maop.core.evolution.evaluator import (
     PerformanceEvaluator,
     PerformanceMetrics,
 )
-from maop.core.evolution.suggester import ImprovementSuggester, SuggestionContext
-from maop.core.evolution_loop import (
+from maop.core.evolution.evolution_perf_loop import (
     EvolutionCycleReport,
     PerformanceEvolutionLoop,
 )
+from maop.core.evolution.suggester import ImprovementSuggester, SuggestionContext
 
 # ════════════════════════════════════════════════════════════════════
 # PerformanceEvaluator

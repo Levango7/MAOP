@@ -120,7 +120,7 @@ class TestMaopLoop:
 class TestEvolutionLoop:
     def test_module_import(self):
         import maop.core.evolution.evolution_loop
-        assert maop.core.evolution_loop is not None
+        assert maop.core.evolution.evolution_loop is not None
 
 
 # ── React Loop ─────────────────────────────────────────────────────
@@ -136,4 +136,4 @@ class TestReactLoop:
 class TestLLMProvider:
     def test_module_import(self):
         import maop.core.agent.llm_chat.llm_provider
-        assert maop.core.llm_provider is not None
+        assert maop.core.agent.llm_chat.llm_provider is not None

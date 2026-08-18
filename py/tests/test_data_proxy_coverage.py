@@ -369,7 +369,7 @@ class TestLiveExceptionBranches:
     def test_live_cost_tracker_exception(self, tmp_path):
         _init_maop_db(tmp_path)
         proxy = _make_proxy(tmp_path)
-        with patch("maop.core.monitoring.cost_tracker.CostTracker") as MockCT:
+        with patch("maop.core.cost_tracker.CostTracker") as MockCT:
             MockCT.return_value.summary.side_effect = RuntimeError("ct boom")
             result = asyncio.run(proxy.live())
         assert result["cost_per_hour"] == 0.0

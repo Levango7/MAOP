@@ -1,4 +1,4 @@
-"""Tests for maop.core.subagent_lifecycle.SubAgentManager.
+"""Tests for maop.core.agent.delegation.subagent_lifecycle.SubAgentManager.
 
 E3 (2026-07-22, Phase E): verifies the async sub-agent lifecycle:
 spawn/wait/cancel/spawn_and_wait_all/list_agents/get_live_transcript.
@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from maop.core.subagent_lifecycle import (
+from maop.core.agent.delegation.subagent_lifecycle import (
     AgentConfig,
     AgentResult,
     AgentRole,

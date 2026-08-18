@@ -159,7 +159,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
 <style scoped>
 .cmdpal { position: fixed; inset: 0; z-index: calc(var(--z-modal, 90) + 10); }
-.cmdpal__scrim { position: absolute; inset: 0; background: rgba(10,12,16,.5); }
+.cmdpal__scrim { position: absolute; inset: 0; background: var(--overlay-scrim); }
 
 .cmdpal__panel {
   position: absolute;

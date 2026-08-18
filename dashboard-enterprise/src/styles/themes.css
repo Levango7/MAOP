@@ -81,4 +81,22 @@
   --topbar-glow: none;
   --topbar-sheen: none;
   --topbar-hairline: transparent;
+
+  /* Extension tokens (P2-1) — identical literals to :root so light-theme
+   * rendering is unchanged from the previous inline fallbacks. */
+  --bg-card: var(--surface);
+  --bg-muted: rgba(148, 163, 184, .16);
+  --bg-hover: rgba(148, 163, 184, .16);
+  --bg-code: #1e293b;
+  --text-code: rgba(148, 163, 184, .35);
+  --bg-elev: rgba(148, 163, 184, .15);
+  --bg-tag: rgba(148, 163, 184, .16);
+  --border-light: rgba(148, 163, 184, .16);
+  --border-soft: rgba(148, 163, 184, .16);
+  --surface-hover: rgba(0, 0, 0, .04);
+  --surface-alt: rgba(0, 0, 0, .02);
+  --danger: #c0392b;
+  --danger-soft: rgba(192, 57, 43, .08);
+  --ok: #3fb950;
+  --overlay-scrim: rgba(15, 23, 42, .65);
 }

@@ -243,7 +243,8 @@ def get_status(task_id: str) -> dict[str, Any] | None:
         if task is None:
             return None
         return cast(dict[str, Any], task.to_dict())
-    except Exception:
+    except Exception as exc:
+        logger.warning("doc_pipeline_adapter.get_status failed: %s", exc)
         return None
 
 
@@ -253,7 +254,8 @@ def list_hooks() -> list[dict]:
         _ensure_importable()
         from pipeline_core.event_hook import get_hook_manager
         return cast(list[dict], get_hook_manager().list_hooks())
-    except Exception:
+    except Exception as exc:
+        logger.warning("doc_pipeline_adapter.list_hooks failed: %s", exc)
         return []
 
 

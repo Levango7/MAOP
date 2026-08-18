@@ -21,6 +21,24 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
+# ── Alerting ──────────────────────────────────────────────────────
+# Route firing alerts to Alertmanager for delivery (webhook/email/slack).
+# The alertmanager service is part of the `monitoring` compose profile
+# (docker compose ... --profile monitoring up -d). If Alertmanager is NOT
+# deployed, Prometheus still evaluates rules but cannot deliver them — deploy
+# the `alertmanager` service (see docker-compose*.yml) for actual delivery.
+# NOTE: keep the placeholder target `alertmanager:9093`; it resolves inside
+# the docker network. For an externally-managed Alertmanager, replace with its
+# reachable host:port.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 rule_files:
   - /etc/prometheus/alerts.yml
   - /etc/prometheus/slo-alerts.yml
+  # Orphaned rule file wired up: previously not referenced by rule_files, so
+  # its alerts were never evaluated. Mounted in docker-compose*.yml as
+  # /etc/prometheus/prometheus-alerts.yml.
+  - /etc/prometheus/prometheus-alerts.yml

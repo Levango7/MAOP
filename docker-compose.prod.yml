@@ -483,6 +483,9 @@ services:
       # P1 fix: 挂载 rule_files 引用的告警规则，否则生产 Prometheus 加载规则失败
       - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
       - ./monitoring/slo-alerts.yml:/etc/prometheus/slo-alerts.yml:ro
+      # P1 fix: also mount prometheus-alerts.yml — prometheus.yml's rule_files
+      # now references it; without this mount Prometheus fails to load rules.
+      - ./monitoring/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
       - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -515,6 +518,10 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?Set GRAFANA_PASSWORD in .env for production}
     volumes:
       - grafana-data:/var/lib/grafana
+      # P1 fix: provision the Prometheus datasource + MAOP dashboards so Grafana
+      # is not empty on first boot. Dashboard JSONs live in monitoring/grafana/.
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana:/etc/grafana/dashboards:ro
     ports:
       - "127.0.0.1:3000:3000"  # P2 fix: bind to localhost only
     depends_on:

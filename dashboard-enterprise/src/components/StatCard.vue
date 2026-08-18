@@ -99,7 +99,7 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
 .stat__icon {
   width: 42px; height: 42px; border-radius: var(--r-md);
   display: grid; place-items: center; flex-shrink: 0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+  box-shadow: inset 0 1px 0 var(--border-subtle);
 }
 .stat__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .stat__label { font-size: var(--fs-xs); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }

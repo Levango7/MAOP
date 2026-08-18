@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from maop.model.budget import BudgetGuard
-from maop.model.fallback import FallbackManager
 from maop.model.quota import QuotaEnforcer
 from maop.model.registry import ModelRegistry
 from maop.model.schema import (
@@ -35,11 +34,6 @@ def registry(MAOP_ROOT):
 @pytest.fixture
 def selector(registry):
     return ModelSelector(registry)
-
-
-@pytest.fixture
-def fallback_mgr(registry):
-    return FallbackManager(registry)
 
 
 @pytest.fixture
@@ -213,39 +207,6 @@ class TestModelSelector:
         em = selector.select(capability="nonexistent")
         # Should fall back to built-in or unknown
         assert em.model_name in ("built-in", "unknown")
-
-
-# ── Fallback tests ────────────────────────────────────────────
-
-class TestFallbackManager:
-    def test_get_chain(self, fallback_mgr, selector):
-        em = selector.select(capability="codegen")
-        chain = fallback_mgr.get_chain(em)
-        assert em.model_name in chain
-
-    def test_record_success(self, fallback_mgr):
-        fallback_mgr.record_failure("yi-large")
-        fallback_mgr.record_success("yi-large")
-        assert fallback_mgr._failure_counts.get("yi-large", 0) == 0
-
-    def test_record_failure(self, fallback_mgr):
-        fallback_mgr.record_failure("yi-large")
-        fallback_mgr.record_failure("yi-large")
-        assert fallback_mgr._failure_counts["yi-large"] == 2
-
-    def test_should_fallback_on_error(self, fallback_mgr):
-        assert fallback_mgr.should_fallback("some error") is True
-
-    def test_should_fallback_on_timeout(self, fallback_mgr):
-        assert fallback_mgr.should_fallback("TIMEOUT after 30s") is True
-
-    def test_should_not_fallback_if_disabled(self, fallback_mgr):
-        assert fallback_mgr.should_fallback("error", policy_fallback_on_error=False) is False
-
-    def test_failure_stats(self, fallback_mgr):
-        fallback_mgr.record_failure("model-a")
-        stats = fallback_mgr.get_failure_stats()
-        assert "model-a" in stats
 
 
 # ── Quota tests ───────────────────────────────────────────────

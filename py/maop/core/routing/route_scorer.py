@@ -28,7 +28,6 @@ from typing import Any
 from maop.config.loader import MaopConfig, RouteEntry
 from maop.core.monitoring.otel import get_tracer
 from maop.core.monitoring.otel import span as otel_span
-from maop.core.routing.multi_objective_scorer import ObjectiveWeights  # R8-F821 fix
 from maop.core.routing.routing_decision import (
     RoutingDecisionRecord,
     get_active_span_context,
@@ -96,42 +95,8 @@ class RouteScorer:
     def __init__(self, config: MaopConfig | None = None) -> None:
         self.config = config
         self._cooldowns: dict[str, _AgentCooldown] = {}
-        # Phase γ-3: multi-objective (Pareto + TOPSIS) agent selection.
-        # Off by default for full backward compatibility; flip via
-        # ``enable_multi_objective()``.
-        self._use_multi_objective: bool = False
-        self._mo_weights: ObjectiveWeights | None = None
 
     # ── Public API ───────────────────────────────────────────
-
-    def enable_multi_objective(
-        self, weights: ObjectiveWeights | None = None
-    ) -> None:
-        """Switch agent selection to the Pareto + TOPSIS scorer.
-
-        Parameters
-        ----------
-        weights : ObjectiveWeights | None
-            Optional custom weights. When None, the scorer's defaults
-            (success_rate=0.4, latency=0.3, cost=0.2, quota_headroom=0.1)
-            are used. The strategy learner may pass tuned weights here.
-        """
-        self._use_multi_objective = True
-        self._mo_weights = weights
-        logger.info(
-            "RouteScorer multi-objective mode ENABLED (weights=%s)",
-            weights,
-        )
-
-    def disable_multi_objective(self) -> None:
-        """Revert to the legacy weighted-sum agent selection."""
-        self._use_multi_objective = False
-        self._mo_weights = None
-        logger.info("RouteScorer multi-objective mode DISABLED")
-
-    @property
-    def is_multi_objective_enabled(self) -> bool:
-        return self._use_multi_objective
 
     def match(self, task: str, *, adaptive: bool = True, trace_id: str = "") -> RouteMatch | None:
         """Match task against all routes and return the best match.
@@ -153,7 +118,7 @@ class RouteScorer:
         # never break routing.
         tracer = get_tracer("maop.routing.route_scorer")
         _start = time.monotonic()
-        decision_mode = "multi_objective" if self._use_multi_objective else "weighted_sum"
+        decision_mode = "weighted_sum"
         with otel_span(
             tracer, "routing.route_scorer.match", trace_id=trace_id,
             attributes={
@@ -198,8 +163,8 @@ class RouteScorer:
             try:
                 from maop.core.monitoring.monitoring import MAOP_ROUTE_DECISION_MODE
                 MAOP_ROUTE_DECISION_MODE.set(
-                    1.0 if self._use_multi_objective else 0.0,
-                    labels={"mode": "multi_objective" if self._use_multi_objective else "weighted_sum"},
+                    0.0,
+                    labels={"mode": "weighted_sum"},
                 )
             except Exception as e:
                 logger.debug("ignored: %s", e, exc_info=True)
@@ -420,94 +385,6 @@ class RouteScorer:
             return _CAPABILITY_BONUS
         return 0.0
 
-    # ── Internal: Multi-Objective Agent Selection (Phase γ-3) ─
-
-    def _compute_score_multi_objective(
-        self,
-        candidates: list[str],
-        routing_key: str,
-        default: str = "",
-    ) -> str:
-        """Pick the best agent via Pareto + TOPSIS over live AgentStats.
-
-        Pulls ``AgentStats`` from the global ``AgentPerformanceTracker``
-        for each candidate, builds an :class:`AgentObjectiveVector` for
-        each, asks :class:`MultiObjectiveScorer` to rank them, and returns
-        the top agent name.  On any data-missing / empty-frontier
-        condition, falls back to ``default`` so the caller (which wraps us
-        in a try/except) can degrade gracefully.
-
-        ``quota_headroom`` is derived from the agent's ``AgentStats``
-        success/failure ratio as a proxy when no dedicated quota tracker
-        is available — a higher recent success rate is treated as more
-        "headroom" because the agent is clearly not being throttled.
-        Callers with real quota data may construct vectors directly via
-        :class:`MultiObjectiveScorer` instead of going through this helper.
-        """
-        if not candidates:
-            return default
-
-        # Lazy imports keep the module import-cost low when the multi-
-        # objective path is never enabled.
-        import os
-
-        from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
-        from maop.core.routing.multi_objective_scorer import (
-            AgentObjectiveVector,
-            MultiObjectiveScorer,
-            ObjectiveWeights,
-        )
-        root = os.environ.get("MAOP_ROOT_DIR", ".")
-        tracker = AgentPerformanceTracker(root_dir=root)
-
-        vectors: dict[str, AgentObjectiveVector] = {}
-        for agent in candidates:
-            stats = tracker.get_agent_stats(agent, routing_key=routing_key)
-            # quota_headroom proxy: success_rate itself.  Agents with no
-            # history (total_tasks == 0) get a neutral 0.5 to give new
-            # agents a fair chance without dominating established ones.
-            if stats.total_tasks == 0:
-                quota_headroom = 0.5
-            else:
-                # Blend: 70% success_rate (recent health signal) +
-                # 30% inverse load (more headroom = fewer failures lately).
-                quota_headroom = max(
-                    0.0,
-                    min(
-                        1.0,
-                        0.7 * stats.success_rate
-                        + 0.3 * (1.0 - min(stats.failure_count / max(stats.total_tasks, 1), 1.0)),
-                    ),
-                )
-            vectors[agent] = AgentObjectiveVector(
-                success_rate=stats.success_rate,
-                latency_ms=stats.avg_latency_ms,
-                cost_usd=stats.avg_cost_usd,
-                quota_headroom=quota_headroom,
-            )
-
-        weights = self._mo_weights if self._mo_weights is not None else ObjectiveWeights()
-        scorer = MultiObjectiveScorer(weights=weights)
-        ranking = scorer.rank_agents(vectors, weights=weights)
-
-        # Record metrics for observability.
-        try:
-            from maop.core.monitoring.monitoring import (
-                MAOP_ROUTE_MULTI_OBJECTIVE_SCORE,
-                MAOP_ROUTE_PARETO_FRONTIER_SIZE,
-            )
-            frontier_size = scorer.compute_pareto_frontier(vectors).frontier_size
-            MAOP_ROUTE_PARETO_FRONTIER_SIZE.set(float(frontier_size))
-            for _name, score in ranking:
-                MAOP_ROUTE_MULTI_OBJECTIVE_SCORE.observe(score)
-        except Exception:
-            # Metrics are best-effort; never fail routing because of them.
-            pass
-
-        if not ranking:
-            return default
-        return ranking[0][0]
-
     # ── Internal: Agent Selection ────────────────────────────
 
     def _select_agent(
@@ -526,28 +403,6 @@ class RouteScorer:
         ]
         if not candidates:
             return "claude"
-
-        # Phase γ-3: multi-objective (Pareto + TOPSIS) path.  Takes
-        # precedence over the legacy weighted-sum adaptive path when
-        # explicitly enabled.  Falls through to the legacy path on any
-        # exception so a transient stats-DB hiccup never breaks routing.
-        if adaptive and self._use_multi_objective and len(candidates) > 1:
-            try:
-                best = self._compute_score_multi_objective(
-                    candidates, routing_key, default=route.primary,
-                )
-                if best and not self.is_agent_in_cooldown(best):
-                    if best != route.primary:
-                        logger.info(
-                            "Multi-objective routing: rk=%s primary=%s → %s "
-                            "(Pareto+TOPSIS)",
-                            routing_key, route.primary, best,
-                        )
-                    return best
-            except Exception as exc:
-                logger.debug(
-                    "Multi-objective routing fallback to adaptive: %s", exc
-                )
 
         # Try adaptive selection first (performance-based)
         if adaptive and len(candidates) > 1:

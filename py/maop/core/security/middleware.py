@@ -77,7 +77,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # local dev). Production should set ``MAOP_AUTH=1`` instead.
         if not self.enabled:
             import os
-            disabled_role = "admin" if os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "0") == "1" else "read"
+            _disabled_admin = os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "0") == "1"
+            if _disabled_admin:
+                logger.warning(
+                    "DANGEROUS flag MAOP_AUTH_DISABLED_ADMIN is enabled — auth is "
+                    "disabled AND anonymous requests are granted admin role. Never use "
+                    "in production or any shared/multi-tenant environment."
+                )
+            disabled_role = "admin" if _disabled_admin else "read"
             request.state.auth_roles = [disabled_role]
             request.state.auth_identity = "anonymous"
             return cast(Response, await call_next(request))

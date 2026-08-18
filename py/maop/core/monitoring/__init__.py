@@ -36,8 +36,6 @@ __all__ = [
     "MAOP_PRIORITY_QUEUE_SIZE",
     "MAOP_QUEUE_PENDING",
     "MAOP_ROUTE_DECISION_MODE",
-    "MAOP_ROUTE_MULTI_OBJECTIVE_SCORE",
-    "MAOP_ROUTE_PARETO_FRONTIER_SIZE",
     "MAOP_ROUTING_DECISION_DURATION_MS",
     "MAOP_ROUTING_DECISION_TOTAL",
     "MAOP_STICKY_SESSION_ACTIVE",
@@ -82,16 +80,16 @@ __all__ = [
 _SYMBOL_TO_MODULE: dict[str, str] = {
     # 注: 多个子模块均导出同名符号（如 logger），
     # 按字典构造语义仅最后一个映射生效，与重构前运行时行为一致。
-    "_BUDGET_DDL": "budget_guard",
-    "BudgetGuard": "budget_guard",
-    "CostEntry": "cost_tracker",
-    "CostSummary": "cost_tracker",
-    "BudgetStatus": "cost_tracker",
-    "ModelPricing": "cost_tracker",
-    "DEFAULT_PRICING": "cost_tracker",
-    "CostTracker": "cost_tracker",
-    "_cost_tracker_instance": "cost_tracker",
-    "get_cost_tracker": "cost_tracker",
+    "_BUDGET_DDL": "maop.core.budget_guard",
+    "BudgetGuard": "maop.core.budget_guard",
+    "CostEntry": "maop.core.cost_tracker",
+    "CostSummary": "maop.core.cost_tracker",
+    "BudgetStatus": "maop.core.cost_tracker",
+    "ModelPricing": "maop.core.cost_tracker",
+    "DEFAULT_PRICING": "maop.core.cost_tracker",
+    "CostTracker": "maop.core.cost_tracker",
+    "_cost_tracker_instance": "maop.core.cost_tracker",
+    "get_cost_tracker": "maop.core.cost_tracker",
     "JsonLogFormatter": "monitoring",
     "_STANDARD_LOGRECORD_ATTRS": "monitoring",
     "setup_json_logging": "monitoring",
@@ -116,8 +114,6 @@ _SYMBOL_TO_MODULE: dict[str, str] = {
     "MAOP_TASK_SLA_VIOLATION_TOTAL": "monitoring",
     "MAOP_TASK_PRIORITY_DISTRIBUTION": "monitoring",
     "MAOP_TASK_SLA_TIER_DISTRIBUTION": "monitoring",
-    "MAOP_ROUTE_PARETO_FRONTIER_SIZE": "monitoring",
-    "MAOP_ROUTE_MULTI_OBJECTIVE_SCORE": "monitoring",
     "MAOP_ROUTE_DECISION_MODE": "monitoring",
     "MAOP_TASK_PREEMPTION_TOTAL": "monitoring",
     "MAOP_PRIORITY_QUEUE_SIZE": "monitoring",
@@ -165,7 +161,10 @@ def __getattr__(name: str):
     """惰性加载子模块符号，避免循环导入。"""
     if name in _SYMBOL_TO_MODULE:
         mod_name = _SYMBOL_TO_MODULE[name]
-        mod = importlib.import_module(f".{mod_name}", __name__)
+        if mod_name.startswith("."):
+            mod = importlib.import_module(mod_name, __name__)
+        else:
+            mod = importlib.import_module(mod_name)
         value = getattr(mod, name)
         globals()[name] = value  # 缓存，下次直接访问
         return value
