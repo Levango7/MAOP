@@ -123,7 +123,9 @@ target-version = "py310"
 # BLE001: MAOP 高容错设计, except Exception 是有意的防御性兜底
 # S110: 非关键路径(metrics/span)的静默兜底, 关键路径已在 R7 阶段改为 logger
 # E402: 模块导入顺序灵活(条件导入、副作用模块)
-ignore = ["E402", "BLE001", "S110"]
+# F403: analyzer/__init__.py 的 TYPE_CHECKING re-export 需要 wildcard import;
+#   ruff 0.16+ 默认不再启用 F403, 0.15 仍启用 —— 显式 ignore 统一两版本行为
+ignore = ["E402", "BLE001", "S110", "F403"]
 
 [tool.mypy]
 python_version = "3.12"  # 3.10→3.12: numpy .pyi stubs use 3.12+ syntax; on 3.10 mypy aborts parsing stubs and the type-check gate is dead. Codebase stays 3.10-compatible.
