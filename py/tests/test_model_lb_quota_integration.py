@@ -369,12 +369,23 @@ class TestStickySessions:
 
     def test_sticky_expired_falls_back_to_normal_select(self):
         """Expired sticky entry is pruned and a fresh selection is made."""
+        # TTL=5s gives ample headroom so the fresh entry recorded by the
+        # second select() cannot expire before get_sticky_session() runs,
+        # even on slow CI runners (previously 0.01s with time.sleep(0.05)
+        # which flaked on Windows where timer resolution is 15.6ms and
+        # inter-call latency under -n auto load can make the sleep return
+        # before the TTL has reliably elapsed, leaving the entry un-expired
+        # or expiring at an unpredictable moment).
         lb = LoadBalancer(
-            sticky_sessions=True, sticky_session_ttl_s=0.01,
+            sticky_sessions=True, sticky_session_ttl_s=5.0,
         )
         lb.register("a", weight=10)
         first = lb.select(session_id="sess-1")
-        time.sleep(0.05)  # exceed TTL
+        # Manually expire the entry (set timestamp 10s in the past) so the
+        # next lookup misses deterministically without relying on sleep.
+        with lb._lock:
+            agent, _ = lb._sticky_map["sess-1"]
+            lb._sticky_map["sess-1"] = (agent, time.time() - 10.0)
         # After expiry, lookup misses and a new selection is recorded.
         second = lb.select(session_id="sess-1")
         # Both should resolve (sticky entry refreshed), and the agent
