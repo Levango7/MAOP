@@ -15,6 +15,8 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from maop.core.monitoring.monitoring import (
+    MAOP_MODEL_SELECTION_LOAD_AWARE,
+    MAOP_MODEL_SELECTION_QUOTA_REJECTED,
     MAOP_ROUTING_DECISION_DURATION_MS,
     MAOP_ROUTING_DECISION_TOTAL,
 )
@@ -41,12 +43,16 @@ logger = logging.getLogger(__name__)
 
 # Quality/latency scoring maps
 _QUALITY_SCORE = {
-    QualityTier.EXCELLENT: 4, QualityTier.GOOD: 3,
-    QualityTier.FAIR: 2, QualityTier.POOR: 1,
+    QualityTier.EXCELLENT: 4,
+    QualityTier.GOOD: 3,
+    QualityTier.FAIR: 2,
+    QualityTier.POOR: 1,
 }
 _LATENCY_SCORE = {
-    LatencyTier.INSTANT: 4, LatencyTier.FAST: 3,
-    LatencyTier.MEDIUM: 2, LatencyTier.SLOW: 1,
+    LatencyTier.INSTANT: 4,
+    LatencyTier.FAST: 3,
+    LatencyTier.MEDIUM: 2,
+    LatencyTier.SLOW: 1,
 }
 
 
@@ -111,7 +117,9 @@ class ModelSelector:
         tracer = get_tracer("maop.routing.model_selector")
         _start = time.monotonic()
         with otel_span(
-            tracer, "routing.model_selector.select", trace_id=trace_id,
+            tracer,
+            "routing.model_selector.select",
+            trace_id=trace_id,
             attributes={
                 "routing.capability": capability,
                 "routing.policy_name": policy_name,
@@ -120,7 +128,8 @@ class ModelSelector:
             },
         ) as _span:
             effective = self._select_impl(
-                capability=capability, agent_model=agent_model,
+                capability=capability,
+                agent_model=agent_model,
                 policy_name=policy_name,
                 task_input_tokens=task_input_tokens,
                 task_output_tokens=task_output_tokens,
@@ -134,9 +143,12 @@ class ModelSelector:
             _set_span_attr(_span, "routing.quota_check_result", self._last_quota_check)
             _set_span_attr(_span, "routing.fallback_used", 1 if self._last_fallback_used else 0)
             _record_selector_decision(
-                trace_id=trace_id, capability=capability,
-                policy_name=policy_name, strategy=effective.policy_name or policy_name,
-                effective=effective, agent_model=agent_model,
+                trace_id=trace_id,
+                capability=capability,
+                policy_name=policy_name,
+                strategy=effective.policy_name or policy_name,
+                effective=effective,
+                agent_model=agent_model,
                 duration_ms=(time.monotonic() - _start) * 1000.0,
                 quota_enforcer_present=self._quota_enforcer is not None,
                 load_balancer_present=self._load_balancer is not None,
@@ -164,7 +176,8 @@ class ModelSelector:
         primary_model = None
         if agent_model or model_ref:
             primary_model = self._registry.resolve_agent_model(
-                agent_model, model_ref=model_ref,
+                agent_model,
+                model_ref=model_ref,
             )
 
         # Step 1.5: Default provider preference (Phase 2 — OmniRoute default exit)
@@ -174,9 +187,9 @@ class ModelSelector:
         if primary_model is None and capability and self._registry.get_default_provider():
             default_provider = self._registry.get_default_provider()
             candidates = [
-                m for m in self._registry.models_by_provider(default_provider)
-                if capability in m.capabilities
-                and self._registry.providers.is_healthy(m.provider)
+                m
+                for m in self._registry.models_by_provider(default_provider)
+                if capability in m.capabilities and self._registry.providers.is_healthy(m.provider)
             ]
             if candidates:
                 # Sort by strategy to pick the best one from the default provider
@@ -184,13 +197,17 @@ class ModelSelector:
                 primary_model = candidates[0]
                 logger.debug(
                     "[selector] Selected %s from default provider %s for capability=%s",
-                    primary_model.name, default_provider, capability,
+                    primary_model.name,
+                    default_provider,
+                    capability,
                 )
 
         # Step 2: If not found, select by capability
         if primary_model is None and capability:
             primary_model = self._registry.best_model(
-                capability, strategy=strategy, max_cost=max_cost,
+                capability,
+                strategy=strategy,
+                max_cost=max_cost,
             )
 
         # Step 3: If still not found, try default model
@@ -200,17 +217,65 @@ class ModelSelector:
         if primary_model is None:
             # Last resort: return an empty effective model
             return EffectiveModel(
-                model_name="unknown", provider="local",
+                model_name="unknown",
+                provider="local",
                 cli_model_arg=agent_model or "auto",
                 policy_name=policy_name,
             )
 
-        # Step 4 (Phase γ-5): Quota-aware fallback.
-        # QuotaEnforcer is not wired into the dispatch path (see
-        # maop.model.quota.QuotaEnforcer for the disconnected-but-designed
-        # enforcement API), so quota checks remain a no-op here.
+        # ── Load-aware tie-breaking (Phase γ-5) ──────────────
+        # When the strategy produces a tie among the top candidates, prefer
+        # the provider with the lower active load. Only active when a
+        # ``load_balancer`` is configured; without one we keep the original
+        # strategy-only behaviour.
+        if self._load_balancer is not None and capability:
+            tie_chosen = self._apply_load_aware_tiebreak(
+                primary_model,
+                capability,
+                strategy,
+                max_cost,
+            )
+            if tie_chosen is not None:
+                primary_model = tie_chosen
+
+        # ── Quota-aware fallback (Phase γ-5) ─────────────────
+        # When a ``quota_enforcer`` is configured and the selected primary's
+        # provider has exhausted its quota, walk the fallback chain for the
+        # first healthy provider that still has quota. If none remain, we
+        # degrade to the (over-quota) primary rather than failing the request.
+        # The QuotaEnforcer is now genuinely consulted — previously this branch
+        # was a documented no-op, so quota exhaustion never triggered a switch.
         quota_check_result = "skipped"
         fallback_used = False
+        if self._quota_enforcer is not None and capability:
+            est_tokens = task_input_tokens + task_output_tokens
+            if not self._quota_enforcer.check(primary_model.provider, tokens=est_tokens):
+                quota_check_result = "rejected"
+                try:
+                    MAOP_MODEL_SELECTION_QUOTA_REJECTED.inc(
+                        labels={"provider": primary_model.provider}
+                    )
+                except Exception:  # metric is best-effort
+                    logger.debug("quota_rejected metric inc failed", exc_info=True)
+                # Walk fallback candidates for the first with remaining quota.
+                switched = None
+                for name in self._build_fallback_chain(
+                    primary_model, capability, strategy, max_cost
+                ):
+                    cand = self._registry.get_model(name)
+                    if cand is None:
+                        continue
+                    if not self._registry.providers.is_healthy(cand.provider):
+                        continue
+                    if self._quota_enforcer.check(cand.provider, tokens=est_tokens):
+                        switched = cand
+                        break
+                if switched is not None:
+                    primary_model = switched
+                    fallback_used = True
+                    quota_check_result = "switched"
+                else:
+                    quota_check_result = "all_exhausted"
 
         # Estimate cost
         cost_estimate = (
@@ -218,9 +283,12 @@ class ModelSelector:
             + primary_model.cost_per_1k_output * task_output_tokens / 1000
         )
 
-        # Build fallback chain
+        # Build fallback chain (for the returned effective model)
         fallback_chain = self._build_fallback_chain(
-            primary_model, capability, strategy, max_cost,
+            primary_model,
+            capability,
+            strategy,
+            max_cost,
         )
 
         # Stash for the decision-record helper (read by the span wrapper).
@@ -235,6 +303,52 @@ class ModelSelector:
             fallback_chain=fallback_chain,
             policy_name=policy_name,
         )
+
+    def _apply_load_aware_tiebreak(
+        self,
+        primary: ModelDef,
+        capability: str,
+        strategy: str,
+        max_cost: float | None,
+    ) -> ModelDef | None:
+        """Among strategy-equivalent top candidates, pick the lower-load provider.
+
+        Returns the model to use only when load actually changes the pick
+        (the strategy winner is not already the lowest-load option); otherwise
+        returns ``None`` so the caller keeps ``primary``. The
+        ``MAOP_MODEL_SELECTION_LOAD_AWARE`` metric is incremented exactly when
+        load changes the outcome.
+        """
+        lb = self._load_balancer
+        if lb is None:
+            return None
+        cand_pool = [
+            m
+            for m in self._registry.models_by_capability(capability)
+            if m.enabled and self._registry.providers.is_healthy(m.provider)
+        ]
+        if max_cost is not None:
+            cand_pool = [
+                m for m in cand_pool if m.cost_per_1k_input + m.cost_per_1k_output <= max_cost
+            ]
+        if not cand_pool:
+            return None
+        cand_pool.sort(key=lambda m: self._strategy_key(m, strategy))
+        best_key = self._strategy_key(cand_pool[0], strategy)
+        tie_group = [m for m in cand_pool if self._strategy_key(m, strategy) == best_key]
+        if len(tie_group) < 2:
+            return None
+        # Break the tie by active load (lower first); stable sort preserves
+        # the strategy order among equal-load providers.
+        tie_group.sort(key=lambda m: lb.get_load(m.provider))
+        chosen = tie_group[0]
+        if chosen.name == primary.name:
+            return None
+        try:
+            MAOP_MODEL_SELECTION_LOAD_AWARE.inc()
+        except Exception:  # metric is best-effort
+            logger.debug("load_aware metric inc failed", exc_info=True)
+        return chosen
 
     def _strategy_key(self, model: ModelDef, strategy: str) -> tuple:
         """Return a sort key for the strategy (smaller = better)."""
@@ -262,9 +376,11 @@ class ModelSelector:
             return []
         candidates = self._registry.models_by_capability(capability)
         # Exclude primary and disabled providers
-        chain = [m.name for m in candidates
-                 if m.name != primary.name
-                 and self._registry.providers.is_healthy(m.provider)]
+        chain = [
+            m.name
+            for m in candidates
+            if m.name != primary.name and self._registry.providers.is_healthy(m.provider)
+        ]
         # Limit to top 3 fallbacks
         return chain[:3]
 
@@ -277,11 +393,21 @@ class ModelSelector:
         """Select model for a routing key (maps routing keys to capabilities)."""
         # Routing key to capability mapping
         key_to_capability = {
-            "codegen": "codegen", "chat": "chat", "search": "search",
-            "review": "review", "planning": "planning", "verify": "verify",
-            "refactor": "codegen", "explain": "chat", "quickfix": "codegen",
-            "fileops": "fileops", "docgen": "codegen", "techdoc": "codegen",
-            "mcp": "mcp", "memory": "memory", "pipeline": "pipeline",
+            "codegen": "codegen",
+            "chat": "chat",
+            "search": "search",
+            "review": "review",
+            "planning": "planning",
+            "verify": "verify",
+            "refactor": "codegen",
+            "explain": "chat",
+            "quickfix": "codegen",
+            "fileops": "fileops",
+            "docgen": "codegen",
+            "techdoc": "codegen",
+            "mcp": "mcp",
+            "memory": "memory",
+            "pipeline": "pipeline",
         }
         capability = key_to_capability.get(routing_key, routing_key)
         # Use routing key as policy name if no policy specified
@@ -350,33 +476,35 @@ def _record_selector_decision(
         MAOP_ROUTING_DECISION_TOTAL.inc(labels={"stage": "model_selector"})
         MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.debug("swallowed exception", exc_info=True)
 
-    record_decision_safe(RoutingDecisionRecord(
-        trace_id=effective_trace,
-        span_id=span_id,
-        parent_span_id=parent_span_id,
-        timestamp=time.time(),
-        stage="model_selector",
-        input_summary={
-            "capability": capability,
-            "policy_name": policy_name,
-            "agent_model": agent_model,
-            "strategy": strategy,
-        },
-        output_summary={
-            "selected_model": effective.model_name,
-            "selected_provider": effective.provider,
-            "fallback_count": len(effective.fallback_chain),
-            "cost_estimate": effective.cost_estimate,
-        },
-        explanation=explanation,
-        duration_ms=duration_ms,
-        attributes={
-            "selected_model": effective.model_name,
-            "selected_provider": effective.provider,
-            "strategy": strategy,
-            "quota_check_result": quota_check_result,
-            "fallback_used": fallback_used,
-        },
-    ))
+    record_decision_safe(
+        RoutingDecisionRecord(
+            trace_id=effective_trace,
+            span_id=span_id,
+            parent_span_id=parent_span_id,
+            timestamp=time.time(),
+            stage="model_selector",
+            input_summary={
+                "capability": capability,
+                "policy_name": policy_name,
+                "agent_model": agent_model,
+                "strategy": strategy,
+            },
+            output_summary={
+                "selected_model": effective.model_name,
+                "selected_provider": effective.provider,
+                "fallback_count": len(effective.fallback_chain),
+                "cost_estimate": effective.cost_estimate,
+            },
+            explanation=explanation,
+            duration_ms=duration_ms,
+            attributes={
+                "selected_model": effective.model_name,
+                "selected_provider": effective.provider,
+                "strategy": strategy,
+                "quota_check_result": quota_check_result,
+                "fallback_used": fallback_used,
+            },
+        )
+    )

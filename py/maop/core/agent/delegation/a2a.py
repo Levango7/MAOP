@@ -26,6 +26,7 @@ Usage::
     client = A2AClient()
     result = await client.send("http://remote:8080", task="Review this code")
 """
+
 from __future__ import annotations
 
 import json
@@ -34,6 +35,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -111,6 +114,7 @@ class A2AManager:
     def _init_db(self) -> None:
         try:
             from maop.core.backends.db_utils import get_db_path, sqlite_connect
+
             self._db_path = str(get_db_path("a2a"))
             with sqlite_connect(self._db_path) as conn:
                 conn.executescript(_A2A_DDL)
@@ -125,6 +129,7 @@ class A2AManager:
             return
         try:
             from maop.core.backends.db_utils import sqlite_connect
+
             with sqlite_connect(self._db_path) as conn:
                 for row in conn.execute("SELECT name, card_json FROM a2a_cards"):
                     self._cards[row[0]] = A2ACard(**json.loads(row[1]))
@@ -138,6 +143,7 @@ class A2AManager:
             return
         try:
             from maop.core.backends.db_utils import sqlite_connect
+
             with sqlite_connect(self._db_path) as conn:
                 conn.execute(
                     "INSERT OR REPLACE INTO a2a_cards (name, card_json) VALUES (?, ?)",
@@ -152,6 +158,7 @@ class A2AManager:
             return
         try:
             from maop.core.backends.db_utils import sqlite_connect
+
             with sqlite_connect(self._db_path) as conn:
                 conn.execute(
                     "INSERT OR REPLACE INTO a2a_tasks (task_id, task_json) VALUES (?, ?)",
@@ -177,27 +184,33 @@ class A2AManager:
             status="submitted",
             metadata={"agent": agent_name, "created_at": datetime.now(timezone.utc).isoformat()},
         )
-        task.history.append({
-            "role": "user",
-            "content": message,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        task.history.append(
+            {
+                "role": "user",
+                "content": message,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         self._tasks[task.task_id] = task
         self._persist_task(task)
         return task
 
-    def update_task(self, task_id: str, status: str, artifact: dict[str, Any] | None = None) -> A2ATaskState | None:
+    def update_task(
+        self, task_id: str, status: str, artifact: dict[str, Any] | None = None
+    ) -> A2ATaskState | None:
         task = self._tasks.get(task_id)
         if not task:
             return None
         task.status = status
         if artifact:
             task.artifacts.append(artifact)
-        task.history.append({
-            "role": "agent",
-            "status": status,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        task.history.append(
+            {
+                "role": "agent",
+                "status": status,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         self._persist_task(task)
         return task
 
@@ -233,7 +246,9 @@ class A2AManager:
         try:
             workdir = self._root_dir or ""
             result = await self._worker_pool.submit(
-                message, workdir=workdir, agent_name=agent_name,
+                message,
+                workdir=workdir,
+                agent_name=agent_name,
             )
             artifact = {
                 "role": "agent",
@@ -262,6 +277,7 @@ class A2AManager:
         """
         try:
             import asyncio
+
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 asyncio.ensure_future(self.dispatch_task(task_id, agent_name, message))
@@ -270,9 +286,12 @@ class A2AManager:
         except RuntimeError:
             pass  # No current event loop.
         import threading
+
         def _bg() -> None:
             import asyncio
+
             asyncio.run(self.dispatch_task(task_id, agent_name, message))
+
         threading.Thread(target=_bg, daemon=True, name=f"a2a-dispatch-{task_id}").start()
 
     def handle_message(self, message: A2AMessage) -> A2AResponse:
@@ -284,13 +303,17 @@ class A2AManager:
             card = self.get_card(name)
             if card:
                 return A2AResponse(id=message.id, result=card.model_dump())
-            return A2AResponse(id=message.id, error={"code": -32601, "message": f"Agent '{name}' not found"})
+            return A2AResponse(
+                id=message.id, error={"code": -32601, "message": f"Agent '{name}' not found"}
+            )
 
         if method == "tasks/send":
             agent_name = params.get("agent", "")
             task_msg = params.get("message", "")
             if not agent_name or not task_msg:
-                return A2AResponse(id=message.id, error={"code": -32602, "message": "Missing 'agent' or 'message'"})
+                return A2AResponse(
+                    id=message.id, error={"code": -32602, "message": "Missing 'agent' or 'message'"}
+                )
             task = self.create_task(agent_name, task_msg)
             # t11: if a WorkerPool is configured, dispatch the task for real execution.
             if self._worker_pool is not None:
@@ -310,25 +333,36 @@ class A2AManager:
             found = self.get_task(task_id)
             if found is not None:
                 return A2AResponse(id=message.id, result=found.model_dump())
-            return A2AResponse(id=message.id, error={"code": -32601, "message": f"Task '{task_id}' not found"})
+            return A2AResponse(
+                id=message.id, error={"code": -32601, "message": f"Task '{task_id}' not found"}
+            )
 
         if method == "tasks/cancel":
             task_id = params.get("task_id", "")
             updated = self.update_task(task_id, "canceled")
             if updated is not None:
-                return A2AResponse(id=message.id, result={"task_id": updated.task_id, "status": "canceled"})
-            return A2AResponse(id=message.id, error={"code": -32601, "message": f"Task '{task_id}' not found"})
+                return A2AResponse(
+                    id=message.id, result={"task_id": updated.task_id, "status": "canceled"}
+                )
+            return A2AResponse(
+                id=message.id, error={"code": -32601, "message": f"Task '{task_id}' not found"}
+            )
 
-        return A2AResponse(id=message.id, error={"code": -32601, "message": f"Method '{method}' not supported"})
+        return A2AResponse(
+            id=message.id, error={"code": -32601, "message": f"Method '{method}' not supported"}
+        )
 
 
 class A2AClient:
     """Client for sending A2A messages to remote agents via HTTP."""
 
-    async def send(self, endpoint: str, agent_name: str, message: str, *, timeout: float = 30.0) -> A2AResponse:
+    async def send(
+        self, endpoint: str, agent_name: str, message: str, *, timeout: float = 30.0
+    ) -> A2AResponse:
         msg = A2AMessage(method="tasks/send", params={"agent": agent_name, "message": message})
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.post(
                     endpoint.rstrip("/") + "/a2a",
@@ -343,10 +377,13 @@ class A2AClient:
             logger.error("[a2a] Failed to send message: %s", exc)
             return A2AResponse(error={"code": -32000, "message": str(exc)})
 
-    async def get_card(self, endpoint: str, agent_name: str, *, timeout: float = 10.0) -> A2ACard | None:
+    async def get_card(
+        self, endpoint: str, agent_name: str, *, timeout: float = 10.0
+    ) -> A2ACard | None:
         msg = A2AMessage(method="agent/card", params={"name": agent_name})
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.post(
                     endpoint.rstrip("/") + "/a2a",
@@ -364,9 +401,6 @@ class A2AClient:
 
 def create_a2a_router(manager: A2AManager) -> Any:
     """Create a FastAPI router for A2A protocol endpoint."""
-    from fastapi import APIRouter, Request
-    from fastapi.responses import JSONResponse
-
     router = APIRouter(prefix="/a2a", tags=["a2a"])
 
     @router.post("")
