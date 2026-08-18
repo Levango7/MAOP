@@ -300,7 +300,7 @@ def attach_trace_context(carrier: dict[str, str]) -> Any:
         return None
     try:
         from opentelemetry import trace as otel_trace
-        return otel_trace.set_span_in_context(None)
+        return otel_trace.set_span_in_context(None)  # type: ignore[arg-type]
     except ImportError:
         return None
 

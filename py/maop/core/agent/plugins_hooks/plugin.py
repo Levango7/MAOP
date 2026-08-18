@@ -404,7 +404,7 @@ class PluginSandbox:
             if "fork" in mp.get_all_start_methods()
             else mp.get_context()
         )
-        proc = ctx.Process(
+        proc = ctx.Process(  # type: ignore[attr-defined]
             target=_mp_init_target,
             args=(init_fn, config, result_queue),
             daemon=True,
