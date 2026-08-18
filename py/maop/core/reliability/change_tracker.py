@@ -89,6 +89,11 @@ class ChangeTracker:
     }
 
     _MAX_FILES = 10000  # Safety limit to prevent runaway scans
+    # Files larger than this are hashed by a cheap size signature instead of
+    # reading the full content into memory. Prevents _hash_file from hanging
+    # on large binaries (models, archives, db snapshots) under Windows CI.
+    _MAX_HASH_SIZE = 16 * 1024 * 1024  # 16 MiB
+    _HASH_CHUNK = 65536  # 64 KiB streaming read chunk
 
     def __init__(self, root_dir: str | Path) -> None:
         self._root = Path(root_dir)
@@ -161,9 +166,23 @@ class ChangeTracker:
         return bool(path.exists() and not path.is_file())
 
     def _hash_file(self, path: Path) -> str:
+        """Compute a short file signature.
+
+        - Files <= ``_MAX_HASH_SIZE`` are streamed in chunks through sha256
+          (avoids loading large files fully into memory, which was the root
+          cause of Windows CI timeouts when ``rglob`` hit big binaries).
+        - Larger files get a cheap ``large:<size>`` signature so they are
+          still tracked for size changes without a full read.
+        """
         try:
-            content = path.read_bytes()
-            return hashlib.sha256(content).hexdigest()[:16]
+            size = path.stat().st_size
+            if size > self._MAX_HASH_SIZE:
+                return f"large:{size:x}"
+            h = hashlib.sha256()
+            with path.open("rb") as fh:
+                for chunk in iter(lambda: fh.read(self._HASH_CHUNK), b""):
+                    h.update(chunk)
+            return h.hexdigest()[:16]
         except Exception:
             logger.debug("Silent exception in core/change_tracker.py:167", exc_info=True)
             return ""
@@ -180,7 +199,7 @@ class ChangeTracker:
                 "INSERT INTO snapshots (id, workdir, label, file_count, total_size, created_at) VALUES (?,?,?,?,?,?)",
                 (snap_id, str(workdir_path), label, 0, 0, now),
             )
-            if workdir_path.is_dir():
+            if workdir and workdir_path.is_dir():
                 for fpath in workdir_path.rglob("*"):
                     if file_count >= self._MAX_FILES:
                         logger.warning(
@@ -381,7 +400,7 @@ class ChangeTracker:
                 logger.warning("[change_tracker] Backup missing for: %s", rel_path)
 
         # 2. Delete files added after snapshot (not in snap_files)
-        if workdir_path.is_dir():
+        if workdir and workdir_path.is_dir():
             for fpath in workdir_path.rglob("*"):
                 if not fpath.is_file():
                     continue
