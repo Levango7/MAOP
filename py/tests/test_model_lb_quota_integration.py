@@ -407,16 +407,19 @@ class TestStickySessions:
         assert lb.get_sticky_session("s3") is None
 
     def test_cleanup_expired_sticky_sessions(self):
+        # TTL=5s gives ample headroom so "keep" cannot expire during the
+        # test even on slow CI runners (previously 0.01s which flaked on
+        # Windows where inter-call latency can exceed 10ms).
         lb = LoadBalancer(
-            sticky_sessions=True, sticky_session_ttl_s=0.01,
+            sticky_sessions=True, sticky_session_ttl_s=5.0,
         )
         lb.register("a", weight=10)
         lb.select(session_id="keep")
         lb.select(session_id="expire-me")
-        # Manually expire one entry.
+        # Manually expire one entry (set timestamp 10s in the past).
         with lb._lock:
             agent, _ = lb._sticky_map["expire-me"]
-            lb._sticky_map["expire-me"] = (agent, time.time() - 1.0)
+            lb._sticky_map["expire-me"] = (agent, time.time() - 10.0)
         removed = lb.cleanup_expired_sticky_sessions()
         assert removed == 1
         assert lb.get_sticky_session("keep") == "a"
