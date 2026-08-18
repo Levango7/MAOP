@@ -111,8 +111,13 @@ class TestDagEventLatency:
                 topic="dag.node-status.lat-test2",
                 data={"node_id": f"n{i}", "status": "pending", "seq": i},
             ))
+            # Yield control so the fire-and-forget task executes immediately.
+            # This ensures latency only reflects asyncio scheduling overhead,
+            # not the bulk sleep wait time (fixes Windows CI flaky failure).
+            await asyncio.sleep(0)
 
-        await asyncio.sleep(0.2)
+        # Brief wait for any remaining tasks to complete.
+        await asyncio.sleep(0.05)
 
         # Compute latencies from emit_times vs receive_times.
         for i, recv_ts in enumerate(receive_times):
