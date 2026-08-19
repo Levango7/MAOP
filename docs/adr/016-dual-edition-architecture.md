@@ -142,7 +142,7 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 
 ### 负面
 
-- ⚠️ 企业版代码在个人版仓库中可见（虽然受 Commercial 许可约束）
+- ⚠️ ~~企业版代码在个人版仓库中可见（虽然受 Commercial 许可约束）~~ **已解决**：见 [ADR-017](017-dual-repo-isolation.md)，企业代码已移至私有仓库 MAOS
 - ⚠️ ~~无在线 license 撤销机制~~（已通过 CRL 实现，见 `maop/enterprise/crl.py`）
 - ⚠️ Edition 检测有轻微运行时开销（首次 import 时）
 - ⚠️ FeatureFlag 枚举膨胀风险（需定期审查）
@@ -190,3 +190,4 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 - ADR-013: Agent LLM Direct + CLI Fallback
 - `py/maop/config/edition.py` — Edition 注册表（唯一真相源）
 - `py/maop/enterprise/license.py` — License 校验实现
+- [ADR-017: Dual-Repository Physical Isolation](017-dual-repo-isolation.md)

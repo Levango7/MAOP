@@ -27,7 +27,7 @@ Entry (maop.ps1 / cli.py)
 
 ## 双版架构（Dual Edition）
 
-MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的双版架构（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)），同一套核心代码同时服务两类用户：
+MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的双版架构（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)），同一套核心代码同时服务两类用户。自 2026-08-20 起进一步采用 **双仓库物理隔离**（详见 [ADR-017](docs/adr/017-dual-repo-isolation.md)），企业代码移至私有仓库 [MAOS](https://github.com/Levango7/MAOS)：
 
 - **个人版 (Personal)**：MIT 许可，零配置开箱即用，面向个人开发者和小团队
 - **企业版 (Enterprise)**：Commercial 许可，面向企业客户，提供 RBAC / 多租户 / SSO / 审计 / HA 等企业级能力
@@ -113,17 +113,32 @@ License 颁发指南见 [docs/enterprise/license-issuance-guide.md](docs/enterpr
 
 企业版后端不可用时自动降级到个人版后端（通过 `record_degradation()` 记录）。
 
-### 双包发布
+### 双包发布 + 双仓库隔离
 
-- `maop`（PyPI, MIT）：核心 + 个人版功能
+自 2026-08-20 起（[ADR-017](docs/adr/017-dual-repo-isolation.md)），企业代码物理隔离到私有仓库：
+
+| 仓库 | 可见性 | 许可 | 内容 |
+|------|--------|------|------|
+| [Levango7/MAOP](https://github.com/Levango7/MAOP) | Public | MIT | 核心 + 个人版 |
+| [Levango7/MAOS](https://github.com/Levango7/MAOS) | Private | Commercial | 企业版模块（25 文件） |
+
+- `maop`（PyPI, MIT）：核心 + 个人版功能，**不含** `maop/enterprise/`
 - `maop-enterprise`（私有分发, Commercial）：依赖 `maop`，包含 `maop/enterprise/` 模块
 
 ```bash
-pip install maop              # 个人版
-pip install maop-enterprise   # 企业版（自动依赖 maop）
+pip install maop              # 个人版（不含企业代码）
+pip install maop-enterprise   # 企业版（自动依赖 maop，从私有源安装）
 ```
 
 `maop/enterprise/__init__.py` 在 import 时调用 `set_edition(Edition.ENTERPRISE)`，这是企业版包"存在即激活"的机制。
+
+> **⚠️ 开发者注意**：开发企业版功能需要同时 clone 两个仓库：
+> ```bash
+> git clone https://github.com/Levango7/MAOP.git
+> git clone https://github.com/Levango7/MAOS.git
+> cd MAOP/py && pip install -e .
+> cd ../../MAOS && pip install -e .
+> ```
 
 ## Quick Start
 

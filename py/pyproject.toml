@@ -115,6 +115,11 @@ maop = "maop.cli:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# ADR-017: 双仓库物理隔离 — 确保 pip install maop (MIT) 不含企业代码。
+# enterprise/ 模块已移至私有仓库 Levango7/MAOS，通过 maop-enterprise 包分发。
+[tool.hatch.build]
+exclude = ["maop/enterprise"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"

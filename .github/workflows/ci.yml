@@ -106,6 +106,8 @@ jobs:
         run: pip install -e .[enterprise] && python -c "import maop; print('enterprise extra install OK')"
 
       - name: Run unit tests
+        # ADR-017: 企业代码已移至私有仓库 MAOS，企业测试条件化运行
+        # 个人版 CI 不运行企业测试（maop.enterprise 不可导入）
         # P0 fix (2026-08-11): 移除 --cov-fail-under(让 pytest 仅对测试成败负责),
         # 覆盖率门禁交给下一步的 ratchet 脚本,这样测试失败仍然会让 CI 失败,
         # 覆盖率回归也会让 CI 失败,两者职责清晰。
@@ -117,7 +119,43 @@ jobs:
         # Ubuntu 3.10 failed, #138 Win 3.11 failed — classic flaky pattern
         # where failures randomly appear on different platforms across runs.
         # --junitxml: export results for artifact upload (debugging future flakes).
-        run: python -m pytest tests/ -q --ignore=tests/contract -m "not slow" --cov=maop --cov-report=xml --cov-report=term-missing --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml
+        shell: bash
+        run: |
+          # ADR-017: 检测 maop.enterprise 是否可导入，条件化运行企业测试
+          if python -c "import maop.enterprise" 2>/dev/null; then
+            ENTERPRISE_IGNORE=""
+            echo "maop.enterprise available: running enterprise tests"
+          else
+            # 个人版: 忽略所有引用 maop.enterprise 的测试文件
+            # （模块级导入会 collection error，函数级导入会 runtime error）
+            ENTERPRISE_IGNORE="\
+              --ignore=tests/test_audit_enhanced.py \
+              --ignore=tests/test_enterprise_audit.py \
+              --ignore=tests/test_enterprise_container.py \
+              --ignore=tests/test_enterprise_ha.py \
+              --ignore=tests/test_enterprise_integration.py \
+              --ignore=tests/test_enterprise_license.py \
+              --ignore=tests/test_enterprise_n8n.py \
+              --ignore=tests/test_enterprise_pg_persist.py \
+              --ignore=tests/test_enterprise_rbac.py \
+              --ignore=tests/test_enterprise_tenant.py \
+              --ignore=tests/test_enterprise_tls_auto.py \
+              --ignore=tests/test_failure_detector.py \
+              --ignore=tests/test_license_crl.py \
+              --ignore=tests/test_licenses.py \
+              --ignore=tests/test_mem_vector_otel_saml_coverage.py \
+              --ignore=tests/test_module_integrity.py \
+              --ignore=tests/test_notifications.py \
+              --ignore=tests/test_router_system.py \
+              --ignore=tests/test_saml_handler_coverage3.py \
+              --ignore=tests/test_sso.py \
+              --ignore=tests/test_sso_providers.py \
+              --ignore=tests/test_tenant_quota.py"
+            echo "maop.enterprise not available: skipping enterprise tests (ADR-017)"
+          fi
+          python -m pytest tests/ -q --ignore=tests/contract $ENTERPRISE_IGNORE \
+            -m "not slow" --cov=maop --cov-report=xml --cov-report=term-missing \
+            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml
 
       - name: Upload test results
         if: always()
@@ -128,7 +166,15 @@ jobs:
           retention-days: 7
 
       - name: Coverage ratchet gate
-        run: python scripts/check_coverage_ratchet.py
+        # ADR-017: maop.enterprise 不可导入时跳过 ratchet（忽略企业测试会降低
+        # 覆盖率，这是预期行为，不应阻塞个人版 CI）
+        shell: bash
+        run: |
+          if python -c "import maop.enterprise" 2>/dev/null; then
+            python scripts/check_coverage_ratchet.py
+          else
+            echo "maop.enterprise not available: skipping coverage ratchet (ADR-017)"
+          fi
 
       - name: Run edition tests
         run: python -m pytest tests/test_edition.py -v --no-cov
