@@ -62,6 +62,9 @@ jobs:
       - name: Config drift audit
         run: python scripts/check_config_drift.py
 
+      - name: Doc↔Code reconcile
+        run: python scripts/doc_reconcile.py
+
   # ── Test ────────────────────────────────────────────────────────
   test:
     name: pytest (${{ matrix.os }}, Python ${{ matrix.python-version }})
