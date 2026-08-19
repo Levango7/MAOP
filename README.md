@@ -22,7 +22,7 @@ Entry (maop.ps1 / cli.py)
 | Entry | `maop.ps1`, `cli.py` | CLI & startup |
 | Orchestration | `maop_loop.py`, `engine.py` | Phase pipeline & DAG workflows |
 | Dispatch | `dispatcher.py`, `maop_plan.py` | Config-driven agent routing |
-| Infrastructure | `core/` (289 modules) | Shared services & utilities |
+| Infrastructure | `core/` (4 files + 17 subpackages) | Shared services & utilities |
 | Data | SQLite, JSON, YAML | Persistence & configuration |
 
 ## 双版架构（Dual Edition）

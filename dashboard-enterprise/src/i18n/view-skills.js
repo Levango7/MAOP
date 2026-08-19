@@ -71,6 +71,11 @@ export const messages = {
     'view.skills.market.installOk': 'Tool installed',
     'view.skills.market.installFailed': 'Install failed',
     'view.skills.market.alreadyInstalled': 'Already installed',
+
+    // ── Coming Soon banner ───────────────────────────────────────
+    'view.skills.market.comingSoon': 'Coming Soon',
+    'view.skills.market.comingSoonHint': 'Skill Marketplace — 数据源接入中，预计 v5.2.0 上线。当前仅展示已安装的 MCP 工具。',
+    'view.skills.market.planned': 'Planned',
   },
 
   zh: {
@@ -145,5 +150,10 @@ export const messages = {
     'view.skills.market.installOk': '工具已安装',
     'view.skills.market.installFailed': '安装失败',
     'view.skills.market.alreadyInstalled': '已安装',
+
+    // ── Coming Soon banner ───────────────────────────────────────
+    'view.skills.market.comingSoon': '即将上线',
+    'view.skills.market.comingSoonHint': 'Skill Marketplace — 数据源接入中，预计 v5.2.0 上线。当前仅展示已安装的 MCP 工具。',
+    'view.skills.market.planned': '规划中',
   },
 };

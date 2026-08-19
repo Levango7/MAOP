@@ -1,5 +1,15 @@
 <template>
   <div class="skill-market-page">
+    <!-- Coming Soon banner: 数据源接入中，提示用户功能规划中 -->
+    <div class="coming-soon-banner" role="alert">
+      <AppIcon name="info" :size="16" class="coming-soon-banner__icon" />
+      <div class="coming-soon-banner__content">
+        <span class="coming-soon-banner__title">🔜 {{ t('view.skills.market.comingSoon') }}</span>
+        <span class="coming-soon-banner__desc">{{ t('view.skills.market.comingSoonHint') }}</span>
+      </div>
+      <Badge tone="info">{{ t('view.skills.market.planned') }}</Badge>
+    </div>
+
     <ListPageLayout
       :loading="loading"
       :error="error"
@@ -25,6 +35,7 @@
       </template>
 
       <template #content>
+
         <!-- 搜索 + 分类筛选 -->
         <div class="market-controls">
           <div class="search-box">
@@ -203,6 +214,39 @@ onMounted(load);
 
 <style scoped>
 .skill-market-page { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+/* ── Coming Soon banner ── */
+.coming-soon-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--info-soft, #f0f5ff);
+  border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
+  border-radius: var(--r-md);
+  margin-bottom: var(--sp-2);
+}
+.coming-soon-banner__icon {
+  color: var(--info);
+  flex-shrink: 0;
+}
+.coming-soon-banner__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.coming-soon-banner__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--info-strong, #1d4ed8);
+}
+.coming-soon-banner__desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
 
 /* ── 控制栏 ── */
 .market-controls {

@@ -41,7 +41,7 @@
 
 ### 范围
 
-- **core/ 子包重构**：按 [`py/maop/core/ARCHITECTURE.md`](py/maop/core/ARCHITECTURE.md) 规划，将 `core/`（107+ 模块）拆分为 9 个职责清晰的子包（如 `core/persistence`、`core/llm`、`core/vector`、`core/mcp`、`core/observability`、`core/security`、`core/config`、`core/runtime`、`core/utils`）。**兼容策略**：保留 `core/__init__.py` re-export，现有 `from maop.core.xxx import yyy` 调用无需改动。
+- ~~**core/ 子包重构**：按 [`py/maop/core/ARCHITECTURE.md`](py/maop/core/ARCHITECTURE.md) 规划，将 `core/`（107+ 模块）拆分为 9 个职责清晰的子包（如 `core/persistence`、`core/llm`、`core/vector`、`core/mcp`、`core/observability`、`core/security`、`core/config`、`core/runtime`、`core/utils`）。**兼容策略**：保留 `core/__init__.py` re-export，现有 `from maop.core.xxx import yyy` 调用无需改动。~~ ✅ 已完成（2026-08-06）
 - **流式 DAG 执行进度推送**：Orchestrator 在 DAG 节点级状态变更时通过 SSE/WebSocket 推送增量进度事件，前端实时渲染节点状态（pending/running/success/failed/skipped）。
 - **知识图谱可视化前端**：基于三层记忆（short/long/vector）构建实体-关系图，支持节点筛选、路径高亮、时间轴回放。
 
