@@ -322,7 +322,8 @@ const providers = ref([]);
 const loading = ref(true);
 const error = ref('');
 const testingId = ref(null);
-const filters = reactive({ protocol: '', enabled: '', query: '' });
+// eslint-disable-next-line prefer-const -- v-model:filters requires a let binding (Vue compiler reassigns on update:filters)
+let filters = reactive({ protocol: '', enabled: '', query: '' });
 
 const filterSchema = computed(() => [
   {

@@ -183,7 +183,6 @@ module = [
     "maop.core.scheduling.*",
     "maop.core.vector.*",
     "maop.core.evolution.*",
-    "maop.core.multimodal.*",
     "maop.core.plugins.*",
     "maop.core.tenant.*",
 ]

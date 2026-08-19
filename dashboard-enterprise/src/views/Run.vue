@@ -341,7 +341,7 @@ const dagLayout = computed(() => {
   const nodes = [];
   for (let li = 0; li < layers.length; li++) {
     const layer = layers[li];
-    const layerWidth = layer.length * xGap;
+
     for (let i = 0; i < layer.length; i++) {
       const id = layer[i];
       const st = idToSubtask.get(id);
