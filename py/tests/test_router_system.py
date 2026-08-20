@@ -387,6 +387,10 @@ class TestAuditEvents:
         assert data["count"] == 0
 
     def test_error_handling(self, client, monkeypatch):
+        # ADR-017 (2026-08-20): enterprise modules moved to private repo MAOS.
+        # This test exercises the enterprise branch's error path; skip when
+        # maop.enterprise is not installed (personal-edition CI).
+        pytest.importorskip("maop.enterprise.audit")
         import maop.dashboard.routers.audit as _audit_mod
         _audit_mod._enterprise_logger = None
         # 2026-08-11 hardening: 无 license 时 has_feature(AUDIT_LOG) 为 False,
