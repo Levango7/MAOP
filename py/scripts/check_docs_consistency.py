@@ -52,7 +52,7 @@ FILE_EXTS = {
     ".gif", ".ico", ".woff", ".woff2", ".ttf", ".crt", ".pem", ".key",
     ".csv", ".xlsx", ".lock", ".pyd", ".so", ".dll", ".exe", ".proto",
     ".sqlite", ".db", ".gitignore", ".dockerignore", ".editorconfig",
-    ".pem", ".crt", ".avsc", ".requirements", ".template",
+    ".avsc", ".requirements", ".template",
 }
 
 # 内联代码块：单个反引号包裹的内容（排除围栏代码块内）
@@ -137,10 +137,8 @@ def looks_like_path(token: str) -> bool:
     has_ext = token.lower().endswith(tuple(FILE_EXTS))
     if "/" not in token:
         return has_ext
-    if not has_ext and any(c.isupper() for c in token):
-        # 无扩展名且含大写（导航菜单/路由名，如 Overview/Monitor），非文件路径
-        return False
-    return True
+    # 无扩展名且含大写（导航菜单/路由名，如 Overview/Monitor），非文件路径
+    return has_ext or not any(c.isupper() for c in token)
 
 
 def load_gitignore_patterns(root: pathlib.Path) -> list[str]:
@@ -151,7 +149,7 @@ def load_gitignore_patterns(root: pathlib.Path) -> list[str]:
     patterns: list[str] = []
     for line in gitignore.read_text(encoding="utf-8", errors="ignore").splitlines():
         line = line.strip()
-        if not line or line.startswith("#") or line.startswith("!"):
+        if not line or line.startswith(("#", "!")):
             continue  # 忽略注释与反向规则（!xxx 不处理）
         patterns.append(line)
     return patterns
@@ -360,7 +358,7 @@ def check_tables(md_files: list[pathlib.Path]) -> list[str]:
         rel = md.relative_to(REPO_ROOT).as_posix()
         block: list[tuple[int, list[str]]] = []  # (行号, 单元格列表)
 
-        def flush() -> None:
+        def flush(rel: str = rel) -> None:
             """结算当前表格块：以分隔行（或首行）列数为基准找破版行。"""
             nonlocal block
             if not block:

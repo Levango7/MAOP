@@ -132,12 +132,22 @@ def test_dispatch_non_blocking_on_tracker_error(monkeypatch) -> None:
 
 def test_dispatcher_uses_cost_tracker_not_json_ledger() -> None:
     """契约：dispatcher 的预算检查必须走 CostTracker（SQLite 真数据源），
-    不得再 import / 实例化已断写的 JSON BudgetGuard（防止账本再次断写）。"""
+    不得再 import / 实例化已断写的 JSON BudgetGuard（防止账本再次断写）。
+
+    注：dispatcher.py 已拆分为 re-export shim + dispatch_core.py 实现；
+    预算检查源码现位于 dispatch_core.py（Dispatcher._dispatch_impl_inner）。"""
     import inspect
 
+    import maop.delegate.dispatch_core as core
     import maop.delegate.dispatcher as disp
 
-    src = inspect.getsource(disp)
+    # 实现源码（Dispatcher._dispatch_impl_inner 现位于 dispatch_core）
+    src = inspect.getsource(core)
+    # re-export shim 也不得重新引入 JSON BudgetGuard
+    shim_src = inspect.getsource(disp)
+
     assert "CostTracker" in src
     assert "from maop.model.budget import BudgetGuard" not in src
     assert "BudgetGuard(" not in src
+    assert "from maop.model.budget import BudgetGuard" not in shim_src
+    assert "BudgetGuard(" not in shim_src

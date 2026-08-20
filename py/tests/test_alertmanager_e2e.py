@@ -707,12 +707,16 @@ def test_webhook_alert_model_fields() -> None:
 
 
 def test_webhook_public_path_in_server() -> None:
-    """/api/alerts/webhook 在 server.py 的 public_paths 列表中（无需认证）."""
-    server_path = _PROJECT_ROOT / "py" / "maop" / "dashboard" / "server.py"
-    assert server_path.exists()
-    src = server_path.read_text(encoding="utf-8")
+    """/api/alerts/webhook 在 public_paths 列表中（无需认证）.
+
+    注：server.py 已拆分为 _middleware_stack.py（含 public_paths）+
+    _register_routes.py + _ws_manager.py（Phase 1 拆分）。
+    """
+    mw_path = _PROJECT_ROOT / "py" / "maop" / "dashboard" / "_middleware_stack.py"
+    assert mw_path.exists()
+    src = mw_path.read_text(encoding="utf-8")
     assert "/api/alerts/webhook" in src, (
-        "server.py 未将 /api/alerts/webhook 列入 public_paths"
+        "_middleware_stack.py 未将 /api/alerts/webhook 列入 public_paths"
     )
 
 

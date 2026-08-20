@@ -16,22 +16,35 @@ Usage::
 
 All endpoints use SQLite-backed Python queries — the Python layer
     runs independently of the legacy PS engine.
+
+The class is split into focused Mixins under :mod:`maop.dashboard.channels`:
+
+* :class:`~maop.dashboard.channels.skills.SkillsMixin`     — skills/versions
+* :class:`~maop.dashboard.channels.mcp.McpMixin`           — tools/sandbox/MCP
+* :class:`~maop.dashboard.channels.models.ModelsMixin`     — memory/guardrail/providers/graph
+* :class:`~maop.dashboard.channels.prompts.PromptsMixin`   — prompts/human/coordination
+* :class:`~maop.dashboard.channels.routing.RoutingMixin`   — delegation/chain/queue
+* :class:`~maop.dashboard.channels.security.SecurityMixin` — logs
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from pydantic import BaseModel
 
 from maop.core.backends.db_utils import get_db_path, get_pool
+from maop.dashboard.channels.mcp import McpMixin
+from maop.dashboard.channels.models import ModelsMixin
+from maop.dashboard.channels.prompts import PromptsMixin
+from maop.dashboard.channels.routing import RoutingMixin
+from maop.dashboard.channels.security import SecurityMixin
+from maop.dashboard.channels.skills import SkillsMixin
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +60,14 @@ class ProxyStats(BaseModel):
 
 # ── DataProxy ────────────────────────────────────────────────
 
-class DataProxy:
+class DataProxy(
+    SkillsMixin,
+    McpMixin,
+    ModelsMixin,
+    PromptsMixin,
+    RoutingMixin,
+    SecurityMixin,
+):
     """Pure Python data bridge for Dashboard — replaces PS scripts.
 
     Parameters
@@ -345,173 +365,6 @@ class DataProxy:
         self._record_latency(start)
         return rows
 
-    @staticmethod
-    def _read_delegations_file(log_path: Path) -> Any:
-        """Read logs/delegations.json — blocking I/O, run via asyncio.to_thread."""
-        with open(log_path, encoding="utf-8") as fh:
-            return json.load(fh)
-
-    async def delegation_period_stats(self, now: datetime | None = None) -> dict[str, Any]:
-        """Compute MoM / YoY trend for delegation volume and success rate.
-
-        The genuine delegation history lives in ``logs/delegations.json``
-        (the SQL ``delegations`` table is not populated by the current
-        pipeline). This method reads that file and returns, for the trailing
-        30-day window (the natural base for 环比/MoM) and the trailing 365-day
-        window (同比/YoY):
-          - ``total`` / ``success_rate`` for the current window
-          - ``delegations_mom`` / ``delegations_yoy`` : % change vs previous
-            window (None when the previous window has no data)
-          - ``success_rate_mom`` / ``success_rate_yoy`` : percentage-point delta
-
-        Returning None (not 0) for a missing previous period lets the UI skip
-        the trend pill instead of showing a misleading 0%.
-        """
-        import re
-
-        def _parse_ts(s: str) -> datetime | None:
-            if not s:
-                return None
-            s = str(s).strip()
-            if s.endswith("Z"):
-                s = s[:-1] + "+00:00"
-            m = re.match(r"^(.*\.\d+)([+\-]\d{2}:?\d{2})$", s)
-            if m:
-                frac = m.group(1)
-                dot = frac.rfind(".")
-                frac6 = frac[: dot + 1] + frac[dot + 1 : dot + 7].ljust(6, "0")[:6]
-                s = frac6 + m.group(2)
-            try:
-                return datetime.fromisoformat(s)
-            except Exception as exc:
-                logger.warning("data_proxy._parse_ts failed: %s", exc)
-                return None
-
-        now_dt = now or datetime.now(timezone.utc)
-        empty = {
-            "total": 0, "success_rate": 0.0,
-            "delegations_mom": None, "delegations_yoy": None,
-            "success_rate_mom": None, "success_rate_yoy": None,
-        }
-        log_path = Path(self._root) / "logs" / "delegations.json"
-        if not log_path.exists():
-            return empty
-        try:
-            # 文件读取放线程池执行，避免阻塞事件循环（ASYNC230）。
-            records = await asyncio.to_thread(self._read_delegations_file, log_path)
-        except Exception as exc:
-            logger.warning("[bridge] delegation_period_stats read failed: %s", exc)
-            return empty
-        if not isinstance(records, list):
-            return empty
-
-        from datetime import timedelta
-
-        def _window(since: datetime, until: datetime) -> tuple[int, float]:
-            total = 0
-            succ = 0
-            for rec in records:
-                if not isinstance(rec, dict):
-                    continue
-                ts = _parse_ts(cast(str, rec.get("timestamp")))
-                if ts is None or not (since <= ts < until):
-                    continue
-                total += 1
-                ec = rec.get("exit_code")
-                if ec is None:
-                    ec = (rec.get("result") or {}).get("exit_code")
-                if ec == 0:
-                    succ += 1
-            rate = round(succ / total * 100, 1) if total else 0.0
-            return total, rate
-
-        cur30_s, cur30_e = now_dt - timedelta(days=30), now_dt
-        prev30_s, prev30_e = now_dt - timedelta(days=60), now_dt - timedelta(days=30)
-        cur365_s, cur365_e = now_dt - timedelta(days=365), now_dt
-        prev365_s, prev365_e = now_dt - timedelta(days=730), now_dt - timedelta(days=365)
-
-        cur30_t, cur30_r = _window(cur30_s, cur30_e)
-        prev30_t, prev30_r = _window(prev30_s, prev30_e)
-        cur365_t, cur365_r = _window(cur365_s, cur365_e)
-        prev365_t, prev365_r = _window(prev365_s, prev365_e)
-
-        def _pct(cur: int, prev: int) -> float | None:
-            return round((cur - prev) / prev * 100, 1) if prev else None
-
-        return {
-            "total": cur30_t,
-            "success_rate": cur30_r,
-            "delegations_mom": _pct(cur30_t, prev30_t),
-            "delegations_yoy": _pct(cur365_t, prev365_t),
-            "success_rate_mom": round(cur30_r - prev30_r, 1) if prev30_r else None,
-            "success_rate_yoy": round(cur365_r - prev365_r, 1) if prev365_r else None,
-        }
-
-    async def chain(self) -> list[dict[str, Any]]:
-        """Fallback chain info — replaces correlation.ps1 -Action chain."""
-        start = time.monotonic()
-
-        rows = await self._query_maop(
-            "SELECT name, agents, current_index FROM failover_chains"
-        )
-
-        self._record_latency(start)
-        return rows
-
-    async def memory_stats(self) -> dict[str, Any]:
-        """Memory statistics — replaces llm-wiki.ps1 -Action stats."""
-        start = time.monotonic()
-
-        entry_count = await self._query_memory("SELECT COUNT(*) as cnt FROM memory_entries")
-        trace_count = await self._query_memory("SELECT COUNT(*) as cnt FROM memory_traces")
-        traj_count = await self._query_memory("SELECT COUNT(*) as cnt FROM memory_trajectory")
-        # 补充 episodic_memory 表统计 (之前缺失)
-        try:
-            episodic_count = await self._query_memory("SELECT COUNT(*) as cnt FROM episodic_memory")
-        except Exception:
-            episodic_count = []
-
-        by_agent = await self._query_memory(
-            "SELECT agent, COUNT(*) as cnt FROM memory_entries GROUP BY agent ORDER BY cnt DESC"
-        )
-        by_topic = await self._query_memory(
-            "SELECT topic, COUNT(*) as cnt FROM memory_entries GROUP BY topic ORDER BY cnt DESC"
-        )
-
-        self._record_latency(start)
-        return {
-            "total_entries": entry_count[0]["cnt"] if entry_count else 0,
-            "total_traces": trace_count[0]["cnt"] if trace_count else 0,
-            "total_trajectory_steps": traj_count[0]["cnt"] if traj_count else 0,
-            "total_episodic": episodic_count[0]["cnt"] if episodic_count else 0,
-            "by_agent": {r["agent"]: r["cnt"] for r in by_agent},
-            "by_topic": {r["topic"]: r["cnt"] for r in by_topic},
-        }
-
-    async def guardrail_report(self) -> dict[str, Any]:
-        """Guardrail report — replaces guardrail.ps1 -Action report."""
-        start = time.monotonic()
-
-        # Read guardrail config if available
-        config_path = self._root / "config" / "guardrails.yaml"
-        rules: list[Any] = []
-        if config_path.exists():
-            try:
-                import yaml
-                _text = await asyncio.to_thread(Path(config_path).read_text, encoding="utf-8")
-                data = yaml.safe_load(_text)
-                rules = data.get("rules", []) if isinstance(data, dict) else []
-            except Exception as exc:
-                # H1: log instead of silently swallowing
-                logger.warning("[bridge] silent except: %s", exc)
-
-        self._record_latency(start)
-        return {
-            "total_rules": len(rules),
-            "rules": rules,
-            "status": "active" if rules else "no_rules",
-        }
-
     async def snapshot(self) -> dict[str, Any]:
         """Aggregate system snapshot for SSE/streaming endpoints.
 
@@ -567,337 +420,6 @@ class DataProxy:
             "delegations": recent_delegations[:10],
             "timestamp": live_data.get("timestamp", ""),
         }
-
-    def _queue_stats_sync(self) -> dict[str, int]:
-        """Sync queue stats — for run_in_executor."""
-        pool = self._pool_queue()
-        conn = pool.acquire()
-        try:
-            rows = conn.execute(
-                "SELECT status, COUNT(*) as cnt FROM queue_messages GROUP BY status"
-            ).fetchall()
-            counts = {r["status"]: r["cnt"] for r in rows}
-            dead = conn.execute(
-                "SELECT COUNT(*) as cnt FROM queue_dead_letters"
-            ).fetchone()["cnt"]
-            return {"pending": counts.get("pending", 0), "processing": counts.get("processing", 0), "dead_letters": dead}
-        except Exception as exc:
-            logger.warning("data_proxy._queue_stats_sync failed: %s", exc)
-            return {"pending": 0, "processing": 0, "dead_letters": 0}
-        finally:
-            pool.release(conn)
-
-    async def queue_stats(self) -> dict[str, Any]:
-        """Message queue statistics — from queue.db."""
-        start = time.monotonic()
-        result = await asyncio.get_running_loop().run_in_executor(
-            None, self._queue_stats_sync
-        )
-        self._record_latency(start)
-        return result
-
-    # ── New pure-Python endpoints (replacing PS bridge) ──────
-
-    async def tools_stats(self) -> dict[str, Any]:
-        """Tool manager statistics — replaces tool-manager.ps1 -Action stats."""
-        start = time.monotonic()
-        try:
-            if self._tool_mgr is None:
-                from maop.core.agent.tools.tool_manager import ToolManager
-                self._tool_mgr = ToolManager(root_dir=self._root)
-            assert self._tool_mgr is not None
-            result: dict[str, Any] = self._tool_mgr.stats()
-        except Exception as exc:
-            logger.warning("[bridge] tools_stats failed: %s", exc)
-            result = {"total": 0, "enabled": 0, "disabled": 0, "total_calls": 0}
-        self._record_latency(start)
-        return result
-
-    async def tools_list(self) -> list[dict[str, Any]]:
-        """Tool list — replaces tool-manager.ps1 -Action list."""
-        start = time.monotonic()
-        try:
-            if self._tool_mgr is None:
-                from maop.core.agent.tools.tool_manager import ToolManager
-                self._tool_mgr = ToolManager(root_dir=self._root)
-            assert self._tool_mgr is not None
-            result: list[Any] = self._tool_mgr.list()
-        except Exception as exc:
-            logger.warning("[bridge] tools_list failed: %s", exc)
-            result = []
-        self._record_latency(start)
-        return result
-
-    async def sandbox_list(self) -> list[dict[str, Any]]:
-        """Sandbox list — replaces sandbox.ps1 -Action list."""
-        start = time.monotonic()
-        try:
-            if self._sandbox_mgr is None:
-                from maop.core.security.sandbox import SandboxManager
-                self._sandbox_mgr = SandboxManager(root_dir=self._root)
-            sandboxes = self._sandbox_mgr.list_all()
-            result = [s.model_dump() for s in sandboxes]
-        except Exception as exc:
-            logger.warning("[bridge] sandbox_list failed: %s", exc)
-            result = []
-        self._record_latency(start)
-        return result
-
-    async def human_pending(self) -> dict[str, Any]:
-        """Human proxy pending requests — replaces human-proxy.ps1 -Action pending."""
-        start = time.monotonic()
-        try:
-            if self._human_proxy is None:
-                from maop.core.agent.delegation.human_proxy import HumanProxy
-                self._human_proxy = HumanProxy(root_dir=self._root)
-            pending = self._human_proxy.pending()
-            stats = self._human_proxy.stats()
-            result = {
-                "pending": [r.model_dump() for r in pending],
-                "stats": stats,
-            }
-        except Exception as exc:
-            logger.warning("[bridge] human_pending failed: %s", exc)
-            result = {"pending": [], "stats": {}}
-        self._record_latency(start)
-        return result
-
-    async def prompts_list(self) -> dict[str, Any]:
-        """Prompt templates — replaces prompt-manager.ps1 -Action list."""
-        start = time.monotonic()
-        try:
-            from maop.prompt_manager import PromptManager
-            mgr = PromptManager(root_dir=self._root)
-            templates = mgr.list_templates()
-            stats = mgr.stats()
-            result = {
-                "templates": [t.model_dump() for t in templates],
-                "stats": stats,
-            }
-        except Exception as exc:
-            logger.warning("[bridge] prompts_list failed: %s", exc)
-            result = {"templates": [], "stats": {}}
-        self._record_latency(start)
-        return result
-
-    async def coordination_report(self) -> dict[str, Any]:
-        """Coordination/teams report — pure Python from queue.db + config."""
-        start = time.monotonic()
-        try:
-            queue = await self.queue_stats()
-            config_agents = await self._query_maop(
-                "SELECT agent, COUNT(*) as cnt FROM delegations GROUP BY agent"
-            )
-            # Build teams from agent config groups
-            teams = []
-            try:
-                from maop.config.loader import ConfigLoader
-                cfg = ConfigLoader(project_root=str(self._root)).load()
-                groups: dict[str, list[str]] = {}
-                for name, ad in cfg.agents.items():
-                    group = getattr(ad, "group", "default")
-                    groups.setdefault(group, []).append(name)
-                teams = [{"team": k, "agents": v, "count": len(v)} for k, v in groups.items()]
-            except Exception as exc:
-                # H1: log instead of silently swallowing
-                logger.warning("[bridge] silent except: %s", exc)
-            result = {
-                "queue": queue,
-                "active_agents": [r["agent"] for r in config_agents],
-                "teams": teams,
-            }
-        except Exception as exc:
-            logger.warning("[bridge] coordination_report failed: %s", exc)
-            result = {"queue": {}, "active_agents": [], "teams": []}
-        self._record_latency(start)
-        return result
-
-    async def skills_list(self) -> list[dict[str, Any]]:
-        """Skills list — derived from tool_manager registry."""
-        start = time.monotonic()
-        try:
-            from maop.core.agent.tools.tool_manager import ToolManager
-            mgr = ToolManager(root_dir=self._root)
-            tools = mgr.list()
-            result = []
-            for cat_group in tools:
-                if cat_group.get("category") in ("skill", "skills"):
-                    result.extend(cat_group.get("tools", []))
-        except Exception as exc:
-            logger.warning("[bridge] skills_list failed: %s", exc)
-            result = []
-        self._record_latency(start)
-        return result
-
-    async def versions_check(self) -> dict[str, Any]:
-        """Version check — returns real MAOP version from package."""
-        start = time.monotonic()
-        try:
-            from maop import __version__ as MAOP_ver
-        except ImportError:
-            MAOP_ver = "unknown"
-        import sys as _sys
-        result = {
-            "MAOP_VERSION": MAOP_ver,
-            "python": _sys.version.split()[0],
-            "ps_bridge_active": False,
-            "checked_at": datetime.now(timezone.utc).isoformat(),
-        }
-        self._record_latency(start)
-        return result
-
-    async def providers_report(self) -> dict[str, Any]:
-        """Providers report — agent availability from circuit breaker."""
-        start = time.monotonic()
-        try:
-            agents = await self.agent_stats()
-            result = {
-                "agents": agents,
-                "total": len(agents),
-                "available": sum(1 for a in agents if a.get("circuit_breaker") == "closed"),
-            }
-        except Exception as exc:
-            logger.warning("[bridge] providers_report failed: %s", exc)
-            result = {"agents": [], "total": 0, "available": 0}
-        self._record_latency(start)
-        return result
-
-    async def mcp_servers(self) -> list[dict[str, Any]]:
-        """MCP servers list — from config if available."""
-        start = time.monotonic()
-        mcp_config = self._root / "config" / "mcp_servers.yaml"
-        result = []
-        if mcp_config.exists():
-            try:
-                import yaml
-                data = yaml.safe_load(mcp_config.read_text(encoding="utf-8"))
-                if isinstance(data, dict):
-                    result = data.get("servers", [])
-            except Exception as exc:
-                # H1: log instead of silently swallowing
-                logger.warning("[bridge] silent except: %s", exc)
-        self._record_latency(start)
-        return result
-
-    async def mcp_tools(self) -> list[dict[str, Any]]:
-        """MCP tools list — from config if available."""
-        start = time.monotonic()
-        mcp_config = self._root / "config" / "mcp_servers.yaml"
-        result = []
-        if mcp_config.exists():
-            try:
-                import yaml
-                data = yaml.safe_load(mcp_config.read_text(encoding="utf-8"))
-                if isinstance(data, dict):
-                    for server in data.get("servers", []):
-                        if isinstance(server, dict):
-                            result.extend(server.get("tools", []))
-            except Exception as exc:
-                # H1: log instead of silently swallowing
-                logger.warning("[bridge] silent except: %s", exc)
-        self._record_latency(start)
-        return result
-
-    async def graph_nodes(self) -> list[dict[str, Any]]:
-        """Memory graph nodes — from memory.db."""
-        start = time.monotonic()
-        result = await self._query_memory(
-            "SELECT agent as id, agent as label, COUNT(*) as weight "
-            "FROM memory_entries GROUP BY agent ORDER BY weight DESC"
-        )
-        self._record_latency(start)
-        return result
-
-    async def graph_edges(self) -> list[dict[str, Any]]:
-        """Memory graph edges — from memory_traces."""
-        start = time.monotonic()
-        result = await self._query_memory(
-            "SELECT trace_id as source, agent as target, COUNT(*) as weight "
-            "FROM memory_traces GROUP BY trace_id, agent ORDER BY weight DESC LIMIT 100"
-        )
-        self._record_latency(start)
-        return result
-
-    async def logs_get(self, name: str = "dashboard", limit: int = 50) -> list[dict[str, Any]]:
-        """Get log entries for the named log stream.
-
-        Routes by ``name`` to the correct source. Previously every call
-        returned the ``error_log`` table regardless of ``name``, so
-        ``logs_get(name="delegations")`` returned the wrong data.
-
-        * ``delegations`` → ``logs/delegations.json`` (the genuine delegation history)
-        * ``checker``     → ``logs/checker_*.log`` parsed into structured entries
-        * anything else (default ``dashboard``) → ``error_log`` table
-        """
-        start = time.monotonic()
-        if name == "delegations":
-            result = await asyncio.to_thread(self._read_delegations_json, limit)
-        elif name == "checker":
-            result = await asyncio.to_thread(self._read_checker_logs, limit)
-        else:
-            result = await self._query_maop(
-                "SELECT * FROM error_log ORDER BY timestamp DESC LIMIT ?",
-                (limit,),
-            )
-        self._record_latency(start)
-        return result
-
-    # ── log readers ───────────────────────────────────────────
-
-    def _read_delegations_json(self, limit: int) -> list[dict[str, Any]]:
-        """Read the genuine delegation history from logs/delegations.json."""
-        path = self._root / "logs" / "delegations.json"
-        if not path.exists():
-            return []
-        try:
-            data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-        except Exception as exc:
-            logger.warning("data_proxy._read_delegations_json failed: %s", exc)
-            return []
-        if not isinstance(data, list):
-            return []
-        if limit and limit > 0:
-            return data[-limit:]
-        return data
-
-    def _read_checker_logs(self, limit: int) -> list[dict[str, Any]]:
-        """Read and parse checker log files into structured entries."""
-        log_dir = self._root / "logs"
-        if not log_dir.is_dir():
-            return []
-        files = sorted(log_dir.glob("checker_*.log"), reverse=True)
-        entries: list[dict[str, Any]] = []
-        _log_re = re.compile(
-            r"^\[(?P<ts>\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})(?:\.\d+)?\]\s*"
-            r"\[(?P<agent>[^\]]+)\]\s*"
-            r"(?P<level>\w+):?\s*"
-            r"(?P<msg>.*)$"
-        )
-        for f in files:
-            try:
-                text = f.read_text(encoding="utf-8", errors="replace")
-            except Exception as exc:
-                logger.debug("[bridge] log scan: failed to read %s: %s", f.name, exc)
-                continue
-            for raw in text.splitlines():
-                line = raw.rstrip("\r\n")
-                if not line:
-                    continue
-                m = _log_re.match(line)
-                if m:
-                    entries.append({
-                        "ts": m.group("ts"),
-                        "level": (m.group("level") or "info").lower(),
-                        "agent": m.group("agent") or "checker",
-                        "msg": m.group("msg") or line,
-                    })
-                else:
-                    entries.append({"ts": None, "level": "info", "agent": "checker", "msg": line})
-                if limit and len(entries) >= limit:
-                    break
-            if limit and len(entries) >= limit:
-                break
-        return entries[:limit] if limit else entries
 
     # ── Internal ─────────────────────────────────────────────
 

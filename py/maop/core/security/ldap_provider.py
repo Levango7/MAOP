@@ -19,6 +19,24 @@
   （生产环境应使用 vault）。
 * **异步**：``sync_users_async`` / ``authenticate_async`` 通过
   ``asyncio.to_thread`` 包装同步调用。
+
+模块拆分（Phase 3-2）
+--------------------
+本模块从单文件 669 行拆分为三个文件以改善可维护性：
+
+* :mod:`maop.core.security.ldap_models` — 异常类 + Pydantic 模型
+  （``LDAPConfig`` / ``LDAPUser`` / ``LDAPSyncResult`` /
+  ``GroupRoleMapping`` / ``AuthResult`` / 三个异常类）。
+* :mod:`maop.core.security.ldap_search` — 用户搜索方法 Mixin
+  （``LDAPSearchMixin``，含 ``search_users`` / ``_paged_search`` /
+  ``_entry_to_user`` 等）。
+* 本模块 — ``LDAPProvider`` 核心类（连接管理 / 同步 / 认证 / 组映射）
+  + 异步包装 + 全部公共符号 re-export。
+
+兼容性：通过 ``__all__`` re-export，``from maop.core.security.ldap_provider
+import LDAPProvider, LDAPConfig, ...`` 等历史导入路径零改动。
+
+依赖方向：``ldap_provider`` → ``ldap_search`` → ``ldap_models``（单向，无循环）。
 """
 
 from __future__ import annotations
@@ -28,126 +46,25 @@ import re
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from maop.core.security.ldap_models import (
+    AuthResult,
+    GroupRoleMapping,
+    LDAPAuthenticationError,
+    LDAPConfig,
+    LDAPConfigError,
+    LDAPConnectionError,
+    LDAPSyncResult,
+    LDAPUser,
+)
+from maop.core.security.ldap_search import LDAPSearchMixin
 
 logger = logging.getLogger(__name__)
-
-
-# ── 异常 ──────────────────────────────────────────────────────
-
-
-class LDAPConfigError(Exception):
-    """LDAP 配置错误。"""
-
-
-class LDAPConnectionError(Exception):
-    """LDAP 连接 / 操作错误。"""
-
-
-class LDAPAuthenticationError(Exception):
-    """LDAP 认证失败。"""
-
-
-# ── 配置与模型 ────────────────────────────────────────────────
-
-
-class LDAPConfig(BaseModel):
-    """LDAP/AD 连接配置。
-
-    Parameters
-    ----------
-    server_url : str
-        LDAP 服务器 URL，例如 ``ldap://dc.example.com:389`` 或
-        ``ldaps://dc.example.com:636``。
-    bind_dn : str
-        用于搜索的绑定 DN（service account）。
-    bind_password : str
-        绑定密码。
-    user_base_dn : str
-        用户搜索基 DN，例如 ``ou=users,dc=example,dc=com``。
-    user_filter : str
-        用户搜索过滤器，默认 ``(&(objectClass=person)(uid={username}))``。
-        ``{username}`` 占位符在认证时替换。
-    group_base_dn : str
-        组搜索基 DN。
-    group_filter : str
-        组搜索过滤器。
-    use_ssl : bool
-        是否使用 SSL/TLS。
-    use_tls : bool
-        是否在明文连接上启动 STARTTLS。
-    page_size : int
-        分页搜索的页大小（默认 1000，AD 推荐值）。
-    """
-
-    server_url: str
-    bind_dn: str = ""
-    bind_password: str = ""
-    user_base_dn: str = ""
-    user_filter: str = "(&(objectClass=person)(uid={username}))"
-    group_base_dn: str = ""
-    group_filter: str = "(objectClass=groupOfNames)"
-    use_ssl: bool = False
-    use_tls: bool = False
-    page_size: int = 1000
-    #: 是否为 Active Directory（影响 user_filter 默认值与属性名）。
-    is_active_directory: bool = False
-    #: 增量同步属性（AD: whenChanged, OpenLDAP: modifyTimestamp）。
-    modify_timestamp_attr: str = "modifyTimestamp"
-
-
-class LDAPUser(BaseModel):
-    """从 LDAP 同步过来的用户。"""
-
-    dn: str                          # LDAP distinguished name
-    username: str                    # MAOP 用户名（从 uid/sAMAccountName 提取）
-    email: str = ""
-    display_name: str = ""
-    first_name: str = ""
-    last_name: str = ""
-    groups: list[str] = Field(default_factory=list)  # LDAP group DN 列表
-    is_active: bool = True
-    raw_attributes: dict[str, Any] = Field(default_factory=dict)
-
-
-class LDAPSyncResult(BaseModel):
-    """用户同步结果。"""
-
-    synced: int = 0
-    created: int = 0
-    updated: int = 0
-    deactivated: int = 0
-    errors: int = 0
-    error_details: list[str] = Field(default_factory=list)
-    synced_users: list[LDAPUser] = Field(default_factory=list)
-
-
-class GroupRoleMapping(BaseModel):
-    """LDAP group → MAOP role 映射规则。"""
-
-    #: LDAP group DN 模式（精确匹配或正则）。
-    group_dn_pattern: str
-    #: 是否使用正则匹配。
-    use_regex: bool = False
-    #: 映射到的 MAOP role 名称。
-    role: str
-    #: 是否为默认 role（所有同步用户都获得）。
-    is_default: bool = False
-
-
-class AuthResult(BaseModel):
-    """LDAP 认证结果。"""
-
-    authenticated: bool = False
-    user: LDAPUser | None = None
-    roles: list[str] = Field(default_factory=list)
-    error: str = ""
 
 
 # ── LDAPProvider ──────────────────────────────────────────────
 
 
-class LDAPProvider:
+class LDAPProvider(LDAPSearchMixin):
     """LDAP/Active Directory 集成提供者。
 
     Parameters
@@ -239,241 +156,6 @@ class LDAPProvider:
         if self.config.bind_dn:
             conn.simple_bind_s(self.config.bind_dn, self.config.bind_password)
         return conn
-
-    # ── 用户搜索 ─────────────────────────────────────────────
-
-    def search_users(
-        self,
-        filter_str: str | None = None,
-        *,
-        attributes: list[str] | None = None,
-    ) -> list[LDAPUser]:
-        """搜索 LDAP 用户。
-
-        Parameters
-        ----------
-        filter_str : str | None
-            LDAP 搜索过滤器。若为 ``None``，使用 ``config.user_filter``
-            并移除 ``{username}`` 占位符（搜索所有用户）。
-        attributes : list[str] | None
-            要取回的属性列表。``None`` 表示全部。
-        """
-        if filter_str is None:
-            # 移除 username 占位符以搜索所有用户
-            filter_str = self.config.user_filter.replace(
-                "(uid={username})", "(uid=*)",
-            ).replace("{username}", "*")
-
-        default_attrs = self._default_user_attributes()
-        attrs = attributes or default_attrs
-
-        conn = self._connect()
-        try:
-            entries = self._paged_search(
-                conn,
-                self.config.user_base_dn,
-                filter_str,
-                attrs,
-            )
-        finally:
-            self._close(conn)
-
-        users: list[LDAPUser] = []
-        for entry in entries:
-            try:
-                user = self._entry_to_user(entry)
-                users.append(user)
-            except Exception as exc:
-                logger.warning("[ldap] failed to parse entry: %s", exc)
-        return users
-
-    def _default_user_attributes(self) -> list[str]:
-        """根据 AD / OpenLDAP 返回默认属性列表。"""
-        if self.config.is_active_directory:
-            return [
-                "sAMAccountName", "userPrincipalName", "mail",
-                "displayName", "givenName", "sn",
-                "memberOf", "userAccountControl", "whenChanged",
-            ]
-        return [
-            "uid", "mail", "cn", "givenName", "sn",
-            "memberOf", "modifyTimestamp",
-        ]
-
-    def _paged_search(
-        self,
-        conn: Any,
-        base_dn: str,
-        filter_str: str,
-        attributes: list[str],
-    ) -> list[Any]:
-        """执行分页搜索（兼容 ldap3 与 mock）。"""
-        # ldap3 风格
-        if hasattr(conn, "search"):
-            entries: list[Any] = []
-            conn.search(
-                search_base=base_dn,
-                search_filter=filter_str,
-                attributes=attributes,
-                paged_size=self.config.page_size,
-            )
-            # ldap3 的响应可能分页，循环读取
-            entries = list(conn.entries)
-            # 处理分页 cookie
-            while hasattr(conn, "result") and conn.result.get("controls"):
-                cookie = (
-                    conn.result["controls"]
-                    .get("1.2.840.113556.1.4.319", [None, None, None])[2]
-                )
-                if not cookie:
-                    break
-                conn.search(
-                    search_base=base_dn,
-                    search_filter=filter_str,
-                    attributes=attributes,
-                    paged_size=self.config.page_size,
-                    paged_cookie=cookie,
-                )
-                entries.extend(conn.entries)
-            return entries
-        # python-ldap 风格
-        if hasattr(conn, "search_ext"):
-            return self._legacy_paged_search(
-                conn, base_dn, filter_str, attributes,
-            )
-        # mock 风格：直接调用
-        result = conn.search(base_dn, filter_str, attributes)
-        return list(result) if result else []
-
-    def _legacy_paged_search(
-        self,
-        conn: Any,
-        base_dn: str,
-        filter_str: str,
-        attributes: list[str],
-    ) -> list[Any]:
-        """python-ldap 分页搜索。"""
-        import ldap as legacy_ldap
-
-        results: list[Any] = []
-        page_cookie = ""
-        while True:
-            msg_id = conn.search_ext(
-                base_dn, legacy_ldap.SCOPE_SUBTREE, filter_str,
-                attrlist=attributes,
-                serverctrls=[
-                    legacy_ldap.controls.SimplePagedResultsControl(
-                        True, self.config.page_size, page_cookie,
-                    ),
-                ],
-            )
-            _rtype, rdata, _rmsgid, rctrls = conn.result3(msg_id)
-            results.extend(rdata)
-            # 解析分页 cookie
-            page_ctrls = [
-                c for c in rctrls
-                if c.controlType == legacy_ldap.LIBLDAP_CONTROL_PAGEDRESULTS
-            ]
-            if not page_ctrls:
-                break
-            _, _, page_cookie = page_ctrls[0].controlValue
-            if not page_cookie:
-                break
-        return results
-
-    def _entry_to_user(self, entry: Any) -> LDAPUser:
-        """将 LDAP 条目转换为 :class:`LDAPUser`。"""
-        # ldap3 Entry 风格
-        if hasattr(entry, "entry_dn") and hasattr(entry, "entry_attributes"):
-            dn = entry.entry_dn
-            raw: dict[str, Any] = {}
-            for attr in entry.entry_attributes:
-                try:
-                    values = entry[attr].values
-                    raw[attr] = list(values) if values else []
-                except Exception:
-                    raw[attr] = []
-            return self._build_user_from_attrs(dn, raw)
-
-        # python-ldap / mock 风格：(dn, attrs_dict)
-        if isinstance(entry, tuple) and len(entry) == 2:
-            dn, attrs = entry
-            raw = {
-                k: (list(v) if isinstance(v, (list, tuple)) else [v])
-                for k, v in (attrs or {}).items()
-            }
-            return self._build_user_from_attrs(dn, raw)
-
-        # mock 对象风格：有 .dn 与 .attributes
-        if hasattr(entry, "dn") and hasattr(entry, "attributes"):
-            return self._build_user_from_attrs(
-                entry.dn, dict(entry.attributes),
-            )
-
-        raise LDAPConnectionError(f"unsupported entry type: {type(entry)}")
-
-    def _build_user_from_attrs(self, dn: str, attrs: dict[str, Any]) -> LDAPUser:
-        """从属性字典构造 :class:`LDAPUser`。"""
-        def _first(key: str, *aliases: str) -> str:
-            for k in (key, *aliases):
-                if attrs.get(k):
-                    val = attrs[k][0] if isinstance(attrs[k], list) else attrs[k]
-                    return val.decode() if isinstance(val, bytes) else str(val)
-            return ""
-
-        if self.config.is_active_directory:
-            username = _first("sAMAccountName")
-            email = _first("userPrincipalName", "mail")
-            display_name = _first("displayName", "cn")
-            first_name = _first("givenName")
-            last_name = _first("sn")
-            groups = self._attr_to_list(attrs.get("memberOf", []))
-            # AD userAccountControl: bit 1 (ACCOUNTDISABLE) 表示禁用
-            uac = _first("userAccountControl")
-            is_active = True
-            if uac:
-                try:
-                    is_active = not (int(uac) & 0x2)
-                except ValueError:
-                    pass
-        else:
-            username = _first("uid", "cn")
-            email = _first("mail")
-            display_name = _first("cn")
-            first_name = _first("givenName")
-            last_name = _first("sn")
-            groups = self._attr_to_list(attrs.get("memberOf", []))
-            is_active = True
-
-        return LDAPUser(
-            dn=dn,
-            username=username,
-            email=email,
-            display_name=display_name,
-            first_name=first_name,
-            last_name=last_name,
-            groups=groups,
-            is_active=is_active,
-            raw_attributes={
-                k: [v.decode() if isinstance(v, bytes) else v for v in val]
-                if isinstance(val, list)
-                else val
-                for k, val in attrs.items()
-            },
-        )
-
-    @staticmethod
-    def _attr_to_list(value: Any) -> list[str]:
-        """将 LDAP 属性值转换为字符串列表。"""
-        if not value:
-            return []
-        if isinstance(value, list):
-            return [
-                v.decode() if isinstance(v, bytes) else str(v) for v in value
-            ]
-        if isinstance(value, bytes):
-            return [value.decode()]
-        return [str(value)]
 
     # ── 用户同步 ─────────────────────────────────────────────
 
@@ -769,3 +451,21 @@ async def authenticate_async(
     return await asyncio.to_thread(
         provider.authenticate, username, password, user_store=user_store,
     )
+
+
+# ── Re-export ─────────────────────────────────────────────────
+# 保持 from maop.core.security.ldap_provider import ... 历史导入路径零改动。
+
+__all__ = [
+    "AuthResult",
+    "GroupRoleMapping",
+    "LDAPAuthenticationError",
+    "LDAPConfig",
+    "LDAPConfigError",
+    "LDAPConnectionError",
+    "LDAPProvider",
+    "LDAPSyncResult",
+    "LDAPUser",
+    "authenticate_async",
+    "sync_users_async",
+]

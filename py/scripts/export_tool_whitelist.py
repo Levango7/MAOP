@@ -26,9 +26,9 @@ PY_DIR = SCRIPTS_DIR.parent  # py/
 ROOT = PY_DIR.parent          # 仓库根
 sys.path.insert(0, str(PY_DIR))
 
-import sqlite3  # noqa: E402
+import sqlite3
 
-from maop.core.backends.db_utils import get_db_path  # noqa: E402
+from maop.core.backends.db_utils import get_db_path
 
 CONFIG_YAML = ROOT / "config" / "tool_whitelist.yaml"
 DEFAULT_OUT = ROOT / "config" / "tool_whitelist.generated.yaml"
@@ -62,7 +62,7 @@ def _load_deny_patterns() -> list[str]:
                 patterns.append(rule)
         if patterns:
             return patterns
-    except Exception as exc:  # noqa: BLE001 - 兜底不阻断导出
+    except Exception as exc:
         print(f"[export_tool_whitelist] WARN: 读取 {CONFIG_YAML.name} 失败: {exc}；使用内置 deny 集")
     return list(_FALLBACK_DENY_PATTERNS)
 

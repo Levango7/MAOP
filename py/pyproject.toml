@@ -168,8 +168,30 @@ module = [
     "maop.core.mcp.mcp_hub_metrics",
     "maop.core.mcp.mcp_hub_ops",
     "maop.core.mcp.mcp_hub_compat",
+    # P2 maop_loop.py 拆分：PhasesMixin 通过 MaopLoop 组合获得
+    # _execute_with_strategy/_execute_with_retry 等宿主属性。
+    "maop.maop_loop_phases",
+    # Phase 3-2 ldap_provider.py 拆分：LDAPSearchMixin 通过 LDAPProvider
+    # 组合获得 self.config / self._connect() / self._close() 等宿主属性。
+    "maop.core.security.ldap_search",
 ]
 disable_error_code = ["attr-defined"]
+
+# P0-3 DataProxy Mixin 拆分：channels/*.py 中的 Mixin（SkillsMixin/McpMixin/...）
+# 通过 DataProxy 组合获得宿主属性（self._root/_query_maop/_record_latency 等），
+# mypy 无法静态推断。豁免 attr-defined（宿主属性）+ has-type（_tool_mgr 等惰性属性）
+# + no-any-return（attr-defined 连锁：属性未定义 → 返回推断为 Any）。
+# 与上方 T2 Mixin 豁免同一模式，宿主属性由 DataProxy.__init__ 保证。
+[[tool.mypy.overrides]]
+module = [
+    "maop.dashboard.channels.skills",
+    "maop.dashboard.channels.mcp",
+    "maop.dashboard.channels.models",
+    "maop.dashboard.channels.prompts",
+    "maop.dashboard.channels.routing",
+    "maop.dashboard.channels.security",
+]
+disable_error_code = ["attr-defined", "has-type", "no-any-return"]
 
 [[tool.mypy.overrides]]
 module = "maop.dashboard.routers.*"

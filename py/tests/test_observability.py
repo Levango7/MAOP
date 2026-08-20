@@ -72,10 +72,11 @@ def test_prometheus_metrics_endpoint():
     assert "# TYPE MAOP_test_obs_gauge gauge" in output
     assert "MAOP_test_obs_gauge 42.0" in output
 
-    # Verify endpoint registered in server source
-    server_path = _PROJECT_ROOT / "py" / "maop" / "dashboard" / "server.py"
-    server_src = server_path.read_text(encoding="utf-8")
-    assert '"/api/prometheus"' in server_src
+    # Verify endpoint registered in route registration source
+    # (server.py was split: routes moved to _register_routes.py in Phase 1)
+    routes_path = _PROJECT_ROOT / "py" / "maop" / "dashboard" / "_register_routes.py"
+    routes_src = routes_path.read_text(encoding="utf-8")
+    assert '"/api/prometheus"' in routes_src
 
     # Verify prometheus.yml metrics_path
     prom_path = _MONITORING_DIR / "prometheus.yml"
