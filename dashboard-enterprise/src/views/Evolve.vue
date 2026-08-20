@@ -21,6 +21,54 @@
         <StatCard :label="t('view.evolve.bestAgent')" :value="bestAgentLabel" icon="star" tone="warn" :loading="loading" />
       </div>
 
+      <!-- ── 企业版差异化叙事: 演化里程碑垂直时间线 ──
+           个人版不渲染此区块 (edition.isEnterprise 控制)。
+           纯静态叙事: 不调用任何 API, 不修改任何数据流, 只读 i18n + edition store。
+           里程碑数据为内嵌常量, 用来说明 MAOP 自演化能力的典型历史轨迹。 -->
+      <section
+        v-if="edition.isEnterprise"
+        class="evolve-milestones"
+        aria-label="Evolution milestones timeline"
+      >
+        <header class="evolve-milestones__head">
+          <div class="evolve-milestones__title-row">
+            <AppIcon name="activity" :size="16" class="evolve-milestones__title-icon" />
+            <h2 class="evolve-milestones__title">{{ t('view.evolve.milestones.title') }}</h2>
+            <Badge tone="brand">{{ edition.edition }}</Badge>
+          </div>
+          <p class="evolve-milestones__subtitle muted">{{ t('view.evolve.milestones.subtitle') }}</p>
+        </header>
+
+        <ol class="evolve-milestones__timeline" role="list">
+          <li
+            v-for="(ms, idx) in evolutionMilestones"
+            :key="ms.key"
+            class="evolve-milestones__node"
+            :class="['evolve-milestones__node--' + ms.type, { 'evolve-milestones__node--first': idx === 0, 'evolve-milestones__node--last': idx === evolutionMilestones.length - 1 }]"
+            role="listitem"
+          >
+            <div class="evolve-milestones__rail" aria-hidden="true">
+              <span class="evolve-milestones__dot"></span>
+            </div>
+            <div class="evolve-milestones__card">
+              <div class="evolve-milestones__card-head">
+                <div class="evolve-milestones__icon-wrap">
+                  <AppIcon :name="ms.typeIcon" :size="14" class="evolve-milestones__type-icon" />
+                </div>
+                <span class="evolve-milestones__time">{{ ms.time }}</span>
+                <Badge :tone="milestoneToneMap[ms.type]">{{ milestoneTypeLabel(ms.type) }}</Badge>
+              </div>
+              <h3 class="evolve-milestones__card-title">{{ ms.title }}</h3>
+              <p class="evolve-milestones__card-desc muted">{{ ms.desc }}</p>
+              <div class="evolve-milestones__impact">
+                <span class="evolve-milestones__impact-label">{{ t('view.evolve.milestones.impact') }}</span>
+                <span class="evolve-milestones__impact-value">{{ ms.impact }}</span>
+              </div>
+            </div>
+          </li>
+        </ol>
+      </section>
+
     <Card :title="t('view.evolve.statsByAgent')" icon="gauge" :margin-bottom="16">
       <DataTable
         v-if="byAgent.length"
@@ -121,6 +169,7 @@ import {
   Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler, Legend,
 } from 'chart.js';
 import { useApiStore } from '../stores/api.js';
+import { useEditionStore } from '../stores/edition.js';
 import { useToast } from '../composables/useToast.js';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -130,6 +179,7 @@ import StatCard from '../components/StatCard.vue';
 import DataTable from '../components/DataTable.vue';
 import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
+import Badge from '../components/Badge.vue';
 import EvolutionTimeline from '../components/EvolutionTimeline.vue';
 import EvolutionHistory from './EvolutionHistory.vue';
 import { cssVar, cssVarAlpha } from '../composables/chartTokens.js';
@@ -139,6 +189,7 @@ ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip,
 
 const { t } = useI18n();
 const api = useApiStore();
+const edition = useEditionStore();
 const toast = useToast();
 const route = useRoute();
 const router = useRouter();
@@ -333,6 +384,80 @@ const lineageRows = computed(() =>
   })),
 );
 
+// ── 演化里程碑叙事 (企业版差异化) ──────────────────────────────────
+// 纯静态叙事数据: 不调用任何 API, 不依赖 lineage/timeseries ref。
+// 用来说明 MAOP 自演化能力的典型里程碑, 让企业版用户在进入 Evolve 页时
+// 立即理解"自调优闭环"的价值, 而不是面对一张空表。
+// type: perf(性能改进) / behavior(行为调整) / capability(新能力)
+// impact: 简短的影响指标描述, 用于卡片右下角
+const evolutionMilestones = [
+  {
+    key: 'ms-cap-1',
+    time: '2026-03',
+    type: 'capability',
+    typeIcon: 'sparkles',
+    title: 'Self-tuning loop bootstrapped',
+    desc: 'MAOP introduced the closed-loop auto-tuning engine: observe → suggest → A/B → promote/rollback.',
+    impact: '+1 closed loop',
+  },
+  {
+    key: 'ms-perf-1',
+    time: '2026-04',
+    type: 'perf',
+    typeIcon: 'gauge',
+    title: 'Routing strategy optimized',
+    desc: 'Cost-aware router reduced avg latency by delegating cheap tasks to local models.',
+    impact: '−23% p95 latency',
+  },
+  {
+    key: 'ms-behavior-1',
+    time: '2026-05',
+    type: 'behavior',
+    typeIcon: 'brain',
+    title: 'Prompt regression guard',
+    desc: 'Per-agent prompt versions now gated by SPRT, blocking silent quality regressions before promotion.',
+    impact: '+12% success rate',
+  },
+  {
+    key: 'ms-cap-2',
+    time: '2026-06',
+    type: 'capability',
+    typeIcon: 'network',
+    title: 'Cross-agent lineage tracking',
+    desc: 'Configuration lineage now records parent → child version chains across all agents for full auditability.',
+    impact: '+full audit trail',
+  },
+  {
+    key: 'ms-perf-2',
+    time: '2026-07',
+    type: 'perf',
+    typeIcon: 'zap',
+    title: 'Parallel A/B experiments',
+    desc: 'Multiple experiments can now run concurrently per agent, cutting tuning cycle time from hours to minutes.',
+    impact: '−68% cycle time',
+  },
+  {
+    key: 'ms-behavior-2',
+    time: '2026-08',
+    type: 'behavior',
+    typeIcon: 'shield',
+    title: 'Human-in-the-loop gate',
+    desc: 'High-risk config changes now require explicit approval, with pending queue and one-click approve/reject.',
+    impact: '0 unapproved promotions',
+  },
+];
+
+// 里程碑类型 → 徽章 tone 映射
+const milestoneToneMap = {
+  perf: 'success',
+  behavior: 'info',
+  capability: 'brand',
+};
+function milestoneTypeLabel(type) {
+  const key = `view.evolve.milestones.type.${type}`;
+  return t(key);
+}
+
 function normalize(raw) {
   const data = raw && raw.data ? raw.data : raw;
   const stats = data && data.stats ? data.stats : {};
@@ -389,6 +514,7 @@ async function triggerEvolve() {
 }
 
 onMounted(() => {
+  edition.fetchEdition().catch(() => {});
   loadStatus();
   loadMetrics();
 });
@@ -402,6 +528,177 @@ onMounted(() => {
 .evolve-chart-box {
   height: 280px;
   position: relative;
+}
+
+/* ── 演化里程碑垂直时间线叙事 (企业版差异化) ───────────────────────────
+ * 设计语言对齐 workbench: 1px 描边卡片, 无阴影/无渐变, 中性灰底。
+ * 垂直时间线: 左侧 2px 轨道线 + 圆点, 右侧事件卡片。
+ * 三种事件类型用不同颜色的圆点和徽章: perf=success / behavior=info / capability=brand。
+ * 响应式: ≤700px 时卡片宽度自适应, 轨道线保持。 */
+.evolve-milestones {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.evolve-milestones__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.evolve-milestones__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.evolve-milestones__title-icon {
+  color: var(--brand-strong);
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-faint);
+  flex-shrink: 0;
+}
+.evolve-milestones__title {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.evolve-milestones__subtitle {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  margin: 0;
+}
+.evolve-milestones__timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+.evolve-milestones__node {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-4);
+}
+.evolve-milestones__node--last { padding-bottom: 0; }
+.evolve-milestones__rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 14px;
+}
+/* 垂直轨道线: 除最后一个节点外, 从圆点向下延伸 */
+.evolve-milestones__node:not(.evolve-milestones__node--last) .evolve-milestones__rail::after {
+  content: "";
+  position: absolute;
+  top: 28px;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: var(--border-subtle, var(--border));
+  border-radius: 1px;
+}
+.evolve-milestones__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border-strong);
+  background: var(--text-faint);
+  flex-shrink: 0;
+  z-index: 1;
+}
+.evolve-milestones__node--perf       .evolve-milestones__dot { background: var(--success); box-shadow: 0 0 0 1px var(--success); }
+.evolve-milestones__node--behavior   .evolve-milestones__dot { background: var(--info); box-shadow: 0 0 0 1px var(--info); }
+.evolve-milestones__node--capability .evolve-milestones__dot { background: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.evolve-milestones__card {
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--r-md);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  transition: border-color var(--motion) var(--ease);
+}
+.evolve-milestones__card:hover { border-color: var(--border-strong); }
+.evolve-milestones__node--perf       .evolve-milestones__card { border-left: 3px solid var(--success); }
+.evolve-milestones__node--behavior   .evolve-milestones__card { border-left: 3px solid var(--info); }
+.evolve-milestones__node--capability .evolve-milestones__card { border-left: 3px solid var(--brand); }
+.evolve-milestones__card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.evolve-milestones__icon-wrap {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.evolve-milestones__node--perf       .evolve-milestones__type-icon { color: var(--success); }
+.evolve-milestones__node--behavior   .evolve-milestones__type-icon { color: var(--info); }
+.evolve-milestones__node--capability .evolve-milestones__type-icon { color: var(--brand-strong); }
+.evolve-milestones__time {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+}
+.evolve-milestones__card-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.35;
+}
+.evolve-milestones__card-desc {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0;
+}
+.evolve-milestones__impact {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding-top: var(--sp-1);
+  border-top: 1px dashed var(--border-subtle, var(--border));
+  margin-top: 2px;
+}
+.evolve-milestones__impact-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.evolve-milestones__impact-value {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Heatmap ── */
@@ -434,4 +731,25 @@ onMounted(() => {
 .heatmap__cell--lo { background: var(--fail-bg); color: var(--fail-strong); }
 
 .muted { color: var(--text-muted); }
+
+/* ── 演化里程碑响应式 ── */
+@media (max-width: 700px) {
+  .evolve-milestones__node {
+    grid-template-columns: 24px 1fr;
+    gap: var(--sp-2);
+  }
+  .evolve-milestones__card {
+    padding: var(--sp-2);
+  }
+  .evolve-milestones__card-title {
+    font-size: var(--fs-sm);
+  }
+}
+@media (max-width: 480px) {
+  .evolve-milestones__impact {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+}
 </style>

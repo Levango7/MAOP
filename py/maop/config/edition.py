@@ -210,8 +210,25 @@ def _detect_with_license_check(requested: Edition) -> Edition:
     if requested != Edition.ENTERPRISE:
         return requested
 
+    # Stage 1: import the license module.  If it is unavailable we degrade
+    # to PERSONAL immediately — this also guarantees that ``LicenseError``
+    # is bound before the ``except LicenseError`` clause in stage 2.
     try:
         from maop.enterprise.license import LicenseError, LicenseValidator
+    except ImportError:
+        # maop.enterprise.license not available — treat as no license.
+        # Prior behavior honored package detection; that is a bypass path
+        # (patch out the license module to get enterprise) — now degraded.
+        logger.info(
+            "[edition] License validation module unavailable; "
+            "enterprise features disabled (personal edition)."
+        )
+        record_degradation("license", "enterprise", "personal", "no_license_module")
+        return Edition.PERSONAL
+
+    # Stage 2: validate the license.  LicenseError is guaranteed to be
+    # defined here because stage 1 returned early on ImportError.
+    try:
         validator = LicenseValidator()
         info = validator.validate_from_env()
         if info is None:
@@ -258,16 +275,6 @@ def _detect_with_license_check(requested: Edition) -> Edition:
             "[edition] License validation failed: %s. Degrading to PERSONAL.", exc
         )
         record_degradation("license", "enterprise", "personal", "license_invalid")
-        return Edition.PERSONAL
-    except ImportError:
-        # maop.enterprise.license not available — treat as no license.
-        # Prior behavior honored package detection; that is a bypass path
-        # (patch out the license module to get enterprise) — now degraded.
-        logger.info(
-            "[edition] License validation module unavailable; "
-            "enterprise features disabled (personal edition)."
-        )
-        record_degradation("license", "enterprise", "personal", "no_license_module")
         return Edition.PERSONAL
     except Exception:
         logger.exception(

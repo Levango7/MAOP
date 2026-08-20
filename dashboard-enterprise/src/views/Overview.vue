@@ -31,6 +31,53 @@
       <span class="ov-hero__fresh muted">{{ t('view.overview.updated') }} {{ freshnessText }}</span>
     </div>
 
+    <!-- ── 企业版差异化叙事: Plan-Execute-Verify 三阶段工作流 ──
+         个人版不渲染此区块 (edition.isEnterprise 控制)。
+         纯展示: 不调用任何 API, 不修改任何数据流, 只读 edition store。 -->
+    <section
+      v-if="!error && edition.isEnterprise"
+      class="ov-pev"
+      aria-label="Plan-Execute-Verify workflow"
+    >
+      <header class="ov-pev__head">
+        <div class="ov-pev__title-row">
+          <AppIcon name="route" :size="16" class="ov-pev__title-icon" />
+          <h2 class="ov-pev__title">{{ t('view.overview.pev.title') }}</h2>
+          <Badge tone="brand">{{ edition.edition }}</Badge>
+        </div>
+        <p class="ov-pev__subtitle muted">{{ t('view.overview.pev.subtitle') }}</p>
+      </header>
+
+      <ol class="ov-pev__phases" role="list">
+        <li
+          v-for="(phase, idx) in pevPhases"
+          :key="phase.key"
+          class="ov-pev__phase"
+          :class="['ov-pev__phase--' + phase.key, { 'ov-pev__phase--first': idx === 0, 'ov-pev__phase--last': idx === pevPhases.length - 1 }]"
+          role="listitem"
+        >
+          <div class="ov-pev__icon-wrap">
+            <AppIcon :name="phase.icon" :size="20" class="ov-pev__icon" />
+          </div>
+          <div class="ov-pev__phase-body">
+            <div class="ov-pev__phase-head">
+              <span class="ov-pev__phase-title">{{ t(phase.titleKey) }}</span>
+              <Badge :tone="phase.stateTone">{{ t(phase.stateKey) }}</Badge>
+            </div>
+            <p class="ov-pev__phase-desc muted">{{ t(phase.descKey) }}</p>
+          </div>
+          <span
+            v-if="idx < pevPhases.length - 1"
+            class="ov-pev__connector"
+            aria-hidden="true"
+          >
+            <AppIcon name="chevron-right" :size="14" />
+            <span class="ov-pev__connector-label">{{ t('view.overview.pev.connector') }}</span>
+          </span>
+        </li>
+      </ol>
+    </section>
+
     <!-- ── 层 2: Action 磁贴 — 引导用户"下一步做什么" ── -->
     <nav class="ov-actions" aria-label="Quick actions">
       <router-link v-for="a in quickActions" :key="a.to" :to="a.to" class="ov-action">
@@ -225,6 +272,15 @@ const quickActions = [
   { to: '/logs', label: 'view.overview.actionLogs', icon: 'scroll' },
 ];
 
+// ── Plan-Execute-Verify 三阶段工作流叙事 (企业版差异化) ──
+// 纯静态描述: 不调用 API, 不依赖 data ref, 只读 i18n + edition store。
+// 三个阶段分别用 route/play/check-circle 图标, 状态徽章用 brand/info/success。
+const pevPhases = [
+  { key: 'plan',    icon: 'route',        titleKey: 'view.overview.pev.plan.title',    descKey: 'view.overview.pev.plan.desc',    stateKey: 'view.overview.pev.plan.state',    stateTone: 'brand' },
+  { key: 'execute', icon: 'play',         titleKey: 'view.overview.pev.execute.title', descKey: 'view.overview.pev.execute.desc', stateKey: 'view.overview.pev.execute.state', stateTone: 'info' },
+  { key: 'verify',  icon: 'check-circle', titleKey: 'view.overview.pev.verify.title',  descKey: 'view.overview.pev.verify.desc',  stateKey: 'view.overview.pev.verify.state',  stateTone: 'success' },
+];
+
 // Dedup palette: 10 visually distinct accent colors, one per KPI, so the
 // colored left borders never repeat within the grid. Values reference theme
 // tokens (var(--chart-N)) so charts follow the active dark/light theme.
@@ -383,6 +439,136 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 .ov-hero__kpi { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .ov-hero__fresh { margin-left: auto; font-size: var(--fs-xs); }
 
+/* ── Plan-Execute-Verify 叙事 (企业版差异化) ───────────────────────────
+ * 设计语言对齐 workbench: 1px 描边卡片, 无阴影/无渐变, 中性灰底。
+ * 三阶段用 grid 横排, 每阶段一张卡片; 阶段间用 chevron + "then" 连接。
+ * 响应式: ≤1200px 切两列, ≤700px 切单列, 连接符在窄屏下隐藏。 */
+.ov-pev {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.ov-pev__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.ov-pev__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.ov-pev__title-icon {
+  color: var(--brand-strong);
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-faint);
+  flex-shrink: 0;
+}
+.ov-pev__title {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.ov-pev__subtitle {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  margin: 0;
+}
+.ov-pev__phases {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--sp-3);
+  position: relative;
+}
+.ov-pev__phase {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--r-md);
+  min-height: 88px;
+  transition: border-color var(--motion) var(--ease);
+}
+.ov-pev__phase:hover { border-color: var(--border-strong); }
+.ov-pev__phase--plan    { border-left: 3px solid var(--brand); }
+.ov-pev__phase--execute { border-left: 3px solid var(--info); }
+.ov-pev__phase--verify  { border-left: 3px solid var(--success); }
+.ov-pev__icon-wrap {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.ov-pev__phase--plan    .ov-pev__icon { color: var(--brand-strong); }
+.ov-pev__phase--execute .ov-pev__icon { color: var(--info); }
+.ov-pev__phase--verify  .ov-pev__icon { color: var(--success); }
+.ov-pev__phase-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+  flex: 1;
+}
+.ov-pev__phase-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.ov-pev__phase-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text);
+}
+.ov-pev__phase-desc {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+.ov-pev__connector {
+  position: absolute;
+  right: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-faint);
+  pointer-events: none;
+  z-index: 1;
+}
+.ov-pev__connector-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.ov-pev__phase--last .ov-pev__connector { display: none; }
+
 /* ── Quick actions — 4 磁贴, 视觉上是明确的"按钮卡" ── */
 .ov-actions {
   display: grid;
@@ -438,10 +624,17 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 
 @media (max-width: 1200px) {
   .ov-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ov-pev__phases { grid-template-columns: 1fr 1fr; }
+  .ov-pev__phase--last { grid-column: 1 / -1; }
+  .ov-pev__connector { display: none; }
 }
 @media (max-width: 900px) {
   .ov-split { grid-template-columns: 1fr; }
   .ov-hero__kpi { display: none; }
+}
+@media (max-width: 700px) {
+  .ov-pev__phases { grid-template-columns: 1fr; }
+  .ov-pev__phase--last { grid-column: auto; }
 }
 @media (max-width: 520px) {
   .ov-actions { grid-template-columns: 1fr; }

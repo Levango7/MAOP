@@ -44,6 +44,15 @@ export const messages = {
     'view.evolve.colVersion': 'Version',
     'view.evolve.colChange': 'Change',
     'view.evolve.colImproved': 'Improved',
+
+    // ── 演化时间线叙事 (企业版差异化) ─────────────────────────────
+    'view.evolve.milestones.title': 'Evolution Milestones',
+    'view.evolve.milestones.subtitle': 'Self-tuning milestones — how the agent fleet reshaped itself over recent cycles',
+    'view.evolve.milestones.type.perf': 'Performance',
+    'view.evolve.milestones.type.behavior': 'Behavior',
+    'view.evolve.milestones.type.capability': 'Capability',
+    'view.evolve.milestones.impact': 'Impact',
+    'view.evolve.milestones.empty': 'No milestones yet — trigger a tuning run to start the timeline',
   },
   zh: {
     'view.evolve.title': '规则驱动自动调优',
@@ -90,5 +99,14 @@ export const messages = {
     'view.evolve.colVersion': '版本',
     'view.evolve.colChange': '变更',
     'view.evolve.colImproved': '是否改善',
+
+    // ── 演化时间线叙事 (企业版差异化) ─────────────────────────────
+    'view.evolve.milestones.title': '演化里程碑',
+    'view.evolve.milestones.subtitle': '自调优里程碑——智能体集群在最近若干轮次中如何重塑自身',
+    'view.evolve.milestones.type.perf': '性能改进',
+    'view.evolve.milestones.type.behavior': '行为调整',
+    'view.evolve.milestones.type.capability': '新能力',
+    'view.evolve.milestones.impact': '影响',
+    'view.evolve.milestones.empty': '暂无里程碑——触发一次调优以开启时间线',
   },
 };

@@ -522,10 +522,12 @@ async function openDetail(tenant) {
   detailAlerts.value = [];
 
   const id = tenant.tenant_id;
-  // 并行加载告警与使用量；trend/history 后端暂无端点，保持空状态
-  const [alertsRes, usageRes] = await Promise.allSettled([
+  // 并行加载告警、使用量与配额变更历史；trend 后端暂无端点，保持空状态
+  const historyUrl = `/api/quotas/history?tenant_id=${encodeURIComponent(id)}&limit=50`;
+  const [alertsRes, usageRes, historyRes] = await Promise.allSettled([
     api.get(`/api/quotas/${id}/alerts`),
     api.get(`/api/quotas/${id}/usage`),
+    api.get(historyUrl),
   ]);
 
   if (alertsRes.status === 'fulfilled') {
@@ -537,6 +539,10 @@ async function openDetail(tenant) {
     const usageMap = {};
     usages.forEach((u) => { if (u && u.resource) usageMap[u.resource] = u.used; });
     detailTenant.value = { ...tenant, usage: { ...(tenant.usage || {}), ...usageMap } };
+  }
+  // 配额变更历史
+  if (historyRes.status === 'fulfilled' && historyRes.value) {
+    quotaHistory.value = historyRes.value.history || [];
   }
 }
 

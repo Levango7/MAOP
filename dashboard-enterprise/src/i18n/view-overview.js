@@ -45,6 +45,20 @@ export const messages = {
     'view.overview.colError': 'Error',
     'view.overview.colCount': 'Count',
     'view.overview.colRate': 'Rate',
+
+    // ── Plan-Execute-Verify 工作流叙事 (企业版差异化) ──────────────
+    'view.overview.pev.title': 'Plan → Execute → Verify',
+    'view.overview.pev.subtitle': 'MAOP enterprise workflow — every delegation runs through a closed three-phase loop',
+    'view.overview.pev.plan.title': 'Plan',
+    'view.overview.pev.plan.desc': 'Decompose the objective, select agents, and lock the execution graph before any tool runs.',
+    'view.overview.pev.plan.state': 'Ready',
+    'view.overview.pev.execute.title': 'Execute',
+    'view.overview.pev.execute.desc': 'Dispatch sub-tasks to chosen agents in parallel or sequence; stream progress back in real time.',
+    'view.overview.pev.execute.state': 'Running',
+    'view.overview.pev.verify.title': 'Verify',
+    'view.overview.pev.verify.desc': 'Cross-check outputs against acceptance gates, replay failures, and gate promotion on evidence.',
+    'view.overview.pev.verify.state': 'Gated',
+    'view.overview.pev.connector': 'then',
   },    'view.overview.Failed to load overview': 'Failed to load overview',
 
   zh: {
@@ -93,6 +107,20 @@ export const messages = {
     'view.overview.colError': '错误',
     'view.overview.colCount': '次数',
     'view.overview.colRate': '比率',
+
+    // ── Plan-Execute-Verify 工作流叙事 (企业版差异化) ──────────────
+    'view.overview.pev.title': '规划 → 执行 → 验证',
+    'view.overview.pev.subtitle': 'MAOP 企业版工作流——每一次委派都跑在闭合的三阶段循环里',
+    'view.overview.pev.plan.title': '规划',
+    'view.overview.pev.plan.desc': '拆解目标、选定智能体，并在任何工具运行前锁定执行图。',
+    'view.overview.pev.plan.state': '就绪',
+    'view.overview.pev.execute.title': '执行',
+    'view.overview.pev.execute.desc': '按并行或串行调度把子任务分发给选定智能体，实时回流进度。',
+    'view.overview.pev.execute.state': '运行中',
+    'view.overview.pev.verify.title': '验证',
+    'view.overview.pev.verify.desc': '依据验收门交叉校验产出、回放失败、按证据放行晋升。',
+    'view.overview.pev.verify.state': '门禁',
+    'view.overview.pev.connector': '而后',
     'view.overview.Failed to load overview': '加载概览失败',
   },
 };

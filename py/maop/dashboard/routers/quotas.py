@@ -14,25 +14,27 @@
   - ``POST   /api/quotas/{tenant_id}/{resource}/consume`` — 检查+消费
   - ``GET    /api/quotas/{tenant_id}/alerts``             — 列出告警
   - ``POST   /api/quotas/alerts/{alert_id}/resolve``      — 解决告警
+  - ``GET    /api/quotas/history``                        — 配额变更历史
 
 所有操作要求 admin 角色(``require_admin``) + ``FeatureFlag.TENANT_ISOLATION``.
 
 路由注册顺序注意: 固定段路径(``/alerts/...``, ``/{tenant_id}/usage``,
-``/{tenant_id}/alerts``)必须在参数段路径(``/{tenant_id}/{resource}``)之前
-注册,否则 ``/t1/usage`` 会被 ``/{tenant_id}/{resource}`` 匹配为
-tenant_id=t1, resource=usage.
+``/{tenant_id}/alerts``, ``/history``)必须在参数段路径
+(``/{tenant_id}/{resource}``)之前注册,否则 ``/t1/usage`` 会被
+``/{tenant_id}/{resource}`` 匹配为 tenant_id=t1, resource=usage.
 """
 
 from __future__ import annotations
 
 import logging
+import sqlite3
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from maop.config.edition import FeatureFlag, has_feature
-from maop.core.backends.db_utils import unified_db_path
+from maop.core.backends.db_utils import sqlite_connect, unified_db_path
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
@@ -59,6 +61,23 @@ def _require_tenant_isolation() -> None:
             status_code=404,
             detail="tenant isolation not available in this edition",
         )
+
+
+def _quota_history_table_exists(conn: sqlite3.Connection) -> bool:
+    """检查 ``quota_history`` 表是否存在于当前数据库.
+
+    使用 ``sqlite_master`` 查询而非 ``PRAGMA table_info`` 以避免在
+    事务中产生隐式提交. 失败时返回 ``False`` (fail-open 语义).
+    """
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='table' AND name='quota_history' LIMIT 1",
+        ).fetchone()
+        return row is not None
+    except sqlite3.Error as exc:
+        logger.warning("[quotas.history] table existence check failed: %s", exc)
+        return False
 
 
 # ── 请求模型 ──────────────────────────────────────────────────────
@@ -101,6 +120,74 @@ class CheckRequest(BaseModel):
 
 
 # ── 告警端点(固定段路径,必须先注册) ──────────────────────────────
+
+
+@router.get("/history")
+@handle_api_errors
+async def list_quota_history(
+    request: Request,
+    tenant_id: str | None = Query(
+        default=None,
+        description="可选: 按租户过滤变更历史",
+    ),
+    limit: int = Query(default=50, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, Any]:
+    """列出配额变更历史记录.
+
+    从 unified SQLite 数据库的 ``quota_history`` 表读取. 若该表不存在
+    (未启用历史记录或全新数据库), 返回空列表而非 404, 这样前端
+    ``Quotas.vue`` 的 ``quotaHistory`` 区块可以平滑降级为 EmptyState.
+
+    每条记录字段:
+      - ``id``         — 记录唯一标识
+      - ``tenant_id``  — 租户 ID
+      - ``resource``   — 资源标识
+      - ``field``      — 变更字段(hard_limit / soft_limit / period)
+      - ``old_value``  — 旧值(字符串)
+      - ``new_value``  — 新值(字符串)
+      - ``changed_by`` — 操作人
+      - ``changed_at`` — 变更时间(UNIX 时间戳, 秒)
+    """
+    require_admin(request)
+    _require_tenant_isolation()
+    db_path = unified_db_path()
+    try:
+        with sqlite_connect(db_path) as conn:
+            if not _quota_history_table_exists(conn):
+                return {"status": "ok", "history": [], "count": 0}
+            if tenant_id is not None:
+                rows = conn.execute(
+                    "SELECT id, tenant_id, resource, field, "
+                    "old_value, new_value, changed_by, changed_at "
+                    "FROM quota_history WHERE tenant_id = ? "
+                    "ORDER BY changed_at DESC LIMIT ? OFFSET ?",
+                    (tenant_id, limit, offset),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT id, tenant_id, resource, field, "
+                    "old_value, new_value, changed_by, changed_at "
+                    "FROM quota_history "
+                    "ORDER BY changed_at DESC LIMIT ? OFFSET ?",
+                    (limit, offset),
+                ).fetchall()
+    except sqlite3.Error as exc:
+        logger.warning("[quotas.history] query failed: %s", exc)
+        return {"status": "ok", "history": [], "count": 0}
+    history: list[dict[str, Any]] = []
+    for r in rows:
+        history.append({
+            "id": r[0],
+            "tenant_id": r[1],
+            "resource": r[2],
+            "field": r[3],
+            "old_value": r[4],
+            "new_value": r[5],
+            "changed_by": r[6],
+            "changed_at": r[7],
+        })
+    return {"status": "ok", "history": history, "count": len(history)}
 
 
 @router.post("/alerts/{alert_id}/resolve")
