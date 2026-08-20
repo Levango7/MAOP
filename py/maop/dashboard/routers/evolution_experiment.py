@@ -278,3 +278,61 @@ async def api_evolution_skill_composite(request: Request) -> dict[str, Any]:
         status_code=501,
         detail="skill persistence not implemented; Skill system backend pending",
     )
+
+
+# ── 演化案例叙事 ───────────────────────────────────────────────
+
+
+def _evo_loop() -> Any:
+    """EvolutionLoop 实例（ErrorLedger 驱动的七段闭环，写入 evolution_cycles 表）。"""
+    from maop.core.evolution.evolution_loop import EvolutionLoop
+
+    return EvolutionLoop(root_dir=str(MAOP_ROOT))
+
+
+def _find_cycle_report(loop: Any, cycle_id: str) -> Any:
+    """从演化历史中查找指定 cycle_id 的 LoopReport，未命中返回 None。"""
+    for report in loop.get_cycle_history(limit=1000):
+        if report.cycle_id == cycle_id:
+            return report
+    return None
+
+
+@router.get("/api/evolution/narrative/{cycle_id}")
+@handle_api_errors("evolution narrative", error_value={"status": "error"})
+async def api_evolution_narrative(cycle_id: str, request: Request) -> dict[str, Any]:
+    """获取指定演化周期的人类可读叙事。
+
+    Path params:
+        cycle_id — EvolutionLoop 周期 ID
+    Query params:
+        format — "markdown"（默认）或 "json"
+
+    Returns:
+        format=markdown → ``{"status": "ok", "format": "markdown", "markdown": "..."}``
+        format=json     → ``{"status": "ok", "format": "json", "narrative": {...}}``
+    """
+    fmt = request.query_params.get("format", "markdown").lower()
+    loop = _evo_loop()
+    report = _find_cycle_report(loop, cycle_id)
+    if report is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"evolution cycle '{cycle_id}' not found",
+        )
+    from maop.core.evolution.narrative import EvolutionNarrative
+
+    narrative = EvolutionNarrative()
+    if fmt == "json":
+        return {
+            "status": "ok",
+            "cycle_id": cycle_id,
+            "format": "json",
+            "narrative": narrative.to_json(report),
+        }
+    return {
+        "status": "ok",
+        "cycle_id": cycle_id,
+        "format": "markdown",
+        "markdown": narrative.to_markdown(report),
+    }

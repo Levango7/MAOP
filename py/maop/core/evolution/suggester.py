@@ -43,7 +43,7 @@ Each candidate MUST be a JSON object with these fields:
   - severity: HIGH | MEDIUM | LOW
   - description: one-line human-readable reason
   - target_name: the agent or routing key to change
-  - mutation_params: object with concrete parameters (e.g. {"timeout_s": 120})
+  - mutation_params: object with concrete parameters (e.g. {{"timeout_s": 120}})
   - auto_applicable: true if safe to auto-apply without human review
 
 Return a JSON array. No prose, no markdown fences.
