@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("maop.enterprise")
+
 try:
     import cryptography  # noqa: F401
     _has_cryptography = True

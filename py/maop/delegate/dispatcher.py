@@ -36,6 +36,7 @@ import logging
 from maop.delegate.dispatch_core import (  # noqa: F401
     Dispatcher,
     _record_dispatcher_decision,
+    otel_span,
 )
 
 # ── Re-export tool / lazy-subsystem helpers ──

@@ -7,6 +7,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+pytest.importorskip("maop.enterprise")
+
 from maop.enterprise.ha import (
     HAConfig,
     HAManager,

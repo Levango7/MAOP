@@ -63,6 +63,7 @@ def tenant_client(tmp_path, monkeypatch):
 
 class TestTenantList:
     def test_list(self, tenant_client):
+        pytest.importorskip("maop.enterprise")
         resp = tenant_client.get("/api/tenant/list")
         assert resp.status_code == 200
 
@@ -73,6 +74,7 @@ class TestTenantList:
 
 class TestTenantCreate:
     def test_happy(self, tenant_client):
+        pytest.importorskip("maop.enterprise")
         resp = tenant_client.post(
             "/api/tenant/create",
             json={"tenant_id": "t1", "name": "test"},

@@ -6,13 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from maop.config.edition import (
-    Edition,
-    FeatureFlag,
-    reset_edition,
-    set_edition,
-    set_feature_override,
-)
+pytest.importorskip("maop.enterprise")
+
 from maop.enterprise.n8n import (
     N8nClient,
     N8nIntegrationError,
@@ -20,6 +15,14 @@ from maop.enterprise.n8n import (
     N8nWorkflowExecution,
     handle_n8n_webhook,
     require_n8n_feature,
+)
+
+from maop.config.edition import (
+    Edition,
+    FeatureFlag,
+    reset_edition,
+    set_edition,
+    set_feature_override,
 )
 
 

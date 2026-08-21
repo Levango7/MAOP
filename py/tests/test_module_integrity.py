@@ -16,10 +16,11 @@ import json
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("maop.enterprise")
+import maop.enterprise.license as license_mod
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
-import maop.enterprise.license as license_mod
 
 
 @pytest.fixture()

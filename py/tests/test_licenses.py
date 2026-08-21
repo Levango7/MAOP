@@ -20,6 +20,8 @@ from types import SimpleNamespace
 
 import pytest
 
+pytest.importorskip("maop.enterprise")
+
 from maop.enterprise.license_manager import (
     LicenseCreateRequest,
     LicenseManager,

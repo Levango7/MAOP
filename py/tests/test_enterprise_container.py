@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+pytest.importorskip("maop.enterprise")
+
 from maop.enterprise.container import (
     ContainerConfig,
     ContainerOrchestrator,

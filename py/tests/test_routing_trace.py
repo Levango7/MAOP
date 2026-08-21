@@ -89,13 +89,15 @@ def recording_spans():
     _span_calls.clear()
     import maop.core.routing.load_balancer as _lb
     import maop.core.routing.route_scorer as _rs
+    import maop.delegate.dispatch_core as _dcore
     import maop.delegate.dispatcher as _disp
     import maop.model.selector as _sel
     with patch.object(otel_module, "span", _recording_span), \
          patch.object(_rs, "otel_span", _recording_span), \
          patch.object(_lb, "otel_span", _recording_span), \
          patch.object(_sel, "otel_span", _recording_span), \
-         patch.object(_disp, "otel_span", _recording_span):
+         patch.object(_disp, "otel_span", _recording_span), \
+         patch.object(_dcore, "otel_span", _recording_span):
         yield _span_calls
 
 

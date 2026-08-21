@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+pytest.importorskip("maop.enterprise")
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa

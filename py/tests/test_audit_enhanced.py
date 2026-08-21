@@ -21,9 +21,10 @@ import time
 from typing import Any
 
 import pytest
+
+pytest.importorskip("maop.enterprise")
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from maop.enterprise.audit import (
     AuditAction,
     AuditEvent,

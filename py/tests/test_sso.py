@@ -15,9 +15,8 @@ import time
 from typing import Any
 
 import pytest
-from typing_extensions import Self
 
-from maop.config.edition import Edition, reset_edition, set_edition
+pytest.importorskip("maop.enterprise")
 from maop.enterprise.sso import (
     SSOConfig,
     SSOError,
@@ -25,6 +24,9 @@ from maop.enterprise.sso import (
     SSOProvider,
     SSOSession,
 )
+from typing_extensions import Self
+
+from maop.config.edition import Edition, reset_edition, set_edition
 
 
 @pytest.fixture(autouse=True)
@@ -718,7 +720,6 @@ class TestSAMLHandler:
 
     def test_handle_response_missing_assertion_rejected(self):
         from lxml import etree
-
         from maop.enterprise.saml_handler import SAMLHandler
 
         _key, cert_b64 = _generate_test_cert()

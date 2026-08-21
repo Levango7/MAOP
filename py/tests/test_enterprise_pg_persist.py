@@ -6,6 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytest.importorskip("maop.enterprise")
+
 
 @pytest.fixture(autouse=True)
 def enterprise_mode():

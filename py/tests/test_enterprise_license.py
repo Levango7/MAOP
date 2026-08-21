@@ -9,10 +9,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("maop.enterprise")
+import maop.enterprise.license as _license_mod
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
-import maop.enterprise.license as _license_mod
 from maop.enterprise.license import (
     LicenseExpiredError,
     LicenseFormatError,
@@ -64,10 +65,9 @@ _DEV_PRIVATE_KEY = _TEST_PRIVATE_PATH
 
 import tempfile
 
+import maop.enterprise.license as _license_mod
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
-import maop.enterprise.license as _license_mod
 
 
 def _generate_test_license(

@@ -6,6 +6,8 @@ import time
 
 import pytest
 
+pytest.importorskip("maop.enterprise")
+
 from maop.enterprise.audit import (
     AuditAction,
     AuditSeverity,

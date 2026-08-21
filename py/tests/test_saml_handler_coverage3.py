@@ -12,6 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytest.importorskip("maop.enterprise")
+
 # ── Helpers ─────────────────────────────────────────────────────────
 
 
@@ -399,7 +401,6 @@ class TestValidateConditionsBranches:
     def test_not_before_parse_exception(self):
         """Cover NotBefore parse failure (547-548)."""
         from lxml import etree
-
         from maop.enterprise.sso import SSOError
         handler = _make_handler()
         xml = b"""<Assertion xmlns="urn:oasis:names:tc:SAML:2.0:assertion">
@@ -412,7 +413,6 @@ class TestValidateConditionsBranches:
     def test_not_on_or_after_parse_exception(self):
         """Cover NotOnOrAfter parse failure (560-561)."""
         from lxml import etree
-
         from maop.enterprise.sso import SSOError
         handler = _make_handler()
         xml = b"""<Assertion xmlns="urn:oasis:names:tc:SAML:2.0:assertion">
@@ -425,7 +425,6 @@ class TestValidateConditionsBranches:
     def test_audience_restriction_no_audience(self):
         """Cover AudienceRestriction with no Audience (573)."""
         from lxml import etree
-
         from maop.enterprise.sso import SSOError
         handler = _make_handler()
         xml = b"""<Assertion xmlns="urn:oasis:names:tc:SAML:2.0:assertion">

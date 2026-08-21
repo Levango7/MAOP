@@ -16,9 +16,8 @@ import urllib.error
 from typing import Any
 
 import pytest
-from typing_extensions import Self
 
-from maop.config.edition import Edition, reset_edition, set_edition
+pytest.importorskip("maop.enterprise")
 from maop.enterprise.sso import (
     SSOConfig,
     SSOManager,
@@ -36,6 +35,9 @@ from maop.enterprise.sso_store import (
     SSOProviderUpdate,
     mask_sensitive_fields,
 )
+from typing_extensions import Self
+
+from maop.config.edition import Edition, reset_edition, set_edition
 
 # ── Edition fixture ──────────────────────────────────────────────────
 

@@ -14,9 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("maop.enterprise")
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from maop.enterprise.quota import (
     QuotaCheckResult,
     QuotaCreate,
@@ -548,9 +549,8 @@ class TestQuotaMiddleware:
     def test_soft_limit_warns_but_allows(self, db_path: Path):
         """软限制触发 → 200 + X-Quota-Warning 头."""
         from fastapi import Request as _Req
-        from starlette.middleware.base import BaseHTTPMiddleware
-
         from maop.enterprise.quota_middleware import QuotaMiddleware
+        from starlette.middleware.base import BaseHTTPMiddleware
 
         qm = QuotaManager(db_path, cache_ttl_s=0.0)
         qm.set_quota("t1", "api_calls", 100, soft_limit=80)

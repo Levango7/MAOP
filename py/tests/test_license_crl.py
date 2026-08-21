@@ -16,10 +16,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from typing_extensions import Self
 
+pytest.importorskip("maop.enterprise")
 from maop.enterprise.crl import CRLChecker, CRLError, LicenseRevokedError
 from maop.enterprise.license import LicenseInfo
+from typing_extensions import Self
 
 # -- 辅助函数 ---------------------------------------------------------------
 

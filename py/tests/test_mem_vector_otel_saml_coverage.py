@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import pytest
 
+pytest.importorskip("maop.enterprise")
+
 # ── Memory Search (via real MemoryStore) ────────────────────────────
 
 class TestMemorySearch:
