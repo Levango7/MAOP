@@ -19,6 +19,10 @@
         <AppIcon name="refresh" :size="14" />
         {{ refreshing ? t('common.loading') : t('common.refresh') }}
       </button>
+      <button class="btn-action" :class="{ 'pulse-once': loadingPresets }" :disabled="loadingPresets || !isAdmin" :title="!isAdmin ? t('nav.editionLocked') : ''" @click="loadPresets">
+        <AppIcon name="sparkles" :size="14" />
+        {{ loadingPresets ? t('common.loading') : t('view.agents.loadPresets') }}
+      </button>
     </PageHeader>
 
     <Card :title="t('view.agents.dispatchRouter')" :subtitle="t('view.agents.dispatchRouterSub')" :margin-bottom="24">
@@ -501,6 +505,7 @@ const selectedCapabilities = ref([]);
 const perfHistory = ref([]);
 const loading = ref(true);
 const refreshing = ref(false);
+const loadingPresets = ref(false);
 const scanned = ref([]);
 const scanning = ref(false);
 const isAdmin = ref(false);
@@ -898,6 +903,47 @@ async function loadAgents() {
   loading.value = false;
   refreshing.value = false;
   if (!ok && !agents.value.length) { /* error already surfaced via toast + empty state */ }
+}
+
+async function loadPresets() {
+  loadingPresets.value = true;
+  try {
+    const data = await api.get('/api/agents/presets');
+    const presets = data?.presets || [];
+    if (!presets.length) {
+      toast.info(t('view.agents.noPresets'));
+      return;
+    }
+    let created = 0;
+    let skipped = 0;
+    for (const p of presets) {
+      try {
+        await api.post('/api/agents/register', {
+          name: p.name,
+          cli_path: p.cli || '',
+          capabilities: p.capabilities || [],
+          description: p.description || '',
+          model: p.model || 'auto',
+          driver: p.driver || 'cli',
+          cli_args: p.cli_args || '',
+          timeout_s: p.timeout_s || 120,
+        });
+        created++;
+      } catch {
+        skipped++;
+      }
+    }
+    if (created > 0) {
+      toast.success(t('view.agents.presetsLoaded', { created, skipped }));
+      await loadAgents();
+    } else {
+      toast.info(t('view.agents.presetsAllExist'));
+    }
+  } catch (e) {
+    toast.error(t('view.agents.loadPresetsFailed') + (e.message ? ': ' + e.message : ''));
+  } finally {
+    loadingPresets.value = false;
+  }
 }
 
 async function loadDecisions() {

@@ -123,6 +123,59 @@ async def list_agents(
     return {"agents": [a.model_dump() for a in agents]}
 
 
+# ── 预置示例 Agent 模板（P1-4） ──────────────────────────────────────
+
+PRESET_AGENTS: list[dict[str, Any]] = [
+    {
+        "name": "code-reviewer",
+        "description": "代码审查助手 — 审查代码质量、发现 bug、提供建议",
+        "capabilities": ["review", "codegen", "explain"],
+        "model": "auto",
+        "cli": "python",
+        "cli_args": "-m maop.cli run --task \"{task}\"",
+        "driver": "cli",
+        "timeout_s": 180,
+    },
+    {
+        "name": "doc-writer",
+        "description": "文档撰写助手 — 撰写技术文档、API 文档、用户指南",
+        "capabilities": ["chat", "explain", "search"],
+        "model": "auto",
+        "cli": "python",
+        "cli_args": "-m maop.cli run --task \"{task}\"",
+        "driver": "cli",
+        "timeout_s": 120,
+    },
+    {
+        "name": "data-analyst",
+        "description": "数据分析助手 — 分析数据、生成报告、可视化建议",
+        "capabilities": ["search", "explain", "chat"],
+        "model": "auto",
+        "cli": "python",
+        "cli_args": "-m maop.cli run --task \"{task}\"",
+        "driver": "cli",
+        "timeout_s": 120,
+    },
+    {
+        "name": "test-generator",
+        "description": "测试生成助手 — 为代码自动生成测试用例",
+        "capabilities": ["codegen", "review"],
+        "model": "auto",
+        "cli": "python",
+        "cli_args": "-m maop.cli run --task \"{task}\"",
+        "driver": "cli",
+        "timeout_s": 180,
+    },
+]
+
+
+@router.get("/presets")
+@handle_api_errors
+async def list_presets():
+    """返回预置示例 Agent 模板，供前端一键创建。"""
+    return {"presets": PRESET_AGENTS}
+
+
 @router.get("/match")
 @handle_api_errors
 async def match_agents(
