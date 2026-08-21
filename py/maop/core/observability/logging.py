@@ -50,7 +50,7 @@ class TraceCorrelationFilter(logging.Filter):
 def _current_otel_ids() -> tuple[str, str]:
     """Return (trace_id_hex, span_id_hex) of the active OTel span."""
     try:
-        from opentelemetry import trace as otel_trace
+        from opentelemetry import trace as otel_trace  # type: ignore[attr-defined]
         span = otel_trace.get_current_span()
         ctx = span.get_span_context() if span else None
         if ctx and ctx.is_valid:

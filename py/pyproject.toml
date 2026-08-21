@@ -216,6 +216,13 @@ module = [
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 
+# opentelemetry 包通过 __getattr__ 动态导出子模块 (trace, baggage, context 等),
+# mypy 无法静态解析, 需要 disable_error_code 避免 attr-defined 误报。
+[[tool.mypy.overrides]]
+module = "opentelemetry.*"
+ignore_missing_imports = true
+disable_error_code = ["attr-defined"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
