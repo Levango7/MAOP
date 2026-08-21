@@ -219,11 +219,10 @@ disallow_incomplete_defs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-# P0 fix (2026-08-14): 移除 --cov-fail-under 门禁 —— 实测全量收集覆盖率 ~18.54%
-# (import 期代码大量计入), 固定门槛在当前代码库物理上不现实,会导致本地 pytest
-# 和 CI test job 每次失败。覆盖率门禁改由 CI 中的 ratchet 脚本
-# (scripts/check_coverage_ratchet.py, FLOOR=18) 渐进管理:每次 PR 只允许 ↑ 不允许 ↓,
-# 从 18% 起步逐迭代抬升到长期目标 70%+。本地不加 --cov-report=xml（CI 专用)
+# 覆盖率门禁: 实测全量覆盖率 82% (2026-08-21 核实, 42367 语句 / 7748 未覆盖)。
+# 早期 baseline 18.54% 是过时快照, 已修正。覆盖率门禁改由 CI 中的 ratchet 脚本
+# (scripts/check_coverage_ratchet.py, FLOOR=80) 渐进管理:每次 PR 只允许 ↑ 不允许 ↓,
+# 从 80% 起步逐迭代抬升到长期目标 90%+。本地不加 --cov-report=xml（CI 专用)
 # 也不加 --ignore=tests/contract（保持本地能跑全部测试）。
 # P2-7: -n auto 启用 pytest-xdist 并行测试（需安装 pytest-xdist，已在 [dev] extra 中）。
 addopts = "-n auto --cov=maop --cov-report=term-missing"

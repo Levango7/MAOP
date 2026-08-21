@@ -27,7 +27,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 BASELINE_FILE = pathlib.Path(__file__).resolve().parent / ".cov_baseline.json"
 COVERAGE_XML = pathlib.Path(__file__).resolve().parent.parent / "coverage.xml"
-FLOOR = 18.0  # absolute minimum, never lower
+FLOOR = 80.0  # absolute minimum, never lower (2026-08-21: 实测 82%, 从 18 修正)
 
 
 def _read_coverage() -> float:
