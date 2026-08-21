@@ -44,11 +44,13 @@ export const messages = {
     'view.overview.colAgent': 'Agent',
     'view.overview.colError': 'Error',
     'view.overview.colCount': 'Count',
+    'view.overview.maosUpgrade': 'Want SSO, RBAC, and audit logs? Upgrade to',
+    'view.overview.getLicense': 'MAOS Enterprise',
     'view.overview.colRate': 'Rate',
 
-    // ── Plan-Execute-Verify 工作流叙事 (企业版差异化) ──────────────
+    // ── Plan-Execute-Verify (MAOS 企业版差异化) ──────────────
     'view.overview.pev.title': 'Plan → Execute → Verify',
-    'view.overview.pev.subtitle': 'MAOP enterprise workflow — every delegation runs through a closed three-phase loop',
+    'view.overview.pev.subtitle': 'MAOS enterprise workflow — every delegation runs through a closed three-phase loop',
     'view.overview.pev.plan.title': 'Plan',
     'view.overview.pev.plan.desc': 'Decompose the objective, select agents, and lock the execution graph before any tool runs.',
     'view.overview.pev.plan.state': 'Ready',
@@ -107,10 +109,12 @@ export const messages = {
     'view.overview.colError': '错误',
     'view.overview.colCount': '次数',
     'view.overview.colRate': '比率',
+    'view.overview.maosUpgrade': '想要 SSO 单点登录、RBAC 权限、审计日志？升级到',
+    'view.overview.getLicense': 'MAOS 企业版',
 
     // ── Plan-Execute-Verify 工作流叙事 (企业版差异化) ──────────────
     'view.overview.pev.title': '规划 → 执行 → 验证',
-    'view.overview.pev.subtitle': 'MAOP 企业版工作流——每一次委派都跑在闭合的三阶段循环里',
+    'view.overview.pev.subtitle': 'MAOS 企业版工作流——每一次委派都跑在闭合的三阶段循环里',
     'view.overview.pev.plan.title': '规划',
     'view.overview.pev.plan.desc': '拆解目标、选定智能体，并在任何工具运行前锁定执行图。',
     'view.overview.pev.plan.state': '就绪',

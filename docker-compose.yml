@@ -1,10 +1,14 @@
-# MAOP v4.0 — Cloud-Native Microservice Deployment
+# MAOP / MAOS — Cloud-Native Microservice Deployment
+#
+# 品牌定位:
+#   MAOP (Multi-Agent Orchestration Platform) — 个人版, 免费开源
+#   MAOS (Multi-Agent Orchestration Suite)    — 企业版, 需 License
 #
 # Services:
 #   dashboard     — FastAPI web UI + API gateway
 #   agent-exec    — Agent execution worker (dispatches to LLM drivers)
 #   queue-worker  — Background queue consumer (human approval, async tasks)
-#   db            — Storage: SQLite (Personal, single-process) | PostgreSQL (Enterprise, --profile postgres)
+#   db            — Storage: SQLite (MAOP Personal, single-process) | PostgreSQL (MAOS Enterprise, --profile postgres)
 #
 # Quick start:  docker compose up -d
 # With OTel:    docker compose --profile otel up -d
@@ -20,9 +24,9 @@
 # Always run `docker compose` from the repo root.
 
 # Storage architecture (T2-10 revised 2026-07-27):
-#   Personal (no license) → SQLite, single-process or this multi-service demo compose.
+#   MAOP Personal (no license) → SQLite, single-process or this multi-service demo compose.
 #     SQLite WAL supports 1 writer + N readers; for multi-container demo only.
-#   Enterprise (with license) → PostgreSQL via --profile postgres.
+#   MAOS Enterprise (with license) → PostgreSQL via --profile postgres.
 #     Production multi-writer workloads MUST use PostgreSQL, not SQLite coordination layers.
 
 services:

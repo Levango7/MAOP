@@ -1,6 +1,12 @@
 <template>
   <div class="overview">
     <OnboardingWizard />
+    <!-- MAOS 升级提示: Personal edition 用户可见企业版功能入口 -->
+    <div v-if="edition.edition === 'personal'" class="upgrade-banner">
+      <AppIcon name="star" :size="14" />
+      <span>{{ t('view.overview.maosUpgrade') }}</span>
+      <router-link to="/licenses" class="upgrade-link">{{ t('view.overview.getLicense') }}</router-link>
+    </div>
     <PageHeader>
       <template #badges>
         <Badge v-if="edition.edition" :tone="edition.edition === 'enterprise' ? 'brand' : 'neutral'">{{ edition.edition }}</Badge>
@@ -417,6 +423,27 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 </script>
 
 <style scoped>
+/* ── MAOS 升级提示 banner (Personal edition 用户可见) ── */
+.upgrade-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-faint, var(--border));
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.upgrade-banner :deep(svg) { color: var(--brand-strong); flex-shrink: 0; }
+.upgrade-link {
+  font-weight: 600;
+  color: var(--brand-strong);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.upgrade-link:hover { text-decoration: underline; }
+
 /* ── Hero strip — 全宽状态条: 描边卡片风, 与全站 workbench 语言一致 ── */
 .ov-hero {
   display: flex;

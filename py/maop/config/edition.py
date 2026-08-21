@@ -1,4 +1,8 @@
-"""MAOP Edition Registry — Single Source of Truth for feature flags.
+"""MAOP/MAOS Edition Registry — Single Source of Truth for feature flags.
+
+品牌定位:
+  - MAOP (Multi-Agent Orchestration Platform) — 个人版, 免费开源
+  - MAOS (Multi-Agent Orchestration Suite)    — 企业版, 需 License
 
 Centralises every edition-dependent decision so that no other module
 duplicates edition logic.  All "is this feature available?" queries
@@ -420,5 +424,5 @@ class FeatureNotAvailable(Exception):
         self.edition = edition
         super().__init__(
             f"Feature '{flag.value}' is not available in {edition.value} edition. "
-            f"Upgrade to MAOP Enterprise or enable it via set_feature_override()."
+            f"Upgrade to MAOS or enable it via set_feature_override()."
         )

@@ -108,7 +108,7 @@ npm run dev
 **A:** 检查 `.env` 中 `MAOP_LLM_API_KEY` 是否正确设置，以及 API 地址是否可访问。可以用 `curl` 测试 API 连通性。
 
 ### Q: 企业版功能（SSO/RBAC/审计）显示 404
-**A:** Community 版默认启用 `personal` edition。企业版功能需要在 `.env` 中设置 `MAOP_EDITION=enterprise` 并配置有效 License。详见 [ADR-016](adr/016-dual-edition-architecture.md)。
+**A:** MAOP 个人版（Community）默认启用 `personal` edition。MAOS 企业版功能需要在 `.env` 中设置 `MAOP_EDITION=enterprise` 并配置有效 License。详见 [ADR-016](adr/016-dual-edition-architecture.md)。
 
 ---
 
