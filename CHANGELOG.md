@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **自演化完善**：修复 `suggester.py` LLM 路径（`_SUGGESTION_PROMPT` 字面量花括号 bug）+ 新增 `narrative.py` 叙事模块 + API 端点 + 前端 `EvolutionHistory.vue` 3-tab + `EvolutionTimeline.vue` 增强 + `useMarkdown.js` / `useTextDiff.js` composable + `docs/evolution-guide.md` 使用指南
+- **新手引导（P0）**：`docs/quickstart.md` 5 分钟上手文档 + `docs/README.md` 文档元索引（7 章 6 分类）+ `OnboardingWizard.vue` 3 步引导组件 + `view-onboard.js` i18n，集成到 `Overview.vue`
+- **MAOP/MAOS 品牌定位统一（P1+P2）**：明确 MAOP = 个人版（免费开源）/ MAOS = 企业版（需 License），全站品牌引用统一（`view-overview.js`、`edition.py`、`docs/`、`docker-compose.yml`）+ Overview.vue 升级提示 banner + i18n 翻译补全
+
+### Changed
+- **Phase 1-3 模块拆分**：10 个大文件（`server.py`、`compliance.py`、`data_proxy.py`、`vector.py`、`llm_provider.py`、`dispatcher.py`、`maop_loop.py`、`plugin.py`、`engine.py`、`ldap_provider.py`）拆分为 re-export shim + 实现模块，保持 `from maop.xxx import Y` 零改动
+
+### Fixed
+- **全量测试 0 failed**：修复 `dispatcher.py` `otel_span` re-export 缺失 + `test_routing_trace.py` fixture（patch `dispatch_core.otel_span`）+ 22 个 enterprise 测试加 `pytest.importorskip("maop.enterprise")` 守卫 → ruff 0 + mypy 0 + pytest **7035 passed, 57 skipped, 0 failed**
+- **ADR-017 enterprise branch test**：加 `importorskip` 守卫适配 Community 版无 `maop.enterprise` 模块
+
 ## [5.1.0] — 2026-08-14
 
 ### Added
