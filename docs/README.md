@@ -71,6 +71,8 @@
 | [v5.0.0 迁移指南](./migration-5.0.md) | v4.5.0 → v5.0.0 全部不兼容变更与迁移步骤 |
 | [API 变更日志](./API_CHANGELOG.md) | REST API 与 WebSocket API 版本变更记录（v4.4.0–v4.4.1） |
 | [v5.1.0 修复计划书](./remediation-plan-v5.1.0.md) | CI/CD、依赖安全、预算守卫、死代码、文档、部署等系统性问题修复方案 |
+| [三阶段演进 PRD](./prd-three-phase-roadmap.md) | 21 个月三阶段路线图产品需求文档 — 阶段一已完成、阶段二/三待启动 |
+| [三阶段演进 HLD](./hld-three-phase-roadmap.md) | 三阶段路线图高层设计 — 分布式执行/智能增强/生态平台化架构设计 |
 | [平台化演进](./platform-evolution.md) | Model Management、Control Plane、Contract Testing 三大支柱演进 |
 | [Agent 自演化指南](./evolution-guide.md) | OBSERVE→HEAL→SUGGEST→EVALUATE→APPLY→VALIDATE→CONSOLIDATE 七段闭环 |
 | [插件迁移指南](./plugin-migration.md) | delegate.ps1（switch-case）→ delegate-plugin.ps1（配置驱动）迁移步骤 |

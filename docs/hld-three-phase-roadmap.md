@@ -11,7 +11,7 @@
 | 状态 | Draft - Pending Review |
 | 适用范围 | MAOP Personal Edition + Enterprise Edition |
 | 评审人 | TBD（待指定架构委员会 + SRE + 安全） |
-| 关联文档 | [prd-three-phase-roadmap.md](./prd-three-phase-roadmap.md)、[ROADMAP.md](../../ROADMAP.md)、[platform-evolution.md](../../platform-evolution.md) |
+| 关联文档 | [prd-three-phase-roadmap.md](./prd-three-phase-roadmap.md)、[ROADMAP.md](../ROADMAP.md)、[platform-evolution.md](./platform-evolution.md) |
 | 文档约定 | Markdown heading：H1 文档名 / H2 章 / H3 节 / H4 子节 / H5 子子节；架构图使用 Mermaid 语法（GitHub/VSCode 兼容） |
 
 ---
