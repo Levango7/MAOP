@@ -1,5 +1,6 @@
 <template>
   <div class="overview">
+    <OnboardingWizard />
     <PageHeader>
       <template #badges>
         <Badge v-if="edition.edition" :tone="edition.edition === 'enterprise' ? 'brand' : 'neutral'">{{ edition.edition }}</Badge>
@@ -203,6 +204,7 @@ import { useI18n } from '../i18n';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import { Card, StatCard, Badge, DataTable, Skeleton, EmptyState } from '../components/index.js';
+import OnboardingWizard from '../components/OnboardingWizard.vue';
 import { cssVar, cssVarAlpha } from '../composables/chartTokens.js';
 import { baseLineOptions } from '../composables/chartOptions.js';
 
