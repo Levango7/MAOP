@@ -115,10 +115,11 @@ maop = "maop.cli:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# ADR-017: 双仓库物理隔离 — 确保 pip install maop (MIT) 不含企业代码。
-# enterprise/ 模块已移至私有仓库 Levango7/MAOS，通过 maop-enterprise 包分发。
-[tool.hatch.build]
-exclude = ["maop/enterprise"]
+# ADR-017: 双仓库物理隔离 — enterprise/ 模块已移至私有仓库 Levango7/MAOS。
+# H3 修复：原 [tool.hatch.build] exclude = ["maop/enterprise"] 配置指向不存在的
+# 目录，且与覆盖率门禁的 `if: import maop.enterprise` 条件共同导致门禁永远
+# 跳过。enterprise/ 目录已不在本代码树中，exclude 配置冗余且具误导性，移除之。
+# 若未来 enterprise/ 重新引入本仓库，需恢复此 exclude 配置。
 
 [tool.ruff]
 line-length = 100

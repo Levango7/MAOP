@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import sys
 import time
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from maop.core.backends.db_utils import get_db_path
 from maop.core.security.middleware import require_admin
@@ -423,6 +424,12 @@ async def api_logs(type: str = "", limit: int = Query(500, ge=1, le=5000)) -> An
         limit: max number of lines to return (default 500, max 5000)
     """
     log_name = type if type and type != "all" else "dashboard"
+    # P0-3 fix: validate log_name to prevent glob injection (e.g. '*' enumerating all files)
+    if not re.match(r"^[a-zA-Z0-9_\-\.]+$", log_name):
+        raise HTTPException(
+            status_code=400,
+            detail="invalid log type: only alphanumeric, dots, hyphens, underscores allowed",
+        )
     if log_name == "delegations":
         entries = await get_bridge().logs_get(name="delegations", limit=limit)
         return {"logs": entries, "count": len(entries), "source": "logs/delegations.json", "type": "delegations"}
@@ -438,7 +445,6 @@ async def api_logs(type: str = "", limit: int = Query(500, ge=1, le=5000)) -> An
                 tail = await asyncio.to_thread(_read_log_tail, f, limit)
                 content = "\n".join(tail)
                 if content:
-                    import re
                     entries = []
                     _log_re = re.compile(
                         r'^(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s*'

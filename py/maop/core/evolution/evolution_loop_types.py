@@ -17,6 +17,9 @@ class LoopPhase(str, Enum):
     OBSERVE = "observe"
     HEAL = "heal"
     SUGGEST = "suggest"
+    # F-5: DEBATE 阶段在 SUGGEST 与 EVALUATE 之间，对建议逐条辩论。
+    # 默认禁用（向后兼容），由 EvolutionLoop.debate_enabled 开关控制。
+    DEBATE = "debate"
     EVALUATE = "evaluate"
     APPLY = "apply"
     VALIDATE = "validate"

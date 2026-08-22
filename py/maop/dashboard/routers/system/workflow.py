@@ -69,6 +69,8 @@ async def api_workflow_run(request: Request) -> dict[str, Any]:
         "--task", task or wf_name,
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
+    # Drain pipes in background to prevent deadlock when child output exceeds OS pipe buffer (~64KB)
+    asyncio.create_task(proc.communicate())
     _deps.active_jobs[job_id] = {
         "action": "workflow", "status": "running",
         "start": time.strftime("%Y-%m-%dT%H:%M:%S"),

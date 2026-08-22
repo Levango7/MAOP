@@ -220,12 +220,29 @@ class AgentRegistry:
     def enable(self, name: str) -> bool:
         with sqlite_connect(self._db_path) as conn:
             cursor = conn.execute("UPDATE registered_agents SET enabled=1 WHERE name=?", (name,))
+        # H8 修复：更新活跃 agent 数量指标
+        self._update_active_agents_metric()
         return cursor.rowcount > 0
 
     def disable(self, name: str) -> bool:
         with sqlite_connect(self._db_path) as conn:
             cursor = conn.execute("UPDATE registered_agents SET enabled=0 WHERE name=?", (name,))
+        # H8 修复：更新活跃 agent 数量指标
+        self._update_active_agents_metric()
         return cursor.rowcount > 0
+
+    def _update_active_agents_metric(self) -> None:
+        """更新 MAOP_ACTIVE_AGENTS 指标（H8 修复）。"""
+        try:
+            from maop.core.monitoring.monitoring import MAOP_ACTIVE_AGENTS
+
+            with sqlite_connect(self._db_path) as conn:
+                row = conn.execute(
+                    "SELECT COUNT(*) AS cnt FROM registered_agents WHERE enabled=1"
+                ).fetchone()
+            MAOP_ACTIVE_AGENTS.set(row["cnt"] if row else 0)
+        except Exception:
+            pass
 
     def health_check(self, name: str) -> HealthCheckResult:
         agent = self.get_agent(name)

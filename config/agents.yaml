@@ -160,7 +160,7 @@ agents:
     - explain
     cli: deepcode
     cli_args: -p {task}
-    description: 'DISABLED: not registered / no auth (2026-07-22)'
+    description: 'DISABLED: not registered / no auth (2026-07-22). 计划启用：用户注册 deepcode 账号并配置 API key 后启用（M7 修复评估）'
     driver: cli
     enabled: false
     model: yi-large
@@ -204,7 +204,7 @@ agents:
     - multimodal
     cli: gemini
     cli_args: -p '{task}'
-    description: 'DISABLED: no VPN/proxy for Google APIs (2026-07-22)'
+    description: 'DISABLED: no VPN/proxy for Google APIs (2026-07-22). 计划启用：配置 VPN/代理可访问 Google APIs 后启用（M7 修复评估）'
     driver: cli
     enabled: false
     extracts_queries: false
@@ -278,7 +278,7 @@ agents:
     - review
     cli: langcli
     cli_args: -p "{task}"
-    description: 'DISABLED: no Anthropic API key, no VPN (2026-07-22)'
+    description: 'DISABLED: no Anthropic API key, no VPN (2026-07-22). 计划启用：配置 Anthropic API key 与 VPN 后启用（M7 修复评估）'
     driver: cli
     enabled: false
     model: auto
@@ -314,7 +314,7 @@ agents:
     cli: mimo
     cli_args: --print {task}
     description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
-      driver migrated powershell -> cli per ADR-009'
+      driver migrated powershell -> cli per ADR-009. 计划启用：安装 mimo CLI 到 PATH 后启用（M7 修复评估）'
     driver: cli
     enabled: false
     model: mimo-v2.5
@@ -429,7 +429,7 @@ agents:
     cli: qoderclicn
     cli_args: -p {task}
     description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
-      driver migrated powershell -> cli per ADR-009'
+      driver migrated powershell -> cli per ADR-009. 计划启用：安装 qoderclicn 到 PATH 后启用（M7 修复评估）'
     driver: cli
     enabled: false
     model: auto
@@ -447,7 +447,7 @@ agents:
     cli: qwen
     cli_args: -p '{{safePrompt}}' -o json --safe-mode
     description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
-      driver migrated powershell -> cli per ADR-009'
+      driver migrated powershell -> cli per ADR-009. 计划启用：安装 qwen CLI 到 PATH 后启用（M7 修复评估）'
     driver: cli
     enabled: false
     model: qwen3.5-plus
@@ -494,7 +494,8 @@ routing:
     - hey
     - 在吗
     - 介绍一下
-    primary: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 mmx（具备 chat 能力）
+    primary: mmx
     tertiary: copilot
   codegen:
     fallback: omniroute
@@ -539,7 +540,8 @@ routing:
     - api文档
     match: (?:document|doc|readme|guide|comment)
     primary: doc-pipeline
-    tertiary: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 copilot（具备 codegen 能力）
+    tertiary: copilot
   fileops:
     fallback: cline
     keywords:
@@ -554,7 +556,8 @@ routing:
     - 复制
     primary: qwenpaw
   mcp:
-    fallback: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 copilot（具备 mcp 能力）
+    fallback: copilot
     keywords:
     - mcp
     - 工具调用
@@ -573,7 +576,8 @@ routing:
     - remember
     - 历史
     - 上下文
-    primary: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 MAOP（具备 memory 能力）
+    primary: MAOP
   multimodal:
     fallback: crush
     keywords:
@@ -582,10 +586,12 @@ routing:
     - 图文
     - 音视频
     - 混合输入
-    primary: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 MAOP（具备 multimodal 能力）
+    primary: MAOP
     tertiary: MAOP
   orchestrate:
-    fallback: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 MAOP（具备 orchestrate 能力）
+    fallback: MAOP
     keywords:
     - orchestrate
     - 编排
@@ -596,9 +602,11 @@ routing:
     - 调度
     match: (?:orchestrat|编排|协调|compose|调度)
     primary: MAOP
-    tertiary: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 copilot
+    tertiary: copilot
   pipeline:
-    fallback: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 MAOP（具备 pipeline 能力）
+    fallback: MAOP
     keywords:
     - 流水线
     - pipeline
@@ -624,7 +632,8 @@ routing:
     - strategy
     match: (?:plan|architect|design|blueprint|strategy)
     primary: kimi
-    tertiary: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 copilot（具备 planning 能力）
+    tertiary: copilot
   quickfix:
     fallback: omniroute
     keywords:
@@ -652,7 +661,8 @@ routing:
     - clean up
     - 优化结构
     match: (?:refactor|rewrite|restructure|clean\s+up)
-    primary: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 cline（具备 refactor 能力）
+    primary: cline
     tertiary: kimi
   review:
     fallback: omniroute
@@ -692,7 +702,8 @@ routing:
     - 架构文档
     - 白皮书
     primary: doc-pipeline
-    tertiary: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 copilot
+    tertiary: copilot
   verify:
     fallback: omniroute
     keywords:
@@ -705,7 +716,8 @@ routing:
     - assert
     - 断言
     match: (?:verify|test|assert|spec|unit\s+test|integration)
-    primary: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 kimi（具备 verify 能力）
+    primary: kimi
     tertiary: kimi
   vision:
     fallback: crush
@@ -718,7 +730,8 @@ routing:
     - 截图
     - screenshot
     - 识别
-    primary: claude
+    # M1 修复：claude agent 不存在，替换为已定义的 MAOP（具备 vision 能力）
+    primary: MAOP
     tertiary: MAOP
 workflows:
   doc-pipeline:

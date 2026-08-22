@@ -151,6 +151,113 @@ def _validate_backup_path(backup_path: Path, allowed_dirs: list[Path]) -> None:
         raise ValueError(f"Backup path contains single quote: {backup_path}")
 
 
+# ── S3 Off-box 备份后端（H10 fix）──────────────────────────────
+
+class S3BackupBackend:
+    """S3 off-box 备份上传后端。
+
+    H10 fix: 原备份逻辑仅在本地同卷执行（VACUUM INTO + shutil.copy2），
+    无 S3 或远程上传，不满足 off-box 备份要求。本类通过 boto3 上传备份文件
+    到 S3，并校验远程对象存在性。
+
+    配置通过环境变量读取：
+      - MAOP_BACKUP_S3_BUCKET: S3 桶名（必填）
+      - MAOP_BACKUP_S3_PREFIX: S3 key 前缀（可选，默认 "backups/"）
+      - MAOP_BACKUP_S3_REGION: S3 区域（可选，boto3 自动推断）
+      - MAOP_BACKUP_S3_ENDPOINT: 自定义 endpoint（可选，兼容 MinIO 等）
+      - MAOP_BACKUP_KEEP_LOCAL: 上传后是否保留本地副本（默认 "0" 删除）
+    """
+
+    def __init__(self) -> None:
+        self._bucket = os.environ.get("MAOP_BACKUP_S3_BUCKET", "").strip()
+        self._prefix = os.environ.get("MAOP_BACKUP_S3_PREFIX", "backups/").strip()
+        self._keep_local = os.environ.get("MAOP_BACKUP_KEEP_LOCAL", "0") == "1"
+        self._client = None
+        if self._bucket:
+            self._client = self._create_client()
+
+    def _create_client(self):  # type: ignore[no-untyped-def]
+        """创建 boto3 S3 客户端（延迟导入，避免硬依赖）。"""
+        try:
+            import boto3  # type: ignore[import-untyped]
+        except ImportError:
+            logger.warning(
+                "[backup] boto3 未安装，S3 off-box 备份不可用。"
+                "请安装：pip install boto3"
+            )
+            return None
+        kwargs = {}
+        region = os.environ.get("MAOP_BACKUP_S3_REGION", "").strip()
+        if region:
+            kwargs["region_name"] = region
+        endpoint = os.environ.get("MAOP_BACKUP_S3_ENDPOINT", "").strip()
+        if endpoint:
+            kwargs["endpoint_url"] = endpoint
+        return boto3.client("s3", **kwargs)
+
+    @property
+    def enabled(self) -> bool:
+        """S3 后端是否已启用（配置了桶名且 boto3 可用）。"""
+        return bool(self._bucket and self._client is not None)
+
+    def upload(self, local_path: Path) -> bool:
+        """上传备份文件到 S3 并校验远程对象存在性。
+
+        Parameters
+        ----------
+        local_path : Path
+            本地备份文件路径。
+
+        Returns
+        -------
+        bool
+            上传并校验成功返回 True，失败或未启用返回 False。
+        """
+        if not self.enabled:
+            return False
+        if not local_path.exists():
+            logger.warning("[backup] S3 上传跳过：本地文件不存在 %s", local_path)
+            return False
+
+        # 构造 S3 key：prefix + 文件名
+        key = f"{self._prefix.rstrip('/')}/{local_path.name}"
+
+        try:
+            # 上传文件（self._client 在 enabled 检查后保证非 None）
+            assert self._client is not None
+            self._client.upload_file(str(local_path), self._bucket, key)
+            logger.info(
+                "[backup] S3 上传成功: s3://%s/%s (%d bytes)",
+                self._bucket, key, local_path.stat().st_size,
+            )
+
+            # 校验远程对象存在性（head_object）
+            try:
+                self._client.head_object(Bucket=self._bucket, Key=key)
+            except Exception as exc:
+                logger.error(
+                    "[backup] S3 上传校验失败: head_object 报错 %s (s3://%s/%s)",
+                    exc, self._bucket, key,
+                )
+                return False
+
+            # 上传成功后按配置决定是否保留本地副本
+            if not self._keep_local:
+                try:
+                    local_path.unlink(missing_ok=True)
+                    logger.debug("[backup] 已删除本地副本 %s", local_path)
+                except Exception as exc:
+                    logger.warning("[backup] 删除本地副本失败 %s: %s", local_path, exc)
+
+            return True
+        except Exception as exc:
+            logger.error(
+                "[backup] S3 上传失败 %s -> s3://%s/%s: %s",
+                local_path, self._bucket, key, exc,
+            )
+            return False
+
+
 # ── DbBackup ───────────────────────────────────────────────────
 
 class DbBackup:
@@ -184,6 +291,8 @@ class DbBackup:
         self._scheduler_running = False
         # P2 安全修复: VACUUM INTO 路径白名单（从 MAOP_BACKUP_DIR 读取或回退默认）
         self._allowed_backup_dirs = _get_allowed_backup_dirs(self._backup_dir)
+        # H10 fix: S3 off-box 备份后端（通过环境变量配置启用）
+        self._s3_backend = S3BackupBackend()
 
         # Load existing manifest
         self._load_manifest()
@@ -307,6 +416,15 @@ class DbBackup:
                 "[backup] %s -> %s (%d bytes, %d ms)",
                 db_name, backup_name, size, duration_ms,
             )
+            # H10 fix: off-box 备份 —— 上传到 S3 并校验远程对象存在性。
+            # S3 后端未启用时跳过（enabled=False），保留原有本地备份行为。
+            if self._s3_backend.enabled:
+                uploaded = self._s3_backend.upload(backup_path)
+                if not uploaded:
+                    logger.warning(
+                        "[backup] S3 off-box 上传失败，本地副本保留: %s",
+                        backup_path,
+                    )
             return entry
 
         except Exception as exc:

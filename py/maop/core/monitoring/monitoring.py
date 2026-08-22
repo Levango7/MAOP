@@ -527,13 +527,41 @@ class MetricsCollector:
 metrics = MetricsCollector()
 
 # Pre-defined MAOP metrics
+# H8 修复：为以下 8 个核心业务指标补充文档注释与调用方说明。
+# 原问题：这些指标仅在 monitoring.py 中定义，全代码树无任何 .inc/.set/.observe
+# 调用，导致运维盲区。现补充注释并在对应业务逻辑处添加调用。
+
+# MAOP_DELEGATIONS_TOTAL — 任务委派总数计数器。
+# 预期调用位置：dispatch_core.py 任务派发时 .inc()；maop_plan.py plan 执行时 .inc()。
 MAOP_DELEGATIONS_TOTAL = metrics.counter("MAOP_delegations_total", "Total task delegations")
+
+# MAOP_DELEGATIONS_SUCCESS — 任务委派成功数计数器。
+# 预期调用位置：dispatch_core.py 任务成功完成时 .inc()。
 MAOP_DELEGATIONS_SUCCESS = metrics.counter("MAOP_delegations_success", "Successful delegations")
+
+# MAOP_DELEGATIONS_FAILED — 任务委派失败数计数器。
+# 预期调用位置：dispatch_core.py 任务失败时 .inc()。
 MAOP_DELEGATIONS_FAILED = metrics.counter("MAOP_delegations_failed", "Failed delegations")
+
+# MAOP_DELEGATION_DURATION — 任务委派耗时直方图（秒）。
+# 预期调用位置：dispatch_core.py 任务完成时 .observe(duration)；
+# maop_plan.py plan 执行完成时 .observe(duration)。
 MAOP_DELEGATION_DURATION = metrics.histogram("MAOP_delegation_duration_seconds", "Delegation duration")
+
+# MAOP_ACTIVE_AGENTS — 活跃 agent 数量仪表。
+# 预期调用位置：agent lifecycle 模块在 agent 启停时 .set(count) 或 .inc()/.dec()。
 MAOP_ACTIVE_AGENTS = metrics.gauge("MAOP_active_agents", "Number of active agents")
+
+# MAOP_MEMORY_ENTRIES — 记忆条目数量仪表。
+# 预期调用位置：memory 模块在写入/删除条目时 .set(count) 或 .inc()/.dec()。
 MAOP_MEMORY_ENTRIES = metrics.gauge("MAOP_memory_entries", "Number of memory entries")
+
+# MAOP_QUEUE_PENDING — 队列待处理消息数仪表。
+# 预期调用位置：queue 模块在入队/出队时 .set(count) 或 .inc()/.dec()。
 MAOP_QUEUE_PENDING = metrics.gauge("MAOP_queue_pending", "Pending messages in queue")
+
+# MAOP_CIRCUIT_BREAKER_STATE — 熔断器状态仪表（1=闭合, 0.5=半开, 0=断开）。
+# 预期调用位置：circuit_breaker 模块在状态转换时 .set(state)。
 MAOP_CIRCUIT_BREAKER_STATE = metrics.gauge("MAOP_circuit_breaker_state", "Circuit breaker state (1=closed, 0.5=half, 0=open)")
 
 # Phase γ-1: SLA-aware scheduling metrics.

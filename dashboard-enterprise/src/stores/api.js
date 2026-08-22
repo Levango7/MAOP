@@ -1,34 +1,44 @@
 import { defineStore } from 'pinia';
 
-// Auth token key — keep in sync with dashboard/js/app-core.js (零构建版)
-const TOKEN_KEY = 'maop_token';
+// M6 fix: token 从 localStorage 迁移到 httpOnly cookie（由后端 Set-Cookie 设置）。
+// httpOnly cookie 无法被 JavaScript 读取，避免 XSS 攻击窃取 token。
+// 前端不再直接接触 token，所有请求通过 withCredentials: true 自动携带 cookie。
+// 保留 USER_KEY 用于存储非敏感的用户名信息（UI 显示登录状态）。
 const USER_KEY = 'maop_user';
 
 /**
- * 读取 localStorage 中的 JWT token。
- * 与零构建版 dashboard/js/app-core.js 共享同一 key，跨版本登录态一致。
+ * M6 fix: token 现由 httpOnly cookie 管理，前端无法读取。
+ * 保留函数签名以兼容现有调用方，但始终返回空字符串。
+ * 登录状态应通过 isLoggedIn() 或 user 信息判断，而非 token 是否存在。
  */
 function getAuthToken() {
+  return '';
+}
+
+/**
+ * 判断当前是否已登录（通过 user 信息存在性判断）。
+ * @returns {boolean}
+ */
+function isLoggedIn() {
   try {
-    return localStorage.getItem(TOKEN_KEY) || '';
+    return !!localStorage.getItem(USER_KEY);
   } catch {
-    // localStorage 在某些隐私模式下不可用
-    return '';
+    return false;
   }
 }
 
 /**
- * 构造带 Authorization 头的请求配置。
+ * 构造带认证的请求配置。
+ * M6 fix: 不再手动设置 Authorization header，依赖 httpOnly cookie 自动携带。
  * @param {RequestInit} [extra] 额外 fetch 配置（method/body 等）
  * @param {object} [headers] 额外 headers（如 Content-Type）
  */
 function withAuth(extra, headers) {
   const init = extra || {};
   const h = Object.assign({}, headers || {});
-  const token = getAuthToken();
-  if (token) h['Authorization'] = 'Bearer ' + token;
+  // M6 fix: 不再设置 Authorization header，依赖 cookie 自动携带。
   init.headers = h;
-  init.credentials = 'include'; // #4 fix: send httpOnly cookie
+  init.credentials = 'include'; // 携带 httpOnly cookie
   return init;
 }
 
@@ -59,17 +69,17 @@ async function tryRefreshToken() {
   if (_refreshPromise) return _refreshPromise;
   _refreshPromise = (async () => {
     try {
-      const token = getAuthToken();
-      if (!token) return false;
+      // M6 fix: 不再从 localStorage 读取 token，依赖 httpOnly cookie 自动携带。
+      if (!isLoggedIn()) return false;
       const res = await fetchWithTimeout('/api/auth/refresh', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // 携带 httpOnly cookie
       });
       if (!res.ok) return false;
       const data = await res.json();
-      if (data.status === 'ok' && data.token) {
-        try { localStorage.setItem(TOKEN_KEY, data.token); } catch { /* ignore */ }
+      // M6 fix: 后端会通过 Set-Cookie 更新 httpOnly cookie，前端不需要处理 token。
+      if (data.status === 'ok') {
         return true;
       }
       return false;
@@ -92,8 +102,8 @@ async function handleUnauthorized() {
   if (refreshed) return;  // Caller should retry the original request
 
   // Refresh failed — clear auth state
+  // M6 fix: token 由后端 httpOnly cookie 管理，前端只需清除 user 信息。
   try {
-    localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   } catch { /* ignore */ }
   // 仅在浏览器环境且非测试环境触发重定向，避免 vitest 中 jsdom 缺少路由
@@ -192,31 +202,43 @@ export const useApiStore = defineStore('api', {
     },
     /**
      * 暴露给组件直接使用的工具方法：返回当前 token（便于 UI 显示登录状态）。
+     * M6 fix: token 现由 httpOnly cookie 管理，前端无法读取，始终返回空字符串。
+     * 登录状态请使用 isLoggedIn() 判断。
      */
     authToken() {
       return getAuthToken();
     },
     /**
-     * 设置 token（登录成功后调用）。
+     * 判断当前是否已登录。
+     * M6 fix: 通过 user 信息存在性判断（token 在 httpOnly cookie 中不可读）。
+     */
+    isLoggedIn() {
+      return isLoggedIn();
+    },
+    /**
+     * 设置登录态（登录成功后调用）。
+     * M6 fix: token 由后端 Set-Cookie httpOnly 管理，前端不接触 token。
+     * 仅存储非敏感的 user 信息用于 UI 登录状态显示。
      */
     setAuthToken(token, user) {
+      // token 参数保留以兼容现有调用方，但不存储到 localStorage。
+      // token 由后端通过 Set-Cookie: maop_token=...; HttpOnly; Secure; SameSite=Strict 设置。
       try {
-        if (token) localStorage.setItem(TOKEN_KEY, token);
-        else localStorage.removeItem(TOKEN_KEY);
         if (user) localStorage.setItem(USER_KEY, user);
         else localStorage.removeItem(USER_KEY);
       } catch { /* ignore */ }
     },
     /**
-     * 清除 token（登出）。P1 fix: 通知后端撤销 JWT token。
+     * 清除登录态（登出）。P1 fix: 通知后端撤销 JWT token。
+     * M6 fix: token 由后端 httpOnly cookie 管理，前端只需清除 user 信息。
      */
     async clearAuthToken() {
       // Notify backend to revoke the token before clearing locally
       try {
         await fetchWithTimeout('/api/auth/logout', withAuth({ method: 'POST' }, {}));
       } catch { /* best-effort — clear locally anyway */ }
+      // M6 fix: 后端会通过 Set-Cookie 清除 httpOnly cookie，前端只需清除 user 信息。
       try {
-        localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
       } catch { /* ignore */ }
     },
@@ -224,4 +246,4 @@ export const useApiStore = defineStore('api', {
 });
 
 // 模块级导出（便于非 Pinia 上下文使用，如 App.vue 直接 import）
-export { getAuthToken, withAuth, handleUnauthorized };
+export { getAuthToken, withAuth, handleUnauthorized, isLoggedIn };

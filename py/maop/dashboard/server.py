@@ -18,7 +18,8 @@ Architecture: routes split into routers/ subpackage by domain.
   - routers/system.py:  framework/audit/config/overview
 
 Start:  python -m maop.dashboard.server
-TLS:    MAOP_TLS=1 MAOP_TLS_CERT=cert.pem MAOP_TLS_KEY=key.pem python -m maop.dashboard.server
+TLS:    MAOP_TLS_ENABLED=1 MAOP_TLS_CERT=cert.pem MAOP_TLS_KEY=key.pem python -m maop.dashboard.server
+        （MAOP_TLS 旧名仍向后兼容，会触发 DeprecationWarning）
 """
 
 from __future__ import annotations
@@ -283,7 +284,10 @@ if sys.platform != "win32":
 _prev_handlers[signal.SIGINT] = signal.signal(signal.SIGINT, _signal_handler)
 
 # ── Start ──────────────────────────────────────────────────────────
-_tls_enabled = os.environ.get("MAOP_TLS", "0") == "1"
+# M2 修复：统一读取 MAOP_TLS_ENABLED（兼容旧名 MAOP_TLS，触发 DeprecationWarning）
+from maop.config.env import get_tls_enabled as _get_tls_enabled
+
+_tls_enabled = _get_tls_enabled()
 
 if __name__ == "__main__":
     import uvicorn

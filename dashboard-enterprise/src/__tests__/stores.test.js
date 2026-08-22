@@ -180,8 +180,9 @@ describe('useApiStore auth header injection', () => {
     try { localStorage.clear(); } catch { /* ignore */ }
   });
 
-  it('get injects Authorization header when token present', async () => {
-    localStorage.setItem('maop_token', 'test-jwt-abc');
+  it('get uses credentials: include for cookie-based auth', async () => {
+    // M6 fix: token 从 localStorage 迁移到 httpOnly cookie，
+    // 请求通过 credentials: 'include' 自动携带 cookie，不再设置 Authorization header。
     const store = useApiStore();
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -192,9 +193,12 @@ describe('useApiStore auth header injection', () => {
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/health',
       expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer test-jwt-abc' }),
+        credentials: 'include',
       })
     );
+    // M6 fix: 不应设置 Authorization header（token 由 httpOnly cookie 携带）
+    const callArgs = global.fetch.mock.calls[0];
+    expect(callArgs[1].headers.Authorization).toBeUndefined();
   });
 
   it('get omits Authorization header when no token', async () => {
@@ -229,19 +233,22 @@ describe('useApiStore auth header injection', () => {
     await expect(store.get('/api/fail')).rejects.toThrow('API /api/fail: 500');
   });
 
-  it('get clears token and throws on 401', async () => {
-    localStorage.setItem('maop_token', 'expired-jwt');
+  it('get clears user info and throws on 401', async () => {
+    // M6 fix: token 由 httpOnly cookie 管理，前端通过 user 信息判断登录状态。
+    // 401 时清除 user 信息（而非 token）。
+    localStorage.setItem('maop_user', 'admin');
     const store = useApiStore();
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 401,
     });
     await expect(store.get('/api/protected')).rejects.toThrow('401 Unauthorized');
-    expect(localStorage.getItem('maop_token')).toBeNull();
+    // M6 fix: user 信息应被清除（token 不再存储在 localStorage）
+    expect(localStorage.getItem('maop_user')).toBeNull();
   });
 
-  it('post sends JSON body with Authorization header', async () => {
-    localStorage.setItem('maop_token', 'post-jwt');
+  it('post sends JSON body with cookie credentials', async () => {
+    // M6 fix: token 由 httpOnly cookie 携带，不再设置 Authorization header。
     const store = useApiStore();
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -255,22 +262,31 @@ describe('useApiStore auth header injection', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ name: 'test' }),
+        credentials: 'include',
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
-          Authorization: 'Bearer post-jwt',
         }),
       })
     );
+    // M6 fix: 不应设置 Authorization header
+    const callArgs = global.fetch.mock.calls[0];
+    expect(callArgs[1].headers.Authorization).toBeUndefined();
   });
 
-  it('setAuthToken / clearAuthToken manage localStorage', async () => {
+  it('setAuthToken / clearAuthToken manage user info (M6 cookie auth)', async () => {
+    // M6 fix: token 由后端 httpOnly cookie 管理，setAuthToken 只存储 user 信息。
+    // authToken() 始终返回空字符串（httpOnly cookie 不可读）。
     const store = useApiStore();
     store.setAuthToken('abc', 'admin');
-    expect(store.authToken()).toBe('abc');
+    // M6 fix: authToken() 返回空字符串（token 在 httpOnly cookie 中不可读）
+    expect(store.authToken()).toBe('');
     expect(localStorage.getItem('maop_user')).toBe('admin');
+    // isLoggedIn() 通过 user 信息判断登录状态
+    expect(store.isLoggedIn()).toBe(true);
     // clearAuthToken 是 async（需 await fetch logout），必须 await
     await store.clearAuthToken();
     expect(store.authToken()).toBe('');
     expect(localStorage.getItem('maop_user')).toBeNull();
+    expect(store.isLoggedIn()).toBe(false);
   });
 });

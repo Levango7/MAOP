@@ -113,7 +113,22 @@ def _ensure_default_user() -> None:
             """)
             existing = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
             if existing == 0:
-                admin_pwd = os.environ.get("MAOP_ADMIN_PASSWORD", "")
+                # H7 fix: 支持 Docker secrets 标准（MAOP_ADMIN_PASSWORD_FILE）。
+                # 优先读取 MAOP_ADMIN_PASSWORD_FILE 指向的文件内容作为密码，
+                # 回退到 MAOP_ADMIN_PASSWORD 环境变量。
+                admin_pwd = ""
+                pwd_file = os.environ.get("MAOP_ADMIN_PASSWORD_FILE", "")
+                if pwd_file:
+                    try:
+                        with open(pwd_file, "r", encoding="utf-8") as f:
+                            admin_pwd = f.read().strip()
+                    except OSError as exc:
+                        logger.warning(
+                            "[auth] MAOP_ADMIN_PASSWORD_FILE=%s 读取失败: %s",
+                            pwd_file, exc,
+                        )
+                if not admin_pwd:
+                    admin_pwd = os.environ.get("MAOP_ADMIN_PASSWORD", "")
                 if not admin_pwd:
                     import secrets
                     admin_pwd = secrets.token_urlsafe(16)
@@ -454,10 +469,19 @@ async def auth_refresh(request: Request):
 
 @router.post("/api/auth/logout")
 async def auth_logout(request: Request) -> Any:
-    """Logout - revoke JWT token server-side (P1 fix)."""
+    """Logout - revoke JWT token server-side (P1 fix).
+
+    M6 fix: 支持从 httpOnly cookie 读取 token（前端不再通过 Authorization header 传递）。
+    登出时清除 httpOnly cookie，确保前端登录态完全清除。
+    """
+    # M6 fix: 优先从 Authorization header 读取 token（兼容旧客户端），
+    # 回退到 httpOnly cookie（新前端通过 cookie 认证）。
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]
+    else:
+        token = request.cookies.get("maop_token", "")
+    if token:
         try:
             mgr = get_auth_mgr()
             revoked = mgr.jwt_handler.revoke_token(token)
@@ -465,7 +489,10 @@ async def auth_logout(request: Request) -> Any:
                 logger.info("[auth] Token revoked via logout")
         except Exception as exc:
             logger.warning("[auth] Failed to revoke token: %s", exc)
-    return {"status": "ok", "message": "Token revoked."}
+    # M6 fix: 清除 httpOnly cookie，确保前端登录态完全清除。
+    response = JSONResponse({"status": "ok", "message": "Token revoked."})
+    response.delete_cookie(key="maop_token", path="/")
+    return response
 
 
 @router.post("/api/auth/register")

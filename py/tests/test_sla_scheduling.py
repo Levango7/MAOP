@@ -24,7 +24,7 @@ from maop.core.monitoring.monitoring import (
 )
 from maop.delegate.dispatcher import Dispatcher
 from maop.delegate.sla_monitor import SLAMonitor
-from maop.maop_plan import Plan
+from maop.maop_plan import DEFAULT_AGENT, Plan
 
 _tier_from_priority = SLAMonitor.tier_from_priority
 
@@ -53,7 +53,7 @@ class TestPlanSLA:
         """Existing Plan fields keep their defaults after γ-1 extension."""
         plan = Plan()
         assert plan.phase == "plan"
-        assert plan.selected_agent == "claude"
+        assert plan.selected_agent == DEFAULT_AGENT
         assert plan.routing_key == "chat"
         assert plan.gates == ["exit_code", "output"]
         assert plan.budget == {"timeout_s": 120, "max_retries": 1}

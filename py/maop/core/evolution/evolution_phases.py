@@ -118,6 +118,113 @@ class EvolutionPhasesMixin:
             logger.warning("[evo-loop] Suggest phase failed: %s", exc)
             return PhaseResult(phase=LoopPhase.SUGGEST, success=False, error=str(exc), duration_s=round(time.time() - start, 3), details={"count": len(suggestions), "suggestions": suggestions})
 
+    def _phase_debate(self, suggestions: list[dict[str, Any]]) -> PhaseResult:
+        """C-2: DEBATE 阶段 — 对每条建议发起辩论，过滤低置信度结论。
+
+        - 对 severity=HIGH 的建议强制辩论（即使 BalancedStrategy 本会自动应用）。
+        - 辩论 consensus=False 的建议标记为 "debate_blocked"，不进入 APPLY。
+        - 辩论 low_confidence=True 的建议标记为 "needs_human_review"。
+        - 未配置 debate_dispatcher 时透传 suggestions（向后兼容）。
+        """
+        start = time.time()
+        accepted: list[dict[str, Any]] = []
+        blocked: list[dict[str, Any]] = []
+        needs_review: list[dict[str, Any]] = []
+        try:
+            dispatcher = getattr(self, "_debate_dispatcher", None)
+            participants = getattr(self, "_debate_participants", []) or []
+            if dispatcher is None or not participants:
+                # 未配置 → 透传（向后兼容）
+                return PhaseResult(
+                    phase=LoopPhase.DEBATE,
+                    success=True,
+                    duration_s=round(time.time() - start, 3),
+                    details={
+                        "accepted_suggestions": suggestions,
+                        "blocked": [],
+                        "needs_review": [],
+                        "debated": 0,
+                        "skipped": len(suggestions),
+                    },
+                )
+            import asyncio
+
+            for sug in suggestions:
+                severity = str(sug.get("severity", "MEDIUM")).upper()
+                description = sug.get("description", "")
+                # 构造辩论问题
+                question = (
+                    f"是否应采纳进化建议: {description} "
+                    f"(severity={severity}, type={sug.get('mutation_type', '')})?"
+                )
+                context = {
+                    "suggestion": sug,
+                    "root_dir": str(getattr(self, "_root", "")),
+                }
+                try:
+                    verdict = asyncio.run(dispatcher.run_debate(
+                        question,
+                        participants,
+                        context=context,
+                        routing_key=sug.get("target_name", ""),
+                    ))
+                except Exception as exc:  # pragma: no cover — 单条辩论失败兜底
+                    logger.warning(
+                        "[evo-loop] debate for suggestion %s failed: %s",
+                        sug.get("id", "?"), exc,
+                    )
+                    # 辩论失败时保守起见标记为 needs_review
+                    sug_copy = dict(sug)
+                    sug_copy["debate_error"] = str(exc)
+                    needs_review.append(sug_copy)
+                    continue
+                # 根据裁决结果分类
+                sug_with_verdict = dict(sug)
+                sug_with_verdict["debate_verdict"] = {
+                    "consensus": verdict.consensus,
+                    "final_confidence": verdict.final_confidence,
+                    "winner": verdict.winner,
+                    "low_confidence": verdict.low_confidence,
+                    "cost_terminated": verdict.cost_terminated,
+                }
+                if not verdict.consensus:
+                    sug_with_verdict["debate_blocked"] = True
+                    blocked.append(sug_with_verdict)
+                elif verdict.low_confidence:
+                    sug_with_verdict["needs_human_review"] = True
+                    needs_review.append(sug_with_verdict)
+                else:
+                    accepted.append(sug_with_verdict)
+            return PhaseResult(
+                phase=LoopPhase.DEBATE,
+                success=True,
+                duration_s=round(time.time() - start, 3),
+                details={
+                    "accepted_suggestions": accepted,
+                    "blocked": blocked,
+                    "needs_review": needs_review,
+                    "debated": len(suggestions),
+                    "accepted_count": len(accepted),
+                    "blocked_count": len(blocked),
+                    "needs_review_count": len(needs_review),
+                },
+            )
+        except Exception as exc:
+            logger.warning("[evo-loop] Debate phase failed: %s", exc)
+            # 失败时透传 suggestions（向后兼容，不阻断主流程）
+            return PhaseResult(
+                phase=LoopPhase.DEBATE,
+                success=False,
+                error=str(exc),
+                duration_s=round(time.time() - start, 3),
+                details={
+                    "accepted_suggestions": suggestions,
+                    "blocked": [],
+                    "needs_review": [],
+                    "debated": 0,
+                },
+            )
+
     def _phase_evaluate(self, suggestions: list[dict[str, Any]]) -> PhaseResult:
         start = time.time()
         approved: list[dict[str, Any]] = []
@@ -142,6 +249,7 @@ class EvolutionPhasesMixin:
         except Exception as exc:
             logger.warning("[evo-loop] Evaluate phase failed: %s", exc)
             return PhaseResult(phase=LoopPhase.EVALUATE, success=False, error=str(exc), duration_s=round(time.time() - start, 3), details={"approved": approved})
+
 
     def _phase_apply(self, approved: list[dict[str, Any]], dry_run: bool = False) -> PhaseResult:
         """Apply approved mutations. In dry_run mode, log proposed changes only."""

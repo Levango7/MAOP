@@ -407,10 +407,10 @@ class RouteScorer:
         # Try adaptive selection first (performance-based)
         if adaptive and len(candidates) > 1:
             try:
-                import os
-
+                from maop.config.env import get_root_dir
                 from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
-                root = os.environ.get("MAOP_ROOT_DIR", ".")
+                # M3 修复：统一使用 get_root_dir() 解析根目录（兼容 MAOP_ROOT_DIR / MAOP_ROOT）
+                root = str(get_root_dir(default="."))
                 tracker = AgentPerformanceTracker(root_dir=root)
                 best = tracker.best_agent(
                     agents=candidates, routing_key=routing_key,

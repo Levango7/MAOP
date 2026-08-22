@@ -99,6 +99,8 @@ services:
     volumes:
       - patroni1-data:/home/postgres/pgdata
       - ./deploy/patroni/hooks:/patroni/hooks:ro
+      # H10 fix: 挂载 patroni.yml 配置文件，使集群配置生效（原为死配置）。
+      - ./deploy/patroni/patroni.yml:/etc/patroni/patroni.yml:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8008/health || exit 1"]
       interval: 10s
@@ -161,6 +163,8 @@ services:
     volumes:
       - patroni2-data:/home/postgres/pgdata
       - ./deploy/patroni/hooks:/patroni/hooks:ro
+      # H10 fix: 挂载 patroni.yml 配置文件，使集群配置生效（原为死配置）。
+      - ./deploy/patroni/patroni.yml:/etc/patroni/patroni.yml:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8008/health || exit 1"]
       interval: 10s
@@ -202,6 +206,8 @@ services:
     volumes:
       - patroni3-data:/home/postgres/pgdata
       - ./deploy/patroni/hooks:/patroni/hooks:ro
+      # H10 fix: 挂载 patroni.yml 配置文件，使集群配置生效（原为死配置）。
+      - ./deploy/patroni/patroni.yml:/etc/patroni/patroni.yml:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8008/health || exit 1"]
       interval: 10s
@@ -380,10 +386,20 @@ services:
       - MAOP_JSON_LOG=1
       - MAOP_OTEL_ENABLED=${MAOP_OTEL_ENABLED:-0}
       - MAOP_STORAGE_BACKEND=postgresql
-      - MAOP_PG_HOST=postgres
+      # H10 fix: HA 接线 —— 将 MAOP_PG_HOST 从 postgres（直连主 PG）改为 pg-haproxy（通过 HAProxy 代理）。
+      # 原：MAOP_PG_HOST=postgres，HA 代理层被绕过，主库故障时应用不切换。
+      # 现：默认通过 pg-haproxy 路由，启用 patroni profile 后 HA 生效。
+      # 未启用 patroni profile 时，可通过 .env 设置 MAOP_PG_HOST=postgres 回退直连。
+      - MAOP_PG_HOST=${MAOP_PG_HOST:-pg-haproxy}
       - MAOP_PG_DATABASE=maop
       - MAOP_PG_USER=maop
       - MAOP_PG_PASSWORD=${MAOP_PG_PASSWORD:?Set MAOP_PG_PASSWORD in .env for production}
+      # H7 fix: 生产环境首启必须设置管理员密码，否则 auth.py 拒绝启动。
+      # 使用 :? 语法：变量未设置时 compose 启动报错，避免静默启动后不可用。
+      # 推荐通过 Docker secrets 设置 MAOP_ADMIN_PASSWORD_FILE（见 secrets 段）。
+      - MAOP_ADMIN_PASSWORD=${MAOP_ADMIN_PASSWORD:-}
+      # H7 fix: Docker secrets 标准支持。设置后 auth.py 从文件读取密码。
+      - MAOP_ADMIN_PASSWORD_FILE=${MAOP_ADMIN_PASSWORD_FILE:-}
       - MAOP_SECRET_BACKEND=vault
       # OPS-15 fix: Vault now serves TLS; CA/cert verification uses the
       # mounted cert (self-signed) or a real CA in front of it.
@@ -400,6 +416,9 @@ services:
       - maop-config:/app/config
       - maop-logs:/app/logs
       - ./certs/vault:/app/certs/vault:ro  # OPS-15 fix: Vault CA cert
+    # H7 fix: Docker secrets 挂载（可选，启用后从 /run/secrets/maop_admin_password 读取）
+    secrets:
+      - maop_admin_password
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9079/api/health')"]
       interval: 30s
@@ -453,8 +472,17 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
-      - nginx-certs:/etc/nginx/certs
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf.template:ro
+      # H9 fix: 将 named volume 改为 bind mount，明确指向宿主机证书目录。
+      # 原：nginx-certs named volume 首次挂载为空卷，证书不存在导致 nginx 启动失败。
+      # 现：要求宿主机 MAOP_TLS_CERT_DIR 存在并包含证书文件，缺失时 compose 启动报错。
+      - ${MAOP_TLS_CERT_DIR:?必须设置证书目录 MAOP_TLS_CERT_DIR}:/etc/nginx/certs:ro
+    environment:
+      # H9 fix: 证书路径环境变量，供 nginx envsubst 模板渲染使用。
+      - MAOP_TLS_CERT_FILE=/etc/nginx/certs/${MAOP_TLS_CERT_FILENAME:-fullchain.pem}
+      - MAOP_TLS_KEY_FILE=/etc/nginx/certs/${MAOP_TLS_KEY_FILENAME:-privkey.pem}
+    # H9 fix: 使用 envsubst 渲染 nginx 配置模板后再启动 nginx。
+    entrypoint: ["/bin/sh", "-c", "envsubst '$$MAOP_TLS_CERT_FILE $$MAOP_TLS_KEY_FILE' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && exec nginx -g 'daemon off;'"]
     depends_on:
       - dashboard  # fix: base compose service is "dashboard", not "maop"
     networks:
@@ -695,6 +723,14 @@ services:
     profiles: ["etcd", "patroni"]
     networks:
       - maop-net
+
+# H7 fix: Docker secrets 段（可选）。启用方式：
+#   1. 创建 ./secrets/maop_admin_password.txt 并写入强密码
+#   2. 在 dashboard 服务中取消 secrets 挂载注释
+#   3. 设置 MAOP_ADMIN_PASSWORD_FILE=/run/secrets/maop_admin_password
+secrets:
+  maop_admin_password:
+    file: ./secrets/maop_admin_password.txt
 
 volumes:
   maop-data:

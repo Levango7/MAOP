@@ -133,24 +133,11 @@ async def csp_violations() -> Any:
 
 
 # ── Prometheus metrics endpoint ────────────────────────────────────
-@router.get("/api/prometheus")
-async def prometheus_metrics() -> Any:
-    """Prometheus text-format metrics exposition endpoint.
-
-    Returns all registered metrics (counters, gauges, histograms) in
-    Prometheus text exposition format.  Scrape with:
-        scrape_configs:
-          - job_name: 'maop'
-            metrics_path: /api/prometheus
-            static_configs:
-              - targets: ['localhost:9079']
-    """
-    from fastapi import Response
-
-    from maop.core.monitoring.monitoring import metrics as _metrics
-
-    text = _metrics.to_prometheus()
-    return Response(content=text, media_type="text/plain; version=0.0.4; charset=utf-8")
+# Low-5 修复：移除重复的 /api/prometheus 端点定义。
+# 原问题：static.py 与 _register_routes.py 均定义了 /api/prometheus 端点，
+# 导致注册冲突或指标覆盖。现统一到 _register_routes.py（路由注册中心）。
+# 如需在 static.py 中使用 prometheus 指标，直接从 monitoring 模块导入即可：
+#   from maop.core.monitoring.monitoring import metrics as _metrics
 
 
 # ── SPA fallback for Vue3 client-side routes ───────────────────────

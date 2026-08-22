@@ -46,7 +46,9 @@ from typing import TYPE_CHECKING, Any
 from maop.core.observability.metrics import get_metrics
 
 if TYPE_CHECKING:
-    from maop.enterprise.notification.event_bus import EventBus
+    # [C-1] 修正：统一使用 core.reliability.event_bus（与 engine.py 导入一致）。
+    # 旧导入 maop.enterprise.notification.event_bus 不存在且 API 不一致（emit vs publish）。
+    from maop.core.reliability.event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,16 @@ class AgentHealth:
         Number of outcomes currently in the window.
     total_recorded : int
         Total outcomes ever recorded for this agent (monotonic).
+    operational_status : str
+        Extended operational status for the Supervisor layer:
+        ``"normal"`` / ``"degraded"`` / ``"drained"`` / ``"recovering"``
+        / ``"replaced"`` / ``"terminated"`` / ``"upgrading"``.
+        Defaults to ``"normal"`` so existing callers (which only read
+        ``status``) see no change — the field is purely additive.
+    disabled : bool
+        When True the agent has been terminated by the Supervisor and
+        the dispatch path must skip it. Defaults to False (passive
+        detector never sets it).
     """
 
     agent_id: str
@@ -110,6 +122,9 @@ class AgentHealth:
     status: str
     window_size: int
     total_recorded: int
+    # ── Supervisor 扩展字段（向后兼容：默认值不破坏既有调用方）──
+    operational_status: str = "normal"
+    disabled: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serialisable dict view of this snapshot."""
@@ -122,6 +137,8 @@ class AgentHealth:
             "status": self.status,
             "window_size": self.window_size,
             "total_recorded": self.total_recorded,
+            "operational_status": self.operational_status,
+            "disabled": self.disabled,
         }
 
 
@@ -464,9 +481,11 @@ class FailurePatternDetector:
     ) -> None:
         """Publish a notification event (best-effort, non-blocking).
 
-        Uses :meth:`EventBus.emit` when an event bus is wired in. When a
-        running asyncio loop exists (production scheduler path), the
-        emit coroutine is scheduled on it so the synchronous
+        [C-1] 修正：统一使用 ``core.reliability.event_bus.EventBus.publish(Event)``
+        API（旧 ``emit()`` 方法在 core 实现中不存在，会抛 AttributeError）。
+
+        When a running asyncio loop exists (production scheduler path), the
+        publish coroutine is scheduled on it so the synchronous
         ``record_result`` caller is not blocked. When no loop is running
         (tests, sync scripts), the coroutine is run to completion on a
         fresh loop so events still land in the bus history buffer.
@@ -477,18 +496,22 @@ class FailurePatternDetector:
         try:
             import asyncio
 
-            coro = self._event_bus.emit(
-                event_type, full_payload, tenant_id=self._tenant_id,
+            from maop.core.reliability.event_bus import Event
+
+            event = Event(
+                topic=event_type,
+                data=full_payload,
+                source="failure_detector",
             )
             try:
                 asyncio.get_running_loop()
                 # A loop is running — schedule fire-and-forget so the
                 # synchronous caller is not blocked.
-                asyncio.ensure_future(coro)
+                asyncio.ensure_future(self._event_bus.publish(event))
             except RuntimeError:
                 # No running loop — run to completion on a fresh loop so
                 # tests / sync callers still see the event in history.
-                asyncio.run(coro)
+                asyncio.run(self._event_bus.publish(event))
         except Exception as exc:
             logger.debug("[failure-detector] event publish failed: %s", exc)
 
@@ -518,6 +541,45 @@ def set_failure_detector(detector: FailurePatternDetector | None) -> None:
         _detector_instance = detector
 
 
+# ── Supervisor singleton accessors ────────────────────────────────────
+# 监督者（Supervisor）继承 FailurePatternDetector，二者共享同一进程级单例。
+# get_supervisor() 返回 Supervisor 实例（若已配置），否则返回 None。
+# set_supervisor() 由 Supervisor 初始化路径或测试注入调用，将 Supervisor
+# 实例注册为 failure_detector 单例（多态生效：get_failure_detector() 返回
+# 的对象 isinstance(_, Supervisor) 为 True，既有调用方零改动即获得新能力）。
+
+def get_supervisor() -> FailurePatternDetector | None:
+    """Return the process-wide Supervisor singleton, or ``None`` if unconfigured.
+
+    The Supervisor is stored in the same slot as the failure detector
+    (Supervisor inherits FailurePatternDetector). When no Supervisor has
+    been set (passive-only mode), this returns ``None`` so callers can
+    branch with ``if supervisor is not None:`` and degrade to current
+    behaviour. When a plain FailurePatternDetector was set (no
+    Supervisor layer), this returns the detector instance — callers
+    should treat the return as "supervisor or detector" and check for
+    Supervisor-specific attributes via hasattr / isinstance.
+    """
+
+    with _detector_lock:
+        return _detector_instance
+
+
+def set_supervisor(supervisor: FailurePatternDetector | None) -> None:
+    """Set (or clear with ``None``) the process-wide Supervisor singleton.
+
+    The Supervisor instance is stored in the failure-detector singleton
+    slot so that ``get_failure_detector()`` returns the Supervisor
+    (polymorphism: Supervisor inherits FailurePatternDetector) and all
+    existing scheduling-path calls transparently gain Supervisor
+    capabilities. Pass ``None`` to disable the supervisor layer and
+    fall back to plain FailurePatternDetector behaviour.
+    """
+    global _detector_instance
+    with _detector_lock:
+        _detector_instance = supervisor
+
+
 
 __all__ = [
     "M_AGENT_AVG_LATENCY",
@@ -528,5 +590,7 @@ __all__ = [
     "AgentHealth",
     "FailurePatternDetector",
     "get_failure_detector",
+    "get_supervisor",
     "set_failure_detector",
+    "set_supervisor",
 ]

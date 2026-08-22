@@ -589,6 +589,14 @@ class MessageQueue:
         )
         by_cg = {r["consumer_group"]: r["cnt"] for r in rows}
 
+        # H8 修复：更新队列待处理消息数指标
+        try:
+            from maop.core.monitoring.monitoring import MAOP_QUEUE_PENDING
+
+            MAOP_QUEUE_PENDING.set(pending)
+        except Exception:
+            pass
+
         return QueueStats(
             pending=pending,
             processing=processing,

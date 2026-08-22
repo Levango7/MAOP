@@ -98,7 +98,10 @@ def get_subsystems() -> dict[str, Any]:
 start_time = time.time()
 
 # ── Config flags ───────────────────────────────────────────────────
-tls_enabled = os.environ.get("MAOP_TLS", "0") == "1"
+# M2 修复：统一读取 MAOP_TLS_ENABLED（兼容旧名 MAOP_TLS，触发 DeprecationWarning）
+from maop.config.env import get_tls_enabled as _get_tls_enabled
+
+tls_enabled = _get_tls_enabled()
 _env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
 # High 安全修复 (2.3): secure-by-default，与 routers/auth.py 和
 # settings._default_auth_enabled 保持一致。

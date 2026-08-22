@@ -303,6 +303,22 @@ class CircuitBreaker:
                            VALUES (?, ?, ?, ?, ?)""",
                         (agent_name, old_state.value, entry.state.value, entry.failures, now),
                     )
+                    # H8 修复：记录熔断器状态指标（1=closed, 0.5=half, 0=open）
+                    try:
+                        from maop.core.monitoring.monitoring import (
+                            MAOP_CIRCUIT_BREAKER_STATE,
+                        )
+
+                        state_value = {
+                            "closed": 1.0,
+                            "half-open": 0.5,
+                            "open": 0.0,
+                        }.get(entry.state.value, 0.0)
+                        MAOP_CIRCUIT_BREAKER_STATE.set(
+                            state_value, labels={"agent": agent_name}
+                        )
+                    except Exception:
+                        pass
         except Exception as exc:
             logger.warning("Breaker save agent %s failed: %s", agent_name, exc)
 

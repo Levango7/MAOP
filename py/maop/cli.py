@@ -12,10 +12,33 @@ logger = logging.getLogger(__name__)
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
 MAOP_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+# ── 统一命令执行包装器（H1 修复：CLI 静默无输出）──────────────────
+# 自动输出执行结果与耗时；对未实现命令输出明确提示并以非零退出码退出；
+# 异常时输出失败信息并以退出码 1 退出，避免静默 pass 导致用户无反馈。
+def _emit_ok(name: str, elapsed_ms: float, detail: str = "") -> None:
+    """输出命令成功完成信息。"""
+    msg = f"[OK] {name} 完成 ({elapsed_ms:.1f}ms)"
+    if detail:
+        msg += f" — {detail}"
+    print(msg)
+
+
+def _emit_fail(name: str, exc: BaseException | str) -> None:
+    """输出命令失败信息到 stderr。"""
+    print(f"[FAIL] {name} 失败: {exc}", file=sys.stderr)
+
+
+def _emit_unimplemented(name: str) -> None:
+    """输出未实现提示到 stderr 并以退出码 2 退出。"""
+    print(f"[ERROR] 命令 {name} 尚未实现", file=sys.stderr)
+    raise SystemExit(2)
 
 
 def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
@@ -24,7 +47,8 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
         import uvicorn
 
         from maop.dashboard.server import app
-    except ImportError:
+    except ImportError as exc:
+        print(f"[FAIL] start 失败: 无法导入 dashboard 依赖 ({exc})", file=sys.stderr)
         sys.exit(1)
 
     # Multi-worker support (MAOP_DASH_WORKERS / MAOP_WORKERS env var)
@@ -35,7 +59,10 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
         uvicorn_kwargs["workers"] = workers
     else:
         # TLS support (single-worker only — uvicorn limitation)
-        tls_enabled = os.environ.get("MAOP_TLS", "0") == "1"
+        # M2 修复：统一读取 MAOP_TLS_ENABLED（兼容旧名 MAOP_TLS）
+        from maop.config.env import get_tls_enabled
+
+        tls_enabled = get_tls_enabled()
         if tls_enabled:
             from maop.core.security.tls import TLSSettings, create_ssl_context
             cert_file = os.environ.get("MAOP_TLS_CERT", "")
@@ -46,89 +73,119 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
                 if ssl_ctx:
                     uvicorn_kwargs["ssl"] = ssl_ctx
 
-        _proto = "https" if "ssl" in uvicorn_kwargs else "http"
-
+    proto = "https" if "ssl" in uvicorn_kwargs else "http"
+    print(f"[INFO] 启动 MAOP Dashboard：{proto}://{host}:{port} (workers={workers})")
     uvicorn.run(app, host=host, port=port, **uvicorn_kwargs)
 
 
 def cmd_stop() -> Any:
     """Stop MAOP using Python-native deploy.stop()."""
+    start = time.monotonic()
     try:
         from maop.deploy import stop
         result = stop(MAOP_ROOT)
+        elapsed = (time.monotonic() - start) * 1000
         if result.pid:
-            pass
-    except Exception:
+            print(f"[OK] stop 完成 ({elapsed:.1f}ms) — 已停止 PID={result.pid}")
+        else:
+            print(f"[OK] stop 完成 ({elapsed:.1f}ms) — 无运行中的进程")
+    except Exception as exc:
+        _emit_fail("stop", exc)
         sys.exit(1)
 
 
 def cmd_status() -> Any:
     """Check MAOP status using Python-native deploy.status()."""
+    start = time.monotonic()
     try:
         from maop.deploy import status
         result = status(MAOP_ROOT)
+        elapsed = (time.monotonic() - start) * 1000
+        # 输出主进程状态
         if result.pid:
-            pass
-        for _comp in result.components:
-            pass
-    except Exception:
+            print(f"[OK] status 完成 ({elapsed:.1f}ms) — MAOP 运行中 PID={result.pid}")
+        else:
+            print(f"[OK] status 完成 ({elapsed:.1f}ms) — MAOP 未运行")
+        # 输出各组件状态
+        for comp in result.components:
+            icon = {"healthy": "+", "degraded": "~", "unhealthy": "!"}.get(comp.status.value, "?")
+            print(f"  [{icon}] {comp.name}: {comp.status.value}")
+    except Exception as exc:
+        _emit_fail("status", exc)
+        # status 失败不应让脚本退出非零码（仅查询用途），但仍输出错误信息
         logger.debug('swallowed exception', exc_info=True)
 
 
 def cmd_run(task: str) -> Any:
     """Run a task through Python-native MaopLoop."""
+    start = time.monotonic()
     try:
         import asyncio
 
         from maop.maop_loop import MaopLoop
         loop = MaopLoop(root_dir=str(MAOP_ROOT))
         result = asyncio.run(loop.run(task))
+        elapsed = (time.monotonic() - start) * 1000
+        # 输出执行结果
         if result.execution:
             if result.execution.stdout:
-                pass
+                print(result.execution.stdout)
             if result.execution.error:
-                pass
+                print(f"[stderr] {result.execution.error}", file=sys.stderr)
         if result.block_reason:
-            pass
-    except ImportError:
+            print(f"[BLOCK] 任务被阻塞：{result.block_reason}", file=sys.stderr)
+            sys.exit(1)
+        print(f"[OK] run 完成 ({elapsed:.1f}ms)")
+    except ImportError as exc:
+        _emit_fail("run", exc)
         sys.exit(1)
-    except Exception:
+    except Exception as exc:
+        _emit_fail("run", exc)
         sys.exit(1)
 
 
 def cmd_validate() -> Any:
     """Run config validation using Python-native deploy.validate_config()."""
+    start = time.monotonic()
     try:
         from maop.deploy import validate_config
         result = validate_config(MAOP_ROOT)
+        elapsed = (time.monotonic() - start) * 1000
         if result.valid:
-            pass
+            print(f"[OK] validate 完成 ({elapsed:.1f}ms) — 配置有效")
         else:
-            for _err in result.errors:
-                pass
-        for _warn in result.warnings:
-            pass
+            print("[FAIL] validate 失败：配置无效", file=sys.stderr)
+            for err in result.errors:
+                print(f"  [ERROR] {err}", file=sys.stderr)
+        for warn in result.warnings:
+            print(f"  [WARN] {warn}")
         if not result.valid:
             sys.exit(1)
-    except Exception:
+    except Exception as exc:
+        _emit_fail("validate", exc)
         sys.exit(1)
 
 
 def cmd_health() -> Any:
     """Run health check using Python-native deploy.health_check()."""
+    start = time.monotonic()
     try:
         from maop.deploy import health_check
         results = health_check(MAOP_ROOT)
+        elapsed = (time.monotonic() - start) * 1000
         all_healthy = True
         for r in results:
-            _status_icon = {"healthy": "+", "degraded": "~", "unhealthy": "!"}[r.status.value]
+            icon = {"healthy": "+", "degraded": "~", "unhealthy": "!"}[r.status.value]
+            print(f"  [{icon}] {r.name}: {r.status.value}")
             if r.status.value != "healthy":
                 all_healthy = False
         if not all_healthy:
+            print(f"[FAIL] health 失败 ({elapsed:.1f}ms) — 存在不健康组件", file=sys.stderr)
             sys.exit(1)
         else:
-            pass
-    except Exception:
+            print(f"[OK] health 完成 ({elapsed:.1f}ms) — 所有组件健康")
+    except Exception as exc:
+        _emit_fail("health", exc)
         sys.exit(1)
 
 
@@ -189,15 +246,18 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
     if parsed.subcommand == "list-registries":
         regs = mp.list_registries()
         if not regs:
-            pass
+            print("[INFO] 未配置任何 registry")
         for r in regs:
-            _trust = "trusted" if r.trusted else "untrusted"
-            _status = "enabled" if r.enabled else "disabled"
+            trust = "trusted" if r.trusted else "untrusted"
+            status = "enabled" if r.enabled else "disabled"
+            print(f"  {r.name}  {r.url}  [{trust}] [{status}]")
     elif parsed.subcommand == "add-registry":
         mp.add_registry(parsed.name, parsed.url, trusted=parsed.trusted)
-        _trust = "trusted" if parsed.trusted else "untrusted"
+        trust = "trusted" if parsed.trusted else "untrusted"
+        print(f"[OK] add-registry 完成 — {parsed.name} {parsed.url} [{trust}]")
     elif parsed.subcommand == "remove-registry":
         mp.remove_registry(parsed.name)
+        print(f"[OK] remove-registry 完成 — 已移除 {parsed.name}")
     elif parsed.subcommand == "search":
         tags = (
             [t.strip() for t in parsed.tags.split(",") if t.strip()]
@@ -205,10 +265,11 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
         )
         results = mp.search(parsed.query, tags=tags)
         if not results:
-            pass
+            print(f"[INFO] 未找到匹配 '{parsed.query}' 的服务器")
         for s in results:
-            _verified = " [verified]" if s.verified else ""
-            _tags_str = f" tags={','.join(s.tags)}" if s.tags else ""
+            verified = " [verified]" if s.verified else ""
+            tags_str = f" tags={','.join(s.tags)}" if s.tags else ""
+            print(f"  {s.name}  {s.description}{verified}{tags_str}")
     elif parsed.subcommand == "install":
         try:
             _cfg = mp.install(
@@ -217,19 +278,21 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
                 verify_checksum=not parsed.no_verify,
                 confirm_untrusted=parsed.confirm_untrusted,
             )
+            print(f"[OK] install 完成 — 已安装 {parsed.name}")
         except ValueError:
             sys.exit(1)
     elif parsed.subcommand == "uninstall":
         if mp.uninstall(parsed.name):
-            pass
+            print(f"[OK] uninstall 完成 — 已卸载 {parsed.name}")
         else:
+            print(f"[FAIL] uninstall 失败 — {parsed.name} 未安装或卸载失败", file=sys.stderr)
             sys.exit(1)
     elif parsed.subcommand == "list-installed":
         installed = mp.list_installed()
         if not installed:
-            pass
+            print("[INFO] 未安装任何 marketplace 服务器")
         for s in installed:  # type: ignore
-            pass
+            print(f"  {s.name}  {s.version}")
 
 
 def cmd_mcp(args: list[str]) -> Any:

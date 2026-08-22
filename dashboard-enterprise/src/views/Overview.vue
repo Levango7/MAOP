@@ -423,7 +423,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 </script>
 
 <style scoped>
-/* ── MAOS 升级提示 banner (Personal edition 用户可见) ── */
+/* MAOS 升级提示 banner */
 .upgrade-banner {
   display: flex;
   align-items: center;

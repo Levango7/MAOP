@@ -163,6 +163,17 @@ class EpisodicStoreMixin:
                  json.dumps(entry.metadata), entry.created_at),
             )
         logger.debug("Episodic stored: %s (outcome=%s score=%.2f)", entry.id[:8], outcome, score)
+        # H8 修复：更新记忆条目数量指标
+        try:
+            from maop.core.monitoring.monitoring import MAOP_MEMORY_ENTRIES
+
+            with self._episodic_connect() as conn:
+                row = conn.execute(
+                    "SELECT COUNT(*) AS cnt FROM episodic_memory"
+                ).fetchone()
+            MAOP_MEMORY_ENTRIES.set(row["cnt"] if row else 0)
+        except Exception:
+            pass
         return entry.id
 
     def episodic_search(

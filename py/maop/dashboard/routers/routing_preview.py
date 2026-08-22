@@ -9,6 +9,7 @@ Provides visibility into the multi-factor route matching process:
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, cast
 
 from fastapi import APIRouter, Request
@@ -34,8 +35,10 @@ async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any
     if not task:
         return {"error": "task is required"}
 
-    import os
-    root = os.environ.get("MAOP_ROOT_DIR", os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
+    # M3 修复：统一使用 get_root_dir() 解析根目录（兼容 MAOP_ROOT_DIR / MAOP_ROOT）
+    from maop.config.env import get_root_dir
+
+    root = str(get_root_dir(default=os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))))
     config = load_config(root)
     scorer = get_route_scorer(config)
     match = scorer.match(task, adaptive=True)
@@ -94,8 +97,10 @@ async def get_route_scores(request: Request, task: str = "") -> dict[str, Any]:
     if not task:
         return {"error": "task parameter is required"}
 
-    import os
-    root = os.environ.get("MAOP_ROOT_DIR", os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
+    # M3 修复：统一使用 get_root_dir() 解析根目录（兼容 MAOP_ROOT_DIR / MAOP_ROOT）
+    from maop.config.env import get_root_dir
+
+    root = str(get_root_dir(default=os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))))
     config = load_config(root)
     scorer = get_route_scorer(config)
     task_lower = task.lower()

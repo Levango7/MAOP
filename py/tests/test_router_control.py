@@ -28,6 +28,7 @@ def _fake_proc(returncode=None) -> MagicMock:
     proc = MagicMock()
     proc.returncode = returncode
     proc.terminate = MagicMock()
+    proc.communicate = AsyncMock(return_value=(b"", b""))
     return proc
 
 
@@ -307,6 +308,9 @@ class FakeProc:
 
     async def wait(self) -> int:
         return self.returncode or 0
+
+    async def communicate(self) -> tuple[bytes, bytes]:
+        return (b"", b"")
 
 
 @pytest.fixture

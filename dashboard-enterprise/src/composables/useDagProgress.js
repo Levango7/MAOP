@@ -67,12 +67,11 @@ export function useDagProgress(executionId, options = {}) {
 
   // ── Helpers ───────────────────────────────────────────────
 
+  // M6 fix: token 现由 httpOnly cookie 管理，前端无法读取。
+  // _getToken 保留以兼容 WebSocket 子协议逻辑，但始终返回空字符串。
+  // SSE 连接通过 withCredentials: true 自动携带 cookie。
   function _getToken() {
-    try {
-      return localStorage.getItem('maop_token') || '';
-    } catch {
-      return '';
-    }
+    return '';
   }
 
   function _applyEvent(data) {
@@ -106,10 +105,13 @@ export function useDagProgress(executionId, options = {}) {
   // ── SSE connection ────────────────────────────────────────
 
   function connectSSE() {
-    const token = _getToken();
-    const url = `/api/stream/dag/${executionId}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    // M6 fix: 移除 URL query 中的 token，避免日志/浏览器历史/Referer 泄漏。
+    // 原：url = `/api/stream/dag/${executionId}?token=${token}`
+    // 现：通过 EventSource withCredentials: true 依赖 httpOnly cookie 认证。
+    const url = `/api/stream/dag/${executionId}`;
     try {
-      eventSource = new EventSource(url);
+      // M6 fix: withCredentials: true 携带 httpOnly cookie（SSE 标准）。
+      eventSource = new EventSource(url, { withCredentials: true });
     } catch {
       _scheduleReconnect();
       return;
@@ -151,11 +153,11 @@ export function useDagProgress(executionId, options = {}) {
 
   function connectWS() {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const token = _getToken();
+    // M6 fix: token 现由 httpOnly cookie 管理，不再通过 Sec-WebSocket-Protocol 子协议传递。
+    // 浏览器在 WebSocket 握手时会自动携带同源 cookie，后端从 cookie 中读取 token 验证。
     const url = `${proto}//${window.location.host}/ws/dag/${executionId}`;
     try {
-      // Sec-WebSocket-Protocol subprotocol carries token (avoids URL exposure).
-      ws = token ? new WebSocket(url, ['token', token]) : new WebSocket(url);
+      ws = new WebSocket(url);
     } catch {
       _scheduleReconnect();
       return;

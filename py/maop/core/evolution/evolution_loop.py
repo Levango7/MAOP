@@ -109,6 +109,10 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
         auto_consolidate: bool = True,
         heal_threshold: int = 2,
         suggest_threshold: int = 3,
+        *,
+        debate_enabled: bool = False,
+        debate_dispatcher: Any | None = None,
+        debate_participants: list[str] | None = None,
     ) -> None:
         self._root = Path(root_dir)
         self._data_dir = self._root / "data"
@@ -118,6 +122,11 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
         self._auto_consolidate = auto_consolidate
         self._heal_threshold = heal_threshold
         self._suggest_threshold = suggest_threshold
+        # C-2: DEBATE 阶段插入配置。默认禁用（向后兼容），
+        # 启用时才在 SUGGEST 与 EVALUATE 之间插入 _phase_debate()。
+        self._debate_enabled = debate_enabled
+        self._debate_dispatcher = debate_dispatcher
+        self._debate_participants = debate_participants or []
         self._init_db()
 
     def _init_db(self) -> None:
@@ -162,7 +171,16 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
         report.phases.append(suggest)
         report.suggestions_generated = suggest.details.get("count", 0)
 
-        evaluate = self._phase_evaluate(suggest.details.get("suggestions", []))
+        # C-2: DEBATE 阶段（默认禁用，启用时才插入）。
+        # 对 suggestions 逐条辩论，仅高置信度共识建议进入 EVALUATE。
+        # 未配置时透传 suggestions，行为退化为现状（向后兼容）。
+        debated_suggestions = suggest.details.get("suggestions", [])
+        if self._debate_enabled and self._debate_dispatcher is not None:
+            debate = self._phase_debate(suggest.details.get("suggestions", []))
+            report.phases.append(debate)
+            debated_suggestions = debate.details.get("accepted_suggestions", [])
+
+        evaluate = self._phase_evaluate(debated_suggestions)
         report.phases.append(evaluate)
 
         # Pre-APPLY snapshot: capture file state so we can rollback if needed.
@@ -206,6 +224,20 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
             consolidate = self._phase_consolidate()
             report.phases.append(consolidate)
             report.consolidated = consolidate.details.get("consolidated", 0)
+            # R-5: 辩论轨迹清理（在 CONSOLIDATE 阶段执行，受既有频率约束）。
+            # 仅在 DEBATE 启用且 dispatcher 提供 cleanup_traces 方法时调用。
+            if self._debate_enabled and self._debate_dispatcher is not None:
+                try:
+                    cleanup_fn = getattr(
+                        self._debate_dispatcher, "cleanup_traces", None,
+                    )
+                    if callable(cleanup_fn):
+                        cleaned = cleanup_fn()
+                        consolidate.details["debate_traces_cleaned"] = cleaned
+                except Exception as exc:  # pragma: no cover — 清理失败不阻断主流程
+                    logger.warning(
+                        "[evo-loop] debate trace cleanup failed: %s", exc,
+                    )
 
         report.finished_at = time.time()
         report.total_duration_s = round(report.finished_at - report.started_at, 2)

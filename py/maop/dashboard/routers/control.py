@@ -56,6 +56,8 @@ async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
         cwd=str(MAOP_ROOT),
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
+    # Drain pipes in background to prevent deadlock when child output exceeds OS pipe buffer (~64KB)
+    asyncio.create_task(proc.communicate())
     active_jobs[job_id] = {"action": "run", "status": "running",
         "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": actual_task, "process": proc}
     return {"job_id": job_id, "status": "started", "task": actual_task}
@@ -86,6 +88,28 @@ async def control_resume(request: Request) -> dict[str, Any]:
             job["status"] = "running"
             resumed += 1
     return {"status": "ok", "action": "resume", "resumed": resumed}
+
+
+@router.get("/api/control/pause-status")
+async def control_pause_status(request: Request) -> dict[str, Any]:
+    """查询系统暂停/恢复状态（M4 修复新增）。
+
+    返回当前是否处于暂停状态，以及暂停标记文件的路径与存在性。
+    便于运维监控与 dashboard 显示暂停状态。
+    """
+    require_admin(request)
+    pause_file = MAOP_ROOT / "logs" / ".maop_pause"
+    is_paused = pause_file.exists()
+    paused_jobs = sum(1 for job in active_jobs.values() if job.get("status") == "paused")
+    running_jobs = sum(1 for job in active_jobs.values() if job.get("status") == "running")
+    return {
+        "status": "paused" if is_paused else "running",
+        "is_paused": is_paused,
+        "pause_file": str(pause_file),
+        "paused_jobs": paused_jobs,
+        "running_jobs": running_jobs,
+        "total_jobs": len(active_jobs),
+    }
 
 @router.post("/api/control/stop")
 async def control_stop(request: Request) -> dict[str, Any]:

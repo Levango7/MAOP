@@ -176,6 +176,30 @@ def register_routers(app: FastAPI) -> None:
     except ImportError as _e:
         logger.warning("[server] Router MISSING: scheduling (import error: %s)", _e)
 
+    # Supervisor (proactive multi-agent supervision): patrol / alert /
+    # replace / degrade / terminate / upgrade. Mounted unconditionally —
+    # endpoints return 404 when no Supervisor has been configured
+    # (passive-only mode), so the router is always importable.
+    try:
+        from maop.dashboard.routers import supervisor as supervisor_router
+
+        app.include_router(supervisor_router.router)
+        logger.info("[server] Router: supervisor enabled")
+    except ImportError as _e:
+        logger.warning("[server] Router MISSING: supervisor (import error: %s)", _e)
+
+    # Debate (adversarial multi-agent debate): start / get / verdict /
+    # config / history. Mounted unconditionally — endpoints return 404
+    # when no DebateDispatcher has been configured, so the router is
+    # always importable.
+    try:
+        from maop.dashboard.routers import debate as debate_router
+
+        app.include_router(debate_router.router)
+        logger.info("[server] Router: debate enabled")
+    except ImportError as _e:
+        logger.warning("[server] Router MISSING: debate (import error: %s)", _e)
+
     # t194 (2026-08-14): LLM 智能任务拆分 — 自然语言 → 子任务 DAG。
     from maop.dashboard.routers import dag as dag_router
 
@@ -338,6 +362,17 @@ def register_routers(app: FastAPI) -> None:
         logger.info("[server] Router: config-history enabled")
     except ImportError as _e:
         logger.warning("[server] Router MISSING: config-history (import error: %s)", _e)
+
+    # ── Blackboard architecture router ──────────────────────────────────
+    # P2: 经典黑板架构 — 结构化共享知识库 + 知识源 + 控制器。
+    # 读操作开放访问；写操作（write/clear）需 admin 鉴权。
+    # 黑板默认不接入 EventBus（向后兼容），需显式 enable_event_bus() 启用。
+    try:
+        from maop.dashboard.routers import blackboard as blackboard_router
+        app.include_router(blackboard_router.router)
+        logger.info("[server] Router: blackboard enabled")
+    except ImportError as _e:
+        logger.warning("[server] Router MISSING: blackboard (import error: %s)", _e)
 
 
 # ── Health ─────────────────────────────────────────────────────────

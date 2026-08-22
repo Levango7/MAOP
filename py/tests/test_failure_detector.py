@@ -51,7 +51,8 @@ def detector():
 @pytest.fixture
 def detector_with_bus():
     """Detector wired to a real EventBus so emitted events are captured."""
-    pytest.importorskip("maop.enterprise")
+    # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
+    pytest.skip(reason="maop.enterprise 未发布")
     from maop.enterprise.notification.event_bus import EventBus
 
     bus = EventBus(history_size=100)

@@ -123,7 +123,7 @@ async def list_agents(
     return {"agents": [a.model_dump() for a in agents]}
 
 
-# ── 预置示例 Agent 模板（P1-4） ──────────────────────────────────────
+# 预置示例 Agent 模板
 
 PRESET_AGENTS: list[dict[str, Any]] = [
     {

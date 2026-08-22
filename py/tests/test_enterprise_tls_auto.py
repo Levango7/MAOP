@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("maop.enterprise")
+# H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
+pytest.skip(reason="maop.enterprise 未发布", allow_module_level=True)
 
 try:
     import cryptography  # noqa: F401

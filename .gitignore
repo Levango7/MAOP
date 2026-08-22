@@ -41,6 +41,8 @@ batch_run_tests.py
 .env
 .env.local
 .env.*.local
+# Low-2 fix: .env.sandbox 含运行时沙箱转发策略，可能含敏感配置，不应入库
+.env.sandbox
 
 # -- Runtime data (SQLite databases + generated state) --
 data/*.db

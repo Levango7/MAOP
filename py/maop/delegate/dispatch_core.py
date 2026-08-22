@@ -346,6 +346,13 @@ class Dispatcher:
         """
         _start = time.monotonic()
         sla_tier = self._sla.tier_from_priority(priority)
+        # H8 修复：记录委派总数指标
+        try:
+            from maop.core.monitoring.monitoring import MAOP_DELEGATIONS_TOTAL
+
+            MAOP_DELEGATIONS_TOTAL.inc()
+        except Exception:
+            pass
         routing_tracer = get_tracer("maop.routing.dispatcher")
         with otel_span(
             routing_tracer, "routing.dispatcher.dispatch", trace_id=trace_id,
@@ -391,6 +398,15 @@ class Dispatcher:
             # C1 fix: 主路径记录 agent 执行性能数据（此前 record() 从不被调用，
             # 自适应路由/演化分析的 agent_performance 表长期为空）
             self._record_agent_performance(agent, routing_key, result)
+            # H8 修复：记录委派耗时指标
+            try:
+                from maop.core.monitoring.monitoring import (
+                    MAOP_DELEGATION_DURATION,
+                )
+
+                MAOP_DELEGATION_DURATION.observe(time.monotonic() - _start)
+            except Exception:
+                pass
             return result
 
     def _record_agent_performance(
@@ -407,11 +423,11 @@ class Dispatcher:
         不阻塞 dispatch。
         """
         try:
-            import os
-
+            from maop.config.env import get_root_dir
             from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
 
-            root = os.environ.get("MAOP_ROOT_DIR", ".") or "."
+            # M3 修复：统一使用 get_root_dir() 解析根目录（兼容 MAOP_ROOT_DIR / MAOP_ROOT）
+            root = str(get_root_dir(default="."))
             tracker = AgentPerformanceTracker(root_dir=root)
             result = dispatch_result.result if dispatch_result else None
             if result is None:
@@ -688,9 +704,24 @@ class Dispatcher:
             # P1-16 fix: use async breaker methods to avoid blocking event loop
             await self._breaker.arecord_success(agent)
             self._notify_route_scorer(agent, success=True)
+            # H8 修复：记录委派成功指标
+            try:
+                from maop.core.monitoring.monitoring import MAOP_DELEGATIONS_SUCCESS
+
+                MAOP_DELEGATIONS_SUCCESS.inc()
+            except Exception:
+                pass
         else:
             await self._breaker.arecord_failure(agent)
             self._notify_route_scorer(agent, success=False)
+            # H8 修复：记录委派失败指标
+            try:
+                from maop.core.monitoring.monitoring import MAOP_DELEGATIONS_FAILED
+
+                MAOP_DELEGATIONS_FAILED.inc()
+            except Exception:
+                pass
+
 
         return DispatchResult(
             result=result,

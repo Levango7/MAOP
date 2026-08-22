@@ -31,6 +31,21 @@ class ExecuteMixin:
     _loop_config: Any
     _log: Any
 
+    def _get_supervisor(self) -> Any:
+        """Lazily return the process-wide Supervisor singleton.
+
+        Returns ``None`` when no Supervisor has been configured
+        (passive-only mode). The retry path takes the ``None`` branch
+        and uses the static ``LoopConfig`` values — full backward
+        compatibility.
+        """
+        try:
+            from maop.core.scheduling.failure_detector import get_supervisor
+
+            return get_supervisor()
+        except Exception:
+            return None
+
     @staticmethod
     def _get_downstream(node: str, dag: Any) -> list[str]:
         """Return all transitive downstream (successor) nodes of *node* in *dag*.
@@ -211,21 +226,64 @@ class ExecuteMixin:
         we try the next agent in the chain. The ``retry`` parameter controls
         whether iterative retry (re-trying the same agent multiple times with
         backoff) is enabled; it no longer gates the fallback chain itself.
+
+        Supervisor integration: when a Supervisor is configured, the
+        per-agent retry strategy is queried dynamically (``max_attempts``
+        reduced for degraded agents, ``skip_agent=True`` for terminated
+        agents). When no Supervisor is configured, the static
+        ``LoopConfig.iterative_max_attempts`` / ``iterative_backoff_ms``
+        values are used — full backward compatibility.
         """
         lc = self._loop_config
+        supervisor = self._get_supervisor()
         agents = fallback_chain  # Always use full fallback chain (P1-10 fix)
         result = None
 
         for attempt, agent in enumerate(agents):
+            # ── Supervisor: query dynamic retry strategy ──
+            if (
+                supervisor is not None
+                and hasattr(supervisor, "get_retry_strategy")
+            ):
+                try:
+                    strategy = supervisor.get_retry_strategy(
+                        agent,
+                        default_max_attempts=lc.iterative_max_attempts,
+                        default_backoff_ms=lc.iterative_backoff_ms,
+                    )
+                    if strategy.get("skip_agent"):
+                        logger.info(
+                            "[loop-executor] supervisor skip agent %s: %s",
+                            agent, strategy,
+                        )
+                        continue
+                    # When retry=False (parallel execution), still only
+                    # one iteration per agent regardless of strategy.
+                    max_iterations = (
+                        int(strategy.get("max_attempts", lc.iterative_max_attempts))
+                        if retry else 1
+                    )
+                    backoff_ms = int(
+                        strategy.get("backoff_ms", lc.iterative_backoff_ms)
+                    )
+                except Exception:
+                    logger.exception(
+                        "[loop-executor] supervisor get_retry_strategy failed for %s",
+                        agent,
+                    )
+                    max_iterations = lc.iterative_max_attempts if retry else 1
+                    backoff_ms = lc.iterative_backoff_ms
+            else:
+                # No supervisor: use static config (original behaviour).
+                max_iterations = lc.iterative_max_attempts if retry else 1
+                backoff_ms = lc.iterative_backoff_ms
+
             if attempt > 0:
                 await asyncio.sleep(lc.retry_backoff_ms / 1000)
 
-            # B-P0-2 fix: respect retry parameter — when False (parallel
-            # execution), only try once per agent, no iterative retry
-            max_iterations = lc.iterative_max_attempts if retry else 1
             for iteration in range(max_iterations):
                 if iteration > 0:
-                    await asyncio.sleep(lc.iterative_backoff_ms / 1000)
+                    await asyncio.sleep(backoff_ms / 1000)
 
                 try:
                     dispatch_result = await self._dispatcher.dispatch(

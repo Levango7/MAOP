@@ -105,12 +105,28 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
         run: pip install -e .[enterprise] && python -c "import maop; print('enterprise extra install OK')"
 
+      - name: Detect enterprise package
+        # H4 修复：显式检测 py/maop/enterprise/ 是否存在，输出明确告警。
+        # 替代原 --ignore 列表静默跳过的方式，让 CI 日志清晰可见。
+        shell: bash
+        run: |
+          if [ -d maop/enterprise ] && python -c "import maop.enterprise" 2>/dev/null; then
+            echo "ENTERPRISE_AVAILABLE=true" >> "$GITHUB_ENV"
+            echo "::notice::maop.enterprise 包存在，将运行企业版测试"
+          else
+            echo "ENTERPRISE_AVAILABLE=false" >> "$GITHUB_ENV"
+            echo "::warning::maop.enterprise 包不存在，跳过企业版测试（已通过 pytest.skip 显式标注）"
+          fi
+
       - name: Run unit tests
         # ADR-017: 企业代码已移至私有仓库 MAOS，企业测试条件化运行
         # 个人版 CI 不运行企业测试（maop.enterprise 不可导入）
         # P0 fix (2026-08-11): 移除 --cov-fail-under(让 pytest 仅对测试成败负责),
         # 覆盖率门禁交给下一步的 ratchet 脚本,这样测试失败仍然会让 CI 失败,
         # 覆盖率回归也会让 CI 失败,两者职责清晰。
+        # H4 修复：移除原 --ignore 列表（22 个文件静默跳过），改为依赖测试文件
+        # 内的 pytest.skip(reason="maop.enterprise 未发布") 显式跳过。这样测试
+        # 报告中会显式统计跳过数，而非通过 --ignore 静默排除。
         # --timeout=60: 防挂起测试无限等待(历史: pg_persist 池重试/PowerShell
         # 冷启动曾让 windows job 卡 25-30 分钟)。任何单测挂起 60s 即失败,
         # 错误定位到具体测试而非整个 job 卡死。
@@ -121,39 +137,7 @@ jobs:
         # --junitxml: export results for artifact upload (debugging future flakes).
         shell: bash
         run: |
-          # ADR-017: 检测 maop.enterprise 是否可导入，条件化运行企业测试
-          if python -c "import maop.enterprise" 2>/dev/null; then
-            ENTERPRISE_IGNORE=""
-            echo "maop.enterprise available: running enterprise tests"
-          else
-            # 个人版: 忽略所有引用 maop.enterprise 的测试文件
-            # （模块级导入会 collection error，函数级导入会 runtime error）
-            ENTERPRISE_IGNORE="\
-              --ignore=tests/test_audit_enhanced.py \
-              --ignore=tests/test_enterprise_audit.py \
-              --ignore=tests/test_enterprise_container.py \
-              --ignore=tests/test_enterprise_ha.py \
-              --ignore=tests/test_enterprise_integration.py \
-              --ignore=tests/test_enterprise_license.py \
-              --ignore=tests/test_enterprise_n8n.py \
-              --ignore=tests/test_enterprise_pg_persist.py \
-              --ignore=tests/test_enterprise_rbac.py \
-              --ignore=tests/test_enterprise_tenant.py \
-              --ignore=tests/test_enterprise_tls_auto.py \
-              --ignore=tests/test_failure_detector.py \
-              --ignore=tests/test_license_crl.py \
-              --ignore=tests/test_licenses.py \
-              --ignore=tests/test_mem_vector_otel_saml_coverage.py \
-              --ignore=tests/test_module_integrity.py \
-              --ignore=tests/test_notifications.py \
-              --ignore=tests/test_router_system.py \
-              --ignore=tests/test_saml_handler_coverage3.py \
-              --ignore=tests/test_sso.py \
-              --ignore=tests/test_sso_providers.py \
-              --ignore=tests/test_tenant_quota.py"
-            echo "maop.enterprise not available: skipping enterprise tests (ADR-017)"
-          fi
-          python -m pytest tests/ -q --ignore=tests/contract $ENTERPRISE_IGNORE \
+          python -m pytest tests/ -q --ignore=tests/contract \
             -m "not slow" --cov=maop --cov-report=xml --cov-report=term-missing \
             --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml
 
@@ -165,15 +149,24 @@ jobs:
           path: py/test-results.xml
           retention-days: 7
 
-      - name: Coverage ratchet gate
-        # ADR-017: maop.enterprise 不可导入时跳过 ratchet（忽略企业测试会降低
-        # 覆盖率，这是预期行为，不应阻塞个人版 CI）
+      - name: Coverage ratchet gate (核心包门禁)
+        # H3 修复：移除 `if python -c "import maop.enterprise"` 条件（该条件
+        # 永远为假，导致覆盖率门禁从未执行）。改为无条件执行核心包门禁，
+        # 企业包门禁单独拆分为可选步骤（仅当 enterprise 存在时执行）。
+        # 核心包门禁始终执行，确保覆盖率回退被 CI 阻断。
+        shell: bash
+        run: |
+          python scripts/check_coverage_ratchet.py
+
+      - name: Coverage ratchet gate (企业包门禁，可选)
+        # H3 修复：企业包门禁仅当 maop.enterprise 可导入时执行。
+        # 个人版 CI 自动跳过，不影响核心包门禁。
         shell: bash
         run: |
           if python -c "import maop.enterprise" 2>/dev/null; then
-            python scripts/check_coverage_ratchet.py
+            python scripts/check_coverage_ratchet.py --include="maop/enterprise/*" --fail-under=70
           else
-            echo "maop.enterprise not available: skipping coverage ratchet (ADR-017)"
+            echo "::notice::maop.enterprise 未发布，跳过企业包覆盖率门禁"
           fi
 
       - name: Run edition tests
@@ -186,11 +179,23 @@ jobs:
         # 不能用 `-p no:xdist`：pyproject addopts 有 `-n auto`（xdist 并行），
         # 禁用 xdist 插件后 `-n auto` 变 unrecognized → exit 4（CI 12 平台
         # pytest job 全挂的真凶之一）。`-n 0` 显式覆盖为单进程，xdist 保持启用。
-        # `|| true`：主矩阵 auth=0，e2e 三兄弟（模块级要求 MAOP_AUTH=1）必然
-        # 全 skip → pytest exit 5（No tests ran）→ 步骤被判失败。e2e 在主矩阵
-        # 是补充验证（真 e2e 由独立 Playwright job 承担），exit 5 是噪音。
+        # H5 修复：原 `|| true` 掩盖所有退出码，导致非 exit 5 失败（如 import
+        # 错误、配置错误）被静默忽略。现改为精确过滤 exit 5（No tests ran），
+        # 仅容忍 exit 5（e2e 在主矩阵 auth=0 时全 skip 是预期噪音），
+        # 其他非零退出码（exit 1/2/4 等）仍判失败。
         # 若需要真跑 e2e：`MAOP_AUTH=1 MAOP_ADMIN_PASSWORD=... pytest tests/e2e/`。
-        run: python -m pytest tests/e2e/ -q --timeout=15 -p no:cacheprovider --no-cov -n 0 || true
+        run: |
+          set +e
+          python -m pytest tests/e2e/ -q --timeout=15 -p no:cacheprovider --no-cov -n 0
+          code=$?
+          set -e
+          if [ $code -ne 0 ] && [ $code -ne 5 ]; then
+            echo "::error::e2e 测试失败（exit code=$code），仅 exit 5（No tests ran）被容忍"
+            exit $code
+          fi
+          if [ $code -eq 5 ]; then
+            echo "::warning::e2e 测试无用例执行（exit 5），主矩阵 auth=0 下属预期行为"
+          fi
 
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'

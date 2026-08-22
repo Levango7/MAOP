@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## 发布节奏规范（M7 修复）
+
+> **背景**：2026-08-11 至 2026-08-14 四天内发布 4 个版本（5.0.0 / 5.0.1 / 5.0.2 / 5.1.0），
+> 发布节奏过快，版本质量难以保证。现制定以下发布节奏规范，约束后续发布频率。
+
+### 发布频率约束
+
+| 版本类型 | 频率上限 | 触发条件 | 审批要求 |
+|---------|---------|---------|---------|
+| **patch**（x.y.Z） | 每周最多 1 个 | 紧急 bug 修复（P0/P1） | 1 名 reviewer 批准 |
+| **minor**（x.Y.0） | 每两周最多 1 个 | 新功能或非紧急修复 | 2 名 reviewer 批准 + CI 全绿 |
+| **major**（X.0.0） | 每季度最多 1 个 | 破坏性变更 | 架构评审 + 3 名 reviewer 批准 |
+
+### 发布前 checklist
+
+1. [ ] CI 全绿（lint + type check + unit + e2e + coverage 门禁）
+2. [ ] CHANGELOG.md 已更新本次版本段
+3. [ ] 版本号在 pyproject.toml / __init__.py / Dockerfile / package.json 同步
+4. [ ] 至少经过 1 个完整工作日的 staging 环境验证
+5. [ ] 无未解决的 P0/P1 issue（紧急 hotfix 除外）
+6. [ ] 发布说明已撰写（含变更摘要 + 破坏性变更 + 迁移指引）
+
+### 禁止行为
+
+- **禁止**同一天发布 2 个及以上版本（紧急安全 hotfix 除外，需附事后复盘）
+- **禁止**跳过 staging 验证直接发布到 production
+- **禁止**在 CI 红灯状态下发布
+
+---
+
 ## [Unreleased]
 
 ### Added

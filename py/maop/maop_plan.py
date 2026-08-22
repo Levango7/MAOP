@@ -10,6 +10,7 @@ v5.0.0: Legacy hardcoded _ROUTING_RULES keyword fallback removed.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any
 
@@ -23,6 +24,12 @@ logger = logging.getLogger(__name__)
 _VALID_SLA_TIERS = frozenset({"best_effort", "standard", "critical"})
 _VALID_PRIORITY_RANGE = (1, 5)  # 1 = highest, 5 = lowest
 
+# M1 修复：移除硬编码 agent = "claude"，改为从环境变量读取默认 agent。
+# MAOP_DEFAULT_AGENT 优先级最高，未设置时回退到 "codex"（已在 agents.yaml 中定义）。
+DEFAULT_AGENT = os.getenv("MAOP_DEFAULT_AGENT", "codex")
+# 默认 routing_key（config 路由未匹配时使用）
+DEFAULT_ROUTING_KEY = "chat"
+
 
 class Plan(BaseModel):
     """Result of the Plan phase.
@@ -33,8 +40,9 @@ class Plan(BaseModel):
     """
     phase: str = "plan"
     task: str = ""
-    selected_agent: str = "claude"
-    routing_key: str = "chat"
+    # M1 修复：默认 agent 改为从配置读取，不再硬编码 "claude"
+    selected_agent: str = DEFAULT_AGENT
+    routing_key: str = DEFAULT_ROUTING_KEY
     gates: list[str] = Field(default_factory=lambda: ["exit_code", "output"])
     budget: dict[str, Any] = Field(default_factory=lambda: {"timeout_s": 120, "max_retries": 1})
     # ── SLA fields (Phase γ-1) ───────────────────────────────────
@@ -108,8 +116,9 @@ class Plan(BaseModel):
 
 # ── Legacy keyword routing removed in v5.0.0 ──────────────────
 # Config-based routing is now the single source of truth. When config
-# routing misses, we fall back to a conservative default ("chat"/"claude")
-# instead of the removed _route_by_keyword() keyword matcher.
+# routing misses, we fall back to a conservative default (DEFAULT_ROUTING_KEY /
+# DEFAULT_AGENT) instead of the removed _route_by_keyword() keyword matcher.
+# M1 修复：默认 agent 不再硬编码 "claude"，改为从环境变量读取（DEFAULT_AGENT）。
 
 
 def _adaptive_agent_select(route: RouteEntry, rk: str) -> str:
@@ -126,10 +135,11 @@ def _adaptive_agent_select(route: RouteEntry, rk: str) -> str:
         return route.primary
 
     try:
-        import os
 
+        from maop.config.env import get_root_dir
         from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
-        root = os.environ.get("MAOP_ROOT_DIR", ".")
+        # M3 修复：统一使用 get_root_dir() 解析根目录（兼容 MAOP_ROOT_DIR / MAOP_ROOT）
+        root = str(get_root_dir(default="."))
         tracker = AgentPerformanceTracker(root_dir=root)
         best = tracker.best_agent(agents=candidates, routing_key=rk, default=route.primary)
         if best != route.primary:
@@ -216,10 +226,16 @@ def maop_plan(
     Plan
         Routing result with selected_agent, routing_key, gates, budget.
     """
+    # H8 修复：记录 plan 阶段耗时与委派计数
+    import time as _time
+
+    _plan_start = _time.monotonic()
+
     # Priority 1: explicit routing_key override
     if routing_key:
         rk = routing_key
-        agent = "claude"
+        # M1 修复：移除硬编码 agent = "claude"，改为从配置读取默认 agent
+        agent = DEFAULT_AGENT
         if config:
             for route_rk, route in config.routing.items():
                 if route_rk == rk:
@@ -234,7 +250,8 @@ def maop_plan(
             rk, agent = config_result
         else:
             # v5.0.0: legacy keyword routing removed; use conservative default.
-            rk, agent = "chat", "claude"
+            # M1 修复：默认 agent 改为从环境变量读取（DEFAULT_AGENT），不再硬编码 "claude"
+            rk, agent = DEFAULT_ROUTING_KEY, DEFAULT_AGENT
             logger.warning("Config routing did not match task, using default: rk=%s agent=%s — check agents.yaml routing table", rk, agent)
 
     # Get agent budget
@@ -252,6 +269,19 @@ def maop_plan(
     # Deployment/infrastructure routes require dry-run gate
     if rk in ("deploy", "pipeline", "fileops"):
         gates.append("dry-run")
+
+    # H8 修复：记录 plan 耗时与委派计数（指标调用）
+    try:
+        from maop.core.monitoring.monitoring import (
+            MAOP_DELEGATION_DURATION,
+            MAOP_DELEGATIONS_TOTAL,
+        )
+
+        MAOP_DELEGATIONS_TOTAL.inc()
+        MAOP_DELEGATION_DURATION.observe(_time.monotonic() - _plan_start)
+    except Exception:
+        # 指标记录失败不应影响业务逻辑
+        pass
 
     return Plan(
         task=task,
@@ -315,6 +345,11 @@ def _topological_sort(steps: list[Any]) -> list[list[int]]:
 
     Returns a list of levels, where each level is a list of step indices
     that can run in parallel. Steps with no depends_on are at level 0.
+
+    Raises
+    ------
+    ValueError
+        当检测到 DAG 循环时，报错并包含循环路径，不再静默绕过（M5 修复）。
     """
     step_ids = {str(i) for i in range(len(steps))}
     dep_map: dict[int, set[str]] = {}
@@ -333,15 +368,76 @@ def _topological_sort(steps: list[Any]) -> list[list[int]]:
             if dep_map[i].issubset(completed):
                 level.append(i)
         if not level:
+            # M5 修复：移除循环节点强行排入逻辑（原代码会绕过循环检查，
+            # 将循环节点静默排入执行序列，导致含循环的 DAG 无限执行或
+            # 产生非预期行为）。改为调用 engine_utils 的循环检测并报错退出。
             remaining = [i for i in range(len(steps)) if str(i) not in completed]
-            level = remaining.copy()
-            if not level:
+            if not remaining:
                 break
+            # 构造循环路径：剩余节点即为循环节点，按依赖关系拼接路径
+            cycle_nodes = [str(i) for i in remaining]
+            # 尝试构造更精确的循环路径（沿依赖链遍历）
+            cycle_path = _detect_cycle_path(remaining, dep_map)
+            if cycle_path:
+                cycle_display = " -> ".join(cycle_path)
+            else:
+                # 回退：剩余节点首尾相连
+                cycle_display = " -> ".join(cycle_nodes + [cycle_nodes[0]])
+            raise ValueError(
+                f"DAG 存在循环: {cycle_display}。请检查任务依赖配置。"
+            )
         for i in level:
             completed.add(str(i))
         levels.append(level)
 
     return levels
+
+
+def _detect_cycle_path(
+    remaining: list[int],
+    dep_map: dict[int, set[str]],
+) -> list[str] | None:
+    """从剩余（循环）节点中检测一条具体的循环路径。
+
+    使用 DFS 沿依赖关系遍历，找到第一个形成环的路径。
+    返回节点索引字符串列表（如 ["1", "2", "3", "1"]）或 None。
+    """
+    if not remaining:
+        return None
+    remaining_set = {str(i) for i in remaining}
+    # 邻接表：节点 -> 它依赖的节点（仅在剩余节点中）
+    adj: dict[str, set[str]] = {}
+    for i in remaining:
+        adj[str(i)] = dep_map[i] & remaining_set
+
+    # DFS 检测环
+    visited: set[str] = set()
+    stack: set[str] = set()
+    path: list[str] = []
+
+    def dfs(node: str) -> list[str] | None:
+        if node in stack:
+            # 找到环：返回从环起点到当前节点的路径 + 当前节点
+            cycle_start = path.index(node)
+            return path[cycle_start:] + [node]
+        if node in visited:
+            return None
+        visited.add(node)
+        stack.add(node)
+        path.append(node)
+        for neighbor in adj.get(node, set()):
+            result = dfs(neighbor)
+            if result is not None:
+                return result
+        path.pop()
+        stack.discard(node)
+        return None
+
+    for start in remaining:
+        result = dfs(str(start))
+        if result is not None:
+            return result
+    return None
 
 
 def execute_workflow(
