@@ -254,30 +254,63 @@ async def api_evolution_approve(request: Request) -> dict[str, Any]:
 
 
 # ── Skill 编辑器 ────────────────────────────────────────────────
-# TODO(P1): 后端尚无 Skill 原子/composite 的持久化数据源，以下端点返回空
-# 结构以对齐前端 SkillEditor.vue 契约（避免 404），待 skill 系统落地后接入。
 
 
 @router.get("/api/evolution/skills")
 @handle_api_errors("evolution skills", error_value={"skills": []})
 async def api_evolution_skills() -> dict[str, Any]:
-    """列出 Skill 原子（当前为空，Skill 系统待落地）。"""
-    return {"skills": []}
+    """列出已保存的 Skill 原子（从 SkillVersionManager 加载）。"""
+    from maop.core.evolution.skill_version import SkillVersionManager
+
+    try:
+        mgr = SkillVersionManager(root_dir=str(MAOP_ROOT))
+        skills_meta = mgr.list_skills()
+        skills = [m.model_dump() for m in skills_meta]
+        return {"skills": skills}
+    except Exception:
+        logger.debug("[evo/skills] list failed", exc_info=True)
+        return {"skills": []}
 
 
 @router.post("/api/evolution/skills/composite")
 @handle_api_errors("evolution skill composite", error_value={"status": "error"})
 async def api_evolution_skill_composite(request: Request) -> dict[str, Any]:
-    """保存 composite Skill。
-
-    Skill 持久化后端尚未落地，此前返回 ``"status": "ok", "saved": False`` 属于
-    假成功；现如实返回 501，待 Skill 系统后端接入后再实现。
-    """
+    """保存 composite Skill（接入 SkillVersionManager）。"""
     require_admin(request)
-    raise HTTPException(
-        status_code=501,
-        detail="skill persistence not implemented; Skill system backend pending",
+    from maop.core.evolution.skill_version import SkillMeta, SkillStep, SkillVersionManager
+
+    body = await request.json()
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="skill name is required")
+
+    steps_raw = body.get("steps") or []
+    steps = [SkillStep(**(s if isinstance(s, dict) else {})) for s in steps_raw]
+
+    meta = SkillMeta(
+        name=name,
+        version=body.get("version", "1.0.0"),
+        description=body.get("description", ""),
+        source=body.get("source", "manual"),
+        tags=body.get("tags", []),
+        steps=steps,
     )
+
+    import json as _json
+    content = body.get("content", _json.dumps(meta.model_dump(), ensure_ascii=False))
+
+    try:
+        mgr = SkillVersionManager(root_dir=str(MAOP_ROOT))
+        mgr.save_skill(name, content=content, metadata={
+            "source": "dashboard",
+            "steps": steps_raw,
+            "description": meta.description,
+            "tags": meta.tags,
+        })
+        return {"status": "ok", "saved": True, "name": name, "version": meta.version}
+    except Exception as exc:
+        logger.exception("[evo/skills] save_skill failed for %s", name)
+        raise HTTPException(status_code=500, detail=f"Failed to save skill: {exc}") from exc
 
 
 # ── 演化案例叙事 ───────────────────────────────────────────────

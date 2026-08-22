@@ -34,10 +34,88 @@ async def api_evolve_status() -> dict[str, Any]:
 async def api_evolve_metrics() -> dict[str, Any]:
     """演化指标聚合（时间序列 / 热力图 / 世系）。
 
-    TODO(P1): 当前后端无演化指标数据源，返回空结构以对齐前端契约。
-    待演化历史数据接入后从 evolve 引擎聚合真实时间序列/热力图/世系。
+    从 evolution_cycles 表聚合真实数据；优先 EvolutionLoop，空回退 EvolveEngine。
     """
-    return {"timeseries": [], "heatmap": [], "lineage": []}
+    from maop.core.evolution.evolution_loop import EvolutionLoop
+
+    try:
+        loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
+        history = loop.get_cycle_history(limit=50)
+
+    except Exception:
+        logger.debug("[evolve/metrics] EvolutionLoop init failed, trying EvolveEngine", exc_info=True)
+        try:
+            from maop.evolve import EvolveEngine
+
+            eng = EvolveEngine(root_dir=str(MAOP_ROOT))
+            raw = eng.status()
+            timeseries = []
+            heatmap = []
+            lineage = []
+            if isinstance(raw, dict):
+                timeseries = raw.get("timeseries", [])
+                heatmap = raw.get("heatmap", [])
+                lineage = raw.get("lineage", [])
+            elif hasattr(raw, "model_dump"):
+                d = raw.model_dump()
+                timeseries = d.get("timeseries", [])
+                heatmap = d.get("heatmap", [])
+                lineage = d.get("lineage", [])
+            return {"timeseries": timeseries, "heatmap": heatmap, "lineage": lineage}
+        except Exception:
+            return {"timeseries": [], "heatmap": [], "lineage": []}
+
+    if not history:
+        return {"timeseries": [], "heatmap": [], "lineage": []}
+
+    timeseries = [
+        {
+            "timestamp": h.started_at,
+            "errors": h.errors_observed,
+            "heals": h.heal_successes,
+            "suggestions": h.suggestions_generated,
+            "duration_s": h.total_duration_s,
+        }
+        for h in history
+    ]
+
+    lineage = [
+        {
+            "cycle_id": h.id,
+            "started_at": h.started_at,
+            "errors_observed": h.errors_observed,
+            "heal_successes": h.heal_successes,
+            "validation_improved": h.validation_improved,
+        }
+        for h in history
+    ]
+
+    heatmap: list[dict[str, Any]] = []
+    agent_counts: dict[str, dict[str, Any]] = {}
+    import contextlib
+    import json as _json
+
+    for h in history:
+        agent = ""
+        with contextlib.suppress(Exception):
+            rpt = _json.loads(h.report_json) if h.report_json else {}
+            agent = rpt.get("agent", "") or rpt.get("agent_name", "") or ""
+        if not agent:
+            continue
+        if agent not in agent_counts:
+            agent_counts[agent] = {"cycles": 0, "errors": 0, "improvement_rate": 0.0}
+        agent_counts[agent]["cycles"] += 1
+        agent_counts[agent]["errors"] += h.errors_observed
+        if agent_counts[agent]["cycles"] > 0:
+            agent_counts[agent]["improvement_rate"] = round(
+                1.0 - (agent_counts[agent]["errors"] / max(1, agent_counts[agent]["cycles"] * 10)), 3
+            )
+
+    heatmap = [
+        {"agent": k, **v} for k, v in agent_counts.items()
+    ]
+
+    return {"timeseries": timeseries, "heatmap": heatmap, "lineage": lineage}
 
 
 @router.post("/api/evolve/analyze")
