@@ -338,7 +338,7 @@ Web dashboard at `http://localhost:9079` with:
 - Agent status & monitoring with availability charts
 - Performance metrics with latency distribution & radar charts
 - Cost tracking with trend analysis & agent cost breakdown
-- Real-time streaming for task execution (WebSocket, per ADR-006)
+- Real-time streaming for task execution (WebSocket + HTTP SSE)
 - Memory search & knowledge graph visualization
 - Self-evolution suggestions & analysis
 - Multi-tenant support with per-tenant quotas
@@ -363,7 +363,7 @@ Web dashboard at `http://localhost:9079` with:
 | `core/event_bus.py` | Async event bus |
 | `core/circuit_breaker.py` | Circuit breaker pattern |
 | `core/vector.py` | Vector store for semantic search |
-| `core/streaming.py` | Streaming infrastructure (WebSocket; HTTP SSE endpoint removed per ADR-006, internal SSEStreamer primitive retained) |
+| `core/streaming.py` | Streaming infrastructure (WebSocket + HTTP SSE at /api/chat/stream; ADR-006 superseded) |
 | `core/security/` | 安全子包：认证、授权、加密、密钥管理等安全相关能力（新增第 18 个子包，原 17 子包基础上补充） |
 | `config/edition.py` | Dual-edition 注册表与 FeatureFlag gate（[ADR-016](docs/adr/016-dual-edition-architecture.md)） |
 | `enterprise/` | 企业版扩展模块（rbac/tenant/audit/sso/ha/license/n8n 等，仅 `maop-enterprise` 包含） |
@@ -392,7 +392,7 @@ Key architectural decisions in [docs/adr/](docs/adr/README.md):
 - [ADR-003](docs/adr/003-mock-fallback-removal.md) — Dashboard mock fallback removal
 - [ADR-004](docs/adr/004-security-hardening.md) — Security hardening
 - [ADR-005](docs/adr/005-powershell-retention.md) — PowerShell retention
-- [ADR-006](docs/adr/006-sse-removal-sync-architecture.md) — SSE removal + sync architecture
+- [ADR-006](docs/adr/006-sse-removal-sync-architecture.md) — SSE removal + sync architecture (Superseded)
 - [ADR-007](docs/adr/007-cache-warmup-fix.md) — Cache persistence + warmup fix
 - [ADR-008](docs/adr/008-dual-arch-scheduling-audit.md) — Dual-arch scheduling audit
 - [ADR-009](docs/adr/009-python-primary-engine.md) — Python primary engine architecture
