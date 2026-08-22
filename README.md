@@ -36,7 +36,7 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 
 | 能力 | Personal | Enterprise |
 |------|----------|------------|
-| 多代理编排 (Multi-Agent Orchestration) | ✓ | ✓ | 编排外部 CLI agent（31 个适配器），非自研运行时 |
+| 多代理编排 (Multi-Agent Orchestration) | ✓ | ✓ |
 | MCP Hub | ✓ | ✓ |
 | 三层记忆 (Three-Layer Memory) | ✓ | ✓ |
 | 向量检索 (Vector Search) | ✓ | ✓ |
@@ -56,6 +56,8 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 | etcd 分布式 KV | ✗ | ○ (planned, 可选依赖 etcd3) |
 | License CRL 在线撤销 | ✗ | ✓ |
 | Vue Dashboard 企业版路由 | ✗ | ✓ |
+
+> 编排外部 CLI agent（31 个适配器），非自研运行时
 
 > Enterprise = Personal ∪ Enterprise 独占能力；企业版包含所有功能。
 
@@ -194,8 +196,7 @@ maop run --task "refactor auth module to use JWT"
 # Monitor real-time progress via dashboard
 # Open http://localhost:9079 -> Overview tab shows live delegation
 # Real-time updates via WebSocket at /ws
-# (HTTP SSE transport endpoint removed per ADR-006; the internal SSEStreamer
-#  primitive is still used as a streaming abstraction for server-side events)
+# (HTTP SSE transport is active at /api/chat/stream; see ADR-006 for design history)
 ```
 
 **Key features used:**
@@ -214,7 +215,7 @@ $env:MAOP_AUTH = "1"
 $env:MAOP_JWT_SECRET = "your-secret-key"
 maop start --port 9079
 
-# Login as admin (default credentials in data/.admin-password)
+# Login as admin (password is printed to console on first launch; set MAOP_ADMIN_PASSWORD to override)
 # First launch auto-generates admin password
 
 # Create tenants and assign roles via dashboard
@@ -240,7 +241,7 @@ maop start --port 9079
 > # RabbitMQ queue backend (needs optional `pika` dep, MAOP_QUEUE_BACKEND=rabbitmq)
 > docker compose -f docker-compose.yml -f docker-compose.prod.yml \
 >   --profile rabbitmq up -d
-> # etcd distributed KV backend (needs optional `etc3` dep, MAOP_KV_BACKEND=etcd)
+> # etcd distributed KV backend (needs optional `etcd3` dep, MAOP_KV_BACKEND=etcd)
 > docker compose -f docker-compose.yml -f docker-compose.prod.yml \
 >   --profile etcd up -d
 > ```
@@ -268,10 +269,10 @@ curl -X POST http://localhost:9079/api/chat `
 ```
 
 **Key features used:**
-- MCP integration: Stdio/WebSocket transports (HTTP SSE endpoint removed per ADR-006; internal SSEStreamer primitive retained)
+- MCP integration: Stdio/WebSocket/HTTP SSE transports (SSE active at /api/chat/stream; ADR-006 superseded)
 - Three-layer memory: Working (current turn) -> Episodic (conversation) -> Semantic (knowledge graph)
 - Tool lifecycle: register -> enable -> call -> disable
-- Streaming: WebSocket for bidirectional real-time output (HTTP SSE endpoint removed per ADR-006; internal SSEStreamer primitive retained)
+- Streaming: WebSocket for bidirectional + HTTP SSE for unidirectional real-time output (SSE at /api/chat/stream; ADR-006 superseded)
 
 ## Cost Tracking
 
@@ -289,7 +290,7 @@ curl http://localhost:9079/api/cost/summary
 # Returns: {"today": 1.23, "week": 8.45, "month": 32.10, "by_agent": {...}}
 
 # Set budget limits
-curl -X POST http://localhost:9079/api/budget/set `
+curl -X PUT http://localhost:9079/api/cost/budget `
   -d '{"daily_limit": 10.0, "monthly_limit": 200.0}'
 # When budget exceeded, dispatcher blocks new delegations (exit_code=-6)
 ```

@@ -400,6 +400,7 @@ class CSPMiddleware(BaseHTTPMiddleware):
 
         # Security headers applied to every response
         self._security_headers = {
+            "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
             "Referrer-Policy": "strict-origin-when-cross-origin",

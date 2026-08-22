@@ -1,7 +1,7 @@
 # ADR-006: Dashboard SSE 删除 & 同步架构保持
 
 ## Status
-**Active (2026-07-10)**
+**Superseded (2026-07-21)**
 
 Original status: Accepted (2026-07-10)
 

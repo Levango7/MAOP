@@ -506,6 +506,12 @@ def get_cache_backend() -> CacheBackend:
                     "redis/backends_redis deps and check MAOP_REDIS_URL, or set "
                     "MAOP_CACHE_ALLOW_FALLBACK=1 to allow degrading to memory."
                 ) from exc
+    if backend_type not in ("memory", ""):
+        logger.warning(
+            "[backends] Unknown cache backend %r (MAOP_CACHE_BACKEND=%s); "
+            "falling back to MemoryCacheBackend. Valid values: memory, redis.",
+            backend_type, backend_type,
+        )
     _cache = MemoryCacheBackend()
     logger.debug("[backends] Cache: Memory")
     return _cache

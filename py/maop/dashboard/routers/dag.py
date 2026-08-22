@@ -124,7 +124,32 @@ async def execute_dag(
                 )
             )
 
-        result = await Engine().run(steps)
+        from types import SimpleNamespace
+
+        async def _default_step_executor(step, context, workdir, trace_id):
+            """Default step executor using Dispatcher to run agent/tool steps."""
+            from maop.delegate.dispatch_core import Dispatcher
+            dispatcher = Dispatcher()
+            try:
+                dr = await dispatcher.dispatch(
+                    agent=step.agent,
+                    task=step.task,
+                    workdir=str(workdir) if workdir else "",
+                    trace_id=trace_id or "",
+                )
+                return SimpleNamespace(
+                    output=dr.result.stdout,
+                    exit_code=dr.result.exit_code,
+                    error=dr.result.error or ("" if dr.result.ok else dr.result.stderr),
+                )
+            except Exception as exc:
+                return SimpleNamespace(
+                    output="",
+                    exit_code=1,
+                    error=str(exc),
+                )
+
+        result = await Engine(step_executor=_default_step_executor).run(steps)
         return {
             "status": "ok",
             "run_id": result.trace_id,

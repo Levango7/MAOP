@@ -96,8 +96,9 @@ jobs:
           # editable 自动装 [project].dependencies（base）；test 依赖显式装。
           # fakeredis/lxml 为测试硬依赖（distributed_execution/enterprise_integration
           # 集合需要），原 requirements.lock 隐式提供，改 editable 后必须显式补。
-          pip install -e .
-          pip install pytest pytest-asyncio pytest-cov pydantic-settings mmh3 httpx python-multipart aiosqlite pytest-timeout pytest-xdist pytest-rerunfailures fakeredis lxml defusedxml
+          # P2-4: 测试依赖统一由 pyproject.toml [dev] extra 声明（单一真相源），
+          # 避免在此手工罗列导致与 pyproject.toml 漂移。editable 安装同时拉取 base deps。
+          pip install -e .[dev]
 
       - name: Enterprise extra smoke (P0-2)
         # 审计 P0-2：`pip install maop[enterprise]` 必须可装（此前 etcd3 在

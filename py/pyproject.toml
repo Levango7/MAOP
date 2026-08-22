@@ -50,6 +50,9 @@ dev = [
     "python-multipart>=0.0.9",
     "aiosqlite>=0.20.0",
     "pytest-timeout>=2.3",
+    # P2-4: pytest-rerunfailures for flaky test retry (CI -n auto 并行场景下
+    # 偶发重试)。原 ci.yml 手工罗列，现移入 dev extra 统一管理。
+    "pytest-rerunfailures>=11.0",
     "mypy>=1.10",
     # Test-only hard deps: tests/test_distributed_execution.py imports fakeredis
     # (mock Redis, no real server); tests/test_enterprise_integration.py imports

@@ -47,11 +47,11 @@ class WorkflowStep(BaseModel):
     agent: str = ""
     task: str = ""
     depends_on: list[str] = Field(default_factory=list)
-    retry: int = 0
+    retry: int = 0            # NOTE: not yet implemented in engine.py
     timeout: int = 120
     description: str = ""
     on_failure: str = ""       # "fallback" | "skip" | "abort"
-    fallback_to: str = ""
+    fallback_to: str = ""      # NOTE: not yet implemented in engine.py
     params: dict[str, Any] = Field(default_factory=dict)
 
 
