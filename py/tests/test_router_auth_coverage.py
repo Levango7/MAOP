@@ -204,7 +204,7 @@ class TestAuthRegister:
         """Register a new user successfully."""
         resp = client.post(
             "/api/auth/register",
-            json={"username": "newuser1", "password": "valid-pwd-123", "roles": ["read"]},
+            json={"username": "newuser1", "password": "Valid-Pwd-123", "roles": ["read"]},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "ok"
@@ -213,11 +213,11 @@ class TestAuthRegister:
         """Register duplicate user returns 409 or 400 (wrapped error)."""
         client.post(
             "/api/auth/register",
-            json={"username": "dupuser", "password": "valid-pwd-123", "roles": ["read"]},
+            json={"username": "dupuser", "password": "Valid-Pwd-123", "roles": ["read"]},
         )
         resp = client.post(
             "/api/auth/register",
-            json={"username": "dupuser", "password": "valid-pwd-123", "roles": ["read"]},
+            json={"username": "dupuser", "password": "Valid-Pwd-123", "roles": ["read"]},
         )
         # _db_register_user returns JSONResponse(409) but auth_register wraps
         # it in try/except which may convert to 400. Both indicate the dup
@@ -238,7 +238,7 @@ class TestAuthUsers:
         """List users after registering one."""
         client.post(
             "/api/auth/register",
-            json={"username": "listuser", "password": "valid-pwd-123", "roles": ["read"]},
+            json={"username": "listuser", "password": "Valid-Pwd-123", "roles": ["read"]},
         )
         resp = client.get("/api/auth/users")
         assert resp.status_code == 200
@@ -255,7 +255,7 @@ class TestAuthUsers:
         # Initialize db by registering a user first (creates the users table)
         client.post(
             "/api/auth/register",
-            json={"username": "inituser", "password": "valid-pwd-123", "roles": ["read"]},
+            json={"username": "inituser", "password": "Valid-Pwd-123", "roles": ["read"]},
         )
         resp = client.delete("/api/auth/users/nobody_xyz_123")
         assert resp.status_code == 404
@@ -264,7 +264,7 @@ class TestAuthUsers:
         """Delete an existing user succeeds."""
         client.post(
             "/api/auth/register",
-            json={"username": "deluser", "password": "valid-pwd-123", "roles": ["read"]},
+            json={"username": "deluser", "password": "Valid-Pwd-123", "roles": ["read"]},
         )
         resp = client.delete("/api/auth/users/deluser")
         assert resp.status_code == 200
@@ -274,7 +274,7 @@ class TestAuthUsers:
         """Update user roles succeeds."""
         client.post(
             "/api/auth/register",
-            json={"username": "upduser", "password": "valid-pwd-123", "roles": ["read"]},
+            json={"username": "upduser", "password": "Valid-Pwd-123", "roles": ["read"]},
         )
         resp = client.put(
             "/api/auth/users/upduser",
@@ -286,7 +286,7 @@ class TestAuthUsers:
         """Update user enabled status succeeds."""
         client.post(
             "/api/auth/register",
-            json={"username": "enauser", "password": "valid-pwd-123", "roles": ["read"]},
+            json={"username": "enauser", "password": "Valid-Pwd-123", "roles": ["read"]},
         )
         resp = client.put(
             "/api/auth/users/enauser",
@@ -298,11 +298,11 @@ class TestAuthUsers:
         """Update user password succeeds."""
         client.post(
             "/api/auth/register",
-            json={"username": "pwduser", "password": "valid-pwd-123", "roles": ["read"]},
+            json={"username": "pwduser", "password": "Valid-Pwd-123", "roles": ["read"]},
         )
         resp = client.put(
             "/api/auth/users/pwduser",
-            json={"password": "new-valid-pwd-456"},
+            json={"password": "7New-Valid-Pwd-456"},
         )
         assert resp.status_code == 200
 
@@ -310,7 +310,7 @@ class TestAuthUsers:
         """Update user with short password returns 400."""
         client.post(
             "/api/auth/register",
-            json={"username": "shortpwd", "password": "valid-pwd-123", "roles": ["read"]},
+            json={"username": "shortpwd", "password": "Valid-Pwd-123", "roles": ["read"]},
         )
         resp = client.put(
             "/api/auth/users/shortpwd",
@@ -323,7 +323,7 @@ class TestAuthUsers:
         # Initialize db by registering a user first
         client.post(
             "/api/auth/register",
-            json={"username": "inituser2", "password": "valid-pwd-123", "roles": ["read"]},
+            json={"username": "inituser2", "password": "Valid-Pwd-123", "roles": ["read"]},
         )
         resp = client.put(
             "/api/auth/users/nobody_xyz_123",

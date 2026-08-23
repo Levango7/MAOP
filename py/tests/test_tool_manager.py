@@ -23,6 +23,16 @@ from maop.core.agent.tools.tool_policy import ToolPolicy
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 
+@pytest.fixture(autouse=True)
+def _audit_policy_mode(monkeypatch):
+    """测试环境默认使用 audit 模式，避免 enforce 模式拒绝临时注册的测试工具。
+
+    需要测试 enforce 模式的测试（TestToolPolicyIntegration/TestToolPolicyUnit）
+    会自行通过 monkeypatch.setenv("MAOP_TOOL_POLICY_MODE", "enforce") 覆盖。
+    """
+    monkeypatch.setenv("MAOP_TOOL_POLICY_MODE", "audit")
+
+
 @pytest.fixture
 def mgr(tmp_path):
     return ToolManager(root_dir=tmp_path)
@@ -664,6 +674,13 @@ class TestCallSyncFallback:
 
 class TestToolPolicyUnit:
     """ToolPolicy 决策逻辑单测（deny/allow/mode/env/fail-open）。"""
+
+    @pytest.fixture(autouse=True)
+    def _clear_policy_env(self, monkeypatch):
+        """ToolPolicy 单元测试直接测试配置文件中的 mode，
+        需清除模块级 autouse fixture 设置的 MAOP_TOOL_POLICY_MODE 环境变量，
+        避免环境变量覆盖配置文件中的 mode 设置。"""
+        monkeypatch.delenv("MAOP_TOOL_POLICY_MODE", raising=False)
 
     @staticmethod
     def _write_policy(tmp_path, text: str) -> ToolPolicy:

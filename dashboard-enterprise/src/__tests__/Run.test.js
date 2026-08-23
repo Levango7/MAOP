@@ -83,7 +83,7 @@ describe('Run.vue', () => {
 
   it('renders the structured tab content by default', async () => {
     const wrapper = await mountRun();
-    expect(wrapper.find('.cp-stub').exists()).toBe(true);
+    expect(wrapper.find('.run-structured-placeholder').exists()).toBe(true);
     wrapper.unmount();
   });
 

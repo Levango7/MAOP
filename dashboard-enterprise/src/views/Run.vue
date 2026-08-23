@@ -25,7 +25,9 @@
       <!-- keep-alive: 切 Tab 不销毁子组件,保留其内部表单/会话状态
            embedded=true 让子视图隐藏自身 PageHeader,避免双层标题 -->
       <KeepAlive>
-        <ControlPanel v-if="tab === 'structured'" embedded />
+        <div v-if="tab === 'structured'" class="run-structured-placeholder">
+          <p>{{ t('view.run.tabStructured') }}</p>
+        </div>
         <Chat v-else embedded />
       </KeepAlive>
     </div>
@@ -195,7 +197,7 @@ import { useRoute, useRouter } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import Segmented from '../components/Segmented.vue';
 import AppIcon from '../components/AppIcon.vue';
-import ControlPanel from './ControlPanel.vue';
+
 import Chat from './Chat.vue';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
