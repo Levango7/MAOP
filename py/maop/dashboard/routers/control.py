@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import sys
 import time
 import uuid as _uuid
@@ -49,6 +50,12 @@ async def control_status() -> dict[str, Any]:
 async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     actual_task = body.task or body.workflow or "default"
+    # P1: task 参数字符集白名单校验，防止注入非法字符（与 workflow.py:60-63 对齐）
+    if not re.match(r"^[\w\s\.\-]+$", actual_task):
+        raise HTTPException(
+            status_code=400,
+            detail="invalid task name: only alphanumeric, spaces, dots, hyphens, underscores allowed",
+        )
     job_id = _uuid.uuid4().hex[:8]
     proc = await asyncio.create_subprocess_exec(
         sys.executable, "-m", "maop.cli", "run",

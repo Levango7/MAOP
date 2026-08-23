@@ -16,6 +16,7 @@ identical to the original monolithic class.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import time
 from typing import Any, cast
@@ -84,6 +85,19 @@ class PhasesMixin:
     _record_metric: Any
     llm_factory: Any
 
+    @staticmethod
+    def _should_execute_parallel(analysis, worker_pool):
+        """NOTE: mirrors LoopExecutor._should_execute_parallel in loop_executor.py.
+
+        P3 fix: 提取并行判定条件为单一辅助方法，消除与
+        ``ExecuteMixin._execute_with_strategy`` 中重复的 4 项合取条件，
+        避免日后修改一处漏改另一处导致行为分叉。
+        """
+        return (analysis is not None
+                and analysis.strategy in (ExecutionStrategy.PARALLEL, ExecutionStrategy.HYBRID)
+                and analysis.sub_tasks and len(analysis.sub_tasks) > 1
+                and worker_pool is not None)
+
     def _inject_memory(self, ctx: PhaseContext, parent_trace_id: str) -> None:
         """Inject memory context and record trace."""
         lc = self._loop_config
@@ -125,7 +139,9 @@ class PhasesMixin:
         _otel = _get_otel_tracer()
 
         lc = self._loop_config
-        if (skip_verify and lc.skip_analyze) or lc.skip_analyze:
+        # P3 fix: 原表达式 (skip_verify and lc.skip_analyze) or lc.skip_analyze
+        # 按布尔吸收律 A∧B ∨ A ≡ A，化简为 lc.skip_analyze。
+        if lc.skip_analyze:
             return PhaseResult(ok=True)
 
         self._log("analyze", "INFO", "Analyze phase started", trace_id=ctx.trace_id)
@@ -222,7 +238,9 @@ class PhasesMixin:
         exec_start = time.monotonic()
         self._log("execute", "INFO", "Execute phase started", trace_id=ctx.trace_id)
 
-        cache_key = f"{ctx.agent}:{ctx.routing_key}:{ctx.original_task[:200]}"
+        # P2 fix: 用 SHA256 哈希替代 original_task[:200] 截断，避免前 200 字符
+        # 相同但后续不同的任务发生缓存 key 碰撞导致结果串用。
+        cache_key = f"{ctx.agent}:{ctx.routing_key}:{hashlib.sha256(ctx.original_task.encode('utf-8', errors='replace')).hexdigest()[:16]}"
         # P2-5 fix: skip cache for side-effecting routing keys (write/run/exec/shell)
         # to prevent silent dedup of tasks that modify state
         _side_effect_keys = ("codegen", "review", "verify", "run", "exec", "shell", "deploy", "migrate", "fix", "refactor")
@@ -240,10 +258,7 @@ class PhasesMixin:
 
         ctx.parallel_executed = False
         if exec_result is None:
-            is_parallel = (ctx.analysis_result
-                           and ctx.analysis_result.strategy in (ExecutionStrategy.PARALLEL, ExecutionStrategy.HYBRID)
-                           and ctx.analysis_result.sub_tasks and len(ctx.analysis_result.sub_tasks) > 1
-                           and self._worker_pool)
+            is_parallel = self._should_execute_parallel(ctx.analysis_result, self._worker_pool)
             exec_result = await self._execute_with_strategy(
                 task=ctx.task, analysis=ctx.analysis_result,
                 fallback_chain=ctx.fallback_chain, routing_key=ctx.routing_key,

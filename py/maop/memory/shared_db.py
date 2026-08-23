@@ -160,11 +160,17 @@ def migrate_legacy_episodic_db(root_dir: str | Path) -> int:
             # 这里只做数据导入，schema 创建由调用方负责
             for row in rows:
                 try:
-                    dst.execute(
+                    # 用 cursor.rowcount 判断单次 INSERT 是否真正插入了一行。
+                    # 注意：不能用 dst.total_changes，它是连接级累计值（自连接
+                    # 创建以来所有 SQL 修改的总行数），只要本进程此前有过任意
+                    # 写入就会一直 > 0，导致 migrated 计数虚高。rowcount 反映
+                    # 本次 execute() 的实际影响行数（INSERT OR IGNORE 命中已
+                    # 存在主键时为 0），才是判断单行迁移是否生效的正确依据。
+                    cursor = dst.execute(
                         f"INSERT OR IGNORE INTO episodic_memory ({cols_csv}) VALUES ({placeholders})",
                         tuple(row),
                     )
-                    if dst.total_changes > 0:
+                    if cursor.rowcount > 0:
                         migrated += 1
                 except sqlite3.Error as exc:
                     logger.warning("[shared_db] 迁移行失败: %s", exc)

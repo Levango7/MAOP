@@ -354,13 +354,22 @@ class Engine:
             # Execute layer steps in parallel
             tasks = []
             for step in layer:
-                tasks.append(self._execute_step(
-                    step, ctx, results, workdir, trace_id,
+                # P0-2 fix: wrap each step with asyncio.wait_for to prevent
+                # a single hanging step from blocking the entire engine.
+                tasks.append(asyncio.wait_for(
+                    self._execute_step(step, ctx, results, workdir, trace_id),
+                    timeout=float(step.timeout) if step.timeout > 0 else 300,
                 ))
             layer_results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for step, lr in zip(layer, layer_results):
-                if isinstance(lr, Exception):
+                if isinstance(lr, asyncio.TimeoutError):
+                    sr = StepResult(
+                        id=step.id, status=StepStatus.FAILED,
+                        error=f"Step timed out after {step.timeout}s", agent=step.agent,
+                        duration_ms=step.timeout * 1000,
+                    )
+                elif isinstance(lr, Exception):
                     sr = StepResult(
                         id=step.id, status=StepStatus.FAILED,
                         error=str(lr), agent=step.agent,
@@ -568,18 +577,53 @@ class Engine:
             elif step.type in (StepType.AGENT, StepType.DAG):
                 # Agent/DAG step: use custom executor or mock
                 if self._step_executor is not None:
-                    result = await self._step_executor(
-                        step=step, context=context, workdir=workdir,
-                        trace_id=trace_id,
-                    )
-                    result_error = result.error if hasattr(result, 'error') else None
-                    result_exit_code = result.exit_code if hasattr(result, 'exit_code') else 0
-                    result_output = result.output if hasattr(result, 'output') else str(result)
-                    # P0-1: Check for execution errors — don't blindly report
-                    # SUCCESS. If the executor returned a non-empty error or a
-                    # non-zero exit_code, the step must be marked FAILED so
-                    # callers aren't misled by a false-positive SUCCESS.
-                    has_error = bool(result_error) or (result_exit_code != 0)
+                    max_attempts = 1 + max(0, step.retry)  # P1-6: retry support
+                    result: Any = None
+                    for attempt in range(max_attempts):
+                        result = await self._step_executor(
+                            step=step, context=context, workdir=workdir,
+                            trace_id=trace_id,
+                        )
+                        result_error = result.error if hasattr(result, 'error') else None
+                        result_exit_code = result.exit_code if hasattr(result, 'exit_code') else 0
+                        result_output = result.output if hasattr(result, 'output') else str(result)
+                        # P0-1: Check for execution errors — don't blindly report
+                        # SUCCESS. If the executor returned a non-empty error or a
+                        # non-zero exit_code, the step must be marked FAILED so
+                        # callers aren't misled by a false-positive SUCCESS.
+                        has_error = bool(result_error) or (result_exit_code != 0)
+                        if not has_error or attempt >= max_attempts - 1:
+                            break
+                        logger.warning(
+                            "[engine] step %s attempt %d/%d failed; retrying",
+                            step.id, attempt + 1, max_attempts,
+                        )
+
+                    # P1-7: fallback_to support — if the step still failed after
+                    # all retries and a fallback agent is configured, re-execute
+                    # the step with the fallback agent. On fallback success,
+                    # promote the fallback result so the step is marked SUCCESS.
+                    if has_error and step.fallback_to:
+                        logger.info(
+                            "[engine] step %s failed; falling back to agent %s",
+                            step.id, step.fallback_to,
+                        )
+                        fallback_step = step.model_copy(
+                            update={"agent": step.fallback_to, "fallback_to": ""},
+                        )
+                        fb_result = await self._step_executor(
+                            step=fallback_step, context=context, workdir=workdir,
+                            trace_id=trace_id,
+                        )
+                        fb_error = fb_result.error if hasattr(fb_result, 'error') else None
+                        fb_exit = fb_result.exit_code if hasattr(fb_result, 'exit_code') else 0
+                        fb_output = fb_result.output if hasattr(fb_result, 'output') else str(fb_result)
+                        if not (bool(fb_error) or fb_exit != 0):
+                            result_output = fb_output
+                            result_exit_code = fb_exit
+                            result_error = ""
+                            has_error = False
+
                     sr = StepResult(
                         id=step.id,
                         status=StepStatus.FAILED if has_error else StepStatus.SUCCESS,

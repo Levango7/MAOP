@@ -31,6 +31,19 @@ class ExecuteMixin:
     _loop_config: Any
     _log: Any
 
+    @staticmethod
+    def _should_execute_parallel(analysis, worker_pool):
+        """NOTE: mirrors PhasesMixin._should_execute_parallel in maop_loop_phases.py.
+
+        P3 fix: 提取并行判定条件为单一辅助方法，消除与
+        ``PhasesMixin._phase_execute`` 中重复的 4 项合取条件，
+        避免日后修改一处漏改另一处导致行为分叉。
+        """
+        return (analysis is not None
+                and analysis.strategy in (ExecutionStrategy.PARALLEL, ExecutionStrategy.HYBRID)
+                and analysis.sub_tasks and len(analysis.sub_tasks) > 1
+                and worker_pool is not None)
+
     def _get_supervisor(self) -> Any:
         """Lazily return the process-wide Supervisor singleton.
 
@@ -83,9 +96,7 @@ class ExecuteMixin:
         execute independent subtasks in parallel. Otherwise, fall back to sequential.
         """
         # Check if we can execute in parallel
-        if (analysis and analysis.strategy in (ExecutionStrategy.PARALLEL, ExecutionStrategy.HYBRID)
-                and analysis.sub_tasks and len(analysis.sub_tasks) > 1
-                and self._worker_pool):
+        if self._should_execute_parallel(analysis, self._worker_pool):
 
             # Execute subtasks via WorkerPool
             return await self._execute_parallel(
