@@ -1,0 +1,15 @@
+# Bandit 安全扫描配置
+# 3.7 fix: 配合 ci.yml 中 bandit -ll -c .bandit 使用。
+# 恢复 Low 及以上级别报告后，通过此配置文件显式管理安全豁免，
+# 而非用 -lll 一刀切忽略整个 Medium 级别（会漏报 B310 pickle RCE 等风险）。
+
+[bandit]
+# 排除测试目录，测试代码不纳入生产安全门禁
+exclude_dirs = ["tests"]
+
+[test_settings]
+# 显式跳过的 bandit 测试 ID。
+# 若存在正当理由使用 pickle（B310）等 Medium 风险的位置，
+# 在此添加对应测试 ID，例如：skips = ["B310"]
+# 当前为空，表示不豁免任何检查，所有 Low 及以上风险均会报告。
+skips = []

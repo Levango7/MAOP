@@ -86,6 +86,9 @@
 - [x] 流式 Agent token 响应端点 + 前端 composable + Chat.vue 集成完成。
 - [x] `ruff check` 0 error，`mypy` 0 error，测试 0 failed，前端构建成功。
 - [ ] `archive/` 目录清空或移至独立仓库（推迟到 v6.0.0，避免 major 范围膨胀）。
+  - **清理计划**：`archive/` 目录将在 v5.2.0 版本前完成清理，详见 `docs/archive/README.md`。
+    当前策略是先在 v5.2.0 前完成内部文档归并、过时 ADR 迁移与冗余报告剔除，
+    再于 v6.0.0 major 周期决定是否整体移至独立仓库，以避免 major 范围膨胀。
 
 ## v5.1.0 (minor) — 已发布 2026-08-14
 

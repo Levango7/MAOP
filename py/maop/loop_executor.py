@@ -179,11 +179,18 @@ class ExecuteMixin:
                     return st_id, r  # type: ignore
 
                 coros = []
+                # M4 修复 3.3：跟踪每个 coro 对应的 st_id。
+                # 原代码在结果处理时用 group[idx] 取 st_id，但当某些 st_id 在
+                # analysis.sub_tasks 中找不到对应 st 时，coros 会跳过这些 st_id，
+                # 导致 coros 的长度 < group 的长度，idx 与 group 错位，
+                # group[idx] 取到错误的 st_id。现用 coro_st_ids 一一对应。
+                coro_st_ids: list[str] = []
                 for st_id in group:
                     st = next((s for s in analysis.sub_tasks if s.id == st_id), None)
                     if st:
                         st_agent = st.assigned_agent or agent
                         coros.append(_run_subtask(st_id, st.description, st_agent))
+                        coro_st_ids.append(st_id)
 
                 # Run in parallel
                 group_results = await asyncio.gather(*coros, return_exceptions=True)
@@ -191,7 +198,9 @@ class ExecuteMixin:
                     if isinstance(gr, Exception):
                         # P1 fix: construct failure result instead of skipping
                         # (safety net — _run_subtask should catch internally)
-                        st_id = group[idx] if idx < len(group) else f"unknown_{idx}"
+                        # M4 修复 3.3：用 coro_st_ids[idx] 而非 group[idx] 取 st_id，
+                        # 避免 coros 跳过某些 st_id 时索引错位。
+                        st_id = coro_st_ids[idx] if idx < len(coro_st_ids) else f"unknown_{idx}"
                         logger.warning("Parallel subtask %s failed: %s", st_id, gr)
                         subtask_results[st_id] = new_result(
                             agent=agent, task="parallel_subtask", exit_code=1,

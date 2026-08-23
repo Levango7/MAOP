@@ -81,6 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [5.0.2] — 2026-08-13
 
+> **发布规范注记**：5.0.2 与 5.0.1 同日发布（2026-08-13），属于 hotfix 特例。
+> 5.0.1 上线后立即发现前端布局回归与 ESLint warnings 问题，按 hotfix 流程
+> 紧接发布 5.0.2 修复。正常情况下同一天不应发布两个版本，此特例不作为
+> 后续发布的先例。详见自定义发布规范 `docs/BRANCH_STRATEGY.md`。
+
 ### Added
 
 - 前端设计规范文档 `docs/frontend-style-guide.md`（10 章节，沉淀迭代 A-C 组件契约）

@@ -16,7 +16,7 @@ agents:
     - multimodal
     cli: python
     cli_args: -m maop.cli run --task "{task}"
-    description: MAOP v4.3 self-referential agent — can delegate to itself (max_self_ref_depth=3)
+    description: MAOP v5.1 self-referential agent — can delegate to itself (max_self_ref_depth=3)
     driver: cli
     extracts_queries: true
     model: auto
@@ -718,7 +718,8 @@ routing:
     match: (?:verify|test|assert|spec|unit\s+test|integration)
     # M1 修复：claude agent 不存在，替换为已定义的 kimi（具备 verify 能力）
     primary: kimi
-    tertiary: kimi
+    # M1 修复：tertiary 原与 primary 重复指向 kimi，改为 copilot 提供差异化兜底
+    tertiary: copilot
   vision:
     fallback: crush
     keywords:

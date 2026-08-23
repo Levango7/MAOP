@@ -53,6 +53,50 @@ def _hash_password(password: str) -> str:
     return f"pbkdf2_sha256${_AUTH_PBKDF2_ITERATIONS}${base64.b64encode(salt).decode()}${base64.b64encode(digest).decode()}"
 
 
+# ── 密码复杂度策略（M4 修复 3.5）──────────────────────────────
+# 原代码仅检查最小长度 8，无复杂度要求，弱密码（如 "12345678"、"aaaaaaaa"）
+# 可通过校验。现新增 _check_password_complexity，要求至少包含：
+#   - 1 个大写字母 (A-Z)
+#   - 1 个小写字母 (a-z)
+#   - 1 个数字 (0-9)
+# 通过 MAOP_PASSWORD_POLICY 环境变量可放宽为 "len"（仅长度检查）以兼容旧部署。
+_PASSWORD_MIN_LEN = 8
+_PASSWORD_POLICY = os.environ.get("MAOP_PASSWORD_POLICY", "complex").strip().lower()
+
+
+def _check_password_complexity(password: str) -> tuple[bool, str]:
+    """检查密码是否满足复杂度策略。
+
+    Returns
+    -------
+    tuple[bool, str]
+        (是否通过, 失败原因)。通过时失败原因为空字符串。
+
+    Notes
+    -----
+    策略可通过环境变量 ``MAOP_PASSWORD_POLICY`` 调整：
+    - ``complex``（默认）：长度 >= 8 且含大写、小写、数字各至少 1 个；
+    - ``len``：仅长度 >= 8（兼容旧部署或测试环境）。
+    """
+    if not isinstance(password, str) or len(password) < _PASSWORD_MIN_LEN:
+        return False, f"Password must be at least {_PASSWORD_MIN_LEN} characters"
+    if _PASSWORD_POLICY == "len":
+        return True, ""
+    has_upper = any(c.isupper() for c in password)
+    has_lower = any(c.islower() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    if not (has_upper and has_lower and has_digit):
+        missing = []
+        if not has_upper:
+            missing.append("an uppercase letter")
+        if not has_lower:
+            missing.append("a lowercase letter")
+        if not has_digit:
+            missing.append("a digit")
+        return False, "Password must contain at least " + ", ".join(missing)
+    return True, ""
+
+
 def _verify_password(password: str, stored_hash: str) -> bool:
     """Verify PBKDF2 hashes only. Legacy unsalted SHA-256 is no longer accepted."""
 
@@ -241,8 +285,11 @@ def _db_update_user(db_path_str: str, username: str, body: dict) -> Any:
         if "enabled" in body:
             conn.execute("UPDATE users SET enabled = ? WHERE username = ?", (1 if body["enabled"] else 0, username))
         if "password" in body:
-            if not isinstance(body["password"], str) or len(body["password"]) < 8:
-                return JSONResponse({"status": "error", "error": "Password must be at least 8 characters"}, status_code=400)
+            # M4 修复 3.5：用 _check_password_complexity 替代单纯长度检查，
+            # 要求大写、小写、数字各至少 1 个（除非 MAOP_PASSWORD_POLICY=len）。
+            pwd_ok, pwd_err = _check_password_complexity(body["password"])
+            if not pwd_ok:
+                return JSONResponse({"status": "error", "error": pwd_err}, status_code=400)
             pwd_hash = _hash_password(body["password"])
             conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", (pwd_hash, username))
 
@@ -250,6 +297,26 @@ def _db_update_user(db_path_str: str, username: str, body: dict) -> Any:
 
 
 # ── Endpoints ──────────────────────────────────────────────────────
+# M4 修复 3.4：多 worker 模式下登录失败锁定无效的说明
+# ─────────────────────────────────────────────────────────────────
+# 以下 _login_failures / _login_failures_by_ip 是进程内 dict，仅在单 worker
+# （如 uvicorn --workers 1）模式下有效。当使用多 worker（如 gunicorn -w 4
+# 或 uvicorn --workers 4）部署时，每个 worker 进程拥有独立的 dict，
+# 攻击者的失败请求被负载均衡到不同 worker，单进程累计失败次数无法达到
+# _MAX_LOGIN_FAILURES 阈值，锁定机制实际失效。
+#
+# 多 worker 部署的推荐做法：
+# 1. 使用 Redis 等共享存储跟踪登录失败次数（键格式：
+#    "auth:fail:user:{username}" / "auth:fail:ip:{ip}"，带 TTL =
+#    _LOCKOUT_SECONDS）；
+# 2. 或使用共享 SQLite/PostgreSQL 表，配合分布式锁；
+# 3. 或在前置反向代理（如 Nginx + lua-resty-limit-req、API Gateway）
+#    层做 IP 维度限流，应用层仅做用户维度锁定；
+# 4. 临时方案：将 _MAX_LOGIN_FAILURES 除以 worker 数量，使攻击者在
+#    遍历 worker 后仍能触发锁定——但这会降低单进程的容错性，不推荐。
+#
+# 本文件暂不引入 Redis 依赖以保持零外部服务运行；如需启用多 worker
+# 部署，请参考上述方案改造并设置 MAOP_LOGIN_FAIL_BACKEND=redis 等开关。
 _login_failures: dict[str, list[float]] = {}
 # H6 fix: IP 维度限流。攻击者可用单一密码遍历用户名绕过 username lockout，
 # 增加 IP 维度记录，对同一 IP 的失败登录次数进行限制。
@@ -507,8 +574,11 @@ async def auth_register(request: Request) -> Any:
 
         if not username or not password:
             return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
-        if len(password) < 8:
-            return JSONResponse({"status": "error", "error": "Password must be at least 8 characters"}, status_code=400)
+        # M4 修复 3.5：用 _check_password_complexity 替代单纯长度检查，
+        # 要求大写、小写、数字各至少 1 个（除非 MAOP_PASSWORD_POLICY=len）。
+        pwd_ok, pwd_err = _check_password_complexity(password)
+        if not pwd_ok:
+            return JSONResponse({"status": "error", "error": pwd_err}, status_code=400)
 
         db_path = get_db_path("auth")
         if not db_path.exists():

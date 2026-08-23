@@ -27,7 +27,7 @@
 # 注意：配置文件缺失或解析失败时 ToolPolicy 会 fail-open 到 audit+warning，
 # 避免策略文件损坏导致全平台工具瘫痪。
 
-mode: audit
+mode: enforce
 
 # 显式允许执行的工具（当前阶段为空，由审计结果填充）。
 # 示例：

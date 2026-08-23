@@ -38,7 +38,25 @@ def _tenant_filter(data: Any, tenant_id: str) -> Any:
     if not tenant_id:
         return data
     if isinstance(data, dict):
-        return {k: _tenant_filter(v, tenant_id) for k, v in data.items()}
+        # M4 修复 3.13：顶层 dict 的租户过滤
+        # ─────────────────────────────────────────────────────────
+        # 原代码仅递归过滤 dict 的 value，对顶层 dict 本身不做租户过滤，
+        # 导致形如 {"agent_1": {"tenant_id": "a", ...},
+        #          "agent_2": {"tenant_id": "b", ...}} 的数据在 tenant_id="a"
+        # 时仍保留 agent_2 项。现对每个顶层 key 对应的 value 做检查：
+        # 若 value 是 dict 且含 tenant_id 字段且不匹配，则过滤掉该 key。
+        # 同时对 dict 本身的 tenant_id 字段也做检查（防止顶层就是带租户的对象）。
+        own_tid = data.get("tenant_id")
+        if isinstance(own_tid, str) and own_tid and own_tid != tenant_id:
+            return {}
+        filtered: dict[str, Any] = {}
+        for k, v in data.items():
+            if isinstance(v, dict):
+                v_tid = v.get("tenant_id")
+                if isinstance(v_tid, str) and v_tid and v_tid != tenant_id:
+                    continue  # 过滤掉不匹配租户的子 dict
+            filtered[k] = _tenant_filter(v, tenant_id)
+        return filtered
     if isinstance(data, list):
         return [
             _tenant_filter(it, tenant_id) for it in data

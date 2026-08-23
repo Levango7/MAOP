@@ -78,16 +78,31 @@ DASH_VUE3_SRC_DIR = MAOP_ROOT / "dashboard-enterprise"
 from maop.config.settings import get_settings as _get_settings
 
 _edition_cfg = _get_settings()
+# M4 修复 3.12：生产环境硬错误，阻止 dev 源码目录启动
+# ─────────────────────────────────────────────────────────────
+# 原代码对 dashboard-enterprise/ 源码目录作为静态资源只发 warning，但 .vue
+# 文件无法被浏览器直接解析，生产环境启动后页面会白屏。现当 MAOP_ENV=production
+# 时改为抛出 RuntimeError 阻止启动，强制要求先执行 npm run build 生成
+# dist-enterprise/。其他环境（dev/test/staging/未设置）保持 warning 行为。
+_is_prod_env_serve = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
 if DASH_VUE3_DIST_DIR.exists():
     _SERVE_DIR = DASH_VUE3_DIST_DIR
 elif DASH_VUE3_SRC_DIR.exists():
     # P2-18 fix: dev source dir is not buildable — warn clearly
     _SERVE_DIR = DASH_VUE3_SRC_DIR
-    logger.warning(
+    _dev_source_msg = (
         "[server] Using dashboard-enterprise/ source dir (dev mode). "
         "Vue .vue files cannot be served as static assets — run "
         "'cd dashboard-enterprise && npm run build' for production."
     )
+    if _is_prod_env_serve:
+        # 生产环境硬失败：避免白屏启动后才发现问题
+        raise RuntimeError(
+            _dev_source_msg
+            + " Refusing to start in production (MAOP_ENV=production) with dev "
+            "source dir. Build the dashboard first or set MAOP_ENV=dev."
+        )
+    logger.warning(_dev_source_msg)
 else:
     _SERVE_DIR = DASH_DIR
     logger.warning("[server] Vue3 dashboard not found, falling back to legacy dashboard/")
@@ -248,6 +263,13 @@ register_websocket(app)
 # fully functional (no breaking change). Exempt endpoints - health
 # (K8s/Docker probes), stream (SSE token-via-query), auth (login/logout/
 # refresh) - stay unversioned for infrastructure compatibility.
+#
+# NOTE: 当前 /api/v1/* 与 /api/* 为同路径映射（alias），并非真正的 API 版本化。
+# 此设计仅用于前端渐进式迁移期的兼容性别名，两个前缀共享同一份路由实现，
+# 因此 v1 与未版本化端点的行为完全等价，无法独立演进 v1 的语义。
+# 未来版本应实现真正的 API 版本化（例如 /api/v2/* 独立路由 + 独立 schema +
+# 独立错误处理），并在 /api/v1/* 与 /api/* 进入废弃期后按 ADR-014 流程
+# 标记 deprecated、给出迁移路径、最终在 ≥ 2 个 major 版本后移除。
 from maop.dashboard._register_routes import _register_v1_aliases
 
 _register_v1_aliases()

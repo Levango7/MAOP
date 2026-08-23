@@ -22,8 +22,10 @@ FROM ${PYTHON_IMAGE} AS builder
 WORKDIR /build
 
 # Install build dependencies
-COPY py/requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# 3.6 fix: 使用 requirements.lock 而非 requirements.txt，确保生产构建使用锁定版本，
+# 与 CI audit（基于 requirements.lock）保持一致，避免版本漂移。
+COPY py/requirements.lock .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.lock
 
 # Stage 2: Runtime
 # PYTHON_IMAGE ARG allows CI to pin digest: --build-arg PYTHON_IMAGE=python:3.13-slim@sha256:xxx

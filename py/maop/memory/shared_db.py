@@ -37,6 +37,7 @@ agent_performance 反馈（episodic_memory）无法回写到 chat 上下文。
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 from pathlib import Path
 
@@ -126,6 +127,29 @@ def migrate_legacy_episodic_db(root_dir: str | Path) -> int:
     -------
     int
         实际迁移的行数。
+
+    Notes
+    -----
+    **旧文件保留策略（M4 修复 3.15）**
+
+    迁移成功后默认**不删除**旧的 ``<root>/data/episodic.db`` 文件，原因：
+
+    - **安全回滚**：若迁移后发现新 DB 数据异常（schema 不兼容、行数对不上、
+      应用层读不到数据等），保留旧文件可立即回滚——只需把
+      ``ThreeLayerMemory`` 的 DB 路径切回旧文件即可恢复服务，无需从备份
+      恢复。一旦删除旧文件，回滚路径被切断，只能依赖外部备份。
+    - **幂等重跑**：保留旧文件使本函数可被多次调用而不丢数据，便于在
+      升级脚本失败后重试。
+    - **审计追溯**：旧文件可作为迁移前的数据快照留存，满足合规审计需求。
+
+    **启用自动清理**
+
+    若确认迁移成功且无需回滚，可通过设置环境变量
+    ``MAOP_CLEANUP_OLD_DB=1`` 启用自动清理——迁移成功且有行数 > 0 时，
+    本函数会删除旧 ``episodic.db`` 文件及其 WAL/SHM 辅助文件。默认为 0
+    （不清理）。建议仅在具备完整备份机制的生产环境启用。
+
+    清理失败不会影响迁移结果（仅记录 warning），因为迁移本身已成功完成。
     """
     legacy_path = Path(root_dir) / "data" / "episodic.db"
     if not legacy_path.exists():
@@ -179,6 +203,23 @@ def migrate_legacy_episodic_db(root_dir: str | Path) -> int:
             "[shared_db] 从旧 %s 迁移了 %d 行 episodic_memory 数据到 %s",
             legacy_path, migrated, new_path,
         )
+
+        # M4 修复 3.15：可选的旧文件自动清理
+        # 默认不清理（保留旧文件以支持安全回滚，详见函数文档字符串 Notes 段）。
+        # 仅当 MAOP_CLEANUP_OLD_DB=1 且迁移有行数时才删除旧文件及其 WAL/SHM。
+        if migrated > 0 and os.environ.get("MAOP_CLEANUP_OLD_DB", "0").strip() == "1":
+            for suffix in ("", "-wal", "-shm"):
+                side_path = Path(str(legacy_path) + suffix)
+                if side_path.exists():
+                    try:
+                        side_path.unlink()
+                        logger.info("[shared_db] 清理旧 DB 辅助文件: %s", side_path)
+                    except OSError as cleanup_exc:
+                        logger.warning(
+                            "[shared_db] 清理旧 DB 辅助文件失败（不影响迁移结果）: %s, %s",
+                            side_path, cleanup_exc,
+                        )
+
         return migrated
     except Exception as exc:
         logger.warning("[shared_db] 迁移旧 episodic.db 失败: %s", exc)

@@ -501,11 +501,12 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install bandit
-      - run: bandit -r maop/ -f json -o bandit-report.json || true
-      # 2026-08-15: Medium 由 -ll 降为 High-only（-lll）。存量 96 Medium
-      # （B608×84 参数化占位符误报为主 + B310×10）为历史安全债，登记专项；
-      # High=0 保持硬门禁。Medium 债修复后恢复 -ll。
-      - run: bandit -r maop/ -lll  # fail on high severity only
+      # 3.7 fix: 报告生成也使用 .bandit 配置，确保报告与门禁规则一致。
+      - run: bandit -r maop/ -c .bandit -f json -o bandit-report.json || true
+      # 3.7 fix: 恢复 -ll（Low 及以上），不再用 -lll 忽略 Medium 级别。
+      # 原 -lll 会漏报 B310（pickle RCE）等 Medium 风险。现通过 .bandit 配置文件
+      # 显式管理安全豁免（如正当使用 pickle 的位置），而非一刀切忽略整个 Medium 级别。
+      - run: bandit -r maop/ -ll -c .bandit  # fail on low severity and above
       - name: Upload SAST report
         if: always()
         uses: actions/upload-artifact@v4
