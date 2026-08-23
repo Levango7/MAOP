@@ -92,10 +92,22 @@ def _cluster_available_static() -> bool:
     Used at class-decoration time (skipif), so it must be cheap and
     side-effect free.  Returns False if kubectl is missing or the cluster
     is unreachable.
+
+    Note: ``_kubectl`` uses a 60s timeout which would block test
+    collection when the configured cluster is unreachable (e.g. a stale
+    kubeconfig pointing at a dead IP like 172.17.218.229:6443).  We use a
+    short 5s timeout here so the skipif condition evaluates quickly and
+    tests are skipped instead of hanging/failing.
     """
     if not _has("kubectl"):
         return False
-    return _kubectl("cluster-info").returncode == 0
+    try:
+        return subprocess.run(
+            ["kubectl", "cluster-info"],
+            capture_output=True, text=True, timeout=5, check=False,
+        ).returncode == 0
+    except subprocess.TimeoutExpired:
+        return False
 
 
 # ── 1. static chart structure ─────────────────────────────────────────
@@ -295,8 +307,9 @@ class TestStaticCRValidation:
 # the no-cluster case.
 
 
-@pytest.mark.skip(
-    reason="Requires real Kubernetes cluster (kubectl cluster-info); CI matrix has none",
+@pytest.mark.skipif(
+    not _cluster_available_static(),
+    reason="Requires reachable Kubernetes cluster (kubectl cluster-info); no cluster available",
 )
 class TestKubectlDryRun:
     """Client-side dry-run against a reachable cluster's API discovery."""
@@ -327,7 +340,8 @@ class TestKubectlDryRun:
 # kind/Docker 环境，且 `docker info` daemon 探测在 Windows 上会挂起（subprocess
 # timeout 杀不掉 native 挂起的 docker CLI → collection 卡死）。无条件 skip，
 # 保留 _docker_available 供未来独立 integration job 手动运行使用。
-@pytest.mark.skip(
+@pytest.mark.skipif(
+    not _has("kind") or not _has("docker"),
     reason="Requires real kind cluster + Docker daemon; run in dedicated integration job",
 )
 class TestKindIntegration:
@@ -336,24 +350,43 @@ class TestKindIntegration:
     CLUSTER_NAME = "maop-test-kind"
     TEST_NS = "maop-kind-test"
 
-    def setup_method(self) -> None:
-        """Create a fresh kind cluster for this test class."""
+    @classmethod
+    def setup_class(cls) -> None:
+        """Create a fresh kind cluster for this test class (once per class).
+
+        Fix: 原实现用 ``setup_method``——pytest 中每个测试方法前都会执行，
+        导致每次重建全新 kind 集群，抹掉前一测试安装的 CRD；而类内测试方法
+        隐含顺序依赖（install_crd → create_cr → get_cr），集群重建后
+        ``create_cr`` 因 CRD 缺失而失败（"ensure CRDs are installed first"）。
+        改为 ``setup_class``（classmethod）使集群在整个测试类期间只创建一次。
+        """
         # Delete any leftover cluster from a previous aborted run.
-        _kind("delete", "cluster", "--name", self.CLUSTER_NAME)
-        result = _kind("create", "cluster", "--name", self.CLUSTER_NAME)
+        _kind("delete", "cluster", "--name", cls.CLUSTER_NAME)
+        result = _kind("create", "cluster", "--name", cls.CLUSTER_NAME)
         if result.returncode != 0:
             pytest.skip(f"kind create cluster failed: {result.stderr}")
         # Point kubectl at the kind cluster.
-        kubeconfig = _kind("get", "kubeconfig", "--name", self.CLUSTER_NAME)
+        kubeconfig = _kind("get", "kubeconfig", "--name", cls.CLUSTER_NAME)
         assert kubeconfig.returncode == 0, "kind get kubeconfig failed"
-        self._kubeconfig_path = Path(os.environ.get("TEMP", "/tmp")) / "kind-kubeconfig"
-        self._kubeconfig_path.write_text(kubeconfig.stdout, encoding="utf-8")
-        os.environ["KUBECONFIG"] = str(self._kubeconfig_path)
+        # 保存进入前的 KUBECONFIG，供 teardown_class 恢复，避免污染同进程内
+        # 后续测试类（TestK3sIntegration / TestK8sIntegration 依赖真实 k3s 集群，
+        # 若继承指向已删除 kind-kubeconfig 文件的 KUBECONFIG 会解析失败）。
+        cls._prev_kubeconfig = os.environ.get("KUBECONFIG")
+        cls._kubeconfig_path = Path(os.environ.get("TEMP", "/tmp")) / "kind-kubeconfig"
+        cls._kubeconfig_path.write_text(kubeconfig.stdout, encoding="utf-8")
+        os.environ["KUBECONFIG"] = str(cls._kubeconfig_path)
 
-    def teardown_method(self) -> None:
-        """Tear down the kind cluster."""
-        _kind("delete", "cluster", "--name", self.CLUSTER_NAME)
-        self._kubeconfig_path.unlink(missing_ok=True)
+    @classmethod
+    def teardown_class(cls) -> None:
+        """Tear down the kind cluster (once per class)."""
+        _kind("delete", "cluster", "--name", cls.CLUSTER_NAME)
+        cls._kubeconfig_path.unlink(missing_ok=True)
+        # 恢复进入前的 KUBECONFIG：未设置则删除，避免残留指向已删文件的路径。
+        prev = getattr(cls, "_prev_kubeconfig", None)
+        if prev:
+            os.environ["KUBECONFIG"] = prev
+        else:
+            os.environ.pop("KUBECONFIG", None)
 
     def test_kind_cluster_ready(self):
         """Cluster is reachable and ready."""
@@ -469,8 +502,9 @@ class TestK3sIntegration:
 # ── 7. Kubernetes cluster (skip if no kubectl / no cluster) ───────────
 
 
-@pytest.mark.skip(
-    reason="Requires real Kubernetes cluster (kubectl cluster-info); CI matrix has none",
+@pytest.mark.skipif(
+    not _cluster_available_static(),
+    reason="Requires reachable Kubernetes cluster (kubectl cluster-info); no cluster available",
 )
 class TestK8sIntegration:
     """End-to-end: apply CRD, create a MaopAgent CR, verify it is accepted."""
