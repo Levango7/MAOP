@@ -46,6 +46,6 @@ repos:
         entry: python -m pytest tests/ -q -x --ignore=tests/contract --ignore=tests/integration -k "not slow" --timeout=30
         language: system
         types: [python]
-        files: ^py/tests/
+        files: ^py/
         pass_filenames: false
         stages: [push]

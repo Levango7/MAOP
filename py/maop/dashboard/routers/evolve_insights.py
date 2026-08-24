@@ -98,7 +98,20 @@ async def api_evolve_metrics() -> dict[str, Any]:
         with contextlib.suppress(Exception):
             rpt: dict[str, Any] = {"phases": [p.model_dump() for p in h.phases]} if h.phases else {}
             agent = rpt.get("agent", "") or rpt.get("agent_name", "") or ""
+            # 扩展 agent 字段获取来源：从第一个 phase 中获取 agent 信息
+            if not agent and h.phases:
+                first_phase = h.phases[0].model_dump() if hasattr(h.phases[0], "model_dump") else {}
+                agent = (
+                    first_phase.get("agent", "")
+                    or first_phase.get("agent_name", "")
+                    or first_phase.get("agent_id", "")
+                    or ""
+                )
         if not agent:
+            logger.debug(
+                "[evolve/metrics] skip cycle %s: no agent field in rpt or phases (errors=%s)",
+                getattr(h, "cycle_id", "?"), h.errors_observed,
+            )
             continue
         if agent not in agent_counts:
             agent_counts[agent] = {"cycles": 0, "errors": 0, "improvement_rate": 0.0}
@@ -108,6 +121,13 @@ async def api_evolve_metrics() -> dict[str, Any]:
             agent_counts[agent]["improvement_rate"] = round(
                 1.0 - (agent_counts[agent]["errors"] / max(1, agent_counts[agent]["cycles"] * 10)), 3
             )
+
+    if not agent_counts:
+        logger.warning(
+            "[evolve/metrics] agent_counts is empty after processing %d cycles; "
+            "heatmap will be empty (history phases may lack agent fields)",
+            len(history),
+        )
 
     heatmap = [
         {"agent": k, **v} for k, v in agent_counts.items()

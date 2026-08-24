@@ -25,7 +25,6 @@ to work; callers may opt into the unified schema by raising
 
 import functools
 import logging
-import types
 from collections.abc import Callable
 from typing import Any
 
@@ -117,15 +116,11 @@ def handle_api_errors(
         op_name = operation
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
-        # Capture HTTPException and error_response in the closure so the
-        # types.FunctionType rebuild below (which rebinds globals to
-        # fn.__globals__) can still resolve them at call time.
+        # Capture HTTPException, error_response and logger in the closure so
+        # the wrapper resolves them at call time without relying on the
+        # endpoint module's globals.
         _HTTPException = HTTPException
         _error_response = error_response
-        # Capture logger in the closure too: the types.FunctionType rebuild below
-        # rebinds wrapper.__globals__ to fn.__globals__ (the endpoint module),
-        # which does NOT define `logger`. Referencing a closure cell avoids the
-        # NameError that previously turned every handled error into a 500.
         _logger = logger
         @functools.wraps(fn)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -149,14 +144,6 @@ def handle_api_errors(
                     code="INTERNAL",
                     status_code=500,
                 )
-        wrapper = types.FunctionType(  # type: ignore
-            wrapper.__code__,  # type: ignore
-            fn.__globals__,
-            name=wrapper.__name__,
-            argdefs=wrapper.__defaults__,  # type: ignore
-            closure=wrapper.__closure__,  # type: ignore
-        )
-        functools.update_wrapper(wrapper, fn)
         return wrapper
 
     if func is not None:

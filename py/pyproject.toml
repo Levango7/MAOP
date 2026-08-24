@@ -77,6 +77,10 @@ otel = [
     "opentelemetry-api>=1.20",
     "opentelemetry-sdk>=1.20",
 ]
+# ADR-017: enterprise/ 模块已移至私有仓库 Levango7/MAOS。
+# 此 extra 保留是因为它包含的后端依赖（alembic/psycopg/asyncpg/redis/pika/lxml）
+# 在本仓库中仍被使用（如 alembic 迁移、redis 缓存、SAML SSO 测试）。
+# 安装方式: pip install maop[enterprise]
 enterprise = [
     "alembic>=1.13",
     "psycopg[binary,pool]>=3.1",
