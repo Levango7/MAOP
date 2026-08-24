@@ -30,75 +30,32 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from pydantic import BaseModel, Field
-
 if TYPE_CHECKING:
     from maop.core.agent.llm_chat.conversation import ConversationManager
+
 from maop.core.backends.db_utils import sqlite_connect
+
+# ── Re-exports from models.py (backward compatibility) ───────
+# MemoryContext / MemoryManagerConfig 在本模块内部使用并 re-export；
+# ConsolidationTrigger / MemoryLayer 仅为 re-export，供现有
+# `from maop.memory.manager import ConsolidationTrigger` 等调用方使用。
+from maop.memory.models import (  # noqa: F401
+    ConsolidationTrigger,
+    MemoryContext,
+    MemoryLayer,
+    MemoryManagerConfig,
+)
 from maop.memory.shared_db import (
     get_memory_db_path,
 )
 from maop.memory.store import MemoryStore
 
 logger = logging.getLogger(__name__)
-
-
-class MemoryLayer(str):
-    WORKING = "working"
-    SHORT_TERM = "short_term"
-    LONG_TERM = "long_term"
-
-
-class MemoryContext(BaseModel):
-    working_context: list[dict[str, Any]] = Field(default_factory=list)
-    short_term_results: list[dict[str, Any]] = Field(default_factory=list)
-    long_term_results: list[dict[str, Any]] = Field(default_factory=list)
-    # 漏斗增强（Funnel Enhancement）：
-    # - atom_facts: L1 原子事实命中（跨会话结构化知识）
-    # - evidence_refs: L0 证据引用（原始对话/工具结果，可按 ref 回查）
-    # - symbolic_map: 符号化短期记忆（Mermaid 任务状态图）
-    atom_facts: list[dict[str, Any]] = Field(default_factory=list)
-    evidence_refs: list[dict[str, Any]] = Field(default_factory=list)
-    symbolic_map: str = ""
-    injected_summary: str = ""
-    total_tokens_estimate: int = 0
-
-
-class ConsolidationTrigger(BaseModel):
-    entry_threshold: int = 100
-    days_since_last: int = 7
-    auto_trigger: bool = True
-
-
-class MemoryManagerConfig(BaseModel):
-    max_working_tokens: int = 4000
-    short_term_ttl_days: int = 30
-    long_term_min_group_size: int = 3
-    consolidation: ConsolidationTrigger = Field(default_factory=ConsolidationTrigger)
-    inject_max_results: int = 5
-    inject_max_tokens: int = 800
-    # 方案 A：LLM 语义去重开关（默认读 MAOP_LLM_DEDUP 环境变量，如 "1"/"true"）。
-    # 开启后 atom_facts 指纹未命中时用 LLM 判定同 subject/predicate 候选，
-    # 判定为同一事实则合并；judge 不可用/失败自动降级为纯 SHA-256 去重。
-    llm_dedup: bool = Field(default_factory=lambda: _env_flag("MAOP_LLM_DEDUP"))
-
-
-def _env_flag(name: str, default: bool = False) -> bool:
-    """解析 MAOP 风格的环境变量布尔开关（1/true/yes/on 视为真）。
-
-    对齐项目惯例（edition.py / backends.py 的 ``os.getenv(...).lower()`` 模式），
-    容错处理大小写与空白。
-    """
-    raw = os.getenv(name, "").strip().lower()
-    if not raw:
-        return default
-    return raw in ("1", "true", "yes", "on")
 
 
 # ── Parallel Implementation Note ──────────────────────────────

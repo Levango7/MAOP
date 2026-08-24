@@ -160,11 +160,12 @@ class TestTokenStreamer:
 # ── P1-4: Dynamic task decomposition ─────────────────────────
 
 class TestTaskDecomposition:
-    """Test engine._decompose_task heuristics."""
+    """Test decompose_task heuristics (extracted to engine_helpers)."""
 
     def setup_method(self):
-        from maop.engine import Engine, StepType, WorkflowStep
-        self.engine = Engine()
+        from maop.engine import StepType, WorkflowStep
+        from maop.engine_helpers import decompose_task
+        self.decompose_task = decompose_task
         self.StepType = StepType
         self.WorkflowStep = WorkflowStep
 
@@ -172,7 +173,7 @@ class TestTaskDecomposition:
         step = self.WorkflowStep(
             id="s1", type=self.StepType.PLAN, task="do A; do B; do C",
         )
-        subs = self.engine._decompose_task("do A; do B; do C", step)
+        subs = self.decompose_task("do A; do B; do C", step)
         assert len(subs) == 3
         assert subs[0].task == "do A"
         assert subs[1].task == "do B"
@@ -186,7 +187,7 @@ class TestTaskDecomposition:
             id="s2", type=self.StepType.PLAN,
             task="1. First step 2. Second step 3. Third step",
         )
-        subs = self.engine._decompose_task(step.task, step)
+        subs = self.decompose_task(step.task, step)
         assert len(subs) == 3
 
     def test_bullet_list_decomposition(self):
@@ -194,7 +195,7 @@ class TestTaskDecomposition:
             id="s3", type=self.StepType.PLAN,
             task="- Fix login bug\n- Add timeout\n- Write tests",
         )
-        subs = self.engine._decompose_task(step.task, step)
+        subs = self.decompose_task(step.task, step)
         assert len(subs) == 3
 
     def test_and_conjunction(self):
@@ -202,14 +203,14 @@ class TestTaskDecomposition:
             id="s4", type=self.StepType.PLAN,
             task="implement the authentication module and write comprehensive test suite",
         )
-        subs = self.engine._decompose_task(step.task, step)
+        subs = self.decompose_task(step.task, step)
         assert len(subs) == 2
 
     def test_atomic_task_no_decomposition(self):
         step = self.WorkflowStep(
             id="s5", type=self.StepType.PLAN, task="simple task",
         )
-        subs = self.engine._decompose_task("simple task", step)
+        subs = self.decompose_task("simple task", step)
         assert len(subs) == 0
 
 

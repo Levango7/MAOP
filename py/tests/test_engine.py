@@ -17,6 +17,7 @@ from maop.engine import (
     json_dumps_safe,
     safe_eval,
 )
+from maop.engine_helpers import decompose_task
 
 
 class TestSafeEval:
@@ -311,22 +312,19 @@ class TestEngineAbortOnFailure:
 
 class TestEngineDecomposition:
     def test_semicolon_decomposition(self):
-        engine = Engine()
         step = WorkflowStep(id="p1", type=StepType.PLAN, task="do A; do B; do C")
-        substeps = engine._decompose_task("do A; do B; do C", step)
+        substeps = decompose_task("do A; do B; do C", step)
         assert len(substeps) == 3
 
     def test_bullet_decomposition(self):
-        engine = Engine()
         task = "- Write tests\n- Fix bugs\n- Deploy"
         step = WorkflowStep(id="p1", type=StepType.PLAN, task=task)
-        substeps = engine._decompose_task(task, step)
+        substeps = decompose_task(task, step)
         assert len(substeps) == 3
 
     def test_atomic_task_no_decomposition(self):
-        engine = Engine()
         step = WorkflowStep(id="p1", type=StepType.PLAN, task="simple task")
-        substeps = engine._decompose_task("simple task", step)
+        substeps = decompose_task("simple task", step)
         assert len(substeps) == 0
 
 
