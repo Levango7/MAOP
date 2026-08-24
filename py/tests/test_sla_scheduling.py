@@ -187,7 +187,9 @@ class TestDispatcherSLA:
                 priority=2, deadline_ms=future_ms,
             )
         )
+        # Agent not found → error result, but no exception
         assert result is not None
+        assert not result.result.is_success()
 
     def test_dispatch_default_sla_params(self):
         """dispatch without SLA params uses defaults (backward compatible)."""
@@ -195,7 +197,9 @@ class TestDispatcherSLA:
         result = asyncio.run(
             dispatcher.dispatch(agent="nonexistent", task="t")
         )
+        # Agent not found → error result, but no exception
         assert result is not None
+        assert not result.result.is_success()
 
     def test_dispatch_past_deadline_records_violation(self):
         """A past deadline triggers the SLA violation counter."""

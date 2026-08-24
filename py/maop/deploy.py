@@ -149,10 +149,41 @@ def validate_config(root_dir: str | Path) -> ValidationResult:
 
 # ── Health Check ────────────────────────────────────────────────
 
-def health_check(root_dir: str | Path, timeout_s: float = 5.0) -> list[ComponentHealth]:
-    """Check health of all MAOP subsystems."""
+def health_check(
+    root_dir: str | Path,
+    timeout_s: float = 5.0,
+    *,
+    host: str | None = None,
+    port: int | None = None,
+) -> list[ComponentHealth]:
+    """Check health of all MAOP subsystems.
+
+    P1 fix: dashboard 的 host 和 port 不再硬编码 ``127.0.0.1:9079``。
+    优先级：显式参数 > 环境变量 > 默认值。
+
+    Parameters
+    ----------
+    host : str | None
+        Dashboard 主机地址。None 时从 ``MAOP_DASHBOARD_HOST`` 环境变量
+        读取，未设置则回退到 ``127.0.0.1``。
+    port : int | None
+        Dashboard 端口号。None 时从 ``MAOP_DASHBOARD_PORT`` 环境变量
+        读取，未设置则回退到 ``9079``。
+    """
     root = Path(root_dir)
     results: list[ComponentHealth] = []
+
+    # P1 fix: 从参数或环境变量解析 dashboard host/port，不再硬编码。
+    dashboard_host = host or os.environ.get("MAOP_DASHBOARD_HOST", "127.0.0.1")
+    dashboard_port_raw = port or os.environ.get("MAOP_DASHBOARD_PORT", "9079")
+    try:
+        dashboard_port = int(dashboard_port_raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Invalid MAOP_DASHBOARD_PORT=%r; falling back to 9079",
+            dashboard_port_raw,
+        )
+        dashboard_port = 9079
 
     # 1. Database health
     t0 = time.monotonic()
@@ -229,7 +260,10 @@ def health_check(root_dir: str | Path, timeout_s: float = 5.0) -> list[Component
     t0 = time.monotonic()
     try:
         import urllib.request
-        req = urllib.request.Request("http://127.0.0.1:9079/api/health")
+        # P1 fix: 使用从参数/环境变量解析的 host 和 port，不再硬编码。
+        req = urllib.request.Request(
+            f"http://{dashboard_host}:{dashboard_port}/api/health"
+        )
         with urllib.request.urlopen(req, timeout=timeout_s) as resp:
             if resp.status == 200:
                 results.append(ComponentHealth(
@@ -353,14 +387,33 @@ def start(
             "--port", str(port),
             "--log-level", log_level.lower(),
         ]
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(root),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            # Windows 专属常量，POSIX 无——getattr 默认值跨平台安全（mypy 两端不报）
-            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if sys.platform == "win32" else 0,
-        )
+        # P1 fix (管道阻塞): 原代码使用 stdout=PIPE/stderr=PIPE 但不读取输出，
+        # 当子进程输出填满管道缓冲区（通常 64KB）后会阻塞，导致 dashboard
+        # 在输出大量日志时挂起。改为重定向到日志文件，既避免管道阻塞，
+        # 又保留日志供调试。文件以追加模式打开，Popen 会 dup 文件描述符，
+        # 随后关闭 Python 侧句柄是安全的。
+        log_dir = root / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        stdout_log_path = log_dir / "dashboard.stdout.log"
+        stderr_log_path = log_dir / "dashboard.stderr.log"
+        # 不使用 context manager，因为需要将文件句柄传给 Popen 作为
+        # stdout/stderr，Popen 会 dup 文件描述符，随后在 finally 中
+        # 关闭 Python 侧句柄。with 语句无法跨越 Popen 调用。
+        stdout_fh = open(stdout_log_path, "ab", buffering=0)  # noqa: SIM115
+        stderr_fh = open(stderr_log_path, "ab", buffering=0)  # noqa: SIM115
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(root),
+                stdout=stdout_fh,
+                stderr=stderr_fh,
+                # Windows 专属常量，POSIX 无——getattr 默认值跨平台安全（mypy 两端不报）
+                creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if sys.platform == "win32" else 0,
+            )
+        finally:
+            # Popen 已 dup 文件描述符，关闭 Python 侧句柄避免泄漏。
+            stdout_fh.close()
+            stderr_fh.close()
         _write_pid(root, proc.pid)
         logger.info("MAOP started: pid=%d, dashboard=%s:%d", proc.pid, host, port)
 
@@ -374,13 +427,15 @@ def start(
 
             # 检查子进程是否已退出（启动失败）
             if proc.poll() is not None:
-                # 子进程已退出，读取 stderr 获取错误信息
+                # 子进程已退出，从日志文件读取 stderr 获取错误信息。
+                # P1 fix: 原来从 proc.stderr.read() 读取，改为重定向到
+                # 文件后 proc.stderr 为 None，故从日志文件读取尾部内容。
                 stderr_output = ""
                 try:
-                    if proc.stderr is not None:
-                        stderr_output = proc.stderr.read().decode("utf-8", errors="replace")[-500:]
+                    stderr_bytes = stderr_log_path.read_bytes()
+                    stderr_output = stderr_bytes.decode("utf-8", errors="replace")[-500:]
                 except Exception:
-                    logger.debug('swallowed exception', exc_info=True)
+                    logger.debug('swallowed exception reading stderr log', exc_info=True)
                 _remove_pid(root)
                 logger.error("MAOP subprocess exited prematurely: %s", stderr_output)
                 return SystemStatus(
@@ -478,8 +533,45 @@ def _wait_for_ready(
     return last_components
 
 
-def stop(root_dir: str | Path = ".") -> SystemStatus:
-    """Stop the MAOP system."""
+def _is_process_alive(pid: int) -> bool:
+    """Check if a process with the given PID is still running.
+
+    Uses ``os.kill(pid, 0)`` (signal 0 = probe) on POSIX, and
+    ``subprocess.run(["taskkill", ...])`` probe on Windows.
+    """
+    if sys.platform == "win32":
+        try:
+            subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                capture_output=True, timeout=5, check=False,
+            )
+            # tasklist returns 0 even when no match; parse stdout instead.
+            # Simpler: just try OpenProcess via os.kill fallback below.
+            os.kill(pid, 0)
+            return True
+        except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
+            return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def stop(root_dir: str | Path = ".", *, graceful_timeout_s: float = 10.0) -> SystemStatus:
+    """Stop the MAOP system.
+
+    P2-6 fix (优雅退出): 先发送 SIGTERM（POSIX）或 taskkill（Windows）请求
+    进程优雅退出，等待最多 ``graceful_timeout_s`` 秒让进程关闭数据库连接、
+    保存状态、刷新日志。超时后仍未退出则发送 SIGKILL 强制终止，避免僵尸进程。
+
+    Parameters
+    ----------
+    root_dir : str | Path
+        MAOP 项目根目录（用于定位 data/maop.pid）。
+    graceful_timeout_s : float
+        优雅退出等待上限（秒），默认 10。设为 0 表示立即强制终止。
+    """
     root = Path(root_dir).resolve()
     pid = _read_pid(root)
 
@@ -491,13 +583,39 @@ def stop(root_dir: str | Path = ".") -> SystemStatus:
 
     try:
         if sys.platform == "win32":
-            # On Windows, kill the process tree
-            subprocess.run(  # noqa: PLW1510
-                ["taskkill", "/F", "/T", "/PID", str(pid)],
-                capture_output=True, timeout=10,
-            )
+            # Windows: taskkill /T kills the process tree.
+            # 先尝试优雅退出（不传 /F），超时后再 /F 强制终止。
+            try:
+                subprocess.run(  # noqa: PLW1510
+                    ["taskkill", "/T", "/PID", str(pid)],
+                    capture_output=True, timeout=graceful_timeout_s,
+                )
+            except subprocess.TimeoutExpired:
+                logger.warning(
+                    "MAOP pid=%d did not exit within %.1fs, force-killing", pid, graceful_timeout_s,
+                )
+                subprocess.run(  # noqa: PLW1510
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True, timeout=10,
+                )
         else:
+            # POSIX: 先 SIGTERM 优雅退出，轮询等待进程消失，超时后 SIGKILL。
             os.kill(pid, signal.SIGTERM)
+            deadline = time.monotonic() + graceful_timeout_s
+            poll_interval = 0.2
+            while time.monotonic() < deadline:
+                if not _is_process_alive(pid):
+                    break
+                time.sleep(poll_interval)
+            if _is_process_alive(pid):
+                logger.warning(
+                    "MAOP pid=%d did not exit within %.1fs after SIGTERM, sending SIGKILL",
+                    pid, graceful_timeout_s,
+                )
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except (OSError, ProcessLookupError) as e:
+                    logger.debug("SIGKILL failed (process may have just exited): %s", e)
         logger.info("MAOP stopped: pid=%d", pid)
     except (OSError, ProcessLookupError) as e:
         logger.warning("Stop failed (process may already be dead): %s", e)

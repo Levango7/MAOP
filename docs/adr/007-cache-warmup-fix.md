@@ -1,7 +1,13 @@
 # ADR-007: Dashboard 缓存持久化 & Warm-Cache 修复
 
 ## Status
-Accepted (2026-07-10)
+Accepted
+
+## Date
+2026-07-10
+
+## Decider
+MAOP Core Team
 
 ## Context
 `server-v2.ps1` 的两个基础功能存在实质性 bug：

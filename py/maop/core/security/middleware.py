@@ -39,11 +39,18 @@ class AuthMiddleware(BaseHTTPMiddleware):
         enabled: bool = True,
     ):
         super().__init__(app)
+        # P2-1 fix: 与实际路由定义对齐。/api/info/* 下 pillars/roles/modules/
+        # workflows/architecture/edition/config/adrs/activity 等端点为公开元信息，
+        # 不需要认证（admin.py 中的 POST /edition 自带 require_admin 守卫）。
+        # /api/csp-report / /api/csp-violations 也需公开，否则浏览器无法上报
+        # CSP 违规（无凭证）。/favicon.svg 由静态资源分支放行，此处一并列入。
         self.public_paths = public_paths or [
             "/", "/api/health",
-            "/style.css", "/app.js",
+            "/style.css", "/app.js", "/favicon.svg",
             "/api/docs", "/openapi.json",
             "/api/auth/login", "/api/auth/status",
+            "/api/info",  # 前缀匹配覆盖 /api/info/pillars 等
+            "/api/csp-report", "/api/csp-violations",
         ]
         self.api_key_header = api_key_header
         self.auth_header = auth_header
@@ -98,7 +105,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return cast(Response, await call_next(request))
 
         # Skip static assets
-        if path.startswith("/static/") or path.endswith((".css", ".js", ".ico", ".png", ".svg")):
+        # P2-2 fix: 放行字体文件（.woff/.woff2/.ttf），否则浏览器加载字体时
+        # 会被认证中间件拦截，导致页面字体回退到系统默认字体。
+        if path.startswith("/static/") or path.endswith((".css", ".js", ".ico", ".png", ".svg", ".woff", ".woff2", ".ttf")):
             return cast(Response, await call_next(request))
 
         auth_manager = getattr(request.app.state, "auth_manager", None)
@@ -125,7 +134,19 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 elif auth_manager is not None and hasattr(auth_manager, "authenticate"):
                     result = auth_manager.authenticate(api_key=api_key)
                 else:
-                    return cast(Response, await call_next(request))  # No auth configured = pass through
+                    # P1安全-6 fix: API key present but no auth checker configured.
+                    # Returning 503 instead of pass-through to avoid silently
+                    # authenticating as anonymous when auth is misconfigured.
+                    logger.warning(
+                        "[auth] API key present but no auth checker configured "
+                        "(api_key_auth/auth_manager missing on app.state) — "
+                        "rejecting request as auth misconfiguration."
+                    )
+                    return JSONResponse(
+                        status_code=503,
+                        content={"error": "Auth configuration error",
+                                 "detail": "No auth checker configured"},
+                    )
 
                 if result.authenticated:
                     request.state.auth_identity = result.identity
@@ -166,7 +187,19 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 elif auth_manager is not None and hasattr(auth_manager, "authenticate"):
                     result = auth_manager.authenticate(bearer_token=token)
                 else:
-                    return cast(Response, await call_next(request))
+                    # P1安全-6 fix: JWT token present but no jwt checker configured.
+                    # Returning 503 instead of pass-through to avoid silently
+                    # authenticating as anonymous when auth is misconfigured.
+                    logger.warning(
+                        "[auth] JWT token present but no jwt checker configured "
+                        "(jwt_auth/auth_manager missing on app.state) — "
+                        "rejecting request as auth misconfiguration."
+                    )
+                    return JSONResponse(
+                        status_code=503,
+                        content={"error": "Auth configuration error",
+                                 "detail": "No auth checker configured"},
+                    )
 
                 if result.authenticated:
                     request.state.auth_identity = result.identity
@@ -257,6 +290,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """FastAPI middleware for per-IP rate limiting.
 
     Uses MAOP.core.rate_limiter.TokenBucket by default.
+
+    P2-4 note (多 worker 限制): ``_buckets`` / ``_lock_time`` / ``_request_count``
+    均为进程内字典/计数器，仅在单 worker 模式下精确。在多 worker（uvicorn
+    --workers N > 1 或 gunicorn 多进程）模式下，每个 worker 拥有独立的计数器，
+    实际限流上限会放大到约 ``N × burst``，限流效果减弱。
+
+    生产环境多 worker 部署时，应改用 Redis 作为共享计数器（见
+    ``maop.core.backends.redis`` —— 使用 INCR + EXPIRE 实现分布式令牌桶），
+    或在反向代理层（nginx limit_req / envoy local_rate_limit）做限流。
+    本中间件保留作为单 worker / 开发环境的轻量级方案。
     """
 
     def __init__(
@@ -473,6 +516,26 @@ def setup_middleware(
 
 
 # ── Shared auth helpers ──────────────────────────────────────────
+
+def should_set_secure_cookie() -> bool:
+    """判断是否应为认证 cookie 设置 Secure 标志。
+
+    P2-3 fix: 生产环境（MAOP_ENV=production）下必须设置 Secure=True，
+    防止认证 cookie 通过 HTTP 明文连接发送（OWASP A02:2021 Cryptographic
+    Failures）。dev/development/local/test 等开发环境下允许 HTTP，故
+    不设置 Secure 标志，否则浏览器在 http://localhost 上不会回传 cookie，
+    导致登录态丢失。
+
+    Returns
+    -------
+    bool
+        True 表示应设置 Secure 标志（生产环境）；
+        False 表示不设置（开发环境，允许 HTTP）。
+    """
+    import os
+    env = os.environ.get("MAOP_ENV", "").strip().lower()
+    return env == "production"
+
 
 def require_admin(request: Request) -> None:
     """Raise HTTPException(403) if not authenticated as admin or superadmin."""

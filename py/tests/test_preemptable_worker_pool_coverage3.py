@@ -122,13 +122,15 @@ class TestStatsAndTasks:
     def test_get_task(self):
         pool = _make_pool()
         result = pool.get_task("nonexistent")
-        # Should not raise
-        assert result is not None or result is None
+        # Nonexistent task id → None (no task found, but no exception raised)
+        assert result is None
 
     def test_all_tasks(self):
         pool = _make_pool()
         result = pool.all_tasks()
-        assert result is not None
+        # all_tasks returns a list of tasks; new pool has no tasks yet
+        assert isinstance(result, list)
+        assert len(result) == 0
 
 
 # ── Async lifecycle: start/stop/submit/wait ────────────────────────

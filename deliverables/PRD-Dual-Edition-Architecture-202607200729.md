@@ -35,7 +35,7 @@ MAOP 当前以单一形态运行，所有功能模块（RBAC、多租户、Postg
 | 安装后磁盘占用 | < 50 MB | < 120 MB |
 | 冷启动时间 | < 3 秒 | < 8 秒 |
 | 外部依赖 | 0（纯 SQLite） | PostgreSQL + Redis（可降级 SQLite） |
-| pip install 依赖数 | < 15 | < 30 |
+| pip install 直接依赖数 | ≤ 18（lock 解析后 44 个传递依赖） | < 30 |
 
 ---
 

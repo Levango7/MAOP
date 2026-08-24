@@ -6,7 +6,7 @@
 
 | 组件 | 最低版本 | 检查命令 |
 |------|---------|----------|
-| Python | 3.11+ | `python --version` |
+| Python | 3.10+ | `python --version` |
 | Node.js | 18+ | `node --version` |
 | npm | 9+ | `npm --version` |
 | Git | 任意 | `git --version` |
@@ -99,7 +99,7 @@ npm run dev
 ## FAQ
 
 ### Q: 启动后端时提示 `ModuleNotFoundError: No module named 'maop'`
-**A:** 确保已运行 `pip install -e py/`（editable 模式安装）。如果仍有问题，检查 Python 版本是否 ≥ 3.11。
+**A:** 确保已运行 `pip install -e py/`（editable 模式安装）。如果仍有问题，检查 Python 版本是否 ≥ 3.10。
 
 ### Q: 前端页面空白或 API 请求失败
 **A:** 检查后端是否正在运行（默认端口 9079），确认 `.env` 中 `MAOP_DASH_PORT` 与前端代理配置一致。

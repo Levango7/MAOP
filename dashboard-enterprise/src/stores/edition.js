@@ -1,5 +1,10 @@
 import { defineStore } from 'pinia';
-import { withAuth, handleUnauthorized } from './api.js';
+import { withAuth, handleUnauthorized, fetchWithTimeout } from './api.js';
+
+// P1 fix: edition 配置请求超时阈值。后端 /api/info/edition 在正常情况下应
+// 极快返回（<200ms）；5s 超时覆盖网络抖动，超时后 fallback 到安全默认
+// 'personal' 并通过 console.warn 提示，避免前端无限等待。
+const EDITION_TIMEOUT_MS = 5000;
 
 function persistEdition(edition, features, backends, degradations) {
   try {
@@ -43,8 +48,15 @@ export const useEditionStore = defineStore('edition', {
       this.loading = true;
       try {
         // Inject Bearer token (aligned with dashboard/js/app-core.js)
-        const res = await fetch('/api/info/edition', withAuth({}, {}));
-        if (res.status === 401) { handleUnauthorized(); return; }
+        // P1 fix: 用 fetchWithTimeout 替代裸 fetch，5s 超时后 abort，
+        // 避免后端响应慢时前端无限等待。超时走 catch 分支 fallback 'personal'。
+        const res = await fetchWithTimeout('/api/info/edition', withAuth({}, {}), EDITION_TIMEOUT_MS);
+        if (res.status === 401) {
+          // P1 fix: await handleUnauthorized 确保未授权处理（清登录态/跳登录页）
+          // 在 return 前完成，避免后续 SPA 导航在未清理登录态时进行。
+          await handleUnauthorized();
+          return;
+        }
         if (!res.ok) { console.error('Failed to fetch edition info: HTTP', res.status); return; }
         const data = await res.json();
         // P1-H1: 后端未返回有效 edition 时 fallback 'personal'（安全失败）
@@ -55,6 +67,11 @@ export const useEditionStore = defineStore('edition', {
         persistEdition(this.edition, this.features, this.backends, this.degradations);
       } catch (e) {
         console.error('Failed to fetch edition info:', e);
+        // P1 fix: 超时/网络错误时提示用户，并保持安全默认 'personal'。
+        // 不抛错以免阻塞调用方（App.vue/onMounted 已 .catch）。
+        if (e && e.name === 'AbortError') {
+          console.warn('Edition config request timed out after', EDITION_TIMEOUT_MS, 'ms — falling back to personal edition.');
+        }
       } finally {
         this.loading = false;
       }
@@ -69,11 +86,16 @@ export const useEditionStore = defineStore('edition', {
       this.switching = true;
       this.switchError = '';
       try {
-        const res = await fetch('/api/info/edition', withAuth(
+        // P1 fix: 用 fetchWithTimeout 替代裸 fetch，复用统一超时机制。
+        const res = await fetchWithTimeout('/api/info/edition', withAuth(
           { method: 'POST', body: JSON.stringify({ edition: targetEdition }) },
           { 'Content-Type': 'application/json' }
-        ));
-        if (res.status === 401) { handleUnauthorized(); throw new Error('401 Unauthorized'); }
+        ), EDITION_TIMEOUT_MS);
+        if (res.status === 401) {
+          // P1 fix: await handleUnauthorized 确保未授权处理先完成再抛错。
+          await handleUnauthorized();
+          throw new Error('401 Unauthorized');
+        }
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           const msg = data.error || data.detail || `Switch failed: HTTP ${res.status}`;

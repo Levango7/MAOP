@@ -1,7 +1,13 @@
 # ADR-008: MAOP 双版本架构 & 调度流程审计
 
 ## Status
-Accepted (2026-07-10)
+Accepted
+
+## Date
+2026-07-10
+
+## Decider
+MAOP Core Team
 
 ## Context
 MAOP 同时维护 PS 和 Python 两套代码。决策"PS 管执行 · Python 管服务"的架构边界。同时审计调度流程中的隐患。

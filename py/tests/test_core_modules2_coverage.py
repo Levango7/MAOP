@@ -272,6 +272,8 @@ class TestProviderHealth:
         import asyncio
         result = asyncio.run(checker.check("nonexistent"))
         assert result is not None
+        assert result.provider == "nonexistent"
+        assert result.healthy is False
 
 
 # ── Subagent DB ─────────────────────────────────────────────────────

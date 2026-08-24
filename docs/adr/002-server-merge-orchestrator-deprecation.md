@@ -1,7 +1,13 @@
 # ADR-002: Server 合并 & Orchestrator 废弃
 
 ## Status
-Accepted (2026-07-10)
+Accepted
+
+## Date
+2026-07-10
+
+## Decider
+MAOP Core Team
 
 ## Context
 项目存在两套并行实现：

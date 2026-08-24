@@ -10,7 +10,19 @@ import { createPinia, setActivePinia } from 'pinia';
 import Evolve from '../views/Evolve.vue';
 import { EmptyState } from '../components/index.js';
 
-const mountOptions = { global: { stubs: { PageHeader: { template: '<slot />' } } } };
+const mountOptions = {
+  global: {
+    stubs: {
+      PageHeader: { template: '<slot />' },
+      // Evolve 页面含 vue-chartjs 图表；jsdom 无 canvas，chart.js 在渲染时
+      // 会因 getComputedStyle(null) 崩溃（unhandled rejection）。与
+      // Audit.test.js 一致地 stub 图表组件，避免真实 Chart 实例化。
+      Line: true,
+      Bar: true,
+      Pie: true,
+    },
+  },
+};
 
 describe('Evolve.vue', () => {
   let originalFetch;

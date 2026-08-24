@@ -37,6 +37,10 @@ logger = logging.getLogger(__name__)
 
 _otel_tracer = None
 
+# Hold strong references to background asyncio tasks so they are not
+# garbage-collected before completion ("Task was destroyed but it is pending").
+_bg_tasks: set[asyncio.Task[Any]] = set()
+
 
 def _get_otel_tracer():
     global _otel_tracer
@@ -175,9 +179,11 @@ class PhasesMixin:
 
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(self._bus.publish(Event(topic="loop.analyze", data={
+            _t = loop.create_task(self._bus.publish(Event(topic="loop.analyze", data={
                 "trace_id": ctx.trace_id, "analysis": ctx.analysis_dict,
             })))
+            _bg_tasks.add(_t)
+            _t.add_done_callback(_bg_tasks.discard)
         except RuntimeError as exc:
             logger.debug("maop_loop: no running loop for loop.analyze publish: %s", exc)
 
@@ -495,9 +501,11 @@ class PhasesMixin:
 
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(self._bus.publish(Event(topic="loop.complete", data={
+            _t = loop.create_task(self._bus.publish(Event(topic="loop.complete", data={
                 "trace_id": ctx.trace_id, "success": success, "duration_ms": total_ms,
             })))
+            _bg_tasks.add(_t)
+            _t.add_done_callback(_bg_tasks.discard)
         except RuntimeError as exc:
             logger.debug("maop_loop: no running loop for loop.complete publish: %s", exc)
 

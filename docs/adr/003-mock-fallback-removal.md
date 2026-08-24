@@ -1,7 +1,13 @@
 # ADR-003: Dashboard 假数据兜底清除
 
 ## Status
-Accepted (2026-07-10)
+Accepted
+
+## Date
+2026-07-10
+
+## Decider
+MAOP Core Team
 
 ## Context
 Dashboard 前端 `index.html` 中 6 个渲染函数在 API 返回空时，用**内联假数据**填充面板：

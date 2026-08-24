@@ -49,7 +49,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import AppIcon from './AppIcon.vue';
 import Badge from './Badge.vue';
 import Skeleton from './Skeleton.vue';
@@ -69,6 +69,16 @@ const props = defineProps({
 const emit = defineEmits(['row-click']);
 
 const { t } = useI18n();
+
+// P1 fix: formatRel 使用 Date.now() 格式化相对时间，但 Date.now() 非响应式，
+// 导致"3m ago"等文本不随时间推移更新。引入 nowTick 响应式 ref，每 30s 更新，
+// formatRel 读取 nowTick.value 建立响应式依赖，触发模板重渲染。
+const nowTick = ref(Date.now());
+let relTimer = null;
+onMounted(() => {
+  relTimer = setInterval(() => { nowTick.value = Date.now(); }, 30000);
+});
+onBeforeUnmount(() => { if (relTimer) clearInterval(relTimer); });
 
 function sortLabel(colLabel) {
   return t('a11y.sortBy', { column: colLabel });
@@ -129,7 +139,10 @@ function formatRel(ts) {
   if (ts === null || ts === undefined) return '—';
   const d = new Date(typeof ts === 'number' ? ts : String(ts));
   if (isNaN(d.getTime())) return String(ts);
-  const diff = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  // P1 fix: 读取 nowTick.value 建立响应式依赖，使 nowTick 每 30s 更新时
+  // 模板重渲染，相对时间文本（"3m ago" → "4m ago"）随之刷新。
+  const now = nowTick.value;
+  const diff = Math.max(0, Math.floor((now - d.getTime()) / 1000));
   if (diff < 60) return diff + 's ago';
   if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
   if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';

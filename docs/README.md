@@ -15,7 +15,7 @@
 |------|------|
 | [用户指南](./user-guide.md) | MAOP 入门与操作手册，覆盖安装、配置、Agent 管理、记忆系统等核心功能 |
 | [API 示例](./api-examples.md) | 常见用例的 curl / Python 示例，含认证、Agent 调用、记忆检索等场景 |
-| [API 参考](./api-reference.md) | 完整 HTTP 与 WebSocket 端点规格（v5.1.0），346 个端点，供集成方与运维人员查阅 |
+| [API 参考](./api-reference.md) | 完整 HTTP 与 WebSocket 端点规格（v5.1.0），380+ 个端点，供集成方与运维人员查阅 |
 
 ---
 

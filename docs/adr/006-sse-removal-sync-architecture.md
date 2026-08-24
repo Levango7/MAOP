@@ -1,9 +1,13 @@
 # ADR-006: Dashboard SSE 删除 & 同步架构保持
 
 ## Status
-**Superseded (2026-07-21)**
+**Superseded** (original: Accepted)
 
-Original status: Accepted (2026-07-10)
+## Date
+2026-07-10 (superseded 2026-07-21)
+
+## Decider
+MAOP Core Team
 
 ## Context
 `dashboard/server-v2.ps1` 有一整套 SSE（Server-Sent Events）实现——`/api/stream` 端点（46行），用于推送 ActiveJobs 状态。但前端从未创建 `EventSource` 连接，只用 `setInterval` 轮询。

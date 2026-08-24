@@ -27,6 +27,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Hold strong references to background asyncio tasks (e.g. pipe drainers) so
+# they are not garbage-collected before completion. See Python docs on
+# asyncio.create_task: "Important: Save a reference to the result of this
+# function, to avoid a task disappearing mid-execution."
+_bg_tasks: set[asyncio.Task[Any]] = set()
+
 
 @router.get("/api/workflow/list")
 @handle_api_errors
@@ -70,7 +76,9 @@ async def api_workflow_run(request: Request) -> dict[str, Any]:
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
     # Drain pipes in background to prevent deadlock when child output exceeds OS pipe buffer (~64KB)
-    asyncio.create_task(proc.communicate())
+    _t = asyncio.create_task(proc.communicate())
+    _bg_tasks.add(_t)
+    _t.add_done_callback(_bg_tasks.discard)
     _deps.active_jobs[job_id] = {
         "action": "workflow", "status": "running",
         "start": time.strftime("%Y-%m-%dT%H:%M:%S"),

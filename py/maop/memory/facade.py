@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +98,13 @@ class MemoryFacade:
         # （MemoryManager.consolidate(dry_run) / ThreeLayerMemory.consolidate(min_score, limit)），
         # 无法用单一 Protocol 签名精确表达。运行时由 Facade 统一转发。
         self._impl: Any = self._build_impl(mode, config, kwargs)
+        # 漏斗增强独立实例缓存（仅 agent 模式使用）。
+        # chat 模式下底层 MemoryManager 已自带 evidence_store/atom_facts/symbolic
+        # 三个 @property 懒加载组件，直接透传即可；agent 模式底层
+        # ThreeLayerMemory 无这些组件，由 Facade 懒加载独立实例补齐。
+        self._funnel_evidence: Any = None
+        self._funnel_atoms: Any = None
+        self._funnel_symbolic: Any = None
 
     # ── 内部构造 ───────────────────────────────────────────────
 
@@ -597,6 +604,195 @@ class MemoryFacade:
                 logger.debug("[memory_facade] vector delete failed: %s", exc)
                 return False
         return False
+
+    # ── 漏斗增强透传（L0 证据 / L1 原子事实 / 符号化短期记忆） ────────
+    # chat 模式底层是 MemoryManager，直接透传其懒加载组件；
+    # agent 模式底层是 ThreeLayerMemory，无这些组件，由 Facade 懒加载
+    # 独立实例补齐，使漏斗增强在两种模式下均可用。
+
+    def evidence_store(self):
+        """L0 证据层实例（chat + agent 模式均可用）。
+
+        - chat 模式：透传 ``MemoryManager.evidence_store`` 懒加载实例。
+        - agent 模式：由 Facade 懒加载独立 ``EvidenceStore`` 实例
+          （与 chat 模式共享同一个 maop.db）。
+
+        Note: 底层 MemoryManager 以 ``@property`` 暴露懒加载实例，直接
+        ``getattr`` 取值即可；不要用 ``callable()`` 判断——property 返回的
+        是实例本身（不可调用），会被误判为 None。
+        """
+        # chat 模式：透传 MemoryManager 的实例
+        existing = getattr(self._impl, "evidence_store", None)
+        if existing is not None:
+            return existing
+        # agent 模式：创建独立实例
+        if self._mode == "agent" and self._funnel_evidence is None:
+            try:
+                from maop.memory.evidence import EvidenceStore
+
+                self._funnel_evidence = EvidenceStore(root_dir=self._root)
+            except Exception as exc:
+                logger.warning(
+                    "[memory_facade] agent mode evidence init failed: %s", exc
+                )
+        return self._funnel_evidence if self._mode == "agent" else None
+
+    def atom_facts(self):
+        """L1 原子事实层实例（chat + agent 模式均可用）。
+
+        - chat 模式：透传 ``MemoryManager.atom_facts`` 懒加载实例。
+        - agent 模式：由 Facade 懒加载独立 ``AtomFactStore`` 实例
+          （使用默认配置：纯 SHA-256 指纹去重，不启用 LLM 语义去重）。
+        """
+        # chat 模式：透传 MemoryManager 的实例
+        existing = getattr(self._impl, "atom_facts", None)
+        if existing is not None:
+            return existing
+        # agent 模式：创建独立实例
+        if self._mode == "agent" and self._funnel_atoms is None:
+            try:
+                from maop.memory.atoms import AtomFactStore
+
+                self._funnel_atoms = AtomFactStore(root_dir=self._root)
+            except Exception as exc:
+                logger.warning(
+                    "[memory_facade] agent mode atom_facts init failed: %s", exc
+                )
+        return self._funnel_atoms if self._mode == "agent" else None
+
+    def symbolic(self):
+        """符号化短期记忆实例（chat + agent 模式均可用）。
+
+        - chat 模式：透传 ``MemoryManager.symbolic`` 懒加载实例。
+        - agent 模式：由 Facade 懒加载独立 ``SymbolicMemory`` 实例，
+          复用 ``self.evidence_store()`` 以共享 L0 证据存储。
+        """
+        # chat 模式：透传 MemoryManager 的实例
+        existing = getattr(self._impl, "symbolic", None)
+        if existing is not None:
+            return existing
+        # agent 模式：创建独立实例，复用 evidence_store
+        if self._mode == "agent" and self._funnel_symbolic is None:
+            try:
+                from maop.memory.symbolic import SymbolicMemory
+
+                self._funnel_symbolic = SymbolicMemory(
+                    root_dir=self._root,
+                    evidence_store=self.evidence_store(),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[memory_facade] agent mode symbolic init failed: %s", exc
+                )
+        return self._funnel_symbolic if self._mode == "agent" else None
+
+    def offload_tool_result(
+        self,
+        tool: str,
+        tool_output: str,
+        *,
+        tool_input: str = "",
+        session_id: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """工具结果外置：全文写 refs 文件，返回摘要 + ref 引用（chat + agent 模式）。"""
+        sym = self.symbolic()
+        if sym is None:
+            return {"ref_id": "", "summary": ""}
+        try:
+            return cast(dict[str, str], sym.offload_tool_result(
+                tool=tool, tool_output=tool_output,
+                tool_input=tool_input, session_id=session_id, metadata=metadata,
+            ))
+        except Exception as exc:
+            logger.warning("[memory_facade] offload_tool_result failed: %s", exc)
+            return {"ref_id": "", "summary": ""}
+
+    def get_evidence(self, ref_id: str) -> str:
+        """按 ref_id 回查 L0 原始证据（chat + agent 模式）。"""
+        sym = self.symbolic()
+        if sym is None:
+            return ""
+        try:
+            return cast(str, sym.evidence.get_evidence(ref_id))
+        except Exception as exc:
+            logger.warning("[memory_facade] get_evidence failed: %s", exc)
+            return ""
+
+    def update_task_map(
+        self,
+        session_id: str,
+        step_id: str,
+        description: str = "",
+        *,
+        status: str = "active",
+        parent_id: str = "",
+        evidence_ref: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """更新符号化任务状态图节点（chat + agent 模式）。"""
+        sym = self.symbolic()
+        if sym is None:
+            return False
+        try:
+            return cast(bool, sym.update_task_map(
+                session_id, step_id, description,
+                status=status, parent_id=parent_id,
+                evidence_ref=evidence_ref, metadata=metadata,
+            ))
+        except Exception as exc:
+            logger.warning("[memory_facade] update_task_map failed: %s", exc)
+            return False
+
+    def get_task_map(self, session_id: str) -> str:
+        """生成会话的 Mermaid 任务状态图（chat + agent 模式）。"""
+        sym = self.symbolic()
+        if sym is None:
+            return ""
+        try:
+            return cast(str, sym.get_task_map(session_id))
+        except Exception as exc:
+            logger.warning("[memory_facade] get_task_map failed: %s", exc)
+            return ""
+
+    def search_evidence(
+        self,
+        query: str = "",
+        *,
+        session_id: str = "",
+        kind: str = "",
+        top: int = 10,
+    ) -> list[dict[str, Any]]:
+        """检索 L0 证据摘要（chat + agent 模式）。"""
+        sym = self.symbolic()
+        if sym is None:
+            return []
+        try:
+            return cast(list[dict[str, Any]], sym.evidence.search_evidence(
+                query=query, session_id=session_id, kind=kind, top=top,
+            ))
+        except Exception as exc:
+            logger.warning("[memory_facade] search_evidence failed: %s", exc)
+            return []
+
+    def search_facts(
+        self,
+        query: str = "",
+        *,
+        topic: str = "",
+        top: int = 10,
+    ) -> list[dict[str, Any]]:
+        """检索 L1 原子事实（chat + agent 模式）。"""
+        atoms = self.atom_facts()
+        if atoms is None:
+            return []
+        try:
+            return cast(list[dict[str, Any]], atoms.search_facts(
+                query=query, topic=topic, top=top,
+            ))
+        except Exception as exc:
+            logger.warning("[memory_facade] search_facts failed: %s", exc)
+            return []
 
     # ── 便捷 repr ──────────────────────────────────────────────
 

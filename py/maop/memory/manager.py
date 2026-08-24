@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,6 +59,13 @@ class MemoryContext(BaseModel):
     working_context: list[dict[str, Any]] = Field(default_factory=list)
     short_term_results: list[dict[str, Any]] = Field(default_factory=list)
     long_term_results: list[dict[str, Any]] = Field(default_factory=list)
+    # 漏斗增强（Funnel Enhancement）：
+    # - atom_facts: L1 原子事实命中（跨会话结构化知识）
+    # - evidence_refs: L0 证据引用（原始对话/工具结果，可按 ref 回查）
+    # - symbolic_map: 符号化短期记忆（Mermaid 任务状态图）
+    atom_facts: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_refs: list[dict[str, Any]] = Field(default_factory=list)
+    symbolic_map: str = ""
     injected_summary: str = ""
     total_tokens_estimate: int = 0
 
@@ -75,6 +83,22 @@ class MemoryManagerConfig(BaseModel):
     consolidation: ConsolidationTrigger = Field(default_factory=ConsolidationTrigger)
     inject_max_results: int = 5
     inject_max_tokens: int = 800
+    # 方案 A：LLM 语义去重开关（默认读 MAOP_LLM_DEDUP 环境变量，如 "1"/"true"）。
+    # 开启后 atom_facts 指纹未命中时用 LLM 判定同 subject/predicate 候选，
+    # 判定为同一事实则合并；judge 不可用/失败自动降级为纯 SHA-256 去重。
+    llm_dedup: bool = Field(default_factory=lambda: _env_flag("MAOP_LLM_DEDUP"))
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    """解析 MAOP 风格的环境变量布尔开关（1/true/yes/on 视为真）。
+
+    对齐项目惯例（edition.py / backends.py 的 ``os.getenv(...).lower()`` 模式），
+    容错处理大小写与空白。
+    """
+    raw = os.getenv(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in ("1", "true", "yes", "on")
 
 
 # ── Parallel Implementation Note ──────────────────────────────
@@ -115,6 +139,10 @@ class MemoryManager:
         self._knowledge_graph: Any = None
         self._vector_search: Any = None
         self._working_cache: dict[str, Any] = {}
+        # 漏斗增强（Funnel Enhancement）懒加载组件
+        self._evidence_store: Any = None
+        self._atom_facts: Any = None
+        self._symbolic: Any = None
         self._ensure_db()
 
     def _ensure_db(self) -> None:
@@ -138,6 +166,54 @@ class MemoryManager:
     @property
     def memory(self) -> MemoryStore:
         return self._memory
+
+    # ── 漏斗增强懒加载组件 ──────────────────────────────────────
+
+    @property
+    def evidence_store(self):
+        """L0 证据层：原始对话/工具结果存储 + refs 回查（懒加载）。"""
+        if self._evidence_store is None:
+            try:
+                from maop.memory.evidence import EvidenceStore
+                self._evidence_store = EvidenceStore(root_dir=self._root)
+            except Exception as exc:
+                logger.warning("[memory_manager] Failed to init EvidenceStore: %s", exc)
+        return self._evidence_store
+
+    @property
+    def atom_facts(self):
+        """L1 原子事实层：抽取 + 语义指纹去重（懒加载）。
+
+        方案 A：按 ``MemoryManagerConfig.llm_dedup`` 决定是否启用 LLM
+        语义去重。judge 不在此传入——``AtomFactStore`` 内部在
+        ``llm_dedup=True`` 时会懒加载默认判定器（models.yaml 配置），
+        构造失败自动降级为纯 SHA-256 去重。
+        """
+        if self._atom_facts is None:
+            try:
+                from maop.memory.atoms import AtomFactStore
+                self._atom_facts = AtomFactStore(
+                    root_dir=self._root,
+                    knowledge_extractor=self.knowledge_extractor,
+                    llm_dedup=self._config.llm_dedup,
+                )
+            except Exception as exc:
+                logger.warning("[memory_manager] Failed to init AtomFactStore: %s", exc)
+        return self._atom_facts
+
+    @property
+    def symbolic(self):
+        """符号化短期记忆：工具结果外置 + 任务状态图（懒加载）。"""
+        if self._symbolic is None:
+            try:
+                from maop.memory.symbolic import SymbolicMemory
+                self._symbolic = SymbolicMemory(
+                    root_dir=self._root,
+                    evidence_store=self.evidence_store,
+                )
+            except Exception as exc:
+                logger.warning("[memory_manager] Failed to init SymbolicMemory: %s", exc)
+        return self._symbolic
 
     def add_exchange(
         self,
@@ -179,6 +255,37 @@ class MemoryManager:
             topic=self._infer_topic(user_msg),
         )
         result["short_term_id"] = entry_id or ""
+
+        # L0: 原始对话证据入库（漏斗底层的"黑匣子"，可回查原文）
+        user_ref = ""
+        asst_ref = ""
+        if self.evidence_store is not None:
+            try:
+                user_ref = self.evidence_store.store_evidence(
+                    user_msg, session_id=session_id, kind="conversation",
+                    source="user", metadata={"agent": agent, "task": task},
+                )
+                asst_ref = self.evidence_store.store_evidence(
+                    assistant_msg, session_id=session_id, kind="conversation",
+                    source="assistant", metadata={"agent": agent, "task": task},
+                )
+            except Exception as exc:
+                logger.warning("[memory_manager] L0 evidence store failed: %s", exc)
+        result["evidence_user_ref"] = user_ref or ""
+        result["evidence_asst_ref"] = asst_ref or ""
+
+        # L1: 原子事实抽取 + 指纹去重（复用 knowledge_extractor 模式匹配）
+        if self.atom_facts is not None:
+            try:
+                ingest_report = self.atom_facts.ingest(
+                    f"{user_msg}\n{assistant_msg}",
+                    source_ref=user_ref or "",
+                    topic=self._infer_topic(user_msg),
+                )
+                result["atom_new"] = str(ingest_report.get("new", 0))
+                result["atom_merged"] = str(ingest_report.get("merged", 0))
+            except Exception as exc:
+                logger.warning("[memory_manager] L1 atom ingest failed: %s", exc)
 
         # L3: Extract knowledge for the knowledge graph
         self.extract_knowledge(user_msg, assistant_msg, topic=self._infer_topic(user_msg))
@@ -233,14 +340,42 @@ class MemoryManager:
                 if any(t == "dream-consolidated" for t in (r.tags or []))
             ]
 
+        # 漏斗增强：L1 原子事实 + 符号化短期记忆（任务图/证据引用）
+        atom_facts: list[dict[str, Any]] = []
+        if query and self.atom_facts is not None:
+            try:
+                atom_facts = self.atom_facts.search_facts(
+                    query=query, top=self._config.inject_max_results,
+                )
+            except Exception as exc:
+                logger.warning("[memory_manager] atom_facts search failed: %s", exc)
+
+        symbolic_map = ""
+        evidence_refs: list[dict[str, Any]] = []
+        if self.symbolic is not None:
+            try:
+                symbolic_map = self.symbolic.get_task_map(session_id)
+                evidence_refs = self.symbolic.evidence.search_evidence(
+                    session_id=session_id, top=5,
+                )
+            except Exception as exc:
+                logger.warning("[memory_manager] symbolic injection failed: %s", exc)
+
         # Build injection summary
-        injected = self._build_injection_summary(short_term, long_term)
+        injected = self._build_injection_summary(
+            short_term, long_term,
+            atom_facts=atom_facts,
+            symbolic_map=symbolic_map,
+        )
         injected_tokens = self._conversation._estimate_tokens(injected)
 
         return MemoryContext(
             working_context=working,
             short_term_results=short_term,
             long_term_results=long_term,
+            atom_facts=atom_facts,
+            evidence_refs=evidence_refs,
+            symbolic_map=symbolic_map,
             injected_summary=injected,
             total_tokens_estimate=window.total_tokens + injected_tokens,
         )
@@ -320,7 +455,49 @@ class MemoryManager:
             )
 
         self._last_consolidation = report.finished_at
-        return cast(dict[str, Any] | None, report.model_dump())
+        result = cast(dict[str, Any] | None, report.model_dump())
+        if isinstance(result, dict):
+            result["atom_facts_promoted"] = self._promote_atom_facts(dry_run=dry_run)
+
+        # 顺带清理 L0 过期证据（与 consolidation 同周期），
+        # 避免 refs 文件持续膨胀。prune 失败不影响 consolidation 主流程。
+        if self.evidence_store is not None:
+            try:
+                pruned = self.evidence_store.prune(older_than_days=90)
+                if pruned:
+                    logger.info(
+                        "[memory_manager] L0 prune: %d 条过期证据已清理", pruned
+                    )
+            except Exception as exc:
+                logger.warning("[memory_manager] L0 prune failed: %s", exc)
+
+        return result
+
+    def _promote_atom_facts(self, *, dry_run: bool = False) -> int:
+        """漏斗增强：把高频原子事实晋升到 L3 长期记忆（向量索引）。
+
+        L1 → L3 晋升链路：``atom_facts.access_count >= min_access`` 的事实
+        通过 ``long_term_index`` 写入向量库，晋升后重置 access_count 防止
+        重复晋升。dry_run 或组件不可用时返回 0，永不抛异常。
+
+        签名契约：``long_term_index(doc_id, text, metadata)`` 与
+        ``atoms.promote_facts`` 调用 ``vector_index_fn(row["id"], text, {...})``
+        的 3 参数位置完全匹配，无需包装适配。
+        """
+        if dry_run or self.atom_facts is None:
+            return 0
+        try:
+            report = self.atom_facts.promote_facts(
+                min_access=self._config.long_term_min_group_size,
+                vector_index_fn=self.long_term_index,
+            )
+            promoted = int(report.get("promoted", 0))
+            if promoted:
+                logger.info("[memory_manager] 晋升 %d 条原子事实到 L3", promoted)
+            return promoted
+        except Exception as exc:
+            logger.warning("[memory_manager] atom facts promotion failed: %s", exc)
+            return 0
 
     def prune_expired(self) -> int:
         """Prune expired short-term memory entries."""
@@ -387,14 +564,37 @@ class MemoryManager:
     def _build_injection_summary(
         short_term: list[dict[str, Any]],
         long_term: list[dict[str, Any]],
+        *,
+        atom_facts: list[dict[str, Any]] | None = None,
+        symbolic_map: str = "",
     ) -> str:
-        """Build a context injection summary from L2/L3 results."""
+        """Build a context injection summary from L2/L3 results + 漏斗增强。
+
+        注入顺序（漏斗由窄到宽，先高层后细节）：
+          1. 符号化任务状态图（最浓缩）
+          2. 长期记忆（L3）
+          3. 原子事实（L1，结构化知识）
+          4. 近期记忆（L2）
+        """
         parts: list[str] = []
+
+        if symbolic_map:
+            parts.append("[Task Map]")
+            parts.append(symbolic_map)
 
         if long_term:
             parts.append("[Long-term Memory]")
             for entry in long_term[:3]:
                 parts.append(f"  - {entry.get('task', '')}: {entry.get('snippet', '')[:120]}")
+
+        if atom_facts:
+            parts.append("[Known Facts]")
+            for fact in atom_facts[:3]:
+                parts.append(
+                    f"  - {fact.get('subject', '')} {fact.get('predicate', '')} "
+                    f"{fact.get('object_value', '')} "
+                    f"(×{fact.get('access_count', 1)})"
+                )
 
         if short_term:
             parts.append("[Recent Memory]")
@@ -613,11 +813,15 @@ class MemoryManager:
         text: str,
         metadata: dict[str, Any] | None = None,
     ) -> str:
-        """索引文档到 Long-term Memory（映射到 VectorSearch.index）。"""
+        """索引文档到 Long-term Memory（映射到 VectorSearch.index_entry）。
+
+        Note: VectorSearch 的索引方法是 ``index_entry(entry_id, text)``，
+        早期版本误调了不存在的 ``index()`` 导致索引静默失败。
+        """
         if self.vector_search is None:
             return ""
         try:
-            self.vector_search.index(doc_id, text)
+            self.vector_search.index_entry(doc_id, text)
             return doc_id
         except Exception as exc:
             logger.warning("[memory_manager] long_term_index failed: %s", exc)

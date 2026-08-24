@@ -37,11 +37,25 @@ logger = logging.getLogger(__name__)
 
 
 class ErrorSchema(BaseModel):
-    """Unified error response schema.
+    """Unified error response schema (single source of truth).
 
-    Every field besides ``status`` defaults to an empty string so the
-    payload is always JSON-serializable and backward compatible with
-    callers that only read ``error``.
+    Every error response flowing through ``handle_api_errors`` or
+    ``error_response`` uses this schema. All fields besides ``status``
+    default to an empty string so the payload is always JSON-serializable
+    and backward compatible with callers that only read ``error``.
+
+    Canonical shape::
+
+        {
+            "status": "error",
+            "error": "<human-readable message>",
+            "code": "<machine-readable code, e.g. HTTP_404>",
+            "detail": "<additional context, optional>",
+            "request_id": "<correlation id, optional>"
+        }
+
+    This is the authoritative definition; documentation (api-reference.md,
+    API_CHANGELOG.md) must be kept in sync with this schema.
     """
     status: str = "error"
     error: str = ""
@@ -55,14 +69,19 @@ def error_response(
     code: str = "",
     detail: str = "",
     status_code: int = 400,
+    request_id: str = "",
 ) -> JSONResponse:
     """Return a unified ``JSONResponse`` using the ``ErrorSchema`` shape.
 
     All optional fields default to empty strings so the body always
     contains the full set of keys (``status``, ``error``, ``code``,
     ``detail``, ``request_id``) for consistent client-side parsing.
+    Callers may pass ``request_id`` to correlate errors with request
+    tracing infrastructure.
     """
-    payload = ErrorSchema(error=error, code=code, detail=detail).model_dump()
+    payload = ErrorSchema(
+        error=error, code=code, detail=detail, request_id=request_id
+    ).model_dump()
     return JSONResponse(status_code=status_code, content=payload)
 
 

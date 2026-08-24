@@ -137,7 +137,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useApiStore } from '../stores/api.js';
-import { useStreamingFetch } from '../composables/useStreamingFetch.js';
+import { useStreamingFetch, estimateTokenCount } from '../composables/useStreamingFetch.js';
 import { useToast } from '../composables/useToast.js';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -282,17 +282,27 @@ function toList(d) {
   return [];
 }
 
+// P1 fix: 先对代码块内容做 HTML 转义再拼接，避免依赖 DOMPurify 兜底
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function renderMarkdown(text) {
   if (!text) return '';
   const html = text
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="$1">$2</code></pre>')
+    .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => `<pre><code class="${lang}">${escapeHtml(code)}</code></pre>`)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br>');
   // P0 fix: sanitize HTML to prevent XSS from LLM output
+  // 渲染逻辑不生成链接，移除 'a' 标签与链接相关属性
   return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['pre', 'code', 'strong', 'em', 'br', 'p', 'ul', 'ol', 'li', 'a', 'span'],
-    ALLOWED_ATTR: ['class', 'href', 'target', 'rel'],
+    ALLOWED_TAGS: ['pre', 'code', 'strong', 'em', 'br', 'p', 'ul', 'ol', 'li', 'span'],
+    ALLOWED_ATTR: ['class'],
   });
 }
 
@@ -371,7 +381,8 @@ async function sendMessage(overrideText) {
       onData: async (fullContent) => {
         streamContent.value = fullContent;
         // v5.0.0: token count + speed tracking
-        streamTokenCount.value = Math.ceil(fullContent.length / 4);
+        // P2 fix: 使用改进的 token 估算算法, 考虑多字节字符 (中文/CJK)。
+        streamTokenCount.value = estimateTokenCount(fullContent);
         const elapsed = (Date.now() - streamStartTime) / 1000;
         if (elapsed > 0.1) {
           streamSpeed.value = Math.round(streamTokenCount.value / elapsed);

@@ -30,8 +30,13 @@ export const messages = {
     'view.rbac.userIdRequired': 'User ID and role are required',
     'view.rbac.granted': 'Granted {role} to {user}',
     'view.rbac.revoked': 'Revoked {role} from {user}',
-  },    'view.rbac.Grant failed': 'Grant failed',
-    'view.rbac.Revoke failed': 'Revoke failed',
+    // P1 fix: 修正错误的 i18n key（原为 'view.rbac.Grant failed' / 'view.rbac.Revoke failed'，
+    // 与 RBAC.vue 中 t('view.rbac.grantFailed') / t('view.rbac.revokeFailed') 不匹配）。
+    'view.rbac.grantFailed': 'Grant failed',
+    'view.rbac.revokeFailed': 'Revoke failed',
+    // P1 fix: 撤销权限确认对话框文案
+    'view.rbac.revokeConfirm': 'Revoke {role} from user {user}? This action cannot be undone.',
+  },
 
   zh: {
     'view.rbac.subtitle': '基于 Role 的访问控制',
@@ -63,7 +68,8 @@ export const messages = {
     'view.rbac.userIdRequired': '用户 ID 和角色为必填项',
     'view.rbac.granted': '已授予 {user} 角色 {role}',
     'view.rbac.revoked': '已撤销 {user} 的角色 {role}',
-    'view.rbac.Grant failed': '授权失败',
-    'view.rbac.Revoke failed': '撤销失败',
+    'view.rbac.grantFailed': '授权失败',
+    'view.rbac.revokeFailed': '撤销失败',
+    'view.rbac.revokeConfirm': '确定撤销用户 {user} 的角色 {role}？此操作不可撤销。',
   },
 };

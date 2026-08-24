@@ -316,6 +316,10 @@ class Engine:
         dist_result = await scheduler.run(nodes, run_id=trace_id)
 
         # Aggregate distributed results into EngineResult.
+        # P1 fix: 分布式类型转换保护。worker 返回的 JSON 反序列化后，
+        # duration_ms 可能是 float/int/str/None，output/error 可能是
+        # None/非 str 类型。直接 int(None) 或 int("abc") 会抛 TypeError/
+        # ValueError，导致聚合失败。此处统一做防御性类型转换。
         all_results: list[StepResult] = []
         for step in steps:
             res = dist_result.results.get(step.id, {})
@@ -326,13 +330,41 @@ class Engine:
                 "pending": StepStatus.PENDING,
             }
             status = status_map.get(res.get("status", "pending"), StepStatus.PENDING)
+
+            # 类型安全地提取 output（确保为 str）
+            raw_output = res.get("output", "")
+            if raw_output is None:
+                safe_output = ""
+            else:
+                safe_output = str(raw_output)
+
+            # 类型安全地提取 error（确保为 str，None → ""）
+            raw_error = res.get("error", "")
+            if raw_error is None:
+                safe_error = ""
+            else:
+                safe_error = str(raw_error)
+
+            # 类型安全地提取 duration_ms（确保为 int）。
+            # worker 可能返回 float/str/None：先转 float 再转 int，
+            # 任何转换失败回退到 0。
+            raw_duration = res.get("duration_ms", 0)
+            try:
+                safe_duration_ms = int(float(raw_duration)) if raw_duration is not None else 0
+            except (TypeError, ValueError):
+                logger.warning(
+                    "[engine] distributed result for step %s has invalid duration_ms=%r; defaulting to 0",
+                    step.id, raw_duration,
+                )
+                safe_duration_ms = 0
+
             sr = StepResult(
                 id=step.id,
                 status=status,
-                output=str(res.get("output", "")) if res.get("output") is not None else "",
-                error=res.get("error", ""),
+                output=safe_output,
+                error=safe_error,
                 agent=step.agent,
-                duration_ms=int(res.get("duration_ms", 0)),
+                duration_ms=safe_duration_ms,
             )
             all_results.append(sr)
             ctx[step.id] = sr.output or sr.error
@@ -541,11 +573,20 @@ class Engine:
                 )
 
             elif step.type == StepType.VERIFY:
-                # Verify step: check upstream results
+                # Verify step: check upstream results.
+                # P0 修复：缺失依赖必须视为 FAILED，而非被 `if d in results`
+                # 静默忽略。否则缺少上游步骤时 upstream_ok 会错误地为 True。
                 upstream_ok = all(
-                    results[d].status == StepStatus.SUCCESS
+                    results.get(
+                        d,
+                        StepResult(
+                            id=d,
+                            status=StepStatus.FAILED,
+                            error="Dependency not executed",
+                        ),
+                    ).status
+                    == StepStatus.SUCCESS
                     for d in step.depends_on
-                    if d in results
                 )
                 if upstream_ok:
                     sr = StepResult(
@@ -629,15 +670,15 @@ class Engine:
                 # Agent/DAG step: use custom executor or mock
                 if self._step_executor is not None:
                     max_attempts = 1 + max(0, step.retry)  # P1-6: retry support
-                    result: Any = None
+                    result_retry: Any = None
                     for attempt in range(max_attempts):
-                        result = await self._step_executor(
+                        result_retry = await self._step_executor(
                             step=step, context=context, workdir=workdir,
                             trace_id=trace_id,
                         )
-                        result_error = result.error if hasattr(result, 'error') else None
-                        result_exit_code = result.exit_code if hasattr(result, 'exit_code') else 0
-                        result_output = result.output if hasattr(result, 'output') else str(result)
+                        result_error = result_retry.error if hasattr(result_retry, 'error') else None
+                        result_exit_code = result_retry.exit_code if hasattr(result_retry, 'exit_code') else 0
+                        result_output = result_retry.output if hasattr(result_retry, 'output') else str(result_retry)
                         # P0-1: Check for execution errors — don't blindly report
                         # SUCCESS. If the executor returned a non-empty error or a
                         # non-zero exit_code, the step must be marked FAILED so

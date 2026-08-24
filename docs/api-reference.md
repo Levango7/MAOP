@@ -1,6 +1,6 @@
 ﻿# MAOP API Reference
 
-MAOP（Model Agent Orchestration Platform）是基于 FastAPI 实现的智能体编排框架，采用 Plan-Execute-Verify 范式。本文档覆盖 `dashboard` 模块暴露的全部 HTTP 与 WebSocket 端点，版本 5.1.0，供使用方、集成方与运维人员查阅。所有示例可直接复制运行，默认服务地址为 `http://127.0.0.1:9079`。
+MAOP（Model Agent Orchestration Platform）是基于 FastAPI 实现的智能体编排框架，采用 Plan-Execute-Verify 范式。本文档覆盖 `dashboard` 模块暴露的核心 HTTP 与 WebSocket 端点，版本 5.1.0，供使用方、集成方与运维人员查阅。本文档列出核心端点，完整端点列表请参考 OpenAPI schema（`/api/v1/openapi.json`）。所有示例可直接复制运行，默认服务地址为 `http://127.0.0.1:9079`。
 
 ---
 
@@ -51,11 +51,27 @@ Authorization: Bearer <token>
 
 ### Error Response
 
-统一错误响应格式：
+统一错误响应格式（与 `py/maop/dashboard/error_handler.py` `ErrorSchema` 对齐，全部字段为 string 类型）：
 
 ```json
-{"detail": "...", "code": "..."}
+{
+  "status": "error",
+  "error": "Bad Request",
+  "code": "INVALID_INPUT",
+  "detail": "具体错误描述",
+  "request_id": "req_xxxxx"
+}
 ```
+
+字段说明：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `status` | string | 固定 `"error"`，标识错误响应 |
+| `error` | string | HTTP 错误短语（如 `"Bad Request"`） |
+| `code` | string | 业务错误码（如 `"INVALID_INPUT"`），可为空 |
+| `detail` | string | 人类可读的具体错误描述，可为空 |
+| `request_id` | string | 请求追踪 ID，与 `X-Request-ID` 响应头一致，可为空 |
 
 常见 HTTP 状态码：
 

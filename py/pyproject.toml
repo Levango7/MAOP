@@ -63,7 +63,11 @@ dev = [
     "defusedxml>=0.7.1",
 ]
 ml = [
-    "sentence-transformers>=2.0",
+    # P1 fix: sentence-transformers 剥离到可选依赖，避免主依赖强制拉取
+    # ~500MB 的 PyTorch + Transformers 运行时。需要语义向量搜索时显式安装：
+    #   pip install "maop[ml]"
+    # 未安装时 VectorStore 自动降级到 sqlite-vec → NumPy → 纯 Python 余弦。
+    "sentence-transformers>=2.7.0",
     # P1-5: HNSW index for ≥100K-vector datasets. Optional because the
     # native build (hnswlib) requires a C++ toolchain at install time.
     # When absent, VectorStore falls back to sqlite-vec → NumPy → pure Python.

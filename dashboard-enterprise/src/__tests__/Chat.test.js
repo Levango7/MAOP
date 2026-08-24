@@ -20,6 +20,10 @@ import { createPinia, setActivePinia } from 'pinia';
 const { streamMock } = vi.hoisted(() => ({ streamMock: vi.fn() }));
 vi.mock('../composables/useStreamingFetch.js', () => ({
   useStreamingFetch: () => ({ stream: streamMock }),
+  // Chat.vue 还导入并调用 estimateTokenCount（token 计数），mock 必须提供该
+  // 导出，否则 vi.mock 只返回部分模块形状会触发 vitest 的 unhandled rejection：
+  //   Error: No "estimateTokenCount" export is defined on the "...useStreamingFetch.js" mock
+  estimateTokenCount: () => 0,
 }));
 
 import Chat from '../views/Chat.vue';

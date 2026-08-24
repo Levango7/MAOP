@@ -472,7 +472,7 @@ describe('Audit.vue enhancement', () => {
     mockFetch({
       '/api/audit/events': { events: [] },
       '/api/audit/summary': { summary: { total: 0 } },
-      '/api/audit/alerts': {
+      '/api/audit/alert/history': {
         alerts: [
           { id: 'a1', time: '2026-01-01T00:00:00Z', rule_name: 'Critical delete', event: 'delete db', actor: 'alice', severity: 'critical' },
         ],

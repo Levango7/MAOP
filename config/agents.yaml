@@ -80,7 +80,7 @@ agents:
     cli_args: --print '{task}'
     description: CodeBuddy v2.123.1 (腾讯, fastest cold-start ~123ms)
     driver: cli
-    model: minimax-m2.7
+    model: minimax-m3
     timeout_s: 60
   codewhale:
     capabilities:
@@ -332,7 +332,7 @@ agents:
     cli_args: text chat --non-interactive --output text --message "{task}"
     description: MiniMax CLI v1.0.18 (mmx, authenticated, global region)
     driver: cli
-    model: MiniMax-M3
+    model: minimax-m3
     model_display: MiniMax-M3 (via mmx text chat)
     timeout_s: 120
   nanobot:

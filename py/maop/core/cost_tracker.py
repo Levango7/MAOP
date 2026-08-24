@@ -14,6 +14,7 @@ Integration points:
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import sqlite3
@@ -27,6 +28,10 @@ from pydantic import BaseModel, Field
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
+
+# Hold strong references to background asyncio tasks so they are not
+# garbage-collected before completion ("Task was destroyed but it is pending").
+_bg_tasks: set[asyncio.Task[Any]] = set()
 
 
 class CostEntry(BaseModel):
@@ -265,11 +270,13 @@ class CostTracker:
             try:
                 import asyncio
                 loop = asyncio.get_running_loop()
-                loop.create_task(
+                _t = loop.create_task(
                     self._hook_manager.trigger(event, {
                         "period": period, "spent_usd": spent, "limit_usd": limit,
                     })
                 )
+                _bg_tasks.add(_t)
+                _t.add_done_callback(_bg_tasks.discard)
             except RuntimeError:
                 logger.debug("[cost] No running event loop; skipping async budget alert for %s", period)
 

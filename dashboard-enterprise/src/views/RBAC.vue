@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
 import { useI18n } from '../i18n';
@@ -120,10 +120,13 @@ const showGrant = ref(false);
 const saving = ref(false);
 const newGrant = ref({ user_id: '', role: '', tenant_id: '' });
 
-const permCols = [
+// P1 fix: permCols 改为 computed 使其响应式。原实现是普通数组，当 i18n locale
+// 切换或权限列需要动态更新时 UI 不刷新。computed 依赖 t()（响应式 locale），
+// locale 变化时 permCols 自动重算并触发 DataTable 重渲染。
+const permCols = computed(() => [
   { key: 'value', label: t('view.rbac.permission') },
   { key: 'name', label: t('view.rbac.constant') },
-];
+]);
 
 function cap(s) {
   if (!s) return '—';
@@ -197,6 +200,11 @@ async function grantRole() {
   }
 }
 async function revoke(g) {
+  // P1 fix: 撤销权限是破坏性操作，需先弹确认对话框避免误点击直接撤销。
+  // 使用 window.confirm 与项目其他视图（Users/Tenants/Audit/ApiKeys 等）的
+  // 确认模式保持一致。取消则直接返回，不调用后端。
+  const confirmMsg = t('view.rbac.revokeConfirm', { role: g.role, user: g.user_id });
+  if (typeof window !== 'undefined' && window.confirm && !window.confirm(confirmMsg)) return;
   try {
     await api.post('/api/rbac/revoke', { user_id: g.user_id, role: g.role, tenant_id: g.tenant_id || '' });
     toast.success(t('view.rbac.revoked', { role: g.role, user: g.user_id }));

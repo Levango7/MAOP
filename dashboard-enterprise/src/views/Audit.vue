@@ -673,7 +673,7 @@ async function loadHistory() {
   historyLoading.value = true;
   historyError.value = '';
   try {
-    const d = await api.get('/api/audit/alerts');
+    const d = await api.get('/api/audit/alert/history');
     history.value = d.alerts || d.history || [];
   } catch (e) {
     historyError.value = e.message || t('view.audit.historyUnavailable');

@@ -1,6 +1,13 @@
 # ADR-010: Batch Bugfix — Critical/High/Medium Priority
 
-Date: 2026-07-12
+## Status
+Accepted
+
+## Date
+2026-07-12
+
+## Decider
+MAOP Core Team
 
 ## Context
 

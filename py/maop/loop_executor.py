@@ -97,6 +97,7 @@ class ExecuteMixin:
         """
         # Check if we can execute in parallel
         if self._should_execute_parallel(analysis, self._worker_pool):
+            assert analysis is not None  # _should_execute_parallel guarantees this
 
             # Execute subtasks via WorkerPool
             return await self._execute_parallel(
@@ -221,12 +222,26 @@ class ExecuteMixin:
         )
         combined_errors = [r for r in subtask_results.values() if not r.is_success()]
 
+        # P1 fix: 并行时长计算说明。
+        # 使用 max(各子任务 duration_ms) 而非 sum，原因：
+        #   - duration_ms 在 MaopResult 中表示 wall clock 时间（真实经过时间），
+        #     用于 format_error 展示、evolve.py 平均时长统计、load_balancer 路由决策，
+        #     三处均为 wall clock 语义。
+        #   - 并行执行时，所有子任务同时运行，wall clock 时间 = 最慢子任务的时间 = max。
+        #   - 若改为 sum，会导致并行任务的 duration_ms 虚高（CPU 时间语义），
+        #     使平均时长统计和路由决策产生偏差。
+        #   - 如未来需要按 CPU 时间计费，应新增单独字段（如 cpu_duration_ms）
+        #     使用 sum，而非复用 duration_ms。
+        parallel_duration_ms = max(
+            (r.duration_ms for r in subtask_results.values()), default=0,
+        )
+
         return new_result(
             agent=agent, task=task,
             exit_code=0 if all_success else 1,
             stdout=combined_stdout,
             error="\n".join(r.error for r in combined_errors if r.error) or None,
-            duration_ms=max((r.duration_ms for r in subtask_results.values()), default=0),
+            duration_ms=parallel_duration_ms,
             trace_id=trace_id, routing_key=routing_key,
         )
 

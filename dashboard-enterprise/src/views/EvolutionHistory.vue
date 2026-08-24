@@ -124,8 +124,8 @@
           >
             <button
               class="suggestion-item__head"
-              @click="toggleSuggestion(sug.id || sug.description)"
               :aria-expanded="openSuggestions.has(sug.id || sug.description)"
+              @click="toggleSuggestion(sug.id || sug.description)"
             >
               <AppIcon
                 :name="openSuggestions.has(sug.id || sug.description) ? 'chevrondown' : 'chevron-right'"
@@ -274,8 +274,8 @@
           <button
             class="btn-ghost btn-sm"
             :disabled="!compareBase || !compareTarget"
-            @click="swapCompare"
             :title="t('view.evolutionHistory.compare.swap')"
+            @click="swapCompare"
           >
             <AppIcon name="arrow-left-right" :size="14" />
           </button>

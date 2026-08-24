@@ -1,8 +1,14 @@
 # ADR-017: Dual-Repository Physical Isolation (MAOP + MAOS)
 
-**Status**: Active
-**Date**: 2026-08-20
-**Decision Owner**: MAOP Architecture Team
+## Status
+Active
+
+## Date
+2026-08-20
+
+## Decider
+MAOP Architecture Team
+
 **Related**: ADR-016 (Dual-Edition Architecture)
 **Supersedes**: None (refines ADR-016's code visibility mitigation)
 

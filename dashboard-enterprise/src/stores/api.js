@@ -45,12 +45,18 @@ function withAuth(extra, headers) {
 /**
  * P2-11 fix: 统一 30s 超时控制，防止后端无响应时前端请求永久挂起。
  * 使用 AbortController 在超时后中止请求。
+ *
+ * P1 fix: 参数化 timeout，让调用方（如 edition store）可按需指定更短/更长超时。
+ * 默认 30s 保持向后兼容；导出供其他模块复用同一套超时机制。
+ * @param {string} url
+ * @param {RequestInit} [init]
+ * @param {number} [timeoutMs=API_TIMEOUT_MS] 可选超时（毫秒）
  */
 const API_TIMEOUT_MS = 30000;
 
-function fetchWithTimeout(url, init) {
+function fetchWithTimeout(url, init, timeoutMs = API_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   return fetch(url, Object.assign({}, init, { signal: controller.signal }))
     .finally(() => clearTimeout(timeoutId));
 }
@@ -127,7 +133,9 @@ export const useApiStore = defineStore('api', {
         // Retry once if refresh succeeded (new token is now in localStorage)
         res = await fetchWithTimeout(url, withAuth({}, (opts && opts.headers) || {}));
         if (res.status === 401) {
-          handleUnauthorized();  // refresh didn't help or no token
+          // P1 fix: await handleUnauthorized 确保未授权处理（清登录态/跳登录页）
+          // 在抛错前完成，避免后续代码先执行导致竞态。
+          await handleUnauthorized();
           throw new Error(`API ${url}: 401 Unauthorized`);
         }
       }
@@ -156,7 +164,8 @@ export const useApiStore = defineStore('api', {
           headers
         ));
         if (res.status === 401) {
-          handleUnauthorized();
+          // P1 fix: await handleUnauthorized 确保未授权处理先完成
+          await handleUnauthorized();
           throw new Error(`API ${url}: 401 Unauthorized`);
         }
       }
@@ -178,7 +187,11 @@ export const useApiStore = defineStore('api', {
           { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) },
           { 'Content-Type': 'application/json' }
         ));
-        if (res.status === 401) { handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+        if (res.status === 401) {
+          // P1 fix: await handleUnauthorized 确保未授权处理先完成
+          await handleUnauthorized();
+          throw new Error(`API ${url}: 401`);
+        }
       }
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
@@ -192,7 +205,11 @@ export const useApiStore = defineStore('api', {
       if (res.status === 401) {
         await handleUnauthorized();
         res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
-        if (res.status === 401) { handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+        if (res.status === 401) {
+          // P1 fix: await handleUnauthorized 确保未授权处理先完成
+          await handleUnauthorized();
+          throw new Error(`API ${url}: 401`);
+        }
       }
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
@@ -246,4 +263,5 @@ export const useApiStore = defineStore('api', {
 });
 
 // 模块级导出（便于非 Pinia 上下文使用，如 App.vue 直接 import）
-export { getAuthToken, withAuth, handleUnauthorized, isLoggedIn };
+// P1 fix: 导出 fetchWithTimeout 供 edition store 等复用同一套超时机制。
+export { getAuthToken, withAuth, handleUnauthorized, isLoggedIn, fetchWithTimeout };

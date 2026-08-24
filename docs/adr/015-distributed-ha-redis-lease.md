@@ -1,7 +1,14 @@
 # ADR-015: Distributed HA via Redis Lease with Fencing Tokens
 
-**Date**: 2026-07-25  
-**Status**: Accepted  
+## Status
+Accepted
+
+## Date
+2026-07-25
+
+## Decider
+MAOP Architecture Team
+
 **Phase**: 3.4 (Distributed HA Implementation)
 
 ## Context

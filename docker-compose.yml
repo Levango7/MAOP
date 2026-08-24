@@ -320,7 +320,7 @@ services:
   vault:
     image: hashicorp/vault:1.17
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${MAOP_VAULT_TOKEN:-dev-token}
+      VAULT_DEV_ROOT_TOKEN_ID: ${MAOP_VAULT_TOKEN:?Set MAOP_VAULT_TOKEN environment variable}
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
     ports:
       - "127.0.0.1:8200:8200"
@@ -335,13 +335,13 @@ services:
   # ── Optional: Redis (cache/queue/HA, --profile redis) ───────────
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes --requirepass ${MAOP_REDIS_PASSWORD:-maop_dev}
+    command: redis-server --appendonly yes --requirepass ${MAOP_REDIS_PASSWORD:?Set MAOP_REDIS_PASSWORD environment variable}
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${MAOP_REDIS_PASSWORD:-maop_dev}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${MAOP_REDIS_PASSWORD:?Set MAOP_REDIS_PASSWORD environment variable}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5

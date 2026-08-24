@@ -55,11 +55,9 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
     workers = int(os.environ.get("MAOP_DASH_WORKERS", os.environ.get("MAOP_WORKERS", "1")))
     uvicorn_kwargs: dict[str, Any] = {"log_level": "info"}
 
-    if workers > 1:
-        uvicorn_kwargs["workers"] = workers
-    else:
-        # TLS support (single-worker only — uvicorn limitation)
-        # M2 修复：统一读取 MAOP_TLS_ENABLED（兼容旧名 MAOP_TLS）
+    # TLS support (single-worker only — uvicorn limitation)
+    # M2 修复：统一读取 MAOP_TLS_ENABLED（兼容旧名 MAOP_TLS）
+    if workers <= 1:
         from maop.config.env import get_tls_enabled
 
         tls_enabled = get_tls_enabled()
@@ -75,7 +73,18 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
 
     proto = "https" if "ssl" in uvicorn_kwargs else "http"
     print(f"[INFO] 启动 MAOP Dashboard：{proto}://{host}:{port} (workers={workers})")
-    uvicorn.run(app, host=host, port=port, **uvicorn_kwargs)
+    if workers > 1:
+        # P0 修复：多 worker 模式下 uvicorn 必须接收 import 字符串才能
+        # fork/spawn 子进程；传入 app 对象时 workers 参数会被静默忽略。
+        uvicorn.run(
+            "maop.dashboard.server:app",
+            host=host,
+            port=port,
+            workers=workers,
+            **uvicorn_kwargs,
+        )
+    else:
+        uvicorn.run(app, host=host, port=port, **uvicorn_kwargs)
 
 
 def cmd_stop() -> Any:

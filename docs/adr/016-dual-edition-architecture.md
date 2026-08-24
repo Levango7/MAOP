@@ -1,8 +1,14 @@
 # ADR-016: Dual-Edition Architecture (Personal / Enterprise)
 
-**Status**: Active  
-**Date**: 2026-07-25  
-**Decision Owner**: MAOP Architecture Team  
+## Status
+Active
+
+## Date
+2026-07-25
+
+## Decider
+MAOP Architecture Team
+
 **Related**: PRD-Dual-Edition-Architecture-202607200729, ADR-013 (Agent LLM Direct + CLI Fallback)
 
 ## Context

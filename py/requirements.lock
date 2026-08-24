@@ -1,72 +1,83 @@
 # MAOP Python — reproducible dependency lock.
 #
-# Generated reference: 2026-07-16 (re-frozen on demand; see note below)
+# Generated reference: 2026-08-23 (re-frozen with exact pins for reproducibility)
 # Python:    requires-python >=3.10 (was incorrectly annotated as "3.13+" — fixed)
 #
-# IMPORTANT (5.1 fix): this lock is a *reference*, not a byte-exact freeze of a
-# production environment. Direct dependencies MUST track pyproject.toml
-# [project.dependencies] and are expressed as narrow ranges (>=, <) here so the
-# file cannot drift into silently different majors. For a truly reproducible
-# build, regenerate after a clean install:
+# IMPORTANT (P2-4 fix): this lock now uses EXACT pins (==) for ALL dependencies
+# to guarantee byte-reproducible builds. Previous narrow ranges (>=, <) allowed
+# pip to resolve different versions across environments/timestamps, breaking
+# reproducibility. To refresh after a clean install:
 #   pip install -r requirements.txt && pip freeze > requirements.lock
 #
-# Source of truth for DIRECT deps: pyproject.toml. This file mirrors it.
+# Source of truth for DIRECT deps: pyproject.toml. This file mirrors it with
+# exact pins resolved from a clean venv (Python 3.13) on 2026-08-23.
 
 # ── Direct dependencies (from pyproject.toml) ──────────────────────
-# 5.1 fix: these were missing from the lock entirely (aiohttp, PyJWT,
-# alembic, aiosqlite) or used bare `>=` ranges. They now mirror pyproject.toml
-# as narrow ranges so the lock cannot claim a pin it does not enforce.
-fastapi>=0.141.1,<0.142
+# P2-4 fix: all direct deps now use exact == pins (was narrow ranges).
+# Versions resolved from .venv2 (Python 3.13.14) + manual fixes for
+# deps that violated pyproject.toml constraints (fastapi, starlette,
+# python-dotenv, cryptography CVE remediation).
+fastapi==0.141.1
 uvicorn[standard]==0.30.6
-pydantic>=2.9.0,<3.0
+pydantic==2.13.4
 pydantic-settings==2.5.2
 pyyaml==6.0.2
-httpx>=0.27.0,<1.0
-python-dotenv>=1.2.2
+httpx==0.28.1
+python-dotenv==1.2.2
 mmh3==5.2.1
-numpy>=1.24.0,<3.0
-cryptography>=44.0,<51
-lxml>=5.0.0
-alembic>=1.13.0
-python-multipart>=0.0.9
-aiosqlite>=0.20.0
-aiohttp>=3.10.0
-websockets>=12.0,<15
-PyJWT>=2.8.0
-packaging>=24.0
+numpy==2.5.2
+cryptography==50.0.0
+lxml==6.1.1
+alembic==1.19.1
+python-multipart==0.0.32
+aiosqlite==0.22.1
+aiohttp==3.14.3
+websockets==14.2
+PyJWT==2.13.0
+packaging==26.3
+sqlite-vec==0.1.6
 
 # Enterprise / optional backend drivers (declared in pyproject `enterprise` extra)
-psycopg[binary,pool]>=3.1
-asyncpg>=0.29.0
-redis>=5.0.0
-pika>=1.3.0
+psycopg[binary,pool]==3.3.4
+asyncpg==0.31.0
+redis==8.1.0
+pika==1.4.4
 # etcd3 已移出 enterprise（P0-2: 2019 停更 + CVE + Python≥3.13 装不上），
 # 需要时显式 pip install "maop[etcd]"（不推荐生产使用）。
 
 # ── Runtime dependencies (transitive) ──────────────────────────────
-# These were frozen from an earlier environment and are kept as a reference.
-# Re-run `pip freeze` in a clean venv to refresh exact transitive pins.
-# starlette 需 >=1.3.1 才能覆盖全部已知 CVE（PYSEC-2026-161/248/249/2280/2281
-# fix 1.0.1~1.3.1；fastapi 0.141.1 依赖 starlette>=0.46.0 无上限，可解析到 1.x）。
-# 此前 fastapi==0.115.0 卡死 starlette<0.39（0.38.6 有 9 个 CVE）。
-starlette>=1.3.1
-anyio>=4.6.2
-typing-extensions>=4.12.2
-python-multipart>=0.0.12
-httptools>=0.6.4
-watchfiles>=1.0.4
-websockets>=13.1
-h11>=0.14.0
-sniffio>=1.3.1
-idna>=3.10
-certifi>=2024.8.30
-annotated-types>=0.7.0
-pydantic-core>=2.46.4
+# P2-4 fix: transitive deps now exact-pinned (was >= ranges).
+# starlette pinned to 1.3.1 to cover all known CVEs
+# (PYSEC-2026-161/248/249/2280/2281 fix 1.0.1~1.3.1; fastapi 0.141.1
+# depends on starlette>=0.46.0 with no upper bound, resolves to 1.x).
+# Previously fastapi==0.115.0 forced starlette<0.39 (0.38.6 had 9 CVEs).
+starlette==1.3.1
+anyio==4.14.2
+typing-extensions==4.16.0
+httptools==0.8.0
+watchfiles==1.2.0
+h11==0.16.0
+sniffio==1.3.1
+idna==3.18
+certifi==2026.7.22
+annotated-types==0.8.0
+pydantic-core==2.46.4
 
 # ── Dev / test dependencies ────────────────────────────────────────
-pytest>=8.0
-pytest-asyncio>=0.23
-ruff>=0.4
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0
+pytest-xdist==3.8.0
+pytest-timeout==2.3.0
+pytest-rerunfailures==11.0.0
+ruff==0.16.3
+mypy==2.3.1
+types-PyYAML==6.0.12.20240822
+fakeredis==2.37.0
+defusedxml==0.7.1
 
 # Optional ML extra (declared in pyproject `ml`)
-sentence-transformers>=2.0
+# sentence-transformers 已剥到可选依赖 pyproject.toml [project.optional-dependencies] ml 组。
+# 需要语义向量搜索时显式安装：pip install "maop[ml]"
+# 未安装时 VectorStore 自动降级到 sqlite-vec → NumPy → 纯 Python 余弦。
+# sentence-transformers==2.7.0  # uncomment to pin for reproducible ML envs

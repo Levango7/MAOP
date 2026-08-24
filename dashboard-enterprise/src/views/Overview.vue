@@ -226,6 +226,11 @@ const error = ref('');
 const lastUpdated = ref(null);
 const pulsing = ref(false);
 let refreshTimer = null;
+// P1 fix: freshnessText / isStale 依赖 Date.now()，但 Date.now() 非响应式，
+// 导致 computed 永不重算、UI 文本不随时间更新。引入 nowTick 响应式 ref，
+// 每 1s 由定时器更新，让 freshnessText/isStale 依赖它从而定期重算。
+const nowTick = ref(Date.now());
+let freshnessTimer = null;
 
 // Activity timeline data — loaded from /api/info/activity
 const recentEvents = ref([]);
@@ -244,11 +249,11 @@ async function loadActivity() {
 
 const isStale = computed(() => {
   if (!lastUpdated.value) return false;
-  return Date.now() - lastUpdated.value.getTime() > 90000;
+  return nowTick.value - lastUpdated.value.getTime() > 90000;
 });
 const freshnessText = computed(() => {
   if (!lastUpdated.value) return '—';
-  const s = Math.floor((Date.now() - lastUpdated.value.getTime()) / 1000);
+  const s = Math.floor((nowTick.value - lastUpdated.value.getTime()) / 1000);
   if (s < 5) return 'just now';
   if (s < 60) return s + 's ago';
   if (s < 3600) return Math.floor(s / 60) + 'm ago';
@@ -418,8 +423,14 @@ onMounted(async () => {
   await edition.fetchEdition().catch(() => {});
   await load();
   refreshTimer = setInterval(load, 30000);
+  // P1 fix: 每 1s 更新 nowTick 触发 freshnessText/isStale 重算，
+  // 让"3s ago → 4s ago"等相对时间文本随时间推移自动刷新。
+  freshnessTimer = setInterval(() => { nowTick.value = Date.now(); }, 1000);
 });
-onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer);
+  if (freshnessTimer) clearInterval(freshnessTimer);
+});
 </script>
 
 <style scoped>

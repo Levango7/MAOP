@@ -1,7 +1,13 @@
 # ADR-013: Agent 机制 — LLM 直连主路径 + CLI 降级保留（双路径并存）
 
 ## Status
-**Accepted (2026-07-22)** — Phase F 决策记录。
+**Accepted** — Phase F 决策记录。
+
+## Date
+2026-07-22
+
+## Decider
+MAOP Core Team
 
 ## Context
 

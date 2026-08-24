@@ -17,6 +17,7 @@ from fastapi import APIRouter, Request
 from maop.config.loader import load_config
 from maop.core.routing.route_scorer import get_route_scorer
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/api/routing", tags=["routing"])
 
 
 @router.post("/match")
+@handle_api_errors("Routing preview match")
 async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any]:
     require_admin(request)
     """Preview route matching for a task description.
@@ -79,6 +81,7 @@ async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any
 
 
 @router.get("/cooldowns")
+@handle_api_errors("Routing cooldowns", error_value={"count": 0, "cooldowns": []})
 async def get_cooldowns(request: Request) -> dict[str, Any]:
     """Get all agents currently in cooldown (recently failed)."""
     require_admin(request)
@@ -91,6 +94,7 @@ async def get_cooldowns(request: Request) -> dict[str, Any]:
 
 
 @router.get("/scores")
+@handle_api_errors("Routing scores")
 async def get_route_scores(request: Request, task: str = "") -> dict[str, Any]:
     """Get scores for all routes against a given task."""
     require_admin(request)

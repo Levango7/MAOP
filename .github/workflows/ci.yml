@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────
 # MAOP — Unified CI/CD Pipeline (GitHub Actions)
 #
-# Pipeline: lint → unit tests (matrix) → frontend build → Docker build → publish
+# Pipeline: lint → unit tests (matrix) → frontend build → Docker build → publish → deploy → (rollback on failure)
 # ─────────────────────────────────────────────────────────────────────
 
 name: MAOP CI
@@ -24,6 +24,34 @@ on:
       - 'dashboard-enterprise/**'
       - '.github/workflows/ci.yml'
   workflow_dispatch:
+    inputs:
+      rollback:
+        description: 'Rollback to previous deployment (skip build/test/deploy)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+# ── Concurrency control ───────────────────────────────────────────
+# P2-4 fix: 同一分支同一 workflow 仅保留最新一次运行，自动取消中间运行。
+# PR 使用 pull_request_number 作为 group key（避免 main 分支并发被误取消）；
+# 主分支使用 ref，确保 push 到 main/master/develop 时旧运行被取消。
+# rollback workflow_dispatch 不受并发限制（group=rollback-${{ github.run_id }}）。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# ── Minimal permissions (least privilege) ────────────────────────
+# P2-4 fix: 顶层默认只读权限。需要写权限的 job（deploy/rollback/publish）
+# 在 job 级别显式提权，避免所有 job 默认获得 contents:write 等危险权限。
+# 参考：https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+permissions:
+  contents: read
+  packages: read
+  checks: write        # test job 上传 junit 结果需要
+  pull-requests: write # PR 评论/状态需要
 
 env:
   PYTHON_VERSION: "3.13"
@@ -514,6 +542,64 @@ jobs:
           name: bandit-sast-report
           path: py/bandit-report.json
 
+  # ── CodeQL (GitHub native SAST) ────────────────────────────────
+  # 补充 bandit 之外的语义级代码安全分析（taint tracking、SQL injection、
+  # path traversal 等）。对 Python + JavaScript/TypeScript 代码运行分析。
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      contents: read
+      security-events: write  # 上传 CodeQL 告警需要
+      actions: read            # CodeQL autobuild 可能需要读取 action 元数据
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python', 'javascript']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # 使用默认的 security-and-quality 查询套件
+          queries: security-and-quality
+      - name: Autobuild (Python)
+        if: matrix.language == 'python'
+        uses: github/codeql-action/autobuild@v3
+        with:
+          working-directory: py
+      - name: Autobuild (JavaScript)
+        if: matrix.language == 'javascript'
+        uses: github/codeql-action/autobuild@v3
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # ── Dependency Review (PR only) ────────────────────────────────
+  # 在 PR 时检查依赖变更是否有已知漏洞（补充 pip-audit 的 PR 级别检查）。
+  # 仅在 pull_request 事件触发时运行，比较 base 和 head 的依赖差异。
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          # 拒绝 Critical + High 级别漏洞
+          fail-on-severity: high
+          # 同时检查 Python 和 Node.js 依赖清单
+          dependency-manifest: |
+            py/requirements.lock
+            dashboard/package-lock.json
+            dashboard-enterprise/package-lock.json
+
   # ── Secret Scan (gitleaks) ─────────────────────────────────────
   secret-scan:
     name: Secret Scan (gitleaks)
@@ -628,3 +714,269 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: echo "::warning::Compose smoke failed — check logs."
+
+  # ── Deploy to Staging ────────────────────────────────────────────
+  # P2-4 fix: 添加 staging 部署步骤。仅 main/master push 触发，依赖 docker
+  # job 产出的镜像。使用 GitHub Environments 保护部署（需 reviewer approval
+  # 若 environment 配置了 required reviewers）。部署失败自动触发 rollback job。
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [docker, compose-smoke]
+    # 仅主分支 push 部署（PR 不部署，develop 走 compose-smoke 冒烟）
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    environment:
+      name: staging
+      url: https://staging.maop.example.com
+    # 部署 job 需要写权限以创建 deployment status
+    permissions:
+      contents: read
+      packages: read
+      deployments: write
+    env:
+      DEPLOY_TARGET: staging
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create deployment status (in_progress)
+        id: deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.ref,
+              environment: 'staging',
+              required_contexts: [],
+              auto_merge: false,
+              transient_environment: true,
+              production_environment: false,
+            });
+            core.setOutput('deployment_id', deployment.data.id);
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'in_progress',
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+
+      - name: Configure deployment target
+        run: |
+          echo "Deploying image tag: ${IMAGE_TAG}"
+          echo "Deploy target: ${DEPLOY_TARGET}"
+          # 写入部署清单供 rollback 使用
+          mkdir -p .deploy
+          cat > .deploy/manifest.json <<EOF
+          {
+            "image_tag": "${IMAGE_TAG}",
+            "deployed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit_sha": "${{ github.sha }}",
+            "environment": "${DEPLOY_TARGET}",
+            "previous_tag": "${{ github.event.before }}"
+          }
+          EOF
+          cat .deploy/manifest.json
+
+      - name: Pull and deploy image
+        env:
+          REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_PASS: ${{ secrets.REGISTRY_PASS }}
+          # SSH 部署密钥（staging 主机）
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+        run: |
+          # 检查必要的 secrets 是否配置
+          if [ -z "$STAGING_SSH_HOST" ]; then
+            echo "::warning::STAGING_SSH_HOST 未配置，跳过实际部署（仅记录清单）"
+            exit 0
+          fi
+          # 配置 SSH
+          mkdir -p ~/.ssh
+          echo "$STAGING_SSH_KEY" > ~/.ssh/staging_key
+          chmod 600 ~/.ssh/staging_key
+          ssh-keyscan -H "$STAGING_SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # 远程拉取新镜像并滚动更新
+          ssh -i ~/.ssh/staging_key "${STAGING_SSH_USER}@${STAGING_SSH_HOST}" \
+            "docker compose -f /opt/maop/docker-compose.prod.yml pull && \
+             docker compose -f /opt/maop/docker-compose.prod.yml up -d --no-deps --build && \
+             sleep 15 && \
+             curl -sf http://localhost:9079/api/health" || {
+               echo "::error::Staging 部署失败"
+               exit 1
+             }
+          echo "Staging 部署成功"
+
+      - name: Upload deployment manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-manifest-staging
+          path: .deploy/manifest.json
+          retention-days: 30
+
+      - name: Mark deployment success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.deployment_id }},
+              state: 'success',
+              environment_url: 'https://staging.maop.example.com',
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+
+      - name: Mark deployment failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.deployment_id }},
+              state: 'failure',
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+
+  # ── Rollback on Deploy Failure ───────────────────────────────────
+  # P2-4 fix: 部署失败时自动回滚到上一个版本。也可通过 workflow_dispatch
+  # 手动触发回滚（inputs.rollback=true）。回滚使用 GitHub Environments
+  # 保护，需要 rollback_url secret 指向 staging 主机。
+  rollback:
+    name: Rollback Staging
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    # 触发条件：deploy-staging 失败，或手动触发回滚
+    if: |
+      always() &&
+      (
+        (needs.deploy-staging.result == 'failure') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.rollback == 'true')
+      )
+    environment:
+      name: staging-rollback
+      url: https://staging.maop.example.com
+    permissions:
+      contents: read
+      packages: read
+      deployments: write
+    env:
+      ROLLBACK_TARGET: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Identify rollback target
+        id: target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 优先使用 push event 的 before SHA（上一个成功部署的 commit）
+          if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            ROLLBACK_TAG="${{ github.event.before }}"
+            echo "使用 push before SHA 作为回滚目标: ${ROLLBACK_TAG}"
+          else
+            # 手动触发或无法获取 before SHA：查询最近成功的 deployment
+            echo "查询最近成功的 staging deployment..."
+            ROLLBACK_TAG=$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              /repos/${{ github.repository }}/deployments \
+              --jq '[.[] | select(.environment=="staging" and .state=="success")] | .[1].sha // empty' \
+              2>/dev/null || echo "")
+            if [ -z "$ROLLBACK_TAG" ]; then
+              echo "::error::无法确定回滚目标：没有找到上一个成功的 staging deployment"
+              exit 1
+            fi
+            echo "使用上一个成功 deployment SHA: ${ROLLBACK_TAG}"
+          fi
+          echo "rollback_tag=${ROLLBACK_TAG}" >> "$GITHUB_OUTPUT"
+          echo "回滚目标: ${ROLLBACK_TAG}"
+
+      - name: Create rollback deployment status
+        id: rollback-deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: '${{ steps.target.outputs.rollback_tag }}',
+              environment: 'staging',
+              required_contexts: [],
+              auto_merge: false,
+              transient_environment: false,
+              production_environment: false,
+              description: 'Rollback deployment',
+            });
+            core.setOutput('deployment_id', deployment.data.id);
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'in_progress',
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+
+      - name: Execute rollback on staging
+        env:
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          ROLLBACK_TAG: ${{ steps.target.outputs.rollback_tag }}
+        run: |
+          echo "回滚 staging 到镜像 tag: ${ROLLBACK_TAG}"
+          if [ -z "$STAGING_SSH_HOST" ]; then
+            echo "::warning::STAGING_SSH_HOST 未配置，跳过实际回滚（仅记录）"
+            exit 0
+          fi
+          # 配置 SSH
+          mkdir -p ~/.ssh
+          echo "$STAGING_SSH_KEY" > ~/.ssh/staging_key
+          chmod 600 ~/.ssh/staging_key
+          ssh-keyscan -H "$STAGING_SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # 远程回滚：拉取旧镜像并重启
+          ssh -i ~/.ssh/staging_key "${STAGING_SSH_USER}@${STAGING_SSH_HOST}" \
+            "export MAOP_IMAGE_TAG=${ROLLBACK_TAG} && \
+             docker compose -f /opt/maop/docker-compose.prod.yml pull && \
+             docker compose -f /opt/maop/docker-compose.prod.yml up -d --no-deps && \
+             sleep 15 && \
+             curl -sf http://localhost:9079/api/health" || {
+               echo "::error::Staging 回滚失败"
+               exit 1
+             }
+          echo "Staging 回滚成功"
+
+      - name: Mark rollback success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.rollback-deployment.outputs.deployment_id }},
+              state: 'success',
+              environment_url: 'https://staging.maop.example.com',
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+            core.notice('Rollback to ${{ steps.target.outputs.rollback_tag }} succeeded');
+
+      - name: Mark rollback failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.rollback-deployment.outputs.deployment_id }},
+              state: 'failure',
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+            core.error('Rollback failed — manual intervention required');

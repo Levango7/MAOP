@@ -25,6 +25,12 @@ from maop.core.memory.three_layer_memory_utils import (
 logger = logging.getLogger(__name__)
 
 
+# P1 fix: episodic_search 的硬性返回上限，防止调用方传入过大的 top
+# 导致查询返回大量数据引发内存溢出。SQL LIMIT 使用 top * 3，所以
+# 实际最多取 3000 行候选（排序后截取 top），内存安全。
+_EPISODIC_SEARCH_MAX_LIMIT: int = 1000
+
+
 _EPISODIC_DDL = """
 CREATE TABLE IF NOT EXISTS episodic_memory (
     id TEXT PRIMARY KEY,
@@ -190,7 +196,16 @@ class EpisodicStoreMixin:
         When a query is provided, uses FTS5 for high-quality full-text search.
         Falls back to LIKE if FTS5 is unavailable.
         Results are ranked by (score * decay_weight) descending.
+
+        P1 fix (线程无限流保护): 对 ``top`` 参数添加硬性上限
+        ``_EPISODIC_SEARCH_MAX_LIMIT``（默认 1000），防止调用方传入
+        过大的值导致查询返回大量数据引发内存溢出。``top`` 会被钳制到
+        [1, _EPISODIC_SEARCH_MAX_LIMIT] 范围内。SQL 始终包含 LIMIT 子句。
         """
+        # P1 fix: 钳制 top 到安全范围，防止无限流/内存溢出。
+        # top * 3 用于 SQL LIMIT（排序前取 3 倍候选），所以上限设为 1000
+        # 意味着 SQL 层最多取 3000 行，内存安全。
+        top = max(1, min(top, _EPISODIC_SEARCH_MAX_LIMIT))
         with self._episodic_connect() as conn:
             rows: list | None = None
             cols: list[str] = []
@@ -293,15 +308,23 @@ class EpisodicStoreMixin:
         return self._row_to_episodic(d)
 
     def _increment_access_counts(self, entry_ids: list[str]) -> None:
-        """Increment access_count for the given entry IDs (P3: access-count consolidation)."""
+        """Increment access_count for the given entry IDs (P3: access-count consolidation).
+
+        N+1 fix: 改为批量 UPDATE，使用 IN 子句一次性更新所有 entry_id，
+        避免对每条记录单独执行 UPDATE 导致的 N+1 查询问题。
+        对于 SQLite，单条 UPDATE ... WHERE id IN (...) 比循环 N 次
+        UPDATE 快约 N 倍（减少 N-1 次语句解析和执行开销）。
+        """
         if not entry_ids:
             return
         with self._episodic_connect() as conn:
-            for eid in entry_ids:
-                conn.execute(
-                    "UPDATE episodic_memory SET access_count = access_count + 1 WHERE id = ?",
-                    (eid,),
-                )
+            # 构造 IN 子句占位符：WHERE id IN (?, ?, ...)
+            placeholders = ",".join("?" for _ in entry_ids)
+            conn.execute(
+                f"UPDATE episodic_memory SET access_count = access_count + 1 "
+                f"WHERE id IN ({placeholders})",
+                entry_ids,
+            )
 
     def episodic_stats(self) -> dict[str, Any]:
         """Get episodic memory statistics."""

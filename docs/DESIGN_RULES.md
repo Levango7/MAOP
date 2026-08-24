@@ -1,6 +1,6 @@
 ﻿# MAOP Dashboard Design Rules
 
-> **权威设计规范** — 所有 UI 改动必须遵循此文档。最后更新: 2026-07-31
+> **权威设计规范** — 所有 UI 改动必须遵循此文档。最后更新: 2026-08-23
 
 > **架构说明**: 原生 JS 仪表盘已归档至 `archive/js-dashboard/`，前端统一基于 Vue 3 + Vite 实现。源码位于 `dashboard-enterprise/`，构建产物输出至 `dashboard/dist-enterprise/`。本规范以下所有条款均针对 Vue 3 实现，原生 JS 仪表盘相关约定（per-section `--sc` 18 色体系、`togglePillarItem()` / `showCtrlMsg()` 等全局函数）随归档废弃，不再适用。
 
@@ -16,47 +16,47 @@ Vue 3 实现采用 **双主题 + Design Token** 体系：暗色主题为默认�
 
 | 变量 | 值 | 用途 |
 |------|-----|------|
-| `--bg` | `#0f172a` | 页面背景 |
-| `--bg2` | `#1e293b` | 外框背景 |
-| `--bg3` | `#334155` | 中框/内框背景 |
-| `--bg4` | `#0f172a` | 悬停背景 |
-| `--border` | `#334155` | 默认边框 |
-| `--text` | `#e2e8f0` | 主文字 |
-| `--text2` | `#94a3b8` | 次文字 |
-| `--text3` | `#64748b` | 弱文字 |
-| `--accent` | `#6366f1` | 主强调色（靛蓝） |
-| `--accent2` | `#818cf8` | 次强调色 |
-| `--success` | `#22c55e` | 成功 |
-| `--warn` | `#f59e0b` | 警告 |
-| `--fail` | `#ef4444` | 失败 |
+| `--bg` | `#1b1d21` | 页面背景（workbench-100 近黑石墨） |
+| `--bg2` | `#24262b` | 外框背景（workbench-200） |
+| `--bg3` | `#2e3138` | 中框/内框背景（workbench-300） |
+| `--bg4` | `#1b1d21` | 悬停背景 |
+| `--border` | `#3c4048` | 默认边框（中性灰描边） |
+| `--text` | `#e8eaf0` | 主文字 |
+| `--text2` | `#adb4c2` | 次文字 |
+| `--text3` | `#7c8595` | 弱文字 |
+| `--accent` | `#3574f0` | 主强调色（工程感信号蓝，非模板紫） |
+| `--accent2` | `#5793f7` | 次强调色 |
+| `--success` | `#3fb950` | 成功 |
+| `--warn` | `#d29922` | 警告 |
+| `--fail` | `#f85149` | 失败 |
 
 #### 1.1.2 语义 Surface Token（新设计系统）
 
 | 变量 | 暗色值 | 亮色值 | 用途 |
 |------|--------|--------|------|
-| `--surface` | `#1e293b` | `#ffffff` | 侧栏/卡片底色 |
-| `--surface-2` | `#243349` | `#f4f7fb` | 悬停底色 |
-| `--surface-3` | `#2b3b54` | `#eef2f8` | 三级底色 |
-| `--border-strong` | `#475569` | `#b4c0d2` | 强边框 |
-| `--border-subtle` | `rgba(148,163,184,.14)` | `rgba(100,116,139,.16)` | 半透明弱边框 |
-| `--text-muted` | `#94a3b8` | `#5b6b82` | 次文字 |
-| `--text-faint` | `#64748b` | `#8493a8` | 弱文字 |
-| `--brand` | `#6366f1` | `#4f46e5` | 品牌主色 |
-| `--brand-strong` | `#818cf8` | `#6366f1` | 品牌强色 |
-| `--brand-soft` | `rgba(99,102,241,.14)` | `rgba(79,70,229,.10)` | 品牌柔色（激活态底） |
+| `--surface` | `#22242a` | `#ffffff` | 侧栏/卡片底色 |
+| `--surface-2` | `#292b32` | `#f6f7f9` | 悬停底色 |
+| `--surface-3` | `#31343c` | `#eef0f4` | 三级底色 |
+| `--border-strong` | `#4e545f` | `#b9bfcc` | 强边框 |
+| `--border-subtle` | `rgba(163,173,190,.13)` | `rgba(89,97,110,.14)` | 半透明弱边框 |
+| `--text-muted` | `#9aa3b2` | `#59616e` | 次文字 |
+| `--text-faint` | `#8a93a3` | `#6b7382` | 弱文字 |
+| `--brand` | `#3574f0` | `#3574f0` | 品牌主色 |
+| `--brand-strong` | `#5793f7` | `#2d63c8` | 品牌强色 |
+| `--brand-soft` | `rgba(53,116,240,.18)` | `rgba(53,116,240,.12)` | 品牌柔色（激活态底） |
 | `--brand-contrast` | `#ffffff` | `#ffffff` | 品牌色上文字 |
 
 #### 1.1.3 亮色主题（themes.css [data-theme="light"]）
 
 | 变量 | 值 | 用途 |
 |------|-----|------|
-| `--bg` | `#e9edf4` | 页面背景（加深以衬托白色卡片） |
-| `--bg2` | `#f4f7fb` | 外框背景 |
-| `--bg3` | `#e2e8f1` | 中框背景 |
+| `--bg` | `#f2f3f5` | 页面背景（纸灰底） |
+| `--bg2` | `#e9ebee` | 外框背景 |
+| `--bg3` | `#dfe2e8` | 中框背景 |
 | `--bg4` | `#ffffff` | 悬停背景 |
-| `--border` | `#d2dae6` | 默认边框 |
-| `--text` | `#1a2332` | 主文字 |
-| `--brand` | `#4f46e5` | 品牌主色 |
+| `--border` | `#d4d8e0` | 默认边框 |
+| `--text` | `#1d2129` | 主文字 |
+| `--brand` | `#3574f0` | 品牌主色 |
 
 ### 1.2 图表配色（Chart Palette）
 
@@ -64,18 +64,18 @@ Vue 3 实现不再为每个导航项分配独立 section 色（原 18 色 `--sc`
 
 | 变量 | 暗色值 | 亮色值 | 用途 |
 |------|--------|--------|------|
-| `--chart-1` | `#6366f1` | `#4f46e5` | 主数据系列 |
-| `--chart-2` | `#38bdf8` | `#0284c7` | 次数据系列 |
-| `--chart-3` | `#22c55e` | `#16a34a` | 成功/正向 |
-| `--chart-4` | `#f59e0b` | `#d97706` | 警告/负载 |
-| `--chart-5` | `#a78bfa` | `#7c3aed` | 紫色系列 |
-| `--chart-6` | `#14b8a6` | `#0d9488` | 青绿系列 |
-| `--chart-7` | `#ec4899` | `#db2777` | 粉色系列 |
-| `--chart-8` | `#06b6d4` | `#0891b2` | 青色系列 |
-| `--chart-9` | `#84cc16` | `#65a30d` | 黄绿系列 |
-| `--chart-10` | `#f43f5e` | `#e11d48` | 红/失败 |
-| `--chart-warn` | `#f59e0b` | `#d97706` | 性能历史告警 |
-| `--chart-fail` | `#ef4444` | `#dc2626` | 连续失败强调 |
+| `--chart-1` | `#3574f0` | `#3574f0` | 主数据系列 |
+| `--chart-2` | `#4cc2ff` | `#0a7ea4` | 次数据系列 |
+| `--chart-3` | `#3fb950` | `#1f883d` | 成功/正向 |
+| `--chart-4` | `#d29922` | `#bf8700` | 警告/负载 |
+| `--chart-5` | `#9e8cfc` | `#7c63e0` | 紫色系列 |
+| `--chart-6` | `#39c5cf` | `#0d9db8` | 青绿系列 |
+| `--chart-7` | `#f778ba` | `#d12470` | 粉色系列 |
+| `--chart-8` | `#56d4dd` | `#0891b2` | 青色系列 |
+| `--chart-9` | `#7ee787` | `#4e8000` | 黄绿系列 |
+| `--chart-10` | `#ff7b72` | `#cf222e` | 红/失败 |
+| `--chart-warn` | `#d29922` | `#bf8700` | 性能历史告警 |
+| `--chart-fail` | `#f85149` | `#d1242f` | 连续失败强调 |
 
 ### 1.3 概览指标色
 
@@ -119,25 +119,28 @@ Vue 3 实现统一使用 1px 边框 + token 驱动，原三级边框（外框 4p
 
 ## 4. 布局规则
 
-### 4.1 导航分组 (4组×17项)
+### 4.1 导航分组 (6组×29项)
 
 导航结构定义于 `src/nav.js`（单一数据源，侧栏与 PageHeader 共享）。路由定义于 `src/router/index.js`。
 
 | 组 | 项 | 路由 |
 |----|-----|------|
-| 核心 (nav.core) | 概览, 控制面板, 对话, Agent, 三层记忆, 自进化 | `/`, `/control`, `/chat`, `/agents`, `/memory`, `/evolve` |
-| 搜索工具 (nav.searchTools) | 搜索, 向量检索, 工具, 大模型 | `/search`, `/vector`, `/tools`, `/models` |
-| 运维 (nav.ops) | 日志, 监控, 成本 | `/logs`, `/monitor`, `/cost` |
-| 企业 (nav.enterprise) | 审计, RBAC, 租户, 设置 | `/audit`, `/rbac`, `/tenants`, `/settings` |
+| 工作台 (nav.workbench) | 概览, 监控, 任务历史 | `/`, `/monitor`, `/tasks` |
+| 构建 (nav.build) | 运行, Agent, 自进化, 工作流编辑器, 技能编辑器, 技能市场 | `/run`, `/agents`, `/evolve`, `/workflow-editor`, `/skill-editor`, `/skill-market` |
+| 资产 (nav.assets) | 三层记忆, 知识图谱, 搜索, 向量检索, 工具 | `/memory`, `/knowledge-graph`, `/search`, `/vector`, `/tools` |
+| 观测 (nav.observe) | 可观测性, 日志, 成本 | `/observability`, `/logs`, `/cost` |
+| 治理 (nav.govern) | 大模型, 审计, RBAC, 租户, 用户, 许可证, SSO, 配额, API Keys | `/models`, `/audit`, `/rbac`, `/tenants`, `/users`, `/licenses`, `/sso`, `/quotas`, `/apikeys` |
+| 系统 (nav.system) | 设置, 通知中心, 文档 | `/settings`, `/notifications`, `/docs` |
 
 说明：
-- `/audit`、`/rbac`、`/tenants` 标记 `meta.requiresEnterprise: true`，由路由守卫拦截非企业版访问
+- `/audit`、`/rbac`、`/tenants`、`/users`、`/licenses`、`/sso`、`/quotas`、`/apikeys` 标记 `enterprise: true`，由 `filterNavByEdition()` 在个人版渲染层直接隐藏（所见即所得，不会出现"点击被弹走"的体验）
+- 旧深链 `/control`、`/chat`、`/evolution-history` 在 router 中 301 重定向到 `/run` / `/evolve`，保留书签可用性
 - 原生 JS 仪表盘的「四大工程 / 工作流 / Skills / MCP / 提示词 / 角色 / 模块 / 架构 / 工作流程」等页面已随 `archive/js-dashboard/` 归档，不再存在于 Vue 3 导航
 - 侧栏支持 rail（折叠至 `--rail-w: 64px`）与移动端抽屉模式（< 900px）
 
 ### 4.2 概览指标
 - 指标卡使用 token 驱动布局，间距消费 `--sp-*` 尺度
-- 指标值字号 `--fs-2xl` (24px) / 800
+- 指标值字号 `--fs-2xl` (22px) / 800
 
 ### 4.3 滚动
 - 左侧导航: `position: sticky; top: 0; height: 100vh; overflow-y: auto`
@@ -223,8 +226,8 @@ Vue 3 实现统一使用 1px 边框 + token 驱动，原三级边框（外框 4p
 | `--fs-base` | 13px | 正文 |
 | `--fs-md` | 14px | 卡片标题 |
 | `--fs-lg` | 16px | 副标题 |
-| `--fs-xl` | 20px | 标题 |
-| `--fs-2xl` | 24px | 指标值/页标题 |
+| `--fs-xl` | 18px | 标题 |
+| `--fs-2xl` | 22px | 指标值/页标题 |
 
 - 基础字号: `--fs-base` (13px)（`body { font-size: var(--fs-base) }`）
 

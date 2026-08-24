@@ -1,7 +1,13 @@
 # ADR-009: Python 主引擎 — 基于实证的架构转向
 
 ## Status
-**Accepted** (2026-07-15). Supersedes ADR-005.
+**Accepted**. Supersedes ADR-005.
+
+## Date
+2026-07-15
+
+## Decider
+MAOP Core Team
 
 ## Context
 

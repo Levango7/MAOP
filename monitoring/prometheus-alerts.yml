@@ -1,13 +1,17 @@
 # MAOP Prometheus Alert Rules
 # Metrics source: maop.core.monitoring (MetricsCollector)
 #
-# NOTE: every metric below is DEFINED in maop.core.monitoring.monitoring
-# (e.g. MAOP_delegations_total, MAOP_active_agents, MAOP_queue_pending,
-# MAOP_circuit_breaker_state, MAOP_memory_entries). The metric *names* are
-# valid, so these rules evaluate correctly once the counters/gauges start
-# being incremented by the runtime. Until then they stay at 0 and the
-# alerts simply will not fire — that is expected (see audit: core MAOP_*
-# metrics are defined but not yet emitted by production code).
+# P2-4 fix (2026-08-23): audit confirmed all metrics below are BOTH defined
+# in maop.core.monitoring.monitoring AND emitted by production code:
+#   - MAOP_delegations_total:    dispatch_core.py:353, maop_plan.py:280 (.inc())
+#   - MAOP_delegations_success:  dispatch_core.py:711 (.inc())
+#   - MAOP_delegations_failed:   dispatch_core.py:721 (.inc())
+#   - MAOP_active_agents:        agent_registry.py:243 (.set())
+#   - MAOP_memory_entries:       episodic_store.py:174 (.set())
+#   - MAOP_queue_pending:        message_queue.py:596 (.set())
+#   - MAOP_circuit_breaker_state: circuit_breaker.py:317 (.set())
+# Previous comment claiming "defined but not yet emitted" was stale — the
+# metrics ARE emitted, so these alerts WILL fire when thresholds are breached.
 #
 # This file is loaded by monitoring/prometheus.yml (rule_files). It is
 # complementary to alerts.yml / slo-alerts.yml; alert *names* here are
@@ -17,21 +21,28 @@ groups:
   - name: maop-agent
     rules:
       - alert: AgentHighFailureRate
+        # P2-4 fix: use clamp_min to avoid division-by-zero when
+        # MAOP_delegations_total is 0 (no delegations yet). Without this,
+        # the expr evaluates to NaN and the alert never fires even when
+        # failures occur. Threshold lowered from 0.5 to 0.3 for earlier
+        # warning (30% failure rate is already actionable).
         expr: |
           (
-            rate(MAOP_delegations_failed[5m])
-            / rate(MAOP_delegations_total[5m])
-          ) > 0.5
+            sum(rate(MAOP_delegations_failed[5m]))
+            /
+            clamp_min(sum(rate(MAOP_delegations_total[5m])), 1e-9)
+          ) > 0.3
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Agent failure rate exceeds 50%"
-          description: "More than half of delegations are failing (current: {{ $value | humanizePercentage }})."
+          summary: "Agent failure rate exceeds 30%"
+          description: "More than 30% of delegations are failing (current: {{ $value | humanizePercentage }})."
 
       - alert: AgentCircuitBreakerOpen
         # MAOP_circuit_breaker_state is registered WITHOUT labels, so there is
         # no per-agent `agent` label — do not reference $labels.agent here.
+        # Metric emitted by circuit_breaker.py:317 (.set()) on state transitions.
         expr: MAOP_circuit_breaker_state == 0
         for: 2m
         labels:
@@ -43,6 +54,7 @@ groups:
   - name: maop-system
     rules:
       - alert: QueueBacklogGrowing
+        # MAOP_queue_pending emitted by message_queue.py:596 (.set(pending)).
         expr: |
           MAOP_queue_pending > 100
           and
@@ -55,6 +67,7 @@ groups:
           description: "Pending messages keep increasing, workers may be overwhelmed."
 
       - alert: NoActiveAgents
+        # MAOP_active_agents emitted by agent_registry.py:243 (.set(count)).
         expr: MAOP_active_agents == 0
         for: 5m
         labels:
@@ -64,6 +77,7 @@ groups:
           description: "All agents are either disabled or circuit-broken."
 
       - alert: MemoryStoreGrowing
+        # MAOP_memory_entries emitted by episodic_store.py:174 (.set(count)).
         expr: |
           MAOP_memory_entries > 100000
           and

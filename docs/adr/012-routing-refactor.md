@@ -3,6 +3,12 @@
 ## Status
 Deferred (P2) — config routing partially implemented via _route_by_config in maop_plan.py. Full config-driven routing remains a P2 backlog item.
 
+## Date
+2026-08-05
+
+## Decider
+MAOP Core Team
+
 ## Context
 `config/agents.yaml` 的 `routing:` 段（:272-324，共 14 条：codegen/refactor/search/planning/review/verify/fileops/chat/quickfix/mcp/memory/docgen/techdoc/pipeline）由 `py/maop/config/loader.py:149-151` 正确解析为 `MaopConfig.routing: dict[str, RouteEntry]`（`RouteEntry` 含 primary/fallback/tertiary，定义于 `loader.py:42`），设计意图是**以配置为路由真源**。`py/maop/maop_loop.py:715` 也确实把 `config=self._config` 传入 `maop_plan`。
 

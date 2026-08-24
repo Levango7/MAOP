@@ -39,20 +39,26 @@ pip install maop
 命令示例：从源码安装 MAOP
 
 ```bash
-git clone https://github.com/your-org/MAOP.git
+git clone https://github.com/Levango7/MAOP.git
 cd MAOP
-pip install -e ".[all]"
+pip install -e ".[dev]"     # 开发环境（含测试/构建工具链）
+pip install -e ".[postgresql]"  # 生产环境使用 PostgreSQL 后端时追加
 ```
+
+> 注：extra 名称以 `py/pyproject.toml` 的 `[project.optional-dependencies]` 为准，
+> 实际提供 `dev` / `ml` / `otel` / `enterprise` / `etcd` / `saml` / `postgresql`。
 
 ### 2.3 可选依赖
 
 | extras | 用途 |
 |--------|------|
-| `[postgresql]` | PostgreSQL 后端 |
-| `[ldap]` | LDAP/AD 集成（ldap3） |
-| `[vector]` | 向量存储（pgvector） |
-| `[dashboard]` | Web Dashboard |
-| `[all]` | 全部可选依赖 |
+| `[postgresql]` | PostgreSQL 后端（SQLAlchemy/asyncpg/psycopg2/pgvector） |
+| `[ml]` | 向量嵌入与 ANN 检索（sentence-transformers/hnswlib） |
+| `[otel]` | OpenTelemetry 可观测性依赖 |
+| `[enterprise]` | 企业版依赖（alembic/psycopg/asyncpg/redis/pika/lxml） |
+| `[etcd]` | etcd 配置/协调后端 |
+| `[saml]` | SAML SSO 集成（xmlsec） |
+| `[dev]` | 开发与测试工具链 |
 
 ## 第3章 配置
 
@@ -73,7 +79,6 @@ MAOP 使用 YAML 配置文件，默认位于 `config/` 目录：
 
 - `config/agents.yaml` — Agent 定义
 - `config/models.yaml` — LLM 后端配置
-- `config/tenants.yaml` — 租户配置
 
 ### 3.3 多租户配置
 
@@ -95,10 +100,11 @@ mgr.create_tenant(
 
 ### 4.1 启动服务
 
-命令示例：启动 MAOP API 服务
+命令示例：启动 MAOP 服务（默认端口 9079）
 
 ```bash
-maop serve --host 0.0.0.0 --port 8000
+maop start                  # 默认 127.0.0.1:9079
+maop start --host 0.0.0.0 --port 9079
 ```
 
 ### 4.2 组织层级
@@ -143,7 +149,7 @@ request, report = gdpr.data_portability("user-123", tenant_id="t1")
 
 ### 4.4 LDAP 集成
 
-代码示例：LDAPC从 LDAP 同步用户（Python）
+代码示例：从 LDAP 同步用户（Python）
 
 ```python
 from maop.core.security.ldap_provider import (
@@ -170,7 +176,7 @@ print(f"synced={result.synced}, created={result.created}")
 
 # 认证
 auth = provider.authenticate("alice", "password")
-print(f"authenticated={auth4uth.authenticated}, roles={auth.roles}")
+print(f"authenticated={auth.authenticated}, roles={auth.roles}")
 ```
 
 ## 第5章 故障排查
@@ -181,7 +187,7 @@ print(f"authenticated={auth4uth.authenticated}, roles={auth.roles}")
 |------|------|---------|
 | `WinError 5` 权限拒绝 | Windows temp 目录权限 | 设置 `MAOP_DATA_DIR` |
 | `sqlite3.OperationalError: database is locked` | 并发写入冲突 | 增大 `MAOP_SQLITE_BUSY_TIMEOUT_MS` |
-| `ImportError: ldap3` | 未安装 LDAP 库 | `pip install maop[ldap]` |
+| `ImportError: ldap3` | 未安装 LDAP 库 | `pip install ldap3`（LDAP 为可选能力，非内置 extra） |
 | `HuggingFace Hub 超时` | 网络问题 | 设置 `HF_HUB_OFFLINE=1` |
 
 ### 5.2 日志

@@ -310,7 +310,9 @@ class TestMultiHeadContext:
     def test_multi_head_fused_context(self, mem_env):
         mem_env.episodic_store(task="Deploy to production", agent="codex", outcome="success", score=0.85)
         result = mem_env.transform_multi_head("Deploy to production")
-        assert len(result.fused_context) >= 0
+        # fused_context is a list of context items; verify it contains the stored episodic entry
+        assert isinstance(result.fused_context, list)
+        assert len(result.fused_context) > 0
         assert result.total_tokens_estimate >= 0
 
     def test_multi_head_single_head(self, mem_env):
@@ -1033,7 +1035,10 @@ class TestTransformMultiHead:
         mem = _make_mem(tmp_path)
         with patch.object(mem, "semantic_search", side_effect=RuntimeError("boom")):
             result = mem.transform_multi_head(query="q")
+        # Semantic search exception should be caught; transform still returns a result with heads
         assert result is not None
+        assert hasattr(result, "heads")
+        assert isinstance(result.heads, list)
 
 
 # ── short_term_search metadata 字段（T3-A） ─────────────────────

@@ -1,7 +1,13 @@
 # ADR-004: 安全加固（CmdDriver 全转义 + 标识符白名单）
 
 ## Status
-Accepted (2026-07-10)
+Accepted
+
+## Date
+2026-07-10
+
+## Decider
+MAOP Core Team
 
 ## Context
 2026-07-06 安全审计发现 19 项问题。到 2026-07-09 时，严重项已基本处置（硬编码 API Key 删除、Dashboard 路径穿越修复、CmdDriver 已有基础转义）。但残留两个缺口：

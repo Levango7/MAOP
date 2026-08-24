@@ -15,6 +15,8 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from maop.dashboard.error_handler import handle_api_errors
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
@@ -40,6 +42,7 @@ class WebhookPayload(BaseModel):
 
 
 @router.post("/webhook")
+@handle_api_errors("Alertmanager webhook", error_value={"status": "error", "error": "Alert webhook unavailable", "received": 0})
 async def alertmanager_webhook(payload: WebhookPayload) -> Any:
     """Receive Alertmanager webhook posts and log each alert.
 

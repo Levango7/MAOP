@@ -124,6 +124,9 @@ class ChatEngine:
         agent = request.agent or self._default_agent
         start = time.perf_counter()
 
+        # 漏斗增强：会话开始 → 任务图节点 active（符号化短期记忆）
+        self._mark_task_active(session_id, "chat", request.message, agent)
+
         # Build context with memory injection
         messages = self._memory_mgr.chat_get_messages_for_llm(
             session_id=session_id,
@@ -165,6 +168,12 @@ class ChatEngine:
             agent=agent,
         )
 
+        # 漏斗增强：会话结束 → 任务图节点 done
+        self._memory_mgr.update_task_map(
+            session_id, "chat", request.message[:60],
+            status="done",
+        )
+
         return ChatResponse(
             session_id=session_id,
             message_id=msg_id,
@@ -179,6 +188,9 @@ class ChatEngine:
         agent = request.agent or self._default_agent
         # P1-13: when execution_id is set, emit token events to EventBus.
         execution_id = request.execution_id
+
+        # 漏斗增强：会话开始 → 任务图节点 active（符号化短期记忆）
+        self._mark_task_active(session_id, "chat", request.message, agent)
 
         # Build context
         messages = self._memory_mgr.chat_get_messages_for_llm(
@@ -235,6 +247,12 @@ class ChatEngine:
             user_msg=request.message,
             assistant_msg=content,
             agent=agent,
+        )
+
+        # 漏斗增强：流式会话结束 → 任务图节点 done
+        self._memory_mgr.update_task_map(
+            session_id, "chat", request.message[:60],
+            status="done",
         )
 
         yield _sse_event("done", {"session_id": session_id, "content_length": len(content), "tokens": token_count, "model": model_name})
@@ -368,6 +386,28 @@ class ChatEngine:
         except Exception as exc:
             yield f"[MAOP] Error: {exc}"
 
+
+    def _mark_task_active(
+        self,
+        session_id: str,
+        step_id: str,
+        description: str,
+        agent: str,
+    ) -> None:
+        """漏斗增强：把会话标记为任务图 active 节点（fire-and-forget）。
+
+        通过 MemoryFacade.update_task_map 写入符号化短期记忆的任务状态图，
+        让下一轮上下文注入能带上当前任务的 Mermaid 进度。永不抛异常——
+        记忆链路故障不应阻断主对话。
+        """
+        try:
+            self._memory_mgr.update_task_map(
+                session_id, step_id, (description or "")[:60],
+                status="active",
+                metadata={"agent": agent},
+            )
+        except Exception as exc:
+            logger.debug("[chat_engine] mark_task_active skipped: %s", exc)
 
     def _build_user_content(self, request: ChatRequest) -> str | list[dict[str, Any]]:
         """Build multimodal user content for LLM API."""

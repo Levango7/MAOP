@@ -1,7 +1,13 @@
 # ADR-001: Python YAML 桥接替代手写正则解析
 
 ## Status
-Accepted (2026-07-10)
+Accepted
+
+## Date
+2026-07-10
+
+## Decider
+MAOP Core Team
 
 ## Context
 MAOP 项目最初用 PowerShell 手写正则解析 `agents.yaml`——`maop-plan.ps1`、`maop-loop.ps1`、`delegate-plugin.ps1` 各有一套独立的按行扫描解析器，合计约 **254 行**代码。问题：

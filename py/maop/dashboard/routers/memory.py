@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
 from maop.core.backends.db_utils import get_db_path
 from maop.core.security.middleware import require_admin
@@ -366,3 +367,346 @@ async def api_memory_store(request: Request) -> dict[str, Any]:
     except Exception as exc:
         logger.exception("memory store failed")
         raise HTTPException(500, f"Store failed: {exc}")
+
+
+# ── 漏斗记忆增强 API (L0 证据 / L1 原子事实 / 符号化短期记忆) ────────
+# 暴露 EvidenceStore / AtomFactStore / SymbolicMemory 的功能，
+# 通过 MemoryFacade(mode="agent") 统一访问，使漏斗记忆在 dashboard 可用。
+
+
+def _funnel_facade():
+    """获取漏斗记忆 facade 实例（agent 模式，懒加载独立组件）。"""
+    from maop.memory.facade import MemoryFacade
+    return MemoryFacade(root_dir=str(MAOP_ROOT), mode="agent")
+
+
+# ── 请求体 Pydantic 模型 ────────────────────────────────────────────
+
+
+class EvidencePruneRequest(BaseModel):
+    """清理 L0 旧证据请求体。"""
+    older_than_days: float = Field(90.0, ge=0, description="清理该天数之前的证据")
+    session_id: str = Field("", description="限定会话 ID（空表示所有会话）")
+    kind: str = Field("", description="限定证据种类（空表示所有种类）")
+    limit: int = Field(500, ge=1, le=10000, description="最多清理条数")
+
+
+class FactsPromoteRequest(BaseModel):
+    """晋升 L1 原子事实到 L3 长期记忆请求体。"""
+    fact_ids: list[str] = Field(default_factory=list, description="待晋升的事实 ID 列表")
+    min_access: int = Field(3, ge=1, description="最低访问次数阈值（fact_ids 为空时按此筛选）")
+    top: int = Field(50, ge=1, le=1000, description="最多晋升条数")
+
+
+class TaskMapUpdateRequest(BaseModel):
+    """更新任务状态图节点请求体。"""
+    node_id: str = Field(..., min_length=1, description="节点 ID")
+    status: str = Field("active", description="节点状态: todo/active/done/failed")
+    description: str = Field("", description="节点描述")
+    parent_id: str = Field("", description="父节点 ID")
+    evidence_ref: str = Field("", description="关联证据 ref_id")
+    metadata: dict[str, Any] | None = Field(None, description="附加元数据")
+
+
+# ── 1. 漏斗记忆统计 ────────────────────────────────────────────────
+
+@router.get("/api/memory/funnel/stats")
+@handle_api_errors("Funnel memory stats", error_value={"status": "error", "error": "Funnel stats unavailable", "stats": {}})
+async def api_memory_funnel_stats() -> dict[str, Any]:
+    """返回漏斗记忆统计信息（L0 条数、L1 条数、各 session 条数等）。
+
+    汇总 L0 证据层、L1 原子事实层、符号化短期记忆（任务图）的统计。
+    """
+    facade = _funnel_facade()
+    stats: dict[str, Any] = {"l0_evidence": {}, "l1_atoms": {}, "symbolic": {}}
+
+    # L0 证据统计
+    ev_store = facade.evidence_store()
+    if ev_store is not None:
+        stats["l0_evidence"] = ev_store.stats()
+
+    # L1 原子事实统计
+    atoms = facade.atom_facts()
+    if atoms is not None:
+        stats["l1_atoms"] = atoms.stats()
+
+    # 符号化短期记忆统计
+    sym = facade.symbolic()
+    if sym is not None:
+        stats["symbolic"] = sym.stats()
+
+    return {"status": "ok", "stats": stats}
+
+
+# ── 2. L0 证据列表 ────────────────────────────────────────────────
+
+@router.get("/api/memory/funnel/evidence")
+@handle_api_errors("Funnel evidence list", error_value={"status": "error", "error": "Evidence list unavailable", "items": [], "count": 0})
+async def api_memory_funnel_evidence_list(
+    request: Request,
+    limit: int = Query(50, ge=1, le=1000, description="每页条数"),
+    offset: int = Query(0, ge=0, description="偏移量"),
+    session_id: str = Query("", description="按会话 ID 过滤"),
+    kind: str = Query("", description="按证据种类过滤"),
+) -> dict[str, Any]:
+    """L0 证据列表（支持分页 limit/offset，支持 session_id 过滤）。"""
+    facade = _funnel_facade()
+    ev_store = facade.evidence_store()
+    if ev_store is None:
+        raise HTTPException(503, "Evidence store unavailable")
+
+    # 底层 search_evidence 不支持 offset，取 limit+offset 后切片
+    fetch_top = limit + offset
+    items = ev_store.search_evidence(
+        query="", session_id=session_id, kind=kind, top=fetch_top,
+    )
+    page = items[offset:offset + limit]
+    page = _tenant_filter(page, _request_tenant_id(request))
+    return {
+        "status": "ok",
+        "items": page,
+        "count": len(page),
+        "total": len(items),
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+# ── 3. 单条证据详情 ───────────────────────────────────────────────
+
+@router.get("/api/memory/funnel/evidence/{ref_id}")
+@handle_api_errors("Funnel evidence detail", error_value={"status": "error", "error": "Evidence not found"})
+async def api_memory_funnel_evidence_detail(ref_id: str) -> dict[str, Any]:
+    """单条证据详情（含 refs 内容）。
+
+    返回证据元数据 + 完整原文（外置时从 refs/*.md 读取）。
+    """
+    facade = _funnel_facade()
+    ev_store = facade.evidence_store()
+    if ev_store is None:
+        raise HTTPException(503, "Evidence store unavailable")
+
+    meta = ev_store.get_evidence_meta(ref_id)
+    if meta is None:
+        raise HTTPException(404, f"Evidence {ref_id} not found")
+
+    content = ev_store.get_evidence(ref_id)
+    return {"status": "ok", "evidence": {**meta, "content": content}}
+
+
+# ── 4. 清理旧证据 ────────────────────────────────────────────────
+
+@router.post("/api/memory/funnel/evidence/prune")
+@handle_api_errors("Funnel evidence prune", error_value={"status": "error", "error": "Prune failed", "deleted": 0})
+async def api_memory_funnel_evidence_prune(request: Request) -> dict[str, Any]:
+    """清理旧证据（参数: older_than_days, session_id, kind, limit）。
+
+    Body: :class:`EvidencePruneRequest`
+    """
+    require_admin(request)
+    body = EvidencePruneRequest.model_validate(await request.json())
+
+    facade = _funnel_facade()
+    ev_store = facade.evidence_store()
+    if ev_store is None:
+        raise HTTPException(503, "Evidence store unavailable")
+
+    deleted = ev_store.prune(
+        older_than_days=body.older_than_days,
+        session_id=body.session_id,
+        kind=body.kind,
+        limit=body.limit,
+    )
+    return {"status": "ok", "deleted": deleted}
+
+
+# ── 5. L1 原子事实列表 ────────────────────────────────────────────
+
+@router.get("/api/memory/funnel/facts")
+@handle_api_errors("Funnel facts list", error_value={"status": "error", "error": "Facts list unavailable", "items": [], "count": 0})
+async def api_memory_funnel_facts_list(
+    request: Request,
+    limit: int = Query(50, ge=1, le=1000, description="每页条数"),
+    offset: int = Query(0, ge=0, description="偏移量"),
+    session_id: str = Query("", description="按会话 ID 过滤（通过 source_ref 关联）"),
+    topic: str = Query("", description="按主题过滤"),
+) -> dict[str, Any]:
+    """L1 原子事实列表（支持分页，支持 session_id 过滤）。
+
+    session_id 过滤通过 source_ref 关联 L0 证据的 session_id 实现。
+    """
+    facade = _funnel_facade()
+    atoms = facade.atom_facts()
+    if atoms is None:
+        raise HTTPException(503, "Atom facts store unavailable")
+
+    fetch_top = limit + offset
+    items = atoms.search_facts(query="", topic=topic, top=fetch_top)
+
+    # 按 session_id 过滤：通过 source_ref 关联 L0 证据的 session_id
+    if session_id:
+        ev_store = facade.evidence_store()
+        if ev_store is not None:
+            ev_refs = {
+                r["ref_id"]
+                for r in ev_store.search_evidence(
+                    query="", session_id=session_id, top=10000,
+                )
+            }
+            items = [it for it in items if it.get("source_ref") in ev_refs]
+
+    page = items[offset:offset + limit]
+    page = _tenant_filter(page, _request_tenant_id(request))
+    return {
+        "status": "ok",
+        "items": page,
+        "count": len(page),
+        "total": len(items),
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+# ── 6. 单条事实详情 ───────────────────────────────────────────────
+
+@router.get("/api/memory/funnel/facts/{fact_id}")
+@handle_api_errors("Funnel fact detail", error_value={"status": "error", "error": "Fact not found"})
+async def api_memory_funnel_fact_detail(fact_id: str) -> dict[str, Any]:
+    """单条事实详情。"""
+    facade = _funnel_facade()
+    atoms = facade.atom_facts()
+    if atoms is None:
+        raise HTTPException(503, "Atom facts store unavailable")
+
+    fact = atoms.get_fact(fact_id)
+    if fact is None:
+        raise HTTPException(404, f"Fact {fact_id} not found")
+
+    return {"status": "ok", "fact": fact}
+
+
+# ── 7. 晋升事实到 L3 长期记忆 ────────────────────────────────────
+
+@router.post("/api/memory/funnel/facts/promote")
+@handle_api_errors("Funnel facts promote", error_value={"status": "error", "error": "Promote failed", "promoted": 0})
+async def api_memory_funnel_facts_promote(request: Request) -> dict[str, Any]:
+    """晋升事实到 L3 长期记忆（参数: fact_ids 列表）。
+
+    Body: :class:`FactsPromoteRequest`
+
+    - 若提供 ``fact_ids``：按指定 ID 晋升（通过 vector_index_fn 写入 L3）。
+    - 否则按 ``min_access`` 阈值批量晋升高频事实。
+    """
+    require_admin(request)
+    body = FactsPromoteRequest.model_validate(await request.json())
+
+    facade = _funnel_facade()
+    atoms = facade.atom_facts()
+    if atoms is None:
+        raise HTTPException(503, "Atom facts store unavailable")
+
+    # 复用 facade 的 long_term_index 作为向量索引写入函数
+    def _vector_index_fn(doc_id: str, text: str, metadata: dict[str, Any] | None = None) -> str:
+        return facade.long_term_index(doc_id, text, metadata=metadata)
+
+    if body.fact_ids:
+        # 按指定 ID 晋升：逐条读取并写入向量索引，重置 access_count
+        promoted = 0
+        for fact_id in body.fact_ids:
+            fact = atoms.get_fact(fact_id)
+            if not fact:
+                continue
+            text = f"{fact['subject']} {fact['predicate']} {fact['object_value']}"
+            try:
+                _vector_index_fn(fact["id"], text, {
+                    "topic": fact.get("topic", ""),
+                    "source_ref": fact.get("source_ref", ""),
+                    "layer": "atom_fact",
+                })
+                promoted += 1
+            except Exception as exc:
+                logger.warning("[funnel_api] promote fact %s failed: %s", fact_id, exc)
+        return {"status": "ok", "promoted": promoted, "fact_ids": body.fact_ids}
+
+    # 按 min_access 批量晋升
+    report = atoms.promote_facts(
+        min_access=body.min_access,
+        top=body.top,
+        vector_index_fn=_vector_index_fn,
+    )
+    return {"status": "ok", "promoted": report.get("promoted", 0)}
+
+
+# ── 8. 搜索事实 ──────────────────────────────────────────────────
+
+@router.get("/api/memory/funnel/facts/search")
+@handle_api_errors("Funnel facts search", error_value={"status": "error", "error": "Facts search unavailable", "items": [], "count": 0})
+async def api_memory_funnel_facts_search(
+    request: Request,
+    query: str = Query("", description="搜索关键词"),
+    limit: int = Query(10, ge=1, le=200, description="返回条数"),
+    topic: str = Query("", description="按主题过滤"),
+) -> dict[str, Any]:
+    """搜索事实（参数: query, limit）。"""
+    facade = _funnel_facade()
+    items = facade.search_facts(query=query, topic=topic, top=limit)
+    items = _tenant_filter(items, _request_tenant_id(request))
+    return {"status": "ok", "query": query, "items": items, "count": len(items)}
+
+
+# ── 9. 任务状态图（Mermaid） ─────────────────────────────────────
+
+@router.get("/api/memory/funnel/task-map/{session_id}")
+@handle_api_errors("Funnel task map", error_value={"status": "error", "error": "Task map unavailable", "mermaid": ""})
+async def api_memory_funnel_task_map(session_id: str) -> dict[str, Any]:
+    """获取任务状态图（返回 Mermaid 文本）。"""
+    facade = _funnel_facade()
+    mermaid = facade.get_task_map(session_id)
+    if not mermaid:
+        return {"status": "ok", "session_id": session_id, "mermaid": "", "nodes_count": 0}
+    # 节点数近似为 mermaid 中节点定义的行数（去掉 ```mermaid/graph TD/``` 包裹）
+    nodes_count = max(0, len(mermaid.splitlines()) - 3)
+    return {"status": "ok", "session_id": session_id, "mermaid": mermaid, "nodes_count": nodes_count}
+
+
+# ── 10. 任务节点列表 ─────────────────────────────────────────────
+
+@router.get("/api/memory/funnel/task-map/{session_id}/nodes")
+@handle_api_errors("Funnel task map nodes", error_value={"status": "error", "error": "Task map nodes unavailable", "nodes": [], "count": 0})
+async def api_memory_funnel_task_map_nodes(session_id: str) -> dict[str, Any]:
+    """获取任务节点列表。"""
+    facade = _funnel_facade()
+    sym = facade.symbolic()
+    if sym is None:
+        raise HTTPException(503, "Symbolic memory unavailable")
+
+    nodes = sym.get_task_map_nodes(session_id)
+    return {"status": "ok", "session_id": session_id, "nodes": nodes, "count": len(nodes)}
+
+
+# ── 11. 更新任务节点状态 ─────────────────────────────────────────
+
+@router.post("/api/memory/funnel/task-map/{session_id}/update")
+@handle_api_errors("Funnel task map update", error_value={"status": "error", "error": "Task map update failed"})
+async def api_memory_funnel_task_map_update(session_id: str, request: Request) -> dict[str, Any]:
+    """更新任务节点状态（参数: node_id, status, description）。
+
+    Body: :class:`TaskMapUpdateRequest`
+    """
+    require_admin(request)
+    body = TaskMapUpdateRequest.model_validate(await request.json())
+
+    facade = _funnel_facade()
+    ok = facade.update_task_map(
+        session_id=session_id,
+        step_id=body.node_id,
+        description=body.description,
+        status=body.status,
+        parent_id=body.parent_id,
+        evidence_ref=body.evidence_ref,
+        metadata=body.metadata,
+    )
+    if not ok:
+        raise HTTPException(400, f"Failed to update node {body.node_id} (invalid status or node limit reached)")
+
+    return {"status": "ok", "session_id": session_id, "node_id": body.node_id, "updated": True}

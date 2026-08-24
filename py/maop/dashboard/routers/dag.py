@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.scheduling.task_splitter import TaskSplitError, TaskSplitter
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class ExecuteDagRequest(BaseModel):
 # ── 端点 ─────────────────────────────────────────────────────────
 
 @router.post("/api/dag/auto-split")
+@handle_api_errors("DAG auto-split")
 async def auto_split(
     body: AutoSplitRequest,
     request: Request,
@@ -74,12 +76,14 @@ async def auto_split(
 
 
 @router.get("/api/dag/health")
+@handle_api_errors("DAG health", error_value={"status": "error", "error": "DAG health unavailable"})
 async def dag_health() -> dict[str, Any]:
     """DAG 模块健康检查（无需鉴权，用于前端探活）。"""
     return {"status": "ok", "module": "dag", "features": ["auto-split", "execute"]}
 
 
 @router.post("/api/dag/execute")
+@handle_api_errors("DAG execute")
 async def execute_dag(
     body: ExecuteDagRequest,
     request: Request,

@@ -255,7 +255,9 @@ class TestConsolidate:
             return_value=mock_consolidator,
         ):
             result = mgr.consolidate(dry_run=True)
+        # Dry run returns a report dict; verify it indicates dry_run mode
         assert result is not None
+        assert result["dry_run"] is True
         mock_consolidator.dream.assert_called_once_with(dry_run=True)
 
 

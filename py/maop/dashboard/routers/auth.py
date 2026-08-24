@@ -30,6 +30,7 @@ router = APIRouter()
 # ── Auth config ────────────────────────────────────────────────────
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
 from maop.core.security.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig, load_jwt_secret
+from maop.dashboard.error_handler import handle_api_errors
 
 _env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
 # High 安全修复 (2.3): secure-by-default。只有显式声明本地开发环境
@@ -343,6 +344,7 @@ def _get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 @router.get("/api/auth/status")
+@handle_api_errors("Auth status")
 async def auth_status(request: Request) -> Any:
     """Check if auth is enabled and whether user is logged in."""
     # F-P0-8 fix: check actual token from Authorization header
@@ -365,6 +367,7 @@ async def auth_status(request: Request) -> Any:
 
 
 @router.post("/api/auth/login")
+@handle_api_errors("Auth login")
 async def auth_login(request: Request) -> Any:
     """Login with username/password, returns JWT token."""
     try:
@@ -481,6 +484,7 @@ async def auth_login(request: Request) -> Any:
 
 
 @router.post("/api/auth/refresh")
+@handle_api_errors("Auth refresh")
 async def auth_refresh(request: Request):
     """Refresh an existing JWT token before it expires.
 
@@ -535,6 +539,7 @@ async def auth_refresh(request: Request):
 
 
 @router.post("/api/auth/logout")
+@handle_api_errors("Auth logout")
 async def auth_logout(request: Request) -> Any:
     """Logout - revoke JWT token server-side (P1 fix).
 
@@ -563,6 +568,7 @@ async def auth_logout(request: Request) -> Any:
 
 
 @router.post("/api/auth/register")
+@handle_api_errors("Auth register")
 async def auth_register(request: Request) -> Any:
     """Register a new user (admin only)."""
     try:
@@ -596,6 +602,7 @@ async def auth_register(request: Request) -> Any:
 
 
 @router.get("/api/auth/users")
+@handle_api_errors("Auth users")
 async def auth_users(request: Request) -> Any:
     """List all users (admin only)."""
     try:
@@ -613,6 +620,7 @@ async def auth_users(request: Request) -> Any:
 
 
 @router.delete("/api/auth/users/{username}")
+@handle_api_errors("Auth delete user")
 async def auth_delete_user(username: str, request: Request) -> Any:
     """Delete a user (admin only, cannot delete admin)."""
     try:
@@ -629,6 +637,7 @@ async def auth_delete_user(username: str, request: Request) -> Any:
 
 
 @router.put("/api/auth/users/{username}")
+@handle_api_errors("Auth update user")
 async def auth_update_user(username: str, request: Request) -> Any:
     """Update user roles, enabled status, or password (admin only)."""
     try:

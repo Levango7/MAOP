@@ -306,11 +306,11 @@ Agents are defined in `config/agents.yaml`:
 
 ```yaml
 agents:
-  - name: coder
+  coder:
     driver: openai
     model: gpt-4
     capabilities: [code, debug, refactor]
-  - name: analyst
+  analyst:
     driver: anthropic
     model: claude-3
     capabilities: [analyze, summarize]

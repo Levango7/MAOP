@@ -29,6 +29,8 @@ export const nav = [
 
   { section: 'nav.assets' },
   { to: '/memory', label: 'nav.memory', icon: 'brain', subtitle: 'nav.memory.subtitle' },
+  // P1-B: 漏斗记忆 — L0 证据 / L1 原子事实 / 任务状态图
+  { to: '/funnel-memory', label: 'nav.funnelMemory', icon: 'database', subtitle: 'nav.funnelMemory.subtitle' },
   { to: '/knowledge-graph', label: 'nav.knowledgeGraph', icon: 'network', subtitle: 'nav.knowledgeGraph.subtitle' },
   { to: '/search', label: 'nav.search', icon: 'search', subtitle: 'nav.search.subtitle' },
   { to: '/vector', label: 'nav.vector', icon: 'box', subtitle: 'nav.vector.subtitle' },

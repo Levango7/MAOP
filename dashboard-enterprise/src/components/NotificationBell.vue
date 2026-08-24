@@ -93,11 +93,9 @@ async function refreshUnreadCount() {
 async function loadRecent() {
   panelLoading.value = true;
   try {
-    const d = await api.get('/api/notifications/list', {
-      limit: RECENT_LIMIT,
-      offset: 0,
-      unread_only: true,
-    });
+    // api.get(url, opts) 的 opts 只支持 { headers }，不会序列化 query 参数。
+    // 将 limit/offset/unread_only 拼接到 URL query string 才能被后端接收。
+    const d = await api.get(`/api/notifications/list?limit=${RECENT_LIMIT}&offset=0&unread_only=true`);
     const items = d.notifications || d.items || d.data || [];
     recent.value = items.map((n) => ({
       id: n.id,

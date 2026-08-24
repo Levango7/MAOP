@@ -7,7 +7,29 @@ providers:
     api_key_env: MINIMAX_API_KEY
   local:
     type: builtin
-
+  openai:
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+  anthropic:
+    base_url: https://api.anthropic.com/v1
+    api_key_env: ANTHROPIC_API_KEY
+  deepseek:
+    base_url: https://api.deepseek.com/v1
+    api_key_env: DEEPSEEK_API_KEY
+  agnes:
+    base_url: https://api.agnes.ai/v1
+    api_key_env: AGNES_API_KEY
+  mimo:
+    base_url: https://api.mimo.ai/v1
+    api_key_env: MIMO_API_KEY
+  qwen:
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_key_env: DASHSCOPE_API_KEY
+  omniroute:
+    base_url: http://localhost:20128/v1
+    api_key_env: OMNIROUTE_API_KEY
+  testprov:
+    api_key_env: TEST_KEY
 models:
   yi-large:
     model_id: yi-large
@@ -28,63 +50,63 @@ models:
     capabilities:
     - codegen
     latency_tier: fast
-  # ── 以下 7 个模型由 agents.yaml 引用，原先缺失定义（P1-2 补全）──
   gpt-5.4:
     model_id: gpt-5.4
     provider: openai
-    tier: premium
     context_window: 128000
-    max_tokens: 16384
     cost_per_1k_input: 0.01
     cost_per_1k_output: 0.03
   claude-3:
     model_id: claude-3
     provider: anthropic
-    tier: premium
     context_window: 200000
-    max_tokens: 8192
     cost_per_1k_input: 0.008
     cost_per_1k_output: 0.024
   minimax-m3:
     model_id: minimax-m3
     provider: minimax
-    tier: standard
     context_window: 1000000
-    max_tokens: 8192
     cost_per_1k_input: 0.002
     cost_per_1k_output: 0.006
   deepseek-v4-flash-free:
     model_id: deepseek-v4-flash-free
     provider: deepseek
-    tier: free
     context_window: 64000
-    max_tokens: 8192
-    cost_per_1k_input: 0.0
-    cost_per_1k_output: 0.0
   agnes-2.0-flash:
     model_id: agnes-2.0-flash
     provider: agnes
-    tier: standard
     context_window: 128000
-    max_tokens: 8192
     cost_per_1k_input: 0.001
     cost_per_1k_output: 0.002
   mimo-v2.5:
     model_id: mimo-v2.5
     provider: mimo
-    tier: standard
     context_window: 128000
-    max_tokens: 8192
     cost_per_1k_input: 0.002
     cost_per_1k_output: 0.004
   qwen3.5-plus:
     model_id: qwen3.5-plus
     provider: qwen
-    tier: standard
     context_window: 131072
-    max_tokens: 8192
     cost_per_1k_input: 0.004
     cost_per_1k_output: 0.012
+  omniroute-auto-coding:
+    model_id: omniroute-auto-coding
+    provider: omniroute
+    context_window: 128000
+    capabilities:
+    - codegen
+    - refactor
+    - explain
+    - review
+    - planning
+    - search
+    - tool_use
+    - chat
+    - quickfix
+    - docgen
+    - techdoc
+    - verify
 policies:
   default: {}
   codegen:

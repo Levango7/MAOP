@@ -9,7 +9,8 @@
       </template>
 
       <nav class="onboard-steps">
-        <button v-for="(s, i) in steps" :key="i"
+        <button
+          v-for="(s, i) in steps" :key="i"
           class="onboard-step-dot" :class="{ active: i === step, done: i < step }"
           :disabled="i > step" @click="step = i">
           <span>{{ i + 1 }}</span>

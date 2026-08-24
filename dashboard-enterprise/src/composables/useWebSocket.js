@@ -1,6 +1,10 @@
 import { ref, onMounted, onUnmounted, getCurrentInstance } from 'vue';
 
 const MAX_RECONNECT_ATTEMPTS = 10;
+// P2 fix: 指数退避重连参数 — 初始延迟 1s, 每次翻倍, 上限 30s。
+// 避免断线后立即重连对服务器造成压力, 同时保证长时间断线后不会无限等待。
+const RECONNECT_BASE_DELAY = 1000;
+const RECONNECT_MAX_DELAY = 30000;
 
 export function useWebSocket(url = '') {
   const connected = ref(false);
@@ -10,22 +14,16 @@ export function useWebSocket(url = '') {
   let reconnectTimer = null;
   let reconnectAttempts = 0;
 
-  function getWsToken() {
-    try { return localStorage.getItem('maop_token') || ''; } catch { return ''; }
-  }
-
   function connect() {
     reconnectAttempts = 0;
     try {
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
       const baseUrl = url || `${proto}//${location.host}/ws`;
-      const token = getWsToken();
-      // P1-10 fix: send JWT via Sec-WebSocket-Protocol subprotocol (not URL
-      // query) so the token never appears in access logs / browser history.
-      // The backend (server.py:612-623) accepts it from the subprotocol.
-      ws = token
-        ? new WebSocket(baseUrl, ['token', token])
-        : new WebSocket(baseUrl);
+      // M6 fix: token 现由 httpOnly cookie 管理，前端无法读取。
+      // 浏览器在 WebSocket 握手时会自动携带同源 cookie，后端从 cookie 中读取
+      // token 验证。移除原 Sec-WebSocket-Protocol 子协议认证（localStorage
+      // token 已失效，getWsToken() 始终返回空字符串）。
+      ws = new WebSocket(baseUrl);
       ws.onopen = () => {
         connected.value = true;
         error.value = null;
@@ -69,10 +67,16 @@ export function useWebSocket(url = '') {
     }
     if (reconnectTimer) return;
     reconnectAttempts++;
+    // P2 fix: 指数退避 — delay = min(BASE * 2^(attempts-1), MAX)
+    // 第 1 次 1s, 第 2 次 2s, 第 3 次 4s, ... 上限 30s。
+    const delay = Math.min(
+      RECONNECT_BASE_DELAY * 2 ** (reconnectAttempts - 1),
+      RECONNECT_MAX_DELAY,
+    );
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connect();
-    }, 3000);
+    }, delay);
   }
 
   function send(data) {

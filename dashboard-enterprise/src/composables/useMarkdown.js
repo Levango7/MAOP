@@ -46,7 +46,7 @@ function renderMarkdown(md) {
   let i = 0;
   let inCodeBlock = false;
   let codeBuf = [];
-  let codeLang = '';
+
 
   const flushParagraph = (buf) => {
     if (buf.length) {
@@ -55,7 +55,7 @@ function renderMarkdown(md) {
     }
   };
 
-  let paraBuf = [];
+  const paraBuf = [];
 
   while (i < lines.length) {
     const line = lines[i];
@@ -65,12 +65,10 @@ function renderMarkdown(md) {
       if (inCodeBlock) {
         out.push('<pre><code class="md-code-block">' + escapeHtml(codeBuf.join('\n')) + '</code></pre>');
         codeBuf = [];
-        codeLang = '';
         inCodeBlock = false;
       } else {
         flushParagraph(paraBuf);
         inCodeBlock = true;
-        codeLang = line.replace(/^```/, '').trim();
       }
       i++;
       continue;

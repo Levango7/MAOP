@@ -480,9 +480,23 @@ class LoadBalancer:
     # ── Load tracking ────────────────────────────────────────
 
     def record_start(self, agent: str, task_id: str) -> None:
-        """Record that a task has started on an agent."""
+        """Record that a task has started on an agent.
+
+        LB fix: 如果 task_id 已在活跃集合中（重试场景下上一次
+        record_finish 尚未调用），不重复增加 active_tasks 计数，
+        避免重试导致 active_tasks 虚高影响路由决策。
+        """
         with self._lock:
             if agent in self._active_tasks:
+                # 重试保护：task_id 已存在说明是重复 start，
+                # 不重复增加 active_tasks 计数。
+                if task_id in self._active_tasks[agent]:
+                    logger.debug(
+                        "[lb] record_start: task_id %s already active on %s "
+                        "(retry); not incrementing active_tasks",
+                        task_id, agent,
+                    )
+                    return
                 self._active_tasks[agent].add(task_id)
             if agent in self._agents:
                 self._agents[agent].active_tasks += 1
@@ -494,21 +508,39 @@ class LoadBalancer:
         *,
         duration_ms: float = 0.0,
         success: bool = True,
+        is_retry: bool = False,
     ) -> None:
-        """Record that a task has finished on an agent."""
+        """Record that a task has finished on an agent.
+
+        LB fix: 添加 ``is_retry`` 参数。重试请求（``is_retry=True``）
+        不重复增加 ``total_requests`` / ``total_successes`` /
+        ``total_failures`` 计数，避免计数虚高影响路由决策。
+        但仍更新 ``total_latency_ms`` 和 EWMA 统计——这些是执行级别
+        的指标，每次执行都应记录，用于 ADAPTIVE 算法的窗口化评分。
+
+        Parameters
+        ----------
+        is_retry : bool
+            当为 True 时，跳过请求级别计数（total_requests/successes/
+            failures），仅更新 latency 和 EWMA。调用方在重试场景下
+            应传入 ``is_retry=True``。
+        """
         with self._lock:
             if agent in self._active_tasks:
                 self._active_tasks[agent].discard(task_id)
             if agent in self._agents:
                 m = self._agents[agent]
                 m.active_tasks = max(0, m.active_tasks - 1)
-                m.total_requests += 1
+                if not is_retry:
+                    m.total_requests += 1
+                    if success:
+                        m.total_successes += 1
+                    else:
+                        m.total_failures += 1
+                # LB-3 fix: feed windowed EWMA stats used by ADAPTIVE.
+                # 无论是否为重试，都更新 latency 和 EWMA（执行级别指标），
+                # 因为每次执行的实际延迟和成功/失败对路由决策有参考价值。
                 m.total_latency_ms += duration_ms
-                if success:
-                    m.total_successes += 1
-                else:
-                    m.total_failures += 1
-                # LB-3 fix: feed windowed EWMA stats used by ADAPTIVE
                 m.record_sample(duration_ms, success)
 
     # ── Query ─────────────────────────────────────────────────

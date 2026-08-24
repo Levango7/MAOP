@@ -29,6 +29,7 @@ Usage::
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
@@ -40,6 +41,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+# Hold strong references to background asyncio tasks so they are not
+# garbage-collected before completion ("Task was destroyed but it is pending").
+_bg_tasks: set[asyncio.Task[Any]] = set()
 
 _A2A_DDL = """
 CREATE TABLE IF NOT EXISTS a2a_cards (
@@ -280,7 +285,9 @@ class A2AManager:
 
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                asyncio.ensure_future(self.dispatch_task(task_id, agent_name, message))
+                _t = asyncio.ensure_future(self.dispatch_task(task_id, agent_name, message))
+                _bg_tasks.add(_t)
+                _t.add_done_callback(_bg_tasks.discard)
                 return
             # Loop exists but not running — run in thread.
         except RuntimeError:

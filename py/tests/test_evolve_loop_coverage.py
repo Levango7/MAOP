@@ -63,14 +63,17 @@ class TestEvolveFunctions:
         assert isinstance(result, EvolutionStats)
 
     def test_compute_stats_with_data(self):
-        from maop.evolve import _compute_stats
+        from maop.evolve import EvolutionStats, _compute_stats
         data = [
             {"agent": "a1", "routing_key": "k1", "result": {"exit_code": 0, "duration_ms": 100}},
             {"agent": "a1", "routing_key": "k1", "result": {"exit_code": 1, "duration_ms": 200}},
             {"agent": "a2", "routing_key": "k2", "result": {"exit_code": 0, "duration_ms": 50}},
         ]
         result = _compute_stats(data)
-        assert result is not None
+        assert isinstance(result, EvolutionStats)
+        # 2 distinct agents (a1, a2) and 2 distinct routing keys (k1, k2)
+        assert len(result.by_agent) == 2
+        assert len(result.by_key) == 2
 
     def test_generate_suggestions_empty(self):
         from maop.evolve import EvolutionStats, _generate_suggestions

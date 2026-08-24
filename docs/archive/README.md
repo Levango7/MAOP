@@ -5,7 +5,7 @@
 
 ## 当前权威文档
 
-- `../adr/` — 架构决策记录（ADR 001-016）
+- `../adr/` — 架构决策记录（ADR 001-017）
 - `../deployment.md` — 部署指南
 - `../enterprise/license-issuance-guide.md` — 许可证签发指南
 - `../../README.md` — 项目概述
@@ -36,6 +36,7 @@
 | architecture-review-20260714-delta.md | 2026-07-14 | 6.0KB | 2026-07-14 架构审查增量报告 | 已过时 |
 | frontend-migration-assessment.md | 2026-07-xx | 4.3KB | 前端迁移评估（Vue3 SPA 已实现） | 已过时 |
 | arch-debt-three-plans-review.md | 2026-08-15 | 6.5KB | 架构债务三方案评审报告 | 历史快照 |
+| design-system-legacy.md | 2026-08-17 | 3.5KB | 旧版 JS 仪表盘设计系统 v4.1（已被 Vue 3 取代） | 已过时 |
 | project-structure-analysis.md | 2026-08-13 | 49.7KB | 项目结构分析报告 | 历史快照 |
 | v5.0.1-review.md | 2026-08-13 | 3.5KB | v5.0.1 版本审查报告 | 历史快照 |
 
@@ -43,13 +44,13 @@
 
 | 文件 | 日期 | 大小 | 说明 | 状态 |
 |------|------|------|------|------|
-| prd-three-phase-roadmap.md | 2026-08-07 | 44.4KB | 三阶段路线图 PRD（21 个月规划） | 已归档 |
-| hld-three-phase-roadmap.md | 2026-08-07 | 52.4KB | 三阶段路线图 HLD | 已归档 |
 | routing-refactor-plan.md | 2026-07-xx | 17.2KB | 路由重构计划 | 已完成 |
 | followup-three-fixes-plan.md | 2026-08-14 | 7.4KB | 三项后续修复计划 | 已完成 |
 | tool-whitelist-enforce-plan.md | 2026-08-15 | 9.2KB | 工具白名单强制执行计划 | 已完成 |
 | tool-whitelist-enforce-checklist.md | 2026-08-15 | 4.0KB | 工具白名单强制检查清单 | 已完成 |
 | tool-whitelist-enforce-drill.md | 2026-08-15 | 3.4KB | 工具白名单强制演练记录 | 已完成 |
+
+> **注**：`prd-three-phase-roadmap.md` 与 `hld-three-phase-roadmap.md` 现位于 `docs/` 根目录作为权威路线图文档，不再属于归档范围。
 
 ## fixes/ — 修复方案文档
 

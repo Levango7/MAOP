@@ -12,8 +12,13 @@
       </button>
     </PageHeader>
 
-    <!-- Tab 容器: main=演化控制台 / history=演化历史(嵌入原 EvolutionHistory 页) -->
-    <div v-show="tab === 'main'" class="evolve-main">
+    <!-- Tab 容器: main=演化控制台 / history=演化历史(嵌入原 EvolutionHistory 页)
+         P2 fix: 统一使用 v-if 而非混用 v-show + v-if。
+         选择 v-if 的原因: main tab 包含 Chart.js 图表/DataTable/Heatmap 等
+         高初始化成本组件, v-show 会在不可见时仍占用 DOM 与内存; 且切换回来
+         时重新加载可保证 evolve 指标数据新鲜度。两个 tab 互斥, 同一时刻只
+         渲染其一, 资源利用率最优。 -->
+    <div v-if="tab === 'main'" class="evolve-main">
       <div class="stats-row">
         <StatCard :label="t('view.evolve.totalEvolutions')" :value="totalEvolutions" icon="activity" tone="brand" :loading="loading" />
         <StatCard :label="t('view.evolve.avgSuccessRate')" :value="successRate" unit="%" icon="check-circle" tone="success" :loading="loading" />

@@ -94,7 +94,7 @@ services:
       # 回调通知应用层
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-      REDIS_PASSWORD: ${MAOP_REDIS_PASSWORD:-}
+      REDIS_PASSWORD: ${MAOP_REDIS_PASSWORD:?Set MAOP_REDIS_PASSWORD in .env}
       ALERTMANAGER_URL: ${ALERTMANAGER_URL:-}
     volumes:
       - patroni1-data:/home/postgres/pgdata
@@ -158,7 +158,7 @@ services:
       PATRONI_synchronous_mode: "true"
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-      REDIS_PASSWORD: ${MAOP_REDIS_PASSWORD:-}
+      REDIS_PASSWORD: ${MAOP_REDIS_PASSWORD:?Set MAOP_REDIS_PASSWORD in .env}
       ALERTMANAGER_URL: ${ALERTMANAGER_URL:-}
     volumes:
       - patroni2-data:/home/postgres/pgdata

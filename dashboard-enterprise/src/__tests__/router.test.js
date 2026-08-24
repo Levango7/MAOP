@@ -29,12 +29,12 @@ describe('Router', () => {
     expect(route?.path).toBe('/');
   });
 
-  it('has 33 route records total', () => {
-    // 拓扑: 29 个命名业务路由 (含 v4.6.0 新增 licenses/sso/quotas/apikeys/notifications
+  it('has 34 route records total', () => {
+    // 拓扑: 30 个命名业务路由 (含 v4.6.0 新增 licenses/sso/quotas/apikeys/notifications
     // + v5.1.0 新增 workflow-editor/skill-editor/skill-market
-    // + P1-3 新增 tasks)
+    // + P1-3 新增 tasks + P1-B 新增 funnel-memory)
     // + 3 个匿名重定向(/control /chat /evolution-history) + 1 个 /:pathMatch(.*)* 兜底
-    expect(router.getRoutes().length).toBe(33);
+    expect(router.getRoutes().length).toBe(34);
   });
 
   it('legacy routes declare redirects to merged pages', () => {

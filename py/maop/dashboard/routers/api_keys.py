@@ -29,6 +29,7 @@ from maop.core.security.api_key_manager import (
     get_api_key_manager,
 )
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,7 @@ def _actor(request: Request) -> str:
 
 @router.post("", response_model=ApiKeyCreateResult, status_code=201)
 @router.post("/", response_model=ApiKeyCreateResult, status_code=201, include_in_schema=False)
+@handle_api_errors("Create API key")
 async def create_api_key(body: ApiKeyCreate, request: Request) -> ApiKeyCreateResult:
     """Create a new API key. The plaintext key is returned **only** here."""
     require_admin(request)
@@ -84,6 +86,7 @@ async def create_api_key(body: ApiKeyCreate, request: Request) -> ApiKeyCreateRe
 
 @router.get("", response_model=list[ApiKeyResponse])
 @router.get("/", response_model=list[ApiKeyResponse], include_in_schema=False)
+@handle_api_errors("List API keys", error_value=[])
 async def list_api_keys(
     request: Request,
     tenant_id: str = Query("", description="Filter by tenant_id"),
@@ -97,6 +100,7 @@ async def list_api_keys(
 
 
 @router.get("/{key_id}", response_model=ApiKeyResponse)
+@handle_api_errors("Get API key")
 async def get_api_key(key_id: str, request: Request) -> ApiKeyResponse:
     """Get a single API key by its key_id."""
     require_admin(request)
@@ -110,6 +114,7 @@ async def get_api_key(key_id: str, request: Request) -> ApiKeyResponse:
 
 
 @router.post("/{key_id}/revoke")
+@handle_api_errors("Revoke API key")
 async def revoke_api_key(key_id: str, request: Request) -> dict[str, Any]:
     """Soft-revoke an API key (enabled=0, revoked_at set)."""
     require_admin(request)
@@ -127,6 +132,7 @@ async def revoke_api_key(key_id: str, request: Request) -> dict[str, Any]:
 
 
 @router.put("/{key_id}", response_model=ApiKeyResponse)
+@handle_api_errors("Update API key")
 async def update_api_key(key_id: str, body: ApiKeyUpdate, request: Request) -> ApiKeyResponse:
     """Update editable metadata of an API key (name/scopes/rate_limit/ip_whitelist)."""
     require_admin(request)
@@ -141,6 +147,7 @@ async def update_api_key(key_id: str, body: ApiKeyUpdate, request: Request) -> A
 
 
 @router.delete("/{key_id}")
+@handle_api_errors("Delete API key")
 async def delete_api_key(key_id: str, request: Request) -> dict[str, Any]:
     """Hard-delete an API key and all its usage records."""
     require_admin(request)
@@ -154,6 +161,7 @@ async def delete_api_key(key_id: str, request: Request) -> dict[str, Any]:
 
 
 @router.get("/{key_id}/usage", response_model=ApiKeyUsageResponse)
+@handle_api_errors("Get API key usage")
 async def get_api_key_usage(
     key_id: str,
     request: Request,
@@ -173,6 +181,7 @@ async def get_api_key_usage(
 
 
 @router.post("/validate")
+@handle_api_errors("Validate API key")
 async def validate_api_key(request: Request) -> dict[str, Any]:
     """Validate a plaintext key without recording usage.
 

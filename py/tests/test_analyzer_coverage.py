@@ -158,7 +158,10 @@ class TestParseLlmDecomp:
             "complexity_score": 5,
         })
         result = _parse_llm_decomp(content, sub_tasks)
+        # Verify parsing succeeded and returned a 3-tuple with no edges (bad deps ignored)
         assert result is not None
+        _parsed, dag, _score = result
+        assert list(dag.edges) == []
 
     def test_risk_levels_non_dict_ignored(self):
         sub_tasks = [SubTask(id="st-000", description="x")]
@@ -168,7 +171,10 @@ class TestParseLlmDecomp:
             "complexity_score": 5,
         })
         result = _parse_llm_decomp(content, sub_tasks)
+        # Verify parsing succeeded and kept default risk_level (bad risk_levels ignored)
         assert result is not None
+        parsed, _dag, _score = result
+        assert parsed[0].risk_level == "low"
 
 
 # ── _semantic_analyze LLM path ────────────────────────────────

@@ -41,7 +41,7 @@ MAOP 旨在解决企业级多智能体编排的核心挑战：
 | 子系统 | 模块 | 职责 |
 |--------|------|------|
 | Agent 管理 | `core/agent_*` | 生命周期、注册、修复 |
-| MCP 工具市场 | `E`core/mcp_*` | 工具发现、调用、审计 |
+| MCP 工具市场 | `core/mcp_*` | 工具发现、调用、审计 |
 | 多模态推理 | `core/multimodal` | 统一接口 |
 | 演化引擎 | `core/evolution_*` | 策略迭代 |
 | 三层记忆 | `core/three_layer_memory` | 短期 / 长期 / 向量 |
@@ -65,11 +65,11 @@ MAOP 旨在解决企业级多智能体编排的核心挑战：
 
 表：闭包表结构
 
-| 列 |' | 类型 | 说明 |
+| 列 | 类型 | 说明 |
 |------|------|------|
 | ancestor | TEXT | 祖先 org_id |
 | descendant | TEXT | 后代 org_id |
-| distance | INT | �%距离（0 = 自引用） |
+| distance | INT | 距离（0 = 自引用） |
 
 闭包表的优势：
 
@@ -101,7 +101,7 @@ effective_permissions(org):
 | Art. 15 | `access_request` | 知情权 / 访问请求 |
 | Art. 17 | `right_to_erasure` | 删除权 / 被遗忘权 |
 | Art. 20 | `data_portability` | 数据可携权 |
-| Art. 28 |" | `register_dpa` | 数据处理协议 |
+| Art. 28 | `register_dpa` | 数据处理协议 |
 | Art. 30 | `record_processing_activity` | 处理记录 |
 
 ### 3.2 级联删除顺序
@@ -141,7 +141,7 @@ effective_permissions(org):
 
 ### 4.3 组映射
 
-支持三种F三种映射规则：
+支持三种映射规则：
 
 1. **精确匹配**：`group_dn_pattern == group_dn`（大小写不敏感）
 2. **正则匹配**：`re.search(pattern, group_dn)`

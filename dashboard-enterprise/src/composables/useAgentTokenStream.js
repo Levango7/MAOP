@@ -7,15 +7,13 @@
  * Unlike useStreamingFetch (POST + ReadableStream for chat), this composable
  * uses EventSource (GET) to subscribe to a running agent execution's token stream.
  *
+ * M6 fix: token 现由 httpOnly cookie 管理，前端无法读取 localStorage token。
+ * EventSource 无法设置 Authorization header，改用 withCredentials: true 让
+ * 浏览器自动携带 httpOnly cookie 完成认证（与 useDagProgress.js SSE 模式一致）。
+ *
  * @returns {{ subscribe: Function, close: Function }}
  */
 import { ref, onUnmounted } from 'vue';
-
-const TOKEN_KEY = 'maop_token';
-
-function getToken() {
-  try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
-}
 
 export function useAgentTokenStream() {
   const streaming = ref(false);
@@ -56,12 +54,14 @@ export function useAgentTokenStream() {
       });
     }
 
-    // Build URL with JWT token (EventSource cannot set Authorization header)
-    const token = getToken();
-    const url = `/api/stream/agent/${encodeURIComponent(executionId)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    // M6 fix: 移除 URL query 中的 token，避免日志/浏览器历史/Referer 泄漏。
+    // 原：url = `/api/stream/agent/${id}?token=${token}`
+    // 现：通过 EventSource withCredentials: true 依赖 httpOnly cookie 认证。
+    const url = `/api/stream/agent/${encodeURIComponent(executionId)}`;
 
     try {
-      eventSource = new EventSource(url);
+      // M6 fix: withCredentials: true 携带 httpOnly cookie（SSE 标准）。
+      eventSource = new EventSource(url, { withCredentials: true });
     } catch (exc) {
       streaming.value = false;
       if (onError) onError(`Failed to create EventSource: ${exc.message}`);

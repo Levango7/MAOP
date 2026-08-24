@@ -14,7 +14,10 @@ function makeWrapper() {
 describe('CommandPalette', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
-    window.location.href = 'http://localhost:5174/';
+    // 注：原 `window.location.href = ...` 赋值会触发 jsdom 的
+    // "Not implemented: navigation (except hash changes)" 未处理错误，
+    // 使 vitest 全量跑出现 unhandled errors 且影响 CI 退出码。
+    // CommandPalette 组件不读取 location（grep 确认无引用），该赋值冗余，已移除。
   });
 
   it('exposes command sources from nav (≥ 15 routes)', () => {

@@ -44,6 +44,8 @@ export const coreMessages = {
     'nav.tasks': 'Tasks',
     'nav.tasks.subtitle': 'Task history: search, filter, rerun',
     'nav.memory': 'Memory',
+    // P1-B: 漏斗记忆导航标签
+    'nav.funnelMemory': 'Funnel Memory',
     'nav.evolve': 'Auto-Tuning',
     'nav.evolutionHistory': 'Tuning History',
     // v5.1.0: Workflow orchestration + Skill composer/market
@@ -76,6 +78,7 @@ export const coreMessages = {
     'nav.chat.subtitle': 'Converse with agents and inspect sessions',
     'nav.agents.subtitle': 'Discovered and registered agent CLIs',
     'nav.memory.subtitle': 'Three-layer memory: working, short-term, long-term',
+    'nav.funnelMemory.subtitle': 'Funnel memory: L0 evidence, L1 atom facts and task state graph',
     'nav.evolve.subtitle': 'Rule-driven auto-tuning and change logs',
     'nav.evolutionHistory.subtitle': 'Performance-driven rule-based auto-tuning closed loop',
     'nav.workflowEditor.subtitle': 'Compose agent workflows as a draggable DAG',
@@ -289,6 +292,8 @@ export const coreMessages = {
     'nav.tasks': '任务历史',
     'nav.tasks.subtitle': '任务历史：搜索、过滤、重跑',
     'nav.memory': '记忆',
+    // P1-B: 漏斗记忆导航标签
+    'nav.funnelMemory': '漏斗记忆',
     'nav.evolve': '自动调优',
     'nav.evolutionHistory': '调优历史',
     // v5.1.0: 工作流编排 + 技能编辑器/市场
@@ -321,6 +326,7 @@ export const coreMessages = {
     'nav.chat.subtitle': '与智能体对话并查看会话',
     'nav.agents.subtitle': '已发现与已注册的智能体 CLI',
     'nav.memory.subtitle': '三层记忆：工作 / 短期 / 长期',
+    'nav.funnelMemory.subtitle': '漏斗记忆：L0 证据 / L1 原子事实 / 任务状态图',
     'nav.evolve.subtitle': '规则驱动自动调优与变更记录',
     'nav.evolutionHistory.subtitle': '性能驱动的规则化自动调优闭环',
     'nav.workflowEditor.subtitle': '以可拖拽 DAG 方式编排智能体工作流',

@@ -29,6 +29,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import time
 from typing import Any
 
@@ -345,10 +346,11 @@ class TestRealOpenLDAP:
 
 # 真实 Docker daemon + OpenLDAP 容器集成测试。CI 主矩阵无 Docker 环境，且
 # `docker info` daemon 探测在 Windows 上挂起（subprocess timeout 杀不掉 native
-# 挂起的 docker CLI → collection 卡死）。无条件 skip，保留 _docker_available
-# 供未来独立 integration job 手动运行使用。
-@pytest.mark.skip(
-    reason="Requires real Docker daemon + OpenLDAP container; run in dedicated integration job",
+# 挂起的 docker CLI → collection 卡死）。在 Windows 上无条件 skip；在非 Windows
+# 上通过 _docker_available() 条件 skip，保留供独立 integration job 运行。
+@pytest.mark.skipif(
+    sys.platform == "win32" or not _docker_available(),
+    reason="Requires real Docker daemon + OpenLDAP container; skipped on Windows (docker info hangs); run in dedicated integration job on Linux",
 )
 class TestDockerOpenLDAP:
     """End-to-end: OpenLDAP container → bind → search → authenticate → teardown."""

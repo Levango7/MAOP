@@ -14,12 +14,19 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 from .state import MAOP_ROOT, active_jobs, cache, cache_lock
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Hold strong references to background asyncio tasks (e.g. pipe drainers) so
+# they are not garbage-collected before completion. See Python docs on
+# asyncio.create_task: "Important: Save a reference to the result of this
+# function, to avoid a task disappearing mid-execution."
+_bg_tasks: set[asyncio.Task[Any]] = set()
 
 
 class RunRequest(BaseModel):
@@ -33,6 +40,7 @@ class MaintainRequest(BaseModel):
 
 
 @router.get("/api/control/status")
+@handle_api_errors("Control status", error_value={"active_jobs": [], "jobs": [], "count": 0})
 async def control_status() -> dict[str, Any]:
     jobs = []
     for job in active_jobs.values():
@@ -47,6 +55,7 @@ async def control_status() -> dict[str, Any]:
     return {"active_jobs": jobs, "jobs": jobs, "count": len(jobs)}
 
 @router.post("/api/control/run")
+@handle_api_errors("Control run")
 async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     actual_task = body.task or body.workflow or "default"
@@ -64,12 +73,15 @@ async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
     # Drain pipes in background to prevent deadlock when child output exceeds OS pipe buffer (~64KB)
-    asyncio.create_task(proc.communicate())
+    _t = asyncio.create_task(proc.communicate())
+    _bg_tasks.add(_t)
+    _t.add_done_callback(_bg_tasks.discard)
     active_jobs[job_id] = {"action": "run", "status": "running",
         "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": actual_task, "process": proc}
     return {"job_id": job_id, "status": "started", "task": actual_task}
 
 @router.post("/api/control/pause")
+@handle_api_errors("Control pause")
 async def control_pause(request: Request) -> dict[str, Any]:
     require_admin(request)
     pause_file = MAOP_ROOT / "logs" / ".maop_pause"
@@ -84,6 +96,7 @@ async def control_pause(request: Request) -> dict[str, Any]:
     return {"status": "ok", "action": "pause", "paused": paused}
 
 @router.post("/api/control/resume")
+@handle_api_errors("Control resume")
 async def control_resume(request: Request) -> dict[str, Any]:
     require_admin(request)
     pause_file = MAOP_ROOT / "logs" / ".maop_pause"
@@ -98,6 +111,7 @@ async def control_resume(request: Request) -> dict[str, Any]:
 
 
 @router.get("/api/control/pause-status")
+@handle_api_errors("Control pause status")
 async def control_pause_status(request: Request) -> dict[str, Any]:
     """查询系统暂停/恢复状态（M4 修复新增）。
 
@@ -119,6 +133,7 @@ async def control_pause_status(request: Request) -> dict[str, Any]:
     }
 
 @router.post("/api/control/stop")
+@handle_api_errors("Control stop")
 async def control_stop(request: Request) -> dict[str, Any]:
     require_admin(request)
     stopped = 0
@@ -131,6 +146,7 @@ async def control_stop(request: Request) -> dict[str, Any]:
     return {"status": "ok", "action": "stop", "stopped": stopped}
 
 @router.post("/api/control/validate")
+@handle_api_errors("Control validate")
 async def control_validate(request: Request) -> dict[str, Any]:
     require_admin(request)
     job_id = _uuid.uuid4().hex[:8]
@@ -145,6 +161,7 @@ async def control_validate(request: Request) -> dict[str, Any]:
         return {"job_id": job_id, "status": "failed", "error": "Validate failed"}
 
 @router.post("/api/control/doctor")
+@handle_api_errors("Control doctor")
 async def control_doctor(request: Request) -> dict[str, Any]:
     require_admin(request)
     job_id = _uuid.uuid4().hex[:8]
@@ -159,6 +176,7 @@ async def control_doctor(request: Request) -> dict[str, Any]:
         return {"job_id": job_id, "status": "failed", "error": "Doctor check failed"}
 
 @router.post("/api/control/cancel")
+@handle_api_errors("Control cancel")
 async def control_cancel(request: Request) -> dict[str, Any]:
     require_admin(request)
     body = await request.json()
@@ -172,6 +190,7 @@ async def control_cancel(request: Request) -> dict[str, Any]:
     raise HTTPException(404, "job not found")
 
 @router.post("/api/control/refresh")
+@handle_api_errors("Control refresh")
 async def control_refresh(request: Request) -> dict[str, Any]:
     require_admin(request)
     async with cache_lock:
@@ -179,6 +198,7 @@ async def control_refresh(request: Request) -> dict[str, Any]:
     return {"status": "ok", "cache": "cleared"}
 
 @router.post("/api/control/clear-cache")
+@handle_api_errors("Control clear cache")
 async def control_clear_cache(request: Request) -> dict[str, Any]:
     require_admin(request)
     async with cache_lock:
@@ -187,6 +207,7 @@ async def control_clear_cache(request: Request) -> dict[str, Any]:
 
 
 @router.post("/api/control/provider-health")
+@handle_api_errors("Control provider health")
 async def control_provider_health(request: Request) -> dict[str, Any]:
     require_admin(request)
     try:
@@ -198,6 +219,7 @@ async def control_provider_health(request: Request) -> dict[str, Any]:
         return {"status": "error", "error": "Provider health check failed"}
 
 @router.post("/api/control/maintain")
+@handle_api_errors("Control maintain")
 async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     action = body.action

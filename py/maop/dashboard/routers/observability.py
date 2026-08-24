@@ -32,6 +32,7 @@ from maop.core.observability import (
     setup_observability,
     tracing_enabled,
 )
+from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ class RecordRequestModel(BaseModel):
 
 # ── Endpoints ──────────────────────────────────────────────────────
 @router.get("/status")
+@handle_api_errors("Observability status")
 async def status() -> Any:
     """Return the live observability stack status.
 
@@ -75,6 +77,7 @@ async def status() -> Any:
 
 
 @router.get("/metrics")
+@handle_api_errors("Observability metrics")
 async def metrics() -> Any:
     """Return a JSON summary of the four canonical observability metrics.
 
@@ -87,6 +90,7 @@ async def metrics() -> Any:
 
 
 @router.get("/metrics/prometheus")
+@handle_api_errors("Observability metrics prometheus")
 async def metrics_prometheus() -> Any:
     """Return all metrics in Prometheus text exposition format.
 
@@ -104,6 +108,7 @@ async def metrics_prometheus() -> Any:
 
 
 @router.get("/traces")
+@handle_api_errors("Observability traces", error_value={"enabled": False, "traces": []})
 async def traces(limit: int = 20) -> Any:
     """Return recent trace summary.
 
@@ -131,6 +136,7 @@ async def traces(limit: int = 20) -> Any:
 
 
 @router.post("/record")
+@handle_api_errors("Observability record")
 async def record(payload: RecordRequestModel) -> Any:
     """Record a custom metric / error event.
 
@@ -159,6 +165,7 @@ async def record(payload: RecordRequestModel) -> Any:
 
 
 @router.get("/health")
+@handle_api_errors("Observability health")
 async def health() -> Any:
     """Deep health check of the observability pipeline.
 
@@ -219,6 +226,7 @@ async def health() -> Any:
 
 
 @router.get("/config")
+@handle_api_errors("Observability config")
 async def config() -> Any:
     """Return the observability configuration (env-driven).
 
@@ -237,6 +245,7 @@ async def config() -> Any:
 
 
 @router.post("/setup")
+@handle_api_errors("Observability setup")
 async def setup(force: bool = False) -> Any:
     """Trigger (or re-trigger) observability setup.
 

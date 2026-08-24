@@ -80,7 +80,7 @@
 
 ### 验收标准
 
-- [x] 所有 deprecated ≥ 2 版本的 API 移极移除，`CHANGELOG.md` 列出迁移路径。
+- [x] 所有 deprecated ≥ 2 版本的 API 积极移除，`CHANGELOG.md` 列出迁移路径。
 - [x] `docs/migration-5.0.md` 迁移指南发布，覆盖后端 + 配置 + Docker。
 - [x] 短名环境变量加 `DeprecationWarning`，`.env.example` 标注 deprecated alias。
 - [x] 流式 Agent token 响应端点 + 前端 composable + Chat.vue 集成完成。
@@ -132,7 +132,7 @@
 
 | 阶段 | 时间窗 | 主题 | 状态 | 关键交付 |
 |------|--------|------|------|----------|
-| 阶段一 | Month 1–3 | 稳定性与规模化 | ✅ 已完成 | 分布式执行、pgvector、UnifiedMemoryProtocol、OTel 可观测性 |
+| 阶段一 | Month 1–3 | 稳定性与规模化 | 🔄 进行中 | 分布式执行、pgvector、UnifiedMemoryProtocol、OTel 可观测性 |
 | 阶段二 | Month 4–9 | 智能增强 | 🔜 待启动 | 自演化闭环、多模态记忆、知识图谱推理、Plan 质量学习 |
 | 阶段三 | Month 10–21 | 生态与平台化 | 🔜 待启动 | Agent Marketplace、多后端编排器适配、原生 K8s Operator、细粒度成本归因 |
 

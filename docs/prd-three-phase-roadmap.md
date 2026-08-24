@@ -5,10 +5,10 @@
 | 字段 | 值 |
 |------|-----|
 | 文档名称 | MAOP 三阶段演进路线图 PRD |
-| 版本 | v1.0.0-draft |
+| 版本 | v5.1.0 |
 | 发布日期 | 2026-08-07 |
 | 作者 | MAOP 高级技术文档专家 |
-| 状态 | Draft - Pending Review |
+| 状态 | Phase 1 In Progress（阶段一进行中） |
 | 适用范围 | MAOP Personal Edition + Enterprise Edition |
 | 评审人 | TBD（待指定产品委员会 + 架构委员会） |
 | 关联文档 | [ROADMAP.md](../ROADMAP.md)、[hld-three-phase-roadmap.md](./hld-three-phase-roadmap.md)、[platform-evolution.md](./platform-evolution.md) |
@@ -38,7 +38,7 @@ MAOP（Multi-Agent Orchestration Platform）在完成 P0–P4 代码优化与 P0
 
 ### 1.4 关键假设
 
-1. 阶段一启动时 MAOP 已稳定发布 v5.0.0（major，废弃清理完成）。
+1. 阶段一启动时 MAOP 已稳定发布 v5.1.0（major，废弃清理完成，阶段一进行中）。
 2. 团队规模：阶段一 6–8 人，阶段二 10–12 人，阶段三 15–20 人（含 SRE、前端、平台）。
 3. 基础设施：阶段一引入 Kubernetes 生产集群；阶段二引入 GPU 训练节点；阶段三引入多区域部署。
 4. 预算：阶段一以基础设施迁移成本为主；阶段二以训练与推理成本为主；阶段三以平台运营成本为主。
@@ -901,3 +901,4 @@ gantt
 | 版本 | 日期 | 变更内容 | 作者 |
 |------|------|----------|------|
 | v1.0.0-draft | 2026-08-07 | 初始草案，覆盖三阶段全部特性 | MAOP 高级技术文档专家 |
+| v5.1.0 | 2026-08-23 | 基线同步：当前版本 v5.1.0，阶段一进行中 | MAOP 高级技术文档专家 |
