@@ -30,6 +30,20 @@ behave exactly as before. The Supervisor inherits all passive detector
 APIs (``record_result`` / ``get_weight`` / ``get_stats`` / drain /
 recovery), so existing scheduling-path callers are zero-change.
 
+Module layout
+-------------
+This module focuses on the :class:`Supervisor` orchestration logic. The
+supporting pieces have been split into sibling modules to keep file
+sizes manageable:
+
+- :mod:`maop.core.scheduling.models` — enums + Pydantic schemas
+- :mod:`maop.core.scheduling.rule_engine` — :class:`RuleEngine` + ``default_rules``
+- :mod:`maop.core.scheduling.health_checker` — :class:`HealthChecker`
+
+All public names are re-exported from this module so existing
+``from maop.core.scheduling.supervisor import ...`` callers keep working
+unchanged.
+
 References
 ----------
 - docs/design-supervisor-agent.md (full design)
@@ -44,16 +58,28 @@ import threading
 import time
 import uuid
 from collections import deque
-from enum import Enum
 from typing import Any
-
-from pydantic import BaseModel, Field
 
 from maop.core.observability.metrics import get_metrics
 from maop.core.scheduling.failure_detector import (
     FailurePatternDetector,
     _AgentState,
 )
+
+# Re-exported names (kept in this module's namespace for backward-compatible
+# `from maop.core.scheduling.supervisor import ...` callers).
+from maop.core.scheduling.health_checker import _DEFAULT_PATROL_CONCURRENCY, HealthChecker
+from maop.core.scheduling.models import (
+    ActionRecord,
+    AgentOperationalStatus,
+    AlertLevel,
+    DispatchDecision,
+    HealthProbe,
+    SupervisorAction,
+    SupervisorActionRequest,
+    SupervisorRule,
+)
+from maop.core.scheduling.rule_engine import RuleEngine, default_rules
 
 logger = logging.getLogger(__name__)
 
@@ -67,457 +93,12 @@ M_SUPERVISOR_ACTIONS_TOTAL = "maop_supervisor_actions_total"
 _MAX_ACTION_HISTORY = 500
 # Maximum number of pending alerts kept in memory.
 _MAX_PENDING_ALERTS = 200
-# Default patrol concurrency (parallel probes per patrol round).
-_DEFAULT_PATROL_CONCURRENCY = 10
 # Number of consecutive unreachable patrols before terminate triggers.
 _UNREACHABLE_TERMINATE_THRESHOLD = 3
 # Cooldown for evolution trigger (avoid feedback storm with EvolutionLoop).
 _EVOLUTION_TRIGGER_COOLDOWN_S = 600.0
 # Number of degraded agents that triggers an evolution suggestion.
 _EVOLUTION_TRIGGER_DEGRADED_COUNT = 3
-
-
-# ── Enums ──────────────────────────────────────────────────────
-
-
-class SupervisorAction(str, Enum):
-    """Actions the Supervisor can execute."""
-
-    PATROL = "patrol"
-    ALERT = "alert"
-    REPLACE = "replace"
-    DEGRADE = "degrade"
-    TERMINATE = "terminate"
-    UPGRADE = "upgrade"
-    NONE = "none"
-
-
-class AlertLevel(str, Enum):
-    """Alert severity levels."""
-
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
-
-
-class AgentOperationalStatus(str, Enum):
-    """Extended agent operational status (superset of passive detector states)."""
-
-    NORMAL = "normal"
-    DEGRADED = "degraded"
-    DRAINED = "drained"
-    RECOVERING = "recovering"
-    REPLACED = "replaced"
-    TERMINATED = "terminated"
-    UPGRADING = "upgrading"
-
-
-# ── Data models (Pydantic) ─────────────────────────────────────
-
-
-class HealthProbe(BaseModel):
-    """Single health probe result for one agent."""
-
-    agent_id: str
-    reachable: bool
-    latency_ms: float = 0.0
-    failure_rate: float = 0.0
-    avg_latency: float = 0.0
-    timeout_rate: float = 0.0
-    breaker_open: bool = False
-    resource_usage: dict[str, Any] = Field(default_factory=dict)
-    probed_at: float = Field(default_factory=time.time)
-
-
-class SupervisorRule(BaseModel):
-    """Supervision rule: threshold condition → trigger action.
-
-    The ``condition`` dict is a declarative threshold description
-    evaluated by :class:`RuleEngine`. Keys are OR-semantics; wrap a
-    list under ``"all"`` for AND-semantics.
-    """
-
-    rule_id: str
-    name: str
-    description: str = ""
-    action: SupervisorAction
-    alert_level: AlertLevel = AlertLevel.WARNING
-    condition: dict[str, Any]
-    action_params: dict[str, Any] = Field(default_factory=dict)
-    cooldown_s: float = 60.0
-    priority: int = 0
-    enabled: bool = True
-
-
-class DispatchDecision(BaseModel):
-    """Pre-dispatch check result returned to the Engine."""
-
-    allow: bool
-    reason: str = ""
-    fallback_agent: str | None = None
-    degraded: bool = False
-
-
-class ActionRecord(BaseModel):
-    """Audit record for a control action."""
-
-    action_id: str
-    action: SupervisorAction
-    agent_id: str
-    reason: str
-    params: dict[str, Any] = Field(default_factory=dict)
-    triggered_by: str = "patrol"
-    created_at: float
-    reverted_at: float | None = None
-
-
-class SupervisorActionRequest(BaseModel):
-    """Manual control action request body (dashboard API)."""
-
-    agent_id: str
-    action: str
-    params: dict[str, Any] = Field(default_factory=dict)
-    reason: str
-
-
-# ── Rule engine ────────────────────────────────────────────────
-
-
-class RuleEngine:
-    """Evaluates :class:`SupervisorRule` conditions against :class:`HealthProbe`.
-
-    A rule's ``condition`` dict supports the following keys (OR-semantics
-    at top level; wrap a list under ``"all"`` for AND-semantics):
-
-    - ``failure_rate_gt``: float — failure_rate > value
-    - ``avg_latency_gt``: float — avg_latency > value
-    - ``timeout_rate_gt``: float — timeout_rate > value
-    - ``breaker_open``: bool — breaker_open == value
-    - ``reachable``: bool — reachable == value (False detects unresponsive)
-    - ``resource_usage_gt``: dict[str, float] — any named resource > threshold
-    - ``all``: list[dict] — all sub-conditions must match (AND)
-    """
-
-    def __init__(self, rules: list[SupervisorRule] | None = None) -> None:
-        self._rules: list[SupervisorRule] = list(rules or [])
-        # Sort by priority descending (high priority first).
-        self._rules.sort(key=lambda r: r.priority, reverse=True)
-        # Cooldown tracking: {(rule_id, agent_id): last_triggered_at}
-        self._cooldowns: dict[tuple[str, str], float] = {}
-        self._lock = threading.Lock()
-
-    @property
-    def rules(self) -> list[SupervisorRule]:
-        """Return the current rule set (sorted by priority desc)."""
-        return list(self._rules)
-
-    def set_rules(self, rules: list[SupervisorRule]) -> None:
-        """Replace the entire rule set (hot-update from API)."""
-        with self._lock:
-            self._rules = list(rules)
-            self._rules.sort(key=lambda r: r.priority, reverse=True)
-            self._cooldowns.clear()
-
-    def evaluate(self, probe: HealthProbe) -> list[SupervisorRule]:
-        """Return the list of rules that match ``probe`` and are off cooldown.
-
-        Rules are returned in priority order (highest first). A rule is
-        skipped if it is disabled, its condition does not match, or it
-        is within its cooldown window for this agent.
-        """
-        now = time.time()
-        matched: list[SupervisorRule] = []
-        with self._lock:
-            for rule in self._rules:
-                if not rule.enabled:
-                    continue
-                if not self._matches(rule.condition, probe):
-                    continue
-                key = (rule.rule_id, probe.agent_id)
-                last = self._cooldowns.get(key, 0.0)
-                if now - last < rule.cooldown_s:
-                    continue
-                matched.append(rule)
-                self._cooldowns[key] = now
-        return matched
-
-    def _matches(self, condition: dict[str, Any], probe: HealthProbe) -> bool:
-        """Evaluate a condition dict against a probe (OR-semantics at top)."""
-        if not condition:
-            return False
-        for key, value in condition.items():
-            if key == "all":
-                # AND-semantics: every sub-condition must match.
-                return all(self._matches(sub, probe) for sub in value)
-            if self._matches_one(key, value, probe):
-                return True
-        return False
-
-    def _matches_one(self, key: str, value: Any, probe: HealthProbe) -> bool:
-        """Evaluate a single condition key/value pair."""
-        if key == "failure_rate_gt":
-            return probe.failure_rate > float(value)
-        if key == "avg_latency_gt":
-            return probe.avg_latency > float(value)
-        if key == "timeout_rate_gt":
-            return probe.timeout_rate > float(value)
-        if key == "breaker_open":
-            return probe.breaker_open == bool(value)
-        if key == "reachable":
-            return probe.reachable == bool(value)
-        if key == "resource_usage_gt":
-            # value is dict[str, float]; any named resource exceeds threshold.
-            for res_name, threshold in value.items():
-                actual = probe.resource_usage.get(res_name)
-                if actual is not None and float(actual) > float(threshold):
-                    return True
-            return False
-        # Unknown key — ignore (forward-compat).
-        return False
-
-
-def default_rules() -> list[SupervisorRule]:
-    """Return the built-in default rule set (see design §2.2.5)."""
-    return [
-        SupervisorRule(
-            rule_id="rule.failure_rate.warning",
-            name="failure-rate-warning",
-            description="Alert when window failure rate exceeds 15%",
-            action=SupervisorAction.ALERT,
-            alert_level=AlertLevel.WARNING,
-            condition={"failure_rate_gt": 0.15},
-            cooldown_s=60.0,
-            priority=10,
-        ),
-        SupervisorRule(
-            rule_id="rule.latency.warning",
-            name="latency-warning",
-            description="Alert when avg latency exceeds 15s",
-            action=SupervisorAction.ALERT,
-            alert_level=AlertLevel.WARNING,
-            condition={"avg_latency_gt": 15.0},
-            cooldown_s=60.0,
-            priority=9,
-        ),
-        SupervisorRule(
-            rule_id="rule.latency.degrade",
-            name="latency-degrade",
-            description="Degrade weight by 0.5 when avg latency exceeds 25s",
-            action=SupervisorAction.DEGRADE,
-            alert_level=AlertLevel.ERROR,
-            condition={"avg_latency_gt": 25.0},
-            action_params={"factor": 0.5},
-            cooldown_s=120.0,
-            priority=8,
-        ),
-        SupervisorRule(
-            rule_id="rule.breaker.open",
-            name="breaker-open",
-            description="Alert when breaker is open",
-            action=SupervisorAction.ALERT,
-            alert_level=AlertLevel.ERROR,
-            condition={"breaker_open": True},
-            cooldown_s=30.0,
-            priority=7,
-        ),
-        SupervisorRule(
-            rule_id="rule.timeout.high",
-            name="timeout-high",
-            description="Degrade weight by 0.7 when timeout rate exceeds 20%",
-            action=SupervisorAction.DEGRADE,
-            alert_level=AlertLevel.WARNING,
-            condition={"timeout_rate_gt": 0.20},
-            action_params={"factor": 0.7},
-            cooldown_s=90.0,
-            priority=6,
-        ),
-        SupervisorRule(
-            rule_id="rule.resource.high",
-            name="resource-high",
-            description="Alert when CPU>90% or memory>85%",
-            action=SupervisorAction.ALERT,
-            alert_level=AlertLevel.WARNING,
-            condition={
-                "resource_usage_gt": {
-                    "cpu_percent": 90.0,
-                    "memory_percent": 85.0,
-                },
-            },
-            cooldown_s=60.0,
-            priority=5,
-        ),
-        # NOTE: rule.unreachable.terminate is enforced inline in
-        # Supervisor.patrol() because it requires consecutive-patrol
-        # counting (3 strikes) which is stateful and not expressible
-        # as a stateless condition.
-    ]
-
-
-# ── Health checker ─────────────────────────────────────────────
-
-
-class HealthChecker:
-    """Health probe executor for agents.
-
-    Probes are intentionally lightweight and reuse existing
-    infrastructure rather than requiring agents to expose a dedicated
-    HTTP health endpoint:
-
-    - **ping** — dispatch a sentinel task ``__health_ping__`` and measure
-      round-trip latency. Reuses the Dispatcher path so breaker /
-      budget / guardrail all stay in effect. When no dispatcher is
-      wired in (tests), ``reachable`` defaults to True and latency 0.
-    - **metrics** — read :meth:`FailurePatternDetector.get_agent_health`
-      (in-memory sliding window, no I/O).
-    - **resource** — read agent-exposed Prometheus gauges from the
-      shared :class:`MetricsCollector`. When the agent exposes no
-      resource metrics, ``resource_usage`` is an empty dict.
-    """
-
-    def __init__(
-        self,
-        *,
-        probe_timeout_s: float = 5.0,
-        probe_types: list[str] | None = None,
-        registry: Any = None,
-        dispatcher: Any = None,
-        detector: FailurePatternDetector | None = None,
-    ) -> None:
-        self._probe_timeout_s = float(probe_timeout_s)
-        self._probe_types = list(probe_types or ["ping", "metrics", "resource"])
-        self._registry = registry
-        self._dispatcher = dispatcher
-        self._detector = detector
-
-    async def check(self, agent_id: str) -> HealthProbe:
-        """Execute health probes for one agent and return the snapshot."""
-        probed_at = time.time()
-        reachable = True
-        latency_ms = 0.0
-        failure_rate = 0.0
-        avg_latency = 0.0
-        timeout_rate = 0.0
-        breaker_open = False
-        resource_usage: dict[str, Any] = {}
-
-        # ── ping probe ──
-        if "ping" in self._probe_types:
-            try:
-                reachable, latency_ms = await asyncio.wait_for(
-                    self._ping(agent_id), timeout=self._probe_timeout_s,
-                )
-            except asyncio.TimeoutError:
-                reachable = False
-                latency_ms = self._probe_timeout_s * 1000.0
-            except Exception as exc:
-                logger.debug("[health-checker] ping %s failed: %s", agent_id, exc)
-                reachable = False
-
-        # ── metrics probe (in-memory, no I/O) ──
-        if "metrics" in self._probe_types and self._detector is not None:
-            try:
-                health = self._detector.get_agent_health(agent_id)
-                if health is not None:
-                    failure_rate = health.failure_rate
-                    avg_latency = health.avg_latency
-                    timeout_rate = health.timeout_rate
-                    # breaker_open inferred from weight==0 or drained status.
-                    breaker_open = health.weight <= 0.0 or health.status == "drained"
-            except Exception as exc:
-                logger.debug("[health-checker] metrics %s failed: %s", agent_id, exc)
-
-        # ── resource probe (read MetricsCollector gauges) ──
-        if "resource" in self._probe_types:
-            try:
-                resource_usage = self._read_resource_metrics(agent_id)
-            except Exception as exc:
-                logger.debug("[health-checker] resource %s failed: %s", agent_id, exc)
-                resource_usage = {}
-
-        return HealthProbe(
-            agent_id=agent_id,
-            reachable=reachable,
-            latency_ms=round(latency_ms, 3),
-            failure_rate=round(failure_rate, 4),
-            avg_latency=round(avg_latency, 4),
-            timeout_rate=round(timeout_rate, 4),
-            breaker_open=breaker_open,
-            resource_usage=resource_usage,
-            probed_at=probed_at,
-        )
-
-    async def _ping(self, agent_id: str) -> tuple[bool, float]:
-        """Dispatch a sentinel ping task and measure round-trip latency.
-
-        When no dispatcher is wired in (tests / passive-only mode),
-        returns ``(True, 0.0)`` so the agent is treated as reachable
-        by default — the metrics probe is then the source of truth.
-        """
-        if self._dispatcher is None:
-            return (True, 0.0)
-        start = time.monotonic()
-        try:
-            result = await self._dispatcher.dispatch(
-                agent=agent_id,
-                task="__health_ping__",
-                routing_key="",
-                workdir="",
-                timeout_seconds=int(self._probe_timeout_s),
-                trace_id="supervisor-ping",
-            )
-            elapsed_ms = (time.monotonic() - start) * 1000.0
-            ok = bool(result) and bool(getattr(result, "result", result))
-            return (ok, elapsed_ms)
-        except Exception:
-            elapsed_ms = (time.monotonic() - start) * 1000.0
-            return (False, elapsed_ms)
-
-    def _read_resource_metrics(self, agent_id: str) -> dict[str, Any]:
-        """Read agent-exposed resource metrics from the MetricsCollector.
-
-        Returns an empty dict when the agent exposes no resource metrics
-        (the common case — agents currently only expose maop_agent_*
-        gauges which are already captured by the metrics probe).
-        """
-        # The MetricsCollector does not currently expose a per-label
-        # read API; resource_usage is left empty in v1. When agents
-        # start exposing cpu_percent / memory_percent gauges, this
-        # method will be extended to read them.
-        _ = agent_id
-        return {}
-
-    async def check_all(self, agent_ids: list[str]) -> list[HealthProbe]:
-        """Probe all given agents concurrently (bounded by semaphore)."""
-        sem = asyncio.Semaphore(_DEFAULT_PATROL_CONCURRENCY)
-
-        async def _bounded(aid: str) -> HealthProbe:
-            async with sem:
-                return await self.check(aid)
-
-        return await asyncio.gather(*[_bounded(a) for a in agent_ids])
-
-    async def check_sample(
-        self,
-        agent_ids: list[str],
-        sample_size: int,
-        priority_weight: bool = True,
-    ) -> list[HealthProbe]:
-        """Sample-based patrol (v1: forwards to check_all).
-
-        Sampling by anomaly-score is deferred to a future version per
-        design §2.4.2 [F-4]. The signature is retained for forward
-        compatibility.
-        """
-        _ = priority_weight
-        return await self.check_all(agent_ids[:max(1, sample_size)])
-
-    async def check_adaptive(self, agent_ids: list[str]) -> list[HealthProbe]:
-        """Adaptive patrol (v1: forwards to check_all).
-
-        Load-aware adaptive sizing is deferred per design §2.4.2 [F-4].
-        """
-        return await self.check_all(agent_ids)
 
 
 # ── Supervisor main class ──────────────────────────────────────

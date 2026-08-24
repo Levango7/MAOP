@@ -113,7 +113,7 @@
 | B4 | P3 | **[实证]** `supervisor.py` 1571 行 / `engine.py` 998 行 / `memory/manager.py` 949 行 | 大文件二轮拆分未完 | ⚠️ 保留（P3 规划项） |
 | B5 | P3 | **[实证]** `cost_tracker.py:278-279`、`maop_loop_phases.py:185-186, 507-508`、`a2a.py:289-290` fire-and-forget 任务均已 `_bg_tasks.add(_t)` + `add_done_callback(_bg_tasks.discard)` 持有引用 | 低风险，与已修模式同类 | ✅ 已修复（cf8c39e） |
 | B6 | P3 | **[实证]** `docs/README.md:18` 已改为 "380+ 个端点"，与实测 384 个去重路径一致 | 文档计数失实 | ✅ 已修复（cf8c39e） |
-| B7 | P3 | **[实证]** `evolve_insights.py` 中 `agent_counts` 从 `phases` 里猜 `agent` 字段（`:98-101`），拿不到就 `continue` 静默跳过统计 | 演化指标聚合对数据形态脆弱，无数据时静默空 | ⚠️ 保留（P3 规划项） |
+| B7 | P3 | **[实证]** `evolve_insights.py` 中 `agent_counts` 已添加 `logger.debug` 跳过日志 + 从 `h.phases` 首个 phase 兜底获取 agent 名称 + 空结果时 `logger.warning` | 演化指标聚合对数据形态脆弱，无数据时静默空 | ✅ 已修复（804592c） |
 | B8 | P3 | **[实证]** `docker-compose.prod.yml:97,161` 应用侧与 `:346` redis-server 均统一为 `${MAOP_REDIS_PASSWORD:?...}` 强制语法 | 配置语法不一致（无实际无鉴权风险） | ✅ 已修复（cf8c39e） |
 
 ### 补充遗漏问题（原报告未提及，本次核对新增）

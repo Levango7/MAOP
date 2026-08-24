@@ -1,6 +1,6 @@
 # RFC-001: MAOP 控制台产品设计演进 — 从"功能仓库"到"工作台"
 
-- **状态**: Draft (待审阅)
+- **状态**: Active (迭代 A 已在 nav.js 落地，Run/Evolve 合并完成)
 - **作者**: InsCode
 - **日期**: 2026-08-12
 - **影响范围**: `dashboard-enterprise/` 全部 22 个视图、`src/nav.js`、`src/components/*`、新增 3 个组件
