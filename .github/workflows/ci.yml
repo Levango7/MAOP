@@ -271,6 +271,12 @@ jobs:
       - name: Run performance smoke tests
         run: python -m pytest tests/performance/ -q -m slow --timeout=120
 
+      - name: PRD 1.3 success-metric gate (cold start / disk footprint)
+        # P3 fix: PRD 1.3 承诺"冷启动 <3s、磁盘占用 <50MB"，此前仅依赖数被
+        # ratchet 跟踪，冷启动/磁盘无验收闭环。此步骤实测 import maop 冷启动
+        # 与 maop 包磁盘占用，超限即 CI 失败（scripts/check_perf_metrics.py）。
+        run: python scripts/check_perf_metrics.py
+
       - name: Run reliability & stability tests
         run: python -m pytest tests/reliability/ tests/stability/ -q --timeout=120
 

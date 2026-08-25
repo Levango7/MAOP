@@ -80,6 +80,12 @@ from maop.core.scheduling.models import (
     SupervisorRule,
 )
 from maop.core.scheduling.rule_engine import RuleEngine, default_rules
+# B4 拆分：内部 per-agent 状态与 supervisor 专属异常已移至独立模块，
+# 此处 re-export 保持向后兼容。
+from maop.core.scheduling.supervisor_state import (
+    _SupervisorAgentState,
+    TerminateRefusedError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1086,54 +1092,13 @@ class Supervisor(FailurePatternDetector):
             )
 
 
-# ── Internal per-agent supervisor state ───────────────────────
-
-
-class _SupervisorAgentState:
-    """Mutable per-agent supervisor state (guarded by supervisor lock)."""
-
-    __slots__ = (
-        "consecutive_unreachable",
-        "disabled",
-        "fallback_agent",
-        "last_probe_at",
-        "max_concurrency",
-        "operational_status",
-        "timeout_s",
-        "upgrade_old_avg_latency",
-        "upgrade_target_version",
-    )
-
-    def __init__(self) -> None:
-        self.operational_status: AgentOperationalStatus = AgentOperationalStatus.NORMAL
-        self.disabled: bool = False
-        self.fallback_agent: str | None = None
-        self.max_concurrency: int | None = None
-        self.timeout_s: float | None = None
-        self.consecutive_unreachable: int = 0
-        self.last_probe_at: float = 0.0
-        self.upgrade_target_version: str | None = None
-        self.upgrade_old_avg_latency: float = 0.0
-
-
-# ── Exceptions ────────────────────────────────────────────────
-
-
-class TerminateRefusedError(Exception):
-    """Raised when terminate is refused because the agent is the only available one."""
-
-    def __init__(self, agent_id: str, routing_key: str, reason: str) -> None:
-        self.agent_id = agent_id
-        self.routing_key = routing_key
-        self.reason = reason
-        super().__init__(f"terminate refused for {agent_id}: {reason}")
-
-
 # ── Re-exports for FailurePatternDetector internals ────────────
 # Supervisor inherits FailurePatternDetector and uses its private
 # _AgentState / _lock / _agents / _agent_health_locked. The import
 # above (top of file) makes _AgentState available to mypy for
 # resolving the references inside Supervisor.
+# _SupervisorAgentState / TerminateRefusedError are imported from
+# maop.core.scheduling.supervisor_state (B4 拆分) and re-exported below.
 
 
 __all__ = [
