@@ -7,9 +7,10 @@ import json
 import logging
 import re
 import time
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,14 @@ class RoutingMixin:
         - ``queue_stats``            — message queue statistics (async)
         - ``_queue_stats_sync``      — sync queue stats (for run_in_executor)
     """
+
+    if TYPE_CHECKING:
+        # 宿主类（DataProxy）提供的属性与方法 —— 仅用于类型检查
+        _root: Path
+        _record_latency: Callable[..., None]
+        _query_maop: Callable[..., Any]
+        _pool_queue: Callable[..., Any]
+
 
     @staticmethod
     def _read_delegations_file(log_path: Path) -> Any:

@@ -8,17 +8,36 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from maop.memory.shared_db import (
     normalize_layer_name,
 )
+
+if TYPE_CHECKING:
+    from maop.core.reliability.cache import LRUCache
 
 logger = logging.getLogger(__name__)
 
 
 class ProtocolMixin:
     """统一 API / UnifiedMemoryProtocol 别名 / F1-03 CRUD 方法。"""
+
+    if TYPE_CHECKING:
+        # 宿主类（ThreeLayerMemory）提供的属性与方法 —— 仅用于类型检查
+        _working: LRUCache
+        working_put: Callable[..., None]
+        working_get: Callable[..., Any]
+        working_delete: Callable[..., None]
+        episodic_store: Callable[..., str]
+        episodic_search: Callable[..., list[Any]]
+        episodic_get: Callable[..., Any]
+        episodic_stats: Callable[..., dict[str, Any]]
+        semantic_index: Callable[..., str]
+        semantic_search: Callable[..., list[Any]]
+        _episodic_connect: Callable[..., Any]
+        _get_vector_store: Callable[..., Any]
 
 
     def store(self, layer: str, content: str, **kwargs: Any) -> str:

@@ -578,7 +578,7 @@ class Engine:
                 # Agent/DAG step: use custom executor or mock
                 if self._step_executor is not None:
                     max_attempts = 1 + max(0, step.retry)  # P1-6: retry support
-                    result: Any = None
+                    result: Any = None  # type: ignore[no-redef]
                     for attempt in range(max_attempts):
                         result = await self._step_executor(
                             step=step, context=context, workdir=workdir,

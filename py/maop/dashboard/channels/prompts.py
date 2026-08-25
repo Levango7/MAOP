@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,16 @@ class PromptsMixin:
         - ``human_pending``        — human proxy pending requests
         - ``coordination_report``  — coordination/teams report
     """
+
+    if TYPE_CHECKING:
+        # 宿主类（DataProxy）提供的属性与方法 —— 仅用于类型检查
+        _root: Path
+        _record_latency: Callable[..., None]
+        _query_maop: Callable[..., Any]
+        queue_stats: Callable[..., Any]
+        # 惰性初始化的 human_proxy（DataProxy.__init__ 中设为 None，首次使用时创建）
+        _human_proxy: Any
+
 
     async def human_pending(self) -> dict[str, Any]:
         """Human proxy pending requests — replaces human-proxy.ps1 -Action pending."""

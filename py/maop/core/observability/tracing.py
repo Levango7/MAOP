@@ -228,7 +228,8 @@ def _stamp_caller_attrs(span_obj: Any, fn: Callable[..., Any], args: tuple) -> N
         if args and hasattr(args[0], "__class__"):
             span_obj.set_attribute("code.class", args[0].__class__.__name__)
     except Exception:
-        pass
+        # span 属性设置失败不应影响业务逻辑；记录 debug 日志便于排查
+        logger.debug("stamp caller attrs failed", exc_info=True)
 
 
 def _record_exception(span_obj: Any, exc: BaseException) -> None:
@@ -243,7 +244,8 @@ def _record_exception(span_obj: Any, exc: BaseException) -> None:
         try:
             span_obj.set_status("ERROR")
         except Exception:
-            pass
+            # span 状态设置二次失败时静默兜底；记录 debug 日志便于排查
+            logger.debug("set span status (fallback) failed", exc_info=True)
 
 
 @contextmanager
@@ -361,9 +363,11 @@ class TraceContextMiddleware:
                 if ctx is not None:
                     token = otel_context.attach(ctx)
             except ImportError:
+                # opentelemetry 未安装是合法状态，静默忽略
                 pass
             except Exception:
-                pass
+                # OTel context attach 失败不应影响请求处理
+                logger.debug("attach otel context failed", exc_info=True)
 
         # Wrap send so we can inject traceparent on egress.
         async def send_wrapper(message: dict) -> None:
@@ -377,7 +381,8 @@ class TraceContextMiddleware:
                             msg_headers.append((k.encode(), v.encode("latin-1")))
                         message["headers"] = msg_headers
                 except Exception:
-                    pass
+                    # trace context 注入失败不应影响响应发送
+                    logger.debug("inject trace context on egress failed", exc_info=True)
             await send(message)
 
         try:
@@ -388,9 +393,11 @@ class TraceContextMiddleware:
                     from opentelemetry import context as otel_context
                     otel_context.detach(token)
                 except ImportError:
+                    # opentelemetry 未安装是合法状态，静默忽略
                     pass
                 except Exception:
-                    pass
+                    # OTel context detach 失败不应影响请求清理
+                    logger.debug("detach otel context failed", exc_info=True)
 
 
 # ── Auto-span installation for spec-named targets ───────────────────

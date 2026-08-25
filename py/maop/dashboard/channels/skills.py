@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,12 @@ class SkillsMixin:
         - ``skills_list``  — skills derived from tool_manager registry
         - ``versions_check`` — MAOP/python version info
     """
+
+    if TYPE_CHECKING:
+        # 宿主类（DataProxy）提供的属性与方法 —— 仅用于类型检查
+        _root: Path
+        _record_latency: Callable[..., None]
+
 
     async def skills_list(self) -> list[dict[str, Any]]:
         """Skills list — derived from tool_manager registry."""

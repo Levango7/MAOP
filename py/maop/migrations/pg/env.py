@@ -8,6 +8,7 @@ local ``postgresql+psycopg2://localhost:5432/maop`` default.
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from logging.config import fileConfig
@@ -22,6 +23,8 @@ MAOP_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(MAOP_ROOT / "py"))
 
 config = context.config
+
+logger = logging.getLogger(__name__)
 
 # Resolve DB URL: MAOP_DATABASE_URL > MAOP_DB_URL > default local PG.
 default_pg_url = "postgresql+psycopg2://localhost:5432/maop"
@@ -53,7 +56,8 @@ def _enable_extensions(connection) -> None:
         try:
             connection.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
         except Exception:
-            pass
+            # CREATE EXTENSION 可能因权限不足或已预装而失败，记录 debug 日志
+            logger.debug("CREATE EXTENSION %s failed (may be pre-provisioned)", ext, exc_info=True)
 
 
 def run_migrations_offline() -> None:

@@ -280,8 +280,8 @@ def maop_plan(
         MAOP_DELEGATIONS_TOTAL.inc()
         MAOP_DELEGATION_DURATION.observe(_time.monotonic() - _plan_start)
     except Exception:
-        # 指标记录失败不应影响业务逻辑
-        pass
+        # 指标记录失败不应影响业务逻辑；记录 debug 日志便于排查
+        logger.debug("record plan delegation metrics failed", exc_info=True)
 
     return Plan(
         task=task,

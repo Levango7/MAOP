@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from maop.core.evolution.evolution_loop_types import (
     EvolutionSuggestion,
@@ -21,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 class EvolutionPhasesMixin:
     """OBSERVE/HEAL/SUGGEST/EVALUATE/APPLY/VALIDATE/CONSOLIDATE 阶段方法。"""
+
+    if TYPE_CHECKING:
+        # 宿主类（EvolutionLoop）提供的属性与方法 —— 仅用于类型检查
+        _root: Path
+        _heal_threshold: int
+        _suggest_threshold: int
+        _strategy_name: str
+        _write_suggestions: Callable[..., None]
 
 
     def _phase_observe(self) -> PhaseResult:

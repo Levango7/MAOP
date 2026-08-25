@@ -98,7 +98,7 @@ mgr.create_tenant(
 命令示例：启动 MAOP API 服务
 
 ```bash
-maop serve --host 0.0.0.0 --port 8000
+maop start --host 0.0.0.0 --port 9079
 ```
 
 ### 4.2 组织层级
@@ -143,7 +143,7 @@ request, report = gdpr.data_portability("user-123", tenant_id="t1")
 
 ### 4.4 LDAP 集成
 
-代码示例：LDAPC从 LDAP 同步用户（Python）
+代码示例：从 LDAP 同步用户（Python）
 
 ```python
 from maop.core.security.ldap_provider import (

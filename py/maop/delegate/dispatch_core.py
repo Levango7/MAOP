@@ -352,7 +352,8 @@ class Dispatcher:
 
             MAOP_DELEGATIONS_TOTAL.inc()
         except Exception:
-            pass
+            # 指标更新失败不应影响业务逻辑
+            logger.debug("inc MAOP_DELEGATIONS_TOTAL failed", exc_info=True)
         routing_tracer = get_tracer("maop.routing.dispatcher")
         with otel_span(
             routing_tracer, "routing.dispatcher.dispatch", trace_id=trace_id,
@@ -406,7 +407,8 @@ class Dispatcher:
 
                 MAOP_DELEGATION_DURATION.observe(time.monotonic() - _start)
             except Exception:
-                pass
+                # 指标更新失败不应影响业务逻辑
+                logger.debug("observe MAOP_DELEGATION_DURATION failed", exc_info=True)
             return result
 
     def _record_agent_performance(
@@ -710,7 +712,8 @@ class Dispatcher:
 
                 MAOP_DELEGATIONS_SUCCESS.inc()
             except Exception:
-                pass
+                # 指标更新失败不应影响业务逻辑
+                logger.debug("inc MAOP_DELEGATIONS_SUCCESS failed", exc_info=True)
         else:
             await self._breaker.arecord_failure(agent)
             self._notify_route_scorer(agent, success=False)
@@ -720,7 +723,8 @@ class Dispatcher:
 
                 MAOP_DELEGATIONS_FAILED.inc()
             except Exception:
-                pass
+                # 指标更新失败不应影响业务逻辑
+                logger.debug("inc MAOP_DELEGATIONS_FAILED failed", exc_info=True)
 
 
         return DispatchResult(

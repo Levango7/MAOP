@@ -8,7 +8,11 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from maop.core.reliability.cache import LRUCache
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +22,11 @@ class WorkingMemoryMixin:
 
     构造函数中的 LRU 初始化仍留在宿主类（引用 ``self._overflow_to_episodic``）。
     """
+
+    if TYPE_CHECKING:
+        # 宿主类（ThreeLayerMemory）提供的属性 —— 仅用于类型检查
+        _working: LRUCache
+        episodic_store: Callable[..., str]
 
     def working_put(self, key: str, value: Any, ttl_s: float | None = None) -> None:
         """Store a value in Working Memory (session-scoped, fast).

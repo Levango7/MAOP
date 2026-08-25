@@ -81,7 +81,7 @@ async def api_evolve_metrics() -> dict[str, Any]:
 
     lineage = [
         {
-            "cycle_id": h.id,
+            "cycle_id": h.cycle_id,
             "started_at": h.started_at,
             "errors_observed": h.errors_observed,
             "heal_successes": h.heal_successes,
@@ -90,7 +90,7 @@ async def api_evolve_metrics() -> dict[str, Any]:
         for h in history
     ]
 
-    heatmap: list[dict[str, Any]] = []
+    heatmap: list[dict[str, Any]] = []  # type: ignore[no-redef]
     agent_counts: dict[str, dict[str, Any]] = {}
     import contextlib
     import json as _json
@@ -98,7 +98,7 @@ async def api_evolve_metrics() -> dict[str, Any]:
     for h in history:
         agent = ""
         with contextlib.suppress(Exception):
-            rpt = _json.loads(h.report_json) if h.report_json else {}
+            rpt = _json.loads(h.model_dump_json()) if h else {}
             agent = rpt.get("agent", "") or rpt.get("agent_name", "") or ""
         if not agent:
             continue

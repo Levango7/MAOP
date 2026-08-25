@@ -10,7 +10,8 @@ import json
 import logging
 import time as _time
 import uuid
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from maop.core.mcp.mcp_hub_types import (
     MCPServerConfig,
@@ -24,6 +25,14 @@ logger = logging.getLogger(__name__)
 
 class MCPHubCompatMixin:
     """名称兼容 shims（get_server_config/add_server/all_tools 等）。"""
+
+    if TYPE_CHECKING:
+        # 宿主类（MCPHub）提供的属性与方法 —— 仅用于类型检查
+        _configs: dict[str, Any]
+        _transports: dict[str, Any]
+        _stop_tasks: set[Any]
+        _connect: Callable[..., Any]
+        call_tool: Callable[..., Any]
 
 
     def get_server_config(self, name: str) -> MCPServerConfig | None:

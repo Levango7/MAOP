@@ -242,7 +242,8 @@ class AgentRegistry:
                 ).fetchone()
             MAOP_ACTIVE_AGENTS.set(row["cnt"] if row else 0)
         except Exception:
-            pass
+            # 指标更新失败不应影响业务逻辑；记录 debug 日志便于排查
+            logger.debug("update MAOP_ACTIVE_AGENTS metric failed", exc_info=True)
 
     def health_check(self, name: str) -> HealthCheckResult:
         agent = self.get_agent(name)

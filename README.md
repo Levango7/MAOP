@@ -351,19 +351,19 @@ Web dashboard at `http://localhost:9079` with:
 
 | Module | Description |
 |--------|-------------|
-| `core/services.py` | Service container & dependency injection |
-| `core/db_utils.py` | Connection pool & unified SQLite access |
-| `core/phases.py` | Phase context & result models |
-| `core/otel.py` | OpenTelemetry native tracing integration |
-| `core/a2a.py` | Agent-to-Agent (A2A) protocol implementation |
-| `core/regression.py` | CI/CD regression testing & persona simulation |
-| `core/byok.py` | Bring-Your-Own-Key gateway |
-| `core/skill_version.py` | Skill Git-based version management |
-| `core/tenant.py` | Multi-tenant isolation & quota management |
-| `core/event_bus.py` | Async event bus |
-| `core/circuit_breaker.py` | Circuit breaker pattern |
-| `core/vector.py` | Vector store for semantic search |
-| `core/streaming.py` | Streaming infrastructure (WebSocket + HTTP SSE at /api/chat/stream; ADR-006 superseded) |
+| `core/reliability/services.py` | Service container & dependency injection |
+| `core/backends/db_utils.py` | Connection pool & unified SQLite access |
+| `core/agent/evolution/phases.py` | Phase context & result models |
+| `core/monitoring/otel.py` | OpenTelemetry native tracing integration |
+| `core/agent/delegation/a2a.py` | Agent-to-Agent (A2A) protocol implementation |
+| `core/evolution/regression.py` | CI/CD regression testing & persona simulation |
+| `core/security/byok.py` | Bring-Your-Own-Key gateway |
+| `core/evolution/skill_version.py` | Skill Git-based version management |
+| `core/security/tenant.py` | Multi-tenant isolation & quota management |
+| `core/reliability/event_bus.py` | Async event bus |
+| `core/reliability/circuit_breaker.py` | Circuit breaker pattern |
+| `core/memory/vector.py` | Vector store for semantic search |
+| `core/reliability/streaming.py` | Streaming infrastructure (WebSocket + HTTP SSE at /api/chat/stream; ADR-006 superseded) |
 | `core/security/` | 安全子包：认证、授权、加密、密钥管理等安全相关能力（新增第 18 个子包，原 17 子包基础上补充） |
 | `config/edition.py` | Dual-edition 注册表与 FeatureFlag gate（[ADR-016](docs/adr/016-dual-edition-architecture.md)） |
 | `enterprise/` | 企业版扩展模块（rbac/tenant/audit/sso/ha/license/n8n 等，仅 `maop-enterprise` 包含） |
@@ -403,6 +403,7 @@ Key architectural decisions in [docs/adr/](docs/adr/README.md):
 - [ADR-014](docs/adr/014-ha-single-instance-status.md) — HA 单实例状态（Superseded by ADR-015）
 - [ADR-015](docs/adr/015-distributed-ha-redis-lease.md) — 分布式 HA Redis 租约
 - [ADR-016](docs/adr/016-dual-edition-architecture.md) — 双版架构（Personal / Enterprise）
+- [ADR-017](docs/adr/017-dual-repo-isolation.md) — 双仓库物理隔离
 
 ## License
 

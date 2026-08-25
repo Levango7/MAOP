@@ -46,6 +46,95 @@ _CSP_VIOLATION_MAX = 200  # keep last 200 violations in memory
 
 
 # ── Include routers ────────────────────────────────────────────────
+def _register_enterprise_routers(app: FastAPI) -> None:
+    """Register enterprise-only routers (tenant, rbac, sso, quotas, n8n, licenses).
+
+    Each router is gated by a feature flag and wrapped in try/except ImportError
+    so that personal edition (which lacks the router module) degrades gracefully
+    with a warning instead of crashing on startup.
+    """
+    if has_feature(FeatureFlag.MULTI_USER):
+        try:
+            # `# type: ignore` is required because mypy cannot
+            # statically verify that routers/tenant.py exists — it is created
+            # in Phase C. The runtime `except ImportError` below emits a
+            # warning if the file is missing, so the silent-swallow problem
+            # from B1 is fixed at runtime; the type-ignore only silences the
+            # static checker.
+            from maop.dashboard.routers import tenant as tenant_router
+            app.include_router(tenant_router.router)
+            logger.info("[server] Enterprise router: tenant enabled")
+        except ImportError as _e:
+            logger.warning(
+                "[server] Enterprise router MISSING: tenant (import error: %s). "
+                "ENTERPRISE mode will return 404 on /api/tenant/* — Phase C will "
+                "add routers/tenant.py to fix this.",
+                _e,
+            )
+        try:
+            # C1 (2026-07-22): RBAC router — bridges RBACManager to frontend.
+            from maop.dashboard.routers import rbac as rbac_router
+            app.include_router(rbac_router.router)
+            logger.info("[server] Enterprise router: rbac enabled")
+        except ImportError as _e:
+            logger.warning(
+                "[server] Enterprise router MISSING: rbac (import error: %s). "
+                "ENTERPRISE mode will return 404 on /api/rbac/* — Phase C will "
+                "add routers/rbac.py to fix this.",
+                _e,
+            )
+        try:
+            # C4 (2026-07-22): SSO router — bridges SSOManager to frontend.
+            from maop.dashboard.routers import sso as sso_router
+            app.include_router(sso_router.router)
+            logger.info("[server] Enterprise router: sso enabled")
+        except ImportError as _e:
+            logger.warning(
+                "[server] Enterprise router MISSING: sso (import error: %s). "
+                "ENTERPRISE mode will return 404 on /api/sso/* — Phase C will "
+                "add routers/sso.py to fix this.",
+                _e,
+            )
+        try:
+            # Multi-tenant resource quotas router — bridges QuotaManager to
+            # frontend. Implements PRD docs/prd-tenant-quota.md.
+            from maop.dashboard.routers import quotas as quotas_router
+            app.include_router(quotas_router.router)
+            logger.info("[server] Enterprise router: quotas enabled")
+        except ImportError as _e:
+            logger.warning(
+                "[server] Enterprise router MISSING: quotas (import error: %s). "
+                "ENTERPRISE mode will return 404 on /api/quotas/*.",
+                _e,
+            )
+
+    # ── n8n integration router (Enterprise only, gated by FeatureFlag.N8N_INTEGRATION) ──
+    if has_feature(FeatureFlag.N8N_INTEGRATION):
+        try:
+            from maop.dashboard.routers import n8n as n8n_router
+            app.include_router(n8n_router.router)
+            logger.info("[server] Enterprise router: n8n enabled")
+        except ImportError as _e:
+            logger.warning(
+                "[server] Enterprise router MISSING: n8n (import error: %s).",
+                _e,
+            )
+
+    # ── License management router (Enterprise only, gated by FeatureFlag.LICENSE_MANAGEMENT) ──
+    # Implements PRD docs/prd-license-management.md: CRUD + lifecycle (validate,
+    # revoke, renew) + audit log for issued MAOP Enterprise licenses.
+    if has_feature(FeatureFlag.LICENSE_MANAGEMENT):
+        try:
+            from maop.dashboard.routers import licenses as licenses_router
+            app.include_router(licenses_router.router)
+            logger.info("[server] Enterprise router: licenses enabled")
+        except ImportError as _e:
+            logger.warning(
+                "[server] Enterprise router MISSING: licenses (import error: %s).",
+                _e,
+            )
+
+
 def register_routers(app: FastAPI) -> None:
     """Register all API routers (core + enterprise + optional)."""
     global _app
@@ -254,86 +343,7 @@ def register_routers(app: FastAPI) -> None:
     except ImportError as _e:
         logger.warning("[server] Router MISSING: audit (import error: %s)", _e)
 
-    if has_feature(FeatureFlag.MULTI_USER):
-        try:
-            # `# type: ignore` is required because mypy cannot
-            # statically verify that routers/tenant.py exists — it is created
-            # in Phase C. The runtime `except ImportError` below emits a
-            # warning if the file is missing, so the silent-swallow problem
-            # from B1 is fixed at runtime; the type-ignore only silences the
-            # static checker.
-            from maop.dashboard.routers import tenant as tenant_router
-            app.include_router(tenant_router.router)
-            logger.info("[server] Enterprise router: tenant enabled")
-        except ImportError as _e:
-            logger.warning(
-                "[server] Enterprise router MISSING: tenant (import error: %s). "
-                "ENTERPRISE mode will return 404 on /api/tenant/* — Phase C will "
-                "add routers/tenant.py to fix this.",
-                _e,
-            )
-        try:
-            # C1 (2026-07-22): RBAC router — bridges RBACManager to frontend.
-            from maop.dashboard.routers import rbac as rbac_router
-            app.include_router(rbac_router.router)
-            logger.info("[server] Enterprise router: rbac enabled")
-        except ImportError as _e:
-            logger.warning(
-                "[server] Enterprise router MISSING: rbac (import error: %s). "
-                "ENTERPRISE mode will return 404 on /api/rbac/* — Phase C will "
-                "add routers/rbac.py to fix this.",
-                _e,
-            )
-        try:
-            # C4 (2026-07-22): SSO router — bridges SSOManager to frontend.
-            from maop.dashboard.routers import sso as sso_router
-            app.include_router(sso_router.router)
-            logger.info("[server] Enterprise router: sso enabled")
-        except ImportError as _e:
-            logger.warning(
-                "[server] Enterprise router MISSING: sso (import error: %s). "
-                "ENTERPRISE mode will return 404 on /api/sso/* — Phase C will "
-                "add routers/sso.py to fix this.",
-                _e,
-            )
-        try:
-            # Multi-tenant resource quotas router — bridges QuotaManager to
-            # frontend. Implements PRD docs/prd-tenant-quota.md.
-            from maop.dashboard.routers import quotas as quotas_router
-            app.include_router(quotas_router.router)
-            logger.info("[server] Enterprise router: quotas enabled")
-        except ImportError as _e:
-            logger.warning(
-                "[server] Enterprise router MISSING: quotas (import error: %s). "
-                "ENTERPRISE mode will return 404 on /api/quotas/*.",
-                _e,
-            )
-
-    # ── n8n integration router (Enterprise only, gated by FeatureFlag.N8N_INTEGRATION) ──
-    if has_feature(FeatureFlag.N8N_INTEGRATION):
-        try:
-            from maop.dashboard.routers import n8n as n8n_router
-            app.include_router(n8n_router.router)
-            logger.info("[server] Enterprise router: n8n enabled")
-        except ImportError as _e:
-            logger.warning(
-                "[server] Enterprise router MISSING: n8n (import error: %s).",
-                _e,
-            )
-
-    # ── License management router (Enterprise only, gated by FeatureFlag.LICENSE_MANAGEMENT) ──
-    # Implements PRD docs/prd-license-management.md: CRUD + lifecycle (validate,
-    # revoke, renew) + audit log for issued MAOP Enterprise licenses.
-    if has_feature(FeatureFlag.LICENSE_MANAGEMENT):
-        try:
-            from maop.dashboard.routers import licenses as licenses_router
-            app.include_router(licenses_router.router)
-            logger.info("[server] Enterprise router: licenses enabled")
-        except ImportError as _e:
-            logger.warning(
-                "[server] Enterprise router MISSING: licenses (import error: %s).",
-                _e,
-            )
+    _register_enterprise_routers(app)
 
     # ── Notification Center router (available in both editions) ──
     # Implements PRD docs/prd-notification-center.md: channels (Email/Webhook/InApp),

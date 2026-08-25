@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,15 @@ class McpMixin:
         - ``mcp_servers``   — MCP servers from config
         - ``mcp_tools``     — MCP tools from config
     """
+
+    if TYPE_CHECKING:
+        # 宿主类（DataProxy）提供的属性与方法 —— 仅用于类型检查
+        _root: Path
+        _record_latency: Callable[..., None]
+        # 惰性初始化的管理器（DataProxy.__init__ 中设为 None，首次使用时创建）
+        _tool_mgr: Any
+        _sandbox_mgr: Any
+
 
     async def tools_stats(self) -> dict[str, Any]:
         """Tool manager statistics — replaces tool-manager.ps1 -Action stats."""

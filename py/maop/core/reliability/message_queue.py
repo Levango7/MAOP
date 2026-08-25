@@ -595,7 +595,8 @@ class MessageQueue:
 
             MAOP_QUEUE_PENDING.set(pending)
         except Exception:
-            pass
+            # 指标更新失败不应影响队列统计
+            logger.debug("set MAOP_QUEUE_PENDING metric failed", exc_info=True)
 
         return QueueStats(
             pending=pending,

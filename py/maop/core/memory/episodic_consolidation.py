@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from maop.core.memory.three_layer_memory_types import (
     ConsolidationReport,
@@ -19,6 +21,11 @@ logger = logging.getLogger(__name__)
 
 class EpisodicConsolidationMixin:
     """Episodic → Semantic consolidation 方法。"""
+
+    if TYPE_CHECKING:
+        # 宿主类（ThreeLayerMemory）提供的方法 —— 仅用于类型检查
+        _episodic_connect: Callable[..., Any]
+        _get_vector_store: Callable[..., Any]
 
 
     def consolidate_by_access(self, min_access_count: int = 3, limit: int = 50) -> ConsolidationReport:

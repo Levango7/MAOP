@@ -854,6 +854,7 @@ class Supervisor(FailurePatternDetector):
             try:
                 await self._patrol_task
             except (asyncio.CancelledError, Exception):
+                # 任务取消/清理时的预期异常，静默忽略
                 pass
         self._patrol_task = None
         logger.info("[supervisor] patrol loop stopped")

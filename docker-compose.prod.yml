@@ -451,7 +451,7 @@ services:
       - maop-net
 
   nginx:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     container_name: maop-nginx
     restart: unless-stopped
     # OPS-19 fix: bound nginx. OPS-20 fix: inherit log rotation.

@@ -84,6 +84,9 @@ class PhasesMixin:
     _log: Any
     _record_metric: Any
     llm_factory: Any
+    # 由 ExecuteMixin 提供的方法（MaopLoop 通过多继承获得）
+    _execute_with_strategy: Any
+    _execute_with_retry: Any
 
     @staticmethod
     def _should_execute_parallel(analysis, worker_pool):

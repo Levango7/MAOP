@@ -25,6 +25,15 @@ on:
       - '.github/workflows/ci.yml'
   workflow_dispatch:
 
+# F-P1-4 fix: cancel superseded CI runs on the same ref to save runner time.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# F-P1-5 fix: least-privilege default token (contents: read only).
+permissions:
+  contents: read
+
 env:
   PYTHON_VERSION: "3.13"
   NODE_VERSION: "20"
@@ -522,7 +531,7 @@ jobs:
         with:
           fetch-depth: 0  # full history for secret scan
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v2.2.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -613,6 +622,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Compose up (smoke)
+        env:
+          # F-P1-9 fix: provide required secrets/env for compose smoke test.
+          # MAOP_JWT_SECRET must be >=32 chars (enforced by load_jwt_secret()).
+          MAOP_JWT_SECRET: test-secret-at-least-32-chars-long
+          MAOP_PG_PASSWORD: maop_dev
+          MAOP_REDIS_PASSWORD: maop_dev
+          MAOP_ENV: test
+          MAOP_AUTH: "1"
         run: |
           docker compose -f docker-compose.yml up -d --build
           sleep 10

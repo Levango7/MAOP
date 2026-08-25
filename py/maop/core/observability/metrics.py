@@ -255,7 +255,8 @@ class MetricsMiddleware:
             try:
                 self._metrics.record_request(method, path, status_code, duration)
             except Exception:
-                pass
+                # 指标记录失败不应影响请求处理；记录 debug 日志便于排查
+                logger.debug("record_request failed", exc_info=True)
 
 
 # ── Edition-aware summary (for the observability API) ──────────────

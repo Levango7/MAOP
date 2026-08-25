@@ -56,8 +56,11 @@ def _current_otel_ids() -> tuple[str, str]:
         if ctx and ctx.is_valid:
             return f"{ctx.trace_id:032x}", f"{ctx.span_id:016x}"
     except ImportError:
+        # opentelemetry 未安装是合法状态（Personal edition），静默忽略
         pass
     except Exception:
+        # OTel API 调用异常不应影响日志写入；此处不能使用 logger 调用
+        # （会触发递归），静默兜底是有意的防御性设计
         pass
     return "", ""
 

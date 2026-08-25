@@ -8,13 +8,17 @@ from __future__ import annotations
 
 import logging
 import time as _time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
 
 class MCPHubMetricsMixin:
     """指标/审计/缓存助手（_record_*/_inc_*/_dec_*）。"""
+
+    if TYPE_CHECKING:
+        # 宿主类（MCPHub）提供的属性 —— 仅用于类型检查
+        _audit_logger: Any
 
 
     def _record_audit(

@@ -132,6 +132,8 @@ py/**/*.log
 data/.admin_initial_password
 data/.write_test
 data/backend_run.log
+# S-P1-3 fix: Docker secrets directory (must NEVER be committed)
+secrets/
 
 # Alembic cache
 py/maop/migrations/alembic/__pycache__/

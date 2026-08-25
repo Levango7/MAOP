@@ -8,7 +8,7 @@ cp .env.example .env
 # Edit .env and set MAOP_JWT_SECRET
 
 # Start production stack
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 # Check health
 curl http://localhost:9079/api/health

@@ -9,7 +9,8 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from maop.core.backends.db_utils import sqlite_connect
 from maop.core.memory.three_layer_memory_types import (
@@ -78,6 +79,11 @@ END;
 
 class EpisodicStoreMixin:
     """Layer 2: Episodic Memory（SQLite 任务经验）方法。"""
+
+    if TYPE_CHECKING:
+        # 宿主类（ThreeLayerMemory）提供的属性 —— 仅用于类型检查
+        _root: Path
+
 
 
     @staticmethod
@@ -173,7 +179,8 @@ class EpisodicStoreMixin:
                 ).fetchone()
             MAOP_MEMORY_ENTRIES.set(row["cnt"] if row else 0)
         except Exception:
-            pass
+            # 指标更新失败不应影响业务逻辑；记录 debug 日志便于排查
+            logger.debug("update MAOP_MEMORY_ENTRIES metric failed", exc_info=True)
         return entry.id
 
     def episodic_search(

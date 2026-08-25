@@ -6,7 +6,9 @@ import json
 import logging
 import re
 import time
-from typing import Any
+from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,13 @@ class SecurityMixin:
         - ``_read_delegations_json`` — read logs/delegations.json
         - ``_read_checker_logs``   — parse logs/checker_*.log into structured entries
     """
+
+    if TYPE_CHECKING:
+        # 宿主类（DataProxy）提供的属性与方法 —— 仅用于类型检查
+        _root: Path
+        _record_latency: Callable[..., None]
+        _query_maop: Callable[..., Any]
+
 
     async def logs_get(
         self, name: str = "dashboard", limit: int = 50

@@ -8,13 +8,32 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
 
 class EvolutionAgentMixin:
     """Agent 专属进化 / 全量进化 / 建议写入。"""
+
+    if TYPE_CHECKING:
+        # 宿主类（EvolutionLoop）提供的属性与方法 —— 仅用于类型检查
+        _root: Path
+        _data_dir: Path
+        _strategy_name: str
+        _collect_agent_memory: Callable[..., dict[str, Any]]
+        _analyze_agent_dimensions: Callable[..., list[dict[str, Any]]]
+        _collect_delegation_stats: Callable[..., dict[str, Any]]
+        _collect_history_analysis: Callable[..., dict[str, Any]]
+        _collect_strategy_learning: Callable[..., dict[str, Any]]
+        _collect_cache_evolution: Callable[..., dict[str, Any]]
+        _analyze_delegation_stats: Callable[..., list[dict[str, Any]]]
+        _analyze_history: Callable[..., list[dict[str, Any]]]
+        _analyze_strategy_learning: Callable[..., list[dict[str, Any]]]
+        _analyze_cache_evolution: Callable[..., list[dict[str, Any]]]
+        run_cycle: Callable[..., Any]
 
 
     def evolve_agent(self, agent_name: str, agent_config: Any = None) -> dict[str, Any]:

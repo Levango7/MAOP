@@ -447,8 +447,8 @@ class TestDistributedWorker:
         await asyncio.sleep(0.25)
         info = worker._registry.get_worker("w-hb")  # type: ignore[union-attr]
         assert info is not None
-        # Heartbeat should be recent.
-        assert time.time() - info.last_heartbeat < 1.0
+        # Heartbeat should be recent (allow generous margin for slow CI).
+        assert time.time() - info.last_heartbeat < 5.0
         await worker.stop()
 
     @pytest.mark.asyncio

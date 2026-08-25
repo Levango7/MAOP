@@ -20,12 +20,16 @@ Mixin 方法访问宿主属性 ``self.config`` / ``self._connect()`` /
 from __future__ import annotations
 
 import logging
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from maop.core.security.ldap_models import (
     LDAPConnectionError,
     LDAPUser,
 )
+
+if TYPE_CHECKING:
+    from maop.core.security.ldap_models import LDAPConfig
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +42,12 @@ class LDAPSearchMixin:
     * ``self._connect() -> Any``
     * ``self._close(conn: Any) -> None``
     """
+
+    if TYPE_CHECKING:
+        # 宿主类（LDAPProvider）提供的属性与方法 —— 仅用于类型检查
+        config: LDAPConfig
+        _connect: Callable[..., Any]
+        _close: Callable[..., None]
 
     # ── 用户搜索 ─────────────────────────────────────────────
 

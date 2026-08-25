@@ -318,7 +318,8 @@ class CircuitBreaker:
                             state_value, labels={"agent": agent_name}
                         )
                     except Exception:
-                        pass
+                        # 指标更新失败不应影响熔断器状态持久化
+                        logger.debug("set MAOP_CIRCUIT_BREAKER_STATE failed", exc_info=True)
         except Exception as exc:
             logger.warning("Breaker save agent %s failed: %s", agent_name, exc)
 

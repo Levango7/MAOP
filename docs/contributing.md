@@ -1,6 +1,6 @@
 # Contributing to MAOP
 
-MAOP（Model Agentic Orchestration Platform）是基于 FastAPI 的智能体编排框架，遵循 Plan-Execute-Verify 范式。当前版本 4.3.0，采用 Python 3.12+、双线发布（Personal/Enterprise）、双包结构（pyproject.toml + pyproject-enterprise.toml）、CI 通过 GitHub Actions。本指南面向所有贡献者，描述如何搭建环境、提交代码、通过 CI 并参与发布流程。
+MAOP（Multi-Agent Orchestration Platform）是基于 FastAPI 的智能体编排框架，遵循 Plan-Execute-Verify 范式。当前版本 5.1.0，采用 Python >= 3.10、双线发布（Personal/Enterprise），企业版已移至独立仓库 MAOS、CI 通过 GitHub Actions。本指南面向所有贡献者，描述如何搭建环境、提交代码、通过 CI 并参与发布流程。
 
 ---
 
@@ -10,7 +10,7 @@ MAOP（Model Agentic Orchestration Platform）是基于 FastAPI 的智能体编�
 
 | 依赖 | 最低版本 | 用途 |
 |------|----------|------|
-| Python | 3.12 | 核心运行时 |
+| Python | >= 3.10 | 核心运行时 |
 | Node.js + npm | 18+ | 构建 dashboard-enterprise |
 | Git | 2.30+ | 版本控制 |
 | Docker + Docker Compose | 最新稳定版 | 集成测试 |
@@ -81,8 +81,7 @@ MAOP/
 │   ├── tests/               # 测试套件（4150+ 用例）
 │   │   ├── contract/        # 契约测试
 │   │   └── e2e/             # E2E 测试
-│   ├── pyproject.toml       # Personal 版包定义
-│   └── pyproject-enterprise.toml  # Enterprise 版包定义
+│   └── pyproject.toml       # Personal 版包定义（企业版已移至独立仓库 MAOS）
 ├── dashboard-enterprise/    # Vue3 SPA 前端
 ├── config/                  # 运行时配置
 ├── docs/                    # 文档
@@ -449,7 +448,7 @@ git push origin main --tags
 | 版本 | 包定义 | License | 模块 |
 |------|--------|---------|------|
 | Personal | `pyproject.toml` | MIT | 开源 |
-| Enterprise | `pyproject-enterprise.toml` | 商业 license | 含 enterprise/ 模块 |
+| Enterprise | 独立仓库 MAOS | 商业 license | 含 enterprise/ 模块 |
 
 License 校验：Ed25519 签名（`scripts/generate_license.py`）
 

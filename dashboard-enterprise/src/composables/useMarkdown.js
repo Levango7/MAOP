@@ -55,7 +55,7 @@ function renderMarkdown(md) {
     }
   };
 
-  let paraBuf = [];
+  const paraBuf = [];
 
   while (i < lines.length) {
     const line = lines[i];

@@ -10,7 +10,8 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from maop.core.memory.three_layer_memory_types import (
     ContextHead,
@@ -34,6 +35,12 @@ logger = logging.getLogger(__name__)
 
 class TransformMixin:
     """Transform（Focus Mode）方法：多 head 上下文重组。"""
+
+    if TYPE_CHECKING:
+        # 宿主类（ThreeLayerMemory）提供的方法 —— 仅用于类型检查
+        working_get: Callable[..., Any]
+        episodic_search: Callable[..., list[Any]]
+        semantic_search: Callable[..., list[Any]]
 
     # ── Transform (Focus Mode) ────────────────────────────────
 

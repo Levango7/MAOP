@@ -405,6 +405,7 @@ class DistributedScheduler:
             try:
                 await failure_task
             except (asyncio.CancelledError, Exception):
+                # 任务取消/清理时的预期异常，静默忽略
                 pass
 
         total_ms = int((time.monotonic() - start) * 1000)
@@ -618,7 +619,8 @@ class DistributedScheduler:
                 try:
                     self._registry.complete_task(worker_id, node_id)
                 except Exception:
-                    pass
+                    # registry 清理失败不应影响调度结果
+                    logger.debug("complete_task failed", exc_info=True)
         return out
 
     # ── Failure detection loop ───────────────────────────────────

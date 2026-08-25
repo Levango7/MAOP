@@ -278,6 +278,44 @@ class ReactLoop:
                 trace_id=trace_id,
             )
 
+    def _extract_final_answer(self, response_text: str, response_json: Any) -> str:
+        """Extract final answer content from response JSON or plain text.
+
+        Handles OpenAI-style ``choices[0].message.content`` and Anthropic-style
+        ``content[].text`` block formats; falls back to raw text.
+        """
+        final_content = response_text
+        if isinstance(response_json, dict):
+            choices = response_json.get("choices", [])
+            if choices:
+                msg = choices[0].get("message", {})
+                final_content = msg.get("content", response_text)
+            content_blocks = response_json.get("content", [])
+            if isinstance(content_blocks, list):
+                texts = [b.get("text", "") for b in content_blocks if b.get("type") == "text"]
+                if texts:
+                    final_content = "\n".join(texts)
+        return final_content
+
+    def _append_assistant_message(
+        self,
+        prov: str,
+        response_json: Any,
+        conversation: list[dict[str, Any]],
+    ) -> None:
+        """Append assistant message to conversation based on provider format.
+
+        OpenAI/Ollama: ``{"role": "assistant", "content": null, "tool_calls": [...]}``
+        Anthropic: ``{"role": "assistant", "content": [...]}``
+        """
+        if prov.lower() in ("openai", "ollama"):
+            assistant_msg: dict[str, Any] = {"role": "assistant", "content": None, "tool_calls": []}
+            raw_calls = response_json.get("choices", [{}])[0].get("message", {}).get("tool_calls", [])
+            assistant_msg["tool_calls"] = raw_calls
+            conversation.append(assistant_msg)
+        elif prov.lower() == "anthropic":
+            conversation.append({"role": "assistant", "content": response_json.get("content", [])})
+
     async def run(
         self,
         task: str,
@@ -414,17 +452,7 @@ class ReactLoop:
             if not tool_calls:
                 step.phase = ReactPhase.FINAL
                 result.steps.append(step)
-                final_content = response_text
-                if isinstance(response_json, dict):
-                    choices = response_json.get("choices", [])
-                    if choices:
-                        msg = choices[0].get("message", {})
-                        final_content = msg.get("content", response_text)
-                    content_blocks = response_json.get("content", [])
-                    if isinstance(content_blocks, list):
-                        texts = [b.get("text", "") for b in content_blocks if b.get("type") == "text"]
-                        if texts:
-                            final_content = "\n".join(texts)
+                final_content = self._extract_final_answer(response_text, response_json)
                 result.final_answer = final_content
                 result.success = True
                 break
@@ -432,13 +460,7 @@ class ReactLoop:
             step.phase = ReactPhase.ACTION
             result.steps.append(step)
 
-            if prov.lower() in ("openai", "ollama"):
-                assistant_msg: dict[str, Any] = {"role": "assistant", "content": None, "tool_calls": []}
-                raw_calls = response_json.get("choices", [{}])[0].get("message", {}).get("tool_calls", [])
-                assistant_msg["tool_calls"] = raw_calls
-                conversation.append(assistant_msg)
-            elif prov.lower() == "anthropic":
-                conversation.append({"role": "assistant", "content": response_json.get("content", [])})
+            self._append_assistant_message(prov, response_json, conversation)
 
             for call in tool_calls:
                 if result.total_tool_calls >= self._config.max_tool_calls:

@@ -97,6 +97,9 @@ class ExecuteMixin:
         """
         # Check if we can execute in parallel
         if self._should_execute_parallel(analysis, self._worker_pool):
+            # _should_execute_parallel guarantees analysis is not None here,
+            # but mypy cannot infer that from the helper's return type.
+            assert analysis is not None
 
             # Execute subtasks via WorkerPool
             return await self._execute_parallel(

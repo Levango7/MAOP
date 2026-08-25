@@ -38,6 +38,99 @@ async def _dag_control_node(execution_id: str, node_id: str, action: str) -> str
     return "ok"
 
 
+async def _authenticate_dag_ws(ws: WebSocket) -> bool:
+    """Authenticate DAG WebSocket via query param or subprotocol token.
+
+    Returns True if authentication succeeded (or is disabled).
+    On failure, closes the WebSocket with code 4401 and returns False.
+    """
+    if not _auth_mod._auth_enabled:
+        return True
+    token = ws.query_params.get("token", "")
+    if not token:
+        protocols = ws.headers.get("sec-websocket-protocol", "")
+        if protocols:
+            parts = [p.strip() for p in protocols.split(",") if p.strip()]
+            if parts:
+                token = parts[-1]
+    if not token:
+        await ws.close(code=4401, reason="Authentication required")
+        return False
+    try:
+        mgr = _auth_mod.get_auth_mgr()
+        payload = mgr.jwt_handler.validate_token(token)
+        if not payload or not getattr(payload, "authenticated", False):
+            await ws.close(code=4401, reason="Invalid token")
+            return False
+    except Exception:
+        await ws.close(code=4401, reason="Authentication failed")
+        return False
+    return True
+
+
+async def _handle_dag_control_message(
+    ws: WebSocket, msg: dict[str, Any], execution_id: str
+) -> None:
+    """Handle a cancel/pause control message from the client.
+
+    Sends an action-result or error response back through the WebSocket.
+    """
+    action: str = msg.get("action", "")
+    node_id = msg.get("node_id", "")
+    if not node_id or not isinstance(node_id, str):
+        await ws.send_json({
+            "type": "error",
+            "message": "node_id required for " + action,
+        })
+        return
+    # Conflict detection: check if node already completed.
+    from maop.core.agent.dag.dag_progress_emitter import get_emitter
+
+    emitter = get_emitter(execution_id)
+    if emitter and emitter.is_node_completed(node_id):
+        await ws.send_json({
+            "type": "action-result",
+            "action": action,
+            "node_id": node_id,
+            "result": "already_completed",
+        })
+        return
+    # Route to orchestrator (cancel/pause hook).
+    # Currently a best-effort ack — full cancel requires
+    # orchestrator integration (future enhancement).
+    result = await _dag_control_node(execution_id, node_id, action)
+    await ws.send_json({
+        "type": "action-result",
+        "action": action,
+        "node_id": node_id,
+        "result": result,
+    })
+
+
+def _cleanup_dag_ws(
+    bus: Any,
+    node_topic: str,
+    complete_topic: str,
+    on_node: Any,
+    on_complete: Any,
+    heartbeat_task: asyncio.Task | None,
+    push_task: asyncio.Task | None,
+) -> None:
+    """Cleanup DAG WebSocket resources: cancel tasks and unsubscribe."""
+    if heartbeat_task:
+        heartbeat_task.cancel()
+    if push_task:
+        push_task.cancel()
+    try:
+        bus.unsubscribe(node_topic, on_node)
+    except Exception:
+        logger.debug("unsubscribe node_topic failed", exc_info=True)
+    try:
+        bus.unsubscribe(complete_topic, on_complete)
+    except Exception:
+        logger.debug("unsubscribe complete_topic failed", exc_info=True)
+
+
 @router.websocket("/ws/dag/{execution_id}")
 async def dag_ws_endpoint(ws: WebSocket, execution_id: str) -> Any:
     """WebSocket endpoint for real-time DAG node-status push + control.
@@ -57,26 +150,8 @@ async def dag_ws_endpoint(ws: WebSocket, execution_id: str) -> Any:
     ``{"result": "already_completed"}`` (spec 5.2.3 anomaly 3).
     """
     # ── Auth (reuse Sec-WebSocket-Protocol subprotocol) ───────
-    if _auth_mod._auth_enabled:
-        token = ws.query_params.get("token", "")
-        if not token:
-            protocols = ws.headers.get("sec-websocket-protocol", "")
-            if protocols:
-                parts = [p.strip() for p in protocols.split(",") if p.strip()]
-                if parts:
-                    token = parts[-1]
-        if not token:
-            await ws.close(code=4401, reason="Authentication required")
-            return
-        try:
-            mgr = _auth_mod.get_auth_mgr()
-            payload = mgr.jwt_handler.validate_token(token)
-            if not payload or not getattr(payload, "authenticated", False):
-                await ws.close(code=4401, reason="Invalid token")
-                return
-        except Exception:
-            await ws.close(code=4401, reason="Authentication failed")
-            return
+    if not await _authenticate_dag_ws(ws):
+        return
 
     await ws.accept()
 
@@ -153,35 +228,7 @@ async def dag_ws_endpoint(ws: WebSocket, execution_id: str) -> Any:
 
             # Control instructions
             if action in ("cancel", "pause"):
-                node_id = msg.get("node_id", "")
-                if not node_id or not isinstance(node_id, str):
-                    await ws.send_json({
-                        "type": "error",
-                        "message": "node_id required for " + action,
-                    })
-                    continue
-                # Conflict detection: check if node already completed.
-                from maop.core.agent.dag.dag_progress_emitter import get_emitter
-
-                emitter = get_emitter(execution_id)
-                if emitter and emitter.is_node_completed(node_id):
-                    await ws.send_json({
-                        "type": "action-result",
-                        "action": action,
-                        "node_id": node_id,
-                        "result": "already_completed",
-                    })
-                    continue
-                # Route to orchestrator (cancel/pause hook).
-                # Currently a best-effort ack — full cancel requires
-                # orchestrator integration (future enhancement).
-                result = await _dag_control_node(execution_id, node_id, action)
-                await ws.send_json({
-                    "type": "action-result",
-                    "action": action,
-                    "node_id": node_id,
-                    "result": result,
-                })
+                await _handle_dag_control_message(ws, msg, execution_id)
             elif msg_type == "ping":
                 # Client-initiated ping → respond with pong.
                 await ws.send_json({"type": "pong", "ts": time.time()})
@@ -192,15 +239,7 @@ async def dag_ws_endpoint(ws: WebSocket, execution_id: str) -> Any:
     except Exception:
         logger.debug("[dag-ws] endpoint error", exc_info=True)
     finally:
-        if heartbeat_task:
-            heartbeat_task.cancel()
-        if push_task:
-            push_task.cancel()
-        try:
-            bus.unsubscribe(node_topic, _on_node)
-        except Exception:
-            logger.debug('swallowed exception', exc_info=True)
-        try:
-            bus.unsubscribe(complete_topic, _on_complete)
-        except Exception:
-            logger.debug('swallowed exception', exc_info=True)
+        _cleanup_dag_ws(
+            bus, node_topic, complete_topic,
+            _on_node, _on_complete, heartbeat_task, push_task,
+        )

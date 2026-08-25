@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,14 @@ class ModelsMixin:
         - ``graph_nodes``      — memory graph nodes
         - ``graph_edges``      — memory graph edges
     """
+
+    if TYPE_CHECKING:
+        # 宿主类（DataProxy）提供的属性与方法 —— 仅用于类型检查
+        _root: Path
+        _record_latency: Callable[..., None]
+        _query_memory: Callable[..., Any]
+        agent_stats: Callable[..., Any]
+
 
     async def memory_stats(self) -> dict[str, Any]:
         """Memory statistics — replaces llm-wiki.ps1 -Action stats."""

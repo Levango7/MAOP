@@ -11,7 +11,8 @@ import json
 import logging
 import time as _time
 import uuid
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from maop.core import otel
 from maop.core.mcp.mcp_hub_types import (
@@ -28,6 +29,14 @@ logger = logging.getLogger(__name__)
 
 class MCPHubOpsMixin:
     """列表/资源/健康检查 ops。"""
+
+    if TYPE_CHECKING:
+        # 宿主类（MCPHub）提供的属性与方法 —— 仅用于类型检查
+        _configs: dict[str, Any]
+        _tracer: Any
+        _transports: dict[str, Any]
+        _connect: Callable[..., Any]
+        _record_health_check: Callable[..., None]
 
 
     async def list_tools(self, server_id: str = "") -> list[MCPTool]:

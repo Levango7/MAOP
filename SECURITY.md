@@ -103,3 +103,13 @@ Last audit: 2026-07-17
 
 Report security vulnerabilities to the project maintainer.
 Do not file public issues for security bugs.
+
+### 安全联系方式
+
+- **邮箱**：security@levango7.com
+- **GPG 公钥指纹**：请通过上述邮箱索取最新 GPG 公钥指纹，用于加密漏洞报告通信
+- **CVE 处理流程**：
+  1. 收到报告后 48 小时内确认接收并开始评估
+  2. 评估漏洞严重性并分配 CVE 编号（如适用，协助通过 MITRE/CNA 申请）
+  3. P0/P1 漏洞在 7 天内发布修复版本；其余漏洞在 90 天协调披露窗口内修复
+  4. 修复版本发布后公开披露漏洞详情与致谢

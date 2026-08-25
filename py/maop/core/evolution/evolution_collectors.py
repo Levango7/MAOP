@@ -7,13 +7,18 @@ T2 架构债治理：从 ``evolution_loop.py`` 拆分。公开 API 不变。
 from __future__ import annotations
 
 import logging
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
 
 class EvolutionCollectorsMixin:
     """统一数据采集器（delegation/agent memory/history/strategy/cache）。"""
+
+    if TYPE_CHECKING:
+        # 宿主类（EvolutionLoop）提供的属性 —— 仅用于类型检查
+        _root: Path
 
 
     def _collect_delegation_stats(self) -> dict[str, Any]:
