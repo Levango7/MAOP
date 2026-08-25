@@ -63,8 +63,12 @@ def tenant_client(tmp_path, monkeypatch):
 
 class TestTenantList:
     def test_list(self, tenant_client):
-        # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-        pytest.skip(reason="maop.enterprise 未发布")
+        # P2 修复：无条件 skip 改为 import 条件化 —— maop.enterprise 可导入
+        # （企业版）时才真正运行测试；个人版（未安装）时才跳过。
+        try:
+            import maop.enterprise  # noqa: F401
+        except ImportError:
+            pytest.skip(reason="maop.enterprise 未发布")
         resp = tenant_client.get("/api/tenant/list")
         assert resp.status_code == 200
 
@@ -75,8 +79,12 @@ class TestTenantList:
 
 class TestTenantCreate:
     def test_happy(self, tenant_client):
-        # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-        pytest.skip(reason="maop.enterprise 未发布")
+        # P2 修复：无条件 skip 改为 import 条件化 —— maop.enterprise 可导入
+        # （企业版）时才真正运行测试；个人版（未安装）时才跳过。
+        try:
+            import maop.enterprise  # noqa: F401
+        except ImportError:
+            pytest.skip(reason="maop.enterprise 未发布")
         resp = tenant_client.post(
             "/api/tenant/create",
             json={"tenant_id": "t1", "name": "test"},

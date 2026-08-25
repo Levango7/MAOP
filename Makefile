@@ -36,7 +36,7 @@ install:
 	$(PYTHON) -m venv $(VENV)
 	$(VENV_PI) install --upgrade pip
 	$(VENV_PI) install -r $(PY_DIR)/requirements.txt
-	$(VENV_PI) install pytest pytest-asyncio ruff
+	$(VENV_PI) install pytest pytest-asyncio pytest-xdist pytest-cov ruff
 
 test:
 	cd $(PY_DIR) && ../$(VENV_PY) -m pytest tests/ -q --ignore=tests/contract

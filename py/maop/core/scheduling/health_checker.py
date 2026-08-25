@@ -139,7 +139,19 @@ class HealthChecker:
                 trace_id="supervisor-ping",
             )
             elapsed_ms = (time.monotonic() - start) * 1000.0
-            ok = bool(result) and bool(getattr(result, "result", result))
+            # P1 fix: DispatchResult / MaopResult are Pydantic models —
+            # bool() on them is ALWAYS True, so the old
+            # ``bool(result) and bool(result.result)`` marked every agent
+            # reachable as long as dispatch didn't raise/timeout, even when
+            # the agent returned ok=False / a non-zero exit code. Judge the
+            # actual success flag instead (MaopResult.ok).
+            inner = getattr(result, "result", None)
+            if inner is not None and hasattr(inner, "ok"):
+                ok = bool(inner.ok)
+            else:
+                # No structured result (e.g. driver returned a bare value) —
+                # fall back to truthiness of the envelope.
+                ok = bool(result)
             return (ok, elapsed_ms)
         except Exception:
             elapsed_ms = (time.monotonic() - start) * 1000.0

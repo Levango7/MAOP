@@ -110,25 +110,19 @@ class TestMemoryStoreSearch:
         from maop.memory.store import MemoryStore
         store = MemoryStore(root_dir=str(tmp_path))
         # Add an entry
-        try:
-            entry_id = store.add(
-                agent="claude", task="test task", outcome="success",
-                tags="test", topic="testing",
-            )
-            if entry_id:
-                result = store.search(query="test")
-                assert isinstance(result, list)
-        except Exception:
-            pass  # add may require specific schema
+        entry_id = store.store(
+            agent="claude", task="test task", content="test content",
+            tags="test", topic="testing",
+        )
+        if entry_id:
+            result = store.search(query="test")
+            assert isinstance(result, list)
 
     def test_store_facets(self, tmp_path):
         from maop.memory.store import MemoryStore
         store = MemoryStore(root_dir=str(tmp_path))
-        try:
-            facets = store.facets()
-            assert facets is not None
-        except Exception:
-            pass
+        facets = store.facets()
+        assert facets is not None
 
 
 # ── Memory Manager ──────────────────────────────────────────────────
@@ -160,21 +154,15 @@ class TestMemoryManager:
     def test_build_context(self, tmp_path):
         from maop.memory.manager import MemoryManager
         mgr = MemoryManager(root_dir=str(tmp_path))
-        try:
-            ctx = mgr.build_context(query="test", top=5)
-            assert ctx is not None
-        except Exception:
-            pass
+        ctx = mgr.build_context(session_id="test-session", query="test", max_tokens=5)
+        assert ctx is not None
 
     def test_consolidate(self, tmp_path):
         from maop.memory.manager import MemoryManager
         mgr = MemoryManager(root_dir=str(tmp_path))
-        try:
-            result = mgr.consolidate(dry_run=True)
-            # May return None if nothing to consolidate
-            assert result is None or isinstance(result, dict)
-        except Exception:
-            pass
+        result = mgr.consolidate(dry_run=True)
+        # May return None if nothing to consolidate
+        assert result is None or isinstance(result, dict)
 
 
 # ── Vector Search ───────────────────────────────────────────────────
@@ -232,20 +220,14 @@ class TestVectorStore:
     def test_search_empty(self, tmp_path):
         from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=str(tmp_path / "vectors.db"))
-        try:
-            result = vs.search(query="test", top=5)
-            assert isinstance(result, list)
-        except Exception:
-            pass
+        result = vs.search(query="test", top=5)
+        assert isinstance(result, list)
 
     def test_stats(self, tmp_path):
         from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=str(tmp_path / "vectors.db"))
-        try:
-            stats = vs.stats()
-            assert stats is not None
-        except Exception:
-            pass
+        count = vs.count()
+        assert isinstance(count, int)
 
 
 # ── Provider Health ─────────────────────────────────────────────────

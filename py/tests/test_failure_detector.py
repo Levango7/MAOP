@@ -51,8 +51,12 @@ def detector():
 @pytest.fixture
 def detector_with_bus():
     """Detector wired to a real EventBus so emitted events are captured."""
-    # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-    pytest.skip(reason="maop.enterprise 未发布")
+    # P2 修复：无条件 skip 改为 import 条件化 —— maop.enterprise 可导入
+    # （企业版）时才真正运行测试；个人版（未安装）时才跳过。
+    try:
+        import maop.enterprise  # noqa: F401
+    except ImportError:
+        pytest.skip(reason="maop.enterprise 未发布")
     from maop.enterprise.notification.event_bus import EventBus
 
     bus = EventBus(history_size=100)

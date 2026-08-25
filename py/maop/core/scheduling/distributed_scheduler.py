@@ -330,6 +330,7 @@ class DistributedScheduler:
         nodes: list[_NodeSpec],
         *,
         run_id: str = "",
+        overall_timeout: float = 0.0,
     ) -> DistributedResult:
         """Execute a DAG of nodes across the distributed worker pool.
 
@@ -339,6 +340,11 @@ class DistributedScheduler:
             Nodes to execute (with dependency edges via ``depends_on``).
         run_id : str
             Optional explicit run id. When empty, a UUID4 hex is generated.
+        overall_timeout : float
+            Wall-clock budget (seconds) for the whole run. When exceeded,
+            any still-pending layer nodes are marked ``failed`` with a
+            timeout error instead of blocking forever. ``0.0`` (default)
+            disables the limit (backward compatible).
 
         Returns
         -------
@@ -348,6 +354,9 @@ class DistributedScheduler:
         if not run_id:
             run_id = uuid.uuid4().hex[:16]
         start = time.monotonic()
+        self._overall_deadline = (
+            start + overall_timeout if overall_timeout > 0 else None
+        )
         node_map = {n.id: n for n in nodes}
         layers = self._compute_layers(nodes)
         results: dict[str, dict[str, Any]] = {
@@ -383,6 +392,7 @@ class DistributedScheduler:
                 # Dispatch the layer and await all results.
                 layer_results = await self._dispatch_and_collect(
                     run_id, layer_idx, runnable, reschedule_queue,
+                    deadline=self._overall_deadline,
                 )
                 for nid, res in layer_results.items():
                     results[nid] = res
@@ -460,8 +470,16 @@ class DistributedScheduler:
         layer_idx: int,
         nodes: list[_NodeSpec],
         reschedule_queue: asyncio.Queue[tuple[str, str]],
+        *,
+        deadline: float | None = None,
     ) -> dict[str, dict[str, Any]]:
-        """Dispatch a layer's nodes and wait for all their results."""
+        """Dispatch a layer's nodes and wait for all their results.
+
+        ``deadline`` is a ``time.monotonic()`` absolute time at which any
+        still-pending nodes are failed out with a timeout error instead of
+        blocking forever (set by :meth:`run` when ``overall_timeout`` is
+        configured; ``None`` disables the check).
+        """
         results_stream = self._results_stream(run_id)
         pending: dict[str, _NodeSpec] = {n.id: n for n in nodes}
         # Track retry counts per node for worker-failure rescheduling.
@@ -478,6 +496,23 @@ class DistributedScheduler:
         # Poll for results + handle reschedules until all nodes resolved.
 
         while pending:
+            # Overall-timeout guard: fail out stragglers instead of
+            # blocking forever when a worker never posts a result.
+            if deadline is not None and time.monotonic() >= deadline:
+                for nid in list(pending):
+                    collected[nid] = {
+                        "status": "failed",
+                        "node_id": nid,
+                        "error": "Overall run timeout exceeded while waiting for results",
+                    }
+                pending.clear()
+                logger.warning(
+                    "[dist-sched] layer %d timed out (deadline passed); "
+                    "marked %d node(s) failed",
+                    layer_idx, len(collected),
+                )
+                break
+
             # Drain any reschedule requests from the failure detector.
             while not reschedule_queue.empty():
                 _old_msg_id, node_id = reschedule_queue.get_nowait()

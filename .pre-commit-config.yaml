@@ -43,7 +43,7 @@ repos:
     hooks:
       - id: pytest-fast
         name: pytest (fast subset)
-        entry: python -m pytest tests/ -q -x --ignore=tests/contract --ignore=tests/integration -k "not slow" --timeout=30
+        entry: python -m pytest tests/ -q -x --ignore=tests/contract --ignore=tests/integration -m "not slow" --timeout=30
         language: system
         types: [python]
         files: ^py/

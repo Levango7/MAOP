@@ -182,11 +182,13 @@ function isActive(item) {
 // `nav` is imported from ./nav.js (single source of truth shared with PageHeader).
 
 // ── Auth flows ───────────────────────────────────────────────────────────
-// Proactive: when auth is enabled and no token exists, show the login
-// overlay immediately with a "Sign In" title — don't wait for 401 errors
-// to trickle in and flash empty pages at the user.
+// Proactive: when auth is enabled and the user is not logged in, show the
+// login overlay immediately with a "Sign In" title — don't wait for 401
+// errors to trickle in and flash empty pages at the user.
+// M6 fix: token lives in an httpOnly cookie (unreadable by JS), so login
+// state is derived from isLoggedIn() (stored user), not authToken().
 function showLoginIfRequired() {
-  if (authEnabled.value && !api.authToken()) {
+  if (authEnabled.value && !api.isLoggedIn()) {
     authExpired.value = true;
     loginTitle.value = t('auth.signIn');
     loginError.value = '';
@@ -195,10 +197,12 @@ function showLoginIfRequired() {
   return false;
 }
 // Reactive: a 401 was intercepted by the api store. Only say "Session
-// Expired" when the user actually had a token before; otherwise it's a
+// Expired" when the user actually had a session before; otherwise it's a
 // first-visit sign-in.
+// M6 fix: derive from isLoggedIn() — authToken() is always empty under
+// httpOnly-cookie auth.
 function onUnauthorized() {
-  const hadToken = !!api.authToken();
+  const hadToken = api.isLoggedIn();
   authExpired.value = true;
   loginTitle.value = hadToken ? t('auth.sessionExpired') : t('auth.signIn');
   loginError.value = '';
@@ -237,14 +241,20 @@ async function checkAuthEnabled() {
     const d = await api.get('/api/auth/status');
     authEnabled.value = d && d.auth_enabled === true;
     try { localStorage.setItem('maop_auth_enabled', String(authEnabled.value)); } catch { /* ignore */ }
-    // If backend says auth is enabled but our token is invalid (has_token:false),
-    // clear the stale local token so showLoginIfRequired() can trigger the
-    // login overlay immediately — instead of waiting for 401 errors from
-    // every subsequent authenticated endpoint.
+    // If backend says auth is enabled but our session cookie is invalid
+    // (has_token:false), clear the stale local user info so
+    // showLoginIfRequired() can trigger the login overlay immediately —
+    // instead of waiting for 401 errors from every subsequent authenticated
+    // endpoint.
     // Direct localStorage removal (not api.clearAuthToken) to avoid triggering
     // /api/auth/logout which would itself 401 and cause a retry loop.
-    if (authEnabled.value && d && d.has_token === false && api.authToken()) {
-      try { localStorage.removeItem('maop_token'); localStorage.removeItem('maop_user'); } catch { /* ignore */ }
+    // M6 fix: local login state is the stored user (authToken() is always
+    // empty under httpOnly-cookie auth).
+    if (authEnabled.value && d && d.has_token === false && api.isLoggedIn()) {
+      try { localStorage.removeItem('maop_user'); } catch { /* ignore */ }
+      // Drop the userName/userRoles refs too — the session is gone.
+      userName.value = '';
+      userRoles.value = [];
     }
   } catch { authEnabled.value = false; }
 }

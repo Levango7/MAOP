@@ -167,8 +167,16 @@ jobs:
         shell: bash
         run: |
           python -m pytest tests/ -q --ignore=tests/contract \
-            -m "not slow" --cov=maop --cov-report=xml --cov-report=term-missing \
+            -m "not slow and not serial" --cov=maop --cov-report=xml --cov-report=term-missing \
             --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml
+
+      - name: Run serial tests
+        # P2 fix: serial 标记此前是死代码 —— pyproject 声明 "Selected by CI's
+        # serial step (-n 0)"，但 CI 从未有该步骤，导致 test_routers_batch /
+        # test_routers_smoke 在主矩阵以 -n auto 并行运行（共享 app 单例状态，
+        # 会随机失败）。现在：主矩阵用 `not serial` 排除并行碰撞，本步骤以
+        # -n 0 串行跑这两个文件，让标记真正落地。
+        run: python -m pytest tests/test_routers_batch.py tests/test_routers_smoke.py -q -n 0 --no-cov --timeout=60
 
       - name: Upload test results
         if: always()
@@ -265,6 +273,15 @@ jobs:
 
       - name: Run reliability & stability tests
         run: python -m pytest tests/reliability/ tests/stability/ -q --timeout=120
+
+      - name: Run standalone slow suites (stress / k8s operator / LDAP real env)
+        # P1 fix: 这三个 slow 文件此前被 test job 的 `-m "not slow"` 排除，
+        # performance job 又只覆盖 tests/performance|reliability|stability
+        # 目录，导致它们从未在任何 CI job 中执行。这里显式纳入：缺
+        # helm/kubectl/kind/docker/MAOP_LDAP_TEST_HOST 的用例会优雅 skip，
+        # 不阻塞 job。`-n 0 --no-cov` 单进程运行，避免压力测试在 xdist
+        # 并行下互相干扰（同 e2e 步骤的写法）。
+        run: python -m pytest tests/test_stress.py tests/test_k8s_operator.py tests/test_ldap_real_env.py -q -m slow --timeout=180 -n 0 --no-cov
 
   # ── Frontend Build ──────────────────────────────────────────────
   frontend:
@@ -644,14 +661,15 @@ jobs:
       - name: Build image for scan
         run: docker build -f py/Dockerfile -t maop:scan .
       - name: Run trivy vulnerability scan
-        # 非阻塞模式：生成报告但不让 CI 失败（报告仍上传供审查）
+        # P2 fix: 真门禁 —— exit-code 1，扫描到 CRITICAL/HIGH 漏洞（有可用修复）
+        # 时 CI 失败，不再只是生成报告。版本固定 v0.36.0 保证可复现。
         # ignore-unfixed: 只报告有可用修复的漏洞，忽略上游未修复的
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: maop:scan
           format: json
           output: trivy-report.json
-          exit-code: '0'
+          exit-code: '1'
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           vuln-type: os,library
