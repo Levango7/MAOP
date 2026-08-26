@@ -6,7 +6,8 @@
 # Stage 0: Frontend Builder (H6 fix)
 # H6 fix: 原 Dockerfile 未包含前端构建步骤，fresh clone 或 CI 环境中 assets 缺失，
 # 导致 Docker 部署后前端白页。现新增前端构建阶段，在镜像构建时执行 npm run build。
-FROM node:20-alpine AS frontend-builder
+# P1-5: 国内源（用户无梯子时 node:20-alpine 可能拉取失败，改用阿里云镜像）
+FROM registry.cn-hangzhou.aliyuncs.com/library/node:20-alpine AS frontend-builder
 WORKDIR /build
 # 先复制 package*.json 以利用 Docker 层缓存
 COPY dashboard-enterprise/package*.json ./
@@ -20,7 +21,9 @@ RUN npm run build
 # upstream tag re-push attacks. CI can still override via --build-arg.
 # Digest: python:3.13-slim@sha256:4d8e9b8f5a2c1e7b3a9f6c2d1e8b7a6c5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7
 # (Replace with the actual digest from `docker pull python:3.13-slim && docker inspect --format='{{index .RepoDigests 0}}' python:3.13-slim`)
-ARG PYTHON_IMAGE=python:3.13-slim
+# P1-5: 国内源（阿里云镜像，避免无梯子时 docker pull 失败）
+# CI 可通过 --build-arg PYTHON_IMAGE=python:3.13-slim 覆盖为 Docker Hub 直连
+ARG PYTHON_IMAGE=registry.cn-hangzhou.aliyuncs.com/library/python:3.13-slim
 FROM ${PYTHON_IMAGE} AS builder
 
 WORKDIR /build
@@ -31,7 +34,9 @@ WORKDIR /build
 # so the image deps now match the audited deps. Previously requirements.txt
 # could drift from requirements.lock, causing image/audit inconsistency.
 COPY py/requirements.lock .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.lock
+# P1-5: pip 使用清华源（避免无梯子时 pip install 超时）
+RUN pip install --no-cache-dir --prefix=/install -r requirements.lock \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
 
 # Stage 2: Runtime
 # PYTHON_IMAGE ARG allows CI to pin digest: --build-arg PYTHON_IMAGE=python:3.13-slim@sha256:xxx

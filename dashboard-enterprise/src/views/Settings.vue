@@ -525,7 +525,15 @@ async function onSwitchClick(target) {
     } else {
       switchNotice.value = switchNoticeText(result);
     }
-  } catch { /* error already in store.switchError */ }
+  } catch {
+    // P1-2: 切换到企业版失败时，显式提示需商业授权（MAOS）+ 有效 License。
+    // 后端无 license 时返回 403，store.switchError 已含后端消息；
+    // 这里对 enterprise 目标用标准化文案覆盖，确保用户看到明确的授权指引
+    // （而非裸 HTTP 错误码），避免静默失败或提示不清。
+    if (target === 'enterprise') {
+      editionStore.switchError = t('view.settings.editionEnterpriseLicenseRequired');
+    }
+  }
 }
 
 function switchNoticeText(result) {

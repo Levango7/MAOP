@@ -63,11 +63,17 @@ async def set_edition_endpoint(request: Request) -> dict[str, Any]:
     # set_edition() 本身只是直接覆盖 _current_edition，不做 license 校验；
     # 因此切换到 enterprise 时先 reset 再走 _detect_with_license_check，
     # 让 license 校验有机会将 edition 降级到 personal。
+    # P1-2 (edition 切换门禁): 无有效 license 切换到 enterprise 时，不再
+    # 静默降级返回 200+degraded，而是明确拒绝并返回 403 + 授权指引消息，
+    # 让用户知道需要 MAOS 商业包 + License。
+    degraded_to_personal = False
     if target_edition is Edition.ENTERPRISE:
         from maop.config.edition import _detect_with_license_check, reset_edition
         reset_edition()  # 清除当前覆盖，让 detect 重新走完整流程
         actual = _detect_with_license_check(Edition.ENTERPRISE)
         set_edition(actual)  # 将实际检测结果固定下来
+        if actual is not Edition.ENTERPRISE:
+            degraded_to_personal = True
     else:
         set_edition(target_edition)
 
@@ -100,6 +106,17 @@ async def set_edition_endpoint(request: Request) -> dict[str, Any]:
         "[info] Edition switched by %s: %s -> %s (requested=%s)",
         actor, previous_value, new_value, target.lower(),
     )
+
+    # 7. P1-2 门禁：无有效 license 切换到 enterprise 被明确拒绝（403）。
+    # 返回标准化授权指引消息，前端据此显示"需 MAOS 商业包 + License"提示。
+    if degraded_to_personal:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "切换到企业版需要：1) 安装 MAOS 商业包（maop-enterprise）"
+                "2) 有效的商业 License。请联系管理员或访问 MAOS 获取授权。"
+            ),
+        )
 
     return {
         "status": "ok",

@@ -1,0 +1,1 @@
+"""Soak test package for MAOP personal edition long-run stability verification."""

@@ -26,6 +26,14 @@ MAOP（Multi Agents Orchestration Platform）是一个企业级多智能体编�
 | PostgreSQL | 13 | 15+（可选） |
 | Node.js | 18 | 20+（仅 Dashboard） |
 
+### 1.3 版本说明
+
+MAOP 个人版（v5.1.0）为单机/小团队设计，包含完整的 Agent 编排、记忆系统、工具集成能力。
+
+**企业版功能**（RBAC、多租户、SSO、配额管理、审计日志、分布式执行等）由独立的商业包 **MAOS**（`maop-enterprise`）提供，需商业授权。个人版不包含这些功能。
+
+如需企业版功能，请联系获取 MAOS 商业 license。
+
 ## 第2章 安装
 
 ### 2.1 pip 安装
@@ -172,6 +180,14 @@ print(f"synced={result.synced}, created={result.created}")
 auth = provider.authenticate("alice", "password")
 print(f"authenticated={auth4uth.authenticated}, roles={auth.roles}")
 ```
+
+### 4.5 分布式执行
+
+分布式执行（多机 worker / Redis Streams 任务队列 / DAG 节点级分发）是企业版（MAOS HA）特性。
+
+个人版仅支持单进程执行，适用于单机/小团队场景。如需分布式执行能力，请升级到企业版。
+
+在个人版下执行 `maop worker start` 会明确提示"需企业版授权"并以非零退出码退出，不会静默启动分布式 worker。
 
 ## 第5章 故障排查
 

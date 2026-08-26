@@ -177,6 +177,25 @@ async def maop_execute(
     if guardrail is None:
         guardrail = Guardrail()
 
+    # P1-1: 个人版成本兜底护栏 — 在发起 LLM 调用前检查全局累计花费。
+    # 软/硬熔断均拒绝新调用；硬熔断的中断运行中语义由 should_interrupt_running()
+    # 提供，供上层 loop 按需集成。此处 fail-open：guard 检查自身异常时不阻断
+    # 主流程（成本护栏是 best-effort 保护，非安全检查）。
+    try:
+        from maop.core.personal_cost_guard import PersonalCostGuard
+        cost_guard = PersonalCostGuard()
+        cost_allowed, cost_reason = cost_guard.check_new_call()
+        if not cost_allowed:
+            return new_result(
+                agent=agent, task=task,
+                exit_code=126,
+                error=f"[Cost Cap Exceeded] 个人版累计花费已达上限。{cost_reason}"
+                      " 如需更高限额，请升级到企业版（MAOS）。",
+                trace_id=trace_id, routing_key=routing_key,
+            )
+    except Exception as exc:
+        logger.debug("[execute] Personal cost guard check failed (fail-open): %s", exc)
+
     start = time.monotonic()
 
     # ReAct mode: delegate to ReactLoop for Thought→Action→Observation cycling

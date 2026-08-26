@@ -51,6 +51,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **全量测试 0 failed**：修复 `dispatcher.py` `otel_span` re-export 缺失 + `test_routing_trace.py` fixture（patch `dispatch_core.otel_span`）+ 22 个 enterprise 测试加 `pytest.importorskip("maop.enterprise")` 守卫 → ruff 0 + mypy 0 + pytest **7035 passed, 57 skipped, 0 failed**
 - **ADR-017 enterprise branch test**：加 `importorskip` 守卫适配 Community 版无 `maop.enterprise` 模块
 
+## [5.1.0-personal] — 2026-08-27
+
+> 个人版交付门禁（Phase 1）完成。基于 v5.1.0 + 140 项安全审核修复，补齐 3 项 P0 门禁后交付。
+
+### Added
+- **P1-1 成本兜底护栏**：新增 `PersonalCostGuard`（`py/maop/core/personal_cost_guard.py`），实现软/硬两档熔断。配置项 `MAOP_PERSONAL_COST_CAP`（全局累计花费阈值 USD）+ `MAOP_PERSONAL_COST_HARD`（硬熔断开关）。软熔断：达到阈值 → 告警 + 拒绝新 LLM 调用，运行中任务允许跑完。硬熔断：达到阈值 → 中断运行中任务。集成到 `maop_execute.py`（fail-open）。3 条单测覆盖三条路径。
+- **P1-2 edition 切换提示**：前端 `Settings.vue` 切换 enterprise 失败时显式提示"需 MAOS 商业包 + 有效 License"。后端 `admin.py` 无 license 切换 enterprise 返回 403 + 明确错误消息（原先静默降级为 200+degraded）。9 条单测覆盖切换门禁。
+- **P1-3 分布式边界声明**：`cli.py` 的 `maop worker start` 在个人版下提示"分布式 worker 是企业版特性"并退出 1。`README.md` / `docs/user-guide.md` 添加版本说明 + 分布式执行边界声明。
+- **P1-4 长稳测试脚本**：新建 `py/tests/soak/soak_test.py`，48h 多指标压测（内存 RSS / 文件句柄数 / 连接池占用 / CPU 使用率）。15 分钟冒烟测试 PASS（29 样本，9397 次记忆操作，164 次 DAG 执行，所有指标平稳）。
+
+### Changed
+- `settings.py` 新增 `personal_cost_cap` + `personal_cost_hard` 配置项
+- `maop_execute.py` 集成 `PersonalCostGuard.check_new_call()` 前置检查
+- `admin.py` edition 切换逻辑：无 license 切换 enterprise 从 200+degraded 改为 403+error
+- `test_distributed_execution.py` worker CLI 测试适配个人版门禁 + 新增拒绝测试
+- `test_edition_switch.py` e2e 测试期望 403（适配 admin.py 变更）
+
+### Fixed
+- 修复 `soak_test.py` ruff 7 个代码风格问题（F401/UP037/I001/LOG014/TRY401/F841）
+
 ## [5.1.0] — 2026-08-14
 
 ### Added

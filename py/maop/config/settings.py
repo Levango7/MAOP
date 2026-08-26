@@ -138,6 +138,26 @@ class MAOPSettings(BaseSettings):
     budget_monthly_limit_usd: float = Field(default=0.0, description="Monthly cost budget limit (USD, 0=unlimited)", ge=0)
     budget_alert_threshold: float = Field(default=0.8, description="Budget alert threshold as fraction of limit", ge=0, le=1)
 
+    # ── Personal Cost Cap (P1-1: 个人版成本兜底护栏) ──────────────────
+    # 全局累计 LLM 花费阈值（USD）。达到此阈值时触发熔断。
+    # 0 = 不限（向后兼容，本地工具默认不强制）。
+    # 通过 MAOP_PERSONAL_COST_CAP 环境变量设置。
+    personal_cost_cap: float = Field(
+        default=0.0,
+        description="Personal edition global cumulative cost cap (USD, 0=unlimited). "
+                    "When total LLM spend reaches this threshold, circuit breaker triggers.",
+        ge=0,
+    )
+    # 硬熔断开关。False=软熔断（默认），True=硬熔断。
+    # 软熔断：达到阈值 → 告警（日志）+ 拒绝新 LLM 调用，运行中任务允许跑完。
+    # 硬熔断：达到阈值 → 告警 + 中断运行中任务。
+    # 通过 MAOP_PERSONAL_COST_HARD=1 启用。
+    personal_cost_hard: bool = Field(
+        default=False,
+        description="Hard circuit breaker: interrupt running tasks when cap reached. "
+                    "Default False = soft breaker (reject new calls, let running finish).",
+    )
+
     # ── Worker Pool ───────────────────────────────────────────────
     worker_count: int = Field(default=4, description="Worker pool size", ge=1, le=64)
 

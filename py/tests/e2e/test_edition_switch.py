@@ -179,9 +179,13 @@ class TestEditionSwitchRBAC:
         )
 
     async def test_switch_to_enterprise_returns_actual_edition(self, client):
-        """切换到 enterprise 时，如果 license 无效则降级到 personal，
-        响应中 edition 字段反映实际 edition（可能是 personal）。
-        测试环境未安装 enterprise 包，因此预期降级到 personal。"""
+        """切换到 enterprise 时，如果 license 无效则被明确拒绝（403），
+        响应中包含授权指引错误消息。
+        测试环境未安装 enterprise 包，因此预期 403 拒绝。
+
+        P1-2 (edition 切换门禁): 无有效 license 切换到 enterprise 不再
+        静默降级返回 200+degraded，而是返回 403 + 明确错误消息，让用户
+        知道需要 MAOS 商业包 + License。"""
         token = await _login(client)
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -193,23 +197,23 @@ class TestEditionSwitchRBAC:
         )
         assert resp.status_code == 200
 
-        # 尝试切到 enterprise
+        # 尝试切到 enterprise —— 测试环境无 enterprise 包/license，应被 403 拒绝
         resp = await client.post(
             "/api/info/edition",
             json={"edition": "enterprise"},
             headers=headers,
         )
-        assert resp.status_code == 200
-        data = resp.json()
-        # 测试环境无 enterprise 包，应降级到 personal
-        assert data["edition"] in ("enterprise", "personal"), (
-            f"Unexpected edition: {data['edition']}"
+        assert resp.status_code == 403, (
+            f"Switch to enterprise without license should be 403, "
+            f"got {resp.status_code}"
         )
-        # 如果降级了，degraded 应为 True
-        if data["edition"] == "personal":
-            assert data.get("degraded") is True, (
-                "Degraded flag should be True when edition differs from requested"
-            )
+        # 错误消息应包含授权指引（MAOS / License 关键词）
+        # handle_api_errors 将 HTTPException.detail 渲染为 ErrorSchema.error 字段
+        body = resp.json()
+        msg = body.get("error", "") or body.get("detail", "")
+        assert "MAOS" in msg or "License" in msg or "license" in msg, (
+            f"403 error should mention MAOS/License authorization, got: {msg!r}"
+        )
 
     async def test_switch_updates_get_edition(self, client):
         """POST 切换后，GET /api/info/edition 返回新 edition。"""

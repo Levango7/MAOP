@@ -621,8 +621,13 @@ class TestWorkerCLI:
         assert exc_info.value.code == 1
 
     def test_cmd_worker_start_parses_args(self) -> None:
-        """``maop worker start --redis-url=... --concurrency=4`` parses correctly."""
+        """``maop worker start --redis-url=... --concurrency=4`` parses correctly.
+
+        P1-3: cmd_worker_start 在个人版下会拒绝并退出，因此本测试 mock
+        edition 为 ENTERPRISE 以验证参数解析逻辑（门禁之上的正常路径）。
+        """
         from maop.cli import cmd_worker
+        from maop.config.edition import Edition
         # Patch run_worker to capture args without actually starting.
         captured: dict[str, Any] = {}
 
@@ -637,7 +642,8 @@ class TestWorkerCLI:
             captured["capabilities"] = capabilities
             captured["heartbeat_interval"] = heartbeat_interval
 
-        with patch("maop.worker.distributed_worker.run_worker", mock_run_worker):
+        with patch("maop.config.edition.get_edition", return_value=Edition.ENTERPRISE), \
+             patch("maop.worker.distributed_worker.run_worker", mock_run_worker):
             cmd_worker([
                 "start",
                 "--redis-url", "redis://example:6380/1",
@@ -650,15 +656,33 @@ class TestWorkerCLI:
         assert captured["capabilities"] == {"gpu", "linux"}
         assert captured["heartbeat_interval"] == 3.0
 
+    def test_cmd_worker_start_personal_edition_rejected(self) -> None:
+        """P1-3: 个人版下 ``maop worker start`` 拒绝并退出码 1。
+
+        分布式 worker 是企业版（MAOS HA）特性，个人版不支持。
+        命令应打印明确提示并以非零退出码退出，不静默失败。
+        """
+        from maop.cli import cmd_worker
+        from maop.config.edition import Edition
+        with patch("maop.config.edition.get_edition", return_value=Edition.PERSONAL):
+            with pytest.raises(SystemExit) as exc_info:
+                cmd_worker(["start", "--concurrency", "2"])
+            assert exc_info.value.code == 1
+
     def test_main_dispatches_worker(self) -> None:
-        """``maop worker start`` is dispatched by main()."""
+        """``maop worker start`` is dispatched by main().
+
+        P1-3: mock edition 为 ENTERPRISE 以通过个人版门禁，验证 main 分发。
+        """
         from maop.cli import main
-        with patch("sys.argv", ["maop", "worker", "start", "--concurrency", "2"]):  # noqa: SIM117
-            with patch("maop.worker.distributed_worker.run_worker") as mock_rw:
-                main()
-                mock_rw.assert_called_once()
-                call_kwargs = mock_rw.call_args
-                assert call_kwargs.kwargs["concurrency"] == 2
+        from maop.config.edition import Edition
+        with patch("maop.config.edition.get_edition", return_value=Edition.ENTERPRISE), \
+             patch("sys.argv", ["maop", "worker", "start", "--concurrency", "2"]), \
+             patch("maop.worker.distributed_worker.run_worker") as mock_rw:
+            main()
+            mock_rw.assert_called_once()
+            call_kwargs = mock_rw.call_args
+            assert call_kwargs.kwargs["concurrency"] == 2
 
 
 # ── TaskAssignment dataclass tests ────────────────────────────────

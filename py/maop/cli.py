@@ -322,6 +322,10 @@ def cmd_worker_start(
     periodic heartbeats, and executes DAG node tasks dispatched by the
     :class:`~maop.core.scheduling.distributed_scheduler.DistributedScheduler`.
 
+    P1-3 (分布式边界声明): 分布式 worker 是企业版（MAOS HA）特性。
+    个人版（edition == "personal"）下执行此命令将打印明确提示并以
+    退出码 1 退出，不静默失败、不假装启动。
+
     Parameters
     ----------
     redis_url : str | None
@@ -334,6 +338,22 @@ def cmd_worker_start(
     heartbeat_interval : float
         Seconds between heartbeat refreshes.
     """
+    # P1-3: 个人版门禁 —— 分布式 worker 为企业版（MAOS HA）特性。
+    # 在导入 distributed_worker 之前检查 edition，避免个人版误启动分布式进程。
+    from maop.config.edition import Edition, get_edition
+
+    current_edition = get_edition()
+    if current_edition is not Edition.ENTERPRISE:
+        print(
+            "[ERROR] 分布式 worker 是企业版（MAOS HA）特性，个人版不支持多机 worker。\n"
+            "如需分布式执行能力，请升级到企业版：\n"
+            "  1) 安装 MAOS 商业包（maop-enterprise）\n"
+            "  2) 配置有效的商业 License（MAOP_LICENSE_KEY）\n"
+            "个人版仅支持单进程执行，适用于单机/小团队场景。",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
     from maop.worker.distributed_worker import run_worker
 
     caps = {t.strip() for t in capabilities.split(",") if t.strip()} if capabilities else set()
