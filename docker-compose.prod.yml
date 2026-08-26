@@ -380,6 +380,9 @@ services:
     environment:
       - MAOP_ENV=production
       - MAOP_ROOT=/app
+      # 容器内必须监听 0.0.0.0 才能被 nginx 反代访问
+      # （宿主机默认已改为 127.0.0.1，容器侧需显式覆盖，见 py/maop/dashboard/server.py）
+      - MAOP_DASH_HOST=0.0.0.0
       - MAOP_AUTH=${MAOP_AUTH:-1}
       - MAOP_JWT_SECRET=${MAOP_JWT_SECRET:?Set MAOP_JWT_SECRET in .env}
       - MAOP_TLS=${MAOP_TLS:-0}
@@ -411,6 +414,11 @@ services:
       - MAOP_HA_BACKEND=redis
       - MAOP_REDIS_HOST=redis
       - MAOP_REDIS_PASSWORD=${MAOP_REDIS_PASSWORD:-}
+      # P0 安全修复：etcd KV backend 凭证（MAOP_KV_BACKEND=etcd 且 etcd 服务端
+      # 启用 auth 后取消注释；TLS 见 .env.example 的 MAOP_ETCD_CA_CERT 等）。
+      # - MAOP_ETCD_HOST=etcd
+      # - MAOP_ETCD_USERNAME=${MAOP_ETCD_USERNAME:?Set MAOP_ETCD_USERNAME when etcd auth is enabled}
+      # - MAOP_ETCD_PASSWORD=${MAOP_ETCD_PASSWORD:?Set MAOP_ETCD_PASSWORD when etcd auth is enabled}
     volumes:
       - maop-data:/app/data
       - maop-config:/app/config
@@ -709,6 +717,19 @@ services:
       ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
       # Patroni 集群选举需要 v2 API（Patroni 兼容 v2 与 v3，默认 v3）
       ALLOW_NONE_AUTHENTICATION: "yes"
+    # P0 安全修复：生产环境必须为 etcd 启用认证。官方 coreos/etcd 镜像
+    # 不支持密码类环境变量（bitnami 的 ETCD_ROOT_PASSWORD 在此镜像无效），
+    # 需在首启后执行一次性初始化（按提示输入 >=16 位随机强密码）：
+    #   docker exec -it maop-etcd etcdctl user add root
+    #   docker exec -it maop-etcd etcdctl user add maop
+    #   docker exec maop-etcd etcdctl role add maop-role
+    #   docker exec maop-etcd etcdctl user grant-role maop maop-role
+    #   docker exec maop-etcd etcdctl auth enable
+    # 然后设置 .env 中 MAOP_ETCD_USERNAME / MAOP_ETCD_PASSWORD（应用侧连接
+    # 凭证，见 .env.example），并在下方 dashboard 服务取消 MAOP_ETCD_* 注释。
+    # 注意：auth enable 后 Patroni DCS（deploy/patroni/patroni.yml 的 etcd
+    # username/password 段）与本服务 healthcheck 均需携带凭证同步更新；
+    # 未启用 auth 前，本服务仅暴露于 127.0.0.1 + maop-net 内部网络，风险受控。
     ports:
       - "127.0.0.1:2379:2379"  # localhost only
     volumes:

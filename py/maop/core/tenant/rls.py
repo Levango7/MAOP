@@ -91,6 +91,40 @@ class TenantRLS:
 
     # ── query builders ──────────────────────────────────────────────
 
+    @staticmethod
+    def _validate_column_list(columns: str) -> str:
+        """Validate a comma-separated column projection list.
+
+        Each element must be a bare identifier or ``*``. The ``columns``
+        string is interpolated verbatim into the SELECT clause, so every
+        token is checked against :func:`validate_identifier` to block SQL
+        injection through this public-API parameter.
+        """
+        for part in columns.split(","):
+            token = part.strip()
+            if not token or token == "*":
+                continue
+            validate_identifier(token, "column")
+        return columns
+
+    @staticmethod
+    def _validate_order_by(order_by: str) -> str:
+        """Validate an ORDER BY clause of the form ``col [ASC|DESC][, ...]``.
+
+        The clause is interpolated verbatim into the SQL text, so each term
+        must be a bare identifier optionally followed by ASC/DESC.
+        """
+        for term in order_by.split(","):
+            tokens = term.strip().split()
+            if not tokens:
+                raise ValueError("Invalid ORDER BY: empty term")
+            if len(tokens) > 2:
+                raise ValueError(f"Invalid ORDER BY term: {term!r}")
+            validate_identifier(tokens[0], "order by column")
+            if len(tokens) == 2 and tokens[1].upper() not in ("ASC", "DESC"):
+                raise ValueError(f"Invalid ORDER BY direction in {term!r}")
+        return order_by
+
     def scoped_select(
         self,
         tenant_id: str,
@@ -107,16 +141,32 @@ class TenantRLS:
         Returns ``(sql, params)`` ready for ``conn.execute(sql, params)``.
         If *table* is not in the scoped set, the query is returned untouched
         (caller explicitly opted out).
+
+        Security notes:
+
+        - *table*, *columns* and *order_by* are interpolated into the SQL
+          text and are therefore validated (identifier whitelist / grammar
+          check). Invalid values raise ``ValueError``.
+        - *where* is intentionally a caller-built SQL fragment paired with
+          *params* (query-builder contract). Callers MUST only pass fixed
+          templates like ``"id > ?"`` — never raw user input. Values must
+          always go through *params*.
+        - *limit* is coerced via ``int()`` so only numeric values reach the
+          SQL text.
         """
         validate_identifier(table, "table")
+        self._validate_column_list(columns)
+        if order_by:
+            self._validate_order_by(order_by)
+        safe_limit = int(limit)
         if table not in self._scoped_tables:
             sql = f"SELECT {columns} FROM {table}"
             if where:
                 sql += f" WHERE {where}"
             if order_by:
                 sql += f" ORDER BY {order_by}"
-            if limit > 0:
-                sql += f" LIMIT {limit}"
+            if safe_limit > 0:
+                sql += f" LIMIT {safe_limit}"
             return sql, params
 
         clauses = ["tenant_id = ?"]
@@ -127,8 +177,8 @@ class TenantRLS:
         sql = f"SELECT {columns} FROM {table} WHERE " + " AND ".join(clauses)
         if order_by:
             sql += f" ORDER BY {order_by}"
-        if limit > 0:
-            sql += f" LIMIT {limit}"
+        if safe_limit > 0:
+            sql += f" LIMIT {safe_limit}"
         return sql, tuple(all_params)
 
     def scoped_insert(

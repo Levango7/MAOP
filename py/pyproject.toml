@@ -18,16 +18,25 @@ dependencies = [
     # break the ABI / asyncio behaviour the code relies on.
     # - numpy 3.0 changed the C ABI; pin below 3.0.
     "numpy>=1.24.0,<3.0",
-    # - cryptography: widened to <51 so pip-audit can resolve CVE fixes
-    #   (PYSEC-2026-3552 needs >=50.0.0; 48.0.1 has 3 known vulns).
-    "cryptography>=44.0,<51",
+    # - P0-C CVE audit (2026-08-26): floor raised to 50.0 — PYSEC-2026-3552
+    #   needs >=50.0.0 (also fixes PYSEC-2026-3553/3554 at >=49.0.0 and
+    #   GHSA-537c-gmf6-5ccf at >=48.0.1). cryptography 50 supports Python
+    #   >=3.9, compatible with requires-python >=3.10.
+    "cryptography>=50.0,<51",
     "aiosqlite>=0.20.0",
-    "python-multipart>=0.0.9",
+    # - P0-C CVE audit (2026-08-26): floor raised to 0.0.31 —
+    #   PYSEC-2026-3036/3037 fixed in 0.0.30, PYSEC-2026-3040 in 0.0.31.
+    "python-multipart>=0.0.31",
     "alembic>=1.13.0",
-    "aiohttp>=3.10.0",
+    # - P0-C CVE audit (2026-08-26): floor raised to 3.14.3 — covers all 14
+    #   aiohttp CVEs reported against 3.13.5 (fixes span 3.14.0 ~ 3.14.3,
+    #   highest being PYSEC-2026-3545/CVE-2026-69244).
+    "aiohttp>=3.14.3",
     # - websockets 14+ made breaking asyncio changes; cap below 15.
     "websockets>=12.0,<15",
-    "PyJWT>=2.8.0",
+    # - P0-C CVE audit (2026-08-26): floor raised to 2.13.0 — fixes
+    #   PYSEC-2026-175..179 (CVE-2026-48522..48526), all patched in 2.13.0.
+    "PyJWT>=2.13.0",
     "packaging>=24.0",
     # P1-5 fix: sqlite-vec is now a default dependency (was optional).
     # Provides ~100x faster ANN vector search via SQLite virtual table extension.
@@ -47,7 +56,7 @@ dev = [
     "pydantic-settings==2.5.2",
     "mmh3==5.2.1",
     "httpx>=0.27.0,<1.0",
-    "python-multipart>=0.0.9",
+    "python-multipart>=0.0.31",
     "aiosqlite>=0.20.0",
     "pytest-timeout>=2.3",
     # P2-4: pytest-rerunfailures for flaky test retry (CI -n auto 并行场景下
@@ -59,9 +68,12 @@ dev = [
     # lxml + defusedxml for SAML XML handling. All were implicit via
     # requirements.lock but must be declared here since CI installs editable.
     "fakeredis>=2.23",
-    "lxml>=5.0.0",
+    # P0-C CVE audit (2026-08-26): lxml >=6.1.0 fixes PYSEC-2026-87 (CVE-2026-41066).
+    "lxml>=6.1.0",
     "defusedxml>=0.7.1",
 ]
+
+
 ml = [
     "sentence-transformers>=2.0",
     # P1-5: HNSW index for ≥100K-vector datasets. Optional because the
@@ -83,7 +95,9 @@ enterprise = [
     # backends permanently falling back to Redis/SQLite.
     "pika>=1.3",
     # SAML SSO (enterprise/saml_handler.py) + sso integration tests require lxml.
-    "lxml>=5.0.0",
+    # P0-C CVE audit (2026-08-26): >=6.1.0 fixes PYSEC-2026-87 (CVE-2026-41066);
+    # this extra is the only lxml constraint for `pip install maop[enterprise]`.
+    "lxml>=6.1.0",
 ]
 # P0-2 fix (2026-08-16): etcd3 移出 enterprise extra —— upstream 2019 年
 # 停更、含已知 CVE、Python≥3.13 无法安装，留在 enterprise 会导致付费用户

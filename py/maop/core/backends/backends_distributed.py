@@ -8,6 +8,13 @@
 --------
 - 连接：通过 ``MAOP_ETCD_HOST`` / ``MAOP_ETCD_PORT`` 环境变量配置，默认
   ``localhost:2379``。
+- 认证（P0 安全修复）：通过 ``username`` / ``password`` 参数传入，缺省读取
+  ``MAOP_ETCD_USERNAME`` / ``MAOP_ETCD_PASSWORD`` 环境变量。生产环境必须
+  启用 etcd auth（``etcdctl user add root && etcdctl auth enable``）并提供
+  凭证；两个变量必须成对出现，只设其一会抛出 ``ValueError``。
+- TLS（P0 安全修复）：通过 ``ca_cert`` / ``cert_key`` / ``cert_cert`` 参数
+  传入客户端 CA / 私钥 / 证书文件路径，缺省读取 ``MAOP_ETCD_CA_CERT`` /
+  ``MAOP_ETCD_CERT_KEY`` / ``MAOP_ETCD_CERT_CERT``。生产环境建议启用 mTLS。
 - 命名空间：通过 key prefix 实现，所有 key 实际存储为 ``/{namespace}/{key}``；
   ``namespace`` 默认 ``maop``，可通过 ``MAOP_ETCD_NAMESPACE`` 覆盖。
   ``list_keys`` 返回时自动剥离前缀，对外暴露逻辑 key。
@@ -60,9 +67,23 @@ class EtcdKVBackend(KVBackend):
     namespace : str
         键命名空间，所有 key 存储为 ``/{namespace}/{key}``；
         为空时读取 ``MAOP_ETCD_NAMESPACE`` 环境变量，默认 ``maop``。
+    username : str
+        etcd 认证用户名，为空时读取 ``MAOP_ETCD_USERNAME`` 环境变量。
+        生产环境必须启用认证（见 SECURITY.md）。
+    password : str
+        etcd 认证密码，为空时读取 ``MAOP_ETCD_PASSWORD`` 环境变量。
+        必须与 username 成对提供，否则抛出 ``ValueError``。
+    ca_cert : str
+        CA 证书文件路径（TLS），为空时读取 ``MAOP_ETCD_CA_CERT``。
+    cert_key : str
+        客户端私钥文件路径（mTLS），为空时读取 ``MAOP_ETCD_CERT_KEY``。
+    cert_cert : str
+        客户端证书文件路径（mTLS），为空时读取 ``MAOP_ETCD_CERT_CERT``。
 
     Raises
     ------
+    ValueError
+        username / password 只提供了其中一个时抛出（认证凭证必须成对）。
     RuntimeError
         连接 etcd 失败时抛出（包含原始异常链）。
     """
@@ -72,14 +93,41 @@ class EtcdKVBackend(KVBackend):
         host: str = "",
         port: int = 0,
         namespace: str = "",
+        username: str = "",
+        password: str = "",
+        ca_cert: str = "",
+        cert_key: str = "",
+        cert_cert: str = "",
     ) -> None:
         self._host = host or os.getenv("MAOP_ETCD_HOST", _DEFAULT_ETCD_HOST)
         self._port = port or int(os.getenv("MAOP_ETCD_PORT", str(_DEFAULT_ETCD_PORT)))
         self._namespace = namespace or os.getenv("MAOP_ETCD_NAMESPACE", _DEFAULT_NAMESPACE)
+        # P0 安全修复：认证凭证 —— 显式参数优先，回退到环境变量。
+        # etcd3 客户端要求 user/password 成对生效，此处提前校验避免
+        # 半配置状态静默退化为无认证连接。
+        self._username = username or os.getenv("MAOP_ETCD_USERNAME", "")
+        self._password = password or os.getenv("MAOP_ETCD_PASSWORD", "")
+        if bool(self._username) != bool(self._password):
+            raise ValueError(
+                "etcd 认证配置不完整：MAOP_ETCD_USERNAME 与 MAOP_ETCD_PASSWORD "
+                "必须成对提供（只设置了其中一个）。请补全凭证或同时清空以使用匿名访问。"
+            )
+        # P0 安全修复：TLS 证书路径 —— 用于加密传输与 mTLS 双向认证。
+        self._ca_cert = ca_cert or os.getenv("MAOP_ETCD_CA_CERT", "")
+        self._cert_key = cert_key or os.getenv("MAOP_ETCD_CERT_KEY", "")
+        self._cert_cert = cert_cert or os.getenv("MAOP_ETCD_CERT_CERT", "")
         # key 前缀，形如 ``/maop``
         self._prefix = f"/{self._namespace}"
         try:
-            self._client = etcd3.client(host=self._host, port=self._port)
+            self._client = etcd3.client(
+                host=self._host,
+                port=self._port,
+                user=self._username or None,
+                password=self._password or None,
+                ca_cert=self._ca_cert or None,
+                cert_key=self._cert_key or None,
+                cert_cert=self._cert_cert or None,
+            )
             # 探活：调用 status() 触发实际连接，便于在初始化阶段暴露问题
             self._client.status()
         except Exception as e:
@@ -92,8 +140,9 @@ class EtcdKVBackend(KVBackend):
                 "请检查 MAOP_ETCD_HOST / MAOP_ETCD_PORT 配置及集群是否可达。"
             ) from e
         logger.debug(
-            "[etcd] 已连接 host=%s port=%s namespace=%s",
+            "[etcd] 已连接 host=%s port=%s namespace=%s auth=%s tls=%s",
             self._host, self._port, self._namespace,
+            bool(self._username), bool(self._ca_cert),
         )
 
     # ------------------------------------------------------------------

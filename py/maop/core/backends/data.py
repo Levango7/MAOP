@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -495,6 +496,11 @@ class MaopDatabase:
         """
         # Security: validate table name
         validate_identifier(table, "table")
+        # Security: highlight_tag is interpolated inside a SQL string literal
+        # (highlight(..., '<tag>', '</tag>')), so a single quote would allow
+        # literal-escape injection. Restrict to a safe tag-name charset.
+        if not re.fullmatch(r"[a-zA-Z0-9_-]+", highlight_tag):
+            raise ValueError(f"invalid highlight tag: {highlight_tag!r}")
         fts_name = f"{table}_fts"
 
         if highlight:

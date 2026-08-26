@@ -335,13 +335,16 @@ services:
   # ── Optional: Redis (cache/queue/HA, --profile redis) ───────────
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes --requirepass ${MAOP_REDIS_PASSWORD:-maop_dev}
+    # O-5 fix (P0): no default password — same treatment as postgres above.
+    # Operators MUST set MAOP_REDIS_PASSWORD in .env; compose fails fast via
+    # the :? syntax instead of silently starting with the weak "maop_dev".
+    command: redis-server --appendonly yes --requirepass ${MAOP_REDIS_PASSWORD:?Set MAOP_REDIS_PASSWORD in .env}
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${MAOP_REDIS_PASSWORD:-maop_dev}", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${MAOP_REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5

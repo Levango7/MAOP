@@ -568,7 +568,9 @@ jobs:
       - name: Run trivy vulnerability scan
         # 非阻塞模式：生成报告但不让 CI 失败（报告仍上传供审查）
         # ignore-unfixed: 只报告有可用修复的漏洞，忽略上游未修复的
-        uses: aquasecurity/trivy-action@master
+        # 供应链安全: 固定到具体版本 tag，禁止 @master/@main 浮动引用
+        # （防止上游仓库被劫持时恶意代码直接进入 CI 执行环境）
+        uses: aquasecurity/trivy-action@0.33.0
         with:
           image-ref: maop:scan
           format: json

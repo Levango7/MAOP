@@ -292,7 +292,11 @@ _tls_enabled = _get_tls_enabled()
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("MAOP_DASH_PORT", sys.argv[1] if len(sys.argv) > 1 else "9079"))
-    host = os.environ.get("MAOP_DASH_HOST", "0.0.0.0")
+    # P0 安全默认: 仅监听本机回环地址。历史默认 0.0.0.0 会把未加防护的
+    # Dashboard 直接暴露到所有网络接口。需要外部/容器访问时通过
+    # MAOP_DASH_HOST 显式设置（Dockerfile 与 docker-compose 已内置
+    # MAOP_DASH_HOST=0.0.0.0，容器部署行为不变）。
+    host = os.environ.get("MAOP_DASH_HOST", "127.0.0.1")
 
     ssl_kwargs: dict[str, Any] = {}
     if _tls_enabled:
