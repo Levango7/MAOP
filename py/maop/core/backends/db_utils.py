@@ -280,8 +280,15 @@ def _default_sqlite_url() -> str:
 
 
 def _default_pg_url() -> str:
-    """Default PostgreSQL URL (local, no auth — override via env in prod)."""
-    return "postgresql+psycopg2://localhost:5432/maop"
+    """Default PostgreSQL URL (local, no auth — override via env in prod).
+
+    Single source of truth: ``config.settings.MAOPSettings.database_url``
+    (env: ``MAOP_DATABASE_URL``).  Historically hard-coded here and in
+    ``core/vector/pg_backend.py``; both now delegate to settings.
+    """
+    from maop.config.settings import get_settings
+
+    return get_settings().database_url
 
 
 def _resolve_url(backend: str, url: str | None) -> str:

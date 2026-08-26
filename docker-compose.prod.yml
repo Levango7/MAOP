@@ -249,7 +249,26 @@ services:
       - "127.0.0.1:5433:5433"   # 读（primary + replica，轮询）
       - "127.0.0.1:7000:7000"   # 统计面板
     volumes:
-      - ./deploy/patroni/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      # P3-P-02 fix: mount haproxy.cfg as template (.tmpl) + render script.
+      # The entrypoint renders ${HAPROXY_STATS_USER} / ${HAPROXY_STATS_PASSWORD_HASH}
+      # placeholders to actual values from env vars at startup, then execs haproxy.
+      - ./deploy/patroni/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg.tmpl:ro
+      - ./deploy/patroni/render-haproxy-config.sh:/usr/local/bin/render-haproxy-config.sh:ro
+    # P3-P-02 fix: render ${VAR} placeholders then start haproxy.
+    # render-haproxy-config.sh writes the rendered config to
+    # /usr/local/etc/haproxy/haproxy.cfg and execs haproxy with it.
+    entrypoint:
+      - /bin/sh
+      - /usr/local/bin/render-haproxy-config.sh
+      - /usr/local/etc/haproxy/haproxy.cfg.tmpl
+      - /usr/local/etc/haproxy/haproxy.cfg
+    environment:
+      # Stats endpoint credentials. HAPROXY_STATS_PASSWORD_HASH must be a
+      # sha-256 hash from `mkpasswd -m sha-256 "your-password"`.
+      # P3-P-02 fix: fail fast if HAPROXY_STATS_PASSWORD_HASH is not set
+      # (render-haproxy-config.sh exits 1 with a clear error message).
+      - HAPROXY_STATS_USER=${HAPROXY_STATS_USER:-admin}
+      - HAPROXY_STATS_PASSWORD_HASH=${HAPROXY_STATS_PASSWORD_HASH:?Set HAPROXY_STATS_PASSWORD_HASH in .env (generate with: mkpasswd -m sha-256 "your-password")}
     healthcheck:
       test: ["CMD-SHELL", "haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg"]
       interval: 30s
@@ -491,6 +510,13 @@ services:
       - MAOP_TLS_KEY_FILE=/etc/nginx/certs/${MAOP_TLS_KEY_FILENAME:-privkey.pem}
     # H9 fix: 使用 envsubst 渲染 nginx 配置模板后再启动 nginx。
     entrypoint: ["/bin/sh", "-c", "envsubst '$$MAOP_TLS_CERT_FILE $$MAOP_TLS_KEY_FILE' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && exec nginx -g 'daemon off;'"]
+    # P2-D-13 fix: healthcheck via nginx serving HTTP (TLS termination layer).
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
       - dashboard  # fix: base compose service is "dashboard", not "maop"
     networks:
@@ -528,6 +554,13 @@ services:
       - "--storage.tsdb.retention.time=30d"
     ports:
       - "127.0.0.1:9090:9090"  # P2 fix: bind to localhost only
+    # P2-D-14 fix: healthcheck via Prometheus /-/healthy endpoint.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     networks:
       - maop-net
 
@@ -560,6 +593,13 @@ services:
       - ./monitoring/grafana:/etc/grafana/dashboards:ro
     ports:
       - "127.0.0.1:3000:3000"  # P2 fix: bind to localhost only
+    # P2-D-15 fix: healthcheck via Grafana /api/health endpoint.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       - prometheus
     networks:

@@ -90,15 +90,6 @@ async def check_pause_async() -> None:
         await asyncio.sleep(PAUSE_CHECK_INTERVAL_S)
 
 
-def check_pause_sync() -> None:
-    """同步检查 pause 状态，若已暂停则等待直到恢复。
-
-    用于同步调用路径。使用 time.sleep 阻塞等待。
-    """
-    while is_paused():
-        logger.info("系统已暂停（.maop_pause 存在），等待恢复...")
-        time.sleep(PAUSE_CHECK_INTERVAL_S)
-
 
 # ── Engine ────────────────────────────────────────────────────
 

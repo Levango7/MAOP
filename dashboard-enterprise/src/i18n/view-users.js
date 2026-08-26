@@ -1,10 +1,10 @@
 export const messages = {
   en: {
-    'view.users.Network error': 'Network error',
-    'view.users.Failed': 'Failed',
+    'view.users.networkError': 'Network error',
+    'view.users.failed': 'Failed',
   },
   zh: {
-    'view.users.Network error': '网络错误',
-    'view.users.Failed': '失败',
+    'view.users.networkError': '网络错误',
+    'view.users.failed': '失败',
   },
 };

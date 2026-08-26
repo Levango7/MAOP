@@ -221,7 +221,7 @@ onMounted(load);
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-4);
-  background: var(--info-soft, #f0f5ff);
+  background: var(--info-soft, rgba(76, 194, 255, .13));
   border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
   border-radius: var(--r-md);
   margin-bottom: var(--sp-2);
@@ -240,7 +240,7 @@ onMounted(load);
 .coming-soon-banner__title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--info-strong, #1d4ed8);
+  color: var(--info-strong, #79c0ff);
 }
 .coming-soon-banner__desc {
   font-size: 12px;

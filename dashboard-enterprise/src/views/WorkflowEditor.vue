@@ -675,7 +675,7 @@ defineExpose({
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+  box-shadow: var(--shadow-sm);
   cursor: grab;
   user-select: none;
   z-index: 2;

@@ -5,7 +5,7 @@
 
 ## 当前权威文档
 
-- `../adr/` — 架构决策记录（ADR 001-016）
+- `../adr/` — 架构决策记录（ADR 001-017）
 - `../deployment.md` — 部署指南
 - `../enterprise/license-issuance-guide.md` — 许可证签发指南
 - `../../README.md` — 项目概述
@@ -38,13 +38,14 @@
 | arch-debt-three-plans-review.md | 2026-08-15 | 6.5KB | 架构债务三方案评审报告 | 历史快照 |
 | project-structure-analysis.md | 2026-08-13 | 49.7KB | 项目结构分析报告 | 历史快照 |
 | v5.0.1-review.md | 2026-08-13 | 3.5KB | v5.0.1 版本审查报告 | 历史快照 |
+| design-system-legacy.md | 2026-07-xx | — | 旧版设计系统遗留文档 | 已过时 |
 
 ## plans/ — 历史计划文档
 
+> **注意**：`prd-three-phase-roadmap.md` 与 `hld-three-phase-roadmap.md` 实际位于 `../`（docs 根目录），而非本子目录；请通过 `../prd-three-phase-roadmap.md` 与 `../hld-three-phase-roadmap.md` 访问。
+
 | 文件 | 日期 | 大小 | 说明 | 状态 |
 |------|------|------|------|------|
-| prd-three-phase-roadmap.md | 2026-08-07 | 44.4KB | 三阶段路线图 PRD（21 个月规划） | 已归档 |
-| hld-three-phase-roadmap.md | 2026-08-07 | 52.4KB | 三阶段路线图 HLD | 已归档 |
 | routing-refactor-plan.md | 2026-07-xx | 17.2KB | 路由重构计划 | 已完成 |
 | followup-three-fixes-plan.md | 2026-08-14 | 7.4KB | 三项后续修复计划 | 已完成 |
 | tool-whitelist-enforce-plan.md | 2026-08-15 | 9.2KB | 工具白名单强制执行计划 | 已完成 |

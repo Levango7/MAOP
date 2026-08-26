@@ -63,10 +63,15 @@ def register_exception_handler(app: FastAPI) -> None:
 def setup_cors(app: FastAPI, is_prod_env: bool) -> list[str]:
     """Configure CORS middleware.  Returns the resolved origin list (used
     by ``server.py`` ``__main__`` for startup logging)."""
+    from maop.config.settings import CORS_DEV_EXTRA_ORIGINS
+
     _cors_origins = os.environ.get("MAOP_CORS_ORIGINS", "").split(",")
     _cors_origins = [o.strip() for o in _cors_origins if o.strip()]
     if not _cors_origins:
-        _cors_origins = ["http://localhost:9079", "http://127.0.0.1:9079", "http://localhost:8080"]
+        # Fallback (env unset or empty): use the settings default origins
+        # plus the dashboard local dev fallback origins.  All default
+        # strings live in config/settings.py — no hard-coded URLs here.
+        _cors_origins = _get_settings().cors_origin_list() + list(CORS_DEV_EXTRA_ORIGINS)
     # Fail-closed: reject wildcard origins. With allow_credentials=True a "*"
     # origin lets any site make authenticated cross-origin requests, so in production
     # we refuse and fall back to an empty allow-list.

@@ -1,5 +1,15 @@
-# MAOP OpenTelemetry Collector Configuration
+# MAOP OpenTelemetry Collector Configuration (simplified fallback)
 # Used with: docker compose --profile otel up -d
+#
+# Note: docker-compose.yml now mounts deploy/otel-collector.yaml (the complete
+# config with jaeger/prometheus/loki exporters, tail_sampling, hostmetrics,
+# resource processor) — see P2-M-02 fix. This root-level file is kept as a
+# simplified fallback for standalone `docker run` invocations and is also
+# fully fixed per P2-M-01/P2-M-03:
+#   - Replaced deprecated `logging` exporter with `debug` (OTel Collector 0.86+).
+#   - Enabled `prometheus` exporter on 0.0.0.0:8889 so the exposed 8889 port
+#     actually has a service listening (was previously dead air).
+#   - Added health_check extension on port 13133 for compose healthcheck.
 
 receivers:
   otlp:
@@ -18,24 +28,39 @@ processors:
     limit_mib: 512
 
 exporters:
-  logging:
-    loglevel: warn
-  # Uncomment for Jaeger:
-  # otlp/jaeger:
-  #   endpoint: jaeger:4317
-  #   tls:
-  #     insecure: true
-  # Uncomment for Prometheus:
-  # prometheus:
-  #   endpoint: "0.0.0.0:8889"
+  # P2-M-01 fix: `logging` exporter was deprecated in OTel Collector 0.86+;
+  # replaced with `debug` (verbosity: basic ≈ former loglevel: warn).
+  debug:
+    verbosity: basic
+  # Jaeger / Tempo via OTLP — uncomment and set endpoint to enable.
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+  # P2-M-03 fix: enable prometheus exporter so the 8889 port exposed in
+  # docker-compose.yml actually has a service listening. Prometheus can now
+  # scrape this endpoint for Collector-received metrics.
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: maop_otel
+    send_timestamps: true
+    metric_expiration: 5m
+    enable_open_metrics: true
+    resource_to_telemetry_conversion:
+      enabled: true
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
 
 service:
+  extensions: [health_check]
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [logging]
+      exporters: [debug, otlp/jaeger]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [logging]
+      exporters: [debug, prometheus]

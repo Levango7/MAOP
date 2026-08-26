@@ -84,3 +84,40 @@ dashboard-enterprise/src
 
 # 归档
 archive/
+
+# P3-D-07 fix: exclude non-runtime files/dirs from build context to reduce
+# docker build transfer size and layer cache invalidation probability.
+# These are not needed inside the runtime image.
+
+# CI/CD config
+.github/
+
+# Build/dev scripts (not needed at runtime — entrypoint is copied explicitly)
+scripts/
+tools/
+deliverables/
+Makefile
+start.sh
+maop.ps1
+
+# Python test + dev files (not needed at runtime)
+py/tests/
+py/scripts/
+py/.cov_baseline.json
+py/requirements.lock
+py/requirements.txt
+
+# Templates (the rendered alembic.ini is copied explicitly)
+alembic.ini.template
+
+# Top-level docs (already covered by docs/ + *.md above, but explicit for clarity)
+CHANGELOG.md
+LICENSE
+SECURITY.md
+CONTRIBUTING.md
+ROADMAP.md
+
+# Audit reports
+docs/p23-cideploy-audit.md
+cc_baseline.json
+_run_check.py

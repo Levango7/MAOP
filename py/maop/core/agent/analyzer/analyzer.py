@@ -434,6 +434,97 @@ def _build_llm_decomp_prompt(task: str, sub_tasks: list[SubTask]) -> list[dict[s
     ]
 
 
+def _strip_markdown_fence(text: str) -> str:
+    """Strip accidental markdown code fences from LLM output."""
+    if not text.startswith("```"):
+        return text
+    first_newline = text.find("\n")
+    if first_newline != -1:
+        text = text[first_newline + 1:]
+    text = text.removesuffix("```")
+    return text.strip()
+
+
+def _build_decomp_edges(
+    deps_raw: Any,
+    sub_tasks: list[SubTask],
+    valid_ids: set[str],
+) -> list[tuple[str, str]]:
+    """Build DAG edge list from LLM ``dependencies`` field.
+
+    Starts from a sequential default baseline (preserving prior behavior),
+    then adds LLM-identified edges (dedup, id-validated).
+
+    When ``deps_raw`` is not a list, returns an empty edge list (preserving
+    the original guard behaviour).
+    """
+    edges: list[tuple[str, str]] = []
+    if not isinstance(deps_raw, list):
+        return edges
+    # Start from sequential default (preserves prior behavior baseline)
+    if len(sub_tasks) > 1:
+        for i in range(len(sub_tasks) - 1):
+            edges.append((sub_tasks[i].id, sub_tasks[i + 1].id))
+    # Add LLM-identified edges (dedup, id-validated)
+    for entry in deps_raw:
+        if not isinstance(entry, dict):
+            continue
+        src = str(entry.get("from", "")).strip()
+        dst = str(entry.get("to", "")).strip()
+        if src in valid_ids and dst in valid_ids and src != dst:
+            edge = (src, dst)
+            if edge not in edges:
+                edges.append(edge)
+    return edges
+
+
+def _apply_risk_levels(risk_raw: Any, sub_tasks: list[SubTask]) -> None:
+    """Mutate ``sub_tasks`` in place to apply LLM-provided risk levels."""
+    if not isinstance(risk_raw, dict):
+        return
+    for st in sub_tasks:
+        val = risk_raw.get(st.id)
+        if isinstance(val, str):
+            v = val.strip().lower()
+            if v in _VALID_RISK_LEVELS:
+                st.risk_level = v
+
+
+def _sync_subtask_deps(
+    sub_tasks: list[SubTask],
+    edges: list[tuple[str, str]],
+) -> None:
+    """Re-derive per-node dependency list from the edge list and mutate sub_tasks."""
+    deps_by_node: dict[str, list[str]] = {st.id: [] for st in sub_tasks}
+    for src, dst in edges:
+        if src in deps_by_node and dst in deps_by_node and src != dst and src not in deps_by_node[dst]:
+            deps_by_node[dst].append(src)
+    for st in sub_tasks:
+        st.dependencies = deps_by_node.get(st.id, [])
+
+
+def _compute_decomp_score(
+    data: dict[str, Any],
+    sub_tasks: list[SubTask],
+    dag: DependencyDAG,
+) -> int:
+    """Compute complexity score: prefer LLM-provided value, else rule-based."""
+    score_raw = data.get("complexity_score")
+    if isinstance(score_raw, (int, float)) and 0 <= score_raw <= 100:
+        return int(score_raw)
+    # Fall back to rule-based scoring on the LLM-built DAG.
+    s = 0
+    s += min(len(sub_tasks) * 5, 25)
+    groups = dag.parallel_groups()
+    s += min(len(groups) * 5, 25)
+    total_effort = sum(st.estimated_effort for st in sub_tasks)
+    s += min(int(total_effort * 3), 25)
+    risk_count = sum(1 for st in sub_tasks if st.risk_level == "high")
+    if risk_count > 0:
+        s += min(risk_count * 10, 25)
+    return min(s, 100)
+
+
 def _parse_llm_decomp(
     content: str,
     sub_tasks: list[SubTask],
@@ -445,14 +536,7 @@ def _parse_llm_decomp(
     """
     if not content or not content.strip():
         return None
-    text = content.strip()
-    # Strip accidental markdown code fences if present.
-    if text.startswith("```"):
-        first_newline = text.find("\n")
-        if first_newline != -1:
-            text = text[first_newline + 1:]
-        text = text.removesuffix("```")
-        text = text.strip()
+    text = _strip_markdown_fence(content.strip())
     try:
         data: Any = json.loads(text)
     except (json.JSONDecodeError, ValueError) as exc:
@@ -464,42 +548,13 @@ def _parse_llm_decomp(
     valid_ids = {st.id for st in sub_tasks}
 
     # ── Dependencies → DAG edges ────────────────────────────
-    edges: list[tuple[str, str]] = []
-    deps_raw = data.get("dependencies", [])
-    if isinstance(deps_raw, list):
-        # Start from sequential default (preserves prior behavior baseline)
-        if len(sub_tasks) > 1:
-            for i in range(len(sub_tasks) - 1):
-                edges.append((sub_tasks[i].id, sub_tasks[i + 1].id))
-        # Add LLM-identified edges (dedup, id-validated)
-        for entry in deps_raw:
-            if not isinstance(entry, dict):
-                continue
-            src = str(entry.get("from", "")).strip()
-            dst = str(entry.get("to", "")).strip()
-            if src in valid_ids and dst in valid_ids and src != dst:
-                edge = (src, dst)
-                if edge not in edges:
-                    edges.append(edge)
+    edges = _build_decomp_edges(data.get("dependencies", []), sub_tasks, valid_ids)
 
     # ── Risk levels → mutate sub_tasks ──────────────────────
-    risk_raw = data.get("risk_levels", {})
-    if isinstance(risk_raw, dict):
-        for st in sub_tasks:
-            val = risk_raw.get(st.id)
-            if isinstance(val, str):
-                v = val.strip().lower()
-                if v in _VALID_RISK_LEVELS:
-                    st.risk_level = v
+    _apply_risk_levels(data.get("risk_levels", {}), sub_tasks)
 
     # ── Update dependencies field on each SubTask ────────────
-    # Re-derive per-node dependency list from the edge list
-    deps_by_node: dict[str, list[str]] = {st.id: [] for st in sub_tasks}
-    for src, dst in edges:
-        if src in deps_by_node and dst in deps_by_node and src != dst and src not in deps_by_node[dst]:
-            deps_by_node[dst].append(src)
-    for st in sub_tasks:
-        st.dependencies = deps_by_node.get(st.id, [])
+    _sync_subtask_deps(sub_tasks, edges)
 
     dag = DependencyDAG(
         nodes=[st.id for st in sub_tasks],
@@ -507,23 +562,7 @@ def _parse_llm_decomp(
     )
 
     # ── Complexity score ────────────────────────────────────
-    # Prefer LLM-provided score when valid; otherwise compute via rule formula
-    # (factor-based) so the caller still gets a sane value.
-    score_raw = data.get("complexity_score")
-    if isinstance(score_raw, (int, float)) and 0 <= score_raw <= 100:
-        score = int(score_raw)
-    else:
-        # Fall back to rule-based scoring on the LLM-built DAG.
-        s = 0
-        s += min(len(sub_tasks) * 5, 25)
-        groups = dag.parallel_groups()
-        s += min(len(groups) * 5, 25)
-        total_effort = sum(st.estimated_effort for st in sub_tasks)
-        s += min(int(total_effort * 3), 25)
-        risk_count = sum(1 for st in sub_tasks if st.risk_level == "high")
-        if risk_count > 0:
-            s += min(risk_count * 10, 25)
-        score = min(s, 100)
+    score = _compute_decomp_score(data, sub_tasks, dag)
 
     return sub_tasks, dag, score
 

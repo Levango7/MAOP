@@ -504,7 +504,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 12px;
-  color: var(--text-faint, #94a3b8);
+  color: var(--text-faint, #8a93a3);
   font-size: 12px;
 }
 .agent-health-list {
@@ -526,17 +526,17 @@ onUnmounted(() => {
 }
 .agent-health-header {
   font-weight: 600;
-  color: var(--text-faint, #94a3b8);
+  color: var(--text-faint, #8a93a3);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border, rgba(148,163,184,.25));
 }
 .row-drained .ah-name {
-  color: var(--fail, #ef4444);
+  color: var(--fail, #f85149);
 }
 .row-recovering .ah-name {
-  color: var(--warn, #f59e0b);
+  color: var(--warn, #d29922);
 }
 .ah-name {
   font-family: var(--font-mono);
@@ -588,24 +588,24 @@ onUnmounted(() => {
 }
 .pill-normal {
   background: var(--success-soft);
-  color: var(--success, #22c55e);
+  color: var(--success, #3fb950);
 }
 .pill-normal .pill-dot {
-  background: var(--success, #22c55e);
+  background: var(--success, #3fb950);
 }
 .pill-drained {
   background: var(--fail-soft);
-  color: var(--fail, #ef4444);
+  color: var(--fail, #f85149);
 }
 .pill-drained .pill-dot {
-  background: var(--fail, #ef4444);
+  background: var(--fail, #f85149);
 }
 .pill-recovering {
   background: var(--warn-soft);
-  color: var(--warn, #f59e0b);
+  color: var(--warn, #d29922);
 }
 .pill-recovering .pill-dot {
-  background: var(--warn, #f59e0b);
+  background: var(--warn, #d29922);
 }
 .agent-health-config {
   display: flex;
@@ -615,7 +615,7 @@ onUnmounted(() => {
   margin-top: 6px;
   border-top: 1px dashed var(--border-light, rgba(148,163,184,.18));
   font-size: 11px;
-  color: var(--text-faint, #94a3b8);
+  color: var(--text-faint, #8a93a3);
   font-family: var(--font-mono);
 }
 </style>

@@ -9,6 +9,15 @@
 #   3. haproxy（读写分离，primary:5432 + replica:5433）
 #
 # 故障切换流程参见 docs/runbook.md
+#
+# P2-P-02 fix: 此文件为**参考配置**。实际部署中 Spilo 镜像（ghcr.io/zalando/spilo-16）
+# 的 entrypoint 根据 PATRONI_* 环境变量（见 docker-compose.prod.yml 的 patroni1/2/3
+# 服务）自动生成 /home/postgres/patroni.yml，**覆盖**此处挂载的配置。因此：
+#   - ${VAR} shell 风格变量引用不会被 Patroni YAML 解析器替换（Patroni 读取字面量）；
+#   - $(POD_IP) Kubernetes 风格变量引用不会被 docker-compose 替换；
+#   - 此文件仅作为配置参考与文档，不直接影响运行时行为。
+# 如需自定义 Patroni 配置，请通过 docker-compose.prod.yml 的 PATRONI_* 环境变量
+# 或 Spilo 的 PATRONI_POSTGRESQL_* 前缀环境变量传递。
 # ─────────────────────────────────────────────────────────────────────
 
 scope: maop-cluster
@@ -20,9 +29,16 @@ etcd:
 # ── 周期性 REST API 用于健康检查与 switchover ─────────────────────
 restapi:
   listen: 0.0.0.0:8008
-  connect_address: $(POD_IP):8008
+  # P2-P-01 fix: $(POD_IP) is Kubernetes-style and is NOT substituted by
+  # docker-compose. In the Spilo image, connect_address is auto-generated
+  # from the PATRONI_NAME env var + container hostname. This reference
+  # config uses ${PATRONI_NAME} placeholder for documentation clarity.
+  connect_address: ${PATRONI_NAME}:8008
   authentication:
     username: patroni
+    # P2-P-02 fix: ${VAR} shell-style refs are NOT substituted by Patroni's
+    # YAML parser (Patroni reads the literal string). Spilo generates the
+    # actual config from PATRONI_RESTAPI_PASSWORD env var. See file header.
     password: ${PATRONI_API_PASSWORD:?Set PATRONI_API_PASSWORD}
 
 # ── PostgreSQL 配置 ───────────────────────────────────────────────
@@ -33,7 +49,8 @@ postgresql:
   pgpass: /var/lib/postgresql/.pgpass
 
   listen: 0.0.0.0:5432
-  connect_address: $(POD_IP):5432
+  # P2-P-01 fix: same as restapi.connect_address above.
+  connect_address: ${PATRONI_NAME}:5432
 
   authentication:
     replication:
@@ -114,10 +131,16 @@ postgresql:
     - data-checksums   # 启用 checksum，pg_rewind 依赖
 
   # ── pg_hba.conf（客户端认证）──────────────────────────────────
+  # P3-P-01 fix: restrict to container network segments instead of 0.0.0.0/0.
+  # Docker bridge networks use 172.16.0.0/12 by default; 10.0.0.0/8 covers
+  # common Kubernetes pod networks. Adjust to your actual network if needed.
   pg_hba:
-    - host all all 0.0.0.0/0 scram-sha-256
-    - host replication replicator 0.0.0.0/0 scram-sha-256
-    - host replication rewinder 0.0.0.0/0 scram-sha-256
+    - host all all 172.16.0.0/12 scram-sha-256
+    - host all all 10.0.0.0/8 scram-sha-256
+    - host replication replicator 172.16.0.0/12 scram-sha-256
+    - host replication replicator 10.0.0.0/8 scram-sha-256
+    - host replication rewinder 172.16.0.0/12 scram-sha-256
+    - host replication rewinder 10.0.0.0/8 scram-sha-256
 
   # ── 回调（角色变更时通知）────────────────────────────────────
   callbacks:

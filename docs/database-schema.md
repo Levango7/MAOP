@@ -1,11 +1,11 @@
 # MAOP Database Schema
 
 > Auto-generated from source code CREATE TABLE statements.
-> ⚠️ 更正 2026-08-14：代码库实际含 **117 张 distinct 表**（`grep -ri "CREATE TABLE" py/maop` 统计）。本文档当前仅记录其中 53 张，其余约 64 张（enterprise / monitoring / evolution 等模块）待补全。
+> ⚠️ 更正 2026-08-26：代码库实际含 **101 张 distinct 表**（`grep -ri "CREATE TABLE" py/maop` 统计，排除 `_subagents_new` 等临时迁移表）。本文档当前仅记录其中 53 张，其余约 48 张（enterprise / monitoring / evolution 等模块）待补全。
 
 ---
 
-## 1. Authentication — `core/auth.py`
+## 1. Authentication — `core/security/auth.py`
 
 ### api_keys
 
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
 
 ---
 
-## 2. Core Data — `core/data.py`
+## 2. Core Data — `core/backends/data.py`
 
 ### delegations
 
@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS error_log (
 
 ---
 
-## 3. Session — `core/session.py`
+## 3. Session — `core/security/session.py`
 
 ### sessions
 
@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 ---
 
-## 4. Circuit Breaker — `core/circuit_breaker.py`
+## 4. Circuit Breaker — `core/reliability/circuit_breaker.py`
 
 ### circuit_breaker_state
 
@@ -289,7 +289,7 @@ CREATE TABLE IF NOT EXISTS breaker_events (
 
 ---
 
-## 5. API Key Vault — `core/api_key_vault.py`
+## 5. API Key Vault — `core/security/api_key_vault.py`
 
 ### api_keys
 
@@ -302,7 +302,7 @@ Encrypted LLM provider API keys (Fernet symmetric encryption).
 | created_at | TEXT | NOT NULL | Creation timestamp |
 | updated_at | TEXT | DEFAULT '' | Last update timestamp |
 
-> **Note**: This table shares the name `api_keys` with `core/auth.py`. They are in separate SQLite databases.
+> **Note**: This table shares the name `api_keys` with `core/security/auth.py`. They are in separate SQLite databases.
 
 ```sql
 CREATE TABLE IF NOT EXISTS api_keys (
@@ -315,7 +315,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
 
 ---
 
-## 6. Time Series — `core/timeseries.py`
+## 6. Time Series — `core/monitoring/timeseries.py`
 
 ### ts_raw
 
@@ -399,7 +399,7 @@ CREATE TABLE IF NOT EXISTS ts_1hour (
 
 ---
 
-## 7. KV Store — `core/kv_store.py`
+## 7. KV Store — `core/backends/kv_store.py`
 
 ### kv_store
 
@@ -432,7 +432,7 @@ CREATE TABLE IF NOT EXISTS kv_store (
 
 ---
 
-## 8. Vector Search — `core/vector.py`
+## 8. Vector Search — `core/memory/vector_store.py`
 
 ### vector_entries
 
@@ -458,7 +458,7 @@ CREATE TABLE IF NOT EXISTS vector_entries (
 
 ---
 
-## 9. Worktree — `core/worktree.py`
+## 9. Worktree — `core/agent/memory_ctx/worktree.py`
 
 ### worktrees
 
@@ -488,7 +488,7 @@ CREATE TABLE IF NOT EXISTS worktrees (
 
 ---
 
-## 10. Tool Manager — `core/tool_manager.py`
+## 10. Tool Manager — `core/agent/tools/tool_manager.py`
 
 ### tools
 
@@ -524,7 +524,7 @@ CREATE TABLE IF NOT EXISTS tools (
 
 ---
 
-## 11. Subagent — `core/subagent.py`
+## 11. Subagent — `core/agent/delegation/subagent_db.py`
 
 ### subagents
 
@@ -582,7 +582,7 @@ CREATE TABLE IF NOT EXISTS agent_messages (
 
 ---
 
-## 12. Sandbox — `core/sandbox.py`
+## 12. Sandbox — `core/security/sandbox.py`
 
 ### sandboxes
 
@@ -614,7 +614,7 @@ CREATE TABLE IF NOT EXISTS sandboxes (
 
 ---
 
-## 13. Protocol — `core/protocol.py`
+## 13. Protocol — `core/agent/plugins_hooks/protocol.py`
 
 ### protocols
 
@@ -675,7 +675,7 @@ CREATE TABLE IF NOT EXISTS protocol_messages (
 
 ---
 
-## 14. Plugin — `core/plugin.py`
+## 14. Plugin — `core/agent/plugins_hooks/plugin_manager.py`
 
 ### plugins
 
@@ -713,7 +713,7 @@ CREATE TABLE IF NOT EXISTS plugins (
 
 ---
 
-## 15. Permission — `core/permission.py`
+## 15. Permission — `core/security/permission.py`
 
 ### permission_rules
 
@@ -743,7 +743,7 @@ CREATE TABLE IF NOT EXISTS permission_rules (
 
 ---
 
-## 16. Message Queue — `core/message_queue.py`
+## 16. Message Queue — `core/reliability/message_queue.py`
 
 ### queue_messages
 
@@ -833,7 +833,7 @@ CREATE TABLE IF NOT EXISTS queue_idempotent (
 
 ---
 
-## 17. MCP Registry — `core/mcp_registry.py`
+## 17. MCP Registry — `core/mcp/mcp_hub.py`
 
 ### mcp_servers
 
@@ -857,7 +857,7 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
 
 ---
 
-## 18. Knowledge Extractor — `core/knowledge_extractor.py`
+## 18. Knowledge Extractor — `core/memory/knowledge_extractor.py`
 
 ### facts
 
@@ -935,7 +935,7 @@ CREATE TABLE IF NOT EXISTS relations (
 
 ---
 
-## 19. Image Store — `core/image_store.py`
+## 19. Image Store — `core/backends/image_store.py`
 
 ### images
 
@@ -971,7 +971,7 @@ CREATE TABLE IF NOT EXISTS images (
 
 ---
 
-## 20. Human Proxy — `core/human_proxy.py`
+## 20. Human Proxy — `core/agent/delegation/human_proxy.py`
 
 ### approval_requests
 
@@ -1007,7 +1007,7 @@ CREATE TABLE IF NOT EXISTS approval_requests (
 
 ---
 
-## 21. Hook Manager — `core/hook_manager.py`
+## 21. Hook Manager — `core/agent/plugins_hooks/hook_manager.py`
 
 ### hooks
 
@@ -1107,7 +1107,7 @@ CREATE TABLE IF NOT EXISTS cost_entries (
 
 ---
 
-## 23. Conversation — `core/conversation.py`
+## 23. Conversation — `core/agent/llm_chat/conversation.py`
 
 ### messages
 
@@ -1137,7 +1137,7 @@ CREATE TABLE IF NOT EXISTS messages (
 
 ---
 
-## 24. Change Tracker — `core/change_tracker.py`
+## 24. Change Tracker — `core/reliability/change_tracker.py`
 
 ### snapshots
 
@@ -1220,7 +1220,7 @@ CREATE TABLE IF NOT EXISTS change_log (
 
 ---
 
-## 25. Artifact Store — `core/artifact_store.py`
+## 25. Artifact Store — `core/backends/artifact_store.py`
 
 ### artifacts
 
@@ -1278,7 +1278,7 @@ CREATE TABLE IF NOT EXISTS artifact_versions (
 
 ---
 
-## 26. Agent Scanner — `core/agent_scanner.py`
+## 26. Agent Scanner — `core/agent/lifecycle/agent_scanner.py`
 
 ### scanned_agents
 
@@ -1322,7 +1322,7 @@ CREATE TABLE IF NOT EXISTS scanned_agents (
 
 ---
 
-## 27. Agent Registry — `core/agent_registry.py`
+## 27. Agent Registry — `core/agent/lifecycle/agent_registry.py`
 
 ### registered_agents
 
@@ -1398,7 +1398,7 @@ CREATE TABLE IF NOT EXISTS health_log (
 
 ---
 
-## 28. Migration — `core/migration.py`
+## 28. Migration — `core/backends/migration.py`
 
 ### _migrations
 
@@ -1650,37 +1650,37 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
 
 | # | Subsystem | Source File | Tables |
 |---|-----------|-------------|--------|
-| 1 | Authentication | core/auth.py | api_keys |
-| 2 | Core Data | core/data.py | delegations, metrics, checkpoints, circuit_breaker, error_log |
-| 3 | Session | core/session.py | sessions |
-| 4 | Circuit Breaker | core/circuit_breaker.py | circuit_breaker_state, failover_chains, breaker_events |
-| 5 | API Key Vault | core/api_key_vault.py | api_keys |
-| 6 | Time Series | core/timeseries.py | ts_raw, ts_5min, ts_1hour |
-| 7 | KV Store | core/kv_store.py | kv_store |
-| 8 | Vector Search | core/vector.py | vector_entries |
-| 9 | Worktree | core/worktree.py | worktrees |
-| 10 | Tool Manager | core/tool_manager.py | tools |
-| 11 | Subagent | core/subagent.py | subagents, agent_messages |
-| 12 | Sandbox | core/sandbox.py | sandboxes |
-| 13 | Protocol | core/protocol.py | protocols, protocol_messages |
-| 14 | Plugin | core/plugin.py | plugins |
-| 15 | Permission | core/permission.py | permission_rules |
-| 16 | Message Queue | core/message_queue.py | queue_messages, queue_dead_letters, queue_idempotent |
-| 17 | MCP Registry | core/mcp_registry.py | mcp_servers |
-| 18 | Knowledge Extractor | core/knowledge_extractor.py | facts, entities, relations |
-| 19 | Image Store | core/image_store.py | images |
-| 20 | Human Proxy | core/human_proxy.py | approval_requests |
-| 21 | Hook Manager | core/hook_manager.py | hooks, hook_logs |
+| 1 | Authentication | core/security/auth.py | api_keys |
+| 2 | Core Data | core/backends/data.py | delegations, metrics, checkpoints, circuit_breaker, error_log |
+| 3 | Session | core/security/session.py | sessions |
+| 4 | Circuit Breaker | core/reliability/circuit_breaker.py | circuit_breaker_state, failover_chains, breaker_events |
+| 5 | API Key Vault | core/security/api_key_vault.py | api_keys |
+| 6 | Time Series | core/monitoring/timeseries.py | ts_raw, ts_5min, ts_1hour |
+| 7 | KV Store | core/backends/kv_store.py | kv_store |
+| 8 | Vector Search | core/memory/vector_store.py | vector_entries |
+| 9 | Worktree | core/agent/memory_ctx/worktree.py | worktrees |
+| 10 | Tool Manager | core/agent/tools/tool_manager.py | tools |
+| 11 | Subagent | core/agent/delegation/subagent_db.py | subagents, agent_messages |
+| 12 | Sandbox | core/security/sandbox.py | sandboxes |
+| 13 | Protocol | core/agent/plugins_hooks/protocol.py | protocols, protocol_messages |
+| 14 | Plugin | core/agent/plugins_hooks/plugin_manager.py | plugins |
+| 15 | Permission | core/security/permission.py | permission_rules |
+| 16 | Message Queue | core/reliability/message_queue.py | queue_messages, queue_dead_letters, queue_idempotent |
+| 17 | MCP Registry | core/mcp/mcp_hub.py | mcp_servers |
+| 18 | Knowledge Extractor | core/memory/knowledge_extractor.py | facts, entities, relations |
+| 19 | Image Store | core/backends/image_store.py | images |
+| 20 | Human Proxy | core/agent/delegation/human_proxy.py | approval_requests |
+| 21 | Hook Manager | core/agent/plugins_hooks/hook_manager.py | hooks, hook_logs |
 | 22 | Cost Tracker | core/cost_tracker.py | cost_entries |
-| 23 | Conversation | core/conversation.py | messages |
-| 24 | Change Tracker | core/change_tracker.py | snapshots, file_states, change_log |
-| 25 | Artifact Store | core/artifact_store.py | artifacts, artifact_versions |
-| 26 | Agent Scanner | core/agent_scanner.py | scanned_agents |
-| 27 | Agent Registry | core/agent_registry.py | registered_agents, health_log |
-| 28 | Migration | core/migration.py | _migrations |
+| 23 | Conversation | core/agent/llm_chat/conversation.py | messages |
+| 24 | Change Tracker | core/reliability/change_tracker.py | snapshots, file_states, change_log |
+| 25 | Artifact Store | core/backends/artifact_store.py | artifacts, artifact_versions |
+| 26 | Agent Scanner | core/agent/lifecycle/agent_scanner.py | scanned_agents |
+| 27 | Agent Registry | core/agent/lifecycle/agent_registry.py | registered_agents, health_log |
+| 28 | Migration | core/backends/migration.py | _migrations |
 | 29 | Memory Manager | memory/manager.py | consolidation_log |
 | 30 | Memory Models | memory/models.py | memory_entries, memory_traces, memory_trajectory, memory_fts |
 | 31 | Dashboard Auth | dashboard/routers/auth.py | users |
 | 32 | Prompt Manager | prompt_manager.py | prompt_templates, prompt_versions |
 
-**Total: 117 tables（本文档已记录 53 张，其余 64 张待补全）**
+**Total: 101 tables（本文档已记录 53 张，其余 48 张待补全）**

@@ -573,7 +573,7 @@ onMounted(loadAll);
 .notif-row:hover { border-color: var(--border-strong); background: var(--surface-2); }
 .notif-row.is-unread { background: color-mix(in srgb, var(--brand-soft) 35%, var(--surface)); }
 .notif-row__bar { width: 4px; height: 32px; border-radius: 2px; background: var(--border); }
-.notif-row__bar.bar-info { background: var(--info, #38bdf8); }
+.notif-row__bar.bar-info { background: var(--info, #4cc2ff); }
 .notif-row__bar.bar-warning { background: var(--warn); }
 .notif-row__bar.bar-error { background: var(--fail); }
 .notif-row__bar.bar-success { background: var(--success); }
@@ -584,7 +584,7 @@ onMounted(loadAll);
   background: var(--surface-2);
   color: var(--text-muted);
 }
-.notif-row__icon.ic-info { color: var(--info, #38bdf8); }
+.notif-row__icon.ic-info { color: var(--info, #4cc2ff); }
 .notif-row__icon.ic-warning { color: var(--warn); }
 .notif-row__icon.ic-error { color: var(--fail); }
 .notif-row__icon.ic-success { color: var(--success); }

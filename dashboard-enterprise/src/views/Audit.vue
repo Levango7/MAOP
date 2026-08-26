@@ -436,7 +436,7 @@ const trendData = computed(() => {
       {
         label: t('view.audit.trendDatasetHighRisk'),
         data: bs.map((b) => b.highRisk),
-        borderColor: cssVar('--chart-5', '#ef4444'),
+        borderColor: cssVar('--chart-5', '#9e8cfc'),
         backgroundColor: trendKind.value === 'bar'
           ? cssVarAlpha('--chart-5', 0.6)
           : cssVarAlpha('--chart-5', 0.08),

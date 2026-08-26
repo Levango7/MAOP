@@ -33,6 +33,13 @@ def _default_auth_enabled() -> bool:
     return env not in ("dev", "development", "local", "test")
 
 
+# Dashboard 本地开发兜底 CORS origin。
+# 当 MAOP_CORS_ORIGINS 环境变量未显式设置时，dashboard 的 setup_cors() 会在
+# settings.cors_origin_list() 基础上追加这些 origin（保持历史行为：本地前端
+# 开发服务器默认监听 8080）。生产环境应显式设置 MAOP_CORS_ORIGINS。
+CORS_DEV_EXTRA_ORIGINS: tuple[str, ...] = ("http://localhost:8080",)
+
+
 class MAOPSettings(BaseSettings):
     """MAOP framework configuration with strong typing and validation."""
 
@@ -50,6 +57,12 @@ class MAOPSettings(BaseSettings):
     dash_host: str = Field(default="127.0.0.1", description="Dashboard listen host")
     dash_port: int = Field(default=9079, description="Dashboard listen port", ge=1, le=65535)
     dash_workers: int = Field(default=1, description="Uvicorn worker count", ge=1)
+
+    # ── Timeouts (P3-B-04: centralized timeout configuration) ──────
+    subprocess_timeout_s: int = Field(default=10, description="Subprocess call timeout (seconds)", ge=1)
+    http_timeout_s: int = Field(default=30, description="HTTP request timeout (seconds)", ge=1)
+    upgrade_timeout_s: int = Field(default=120, description="Upgrade operation timeout (seconds)", ge=1)
+    task_wait_timeout_s: int = Field(default=300, description="Task wait timeout (seconds)", ge=1)
 
     # ── TLS ───────────────────────────────────────────────────────
     # 支持 MAOP_TLS_CERT / MAOP_TLS_KEY（短名，.env.example 与 docker 使用）
@@ -88,6 +101,20 @@ class MAOPSettings(BaseSettings):
     cors_origins: str = Field(
         default="http://localhost:9079,http://127.0.0.1:9079",
         description="Comma-separated allowed CORS origins",
+    )
+
+    # ── External service URLs ──────────────────────────────────────
+    # Single source of truth for default PostgreSQL / Redis connection URLs.
+    # Previously hard-coded in core/backends/db_utils.py,
+    # core/vector/pg_backend.py (PG) and worker/distributed_worker.py,
+    # cli.py (Redis).  Override via MAOP_DATABASE_URL / MAOP_REDIS_URL.
+    database_url: str = Field(
+        default="postgresql+psycopg2://localhost:5432/maop",
+        description="Default PostgreSQL SQLAlchemy URL (override in production)",
+    )
+    redis_url: str = Field(
+        default="redis://localhost:6379/0",
+        description="Default Redis connection URL (override in production)",
     )
 
     # ── Data ──────────────────────────────────────────────────────

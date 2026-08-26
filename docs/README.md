@@ -15,7 +15,7 @@
 |------|------|
 | [用户指南](./user-guide.md) | MAOP 入门与操作手册，覆盖安装、配置、Agent 管理、记忆系统等核心功能 |
 | [API 示例](./api-examples.md) | 常见用例的 curl / Python 示例，含认证、Agent 调用、记忆检索等场景 |
-| [API 参考](./api-reference.md) | 完整 HTTP 与 WebSocket 端点规格（v5.1.0），346 个端点，供集成方与运维人员查阅 |
+| [API 参考](./api-reference.md) | 完整 HTTP 与 WebSocket 端点规格（v5.1.0），448 个端点，供集成方与运维人员查阅 |
 
 ---
 
@@ -26,7 +26,7 @@
 | [技术白皮书](./technical-whitepaper.md) | MAOP 架构、设计目标、多租户隔离、合规性、可观测性技术白皮书 |
 | [Nexus 统一编排平台 HLD](./Nexus统一编排平台_HLD.md) | 五层架构（交互层→网关层→编排层→能力节点层→事件/可观测层）高层设计 |
 | [Nexus 交付流水线 LLD](./Nexus交付流水线_LLD.md) | 需求→编码→审查→构建→测试→部署→压测→回归 8 阶段交付流水线低层设计 |
-| [数据库 Schema](./database-schema.md) | 数据库表结构参考（117 张表，当前记录 53 张） |
+| [数据库 Schema](./database-schema.md) | 数据库表结构参考（101 张表，当前记录 53 张） |
 | [设计规范](./DESIGN_RULES.md) | Dashboard 权威设计规范 — 色彩体系、组件契约、交互模式 |
 | [产品设计 RFC-001](./product-design-rfc-001.md) | MAOP 控制台从"功能仓库"到"工作台"的产品设计演进方案 |
 | [接口盘点报告](./_盘点_MAOP_OpsMesh_Interaction.md) | MAOP × OpsMesh × Interaction 三项目接口盘点，含 API 端点/鉴权/事件总线 |

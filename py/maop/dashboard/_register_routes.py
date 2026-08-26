@@ -135,11 +135,8 @@ def _register_enterprise_routers(app: FastAPI) -> None:
             )
 
 
-def register_routers(app: FastAPI) -> None:
-    """Register all API routers (core + enterprise + optional)."""
-    global _app
-    _app = app
-
+def _register_core_routers(app: FastAPI) -> None:
+    """Register core dashboard routers (data / control / model / memory / system / auth)."""
     from maop.dashboard.routers import control, data, evolve_insights, memory, model, system
 
     app.include_router(data.router)
@@ -150,7 +147,9 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(system.router)
     app.include_router(_auth_mod.router)
 
-    # API Key management router (structured keys with scopes, IP allow-list, rate limit, usage stats).
+
+def _register_api_keys_router(app: FastAPI) -> None:
+    """Register the structured API Key management router (optional)."""
     try:
         from maop.dashboard.routers import api_keys as _api_keys_router
         app.include_router(_api_keys_router.router)
@@ -158,6 +157,9 @@ def register_routers(app: FastAPI) -> None:
     except ImportError as _e:
         logger.warning("[server] Router MISSING: api_keys (import error: %s)", _e)
 
+
+def _register_workflow_routers(app: FastAPI) -> None:
+    """Register workflow / session / plugin / stream routers."""
     from maop.dashboard.routers import protocol, subagent, worktree
 
     app.include_router(subagent.router)
@@ -199,6 +201,9 @@ def register_routers(app: FastAPI) -> None:
 
     app.include_router(plugin_router.router)
 
+
+def _register_data_routers(app: FastAPI) -> None:
+    """Register data / cost / agents / chat / knowledge / observability routers."""
     from maop.dashboard.routers import cost as cost_router
 
     app.include_router(cost_router.router)
@@ -253,6 +258,14 @@ def register_routers(app: FastAPI) -> None:
 
     app.include_router(alerts_router.router)
 
+    # t194 (2026-08-14): LLM 智能任务拆分 — 自然语言 → 子任务 DAG。
+    from maop.dashboard.routers import dag as dag_router
+
+    app.include_router(dag_router.router)
+
+
+def _register_scheduling_routers(app: FastAPI) -> None:
+    """Register scheduling / supervisor / debate routers (all optional, guarded)."""
     # F1-02 (异常自适应调度): scheduling failure-detector stats endpoint
     # (GET /api/scheduling/failure-stats + POST .../reset). Mounted
     # unconditionally — the detector is process-wide and available in both
@@ -289,19 +302,18 @@ def register_routers(app: FastAPI) -> None:
     except ImportError as _e:
         logger.warning("[server] Router MISSING: debate (import error: %s)", _e)
 
-    # t194 (2026-08-14): LLM 智能任务拆分 — 自然语言 → 子任务 DAG。
-    from maop.dashboard.routers import dag as dag_router
 
-    app.include_router(dag_router.router)
+def _register_a2a_router(app: FastAPI) -> None:
+    """Mount the A2A protocol endpoint (JSON-RPC /a2a) if available.
 
-    # ── A2A protocol endpoint (JSON-RPC /a2a) ─────────────────────────
-    # F6b (2026-07-22, Phase F): mount the A2A protocol so external agents
-    # (Google ADK / LangGraph / CrewAI / any A2A-compliant system) can
-    # discover MAOP agents and dispatch tasks to them. The A2AManager is
-    # assembled by ServiceContainer with the WorkerPool injected (F6a):
-    # every ``tasks/send`` is forwarded via ``WorkerPool.submit(agent_name=...)``
-    # to ``MaopLoop.run(agent=...)`` so the caller-pinned agent actually
-    # executes the task. See ADR-013.
+    F6b (2026-07-22, Phase F): mount the A2A protocol so external agents
+    (Google ADK / LangGraph / CrewAI / any A2A-compliant system) can
+    discover MAOP agents and dispatch tasks to them. The A2AManager is
+    assembled by ServiceContainer with the WorkerPool injected (F6a):
+    every ``tasks/send`` is forwarded via ``WorkerPool.submit(agent_name=...)``
+    to ``MaopLoop.run(agent=...)`` so the caller-pinned agent actually
+    executes the task. See ADR-013.
+    """
     from maop.core.agent.delegation.a2a import create_a2a_router as _create_a2a_router
     from maop.core.reliability.services import ServiceContainer as _A2AContainer
 
@@ -320,22 +332,13 @@ def register_routers(app: FastAPI) -> None:
     except Exception as _a2a_exc:
         logger.warning("[server] A2A router mount failed: %s", _a2a_exc)
 
-    # ── Enterprise-only routers ────────────────────────────────────────
-    # t19 (2026-07-21): removed redundant `from maop.config.edition import
-    # has_feature, FeatureFlag` — these symbols were already imported at line 52
-    # and the duplicate import triggered ruff F811.
-    #
-    # B1 (2026-07-22): replaced silent `except ImportError: logger.debug(...)`
-    # (which used `# type: ignore` to mask missing modules) with
-    # explicit `logger.warning` + a `has_<name>_router` flag. The previous
-    # behavior silently degraded ENTERPRISE mode to "router enabled but 404
-    # on every call" because the missing module was treated as a non-event.
-    # Enterprise routers (files already exist in routers/) (routers/{rbac,tenant,audit,sso}.py)
-    # and flip these flags to True.
 
-    # ── Audit router (always registered — unified for both editions) ──
-    # audit.py handles enterprise (EnterpriseAuditLogger) and personal
-    # (control.audit.AuditLog) editions with FeatureFlag gating internally.
+def _register_audit_router(app: FastAPI) -> None:
+    """Register the audit router (unified for both editions).
+
+    audit.py handles enterprise (EnterpriseAuditLogger) and personal
+    (control.audit.AuditLog) editions with FeatureFlag gating internally.
+    """
     try:
         from maop.dashboard.routers import audit as audit_router
         app.include_router(audit_router.router)
@@ -343,8 +346,9 @@ def register_routers(app: FastAPI) -> None:
     except ImportError as _e:
         logger.warning("[server] Router MISSING: audit (import error: %s)", _e)
 
-    _register_enterprise_routers(app)
 
+def _register_notifications_and_config(app: FastAPI) -> None:
+    """Register notifications / config-history / blackboard routers."""
     # ── Notification Center router (available in both editions) ──
     # Implements PRD docs/prd-notification-center.md: channels (Email/Webhook/InApp),
     # rules, templates, event bus, async delivery with retry + dead-letter queue,
@@ -383,6 +387,35 @@ def register_routers(app: FastAPI) -> None:
         logger.info("[server] Router: blackboard enabled")
     except ImportError as _e:
         logger.warning("[server] Router MISSING: blackboard (import error: %s)", _e)
+
+
+def register_routers(app: FastAPI) -> None:
+    """Register all API routers (core + enterprise + optional)."""
+    global _app
+    _app = app
+
+    _register_core_routers(app)
+    _register_api_keys_router(app)
+    _register_workflow_routers(app)
+    _register_data_routers(app)
+    _register_scheduling_routers(app)
+    _register_a2a_router(app)
+
+    # ── Enterprise-only routers ────────────────────────────────────────
+    # t19 (2026-07-21): removed redundant `from maop.config.edition import
+    # has_feature, FeatureFlag` — these symbols were already imported at line 52
+    # and the duplicate import triggered ruff F811.
+    #
+    # B1 (2026-07-22): replaced silent `except ImportError: logger.debug(...)`
+    # (which used `# type: ignore` to mask missing modules) with
+    # explicit `logger.warning` + a `has_<name>_router` flag. The previous
+    # behavior silently degraded ENTERPRISE mode to "router enabled but 404
+    # on every call" because the missing module was treated as a non-event.
+    # Enterprise routers (files already exist in routers/) (routers/{rbac,tenant,audit,sso}.py)
+    # and flip these flags to True.
+    _register_audit_router(app)
+    _register_enterprise_routers(app)
+    _register_notifications_and_config(app)
 
 
 # ── Health ─────────────────────────────────────────────────────────
@@ -430,45 +463,75 @@ async def health() -> Any:
 
 
 # ── Static files + health + CSP + Prometheus + v1-version + SPA fallback ──
+
+def _serve_index_html(serve_dir: Path) -> Any:
+    """Return index.html from ``serve_dir`` (or 404 fallback)."""
+    html_path = serve_dir / "index.html"
+    if html_path.exists():
+        return HTMLResponse(html_path.read_text(encoding="utf-8"), headers={"Cache-Control":"no-cache, no-store, must-revalidate"})
+    return HTMLResponse("<h1>index.html not found</h1>", status_code=404)
+
+
+def _serve_style_css(serve_dir: Path) -> Any:
+    """Return style.css from ``serve_dir`` (or 404 fallback)."""
+    css_path = serve_dir / "style.css"
+    if not css_path.exists():
+        css_path = serve_dir / "src" / "style.css"
+    if css_path.exists():
+        return FileResponse(css_path, media_type="text/css", headers={"Cache-Control":"public, max-age=3600"})
+    return HTMLResponse("/* not found */", status_code=404)
+
+
+def _serve_favicon(serve_dir: Path) -> Any:
+    """Return favicon.svg from ``serve_dir`` (or 404 fallback)."""
+    fav = serve_dir / "favicon.svg"
+    if not fav.exists():
+        fav = serve_dir / "public" / "favicon.svg"
+    if fav.exists():
+        return FileResponse(fav, media_type="image/svg+xml", headers={"Cache-Control":"public, max-age=86400"})
+    return HTMLResponse("", status_code=404)
+
+
+def _mount_asset_dirs(app: FastAPI, serve_dir: Path) -> None:
+    """Mount Vite asset directories (``assets`` / ``src`` / ``public``) on ``app``."""
+    for _asset_dir_name in ["assets", "src"]:
+        _asset_dir = serve_dir / _asset_dir_name
+        if _asset_dir.exists():
+            app.mount(f"/{_asset_dir_name}", StaticFiles(directory=str(_asset_dir)), name=f"static-{_asset_dir_name}")
+    _public_dir = serve_dir / "public"
+    if _public_dir.exists():
+        app.mount("/public", StaticFiles(directory=str(_public_dir)), name="static-public")
+
+
+def _build_csp_entry(body: dict[str, Any]) -> dict[str, Any]:
+    """Extract a CSP violation entry from the report body."""
+    report = body.get("csp-report", {})
+    return {
+        "ts": time.time(),
+        "document_uri": report.get("document-uri", ""),
+        "violated_directive": report.get("violated-directive", ""),
+        "blocked_uri": report.get("blocked-uri", ""),
+        "source_file": report.get("source-file", ""),
+        "line_number": report.get("line-number", ""),
+    }
+
+
 def register_static_routes(app: FastAPI, serve_dir: Path) -> None:
     """Register index/style/favicon/asset mounts/health/CSP/Prometheus/
     v1-version/SPA-fallback routes on ``app``."""
     @app.get("/")
     async def index() -> Any:
-        html_path = serve_dir / "index.html"
-        if html_path.exists():
-            return HTMLResponse(html_path.read_text(encoding="utf-8"), headers={"Cache-Control":"no-cache, no-store, must-revalidate"})
-        return HTMLResponse("<h1>index.html not found</h1>", status_code=404)
+        return _serve_index_html(serve_dir)
 
     @app.get("/style.css")
     async def style_css() -> Any:
-        css_path = serve_dir / "style.css"
-        if not css_path.exists():
-            css_path = serve_dir / "src" / "style.css"
-        if css_path.exists():
-            return FileResponse(css_path, media_type="text/css", headers={"Cache-Control":"public, max-age=3600"})
-        return HTMLResponse("/* not found */", status_code=404)
+        return _serve_style_css(serve_dir)
 
     @app.get("/favicon.svg")
     async def favicon() -> Any:
-        fav = serve_dir / "favicon.svg"
-        if not fav.exists():
-            fav = serve_dir / "public" / "favicon.svg"
+        return _serve_favicon(serve_dir)
 
-        if fav.exists():
-            return FileResponse(fav, media_type="image/svg+xml", headers={"Cache-Control":"public, max-age=86400"})
-        return HTMLResponse("", status_code=404)
-
-    # Serve JS/CSS assets from /assets/ (Vite build output) or /src/ (Vite dev)
-    for _asset_dir_name in ["assets", "src"]:
-        _asset_dir = serve_dir / _asset_dir_name
-        if _asset_dir.exists():
-            app.mount(f"/{_asset_dir_name}", StaticFiles(directory=str(_asset_dir)), name=f"static-{_asset_dir_name}")
-
-    # Also serve public/ dir for Vite
-    _public_dir = serve_dir / "public"
-    if _public_dir.exists():
-        app.mount("/public", StaticFiles(directory=str(_public_dir)), name="static-public")
+    _mount_asset_dirs(app, serve_dir)
 
     @app.get("/api/health")
     async def health_endpoint() -> Any:
@@ -487,14 +550,7 @@ def register_static_routes(app: FastAPI, serve_dir: Path) -> None:
             body = await request.json()
         except Exception:
             return _JResp(status_code=400, content={"error": "Invalid JSON"})
-        entry = {
-            "ts": time.time(),
-            "document_uri": body.get("csp-report", {}).get("document-uri", ""),
-            "violated_directive": body.get("csp-report", {}).get("violated-directive", ""),
-            "blocked_uri": body.get("csp-report", {}).get("blocked-uri", ""),
-            "source_file": body.get("csp-report", {}).get("source-file", ""),
-            "line_number": body.get("csp-report", {}).get("line-number", ""),
-        }
+        entry = _build_csp_entry(body)
         logger.warning(
             "CSP violation: directive=%s blocked=%s uri=%s source=%s:%s",
             entry["violated_directive"], entry["blocked_uri"],
@@ -541,10 +597,7 @@ def register_static_routes(app: FastAPI, serve_dir: Path) -> None:
     # are not affected.
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str) -> Any:
-        html_path = serve_dir / "index.html"
-        if html_path.exists():
-            return HTMLResponse(html_path.read_text(encoding="utf-8"), headers={"Cache-Control":"no-cache, no-store, must-revalidate"})
-        return HTMLResponse("<h1>index.html not found</h1>", status_code=404)
+        return _serve_index_html(serve_dir)
 
 
 # ── WebSocket endpoint ─────────────────────────────────────────────

@@ -80,7 +80,7 @@ v-for="topic in topicEntries" :key="topic.key" class="chip" :class="{ active: qu
     <Card :title="t('view.tlmemory.memoryEntries')" icon="search" :margin-bottom="16">
       <div class="search-bar">
         <span class="search-icon"><AppIcon name="search" :size="16" /></span>
-        <input v-model="query" :placeholder="t('view.tlmemory.searchPlaceholder')" @keyup.enter="runSearch" />
+        <input v-model="query" :aria-label="t('view.tlmemory.searchPlaceholder')" :placeholder="t('view.tlmemory.searchPlaceholder')" @keyup.enter="runSearch" />
         <button class="search-btn" :disabled="loading" @click="runSearch">
           <AppIcon name="search" :size="15" /> {{ t('common.search') }}
         </button>
@@ -135,16 +135,16 @@ v-model="addForm.content" class="field__input" rows="4"
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-4);">
               <label class="field">
                 <span class="field__label">{{ t('view.tlmemory.topic') }}</span>
-                <input v-model="addForm.topic" class="field__input" :placeholder="t('view.tlmemory.topicPlaceholder')" />
+                <input v-model="addForm.topic" :aria-label="t('view.tlmemory.topicPlaceholder')" class="field__input" :placeholder="t('view.tlmemory.topicPlaceholder')" />
               </label>
               <label class="field">
                 <span class="field__label">{{ t('view.tlmemory.agent') }}</span>
-                <input v-model="addForm.agent" class="field__input" :placeholder="t('view.tlmemory.agentPlaceholder')" />
+                <input v-model="addForm.agent" :aria-label="t('view.tlmemory.agentPlaceholder')" class="field__input" :placeholder="t('view.tlmemory.agentPlaceholder')" />
               </label>
             </div>
             <label class="field">
               <span class="field__label">{{ t('view.tlmemory.tags') }}</span>
-              <input v-model="addForm.tags" class="field__input" :placeholder="t('view.tlmemory.tagsPlaceholder')" />
+              <input v-model="addForm.tags" :aria-label="t('view.tlmemory.tagsPlaceholder')" class="field__input" :placeholder="t('view.tlmemory.tagsPlaceholder')" />
             </label>
           </div>
           <div class="modal__foot">

@@ -9,7 +9,8 @@
       </template>
 
       <nav class="onboard-steps">
-        <button v-for="(s, i) in steps" :key="i"
+        <button
+v-for="(s, i) in steps" :key="i"
           class="onboard-step-dot" :class="{ active: i === step, done: i < step }"
           :disabled="i > step" @click="step = i">
           <span>{{ i + 1 }}</span>
@@ -83,7 +84,7 @@ function finish() {
 <style scoped>
 .onboard-overlay {
   position: fixed; inset: 0; z-index: 100;
-  background: rgba(0,0,0,0.5);
+  background: var(--overlay-scrim, rgba(0,0,0,0.5));
   display: flex; align-items: center; justify-content: center;
   padding: 1rem;
 }
@@ -92,8 +93,8 @@ function finish() {
 .onboard-steps { display: flex; gap: 0; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
 .onboard-step-dot { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 0.75rem; padding: 0; }
 .onboard-step-dot span { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-muted); font-weight: 600; font-size: 0.8125rem; }
-.onboard-step-dot.active span { background: var(--primary); color: #fff; }
-.onboard-step-dot.done span { background: var(--success); color: #fff; }
+.onboard-step-dot.active span { background: var(--primary); color: var(--brand-contrast, #fff); }
+.onboard-step-dot.done span { background: var(--success); color: var(--brand-contrast, #fff); }
 .onboard-step-dot.active { color: var(--primary); }
 .onboard-step-dot.done { color: var(--success); }
 .onboard-step-dot:disabled { opacity: 0.4; cursor: not-allowed; }

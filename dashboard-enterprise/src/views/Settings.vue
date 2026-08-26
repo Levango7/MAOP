@@ -366,7 +366,7 @@
         <div class="hooks-modal-body">
           <div class="hooks-form-row">
             <label class="hooks-form-label">{{ t('view.hooks.fieldName') }}</label>
-            <input v-model="hookForm.name" type="text" class="hooks-form-input" :placeholder="t('view.hooks.fieldName')" />
+            <input v-model="hookForm.name" :aria-label="t('view.hooks.fieldName')" type="text" class="hooks-form-input" :placeholder="t('view.hooks.fieldName')" />
           </div>
           <div class="hooks-form-row">
             <label class="hooks-form-label">{{ t('view.hooks.fieldEvent') }}</label>
@@ -377,7 +377,7 @@
           </div>
           <div class="hooks-form-row">
             <label class="hooks-form-label">{{ t('view.hooks.fieldUrl') }}</label>
-            <input v-model="hookForm.url" type="text" class="hooks-form-input" :placeholder="t('view.hooks.placeholderUrl')" />
+            <input v-model="hookForm.url" :aria-label="t('view.hooks.placeholderUrl')" type="text" class="hooks-form-input" :placeholder="t('view.hooks.placeholderUrl')" />
           </div>
           <div class="hooks-form-row">
             <label class="hooks-form-label">{{ t('view.hooks.fieldMethod') }}</label>
@@ -387,7 +387,7 @@
           </div>
           <div class="hooks-form-row">
             <label class="hooks-form-label">{{ t('view.hooks.fieldHeaders') }}</label>
-            <input v-model="hookFormHeadersText" type="text" class="hooks-form-input" :placeholder="t('view.hooks.placeholderHeaders')" />
+            <input v-model="hookFormHeadersText" :aria-label="t('view.hooks.placeholderHeaders')" type="text" class="hooks-form-input" :placeholder="t('view.hooks.placeholderHeaders')" />
           </div>
           <div class="hooks-form-row-inline">
             <div class="hooks-form-row">
@@ -914,7 +914,7 @@ async function onTestHook(hook) {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-modal);
 }
 .history-modal-head {
   display: flex;
@@ -1103,7 +1103,7 @@ async function onTestHook(hook) {
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-modal);
 }
 .hooks-modal-head {
   display: flex;

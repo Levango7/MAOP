@@ -445,7 +445,7 @@ const dagLayout = computed(() => {
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-modal);
 }
 .split-dialog__header {
   display: flex;

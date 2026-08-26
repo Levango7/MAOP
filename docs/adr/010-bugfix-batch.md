@@ -1,5 +1,8 @@
 # ADR-010: Batch Bugfix — Critical/High/Medium Priority
 
+## Status
+**Accepted** (2026-07-15)
+
 Date: 2026-07-12
 
 ## Context

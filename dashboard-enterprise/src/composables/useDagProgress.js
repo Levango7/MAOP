@@ -70,6 +70,7 @@ export function useDagProgress(executionId, options = {}) {
   // M6 fix: token 现由 httpOnly cookie 管理，前端无法读取。
   // _getToken 保留以兼容 WebSocket 子协议逻辑，但始终返回空字符串。
   // SSE 连接通过 withCredentials: true 自动携带 cookie。
+  // eslint-disable-next-line no-unused-vars
   function _getToken() {
     return '';
   }

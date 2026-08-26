@@ -188,6 +188,94 @@ async def dag_progress_stream(execution_id: str, request: Request) -> Any:
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
+async def _stream_from_streamer(streamer: Any) -> Any:
+    """Stream tokens from an active StreamRegistry entry.
+
+    Yields SSE-formatted events: ``token`` (each chunk), ``done`` (completion),
+    ``error`` (error event).
+    """
+    import json
+
+    full_content: list[str] = []
+    async for chunk in streamer.sse.stream():
+        # Parse existing SSE chunk to extract content
+        for line in chunk.split("\n"):
+            if not line.startswith("data: "):
+                continue
+            data = line[6:].strip()
+            if data == "[DONE]":
+                yield f"event: done\ndata: {json.dumps({'content_length': len(''.join(full_content)), 'tokens': len(''.join(full_content)) // 4})}\n\n"
+                return
+            try:
+                parsed = json.loads(data)
+                content = parsed.get("content", "")
+                if content:
+                    full_content.append(content)
+                    yield f"event: token\ndata: {json.dumps({'content': content})}\n\n"
+                if parsed.get("error"):
+                    yield f"event: error\ndata: {json.dumps({'error': parsed['error']})}\n\n"
+                    return
+            except Exception:
+                logger.debug('swallowed exception', exc_info=True)
+    yield f"event: done\ndata: {json.dumps({'content_length': len(''.join(full_content)), 'tokens': len(''.join(full_content)) // 4})}\n\n"
+
+
+async def _stream_from_event_bus(execution_id: str, request: Request) -> Any:
+    """Subscribe to agent token events from the event bus.
+
+    P1-13: subscribes via the ``agent.{execution_id}.*`` wildcard so
+    events published on ``agent.{execution_id}.token``, ``.meta``,
+    ``.done``, ``.error`` are all received. Replays history first
+    (for late-joining clients) then subscribes for live events.
+    """
+    import asyncio
+    import json
+
+    from maop.core.reliability.event_bus import get_event_bus
+
+    bus = get_event_bus()
+    queue: asyncio.Queue = asyncio.Queue()
+    # P1-13: wildcard subscription — matches agent.{execution_id}.token,
+    # .meta, .done, .error sub-topics emitted by maop_execute / chat_engine.
+    topic_pattern = f"agent.{execution_id}.*"
+    # History prefix for replaying events to late-joining clients.
+    history_prefix = f"agent.{execution_id}."
+
+    async def _handler(event):
+        await queue.put(event)
+
+    # P1-13: replay history events for late-joining clients so tokens
+    # emitted before the SSE connection opened are not lost.
+    sent_complete = False
+    last_event_id = int(request.headers.get("Last-Event-ID", "0"))
+    for evt in bus.get_history(limit=500):
+        if evt._id <= last_event_id:
+            continue
+        if not evt.topic.startswith(history_prefix):
+            continue
+        event_type, data = _classify_agent_event(evt.topic, evt.data)
+        yield f"id: {evt._id}\nevent: {event_type}\ndata: {json.dumps(data)}\n\n"
+        if event_type in ("done", "error"):
+            sent_complete = True
+            break
+
+    if not sent_complete:
+        bus.subscribe(topic_pattern, _handler)
+        try:
+            while True:
+                evt = await asyncio.wait_for(queue.get(), timeout=60)
+                if evt._id <= last_event_id:
+                    continue
+                event_type, data = _classify_agent_event(evt.topic, evt.data)
+                yield f"id: {evt._id}\nevent: {event_type}\ndata: {json.dumps(data)}\n\n"
+                if event_type in ("done", "error"):
+                    break
+        except asyncio.TimeoutError:
+            yield f"event: done\ndata: {json.dumps({'content_length': 0, 'tokens': 0, 'reason': 'timeout'})}\n\n"
+        finally:
+            bus.unsubscribe(topic_pattern, _handler)
+
+
 @router.get("/agent/{execution_id}")
 @handle_api_errors
 async def agent_token_stream(execution_id: str, request: Request) -> Any:
@@ -207,96 +295,16 @@ async def agent_token_stream(execution_id: str, request: Request) -> Any:
     """
     _check_sse_token(request)
     require_admin(request)
-    import asyncio
-    import json
 
     from maop.core.reliability.streaming import get_stream_registry
 
     registry = get_stream_registry()
     streamer = registry.get(execution_id)
 
-    async def generate_from_streamer():
-        """Stream tokens from an active StreamRegistry entry."""
-        full_content: list[str] = []
-        assert streamer is not None  # narrowed by caller; assert for mypy
-        async for chunk in streamer.sse.stream():
-            # Parse existing SSE chunk to extract content
-            for line in chunk.split("\n"):
-                if not line.startswith("data: "):
-                    continue
-                data = line[6:].strip()
-                if data == "[DONE]":
-                    yield f"event: done\ndata: {json.dumps({'content_length': len(''.join(full_content)), 'tokens': len(''.join(full_content)) // 4})}\n\n"
-                    return
-                try:
-                    parsed = json.loads(data)
-                    content = parsed.get("content", "")
-                    if content:
-                        full_content.append(content)
-                        yield f"event: token\ndata: {json.dumps({'content': content})}\n\n"
-                    if parsed.get("error"):
-                        yield f"event: error\ndata: {json.dumps({'error': parsed['error']})}\n\n"
-                        return
-                except Exception:
-                    logger.debug('swallowed exception', exc_info=True)
-        yield f"event: done\ndata: {json.dumps({'content_length': len(''.join(full_content)), 'tokens': len(''.join(full_content)) // 4})}\n\n"
-
-    async def generate_from_event_bus():
-        """Subscribe to agent token events from the event bus.
-
-        P1-13: subscribes via the ``agent.{execution_id}.*`` wildcard so
-        events published on ``agent.{execution_id}.token``, ``.meta``,
-        ``.done``, ``.error`` are all received. Replays history first
-        (for late-joining clients) then subscribes for live events.
-        """
-        from maop.core.reliability.event_bus import get_event_bus
-
-        bus = get_event_bus()
-        queue: asyncio.Queue = asyncio.Queue()
-        # P1-13: wildcard subscription — matches agent.{execution_id}.token,
-        # .meta, .done, .error sub-topics emitted by maop_execute / chat_engine.
-        topic_pattern = f"agent.{execution_id}.*"
-        # History prefix for replaying events to late-joining clients.
-        history_prefix = f"agent.{execution_id}."
-
-        async def _handler(event):
-            await queue.put(event)
-
-        # P1-13: replay history events for late-joining clients so tokens
-        # emitted before the SSE connection opened are not lost.
-        sent_complete = False
-        last_event_id = int(request.headers.get("Last-Event-ID", "0"))
-        for evt in bus.get_history(limit=500):
-            if evt._id <= last_event_id:
-                continue
-            if not evt.topic.startswith(history_prefix):
-                continue
-            event_type, data = _classify_agent_event(evt.topic, evt.data)
-            yield f"id: {evt._id}\nevent: {event_type}\ndata: {json.dumps(data)}\n\n"
-            if event_type in ("done", "error"):
-                sent_complete = True
-                break
-
-        if not sent_complete:
-            bus.subscribe(topic_pattern, _handler)
-            try:
-                while True:
-                    evt = await asyncio.wait_for(queue.get(), timeout=60)
-                    if evt._id <= last_event_id:
-                        continue
-                    event_type, data = _classify_agent_event(evt.topic, evt.data)
-                    yield f"id: {evt._id}\nevent: {event_type}\ndata: {json.dumps(data)}\n\n"
-                    if event_type in ("done", "error"):
-                        break
-            except asyncio.TimeoutError:
-                yield f"event: done\ndata: {json.dumps({'content_length': 0, 'tokens': 0, 'reason': 'timeout'})}\n\n"
-            finally:
-                bus.unsubscribe(topic_pattern, _handler)
-
     if streamer is not None:
-        generator = generate_from_streamer()
+        generator = _stream_from_streamer(streamer)
     else:
-        generator = generate_from_event_bus()
+        generator = _stream_from_event_bus(execution_id, request)
 
     return StreamingResponse(
         generator,

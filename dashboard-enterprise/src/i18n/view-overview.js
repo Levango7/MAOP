@@ -61,7 +61,8 @@ export const messages = {
     'view.overview.pev.verify.desc': 'Cross-check outputs against acceptance gates, replay failures, and gate promotion on evidence.',
     'view.overview.pev.verify.state': 'Gated',
     'view.overview.pev.connector': 'then',
-  },    'view.overview.Failed to load overview': 'Failed to load overview',
+    'view.overview.loadFailed': 'Failed to load overview',
+  },
 
   zh: {
     'view.overview.title': '概览',
@@ -125,6 +126,6 @@ export const messages = {
     'view.overview.pev.verify.desc': '依据验收门交叉校验产出、回放失败、按证据放行晋升。',
     'view.overview.pev.verify.state': '门禁',
     'view.overview.pev.connector': '而后',
-    'view.overview.Failed to load overview': '加载概览失败',
+    'view.overview.loadFailed': '加载概览失败',
   },
 };

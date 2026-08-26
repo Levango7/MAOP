@@ -10,8 +10,16 @@
 # metrics are defined but not yet emitted by production code).
 #
 # This file is loaded by monitoring/prometheus.yml (rule_files). It is
-# complementary to alerts.yml / slo-alerts.yml; alert *names* here are
-# distinct (Agent*, No*, Queue*, Memory*) so there is no collision.
+# complementary to alerts.yml / slo-alerts.yml.
+#
+# P3-M-01 fix: removed 4 duplicate alert rules that were semantically
+# identical to alerts.yml (same expr, different alert name):
+#   - AgentCircuitBreakerOpen  ≡ MAOPCircuitBreakerOpen
+#   - QueueBacklogGrowing       ≡ MAOPQueueBacklogGrowing
+#   - NoActiveAgents            ≡ MAOPNoActiveAgents
+#   - MemoryStoreGrowing        ≡ MAOPMemoryStoreGrowing
+# Keeping both caused the same condition to fire two alerts (noise).
+# Only AgentHighFailureRate remains here (no equivalent in alerts.yml).
 
 groups:
   - name: maop-agent
@@ -28,49 +36,3 @@ groups:
         annotations:
           summary: "Agent failure rate exceeds 50%"
           description: "More than half of delegations are failing (current: {{ $value | humanizePercentage }})."
-
-      - alert: AgentCircuitBreakerOpen
-        # MAOP_circuit_breaker_state is registered WITHOUT labels, so there is
-        # no per-agent `agent` label — do not reference $labels.agent here.
-        expr: MAOP_circuit_breaker_state == 0
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Circuit breaker is OPEN"
-          description: "An agent circuit breaker is OPEN and not accepting requests."
-
-  - name: maop-system
-    rules:
-      - alert: QueueBacklogGrowing
-        expr: |
-          MAOP_queue_pending > 100
-          and
-          deriv(MAOP_queue_pending[10m]) > 0
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Queue backlog is growing ({{ $value }} pending)"
-          description: "Pending messages keep increasing, workers may be overwhelmed."
-
-      - alert: NoActiveAgents
-        expr: MAOP_active_agents == 0
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "No active agents available"
-          description: "All agents are either disabled or circuit-broken."
-
-      - alert: MemoryStoreGrowing
-        expr: |
-          MAOP_memory_entries > 100000
-          and
-          deriv(MAOP_memory_entries[1h]) > 0
-        for: 1h
-        labels:
-          severity: info
-        annotations:
-          summary: "Memory store exceeds 100K entries and growing"
-          description: "Consider running memory prune to reduce store size."

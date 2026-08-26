@@ -4,7 +4,7 @@
 // files from ../../../docs/**/*.md. We stub PageHeader and assert the root
 // renders, the sidebar lists categories, and selecting a doc renders content.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import Docs from '../views/Docs.vue';

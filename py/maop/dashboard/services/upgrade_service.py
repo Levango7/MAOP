@@ -43,19 +43,13 @@ async def _run_subproc(args: list[str], timeout: float) -> tuple[int | None, byt
     """Run a subprocess and return (returncode, stdout, stderr).
 
     Times out after ``timeout`` seconds (kills the process on timeout).
+
+    Thin wrapper around :func:`maop.core.utils.async_subprocess.run_subprocess_bytes`
+    kept for backward compatibility with callers that expect the private name.
     """
-    proc = await asyncio.create_subprocess_exec(
-        *args,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    try:
-        out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
-        raise
-    return proc.returncode, out, err
+    from maop.core.utils.async_subprocess import run_subprocess_bytes
+
+    return await run_subprocess_bytes(args, timeout)
 
 
 async def check_agent_upgrade(name: str, agent_cfg: Any) -> dict[str, Any]:

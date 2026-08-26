@@ -30,7 +30,7 @@ else
   VENV_PI := $(VENV)/bin/pip
 endif
 
-.PHONY: install test lint clean
+.PHONY: install test test-all lint clean
 
 install:
 	$(PYTHON) -m venv $(VENV)
@@ -41,8 +41,21 @@ test:
 	cd $(PY_DIR) && ../$(VENV_PY) -m pytest tests/ -q --ignore=tests/contract
 	cd $(PY_DIR) && ../$(VENV_PY) -m pytest tests/contract/ -q -m contract
 
+# P3-F-01 fix: test-all target includes e2e/performance/reliability/stability
+# tests that the `test` target excludes. This matches CI's independent jobs
+# (test, performance) so `make test-all` locally validates what CI validates.
+test-all:
+	cd $(PY_DIR) && ../$(VENV_PY) -m pytest tests/ -q --ignore=tests/contract
+	cd $(PY_DIR) && ../$(VENV_PY) -m pytest tests/contract/ -q -m contract
+	cd $(PY_DIR) && ../$(VENV_PY) -m pytest tests/e2e/ -q --timeout=15 -n 0
+	cd $(PY_DIR) && ../$(VENV_PY) -m pytest tests/performance/ -q -m slow --timeout=120
+	cd $(PY_DIR) && ../$(VENV_PY) -m pytest tests/reliability/ tests/stability/ -q --timeout=120
+
+# P3-F-02 fix: lint checks both maop/ and tests/ to match CI (ci.yml:55
+# runs `ruff check maop/ tests/`). Previously only maop/ was checked, so
+# test code lint errors were invisible locally.
 lint:
-	$(VENV_PY) -m ruff check $(PY_DIR)/maop/
+	$(VENV_PY) -m ruff check $(PY_DIR)/maop/ $(PY_DIR)/tests/
 
 clean:
 	rm -rf $(VENV) $(PY_DIR)/.pytest_cache $(PY_DIR)/.tmp

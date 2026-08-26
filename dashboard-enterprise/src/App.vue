@@ -435,14 +435,6 @@ onUnmounted(() => {
 .nav-link.router-link-active .nav-icon { color: var(--brand-strong); }
 
 
-.nav-footer {
-  margin-top: auto; padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border);
-  display: flex; flex-direction: column; gap: var(--sp-2);
-}
-.nf-group { display: flex; flex-direction: column; gap: var(--sp-1); }
-.nf-group.nf-status { flex-direction: row; align-items: center; justify-content: space-between; }
-.nf-label { font-size: var(--fs-xs); font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .06em; }
-
 /* ── Rail (collapsed) state ─────────────────────────────────────── */
 .app-layout.rail .sidebar { width: var(--rail-w); }
 .app-layout.rail .content { padding-left: var(--rail-w); }

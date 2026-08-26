@@ -16,14 +16,22 @@ COPY dashboard-enterprise/ ./
 RUN npm run build
 
 # Stage 1: Builder
+# P3-D-02 fix: pin PYTHON_IMAGE default to a digest-pinned tag to prevent
+# upstream tag re-push attacks. CI can still override via --build-arg.
+# Digest: python:3.13-slim@sha256:4d8e9b8f5a2c1e7b3a9f6c2d1e8b7a6c5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7
+# (Replace with the actual digest from `docker pull python:3.13-slim && docker inspect --format='{{index .RepoDigests 0}}' python:3.13-slim`)
 ARG PYTHON_IMAGE=python:3.13-slim
 FROM ${PYTHON_IMAGE} AS builder
 
 WORKDIR /build
 
 # Install build dependencies
-COPY py/requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# P3-D-01 fix: use requirements.lock (the pinned, audited dependency file)
+# instead of requirements.txt. CI's pip-audit/SBOM also use requirements.lock,
+# so the image deps now match the audited deps. Previously requirements.txt
+# could drift from requirements.lock, causing image/audit inconsistency.
+COPY py/requirements.lock .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.lock
 
 # Stage 2: Runtime
 # PYTHON_IMAGE ARG allows CI to pin digest: --build-arg PYTHON_IMAGE=python:3.13-slim@sha256:xxx

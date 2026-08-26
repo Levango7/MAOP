@@ -191,24 +191,6 @@ onMounted(() => {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
-/* ⓪ 侧栏折叠按钮 — 在顶栏最左, 永远在, 不被 rail 状态影响 */
-.topbar__siderail-btn {
-  display: grid; place-items: center;
-  width: 34px; height: 34px;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  color: var(--text-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), border-color var(--motion) var(--ease);
-}
-.topbar__siderail-btn:hover {
-  color: var(--text);
-  background: var(--surface-2);
-  border-color: var(--border-strong);
-}
-.topbar__siderail-btn:active { transform: scale(.96); }
 
 /* 顶部细线：强化顶栏边界感 */
 .topbar__hairline {
@@ -360,7 +342,7 @@ onMounted(() => {
   background: linear-gradient(135deg, var(--brand) 0%, var(--chart-6) 100%);
   color: var(--brand-contrast); font-size: 13px; font-weight: 700;
   display: grid; place-items: center;
-  box-shadow: var(--shadow-brand), inset 0 1px 0 rgba(255, 255, 255, .25);
+  box-shadow: var(--shadow-brand), var(--shadow-inset-highlight);
   font-family: var(--font-sans);
   position: relative;
 }

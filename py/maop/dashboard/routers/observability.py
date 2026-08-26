@@ -24,6 +24,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from maop.config.edition import get_edition
+from maop.core.monitoring.otel import get_otel_endpoint
 from maop.core.observability import (
     observability_status,
     record_agent_execution,
@@ -229,7 +230,7 @@ async def config() -> Any:
         "edition": get_edition().value,
         "otel_enabled": os.getenv("MAOP_OTEL_ENABLED", "").strip() in ("1", "true", "yes"),
         "otel_exporter": os.getenv("MAOP_OTEL_EXPORTER", "none"),
-        "otel_endpoint": os.getenv("MAOP_OTEL_ENDPOINT", "http://localhost:4317"),
+        "otel_endpoint": get_otel_endpoint(),
         "otel_service_name": os.getenv("MAOP_OTEL_SERVICE_NAME", "maop"),
         "prometheus_scrape_path": "/api/prometheus",
         "grafana_dashboard_uid": "maop-overview",

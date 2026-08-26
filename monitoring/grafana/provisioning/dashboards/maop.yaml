@@ -11,6 +11,8 @@ providers:
       # Dashboards are mounted from monitoring/grafana (see docker-compose.prod.yml
       # grafana service: ./monitoring/grafana -> /etc/grafana/dashboards).
       path: /etc/grafana/dashboards
-      # Only load the populated overview dashboard. maop-slo.json is currently an
-      # empty placeholder and is intentionally excluded to avoid a parse error.
+      # P3-M-02 fix: maop-slo.json (empty placeholder) was deleted. Only load
+      # the populated overview dashboard. To add the SLO dashboard back,
+      # implement it based on slo-alerts.yml (SLO-1~5 metrics) and add the
+      # filename to this include list.
       include: ["maop-overview.json"]

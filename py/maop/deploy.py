@@ -22,6 +22,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from maop.config.settings import get_settings
+
 logger = logging.getLogger(__name__)
 
 # ── Models ──────────────────────────────────────────────────────
@@ -229,7 +231,9 @@ def health_check(root_dir: str | Path, timeout_s: float = 5.0) -> list[Component
     t0 = time.monotonic()
     try:
         import urllib.request
-        req = urllib.request.Request("http://127.0.0.1:9079/api/health")
+        _cfg = get_settings()
+        _health_url = f"http://{_cfg.dash_host}:{_cfg.dash_port}/api/health"
+        req = urllib.request.Request(_health_url)
         with urllib.request.urlopen(req, timeout=timeout_s) as resp:
             if resp.status == 200:
                 results.append(ComponentHealth(

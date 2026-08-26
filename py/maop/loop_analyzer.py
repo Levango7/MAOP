@@ -130,6 +130,87 @@ def _estimate_complexity(
     return "complex"
 
 
+# Section header prefixes for rule-based task parsing (lower-cased).
+# Maps section name → tuple of recognised header prefixes.
+_SECTION_HEADERS: dict[str, tuple[str, ...]] = {
+    "objective": ("目标:", "objective:", "goal:"),
+    "boundary": ("边界:", "boundary:", "范围:", "scope:"),
+    "acceptance": ("验收:", "acceptance:", "标准:", "criteria:"),
+    "assumption": ("假设:", "assumption:", "前提:"),
+    "risk": ("风险:", "risk:"),
+}
+
+
+def _detect_section_header(stripped: str) -> tuple[str, str]:
+    """Return (section_name, content_after_colon) if ``stripped`` starts with a
+    recognised section header prefix, else ("", "").
+
+    Prefix matching is case-insensitive; the returned content preserves the
+    original casing of ``stripped``.
+    """
+    lower = stripped.lower()
+    for section, prefixes in _SECTION_HEADERS.items():
+        for prefix in prefixes:
+            if lower.startswith(prefix):
+                content = stripped.split(":", 1)[1].strip() if ":" in stripped else ""
+                return section, content
+    return "", ""
+
+
+def _parse_task_sections(task: str) -> dict[str, list[str]]:
+    """Parse task text into structured sections (rule-based).
+
+    Returns a dict with keys: objectives, boundaries, acceptance,
+    assumptions, risks — each a list[str].
+    """
+    sections: dict[str, list[str]] = {
+        "objectives": [],
+        "boundaries": [],
+        "acceptance": [],
+        "assumptions": [],
+        "risks": [],
+    }
+    # section name → list key in ``sections``.
+    section_to_key = {
+        "objective": "objectives",
+        "boundary": "boundaries",
+        "acceptance": "acceptance",
+        "assumption": "assumptions",
+        "risk": "risks",
+    }
+    current_section = ""
+    for line in task.strip().split("\n"):
+        stripped = line.strip()
+        section, content = _detect_section_header(stripped)
+        if section:
+            current_section = section
+            if content:
+                sections[section_to_key[section]].append(content)
+            continue
+        if stripped and current_section:
+            key = section_to_key.get(current_section)
+            if key:
+                sections[key].append(stripped)
+    return sections
+
+
+def _build_clarified_task(
+    task: str,
+    objectives: list[str],
+    boundaries: list[str],
+    acceptance: list[str],
+) -> str:
+    """Build the clarified task summary from parsed sections."""
+    parts = [task.strip()]
+    if objectives and len(objectives) > 1:
+        parts.append("Objectives: " + "; ".join(objectives))
+    if boundaries:
+        parts.append("Boundaries: " + "; ".join(boundaries))
+    if acceptance:
+        parts.append("Accept: " + "; ".join(acceptance))
+    return "\n".join(parts)
+
+
 def _rule_based_analyze(task: str) -> RequirementAnalysis:
     """Rule-based fallback — original simple_analyze behavior.
 
@@ -146,60 +227,12 @@ def _rule_based_analyze(task: str) -> RequirementAnalysis:
     G1a (2026-07-22): extracted verbatim from ``simple_analyze`` to serve
     as the rule-based fallback path. No behavioral change.
     """
-    objectives: list[str] = []
-    boundaries: list[str] = []
-    acceptance: list[str] = []
-    assumptions: list[str] = []
-    risks: list[str] = []
-
-    lines = task.strip().split("\n")
-    current_section = ""
-    for line in lines:
-        stripped = line.strip()
-        lower = stripped.lower()
-
-        if lower.startswith(("目标:", "objective:", "goal:")):
-            current_section = "objective"
-            content = stripped.split(":", 1)[1].strip()
-            if content:
-                objectives.append(content)
-            continue
-        elif lower.startswith(("边界:", "boundary:", "范围:", "scope:")):
-            current_section = "boundary"
-            content = stripped.split(":", 1)[1].strip()
-            if content:
-                boundaries.append(content)
-            continue
-        elif lower.startswith(("验收:", "acceptance:", "标准:", "criteria:")):
-            current_section = "acceptance"
-            content = stripped.split(":", 1)[1].strip()
-            if content:
-                acceptance.append(content)
-            continue
-        elif lower.startswith(("假设:", "assumption:", "前提:")):
-            current_section = "assumption"
-            content = stripped.split(":", 1)[1].strip()
-            if content:
-                assumptions.append(content)
-            continue
-        elif lower.startswith(("风险:", "risk:")):
-            current_section = "risk"
-            content = stripped.split(":", 1)[1].strip()
-            if content:
-                risks.append(content)
-            continue
-
-        if stripped and current_section:
-            if current_section == "objective":
-                objectives.append(stripped)
-            elif current_section == "boundary":
-                boundaries.append(stripped)
-            elif current_section == "acceptance":
-                acceptance.append(stripped)
-            elif current_section == "assumption":
-                assumptions.append(stripped)
-            elif current_section == "risk":
-                risks.append(stripped)
+    sections = _parse_task_sections(task)
+    objectives = sections["objectives"]
+    boundaries = sections["boundaries"]
+    acceptance = sections["acceptance"]
+    assumptions = sections["assumptions"]
+    risks = sections["risks"]
 
     if not objectives:
         objectives = [task.strip()]
@@ -208,14 +241,7 @@ def _rule_based_analyze(task: str) -> RequirementAnalysis:
     if not assumptions:
         assumptions = ["Assumption: Task description is complete and unambiguous"]
 
-    clarified_parts = [task.strip()]
-    if objectives and len(objectives) > 1:
-        clarified_parts.append("Objectives: " + "; ".join(objectives))
-    if boundaries:
-        clarified_parts.append("Boundaries: " + "; ".join(boundaries))
-    if acceptance:
-        clarified_parts.append("Accept: " + "; ".join(acceptance))
-    clarified_task = "\n".join(clarified_parts)
+    clarified_task = _build_clarified_task(task, objectives, boundaries, acceptance)
 
     # ── t18: semantic analysis (rule-based) ───────────────
     task_lower = task.lower()

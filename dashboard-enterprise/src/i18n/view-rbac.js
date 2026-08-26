@@ -30,8 +30,9 @@ export const messages = {
     'view.rbac.userIdRequired': 'User ID and role are required',
     'view.rbac.granted': 'Granted {role} to {user}',
     'view.rbac.revoked': 'Revoked {role} from {user}',
-  },    'view.rbac.Grant failed': 'Grant failed',
-    'view.rbac.Revoke failed': 'Revoke failed',
+    'view.rbac.grantFailed': 'Grant failed',
+    'view.rbac.revokeFailed': 'Revoke failed',
+  },
 
   zh: {
     'view.rbac.subtitle': '基于 Role 的访问控制',
@@ -63,7 +64,7 @@ export const messages = {
     'view.rbac.userIdRequired': '用户 ID 和角色为必填项',
     'view.rbac.granted': '已授予 {user} 角色 {role}',
     'view.rbac.revoked': '已撤销 {user} 的角色 {role}',
-    'view.rbac.Grant failed': '授权失败',
-    'view.rbac.Revoke failed': '撤销失败',
+    'view.rbac.grantFailed': '授权失败',
+    'view.rbac.revokeFailed': '撤销失败',
   },
 };

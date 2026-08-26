@@ -110,8 +110,9 @@ export const messages = {
     'view.agents.importance': 'Importance',
     'view.agents.noMemories': 'No memories yet',
     'view.agents.switchModelTo': 'Switch to model {name}',
-  },    'view.agents.check failed': 'Check failed',
-    'view.agents.upgrade failed': 'Upgrade failed',
+    'view.agents.checkFailed': 'Check failed',
+
+  },
 
   zh: {
     'view.agents.title': '智能体调度与管理',
@@ -224,7 +225,7 @@ export const messages = {
     'view.agents.importance': '重要性',
     'view.agents.noMemories': '暂无记忆数据',
     'view.agents.switchModelTo': '切换到模型 {name}',
-    'view.agents.check failed': '检查失败',
-    'view.agents.upgrade failed': '升级失败',
+    'view.agents.checkFailed': '检查失败',
+
   },
 };

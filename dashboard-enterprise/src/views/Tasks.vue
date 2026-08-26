@@ -346,9 +346,6 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.tasks-filterbar {
-  margin-bottom: var(--sp-3);
-}
 
 /* ── 任务表格 ── */
 .tasks-table-wrap {

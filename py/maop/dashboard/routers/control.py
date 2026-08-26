@@ -34,6 +34,7 @@ class MaintainRequest(BaseModel):
 
 @router.get("/api/control/status")
 async def control_status() -> dict[str, Any]:
+    """Return status of all active control jobs."""
     jobs = []
     for job in active_jobs.values():
         proc = job.get("process")
@@ -48,6 +49,7 @@ async def control_status() -> dict[str, Any]:
 
 @router.post("/api/control/run")
 async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
+    """Start a new control job from a task or workflow."""
     require_admin(request)
     actual_task = body.task or body.workflow or "default"
     # P1: task 参数字符集白名单校验，防止注入非法字符（与 workflow.py:60-63 对齐）
@@ -71,6 +73,7 @@ async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
 
 @router.post("/api/control/pause")
 async def control_pause(request: Request) -> dict[str, Any]:
+    """Pause the control loop."""
     require_admin(request)
     pause_file = MAOP_ROOT / "logs" / ".maop_pause"
     pause_file.parent.mkdir(parents=True, exist_ok=True)
@@ -85,6 +88,7 @@ async def control_pause(request: Request) -> dict[str, Any]:
 
 @router.post("/api/control/resume")
 async def control_resume(request: Request) -> dict[str, Any]:
+    """Resume the control loop."""
     require_admin(request)
     pause_file = MAOP_ROOT / "logs" / ".maop_pause"
     if pause_file.exists():
@@ -120,6 +124,7 @@ async def control_pause_status(request: Request) -> dict[str, Any]:
 
 @router.post("/api/control/stop")
 async def control_stop(request: Request) -> dict[str, Any]:
+    """Stop the control loop gracefully."""
     require_admin(request)
     stopped = 0
     for job in active_jobs.values():
@@ -132,6 +137,7 @@ async def control_stop(request: Request) -> dict[str, Any]:
 
 @router.post("/api/control/validate")
 async def control_validate(request: Request) -> dict[str, Any]:
+    """Validate the current MAOP configuration."""
     require_admin(request)
     job_id = _uuid.uuid4().hex[:8]
     try:
@@ -146,6 +152,7 @@ async def control_validate(request: Request) -> dict[str, Any]:
 
 @router.post("/api/control/doctor")
 async def control_doctor(request: Request) -> dict[str, Any]:
+    """Run health diagnostics and return findings."""
     require_admin(request)
     job_id = _uuid.uuid4().hex[:8]
     try:
@@ -160,6 +167,7 @@ async def control_doctor(request: Request) -> dict[str, Any]:
 
 @router.post("/api/control/cancel")
 async def control_cancel(request: Request) -> dict[str, Any]:
+    """Cancel a running job by ID."""
     require_admin(request)
     body = await request.json()
     job_id = body.get("job_id", "")
@@ -173,6 +181,7 @@ async def control_cancel(request: Request) -> dict[str, Any]:
 
 @router.post("/api/control/refresh")
 async def control_refresh(request: Request) -> dict[str, Any]:
+    """Refresh runtime state and caches."""
     require_admin(request)
     async with cache_lock:
         cache.clear()
@@ -180,6 +189,7 @@ async def control_refresh(request: Request) -> dict[str, Any]:
 
 @router.post("/api/control/clear-cache")
 async def control_clear_cache(request: Request) -> dict[str, Any]:
+    """Clear all in-memory caches."""
     require_admin(request)
     async with cache_lock:
         cache.clear()
@@ -188,6 +198,7 @@ async def control_clear_cache(request: Request) -> dict[str, Any]:
 
 @router.post("/api/control/provider-health")
 async def control_provider_health(request: Request) -> dict[str, Any]:
+    """Check health of configured LLM providers."""
     require_admin(request)
     try:
         from maop.deploy import health_check
@@ -197,103 +208,144 @@ async def control_provider_health(request: Request) -> dict[str, Any]:
         logger.exception("Provider health check failed")
         return {"status": "error", "error": "Provider health check failed"}
 
+async def _maintain_log_rotate() -> dict[str, Any]:
+    """log-rotate 维护操作：轮转日志文件。"""
+    try:
+        from maop.core.reliability.log_rotate import rotate_logs
+        result = rotate_logs(log_dir=MAOP_ROOT / "logs", data_dir=MAOP_ROOT / "data")
+        return {"status": "ok", "action": "log-rotate", "msg": "Logs rotated", "rotated": result.rotated, "deleted": result.deleted}
+    except Exception:
+        logger.exception("Log rotate failed")
+        return {"status": "ok", "action": "log-rotate", "msg": "Skipped: log rotate unavailable"}
+
+
+async def _maintain_prune() -> dict[str, Any]:
+    """prune 维护操作：清理过期 memory 条目。"""
+    try:
+        from maop.memory.store import MemoryStore
+        store = MemoryStore(root_dir=str(MAOP_ROOT))
+        stats_before = store.stats()
+        if hasattr(stats_before, 'model_dump'):
+            stats_dict_before: Any = stats_before.model_dump()
+        elif isinstance(stats_before, dict):
+            stats_dict_before = stats_before
+        else:
+            stats_dict_before = {}
+        total_before = stats_dict_before.get("total_entries", 0)
+        pruned_ids = store.prune(ttl_days=30, dry_run=False) if hasattr(store, "prune") else []
+        if isinstance(pruned_ids, int):
+            pruned_count = pruned_ids
+            pruned_ids = []
+        else:
+            pruned_count = len(pruned_ids)
+        stats_after = store.stats()
+        if hasattr(stats_after, 'model_dump'):
+            stats_dict_after: Any = stats_after.model_dump()
+        elif isinstance(stats_after, dict):
+            stats_dict_after = stats_after
+        else:
+            stats_dict_after = {}
+        total_after = stats_dict_after.get("total_entries", 0)
+        return {"status": "ok", "action": "prune", "pruned": pruned_count, "remaining": total_after, "total_before": total_before, "pruned_ids": list(pruned_ids)[:20]}
+    except Exception:
+        logger.exception("Prune failed")
+        return {"status": "error", "action": "prune", "msg": "Failed: prune unavailable"}
+
+
+async def _maintain_health() -> dict[str, Any]:
+    """health 维护操作：运行健康检查。"""
+    try:
+        from maop.deploy import health_check
+        results = health_check(MAOP_ROOT)
+        healthy = all(r.status == "ok" for r in results)
+        return {"status": "ok", "action": "health", "healthy": healthy, "components": [r.model_dump() for r in results]}
+    except Exception:
+        logger.exception("Health check failed")
+        return {"status": "ok", "action": "health", "healthy": True, "msg": "Skipped: health check unavailable"}
+
+
+async def _maintain_backup() -> dict[str, Any]:
+    """backup 维护操作：运行数据库备份。"""
+    try:
+        from maop.core.backends.db_backup import DbBackup
+        backup = DbBackup(root_dir=str(MAOP_ROOT))
+        entries = backup.run() if hasattr(backup, "run") else []
+        path = entries[0].backup_path if entries else "N/A"
+        return {"status": "ok", "action": "backup", "path": str(path)}
+    except Exception:
+        logger.exception("Backup failed")
+        return {"status": "ok", "action": "backup", "msg": "Skipped: backup unavailable"}
+
+
+async def _maintain_cache_clear() -> dict[str, Any]:
+    """cache-clear 维护操作：清空内存缓存。"""
+    async with cache_lock:
+        cache.clear()
+    return {"status": "ok", "action": "cache-clear"}
+
+
+async def _maintain_reload() -> dict[str, Any]:
+    """reload 维护操作：热重载配置。"""
+    try:
+        from maop.config.hot_reload import ConfigHotReload
+        reloader = ConfigHotReload(root_dir=str(MAOP_ROOT))
+        reloader.reload() if hasattr(reloader, "reload") else None
+        return {"status": "ok", "action": "reload", "msg": "Config reloaded"}
+    except Exception:
+        logger.exception("Config reload failed")
+        return {"status": "ok", "action": "reload", "msg": "Skipped: reload unavailable"}
+
+
+async def _maintain_reindex() -> dict[str, Any]:
+    """reindex 维护操作：重建向量索引。"""
+    try:
+        from maop.core.memory.vector import VectorStore
+        store = VectorStore() if hasattr(VectorStore, '__init__') else None  # type: ignore
+        if store and hasattr(store, 'reindex'):
+            store.reindex()
+            return {"status": "ok", "action": "reindex", "msg": "Vector index rebuilt"}
+        return {"status": "ok", "action": "reindex", "msg": "Skipped: vector store unavailable"}
+    except Exception:
+        logger.exception("Vector reindex failed")
+        return {"status": "ok", "action": "reindex", "msg": "Skipped: reindex unavailable"}
+
+
+async def _maintain_vacuum() -> dict[str, Any]:
+    """vacuum 维护操作：压缩 SQLite 数据库。"""
+    try:
+        from maop.core.backends.db_utils import sqlite_connect
+        with sqlite_connect() as conn:  # type: ignore
+            conn.execute("VACUUM")
+        return {"status": "ok", "action": "vacuum", "msg": "Database compacted"}
+    except Exception:
+        logger.exception("Database vacuum failed")
+        return {"status": "ok", "action": "vacuum", "msg": "Skipped: vacuum unavailable"}
+
+
+# 维护操作分派表（action name → handler coroutine function）。
+_MAINTAIN_HANDLERS: dict[str, Any] = {
+    "log-rotate": _maintain_log_rotate,
+    "prune": _maintain_prune,
+    "health": _maintain_health,
+    "backup": _maintain_backup,
+    "cache-clear": _maintain_cache_clear,
+    "reload": _maintain_reload,
+    "reindex": _maintain_reindex,
+    "vacuum": _maintain_vacuum,
+}
+
+
 @router.post("/api/control/maintain")
 async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[str, Any]:
+    """Execute a maintenance operation (cleanup/compact/etc.)."""
     require_admin(request)
     action = body.action
     if action is None:
         return {"status": "ok", "action": "noop", "msg": "No action specified"}
     try:
-        if action == "log-rotate":
-            try:
-                from maop.core.reliability.log_rotate import rotate_logs
-                result = rotate_logs(log_dir=MAOP_ROOT / "logs", data_dir=MAOP_ROOT / "data")
-                return {"status": "ok", "action": "log-rotate", "msg": "Logs rotated", "rotated": result.rotated, "deleted": result.deleted}
-            except Exception:
-                logger.exception("Log rotate failed")
-                return {"status": "ok", "action": "log-rotate", "msg": "Skipped: log rotate unavailable"}
-        elif action == "prune":
-            try:
-                from maop.memory.store import MemoryStore
-                store = MemoryStore(root_dir=str(MAOP_ROOT))
-                stats_before = store.stats()
-                if hasattr(stats_before, 'model_dump'):
-                    stats_dict_before: Any = stats_before.model_dump()
-                elif isinstance(stats_before, dict):
-                    stats_dict_before = stats_before
-                else:
-                    stats_dict_before = {}
-                total_before = stats_dict_before.get("total_entries", 0)
-                pruned_ids = store.prune(ttl_days=30, dry_run=False) if hasattr(store, "prune") else []
-                if isinstance(pruned_ids, int):
-                    pruned_count = pruned_ids
-                    pruned_ids = []
-                else:
-                    pruned_count = len(pruned_ids)
-                stats_after = store.stats()
-                if hasattr(stats_after, 'model_dump'):
-                    stats_dict_after: Any = stats_after.model_dump()
-                elif isinstance(stats_after, dict):
-                    stats_dict_after = stats_after
-                else:
-                    stats_dict_after = {}
-                total_after = stats_dict_after.get("total_entries", 0)
-                return {"status": "ok", "action": "prune", "pruned": pruned_count, "remaining": total_after, "total_before": total_before, "pruned_ids": list(pruned_ids)[:20]}
-            except Exception:
-                logger.exception("Prune failed")
-                return {"status": "error", "action": "prune", "msg": "Failed: prune unavailable"}
-        elif action == "health":
-            try:
-                from maop.deploy import health_check
-                results = health_check(MAOP_ROOT)
-                healthy = all(r.status == "ok" for r in results)
-                return {"status": "ok", "action": "health", "healthy": healthy, "components": [r.model_dump() for r in results]}
-            except Exception:
-                logger.exception("Health check failed")
-                return {"status": "ok", "action": "health", "healthy": True, "msg": "Skipped: health check unavailable"}
-        elif action == "backup":
-            try:
-                from maop.core.backends.db_backup import DbBackup
-                backup = DbBackup(root_dir=str(MAOP_ROOT))
-                entries = backup.run() if hasattr(backup, "run") else []
-                path = entries[0].backup_path if entries else "N/A"
-                return {"status": "ok", "action": "backup", "path": str(path)}
-            except Exception:
-                logger.exception("Backup failed")
-                return {"status": "ok", "action": "backup", "msg": "Skipped: backup unavailable"}
-        elif action == "cache-clear":
-            async with cache_lock:
-                cache.clear()
-            return {"status": "ok", "action": "cache-clear"}
-        elif action == "reload":
-            try:
-                from maop.config.hot_reload import ConfigHotReload
-                reloader = ConfigHotReload(root_dir=str(MAOP_ROOT))
-                reloader.reload() if hasattr(reloader, "reload") else None
-                return {"status": "ok", "action": "reload", "msg": "Config reloaded"}
-            except Exception:
-                logger.exception("Config reload failed")
-                return {"status": "ok", "action": "reload", "msg": "Skipped: reload unavailable"}
-        elif action == "reindex":
-            try:
-                from maop.core.memory.vector import VectorStore
-                store = VectorStore() if hasattr(VectorStore, '__init__') else None  # type: ignore
-                if store and hasattr(store, 'reindex'):
-                    store.reindex()
-                    return {"status": "ok", "action": "reindex", "msg": "Vector index rebuilt"}
-                return {"status": "ok", "action": "reindex", "msg": "Skipped: vector store unavailable"}
-            except Exception:
-                logger.exception("Vector reindex failed")
-                return {"status": "ok", "action": "reindex", "msg": "Skipped: reindex unavailable"}
-        elif action == "vacuum":
-            try:
-                from maop.core.backends.db_utils import sqlite_connect
-                with sqlite_connect() as conn:  # type: ignore
-                    conn.execute("VACUUM")
-                return {"status": "ok", "action": "vacuum", "msg": "Database compacted"}
-            except Exception:
-                logger.exception("Database vacuum failed")
-                return {"status": "ok", "action": "vacuum", "msg": "Skipped: vacuum unavailable"}
+        handler = _MAINTAIN_HANDLERS.get(action)
+        if handler is not None:
+            return await handler()
         return {"status": "ok", "action": action or "noop"}
     except Exception:
         logger.exception("Maintain action failed")

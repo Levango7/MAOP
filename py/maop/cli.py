@@ -310,7 +310,7 @@ def cmd_mcp(args: list[str]) -> Any:
 # ── worker subcommand (F1-01 distributed execution) ──────────────
 
 def cmd_worker_start(
-    redis_url: str = "redis://localhost:6379/0",
+    redis_url: str | None = None,
     concurrency: int = 4,
     capabilities: str = "",
     heartbeat_interval: float = 5.0,
@@ -324,8 +324,9 @@ def cmd_worker_start(
 
     Parameters
     ----------
-    redis_url : str
-        Redis connection URL.
+    redis_url : str | None
+        Redis connection URL.  ``None`` resolves the default from
+        ``config.settings`` (env: ``MAOP_REDIS_URL``).
     concurrency : int
         Maximum concurrent task executions.
     capabilities : str
@@ -366,8 +367,8 @@ def cmd_worker(args: list[str]) -> None:
             description="Start a distributed worker that consumes tasks from Redis Streams",
         )
         parser.add_argument(
-            "--redis-url", default="redis://localhost:6379/0",
-            help="Redis connection URL (default: redis://localhost:6379/0)",
+            "--redis-url", default=None,
+            help="Redis connection URL (default: from MAOP_REDIS_URL or redis://localhost:6379/0)",
         )
         parser.add_argument(
             "--concurrency", type=int, default=4,

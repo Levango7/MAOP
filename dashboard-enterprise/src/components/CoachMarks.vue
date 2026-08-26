@@ -182,7 +182,7 @@ onBeforeUnmount(() => {
 .cm-spotlight {
   position: absolute;
   border-radius: var(--r-md);
-  box-shadow: 0 0 0 9999px var(--overlay-scrim), 0 0 0 2px var(--brand), 0 4px 24px rgba(0,0,0,.5);
+  box-shadow: 0 0 0 9999px var(--overlay-scrim), 0 0 0 2px var(--brand), var(--shadow-card);
   pointer-events: none;
   transition: top .25s var(--ease), left .25s var(--ease), width .25s var(--ease), height .25s var(--ease);
 }

@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.config.loader import MaopConfig, RouteEntry
+from maop.config.loader import MaopConfig
 
 logger = logging.getLogger(__name__)
 
@@ -120,34 +120,6 @@ class Plan(BaseModel):
 # DEFAULT_AGENT) instead of the removed _route_by_keyword() keyword matcher.
 # M1 修复：默认 agent 不再硬编码 "claude"，改为从环境变量读取（DEFAULT_AGENT）。
 
-
-def _adaptive_agent_select(route: RouteEntry, rk: str) -> str:
-    """Select the best agent from route candidates using performance data.
-
-    Considers primary, fallback, and tertiary agents. If the primary agent
-    has significantly lower success rate than a fallback, switches to the
-    better-performing agent.
-
-    Returns the selected agent name.
-    """
-    candidates = [a for a in [route.primary, route.fallback, route.tertiary] if a]
-    if len(candidates) <= 1:
-        return route.primary
-
-    try:
-
-        from maop.config.env import get_root_dir
-        from maop.core.agent.lifecycle.agent_performance import AgentPerformanceTracker
-        # M3 修复：统一使用 get_root_dir() 解析根目录（兼容 MAOP_ROOT_DIR / MAOP_ROOT）
-        root = str(get_root_dir(default="."))
-        tracker = AgentPerformanceTracker(root_dir=root)
-        best = tracker.best_agent(agents=candidates, routing_key=rk, default=route.primary)
-        if best != route.primary:
-            logger.info("Adaptive routing: rk=%s primary=%s → %s (performance-based)", rk, route.primary, best)
-        return best
-    except Exception as exc:
-        logger.warning("Adaptive routing failed (%s); falling back to primary agent %s", exc, route.primary)
-        return route.primary
 
 
 def _route_by_config(task: str, config: MaopConfig | None, *, adaptive: bool = True, trace_id: str = "", scorer: Any = None) -> tuple[str, str] | None:

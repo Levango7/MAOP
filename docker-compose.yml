@@ -161,6 +161,14 @@ services:
     depends_on:
       dashboard:
         condition: service_healthy
+    # P3-D-06 fix: healthcheck via process existence (worker has no HTTP endpoint).
+    # pgrep finds the python worker process; exits 0 if running, 1 if not.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'maop.worker.agent_executor' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
     cap_drop:
       - ALL
@@ -202,6 +210,13 @@ services:
     depends_on:
       dashboard:
         condition: service_healthy
+    # P3-D-06 fix: healthcheck via process existence (worker has no HTTP endpoint).
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'maop.worker.queue_worker' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
     cap_drop:
       - ALL
@@ -230,20 +245,45 @@ services:
       - monitoring  # P1 fix: prometheus(monitoring) depends_on 本服务，纳入 monitoring profile 避免单独 --profile monitoring 时依赖缺失
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+      # P2-M-02 fix: 挂载 deploy/otel-collector.yaml（完整配置含 jaeger/prometheus/loki exporter、
+      # tail_sampling、hostmetrics、resource processor），替代根目录简化版 otel-collector-config.yaml。
+      - ./deploy/otel-collector.yaml:/etc/otel-collector-config.yaml:ro
     ports:
       - "127.0.0.1:4317:4317"   # OTLP gRPC (T2-9: localhost only)
       - "127.0.0.1:4318:4318"   # OTLP HTTP (T2-9: localhost only)
       - "127.0.0.1:8889:8889"   # Prometheus metrics (T2-9: localhost only)
+      - "127.0.0.1:13133:13133" # health_check extension (P2-D-01 fix)
     # t15: MAOP_OTEL_* env vars removed from otel-collector service — the
     # collector reads its own config file (--config=/etc/otel-collector-config.yaml)
     # and does not consume these. They now live on the dashboard service so
     # the app actually exports traces to the collector via its service name.
+    # P2-D-01 fix: healthcheck via OTel Collector health_check extension (port 13133).
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:13133/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # P2-D-07 fix: bound otel-collector resources to prevent OOM-kill under burst load.
+    # P3-D-04 fix: explicit log rotation (json-file 10m×3).
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ── Optional: Nginx TLS termination ─────────────────────────────
   nginx:
@@ -260,15 +300,38 @@ services:
     depends_on:
       dashboard:
         condition: service_healthy
+    # P2-D-02 fix: healthcheck via nginx serving HTTP.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     restart: unless-stopped
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # P2-D-08 fix: bound nginx resources (TLS termination layer).
+    # P3-D-04 fix: explicit log rotation (json-file 10m×3).
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ── Optional: Prometheus + AlertManager ─────────────────────────
   prometheus:
-    image: prom/prometheus:v2.51.0
+    # P3-D-03 fix: 统一 base 与 prod 的 Prometheus 版本为 v2.53.0，避免本地与生产行为差异。
+    image: prom/prometheus:v2.53.0
     container_name: maop-prometheus
     profiles:
       - monitoring
@@ -293,11 +356,33 @@ services:
       - "127.0.0.1:9090:9090"
     depends_on:
       - otel-collector
+    # P2-D-03 fix: healthcheck via Prometheus /-/healthy endpoint.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # P2-D-09 fix: bound Prometheus resources (TSDB can grow large).
+    # P3-D-04 fix: explicit log rotation (json-file 10m×3).
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
@@ -308,11 +393,33 @@ services:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     ports:
       - "127.0.0.1:9093:9093"
+    # P2-D-04 fix: healthcheck via Alertmanager /-/healthy endpoint.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # P2-D-10 fix: bound Alertmanager resources.
+    # P3-D-04 fix: explicit log rotation (json-file 10m×3).
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ── Optional: HashiCorp Vault (dev server, --profile vault) ──────
   # WARNING: This is a DEV-ONLY configuration. For production, use:
@@ -324,12 +431,37 @@ services:
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
     ports:
       - "127.0.0.1:8200:8200"
+    # P2-D-05 fix: healthcheck via `vault status` (exit 0 = initialized + unsealed;
+    # in dev mode Vault auto-inits/unseals so this exits 0 once ready).
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    # P3-D-05 fix: restart policy so the container auto-recovers on exit.
+    restart: unless-stopped
     cap_drop:
       - ALL
     cap_add:
       - IPC_LOCK
     security_opt:
       - no-new-privileges:true
+    # P2-D-11 fix: bound Vault resources (secrets backend).
+    # P3-D-04 fix: explicit log rotation (json-file 10m×3).
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     profiles: ["vault"]
 
   # ── Optional: Redis (cache/queue/HA, --profile redis) ───────────
@@ -373,11 +505,33 @@ services:
       - n8n-data:/home/node/.n8n
     depends_on:
       - dashboard
+    # P2-D-06 fix: healthcheck via n8n /healthz endpoint.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # P2-D-12 fix: bound n8n resources (workflow engine).
+    # P3-D-04 fix: explicit log rotation (json-file 10m×3).
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   maop-data:

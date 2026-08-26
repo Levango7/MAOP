@@ -16,7 +16,7 @@
     <div class="filter-bar">
       <div class="filter-input-wrap">
         <AppIcon name="search" :size="15" class="filter-input-icon" />
-        <input v-model="filter" class="filter-input" :placeholder="t('view.logs.filterPlaceholder')" />
+        <input v-model="filter" :aria-label="t('view.logs.filterPlaceholder')" class="filter-input" :placeholder="t('view.logs.filterPlaceholder')" />
       </div>
       <span v-if="!loading" class="filter-meta">{{ displayLogs.length }} / {{ logs.length }} {{ t('view.logs.lines') }}</span>
     </div>

@@ -706,6 +706,7 @@ _hook_manager: HookManager | None = None
 
 
 def get_hook_manager(root_dir: str | Path | None = None) -> HookManager:
+    """Return the global HookManager singleton, creating it on first call."""
     global _hook_manager
     if _hook_manager is None:
         _hook_manager = HookManager(root_dir=root_dir or "data")

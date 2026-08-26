@@ -30,6 +30,13 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_OTEL_ENDPOINT = "http://localhost:4317"
+
+
+def get_otel_endpoint() -> str:
+    """Return the OTLP endpoint from env, defaulting to localhost:4317."""
+    return os.getenv("MAOP_OTEL_ENDPOINT", _DEFAULT_OTEL_ENDPOINT)
+
 _OTELE_AVAILABLE = False
 try:
     from opentelemetry import trace as otel_trace
@@ -43,10 +50,12 @@ except ImportError:
 
 
 def is_enabled() -> bool:
+    """Return True if OpenTelemetry is enabled via MAOP_OTEL_ENABLED env var."""
     return os.getenv("MAOP_OTEL_ENABLED", "").strip() in ("1", "true", "yes")
 
 
 def get_tracer(name: str = "maop") -> Any:
+    """Return an OTel tracer (or a no-op tracer if OTel is unavailable/disabled)."""
     if not _OTELE_AVAILABLE or not is_enabled():
         return _NoopTracer()
     return otel_trace.get_tracer(name)
@@ -103,7 +112,7 @@ def setup_provider() -> None:
         provider = TracerProvider(resource=resource)
         provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
     elif exporter_type == "otlp":
-        endpoint = os.getenv("MAOP_OTEL_ENDPOINT", "http://localhost:4317")
+        endpoint = get_otel_endpoint()
         try:
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
             from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -138,7 +147,7 @@ def setup_provider() -> None:
         from opentelemetry.sdk.metrics import MeterProvider as SDKMeterProvider
         from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 
-        metric_endpoint = os.getenv("MAOP_OTEL_ENDPOINT", "http://localhost:4317")
+        metric_endpoint = get_otel_endpoint()
         metric_exporter = OTLPMetricExporter(endpoint=metric_endpoint)
         metric_reader = PeriodicExportingMetricReader(metric_exporter, export_interval_millis=15000)
         meter_provider = SDKMeterProvider(resource=resource, metric_readers=[metric_reader])

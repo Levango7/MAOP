@@ -75,7 +75,7 @@
     <!-- ── Health checks ──────────────────────────────────────── -->
     <Card title="Pipeline Health Checks" icon="shield" class="mt">
       <template #actions>
-        <button class="refresh-btn" :disabled="healthLoading" @click="loadHealth">
+        <button class="refresh-btn" :aria-label="t('common.refresh')" :disabled="healthLoading" @click="loadHealth">
           <AppIcon name="refresh" :size="14" />
         </button>
       </template>

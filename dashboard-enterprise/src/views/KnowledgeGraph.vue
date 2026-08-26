@@ -76,6 +76,7 @@
           <div class="kg-filter-section">
             <div class="kg-filter-label">{{ t('view.kg.filter.search') }}</div>
             <input
+:aria-label="t('view.kg.filter.searchPlaceholder')"
               type="text"
               :value="searchKeyword"
               :placeholder="t('view.kg.filter.searchPlaceholder')"

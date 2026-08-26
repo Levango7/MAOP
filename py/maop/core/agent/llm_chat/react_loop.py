@@ -316,6 +316,171 @@ class ReactLoop:
         elif prov.lower() == "anthropic":
             conversation.append({"role": "assistant", "content": response_json.get("content", [])})
 
+    def _setup_run_context(
+        self,
+        task: str,
+        agent: str,
+        trace_id: str,
+        session_id: str,
+        workdir: str,
+    ) -> tuple[str, str, ReactResult, list[dict[str, Any]]]:
+        """Initialize trace_id, session_id, result and conversation for a run."""
+        if not trace_id:
+            trace_id = uuid.uuid4().hex
+        if not session_id:
+            session_id = f"react-{uuid.uuid4().hex[:8]}"
+        result = ReactResult(session_id=session_id, task=task, agent=agent)
+        conversation: list[dict[str, Any]] = [{"role": "user", "content": task}]
+        if self._config.enable_change_tracking:
+            tracker = self._get_change_tracker()
+            if tracker and workdir:
+                tracker.snapshot(workdir, label=f"react-start-{session_id}")
+        return trace_id, session_id, result, conversation
+
+    async def _execute_task(
+        self,
+        task: str,
+        agent: str,
+        conversation: list[dict[str, Any]],
+        dispatcher: Any,
+        iteration: int,
+        trace_id: str,
+        workdir: str,
+        tools: list[dict] | None,
+    ) -> MaopResult:
+        """Execute one iteration via LLM path (if enabled) or CLI dispatcher fallback."""
+        intent = task
+        for msg in conversation:
+            if msg.get("role") == "user" and isinstance(msg.get("content"), str):
+                intent = msg["content"]
+                break
+
+        # F3c (2026-07-22, Phase F): Dual-path execution per ADR-013.
+        exec_result: MaopResult
+        used_llm_path = False
+
+        if (
+            self._config.enable_llm
+            and self._config.llm_model
+            and self.provider_factory is not None
+        ):
+            llm_result = await self._call_llm(
+                conversation=conversation,
+                model_name=self._config.llm_model,
+                trace_id=trace_id,
+                tools=tools,
+            )
+            if llm_result.is_success():
+                exec_result = llm_result
+                used_llm_path = True
+                logger.debug(
+                    "[react_loop] iter=%d used LLM path (model=%s)",
+                    iteration, self._config.llm_model,
+                )
+            else:
+                logger.info(
+                    "[react_loop] iter=%d LLM path failed (%s), falling back to CLI dispatcher",
+                    iteration, llm_result.error,
+                )
+
+        if not used_llm_path:
+            dispatch_result = await dispatcher.dispatch(
+                agent=agent,
+                task=intent,
+                _react_context=json.dumps(conversation, ensure_ascii=False) if len(conversation) > 1 else None,
+                routing_key="react",
+                workdir=workdir,
+                timeout_seconds=self._config.timeout_seconds,
+                trace_id=trace_id,
+            )
+            exec_result = dispatch_result.result
+
+        return exec_result
+
+    async def _execute_tool_calls(
+        self,
+        tool_calls: list[Any],
+        bridge: Any,
+        prov: str,
+        conversation: list[dict[str, Any]],
+        result: ReactResult,
+        iteration: int,
+    ) -> bool:
+        """Append observation steps and execute tool calls in parallel.
+
+        Returns True if the main loop should break (e.g. max tool calls reached).
+        """
+        for call in tool_calls:
+            if result.total_tool_calls >= self._config.max_tool_calls:
+                result.error = f"Max tool calls ({self._config.max_tool_calls}) reached"
+                result.success = False
+                break
+
+            obs_step = ReactStep(
+                iteration=iteration,
+                phase=ReactPhase.OBSERVATION,
+                tool_name=call.name,
+                tool_args=call.arguments,
+                timestamp=time.time(),
+            )
+            result.steps.append(obs_step)
+            result.total_tool_calls += 1
+
+        if result.error and "Max tool calls" in result.error:
+            return True
+
+        if result.steps:
+            import asyncio
+            obs_indices = [
+                i for i, s in enumerate(result.steps)
+                if s.phase == ReactPhase.OBSERVATION and s.iteration == iteration
+            ]
+            if obs_indices:
+                coros = [bridge.execute(tool_calls[j - obs_indices[0]]) for j in obs_indices]
+                outcomes = await asyncio.gather(*coros, return_exceptions=True)
+                for idx, outcome in zip(obs_indices, outcomes):
+                    call_idx = idx - obs_indices[0]
+                    call = tool_calls[call_idx]
+                    obs_step = result.steps[idx]
+                    if isinstance(outcome, Exception):
+                        obs_step.tool_error = str(outcome)
+                        obs_step.phase = ReactPhase.ERROR
+                        conversation.append({
+                            "role": "tool",
+                            "tool_call_id": call.id or call.name,
+                            "content": json.dumps({"error": str(outcome)}),
+                        })
+                    else:
+                        call_result = outcome
+                        obs_step.tool_result = getattr(call_result, "output", "")
+                        obs_step.tool_error = getattr(call_result, "error", "") if not getattr(call_result, "success", True) else ""
+                        obs_step.duration_ms = getattr(call_result, "duration_ms", 0)
+                        tool_msg = bridge.format_result(call, call_result, provider=prov)
+                        conversation.append(tool_msg)
+
+        return result.error is not None and "Max tool calls" in result.error
+
+    def _finalize_result(
+        self,
+        result: ReactResult,
+        start: float,
+        workdir: str,
+        session_id: str,
+        iteration: int,
+    ) -> None:
+        """Set totals, end change-tracker snapshot, and check for exhaustion."""
+        result.total_iterations = iteration + 1 if result.steps else 0
+        result.total_duration_ms = int((time.monotonic() - start) * 1000)
+
+        if self._config.enable_change_tracking:
+            tracker = self._get_change_tracker()
+            if tracker and workdir:
+                tracker.snapshot(workdir, label=f"react-end-{session_id}")
+
+        if not result.final_answer and not result.error:
+            result.error = f"ReAct loop exhausted {self._config.max_iterations} iterations without final answer"
+            result.success = False
+
     async def run(
         self,
         task: str,
@@ -329,26 +494,11 @@ class ReactLoop:
         provider: str = "",
     ) -> ReactResult:
         start = time.monotonic()
-        if not trace_id:
-            trace_id = uuid.uuid4().hex
-        if not session_id:
-            session_id = f"react-{uuid.uuid4().hex[:8]}"
-
-        prov = provider or self._config.provider
-        result = ReactResult(
-            session_id=session_id,
-            task=task,
-            agent=agent,
+        trace_id, session_id, result, conversation = self._setup_run_context(
+            task, agent, trace_id, session_id, workdir,
         )
-
-        conversation: list[dict[str, Any]] = [
-            {"role": "user", "content": task},
-        ]
-
-        if self._config.enable_change_tracking:
-            tracker = self._get_change_tracker()
-            if tracker and workdir:
-                tracker.snapshot(workdir, label=f"react-start-{session_id}")
+        prov = provider or self._config.provider
+        iteration = -1
 
         for iteration in range(self._config.max_iterations):
             conversation = self._trim_conversation(conversation)
@@ -360,63 +510,10 @@ class ReactLoop:
             )
 
             try:
-                intent = task
-                for msg in conversation:
-                    if msg.get("role") == "user" and isinstance(msg.get("content"), str):
-                        intent = msg["content"]
-                        break
-
-                # F3c (2026-07-22, Phase F): Dual-path execution per ADR-013.
-                # When enable_llm=True + llm_model configured + factory
-                # available, try LLM direct call first. On LLM failure
-                # (exception or error response), transparently fall back
-                # to the original CLI dispatcher path. When enable_llm
-                # is False (default), behavior is identical to prior
-                # CLI-only flow.
-                exec_result: MaopResult
-                used_llm_path = False
-
-                if (
-                    self._config.enable_llm
-                    and self._config.llm_model
-                    and self.provider_factory is not None
-                ):
-                    # C-5 修复：把 run() 接收的 tools 透传给 _call_llm，
-                    # 进而通过 chat_with_fallback → provider.chat(tools=...)
-                    # 告知 LLM 可用工具列表
-                    llm_result = await self._call_llm(
-                        conversation=conversation,
-                        model_name=self._config.llm_model,
-                        trace_id=trace_id,
-                        tools=tools,
-                    )
-                    if llm_result.is_success():
-                        exec_result = llm_result
-                        used_llm_path = True
-                        logger.debug(
-                            "[react_loop] iter=%d used LLM path (model=%s)",
-                            iteration, self._config.llm_model,
-                        )
-                    else:
-                        logger.info(
-                            "[react_loop] iter=%d LLM path failed (%s), falling back to CLI dispatcher",
-                            iteration, llm_result.error,
-                        )
-
-                if not used_llm_path:
-                    # Original CLI path via dispatcher.dispatch(). Preserved
-                    # verbatim from pre-Phase-F behavior so that when
-                    # enable_llm=False (default) execution is identical.
-                    dispatch_result = await dispatcher.dispatch(
-                        agent=agent,
-                        task=intent,
-                        _react_context=json.dumps(conversation, ensure_ascii=False) if len(conversation) > 1 else None,
-                        routing_key="react",
-                        workdir=workdir,
-                        timeout_seconds=self._config.timeout_seconds,
-                        trace_id=trace_id,
-                    )
-                    exec_result = dispatch_result.result
+                exec_result = await self._execute_task(
+                    task, agent, conversation, dispatcher,
+                    iteration, trace_id, workdir, tools,
+                )
             except Exception as exc:
                 step.phase = ReactPhase.ERROR
                 step.content = str(exc)
@@ -462,67 +559,11 @@ class ReactLoop:
 
             self._append_assistant_message(prov, response_json, conversation)
 
-            for call in tool_calls:
-                if result.total_tool_calls >= self._config.max_tool_calls:
-                    result.error = f"Max tool calls ({self._config.max_tool_calls}) reached"
-                    result.success = False
-                    break
-
-                obs_step = ReactStep(
-                    iteration=iteration,
-                    phase=ReactPhase.OBSERVATION,
-                    tool_name=call.name,
-                    tool_args=call.arguments,
-                    timestamp=time.time(),
-                )
-                result.steps.append(obs_step)
-                result.total_tool_calls += 1
-
-            if result.error and "Max tool calls" in result.error:
+            should_break = await self._execute_tool_calls(
+                tool_calls, bridge, prov, conversation, result, iteration,
+            )
+            if should_break:
                 break
 
-            if result.steps:
-                import asyncio
-                obs_indices = [
-                    i for i, s in enumerate(result.steps)
-                    if s.phase == ReactPhase.OBSERVATION and s.iteration == iteration
-                ]
-                if obs_indices:
-                    coros = [bridge.execute(tool_calls[j - obs_indices[0]]) for j in obs_indices]
-                    outcomes = await asyncio.gather(*coros, return_exceptions=True)
-                    for idx, outcome in zip(obs_indices, outcomes):
-                        call_idx = idx - obs_indices[0]
-                        call = tool_calls[call_idx]
-                        obs_step = result.steps[idx]
-                        if isinstance(outcome, Exception):
-                            obs_step.tool_error = str(outcome)
-                            obs_step.phase = ReactPhase.ERROR
-                            conversation.append({
-                                "role": "tool",
-                                "tool_call_id": call.id or call.name,
-                                "content": json.dumps({"error": str(outcome)}),
-                            })
-                        else:
-                            call_result = outcome
-                            obs_step.tool_result = getattr(call_result, "output", "")
-                            obs_step.tool_error = getattr(call_result, "error", "") if not getattr(call_result, "success", True) else ""
-                            obs_step.duration_ms = getattr(call_result, "duration_ms", 0)
-                            tool_msg = bridge.format_result(call, call_result, provider=prov)
-                            conversation.append(tool_msg)
-
-            if result.error and "Max tool calls" in result.error:
-                break
-
-        result.total_iterations = iteration + 1 if result.steps else 0
-        result.total_duration_ms = int((time.monotonic() - start) * 1000)
-
-        if self._config.enable_change_tracking:
-            tracker = self._get_change_tracker()
-            if tracker and workdir:
-                tracker.snapshot(workdir, label=f"react-end-{session_id}")
-
-        if not result.final_answer and not result.error:
-            result.error = f"ReAct loop exhausted {self._config.max_iterations} iterations without final answer"
-            result.success = False
-
+        self._finalize_result(result, start, workdir, session_id, iteration)
         return result

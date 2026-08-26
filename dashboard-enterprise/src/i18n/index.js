@@ -177,6 +177,7 @@ export const coreMessages = {
     'action.skip': 'Skip',
     'action.next': 'Next',
     'action.done': 'Done',
+    'action.close': 'Close',
     'palette.placeholder': 'Type a command or page name…',
     'palette.noResults': 'No matches — try a page name or command',
     'common.actions': 'Actions',
@@ -214,6 +215,9 @@ export const coreMessages = {
     'common.name': 'Name',
     'common.type': 'Type',
     'common.state': 'State',
+    'common.provider': 'Provider',
+    'common.disabled': 'Disabled',
+    'common.required': 'Required',
 
     // ── TopBar / User module ─────────────────────────────────────
     'topbar.refreshTime': 'Last refresh',
@@ -417,6 +421,7 @@ export const coreMessages = {
     'action.skip': '跳过',
     'action.next': '下一步',
     'action.done': '完成',
+    'action.close': '关闭',
     'palette.placeholder': '输入命令或页面名…',
     'palette.noResults': '无匹配结果 — 试试页面名或命令',
     'common.actions': '操作',
@@ -454,6 +459,9 @@ export const coreMessages = {
     'common.name': '名称',
     'common.type': '类型',
     'common.state': '状态',
+    'common.provider': '提供商',
+    'common.disabled': '已禁用',
+    'common.required': '必填',
 
     // ── 顶栏 / 用户模块 ────────────────────────────────────────
     'topbar.refreshTime': '最后刷新',

@@ -58,7 +58,7 @@ const TONE = {
   success: { soft: 'var(--success-soft)',    color: 'var(--success)' },
   warn:    { soft: 'var(--warn-soft)',       color: 'var(--warn)' },
   fail:    { soft: 'var(--fail-soft)',        color: 'var(--fail)' },
-  info:    { soft: 'var(--info-soft)',       color: 'var(--info, #38bdf8)' },
+  info:    { soft: 'var(--info-soft)',       color: 'var(--info, #4cc2ff)' },
   neutral: { soft: 'var(--surface-2)',        color: 'var(--text-muted)' },
 };
 const toneSoft = computed(() => (TONE[props.tone] || TONE.neutral).soft);

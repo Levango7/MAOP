@@ -64,30 +64,128 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 return True
         return False
 
+    async def _dispatch_disabled(
+        self, request: Request, call_next: Callable
+    ) -> Response:
+        """Handle the auth-disabled branch: grant anonymous role and pass through.
+
+        Security (C-1 fix): default to ``read`` role — NOT ``admin`` — so a
+        misconfigured deployment does not grant anonymous users write access
+        to admin endpoints.  Operators who explicitly want admin role in
+        disabled mode can set ``MAOP_AUTH_DISABLED_ADMIN=1``.
+        """
+        import os
+        _disabled_admin = os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "0") == "1"
+        if _disabled_admin:
+            logger.warning(
+                "DANGEROUS flag MAOP_AUTH_DISABLED_ADMIN is enabled — auth is "
+                "disabled AND anonymous requests are granted admin role. Never use "
+                "in production or any shared/multi-tenant environment."
+            )
+        disabled_role = "admin" if _disabled_admin else "read"
+        request.state.auth_roles = [disabled_role]
+        request.state.auth_identity = "anonymous"
+        return cast(Response, await call_next(request))
+
+    def _is_static_asset(self, path: str) -> bool:
+        """Return True for static asset paths that bypass auth."""
+        return path.startswith("/static/") or path.endswith(
+            (".css", ".js", ".ico", ".png", ".svg")
+        )
+
+    async def _authenticate_api_key(
+        self,
+        api_key: str,
+        request: Request,
+        call_next: Callable,
+        api_key_mgr: Any,
+        auth_manager: Any,
+    ) -> Response:
+        """Validate the X-API-Key header and dispatch.
+
+        Tries the new structured ApiKeyManager first, then falls back to the
+        legacy auth_checker / auth_manager paths.
+        """
+        # New manager path: structured validation + usage recording.
+        if api_key_mgr is not None and hasattr(api_key_mgr, "validate_key"):
+            resp = await self._authenticate_with_api_key_manager(
+                api_key_mgr, api_key, request, call_next
+            )
+            if resp is not None:
+                return resp
+            # validate_key returned a non-None sentinel? fall through to legacy.
+        try:
+            auth_checker = getattr(request.app.state, "api_key_auth", None)
+            if auth_checker is not None and hasattr(auth_checker, "validate"):
+                result = auth_checker.validate(api_key)
+            elif auth_checker is not None and hasattr(auth_checker, "validate_key"):
+                result = auth_checker.validate_key(api_key)
+            elif auth_manager is not None and hasattr(auth_manager, "authenticate"):
+                result = auth_manager.authenticate(api_key=api_key)
+            else:
+                return cast(Response, await call_next(request))  # No auth configured = pass through
+
+            if result.authenticated:
+                request.state.auth_identity = result.identity
+                request.state.auth_roles = result.roles
+                return cast(Response, await call_next(request))
+            return JSONResponse(
+                status_code=401,
+                content={"error": "Invalid API key", "detail": result.error},
+            )
+        except Exception as e:
+            logger.warning("Auth check failed: %s", e)
+            return JSONResponse(status_code=500, content={"error": "Auth check failed"})
+
+    async def _authenticate_bearer(
+        self,
+        token: str,
+        request: Request,
+        call_next: Callable,
+        api_key_mgr: Any,
+        auth_manager: Any,
+    ) -> Response:
+        """Validate a Bearer token (JWT or structured API key) and dispatch."""
+        try:
+            # If the bearer token looks like a structured API key
+            # (maop_{key_id}_{secret}), validate via ApiKeyManager.
+            if (
+                token.startswith("maop_")
+                and api_key_mgr is not None
+                and hasattr(api_key_mgr, "validate_key")
+            ):
+                resp = await self._authenticate_with_api_key_manager(
+                    api_key_mgr, token, request, call_next
+                )
+                if resp is not None:
+                    return resp
+
+            jwt_checker = getattr(request.app.state, "jwt_auth", None)
+            if jwt_checker is not None and hasattr(jwt_checker, "validate_token"):
+                result = jwt_checker.validate_token(token)
+            elif auth_manager is not None and hasattr(auth_manager, "authenticate"):
+                result = auth_manager.authenticate(bearer_token=token)
+            else:
+                return cast(Response, await call_next(request))
+
+            if result.authenticated:
+                request.state.auth_identity = result.identity
+                request.state.auth_roles = result.roles
+                return cast(Response, await call_next(request))
+            return JSONResponse(
+                status_code=401,
+                content={"error": "Invalid token", "detail": result.error},
+            )
+        except Exception as e:
+            logger.warning("JWT check failed: %s", e)
+            return JSONResponse(status_code=500, content={"error": "Auth check failed"})
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # P0-1 FIX (R3 audit): restore if-guard that was lost in P2-3 fix.
         # Without this guard, ALL auth logic below is dead code and every
         # request gets anonymous/read role regardless of MAOP_AUTH setting.
-        #
-        # Security (C-1 fix): when auth is disabled (dev mode), default to
-        # ``read`` role — NOT ``admin`` — so a misconfigured deployment
-        # does not grant anonymous users write access to admin endpoints.
-        # Operators who explicitly want admin role in disabled mode can set
-        # ``MAOP_AUTH_DISABLED_ADMIN=1`` (NOT recommended outside isolated
-        # local dev). Production should set ``MAOP_AUTH=1`` instead.
         if not self.enabled:
-            import os
-            _disabled_admin = os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "0") == "1"
-            if _disabled_admin:
-                logger.warning(
-                    "DANGEROUS flag MAOP_AUTH_DISABLED_ADMIN is enabled — auth is "
-                    "disabled AND anonymous requests are granted admin role. Never use "
-                    "in production or any shared/multi-tenant environment."
-                )
-            disabled_role = "admin" if _disabled_admin else "read"
-            request.state.auth_roles = [disabled_role]
-            request.state.auth_identity = "anonymous"
-            return cast(Response, await call_next(request))
+            return await self._dispatch_disabled(request, call_next)
 
         # Skip public paths — prefix match so subtree endpoints (e.g.
         # /api/stream/agent/{id}, /api/auth/login/*) inherit the public
@@ -98,7 +196,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return cast(Response, await call_next(request))
 
         # Skip static assets
-        if path.startswith("/static/") or path.endswith((".css", ".js", ".ico", ".png", ".svg")):
+        if self._is_static_asset(path):
             return cast(Response, await call_next(request))
 
         auth_manager = getattr(request.app.state, "auth_manager", None)
@@ -108,36 +206,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Check API Key header — prefer the new ApiKeyManager when available.
         api_key = request.headers.get(self.api_key_header, "")
         if api_key:
-            # New manager path: structured validation + usage recording.
-            if api_key_mgr is not None and hasattr(api_key_mgr, "validate_key"):
-                resp = await self._authenticate_with_api_key_manager(
-                    api_key_mgr, api_key, request, call_next
-                )
-                if resp is not None:
-                    return resp
-                # validate_key returned a non-None sentinel? fall through to legacy.
-            try:
-                auth_checker = getattr(request.app.state, "api_key_auth", None)
-                if auth_checker is not None and hasattr(auth_checker, "validate"):
-                    result = auth_checker.validate(api_key)
-                elif auth_checker is not None and hasattr(auth_checker, "validate_key"):
-                    result = auth_checker.validate_key(api_key)
-                elif auth_manager is not None and hasattr(auth_manager, "authenticate"):
-                    result = auth_manager.authenticate(api_key=api_key)
-                else:
-                    return cast(Response, await call_next(request))  # No auth configured = pass through
-
-                if result.authenticated:
-                    request.state.auth_identity = result.identity
-                    request.state.auth_roles = result.roles
-                    return cast(Response, await call_next(request))
-                return JSONResponse(
-                    status_code=401,
-                    content={"error": "Invalid API key", "detail": result.error},
-                )
-            except Exception as e:
-                logger.warning("Auth check failed: %s", e)
-                return JSONResponse(status_code=500, content={"error": "Auth check failed"})
+            return await self._authenticate_api_key(
+                api_key, request, call_next, api_key_mgr, auth_manager
+            )
 
         # Check Authorization header (Bearer JWT or Bearer maop_{key_id}_{secret})
         auth_header = request.headers.get(self.auth_header, "")
@@ -145,40 +216,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not auth_header.startswith("Bearer ") and "maop_token" in request.cookies:
             auth_header = "Bearer " + request.cookies["maop_token"]
         if auth_header.startswith("Bearer "):
-            try:
-                token = auth_header[7:]
-                # If the bearer token looks like a structured API key
-                # (maop_{key_id}_{secret}), validate via ApiKeyManager.
-                if (
-                    token.startswith("maop_")
-                    and api_key_mgr is not None
-                    and hasattr(api_key_mgr, "validate_key")
-                ):
-                    resp = await self._authenticate_with_api_key_manager(
-                        api_key_mgr, token, request, call_next
-                    )
-                    if resp is not None:
-                        return resp
-
-                jwt_checker = getattr(request.app.state, "jwt_auth", None)
-                if jwt_checker is not None and hasattr(jwt_checker, "validate_token"):
-                    result = jwt_checker.validate_token(token)
-                elif auth_manager is not None and hasattr(auth_manager, "authenticate"):
-                    result = auth_manager.authenticate(bearer_token=token)
-                else:
-                    return cast(Response, await call_next(request))
-
-                if result.authenticated:
-                    request.state.auth_identity = result.identity
-                    request.state.auth_roles = result.roles
-                    return cast(Response, await call_next(request))
-                return JSONResponse(
-                    status_code=401,
-                    content={"error": "Invalid token", "detail": result.error},
-                )
-            except Exception as e:
-                logger.warning("JWT check failed: %s", e)
-                return JSONResponse(status_code=500, content={"error": "Auth check failed"})
+            token = auth_header[7:]
+            return await self._authenticate_bearer(
+                token, request, call_next, api_key_mgr, auth_manager
+            )
 
         # No auth provided - check if any auth is configured
         has_auth = (
@@ -449,7 +490,10 @@ def setup_middleware(
     """
     # CORS - configurable origins
     from fastapi.middleware.cors import CORSMiddleware
-    origins = cors_origins or ["http://localhost:9079", "http://127.0.0.1:9079"]
+    if not cors_origins:
+        from maop.config.settings import get_settings
+        cors_origins = get_settings().cors_origin_list()
+    origins = cors_origins
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,

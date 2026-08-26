@@ -189,6 +189,7 @@ _registry: StreamRegistry | None = None
 
 
 def get_stream_registry() -> StreamRegistry:
+    """Return the global StreamRegistry singleton, creating it on first call."""
     global _registry
     if _registry is None:
         _registry = StreamRegistry()

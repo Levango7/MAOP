@@ -123,10 +123,17 @@ _DIM_RE = re.compile(r"vector\((\d+)\)")
 
 
 def _default_pg_url() -> str:
+    """Default PostgreSQL URL — single source of truth in ``config.settings``.
+
+    Reads ``MAOP_DATABASE_URL`` / ``MAOP_DB_URL`` env vars first (preserving
+    historical precedence), then falls back to ``settings.database_url``.
+    """
+    from maop.config.settings import get_settings
+
     return (
         os.environ.get("MAOP_DATABASE_URL")
         or os.environ.get("MAOP_DB_URL")
-        or "postgresql+psycopg2://localhost:5432/maop"
+        or get_settings().database_url
     )
 
 

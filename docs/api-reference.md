@@ -1,4 +1,4 @@
-﻿# MAOP API Reference
+# MAOP API Reference
 
 MAOP（Multi-Agent Orchestration Platform）是基于 FastAPI 实现的智能体编排框架，采用 Plan-Execute-Verify 范式。本文档覆盖 `dashboard` 模块暴露的全部 HTTP 与 WebSocket 端点，版本 5.1.0，供使用方、集成方与运维人员查阅。所有示例可直接复制运行，默认服务地址为 `http://127.0.0.1:9079`。
 
@@ -135,7 +135,7 @@ curl http://127.0.0.1:9079/api/auth/users \
 | GET | `/api/failures` | 失败列表 | | |
 | GET | `/api/chain` | 调用链 | | |
 | GET | `/api/optimizer` | 优化器状态 | | |
-| GET | `/api/batch` | 批量结果 | | deprecated |
+| GET | `/api/graph/stats` | 图统计 | | |
 | GET | `/api/graph/nodes` | 图节点 | | |
 | GET | `/api/graph/edges` | 图边 | | |
 | GET | `/api/vector/stats` | 向量索引统计 | | |
@@ -178,7 +178,7 @@ curl http://127.0.0.1:9079/api/report -H "Authorization: Bearer $TOKEN"
 | POST | `/api/control/cancel` | 取消任务 | | |
 | POST | `/api/control/refresh` | 刷新缓存 | | |
 | POST | `/api/control/clear-cache` | 清缓存 | `[admin]` | |
-| GET | `/api/control/provider-health` | 提供方健康 | | |
+| POST | `/api/control/provider-health` | 提供方健康 | | |
 | POST | `/api/control/maintain` | 维护模式 | `[admin]` | |
 
 ```bash
@@ -193,12 +193,12 @@ curl -X POST http://127.0.0.1:9079/api/control/run \
 | --- | --- | --- | --- | --- |
 | GET | `/api/model/agents` | Agent 模型映射 | | |
 | GET | `/api/model/quota` | 配额 | | |
-| POST | `/api/model/quota/status` | 配额状态 | | |
+| GET | `/api/model/quota/status` | 配额状态 | | |
 | POST | `/api/model/switch` | 切换模型 | `[admin]` | |
 | GET | `/api/model/registry` | 模型注册表 | | |
 | GET | `/api/model/list` | 模型列表 | | |
 | GET | `/api/model/providers` | 提供方 | | |
-| POST | `/api/model/select` | 选择默认模型 | | |
+| GET | `/api/model/select` | 选择默认模型 | | |
 | GET | `/api/model/budget` | 预算 | | |
 | GET | `/api/model/policies` | 策略 | | |
 | POST | `/api/model/provider/add` | 添加提供方 | `[admin]` | |
@@ -208,7 +208,7 @@ curl -X POST http://127.0.0.1:9079/api/control/run \
 | POST | `/api/model/key/store` | 存储密钥 | `[admin]` | |
 | POST | `/api/model/key/delete` | 删除密钥 | `[admin]` | |
 | GET | `/api/model/key/list` | 密钥列表 | `[admin]` | |
-| GET | `/api/model/health/check` | 健康检查 | | |
+| POST | `/api/model/health/check` | 健康检查 | | |
 
 ```bash
 curl -X POST http://127.0.0.1:9079/api/model/switch \
@@ -266,17 +266,16 @@ curl -X POST http://127.0.0.1:9079/api/evolve/analyze -H "Authorization: Bearer 
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |
 | GET | `/api/memory/deep` | 深度记忆 | | |
-| POST | `/api/memory/search` | 记忆检索 | | |
-| GET | `/api/memory/trace/{trace_id}` | 记忆轨迹 | | |
+| GET | `/api/memory/search` | 记忆检索 | | |
+| GET | `/api/memory/trace` | 记忆轨迹 | | |
 | GET | `/api/memory/stats` | 记忆统计 | | |
 | GET | `/api/neural/status` | 神经状态 | | |
 | GET | `/api/neural/attention` | 注意力 | | |
 | POST | `/api/neural/attention` | 调整注意力 | | |
 
 ```bash
-curl -X POST http://127.0.0.1:9079/api/memory/search \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"query":"上次部署失败原因"}'
+curl http://127.0.0.1:9079/api/memory/search?query=last-deploy-failure \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ### 3.6 System（框架状态/审计/配置/概览）— `system.py`
@@ -300,7 +299,7 @@ curl -X POST http://127.0.0.1:9079/api/memory/search \
 | GET | `/api/security/config` | 安全配置 | | |
 | GET | `/api/audit/events` | 审计事件 | | |
 | GET | `/api/audit/summary` | 审计摘要 | | |
-| POST | `/api/audit/filter` | 审计过滤 | | |
+| GET | `/api/audit/filter` | 审计过滤 | | |
 | GET | `/api/system/resources` | 资源 | | |
 | GET | `/api/system/diagnostics` | 诊断 | | |
 
@@ -312,15 +311,20 @@ curl http://127.0.0.1:9079/api/overview -H "Authorization: Bearer $TOKEN"
 
 ## 4. Agent & Delegation
 
-### `agents.py`（prefix=`/api/agents`）
+### `agents/`（prefix=`/api/agents`）
+
+由 `agents/crud.py` + `agents/evolution.py` + `agents/memory.py` + `agents/routes.py` 共同提供，共 23 个端点。
 
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |
 | GET | `/api/agents` | Agent 列表 | | |
+| GET | `/api/agents/presets` | Agent 预设 | | |
 | GET | `/api/agents/routes` | 路由表 | | |
-| POST | `/api/agents/match` | 匹配 Agent | | |
+| GET | `/api/agents/match` | 匹配 Agent | | |
 | GET | `/api/agents/{name}` | Agent 详情 | | |
 | GET | `/api/agents/{name}/health-log` | 健康日志 | | |
+| GET | `/api/agents/{name}/diagnose` | 诊断 | `[admin]` | |
+| POST | `/api/agents/{name}/repair` | 修复 | `[admin]` | |
 | POST | `/api/agents/scan` | 扫描 Agent | `[admin]` | |
 | POST | `/api/agents/{name}/health-check` | 健康检查 | `[admin]` | |
 | POST | `/api/agents/health-check-all` | 全员检查 | `[admin]` | |
@@ -328,6 +332,15 @@ curl http://127.0.0.1:9079/api/overview -H "Authorization: Bearer $TOKEN"
 | POST | `/api/agents/{name}/disable` | 禁用 | `[admin]` | |
 | POST | `/api/agents/register` | 注册 Agent | `[admin]` | |
 | DELETE | `/api/agents/{name}` | 删除 Agent | `[admin]` | |
+| GET | `/api/agents/upgrade/status` | 升级状态 | | |
+| GET | `/api/agents/{name}/upgrade/check` | 升级检查 | | |
+| POST | `/api/agents/{name}/upgrade` | 触发升级 | `[admin]` | |
+| POST | `/api/agents/{name}/evolve` | 触发演化 | `[admin]` | |
+| GET | `/api/agents/{name}/evolution-status` | 演化状态 | | |
+| GET | `/api/agents/{name}/memory` | Agent 记忆 | | |
+| POST | `/api/agents/{name}/memory` | 写入记忆 | `[admin]` | |
+| DELETE | `/api/agents/{name}/memory` | 清除记忆 | `[admin]` | |
+| GET | `/api/agents/{name}/memory/summary` | 记忆摘要 | | |
 
 ### `subagent.py`
 
@@ -337,7 +350,7 @@ curl http://127.0.0.1:9079/api/overview -H "Authorization: Bearer $TOKEN"
 | POST | `/api/subagent/wait` | 等待子代理 | `[admin]` | |
 | POST | `/api/subagent/cancel` | 取消子代理 | `[admin]` | |
 | GET | `/api/subagent/list` | 子代理列表 | | |
-| GET | `/api/subagent/transcript/{id}` | 子代理回执 | | |
+| GET | `/api/subagent/transcript` | 子代理回执 | | |
 
 ### `agent_bridge.py`（prefix=`/api/bridge`）
 
@@ -358,22 +371,21 @@ curl -X POST http://127.0.0.1:9079/api/agents/scan -H "Authorization: Bearer $TO
 
 ### `chat.py`（prefix=`/api/chat`）
 
-12 个端点，覆盖会话创建、消息追加、历史查询、删除等。
+11 个端点，覆盖流式对话、会话查询/删除、记忆检索、图片上传等。
 
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |
-| POST | `/api/chat/start` | 开始会话 | | |
-| POST | `/api/chat/message` | 发送消息 | | |
-| GET | `/api/chat/sessions` | 会话列表 | | |
-| GET | `/api/chat/sessions/{id}` | 会话详情 | | |
-| DELETE | `/api/chat/sessions/{id}` | 删除会话 | | |
-| GET | `/api/chat/history/{id}` | 历史 | | |
-| POST | `/api/chat/feedback` | 反馈 | | |
-| GET | `/api/chat/templates` | 模板 | | |
-| POST | `/api/chat/templates` | 创建模板 | `[admin]` | |
+| POST | `/api/chat/stream` | 流式对话（SSE） | | body: `{session_id?, message}` |
 | GET | `/api/chat/models` | 可用模型 | | |
-| POST | `/api/chat/stop/{id}` | 停止生成 | | |
-| GET | `/api/chat/health` | 健康 | | |
+| GET | `/api/chat/sessions` | 会话列表 | | |
+| GET | `/api/chat/{session_id}` | 会话详情 | | |
+| DELETE | `/api/chat/{session_id}` | 删除会话 | | |
+| POST | `/api/chat/memory/search` | 会话内记忆检索 | | |
+| POST | `/api/chat/memory/consolidate` | 记忆合并 | `[admin]` | |
+| GET | `/api/chat/memory/stats` | 记忆统计 | | |
+| POST | `/api/chat/upload` | 上传图片/附件 | | multipart |
+| GET | `/api/chat/images/{session_id}` | 会话图片列表 | | |
+| DELETE | `/api/chat/images/{image_id}` | 删除图片 | | |
 
 ### `stream.py`（prefix=`/api/stream`）
 
@@ -381,7 +393,8 @@ curl -X POST http://127.0.0.1:9079/api/agents/scan -H "Authorization: Bearer $TO
 | --- | --- | --- | --- | --- |
 | GET | `/api/stream/{trace_id}` | SSE 流 | `[admin]` | 豁免版本别名 |
 | GET | `/api/stream/active` | 活跃流 | `[admin]` | |
-| GET | `/api/stream/{trace_id}/status` | 流状态 | `[admin]` | |
+| GET | `/api/stream/dag/{execution_id}` | DAG 执行流 | `[admin]` | |
+| GET | `/api/stream/agent/{execution_id}` | Agent 执行流 | `[admin]` | |
 
 ### WebSocket `/ws`
 
@@ -426,8 +439,8 @@ asyncio.run(listen())
 
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |
-| POST | `/api/mcp/connect` | 连接 MCP | | |
-| POST | `/api/mcp/disconnect` | 断开 | | |
+| POST | `/api/mcp/connect/{server_name}` | 连接 MCP | | |
+| POST | `/api/mcp/disconnect/{server_name}` | 断开 | | |
 | GET | `/api/mcp/servers` | 服务列表 | | |
 | GET | `/api/mcp/tools` | 工具列表 | | |
 | POST | `/api/mcp/call` | 调用工具 | | |
@@ -467,35 +480,35 @@ curl http://127.0.0.1:9079/api/routing/decisions/recent -H "Authorization: Beare
 
 ## 8. Hooks & Protocols
 
-### `hook.py`
+### `hook.py`（prefix=`/api/hook`）
 
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |
-| POST | `/api/hooks/register` | 注册 hook | | |
-| POST | `/api/hooks/unregister` | 注销 | | |
-| POST | `/api/hooks/enable` | 启用 | | |
-| POST | `/api/hooks/disable` | 禁用 | | |
-| GET | `/api/hooks/list` | 列表 | | |
-| GET | `/api/hooks/{name}` | 详情 | | |
-| POST | `/api/hooks/trigger` | 触发 | | |
-| GET | `/api/hooks/logs` | 日志 | | |
-| GET | `/api/hooks/events` | 事件 | | |
+| POST | `/api/hook/register` | 注册 hook | | |
+| POST | `/api/hook/unregister` | 注销 | | |
+| POST | `/api/hook/enable` | 启用 | | |
+| POST | `/api/hook/disable` | 禁用 | | |
+| GET | `/api/hook/list` | 列表 | | |
+| GET | `/api/hook/get` | 查询 hook | | |
+| POST | `/api/hook/trigger` | 触发 | | |
+| GET | `/api/hook/logs` | 日志 | | |
+| GET | `/api/hook/events` | 事件 | | |
 
-### `protocol.py`
+### `protocol.py`（prefix=`/api/protocol`）
 
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |
-| POST | `/api/protocols/register` | 注册协议 | `[admin]` | |
-| POST | `/api/protocols/unregister` | 注销 | `[admin]` | |
-| GET | `/api/protocols/get` | 查询 | | |
-| GET | `/api/protocols/list` | 列表 | | |
-| GET | `/api/protocols/versions` | 版本 | | |
-| POST | `/api/protocols/validate` | 校验 | `[admin]` | |
-| POST | `/api/protocols/send` | 发送 | `[admin]` | |
-| GET | `/api/protocols/messages` | 消息 | | |
+| POST | `/api/protocol/register` | 注册协议 | `[admin]` | |
+| POST | `/api/protocol/unregister` | 注销 | `[admin]` | |
+| GET | `/api/protocol/get` | 查询 | | |
+| GET | `/api/protocol/list` | 列表 | | |
+| GET | `/api/protocol/versions` | 版本 | | |
+| POST | `/api/protocol/validate` | 校验 | `[admin]` | |
+| POST | `/api/protocol/send` | 发送 | `[admin]` | |
+| GET | `/api/protocol/messages` | 消息 | | |
 
 ```bash
-curl -X POST http://127.0.0.1:9079/api/hooks/trigger \
+curl -X POST http://127.0.0.1:9079/api/hook/trigger \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"event":"on_task_done","payload":{"trace_id":"t-1"}}'
 ```
@@ -589,7 +602,7 @@ curl http://127.0.0.1:9079/api/session/active -H "Authorization: Bearer $TOKEN"
 | GET | `/api/cost/summary` | 汇总 | | |
 | GET | `/api/cost/budget` | 预算 | | |
 | GET | `/api/cost/pricing` | 定价表 | | |
-| GET | `/api/cost/pricing/{model}` | 单模型定价 | | |
+| PUT | `/api/cost/pricing/{model}` | 单模型定价 | `[admin]` | |
 | POST | `/api/cost/record` | 记录费用 | | |
 
 ### `budget.py`
@@ -621,17 +634,16 @@ curl http://127.0.0.1:9079/api/cost/summary -H "Authorization: Bearer $TOKEN"
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |
 | POST | `/api/permission/rules` | 添加规则 | | |
-| DELETE | `/api/permission/rules` | 删除规则 | | |
+| DELETE | `/api/permission/rules/{rule_id}` | 删除规则 | | |
 | GET | `/api/permission/rules` | 规则列表 | | |
-| POST | `/api/permission/check` | 权限校验 | | |
+| GET | `/api/permission/check` | 权限校验 | | |
 | GET | `/api/approval/pending` | 待审批 | | |
 | POST | `/api/approval/{id}/approve` | 批准 | | |
 | POST | `/api/approval/{id}/reject` | 拒绝 | | |
 
 ```bash
-curl -X POST http://127.0.0.1:9079/api/permission/check \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"user":"alice","action":"run","resource":"control"}'
+curl "http://127.0.0.1:9079/api/permission/check?user=alice&action=run&resource=control" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
@@ -656,10 +668,26 @@ curl -X POST http://127.0.0.1:9079/api/permission/check \
 
 #### `audit.py`（prefix=`/api/audit`）
 
+16 个端点，覆盖审计事件查询、过滤、导出、告警规则 CRUD 与告警评估。
+
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |
 | GET | `/api/audit/events` | 审计事件 | `[admin]` | |
 | GET | `/api/audit/summary` | 审计摘要 | `[admin]` | |
+| GET | `/api/audit/filter` | 审计过滤 | `[admin]` | |
+| POST | `/api/audit/events/advanced` | 高级事件查询 | `[admin]` | |
+| GET | `/api/audit/export` | 导出 | `[admin]` | |
+| GET | `/api/audit/stats` | 统计 | `[admin]` | |
+| GET | `/api/audit/timeline` | 时间线 | `[admin]` | |
+| GET | `/api/audit/heatmap` | 热力图 | `[admin]` | |
+| POST | `/api/audit/alert/rules` | 创建告警规则 | `[admin]` | |
+| GET | `/api/audit/alert/rules` | 告警规则列表 | `[admin]` | |
+| GET | `/api/audit/alert/rules/{rule_id}` | 规则详情 | `[admin]` | |
+| PUT | `/api/audit/alert/rules/{rule_id}` | 更新规则 | `[admin]` | |
+| DELETE | `/api/audit/alert/rules/{rule_id}` | 删除规则 | `[admin]` | |
+| GET | `/api/audit/alert/history` | 告警历史 | `[admin]` | |
+| POST | `/api/audit/alert/{alert_id}/acknowledge` | 确认告警 | `[admin]` | |
+| POST | `/api/audit/alert/evaluate` | 评估告警 | `[admin]` | |
 
 #### `rbac.py`（prefix=`/api/rbac`）
 
@@ -673,6 +701,8 @@ curl -X POST http://127.0.0.1:9079/api/permission/check \
 
 #### `sso.py`（prefix=`/api/sso`）
 
+17 个端点，覆盖 OIDC/SAML 授权流、Provider CRUD、元数据与启用状态。
+
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |
 | GET | `/api/sso/authorize` | 跳转授权 | | |
@@ -680,6 +710,18 @@ curl -X POST http://127.0.0.1:9079/api/permission/check \
 | POST | `/api/sso/logout` | 登出 | | |
 | GET | `/api/sso/validate` | 校验 | | |
 | GET | `/api/sso/config` | 配置 | | |
+| GET | `/api/sso/enabled` | SSO 是否启用 | | |
+| GET | `/api/sso/providers` | Provider 列表 | | |
+| POST | `/api/sso/providers` | 创建 Provider | `[admin]` | |
+| GET | `/api/sso/providers/{provider_id}` | Provider 详情 | | |
+| PUT | `/api/sso/providers/{provider_id}` | 更新 Provider | `[admin]` | |
+| DELETE | `/api/sso/providers/{provider_id}` | 删除 Provider | `[admin]` | |
+| POST | `/api/sso/providers/{provider_id}/test` | 测试连接 | `[admin]` | |
+| GET | `/api/sso/providers/{provider_id}/metadata` | 元数据 | | |
+| GET | `/api/sso/oidc/{provider_id}/login` | OIDC 登录 | | |
+| GET | `/api/sso/oidc/{provider_id}/callback` | OIDC 回调 | | |
+| GET | `/api/sso/saml/{provider_id}/login` | SAML 登录 | | |
+| POST | `/api/sso/saml/{provider_id}/acs` | SAML ACS | | |
 
 ### [Enterprise N8N_INTEGRATION]
 
@@ -689,7 +731,7 @@ curl -X POST http://127.0.0.1:9079/api/permission/check \
 
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |
-| POST | `/api/n8n/webhook/{id}` | 接收 webhook | | |
+| POST | `/api/n8n/webhook` | 接收 webhook | | |
 | GET | `/api/n8n/workflows` | 工作流 | | |
 | POST | `/api/n8n/workflows/{id}/trigger` | 触发 | | |
 | GET | `/api/n8n/executions/{id}` | 执行详情 | | |

@@ -14,7 +14,8 @@
       <div class="search-bar">
         <div class="input-wrap">
           <input
-v-model="query" class="search-input" :placeholder="placeholder"
+v-model="query"
+:aria-label="placeholder" class="search-input" :placeholder="placeholder"
             :disabled="searching" @keydown.enter="doSearch" />
           <AppIcon name="search" :size="16" class="input-icon-right" />
         </div>

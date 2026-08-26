@@ -29,6 +29,7 @@ def _get_bridge() -> Any:
 @router.get("/api/bridge/adapters")
 @handle_api_errors("Bridge adapters", error_value={"adapters": [], "count": 0, "error": "List failed"})
 async def api_bridge_adapters() -> dict[str, Any]:
+    """List available bridge adapters."""
     bridge = _get_bridge()
     names = bridge.list_adapters()
     statuses = []
@@ -44,6 +45,7 @@ async def api_bridge_adapters() -> dict[str, Any]:
 @router.post("/api/bridge/call")
 @handle_api_errors("Bridge call", error_value={"status": "error", "error": "Call failed"})
 async def api_bridge_call(request: Request) -> dict[str, Any]:
+    """Proxy a call through a bridge adapter."""
     require_admin(request)
     body = await request.json()
     adapter_name = body.get("adapter", "")
@@ -63,6 +65,7 @@ async def api_bridge_call(request: Request) -> dict[str, Any]:
 @router.get("/api/bridge/health")
 @handle_api_errors("Bridge health", error_value={"health": {}, "error": "Health check failed"})
 async def api_bridge_health() -> dict[str, Any]:
+    """Check bridge adapter health status."""
     bridge = _get_bridge()
     health = bridge.health_check_all()
     return {"health": health}
@@ -71,6 +74,7 @@ async def api_bridge_health() -> dict[str, Any]:
 @router.post("/api/bridge/sync-config")
 @handle_api_errors("Bridge sync-config", error_value={"status": "error", "error": "Sync failed"})
 async def api_bridge_sync_config(request: Request) -> dict[str, Any]:
+    """Sync bridge adapter configuration."""
     require_admin(request)
     body = await request.json()
     adapter_name = body.get("adapter", "")

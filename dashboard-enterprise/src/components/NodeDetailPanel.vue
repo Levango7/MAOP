@@ -3,7 +3,7 @@
     <div class="ndp-header">
       <span class="ndp-status-dot" :class="`status-${node.status}`"></span>
       <h4>{{ node.node_id }}</h4>
-      <button class="ndp-close" @click="$emit('close')">
+      <button class="ndp-close" :aria-label="t('common.close')" @click="$emit('close')">
         <AppIcon name="x" :size="16" />
       </button>
     </div>
@@ -70,7 +70,7 @@ function formatTime(ts) {
   background: var(--bg-card, #fff);
   border: 1px solid var(--border, rgba(148,163,184,.35));
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
   font-size: 13px;
 }
@@ -121,7 +121,7 @@ function formatTime(ts) {
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 12px;
 }
-.ndp-error .ndp-value { color: var(--fail, #dc2626); }
+.ndp-error .ndp-value { color: var(--fail, #f85149); }
 .ndp-traceback { flex-direction: column; gap: 4px; }
 .ndp-traceback-pre {
   margin: 0;

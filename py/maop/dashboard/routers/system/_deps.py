@@ -16,9 +16,7 @@ Backward-compatibility note:
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing import cast
 
 from maop import __version__ as MAOP_VERSION  # noqa: F401  — re-exported
 from maop.core.backends.db_utils import get_db_path  # noqa: F401  — re-exported
@@ -46,28 +44,15 @@ async def _run_subprocess(cmd: list[str], timeout: int = 10) -> tuple[int, str, 
     """M21 fix (Phase R7): async subprocess 替代 subprocess.run，避免阻塞事件循环。
 
     返回 (returncode, stdout, stderr)，超时或异常返回 (-1, "", error_msg)。
+
+    Thin wrapper around :func:`maop.core.utils.async_subprocess.run_subprocess_safe`
+    kept for backward compatibility with tests that monkeypatch this name.
     """
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            stdout_b, stderr_b = await asyncio.wait_for(
-                proc.communicate(), timeout=timeout
-            )
-            return (
-                cast(int, proc.returncode),
-                stdout_b.decode("utf-8", errors="replace"),
-                stderr_b.decode("utf-8", errors="replace"),
-            )
-        except asyncio.TimeoutError:
-            proc.kill()
-            await proc.wait()
-            return -1, "", f"timeout after {timeout}s"
-    except Exception as exc:
-        return -1, "", str(exc)
+    from maop.core.utils.async_subprocess import run_subprocess_safe
+
+    return await run_subprocess_safe(
+        cmd, timeout=timeout, timeout_msg=f"timeout after {timeout}s"
+    )
 
 
 _HARDENED_ALLOWED_PACKAGES = frozenset({

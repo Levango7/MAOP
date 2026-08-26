@@ -36,6 +36,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import signal
 import socket
 import time
@@ -64,6 +65,21 @@ _DEFAULT_GROUP = "maop_workers"
 _F_CONSUMER = "consumer"
 
 
+def _default_redis_url() -> str:
+    """Default Redis URL — single source of truth in ``config.settings``.
+
+    Reads ``MAOP_REDIS_URL`` env var first (preserving historical precedence
+    for callers that set it before settings is loaded), then falls back to
+    ``settings.redis_url``.
+    """
+    env_url = os.environ.get("MAOP_REDIS_URL")
+    if env_url:
+        return env_url
+    from maop.config.settings import get_settings
+
+    return get_settings().redis_url
+
+
 @dataclass
 class WorkerConfig:
     """Configuration for a :class:`DistributedWorker`.
@@ -84,7 +100,7 @@ class WorkerConfig:
         Optional explicit id (auto-generated when empty).
     """
 
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = field(default_factory=lambda: _default_redis_url())
     concurrency: int = 4
     capabilities: set[str] = field(default_factory=set)
     heartbeat_interval: float = 5.0
@@ -393,7 +409,7 @@ class DistributedWorker:
 # ── CLI entry point ──────────────────────────────────────────────────
 
 def run_worker(
-    redis_url: str = "redis://localhost:6379/0",
+    redis_url: str | None = None,
     *,
     concurrency: int = 4,
     capabilities: set[str] | None = None,
@@ -408,6 +424,8 @@ def run_worker(
     """
     import redis as _redis_mod
 
+    if redis_url is None:
+        redis_url = _default_redis_url()
     client = _redis_mod.from_url(redis_url)
     # Verify connection.
     try:

@@ -450,7 +450,7 @@ onMounted(async () => {
   gap: 8px;
   margin-top: 4px;
   font-size: 11px;
-  color: var(--text-faint, #999);
+  color: var(--text-faint, #8a93a3);
 }
 .stream-tokens, .stream-speed {
   font-variant-numeric: tabular-nums;

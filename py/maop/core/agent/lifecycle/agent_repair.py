@@ -23,7 +23,6 @@ Usage::
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import shutil
@@ -114,27 +113,15 @@ class AgentRepair:
     async def _run_subprocess(
         self, cmd: list[str], timeout: int = 30
     ) -> tuple[int, str, str]:
-        """运行子进程，返回 (returncode, stdout, stderr)。"""
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout_b, stderr_b = await asyncio.wait_for(
-                proc.communicate(), timeout=timeout
-            )
-            return (
-                proc.returncode or 0,
-                stdout_b.decode(errors="replace") if stdout_b else "",
-                stderr_b.decode(errors="replace") if stderr_b else "",
-            )
-        except asyncio.TimeoutError:
-            proc.kill()
-            await proc.wait()
-            return -1, "", "timeout"
-        except Exception as exc:
-            return -1, "", str(exc)
+        """运行子进程，返回 (returncode, stdout, stderr)。
+
+        Thin wrapper around :func:`maop.core.utils.async_subprocess.run_subprocess_safe`
+        kept as an instance method for backward compatibility with callers/tests
+        that monkeypatch ``AgentRepair._run_subprocess``.
+        """
+        from maop.core.utils.async_subprocess import run_subprocess_safe
+
+        return await run_subprocess_safe(cmd, timeout=timeout, timeout_msg="timeout")
 
     def _detect_install_method(self, cli_name: str) -> str:
         """检测 agent CLI 的安装方式。"""
