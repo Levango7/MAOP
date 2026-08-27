@@ -689,7 +689,7 @@ agents:
 | 问题 | 说明 | 工作量 |
 |------|------|--------|
 | **`cryptography` 非核心依赖** | `api_key_vault.py` 在 `cryptography` 缺失时降级到明文存储，应升为核心依赖或提供警告 | 极小 |
-| **`sentence-transformers` 在 `[ml]` extra** | 语义搜索需单独 `pip install maop[ml]`，默认安装不含 | 小 |
+| **`sentence-transformers` 在 `[ml]` extra** | 语义搜索需单独 `pip install maop-orchestrator[ml]`，默认安装不含 | 小 |
 | **`maop_execute.py` 注释提到 v3.6.0** | 文件开头 `v3.6.0` 版本号与项目实际版本 3.5.0 不一致 | 极小 |
 | **`data_bridge.py` 中 `_connect_queue` 仍可优化** | 注释已修正，但仍有 `human-queue.json` 提及（:99-102 注释） | 极小 |
 

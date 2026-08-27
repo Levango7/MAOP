@@ -24,10 +24,10 @@ MAOP 个人版（开源 MIT）和 MAOS 企业版（商业 license）需要清晰
 1. **商业 license 独立**：企业版代码不混入开源 wheel，避免 license 污染
 2. **私有仓库可控**：`maop-enterprise` 不上 PyPI，通过私有渠道分发
 3. **发版解耦**：个人版和企业版可独立发版，不互相阻塞
-4. **安全边界清晰**：`pip install maop` 只装个人版，企业功能需额外安装 `maop-enterprise` + 有效 license
+4. **安全边界清晰**：`pip install maop-orchestrator` 只装个人版，企业功能需额外安装 `maop-enterprise` + 有效 license
 
 ## 影响
 
 - MAOS 仓库需补齐 `maop/__init__.py`（namespace 包兼容 hatchling）
 - MAOP 仓库需加契约测试（`test_enterprise_contract.py`），防止双仓 API 漂移
-- 客户安装流程：`pip install maop` + `pip install maop-enterprise` + 配置 license key
+- 客户安装流程：`pip install maop-orchestrator` + `pip install maop-enterprise` + 配置 license key

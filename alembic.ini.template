@@ -2,7 +2,7 @@
 # Copy to project root and adjust as needed.
 #
 # Usage:
-#   pip install maop[enterprise]
+#   pip install maop-orchestrator[enterprise]
 #   cd py && alembic upgrade head
 #
 # For personal edition, the built-in MigrationManager is used instead.

@@ -120,7 +120,7 @@ jobs:
           pip install -e .[dev]
 
       - name: Enterprise extra smoke (P0-2)
-        # 审计 P0-2：`pip install maop[enterprise]` 必须可装（此前 etcd3 在
+        # 审计 P0-2：`pip install maop-orchestrator[enterprise]` 必须可装（此前 etcd3 在
         # enterprise extra 内、Python≥3.13 装不上 → 付费用户第一步就撞墙）。
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
         run: pip install -e .[enterprise] && python -c "import maop; print('enterprise extra install OK')"

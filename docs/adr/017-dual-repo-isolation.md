@@ -21,7 +21,7 @@ Mitigation was "Commercial license terms + future code obfuscation."
 During a security review on 2026-08-20, it was confirmed that:
 
 1. **GitHub repository `Levango7/MAOP` is PUBLIC** — all enterprise code is visible to anyone
-2. **`maop` PyPI package had no hatch exclude rule** — `pip install maop` would include `maop/enterprise/` (MIT-licensed!)
+2. **`maop` PyPI package had no hatch exclude rule** — `pip install maop-orchestrator` would include `maop/enterprise/` (MIT-licensed!)
 3. Enterprise modules (25 files: RBAC, SSO, License validation, CRL, audit, tenant isolation) were accessible for free
 
 This constituted a real commercial/security exposure.
@@ -86,7 +86,7 @@ Repository 2: Levango7/MAOS (private, Commercial)
 ### Positive
 
 - ✅ Enterprise code physically isolated (not in public repo)
-- ✅ `pip install maop` no longer includes enterprise code
+- ✅ `pip install maop-orchestrator` no longer includes enterprise code
 - ✅ ADR-016 architecture preserved
 - ✅ No core code synchronization needed
 - ✅ Personal edition remains open source

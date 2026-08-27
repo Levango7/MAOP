@@ -10,7 +10,7 @@
 ```
 Entry (maop.ps1 / cli.py)
   → Orchestrator (maop_loop.py + engine.py)
-    → Dispatcher (dispatcher.py + maop_plan.py)
+    → Dispatcher (delegate/dispatcher.py [shim] + delegate/dispatch_core.py + maop_plan.py)
       → Infrastructure (core/)
         → Data Layer (SQLite + JSON + YAML)
 ```
@@ -21,7 +21,7 @@ Entry (maop.ps1 / cli.py)
 |-------|-----------|---------|
 | Entry | `maop.ps1`, `cli.py` | CLI & startup |
 | Orchestration | `maop_loop.py`, `engine.py` | Phase pipeline & DAG workflows |
-| Dispatch | `dispatcher.py`, `maop_plan.py` | Config-driven agent routing |
+| Dispatch | `delegate/dispatcher.py`, `delegate/dispatch_core.py`, `maop_plan.py` | Config-driven agent routing |
 | Infrastructure | `core/` (4 files + 18 subpackages) | Shared services & utilities |
 | Data | SQLite, JSON, YAML | Persistence & configuration |
 
@@ -128,7 +128,7 @@ License 颁发指南见 [docs/enterprise/license-issuance-guide.md](docs/enterpr
 - `maop-enterprise`（私有分发, Commercial）：依赖 `maop`，包含 `maop/enterprise/` 模块
 
 ```bash
-pip install maop              # 个人版（不含企业代码）
+pip install maop-orchestrator              # 个人版（不含企业代码）
 pip install maop-enterprise   # 企业版（自动依赖 maop，从私有源安装）
 ```
 

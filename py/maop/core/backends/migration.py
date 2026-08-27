@@ -239,7 +239,7 @@ class AlembicBridge:
 
         except ImportError:
             raise ImportError(
-                "alembic not installed. Install with: pip install maop[enterprise]"
+                "alembic not installed. Install with: pip install maop-orchestrator[enterprise]"
             )
         self._db_url = db_url or os.getenv("MAOP_DATABASE_URL", "")
         self._config = Config()

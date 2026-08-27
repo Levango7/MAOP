@@ -101,7 +101,7 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 - `maop`（PyPI, MIT）：核心 + 个人版功能
 - `maop-enterprise`（私有分发, Commercial）：依赖 `maop`，包含 `maop/enterprise/` 模块
 
-`pip install maop` → 个人版  
+`pip install maop-orchestrator` → 个人版  
 `pip install maop-enterprise` → 企业版（自动依赖 maop）
 
 `maop/enterprise/__init__.py` 在 import 时调用 `set_edition(Edition.ENTERPRISE)`，这是企业版包"存在即激活"的机制。

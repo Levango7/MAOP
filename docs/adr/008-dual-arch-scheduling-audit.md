@@ -54,4 +54,4 @@ Python (约 2000 行)            PowerShell (约 7000 行，保留)
 ## Consequences
 - 架构边界清晰，Python 和 PS 职责不重叠
 - 调度流程已验证无显著隐患
-- `psutil` 作为 maop.py CLI 的可选依赖（`pip install maop[full]` 或 fallback 到 PS maop.ps1）
+- `psutil` 作为 maop.py CLI 的可选依赖（`pip install maop-orchestrator[full]` 或 fallback 到 PS maop.ps1）

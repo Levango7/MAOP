@@ -39,7 +39,7 @@ MAOP 个人版（v5.1.0）为单机/小团队设计，包含完整的 Agent 编�
 ### 2.1 pip 安装
 
 ```bash
-pip install maop
+pip install maop-orchestrator
 ```
 
 ### 2.2 源码安装
@@ -197,7 +197,7 @@ print(f"authenticated={auth4uth.authenticated}, roles={auth.roles}")
 |------|------|---------|
 | `WinError 5` 权限拒绝 | Windows temp 目录权限 | 设置 `MAOP_DATA_DIR` |
 | `sqlite3.OperationalError: database is locked` | 并发写入冲突 | 增大 `MAOP_SQLITE_BUSY_TIMEOUT_MS` |
-| `ImportError: ldap3` | 未安装 LDAP 库 | `pip install maop[ldap]` |
+| `ImportError: ldap3` | 未安装 LDAP 库 | `pip install maop-orchestrator[ldap]` |
 | `HuggingFace Hub 超时` | 网络问题 | 设置 `HF_HUB_OFFLINE=1` |
 
 ### 5.2 日志

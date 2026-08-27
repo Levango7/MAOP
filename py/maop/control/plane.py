@@ -179,8 +179,18 @@ class ControlPlane:
         return {"reloaded": True, "configs": reloaded_configs}
 
     def _handle_cache_clear(self, target: str = "", detail: dict | None = None) -> dict:
-        logger.info("[control] Cache clear requested (target=%s)", target or "all")
-        return {"cleared": True, "target": target or "all"}
+        cleared_caches: list[str] = []
+        try:
+            from maop.core.reliability.cache import _caches, _caches_lock, LRUCache
+            with _caches_lock:
+                for name, cache in list(_caches.items()):
+                    if target == "" or target == "all" or target == name:
+                        cache.clear()
+                        cleared_caches.append(name)
+        except Exception as exc:
+            logger.warning("[control] Cache clear (backend): %s", exc)
+        logger.info("[control] Cache cleared: %s (target=%s)", cleared_caches, target or "all")
+        return {"cleared": True, "target": target or "all", "caches": cleared_caches}
 
     def _handle_memory_prune(self, target: str = "", detail: dict | None = None) -> dict:
         detail = detail or {}

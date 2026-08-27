@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **PyPI 包名变更**：`maop` → `maop-orchestrator`（PyPI 上 `maop` 被他人占用）。`import maop` 不变，仅 `pip install maop-orchestrator`。`pyproject.toml` 新增 `[tool.hatch.build.targets.wheel] packages = ["maop"]` 确保 import 名不变。14 个文档文件同步更新。
+- **48h 长稳测试脚本**：新建 `scripts/run_soak_48h.ps1`（一键启动/停止/查看）+ `deliverables/soak-test-report-48h.md`（监控指南 + 结果模板）。
+- **PyPI 上传指南**：新建 `deliverables/pypi-upload-guide.md`（供未来有账号+梯子时使用）。
+- **GitHub Release**：已创建 v5.1.0-personal Release，上传 wheel + sdist。
+
 ### Added
 - **自演化完善**：修复 `suggester.py` LLM 路径（`_SUGGESTION_PROMPT` 字面量花括号 bug）+ 新增 `narrative.py` 叙事模块 + API 端点 + 前端 `EvolutionHistory.vue` 3-tab + `EvolutionTimeline.vue` 增强 + `useMarkdown.js` / `useTextDiff.js` composable + `docs/evolution-guide.md` 使用指南
 - **新手引导（P0）**：`docs/quickstart.md` 5 分钟上手文档 + `docs/README.md` 文档元索引（7 章 6 分类）+ `OnboardingWizard.vue` 3 步引导组件 + `view-onboard.js` i18n，集成到 `Overview.vue`

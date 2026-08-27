@@ -129,7 +129,7 @@ docker:
 
 ```bash
 # PyPI
-pip install maop==5.0.0
+pip install maop-orchestrator==5.0.0
 python -c "import maop; print(maop.__version__)"
 
 # Docker Hub
