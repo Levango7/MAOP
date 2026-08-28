@@ -22,7 +22,7 @@ Entry (maop.ps1 / cli.py)
 | Entry | `maop.ps1`, `cli.py` | CLI & startup |
 | Orchestration | `maop_loop.py`, `engine.py` | Phase pipeline & DAG workflows |
 | Dispatch | `delegate/dispatcher.py`, `delegate/dispatch_core.py`, `maop_plan.py` | Config-driven agent routing |
-| Infrastructure | `core/` (4 files + 18 subpackages) | Shared services & utilities |
+| Infrastructure | `core/` (5 files + 19 subpackages) | Shared services & utilities |
 | Data | SQLite, JSON, YAML | Persistence & configuration |
 
 ## 双版架构（Dual Edition）
@@ -374,7 +374,7 @@ Web dashboard at `http://localhost:9079` with:
 | `core/reliability/circuit_breaker.py` | Circuit breaker pattern |
 | `core/memory/vector.py` | Vector store for semantic search |
 | `core/reliability/streaming.py` | Streaming infrastructure (WebSocket + HTTP SSE at /api/chat/stream; ADR-006 superseded) |
-| `core/security/` | 安全子包：认证、授权、加密、密钥管理等安全相关能力（新增第 18 个子包，原 17 子包基础上补充） |
+| `core/security/` | 安全子包：认证、授权、加密、密钥管理等安全相关能力（2026-07 新增；core/ 现有 19 个子包） |
 | `config/edition.py` | Dual-edition 注册表与 FeatureFlag gate（[ADR-016](docs/adr/016-dual-edition-architecture.md)） |
 | `enterprise/` | 企业版扩展模块（rbac/tenant/audit/sso/ha/license/n8n 等，仅 `maop-enterprise` 包含） |
 
