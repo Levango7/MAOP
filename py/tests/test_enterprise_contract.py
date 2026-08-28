@@ -53,7 +53,7 @@ if "maop" in sys.modules:
         importlib.invalidate_caches()
 
 
-import pytest  # noqa: E402
+import pytest
 
 # ── Contract definition ─────────────────────────────────────────────
 # Every module that MAOP references, with the specific symbols it imports.

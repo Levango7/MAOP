@@ -593,7 +593,7 @@ async def notifications_ws(ws: WebSocket) -> Any:
       - ``"ping"``  — keepalive
       - ``{"action": "mark_read", "id": "..."}``  — mark notification read
     """
-    # Auth — same logic as the main /ws endpoint
+    # Auth — same logic as the main /ws endpoint (ws_broadcast.py).
     token = ws.query_params.get("token", "")
     if not token:
         protocols = ws.headers.get("sec-websocket-protocol", "")
@@ -601,15 +601,21 @@ async def notifications_ws(ws: WebSocket) -> Any:
             parts = [p.strip() for p in protocols.split(",") if p.strip()]
             if parts:
                 token = parts[-1]
-    if token:
+    from maop.dashboard.routers import auth as _auth_mod
+    if _auth_mod._auth_enabled:
+        # P0 fix (2026-08-29): a missing token must be rejected. The previous
+        # `if token:` guard skipped validation entirely when no token was
+        # provided, so unauthenticated sockets were accepted even with
+        # MAOP_AUTH=1. ws_broadcast.py already closes with 4401 in this case.
+        if not token:
+            await ws.close(code=4401, reason="Authentication required")
+            return
         try:
-            from maop.dashboard.routers import auth as _auth_mod
-            if _auth_mod._auth_enabled:
-                mgr = _auth_mod.get_auth_mgr()
-                payload = mgr.jwt_handler.validate_token(token)
-                if not payload or not getattr(payload, "authenticated", False):
-                    await ws.close(code=4401, reason="Invalid token")
-                    return
+            mgr = _auth_mod.get_auth_mgr()
+            payload = mgr.jwt_handler.validate_token(token)
+            if not payload or not getattr(payload, "authenticated", False):
+                await ws.close(code=4401, reason="Invalid token")
+                return
         except Exception:
             await ws.close(code=4401, reason="Authentication failed")
             return
