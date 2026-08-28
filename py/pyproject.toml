@@ -157,6 +157,11 @@ target-version = "py310"
 #   ruff 0.16+ 默认不再启用 F403, 0.15 仍启用 —— 显式 ignore 统一两版本行为
 ignore = ["E402", "BLE001", "S110", "F403"]
 
+# __init__.py 中的 re-export（from module import Name）是子包公开 API 的有意设计，
+# ruff F401 会误报为 unused-import。对 __init__.py 豁免 F401。
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
 [tool.mypy]
 python_version = "3.12"  # 3.10→3.12: numpy .pyi stubs use 3.12+ syntax; on 3.10 mypy aborts parsing stubs and the type-check gate is dead. Codebase stays 3.10-compatible.
 warn_return_any = true

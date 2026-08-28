@@ -57,7 +57,7 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 | License CRL 在线撤销 | ✗ | ✓ |
 | Vue Dashboard 企业版路由 | ✗ | ✓ |
 
-> 编排外部 CLI agent（31 个适配器），非自研运行时
+> 编排外部 CLI agent（适配器数量基于实际集成情况；文档描述"31 个适配器"与代码实际未完全对齐，需核实适配器列表完整性）。非自研运行时。
 
 > Enterprise = Personal ∪ Enterprise 独占能力；企业版包含所有功能。
 

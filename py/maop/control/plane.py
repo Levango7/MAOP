@@ -181,7 +181,7 @@ class ControlPlane:
     def _handle_cache_clear(self, target: str = "", detail: dict | None = None) -> dict:
         cleared_caches: list[str] = []
         try:
-            from maop.core.reliability.cache import _caches, _caches_lock, LRUCache
+            from maop.core.reliability.cache import _caches, _caches_lock
             with _caches_lock:
                 for name, cache in list(_caches.items()):
                     if target == "" or target == "all" or target == name:

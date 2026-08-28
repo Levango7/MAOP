@@ -6,8 +6,8 @@ from maop.core.agent.lifecycle.agent_repair import AgentRepair
 from maop.core.agent.lifecycle.agent_scanner import AgentScanner
 from maop.core.agent.lifecycle.runtime import (
     BaseRuntime,
+    ExecutionResult,
     LocalRuntime,
     RuntimeConfig,
-    ExecutionResult,
 )
 from maop.core.agent.lifecycle.state_classifier import TaskStateClassifier

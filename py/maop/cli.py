@@ -137,7 +137,8 @@ def cmd_run(task: str) -> Any:
             sys.exit(1)
         print(f"[OK] run 完成 ({elapsed:.1f}ms)")
     except ImportError as exc:
-        _emit_fail("run", exc)
+        # 依赖模块验证提示：明确提示缺失模块名称（小修复，不修改核心逻辑）
+        _emit_fail("run", f"缺失依赖模块（可能缺失：maop.migrations.sqlite_to_pg 或相关依赖）: {exc}")
         sys.exit(1)
     except Exception as exc:
         _emit_fail("run", exc)
