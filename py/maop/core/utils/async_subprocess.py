@@ -22,7 +22,6 @@ so the implementation exists in exactly one place.
 from __future__ import annotations
 
 import asyncio
-from typing import cast
 
 
 async def run_subprocess_bytes(
@@ -71,7 +70,7 @@ async def run_subprocess_safe(
                 proc.communicate(), timeout=timeout
             )
             return (
-                cast(int, proc.returncode) if proc.returncode is not None else 0,
+                proc.returncode if proc.returncode is not None else 0,
                 stdout_b.decode("utf-8", errors="replace"),
                 stderr_b.decode("utf-8", errors="replace"),
             )
