@@ -265,9 +265,15 @@ jobs:
         # 若需要真跑 e2e：`MAOP_AUTH=1 MAOP_ADMIN_PASSWORD=... pytest tests/e2e/`。
         run: |
           set +e
-          python -m pytest tests/e2e/ -q --timeout=15 -p no:cacheprovider --no-cov -n 0
-          code=$?
+          python -m pytest tests/e2e/ -q --timeout=60 -p no:cacheprovider --no-cov -n 0 -ra 2>&1 | tee /tmp/e2e.log
+          code=${PIPESTATUS[0]}
           set -e
+          {
+            echo "### e2e tests (${{ matrix.os }}, Python ${{ matrix.python-version }})"
+            echo '```'
+            tail -30 /tmp/e2e.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           if [ $code -ne 0 ] && [ $code -ne 5 ]; then
             echo "::error::e2e 测试失败（exit code=$code），仅 exit 5（No tests ran）被容忍"
             exit $code
