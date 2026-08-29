@@ -85,6 +85,10 @@ jobs:
     name: pytest (${{ matrix.os }}, Python ${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     needs: lint
+    # P0 fix (2026-08-29): 兜底超时 —— 历史证据显示收尾挂起/慢测试可让 job
+    # 无限运行（无显式 timeout 时 GitHub 默认 360 分钟）。50 分钟足够
+    # 串行跑完整套件（windows -n 0），并行矩阵更快；超时即失败而非挂死。
+    timeout-minutes: 50
     defaults:
       run:
         working-directory: py
@@ -161,11 +165,19 @@ jobs:
         # Ubuntu 3.10 failed, #138 Win 3.11 failed — classic flaky pattern
         # where failures randomly appear on different platforms across runs.
         # --junitxml: export results for artifact upload (debugging future flakes).
+        # P0 fix (2026-08-29): Windows + pytest-xdist 存在 execnet worker 竞态
+        # (INTERNALERROR: KeyError: WorkerController) — 本地 Windows 与 CI
+        # windows-latest 均可稳定复现（xdist 3.8.0）。Windows 平台禁用 xdist
+        # 串行运行（-n 0 覆盖 pyproject addopts 的 -n auto）；Linux/macOS 保持并行。
         shell: bash
         run: |
+          XDIST_ARGS=""
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            XDIST_ARGS="-n 0"
+          fi
           python -m pytest tests/ -q --ignore=tests/contract \
             -m "not slow" --cov=maop --cov-report=xml --cov-report=term-missing \
-            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml
+            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml $XDIST_ARGS
 
       - name: Upload test results
         if: always()

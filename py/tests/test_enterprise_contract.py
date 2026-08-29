@@ -43,14 +43,11 @@ if sys.path[0] != _MAOS_PATH:
     sys.path.insert(0, _MAOS_PATH)
 
 # If maop was already loaded as a plain package (single __path__ entry),
-# purge it so the namespace package is picked up on next import.
-if "maop" in sys.modules:
-    _existing_maop = sys.modules["maop"]
-    if len(getattr(_existing_maop, "__path__", [])) < 2:
-        for _key in list(sys.modules):
-            if _key == "maop" or _key.startswith("maop."):
-                sys.modules.pop(_key, None)
-        importlib.invalidate_caches()
+# the purge to merge the MAOS namespace package is handled inside the
+# module-scoped ``require_enterprise`` fixture with a save/restore —
+# see P0 note there. No module-level sys.modules mutation is allowed
+# (it corrupts module instances captured by other test modules at
+# pytest collection time).
 
 
 import pytest
@@ -212,12 +209,36 @@ def require_enterprise():
     In personal edition (maop-enterprise not installed), the contract
     tests are skipped rather than failed — the contract only applies
     when both packages are present.
+
+    P0 fix (2026-08-29): the MAOS namespace reconciliation (purging a
+    plain ``maop`` package from ``sys.modules``) must be wrapped in a
+    save/restore. Without the restore, the module instances captured at
+    pytest collection time by other test modules (e.g. the ``Dispatcher``
+    class in tests/reliability/test_pev_pipeline.py) diverge from the
+    re-loaded instances, so driver-registry patches silently target the
+    wrong object. Restoring the exact pre-test instances keeps the rest
+    of the session consistent.
     """
-    if not _enterprise_available():
+    if not _MAOS_PATH or not Path(_MAOS_PATH).exists():
         pytest.skip(
-            "maop-enterprise not installed — contract tests skipped "
+            "MAOS repo not found — contract tests skipped "
             "(personal edition)"
         )
+    saved = {
+        k: v for k, v in sys.modules.items()
+        if k == "maop" or k.startswith("maop.")
+    }
+    try:
+        if not _enterprise_available():
+            pytest.skip(
+                "maop-enterprise not installed — contract tests skipped "
+                "(personal edition)"
+            )
+        yield  # 契约测试运行期间 sys.modules 为 namespace 树（含 MAOS）
+    finally:
+        # teardown: 恢复收集时的模块实例，避免污染后续测试模块
+        sys.modules.update(saved)
+        importlib.invalidate_caches()
 
 
 # ── Tests ──────────────────────────────────────────────────────────

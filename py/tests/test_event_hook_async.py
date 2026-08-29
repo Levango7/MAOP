@@ -120,12 +120,21 @@ class TestAsyncWebhookEngine:
         shutdown_webhook(timeout_s=1.0)
         shutdown_webhook(timeout_s=1.0)
 
-    def test_actual_webhook_delivery(self):
+    def test_actual_webhook_delivery(self, monkeypatch):
         """Verify actual webhook delivery using a local HTTP server."""
         import json as _json
         from http.server import BaseHTTPRequestHandler, HTTPServer
 
+        from pipeline_core import event_hook as _event_hook
         from pipeline_core.event_hook import get_hook_manager, shutdown_webhook
+
+        # 该测试验证的是异步投递机制本身；SSRF 校验（拒绝 127.0.0.1）是
+        # doc-pipeline url_guard 的独立关注点。本地回环接收端在真实外网
+        # 场景不适用，此处显式放行校验以聚焦投递路径。
+        monkeypatch.setattr(
+            _event_hook, "validate_public_http_url",
+            lambda url: (True, ""),
+        )
 
         received_bodies = []
 
