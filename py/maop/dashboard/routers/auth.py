@@ -191,13 +191,20 @@ def _db_login_user(db_path_str: str, username: str, password: str) -> Any:
     return {"status": "ok", "username": username, "roles": roles}
 
 
-def _db_register_user(db_path_str: str, username: str, password: str, roles: list) -> Any:
-    """Sync: register a new user."""
+def _db_register_user(db_path_str: str, username: str, password: str, roles: list) -> dict:
+    """Sync: register a new user.
+
+    P1-9 fix: returns a plain dict with an http_status field instead of a
+    JSONResponse. The old JSONResponse return crashed the caller
+    (`result["status"]` -> TypeError: 'JSONResponse' object is not
+    subscriptable), which the blanket except turned into a misleading
+    400 "Registration failed" — hiding the real 409 duplicate-username case.
+    """
 
     with sqlite_connect(db_path_str) as conn:
         existing = conn.execute("SELECT username FROM users WHERE username = ?", (username,)).fetchone()
         if existing:
-            return JSONResponse({"status": "error", "error": "Username already exists"}, status_code=409)
+            return {"status": "error", "error": "Username already exists", "http_status": 409}
 
         pwd_hash = _hash_password(password)
         conn.execute(
@@ -205,7 +212,7 @@ def _db_register_user(db_path_str: str, username: str, password: str, roles: lis
             (username, pwd_hash, json.dumps(roles), time.time()),
         )
 
-    return {"status": "ok", "username": username, "roles": roles}
+    return {"status": "ok", "username": username, "roles": roles, "http_status": 200}
 
 
 def _db_list_users(db_path_str: str) -> list:
@@ -218,31 +225,34 @@ def _db_list_users(db_path_str: str) -> list:
              "created_at": r["created_at"], "enabled": bool(r["enabled"])} for r in rows]
 
 
-def _db_delete_user(db_path_str: str, username: str) -> Any:
-    """Sync: delete a user."""
+def _db_delete_user(db_path_str: str, username: str) -> dict:
+    """Sync: delete a user. Plain dict + http_status (P1-9, see _db_register_user)."""
     with sqlite_connect(db_path_str) as conn:
         result = conn.execute("DELETE FROM users WHERE username = ?", (username,))
         deleted = result.rowcount > 0
 
     if not deleted:
-        return JSONResponse({"status": "error", "error": "User not found"}, status_code=404)
-    return {"status": "ok", "message": f"User {username} deleted"}
+        return {"status": "error", "error": "User not found", "http_status": 404}
+    return {"status": "ok", "message": f"User {username} deleted", "http_status": 200}
 
 
-def _db_update_user(db_path_str: str, username: str, body: dict) -> Any:
-    """Sync: update user roles, enabled, or password."""
+def _db_update_user(db_path_str: str, username: str, body: dict) -> dict:
+    """Sync: update user roles, enabled, or password.
+
+    Plain dict + http_status (P1-9, see _db_register_user).
+    """
 
     with sqlite_connect(db_path_str) as conn:
         existing = conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone()
         if not existing:
-            return JSONResponse({"status": "error", "error": "User not found"}, status_code=404)
+            return {"status": "error", "error": "User not found", "http_status": 404}
         if "roles" in body:
             conn.execute("UPDATE users SET roles = ? WHERE username = ?", (json.dumps(body["roles"]), username))
         if "enabled" in body:
             conn.execute("UPDATE users SET enabled = ? WHERE username = ?", (1 if body["enabled"] else 0, username))
         if "password" in body:
             if not isinstance(body["password"], str) or len(body["password"]) < 8:
-                return JSONResponse({"status": "error", "error": "Password must be at least 8 characters"}, status_code=400)
+                return {"status": "error", "error": "Password must be at least 8 characters", "http_status": 400}
             pwd_hash = _hash_password(body["password"])
             conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", (pwd_hash, username))
 
@@ -523,7 +533,10 @@ async def auth_register(request: Request) -> Any:
         )
         if result["status"] == "ok":
             logger.info("[auth] New user registered: %s (roles: %s)", username, roles)
-        return result
+            return result
+        # P1-9: propagate the real status (409 duplicate) instead of losing it
+        # through the blanket except below (which masked it as 400).
+        return JSONResponse(result, status_code=result.get("http_status", 400))
     except Exception:
         logger.exception("[auth] Registration failed")
         return JSONResponse({"status": "error", "error": "Registration failed"}, status_code=400)
@@ -554,9 +567,12 @@ async def auth_delete_user(username: str, request: Request) -> Any:
         if username == "admin":
             return JSONResponse({"status": "error", "error": "Cannot delete admin user"}, status_code=403)
         db_path = get_db_path("auth")
-        return await asyncio.get_running_loop().run_in_executor(
+        result = await asyncio.get_running_loop().run_in_executor(
             None, _db_delete_user, str(db_path), username
         )
+        if result.get("status") == "ok":
+            return result
+        return JSONResponse(result, status_code=result.get("http_status", 500))
     except Exception:
         logger.exception("[auth] Delete user %s failed", username)
         return JSONResponse({"status": "error", "error": "Failed to delete user"}, status_code=500)
@@ -569,9 +585,12 @@ async def auth_update_user(username: str, request: Request) -> Any:
         _require_admin(request)
         body = await request.json()
         db_path = get_db_path("auth")
-        return await asyncio.get_running_loop().run_in_executor(
+        result = await asyncio.get_running_loop().run_in_executor(
             None, _db_update_user, str(db_path), username, body
         )
+        if result.get("status") == "ok":
+            return result
+        return JSONResponse(result, status_code=result.get("http_status", 500))
     except Exception:
         logger.exception("[auth] User update failed")
         return JSONResponse({"status": "error", "error": "Update failed"}, status_code=500)

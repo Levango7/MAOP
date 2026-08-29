@@ -55,18 +55,28 @@ async def _login(client, username="admin", password=_TEST_PASSWORD):
 
 
 async def _register_viewer(client, admin_token):
-    """Register a read-only user (via admin) and return its JWT token."""
+    """Register a read-only user (via admin) and return its JWT token.
+
+    P1-9 fix: the auth DB is resolved via find_project_root() (NOT the
+    monkeypatched MAOP_ROOT), so it is SHARED across e2e files — a fixed
+    "viewer" username collides with viewers registered by earlier runs
+    (the 409 path). Use a per-call unique username so each test registers
+    its own viewer and later logs in as that exact user.
+    """
+    import uuid
+
+    username = f"viewer_{uuid.uuid4().hex[:8]}"
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
     resp = await client.post(
         "/api/auth/register",
-        json={"username": "viewer", "password": _VIEWER_PASSWORD, "roles": ["read"]},
+        json={"username": username, "password": _VIEWER_PASSWORD, "roles": ["read"]},
         headers=admin_headers,
     )
     assert resp.status_code == 200, f"Register viewer failed: {resp.status_code} {resp.text}"
 
     resp = await client.post(
         "/api/auth/login",
-        json={"username": "viewer", "password": _VIEWER_PASSWORD},
+        json={"username": username, "password": _VIEWER_PASSWORD},
     )
     assert resp.status_code == 200, f"Viewer login failed: {resp.status_code} {resp.text}"
     return resp.json()["token"]

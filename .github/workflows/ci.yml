@@ -265,7 +265,13 @@ jobs:
         # 若需要真跑 e2e：`MAOP_AUTH=1 MAOP_ADMIN_PASSWORD=... pytest tests/e2e/`。
         run: |
           set +e
-          python -m pytest tests/e2e/ -q --timeout=60 -p no:cacheprovider --no-cov -n 0 -ra 2>&1 | tee /tmp/e2e.log
+          # --confcutdir: e2e REQUIRES isolation (module-level MAOP_AUTH=1 must
+          # win over tests/conftest.py's auth-off pinning). Without it the
+          # e2e files skip everywhere except Windows, where a path-dependent
+          # conftest load-order made them actually run AND fail (see P1-9:
+          # JSONResponse-as-dict TypeError + shared-db viewer collision).
+          # With confcutdir they run for real on every platform (29 cases).
+          python -m pytest tests/e2e/ -q --timeout=60 -p no:cacheprovider --no-cov -n 0 --confcutdir=tests/e2e -ra 2>&1 | tee /tmp/e2e.log
           code=${PIPESTATUS[0]}
           set -e
           {
