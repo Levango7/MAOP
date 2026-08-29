@@ -16,7 +16,11 @@ from pathlib import Path
 
 
 def count_core_contents() -> tuple[int, int]:
-    """统计 py/maop/core/ 下的文件数和子包数（不含 __pycache__）。
+    """统计 py/maop/core/ 下的文件数和子包数。
+
+    子包仅统计含 ``__init__.py`` 的目录——避免本地工作区遗留的
+    空目录（如 core/cache、core/data）导致计数随环境漂移
+    （CI checkout 与本地开发机结果必须一致）。
 
     Returns:
         (文件数, 子包数)
@@ -34,7 +38,9 @@ def count_core_contents() -> tuple[int, int]:
         if entry.is_file() and entry.name != "__init__.py":
             files += 1
         elif entry.is_dir():
-            subpackages += 1
+            # 只统计真实包（含 __init__.py），空目录不计入
+            if (entry / "__init__.py").is_file():
+                subpackages += 1
     return files, subpackages
 
 
