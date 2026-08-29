@@ -180,8 +180,9 @@ jobs:
           python -m pytest tests/ -q --ignore=tests/contract \
             -m "not slow and not serial" --cov=maop --cov-report=xml --cov-report=term-missing \
             --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml $XDIST_ARGS || true
-          # 诊断（临时）：解析 junit 输出失败测试名到 step summary
-          python -c 'import xml.etree.ElementTree as ET; t=ET.parse("test-results.xml"); fails=[tc.get("classname")+"::"+tc.get("name") for tc in t.iter("testcase") for f in list(tc.iter("failure"))+list(tc.iter("error"))]; print("FAILED_COUNT="+str(len(fails))); print("\n".join(fails[:30]))' >> "$GITHUB_STEP_SUMMARY" || echo "no-junit"
+          # 诊断（临时）：解析 junit，用 workflow command 输出失败测试名
+          # 为 annotation（annotations API 可读，绕过日志 403）
+          python -c 'import xml.etree.ElementTree as ET; t=ET.parse("test-results.xml"); fails=[tc.get("classname")+"::"+tc.get("name") for tc in t.iter("testcase") for f in list(tc.iter("failure"))+list(tc.iter("error"))]; [print("::error::FAILED_TEST " + n) for n in fails[:30]] or print("FAILED_COUNT=0")'
           exit 1
 
       - name: Run serial tests (fixed port / shared state)
