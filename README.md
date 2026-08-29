@@ -4,6 +4,8 @@
 > model management, control plane, and real-time dashboard.
 
 > **定位说明**：MAOP 是**多 Agent 编排与治理层**——通过 Plan-Execute-Verify 循环编排**外部 CLI agent**（内置 31 个第三方 CLI 适配器），而非自研 agent 运行时。内置 LLM provider 用于对话、分析与建议生成，不承担 agent 执行引擎角色。
+>
+> **适配器计数口径**（2026-08-30 实测）：`config/agents.yaml` 顶层共 31 个 agent 条目，其中 1 个为 MAOP 自引用 agent（`max_self_ref_depth=3` 防递归），**第三方 CLI 适配器 30 个**（claude 系、codex、gemini、cursor、kimi 等）。能力矩阵/超时/SLA 配置见该文件。
 
 ## Architecture
 

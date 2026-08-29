@@ -108,6 +108,15 @@
 
 > **注意：** 归档文档仅作历史参考与追溯之用，不作为当前项目状态或架构决策的依据。当前权威文档以上述第1–6章所列为准。
 
+### 旧版本审计/审核报告（保留但已废弃）
+
+以下文档存在于 `docs/` 根目录但**已被 v2 版本取代**，文件头部已加 SUPERSEDED 标注，仅作历史脉络保留：
+
+| 已废弃文档 | 取代版本 |
+|-----------|---------|
+| [audit-report-corrected.md](./audit-report-corrected.md) | [audit-report-corrected-v2.md](./audit-report-corrected-v2.md) |
+| [design-review-report.md](./design-review-report.md) | [design-review-report-v2.md](./design-review-report-v2.md) |
+
 ---
 
-*文档索引维护：MAOP 团队 ｜ 最后更新：2026-08-21*
+*文档索引维护：MAOP 团队 ｜ 最后更新：2026-08-30*

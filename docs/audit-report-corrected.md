@@ -1,5 +1,7 @@
 # MAOP 深度审查修正报告
 
+> **⚠️ SUPERSEDED（已废弃）**：本文档已被 [audit-report-corrected-v2.md](./audit-report-corrected-v2.md) 取代。新读者请直接阅读 v2；本文件仅保留作历史审计脉络，其中结论可能已过时或被后续修复改变。
+
 **审查对象**：`F:\Nexus\MAOP\`（Python MAOP 项目）
 **Git HEAD**：`ef80b6a`（243 commits）
 **审查日期**：2026-08-22

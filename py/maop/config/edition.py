@@ -290,10 +290,39 @@ def _detect_with_license_check(requested: Edition) -> Edition:
 
 
 def set_edition(edition: Edition | str) -> None:
-    """Programmatically set the edition (overrides env detection)."""
-    global _current_edition
+    """Programmatically set the edition (overrides env detection).
+
+    M-2 fix (2026-08-30): blocked in production, mirroring
+    ``set_feature_override``. ``set_edition(ENTERPRISE)`` is an in-process
+    license bypass — without this guard any code path (plugin, test
+    leftover, injected module) could flip a production personal deployment
+    to ENTERPRISE without a license. Programmatic overrides remain
+    available in dev/test; production must activate via
+    ``MAOP_LICENSE_KEY`` + ``detect_edition()`` instead.
+    """
     if isinstance(edition, str):
         edition = Edition(edition.lower())
+    if edition == Edition.ENTERPRISE and os.getenv("MAOP_ENV", "development").lower() == "production":
+        try:
+            # The enterprise package's __init__ calls set_edition(ENTERPRISE)
+            # at import time as its "present = activated" mechanism; that
+            # legitimate path is allowed to proceed through license
+            # validation below. A *raw* programmatic call in production is
+            # not.
+            from maop.enterprise.license import LicenseValidator
+            info = LicenseValidator().validate_from_env()
+            if info is None:
+                raise RuntimeError(
+                    "SECURITY: set_edition(ENTERPRISE) refused in production "
+                    "without a valid MAOP_LICENSE_KEY. Use license-based "
+                    "activation (MAOP_LICENSE_KEY) in production."
+                )
+        except ImportError:
+            raise RuntimeError(
+                "SECURITY: set_edition(ENTERPRISE) refused in production "
+                "without the enterprise package + valid license."
+            )
+    global _current_edition
     _current_edition = edition
     logger.info("[edition] Set to %s", edition.value)
 
