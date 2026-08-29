@@ -109,3 +109,8 @@ class LoopConfig(BaseModel):
     enable_dream: bool = True
     dream_interval_cycles: int = 10  # Run dream consolidation every N loops
     dream_min_group_size: int = 3
+    # P1-4 fix: per-subtask stdout cap for parallel aggregation
+    # (loop_executor._execute_parallel). Anti-bloat guard only — set 0 to
+    # pass outputs through unbounded. Default 200k chars, far above the
+    # old hard-truncated 200 chars that broke verify-phase consumers.
+    parallel_subtask_stdout_cap: int = 200_000

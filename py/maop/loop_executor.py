@@ -210,8 +210,18 @@ class ExecuteMixin:
 
         # Aggregate results
         all_success = all(r.is_success() for r in subtask_results.values()) if subtask_results else False
+        # P1-4 fix: full subtask stdout used to be truncated to 200 chars here,
+        # so verify-phase consumers received fragments and could mis-judge
+        # multi-subtask results. Pass complete outputs; per-subtask cap only
+        # as an anti-bloat guard for extremely large agent outputs, sized
+        # well above realistic CLI output and configurable via
+        # LoopConfig.parallel_subtask_stdout_cap (0 = unlimited).
+        cap = int(getattr(self._loop_config, "parallel_subtask_stdout_cap", 200_000))
+        def _fmt_out(r: MaopResult) -> str:
+            s = r.stdout or ""
+            return s[:cap] if cap > 0 else s
         combined_stdout = "\n".join(
-            f"[{st_id}] {r.stdout[:200]}" for st_id, r in subtask_results.items() if r.stdout
+            f"[{st_id}] {_fmt_out(r)}" for st_id, r in subtask_results.items() if r.stdout
         )
         combined_errors = [r for r in subtask_results.values() if not r.is_success()]
 

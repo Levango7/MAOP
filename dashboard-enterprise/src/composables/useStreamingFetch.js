@@ -2,37 +2,30 @@
  * useStreamingFetch — POST + SSE streaming via ReadableStream.
  *
  * Supports POST requests with a JSON body and parses the SSE response stream.
- * Automatically injects JWT token for auth.
+ * Auth: httpOnly cookie only (M7 fix — no localStorage token, no
+ * Authorization header; the cookie is sent automatically for same-origin).
  *
  * @returns {{ stream: Function }}
  */
 
 
-const TOKEN_KEY = 'maop_token';
-
-function getToken() {
-  try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
-}
-
 export function useStreamingFetch() {
-  /**
-   * Send a POST request and stream the SSE response.
-   *
-   * @param {string} url - Endpoint URL (e.g. '/api/chat/stream')
-   * @param {object} body - JSON body
-   * @param {object} [callbacks]
-   * @param {function(string, object): void} [callbacks.onData] - Called with (content, meta) for each chunk
-   * @param {function(object): void} [callbacks.onMeta] - Called with metadata (session_id, tokens, model)
-   * @param {function(): void} [callbacks.onDone] - Called when stream completes
-   * @param {function(string): void} [callbacks.onError] - Called on error
-   * @returns {Promise<void>}
-   */
-  async function stream(url, body, callbacks = {}) {
-    const { onData, onMeta, onDone, onError } = callbacks;
-    const token = getToken();
+    /**
+     * Send a POST request and stream the SSE response.
+     *
+     * @param {string} url - Endpoint URL (e.g. '/api/chat/stream')
+     * @param {object} body - JSON body
+     * @param {object} [callbacks]
+     * @param {function(string, object): void} [callbacks.onData] - Called with (content, meta) for each chunk
+     * @param {function(object): void} [callbacks.onMeta] - Called with metadata (session_id, tokens, model)
+     * @param {function(): void} [callbacks.onDone] - Called when stream completes
+     * @param {function(string): void} [callbacks.onError] - Called on error
+     * @returns {Promise<void>}
+     */
+    async function stream(url, body, callbacks = {}) {
+        const { onData, onMeta, onDone, onError } = callbacks;
 
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+        const headers = { 'Content-Type': 'application/json' };
 
     // AbortController for cancellable streaming (prevents leak on unmount/renavigate)
     const controller = new AbortController();

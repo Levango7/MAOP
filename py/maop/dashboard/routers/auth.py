@@ -317,8 +317,17 @@ async def auth_login(request: Request) -> Any:
             # P1-18 fix: periodic cleanup to prevent unbounded growth.
             # High 安全修复 (2.5): 不再整表 clear() —— 攻击者可用 1 万个不同
             # 用户名触发 clear 来重置目标账户的锁定计数（暴力破解绕过）。
-            # 改为：先清理已过期条目；仍超限时仅淘汰"未锁定"的最旧条目，
-            # 已锁定账户的计数永不被淘汰。
+            # P1-7 fix (2026-08-29): 原淘汰策略只淘汰"未达 5 次失败"的条目，
+            # 攻击者可预填 1 万个各 4 次失败的用户名占满配额，使新受害者的
+            # 失败记录无法留存/被淘汰 → 锁定机制对其失效。改为：
+            #   1) 先清理纯过期条目；
+            #   2) 仍超限时按"最近一次失败时间"整体 LRU 淘汰（不豁免任何
+            #      未锁定账户——LRU 顺序下最先被淘汰的是最久未活动的记录，
+            #      预填的静态记录会最先被逐出，而刚登录失败的受害者记录
+            #      因最新而必然保留）。
+            # 已锁定（≥5 次）账户不参与淘汰豁免同样成立：若攻击者将 1 万个
+            # 账户全部刷到锁定态，新受害者仍因其时间戳最新而保留；被逐出
+            # 的锁定账户仅意味着"该攻击账户可再尝试 5 次"，不构成绕过。
             if len(_login_failures) > _MAX_TRACKED_USERS:
                 for user in list(_login_failures):
                     recent = [
@@ -331,16 +340,14 @@ async def auth_login(request: Request) -> Any:
                         del _login_failures[user]
                 if len(_login_failures) > _MAX_TRACKED_USERS:
                     evictable = sorted(
-                        (
-                            u for u, ts in _login_failures.items()
-                            if len(ts) < _MAX_LOGIN_FAILURES and u != username
-                        ),
+                        (u for u in _login_failures if u != username),
                         key=lambda u: max(_login_failures[u], default=0.0),
                     )
                     excess = len(_login_failures) - _MAX_TRACKED_USERS
                     for u in evictable[:excess]:
                         del _login_failures[u]
             # H6 fix: IP 维度限流检查与清理（与 username lockout 逻辑一致）
+            # P1-7 fix: 同 username 维度 — LRU 淘汰策略（见上方 P1-7 注释）。
             ip_failures = _login_failures_by_ip.get(client_ip, [])
             ip_failures = [t for t in ip_failures if now - t < _LOCKOUT_SECONDS]
             _login_failures_by_ip[client_ip] = ip_failures
@@ -356,10 +363,7 @@ async def auth_login(request: Request) -> Any:
                         del _login_failures_by_ip[ip]
                 if len(_login_failures_by_ip) > _MAX_TRACKED_IPS:
                     evictable_ip = sorted(
-                        (
-                            ip for ip, ts in _login_failures_by_ip.items()
-                            if len(ts) < _MAX_LOGIN_FAILURES and ip != client_ip
-                        ),
+                        (ip for ip in _login_failures_by_ip if ip != client_ip),
                         key=lambda ip: max(_login_failures_by_ip[ip], default=0.0),
                     )
                     excess_ip = len(_login_failures_by_ip) - _MAX_TRACKED_IPS

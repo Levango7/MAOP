@@ -118,11 +118,6 @@ class APIKeyStore:
         now = time.time()
         expires = now + ttl_s if ttl_s else None
 
-
-        key_hash = self._hash_key(raw_key)
-        now = time.time()
-        expires = now + ttl_s if ttl_s else None
-
         conn = self._pool.acquire()
         try:
             conn.execute("""
@@ -242,13 +237,27 @@ class JWTHandler:
             logger.warning("[auth] Could not load revoked tokens: %s", exc)
 
     def _save_revoked(self) -> None:
-        """Persist the revocation blacklist to disk (best-effort)."""
+        """Persist the revocation blacklist to disk (best-effort, atomic).
+
+        P1-6 fix: write via tmp file + os.replace so a crash or concurrent
+        write can never leave a truncated/corrupt JSON on disk — a corrupt
+        blacklist is silently discarded on load, which would resurrect
+        every revoked token.
+        """
         try:
             self._revoked_file.parent.mkdir(parents=True, exist_ok=True)
-            self._revoked_file.write_text(
+            tmp_path = self._revoked_file.with_suffix(
+                self._revoked_file.suffix + ".tmp"
+            )
+            tmp_path.write_text(
                 json.dumps(self._revoked), encoding="utf-8"
             )
+            os.replace(tmp_path, self._revoked_file)
         except Exception as exc:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
             logger.warning("[auth] Could not persist revoked tokens: %s", exc)
 
     def revoke_token(self, token: str) -> bool:

@@ -11,12 +11,6 @@
  */
 import { ref, onUnmounted } from 'vue';
 
-const TOKEN_KEY = 'maop_token';
-
-function getToken() {
-  try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
-}
-
 export function useAgentTokenStream() {
   const streaming = ref(false);
   const content = ref('');
@@ -56,9 +50,12 @@ export function useAgentTokenStream() {
       });
     }
 
-    // Build URL with JWT token (EventSource cannot set Authorization header)
-    const token = getToken();
-    const url = `/api/stream/agent/${encodeURIComponent(executionId)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    // Auth: rely on the httpOnly maop_token cookie (same-origin EventSource
+    // sends it automatically; AuthMiddleware falls back to the cookie).
+    // M7 fix: previously the JWT was read from localStorage and appended to
+    // the URL — tokens must never appear in URLs/access logs (parity with
+    // the WebSocket subprotocol fix P1-10).
+    const url = `/api/stream/agent/${encodeURIComponent(executionId)}`;
 
     try {
       eventSource = new EventSource(url);

@@ -57,6 +57,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **全量测试 0 failed**：修复 `dispatcher.py` `otel_span` re-export 缺失 + `test_routing_trace.py` fixture（patch `dispatch_core.otel_span`）+ 22 个 enterprise 测试加 `pytest.importorskip("maop.enterprise")` 守卫 → ruff 0 + mypy 0 + pytest **7035 passed, 57 skipped, 0 failed**
 - **ADR-017 enterprise branch test**：加 `importorskip` 守卫适配 Community 版无 `maop.enterprise` 模块
 
+### Fixed（2026-08-29 审查修复批次）
+- **P0-1 48h 长稳宣称修正**：`deliverables/release-notes-v5.1.0-personal.md` 与 `soak-test-report-48h.md` 明确标注"48h 完整测试尚未执行；当前仅有 1h 验证 PASS"，第 6 章结果区标为待填写（`soak-48h-logs/` 为空，`soak-test-data.csv` 为 1h 数据）
+- **P0-2 本地 .coverage 重建**：原文件含垃圾路径条目导致 `coverage report` 报错；删除重建并导出核心模块覆盖率证据至 `deliverables/coverage-core-evidence.json`
+- **P0-3 契约测试去机器路径**：`test_enterprise_contract.py` 移除硬编码 `F:\Nexus\MAOS` 回退，统一走 `MAOS_REPO_PATH`/同目录探测，缺失即 skip（个人版行为不变）
+- **P1-4 并行子任务 stdout 截断修复**：`loop_executor.py` 聚合 stdout 不再硬截断 200 字符（原实现导致 verify 阶段拿到碎片），改为完整传递 + 可配置防膨胀上限（`LoopConfig.parallel_subtask_stdout_cap`，默认 200k，0=不限）
+- **P1-5 PLAN 递归分解深度上限**：`engine.py` `_execute_step` 的 PLAN 递归分解加 `_MAX_PLAN_DEPTH=5`，超过即按原子任务执行，杜绝嵌套分隔符导致的无限递归
+- **P1-6 JWT 撤销黑名单原子写**：`core/security/auth.py` `_save_revoked` 改 tmp+`os.replace`，崩溃/并发不再产生损坏 JSON（损坏会使全部已撤销 token 复活）；顺带删除 `create_key` 中 4 行重复代码
+- **P1-7 登录限流淘汰策略**：`dashboard/routers/auth.py` 用户名/IP 双维度淘汰由"仅淘汰未锁定条目"改为整体 LRU（原策略可被预填 1 万个 4 次失败账户绕过，使受害者锁定计数失效）
+- **P1-8 CLI 自委托深度兜底**：`cli.py` 新增 `--depth` 参数（`agents.yaml` MAOP agent 模板 `--depth {depth}` 此前未被 argparse 识别，自委托子进程必然报错）；`cmd_run` 在 depth≥3 时硬拒绝退出，与 SubagentManager 层防护形成纵深
+- **P2 worker 事件循环复用**：`worker/agent_executor.py` 由每任务 `asyncio.run()` 改为单循环持续消费（`to_thread` 包裹同步 dequeue/ack/nack）
+- **P2 tenant 配额事务**：`core/security/tenant.py` `check_quota` 的读-检-写包进 `BEGIN IMMEDIATE` 单事务，消除并发超卖（TOCTOU）
+- **P2 前端 token 出 localStorage（M7）**：`useWebSocket.js`/`useStreamingFetch.js`/`useAgentTokenStream.js` 移除 `maop_token` localStorage 读取；后端 `/ws` 握手新增 httpOnly cookie 回退（`_register_routes.py`），SSE URL 不再携带 token（顺带消除 token 进 URL/访问日志的泄露面，与 WS P1-10 修复方向对齐）
+- **代码清理**：`engine.py` 函数内 `import re as _re` 提升至模块顶层
+
 ## [5.1.0-personal] — 2026-08-27
 
 > 个人版交付门禁（Phase 1）完成。基于 v5.1.0 + 140 项安全审核修复，补齐 3 项 P0 门禁后交付。

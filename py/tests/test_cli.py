@@ -38,7 +38,24 @@ class TestArgParsing:
         with patch.object(sys, "argv", ["MAOP", "run", "--task", "fix bug"]), \
              patch("maop.cli.cmd_run") as mock_run:
             cli.main()
-            mock_run.assert_called_once_with("fix bug")
+            # P1-8: cmd_run now carries the self-delegation depth (default 0)
+            mock_run.assert_called_once_with("fix bug", depth=0)
+
+    def test_run_action_with_depth(self):
+        # P1-8: --depth is declared argparse-side (agents.yaml's self-referential
+        # MAOP agent passes it on self-delegation; previously argparse rejected
+        # it and every self-delegation subprocess died on unrecognized args).
+        with patch.object(sys, "argv", ["MAOP", "run", "--task", "fix bug", "--depth", "2"]), \
+             patch("maop.cli.cmd_run") as mock_run:
+            cli.main()
+            mock_run.assert_called_once_with("fix bug", depth=2)
+
+    def test_run_depth_cap_exits(self):
+        # P1-8: at the hard cap the CLI refuses to re-enter the loop.
+        with patch.object(sys, "argv", ["MAOP", "run", "--task", "fix bug", "--depth", "3"]):
+            with pytest.raises(SystemExit) as exc_info:
+                cli.main()
+            assert exc_info.value.code == 1
 
     def test_run_action_without_task_exits(self):
         with patch.object(sys, "argv", ["MAOP", "run"]), patch("maop.cli.cmd_run") as mock_run:
@@ -67,7 +84,7 @@ class TestArgParsing:
         with patch.object(sys, "argv", ["MAOP", "run", "-t", "do something"]), \
              patch("maop.cli.cmd_run") as mock_run:
             cli.main()
-            mock_run.assert_called_once_with("do something")
+            mock_run.assert_called_once_with("do something", depth=0)
 
     def test_short_port_flag(self):
         with patch.object(sys, "argv", ["MAOP", "start", "-p", "9999"]), \

@@ -10,7 +10,7 @@
 - **P1-1 成本兜底护栏**：新增 `PersonalCostGuard`，实现软/硬两档熔断。配置项 `MAOP_PERSONAL_COST_CAP`（全局累计花费阈值 USD）+ `MAOP_PERSONAL_COST_HARD`（硬熔断开关）。软熔断：达到阈值 → 告警 + 拒绝新 LLM 调用。硬熔断：达到阈值 → 中断运行中任务。
 - **P1-2 edition 切换提示**：前端切换 enterprise 失败时显式提示"需 MAOS 商业包 + 有效 License"。后端无 license 切换 enterprise 返回 403。
 - **P1-3 分布式边界声明**：`maop worker start` 在个人版下提示"分布式 worker 是企业版特性"并退出 1。
-- **P1-4 长稳测试脚本**：新建 48h 多指标压测脚本（内存 RSS / 文件句柄数 / 连接池占用 / CPU 使用率）。1h 验证 PASS（116 样本，无内存泄漏）。
+- **P1-4 长稳测试脚本**：新建 48h 多指标压测脚本（内存 RSS / 文件句柄数 / 连接池占用 / CPU 使用率）。**当前状态：脚本就绪，1h 验证 PASS（116 样本，无内存泄漏）；48h 完整运行尚未执行**，报告第 6 章结果区为空，`deliverables/soak-48h-logs/` 无日志产物。48h 通过前不应引用"48h 长稳已验证"。
 
 ## 变更
 

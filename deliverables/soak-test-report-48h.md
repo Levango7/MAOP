@@ -133,7 +133,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_soak_48h.ps1 -Stop
 
 ## 6. 48 小时结果填写区
 
-> 以下为模板，待 48h 测试完成后填写。
+> **当前状态（2026-08-29）：48h 完整测试尚未执行。** 本报告为交付模板 + 监控指南；`deliverables/soak-48h-logs/` 目前为空，`soak-test-data.csv` / `soak-test-summary.json` 为 1 小时验证数据（duration_s=3600）。在以下表格填写完成并判定通过之前，任何对外材料不得引用"48h 长稳测试已通过"。
+
+以下为模板，待 48h 测试完成后填写。
 
 ### 6.1 运行信息
 

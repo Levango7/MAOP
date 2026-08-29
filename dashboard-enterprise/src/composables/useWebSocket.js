@@ -11,7 +11,10 @@ export function useWebSocket(url = '') {
   let reconnectAttempts = 0;
 
   function getWsToken() {
-    try { return localStorage.getItem('maop_token') || ''; } catch { return ''; }
+    // M7 fix: token no longer read from localStorage (XSS-readable). The
+    // same-origin WS handshake carries the httpOnly maop_token cookie,
+    // which the backend now accepts (fallback after subprotocol/query).
+    return '';
   }
 
   function connect() {

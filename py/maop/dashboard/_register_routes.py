@@ -621,6 +621,14 @@ def register_websocket(app: FastAPI) -> None:
                     if parts:
                         token = parts[-1]  # last protocol identifier
             if not token:
+                # M7 fix: same-origin browser WS handshakes carry the httpOnly
+                # maop_token cookie automatically. The frontend no longer stores
+                # the JWT in localStorage (XSS-readable), so the subprotocol
+                # path has no client-side token source — the cookie is the
+                # browser's primary credential. Explicit query/subprotocol
+                # tokens still take precedence for non-browser clients.
+                token = ws.cookies.get("maop_token", "")
+            if not token:
                 await ws.close(code=4401, reason="Authentication required")
                 return
             try:

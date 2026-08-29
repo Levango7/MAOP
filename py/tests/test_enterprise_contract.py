@@ -31,14 +31,18 @@ from pathlib import Path
 _MAOS_PATH = os.environ.get("MAOS_REPO_PATH") or str(
     Path(__file__).resolve().parents[3]  # ../../..  from py/tests/ → MAOS sibling
 )
-# Fallback: known absolute path
-if not (Path(_MAOS_PATH) / "maop" / "enterprise").exists():
-    _MAOS_PATH = r"F:\Nexus\MAOS"
+# No hardcoded absolute fallback: a machine-specific path leaked into the
+# published tree. When the sibling directory does not contain
+# maop/enterprise, the enterprise package simply stays unavailable and the
+# contract tests skip (personal edition) — same behaviour as any machine
+# without MAOS checked out.
+if _MAOS_PATH and not (Path(_MAOS_PATH) / "maop" / "enterprise").exists():
+    _MAOS_PATH = ""
 
-if _MAOS_PATH not in sys.path:
+if _MAOS_PATH and _MAOS_PATH not in sys.path:
     sys.path.insert(0, _MAOS_PATH)
 # Force MAOS to position 0 regardless of pytest's own insertions.
-if sys.path[0] != _MAOS_PATH:
+if _MAOS_PATH and sys.path[0] != _MAOS_PATH:
     sys.path.remove(_MAOS_PATH)
     sys.path.insert(0, _MAOS_PATH)
 

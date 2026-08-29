@@ -18,7 +18,6 @@ import logging
 import os
 import signal
 import sys
-import time
 from pathlib import Path
 
 logger = logging.getLogger("maop.worker.agent_executor")
@@ -82,50 +81,58 @@ def run() -> None:
     consumer_id = f"worker-{socket.gethostname()}-{os.getpid()}"
     logger.info("Worker ready — consuming from queue... (consumer_id=%s)", consumer_id)
 
-    while not _shutdown:
-        msg = None
-        try:
-            msg = queue.dequeue(
-                topic="agent_tasks",
-                consumer_group="agent-exec",
-                consumer_id=consumer_id,
-                timeout_s=5,
-            )
-            if msg is None:
-                continue
-
-            logger.info("Executing task: %s (id=%s)", msg.payload.get("task", "")[:80], msg.id)
-
+    # P2 fix: run ONE event loop for the whole worker lifetime instead of a
+    # fresh asyncio.run() per task. Per-task loop churn destroys and rebuilds
+    # the loop every message (slow) and reuses a Dispatcher whose internal
+    # asyncio primitives were created under a previous, now-closed loop.
+    async def _consume() -> None:
+        while not _shutdown:
+            msg = None
             try:
-                result = asyncio.run(dispatcher.dispatch(
-                    agent=msg.payload.get("agent", "claude"),
-                    task=msg.payload.get("task", ""),
-                    routing_key=msg.payload.get("routing_key", ""),
-                    trace_id=msg.id,
-                ))
-
-                logger.info(
-                    "Task completed: agent=%s exit_code=%s",
-                    getattr(result, "agent", "unknown"),
-                    getattr(result, "exit_code", -1),
+                msg = await asyncio.to_thread(
+                    queue.dequeue,
+                    topic="agent_tasks",
+                    consumer_group="agent-exec",
+                    consumer_id=consumer_id,
+                    timeout_s=5,
                 )
-                # P0 fix: ACK on successful dispatch so the message is not
-                # reclaimed by _reclaim_unacked and re-executed (previously
-                # caused each task to run up to 4 times).
-                queue.ack(msg.id, consumer_id=consumer_id)
-            except Exception as exc:
-                # P0 fix: NACK on dispatch failure so the message is re-queued
-                # or dead-lettered instead of lingering in 'processing'.
-                logger.exception("Dispatch failed for task id=%s", msg.id)
-                try:
-                    queue.nack(msg.id, error=str(exc))
-                except Exception as nack_exc:
-                    logger.warning("Failed to NACK message %s: %s", msg.id, nack_exc)
-                time.sleep(1)
+                if msg is None:
+                    continue
 
-        except Exception:
-            logger.exception("Worker error")
-            time.sleep(1)
+                logger.info("Executing task: %s (id=%s)", msg.payload.get("task", "")[:80], msg.id)
+
+                try:
+                    result = await dispatcher.dispatch(
+                        agent=msg.payload.get("agent", "claude"),
+                        task=msg.payload.get("task", ""),
+                        routing_key=msg.payload.get("routing_key", ""),
+                        trace_id=msg.id,
+                    )
+
+                    logger.info(
+                        "Task completed: agent=%s exit_code=%s",
+                        getattr(result, "agent", "unknown"),
+                        getattr(result, "exit_code", -1),
+                    )
+                    # P0 fix: ACK on successful dispatch so the message is not
+                    # reclaimed by _reclaim_unacked and re-executed (previously
+                    # caused each task to run up to 4 times).
+                    await asyncio.to_thread(queue.ack, msg.id, consumer_id=consumer_id)
+                except Exception as exc:
+                    # P0 fix: NACK on dispatch failure so the message is re-queued
+                    # or dead-lettered instead of lingering in 'processing'.
+                    logger.exception("Dispatch failed for task id=%s", msg.id)
+                    try:
+                        await asyncio.to_thread(queue.nack, msg.id, error=str(exc))
+                    except Exception as nack_exc:
+                        logger.warning("Failed to NACK message %s: %s", msg.id, nack_exc)
+                    await asyncio.sleep(1)
+
+            except Exception:
+                logger.exception("Worker error")
+                await asyncio.sleep(1)
+
+    asyncio.run(_consume())
     logger.info("Agent Executor Worker shut down.")
 
 

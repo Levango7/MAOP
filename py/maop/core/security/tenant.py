@@ -146,6 +146,13 @@ class TenantManager:
             return cursor.rowcount > 0
 
     def check_quota(self, tenant_id: str, *, tokens_used: int = 0, requests_used: int = 0) -> bool:
+        """Check and atomically consume per-tenant quota for today.
+
+        P2 fix: SELECT then INSERT..ON CONFLICT ran as two implicit
+        transactions — concurrent requests could both pass the quota check
+        and overshoot. Both statements now share one connection wrapped in
+        BEGIN IMMEDIATE so the read-check-write cycle is serialised.
+        """
         from datetime import datetime, timezone
         config = self.get_tenant(tenant_id)
         if not config or not config.enabled:
@@ -153,8 +160,16 @@ class TenantManager:
 
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         validate_identifier("tenant_usage", "table")
+        # sqlite_connect is a @contextmanager — take the connection with
+        # `with`. The explicit BEGIN IMMEDIATE below is legal here because
+        # sqlite_connect yields BEFORE its implicit conn.commit() (which
+        # would conflict with an open explicit transaction); on normal exit
+        # from the with-block commit() is a no-op after our own commit/rollback.
         with sqlite_connect(self._db_path) as conn:
             conn.row_factory = sqlite3.Row
+            # BEGIN IMMEDIATE takes the write lock up front, serialising
+            # concurrent quota checks (read-check-write in one transaction).
+            conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
                 "SELECT * FROM tenant_usage WHERE tenant_id = ? AND date = ?",
                 (tenant_id, today),
@@ -164,8 +179,10 @@ class TenantManager:
             current_requests = row["requests_used"] if row else 0
 
             if config.quota_tokens > 0 and current_tokens + tokens_used > config.quota_tokens:
+                conn.execute("ROLLBACK")
                 return False
             if config.quota_requests > 0 and current_requests + requests_used > config.quota_requests:
+                conn.execute("ROLLBACK")
                 return False
 
             conn.execute(
@@ -176,7 +193,7 @@ class TenantManager:
                      requests_used = requests_used + excluded.requests_used""",
                 (tenant_id, today, tokens_used, requests_used),
             )
-
+            conn.commit()
         return True
 
     def check_agent_access(self, tenant_id: str, agent: str) -> bool:

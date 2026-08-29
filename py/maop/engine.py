@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 import uuid
 from pathlib import Path
@@ -51,6 +52,11 @@ logger = logging.getLogger(__name__)
 # 导致 pause 后系统继续执行。现新增 check_pause() 在任务派发前检查标记文件。
 PAUSE_CHECK_INTERVAL_S: float = 1.0  # pause 检查轮询间隔（秒）
 PAUSE_FILE_NAME: str = ".maop_pause"  # pause 标记文件名（与 control.py 一致）
+
+# P1-5 fix: PLAN-step dynamic decomposition recursion cap. Each recursion
+# level multiplies the number of steps; without a cap, adversarial/looping
+# task text (nested separators) could recurse until stack exhaustion.
+_MAX_PLAN_DEPTH: int = 5
 
 
 def _get_pause_file_path() -> Path:
@@ -519,7 +525,34 @@ class Engine:
 
             elif step.type == StepType.PLAN:
                 # Plan step: dynamic task decomposition (P1-4)
-                substeps = self._decompose_task(resolved_task, step)
+                # P1-5 fix: recursion guard. _decompose_task splits compound
+                # tasks into sub-steps which are executed via a recursive
+                # _execute_step call; without a depth cap a pathological
+                # task (nested semicolon/numbered lists) recurses without
+                # bound. Depth is carried in params["_plan_depth"]; at the
+                # cap the step degrades to atomic execution (executor path)
+                # instead of splitting further.
+                depth = 0
+                if isinstance(step.params, dict):
+                    try:
+                        depth = int(step.params.get("_plan_depth", 0))
+                    except (TypeError, ValueError):
+                        depth = 0
+                substeps: list[WorkflowStep] = []
+                if depth < _MAX_PLAN_DEPTH:
+                    substeps = self._decompose_task(resolved_task, step)
+                    substeps = [
+                        sub.model_copy(update={
+                            "params": {**(sub.params or {}), "_plan_depth": depth + 1},
+                        })
+                        for sub in substeps
+                    ]
+                else:
+                    logger.info(
+                        "[engine] step %s: plan decomposition depth cap %d reached; "
+                        "executing as atomic task",
+                        step.id, _MAX_PLAN_DEPTH,
+                    )
                 if substeps:
                     # Execute sub-steps recursively
                     sub_results = []
@@ -715,8 +748,7 @@ class Engine:
                 return substeps
 
         # Strategy 2: Numbered list "1. A 2. B"
-        import re as _re
-        numbered = _re.findall(r'\d+\.\s+(.+?)(?=\d+\.|$)', task, _re.DOTALL)
+        numbered = re.findall(r'\d+\.\s+(.+?)(?=\d+\.|$)', task, re.DOTALL)
         if len(numbered) > 1:
             for i, part in enumerate(numbered):
                 substeps.append(WorkflowStep(
@@ -729,7 +761,7 @@ class Engine:
             return substeps
 
         # Strategy 3: Bullet list "- A\n- B"
-        bullets = _re.findall(r'^[-*]\s+(.+)$', task, _re.MULTILINE)
+        bullets = re.findall(r'^[-*]\s+(.+)$', task, re.MULTILINE)
         if len(bullets) > 1:
             for i, part in enumerate(bullets):
                 substeps.append(WorkflowStep(
@@ -742,7 +774,7 @@ class Engine:
             return substeps
 
         # Strategy 4: "and" conjunction (conservative: only split on clear "and")
-        and_parts = _re.split(r'\s+and\s+', task, maxsplit=2)
+        and_parts = re.split(r'\s+and\s+', task, maxsplit=2)
         if len(and_parts) > 1 and all(len(p) > 10 for p in and_parts):
             for i, part in enumerate(and_parts):
                 substeps.append(WorkflowStep(

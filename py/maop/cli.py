@@ -116,8 +116,27 @@ def cmd_status() -> Any:
         logger.debug('swallowed exception', exc_info=True)
 
 
-def cmd_run(task: str) -> Any:
-    """Run a task through Python-native MaopLoop."""
+_MAX_SELF_DELEGATION_DEPTH = 3  # 与 core/subagent_delegation 的 max_self_ref_depth 一致
+
+
+def cmd_run(task: str, depth: int = 0) -> Any:
+    """Run a task through Python-native MaopLoop.
+
+    P1-8 fix: ``--depth`` is passed by agents.yaml's self-referential MAOP
+    agent (``cli_args: ... run --task "{task}" --depth {depth}``). It was
+    previously not a declared argparse argument, so any self-delegation
+    subprocess died on an unrecognized-argument error. Now it is declared
+    and acts as a hard CLI-level backstop: at/beyond the cap the run is
+    refused with a non-zero exit instead of re-entering the orchestration
+    loop (defence-in-depth on top of SubagentManager's own limit).
+    """
+    if depth >= _MAX_SELF_DELEGATION_DEPTH:
+        print(
+            f"[BLOCK] self-delegation depth {depth} reached hard cap "
+            f"({_MAX_SELF_DELEGATION_DEPTH}); refusing to re-enter orchestration loop",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     start = time.monotonic()
     try:
         import asyncio
@@ -626,8 +645,12 @@ def main() -> Any:
     parser.add_argument("action", nargs="?", default="start",
                         choices=["start", "stop", "status", "run", "validate", "health"])
     parser.add_argument("--task", "-t", default="", help="Task description (for run)")
-    parser.add_argument("--port", "-p", type=int, default=9079, help="Dashboard port (default 9079)")
-    parser.add_argument("--host", default="127.0.0.1", help="Dashboard host (default 127.0.0.1)")
+    parser.add_argument("--depth", type=int, default=0,
+                        help="Self-delegation depth (internal: agents.yaml MAOP agent "
+                             "passes this on self-delegation; capped at "
+                             f"{_MAX_SELF_DELEGATION_DEPTH})")
+    parser.add_argument("--port", "-p", type=int, default=9079, help="Dashboard port (default: 9079)")
+    parser.add_argument("--host", default="127.0.0.1", help="Dashboard host (default: 127.0.0.1)")
     args = parser.parse_args()
 
     if args.action == "start":
@@ -639,7 +662,7 @@ def main() -> Any:
     elif args.action == "run":
         if not args.task:
             sys.exit(1)
-        cmd_run(args.task)
+        cmd_run(args.task, depth=args.depth)
     elif args.action == "validate":
         cmd_validate()
     elif args.action == "health":
