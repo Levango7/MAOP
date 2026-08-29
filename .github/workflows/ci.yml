@@ -185,10 +185,16 @@ jobs:
         # pyproject [tool.pytest.ini_options] markers 声明了 serial 机制
         # （"Selected by CI's serial step (-n 0)"），但 ci.yml 从未实现该步骤。
         # serial 标记测试（共享 server app 全局状态）必须串行，补上缺失步骤。
+        # 修复(2026-08-30): serial step 原用 --no-cov，其覆盖不进 coverage.xml，
+        # ratchet 只看到主 step 的 ~80%（低于 81% baseline）→ 9 平台全挂覆盖率
+        # 门禁而测试全过。改为 --cov-append 合流到同一 coverage.xml，ratchet
+        # 读到主+serial 的完整覆盖（本地实测 81.59%）。注意: 不能用 --no-cov
+        # + 依赖主 step 数据——append 模式下本 step 若不收集则数据面缺 serial。
         shell: bash
         run: |
           python -m pytest tests/ -q --ignore=tests/contract \
-            -m "not slow and serial" -n 0 --no-cov \
+            -m "not slow and serial" -n 0 \
+            --cov=maop --cov-append --cov-report=xml \
             --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results-serial.xml
 
       - name: Upload test results

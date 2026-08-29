@@ -29,6 +29,11 @@ BASELINE_FILE = pathlib.Path(__file__).resolve().parent / ".cov_baseline.json"
 COVERAGE_XML = pathlib.Path(__file__).resolve().parent.parent / "coverage.xml"
 FLOOR = 80.0  # absolute minimum, never lower (2026-08-21: 实测 82%, 从 18 修正)
 
+# Floating-point tail immunity: a measured 81.58999999... must compare equal
+# to a stored 81.59, not "below". Any difference within this epsilon counts
+# as unchanged; the ratchet only rejects real regressions.
+_EPS = 0.005
+
 
 def _read_coverage() -> float:
     """Parse line-rate from coverage.xml (Cobertura schema)."""
@@ -44,7 +49,13 @@ def _read_baseline() -> float:
 
 
 def _write_baseline(rate: float) -> None:
-    BASELINE_FILE.write_text(json.dumps({"line_rate": round(rate, 2)}) + "\n")
+    # Round DOWN (math.floor to 2dp): rounding can write a baseline HIGHER
+    # than the measured rate (81.586 -> "81.59"), which makes the next run
+    # of the SAME code fail the ratchet (81.586 < 81.59). Floor guarantees
+    # the stored bar never exceeds what was actually measured.
+    import math
+    floored = math.floor(rate * 100) / 100
+    BASELINE_FILE.write_text(json.dumps({"line_rate": floored}) + "\n")
 
 
 def main() -> int:
@@ -56,14 +67,18 @@ def main() -> int:
     baseline = _read_baseline()
     effective_floor = max(baseline, FLOOR)
 
-    if current < effective_floor:
+    # Epsilon comparison: within _EPS of the bar counts as "meets", not
+    # "dropped". This kills the round()-induced self-inflation failure where
+    # a measured 81.589999 was stored as 81.59 and then failed against
+    # itself on the next identical run.
+    if current < effective_floor - _EPS:
         print(
             f"FAIL: coverage {current:.2f}% dropped below baseline "
             f"{effective_floor:.2f}%"
         )
         return 1
 
-    if current > baseline:
+    if current > baseline + _EPS:
         _write_baseline(current)
         # ASCII-only: U+2192 arrow crashed Windows CI (cp1252 cannot encode it).
         print(
@@ -71,6 +86,8 @@ def main() -> int:
             "Baseline updated."
         )
     else:
+        # current within _EPS of baseline (equal or marginal): NOT a
+        # regression — the ratchet's contract is "never drop below".
         print(f"OK: coverage {current:.2f}% meets baseline {effective_floor:.2f}%.")
     return 0
 
