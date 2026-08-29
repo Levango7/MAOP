@@ -179,7 +179,9 @@ jobs:
           fi
           python -m pytest tests/ -q --ignore=tests/contract \
             -m "not slow and not serial" --cov=maop --cov-report=xml --cov-report=term-missing \
-            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml $XDIST_ARGS
+            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml $XDIST_ARGS || true
+          python -c 'import xml.etree.ElementTree as ET; t=ET.parse("test-results.xml"); f=[tc.get("classname")+"::"+tc.get("name") for tc in t.iter("testcase") for e in list(tc.iter("failure"))+list(tc.iter("error"))]; [print("::error::MAIN_FAILED " + n) for n in f[:25]] or print("MAIN_CLEAN")'
+          exit 1
 
       - name: Run serial tests (fixed port / shared state)
         # pyproject [tool.pytest.ini_options] markers 声明了 serial 机制
@@ -189,7 +191,9 @@ jobs:
         run: |
           python -m pytest tests/ -q --ignore=tests/contract \
             -m "not slow and serial" -n 0 --no-cov \
-            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results-serial.xml
+            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results-serial.xml || true
+          python -c 'import xml.etree.ElementTree as ET; t=ET.parse("test-results-serial.xml"); f=[tc.get("classname")+"::"+tc.get("name") for tc in t.iter("testcase") for e in list(tc.iter("failure"))+list(tc.iter("error"))]; [print("::error::SERIAL_FAILED " + n) for n in f[:25]] or print("SERIAL_CLEAN")'
+          exit 1
 
       - name: Upload test results
         if: always()
