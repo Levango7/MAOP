@@ -35,11 +35,16 @@ FLOOR = 80.0  # absolute minimum, never lower (2026-08-21: 实测 82%, 从 18 �
 _EPS = 0.005
 
 
-def _read_coverage() -> float:
-    """Parse line-rate from coverage.xml (Cobertura schema)."""
+def _read_coverage() -> tuple[float, int]:
+    """Parse line-rate and lines-valid from coverage.xml (Cobertura schema)."""
     tree = ET.parse(COVERAGE_XML)
     root = tree.getroot()
-    return float(root.attrib["line-rate"]) * 100.0
+    rate = float(root.attrib["line-rate"]) * 100.0
+    try:
+        valid = int(root.attrib.get("lines-valid", "0") or 0)
+    except ValueError:
+        valid = 0
+    return rate, valid
 
 
 def _read_baseline() -> float:
@@ -63,7 +68,7 @@ def main() -> int:
         print(f"ERROR: {COVERAGE_XML} not found. Run pytest --cov-report=xml first.")
         return 2
 
-    current = _read_coverage()
+    current, stmts = _read_coverage()
     baseline = _read_baseline()
     effective_floor = max(baseline, FLOOR)
 
@@ -74,7 +79,7 @@ def main() -> int:
     if current < effective_floor - _EPS:
         print(
             f"FAIL: coverage {current:.2f}% dropped below baseline "
-            f"{effective_floor:.2f}%"
+            f"{effective_floor:.2f}% (lines-valid={stmts})"
         )
         return 1
 
@@ -82,13 +87,13 @@ def main() -> int:
         _write_baseline(current)
         # ASCII-only: U+2192 arrow crashed Windows CI (cp1252 cannot encode it).
         print(
-            f"GOOD: coverage rose {baseline:.2f}% -> {current:.2f}%. "
-            "Baseline updated."
+            f"GOOD: coverage rose {baseline:.2f}% -> {current:.2f}% "
+            f"(lines-valid={stmts}). Baseline updated."
         )
     else:
         # current within _EPS of baseline (equal or marginal): NOT a
         # regression — the ratchet's contract is "never drop below".
-        print(f"OK: coverage {current:.2f}% meets baseline {effective_floor:.2f}%.")
+        print(f"OK: coverage {current:.2f}% meets baseline {effective_floor:.2f}% (lines-valid={stmts}).")
     return 0
 
 

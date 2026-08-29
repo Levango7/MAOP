@@ -205,14 +205,37 @@ jobs:
           path: py/test-results.xml
           retention-days: 7
 
+      - name: Upload coverage data (debug ratchet failures)
+        # 2026-08-30: ratchet 失败时需要 coverage.xml 定位平台差异（ubuntu 挂
+        # 而 macOS 过），此前不传 artifact 导致只能盲猜。失败也上传。
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: py/coverage.xml
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Coverage ratchet gate (核心包门禁)
         # H3 修复：移除 `if python -c "import maop.enterprise"` 条件（该条件
         # 永远为假，导致覆盖率门禁从未执行）。改为无条件执行核心包门禁，
         # 企业包门禁单独拆分为可选步骤（仅当 enterprise 存在时执行）。
         # 核心包门禁始终执行，确保覆盖率回退被 CI 阻断。
+        # 2026-08-30: ratchet 输出写入 step summary，无需拉日志即可在
+        # GitHub UI 看到 FAIL 行的实测/基线数字（ubuntu 挂 macOS 过的平台
+        # 差异此前无法定量）。
         shell: bash
         run: |
-          python scripts/check_coverage_ratchet.py
+          set +e
+          python scripts/check_coverage_ratchet.py | tee /tmp/ratchet.log
+          code=${PIPESTATUS[0]}
+          {
+            echo "### Coverage ratchet (${{ matrix.os }}, Python ${{ matrix.python-version }})"
+            echo '```'
+            cat /tmp/ratchet.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
 
       - name: Coverage ratchet gate (企业包门禁，可选)
         # H3 修复：企业包门禁仅当 maop.enterprise 可导入时执行。
