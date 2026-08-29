@@ -179,7 +179,10 @@ jobs:
           fi
           python -m pytest tests/ -q --ignore=tests/contract \
             -m "not slow and not serial" --cov=maop --cov-report=xml --cov-report=term-missing \
-            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml $XDIST_ARGS
+            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml $XDIST_ARGS || true
+          # 诊断（临时）：解析 junit 输出失败测试名到 step summary
+          python -c 'import xml.etree.ElementTree as ET; t=ET.parse("test-results.xml"); fails=[tc.get("classname")+"::"+tc.get("name") for tc in t.iter("testcase") for f in list(tc.iter("failure"))+list(tc.iter("error"))]; print("FAILED_COUNT="+str(len(fails))); print("\n".join(fails[:30]))' >> "$GITHUB_STEP_SUMMARY" || echo "no-junit"
+          exit 1
 
       - name: Run serial tests (fixed port / shared state)
         # pyproject [tool.pytest.ini_options] markers 声明了 serial 机制
