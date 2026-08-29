@@ -168,16 +168,28 @@ jobs:
         # P0 fix (2026-08-29): Windows + pytest-xdist 存在 execnet worker 竞态
         # (INTERNALERROR: KeyError: WorkerController) — 本地 Windows 与 CI
         # windows-latest 均可稳定复现（xdist 3.8.0）。Windows 平台禁用 xdist
-        # 串行运行（-n 0 覆盖 pyproject addopts 的 -n auto）；Linux/macOS 保持并行。
+        # 串行运行（-n 0 覆盖 pyproject addopts 的 -n auto）；Linux/macOS 并行。
+        # 并发收敛：CI -n auto（4 worker）多次快速失败，本地 -n 2 全量验证通过，
+        # 高并发下共享资源（data/ 真实 SQLite、固定端口）冲突是主嫌疑 → 统一 -n 2。
         shell: bash
         run: |
-          XDIST_ARGS=""
+          XDIST_ARGS="-n 2"
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             XDIST_ARGS="-n 0"
           fi
           python -m pytest tests/ -q --ignore=tests/contract \
-            -m "not slow" --no-cov \
+            -m "not slow and not serial" --cov=maop --cov-report=xml --cov-report=term-missing \
             --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml $XDIST_ARGS
+
+      - name: Run serial tests (fixed port / shared state)
+        # pyproject [tool.pytest.ini_options] markers 声明了 serial 机制
+        # （"Selected by CI's serial step (-n 0)"），但 ci.yml 从未实现该步骤。
+        # serial 标记测试（共享 server app 全局状态）必须串行，补上缺失步骤。
+        shell: bash
+        run: |
+          python -m pytest tests/ -q --ignore=tests/contract \
+            -m "not slow and serial" -n 0 --no-cov \
+            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results-serial.xml
 
       - name: Upload test results
         if: always()
@@ -188,9 +200,6 @@ jobs:
           retention-days: 7
 
       - name: Coverage ratchet gate (核心包门禁)
-        # 实验性禁用（2026-08-29）：验证 --cov 移除后 pytest 是否全绿。
-        # 定位后恢复覆盖率门禁。
-        if: false
         # H3 修复：移除 `if python -c "import maop.enterprise"` 条件（该条件
         # 永远为假，导致覆盖率门禁从未执行）。改为无条件执行核心包门禁，
         # 企业包门禁单独拆分为可选步骤（仅当 enterprise 存在时执行）。
