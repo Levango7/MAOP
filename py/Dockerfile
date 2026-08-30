@@ -3,11 +3,20 @@
 # Supports: dashboard, agent-executor, queue-worker
 # ──────────────────────────────────────────────────────────────────
 
+# 64d2732: buildx resolved ${PYTHON_IMAGE} as blank in the FROM lines even
+# with the build-arg passed. An ARG declared AFTER the first FROM is NOT in
+# the global scope buildx uses for FROM interpolation — move it to the very
+# top (before ANY FROM), which is the unambiguous global position.
+# 64d2732 (2): NODE_IMAGE ARG too — GitHub runners pull from Docker Hub;
+# the aliyun mirrors below remain the no-proxy defaults for CN-local builds.
+ARG PYTHON_IMAGE=registry.cn-hangzhou.aliyuncs.com/library/python:3.13-slim
+ARG NODE_IMAGE=registry.cn-hangzhou.aliyuncs.com/library/node:20-alpine
+
 # Stage 0: Frontend Builder (H6 fix)
 # H6 fix: 原 Dockerfile 未包含前端构建步骤，fresh clone 或 CI 环境中 assets 缺失，
 # 导致 Docker 部署后前端白页。现新增前端构建阶段，在镜像构建时执行 npm run build。
 # P1-5: 国内源（用户无梯子时 node:20-alpine 可能拉取失败，改用阿里云镜像）
-FROM registry.cn-hangzhou.aliyuncs.com/library/node:20-alpine AS frontend-builder
+FROM ${NODE_IMAGE} AS frontend-builder
 WORKDIR /build
 # 先复制 package*.json 以利用 Docker 层缓存
 COPY dashboard-enterprise/package*.json ./
@@ -23,7 +32,6 @@ RUN npm run build
 # (Replace with the actual digest from `docker pull python:3.13-slim && docker inspect --format='{{index .RepoDigests 0}}' python:3.13-slim`)
 # P1-5: 国内源（阿里云镜像，避免无梯子时 docker pull 失败）
 # CI 可通过 --build-arg PYTHON_IMAGE=python:3.13-slim 覆盖为 Docker Hub 直连
-ARG PYTHON_IMAGE=registry.cn-hangzhou.aliyuncs.com/library/python:3.13-slim
 FROM ${PYTHON_IMAGE} AS builder
 
 WORKDIR /build
