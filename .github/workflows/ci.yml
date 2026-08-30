@@ -283,36 +283,12 @@ jobs:
           if [ $code -ne 0 ] && [ $code -ne 5 ]; then
             # Surface the actual pytest failure via per-line ::error:: annotations
             # (fetchable via check-runs API without log download permissions).
-            # P1: use python for extraction — bash grep/sed/while-read pipelines
-            # proved unreliable on windows runners (0 annotations produced
-            # while ubuntu/macOS worked; encoding + locale differences).
-            # The heredoc body is indented to stay inside this YAML block
-            # scalar; PYEOF terminator must sit at the block's indent column.
-            python - <<'PYEOF'
-            import re
-            import sys
-
-            try:
-                with open("/tmp/e2e.log", "r", encoding="utf-8", errors="replace") as f:
-                    lines = f.read().splitlines()
-            except OSError:
-                # windows runners: /tmp maps to a bash-internal temp; fall back
-                import os
-                import tempfile
-                lines = []
-                for p in (os.path.join(tempfile.gettempdir(), "e2e.log"), "e2e.log"):
-                    try:
-                        with open(p, "r", encoding="utf-8", errors="replace") as f:
-                            lines = f.read().splitlines()
-                        break
-                    except OSError:
-                        continue
-            ansi = re.compile(r"\x1b\[[0-9;]*m")
-            hits = [ansi.sub("", l).rstrip() for l in lines if re.search(r"FAILED|Error|assert|raise|Traceback", l, re.I)]
-            for l in hits[-20:]:
-                safe = l.replace("::", "%3A%3A").replace("%", "%25")[:220]
-                print(f"::error::e2e: {safe}")
-            PYEOF
+            # P1: extraction lives in scripts/e2e_annotate.py — bash heredocs
+            # with indented terminators break YAML-vs-bash indentation rules
+            # (exit 2), and bash grep/sed pipelines produced 0 annotations on
+            # Windows runners (encoding/locale). A repo script is testable
+            # locally and identical on every platform.
+            python scripts/e2e_annotate.py /tmp/e2e.log
             exit $code
           fi
           if [ $code -eq 5 ]; then
