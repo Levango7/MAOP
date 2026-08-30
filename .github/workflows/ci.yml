@@ -710,6 +710,12 @@ jobs:
           severity: CRITICAL
           ignore-unfixed: true
           vuln-type: os,library
+      - name: Trivy CRITICAL summary (on failure)
+        # a308278: trivy exit-1 blocked CI but the finding list was only in
+        # the (unfetchable) report — surface the CVE IDs as annotations so
+        # triage (fix vs .trivy-ignore with justification) is possible via API.
+        if: failure()
+        run: python py/scripts/trivy_annotate.py trivy-report.json
       - name: Upload container scan report
         if: always()
         uses: actions/upload-artifact@v4
