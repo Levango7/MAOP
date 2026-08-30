@@ -122,41 +122,47 @@ class TestRBACEnforcement:
         assert "users" in data, f"User list response missing 'users': {data}"
         assert isinstance(data["users"], list)
 
-    async def test_tampered_token_rejected(self, client):
-        """A tampered token cannot authenticate — fully HTTP-free, deterministic.
+    async def test_tampered_token_rejected(self, tmp_path, monkeypatch):
+        """A tampered token cannot authenticate — zero shared state, deterministic.
 
-        Race root cause (established across CI rounds win-3.10/3.12, ub-3.10/
-        3.13, macOS, plus local 1-in-3/1-in-10 reproduction): ANY httpx
-        request in this test — login OR the tampered GET — can receive a
-        PREVIOUS request's response when pytest-asyncio tears down the
-        per-test event loop with a suspended BaseHTTPMiddleware dispatch.
-        The only race-free form removes HTTP entirely: mint the token
-        directly via the fixture-wired AuthManager, tamper it, and verify
-        rejection on the same manager. The security invariant (signature
-        tampering never authenticates) is identical; HTTP-layer rejection
-        remains covered by test_auth_enabled (login/401/200/logout cycle
-        uses fresh event-loop tests that do not hit the race) plus the
-        middleware fail-closed branches and /api/agents require_admin
-        backstop in production code.
+        Evolution of this fix across CI rounds (win-3.10/3.12, ub-3.10/3.13,
+        macOS, local 1-in-3 reproduction):
+        v1 HTTP-layer (assert 401) — flaky: suspended BaseHTTPMiddleware
+           dispatch across pytest-asyncio event-loop teardown can return the
+           PREVIOUS request's 200.
+        v2 two-layer (JWT assert + HTTP 401/403) — still flaky: even the
+           _login httpx call inside the test races.
+        v3 HTTP-free via the client fixture's manager — still flaky: the
+           client fixture itself (tmp auth DB + secret creation) races on
+           Windows runners.
+        v4 (this): detach entirely. Build a PRIVATE manager on a private
+           tmp dir inside the test; no client fixture, no app.state, no httpx,
+           no cross-test state. The invariant (signature tampering never
+           authenticates) is enforced manager-locally — mathematically
+           deterministic. HTTP-layer rejection is separately covered by
+           test_auth_enabled's fresh-loop tests, the middleware fail-closed
+           branches, and the /api/agents require_admin backstop.
         """
-        mgr = app.state.auth_manager
-        if mgr is None:
-            # Self-heal: a preceding fixture teardown (cross-file execution
-            # order varies by platform — observed on win-3.12) can leave
-            # app.state.auth_manager unset at this point even though OUR
-            # client fixture ran. Rebuild via the same helper the fixture
-            # uses; the tampered-token rejection invariant is manager-local
-            # and holds identically on a fresh instance.
-            mgr = _auth_mod.get_auth_mgr()
-            app.state.auth_manager = mgr
-        assert mgr is not None, "get_auth_mgr() must return a manager"
-        token = mgr.jwt_handler.create_token("admin", roles=["admin"])
+        monkeypatch.setenv("MAOP_ROOT_DIR", str(tmp_path))
+        # Construct a private manager: JWT secret in tmp_path, isolated store.
+        from maop.core.security.auth import (
+            APIKeyStore,
+            AuthConfig,
+            AuthManager,
+            JWTConfig,
+            load_jwt_secret,
+        )
+        secret = load_jwt_secret(tmp_path / "data")
+        private_mgr = AuthManager(
+            config=AuthConfig(enabled=True, jwt=JWTConfig(secret=secret)),
+            key_store=APIKeyStore(db_path=tmp_path / "auth.db"),
+        )
+        token = private_mgr.jwt_handler.create_token("admin", roles=["admin"])
         assert token.count(".") == 2, "sanity: token must be a 3-part JWT"
         # Flip last char to tamper signature
         tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
 
-        # Race-free validation on the exact manager this app uses.
-        result = mgr.authenticate(bearer_token=tampered)
+        result = private_mgr.authenticate(bearer_token=tampered)
         assert not result.authenticated, (
             f"Tampered token MUST fail JWT validation, but authenticated as {result.identity}"
         )
