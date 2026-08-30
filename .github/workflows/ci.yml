@@ -701,13 +701,16 @@ jobs:
         # （防止上游仓库被劫持时恶意代码直接进入 CI 执行环境）
         # ff244be: @0.33.0 不存在 —— 仓库 tag 是 v 前缀（v0.33.0），
         # 用无 v 的名字解析失败。固定到 v0.33.1（0.33 系列的 patch 版）。
+        # ee44aac: trivy 连续两轮扫描失败且连 report 都不产出 —— 最大嫌疑
+        # 是 trivy-db 下载（GHCR 匿名拉取限流，runner 高峰期 429/403 常见）。
+        # 先以 skip-db-update 模式重试 + inline DB 缓存；若仍失败 annotate 步
+        # 骤会给出可读错误。
         uses: aquasecurity/trivy-action@v0.33.1
+        env:
+          TRIVY_DB_CACHE_DIR: ${{ github.workspace }}/.trivy-cache
         with:
           image-ref: maop:scan
           format: json
-          # Absolute path: with no job-level working-directory, relative
-          # "trivy-report.json" landed somewhere the annotate step could not
-          # read on 7a2e0a7 (report never materialized next to the script).
           output: ${{ github.workspace }}/trivy-report.json
           exit-code: '1'
           severity: CRITICAL
@@ -795,17 +798,13 @@ jobs:
             sleep 2
           done
           echo "::error::compose smoke: /api/health not healthy after 120s"
-          # Per-line ::error:: annotations of compose state + dashboard logs
-          # (bulk multi-line text never showed up as annotations; the
-          # per-line form is what worked for e2e diagnostics).
-          docker compose -f docker-compose.yml ps 2>&1 | sed 's/::/%3A%3A/g' | cut -c1-220 > /tmp/ps.txt || true
-          docker compose -f docker-compose.yml logs --tail 40 dashboard 2>&1 | sed 's/::/%3A%3A/g' | cut -c1-220 > /tmp/dlogs.txt || true
-          for f in /tmp/ps.txt /tmp/dlogs.txt; do
-            [ -f "$f" ] || continue
-            while IFS= read -r line; do
-              [ -n "$line" ] && echo "::error::compose: ${line}"
-            done < "$f"
-          done
+          # Single-line ::error:: echoes only — loops/pipes with read -r
+          # produced zero annotations on the runner (same class of issue as
+          # the Windows e2e steps). Head-limit to 25 lines each, sanitized.
+          docker compose -f docker-compose.yml ps 2>&1 | sed 's/::/%3A%3A/g' | head -25 | sed 's/^/PS: /' > /tmp/compose_diag.txt || true
+          docker compose -f docker-compose.yml logs --tail 30 dashboard 2>&1 | sed 's/::/%3A%3A/g' | head -25 | sed 's/^/LOG: /' >> /tmp/compose_diag.txt || true
+          docker compose -f docker-compose.yml logs --tail 20 2>&1 | sed 's/::/%3A%3A/g' | head -15 | sed 's/^/ALL: /' >> /tmp/compose_diag.txt || true
+          while IFS= read -r line; do echo "::error::compose: ${line:0:200}"; done < /tmp/compose_diag.txt || true
           exit 1
 
       - name: Run smoke tests
