@@ -281,7 +281,12 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if [ $code -ne 0 ] && [ $code -ne 5 ]; then
-            echo "::error::e2e 测试失败（exit code=$code），仅 exit 5（No tests ran）被容忍"
+            # Surface the actual pytest failure tail via ::error:: annotation
+            # (fetchable via check-runs API without log download permissions).
+            # Single-line to satisfy the annotation format; keep last ~40
+            # informative lines, each truncated.
+            err_tail=$(grep -E "FAILED|Error|assert|raise|Traceback|___" /tmp/e2e.log | tail -40 | cut -c1-200 | tr '\n' '|' | cut -c1-3000)
+            echo "::error::e2e FAILED (exit=$code): ${err_tail}"
             exit $code
           fi
           if [ $code -eq 5 ]; then
