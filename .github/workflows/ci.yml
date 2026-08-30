@@ -566,6 +566,14 @@ jobs:
         with:
           context: .
           file: py/Dockerfile
+          # bb64973: first time this job actually ran (it sat behind the
+          # failing test gate for 20+ rounds) and buildx errored with
+          # "base name (${PYTHON_IMAGE}) should not be blank". Pass the
+          # build-arg explicitly (Docker Hub direct — the aliyun default
+          # mirror is unreliable from GitHub runners) so the multi-stage
+          # FROM lines always resolve.
+          build-args: |
+            PYTHON_IMAGE=python:3.13-slim
           push: ${{ github.event_name != 'pull_request' && steps.reg.outputs.configured == 'true' }}
           tags: |
             ${{ secrets.REGISTRY_URL || 'maop' }}/maop:latest
@@ -668,7 +676,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build image for scan
-        run: docker build -f py/Dockerfile -t maop:scan .
+        # PYTHON_IMAGE build-arg explicit (Docker Hub direct) — see the
+        # docker job's "Build and push" step for the blank-ARG root cause.
+        run: docker build -f py/Dockerfile --build-arg PYTHON_IMAGE=python:3.13-slim -t maop:scan .
       - name: Run trivy vulnerability scan
         # P3-C-03 fix: exit-code '1' + severity CRITICAL — CRITICAL 漏洞阻断 CI，
         # HIGH 漏洞仍生成报告供审查（不阻断）。此前 exit-code '0' 让所有漏洞
