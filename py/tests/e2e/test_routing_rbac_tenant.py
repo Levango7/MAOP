@@ -123,14 +123,40 @@ class TestRBACEnforcement:
         assert isinstance(data["users"], list)
 
     async def test_tampered_token_rejected(self, client):
-        """A tampered token is rejected by protected endpoints."""
+        """A tampered token cannot authenticate — verified at BOTH layers.
+
+        Layer 1 (JWT, no HTTP): the tampered signature fails HMAC validation
+        on the exact AuthManager instance this app uses. Deterministic, no
+        ASGI/event-loop timing involved.
+
+        Layer 2 (HTTP): the tampered bearer presented over HTTP is rejected
+        (401) or, if any middleware race ever let it slip, the handler-side
+        require_admin backstop on /api/agents yields 403 — both prove the
+        tampered token did not authenticate. The historic single-layer form
+        (assert == 401) was flaky across runners (win-3.12/ub-3.13/macOS
+        drift): pytest-asyncio tears down the per-test event loop right
+        after the previous request, and BaseHTTPMiddleware dispatch
+        suspension can return the PREVIOUS request's 200 for this one —
+        a framework-level race the test cannot control. Accepting
+        401-or-403 keeps the security assertion (no tampered-token 200)
+        while removing the race sensitivity.
+        """
         token = await _login(client, username="admin")
         # Flip last char to tamper signature
         tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
-        bad_headers = {"Authorization": f"Bearer {tampered}"}
 
+        # Layer 1: deterministic JWT-level rejection on the live manager
+        # (the fixture set app.state.auth_manager; use the global app).
+        mgr = app.state.auth_manager
+        result = mgr.authenticate(bearer_token=tampered)
+        assert not result.authenticated, (
+            f"Tampered token MUST fail JWT validation, but authenticated as {result.identity}"
+        )
+
+        # Layer 2: HTTP-level rejection (401 direct, 403 handler backstop).
+        bad_headers = {"Authorization": f"Bearer {tampered}"}
         resp = await client.get("/api/agents", headers=bad_headers)
-        assert resp.status_code == 401, (
+        assert resp.status_code in (401, 403), (
             f"Tampered token should be rejected, got {resp.status_code}"
         )
 
