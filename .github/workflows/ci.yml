@@ -281,12 +281,16 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if [ $code -ne 0 ] && [ $code -ne 5 ]; then
-            # Surface the actual pytest failure tail via ::error:: annotation
+            # Surface the actual pytest failure via per-line ::error:: annotations
             # (fetchable via check-runs API without log download permissions).
-            # Single-line to satisfy the annotation format; keep last ~40
-            # informative lines, each truncated.
-            err_tail=$(grep -E "FAILED|Error|assert|raise|Traceback|___" /tmp/e2e.log | tail -40 | cut -c1-200 | tr '\n' '|' | cut -c1-3000)
-            echo "::error::e2e FAILED (exit=$code): ${err_tail}"
+            # One annotation per line; strip characters that could break the
+            # workflow-command format (:: and %).
+            grep -E "FAILED|Error|assert|raise" /tmp/e2e.log | tail -20 \
+              | sed 's/::/%3A%3A/g; s/%/%%/g' \
+              | cut -c1-220 \
+              | while IFS= read -r line; do
+                  echo "::error::e2e: ${line}"
+                done
             exit $code
           fi
           if [ $code -eq 5 ]; then
