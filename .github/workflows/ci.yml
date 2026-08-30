@@ -271,13 +271,16 @@ jobs:
           # conftest load-order made them actually run AND fail (see P1-9:
           # JSONResponse-as-dict TypeError + shared-db viewer collision).
           # With confcutdir they run for real on every platform (29 cases).
-          python -m pytest tests/e2e/ -q --timeout=60 -p no:cacheprovider --no-cov -n 0 --confcutdir=tests/e2e -ra 2>&1 | tee /tmp/e2e.log
+          # Log to a cwd-RELATIVE path: /tmp is a bash-only mapping on Windows
+          # runners — a Windows python process resolves /tmp to <drive>\tmp
+          # and cannot read what Git-Bash tee wrote there.
+          python -m pytest tests/e2e/ -q --timeout=60 -p no:cacheprovider --no-cov -n 0 --confcutdir=tests/e2e -ra 2>&1 | tee e2e_ci.log
           code=${PIPESTATUS[0]}
           set -e
           {
             echo "### e2e tests (${{ matrix.os }}, Python ${{ matrix.python-version }})"
             echo '```'
-            tail -30 /tmp/e2e.log
+            tail -30 e2e_ci.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if [ $code -ne 0 ] && [ $code -ne 5 ]; then
@@ -288,7 +291,7 @@ jobs:
             # (exit 2), and bash grep/sed pipelines produced 0 annotations on
             # Windows runners (encoding/locale). A repo script is testable
             # locally and identical on every platform.
-            python scripts/e2e_annotate.py /tmp/e2e.log
+            python scripts/e2e_annotate.py e2e_ci.log
             exit $code
           fi
           if [ $code -eq 5 ]; then
