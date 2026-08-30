@@ -275,16 +275,21 @@ jobs:
           # runners — a Windows python process resolves /tmp to <drive>\tmp
           # and cannot read what Git-Bash tee wrote there.
           #
-          # Windows-step bulletproofing (2026-08-30): every prior run failed
-          # on Windows with NO custom annotations — even a bare echo ::error::
-          # never appeared, which means execution died inside this block BEFORE
-          # any echo: the `set -e` + summary-append (`>> $GITHUB_STEP_SUMMARY`)
-          # + tail sequence. Therefore: (a) no set -e in this step at all;
-          # (b) summary write is best-effort (|| true); (c) annotate via the
-          # repo script guarded by || true so its own failure never masks
-          # pytest's exit code; (d) diagnostics: always print code + ls.
-          python -m pytest tests/e2e/ -q --timeout=60 -p no:cacheprovider --no-cov -n 0 --confcutdir=tests/e2e -ra 2>&1 | tee e2e_ci.log
-          code=${PIPESTATUS[0]}
+          # Windows-Git-Bash bulletproofing (2026-08-30, two layers):
+          # (1) python resolution fallback chain — in a Windows Git Bash the
+          #     bare `python` shim is NOT on PATH (verified by local
+          #     simulation: exit 127 in ~1s, matching CI Windows e2e steps
+          #     that died in 1s with zero output), while python.exe / py.exe
+          #     ARE. ubuntu/macOS resolve at the first link.
+          # (2) Output REDIRECTION instead of `| tee` — plain $? carries
+          #     pytest's exit code without PIPESTATUS subtleties.
+          PY="python"
+          for c in python python3 python.exe py.exe; do
+            if command -v "$c" >/dev/null 2>&1; then PY="$c"; break; fi
+          done
+          echo "e2e using python launcher: ${PY}"
+          $PY -m pytest tests/e2e/ -q --timeout=60 -p no:cacheprovider --no-cov -n 0 --confcutdir=tests/e2e -ra > e2e_ci.log 2>&1
+          code=$?
           echo "e2e pytest exit code: ${code}"
           ls -la e2e_ci.log || true
           {
@@ -297,8 +302,9 @@ jobs:
             # Surface the actual pytest failure via per-line ::error:: annotations
             # (fetchable via check-runs API without log download permissions).
             # Extraction lives in scripts/e2e_annotate.py — guarded so a
-            # script failure never masks pytest's real exit code.
-            python scripts/e2e_annotate.py e2e_ci.log || true
+            # script failure never masks pytest's real exit code. Uses the
+            # same $PY fallback as the pytest invocation above.
+            $PY scripts/e2e_annotate.py e2e_ci.log || true
             exit "$code"
           fi
           if [ "$code" -eq 5 ]; then
