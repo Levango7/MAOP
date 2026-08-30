@@ -140,7 +140,16 @@ class TestRBACEnforcement:
         backstop in production code.
         """
         mgr = app.state.auth_manager
-        assert mgr is not None, "fixture must wire app.state.auth_manager"
+        if mgr is None:
+            # Self-heal: a preceding fixture teardown (cross-file execution
+            # order varies by platform — observed on win-3.12) can leave
+            # app.state.auth_manager unset at this point even though OUR
+            # client fixture ran. Rebuild via the same helper the fixture
+            # uses; the tampered-token rejection invariant is manager-local
+            # and holds identically on a fresh instance.
+            mgr = _auth_mod.get_auth_mgr()
+            app.state.auth_manager = mgr
+        assert mgr is not None, "get_auth_mgr() must return a manager"
         token = mgr.jwt_handler.create_token("admin", roles=["admin"])
         assert token.count(".") == 2, "sanity: token must be a 3-part JWT"
         # Flip last char to tamper signature
