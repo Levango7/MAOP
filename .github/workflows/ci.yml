@@ -177,9 +177,22 @@ jobs:
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             XDIST_ARGS="-n 0"
           fi
+          set +e
           python -m pytest tests/ -q --ignore=tests/contract \
             -m "not slow and not serial" --cov=maop --cov-report=xml --cov-report=term-missing \
             --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results.xml $XDIST_ARGS
+          unit_code=$?
+          set -e
+          echo "unit tests exit code: ${unit_code}"
+          if [ "$unit_code" -ne 0 ]; then
+            # 2026-08-30: unit tests failed on ALL 9 platforms on 4498f4e while
+            # identical code + env passes locally (CI-mirrored 7403 green).
+            # Surface the failing test IDs from the junit xml as annotations so
+            # they are readable via the check-runs API without log download.
+            # This does NOT alter the step's exit code — $unit_code is re-raised.
+            python scripts/junit_annotate.py test-results.xml || true
+            exit "$unit_code"
+          fi
 
       - name: Run serial tests (fixed port / shared state)
         # pyproject [tool.pytest.ini_options] markers 声明了 serial 机制
