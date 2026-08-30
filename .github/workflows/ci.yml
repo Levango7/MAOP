@@ -705,7 +705,10 @@ jobs:
         with:
           image-ref: maop:scan
           format: json
-          output: trivy-report.json
+          # Absolute path: with no job-level working-directory, relative
+          # "trivy-report.json" landed somewhere the annotate step could not
+          # read on 7a2e0a7 (report never materialized next to the script).
+          output: ${{ github.workspace }}/trivy-report.json
           exit-code: '1'
           severity: CRITICAL
           ignore-unfixed: true
@@ -792,8 +795,17 @@ jobs:
             sleep 2
           done
           echo "::error::compose smoke: /api/health not healthy after 120s"
-          docker compose -f docker-compose.yml ps || true
-          docker compose -f docker-compose.yml logs --tail 50 dashboard || true
+          # Per-line ::error:: annotations of compose state + dashboard logs
+          # (bulk multi-line text never showed up as annotations; the
+          # per-line form is what worked for e2e diagnostics).
+          docker compose -f docker-compose.yml ps 2>&1 | sed 's/::/%3A%3A/g' | cut -c1-220 > /tmp/ps.txt || true
+          docker compose -f docker-compose.yml logs --tail 40 dashboard 2>&1 | sed 's/::/%3A%3A/g' | cut -c1-220 > /tmp/dlogs.txt || true
+          for f in /tmp/ps.txt /tmp/dlogs.txt; do
+            [ -f "$f" ] || continue
+            while IFS= read -r line; do
+              [ -n "$line" ] && echo "::error::compose: ${line}"
+            done < "$f"
+          done
           exit 1
 
       - name: Run smoke tests
