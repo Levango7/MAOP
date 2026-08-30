@@ -108,11 +108,18 @@ def _remove_agent_from_yaml(name: str) -> None:
 @router.get("")
 @handle_api_errors
 async def list_agents(
+    request: Request,
     enabled_only: bool = Query(False, description="Only enabled agents"),
     healthy_only: bool = Query(False, description="Only healthy agents"),
     capability: str = Query("", description="Filter by capability"),
     provider: str = Query("", description="Filter by provider"),
 ):
+    # P1-10 fix: defense-in-depth. The agent registry enumerates every
+    # configured agent (CLI commands, models, capabilities) — treat it as
+    # admin surface. AuthMiddleware is the primary gate; this handler-side
+    # guard means a tampered/expired token that slips through any
+    # middleware race window still cannot list agents (403 vs 200).
+    require_admin(request)
     registry = _deps._get_registry()
     agents = registry.list_agents(
         enabled_only=enabled_only,
