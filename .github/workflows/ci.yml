@@ -285,8 +285,8 @@ jobs:
             # (fetchable via check-runs API without log download permissions).
             # One annotation per line; strip characters that could break the
             # workflow-command format (:: and %).
-            grep -E "FAILED|Error|assert|raise" /tmp/e2e.log | tail -20 \
-              | sed 's/::/%3A%3A/g; s/%/%%/g' \
+            grep -aiE "FAILED|Error|assert|raise" /tmp/e2e.log | tail -20 \
+              | sed 's/\x1b\[[0-9;]*m//g; s/::/%3A%3A/g; s/%/%%/g' \
               | cut -c1-220 \
               | while IFS= read -r line; do
                   echo "::error::e2e: ${line}"

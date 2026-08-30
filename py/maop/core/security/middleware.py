@@ -166,7 +166,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
             elif auth_manager is not None and hasattr(auth_manager, "authenticate"):
                 result = auth_manager.authenticate(bearer_token=token)
             else:
-                return cast(Response, await call_next(request))
+                # P1-10 fix: fail-closed. A credential was PRESENTED but no
+                # verifier is wired (e.g. a race window during e2e fixture
+                # teardown where app.state.auth_manager is momentarily None).
+                # Passing through anonymously let a TAMPERED token through
+                # (e2e test_tampered_token_rejected failed intermittently
+                # with 200). Presenting a credential commits this request to
+                # verification — reject with 401 instead of anonymous pass.
+                logger.warning(
+                    "Bearer credential present but no verifier configured; rejecting (fail-closed)"
+                )
+                return JSONResponse(
+                    status_code=401,
+                    content={"error": "Authentication verifier unavailable", "detail": "auth manager not initialized"},
+                )
 
             if result.authenticated:
                 request.state.auth_identity = result.identity
