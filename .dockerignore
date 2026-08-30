@@ -79,8 +79,11 @@ alertmanager.yml
 grafana/
 
 # 前端源码（只需要构建产物）
+# P0 fix (4d68569): the frontend-builder stage COPYs dashboard-enterprise/
+# wholesale (package*.json first, then the full source for `npm run build`).
+# Excluding src/ here broke that COPY. Only node_modules stays excluded —
+# npm ci reinstalls it inside the stage from the lockfile.
 dashboard-enterprise/node_modules
-dashboard-enterprise/src
 
 # 归档
 archive/
@@ -104,8 +107,12 @@ maop.ps1
 py/tests/
 py/scripts/
 py/.cov_baseline.json
-py/requirements.lock
-py/requirements.txt
+# P0 fix (4d68569): requirements.lock was excluded here but the builder stage
+# COPYs it (py/requirements.lock) to pip-install the pinned, audited deps —
+# the exclusion broke the first-ever real docker build. requirements.txt is
+# likewise kept: it documents the loose dependency set and is small.
+# py/requirements.lock
+# py/requirements.txt
 
 # Templates (the rendered alembic.ini is copied explicitly)
 alembic.ini.template
