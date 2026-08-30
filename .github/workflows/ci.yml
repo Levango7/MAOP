@@ -19,6 +19,12 @@ on:
       # 若排除在触发路径外，文档修复提交永远无法通过该门禁。
       - 'README.md'
       - 'ROADMAP.md'
+      # 77baf30: Docker 面文件此前不在触发路径 —— .dockerignore 修复提交
+      # push 后 CI 静默不跑（docker job 是门禁一部分，必须覆盖）。
+      - 'py/Dockerfile'
+      - '.dockerignore'
+      - 'docker-compose.yml'
+      - 'docker-compose.prod.yml'
   pull_request:
     branches: [main, master]
     paths:
@@ -29,6 +35,10 @@ on:
       - '.github/workflows/ci.yml'
       - 'README.md'
       - 'ROADMAP.md'
+      - 'py/Dockerfile'
+      - '.dockerignore'
+      - 'docker-compose.yml'
+      - 'docker-compose.prod.yml'
   workflow_dispatch:
 
 # F-P1-4 fix: cancel superseded CI runs on the same ref to save runner time.
