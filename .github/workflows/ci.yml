@@ -699,7 +699,9 @@ jobs:
         # ignore-unfixed: 只报告有可用修复的漏洞，忽略上游未修复的
         # 供应链安全: 固定到具体版本 tag，禁止 @master/@main 浮动引用
         # （防止上游仓库被劫持时恶意代码直接进入 CI 执行环境）
-        uses: aquasecurity/trivy-action@0.33.0
+        # ff244be: @0.33.0 不存在 —— 仓库 tag 是 v 前缀（v0.33.0），
+        # 用无 v 的名字解析失败。固定到 v0.33.1（0.33 系列的 patch 版）。
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           image-ref: maop:scan
           format: json
@@ -765,10 +767,28 @@ jobs:
           MAOP_REDIS_PASSWORD: maop_dev
           MAOP_ENV: test
           MAOP_AUTH: "1"
+          # ff244be: Docker Hub direct base images for the compose build
+          # (aliyun mirrors are slow/unreachable from GitHub runners; the
+          # compose build previously used the Dockerfile's aliyun defaults
+          # with no override path).
+          PYTHON_IMAGE: python:3.13-slim
+          NODE_IMAGE: node:20-alpine
         run: |
           docker compose -f docker-compose.yml up -d --build
-          sleep 10
-          curl -sf http://localhost:9079/api/health || exit 1
+          # Wait-for-health loop instead of a fixed 10s sleep: the full stack
+          # (dashboard + agent-executor + postgres + redis + ...) builds and
+          # boots slower than 10s on shared runners; poll up to ~120s.
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:9079/api/health; then
+              echo " (healthy after ${i}x2s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::compose smoke: /api/health not healthy after 120s"
+          docker compose -f docker-compose.yml ps || true
+          docker compose -f docker-compose.yml logs --tail 50 dashboard || true
+          exit 1
 
       - name: Run smoke tests
         run: |

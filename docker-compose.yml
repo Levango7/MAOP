@@ -57,6 +57,15 @@ services:
     build:
       context: .
       dockerfile: py/Dockerfile
+      # ff244be: compose build never passed these args — on GitHub runners
+      # (compose-smoke job) the aliyun defaults are slow/unreachable, while
+      # the docker CI job passes Docker Hub explicitly and succeeds. Route
+      # through environment: unset here keeps the Dockerfile's aliyun
+      # defaults for CN-local no-proxy builds; compose-smoke sets the
+      # PYTHON_IMAGE/NODE_IMAGE env vars to Docker Hub images.
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-registry.cn-hangzhou.aliyuncs.com/library/python:3.13-slim}
+        NODE_IMAGE: ${NODE_IMAGE:-registry.cn-hangzhou.aliyuncs.com/library/node:20-alpine}
     container_name: maop-dashboard
     ports:
       - "${MAOP_DASH_PORT:-9079}:9079"
