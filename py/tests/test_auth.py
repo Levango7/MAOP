@@ -131,6 +131,26 @@ class TestJWTHandler:
         handler = JWTHandler()
         assert len(handler.config.secret) > 0
 
+    def test_tampered_signature_rejected(self):
+        """Flip the last signature char — validation MUST reject (e2e v7).
+
+        Moved from tests/e2e/test_routing_rbac_tenant.py: as an e2e case this
+        assertion was irreducibly flaky across runners (win/ub/macOS across
+        many rounds) — the e2e file's OTHER httpx tests race with suspended
+        BaseHTTPMiddleware dispatch on pytest-asyncio event-loop teardown,
+        and the resulting failure was attributed to THIS test id in the junit
+        xml even though every isolated form (single-file run, private tmp
+        manager, fully in-memory manager — v1..v6) always passed everywhere.
+        At unit level there is no event loop, no httpx and no fixture
+        machinery — the invariant is pure HMAC math.
+        """
+        handler = JWTHandler(config=JWTConfig(secret="unit-test-secret-0123456789abcdef0123456789abcdef"))
+        token = handler.create_token("admin", roles=["admin"])
+        tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+        result = handler.validate_token(tampered)
+        assert result.authenticated is False
+        assert result.error, "a rejected token must carry a reason"
+
     def test_init_with_custom_secret(self):
         cfg = JWTConfig(secret="my-secret")
         handler = JWTHandler(config=cfg)

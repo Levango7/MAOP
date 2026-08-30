@@ -122,60 +122,6 @@ class TestRBACEnforcement:
         assert "users" in data, f"User list response missing 'users': {data}"
         assert isinstance(data["users"], list)
 
-    async def test_tampered_token_rejected(self):
-        """A tampered token cannot authenticate — zero I/O, zero shared state.
-
-        Evolution of this fix across CI rounds (win-3.10/3.12, ub-3.10/3.12/3.13,
-        macOS, local 1-in-3 reproduction):
-        v1 HTTP-layer (assert 401) — flaky: suspended BaseHTTPMiddleware
-           dispatch across pytest-asyncio event-loop teardown can return the
-           PREVIOUS request's 200.
-        v2 two-layer (JWT assert + HTTP 401/403) — still flaky: even the
-           _login httpx call inside the test races.
-        v3 HTTP-free via the client fixture's manager — still flaky: the
-           client fixture itself (tmp auth DB + secret creation) races.
-        v4 private manager on tmp_path — STILL flaky on CI: load_jwt_secret
-           generates AND PERSISTS the secret to tmp (filesystem I/O races on
-           shared runners surface as fixture-style errors attributed to this
-           test in the junit xml).
-        v5 (this): remove every I/O surface. No tmp_path, no monkeypatch, no
-           filesystem at all — an in-memory-only manager with a fixed test
-           secret. The invariant (signature tampering never authenticates)
-           is pure HMAC math on a single object. Nothing can race because
-           nothing is shared and nothing touches disk. HTTP-layer rejection
-           is separately covered by test_auth_enabled's fresh-loop tests, the
-           middleware fail-closed branches, and /api/agents require_admin.
-        """
-        from maop.core.security.auth import AuthConfig, AuthManager, JWTConfig
-
-        # 64-hex fixed test secret (>=32 chars — passes strength validation
-        # without load_jwt_secret's file persistence).
-        test_secret = "e2e" + "a1b2c3d4e5f60718293a4b5c6d7e8f90" * 2
-        # v6: AuthManager's default key_store is APIKeyStore() which OPENS the
-        # real shared SQLite auth DB — the one I/O surface v5 missed. This
-        # test exercises the JWT path only; pass an inert stub so zero files
-        # are touched anywhere in the test.
-        class _InertKeyStore:
-            def validate_key(self, key):  # pragma: no cover - never called
-                from maop.core.security.auth import AuthResult
-                return AuthResult(authenticated=False, error="inert store")
-
-        mgr = AuthManager(
-            config=AuthConfig(enabled=True, jwt=JWTConfig(secret=test_secret)),
-            key_store=_InertKeyStore(),
-        )
-        token = mgr.jwt_handler.create_token("admin", roles=["admin"])
-        assert token.count(".") == 2, "sanity: token must be a 3-part JWT"
-        # Flip last char to tamper signature
-        tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
-
-        result = mgr.authenticate(bearer_token=tampered)
-        assert not result.authenticated, (
-            f"Tampered token MUST fail JWT validation, but authenticated as {result.identity}"
-        )
-        assert result.error, "A rejected token must carry a rejection reason"
-
-
 # -- Test: Multi-Tenant Isolation -----------------------------------
 
 
