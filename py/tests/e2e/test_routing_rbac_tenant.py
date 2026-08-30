@@ -151,8 +151,18 @@ class TestRBACEnforcement:
         # 64-hex fixed test secret (>=32 chars — passes strength validation
         # without load_jwt_secret's file persistence).
         test_secret = "e2e" + "a1b2c3d4e5f60718293a4b5c6d7e8f90" * 2
+        # v6: AuthManager's default key_store is APIKeyStore() which OPENS the
+        # real shared SQLite auth DB — the one I/O surface v5 missed. This
+        # test exercises the JWT path only; pass an inert stub so zero files
+        # are touched anywhere in the test.
+        class _InertKeyStore:
+            def validate_key(self, key):  # pragma: no cover - never called
+                from maop.core.security.auth import AuthResult
+                return AuthResult(authenticated=False, error="inert store")
+
         mgr = AuthManager(
             config=AuthConfig(enabled=True, jwt=JWTConfig(secret=test_secret)),
+            key_store=_InertKeyStore(),
         )
         token = mgr.jwt_handler.create_token("admin", roles=["admin"])
         assert token.count(".") == 2, "sanity: token must be a 3-part JWT"
