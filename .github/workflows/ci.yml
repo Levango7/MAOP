@@ -268,66 +268,20 @@ jobs:
         run: python -m pytest tests/contract/ -q -m contract --no-cov
 
       - name: Run e2e tests
-        # 不能用 `-p no:xdist`：pyproject addopts 有 `-n auto`（xdist 并行），
-        # 禁用 xdist 插件后 `-n auto` 变 unrecognized → exit 4（CI 12 平台
-        # pytest job 全挂的真凶之一）。`-n 0` 显式覆盖为单进程，xdist 保持启用。
-        # H5 修复：原 `|| true` 掩盖所有退出码，导致非 exit 5 失败（如 import
-        # 错误、配置错误）被静默忽略。现改为精确过滤 exit 5（No tests ran），
-        # 仅容忍 exit 5（e2e 在主矩阵 auth=0 时全 skip 是预期噪音），
-        # 其他非零退出码（exit 1/2/4 等）仍判失败。
-        # 若需要真跑 e2e：`MAOP_AUTH=1 MAOP_ADMIN_PASSWORD=... pytest tests/e2e/`。
-        run: |
-          set +e
-          # --confcutdir: e2e REQUIRES isolation (module-level MAOP_AUTH=1 must
-          # win over tests/conftest.py's auth-off pinning). Without it the
-          # e2e files skip everywhere except Windows, where a path-dependent
-          # conftest load-order made them actually run AND fail (see P1-9:
-          # JSONResponse-as-dict TypeError + shared-db viewer collision).
-          # With confcutdir they run for real on every platform (29 cases).
-          # Log to a cwd-RELATIVE path: /tmp is a bash-only mapping on Windows
-          # runners — a Windows python process resolves /tmp to <drive>\tmp
-          # and cannot read what Git-Bash tee wrote there.
-          #
-          # Windows-Git-Bash bulletproofing (2026-08-30, two layers):
-          # (1) python resolution fallback chain — in a Windows Git Bash the
-          #     bare `python` shim is NOT on PATH (verified by local
-          #     simulation: exit 127 in ~1s, matching CI Windows e2e steps
-          #     that died in 1s with zero output), while python.exe / py.exe
-          #     ARE. ubuntu/macOS resolve at the first link.
-          # (2) Output REDIRECTION instead of `| tee` — plain $? carries
-          #     pytest's exit code without PIPESTATUS subtleties.
-          PY="python"
-          for c in python python3 python.exe py.exe; do
-            if command -v "$c" >/dev/null 2>&1; then PY="$c"; break; fi
-          done
-          # Emit diagnostics AS ANNOTATIONS so they are readable via the API
-          # even when pytest dies before writing a log (the 1s-death pattern):
-          # which launcher resolved, whether it can even print its version,
-          # and the tail of whatever log materialized.
-          echo "::notice::e2e launcher resolved: ${PY} (path: $(command -v $PY))"
-          $PY --version 2>&1 || echo "::error::e2e launcher cannot execute: $PY"
-          $PY -m pytest tests/e2e/ -q --timeout=60 -p no:cacheprovider --no-cov -n 0 --confcutdir=tests/e2e -ra > e2e_ci.log 2>&1
-          code=$?
-          echo "::notice::e2e pytest exit code: ${code}; log bytes: $(wc -c < e2e_ci.log 2>/dev/null || echo 0)"
-          tail -5 e2e_ci.log 2>/dev/null | while IFS= read -r l; do echo "::notice::e2e-log: $l"; done || true
-          {
-            echo "### e2e tests (${{ matrix.os }}, Python ${{ matrix.python-version }})"
-            echo '```'
-            tail -30 e2e_ci.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY" || true
-          if [ "$code" -ne 0 ] && [ "$code" -ne 5 ]; then
-            # Surface the actual pytest failure via per-line ::error:: annotations
-            # (fetchable via check-runs API without log download permissions).
-            # Extraction lives in scripts/e2e_annotate.py — guarded so a
-            # script failure never masks pytest's real exit code. Uses the
-            # same $PY fallback as the pytest invocation above.
-            $PY scripts/e2e_annotate.py e2e_ci.log || true
-            exit "$code"
-          fi
-          if [ "$code" -eq 5 ]; then
-            echo "::warning::e2e 测试无用例执行（exit 5），主矩阵 auth=0 下属预期行为"
-          fi
+        # e2e REQUIRES isolation: module-level MAOP_AUTH=1 must win over
+        # tests/conftest.py's auth-off pinning (--confcutdir). Windows runners
+        # died in ~1s with zero output on every prior multi-line bash variant
+        # of this step (fallback loops, pipes, heredocs — all unverifiable);
+        # reduced to single-command steps so each failure is individually
+        # visible and no shell constructs can swallow the exit code.
+        run: python -m pytest tests/e2e/ -q --timeout=60 -p no:cacheprovider --no-cov -n 0 --confcutdir=tests/e2e -ra --junitxml=test-results-e2e.xml
+
+      - name: e2e failure annotations
+        # Runs only when the e2e step failed. Reads the junit xml and emits
+        # failing test IDs as ::error:: annotations (API-readable without log
+        # download permissions). Never changes the job verdict.
+        if: failure()
+        run: python scripts/junit_annotate.py test-results-e2e.xml
 
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
@@ -368,10 +322,20 @@ jobs:
           pip install pytest pytest-asyncio pytest-timeout pytest-xdist pytest-cov
 
       - name: Run performance smoke tests
-        run: python -m pytest tests/performance/ -q -m slow --timeout=120
+        run: python -m pytest tests/performance/ -q -m slow --timeout=120 --junitxml=test-results-perf.xml
 
       - name: Run reliability & stability tests
-        run: python -m pytest tests/reliability/ tests/stability/ -q --timeout=120
+        # 0074b97: this step failed on CI while the identical suites pass
+        # locally (31 green). junitxml + annotate so the failing IDs are
+        # readable via the API.
+        run: |
+          set +e
+          python -m pytest tests/reliability/ tests/stability/ -q --timeout=120 --junitxml=test-results-rel.xml
+          code=$?
+          if [ "$code" -ne 0 ]; then
+            python scripts/junit_annotate.py test-results-rel.xml || true
+            exit "$code"
+          fi
 
   # ── Frontend Build ──────────────────────────────────────────────
   frontend:
