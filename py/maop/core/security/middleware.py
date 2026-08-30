@@ -247,8 +247,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 content={"error": "Authentication required", "detail": "Provide X-API-Key or Authorization header"},
             )
 
-        # No auth configured = pass through
-        return cast(Response, await call_next(request))
+        # P1-10 fix (second path): no verifier wired at all. With auth ENABLED
+        # this is a transient race window (e2e fixture teardown restores
+        # app.state.auth_manager to None between tests) — anonymous pass-through
+        # here made the e2e tampered-token test flaky-fail with 200 on runners
+        # (ubuntu-3.13 two runs, macOS once). When this middleware is enabled,
+        # missing configuration must FAIL CLOSED; anonymous pass-through is
+        # only valid in the explicitly-disabled branch (_dispatch_disabled).
+        logger.warning(
+            "Auth enabled but no verifier configured; rejecting request (fail-closed)"
+        )
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Authentication verifier unavailable", "detail": "auth manager not initialized"},
+        )
 
     async def _authenticate_with_api_key_manager(
         self,

@@ -287,11 +287,16 @@ jobs:
           for c in python python3 python.exe py.exe; do
             if command -v "$c" >/dev/null 2>&1; then PY="$c"; break; fi
           done
-          echo "e2e using python launcher: ${PY}"
+          # Emit diagnostics AS ANNOTATIONS so they are readable via the API
+          # even when pytest dies before writing a log (the 1s-death pattern):
+          # which launcher resolved, whether it can even print its version,
+          # and the tail of whatever log materialized.
+          echo "::notice::e2e launcher resolved: ${PY} (path: $(command -v $PY))"
+          $PY --version 2>&1 || echo "::error::e2e launcher cannot execute: $PY"
           $PY -m pytest tests/e2e/ -q --timeout=60 -p no:cacheprovider --no-cov -n 0 --confcutdir=tests/e2e -ra > e2e_ci.log 2>&1
           code=$?
-          echo "e2e pytest exit code: ${code}"
-          ls -la e2e_ci.log || true
+          echo "::notice::e2e pytest exit code: ${code}; log bytes: $(wc -c < e2e_ci.log 2>/dev/null || echo 0)"
+          tail -5 e2e_ci.log 2>/dev/null | while IFS= read -r l; do echo "::notice::e2e-log: $l"; done || true
           {
             echo "### e2e tests (${{ matrix.os }}, Python ${{ matrix.python-version }})"
             echo '```'
