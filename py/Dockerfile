@@ -83,8 +83,18 @@ COPY dashboard/ dashboard/
 COPY --from=frontend-builder /dashboard/dist-enterprise/ dashboard/dist-enterprise/
 # H9 fix: 复制 alembic.ini 与迁移脚本到镜像，确保 docker-entrypoint.sh 能执行数据库迁移。
 # 原：未复制 alembic.ini，导致 entrypoint 检测不到而静默跳过迁移，PG schema 不初始化。
+# 3f335fb: COPY to the SAME repo-relative layout the repo-root alembic.ini
+# expects (script_location = py/maop/migrations/alembic, resolved from /app).
+# The previous flat COPY to migrations/ left alembic looking for
+# py/maop/migrations/alembic which did not exist in the container — the
+# entrypoint then failed "Path doesn't exist", restarting the dashboard
+# container forever and failing the compose-smoke healthcheck.
 COPY alembic.ini ./
-COPY py/maop/migrations/ migrations/
+COPY py/maop/migrations/ py/maop/migrations/
+# 3f335fb: seed the migration SQL into a NON-volume-mounted path. /app/data
+# is bind-mounted (named volume) at runtime, which SHADOWS anything baked
+# here — the entrypoint copies from seed/ into the volume on first boot.
+COPY data/migrations/ /app/seed/migrations/
 
 # Create data directory
 RUN mkdir -p /app/data /app/logs && chown -R maop:maop /app

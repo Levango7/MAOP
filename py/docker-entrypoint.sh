@@ -12,6 +12,14 @@ echo "[entrypoint] Starting MAOP container..."
 if [ -f "alembic.ini" ] || [ -f "/app/alembic.ini" ]; then
     echo "[entrypoint] Running database migrations..."
     cd /app
+    # 3f335fb: /app/data is a named volume at runtime and shadows the image
+    # layer — seed the migration SQL into it on first boot so alembic's
+    # 001_init (which reads data/migrations/001_init.sql) can find the files.
+    if [ -d /app/seed/migrations ] && [ ! -f /app/data/migrations/001_init.sql ]; then
+        echo "[entrypoint] Seeding migration SQL into data volume..."
+        mkdir -p /app/data/migrations
+        cp /app/seed/migrations/*.sql /app/data/migrations/ 2>/dev/null || true
+    fi
     # H9 fix: 迁移失败时明确报错退出，而非静默跳过（2>/dev/null 掩盖了真实错误）。
     if ! python -m alembic upgrade head; then
         echo "[entrypoint] FATAL: Database migration failed (alembic upgrade head)."

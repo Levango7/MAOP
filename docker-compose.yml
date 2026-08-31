@@ -29,6 +29,21 @@
 #   MAOS Enterprise (with license) → PostgreSQL via --profile postgres.
 #     Production multi-writer workloads MUST use PostgreSQL, not SQLite coordination layers.
 
+# 3f335fb: shared build block (YAML anchor) — all three MAOP services build
+# the same Dockerfile with the same base-image args. Previously only the
+# dashboard service passed build args; agent-exec and queue-worker fell back
+# to the Dockerfile's bare defaults (docker.io), which broke CN-local builds
+# and left the CI compose-smoke dependent on per-service overrides.
+x-maop-build: &maop-build
+  context: .
+  dockerfile: py/Dockerfile
+  args:
+    # Docker Hub defaults; override via env for CN-local mirror registries
+    # (e.g. docker.m.daocloud.io/library/...). The compose-smoke CI job sets
+    # these explicitly.
+    PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.13-slim}
+    NODE_IMAGE: ${NODE_IMAGE:-node:20-alpine}
+
 services:
   # ── PostgreSQL (optional, --profile postgres) ──────────────────────────────────────────────────────────────
   postgres:
@@ -54,18 +69,7 @@ services:
 
   # ── Dashboard (API + Web UI) ────────────────────────────────────
   dashboard:
-    build:
-      context: .
-      dockerfile: py/Dockerfile
-      # ff244be: compose build never passed these args — on GitHub runners
-      # (compose-smoke job) the previous aliyun defaults were unreachable,
-      # while the docker CI job passes Docker Hub explicitly and succeeds.
-      # 3f335fb: the aliyun library/ paths do not exist at all (pull access
-      # denied) — default to Docker Hub and let CN-local users configure a
-      # registry mirror in Docker Desktop, or override these env vars.
-      args:
-        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.13-slim}
-        NODE_IMAGE: ${NODE_IMAGE:-node:20-alpine}
+    build: *maop-build
     container_name: maop-dashboard
     ports:
       - "${MAOP_DASH_PORT:-9079}:9079"
@@ -147,9 +151,7 @@ services:
 
   # ── Agent Executor Worker ───────────────────────────────────────
   agent-exec:
-    build:
-      context: .
-      dockerfile: py/Dockerfile
+    build: *maop-build
     container_name: maop-agent-exec
     entrypoint: ["python", "-m", "maop.worker.agent_executor"]
     volumes:
@@ -199,9 +201,7 @@ services:
 
   # ── Queue Worker (human approval, async tasks) ──────────────────
   queue-worker:
-    build:
-      context: .
-      dockerfile: py/Dockerfile
+    build: *maop-build
     container_name: maop-queue-worker
     entrypoint: ["python", "-m", "maop.worker.queue_worker"]
     volumes:

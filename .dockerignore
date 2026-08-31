@@ -55,7 +55,12 @@ logs/
 *.log
 
 # 数据目录（运行时生成）
+# 3f335fb exception: data/migrations/*.sql are CODE assets consumed by the
+# alembic 001_init/002 migrations (baked into the image at /app/seed/) —
+# excluding all of data/ previously starved the container entrypoint.
 data/
+!data/migrations/
+!data/migrations/*.sql
 
 # 文档（不需要进入镜像）
 docs/
