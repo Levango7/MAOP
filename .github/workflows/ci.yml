@@ -801,9 +801,14 @@ jobs:
         run: python py/scripts/compose_smoke.py
 
       - name: Run smoke tests
+        # 8a6f128: /api/info has no "version" field, and /api/versions is
+        # admin-gated (401 for anonymous curl). The health payload itself
+        # carries both status AND version — assert both from the one
+        # public, healthcheck-approved endpoint.
         run: |
-          curl -sf http://localhost:9079/api/health | grep -q '"status"'
-          curl -sf http://localhost:9079/api/info | grep -q '"version"'
+          BODY=$(curl -sf http://localhost:9079/api/health)
+          echo "$BODY" | grep -q '"status"'
+          echo "$BODY" | grep -q '"version"'
           echo "Compose smoke tests passed."
 
       - name: Notify on failure
