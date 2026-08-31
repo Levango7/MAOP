@@ -7,10 +7,14 @@
 # with the build-arg passed. An ARG declared AFTER the first FROM is NOT in
 # the global scope buildx uses for FROM interpolation — move it to the very
 # top (before ANY FROM), which is the unambiguous global position.
-# 64d2732 (2): NODE_IMAGE ARG too — GitHub runners pull from Docker Hub;
-# the aliyun mirrors below remain the no-proxy defaults for CN-local builds.
-ARG PYTHON_IMAGE=registry.cn-hangzhou.aliyuncs.com/library/python:3.13-slim
-ARG NODE_IMAGE=registry.cn-hangzhou.aliyuncs.com/library/node:20-alpine
+# 64d2732 (2): NODE_IMAGE ARG too — GitHub runners pull from Docker Hub.
+# 3f335fb: the previous aliyun defaults (registry.cn-hangzhou.aliyuncs.com/
+# library/python|node) DO NOT EXIST — pull access denied / repository does
+# not exist (the library/ namespace is Docker Hub's, aliyun's public mirror
+# for it is long gone). CN-local users should configure a registry mirror
+# in Docker Desktop settings instead of overriding these build args.
+ARG PYTHON_IMAGE=python:3.13-slim
+ARG NODE_IMAGE=node:20-alpine
 
 # Stage 0: Frontend Builder (H6 fix)
 # H6 fix: 原 Dockerfile 未包含前端构建步骤，fresh clone 或 CI 环境中 assets 缺失，

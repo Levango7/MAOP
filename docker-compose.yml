@@ -58,14 +58,14 @@ services:
       context: .
       dockerfile: py/Dockerfile
       # ff244be: compose build never passed these args — on GitHub runners
-      # (compose-smoke job) the aliyun defaults are slow/unreachable, while
-      # the docker CI job passes Docker Hub explicitly and succeeds. Route
-      # through environment: unset here keeps the Dockerfile's aliyun
-      # defaults for CN-local no-proxy builds; compose-smoke sets the
-      # PYTHON_IMAGE/NODE_IMAGE env vars to Docker Hub images.
+      # (compose-smoke job) the previous aliyun defaults were unreachable,
+      # while the docker CI job passes Docker Hub explicitly and succeeds.
+      # 3f335fb: the aliyun library/ paths do not exist at all (pull access
+      # denied) — default to Docker Hub and let CN-local users configure a
+      # registry mirror in Docker Desktop, or override these env vars.
       args:
-        PYTHON_IMAGE: ${PYTHON_IMAGE:-registry.cn-hangzhou.aliyuncs.com/library/python:3.13-slim}
-        NODE_IMAGE: ${NODE_IMAGE:-registry.cn-hangzhou.aliyuncs.com/library/node:20-alpine}
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.13-slim}
+        NODE_IMAGE: ${NODE_IMAGE:-node:20-alpine}
     container_name: maop-dashboard
     ports:
       - "${MAOP_DASH_PORT:-9079}:9079"
@@ -508,7 +508,15 @@ services:
       - GENERIC_TIMEZONE=${MAOP_TIMEZONE:-Asia/Shanghai}
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:?Set N8N_PASSWORD in .env}
+      # 3f335fb: hard-required (?:) interpolation broke the WHOLE compose
+      # file even with the n8n profile disabled — docker compose validates
+      # every service's variables during interpolation, so compose-smoke
+      # failed before starting a single container. n8n is an optional
+      # enterprise profile service: default the password (operator MUST
+      # still set N8N_PASSWORD when actually enabling the profile — same
+      # posture as PG/Redis fail-fast vars, which apply only to services
+      # enabled in the default profile).
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-change-me-n8n-not-running}
       - N8N_API_KEY=${N8N_API_KEY:-}
     volumes:
       - n8n-data:/home/node/.n8n
