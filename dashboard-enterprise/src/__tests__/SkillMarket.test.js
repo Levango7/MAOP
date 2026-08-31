@@ -76,16 +76,23 @@ describe('SkillMarket.vue', () => {
     wrapper.unmount();
   });
 
-  // ── 2. Coming Soon banner 存在 ──
-  it('renders the Coming Soon informational banner', async () => {
+  // ── 2. Coming Soon banner（user#1 fix：仅空数据时降级显示）──
+  it('hides the Coming Soon banner when tools are loaded, shows it only for empty data', async () => {
     mockFetch(defaultMarketRoutes());
     const wrapper = await mountMarket();
-    const banner = wrapper.find('.coming-soon-banner');
+    // loaded marketplace (3 tools) → banner hidden
+    expect(wrapper.findAll('.install-row').length).toBeGreaterThan(0);
+    expect(wrapper.find('.coming-soon-banner').exists()).toBe(false);
+    wrapper.unmount();
+
+    // empty marketplace → banner shown as the degraded hint
+    mockFetch({ '/api/mcp/marketplace/tools': { tools: [] } });
+    const wrapper2 = await mountMarket();
+    const banner = wrapper2.find('.coming-soon-banner');
     expect(banner.exists()).toBe(true);
     expect(banner.text()).toContain('Coming Soon');
     expect(banner.text()).toContain('Planned');
-    expect(banner.text()).toContain('Skill Marketplace');
-    wrapper.unmount();
+    wrapper2.unmount();
   });
 
   // ── 3. 市场工具列表展示 ──
@@ -176,8 +183,9 @@ describe('SkillMarket.vue', () => {
     const wrapper = await mountMarket();
     expect(wrapper.findComponent(EmptyState).exists()).toBe(true);
     expect(wrapper.text()).toContain('500');
-    // Coming Soon banner 在错误态下仍然显示
-    expect(wrapper.find('.coming-soon-banner').exists()).toBe(true);
+    // user#1 fix：错误态显示 EmptyState；Coming Soon banner 只在
+    // "无数据且无错误"的降级场景显示，错误时不重复叠提示。
+    expect(wrapper.find('.coming-soon-banner').exists()).toBe(false);
     wrapper.unmount();
   });
 });

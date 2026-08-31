@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, onErrorCaptured } from 'vue';
+import { ref, computed, onMounted, onUnmounted, onErrorCaptured, watchEffect } from 'vue';
 import { useEditionStore } from './stores/edition.js';
 import { useApiStore } from './stores/api.js';
 import { useRealtimeStore } from './stores/realtime.js';
@@ -120,6 +120,14 @@ onErrorCaptured((err, instance, info) => {
 
 const version = ref(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown');
 const authExpired = ref(false);
+// 一号用户实测修复（2026-08-31）：body[data-auth-open] 让 CoachMarks 知道
+// 登录弹窗在前，暂停引导遮罩（否则 .cm-scrim 同 z-index 后挂载压住登录
+// 表单，submit 发不出去 → 登录无限循环）。
+watchEffect(() => {
+  if (typeof document !== 'undefined') {
+    document.body.dataset.authOpen = authExpired.value ? '1' : '0';
+  }
+});
 const loginUsername = ref('');
 const loginPassword = ref('');
 const loginError = ref('');
@@ -186,7 +194,10 @@ function isActive(item) {
 // overlay immediately with a "Sign In" title — don't wait for 401 errors
 // to trickle in and flash empty pages at the user.
 function showLoginIfRequired() {
-  if (authEnabled.value && !api.authToken()) {
+  // 一号用户实测修复（2026-08-31 循环最后主因）：M6 改版后 authToken() 恒
+  // 空（token 由 httpOnly cookie 承载，前端不可读）——用它判断登录态等于
+  // 永远未登录，每次加载必弹窗。改用 isLoggedIn()（按 user 存在性判断）。
+  if (authEnabled.value && !api.isLoggedIn()) {
     authExpired.value = true;
     loginTitle.value = t('auth.signIn');
     loginError.value = '';
@@ -198,7 +209,9 @@ function showLoginIfRequired() {
 // Expired" when the user actually had a token before; otherwise it's a
 // first-visit sign-in.
 function onUnauthorized() {
-  const hadToken = !!api.authToken();
+  // M6: token 由 httpOnly cookie 承载，authToken() 恒空 —— 以登录用户
+  // 信息存在性判断“此前已登录”，才能正确显示 Session Expired 提示。
+  const hadToken = api.isLoggedIn();
   authExpired.value = true;
   loginTitle.value = hadToken ? t('auth.sessionExpired') : t('auth.signIn');
   loginError.value = '';
@@ -237,13 +250,12 @@ async function checkAuthEnabled() {
     const d = await api.get('/api/auth/status');
     authEnabled.value = d && d.auth_enabled === true;
     try { localStorage.setItem('maop_auth_enabled', String(authEnabled.value)); } catch { /* ignore */ }
-    // If backend says auth is enabled but our token is invalid (has_token:false),
-    // clear the stale local token so showLoginIfRequired() can trigger the
-    // login overlay immediately — instead of waiting for 401 errors from
-    // every subsequent authenticated endpoint.
-    // Direct localStorage removal (not api.clearAuthToken) to avoid triggering
-    // /api/auth/logout which would itself 401 and cause a retry loop.
-    if (authEnabled.value && d && d.has_token === false && api.authToken()) {
+    // If backend says auth is enabled and the cookie session is dead
+    // (has_token:false) while we still show a logged-in user, clear the
+    // stale user info so showLoginIfRequired() can trigger the login
+    // overlay immediately. M6: presence = isLoggedIn(), not authToken()
+    // (token lives in an httpOnly cookie and is unreadable from JS).
+    if (authEnabled.value && d && d.has_token === false && api.isLoggedIn()) {
       try { localStorage.removeItem('maop_token'); localStorage.removeItem('maop_user'); } catch { /* ignore */ }
     }
   } catch { authEnabled.value = false; }
@@ -467,7 +479,9 @@ onUnmounted(() => {
 
 /* ── Auth overlay ───────────────────────────────────────────────── */
 .auth-overlay {
-  position: fixed; inset: 0; z-index: var(--z-modal);
+  /* 一号用户实测修复：登录框必须压过一切 UI（含同为 z-modal 的 CoachMarks
+     Teleport —— 后挂载者同层居上曾把 .cm-scrim 盖在登录表单上）。 */
+  position: fixed; inset: 0; z-index: 110;
   display: flex; align-items: center; justify-content: center;
   background: var(--overlay-scrim);
   backdrop-filter: blur(8px);

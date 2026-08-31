@@ -24,9 +24,14 @@ function readRail() {
 }
 function readLocale() {
   const v = typeof localStorage !== 'undefined' ? localStorage.getItem('maop_locale') : null;
-  // Default to English so the existing UI shows no partial-translation regressions;
-  // the user can switch to 中文 from Settings at any time.
-  return v === 'zh' ? 'zh' : 'en';
+  if (v === 'zh' || v === 'en') return v; // explicit user choice always wins
+  // 一号用户实测修复（2026-08-31）：原默认强制英文（注释自称"避免半翻译
+  // 回归"——治标不治本，中文用户首屏全英文）。改为跟随浏览器语言：
+  // zh-CN/zh-TW/zh-HK/zh* 自动中文，其余英文。半翻译问题在词典层解决。
+  if (typeof navigator !== 'undefined' && /^zh\b|zh-/i.test(navigator.language || '')) {
+    return 'zh';
+  }
+  return 'en';
 }
 
 export const useUiStore = defineStore('ui', () => {

@@ -147,14 +147,27 @@ onMounted(() => {
   let done = false;
   try { done = localStorage.getItem(STORAGE_KEY) === '1'; } catch { /* ignore */ }
   if (done) return;
-  // 延迟到路由视图渲染(SVG 图绘制耗时), 再测量目标元素
-  setTimeout(() => {
+
+  // 一号用户实测修复（2026-08-31 登录无限循环根因）：CoachMarks 与登录
+  // 遮罩同为 z-modal(90) 且 Teleport 到 body 末尾（后挂载压前）——
+  // .cm-scrim 盖住登录表单，submit 根本发不出去 → 401 循环弹窗。
+  // 修复：登录弹窗激活期间绝不启动/立即隐藏；登录完成后再启动引导。
+  // App.vue 在登录遮罩打开时置 body[data-auth-open="1"]。
+  const tryStart = () => {
+    const authOpen = document.body?.dataset?.authOpen === '1';
+    if (authOpen) {
+      active.value = false;
+      setTimeout(tryStart, 800);
+      return;
+    }
     // 若首次进入不是 Overview(如深链), steps[0] 的 .ov-actions 不在 → 跳过
     const el0 = document.querySelector(steps[0].sel);
     if (!el0) { finish(); return; }
     active.value = true;
     nextTick(measure);
-  }, 1200);
+  };
+  // 延迟到路由视图渲染(SVG 图绘制耗时), 再测量目标元素
+  setTimeout(tryStart, 1200);
   window.addEventListener('keydown', onKey);
   window.addEventListener('resize', onResize);
 });

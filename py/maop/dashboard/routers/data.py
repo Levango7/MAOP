@@ -481,37 +481,52 @@ async def api_logs_checker(limit: int = Query(500, ge=1, le=5000)) -> Any:
 
 
 @router.get("/api/logs/analysis")
-async def api_logs_analysis() -> dict[str, Any]:
+async def api_logs_analysis(type: str = Query("delegations", description="分析哪一路日志流（与日志页所选类型一致）")) -> dict[str, Any]:
+    # 一号用户实测修复（2026-08-31）：原实现硬编码 name="delegations" ——
+    # 用户看 dashboard/checker 日志时，"日志分析"卡片统计的却是另一路日志
+    # 的数据，与页面内容完全脱节。改为跟随 ?type=（前端传当前所选类型），
+    # delegations 走既有结果语义（exit_code→success/failure），其他类型按
+    # 行结构统计（level→success/error、agent 维度分布）。
     try:
-        logs = await get_bridge().logs_get(name="delegations", limit=10000)
+        logs = await get_bridge().logs_get(name=type or "delegations", limit=10000)
         if not isinstance(logs, list):
             logs = []
         total = len(logs)
         by_agent: dict[str, int] = {}
         by_status: dict[str, int] = {"success": 0, "failure": 0, "timeout": 0, "other": 0}
         error_patterns: dict[str, int] = {}
+        is_delegations = (type or "delegations") == "delegations"
         for e in logs:
             if not isinstance(e, dict):
                 continue
-            ag = e.get("agent", "unknown")
+            ag = e.get("agent") or e.get("ts_agent") or "unknown"
             by_agent[ag] = by_agent.get(ag, 0) + 1
-            res = e.get("result") if isinstance(e.get("result"), dict) else {}
-            ec = res.get("exit_code") if res else None
-            if ec == 0:
-                st = "success"
-            elif ec is not None:
-                st = "failure"
+            if is_delegations:
+                res = e.get("result") if isinstance(e.get("result"), dict) else {}
+                ec = res.get("exit_code") if res else None
+                if ec == 0:
+                    st = "success"
+                elif ec is not None:
+                    st = "failure"
+                else:
+                    st = e.get("status", "other")
             else:
-                st = e.get("status", "other")
+                # dashboard / checker rows carry level + ts/msg fields
+                lvl = str(e.get("level", "")).lower()
+                st = "failure" if lvl in ("error", "critical", "fatal") else (
+                    "success" if lvl in ("success", "info", "ok") else "other")
+                if e.get("status"):
+                    st = e["status"]
             if st in by_status:
                 by_status[st] += 1
             else:
                 by_status["other"] += 1
             if st == "failure":
-                ek = str((res or {}).get("error") or e.get("error") or "unknown")[:80]
+                ek = str((e.get("result") or {}).get("error") or e.get("error") or e.get("msg") or "unknown")[:80]
                 error_patterns[ek] = error_patterns.get(ek, 0) + 1
         return {"total": total, "by_agent": by_agent, "by_status": by_status,
-                "error_patterns": sorted(error_patterns.items(), key=lambda x: -x[1])[:10]}
+                "error_patterns": sorted(error_patterns.items(), key=lambda x: -x[1])[:10],
+                "type": type or "delegations"}
     except Exception as exc:
         logger.error('Logs analysis failed: %s', exc)
         return {"total": 0, "status": "error", "error": "Logs analysis unavailable"}

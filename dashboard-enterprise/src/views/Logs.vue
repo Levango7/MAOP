@@ -151,7 +151,9 @@ async function load() {
   error.value = null;
   const [l, a] = await Promise.allSettled([
     api.get(`/api/logs?type=${logType.value}`),
-    api.get('/api/logs/analysis'),
+    // 一号用户实测修复：分析跟随当前所选日志类型（此前后端硬编码
+    // delegations，看 dashboard 日志时统计的却是另一路数据）。
+    api.get(`/api/logs/analysis?type=${logType.value}`),
   ]);
   if (l.status === 'fulfilled') logs.value = l.value.logs || [];
   else error.value = (l.reason && l.reason.message) || 'Log stream failed';

@@ -219,6 +219,11 @@ def _register_data_routers(app: FastAPI) -> None:
     from maop.dashboard.routers import knowledge as knowledge_router
 
     app.include_router(knowledge_router.router)
+    # 一号用户实测修复（2026-08-31 知识图谱 "Unexpected token '<'" 根因）：
+    # kg_router（/api/knowledge-graph，v4.5.0）在 knowledge.py 中定义但从未
+    # include —— 请求落到 SPA fallback 返回 HTML，前端 JSON.parse 报
+    # "<!DOCTYPE" 错。
+    app.include_router(knowledge_router.kg_router)
 
     from maop.dashboard.routers import info as info_router
 

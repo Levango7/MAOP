@@ -474,6 +474,24 @@ agents:
     driver: cli
     model: deepseek-v4-flash-free
     timeout_s: 120
+  claude:
+    cli: claude
+    cli_args: -p '{task}'
+    capabilities:
+    - codegen
+    - chat
+    - planning
+    - search
+    - review
+    - explain
+    - refactor
+    - fileops
+    - orchestrate
+    description: Claude Code 2.1.x (headless -p, 一号用户本机实测 2026-08-31)
+    driver: cli
+    model: auto
+    timeout_s: 300
+    provider: anthropic
 loops:
   iterative:
     backoff_ms: 2000

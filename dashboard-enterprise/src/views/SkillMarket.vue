@@ -1,7 +1,9 @@
 <template>
   <div class="skill-market-page">
-    <!-- Coming Soon banner: 数据源接入中，提示用户功能规划中 -->
-    <div class="coming-soon-banner" role="alert">
+    <!-- 一号用户实测修复（2026-08-31）：Coming Soon banner 原为常驻 ——
+         给人"整个功能待开发"的错觉，实际 marketplace 聚合 + 一键安装
+         已实现。仅在数据源未配置/不可达（列表为空）时降级提示。 -->
+    <div v-if="!loading && !error && !filteredTools.length" class="coming-soon-banner" role="alert">
       <AppIcon name="info" :size="16" class="coming-soon-banner__icon" />
       <div class="coming-soon-banner__content">
         <span class="coming-soon-banner__title">🔜 {{ t('view.skills.market.comingSoon') }}</span>
