@@ -32,8 +32,19 @@ MAOP_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 
 
 def _get_engine():
+    import os
+
     from maop.core.agent.llm_chat.chat_engine import ChatEngine
-    return ChatEngine(root_dir=str(MAOP_ROOT))
+    # 一号用户实测（2026-08-31）：原构造用 ChatEngine 默认值（agent="mavis"
+    # —— agents.yaml 无此 agent，幽灵引用）且不传 default_model —— 内置
+    # provider 路径从不激活，永远 fallback 到 dispatcher 再报 agent 不存在。
+    # 修复：默认 agent 用真实存在的 MAOP 自引用；默认模型经
+    # MAOP_LLM_DEFAULT_MODEL 注入（models.yaml 中配置的任一模型名）。
+    return ChatEngine(
+        root_dir=str(MAOP_ROOT),
+        default_agent=os.environ.get("MAOP_LLM_DEFAULT_AGENT", "MAOP"),
+        default_model=os.environ.get("MAOP_LLM_DEFAULT_MODEL", ""),
+    )
 
 
 # ── Request/Response Models ──────────────────────────────────────

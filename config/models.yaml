@@ -1,4 +1,7 @@
 providers:
+  agnes:
+    base_url: https://api.agnes-ai.cn/v1
+    api_key_env: AGNES_API_KEY
   stepfun:
     base_url: https://api.stepfun.com/v1
     api_key_env: STEPFUN_API_KEY
@@ -10,6 +13,18 @@ providers:
   testprov:
     api_key_env: TEST_KEY
 models:
+  agnes-2.5-pro:
+    model_id: agnes-2.5-pro
+    provider: agnes
+    family: agnes
+    cost_per_1k_input: 0.01
+    cost_per_1k_output: 0.03
+    capabilities:
+    - codegen
+    - chat
+    - analysis
+    latency_tier: fast
+    quality_tier: excellent
   yi-large:
     model_id: yi-large
     provider: stepfun

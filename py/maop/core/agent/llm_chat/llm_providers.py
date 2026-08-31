@@ -46,7 +46,11 @@ class BaseLLMProvider(ABC):
     def __init__(self, provider_config: ProviderConfig) -> None:
         self._config = provider_config
         env_key = os.environ.get(provider_config.api_key_env, "")
-        self._api_key = env_key or provider_config.api_key
+        # 一号用户实测（2026-08-31）：带尾随空白的 key（Windows `set X=Y ` 的
+        # 经典陷阱）直接拼进 Authorization header → httpx "Illegal header
+        # value"。任何来源（env/YAML/vault）的 key 都 strip 后再使用。
+        raw = env_key or provider_config.api_key
+        self._api_key = raw.strip() if isinstance(raw, str) else raw
         self._client: httpx.AsyncClient | None = None
 
     def _get_client(self) -> httpx.AsyncClient:
