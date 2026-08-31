@@ -287,20 +287,37 @@ def _get_client_ip(request: Request) -> str:
 
 @router.get("/api/auth/status")
 async def auth_status(request: Request) -> Any:
-    """Check if auth is enabled and whether user is logged in."""
-    # F-P0-8 fix: check actual token from Authorization header
+    """Check if auth is enabled and whether user is logged in.
+
+    一号用户实测修复（2026-08-31 登录无限循环根因）：has_token 只查
+    Authorization header —— M6 改版后前端登录走 httpOnly cookie（后端
+    Set-Cookie），页面 reload 后的 status 请求不带 header → has_token
+    恒 false → 前端据此清掉刚存的 token → 又弹登录框，无限循环。
+    修复：header 之外同样检查 maop_token cookie（M7 修复已让 AuthMiddleware
+    接受 cookie），任一有效即 has_token=true。
+    """
     has_token = False
     if _auth_enabled:
+        mgr = None
+        candidates = []
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
+            candidates.append(auth_header[7:])
+        cookie_token = request.cookies.get("maop_token", "")
+        if cookie_token:
+            candidates.append(cookie_token)
+        for token in candidates:
+            if not token:
+                continue
             try:
-                mgr = get_auth_mgr()
+                if mgr is None:
+                    mgr = get_auth_mgr()
                 result = mgr.jwt_handler.validate_token(token)
                 if result.authenticated:
                     has_token = True
+                    break
             except Exception:
-                logger.debug('swallowed exception', exc_info=True)
+                logger.debug('auth status validate failed', exc_info=True)
     return {
         "auth_enabled": _auth_enabled,
         "has_token": has_token,

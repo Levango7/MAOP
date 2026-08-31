@@ -59,6 +59,12 @@ async def client(tmp_path, monkeypatch):
     """Create test client with auth enabled, using isolated temp DB."""
     monkeypatch.setattr(_auth_mod, "MAOP_ROOT", tmp_path)
     monkeypatch.setenv("MAOP_ROOT_DIR", str(tmp_path))
+    # user#1 fix (2026-08-31): the auth DB path ignores MAOP_ROOT — set
+    # MAOP_DATA_DIR (first-priority override in _resolve_data_dir) so the
+    # auth DB lives in tmp too. Otherwise e2e reads the REAL data/maop.db
+    # whose admin password differs (any dev machine running the dashboard
+    # breaks these tests with Invalid credentials).
+    monkeypatch.setenv("MAOP_DATA_DIR", str(tmp_path))
     _auth_mod._auth_mgr = None
     mgr = _auth_mod.get_auth_mgr()
     app.state.auth_manager = mgr

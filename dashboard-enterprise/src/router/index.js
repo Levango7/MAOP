@@ -54,9 +54,13 @@ export default router;
 
 // P1-4: 高频路由预加载策略。
 // 当用户进入任意页面时，在浏览器空闲时段（requestIdleCallback）预取
-// Overview / Chat 两个高频访问路由的 chunk，缩短后续跳转的首屏耗时。
+// 高频访问路由的 chunk，缩短后续跳转的首屏耗时。
 // 仅在支持 requestIdleCallback 的浏览器启用，避免在不支持的环境抛错。
-const PREFETCH_ROUTES = new Set(['overview', 'chat']);
+// 一号用户实测修复（2026-08-31）：原集合含 'chat'，但 /chat 是无 name 的
+// redirect 路由（重定向到 /run）——router.resolve({name:'chat'}) 每次页面
+// 加载都抛 Uncaught Error（vendor-vue resolve 报错）。改为预取真实存在的
+// overview + run（迭代 A 合并后 Chat 被吸收进 Run）。
+const PREFETCH_ROUTES = new Set(['overview', 'run']);
 const prefetched = new Set();
 function prefetchHighFrequencyRoutes() {
   if (typeof window === 'undefined') return;
