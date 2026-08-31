@@ -67,7 +67,18 @@ def _warn_deprecated_env_aliases() -> None:
 _warn_deprecated_env_aliases()
 
 # ── Paths ──────────────────────────────────────────────────────────
-MAOP_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+# 3f335fb: env first, path-derivation fallback. The derivation assumes the
+# repo layout py/maop/dashboard/... — inside the container maop/ sits at
+# /app/maop (one level shallower), so parents[3] resolved to "/" and the
+# backup scheduler tried to mkdir /data (Permission denied in the
+# compose-smoke logs). get_root_dir() honors MAOP_ROOT_DIR / MAOP_ROOT
+# (the container sets MAOP_ROOT=/app) with the derivation as last resort.
+try:
+    from maop.config.env import get_root_dir as _get_root_dir
+
+    MAOP_ROOT = _get_root_dir(default=Path(__file__).resolve().parent.parent.parent.parent)
+except Exception:
+    MAOP_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DASH_DIR = MAOP_ROOT / "dashboard"
 DASH_VUE3_DIST_DIR = MAOP_ROOT / "dashboard" / "dist-enterprise"
 DASH_VUE3_SRC_DIR = MAOP_ROOT / "dashboard-enterprise"

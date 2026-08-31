@@ -282,8 +282,14 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'viewer',
-  created TEXT NOT NULL DEFAULT ''
+  -- 3f335fb: align with the ONLY runtime consumer (dashboard/routers/auth.py
+  -- _ensure_default_user/_db_login_user), which uses the plural `roles`
+  -- JSON column + created_at + enabled. The previous singular `role`/`created`
+  -- columns made every default-admin bootstrap fail with "table users has
+  -- no column named roles" inside the container (compose-smoke log).
+  roles TEXT NOT NULL DEFAULT '["read"]',
+  created_at REAL NOT NULL DEFAULT 0.0,
+  enabled INTEGER NOT NULL DEFAULT 1
 );
 
 -- ── Vector entries ──────────────────────────────────────────

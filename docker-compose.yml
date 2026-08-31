@@ -78,6 +78,7 @@ services:
       - maop-logs:/app/logs
       - ./config:/app/config:ro
     environment:
+      - MAOP_ROOT_DIR=/app
       - MAOP_ROOT=/app
       - MAOP_DATA_DIR=/app/data
       - MAOP_LOG_LEVEL=${MAOP_LOG_LEVEL:-INFO}
@@ -159,6 +160,7 @@ services:
       - maop-logs:/app/logs
       - ./config:/app/config:ro
     environment:
+      - MAOP_ROOT_DIR=/app
       - MAOP_ROOT=/app
       - MAOP_DATA_DIR=/app/data
       - MAOP_LOG_LEVEL=${MAOP_LOG_LEVEL:-INFO}
@@ -209,6 +211,7 @@ services:
       - maop-logs:/app/logs
       - ./config:/app/config:ro
     environment:
+      - MAOP_ROOT_DIR=/app
       - MAOP_ROOT=/app
       - MAOP_DATA_DIR=/app/data
       - MAOP_LOG_LEVEL=${MAOP_LOG_LEVEL:-INFO}
