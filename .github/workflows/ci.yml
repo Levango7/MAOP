@@ -692,30 +692,36 @@ jobs:
         # Explicit build-args (Docker Hub direct) — see the docker job's
         # "Build and push" step for the ARG-scope root cause.
         run: docker build -f py/Dockerfile --build-arg PYTHON_IMAGE=python:3.13-slim --build-arg NODE_IMAGE=node:20-alpine -t maop:scan .
+      - name: Install trivy CLI
+        # 5d80ce2: the trivy-action wrapper failed 3 rounds in a row with no
+        # report and no diagnosable output. Install the CLI directly — its
+        # stderr lands in the step log/annotations and nothing is hidden
+        # behind the action's output plumbing. Pinned version, no floating
+        # tags (supply-chain rule, P3-C-03).
+        run: |
+          curl -sfL https://github.com/aquasecurity/trivy/releases/download/v0.65.0/trivy_0.65.0_Linux-64bit.tar.gz -o /tmp/trivy.tgz
+          tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
+          trivy --version
+
       - name: Run trivy vulnerability scan
-        # P3-C-03 fix: exit-code '1' + severity CRITICAL — CRITICAL 漏洞阻断 CI，
-        # HIGH 漏洞仍生成报告供审查（不阻断）。此前 exit-code '0' 让所有漏洞
-        # （含 CRITICAL）都不阻断 CI，供应链漏洞无门禁。
-        # ignore-unfixed: 只报告有可用修复的漏洞，忽略上游未修复的
-        # 供应链安全: 固定到具体版本 tag，禁止 @master/@main 浮动引用
-        # （防止上游仓库被劫持时恶意代码直接进入 CI 执行环境）
-        # ff244be: @0.33.0 不存在 —— 仓库 tag 是 v 前缀（v0.33.0），
-        # 用无 v 的名字解析失败。固定到 v0.33.1（0.33 系列的 patch 版）。
-        # ee44aac: trivy 连续两轮扫描失败且连 report 都不产出 —— 最大嫌疑
-        # 是 trivy-db 下载（GHCR 匿名拉取限流，runner 高峰期 429/403 常见）。
-        # 先以 skip-db-update 模式重试 + inline DB 缓存；若仍失败 annotate 步
-        # 骤会给出可读错误。
-        uses: aquasecurity/trivy-action@v0.33.1
-        env:
-          TRIVY_DB_CACHE_DIR: ${{ github.workspace }}/.trivy-cache
-        with:
-          image-ref: maop:scan
-          format: json
-          output: ${{ github.workspace }}/trivy-report.json
-          exit-code: '1'
-          severity: CRITICAL
-          ignore-unfixed: true
-          vuln-type: os,library
+        # P3-C-03 fix: CRITICAL findings block CI; HIGH still reported for
+        # review. ignore-unfixed: only report findings with a fix available.
+        # DB caching via actions/cache keyed on the week — avoids the GHCR
+        # anonymous pull rate-limits suspected of killing the action-based
+        # runs (3 rounds: no report, no readable error).
+        run: |
+          trivy image --severity CRITICAL --ignore-unfixed \
+            --format json --output trivy-report.json \
+            --exit-code 1 --timeout 10m \
+            maop:scan || code=$?
+          if [ "${code:-0}" != "0" ] && [ "${code:-0}" != "1" ]; then
+            echo "::error::trivy scan error (exit=$code)"
+            exit "$code"
+          fi
+          if [ "${code:-0}" = "1" ]; then
+            echo "::error::trivy found CRITICAL findings"
+            exit 1
+          fi
       - name: Trivy CRITICAL summary (on failure)
         # a308278: trivy exit-1 blocked CI but the finding list was only in
         # the (unfetchable) report — surface the CVE IDs as annotations so
@@ -771,6 +777,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Compose up (smoke)
+        # 5d80ce2: every bash construct in this step (for/$(seq)/while-read
+        # pipelines) never executed on the runner — zero annotations across
+        # 3 rounds, same "1-second-death with no output" signature as the
+        # old Windows e2e steps. The entire up+poll+diagnose flow now lives
+        # in a single python invocation (scripts/compose_smoke.py): no bash
+        # loops, no command substitution, cross-platform, locally testable.
         env:
           # F-P1-9 fix: provide required secrets/env for compose smoke test.
           # MAOP_JWT_SECRET must be >=32 chars (enforced by load_jwt_secret()).
@@ -785,27 +797,7 @@ jobs:
           # with no override path).
           PYTHON_IMAGE: python:3.13-slim
           NODE_IMAGE: node:20-alpine
-        run: |
-          docker compose -f docker-compose.yml up -d --build
-          # Wait-for-health loop instead of a fixed 10s sleep: the full stack
-          # (dashboard + agent-executor + postgres + redis + ...) builds and
-          # boots slower than 10s on shared runners; poll up to ~120s.
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:9079/api/health; then
-              echo " (healthy after ${i}x2s)"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::compose smoke: /api/health not healthy after 120s"
-          # Single-line ::error:: echoes only — loops/pipes with read -r
-          # produced zero annotations on the runner (same class of issue as
-          # the Windows e2e steps). Head-limit to 25 lines each, sanitized.
-          docker compose -f docker-compose.yml ps 2>&1 | sed 's/::/%3A%3A/g' | head -25 | sed 's/^/PS: /' > /tmp/compose_diag.txt || true
-          docker compose -f docker-compose.yml logs --tail 30 dashboard 2>&1 | sed 's/::/%3A%3A/g' | head -25 | sed 's/^/LOG: /' >> /tmp/compose_diag.txt || true
-          docker compose -f docker-compose.yml logs --tail 20 2>&1 | sed 's/::/%3A%3A/g' | head -15 | sed 's/^/ALL: /' >> /tmp/compose_diag.txt || true
-          while IFS= read -r line; do echo "::error::compose: ${line:0:200}"; done < /tmp/compose_diag.txt || true
-          exit 1
+        run: python py/scripts/compose_smoke.py
 
       - name: Run smoke tests
         run: |
