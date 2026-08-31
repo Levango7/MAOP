@@ -697,9 +697,10 @@ jobs:
         # report and no diagnosable output. Install the CLI directly — its
         # stderr lands in the step log/annotations and nothing is hidden
         # behind the action's output plumbing. Pinned version, no floating
-        # tags (supply-chain rule, P3-C-03).
+        # tags (supply-chain rule, P3-C-03). ef14bee: v0.65.0 does not exist
+        # (curl 404 → exit 22); v0.74.0 asset verified via the releases API.
         run: |
-          curl -sfL https://github.com/aquasecurity/trivy/releases/download/v0.65.0/trivy_0.65.0_Linux-64bit.tar.gz -o /tmp/trivy.tgz
+          curl -sfL https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz -o /tmp/trivy.tgz
           tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
           trivy --version
 
