@@ -89,11 +89,17 @@ class ConfigHotReload:
         self._poll_interval = poll_interval_s
         self._on_reload = on_reload
 
-        # Config files to watch (routing rules live inside agents.yaml)
+        # Config files to watch (routing rules live inside agents.yaml).
+        # Includes mcp_servers.yaml and tool_whitelist.yaml — both are
+        # hot-affecting: MCP server / tool permissions changes should reload
+        # without a process restart, otherwise stale config is served until
+        # a manual bounce.
         self._watch_files = [
             self._root / "config" / "agents.yaml",
             self._root / "config" / "rules.yaml",
             self._root / "config" / "models.yaml",
+            self._root / "config" / "mcp_servers.yaml",
+            self._root / "config" / "tool_whitelist.yaml",
         ]
 
         # State

@@ -343,7 +343,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.burst = burst
         self.key_func = key_func or self._default_key
         self._buckets: dict[str, Any] = {}
-        self._lock_time: dict[str, float] = {}
         self._request_count = 0  # for periodic cleanup
 
     @staticmethod

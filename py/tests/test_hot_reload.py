@@ -96,12 +96,14 @@ class TestHotReloadState:
 
 @pytest.fixture
 def config_files(tmp_path):
-    """Create config directory with agents.yaml, rules.yaml, models.yaml."""
+    """Create config directory with the full set of hot-reloaded files."""
     config_dir = tmp_path / "config"
     config_dir.mkdir(parents=True)
     (config_dir / "agents.yaml").write_text("agents: {}", encoding="utf-8")
     (config_dir / "rules.yaml").write_text("guards: {}", encoding="utf-8")
     (config_dir / "models.yaml").write_text("models: {}", encoding="utf-8")
+    (config_dir / "mcp_servers.yaml").write_text("servers: {}", encoding="utf-8")
+    (config_dir / "tool_whitelist.yaml").write_text("allow: []", encoding="utf-8")
     return tmp_path
 
 
@@ -131,10 +133,12 @@ class TestConfigHotReloadInit:
 
     def test_init_watch_files(self, config_files):
         wr = ConfigHotReload(root_dir=config_files)
-        assert len(wr._watch_files) == 3
+        assert len(wr._watch_files) == 5
         assert (config_files / "config" / "agents.yaml") in wr._watch_files
         assert (config_files / "config" / "rules.yaml") in wr._watch_files
         assert (config_files / "config" / "models.yaml") in wr._watch_files
+        assert (config_files / "config" / "mcp_servers.yaml") in wr._watch_files
+        assert (config_files / "config" / "tool_whitelist.yaml") in wr._watch_files
 
     def test_init_hashes_populated(self, config_files):
         wr = ConfigHotReload(root_dir=config_files)
