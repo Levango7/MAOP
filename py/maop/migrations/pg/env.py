@@ -42,22 +42,56 @@ target_metadata = None
 def _enable_extensions(connection) -> None:
     """Enable PG extensions required by the schema (idempotent).
 
-    - ``pgvector``: ``vector`` type for sqlite-vec table replacement.
-    - ``pg_trgm``: trigram index for fuzzy text search (optional, best-effort).
+    - ``pgvector``: ``vector`` type for sqlite-vec table replacement --- the
+      schema hard-depends on it, so a missing/un-creatable extension must
+      **fail fast** with a clear, actionable message rather than surfacing a
+      confusing error later at an unrelated migration line.
 
-    Errors are swallowed because the extensions may already be installed
-    at the template/database level and CREATE EXTENSION requires superuser
-    privileges — failing here should not abort migrations in CI where the
-    extension is pre-provisioned.
+    - ``pg_trgm``: trigram index for fuzzy text search (optional) ---
+      best-effort only.
+
+    Design: check each extension in ``pg_extension`` first. When it is already
+    provisioned (install template / pre-provisioned CI cluster / a superuser
+    made it world-visible) we skip CREATE entirely, which keeps CI green even
+    when the migration user lacks CREATEDB/CREATE privilege on the extension.
+    Only when the extension is genuinely absent do we attempt CREATE:
+      - ``vector`` failure -> raise RuntimeError with how-to-fix guidance;
+      - ``pg_trgm`` failure -> log warning and continue.
     """
     from sqlalchemy import text
 
     for ext in ("vector", "pg_trgm"):
+        installed = connection.execute(
+            text("SELECT 1 FROM pg_extension WHERE extname = :name"),
+            {"name": ext},
+        ).first()
+        if installed:
+            logger.debug("PG extension %r already provisioned; skipping", ext)
+            continue
         try:
             connection.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
-        except Exception:
-            # CREATE EXTENSION 可能因权限不足或已预装而失败，记录 debug 日志
-            logger.debug("CREATE EXTENSION %s failed (may be pre-provisioned)", ext, exc_info=True)
+        except Exception as exc:  # noqa: BLE001 — surfaced per-extension below
+            if ext == "vector":
+                logger.error(
+                    "PG extension 'vector' is REQUIRED but could not be "
+                    "created: %s. Ensure the pgvector package is installed and "
+                    "the migration role can CREATE the extension, then re-run "
+                    "the migration.",
+                    exc,
+                )
+                raise RuntimeError(
+                    "Required PostgreSQL extension 'vector' (pgvector) is "
+                    "missing and could not be created. Install pgvector on "
+                    "the server and/or grant CREATE EXTENSION permission to "
+                    "the migration role before migrating."
+                ) from exc
+            # Optional extension: log and continue so migrations proceed even
+            # when trigram support is unavailable (e.g. restricted roles).
+            logger.warning(
+                "Optional PG extension 'pg_trgm' could not be created: %s. "
+                "Trigram-based fuzzy search will be unavailable.",
+                exc,
+            )
 
 
 def run_migrations_offline() -> None:
