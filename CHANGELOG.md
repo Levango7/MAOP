@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **吞异常规范化（P1）**：全库 35+ 处 `logger.debug("Silent exception in ...")` 升级为 `logger.warning` 并带 `[module]` 上下文前缀；路由决策指标、认证 Token 撤销、Bloom filter mmh3 fallback 等关键路径从 debug 提升至 warning，production 可观测。控制流不变（仍为 best-effort）。
+- **PG 迁移 CREATE EXTENSION 失败分级**：`vector` 必选扩展失败时 fail-fast 报明确错误；`pg_trgm` 可选扩展失败仍 best-effort 不中断。
+- **HookManager 单例重置（test flaky fix）**：在 `conftest.py` autouse fixture 中加入 `reset_hook_manager()`，消除测试间 MAOP_DATA_DIR 变化导致的全局单例路径 dangling（既有 flaky，非回归）。
+- **hot_reload 监视范围扩展**：从仅监视 3 个配置文件扩展至 5 个（新增 `mcp_servers.yaml` / `tool_whitelist.yaml`），防止 MCP 配置漂移未检测。
+- **RateLimitMiddleware 死代码清除**：删除 `_lock_time: dict[str, float] = {}`（未在运行时读取）。
+
 ### Changed
 - **PyPI 包名变更**：`maop` → `maop-orchestrator`（PyPI 上 `maop` 被他人占用）。`import maop` 不变，仅 `pip install maop-orchestrator`。`pyproject.toml` 新增 `[tool.hatch.build.targets.wheel] packages = ["maop"]` 确保 import 名不变。14 个文档文件同步更新。
 - **48h 长稳测试脚本**：新建 `scripts/run_soak_48h.ps1`（一键启动/停止/查看）+ `deliverables/soak-test-report-48h.md`（监控指南 + 结果模板）。

@@ -394,8 +394,12 @@ class A2AClient:
                 if data.get("error"):
                     return None
                 return A2ACard(**data.get("result", {}))
-        except Exception:
-            logger.debug("Silent exception in core/a2a.py:355", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[a2a] Failed to fetch agent card for name=%s from %s, "
+                "returning None (caller will skip this peer in delegation): %s",
+                agent_name, endpoint, exc, exc_info=True,
+            )
             return None
 
 

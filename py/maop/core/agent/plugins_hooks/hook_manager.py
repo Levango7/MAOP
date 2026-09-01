@@ -203,8 +203,11 @@ class HookManager:
                 cols = [r[1] for r in conn.execute("PRAGMA table_info(hooks)").fetchall()]
                 if "callback_path" not in cols:
                     conn.execute("ALTER TABLE hooks ADD COLUMN callback_path TEXT DEFAULT ''")
-            except Exception:
-                logger.debug("Silent exception in core/hook_manager.py:206", exc_info=True)
+            except Exception as exc:
+                logger.warning(
+                    "[hook_manager] Schema migration ALTER TABLE failed, continuing with existing schema: %s",
+                    exc, exc_info=True,
+                )
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS hook_logs (
                     id TEXT PRIMARY KEY,
@@ -440,8 +443,11 @@ class HookManager:
                     data={"event": event, "results": [r.model_dump() for r in results], "final_payload": payload},
                     source="hook_manager",
                 ))
-            except Exception:
-                logger.debug("Silent exception in core/hook_manager.py:443", exc_info=True)
+            except Exception as exc:
+                logger.warning(
+                    "[hook_manager] Failed to publish hook event to event bus, continuing: %s",
+                    exc, exc_info=True,
+                )
 
         return results
 
@@ -649,8 +655,11 @@ class HookManager:
             import importlib
             mod = importlib.import_module(parts[0])
             return cast(Callable[..., Any] | None, getattr(mod, parts[1]))
-        except Exception:
-            logger.debug("Silent exception in core/hook_manager.py:634", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[hook_manager] Failed to resolve callback '%s', skipping hook: %s",
+                dotted_path, exc, exc_info=True,
+            )
             return None
 
     # ── Internal helpers ───────────────────────────────────────
@@ -696,8 +705,11 @@ class HookManager:
                      1 if result.success else 0, result.error,
                      result.duration_ms, now),
                 )
-        except Exception:
-            logger.debug("Silent exception in core/hook_manager.py:680", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[hook_manager] Failed to insert hook log for %s, continuing: %s",
+                result.hook_id, exc, exc_info=True,
+            )
 
 
 # ── Global singleton ──────────────────────────────────────────────
@@ -711,3 +723,9 @@ def get_hook_manager(root_dir: str | Path | None = None) -> HookManager:
     if _hook_manager is None:
         _hook_manager = HookManager(root_dir=root_dir or "data")
     return _hook_manager
+
+
+def reset_hook_manager() -> None:
+    """Reset the global HookManager singleton (mainly for tests)."""
+    global _hook_manager
+    _hook_manager = None

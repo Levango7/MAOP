@@ -54,8 +54,12 @@ def _file_hash(path: Path) -> str | None:
         return None
     try:
         return hashlib.sha256(path.read_bytes()).hexdigest()
-    except Exception:
-        logger.debug("Silent exception in config/hot_reload.py:57", exc_info=True)
+    except Exception as exc:
+        logger.warning(
+            "[hot_reload] Failed to compute file hash for %s, treating as 'no change' "
+            "(change detection skipped, will rely on mtime): %s",
+            path, exc, exc_info=True,
+        )
         return None
 
 

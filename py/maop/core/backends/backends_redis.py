@@ -138,8 +138,12 @@ class RedisQueueBackend(QueueBackend):
         try:
             self._client.xclaim(stream, "maop_group", self._consumer_name, min_idle_time=0, message_ids=[message_id])
             return True
-        except Exception:
-            logger.debug("Silent exception in core/backends_redis.py:140", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[backends_redis] xclaim nack failed for topic=%s message_id=%s, "
+                "returning False (message stays in PEL, will be redelivered after idle timeout): %s",
+                topic, message_id, exc, exc_info=True,
+            )
             return False
 
     def topic_stats(self, topic: str) -> dict[str, Any]:

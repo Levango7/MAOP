@@ -169,8 +169,11 @@ class ReactLoop:
             try:
                 from maop.core.reliability.change_tracker import ChangeTracker
                 self._change_tracker = ChangeTracker(root_dir=self._root_dir)
-            except Exception:
-                logger.debug("Silent exception in core/react_loop.py:172", exc_info=True)
+            except Exception as exc:
+                logger.warning(
+                    "[react_loop] Failed to init ChangeTracker, change tracking disabled: %s",
+                    exc, exc_info=True,
+                )
         return self._change_tracker
 
     @staticmethod

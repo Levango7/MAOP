@@ -218,8 +218,11 @@ class CircuitBreaker:
             config = loader.load()
             names = list(config.agents.keys()) if hasattr(config, "agents") and config.agents else []
             return names
-        except Exception:
-            logger.debug("Silent exception in core/circuit_breaker.py:221", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[circuit_breaker] Failed to load agent config for default list, returning empty: %s",
+                exc, exc_info=True,
+            )
             return []
 
     # ── SQLite connection ─────────────────────────────────────
@@ -714,8 +717,11 @@ class CircuitBreaker:
                     params,
                 ).fetchone()
                 return row["cnt"] if row else 0
-        except Exception:
-            logger.debug("Silent exception in core/circuit_breaker.py:699", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[circuit_breaker] Failed to query breaker event count, returning 0: %s",
+                exc, exc_info=True,
+            )
             return 0
 
     # ── Async wrappers ─────────────────────────────────────

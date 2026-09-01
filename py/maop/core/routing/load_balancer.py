@@ -640,8 +640,11 @@ def _record_lb_decision(
         )
         MAOP_ROUTING_DECISION_TOTAL.inc(labels={"stage": "load_balancer"})
         MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)
-    except Exception:
-        logger.debug("Silent exception in core/load_balancer.py:643", exc_info=True)
+    except Exception as exc:
+        logger.warning(
+            "[load_balancer] Failed to record routing decision metrics, continuing: %s",
+            exc, exc_info=True,
+        )
 
     record_decision_safe(RoutingDecisionRecord(
         trace_id=effective_trace,

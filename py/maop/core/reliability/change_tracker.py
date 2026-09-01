@@ -183,8 +183,11 @@ class ChangeTracker:
                 for chunk in iter(lambda: fh.read(self._HASH_CHUNK), b""):
                     h.update(chunk)
             return h.hexdigest()[:16]
-        except Exception:
-            logger.debug("Silent exception in core/change_tracker.py:167", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[change_tracker] Failed to hash file %s, returning empty signature: %s",
+                path, exc, exc_info=True,
+            )
             return ""
 
     def snapshot(self, workdir: str, label: str = "") -> str:

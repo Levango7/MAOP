@@ -111,8 +111,11 @@ class RegressionTestRunner:
                 from maop.core.reliability.services import ServiceContainer
                 svc = ServiceContainer(root_dir=self._root)
                 dispatcher = svc.get("dispatcher", raise_on_failure=False)
-            except Exception:
-                logger.debug("Silent exception in core/regression.py:113", exc_info=True)
+            except Exception as exc:
+                logger.warning(
+                    "[regression] Failed to get dispatcher from ServiceContainer, test will fail: %s",
+                    exc, exc_info=True,
+                )
 
         if dispatcher is None:
             result.error = "No dispatcher available"

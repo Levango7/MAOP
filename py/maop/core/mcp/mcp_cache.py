@@ -279,7 +279,10 @@ class MCPCache:
         """Increment the global eviction metric (defensive import)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CACHE_EVICTION_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_cache.py:282", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_cache] Failed to import MAOP_MCP_CACHE_EVICTION_TOTAL, eviction not recorded: %s",
+                exc, exc_info=True,
+            )
             return
         MAOP_MCP_CACHE_EVICTION_TOTAL.inc()

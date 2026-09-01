@@ -274,8 +274,11 @@ class JWTHandler:
             self._revoked[sig_b64] = exp
             self._save_revoked()
             return True
-        except Exception:
-            logger.debug("Silent exception in core/auth.py:268", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[auth] Failed to revoke token, revocation skipped: %s",
+                exc, exc_info=True,
+            )
             return False
 
     def _cleanup_revoked(self) -> None:

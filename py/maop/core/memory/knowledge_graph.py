@@ -490,8 +490,11 @@ class KnowledgeGraph:
                     f"SELECT * FROM relations WHERE {where} ORDER BY confidence DESC LIMIT 50",
                     params,
                 ).fetchall()
-            except Exception:
-                logger.debug("Silent exception in core/knowledge_graph.py:291", exc_info=True)
+            except Exception as exc:
+                logger.warning(
+                    "[knowledge_graph] Failed to query relations, returning empty: %s",
+                    exc, exc_info=True,
+                )
                 return []
 
         return [GraphEdge(
@@ -530,8 +533,11 @@ class KnowledgeGraph:
                     attributes=json.loads(row["attributes"]) if row["attributes"] else {},
                     in_degree=in_deg, out_degree=out_deg,
                 )
-            except Exception:
-                logger.debug("Silent exception in core/knowledge_graph.py:330", exc_info=True)
+            except Exception as exc:
+                logger.warning(
+                    "[knowledge_graph] Failed to get node %s, returning None: %s",
+                    name, exc, exc_info=True,
+                )
                 return None
 
     def _get_facts_for(self, entity_name: str, limit: int = 10) -> list[dict[str, Any]]:
@@ -543,8 +549,11 @@ class KnowledgeGraph:
                     "SELECT * FROM facts WHERE subject LIKE ? ORDER BY confidence DESC LIMIT ?",
                     (f"%{entity_name}%", limit),
                 ).fetchall()
-            except Exception:
-                logger.debug("Silent exception in core/knowledge_graph.py:342", exc_info=True)
+            except Exception as exc:
+                logger.warning(
+                    "[knowledge_graph] Failed to query facts for %s, returning empty: %s",
+                    entity_name, exc, exc_info=True,
+                )
                 return []
         return [dict(r) for r in rows]
 

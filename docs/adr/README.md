@@ -19,3 +19,4 @@
 | [015](015-distributed-ha-redis-lease.md) | 分布式 HA Redis 租约 + Fencing Token | Accepted (2026-07-25) |
 | [016](016-dual-edition-architecture.md) | 双版架构（Personal / Enterprise） | Active (2026-07-25) |
 | [017](017-dual-repo-isolation.md) | 双仓库物理隔离 | Active (2026-08-20) |
+| [018](018-swallowed-exception-handling.md) | 吞异常处理规范化 + HookManager 单例重置 | Accepted (2026-09-02) |

@@ -75,8 +75,11 @@ class MCPHubMetricsMixin:
                 MAOP_MCP_CALL_AUDITED_TOTAL,
                 MAOP_MCP_CALL_DENIED_TOTAL,
             )
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1279", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_metrics] Failed to import MCP call metrics, skipping audit record: %s",
+                exc, exc_info=True,
+            )
             return
         MAOP_MCP_CALL_AUDITED_TOTAL.inc()
         if allowed:
@@ -88,8 +91,11 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_calls_total (label=server,tool)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CALLS_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1293", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_metrics] Failed to import MAOP_MCP_CALLS_TOTAL, skipping call attempt: %s",
+                exc, exc_info=True,
+            )
             return
         MAOP_MCP_CALLS_TOTAL.inc(labels={"server": server_name, "tool": tool_name})
 
@@ -97,8 +103,11 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_call_errors_total (label=server,tool)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CALL_ERRORS_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1301", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_metrics] Failed to import MAOP_MCP_CALL_ERRORS_TOTAL, skipping error record: %s",
+                exc, exc_info=True,
+            )
             return
         MAOP_MCP_CALL_ERRORS_TOTAL.inc(labels={"server": server_name, "tool": tool_name})
 
@@ -107,8 +116,11 @@ class MCPHubMetricsMixin:
         class in monitoring.py does not carry labels)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CALL_DURATION_SECONDS
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1310", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_metrics] Failed to import MAOP_MCP_CALL_DURATION_SECONDS, skipping duration: %s",
+                exc, exc_info=True,
+            )
             return
         elapsed = _time.monotonic() - started_monotonic
         if elapsed < 0:
@@ -119,8 +131,11 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_health_check_total (label=server,result)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_HEALTH_CHECK_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1321", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_metrics] Failed to import MAOP_MCP_HEALTH_CHECK_TOTAL, skipping health check: %s",
+                exc, exc_info=True,
+            )
             return
         MAOP_MCP_HEALTH_CHECK_TOTAL.inc(
             labels={"server": server_name, "result": "healthy" if healthy else "unhealthy"},
@@ -130,8 +145,11 @@ class MCPHubMetricsMixin:
         """+1 on MAOP_mcp_servers_connected (no labels)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_SERVERS_CONNECTED
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1331", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_metrics] Failed to import MAOP_MCP_SERVERS_CONNECTED, skipping inc: %s",
+                exc, exc_info=True,
+            )
             return
         MAOP_MCP_SERVERS_CONNECTED.inc()
 
@@ -139,8 +157,11 @@ class MCPHubMetricsMixin:
         """-1 on MAOP_mcp_servers_connected (no labels)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_SERVERS_CONNECTED
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1339", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_metrics] Failed to import MAOP_MCP_SERVERS_CONNECTED, skipping dec: %s",
+                exc, exc_info=True,
+            )
             return
         MAOP_MCP_SERVERS_CONNECTED.dec()
 
@@ -148,8 +169,11 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_cache_hit_total (label=server)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CACHE_HIT_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1349", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_metrics] Failed to import MAOP_MCP_CACHE_HIT_TOTAL, skipping hit: %s",
+                exc, exc_info=True,
+            )
             return
         MAOP_MCP_CACHE_HIT_TOTAL.inc(labels={"server": server_name})
 
@@ -157,8 +181,11 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_cache_miss_total (label=server)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CACHE_MISS_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1357", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_metrics] Failed to import MAOP_MCP_CACHE_MISS_TOTAL, skipping miss: %s",
+                exc, exc_info=True,
+            )
             return
         MAOP_MCP_CACHE_MISS_TOTAL.inc(labels={"server": server_name})
 
@@ -166,8 +193,11 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_rate_limited_total (label=server)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_RATE_LIMITED_TOTAL
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1365", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_metrics] Failed to import MAOP_MCP_RATE_LIMITED_TOTAL, skipping rate limit: %s",
+                exc, exc_info=True,
+            )
             return
         MAOP_MCP_RATE_LIMITED_TOTAL.inc(labels={"server": server_name})
 

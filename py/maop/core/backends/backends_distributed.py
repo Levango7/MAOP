@@ -320,5 +320,9 @@ class EtcdKVBackend(KVBackend):
             if transport is not None and hasattr(transport, "close"):
                 try:
                     transport.close()
-                except Exception:
-                    logger.debug("Silent exception in core/backends_distributed.py:274", exc_info=True)
+                except Exception as exc:
+                    logger.warning(
+                        "[backends_distributed] etcd transport.close() failed during "
+                        "backend shutdown (best-effort cleanup, ignored): %s",
+                        exc, exc_info=True,
+                    )

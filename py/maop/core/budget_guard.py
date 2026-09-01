@@ -198,8 +198,12 @@ class BudgetGuard:
                     "cost_used": cost_usd,
                     "reason": reason,
                 }))
-            except Exception:
-                logger.debug("Silent exception in core/budget_guard.py:201", exc_info=True)
+            except Exception as exc:
+                logger.warning(
+                    "[budget_guard] on_budget_exceed hook dispatch failed (best-effort, "
+                    "budget enforcement still returns BudgetStatus normally): %s",
+                    exc, exc_info=True,
+                )
 
         return BudgetStatus(
             date=today,

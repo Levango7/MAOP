@@ -46,8 +46,11 @@ def _mmh3_hash32(key: bytes, seed: int = 0) -> int:
     if _HAS_MMH3 and _mmh3 is not None:
         try:
             return _mmh3.hash(key, seed, signed=False)  # type: ignore
-        except Exception:
-            logger.debug("Silent exception in core/bloom_filter.py:49", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[bloom_filter] mmh3.hash failed, falling back to FNV-1a: %s",
+                exc, exc_info=True,
+            )
     # Pure-Python fallback (FNV-1a variant with seed mixing)
     h = 2166136261 ^ seed
     for b in key:

@@ -45,8 +45,11 @@ def _safe_enum_value(val: Any) -> str:
         if "magicmock" in s or s.startswith("<"):
             return ""
         return s
-    except Exception:
-        logger.debug("Silent exception in core/provider_health.py:48", exc_info=True)
+    except Exception as exc:
+        logger.warning(
+            "[provider_health] Failed to extract provider type string, returning empty: %s",
+            exc, exc_info=True,
+        )
         return ""
 
 

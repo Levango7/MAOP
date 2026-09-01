@@ -247,7 +247,7 @@ class AgentScanner:
             first_line = output.split("\n")[0].strip() if output else ""
             return first_line[:80]
         except Exception:
-            logger.debug("Silent exception in core/agent_scanner.py:248", exc_info=True)
+            logger.warning("Silent exception in core/agent_scanner.py:250: 单次扫描探测 CLI 版本，失败返回空字符串即可，不阻断整体扫描", exc_info=True)
             return ""
 
     def scan(self) -> list[ScannedAgent]:

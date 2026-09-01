@@ -46,8 +46,11 @@ class MCPHubCompatMixin:
             return None
         try:
             return MCPServerConfig.model_validate_json(row["config"])  # type: ignore
-        except Exception:
-            logger.debug("Silent exception in core/mcp_hub.py:1594", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_compat] Failed to validate MCP server config JSON, returning None: %s",
+                exc, exc_info=True,
+            )
             return None
 
     def find_server_id_by_name(self, name: str) -> str | None:

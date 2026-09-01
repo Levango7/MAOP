@@ -179,7 +179,7 @@ class ProjectContext:
                     content = fpath.read_text(encoding="utf-8", errors="replace")[:1000]
                     result[name] = content
                 except Exception:
-                    logger.debug("Silent exception in core/project_context.py:181", exc_info=True)
+                    logger.warning("Silent exception in core/project_context.py:182: 防御性读取项目配置片段，缺失/坏文件不影响主流程", exc_info=True)
         return result
 
     def _read_instructions(self) -> str:
@@ -191,8 +191,11 @@ class ProjectContext:
                     content = fpath.read_text(encoding="utf-8", errors="replace").strip()
                     if content:
                         parts.append(f"### {name}\n{content[:2000]}")
-                except Exception:
-                    logger.debug("Silent exception in core/project_context.py:194", exc_info=True)
+                except Exception as exc:
+                    logger.warning(
+                        "[project_context] Failed to read instruction file %s, skipping: %s",
+                        name, exc, exc_info=True,
+                    )
         return "\n\n".join(parts)
 
     def _detect_recent_changes(self) -> str:
@@ -206,8 +209,11 @@ class ProjectContext:
             if result.returncode == 0 and result.stdout.strip():
                 lines = result.stdout.strip().splitlines()[:20]
                 return "\n".join(lines)
-        except Exception:
-            logger.debug("Silent exception in core/project_context.py:209", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[project_context] git status failed, falling back to mtime scan: %s",
+                exc, exc_info=True,
+            )
         try:
             recent = []
             for f in self._workdir.rglob("*"):
@@ -215,11 +221,17 @@ class ProjectContext:
                     try:
                         mtime = f.stat().st_mtime
                         recent.append((mtime, str(f.relative_to(self._workdir))))
-                    except Exception:
-                        logger.debug("Silent exception in core/project_context.py:218", exc_info=True)
+                    except Exception as exc:
+                        logger.warning(
+                            "[project_context] Failed to stat file %s, skipping: %s",
+                            f, exc, exc_info=True,
+                        )
             recent.sort(reverse=True)
             if recent:
                 return "\n".join(f"  {name}" for _, name in recent[:10])
-        except Exception:
-            logger.debug("Silent exception in core/project_context.py:223", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[project_context] mtime scan failed, returning empty: %s",
+                exc, exc_info=True,
+            )
         return ""

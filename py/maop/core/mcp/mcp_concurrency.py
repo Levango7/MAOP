@@ -138,8 +138,11 @@ class MCPServerConcurrency:
         """Mirror the active count into the global gauge (defensive)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CONCURRENT_ACTIVE
-        except Exception:
-            logger.debug("Silent exception in core/mcp_concurrency.py:141", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "[mcp_concurrency] Failed to import MAOP_MCP_CONCURRENT_ACTIVE, gauge not updated: %s",
+                exc, exc_info=True,
+            )
             return
         try:
             MAOP_MCP_CONCURRENT_ACTIVE.set(

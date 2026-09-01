@@ -70,7 +70,7 @@ def _enable_extensions(connection) -> None:
             continue
         try:
             connection.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
-        except Exception as exc:  # noqa: BLE001 — surfaced per-extension below
+        except Exception as exc:  # surfaced per-extension below
             if ext == "vector":
                 logger.error(
                     "PG extension 'vector' is REQUIRED but could not be "

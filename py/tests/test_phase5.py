@@ -1,4 +1,4 @@
-﻿"""Tests for Phase 5: evolve engine + config hot-reload."""
+"""Tests for Phase 5: evolve engine + config hot-reload."""
 
 import json
 import tempfile
@@ -263,7 +263,7 @@ class TestConfigHotReload:
             (config_dir / "agents.yaml").write_text("agents: {}\n", encoding="utf-8")
 
             watcher = ConfigHotReload(root_dir=tmp)
-            assert len(watcher.state.watching) == 3  # agents, rules, models
+            assert len(watcher.state.watching) == 5  # agents, rules, models, mcp_servers, tool_whitelist
 
     def test_start_stop(self):
         with tempfile.TemporaryDirectory() as tmp:
