@@ -63,7 +63,9 @@ const steps = [
   { sel: '.ov-actions', title: t('coach.actions.title'), body: t('coach.actions.body') },
   { sel: '.sidebar', title: t('coach.nav.title'), body: t('coach.nav.body') },
   { sel: '.topbar__statusline', title: t('coach.topbar.title'), body: t('coach.topbar.body') },
-  { sel: '.evolve-tabs', title: t('coach.evolve.title'), body: t('coach.evolve.body') },
+  // 2026-09-01 IA 重设计适配：.evolve-tabs 已不存在（演化入口并入记忆
+  // 站）。目标改为侧边栏的"记忆"链接本身（在所有页面都存在）。
+  { sel: '.sidebar a[href="/memory"]', title: t('coach.evolve.title'), body: t('coach.evolve.body') },
 ];
 
 const active = ref(false);
@@ -98,17 +100,42 @@ const spotlightStyle = computed(() => ({
 }));
 
 const popoverStyle = computed(() => {
-  // 默认在目标右下方
+  // 2026-09-01 一号用户实测修复（第 2 步悬浮窗"看不到"）：
+  // 原逻辑无条件放目标下方 —— 目标是长侧边栏（.sidebar 高度 > 视口）
+  // 时，弹窗被定位到视口外，"下一步"按钮不可见也不可点（Playwright
+  // 实证 element is outside of the viewport）。
+  // 改：先测下方是否放得下（目标底 + 16 + 弹窗高 ~ 220px 视口内），
+  // 放不下则改放目标右上侧（仍在视口内）；目标本身在下半屏时放上方。
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
+  const belowTop = rect.value.top + rect.value.height + 16;
+  const POPOVER_H = 240; // 保守估计（标题+正文+按钮），超设只会更安全
+  if (belowTop + POPOVER_H <= vh) {
+    // 下方放得下 → 右下（原始行为）
+    return { top: belowTop + 'px', left: rect.value.left + 'px' };
+  }
+  if (rect.value.top - 16 - POPOVER_H >= 0) {
+    // 下方放不下、上方放得下 → 目标上方
+    return { top: (rect.value.top - 16 - POPOVER_H) + 'px', left: rect.value.left + 'px' };
+  }
+  // 上下都放不下（目标很高，如整条侧边栏）→ 定位到视口中部、目标右侧
   return {
-    top: rect.value.top + rect.value.height + 16 + 'px',
-    left: rect.value.left + 'px',
+    top: Math.max(16, Math.round(vh / 2 - POPOVER_H / 2)) + 'px',
+    left: (rect.value.left + rect.value.width + 24) + 'px',
   };
 });
 
 function next() {
   if (step.value < steps.length - 1) {
     step.value += 1;
-    nextTick(measure);
+    // 2026-09-01 容错：目标元素不存在（页面在窄屏/新 IA 改动/视图未挂
+    // 载时）→ 自动跳到下一步，不再让该步成为"看不到的悬浮窗"。
+    nextTick(() => {
+      if (!document.querySelector(steps[step.value]?.sel || '.nothing')) {
+        next(); // 递归跳过（若后面也缺，直到找到或跳完）
+      } else {
+        measure();
+      }
+    });
   } else {
     finish();
   }

@@ -38,3 +38,8 @@ testConfig.global.directives = {
   ...testConfig.global.directives,
   'modal-a11y': vModalA11y,
 };
+
+// 2026-09-01: 产品默认语言改为 zh（用户需求），但既有测试断言的文案
+// 是英文。在测试环境显式 pin en，保持断言语义不变；i18n 的 zh 词典
+// 由专门的词典覆盖测试（zh 键与 en 键一一对应）保证。
+try { localStorage.setItem('maop_locale', 'en'); } catch { /* ignore */ }
