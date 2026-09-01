@@ -20,3 +20,4 @@
 | [016](016-dual-edition-architecture.md) | 双版架构（Personal / Enterprise） | Active (2026-07-25) |
 | [017](017-dual-repo-isolation.md) | 双仓库物理隔离 | Active (2026-08-20) |
 | [018](018-swallowed-exception-handling.md) | 吞异常处理规范化 + HookManager 单例重置 | Accepted (2026-09-02) |
+| [019](019-module-singleton-testability.md) | 模块级单例的可测性问题（MAOP_DATA_DIR 切换下路径固化） | Accepted (2026-09-02) |
