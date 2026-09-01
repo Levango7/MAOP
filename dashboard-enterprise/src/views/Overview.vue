@@ -1,6 +1,10 @@
 <template>
   <div class="overview">
-    <OnboardingWizard />
+    <!-- 2026-09-01 IA 修复：移除 OnboardingWizard —— 与全局 CoachMarks 构成
+         双引导（两套独立 localStorage key，两个全屏遮罩叠在首页右侧内容上，
+         一号用户实报"右边你自己看看"）。CoachMarks（分步聚光）是唯一首访
+         引导；其缺的"创建 Agent/打开对话"快捷入口已由下方 .ov-actions 承担。
+         组件文件保留供将来回收，但不再挂载。 -->
     <!-- MAOS 升级提示: Personal edition 用户可见企业版功能入口 -->
     <div v-if="edition.edition === 'personal'" class="upgrade-banner">
       <AppIcon name="star" :size="14" />
@@ -154,6 +158,14 @@
             <p class="activity-desc">{{ ev.desc }}</p>
           </div>
         </div>
+        <!-- 2026-09-01: 空活动流此前是一块无提示的空白卡（用户看到"右边不对劲"
+             的一部分）—— 明确告知什么会产生内容 + 去哪产生。 -->
+        <EmptyState
+          v-if="!recentEvents.length"
+          icon="activity"
+          :title="t('view.overview.noActivity')"
+          :description="t('view.overview.noActivityHint')"
+        />
       </div>
     </div>
 
@@ -210,7 +222,8 @@ import { useI18n } from '../i18n';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import { Card, StatCard, Badge, DataTable, Skeleton, EmptyState } from '../components/index.js';
-import OnboardingWizard from '../components/OnboardingWizard.vue';
+// 2026-09-01: OnboardingWizard import removed — CoachMarks is the single
+// first-visit guide (see template comment above).
 import { cssVar, cssVarAlpha } from '../composables/chartTokens.js';
 import { baseLineOptions } from '../composables/chartOptions.js';
 
