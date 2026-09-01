@@ -475,8 +475,17 @@ def _record_selector_decision(
     try:
         MAOP_ROUTING_DECISION_TOTAL.inc(labels={"stage": "model_selector"})
         MAOP_ROUTING_DECISION_DURATION_MS.observe(duration_ms)
-    except Exception:
-        logger.debug("swallowed exception", exc_info=True)
+    except Exception as exc:  # noqa: BLE001 — instrumentation must not abort selection
+        # Observability must never take down the routing path: a metric
+        # recording failure (e.g. unknown label key / collector error) is
+        # logged at WARNING so it is actually visible and debuggable, rather
+        # than silently dropped at debug level, but selection still proceeds.
+        logger.warning(
+            "Failed to record routing decision metrics "
+            "(MAOP_ROUTING_DECISION_TOTAL / DURATION_MS) for stage='model_selector': %s",
+            exc,
+        )
+        logger.debug("routing decision metric detail", exc_info=True)
 
     record_decision_safe(
         RoutingDecisionRecord(
