@@ -2,47 +2,75 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { useEditionStore } from '../stores/edition.js';
 
 const routes = [
-  { path: '/', name: 'overview', component: () => import('../views/Overview.vue') },
-  // 迭代 A (RFC-001): /run 合并 Control + Chat; /evolve 吸收 evolution-history
+  // ═══ 2026-09-01 信息架构重设计：5 组任务流导航（一号用户驱动）═══
+  // 每个顶层路径挂载现有 View（零 View 改动），旧路径全部 301 重定向。
+  // 设计原则：用户任务流（看状态/做事/记忆/能力/运维）而非后端模块罗列。
+
+  // ── 首页 ──
+  { path: '/home', name: 'overview', component: () => import('../views/Overview.vue') },
+  { path: '/home/tasks', name: 'tasks', component: () => import('../views/Tasks.vue') },
+
+  // ── 执行 ──
   { path: '/run', name: 'run', component: () => import('../views/Run.vue') },
-  // 旧深链 301 重定向,保留书签/外部链接可用
-  { path: '/control', redirect: { path: '/run', query: { tab: 'structured' } } },
-  { path: '/chat', redirect: { path: '/run', query: { tab: 'chat' } } },
-  { path: '/evolution-history', redirect: { path: '/evolve', query: { tab: 'history' } } },
-  { path: '/agents', name: 'agents', component: () => import('../views/Agents.vue') },
-  // P1-3: 任务历史页 — 搜索/过滤/分页/重跑
-  { path: '/tasks', name: 'tasks', component: () => import('../views/Tasks.vue') },
+  { path: '/run/agents', name: 'dispatch', component: () => import('../views/ControlPanel.vue') },
+
+  // ── 记忆 ──
   { path: '/memory', name: 'memory', component: () => import('../views/ThreeLayerMemory.vue') },
-  { path: '/evolve', name: 'evolve', component: () => import('../views/Evolve.vue') },
-  { path: '/search', name: 'search', component: () => import('../views/Search.vue') },
-  { path: '/vector', name: 'vector', component: () => import('../views/VectorSearch.vue') },
-  { path: '/models', name: 'models', component: () => import('../views/Models.vue') },
-  { path: '/tools', name: 'tools', component: () => import('../views/Tools.vue') },
-  { path: '/logs', name: 'logs', component: () => import('../views/Logs.vue') },
-  { path: '/monitor', name: 'monitor', component: () => import('../views/Monitor.vue') },
-  { path: '/observability', name: 'observability', component: () => import('../views/Observability.vue') },
-  { path: '/cost', name: 'cost', component: () => import('../views/Cost.vue') },
+  { path: '/memory/search', name: 'search', component: () => import('../views/Search.vue') },
+  { path: '/memory/graph', name: 'knowledge-graph', component: () => import('../views/KnowledgeGraph.vue') },
+
+  // ── 能力 ──
+  { path: '/capability/agents', name: 'agents', component: () => import('../views/Agents.vue') },
+  { path: '/capability/skills', name: 'skills', component: () => import('../views/Tools.vue') },
+  { path: '/capability/market', name: 'skill-market', component: () => import('../views/SkillMarket.vue') },
+  { path: '/capability/models', name: 'models', component: () => import('../views/Models.vue') },
+
+  // ── 运维 ──
+  { path: '/operate', name: 'monitor', component: () => import('../views/Monitor.vue') },
+  { path: '/operate/logs', name: 'logs', component: () => import('../views/Logs.vue') },
+  { path: '/operate/tracing', name: 'observability', component: () => import('../views/Observability.vue') },
+  { path: '/operate/cost', name: 'cost', component: () => import('../views/Cost.vue') },
+
+  // ── 管理（企业版专属，守卫保持不变）──
   { path: '/audit', name: 'audit', component: () => import('../views/Audit.vue'), meta: { requiresEnterprise: true } },
   { path: '/rbac', name: 'rbac', component: () => import('../views/RBAC.vue'), meta: { requiresEnterprise: true } },
   { path: '/tenants', name: 'tenants', component: () => import('../views/Tenants.vue'), meta: { requiresEnterprise: true } },
-  // v4.6.0 企业版新功能路由（懒加载 + requiresEnterprise 守卫，personal 版重定向到 '/'）
   { path: '/licenses', name: 'licenses', component: () => import('../views/Licenses.vue'), meta: { requiresEnterprise: true } },
   { path: '/sso', name: 'sso', component: () => import('../views/SsoProviders.vue'), meta: { requiresEnterprise: true } },
   { path: '/quotas', name: 'quotas', component: () => import('../views/Quotas.vue'), meta: { requiresEnterprise: true } },
   { path: '/apikeys', name: 'apikeys', component: () => import('../views/ApiKeys.vue'), meta: { requiresEnterprise: true } },
-  { path: '/settings', name: 'settings', component: () => import('../views/Settings.vue') },
-  // v4.6.0 通知中心（通用功能，不限定企业版）
-  { path: '/notifications', name: 'notifications', component: () => import('../views/Notifications.vue') },
   { path: '/users', name: 'users', component: () => import('../views/Users.vue'), meta: { requiresEnterprise: true } },
+
+  // ── 设置 ──
+  { path: '/settings', name: 'settings', component: () => import('../views/Settings.vue') },
+  { path: '/notifications', name: 'notifications', component: () => import('../views/Notifications.vue') },
   { path: '/docs', name: 'docs', component: () => import('../views/Docs.vue') },
-  // v4.5.0: Knowledge graph visualization (general-availability, no enterprise guard)
-  { path: '/knowledge-graph', name: 'knowledge-graph', component: () => import('../views/KnowledgeGraph.vue') },
-  // v5.1.0: Workflow editor / Skill editor / Skill market (general-availability)
+
+  // ═══ 旧路径 301 重定向（书签/深链/外部链接兼容，零断链）═══
+  { path: '/', redirect: '/home' },
+  { path: '/control', redirect: { path: '/run', query: { tab: 'structured' } } },
+  { path: '/chat', redirect: { path: '/run', query: { tab: 'chat' } } },
+  { path: '/agents', redirect: '/capability/agents' },
+  { path: '/tasks', redirect: '/home/tasks' },
+  { path: '/search', redirect: '/memory/search' },
+  { path: '/vector', redirect: '/memory/search' },
+  { path: '/knowledge-graph', redirect: '/memory/graph' },
+  { path: '/tools', redirect: '/capability/skills' },
+  { path: '/models', redirect: '/capability/models' },
+  { path: '/monitor', redirect: '/operate' },
+  { path: '/logs', redirect: '/operate/logs' },
+  { path: '/observability', redirect: '/operate/tracing' },
+  { path: '/cost', redirect: '/operate/cost' },
+  { path: '/skill-market', redirect: '/capability/market' },
+  { path: '/skill-editor', redirect: '/capability/skills' },
+  // 暂降级入口：workflow-editor 并入执行组的高编排模式（原页面保留可达）
   { path: '/workflow-editor', name: 'workflow-editor', component: () => import('../views/WorkflowEditor.vue') },
-  { path: '/skill-editor', name: 'skill-editor', component: () => import('../views/SkillEditor.vue') },
-  { path: '/skill-market', name: 'skill-market', component: () => import('../views/SkillMarket.vue') },
-  // P2-10 fix: catch-all 404 route — redirect unknown paths to overview
-  { path: '/:pathMatch(.*)*', redirect: '/' },
+  // 自演化并入记忆组（原页面保留可达，导航不再罗列）
+  { path: '/evolve', name: 'evolve', component: () => import('../views/Evolve.vue') },
+  { path: '/evolution-history', redirect: { path: '/evolve', query: { tab: 'history' } } },
+
+  // P2-10 fix: catch-all 404 route — redirect unknown paths to home
+  { path: '/:pathMatch(.*)*', redirect: '/home' },
 ];
 
 const router = createRouter({
