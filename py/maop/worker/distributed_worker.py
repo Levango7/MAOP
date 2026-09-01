@@ -470,7 +470,7 @@ def run_worker(
         try:
             client.close()
         except Exception:
-            logger.debug('swallowed exception', exc_info=True)
+            logger.warning("distributed_worker: 工作线程停止时关闭 client 失败，已忽略", exc_info=True)
 
 
 async def _wait_for_stop(worker: DistributedWorker) -> None:

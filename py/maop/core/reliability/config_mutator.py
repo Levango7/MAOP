@@ -366,8 +366,8 @@ class ConfigMutator:
             mem.store(agent_name=agent_name, memory_type="lesson",
                       content={"type": "capability_added", "capability": new_cap},
                       importance=0.7)
-        except Exception:
-            logger.debug('swallowed exception', exc_info=True)
+        except Exception as exc:
+            logger.warning("config_mutator._mutate_add_capability: 向 agent 记忆记录 capability_added lesson 失败（被忽略），异常: %s", exc, exc_info=True)
 
         return changes
 

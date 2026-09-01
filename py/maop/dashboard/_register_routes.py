@@ -448,7 +448,7 @@ async def health() -> Any:
         _agents = await _state.get_bridge().agent_stats()
         active_agents = len(_agents) if isinstance(_agents, list) else 0
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.warning("获取 active_agents 数量失败（健康检查路由），将按 0 处理", exc_info=True)
 
     if not storage_ok:
         return _JResp(

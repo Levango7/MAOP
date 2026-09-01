@@ -166,13 +166,15 @@ async def dag_ws_endpoint(ws: WebSocket, execution_id: str) -> Any:
         try:
             queue.put_nowait(evt)
         except Exception:
-            logger.debug('swallowed exception', exc_info=True)
+            # best-effort：事件总线回调入队失败时忽略该事件，避免中断推送
+            logger.warning("入队 DAG 节点状态事件失败（dag_ws_endpoint._on_node），该事件被忽略", exc_info=True)
 
     def _on_complete(evt: Any) -> None:
         try:
             queue.put_nowait(evt)
         except Exception:
-            logger.debug('swallowed exception', exc_info=True)
+            # best-effort：事件总线回调入队失败时忽略该事件，避免中断推送
+            logger.warning("入队 DAG 执行完成事件失败（dag_ws_endpoint._on_complete），该事件被忽略", exc_info=True)
 
     bus.subscribe(node_topic, _on_node)
     bus.subscribe(complete_topic, _on_complete)

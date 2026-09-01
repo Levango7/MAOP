@@ -80,7 +80,7 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
                             latest = line.split(":", 1)[1].strip()
                             break
             except Exception:
-                logger.debug('swallowed exception', exc_info=True)
+                logger.warning('[agents/evolution] get_upgrade_status：pip show 查询 %s 的 CLI 版本失败已忽略，视为未知安装方式', ad.cli, exc_info=True)
 
             # 尝试 npm
             if install_method == "unknown":
@@ -96,7 +96,7 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
                         install_method = "npm"
                         latest = "check npm"
                     except Exception:
-                        logger.debug('swallowed exception', exc_info=True)
+                        logger.warning("[agents/evolution] get_upgrade_status：npm list 全局查询失败已忽略，视为非 npm 安装", exc_info=True)
 
             # 二进制分发
             if install_method == "unknown" and cli_path:
@@ -173,7 +173,7 @@ async def evolve_agent(name: str, request: Request) -> dict[str, Any]:
             detail={"summary": result.summary, "auto_applied": len(result.auto_applied)},
         )
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.warning('[agents/evolution] evolve_agent：写入审计日志失败已忽略', exc_info=True)
 
     return {"result": result.model_dump()}
 

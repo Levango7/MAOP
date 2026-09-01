@@ -645,7 +645,8 @@ async def notifications_ws(ws: WebSocket) -> Any:
                         count = mgr.unread_count(user_id)
                         await ws.send_json({"type": "unread_count", "count": count})
                 except Exception:
-                    logger.debug('swallowed exception', exc_info=True)
+                    # best-effort：WebSocket 命令为即时推送，畸形/异常输入直接忽略保证连接不断
+                    logger.warning("处理 WebSocket 通知命令消息失败（notifications_ws），忽略畸形输入", exc_info=True)
                     # ignore malformed input
     except WebSocketDisconnect:
         pass

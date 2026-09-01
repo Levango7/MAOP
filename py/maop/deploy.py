@@ -383,8 +383,8 @@ def start(
                 try:
                     if proc.stderr is not None:
                         stderr_output = proc.stderr.read().decode("utf-8", errors="replace")[-500:]
-                except Exception:
-                    logger.debug('swallowed exception', exc_info=True)
+                except Exception as exc:
+                    logger.warning("deploy.start: 读取过早退出的 MAOP 子进程 stderr 失败，错误信息缺失，异常: %s", exc, exc_info=True)
                 _remove_pid(root)
                 logger.error("MAOP subprocess exited prematurely: %s", stderr_output)
                 return SystemStatus(

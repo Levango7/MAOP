@@ -113,7 +113,8 @@ def cmd_status() -> Any:
     except Exception as exc:
         _emit_fail("status", exc)
         # status 失败不应让脚本退出非零码（仅查询用途），但仍输出错误信息
-        logger.debug('swallowed exception', exc_info=True)
+        # 刻意降级：仅查询用途，失败不阻塞脚本退出码，但保留异常上下文
+        logger.warning("cmd_status: 查询 MAOP 状态失败（刻意降级，不阻塞退出码），异常: %s", exc, exc_info=True)
 
 
 _MAX_SELF_DELEGATION_DEPTH = 3  # 与 core/subagent_delegation 的 max_self_ref_depth 一致

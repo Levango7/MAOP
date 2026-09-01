@@ -52,7 +52,7 @@ async def get_agent_routes() -> dict[str, Any]:
                 "capabilities": getattr(a, "capabilities", []) or [],
             }
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.warning('[agents/routes] get_agent_routes：从 registry 读取 agent 映射失败已忽略（agent_map 可能为空）', exc_info=True)
 
     # 2. 读 agents.yaml routing 配置
     yaml_path = _deps.MAOP_ROOT / "config" / "agents.yaml"
@@ -67,7 +67,7 @@ async def get_agent_routes() -> dict[str, Any]:
             agents_cfg = data.get("agents", {}) or {}
             routing_cfg = data.get("routing", {}) or {}
         except Exception:
-            logger.debug('swallowed exception', exc_info=True)
+            logger.warning('[agents/routes] get_agent_routes：读取 agents.yaml 路由配置失败已忽略（agents_cfg 为空），请检查 YAML 格式', exc_info=True)
 
     def _agent_model(agent_name: str) -> str:
         ad = agents_cfg.get(agent_name, {})

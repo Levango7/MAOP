@@ -1,4 +1,4 @@
-﻿"""MAOP TLS - SSL/TLS context management for HTTPS support.
+"""MAOP TLS - SSL/TLS context management for HTTPS support.
 
 Provides:
   1. create_ssl_context: Build ssl.SSLContext from cert/key paths
@@ -86,7 +86,7 @@ def create_ssl_context(settings: TLSSettings) -> ssl.SSLContext | None:
     except ValueError:
         raise
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.warning("tls: 读取证书文件头部做占位符校验时失败，已忽略，继续按真实证书加载", exc_info=True)
 
     ctx.load_cert_chain(str(cert_path), str(key_path))
 

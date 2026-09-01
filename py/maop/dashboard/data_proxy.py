@@ -315,7 +315,7 @@ class DataProxy(
             csum = ct.summary(start_date=hour_ago)
             cost_per_hour = round(getattr(csum, "total_cost_usd", 0.0), 4)
         except Exception:
-            logger.debug('swallowed exception', exc_info=True)
+            logger.warning("统计每小时成本失败（DataProxy.live 快照），cost_per_hour 将置 0.0", exc_info=True)
         self._record_latency(start)
         return {
             "recent_delegations": recent,

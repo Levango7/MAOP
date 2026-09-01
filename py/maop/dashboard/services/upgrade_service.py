@@ -100,7 +100,7 @@ async def check_agent_upgrade(name: str, agent_cfg: Any) -> dict[str, Any]:
             except Exception:
                 latest_version = "unknown"
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.warning("检测 CLI 当前/最新版本失败（check_agent_upgrade），latest_version 将标记为 unknown", exc_info=True)
 
     # 2. npm
     if install_method == "unknown":
@@ -188,7 +188,7 @@ async def upgrade_agent_cli(name: str, agent_cfg: Any, maop_root: Path) -> dict[
                 info["output"] = (up_err.decode(errors="replace") or up_out.decode(errors="replace"))[-500:]
             return {"status": "ok", "info": info}
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.warning("pip 自动升级失败（upgrade_agent_cli），将尝试 npm 降级安装", exc_info=True)
 
     # 2. 尝试 npm
     npm_path = shutil.which("npm")
@@ -233,6 +233,6 @@ async def upgrade_agent_cli(name: str, agent_cfg: Any, maop_root: Path) -> dict[
             target=name, level=AuditLevel.INFO, detail=info,
         )
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.warning("写入升级审计日志失败（upgrade_agent_cli），审计记录被忽略", exc_info=True)
 
     return {"status": "ok", "info": info}

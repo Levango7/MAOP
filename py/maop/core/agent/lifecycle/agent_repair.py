@@ -192,7 +192,7 @@ class AgentRepair:
                     result.missing_dependencies.append(pip_name)
                     result.overall_status = "degraded"
             except Exception:
-                logger.debug('swallowed exception', exc_info=True)
+                logger.warning("agent_repair: 检查 pip 依赖（pip show）失败，已忽略，依赖状态可能不准确", exc_info=True)
                 # 非关键
 
         # 5. 检查配置完整性

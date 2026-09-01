@@ -497,7 +497,7 @@ async def auth_refresh(request: Request):
         try:
             mgr.jwt_handler.revoke_token(token)
         except Exception:
-            logger.debug('swallowed exception', exc_info=True)
+            logger.warning('[auth] auth_refresh：吊销旧 token 失败已忽略（best-effort），可能残留可用的旧 token', exc_info=True)
             # best-effort revocation
         return response
     except Exception as exc:

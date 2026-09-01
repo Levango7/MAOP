@@ -288,7 +288,7 @@ async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[s
     try:
         synced_to_yaml = await asyncio.to_thread(_sync_agent_to_yaml, body)
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.warning('[agents/crud] register_agent：同步 agent 到 agents.yaml 失败已忽略（registry 已写入，yaml 写入失败不阻塞）', exc_info=True)
         # registry 已写入，yaml 写入失败不阻塞
 
     return {"agent": agent.model_dump(), "synced_to_yaml": synced_to_yaml}
@@ -337,7 +337,7 @@ async def unregister_agent(name: str, request: Request) -> dict[str, Any]:
             detail={"registry": ok_registry, "errors": errors},
         )
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.warning('[agents/crud] unregister_agent：记录 agent.remove 审计日志失败已忽略', exc_info=True)
 
     return {"deleted": ok_registry, "errors": errors}
 
@@ -384,6 +384,6 @@ async def repair_agent(name: str, request: Request) -> dict[str, Any]:
             detail=result.model_dump(),
         )
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.warning('[agents/crud] 修复 agent 后记录 agent.repair 审计日志失败已忽略', exc_info=True)
 
     return {"result": result.model_dump()}

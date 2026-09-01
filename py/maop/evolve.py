@@ -440,8 +440,8 @@ class EvolveEngine:
                 try:
                     shutil.copy2(backup, agents_yaml)
                     logger.info("[evolve] Restored agents.yaml from backup")
-                except Exception:
-                    logger.debug('swallowed exception', exc_info=True)
+                except Exception as exc:
+                    logger.warning("[evolve] Evolver._apply_to_agents_yaml: 从 backup 恢复 agents.yaml 失败（恢复被忽略），异常: %s", exc, exc_info=True)
 
     def status(self) -> EvolveResult:
         """Show current evolution status."""

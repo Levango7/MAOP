@@ -53,7 +53,7 @@ def _check_sse_token(request: Request) -> None:
             request.state.auth_roles = result.roles
             request.state.auth_identity = result.identity
     except Exception:
-        logger.debug('swallowed exception', exc_info=True)
+        logger.warning('[stream] _check_sse_token：校验查询参数 token 失败已忽略，交由 require_admin 拒绝', exc_info=True)
         # invalid token → require_admin will reject
 
 
@@ -101,7 +101,7 @@ async def global_state_stream(request: Request) -> Any:
                     logger.warning("[stream] snapshot failed: %s", exc)
                 yield f"event: state\ndata: {json.dumps(state)}\n\n"
             except Exception:
-                logger.debug('swallowed exception', exc_info=True)
+                logger.warning('[stream] global_state_stream.generate：SSE 状态推送单次循环失败已忽略', exc_info=True)
             await asyncio.sleep(2)
 
     return StreamingResponse(generate(), media_type="text/event-stream")
@@ -216,7 +216,7 @@ async def _stream_from_streamer(streamer: Any) -> Any:
                     yield f"event: error\ndata: {json.dumps({'error': parsed['error']})}\n\n"
                     return
             except Exception:
-                logger.debug('swallowed exception', exc_info=True)
+                logger.warning('[stream] _stream_from_streamer：解析上游 SSE 数据行失败已忽略', exc_info=True)
     yield f"event: done\ndata: {json.dumps({'content_length': len(''.join(full_content)), 'tokens': len(''.join(full_content)) // 4})}\n\n"
 
 

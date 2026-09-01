@@ -171,7 +171,7 @@ class BudgetGuard:
                     + m.cost_per_1k_output * actual_tokens_out / 1000
                 )
         except Exception:
-            logger.debug('swallowed exception', exc_info=True)
+            logger.warning('[model/budget] 按模型价格计算实际成本失败已忽略，回退使用估算成本', exc_info=True)
             # fall back to estimated
 
         self.record(

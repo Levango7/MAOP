@@ -102,8 +102,12 @@ def register_maop_event_hooks() -> int:
                 getattr(metrics, "increment", lambda *a: None)("MAOP_doc_pipeline_completed", 1)
             elif event == "task.failed":
                 getattr(metrics, "increment", lambda *a: None)("MAOP_doc_pipeline_failed", 1)
-        except Exception:
-            logger.debug('swallowed exception', exc_info=True)
+        except Exception as exc:
+            # best-effort：指标打点失败不应中断文档流水线事件处理，记录上下文便于定位
+            logger.warning(
+                "doc_pipeline_adapter._on_metrics: 更新 MAOP_doc_pipeline_* 指标失败，已忽略，异常: %s",
+                exc, exc_info=True,
+            )
 
     def _on_quality_gate(event: str, payload: dict):
         logger.info("[doc-pipeline→MAOP] quality_gate: score=%s passed=%s",
@@ -157,7 +161,7 @@ def run_pipeline(
             if not mgr.list_hooks():
                 register_maop_event_hooks()
         except Exception:
-            logger.debug('swallowed exception', exc_info=True)
+            logger.warning("doc_pipeline_adapter.run_pipeline: 注册 doc-pipeline MAOP 事件钩子失败，已忽略", exc_info=True)
 
         # Execute pipeline
         task = orch.run(

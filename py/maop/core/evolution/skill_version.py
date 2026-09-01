@@ -171,7 +171,7 @@ class SkillVersionManager:
                 if result.returncode == 0:
                     return result.stdout
             except Exception:
-                logger.debug('swallowed exception', exc_info=True)
+                logger.warning("skill_version.load_skill: 通过 git show 读取指定版本技能失败，已忽略，回退本地文件", exc_info=True)
 
         if skill_file.exists():
             return skill_file.read_text(encoding="utf-8")
@@ -210,7 +210,7 @@ class SkillVersionManager:
                 meta = SkillMeta(**json.loads(meta_file.read_text(encoding="utf-8")))
                 skills.append(meta)
             except Exception:
-                logger.debug('swallowed exception', exc_info=True)
+                logger.warning("skill_version.list_skills: 解析技能 meta 文件失败，已忽略该技能元数据", exc_info=True)
         return skills
 
     def delete_skill(self, name: str) -> bool:

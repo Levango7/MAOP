@@ -155,8 +155,11 @@ class VectorSearch:
                 ).fetchone()
                 if row:
                     existing = row["text_hash"]
-            except Exception:
-                logger.debug('swallowed exception', exc_info=True)
+            except Exception as exc:
+                logger.warning(
+                    "vector_search: 读取已存在向量 text_hash 失败，按不存在处理，异常: %s",
+                    exc, exc_info=True,
+                )
 
         if existing == text_hash:
             return False
@@ -264,7 +267,7 @@ class VectorSearch:
                 if row:
                     return f"{row['task']}: {row['content']}"
             except Exception:
-                logger.debug('swallowed exception', exc_info=True)
+                logger.warning("vector_search._get_entry_text: 读取记忆条目文本失败，已忽略并返回空", exc_info=True)
         return ""
 
     def stats(self) -> dict[str, Any]:
