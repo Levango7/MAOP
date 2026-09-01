@@ -329,11 +329,21 @@ async def auth_login(request: Request) -> Any:
     """Login with username/password, returns JWT token."""
     try:
         body = await request.json()
-        username = body.get("username", "")
-        password = body.get("password", "")
-        if not username or not password:
-            return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
+    except Exception:
+        # 2026-09-01 user#1 反馈：默认浏览器打不开 → 实测 curl/cmd 双引号展开
+        # 把 body 截成空 → request.json() 抛 JSONDecodeError → 原 except 静默
+        # 吞掉返 "Login failed"（401），用户困惑到底是密码错还是没发送。
+        # 改: 明确返 400 "请求体不是 JSON" 提示客户端修。
+        return JSONResponse(
+            {"status": "error", "error": "Request body must be valid JSON: {\"username\":..., \"password\":...}"},
+            status_code=400,
+        )
+    username = body.get("username", "")
+    password = body.get("password", "")
+    if not username or not password:
+        return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
 
+    try:
         now = time.monotonic()
         # H6 fix: 提取客户端 IP 用于 IP 维度限流
         client_ip = _get_client_ip(request)
