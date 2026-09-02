@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     48 小时长稳（Soak）测试一键启动 / 状态查看 / 停止脚本。
 
@@ -80,9 +80,12 @@ if ($Status) {
         Write-Host "[STOPPED] PID $currentPid 进程不存在，测试可能已结束或被终止。" -ForegroundColor Yellow
     }
 
-    # 显示最新日志最后 20 行
-    $latestLog = Get-ChildItem -Path $LogDir -Filter "soak_*.log" -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    # 显示最新日志最后 20 行（兼容旧运行：2026-09-02 前 stdout/stderr 分离落盘，
+    # soak 的 logging 走 stderr，旧运行记录主要在 .err 中）
+    $latestLog = @(
+        Get-ChildItem -Path $LogDir -Filter "soak_*.log" -ErrorAction SilentlyContinue
+        Get-ChildItem -Path $LogDir -Filter "soak_*.err" -ErrorAction SilentlyContinue
+    ) | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if ($latestLog) {
         Write-Host ""
         Write-Host ("--- 日志尾部（{0}）最后 20 行 ---" -f $latestLog.Name) -ForegroundColor Cyan
@@ -138,18 +141,19 @@ if (Test-Path $PidFile) { Remove-Item $PidFile -Force -ErrorAction SilentlyConti
 # 时间戳与日志路径
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $LogFile   = Join-Path $LogDir "soak_$timestamp.log"
-$ErrFile   = Join-Path $LogDir "soak_$timestamp.err"
 
 $startTime = Get-Date
 $endTime   = $startTime.AddSeconds($Duration)
 
-# 启动后台进程：stdout -> .log，stderr -> .err
+# 启动后台进程：经 cmd /c 将 stdout+stderr 合并重定向到同一 .log。
+# soak_test.py 的 logging 输出走 stderr，分离重定向会让 -Status 读到空的
+# .log；合并后 -Status 才能直接看到采样趋势。
+# PID 记录 cmd.exe 的 PID：cmd 等待 python 子进程退出，存活状态与测试一致；
+# -Stop 本就按"先杀子进程(python)再杀父进程"处理，语义不变。
 try {
-    $proc = Start-Process -FilePath "python" `
-        -ArgumentList "`"$SoakScript`" --duration $Duration" `
-        -RedirectStandardOutput $LogFile `
-        -RedirectStandardError $ErrFile `
-        -PassThru -NoNewWindow
+    $proc = Start-Process -FilePath "cmd.exe" `
+        -ArgumentList "/c python `"$SoakScript`" --duration $Duration > `"$LogFile`" 2>&1" `
+        -PassThru -WindowStyle Hidden
 }
 catch {
     Write-Host "[ERROR] 启动 soak 测试失败：$($_.Exception.Message)" -ForegroundColor Red
@@ -162,8 +166,7 @@ catch {
 Write-Host "[OK] 48h 长稳测试已在后台启动" -ForegroundColor Green
 Write-Host ("  脚本路径     : {0}" -f $SoakScript)
 Write-Host ("  PID          : {0}" -f $proc.Id)
-Write-Host ("  日志(stdout) : {0}" -f $LogFile)
-Write-Host ("  日志(stderr) : {0}" -f $ErrFile)
+Write-Host ("  日志(合并)   : {0}" -f $LogFile)
 Write-Host ("  PID 文件     : {0}" -f $PidFile)
 Write-Host ("  测试时长     : 48 小时（172800 秒）")
 Write-Host ("  开始时间     : {0}" -f $startTime.ToString('yyyy-MM-dd HH:mm:ss'))
