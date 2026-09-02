@@ -120,7 +120,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_soak_48h.ps1 -Stop
 表：1h 验证结果摘要
 
 | 项目 | 数值 |
-| --- | --- |
+|------|------|
 | 采样样本数 | 116 |
 | 测试时长 | 1 小时 |
 | 内存 RSS slope | -12.36 MB/h |
@@ -130,6 +130,37 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_soak_48h.ps1 -Stop
 | 结论 | 通过 |
 
 基线结论：1h 阶段内存与句柄 slope 均为负值，表明资源在采样窗口内呈回收趋势，未观察到泄漏迹象，具备进入 48h 长稳测试的条件。
+
+## 5.1 2026-08-31 进度更新
+
+启动于 2026-08-31 13:14（`elapsed=12729.8s` 起），用户主动停止前已运行 **3.7 小时 / 434 采样**（`soak_20260831.log`）。尾部趋势：
+
+- RSS 稳定 48.4-49.3MB，无上升趋势
+- 句柄 157-161 区间小幅波动
+- 连接池占用 0，无泄漏
+- CPU 17-35%
+- 错误率 0
+
+由于 < 1h 验证 3600s 阈值，soak 脚本未计算正式 slope；定性结论与 1h 验证一致（无泄漏迹象）。中止非异常中断。
+
+## 5.2 2026-09-02 回归冒烟（本轮 session 改动验证）
+
+本轮 session 完成 6 项 P1/P2 修复（吞异常规范化、HookManager 单例重置、CREATE EXTENSION 分级、hot_reload 扩监视、删除 `_lock_time` 死代码），用 15 分钟冒烟回归：
+
+命令：`python py/tests/soak/soak_test.py --duration 900 --sample-interval 15 --mem-rps 15 --dag-interval 3`
+日志：`deliverables/soak-48h-logs/soak_smoke_20260902.log`
+汇总：`deliverables/soak-test-summary.json`
+
+| 指标 | 实测 | 阈值 | 判定 |
+|------|------|------|------|
+| 内存 RSS slope | 4.65 MB/h | < 50 | ✅ |
+| 句柄 slope | -5.82 handles/h | < 5 | ✅ |
+| 连接池 | 0 | — | ✅ |
+| CPU 平均 | 37.5% | — | — |
+| 错误率 | 0 | < 0.1% | ✅ |
+| `overall_pass` | true | — | ✅ |
+
+回归冒烟结论：本轮 P1/P2 修复未引入长稳回归。
 
 ## 6. 48 小时结果填写区
 
