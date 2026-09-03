@@ -10,6 +10,7 @@
 - **已发布**：v5.1.0（2026-08-14，minor）— 企业版 6 大功能（许可证/SSO/审计/配额/API Key/通知）+ v5.1.0 6 大新功能（LLM 任务拆分/工作流编辑器/配置历史/Skill 编辑器/异常调度/Hook 配置）+ 版本号统一至 v5.1.0。
 - **上一版**：v5.0.0（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](docs/migration-5.0.md)。
 - **双版架构**：自 2026-07-20 起采用单代码库 + 运行时 Edition 检测（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)）。
+- **阶段二启动**：2026-09-05（48h 长稳判定后）进入阶段二"智能增强"，首版 v5.2.0 = 自演化闭环 MVP（2026-09-05 ~ 10-31），详见下方 v5.2.0 节与 [PRD](docs/prd-three-phase-roadmap.md) / [HLD](docs/hld-three-phase-roadmap.md)。
 
 ## v4.4.2 (patch) — 已发布 2026-08-06
 
@@ -123,6 +124,36 @@
 - [x] `dashboard-enterprise` 前端 `npm run build` 构建成功。
 - [x] `CHANGELOG.md` 补 v5.1.0 条目，`ROADMAP.md` 更新当前状态。
 
+## v5.2.0 (minor) — 进行中（2026-09-05 启动，目标 2026-10-31）
+
+**主题**：自演化闭环 MVP（三阶段路线图 [M2.1](docs/prd-three-phase-roadmap.md)，F2-01）。把已有的 `core/evolution/` 16 模块底座接入主循环，形成可观测、可审批、可回滚的完整闭环。
+
+### 范围
+
+- **EvolutionLoop 接入主循环**：`py/maop/core/evolution/evolution_loop.py` 七阶段闭环接入 `maop_loop_phases.py` 的 `_phase_evolve`（当前仅调 `EvolveEngine.analyze()` 产建议）。配置开关 `MAOP_EVOLUTION_LOOP_ENABLED` **默认关闭**——自动改 prompt / 自动部署属高危操作，稳定性优先。
+- **人工 gate**：闭环状态机 `PendingApproval` 停靠 + dashboard 审批入口（复用 `dashboard/routers/evolve_insights.py` / `evolution_experiment.py` 既有路由基础）。
+- **A/B 验证**：复用 `ab_test.py`（Z 检验）+ `evolution_perf_loop.py`（SPRT 序贯检验），对齐 HLD 3.1 决策规则（p < 0.05）。
+- **自动回滚**：复用 `regression.py`（Persona 模拟回归）+ `prompt_version.py` 版本链回滚。
+- **演化可视化**：dashboard 呈现闭环状态机流转与 A/B 结果。
+- 开发启动时评估是否立 ADR-020（演化闭环安全边界 / 人工 gate 设计）。
+
+### 验收标准
+
+- [ ] 闭环 E2E：observe→suggest→approve→A/B→promote/rollback 在测试环境对模拟 agent 完整跑通。
+- [ ] 劣化候选注入 → 自动回滚 < 5 分钟（PRD 4.2.4 验收的 MVP 子集）。
+- [ ] `MAOP_EVOLUTION_LOOP_ENABLED` 默认关闭；开启后主循环其余阶段行为不变（全量测试零回归）。
+- [ ] dashboard 可见闭环状态机流转与 A/B 结果。
+
+## 阶段二后续里程碑
+
+| 里程碑 | 版本 | 目标窗口 | 范围锚点 |
+|--------|------|----------|----------|
+| M2.2 | v5.3.0 | 2026-11-01 ~ 2027-01-15 | F2-02 多模态记忆（嵌入扩展 / pgvector 多向量列 / 融合检索，PRD 4.3）+ F2-03 KGE 选型预研 |
+| M2.3 | v6.0.0 (major) | 2027-01-16 ~ 2027-03-05 | F2-03 知识图谱推理（Neo4j Enterprise / 双通道推理，PRD 4.4）+ F2-04 Plan 质量学习 MVP（PRD 4.5） |
+| M2.4 | v7.0.0 | 2027-03 | F2-01 GA + F2-04 GA + 阶段二收官（PRD 4.2.4 / 4.5.4 全量验收） |
+
+> 各里程碑进入开发窗口时，按 v5.2.0 节模式补明确范围与验收标准，避免探索性占位。
+
 ## 三阶段演进路线图（2026-08-07 制定）
 
 > 详细文档：[PRD](docs/prd-three-phase-roadmap.md) | [HLD](docs/hld-three-phase-roadmap.md)
@@ -130,7 +161,7 @@
 | 阶段 | 时间窗 | 主题 | 状态 | 关键交付 |
 |------|--------|------|------|----------|
 | 阶段一 | Month 1–3 | 稳定性与规模化 | ✅ 已完成 | 分布式执行、pgvector、UnifiedMemoryProtocol、OTel 可观测性 |
-| 阶段二 | Month 4–9 | 智能增强 | 🔜 待启动 | 自演化闭环、多模态记忆、知识图谱推理、Plan 质量学习 |
+| 阶段二 | Month 4–9（2026-09-05 启动，至 2027-03） | 智能增强 | 🔄 进行中 | 自演化闭环、多模态记忆、知识图谱推理、Plan 质量学习 |
 | 阶段三 | Month 10–21 | 生态与平台化 | 🔜 待启动 | Agent Marketplace、多后端编排器适配、原生 K8s Operator、细粒度成本归因 |
 
 ## 长期方向（未排期）

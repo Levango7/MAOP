@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs
+- **三阶段路线图阶段二启动定稿**：PRD/HLD 升 v1.1.0（Approved，评审 Levango7 2026-09-03）——Gantt 以 2026-09-05 为阶段二起点重排（消除 v1.0.0 中 Month 1 = 2026-09 与 F2-01 MVP 自 2027-01 起的口径矛盾）、v6.0.0 锚点由"阶段一末"移至阶段二 M2.3、HLD 3.1/3.2/3.3 补代码现状对齐注记；`ROADMAP.md` 新增 v5.2.0 节（自演化闭环 MVP，2026-09-05 启动，`MAOP_EVOLUTION_LOOP_ENABLED` 默认关闭）+ 阶段二后续里程碑锚点（v5.3.0 / v6.0.0 / v7.0.0）。
+
 ### Fixed
 - **吞异常规范化（P1）**：全库 35+ 处 `logger.debug("Silent exception in ...")` 升级为 `logger.warning` 并带 `[module]` 上下文前缀；路由决策指标、认证 Token 撤销、Bloom filter mmh3 fallback 等关键路径从 debug 提升至 warning，production 可观测。控制流不变（仍为 best-effort）。
 - **PG 迁移 CREATE EXTENSION 失败分级**：`vector` 必选扩展失败时 fail-fast 报明确错误；`pg_trgm` 可选扩展失败仍 best-effort 不中断。

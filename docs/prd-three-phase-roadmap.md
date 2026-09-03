@@ -5,12 +5,12 @@
 | 字段 | 值 |
 |------|-----|
 | 文档名称 | MAOP 三阶段演进路线图 PRD |
-| 版本 | v1.0.0-draft |
-| 发布日期 | 2026-08-07 |
+| 版本 | v1.1.0 |
+| 发布日期 | 2026-08-07（v1.0.0）/ 2026-09-03（v1.1.0） |
 | 作者 | MAOP 高级技术文档专家 |
-| 状态 | Draft - Pending Review |
+| 状态 | Approved |
 | 适用范围 | MAOP Personal Edition + Enterprise Edition |
-| 评审人 | TBD（待指定产品委员会 + 架构委员会） |
+| 评审人 | Levango7（2026-09-03 阶段二启动评审） |
 | 关联文档 | [ROADMAP.md](../ROADMAP.md)、[hld-three-phase-roadmap.md](./hld-three-phase-roadmap.md)、[platform-evolution.md](./platform-evolution.md) |
 | 文档约定 | Markdown heading：H1 文档名 / H2 章 / H3 节 / H4 子节 / H5 子子节；图表使用 Mermaid 语法 |
 
@@ -29,6 +29,8 @@ MAOP（Multi-Agent Orchestration Platform）在完成 P0–P4 代码优化与 P0
 | 阶段一 | Month 1–3（3 个月） | 稳定性与规模化 | 从单机走向分布式，从万级走向百万级 | 分布式执行、pgvector、UnifiedMemoryProtocol、OTel 可观测性 |
 | 阶段二 | Month 4–9（6 个月） | 智能增强 | 从被动执行走向自演化，从单模态走向多模态 | 自演化闭环、多模态记忆、知识图谱推理、Plan 质量学习 |
 | 阶段三 | Month 10–21（12 个月） | 生态与平台化 | 从产品走向平台，从单租户走向生态 | Agent Marketplace、Visual Builder、Multi-Tenant SaaS、Federation、LLM Cost Optimization |
+
+> **v1.1.0 启动基准（2026-09-03）**：阶段一四特性已交付（由 v5.1.0 于 2026-08-14 收官），阶段二启动前置条件满足。阶段二于 **2026-09-05**（48h 长稳测试判定后）启动，至 2027-03；阶段三相应前移至 2027-04 起。绝对日历见 8.1 Gantt。
 
 ### 1.3 价值主张
 
@@ -277,7 +279,9 @@ MAOP（Multi-Agent Orchestration Platform）在完成 P0–P4 代码优化与 P0
 
 ---
 
-## 第4章 阶段二：智能增强（Month 4–9）
+## 第4章 阶段二：智能增强（Month 4–9，2026-09-05 启动）
+
+> **启动状态（2026-09-03）**：本章为阶段二执行依据。首版 v5.2.0（M2.1）= F2-01 自演化闭环 MVP，范围与验收标准见根目录 [ROADMAP.md](../ROADMAP.md) v5.2.0 节；阶段二里程碑日历见 4.6（v1.1.0 已重排为绝对日期）。
 
 ### 4.1 阶段目标
 
@@ -447,12 +451,12 @@ MAOP（Multi-Agent Orchestration Platform）在完成 P0–P4 代码优化与 P0
 
 ### 4.6 阶段二里程碑
 
-| 里程碑 | 时间 | 交付物 |
-|--------|------|--------|
-| M2.1 | Month 4–5 | F2-01 自演化闭环 MVP（评估器 + 建议器） |
-| M2.2 | Month 6 | F2-02 多模态记忆 GA + F2-03 知识图谱推理 MVP |
-| M2.3 | Month 7–8 | F2-03 知识图谱推理 GA + F2-04 Plan 质量学习 MVP |
-| M2.4 | Month 9 | F2-01 自演化闭环 GA + F2-04 Plan 质量学习 GA + v7.0.0 发布 |
+| 里程碑 | 时间（v1.1.0 重排） | 版本 | 交付物 |
+|--------|------|------|--------|
+| M2.1 | 2026-09-05 ~ 2026-10-31 | v5.2.0 | F2-01 自演化闭环 MVP（EvolutionLoop 接入主循环 + 人工 gate + A/B 验证） |
+| M2.2 | 2026-11-01 ~ 2027-01-15 | v5.3.0 | F2-02 多模态记忆 MVP→GA + F2-03 KGE 选型预研 |
+| M2.3 | 2027-01-16 ~ 2027-03-05 | v6.0.0 | F2-03 知识图谱推理（Neo4j Enterprise + 双通道推理）+ F2-04 Plan 质量学习 MVP |
+| M2.4 | 2027-03 | v7.0.0 | F2-01 自演化闭环 GA + F2-04 Plan 质量学习 GA + 阶段二收官 |
 
 ---
 
@@ -800,33 +804,30 @@ gantt
     dateFormat YYYY-MM
     axisFormat %Y-%m
 
-    section 阶段一 稳定性与规模化
-    F1-04 可观测性增强           :a1, 2026-09, 1M
-    F1-03 记忆统一               :a2, 2026-10, 1M
-    F1-02 pgvector 升级          :a3, 2026-10, 1M
-    F1-01 分布式执行             :a4, 2026-11, 1M
-    v6.0.0 发布                  :milestone, m1, 2026-12, 0d
+    section 阶段一 稳定性与规模化（已完成）
+    F1-01~F1-04 四特性交付        :done, a1, 2026-07, 2M
+    v5.1.0 发布（阶段一收官）     :done, milestone, m1, 2026-08, 0d
 
-    section 阶段二 智能增强
-    F2-01 自演化闭环 MVP         :b1, 2027-01, 2M
-    F2-02 多模态记忆             :b2, 2027-03, 1M
-    F2-03 知识图谱推理 MVP       :b3, 2027-03, 2M
-    F2-04 Plan 质量学习 MVP      :b4, 2027-05, 2M
-    F2-01 自演化闭环 GA          :b5, 2027-07, 1M
-    F2-03 知识图谱推理 GA        :b6, 2027-07, 1M
-    F2-04 Plan 质量学习 GA       :b7, 2027-08, 1M
-    v7.0.0 发布                  :milestone, m2, 2027-09, 0d
+    section 阶段二 智能增强（2026-09-05 启动）
+    F2-01 自演化闭环 MVP (v5.2.0) :b1, 2026-09, 2M
+    F2-02 多模态记忆 (v5.3.0)     :b2, 2026-11, 2M
+    F2-03 知识图谱推理 (v6.0.0)   :b3, 2027-01, 2M
+    F2-04 Plan 质量学习 MVP       :b4, 2027-01, 2M
+    v6.0.0 发布                   :milestone, m2, 2027-03, 0d
+    F2-01/F2-04 GA (v7.0.0)       :milestone, m3, 2027-03, 0d
 
-    section 阶段三 生态与平台化
-    F3-05 LLM Cost Optimization  :c1, 2027-10, 3M
-    F3-02 Visual Builder MVP     :c2, 2027-10, 3M
-    F3-03 Multi-Tenant SaaS      :c3, 2028-01, 3M
-    F3-01 Marketplace MVP        :c4, 2028-01, 3M
-    F3-01 Marketplace GA         :c5, 2028-04, 3M
-    F3-02 Visual Builder GA      :c6, 2028-04, 3M
-    F3-04 Federation GA          :c7, 2028-07, 3M
-    v8.0.0 发布                  :milestone, m3, 2028-09, 0d
+    section 阶段三 生态与平台化（2027-04 起）
+    F3-05 LLM Cost Optimization  :c1, 2027-04, 3M
+    F3-02 Visual Builder MVP     :c2, 2027-04, 3M
+    F3-03 Multi-Tenant SaaS      :c3, 2027-07, 3M
+    F3-01 Marketplace MVP        :c4, 2027-07, 3M
+    F3-01 Marketplace GA         :c5, 2027-10, 3M
+    F3-02 Visual Builder GA      :c6, 2027-10, 3M
+    F3-04 Federation GA          :c7, 2028-01, 3M
+    v8.0.0 发布                  :milestone, m4, 2028-03, 0d
 ```
+
+> **v1.1.0 Gantt 重排说明**：原 v1.0.0 Gantt 存在口径矛盾（Month 1 = 2026-09 与 F2-01 MVP 自 2027-01 起并存）。本次重排以阶段二实际启动日 **2026-09-05** 为基准：阶段一按实际由 v5.1.0（2026-08-14）收官（原 v6.0.0"阶段一末"锚点取消）；v6.0.0 锚点移至阶段二 M2.3（2027-01-16 ~ 03-05，引入 Neo4j Enterprise / GPU 节点，major）；阶段三相应前移至 2027-04 起。Gantt 为月粒度示意，精确窗口以 4.6 里程碑表为准。
 
 ### 8.2 交付物清单
 
@@ -853,9 +854,12 @@ gantt
 
 | 版本 | 阶段 | 主题 | 兼容性 |
 |------|------|------|--------|
-| v6.0.0 | 阶段一末 | 分布式 + pgvector + 记忆统一 + 可观测性 | 向后兼容（API 零变更），数据需迁移 |
-| v7.0.0 | 阶段二末 | 自演化 + 多模态 + 知识图谱推理 + Plan 学习 | 向后兼容，新增能力可选启用 |
-| v8.0.0 | 阶段三末 | Marketplace + Visual Builder + Multi-Tenant + Federation + Cost Opt | 含 Marketplace API 新增，Multi-Tenant 需部署调整 |
+| v5.1.0 | 阶段一末（已发布 2026-08-14） | 阶段一收官（分布式执行 + pgvector + 记忆统一 + 可观测性实际交付版本） | 向后兼容 |
+| v5.2.0 | 阶段二初（M2.1，2026-09-05 启动） | 自演化闭环 MVP（默认关闭，人工 gate） | 向后兼容 |
+| v5.3.0 | 阶段二中（M2.2） | 多模态记忆 | 向后兼容 |
+| v6.0.0 | 阶段二中（M2.3，2027-01 ~ 03） | 知识图谱推理 + Plan 质量学习 MVP | major：引入 Neo4j Enterprise / GPU 节点 |
+| v7.0.0 | 阶段二末（M2.4，2027-03） | 自演化 + 多模态 + 知识图谱推理 + Plan 学习 GA | 向后兼容，新增能力可选启用 |
+| v8.0.0 | 阶段三末（2028-03） | Marketplace + Visual Builder + Multi-Tenant + Federation + Cost Opt | 含 Marketplace API 新增，Multi-Tenant 需部署调整 |
 
 ---
 
@@ -863,21 +867,23 @@ gantt
 
 ### 9.1 评审清单
 
-- [ ] 产品委员会评审（价值主张、优先级、里程碑）
-- [ ] 架构委员会评审（技术可行性、依赖关系、风险）
-- [ ] SRE 评审（运维可行性、可观测性、容量）
-- [ ] 安全评审（沙箱、隔离、隐私、联邦）
-- [ ] 财务评审（成本预算、计费、分成）
+> 单人项目：以下评审维度由项目所有者 Levango7 于 2026-09-03（阶段二启动评审）一次性完成。
+
+- [x] 产品委员会评审（价值主张、优先级、里程碑）— Levango7 2026-09-03
+- [x] 架构委员会评审（技术可行性、依赖关系、风险）— Levango7 2026-09-03
+- [x] SRE 评审（运维可行性、可观测性、容量）— Levango7 2026-09-03
+- [x] 安全评审（沙箱、隔离、隐私、联邦）— Levango7 2026-09-03
+- [x] 财务评审（成本预算、计费、分成）— Levango7 2026-09-03
 
 ### 9.2 签署
 
 | 角色 | 签署人 | 状态 | 日期 |
 |------|--------|------|------|
-| 产品负责人 | TBD | Pending | — |
-| 架构负责人 | TBD | Pending | — |
-| 工程负责人 | TBD | Pending | — |
-| SRE 负责人 | TBD | Pending | — |
-| 安全负责人 | TBD | Pending | — |
+| 产品负责人 | Levango7 | Approved | 2026-09-03 |
+| 架构负责人 | Levango7 | Approved | 2026-09-03 |
+| 工程负责人 | Levango7 | Approved | 2026-09-03 |
+| SRE 负责人 | Levango7 | Approved | 2026-09-03 |
+| 安全负责人 | Levango7 | Approved | 2026-09-03 |
 
 ---
 
@@ -901,3 +907,4 @@ gantt
 | 版本 | 日期 | 变更内容 | 作者 |
 |------|------|----------|------|
 | v1.0.0-draft | 2026-08-07 | 初始草案，覆盖三阶段全部特性 | MAOP 高级技术文档专家 |
+| v1.1.0 | 2026-09-03 | 阶段二启动定稿：Gantt 以 2026-09-05 为阶段二起点重排（消除 v1.0.0 的 Month 1 = 2026-09 与 F2-01 MVP 2027-01 起的口径矛盾）；v6.0.0 锚点由"阶段一末"移至 M2.3；4.6 里程碑表对齐绝对日期；评审清单/签署完成，状态升 Approved | Levango7 |

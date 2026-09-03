@@ -5,12 +5,12 @@
 | 字段 | 值 |
 |------|-----|
 | 文档名称 | MAOP 三阶段演进路线图 HLD |
-| 版本 | v1.0.0-draft |
-| 发布日期 | 2026-08-07 |
+| 版本 | v1.1.0 |
+| 发布日期 | 2026-08-07（v1.0.0）/ 2026-09-03（v1.1.0） |
 | 作者 | MAOP 高级技术文档专家 |
-| 状态 | Draft - Pending Review |
+| 状态 | Approved |
 | 适用范围 | MAOP Personal Edition + Enterprise Edition |
-| 评审人 | TBD（待指定架构委员会 + SRE + 安全） |
+| 评审人 | Levango7（2026-09-03 阶段二启动评审） |
 | 关联文档 | [prd-three-phase-roadmap.md](./prd-three-phase-roadmap.md)、[ROADMAP.md](../ROADMAP.md)、[platform-evolution.md](./platform-evolution.md) |
 | 文档约定 | Markdown heading：H1 文档名 / H2 章 / H3 节 / H4 子节 / H5 子子节；架构图使用 Mermaid 语法（GitHub/VSCode 兼容） |
 
@@ -604,6 +604,8 @@ service:
 
 ### 3.1 自演化闭环架构
 
+> **现状对齐（2026-09-03）**：本节类设计已大部分落地于 `py/maop/core/evolution/`（16 模块：evaluator.py ≈ PerformanceEvaluator、suggester.py ≈ ImprovementSuggester、ab_test.py Z 检验 + evolution_perf_loop.py SPRT ≈ AB Test Framework、auto_deployer.py ≈ AutoDeployer、prompt_version.py 版本链/回滚）。v5.2.0（M2.1）待补：EvolutionLoop 接入主循环（`maop_loop_phases.py` `_phase_evolve` 当前仅调 `EvolveEngine.analyze()`，只产建议不执行闭环）与 PendingApproval 人工 gate；开关 `MAOP_EVOLUTION_LOOP_ENABLED` 默认关闭。
+
 #### 3.1.1 架构图
 
 ```mermaid
@@ -684,6 +686,8 @@ stateDiagram-v2
 
 ### 3.2 多模态记忆架构
 
+> **现状对齐（2026-09-03）**：当前记忆为纯文本三层实现（`core/memory/three_layer_memory.py` + `py/maop/memory/unified.py` UnifiedMemoryProtocol，共享 maop.db），`core/memory/` 内无 image/audio/multimodal 引用；多模态仅存在于聊天层（`core/backends/image_store.py`，未进记忆索引）。v5.3.0（M2.2）以 UnifiedMemoryProtocol / MemoryFacade 为扩展点实施本节设计。
+
 #### 3.2.1 架构图
 
 ```mermaid
@@ -763,6 +767,8 @@ graph TB
 | 模态门控 | 查询模态决定检索模态（文本查文本，图像查图像+文本） | 模态对齐场景 |
 
 ### 3.3 知识图谱推理架构
+
+> **现状对齐（2026-09-03）**：Personal 版现状为 SQLite 图存储（`core/memory/knowledge_graph.py`：邻居/路径/主题子图/查询 + `_infer_transitive` 传递闭包；API 在 `dashboard/routers/knowledge.py`，前端 `KnowledgeGraph.vue`），无规则引擎/KGE。v6.0.0（M2.3）实施本节双通道推理时，`GraphBackend` 抽象需兼容此 SQLite 现状（Personal 版缺省后端，networkx/Neo4j 为升级路径）。
 
 #### 3.3.1 架构图
 
@@ -1659,9 +1665,9 @@ graph TB
 | 阶段 | 部署形态 | 关键变化 |
 |------|----------|----------|
 | 基线 v5.0.0 | 单进程 / docker-compose | — |
-| 阶段一 v6.0.0 | K8s 单集群 + 多 Worker Pod + PG + Redis + 可观测栈 | 引入 K8s 生产部署 |
-| 阶段二 v7.0.0 | K8s + GPU 节点（训练） + Neo4j | 新增 GPU 训练节点、图存储 |
-| 阶段三 v8.0.0 | 多区域 K8s + Multi-Tenant + Marketplace + Federation | 多区域、SaaS、联邦 |
+| 阶段一（v5.1.0 已收官 2026-08-14） | docker-compose 为主（PG/Redis/OTel 栈）+ Patroni PG HA + K8s Operator 集成测试基线 | 分布式执行组件 / pgvector / OTel 按需落地；全量 K8s 生产部署推迟（原 v6.0.0"阶段一"锚点取消，v1.1.0） |
+| 阶段二 M2.3（v6.0.0，2027-01 ~ 03） | 既有部署 + GPU 节点（训练，F2-04） + Neo4j Enterprise（F2-03） | 新增 GPU 训练节点、图存储 |
+| 阶段三（v8.0.0，2028-03） | 多区域 K8s + Multi-Tenant + Marketplace + Federation | 多区域、SaaS、联邦 |
 
 ---
 
@@ -1669,25 +1675,29 @@ graph TB
 
 ### 8.1 评审清单
 
-- [ ] 架构委员会评审（架构合理性、技术选型、演进路径）
-- [ ] SRE 评审（部署可行性、可观测性、容量规划、运维成本）
-- [ ] 安全评审（沙箱、隔离、隐私、联邦、签名）
-- [ ] 性能评审（延迟、吞吐、规模指标可达性）
-- [ ] 兼容性评审（API 兼容、数据迁移、回滚）
+> 单人项目：以下评审维度由项目所有者 Levango7 于 2026-09-03（阶段二启动评审）一次性完成。
+
+- [x] 架构委员会评审（架构合理性、技术选型、演进路径）— Levango7 2026-09-03
+- [x] SRE 评审（部署可行性、可观测性、容量规划、运维成本）— Levango7 2026-09-03
+- [x] 安全评审（沙箱、隔离、隐私、联邦、签名）— Levango7 2026-09-03
+- [x] 性能评审（延迟、吞吐、规模指标可达性）— Levango7 2026-09-03
+- [x] 兼容性评审（API 兼容、数据迁移、回滚）— Levango7 2026-09-03
 
 ### 8.2 签署
 
 | 角色 | 签署人 | 状态 | 日期 |
 |------|--------|------|------|
-| 架构负责人 | TBD | Pending | — |
-| SRE 负责人 | TBD | Pending | — |
-| 安全负责人 | TBD | Pending | — |
-| 性能负责人 | TBD | Pending | — |
-| 工程负责人 | TBD | Pending | — |
+| 架构负责人 | Levango7 | Approved | 2026-09-03 |
+| SRE 负责人 | Levango7 | Approved | 2026-09-03 |
+| 安全负责人 | Levango7 | Approved | 2026-09-03 |
+| 性能负责人 | Levango7 | Approved | 2026-09-03 |
+| 工程负责人 | Levango7 | Approved | 2026-09-03 |
 
 ---
 
 ## 附录 A：架构决策记录（ADR）索引
+
+> **v1.1.0 注记**：本表 ADR-017~028 为规划期占位编号，与 `docs/adr/` 实际编号体系已冲突（实际 ADR-017 = 双仓库物理隔离、ADR-018 = 吞异常处理规范化、ADR-019 = 模块级单例可测性，均已落卷）。新增 ADR 按实际递增编号取号，本表仅作主题索引参考，以 `docs/adr/` 为准。
 
 | ADR 编号 | 标题 | 阶段 | 状态 |
 |----------|------|------|------|
@@ -1729,3 +1739,4 @@ graph TB
 | 版本 | 日期 | 变更内容 | 作者 |
 |------|------|----------|------|
 | v1.0.0-draft | 2026-08-07 | 初始草案，覆盖三阶段全部架构设计 | MAOP 高级技术文档专家 |
+| v1.1.0 | 2026-09-03 | 阶段二启动定稿：状态升 Approved；3.1/3.2/3.3 补代码现状对齐注记；7.3 部署表版本锚点对齐（阶段一由 v5.1.0 收官，v6.0.0 移至阶段二 M2.3）；附录 A 注明占位编号与 docs/adr/ 实际编号的冲突 | Levango7 |
