@@ -3,7 +3,10 @@ import { test, expect } from '@playwright/test';
 // Knowledge Graph visualization e2e tests (v4.5.0).
 //
 // Coverage:
-//   - Page load: /knowledge-graph renders the graph canvas + filter panel
+//   - Page load: /memory/graph renders the graph canvas + filter panel
+//     (2026-09-04 IA redesign: canonical path moved from /knowledge-graph to
+//     /memory/graph; the legacy path 301-redirects to it — tests now target
+//     the canonical path directly to avoid redirect-race flakiness)
 //   - Node type filter: toggling a checkbox filters the visible graph
 //   - Path highlight: clicking a node highlights the reachable path
 //   - Timeline replay: scrubbing the timeline filters by time range
@@ -111,8 +114,8 @@ test.describe('Knowledge Graph visualization', () => {
 
   test('page loads with graph canvas and filter panel', async ({ page }) => {
     await stubApi(page);
-    await page.goto('/knowledge-graph');
-    await expect(page).toHaveURL(/\/knowledge-graph$/);
+    await page.goto('/memory/graph');
+    await expect(page).toHaveURL(/\/memory\/graph$/);
     // Filter panel
     await expect(page.locator('.kg-filter')).toBeVisible();
     // Graph canvas
@@ -124,7 +127,7 @@ test.describe('Knowledge Graph visualization', () => {
 
   test('stats toolbar shows node and edge counts', async ({ page }) => {
     await stubApi(page);
-    await page.goto('/knowledge-graph');
+    await page.goto('/memory/graph');
     await expect(page.locator('.kg-stats')).toBeVisible();
     // The small graph has 5 nodes and 5 edges.
     await expect(page.locator('.kg-stats')).toContainText('5');
@@ -133,21 +136,22 @@ test.describe('Knowledge Graph visualization', () => {
   test('navigation sidebar has Knowledge Graph entry', async ({ page }) => {
     await stubApi(page);
     await page.goto('/');
-    // The nav entry should link to /knowledge-graph.
-    const navLink = page.locator('a[href="/knowledge-graph"]');
+    // 2026-09-04 IA redesign: the nav entry now links to /memory/graph
+    // (the legacy /knowledge-graph path 301-redirects to it).
+    const navLink = page.locator('a[href="/memory/graph"]');
     await expect(navLink).toBeVisible();
   });
 
-  test('clicking nav entry navigates to /knowledge-graph', async ({ page }) => {
+  test('clicking nav entry navigates to /memory/graph', async ({ page }) => {
     await stubApi(page);
     await page.goto('/');
-    await page.click('a[href="/knowledge-graph"]');
-    await expect(page).toHaveURL(/\/knowledge-graph$/);
+    await page.click('a[href="/memory/graph"]');
+    await expect(page).toHaveURL(/\/memory\/graph$/);
   });
 
   test('toggling a node type checkbox filters the graph', async ({ page }) => {
     await stubApi(page);
-    await page.goto('/knowledge-graph');
+    await page.goto('/memory/graph');
     // Wait for the graph to load.
     await expect(page.locator('.kg-canvas-wrap')).toBeVisible();
     // Uncheck the "task" checkbox (second one).
@@ -163,7 +167,7 @@ test.describe('Knowledge Graph visualization', () => {
 
   test('search input filters nodes by label', async ({ page }) => {
     await stubApi(page);
-    await page.goto('/knowledge-graph');
+    await page.goto('/memory/graph');
     const searchInput = page.locator('.kg-filter input[type="text"]').first();
     await searchInput.fill('Agent');
     // The page should remain stable (no crash).
@@ -172,7 +176,7 @@ test.describe('Knowledge Graph visualization', () => {
 
   test('timeline start/end inputs are present', async ({ page }) => {
     await stubApi(page);
-    await page.goto('/knowledge-graph');
+    await page.goto('/memory/graph');
     await expect(page.locator('.kg-timeline')).toBeVisible();
     // Two datetime-local inputs (start + end).
     const dtInputs = page.locator('.kg-timeline input[type="datetime-local"]');
@@ -181,7 +185,7 @@ test.describe('Knowledge Graph visualization', () => {
 
   test('timeline range slider is present', async ({ page }) => {
     await stubApi(page);
-    await page.goto('/knowledge-graph');
+    await page.goto('/memory/graph');
     // The timeline range slider.
     const rangeInputs = page.locator('.kg-timeline input[type="range"]');
     await expect(rangeInputs).toBeVisible();
@@ -208,7 +212,7 @@ test.describe('Knowledge Graph visualization', () => {
       body: JSON.stringify({ auth_enabled: false, has_token: false }),
     }));
 
-    await page.goto('/knowledge-graph');
+    await page.goto('/memory/graph');
     await expect(page.locator('.kg-canvas-wrap')).toBeVisible();
     const initialCount = fetchCount;
     await page.click('.kg-toolbar-actions .btn');
@@ -219,7 +223,7 @@ test.describe('Knowledge Graph visualization', () => {
 
   test('empty graph shows empty state', async ({ page }) => {
     await stubApi(page, { status: 'ok', data: { nodes: [], edges: [], stats: { node_count: 0, edge_count: 0 } } });
-    await page.goto('/knowledge-graph');
+    await page.goto('/memory/graph');
     // 空态容器（.empty 含 .empty__title 子元素，用 .first() 避免 strict mode 冲突）。
     await expect(page.locator('.empty').first()).toBeVisible({ timeout: 5000 });
   });
@@ -231,20 +235,20 @@ test.describe('Knowledge Graph visualization', () => {
     await page.route('**/api/knowledge-graph**', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"server"}' }));
     await page.route('**/api/info/edition', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ edition: 'enterprise', features: {}, backends: {}, degradations: [] }) }));
     await page.route('**/api/auth/status', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ auth_enabled: false, has_token: false }) }));
-    await page.goto('/knowledge-graph');
+    await page.goto('/memory/graph');
     await expect(page.locator('.kg-notice--error')).toBeVisible({ timeout: 5000 });
   });
 
   test('limit input defaults to 500', async ({ page }) => {
     await stubApi(page);
-    await page.goto('/knowledge-graph');
+    await page.goto('/memory/graph');
     const limitInput = page.locator('.kg-filter input[type="number"]');
     await expect(limitInput).toHaveValue('500');
   });
 
   test('reset button restores all filters', async ({ page }) => {
     await stubApi(page);
-    await page.goto('/knowledge-graph');
+    await page.goto('/memory/graph');
     // Uncheck a checkbox first.
     const cb = page.locator('.kg-checkbox input[type="checkbox"]').first();
     await cb.uncheck();
@@ -268,7 +272,7 @@ test.describe('Knowledge Graph performance', () => {
   test('1000-node graph loads and remains interactive (≥ 30fps)', async ({ page }) => {
     test.setTimeout(60_000);
     await stubApi(page, largeGraph(1000));
-    await page.goto('/knowledge-graph');
+    await page.goto('/memory/graph');
     // Wait for the canvas to mount.
     await expect(page.locator('.kg-canvas-wrap')).toBeVisible({ timeout: 10_000 });
 

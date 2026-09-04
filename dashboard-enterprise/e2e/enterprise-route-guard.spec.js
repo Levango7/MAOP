@@ -24,9 +24,12 @@ import { test, expect } from '@playwright/test'
 //   enterprise-only routes blocked.
 //
 // Test coverage:
-//   - personal edition: direct goto /audit|/rbac|/tenants → redirected to /
-//     (exercises the cold-load fix). SPA navigation variants retained to
-//     verify the post-fetchEdition path still redirects.
+//   - personal edition: direct goto /audit|/rbac|/tenants → redirected to the
+//     home page (/home) (exercises the cold-load fix). SPA navigation variants
+//     retained to verify the post-fetchEdition path still redirects.
+//     2026-09-04 IA redesign follow-up: the guard still redirects to '/', but
+//     '/' is now itself a redirect record to '/home' (router/index.js), so
+//     the final observed URL is /home. Assertions updated accordingly.
 //   - enterprise edition: direct goto loads without redirect.
 //   - cold load boundary: no localStorage snapshot → default personal blocks
 //     /audit on the cold first pass; no localStorage + personal API → cold
@@ -104,49 +107,49 @@ test.describe('Enterprise route guard', () => {
       await stubApi(page, 'personal')
     })
 
-    test('direct goto /audit redirects to / (cold-load fix)', async ({ page }) => {
+    test('direct goto /audit redirects to /home (cold-load fix)', async ({ page }) => {
       await page.goto('/audit')
-      await expect(page).toHaveURL(/\/$/)
+      await expect(page).toHaveURL(/\/home$/)
     })
 
-    test('direct goto /rbac redirects to / (cold-load fix)', async ({ page }) => {
+    test('direct goto /rbac redirects to /home (cold-load fix)', async ({ page }) => {
       await page.goto('/rbac')
-      await expect(page).toHaveURL(/\/$/)
+      await expect(page).toHaveURL(/\/home$/)
     })
 
-    test('direct goto /tenants redirects to / (cold-load fix)', async ({ page }) => {
+    test('direct goto /tenants redirects to /home (cold-load fix)', async ({ page }) => {
       await page.goto('/tenants')
-      await expect(page).toHaveURL(/\/$/)
+      await expect(page).toHaveURL(/\/home$/)
     })
 
-    test('SPA navigation to /audit redirects to /', async ({ page }) => {
+    test('SPA navigation to /audit redirects to /home', async ({ page }) => {
       const editionResp = editionResponsePromise(page)
       await page.goto('/')
       await editionResp
       await spaNavigate(page, '/audit')
-      await expect(page).toHaveURL(/\/$/)
+      await expect(page).toHaveURL(/\/home$/)
     })
 
-    test('SPA navigation to /rbac redirects to /', async ({ page }) => {
+    test('SPA navigation to /rbac redirects to /home', async ({ page }) => {
       const editionResp = editionResponsePromise(page)
       await page.goto('/')
       await editionResp
       await spaNavigate(page, '/rbac')
-      await expect(page).toHaveURL(/\/$/)
+      await expect(page).toHaveURL(/\/home$/)
     })
 
-    test('SPA navigation to /tenants redirects to /', async ({ page }) => {
+    test('SPA navigation to /tenants redirects to /home', async ({ page }) => {
       const editionResp = editionResponsePromise(page)
       await page.goto('/')
       await editionResp
       await spaNavigate(page, '/tenants')
-      await expect(page).toHaveURL(/\/$/)
+      await expect(page).toHaveURL(/\/home$/)
     })
 
-    test('overview / loads normally without redirect', async ({ page }) => {
+    test('overview / redirects to /home (new IA)', async ({ page }) => {
       await page.goto('/')
       await expect(page).toHaveTitle(/MAOP/)
-      await expect(page).toHaveURL(/\/$/)
+      await expect(page).toHaveURL(/\/home$/)
     })
   })
 
@@ -188,7 +191,7 @@ test.describe('Enterprise route guard', () => {
       })
       await stubApi(page, 'enterprise')
       await page.goto('/audit')
-      await expect(page).toHaveURL(/\/$/)
+      await expect(page).toHaveURL(/\/home$/)
     })
 
     test('no localStorage + personal API → cold goto blocked, SPA nav still blocked', async ({ page }) => {
@@ -204,10 +207,10 @@ test.describe('Enterprise route guard', () => {
       await stubApi(page, 'personal')
       const configResp = page.waitForResponse((resp) => resp.url().includes('/api/info/config'))
       await page.goto('/audit')
-      await expect(page).toHaveURL(/\/$/)
+      await expect(page).toHaveURL(/\/home$/)
       await configResp
       await spaNavigate(page, '/audit')
-      await expect(page).toHaveURL(/\/$/)
+      await expect(page).toHaveURL(/\/home$/)
     })
   })
 })
