@@ -177,3 +177,9 @@ py/maop/data/*.db-wal
 
 # -- Temporary attachments --
 attachments/
+
+# WorkBuddy session data (AI assistant workspace memory)
+.workbuddy/
+
+# WorkBuddy session data (AI assistant workspace memory)
+.workbuddy/
