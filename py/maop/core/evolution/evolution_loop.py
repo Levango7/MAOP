@@ -183,6 +183,13 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
         evaluate = self._phase_evaluate(debated_suggestions)
         report.phases.append(evaluate)
 
+        # AC-04: Capture pending_approval from evaluate phase for human gate
+        pending_approval_ids = [item.get("suggestion_id", "") for item in evaluate.details.get("pending_approval", [])]
+        report.pending_approval = pending_approval_ids
+        if pending_approval_ids:
+            report.approval_state = "pending"
+            logger.info("[evo-loop] %d suggestions pending human approval", len(pending_approval_ids))
+
         # Pre-APPLY snapshot: capture file state so we can rollback if needed.
         if not dry_run:
             try:
@@ -194,6 +201,7 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
             except Exception as exc:
                 logger.warning("[evo-loop] Pre-APPLY snapshot failed (rollback unavailable): %s", exc)
 
+        # Only apply approved suggestions; pending_approval ones are held for human gate
         apply_result = self._phase_apply(evaluate.details.get("approved", []), dry_run=dry_run)
         report.phases.append(apply_result)
         report.suggestions_applied = apply_result.details.get("applied", 0)

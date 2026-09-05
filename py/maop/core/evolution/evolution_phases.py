@@ -238,6 +238,7 @@ class EvolutionPhasesMixin:
     def _phase_evaluate(self, suggestions: list[dict[str, Any]]) -> PhaseResult:
         start = time.time()
         approved: list[dict[str, Any]] = []
+        pending_approval: list[dict[str, Any]] = []
         try:
             from maop.core.evolution.evolution_strategies import StrategyEngine
             engine = StrategyEngine(root_dir=str(self._root), strategy_name=self._strategy_name)
@@ -250,15 +251,29 @@ class EvolutionPhasesMixin:
                         "severity": decision.severity,
                         "reason": decision.reason,
                     })
+                elif decision.suggestion_id and decision.severity in ("HIGH", "MEDIUM"):
+                    # 非自动应用但有一定严重性的建议，暂存待人工审批
+                    pending_approval.append({
+                        "suggestion_id": decision.suggestion_id,
+                        "type": decision.suggestion_type,
+                        "severity": decision.severity,
+                        "reason": decision.reason,
+                    })
             return PhaseResult(
                 phase=LoopPhase.EVALUATE,
                 success=True,
                 duration_s=round(time.time() - start, 3),
-                details={"approved": approved, "total": len(suggestions), "approved_count": len(approved)},
+                details={
+                    "approved": approved,
+                    "pending_approval": pending_approval,
+                    "total": len(suggestions),
+                    "approved_count": len(approved),
+                    "pending_count": len(pending_approval),
+                },
             )
         except Exception as exc:
             logger.warning("[evo-loop] Evaluate phase failed: %s", exc)
-            return PhaseResult(phase=LoopPhase.EVALUATE, success=False, error=str(exc), duration_s=round(time.time() - start, 3), details={"approved": approved})
+            return PhaseResult(phase=LoopPhase.EVALUATE, success=False, error=str(exc), duration_s=round(time.time() - start, 3), details={"approved": approved, "pending_approval": []})
 
 
     def _phase_apply(self, approved: list[dict[str, Any]], dry_run: bool = False) -> PhaseResult:
