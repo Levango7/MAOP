@@ -21,3 +21,4 @@
 | [017](017-dual-repo-isolation.md) | 双仓库物理隔离 | Active (2026-08-20) |
 | [018](018-swallowed-exception-handling.md) | 吞异常处理规范化 + HookManager 单例重置 | Accepted (2026-09-02) |
 | [019](019-module-singleton-testability.md) | 模块级单例的可测性问题（MAOP_DATA_DIR 切换下路径固化） | Accepted (2026-09-02) |
+| [020](020-evolution-loop-safety-boundary.md) | 自演化闭环的安全边界（EvolutionLoop Safety Boundary） | Proposed (Stub, 2026-09-06) — Phase 2 评审填充 |
