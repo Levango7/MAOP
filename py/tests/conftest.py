@@ -133,3 +133,104 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         with contextlib.suppress(Exception):
             shutil.rmtree(d, ignore_errors=True)
     _tmp_dirs.clear()
+
+
+# ── v5.2.0 Evolution loop fixtures (spec §15 / ADR-019 / ADR-020) ────
+# AC-08 conftest fixture 模板：避免 evolution 模块级单例路径固化导致
+# 跨测试污染（ADR-019 同类风险）。
+#
+# 用法：
+#     def test_my_evo_thing(evolution_loop_factory):
+#         loop = evolution_loop_factory()  # 每次新实例 + 显式 db_path
+#         loop.run_cycle(dry_run=True)
+#
+# 禁止在测试 module-top 写：
+#     from maop.core.evolution.evolution_loop import EvolutionLoop  # noqa
+# （会触发模块级 _init_db 路径固化 — 跨测试污染）
+
+from typing import Any  # noqa: E402
+
+# 拟扩展的 evolution 单例属性名（spec §15 + ADR-019 同类风险登记）。
+# 任何 evol 子模块在 module 顶层定义 `_*_instance` / `_*_singleton` / `_*_db_path` 等
+# 缓存性单例时，必须加入此列表。
+_EVO_SINGLETON_ATTRS: tuple[str, ...] = (
+    "_db_path",
+    "_instance",
+    "_singleton",
+    "_global_loop",
+    "_global_history",
+    "_global_bus",
+    "_global_pool",
+    "_global_lb",
+    "_metrics",
+    "_otel_tracer",
+)
+
+_EVOLUTION_MODULES: tuple[str, ...] = (
+    "maop.core.evolution.evolution_loop",
+    "maop.core.evolution.evolution_loop_types",
+    "maop.core.evolution.evolution_collectors",
+    "maop.core.evolution.evolution_analyzers",
+    "maop.core.evolution.evolution_agent",
+    "maop.core.evolution.evolution_phases",
+)
+
+
+def _try_reset_evo_singletons() -> None:
+    """对 evolution 子模块的潜在单例属性做 best-effort 重置（不存在则跳过）。
+
+    通过直接 setattr 尝试清空缓存性引用。某些属性可能是 property 或不允许
+    set，捕获 AttributeError / TypeError 即可——清理失败不致命，下个测试的
+    ``EvolutionLoop(root_dir=...)`` 仍能正确使用传入的 root_dir。
+    """
+    import importlib
+
+    for mod_name in _EVOLUTION_MODULES:
+        try:
+            mod = importlib.import_module(mod_name)
+        except ImportError:
+            continue
+        for attr in _EVO_SINGLETON_ATTRS:
+            if hasattr(mod, attr):
+                try:
+                    setattr(mod, attr, None)
+                except (AttributeError, TypeError):
+                    pass
+
+
+@pytest.fixture
+def evolution_loop_factory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """可重置的 EvolutionLoop 工厂：每次返回新实例 + 显式 db_path。
+
+    与 ``_isolate_data_dir`` autouse 协同：
+    - autouse 设 ``MAOP_DATA_DIR=tmp_path/data`` + ``reload_settings()`` →
+      ``get_db_path()`` 读到的路径正确。
+    - 本 fixture 进一步 best-effort 重置 evolution 子模块的单例属性。
+    - 显式传 ``root_dir=tmp_path/evolution`` 给 EvolutionLoop（不依赖单例缓存）。
+
+    Returns:
+        callable: () -> EvolutionLoop（每次新实例）
+    """
+    db_root = tmp_path / "evolution"
+    db_root.mkdir(parents=True, exist_ok=True)
+    # 工厂默认开启开关，让「开关=开」路径易于测试；测试自身可 monkeypatch.setenv
+    # 在调用 _factory() 之前覆盖为 "0" 验证「开关=关」零行为变化（AC-01）。
+    monkeypatch.setenv("MAOP_EVOLUTION_LOOP_ENABLED", "1")
+
+    def _factory(**kwargs: Any):
+        _try_reset_evo_singletons()
+        from maop.core.evolution.evolution_loop import EvolutionLoop
+        return EvolutionLoop(root_dir=db_root, **kwargs)
+
+    return _factory
+
+
+@pytest.fixture(autouse=True)
+def _reset_evolution_singletons():
+    """任何测试跑完都重置 evolution 模块的潜在单例属性（autouse）。
+
+    与 ``_isolate_data_dir`` 协同：后者在 yield 前 reload_settings，
+    本 fixture 在 yield 后清理 evolution 自身的单例。两个机制互不冲突。
+    """
+    yield
+    _try_reset_evo_singletons()
