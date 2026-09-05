@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import os
 import time
 from typing import Any, cast
 
@@ -36,6 +37,16 @@ from maop.maop_verify import VerifyResult
 logger = logging.getLogger(__name__)
 
 _otel_tracer = None
+
+
+def _env_truthy(name: str) -> bool:
+    """检查环境变量是否为 truthy 值（'1' / 'true' / 'yes' / 'on'，大小写不敏感）。
+
+    空 / 未设置 / 任何其他值 → False。
+    用于 v5.2.0 MAOP_EVOLUTION_LOOP_ENABLED 开关（spec §2 P0 + AC-01 默认 false）。
+    """
+    raw = os.getenv(name, "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
 
 
 def _get_otel_tracer():
@@ -420,8 +431,18 @@ class PhasesMixin:
         return PhaseResult(ok=True)
 
     async def _phase_evolve(self, ctx: PhaseContext) -> PhaseResult:
-        """Phase 5: Evolve + Dream scheduling."""
+        """Phase 5: Evolve + Dream scheduling.
+
+        v5.2.0 (spec §5 接线点 #1):
+        - lc.enable_evolve = True（默认）→ 仅调 EvolveEngine.analyze()，行为与现状完全一致（AC-01）
+        - MAOP_EVOLUTION_LOOP_ENABLED=1（环境变量）→ 调 EvolutionLoop.run_cycle() 走完整闭环（AC-02）
+        - 两个开关**独立**：可单独开 analyze，也可同时开 analyze + 完整闭环
+        - 完整闭环默认 false（spec §1 / ADR-020）：未开启时零行为变化
+
+        改动粒度 ≤30 行（spec §18）。
+        """
         lc = self._loop_config
+        evolution_loop_enabled = _env_truthy("MAOP_EVOLUTION_LOOP_ENABLED")
 
         if lc.enable_evolve and ctx.verify_result:
             try:
@@ -438,6 +459,31 @@ class PhasesMixin:
                     }))
             except Exception as exc:
                 logger.warning("Evolve phase failed: %s", exc)
+
+            # v5.2.0: 完整闭环（独立分支，失败不影响主 analyze 路径）
+            if evolution_loop_enabled:
+                try:
+                    from maop.core.evolution.evolution_loop import EvolutionLoop
+                    loop = EvolutionLoop(root_dir=self._root)
+                    loop_report = loop.run_cycle(dry_run=True, auto_rollback=True)
+                    self._log("evolve", "INFO",
+                              f"EvolutionLoop({loop_report.cycle_id}): "
+                              f"{loop_report.errors_observed} errors → "
+                              f"{loop_report.suggestions_generated} suggestions → "
+                              f"{loop_report.suggestions_applied} applied "
+                              f"(rolled_back={loop_report.rolled_back})",
+                              trace_id=ctx.trace_id)
+                    await self._bus.publish(Event(topic="loop.evolution_cycle", data={
+                        "trace_id": ctx.trace_id,
+                        "cycle_id": loop_report.cycle_id,
+                        "errors_observed": loop_report.errors_observed,
+                        "suggestions_generated": loop_report.suggestions_generated,
+                        "suggestions_applied": loop_report.suggestions_applied,
+                        "validation_improved": loop_report.validation_improved,
+                        "rolled_back": loop_report.rolled_back,
+                    }))
+                except Exception as exc:
+                    logger.warning("EvolutionLoop.run_cycle failed: %s", exc)
 
         self._loop_count += 1
         if (self._consolidator and lc.enable_dream
