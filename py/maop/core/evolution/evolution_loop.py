@@ -362,6 +362,24 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
             "total_heal_successes": total_heals,
         }
 
+    # AC-05 / spec §16: 自动回滚 SLA 验证辅助方法
+    # 仅供测试使用（生产无入口），构造必然失败的 mutation。
+    def _build_degradation_test_suggestion(self) -> EvolutionSuggestion:
+        """构造必然导致 VALIDATE 失败的测试建议（仅 AC-05 验收用）。
+
+        mutation_type="adjust_timeout" + timeout_s=-1 会被 VALIDATE 阶段拒绝，
+        触发 auto_rollback=True 分支，5 分钟内回滚。
+        """
+        from maop.core.evolution.evolution_loop_types import EvolutionSuggestion
+        return EvolutionSuggestion(
+            category="performance",
+            mutation_type="adjust_timeout",
+            severity="HIGH",
+            target_name="__ac05_test__",
+            mutation_params={"timeout_s": -1},
+            metadata={"_ac05_test": True},
+        )
+
 
 # ════════════════════════════════════════════════════════════════════
 # F2-01: PerformanceEvolutionLoop — 基于性能指标的闭环调度
