@@ -2,7 +2,7 @@
 # PyPI 包名改为 maop-orchestrator（原 `maop` 被 Justin Ryan 2021-07-09 注册为 0.0.0）。
 # import 名仍为 `maop`（由 [tool.hatch.build.targets.wheel] packages 指定）。
 name = "maop-orchestrator"
-version = "5.1.0"
+version = "5.2.0"
 description = "MAOP - Multi-Agent Orchestration Framework (Python-first, Plan-Execute-Verify)"
 readme = "README.md"
 requires-python = ">=3.10"

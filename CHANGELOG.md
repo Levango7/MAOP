@@ -168,7 +168,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 6 个临时日志文件（docs/_review_*.log）
 
-## [5.0.0] — 2026-08-11
+## [5.2.0] — 2026-09-08
+
+### Added
+- **自演化闭环 MVP（F2-01 / M2.1）**：`MAOP_EVOLUTION_LOOP_ENABLED` 开关接入主循环，完成 observe→suggest→evaluate→apply→validate→consolidate 完整闭环，默认关闭（AC-01/AC-02）。
+- **人工 gate（AC-04）**：`LoopReport` 新增 `pending_approval` / `approval_state` / `approved_by` / `approved_at` 字段；`_phase_evaluate` 返回 `pending_approval` 列表；`_phase_apply` 仅执行 `approved` 列表，跳过待审批项。
+- **自动回滚 SLA（AC-05）**：`EvolutionLoop._build_degradation_test_suggestion()` 构造必然导致 VALIDATE 失败的测试建议；`run_cycle(auto_rollback=True)` 5 分钟内触发 `rollback_cycle()` 验证。
+- **显著性检验对照（AC-06）**：`_z_test_p_value` 对照 scipy.stats.norm.sf，边界条件（p_pool=0/1、p1=0 vs p2=1）覆盖。
+- **Dashboard /evolve 扩展（AC-07）**：新增 7 个 API 端点（`/api/evolution/loop/status`、`/api/evolution/loop/trigger`、`/api/evolution/approvals`、`/api/evolution/approvals/{id}/decision`、`/api/evolution/ab/{cycle_id}`、`/api/evolution/loop/rollback`、`/api/evolution/loop/status`）。
+- **conftest evolution_loop_factory（AC-08）**：`evolution_loop_factory` fixture + autouse `_reset_evolution_singletons`，避免 ADR-019 模块级单例路径固化同类 bug。
+
+### Changed
+- **EvolutionLoop.run_cycle()**：改为 `async`，`_phase_evolve` 中正确 `await run_cycle()`（修复 coroutine 未 await 导致 `model_dump` 失败）。
+- **_phase_evolve** 接线点：新增 `MAOP_EVOLUTION_LOOP_ENABLED` 环境变量开关，默认 `false` → 兼容 AC-01 零回归 / AC-02 开启完整闭环。
+
+### Fixed
+- **AC-04 人工 gate**：`LoopReport.pending_approval` / `approval_state` / `approved_by` / `approved_at` 字段（默认 `n/a`）。
+- **AC-05 自动回滚 SLA**：`_build_degradation_test_suggestion()` + `rollback_cycle()` 路径验证（5min SLA）。
+- **AC-06 显著性检验对照**：`_z_test_p_value` 对照 scipy.stats.norm.sf，边界条件（p1=0 vs p2=1 必 p<1e-10）。
+- **AC-07 Dashboard**：`/evolve` 页面新增状态机、待审批列表、A/B 结果卡、回滚按钮。
+
+### Soak Test
+- **第一轮**：47.48h / 5504 样本 / RSS slope -0.028 MB/h / Handles +0.021/h / Pool 0 / 错误率 0% → PASS
+- **第二轮**：31.23h / 3620 样本（用户主动停止） / 内存 14.4MB (min 11.7 / max 49.4) / Handles 153 (152-160) / Pool 0 / CPU 平均 63.6% → 趋势一致，**综合判定通过**。
+
+### Security
+- **MAOS audit.py** metadata JSON 字符串解析修复（`_coerce_event_dict` 新增 `metadata` 分支）：SQLite `metadata` 列存储为 `'{}'` 字符串，Pydantic `AuditEvent(metadata: dict)` 校验失败 → query_events 全路径抛 ValidationError：Input should be a valid dictionary [type=dict_type, input_value='{}', input_type=str]。
+
+### Added
+- **ADR-020**：演化闭环安全边界 Stub（Phase 2 评审待填充 5 个待决问题）。
+
+---
+
+## [5.1.0] — 2026-08-14
 
 ### ⚠ Breaking Changes
 
