@@ -10,8 +10,6 @@ from pathlib import Path
 
 import pytest
 
-# H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-pytest.skip(reason="maop.enterprise 未发布", allow_module_level=True)
 import maop.enterprise.license as _license_mod
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -223,7 +221,10 @@ class TestLicenseValidator:
         key = f"MAOP-ENT-{payload_b64}.{sig_b64}"
 
         validator = LicenseValidator()
-        info = validator.validate(key)
+        # P0 #8: license 携带 fingerprint 时强制机器绑定校验（fail-closed）。
+        # 本测试验证的是可选字段解析，fingerprint='abc123' 非本机真实指纹，
+        # 需以 expected_fingerprint 显式匹配（模拟签发机器）。
+        info = validator.validate(key, expected_fingerprint="abc123")
         assert info.max_users == 100
         assert info.fingerprint == "abc123"
         assert info.features == ["rbac", "audit_log", "sso"]

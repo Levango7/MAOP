@@ -15,8 +15,6 @@ from pathlib import Path
 
 import pytest
 
-# H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-pytest.skip(reason="maop.enterprise 未发布", allow_module_level=True)
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from maop.enterprise.quota import (
@@ -517,9 +515,13 @@ class TestQuotaMiddleware:
         assert r.status_code == 200
 
     def test_hard_limit_denies_429(self, app_with_mw: FastAPI, qm: QuotaManager):
-        """硬限制触发 → 429 + Retry-After."""
-        qm.set_quota("t1", "api_calls", 1)
-        qm.set_usage("t1", "api_calls", 1)
+        """硬限制触发 → 429 + Retry-After.
+
+        /api/agents/{id}/run 映射到 concurrent_tasks（_DEFAULT_PATH_PATTERNS
+        首条，避免被 api_calls 遮蔽），配额须设在 concurrent_tasks 上。
+        """
+        qm.set_quota("t1", "concurrent_tasks", 1)
+        qm.set_usage("t1", "concurrent_tasks", 1)
         # 模拟 AuthMiddleware 注入 tenant_id;
         # TestClient 不直接支持,我们用 middleware 注入.
         from fastapi import Request as _Req
@@ -544,18 +546,22 @@ class TestQuotaMiddleware:
         r = client2.post("/api/agents/bot1/run")
         assert r.status_code == 429
         assert r.headers.get("Retry-After") == "60"
-        assert r.headers.get("X-Quota-Resource") == "api_calls"
+        assert r.headers.get("X-Quota-Resource") == "concurrent_tasks"
         assert "quota exceeded" in r.json()["error"].lower()
 
     def test_soft_limit_warns_but_allows(self, db_path: Path):
-        """软限制触发 → 200 + X-Quota-Warning 头."""
+        """软限制触发 → 200 + X-Quota-Warning 头.
+
+        /api/agents/{id}/run 映射到 concurrent_tasks，配额须设在
+        concurrent_tasks 上。
+        """
         from fastapi import Request as _Req
         from maop.enterprise.quota_middleware import QuotaMiddleware
         from starlette.middleware.base import BaseHTTPMiddleware
 
         qm = QuotaManager(db_path, cache_ttl_s=0.0)
-        qm.set_quota("t1", "api_calls", 100, soft_limit=80)
-        qm.set_usage("t1", "api_calls", 80)  # used=80, amount=1 → projected=81 > 80 (soft)
+        qm.set_quota("t1", "concurrent_tasks", 100, soft_limit=80)
+        qm.set_usage("t1", "concurrent_tasks", 80)  # used=80, amount=1 → projected=81 > 80 (soft)
 
         class _InjectTenant(BaseHTTPMiddleware):
             async def dispatch(self, request: _Req, call_next):

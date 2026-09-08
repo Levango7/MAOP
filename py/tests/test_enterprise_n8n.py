@@ -6,8 +6,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-pytest.skip(reason="maop.enterprise 未发布", allow_module_level=True)
 
 from maop.enterprise.n8n import (
     N8nClient,
@@ -28,8 +26,15 @@ from maop.config.edition import (
 
 
 @pytest.fixture(autouse=True)
-def enterprise_edition():
-    """Enable enterprise edition + n8n feature for all tests."""
+def enterprise_edition(monkeypatch: pytest.MonkeyPatch):
+    """Enable enterprise edition + n8n feature for all tests.
+
+    P0 修复后 handle_n8n_webhook 为 fail-closed：未配置 N8N_WEBHOOK_SECRET
+    时拒绝所有请求。单元测试无 HMAC 签名通道，使用文档化的逃生舱
+    N8N_ALLOW_UNSIGNED=1（生产禁止，本地/内网测试专用）。
+    """
+    monkeypatch.setenv("N8N_ALLOW_UNSIGNED", "1")
+    monkeypatch.delenv("N8N_WEBHOOK_SECRET", raising=False)
     reset_edition()
     set_edition(Edition.ENTERPRISE)
     set_feature_override(FeatureFlag.N8N_INTEGRATION, True)
@@ -135,10 +140,9 @@ class TestHandleWebhook:
 class TestN8nClient:
     """Test N8nClient (with mocked HTTP)."""
 
-    @patch("maop.enterprise.n8n.httpx.Client")
-    def test_trigger_workflow_success(self, mock_client_class):
-        """Test triggering a workflow."""
-        mock_client = MagicMock()
+    @patch("maop.enterprise.n8n.httpx.post")
+    def test_trigger_workflow_success(self, mock_post):
+        """Test triggering a workflow（MAOS trigger_workflow 改用模块级 httpx.post）."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -146,8 +150,7 @@ class TestN8nClient:
             "status": "running",
         }
         mock_response.raise_for_status = MagicMock()
-        mock_client.post.return_value = mock_response
-        mock_client_class.return_value = mock_client
+        mock_post.return_value = mock_response
 
         client = N8nClient(base_url="http://localhost:5678", api_key="test-key")
         execution = client.trigger_workflow("wf-123", data={"input": "test"})

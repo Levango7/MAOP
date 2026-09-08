@@ -9,8 +9,6 @@ from pathlib import Path
 
 import pytest
 
-# H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-pytest.skip(reason="maop.enterprise 未发布", allow_module_level=True)
 
 try:
     import cryptography  # noqa: F401
@@ -104,7 +102,11 @@ def test_ensure_dev_certs_creates_files(tmp_path, monkeypatch):
 
 
 def test_ensure_dev_certs_reuses_existing(tmp_path, monkeypatch):
-    """_ensure_dev_certs() reuses existing cert/key files without regenerating."""
+    """_ensure_dev_certs() reuses a valid existing cert without regenerating.
+
+    P1 修复后复用前会校验证书有效期（fail-closed）：损坏/过期证书
+    触发重新生成。因此测试须先写一个真实有效的自签名证书。
+    """
     monkeypatch.delenv("MAOP_TLS_CERT", raising=False)
     monkeypatch.delenv("MAOP_TLS_KEY", raising=False)
     data_dir = os.getenv("MAOP_DATA_DIR")
@@ -112,15 +114,16 @@ def test_ensure_dev_certs_reuses_existing(tmp_path, monkeypatch):
     os.makedirs(tls_dir, exist_ok=True)
     cert_path = os.path.join(tls_dir, "dev-cert.pem")
     key_path = os.path.join(tls_dir, "dev-key.pem")
-    Path(cert_path).write_bytes(b"existing-cert")
-    Path(key_path).write_bytes(b"existing-key")
+    _generate_self_signed_cert(Path(cert_path), Path(key_path))
+    original_cert_bytes = Path(cert_path).read_bytes()
+    original_key_bytes = Path(key_path).read_bytes()
 
     cert, key = tls_auto._ensure_dev_certs()
     assert cert == cert_path
     assert key == key_path
-    # content unchanged -> cert was reused, not regenerated
-    assert Path(cert).read_bytes() == b"existing-cert"
-    assert Path(key).read_bytes() == b"existing-key"
+    # content unchanged -> valid cert was reused, not regenerated
+    assert Path(cert).read_bytes() == original_cert_bytes
+    assert Path(key).read_bytes() == original_key_bytes
 
 
 def test_build_ssl_kwargs(tmp_path):
@@ -134,8 +137,14 @@ def test_build_ssl_kwargs(tmp_path):
     assert isinstance(result["ssl"], ssl.SSLContext)
 
 
-def test_auto_configure_no_certs_returns_empty(monkeypatch):
-    """auto_configure_tls() returns an empty dict when cryptography is unavailable."""
+def test_auto_configure_no_certs_raises(monkeypatch):
+    """auto_configure_tls() raises TLSAutoConfigError when generation fails.
+
+    fail-closed 修复后：cryptography 不可用导致 dev cert 生成失败时
+    直接抛 TLSAutoConfigError（不再静默返回 {} 退回明文 HTTP）。
+    """
+    from maop.enterprise.tls_auto import TLSAutoConfigError
+
     monkeypatch.delenv("MAOP_TLS_CERT", raising=False)
     monkeypatch.delenv("MAOP_TLS_KEY", raising=False)
     # Simulate cryptography being unavailable so dev cert generation fails
@@ -145,5 +154,5 @@ def test_auto_configure_no_certs_returns_empty(monkeypatch):
     monkeypatch.setitem(sys.modules, "cryptography.hazmat.primitives", None)
     monkeypatch.setitem(sys.modules, "cryptography.hazmat.primitives.asymmetric", None)
 
-    result = tls_auto.auto_configure_tls()
-    assert result == {}
+    with pytest.raises(TLSAutoConfigError, match="auto-generation failed"):
+        tls_auto.auto_configure_tls()

@@ -50,12 +50,16 @@ def detector():
 
 @pytest.fixture
 def detector_with_bus():
-    """Detector wired to a real EventBus so emitted events are captured."""
-    # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-    pytest.skip(reason="maop.enterprise 未发布")
-    from maop.enterprise.notification.event_bus import EventBus
+    """Detector wired to the CORE EventBus（failure_detector 的实际依赖）。
 
-    bus = EventBus(history_size=100)
+    [C-1] 修正后 failure_detector 发布的是 core.reliability.EventBus.Event
+    （topic/data 字段），而非 MAOS notification.EventBus 的 EventPayload
+    （event_type/payload）。本 fixture 使用 core bus 以匹配真实发布 API。
+    """
+    pass  # enterprise installed (maop-enterprise wheel): guard removed
+    from maop.core.reliability.event_bus import EventBus
+
+    bus = EventBus()
     d = FailurePatternDetector(
         window_size=10,
         failure_rate_threshold=0.30,
@@ -311,11 +315,11 @@ def test_drain_publishes_agent_drained_event(detector_with_bus):
     for _ in range(4):
         detector.record_result("a1", success=False, latency=0.1)
     # The event bus records published events in its history buffer.
-    history = bus.history("agent_drained")
+    history = bus.get_history(topic="agent_drained")
     assert len(history) >= 1
     event = history[-1]
-    assert event.payload["agent_id"] == "a1"
-    assert event.payload["level"] == "error"
+    assert event.data["agent_id"] == "a1"
+    assert event.data["level"] == "error"
 
 
 def test_recovery_publishes_agent_recovering_event(detector_with_bus):
@@ -327,9 +331,9 @@ def test_recovery_publishes_agent_recovering_event(detector_with_bus):
     # First recovery step.
     for _ in range(3):
         detector.record_result("a1", success=True, latency=0.1)
-    recovering = bus.history("agent_recovering")
+    recovering = bus.get_history(topic="agent_recovering")
     assert len(recovering) >= 1
-    assert recovering[-1].payload["weight"] == pytest.approx(0.3)
+    assert recovering[-1].data["weight"] == pytest.approx(0.3)
 
 
 def test_full_recovery_publishes_agent_recovered_event(detector_with_bus):
@@ -341,9 +345,9 @@ def test_full_recovery_publishes_agent_recovered_event(detector_with_bus):
     # Walk the full recovery ladder: 3 + 3 + 3 successes.
     for _ in range(9):
         detector.record_result("a1", success=True, latency=0.1)
-    recovered = bus.history("agent_recovered")
+    recovered = bus.get_history(topic="agent_recovered")
     assert len(recovered) >= 1
-    assert recovered[-1].payload["weight"] == pytest.approx(1.0)
+    assert recovered[-1].data["weight"] == pytest.approx(1.0)
 
 
 # ── 10. Thread safety ─────────────────────────────────────────────

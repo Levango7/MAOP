@@ -16,8 +16,6 @@ from typing import Any
 
 import pytest
 
-# H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-pytest.skip(reason="maop.enterprise 未发布", allow_module_level=True)
 from maop.enterprise.sso import (
     SSOConfig,
     SSOError,
@@ -333,11 +331,11 @@ class TestHandleCallbackOIDC:
                 "data": req.data.decode() if req.data else "",
                 "headers": dict(req.headers),
             })
-            # Return token JSON for the token call; empty userinfo for the
-            # userinfo call (so we don't need to fabricate claims here).
+            # Return token JSON for the token call; minimal userinfo with
+            # 'sub' so the fail-closed subject check (P0 fix) passes.
             if "token" in req.full_url:
                 return _FakeResponse(token_payload)
-            return _FakeResponse(b"{}")
+            return _FakeResponse(json.dumps({"sub": "user-1"}).encode())
 
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
@@ -398,7 +396,12 @@ class TestHandleCallbackOIDC:
         assert user.roles == ["admin", "viewer"]
         assert user.tenant_id == "tenant-9"
 
-    def test_handle_callback_userinfo_failure_is_non_fatal(self, monkeypatch):
+    def test_handle_callback_userinfo_failure_is_fatal(self, monkeypatch):
+        """P0 fix: userinfo endpoint down → login rejected (fail-closed).
+
+        旧实现降级为 oidc:unknown（身份合并风险）；P0 修复后 userinfo
+        获取失败应抛 SSOError，不再静默创建 session。
+        """
         config = _make_oidc_config()
         mgr = SSOManager(config)
 
@@ -415,12 +418,8 @@ class TestHandleCallbackOIDC:
 
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
-        session = mgr.handle_callback("CODE")
-
-        # Session still created; user built from token_resp only.
-        assert session.access_token == "AT"
-        assert session.user.external_id == "oidc:unknown"
-        assert session.user.roles == ["viewer"]  # default role
+        with pytest.raises(Exception, match="userinfo fetch failed"):
+            mgr.handle_callback("CODE")
 
     def test_handle_callback_empty_code_raises(self):
         config = _make_oidc_config()
@@ -502,8 +501,11 @@ class TestHandleCallbackOIDC:
             "access_token": "AT",
             "expires_in": "not-a-number",
         }).encode()
+        userinfo_payload = json.dumps({"sub": "user-9"}).encode()
 
         def fake_urlopen(req, timeout=None):
+            if "userinfo" in req.full_url:
+                return _FakeResponse(userinfo_payload)
             return _FakeResponse(token_payload)
 
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
@@ -522,6 +524,10 @@ class TestHandleCallbackSAML:
         key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         mgr = SSOManager(config)
+        # G-06: 测试响应带 InResponseTo，须先注册 pending AuthnRequest ID
+        # （_saml_handler 懒初始化，先触发实例化再播种 pending 表）。
+        import time as _time
+        mgr._get_saml_handler_instance()._pending_request_ids["_authn_request_1"] = _time.time()
 
         saml_response_b64 = _build_signed_saml_response(key)
         session = mgr.handle_callback(saml_response_b64, state="relay-state")
@@ -546,6 +552,8 @@ class TestHandleCallbackSAML:
         key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         mgr = SSOManager(config)
+        import time as _time
+        mgr._get_saml_handler_instance()._pending_request_ids["_authn_request_1"] = _time.time()
 
         saml_response_b64 = _build_signed_saml_response(key, tamper_signature=True)
         with pytest.raises(SSOError, match="signature|digest|verification"):
@@ -613,6 +621,10 @@ class TestSAMLHandler:
             saml_entity_id="maop-sp",
         )
         handler = SAMLHandler(config)
+        # G-06: 测试响应带 InResponseTo='_authn_request_1'，须先注册
+        # pending AuthnRequest ID（模拟 SP 发起过 AuthnRequest）。
+        import time as _time
+        handler._pending_request_ids["_authn_request_1"] = _time.time()
 
         saml_response_b64 = _build_signed_saml_response(key, audience="maop-sp")
         session = handler.handle_response(saml_response_b64, relay_state="state")
@@ -633,6 +645,8 @@ class TestSAMLHandler:
         key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         handler = SAMLHandler(config)
+        import time as _time
+        handler._pending_request_ids["_authn_request_1"] = _time.time()
 
         saml_response_b64 = _build_signed_saml_response(key, tamper_signature=True)
         with pytest.raises(SSOError, match="signature|digest|verification"):
@@ -646,6 +660,8 @@ class TestSAMLHandler:
         _, cert_b64_b = _generate_test_cert()  # 不同的密钥对
         config = _make_saml_config(saml_idp_cert=cert_b64_b)
         handler = SAMLHandler(config)
+        import time as _time
+        handler._pending_request_ids["_authn_request_1"] = _time.time()
 
         saml_response_b64 = _build_signed_saml_response(key_a)
         with pytest.raises(SSOError, match="signature|digest|verification"):
@@ -658,6 +674,8 @@ class TestSAMLHandler:
         key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         handler = SAMLHandler(config)
+        import time as _time
+        handler._pending_request_ids["_authn_request_1"] = _time.time()
 
         now = datetime.datetime.now(datetime.timezone.utc)
         saml_response_b64 = _build_signed_saml_response(
@@ -675,6 +693,8 @@ class TestSAMLHandler:
         key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
         handler = SAMLHandler(config)
+        import time as _time
+        handler._pending_request_ids["_authn_request_1"] = _time.time()
 
         now = datetime.datetime.now(datetime.timezone.utc)
         saml_response_b64 = _build_signed_saml_response(
@@ -693,6 +713,8 @@ class TestSAMLHandler:
         # SP entity_id 是 "maop-sp"，但 Response 中 Audience 是 "other-sp"
         config = _make_saml_config(saml_idp_cert=cert_b64, saml_entity_id="maop-sp")
         handler = SAMLHandler(config)
+        import time as _time
+        handler._pending_request_ids["_authn_request_1"] = _time.time()
 
         saml_response_b64 = _build_signed_saml_response(key, audience="other-sp")
         with pytest.raises(SSOError, match="Audience mismatch"):
@@ -816,8 +838,8 @@ class TestGetAuthorizeUrl:
         assert url.startswith("https://idp.example.com/authorize?")
         assert "client_id=test-client-id" in url
         assert "response_type=code" in url
-        # get_authorize_url joins scopes with a raw space (not URL-encoded).
-        assert "scope=openid profile email" in url
+        # scope 空格在 query string 中编码为 '+'（urlencode 标准行为）。
+        assert "scope=openid+profile+email" in url
         assert "state=rand123" in url
 
     def test_saml_authorize_url_returns_redirect_url(self, monkeypatch):
@@ -855,10 +877,14 @@ class TestSessionLifecycle:
         token_payload = json.dumps({
             "access_token": "AT", "expires_in": 3600,
         }).encode()
-        monkeypatch.setattr(
-            "urllib.request.urlopen",
-            lambda req, timeout=None: _FakeResponse(token_payload),
-        )
+        userinfo_payload = json.dumps({"sub": "user-1"}).encode()
+
+        def fake_urlopen(req, timeout=None):
+            if "userinfo" in req.full_url:
+                return _FakeResponse(userinfo_payload)
+            return _FakeResponse(token_payload)
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
         session = mgr.handle_callback("CODE")
         assert mgr.validate_session(session.session_id) is not None
 
@@ -867,10 +893,14 @@ class TestSessionLifecycle:
         token_payload = json.dumps({
             "access_token": "AT", "expires_in": 3600,
         }).encode()
-        monkeypatch.setattr(
-            "urllib.request.urlopen",
-            lambda req, timeout=None: _FakeResponse(token_payload),
-        )
+        userinfo_payload = json.dumps({"sub": "user-1"}).encode()
+
+        def fake_urlopen(req, timeout=None):
+            if "userinfo" in req.full_url:
+                return _FakeResponse(userinfo_payload)
+            return _FakeResponse(token_payload)
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
         session = mgr.handle_callback("CODE")
         # Force expiry by setting expires_at to a clearly past timestamp.
         # (Using 0.0 would be treated as "no expiry set" by validate_session's
@@ -881,10 +911,14 @@ class TestSessionLifecycle:
     def test_logout_removes_session(self, monkeypatch):
         mgr = SSOManager(_make_oidc_config())
         token_payload = json.dumps({"access_token": "AT", "expires_in": 3600}).encode()
-        monkeypatch.setattr(
-            "urllib.request.urlopen",
-            lambda req, timeout=None: _FakeResponse(token_payload),
-        )
+        userinfo_payload = json.dumps({"sub": "user-1"}).encode()
+
+        def fake_urlopen(req, timeout=None):
+            if "userinfo" in req.full_url:
+                return _FakeResponse(userinfo_payload)
+            return _FakeResponse(token_payload)
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
         session = mgr.handle_callback("CODE")
         assert mgr.logout(session.session_id) is True
         assert mgr.validate_session(session.session_id) is None

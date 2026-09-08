@@ -391,7 +391,7 @@ class TestAuditEvents:
         # This test exercises the enterprise branch's error path; skip when
         # maop.enterprise is not installed (personal-edition CI).
         # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-        pytest.skip(reason="maop.enterprise 未发布")
+        pass  # enterprise installed (maop-enterprise wheel): guard removed
         import maop.dashboard.routers.audit as _audit_mod
         _audit_mod._enterprise_logger = None
         # 2026-08-11 hardening: 无 license 时 has_feature(AUDIT_LOG) 为 False,

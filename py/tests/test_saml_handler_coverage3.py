@@ -12,8 +12,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-pytest.skip(reason="maop.enterprise 未发布", allow_module_level=True)
 
 # ── Helpers ─────────────────────────────────────────────────────────
 
@@ -367,23 +365,27 @@ class TestExtractBranches:
         assert result["email"] == ["test@example.com"]
 
     def test_no_subject(self):
-        """Cover no Subject (523)."""
+        """Cover no Subject (523) — MAOS fail-closed：缺 Subject 抛 SSOError。"""
         from lxml import etree
+        from maop.enterprise.sso import SSOError
         handler = _make_handler()
         assertion = etree.fromstring(
             b'<Assertion xmlns="urn:oasis:names:tc:SAML:2.0:assertion"/>'
         )
-        assert handler._extract_name_id(assertion) == ""
+        with pytest.raises(SSOError, match="Subject"):
+            handler._extract_name_id(assertion)
 
     def test_no_name_id(self):
-        """Cover no NameID (525-526)."""
+        """Cover no NameID (525-526) — MAOS fail-closed：缺 NameID 抛 SSOError。"""
         from lxml import etree
+        from maop.enterprise.sso import SSOError
         handler = _make_handler()
         xml = b"""<Assertion xmlns="urn:oasis:names:tc:SAML:2.0:assertion">
   <Subject/>
 </Assertion>"""
         assertion = etree.fromstring(xml)
-        assert handler._extract_name_id(assertion) == ""
+        with pytest.raises(SSOError, match="NameID"):
+            handler._extract_name_id(assertion)
 
 
 # ─– _validate_conditions branches (537, 547-548, 560-561, 573) ─────
@@ -391,13 +393,15 @@ class TestExtractBranches:
 
 class TestValidateConditionsBranches:
     def test_no_conditions(self):
-        """Cover no Conditions (537)."""
+        """Cover no Conditions (537) — MAOS fail-closed：缺 Conditions 抛 SSOError。"""
         from lxml import etree
+        from maop.enterprise.sso import SSOError
         handler = _make_handler()
         assertion = etree.fromstring(
             b'<Assertion xmlns="urn:oasis:names:tc:SAML:2.0:assertion"/>'
         )
-        handler._validate_conditions(assertion, "maop-sp")  # should not raise
+        with pytest.raises(SSOError, match="Conditions"):
+            handler._validate_conditions(assertion, "maop-sp")
 
     def test_not_before_parse_exception(self):
         """Cover NotBefore parse failure (547-548)."""

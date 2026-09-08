@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-# H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-pytest.skip(reason="maop.enterprise 未发布", allow_module_level=True)
 
 from maop.enterprise.tenant import (
     TenantManager,
@@ -116,10 +114,13 @@ def test_check_quota():
 
 
 def test_check_quota_unknown_resource():
-    """check_quota() for an unknown resource returns True."""
+    """P0 修复：check_quota() 对未知资源 fail-closed 返回 False。
+
+    旧实现 limit=0 → 恒放行，资源名拼错（如 "api_call"）即永久绕过配额。
+    """
     mgr = TenantManager()
     mgr.create_tenant("t1", "Acme")
-    assert mgr.check_quota("t1", "unknown_resource", 999999) is True
+    assert mgr.check_quota("t1", "unknown_resource", 999999) is False
 
 
 def test_check_quota_not_found():

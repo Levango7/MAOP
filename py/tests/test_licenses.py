@@ -20,8 +20,6 @@ from types import SimpleNamespace
 
 import pytest
 
-# H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-pytest.skip(reason="maop.enterprise 未发布", allow_module_level=True)
 
 from maop.enterprise.license_manager import (
     LicenseCreateRequest,
@@ -39,10 +37,27 @@ from maop.enterprise.license_manager import (
 
 @pytest.fixture
 def manager(tmp_path: Path) -> LicenseManager:
-    """LicenseManager with an in-memory keypair and isolated SQLite DB."""
+    """LicenseManager with a generated Ed25519 keypair and isolated SQLite DB.
+
+    企业版 P1 #15 后 LicenseManager 为 fail-closed：签发（create/renew）
+    需要私钥。测试生成临时 Ed25519 密钥对（PEM 落盘到 tmp_path）并
+    通过 private_key_path 注入，模拟真实签发环境。
+    """
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives import serialization
+
+    key = Ed25519PrivateKey.generate()
+    key_pem = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    priv_path = tmp_path / "signing_key.pem"
+    priv_path.write_bytes(key_pem)
+
     db_path = tmp_path / "data" / "test_licenses.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    return LicenseManager(db_path=db_path)
+    return LicenseManager(db_path=db_path, private_key_path=priv_path)
 
 
 def _future_iso(days: int = 365) -> str:
@@ -301,10 +316,15 @@ class TestLicenseManagerUpdate:
 
 class TestLicenseManagerDelete:
     def test_delete_license(self, manager: LicenseManager):
+        """P1 #14: delete 为软删除——记录保留为 status='deleted' 作审计证据。"""
         rec = manager.create_license(customer="ACME", expires_at=_future_iso(365))
         assert manager.delete_license(rec.license_id) is True
-        with pytest.raises(LicenseNotFoundError):
-            manager.get_license(rec.license_id)
+        # 软删除后记录仍可 get（status='deleted'），不再抛 LicenseNotFoundError。
+        soft = manager.get_license(rec.license_id)
+        assert soft.status == "deleted"
+        # 默认列表不再包含已删除 license。
+        listing = manager.list_licenses()
+        assert all(item.license_id != rec.license_id for item in listing)
 
     def test_delete_nonexistent_raises(self, manager: LicenseManager):
         with pytest.raises(LicenseNotFoundError):
@@ -417,14 +437,32 @@ class TestLicensesRouter:
     """Test the FastAPI router endpoints with mocked admin auth."""
 
     @pytest.fixture(autouse=True)
-    def _enable_feature(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Force LICENSE_MANAGEMENT feature on and edition to enterprise."""
+    def _enable_feature(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Force LICENSE_MANAGEMENT feature on and edition to enterprise.
+
+        企业版 P1 #15 后 LicenseManager 签发需要私钥（fail-closed）。
+        为路由单例生成临时 Ed25519 签名密钥并通过
+        MAOP_LICENSE_MGR_PRIVATE_KEY 注入（_get_manager 读取该环境变量）。
+        """
         from maop.config.edition import (
             Edition,
             FeatureFlag,
             set_edition,
             set_feature_override,
         )
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives import serialization
+
+        key = Ed25519PrivateKey.generate()
+        key_pem = key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        priv_path = tmp_path / "router_signing_key.pem"
+        priv_path.write_bytes(key_pem)
+        monkeypatch.setenv("MAOP_LICENSE_MGR_PRIVATE_KEY", str(priv_path))
+
         set_edition(Edition.ENTERPRISE)
         set_feature_override(FeatureFlag.LICENSE_MANAGEMENT, True)
         # Reset the router-level manager singleton so each test gets a fresh one.
@@ -532,19 +570,27 @@ class TestLicensesRouter:
 
     @pytest.mark.asyncio
     async def test_delete_endpoint(self, admin_request):
-        from fastapi.responses import JSONResponse
-
-        from maop.dashboard.routers.licenses import create_license, delete_license, get_license
+        # P1 #14: delete 为软删除——记录保留（审计证据），get 仍返回 200
+        # 但 status='deleted'；列表接口不再显示。
+        from maop.dashboard.routers.licenses import (
+            create_license,
+            delete_license,
+            get_license,
+            list_licenses,
+        )
         body = {"customer": "ACME", "expires_at": _future_iso(365)}
         created = await create_license(admin_request, body)
         license_id = created["license"]["license_id"]
         result = await delete_license(license_id, admin_request)
         assert result["status"] == "ok"
         assert result["deleted"] is True
-        # Subsequent get should return 404 JSONResponse.
-        result = await get_license(license_id, admin_request)
-        assert isinstance(result, JSONResponse)
-        assert result.status_code == 404
+        # 软删除后记录仍可 get，status='deleted'。
+        got = await get_license(license_id, admin_request)
+        assert got["status"] == "ok"
+        assert got["license"]["status"] == "deleted"
+        # 默认列表不再显示已删除 license。
+        listing = await list_licenses(admin_request, status="")
+        assert all(item["license_id"] != license_id for item in listing["licenses"])
 
     @pytest.mark.asyncio
     async def test_audit_endpoint(self, admin_request):
