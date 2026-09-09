@@ -231,6 +231,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { useI18n } from '../i18n';
 import { StatCard, Badge, DataTable } from '../components/index.js';
 import ListPageLayout from '../components/ListPageLayout.vue';
@@ -240,6 +241,7 @@ import AppIcon from '../components/AppIcon.vue';
 const { t } = useI18n();
 const api = useApiStore();
 const toast = useToast();
+const { showConfirm } = useConfirm();
 
 // ── State ──────────────────────────────────────────────────────
 const licenses = ref([]);
@@ -498,7 +500,8 @@ async function renewLicense() {
 
 async function revokeLicense(lic) {
   const id = lic.license_id || lic.license_key;
-  if (typeof confirm === 'function' && !confirm(t('view.licenses.revokeConfirm', { id }))) return;
+  const ok = await showConfirm({ message: t('view.licenses.revokeConfirm', { id }), tone: 'danger' });
+  if (!ok) return;
   try {
     await api.post(`/api/licenses/${encodeURIComponent(id)}/revoke`, { reason: '' });
     toast.success(t('view.licenses.revoked', { id }));
@@ -534,7 +537,7 @@ onMounted(load);
 .lic-btn {
   display: inline-flex; align-items: center; gap: 5px;
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 7px 12px; font-size: 12px; font-weight: 600;
+  border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease), border-color var(--motion) var(--ease);
   font-family: inherit;
 }
@@ -573,7 +576,7 @@ onMounted(load);
   transition: color var(--motion) var(--ease), background var(--motion) var(--ease);
 }
 .lic-dialog__close:hover { color: var(--text); background: var(--surface-2); }
-.lic-dialog h3 { margin: 0 0 16px; font-size: 16px; color: var(--text); }
+.lic-dialog h3 { margin: 0 0 16px; font-size: var(--fs-lg); color: var(--text); }
 
 /* ── Form ────────────────────────────────────────────────────── */
 .lic-fieldset {
@@ -581,48 +584,48 @@ onMounted(load);
   padding: 12px; margin: 0 0 12px;
 }
 .lic-fieldset legend {
-  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  font-size: var(--fs-xs); font-weight: 700; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: .05em; padding: 0 6px;
 }
 .lic-field {
   display: flex; flex-direction: column; gap: 4px;
-  font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
+  font-size: var(--fs-sm); color: var(--text-muted); margin-bottom: 8px;
 }
 .lic-field:last-child { margin-bottom: 0; }
 .lic-input {
   background: var(--bg, var(--surface-2)); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 8px 10px; color: var(--text); font-size: 13px;
+  border-radius: var(--r-md); padding: 8px 10px; color: var(--text); font-size: var(--fs-base);
   font-family: inherit; transition: border-color var(--motion) var(--ease);
 }
 .lic-input:focus { outline: none; border-color: var(--brand); }
 .lic-quota-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.lic-form-error { color: var(--fail); font-size: 12px; margin: 8px 0; }
+.lic-form-error { color: var(--fail); font-size: var(--fs-sm); margin: 8px 0; }
 .lic-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
 /* ── Detail drawer content ───────────────────────────────────── */
 .lic-detail { display: flex; flex-direction: column; gap: var(--sp-4); }
 .lic-detail-section h4 {
-  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  font-size: var(--fs-sm); font-weight: 700; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: .05em;
   margin: 0 0 var(--sp-2); padding-bottom: var(--sp-2);
   border-bottom: 1px solid var(--border);
 }
-.lic-dl { display: grid; grid-template-columns: 110px 1fr; gap: var(--sp-1) var(--sp-3); font-size: 13px; }
+.lic-dl { display: grid; grid-template-columns: 110px 1fr; gap: var(--sp-1) var(--sp-3); font-size: var(--fs-base); }
 .lic-dl dt { color: var(--text-muted); font-weight: 600; }
 .lic-dl dd { margin: 0; color: var(--text); word-break: break-all; }
-.lic-mono { font-family: var(--font-mono, monospace); font-size: 12px; }
+.lic-mono { font-family: var(--font-mono, monospace); font-size: var(--fs-sm); }
 
 .lic-history { display: flex; flex-direction: column; gap: var(--sp-2); }
 .lic-history-item {
   display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
   padding: var(--sp-2); background: var(--surface-2); border-radius: var(--r-sm);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .lic-history-action { font-weight: 600; color: var(--text); }
 .lic-history-time { color: var(--text-muted); }
 .lic-history-actor {
-  margin-left: auto; font-size: 11px; color: var(--text-faint);
+  margin-left: auto; font-size: var(--fs-xs); color: var(--text-faint);
   background: var(--surface-3, var(--surface-2)); padding: 1px 6px; border-radius: var(--r-full);
 }
-.lic-muted { color: var(--text-faint); font-size: 13px; }
+.lic-muted { color: var(--text-faint); font-size: var(--fs-base); }
 </style>

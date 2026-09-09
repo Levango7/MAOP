@@ -460,7 +460,9 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   border: 1px solid var(--border); border-radius: var(--r-md);
   font-size: var(--fs-sm); font-family: inherit;
   cursor: pointer; appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  /* 主题感知箭头: --icon-chevron 变量在 tokens.css/themes.css 中按主题定义。
+     修复 P3: 原硬编码 #888 在暗色主题下不可见。 */
+  background-image: var(--icon-chevron);
   background-repeat: no-repeat; background-position: right var(--sp-3) center;
   padding-right: var(--sp-7);
   transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
@@ -543,7 +545,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .chat-page textarea::placeholder { color: var(--text-faint); }
 .chat-header__actions select {
   width: auto; min-width: 160px; height: 36px; cursor: pointer;
-  appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  appearance: none; background-image: var(--icon-chevron);
   background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px;
   /* CJK font rendering: allow breathing room so Chinese text isn't clipped */
   line-height: 1.5;
@@ -831,7 +833,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   display: inline-flex; align-items: center; gap: 4px;
 }
 .control-panel .row-main .agent-field .field-label { color: var(--text-faint); }
-.control-panel .row-main .agent-field .field-val { color: var(--text); font-family: var(--font-mono); font-size: 10px; }
+.control-panel .row-main .agent-field .field-val { color: var(--text); font-family: var(--font-mono); font-size: var(--fs-2xs); }
 
 /* Check upgrades button */
 .btn-check {
@@ -874,7 +876,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .agent-top { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .agent-avatar {
   width: 42px; height: 42px; border-radius: var(--r-full); flex-shrink: 0;
-  display: grid; place-items: center; color: var(--brand-contrast); font-weight: 700; font-size: 17px;
+  display: grid; place-items: center; color: var(--brand-contrast); font-weight: 700; font-size: var(--fs-lg-plus);
 }
 .agent-identity { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .agent-identity h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -888,7 +890,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .agent-metrics .metric { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0; }
 .agent-metrics .metric + .metric { border-top: none; }
 .agent-metrics .metric-val { font-family: var(--font-mono); font-size: var(--fs-md); font-weight: 600; color: var(--text); line-height: 1.1; }
-.agent-metrics .metric-val small { font-size: 10px; font-weight: 500; color: var(--text-faint); }
+.agent-metrics .metric-val small { font-size: var(--fs-2xs); font-weight: 500; color: var(--text-faint); }
 .agent-metrics .metric-lbl { font-size: var(--fs-xs); color: var(--text-faint); }
 
 .agent-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
@@ -1094,7 +1096,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .modal__x {
   width: 30px; height: 30px; border-radius: var(--r-md); border: 1px solid var(--border);
   background: var(--surface-2); color: var(--text-muted); cursor: pointer;
-  font-size: 18px; line-height: 1; display: grid; place-items: center;
+  font-size: var(--fs-xl); line-height: 1; display: grid; place-items: center;
 }
 .modal__x:hover { border-color: var(--border-strong); color: var(--text); }
 .modal__body { display: flex; flex-direction: column; }

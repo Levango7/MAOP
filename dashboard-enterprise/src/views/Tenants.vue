@@ -77,12 +77,14 @@
 import { ref, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { useI18n } from '../i18n';
 import Badge from '../components/Badge.vue';
 import ListPageLayout from '../components/ListPageLayout.vue';
 import AppIcon from '../components/AppIcon.vue';
 
 const { t } = useI18n();
+const { showConfirm } = useConfirm();
 
 const api = useApiStore();
 const toast = useToast();
@@ -167,7 +169,8 @@ async function activate(id) {
   }
 }
 async function remove(id) {
-  if (typeof confirm === 'function' && !confirm(t('view.tenants.deleteConfirm', { id }))) return;
+  const ok = await showConfirm({ message: t('view.tenants.deleteConfirm', { id }), tone: 'danger' });
+  if (!ok) return;
   try {
     await api.delete(`/api/tenant/${id}`);
     toast.success(t('view.tenants.deleted', { id }));

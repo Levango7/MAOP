@@ -14,7 +14,7 @@ import sys
 import time
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
 from maop.dashboard.error_handler import handle_api_errors
 
@@ -27,7 +27,8 @@ router = APIRouter()
 
 @router.get("/api/framework/status")
 @handle_api_errors
-async def api_framework_status() -> dict[str, Any]:
+async def api_framework_status(request: Request) -> dict[str, Any]:
+    _deps.require_admin(request)
     try:
         from maop import __version__ as MAOP_ver
     except ImportError:
@@ -58,7 +59,8 @@ async def api_framework_status() -> dict[str, Any]:
 
 @router.get("/api/framework/logs")
 @handle_api_errors
-async def api_framework_logs(limit: int = Query(50)) -> dict[str, Any]:
+async def api_framework_logs(request: Request, limit: int = Query(50)) -> dict[str, Any]:
+    _deps.require_admin(request)
     logs = []
     log_dir = _deps.MAOP_ROOT / "logs"
     if log_dir.exists():
@@ -86,7 +88,8 @@ async def api_framework_logs(limit: int = Query(50)) -> dict[str, Any]:
 
 @router.get("/api/framework/config")
 @handle_api_errors
-async def api_framework_config() -> dict[str, Any]:
+async def api_framework_config(request: Request) -> dict[str, Any]:
+    _deps.require_admin(request)
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()

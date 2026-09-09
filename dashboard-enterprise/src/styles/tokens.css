@@ -116,8 +116,9 @@
     'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, 'Cascadia Code',
     Menlo, Consolas, monospace;
+  --fs-3xs: 9px;  --fs-2xs: 10px;
   --fs-xs: 11px;  --fs-sm: 12px;  --fs-base: 13px;  --fs-md: 14px;
-  --fs-lg: 16px;  --fs-xl: 18px;  --fs-2xl: 22px;
+  --fs-lg: 16px;  --fs-lg-plus: 17px;  --fs-xl: 18px;  --fs-2xl: 22px;
 
   /* ── Z-index scale ───────────────────────────────────────────────────── */
   --z-base: 0;  --z-sticky: 30;  --z-drawer: 40;  --z-topbar: 50;
@@ -166,12 +167,17 @@
   --bg-tag: rgba(148, 163, 184, .16);
   --border-light: rgba(148, 163, 184, .16);
   --border-soft: rgba(148, 163, 184, .16);
-  --surface-hover: rgba(0, 0, 0, .04);
+  --surface-hover: rgba(255, 255, 255, .06);
   --surface-alt: rgba(0, 0, 0, .02);
   --danger: #c0392b;
   --danger-soft: rgba(192, 57, 43, .08);
   --ok: #3fb950;
   --overlay-scrim: rgba(15, 23, 42, .65);
+
+  /* ── 主题感知图标 data URI (P3-4) ───────────────────────────────────────
+   * select 箭头等内联 SVG 图标需随主题切换颜色。data URI 中无法引用 CSS
+   * 变量, 故在此按主题分别定义完整 data URI。暗色用 #9aa3b2 (text-muted)。 */
+  --icon-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa3b2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
 /* ── Density 规范 ──────────────────────────────────────────────────────────

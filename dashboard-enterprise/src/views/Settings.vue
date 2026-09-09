@@ -457,12 +457,16 @@ import { useApiStore } from '../stores/api.js';
 import { useEditionStore } from '../stores/edition.js';
 import { useUiStore } from '../stores/ui.js';
 import { useI18n } from '../i18n/index.js';
+import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { Card, Badge, Segmented, PageHeader } from '../components/index.js';
 
 const api = useApiStore();
 const editionStore = useEditionStore();
 const ui = useUiStore();
 const { t } = useI18n();
+const toast = useToast();
+const { showConfirm } = useConfirm();
 const edition = ref({});
 const config = ref({});
 const isAdmin = ref(false);
@@ -506,7 +510,7 @@ async function onSwitchClick(target) {
   const featureDesc = target === 'enterprise'
     ? t('view.settings.editionToEnterpriseDesc')
     : t('view.settings.editionToPersonalDesc');
-  const ok = confirm(t('view.settings.editionSwitchConfirm', { label, featureDesc }));
+  const ok = await showConfirm({ message: t('view.settings.editionSwitchConfirm', { label, featureDesc }), tone: 'info' });
   if (!ok) return;
   switchNotice.value = '';
   switchNoticeDegraded.value = false;
@@ -616,7 +620,7 @@ function closeDetailModal() {
 }
 
 async function onRollback(version) {
-  const ok = confirm(t('view.settings.rollbackConfirm', { version }));
+  const ok = await showConfirm({ message: t('view.settings.rollbackConfirm', { version }), tone: 'danger' });
   if (!ok) return;
   historyRollbackLoading.value = version;
   try {
@@ -775,7 +779,7 @@ async function onSaveHook() {
 }
 
 async function onDeleteHook(hook) {
-  const ok = confirm(t('view.hooks.deleteConfirm', { name: hook.name }));
+  const ok = await showConfirm({ message: t('view.hooks.deleteConfirm', { name: hook.name }), tone: 'danger' });
   if (!ok) return;
   try {
     await api.delete(`/api/hooks/${hook.id}`);
@@ -805,15 +809,15 @@ async function onTestHook(hook) {
     const result = await api.post(`/api/hooks/${hook.id}/test`);
     if (result.success) {
       if (result.response === 'no listener') {
-        alert(t('view.hooks.testNoListener'));
+        toast.warn(t('view.hooks.testNoListener'));
       } else {
-        alert(t('view.hooks.testSuccess', { ms: result.duration_ms || 0 }));
+        toast.success(t('view.hooks.testSuccess', { ms: result.duration_ms || 0 }));
       }
     } else {
-      alert(t('view.hooks.testFailed', { error: result.error || 'unknown' }));
+      toast.error(t('view.hooks.testFailed', { error: result.error || 'unknown' }));
     }
   } catch (e) {
-    alert(t('view.hooks.testError') + (e && e.message ? `: ${e.message}` : ''));
+    toast.error(t('view.hooks.testError') + (e && e.message ? `: ${e.message}` : ''));
   }
 }
 </script>

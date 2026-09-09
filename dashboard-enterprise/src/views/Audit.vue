@@ -243,6 +243,7 @@ import {
 } from 'chart.js';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { useI18n } from '../i18n';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -266,6 +267,7 @@ ChartJS.register(
 const { t } = useI18n();
 const api = useApiStore();
 const toast = useToast();
+const { showConfirm } = useConfirm();
 
 const loading = ref(true);
 const lastUpdated = ref('');
@@ -647,7 +649,8 @@ async function toggleRule(rule) {
   }
 }
 async function deleteRule(rule) {
-  if (!window.confirm(t('view.audit.ruleConfirmDelete'))) return;
+  const ok = await showConfirm({ message: t('view.audit.ruleConfirmDelete'), tone: 'danger' });
+  if (!ok) return;
   try {
     await api.delete(`/api/audit/rules/${rule.id}`);
     toast.success(t('view.audit.ruleDeleted'));

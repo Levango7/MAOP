@@ -167,7 +167,11 @@ class MAOPSettings(BaseSettings):
     dispatch_retry_base_ms: int = Field(default=500, description="Base retry delay in ms", ge=100)
 
     # ── Security / Auth ───────────────────────────────────────────
-    jwt_secret: str = Field(default="", description="JWT signing secret (required in production)")
+    jwt_secret: str = Field(
+        default="",
+        description="JWT signing secret. DEPRECATED — use MAOP_JWT_SECRET env var "
+                    "or load_jwt_secret() instead. If set, must be >=32 chars.",
+    )
     admin_password: str = Field(default="", description="Initial admin password (auto-generated if empty)")
     api_key: str = Field(default="", description="API key for external services")
     key_file: str = Field(default="", description="Path to API key file")
@@ -190,6 +194,21 @@ class MAOPSettings(BaseSettings):
         "case_sensitive": False,
         "extra": "ignore",
     }
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def _validate_jwt_secret_field(cls, v: str) -> str:
+        """Validate jwt_secret strength if explicitly set.
+
+        P0-6 fix: an empty value is allowed (the runtime falls back to
+        load_jwt_secret()), but a non-empty value must be at least 32
+        characters to prevent trivially-guessable signing secrets.
+        """
+        if v == "":
+            return v  # 空允许，实际走 load_jwt_secret()
+        if len(v) < 32:
+            raise ValueError("jwt_secret must be at least 32 characters")
+        return v
 
     @field_validator("log_level")
     @classmethod

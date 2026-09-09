@@ -110,6 +110,90 @@ class Delegate(BaseModel):
     react_max_iterations: int = 10
 
 
+async def _check_permission_and_hooks(
+    agent: str,
+    task: str,
+    routing_key: str,
+    trace_id: str,
+    permission_manager: Any = None,
+) -> MaopResult | None:
+    """Run permission check and pre_dispatch hook before dispatch.
+
+    Returns ``None`` if dispatch may proceed, or a ``MaopResult``
+    (exit_code=126) if permission/hook denies the call.
+
+    P0 fix: extracted so both the ``react_mode`` branch and the normal
+    dispatch branch go through the same security gate. Previously
+    (maop_execute.py:202-286) the ``react_mode`` branch returned before
+    reaching the permission check and pre_dispatch hook, allowing a
+    caller to bypass all security gates by setting ``react_mode=True``.
+    """
+    # Permission check — consult PermissionManager before dispatch
+    try:
+        from pathlib import Path as _Path
+
+        from maop.core.security.permission import PermissionManager
+        _root = _Path(__file__).resolve().parent.parent.parent
+        pm = permission_manager if permission_manager is not None else PermissionManager(root_dir=str(_root))
+        perm = pm.check(agent=agent, action=routing_key or "execute")
+        if perm.decision == "deny":
+            return new_result(
+                agent=agent, task=task,
+                exit_code=126,
+                error=f"Permission denied: {perm.reason or 'rule=' + perm.matched_rule}",
+                trace_id=trace_id, routing_key=routing_key,
+            )
+        if perm.decision == "ask":
+            from maop.core.agent.delegation.human_proxy import HumanProxy
+            hp = HumanProxy(root_dir=str(_root))
+            req_id = hp.request(
+                task=task, agent=agent,
+                priority="high", reason=f"Permission check: agent={agent} action={routing_key or 'execute'}",
+                metadata={"routing_key": routing_key, "trace_id": trace_id},
+            )
+            logger.warning("[execute] Permission=ask, request %s pending human approval — denying until approved", req_id)
+            return new_result(
+                agent=agent, task=task,
+                exit_code=126,
+                error=f"Permission pending human approval (request={req_id}): {perm.reason or 'agent=' + agent}",
+                trace_id=trace_id, routing_key=routing_key,
+            )
+    except Exception as exc:
+        logger.error("[execute] Permission check failed (fail-closed): %s", exc)
+        return new_result(
+            agent=agent, task=task,
+            exit_code=126,
+            error=f"Permission check failed: {exc}",
+            trace_id=trace_id, routing_key=routing_key,
+        )
+
+    # Hook: agent.pre_dispatch — hooks can veto dispatch by returning decision="deny"
+    try:
+        from maop.core.agent.plugins_hooks.hook_manager import LifecycleEvent, get_hook_manager
+        mgr = get_hook_manager()
+        hook_results = await mgr.trigger(LifecycleEvent.AGENT_PRE_DISPATCH, {
+            "agent": agent, "task": task, "routing_key": routing_key, "trace_id": trace_id,
+        })
+        for hr in hook_results:
+            if hr.decision == "deny":
+                return new_result(
+                    agent=agent, task=task,
+                    exit_code=126,
+                    error=f"Hook vetoed dispatch: hook={hr.hook_id} reason={hr.error or 'denied'}",
+                    trace_id=trace_id, routing_key=routing_key,
+                )
+    except Exception as exc:
+        logger.error("[execute] Hook pre_dispatch failed (fail-closed): %s", exc)
+        return new_result(
+            agent=agent, task=task,
+            exit_code=126,
+            error=f"Hook pre_dispatch error (fail-closed): {exc}",
+            trace_id=trace_id, routing_key=routing_key,
+        )
+
+    return None
+
+
 async def maop_execute(
     delegate: Delegate | None = None,
     *,
@@ -196,6 +280,16 @@ async def maop_execute(
     except Exception as exc:
         logger.debug("[execute] Personal cost guard check failed (fail-open): %s", exc)
 
+    # P0 fix: permission check + pre_dispatch hook must run BEFORE both
+    # the react_mode branch and the normal dispatch branch, otherwise
+    # react_mode bypasses all security gates (was maop_execute.py:202-286).
+    perm_hook_result = await _check_permission_and_hooks(
+        agent=agent, task=task, routing_key=routing_key,
+        trace_id=trace_id, permission_manager=permission_manager,
+    )
+    if perm_hook_result is not None:
+        return perm_hook_result
+
     start = time.monotonic()
 
     # ReAct mode: delegate to ReactLoop for Thought→Action→Observation cycling
@@ -246,68 +340,6 @@ async def maop_execute(
                 trace_id=trace_id, routing_key=routing_key,
             )
 
-    # Permission check — consult PermissionManager before dispatch
-    try:
-        from pathlib import Path as _Path
-
-        from maop.core.security.permission import PermissionManager
-        _root = _Path(__file__).resolve().parent.parent.parent
-        pm = permission_manager if permission_manager is not None else PermissionManager(root_dir=str(_root))
-        perm = pm.check(agent=agent, action=routing_key or "execute")
-        if perm.decision == "deny":
-            return new_result(
-                agent=agent, task=task,
-                exit_code=126,
-                error=f"Permission denied: {perm.reason or 'rule=' + perm.matched_rule}",
-                trace_id=trace_id, routing_key=routing_key,
-            )
-        if perm.decision == "ask":
-            from maop.core.agent.delegation.human_proxy import HumanProxy
-            hp = HumanProxy(root_dir=str(_root))
-            req_id = hp.request(
-                task=task, agent=agent,
-                priority="high", reason=f"Permission check: agent={agent} action={routing_key or 'execute'}",
-                metadata={"routing_key": routing_key, "trace_id": trace_id},
-            )
-            logger.warning("[execute] Permission=ask, request %s pending human approval — denying until approved", req_id)
-            return new_result(
-                agent=agent, task=task,
-                exit_code=126,
-                error=f"Permission pending human approval (request={req_id}): {perm.reason or 'agent=' + agent}",
-                trace_id=trace_id, routing_key=routing_key,
-            )
-    except Exception as exc:
-        logger.error("[execute] Permission check failed (fail-closed): %s", exc)
-        return new_result(
-            agent=agent, task=task,
-            exit_code=126,
-            error=f"Permission check failed: {exc}",
-            trace_id=trace_id, routing_key=routing_key,
-        )
-
-    # Hook: agent.pre_dispatch — hooks can veto dispatch by returning decision="deny"
-    try:
-        from maop.core.agent.plugins_hooks.hook_manager import LifecycleEvent, get_hook_manager
-        mgr = get_hook_manager()
-        hook_results = await mgr.trigger(LifecycleEvent.AGENT_PRE_DISPATCH, {
-            "agent": agent, "task": task, "routing_key": routing_key, "trace_id": trace_id,
-        })
-        for hr in hook_results:
-            if hr.decision == "deny":
-                return new_result(
-                    agent=agent, task=task,
-                    exit_code=126,
-                    error=f"Hook vetoed dispatch: hook={hr.hook_id} reason={hr.error or 'denied'}",
-                    trace_id=trace_id, routing_key=routing_key,
-                )
-    except Exception as exc:
-        logger.error("[execute] Hook pre_dispatch failed (fail-closed): %s", exc)
-        return new_result(
-            agent=agent, task=task,
-            exit_code=126,
-            error=f"Hook pre_dispatch error (fail-closed): {exc}",
-            trace_id=trace_id, routing_key=routing_key,
-        )
 
     # Pre-guardrail check
     try:
@@ -457,13 +489,48 @@ async def _handle_function_calls(
         {"role": "user", "content": task},
     ]
 
+    # P1-12 fix: 校验 agent 输出，防止恶意/被入侵 agent 注入非法 tool_calls
+    _MAX_STDOUT_LEN = 1_000_000  # 1MB 最大 stdout 长度，防止超大输出导致 OOM
+    _MAX_TOOL_CALLS = 20  # 单轮最大工具调用数
+    allowed_tool_names = {t.get("name") for t in tools if t.get("name")}
+
     for round_idx in range(max_tool_rounds):
         try:
-            response = json.loads(result.stdout)
+            # P1-12 fix: 截断超长 stdout，防止 OOM
+            raw_stdout = result.stdout or ""
+            if len(raw_stdout) > _MAX_STDOUT_LEN:
+                logger.warning(
+                    "[execute] Agent stdout truncated: %d chars > %d limit",
+                    len(raw_stdout), _MAX_STDOUT_LEN,
+                )
+                raw_stdout = raw_stdout[:_MAX_STDOUT_LEN]
+            response = json.loads(raw_stdout)
         except (json.JSONDecodeError, ValueError):
             break
 
         tool_calls = bridge.parse_response(response, provider=provider)
+        if not tool_calls:
+            break
+
+        # P1-12 fix: 限制单轮工具调用数量
+        if len(tool_calls) > _MAX_TOOL_CALLS:
+            logger.warning(
+                "[execute] Too many tool calls: %d > %d limit, truncating",
+                len(tool_calls), _MAX_TOOL_CALLS,
+            )
+            tool_calls = tool_calls[:_MAX_TOOL_CALLS]
+        # P1-12 fix: 过滤非白名单工具调用，拒绝执行未声明的工具
+        # 兼容 ToolCall 对象（.name 属性）和 dict（["name"] 键）两种形式
+        def _tool_name(c: Any) -> str:
+            return getattr(c, "name", None) or (c.get("name") if isinstance(c, dict) else None) or ""
+        valid_calls = [c for c in tool_calls if _tool_name(c) in allowed_tool_names]
+        if len(valid_calls) < len(tool_calls):
+            rejected = len(tool_calls) - len(valid_calls)
+            logger.warning(
+                "[execute] Rejected %d tool calls with non-whitelisted names",
+                rejected,
+            )
+            tool_calls = valid_calls
         if not tool_calls:
             break
 

@@ -224,6 +224,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { useI18n } from '../i18n';
 import ListPageLayout from '../components/ListPageLayout.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
@@ -234,6 +235,7 @@ import StatCard from '../components/StatCard.vue';
 const { t } = useI18n();
 const api = useApiStore();
 const toast = useToast();
+const { showConfirm } = useConfirm();
 
 // ── State ──
 const notifications = ref([]);
@@ -476,7 +478,8 @@ async function markAllRead() {
 }
 
 async function removeNotification(n) {
-  if (typeof window !== 'undefined' && !window.confirm(t('view.notifications.deleteConfirm'))) return;
+  const ok = await showConfirm({ message: t('view.notifications.deleteConfirm'), tone: 'danger' });
+  if (!ok) return;
   try {
     await api.delete(`/api/notifications/${n.id}`);
     notifications.value = notifications.value.filter((x) => x.id !== n.id);

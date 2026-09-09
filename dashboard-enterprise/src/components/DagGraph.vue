@@ -301,7 +301,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
   transition: width 0.3s ease;
 }
 .dag-progress-text {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted, #9aa3b2);
   white-space: nowrap;
 }
@@ -349,7 +349,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 .dag-node-group:hover .dag-node-circle { stroke: var(--brand, #3574f0); stroke-width: 3; }
 
 .dag-node-label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   fill: var(--text, #e8eaf0);
   font-family: inherit;
   user-select: none;
@@ -370,7 +370,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
   text-align: center;
   padding: 30px;
   color: var(--text-muted, #6e7686);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 
 /* Detail overlay */

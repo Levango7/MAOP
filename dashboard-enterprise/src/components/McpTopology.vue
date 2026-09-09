@@ -268,7 +268,7 @@ watch(
   gap: 8px;
   padding: 8px 12px;
   border-radius: var(--r-md, 8px);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .mcp-topo__notice--error { background: var(--fail-soft); border: 1px solid var(--fail); color: var(--fail-strong); }
 
@@ -301,7 +301,7 @@ watch(
   display: flex;
   gap: 16px;
   padding: 6px 12px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 .mcp-topo__legend-item { display: inline-flex; align-items: center; gap: 6px; }
@@ -324,7 +324,7 @@ watch(
   border-radius: 4px;
   background: var(--surface);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-base);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }

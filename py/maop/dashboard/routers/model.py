@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -18,6 +20,34 @@ from .state import MAOP_ROOT
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ── Pydantic 请求模型 (P2-#4 fix: 输入校验) ────────────────────────
+
+class ModelSwitchRequest(BaseModel):
+    agent: str = ""
+    model: str = ""
+
+
+class ProviderNameRequest(BaseModel):
+    name: str = ""
+
+
+class ModelNameRequest(BaseModel):
+    name: str = ""
+
+
+class KeyStoreRequest(BaseModel):
+    provider: str = ""
+    api_key: str = ""
+
+
+class KeyDeleteRequest(BaseModel):
+    provider: str = ""
+
+
+class HealthCheckRequest(BaseModel):
+    provider: str = ""
 
 @router.get("/api/model/agents")
 @handle_api_errors("Model agents", error_value={"agents": [], "count": 0, "error": "Model agents failed"})
@@ -49,24 +79,29 @@ async def api_model_quota() -> dict[str, Any]:
 
 @router.post("/api/model/switch")
 @handle_api_errors("Model switch", error_value={"status": "error", "error": "Model switch failed"})
-async def api_model_switch(request: Request) -> dict[str, Any]:
+async def api_model_switch(body: ModelSwitchRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    agent_name = body.get("agent", "")
-    new_model = body.get("model", "")
+    agent_name = body.agent
+    new_model = body.model
     if not agent_name or not new_model:
         raise HTTPException(400, "missing agent or model")
     ypath = MAOP_ROOT / "agents.yaml"
     if not ypath.exists():
         ypath = MAOP_ROOT / "config" / "agents.yaml"
     if not ypath.exists():
-        return {"status": "error", "error": "agents.yaml not found"}
+        return JSONResponse(
+            status_code=404,
+            content={"success": False, "message": "agents.yaml not found", "data": None},
+        )
     import yaml
     _text = await asyncio.to_thread(Path(ypath).read_text, encoding="utf-8")
     data = yaml.safe_load(_text)
     agents = data.get("agents", {})
     if agent_name not in agents:
-        return {"status": "error", "error": f"Unknown agent: {agent_name}"}
+        return JSONResponse(
+            status_code=404,
+            content={"success": False, "message": f"Unknown agent: {agent_name}", "data": None},
+        )
     mpath = MAOP_ROOT / "models.yaml"
     if not mpath.exists():
         mpath = MAOP_ROOT / "config" / "models.yaml"
@@ -76,7 +111,10 @@ async def api_model_switch(request: Request) -> dict[str, Any]:
         mdata = _yaml.safe_load(_mtext)
         valid_models = set(mdata.get("models", {}).keys()) if isinstance(mdata, dict) else set()
         if valid_models and new_model not in valid_models:
-            return {"status": "error", "error": f"Unknown model: {new_model}. Valid: {sorted(valid_models)}"}
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "message": f"Unknown model: {new_model}. Valid: {sorted(valid_models)}", "data": None},
+            )
     agents[agent_name]["model"] = new_model
     _dumped = yaml.dump(data, allow_unicode=True, default_flow_style=False)
     await asyncio.to_thread(Path(ypath).write_text, _dumped, encoding="utf-8")
@@ -166,10 +204,9 @@ async def api_provider_add(request: Request) -> dict[str, Any]:
 
 @router.post("/api/model/provider/delete")
 @handle_api_errors("Provider delete", error_value={"status": "error", "error": "Provider delete failed"})
-async def api_provider_delete(request: Request) -> dict[str, Any]:
+async def api_provider_delete(body: ProviderNameRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    name = body.get("name", "")
+    name = body.name
     if not name:
         raise HTTPException(400, "missing provider name")
     reg = _get_model_registry()
@@ -199,10 +236,9 @@ async def api_model_add(request: Request) -> dict[str, Any]:
 
 @router.post("/api/model/delete")
 @handle_api_errors("Model delete", error_value={"status": "error", "error": "Model delete failed"})
-async def api_model_delete(request: Request) -> dict[str, Any]:
+async def api_model_delete(body: ModelNameRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    name = body.get("name", "")
+    name = body.name
     if not name:
         raise HTTPException(400, "missing model name")
     reg = _get_model_registry()
@@ -225,11 +261,10 @@ def _get_api_key_vault() -> Any:
 
 @router.post("/api/model/key/store")
 @handle_api_errors("Key store", error_value={"status": "error", "error": "Key store failed"})
-async def api_key_store(request: Request) -> dict[str, Any]:
+async def api_key_store(body: KeyStoreRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    provider = body.get("provider", "")
-    api_key = body.get("api_key", "")
+    provider = body.provider
+    api_key = body.api_key
     if not provider or not api_key:
         raise HTTPException(400, "missing provider or api_key")
     vault = _get_api_key_vault()
@@ -238,10 +273,9 @@ async def api_key_store(request: Request) -> dict[str, Any]:
 
 @router.post("/api/model/key/delete")
 @handle_api_errors("Key delete", error_value={"status": "error", "error": "Key delete failed"})
-async def api_key_delete(request: Request) -> dict[str, Any]:
+async def api_key_delete(body: KeyDeleteRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    provider = body.get("provider", "")
+    provider = body.provider
     if not provider:
         raise HTTPException(400, "missing provider")
     vault = _get_api_key_vault()
@@ -258,10 +292,9 @@ async def api_key_list() -> dict[str, Any]:
 
 @router.post("/api/model/health/check")
 @handle_api_errors("Health check", error_value={"status": "error", "error": "Health check failed"})
-async def api_health_check(request: Request) -> dict[str, Any]:
+async def api_health_check(body: HealthCheckRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    provider = body.get("provider", "")
+    provider = body.provider
     reg = _get_model_registry()
     vault = _get_api_key_vault()
     from maop.core.routing.provider_health import ProviderHealthChecker

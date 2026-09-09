@@ -294,17 +294,23 @@ class TestAuthDisabledDefaultRole:
         body = resp.json()
         assert body["roles"] == ["read"], (
             "Auth-disabled default role must be 'read' (got {body['roles']!r}). "
-            "Set MAOP_AUTH_DISABLED_ADMIN=1 to opt into admin role."
+            "P0-4 fix: MAOP_AUTH_DISABLED_ADMIN is deprecated; auth-disabled mode "
+            "always grants read-only role."
         )
 
     def test_disabled_auth_admin_opt_in_via_env(self, monkeypatch):
-        """Explicit env var opt-in still works for legacy/dev workflows."""
+        """P0-4 fix: MAOP_AUTH_DISABLED_ADMIN is DEPRECATED and IGNORED.
+
+        The flag previously granted anonymous users admin role when auth was
+        disabled — a dangerous misconfiguration footgun. It is now ignored;
+        auth-disabled mode always grants read-only role regardless of the flag.
+        """
         monkeypatch.setenv("MAOP_AUTH_DISABLED_ADMIN", "1")
         app = self._make_app(enabled=False)
         with TestClient(app) as client:
             resp = client.get("/api/whoami")
         assert resp.status_code == 200
-        assert resp.json()["roles"] == ["admin"]
+        assert resp.json()["roles"] == ["read"]
 
     def test_disabled_auth_explicit_zero_is_read(self, monkeypatch):
         """MAOP_AUTH_DISABLED_ADMIN=0 explicitly → read role."""

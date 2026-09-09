@@ -22,7 +22,7 @@
         >
           <div class="cm-step">{{ step + 1 }} / {{ steps.length }}</div>
           <div class="cm-title">{{ current.title }}</div>
-          <div class="cm-body" v-html="current.body"></div>
+          <div class="cm-body">{{ current.body }}</div>
           <div class="cm-actions">
             <button class="cm-skip" type="button" :aria-label="t('action.skip')" @click="finish">{{ t('action.skip') }}</button>
             <button class="cm-next" type="button" @click="next">

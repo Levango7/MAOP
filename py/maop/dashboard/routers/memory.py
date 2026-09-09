@@ -364,5 +364,5 @@ async def api_memory_store(request: Request) -> dict[str, Any]:
         )
         return {"status": "ok", "id": entry_id, "layer": layer}
     except Exception as exc:
-        logger.exception("memory store failed")
-        raise HTTPException(500, f"Store failed: {exc}")
+        logger.exception("memory store failed: %s", exc)
+        raise HTTPException(500, "Store failed, please try again later")

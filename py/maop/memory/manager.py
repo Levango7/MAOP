@@ -30,7 +30,9 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import time
+from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -114,7 +116,11 @@ class MemoryManager:
         self._knowledge_extractor: Any = None
         self._knowledge_graph: Any = None
         self._vector_search: Any = None
-        self._working_cache: dict[str, Any] = {}
+        # P1-10 fix: 限制 working cache 大小，LRU 淘汰防止 OOM
+        self._working_cache: OrderedDict[str, Any] = OrderedDict()
+        self._working_cache_max_size: int = int(
+            os.getenv("MAOP_WORKING_CACHE_MAX_SIZE", "1000")
+        )
         self._ensure_db()
 
     def _ensure_db(self) -> None:
@@ -529,12 +535,27 @@ class MemoryManager:
     # 详见 maop/memory/unified.py 与 maop/memory/facade.py。
 
     def working_put(self, key: str, value: Any, ttl_s: float | None = None) -> None:
-        """写入 Working Memory（临时键值缓存）。"""
+        """写入 Working Memory（临时键值缓存）。
+
+        P1-10 fix: 超过 ``_working_cache_max_size`` 时按 LRU 淘汰最旧条目，
+        防止无限制增长导致 OOM。重复写入同一 key 时 OrderedDict 赋值会
+        原地更新值（不改变顺序），如需提升为最近使用请先 get 再 put。
+        """
         self._working_cache[key] = value
+        # P1-10 fix: LRU 淘汰 —— 超过上限时移除最旧（最久未访问）条目
+        if len(self._working_cache) > self._working_cache_max_size:
+            self._working_cache.popitem(last=False)
 
     def working_get(self, key: str) -> Any:
-        """读取 Working Memory。"""
-        return self._working_cache.get(key)
+        """读取 Working Memory。
+
+        P1-10 fix: 命中时移到末尾（LRU 顺序更新），使最近访问的条目
+        不易被淘汰；未命中返回 None。
+        """
+        if key in self._working_cache:
+            self._working_cache.move_to_end(key)
+            return self._working_cache[key]
+        return None
 
     def working_clear(self) -> None:
         """清空 Working Memory。"""

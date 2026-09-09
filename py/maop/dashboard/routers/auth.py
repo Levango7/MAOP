@@ -143,11 +143,21 @@ def _ensure_default_user() -> None:
                             "production (MAOP_ENV=production). Refusing to start with a "
                             "random, non-persisted admin password."
                         )
+                    # P0-5 fix: DO NOT print the plaintext password to logs.
+                    # Write it to a mode-0600 file beside the auth DB instead,
+                    # so the operator can read it once without it persisting
+                    # in stdout/log aggregators.
+                    pwd_file_path = db_path.parent / "admin_password_once.txt"
+                    pwd_file_path.write_text(admin_pwd, encoding="utf-8")
+                    try:
+                        pwd_file_path.chmod(0o600)
+                    except OSError:
+                        pass  # Windows
                     logger.warning(
-                        "MAOP_ADMIN_PASSWORD not set — generated a ONE-TIME random admin "
-                        "password (shown below). Set MAOP_ADMIN_PASSWORD to persist it "
-                        "across restarts. First-run admin password: %s",
-                        admin_pwd,
+                        "MAOP_ADMIN_PASSWORD not set — generated a ONE-TIME random "
+                        "admin password. It has been written to %s (mode 0o600). "
+                        "Set MAOP_ADMIN_PASSWORD to persist it across restarts.",
+                        pwd_file_path,
                     )
                 pwd_hash = _hash_password(admin_pwd)
                 conn.execute(
@@ -501,9 +511,9 @@ async def auth_refresh(request: Request):
             # best-effort revocation
         return response
     except Exception as exc:
-        logger.exception("[auth] Token refresh failed")
+        logger.exception("[auth] Token refresh failed: %s", exc)
         return JSONResponse(
-            {"status": "error", "error": f"Refresh failed: {exc}"},
+            {"status": "error", "error": "Refresh failed, please try again later"},
             status_code=500,
         )
 

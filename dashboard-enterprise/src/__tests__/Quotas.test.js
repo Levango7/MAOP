@@ -8,6 +8,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
+
+// Mock useConfirm — showConfirm returns Promise<boolean>
+const mockShowConfirm = vi.fn(() => Promise.resolve(true));
+vi.mock('../composables/useConfirm.js', () => ({
+  useConfirm: () => ({ showConfirm: mockShowConfirm }),
+  confirmState: { visible: false, message: '', title: '', confirmText: '', cancelText: '', tone: 'danger', _resolve: null },
+}));
+
 import Quotas from '../views/Quotas.vue';
 import { EmptyState } from '../components/index.js';
 
@@ -286,9 +294,7 @@ describe('Quotas.vue', () => {
   });
 
   it('resolves an alert via POST', async () => {
-    if (typeof window !== 'undefined') {
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
-    }
+    mockShowConfirm.mockReturnValue(Promise.resolve(true));
     mockFetchFull();
     const wrapper = await mountQuotas();
     const cards = wrapper.findAll('.quota-card');

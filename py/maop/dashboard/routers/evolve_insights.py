@@ -150,8 +150,8 @@ async def api_evolve_analyze(request: Request) -> dict[str, Any]:
             hours = body.get("hours", 24)
             result = eng.auto_evolve(hours=hours) if hasattr(eng, "auto_evolve") else eng.analyze()
         except Exception as exc:
-            logger.warning("auto_evolve failed: %s", exc)
-            result = {"error": str(exc)}
+            logger.warning("auto_evolve failed: %s", exc, exc_info=True)
+            result = {"error": "auto_evolve failed, please try again later"}
         return {"status": "ok", "action": "auto_evolve", "result": result}
     else:
         analyze_result: Any = eng.analyze()
@@ -315,8 +315,8 @@ async def api_evolution_loop_status() -> dict[str, Any]:
             "pending_approval_ids": history[0].pending_approval if history else [],
         }
     except Exception as exc:
-        logger.warning("Evolution loop status failed: %s", exc)
-        return {"status": "error", "error": str(exc), "state": "unknown"}
+        logger.warning("Evolution loop status failed: %s", exc, exc_info=True)
+        return {"status": "error", "error": "Evolution loop status unavailable", "state": "unknown"}
 
 
 @router.post("/api/evolution/loop/trigger")
@@ -334,8 +334,8 @@ async def api_evolution_loop_trigger(request: Request) -> dict[str, Any]:
         report = await loop.run_cycle(dry_run=dry_run, auto_rollback=True)
         return {"status": "ok", "report": report.model_dump()}
     except Exception as exc:
-        logger.warning("Evolution loop trigger failed: %s", exc)
-        return {"status": "error", "error": str(exc)}
+        logger.warning("Evolution loop trigger failed: %s", exc, exc_info=True)
+        return {"status": "error", "error": "Evolution loop trigger failed, please try again later"}
 
 
 @router.get("/api/evolution/approvals")
@@ -366,8 +366,8 @@ async def api_evolution_approvals() -> dict[str, Any]:
 
         return {"status": "ok", "approvals": approvals, "total": len(approvals)}
     except Exception as exc:
-        logger.warning("Evolution approvals failed: %s", exc)
-        return {"status": "error", "error": str(exc), "approvals": []}
+        logger.warning("Evolution approvals failed: %s", exc, exc_info=True)
+        return {"status": "error", "error": "Evolution approvals unavailable", "approvals": []}
 
 
 @router.post("/api/evolution/approvals/{approval_id}/decision")
@@ -417,8 +417,8 @@ async def api_evolution_approval_decision(approval_id: str, request: Request) ->
 
         return {"status": "ok", "decision": decision, "approval_id": approval_id, "cycle_id": cycle_id}
     except Exception as exc:
-        logger.warning("Evolution approval decision failed: %s", exc)
-        return {"status": "error", "error": str(exc)}
+        logger.warning("Evolution approval decision failed: %s", exc, exc_info=True)
+        return {"status": "error", "error": "Evolution approval decision failed, please try again later"}
 
 
 @router.get("/api/evolution/ab/{cycle_id}")
@@ -460,8 +460,8 @@ async def api_evolution_ab_results(cycle_id: str) -> dict[str, Any]:
             "ab_result": ab_result,
         }
     except Exception as exc:
-        logger.warning("Evolution A/B results failed: %s", exc)
-        return {"status": "error", "error": str(exc), "ab_result": None}
+        logger.warning("Evolution A/B results failed: %s", exc, exc_info=True)
+        return {"status": "error", "error": "Evolution A/B results unavailable", "ab_result": None}
 
 
 @router.post("/api/evolution/loop/rollback")
@@ -486,5 +486,5 @@ async def api_evolution_loop_rollback(request: Request) -> dict[str, Any]:
         restored = loop.rollback_cycle(cycle_id, snapshot_id=snapshot_id)
         return {"status": "ok", "restored_files": restored, "cycle_id": cycle_id}
     except Exception as exc:
-        logger.warning("Evolution rollback failed: %s", exc)
-        return {"status": "error", "error": str(exc)}
+        logger.warning("Evolution rollback failed: %s", exc, exc_info=True)
+        return {"status": "error", "error": "Evolution rollback failed, please try again later"}

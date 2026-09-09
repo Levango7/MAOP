@@ -46,8 +46,11 @@ class DispatchResult(BaseModel):
 # ── Security helpers ──────────────────────────────────────────
 
 def _escape_for_cmd(s: str) -> str:
-    """Escape string for cmd.exe /c context: & | ( ) < > ^ % " newline."""
-    s = re.sub(r"([\^&|<>()%\"])", r"^\1", s)
+    """Escape string for cmd.exe /c context: & | ( ) < > ^ % " ! newline."""
+    # Strip null bytes first to prevent injection via truncation
+    s = s.replace('\x00', '')
+    # 转义所有 cmd.exe 特殊字符，包括 ! (延迟变量扩展)
+    s = re.sub(r'([\^&|<>()%"!])', r'^\1', s)
     s = s.replace("\n", "^\n").replace("\r", "")
     return s
 

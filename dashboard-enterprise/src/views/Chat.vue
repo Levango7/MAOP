@@ -144,8 +144,10 @@ import PageHeader from '../components/PageHeader.vue';
 import { EmptyState } from '../components/index.js';
 import DOMPurify from 'dompurify';
 import { useI18n } from '../i18n';
+import { useConfirm } from '../composables/useConfirm.js';
 
 const { t } = useI18n();
+const { showConfirm } = useConfirm();
 // 嵌入式模式: 作为 Run.vue 的 Tab 子视图时, 隐藏自身 PageHeader
 defineProps({
   embedded: { type: Boolean, default: false },
@@ -262,13 +264,14 @@ async function selectSession(s) {
   await loadSessionMessages(s.id);
 }
 async function deleteSession(s) {
-  if (!confirm(t('view.chat.deleteSessionConfirm', { title: sessionTitle(s) }))) return;
+  const ok = await showConfirm({ message: t('view.chat.deleteSessionConfirm', { title: sessionTitle(s) }), tone: 'danger' });
+  if (!ok) return;
   try {
     await api.delete(`/api/chat/${s.id}`);
     sessions.value = sessions.value.filter((x) => x.id !== s.id);
     if (sessionId.value === s.id) { sessionId.value = ''; messages.value = []; }
   } catch (e) {
-    alert(t('view.chat.deleteFailed') + ': ' + (e && e.message ? e.message : 'error'));
+    toast.error(t('view.chat.deleteFailed') + ': ' + (e && e.message ? e.message : 'error'));
   }
 }
 
@@ -449,7 +452,7 @@ onMounted(async () => {
   display: flex;
   gap: 8px;
   margin-top: 4px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint, #8a93a3);
 }
 .stream-tokens, .stream-speed {

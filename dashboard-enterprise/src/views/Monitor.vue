@@ -463,7 +463,7 @@ onUnmounted(() => {
 
 <style scoped>
 .resource-err-detail {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint);
   font-family: var(--font-mono);
   margin-top: 4px;
@@ -471,7 +471,7 @@ onUnmounted(() => {
 }
 /* v4.5.0: DAG execution input */
 .dag-exec-input {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding: 4px 8px;
   border: 1px solid var(--border, rgba(148,163,184,.35));
   border-radius: 4px;
@@ -487,7 +487,7 @@ onUnmounted(() => {
 
 /* F1-02: Agent 健康度面板 */
 .agent-health-refresh {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding: 4px 10px;
   border: 1px solid var(--border, rgba(148,163,184,.35));
   border-radius: 4px;
@@ -505,13 +505,13 @@ onUnmounted(() => {
   gap: 8px;
   padding: 12px;
   color: var(--text-faint, #8a93a3);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .agent-health-list {
   display: flex;
   flex-direction: column;
   gap: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .agent-health-row {
   display: grid;
@@ -527,7 +527,7 @@ onUnmounted(() => {
 .agent-health-header {
   font-weight: 600;
   color: var(--text-faint, #8a93a3);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border, rgba(148,163,184,.25));
@@ -540,7 +540,7 @@ onUnmounted(() => {
 }
 .ah-name {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -564,13 +564,13 @@ onUnmounted(() => {
 }
 .mini-val {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   min-width: 42px;
   text-align: right;
 }
 .ah-latency, .ah-timeout {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 .status-pill {
   display: inline-flex;
@@ -578,7 +578,7 @@ onUnmounted(() => {
   gap: 4px;
   padding: 2px 8px;
   border-radius: 10px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 500;
 }
 .pill-dot {
@@ -614,7 +614,7 @@ onUnmounted(() => {
   padding: 8px 4px 4px;
   margin-top: 6px;
   border-top: 1px dashed var(--border-light, rgba(148,163,184,.18));
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint, #8a93a3);
   font-family: var(--font-mono);
 }

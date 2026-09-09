@@ -31,7 +31,7 @@ def _no_pg_backend(monkeypatch):
 def test_grant_role():
     """grant_role() returns a RoleGrant with the given user_id and role."""
     mgr = RBACManager()
-    grant = mgr.grant_role("alice", Role.ADMIN, granted_by="root")
+    grant = mgr.grant_role("alice", Role.ADMIN, granted_by="root", _caller_roles=frozenset({Role.SUPERADMIN}))
     assert grant.user_id == "alice"
     assert grant.role == Role.ADMIN
     assert grant.granted_by == "root"
@@ -40,7 +40,7 @@ def test_grant_role():
 def test_revoke_role():
     """revoke_role() returns True when a grant exists, False otherwise."""
     mgr = RBACManager()
-    mgr.grant_role("alice", Role.ADMIN)
+    mgr.grant_role("alice", Role.ADMIN, _caller_roles=frozenset({Role.SUPERADMIN}))
     assert mgr.revoke_role("alice", Role.ADMIN) is True
     assert mgr.revoke_role("alice", Role.ADMIN) is False
     assert mgr.revoke_role("unknown", Role.VIEWER) is False
@@ -49,7 +49,7 @@ def test_revoke_role():
 def test_user_roles():
     """user_roles() returns all roles granted to a user."""
     mgr = RBACManager()
-    mgr.grant_role("alice", Role.ADMIN)
+    mgr.grant_role("alice", Role.ADMIN, _caller_roles=frozenset({Role.SUPERADMIN}))
     mgr.grant_role("alice", Role.OPERATOR)
     roles = mgr.user_roles("alice")
     assert Role.ADMIN in roles
@@ -60,7 +60,7 @@ def test_user_roles():
 def test_user_permissions():
     """superadmin has all Permissions; viewer has only read permissions."""
     mgr = RBACManager()
-    mgr.grant_role("root", Role.SUPERADMIN)
+    mgr.grant_role("root", Role.SUPERADMIN, _caller_roles=frozenset({Role.SUPERADMIN}))
     root_perms = mgr.user_permissions("root")
     assert len(root_perms) == len(list(Permission))
 
@@ -74,7 +74,7 @@ def test_user_permissions():
 def test_has_permission():
     """admin has AGENTS_WRITE but not TENANT_ADMIN."""
     mgr = RBACManager()
-    mgr.grant_role("alice", Role.ADMIN)
+    mgr.grant_role("alice", Role.ADMIN, _caller_roles=frozenset({Role.SUPERADMIN}))
     assert mgr.has_permission("alice", Permission.AGENTS_WRITE) is True
     assert mgr.has_permission("alice", Permission.TENANT_ADMIN) is False
 
@@ -90,14 +90,14 @@ def test_require_permission_raises():
 def test_require_permission_passes():
     """require_permission() does not raise when permission is present."""
     mgr = RBACManager()
-    mgr.grant_role("alice", Role.ADMIN)
+    mgr.grant_role("alice", Role.ADMIN, _caller_roles=frozenset({Role.SUPERADMIN}))
     mgr.require_permission("alice", Permission.AGENTS_WRITE)
 
 
 def test_role_hierarchy_superadmin():
     """SUPERADMIN has every Permission in the enum."""
     mgr = RBACManager()
-    mgr.grant_role("root", Role.SUPERADMIN)
+    mgr.grant_role("root", Role.SUPERADMIN, _caller_roles=frozenset({Role.SUPERADMIN}))
     for p in Permission:
         assert mgr.has_permission("root", p) is True
 
@@ -105,7 +105,7 @@ def test_role_hierarchy_superadmin():
 def test_role_hierarchy_admin():
     """ADMIN lacks TENANT_ADMIN and SYSTEM_ADMIN."""
     mgr = RBACManager()
-    mgr.grant_role("alice", Role.ADMIN)
+    mgr.grant_role("alice", Role.ADMIN, _caller_roles=frozenset({Role.SUPERADMIN}))
     assert mgr.has_permission("alice", Permission.TENANT_ADMIN) is False
     assert mgr.has_permission("alice", Permission.SYSTEM_ADMIN) is False
     assert mgr.has_permission("alice", Permission.AGENTS_WRITE) is True
@@ -130,7 +130,7 @@ def test_role_hierarchy_viewer():
 def test_list_grants():
     """list_grants() filters by user_id and tenant_id."""
     mgr = RBACManager()
-    mgr.grant_role("alice", Role.ADMIN, tenant_id="t1")
+    mgr.grant_role("alice", Role.ADMIN, tenant_id="t1", _caller_roles=frozenset({Role.SUPERADMIN}))
     mgr.grant_role("bob", Role.VIEWER, tenant_id="t2")
     mgr.grant_role("alice", Role.OPERATOR, tenant_id="t2")
 
@@ -146,7 +146,7 @@ def test_list_grants():
 def test_tenant_scoped_roles():
     """grant_role() with tenant_id scopes user_roles() filtering."""
     mgr = RBACManager()
-    mgr.grant_role("alice", Role.ADMIN, tenant_id="t1")
+    mgr.grant_role("alice", Role.ADMIN, tenant_id="t1", _caller_roles=frozenset({Role.SUPERADMIN}))
     mgr.grant_role("alice", Role.VIEWER, tenant_id="t2")
 
     roles_t1 = mgr.user_roles("alice", tenant_id="t1")

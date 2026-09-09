@@ -825,7 +825,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   gap: 8px;
   padding: 8px 12px;
   border-radius: var(--r-md, 8px);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .kg-notice--warn { background: var(--warn-soft); border: 1px solid var(--warn); color: var(--warn-strong); }
 .kg-notice--error { background: var(--fail-soft); border: 1px solid var(--fail); color: var(--fail-strong); }
@@ -851,8 +851,8 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
 .kg-filter { display: flex; flex-direction: column; gap: 12px; }
 .kg-filter-section { display: flex; flex-direction: column; gap: 6px; padding: 6px 0; }
 .kg-filter-section + .kg-filter-section { border-top: 1px solid var(--border-light, rgba(148,163,184,.16)); }
-.kg-filter-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
-.kg-checkbox { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.kg-filter-label { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
+.kg-checkbox { display: flex; align-items: center; gap: 6px; font-size: var(--fs-base); cursor: pointer; }
 .kg-checkbox input { margin: 0; }
 .kg-type-dot {
   display: inline-block;
@@ -870,7 +870,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--fs-base);
   background: var(--surface);
   color: var(--text);
 }
@@ -880,8 +880,8 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
 /* ── Timeline ── */
 .kg-timeline { display: flex; flex-direction: column; gap: 8px; }
 .kg-timeline-row { display: flex; flex-direction: column; gap: 4px; }
-.kg-timeline-row label { font-size: 12px; color: var(--text-muted); }
-.kg-timeline-error { color: var(--fail-strong); font-size: 12px; }
+.kg-timeline-row label { font-size: var(--fs-sm); color: var(--text-muted); }
+.kg-timeline-error { color: var(--fail-strong); font-size: var(--fs-sm); }
 .kg-timeline-range { padding-top: 4px; }
 
 /* ── Canvas ── */
@@ -914,15 +914,15 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
 .kg-detail-body { display: flex; flex-direction: column; gap: 8px; }
 .kg-detail-row { display: flex; gap: 12px; padding: 4px 0; align-items: center; }
 .kg-detail-row + .kg-detail-row { border-top: 1px solid var(--border-light, rgba(148,163,184,.16)); }
-.kg-detail-label { width: 90px; flex-shrink: 0; font-size: 12px; color: var(--text-muted); font-weight: 500; }
-.kg-detail-value { flex: 1; font-size: 13px; word-break: break-word; display: flex; align-items: center; gap: 6px; }
+.kg-detail-label { width: 90px; flex-shrink: 0; font-size: var(--fs-sm); color: var(--text-muted); font-weight: 500; }
+.kg-detail-value { flex: 1; font-size: var(--fs-base); word-break: break-word; display: flex; align-items: center; gap: 6px; }
 .kg-detail-section { padding-top: 8px; border-top: 1px solid var(--border-light, rgba(148,163,184,.16)); display: flex; flex-direction: column; gap: 6px; }
 .kg-detail-pre {
   margin: 0;
   padding: 8px;
   background: var(--surface-3);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-family: 'SF Mono', 'Fira Code', monospace;
   overflow-x: auto;
   max-height: 160px;
@@ -930,7 +930,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   white-space: pre-wrap;
 }
 .kg-rel-list { display: flex; flex-direction: column; gap: 4px; }
-.kg-rel-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.kg-rel-item { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
 .kg-rel-dir { font-weight: bold; color: var(--text-muted); }
 .kg-rel-dir.out { color: var(--brand); }
 .kg-rel-dir.in { color: var(--warn); }
@@ -940,7 +940,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   padding: 8px;
   background: var(--bg-muted, rgba(148,163,184,.10));
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
   max-height: 120px;
   overflow-y: auto;
@@ -957,7 +957,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   border-radius: 4px;
   background: var(--surface);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-base);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }

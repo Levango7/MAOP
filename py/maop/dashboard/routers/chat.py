@@ -224,7 +224,7 @@ async def upload_image(
     from maop.core.backends.image_store import ImageStore
 
     if file is None:
-        return {"status": "error", "error": "No file provided"}
+        return {"success": False, "message": "No file provided", "data": None}
 
     content = await file.read()
     store = ImageStore(root_dir=str(MAOP_ROOT))
@@ -255,4 +255,10 @@ async def delete_image(image_id: str, request: Request) -> dict[str, Any]:
     from maop.core.backends.image_store import ImageStore
     store = ImageStore(root_dir=str(MAOP_ROOT))
     deleted = store.delete(image_id)
-    return {"status": "ok" if deleted else "not_found", "deleted": deleted}
+    if not deleted:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=404,
+            content={"success": False, "message": "Image not found", "data": None},
+        )
+    return {"success": True, "message": "ok", "data": {"deleted": True}}

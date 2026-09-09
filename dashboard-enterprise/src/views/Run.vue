@@ -559,12 +559,12 @@ const dagLayout = computed(() => {
   stroke-width: 2;
 }
 .split-dag__node-id {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   fill: var(--text);
 }
 .split-dag__node-label {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   fill: var(--text-muted);
 }
 
@@ -592,7 +592,7 @@ const dagLayout = computed(() => {
   background: var(--brand);
   color: var(--brand-contrast, #fff);
   border-radius: var(--r-sm, 6px);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 .split-subtask__name { font-weight: 500; color: var(--text); }

@@ -113,9 +113,13 @@ import ListPageLayout from '../components/ListPageLayout.vue';
 import AppIcon from '../components/AppIcon.vue';
 import { useI18n } from '../i18n/index.js';
 import { useApiStore } from '../stores/api.js';
+import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 
 const { t } = useI18n();
 const api = useApiStore();
+const toast = useToast();
+const { showConfirm } = useConfirm();
 
 const users = ref([]);
 const loading = ref(false);
@@ -212,12 +216,13 @@ async function submitForm() {
 }
 
 async function confirmDelete(u) {
-  if (!window.confirm(t('users.confirmDelete'))) return;
+  const ok = await showConfirm({ message: t('users.confirmDelete'), tone: 'danger' });
+  if (!ok) return;
   try {
     await api.delete('/api/auth/users/' + encodeURIComponent(u.username));
     await fetchUsers();
   } catch (e) {
-    window.alert(e.message || t('view.users.failed'));
+    toast.error(e.message || t('view.users.failed'));
   }
 }
 
@@ -231,20 +236,20 @@ onMounted(fetchUsers);
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 22px; height: 22px; padding: 0 6px;
   background: var(--brand-soft); color: var(--brand-strong);
-  border-radius: var(--r-full); font-size: 11px; font-weight: 700;
+  border-radius: var(--r-full); font-size: var(--fs-xs); font-weight: 700;
 }
 
 .btn-primary {
   display: inline-flex; align-items: center; gap: 5px;
   background: var(--brand); color: var(--brand-contrast); border: none;
-  border-radius: var(--r-md); padding: 7px 12px; font-size: 12px; font-weight: 600;
+  border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
 .btn-primary:hover { opacity: .9; }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .btn-secondary {
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 7px 12px; font-size: 12px; font-weight: 600;
+  border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer;
 }
 .btn-icon {
@@ -272,12 +277,12 @@ onMounted(fetchUsers);
   align-items: center;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .users-row:last-child { border-bottom: none; }
 .users-row--head {
   background: var(--surface-2);
-  font-size: 11px; font-weight: 700; color: var(--text-faint);
+  font-size: var(--fs-xs); font-weight: 700; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: .05em;
 }
 .users-cell { padding: 0 4px; }
@@ -287,18 +292,18 @@ onMounted(fetchUsers);
 .users-avatar {
   width: 30px; height: 30px; border-radius: var(--r-full);
   background: linear-gradient(135deg, var(--brand), var(--chart-6));
-  color: var(--brand-contrast); font-size: 12px; font-weight: 700;
+  color: var(--brand-contrast); font-size: var(--fs-sm); font-weight: 700;
   display: grid; place-items: center;
 }
 .users-uname { font-weight: 600; color: var(--text); }
 .users-self {
-  font-size: 9px; padding: 1px 5px; border-radius: var(--r-sm);
+  font-size: var(--fs-3xs); padding: 1px 5px; border-radius: var(--r-sm);
   background: var(--brand-soft); color: var(--brand-strong); font-weight: 600;
 }
 
 .users-role {
   display: inline-block; padding: 1px 6px; margin-right: 4px;
-  border-radius: var(--r-sm); font-size: 10px; font-weight: 600;
+  border-radius: var(--r-sm); font-size: var(--fs-2xs); font-weight: 600;
   background: var(--surface-3); color: var(--text-muted);
 }
 .users-role--admin { background: var(--fail-soft); color: var(--fail); }
@@ -328,12 +333,12 @@ onMounted(fetchUsers);
   transition: color var(--motion) var(--ease), background var(--motion) var(--ease);
 }
 .users-dialog-close:hover { color: var(--text); background: var(--surface-2); }
-.users-dialog h3 { margin: 0 0 16px; font-size: 16px; color: var(--text); }
+.users-dialog h3 { margin: 0 0 16px; font-size: var(--fs-lg); color: var(--text); }
 .users-form { display: flex; flex-direction: column; gap: 12px; }
-.users-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.users-form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
 .users-form input[type="text"], .users-form input[type="password"] {
   background: var(--bg); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 8px 10px; color: var(--text); font-size: 13px;
+  border-radius: var(--r-md); padding: 8px 10px; color: var(--text); font-size: var(--fs-base);
 }
 .users-form input:focus { outline: none; border-color: var(--brand); }
 .users-form input:disabled { opacity: .6; }
@@ -342,12 +347,12 @@ onMounted(fetchUsers);
 .users-role-chip {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 4px 8px; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--r-sm); font-size: 11px; cursor: pointer; flex-direction: row;
+  border-radius: var(--r-sm); font-size: var(--fs-xs); cursor: pointer; flex-direction: row;
 }
 .users-role-chip input { margin: 0; }
 
 .users-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-.users-form-error { color: var(--fail); font-size: 12px; margin-top: 8px; }
+.users-form-error { color: var(--fail); font-size: var(--fs-sm); margin-top: 8px; }
 
 @media (max-width: 700px) {
   .users-row { grid-template-columns: 40px 1fr 1fr 60px; }

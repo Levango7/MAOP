@@ -78,6 +78,7 @@
     </div>
 
     <Toast />
+    <ConfirmDialog />
     <CoachMarks />
     <CommandPalette />
   </div>
@@ -92,6 +93,7 @@ import { useUiStore } from './stores/ui.js';
 import AppIcon from './components/AppIcon.vue';
 import TopBar from './components/TopBar.vue';
 import Toast from './components/Toast.vue';
+import ConfirmDialog from './components/ConfirmDialog.vue';
 import AppFooter from './components/AppFooter.vue';
 import CoachMarks from './components/CoachMarks.vue';
 import CommandPalette from './components/CommandPalette.vue';

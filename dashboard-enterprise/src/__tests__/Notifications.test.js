@@ -8,6 +8,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
+
+// Mock useConfirm — showConfirm returns Promise<boolean>
+const mockShowConfirm = vi.fn(() => Promise.resolve(true));
+vi.mock('../composables/useConfirm.js', () => ({
+  useConfirm: () => ({ showConfirm: mockShowConfirm }),
+  confirmState: { visible: false, message: '', title: '', confirmText: '', cancelText: '', tone: 'danger', _resolve: null },
+}));
+
 import Notifications from '../views/Notifications.vue';
 import ListPageLayout from '../components/ListPageLayout.vue';
 import StatCard from '../components/StatCard.vue';
@@ -291,9 +299,7 @@ describe('Notifications.vue', () => {
 
   // ── Extra: delete button removes the notification ──
   it('deletes a notification when the delete button is clicked', async () => {
-    // jsdom window.confirm returns false by default → override to true
-    const origConfirm = window.confirm;
-    window.confirm = () => true;
+    mockShowConfirm.mockReturnValue(Promise.resolve(true));
     mockFetch(defaultRoutes());
     const wrapper = await mountNotifications();
     expect(wrapper.findAll('.notif-row')).toHaveLength(3);
@@ -302,12 +308,12 @@ describe('Notifications.vue', () => {
     expect(deleteBtn.exists()).toBe(true);
     await deleteBtn.trigger('click');
     await flushPromises();
+    await flushPromises();
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/notifications/notif_1',
       expect.objectContaining({ method: 'DELETE' }),
     );
     expect(wrapper.findAll('.notif-row')).toHaveLength(2);
-    window.confirm = origConfirm;
     wrapper.unmount();
   });
 

@@ -339,13 +339,20 @@ async def _run_cmd(config: AgentConfig, prompt: str, timeout: int,
         )
     escaped = _escape_for_cmd(prompt)
     args_template = config.cli_args or "{task}"
-    arg_line = args_template.replace("{task}", escaped)
+    # 安全改进：当模板就是 {task} 时，把 escaped 作为独立参数传给 subprocess
+    # 避免 cmd /c 对拼接后的字符串做二次解析
+    if args_template.strip() == "{task}":
+        cmd_args = [cli, escaped]
+    else:
+        # 自定义模板仍需拼接，escaped 已转义
+        arg_line = args_template.replace("{task}", escaped)
+        cmd_args = [cli, arg_line]
 
     start = time.monotonic()
     proc = None
     try:
         proc = await asyncio.create_subprocess_exec(
-            "cmd", "/c", cli, arg_line,
+            "cmd", "/c", *cmd_args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,

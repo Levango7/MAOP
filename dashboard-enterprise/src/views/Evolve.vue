@@ -522,7 +522,7 @@ onMounted(() => {
 
 <style scoped>
 .evolve-chart-desc {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   margin-bottom: 8px;
 }
 .evolve-chart-box {
@@ -688,7 +688,7 @@ onMounted(() => {
   margin-top: 2px;
 }
 .evolve-milestones__impact-label {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -708,7 +708,7 @@ onMounted(() => {
 }
 .heatmap__table {
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   width: 100%;
 }
 .heatmap__table th,

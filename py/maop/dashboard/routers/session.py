@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -16,6 +18,34 @@ router = APIRouter(prefix="/api/session", tags=["session"])
 # 现有 /api/session/* 端点保持不变, 新增 /api/sessions (列表+分页) 与
 # /api/sessions/{id}/rerun (重跑) 走此 router。
 tasks_router = APIRouter(prefix="/api/sessions", tags=["sessions"])
+
+
+# ── Pydantic 请求模型 (P2-#4 fix: 输入校验) ────────────────────────
+
+class CreateSessionRequest(BaseModel):
+    agent: str = ""
+    workdir: str = ""
+    tags: list[str] | None = None
+    metadata: dict[str, Any] | None = None
+    token_budget: int = 0
+
+
+class UpdateSessionRequest(BaseModel):
+    status: str | None = None
+    agent: str | None = None
+    workdir: str | None = None
+    tags: list[str] | None = None
+    metadata: dict[str, Any] | None = None
+    token_count: int | None = None
+    token_budget: int | None = None
+    message_count: int | None = None
+
+
+class AddMessageRequest(BaseModel):
+    role: str = "user"
+    content: str = ""
+    metadata: dict[str, Any] | None = None
+    token_count: int = 0
 
 
 def _get_session_mgr():
@@ -44,15 +74,15 @@ async def list_sessions(
 
 @router.post("/")
 @handle_api_errors
-async def create_session(body: dict, request: Request) -> dict[str, Any]:
+async def create_session(body: CreateSessionRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_session_mgr()
     sid = mgr.create(
-        agent=body.get("agent", ""),
-        workdir=body.get("workdir", ""),
-        tags=body.get("tags"),
-        metadata=body.get("metadata"),
-        token_budget=body.get("token_budget", 0),
+        agent=body.agent,
+        workdir=body.workdir,
+        tags=body.tags,
+        metadata=body.metadata,
+        token_budget=body.token_budget,
     )
     session = mgr.get(sid)
     return {"session": session.model_dump() if session else None}
@@ -70,25 +100,28 @@ async def get_session(session_id: str) -> dict[str, Any]:
     mgr = _get_session_mgr()
     session = mgr.get(session_id)
     if session is None:
-        return {"error": "Session not found"}
+        return JSONResponse(
+            status_code=404,
+            content={"success": False, "message": "Session not found", "data": None},
+        )
     return {"session": session.model_dump()}
 
 
 @router.patch("/{session_id}")
 @handle_api_errors
-async def update_session(session_id: str, body: dict, request: Request) -> dict[str, Any]:
+async def update_session(session_id: str, body: UpdateSessionRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_session_mgr()
     ok = mgr.update(
         session_id,
-        status=body.get("status"),
-        agent=body.get("agent"),
-        workdir=body.get("workdir"),
-        tags=body.get("tags"),
-        metadata=body.get("metadata"),
-        token_count=body.get("token_count"),
-        token_budget=body.get("token_budget"),
-        message_count=body.get("message_count"),
+        status=body.status,
+        agent=body.agent,
+        workdir=body.workdir,
+        tags=body.tags,
+        metadata=body.metadata,
+        token_count=body.token_count,
+        token_budget=body.token_budget,
+        message_count=body.message_count,
     )
     return {"updated": ok}
 
@@ -117,15 +150,15 @@ async def get_messages(
 
 @router.post("/{session_id}/messages")
 @handle_api_errors
-async def add_message(session_id: str, body: dict, request: Request) -> dict[str, Any]:
+async def add_message(session_id: str, body: AddMessageRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     cmgr = _get_conversation_mgr()
     msg_id = cmgr.add_message(
         session_id=session_id,
-        role=body.get("role", "user"),
-        content=body.get("content", ""),
-        metadata=body.get("metadata"),
-        token_count=body.get("token_count", 0),
+        role=body.role,
+        content=body.content,
+        metadata=body.metadata,
+        token_count=body.token_count,
     )
     smgr = _get_session_mgr()
     smgr.touch(session_id)
@@ -213,5 +246,8 @@ async def rerun_session(session_id: str, request: Request) -> dict[str, Any]:
     mgr = _get_session_mgr()
     new_session = mgr.rerun(session_id)
     if new_session is None:
-        return {"error": "Session not found", "session": None}
+        return JSONResponse(
+            status_code=404,
+            content={"success": False, "message": "Session not found", "data": None},
+        )
     return {"session": new_session.model_dump(), "rerun_from": session_id}

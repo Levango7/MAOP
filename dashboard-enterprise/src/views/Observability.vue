@@ -329,7 +329,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   gap: 4px;
   padding: 3px 10px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   background: var(--bg-tag, rgba(148,163,184,.16));
   color: var(--text-muted, #9aa3b2);
@@ -344,7 +344,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   gap: 6px;
   padding: 3px 10px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 .tracing-badge .dot {
@@ -408,19 +408,19 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .pipeline-dot.ok, .health-dot.ok { background: var(--success, #3fb950); }
 .pipeline-dot.bad, .health-dot.bad { background: var(--fail, #f85149); }
 .pipeline-name, .health-name {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text, #e8eaf0);
   font-weight: 500;
 }
 .pipeline-detail, .health-detail {
   grid-column: 3;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted, #9aa3b2);
   font-family: var(--font-mono, monospace);
 }
 .pipeline-status {
   grid-column: 3;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 8px;
@@ -439,17 +439,17 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   grid-template-columns: 1fr auto;
 }
 .config-label {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-muted, #9aa3b2);
 }
 .config-value {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text, #e8eaf0);
   font-weight: 500;
 }
 .config-value.mono {
   font-family: var(--font-mono, monospace);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 /* ── Metric table ───────────────────────────────────────────────── */
@@ -465,7 +465,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   align-items: center;
 }
 .metric-header {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--text-faint, #6e7686);
   text-transform: uppercase;
@@ -476,7 +476,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   border-bottom: 1px solid var(--border-soft, rgba(148,163,184,.16));
 }
 .metric-row:last-child { border-bottom: none; }
-.mono { font-family: var(--font-mono, monospace); font-size: 12px; }
+.mono { font-family: var(--font-mono, monospace); font-size: var(--fs-sm); }
 .col-name { color: var(--text, #e8eaf0); }
 .col-type { text-align: center; }
 .col-value {
@@ -485,7 +485,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   color: var(--text, #e8eaf0);
 }
 .col-extra {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted, #9aa3b2);
   font-family: var(--font-mono, monospace);
 }
@@ -493,7 +493,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   display: inline-block;
   padding: 1px 8px;
   border-radius: 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 .type-tag.counter {
@@ -538,17 +538,17 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text, #e8eaf0);
 }
 .trace-info.disabled .trace-row { color: var(--text-muted, #9aa3b2); }
 .trace-hint {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-faint, #6e7686);
   padding-left: 24px;
 }
 .trace-enable {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding-left: 24px;
   color: var(--text-muted, #9aa3b2);
 }
@@ -557,6 +557,6 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   background: var(--bg-tag, rgba(148,163,184,.16));
   padding: 1px 6px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 </style>

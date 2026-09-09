@@ -8,29 +8,44 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
+
+// Mock useConfirm — showConfirm returns Promise<boolean>
+const mockShowConfirm = vi.fn(() => Promise.resolve(true));
+vi.mock('../composables/useConfirm.js', () => ({
+  useConfirm: () => ({ showConfirm: mockShowConfirm }),
+  confirmState: { visible: false, message: '', title: '', confirmText: '', cancelText: '', tone: 'danger', _resolve: null },
+}));
+
+// Mock useToast
+const mockToast = { success: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn(), show: vi.fn(), dismiss: vi.fn() };
+vi.mock('../composables/useToast.js', () => ({
+  useToast: () => mockToast,
+  toastState: { items: [] },
+}));
+
 import Settings from '../views/Settings.vue';
 
 
 const mountOptions = { global: { stubs: { PageHeader: { template: '<slot />' } } } };
 
 describe('Settings.vue Hook 管理 Tab', () => {
-  let originalFetch, originalConfirm, originalAlert;
+  let originalFetch;
 
   beforeEach(() => {
     setActivePinia(createPinia());
     originalFetch = global.fetch;
-    originalConfirm = global.confirm;
-    originalAlert = global.alert;
-    global.confirm = vi.fn(() => true);
-    global.alert = vi.fn();
+    mockShowConfirm.mockReturnValue(Promise.resolve(true));
     global.__VITEST__ = true;
     if (typeof window !== 'undefined') window.__VITEST__ = true;
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    global.confirm = originalConfirm;
-    global.alert = originalAlert;
+    mockShowConfirm.mockClear();
+    mockToast.success.mockClear();
+    mockToast.error.mockClear();
+    mockToast.warn.mockClear();
+    mockToast.info.mockClear();
     delete global.__VITEST__;
     if (typeof window !== 'undefined') delete window.__VITEST__;
   });
@@ -237,8 +252,9 @@ describe('Settings.vue Hook 管理 Tab', () => {
     expect(deleteBtn).toBeDefined();
     await deleteBtn.trigger('click');
     await flushPromises();
-    // confirm 已被调用
-    expect(global.confirm).toHaveBeenCalled();
+    await flushPromises();
+    // showConfirm 已被调用
+    expect(mockShowConfirm).toHaveBeenCalled();
     // DELETE 请求已发出
     const deleteCalls = global.fetch.mock.calls.filter(c => c[1] && c[1].method === 'DELETE' && String(c[0]) === '/api/hooks/hk-001');
     expect(deleteCalls.length).toBe(1);
@@ -306,8 +322,8 @@ describe('Settings.vue Hook 管理 Tab', () => {
     await flushPromises();
     const testCalls = global.fetch.mock.calls.filter(c => c[1] && c[1].method === 'POST' && String(c[0]) === '/api/hooks/hk-001/test');
     expect(testCalls.length).toBe(1);
-    // alert 应被调用显示结果
-    expect(global.alert).toHaveBeenCalled();
+    // toast 应被调用显示结果
+    expect(mockToast.success).toHaveBeenCalled();
     wrapper.unmount();
   });
 });

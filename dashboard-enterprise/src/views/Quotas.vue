@@ -273,6 +273,7 @@ import {
 } from 'chart.js';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { useI18n } from '../i18n';
 import Badge from '../components/Badge.vue';
 import StatCard from '../components/StatCard.vue';
@@ -292,6 +293,7 @@ ChartJS.register(
 const { t } = useI18n();
 const api = useApiStore();
 const toast = useToast();
+const { showConfirm } = useConfirm();
 
 // ── 资源字段定义(统一 6 项配额维度) ───────────────────────────
 const RESOURCES = [
@@ -595,7 +597,8 @@ async function saveAdjust() {
 
 async function resolveAlert(alert) {
   if (!detailTenant.value) return;
-  if (typeof confirm === 'function' && !confirm(t('view.quotas.resolveConfirm'))) return;
+  const ok = await showConfirm({ message: t('view.quotas.resolveConfirm'), tone: 'danger' });
+  if (!ok) return;
   const alertId = alert.alert_id || alert.id;
   try {
     await api.post(`/api/quotas/alerts/${encodeURIComponent(alertId)}/resolve`, {});

@@ -1035,7 +1035,7 @@ onMounted(() => {
   border-left: 3px solid var(--border);
 }
 .mem-type {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase;
   padding: 2px 6px; border-radius: var(--r-sm);
   background: var(--surface-3); color: var(--text-muted);
   flex-shrink: 0;
@@ -1045,7 +1045,7 @@ onMounted(() => {
 .mem-type.lesson { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
 .mem-type.performance { background: color-mix(in srgb, var(--chart-4) 15%, transparent); color: var(--chart-4); }
 .mem-content { flex: 1; font-size: var(--fs-xs); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mem-time { font-size: 10px; color: var(--text-faint); flex-shrink: 0; }
+.mem-time { font-size: var(--fs-2xs); color: var(--text-faint); flex-shrink: 0; }
 
 /* ── 自进化面板（DetailDrawer 内容样式） ── */
 .evolution-summary { color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: var(--sp-4); }
@@ -1059,8 +1059,8 @@ onMounted(() => {
 .evo-suggestion.prio-medium { border-left-color: var(--warn); }
 .evo-suggestion.prio-low { border-left-color: var(--chart-4); }
 .evo-suggestion.auto { background: color-mix(in srgb, var(--success) 8%, var(--surface-2)); }
-.evo-cat { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--brand-strong); margin-right: var(--sp-2); }
-.evo-prio { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 1px 5px; border-radius: var(--r-sm); }
+.evo-cat { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; color: var(--brand-strong); margin-right: var(--sp-2); }
+.evo-prio { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; padding: 1px 5px; border-radius: var(--r-sm); }
 .prio-high .evo-prio { background: color-mix(in srgb, var(--fail) 15%, transparent); color: var(--fail); }
 .prio-medium .evo-prio { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
 .prio-low .evo-prio { background: color-mix(in srgb, var(--chart-4) 15%, transparent); color: var(--chart-4); }
@@ -1073,7 +1073,7 @@ onMounted(() => {
   padding: var(--sp-2); background: color-mix(in srgb, var(--success) 5%, var(--surface-2));
   border-radius: var(--r-sm); margin-bottom: 4px;
 }
-.applied-cat { font-size: 10px; font-weight: 700; color: var(--success); text-transform: uppercase; }
+.applied-cat { font-size: var(--fs-2xs); font-weight: 700; color: var(--success); text-transform: uppercase; }
 .applied-desc { font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* ── 确认对话框 ── */
@@ -1108,7 +1108,7 @@ onMounted(() => {
   display: flex; align-items: flex-start; gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-4);
-  background: color-mix(in srgb, var(--primary) 6%, var(--surface-2));
+  background: color-mix(in srgb, var(--brand) 6%, var(--surface-2));
   border-radius: var(--r-sm);
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -1155,19 +1155,19 @@ onMounted(() => {
 .route-node.fallback { border-left: 3px solid var(--warn, #d29922); }
 .route-node.tertiary { border-left: 3px solid var(--text-faint, #6e7686); }
 .route-agent { font-weight: 600; font-size: var(--fs-sm); }
-.route-model { font-size: 11px; color: var(--text-muted); }
+.route-model { font-size: var(--fs-xs); color: var(--text-muted); }
 .route-sep { color: var(--text-faint); font-size: var(--fs-sm); }
 .route-keywords {
   display: flex; flex-wrap: wrap; gap: 4px;
   margin-top: 2px;
 }
 .kw-chip {
-  font-size: 11px; padding: 1px 6px;
+  font-size: var(--fs-xs); padding: 1px 6px;
   border-radius: var(--r-xs);
   background: var(--surface-3);
   color: var(--text-muted);
 }
-.kw-more { font-size: 11px; color: var(--text-faint); }
+.kw-more { font-size: var(--fs-xs); color: var(--text-faint); }
 
 /* ── 路由决策记录 ── */
 .decisions-list {
@@ -1183,7 +1183,7 @@ onMounted(() => {
   font-size: var(--fs-sm);
 }
 .dec-stage {
-  font-size: 11px; font-weight: 600;
+  font-size: var(--fs-xs); font-weight: 600;
   padding: 2px 8px; border-radius: var(--r-xs);
   text-align: center; text-transform: uppercase;
   letter-spacing: .03em;
@@ -1193,8 +1193,8 @@ onMounted(() => {
 .dec-stage.model_selector { background: color-mix(in srgb, var(--chart-5) 15%, transparent); color: var(--chart-5); }
 .dec-stage.dispatcher { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
 .dec-agent { font-weight: 600; color: var(--text); }
-.dec-reason { color: var(--text-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dec-time { color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+.dec-reason { color: var(--text-muted); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dec-time { color: var(--text-faint); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .decisions-empty {
   display: flex; align-items: center; gap: var(--sp-2);
   padding: var(--sp-4); color: var(--text-faint);
@@ -1235,18 +1235,18 @@ onMounted(() => {
   cursor: pointer; transition: all .15s ease;
 }
 .model-option:hover:not(.disabled) {
-  border-color: var(--accent, var(--primary));
+  border-color: var(--accent, var(--brand));
   background: var(--surface-2);
 }
 .model-option.selected {
-  border-color: var(--accent, var(--primary));
-  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  border-color: var(--accent, var(--brand));
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
 }
 .model-option.disabled { opacity: .5; cursor: not-allowed; }
-.model-option input[type="radio"] { accent-color: var(--primary); }
+.model-option input[type="radio"] { accent-color: var(--brand); }
 .model-name { font-size: var(--fs-sm); font-weight: 500; }
-.model-provider { font-size: 11px; color: var(--text-muted); margin-left: auto; }
-.model-status { font-size: 11px; color: var(--text-faint); }
+.model-provider { font-size: var(--fs-xs); color: var(--text-muted); margin-left: auto; }
+.model-status { font-size: var(--fs-xs); color: var(--text-faint); }
 .model-switch-panel__actions {
   display: flex; gap: var(--sp-3); justify-content: flex-end;
 }
@@ -1287,7 +1287,7 @@ onMounted(() => {
 .upgrade-result {
   margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-sm); background: var(--surface-2);
-  font-size: 12px; display: flex; flex-direction: column; gap: 2px;
+  font-size: var(--fs-sm); display: flex; flex-direction: column; gap: 2px;
 }
 .upgrade-result.success { border-left: 3px solid var(--success); }
 .upgrade-result.failed { border-left: 3px solid var(--fail); }

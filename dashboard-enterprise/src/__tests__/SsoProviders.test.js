@@ -7,6 +7,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
+
+// Mock useConfirm — showConfirm returns Promise<boolean>
+const mockShowConfirm = vi.fn(() => Promise.resolve(true));
+vi.mock('../composables/useConfirm.js', () => ({
+  useConfirm: () => ({ showConfirm: mockShowConfirm }),
+  confirmState: { visible: false, message: '', title: '', confirmText: '', cancelText: '', tone: 'danger', _resolve: null },
+}));
+
 import SsoProviders from '../views/SsoProviders.vue';
 
 // PageHeader 调用 useRoute(), 需要路由上下文; stub 成透传 slot 的占位组件,
@@ -22,7 +30,7 @@ describe('SsoProviders.vue', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     originalFetch = global.fetch;
-    originalConfirm = window.confirm;
+    mockShowConfirm.mockReturnValue(Promise.resolve(true));
     // 标记 vitest 环境, 避免 handleUnauthorized 触发 CustomEvent
     global.__VITEST__ = true;
     if (typeof window !== 'undefined') window.__VITEST__ = true;
@@ -30,7 +38,7 @@ describe('SsoProviders.vue', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
-    window.confirm = originalConfirm;
+    mockShowConfirm.mockClear();
     delete global.__VITEST__;
     if (typeof window !== 'undefined') delete window.__VITEST__;
   });
@@ -250,7 +258,7 @@ describe('SsoProviders.vue', () => {
     mockFetch({
       '/api/v1/sso/providers': { status: 'ok', providers: defaultProviders(), count: 2, total: 2 },
     });
-    window.confirm = () => true;
+    mockShowConfirm.mockReturnValue(Promise.resolve(true));
 
     const wrapper = await mountView();
     expect(wrapper.findAll('.sso-row:not(.sso-row--head)').length).toBe(2);
@@ -279,7 +287,7 @@ describe('SsoProviders.vue', () => {
 
   it('does not delete when confirm is cancelled', async () => {
     mockFetch(defaultRoutes());
-    window.confirm = () => false;
+    mockShowConfirm.mockReturnValue(Promise.resolve(false));
 
     const wrapper = await mountView();
     const rows = wrapper.findAll('.sso-row:not(.sso-row--head)');

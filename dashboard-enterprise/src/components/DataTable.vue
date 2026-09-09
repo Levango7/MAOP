@@ -130,10 +130,10 @@ function formatRel(ts) {
   const d = new Date(typeof ts === 'number' ? ts : String(ts));
   if (isNaN(d.getTime())) return String(ts);
   const diff = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-  if (diff < 60) return diff + 's ago';
-  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-  return Math.floor(diff / 86400) + 'd ago';
+  if (diff < 60) return t('common.secondsAgo', { n: diff });
+  if (diff < 3600) return t('common.minutesAgo', { n: Math.floor(diff / 60) });
+  if (diff < 86400) return t('common.hoursAgo', { n: Math.floor(diff / 3600) });
+  return t('common.daysAgo', { n: Math.floor(diff / 86400) });
 }
 </script>
 

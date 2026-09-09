@@ -262,10 +262,10 @@ const isStale = computed(() => {
 const freshnessText = computed(() => {
   if (!lastUpdated.value) return '—';
   const s = Math.floor((Date.now() - lastUpdated.value.getTime()) / 1000);
-  if (s < 5) return 'just now';
-  if (s < 60) return s + 's ago';
-  if (s < 3600) return Math.floor(s / 60) + 'm ago';
-  return Math.floor(s / 3600) + 'h ago';
+  if (s < 5) return t('common.justNow');
+  if (s < 60) return t('common.secondsAgo', { n: s });
+  if (s < 3600) return t('common.minutesAgo', { n: Math.floor(s / 60) });
+  return t('common.hoursAgo', { n: Math.floor(s / 3600) });
 });
 
 // ── Hero strip: 健康结论 + 关键运行态 ──
@@ -603,7 +603,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
   z-index: 1;
 }
 .ov-pev__connector-label {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   letter-spacing: .04em;
   text-transform: uppercase;

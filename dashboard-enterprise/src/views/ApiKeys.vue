@@ -291,6 +291,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { useI18n } from '../i18n/index.js';
 import Badge from '../components/Badge.vue';
 import ListPageLayout from '../components/ListPageLayout.vue';
@@ -301,6 +302,7 @@ import AppIcon from '../components/AppIcon.vue';
 const { t } = useI18n();
 const api = useApiStore();
 const toast = useToast();
+const { showConfirm } = useConfirm();
 
 // 权限范围分组(对齐 RBAC 权限模型)
 const SCOPE_GROUPS = [
@@ -396,10 +398,10 @@ function formatRel(ts) {
   const d = new Date(typeof ts === 'number' ? ts : String(ts));
   if (isNaN(d.getTime())) return String(ts);
   const diff = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-  if (diff < 60) return diff + 's ago';
-  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-  return Math.floor(diff / 86400) + 'd ago';
+  if (diff < 60) return t('common.secondsAgo', { n: diff });
+  if (diff < 3600) return t('common.minutesAgo', { n: Math.floor(diff / 60) });
+  if (diff < 86400) return t('common.hoursAgo', { n: Math.floor(diff / 3600) });
+  return t('common.daysAgo', { n: Math.floor(diff / 86400) });
 }
 function formatAbs(ts) {
   if (ts === null || ts === undefined || ts === '') return '—';
@@ -526,7 +528,8 @@ async function saveEdit() {
 
 // ── 吊销 ──
 async function revoke(k) {
-  if (typeof confirm === 'function' && !confirm(t('view.apikeys.revokeConfirm', { name: k.name }))) return;
+  const ok = await showConfirm({ message: t('view.apikeys.revokeConfirm', { name: k.name }), tone: 'danger' });
+  if (!ok) return;
   try {
     await api.post('/api/api-keys/' + encodeURIComponent(k.key_id) + '/revoke', {});
     toast.success(t('view.apikeys.revoked', { name: k.name }));
@@ -562,7 +565,7 @@ onMounted(load);
 .btn {
   display: inline-flex; align-items: center; gap: 5px;
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 7px 12px; font-size: 12px; font-weight: 600;
+  border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
 .btn:hover { opacity: .9; }
@@ -570,7 +573,7 @@ onMounted(load);
   background: var(--brand); color: var(--brand-contrast); border: none;
 }
 .btn--primary:disabled { opacity: .5; cursor: not-allowed; }
-.btn--sm { padding: 4px 8px; font-size: 11px; }
+.btn--sm { padding: 4px 8px; font-size: var(--fs-xs); }
 .btn-icon {
   display: grid; place-items: center;
   width: 28px; height: 28px;
@@ -592,22 +595,22 @@ onMounted(load);
   align-items: center;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .ak-row:last-child { border-bottom: none; }
 .ak-row--head {
   background: var(--surface-2);
-  font-size: 11px; font-weight: 700; color: var(--text-faint);
+  font-size: var(--fs-xs); font-weight: 700; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: .05em;
 }
 .ak-cell { padding: 0 4px; }
 .ak-cell--scopes { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .ak-cell--actions { display: flex; gap: 6px; justify-content: flex-end; }
 .ak-name { font-weight: 600; color: var(--text); }
-.ak-mono { font-family: var(--font-mono); font-size: 12px; color: var(--text); background: var(--surface-2); padding: 1px 6px; border-radius: var(--r-sm); }
-.ak-more { font-size: 11px; color: var(--text-muted); }
-.ak-muted { color: var(--text-muted); font-size: 12px; }
-.ak-time { color: var(--text-muted); white-space: nowrap; font-size: 12px; }
+.ak-mono { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text); background: var(--surface-2); padding: 1px 6px; border-radius: var(--r-sm); }
+.ak-more { font-size: var(--fs-xs); color: var(--text-muted); }
+.ak-muted { color: var(--text-muted); font-size: var(--fs-sm); }
+.ak-time { color: var(--text-muted); white-space: nowrap; font-size: var(--fs-sm); }
 
 /* ── 模态 ── */
 .modal-overlay {
@@ -631,15 +634,15 @@ onMounted(load);
   transition: color var(--motion) var(--ease), background var(--motion) var(--ease);
 }
 .modal-close:hover { color: var(--text); background: var(--surface-2); }
-.modal h3 { margin: 0 0 16px; font-size: 16px; color: var(--text); }
+.modal h3 { margin: 0 0 16px; font-size: var(--fs-lg); color: var(--text); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
 /* ── 表单 ── */
 .form { display: flex; flex-direction: column; gap: 12px; }
-.form-label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.form-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
 .input {
   background: var(--bg); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 8px 10px; color: var(--text); font-size: 13px;
+  border-radius: var(--r-md); padding: 8px 10px; color: var(--text); font-size: var(--fs-base);
 }
 .input:focus { outline: none; border-color: var(--brand); }
 
@@ -650,37 +653,37 @@ onMounted(load);
   border-radius: var(--r-md); padding: 8px 10px;
   min-width: 140px;
 }
-.scope-group__head { font-size: 11px; font-weight: 700; color: var(--text); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+.scope-group__head { font-size: var(--fs-xs); font-weight: 700; color: var(--text); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
 .scope-chip {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 3px 6px; margin: 2px 2px 0 0;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-sm); font-size: 11px; cursor: pointer; color: var(--text);
+  border-radius: var(--r-sm); font-size: var(--fs-xs); cursor: pointer; color: var(--text);
 }
 .scope-chip input { margin: 0; }
 
 /* ── 生成后 Key 展示 ── */
 .key-result { display: flex; flex-direction: column; gap: 10px; }
 .key-warn-icon { color: var(--warn); align-self: flex-start; }
-.key-warn { font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.5; }
+.key-warn { font-size: var(--fs-sm); color: var(--text-muted); margin: 0; line-height: 1.5; }
 .key-box {
   display: flex; align-items: center; gap: 8px;
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: var(--r-md); padding: 10px 12px;
 }
 .key-full {
-  flex: 1; font-family: var(--font-mono); font-size: 12px; color: var(--text);
+  flex: 1; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text);
   word-break: break-all; white-space: pre-wrap;
 }
 
 /* ── 详情面板 ── */
 .detail-content { display: flex; flex-direction: column; gap: var(--sp-4); }
 .detail-section { display: flex; flex-direction: column; gap: 6px; }
-.detail-section__title { font-size: 12px; font-weight: 700; color: var(--text); margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
-.detail-dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12px; }
+.detail-section__title { font-size: var(--fs-sm); font-weight: 700; color: var(--text); margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
+.detail-dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: var(--fs-sm); }
 .detail-dl dt { color: var(--text-muted); }
 .detail-dl dd { color: var(--text); margin: 0; }
-.detail-value { font-size: 13px; color: var(--text); margin: 0 0 8px; }
+.detail-value { font-size: var(--fs-base); color: var(--text); margin: 0 0 8px; }
 .scope-badges { display: flex; flex-wrap: wrap; gap: 4px; }
 
 /* ── 统计摘要 ── */
@@ -689,12 +692,12 @@ onMounted(load);
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: var(--r-md); padding: 8px 10px; text-align: center;
 }
-.stat-item__label { display: block; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
-.stat-item__value { display: block; font-size: 16px; font-weight: 700; color: var(--text); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.stat-item__label { display: block; font-size: var(--fs-2xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.stat-item__value { display: block; font-size: var(--fs-lg); font-weight: 700; color: var(--text); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
 /* ── 柱状图(调用量趋势) ── */
 .chart-block { margin-top: 12px; }
-.chart-block__title { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+.chart-block__title { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
 .bar-chart { display: flex; align-items: flex-end; gap: 2px; height: 60px; }
 .bar-chart__col { flex: 1; display: flex; align-items: flex-end; height: 100%; }
 .bar-chart__bar {
@@ -705,7 +708,7 @@ onMounted(load);
 
 /* ── 状态码分布 ── */
 .dist-rows { display: flex; flex-direction: column; gap: 4px; }
-.dist-row { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 8px; font-size: 11px; }
+.dist-row { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 8px; font-size: var(--fs-xs); }
 .dist-row__label { color: var(--text-muted); font-family: var(--font-mono); }
 .dist-row__bar { height: 8px; background: var(--surface-2); border-radius: var(--r-full); overflow: hidden; }
 .dist-row__fill { height: 100%; border-radius: var(--r-full); transition: width var(--motion) var(--ease); }

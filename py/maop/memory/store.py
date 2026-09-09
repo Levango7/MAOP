@@ -415,8 +415,12 @@ class MemoryStore(SearchMixin):
         if not dry_run and pruned_ids:
             try:
                 with self._connect() as conn:
-                    for eid in pruned_ids:
-                        conn.execute("DELETE FROM memory_entries WHERE id = ?", (eid,))
+                    # 批量删除（单条 SQL 替代循环内 N 次 DELETE，避免 N+1 查询）
+                    placeholders = ",".join("?" * len(pruned_ids))
+                    conn.execute(
+                        f"DELETE FROM memory_entries WHERE id IN ({placeholders})",
+                        pruned_ids,
+                    )
             except Exception as exc:
                 logger.warning("[mem] Prune delete failed: %s", exc)
 

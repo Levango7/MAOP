@@ -39,6 +39,10 @@ def _clean_crl_env(monkeypatch: pytest.MonkeyPatch) -> None:
     # 生产/开发私钥签的——两套 keypair 不兼容,完整性校验会误报。本测试 suite
     # 只关心 license-key 校验,不关心模块 code-signing。
     monkeypatch.setenv("MAOP_SKIP_INTEGRITY", "1")
+    # P1-1 fix 适配: 测试使用临时 keypair，公钥指纹与硬编码的
+    # _DEFAULT_PUBLIC_KEY_FINGERPRINT 不匹配。设置跳过标志以绕过指纹校验
+    # （仅限测试环境，生产环境绝不可设置此变量）。
+    monkeypatch.setenv("MAOP_LICENSE_KEY_FP_SKIP", "1")
 
 _TEST_KEY_DIR = Path(tempfile.mkdtemp(prefix="maop_test_keys_"))
 _TEST_PRIVATE_PATH = _TEST_KEY_DIR / "private.pem"

@@ -458,6 +458,7 @@ class Dispatcher:
         streamer: Any | None = None,
         priority: int = 3,
         deadline_ms: int | None = None,
+        _failover_depth: int = 0,
     ) -> DispatchResult:
         # Phase γ-1: derive SLA tier, log SLA context, and record
         # in-flight gauges. The finally block at the end of this method
@@ -482,6 +483,7 @@ class Dispatcher:
                 streamer=streamer,
                 priority=priority, deadline_ms=deadline_ms,
                 sla_tier=sla_tier,
+                _failover_depth=_failover_depth,
             )
         finally:
             self._record_sla_dispatch_end(priority, sla_tier, deadline_ms=deadline_ms)
@@ -499,6 +501,7 @@ class Dispatcher:
         priority: int = 3,
         deadline_ms: int | None = None,
         sla_tier: str = "standard",
+        _failover_depth: int = 0,
     ) -> DispatchResult:
         """Inner dispatch implementation (Phase γ-1).
 
@@ -582,6 +585,20 @@ class Dispatcher:
 
         # 2. Circuit-breaker check
         if not await self._breaker.ais_available(agent):
+            # P1-11 fix: failover 深度限制，防止递归栈溢出/无限循环
+            _MAX_FAILOVER_DEPTH = 3
+            if _failover_depth >= _MAX_FAILOVER_DEPTH:
+                logger.warning(
+                    "[dispatch] Failover depth %d >= max %d for '%s' — giving up",
+                    _failover_depth, _MAX_FAILOVER_DEPTH, agent,
+                )
+                result = new_result(
+                    agent=agent, task=task,
+                    exit_code=-3,
+                    error=f"Circuit breaker OPEN for '{agent}' and failover depth limit reached ({_failover_depth})",
+                    trace_id=trace_id, routing_key=routing_key,
+                )
+                return DispatchResult(result=result, breaker_tripped=True)
             # Attempt failover to a fallback agent before giving up.
             try:
                 failover = self._breaker.resolve_failover(agent)
@@ -601,6 +618,7 @@ class Dispatcher:
                     timeout_seconds=timeout_seconds, trace_id=trace_id,
                     streamer=streamer,
                     priority=priority, deadline_ms=deadline_ms,
+                    _failover_depth=_failover_depth + 1,  # P1-11 fix: 增加深度
                 )
             result = new_result(
                 agent=agent, task=task,

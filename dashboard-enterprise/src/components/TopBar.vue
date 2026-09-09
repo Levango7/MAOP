@@ -45,10 +45,10 @@
 
     <!-- ③ 布局/主题（用户左侧） -->
     <div class="topbar__prefs">
-      <div class="topbar__pref-group" role="group" :aria-label="t('settings.density')" :title="t('settings.density')">
+      <div class="topbar__pref-group topbar__pref-group--density" role="group" :aria-label="t('settings.density')" :title="t('settings.density')">
         <Segmented :model-value="densityVal" :options="densityOpts" size="sm" @update:model-value="onDensityChange" />
       </div>
-      <div class="topbar__pref-group" role="group" :aria-label="t('settings.theme')" :title="t('settings.theme')">
+      <div class="topbar__pref-group topbar__pref-group--theme" role="group" :aria-label="t('settings.theme')" :title="t('settings.theme')">
         <Segmented :model-value="themeVal" :options="themeOpts" size="sm" @update:model-value="onThemeChange" />
       </div>
     </div>
@@ -230,7 +230,7 @@ onMounted(() => {
 .topbar__brandtext { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
 .topbar__brandname-row { display: flex; align-items: baseline; gap: 8px; }
 .topbar__brandname {
-  font-size: 16px; font-weight: 700; color: var(--text);
+  font-size: var(--fs-lg); font-weight: 700; color: var(--text);
   letter-spacing: -0.012em;
 }
 .topbar__brandedition {
@@ -249,7 +249,7 @@ onMounted(() => {
 }
 .topbar__statusline {
   display: flex; align-items: center; gap: 8px; margin-top: 3px;
-  font-size: 10px; color: var(--text-faint);
+  font-size: var(--fs-2xs); color: var(--text-faint);
 }
 .topbar__live { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
 .topbar__livedot {
@@ -304,7 +304,7 @@ onMounted(() => {
 .topbar__refresh-btn:active { transform: rotate(180deg); }
 .topbar__refreshmeta { display: flex; flex-direction: column; line-height: 1.1; }
 .topbar__refreshtime {
-  font-size: 12px; color: var(--text);
+  font-size: var(--fs-sm); color: var(--text);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
@@ -340,7 +340,7 @@ onMounted(() => {
   width: 34px; height: 34px; flex-shrink: 0;
   border-radius: var(--r-full);
   background: linear-gradient(135deg, var(--brand) 0%, var(--chart-6) 100%);
-  color: var(--brand-contrast); font-size: 13px; font-weight: 700;
+  color: var(--brand-contrast); font-size: var(--fs-base); font-weight: 700;
   display: grid; place-items: center;
   box-shadow: var(--shadow-brand), var(--shadow-inset-highlight);
   font-family: var(--font-sans);
@@ -359,13 +359,13 @@ onMounted(() => {
 }
 .topbar__usermeta { display: flex; flex-direction: column; line-height: 1.2; text-align: left; min-width: 0; }
 .topbar__username {
-  font-size: 13px; font-weight: 600; color: var(--text);
+  font-size: var(--fs-base); font-weight: 600; color: var(--text);
   max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   letter-spacing: -0.005em;
 }
 .topbar__userrole {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 10px; color: var(--brand-strong);
+  font-size: var(--fs-2xs); color: var(--brand-strong);
   font-weight: 600; letter-spacing: .02em;
   margin-top: 1px;
 }
@@ -379,7 +379,7 @@ onMounted(() => {
   padding: 8px 12px;
   background: var(--surface-2); border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
-  color: var(--fail); font-size: 11px;
+  color: var(--fail); font-size: var(--fs-xs);
   font-weight: 600;
   cursor: pointer;
   transition: background var(--motion) var(--ease), border-color var(--motion) var(--ease), transform var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
@@ -401,7 +401,9 @@ onMounted(() => {
 @media (max-width: 900px) {
   .topbar { gap: var(--sp-2); padding: 0 var(--sp-3); }
   .topbar__statusline { display: none; }
-  .topbar__prefs { display: none; }
+  /* 移动端保留主题切换(高使用频次), 仅隐藏密度切换(低使用频次)。
+     修复 P3: 此前整个 .topbar__prefs 被隐藏导致移动端无法切换主题。 */
+  .topbar__pref-group--density { display: none; }
   .topbar__usermeta { display: none; }
   .topbar__logout-text { display: none; }
   .topbar__refresh { padding: 4px; }

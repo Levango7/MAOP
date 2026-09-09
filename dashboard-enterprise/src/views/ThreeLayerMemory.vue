@@ -306,6 +306,6 @@ onMounted(refreshAll);
   padding: 8px 12px; margin-bottom: 16px;
   background: var(--fail-soft); border: 1px solid var(--fail);
   border-radius: var(--r-md); color: var(--fail, #f85149);
-  font-size: 12px; font-family: var(--font-mono); word-break: break-word;
+  font-size: var(--fs-sm); font-family: var(--font-mono); word-break: break-word;
 }
 </style>

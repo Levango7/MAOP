@@ -72,7 +72,7 @@ function formatTime(ts) {
   border-radius: 8px;
   box-shadow: var(--shadow-card);
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .ndp-header {
   display: flex;
@@ -85,7 +85,7 @@ function formatTime(ts) {
 .ndp-header h4 {
   margin: 0;
   flex: 1;
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 .ndp-close {
@@ -119,7 +119,7 @@ function formatTime(ts) {
 }
 .ndp-mono {
   font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .ndp-error .ndp-value { color: var(--fail, #f85149); }
 .ndp-traceback { flex-direction: column; gap: 4px; }
@@ -129,7 +129,7 @@ function formatTime(ts) {
   background: var(--bg-code, #1e293b);
   color: var(--text-code, rgba(148,163,184,.35));
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-family: 'SF Mono', 'Fira Code', monospace;
   overflow-x: auto;
   max-height: 200px;

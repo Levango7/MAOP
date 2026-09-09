@@ -34,6 +34,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         app: Any,
         *,
         public_paths: list[str] | None = None,
+        public_prefix_paths: list[str] | None = None,
         api_key_header: str = "X-API-Key",
         auth_header: str = "Authorization",
         enabled: bool = True,
@@ -45,45 +46,55 @@ class AuthMiddleware(BaseHTTPMiddleware):
             "/api/docs", "/openapi.json",
             "/api/auth/login", "/api/auth/status",
         ]
+        # P0-3 fix: prefix matching is opt-in via an explicit allowlist.
+        # Only paths listed here get subtree exemption (e.g. /api/stream SSE
+        # sub-routes that carry their own _check_sse_token + require_admin).
+        # This prevents /api/auth/login/anything from being exempted just
+        # because /api/auth/login is a public path.
+        self.prefix_public_paths = public_prefix_paths or ["/api/stream"]
         self.api_key_header = api_key_header
         self.auth_header = auth_header
         self.enabled = enabled
 
     def _is_public_path(self, path: str) -> bool:
-        """Exact match, or prefix match for non-root public paths.
+        """Exact match for all public paths; prefix match only for
+        explicitly-listed prefix paths (e.g. /api/stream SSE sub-routes).
 
-        ``"/api/stream"`` therefore also exempts ``/api/stream/agent/{id}``
-        (SSE endpoints that validate their own token via ``_check_sse_token``
-        + ``require_admin`` in the handler). The root ``"/"`` stays exact so
-        no other route is accidentally exempted.
+        P0-3 fix: previously every non-root public path was prefix-matched,
+        so ``/api/auth/login`` being public also exempted
+        ``/api/auth/login/anything`` — an auth bypass. Now only paths in
+        ``self.prefix_public_paths`` get prefix matching; everything else
+        is exact-match only.
         """
-        for p in self.public_paths:
-            if path == p:
-                return True
-            if p != "/" and path.startswith(p.rstrip("/") + "/"):
+        # 精确匹配
+        if path in self.public_paths:
+            return True
+        # 仅对白名单前缀路径做前缀匹配
+        for p in self.prefix_public_paths:
+            if path.startswith(p.rstrip("/") + "/"):
                 return True
         return False
 
     async def _dispatch_disabled(
         self, request: Request, call_next: Callable
     ) -> Response:
-        """Handle the auth-disabled branch: grant anonymous role and pass through.
+        """Handle the auth-disabled branch: grant anonymous READ-ONLY role.
 
-        Security (C-1 fix): default to ``read`` role — NOT ``admin`` — so a
-        misconfigured deployment does not grant anonymous users write access
-        to admin endpoints.  Operators who explicitly want admin role in
-        disabled mode can set ``MAOP_AUTH_DISABLED_ADMIN=1``.
+        Security (P0-4 fix): always ``read`` role — never ``admin``. The
+        previous ``MAOP_AUTH_DISABLED_ADMIN=1`` flag granted anonymous users
+        admin role while auth was disabled, a dangerous misconfiguration
+        footgun. The flag is now DEPRECATED and IGNORED. Operators who need
+        admin access must set MAOP_AUTH_ENABLED=1 and log in normally.
         """
         import os
-        _disabled_admin = os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "0") == "1"
-        if _disabled_admin:
+        # 检测废弃标志并警告
+        if os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "0") == "1":
             logger.warning(
-                "DANGEROUS flag MAOP_AUTH_DISABLED_ADMIN is enabled — auth is "
-                "disabled AND anonymous requests are granted admin role. Never use "
-                "in production or any shared/multi-tenant environment."
+                "MAOP_AUTH_DISABLED_ADMIN is DEPRECATED and IGNORED. "
+                "Auth-disabled mode always grants read-only role. "
+                "Set MAOP_AUTH_ENABLED=1 and log in for admin access."
             )
-        disabled_role = "admin" if _disabled_admin else "read"
-        request.state.auth_roles = [disabled_role]
+        request.state.auth_roles = ["read"]
         request.state.auth_identity = "anonymous"
         return cast(Response, await call_next(request))
 
@@ -200,10 +211,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not self.enabled:
             return await self._dispatch_disabled(request, call_next)
 
-        # Skip public paths — prefix match so subtree endpoints (e.g.
-        # /api/stream/agent/{id}, /api/auth/login/*) inherit the public
-        # status of their mount point. Per-handler auth (require_admin /
-        # _check_sse_token) still applies inside the route.
+        # Skip public paths — exact match for most paths; prefix match only
+        # for opt-in prefix_public_paths (e.g. /api/stream/agent/{id}).
+        # Per-handler auth (require_admin / _check_sse_token) still applies
+        # inside the route. (P0-3 fix: /api/auth/login/* is NO LONGER
+        # exempted — only /api/stream/* is, via prefix_public_paths.)
         path = request.url.path
         if self._is_public_path(path):
             return cast(Response, await call_next(request))

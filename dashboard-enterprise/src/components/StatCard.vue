@@ -113,7 +113,7 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
 .stat__delta-arrow { transform: rotate(-90deg); }
 .stat__delta.is-down .stat__delta-arrow { transform: rotate(90deg); }
 .stat__trends { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
-.trend { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: var(--r-full); line-height: 1.4; white-space: nowrap; }
+.trend { display: inline-flex; align-items: center; gap: 2px; font-size: var(--fs-2xs); font-weight: 700; padding: 1px 6px; border-radius: var(--r-full); line-height: 1.4; white-space: nowrap; }
 .trend.is-up { color: var(--success); background: var(--success-soft); }
 .trend.is-down { color: var(--fail); background: var(--fail-soft); }
 .trend.is-flat { color: var(--text-faint); background: var(--surface-2); }

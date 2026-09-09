@@ -702,12 +702,12 @@ onMounted(() => {
 
 <style scoped>
 .subtitle {
-  font-size: 13px;
+  font-size: var(--fs-base);
   margin-right: auto;
   padding-right: 12px;
 }
 .card-desc {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   margin-bottom: 10px;
 }
 .muted { color: var(--text-muted); }
@@ -738,7 +738,7 @@ onMounted(() => {
 }
 .pending-item__detail {
   grid-column: 1 / 2;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .btn-action {
   grid-row: 1 / 3;
@@ -750,7 +750,7 @@ onMounted(() => {
   background: var(--surface, #fff);
   border-radius: 5px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .btn-action:hover:not(:disabled) {
   background: var(--surface-2, rgba(148,163,184,.16));
@@ -768,7 +768,7 @@ onMounted(() => {
   background: transparent;
   border-radius: 5px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .btn-ghost:hover:not(:disabled) {
   background: var(--surface-2, rgba(148,163,184,.16));
@@ -777,7 +777,7 @@ onMounted(() => {
   opacity: 0.6;
   cursor: progress;
 }
-.btn-sm { padding: 3px 8px; font-size: 12px; }
+.btn-sm { padding: 3px 8px; font-size: var(--fs-sm); }
 
 /* ── 选中周期标签 ─────────────────────────────────────────── */
 .selected-cycle-tag {

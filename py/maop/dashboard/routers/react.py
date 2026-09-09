@@ -6,11 +6,31 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 router = APIRouter(prefix="/api/react", tags=["react"])
+
+
+# ── Pydantic 请求模型 (P2-#4 fix: 输入校验) ────────────────────────
+
+class CreateSnapshotRequest(BaseModel):
+    workdir: str = ""
+    label: str = ""
+
+
+class SaveArtifactRequest(BaseModel):
+    name: str = ""
+    content: str = ""
+    tag: str = ""
+    metadata: dict[str, Any] | None = None
+
+
+class RestoreArtifactRequest(BaseModel):
+    version: int = 1
 
 
 def _get_change_tracker():
@@ -38,12 +58,12 @@ async def list_snapshots(
 
 @router.post("/snapshots")
 @handle_api_errors
-async def create_snapshot(body: dict, request: Request) -> dict[str, Any]:
+async def create_snapshot(body: CreateSnapshotRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_change_tracker()
     snap_id = tracker.snapshot(
-        workdir=body.get("workdir", ""),
-        label=body.get("label", ""),
+        workdir=body.workdir,
+        label=body.label,
     )
     snap = tracker.get_snapshot(snap_id)
     return {"snapshot": snap.model_dump() if snap else None}
@@ -90,14 +110,14 @@ async def list_artifacts(limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]
 
 @router.post("/artifacts")
 @handle_api_errors
-async def save_artifact(body: dict, request: Request) -> dict[str, Any]:
+async def save_artifact(body: SaveArtifactRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     store = _get_artifact_store()
     version = store.save(
-        name=body.get("name", ""),
-        content=body.get("content", ""),
-        tag=body.get("tag", ""),
-        metadata=body.get("metadata"),
+        name=body.name,
+        content=body.content,
+        tag=body.tag,
+        metadata=body.metadata,
     )
     return {"version": version}
 
@@ -108,7 +128,10 @@ async def load_artifact(name: str, version: int | None = Query(None)) -> dict[st
     store = _get_artifact_store()
     content = store.load(name, version=version)
     if content is None:
-        return {"error": "Artifact not found"}
+        return JSONResponse(
+            status_code=404,
+            content={"success": False, "message": "Artifact not found", "data": None},
+        )
     return {"name": name, "content": content}
 
 
@@ -122,10 +145,10 @@ async def artifact_history(name: str, limit: int = Query(20)) -> dict[str, Any]:
 
 @router.post("/artifacts/{name}/restore")
 @handle_api_errors
-async def restore_artifact(name: str, body: dict, request: Request) -> dict[str, Any]:
+async def restore_artifact(name: str, body: RestoreArtifactRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     store = _get_artifact_store()
-    ok = store.restore(name, version=body.get("version", 1))
+    ok = store.restore(name, version=body.version)
     return {"restored": ok}
 
 

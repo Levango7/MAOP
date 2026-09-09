@@ -434,7 +434,7 @@ class TestReactArtifacts:
         store = react_mod._get_artifact_store()
         store.load.return_value = None
         resp = react_client.get("/api/react/artifacts/nonexistent")
-        assert resp.status_code == 200
+        assert resp.status_code == 404
 
     def test_history(self, react_client):
         resp = react_client.get("/api/react/artifacts/a1/history")

@@ -308,6 +308,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { useI18n } from '../i18n';
 import Badge from '../components/Badge.vue';
 import ListPageLayout from '../components/ListPageLayout.vue';
@@ -316,6 +317,7 @@ import AppIcon from '../components/AppIcon.vue';
 const { t } = useI18n();
 const api = useApiStore();
 const toast = useToast();
+const { showConfirm } = useConfirm();
 
 // ── 列表状态 ──────────────────────────────────────────────
 const providers = ref([]);
@@ -423,10 +425,10 @@ function formatRel(ts) {
   const d = new Date(ms);
   if (isNaN(d.getTime())) return '—';
   const diff = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-  if (diff < 60) return diff + 's ago';
-  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-  return Math.floor(diff / 86400) + 'd ago';
+  if (diff < 60) return t('common.secondsAgo', { n: diff });
+  if (diff < 3600) return t('common.minutesAgo', { n: Math.floor(diff / 60) });
+  if (diff < 86400) return t('common.hoursAgo', { n: Math.floor(diff / 3600) });
+  return t('common.daysAgo', { n: Math.floor(diff / 86400) });
 }
 
 // ── 数据加载 ──────────────────────────────────────────────
@@ -691,7 +693,8 @@ async function toggleProvider(p) {
 
 // ── 删除 ──────────────────────────────────────────────────
 async function deleteProvider(p) {
-  if (typeof window !== 'undefined' && window.confirm && !window.confirm(t('view.sso.confirmDelete'))) return;
+  const ok = await showConfirm({ message: t('view.sso.confirmDelete'), tone: 'danger' });
+  if (!ok) return;
   try {
     await api.delete(`/api/v1/sso/providers/${p.id}`);
     toast.success(t('view.sso.deleted'));
@@ -746,12 +749,12 @@ onMounted(load);
   align-items: center;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .sso-row:last-child { border-bottom: none; }
 .sso-row--head {
   background: var(--surface-2);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--text-faint);
   text-transform: uppercase;
@@ -760,9 +763,9 @@ onMounted(load);
 .sso-cell { padding: 0 4px; }
 .sso-cell--name { display: flex; align-items: center; gap: 8px; }
 .sso-name { font-weight: 600; color: var(--text); }
-.sso-tenant { font-size: 11px; }
+.sso-tenant { font-size: var(--fs-xs); }
 .sso-cell--actions { display: flex; gap: 6px; justify-content: flex-end; }
-.sso-status { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.sso-status { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); }
 .sso-status.is-on { color: var(--success); }
 .sso-status.is-off { color: var(--text-faint); }
 
@@ -776,7 +779,7 @@ onMounted(load);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: 7px 12px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
   transition: opacity var(--motion) var(--ease), background var(--motion) var(--ease);
@@ -789,7 +792,7 @@ onMounted(load);
 }
 .btn--primary:hover { opacity: 0.9; }
 .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn--sm { padding: 4px 8px; font-size: 11px; }
+.btn--sm { padding: 4px 8px; font-size: var(--fs-xs); }
 .btn-icon {
   display: grid;
   place-items: center;
@@ -845,11 +848,11 @@ onMounted(load);
   transition: color var(--motion) var(--ease), background var(--motion) var(--ease);
 }
 .sso-dialog-close:hover { color: var(--text); background: var(--surface-2); }
-.sso-dialog h3 { margin: 0 0 16px; font-size: 16px; color: var(--text); }
+.sso-dialog h3 { margin: 0 0 16px; font-size: var(--fs-lg); color: var(--text); }
 
 /* ── 表单 ─────────────────────────────────────────────── */
 .sso-form { display: flex; flex-direction: column; gap: 12px; }
-.sso-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.sso-form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
 .sso-label { font-weight: 600; }
 .sso-input {
   background: var(--bg);
@@ -857,12 +860,12 @@ onMounted(load);
   border-radius: var(--r-md);
   padding: 8px 10px;
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-family: inherit;
 }
 .sso-input:focus { outline: none; border-color: var(--brand); }
 .sso-input:disabled { opacity: 0.6; cursor: not-allowed; }
-.sso-textarea { resize: vertical; font-family: var(--font-mono, monospace); font-size: 12px; }
+.sso-textarea { resize: vertical; font-family: var(--font-mono, monospace); font-size: var(--fs-sm); }
 .req { color: var(--fail); font-style: normal; margin-left: 2px; }
 
 .sso-toggles { display: flex; gap: 20px; }
@@ -871,7 +874,7 @@ onMounted(load);
   flex-direction: row;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .sso-toggle input { margin: 0; width: 16px; height: 16px; }
@@ -887,12 +890,12 @@ onMounted(load);
   gap: 12px;
 }
 .sso-fieldset legend {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--brand-strong);
   padding: 0 6px;
 }
-.sso-fieldset-desc { font-size: 11px; color: var(--text-faint); margin: 0; }
+.sso-fieldset-desc { font-size: var(--fs-xs); color: var(--text-faint); margin: 0; }
 
 /* ── 角色映射表 ───────────────────────────────────────── */
 .sso-role-mapping { display: flex; flex-direction: column; gap: 8px; }
@@ -903,12 +906,12 @@ onMounted(load);
   align-items: center;
   gap: 6px;
 }
-.sso-role-mapping-arrow { color: var(--text-faint); font-size: 14px; }
-.sso-role-mapping-empty { font-size: 11px; color: var(--text-faint); margin: 0; }
+.sso-role-mapping-arrow { color: var(--text-faint); font-size: var(--fs-md); }
+.sso-role-mapping-empty { font-size: var(--fs-xs); color: var(--text-faint); margin: 0; }
 
 /* ── 对话框底部 ───────────────────────────────────────── */
 .sso-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-.sso-form-error { color: var(--fail); font-size: 12px; margin-top: 8px; }
+.sso-form-error { color: var(--fail); font-size: var(--fs-sm); margin-top: 8px; }
 
 /* ── 响应式 ───────────────────────────────────────────── */
 @media (max-width: 760px) {

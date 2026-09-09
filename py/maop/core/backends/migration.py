@@ -30,6 +30,62 @@ from maop.core.backends.db_utils import sqlite_connect
 logger = logging.getLogger(__name__)
 
 
+def _split_sql_statements(sql: str) -> list[str]:
+    """P1-9 fix: 将 SQL 脚本拆分为单条语句列表。
+
+    使用字符级状态机判断语句边界，正确处理多行语句、单引号字符串字面量
+    内嵌的分号、以及 ``--`` 行注释。替代 ``executescript`` 的隐式 commit
+    行为，使逐条 ``execute`` 在事务内运行、失败可回滚。
+
+    块注释 ``/* ... */`` 不在此处特殊处理（migration 文件约定使用 ``--``）。
+    """
+    statements: list[str] = []
+    buffer = ""
+    in_string = False  # 单引号字符串内
+    i = 0
+    n = len(sql)
+    while i < n:
+        ch = sql[i]
+        # 检测行注释 "--"
+        if not in_string and ch == "-" and i + 1 < n and sql[i + 1] == "-":
+            # 跳到行尾
+            j = sql.find("\n", i)
+            if j == -1:
+                # 注释到末尾
+                if buffer.strip():
+                    statements.append(buffer)
+                return statements
+            # 将注释行加入 buffer（保留可读性），然后继续
+            buffer += sql[i:j]
+            i = j
+            continue
+        # 单引号转义（SQL 中用 '' 表示字面量单引号）
+        if ch == "'":
+            if in_string and i + 1 < n and sql[i + 1] == "'":
+                buffer += "''"
+                i += 2
+                continue
+            in_string = not in_string
+            buffer += ch
+            i += 1
+            continue
+        # 分号且不在字符串内 → 语句边界
+        if ch == ";" and not in_string:
+            buffer += ch
+            stmt = buffer.strip()
+            if stmt:
+                statements.append(stmt)
+            buffer = ""
+            i += 1
+            continue
+        buffer += ch
+        i += 1
+    # 末尾残留（无分号结尾的语句）
+    if buffer.strip():
+        statements.append(buffer.strip())
+    return statements
+
+
 class Migration(BaseModel):
     """A single migration step."""
     version: int
@@ -140,7 +196,21 @@ class MigrationManager:
                         f"Migration file may have been tampered with."
                     )
             t0 = time.monotonic()
-            conn.executescript(migration.up_sql)
+            # P1-9 fix: 逐条执行而非 executescript，支持失败回滚。
+            # executescript 会隐式 commit，中途失败时已执行语句无法回滚；
+            # 逐条 execute 在事务内运行，失败时显式 ROLLBACK。
+            statements = _split_sql_statements(migration.up_sql)
+            try:
+                for stmt in statements:
+                    conn.execute(stmt)
+            except Exception as exc:
+                try:
+                    conn.execute("ROLLBACK")
+                except Exception:
+                    pass
+                raise RuntimeError(
+                    f"Migration v{migration.version} failed during execution, rolled back: {exc}"
+                ) from exc
             exec_ms = (time.monotonic() - t0) * 1000
 
             applied_at = datetime.now(timezone.utc).isoformat()
@@ -164,7 +234,19 @@ class MigrationManager:
             raise ValueError(f"Migration v{migration.version} has no down_sql (irreversible)")
 
         with sqlite_connect(self.db_path, wal=True, foreign_keys=False) as conn:
-            conn.executescript(migration.down_sql)
+            # P1-9 fix: 逐条执行 down_sql，失败时回滚（与 apply 对齐）
+            statements = _split_sql_statements(migration.down_sql)
+            try:
+                for stmt in statements:
+                    conn.execute(stmt)
+            except Exception as exc:
+                try:
+                    conn.execute("ROLLBACK")
+                except Exception:
+                    pass
+                raise RuntimeError(
+                    f"Rollback of migration v{migration.version} failed, rolled back: {exc}"
+                ) from exc
             conn.execute("DELETE FROM _migrations WHERE version = ?", (migration.version,))
             logger.info("Rolled back migration v%d: %s", migration.version, migration.name)
 

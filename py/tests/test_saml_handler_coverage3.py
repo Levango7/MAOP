@@ -244,15 +244,18 @@ class TestVerifySignatureBranches:
         handler = _make_handler(saml_idp_cert="dummy")
         # Valid base64 but not a valid DER cert
         bad_cert = base64.b64encode(b"not a cert").decode()
-        with pytest.raises(SSOError, match="cert parse failed"):
-            handler._verify_signature(b"<resp/>", bad_cert)
+        # P1-6 fix 适配: mock _HAS_XMLSEC=True 以到达 cert parse 分支
+        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True):
+            with pytest.raises(SSOError, match="cert parse failed"):
+                handler._verify_signature(b"<resp/>", bad_cert)
 
     def test_xml_parse_failed(self):
         """Cover XML parse failure in verify (400-401)."""
         from maop.enterprise.sso import SSOError
         handler = _make_handler(saml_idp_cert="dummy")
         cert_b64 = base64.b64encode(b"dummy-cert-bytes").decode()
-        with self._patch_cert(), pytest.raises(SSOError, match="XML parse failed"):
+        # P1-6 fix 适配: mock _HAS_XMLSEC=True 以到达 XML parse 分支
+        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="XML parse failed"):
             handler._verify_signature(b"not valid xml <<<>", cert_b64)
 
     def test_no_signature_element(self):
@@ -261,7 +264,8 @@ class TestVerifySignatureBranches:
         handler = _make_handler(saml_idp_cert="dummy")
         cert_b64 = base64.b64encode(b"dummy-cert-bytes").decode()
         xml = b'<Response xmlns="urn:oasis:names:tc:SAML:2.0:protocol"/>'
-        with self._patch_cert(), pytest.raises(SSOError, match="missing.*Signature"):
+        # P1-6 fix 适配: mock _HAS_XMLSEC=True 以到达 Signature 查找分支
+        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="missing.*Signature"):
             handler._verify_signature(xml, cert_b64)
 
     def test_missing_signed_info(self):
@@ -274,7 +278,7 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with self._patch_cert(), pytest.raises(SSOError, match="missing SignedInfo"):
+        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="missing SignedInfo"):
             handler._verify_signature(xml, cert_b64)
 
     def test_missing_reference(self):
@@ -290,7 +294,7 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with self._patch_cert(), pytest.raises(SSOError, match="missing Reference"):
+        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="missing Reference"):
             handler._verify_signature(xml, cert_b64)
 
     def test_missing_digest_value(self):
@@ -308,7 +312,7 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with self._patch_cert(), pytest.raises(SSOError, match="missing DigestValue"):
+        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="missing DigestValue"):
             handler._verify_signature(xml, cert_b64)
 
     def test_digest_value_decode_failed(self):
@@ -327,7 +331,7 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with self._patch_cert(), pytest.raises(SSOError, match="DigestValue base64 decode"):
+        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="DigestValue base64 decode"):
             handler._verify_signature(xml, cert_b64)
 
 
@@ -504,14 +508,16 @@ class TestBuildUserFromSaml:
         user = handler._build_user_from_saml("nameid", attrs)
         assert user.email == "user@example.com"
         assert user.display_name == "Test User"
-        assert "admin" in user.roles
+        # P1-4 fix 适配: admin 在 _DANGEROUS_ROLES 黑名单中被过滤，只剩 user
+        assert "user" in user.roles
         assert user.tenant_id == "t1"
 
     def test_with_empty_attributes(self):
         handler = _make_handler()
-        user = handler._build_user_from_saml("", {})
-        assert user.email == ""
-        assert user.external_id == "saml:unknown"
+        # P1-3 fix 适配: NameID 缺失现在 fail-closed 抛 SSOError，不再降级为 "unknown"
+        from maop.enterprise.sso import SSOError
+        with pytest.raises(SSOError, match="missing NameID"):
+            handler._build_user_from_saml("", {})
 
     def test_with_adfs_claim_uris(self):
         handler = _make_handler()

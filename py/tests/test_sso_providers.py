@@ -590,7 +590,8 @@ class TestAttributeMapping:
             {"sub": "u1", "groups": ["admins", "viewers", "unknown"]},
             {},
         )
-        assert user.roles == ["admin", "viewer", "unknown"]
+        # P1-4 fix 适配: admin 在 _DANGEROUS_ROLES 黑名单中被过滤
+        assert user.roles == ["viewer", "unknown"]
 
     def test_default_role_when_no_roles(self) -> None:
         cfg = SSOConfig(

@@ -311,6 +311,8 @@ class TestHandleCallbackOIDC:
     def test_exchange_code_success_builds_real_session(self, monkeypatch):
         config = _make_oidc_config()
         mgr = SSOManager(config)
+        # P1-2 fix 适配: id_token 验签需要 JWKS，测试环境 mock 验签通过
+        monkeypatch.setattr(mgr, "_verify_id_token", lambda id_token: {})
 
         token_payload = json.dumps({
             "access_token": "AT-abc-123",
@@ -393,7 +395,7 @@ class TestHandleCallbackOIDC:
         assert user.external_id == "oidc:user-42"
         assert user.email == "alice@example.com"
         assert user.display_name == "Alice Lee"
-        assert user.roles == ["admin", "viewer"]
+        assert user.roles == ["viewer"]
         assert user.tenant_id == "tenant-9"
 
     def test_handle_callback_userinfo_failure_is_fatal(self, monkeypatch):
@@ -519,7 +521,7 @@ class TestHandleCallbackOIDC:
 
 
 class TestHandleCallbackSAML:
-    def test_saml_callback_with_valid_response_returns_session(self):
+    def test_saml_callback_with_valid_response_returns_session(self, monkeypatch):
         # SAML 回调：handle_callback 接收 base64 SAMLResponse，返回真实 SSOSession。
         key, cert_b64 = _generate_test_cert()
         config = _make_saml_config(saml_idp_cert=cert_b64)
@@ -528,6 +530,11 @@ class TestHandleCallbackSAML:
         # （_saml_handler 懒初始化，先触发实例化再播种 pending 表）。
         import time as _time
         mgr._get_saml_handler_instance()._pending_request_ids["_authn_request_1"] = _time.time()
+        # P1-6 fix 适配: xmlsec 未安装时签名验证 fail-closed，mock 使其通过
+        monkeypatch.setattr(
+            mgr._get_saml_handler_instance(), "_verify_signature",
+            lambda response_xml, cert_b64: None,
+        )
 
         saml_response_b64 = _build_signed_saml_response(key)
         session = mgr.handle_callback(saml_response_b64, state="relay-state")
@@ -537,7 +544,8 @@ class TestHandleCallbackSAML:
         assert session.user.external_id == "saml:testuser@example.com"
         assert session.user.email == "testuser@example.com"
         assert session.user.display_name == "Test User"
-        assert session.user.roles == ["admin", "viewer"]
+        # P1-4 fix 适配: admin 在 _DANGEROUS_ROLES 黑名单中被过滤
+        assert session.user.roles == ["viewer"]
         assert session.session_id.startswith("sess_")
 
     def test_saml_empty_code_still_raises(self):
@@ -611,7 +619,7 @@ class TestSAMLHandler:
         assert "SAMLRequest=" in url
         assert "RelayState" not in url
 
-    def test_handle_valid_response_returns_session(self):
+    def test_handle_valid_response_returns_session(self, monkeypatch):
         # 有效签名的 SAML Response 应返回 SSOSession
         from maop.enterprise.saml_handler import SAMLHandler
 
@@ -625,6 +633,8 @@ class TestSAMLHandler:
         # pending AuthnRequest ID（模拟 SP 发起过 AuthnRequest）。
         import time as _time
         handler._pending_request_ids["_authn_request_1"] = _time.time()
+        # P1-6 fix 适配: xmlsec 未安装时签名验证 fail-closed，mock 使其通过
+        monkeypatch.setattr(handler, "_verify_signature", lambda response_xml, cert_b64: None)
 
         saml_response_b64 = _build_signed_saml_response(key, audience="maop-sp")
         session = handler.handle_response(saml_response_b64, relay_state="state")
@@ -634,7 +644,8 @@ class TestSAMLHandler:
         assert session.user.external_id == "saml:testuser@example.com"
         assert session.user.email == "testuser@example.com"
         assert session.user.display_name == "Test User"
-        assert session.user.roles == ["admin", "viewer"]
+        # P1-4 fix 适配: admin 在 _DANGEROUS_ROLES 黑名单中被过滤
+        assert session.user.roles == ["viewer"]
         # session 应有过期时间（来自 Conditions.NotOnOrAfter 或默认 8h）
         assert session.expires_at > session.created_at
 
@@ -667,7 +678,7 @@ class TestSAMLHandler:
         with pytest.raises(SSOError, match="signature|digest|verification"):
             handler.handle_response(saml_response_b64)
 
-    def test_handle_response_expired_rejected(self):
+    def test_handle_response_expired_rejected(self, monkeypatch):
         # NotOnOrAfter 已过期 → 抛 SSOError
         from maop.enterprise.saml_handler import SAMLHandler
 
@@ -676,6 +687,8 @@ class TestSAMLHandler:
         handler = SAMLHandler(config)
         import time as _time
         handler._pending_request_ids["_authn_request_1"] = _time.time()
+        # P1-6 fix 适配: mock 签名验证通过，使测试到达 Conditions 校验
+        monkeypatch.setattr(handler, "_verify_signature", lambda response_xml, cert_b64: None)
 
         now = datetime.datetime.now(datetime.timezone.utc)
         saml_response_b64 = _build_signed_saml_response(
@@ -686,7 +699,7 @@ class TestSAMLHandler:
         with pytest.raises(SSOError, match="NotOnOrAfter.*passed|expired"):
             handler.handle_response(saml_response_b64)
 
-    def test_handle_response_future_notbefore_rejected(self):
+    def test_handle_response_future_notbefore_rejected(self, monkeypatch):
         # NotBefore 在未来 → 抛 SSOError
         from maop.enterprise.saml_handler import SAMLHandler
 
@@ -695,6 +708,8 @@ class TestSAMLHandler:
         handler = SAMLHandler(config)
         import time as _time
         handler._pending_request_ids["_authn_request_1"] = _time.time()
+        # P1-6 fix 适配: mock 签名验证通过，使测试到达 Conditions 校验
+        monkeypatch.setattr(handler, "_verify_signature", lambda response_xml, cert_b64: None)
 
         now = datetime.datetime.now(datetime.timezone.utc)
         saml_response_b64 = _build_signed_saml_response(
@@ -705,7 +720,7 @@ class TestSAMLHandler:
         with pytest.raises(SSOError, match="NotBefore.*future"):
             handler.handle_response(saml_response_b64)
 
-    def test_handle_response_wrong_audience_rejected(self):
+    def test_handle_response_wrong_audience_rejected(self, monkeypatch):
         # Audience 不匹配 → 抛 SSOError
         from maop.enterprise.saml_handler import SAMLHandler
 
@@ -715,6 +730,8 @@ class TestSAMLHandler:
         handler = SAMLHandler(config)
         import time as _time
         handler._pending_request_ids["_authn_request_1"] = _time.time()
+        # P1-6 fix 适配: mock 签名验证通过，使测试到达 Conditions 校验
+        monkeypatch.setattr(handler, "_verify_signature", lambda response_xml, cert_b64: None)
 
         saml_response_b64 = _build_signed_saml_response(key, audience="other-sp")
         with pytest.raises(SSOError, match="Audience mismatch"):
@@ -809,7 +826,8 @@ class TestSAMLHandler:
 class TestRolesFromClaims:
     def test_roles_from_list(self):
         mgr = SSOManager(_make_oidc_config())
-        assert mgr._roles_from_claims({"roles": ["admin", "ops"]}) == ["admin", "ops"]
+        # P1-4 fix 适配: admin 在 _DANGEROUS_ROLES 黑名单中被过滤
+        assert mgr._roles_from_claims({"roles": ["admin", "ops"]}) == ["ops"]
 
     def test_role_from_string(self):
         mgr = SSOManager(_make_oidc_config())

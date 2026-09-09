@@ -240,12 +240,12 @@ onMounted(load);
   min-width: 0;
 }
 .coming-soon-banner__title {
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--info-strong, #79c0ff);
 }
 .coming-soon-banner__desc {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   line-height: 1.5;
 }
@@ -278,7 +278,7 @@ onMounted(load);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: 8px 10px 8px 32px;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text);
 }
 .search-box__input:focus { outline: none; border-color: var(--brand); }
@@ -287,7 +287,7 @@ onMounted(load);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text);
   cursor: pointer;
   min-width: 160px;
@@ -318,7 +318,7 @@ onMounted(load);
   min-width: 0;
 }
 .install-row__name {
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--text);
   overflow: hidden;
@@ -330,12 +330,12 @@ onMounted(load);
 .btn {
   display: inline-flex; align-items: center; gap: 5px;
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 7px 12px; font-size: 12px; font-weight: 600;
+  border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
 .btn:hover { opacity: .9; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn--primary { background: var(--brand); color: var(--brand-contrast); border: none; }
 .btn--ghost { background: transparent; }
-.btn--sm { padding: 4px 8px; font-size: 11px; }
+.btn--sm { padding: 4px 8px; font-size: var(--fs-xs); }
 </style>

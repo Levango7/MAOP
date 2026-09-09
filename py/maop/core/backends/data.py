@@ -75,6 +75,23 @@ CREATE TABLE IF NOT EXISTS error_log (
   trace_id TEXT,
   duration_ms INT
 );
+
+-- P2-#9 fix: 索引以加速常用查询（按 agent / timestamp / trace_id 过滤与排序）
+CREATE INDEX IF NOT EXISTS idx_delegations_agent ON delegations(agent);
+CREATE INDEX IF NOT EXISTS idx_delegations_timestamp ON delegations(timestamp);
+CREATE INDEX IF NOT EXISTS idx_delegations_trace_id ON delegations(trace_id);
+CREATE INDEX IF NOT EXISTS idx_delegations_routing_key ON delegations(routing_key);
+
+CREATE INDEX IF NOT EXISTS idx_metrics_agent ON metrics(agent);
+CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp);
+CREATE INDEX IF NOT EXISTS idx_metrics_metric_name ON metrics(metric_name);
+
+CREATE INDEX IF NOT EXISTS idx_checkpoints_agent ON checkpoints(agent);
+CREATE INDEX IF NOT EXISTS idx_checkpoints_task ON checkpoints(task);
+
+CREATE INDEX IF NOT EXISTS idx_error_log_agent ON error_log(agent);
+CREATE INDEX IF NOT EXISTS idx_error_log_timestamp ON error_log(timestamp);
+CREATE INDEX IF NOT EXISTS idx_error_log_trace_id ON error_log(trace_id);
 """
 
 

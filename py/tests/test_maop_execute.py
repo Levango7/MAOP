@@ -244,7 +244,7 @@ class TestReactMode:
             "maop.core.agent.llm_chat.react_loop.ReactLoop", return_value=mock_loop
         ), patch(
             "maop.core.agent.llm_chat.react_loop.ReactConfig"
-        ):
+        ), patch("maop.core.security.permission.PermissionManager", return_value=_mock_perm_allow()):
             result = await execute(
                 agent="test", task="do something",
                 react_mode=True, react_max_iterations=5,
@@ -258,7 +258,7 @@ class TestReactMode:
         with patch(
             "maop.core.agent.llm_chat.react_loop.ReactLoop",
             side_effect=ImportError("no react loop"),
-        ):
+        ), patch("maop.core.security.permission.PermissionManager", return_value=_mock_perm_allow()):
             result = await execute(
                 agent="test", task="do something",
                 react_mode=True,
@@ -291,7 +291,7 @@ class TestReactMode:
             "maop.core.agent.llm_chat.react_loop.ReactLoop", return_value=mock_loop
         ), patch(
             "maop.core.agent.llm_chat.react_loop.ReactConfig"
-        ):
+        ), patch("maop.core.security.permission.PermissionManager", return_value=_mock_perm_allow()):
             result = await execute(delegate=delegate)
         assert result.exit_code == 0
 
