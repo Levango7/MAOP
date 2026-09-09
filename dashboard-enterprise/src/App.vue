@@ -239,7 +239,7 @@ async function doLogin() {
       loginPassword.value = '';
       if (typeof window !== 'undefined' && window.location) window.location.reload();
     } else {
-      loginError.value = data.error || 'Login failed';
+      loginError.value = data.error || t('auth.loginFailed');
     }
   } catch (e) {
     loginError.value = e.message || t('auth.networkError');

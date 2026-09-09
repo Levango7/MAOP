@@ -24,7 +24,7 @@
         </tr>
       </thead>
         <tbody>
-        <tr v-for="(row, i) in sortedRows" :key="rowKey ? row[rowKey] : i" :class="{ 'is-clickable': clickable }" @click="onRowClick(row)">
+        <tr v-for="(row, i) in pagedData" :key="rowKey ? row[rowKey] : i" :class="{ 'is-clickable': clickable }" @click="onRowClick(row)">
           <td v-for="col in cols" :key="col.key" :style="{ textAlign: col.align || 'left' }">
             <Badge v-if="col.type === 'badge'" :tone="badgeTone(col, row)">{{ row[col.key] }}</Badge>
             <span v-else-if="col.type === 'bool-icon'" class="dt__bool" :class="row[col.key] ? 'is-true' : 'is-false'" :aria-label="row[col.key] ? t('a11y.yes') : t('a11y.no')">
@@ -45,11 +45,30 @@
         <Skeleton v-for="c in cols.length" :key="c" height="12px" />
       </div>
     </div>
+    <!-- 分页控件: pageSize > 0 且多页时显示。
+         ‹/› 为通用排版符号(非英文), 页码格式 "当前页 / 总页数"。
+         下一页 aria-label 复用已有 i18n key action.next, 避免新增 key。 -->
+    <div v-if="showPager" class="dt__pager" role="navigation">
+      <button
+        class="dt__pager-btn"
+        type="button"
+        :disabled="currentPage === 1"
+        @click="goPrev"
+      >‹</button>
+      <span class="dt__pager-info">{{ currentPage }} / {{ totalPages }}</span>
+      <button
+        class="dt__pager-btn"
+        type="button"
+        :disabled="currentPage === totalPages"
+        :aria-label="t('action.next')"
+        @click="goNext"
+      >›</button>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import AppIcon from './AppIcon.vue';
 import Badge from './Badge.vue';
 import Skeleton from './Skeleton.vue';
@@ -64,6 +83,8 @@ const props = defineProps({
   sortable: { type: Boolean, default: false },
   compact: { type: Boolean, default: false },
   clickable: { type: Boolean, default: false },
+  // 分页: pageSize <= 0 时不分页(向后兼容, 显示全部数据)
+  pageSize: { type: Number, default: 0 },
 });
 
 const emit = defineEmits(['row-click']);
@@ -107,6 +128,28 @@ const sortedRows = computed(() => {
   });
   return arr;
 });
+
+// ── 分页 (迭代 C: 大数据集客户端分页) ───────────────────────────────
+// pageSize <= 0 时不分页, 显示全部数据(向后兼容)。
+// currentPage 越界(数据减少/筛选后)自动回正, 避免空页。
+const currentPage = ref(1);
+const total = computed(() => sortedRows.value.length);
+const totalPages = computed(() => props.pageSize > 0 ? Math.max(1, Math.ceil(total.value / props.pageSize)) : 1);
+const showPager = computed(() => props.pageSize > 0 && totalPages.value > 1);
+
+// 数据减少时当前页可能越界 → 自动回正到末页
+watch(totalPages, (tp) => {
+  if (currentPage.value > tp) currentPage.value = tp;
+});
+
+const pagedData = computed(() => {
+  if (props.pageSize <= 0) return sortedRows.value;
+  const start = (currentPage.value - 1) * props.pageSize;
+  return sortedRows.value.slice(start, start + props.pageSize);
+});
+
+function goPrev() { if (currentPage.value > 1) currentPage.value -= 1; }
+function goNext() { if (currentPage.value < totalPages.value) currentPage.value += 1; }
 
 function labelize(k) {
   return k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -175,4 +218,43 @@ function formatRel(ts) {
 .dt__empty { text-align: center; color: var(--text-faint); padding: var(--sp-6); }
 .dt__skeleton { padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-3); }
 .dt__sk-row { display: grid; gap: var(--sp-3); }
+/* ── 分页控件 ── */
+.dt__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-top: 1px solid var(--border-subtle, var(--border));
+}
+.dt__pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+  cursor: pointer;
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease), border-color var(--motion) var(--ease);
+}
+.dt__pager-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.dt__pager-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.dt__pager-info {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 60px;
+  text-align: center;
+}
 </style>

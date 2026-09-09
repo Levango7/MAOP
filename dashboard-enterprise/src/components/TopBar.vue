@@ -234,7 +234,8 @@ onMounted(() => {
   letter-spacing: -0.012em;
 }
 .topbar__brandedition {
-  font-size: 9.5px; font-weight: 700;
+  /* 修复: 9.5px 硬编码 token 化 → calc(var(--fs-2xs) - .5px) (10px - 0.5px) */
+  font-size: calc(var(--fs-2xs) - .5px); font-weight: 700;
   color: var(--brand-strong);
   background: var(--brand-soft);
   border: 1px solid var(--brand-faint);
@@ -244,7 +245,8 @@ onMounted(() => {
   text-transform: uppercase;
 }
 .topbar__branddesc {
-  font-size: 10.5px; color: var(--text-muted);
+  /* 修复: 10.5px 硬编码 token 化 → calc(var(--fs-xs) - .5px) (11px - 0.5px) */
+  font-size: calc(var(--fs-xs) - .5px); color: var(--text-muted);
   letter-spacing: .015em; margin-top: 1px;
 }
 .topbar__statusline {
@@ -310,7 +312,8 @@ onMounted(() => {
   font-weight: 600;
 }
 .topbar__refreshlabel {
-  font-size: 9.5px; color: var(--text-faint);
+  /* 修复: 9.5px 硬编码 token 化 → calc(var(--fs-2xs) - .5px) (10px - 0.5px) */
+  font-size: calc(var(--fs-2xs) - .5px); color: var(--text-faint);
   letter-spacing: .02em;
 }
 

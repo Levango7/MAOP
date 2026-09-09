@@ -204,8 +204,9 @@ async def create_provider(request: Request, body: dict[str, Any]) -> dict[str, A
     try:
         resp = reg.store.create(payload)
     except ValueError as exc:
-        # 名称冲突
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        # 批次3A: 脱敏——名称冲突细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] Provider create name conflict: %s", exc)
+        raise HTTPException(status_code=409, detail="SSO provider name conflict") from exc
     reg.invalidate(resp.id)
     _audit(request, "sso.provider.create", resource=f"provider:{resp.id}", detail=resp.name)
     return {"status": "ok", "provider": reg.to_masked_response(resp)}
@@ -279,7 +280,9 @@ async def update_provider(
     try:
         resp = reg.store.update(provider_id, payload)
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        # 批次3A: 脱敏——更新冲突细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] Provider update conflict: %s", exc)
+        raise HTTPException(status_code=409, detail="SSO provider update conflict") from exc
     if resp is None:
         raise HTTPException(
             status_code=404,
@@ -320,7 +323,9 @@ async def test_provider(request: Request, provider_id: int) -> dict[str, Any]:
     try:
         result = reg.test_connection(provider_id)
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——KeyError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] Provider test not found: %s", exc)
+        raise HTTPException(status_code=404, detail="SSO provider not found") from exc
     _audit(
         request,
         "sso.provider.test",
@@ -339,9 +344,13 @@ async def get_provider_metadata(request: Request, provider_id: int) -> Any:
     try:
         xml = reg.get_sp_metadata(provider_id)
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——KeyError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] Metadata provider not found: %s", exc)
+        raise HTTPException(status_code=404, detail="SSO provider not found") from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # 批次3A: 脱敏——ValueError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] Metadata invalid request: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid SAML metadata request") from exc
     return PlainTextResponse(content=xml, media_type="application/xml")
 
 
@@ -359,9 +368,13 @@ async def oidc_login(request: Request, provider_id: int, state: str = "") -> Any
     try:
         url, _state = reg.prepare_oidc_authorize(provider_id, state=state)
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——KeyError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] OIDC login provider not found: %s", exc)
+        raise HTTPException(status_code=404, detail="SSO provider not found") from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # 批次3A: 脱敏——ValueError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] OIDC login invalid request: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid OIDC login request") from exc
     return RedirectResponse(url=url, status_code=302)
 
 
@@ -403,16 +416,19 @@ async def oidc_callback(
             result="failure",
             detail=str(exc),
         )
+        # 批次3A: 脱敏——回调错误细节不暴露给客户端，仅审计日志记录。
         return JSONResponse(
             status_code=400,
             content={
                 "status": "error",
-                "error": str(exc),
+                "error": "SSO callback error",
                 "code": "SSO_CALLBACK_ERROR",
             },
         )
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——KeyError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] OIDC callback provider not found: %s", exc)
+        raise HTTPException(status_code=404, detail="SSO provider not found") from exc
     except Exception as exc:
         _audit(
             request,
@@ -421,11 +437,12 @@ async def oidc_callback(
             result="failure",
             detail=str(exc),
         )
+        # 批次3A: 脱敏——token exchange 错误细节不暴露给客户端，仅审计日志记录。
         return JSONResponse(
             status_code=401,
             content={
                 "status": "error",
-                "error": str(exc),
+                "error": "SSO token exchange failed",
                 "code": "SSO_TOKEN_EXCHANGE_FAILED",
             },
         )
@@ -457,9 +474,13 @@ async def saml_login(request: Request, provider_id: int, relay_state: str = "") 
     try:
         url, _rs = reg.prepare_saml_authorize(provider_id, relay_state=relay_state)
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——KeyError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] SAML login provider not found: %s", exc)
+        raise HTTPException(status_code=404, detail="SSO provider not found") from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # 批次3A: 脱敏——ValueError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] SAML login invalid request: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid SAML login request") from exc
     return RedirectResponse(url=url, status_code=302)
 
 
@@ -487,7 +508,9 @@ async def saml_acs(
             relay_state=body.RelayState,
         )
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——KeyError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] SAML ACS provider not found: %s", exc)
+        raise HTTPException(status_code=404, detail="SSO provider not found") from exc
     except Exception as exc:
         # SAML 验证失败（签名/Conditions/Audience）→ 403
         from maop.enterprise.sso import SSOError
@@ -499,19 +522,21 @@ async def saml_acs(
             detail=str(exc),
         )
         if isinstance(exc, SSOError):
+            # 批次3A: 脱敏——签名错误细节不暴露给客户端，仅审计日志记录。
             return JSONResponse(
                 status_code=403,
                 content={
                     "status": "error",
-                    "error": str(exc),
+                    "error": "SAML signature verification failed",
                     "code": "SSO_SIGNATURE_INVALID",
                 },
             )
+        # 批次3A: 脱敏——ACS 错误细节不暴露给客户端，仅审计日志记录。
         return JSONResponse(
             status_code=400,
             content={
                 "status": "error",
-                "error": str(exc),
+                "error": "SAML ACS processing error",
                 "code": "SSO_CALLBACK_ERROR",
             },
         )

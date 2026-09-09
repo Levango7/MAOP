@@ -415,14 +415,24 @@ class MemoryStore(SearchMixin):
         if not dry_run and pruned_ids:
             try:
                 with self._connect() as conn:
-                    # 批量删除（单条 SQL 替代循环内 N 次 DELETE，避免 N+1 查询）
-                    placeholders = ",".join("?" * len(pruned_ids))
-                    conn.execute(
-                        f"DELETE FROM memory_entries WHERE id IN ({placeholders})",
-                        pruned_ids,
-                    )
+                    # 批量删除（单条 SQL 替代循环内 N 次 DELETE，避免 N+1 查询）。
+                    # 修复: 分 chunk 执行，每 chunk 最多 CHUNK_SIZE 个参数，
+                    # 防止参数数量超过 SQLite 限制（默认 999）导致
+                    # "too many SQL variables" 错误。
+                    CHUNK_SIZE = 500  # 留余量，SQLite 默认限制 999
+                    for i in range(0, len(pruned_ids), CHUNK_SIZE):
+                        chunk = pruned_ids[i:i + CHUNK_SIZE]
+                        placeholders = ",".join("?" * len(chunk))
+                        conn.execute(
+                            f"DELETE FROM memory_entries WHERE id IN ({placeholders})",
+                            chunk,
+                        )
             except Exception as exc:
                 logger.warning("[mem] Prune delete failed: %s", exc)
+                # 修复: DELETE 失败时返回空列表，避免调用方误认为删除成功。
+                # 原实现只记录 warning 但仍返回 pruned_ids，调用方无法区分
+                # 删除成功与失败，可能基于错误的返回值做后续决策。
+                pruned_ids = []
 
         logger.info("[mem] Pruned %d entries (ttl=%d days, dry_run=%s)",
                      len(pruned_ids), ttl_days, dry_run)

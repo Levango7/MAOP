@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Request
+from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -15,6 +16,32 @@ from .state import MAOP_ROOT
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ── Pydantic 请求模型 (批次3A: 输入校验) ───────────────────────────
+class EvolveAnalyzeRequest(BaseModel):
+    """POST /api/evolve/analyze 请求体。"""
+    action: str = ""
+    suggestion_id: str = ""
+    hours: int = 24
+
+
+class EvolutionLoopTriggerRequest(BaseModel):
+    """POST /api/evolution/loop/trigger 请求体。"""
+    dry_run: bool = True
+
+
+class EvolutionApprovalDecisionRequest(BaseModel):
+    """POST /api/evolution/approvals/{approval_id}/decision 请求体。"""
+    decision: str = ""
+    approved_by: str = "admin"
+    reason: str = ""
+
+
+class EvolutionLoopRollbackRequest(BaseModel):
+    """POST /api/evolution/loop/rollback 请求体。"""
+    cycle_id: str = ""
+    snapshot_id: str = ""
 
 @router.get("/api/evolve/status")
 @handle_api_errors("Evolve status", error_value={"status": "error", "error": "Evolve status unavailable"})
@@ -120,18 +147,15 @@ async def api_evolve_metrics() -> dict[str, Any]:
 
 @router.post("/api/evolve/analyze")
 @handle_api_errors("Evolve analyze", error_value={"status": "error", "error": "Evolve analyze unavailable"})
-async def api_evolve_analyze(request: Request) -> dict[str, Any]:
+async def api_evolve_analyze(request: Request, body: EvolveAnalyzeRequest) -> dict[str, Any]:
+    # 批次3A: 用 Pydantic EvolveAnalyzeRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（action/suggestion_id/hours 字段类型）。
     require_admin(request)
     from maop.evolve import EvolveEngine
     eng = EvolveEngine(root_dir=str(MAOP_ROOT))
-    action = ""
-    try:
-        body = await request.json()
-        action = body.get("action", "")
-    except Exception:
-        logger.debug("Failed to parse request body", exc_info=True)
+    action = body.action
     if action == "apply":
-        suggestion_id = body.get("suggestion_id", "")
+        suggestion_id = body.suggestion_id
         try:
             result: Any = eng.apply(suggestion_id) if hasattr(eng, "apply") else eng.analyze()
         except TypeError:
@@ -147,7 +171,7 @@ async def api_evolve_analyze(request: Request) -> dict[str, Any]:
         return {"status": "ok", "action": "reset", "msg": "Suggestions cleared"}
     elif action == "auto_evolve":
         try:
-            hours = body.get("hours", 24)
+            hours = body.hours
             result = eng.auto_evolve(hours=hours) if hasattr(eng, "auto_evolve") else eng.analyze()
         except Exception as exc:
             logger.warning("auto_evolve failed: %s", exc, exc_info=True)
@@ -321,13 +345,14 @@ async def api_evolution_loop_status() -> dict[str, Any]:
 
 @router.post("/api/evolution/loop/trigger")
 @handle_api_errors("Evolution loop trigger", error_value={"status": "error", "error": "Trigger failed"})
-async def api_evolution_loop_trigger(request: Request) -> dict[str, Any]:
+async def api_evolution_loop_trigger(request: Request, body: EvolutionLoopTriggerRequest) -> dict[str, Any]:
     """手动触发一轮闭环（支持 dry_run）（AC-07）."""
+    # 批次3A: 用 Pydantic EvolutionLoopTriggerRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（dry_run 字段类型）。
     require_admin(request)
     from maop.core.evolution.evolution_loop import EvolutionLoop
 
-    body = await request.json()
-    dry_run = body.get("dry_run", True)
+    dry_run = body.dry_run
 
     try:
         loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
@@ -372,12 +397,14 @@ async def api_evolution_approvals() -> dict[str, Any]:
 
 @router.post("/api/evolution/approvals/{approval_id}/decision")
 @handle_api_errors("Evolution approval decision", error_value={"status": "error", "error": "Decision failed"})
-async def api_evolution_approval_decision(approval_id: str, request: Request) -> dict[str, Any]:
+async def api_evolution_approval_decision(approval_id: str, request: Request, body: EvolutionApprovalDecisionRequest) -> dict[str, Any]:
     """审批通过 / 拒绝 (AC-07).
 
     approval_id 格式：cycle_id:suggestion_id
     body: {"decision": "approve"|"reject", "approved_by": "username", "reason": "..."}
     """
+    # 批次3A: 用 Pydantic EvolutionApprovalDecisionRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（decision/approved_by/reason 字段类型）。
     require_admin(request)
 
     try:
@@ -385,10 +412,9 @@ async def api_evolution_approval_decision(approval_id: str, request: Request) ->
     except ValueError:
         return {"status": "error", "error": "Invalid approval_id format (cycle_id:suggestion_id)"}
 
-    body = await request.json()
-    decision = body.get("decision", "").lower()
-    approved_by = body.get("approved_by", "admin")
-    reason = body.get("reason", "")
+    decision = body.decision.lower()
+    approved_by = body.approved_by
+    reason = body.reason
 
     if decision not in ("approve", "reject"):
         return {"status": "error", "error": "decision must be 'approve' or 'reject'"}
@@ -466,17 +492,18 @@ async def api_evolution_ab_results(cycle_id: str) -> dict[str, Any]:
 
 @router.post("/api/evolution/loop/rollback")
 @handle_api_errors("Evolution loop rollback", error_value={"status": "error", "error": "Rollback failed"})
-async def api_evolution_loop_rollback(request: Request) -> dict[str, Any]:
+async def api_evolution_loop_rollback(request: Request, body: EvolutionLoopRollbackRequest) -> dict[str, Any]:
     """手动触发回滚 (AC-05).
 
     body: {"cycle_id": "...", "snapshot_id": "..."} (snapshot_id 可选)
     """
+    # 批次3A: 用 Pydantic EvolutionLoopRollbackRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（cycle_id/snapshot_id 字段类型）。
     require_admin(request)
     from maop.core.evolution.evolution_loop import EvolutionLoop
 
-    body = await request.json()
-    cycle_id = body.get("cycle_id", "")
-    snapshot_id = body.get("snapshot_id", "")
+    cycle_id = body.cycle_id
+    snapshot_id = body.snapshot_id
 
     if not cycle_id:
         return {"status": "error", "error": "cycle_id required"}

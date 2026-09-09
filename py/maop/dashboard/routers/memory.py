@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
 from maop.core.backends.db_utils import get_db_path
 from maop.core.security.middleware import require_admin
@@ -18,6 +19,28 @@ from .state import MAOP_ROOT
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ── Pydantic 请求模型 (批次3A: 输入校验) ───────────────────────────
+class NeuralAttentionRequest(BaseModel):
+    """POST /api/neural/attention 请求体。"""
+    query: str = ""
+    top_k: int = 10
+
+
+class MemoryStoreRequest(BaseModel):
+    """POST /api/memory/store 请求体。
+
+    Body: { layer: "working"|"episodic"|"semantic", content: str,
+            agent?: str, topic?: str, task?: str, tags?: str|list, ttl_s?: int }
+    """
+    layer: str = "episodic"
+    content: str = ""
+    agent: str = "admin"
+    topic: str = ""
+    task: str = ""
+    tags: str | list[str] | None = None
+    ttl_s: int | None = None
 
 def _request_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", "")
@@ -275,11 +298,12 @@ async def api_neural_status() -> dict[str, Any]:
 
 @router.post("/api/neural/attention")
 @handle_api_errors("Neural attention", error_value={"results": [], "attention_weights": [], "error": "Neural attention unavailable"})
-async def api_neural_attention(request: Request) -> dict[str, Any]:
+async def api_neural_attention(request: Request, body: NeuralAttentionRequest) -> dict[str, Any]:
+    # 批次3A: 用 Pydantic NeuralAttentionRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（query/top_k 字段类型）。
     require_admin(request)
-    body = await request.json()
-    query = body.get("query", "")
-    top_k = body.get("top_k", 10)
+    query = body.query
+    top_k = body.top_k
     if not query:
         raise HTTPException(400, "missing query")
     from maop.memory.store import MemoryStore
@@ -330,22 +354,23 @@ async def api_neural_attention_get(q: str = "") -> dict[str, Any]:
 # ── Memory Write (manual entry) ────────────────────────────────────────
 @router.post("/api/memory/store")
 @handle_api_errors("Memory store", error_value={"status": "error", "error": "Failed to store memory", "id": None})
-async def api_memory_store(request: Request) -> dict[str, Any]:
+async def api_memory_store(request: Request, body: MemoryStoreRequest) -> dict[str, Any]:
     """Write a manual memory entry into the three-layer system.
     Body: { layer: "working"|"episodic"|"semantic", content: str,
             agent?: str, topic?: str, task?: str, tags?: str, ttl_s?: int }
     """
+    # 批次3A: 用 Pydantic MemoryStoreRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体字段类型。
     require_admin(request)
-    body = await request.json()
-    layer = body.get("layer", "episodic")
-    content = body.get("content", "").strip()
+    layer = body.layer
+    content = body.content.strip()
     if not content:
         raise HTTPException(400, "content is required")
 
     try:
         # T3: 收敛到 MemoryFacade（mode="agent"），store 按 layer 路由到同一底层。
         from maop.memory.facade import MemoryFacade
-        raw_tags = body.get("tags")
+        raw_tags = body.tags
         if isinstance(raw_tags, str):
             tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
         elif isinstance(raw_tags, (list, tuple)):
@@ -356,11 +381,11 @@ async def api_memory_store(request: Request) -> dict[str, Any]:
         entry_id = mem.store(
             layer=layer,
             content=content,
-            agent=body.get("agent", "admin"),
-            topic=body.get("topic", ""),
-            task=body.get("task", ""),
+            agent=body.agent,
+            topic=body.topic,
+            task=body.task,
             tags=tags,
-            ttl_s=body.get("ttl_s"),
+            ttl_s=body.ttl_s,
         )
         return {"status": "ok", "id": entry_id, "layer": layer}
     except Exception as exc:

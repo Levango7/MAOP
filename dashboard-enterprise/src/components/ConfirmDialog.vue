@@ -8,15 +8,15 @@
     @click.self="onCancel"
   >
     <div class="confirm-dialog" @keydown.esc="onCancel">
-      <div v-if="confirmState.title" class="confirm-title">{{ confirmState.title }}</div>
-      <div class="confirm-message">{{ confirmState.message }}</div>
-      <div class="confirm-actions">
-        <button class="btn-cancel" @click="onCancel">
+      <div v-if="confirmState.title" class="confirm-dialog__title">{{ confirmState.title }}</div>
+      <div class="confirm-dialog__message">{{ confirmState.message }}</div>
+      <div class="confirm-dialog__actions">
+        <button class="confirm-dialog__cancel" @click="onCancel">
           {{ confirmState.cancelText || t('common.cancel') }}
         </button>
         <button
-          class="btn-confirm"
-          :class="'btn-confirm--' + confirmState.tone"
+          class="confirm-dialog__confirm"
+          :class="'confirm-dialog__confirm--' + confirmState.tone"
           @click="onConfirm"
         >
           {{ confirmState.confirmText || t('common.confirm') }}
@@ -59,52 +59,52 @@ function onCancel() { resolve(false); }
   flex-direction: column;
   gap: var(--sp-3);
 }
-.confirm-title {
+.confirm-dialog__title {
   font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--text);
 }
-.confirm-message {
+.confirm-dialog__message {
   font-size: var(--fs-base);
   line-height: 1.5;
   color: var(--text-muted);
 }
-.confirm-actions {
+.confirm-dialog__actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--sp-2);
   margin-top: var(--sp-2);
 }
-.btn-cancel,
-.btn-confirm {
+.confirm-dialog__cancel,
+.confirm-dialog__confirm {
   padding: var(--sp-2) var(--sp-4);
   border-radius: var(--r-md);
   font-size: var(--fs-base);
   cursor: pointer;
   transition: background var(--motion) var(--ease);
 }
-.btn-cancel {
+.confirm-dialog__cancel {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-muted);
 }
-.btn-cancel:hover {
+.confirm-dialog__cancel:hover {
   background: var(--bg-hover);
 }
-.btn-confirm {
+.confirm-dialog__confirm {
   border: none;
   color: var(--brand-contrast);
 }
-.btn-confirm--danger {
+.confirm-dialog__confirm--danger {
   background: var(--fail);
 }
-.btn-confirm--danger:hover {
+.confirm-dialog__confirm--danger:hover {
   background: var(--fail-strong);
 }
-.btn-confirm--info {
+.confirm-dialog__confirm--info {
   background: var(--brand);
 }
-.btn-confirm--info:hover {
+.confirm-dialog__confirm--info:hover {
   background: var(--brand-strong);
 }
 </style>

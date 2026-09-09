@@ -146,8 +146,12 @@ import DOMPurify from 'dompurify';
 import { useI18n } from '../i18n';
 import { useConfirm } from '../composables/useConfirm.js';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const { showConfirm } = useConfirm();
+// 修复: 将 i18n locale ('en'/'zh') 映射为 BCP 47 tag, 替代硬编码 'en-US'
+function bcp47Locale() {
+  return locale.value === 'zh' ? 'zh-CN' : 'en-US';
+}
 // 嵌入式模式: 作为 Run.vue 的 Tab 子视图时, 隐藏自身 PageHeader
 defineProps({
   embedded: { type: Boolean, default: false },
@@ -213,7 +217,7 @@ function fmtDate(iso) {
   if (isNaN(d.getTime())) return '';
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();
-  const hhmm = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const hhmm = d.toLocaleTimeString(bcp47Locale(), { hour: '2-digit', minute: '2-digit' });
   return sameDay ? hhmm : `${d.toLocaleDateString()} ${hhmm}`;
 }
 function sessionTitle(s) {
@@ -326,7 +330,8 @@ function onEnter(e) {
 }
 
 function now() {
-  return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  // 修复: 硬编码 'en-US' 替换为从 i18n locale 派生的 BCP 47 tag
+  return new Date().toLocaleTimeString(bcp47Locale(), { hour: '2-digit', minute: '2-digit' });
 }
 
 async function sendMessage(overrideText) {

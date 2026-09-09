@@ -434,7 +434,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: all .15s ease;
+  transition: all var(--motion-fast) var(--ease);  /* P3: 原硬编码 .15s ease → motion token */
   /* Fixed width: buttons keep the same size regardless of label language.
      "Personal"(8ch) is the longest EN label; "企业版"(3 CJK) is the longest ZH.
      96px comfortably fits both with consistent padding. */
@@ -454,6 +454,23 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .switch-fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
 .switch-fields .field { margin-bottom: 0; }
 .switch-fields .field > label { display: block; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: var(--sp-2); }
+/* ── Global select arrow (P3: 修复 select 箭头颜色遗漏 4 处) ──────────────
+ * 原先仅 .switch-select 和 .chat-header__actions select 设置了主题感知箭头
+ * (--icon-chevron), 其余裸 select 元素(如 Observability/Settings/Filter 等)
+ * 保留浏览器默认箭头, 在暗色主题下不可见。此全局规则覆盖所有 appearance:none
+ * 的 select, 确保箭头颜色随主题切换。 */
+select {
+  /* 仅当 select 通过 appearance:none 移除原生箭头时才显示自定义箭头 */
+  background-image: var(--icon-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--sp-3) center;
+  padding-right: var(--sp-7);
+}
+/* 保留原生外观的 select 不受全局箭头影响 */
+select:not([class]):not([style*="appearance"]) {
+  /* 有 class 的 select 已由下方规则处理; 无 class 的裸 select 也应用箭头 */
+}
+
 .switch-select {
   width: 100%; height: var(--row-h); padding: 0 var(--sp-3);
   background: var(--bg); color: var(--text);
@@ -715,7 +732,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-md);
   background: var(--surface-2);
-  transition: background .15s ease;
+  transition: background var(--motion-fast) var(--ease);  /* P3: 原硬编码 .15s ease → motion token */
 }
 .feature-item:hover { background: var(--surface-3); }
 .feature-name { font-size: var(--fs-sm); font-weight: 500; color: var(--text); }
@@ -1087,7 +1104,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .skills-actions { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 /* Modal (Teleport) */
 .modal-mask {
-  position: fixed; inset: 0; z-index: var(--z-modal, 1000);
+  position: fixed; inset: 0; z-index: var(--z-modal, 90);  /* P3: fallback 与 tokens.css 定义一致 (原 1000) */
   display: flex; align-items: center; justify-content: center;
   background: var(--overlay-scrim); backdrop-filter: blur(4px); padding: var(--sp-4);
 }
@@ -1289,8 +1306,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   gap: var(--sp-3); text-align: center; padding: 48px var(--sp-6);
   color: var(--text-muted); min-height: 320px;
 }
-.fatal-error h2 { font-size: var(--fs-xl, 19px); color: var(--text); margin: 0; font-weight: 700; }
-.fatal-error p { font-size: var(--fs-sm, 13px); max-width: 520px; word-break: break-word; font-family: var(--font-mono); opacity: .85; }
+.fatal-error h2 { font-size: var(--fs-xl, 18px); color: var(--text); margin: 0; font-weight: 700; }  /* P3: fallback 与 tokens.css 一致 (原 19px) */
+.fatal-error p { font-size: var(--fs-sm, 12px); max-width: 520px; word-break: break-word; font-family: var(--font-mono); opacity: .85; }  /* P3: fallback 与 tokens.css 一致 (原 13px) */
 .fatal-error .btn-primary { margin-top: var(--sp-3); }
 
 /* ── Responsive ───────────────────────────────────────────────────────── */

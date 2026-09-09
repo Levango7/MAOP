@@ -24,7 +24,7 @@ import contextlib
 import hashlib
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -234,61 +234,78 @@ class ImageStore:
             ).fetchall()
             if not rows:
                 return 0
-            # 批量删除数据库记录（单条 SQL 替代循环内 N 次 DELETE）
+            # 批量删除数据库记录（单条 SQL 替代循环内 N 次 DELETE）。
+            # 修复: 分 chunk 执行，每 chunk 最多 CHUNK_SIZE 个参数，
+            # 防止参数数量超过 SQLite 限制（默认 999）导致
+            # "too many SQL variables" 错误。
             ids = [r["id"] for r in rows]
-            placeholders = ",".join("?" * len(ids))
-            conn.execute(
-                f"DELETE FROM images WHERE id IN ({placeholders})",
-                ids,
-            )
+            CHUNK_SIZE = 500  # 留余量，SQLite 默认限制 999
+            for i in range(0, len(ids), CHUNK_SIZE):
+                chunk = ids[i:i + CHUNK_SIZE]
+                placeholders = ",".join("?" * len(chunk))
+                conn.execute(
+                    f"DELETE FROM images WHERE id IN ({placeholders})",
+                    chunk,
+                )
         # 删除磁盘文件（数据库事务已提交）
+        # 修复: 只在文件实际删除成功时才计数，避免文件不存在或删除失败时
+        # 仍计入 count 导致返回值不精确（原实现对每个 row 无条件 +1）。
         count = 0
         for r in rows:
             path = r["file_path"]
             if path:
-                with contextlib.suppress(Exception):
+                try:
                     Path(path).unlink(missing_ok=True)
-                count += 1
+                    count += 1
+                except Exception as exc:
+                    logger.debug("image_store: failed to delete %s: %s", path, exc)
         return count
 
     def cleanup_expired(self, max_age_days: int = 30) -> int:
         """Delete images older than max_age_days."""
-        cutoff = datetime.now(timezone.utc)
-        # 批量获取所有图片的 id/created_at/file_path，避免循环内逐个查询（N+1 查询）
+        # 修复: 在 SQL 中直接筛选过期图片，避免将全部图片载入内存再筛选。
+        # created_at 是 ISO 格式 TEXT 列，ISO 格式字符串的字典序与时间序一致，
+        # 因此可以直接用字符串比较 WHERE created_at < ?。
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+        cutoff_iso = cutoff.isoformat()
         with sqlite_connect(self._db_path) as conn:
             rows = conn.execute(
-                "SELECT id, created_at, file_path FROM images ORDER BY created_at"
+                "SELECT id, file_path FROM images WHERE created_at < ? ORDER BY created_at",
+                (cutoff_iso,),
             ).fetchall()
 
-        # 筛选过期图片（仅解析时间，不触发数据库查询）
-        expired: list[tuple[str, str]] = []  # (id, file_path)
-        for r in rows:
-            try:
-                created = datetime.fromisoformat(r["created_at"])
-                if (cutoff - created).days > max_age_days:
-                    expired.append((r["id"], r["file_path"]))
-            except (ValueError, TypeError) as exc:
-                logger.debug("image_store: skip invalid image meta %s: %s", r["id"], exc)
+        # 过期图片已由 SQL WHERE 条件筛选，无需内存再筛选
+        expired: list[tuple[str, str]] = [(r["id"], r["file_path"]) for r in rows]
 
         if not expired:
             return 0
 
-        # 批量删除数据库记录（单条 SQL 替代循环内 N 次 DELETE）
+        # 批量删除数据库记录（单条 SQL 替代循环内 N 次 DELETE）。
+        # 修复: 分 chunk 执行，每 chunk 最多 CHUNK_SIZE 个参数，
+        # 防止参数数量超过 SQLite 限制（默认 999）导致
+        # "too many SQL variables" 错误。
         ids = [eid for eid, _ in expired]
-        placeholders = ",".join("?" * len(ids))
+        CHUNK_SIZE = 500  # 留余量，SQLite 默认限制 999
         with sqlite_connect(self._db_path) as conn:
-            conn.execute(
-                f"DELETE FROM images WHERE id IN ({placeholders})",
-                ids,
-            )
+            for i in range(0, len(ids), CHUNK_SIZE):
+                chunk = ids[i:i + CHUNK_SIZE]
+                placeholders = ",".join("?" * len(chunk))
+                conn.execute(
+                    f"DELETE FROM images WHERE id IN ({placeholders})",
+                    chunk,
+                )
 
         # 删除磁盘文件
+        # 修复: 只在文件实际删除成功时才计数，避免文件不存在或删除失败时
+        # 仍计入 count 导致返回值不精确（原实现对每个 row 无条件 +1）。
         count = 0
         for _, path in expired:
             if path:
-                with contextlib.suppress(Exception):
+                try:
                     Path(path).unlink(missing_ok=True)
-                count += 1
+                    count += 1
+                except Exception as exc:
+                    logger.debug("image_store: failed to delete %s: %s", path, exc)
         return count
 
     @staticmethod

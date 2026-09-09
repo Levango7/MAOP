@@ -55,6 +55,8 @@
   --fail-soft: rgba(209, 36, 47, .10);
   --info: #0a7ea4;
   --info-soft: rgba(10, 126, 164, .10);
+  /* P3: --chart-5-soft 亮色主题值 (暗色定义在 tokens.css, 此前亮色缺失导致回退到暗色值) */
+  --chart-5-soft: rgba(124, 99, 224, .10);
 
   /* 语义状态对(亮色): 背景浅, 文字深 */
   --success-strong: #116329;
@@ -98,8 +100,13 @@
   --border-soft: rgba(148, 163, 184, .16);
   --surface-hover: rgba(0, 0, 0, .04);
   --surface-alt: rgba(0, 0, 0, .02);
-  --danger: #c0392b;
-  --danger-soft: rgba(192, 57, 43, .08);
+  /* --danger 亮色: 统一为 --fail 亮色值 #d1242f (原 #c0392b, 语义关系见 tokens.css)。
+   * #d1242f on #f2f3f5 ≈ 5.4:1, 满足 WCAG AA。 */
+  --danger: #d1242f;
+  --danger-soft: rgba(209, 36, 47, .08);
+  /* 输入框错误状态 (亮色): 与 --danger 同色系 */
+  --input-error-border: var(--danger);
+  --input-error-focus: rgba(209, 36, 47, .18);
   --ok: #3fb950;
   --overlay-scrim: rgba(15, 23, 42, .65);
 

@@ -283,14 +283,21 @@ onMounted(load);
 }
 .search-box__input:focus { outline: none; border-color: var(--brand); }
 .category-select {
-  background: var(--surface);
+  background-color: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 8px 10px;
+  padding: 8px var(--sp-7) 8px 10px; /* 右侧留出箭头空间, 避免文字与箭头重叠 */
   font-size: var(--fs-base);
   color: var(--text);
   cursor: pointer;
   min-width: 160px;
+  /* 自定义 select 箭头: 移除原生箭头, 使用主题感知的 --icon-chevron
+     修复原因: 暗色主题下原生箭头不可见, 需 appearance:none + 自定义背景图 */
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: var(--icon-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--sp-2) center;
 }
 .category-select:focus { outline: none; border-color: var(--brand); }
 

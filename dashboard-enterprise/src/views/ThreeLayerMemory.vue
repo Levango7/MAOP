@@ -172,7 +172,11 @@ import Badge from '../components/Badge.vue';
 import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
+// 修复: 将 i18n locale ('en'/'zh') 映射为 BCP 47 tag, 替代硬编码 'en-US'
+function bcp47Locale() {
+  return locale.value === 'zh' ? 'zh-CN' : 'en-US';
+}
 const api = useApiStore();
 const toast = useToast();
 const loading = ref(false);
@@ -222,7 +226,7 @@ function formatTime(ts) {
   if (!ts) return '—';
   const d = new Date(String(ts));
   if (isNaN(d.getTime())) return String(ts);
-  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString(bcp47Locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 function splitTags(t) {
   if (!t) return [];

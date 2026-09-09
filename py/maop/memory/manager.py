@@ -31,6 +31,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import threading
 import time
 from collections import OrderedDict
 from datetime import datetime, timezone
@@ -121,6 +122,11 @@ class MemoryManager:
         self._working_cache_max_size: int = int(
             os.getenv("MAOP_WORKING_CACHE_MAX_SIZE", "1000")
         )
+        # 修复: _working_cache 是 OrderedDict，非线程安全。多线程并发调用
+        # working_put/working_get/delete 时可能触发 OrderedDict 内部状态损坏
+        # （如 LRU move_to_end 与 popitem 竞争）。用专用锁保护所有
+        # _working_cache 操作，锁粒度仅覆盖 OrderedDict 操作，不包含磁盘 I/O。
+        self._working_cache_lock = threading.Lock()
         self._ensure_db()
 
     def _ensure_db(self) -> None:
@@ -541,10 +547,13 @@ class MemoryManager:
         防止无限制增长导致 OOM。重复写入同一 key 时 OrderedDict 赋值会
         原地更新值（不改变顺序），如需提升为最近使用请先 get 再 put。
         """
-        self._working_cache[key] = value
-        # P1-10 fix: LRU 淘汰 —— 超过上限时移除最旧（最久未访问）条目
-        if len(self._working_cache) > self._working_cache_max_size:
-            self._working_cache.popitem(last=False)
+        # 修复: 加锁保护 _working_cache 的并发读写，防止多线程下
+        # OrderedDict 内部状态损坏（赋值与 LRU 淘汰竞争）。
+        with self._working_cache_lock:
+            self._working_cache[key] = value
+            # P1-10 fix: LRU 淘汰 —— 超过上限时移除最旧（最久未访问）条目
+            if len(self._working_cache) > self._working_cache_max_size:
+                self._working_cache.popitem(last=False)
 
     def working_get(self, key: str) -> Any:
         """读取 Working Memory。
@@ -552,14 +561,19 @@ class MemoryManager:
         P1-10 fix: 命中时移到末尾（LRU 顺序更新），使最近访问的条目
         不易被淘汰；未命中返回 None。
         """
-        if key in self._working_cache:
-            self._working_cache.move_to_end(key)
-            return self._working_cache[key]
+        # 修复: 加锁保护 _working_cache 的并发读，防止与 working_put 的
+        # 写入竞争导致 move_to_end 迭代器失效。
+        with self._working_cache_lock:
+            if key in self._working_cache:
+                self._working_cache.move_to_end(key)
+                return self._working_cache[key]
         return None
 
     def working_clear(self) -> None:
         """清空 Working Memory。"""
-        self._working_cache.clear()
+        # 修复: 加锁保护 _working_cache 的并发清空操作。
+        with self._working_cache_lock:
+            self._working_cache.clear()
 
     def short_term_store(
         self,
@@ -736,9 +750,12 @@ class MemoryManager:
 
         normalized = normalize_layer_name(layer)
         if normalized == "working":
-            if entry_id in self._working_cache:
-                self._working_cache.pop(entry_id, None)
-                return True
+            # 修复: 加锁保护 _working_cache 的并发删除，防止与
+            # working_put/working_get 的竞争导致状态不一致。
+            with self._working_cache_lock:
+                if entry_id in self._working_cache:
+                    self._working_cache.pop(entry_id, None)
+                    return True
             return False
         if normalized == "short_term":
             try:

@@ -21,6 +21,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from maop.core.backends.db_utils import get_db_path
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors  # 批次3A: 统一异常处理装饰器
 
 from .state import MAOP_ROOT, get_bridge
 
@@ -50,23 +51,27 @@ def _tenant_filter(data: Any, tenant_id: str) -> Any:
 # ── Overview ────────────────────────────────────────────────────────────
 
 @router.get("/api/report")
+@handle_api_errors("Report", error_value={"status": "error", "error": "Report unavailable"})
 async def api_report(request: Request, hours: int = Query(48, ge=1, le=720)) -> Any:
     require_admin(request)
     return _tenant_filter(await get_bridge().report(hours=hours), _request_tenant_id(request))
 
 
 @router.get("/api/agents/stats")
+@handle_api_errors("Agents stats", error_value={"agents": [], "count": 0, "error": "Agents stats unavailable"})
 async def api_agents_stats(request: Request) -> dict[str, Any]:
     agents = await get_bridge().agent_stats()
     return _tenant_filter({"agents": agents, "count": len(agents)}, _request_tenant_id(request))
 
 
 @router.get("/api/timeseries")
+@handle_api_errors("Timeseries", error_value={"status": "error", "error": "Timeseries unavailable"})
 async def api_timeseries(request: Request) -> Any:
     return _tenant_filter(await get_bridge().timeseries(hours=168), _request_tenant_id(request))
 
 
 @router.get("/api/metrics")
+@handle_api_errors("Metrics", error_value={"status": "error", "error": "Metrics unavailable"})
 async def api_metrics(request: Request) -> dict[str, Any]:
     require_admin(request)
     """Real-time metrics from LoadBalancer, TimeSeries, and CircuitBreaker."""
@@ -108,12 +113,14 @@ async def api_metrics(request: Request) -> dict[str, Any]:
 
 
 @router.get("/api/live")
+@handle_api_errors("Live", error_value={"status": "error", "error": "Live data unavailable"})
 async def api_live(request: Request) -> Any:
     require_admin(request)
     return _tenant_filter(await get_bridge().live(), _request_tenant_id(request))
 
 
 @router.get("/api/snapshot")
+@handle_api_errors("Snapshot", error_value={"status": "error", "error": "Snapshot unavailable"})
 async def api_snapshot(request: Request) -> Any:
     """F-P0-2 fix: Aggregate snapshot for Overview.vue health metrics."""
     require_admin(request)
@@ -121,16 +128,19 @@ async def api_snapshot(request: Request) -> Any:
 
 
 @router.get("/api/failures")
+@handle_api_errors("Failures", error_value={"status": "error", "error": "Failures unavailable"})
 async def api_failures(request: Request) -> Any:
     return _tenant_filter(await get_bridge().failures(), _request_tenant_id(request))
 
 
 @router.get("/api/chain")
+@handle_api_errors("Chain", error_value={"status": "error", "error": "Chain unavailable"})
 async def api_chain(request: Request) -> Any:
     return _tenant_filter(await get_bridge().chain(), _request_tenant_id(request))
 
 
 @router.get("/api/optimizer")
+@handle_api_errors("Optimizer", error_value={"status": "error", "error": "Optimizer report unavailable"})
 async def api_optimizer(request: Request) -> dict[str, Any]:
     try:
         bridge = get_bridge()
@@ -155,6 +165,7 @@ async def api_optimizer(request: Request) -> dict[str, Any]:
 # ── Graph ───────────────────────────────────────────────────────────────
 
 @router.get("/api/graph/stats")
+@handle_api_errors("Graph stats", error_value={"nodes": 0, "edges": 0, "status": "error", "error": "Graph stats unavailable"})
 async def api_graph_stats() -> dict[str, Any]:
     try:
         bridge = get_bridge()
@@ -178,16 +189,19 @@ async def api_graph_stats() -> dict[str, Any]:
 
 
 @router.get("/api/graph/nodes")
+@handle_api_errors("Graph nodes", error_value={"nodes": [], "error": "Graph nodes unavailable"})
 async def api_graph_nodes() -> Any:
     return await get_bridge().graph_nodes()
 
 
 @router.get("/api/graph/edges")
+@handle_api_errors("Graph edges", error_value={"edges": [], "error": "Graph edges unavailable"})
 async def api_graph_edges() -> Any:
     return await get_bridge().graph_edges()
 
 
 @router.get("/api/graph/neighbors")
+@handle_api_errors("Graph neighbors", error_value={"neighbors": [], "count": 0, "error": "Graph neighbors unavailable"})
 async def api_graph_neighbors(node: str = Query(...)) -> dict[str, Any]:
     bridge = get_bridge()
     edges = await bridge.graph_edges()
@@ -198,11 +212,13 @@ async def api_graph_neighbors(node: str = Query(...)) -> dict[str, Any]:
 # ── Knowledge ───────────────────────────────────────────────────────────
 
 @router.get("/api/vector/stats")
+@handle_api_errors("Vector stats", error_value={"status": "error", "error": "Vector stats unavailable"})
 async def api_vector_stats() -> Any:
     return await get_bridge().memory_stats()
 
 
 @router.get("/api/vector/list")
+@handle_api_errors("Vector list", error_value={"vectors": [], "count": 0, "total": 0, "status": "error", "error": "Vector list unavailable"})
 async def api_vector_list(
     limit: int = Query(1000, ge=1, le=10000, description="最大返回条数 (1..10000)"),
     offset: int = Query(0, ge=0, description="跳过条数 (>=0)"),
@@ -236,6 +252,7 @@ async def api_vector_list(
 
 
 @router.get("/api/vector/search")
+@handle_api_errors("Vector search", error_value={"query": "", "results": [], "count": 0, "status": "error", "error": "Vector search unavailable"})
 async def api_vector_search(q: str = Query(...), k: int = Query(5, alias="topk")) -> dict[str, Any]:
     try:
         from maop.core.memory.vector import VectorStore
@@ -256,6 +273,7 @@ async def api_vector_search(q: str = Query(...), k: int = Query(5, alias="topk")
 
 
 @router.get("/api/wiki/stats")
+@handle_api_errors("Wiki stats", error_value={"status": "error", "error": "Wiki stats unavailable"})
 async def api_wiki_stats() -> dict[str, Any]:
     base = await get_bridge().memory_stats()
     try:
@@ -269,6 +287,7 @@ async def api_wiki_stats() -> dict[str, Any]:
 
 
 @router.get("/api/prompts")
+@handle_api_errors("Prompts", error_value={"prompts": [], "status": "error", "error": "Prompts list unavailable"})
 async def api_prompts() -> dict[str, Any]:
     try:
         result = await get_bridge().prompts_list()
@@ -300,11 +319,13 @@ async def api_prompts() -> dict[str, Any]:
 
 
 @router.get("/api/coordination")
+@handle_api_errors("Coordination", error_value={"status": "error", "error": "Coordination report unavailable"})
 async def api_coordination() -> Any:
     return await get_bridge().coordination_report()
 
 
 @router.get("/api/teams")
+@handle_api_errors("Teams", error_value={"status": "error", "error": "Teams unavailable"})
 async def api_teams() -> Any:
     try:
         from maop.config.loader import ConfigLoader
@@ -320,6 +341,7 @@ async def api_teams() -> Any:
 
 
 @router.get("/api/skills")
+@handle_api_errors("Skills", error_value={"skills": [], "count": 0, "status": "error", "error": "Skills list unavailable"})
 async def api_skills() -> dict[str, Any]:
     try:
         result = await get_bridge().skills_list()
@@ -355,36 +377,43 @@ async def api_skills() -> dict[str, Any]:
 # ── Tools ───────────────────────────────────────────────────────────────
 
 @router.get("/api/tools/stats")
+@handle_api_errors("Tools stats", error_value={"status": "error", "error": "Tools stats unavailable"})
 async def api_tools_stats() -> Any:
     return await get_bridge().tools_stats()
 
 
 @router.get("/api/guardrails")
+@handle_api_errors("Guardrails", error_value={"status": "error", "error": "Guardrails report unavailable"})
 async def api_guardrails() -> Any:
     return await get_bridge().guardrail_report()
 
 
 @router.get("/api/sandbox/list")
+@handle_api_errors("Sandbox list", error_value={"status": "error", "error": "Sandbox list unavailable"})
 async def api_sandbox_list() -> Any:
     return await get_bridge().sandbox_list()
 
 
 @router.get("/api/human/pending")
+@handle_api_errors("Human pending", error_value={"status": "error", "error": "Human pending unavailable"})
 async def api_human_pending() -> Any:
     return await get_bridge().human_pending()
 
 
 @router.get("/api/mcp/servers")
+@handle_api_errors("MCP servers", error_value={"status": "error", "error": "MCP servers unavailable"})
 async def api_mcp_servers() -> Any:
     return await get_bridge().mcp_servers()
 
 
 @router.get("/api/mcp/tools")
+@handle_api_errors("MCP tools", error_value={"status": "error", "error": "MCP tools unavailable"})
 async def api_mcp_tools() -> Any:
     return await get_bridge().mcp_tools()
 
 
 @router.get("/api/mcp")
+@handle_api_errors("MCP combined", error_value={"servers": [], "tools": [], "server_count": 0, "tool_count": 0, "error": "MCP combined unavailable"})
 async def api_mcp_combined() -> dict[str, Any]:
     servers = await get_bridge().mcp_servers()
     tools = await get_bridge().mcp_tools()
@@ -394,6 +423,7 @@ async def api_mcp_combined() -> dict[str, Any]:
 # ── System ──────────────────────────────────────────────────────────────
 
 @router.get("/api/versions")
+@handle_api_errors("Versions", error_value={"status": "error", "error": "Versions unavailable"})
 async def api_versions() -> dict[str, Any]:
     try:
         from maop import __version__ as MAOP_ver
@@ -404,6 +434,7 @@ async def api_versions() -> dict[str, Any]:
 
 
 @router.get("/api/providers")
+@handle_api_errors("Providers", error_value={"status": "error", "error": "Providers report unavailable"})
 async def api_providers() -> Any:
     return await get_bridge().providers_report()
 
@@ -416,13 +447,16 @@ def _read_log_tail(path, limit: int) -> list[str]:
 
 
 @router.get("/api/logs")
-async def api_logs(type: str = "", limit: int = Query(500, ge=1, le=5000)) -> Any:
+@handle_api_errors("Logs", error_value={"logs": [], "count": 0, "status": "error", "error": "Logs unavailable"})
+async def api_logs(request: Request, type: str = "", limit: int = Query(500, ge=1, le=5000)) -> Any:
     """Read log files with bounded size (P2-9 fix: prevents unbounded read_text).
 
     Args:
         type: log type name (dashboard, delegations, checker, etc.)
         limit: max number of lines to return (default 500, max 5000)
     """
+    # 批次3A: 日志端点添加 require_admin 鉴权，防止未授权用户读取系统日志。
+    require_admin(request)
     log_name = type if type and type != "all" else "dashboard"
     # P0-3 fix: validate log_name to prevent glob injection (e.g. '*' enumerating all files)
     if not re.match(r"^[a-zA-Z0-9_\-\.]+$", log_name):
@@ -471,17 +505,26 @@ async def api_logs(type: str = "", limit: int = Query(500, ge=1, le=5000)) -> An
 
 
 @router.get("/api/logs/delegations")
-async def api_logs_delegations(limit: int = Query(500, ge=1, le=5000)) -> Any:
+@handle_api_errors("Logs delegations", error_value={"status": "error", "error": "Delegations logs unavailable"})
+async def api_logs_delegations(request: Request, limit: int = Query(500, ge=1, le=5000)) -> Any:
+    # 批次3A: 日志端点添加 require_admin 鉴权，防止未授权用户读取系统日志。
+    require_admin(request)
     return await get_bridge().logs_get(name="delegations", limit=limit)
 
 
 @router.get("/api/logs/checker")
-async def api_logs_checker(limit: int = Query(500, ge=1, le=5000)) -> Any:
+@handle_api_errors("Logs checker", error_value={"status": "error", "error": "Checker logs unavailable"})
+async def api_logs_checker(request: Request, limit: int = Query(500, ge=1, le=5000)) -> Any:
+    # 批次3A: 日志端点添加 require_admin 鉴权，防止未授权用户读取系统日志。
+    require_admin(request)
     return await get_bridge().logs_get(name="checker", limit=limit)
 
 
 @router.get("/api/logs/analysis")
-async def api_logs_analysis(type: str = Query("delegations", description="分析哪一路日志流（与日志页所选类型一致）")) -> dict[str, Any]:
+@handle_api_errors("Logs analysis", error_value={"total": 0, "status": "error", "error": "Logs analysis unavailable"})
+async def api_logs_analysis(request: Request, type: str = Query("delegations", description="分析哪一路日志流（与日志页所选类型一致）")) -> dict[str, Any]:
+    # 批次3A: 日志端点添加 require_admin 鉴权，防止未授权用户读取系统日志。
+    require_admin(request)
     # 一号用户实测修复（2026-08-31）：原实现硬编码 name="delegations" ——
     # 用户看 dashboard/checker 日志时，"日志分析"卡片统计的却是另一路日志
     # 的数据，与页面内容完全脱节。改为跟随 ?type=（前端传当前所选类型），

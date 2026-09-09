@@ -1325,9 +1325,18 @@ onMounted(() => {
   padding: var(--sp-1) var(--sp-2);
   border: 1px solid var(--border);
   border-radius: var(--r-xs);
-  background: var(--surface);
+  /* 修复: 原 background 简写覆盖了 pages.css 全局 select 的 background-image
+     (主题感知箭头 --icon-chevron), 导致暗色主题下箭头不可见。
+     改用 background-color 并显式补回 appearance/箭头, 与全局规则一致。 */
+  background-color: var(--surface);
   color: var(--text);
   font-size: var(--fs-sm);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: var(--icon-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--sp-2) center;
+  padding-right: var(--sp-7);
 }
 .mem-add-textarea {
   padding: var(--sp-2);

@@ -93,8 +93,10 @@ function measure() {
 }
 
 const spotlightStyle = computed(() => ({
-  top: rect.value.top + 'px',
-  left: rect.value.left + 'px',
+  // 修复: 用 transform translate 代替 top/left 定位, 避免 position 变化触发 layout reflow。
+  // transform 走 GPU 合成层(composite), 不重排; width/height 保留(尺寸变化不频繁,
+  // 且 scale 会缩放 box-shadow/border 导致视觉变形, 故不采用 scale 方案)。
+  transform: `translate(${rect.value.left}px, ${rect.value.top}px)`,
   width: rect.value.width + 'px',
   height: rect.value.height + 'px',
 }));
@@ -221,10 +223,15 @@ onBeforeUnmount(() => {
 }
 .cm-spotlight {
   position: absolute;
+  top: 0;
+  left: 0;
   border-radius: var(--r-md);
   box-shadow: 0 0 0 9999px var(--overlay-scrim), 0 0 0 2px var(--brand), var(--shadow-card);
   pointer-events: none;
-  transition: top .25s var(--ease), left .25s var(--ease), width .25s var(--ease), height .25s var(--ease);
+  /* 修复: 仅 transition transform(GPU 合成, 不 reflow); width/height 瞬间切换,
+     避免动画过程中持续重排。will-change 提示浏览器为 transform 建立合成层。 */
+  transition: transform .25s var(--ease);
+  will-change: transform;
 }
 .cm-popover {
   position: absolute;

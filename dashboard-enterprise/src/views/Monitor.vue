@@ -176,7 +176,8 @@
 
     <div v-if="activeTab === 'maintenance'">
       <div class="maint-grid">
-        <button v-for="m in maintActions" :key="m.titleKey" class="maint-card" @click="runMaint(m)">
+        <!-- 修复: 添加 :disabled 绑定防止维护操作重复点击 (m.status === 'running' 时禁用) -->
+        <button v-for="m in maintActions" :key="m.titleKey" class="maint-card" :disabled="m.status === 'running'" @click="runMaint(m)">
           <span class="maint-icon"><AppIcon :name="m.icon" :size="24" /></span>
           <h4>{{ t(m.titleKey) }}</h4>
           <p>{{ t(m.descKey) }}</p>
@@ -477,7 +478,9 @@ onUnmounted(() => {
   border-radius: 4px;
   background: var(--bg-card, #fff);
   color: var(--text, #e8eaf0);
-  width: 200px;
+  /* 修复: 固定 200px 宽度在小屏挤压 → 改为 min-width + flex 响应式伸缩 */
+  min-width: 200px;
+  flex: 1;
   outline: none;
 }
 .dag-exec-input:focus {
@@ -523,6 +526,17 @@ onUnmounted(() => {
 }
 .agent-health-row:last-child {
   border-bottom: none;
+}
+/* 修复: 6列 grid 在小屏无响应式断点 → 768px 以下降为 3列，避免列内容挤压 */
+@media (max-width: 768px) {
+  .agent-health-row {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    padding: 6px 2px;
+  }
+  /* 第二行折回: failure/latency/timeout 占第一行, weight/status 占第二行 */
+  .agent-health-row .ah-weight { grid-column: 1; }
+  .agent-health-row .ah-status { grid-column: 2; }
 }
 .agent-health-header {
   font-weight: 600;

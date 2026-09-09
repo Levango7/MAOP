@@ -68,10 +68,11 @@ async def status() -> Any:
     try:
         return observability_status()
     except Exception as exc:
+        # 批次3A: 脱敏——错误细节不暴露给客户端，仅日志记录。
         logger.exception("[observability] status failed: %s", exc)  # noqa: TRY401
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "error": str(exc)},
+            content={"status": "error", "error": "Observability status error"},
         )
 
 
@@ -152,10 +153,11 @@ async def record(payload: RecordRequestModel) -> Any:
             )
         return {"status": "ok", "kind": payload.kind}
     except Exception as exc:
+        # 批次3A: 脱敏——错误细节不暴露给客户端，仅日志记录。
         logger.exception("[observability] record failed: %s", exc)  # noqa: TRY401
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "error": str(exc)},
+            content={"status": "error", "error": "Observability record failed"},
         )
 
 
@@ -188,7 +190,9 @@ async def health() -> Any:
             "type": type(provider).__name__,
         }
     except Exception as exc:
-        checks["tracer_provider"] = {"ok": False, "error": str(exc)}
+        # 批次3A: 脱敏——错误细节不暴露给客户端，仅日志记录。
+        logger.debug("[observability] tracer provider check failed: %s", exc)
+        checks["tracer_provider"] = {"ok": False, "error": "Tracer provider unavailable"}
 
     # MeterProvider
     try:
@@ -199,7 +203,9 @@ async def health() -> Any:
             "type": type(meter_provider).__name__,
         }
     except Exception as exc:
-        checks["meter_provider"] = {"ok": False, "error": str(exc)}
+        # 批次3A: 脱敏——错误细节不暴露给客户端，仅日志记录。
+        logger.debug("[observability] meter provider check failed: %s", exc)
+        checks["meter_provider"] = {"ok": False, "error": "Meter provider unavailable"}
 
     # deploy/ configs
     otel_cfg = _PROJECT_ROOT / "deploy" / "otel-collector.yaml"

@@ -886,13 +886,20 @@ onMounted(() => {
   font-weight: 600;
 }
 .compare-select {
-  padding: 5px 8px;
+  padding: 5px var(--sp-7) 5px 8px; /* 右侧留出箭头空间, 避免文字与箭头重叠 */
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  background: var(--surface);
+  background-color: var(--surface);
   color: var(--text);
   font-size: var(--fs-sm);
   min-width: 220px;
+  /* 自定义 select 箭头: 移除原生箭头, 使用主题感知的 --icon-chevron
+     修复原因: 暗色主题下原生箭头不可见, 需 appearance:none + 自定义背景图 */
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: var(--icon-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--sp-2) center;
 }
 .diff-result { display: flex; flex-direction: column; gap: 10px; }
 .diff-stats { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.model.schema import ModelDef, ProviderDef  # 批次3A: 模块级导入以支持 Pydantic 模型继承
 
 from .state import MAOP_ROOT
 
@@ -48,6 +49,24 @@ class KeyDeleteRequest(BaseModel):
 
 class HealthCheckRequest(BaseModel):
     provider: str = ""
+
+
+# 批次3A: Provider/Model 添加端点的请求模型。
+# 继承自 ProviderDef/ModelDef 并添加 name 字段，由 FastAPI 自动校验所有字段类型。
+class ProviderAddRequest(ProviderDef):
+    """POST /api/model/provider/add 请求体。
+
+    继承 ProviderDef 全部字段并添加 name，由 FastAPI 自动校验。
+    """
+    name: str = ""
+
+
+class ModelAddRequest(ModelDef):
+    """POST /api/model/add 请求体。
+
+    继承 ModelDef 全部字段并添加 name，由 FastAPI 自动校验。
+    """
+    name: str = ""
 
 @router.get("/api/model/agents")
 @handle_api_errors("Model agents", error_value={"agents": [], "count": 0, "error": "Model agents failed"})
@@ -89,18 +108,20 @@ async def api_model_switch(body: ModelSwitchRequest, request: Request) -> dict[s
     if not ypath.exists():
         ypath = MAOP_ROOT / "config" / "agents.yaml"
     if not ypath.exists():
+        # 批次3A: 统一响应格式为 {status, error}，消除 {success, message, data} 混用。
         return JSONResponse(
             status_code=404,
-            content={"success": False, "message": "agents.yaml not found", "data": None},
+            content={"status": "error", "error": "agents.yaml not found"},
         )
     import yaml
     _text = await asyncio.to_thread(Path(ypath).read_text, encoding="utf-8")
     data = yaml.safe_load(_text)
     agents = data.get("agents", {})
     if agent_name not in agents:
+        # 批次3A: 统一响应格式为 {status, error}，消除 {success, message, data} 混用。
         return JSONResponse(
             status_code=404,
-            content={"success": False, "message": f"Unknown agent: {agent_name}", "data": None},
+            content={"status": "error", "error": f"Unknown agent: {agent_name}"},
         )
     mpath = MAOP_ROOT / "models.yaml"
     if not mpath.exists():
@@ -111,10 +132,12 @@ async def api_model_switch(body: ModelSwitchRequest, request: Request) -> dict[s
         mdata = _yaml.safe_load(_mtext)
         valid_models = set(mdata.get("models", {}).keys()) if isinstance(mdata, dict) else set()
         if valid_models and new_model not in valid_models:
+            # 批次3A: 统一响应格式为 {status, error}，消除 {success, message, data} 混用。
             return JSONResponse(
                 status_code=404,
-                content={"success": False, "message": f"Unknown model: {new_model}. Valid: {sorted(valid_models)}", "data": None},
+                content={"status": "error", "error": f"Unknown model: {new_model}. Valid: {sorted(valid_models)}"},
             )
+
     agents[agent_name]["model"] = new_model
     _dumped = yaml.dump(data, allow_unicode=True, default_flow_style=False)
     await asyncio.to_thread(Path(ypath).write_text, _dumped, encoding="utf-8")
@@ -189,14 +212,15 @@ async def api_model_policies() -> dict[str, Any]:
 
 @router.post("/api/model/provider/add")
 @handle_api_errors("Provider add", error_value={"status": "error", "error": "Provider add failed"})
-async def api_provider_add(request: Request) -> dict[str, Any]:
+async def api_provider_add(request: Request, body: ProviderAddRequest) -> dict[str, Any]:
+    # 批次3A: 用 Pydantic ProviderAddRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（name + ProviderDef 全部字段类型）。
     require_admin(request)
-    body = await request.json()
-    name = body.get("name", "")
+    name = body.name
     if not name:
         raise HTTPException(400, "missing provider name")
-    from maop.model.schema import ProviderDef
-    pdef = ProviderDef(**{k: v for k, v in body.items() if k != "name"})
+    # 构造 ProviderDef（排除 name 字段）
+    pdef = ProviderDef(**{k: v for k, v in body.model_dump().items() if k != "name"})
     reg = _get_model_registry()
     reg.add_provider(name, pdef)
     reg.save()
@@ -221,14 +245,15 @@ async def api_provider_delete(body: ProviderNameRequest, request: Request) -> di
 
 @router.post("/api/model/add")
 @handle_api_errors("Model add", error_value={"status": "error", "error": "Model add failed"})
-async def api_model_add(request: Request) -> dict[str, Any]:
+async def api_model_add(request: Request, body: ModelAddRequest) -> dict[str, Any]:
+    # 批次3A: 用 Pydantic ModelAddRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（name + ModelDef 全部字段类型）。
     require_admin(request)
-    body = await request.json()
-    name = body.get("name", "")
+    name = body.name
     if not name:
         raise HTTPException(400, "missing model name")
-    from maop.model.schema import ModelDef
-    mdef = ModelDef(**{k: v for k, v in body.items() if k != "name"})
+    # 构造 ModelDef（排除 name 字段）
+    mdef = ModelDef(**{k: v for k, v in body.model_dump().items() if k != "name"})
     reg = _get_model_registry()
     reg.add_model(name, mdef)
     reg.save()

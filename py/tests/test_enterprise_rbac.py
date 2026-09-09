@@ -41,8 +41,9 @@ def test_revoke_role():
     """revoke_role() returns True when a grant exists, False otherwise."""
     mgr = RBACManager()
     mgr.grant_role("alice", Role.ADMIN, _caller_roles=frozenset({Role.SUPERADMIN}))
-    assert mgr.revoke_role("alice", Role.ADMIN) is True
-    assert mgr.revoke_role("alice", Role.ADMIN) is False
+    # 撤销 ADMIN 角色需要 SUPERADMIN 权限（与 grant_role 提权检查对齐）
+    assert mgr.revoke_role("alice", Role.ADMIN, _caller_roles=frozenset({Role.SUPERADMIN})) is True
+    assert mgr.revoke_role("alice", Role.ADMIN, _caller_roles=frozenset({Role.SUPERADMIN})) is False
     assert mgr.revoke_role("unknown", Role.VIEWER) is False
 
 

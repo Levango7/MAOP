@@ -81,8 +81,12 @@ def _split_sql_statements(sql: str) -> list[str]:
         buffer += ch
         i += 1
     # 末尾残留（无分号结尾的语句）
-    if buffer.strip():
-        statements.append(buffer.strip())
+    # 修复: 纯注释行（strip 后以 "--" 开头）不是有效 SQL 语句，不应加入
+    # statements。例如 "SELECT 1; -- comment\n" 末尾的 "-- comment" 会被
+    # buffer.strip() 捕获并误当作 SQL 执行，导致执行报错。
+    residual = buffer.strip()
+    if residual and not residual.startswith("--"):
+        statements.append(residual)
     return statements
 
 

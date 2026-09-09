@@ -4,11 +4,13 @@
       <div class="header-actions">
         <span class="edition-badge" :class="edition">
           <AppIcon :name="edition === 'enterprise' ? 'shield' : 'user'" :size="14" />
-          {{ edition === 'enterprise' ? 'Enterprise' : 'Personal' }}
+          <!-- 修复: 硬编码英文替换为 i18n 翻译键 -->
+          {{ edition === 'enterprise' ? t('view.observability.enterprise') : t('view.observability.personal') }}
         </span>
         <span class="tracing-badge" :class="tracingEnabled ? 'on' : 'off'">
           <span class="dot"></span>
-          {{ tracingEnabled ? 'Tracing ON' : 'Tracing OFF' }}
+          <!-- 修复: 硬编码英文替换为 i18n 翻译键 -->
+          {{ tracingEnabled ? t('view.observability.tracingOn') : t('view.observability.tracingOff') }}
         </span>
       </div>
     </PageHeader>
@@ -29,19 +31,20 @@
 
     <div class="two-col">
       <!-- ── Pipeline status ─────────────────────────────────── -->
-      <Card title="Observability Pipeline" icon="activity" :margin-bottom="0">
+      <Card :title="t('view.observability.pipelineTitle')" icon="activity" :margin-bottom="0">
         <div class="pipeline-list">
           <div v-for="p in pipelineRows" :key="p.name" class="pipeline-row">
             <span class="pipeline-dot" :class="p.ok ? 'ok' : 'bad'"></span>
             <span class="pipeline-name">{{ p.name }}</span>
             <span class="pipeline-detail">{{ p.detail }}</span>
-            <span class="pipeline-status" :class="p.ok ? 'ok' : 'bad'">{{ p.ok ? 'OK' : 'OFF' }}</span>
+            <!-- 修复: 硬编码 OK/OFF 替换为 i18n 翻译键 -->
+            <span class="pipeline-status" :class="p.ok ? 'ok' : 'bad'">{{ p.ok ? t('view.observability.statusOk') : t('view.observability.statusOff') }}</span>
           </div>
         </div>
       </Card>
 
       <!-- ── Configuration ──────────────────────────────────── -->
-      <Card title="Configuration" icon="gear" :margin-bottom="0">
+      <Card :title="t('view.observability.configTitle')" icon="gear" :margin-bottom="0">
         <div v-if="configLoading" class="config-skel">
           <Skeleton v-for="n in 5" :key="n" height="18px" />
         </div>
@@ -55,7 +58,7 @@
     </div>
 
     <!-- ── Canonical metrics ──────────────────────────────────── -->
-    <Card title="Canonical Metrics (F1-04)" icon="gauge" class="mt">
+    <Card :title="t('view.observability.canonicalMetricsTitle')" icon="gauge" class="mt">
       <div class="metric-table">
         <div class="metric-header">
           <span class="col-name">{{ t('view.observability.metric') }}</span>
@@ -73,7 +76,7 @@
     </Card>
 
     <!-- ── Health checks ──────────────────────────────────────── -->
-    <Card title="Pipeline Health Checks" icon="shield" class="mt">
+    <Card :title="t('view.observability.healthChecksTitle')" icon="shield" class="mt">
       <template #actions>
         <button class="refresh-btn" :aria-label="t('common.refresh')" :disabled="healthLoading" @click="loadHealth">
           <AppIcon name="refresh" :size="14" />
@@ -89,22 +92,24 @@
           <span class="health-detail">{{ h.detail }}</span>
         </div>
       </div>
-      <EmptyState v-else icon="shield" title="No health data" hint="Click refresh to run pipeline checks." />
+      <EmptyState v-else icon="shield" :title="t('view.observability.noHealthData')" :hint="t('view.observability.noHealthHint')" />
     </Card>
 
     <!-- ── Trace info ─────────────────────────────────────────── -->
-    <Card title="Distributed Tracing" icon="share2" class="mt">
+    <Card :title="t('view.observability.distributedTracingTitle')" icon="share2" class="mt">
       <div v-if="traceInfo.enabled" class="trace-info">
         <div class="trace-row">
           <AppIcon name="check-circle" :size="16" />
-          <span>Tracing active — spans exported via OTLP to the Collector.</span>
+          <!-- 修复: 硬编码英文替换为 i18n 翻译键 -->
+          <span>{{ t('view.observability.tracingActive') }}</span>
         </div>
         <div class="trace-hint">{{ traceInfo.hint }}</div>
       </div>
       <div v-else class="trace-info disabled">
         <div class="trace-row">
           <AppIcon name="alert-triangle" :size="16" />
-          <span>Tracing disabled ({{ traceInfo.hint }})</span>
+          <!-- 修复: 硬编码英文替换为 i18n 翻译键 (带插值) -->
+          <span>{{ t('view.observability.tracingDisabled', { hint: traceInfo.hint }) }}</span>
         </div>
         <div class="trace-enable">
           <code>MAOP_OTEL_ENABLED=1</code> + <code>pip install opentelemetry-sdk</code>
@@ -139,28 +144,29 @@ const enterpriseMode = computed(() => !!status.value?.enterprise_mode);
 // ── Summary cards (top row) ───────────────────────────────────────
 const summaryCards = computed(() => [
   {
-    label: 'Requests Total',
+    // 修复: 硬编码英文替换为 i18n 翻译键
+    label: t('view.observability.requestsTotal'),
     value: formatNum(status.value?.metrics?.metrics?.maop_requests_total || 0),
     unit: '',
     icon: 'activity',
     tone: 'brand',
   },
   {
-    label: 'Errors Total',
+    label: t('view.observability.errorsTotal'),
     value: formatNum(status.value?.metrics?.metrics?.maop_errors_total || 0),
     unit: '',
     icon: 'alert-triangle',
     tone: status.value?.metrics?.metrics?.maop_errors_total > 0 ? 'fail' : 'success',
   },
   {
-    label: 'Active Spans',
+    label: t('view.observability.activeSpans'),
     value: formatNum(status.value?.metrics?.metrics?.maop_active_spans || 0),
     unit: '',
     icon: 'share2',
     tone: 'brand',
   },
   {
-    label: 'Trace Exports',
+    label: t('view.observability.traceExports'),
     value: formatNum(status.value?.metrics?.metrics?.maop_trace_export_total || 0),
     unit: '',
     icon: 'refresh',
@@ -171,27 +177,28 @@ const summaryCards = computed(() => [
 // ── Pipeline rows ─────────────────────────────────────────────────
 const pipelineRows = computed(() => [
   {
-    name: 'Structured Logging',
+    // 修复: 硬编码英文替换为 i18n 翻译键
+    name: t('view.observability.structuredLogging'),
     ok: true,
     detail: status.value?.logging?.level || 'INFO',
   },
   {
-    name: 'Trace Correlation',
+    name: t('view.observability.traceCorrelation'),
     ok: !!status.value?.logging?.trace_correlation,
-    detail: status.value?.logging?.trace_correlation ? 'OTel linked' : 'no OTel',
+    detail: status.value?.logging?.trace_correlation ? t('view.observability.otelLinked') : t('view.observability.noOtel'),
   },
   {
-    name: 'OTel Tracing',
+    name: t('view.observability.otelTracing'),
     ok: tracingEnabled.value,
     detail: status.value?.tracing?.tracer_type || 'NoopTracer',
   },
   {
-    name: 'Prometheus Metrics',
+    name: t('view.observability.prometheusMetrics'),
     ok: true,
     detail: '/api/prometheus',
   },
   {
-    name: 'Enterprise Mode',
+    name: t('view.observability.enterpriseMode'),
     ok: enterpriseMode.value,
     detail: edition.value,
   },
@@ -200,14 +207,15 @@ const pipelineRows = computed(() => [
 // ── Config rows ───────────────────────────────────────────────────
 const configRows = computed(() => {
   if (!config.value) return [];
+  // 修复: 硬编码英文 label 替换为 i18n 翻译键; yes/no 也走 i18n
   return [
-    { label: 'Edition', value: config.value.edition },
-    { label: 'OTel Enabled', value: config.value.otel_enabled ? 'yes' : 'no' },
-    { label: 'OTel Exporter', value: config.value.otel_exporter },
-    { label: 'OTel Endpoint', value: config.value.otel_endpoint, mono: true },
-    { label: 'Service Name', value: config.value.otel_service_name, mono: true },
-    { label: 'Scrape Path', value: config.value.prometheus_scrape_path, mono: true },
-    { label: 'Grafana UID', value: config.value.grafana_dashboard_uid, mono: true },
+    { label: t('view.observability.configEdition'), value: config.value.edition },
+    { label: t('view.observability.configOtelEnabled'), value: config.value.otel_enabled ? t('view.observability.yes') : t('view.observability.no') },
+    { label: t('view.observability.configOtelExporter'), value: config.value.otel_exporter },
+    { label: t('view.observability.configOtelEndpoint'), value: config.value.otel_endpoint, mono: true },
+    { label: t('view.observability.configServiceName'), value: config.value.otel_service_name, mono: true },
+    { label: t('view.observability.configScrapePath'), value: config.value.prometheus_scrape_path, mono: true },
+    { label: t('view.observability.configGrafanaUid'), value: config.value.grafana_dashboard_uid, mono: true },
   ];
 });
 
@@ -251,7 +259,8 @@ const healthChecks = computed(() => {
     out.push({
       name,
       ok: !!info.ok,
-      detail: info.error || info.type || info.version || (info.ok ? 'available' : 'missing'),
+      // 修复: 硬编码 available/missing 替换为 i18n 翻译键
+      detail: info.error || info.type || info.version || (info.ok ? t('view.observability.available') : t('view.observability.missing')),
     });
   }
   return out;
@@ -300,7 +309,8 @@ async function loadTraces() {
   try {
     traceInfo.value = await api.get('/api/observability/traces?limit=5');
   } catch {
-    traceInfo.value = { enabled: false, hint: 'endpoint unavailable' };
+    // 修复: 硬编码英文替换为 i18n 翻译键
+    traceInfo.value = { enabled: false, hint: t('view.observability.endpointUnavailable') };
   }
 }
 
@@ -380,6 +390,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 @media (max-width: 900px) {
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
   .two-col { grid-template-columns: 1fr; }
+}
+
+/* 修复: metrics-grid 缺少小屏幕 1 列断点 → 640px 以下降为单列 */
+@media (max-width: 640px) {
+  .metrics-grid { grid-template-columns: 1fr; }
 }
 
 /* ── Pipeline list ──────────────────────────────────────────────── */

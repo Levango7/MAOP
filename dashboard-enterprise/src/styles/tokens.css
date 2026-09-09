@@ -124,9 +124,12 @@
   --z-base: 0;  --z-sticky: 30;  --z-drawer: 40;  --z-topbar: 50;
   --z-overlay: 80;  --z-modal: 90;  --z-toast: 100;
 
-  /* ── Motion ───────────────────────────────────────────────────────────── */
+  /* ── Motion ─────────────────────────────────────────────────────────────
+   * 三档动画时长: fast(微交互) / normal(常规过渡) / slow(大区域/进度条)。
+   * --motion 是 --motion-normal 的旧别名, 保留以兼容现有引用。 */
   --motion-fast: 120ms;
-  --motion: 180ms;
+  --motion-normal: 250ms;   /* P3: 新增标准过渡时长, 用于替换 pages.css 中 .15s/.25s 等硬编码 */
+  --motion: 180ms;           /* legacy alias — 等价于 fast 与 normal 之间, 保留兼容 */
   --motion-slow: 280ms;
   --ease: cubic-bezier(.4, 0, .2, 1);
   --ease-out: cubic-bezier(.16, 1, .3, 1);
@@ -160,6 +163,9 @@
    * (the #fff fallback was a leftover white-on-dark default). */
   --bg-card: var(--surface);
   --bg-muted: rgba(148, 163, 184, .16);
+  /* --bg-hover: 旧版通用 hover 底色, 用于 legacy 视图中行/项的 hover 态。
+   * 语义上与 --surface-hover 重叠, 但值不同(此为中性灰, surface-hover 为白色低透)。
+   * 保留 --bg-hover 仅为向后兼容; 新代码应优先使用 --surface-hover。 */
   --bg-hover: rgba(148, 163, 184, .16);
   --bg-code: #1e293b;
   --text-code: rgba(148, 163, 184, .35);
@@ -167,10 +173,19 @@
   --bg-tag: rgba(148, 163, 184, .16);
   --border-light: rgba(148, 163, 184, .16);
   --border-soft: rgba(148, 163, 184, .16);
+  /* --surface-hover: 语义化 hover 底色(基于当前主题 surface 派生), 新代码统一使用此 token。
+   * 暗色用白色低透(rgba(255,255,255,.06)), 亮色用黑色低透(见 themes.css)。 */
   --surface-hover: rgba(255, 255, 255, .06);
   --surface-alt: rgba(0, 0, 0, .02);
-  --danger: #c0392b;
-  --danger-soft: rgba(192, 57, 43, .08);
+  /* --danger: 提亮至 #f05545 以满足 WCAG AA 4.5:1 (原 #c0392b on #1b1d21 ≈ 3.27:1)。
+   * 语义关系: --danger 用于错误/危险状态的"文本与边框"(需满足 AA 对比度);
+   *           --fail  用于图表/徽标等"指示色"(视觉一致性优先, 对比度要求宽松)。
+   * 两者均为红色系, --danger 更亮以保证文本可读性, --fail 保持 GitHub 风格 #f85149。 */
+  --danger: #f05545;
+  --danger-soft: rgba(240, 85, 69, .08);
+  /* 输入框错误状态: 用于表单校验失败时的边框与聚焦环颜色 */
+  --input-error-border: var(--danger);
+  --input-error-focus: rgba(240, 85, 69, .22);
   --ok: #3fb950;
   --overlay-scrim: rgba(15, 23, 42, .65);
 

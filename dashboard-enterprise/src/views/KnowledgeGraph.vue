@@ -847,6 +847,13 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   .kg-detail { display: none; }
 }
 
+/* 修复: 固定侧栏在中等屏幕(1024px)挤压主画布 → 侧栏宽度减小至 200px, 释放主画布空间 */
+@media (max-width: 1024px) {
+  .kg-layout { grid-template-columns: 200px 1fr; }
+  .kg-filter { font-size: var(--fs-sm); }
+  .kg-filter-label { font-size: var(--fs-xs); }
+}
+
 /* ── Filter panel ── */
 .kg-filter { display: flex; flex-direction: column; gap: 12px; }
 .kg-filter-section { display: flex; flex-direction: column; gap: 6px; padding: 6px 0; }

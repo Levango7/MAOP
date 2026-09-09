@@ -22,10 +22,35 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from .state import MAOP_ROOT
 
 router = APIRouter()
+
+
+# ── Pydantic 请求模型 (批次3A: 输入校验) ───────────────────────────
+class LoginRequest(BaseModel):
+    """POST /api/auth/login 请求体。"""
+    username: str = ""
+    password: str = ""
+
+
+class RegisterRequest(BaseModel):
+    """POST /api/auth/register 请求体。"""
+    username: str = ""
+    password: str = ""
+    roles: list[str] = Field(default_factory=lambda: ["read"])
+
+
+class UpdateUserRequest(BaseModel):
+    """PUT /api/auth/users/{username} 请求体。
+
+    所有字段可选——只更新提供的字段。
+    """
+    roles: list[str] | None = None
+    enabled: bool | None = None
+    password: str | None = None
 
 # ── Auth config ────────────────────────────────────────────────────
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
@@ -335,21 +360,12 @@ async def auth_status(request: Request) -> Any:
 
 
 @router.post("/api/auth/login")
-async def auth_login(request: Request) -> Any:
+async def auth_login(request: Request, body: LoginRequest) -> Any:
     """Login with username/password, returns JWT token."""
-    try:
-        body = await request.json()
-    except Exception:
-        # 2026-09-01 user#1 反馈：默认浏览器打不开 → 实测 curl/cmd 双引号展开
-        # 把 body 截成空 → request.json() 抛 JSONDecodeError → 原 except 静默
-        # 吞掉返 "Login failed"（401），用户困惑到底是密码错还是没发送。
-        # 改: 明确返 400 "请求体不是 JSON" 提示客户端修。
-        return JSONResponse(
-            {"status": "error", "error": "Request body must be valid JSON: {\"username\":..., \"password\":...}"},
-            status_code=400,
-        )
-    username = body.get("username", "")
-    password = body.get("password", "")
+    # 批次3A: 用 Pydantic LoginRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体并返回 422 而非静默 401。
+    username = body.username
+    password = body.password
     if not username or not password:
         return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
 
@@ -547,14 +563,15 @@ async def auth_logout(request: Request) -> Any:
 
 
 @router.post("/api/auth/register")
-async def auth_register(request: Request) -> Any:
+async def auth_register(request: Request, body: RegisterRequest) -> Any:
     """Register a new user (admin only)."""
+    # 批次3A: 用 Pydantic RegisterRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（username/password/roles 字段类型）。
     try:
         _require_admin(request)
-        body = await request.json()
-        username = body.get("username", "").strip()
-        password = body.get("password", "")
-        roles = body.get("roles", ["read"])
+        username = body.username.strip()
+        password = body.password
+        roles = body.roles
 
         if not username or not password:
             return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
@@ -616,14 +633,23 @@ async def auth_delete_user(username: str, request: Request) -> Any:
 
 
 @router.put("/api/auth/users/{username}")
-async def auth_update_user(username: str, request: Request) -> Any:
+async def auth_update_user(username: str, request: Request, body: UpdateUserRequest) -> Any:
     """Update user roles, enabled status, or password (admin only)."""
+    # 批次3A: 用 Pydantic UpdateUserRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（roles/enabled/password 字段类型）。
     try:
         _require_admin(request)
-        body = await request.json()
+        # 构造与 _db_update_user 兼容的 dict（只包含显式提供的字段）
+        update_payload: dict[str, Any] = {}
+        if body.roles is not None:
+            update_payload["roles"] = body.roles
+        if body.enabled is not None:
+            update_payload["enabled"] = body.enabled
+        if body.password is not None:
+            update_payload["password"] = body.password
         db_path = get_db_path("auth")
         result = await asyncio.get_running_loop().run_in_executor(
-            None, _db_update_user, str(db_path), username, body
+            None, _db_update_user, str(db_path), username, update_payload
         )
         if result.get("status") == "ok":
             return result

@@ -210,7 +210,7 @@
           </label>
         </div>
         <template #footer>
-          <button class="act-btn" :disabled="!ruleEditor.rule.name?.trim()" @click="saveRule">{{ t('view.audit.ruleSave') }}</button>
+          <button class="act-btn" :disabled="!ruleEditor.rule.name?.trim() || ruleSaving" @click="saveRule">{{ t('view.audit.ruleSave') }}</button>
           <button class="act-btn ghost" @click="ruleEditor.open = false">{{ t('view.audit.ruleCancel') }}</button>
         </template>
       </DetailDrawer>
@@ -602,6 +602,8 @@ const rules = ref([]);
 const rulesLoading = ref(false);
 const rulesError = ref('');
 const ruleEditor = reactive({ open: false, rule: { id: '', name: '', condition: '', severity: 'warning', enabled: true } });
+// 修复: 添加 ruleSaving 状态防止保存规则按钮重复提交
+const ruleSaving = ref(false);
 
 async function loadRules() {
   rulesLoading.value = true;
@@ -624,6 +626,8 @@ function openRuleEditor(rule) {
   ruleEditor.open = true;
 }
 async function saveRule() {
+  // 修复: 设置 ruleSaving 防止重复提交, finally 中重置
+  ruleSaving.value = true;
   try {
     const r = ruleEditor.rule;
     if (r.id) {
@@ -637,6 +641,8 @@ async function saveRule() {
     await loadRules();
   } catch (e) {
     toast.error(e.message || t('view.audit.saveFailed'));
+  } finally {
+    ruleSaving.value = false;
   }
 }
 async function toggleRule(rule) {

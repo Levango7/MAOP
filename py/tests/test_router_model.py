@@ -221,8 +221,8 @@ class TestModelSwitch:
         # P2-#2 fix: 资源不存在现在返回 404
         assert resp.status_code == 404
         data = resp.json()
-        assert data["success"] is False
-        assert "not found" in data["message"]
+        assert data["status"] == "error"
+        assert "not found" in data["error"]
 
     def test_switch_with_agents_yaml(self, tmp_root, client):
         """Create agents.yaml in temp root and test switch."""
@@ -250,8 +250,8 @@ class TestModelSwitch:
         # P2-#2 fix: 未知 agent 现在返回 404
         assert resp.status_code == 404
         data = resp.json()
-        assert data["success"] is False
-        assert "Unknown agent" in data["message"]
+        assert data["status"] == "error"
+        assert "Unknown agent" in data["error"]
 
 
 # ── /api/model/registry ─────────────────────────────────────────────
@@ -447,7 +447,7 @@ class TestModelSwitchCoverage:
         )
         # P2-#2 fix: agents.yaml 不存在现在返回 404
         assert resp.status_code == 404
-        assert resp.json()["success"] is False
+        assert resp.json()["status"] == "error"
 
     def test_unknown_agent(self, client_coverage):
         """Switch with unknown agent returns 404."""
@@ -457,7 +457,7 @@ class TestModelSwitchCoverage:
         )
         # P2-#2 fix: 未知 agent 现在返回 404
         assert resp.status_code == 404
-        assert resp.json()["success"] is False
+        assert resp.json()["status"] == "error"
 
     def test_unknown_model(self, client_coverage):
         """Switch with unknown model returns 404."""
@@ -467,7 +467,7 @@ class TestModelSwitchCoverage:
         )
         # P2-#2 fix: 未知 model 现在返回 404
         assert resp.status_code == 404
-        assert resp.json()["success"] is False
+        assert resp.json()["status"] == "error"
 
     def test_switch_happy(self, client_coverage):
         """Switch with valid agent + model succeeds."""

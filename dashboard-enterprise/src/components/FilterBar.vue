@@ -102,14 +102,22 @@ function set(key, val) { props.modelValue[key] = val; }
 .filterbar__input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
 .filterbar__input::placeholder { color: var(--text-faint); }
 .filterbar__select {
-  padding: var(--sp-1) var(--sp-3);
-  background: var(--surface-2);
+  /* 右侧留出箭头空间(--sp-7=32px), 避免文字与箭头重叠 */
+  padding: var(--sp-1) var(--sp-7) var(--sp-1) var(--sp-3);
+  background-color: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   color: var(--text);
   font-size: var(--fs-sm);
   font-family: inherit;
   cursor: pointer;
+  /* 自定义 select 箭头: 移除原生箭头, 使用主题感知的 --icon-chevron
+     修复原因: 暗色主题下原生箭头不可见, 需 appearance:none + 自定义背景图 */
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: var(--icon-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--sp-2) center;
 }
 .filterbar__select:focus { outline: none; border-color: var(--brand); }
 .filterbar__meta { margin-left: auto; font-size: var(--fs-xs); color: var(--text-faint); white-space: nowrap; }

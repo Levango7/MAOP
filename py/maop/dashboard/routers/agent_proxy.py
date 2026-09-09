@@ -57,9 +57,13 @@ async def api_bridge_call(request: Request) -> dict[str, Any]:
         result = bridge.call(adapter_name, task, **body.get("kwargs", {}))
         return {"status": "ok", "result": result}
     except KeyError as exc:
-        raise HTTPException(404, str(exc))
+        # 批次3A: 脱敏——KeyError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[bridge] call adapter not found: %s", exc)
+        raise HTTPException(404, "Bridge adapter not found")
     except RuntimeError as exc:
-        raise HTTPException(500, str(exc))
+        # 批次3A: 脱敏——RuntimeError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[bridge] call runtime error: %s", exc)
+        raise HTTPException(500, "Bridge call failed")
 
 
 @router.get("/api/bridge/health")
@@ -86,4 +90,6 @@ async def api_bridge_sync_config(request: Request) -> dict[str, Any]:
         bridge.sync_config(adapter_name, config)
         return {"status": "ok"}
     except KeyError as exc:
-        raise HTTPException(404, str(exc))
+        # 批次3A: 脱敏——KeyError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[bridge] sync-config adapter not found: %s", exc)
+        raise HTTPException(404, "Bridge adapter not found")

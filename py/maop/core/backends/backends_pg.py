@@ -24,6 +24,7 @@ import contextlib
 import logging
 import os
 from typing import Any
+from urllib.parse import quote_plus
 
 from maop.core.backends.backends import StorageBackend
 
@@ -39,7 +40,9 @@ def _build_dsn() -> str:
     dbname = os.getenv("MAOP_PG_DATABASE", "maop")
     user = os.getenv("MAOP_PG_USER", "maop")
     password = os.getenv("MAOP_PG_PASSWORD", "")
-    return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
+    # 修复: 对用户名和密码进行 URL 编码，防止密码中含 @ / : 等特殊字符
+    # 破坏 DSN 解析（例如 password="p@ss:word" 会被误解析为主机/端口）。
+    return f"postgresql://{quote_plus(user)}:{quote_plus(password)}@{host}:{port}/{dbname}"
 
 
 class _PgTransaction:
@@ -174,6 +177,11 @@ class PostgreSQLStorageBackend(StorageBackend):
                 raise
             finally:
                 cur.close()
+                # 修复: 恢复连接的 autocommit 状态。transaction() 在进入时设置
+                # autocommit=False 以开启显式事务，但连接归还到池后若不恢复为
+                # True，下次 execute() 通过该连接的语句不会自动提交，导致数据
+                # 静默丢失。连接池会复用此连接，必须保证状态不泄漏。
+                conn.autocommit = True
 
     def close(self) -> None:
         if self._pool is not None:

@@ -474,7 +474,7 @@ const dagLayout = computed(() => {
   border-radius: var(--r-sm, 6px);
   display: inline-flex;
 }
-.split-dialog__close:hover { background: var(--surface-hover, rgba(0,0,0,0.04)); }
+.split-dialog__close:hover { background: var(--surface-hover, rgba(255, 255, 255, .06)); }
 .split-dialog__body {
   padding: 20px;
   overflow-y: auto;
