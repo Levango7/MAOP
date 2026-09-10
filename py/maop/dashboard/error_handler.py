@@ -114,6 +114,15 @@ def handle_api_errors(
                 return await fn(*args, **kwargs)
             except _HTTPException as exc:
                 op = op_name or fn.__name__
+                # B4: 5xx 错误脱敏——不向客户端泄露内部错误细节；
+                # 4xx 保留 detail 以便客户端据此修正请求。
+                if exc.status_code >= 500:
+                    _logger.warning("%s raised HTTPException %d: %s", op, exc.status_code, exc.detail)
+                    return _error_response(
+                        error="Internal server error",
+                        code=f"HTTP_{exc.status_code}",
+                        status_code=exc.status_code,
+                    )
                 _logger.warning("%s raised HTTPException: %s", op, exc.detail)
                 return _error_response(
                     error=str(exc.detail) if exc.detail is not None else "",
@@ -125,8 +134,9 @@ def handle_api_errors(
                 _logger.exception("%s failed", op)
                 if error_value is not None:
                     return error_value
+                # B4: 5xx 脱敏——返回固定文案而非暴露内部操作名/栈细节。
                 return _error_response(
-                    error=f"{op} unavailable",
+                    error="Internal server error",
                     code="INTERNAL",
                     status_code=500,
                 )

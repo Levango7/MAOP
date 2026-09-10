@@ -570,13 +570,12 @@ class TestApiKeyDelete:
         assert resp.status_code == 400
 
     def test_delete_nonexistent(self, client_coverage):
-        """Key delete with unknown provider returns not_found."""
+        """Key delete with unknown provider returns 404."""
         resp = client_coverage.post(
             "/api/model/key/delete",
             json={"provider": "nonexistent-key"},
         )
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "not_found"
+        assert resp.status_code == 404
 
     def test_delete_existing(self, client_coverage):
         """Key delete after store returns ok."""

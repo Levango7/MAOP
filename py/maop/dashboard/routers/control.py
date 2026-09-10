@@ -36,7 +36,8 @@ class MaintainRequest(BaseModel):
 async def control_status() -> dict[str, Any]:
     """Return status of all active control jobs."""
     jobs = []
-    for job in active_jobs.values():
+    # B23: 使用 list() 快照避免并发迭代时字典修改抛 RuntimeError。
+    for job in list(active_jobs.values()):
         proc = job.get("process")
         if proc is not None:
             if proc.returncode is not None:
@@ -79,7 +80,8 @@ async def control_pause(request: Request) -> dict[str, Any]:
     pause_file.parent.mkdir(parents=True, exist_ok=True)
     pause_file.write_text("paused")
     paused = 0
-    for job in active_jobs.values():
+    # B23: 使用 list() 快照避免并发迭代时字典修改抛 RuntimeError。
+    for job in list(active_jobs.values()):
         proc = job.get("process")
         if proc and proc.returncode is None and job.get("status") == "running":
             job["status"] = "paused"
@@ -94,7 +96,8 @@ async def control_resume(request: Request) -> dict[str, Any]:
     if pause_file.exists():
         pause_file.unlink()
     resumed = 0
-    for job in active_jobs.values():
+    # B23: 使用 list() 快照避免并发迭代时字典修改抛 RuntimeError。
+    for job in list(active_jobs.values()):
         if job.get("status") == "paused":
             job["status"] = "running"
             resumed += 1
@@ -111,8 +114,10 @@ async def control_pause_status(request: Request) -> dict[str, Any]:
     require_admin(request)
     pause_file = MAOP_ROOT / "logs" / ".maop_pause"
     is_paused = pause_file.exists()
-    paused_jobs = sum(1 for job in active_jobs.values() if job.get("status") == "paused")
-    running_jobs = sum(1 for job in active_jobs.values() if job.get("status") == "running")
+    # B23: 使用 list() 快照避免并发迭代时字典修改抛 RuntimeError。
+    jobs_snapshot = list(active_jobs.values())
+    paused_jobs = sum(1 for job in jobs_snapshot if job.get("status") == "paused")
+    running_jobs = sum(1 for job in jobs_snapshot if job.get("status") == "running")
     return {
         "status": "paused" if is_paused else "running",
         "is_paused": is_paused,
@@ -127,7 +132,8 @@ async def control_stop(request: Request) -> dict[str, Any]:
     """Stop the control loop gracefully."""
     require_admin(request)
     stopped = 0
-    for job in active_jobs.values():
+    # B23: 使用 list() 快照避免并发迭代时字典修改抛 RuntimeError。
+    for job in list(active_jobs.values()):
         proc = job.get("process")
         if proc and proc.returncode is None:
             proc.terminate()

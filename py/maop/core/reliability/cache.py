@@ -321,6 +321,66 @@ class LRUCache:
             self._store.clear()
             self._pinned.clear()
 
+    # ── dict-like interface (B8: CacheGuard 兼容) ──────────────
+
+    def __contains__(self, key: str) -> bool:
+        """Check if key is present (regardless of TTL expiry)."""
+        with self._lock:
+            return key in self._store
+
+    def __getitem__(self, key: str) -> Any:
+        """Get value by key. Raises KeyError if missing.
+
+        Note: 不检查 TTL 过期，由调用方自行处理（CacheGuard 自管 TTL）。
+        """
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                raise KeyError(key)
+            return entry.value
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Store value without TTL (永不过期), 用于 CacheGuard 自管 TTL 场景。"""
+        with self._lock:
+            if key in self._store:
+                self._store[key].value = value
+                self._store.move_to_end(key)
+            else:
+                self._store[key] = CacheEntry(value=value, expires_at=0)
+                while len(self._store) > self._max_size:
+                    # LRU 淘汰：跳过 pinned，淘汰最旧非 pinned 项
+                    evicted = False
+                    for k in list(self._store.keys()):
+                        if k == key:
+                            break
+                        if k not in self._pinned:
+                            evicted_entry = self._store.pop(k)
+                            self._evictions += 1
+                            if self._on_evict is not None:
+                                self._on_evict(k, evicted_entry.value)
+                            evicted = True
+                            break
+                    if not evicted:
+                        break
+
+    def __delitem__(self, key: str) -> None:
+        """Delete by key. Raises KeyError if missing."""
+        with self._lock:
+            self._pinned.discard(key)
+            if key in self._store:
+                del self._store[key]
+            else:
+                raise KeyError(key)
+
+    def __iter__(self):
+        """Iterate over keys (snapshot under lock)."""
+        with self._lock:
+            return iter(list(self._store.keys()))
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._store)
+
     # ── Bulk operations ───────────────────────────────────────
 
     def get_or_compute(
@@ -611,7 +671,9 @@ class CacheGuard:
         cache: dict[str, Any] | None = None,
         config: CacheGuardConfig | None = None,
     ):
-        self._cache: dict[str, Any] = cache if cache is not None else {}
+        # B8: 默认使用 LRUCache(max_size=1000) 替代裸 dict，防止无限制增长。
+        # 调用方仍可显式传入自定义 cache（dict 或 LRUCache）。
+        self._cache: Any = cache if cache is not None else LRUCache(max_size=1000)
         self._config = config or CacheGuardConfig()
         self._stats = CacheGuardStats()
         self._sf = SingleFlight(

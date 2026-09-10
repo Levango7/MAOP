@@ -67,7 +67,7 @@ function formatTime(ts) {
 
 <style scoped>
 .node-detail-panel {
-  background: var(--bg-card, #fff);
+  background: var(--bg-card, #22242a);
   border: 1px solid var(--border, rgba(148,163,184,.35));
   border-radius: 8px;
   box-shadow: var(--shadow-card);

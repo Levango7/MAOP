@@ -19,11 +19,12 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from maop.config.edition import get_edition
+from maop.core.security.middleware import require_admin
 from maop.core.monitoring.otel import get_otel_endpoint
 from maop.core.observability import (
     observability_status,
@@ -133,12 +134,13 @@ async def traces(limit: int = 20) -> Any:
 
 
 @router.post("/record")
-async def record(payload: RecordRequestModel) -> Any:
+async def record(payload: RecordRequestModel, request: Request) -> Any:
     """Record a custom metric / error event.
 
     Used by the frontend (and external integrators) to push custom
     observability events into the MAOP metric pipeline.
     """
+    require_admin(request)
     try:
         if payload.kind == "request":
             record_request(payload.method, payload.path, payload.status, payload.duration)
@@ -244,12 +246,13 @@ async def config() -> Any:
 
 
 @router.post("/setup")
-async def setup(force: bool = False) -> Any:
+async def setup(request: Request, force: bool = False) -> Any:
     """Trigger (or re-trigger) observability setup.
 
     Useful for testing or for enabling tracing at runtime without a
     process restart (e.g. after installing the OTel SDK).
     """
+    require_admin(request)
     summary = setup_observability(force=force)
     return {"status": "ok", "summary": summary}
 

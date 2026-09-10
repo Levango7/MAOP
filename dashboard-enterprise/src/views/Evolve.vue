@@ -182,7 +182,7 @@ import EmptyState from '../components/EmptyState.vue';
 import Badge from '../components/Badge.vue';
 import EvolutionTimeline from '../components/EvolutionTimeline.vue';
 import EvolutionHistory from './EvolutionHistory.vue';
-import { cssVar, cssVarAlpha } from '../composables/chartTokens.js';
+import { cssVar, cssVarAlpha } from '../utils/chartTokens.js';
 import { useI18n } from '../i18n';
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler, Legend);

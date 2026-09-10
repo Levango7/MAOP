@@ -405,4 +405,6 @@ async def get_config() -> dict[str, Any]:
             "rate_limit_burst": s.rate_limit_burst,
         }
     except Exception as exc:
-        return {"error": str(exc)}
+        # 批次3A: 脱敏——系统信息读取错误细节不暴露给客户端，仅日志记录。
+        logger.warning("[meta] System info failed: %s", exc)
+        return {"error": "System info unavailable"}

@@ -903,8 +903,8 @@ async function onTestHook(hook) {
   background: var(--brand-soft);
 }
 .history-action-btn.danger:hover:not(:disabled) {
-  border-color: var(--danger, #c0392b);
-  background: var(--danger-soft, rgba(192, 57, 43, 0.08));
+  border-color: var(--danger, #f05545);  /* F-views: fallback 与 tokens.css --danger 一致 (原 #c0392b) */
+  background: var(--danger-soft, rgba(240, 85, 69, .08));  /* F-views: fallback 与 tokens.css --danger-soft 一致 */
 }
 .history-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -916,7 +916,7 @@ async function onTestHook(hook) {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
 }
 .history-modal {
   background: var(--surface);
@@ -1083,8 +1083,8 @@ async function onTestHook(hook) {
   background: var(--brand-soft);
 }
 .hooks-action-btn.danger:hover:not(:disabled) {
-  border-color: var(--danger, #c0392b);
-  background: var(--danger-soft, rgba(192, 57, 43, 0.08));
+  border-color: var(--danger, #f05545);  /* F-views: fallback 与 tokens.css --danger 一致 (原 #c0392b) */
+  background: var(--danger-soft, rgba(240, 85, 69, .08));  /* F-views: fallback 与 tokens.css --danger-soft 一致 */
 }
 .hooks-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -1105,7 +1105,7 @@ async function onTestHook(hook) {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
 }
 .hooks-modal {
   background: var(--surface);

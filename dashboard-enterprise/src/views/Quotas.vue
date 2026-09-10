@@ -282,8 +282,8 @@ import AppIcon from '../components/AppIcon.vue';
 import EmptyState from '../components/EmptyState.vue';
 import ListPageLayout from '../components/ListPageLayout.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
-import { baseLineOptions } from '../composables/chartOptions.js';
-import { cssVar } from '../composables/chartTokens.js';
+import { baseLineOptions } from '../utils/chartOptions.js';
+import { cssVar } from '../utils/chartTokens.js';
 
 ChartJS.register(
   LineElement, PointElement, LinearScale, CategoryScale,

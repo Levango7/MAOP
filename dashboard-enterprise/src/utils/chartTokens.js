@@ -1,12 +1,15 @@
 /**
- * Chart tokens composable (2026-08-12, P0-1 fix):
+ * Chart tokens utility (2026-08-12, P0-1 fix):
  *
  * Reads CSS custom properties so chart/diagram colors follow the active
  * dark/light theme instead of hardcoding hex values. Live-read on every
  * call, so theme switches apply immediately without a remount.
  *
+ * F2: 从 composables/ 移至 utils/ —— 本文件是纯工具函数，不使用 Vue 响应式 API，
+ * 放在 utils/ 更符合语义。
+ *
  * Typical usage:
- *   import { cssVar, cssVarAlpha } from '../composables/chartTokens.js';
+ *   import { cssVar, cssVarAlpha } from '../utils/chartTokens.js';
  *   cssVar('--chart-1')            // "#3574f0" (current theme)
  *   cssVar('--chart-1', '#6366f1') // fallback when CSS var is empty
  *   cssVarAlpha('--chart-1', 0.12) // "#3574f01f" (hex8) or rgba()

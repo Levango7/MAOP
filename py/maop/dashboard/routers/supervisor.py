@@ -113,9 +113,11 @@ async def api_supervisor_rule_update(
     try:
         new_rules = [SupervisorRule(**r) for r in body]
     except Exception as exc:
+        # 批次3A: 脱敏——校验错误细节不暴露给客户端，仅日志记录。
+        logger.warning("[supervisor-api] Invalid rule schema: %s", exc)
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid rule schema: {exc}",
+            detail="Invalid supervisor rule schema",
         ) from exc
     sup.set_rules(new_rules)
     logger.info(
@@ -238,7 +240,7 @@ async def api_supervisor_action(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"action execution failed: {exc}",
+            detail="Supervisor action execution failed",
         ) from exc
 
 

@@ -391,6 +391,9 @@ class ApiKeyManager:
         finally:
             self._pool.release(conn)
         if updated:
+            # B18: 清理该 key 的限流窗口，避免内存泄漏。
+            with self._rl_lock:
+                self._rl_windows.pop(key_id, None)
             logger.info("[api_keys] Revoked key id=%s by=%s", key_id, revoked_by)
         return updated
 
@@ -439,6 +442,9 @@ class ApiKeyManager:
         finally:
             self._pool.release(conn)
         if deleted:
+            # B18: 清理该 key 的限流窗口，避免内存泄漏。
+            with self._rl_lock:
+                self._rl_windows.pop(key_id, None)
             logger.info("[api_keys] Deleted key id=%s", key_id)
         return deleted
 

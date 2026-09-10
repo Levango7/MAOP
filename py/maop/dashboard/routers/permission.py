@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
@@ -43,7 +43,9 @@ async def remove_rule(rule_id: str, request: Request) -> dict[str, Any]:
     from maop.core.security.permission import PermissionManager
     pm = PermissionManager(root_dir=str(MAOP_ROOT))
     removed = pm.remove_rule(rule_id)
-    return {"status": "ok" if removed else "not_found", "rule_id": rule_id}
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Rule {rule_id} not found")
+    return {"status": "ok", "rule_id": rule_id}
 
 
 @router.get("/permission/rules")
@@ -80,7 +82,9 @@ async def approve_request(request_id: str, request: Request) -> dict[str, Any]:
     from maop.core.agent.delegation.human_proxy import HumanProxy
     hp = HumanProxy(root_dir=str(MAOP_ROOT))
     ok = hp.approve(request_id)
-    return {"status": "ok" if ok else "not_found", "request_id": request_id}
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Request {request_id} not found")
+    return {"status": "ok", "request_id": request_id}
 
 
 @router.post("/approval/{request_id}/reject")
@@ -90,4 +94,6 @@ async def reject_request(request_id: str, request: Request, reason: str = "") ->
     from maop.core.agent.delegation.human_proxy import HumanProxy
     hp = HumanProxy(root_dir=str(MAOP_ROOT))
     ok = hp.reject(request_id, reason=reason)
-    return {"status": "ok" if ok else "not_found", "request_id": request_id}
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Request {request_id} not found")
+    return {"status": "ok", "request_id": request_id}

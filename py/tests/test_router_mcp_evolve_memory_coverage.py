@@ -70,8 +70,7 @@ class TestMcpConnect:
     def test_no_config(self, mcp_env, mcp_client):
         mcp_env.get_server_config.return_value = None
         resp = mcp_client.post("/api/mcp/connect/nonexistent")
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "failed"
+        assert resp.status_code == 404
 
 
 class TestMcpDisconnect:
@@ -105,8 +104,7 @@ class TestMcpServers:
     def test_remove_not_found(self, mcp_env, mcp_client):
         mcp_env.remove_server.return_value = False
         resp = mcp_client.delete("/api/mcp/servers/nonexistent")
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "not_found"
+        assert resp.status_code == 404
 
 
 class TestMcpTools:

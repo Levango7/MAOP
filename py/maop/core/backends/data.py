@@ -6,16 +6,18 @@ SQLite-backed data access layer. with Python sqlite3 (stdlib) + aiosqlite for as
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import re
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
 from pydantic import BaseModel
 
-from maop.core.backends.db_utils import sqlite_connect, validate_identifier
+from maop.core.backends.db_utils import get_pool, sqlite_connect, validate_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -154,11 +156,27 @@ class MaopDatabase:
             db_path = _default_db_path()
         self._path = Path(db_path)
         self._initialized = False
+        # B10: 使用连接池复用连接，与 KVStore/APIKeyStore 保持一致。
+        self._pool = get_pool(self._path)
 
     # ── Connection management ─────────────────────────────────
 
+    @contextlib.contextmanager
     def _connect(self):
-        return sqlite_connect(self._path)
+        """B10: 从连接池获取连接，退出时 commit/rollback 并归还池。
+
+        与 sqlite3.Connection 的上下文管理器行为一致：
+        正常退出 commit，异常退出 rollback。
+        """
+        conn = self._pool.acquire()
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            self._pool.release(conn)
 
     # ── Init ──────────────────────────────────────────────────
 
@@ -256,7 +274,8 @@ class MaopDatabase:
         """Save or update a checkpoint."""
         now = datetime.now(timezone.utc).isoformat()
         state_json = json.dumps(state, ensure_ascii=False)
-        cp_id = f"{agent}_{task}_{phase}_{id(state) % 99999}"
+        # B11: 用 uuid4 生成 ID，避免 id(state) % 99999 在 CPython 地址复用下冲突。
+        cp_id = f"{agent}_{task}_{phase}_{uuid.uuid4().hex[:8]}"
 
         # Delete existing
         self.execute(

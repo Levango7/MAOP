@@ -99,22 +99,45 @@ class MemoryStore(SearchMixin):
                     conn.executescript(_FTS5_DDL)
                     self._fts5_available = True
                     logger.info("[mem] FTS5 full-text index initialized")
-                except Exception as fts_exc:
+                except sqlite3.Error as fts_exc:
+                    # B25: FTS5 不可用通常是 OperationalError（扩展未加载）
                     logger.warning("[mem] FTS5 not available, falling back to regex: %s", fts_exc)
                     self._fts5_available = False
             self._initialized = True
-        except Exception as exc:
+        except sqlite3.Error as exc:
+            # B25: 改为具体异常类型
             logger.warning("Failed to initialize memory DB: %s", exc)
+        except Exception as exc:
+            # B25: 兜底
+            logger.warning("Failed to initialize memory DB (non-SQLite error): %s", exc, exc_info=True)
 
     def _init_bloom(self):
-        """Initialize bloom filter with existing entry IDs for fast dedup."""
+        """Initialize bloom filter with existing entry IDs for fast dedup.
+
+        B26: 分批加载——避免一次性 fetchall 把所有行加载到 Python 内存，
+        减少启动时内存峰值，并记录加载进度日志。
+        """
         try:
             from maop.core.memory.bloom_filter import BloomFilter
             bf = BloomFilter(expected_items=50_000, fp_rate=0.01)
-            rows = self._query("SELECT id FROM memory_entries")
-            for r in rows:
-                bf.add(r["id"])
-            logger.info("[mem] Bloom filter initialized: %d IDs loaded", len(rows))
+            batch_size = 1000
+            total_loaded = 0
+            with self._connect() as conn:
+                cursor = conn.execute("SELECT id FROM memory_entries")
+                while True:
+                    rows = cursor.fetchmany(batch_size)
+                    if not rows:
+                        break
+                    for r in rows:
+                        # row 可能是 tuple 或 sqlite3.Row，统一用索引访问
+                        bf.add(r[0])
+                    total_loaded += len(rows)
+                    if total_loaded % (batch_size * 10) == 0:
+                        logger.info(
+                            "[mem] Bloom filter loading: %d IDs so far",
+                            total_loaded,
+                        )
+            logger.info("[mem] Bloom filter initialized: %d IDs loaded", total_loaded)
             return bf
         except Exception as exc:
             logger.warning("[mem] Bloom filter init failed: %s", exc)
@@ -173,8 +196,13 @@ class MemoryStore(SearchMixin):
                      entry.timestamp),
                 )
             logger.info("[mem] Stored: %s (%s, %s)", entry.id, agent, tags_str)
-        except Exception as exc:
+        except sqlite3.Error as exc:
+            # B25: 改为具体异常类型，sqlite3.Error 覆盖 IntegrityError/OperationalError 等
             logger.warning("[mem] Store failed: %s", exc)
+            return None
+        except Exception as exc:
+            # B25: 兜底——非 SQLite 错误（如编码/序列化）也记录 warning
+            logger.warning("[mem] Store failed (non-SQLite error): %s", exc, exc_info=True)
             return None
 
         # Add to bloom filter for future dedup
@@ -190,8 +218,12 @@ class MemoryStore(SearchMixin):
                     text=index_text[:500],
                     metadata={"agent": entry.agent, "topic": entry.topic, "tags": tags_str},
                 )
-            except Exception as exc:
+            except (sqlite3.Error, ValueError, TypeError) as exc:
+                # B25: 改为具体异常类型。best-effort 路径用 logger.debug。
                 logger.debug("[mem] VectorStore index skipped: %s", exc)
+            except Exception as exc:
+                # B25: 兜底——未知错误也记录 debug（best-effort）
+                logger.debug("[mem] VectorStore index skipped (unknown error): %s", exc, exc_info=True)
 
         self._dirty = True
         self._dirty_count += 1
@@ -370,30 +402,55 @@ class MemoryStore(SearchMixin):
     # ── STATS ─────────────────────────────────────────────
 
     def stats(self) -> MemoryStats:
-        """Compute memory store statistics."""
-        entries = self._query("SELECT * FROM memory_entries")
+        """Compute memory store statistics.
+
+        Uses SQL aggregation (GROUP BY / MIN / MAX / COUNT) instead of
+        loading every row into Python. This keeps memory usage O(groups)
+        rather than O(rows) — critical when the table grows large.
+        """
+        # total_entries via COUNT(*) — O(1) on SQLite, no row materialisation.
+        total_rows = self._query("SELECT COUNT(*) as cnt FROM memory_entries")
+        total_entries = total_rows[0]["cnt"] if total_rows else 0
+
+        # by_agent / by_topic via GROUP BY — returns one row per distinct value.
+        agent_rows = self._query(
+            "SELECT agent, COUNT(*) as count FROM memory_entries GROUP BY agent"
+        )
+        by_agent: dict[str, int] = {
+            r["agent"]: r["count"] for r in agent_rows if r["agent"]
+        }
+
+        topic_rows = self._query(
+            "SELECT topic, COUNT(*) as count FROM memory_entries GROUP BY topic"
+        )
+        by_topic: dict[str, int] = {
+            r["topic"]: r["count"] for r in topic_rows if r["topic"]
+        }
+
+        # oldest / newest via MIN/MAX. Filter out empty timestamps to match
+        # the previous semantics (empty strings were skipped). ISO-8601
+        # timestamps sort lexicographically == chronologically.
+        oldest_rows = self._query(
+            "SELECT MIN(timestamp) as oldest FROM memory_entries WHERE timestamp != ''"
+        )
+        newest_rows = self._query(
+            "SELECT MAX(timestamp) as newest FROM memory_entries WHERE timestamp != ''"
+        )
+        oldest = oldest_rows[0]["oldest"] if oldest_rows and oldest_rows[0]["oldest"] else ""
+        newest = newest_rows[0]["newest"] if newest_rows and newest_rows[0]["newest"] else ""
+
         traces = self._query("SELECT COUNT(*) as cnt FROM memory_traces")
         traj = self._query("SELECT COUNT(*) as cnt FROM memory_trajectory")
-
-        by_agent: dict[str, int] = {}
-        by_topic: dict[str, int] = {}
-        timestamps = []
-        for r in entries:
-            by_agent[r["agent"]] = by_agent.get(r["agent"], 0) + 1
-            by_topic[r["topic"]] = by_topic.get(r["topic"], 0) + 1
-            if r["timestamp"]:
-                timestamps.append(r["timestamp"])
-
         trace_count = traces[0]["cnt"] if traces else 0
         traj_count = traj[0]["cnt"] if traj else 0
 
         return MemoryStats(
-            total_entries=len(entries),
+            total_entries=total_entries,
             total_traces=trace_count,
             total_trajectory_steps=traj_count,
             by_agent=by_agent, by_topic=by_topic,
-            oldest=min(timestamps) if timestamps else "",
-            newest=max(timestamps) if timestamps else "",
+            oldest=oldest,
+            newest=newest,
         )
 
     # ── PRUNE ─────────────────────────────────────────────

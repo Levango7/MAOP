@@ -1,45 +1,45 @@
 <template>
-  <div v-if="visible" class="onboard-overlay" @click.self="skip">
+  <div v-if="visible" class="onboard-wizard__overlay" @click.self="skip">
     <Card class="onboard-wizard" :padded="false">
       <template #title>
         <h2>{{ t('view.onboard.title') }}</h2>
       </template>
       <template #actions>
-        <button class="onboard-skip" @click="skip">{{ t('view.onboard.skip') }}</button>
+        <button class="onboard-wizard__skip" @click="skip">{{ t('view.onboard.skip') }}</button>
       </template>
 
-      <nav class="onboard-steps">
+      <nav class="onboard-wizard__steps">
         <button
 v-for="(s, i) in steps" :key="i"
-          class="onboard-step-dot" :class="{ active: i === step, done: i < step }"
+          class="onboard-wizard__step-dot" :class="{ 'onboard-wizard__step-dot--active': i === step, 'onboard-wizard__step-dot--done': i < step }"
           :disabled="i > step" @click="step = i">
           <span>{{ i + 1 }}</span>
           <small>{{ s.label }}</small>
         </button>
       </nav>
 
-      <div class="onboard-body">
-        <div v-if="step === 0" class="onboard-step-content">
+      <div class="onboard-wizard__body">
+        <div v-if="step === 0" class="onboard-wizard__step-content">
           <p>{{ t('view.onboard.step1Desc') }}</p>
-          <div class="onboard-quick-actions">
+          <div class="onboard-wizard__quick-actions">
             <router-link to="/agents/new" class="btn btn-primary">{{ t('view.onboard.createAgent') }}</router-link>
             <router-link to="/chat" class="btn btn-outline">{{ t('view.onboard.openChat') }}</router-link>
           </div>
-          <p class="onboard-hint">{{ t('view.onboard.step1Hint') }}</p>
+          <p class="onboard-wizard__hint">{{ t('view.onboard.step1Hint') }}</p>
         </div>
 
-        <div v-if="step === 1" class="onboard-step-content">
+        <div v-if="step === 1" class="onboard-wizard__step-content">
           <p>{{ t('view.onboard.step2Desc') }}</p>
-          <div class="onboard-quick-actions">
+          <div class="onboard-wizard__quick-actions">
             <router-link to="/agents" class="btn btn-outline">{{ t('view.onboard.browseAgents') }}</router-link>
             <router-link to="/models" class="btn btn-outline">{{ t('view.onboard.manageModels') }}</router-link>
           </div>
-          <p class="onboard-hint">{{ t('view.onboard.step2Hint') }}</p>
+          <p class="onboard-wizard__hint">{{ t('view.onboard.step2Hint') }}</p>
         </div>
 
-        <div v-if="step === 2" class="onboard-step-content">
+        <div v-if="step === 2" class="onboard-wizard__step-content">
           <p>{{ t('view.onboard.step3Desc') }}</p>
-          <div class="onboard-quick-actions">
+          <div class="onboard-wizard__quick-actions">
             <a :href="t('view.onboard.docsUrl')" target="_blank" class="btn btn-outline">{{ t('view.onboard.readDocs') }}</a>
           </div>
           <button class="btn btn-primary" @click="finish">{{ t('view.onboard.done') }}</button>
@@ -82,7 +82,8 @@ function finish() {
 </script>
 
 <style scoped>
-.onboard-overlay {
+/* F4: BEM 命名统一 — block: onboard-wizard, element: __*, modifier: --* */
+.onboard-wizard__overlay {
   position: fixed; inset: 0;
   /* 修复: z-index: 100 硬编码 token 化 → var(--z-modal) */
   z-index: var(--z-modal);
@@ -94,19 +95,19 @@ function finish() {
 }
 .onboard-wizard { max-width: 520px; width: 100%; }
 /* 修复: 0.875rem 硬编码 token 化 → var(--fs-sm) */
-.onboard-skip { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-sm); }
-.onboard-steps { display: flex; gap: 0; /* 修复: 1rem token 化 */ padding: var(--fs-base) 1.5rem; border-bottom: 1px solid var(--border); }
-/* 修复: 4px 硬编码 token 化 → var(--r-sm) */
-.onboard-step-dot { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--r-sm); background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 0.75rem; padding: 0; }
-.onboard-step-dot span { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-muted); font-weight: 600; font-size: 0.8125rem; }
-.onboard-step-dot.active span { background: var(--brand); color: var(--brand-contrast, #fff); }
-.onboard-step-dot.done span { background: var(--success); color: var(--brand-contrast, #fff); }
-.onboard-step-dot.active { color: var(--brand); }
-.onboard-step-dot.done { color: var(--success); }
-.onboard-step-dot:disabled { opacity: 0.4; cursor: not-allowed; }
-.onboard-body { padding: 1.5rem; }
-/* 修复: 1rem token 化 → var(--fs-base) */
-.onboard-step-content p { margin-bottom: var(--fs-base); color: var(--text-muted); }
-.onboard-quick-actions { display: flex; gap: 0.5rem; margin-bottom: var(--fs-base); }
-.onboard-hint { font-size: 0.8125rem; color: var(--text-muted); }
+.onboard-wizard__skip { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-sm); }
+.onboard-wizard__steps { display: flex; gap: 0; /* 修复: 1rem token 化 */ padding: var(--fs-base) var(--sp-6); border-bottom: 1px solid var(--border); }
+/* 修复: 4px 硬编码 token 化 → var(--r-sm); 0.75rem → var(--fs-2xs) */
+.onboard-wizard__step-dot { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--r-sm); background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: var(--fs-2xs); padding: 0; }
+.onboard-wizard__step-dot span { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-muted); font-weight: 600; font-size: var(--fs-xs); }
+.onboard-wizard__step-dot--active span { background: var(--brand); color: var(--brand-contrast, #fff); }
+.onboard-wizard__step-dot--done span { background: var(--success); color: var(--brand-contrast, #fff); }
+.onboard-wizard__step-dot--active { color: var(--brand); }
+.onboard-wizard__step-dot--done { color: var(--success); }
+.onboard-wizard__step-dot:disabled { opacity: 0.4; cursor: not-allowed; }
+.onboard-wizard__body { padding: var(--sp-6); }
+/* 修复: 1rem token 化 → var(--fs-base); 0.5rem → var(--sp-2) */
+.onboard-wizard__step-content p { margin-bottom: var(--fs-base); color: var(--text-muted); }
+.onboard-wizard__quick-actions { display: flex; gap: var(--sp-2); margin-bottom: var(--fs-base); }
+.onboard-wizard__hint { font-size: var(--fs-xs); color: var(--text-muted); }
 </style>

@@ -127,7 +127,7 @@ export const useApiStore = defineStore('api', {
         // Retry once if refresh succeeded (new token is now in localStorage)
         res = await fetchWithTimeout(url, withAuth({}, (opts && opts.headers) || {}));
         if (res.status === 401) {
-          handleUnauthorized();  // refresh didn't help or no token
+          await handleUnauthorized();  // refresh didn't help or no token
           throw new Error(`API ${url}: 401 Unauthorized`);
         }
       }
@@ -156,7 +156,7 @@ export const useApiStore = defineStore('api', {
           headers
         ));
         if (res.status === 401) {
-          handleUnauthorized();
+          await handleUnauthorized();
           throw new Error(`API ${url}: 401 Unauthorized`);
         }
       }
@@ -168,17 +168,21 @@ export const useApiStore = defineStore('api', {
     },
     /** PUT 请求，自动注入 Bearer token */
     async put(url, body) {
+      // F3: Content-Type 只在 withAuth 的 headers 参数中设置一次。
+      // withAuth 实现中 init.headers = h 会覆盖 extra.headers，故 extra 内
+      // 不再冗余设置 headers（原代码 extra.headers 是被丢弃的死代码）。
+      const putHeaders = { 'Content-Type': 'application/json' };
       let res = await fetchWithTimeout(url, withAuth(
-        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) },
-        { 'Content-Type': 'application/json' }
+        { method: 'PUT', body: JSON.stringify(body || {}) },
+        putHeaders
       ));
       if (res.status === 401) {
         await handleUnauthorized();
         res = await fetchWithTimeout(url, withAuth(
-          { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) },
-          { 'Content-Type': 'application/json' }
+          { method: 'PUT', body: JSON.stringify(body || {}) },
+          putHeaders
         ));
-        if (res.status === 401) { handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+        if (res.status === 401) { await handleUnauthorized(); throw new Error(`API ${url}: 401`); }
       }
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
@@ -192,7 +196,7 @@ export const useApiStore = defineStore('api', {
       if (res.status === 401) {
         await handleUnauthorized();
         res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
-        if (res.status === 401) { handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+        if (res.status === 401) { await handleUnauthorized(); throw new Error(`API ${url}: 401`); }
       }
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));

@@ -176,13 +176,14 @@ onMounted(() => {
 
 <style scoped>
 .topbar {
-  /* 层叠覆盖布局 (2026-08-13 重构): 顶栏全宽 fixed, z-index:10 低于侧栏 (z-index:20),
-     侧栏展开时覆盖顶栏左侧品牌区, 折叠时品牌区自然露出 */
+  /* 层叠覆盖布局 (2026-08-13 重构): 顶栏全宽 fixed, z-index 低于侧栏 (z-index:20),
+     侧栏展开时覆盖顶栏左侧品牌区, 折叠时品牌区自然露出。
+     F32: z-index 硬编码 token 化 → var(--z-topbar-fixed) */
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 10;
+  z-index: var(--z-topbar-fixed);
   display: flex;
   align-items: center;
   gap: var(--sp-4);
@@ -204,7 +205,7 @@ onMounted(() => {
     var(--topbar-hairline) 88%,
     transparent 100%);
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 /* 右上品牌微光 */
 .topbar::after {

@@ -476,7 +476,7 @@ onUnmounted(() => {
   padding: 4px 8px;
   border: 1px solid var(--border, rgba(148,163,184,.35));
   border-radius: 4px;
-  background: var(--bg-card, #fff);
+  background: var(--bg-card, #22242a);
   color: var(--text, #e8eaf0);
   /* 修复: 固定 200px 宽度在小屏挤压 → 改为 min-width + flex 响应式伸缩 */
   min-width: 200px;
@@ -494,7 +494,7 @@ onUnmounted(() => {
   padding: 4px 10px;
   border: 1px solid var(--border, rgba(148,163,184,.35));
   border-radius: 4px;
-  background: var(--bg-card, #fff);
+  background: var(--bg-card, #22242a);
   color: var(--text, #e8eaf0);
   cursor: pointer;
 }
@@ -527,8 +527,9 @@ onUnmounted(() => {
 .agent-health-row:last-child {
   border-bottom: none;
 }
-/* 修复: 6列 grid 在小屏无响应式断点 → 768px 以下降为 3列，避免列内容挤压 */
-@media (max-width: 768px) {
+/* 修复: 6列 grid 在小屏无响应式断点 → 700px 以下降为 3列，避免列内容挤压
+ * F-views: 断点 768px → 700px，与项目标准断点统一 (1100/900/700/640) */
+@media (max-width: 700px) {
   .agent-health-row {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 6px;

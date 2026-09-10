@@ -18,6 +18,10 @@ export function useAgentTokenStream() {
   const meta = ref(null);
   let eventSource = null;
   let abortController = null;
+  // F26 fix: 保存外部 signal 的 abort handler 引用, 以便在 close() 中移除监听器,
+  // 避免每次 subscribe 都累积一个监听器 (memory leak + 重复 close 调用)。
+  let externalSignal = null;
+  let externalAbortHandler = null;
 
   /**
    * Subscribe to an agent execution's token stream.
@@ -44,10 +48,14 @@ export function useAgentTokenStream() {
 
     abortController = new AbortController();
     if (signal) {
-      signal.addEventListener('abort', () => {
+      // F26 fix: 保存 handler 引用以便 close() 能 removeEventListener。
+      // 此前直接传匿名箭头函数, 引用丢失导致监听器永远无法移除。
+      externalSignal = signal;
+      externalAbortHandler = () => {
         close();
         if (onDone) onDone({ reason: 'aborted' });
-      });
+      };
+      signal.addEventListener('abort', externalAbortHandler);
     }
 
     // Auth: rely on the httpOnly maop_token cookie (same-origin EventSource
@@ -128,6 +136,12 @@ export function useAgentTokenStream() {
     if (abortController) {
       abortController.abort();
       abortController = null;
+    }
+    // F26 fix: 移除外部 signal 的 abort 监听器, 释放引用避免泄漏。
+    if (externalSignal && externalAbortHandler) {
+      externalSignal.removeEventListener('abort', externalAbortHandler);
+      externalSignal = null;
+      externalAbortHandler = null;
     }
     streaming.value = false;
   }

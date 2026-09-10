@@ -196,9 +196,11 @@ async def create_provider(request: Request, body: dict[str, Any]) -> dict[str, A
     try:
         payload = SSOProviderCreate(**body)
     except Exception as exc:
+        # 批次3A: 脱敏——校验错误细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] Invalid provider config: %s", exc)
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid SSO provider config: {exc}",
+            detail="Invalid SSO provider configuration",
         ) from exc
     reg = _get_registry()
     try:
@@ -272,9 +274,11 @@ async def update_provider(
     try:
         payload = SSOProviderUpdate(**body)
     except Exception as exc:
+        # 批次3A: 脱敏——校验错误细节不暴露给客户端，仅日志记录。
+        logger.warning("[sso] Invalid provider update: %s", exc)
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid SSO provider update: {exc}",
+            detail="Invalid SSO provider update",
         ) from exc
     reg = _get_registry()
     try:
@@ -409,12 +413,13 @@ async def oidc_callback(
     try:
         session = reg.handle_oidc_callback(provider_id, code, state=state)
     except ValueError as exc:
+        logger.warning("[sso] OIDC callback error: %s", exc)
         _audit(
             request,
             "sso.login.failure",
             resource=f"provider:{provider_id}",
             result="failure",
-            detail=str(exc),
+            detail="SSO callback error",
         )
         # 批次3A: 脱敏——回调错误细节不暴露给客户端，仅审计日志记录。
         return JSONResponse(
@@ -430,12 +435,13 @@ async def oidc_callback(
         logger.warning("[sso] OIDC callback provider not found: %s", exc)
         raise HTTPException(status_code=404, detail="SSO provider not found") from exc
     except Exception as exc:
+        logger.warning("[sso] OIDC token exchange error: %s", exc)
         _audit(
             request,
             "sso.login.failure",
             resource=f"provider:{provider_id}",
             result="failure",
-            detail=str(exc),
+            detail="SSO token exchange failed",
         )
         # 批次3A: 脱敏——token exchange 错误细节不暴露给客户端，仅审计日志记录。
         return JSONResponse(
@@ -514,12 +520,13 @@ async def saml_acs(
     except Exception as exc:
         # SAML 验证失败（签名/Conditions/Audience）→ 403
         from maop.enterprise.sso import SSOError
+        logger.warning("[sso] SAML ACS error: %s", exc)
         _audit(
             request,
             "sso.login.failure",
             resource=f"provider:{provider_id}",
             result="failure",
-            detail=str(exc),
+            detail="SAML assertion error",
         )
         if isinstance(exc, SSOError):
             # 批次3A: 脱敏——签名错误细节不暴露给客户端，仅审计日志记录。

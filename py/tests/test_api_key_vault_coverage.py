@@ -107,7 +107,11 @@ class TestApiKeyVault:
 
 
 class TestApiKeyVaultNoCrypto:
-    """Test behavior when cryptography is not available (mocked out)."""
+    """Test behavior when cryptography is not available (mocked out).
+
+    After B16 fail-fast: ApiKeyVault construction itself raises RuntimeError
+    when cryptography is missing, rather than silently degrading to plaintext.
+    """
 
     def test_encrypt_without_crypto_raises(self, tmp_path, monkeypatch):
         # Force ImportError for cryptography.fernet
@@ -121,12 +125,11 @@ class TestApiKeyVaultNoCrypto:
         monkeypatch.setattr("builtins.__import__", _fake_import)
         monkeypatch.delenv("MAOP_KEY", raising=False)
 
-        vault = ApiKeyVault(root_dir=tmp_path)
-        assert vault._fernet is None
-        with pytest.raises(RuntimeError, match="cryptography library required"):
-            vault.store("openai", "sk-test")
+        # B16: fail-fast — construction raises immediately, no silent degradation.
+        with pytest.raises(RuntimeError, match="cryptography package is required"):
+            ApiKeyVault(root_dir=tmp_path)
 
-    def test_rotate_without_crypto_returns_false(self, tmp_path, monkeypatch):
+    def test_rotate_without_crypto_raises(self, tmp_path, monkeypatch):
         original_import = __import__
 
         def _fake_import(name, *args, **kwargs):
@@ -137,5 +140,6 @@ class TestApiKeyVaultNoCrypto:
         monkeypatch.setattr("builtins.__import__", _fake_import)
         monkeypatch.delenv("MAOP_KEY", raising=False)
 
-        vault = ApiKeyVault(root_dir=tmp_path)
-        assert vault.rotate_master_key() is False
+        # B16: fail-fast — construction raises immediately.
+        with pytest.raises(RuntimeError, match="cryptography package is required"):
+            ApiKeyVault(root_dir=tmp_path)

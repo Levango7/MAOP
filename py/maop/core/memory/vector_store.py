@@ -35,6 +35,8 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -292,6 +294,11 @@ class VectorStore:
         self._cache_max_size = 50000  # P2 fix: prevent unbounded memory growth
         self._text_cache: dict[str, str] = {}  # id → text cache
         self._meta_cache: dict[str, dict[str, Any]] = {}  # id → metadata cache
+        # B19: text/meta 缓存也设上限，防止无限制增长。
+        self._text_cache_max_size = 50000
+        self._meta_cache_max_size = 50000
+        # B22: 保护 _cache/_text_cache/_meta_cache 的并发读写。
+        self._cache_lock = threading.Lock()
         # P1-5: HNSW tier configuration
         self.hnsw_threshold = max(0, int(hnsw_threshold))
         self._enable_hnsw = bool(enable_hnsw) and _HnswIndex.available()
@@ -360,14 +367,31 @@ class VectorStore:
                         VALUES (?, ?, ?, ?, ?)""",
                     (entry_id, text, json.dumps(vector), json.dumps(meta), now),
                 )
-        except Exception as exc:
+        except sqlite3.Error as exc:
+            # B25: 改为具体异常类型
             logger.warning("[vector] Index failed: %s", exc)
+            return ""
+        except Exception as exc:
+            # B25: 兜底
+            logger.warning("[vector] Index failed (non-SQLite error): %s", exc, exc_info=True)
             return ""
 
         # Update caches
-        self._cache[entry_id] = vector
-        self._text_cache[entry_id] = text
-        self._meta_cache[entry_id] = meta
+        # B19/B22: 加锁保护缓存写入，并淘汰超限的最旧项。
+        with self._cache_lock:
+            self._cache[entry_id] = vector
+            self._text_cache[entry_id] = text
+            self._meta_cache[entry_id] = meta
+            # 淘汰超限项
+            if len(self._cache) > self._cache_max_size:
+                oldest = next(iter(self._cache))
+                self._cache.pop(oldest, None)
+            if len(self._text_cache) > self._text_cache_max_size:
+                oldest = next(iter(self._text_cache))
+                self._text_cache.pop(oldest, None)
+            if len(self._meta_cache) > self._meta_cache_max_size:
+                oldest = next(iter(self._meta_cache))
+                self._meta_cache.pop(oldest, None)
         # P1-5: incrementally feed new vector into HNSW if active
         self._hnsw_add([(entry_id, vector)])
         return entry_id
@@ -419,9 +443,11 @@ class VectorStore:
                     eid = entry["id"]
                     text = entry["text"]
                     rows.append((eid, text, json.dumps(vec), json.dumps(meta), now))
-                    self._cache[eid] = vec
-                    self._text_cache[eid] = text
-                    self._meta_cache[eid] = meta
+                    # B22: 加锁保护缓存写入
+                    with self._cache_lock:
+                        self._cache[eid] = vec
+                        self._text_cache[eid] = text
+                        self._meta_cache[eid] = meta
                     count += 1
                 if rows:
                     conn.executemany(
@@ -498,16 +524,22 @@ class VectorStore:
             Results sorted by similarity descending.
         """
         # Load all vectors (with cache)
-        if not self._cache:
+        # B22: 加锁保护缓存读取
+        with self._cache_lock:
+            cache_empty = not self._cache
+        if cache_empty:
             self._load_cache()
 
-        if not self._cache:
+        with self._cache_lock:
+            cache_empty = not self._cache
+            cache_len = len(self._cache)
+        if cache_empty:
             return []
 
         # P1-5: Tier 0 — HNSW (best, optional). Only attempted when
         # the index size exceeds the configured threshold and hnswlib
         # is available. Falls back silently on any failure.
-        if self._enable_hnsw and len(self._cache) >= self.hnsw_threshold:
+        if self._enable_hnsw and cache_len >= self.hnsw_threshold:
             try:
                 return self._search_vector_hnsw(query_vector, top, threshold)
             except Exception as e:
@@ -584,13 +616,18 @@ class VectorStore:
         if self._hnsw_index is None:
             raise RuntimeError("HNSW index not initialized")
         # Rebuild if dirty (e.g. after delete/clear)
-        if not self._cache:
+        # B22: 加锁保护缓存读取
+        with self._cache_lock:
+            cache_empty = not self._cache
+        if cache_empty:
             self._load_cache()
         # Sync index with current cache when sizes diverge (post-delete)
-        if self._hnsw_index.size != len(self._cache):
-            items = list(self._cache.items())
+        with self._cache_lock:
+            cache_len = len(self._cache)
+            cache_items = list(self._cache.items()) if self._hnsw_index.size != cache_len else None
+        if cache_items is not None:
             self._hnsw_index.invalidate()
-            self._hnsw_index.build(items)
+            self._hnsw_index.build(cache_items)
         hits = self._hnsw_index.search(query_vector, top)
         results: list[VectorSearchResult] = []
         for eid, score in hits:
@@ -640,8 +677,10 @@ class VectorStore:
         np: Any,
     ) -> list[VectorSearchResult]:
         """NumPy-accelerated batch cosine similarity search."""
-        ids = list(self._cache.keys())
-        vecs = list(self._cache.values())
+        # B22: 加锁保护缓存读取，获取快照后在锁外计算。
+        with self._cache_lock:
+            ids = list(self._cache.keys())
+            vecs = list(self._cache.values())
         mat = np.array(vecs, dtype=np.float64)
         q = np.array(query_vector, dtype=np.float64)
 
@@ -670,7 +709,10 @@ class VectorStore:
     ) -> list[VectorSearchResult]:
         """Pure Python cosine similarity search (fallback)."""
         scored: list[tuple[float, str, str, dict]] = []
-        for entry_id, vec in self._cache.items():
+        # B22: 加锁保护缓存读取，获取快照后在锁外计算。
+        with self._cache_lock:
+            cache_items = list(self._cache.items())
+        for entry_id, vec in cache_items:
             sim = cosine_similarity(query_vector, vec)
             if sim >= threshold:
                 text, meta = self._get_entry_info(entry_id)
@@ -722,16 +764,20 @@ class VectorStore:
                     ).fetchall()
 
                 for row in rows:
-                    self._cache[row["id"]] = json.loads(row["vector"])
-                    self._text_cache[row["id"]] = row["text"] or ""
-                    self._meta_cache[row["id"]] = json.loads(row["metadata"] or "{}")
+                    # B22: 加锁保护缓存写入
+                    with self._cache_lock:
+                        self._cache[row["id"]] = json.loads(row["vector"])
+                        self._text_cache[row["id"]] = row["text"] or ""
+                        self._meta_cache[row["id"]] = json.loads(row["metadata"] or "{}")
         except Exception as exc:
             logger.warning("[vector] Cache load failed: %s", exc)
 
     def _get_entry_info(self, entry_id: str) -> tuple[str, dict[str, Any]]:
         """Get text and metadata for an entry from in-memory cache."""
-        text = self._text_cache.get(entry_id, "")
-        meta = self._meta_cache.get(entry_id, {})
+        # B22: 加锁保护缓存读取
+        with self._cache_lock:
+            text = self._text_cache.get(entry_id, "")
+            meta = self._meta_cache.get(entry_id, {})
         if text or meta:
             return text, meta
         try:
@@ -743,8 +789,10 @@ class VectorStore:
                 if row:
                     text = row["text"] or ""
                     meta = json.loads(row["metadata"] or "{}")
-                    self._text_cache[entry_id] = text
-                    self._meta_cache[entry_id] = meta
+                    # B22: 加锁保护缓存写入
+                    with self._cache_lock:
+                        self._text_cache[entry_id] = text
+                        self._meta_cache[entry_id] = meta
                     return text, meta
         except Exception as e:
             logger.debug("ignored: %s", e, exc_info=True)
@@ -757,9 +805,11 @@ class VectorStore:
         try:
             with self._connect() as conn:
                 conn.execute("DELETE FROM vector_entries WHERE id = ?", (entry_id,))
-            self._cache.pop(entry_id, None)
-            self._text_cache.pop(entry_id, None)
-            self._meta_cache.pop(entry_id, None)
+            # B22: 加锁保护缓存删除
+            with self._cache_lock:
+                self._cache.pop(entry_id, None)
+                self._text_cache.pop(entry_id, None)
+                self._meta_cache.pop(entry_id, None)
             # P1-5: HNSW does not support cheap incremental delete;
             # mark dirty so the next search rebuilds from cache.
             if self._hnsw_index is not None:
@@ -832,9 +882,11 @@ class VectorStore:
         try:
             with self._connect() as conn:
                 conn.execute("DELETE FROM vector_entries")
-            self._cache.clear()
-            self._text_cache.clear()
-            self._meta_cache.clear()
+            # B22: 加锁保护缓存清空
+            with self._cache_lock:
+                self._cache.clear()
+                self._text_cache.clear()
+                self._meta_cache.clear()
             # P1-5: drop HNSW index entirely so next build starts fresh.
             if self._hnsw_index is not None:
                 self._hnsw_index.invalidate()

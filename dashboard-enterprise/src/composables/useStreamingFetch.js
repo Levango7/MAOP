@@ -39,16 +39,18 @@ export function useStreamingFetch() {
         headers,
         body: JSON.stringify(body || {}),
         signal: controller.signal,
+        credentials: 'include',
       });
+
+      // F23 修复: 401 检查必须在通用 !res.ok 之前，否则 401 分支为死代码
+      if (res.status === 401) {
+        if (onError) onError('Unauthorized');
+        return;
+      }
 
       if (!res.ok) {
         const errText = await res.text().catch(() => res.statusText);
         if (onError) onError(`HTTP ${res.status}: ${errText}`);
-        return;
-      }
-
-      if (res.status === 401) {
-        if (onError) onError('Unauthorized');
         return;
       }
 

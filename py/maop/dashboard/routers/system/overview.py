@@ -158,7 +158,8 @@ async def api_system_resources(request: Request) -> dict[str, Any]:
     except ImportError:
         mem_error = "psutil not available"
     except Exception as exc:
-        mem_error = str(exc)[:200]
+        logger.warning('Memory stat failed: %s', exc)
+        mem_error = "Memory stat failed"
     memory_store: dict[str, Any] = {
         "pct": _deps._pct(mem_used_mb, mem_total_mb),
         "used_mb": round(mem_used_mb, 2),
@@ -181,7 +182,8 @@ async def api_system_resources(request: Request) -> dict[str, Any]:
                     except OSError as exc:
                         logger.warning('Failed to stat %s: %s', f, exc)
     except Exception as exc:
-        sqlite_error = str(exc)[:200]
+        logger.warning('SQLite stat failed: %s', exc)
+        sqlite_error = "SQLite stat failed"
     sqlite_db: dict[str, Any] = {
         "pct": _deps._pct(sqlite_used_mb, sqlite_total_mb),
         "used_mb": round(sqlite_used_mb, 2),
@@ -205,7 +207,8 @@ async def api_system_resources(request: Request) -> dict[str, Any]:
                         except OSError as exc:
                             logger.warning('Failed to stat %s: %s', f, exc)
     except Exception as exc:
-        vector_error = str(exc)[:200]
+        logger.warning('Vector stat failed: %s', exc)
+        vector_error = "Vector stat failed"
     vector_index: dict[str, Any] = {
         "pct": _deps._pct(vector_used_mb, vector_total_mb),
         "used_mb": round(vector_used_mb, 2),
@@ -222,7 +225,8 @@ async def api_system_resources(request: Request) -> dict[str, Any]:
         log_dir = _deps.MAOP_ROOT / "logs"
         log_used_mb = _deps._dir_size_mb(log_dir)
     except Exception as exc:
-        log_error = str(exc)[:200]
+        logger.warning('Log stat failed: %s', exc)
+        log_error = "Log stat failed"
     log_files: dict[str, Any] = {
         "pct": _deps._pct(log_used_mb, log_total_mb),
         "used_mb": round(log_used_mb, 2),
@@ -271,7 +275,8 @@ async def api_system_diagnostics(request: Request) -> dict[str, Any]:
         else:
             result["database"] = {"ok": True, "result": "OK (no db file yet)"}
     except Exception as exc:
-        result["database"] = {"ok": False, "result": str(exc)[:200]}
+        logger.warning('Database diagnostic failed: %s', exc)
+        result["database"] = {"ok": False, "result": "Database check failed"}
 
     # ── Agent Registry: 调用 list_agents() 返回数量 ──
     try:
@@ -281,21 +286,24 @@ async def api_system_diagnostics(request: Request) -> dict[str, Any]:
         count = len(agents) if hasattr(agents, "__len__") else 0
         result["agent_registry"] = {"ok": True, "result": f"{count} agents"}
     except Exception as exc:
-        result["agent_registry"] = {"ok": False, "result": str(exc)[:200]}
+        logger.warning('Agent registry diagnostic failed: %s', exc)
+        result["agent_registry"] = {"ok": False, "result": "Agent registry check failed"}
 
     # ── Memory Store: try import 检查 ──
     try:
         from maop.core.reliability.cache import get_cache  # noqa: F401
         result["memory_store"] = {"ok": True, "result": "OK"}
     except Exception as exc:
-        result["memory_store"] = {"ok": False, "result": str(exc)[:200]}
+        logger.warning('Memory store diagnostic failed: %s', exc)
+        result["memory_store"] = {"ok": False, "result": "Memory store check failed"}
 
     # ── Vector Index: try import ──
     try:
         from maop.core.memory.vector import VectorStore  # noqa: F401
         result["vector_index"] = {"ok": True, "result": "OK"}
     except Exception as exc:
-        result["vector_index"] = {"ok": False, "result": str(exc)[:200]}
+        logger.warning('Vector index diagnostic failed: %s', exc)
+        result["vector_index"] = {"ok": False, "result": "Vector index check failed"}
 
     # ── Config Loader: try 加载 agents.yaml ──
     try:
@@ -304,7 +312,8 @@ async def api_system_diagnostics(request: Request) -> dict[str, Any]:
         agent_count = len(cfg.agents) if hasattr(cfg, "agents") else 0
         result["config_loader"] = {"ok": True, "result": f"OK ({agent_count} agents configured)"}
     except Exception as exc:
-        result["config_loader"] = {"ok": False, "result": str(exc)[:200]}
+        logger.warning('Config loader diagnostic failed: %s', exc)
+        result["config_loader"] = {"ok": False, "result": "Config loader check failed"}
 
     # ── Audit Log: try import maop.enterprise.audit；Personal 版降级 ──
     try:
@@ -313,6 +322,7 @@ async def api_system_diagnostics(request: Request) -> dict[str, Any]:
     except ImportError:
         result["audit_log"] = {"ok": True, "result": "N/A (personal edition)"}
     except Exception as exc:
-        result["audit_log"] = {"ok": False, "result": str(exc)[:200]}
+        logger.warning('Audit log diagnostic failed: %s', exc)
+        result["audit_log"] = {"ok": False, "result": "Audit log check failed"}
 
     return result

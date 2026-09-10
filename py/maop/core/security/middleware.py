@@ -9,6 +9,7 @@ Provides:
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from collections.abc import Callable
 from typing import Any, cast
@@ -356,6 +357,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.key_func = key_func or self._default_key
         self._buckets: dict[str, Any] = {}
         self._request_count = 0  # for periodic cleanup
+        # B20: 保护 _buckets/_request_count 的并发读写。
+        self._lock = threading.Lock()
 
     @staticmethod
     def _default_key(request: Request) -> str:
@@ -387,34 +390,36 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Simple in-memory token bucket per key
         now = time.monotonic()
 
-        # Periodic cleanup: remove stale buckets every 200 requests
-        self._request_count += 1
-        if self._request_count % 200 == 0:
-            stale_cutoff = now - 300  # 5 minutes
-            stale_keys = [k for k, v in self._buckets.items() if v["last"] < stale_cutoff]
-            for k in stale_keys:
-                del self._buckets[k]
+        # B20: 加锁保护 _buckets/_request_count 的并发读写。
+        with self._lock:
+            # Periodic cleanup: remove stale buckets every 200 requests
+            self._request_count += 1
+            if self._request_count % 200 == 0:
+                stale_cutoff = now - 300  # 5 minutes
+                stale_keys = [k for k, v in self._buckets.items() if v["last"] < stale_cutoff]
+                for k in stale_keys:
+                    del self._buckets[k]
 
-        if key not in self._buckets:
-            self._buckets[key] = {"tokens": float(self.burst), "last": now}
+            if key not in self._buckets:
+                self._buckets[key] = {"tokens": float(self.burst), "last": now}
 
-        bucket = self._buckets[key]
-        elapsed = now - bucket["last"]
-        bucket["tokens"] = min(self.burst, bucket["tokens"] + elapsed * self.rate)
-        bucket["last"] = now
+            bucket = self._buckets[key]
+            elapsed = now - bucket["last"]
+            bucket["tokens"] = min(self.burst, bucket["tokens"] + elapsed * self.rate)
+            bucket["last"] = now
 
-        if bucket["tokens"] < 1.0:
-            retry_after = (1.0 - bucket["tokens"]) / self.rate
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "error": "Rate limit exceeded",
-                    "retry_after_s": round(retry_after, 2),
-                },
-                headers={"Retry-After": str(int(retry_after) + 1)},
-            )
+            if bucket["tokens"] < 1.0:
+                retry_after = (1.0 - bucket["tokens"]) / self.rate
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "error": "Rate limit exceeded",
+                        "retry_after_s": round(retry_after, 2),
+                    },
+                    headers={"Retry-After": str(int(retry_after) + 1)},
+                )
 
-        bucket["tokens"] -= 1.0
+            bucket["tokens"] -= 1.0
         return cast(Response, await call_next(request))
 
 

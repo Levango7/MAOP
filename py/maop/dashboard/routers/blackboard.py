@@ -84,7 +84,9 @@ async def read_domain(domain: str) -> dict[str, Any]:
     try:
         entries = bb.read(domain)
     except InvalidDomainError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # 批次3A: 脱敏——InvalidDomainError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[blackboard] Invalid domain: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid domain") from exc
     return {
         "status": "ok",
         "data": [e.to_dict() for e in entries],
@@ -113,7 +115,9 @@ async def write_entry(
             metadata=body.metadata,
         )
     except InvalidDomainError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # 批次3A: 脱敏——InvalidDomainError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[blackboard] Invalid domain: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid domain") from exc
     return {"status": "ok", "data": entry.to_dict()}
 
 
@@ -126,7 +130,9 @@ async def clear_domain(domain: str, request: Request) -> dict[str, Any]:
     try:
         cleared = await bb.clear(domain)
     except InvalidDomainError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # 批次3A: 脱敏——InvalidDomainError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[blackboard] Invalid domain: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid domain") from exc
     return {"status": "ok", "domain": domain, "cleared": cleared}
 
 

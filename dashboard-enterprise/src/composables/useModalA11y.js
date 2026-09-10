@@ -50,8 +50,13 @@ export function useModalA11y(isOpen, onClose) {
   }
 
   // global Esc listener (always mounted while composable is alive)
-  window.addEventListener('keydown', handleKeydown);
-  window.addEventListener('keydown', handleFocusTrap, true);
+  // SSR-safe: guard window access so the composable can be imported in a
+  // server/SSR or test (jsdom-less) context without throwing ReferenceError.
+  const hasWindow = typeof window !== 'undefined';
+  if (hasWindow) {
+    window.addEventListener('keydown', handleKeydown);
+    window.addEventListener('keydown', handleFocusTrap, true);
+  }
 
   watch(isOpen, (open) => {
     if (open) {
@@ -76,7 +81,11 @@ export function useModalA11y(isOpen, onClose) {
   });
 
   onBeforeUnmount(() => {
-    window.removeEventListener('keydown', handleKeydown);
-    window.removeEventListener('keydown', handleFocusTrap, true);
+    // SSR-safe: mirror the mount-time guard so removal never throws if window
+    // was undefined at setup (e.g. composable imported but never mounted in SSR).
+    if (hasWindow) {
+      window.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener('keydown', handleFocusTrap, true);
+    }
   });
 }

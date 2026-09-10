@@ -1153,7 +1153,7 @@ onMounted(() => {
 }
 .route-node.primary { border-left: 3px solid var(--ok, #3fb950); }
 .route-node.fallback { border-left: 3px solid var(--warn, #d29922); }
-.route-node.tertiary { border-left: 3px solid var(--text-faint, #6e7686); }
+.route-node.tertiary { border-left: 3px solid var(--text-faint, #8a93a3); }
 .route-agent { font-weight: 600; font-size: var(--fs-sm); }
 .route-model { font-size: var(--fs-xs); color: var(--text-muted); }
 .route-sep { color: var(--text-faint); font-size: var(--fs-sm); }

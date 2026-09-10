@@ -592,6 +592,10 @@ class TestObservabilityRouter:
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
+        @app.middleware("http")
+        async def _inject_admin(request, call_next):
+            request.state.auth_roles = ["admin"]
+            return await call_next(request)
         app.include_router(router)
         client = TestClient(app)
         resp = client.post("/api/observability/record", json={
@@ -612,6 +616,10 @@ class TestObservabilityRouter:
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
+        @app.middleware("http")
+        async def _inject_admin(request, call_next):
+            request.state.auth_roles = ["admin"]
+            return await call_next(request)
         app.include_router(router)
         client = TestClient(app)
         resp = client.post("/api/observability/record", json={
@@ -629,6 +637,10 @@ class TestObservabilityRouter:
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
+        @app.middleware("http")
+        async def _inject_admin(request, call_next):
+            request.state.auth_roles = ["admin"]
+            return await call_next(request)
         app.include_router(router)
         client = TestClient(app)
         resp = client.post("/api/observability/record", json={"kind": "bogus"})

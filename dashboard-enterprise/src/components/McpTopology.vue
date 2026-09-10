@@ -66,7 +66,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useI18n } from '../i18n';
 import { AppIcon, Badge, EmptyState } from './index.js';
-import { cssVar } from '../composables/chartTokens.js';
+import { cssVar } from '../utils/chartTokens.js';
 
 const props = defineProps({
   data: {

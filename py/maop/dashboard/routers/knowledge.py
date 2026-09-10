@@ -78,7 +78,7 @@ async def get_entity(name: str) -> dict[str, Any]:
     entity = ext.get_entity(name)
     if entity:
         return {"status": "ok", "data": entity.model_dump()}
-    return {"status": "not_found", "data": None}
+    raise HTTPException(status_code=404, detail="Entity not found")
 
 
 @router.get("/relations")

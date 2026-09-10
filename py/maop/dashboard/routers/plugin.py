@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -36,7 +36,7 @@ async def get_plugin(plugin_id: str) -> dict[str, Any]:
     mgr = _get_plugin_manager()
     info = mgr.get_plugin(plugin_id)
     if info is None:
-        return {"error": "Plugin not found"}
+        raise HTTPException(status_code=404, detail="Plugin not found")
     return {"plugin": info.model_dump()}
 
 

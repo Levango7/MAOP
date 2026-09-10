@@ -242,7 +242,7 @@ import Card from '../components/Card.vue';
 import Badge from '../components/Badge.vue';
 import EmptyState from '../components/EmptyState.vue';
 import AppIcon from '../components/AppIcon.vue';
-import { cssVar } from '../composables/chartTokens.js';
+import { cssVar } from '../utils/chartTokens.js';
 
 const { t } = useI18n();
 const kg = useKnowledgeGraph();
@@ -847,8 +847,9 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   .kg-detail { display: none; }
 }
 
-/* 修复: 固定侧栏在中等屏幕(1024px)挤压主画布 → 侧栏宽度减小至 200px, 释放主画布空间 */
-@media (max-width: 1024px) {
+/* 修复: 固定侧栏在中等屏幕(900px)挤压主画布 → 侧栏宽度减小至 200px, 释放主画布空间
+ * F-views: 断点 1024px → 900px，与项目标准断点统一 (1100/900/700/640) */
+@media (max-width: 900px) {
   .kg-layout { grid-template-columns: 200px 1fr; }
   .kg-filter { font-size: var(--fs-sm); }
   .kg-filter-label { font-size: var(--fs-xs); }

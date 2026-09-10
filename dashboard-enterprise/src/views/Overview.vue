@@ -224,8 +224,8 @@ import PageHeader from '../components/PageHeader.vue';
 import { Card, StatCard, Badge, DataTable, Skeleton, EmptyState } from '../components/index.js';
 // 2026-09-01: OnboardingWizard import removed — CoachMarks is the single
 // first-visit guide (see template comment above).
-import { cssVar, cssVarAlpha } from '../composables/chartTokens.js';
-import { baseLineOptions } from '../composables/chartOptions.js';
+import { cssVar, cssVarAlpha } from '../utils/chartTokens.js';
+import { baseLineOptions } from '../utils/chartOptions.js';
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler);
 

@@ -127,7 +127,7 @@ async def connect_server(server_name: str, request: Request) -> dict[str, Any]:
     # δ-1: use MCPHub.connect(config) — look up previously registered config by name
     config = hub.get_server_config(server_name)
     if config is None:
-        return {"status": "failed", "server": server_name}
+        raise HTTPException(status_code=404, detail=f"Server {server_name} not found")
     # Clear the old record so connect() inserts a fresh connected record
     hub.remove_server(server_name)
     server_id = await hub.connect(config)
@@ -178,7 +178,9 @@ async def remove_server(server_name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
     removed = hub.remove_server(server_name)
-    return {"status": "ok" if removed else "not_found", "server": server_name}
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Server {server_name} not found")
+    return {"status": "ok", "server": server_name}
 
 
 @router.get("/tools")
@@ -309,10 +311,12 @@ async def marketplace_install(tool_id: str, request: Request) -> dict[str, Any]:
     try:
         config = mp.install(tool_id)
     except ValueError as exc:
+        # 批次3A: 脱敏——安装错误细节不暴露给客户端，仅日志记录。
         msg = str(exc)
+        logger.warning("[mcp] Install failed for tool %s: %s", tool_id, exc)
         if "not found" in msg.lower():
-            raise HTTPException(status_code=404, detail=msg) from exc
-        raise HTTPException(status_code=400, detail=msg) from exc
+            raise HTTPException(status_code=404, detail="Tool not found") from exc
+        raise HTTPException(status_code=400, detail="Tool installation failed") from exc
     # 2. 注册到 MCPHub (不自动连接, 保持 DISCONNECTED 状态)
     hub = _get_hub()
     try:

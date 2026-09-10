@@ -63,14 +63,14 @@ async def auto_split(
             context=body.context,
             max_subtasks=body.max_subtasks,
         )
-        return {"success": True, "data": result}
+        return {"status": "ok", "data": result}
     except TaskSplitError as exc:
         logger.warning("[dag/auto-split] 任务拆分失败: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail="Task split failed") from exc
     except Exception as exc:
         # 防御性兜底：任何意外错误都返回 400 而非 500，避免泄露内部栈
         logger.exception("[dag/auto-split] 意外错误")
-        raise HTTPException(status_code=400, detail=f"任务拆分失败: {exc}") from exc
+        raise HTTPException(status_code=400, detail="Task split failed") from exc
 
 
 @router.get("/api/dag/health")
@@ -143,10 +143,11 @@ async def execute_dag(
                     error=dr.result.error or ("" if dr.result.ok else dr.result.stderr),
                 )
             except Exception as exc:
+                logger.warning("[dag/execute] step executor error: %s", exc)
                 return SimpleNamespace(
                     output="",
                     exit_code=1,
-                    error=str(exc),
+                    error="Step execution failed",
                 )
 
         result = await Engine(step_executor=_default_step_executor).run(steps)
@@ -161,4 +162,4 @@ async def execute_dag(
     except Exception as exc:
         # 防御性兜底：不泄露内部栈
         logger.exception("[dag/execute] DAG 执行失败")
-        raise HTTPException(status_code=400, detail=f"DAG 执行失败: {exc}") from exc
+        raise HTTPException(status_code=400, detail="DAG execution failed") from exc

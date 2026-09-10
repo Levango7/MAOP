@@ -256,8 +256,8 @@ import DataTable from '../components/DataTable.vue';
 import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
-import { cssVar, cssVarAlpha } from '../composables/chartTokens.js';
-import { baseLineOptions } from '../composables/chartOptions.js';
+import { cssVar, cssVarAlpha } from '../utils/chartTokens.js';
+import { baseLineOptions } from '../utils/chartOptions.js';
 
 ChartJS.register(
   LineElement, PointElement, LinearScale, CategoryScale,
@@ -753,7 +753,7 @@ onUnmounted(() => {
   gap: var(--sp-3);
 }
 @media (max-width: 900px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) { .stat-row { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .stat-row { grid-template-columns: 1fr; } }  /* F-views: 断点 560px → 640px，与项目标准断点统一 */
 
 /* ── 过滤栏 ── */
 .audit-filterbar { margin-bottom: 0; }

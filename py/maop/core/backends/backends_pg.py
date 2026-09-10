@@ -132,16 +132,16 @@ class PostgreSQLStorageBackend(StorageBackend):
             return [dict(zip(cols, row)) for row in cur.fetchall()]
 
     def commit(self) -> None:
-        # P1-8 fix: 不再静默 no-op。pool 在 autocommit=True 模式下，每次
-        # execute 已自动提交，顶层 commit() 无未提交事务可提交。记录 debug
-        # 日志使调用行为可观测；需要真正的事务提交/回滚请使用 transaction()。
-        logger.debug(
+        # B9: 不再静默 no-op。pool 在 autocommit=True 模式下，每次
+        # execute 已自动提交，顶层 commit() 无未提交事务可提交。发出
+        # warning 让调用方意识到问题，并改用 transaction() 获得事务能力。
+        logger.warning(
             "[pg] commit() invoked in autocommit mode (no pending txn); "
             "use transaction() for explicit transactional control"
         )
 
     def rollback(self) -> None:
-        # P1-8 fix: 不再静默 no-op。autocommit 模式下已执行的语句无法回滚；
+        # B9: 不再静默 no-op。autocommit 模式下已执行的语句无法回滚；
         # 发出 warning 让调用方意识到问题，并改用 transaction() 获得回滚能力。
         logger.warning(
             "[pg] rollback() invoked in autocommit mode — already-committed "

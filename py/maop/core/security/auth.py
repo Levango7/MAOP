@@ -15,6 +15,7 @@ import hmac
 import json
 import logging
 import os
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -209,6 +210,12 @@ class JWTHandler:
             self.config.secret = load_jwt_secret()
         # P1 fix: in-memory token revocation blacklist (sig_b64 → exp timestamp)
         self._revoked: dict[str, float] = {}
+        # B21: 保护 _revoked 的并发读写。
+        self._revoked_lock = threading.Lock()
+        # B27: _revoked 清理节流——避免每次 validate/revoke 都遍历整个黑名单。
+        # 距上次清理超过 _cleanup_interval 秒才真正执行清理。
+        self._last_cleanup_time: float = 0.0
+        self._cleanup_interval: float = 600.0
         # P2-2 fix: persist revocation blacklist across restarts so revoked
         # tokens remain invalid after a server restart.
         root = os.environ.get("MAOP_ROOT_DIR", ".")
@@ -249,8 +256,11 @@ class JWTHandler:
             tmp_path = self._revoked_file.with_suffix(
                 self._revoked_file.suffix + ".tmp"
             )
+            # B21: 加锁保护 _revoked 读取
+            with self._revoked_lock:
+                revoked_snapshot = dict(self._revoked)
             tmp_path.write_text(
-                json.dumps(self._revoked), encoding="utf-8"
+                json.dumps(revoked_snapshot), encoding="utf-8"
             )
             os.replace(tmp_path, self._revoked_file)
         except Exception as exc:
@@ -262,6 +272,7 @@ class JWTHandler:
 
     def revoke_token(self, token: str) -> bool:
         """Add a token to the revocation blacklist. Returns True if revoked."""
+        self._maybe_cleanup_revoked()  # B27: 顺带触发节流清理
         try:
             parts = token.split(".")
             if len(parts) != 3:
@@ -271,7 +282,9 @@ class JWTHandler:
             exp = payload.get("exp", 0)
             if time.time() > exp:
                 return False  # already expired
-            self._revoked[sig_b64] = exp
+            # B21: 加锁保护 _revoked 写入
+            with self._revoked_lock:
+                self._revoked[sig_b64] = exp
             self._save_revoked()
             return True
         except Exception as exc:
@@ -284,11 +297,26 @@ class JWTHandler:
     def _cleanup_revoked(self) -> None:
         """Remove expired entries from the revocation blacklist."""
         now = time.time()
-        expired = [sig for sig, exp in self._revoked.items() if exp <= now]
-        for sig in expired:
-            del self._revoked[sig]
+        # B21: 加锁保护 _revoked 读写
+        with self._revoked_lock:
+            expired = [sig for sig, exp in self._revoked.items() if exp <= now]
+            for sig in expired:
+                del self._revoked[sig]
         if expired:
             self._save_revoked()
+
+    def _maybe_cleanup_revoked(self) -> None:
+        """B27: 节流版清理——距上次清理超过 _cleanup_interval 秒才真正执行。
+
+        避免每次 validate_token 都遍历整个 _revoked 黑名单。
+        CPython 下 float 读取是原子的；即使多线程同时通过检查，
+        _cleanup_revoked 在锁内操作且幂等，最多多执行一次，无正确性问题。
+        """
+        now = time.time()
+        if now - self._last_cleanup_time < self._cleanup_interval:
+            return
+        self._last_cleanup_time = now
+        self._cleanup_revoked()
 
     def _b64url_encode(self, data: bytes) -> str:
         return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
@@ -379,8 +407,11 @@ class JWTHandler:
                 return AuthResult(authenticated=False, error="Token missing subject (sub)")
 
             # P1 fix: check revocation blacklist
-            self._cleanup_revoked()
-            if sig_b64 in self._revoked:
+            self._maybe_cleanup_revoked()
+            # B21: 加锁保护 _revoked 读取
+            with self._revoked_lock:
+                is_revoked = sig_b64 in self._revoked
+            if is_revoked:
                 return AuthResult(authenticated=False, error="Token revoked")
 
             return AuthResult(

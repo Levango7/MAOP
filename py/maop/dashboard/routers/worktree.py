@@ -56,7 +56,9 @@ async def api_worktree_branch(request: Request) -> dict[str, Any]:
         node_id = mgr.branch(parent_id=parent_id, name=name, description=description, metadata=metadata)
         return {"status": "ok", "node_id": node_id}
     except ValueError as exc:
-        raise HTTPException(400, str(exc))
+        # 批次3A: 脱敏——ValueError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[worktree] Branch failed: %s", exc)
+        raise HTTPException(400, "Worktree branch failed") from exc
 
 
 @router.post("/api/worktree/abandon")
@@ -69,7 +71,9 @@ async def api_worktree_abandon(request: Request) -> dict[str, Any]:
         raise HTTPException(400, "missing id")
     mgr = _get_worktree_mgr()
     ok = mgr.abandon(node_id)
-    return {"status": "ok" if ok else "not_found", "id": node_id}
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+    return {"status": "ok", "id": node_id}
 
 
 @router.get("/api/worktree/get")
@@ -120,7 +124,9 @@ async def api_worktree_checkpoint(request: Request) -> dict[str, Any]:
         cp_id = mgr.checkpoint(node_id, label=label)
         return {"status": "ok", "checkpoint_id": cp_id}
     except ValueError as exc:
-        raise HTTPException(400, str(exc))
+        # 批次3A: 脱敏——ValueError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[worktree] Checkpoint failed: %s", exc)
+        raise HTTPException(400, "Worktree checkpoint failed") from exc
 
 
 @router.post("/api/worktree/rollback")
@@ -134,4 +140,6 @@ async def api_worktree_rollback(request: Request) -> dict[str, Any]:
         raise HTTPException(400, "missing node_id or checkpoint_id")
     mgr = _get_worktree_mgr()
     ok = mgr.rollback(node_id, to_checkpoint=checkpoint_id)
-    return {"status": "ok" if ok else "failed"}
+    if not ok:
+        raise HTTPException(status_code=404, detail="Rollback target not found")
+    return {"status": "ok"}

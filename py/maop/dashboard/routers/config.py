@@ -111,7 +111,9 @@ async def rollback_config(
     try:
         restored = hist.rollback(version)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——ValueError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[config-api] Rollback failed: %s", exc)
+        raise HTTPException(status_code=404, detail="Version not found") from exc
     logger.info(
         "[config-api] Rollback to v%d by %s → new v%d",
         version, _actor(request), restored["version"],

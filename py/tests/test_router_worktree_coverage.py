@@ -126,8 +126,7 @@ class TestAbandon:
     def test_not_found(self, worktree_env, client):
         worktree_env.abandon.return_value = False
         resp = client.post("/api/worktree/abandon", json={"id": "nonexistent"})
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "not_found"
+        assert resp.status_code == 404
 
 
 class TestGet:
@@ -222,5 +221,4 @@ class TestRollback:
             "/api/worktree/rollback",
             json={"node_id": "b1", "checkpoint_id": "cp-1"},
         )
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "failed"
+        assert resp.status_code == 404

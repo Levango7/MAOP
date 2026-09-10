@@ -130,7 +130,7 @@ async def load_artifact(name: str, version: int | None = Query(None)) -> dict[st
     if content is None:
         return JSONResponse(
             status_code=404,
-            content={"success": False, "message": "Artifact not found", "data": None},
+            content={"status": "error", "error": "Artifact not found"},
         )
     return {"name": name, "content": content}
 

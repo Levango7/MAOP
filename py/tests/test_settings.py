@@ -49,6 +49,11 @@ class TestMAOPSettings:
         from maop.config.settings import MAOPSettings
         for env in ("production", "staging", "qa", "demo", "prod", "porduction"):
             monkeypatch.setenv("MAOP_ENV", env)
+            # B24: production 环境校验 database_url/redis_url 不为默认值，
+            # 测试中设置有效值以通过校验。
+            if env == "production":
+                monkeypatch.setenv("MAOP_DATABASE_URL", "postgresql+psycopg2://user:pass@db:5432/maop")
+                monkeypatch.setenv("MAOP_REDIS_URL", "redis://:pass@redis:6379/0")
             assert MAOPSettings().auth_enabled, env
 
     def test_env_override(self, monkeypatch):

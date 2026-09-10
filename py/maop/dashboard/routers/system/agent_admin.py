@@ -94,7 +94,9 @@ async def api_agent_config_update(request: Request) -> dict[str, Any]:
         except HTTPException:
             raise
         except Exception as ve:
-            raise HTTPException(400, f"Config validation failed: {ve}")
+            # 批次3A: 脱敏——校验错误细节不暴露给客户端，仅日志记录。
+            logger.warning("[agent_admin] Config validation failed: %s", ve)
+            raise HTTPException(400, "Config validation failed") from ve
 
         for key in ("model", "cli", "cli_args", "driver", "timeout_s", "description", "wrapper"):
             if key in body:

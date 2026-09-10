@@ -239,7 +239,9 @@ async def api_provider_delete(body: ProviderNameRequest, request: Request) -> di
         reg.save()
         return {"status": "ok", "removed": name}
     except ValueError as exc:
-        raise HTTPException(409, str(exc))
+        # 批次3A: 脱敏——ValueError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[model] Remove provider failed: %s", exc)
+        raise HTTPException(409, "Provider removal failed") from exc
 
 # ── Model CRUD ───────────────────────────────────────────────────────
 
@@ -305,7 +307,9 @@ async def api_key_delete(body: KeyDeleteRequest, request: Request) -> dict[str, 
         raise HTTPException(400, "missing provider")
     vault = _get_api_key_vault()
     deleted = vault.delete(provider)
-    return {"status": "ok" if deleted else "not_found", "provider": provider}
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Provider {provider} not found")
+    return {"status": "ok", "provider": provider}
 
 @router.get("/api/model/key/list")
 @handle_api_errors("Key list", error_value={"providers": [], "error": "Key list failed"})

@@ -369,9 +369,9 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .tracing-badge.on .dot { background: var(--success, #3fb950); }
 .tracing-badge.off {
   background: var(--bg-tag, rgba(148,163,184,.16));
-  color: var(--text-faint, #6e7686);
+  color: var(--text-faint, #8a93a3);
 }
-.tracing-badge.off .dot { background: var(--text-faint, #6e7686); }
+.tracing-badge.off .dot { background: var(--text-faint, #8a93a3); }
 
 /* ── Layout ─────────────────────────────────────────────────────── */
 .metrics-grid {
@@ -482,7 +482,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .metric-header {
   font-size: var(--fs-xs);
   font-weight: 600;
-  color: var(--text-faint, #6e7686);
+  color: var(--text-faint, #8a93a3);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-bottom: 1px solid var(--border, rgba(148,163,184,.35));
@@ -559,7 +559,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .trace-info.disabled .trace-row { color: var(--text-muted, #9aa3b2); }
 .trace-hint {
   font-size: var(--fs-sm);
-  color: var(--text-faint, #6e7686);
+  color: var(--text-faint, #8a93a3);
   padding-left: 24px;
 }
 .trace-enable {

@@ -3,6 +3,9 @@
  *
  * 单仓唯一事实源: 所有时序图的 hover 行为统一, 不再逐页写死。
  *
+ * F2: 从 composables/ 移至 utils/ —— 本文件是纯工具函数，不使用 Vue 响应式 API，
+ * 放在 utils/ 更符合语义。
+ *
  * 约定(写入前端 style-guide):
  *   - interaction.mode = 'index' + intersect=false → 鼠标扫过即显示
  *     当前索引对应的所有数据集 tooltip, 不要求精确点在线上
@@ -10,7 +13,7 @@
  *   - tooltip 跟随激活索引高亮 → 用 hooks 标注
  *
  * 用法:
- *   import { baseLineOptions } from '../composables/chartOptions.js';
+ *   import { baseLineOptions } from '../utils/chartOptions.js';
  *   const options = baseLineOptions({ muted, grid: chartGridColor() });
  */
 

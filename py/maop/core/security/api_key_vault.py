@@ -61,15 +61,22 @@ class ApiKeyVault:
     def _init_encryption(self) -> None:
         try:
             from cryptography.fernet import Fernet
-        except ImportError:
-            logger.error("[api_key_vault] cryptography not installed, keys stored in plaintext")
-            self._fernet = None
-            return
+        except ImportError as exc:
+            # Fail-fast: cryptography is mandatory for API key encryption.
+            # Silently degrading to plaintext would expose secrets at rest.
+            raise RuntimeError(
+                "cryptography package is required for API key encryption"
+            ) from exc
 
         key = self._load_or_create_key()
         if key:
             self._fernet = Fernet(key)
             self._master_key = key
+        else:
+            raise RuntimeError(
+                "cryptography package is required for API key encryption: "
+                "failed to load or generate master key"
+            )
 
     def _resolve_key_path(self) -> Path:
         """Resolve the encryption key file path.

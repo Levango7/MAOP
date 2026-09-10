@@ -134,7 +134,9 @@ async def get_license(license_id: str, request: Request) -> dict[str, Any]:
     try:
         record = mgr.get_license(license_id)
     except LicenseNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——LicenseNotFoundError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[licenses] License not found: %s", exc)
+        raise HTTPException(status_code=404, detail="License not found") from exc
     return {"status": "ok", "license": record.model_dump()}
 
 
@@ -158,7 +160,9 @@ async def update_license(license_id: str, request: Request, body: dict[str, Any]
             notes=req.notes,
         )
     except LicenseNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——LicenseNotFoundError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[licenses] License not found: %s", exc)
+        raise HTTPException(status_code=404, detail="License not found") from exc
     return {"status": "ok", "license": record.model_dump()}
 
 
@@ -175,7 +179,9 @@ async def renew_license(license_id: str, request: Request, body: dict[str, Any])
     try:
         record = mgr.renew_license(license_id, new_expires_at=req.new_expires_at, actor=req.actor)
     except LicenseNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——LicenseNotFoundError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[licenses] License not found: %s", exc)
+        raise HTTPException(status_code=404, detail="License not found") from exc
     return {"status": "ok", "license": record.model_dump()}
 
 
@@ -192,7 +198,9 @@ async def revoke_license(license_id: str, request: Request, body: dict[str, Any]
     try:
         record = mgr.revoke_license(license_id, reason=req.reason, actor=req.actor)
     except LicenseNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——LicenseNotFoundError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[licenses] License not found: %s", exc)
+        raise HTTPException(status_code=404, detail="License not found") from exc
     return {"status": "ok", "license": record.model_dump()}
 
 
@@ -208,7 +216,9 @@ async def delete_license(license_id: str, request: Request) -> dict[str, Any]:
     try:
         deleted = mgr.delete_license(license_id)
     except LicenseNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # 批次3A: 脱敏——LicenseNotFoundError 细节不暴露给客户端，仅日志记录。
+        logger.warning("[licenses] License not found: %s", exc)
+        raise HTTPException(status_code=404, detail="License not found") from exc
     return {"status": "ok" if deleted else "error", "deleted": deleted}
 
 

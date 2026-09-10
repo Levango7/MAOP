@@ -236,6 +236,30 @@ class MAOPSettings(BaseSettings):
             raise ValueError(f"tls_min_version must be one of {valid} (TLSv1/TLSv1_1 are insecure and rejected), got {v}")
         return v
 
+    @field_validator("database_url")
+    @classmethod
+    def _validate_database_url(cls, v: str) -> str:
+        """B24: 生产环境校验 database_url 不为默认无认证值。"""
+        env = os.environ.get("MAOP_ENV", "").strip().lower()
+        if env == "production" and v == "postgresql+psycopg2://localhost:5432/maop":
+            raise RuntimeError(
+                "database_url is set to the default value in production. "
+                "Set MAOP_DATABASE_URL to a connection string with authentication."
+            )
+        return v
+
+    @field_validator("redis_url")
+    @classmethod
+    def _validate_redis_url(cls, v: str) -> str:
+        """B24: 生产环境校验 redis_url 不为默认无认证值。"""
+        env = os.environ.get("MAOP_ENV", "").strip().lower()
+        if env == "production" and v == "redis://localhost:6379/0":
+            raise RuntimeError(
+                "redis_url is set to the default value in production. "
+                "Set MAOP_REDIS_URL to a connection string with authentication."
+            )
+        return v
+
     def resolved_root_dir(self) -> Path:
         """Get resolved root directory."""
         if self.root_dir:

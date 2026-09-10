@@ -102,7 +102,7 @@ async def get_session(session_id: str) -> dict[str, Any]:
     if session is None:
         return JSONResponse(
             status_code=404,
-            content={"success": False, "message": "Session not found", "data": None},
+            content={"status": "error", "error": "Session not found"},
         )
     return {"session": session.model_dump()}
 
@@ -248,6 +248,6 @@ async def rerun_session(session_id: str, request: Request) -> dict[str, Any]:
     if new_session is None:
         return JSONResponse(
             status_code=404,
-            content={"success": False, "message": "Session not found", "data": None},
+            content={"status": "error", "error": "Session not found"},
         )
     return {"session": new_session.model_dump(), "rerun_from": session_id}

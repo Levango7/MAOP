@@ -10,6 +10,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -22,6 +23,8 @@ from maop.enterprise.n8n import (
     N8nIntegrationError,
     handle_n8n_webhook,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/n8n", tags=["n8n"])
 
@@ -52,7 +55,9 @@ async def receive_webhook(request: Request) -> dict[str, Any]:
     try:
         payload = await request.json()
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON: {exc}") from exc
+        # 批次3A: 脱敏——JSON 解析错误细节不暴露给客户端，仅日志记录。
+        logger.warning("[n8n] Invalid JSON in webhook: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
 
     return handle_n8n_webhook(payload, raw_body=raw_body, signature=signature)
 
@@ -69,7 +74,9 @@ async def list_workflows(request: Request) -> dict[str, Any]:
             workflows = client.list_workflows()
             return {"workflows": workflows, "count": len(workflows)}
         except N8nIntegrationError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
+            logger.warning("[n8n] Integration error: %s", exc)
+            raise HTTPException(status_code=502, detail="n8n integration error") from exc
 
 
 @router.post("/workflows/{workflow_id}/trigger")
@@ -95,7 +102,9 @@ async def trigger_workflow(
             )
             return execution.model_dump()
         except N8nIntegrationError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
+            logger.warning("[n8n] Integration error: %s", exc)
+            raise HTTPException(status_code=502, detail="n8n integration error") from exc
 
 
 @router.get("/executions/{execution_id}")
@@ -110,7 +119,9 @@ async def get_execution(execution_id: str, request: Request) -> dict[str, Any]:
             execution = client.get_execution(execution_id)
             return execution.model_dump()
         except N8nIntegrationError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
+            logger.warning("[n8n] Integration error: %s", exc)
+            raise HTTPException(status_code=502, detail="n8n integration error") from exc
 
 
 @router.get("/health")

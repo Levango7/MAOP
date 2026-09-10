@@ -195,7 +195,9 @@ async def api_hooks_create(request: Request) -> HookResponse:
     try:
         validate_webhook_url(body.url)
     except SSRFError as exc:
-        raise HTTPException(400, str(exc)) from exc
+        # 批次3A: 脱敏——SSRF 拒绝原因不暴露给客户端，仅日志记录。
+        logger.warning("[hooks] SSRF rejected URL: %s", exc)
+        raise HTTPException(400, "URL not allowed") from exc
 
     mgr = _get_hook_mgr()
     hdef = mgr.register(
@@ -270,7 +272,9 @@ async def api_hooks_update(hook_id: str, request: Request) -> HookResponse:
     try:
         validate_webhook_url(new_url)
     except SSRFError as exc:
-        raise HTTPException(400, str(exc)) from exc
+        # 批次3A: 脱敏——SSRF 拒绝原因不暴露给客户端，仅日志记录。
+        logger.warning("[hooks] SSRF rejected URL: %s", exc)
+        raise HTTPException(400, "URL not allowed") from exc
 
     # 删除旧 hook 并注册新 hook（保留原 id）
     mgr.unregister(hook_id)

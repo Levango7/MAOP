@@ -390,7 +390,7 @@ class TestApiAutoSplitEndpoint:
             resp = await client.post("/api/dag/auto-split", json={"description": "do task"})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
+        assert data["status"] == "ok"
         assert "data" in data
         assert len(data["data"]["subtasks"]) == 1
 
@@ -415,7 +415,7 @@ class TestApiAutoSplitEndpoint:
             resp = await client.post("/api/dag/auto-split", json={"description": "do task"})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
+        assert data["status"] == "ok"
         assert len(data["data"]["subtasks"]) == 1
 
     @pytest.mark.asyncio

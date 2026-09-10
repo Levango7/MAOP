@@ -69,6 +69,10 @@ class KVStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._pool: ConnectionPool = get_pool(self.db_path)
         self._init_db()
+        # B12: prune 节流——避免每次读操作都触发全表 DELETE 扫描。
+        # 记录上次 prune 时间戳，只在距上次 prune 超过 _prune_interval 秒时才真正执行。
+        self._last_prune_time: float = 0.0
+        self._prune_interval: float = 60.0
 
     def _init_db(self) -> None:
         conn = self._pool.acquire()
@@ -121,15 +125,33 @@ class KVStore:
         finally:
             self._pool.release(conn)
 
+    def _maybe_prune(self) -> None:
+        """B12: 节流版 prune——距上次 prune 超过 _prune_interval 秒才真正执行。
+
+        避免每次 get/exists/list_keys 等读操作都触发全表 DELETE 扫描。
+        CPython 下 float 读取是原子的；即使多线程同时通过检查，
+        _prune_expired 是幂等的，最多多执行一次，无正确性问题。
+        """
+        now = self._now()
+        if now - self._last_prune_time < self._prune_interval:
+            return
+        self._last_prune_time = now
+        pruned = self._prune_expired()
+        if pruned > 0:
+            logger.debug("[kv_store] pruned %d expired keys", pruned)
+
     # ── Core operations ─────────────────────────────────────
 
     def get(self, key: str, *, namespace: str = "default", default: Any = None) -> Any:
-        self._prune_expired()
+        self._maybe_prune()
         conn = self._pool.acquire()
         try:
+            # B12: 查询自身过滤过期键，不依赖 prune 执行（prune 只负责清理磁盘空间）。
+            now = self._now()
             row = conn.execute(
-                "SELECT value FROM kv_store WHERE key = ? AND namespace = ?",
-                (key, namespace),
+                "SELECT value FROM kv_store WHERE key = ? AND namespace = ? "
+                "AND (ttl_expires IS NULL OR ttl_expires > ?)",
+                (key, namespace, now),
             ).fetchone()
             if row is None:
                 return default
@@ -197,12 +219,15 @@ class KVStore:
             self._pool.release(conn)
 
     def exists(self, key: str, *, namespace: str = "default") -> bool:
-        self._prune_expired()
+        self._maybe_prune()
         conn = self._pool.acquire()
         try:
+            # B12: 查询自身过滤过期键。
+            now = self._now()
             row = conn.execute(
-                "SELECT 1 FROM kv_store WHERE key = ? AND namespace = ?",
-                (key, namespace),
+                "SELECT 1 FROM kv_store WHERE key = ? AND namespace = ? "
+                "AND (ttl_expires IS NULL OR ttl_expires > ?)",
+                (key, namespace, now),
             ).fetchone()
             return row is not None
         finally:
@@ -218,13 +243,16 @@ class KVStore:
     ) -> dict[str, Any]:
         if not keys:
             return {}
-        self._prune_expired()
+        self._maybe_prune()
         conn = self._pool.acquire()
         try:
             placeholders = ",".join("?" * len(keys))
+            # B12: 查询自身过滤过期键。
+            now = self._now()
             rows = conn.execute(
-                f"SELECT key, value FROM kv_store WHERE key IN ({placeholders}) AND namespace = ?",
-                (*keys, namespace),
+                f"SELECT key, value FROM kv_store WHERE key IN ({placeholders}) AND namespace = ? "
+                "AND (ttl_expires IS NULL OR ttl_expires > ?)",
+                (*keys, namespace, now),
             ).fetchall()
             result: dict[str, Any] = {}
             for row in rows:
@@ -324,18 +352,22 @@ class KVStore:
     # ── Namespace operations ────────────────────────────────
 
     def list_keys(self, *, namespace: str = "default", prefix: str = "") -> list[str]:
-        self._prune_expired()
+        self._maybe_prune()
         conn = self._pool.acquire()
         try:
+            # B12: 查询自身过滤过期键。
+            now = self._now()
             if prefix:
                 rows = conn.execute(
-                    "SELECT key FROM kv_store WHERE namespace = ? AND key LIKE ? ORDER BY key",
-                    (namespace, prefix + "%"),
+                    "SELECT key FROM kv_store WHERE namespace = ? AND key LIKE ? "
+                    "AND (ttl_expires IS NULL OR ttl_expires > ?) ORDER BY key",
+                    (namespace, prefix + "%", now),
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    "SELECT key FROM kv_store WHERE namespace = ? ORDER BY key",
-                    (namespace,),
+                    "SELECT key FROM kv_store WHERE namespace = ? "
+                    "AND (ttl_expires IS NULL OR ttl_expires > ?) ORDER BY key",
+                    (namespace, now),
                 ).fetchall()
             return [row["key"] for row in rows]
         finally:
@@ -366,10 +398,16 @@ class KVStore:
     # ── Stats ───────────────────────────────────────────────
 
     def stats(self) -> KVStats:
-        self._prune_expired()
+        self._maybe_prune()
         conn = self._pool.acquire()
         try:
-            total = conn.execute("SELECT COUNT(*) as c FROM kv_store").fetchone()["c"]
+            # B12: 统计自身过滤过期键。
+            now = self._now()
+            total = conn.execute(
+                "SELECT COUNT(*) as c FROM kv_store "
+                "WHERE ttl_expires IS NULL OR ttl_expires > ?",
+                (now,),
+            ).fetchone()["c"]
             ns_rows = conn.execute(
                 "SELECT DISTINCT namespace FROM kv_store"
             ).fetchall()

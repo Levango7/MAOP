@@ -87,9 +87,10 @@ def _get_debate_dispatcher() -> Any:
     except HTTPException:
         raise
     except Exception as exc:
+        logger.warning("[debate-api] DebateDispatcher unavailable: %s", exc)
         raise HTTPException(
             status_code=503,
-            detail=f"DebateDispatcher unavailable: {exc}",
+            detail="DebateDispatcher unavailable",
         ) from exc
 
 
@@ -148,7 +149,7 @@ async def api_debate_start(
         logger.exception("[debate-api] start failed")
         raise HTTPException(
             status_code=500,
-            detail=f"debate execution failed: {exc}",
+            detail="Debate execution failed",
         ) from exc
     return {"ok": True, "verdict": verdict.model_dump()}
 
@@ -233,7 +234,7 @@ async def api_debate_config(
         logger.warning("[debate-api] config update failed: %s", exc)
         raise HTTPException(
             status_code=500,
-            detail=f"config update failed: {exc}",
+            detail="Debate config update failed",
         ) from exc
     logger.info(
         "[debate-api] config updated (max_rounds=%d, threshold=%.2f, by=%s)",

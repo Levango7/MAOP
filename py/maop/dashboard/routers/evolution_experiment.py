@@ -67,6 +67,7 @@ async def api_evolution_evaluate(request: Request) -> dict[str, Any]:
     Body: {"traces": [...], "baseline": [...] (可选)}
     返回 metrics（+ delta 当提供 baseline）。
     """
+    require_admin(request)
     body = await request.json()
     traces = body.get("traces", [])
     evaluator = _evaluator()
@@ -88,6 +89,7 @@ async def api_evolution_suggest(request: Request) -> dict[str, Any]:
 
     Body: {"metrics": {...}, "agent_name": "...", "enable_llm": true}
     """
+    require_admin(request)
     body = await request.json()
     from maop.core.evolution.evaluator import PerformanceMetrics
     from maop.core.evolution.suggester import ImprovementSuggester, SuggestionContext
@@ -133,6 +135,7 @@ async def api_ab_record(request: Request) -> dict[str, Any]:
 
     Body: {"experiment": "...", "variant": "...", "entity_id": "...", "success": true}
     """
+    require_admin(request)
     body = await request.json()
     fw = _ab_fw()
     state = fw.record(
@@ -310,7 +313,7 @@ async def api_evolution_skill_composite(request: Request) -> dict[str, Any]:
         return {"status": "ok", "saved": True, "name": name, "version": meta.version}
     except Exception as exc:
         logger.exception("[evo/skills] save_skill failed for %s", name)
-        raise HTTPException(status_code=500, detail=f"Failed to save skill: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Failed to save skill") from exc
 
 
 # ── 演化案例叙事 ───────────────────────────────────────────────

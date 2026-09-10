@@ -78,7 +78,7 @@ const realtimeConnected = computed(() => realtime.connected);
 .footer-sep { color: var(--border-strong); opacity: .6; }
 .footer-copy { color: var(--text-faint); white-space: nowrap; }
 
-@media (max-width: 899px) {
+@media (max-width: 900px) {  /* F7: 断点统一 899px → 900px，与 pages.css / 项目其他组件一致 */
   .app-footer { padding: var(--sp-2) 16px; }
   .footer-inner { justify-content: center; gap: var(--sp-1); }
   .footer-copy { width: 100%; text-align: center; }
