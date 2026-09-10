@@ -44,6 +44,8 @@ defineProps({
   inset: 0;
   transform: translateX(-100%);
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text-faint) 22%, transparent), transparent);
-  animation: maop-shimmer 1.2s infinite;
+  /* shimmer 扫光时长 = motion-slow × 4: 骨架占位是被动等待态,
+     动画需明显慢于交互态动画, 避免抢夺用户注意力 (性能/体感权衡) */
+  animation: maop-shimmer calc(var(--motion-slow) * 4) infinite;
 }
 </style>

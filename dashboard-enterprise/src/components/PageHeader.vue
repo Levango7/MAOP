@@ -24,7 +24,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { useI18n } from '../i18n/index.js';
+import { useI18n } from '../i18n';
 import { getPageMeta } from '../nav.js';
 import AppIcon from './AppIcon.vue';
 

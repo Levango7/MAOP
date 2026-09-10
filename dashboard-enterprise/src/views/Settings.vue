@@ -860,7 +860,7 @@ async function onTestHook(hook) {
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-.history-state.error { color: var(--danger, #f05545); }
+.history-state.error { color: var(--danger); }
 
 .history-table {
   width: 100%;
@@ -903,8 +903,8 @@ async function onTestHook(hook) {
   background: var(--brand-soft);
 }
 .history-action-btn.danger:hover:not(:disabled) {
-  border-color: var(--danger, #f05545);  /* F-views: fallback 与 tokens.css --danger 一致 (原 #c0392b) */
-  background: var(--danger-soft, rgba(240, 85, 69, .08));  /* F-views: fallback 与 tokens.css --danger-soft 一致 */
+  border-color: var(--danger);  /* F-views: token 由 tokens.css 提供 */
+  background: var(--danger-soft);  /* F-views: token 由 tokens.css 提供 */
 }
 .history-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -1024,7 +1024,7 @@ async function onTestHook(hook) {
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-.hooks-state.error { color: var(--danger, #f05545); }
+.hooks-state.error { color: var(--danger); }
 .hooks-empty {
   padding: var(--sp-5);
   text-align: center;
@@ -1083,8 +1083,8 @@ async function onTestHook(hook) {
   background: var(--brand-soft);
 }
 .hooks-action-btn.danger:hover:not(:disabled) {
-  border-color: var(--danger, #f05545);  /* F-views: fallback 与 tokens.css --danger 一致 (原 #c0392b) */
-  background: var(--danger-soft, rgba(240, 85, 69, .08));  /* F-views: fallback 与 tokens.css --danger-soft 一致 */
+  border-color: var(--danger);  /* F-views: token 由 tokens.css 提供 */
+  background: var(--danger-soft);  /* F-views: token 由 tokens.css 提供 */
 }
 .hooks-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -1173,7 +1173,7 @@ async function onTestHook(hook) {
   box-shadow: 0 0 0 2px var(--brand-soft);
 }
 .hooks-form-error {
-  color: var(--danger, #f05545);
+  color: var(--danger);
   font-size: var(--fs-sm);
   margin-top: var(--sp-2);
 }

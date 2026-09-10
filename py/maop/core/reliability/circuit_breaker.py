@@ -474,13 +474,21 @@ class CircuitBreaker:
         Repeated calls within _STATES_CACHE_TTL (500ms) return the same
         cached snapshot without re-acquiring the lock or re-copying _data.
         Falls back to a fresh snapshot on miss.
+
+        M-2 fix: 缓存写入移入锁内并采用双检锁（double-checked locking），
+        避免多线程并发时重复构建快照及无锁写入竞态。
         """
         now = time.monotonic()
+        # 第一次无锁检查：命中则直接返回
         if self._states_cache is not None and (now - self._states_cache[0]) < self._STATES_CACHE_TTL:
             return self._states_cache[1]
         with self._sync_lock:
+            # 第二次检查（持锁）：防止并发线程重复构建快照
+            if self._states_cache is not None and (now - self._states_cache[0]) < self._STATES_CACHE_TTL:
+                return self._states_cache[1]
             snapshot = dict(self._data)
-        self._states_cache = (now, snapshot)
+            # 缓存写入在锁内，避免竞态
+            self._states_cache = (now, snapshot)
         return snapshot
 
     # ── Failover ─────────────────────────────────────────────

@@ -11,6 +11,7 @@ import asyncio
 import contextlib
 import hashlib
 import logging
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -114,6 +115,15 @@ class ConfigHotReload:
         )
         self._task: asyncio.Task | None = None
 
+        # t88-L2: guards reload_count (read-modify-write) against the
+        # race between the async _watch_loop/_reload path (event-loop
+        # thread) and force_reload() which may be invoked from another
+        # thread. Pydantic's `+= 1` is not atomic — it loads, adds, and
+        # stores, so two concurrent reloads could lose an increment.
+        # Per the concurrency audit playbook, single `dict[k] = v` is
+        # GIL-safe, but `state.reload_count += 1` is RMW and needs a lock.
+        self._count_lock = threading.Lock()
+
         # Initialize hashes
         for f in self._watch_files:
             self._hashes[str(f)] = _file_hash(f)
@@ -176,7 +186,10 @@ class ConfigHotReload:
         """Reload config and emit event."""
         try:
             self._config = self._loader.load()
-            self._state.reload_count += 1
+            # t88-L2: RMW on reload_count must be atomic across threads.
+            with self._count_lock:
+                self._state.reload_count += 1
+                reload_count_snapshot = self._state.reload_count
             self._state.last_check = time.time()
 
             logger.info("Config reloaded: %s", changed_files)
@@ -184,7 +197,7 @@ class ConfigHotReload:
             # Emit event
             await self._bus.publish(Event(topic="config.reloaded", data={
                 "files_changed": changed_files,
-                "reload_count": self._state.reload_count,
+                "reload_count": reload_count_snapshot,
             }))
 
             # Callback
@@ -199,10 +212,17 @@ class ConfigHotReload:
         return self._check_changes()
 
     def force_reload(self) -> MaopConfig | None:
-        """Force a reload regardless of file changes."""
+        """Force a reload regardless of file changes.
+
+        Safe to call from any thread (e.g. a signal handler or admin
+        endpoint). ``reload_count`` is mutated under ``self._count_lock``
+        so it does not race with the async ``_reload`` path.
+        """
         try:
             self._config = self._loader.load()
-            self._state.reload_count += 1
+            # t88-L2: RMW on reload_count must be atomic across threads.
+            with self._count_lock:
+                self._state.reload_count += 1
             self._state.last_check = time.time()
             return self._config
         except Exception as exc:

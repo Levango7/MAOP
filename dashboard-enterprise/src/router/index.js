@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useEditionStore } from '../stores/edition.js';
+import { fetchWithTimeout } from '../stores/api.js';
 
 const routes = [
   // ═══ 2026-09-01 信息架构重设计：5 组任务流导航（一号用户驱动）═══
@@ -135,7 +136,8 @@ let editionConfigHydrated = false;
 function hydrateEditionFromConfig() {
   if (editionConfigHydrated) return;
   editionConfigHydrated = true;
-  fetch('/api/info/config')
+  // M5 fix: 使用 fetchWithTimeout 添加超时保护，防止后端无响应时 hydrate 永久挂起
+  fetchWithTimeout('/api/info/config')
     .then((res) => (res.ok ? res.json() : null))
     .then((data) => {
       if (!data || !VALID_EDITIONS.has(data.edition)) return;

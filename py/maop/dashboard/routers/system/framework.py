@@ -8,6 +8,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import platform
 import sys
@@ -47,6 +48,7 @@ async def api_framework_status(request: Request) -> dict[str, Any]:
         else []
     )
     return {
+        "status": "ok",
         "version": MAOP_ver,
         "python": sys.version.split()[0],
         "platform": f"{platform.system()} {platform.machine()}",
@@ -67,7 +69,8 @@ async def api_framework_logs(request: Request, limit: int = Query(50)) -> dict[s
     if log_dir.exists():
         for f in sorted(log_dir.glob("*.jsonl"), reverse=True):
             try:
-                lines = f.read_text(encoding="utf-8").strip().split("\n")
+                _text = await asyncio.to_thread(f.read_text, encoding="utf-8")
+                lines = _text.strip().split("\n")
                 for line in lines[-limit:]:
                     try:
                         import json as _json
@@ -84,7 +87,7 @@ async def api_framework_logs(request: Request, limit: int = Query(50)) -> dict[s
             logs = await _deps.get_bridge().logs_get(name="dashboard", limit=limit)
         except Exception as exc:
             logger.warning('Failed to get logs from bridge: %s', exc)
-    return {"logs": logs, "count": len(logs)}
+    return {"status": "ok", "logs": logs, "count": len(logs)}
 
 
 @router.get("/api/framework/config")
@@ -95,6 +98,7 @@ async def api_framework_config(request: Request) -> dict[str, Any]:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
         return {
+            "status": "ok",
             "agents": {
                 name: {
                     "cli": ad.cli,
@@ -118,5 +122,5 @@ async def api_framework_config(request: Request) -> dict[str, Any]:
         logger.error('Framework config failed: %s', exc)
         return JSONResponse(
             status_code=500,
-            content={"error": "Framework config failed"},
+            content={"status": "error", "error": "Framework config failed"},
         )

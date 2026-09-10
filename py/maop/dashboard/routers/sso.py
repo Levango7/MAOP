@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -102,9 +103,17 @@ class LogoutRequest(BaseModel):
 @router.get("/authorize")
 @handle_api_errors
 async def authorize(request: Request, state: str = "") -> Any:
-    """Redirect to the IdP's authorize URL（单 IdP 向后兼容）。"""
+    """Redirect to the IdP's authorize URL（单 IdP 向后兼容）。
+
+    P2 fix: state CSRF 保护——若调用方未传 state，自动生成随机 state。
+    SSOManager.get_authorize_url(store_state=True) 会将 state 存入
+    _pending_states，handle_callback 时校验并一次性消费。
+    """
     _require_sso()
     mgr = _get_manager()
+    # P2 fix: state 为空时自动生成随机 state，确保 CSRF 保护始终生效。
+    if not state:
+        state = secrets.token_urlsafe(32)
     url = mgr.get_authorize_url(state=state)
     return RedirectResponse(url=url, status_code=302)
 
@@ -154,6 +163,8 @@ async def logout(body: LogoutRequest, request: Request) -> dict[str, Any]:
 async def validate_session(request: Request, session_id: str = "") -> dict[str, Any]:
     """Validate an SSO session ID（单 IdP 向后兼容）。"""
     _require_sso()
+    from maop.core.security.middleware import require_admin
+    require_admin(request)
     if not session_id:
         return {"status": "error", "error": "Missing session_id"}
     mgr = _get_manager()
@@ -171,7 +182,13 @@ async def validate_session(request: Request, session_id: str = "") -> dict[str, 
 @router.get("/config")
 @handle_api_errors
 async def get_config(request: Request) -> dict[str, Any]:
-    """Return non-secret SSO config for frontend（单 IdP 向后兼容）。"""
+    """Return non-secret SSO config for frontend（单 IdP 向后兼容）。
+
+    P2 评估：本端点返回的是非敏感配置（provider/client_id/authorize_url/
+    redirect_uri/scopes/configured），不含 client_secret 等机密字段。
+    前端登录页需在未鉴权状态下调用此端点判断 SSO 是否可用，
+    因此保留无 require_admin——与 /enabled 端点保持一致。
+    """
     _require_sso()
     mgr = _get_manager()
     config = mgr.config

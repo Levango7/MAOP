@@ -51,6 +51,13 @@ class TenantRLS:
     ) -> None:
         self._db_path = db_path
         self._scoped_tables: set[str] = set(scoped_tables or [])
+        # t88-L7: registry of sanitized tenant_id → original tenant_id
+        # mappings, to detect prefix collisions. Two different tenant_ids
+        # like "a-b" and "a_b" both sanitize to "a_b", which would cause
+        # them to share the same prefix-namespaced table — a cross-tenant
+        # data leak. We raise RLSError on collision rather than silently
+        # aliasing.
+        self._prefix_registry: dict[str, str] = {}
         self._ensure_columns()
 
     def register_table(self, table: str) -> None:
@@ -227,7 +234,42 @@ class TenantRLS:
         Useful for modules that store per-tenant data in separate tables:
         ``tenant_<id>__<table>``.  The caller is responsible for creating the
         table; this only computes the name.
+
+        t88-L7 — prefix collision detection
+        -----------------------------------
+        The sanitization ``c if c.isalnum() else "_"`` is not injective:
+        ``"a-b"`` and ``"a_b"`` both map to ``"a_b"``. Without collision
+        detection, two distinct tenants would share the same prefixed
+        table name, causing a silent cross-tenant data leak.
+
+        This method maintains an internal registry
+        (``self._prefix_registry``) mapping the sanitized form back to
+        the first ``tenant_id`` that produced it. If a later call with a
+        *different* ``tenant_id`` produces the same sanitized form,
+        :class:`RLSError` is raised.
+
+        Assumption: tenant_ids are expected to be alphanumeric (UUIDs,
+        slugs, etc.). If your system allows tenant_ids that differ only
+        in non-alphanumeric characters, enforce a canonical form at the
+        tenant creation boundary instead of relying on this check.
         """
         validate_identifier(table, "table")
         safe = "".join(c if c.isalnum() else "_" for c in tenant_id)
+        # t88-L7: detect collision — two different tenant_ids sanitizing
+        # to the same prefix would silently share a table.
+        # Defensive: _prefix_registry may not exist if __init__ was
+        # bypassed (e.g. via __new__ in tests). Initialize on first use.
+        if not hasattr(self, "_prefix_registry"):
+            self._prefix_registry = {}
+        existing = self._prefix_registry.get(safe)
+        if existing is None:
+            self._prefix_registry[safe] = tenant_id
+        elif existing != tenant_id:
+            raise RLSError(
+                f"tenant_prefix collision: tenant_id {tenant_id!r} sanitizes to "
+                f"{safe!r}, which is already registered by tenant_id {existing!r}. "
+                f"Two distinct tenants would share the same prefix-namespaced "
+                f"table, causing a cross-tenant data leak. Ensure tenant_ids "
+                f"are canonical (e.g. alphanumeric-only) at the creation boundary."
+            )
         return f"tenant_{safe}__{table}"

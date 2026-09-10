@@ -68,8 +68,8 @@ function formatTime(ts) {
 <style scoped>
 .node-detail-panel {
   background: var(--bg-card, #22242a);
-  border: 1px solid var(--border, rgba(148,163,184,.35));
-  border-radius: 8px;
+  border: 1px solid var(--border, #3c4048);
+  border-radius: var(--r-lg);
   box-shadow: var(--shadow-card);
   overflow: hidden;
   font-size: var(--fs-base);
@@ -77,10 +77,10 @@ function formatTime(ts) {
 .ndp-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   padding: 10px 14px;
-  border-bottom: 1px solid var(--border, rgba(148,163,184,.35));
-  background: var(--bg-muted, rgba(148,163,184,.10));
+  border-bottom: 1px solid var(--border, #3c4048);
+  background: var(--bg-muted, rgba(148,163,184,.16));
 }
 .ndp-header h4 {
   margin: 0;
@@ -92,8 +92,8 @@ function formatTime(ts) {
   border: none;
   background: none;
   cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
+  padding: var(--sp-1);
+  border-radius: var(--r-sm);
   color: var(--text-muted, #9aa3b2);
   display: flex;
   align-items: center;
@@ -102,7 +102,7 @@ function formatTime(ts) {
 .ndp-body { padding: 10px 14px; }
 .ndp-row {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
   padding: 6px 0;
   align-items: flex-start;
 }
@@ -122,13 +122,13 @@ function formatTime(ts) {
   font-size: var(--fs-sm);
 }
 .ndp-error .ndp-value { color: var(--fail, #f85149); }
-.ndp-traceback { flex-direction: column; gap: 4px; }
+.ndp-traceback { flex-direction: column; gap: var(--sp-1); }
 .ndp-traceback-pre {
   margin: 0;
-  padding: 8px;
+  padding: var(--sp-2);
   background: var(--bg-code, #1e293b);
   color: var(--text-code, rgba(148,163,184,.35));
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   font-size: var(--fs-xs);
   font-family: var(--font-mono);
   overflow-x: auto;

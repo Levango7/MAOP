@@ -54,10 +54,10 @@ export const messages = {
 
   zh: {
     'view.cost.title': '成本追踪',
-    'view.cost.subtitle': '令牌消耗、预算余量与近期成本明细。',
+    'view.cost.subtitle': 'Token 消耗、预算余量与近期成本明细。',
 
     'view.cost.stat.totalCost': '总成本',
-    'view.cost.stat.totalTokens': '总令牌数',
+    'view.cost.stat.totalTokens': '总 Token 数',
     'view.cost.stat.totalCalls': '总调用次数',
     'view.cost.stat.avgLatency': '平均延迟',
 
@@ -85,7 +85,7 @@ export const messages = {
     'view.cost.noAgentSpend': '暂无智能体消耗',
     'view.cost.noAgentSpendDesc': '将在此显示按智能体的成本归集。',
     'view.cost.unknown': '未知',
-    'view.cost.tokens': '令牌',
+    'view.cost.tokens': 'Token',
     'view.cost.calls': '次调用',
 
     'view.cost.recentEntries': '近期明细',
@@ -98,7 +98,7 @@ export const messages = {
 
     'view.cost.col.time': '时间',
     'view.cost.col.agent': '智能体',
-    'view.cost.col.tokens': '令牌',
+    'view.cost.col.tokens': 'Token',
     'view.cost.col.cost': '成本',
     'view.cost.summaryFailed': '汇总失败。',
     'view.cost.budgetFailed': '预算失败。',

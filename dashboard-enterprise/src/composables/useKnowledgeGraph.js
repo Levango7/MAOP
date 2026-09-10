@@ -21,6 +21,9 @@ import { useApiStore } from '../stores/api.js';
 
 // ── Node/edge style maps (design.md 2.4.5) ───────────────────────────
 // Colors chosen for light theme (user pref: light/white, elegant, natural).
+// L5 fix: 提取节点类型集合为命名常量，避免魔法数字 4 散落在过滤逻辑中。
+const ALL_NODE_TYPES = ['agent', 'task', 'memory', 'concept'];
+const ALL_NODE_TYPE_COUNT = ALL_NODE_TYPES.length;
 export const NODE_STYLE = {
   agent:   { color: { background: '#E3F2FD', border: '#1565C0', highlight: { background: '#BBDEFB', border: '#1565C0' } }, icon: { code: 'f2bd' }, shape: 'icon' },
   task:    { color: { background: '#FFF3E0', border: '#E65100', highlight: { background: '#FFE0B2', border: '#E65100' } }, icon: { code: 'f073' }, shape: 'icon' },
@@ -159,13 +162,8 @@ export async function progressiveLoad(items, onBatch, opts = {}) {
 
 /**
  * ric-aware scheduler shim for environments without requestIdleCallback.
- * NOTE: kept for future use; currently unused to satisfy no-unused-vars.
+ * L8 fix: 移除未使用的 scheduleIdle 死代码（progressiveLoad 已内联 ric 逻辑）。
  */
-// eslint-disable-next-line no-unused-vars
-function scheduleIdle(task) {
-  if (typeof requestIdleCallback === 'function') requestIdleCallback(task);
-  else setTimeout(task, 16);
-}
 
 export function useKnowledgeGraph() {
   const api = useApiStore();
@@ -179,7 +177,7 @@ export function useKnowledgeGraph() {
   const lastParams = ref(null);
 
   // ── Client-side filter state ──
-  const selectedTypes = ref(new Set(['agent', 'task', 'memory', 'concept']));
+  const selectedTypes = ref(new Set(ALL_NODE_TYPES));
   const minConfidence = ref(0);
   const searchKeyword = ref('');
   const timeRange = ref({ start: '', end: '' });  // ISO strings, '' = unbounded
@@ -191,9 +189,9 @@ export function useKnowledgeGraph() {
   // ── Derived: filtered nodes/edges (client-side) ──
   const filteredNodes = computed(() => {
     let nodes = rawNodes.value;
-    // Type filter
+    // Type filter: 仅在未选中全部类型时执行过滤（选中全部时跳过，避免无谓遍历）
     const types = selectedTypes.value;
-    if (types && types.size < 4) {
+    if (types && types.size < ALL_NODE_TYPE_COUNT) {
       nodes = nodes.filter((n) => types.has(n.type));
     }
     // Confidence filter
@@ -272,7 +270,7 @@ export function useKnowledgeGraph() {
 
   /** Reset all client-side filters to defaults. */
   function resetFilters() {
-    selectedTypes.value = new Set(['agent', 'task', 'memory', 'concept']);
+    selectedTypes.value = new Set(ALL_NODE_TYPES);
     minConfidence.value = 0;
     searchKeyword.value = '';
     timeRange.value = { start: '', end: '' };

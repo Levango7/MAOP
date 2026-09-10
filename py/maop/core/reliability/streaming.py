@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import threading
 import time
 from collections.abc import Callable
 
@@ -186,11 +187,20 @@ class StreamRegistry:
 
 
 _registry: StreamRegistry | None = None
+# M-11: 保护单例创建的锁，避免多线程并发时创建多个实例
+_registry_lock = threading.Lock()
 
 
 def get_stream_registry() -> StreamRegistry:
-    """Return the global StreamRegistry singleton, creating it on first call."""
+    """Return the global StreamRegistry singleton, creating it on first call.
+
+    M-11 fix: 使用 threading.Lock + 双检锁保护单例创建，
+    避免多线程并发调用时创建多个 StreamRegistry 实例。
+    """
     global _registry
     if _registry is None:
-        _registry = StreamRegistry()
+        with _registry_lock:
+            # 双检锁：持锁后再次检查，防止等待期间已被其他线程初始化
+            if _registry is None:
+                _registry = StreamRegistry()
     return _registry

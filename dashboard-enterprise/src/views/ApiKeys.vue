@@ -253,6 +253,10 @@
                 <div class="bar-chart__bar" :style="{ height: barHeight(pt.count) + '%' }"></div>
               </div>
             </div>
+            <div v-if="callTrend.length" class="bar-chart__axis">
+              <span>{{ callTrend[0]?.date }}</span>
+              <span v-if="callTrend.length > 1">{{ callTrend[callTrend.length - 1]?.date }}</span>
+            </div>
             <p v-else class="ak-muted">{{ t('view.apikeys.noRecentCalls') }}</p>
           </div>
 
@@ -704,6 +708,11 @@ onMounted(load);
   width: 100%; min-height: 2px; border-radius: 2px 2px 0 0;
   background: var(--brand);
   transition: height var(--motion) var(--ease);
+}
+.bar-chart__axis {
+  display: flex; justify-content: space-between;
+  font-size: var(--fs-xs); color: var(--text-faint);
+  margin-top: 4px; font-variant-numeric: tabular-nums;
 }
 
 /* ── 状态码分布 ── */

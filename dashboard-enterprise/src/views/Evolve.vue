@@ -704,6 +704,8 @@ onMounted(() => {
 /* ── Heatmap ── */
 .heatmap {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 400px;
   padding: 4px 0;
 }
 .heatmap__table {

@@ -415,8 +415,20 @@ def record_degradation(backend: str, requested: str, fallback: str, reason: str 
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
-    except OSError:
-        pass
+    except OSError as exc:
+        # t88-L3: previously `except OSError: pass` silently swallowed
+        # persistence failures. The in-memory _degradation_log still
+        # captured the event (above), so the audit trail is not lost for
+        # this process, but the on-disk JSONL log would silently stop
+        # appending — making cross-restart audit impossible to debug.
+        # Per the silent-swallow key-path focus strategy, persistence
+        # failures must be surfaced via logger.warning (not error, since
+        # the system continues to operate with the in-memory log).
+        logger.warning(
+            "[edition] Failed to persist degradation event to %s "
+            "(in-memory log still captured this entry): %s",
+            log_path, exc, exc_info=True,
+        )
 
 
 def degradation_log() -> list[dict[str, str]]:

@@ -569,25 +569,65 @@ class MessageQueue:
     # ── Stats ─────────────────────────────────────────────────
 
     def stats(self) -> QueueStats:
-        """Get queue statistics."""
+        """Get queue statistics.
+
+        M-3 fix: 将原本 7 次独立 _count/_query 调用（每次各自开闭一个
+        SQLite 连接）合并到单一连接内执行，减少连接开销与锁竞争。
+        """
         now = time.time()
-        pending = self._count("queue_messages", "status = 'pending' AND visible_at <= ?", (now,))
-        processing = self._count("queue_messages", "status = 'processing'")
-        acked = self._count("queue_messages", "status = 'acked'")
-        dead = self._count("queue_dead_letters")
-        delayed = self._count("queue_messages", "status = 'pending' AND visible_at > ?", (now,))
+        pending = 0
+        processing = 0
+        acked = 0
+        dead = 0
+        delayed = 0
+        by_topic: dict[str, int] = {}
+        by_cg: dict[str, int] = {}
 
-        # By topic
-        rows = self._query(
-            "SELECT topic, COUNT(*) as cnt FROM queue_messages WHERE status = 'pending' GROUP BY topic"
-        )
-        by_topic = {r["topic"]: r["cnt"] for r in rows}
+        try:
+            with self._connect() as conn:
+                # 5 个 COUNT 查询 + 2 个 GROUP BY 查询，共用同一连接
+                cur = conn.execute(
+                    "SELECT COUNT(*) AS cnt FROM queue_messages "
+                    "WHERE status = 'pending' AND visible_at <= ?",
+                    (now,),
+                )
+                pending = cur.fetchone()["cnt"]
 
-        # By consumer group
-        rows = self._query(
-            "SELECT consumer_group, COUNT(*) as cnt FROM queue_messages WHERE status = 'processing' GROUP BY consumer_group"
-        )
-        by_cg = {r["consumer_group"]: r["cnt"] for r in rows}
+                cur = conn.execute(
+                    "SELECT COUNT(*) AS cnt FROM queue_messages WHERE status = 'processing'"
+                )
+                processing = cur.fetchone()["cnt"]
+
+                cur = conn.execute(
+                    "SELECT COUNT(*) AS cnt FROM queue_messages WHERE status = 'acked'"
+                )
+                acked = cur.fetchone()["cnt"]
+
+                cur = conn.execute(
+                    "SELECT COUNT(*) AS cnt FROM queue_dead_letters"
+                )
+                dead = cur.fetchone()["cnt"]
+
+                cur = conn.execute(
+                    "SELECT COUNT(*) AS cnt FROM queue_messages "
+                    "WHERE status = 'pending' AND visible_at > ?",
+                    (now,),
+                )
+                delayed = cur.fetchone()["cnt"]
+
+                cur = conn.execute(
+                    "SELECT topic, COUNT(*) AS cnt FROM queue_messages "
+                    "WHERE status = 'pending' GROUP BY topic"
+                )
+                by_topic = {row["topic"]: row["cnt"] for row in cur.fetchall()}
+
+                cur = conn.execute(
+                    "SELECT consumer_group, COUNT(*) AS cnt FROM queue_messages "
+                    "WHERE status = 'processing' GROUP BY consumer_group"
+                )
+                by_cg = {row["consumer_group"]: row["cnt"] for row in cur.fetchall()}
+        except Exception as exc:
+            logger.warning("[mq] stats() batch query failed: %s", exc, exc_info=True)
 
         # H8 修复：更新队列待处理消息数指标
         try:

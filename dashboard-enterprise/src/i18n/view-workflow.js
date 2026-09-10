@@ -52,6 +52,9 @@ export const messages = {
     'view.workflow.duplicateId': 'Duplicate node id: {id}',
     'view.workflow.edgeExists': 'Edge already exists',
     'view.workflow.cannotSelfLoop': 'Cannot connect a node to itself',
+    // ── P0 修复: 替换硬编码英文 ──
+    'view.workflow.portOutput': 'Output',
+    'view.workflow.toolbarStats': '{nodes} nodes · {edges} edges',
   },
   zh: {
     'view.workflow.subtitle': '以拖拽方式编排智能体工作流 DAG',
@@ -100,5 +103,8 @@ export const messages = {
     'view.workflow.duplicateId': '节点 ID 重复：{id}',
     'view.workflow.edgeExists': '连线已存在',
     'view.workflow.cannotSelfLoop': '不能连接到自身',
+    // ── P0 修复: 替换硬编码英文 ──
+    'view.workflow.portOutput': '输出端口',
+    'view.workflow.toolbarStats': '{nodes} 个节点 · {edges} 条边',
   },
 };

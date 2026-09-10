@@ -58,15 +58,16 @@ export function useAgentTokenStream() {
       signal.addEventListener('abort', externalAbortHandler);
     }
 
-    // Auth: rely on the httpOnly maop_token cookie (same-origin EventSource
-    // sends it automatically; AuthMiddleware falls back to the cookie).
+    // Auth: rely on the httpOnly maop_token cookie.
+    // H2 fix: EventSource 默认不携带跨域 cookie，必须显式设置 withCredentials: true，
+    // 否则 httpOnly maop_token cookie 在跨域场景下不会随请求发送，导致鉴权失败。
     // M7 fix: previously the JWT was read from localStorage and appended to
     // the URL — tokens must never appear in URLs/access logs (parity with
     // the WebSocket subprotocol fix P1-10).
     const url = `/api/stream/agent/${encodeURIComponent(executionId)}`;
 
     try {
-      eventSource = new EventSource(url);
+      eventSource = new EventSource(url, { withCredentials: true });
     } catch (exc) {
       streaming.value = false;
       if (onError) onError(`Failed to create EventSource: ${exc.message}`);

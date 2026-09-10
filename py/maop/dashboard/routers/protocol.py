@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -50,12 +51,17 @@ class ProtocolSendRequest(BaseModel):
     version: str = Field(default="1.0", max_length=64)
 
 _protocol_reg = None
+_protocol_reg_lock = threading.Lock()
 
 def _get_protocol_reg() -> Any:
     global _protocol_reg
     if _protocol_reg is None:
-        from maop.core.agent.plugins_hooks.protocol import ProtocolRegistry
-        _protocol_reg = ProtocolRegistry(root_dir=str(MAOP_ROOT))
+        with _protocol_reg_lock:
+            # Double-checked locking: re-test inside the lock to avoid
+            # re-initializing when another thread already did it.
+            if _protocol_reg is None:
+                from maop.core.agent.plugins_hooks.protocol import ProtocolRegistry
+                _protocol_reg = ProtocolRegistry(root_dir=str(MAOP_ROOT))
     return _protocol_reg
 
 
@@ -108,7 +114,7 @@ async def api_protocol_list(request: Request) -> dict[str, Any]:
     require_admin(request)
     reg = _get_protocol_reg()
     protocols = reg.list_protocols()
-    return {"protocols": [p.model_dump() for p in protocols], "count": len(protocols)}
+    return {"status": "ok", "protocols": [p.model_dump() for p in protocols], "count": len(protocols)}
 
 
 @router.get("/api/protocol/versions")
@@ -119,7 +125,7 @@ async def api_protocol_versions(request: Request, name: str = "") -> dict[str, A
         raise HTTPException(400, "missing name")
     reg = _get_protocol_reg()
     versions = reg.list_versions(name)
-    return {"name": name, "versions": versions}
+    return {"status": "ok", "name": name, "versions": versions}
 
 
 @router.post("/api/protocol/validate")
@@ -133,7 +139,7 @@ async def api_protocol_validate(body: ProtocolValidateRequest, request: Request)
         raise HTTPException(400, "missing protocol")
     reg = _get_protocol_reg()
     valid = reg.validate(protocol_name, payload, version)
-    return {"valid": valid, "protocol": protocol_name, "version": version}
+    return {"status": "ok", "valid": valid, "protocol": protocol_name, "version": version}
 
 
 @router.post("/api/protocol/send")
@@ -161,4 +167,4 @@ async def api_protocol_messages(request: Request, recipient: str = "", protocol:
         raise HTTPException(400, "missing recipient")
     reg = _get_protocol_reg()
     messages = reg.get_messages(recipient, protocol=protocol or None, limit=limit)
-    return {"messages": [m.model_dump() for m in messages], "count": len(messages)}
+    return {"status": "ok", "messages": [m.model_dump() for m in messages], "count": len(messages)}

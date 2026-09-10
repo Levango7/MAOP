@@ -1,0 +1,2 @@
+﻿$ErrorActionPreference = 'SilentlyContinue'
+npx vitest run 2>&1 | Select-Object -Last 5

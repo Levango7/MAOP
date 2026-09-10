@@ -40,11 +40,15 @@ async def api_subsystems(request: Request) -> dict[str, Any]:
             "module": info.get("module", ""),
             "error": info.get("error"),
         }
+    # P2 fix: 统一响应格式为 {status, data}。
     return {
-        "subsystems": result,
-        "count": len(result),
-        "available": sum(1 for v in subs.values() if v.get("available")),
-        "unavailable": sum(1 for v in subs.values() if not v.get("available")),
+        "status": "ok",
+        "data": {
+            "subsystems": result,
+            "count": len(result),
+            "available": sum(1 for v in subs.values() if v.get("available")),
+            "unavailable": sum(1 for v in subs.values() if not v.get("available")),
+        },
     }
 
 
@@ -62,12 +66,13 @@ async def api_coordination_report_v4(request: Request) -> dict[str, Any]:
             }
             for n, ad in cfg.agents.items()
         ]
-        return {"teams": teams, "agent_count": len(teams)}
+        # P2 fix: 统一响应格式为 {status, data}。
+        return {"status": "ok", "data": {"teams": teams, "agent_count": len(teams)}}
     except Exception as exc:
         logger.error('Coordination report failed: %s', exc)
         return JSONResponse(
             status_code=500,
-            content={"teams": [], "error": "Coordination report failed"},
+            content={"status": "error", "detail": "Coordination report failed"},
         )
 
 
@@ -89,12 +94,13 @@ async def api_routing_v4(request: Request) -> dict[str, Any]:
             if hasattr(cfg, "routes")
             else []
         )
-        return {"routes": routes}
+        # P2 fix: 统一响应格式为 {status, data}。
+        return {"status": "ok", "data": {"routes": routes}}
     except Exception as exc:
         logger.error('Routing config failed: %s', exc)
         return JSONResponse(
             status_code=500,
-            content={"routes": [], "error": "Routing config failed"},
+            content={"status": "error", "detail": "Routing config failed"},
         )
 
 
@@ -116,4 +122,5 @@ async def api_security_config_v4(request: Request) -> dict[str, Any]:
         except Exception as exc:
             logger.warning('Failed to check subsystem availability: %s', exc)
             result[mod_name] = False
-    return result
+    # P2 fix: 统一响应格式为 {status, data}。
+    return {"status": "ok", "data": result}

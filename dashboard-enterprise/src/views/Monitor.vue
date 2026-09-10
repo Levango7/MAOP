@@ -358,10 +358,10 @@ async function loadSystemStats() {
 
   if (resRes && !resRes.error && resRes.memory_store) {
     resources.value = [
-      { name: 'Memory Store', pct: Math.round((resRes.memory_store?.pct ?? 0) * 100), used: `${(resRes.memory_store?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.memory_store?.total_mb ?? 0} MB` },
-      { name: 'SQLite DB', pct: Math.round((resRes.sqlite_db?.pct ?? 0) * 100), used: `${(resRes.sqlite_db?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.sqlite_db?.total_mb ?? 0} MB` },
-      { name: 'Vector Index', pct: Math.round((resRes.vector_index?.pct ?? 0) * 100), used: `${(resRes.vector_index?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.vector_index?.total_mb ?? 0} MB` },
-      { name: 'Log Files', pct: Math.round((resRes.log_files?.pct ?? 0) * 100), used: `${(resRes.log_files?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.log_files?.total_mb ?? 0} MB` },
+      { name: t('view.monitor.resMemoryStore'), pct: Math.round((resRes.memory_store?.pct ?? 0) * 100), used: `${(resRes.memory_store?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.memory_store?.total_mb ?? 0} MB` },
+      { name: t('view.monitor.resSqliteDb'), pct: Math.round((resRes.sqlite_db?.pct ?? 0) * 100), used: `${(resRes.sqlite_db?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.sqlite_db?.total_mb ?? 0} MB` },
+      { name: t('view.monitor.resVectorIndex'), pct: Math.round((resRes.vector_index?.pct ?? 0) * 100), used: `${(resRes.vector_index?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.vector_index?.total_mb ?? 0} MB` },
+      { name: t('view.monitor.resLogFiles'), pct: Math.round((resRes.log_files?.pct ?? 0) * 100), used: `${(resRes.log_files?.used_mb ?? 0).toFixed(1)} MB`, total: `${resRes.log_files?.total_mb ?? 0} MB` },
     ];
   } else {
     resources.value = [];
@@ -476,15 +476,15 @@ onUnmounted(() => {
   padding: 4px 8px;
   border: 1px solid var(--border, rgba(148,163,184,.35));
   border-radius: 4px;
-  background: var(--bg-card, #22242a);
-  color: var(--text, #e8eaf0);
+  background: var(--bg-card);
+  color: var(--text);
   /* 修复: 固定 200px 宽度在小屏挤压 → 改为 min-width + flex 响应式伸缩 */
   min-width: 200px;
   flex: 1;
   outline: none;
 }
 .dag-exec-input:focus {
-  border-color: var(--brand, #3574f0);
+  border-color: var(--brand);
   box-shadow: 0 0 0 2px var(--brand-soft);
 }
 
@@ -494,8 +494,8 @@ onUnmounted(() => {
   padding: 4px 10px;
   border: 1px solid var(--border, rgba(148,163,184,.35));
   border-radius: 4px;
-  background: var(--bg-card, #22242a);
-  color: var(--text, #e8eaf0);
+  background: var(--bg-card);
+  color: var(--text);
   cursor: pointer;
 }
 .agent-health-refresh:disabled {
@@ -507,7 +507,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 12px;
-  color: var(--text-faint, #8a93a3);
+  color: var(--text-faint);
   font-size: var(--fs-sm);
 }
 .agent-health-list {
@@ -541,17 +541,17 @@ onUnmounted(() => {
 }
 .agent-health-header {
   font-weight: 600;
-  color: var(--text-faint, #8a93a3);
+  color: var(--text-faint);
   font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border, rgba(148,163,184,.25));
 }
 .row-drained .ah-name {
-  color: var(--fail, #f85149);
+  color: var(--fail);
 }
 .row-recovering .ah-name {
-  color: var(--warn, #d29922);
+  color: var(--warn);
 }
 .ah-name {
   font-family: var(--font-mono);
@@ -575,7 +575,7 @@ onUnmounted(() => {
 .mini-fill {
   height: 100%;
   border-radius: 3px;
-  transition: width 0.3s ease;
+  transition: width var(--motion-slow, 280ms) ease;
 }
 .mini-val {
   font-family: var(--font-mono);
@@ -603,24 +603,24 @@ onUnmounted(() => {
 }
 .pill-normal {
   background: var(--success-soft);
-  color: var(--success, #3fb950);
+  color: var(--success);
 }
 .pill-normal .pill-dot {
-  background: var(--success, #3fb950);
+  background: var(--success);
 }
 .pill-drained {
   background: var(--fail-soft);
-  color: var(--fail, #f85149);
+  color: var(--fail);
 }
 .pill-drained .pill-dot {
-  background: var(--fail, #f85149);
+  background: var(--fail);
 }
 .pill-recovering {
   background: var(--warn-soft);
-  color: var(--warn, #d29922);
+  color: var(--warn);
 }
 .pill-recovering .pill-dot {
-  background: var(--warn, #d29922);
+  background: var(--warn);
 }
 .agent-health-config {
   display: flex;
@@ -630,7 +630,7 @@ onUnmounted(() => {
   margin-top: 6px;
   border-top: 1px dashed var(--border-light, rgba(148,163,184,.18));
   font-size: var(--fs-xs);
-  color: var(--text-faint, #8a93a3);
+  color: var(--text-faint);
   font-family: var(--font-mono);
 }
 </style>

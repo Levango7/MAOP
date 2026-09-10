@@ -120,7 +120,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { StatCard, Card, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
 import { useI18n } from '../i18n';
@@ -322,7 +322,7 @@ onMounted(() => {
   loadTraces();
   pollTimer = setInterval(loadStatus, 15000);
 });
-import { onUnmounted } from 'vue';
+
 onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 </script>
 
@@ -342,11 +342,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   font-size: var(--fs-sm);
   font-weight: 600;
   background: var(--bg-tag, rgba(148,163,184,.16));
-  color: var(--text-muted, #9aa3b2);
+  color: var(--text-muted);
 }
 .edition-badge.enterprise {
   background: var(--brand-soft);
-  color: var(--brand, #3574f0);
+  color: var(--brand);
 }
 .tracing-badge {
   display: inline-flex;
@@ -364,14 +364,14 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .tracing-badge.on {
   background: var(--success-soft);
-  color: var(--success, #3fb950);
+  color: var(--success);
 }
-.tracing-badge.on .dot { background: var(--success, #3fb950); }
+.tracing-badge.on .dot { background: var(--success); }
 .tracing-badge.off {
   background: var(--bg-tag, rgba(148,163,184,.16));
-  color: var(--text-faint, #8a93a3);
+  color: var(--text-faint);
 }
-.tracing-badge.off .dot { background: var(--text-faint, #8a93a3); }
+.tracing-badge.off .dot { background: var(--text-faint); }
 
 /* ── Layout ─────────────────────────────────────────────────────── */
 .metrics-grid {
@@ -420,17 +420,17 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   border-radius: 50%;
   justify-self: center;
 }
-.pipeline-dot.ok, .health-dot.ok { background: var(--success, #3fb950); }
-.pipeline-dot.bad, .health-dot.bad { background: var(--fail, #f85149); }
+.pipeline-dot.ok, .health-dot.ok { background: var(--success); }
+.pipeline-dot.bad, .health-dot.bad { background: var(--fail); }
 .pipeline-name, .health-name {
   font-size: var(--fs-base);
-  color: var(--text, #e8eaf0);
+  color: var(--text);
   font-weight: 500;
 }
 .pipeline-detail, .health-detail {
   grid-column: 3;
   font-size: var(--fs-sm);
-  color: var(--text-muted, #9aa3b2);
+  color: var(--text-muted);
   font-family: var(--font-mono, monospace);
 }
 .pipeline-status {
@@ -442,11 +442,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .pipeline-status.ok {
   background: var(--success-soft);
-  color: var(--success, #3fb950);
+  color: var(--success);
 }
 .pipeline-status.bad {
   background: var(--fail-soft);
-  color: var(--fail, #f85149);
+  color: var(--fail);
 }
 
 /* ── Config rows ────────────────────────────────────────────────── */
@@ -455,11 +455,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .config-label {
   font-size: var(--fs-base);
-  color: var(--text-muted, #9aa3b2);
+  color: var(--text-muted);
 }
 .config-value {
   font-size: var(--fs-base);
-  color: var(--text, #e8eaf0);
+  color: var(--text);
   font-weight: 500;
 }
 .config-value.mono {
@@ -482,7 +482,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .metric-header {
   font-size: var(--fs-xs);
   font-weight: 600;
-  color: var(--text-faint, #8a93a3);
+  color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-bottom: 1px solid var(--border, rgba(148,163,184,.35));
@@ -492,16 +492,16 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .metric-row:last-child { border-bottom: none; }
 .mono { font-family: var(--font-mono, monospace); font-size: var(--fs-sm); }
-.col-name { color: var(--text, #e8eaf0); }
+.col-name { color: var(--text); }
 .col-type { text-align: center; }
 .col-value {
   text-align: center;
   font-weight: 600;
-  color: var(--text, #e8eaf0);
+  color: var(--text);
 }
 .col-extra {
   font-size: var(--fs-sm);
-  color: var(--text-muted, #9aa3b2);
+  color: var(--text-muted);
   font-family: var(--font-mono, monospace);
 }
 .type-tag {
@@ -513,7 +513,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .type-tag.counter {
   background: var(--brand-soft);
-  color: var(--brand, #3574f0);
+  color: var(--brand);
 }
 .type-tag.histogram {
   background: var(--chart-5-soft);
@@ -531,11 +531,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   border-radius: 4px;
   padding: 4px 8px;
   cursor: pointer;
-  color: var(--text-muted, #9aa3b2);
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
 }
-.refresh-btn:hover { color: var(--brand, #3574f0); border-color: var(--brand, #3574f0); }
+.refresh-btn:hover { color: var(--brand); border-color: var(--brand); }
 .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .health-skel, .config-skel {
@@ -554,18 +554,18 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   align-items: center;
   gap: 8px;
   font-size: var(--fs-base);
-  color: var(--text, #e8eaf0);
+  color: var(--text);
 }
-.trace-info.disabled .trace-row { color: var(--text-muted, #9aa3b2); }
+.trace-info.disabled .trace-row { color: var(--text-muted); }
 .trace-hint {
   font-size: var(--fs-sm);
-  color: var(--text-faint, #8a93a3);
+  color: var(--text-faint);
   padding-left: 24px;
 }
 .trace-enable {
   font-size: var(--fs-sm);
   padding-left: 24px;
-  color: var(--text-muted, #9aa3b2);
+  color: var(--text-muted);
 }
 .trace-enable code {
   font-family: var(--font-mono, monospace);

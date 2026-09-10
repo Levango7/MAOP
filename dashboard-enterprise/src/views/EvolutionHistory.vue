@@ -188,7 +188,16 @@
                 </div>
                 <div class="suggestion-field suggestion-field--full">
                   <span class="suggestion-field__label">{{ t('view.evolutionHistory.suggestions.params') }}</span>
-                  <pre class="suggestion-field__code">{{ formatJson(sug.mutation_params) }}</pre>
+                  <pre
+                    class="suggestion-field__code"
+                    :class="{ 'is-collapsible': formatJson(sug.mutation_params).split('\n').length > JSON_COLLAPSE_LINES }"
+                    @click="formatJson(sug.mutation_params).split('\n').length > JSON_COLLAPSE_LINES && toggleJson(sug.id || sug.description)"
+                  >{{ formatJsonCollapsed(sug.mutation_params, sug.id || sug.description) }}</pre>
+                  <button
+                    v-if="formatJson(sug.mutation_params).split('\n').length > JSON_COLLAPSE_LINES"
+                    class="suggestion-field__toggle"
+                    @click="toggleJson(sug.id || sug.description)"
+                  >{{ expandedJsons.has(sug.id || sug.description) ? '−' : '+' }}</button>
                 </div>
               </div>
             </div>
@@ -426,6 +435,14 @@ const tabOptions = computed(() => [
 const selectedCycle = ref(null);
 const openSuggestions = reactive(new Set());
 
+// L4: formatJson 折叠功能 — 超过阈值行数时默认折叠，点击展开
+const JSON_COLLAPSE_LINES = 10;
+const expandedJsons = reactive(new Set());
+function toggleJson(key) {
+  if (expandedJsons.has(key)) expandedJsons.delete(key);
+  else expandedJsons.add(key);
+}
+
 function onCycleClick(row) {
   // row 是 cycleRows 中的展开行, 用 cycle_id 找回原始 cycle
   const cycle = cycles.value.find((c) => c.cycle_id === row.cycle_id);
@@ -468,6 +485,15 @@ function formatJson(v) {
     try { return JSON.stringify(v, null, 2); } catch { return String(v); }
   }
   return String(v);
+}
+
+// L4: 带折叠的 JSON 显示 — 超过 JSON_COLLAPSE_LINES 行时截断，点击展开查看完整
+function formatJsonCollapsed(v, key) {
+  const full = formatJson(v);
+  if (full === '—' || full === String(v)) return full;
+  const lines = full.split('\n');
+  if (lines.length <= JSON_COLLAPSE_LINES || expandedJsons.has(key)) return full;
+  return lines.slice(0, JSON_COLLAPSE_LINES).join('\n') + '\n…';
 }
 
 // ── 迭代 C：Prompt 版本对比 ────────────────────────────────────
@@ -866,6 +892,20 @@ onMounted(() => {
   white-space: pre-wrap;
   word-break: break-all;
 }
+.suggestion-field__code.is-collapsible { cursor: pointer; }
+.suggestion-field__toggle {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 0 6px;
+  font-size: var(--fs-sm);
+  line-height: 18px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.suggestion-field__toggle:hover { color: var(--text); border-color: var(--border); }
 
 /* ── Prompt 对比视图（迭代 C）────────────────────────────── */
 .compare-controls {

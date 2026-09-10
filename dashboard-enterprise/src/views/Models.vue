@@ -299,5 +299,3 @@ onMounted(loadAll);
 onUnmounted(() => { if (_switchTimer) clearTimeout(_switchTimer); });
 </script>
 
-<style scoped>
-</style>

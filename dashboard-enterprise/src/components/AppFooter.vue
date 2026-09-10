@@ -29,7 +29,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRealtimeStore } from '../stores/realtime.js';
-import { useI18n } from '../i18n/index.js';
+import { useI18n } from '../i18n';
 
 defineProps({
   version: { type: String, default: 'unknown' },

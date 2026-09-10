@@ -1,5 +1,14 @@
 <template>
-  <div v-if="visible" class="onboard-wizard__overlay" @click.self="skip">
+  <div
+    v-if="visible"
+    ref="rootRef"
+    class="onboard-wizard__overlay"
+    data-modal-root="true"
+    aria-modal="true"
+    role="dialog"
+    :aria-label="t('view.onboard.title')"
+    @click.self="skip"
+  >
     <Card class="onboard-wizard" :padded="false">
       <template #title>
         <h2>{{ t('view.onboard.title') }}</h2>
@@ -54,6 +63,7 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from '../i18n';
 import Card from './Card.vue';
+import { useModalA11y } from '../composables/useModalA11y.js';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -63,6 +73,7 @@ const STORAGE_KEY = 'maop_onboarding_completed';
 const completed = ref(localStorage.getItem(STORAGE_KEY) === '1');
 const visible = ref(!completed.value);
 const step = ref(0);
+const rootRef = ref(null);
 
 const steps = [
   { label: t('view.onboard.step1') },
@@ -79,6 +90,13 @@ function finish() {
   skip();
   router.push('/agents');
 }
+
+// 焦点管理 + focus trap + Esc 关闭(复用 useModalA11y)
+useModalA11y(
+  () => visible.value,
+  () => skip(),
+  () => rootRef.value,
+);
 </script>
 
 <style scoped>

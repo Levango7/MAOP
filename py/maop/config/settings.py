@@ -12,6 +12,7 @@ Production overrides via environment variables.
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 
 from pydantic import AliasChoices, Field, field_validator
@@ -346,18 +347,28 @@ class MAOPSettings(BaseSettings):
 # ── Singleton ─────────────────────────────────────────────────────
 
 _settings: MAOPSettings | None = None
+# M-10: 保护单例创建的锁，避免多线程并发时创建多个实例
+_settings_lock = threading.Lock()
 
 
 def get_settings() -> MAOPSettings:
-    """Get or create the global settings singleton."""
+    """Get or create the global settings singleton.
+
+    M-10 fix: 使用 threading.Lock + 双检锁保护单例创建，
+    避免多线程并发调用时创建多个 MAOPSettings 实例。
+    """
     global _settings
     if _settings is None:
-        _settings = MAOPSettings()
+        with _settings_lock:
+            # 双检锁：持锁后再次检查，防止等待期间已被其他线程初始化
+            if _settings is None:
+                _settings = MAOPSettings()
     return _settings
 
 
 def reload_settings() -> MAOPSettings:
     """Force-reload settings (e.g., after .env change)."""
     global _settings
-    _settings = MAOPSettings()
+    with _settings_lock:
+        _settings = MAOPSettings()
     return _settings

@@ -6,6 +6,12 @@ import { defineStore } from 'pinia';
 // 保留 USER_KEY 用于存储非敏感的用户名信息（UI 显示登录状态）。
 const USER_KEY = 'maop_user';
 
+// L3 fix: 提取硬编码的 API 路径为命名常量，便于统一维护与路径变更。
+const API_ENDPOINTS = {
+  AUTH_REFRESH: '/api/auth/refresh',
+  AUTH_LOGOUT: '/api/auth/logout',
+};
+
 /**
  * M6 fix: token 现由 httpOnly cookie 管理，前端无法读取。
  * 保留函数签名以兼容现有调用方，但始终返回空字符串。
@@ -71,7 +77,7 @@ async function tryRefreshToken() {
     try {
       // M6 fix: 不再从 localStorage 读取 token，依赖 httpOnly cookie 自动携带。
       if (!isLoggedIn()) return false;
-      const res = await fetchWithTimeout('/api/auth/refresh', {
+      const res = await fetchWithTimeout(API_ENDPOINTS.AUTH_REFRESH, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include', // 携带 httpOnly cookie
@@ -130,8 +136,10 @@ export const useApiStore = defineStore('api', () => {
       await handleUnauthorized();
       // Retry once if refresh succeeded (new token is now in localStorage)
       res = await fetchWithTimeout(url, withAuth({}, (opts && opts.headers) || {}));
+      // H3 fix: 消除重复调用 handleUnauthorized()。首次 401 已调用过一次
+      // （内部会尝试 refresh，失败则清除登录态并触发 maop:unauthorized 事件）。
+      // 重试仍 401 说明 token 确实无效，直接抛错即可，避免事件重复触发。
       if (res.status === 401) {
-        await handleUnauthorized();  // refresh didn't help or no token
         throw new Error(`API ${url}: 401 Unauthorized`);
       }
     }
@@ -160,8 +168,8 @@ export const useApiStore = defineStore('api', () => {
         { method: 'POST', body: JSON.stringify(body || {}) },
         headers
       ));
+      // H3 fix: 消除重复调用 handleUnauthorized()，避免 maop:unauthorized 事件重复触发。
       if (res.status === 401) {
-        await handleUnauthorized();
         throw new Error(`API ${url}: 401 Unauthorized`);
       }
     }
@@ -188,7 +196,8 @@ export const useApiStore = defineStore('api', () => {
         { method: 'PUT', body: JSON.stringify(body || {}) },
         putHeaders
       ));
-      if (res.status === 401) { await handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+      // H3 fix: 消除重复调用 handleUnauthorized()，避免 maop:unauthorized 事件重复触发。
+      if (res.status === 401) { throw new Error(`API ${url}: 401`); }
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
@@ -203,7 +212,8 @@ export const useApiStore = defineStore('api', () => {
     if (res.status === 401) {
       await handleUnauthorized();
       res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
-      if (res.status === 401) { await handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+      // H3 fix: 消除重复调用 handleUnauthorized()，避免 maop:unauthorized 事件重复触发。
+      if (res.status === 401) { throw new Error(`API ${url}: 401`); }
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
@@ -250,7 +260,7 @@ export const useApiStore = defineStore('api', () => {
   async function clearAuthToken() {
     // Notify backend to revoke the token before clearing locally
     try {
-      await fetchWithTimeout('/api/auth/logout', withAuth({ method: 'POST' }, {}));
+      await fetchWithTimeout(API_ENDPOINTS.AUTH_LOGOUT, withAuth({ method: 'POST' }, {}));
     } catch { /* best-effort — clear locally anyway */ }
     // M6 fix: 后端会通过 Set-Cookie 清除 httpOnly cookie，前端只需清除 user 信息。
     try {
@@ -272,4 +282,4 @@ export const useApiStore = defineStore('api', () => {
 });
 
 // 模块级导出（便于非 Pinia 上下文使用，如 App.vue 直接 import）
-export { getAuthToken, withAuth, handleUnauthorized, isLoggedIn };
+export { getAuthToken, withAuth, handleUnauthorized, isLoggedIn, fetchWithTimeout };

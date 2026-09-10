@@ -653,6 +653,11 @@ export const coreMessages = {
 };
 
 // Auto-collect every view-level dictionary: src/i18n/view-*.js
+// L9 fix: 使用 eager: true 同步加载所有语言包，而非懒加载。原因：
+//   1. i18n 字典必须在首屏渲染前就绪，否则 t() 在初次渲染时返回原始 key，导致 UI 闪烁。
+//   2. 语言包总体积小（< 50KB gzipped），懒加载的 chunk 数量开销反而大于内容本身。
+//   3. vue-i18n 的 createI18n 也默认同步加载 messages，此处保持一致语义。
+// 若未来语言包体积显著增长，可改为按路由懒加载 + Suspense 边界处理首次空态。
 const viewModules = import.meta.glob('./view-*.js', { eager: true });
 const viewMessages = { en: {}, zh: {} };
 for (const mod of Object.values(viewModules)) {

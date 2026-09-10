@@ -46,7 +46,12 @@ async def api_workflow_list(request: Request) -> dict[str, Any]:
 @handle_api_errors
 async def api_workflow_run(request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
+    # P0 fix: JSON 解析失败时返回 400 而非 500。
+    try:
+        body = await request.json()
+    except Exception as exc:
+        logger.warning("[workflow] Invalid JSON in workflow run request: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
     wf_name = body.get("name", "")
     task = body.get("task", "")
     if not wf_name:

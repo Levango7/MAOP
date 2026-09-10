@@ -968,7 +968,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   color: var(--text);
   font-size: var(--fs-base);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--motion-fast, 120ms), border-color var(--motion-fast, 120ms);
 }
 .btn:hover { background: var(--bg-hover, rgba(148,163,184,.16)); border-color: var(--border-strong, rgba(148,163,184,.45)); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }

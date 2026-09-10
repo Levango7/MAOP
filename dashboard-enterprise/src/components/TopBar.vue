@@ -81,7 +81,7 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useI18n } from '../i18n/index.js';
+import { useI18n } from '../i18n';
 import AppIcon from './AppIcon.vue';
 import Segmented from './Segmented.vue';
 import { useUiStore } from '../stores/ui.js';
@@ -417,7 +417,7 @@ onMounted(() => {
   .topbar__brandedition { display: none; }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .topbar__brandtext { display: none; }
   .topbar__refresh { display: none; }
 }

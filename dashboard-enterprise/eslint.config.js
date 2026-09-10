@@ -69,6 +69,8 @@ export default [
 
       // ── Vue 规则 ─────────────────────────────────────────────
       'vue/multi-word-component-names': 'off',
+      // no-v-html 关闭: 项目中 v-html 仅用于受控 SVG 图标 (DagGraph.vue statusSvg)
+      // 及经 DOMPurify 消毒的内容, 已在 utils/sanitize.js 统一防护, 详见安全审查经验。
       'vue/no-v-html': 'off',
       'vue/require-default-prop': 'warn',
       'vue/attribute-hyphenation': 'error',

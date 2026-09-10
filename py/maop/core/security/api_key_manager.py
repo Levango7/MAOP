@@ -140,8 +140,19 @@ class ApiKeyValidationResult(BaseModel):
 # ── Constants ──────────────────────────────────────────────────────
 
 _KEY_PREFIX = "maop"
-_KEY_ID_LEN = 8          # chars in the stable identifier
-_SECRET_LEN = 32         # chars in the random secret
+_KEY_ID_LEN = 8          # chars in the stable identifier (4 bytes entropy)
+# t88-L5: secret entropy hardened from 32 hex chars (16 bytes / 128 bits)
+# to 64 hex chars (32 bytes / 256 bits). 128 bits is the floor for
+# general-purpose secrets but below the 256-bit recommendation for
+# long-lived API keys (NIST SP 800-131A r2 §1, "strength of 112 bits
+# or more for the period beyond 2030"; 256 bits provides a comfortable
+# margin against future advances). secrets.token_hex(32) draws from
+# the OS CSPRNG, so 64 hex chars = 32 bytes = 256 bits of entropy.
+# The hex alphabet avoids '_' so the `maop_{key_id}_{secret}` format
+# remains unambiguous. Existing keys (32-char secrets) continue to
+# validate — validation hashes the full plaintext and does not depend
+# on secret length.
+_SECRET_LEN = 64         # chars in the random secret (32 bytes entropy)
 _DEFAULT_RATE_WINDOW_S = 60
 _MAX_USAGE_ROWS = 100_000  # soft cap; older rows pruned periodically
 
@@ -266,6 +277,11 @@ class ApiKeyManager:
         ``plaintext_key`` has the form ``maop_{key_id}_{secret}``. Both
         ``key_id`` and ``secret`` are hex strings so they never contain
         the ``_`` separator.
+
+        Entropy: ``key_id`` provides 32 bits (sufficient for lookup
+        indexing), ``secret`` provides 256 bits (32 bytes via
+        ``secrets.token_hex(32)``, see t88-L5). The total key space is
+        2^288, making brute-force infeasible.
         """
         key_id = secrets.token_hex(_KEY_ID_LEN // 2)[:_KEY_ID_LEN]
         secret = secrets.token_hex(_SECRET_LEN // 2)[:_SECRET_LEN]

@@ -300,14 +300,25 @@ class EpisodicStoreMixin:
         return self._row_to_episodic(d)
 
     def _increment_access_counts(self, entry_ids: list[str]) -> None:
-        """Increment access_count for the given entry IDs (P3: access-count consolidation)."""
+        """Increment access_count for the given entry IDs (P3: access-count consolidation).
+
+        M-4 fix: 将逐行 UPDATE 改为批量 UPDATE ... WHERE id IN (...)，
+        显著减少 SQL 往返次数。考虑 SQLite 参数上限（默认 999）分批执行。
+        """
         if not entry_ids:
             return
+        # 去重，避免重复计数
+        unique_ids = list(dict.fromkeys(entry_ids))
+        # SQLite 默认单语句参数上限 999，留余量取 500
+        _BATCH = 500
         with self._episodic_connect() as conn:
-            for eid in entry_ids:
+            for i in range(0, len(unique_ids), _BATCH):
+                batch = unique_ids[i : i + _BATCH]
+                placeholders = ",".join("?" * len(batch))
                 conn.execute(
-                    "UPDATE episodic_memory SET access_count = access_count + 1 WHERE id = ?",
-                    (eid,),
+                    f"UPDATE episodic_memory SET access_count = access_count + 1 "
+                    f"WHERE id IN ({placeholders})",
+                    batch,
                 )
 
     def episodic_stats(self) -> dict[str, Any]:

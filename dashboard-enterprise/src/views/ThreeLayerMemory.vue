@@ -115,7 +115,7 @@ v-else-if="!loading" icon="search" :title="t('view.tlmemory.noMemories')"
         <div class="modal" role="dialog" aria-modal="true">
           <div class="modal__head">
             <h3>{{ t('view.tlmemory.addMemoryTitle') }}</h3>
-            <button class="modal__x" type="button" aria-label="Close" @click="showAdd = false">×</button>
+            <button class="modal__x" type="button" :aria-label="t('common.close')" @click="showAdd = false">×</button>
           </div>
           <div class="modal__body">
             <label class="field">
@@ -132,7 +132,7 @@ v-else-if="!loading" icon="search" :title="t('view.tlmemory.noMemories')"
 v-model="addForm.content" class="field__input" rows="4"
                 :placeholder="t('view.tlmemory.contentPlaceholder')"></textarea>
             </label>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-4);">
+            <div class="add-form__two-col">
               <label class="field">
                 <span class="field__label">{{ t('view.tlmemory.topic') }}</span>
                 <input v-model="addForm.topic" :aria-label="t('view.tlmemory.topicPlaceholder')" class="field__input" :placeholder="t('view.tlmemory.topicPlaceholder')" />
@@ -305,11 +305,16 @@ onMounted(refreshAll);
 </script>
 
 <style scoped>
+.add-form__two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
 .mem-error-banner {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px; margin-bottom: 16px;
   background: var(--fail-soft); border: 1px solid var(--fail);
-  border-radius: var(--r-md); color: var(--fail, #f85149);
+  border-radius: var(--r-md); color: var(--fail);
   font-size: var(--fs-sm); font-family: var(--font-mono); word-break: break-word;
 }
 </style>

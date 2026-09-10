@@ -152,6 +152,12 @@ class Guardrail:
         self._path = Path(config_path)
         self._config = self._load()
         self._rate_limiters: dict[str, Any] = {}  # persistent rate limiters per rule
+        # M-9: RateLimiter 异常熔断状态——连续失败超过阈值后切换到 fail-open，
+        # 避免 RateLimiter 持续故障导致所有请求被 fail-closed 阻断。
+        self._rl_fail_counts: dict[str, int] = {}
+        self._RL_CIRCUIT_THRESHOLD = 5  # 连续失败阈值
+        # M-9: 系统级异常直接 fail-open（非业务异常不应阻断请求）
+        self._SYSTEM_EXCEPTIONS = (MemoryError, SystemError, OSError, KeyboardInterrupt)
 
     # ── persistence ──────────────────────────────────────────
 
@@ -249,6 +255,8 @@ class Guardrail:
                         )
                     rl = self._rate_limiters[rule.id]
                     result = rl.consume(agent or "default")
+                    # M-9: 成功调用后重置熔断失败计数
+                    self._rl_fail_counts.pop(rule.id, None)
                     if not result.allowed:
                         violations.append(Violation(
                             rule=rule.id,
@@ -257,15 +265,35 @@ class Guardrail:
                             action=rule.action.value,
                         ))
                 except Exception as exc:
-                    # Security: fail-closed — if rate limiter fails, treat as violation
-                    # rather than silently allowing the request through.
-                    logger.warning("[guardrail] rate limit check failed (fail-closed): %s", exc)
-                    violations.append(Violation(
-                        rule=rule.id,
-                        severity="warn",
-                        message=f"rate limit check error: {exc}",
-                        action=rule.action.value,
-                    ))
+                    # M-9: fail-closed 加熔断机制
+                    # 1. 系统级异常（MemoryError/SystemError/OSError）直接 fail-open，
+                    #    因为这类异常下 fail-closed 可能加剧系统压力。
+                    # 2. 业务异常连续失败超过阈值后切换到 fail-open，避免持续阻断。
+                    # 3. 正常情况下保持 fail-closed（安全优先）。
+                    is_system_exc = isinstance(exc, self._SYSTEM_EXCEPTIONS)
+                    fail_count = self._rl_fail_counts.get(rule.id, 0) + 1
+                    self._rl_fail_counts[rule.id] = fail_count
+
+                    if is_system_exc or fail_count > self._RL_CIRCUIT_THRESHOLD:
+                        # fail-open: 允许请求通过，记录警告
+                        logger.warning(
+                            "[guardrail] rate limit check failed (fail-open, rule=%s, "
+                            "fail_count=%d, system_exc=%s): %s",
+                            rule.id, fail_count, is_system_exc, exc,
+                        )
+                    else:
+                        # fail-closed: 视为违规
+                        logger.warning(
+                            "[guardrail] rate limit check failed (fail-closed, rule=%s, "
+                            "fail_count=%d): %s",
+                            rule.id, fail_count, exc,
+                        )
+                        violations.append(Violation(
+                            rule=rule.id,
+                            severity="warn",
+                            message=f"rate limit check error: {exc}",
+                            action=rule.action.value,
+                        ))
 
         blocked = [v for v in violations if v.action == "block"]
         passed = len(blocked) == 0
@@ -321,10 +349,50 @@ class Guardrail:
 # ── Helpers ───────────────────────────────────────────────────
 
 def fnmatch_simple(name: str, pattern: str) -> bool:
-    """Minimal glob-style matching (only ``*`` wildcard).
+    """Minimal glob-style matching supporting only the ``*`` wildcard.
 
-    Avoids importing ``fnmatch`` to keep dependencies minimal;
-    use ``fnmatch.fnmatch`` if you need full glob semantics.
+    This is a deliberately restricted subset of glob semantics, NOT a
+    drop-in replacement for :func:`fnmatch.fnmatch`. The differences
+    from standard ``fnmatch`` are:
+
+    Supported
+        - ``*`` : matches zero or more characters (greedy, but
+          implemented via sequential substring containment so
+          backtracking is implicit).
+
+    NOT supported (unlike :func:`fnmatch.fnmatch`)
+        - ``?``   : single-char wildcard (treated as a literal ``?``)
+        - ``[seq]`` / ``[!seq]`` : character ranges (treated literally)
+        - Case-insensitivity: ``fnmatch.fnmatch`` lowercases on
+          case-insensitive platforms (Windows/macOS); ``fnmatch_simple``
+          is always case-sensitive. Use :func:`fnmatch.fnmatchcase` for
+          an explicit case-sensitive standard match.
+        - Path separators: ``fnmatch.fnmatch`` treats ``*`` as not
+          crossing ``os.sep`` on some platforms; ``fnmatch_simple``
+          has no such special-casing — ``*`` matches everything
+          including ``/`` and ``\\``.
+
+    Edge cases
+        - ``pattern == "*"`` returns ``True`` for any ``name``
+          (including empty).
+        - ``pattern`` with no ``*`` is an exact equality check.
+        - Leading/trailing ``*`` (e.g. ``"foo*"``, ``"*bar"``) work as
+          suffix/prefix tests.
+        - Multiple ``*`` (e.g. ``"a*b*c"``) require ``a``, ``b``, ``c``
+          to appear in order as (possibly empty) substrings.
+
+    Rationale: avoids importing :mod:`fnmatch` to keep the guardrail
+    module dependency-minimal (it may run in sandboxed/restricted-import
+    contexts). Use :func:`fnmatch.fnmatch` if you need the full glob
+    semantics (``?``, ``[seq]``, platform case-folding).
+
+    Args:
+        name: The string to test (e.g. a task description).
+        pattern: The glob pattern (only ``*`` is special).
+
+    Returns:
+        True if ``name`` matches ``pattern`` under the restricted
+        semantics above.
     """
     if pattern == "*":
         return True

@@ -100,10 +100,19 @@ class SandboxManager:
         mgr.cleanup(sb.id)
     """
 
-    def __init__(self, root_dir: str | Path) -> None:
+    def __init__(
+        self,
+        root_dir: str | Path,
+        allowed_commands: set[str] | list[str] | None = None,
+    ) -> None:
         self._root = Path(root_dir)
         self._sandbox_dir = self._root / "data" / "sandboxes"
         self._db_path = self._sandbox_dir / "sandbox_index.db"
+        # H-3 fix: 可选命令白名单。None 表示不限制（向后兼容）；
+        # 配置后只允许白名单内的命令（按命令名匹配，忽略路径前缀和参数）。
+        self._allowed_commands: set[str] | None = (
+            {c.lower() for c in allowed_commands} if allowed_commands else None
+        )
         self._ensure_db()
 
     def _ensure_db(self) -> None:
@@ -129,6 +138,28 @@ class SandboxManager:
     def _new_id(self) -> str:
         ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         return f"sb-{ts}-{uuid.uuid4().hex[:8]}"
+
+    def _check_command_allowed(self, command: str) -> str | None:
+        """H-3 fix: 检查命令是否在白名单内。
+
+        Returns
+        -------
+        str | None
+            被拒绝时返回原因字符串；允许时返回 None。
+        """
+        if self._allowed_commands is None:
+            return None  # 未配置白名单，允许所有（向后兼容）
+        try:
+            import shlex
+            parts = shlex.split(command)
+            if not parts:
+                return "Empty command"
+            cmd_name = os.path.basename(parts[0]).lower()
+            if cmd_name not in self._allowed_commands:
+                return f"Command not in allowlist: {cmd_name}"
+            return None
+        except ValueError as exc:
+            return f"Invalid command syntax: {exc}"
 
     # ── Actions ──────────────────────────────────────────────
 
@@ -171,6 +202,11 @@ class SandboxManager:
         sb = await asyncio.to_thread(self.get, sandbox_id)
         if sb is None:
             return SandboxResult(ok=False, error=f"sandbox not found: {sandbox_id}")
+
+        # H-3 fix: 命令白名单检查
+        denied = self._check_command_allowed(command)
+        if denied:
+            return SandboxResult(ok=False, error=denied)
 
         exec_dir = Path(work_dir) if work_dir else Path(sb.path)
         exec_dir.mkdir(parents=True, exist_ok=True)
@@ -247,6 +283,11 @@ class SandboxManager:
         sb = self.get(sandbox_id)
         if sb is None:
             return SandboxResult(ok=False, error=f"sandbox not found: {sandbox_id}")
+
+        # H-3 fix: 命令白名单检查
+        denied = self._check_command_allowed(command)
+        if denied:
+            return SandboxResult(ok=False, error=denied)
 
         exec_dir = Path(work_dir) if work_dir else Path(sb.path)
         exec_dir.mkdir(parents=True, exist_ok=True)

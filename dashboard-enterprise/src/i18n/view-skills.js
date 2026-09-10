@@ -73,7 +73,7 @@ export const messages = {
     'view.skills.market.alreadyInstalled': 'Already installed',
 
     // ── Coming Soon banner ───────────────────────────────────────
-    'view.skills.market.comingSoon': 'Coming Soon',
+    'view.skills.market.comingSoon': '🔜 Coming Soon',
     'view.skills.market.comingSoonHint': 'Skill Marketplace — data source integration in progress, expected v5.2.0. Currently showing installed MCP tools only.',
     'view.skills.market.planned': 'Planned',
   },
@@ -152,7 +152,7 @@ export const messages = {
     'view.skills.market.alreadyInstalled': '已安装',
 
     // ── Coming Soon banner ───────────────────────────────────────
-    'view.skills.market.comingSoon': '即将上线',
+    'view.skills.market.comingSoon': '🔜 即将上线',
     'view.skills.market.comingSoonHint': 'Skill Marketplace — 数据源接入中，预计 v5.2.0 上线。当前仅展示已安装的 MCP 工具。',
     'view.skills.market.planned': '规划中',
   },

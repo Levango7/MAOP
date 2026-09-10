@@ -127,7 +127,7 @@ async def list_agents(
         capability=capability or "",
         provider=provider or "",
     )
-    return {"agents": [a.model_dump() for a in agents]}
+    return {"status": "ok", "agents": [a.model_dump() for a in agents]}
 
 
 # 预置示例 Agent 模板
@@ -178,27 +178,35 @@ PRESET_AGENTS: list[dict[str, Any]] = [
 
 @router.get("/presets")
 @handle_api_errors
-async def list_presets():
+async def list_presets(request: Request):
     """返回预置示例 Agent 模板，供前端一键创建。"""
-    return {"presets": PRESET_AGENTS}
+    # P2 fix: 只读端点，但为一致性添加 require_admin。
+    # 预置模板包含 CLI 调用约定与能力声明，视为 admin 配置表面。
+    require_admin(request)
+    return {"status": "ok", "presets": PRESET_AGENTS}
 
 
 @router.get("/match")
 @handle_api_errors
 async def match_agents(
+    request: Request,
     task: str = Query(..., description="Task description"),
     requirements: str = Query("", description="Comma-separated capabilities"),
     top_k: int = Query(5, ge=1, le=20),
 ):
+    # P0 fix: agent matching reveals agent capabilities/scores — admin surface.
+    require_admin(request)
     matcher = _deps._get_matcher()
     reqs = [r.strip() for r in requirements.split(",") if r.strip()] if requirements else None
     scores = matcher.match(task=task, requirements=reqs, top_k=top_k)
-    return {"matches": [s.model_dump() for s in scores]}
+    return {"status": "ok", "matches": [s.model_dump() for s in scores]}
 
 
 @router.get("/{name}")
 @handle_api_errors
-async def get_agent(name: str) -> Response:
+async def get_agent(name: str, request: Request) -> Response:
+    # P0 fix: agent detail reveals CLI path, model, capabilities — admin surface.
+    require_admin(request)
     registry = _deps._get_registry()
     agent = registry.get_agent(name)
     if agent is None:
@@ -217,7 +225,7 @@ async def scan_agents(request: Request) -> dict[str, Any]:
     registry = _deps._get_registry()
     found = scanner.scan()
     synced = registry.sync_from_scanner(scanner, scanned=found)
-    return {"scanned": len(found), "synced": synced, "agents": [a.model_dump() for a in found]}
+    return {"status": "ok", "scanned": len(found), "synced": synced, "agents": [a.model_dump() for a in found]}
 
 
 @router.post("/{name}/health-check")
@@ -226,7 +234,7 @@ async def check_agent_health(name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     registry = _deps._get_registry()
     result = registry.health_check(name)
-    return {"result": result.model_dump()}
+    return {"status": "ok", "result": result.model_dump()}
 
 
 @router.post("/health-check-all")
@@ -235,7 +243,7 @@ async def check_all_health(request: Request) -> dict[str, Any]:
     require_admin(request)
     registry = _deps._get_registry()
     results = registry.health_check_all()
-    return {"results": [r.model_dump() for r in results]}
+    return {"status": "ok", "results": [r.model_dump() for r in results]}
 
 
 @router.post("/{name}/enable")
@@ -244,7 +252,7 @@ async def enable_agent(name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     registry = _deps._get_registry()
     ok = registry.enable(name)
-    return {"enabled": ok}
+    return {"status": "ok", "enabled": ok}
 
 
 @router.post("/{name}/disable")
@@ -253,7 +261,7 @@ async def disable_agent(name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     registry = _deps._get_registry()
     ok = registry.disable(name)
-    return {"disabled": ok}
+    return {"status": "ok", "disabled": ok}
 
 
 @router.post("/register")
@@ -291,7 +299,7 @@ async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[s
         logger.warning('[agents/crud] register_agent：同步 agent 到 agents.yaml 失败已忽略（registry 已写入，yaml 写入失败不阻塞）', exc_info=True)
         # registry 已写入，yaml 写入失败不阻塞
 
-    return {"agent": agent.model_dump(), "synced_to_yaml": synced_to_yaml}
+    return {"status": "ok", "agent": agent.model_dump(), "synced_to_yaml": synced_to_yaml}
 
 
 @router.delete("/{name}")
@@ -339,15 +347,17 @@ async def unregister_agent(name: str, request: Request) -> dict[str, Any]:
     except Exception:
         logger.warning('[agents/crud] unregister_agent：记录 agent.remove 审计日志失败已忽略', exc_info=True)
 
-    return {"deleted": ok_registry, "errors": errors}
+    return {"status": "ok", "deleted": ok_registry, "errors": errors}
 
 
 @router.get("/{name}/health-log")
 @handle_api_errors
-async def get_health_log(name: str, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+async def get_health_log(name: str, request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    # P0 fix: health log reveals agent operational history — admin surface.
+    require_admin(request)
     registry = _deps._get_registry()
     log = registry.get_health_log(agent_name=name, limit=limit)
-    return {"log": log}
+    return {"status": "ok", "log": log}
 
 
 # ── 诊断与修复 ────────────────────────────────────────────────────
@@ -361,7 +371,7 @@ async def diagnose_agent(name: str, request: Request) -> dict[str, Any]:
     repair = _deps._get_repair()
     agent_cfg = _deps._get_agent_config(name)
     result = await repair.diagnose(name, agent_cfg)
-    return {"diagnosis": result.model_dump()}
+    return {"status": "ok", "diagnosis": result.model_dump()}
 
 
 @router.post("/{name}/repair")
@@ -386,4 +396,4 @@ async def repair_agent(name: str, request: Request) -> dict[str, Any]:
     except Exception:
         logger.warning('[agents/crud] 修复 agent 后记录 agent.repair 审计日志失败已忽略', exc_info=True)
 
-    return {"result": result.model_dump()}
+    return {"status": "ok", "result": result.model_dump()}

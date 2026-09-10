@@ -1,0 +1,1002 @@
+=== STDOUT ===
+bringing up nodes...
+bringing up nodes...
+
+.........................................................F....F......... [  0%]
+.....................s.s................................................ [  1%]
+........................................................................ [  2%]
+........................................................................ [  3%]
+........................................................................ [  4%]
+........................................................................ [  4%]
+........................................................................ [  5%]
+.........................sss............................................ [  6%]
+........................................................................ [  7%]
+................................................FF....F.F.....F......F.. [  8%]
+........................................................................ [  9%]
+...............................................F........................ [  9%]
+........................................................................ [ 10%]
+........................................................................ [ 11%]
+........................................................................ [ 12%]
+..............................................................ssssssssss [ 13%]
+sssssssssssssssssssssssssss............................................. [ 14%]
+........................................................................ [ 14%]
+........................................................................ [ 15%]
+........................................................................ [ 16%]
+........................................................................ [ 17%]
+........................................................................ [ 18%]
+........................................................................ [ 19%]
+........................................................................ [ 19%]
+........................................................................ [ 20%]
+........................................................................ [ 21%]
+....sss................................................................. [ 22%]
+........................................................................ [ 23%]
+........................................................................ [ 24%]
+.........................sssssss........................................ [ 24%]
+........................................................................ [ 25%]
+........................................................................ [ 26%]
+........................................................................ [ 27%]
+........................................................................ [ 28%]
+........................................................................ [ 28%]
+........................................................................ [ 29%]
+........................................................................ [ 30%]
+........................................................................ [ 31%]
+........................................................................ [ 32%]
+........................................................................ [ 33%]
+........................................................................ [ 33%]
+........................................................................ [ 34%]
+........................................................................ [ 35%]
+...........................................................F............ [ 36%]
+........................................................................ [ 37%]
+........................................................................ [ 38%]
+........................................................................ [ 38%]
+...................................................F.F..F............... [ 39%]
+........................................................................ [ 40%]
+........................................................................ [ 41%]
+........................................................................ [ 42%]
+........................................................................ [ 43%]
+........................................................................ [ 43%]
+........................................................................ [ 44%]
+........................................................................ [ 45%]
+........................................................................ [ 46%]
+........................................................................ [ 47%]
+........................................................................ [ 48%]
+........................................................................ [ 48%]
+........................................................................ [ 49%]
+........................................................................ [ 50%]
+..........................s............................................. [ 51%]
+........................................................................ [ 52%]
+........................................................................ [ 52%]
+........................................................................ [ 53%]
+........................................................................ [ 54%]
+........................................................................ [ 55%]
+.......................................................................F [ 56%]
+.F.FF................................................................... [ 57%]
+........................................................................ [ 57%]
+........................................................................ [ 58%]
+........................................................................ [ 59%]
+........................................................................ [ 60%]
+........................................................................ [ 61%]
+........................................................................ [ 62%]
+........................................................................ [ 62%]
+........................................................................ [ 63%]
+........................................................................ [ 64%]
+........................................................................ [ 65%]
+........................................................................ [ 66%]
+...........................................s...........F................ [ 67%]
+........................................................................ [ 67%]
+........................................................................ [ 68%]
+.................................................................F...... [ 69%]
+........................................................................ [ 70%]
+........................................................................ [ 71%]
+........................................................................ [ 72%]
+................F....................................................... [ 72%]
+........................................................................ [ 73%]
+........................................................................ [ 74%]
+........................................................................ [ 75%]
+........................................................................ [ 76%]
+........................................................................ [ 76%]
+........................................................................ [ 77%]
+........................................................................ [ 78%]
+.........................................................FF.FF.......... [ 79%]
+F....................................................................... [ 80%]
+........................................................................ [ 81%]
+........................................................................ [ 81%]
+........................................................................ [ 82%]
+........................................................................ [ 83%]
+........................................................................ [ 84%]
+........................................................................ [ 85%]
+.....................................FFFF............................... [ 86%]
+........................................................................ [ 86%]
+........................................................................ [ 87%]
+........................................................................ [ 88%]
+........................................................................ [ 89%]
+........................................................................ [ 90%]
+........................................................................ [ 91%]
+........................................................................ [ 91%]
+........................................................................ [ 92%]
+........................................................................ [ 93%]
+........................................................................ [ 94%]
+........................................................................ [ 95%]
+........................................................................ [ 96%]
+........................................................................ [ 96%]
+........................................................................ [ 97%]
+........................................................................ [ 98%]
+........................................................................ [ 99%]
+.........................................................                [100%]
+================================== FAILURES ===================================
+F:\Nexus\MAOP\py\tests\contract\test_dashboard_api_contract.py:261: TypeError: argument of type 'JSONResponse' is not a container or iterable
+F:\Nexus\MAOP\py\tests\contract\test_dashboard_api_contract.py:337: AssertionError: /api/evolve/status must wrap payload in {status, data} (R4 nesting fix)
+F:\Nexus\MAOP\py\tests\test_debate.py:679: assert 403 == 404
+F:\Nexus\MAOP\py\tests\test_debate.py:686: assert 403 == 404
+F:\Nexus\MAOP\py\tests\test_debate.py:724: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_debate.py:738: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_debate.py:748: assert 403 == 404
+F:\Nexus\MAOP\py\tests\test_debate.py:759: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_compliance_core.py:21: assert 403 in (200, 401, 404)
+F:\Nexus\MAOP\py\tests\test_edition_switch_guard.py:163: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_evolution_loop_ac07.py:39: AssertionError: assert 'error' == 'ok'
+F:\Nexus\MAOP\py\tests\test_evolution_loop_ac07.py:97: AssertionError: assert 'error' == 'ok'
+F:\Nexus\MAOP\py\tests\test_evolution_loop_ac07.py:154: AssertionError: assert 'error' == 'ok'
+F:\Nexus\MAOP\py\tests\test_observability.py:536: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_observability.py:552: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_observability.py:567: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_observability.py:583: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_router_model.py:186: KeyError: 'agents'
+F:\Nexus\MAOP\py\tests\test_router_system.py:274: KeyError: 'agents'
+F:\Nexus\MAOP\py\tests\test_router_system.py:433: KeyError: 'routes'
+F:\Nexus\MAOP\py\tests\test_routing_trace.py:630: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_routing_trace.py:650: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_routing_trace.py:670: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_routing_trace.py:682: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_routing_trace.py:702: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_supervisor.py:760: assert 403 == 404
+F:\Nexus\MAOP\py\tests\test_supervisor.py:768: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_supervisor.py:778: assert 403 == 200
+F:\Nexus\MAOP\py\tests\test_supervisor.py:790: assert 403 == 200
+============================== warnings summary ===============================
+maop\dashboard\server.py:67
+maop\dashboard\server.py:67
+maop\dashboard\server.py:67
+maop\dashboard\server.py:67
+maop\dashboard\server.py:67
+tests/test_enterprise_guard.py::test_guard_blocks_versioned_enterprise_path
+tests/test_enterprise_guard.py::test_guard_blocks_versioned_enterprise_path
+  F:\Nexus\MAOP\py\maop\dashboard\server.py:67: DeprecationWarning: MAOP_AUTH is deprecated since v5.0.0; use MAOP_AUTH_ENABLED instead. Short name will be removed in v6.0.0.
+    _warn_deprecated_env_aliases()
+
+maop\model\__init__.py:11
+maop\model\__init__.py:11
+maop\model\__init__.py:11
+maop\model\__init__.py:11
+maop\model\__init__.py:11
+  F:\Nexus\MAOP\py\maop\model\__init__.py:11: DeprecationWarning: maop.model.budget is deprecated since P2-1; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead. The JSON budget_ledger.json path has been removed; this module now only provides an in-memory BudgetGuard shim.
+    from maop.model.budget import BudgetGuard
+
+E:\dev-tools\python-3.14.3\Lib\site-packages\fastapi\testclient.py:1
+E:\dev-tools\python-3.14.3\Lib\site-packages\fastapi\testclient.py:1
+E:\dev-tools\python-3.14.3\Lib\site-packages\fastapi\testclient.py:1
+E:\dev-tools\python-3.14.3\Lib\site-packages\fastapi\testclient.py:1
+  E:\dev-tools\python-3.14.3\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+maop\core\evolution\regression.py:35
+maop\core\evolution\regression.py:35
+maop\core\evolution\regression.py:35
+maop\core\evolution\regression.py:35
+  F:\Nexus\MAOP\py\maop\core\evolution\regression.py:35: PytestCollectionWarning: cannot collect test class 'TestCase' because it has a __init__ constructor (from: tests/test_regression.py)
+    class TestCase(BaseModel):
+
+maop\core\evolution\regression.py:46
+maop\core\evolution\regression.py:46
+maop\core\evolution\regression.py:46
+maop\core\evolution\regression.py:46
+  F:\Nexus\MAOP\py\maop\core\evolution\regression.py:46: PytestCollectionWarning: cannot collect test class 'TestResult' because it has a __init__ constructor (from: tests/test_regression.py)
+    class TestResult(BaseModel):
+
+tests\test_subagent_delegation.py:13
+tests\test_subagent_delegation.py:13
+tests\test_subagent_delegation.py:13
+tests\test_subagent_delegation.py:13
+  F:\Nexus\MAOP\py\tests\test_subagent_delegation.py:13: DeprecationWarning: maop.core.subagent_delegation is deprecated since v5.0.0 and will be removed in v6.0.0. Use maop.core.agent.delegation.subagent_lifecycle instead.
+    from maop.core.subagent_delegation import (
+
+tests/test_cache_guard.py::TestCacheGuardStatsMethods::test_clear
+tests/test_analyzer_coverage.py::TestComplexityLevel::test_simple
+tests/contract/test_behavioral_contracts.py::TestControlActionAuditBehavior::test_successful_action_produces_audit
+tests/test_data_proxy_coverage.py::TestDataProxy::test_live
+  F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:1186: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+
+tests/test_analyzer_coverage.py: 10 warnings
+tests/test_chat_engine_whitebox.py: 7 warnings
+tests/reliability/test_pev_pipeline.py: 5 warnings
+tests/stability/test_boundary_inputs.py: 3 warnings
+tests/stability/test_crash_recovery.py: 1 warning
+tests/test_chat_memory.py: 4 warnings
+tests/test_debate.py: 17 warnings
+tests/test_blackboard.py: 53 warnings
+tests/test_dispatcher.py: 15 warnings
+tests/test_coverage_boost.py: 5 warnings
+tests/test_dag_latency.py: 5 warnings
+tests/stability/test_long_run.py: 1 warning
+tests/test_dag_progress_emitter.py: 12 warnings
+tests/test_a2a.py: 6 warnings
+tests/test_evolution_e2e.py: 7 warnings
+tests/test_adr010_regression.py: 2 warnings
+tests/test_agent_evolution.py: 5 warnings
+tests/test_ldap_provider.py: 2 warnings
+tests/test_distributed_execution.py: 15 warnings
+tests/test_licenses.py: 13 warnings
+tests/test_llm_provider.py: 10 warnings
+tests/test_llm_provider_fallback.py: 7 warnings
+tests/test_mcp_cache_concurrency.py: 12 warnings
+tests/test_agent_repair.py: 12 warnings
+tests/test_loop_analyzer_coverage.py: 13 warnings
+tests/test_loop_executor.py: 15 warnings
+tests/test_maop_execute.py: 23 warnings
+tests/test_maop_loop.py: 32 warnings
+tests/test_drivers.py: 10 warnings
+tests/test_agent_token_stream.py: 4 warnings
+tests/test_mcp_hub.py: 10 warnings
+tests/test_drivers_coverage.py: 29 warnings
+tests/test_analyzer.py: 18 warnings
+tests/test_e2e_multivendor.py: 1 warning
+tests/test_edition_switch_guard.py: 8 warnings
+tests/test_engine.py: 8 warnings
+tests/test_enhancements.py: 2 warnings
+tests/test_mcp_observability.py: 30 warnings
+tests/test_function_call.py: 1 warning
+tests/test_hook_decision.py: 6 warnings
+tests/test_hot_reload.py: 4 warnings
+tests/test_mcp_permission_audit.py: 8 warnings
+tests/test_preemption.py: 7 warnings
+tests/test_provider.py: 7 warnings
+tests/test_provider_health.py: 8 warnings
+tests/test_react_loop.py: 15 warnings
+tests/test_regression.py: 9 warnings
+tests/test_missing_modules.py: 2 warnings
+tests/test_router_state.py: 1 warning
+tests/test_preemptable_worker_pool_coverage3.py: 10 warnings
+tests/test_new_modules.py: 8 warnings
+tests/test_routers_smoke_coverage.py: 204 warnings
+tests/test_routers_batch_coverage.py: 181 warnings
+tests/test_server_coverage.py: 14 warnings
+tests/test_subagent_lifecycle.py: 19 warnings
+tests/test_subagent_manager.py: 11 warnings
+tests/test_streaming.py: 5 warnings
+tests/test_supervisor.py: 34 warnings
+tests/test_t2_modules.py: 5 warnings
+tests/test_task_splitter.py: 15 warnings
+tests/test_tenant_isolation.py: 1 warning
+tests/test_tool_manager.py: 18 warnings
+tests/test_tool_market.py: 4 warnings
+tests/test_worker_pool.py: 8 warnings
+tests/test_worker_pool_coverage.py: 13 warnings
+tests/test_ws_manager_coverage.py: 8 warnings
+  F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:857: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+
+tests/test_analyzer_coverage.py: 10 warnings
+tests/test_chat_engine_whitebox.py: 7 warnings
+tests/reliability/test_pev_pipeline.py: 5 warnings
+tests/stability/test_boundary_inputs.py: 3 warnings
+tests/stability/test_crash_recovery.py: 1 warning
+tests/test_chat_memory.py: 4 warnings
+tests/test_debate.py: 17 warnings
+tests/test_blackboard.py: 53 warnings
+tests/test_dispatcher.py: 15 warnings
+tests/test_coverage_boost.py: 5 warnings
+tests/test_dag_latency.py: 5 warnings
+tests/stability/test_long_run.py: 1 warning
+tests/test_dag_progress_emitter.py: 12 warnings
+tests/test_a2a.py: 6 warnings
+tests/test_evolution_e2e.py: 7 warnings
+tests/test_adr010_regression.py: 2 warnings
+tests/test_agent_evolution.py: 5 warnings
+tests/test_ldap_provider.py: 2 warnings
+tests/test_distributed_execution.py: 15 warnings
+tests/test_licenses.py: 13 warnings
+tests/test_llm_provider.py: 10 warnings
+tests/test_llm_provider_fallback.py: 7 warnings
+tests/test_mcp_cache_concurrency.py: 12 warnings
+tests/test_agent_repair.py: 12 warnings
+tests/test_loop_analyzer_coverage.py: 13 warnings
+tests/test_loop_executor.py: 15 warnings
+tests/test_maop_execute.py: 23 warnings
+tests/test_maop_loop.py: 32 warnings
+tests/test_drivers.py: 10 warnings
+tests/test_agent_token_stream.py: 4 warnings
+tests/test_mcp_hub.py: 10 warnings
+tests/test_drivers_coverage.py: 29 warnings
+tests/test_analyzer.py: 18 warnings
+tests/test_e2e_multivendor.py: 1 warning
+tests/test_edition_switch_guard.py: 8 warnings
+tests/test_engine.py: 8 warnings
+tests/test_enhancements.py: 2 warnings
+tests/test_mcp_observability.py: 30 warnings
+tests/test_function_call.py: 1 warning
+tests/test_hook_decision.py: 6 warnings
+tests/test_hot_reload.py: 4 warnings
+tests/test_mcp_permission_audit.py: 8 warnings
+tests/test_preemption.py: 7 warnings
+tests/test_provider.py: 7 warnings
+tests/test_provider_health.py: 8 warnings
+tests/test_react_loop.py: 15 warnings
+tests/test_regression.py: 9 warnings
+tests/test_missing_modules.py: 2 warnings
+tests/test_router_state.py: 1 warning
+tests/test_preemptable_worker_pool_coverage3.py: 10 warnings
+tests/test_new_modules.py: 8 warnings
+tests/test_routers_smoke_coverage.py: 204 warnings
+tests/test_routers_batch_coverage.py: 181 warnings
+tests/test_server_coverage.py: 14 warnings
+tests/test_subagent_lifecycle.py: 19 warnings
+tests/test_subagent_manager.py: 11 warnings
+tests/test_streaming.py: 5 warnings
+tests/test_supervisor.py: 34 warnings
+tests/test_t2_modules.py: 5 warnings
+tests/test_task_splitter.py: 15 warnings
+tests/test_tenant_isolation.py: 1 warning
+tests/test_tool_manager.py: 18 warnings
+tests/test_tool_market.py: 4 warnings
+tests/test_worker_pool.py: 8 warnings
+tests/test_worker_pool_coverage.py: 13 warnings
+tests/test_ws_manager_coverage.py: 8 warnings
+  F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:756: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+
+tests/test_analyzer_coverage.py: 10 warnings
+tests/test_chat_engine_whitebox.py: 7 warnings
+tests/reliability/test_pev_pipeline.py: 5 warnings
+tests/stability/test_boundary_inputs.py: 3 warnings
+tests/stability/test_crash_recovery.py: 1 warning
+tests/test_chat_memory.py: 4 warnings
+tests/test_debate.py: 17 warnings
+tests/test_blackboard.py: 53 warnings
+tests/test_dispatcher.py: 15 warnings
+tests/test_coverage_boost.py: 5 warnings
+tests/test_dag_latency.py: 5 warnings
+tests/stability/test_long_run.py: 1 warning
+tests/test_dag_progress_emitter.py: 12 warnings
+tests/test_a2a.py: 6 warnings
+tests/test_evolution_e2e.py: 7 warnings
+tests/test_adr010_regression.py: 2 warnings
+tests/test_agent_evolution.py: 5 warnings
+tests/test_ldap_provider.py: 2 warnings
+tests/test_distributed_execution.py: 15 warnings
+tests/test_licenses.py: 13 warnings
+tests/test_llm_provider.py: 10 warnings
+tests/test_llm_provider_fallback.py: 7 warnings
+tests/test_mcp_cache_concurrency.py: 12 warnings
+tests/test_agent_repair.py: 12 warnings
+tests/test_loop_analyzer_coverage.py: 13 warnings
+tests/test_loop_executor.py: 15 warnings
+tests/test_maop_execute.py: 23 warnings
+tests/test_maop_loop.py: 32 warnings
+tests/test_drivers.py: 10 warnings
+tests/test_agent_token_stream.py: 4 warnings
+tests/test_mcp_hub.py: 10 warnings
+tests/test_drivers_coverage.py: 29 warnings
+tests/test_analyzer.py: 18 warnings
+tests/test_e2e_multivendor.py: 1 warning
+tests/test_edition_switch_guard.py: 8 warnings
+tests/test_engine.py: 8 warnings
+tests/test_enhancements.py: 2 warnings
+tests/test_mcp_observability.py: 30 warnings
+tests/test_function_call.py: 1 warning
+tests/test_hook_decision.py: 6 warnings
+tests/test_hot_reload.py: 4 warnings
+tests/test_mcp_permission_audit.py: 8 warnings
+tests/test_preemption.py: 7 warnings
+tests/test_provider.py: 7 warnings
+tests/test_provider_health.py: 8 warnings
+tests/test_react_loop.py: 15 warnings
+tests/test_regression.py: 9 warnings
+tests/test_missing_modules.py: 2 warnings
+tests/test_router_state.py: 1 warning
+tests/test_preemptable_worker_pool_coverage3.py: 10 warnings
+tests/test_new_modules.py: 8 warnings
+tests/test_routers_smoke_coverage.py: 204 warnings
+tests/test_routers_batch_coverage.py: 181 warnings
+tests/test_server_coverage.py: 14 warnings
+tests/test_subagent_lifecycle.py: 19 warnings
+tests/test_subagent_manager.py: 11 warnings
+tests/test_streaming.py: 5 warnings
+tests/test_supervisor.py: 34 warnings
+tests/test_t2_modules.py: 5 warnings
+tests/test_task_splitter.py: 15 warnings
+tests/test_tenant_isolation.py: 1 warning
+tests/test_tool_manager.py: 18 warnings
+tests/test_tool_market.py: 4 warnings
+tests/test_worker_pool.py: 8 warnings
+tests/test_worker_pool_coverage.py: 13 warnings
+tests/test_ws_manager_coverage.py: 8 warnings
+  F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:761: DeprecationWarning: 'asyncio.set_event_loop_policy' is deprecated and slated for removal in Python 3.16
+
+tests/test_analyzer_coverage.py: 10 warnings
+tests/test_chat_engine_whitebox.py: 7 warnings
+tests/reliability/test_pev_pipeline.py: 5 warnings
+tests/stability/test_boundary_inputs.py: 3 warnings
+tests/stability/test_crash_recovery.py: 1 warning
+tests/test_chat_memory.py: 4 warnings
+tests/test_debate.py: 17 warnings
+tests/test_blackboard.py: 53 warnings
+tests/test_dispatcher.py: 15 warnings
+tests/test_coverage_boost.py: 5 warnings
+tests/test_dag_latency.py: 5 warnings
+tests/stability/test_long_run.py: 1 warning
+tests/test_dag_progress_emitter.py: 12 warnings
+tests/test_a2a.py: 6 warnings
+tests/test_evolution_e2e.py: 7 warnings
+tests/test_adr010_regression.py: 2 warnings
+tests/test_agent_evolution.py: 5 warnings
+tests/test_ldap_provider.py: 2 warnings
+tests/test_distributed_execution.py: 15 warnings
+tests/test_licenses.py: 13 warnings
+tests/test_llm_provider.py: 10 warnings
+tests/test_llm_provider_fallback.py: 7 warnings
+tests/test_mcp_cache_concurrency.py: 12 warnings
+tests/test_agent_repair.py: 12 warnings
+tests/test_loop_analyzer_coverage.py: 13 warnings
+tests/test_loop_executor.py: 15 warnings
+tests/test_maop_execute.py: 23 warnings
+tests/test_maop_loop.py: 32 warnings
+tests/test_drivers.py: 10 warnings
+tests/test_agent_token_stream.py: 4 warnings
+tests/test_mcp_hub.py: 10 warnings
+tests/test_drivers_coverage.py: 29 warnings
+tests/test_analyzer.py: 18 warnings
+tests/test_e2e_multivendor.py: 1 warning
+tests/test_edition_switch_guard.py: 8 warnings
+tests/test_engine.py: 8 warnings
+tests/test_enhancements.py: 2 warnings
+tests/test_mcp_observability.py: 30 warnings
+tests/test_function_call.py: 1 warning
+tests/test_hook_decision.py: 6 warnings
+tests/test_hot_reload.py: 4 warnings
+tests/test_mcp_permission_audit.py: 8 warnings
+tests/test_preemption.py: 7 warnings
+tests/test_provider.py: 7 warnings
+tests/test_provider_health.py: 8 warnings
+tests/test_react_loop.py: 15 warnings
+tests/test_regression.py: 9 warnings
+tests/test_missing_modules.py: 2 warnings
+tests/test_router_state.py: 1 warning
+tests/test_preemptable_worker_pool_coverage3.py: 10 warnings
+tests/test_new_modules.py: 8 warnings
+tests/test_routers_smoke_coverage.py: 204 warnings
+tests/test_routers_batch_coverage.py: 181 warnings
+tests/test_server_coverage.py: 14 warnings
+tests/test_subagent_lifecycle.py: 19 warnings
+tests/test_subagent_manager.py: 11 warnings
+tests/test_streaming.py: 5 warnings
+tests/test_supervisor.py: 34 warnings
+tests/test_t2_modules.py: 5 warnings
+tests/test_task_splitter.py: 15 warnings
+tests/test_tenant_isolation.py: 1 warning
+tests/test_tool_manager.py: 18 warnings
+tests/test_tool_market.py: 4 warnings
+tests/test_worker_pool.py: 8 warnings
+tests/test_worker_pool_coverage.py: 13 warnings
+tests/test_ws_manager_coverage.py: 8 warnings
+  F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:1157: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+
+tests/test_analyzer_coverage.py: 10 warnings
+tests/test_chat_engine_whitebox.py: 7 warnings
+tests/reliability/test_pev_pipeline.py: 5 warnings
+tests/stability/test_boundary_inputs.py: 3 warnings
+tests/stability/test_crash_recovery.py: 1 warning
+tests/test_chat_memory.py: 4 warnings
+tests/test_debate.py: 17 warnings
+tests/test_blackboard.py: 53 warnings
+tests/test_dispatcher.py: 15 warnings
+tests/test_coverage_boost.py: 5 warnings
+tests/test_dag_latency.py: 5 warnings
+tests/stability/test_long_run.py: 1 warning
+tests/test_dag_progress_emitter.py: 12 warnings
+tests/test_a2a.py: 6 warnings
+tests/test_evolution_e2e.py: 7 warnings
+tests/test_adr010_regression.py: 2 warnings
+tests/test_agent_evolution.py: 5 warnings
+tests/test_ldap_provider.py: 2 warnings
+tests/test_distributed_execution.py: 15 warnings
+tests/test_licenses.py: 13 warnings
+tests/test_llm_provider.py: 10 warnings
+tests/test_llm_provider_fallback.py: 7 warnings
+tests/test_mcp_cache_concurrency.py: 12 warnings
+tests/test_agent_repair.py: 12 warnings
+tests/test_loop_analyzer_coverage.py: 13 warnings
+tests/test_loop_executor.py: 15 warnings
+tests/test_maop_execute.py: 23 warnings
+tests/test_maop_loop.py: 32 warnings
+tests/test_drivers.py: 10 warnings
+tests/test_agent_token_stream.py: 4 warnings
+tests/test_mcp_hub.py: 10 warnings
+tests/test_drivers_coverage.py: 29 warnings
+tests/test_analyzer.py: 18 warnings
+tests/test_e2e_multivendor.py: 1 warning
+tests/test_edition_switch_guard.py: 8 warnings
+tests/test_engine.py: 8 warnings
+tests/test_enhancements.py: 2 warnings
+tests/test_mcp_observability.py: 30 warnings
+tests/test_function_call.py: 1 warning
+tests/test_hook_decision.py: 6 warnings
+tests/test_hot_reload.py: 4 warnings
+tests/test_mcp_permission_audit.py: 8 warnings
+tests/test_preemption.py: 7 warnings
+tests/test_provider.py: 7 warnings
+tests/test_provider_health.py: 8 warnings
+tests/test_react_loop.py: 15 warnings
+tests/test_regression.py: 9 warnings
+tests/test_missing_modules.py: 2 warnings
+tests/test_router_state.py: 1 warning
+tests/test_preemptable_worker_pool_coverage3.py: 10 warnings
+tests/test_new_modules.py: 8 warnings
+tests/test_routers_smoke_coverage.py: 204 warnings
+tests/test_routers_batch_coverage.py: 181 warnings
+tests/test_server_coverage.py: 14 warnings
+tests/test_subagent_lifecycle.py: 19 warnings
+tests/test_subagent_manager.py: 11 warnings
+tests/test_streaming.py: 5 warnings
+tests/test_supervisor.py: 34 warnings
+tests/test_t2_modules.py: 5 warnings
+tests/test_task_splitter.py: 15 warnings
+tests/test_tenant_isolation.py: 1 warning
+tests/test_tool_manager.py: 18 warnings
+tests/test_tool_market.py: 4 warnings
+tests/test_worker_pool.py: 8 warnings
+tests/test_worker_pool_coverage.py: 13 warnings
+tests/test_ws_manager_coverage.py: 8 warnings
+  F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:872: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+
+tests/test_analyzer_coverage.py: 10 warnings
+tests/test_chat_engine_whitebox.py: 7 warnings
+tests/reliability/test_pev_pipeline.py: 5 warnings
+tests/stability/test_boundary_inputs.py: 3 warnings
+tests/stability/test_crash_recovery.py: 1 warning
+tests/test_chat_memory.py: 4 warnings
+tests/test_debate.py: 17 warnings
+tests/test_blackboard.py: 53 warnings
+tests/test_dispatcher.py: 15 warnings
+tests/test_coverage_boost.py: 5 warnings
+tests/test_dag_latency.py: 5 warnings
+tests/stability/test_long_run.py: 1 warning
+tests/test_dag_progress_emitter.py: 12 warnings
+tests/test_a2a.py: 6 warnings
+tests/test_evolution_e2e.py: 7 warnings
+tests/test_adr010_regression.py: 2 warnings
+tests/test_agent_evolution.py: 5 warnings
+tests/test_ldap_provider.py: 2 warnings
+tests/test_distributed_execution.py: 15 warnings
+tests/test_licenses.py: 13 warnings
+tests/test_llm_provider.py: 10 warnings
+tests/test_llm_provider_fallback.py: 7 warnings
+tests/test_mcp_cache_concurrency.py: 12 warnings
+tests/test_agent_repair.py: 12 warnings
+tests/test_loop_analyzer_coverage.py: 13 warnings
+tests/test_loop_executor.py: 15 warnings
+tests/test_maop_execute.py: 23 warnings
+tests/test_maop_loop.py: 32 warnings
+tests/test_drivers.py: 10 warnings
+tests/test_agent_token_stream.py: 4 warnings
+tests/test_mcp_hub.py: 10 warnings
+tests/test_drivers_coverage.py: 29 warnings
+tests/test_analyzer.py: 18 warnings
+tests/test_e2e_multivendor.py: 1 warning
+tests/test_edition_switch_guard.py: 8 warnings
+tests/test_engine.py: 8 warnings
+tests/test_enhancements.py: 2 warnings
+tests/test_mcp_observability.py: 30 warnings
+tests/test_function_call.py: 1 warning
+tests/test_hook_decision.py: 6 warnings
+tests/test_hot_reload.py: 4 warnings
+tests/test_mcp_permission_audit.py: 8 warnings
+tests/test_preemption.py: 7 warnings
+tests/test_provider.py: 7 warnings
+tests/test_provider_health.py: 8 warnings
+tests/test_react_loop.py: 15 warnings
+tests/test_regression.py: 9 warnings
+tests/test_missing_modules.py: 2 warnings
+tests/test_router_state.py: 1 warning
+tests/test_preemptable_worker_pool_coverage3.py: 10 warnings
+tests/test_new_modules.py: 8 warnings
+tests/test_routers_smoke_coverage.py: 204 warnings
+tests/test_routers_batch_coverage.py: 181 warnings
+tests/test_server_coverage.py: 14 warnings
+tests/test_subagent_lifecycle.py: 19 warnings
+tests/test_subagent_manager.py: 11 warnings
+tests/test_streaming.py: 5 warnings
+tests/test_supervisor.py: 34 warnings
+tests/test_t2_modules.py: 5 warnings
+tests/test_task_splitter.py: 15 warnings
+tests/test_tenant_isolation.py: 1 warning
+tests/test_tool_manager.py: 18 warnings
+tests/test_tool_market.py: 4 warnings
+tests/test_worker_pool.py: 8 warnings
+tests/test_worker_pool_coverage.py: 13 warnings
+tests/test_ws_manager_coverage.py: 8 warnings
+  F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:778: DeprecationWarning: 'asyncio.set_event_loop_policy' is deprecated and slated for removal in Python 3.16
+
+tests/test_analyzer_coverage.py: 10 warnings
+tests/test_chat_engine_whitebox.py: 7 warnings
+tests/reliability/test_pev_pipeline.py: 5 warnings
+tests/stability/test_boundary_inputs.py: 3 warnings
+tests/stability/test_crash_recovery.py: 1 warning
+tests/test_chat_memory.py: 4 warnings
+tests/test_debate.py: 17 warnings
+tests/test_blackboard.py: 53 warnings
+tests/test_dispatcher.py: 15 warnings
+tests/test_coverage_boost.py: 5 warnings
+tests/test_dag_latency.py: 5 warnings
+tests/stability/test_long_run.py: 1 warning
+tests/test_dag_progress_emitter.py: 12 warnings
+tests/test_a2a.py: 6 warnings
+tests/test_evolution_e2e.py: 7 warnings
+tests/test_adr010_regression.py: 2 warnings
+tests/test_agent_evolution.py: 5 warnings
+tests/test_ldap_provider.py: 2 warnings
+tests/test_distributed_execution.py: 15 warnings
+tests/test_licenses.py: 13 warnings
+tests/test_llm_provider.py: 10 warnings
+tests/test_llm_provider_fallback.py: 7 warnings
+tests/test_mcp_cache_concurrency.py: 12 warnings
+tests/test_agent_repair.py: 12 warnings
+tests/test_loop_analyzer_coverage.py: 13 warnings
+tests/test_loop_executor.py: 15 warnings
+tests/test_maop_execute.py: 23 warnings
+tests/test_maop_loop.py: 32 warnings
+tests/test_drivers.py: 10 warnings
+tests/test_agent_token_stream.py: 4 warnings
+tests/test_mcp_hub.py: 10 warnings
+tests/test_drivers_coverage.py: 29 warnings
+tests/test_analyzer.py: 18 warnings
+tests/test_e2e_multivendor.py: 1 warning
+tests/test_edition_switch_guard.py: 8 warnings
+tests/test_engine.py: 8 warnings
+tests/test_enhancements.py: 2 warnings
+tests/test_mcp_observability.py: 30 warnings
+tests/test_function_call.py: 1 warning
+tests/test_hook_decision.py: 6 warnings
+tests/test_hot_reload.py: 4 warnings
+tests/test_mcp_permission_audit.py: 8 warnings
+tests/test_preemption.py: 7 warnings
+tests/test_provider.py: 7 warnings
+tests/test_provider_health.py: 8 warnings
+tests/test_react_loop.py: 15 warnings
+tests/test_regression.py: 9 warnings
+tests/test_missing_modules.py: 2 warnings
+tests/test_router_state.py: 1 warning
+tests/test_preemptable_worker_pool_coverage3.py: 10 warnings
+tests/test_new_modules.py: 8 warnings
+tests/test_routers_smoke_coverage.py: 204 warnings
+tests/test_routers_batch_coverage.py: 181 warnings
+tests/test_server_coverage.py: 14 warnings
+tests/test_subagent_lifecycle.py: 19 warnings
+tests/test_subagent_manager.py: 11 warnings
+tests/test_streaming.py: 5 warnings
+tests/test_supervisor.py: 34 warnings
+tests/test_t2_modules.py: 5 warnings
+tests/test_task_splitter.py: 15 warnings
+tests/test_tenant_isolation.py: 1 warning
+tests/test_tool_manager.py: 18 warnings
+tests/test_tool_market.py: 4 warnings
+tests/test_worker_pool.py: 8 warnings
+tests/test_worker_pool_coverage.py: 13 warnings
+tests/test_ws_manager_coverage.py: 8 warnings
+  F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:925: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+
+tests/test_analyzer_coverage.py: 10 warnings
+tests/test_chat_engine_whitebox.py: 7 warnings
+tests/reliability/test_pev_pipeline.py: 5 warnings
+tests/stability/test_boundary_inputs.py: 3 warnings
+tests/stability/test_crash_recovery.py: 1 warning
+tests/test_chat_memory.py: 4 warnings
+tests/test_debate.py: 17 warnings
+tests/test_blackboard.py: 53 warnings
+tests/test_dispatcher.py: 15 warnings
+tests/test_coverage_boost.py: 5 warnings
+tests/test_dag_latency.py: 5 warnings
+tests/stability/test_long_run.py: 1 warning
+tests/test_dag_progress_emitter.py: 12 warnings
+tests/test_a2a.py: 6 warnings
+tests/test_evolution_e2e.py: 7 warnings
+tests/test_adr010_regression.py: 2 warnings
+tests/test_agent_evolution.py: 5 warnings
+tests/test_ldap_provider.py: 2 warnings
+tests/test_distributed_execution.py: 15 warnings
+tests/test_licenses.py: 13 warnings
+tests/test_llm_provider.py: 10 warnings
+tests/test_llm_provider_fallback.py: 7 warnings
+tests/test_mcp_cache_concurrency.py: 12 warnings
+tests/test_agent_repair.py: 12 warnings
+tests/test_loop_analyzer_coverage.py: 13 warnings
+tests/test_loop_executor.py: 15 warnings
+tests/test_maop_execute.py: 23 warnings
+tests/test_maop_loop.py: 32 warnings
+tests/test_drivers.py: 10 warnings
+tests/test_agent_token_stream.py: 4 warnings
+tests/test_mcp_hub.py: 10 warnings
+tests/test_drivers_coverage.py: 29 warnings
+tests/test_analyzer.py: 18 warnings
+tests/test_e2e_multivendor.py: 1 warning
+tests/test_edition_switch_guard.py: 8 warnings
+tests/test_engine.py: 8 warnings
+tests/test_enhancements.py: 2 warnings
+tests/test_mcp_observability.py: 30 warnings
+tests/test_function_call.py: 1 warning
+tests/test_hook_decision.py: 6 warnings
+tests/test_hot_reload.py: 4 warnings
+tests/test_mcp_permission_audit.py: 8 warnings
+tests/test_preemption.py: 7 warnings
+tests/test_provider.py: 7 warnings
+tests/test_provider_health.py: 8 warnings
+tests/test_react_loop.py: 15 warnings
+tests/test_regression.py: 9 warnings
+tests/test_missing_modules.py: 2 warnings
+tests/test_router_state.py: 1 warning
+tests/test_preemptable_worker_pool_coverage3.py: 10 warnings
+tests/test_new_modules.py: 8 warnings
+tests/test_routers_smoke_coverage.py: 204 warnings
+tests/test_routers_batch_coverage.py: 181 warnings
+tests/test_server_coverage.py: 14 warnings
+tests/test_subagent_lifecycle.py: 19 warnings
+tests/test_subagent_manager.py: 11 warnings
+tests/test_streaming.py: 5 warnings
+tests/test_supervisor.py: 34 warnings
+tests/test_t2_modules.py: 5 warnings
+tests/test_task_splitter.py: 15 warnings
+tests/test_tenant_isolation.py: 1 warning
+tests/test_tool_manager.py: 18 warnings
+tests/test_tool_market.py: 4 warnings
+tests/test_worker_pool.py: 8 warnings
+tests/test_worker_pool_coverage.py: 13 warnings
+tests/test_ws_manager_coverage.py: 8 warnings
+  F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:949: DeprecationWarning: 'asyncio.set_event_loop_policy' is deprecated and slated for removal in Python 3.16
+
+tests/test_analyzer_coverage.py: 10 warnings
+tests/test_chat_engine_whitebox.py: 7 warnings
+tests/reliability/test_pev_pipeline.py: 5 warnings
+tests/stability/test_boundary_inputs.py: 3 warnings
+tests/stability/test_crash_recovery.py: 1 warning
+tests/test_chat_memory.py: 4 warnings
+tests/test_debate.py: 17 warnings
+tests/test_blackboard.py: 53 warnings
+tests/test_dispatcher.py: 15 warnings
+tests/test_coverage_boost.py: 5 warnings
+tests/test_dag_latency.py: 5 warnings
+tests/stability/test_long_run.py: 1 warning
+tests/test_dag_progress_emitter.py: 12 warnings
+tests/test_a2a.py: 6 warnings
+tests/test_evolution_e2e.py: 7 warnings
+tests/test_adr010_regression.py: 2 warnings
+tests/test_agent_evolution.py: 5 warnings
+tests/test_ldap_provider.py: 2 warnings
+tests/test_distributed_execution.py: 15 warnings
+tests/test_licenses.py: 13 warnings
+tests/test_llm_provider.py: 10 warnings
+tests/test_llm_provider_fallback.py: 7 warnings
+tests/test_mcp_cache_concurrency.py: 12 warnings
+tests/test_agent_repair.py: 12 warnings
+tests/test_loop_analyzer_coverage.py: 13 warnings
+tests/test_loop_executor.py: 15 warnings
+tests/test_maop_execute.py: 23 warnings
+tests/test_maop_loop.py: 32 warnings
+tests/test_drivers.py: 10 warnings
+tests/test_agent_token_stream.py: 4 warnings
+tests/test_mcp_hub.py: 10 warnings
+tests/test_drivers_coverage.py: 29 warnings
+tests/test_analyzer.py: 18 warnings
+tests/test_e2e_multivendor.py: 1 warning
+tests/test_edition_switch_guard.py: 8 warnings
+tests/test_engine.py: 8 warnings
+tests/test_enhancements.py: 2 warnings
+tests/test_mcp_observability.py: 30 warnings
+tests/test_function_call.py: 1 warning
+tests/test_hook_decision.py: 6 warnings
+tests/test_hot_reload.py: 4 warnings
+tests/test_mcp_permission_audit.py: 8 warnings
+tests/test_preemption.py: 7 warnings
+tests/test_provider.py: 7 warnings
+tests/test_provider_health.py: 8 warnings
+tests/test_react_loop.py: 15 warnings
+tests/test_regression.py: 9 warnings
+tests/test_missing_modules.py: 2 warnings
+tests/test_router_state.py: 1 warning
+tests/test_preemptable_worker_pool_coverage3.py: 10 warnings
+tests/test_new_modules.py: 8 warnings
+tests/test_routers_smoke_coverage.py: 204 warnings
+tests/test_routers_batch_coverage.py: 181 warnings
+tests/test_server_coverage.py: 14 warnings
+tests/test_subagent_lifecycle.py: 19 warnings
+tests/test_subagent_manager.py: 11 warnings
+tests/test_streaming.py: 5 warnings
+tests/test_supervisor.py: 34 warnings
+tests/test_t2_modules.py: 5 warnings
+tests/test_task_splitter.py: 15 warnings
+tests/test_tenant_isolation.py: 1 warning
+tests/test_tool_manager.py: 18 warnings
+tests/test_tool_market.py: 4 warnings
+tests/test_worker_pool.py: 8 warnings
+tests/test_worker_pool_coverage.py: 13 warnings
+tests/test_ws_manager_coverage.py: 8 warnings
+  F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:961: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+
+tests/reliability/test_cascade_degradation.py::test_budget_guard_under_degradation
+  F:\Nexus\MAOP\py\tests\reliability\test_cascade_degradation.py:320: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    guard = BudgetGuard(root_dir=tmp_path, config=config)
+
+tests/reliability/test_cascade_degradation.py::test_budget_guard_under_degradation
+  F:\Nexus\MAOP\py\tests\reliability\test_cascade_degradation.py:329: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    guard2 = BudgetGuard(root_dir=tmp_path, config=config)
+
+tests/stability/test_crash_recovery.py::test_budget_ledger_survives_crash
+  F:\Nexus\MAOP\py\tests\stability\test_crash_recovery.py:85: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    guard = BudgetGuard(root_dir=tmp_path)
+
+tests/stability/test_crash_recovery.py::test_budget_ledger_survives_crash
+  F:\Nexus\MAOP\py\tests\stability\test_crash_recovery.py:101: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    guard2 = BudgetGuard(root_dir=tmp_path)
+
+tests/test_budget.py::TestBudgetGuardInit::test_init_with_config
+  F:\Nexus\MAOP\py\tests\test_budget.py:52: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    g = BudgetGuard(root_dir=tmp_path, config=budget_config)
+
+tests/test_budget.py::TestBudgetGuardInit::test_init_default_config
+  F:\Nexus\MAOP\py\tests\test_budget.py:60: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    g = BudgetGuard(root_dir=tmp_path)
+
+tests/test_budget.py::TestBudgetGuardInit::test_init_no_root
+  F:\Nexus\MAOP\py\tests\test_budget.py:65: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    g = BudgetGuard()
+
+tests/test_budget.py::TestBudgetGuardInit::test_load_ledger_nonexistent
+  F:\Nexus\MAOP\py\tests\test_budget.py:70: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    g = BudgetGuard(root_dir=tmp_path)
+
+tests/test_budget.py::TestBudgetGuardInit::test_load_ledger_with_entries
+  F:\Nexus\MAOP\py\tests\test_budget.py:89: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    g = BudgetGuard(root_dir=tmp_path)
+
+tests/test_budget.py::TestBudgetGuardInit::test_load_ledger_corrupt
+  F:\Nexus\MAOP\py\tests\test_budget.py:100: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    g = BudgetGuard(root_dir=tmp_path)
+
+tests/test_budget.py: 20 warnings
+  F:\Nexus\MAOP\py\tests\test_budget.py:38: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    return BudgetGuard(root_dir=tmp_path, config=budget_config)
+
+tests/test_budget.py::TestCanSpend::test_can_spend_no_hard_stop
+  F:\Nexus\MAOP\py\tests\test_budget.py:43: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    return BudgetGuard(root_dir=tmp_path, config=no_stop_config)
+
+tests/test_budget.py::TestCanSpend::test_can_spend_exceeds_monthly
+  F:\Nexus\MAOP\py\tests\test_budget.py:133: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    g = BudgetGuard(root_dir=tmp_path, config=config)
+
+tests/test_budget.py::TestStats::test_stats_zero_daily_limit
+  F:\Nexus\MAOP\py\tests\test_budget.py:221: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    g = BudgetGuard(root_dir=tmp_path, config=config)
+
+tests/test_core_modules_coverage.py::TestCreateSslContext::test_deprecated_tls_version_allowed_with_env
+  F:\Nexus\MAOP\py\maop\core\security\tls.py:70: DeprecationWarning: ssl.TLSVersion.TLSv1 is deprecated
+    ctx.minimum_version = min_ver
+
+tests/test_evolution_loop_ac06.py::test_z_test_pvalue_against_scipy_if_available
+  E:\dev-tools\python-3.14.3\Lib\site-packages\scipy\optimize\_optimize.py:35: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    from ._linesearch import (line_search_wolfe1, line_search_wolfe2,
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_notifications.py: 16 warnings
+  F:\Nexus\MAOS\maop\enterprise\notification\event_bus.py:131: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    if asyncio.iscoroutinefunction(handler):
+
+tests/test_router_model.py::TestModelGetEndpoints::test_model_budget
+tests/test_routers_smoke_coverage.py::test_get_endpoint_reachable[/api/model/budget]
+  F:\Nexus\MAOP\py\maop\dashboard\routers\model.py:199: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    return {"status": "ok", "budget": BudgetGuard(root_dir=str(MAOP_ROOT), config=reg.config.budget).stats()}
+
+tests/test_model_management.py::TestBudgetGuard::test_can_spend_within_budget
+tests/test_model_management.py::TestBudgetGuard::test_cannot_spend_over_daily
+tests/test_model_management.py::TestBudgetGuard::test_record_and_stats
+tests/test_model_management.py::TestBudgetGuard::test_alert_threshold
+  F:\Nexus\MAOP\py\tests\test_model_management.py:47: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    return BudgetGuard(root_dir=tmp_path, config=BudgetConfig(daily_limit=5.0, monthly_limit=100.0))
+
+tests/test_model_management.py::TestBudgetGuard::test_hard_stop_disabled
+  F:\Nexus\MAOP\py\tests\test_model_management.py:261: DeprecationWarning: maop.model.budget.BudgetGuard is deprecated; use maop.core.cost_tracker.CostTracker or maop.core.budget_guard.BudgetGuard instead.
+    guard = BudgetGuard(root_dir=tmp_path, config=BudgetConfig(hard_stop=False))
+
+tests/test_preemptable_worker_pool_coverage3.py::TestDispatchLoopMocked::test_watch_completion_with_task_error
+  E:\dev-tools\python-3.14.3\Lib\site-packages\_pytest\unraisableexception.py:85: PytestUnraisableExceptionWarning: Exception ignored while calling deallocator <function _ProactorBasePipeTransport.__del__ at 0x000001B660E60E00>: None
+  
+  Traceback (most recent call last):
+    File "E:\dev-tools\python-3.14.3\Lib\asyncio\proactor_events.py", line 116, in __del__
+      _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
+                                 ^^^^^^^^
+    File "E:\dev-tools\python-3.14.3\Lib\asyncio\proactor_events.py", line 80, in __repr__
+      info.append(f'fd={self._sock.fileno()}')
+                        ~~~~~~~~~~~~~~~~~^^
+    File "E:\dev-tools\python-3.14.3\Lib\asyncio\windows_utils.py", line 102, in fileno
+      raise ValueError("I/O operation on closed pipe")
+  ValueError: I/O operation on closed pipe
+  
+    warnings.warn(pytest.PytestUnraisableExceptionWarning(msg))
+
+tests/test_routers_smoke_coverage.py::test_get_endpoint_reachable[/api/v1/openapi.json]
+  E:\dev-tools\python-3.14.3\Lib\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID openapi_api_v1_openapi_json_get for function openapi at E:\dev-tools\python-3.14.3\Lib\site-packages\fastapi\applications.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_routers_smoke_coverage.py::test_get_endpoint_reachable[/api/v1/openapi.json]
+  E:\dev-tools\python-3.14.3\Lib\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID swagger_ui_html_api_v1_docs_get for function swagger_ui_html at E:\dev-tools\python-3.14.3\Lib\site-packages\fastapi\applications.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_routers_smoke_coverage.py::test_get_endpoint_reachable[/api/v1/openapi.json]
+  E:\dev-tools\python-3.14.3\Lib\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID redoc_html_api_v1_redoc_get for function redoc_html at E:\dev-tools\python-3.14.3\Lib\site-packages\fastapi\applications.py
+    warnings.warn(message, stacklevel=1)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/contract/test_dashboard_api_contract.py::TestAgentsRoutesContract::test_routes_use_correct_field_names
+FAILED tests/contract/test_dashboard_api_contract.py::TestEvolveContract::test_evolve_status_has_data_wrapper
+FAILED tests/test_debate.py::test_api_get_returns_404_when_unconfigured - ass...
+FAILED tests/test_debate.py::test_api_history_returns_404_when_unconfigured
+FAILED tests/test_debate.py::test_api_get_verdict_after_debate - assert 403 =...
+FAILED tests/test_debate.py::test_api_get_verdict_explicit_endpoint - assert ...
+FAILED tests/test_debate.py::test_api_get_verdict_404_for_nonexistent - asser...
+FAILED tests/test_debate.py::test_api_history_returns_verdicts - assert 403 =...
+FAILED tests/test_compliance_core.py::test_app_creates - assert 403 in (200, ...
+FAILED tests/test_edition_switch_guard.py::TestEditionSwitchPersonal::test_get_edition_after_switch
+FAILED tests/test_evolution_loop_ac07.py::test_ac07_evolution_loop_status - A...
+FAILED tests/test_evolution_loop_ac07.py::test_ac07_evolution_approvals - Ass...
+FAILED tests/test_evolution_loop_ac07.py::test_ac07_evolution_ab_results - As...
+FAILED tests/test_observability.py::TestObservabilityRouter::test_status_endpoint
+FAILED tests/test_observability.py::TestObservabilityRouter::test_metrics_endpoint
+FAILED tests/test_observability.py::TestObservabilityRouter::test_config_endpoint
+FAILED tests/test_observability.py::TestObservabilityRouter::test_traces_endpoint
+FAILED tests/test_router_model.py::TestModelAgents::test_error_returns_empty_list
+FAILED tests/test_router_system.py::TestAgentConfig::test_error_returns_empty
+FAILED tests/test_router_system.py::TestRouting::test_error_returns_empty - K...
+FAILED tests/test_routing_trace.py::TestRoutingDecisionsAPI::test_recent_endpoint_returns_decisions
+FAILED tests/test_routing_trace.py::TestRoutingDecisionsAPI::test_recent_endpoint_filters_by_stage
+FAILED tests/test_routing_trace.py::TestRoutingDecisionsAPI::test_by_trace_endpoint_returns_chain
+FAILED tests/test_routing_trace.py::TestRoutingDecisionsAPI::test_by_trace_endpoint_returns_empty_for_unknown
+FAILED tests/test_routing_trace.py::TestRoutingDecisionsAPI::test_stats_endpoint_returns_aggregates
+FAILED tests/test_supervisor.py::test_api_status_returns_404_when_unconfigured
+FAILED tests/test_supervisor.py::test_api_status_returns_snapshot - assert 40...
+FAILED tests/test_supervisor.py::test_api_rules_list - assert 403 == 200
+FAILED tests/test_supervisor.py::test_api_actions_list - assert 403 == 200
+29 failed, 8614 passed, 57 skipped, 9616 warnings in 377.05s (0:06:17)
+
+=== STDERR ===
+F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:207: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:207: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:207: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:207: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+F:\Program Files (x86)\Python\Python 3.14.3 (64-bit)\Lib\site-packages\pytest_asyncio\plugin.py:207: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+--- Logging error ---
+Traceback (most recent call last):
+  File "E:\dev-tools\python-3.14.3\Lib\logging\__init__.py", line 1154, in emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: I/O operation on closed file.
+Call stack:
+  File "E:\dev-tools\python-3.14.3\Lib\asyncio\base_events.py", line 1903, in call_exception_handler
+    self.default_exception_handler(context)
+  File "E:\dev-tools\python-3.14.3\Lib\asyncio\base_events.py", line 1875, in default_exception_handler
+    logger.error('\n'.join(log_lines), exc_info=exc_info)
+Message: "Task was destroyed but it is pending!\ntask: <Task pending name='Task-1709' coro=<SubAgentManager._execute_agent() done, defined at F:\\Nexus\\MAOP\\py\\maop\\core\\agent\\delegation\\subagent_lifecycle.py:334> wait_for=<Future pending cb=[Task.task_wakeup()]> cb=[shield.<locals>._clear_awaited_by_callback() at E:\\dev-tools\\python-3.14.3\\Lib\\asyncio\\tasks.py:975, _log_on_exception() at E:\\dev-tools\\python-3.14.3\\Lib\\asyncio\\tasks.py:911]>"
+Arguments: ()
+[config] MAOP_AUTH is deprecated; use MAOP_AUTH_ENABLED instead (will be removed in v6.0.0).
+[server] Using dashboard-enterprise/ source dir (dev mode). Vue .vue files cannot be served as static assets — run 'cd dashboard-enterprise && npm run build' for production.
+[edition] Degradation: license backend 'enterprise' unavailable, falling back to 'personal' (no_license_key)
+[integrity] enterprise module integrity check failed: modified modules detected: ['maop/enterprise/license.py', 'maop/enterprise/rbac.py', 'maop/enterprise/saml_handler.py', 'maop/enterprise/sso.py', 'maop/enterprise/tls_auto.py']
+[edition] Degradation: integrity backend 'enterprise' unavailable, falling back to 'personal' (integrity_check_failed:modified modules detected: ['maop/enterprise/license.py', 'maop/enterprise/rbac.py', 'maop/enterprise/saml_handler.py', 'maop/enterprise/sso.py', 'maop/enterprise/tls_auto.py'])
+[enterprise] module integrity check failed: modified modules detected: ['maop/enterprise/license.py', 'maop/enterprise/rbac.py', 'maop/enterprise/saml_handler.py', 'maop/enterprise/sso.py', 'maop/enterprise/tls_auto.py']

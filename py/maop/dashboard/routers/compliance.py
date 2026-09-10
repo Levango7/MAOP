@@ -28,7 +28,12 @@ _compliance_mgr: ComplianceManager | None = None
 def _get_manager(request: Request) -> ComplianceManager:
     global _compliance_mgr
     if _compliance_mgr is None:
-        root_dir = getattr(request.app.state, "root_dir", ".")
+        root_dir = getattr(request.app.state, "root_dir", None)
+        if not root_dir:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Compliance root_dir not configured on app.state — cannot initialize ComplianceManager",
+            )
         _compliance_mgr = ComplianceManager(root_dir)
     return _compliance_mgr
 
@@ -78,7 +83,7 @@ async def delete_user_data(
     tenant_id = _tenant_id_from_jwt(request)
     mgr = _get_manager(request)
     report = mgr.delete_user_data(body.user_id, tenant_id=tenant_id)
-    return report.model_dump()
+    return {"status": "ok", **report.model_dump()}
 
 
 @router.post("/export-user-data")
@@ -101,4 +106,4 @@ async def export_user_data(
     tenant_id = _tenant_id_from_jwt(request)
     mgr = _get_manager(request)
     report = mgr.export_user_data(body.user_id, tenant_id=tenant_id)
-    return report.model_dump()
+    return {"status": "ok", **report.model_dump()}

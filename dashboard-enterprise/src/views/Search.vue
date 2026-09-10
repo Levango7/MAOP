@@ -263,5 +263,3 @@ async function doSearch() {
 onMounted(loadStats);
 </script>
 
-<style scoped>
-</style>

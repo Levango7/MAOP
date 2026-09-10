@@ -95,6 +95,10 @@ class SemanticCache:
         # 每次 get/put 操作时检查距上次清理的时间，超过阈值则自动触发。
         self._last_cleanup_time: float = time.time()
         self._cleanup_interval: float = 300.0
+        # M-6: embedding 失败的负缓存，避免短时间内重复计算 embedding。
+        # 结构: {query_text: expiry_timestamp}
+        self._negative_cache: dict[str, float] = {}
+        self._negative_ttl: float = 60.0  # 负结果短 TTL（60s）
 
     def _get_embedder(self):
         if self._embedder is None:
@@ -152,10 +156,24 @@ class SemanticCache:
         the similarity threshold, otherwise None.
         """
         self._maybe_cleanup()  # B13: 自动触发过期清理
+
+        # M-6: 检查 embedding 失败的负缓存，避免重复计算 embedding
+        now = time.time()
+        with self._lock:
+            neg_expiry = self._negative_cache.get(query)
+            if neg_expiry is not None:
+                if now < neg_expiry:
+                    self._misses += 1
+                    return None
+                # 已过期，移除负缓存条目
+                del self._negative_cache[query]
+
         query_embedding = self._embed(query)
         if not query_embedding:
             with self._lock:
                 self._misses += 1
+                # M-6: 缓存短 TTL 负结果，避免重复 embedding 计算
+                self._negative_cache[query] = now + self._negative_ttl
             return None
 
         with self._lock:

@@ -10,6 +10,7 @@ import contextlib
 import json
 import logging
 import re
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -204,14 +205,34 @@ class MaopDatabase:
         sql: str,
         params: dict[str, Any] | tuple | None = None,
     ) -> bool:
-        """Execute a non-query SQL statement."""
+        """Execute a non-query SQL statement.
+
+        H-2 fix: 区分可恢复异常与不可恢复异常，避免静默吞掉严重错误。
+        - 可恢复（sqlite3.OperationalError "database is locked"）：warning 级别日志
+          + 降级返回 False，调用方可重试。
+        - 不可恢复（IntegrityError / DataError / ProgrammingError / 其他未知异常）：
+          error 级别日志 + 重新抛出，让上层感知并处理。
+        """
         try:
             with self._connect() as conn:
                 conn.execute(sql, params or ())
             return True
+        except sqlite3.OperationalError as exc:
+            # 可恢复的临时性错误（锁冲突）：降级返回，调用方可重试。
+            if "locked" in str(exc).lower():
+                logger.warning("Execute failed (recoverable lock conflict): %s", exc)
+                return False
+            # 其他 OperationalError（磁盘满、只读等）不可恢复，向上抛出。
+            logger.error("Execute failed (non-recoverable OperationalError): %s", exc)
+            raise
+        except sqlite3.Error as exc:
+            # IntegrityError / DataError / ProgrammingError 等：SQL 或数据问题，不可恢复。
+            logger.error("Execute failed (non-recoverable DB error): %s", exc)
+            raise
         except Exception as exc:
-            logger.warning("Execute failed: %s", exc)
-            return False
+            # 编程错误（TypeError / ValueError 等）或其他未知异常：不可恢复。
+            logger.error("Execute failed (unexpected error): %s", exc)
+            raise
 
     def _query(
         self,
@@ -221,15 +242,30 @@ class MaopDatabase:
         """Execute a SELECT query and return rows as dicts.
 
         .. warning:: Internal API — not for external use. Accepts raw SQL.
+
+        H-2 fix: 区分可恢复异常与不可恢复异常，避免静默吞掉严重错误。
+        - 可恢复（sqlite3.OperationalError "database is locked"）：warning 级别日志
+          + 降级返回空列表，调用方可重试。
+        - 不可恢复（IntegrityError / DataError / ProgrammingError / 其他未知异常）：
+          error 级别日志 + 重新抛出。
         """
         try:
             with self._connect() as conn:
                 cursor = conn.execute(sql, params or ())
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        except sqlite3.OperationalError as exc:
+            if "locked" in str(exc).lower():
+                logger.warning("Query failed (recoverable lock conflict): %s", exc)
+                return []
+            logger.error("Query failed (non-recoverable OperationalError): %s", exc)
+            raise
+        except sqlite3.Error as exc:
+            logger.error("Query failed (non-recoverable DB error): %s", exc)
+            raise
         except Exception as exc:
-            logger.warning("Query failed: %s", exc)
-            return []
+            logger.error("Query failed (unexpected error): %s", exc)
+            raise
 
     # ── Delegations ───────────────────────────────────────────
 
@@ -277,16 +313,30 @@ class MaopDatabase:
         # B11: 用 uuid4 生成 ID，避免 id(state) % 99999 在 CPython 地址复用下冲突。
         cp_id = f"{agent}_{task}_{phase}_{uuid.uuid4().hex[:8]}"
 
-        # Delete existing
-        self.execute(
-            "DELETE FROM checkpoints WHERE agent = ? AND task = ?",
-            (agent, task),
-        )
-        return self.execute(
-            """INSERT INTO checkpoints (id, agent, task, phase, state_json, created, updated)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (cp_id, agent, task, phase, state_json, now, now),
-        )
+        # H-1 fix: 在同一事务内原子完成 DELETE + INSERT，避免并发下数据丢失。
+        # checkpoints 表无 (agent, task) UNIQUE 约束，不能用 INSERT OR REPLACE，
+        # 因此用单一 _connect 上下文保证原子性（正常退出 commit，异常退出 rollback）。
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    "DELETE FROM checkpoints WHERE agent = ? AND task = ?",
+                    (agent, task),
+                )
+                conn.execute(
+                    """INSERT INTO checkpoints (id, agent, task, phase, state_json, created, updated)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (cp_id, agent, task, phase, state_json, now, now),
+                )
+            return True
+        except sqlite3.OperationalError as exc:
+            if "locked" in str(exc).lower():
+                logger.warning("save_checkpoint failed (recoverable lock conflict): %s", exc)
+                return False
+            logger.error("save_checkpoint failed (non-recoverable): %s", exc)
+            raise
+        except Exception as exc:
+            logger.error("save_checkpoint failed for agent=%s task=%s: %s", agent, task, exc)
+            raise
 
     def get_checkpoint(self, agent: str, task: str) -> dict[str, Any] | None:
         """Retrieve checkpoint state for an agent+task."""

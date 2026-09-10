@@ -79,7 +79,12 @@ export const useUiStore = defineStore('ui', () => {
     persist();
   }
   function setLocale(l) {
-    locale.value = l === 'zh' ? 'zh' : 'en';
+    // L6 fix: 传入无效 locale 时发出警告，避免静默降级导致调试困难。
+    if (l !== 'zh' && l !== 'en') {
+      console.warn(`[ui] Invalid locale "${l}", falling back to "en". Supported locales: "zh", "en".`);
+      l = 'en';
+    }
+    locale.value = l;
     persist();
     applyAttrs();
   }

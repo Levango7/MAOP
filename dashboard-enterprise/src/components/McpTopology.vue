@@ -260,19 +260,19 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md, 8px);
 }
-.mcp-topo__stats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.mcp-topo__actions { display: flex; gap: 8px; }
+.mcp-topo__stats { display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center; }
+.mcp-topo__actions { display: flex; gap: var(--sp-2); }
 
 .mcp-topo__notice {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-md, 8px);
   font-size: var(--fs-base);
 }
@@ -285,7 +285,7 @@ watch(
   border-radius: var(--r-md, 8px);
   overflow: hidden;
   min-height: 480px;
-  height: 480px;
+  height: clamp(480px, 60vh, 720px);
 }
 .mcp-topo__canvas { width: 100%; height: 100%; min-height: 480px; }
 .mcp-topo__loading {
@@ -295,18 +295,17 @@ watch(
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: var(--sp-3);
   color: var(--text-muted);
   background: var(--surface);
   /* z-index 2 为 loading 覆盖层层级，无精确 token 对应，保留硬编码 */
   z-index: 2;
 }
-.mcp-topo__spin { animation: mcp-topo-spin 1s linear infinite; }
-@keyframes mcp-topo-spin { to { transform: rotate(360deg); } }
+.mcp-topo__spin { animation: maop-spin calc(var(--motion-normal) * 4) linear infinite; }
 
 .mcp-topo__legend {
   display: flex;
-  gap: 16px;
+  gap: var(--sp-4);
   padding: 6px 12px;
   font-size: var(--fs-sm);
   color: var(--text-muted);

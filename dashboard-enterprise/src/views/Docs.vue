@@ -131,7 +131,7 @@ async function selectDoc(doc) {
 selectDoc(categories[0].items[0]);
 
 // ── 极简 Markdown 渲染器 ──────────────────────────────────────────────
-// 支持：标题、代码块、行内代码、粗体/斜体、链接、列表、引用、水平线、段落
+// 支持：标题、代码块、行内代码、粗体/斜体、链接、列表、引用、水平线、GFM 表格、段落
 function renderMarkdown(md) {
   if (!md) return '';
   const lines = md.split('\n');
@@ -155,6 +155,17 @@ function renderMarkdown(md) {
 
   const closeList = () => { if (inList) { html += `</${listType}>`; inList = false; } };
   const closeQuote = () => { if (inQuote) { html += '</blockquote>'; inQuote = false; } };
+
+  // GFM 表格行解析：返回单元格数组，去除首尾空管道
+  const parseTableRow = (line) => {
+    const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+    return trimmed.split('|').map((cell) => cell.trim());
+  };
+  // GFM 表格分隔行检测：| --- | :--: | --: | :- |
+  const isTableSeparator = (line) => {
+    const cells = parseTableRow(line);
+    return cells.length > 0 && cells.every((c) => /^:?-+:?$/.test(c));
+  };
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -214,6 +225,24 @@ function renderMarkdown(md) {
     if (ul) {
       if (!inList || listType !== 'ul') { closeList(); html += '<ul>'; inList = true; listType = 'ul'; }
       html += `<li>${inline(ul[1])}</li>`;
+      continue;
+    }
+
+    // GFM 表格：当前行含 | 且下一行是分隔行
+    if (line.includes('|') && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+      closeList(); closeQuote();
+      const headerCells = parseTableRow(line);
+      i += 2; // 跳过表头和分隔行
+      html += '<table><thead><tr>';
+      html += headerCells.map((c) => `<th>${inline(c)}</th>`).join('');
+      html += '</tr></thead><tbody>';
+      while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') {
+        const rowCells = parseTableRow(lines[i]);
+        html += '<tr>' + rowCells.map((c) => `<td>${inline(c)}</td>`).join('') + '</tr>';
+        i++;
+      }
+      html += '</tbody></table>';
+      i--; // 抵消 for 循环的 i++
       continue;
     }
 

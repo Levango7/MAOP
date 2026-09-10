@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from maop.core.security.middleware import require_admin
@@ -49,12 +49,12 @@ async def api_agent_config(request: Request) -> dict[str, Any]:
             if hasattr(cfg, "routes")
             else []
         )
-        return {"agents": agents, "routes": routes, "agent_count": len(agents)}
+        return {"status": "ok", "agents": agents, "routes": routes, "agent_count": len(agents)}
     except Exception as exc:
         logger.error('Agent config failed: %s', exc)
         return JSONResponse(
             status_code=500,
-            content={"agents": [], "routes": [], "error": "Agent config failed"},
+            content={"status": "error", "agents": [], "routes": [], "error": "Agent config failed"},
         )
 
 
@@ -62,7 +62,12 @@ async def api_agent_config(request: Request) -> dict[str, Any]:
 @handle_api_errors
 async def api_agent_config_update(request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
+    # P0 fix: JSON 解析失败时返回 400 而非 500。
+    try:
+        body = await request.json()
+    except Exception as exc:
+        logger.warning("[agent_admin] Invalid JSON in config update request: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
     agent_name = body.get("agent", "")
     if not agent_name:
         raise HTTPException(400, "missing agent name")
@@ -128,17 +133,9 @@ async def api_agent_config_update(request: Request) -> dict[str, Any]:
 # ── Agent Upgrade ─────────────────────────────────────────────────
 @router.post("/api/agent/upgrade")
 @handle_api_errors
-async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]:
+async def api_agent_upgrade(request: Request, agent: str = Query(..., description="Agent name to upgrade")) -> dict[str, Any]:
     require_admin(request)
     agent_name = agent
-    if not agent_name:
-        try:
-            body = await request.json()
-            agent_name = body.get("agent", "")
-        except Exception as exc:
-            logger.warning('Failed to parse request body: %s', exc)
-    if not agent_name:
-        raise HTTPException(400, "missing agent name")
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
@@ -264,10 +261,10 @@ async def api_agent_upgrade_get(request: Request, agent: str = "") -> dict[str, 
                 "name": name, "current": current, "latest": latest,
                 "status": "ok" if cli_path else "unavailable",
             })
-        return {"agents": result}
+        return {"status": "ok", "agents": result}
     except Exception as exc:
-        logger.error('Agent upgrade list failed: %s', exc)
+        logger.error("Agent upgrade list failed: %s", exc)
         return JSONResponse(
             status_code=500,
-            content={"agents": [], "error": "Agent upgrade list failed"},
+            content={"status": "error", "agents": [], "error": "Agent upgrade list failed"},
         )

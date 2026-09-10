@@ -417,10 +417,10 @@ const dagLayout = computed(() => {
   border-radius: var(--r-md, 6px);
   background: var(--brand);
   color: var(--brand-contrast, #fff);
-  font-size: var(--fs-sm, 12px);
+  font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
-  transition: opacity 0.15s, transform 0.1s;
+  transition: opacity var(--motion-fast, 120ms), transform var(--motion-fast, 120ms);
 }
 .ai-split-btn:hover:not(:disabled) { opacity: 0.9; }
 .ai-split-btn:active:not(:disabled) { transform: scale(0.98); }
@@ -462,7 +462,7 @@ const dagLayout = computed(() => {
 }
 .split-dialog__title h2 {
   margin: 0;
-  font-size: var(--fs-lg, 16px);
+  font-size: var(--fs-lg);
   font-weight: 600;
 }
 .split-dialog__close {
@@ -483,12 +483,12 @@ const dagLayout = computed(() => {
 .split-dialog__desc {
   margin: 0 0 16px;
   color: var(--text-muted);
-  font-size: var(--fs-sm, 13px);
+  font-size: var(--fs-sm);
   line-height: 1.5;
 }
 .split-form { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .split-form__label {
-  font-size: var(--fs-sm, 13px);
+  font-size: var(--fs-sm);
   font-weight: 500;
   color: var(--text);
 }
@@ -497,7 +497,7 @@ const dagLayout = computed(() => {
   border: 1px solid var(--border);
   border-radius: var(--r-md, 8px);
   padding: 8px 10px;
-  font-size: var(--fs-sm, 13px);
+  font-size: var(--fs-sm);
   font-family: inherit;
   background: var(--surface);
   color: var(--text);
@@ -520,7 +520,7 @@ const dagLayout = computed(() => {
   border: 1px solid var(--fail);
   border-radius: var(--r-md, 8px);
   color: var(--fail);
-  font-size: var(--fs-sm, 13px);
+  font-size: var(--fs-sm);
   margin-bottom: 12px;
 }
 
@@ -535,7 +535,7 @@ const dagLayout = computed(() => {
   border-bottom: 1px solid var(--border);
 }
 .split-result__title { font-weight: 600; color: var(--text); }
-.split-result__stats { font-size: var(--fs-sm, 13px); color: var(--text-muted); }
+.split-result__stats { font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* DAG SVG */
 .split-dag {
@@ -543,10 +543,18 @@ const dagLayout = computed(() => {
   border: 1px solid var(--border);
   border-radius: var(--r-md, 8px);
   padding: 12px;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   margin-bottom: 16px;
+  /* 窄屏约束: 防止 SVG 撑破容器 */
+  max-width: 100%;
 }
-.split-dag__svg { display: block; }
+.split-dag__svg {
+  display: block;
+  /* 响应式: 窄屏自适应缩放, 大屏保持原始尺寸; 超宽可水平滚动 */
+  max-width: 100%;
+  height: auto;
+}
 .split-dag__edge {
   stroke: var(--text-muted);
   stroke-width: 1.5;
@@ -598,13 +606,13 @@ const dagLayout = computed(() => {
 .split-subtask__name { font-weight: 500; color: var(--text); }
 .split-subtask__deps {
   margin-left: auto;
-  font-size: var(--fs-sm, 13px);
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 .split-subtask__no-deps { font-style: italic; opacity: 0.7; }
 .split-subtask__desc {
   margin: 6px 0 0;
-  font-size: var(--fs-sm, 13px);
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   line-height: 1.5;
 }
@@ -623,11 +631,11 @@ const dagLayout = computed(() => {
   gap: 6px;
   padding: 8px 16px;
   border-radius: var(--r-md, 8px);
-  font-size: var(--fs-sm, 13px);
+  font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: opacity 0.15s;
+  transition: opacity var(--motion-fast, 120ms);
 }
 .split-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .split-btn--ghost {

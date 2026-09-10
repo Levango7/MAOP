@@ -80,7 +80,7 @@ export const messages = {
     'view.apikeys.revokeFailed': 'Revoke failed',
   },
   zh: {
-    'view.apikeys.subtitle': '用于智能体、CI 与外部集成的编程访问令牌',
+    'view.apikeys.subtitle': '用于智能体、CI 与外部集成的编程访问 Token',
     'view.apikeys.enterprise': '企业版',
     'view.apikeys.generate': '生成 API Key',
     'view.apikeys.generating': '生成中…',

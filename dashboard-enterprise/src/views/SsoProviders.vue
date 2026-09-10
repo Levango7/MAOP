@@ -122,8 +122,8 @@
         <div class="sso-form">
           <!-- 通用字段 -->
           <label>
-            <span class="sso-label">{{ t('view.sso.name') }}</span>
-            <input v-model="form.name" type="text" class="sso-input" :placeholder="t('view.sso.name')" />
+            <span class="sso-label">{{ t('view.sso.name') }} <em class="req">*</em></span>
+            <input v-model="form.name" type="text" class="sso-input" :placeholder="t('view.sso.name')" required />
           </label>
 
           <label>
@@ -155,23 +155,23 @@
             <legend>{{ t('view.sso.protocol.oidc.full') }}</legend>
             <label>
               <span class="sso-label">{{ t('view.sso.oidc.issuerUrl') }}</span>
-              <input v-model="form.config.issuer_url" type="text" class="sso-input" :placeholder="t('view.sso.oidc.issuerUrlHint')" />
+              <input v-model="form.config.issuer_url" type="url" class="sso-input" :placeholder="t('view.sso.oidc.issuerUrlHint')" />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.oidc.authorizeUrl') }} <em class="req">*</em></span>
-              <input v-model="form.config.authorize_url" type="text" class="sso-input" />
+              <input v-model="form.config.authorize_url" type="url" class="sso-input" required />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.oidc.tokenUrl') }} <em class="req">*</em></span>
-              <input v-model="form.config.token_url" type="text" class="sso-input" />
+              <input v-model="form.config.token_url" type="url" class="sso-input" required />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.oidc.userinfoUrl') }}</span>
-              <input v-model="form.config.userinfo_url" type="text" class="sso-input" :placeholder="t('view.sso.oidc.userinfoUrlHint')" />
+              <input v-model="form.config.userinfo_url" type="url" class="sso-input" :placeholder="t('view.sso.oidc.userinfoUrlHint')" />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.oidc.clientId') }} <em class="req">*</em></span>
-              <input v-model="form.config.client_id" type="text" class="sso-input" />
+              <input v-model="form.config.client_id" type="text" class="sso-input" required />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.oidc.clientSecret') }} <em class="req">*</em></span>
@@ -181,11 +181,12 @@
                 class="sso-input"
                 autocomplete="new-password"
                 :placeholder="isEditing ? t('view.sso.oidc.clientSecretEditHint') : ''"
+                :required="!isEditing"
               />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.oidc.redirectUri') }} <em class="req">*</em></span>
-              <input v-model="form.config.redirect_uri" type="text" class="sso-input" :placeholder="t('view.sso.oidc.redirectUriHint')" />
+              <input v-model="form.config.redirect_uri" type="url" class="sso-input" :placeholder="t('view.sso.oidc.redirectUriHint')" required />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.oidc.scopes') }}</span>
@@ -202,23 +203,23 @@
             <legend>{{ t('view.sso.protocol.saml.full') }}</legend>
             <label>
               <span class="sso-label">{{ t('view.sso.saml.spEntityId') }} <em class="req">*</em></span>
-              <input v-model="form.config.sp_entity_id" type="text" class="sso-input" />
+              <input v-model="form.config.sp_entity_id" type="text" class="sso-input" required />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.saml.idpEntityId') }} <em class="req">*</em></span>
-              <input v-model="form.config.entity_id" type="text" class="sso-input" />
+              <input v-model="form.config.entity_id" type="text" class="sso-input" required />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.saml.ssoUrl') }} <em class="req">*</em></span>
-              <input v-model="form.config.sso_url" type="text" class="sso-input" />
+              <input v-model="form.config.sso_url" type="url" class="sso-input" required />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.saml.sloUrl') }}</span>
-              <input v-model="form.config.slo_url" type="text" class="sso-input" :placeholder="t('view.sso.saml.sloUrlHint')" />
+              <input v-model="form.config.slo_url" type="url" class="sso-input" :placeholder="t('view.sso.saml.sloUrlHint')" />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.saml.acsUrl') }} <em class="req">*</em></span>
-              <input v-model="form.config.acs_url" type="text" class="sso-input" :placeholder="t('view.sso.saml.acsUrlHint')" />
+              <input v-model="form.config.acs_url" type="url" class="sso-input" :placeholder="t('view.sso.saml.acsUrlHint')" required />
             </label>
             <label>
               <span class="sso-label">{{ t('view.sso.saml.x509Cert') }} <em class="req">*</em></span>
@@ -227,6 +228,7 @@
                 class="sso-input sso-textarea"
                 rows="4"
                 :placeholder="isEditing ? t('view.sso.saml.x509CertEditHint') : t('view.sso.saml.x509CertHint')"
+                :required="!isEditing"
               />
             </label>
             <label>
@@ -555,6 +557,17 @@ function removeRoleMapping(idx) {
 }
 
 // ── 表单校验 ──────────────────────────────────────────────
+// L8: URL 格式校验 — 检查字符串是否为合法 http(s) URL
+function isValidUrl(str) {
+  if (!str) return false;
+  try {
+    const u = new URL(str);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function validate() {
   if (!form.name.trim()) {
     formError.value = t('view.sso.nameRequired');
@@ -562,21 +575,37 @@ function validate() {
   }
   if (form.protocol === 'oidc') {
     if (!form.config.authorize_url.trim()) { formError.value = t('view.sso.oidc.authorizeUrlRequired'); return false; }
+    if (!isValidUrl(form.config.authorize_url)) { formError.value = t('view.sso.oidc.authorizeUrlRequired'); return false; }
     if (!form.config.token_url.trim()) { formError.value = t('view.sso.oidc.tokenUrlRequired'); return false; }
+    if (!isValidUrl(form.config.token_url)) { formError.value = t('view.sso.oidc.tokenUrlRequired'); return false; }
     if (!form.config.client_id.trim()) { formError.value = t('view.sso.oidc.clientIdRequired'); return false; }
     if (!isEditing.value && !form.config.client_secret.trim()) {
       formError.value = t('view.sso.oidc.clientSecretRequired');
       return false;
     }
     if (!form.config.redirect_uri.trim()) { formError.value = t('view.sso.oidc.redirectUriRequired'); return false; }
+    if (!isValidUrl(form.config.redirect_uri)) { formError.value = t('view.sso.oidc.redirectUriRequired'); return false; }
+    // 可选 URL 字段：填写了则校验格式，格式不合法时清空避免提交错误数据
+    if (form.config.issuer_url.trim() && !isValidUrl(form.config.issuer_url)) {
+      form.config.issuer_url = '';
+    }
+    if (form.config.userinfo_url.trim() && !isValidUrl(form.config.userinfo_url)) {
+      form.config.userinfo_url = '';
+    }
   } else if (form.protocol === 'saml') {
     if (!form.config.sp_entity_id.trim()) { formError.value = t('view.sso.saml.spEntityIdRequired'); return false; }
     if (!form.config.entity_id.trim()) { formError.value = t('view.sso.saml.idpEntityIdRequired'); return false; }
     if (!form.config.sso_url.trim()) { formError.value = t('view.sso.saml.ssoUrlRequired'); return false; }
+    if (!isValidUrl(form.config.sso_url)) { formError.value = t('view.sso.saml.ssoUrlRequired'); return false; }
     if (!form.config.acs_url.trim()) { formError.value = t('view.sso.saml.acsUrlRequired'); return false; }
+    if (!isValidUrl(form.config.acs_url)) { formError.value = t('view.sso.saml.acsUrlRequired'); return false; }
     if (!isEditing.value && !form.config.x509_cert.trim()) {
       formError.value = t('view.sso.saml.x509CertRequired');
       return false;
+    }
+    // 可选 slo_url：填写了则校验格式，格式不合法时清空
+    if (form.config.slo_url.trim() && !isValidUrl(form.config.slo_url)) {
+      form.config.slo_url = '';
     }
   }
   formError.value = '';

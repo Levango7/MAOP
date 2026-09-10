@@ -291,7 +291,7 @@ onMounted(fetchUsers);
 
 .users-avatar {
   width: 30px; height: 30px; border-radius: var(--r-full);
-  background: linear-gradient(135deg, var(--brand), var(--chart-6));
+  background: var(--brand);
   color: var(--brand-contrast); font-size: var(--fs-sm); font-weight: 700;
   display: grid; place-items: center;
 }

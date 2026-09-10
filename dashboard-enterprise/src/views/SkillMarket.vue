@@ -6,7 +6,7 @@
     <div v-if="!loading && !error && !filteredTools.length" class="coming-soon-banner" role="alert">
       <AppIcon name="info" :size="16" class="coming-soon-banner__icon" />
       <div class="coming-soon-banner__content">
-        <span class="coming-soon-banner__title">🔜 {{ t('view.skills.market.comingSoon') }}</span>
+        <span class="coming-soon-banner__title">{{ t('view.skills.market.comingSoon') }}</span>
         <span class="coming-soon-banner__desc">{{ t('view.skills.market.comingSoonHint') }}</span>
       </div>
       <Badge tone="info">{{ t('view.skills.market.planned') }}</Badge>
@@ -338,7 +338,7 @@ onMounted(load);
   display: inline-flex; align-items: center; gap: 5px;
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
   border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
-  cursor: pointer; transition: opacity var(--motion) var(--ease);
+  cursor: pointer; transition: opacity var(--motion, 180ms) var(--ease, cubic-bezier(.4, 0, .2, 1));
 }
 .btn:hover { opacity: .9; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }

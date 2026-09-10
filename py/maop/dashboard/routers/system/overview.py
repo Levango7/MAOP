@@ -34,6 +34,46 @@ _OVERVIEW_CACHE_TTL = 60.0
 # P2-9 fix: cache file counts separately (rarely change, expensive to compute)
 _file_counts_cache: dict[str, Any] = {}
 _FILE_COUNTS_CACHE_TTL = 600.0  # 10 minutes
+# M-02 fix: protect module-level caches with asyncio.Lock to avoid
+# concurrent read-modify-write races under parallel requests.
+_overview_cache_lock = asyncio.Lock()
+_file_counts_cache_lock = asyncio.Lock()
+
+
+def _compute_file_counts_sync() -> dict[str, Any]:
+    """Synchronous file-count computation — run via asyncio.to_thread.
+
+    Walks the source tree and test directory to count .py files, code
+    lines, test files and test functions. Extracted as a standalone
+    function so the blocking I/O can be offloaded to a worker thread.
+    """
+    py_dir = _deps.MAOP_ROOT / "py" / "maop"
+    source_files = sum(
+        1 for p in py_dir.rglob("*.py") if "__pycache__" not in str(p)
+    )
+    code_lines = 0
+    for p in py_dir.rglob("*.py"):
+        if "__pycache__" in str(p):
+            continue
+        try:
+            code_lines += _deps._count_file_lines(p)
+        except Exception as exc:
+            logger.warning('Failed to count code lines: %s', exc)
+    test_dir = _deps.MAOP_ROOT / "py" / "tests"
+    test_files = sum(1 for p in test_dir.glob("test_*.py")) if test_dir.exists() else 0
+    tests_total = 0
+    if test_dir.exists():
+        for tf in test_dir.glob("test_*.py"):
+            try:
+                tests_total += tf.read_text(encoding="utf-8", errors="replace").count("def test_")
+            except Exception as exc:
+                logger.warning('Failed to count test functions: %s', exc)
+    return {
+        "source_files": source_files,
+        "code_lines": code_lines,
+        "test_files": test_files,
+        "tests_total": tests_total,
+    }
 
 
 @router.get("/api/overview")
@@ -41,8 +81,10 @@ _FILE_COUNTS_CACHE_TTL = 600.0  # 10 minutes
 async def api_overview(request: Request) -> dict[str, Any]:
     require_admin(request)
     now = time.monotonic()
-    cached = _overview_cache.get("data")
-    cached_at = _overview_cache.get("ts", 0)
+    # M-02 fix: lock-guarded cache read
+    async with _overview_cache_lock:
+        cached = _overview_cache.get("data")
+        cached_at = _overview_cache.get("ts", 0)
     if cached and now - cached_at < _OVERVIEW_CACHE_TTL:
         return cached
     try:
@@ -67,45 +109,35 @@ async def api_overview(request: Request) -> dict[str, Any]:
         deleg_sr = period.get("success_rate", 0.0)
         # P2-9 fix: cache file counts (10min TTL) to avoid per-request file traversal
         _fc_now = time.monotonic()
-        _fc_cached = _file_counts_cache.get("data")
-        _fc_ts = _file_counts_cache.get("ts", 0)
+        # M-02 fix: lock-guarded file-counts cache read
+        async with _file_counts_cache_lock:
+            _fc_cached = _file_counts_cache.get("data")
+            _fc_ts = _file_counts_cache.get("ts", 0)
         if _fc_cached and _fc_now - _fc_ts < _FILE_COUNTS_CACHE_TTL:
             source_files = _fc_cached["source_files"]
             code_lines = _fc_cached["code_lines"]
             test_files = _fc_cached["test_files"]
             tests_total = _fc_cached["tests_total"]
         else:
-            py_dir = _deps.MAOP_ROOT / "py" / "maop"
-            source_files = sum(
-                1 for p in py_dir.rglob("*.py") if "__pycache__" not in str(p)
-            )
-            code_lines = 0
-            for p in py_dir.rglob("*.py"):
-                if "__pycache__" in str(p):
-                    continue
-                try:
-                    code_lines += await asyncio.to_thread(_deps._count_file_lines, p)
-                except Exception as exc:
-                    logger.warning('Failed to count code lines: %s', exc)
-            test_dir = _deps.MAOP_ROOT / "py" / "tests"
-            test_files = sum(1 for p in test_dir.glob("test_*.py")) if test_dir.exists() else 0
-            tests_total = 0
-            if test_dir.exists():
-                for tf in test_dir.glob("test_*.py"):
-                    try:
-                        tests_total += tf.read_text(encoding="utf-8", errors="replace").count("def test_")
-                    except Exception as exc:
-                        logger.warning('Failed to count test functions: %s', exc)
-            _file_counts_cache["data"] = {
-                "source_files": source_files, "code_lines": code_lines,
-                "test_files": test_files, "tests_total": tests_total,
-            }
-            _file_counts_cache["ts"] = _fc_now
+            # M-04 fix: offload blocking file traversal to a worker thread
+            fc_result = await asyncio.to_thread(_compute_file_counts_sync)
+            source_files = fc_result["source_files"]
+            code_lines = fc_result["code_lines"]
+            test_files = fc_result["test_files"]
+            tests_total = fc_result["tests_total"]
+            # M-02 fix: lock-guarded file-counts cache write
+            async with _file_counts_cache_lock:
+                _file_counts_cache["data"] = {
+                    "source_files": source_files, "code_lines": code_lines,
+                    "test_files": test_files, "tests_total": tests_total,
+                }
+                _file_counts_cache["ts"] = _fc_now
         # Count actual API endpoints from FastAPI app routes
         api_endpoints = sum(
             1 for r in request.app.routes if getattr(r, 'path', '').startswith('/api/')
         )
         result = {
+            "status": "ok",
             "agents_total": agent_count, "modules_total": source_files,
             "tests_total": tests_total,
             "success_rate": deleg_sr,
@@ -130,14 +162,16 @@ async def api_overview(request: Request) -> dict[str, Any]:
             "uptime": f"{round(time.time() - _deps.start_time)}s",
             "timeseries": ts if isinstance(ts, list) else None,
         }
-        _overview_cache["data"] = result
-        _overview_cache["ts"] = now
+        # M-02 fix: lock-guarded overview cache write
+        async with _overview_cache_lock:
+            _overview_cache["data"] = result
+            _overview_cache["ts"] = now
         return result
     except Exception as exc:
         logger.error('Overview failed: %s', exc)
         return JSONResponse(
             status_code=500,
-            content={"error": "Overview failed", "agents_total": 0, "modules_total": 0, "tests_total": 0},
+            content={"status": "error", "error": "Overview failed", "agents_total": 0, "modules_total": 0, "tests_total": 0},
         )
 
 
@@ -241,6 +275,7 @@ async def api_system_resources(request: Request) -> dict[str, Any]:
         log_files["error"] = log_error
 
     return {
+        "status": "ok",
         "memory_store": memory_store,
         "sqlite_db": sqlite_db,
         "vector_index": vector_index,
@@ -330,4 +365,5 @@ async def api_system_diagnostics(request: Request) -> dict[str, Any]:
         logger.warning('Audit log diagnostic failed: %s', exc)
         result["audit_log"] = {"ok": False, "result": "Audit log check failed"}
 
+    result["status"] = "ok"
     return result

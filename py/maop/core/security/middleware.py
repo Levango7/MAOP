@@ -339,6 +339,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """FastAPI middleware for per-IP rate limiting.
 
     Uses MAOP.core.rate_limiter.TokenBucket by default.
+
+    .. note::
+        **M-7 限制说明**：本中间件使用 **内存 token bucket**（``self._buckets``），
+        速率限制状态仅存在于当前进程内存中。这意味着：
+
+        1. **进程重启后状态丢失** —— 重启后所有令牌桶重置，突发限流暂时失效。
+        2. **多进程部署不共享状态** —— 在 uvicorn/gunicorn 多 worker 部署下，
+           每个 worker 维护独立的限流状态，实际限流阈值为 ``rate × worker_count``。
+
+        如需跨进程一致的限流，请考虑使用 Redis-backed 方案（如
+        ``redis-py`` + Lua 脚本实现滑动窗口或 token bucket）。
     """
 
     def __init__(
@@ -425,6 +436,86 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 # ── CSP & Security Headers Middleware ─────────────────────────────
 
+# t88-L9: Dangerous connect-src tokens that weaken CSP.
+# These are logged at WARNING but not rejected, because some
+# deployments legitimately need them.
+_CSP_DANGEROUS_TOKENS: dict[str, str] = {
+    "*": "wildcard '*' allows connections to ANY origin — effectively disables connect-src",
+    "http:": "plain HTTP scheme allows unencrypted connections (MITM risk)",
+    "ws:": "plain WebSocket scheme allows unencrypted WS (MITM risk)",
+    "data:": "data: URIs in connect-src allow inline content injection",
+    "blob:": "blob: URIs in connect-src allow dynamic content sources",
+}
+
+
+def _validate_connect_src(connect_src: str) -> None:
+    """Validate CSP ``connect-src`` value for dangerous patterns.
+
+    This is a **trust-policy audit**, not a hard gate. The CSP
+    ``connect-src`` directive controls where the browser can issue
+    ``fetch()``, ``XMLHttpRequest``, and WebSocket connections. A
+    permissive value undermines the entire CSP XSS mitigation.
+
+    Trust policy
+    ------------
+    - ``'self'`` (default): trusted — same-origin only.
+    - ``'none'``: trusted — most restrictive.
+    - ``https://host`` / ``wss://host``: trusted — encrypted, explicit host.
+    - Dangerous tokens (see ``_CSP_DANGEROUS_TOKENS``): logged at WARNING
+      but NOT rejected, because:
+        * Development environments may need ``http:`` for localhost.
+        * Public API gateways may need ``*``.
+        * The operator is responsible for the CSP policy; we surface
+          the risk but do not override their decision.
+    - Empty string: rejected (would produce ``connect-src`` with no
+      sources, which defaults to ``default-src`` — confusing and
+      likely unintended).
+
+    Args:
+        connect_src: The raw ``connect-src`` value (e.g. ``"'self'"``,
+            ``"'self' wss://api.example.com"``).
+
+    Raises:
+        ValueError: If ``connect_src`` is empty (would produce an
+            invalid/ambiguous directive).
+    """
+    if not connect_src or not connect_src.strip():
+        raise ValueError(
+            "CSP connect-src must not be empty — an empty value produces "
+            "'connect-src' with no sources, which falls back to default-src "
+            "and is likely unintended. Use 'none' to explicitly block all "
+            "connections."
+        )
+
+    # Tokenize on whitespace and check each token.
+    tokens = connect_src.split()
+    for token in tokens:
+        # Check exact-match dangerous tokens (e.g. "*", "http:")
+        if token in _CSP_DANGEROUS_TOKENS:
+            logger.warning(
+                "[CSP] connect-src contains dangerous token %r: %s. "
+                "This weakens the Content-Security-Policy. Ensure this is "
+                "intentional (e.g. dev environment) and not present in "
+                "production.",
+                token, _CSP_DANGEROUS_TOKENS[token],
+            )
+        # Check prefix-match for http:// and ws:// (scheme + explicit host)
+        elif token.startswith("http://"):
+            logger.warning(
+                "[CSP] connect-src allows plain HTTP origin %r — "
+                "connections to this host are unencrypted (MITM risk). "
+                "Prefer https:// in production.",
+                token,
+            )
+        elif token.startswith("ws://"):
+            logger.warning(
+                "[CSP] connect-src allows plain WebSocket origin %r — "
+                "connections to this host are unencrypted (MITM risk). "
+                "Prefer wss:// in production.",
+                token,
+            )
+
+
 class CSPMiddleware(BaseHTTPMiddleware):
     """Content-Security-Policy and security response headers.
 
@@ -463,6 +554,14 @@ class CSPMiddleware(BaseHTTPMiddleware):
         self.enabled = enabled
         self.report_only = report_only
         self.report_uri = report_uri
+
+        # t88-L9: validate connect-src before building the policy.
+        # connect-src governs XHR/fetch/WebSocket destinations — a
+        # misconfigured value can punch a hole through the CSP. We log
+        # warnings for dangerous patterns but do not raise, because some
+        # deployments legitimately need them (e.g. `*` for a public
+        # API gateway, `http:` for localhost dev).
+        _validate_connect_src(connect_src)
 
         # Build CSP policy string
         directives = [

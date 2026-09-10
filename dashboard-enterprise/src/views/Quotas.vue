@@ -632,6 +632,8 @@ onMounted(loadAll);
   grid-auto-rows: minmax(28px, auto);
   font-size: var(--fs-xs);
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 400px;
 }
 .heatmap__header,
 .heatmap__row {

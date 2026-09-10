@@ -1151,9 +1151,9 @@ onMounted(() => {
   border-radius: var(--r-sm);
   background: var(--surface-3);
 }
-.route-node.primary { border-left: 3px solid var(--ok, #3fb950); }
-.route-node.fallback { border-left: 3px solid var(--warn, #d29922); }
-.route-node.tertiary { border-left: 3px solid var(--text-faint, #8a93a3); }
+.route-node.primary { border-left: 3px solid var(--ok); }
+.route-node.fallback { border-left: 3px solid var(--warn); }
+.route-node.tertiary { border-left: 3px solid var(--text-faint); }
 .route-agent { font-weight: 600; font-size: var(--fs-sm); }
 .route-model { font-size: var(--fs-xs); color: var(--text-muted); }
 .route-sep { color: var(--text-faint); font-size: var(--fs-sm); }
@@ -1232,7 +1232,7 @@ onMounted(() => {
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  cursor: pointer; transition: all .15s ease;
+  cursor: pointer; transition: border-color var(--motion-fast, 120ms) var(--ease, ease), background var(--motion-fast, 120ms) var(--ease, ease);
 }
 .model-option:hover:not(.disabled) {
   border-color: var(--accent, var(--brand));

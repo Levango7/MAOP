@@ -89,7 +89,7 @@
               <button
                 class="wf-node__port"
                 data-test="wf-node-port"
-                title="output"
+                :title="t('view.workflow.portOutput')"
                 @click.stop.prevent="onPortClick(node)"
               />
             </div>
@@ -189,7 +189,7 @@
         <div class="wf-toolbar" data-test="wf-toolbar">
           <span class="wf-toolbar__label">{{ t('view.workflow.toolbar') }}</span>
           <span class="wf-toolbar__stats">
-            {{ nodes.length }} nodes · {{ edges.length }} edges
+            {{ t('view.workflow.toolbarStats', { nodes: nodes.length, edges: edges.length }) }}
           </span>
           <button class="btn btn--sm" data-test="wf-clear" @click="clearAll">
             <AppIcon name="trash" :size="14" /> {{ t('view.workflow.clear') }}
@@ -279,8 +279,8 @@ const fileInputRef = ref(null);
 // 连线模式: 点击 output 端口后, pendingEdgeSource 记录源节点 id
 const pendingEdgeSource = ref('');
 
-// 画布尺寸 (SVG 视口), 给一个足够大的固定值, 节点超出则裁切
-const canvasSize = 4000;
+// 画布尺寸 (SVG 视口), 响应式: 跟随容器大小, CSS min-width/min-height 保证绘制空间
+const canvasSize = '100%';
 
 let _idSeq = 0;
 function genId(type) {
@@ -625,7 +625,7 @@ defineExpose({
   background: var(--surface-2);
   cursor: grab;
   user-select: none;
-  transition: border-color .15s, background .15s;
+  transition: border-color var(--motion-fast, 120ms), background var(--motion-fast, 120ms);
 }
 .wf-palette-item:hover {
   border-color: var(--brand);
@@ -657,6 +657,9 @@ defineExpose({
   top: 0;
   left: 0;
   pointer-events: none;
+  /* 响应式: 视口跟随容器, 但保留足够绘制空间避免连线裁切 */
+  min-width: 4000px;
+  min-height: 4000px;
 }
 .wf-edge {
   fill: none;

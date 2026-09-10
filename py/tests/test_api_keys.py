@@ -80,7 +80,7 @@ class TestKeyGeneration:
         assert parts[0] == "maop"
         assert parts[1] == result.key_id
         assert len(parts[1]) == 8   # key_id length
-        assert len(parts[2]) == 32  # secret length
+        assert len(parts[2]) == 64  # secret length (t88-L5: 256-bit / 32 bytes)
 
     def test_key_id_is_unique(self, manager: ApiKeyManager):
         r1 = manager.create_key(ApiKeyCreate(name="a"))

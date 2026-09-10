@@ -59,6 +59,11 @@ export const messages = {
     'view.monitor.healthStatusNormal': 'Normal',
     'view.monitor.healthStatusDrained': 'Drained',
     'view.monitor.healthStatusRecovering': 'Recovering',
+    // ── 资源名称 (P0 修复: 替换硬编码英文) ──
+    'view.monitor.resMemoryStore': 'Memory Store',
+    'view.monitor.resSqliteDb': 'SQLite DB',
+    'view.monitor.resVectorIndex': 'Vector Index',
+    'view.monitor.resLogFiles': 'Log Files',
   },
   zh: {
     'view.monitor.title': '监控与维护',
@@ -120,5 +125,10 @@ export const messages = {
     'view.monitor.healthStatusNormal': '正常',
     'view.monitor.healthStatusDrained': '摘流',
     'view.monitor.healthStatusRecovering': '灰度',
+    // ── 资源名称 (P0 修复: 替换硬编码英文) ──
+    'view.monitor.resMemoryStore': '记忆存储',
+    'view.monitor.resSqliteDb': 'SQLite 数据库',
+    'view.monitor.resVectorIndex': '向量索引',
+    'view.monitor.resLogFiles': '日志文件',
   },
 };

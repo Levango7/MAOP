@@ -187,8 +187,10 @@ async def evolve_agent(name: str, request: Request) -> dict[str, Any]:
 
 @router.get("/{name}/evolution-status")
 @handle_api_errors
-async def get_evolution_status(name: str) -> dict[str, Any]:
+async def get_evolution_status(name: str, request: Request) -> dict[str, Any]:
     """获取 agent 的自进化状态。"""
+    # P0 fix: evolution status reveals agent self-improvement state — admin surface.
+    require_admin(request)
     evolution = _deps._get_evolution()
     status = evolution.get_status(name)
     return {"status": status}

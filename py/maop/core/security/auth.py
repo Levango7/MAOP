@@ -580,13 +580,14 @@ class AuthManager:
         Tries API key first, then JWT.
         """
         if not self.config.enabled:
-            # Security: when auth is disabled (dev mode), grant guest role only.
+            # Security: when auth is disabled (dev mode), grant read-only role.
             # This prevents accidental admin access in misconfigured deployments.
+            # H-4 fix: 统一为 ["read"]，与 middleware.py _dispatch_disabled 保持一致。
             logger.warning(
-                "Auth disabled — granting guest role (not admin). "
+                "Auth disabled — granting read role (not admin). "
                 "Enable auth in production via MAOP_AUTH=1."
             )
-            return AuthResult(authenticated=True, identity="anonymous", roles=["guest"])
+            return AuthResult(authenticated=True, identity="anonymous", roles=["read"])
 
         # Try API key
         if api_key:

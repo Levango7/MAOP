@@ -10,26 +10,33 @@
 
 
 export function useStreamingFetch() {
-    /**
-     * Send a POST request and stream the SSE response.
-     *
-     * @param {string} url - Endpoint URL (e.g. '/api/chat/stream')
-     * @param {object} body - JSON body
-     * @param {object} [callbacks]
-     * @param {function(string, object): void} [callbacks.onData] - Called with (content, meta) for each chunk
-     * @param {function(object): void} [callbacks.onMeta] - Called with metadata (session_id, tokens, model)
-     * @param {function(): void} [callbacks.onDone] - Called when stream completes
-     * @param {function(string): void} [callbacks.onError] - Called on error
-     * @returns {Promise<void>}
-     */
-    async function stream(url, body, callbacks = {}) {
-        const { onData, onMeta, onDone, onError } = callbacks;
+  /**
+   * Send a POST request and stream the SSE response.
+   *
+   * @param {string} url - Endpoint URL (e.g. '/api/chat/stream')
+   * @param {object} body - JSON body
+   * @param {object} [callbacks]
+   * @param {function(string, object): void} [callbacks.onData] - Called with (content, meta) for each chunk
+   * @param {function(object): void} [callbacks.onMeta] - Called with metadata (session_id, tokens, model)
+   * @param {function(): void} [callbacks.onDone] - Called when stream completes
+   * @param {function(string): void} [callbacks.onError] - Called on error
+   * @returns {Promise<void>}
+   */
+  async function stream(url, body, callbacks = {}) {
+    const { onData, onMeta, onDone, onError } = callbacks;
 
-        const headers = { 'Content-Type': 'application/json' };
+    const headers = { 'Content-Type': 'application/json' };
 
     // AbortController for cancellable streaming (prevents leak on unmount/renavigate)
     const controller = new AbortController();
     const onAbort = () => controller.abort();
+    // M4 fix: fetch 开始前检查外部 signal 是否已 aborted。
+    // 若外部 signal 在调用 stream() 之前已 aborted，addEventListener('abort')
+    // 不会触发（事件已过），fetch 仍会发起无用请求。提前检查并直接返回。
+    if (callbacks.signal && callbacks.signal.aborted) {
+      if (onError) onError('Aborted');
+      return;
+    }
     if (callbacks.signal) {
       callbacks.signal.addEventListener('abort', onAbort);
     }

@@ -135,6 +135,40 @@ class PostgreSQLStorageBackend(StorageBackend):
             return [dict(zip(cols, row)) for row in cur.fetchall()]
 
     def commit(self) -> None:
+        """No-op in autocommit mode — logs a warning/debug instead of committing.
+
+        .. warning::
+
+            This method **does not commit any transaction**. The underlying
+            psycopg connection pool operates in ``autocommit=True`` mode
+            (see :meth:`__init__` / pool kwargs), so every ``execute()``
+            is committed immediately by PostgreSQL. There is never a
+            pending transaction to commit at this level.
+
+        **When you DO need transactional commit:**
+        Use the :meth:`transaction` context manager, which switches the
+        connection to ``autocommit=False`` and commits/rolls back on
+        context exit::
+
+            with backend.transaction() as tx:
+                tx.execute("INSERT ...")
+                tx.execute("UPDATE ...")
+            # auto-commit on clean exit, auto-rollback on exception
+
+        **Why this is a no-op and not removed:**
+        The method exists to satisfy the backend protocol interface
+        (:class:`~maop.core.backends.backends.BackendProtocol`) so that
+        generic code can call ``backend.commit()`` without knowing
+        whether the backend is autocommit or explicit-txn. Removing it
+        would break the protocol; silently swallowing the call would
+        hide bugs where callers think they've committed. Logging makes
+        the no-op observable.
+
+        **Log level policy (R4-low):**
+        First call logs at ``WARNING`` (to alert on likely misuse);
+        subsequent calls log at ``DEBUG`` (to avoid log spam in hot
+        paths where the protocol is called unconditionally).
+        """
         # B9: 不再静默 no-op。pool 在 autocommit=True 模式下，每次
         # execute 已自动提交，顶层 commit() 无未提交事务可提交。
         # R4-low fix: 高频操作场景下 warning 产生大量日志噪音，改为 debug。
@@ -152,6 +186,35 @@ class PostgreSQLStorageBackend(StorageBackend):
             )
 
     def rollback(self) -> None:
+        """No-op in autocommit mode — logs a warning/debug instead of rolling back.
+
+        .. warning::
+
+            This method **cannot roll back any executed statements**. The
+            underlying psycopg connection pool operates in
+            ``autocommit=True`` mode, so every ``execute()`` is committed
+            immediately by PostgreSQL. By the time ``rollback()`` is
+            called, the statements are already durable — there is nothing
+            to roll back.
+
+        **When you DO need transactional rollback:**
+        Use the :meth:`transaction` context manager, which rolls back
+        automatically on exception::
+
+            with backend.transaction() as tx:
+                tx.execute("INSERT ...")
+                raise SomeError()  # auto-rollback of both statements
+
+        **Why this is a no-op and not removed:**
+        Same protocol-compatibility rationale as :meth:`commit`. Logging
+        makes the no-op observable so callers can detect if they are
+        relying on rollback semantics that do not exist.
+
+        **Log level policy (R4-low):**
+        First call logs at ``WARNING`` (rollback-as-no-op is especially
+        dangerous — data the caller thinks was rolled back is actually
+        committed); subsequent calls log at ``DEBUG`` to avoid spam.
+        """
         # B9: 不再静默 no-op。autocommit 模式下已执行的语句无法回滚。
         # R4-low fix: 高频操作场景下 warning 产生大量日志噪音，改为 debug。
         # 首次调用时发 warning 提醒，后续发 debug。

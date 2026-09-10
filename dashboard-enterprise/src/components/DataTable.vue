@@ -47,12 +47,13 @@
     </div>
     <!-- 分页控件: pageSize > 0 且多页时显示。
          ‹/› 为通用排版符号(非英文), 页码格式 "当前页 / 总页数"。
-         下一页 aria-label 复用已有 i18n key action.next, 避免新增 key。 -->
+         上一页/下一页 aria-label 复用已有 i18n key, 避免新增 key。 -->
     <div v-if="showPager" class="dt__pager" role="navigation">
       <button
         class="dt__pager-btn"
         type="button"
         :disabled="currentPage === 1"
+        :aria-label="t('view.tasks.prevPage')"
         @click="goPrev"
       >‹</button>
       <span class="dt__pager-info">{{ currentPage }} / {{ totalPages }}</span>

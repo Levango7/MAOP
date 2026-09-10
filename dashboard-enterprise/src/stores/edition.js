@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { withAuth, handleUnauthorized } from './api.js';
+import { withAuth, handleUnauthorized, fetchWithTimeout } from './api.js';
+
+// L3 fix: 提取硬编码的 API 路径为命名常量，便于统一维护与路径变更。
+const API_ENDPOINT_EDITION = '/api/info/edition';
 
 function persistEdition(edition, features, backends, degradations) {
   try {
@@ -56,8 +59,15 @@ export const useEditionStore = defineStore('edition', () => {
     loading.value = true;
     try {
       // Inject Bearer token (aligned with dashboard/js/app-core.js)
-      const res = await fetch('/api/info/edition', withAuth({}, {}));
-      if (res.status === 401) { await handleUnauthorized(); return; }
+      // M1 fix: 使用 fetchWithTimeout 添加超时保护，防止后端无响应时请求永久挂起。
+      // M3 fix: 401 处理与 api store 行为统一——先 handleUnauthorized()（内部尝试
+      // refresh token），refresh 成功后重试一次；重试仍 401 才放弃。
+      let res = await fetchWithTimeout(API_ENDPOINT_EDITION, withAuth({}, {}));
+      if (res.status === 401) {
+        await handleUnauthorized();
+        res = await fetchWithTimeout(API_ENDPOINT_EDITION, withAuth({}, {}));
+        if (res.status === 401) { return; }
+      }
       if (!res.ok) { console.error('Failed to fetch edition info: HTTP', res.status); return; }
       const data = await res.json();
       // P1-H1: 后端未返回有效 edition 时 fallback 'personal'（安全失败）
@@ -83,11 +93,21 @@ export const useEditionStore = defineStore('edition', () => {
     switching.value = true;
     switchError.value = '';
     try {
-      const res = await fetch('/api/info/edition', withAuth(
+      // M2 fix: 使用 fetchWithTimeout 添加超时保护，防止后端无响应时请求永久挂起。
+      // M3 fix: 401 处理与 api store 行为统一——先 handleUnauthorized()（内部尝试
+      // refresh token），refresh 成功后重试一次；重试仍 401 才抛错。
+      let res = await fetchWithTimeout(API_ENDPOINT_EDITION, withAuth(
         { method: 'POST', body: JSON.stringify({ edition: targetEdition }) },
         { 'Content-Type': 'application/json' }
       ));
-      if (res.status === 401) { await handleUnauthorized(); throw new Error('401 Unauthorized'); }
+      if (res.status === 401) {
+        await handleUnauthorized();
+        res = await fetchWithTimeout(API_ENDPOINT_EDITION, withAuth(
+          { method: 'POST', body: JSON.stringify({ edition: targetEdition }) },
+          { 'Content-Type': 'application/json' }
+        ));
+        if (res.status === 401) { throw new Error('401 Unauthorized'); }
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const msg = data.error || data.detail || `Switch failed: HTTP ${res.status}`;

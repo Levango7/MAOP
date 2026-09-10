@@ -26,10 +26,13 @@ class MemoryStoreRequest(BaseModel):
 @handle_api_errors
 async def get_agent_memory(
     name: str,
+    request: Request,
     memory_type: str = Query("", description="Filter by memory type"),
     limit: int = Query(50, ge=1, le=500),
 ):
     """获取 agent 的记忆记录。"""
+    # P0 fix: agent memory reveals interaction/error/performance history — admin surface.
+    require_admin(request)
     memory = _deps._get_memory()
     records = memory.retrieve(name, memory_type=memory_type or None, limit=limit)
     return {"memories": records, "count": len(records)}
@@ -70,8 +73,10 @@ async def clear_agent_memory(
 
 @router.get("/{name}/memory/summary")
 @handle_api_errors
-async def get_memory_summary(name: str) -> dict[str, Any]:
+async def get_memory_summary(name: str, request: Request) -> dict[str, Any]:
     """获取 agent 记忆的统计摘要。"""
+    # P0 fix: memory summary reveals agent operational stats — admin surface.
+    require_admin(request)
     memory = _deps._get_memory()
     summary = memory.summarize(name)
     return {"summary": summary}

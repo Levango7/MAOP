@@ -357,7 +357,15 @@ class LRUCache:
             return entry.value
 
     def __setitem__(self, key: str, value: Any) -> None:
-        """Store value without TTL (永不过期), 用于 CacheGuard 自管 TTL 场景。"""
+        """Store value without TTL (永不过期), 用于 CacheGuard 自管 TTL 场景。
+
+        M-1 fix: 与 put() 一致，在锁内收集待淘汰项，锁外批量调用 on_evict 回调，
+        避免回调重入缓存导致死锁（来源：coding-pattern/lrucache-dict-like-interface-adapter）。
+        """
+        # t13/M-1: collect evicted (key, value) pairs under the lock, then invoke
+        # the on_evict callback AFTER releasing the lock to prevent reentrancy.
+        evicted_entries: list[tuple[str, Any]] = []
+
         with self._lock:
             if key in self._store:
                 self._store[key].value = value
@@ -373,12 +381,22 @@ class LRUCache:
                         if k not in self._pinned:
                             evicted_entry = self._store.pop(k)
                             self._evictions += 1
-                            if self._on_evict is not None:
-                                self._on_evict(k, evicted_entry.value)
+                            evicted_entries.append((k, evicted_entry.value))
                             evicted = True
                             break
                     if not evicted:
                         break
+
+        # Invoke eviction observer outside the lock.
+        if evicted_entries and self._on_evict is not None:
+            for ev_key, ev_value in evicted_entries:
+                try:
+                    self._on_evict(ev_key, ev_value)
+                except Exception:
+                    logger.warning(
+                        "[cache] on_evict callback failed for key '%s'",
+                        ev_key, exc_info=True,
+                    )
 
     def __delitem__(self, key: str) -> None:
         """Delete by key. Raises KeyError if missing."""
@@ -481,8 +499,27 @@ class LRUCache:
                 event.set()
 
     def invalidate_prefix(self, prefix: str) -> int:
-        """Remove all keys starting with prefix. Returns count removed."""
+        """Remove all keys starting with prefix. Returns count removed.
+
+        Complexity: O(n) where n = len(self._store). Scans every key under
+        the lock to test ``k.startswith(prefix)``.
+
+        Rationale: LRUCache is sized by ``max_size`` (default 256, typically
+        < 1000 entries). At this scale the linear scan is cheap and the
+        overhead of maintaining a prefix → keys index (extra memory plus
+        per-put/delete bookkeeping) is not justified. If the cache is ever
+        resized to tens of thousands of entries or ``invalidate_prefix`` is
+        called in a hot path, consider adding an auxiliary trie/prefix index
+        and re-evaluating.
+
+        Thread-safety: holds ``self._lock`` for the whole scan+delete, so
+        concurrent puts/gets block until invalidation completes. Snapshot
+        the keys first to avoid mutating the OrderedDict during iteration
+        (which would raise ``RuntimeError``).
+        """
         with self._lock:
+            # Snapshot keys first: deleting from self._store while iterating
+            # it directly raises RuntimeError. list(...) forces a copy.
             keys_to_remove = [k for k in self._store if k.startswith(prefix)]
             for k in keys_to_remove:
                 del self._store[k]

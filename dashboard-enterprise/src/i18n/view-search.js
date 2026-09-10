@@ -144,7 +144,8 @@ export const messages = {
     'view.search.col.time': '时间',
     'view.search.col.level': '级别',
     'view.search.col.message': '消息',
-    'view.search.Search failed': '搜索失败',
+    // H1 fix: 删除错误的重复键 'view.search.Search failed'（含空格+大小写错误），
+    // 第123行已存在正确键名 'view.search.searchFailed'，与 en 字典第48行对齐。
     'view.search.resultCount': '{count} 条结果',
     'view.search.resultCountWithTime': '{count} 条结果（{time}ms）',
     'view.search.noMatches': '未找到匹配“{query}”的结果。',

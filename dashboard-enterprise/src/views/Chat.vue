@@ -291,6 +291,8 @@ function toList(d) {
 
 function renderMarkdown(text) {
   if (!text) return '';
+  // TODO(L3): 当前为极简 Markdown 渲染，不支持 GFM 表格。如需表格支持，
+  // 建议迁移至 useMarkdown composable 或引入 marked + dompurify（gfm: true）。
   const html = text
     .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="$1">$2</code></pre>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -458,7 +460,7 @@ onMounted(async () => {
   gap: 8px;
   margin-top: 4px;
   font-size: var(--fs-xs);
-  color: var(--text-faint, #8a93a3);
+  color: var(--text-faint);
 }
 .stream-tokens, .stream-speed {
   font-variant-numeric: tabular-nums;

@@ -239,5 +239,3 @@ async function refreshAll() {
 onMounted(refreshAll);
 </script>
 
-<style scoped>
-</style>

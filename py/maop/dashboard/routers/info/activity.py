@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -43,12 +43,12 @@ def _fmt_age_ago(seconds: float) -> str:
 
 @router.get("/activity")
 @handle_api_errors
-async def get_activity(request: Request, limit: int = 10) -> dict[str, Any]:
+async def get_activity(request: Request, limit: int = Query(default=10, ge=1, le=200)) -> dict[str, Any]:
     """Return recent system activity events for the Overview page feed.
 
     Aggregates data from delegation logs and system state into a
     timeline format compatible with the Overview activity feed.
-    No admin required — available to any authenticated user.
+    Requires admin role.
     """
     require_admin(request)
     import time as _time

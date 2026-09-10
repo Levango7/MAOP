@@ -181,6 +181,24 @@ class RedisDistributedLock:
                 # do work with token
             finally:
                 lock.release()
+
+    .. note::
+        **M-8 Fencing Token 验证责任说明**：
+
+        ``fencing_token`` 是通过 Redis ``INCR`` 生成的单调递增值，用于保护
+        受锁保护的资源（如存储写入）免受**过期锁持有者**的污染。当锁因 TTL
+        过期被另一客户端获取时，旧持有者仍可能尝试写入——fencing token 要求
+        存储层在写入时校验 ``token > last_seen_token``，从而拒绝过期写入。
+
+        **fencing token 的验证责任在使用方（存储层），而非 ``release()`` 方法**。
+        ``release()`` 仅通过 Lua 脚本原子校验锁的 ``uuid token`` 以确保只有
+        当前持有者能释放锁。使用方在写入受保护资源时**必须**：
+
+        1. 获取 ``token = lock.fencing_token``；
+        2. 将 ``token`` 随写入请求传递给存储层；
+        3. 存储层校验 ``token > last_committed_token``，拒绝旧 token 的写入。
+
+        若使用方不做此校验，fencing token 将不提供任何安全性保证。
     """
 
     def __init__(self, name: str, ttl: float = 30.0, client: Any = None) -> None:

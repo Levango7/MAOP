@@ -1,6 +1,7 @@
 <template>
   <div
     v-if="confirmState.visible"
+    ref="rootRef"
     class="confirm-overlay"
     data-modal-root="true"
     aria-modal="true"
@@ -27,11 +28,22 @@
 </template>
 
 <script setup>
-import { useI18n } from '../i18n/index.js';
+import { ref } from 'vue';
+import { useI18n } from '../i18n';
 import { confirmState, useConfirm } from '../composables/useConfirm.js';
+import { useModalA11y } from '../composables/useModalA11y.js';
 
 const { t } = useI18n();
 const { resolve } = useConfirm();
+
+const rootRef = ref(null);
+
+// 焦点管理 + focus trap + Esc 关闭(复用 useModalA11y)
+useModalA11y(
+  () => confirmState.visible,
+  () => onCancel(),
+  () => rootRef.value,
+);
 
 function onConfirm() { resolve(true); }
 function onCancel() { resolve(false); }

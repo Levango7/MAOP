@@ -7,10 +7,12 @@ handler is ~117 lines and conceptually distinct from CRUD/evolution/memory.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -65,7 +67,10 @@ async def get_agent_routes(request: Request) -> dict[str, Any]:
     routing_cfg: dict = {}
     if yaml_path.exists():
         try:
-            data = _yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+            # P2 fix: 异步端点中同步文件 I/O 会阻塞事件循环，
+            # 用 asyncio.to_thread 包装（ASYNC230）。
+            _text = await asyncio.to_thread(Path(yaml_path).read_text, encoding="utf-8")
+            data = _yaml.safe_load(_text) or {}
             agents_cfg = data.get("agents", {}) or {}
             routing_cfg = data.get("routing", {}) or {}
         except Exception:

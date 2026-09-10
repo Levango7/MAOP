@@ -29,13 +29,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/n8n", tags=["n8n"])
 
+# Module-level singleton cache for N8nClient — avoids re-creating the client
+# (and re-reading env config) on every request. Invalidated if env changes.
+_n8n_client: N8nClient | None = None
+_n8n_client_env: tuple[str, str] | None = None
+
 
 def _get_client() -> N8nClient:
-    """Create an N8nClient from environment configuration."""
-    return N8nClient(
-        base_url=os.getenv("N8N_BASE_URL", "http://localhost:5678"),
-        api_key=os.getenv("N8N_API_KEY", ""),
-    )
+    """Return a cached N8nClient singleton, re-created only when env config changes."""
+    global _n8n_client, _n8n_client_env
+    base_url = os.getenv("N8N_BASE_URL", "http://localhost:5678")
+    api_key = os.getenv("N8N_API_KEY", "")
+    current_env = (base_url, api_key)
+    if _n8n_client is None or _n8n_client_env != current_env:
+        _n8n_client = N8nClient(base_url=base_url, api_key=api_key)
+        _n8n_client_env = current_env
+    return _n8n_client
 
 
 @router.post("/webhook")
@@ -45,11 +54,16 @@ async def receive_webhook(request: Request) -> dict[str, Any]:
 
     通过 HMAC-SHA256 签名校验（请求头 ``X-N8N-Signature`` 或
     ``X-MAOP-Signature``）替代管理员鉴权——n8n 在请求头中携带用共享密钥
-    计算的签名。需配置环境变量 ``N8N_WEBHOOK_SECRET``；未配置时仅记录
-    警告（向后兼容）。端点仍受 Enterprise 特性开关保护。
+    计算的签名。需配置环境变量 ``N8N_WEBHOOK_SECRET``；未配置时返回 403
+    Forbidden 以拒绝无鉴权的 webhook 请求。端点仍受 Enterprise 特性开关保护。
     """
     if not has_feature(FeatureFlag.N8N_INTEGRATION):
         raise HTTPException(status_code=404, detail="n8n integration not available")
+
+    # P0 fix: 未配置 N8N_WEBHOOK_SECRET 时，webhook 完全无鉴权——拒绝请求。
+    if not os.getenv("N8N_WEBHOOK_SECRET"):
+        logger.warning("[n8n] N8N_WEBHOOK_SECRET not configured; rejecting webhook request")
+        raise HTTPException(status_code=403, detail="webhook secret not configured")
 
     raw_body = await request.body()
     signature = request.headers.get("X-N8N-Signature") or request.headers.get("X-MAOP-Signature")
@@ -75,7 +89,7 @@ async def list_workflows(request: Request) -> dict[str, Any]:
     with _get_client() as client:
         try:
             workflows = client.list_workflows()
-            return {"workflows": workflows, "count": len(workflows)}
+            return {"status": "ok", "workflows": workflows, "count": len(workflows)}
         except N8nIntegrationError as exc:
             # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
             logger.warning("[n8n] Integration error: %s", exc)
@@ -87,10 +101,13 @@ async def list_workflows(request: Request) -> dict[str, Any]:
 async def trigger_workflow(
     workflow_id: str,
     request: Request,
-    data: dict[str, Any] | None = None,
-    wait: bool = False,
 ) -> dict[str, Any]:
-    """Trigger an n8n workflow by ID."""
+    """Trigger an n8n workflow by ID.
+
+    P0 fix: 移除函数签名中的 ``data`` 和 ``wait`` 参数——它们会被 FastAPI
+    解释为请求体参数，与 ``await request.json()`` 再次读取请求体冲突。
+    请求体统一通过 ``await request.json()`` 解析。
+    """
     require_admin(request)
     if not has_feature(FeatureFlag.N8N_INTEGRATION):
         raise HTTPException(status_code=404, detail="n8n integration not available")
@@ -104,7 +121,7 @@ async def trigger_workflow(
                 data=body.get("data", {}),
                 wait_for_completion=body.get("wait", False),
             )
-            return execution.model_dump()
+            return {"status": "ok", **execution.model_dump()}
         except N8nIntegrationError as exc:
             # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
             logger.warning("[n8n] Integration error: %s", exc)
@@ -122,7 +139,7 @@ async def get_execution(execution_id: str, request: Request) -> dict[str, Any]:
     with _get_client() as client:
         try:
             execution = client.get_execution(execution_id)
-            return execution.model_dump()
+            return {"status": "ok", **execution.model_dump()}
         except N8nIntegrationError as exc:
             # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
             logger.warning("[n8n] Integration error: %s", exc)
@@ -141,4 +158,4 @@ async def health_check(request: Request) -> dict[str, Any]:
     base_url = os.getenv("N8N_BASE_URL", "http://localhost:5678")
     with _get_client() as client:
         healthy = client.health_check()
-        return {"n8n_reachable": healthy, "base_url": base_url}
+        return {"status": "ok", "n8n_reachable": healthy, "base_url": base_url}

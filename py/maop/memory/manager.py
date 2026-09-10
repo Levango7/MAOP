@@ -223,27 +223,21 @@ class MemoryManager:
         )
         working = [{"role": m.role, "content": m.content} for m in window.messages]
 
-        # L2: Short-term memory search
+        # L2 + L3: 单次搜索后按标签分拆为短期/长期结果
+        # M-5 fix: 原先对同一 query+top 调用两次 search，现合并为一次并去重分拆。
         short_term = []
-        if query:
-            results = self._memory.search(query=query, top=self._config.inject_max_results)
-            short_term = [
-                {"id": r.id, "agent": r.agent, "task": r.task,
-                 "snippet": r.snippet, "score": r.score, "topic": r.topic}
-                for r in results
-                if not any(t == "dream-consolidated" for t in (r.tags or []))
-            ]
-
-        # L3: Long-term memory search (consolidated entries)
         long_term = []
         if query:
             results = self._memory.search(query=query, top=self._config.inject_max_results)
-            long_term = [
-                {"id": r.id, "agent": r.agent, "task": r.task,
-                 "snippet": r.snippet, "score": r.score, "topic": r.topic}
-                for r in results
-                if any(t == "dream-consolidated" for t in (r.tags or []))
-            ]
+            for r in results:
+                entry = {
+                    "id": r.id, "agent": r.agent, "task": r.task,
+                    "snippet": r.snippet, "score": r.score, "topic": r.topic,
+                }
+                if any(t == "dream-consolidated" for t in (r.tags or [])):
+                    long_term.append(entry)
+                else:
+                    short_term.append(entry)
 
         # Build injection summary
         injected = self._build_injection_summary(short_term, long_term)

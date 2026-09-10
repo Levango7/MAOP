@@ -27,10 +27,19 @@ function escapeHtml(s) {
 /** 行内格式化：加粗 + 行内代码。 */
 function inline(s) {
   let out = escapeHtml(s);
-  // 行内代码 `code` — 先处理，避免内部被加粗规则误伤
-  out = out.replace(/`([^`]+)`/g, (_, code) => `<code class="md-code-inline">${code}</code>`);
+  // L7 fix: 行内代码 `code` — 使用占位符替换，避免后续加粗正则误匹配代码内的 ** 符号。
+  // 此前直接替换为 <code>...</code>，加粗正则 /\*\*([^*]+)\*\*/g 仍会匹配 <code> 标签
+  // 内的 **text**，导致行内代码内容被错误加粗。改用唯一占位符暂存，加粗处理后再还原。
+  const codePlaceholders = [];
+  out = out.replace(/`([^`]+)`/g, (_, code) => {
+    const idx = codePlaceholders.length;
+    codePlaceholders.push(`<code class="md-code-inline">${code}</code>`);
+    return `\x00CODE${idx}\x00`;
+  });
   // 加粗 **text**
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // 还原行内代码占位符
+  out = out.replace(/\x00CODE(\d+)\x00/g, (_, idx) => codePlaceholders[Number(idx)] || '');
   return out;
 }
 

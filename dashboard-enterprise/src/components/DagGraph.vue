@@ -277,9 +277,9 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 .dag-graph {
   position: relative;
   border: 1px solid var(--border, #3c4048);
-  border-radius: 8px;
+  border-radius: var(--r-lg);
   background: var(--bg-card, #22242a);
-  padding: 12px;
+  padding: var(--sp-3);
 }
 
 /* Progress bar */
@@ -293,14 +293,14 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
   flex: 1;
   height: 6px;
   background: var(--bg-muted, rgba(148,163,184,.16));
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   overflow: hidden;
 }
 .dag-progress-fill {
   height: 100%;
   background: var(--brand, #3574f0);
-  border-radius: 3px;
-  transition: width 0.3s ease;
+  border-radius: var(--r-xs);
+  transition: width var(--motion-slow) var(--ease);
 }
 .dag-progress-text {
   font-size: var(--fs-sm);
@@ -327,7 +327,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 
 /* Edges */
 .dag-edge {
-  stroke: var(--border, rgba(148,163,184,.45));
+  stroke: var(--border, #3c4048);
   stroke-width: 1.5;
   fill: none;
 }
@@ -341,7 +341,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
   stroke-width: 2;
   stroke: var(--brand-contrast);
   fill: var(--text-faint); /* pending (default) */
-  transition: fill 0.2s ease;
+  transition: fill var(--motion-normal) var(--ease);
 }
 .dag-node-circle.status-pending { fill: var(--text-faint); }
 .dag-node-circle.status-running { fill: var(--info); }
@@ -382,7 +382,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--overlay-scrim, rgba(0, 0, 0, 0.3));
+  background: var(--overlay-scrim, rgba(15, 23, 42, .65));
   display: flex;
   align-items: center;
   justify-content: center;

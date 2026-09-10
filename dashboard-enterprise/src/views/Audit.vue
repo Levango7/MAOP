@@ -783,7 +783,7 @@ onUnmounted(() => {
 @media (max-width: 1100px) { .two-col { grid-template-columns: 1fr; } }
 
 /* ── 热力图 ── */
-.heatmap { overflow-x: auto; margin-top: var(--sp-2); }
+.heatmap { overflow-x: auto; overflow-y: auto; max-height: 400px; margin-top: var(--sp-2); }
 .heatmap__table { width: 100%; border-collapse: collapse; font-size: var(--fs-xs); }
 .heatmap__table th,
 .heatmap__table td {

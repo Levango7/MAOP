@@ -67,13 +67,8 @@ export function useDagProgress(executionId, options = {}) {
 
   // ── Helpers ───────────────────────────────────────────────
 
-  // M6 fix: token 现由 httpOnly cookie 管理，前端无法读取。
-  // _getToken 保留以兼容 WebSocket 子协议逻辑，但始终返回空字符串。
-  // SSE 连接通过 withCredentials: true 自动携带 cookie。
-  // eslint-disable-next-line no-unused-vars
-  function _getToken() {
-    return '';
-  }
+  // L8 fix: 移除未使用的 _getToken 死代码（M6 fix 后 token 由 httpOnly cookie 管理，
+  // SSE 通过 withCredentials: true 自动携带，不再需要读取 token）。
 
   function _applyEvent(data) {
     if (!data || !data.node_id || !data.status) return;
@@ -143,8 +138,9 @@ export function useDagProgress(executionId, options = {}) {
       connected.value = false;
       // EventSource auto-reconnects, but if it fails repeatedly we
       // supplement with our own exponential backoff for robustness.
-      // Only schedule if EventSource is in CLOSED state (readyState 2).
-      if (eventSource && eventSource.readyState === 2) {
+      // Only schedule if EventSource is in CLOSED state.
+      // L4 fix: 使用 EventSource.CLOSED 常量替代硬编码数字 2，提高可读性。
+      if (eventSource && eventSource.readyState === EventSource.CLOSED) {
         _scheduleReconnect();
       }
     };
