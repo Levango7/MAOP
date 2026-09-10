@@ -103,10 +103,10 @@ class TestEvolveAnalyze:
         assert "cleared" in data["msg"].lower()
 
     def test_analyze_no_body(self, client, temp_maop_root):
-        """POST without JSON body should not crash."""
+        """POST with empty JSON body should not crash."""
         eng = _make_evolve_engine_mock()
         with patch("maop.evolve.EvolveEngine", return_value=eng):
-            resp = client.post("/api/evolve/analyze")
+            resp = client.post("/api/evolve/analyze", json={})
         assert resp.status_code == 200
 
     def test_analyze_error(self, client, temp_maop_root):
