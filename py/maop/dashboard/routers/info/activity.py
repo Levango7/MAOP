@@ -14,6 +14,8 @@ from fastapi import APIRouter, Query, Request
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
+from ..state import MAOP_ROOT
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/info", tags=["info"])
@@ -59,7 +61,7 @@ async def get_activity(request: Request, limit: int = Query(default=10, ge=1, le
 
     # 1. System startup event (always first if recently started)
     try:
-        pid_file = Path(__file__).resolve().parents[4] / "data" / "maop.pid"
+        pid_file = MAOP_ROOT / "data" / "maop.pid"
         if pid_file.exists():
             mtime = pid_file.stat().st_mtime
             age_s = now - mtime

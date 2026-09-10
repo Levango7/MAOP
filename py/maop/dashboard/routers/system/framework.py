@@ -120,7 +120,8 @@ async def api_framework_config(request: Request) -> dict[str, Any]:
         }
     except Exception as exc:
         logger.error('Framework config failed: %s', exc)
-        return JSONResponse(
+        # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
+        raise HTTPException(
             status_code=500,
-            content={"status": "error", "error": "Framework config failed"},
+            detail="Framework config failed",
         )

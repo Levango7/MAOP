@@ -52,10 +52,7 @@ async def api_agent_config(request: Request) -> dict[str, Any]:
         return {"status": "ok", "agents": agents, "routes": routes, "agent_count": len(agents)}
     except Exception as exc:
         logger.error('Agent config failed: %s', exc)
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "agents": [], "routes": [], "error": "Agent config failed"},
-        )
+        return {"agents": [], "routes": [], "agent_count": 0, "status": "error", "error": "Agent config failed"}
 
 
 @router.post("/api/agent/config/update")
@@ -76,18 +73,20 @@ async def api_agent_config_update(request: Request) -> dict[str, Any]:
         if not ypath.exists():
             ypath = _deps.MAOP_ROOT / "agents.yaml"
         if not ypath.exists():
-            return JSONResponse(
+            # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
+            raise HTTPException(
                 status_code=404,
-                content={"status": "error", "error": "agents.yaml not found"},
+                detail="agents.yaml not found",
             )
         import yaml
         _text = await asyncio.to_thread(Path(ypath).read_text, encoding="utf-8")
         data = yaml.safe_load(_text)
         agents = data.get("agents", {})
         if agent_name not in agents:
-            return JSONResponse(
+            # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
+            raise HTTPException(
                 status_code=404,
-                content={"status": "error", "error": f"Unknown agent: {agent_name}"},
+                detail=f"Unknown agent: {agent_name}",
             )
         agent_cfg = agents[agent_name]
 
@@ -127,7 +126,8 @@ async def api_agent_config_update(request: Request) -> dict[str, Any]:
     except Exception:
         import logging
         logging.getLogger(__name__).exception("[system] Config update failed")
-        return {"status": "error", "error": "Config update failed"}
+        # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
+        raise HTTPException(status_code=500, detail="Config update failed")
 
 
 # ── Agent Upgrade ─────────────────────────────────────────────────
@@ -141,9 +141,10 @@ async def api_agent_upgrade(request: Request, agent: str = Query(..., descriptio
         cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
         ad = cfg.agents.get(agent_name)
         if not ad:
-            return JSONResponse(
+            # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
+            raise HTTPException(
                 status_code=404,
-                content={"status": "error", "error": f"agent {agent_name} not found"},
+                detail=f"agent {agent_name} not found",
             )
         cli_path = shutil.which(ad.cli) if ad.cli else None
         info = {
@@ -183,9 +184,10 @@ async def api_agent_upgrade(request: Request, agent: str = Query(..., descriptio
                         except asyncio.TimeoutError:
                             upgrade_proc.kill()
                             await upgrade_proc.wait()
-                            return JSONResponse(
+                            # H1 fix: 统一错误响应——raise HTTPException。
+                            raise HTTPException(
                                 status_code=500,
-                                content={"ok": False, "error": "pip install upgrade timed out (120s)"},
+                                detail="pip install upgrade timed out (120s)",
                             )
                         upgrade_r_stdout = upgrade_stdout.decode(errors="replace") if upgrade_stdout else ""
                         upgrade_r_stderr = upgrade_stderr.decode(errors="replace") if upgrade_stderr else ""
@@ -224,7 +226,8 @@ async def api_agent_upgrade(request: Request, agent: str = Query(..., descriptio
         return {"status": "ok", "info": info}
     except Exception as exc:
         logger.error("Agent upgrade failed: %s", exc)
-        return {"status": "error", "error": "Agent upgrade failed"}
+        # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
+        raise HTTPException(status_code=500, detail="Agent upgrade failed")
 
 
 @router.get("/api/agent/upgrade")
@@ -264,7 +267,8 @@ async def api_agent_upgrade_get(request: Request, agent: str = "") -> dict[str, 
         return {"status": "ok", "agents": result}
     except Exception as exc:
         logger.error("Agent upgrade list failed: %s", exc)
-        return JSONResponse(
+        # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
+        raise HTTPException(
             status_code=500,
-            content={"status": "error", "agents": [], "error": "Agent upgrade list failed"},
+            detail="Agent upgrade list failed",
         )

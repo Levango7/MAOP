@@ -64,6 +64,13 @@ export const messages = {
     'view.monitor.resSqliteDb': 'SQLite DB',
     'view.monitor.resVectorIndex': 'Vector Index',
     'view.monitor.resLogFiles': 'Log Files',
+    // ── DAG 执行进度 (M4 修复: 替换硬编码英文) ──
+    'view.monitor.dagProgress': 'DAG Execution Progress',
+    'view.monitor.dagInputPlaceholder': 'execution_id (trace_id)',
+    'view.monitor.noDagSub': 'No DAG subscription',
+    'view.monitor.dagInputHint': 'Enter an execution_id above to stream real-time DAG node status.',
+    // ── 状态指示 (L6 修复: i18n 命名空间统一) ──
+    'view.monitor.statusLive': 'Live',
   },
   zh: {
     'view.monitor.title': '监控与维护',
@@ -130,5 +137,12 @@ export const messages = {
     'view.monitor.resSqliteDb': 'SQLite 数据库',
     'view.monitor.resVectorIndex': '向量索引',
     'view.monitor.resLogFiles': '日志文件',
+    // ── DAG 执行进度 (M4 修复: 替换硬编码英文) ──
+    'view.monitor.dagProgress': 'DAG 执行进度',
+    'view.monitor.dagInputPlaceholder': 'execution_id (trace_id)',
+    'view.monitor.noDagSub': '无 DAG 订阅',
+    'view.monitor.dagInputHint': '在上方输入 execution_id 以流式订阅实时 DAG 节点状态。',
+    // ── 状态指示 (L6 修复: i18n 命名空间统一) ──
+    'view.monitor.statusLive': '在线',
   },
 };

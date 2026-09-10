@@ -69,6 +69,7 @@ export const messages = {
     'view.search.col.time': 'Time',
     'view.search.col.level': 'Level',
     'view.search.col.message': 'Message',
+    'view.search.colCli': 'CLI',
     // 'Detail' reuses common.details; 'Name'/'Model'/'Driver'/'Capabilities' reuse common.*
     'view.search.resultCount': '{count} result(s)',
     'view.search.resultCountWithTime': '{count} result(s) in {time}ms',
@@ -144,6 +145,7 @@ export const messages = {
     'view.search.col.time': '时间',
     'view.search.col.level': '级别',
     'view.search.col.message': '消息',
+    'view.search.colCli': 'CLI',
     // H1 fix: 删除错误的重复键 'view.search.Search failed'（含空格+大小写错误），
     // 第123行已存在正确键名 'view.search.searchFailed'，与 en 字典第48行对齐。
     'view.search.resultCount': '{count} 条结果',

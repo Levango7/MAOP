@@ -106,7 +106,7 @@
       </Card>
     </div>
 
-    <Card :title="t('view.cost.costByAgent')" icon="bot" margin-bottom="16px" class="margin-top">
+    <Card :title="t('view.cost.costByAgent')" icon="bot" :margin-bottom="16" class="margin-top">
       <div v-if="loading" class="blk"><Skeleton block height="14px" /><Skeleton block height="14px" /></div>
       <EmptyState v-else-if="!agentKeys.length" icon="bot" :title="t('view.cost.noAgentSpend')" :description="t('view.cost.noAgentSpendDesc')" />
       <div v-else class="agent-grid">

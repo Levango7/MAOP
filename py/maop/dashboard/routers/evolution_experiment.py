@@ -211,7 +211,8 @@ async def api_ab_record(body: EvolutionABRecordRequest, request: Request) -> dic
 
 @router.get("/api/evolution/ab/evaluate/{experiment}")
 @handle_api_errors("evolution ab evaluate", error_value={"status": "error"})
-async def api_ab_evaluate(experiment: str) -> dict[str, Any]:
+async def api_ab_evaluate(request: Request, experiment: str) -> dict[str, Any]:
+    require_admin(request)
     fw = _ab_fw()
     result = fw.evaluate_sprt(experiment)
     return {"status": "ok", "result": result.model_dump()}
@@ -219,7 +220,8 @@ async def api_ab_evaluate(experiment: str) -> dict[str, Any]:
 
 @router.get("/api/evolution/ab/list")
 @handle_api_errors("evolution ab list", error_value={"status": "error", "experiments": []})
-async def api_ab_list() -> dict[str, Any]:
+async def api_ab_list(request: Request) -> dict[str, Any]:
+    require_admin(request)
     fw = _ab_fw()
     return {"status": "ok", "experiments": fw.list_experiments()}
 
@@ -298,8 +300,9 @@ async def api_evolution_cycles(request: Request) -> dict[str, Any]:
 
 @router.get("/api/evolution/pending")
 @handle_api_errors("evolution pending", error_value={"status": "error", "pending": []})
-async def api_evolution_pending() -> dict[str, Any]:
+async def api_evolution_pending(request: Request) -> dict[str, Any]:
     """人工 gate：返回待批准的提升列表。"""
+    require_admin(request)
     loop = _perf_loop()
     pending = loop.get_pending_approvals()
     return {"status": "ok", "pending": [c.model_dump() for c in pending]}
@@ -322,8 +325,9 @@ async def api_evolution_approve(body: EvolutionApproveRequest, request: Request)
 
 @router.get("/api/evolution/skills")
 @handle_api_errors("evolution skills", error_value={"skills": []})
-async def api_evolution_skills() -> dict[str, Any]:
+async def api_evolution_skills(request: Request) -> dict[str, Any]:
     """列出已保存的 Skill 原子（从 SkillVersionManager 加载）。"""
+    require_admin(request)
     from maop.core.evolution.skill_version import SkillVersionManager
 
     try:

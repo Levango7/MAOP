@@ -674,7 +674,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
   .ov-split { grid-template-columns: 1fr; }
   .ov-hero__kpi { display: none; }
 }
-@media (max-width: 700px) {
+@media (max-width: 640px) {
   .ov-pev__phases { grid-template-columns: 1fr; }
   .ov-pev__phase--last { grid-column: auto; }
 }

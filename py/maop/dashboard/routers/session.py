@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -100,10 +100,7 @@ async def get_session(session_id: str) -> dict[str, Any]:
     mgr = _get_session_mgr()
     session = mgr.get(session_id)
     if session is None:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "error", "error": "Session not found"},
-        )
+        raise HTTPException(status_code=404, detail="Session not found")
     return {"session": session.model_dump()}
 
 
@@ -246,8 +243,5 @@ async def rerun_session(session_id: str, request: Request) -> dict[str, Any]:
     mgr = _get_session_mgr()
     new_session = mgr.rerun(session_id)
     if new_session is None:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "error", "error": "Session not found"},
-        )
+        raise HTTPException(status_code=404, detail="Session not found")
     return {"session": new_session.model_dump(), "rerun_from": session_id}

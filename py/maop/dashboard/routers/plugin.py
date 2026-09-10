@@ -9,20 +9,20 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
+from .state import MAOP_ROOT
+
 router = APIRouter(prefix="/api/plugins", tags=["plugins"])
 
 
 def _get_plugin_manager():
-    from pathlib import Path
-
     from maop.core.agent.plugins_hooks.plugin import PluginManager
-    root = Path(__file__).resolve().parent.parent.parent.parent
-    return PluginManager(root_dir=str(root))
+    return PluginManager(root_dir=str(MAOP_ROOT))
 
 
 @router.get("")
 @handle_api_errors
-async def list_plugins(state: str = Query("", description="Filter by state")) -> dict[str, Any]:
+async def list_plugins(request: Request, state: str = Query("", description="Filter by state")) -> dict[str, Any]:
+    require_admin(request)
     from maop.core.agent.plugins_hooks.plugin import PluginState
     mgr = _get_plugin_manager()
     filter_state = PluginState(state) if state else None
@@ -32,7 +32,8 @@ async def list_plugins(state: str = Query("", description="Filter by state")) ->
 
 @router.get("/{plugin_id}")
 @handle_api_errors
-async def get_plugin(plugin_id: str) -> dict[str, Any]:
+async def get_plugin(request: Request, plugin_id: str) -> dict[str, Any]:
+    require_admin(request)
     mgr = _get_plugin_manager()
     info = mgr.get_plugin(plugin_id)
     if info is None:

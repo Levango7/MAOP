@@ -9,10 +9,10 @@
         <Badge tone="neutral">{{ t('view.tools.topo.edges') }}: {{ stats.edges }}</Badge>
       </div>
       <div class="mcp-topo__actions">
-        <button class="btn-ghost" :disabled="!ready" @click="fitView">
+        <button class="mcp-topo__btn" :disabled="!ready" @click="fitView">
           <AppIcon name="filter" :size="14" /> {{ t('view.tools.topo.fit') }}
         </button>
-        <button class="btn-ghost" :disabled="loading" @click="emit('refresh')">
+        <button class="mcp-topo__btn" :disabled="loading" @click="emit('refresh')">
           <AppIcon name="refresh" :size="14" /> {{ t('common.refresh') }}
         </button>
       </div>
@@ -253,13 +253,13 @@ watch(
 .mcp-topo {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--sp-2);
 }
 .mcp-topo__toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--sp-3);
   padding: var(--sp-2) var(--sp-3);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -306,7 +306,7 @@ watch(
 .mcp-topo__legend {
   display: flex;
   gap: var(--sp-4);
-  padding: 6px 12px;
+  padding: var(--sp-1) var(--sp-3);
   font-size: var(--fs-sm);
   color: var(--text-muted);
 }
@@ -321,11 +321,11 @@ watch(
 .mcp-topo__dot--tool { background: var(--info); }
 .mcp-topo__dot--agent { background: var(--success); transform: rotate(45deg); }
 
-.btn-ghost {
+.mcp-topo__btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--surface);
@@ -334,6 +334,6 @@ watch(
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
-.btn-ghost:hover { background: var(--bg-hover, rgba(148,163,184,.16)); border-color: var(--border-strong, rgba(148,163,184,.45)); }
-.btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+.mcp-topo__btn:hover { background: var(--bg-hover, rgba(148,163,184,.16)); border-color: var(--border-strong, #4e545f); }
+.mcp-topo__btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

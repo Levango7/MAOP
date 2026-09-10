@@ -27,6 +27,10 @@ export const messages = {
     'view.tenants.created': 'Tenant “{name}” created',
     'view.tenants.suspended': 'Suspended {id}',
     'view.tenants.activated': 'Activated {id}',
+    // ── 配额名称 (M6 修复: 替换硬编码英文) ──
+    'view.tenants.quotaApiCalls': 'API Calls',
+    'view.tenants.quotaStorage': 'Storage',
+    'view.tenants.quotaAgents': 'Agents',
   },
 
   zh: {
@@ -57,5 +61,9 @@ export const messages = {
     'view.tenants.created': '租户“{name}”已创建',
     'view.tenants.suspended': '已停用 {id}',
     'view.tenants.activated': '已激活 {id}',
+    // ── 配额名称 (M6 修复: 替换硬编码英文) ──
+    'view.tenants.quotaApiCalls': 'API 调用',
+    'view.tenants.quotaStorage': '存储',
+    'view.tenants.quotaAgents': '智能体',
   },
 };

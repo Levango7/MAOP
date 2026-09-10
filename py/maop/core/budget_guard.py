@@ -190,14 +190,24 @@ class BudgetGuard:
 
                 from maop.core.agent.plugins_hooks.hook_manager import HookManager
                 hm = HookManager(root_dir=str(self._root))
-                with contextlib.suppress(RuntimeError):
-                    asyncio.get_running_loop()
-                asyncio.run(hm.trigger("on_budget_exceed", {
+                _trigger_coro = hm.trigger("on_budget_exceed", {
                     "date": today,
                     "tokens_used": tokens_used,
                     "cost_used": cost_usd,
                     "reason": reason,
-                }))
+                })
+                # H2 修复：在已有事件循环中调用 asyncio.run() 会抛
+                # RuntimeError("asyncio.run() cannot be called from a
+                # running event loop")。改为检测循环状态：在循环内用
+                # asyncio.ensure_future 调度（fire-and-forget），不在循
+                # 环内才用 asyncio.run 同步执行。
+                try:
+                    asyncio.get_running_loop()
+                    # 已在事件循环内 —— 调度为后台任务，避免阻塞调用方
+                    asyncio.ensure_future(_trigger_coro)
+                except RuntimeError:
+                    # 无运行中的事件循环 —— 安全地在新循环上同步执行
+                    asyncio.run(_trigger_coro)
             except Exception as exc:
                 logger.warning(
                     "[budget_guard] on_budget_exceed hook dispatch failed (best-effort, "

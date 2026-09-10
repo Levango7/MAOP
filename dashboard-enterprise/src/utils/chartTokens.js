@@ -18,9 +18,24 @@
  * someone renders a chart before stylesheets finish loading (unit tests,
  * SSR-ish edge cases).
  */
+// L13 fix: getComputedStyle 每次调用都触发样式重计算，在高频渲染场景
+// （如 ECharts 动画、多图表同时刷新）下造成性能瓶颈。添加模块级缓存，
+// 按 CSS 变量名缓存结果。缓存仅在首次访问时填充，主题切换时通过
+// invalidateCssVarCache() 手动失效（或页面刷新自动重置）。
+const _styleCache = new Map();
+
+/** 清空 CSS 变量缓存（主题切换后调用）。 */
+export function invalidateCssVarCache() {
+  _styleCache.clear();
+}
+
 export function cssVar(name, fallback = '') {
+  if (_styleCache.has(name)) {
+    return _styleCache.get(name) || fallback;
+  }
   try {
     const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    _styleCache.set(name, v);
     return v || fallback;
   } catch {
     return fallback;

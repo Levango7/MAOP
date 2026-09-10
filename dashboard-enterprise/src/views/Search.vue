@@ -144,15 +144,15 @@ async function loadStats() {
 const resultColumns = computed(() => {
   switch (activeTab.value) {
     case 'memory': return [
-      { key: 'id', label: 'ID' }, { key: 'agent', label: t('view.search.col.agent') },
+      { key: 'id', label: t('common.id') }, { key: 'agent', label: t('view.search.col.agent') },
       { key: 'task', label: t('view.search.col.task') }, { key: 'tags', label: t('view.search.col.tags') },
       { key: 'score', label: t('view.search.col.score'), align: 'right', type: 'num' },
     ];
     case 'vector': return [
-      { key: 'id', label: 'ID' }, { key: 'score', label: t('view.search.col.score'), align: 'right', type: 'num' },
+      { key: 'id', label: t('common.id') }, { key: 'score', label: t('view.search.col.score'), align: 'right', type: 'num' },
     ];
     case 'graph':
-      if (graphMode.value === 'nodes') return [{ key: 'id', label: 'ID' }, { key: 'label', label: t('view.search.col.label') }, { key: 'weight', label: t('view.search.col.weight'), align: 'right', type: 'num' }];
+      if (graphMode.value === 'nodes') return [{ key: 'id', label: t('common.id') }, { key: 'label', label: t('view.search.col.label') }, { key: 'weight', label: t('view.search.col.weight'), align: 'right', type: 'num' }];
       if (graphMode.value === 'edges') return [{ key: 'source', label: t('view.search.col.source') }, { key: 'target', label: t('view.search.col.target') }];
       return [{ key: 'name', label: t('view.search.col.node') }, { key: 'detail', label: t('common.details') }];
     case 'log': return [
@@ -161,7 +161,7 @@ const resultColumns = computed(() => {
     ];
     case 'agent': return [
       { key: 'name', label: t('common.name') }, { key: 'model', label: t('common.model') }, { key: 'driver', label: t('common.driver') },
-      { key: 'capabilities', label: t('common.capabilities') }, { key: 'cli_available', label: 'CLI', type: 'badge' },
+      { key: 'capabilities', label: t('common.capabilities') }, { key: 'cli_available', label: t('view.search.colCli'), type: 'badge' },
     ];
   }
   return [];

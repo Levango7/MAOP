@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import os
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -40,7 +41,12 @@ cache: dict[str, tuple[float, Any]] = {}
 cache_lock = asyncio.Lock()
 
 # ── Active jobs ────────────────────────────────────────────────────
+# H3 fix: active_jobs 全局字典在多请求并发下会被同时读写（control_run 写入、
+# control_status 迭代、control_cancel 修改），无锁保护会触发
+# RuntimeError: dictionary changed size during iteration 或丢失更新。
+# 提供 active_jobs_lock 供所有赋值/pop/迭代处用 `with active_jobs_lock:` 包裹。
 active_jobs: dict[str, Any] = {}
+active_jobs_lock = threading.Lock()
 
 # ── Subsystem Registry ─────────────────────────────────────────────
 _SUBSYSTEMS: dict[str, Any] = {}

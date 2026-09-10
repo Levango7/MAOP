@@ -110,10 +110,12 @@ class APIKeyStore:
         rate_limit: int = 0,
     ) -> str:
         """Create a new API key. Returns the plaintext key (shown once)."""
-        # Generate random key
-        raw_key = hashlib.sha256(
-            f"{name}:{time.time()}:{os.urandom(16).hex()}".encode()
-        ).hexdigest()[:32]
+        # L1 修复：原实现使用 os.urandom(16)（128位熵）并混入 name 和
+        # time.time()（可预测值），实际熵仅 128 位。改为 secrets.token_urlsafe(32)
+        # 提供 256 位熵，移除可预测的 name/time 混入，符合安全最佳实践。
+        import secrets
+
+        raw_key = secrets.token_urlsafe(32)  # 256-bit entropy
 
         key_hash = self._hash_key(raw_key)
         now = time.time()

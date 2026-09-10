@@ -28,8 +28,9 @@ def _get_bridge() -> Any:
 
 @router.get("/api/bridge/adapters")
 @handle_api_errors("Bridge adapters", error_value={"adapters": [], "count": 0, "error": "List failed"})
-async def api_bridge_adapters() -> dict[str, Any]:
+async def api_bridge_adapters(request: Request) -> dict[str, Any]:
     """List available bridge adapters."""
+    require_admin(request)
     bridge = _get_bridge()
     names = bridge.list_adapters()
     statuses = []
@@ -68,8 +69,9 @@ async def api_bridge_call(request: Request) -> dict[str, Any]:
 
 @router.get("/api/bridge/health")
 @handle_api_errors("Bridge health", error_value={"health": {}, "error": "Health check failed"})
-async def api_bridge_health() -> dict[str, Any]:
+async def api_bridge_health(request: Request) -> dict[str, Any]:
     """Check bridge adapter health status."""
+    require_admin(request)
     bridge = _get_bridge()
     health = bridge.health_check_all()
     return {"health": health}

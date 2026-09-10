@@ -62,16 +62,36 @@ export function useStreamingFetch() {
         return;
       }
 
+      // M5 fix: res.body 可能为 null（如 204 No Content、某些浏览器/代理剥离 body，
+      // 或后端未正确设置 SSE Content-Type）。getReader() 在 null 上调用会抛
+      // TypeError，提前检查给出明确错误信息便于调用方排查。
+      if (!res.body) throw new Error('Response body is null');
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let fullContent = '';
       let buffer = '';
       let currentEvent = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+      // M6 fix: 流式读取超时机制。某些后端在连接建立后不再发送任何数据
+      // （如 agent 卡死、队列阻塞），reader.read() 会永久挂起导致前端
+      // Promise 永不 resolve。设置 30s 无数据超时，超时后 abort 连接。
+      const STREAM_TIMEOUT_MS = 30000;
+      let streamTimer = setTimeout(() => {
+        try { controller.abort(); } catch { /* already aborted */ }
+        if (onError) onError('Stream timeout: no data received in 30s');
+      }, STREAM_TIMEOUT_MS);
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          // 收到数据，重置超时计时器
+          clearTimeout(streamTimer);
+          streamTimer = setTimeout(() => {
+            try { controller.abort(); } catch { /* already aborted */ }
+            if (onError) onError('Stream timeout: no data received in 30s');
+          }, STREAM_TIMEOUT_MS);
+          buffer += decoder.decode(value, { stream: true });
 
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
@@ -113,6 +133,11 @@ export function useStreamingFetch() {
           }
           currentEvent = '';
         }
+      }
+      } finally {
+        // M6 fix: 无论流式读取正常结束、中途 return 还是抛错，都清理超时计时器，
+        // 避免定时器泄漏导致 abort 在连接已关闭后仍触发。
+        clearTimeout(streamTimer);
       }
 
       if (onDone) onDone();

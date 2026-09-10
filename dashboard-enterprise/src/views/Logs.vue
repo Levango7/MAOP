@@ -156,7 +156,7 @@ async function load() {
     api.get(`/api/logs/analysis?type=${logType.value}`),
   ]);
   if (l.status === 'fulfilled') logs.value = l.value.logs || [];
-  else error.value = (l.reason && l.reason.message) || 'Log stream failed';
+  else error.value = (l.reason && l.reason.message) || t('view.logs.streamFailed');
   if (a.status === 'fulfilled') {
     const d = a.value || {};
     analysis.value = {

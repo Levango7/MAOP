@@ -149,6 +149,40 @@ class SemanticCache:
 
         return best_key, best_score
 
+    def _find_similar_snapshot(
+        self,
+        query_embedding: list[float],
+        scan_keys: list[str],
+        entries_snapshot: dict[str, SemanticCacheEntry],
+    ) -> tuple[str | None, float]:
+        """M7 修复：在锁外执行相似度扫描。
+
+        接受 _order 尾部快照和 _entries 浅拷贝，在无锁状态下执行
+        相似度计算，避免持锁全量扫描阻塞其他线程的 get/put 操作。
+
+        浅拷贝是安全的：SemanticCacheEntry 是 Pydantic 模型（不可变字段），
+        读取 embedding/created_at/ttl_s 不会与 put 的写入产生数据竞争
+        （put 创建新条目而非修改现有条目）。
+        """
+        best_key = None
+        best_score = 0.0
+        now = time.time()
+
+        for key in scan_keys:
+            entry = entries_snapshot.get(key)
+            if entry is None:
+                continue
+            if entry.ttl_s > 0 and now > entry.created_at + entry.ttl_s:
+                continue
+            if not entry.embedding:
+                continue
+            score = self._cosine_sim(query_embedding, entry.embedding)
+            if score > best_score:
+                best_score = score
+                best_key = key
+
+        return best_key, best_score
+
     def get(self, query: str) -> str | None:
         """Look up a response by semantic similarity.
 
@@ -176,18 +210,29 @@ class SemanticCache:
                 self._negative_cache[query] = now + self._negative_ttl
             return None
 
+        # M7 修复：原实现在持锁状态下调用 _find_similar 执行全量相似度扫描，
+        # 阻塞其他线程的 get/put 操作。改为在锁内获取 _order 尾部快照和
+        # _entries 浅拷贝，然后在锁外执行相似度扫描，显著减少锁持有时间。
         with self._lock:
-            best_key, best_score = self._find_similar(query_embedding)
+            scan_keys_snapshot = list(self._order[-self._max_scan:])
+            entries_snapshot = dict(self._entries)
 
+        # 锁外执行相似度扫描（O(max_scan) 次余弦计算，无锁竞争）
+        best_key, best_score = self._find_similar_snapshot(
+            query_embedding, scan_keys_snapshot, entries_snapshot,
+        )
+
+        with self._lock:
             if best_key is not None and best_score >= self._threshold:
-                entry = self._entries[best_key]
-                entry.access_count += 1
-                self._hits += 1
-                logger.debug(
-                    "[semantic_cache] HIT: score=%.3f for '%s'",
-                    best_score, query[:50],
-                )
-                return entry.response
+                entry = self._entries.get(best_key)
+                if entry is not None:
+                    entry.access_count += 1
+                    self._hits += 1
+                    logger.debug(
+                        "[semantic_cache] HIT: score=%.3f for '%s'",
+                        best_score, query[:50],
+                    )
+                    return entry.response
 
             self._misses += 1
         return None

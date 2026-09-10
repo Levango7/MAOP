@@ -8,7 +8,7 @@
       </div>
       <span class="sse-indicator" :class="realtimeConnected ? 'on' : 'off'" :title="realtimeConnected ? t('view.monitor.sseConnected') : t('view.monitor.sseDisconnected')">
         <span class="sse-dot"></span>
-        <span class="sse-text">{{ t('status.live') }}</span>
+        <span class="sse-text">{{ t('view.monitor.statusLive') }}</span>
       </span>
     </PageHeader>
 
@@ -149,12 +149,12 @@
       </Card>
 
       <!-- v4.5.0: DAG execution progress streaming -->
-      <Card title="DAG Execution Progress" icon="network" class="mt">
+      <Card :title="t('view.monitor.dagProgress')" icon="network" class="mt">
         <template #actions>
           <input
             v-model="dagExecutionId"
             class="dag-exec-input"
-            placeholder="execution_id (trace_id)"
+            :placeholder="t('view.monitor.dagInputPlaceholder')"
             @keyup.enter="dagExecInput = dagExecutionId"
           />
         </template>
@@ -168,8 +168,8 @@
         <EmptyState
           v-else
           icon="network"
-          title="No DAG subscription"
-          hint="Enter an execution_id above to stream real-time DAG node status."
+          :title="t('view.monitor.noDagSub')"
+          :hint="t('view.monitor.dagInputHint')"
         />
       </Card>
     </div>
@@ -527,9 +527,9 @@ onUnmounted(() => {
 .agent-health-row:last-child {
   border-bottom: none;
 }
-/* 修复: 6列 grid 在小屏无响应式断点 → 700px 以下降为 3列，避免列内容挤压
- * F-views: 断点 768px → 700px，与项目标准断点统一 (1100/900/700/640) */
-@media (max-width: 700px) {
+/* 修复: 6列 grid 在小屏无响应式断点 → 640px 以下降为 3列，避免列内容挤压
+ * F-views: 断点 768px → 640px，与项目标准断点统一 (1100/900/700/640) */
+@media (max-width: 640px) {
   .agent-health-row {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 6px;

@@ -75,7 +75,7 @@
           <option v-for="r in roles" :key="r.role" :value="r.role">{{ roleLabel(r.role) }}</option>
         </select>
         <label>{{ t('view.rbac.tenantOptional') }}</label>
-        <input v-model="newGrant.tenant_id" class="input" placeholder="default" />
+        <input v-model="newGrant.tenant_id" class="input" :placeholder="t('common.default')" />
         <div class="modal-actions">
           <button class="btn" @click="showGrant = false">{{ t('common.cancel') }}</button>
           <button class="btn btn--primary" :disabled="saving" @click="grantRole">

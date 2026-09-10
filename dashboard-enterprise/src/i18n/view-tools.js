@@ -92,6 +92,7 @@ export const messages = {
     'view.tools.builtin.memoryManager': 'Three-layer memory system: working → episodic → semantic, with search and trace.',
     'view.tools.builtin.skillRouter': 'MCP server management, tool routing rules, prompt templates, and capability discovery.',
     'view.tools.builtin.securityAudit': 'RBAC roles, permission grants, audit trail, and security configuration overview.',
+    'view.tools.importFailed': 'Import failed: {detail}',
   },
 
   zh: {
@@ -185,5 +186,6 @@ export const messages = {
     'view.tools.builtin.memoryManager': '三层记忆系统：工作 → 情景 → 语义，支持搜索与回溯。',
     'view.tools.builtin.skillRouter': 'MCP 服务管理、工具路由规则、提示词模板与能力发现。',
     'view.tools.builtin.securityAudit': 'RBAC 角色、权限授予、审计追踪与安全配置总览。',
+    'view.tools.importFailed': '导入失败：{detail}',
   },
 };

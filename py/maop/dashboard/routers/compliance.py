@@ -8,6 +8,7 @@ This prevents cross-tenant data access via forged body parameters.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -23,11 +24,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/compliance", tags=["compliance"])
 
 _compliance_mgr: ComplianceManager | None = None
+_compliance_mgr_lock = threading.Lock()
 
 
 def _get_manager(request: Request) -> ComplianceManager:
     global _compliance_mgr
-    if _compliance_mgr is None:
+    if _compliance_mgr is not None:
+        return _compliance_mgr
+    with _compliance_mgr_lock:
+        if _compliance_mgr is not None:  # double-checked locking
+            return _compliance_mgr
         root_dir = getattr(request.app.state, "root_dir", None)
         if not root_dir:
             raise HTTPException(

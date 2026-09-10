@@ -72,6 +72,9 @@ const routes = [
 
   // P2-10 fix: catch-all 404 route — redirect unknown paths to home.
   // 使用命名路由 'overview' 而非硬编码路径 '/home'，更健壮（路径变更时只需改一处）。
+  // L12 fix: catch-all 设计为静默重定向到 overview 而非显示 404 页面——
+  // 本应用为 SPA，用户手动输入的 URL 大多是旧路径拼写错误或书签过期，
+  // 重定向到首页比显示 404 更友好。如需 404 页面，可改为 component: NotFound.vue。
   { path: '/:pathMatch(.*)*', redirect: { name: 'overview' } },
 ];
 

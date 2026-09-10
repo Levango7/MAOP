@@ -59,6 +59,7 @@ const mbStyle = computed(() => {
 .card:hover { border-color: var(--border-strong); }
 .card--clickable { cursor: pointer; }
 .card--clickable:hover { border-color: var(--brand); background: var(--surface-2); }
+.card--clickable:active { transform: scale(0.99); }
 .card--bare .card__body { padding: 0; }
 .card:not(.card--bare) .card__body { padding: var(--sp-4); }
 .card__head {

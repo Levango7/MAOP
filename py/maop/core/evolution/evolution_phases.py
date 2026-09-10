@@ -172,12 +172,28 @@ class EvolutionPhasesMixin:
                     "root_dir": str(getattr(self, "_root", "")),
                 }
                 try:
-                    verdict = asyncio.run(dispatcher.run_debate(
+                    # H2 修复：asyncio.run() 在已有事件循环中会抛
+                    # RuntimeError。检测循环状态：在循环内时用线程池
+                    # 在新循环上同步执行并等待结果（verdict 需被使用，
+                    # 不能 fire-and-forget）；不在循环内时直接 asyncio.run。
+                    import asyncio
+                    _debate_coro = dispatcher.run_debate(
                         question,
                         participants,
                         context=context,
                         routing_key=sug.get("target_name", ""),
-                    ))
+                    )
+                    try:
+                        asyncio.get_running_loop()
+                        # 已在事件循环内 —— 在独立线程的新循环上同步等待
+                        import concurrent.futures
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _pool:
+                            verdict = _pool.submit(
+                                asyncio.run, _debate_coro
+                            ).result()
+                    except RuntimeError:
+                        # 无运行中的事件循环 —— 直接同步执行
+                        verdict = asyncio.run(_debate_coro)
                 except Exception as exc:  # pragma: no cover — 单条辩论失败兜底
                     logger.warning(
                         "[evo-loop] debate for suggestion %s failed: %s",

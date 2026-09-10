@@ -116,10 +116,18 @@ class DreamConsolidator:
         Returns
         -------
         ConsolidationReport
+
+        H3 修复（合并操作非原子）：Phase 3 创建新合并条目，Phase 5 删除
+        原始条目。若 Phase 4（Extract）或 Phase 5（Prune）失败，已创建的
+        合并条目会成为重复数据。修复方式：在 try 块外跟踪已创建的 new_ids，
+        在 except 块中补偿删除这些未完成修剪的新条目，使合并操作具备
+        "all-or-nothing" 语义（创建成功+修剪成功 才保留合并条目）。
         """
         report = ConsolidationReport(
             started_at=datetime.now(timezone.utc).isoformat(),
         )
+        # H3: 跟踪已创建的合并条目 ID，用于失败时补偿删除
+        created_new_ids: list[str] = []
 
         try:
             # ── Phase 1: ORIENT ──
@@ -130,6 +138,8 @@ class DreamConsolidator:
 
             # ── Phase 3: CONSOLIDATE ──
             summaries = self._consolidate(groups, report, dry_run)
+            # H3: 记录已创建的合并条目 ID，供 except 补偿删除
+            created_new_ids = list(summaries)
 
             # ── Phase 4: EXTRACT (knowledge → graph) ──
             self._extract(groups, summaries, report, dry_run)
@@ -150,9 +160,43 @@ class DreamConsolidator:
             report.success = False
             report.error = str(exc)
             logger.error("[dream] Consolidation failed: %s", exc)
+            # H3 补偿：删除已创建但未完成修剪的合并条目，避免数据重复。
+            # 仅在非 dry_run 模式下执行（dry_run 不会真正创建条目）。
+            if created_new_ids and not dry_run:
+                self._compensate_created_entries(created_new_ids)
 
         report.finished_at = datetime.now(timezone.utc).isoformat()
         return report
+
+    def _compensate_created_entries(self, created_ids: list[str]) -> None:
+        """H3 补偿：删除已创建但未完成修剪的合并条目。
+
+        在 dream() 失败时调用，删除 Phase 3 创建的合并条目，使合并操作
+        回滚到原始状态（原始条目仍在，合并条目被清除）。补偿删除是
+        best-effort 的——个别删除失败不影响其他条目的清理。
+        """
+        compensated = 0
+        for eid in created_ids:
+            try:
+                # 优先使用公共 delete_entry（M5 修复后暴露），
+                # 回退到直接 SQL 删除以保证兼容性。
+                if hasattr(self._store, "delete_entry"):
+                    self._store.delete_entry(eid)
+                else:
+                    with self._store._connect() as conn:
+                        conn.execute(
+                            "DELETE FROM memory_entries WHERE id = ?", (eid,)
+                        )
+                compensated += 1
+            except Exception as exc:
+                logger.debug(
+                    "[dream] compensate delete failed for %s: %s", eid, exc,
+                )
+        if compensated > 0:
+            logger.warning(
+                "[dream] H3 补偿：删除了 %d/%d 个未完成修剪的合并条目",
+                compensated, len(created_ids),
+            )
 
     # ── Phase 1: Orient ───────────────────────────────────────
 
@@ -365,11 +409,10 @@ class DreamConsolidator:
             # Delete each original entry
             for eid in group.entry_ids:
                 try:
-                    with self._store._connect() as conn:
-                        conn.execute(
-                            "DELETE FROM memory_entries WHERE id = ?", (eid,)
-                        )
-                    all_pruned.append(eid)
+                    # M5 修复：使用公共 delete_entry 方法，而非直接访问
+                    # 私有方法 _connect() 执行 SQL DELETE。
+                    if self._store.delete_entry(eid):
+                        all_pruned.append(eid)
                 except Exception as exc:
                     logger.debug("[dream] Prune failed for %s: %s", eid, exc)
 

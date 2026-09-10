@@ -138,6 +138,7 @@ const completedCount = computed(() => {
 });
 
 // Layout: arrange nodes in a grid (columns based on count).
+// 以下为 SVG 布局常量(像素坐标),非 CSS 间距,不使用 --sp-* token
 const NODE_SPACING_X = 100;
 const NODE_SPACING_Y = 80;
 const nodeRadius = 18;
@@ -286,8 +287,8 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 .dag-progress-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
 }
 .dag-progress-track {
   flex: 1;
@@ -370,7 +371,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 /* Empty state */
 .dag-empty {
   text-align: center;
-  padding: 30px;
+  padding: var(--sp-7);
   color: var(--text-muted, #9aa3b2);
   font-size: var(--fs-base);
 }

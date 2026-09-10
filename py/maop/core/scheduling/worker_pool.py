@@ -113,6 +113,15 @@ class WorkerRegistry:
     key_prefix : str
         Redis key prefix for the registry namespace. Override only when
         running multiple isolated registries in the same Redis instance.
+
+    L3 限制说明
+    ------------
+    ``_in_flight`` 是进程内本地映射，**不持久化到 Redis**。这意味着：
+    - 进程重启后 in-flight 信息丢失，运行中任务不会被自动重投。
+    - 多实例部署时，一个实例的 in-flight 信息对其他实例不可见。
+    上层调度器**必须**实现任务超时重投机制作为兜底（如为每个任务
+    设置 deadline，超时后由调度器重新分配），不能依赖 _in_flight
+    做故障恢复的唯一手段。
     """
 
     def __init__(
@@ -130,6 +139,8 @@ class WorkerRegistry:
         # locally because it changes on every assign/complete and would
         # generate excessive Redis writes. On failure detection we read
         # this map to know which tasks to reschedule.
+        # L3 限制：_in_flight 不持久化——进程重启后丢失。上层调度器
+        # 必须有任务超时重投机制作为兜底，不能仅依赖此映射做故障恢复。
         self._in_flight: dict[str, set[str]] = {}
 
     # ── Key helpers ──────────────────────────────────────────────

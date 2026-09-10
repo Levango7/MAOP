@@ -31,8 +31,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
+import time
+from collections.abc import Callable
+from typing import Any
 
 # 顶层导入 etcd3 —— 未安装时抛出带清晰提示的 ImportError，
 # 由 backends.py 工厂函数的 try/except ImportError 捕获后降级。
@@ -53,6 +57,9 @@ _DEFAULT_ETCD_HOST = "localhost"
 _DEFAULT_ETCD_PORT = 2379
 # 默认命名空间
 _DEFAULT_NAMESPACE = "maop"
+# M3 修复：重连机制参数
+_MAX_RETRIES = 3
+_RETRY_BACKOFF_S = 0.5  # 首次退避 0.5s，后续指数增长
 
 
 class EtcdKVBackend(KVBackend):
@@ -119,17 +126,7 @@ class EtcdKVBackend(KVBackend):
         # key 前缀，形如 ``/maop``
         self._prefix = f"/{self._namespace}"
         try:
-            self._client = etcd3.client(
-                host=self._host,
-                port=self._port,
-                user=self._username or None,
-                password=self._password or None,
-                ca_cert=self._ca_cert or None,
-                cert_key=self._cert_key or None,
-                cert_cert=self._cert_cert or None,
-            )
-            # 探活：调用 status() 触发实际连接，便于在初始化阶段暴露问题
-            self._client.status()
+            self._client = self._create_client()
         except Exception as e:
             logger.error(
                 "[etcd] 连接 etcd 失败 (host=%s port=%s): %s",
@@ -144,6 +141,84 @@ class EtcdKVBackend(KVBackend):
             self._host, self._port, self._namespace,
             bool(self._username), bool(self._ca_cert),
         )
+
+    # ------------------------------------------------------------------
+    # M3 修复：重连机制
+    # ------------------------------------------------------------------
+    def _create_client(self) -> Any:
+        """创建新的 etcd3 客户端并探活。
+
+        从 ``__init__`` 提取，供 ``_reconnect`` 复用。抛出异常表示连接失败。
+        """
+        client = etcd3.client(
+            host=self._host,
+            port=self._port,
+            user=self._username or None,
+            password=self._password or None,
+            ca_cert=self._ca_cert or None,
+            cert_key=self._cert_key or None,
+            cert_cert=self._cert_cert or None,
+        )
+        # 探活：调用 status() 触发实际连接
+        client.status()
+        return client
+
+    def _reconnect(self) -> None:
+        """重建 etcd 客户端连接（best-effort）。
+
+        关闭旧客户端的 transport（如有），然后创建新客户端。
+        失败时抛出异常，由调用方决定是否继续重试。
+        """
+        old_client = getattr(self, "_client", None)
+        if old_client is not None:
+            transport = getattr(old_client, "transport", None)
+            if transport is not None and hasattr(transport, "close"):
+                with contextlib.suppress(Exception):
+                    transport.close()
+        self._client = self._create_client()
+        logger.info("[etcd] 重连成功 host=%s port=%s", self._host, self._port)
+
+    def _with_retry(self, op_name: str, op_fn: Callable[[], Any]) -> Any:
+        """带重连重试的操作包装器。
+
+        M3 修复：捕获操作中的连接异常，重建客户端后重试。
+        退避策略：首次 0.5s，后续指数增长（0.5, 1.0, 2.0）。
+        最大重试次数 _MAX_RETRIES（含首次执行）。
+
+        Parameters
+        ----------
+        op_name : str
+            操作名称（用于日志）。
+        op_fn : callable
+            无参数的可调用对象，执行实际操作并返回结果。
+        """
+
+        last_exc: Exception | None = None
+        for attempt in range(_MAX_RETRIES):
+            try:
+                return op_fn()
+            except Exception as e:
+                last_exc = e
+                if attempt < _MAX_RETRIES - 1:
+                    backoff = _RETRY_BACKOFF_S * (2 ** attempt)
+                    logger.warning(
+                        "[etcd] %s 失败 (attempt %d/%d)，%0.1fs 后重试: %s",
+                        op_name, attempt + 1, _MAX_RETRIES, backoff, e,
+                    )
+                    time.sleep(backoff)
+                    try:
+                        self._reconnect()
+                    except Exception as re_exc:
+                        logger.warning(
+                            "[etcd] 重连失败 (attempt %d/%d): %s",
+                            attempt + 1, _MAX_RETRIES, re_exc,
+                        )
+                else:
+                    logger.error(
+                        "[etcd] %s 失败，已达最大重试次数 %d: %s",
+                        op_name, _MAX_RETRIES, e,
+                    )
+        raise last_exc  # type: ignore[misc]
 
     # ------------------------------------------------------------------
     # key 前缀处理
@@ -176,17 +251,21 @@ class EtcdKVBackend(KVBackend):
         str | None
             key 存在返回字符串值；不存在返回 None。
         """
-        try:
-            value, _meta = self._client.get(self._full_key(key))
-        except Exception as e:
-            logger.error("[etcd] get 失败 key=%s: %s", key, e)
-            raise
-        if value is None:
-            return None
-        # etcd3 以 bytes 返回，解码为 str
-        if isinstance(value, bytes):
-            return value.decode("utf-8", errors="replace")
-        return str(value)
+        # M3 修复：带重连重试的连接异常处理
+        def _do_get() -> str | None:
+            try:
+                value, _meta = self._client.get(self._full_key(key))
+            except Exception as e:
+                logger.error("[etcd] get 失败 key=%s: %s", key, e)
+                raise
+            if value is None:
+                return None
+            # etcd3 以 bytes 返回，解码为 str
+            if isinstance(value, bytes):
+                return value.decode("utf-8", errors="replace")
+            return str(value)
+
+        return self._with_retry("get", _do_get)
 
     def set(self, key: str, value: str, ttl: float | None = None) -> None:
         """写入 key/value，可选 TTL。
@@ -202,21 +281,26 @@ class EtcdKVBackend(KVBackend):
             ``None`` 或 ``<= 0`` 时持久化存储。
         """
         full_key = self._full_key(key)
-        try:
-            if ttl is not None and ttl > 0:
-                # 创建租约，TTL 到期后 etcd 自动删除绑定的 key
-                lease = self._client.lease(int(ttl))
-                self._client.put(full_key, value, lease=lease)
-                logger.debug(
-                    "[etcd] set key=%s ttl=%ss (lease_id=%s)",
-                    key, int(ttl), lease.id,
-                )
-            else:
-                self._client.put(full_key, value)
-                logger.debug("[etcd] set key=%s (持久化)", key)
-        except Exception as e:
-            logger.error("[etcd] set 失败 key=%s: %s", key, e)
-            raise
+
+        # M3 修复：带重连重试的连接异常处理
+        def _do_set() -> None:
+            try:
+                if ttl is not None and ttl > 0:
+                    # 创建租约，TTL 到期后 etcd 自动删除绑定的 key
+                    lease = self._client.lease(int(ttl))
+                    self._client.put(full_key, value, lease=lease)
+                    logger.debug(
+                        "[etcd] set key=%s ttl=%ss (lease_id=%s)",
+                        key, int(ttl), lease.id,
+                    )
+                else:
+                    self._client.put(full_key, value)
+                    logger.debug("[etcd] set key=%s (持久化)", key)
+            except Exception as e:
+                logger.error("[etcd] set 失败 key=%s: %s", key, e)
+                raise
+
+        self._with_retry("set", _do_set)
 
     def delete(self, key: str) -> bool:
         """删除 key。
@@ -227,17 +311,22 @@ class EtcdKVBackend(KVBackend):
             key 存在并删除成功返回 True；key 不存在返回 False。
         """
         full_key = self._full_key(key)
-        try:
-            # 先查询是否存在，再删除（避免 etcd3 不同版本 delete 返回值不一致）
-            value, _meta = self._client.get(full_key)
-            if value is None:
-                return False
-            self._client.delete(full_key)
-            logger.debug("[etcd] delete key=%s", key)
-            return True
-        except Exception as e:
-            logger.error("[etcd] delete 失败 key=%s: %s", key, e)
-            raise
+
+        # M3 修复：带重连重试的连接异常处理
+        def _do_delete() -> bool:
+            try:
+                # 先查询是否存在，再删除（避免 etcd3 不同版本 delete 返回值不一致）
+                value, _meta = self._client.get(full_key)
+                if value is None:
+                    return False
+                self._client.delete(full_key)
+                logger.debug("[etcd] delete key=%s", key)
+                return True
+            except Exception as e:
+                logger.error("[etcd] delete 失败 key=%s: %s", key, e)
+                raise
+
+        return self._with_retry("delete", _do_delete)
 
     def list_keys(self, prefix: str = "") -> list[str]:
         """列出符合前缀的所有逻辑 key。
@@ -257,17 +346,22 @@ class EtcdKVBackend(KVBackend):
         else:
             # 列出整个命名空间：前缀以 ``/`` 结尾，避免误匹配 ``/maop_xxx``
             full_prefix = self._prefix + "/"
-        try:
-            keys: list[str] = []
-            for _value, meta in self._client.get_prefix(full_prefix):
-                keys.append(self._strip_prefix(meta.key))
-            logger.debug(
-                "[etcd] list_keys prefix=%s 返回 %d 个", prefix, len(keys)
-            )
-            return keys
-        except Exception as e:
-            logger.error("[etcd] list_keys 失败 prefix=%s: %s", prefix, e)
-            raise
+
+        # M3 修复：带重连重试的连接异常处理
+        def _do_list_keys() -> list[str]:
+            try:
+                keys: list[str] = []
+                for _value, meta in self._client.get_prefix(full_prefix):
+                    keys.append(self._strip_prefix(meta.key))
+                logger.debug(
+                    "[etcd] list_keys prefix=%s 返回 %d 个", prefix, len(keys)
+                )
+                return keys
+            except Exception as e:
+                logger.error("[etcd] list_keys 失败 prefix=%s: %s", prefix, e)
+                raise
+
+        return self._with_retry("list_keys", _do_list_keys)
 
     def cas(self, key: str, expected: str, new_value: str) -> bool:
         """原子 compare-and-swap。
@@ -291,21 +385,26 @@ class EtcdKVBackend(KVBackend):
             交换成功返回 True；当前值不等于 expected 返回 False。
         """
         full_key = self._full_key(key)
-        tx = self._client.transactions
-        try:
-            # etcd3 事务：compare value 相等才执行 put
-            status, _responses = self._client.transaction(
-                compare=[tx.value(full_key) == expected.encode("utf-8")],
-                success=[tx.put(full_key, new_value)],
-                failure=[],
-            )
-            logger.debug(
-                "[etcd] cas key=%s status=%s", key, status,
-            )
-            return bool(status)
-        except Exception as e:
-            logger.error("[etcd] cas 失败 key=%s: %s", key, e)
-            raise
+
+        # M3 修复：带重连重试的连接异常处理
+        def _do_cas() -> bool:
+            tx = self._client.transactions
+            try:
+                # etcd3 事务：compare value 相等才执行 put
+                status, _responses = self._client.transaction(
+                    compare=[tx.value(full_key) == expected.encode("utf-8")],
+                    success=[tx.put(full_key, new_value)],
+                    failure=[],
+                )
+                logger.debug(
+                    "[etcd] cas key=%s status=%s", key, status,
+                )
+                return bool(status)
+            except Exception as e:
+                logger.error("[etcd] cas 失败 key=%s: %s", key, e)
+                raise
+
+        return self._with_retry("cas", _do_cas)
 
     # ------------------------------------------------------------------
     # 资源清理

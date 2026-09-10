@@ -53,8 +53,10 @@
       <div class="modal">
         <h3>{{ t('view.tenants.createTenant') }}</h3>
         <label>{{ t('view.tenants.tenantId') }}</label>
+        <!-- placeholder 为格式示例，不参与 i18n（保持跨语言一致的 ID 命名约定演示） -->
         <input v-model="newTenant.tenant_id" class="input" placeholder="acme-corp" />
         <label>{{ t('common.name') }}</label>
+        <!-- placeholder 为格式示例，不参与 i18n（保持跨语言一致的显示名示例） -->
         <input v-model="newTenant.name" class="input" placeholder="Acme Corporation" />
         <label>{{ t('view.tenants.plan') }}</label>
         <select v-model="newTenant.plan" class="input">
@@ -105,13 +107,13 @@ function statusTone(s) {
 function hasQuota(t) {
   return !!(t.quota || t.usage);
 }
-function quotaUsage(t) {
-  const q = t.quota || {};
-  const u = t.usage || {};
+function quotaUsage(tenant) {
+  const q = tenant.quota || {};
+  const u = tenant.usage || {};
   return [
-    { name: 'API Calls', current: u.api_calls_today ?? 0, max: q.max_api_calls_per_day ?? 0 },
-    { name: 'Storage', current: Math.round(u.storage_mb ?? 0), max: q.max_storage_mb ?? 0 },
-    { name: 'Agents', current: u.active_agents ?? 0, max: q.max_agents ?? 0 },
+    { name: t('view.tenants.quotaApiCalls'), current: u.api_calls_today ?? 0, max: q.max_api_calls_per_day ?? 0 },
+    { name: t('view.tenants.quotaStorage'), current: Math.round(u.storage_mb ?? 0), max: q.max_storage_mb ?? 0 },
+    { name: t('view.tenants.quotaAgents'), current: u.active_agents ?? 0, max: q.max_agents ?? 0 },
   ].map((i) => ({ ...i, pct: i.max ? Math.min(100, Math.round((i.current / i.max) * 100)) : 0 }));
 }
 

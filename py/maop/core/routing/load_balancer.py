@@ -318,10 +318,9 @@ class LoadBalancer:
         """Return the sticky agent for ``session_id`` if still valid.
 
         Updates the hit/miss counters and prunes the entry on expiry.
-        Runs without the main lock — the sticky map has its own atomic
-        read/write semantics under ``self._lock`` for mutations; lookups
-        here are read-only on a dict (CPython atomic) followed by a
-        guarded prune.
+        L2 修复：原 docstring 声称 "Runs without the main lock"，但实现
+        实际在 ``with self._lock`` 块内执行。更新注释以准确描述行为：
+        Acquires ``self._lock`` for the sticky map lookup and prune.
         """
         from maop.core.monitoring.monitoring import (
             MAOP_STICKY_SESSION_HIT,

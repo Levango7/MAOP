@@ -30,6 +30,9 @@ function inline(s) {
   // L7 fix: 行内代码 `code` — 使用占位符替换，避免后续加粗正则误匹配代码内的 ** 符号。
   // 此前直接替换为 <code>...</code>，加粗正则 /\*\*([^*]+)\*\*/g 仍会匹配 <code> 标签
   // 内的 **text**，导致行内代码内容被错误加粗。改用唯一占位符暂存，加粗处理后再还原。
+  // L5 fix: \x00 (NUL 字符) 是内部占位符分隔符，不会出现在最终 HTML 输出中——
+  // 占位符在加粗处理后被 \x00CODE(\d+)\x00 正则完整还原为 <code> 标签。
+  // \x00 在合法 Markdown 文本中不会出现（JSON/HTML 均不允许），保证唯一性。
   const codePlaceholders = [];
   out = out.replace(/`([^`]+)`/g, (_, code) => {
     const idx = codePlaceholders.length;

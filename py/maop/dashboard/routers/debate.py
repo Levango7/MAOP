@@ -12,8 +12,8 @@ Endpoints
 - ``POST /api/debate/config`` — configure debate parameters (admin).
 - ``GET /api/debate/history`` — recent debate history (read-only).
 
-POST endpoints require the ``admin`` role (mirrors supervisor router's
-policy). GET endpoints are read-only and do not require admin auth.
+POST endpoints require the ``admin`` role (via ``require_admin`` middleware).
+GET endpoints are read-only and do not require admin auth.
 """
 
 from __future__ import annotations
@@ -95,12 +95,6 @@ def _get_debate_dispatcher() -> Any:
         ) from exc
 
 
-def _require_admin(request: Request) -> None:
-    """Lightweight admin guard — mirrors supervisor router's pattern."""
-    roles = getattr(getattr(request, "state", None), "auth_roles", None) or []
-    if "admin" not in roles:
-        raise HTTPException(status_code=403, detail="admin role required")
-
 
 # ── Endpoints ───────────────────────────────────────────────────
 
@@ -129,7 +123,7 @@ async def api_debate_start(
 
     Returns the ``DebateVerdict`` as a dict.
     """
-    _require_admin(request)
+    require_admin(request)
     dispatcher = _get_debate_dispatcher()
     from maop.delegate.dispatch_debate import DebateConfig
 
@@ -217,7 +211,7 @@ async def api_debate_config(
 
     Updates the DebateDispatcher's runtime config in place.
     """
-    _require_admin(request)
+    require_admin(request)
     dispatcher = _get_debate_dispatcher()
     from maop.delegate.dispatch_debate import DebateConfig
 
@@ -231,12 +225,11 @@ async def api_debate_config(
         early_exit_on_unanimous=body.early_exit_on_unanimous,
         retention_days=body.retention_days,
     )
-    # 更新 dispatcher 的 config（优先使用公开方法，回退到 setattr 避免直接访问内部属性）
+    # 更新 dispatcher 的 config（优先使用公开方法，回退到 setattr）
     try:
         if hasattr(dispatcher, "update_config") and callable(dispatcher.update_config):
             dispatcher.update_config(new_config)
         else:
-            # 回退：通过 setattr 设置，避免直接引用 _config 内部属性名
             setattr(dispatcher, "_config", new_config)
     except Exception as exc:  # pragma: no cover
         logger.warning("[debate-api] config update failed: %s", exc)

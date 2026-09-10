@@ -114,7 +114,8 @@ async def api_worktree_abandon(body: WorktreeAbandonRequest, request: Request) -
 
 @router.get("/api/worktree/get")
 @handle_api_errors("Worktree get", error_value={"status": "error", "error": "Get failed"})
-async def api_worktree_get(node_id: str = "") -> dict[str, Any]:
+async def api_worktree_get(request: Request, node_id: str = "") -> dict[str, Any]:
+    require_admin(request)
     if not node_id:
         raise HTTPException(400, "missing node_id")
     mgr = _get_worktree_mgr()
@@ -126,7 +127,8 @@ async def api_worktree_get(node_id: str = "") -> dict[str, Any]:
 
 @router.get("/api/worktree/list")
 @handle_api_errors("Worktree list", error_value={"branches": [], "count": 0, "error": "List failed"})
-async def api_worktree_list(root_id: str = "", active_only: bool = False) -> dict[str, Any]:
+async def api_worktree_list(request: Request, root_id: str = "", active_only: bool = False) -> dict[str, Any]:
+    require_admin(request)
     mgr = _get_worktree_mgr()
     branches = mgr.list_branches(root_id=root_id, active_only=active_only)
     return {"branches": [b.model_dump() for b in branches], "count": len(branches)}

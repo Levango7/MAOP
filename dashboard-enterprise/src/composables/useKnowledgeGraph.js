@@ -163,8 +163,8 @@ export async function progressiveLoad(items, onBatch, opts = {}) {
 /**
  * ric-aware scheduler shim for environments without requestIdleCallback.
  * L8 fix: 移除未使用的 scheduleIdle 死代码（progressiveLoad 已内联 ric 逻辑）。
+ * L6 fix: 移除残留的空注释块。
  */
-
 export function useKnowledgeGraph() {
   const api = useApiStore();
 

@@ -18,16 +18,18 @@
 
 所有操作要求 admin 角色(``require_admin``) + ``FeatureFlag.TENANT_ISOLATION``.
 
-路由注册顺序注意: 固定段路径(``/alerts/...``, ``/{tenant_id}/usage``,
-``/{tenant_id}/alerts``, ``/history``)必须在参数段路径
-(``/{tenant_id}/{resource}``)之前注册,否则 ``/t1/usage`` 会被
-``/{tenant_id}/{resource}`` 匹配为 tenant_id=t1, resource=usage.
+# WARNING: route order matters - static paths must come before parameterized paths.
+# 固定段路径(``/alerts/...``, ``/{tenant_id}/usage``,
+# ``/{tenant_id}/alerts``, ``/history``)必须在参数段路径
+# (``/{tenant_id}/{resource}``)之前注册,否则 ``/t1/usage`` 会被
+# ``/{tenant_id}/{resource}`` 匹配为 tenant_id=t1, resource=usage.
 """
 
 from __future__ import annotations
 
 import logging
 import sqlite3
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -43,12 +45,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/quotas", tags=["quotas"])
 
 _quota_manager: Any = None
+_quota_manager_lock = threading.Lock()
 
 
 def _get_manager() -> Any:
     """惰性初始化 QuotaManager 单例(共享 unified maop.db)."""
     global _quota_manager
-    if _quota_manager is None:
+    if _quota_manager is not None:
+        return _quota_manager
+    with _quota_manager_lock:
+        if _quota_manager is not None:  # double-checked locking
+            return _quota_manager
         from maop.enterprise.quota import QuotaManager
         _quota_manager = QuotaManager(unified_db_path())
     return _quota_manager

@@ -274,22 +274,25 @@ class A2AManager:
         If an asyncio event loop is running, schedule the coroutine with
         ``asyncio.ensure_future``. Otherwise fall back to a daemon thread
         that runs a fresh loop (for non-async callers like CLI tools).
-        """
-        try:
-            import asyncio
 
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(self.dispatch_task(task_id, agent_name, message))
-                return
-            # Loop exists but not running — run in thread.
-        except RuntimeError:
-            pass  # No current event loop.
+        H2 修复：统一使用 ``asyncio.get_running_loop()`` 检测事件循环
+        状态（``get_event_loop()`` 在 Python 3.12+ 无当前循环时抛
+        RuntimeError，且在 3.10+ 已弃用隐式创建循环的行为）。在循环内
+        用 ``ensure_future`` 调度，不在循环内时在新线程的独立循环上
+        运行，避免 ``asyncio.run()`` 在已有循环中抛 RuntimeError。
+        """
+        import asyncio
         import threading
 
-        def _bg() -> None:
-            import asyncio
+        try:
+            asyncio.get_running_loop()
+            # 已在事件循环内 —— 调度为后台任务
+            asyncio.ensure_future(self.dispatch_task(task_id, agent_name, message))
+            return
+        except RuntimeError:
+            pass  # 无运行中的事件循环 —— 在新线程上运行
 
+        def _bg() -> None:
             asyncio.run(self.dispatch_task(task_id, agent_name, message))
 
         threading.Thread(target=_bg, daemon=True, name=f"a2a-dispatch-{task_id}").start()

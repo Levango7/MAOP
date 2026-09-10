@@ -581,8 +581,8 @@ function selectAgent(a) {
   selectedCapabilities.value = a.capabilities || [];
   // Real runtime signals only — no synthetic fillers.
   perfHistory.value = [
-    { label: 'Last Latency', pct: Math.min(100, (a.last_latency_ms || 0) / 50), value: (a.last_latency_ms || 0) + ' ms', color: 'var(--chart-1)' },
-    { label: 'Consecutive Failures', pct: Math.min(100, (a.consecutive_failures || 0) * 10), value: String(a.consecutive_failures || 0), color: 'var(--chart-fail)' },
+    { label: t('view.agents.metricLastLatency'), pct: Math.min(100, (a.last_latency_ms || 0) / 50), value: (a.last_latency_ms || 0) + ' ms', color: 'var(--chart-1)' },
+    { label: t('view.agents.metricConsecutiveFailures'), pct: Math.min(100, (a.consecutive_failures || 0) * 10), value: String(a.consecutive_failures || 0), color: 'var(--chart-fail)' },
   ];
 }
 

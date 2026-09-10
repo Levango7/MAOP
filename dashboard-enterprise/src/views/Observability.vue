@@ -228,17 +228,19 @@ const canonicalMetrics = computed(() => {
       name: 'maop_requests_total',
       type: 'counter',
       value: formatNum(m.maop_requests_total || 0),
-      detail: 'labels: method, path, status',
+      detail: t('view.observability.metricLabelsHttp'),
     },
     {
       name: 'maop_request_duration_seconds',
       type: 'histogram',
+      // 'obs' / 's' 为技术单位后缀，不参与 i18n（遵循 OpenMetrics/Prometheus 单位约定）
       value: `${h.maop_request_duration_seconds?.count || 0} obs`,
       detail: `sum=${h.maop_request_duration_seconds?.sum || 0}s`,
     },
     {
       name: 'maop_agent_execution_seconds',
       type: 'histogram',
+      // 'obs' / 's' 为技术单位后缀，不参与 i18n（遵循 OpenMetrics/Prometheus 单位约定）
       value: `${h.maop_agent_execution_seconds?.count || 0} obs`,
       detail: `sum=${h.maop_agent_execution_seconds?.sum || 0}s`,
     },
@@ -246,7 +248,7 @@ const canonicalMetrics = computed(() => {
       name: 'maop_errors_total',
       type: 'counter',
       value: formatNum(m.maop_errors_total || 0),
-      detail: 'labels: type, module',
+      detail: t('view.observability.metricLabelsModule'),
     },
   ];
 });

@@ -17,11 +17,16 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections import OrderedDict
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+# M1 修复：_key_cache 最大容量限制，防止无界增长导致内存泄漏。
+# 超过此容量时按 LRU 策略淘汰最久未使用的条目。
+_KEY_CACHE_MAX_SIZE = 10000
 
 
 class KeySource(BaseModel):
@@ -64,7 +69,9 @@ class BYOKGateway:
         self._vault = vault
         self._sources: dict[str, list[KeySource]] = {}
         self._routes: list[KeyRoute] = []
-        self._key_cache: dict[str, ResolvedKey] = {}
+        # M1 修复：使用 OrderedDict + LRU 淘汰策略，限制 _key_cache
+        # 最大容量为 _KEY_CACHE_MAX_SIZE，防止无界增长导致内存泄漏。
+        self._key_cache: OrderedDict[str, ResolvedKey] = OrderedDict()
         self._key_usage: dict[str, int] = {}
 
     def register_source(self, source: KeySource) -> None:
@@ -86,6 +93,8 @@ class BYOKGateway:
         cache_key = f"{provider}:{model}:{tenant_id}"
         cached = self._key_cache.get(cache_key)
         if cached and (cached.expires_at == 0 or cached.expires_at > time.time()):
+            # M1 修复：缓存命中时将条目移到末尾（标记为最近使用）
+            self._key_cache.move_to_end(cache_key)
             return cached
 
         route = self._find_route(provider, model, tenant_id)
@@ -98,7 +107,11 @@ class BYOKGateway:
 
         key = await self._resolve_from_sources(provider, tenant_id)
         if key:
+            # M1 修复：LRU 淘汰——超过最大容量时移除最久未使用的条目
             self._key_cache[cache_key] = key
+            self._key_cache.move_to_end(cache_key)
+            while len(self._key_cache) > _KEY_CACHE_MAX_SIZE:
+                self._key_cache.popitem(last=False)
             self._key_usage[provider] = self._key_usage.get(provider, 0) + 1
         return key
 

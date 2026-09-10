@@ -81,6 +81,7 @@ function moveTo(i) {
 /* padding 3px 8px 为小尺寸 Segmented 项视觉规格固定值 */
 .seg--sm .seg__item { padding: 3px 8px; font-size: var(--fs-xs); }
 .seg__item:hover { color: var(--text); }
+.seg__item:disabled { opacity: 0.45; cursor: not-allowed; }
 .seg__item.active {
   background: var(--surface);
   color: var(--brand-strong);

@@ -75,8 +75,8 @@ async def api_timeseries(request: Request) -> Any:
 @router.get("/api/metrics")
 @handle_api_errors("Metrics", error_value={"status": "error", "error": "Metrics unavailable"})
 async def api_metrics(request: Request) -> dict[str, Any]:
-    require_admin(request)
     """Real-time metrics from LoadBalancer, TimeSeries, and CircuitBreaker."""
+    require_admin(request)
     result: dict[str, Any] = {}
     try:
         from maop.core.routing.load_balancer import get_load_balancer

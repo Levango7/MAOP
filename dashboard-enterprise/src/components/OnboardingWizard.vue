@@ -32,7 +32,7 @@ v-for="(s, i) in steps" :key="i"
           <p>{{ t('view.onboard.step1Desc') }}</p>
           <div class="onboard-wizard__quick-actions">
             <router-link to="/agents/new" class="btn btn-primary">{{ t('view.onboard.createAgent') }}</router-link>
-            <router-link to="/chat" class="btn btn-outline">{{ t('view.onboard.openChat') }}</router-link>
+            <router-link to="/chat" class="btn btn-ghost">{{ t('view.onboard.openChat') }}</router-link>
           </div>
           <p class="onboard-wizard__hint">{{ t('view.onboard.step1Hint') }}</p>
         </div>
@@ -40,8 +40,8 @@ v-for="(s, i) in steps" :key="i"
         <div v-if="step === 1" class="onboard-wizard__step-content">
           <p>{{ t('view.onboard.step2Desc') }}</p>
           <div class="onboard-wizard__quick-actions">
-            <router-link to="/agents" class="btn btn-outline">{{ t('view.onboard.browseAgents') }}</router-link>
-            <router-link to="/models" class="btn btn-outline">{{ t('view.onboard.manageModels') }}</router-link>
+            <router-link to="/agents" class="btn btn-ghost">{{ t('view.onboard.browseAgents') }}</router-link>
+            <router-link to="/models" class="btn btn-ghost">{{ t('view.onboard.manageModels') }}</router-link>
           </div>
           <p class="onboard-wizard__hint">{{ t('view.onboard.step2Hint') }}</p>
         </div>
@@ -49,7 +49,7 @@ v-for="(s, i) in steps" :key="i"
         <div v-if="step === 2" class="onboard-wizard__step-content">
           <p>{{ t('view.onboard.step3Desc') }}</p>
           <div class="onboard-wizard__quick-actions">
-            <a :href="t('view.onboard.docsUrl')" target="_blank" class="btn btn-outline">{{ t('view.onboard.readDocs') }}</a>
+            <a :href="t('view.onboard.docsUrl')" target="_blank" class="btn btn-ghost">{{ t('view.onboard.readDocs') }}</a>
           </div>
           <button class="btn btn-primary" @click="finish">{{ t('view.onboard.done') }}</button>
         </div>

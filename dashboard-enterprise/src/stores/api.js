@@ -226,7 +226,9 @@ export const useApiStore = defineStore('api', () => {
    * 暴露给组件直接使用的工具方法：返回当前 token（便于 UI 显示登录状态）。
    * M6 fix: token 现由 httpOnly cookie 管理，前端无法读取，始终返回空字符串。
    * 登录状态请使用 isLoggedIn() 判断。
+   * L2 fix: 标记为废弃，保留仅为向后兼容现有调用方，不应在新代码中使用。
    */
+  /* Deprecated: always returns '' after M6 fix — use isLoggedIn() instead */
   function authToken() {
     return getAuthToken();
   }

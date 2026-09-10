@@ -17,25 +17,21 @@
       </template>
       <template #content>
         <div v-if="registryError" class="grid-2">
-          <EmptyState
-icon="alert-triangle" :title="t('view.models.couldNotLoadRegistry')"
+          <EmptyState icon="alert-triangle" :title="t('view.models.couldNotLoadRegistry')"
             :description="registryError" />
         </div>
 
         <!-- Model registry -->
-        <Card
-:title="t('view.models.modelRegistry')" icon="cpu" :margin-bottom="16"
+        <Card :title="t('view.models.modelRegistry')" icon="cpu" :margin-bottom="16"
           :subtitle="`${models.length} ` + t('view.models.registeredModels')">
           <div v-if="modelsError"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadModels')" :description="modelsError" /></div>
           <Skeleton v-else-if="loading" :lines="6" block />
-          <DataTable
-v-else :columns="modelCols" :rows="modelRows" :loading="false"
+          <DataTable v-else :columns="modelCols" :rows="modelRows" :loading="false"
             :empty-text="t('view.models.noModels')" />
         </Card>
 
         <!-- Providers -->
-        <Card
-:title="t('view.models.providerHealth')" icon="activity" :margin-bottom="16"
+        <Card :title="t('view.models.providerHealth')" icon="activity" :margin-bottom="16"
           :subtitle="`${providers.length} ` + t('view.models.providersLabel')">
           <div v-if="providersError"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadProviders')" :description="providersError" /></div>
           <Skeleton v-else-if="loading && !providers.length" :lines="5" block />
@@ -43,8 +39,7 @@ v-else :columns="modelCols" :rows="modelRows" :loading="false"
         </Card>
 
         <!-- Agents -->
-        <Card
-:title="t('view.models.agentDrivers')" icon="bot" :margin-bottom="16"
+        <Card :title="t('view.models.agentDrivers')" icon="bot" :margin-bottom="16"
           :subtitle="`${agents.length} ` + t('view.models.agentsLabel')">
           <div v-if="agentsError"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAgents')" :description="agentsError" /></div>
           <Skeleton v-else-if="loading && !agents.length" :lines="5" block />
@@ -75,8 +70,7 @@ v-else :columns="modelCols" :rows="modelRows" :loading="false"
         </div>
 
         <!-- Routing policies -->
-        <Card
-:title="t('view.models.routingPolicies')" icon="route" :margin-bottom="16"
+        <Card :title="t('view.models.routingPolicies')" icon="route" :margin-bottom="16"
           :subtitle="`${policies.length} ` + t('view.models.policiesLabel')">
           <div v-if="policiesError"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadPolicies')" :description="policiesError" /></div>
           <Skeleton v-else-if="loading && !policies.length" :lines="4" block />

@@ -21,6 +21,9 @@ export function useToast() {
       message,
       tone: opts.tone || 'info',
       timeout: opts.timeout === null ? 3200 : opts.timeout,
+      // L10 fix: _timer 是内部实现字段（setTimeout 句柄），不应被外部组件
+      // 读取或修改。以下划线前缀标记为内部字段，外部代码不应依赖此属性。
+      // 仅在设置 timeout 时赋值，无 timeout 时保持 undefined（持久 toast）。
     };
     toastState.items.push(t);
     if (t.timeout) t._timer = setTimeout(() => dismiss(t.id), t.timeout);

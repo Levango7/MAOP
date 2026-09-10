@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, Request
+from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -16,11 +18,24 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+class BudgetRecordRequest(BaseModel):
+    """POST /api/budget/record 请求体。"""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cost_usd: float = 0.0
+
+
 _budget_guard = None
+_budget_guard_lock = threading.Lock()
 
 def _get_budget_guard() -> Any:
     global _budget_guard
-    if _budget_guard is None:
+    if _budget_guard is not None:
+        return _budget_guard
+    with _budget_guard_lock:
+        if _budget_guard is not None:  # double-checked locking
+            return _budget_guard
         from maop.core.budget_guard import BudgetGuard
         _budget_guard = BudgetGuard(root_dir=str(MAOP_ROOT))
     return _budget_guard
@@ -48,13 +63,12 @@ async def api_budget_reset(request: Request) -> dict[str, Any]:
 
 @router.post("/api/budget/record")
 @handle_api_errors("Budget record", error_value={"status": "error", "error": "Record failed"})
-async def api_budget_record(request: Request) -> dict[str, Any]:
+async def api_budget_record(request: Request, body: BudgetRecordRequest) -> dict[str, Any]:
     """Record a budget usage entry."""
     require_admin(request)
-    body = await request.json()
-    prompt_tokens = body.get("prompt_tokens", 0)
-    completion_tokens = body.get("completion_tokens", 0)
-    cost_usd = body.get("cost_usd", 0.0)
+    prompt_tokens = body.prompt_tokens
+    completion_tokens = body.completion_tokens
+    cost_usd = body.cost_usd
     guard = _get_budget_guard()
     result = guard.record_usage(
         prompt_tokens=prompt_tokens,

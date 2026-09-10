@@ -13,13 +13,13 @@ Endpoints
 - ``GET /api/routing/decisions/stats`` — aggregate counts (total, by_stage,
   last_24h).
 
-All endpoints are read-only (GET) and do not require admin auth, mirroring
-the ``tool_audit`` router's GET endpoints.
+All endpoints require the ``admin`` role (via ``require_admin`` middleware).
 """
 
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -32,12 +32,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _decision_store: Any = None
+_decision_store_lock = threading.Lock()
 
 
 def _get_store() -> Any:
     """Lazy-init the global :class:`RoutingDecisionStore` singleton."""
     global _decision_store
-    if _decision_store is None:
+    if _decision_store is not None:
+        return _decision_store
+    with _decision_store_lock:
+        if _decision_store is not None:  # double-checked locking
+            return _decision_store
         from maop.core.routing.routing_decision import RoutingDecisionStore
         _decision_store = RoutingDecisionStore()
     return _decision_store
@@ -45,9 +50,9 @@ def _get_store() -> Any:
 
 # ── Endpoints ─────────────────────────────────────────────────────
 #
-# Route registration order matters: ``/stats`` and ``/recent`` must be
-# declared before ``/{trace_id}`` so the path-parameter route doesn't
-# shadow them (FastAPI matches routes in declaration order).
+# WARNING: route order matters - static paths must come before parameterized paths.
+# ``/stats`` and ``/recent`` must be declared before ``/{trace_id}`` so the
+# path-parameter route doesn't shadow them (FastAPI matches routes in declaration order).
 
 
 @router.get("/api/routing/decisions/recent")

@@ -107,9 +107,17 @@ class PermissionManager:
             return cast(bool, cursor.rowcount > 0)
 
     def check(self, agent: str, action: str = "*") -> PermissionCheck:
+        # M2 修复：原 SQL 加载全部规则再在 Python 中遍历匹配，规则表增大后
+        # 每次检查都全表扫描。改为在 SQL 层利用 idx_perm_agent_action 索引
+        # 过滤出可能匹配的规则：agent 精确匹配、通配 "*"、以及包含 fnmatch
+        # 通配符字符（*、?、[）的模式规则。仍保留 _match() 做最终匹配。
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM permission_rules ORDER BY priority DESC"
+                "SELECT * FROM permission_rules "
+                "WHERE agent = ? OR agent = '*' "
+                "  OR agent LIKE '%*%' OR agent LIKE '%?%' OR agent LIKE '%[%' "
+                "ORDER BY priority DESC",
+                (agent,),
             ).fetchall()
 
         for row in rows:

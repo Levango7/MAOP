@@ -12,8 +12,8 @@ Endpoints
   for one agent (body: ``{"agent_id": "..."}``) or all agents (empty
   body). Admin-only.
 
-All endpoints are read-/write-light and do not require admin auth for
-GET (mirroring the routing decision-trace router's policy).
+GET endpoints are read-only and do not require admin auth.
+POST endpoints require the ``admin`` role (via ``require_admin`` middleware).
 """
 
 from __future__ import annotations
@@ -88,13 +88,7 @@ async def api_scheduling_failure_stats_reset(
     operations — manual recovery without waiting for the grey-probe
     ladder.
     """
-    # Lightweight admin guard — mirrors routing_preview's require_admin
-    # pattern but degrades gracefully when auth is not configured.
-    roles = getattr(getattr(request, "state", None), "auth_roles", None) or []
-    if "admin" not in roles:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=403, detail="admin role required")
+    require_admin(request)
     payload = body or {}
     agent_id = str(payload.get("agent_id", "") or "").strip() or None
     _detector().reset(agent_id)

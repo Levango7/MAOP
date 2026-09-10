@@ -186,17 +186,69 @@ class ResourceQuotaManager:
 
         If *consume* is True and the check passes, the usage is recorded
         atomically.  In strict mode a :class:`QuotaError` is raised on denial.
+
+        H1 修复（TOCTOU 竞态）：当 ``consume=True`` 时，使用
+        ``BEGIN IMMEDIATE`` 事务将"读取当前用量 → 检查限额 → 写入新用量"
+        三步合并为单原子操作，避免并发请求在 check 与 record 之间竞态超额。
+        ``BEGIN IMMEDIATE`` 立即获取写锁，其他连接的写操作会阻塞至事务结束，
+        从而保证读-检-写的线性一致性。
         """
-        usage = self.get_usage(tenant_id, resource)
-        if usage.exceeded or (usage.limit > 0 and usage.used + amount > usage.limit):
-            if self._strict:
-                raise QuotaError(
-                    f"quota exceeded: tenant={tenant_id!r} resource={resource!r} "
-                    f"used={usage.used} limit={usage.limit} requested={amount}"
+        if not consume:
+            # 纯检查路径：无需写锁，保持原语义
+            usage = self.get_usage(tenant_id, resource)
+            if usage.exceeded or (usage.limit > 0 and usage.used + amount > usage.limit):
+                if self._strict:
+                    raise QuotaError(
+                        f"quota exceeded: tenant={tenant_id!r} resource={resource!r} "
+                        f"used={usage.used} limit={usage.limit} requested={amount}"
+                    )
+                return False
+            return True
+
+        # consume=True：在单事务内原子地执行读-检-写
+        quota = self.get_quota(tenant_id, resource)
+        period = quota.period if quota else "total"
+        key = self._period_key(period)
+        limit = quota.limit if quota else 0
+
+        validate_identifier("tenant_resource_usage", "table")
+        with sqlite_connect(self._db_path) as conn:
+            # BEGIN IMMEDIATE 立即获取保留写锁，阻止并发写事务，
+            # 消除 check 与 record 之间的 TOCTOU 窗口。
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    "SELECT used FROM tenant_resource_usage "
+                    "WHERE tenant_id = ? AND resource = ? AND period_key = ?",
+                    (tenant_id, resource, key),
+                ).fetchone()
+                used = row[0] if row else 0
+
+                # 在事务内做限额检查
+                if limit > 0 and (used >= limit or used + amount > limit):
+                    if self._strict:
+                        raise QuotaError(
+                            f"quota exceeded: tenant={tenant_id!r} resource={resource!r} "
+                            f"used={used} limit={limit} requested={amount}"
+                        )
+                    return False
+
+                # 事务内写入新用量
+                conn.execute(
+                    """INSERT INTO tenant_resource_usage
+                       (tenant_id, resource, period_key, used)
+                       VALUES (?, ?, ?, ?)
+                       ON CONFLICT(tenant_id, resource, period_key) DO UPDATE SET
+                         used = used + excluded.used""",
+                    (tenant_id, resource, key, amount),
                 )
-            return False
-        if consume:
-            self._record(tenant_id, resource, usage.period, amount)
+            except Exception:
+                # 异常时回滚到 SAVEPOINT 之前的状态（sqlite_connect 也会
+                # rollback，但显式 ROLLBACK 保证 BEGIN IMMEDIATE 已释放写锁）
+                conn.execute("ROLLBACK")
+                raise
+            else:
+                conn.execute("COMMIT")
         return True
 
     def consume(self, tenant_id: str, resource: str, amount: int = 1) -> bool:

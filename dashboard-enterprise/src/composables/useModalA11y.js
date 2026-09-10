@@ -32,6 +32,21 @@ const MODAL_ROOT_SELECTOR = '[data-modal-root="true"][aria-modal="true"]';
 export function useModalA11y(isOpen, onClose, containerEl) {
   let previousFocus = null;
 
+  // L14 fix: focusable 元素缓存，避免 handleFocusTrap 每次按键都执行
+  // querySelectorAll（模态内元素多时性能开销显著）。仅在 root 变化时重新查询。
+  let _focusableCache = null;
+  let _focusableCacheRoot = null;
+
+  function getFocusables(root) {
+    if (_focusableCacheRoot === root && _focusableCache) {
+      return _focusableCache;
+    }
+    _focusableCacheRoot = root;
+    _focusableCache = Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR))
+      .filter((el) => el.offsetParent !== null); // visible only
+    return _focusableCache;
+  }
+
   /**
    * 解析当前模态根元素：优先使用传入的 containerEl，fallback 到全局查询。
    * 支持 HTMLElement / Vue ref / getter 函数三种形式。
@@ -43,8 +58,12 @@ export function useModalA11y(isOpen, onClose, containerEl) {
       if (typeof containerEl === 'function') return containerEl();
       // Vue ref: 自动解包 .value
       if (containerEl.value) return containerEl.value;
-      // HTMLElement: 直接使用
-      return containerEl;
+      // M4 fix: 当 containerEl 是 Vue ref 且 .value 为 null 时（元素尚未挂载
+      // 或已卸载），返回 null 而非返回 ref 对象本身——否则后续
+      // root.querySelector / root.hasAttribute 会因 root 不是 HTMLElement 而抛错。
+      // 仅当 containerEl 是真正的 HTMLElement 时才直接使用。
+      if (containerEl instanceof HTMLElement) return containerEl;
+      return null;
     }
     // fallback: 全局查询（向后兼容单模态场景）
     return document.querySelector(MODAL_ROOT_SELECTOR);
@@ -62,8 +81,8 @@ export function useModalA11y(isOpen, onClose, containerEl) {
     if (!isOpen() || e.key !== 'Tab') return;
     const root = resolveRoot();
     if (!root) return;
-    const focusables = Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR))
-      .filter((el) => el.offsetParent !== null); // visible only
+    // L14 fix: 使用缓存的 focusable 元素列表，避免每次 Tab 按键都执行 querySelectorAll。
+    const focusables = getFocusables(root);
     if (!focusables.length) return;
     const first = focusables[0];
     const last = focusables[focusables.length - 1];

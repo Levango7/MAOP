@@ -133,7 +133,7 @@
                 class="suggestion-item__caret"
               />
               <span class="suggestion-item__id mono">{{ sug.id || '—' }}</span>
-              <Badge :tone="severityTone(sug.severity)">{{ sug.severity || 'MEDIUM' }}</Badge>
+              <Badge :tone="severityTone(sug.severity)">{{ sug.severity || t('common.severityMedium') }}</Badge>
               <span class="suggestion-item__desc">{{ sug.description || '—' }}</span>
               <Badge v-if="sug.auto_applicable" tone="success" class="suggestion-item__auto">
                 {{ t('view.evolutionHistory.suggestions.autoApplicable') }}
@@ -608,7 +608,7 @@ const abCols = computed(() => [
   { key: 'decision_label', label: t('view.evolutionHistory.colDecision'), type: 'badge' },
   { key: 'winner', label: t('view.evolutionHistory.colWinner') },
   { key: 'samples', label: t('view.evolutionHistory.colSuggestions'), type: 'num' },
-  { key: 'success_rate', label: 'Rate %', type: 'num' },
+  { key: 'success_rate', label: t('view.evolutionHistory.colRate'), type: 'num' },
 ]);
 
 const abRows = computed(() =>

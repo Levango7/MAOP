@@ -390,62 +390,63 @@ const lineageRows = computed(() =>
 // 立即理解"自调优闭环"的价值, 而不是面对一张空表。
 // type: perf(性能改进) / behavior(行为调整) / capability(新能力)
 // impact: 简短的影响指标描述, 用于卡片右下角
-const evolutionMilestones = [
+// M11 修复: title/desc/impact 改为 i18n 键引用, 通过 computed 实现响应式
+const evolutionMilestones = computed(() => [
   {
     key: 'ms-cap-1',
     time: '2026-03',
     type: 'capability',
     typeIcon: 'sparkles',
-    title: 'Self-tuning loop bootstrapped',
-    desc: 'MAOP introduced the closed-loop auto-tuning engine: observe → suggest → A/B → promote/rollback.',
-    impact: '+1 closed loop',
+    title: t('view.evolve.milestones.msCap1Title'),
+    desc: t('view.evolve.milestones.msCap1Desc'),
+    impact: t('view.evolve.milestones.msCap1Impact'),
   },
   {
     key: 'ms-perf-1',
     time: '2026-04',
     type: 'perf',
     typeIcon: 'gauge',
-    title: 'Routing strategy optimized',
-    desc: 'Cost-aware router reduced avg latency by delegating cheap tasks to local models.',
-    impact: '−23% p95 latency',
+    title: t('view.evolve.milestones.msPerf1Title'),
+    desc: t('view.evolve.milestones.msPerf1Desc'),
+    impact: t('view.evolve.milestones.msPerf1Impact'),
   },
   {
     key: 'ms-behavior-1',
     time: '2026-05',
     type: 'behavior',
     typeIcon: 'brain',
-    title: 'Prompt regression guard',
-    desc: 'Per-agent prompt versions now gated by SPRT, blocking silent quality regressions before promotion.',
-    impact: '+12% success rate',
+    title: t('view.evolve.milestones.msBehavior1Title'),
+    desc: t('view.evolve.milestones.msBehavior1Desc'),
+    impact: t('view.evolve.milestones.msBehavior1Impact'),
   },
   {
     key: 'ms-cap-2',
     time: '2026-06',
     type: 'capability',
     typeIcon: 'network',
-    title: 'Cross-agent lineage tracking',
-    desc: 'Configuration lineage now records parent → child version chains across all agents for full auditability.',
-    impact: '+full audit trail',
+    title: t('view.evolve.milestones.msCap2Title'),
+    desc: t('view.evolve.milestones.msCap2Desc'),
+    impact: t('view.evolve.milestones.msCap2Impact'),
   },
   {
     key: 'ms-perf-2',
     time: '2026-07',
     type: 'perf',
     typeIcon: 'zap',
-    title: 'Parallel A/B experiments',
-    desc: 'Multiple experiments can now run concurrently per agent, cutting tuning cycle time from hours to minutes.',
-    impact: '−68% cycle time',
+    title: t('view.evolve.milestones.msPerf2Title'),
+    desc: t('view.evolve.milestones.msPerf2Desc'),
+    impact: t('view.evolve.milestones.msPerf2Impact'),
   },
   {
     key: 'ms-behavior-2',
     time: '2026-08',
     type: 'behavior',
     typeIcon: 'shield',
-    title: 'Human-in-the-loop gate',
-    desc: 'High-risk config changes now require explicit approval, with pending queue and one-click approve/reject.',
-    impact: '0 unapproved promotions',
+    title: t('view.evolve.milestones.msBehavior2Title'),
+    desc: t('view.evolve.milestones.msBehavior2Desc'),
+    impact: t('view.evolve.milestones.msBehavior2Impact'),
   },
-];
+]);
 
 // 里程碑类型 → 徽章 tone 映射
 const milestoneToneMap = {
@@ -735,7 +736,7 @@ onMounted(() => {
 .muted { color: var(--text-muted); }
 
 /* ── 演化里程碑响应式 ── */
-@media (max-width: 700px) {
+@media (max-width: 640px) {
   .evolve-milestones__node {
     grid-template-columns: 24px 1fr;
     gap: var(--sp-2);

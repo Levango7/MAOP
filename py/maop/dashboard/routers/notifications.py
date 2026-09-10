@@ -56,7 +56,9 @@ Endpoints:
 
 from __future__ import annotations
 
+import json
 import logging
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
@@ -512,6 +514,7 @@ async def get_stats(request: Request) -> dict[str, Any]:
 
 
 # ── Dynamic notification routes (MUST come after all static paths) ──
+# WARNING: route order matters - static paths must come before parameterized paths.
 # FastAPI matches routes in registration order. The /{notification_id}
 # wildcard would otherwise shadow /unread-count, /dead-letters, /stats,
 # /send, /preferences, /events/publish, /ws, etc. So we register these
@@ -629,15 +632,15 @@ async def notifications_ws(ws: WebSocket) -> Any:
     async with _ws_lock:
         _ws_clients.add(ws)
     try:
-        await ws.send_json({"type": "hello", "msg": "MAOP Notifications WebSocket", "ts": __import__("time").time()})
+        await ws.send_json({"type": "hello", "msg": "MAOP Notifications WebSocket", "ts": time.time()})
         while True:
             data = await ws.receive_text()
             if data == "ping":
-                await ws.send_json({"type": "pong", "ts": __import__("time").time()})
+                await ws.send_json({"type": "pong", "ts": time.time()})
             else:
                 # Try to parse JSON commands
                 try:
-                    cmd = __import__("json").loads(data)
+                    cmd = json.loads(data)
                     action = cmd.get("action")
                     if action == "mark_read":
                         notif_id = cmd.get("id", "")

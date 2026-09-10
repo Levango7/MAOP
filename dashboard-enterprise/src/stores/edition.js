@@ -66,7 +66,12 @@ export const useEditionStore = defineStore('edition', () => {
       if (res.status === 401) {
         await handleUnauthorized();
         res = await fetchWithTimeout(API_ENDPOINT_EDITION, withAuth({}, {}));
-        if (res.status === 401) { return; }
+        // M1 fix: 重试仍 401 时设置 switchError，让调用方可感知鉴权失败，
+        // 而非静默 return 导致调用方误以为 fetch 成功但未更新状态。
+        if (res.status === 401) {
+          switchError.value = 'Authentication required';
+          return;
+        }
       }
       if (!res.ok) { console.error('Failed to fetch edition info: HTTP', res.status); return; }
       const data = await res.json();
@@ -116,7 +121,9 @@ export const useEditionStore = defineStore('edition', () => {
       }
       // 刷新完整 edition 信息（features/backends/degradations 可能已变化）
       await fetchEdition();
-      persistEdition(edition.value, features.value, backends.value, degradations.value);
+      // L1 fix: 移除冗余的 persistEdition() 调用——fetchEdition() 内部成功
+      // 获取数据后已调用 persistEdition() 持久化最新状态，此处重复调用
+      // 不仅冗余，还在 fetchEdition 失败时用旧数据覆盖可能已部分更新的状态。
       return data;
     } catch (e) {
       switchError.value = e.message || String(e);

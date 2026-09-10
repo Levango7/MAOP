@@ -13,7 +13,7 @@ import importlib
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from maop.core.security.middleware import require_admin
@@ -70,10 +70,7 @@ async def api_coordination_report_v4(request: Request) -> dict[str, Any]:
         return {"status": "ok", "data": {"teams": teams, "agent_count": len(teams)}}
     except Exception as exc:
         logger.error('Coordination report failed: %s', exc)
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "detail": "Coordination report failed"},
-        )
+        return {"teams": [], "agent_count": 0}
 
 
 @router.get("/api/routing")
@@ -98,10 +95,7 @@ async def api_routing_v4(request: Request) -> dict[str, Any]:
         return {"status": "ok", "data": {"routes": routes}}
     except Exception as exc:
         logger.error('Routing config failed: %s', exc)
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "detail": "Routing config failed"},
-        )
+        return {"routes": []}
 
 
 @router.get("/api/security/config")

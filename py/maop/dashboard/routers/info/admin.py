@@ -16,6 +16,8 @@ from fastapi import APIRouter, HTTPException, Request
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
+from ..state import MAOP_ROOT
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/info", tags=["info"])
@@ -85,7 +87,7 @@ async def set_edition_endpoint(request: Request) -> dict[str, Any]:
     try:
         # admin.py 路径：MAOP/py/maop/dashboard/routers/info/admin.py
         # parents[0]=info, [1]=routers, [2]=dashboard, [3]=maop, [4]=py, [5]=MAOP 根
-        maop_root = Path(__file__).resolve().parents[5]
+        maop_root = MAOP_ROOT
         from maop.control.audit import AuditLevel, AuditLog
         AuditLog(maop_root / "logs" / "audit.jsonl").log(
             action="edition.switch",
@@ -138,8 +140,8 @@ async def list_adrs() -> list[dict[str, str]]:
     import re
 
     # admin.py 路径：MAOP/py/maop/dashboard/routers/info/admin.py
-    # parents[0]=info, [1]=routers, [2]=dashboard, [3]=maop, [4]=py, [5]=MAOP 根
-    adr_dir = Path(__file__).resolve().parents[5] / "docs" / "adr"
+    # L2: 使用 ..state.MAOP_ROOT 替代 Path(__file__).resolve().parents[5]
+    adr_dir = MAOP_ROOT / "docs" / "adr"
     adrs: list[dict[str, str]] = []
     if not adr_dir.exists():
         return adrs

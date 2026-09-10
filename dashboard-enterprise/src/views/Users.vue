@@ -3,7 +3,7 @@
     <!-- 非管理员提示 -->
     <div v-if="!isAdmin" class="users-locked">
       <AppIcon name="shield" :size="32" />
-      <p>{{ t('topbar.role.admin') }} {{ t('common.required') || 'required' }}</p>
+      <p>{{ t('topbar.role.admin') }} {{ t('common.required') }}</p>
     </div>
 
     <!-- 管理员视图 -->
@@ -354,7 +354,7 @@ onMounted(fetchUsers);
 .users-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .users-form-error { color: var(--fail); font-size: var(--fs-sm); margin-top: 8px; }
 
-@media (max-width: 700px) {
+@media (max-width: 640px) {
   .users-row { grid-template-columns: 40px 1fr 1fr 60px; }
   .users-cell--created, .users-cell--login { display: none; }
 }

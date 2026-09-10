@@ -14,8 +14,8 @@ Endpoints
 - ``POST /api/supervisor/patrol`` — manually trigger one patrol round (admin).
 - ``POST /api/supervisor/action`` — manually execute a control action (admin).
 
-All GET endpoints are read-only and do not require admin auth (mirroring
-the scheduling router's policy). POST endpoints require the ``admin`` role.
+All GET endpoints are read-only and do not require admin auth.
+POST endpoints require the ``admin`` role (via ``require_admin`` middleware).
 """
 
 from __future__ import annotations
@@ -57,12 +57,6 @@ def _get_supervisor_or_404() -> Supervisor:
         )
     return sup
 
-
-def _require_admin(request: Request) -> None:
-    """Lightweight admin guard — mirrors scheduling router's pattern."""
-    roles = getattr(getattr(request, "state", None), "auth_roles", None) or []
-    if "admin" not in roles:
-        raise HTTPException(status_code=403, detail="admin role required")
 
 
 # ── Status ─────────────────────────────────────────────────────
@@ -112,7 +106,7 @@ async def api_supervisor_rule_update(
     :class:`SupervisorRule`. Invalid rules abort the update without
     partially applying.
     """
-    _require_admin(request)
+    require_admin(request)
     sup = _get_supervisor_or_404()
     try:
         new_rules = [SupervisorRule(**r) for r in body]
@@ -172,7 +166,7 @@ async def api_supervisor_action(
           "reason": "manual degrade: latency"
         }
     """
-    _require_admin(request)
+    require_admin(request)
     sup = _get_supervisor_or_404()
     action_str = body.action.strip().lower()
     params = body.params or {}
@@ -266,7 +260,7 @@ async def api_supervisor_patrol(
     Returns the probes collected this round and the count of issues
     found (rules matched + unreachable strikes).
     """
-    _require_admin(request)
+    require_admin(request)
     sup = _get_supervisor_or_404()
     # 在路由层测量 patrol 持续时间，避免访问 sup 的内部属性 _last_patrol_duration_s
     _start = time.monotonic()

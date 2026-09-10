@@ -676,7 +676,7 @@ onMounted(loadAll);
 .btn--primary { background: var(--brand); color: var(--brand-contrast); border-color: var(--brand); }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
 
-@media (max-width: 700px) {
+@media (max-width: 640px) {
   .notif-row { grid-template-columns: 4px 36px 1fr auto; }
   .notif-row__time { display: none; }
 }

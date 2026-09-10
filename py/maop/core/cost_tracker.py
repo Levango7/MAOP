@@ -121,6 +121,15 @@ class CostTracker:
         self._budget_warned_monthly = False
         self._init_db()
 
+    @property
+    def db_path(self) -> Path:
+        """M4 修复：公共访问器，暴露 SQLite 数据库路径。
+
+        替代直接访问私有属性 ``_db_path``，供 PersonalCostGuard 等外部
+        模块安全地获取数据库路径以查询累计花费。
+        """
+        return self._db_path
+
     def _init_db(self) -> None:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite_connect(self._db_path) as conn:

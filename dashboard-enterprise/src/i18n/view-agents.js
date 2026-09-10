@@ -111,6 +111,9 @@ export const messages = {
     'view.agents.noMemories': 'No memories yet',
     'view.agents.switchModelTo': 'Switch to model {name}',
     'view.agents.checkFailed': 'Check failed',
+    // ── 性能指标标签 (M10 修复: 替换硬编码英文) ──
+    'view.agents.metricLastLatency': 'Last Latency',
+    'view.agents.metricConsecutiveFailures': 'Consecutive Failures',
 
   },
 
@@ -226,6 +229,9 @@ export const messages = {
     'view.agents.noMemories': '暂无记忆数据',
     'view.agents.switchModelTo': '切换到模型 {name}',
     'view.agents.checkFailed': '检查失败',
+    // ── 性能指标标签 (M10 修复: 替换硬编码英文) ──
+    'view.agents.metricLastLatency': '最近延迟',
+    'view.agents.metricConsecutiveFailures': '连续失败次数',
 
   },
 };

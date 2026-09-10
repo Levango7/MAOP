@@ -1,7 +1,7 @@
 <template>
   <div v-if="node" class="node-detail-panel">
     <div class="ndp-header">
-      <span class="ndp-status-dot" :class="`status-${node.status}`"></span>
+      <span class="ndp-status-dot" :class="`ndp-status-${node.status}`"></span>
       <h4>{{ node.node_id }}</h4>
       <button class="ndp-close" :aria-label="t('common.close')" @click="$emit('close')">
         <AppIcon name="x" :size="16" />
@@ -10,7 +10,7 @@
     <div class="ndp-body">
       <div class="ndp-row">
         <span class="ndp-label">{{ t('view.nodedetailpanel.status') }}</span>
-        <span class="ndp-value" :class="`status-${node.status}`">{{ node.status }}</span>
+        <span class="ndp-value" :class="`ndp-status-${node.status}`">{{ node.status }}</span>
       </div>
       <div class="ndp-row">
         <span class="ndp-label">{{ t('view.nodedetailpanel.timestamp') }}</span>
@@ -78,7 +78,7 @@ function formatTime(ts) {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: 10px 14px;
+  padding: var(--sp-2) var(--sp-3);
   border-bottom: 1px solid var(--border, #3c4048);
   background: var(--bg-muted, rgba(148,163,184,.16));
 }
@@ -99,11 +99,11 @@ function formatTime(ts) {
   align-items: center;
 }
 .ndp-close:hover { background: var(--bg-hover, rgba(148,163,184,.16)); }
-.ndp-body { padding: 10px 14px; }
+.ndp-body { padding: var(--sp-2) var(--sp-3); }
 .ndp-row {
   display: flex;
   gap: var(--sp-3);
-  padding: 6px 0;
+  padding: var(--sp-1) 0;
   align-items: flex-start;
 }
 .ndp-row + .ndp-row { border-top: 1px solid var(--border-light, rgba(148,163,184,.16)); }
@@ -142,14 +142,14 @@ function formatTime(ts) {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.status-pending { color: var(--text-faint); }
-.status-pending .ndp-status-dot, .ndp-status-dot.status-pending { background: var(--text-faint); }
-.status-running { color: var(--info); }
-.status-running .ndp-status-dot, .ndp-status-dot.status-running { background: var(--info); }
-.status-success { color: var(--success); }
-.status-success .ndp-status-dot, .ndp-status-dot.status-success { background: var(--success); }
-.status-failed { color: var(--fail); }
-.status-failed .ndp-status-dot, .ndp-status-dot.status-failed { background: var(--fail); }
-.status-skipped { color: var(--warn); }
-.status-skipped .ndp-status-dot, .ndp-status-dot.status-skipped { background: var(--warn); }
+.ndp-status-pending { color: var(--text-faint); }
+.ndp-status-pending .ndp-status-dot, .ndp-status-dot.status-pending { background: var(--text-faint); }
+.ndp-status-running { color: var(--info); }
+.ndp-status-running .ndp-status-dot, .ndp-status-dot.status-running { background: var(--info); }
+.ndp-status-success { color: var(--success); }
+.ndp-status-success .ndp-status-dot, .ndp-status-dot.status-success { background: var(--success); }
+.ndp-status-failed { color: var(--fail); }
+.ndp-status-failed .ndp-status-dot, .ndp-status-dot.status-failed { background: var(--fail); }
+.ndp-status-skipped { color: var(--warn); }
+.ndp-status-skipped .ndp-status-dot, .ndp-status-dot.status-skipped { background: var(--warn); }
 </style>

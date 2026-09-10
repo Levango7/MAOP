@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from maop.core.security.middleware import require_admin
@@ -416,7 +416,4 @@ async def get_config(request: Request) -> dict[str, Any]:
     except Exception as exc:
         # 批次3A: 脱敏——系统信息读取错误细节不暴露给客户端，仅日志记录。
         logger.warning("[meta] System info failed: %s", exc)
-        return JSONResponse(
-            status_code=500,
-            content={"error": "System info unavailable"},
-        )
+        raise HTTPException(status_code=500, detail="System info unavailable")

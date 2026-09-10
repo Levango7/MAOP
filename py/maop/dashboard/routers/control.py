@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
-from .state import MAOP_ROOT, active_jobs, cache, cache_lock
+from .state import MAOP_ROOT, active_jobs, active_jobs_lock, cache, cache_lock
 
 logger = logging.getLogger(__name__)
 
@@ -45,15 +45,17 @@ async def control_status(request: Request) -> dict[str, Any]:
     require_admin(request)
     jobs = []
     # B23: 使用 list() 快照避免并发迭代时字典修改抛 RuntimeError。
-    for job in list(active_jobs.values()):
-        proc = job.get("process")
-        if proc is not None:
-            if proc.returncode is not None:
-                job["status"] = "completed" if proc.returncode == 0 else "failed"
-                job["exit_code"] = proc.returncode
-            else:
-                job["status"] = "running"
-        jobs.append({k: v for k, v in job.items() if k != "process"})
+    # H3 fix: 用 active_jobs_lock 保护并发读写。
+    with active_jobs_lock:
+        for job in list(active_jobs.values()):
+            proc = job.get("process")
+            if proc is not None:
+                if proc.returncode is not None:
+                    job["status"] = "completed" if proc.returncode == 0 else "failed"
+                    job["exit_code"] = proc.returncode
+                else:
+                    job["status"] = "running"
+            jobs.append({k: v for k, v in job.items() if k != "process"})
     return {"active_jobs": jobs, "jobs": jobs, "count": len(jobs)}
 
 @router.post("/api/control/run")
@@ -75,10 +77,15 @@ async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
         cwd=str(MAOP_ROOT),
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
-    # Drain pipes in background to prevent deadlock when child output exceeds OS pipe buffer (~64KB)
-    asyncio.create_task(proc.communicate())
-    active_jobs[job_id] = {"action": "run", "status": "running",
-        "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": actual_task, "process": proc}
+    # H4 fix: 保存 task 引用到 active_jobs 字典，避免未保存的 task 引用被
+    # GC 回收时触发 "Task was destroyed but it is pending" warning。
+    # communicate() 会持续读取 stdout/stderr 直到子进程退出，防止管道缓冲区
+    # 死锁（child 输出超过 ~64KB OS pipe buffer 时会阻塞）。
+    _drain_task = asyncio.create_task(proc.communicate())
+    with active_jobs_lock:
+        active_jobs[job_id] = {"action": "run", "status": "running",
+            "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": actual_task,
+            "process": proc, "_drain_task": _drain_task}
     return {"job_id": job_id, "status": "started", "task": actual_task}
 
 @router.post("/api/control/pause")
@@ -91,11 +98,13 @@ async def control_pause(request: Request) -> dict[str, Any]:
     pause_file.write_text("paused")
     paused = 0
     # B23: 使用 list() 快照避免并发迭代时字典修改抛 RuntimeError。
-    for job in list(active_jobs.values()):
-        proc = job.get("process")
-        if proc and proc.returncode is None and job.get("status") == "running":
-            job["status"] = "paused"
-            paused += 1
+    # H3 fix: 用 active_jobs_lock 保护并发读写。
+    with active_jobs_lock:
+        for job in list(active_jobs.values()):
+            proc = job.get("process")
+            if proc and proc.returncode is None and job.get("status") == "running":
+                job["status"] = "paused"
+                paused += 1
     return {"status": "ok", "action": "pause", "paused": paused}
 
 @router.post("/api/control/resume")
@@ -108,10 +117,12 @@ async def control_resume(request: Request) -> dict[str, Any]:
         pause_file.unlink()
     resumed = 0
     # B23: 使用 list() 快照避免并发迭代时字典修改抛 RuntimeError。
-    for job in list(active_jobs.values()):
-        if job.get("status") == "paused":
-            job["status"] = "running"
-            resumed += 1
+    # H3 fix: 用 active_jobs_lock 保护并发读写。
+    with active_jobs_lock:
+        for job in list(active_jobs.values()):
+            if job.get("status") == "paused":
+                job["status"] = "running"
+                resumed += 1
     return {"status": "ok", "action": "resume", "resumed": resumed}
 
 
@@ -127,16 +138,19 @@ async def control_pause_status(request: Request) -> dict[str, Any]:
     pause_file = MAOP_ROOT / "logs" / ".maop_pause"
     is_paused = pause_file.exists()
     # B23: 使用 list() 快照避免并发迭代时字典修改抛 RuntimeError。
-    jobs_snapshot = list(active_jobs.values())
-    paused_jobs = sum(1 for job in jobs_snapshot if job.get("status") == "paused")
-    running_jobs = sum(1 for job in jobs_snapshot if job.get("status") == "running")
+    # H3 fix: 用 active_jobs_lock 保护并发读写。
+    with active_jobs_lock:
+        jobs_snapshot = list(active_jobs.values())
+        paused_jobs = sum(1 for job in jobs_snapshot if job.get("status") == "paused")
+        running_jobs = sum(1 for job in jobs_snapshot if job.get("status") == "running")
+        total_jobs = len(active_jobs)
     return {
         "status": "paused" if is_paused else "running",
         "is_paused": is_paused,
         "pause_file": str(pause_file),
         "paused_jobs": paused_jobs,
         "running_jobs": running_jobs,
-        "total_jobs": len(active_jobs),
+        "total_jobs": total_jobs,
     }
 
 @router.post("/api/control/stop")
@@ -146,12 +160,14 @@ async def control_stop(request: Request) -> dict[str, Any]:
     require_admin(request)
     stopped = 0
     # B23: 使用 list() 快照避免并发迭代时字典修改抛 RuntimeError。
-    for job in list(active_jobs.values()):
-        proc = job.get("process")
-        if proc and proc.returncode is None:
-            proc.terminate()
-            job["status"] = "stopped"
-            stopped += 1
+    # H3 fix: 用 active_jobs_lock 保护并发读写。
+    with active_jobs_lock:
+        for job in list(active_jobs.values()):
+            proc = job.get("process")
+            if proc and proc.returncode is None:
+                proc.terminate()
+                job["status"] = "stopped"
+                stopped += 1
     return {"status": "ok", "action": "stop", "stopped": stopped}
 
 @router.post("/api/control/validate")
@@ -163,12 +179,15 @@ async def control_validate(request: Request) -> dict[str, Any]:
     try:
         from maop.deploy import validate_config
         result = validate_config(MAOP_ROOT)
-        active_jobs[job_id] = {"action": "validate", "status": "completed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "config validation", "result": result.model_dump()}
+        with active_jobs_lock:
+            active_jobs[job_id] = {"action": "validate", "status": "completed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "config validation", "result": result.model_dump()}
         return {"job_id": job_id, "status": "completed", "result": result.model_dump()}
     except Exception:
         logger.exception("Validate failed")
-        active_jobs[job_id] = {"action": "validate", "status": "failed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "config validation", "error": "Validate failed"}
-        return {"job_id": job_id, "status": "failed", "error": "Validate failed"}
+        with active_jobs_lock:
+            active_jobs[job_id] = {"action": "validate", "status": "failed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "config validation", "error": "Validate failed"}
+        # M4 fix: 统一错误处理——raise HTTPException 让 handle_api_errors 装饰器处理。
+        raise HTTPException(status_code=500, detail="Validate failed")
 
 @router.post("/api/control/doctor")
 @handle_api_errors("control doctor")
@@ -179,12 +198,15 @@ async def control_doctor(request: Request) -> dict[str, Any]:
     try:
         from maop.deploy import health_check
         results = health_check(MAOP_ROOT)
-        active_jobs[job_id] = {"action": "doctor", "status": "completed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "system diagnostics", "result": [r.model_dump() for r in results]}
+        with active_jobs_lock:
+            active_jobs[job_id] = {"action": "doctor", "status": "completed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "system diagnostics", "result": [r.model_dump() for r in results]}
         return {"job_id": job_id, "status": "completed", "result": [r.model_dump() for r in results]}
     except Exception:
         logger.exception("Doctor check failed")
-        active_jobs[job_id] = {"action": "doctor", "status": "failed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "system diagnostics", "error": "Doctor check failed"}
-        return {"job_id": job_id, "status": "failed", "error": "Doctor check failed"}
+        with active_jobs_lock:
+            active_jobs[job_id] = {"action": "doctor", "status": "failed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "system diagnostics", "error": "Doctor check failed"}
+        # M4 fix: 统一错误处理——raise HTTPException 让 handle_api_errors 装饰器处理。
+        raise HTTPException(status_code=500, detail="Doctor check failed")
 
 @router.post("/api/control/cancel")
 @handle_api_errors("control cancel")
@@ -192,12 +214,14 @@ async def control_cancel(body: CancelRequest, request: Request) -> dict[str, Any
     """Cancel a running job by ID."""
     require_admin(request)
     job_id = body.job_id
-    if job_id in active_jobs:
-        proc = active_jobs[job_id].get("process")
-        if proc and proc.returncode is None:
-            proc.terminate()
-        active_jobs[job_id]["status"] = "cancelled"
-        return {"job_id": job_id, "status": "cancelled"}
+    # H3 fix: 用 active_jobs_lock 保护并发读写。
+    with active_jobs_lock:
+        if job_id in active_jobs:
+            proc = active_jobs[job_id].get("process")
+            if proc and proc.returncode is None:
+                proc.terminate()
+            active_jobs[job_id]["status"] = "cancelled"
+            return {"job_id": job_id, "status": "cancelled"}
     raise HTTPException(404, "job not found")
 
 @router.post("/api/control/refresh")
@@ -230,7 +254,8 @@ async def control_provider_health(request: Request) -> dict[str, Any]:
         return {"status": "ok", "components": [r.model_dump() for r in results]}
     except Exception:
         logger.exception("Provider health check failed")
-        return {"status": "error", "error": "Provider health check failed"}
+        # M4 fix: 统一错误处理——raise HTTPException 让 handle_api_errors 装饰器处理。
+        raise HTTPException(status_code=500, detail="Provider health check failed")
 
 async def _maintain_log_rotate() -> dict[str, Any]:
     """log-rotate 维护操作：轮转日志文件。"""

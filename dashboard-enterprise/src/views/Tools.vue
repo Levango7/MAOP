@@ -304,7 +304,7 @@ async function onImport(e) {
     importedSkills.value = [...importedSkills.value, ...next];
     saveLocal(LS_IMPORTED, importedSkills.value);
   } catch (err) {
-    errors.value = { ...errors.value, skills: 'Import failed: ' + (err && err.message ? err.message : err) };
+    errors.value = { ...errors.value, skills: t('view.tools.importFailed', { detail: (err && err.message ? err.message : err) }) };
   }
 }
 

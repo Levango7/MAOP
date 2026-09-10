@@ -14,6 +14,9 @@ import { ref, onUnmounted } from 'vue';
 export function useAgentTokenStream() {
   const streaming = ref(false);
   const content = ref('');
+  // L7 fix: tokenCount 实际存储的是 content.value.length（字符数），
+  // 而非 LLM token 数。命名保留以兼容现有调用方，但此处明确注释：
+  /* charCount: actually character count, not token count */
   const tokenCount = ref(0);
   const meta = ref(null);
   let eventSource = null;

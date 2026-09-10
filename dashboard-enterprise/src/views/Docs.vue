@@ -18,7 +18,7 @@
                 @click="selectDoc(doc)"
               >
                 <AppIcon name="file-text" :size="13" class="doc-cat__icon" />
-                <span>{{ doc.name }}</span>
+                <span>{{ t(doc.nameKey) }}</span>
               </button>
             </li>
           </ul>
@@ -61,38 +61,38 @@ const categories = [
     titleKey: 'view.docs.gettingStarted',
     icon: 'book-open',
     items: [
-      { name: 'Deployment Guide', path: 'deployment.md' },
-      { name: 'API Reference', path: 'api-reference.md' },
-      { name: 'Database Schema', path: 'database-schema.md' },
-      { name: 'Design System (Legacy)', path: 'archive/audits/design-system-legacy.md' },
+      { nameKey: 'view.docs.doc.deploymentGuide', path: 'deployment.md' },
+      { nameKey: 'view.docs.doc.apiReference', path: 'api-reference.md' },
+      { nameKey: 'view.docs.doc.databaseSchema', path: 'database-schema.md' },
+      { nameKey: 'view.docs.doc.designSystemLegacy', path: 'archive/audits/design-system-legacy.md' },
     ],
   },
   {
     titleKey: 'view.docs.guides',
     icon: 'compass',
     items: [
-      { name: 'Troubleshooting', path: 'troubleshooting.md' },
-      { name: 'Performance Benchmarks', path: 'performance-benchmarks.md' },
-      { name: 'Plugin Migration', path: 'plugin-migration.md' },
-      { name: 'Platform Evolution', path: 'platform-evolution.md' },
-      { name: 'Contributing', path: 'contributing.md' },
+      { nameKey: 'view.docs.doc.troubleshooting', path: 'troubleshooting.md' },
+      { nameKey: 'view.docs.doc.performanceBenchmarks', path: 'performance-benchmarks.md' },
+      { nameKey: 'view.docs.doc.pluginMigration', path: 'plugin-migration.md' },
+      { nameKey: 'view.docs.doc.platformEvolution', path: 'platform-evolution.md' },
+      { nameKey: 'view.docs.doc.contributing', path: 'contributing.md' },
     ],
   },
   {
     titleKey: 'view.docs.enterprise',
     icon: 'building',
     items: [
-      { name: 'License Issuance Guide', path: 'enterprise/license-issuance-guide.md' },
-      { name: 'License CRL Guide', path: 'enterprise/license-crl-guide.md' },
-      { name: 'SAML SSO Guide', path: 'enterprise/saml-sso-guide.md' },
+      { nameKey: 'view.docs.doc.licenseIssuanceGuide', path: 'enterprise/license-issuance-guide.md' },
+      { nameKey: 'view.docs.doc.licenseCrlGuide', path: 'enterprise/license-crl-guide.md' },
+      { nameKey: 'view.docs.doc.samlSsoGuide', path: 'enterprise/saml-sso-guide.md' },
     ],
   },
   {
     titleKey: 'view.docs.integrations',
     icon: 'plug',
     items: [
-      { name: 'n8n Integration', path: 'integrations/n8n.md' },
-      { name: 'OmniRoute Integration', path: 'integrations/omniroute.md' },
+      { nameKey: 'view.docs.doc.n8nIntegration', path: 'integrations/n8n.md' },
+      { nameKey: 'view.docs.doc.omnirouteIntegration', path: 'integrations/omniroute.md' },
     ],
   },
 ];

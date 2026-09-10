@@ -169,9 +169,10 @@ async def api_overview(request: Request) -> dict[str, Any]:
         return result
     except Exception as exc:
         logger.error('Overview failed: %s', exc)
-        return JSONResponse(
+        # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
+        raise HTTPException(
             status_code=500,
-            content={"status": "error", "error": "Overview failed", "agents_total": 0, "modules_total": 0, "tests_total": 0},
+            detail="Overview failed",
         )
 
 

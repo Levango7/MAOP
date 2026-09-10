@@ -88,7 +88,8 @@ class PersonalCostGuard:
         明确为"全局累计"而非"当日/当月"。
         """
         tracker = self._get_tracker()
-        db_path = tracker._db_path
+        # M4 修复：通过公共属性 db_path 访问，而非私有属性 _db_path
+        db_path = getattr(tracker, "db_path", None) or tracker._db_path
         with sqlite_connect(db_path) as conn:
             row = conn.execute(
                 "SELECT COALESCE(SUM(cost_usd), 0) as total FROM cost_entries"

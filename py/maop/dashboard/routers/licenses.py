@@ -21,6 +21,7 @@ Endpoints
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -43,6 +44,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/licenses", tags=["licenses"])
 
 _license_manager: Any = None
+_license_manager_lock = threading.Lock()
 
 
 def _get_manager() -> Any:
@@ -53,7 +55,11 @@ def _get_manager() -> Any:
     to point to the real signing key path.
     """
     global _license_manager
-    if _license_manager is None:
+    if _license_manager is not None:
+        return _license_manager
+    with _license_manager_lock:
+        if _license_manager is not None:  # double-checked locking
+            return _license_manager
         import os
         from pathlib import Path
 

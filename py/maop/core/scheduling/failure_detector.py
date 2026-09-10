@@ -511,6 +511,9 @@ class FailurePatternDetector:
             except RuntimeError:
                 # No running loop — run to completion on a fresh loop so
                 # tests / sync callers still see the event in history.
+                # H2 修复：此处在 except RuntimeError 块内，仅当无运行中
+                # 的事件循环时才调用 asyncio.run()，不会抛 "cannot be
+                # called from a running event loop" RuntimeError。
                 asyncio.run(self._event_bus.publish(event))
         except Exception as exc:
             logger.debug("[failure-detector] event publish failed: %s", exc)

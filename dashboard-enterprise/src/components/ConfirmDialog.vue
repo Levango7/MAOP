@@ -65,8 +65,8 @@ function onCancel() { resolve(false); }
   padding: var(--sp-5);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-modal);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);

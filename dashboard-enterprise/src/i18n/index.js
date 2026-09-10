@@ -21,6 +21,9 @@
 import { useUiStore } from '../stores/ui.js';
 
 export const coreMessages = {
+  // L11 fix: en 与 zh 的键顺序可能不一致（zh 按 F34 补全时重新分组排序）。
+  // 这不影响功能——t() 按 key 查找而非按顺序索引，键顺序仅影响可读性。
+  // 如需对齐顺序，应作为独立重构任务处理，避免与翻译补全混在一起增加 review 负担。
   en: {
     // ── Sidebar navigation ──────────────────────────────────────
     // 2026-08-12 (RFC-001 迭代 A): 6-group journey-based IA
@@ -231,6 +234,9 @@ export const coreMessages = {
     'common.provider': 'Provider',
     'common.disabled': 'Disabled',
     'common.required': 'Required',
+    'common.id': 'ID',
+    'common.default': 'default',
+    'common.severityMedium': 'MEDIUM',
     // ── Relative time (P2-3: replace hardcoded English) ──────────
     'common.justNow': 'just now',
     'common.secondsAgo': '{n}s ago',
@@ -523,6 +529,9 @@ export const coreMessages = {
     'common.provider': '提供商',
     'common.disabled': '已禁用',
     'common.required': '必填',
+    'common.id': 'ID',
+    'common.default': '默认',
+    'common.severityMedium': '中',
 
     // ── 引导标记 ──────────────────────────────────────────
     'coach.actions.title': '快捷操作',

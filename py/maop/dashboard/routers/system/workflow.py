@@ -76,13 +76,16 @@ async def api_workflow_run(request: Request) -> dict[str, Any]:
         "--task", task or wf_name,
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
-    # Drain pipes in background to prevent deadlock when child output exceeds OS pipe buffer (~64KB)
-    asyncio.create_task(proc.communicate())
-    _deps.active_jobs[job_id] = {
-        "action": "workflow", "status": "running",
-        "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "task": wf_name, "process": proc,
-    }
+    # H4 fix: 保存 task 引用到 active_jobs 字典，避免未保存的 task 引用被
+    # GC 回收时触发 "Task was destroyed but it is pending" warning。
+    _drain_task = asyncio.create_task(proc.communicate())
+    # H3 fix: 用 active_jobs_lock 保护并发读写。
+    with _deps.active_jobs_lock:
+        _deps.active_jobs[job_id] = {
+            "action": "workflow", "status": "running",
+            "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "task": wf_name, "process": proc, "_drain_task": _drain_task,
+        }
     return {"job_id": job_id, "status": "started", "workflow": wf_name}
 
 
@@ -111,7 +114,8 @@ async def api_workflows_v4(request: Request) -> dict[str, Any]:
         return {"workflows": wfs, "count": len(wfs)}
     except Exception as exc:
         logger.error('Workflows list failed: %s', exc)
-        return JSONResponse(
+        # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
+        raise HTTPException(
             status_code=500,
-            content={"workflows": [], "count": 0, "error": "Workflows list failed"},
+            detail="Workflows list failed",
         )

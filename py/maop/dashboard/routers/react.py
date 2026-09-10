@@ -5,12 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+
+from .state import MAOP_ROOT
 
 router = APIRouter(prefix="/api/react", tags=["react"])
 
@@ -35,14 +37,12 @@ class RestoreArtifactRequest(BaseModel):
 
 def _get_change_tracker():
     from maop.core.reliability.change_tracker import ChangeTracker
-    root = Path(__file__).resolve().parent.parent.parent.parent
-    return ChangeTracker(root_dir=str(root))
+    return ChangeTracker(root_dir=str(MAOP_ROOT))
 
 
 def _get_artifact_store():
     from maop.core.backends.artifact_store import ArtifactStore
-    root = Path(__file__).resolve().parent.parent.parent.parent
-    return ArtifactStore(root_dir=str(root))
+    return ArtifactStore(root_dir=str(MAOP_ROOT))
 
 
 @router.get("/snapshots")
@@ -136,10 +136,7 @@ async def load_artifact(request: Request, name: str, version: int | None = Query
     store = _get_artifact_store()
     content = store.load(name, version=version)
     if content is None:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "error", "error": "Artifact not found"},
-        )
+        raise HTTPException(status_code=404, detail="Artifact not found")
     return {"name": name, "content": content}
 
 

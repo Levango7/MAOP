@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -420,20 +420,14 @@ async def api_evolution_approval_decision(approval_id: str, request: Request, bo
     try:
         cycle_id, suggestion_id = approval_id.split(":", 1)
     except ValueError:
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "error": "Invalid approval_id format (cycle_id:suggestion_id)"},
-        )
+        raise HTTPException(status_code=400, detail="Invalid approval_id format (cycle_id:suggestion_id)")
 
     decision = body.decision.lower()
     approved_by = body.approved_by
     reason = body.reason
 
     if decision not in ("approve", "reject"):
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "error": "decision must be 'approve' or 'reject'"},
-        )
+        raise HTTPException(status_code=400, detail="decision must be 'approve' or 'reject'")
 
     # 这里简化实现：仅更新 LoopReport 的 approval_state
     # 完整实现需持久化审批记录、触发后续 APPLY/AB 流程
@@ -443,6 +437,8 @@ async def api_evolution_approval_decision(approval_id: str, request: Request, bo
     try:
         loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
         # 尝试读取并更新该 cycle 的报告
+        # M5: _load_report 是 EvolutionLoop 内部协调接口，非公开 API；
+        # 此处通过内部方法读取循环报告以支持审批决策持久化。
         report = loop._load_report(cycle_id)  # 假设有此方法或通过 DB 查询
         if not report:
             return {"status": "error", "error": f"Cycle {cycle_id} not found"}
@@ -455,12 +451,14 @@ async def api_evolution_approval_decision(approval_id: str, request: Request, bo
         report.approval_state = "approved" if decision == "approve" else "rejected"
         report.approved_by = approved_by
         report.approved_at = time.time()
+        # M5: _save_report 是 EvolutionLoop 内部协调接口，非公开 API；
+        # 此处通过内部方法持久化审批后的循环报告。
         loop._save_report(report)
 
         return {"status": "ok", "decision": decision, "approval_id": approval_id, "cycle_id": cycle_id}
     except Exception as exc:
         logger.warning("Evolution approval decision failed: %s", exc, exc_info=True)
-        return {"status": "error", "error": "Evolution approval decision failed, please try again later"}
+        raise HTTPException(status_code=500, detail="Evolution approval decision failed, please try again later")
 
 
 @router.get("/api/evolution/ab/{cycle_id}")

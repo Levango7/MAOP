@@ -116,8 +116,13 @@ class ApiKeyVault:
                     len(env_key),
                 )
             except Exception as exc:
-                logger.warning(
-                    "[api_key_vault] MAOP_KEY set but could not be decoded: %s; falling through to key file",
+                # M6 修复：MAOP_KEY 设置但解码失败意味着密钥配置错误，
+                # 可能导致回退到文件密钥或生成新密钥——提升告警级别以醒目提示。
+                logger.error(
+                    "[api_key_vault] MAOP_KEY env var is set but could not be "
+                    "decoded: %s; falling through to key file. "
+                    "Verify MAOP_KEY is a valid 44-char Fernet key or 32-byte "
+                    "urlsafe-base64 value.",
                     exc,
                 )
 
@@ -298,9 +303,17 @@ class ApiKeyVault:
 
         # If MAOP_KEY env var is set, the persisted file is shadowed on restart.
         if os.environ.get("MAOP_KEY", "").strip():
-            logger.warning(
-                "[api_key_vault] MAOP_KEY env var is set; the rotated key has been "
-                "written to %s but will be ignored on restart until MAOP_KEY is updated.",
+            # M6 修复：密钥轮换后 MAOP_KEY 环境变量会遮蔽新密钥——重启后
+            # 进程仍读取旧 MAOP_KEY，导致用旧密钥解密新密钥加密的数据失败，
+            # 所有已存储的 API key 将不可读。这是严重的数据可用性问题，
+            # 告警从 WARNING 提升为 ERROR 并添加醒目提示。
+            logger.error(
+                "[api_key_vault] !!! CRITICAL: MAOP_KEY env var is set !!! "
+                "The rotated key has been written to %s but will be SHADOWED "
+                "on restart — the old MAOP_KEY will be used instead, making "
+                "all re-encrypted secrets UNREADABLE. "
+                "ACTION REQUIRED: update MAOP_KEY to the new key or unset it "
+                "before restarting, otherwise stored API keys will be lost.",
                 key_path,
             )
 

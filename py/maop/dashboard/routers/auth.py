@@ -14,13 +14,14 @@ import hmac
 import json
 import logging
 import os
+import sqlite3
 import threading
 import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -367,7 +368,8 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
     username = body.username
     password = body.password
     if not username or not password:
-        return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
+        # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
+        raise HTTPException(status_code=400, detail="Username and password required")
 
     try:
         now = time.monotonic()
@@ -433,12 +435,12 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
                     for ip in evictable_ip[:excess_ip]:
                         del _login_failures_by_ip[ip]
         if len(failures) >= _MAX_LOGIN_FAILURES:
-            return JSONResponse({"status": "error", "error": "Account locked. Try again later."}, status_code=429)
+            raise HTTPException(status_code=429, detail="Account locked. Try again later.")
         # H6 fix: IP 维度限流 —— 同一 IP 15 分钟内失败超过 5 次则锁定
         if len(ip_failures) >= _MAX_LOGIN_FAILURES:
-            return JSONResponse(
-                {"status": "error", "error": "Too many login attempts from this IP. Try again later."},
+            raise HTTPException(
                 status_code=429,
+                detail="Too many login attempts from this IP. Try again later.",
             )
 
         db_path = get_db_path("auth")
@@ -453,7 +455,7 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
             with _login_failures_lock:
                 _login_failures.setdefault(username, []).append(now)
                 _login_failures_by_ip.setdefault(client_ip, []).append(now)  # H6 fix
-            return JSONResponse(result, status_code=401)
+            raise HTTPException(status_code=401, detail=result.get("error", "Login failed"))
 
         mgr = get_auth_mgr()
         token = mgr.jwt_handler.create_token(result["username"], roles=result["roles"], ttl_s=7200.0)
@@ -475,14 +477,15 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
             httponly=True, secure=True, samesite="strict", path="/",
         )
         return response
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Login error")
         # sqlite3.Error（如数据库未初始化、表缺失）视为认证服务不可用，返回 401；
         # 其他异常（如 TypeError、IOError 等代码bug）视为内部错误，返回 500。
-        import sqlite3 as _sqlite3
-        if isinstance(exc, _sqlite3.Error):
-            return JSONResponse({"status": "error", "error": "Login failed"}, status_code=401)
-        return JSONResponse({"status": "error", "error": "Login failed"}, status_code=500)
+        if isinstance(exc, sqlite3.Error):
+            raise HTTPException(status_code=401, detail="Login failed")
+        raise HTTPException(status_code=500, detail="Login failed")
 
 
 @router.post("/api/auth/refresh")
@@ -494,18 +497,18 @@ async def auth_refresh(request: Request):
     """
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
-        return JSONResponse(
-            {"status": "error", "error": "Missing or invalid Authorization header"},
+        raise HTTPException(
             status_code=401,
+            detail="Missing or invalid Authorization header",
         )
     token = auth_header[7:]
     try:
         mgr = get_auth_mgr()
         result = mgr.jwt_handler.validate_token(token)
         if not result.authenticated:
-            return JSONResponse(
-                {"status": "error", "error": result.error or "Token invalid or expired"},
+            raise HTTPException(
                 status_code=401,
+                detail=result.error or "Token invalid or expired",
             )
         # Issue new token with same identity + roles
         new_token = mgr.jwt_handler.create_token(
@@ -531,11 +534,13 @@ async def auth_refresh(request: Request):
             logger.warning('[auth] auth_refresh：吊销旧 token 失败已忽略（best-effort），可能残留可用的旧 token', exc_info=True)
             # best-effort revocation
         return response
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("[auth] Token refresh failed: %s", exc)
-        return JSONResponse(
-            {"status": "error", "error": "Refresh failed, please try again later"},
+        raise HTTPException(
             status_code=500,
+            detail="Refresh failed, please try again later",
         )
 
 
@@ -579,9 +584,9 @@ async def auth_register(request: Request, body: RegisterRequest) -> Any:
         roles = body.roles
 
         if not username or not password:
-            return JSONResponse({"status": "error", "error": "Username and password required"}, status_code=400)
+            raise HTTPException(status_code=400, detail="Username and password required")
         if len(password) < 8:
-            return JSONResponse({"status": "error", "error": "Password must be at least 8 characters"}, status_code=400)
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
         db_path = get_db_path("auth")
         if not db_path.exists():
@@ -596,14 +601,15 @@ async def auth_register(request: Request, body: RegisterRequest) -> Any:
         # P1-9: propagate the real status (409 duplicate) instead of losing it
         # through the blanket except below (which masked it as 400).
         return JSONResponse(result, status_code=result.get("http_status", 400))
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("[auth] Registration failed")
         # sqlite3.Error（如数据库未初始化、表缺失）视为注册服务不可用，返回 400；
         # 其他异常（如 TypeError、IOError 等代码bug）视为内部错误，返回 500。
-        import sqlite3 as _sqlite3
-        if isinstance(exc, _sqlite3.Error):
-            return JSONResponse({"status": "error", "error": "Registration failed"}, status_code=400)
-        return JSONResponse({"status": "error", "error": "Registration failed"}, status_code=500)
+        if isinstance(exc, sqlite3.Error):
+            raise HTTPException(status_code=400, detail="Registration failed")
+        raise HTTPException(status_code=500, detail="Registration failed")
 
 
 @router.get("/api/auth/users")
@@ -618,9 +624,11 @@ async def auth_users(request: Request) -> Any:
             None, _db_list_users, str(db_path)
         )
         return {"status": "ok", "users": users}
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("[auth] List users failed")
-        return JSONResponse({"status": "error", "error": "Failed to list users"}, status_code=500)
+        raise HTTPException(status_code=500, detail="Failed to list users")
 
 
 @router.delete("/api/auth/users/{username}")
@@ -629,7 +637,7 @@ async def auth_delete_user(username: str, request: Request) -> Any:
     try:
         _require_admin(request)
         if username == "admin":
-            return JSONResponse({"status": "error", "error": "Cannot delete admin user"}, status_code=403)
+            raise HTTPException(status_code=403, detail="Cannot delete admin user")
         db_path = get_db_path("auth")
         result = await asyncio.get_running_loop().run_in_executor(
             None, _db_delete_user, str(db_path), username
@@ -637,9 +645,11 @@ async def auth_delete_user(username: str, request: Request) -> Any:
         if result.get("status") == "ok":
             return result
         return JSONResponse(result, status_code=result.get("http_status", 500))
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("[auth] Delete user %s failed", username)
-        return JSONResponse({"status": "error", "error": "Failed to delete user"}, status_code=500)
+        raise HTTPException(status_code=500, detail="Failed to delete user")
 
 
 @router.put("/api/auth/users/{username}")
@@ -664,6 +674,8 @@ async def auth_update_user(username: str, request: Request, body: UpdateUserRequ
         if result.get("status") == "ok":
             return result
         return JSONResponse(result, status_code=result.get("http_status", 500))
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("[auth] User update failed")
-        return JSONResponse({"status": "error", "error": "Update failed"}, status_code=500)
+        raise HTTPException(status_code=500, detail="Update failed")

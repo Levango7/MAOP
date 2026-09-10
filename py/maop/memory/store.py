@@ -232,6 +232,43 @@ class MemoryStore(SearchMixin):
 
         return entry.id
 
+    def delete_entry(self, entry_id: str) -> bool:
+        """M5 修复：删除指定条目（公共 API）。
+
+        替代外部模块直接访问私有方法 ``_connect()`` 执行 SQL DELETE。
+        封装为公共方法，保持封装性并集中管理删除逻辑（含二级索引同步）。
+
+        Parameters
+        ----------
+        entry_id : str
+            要删除的条目 ID。
+
+        Returns
+        -------
+        bool
+            条目存在并删除成功返回 True；条目不存在返回 False。
+        """
+        try:
+            with self._connect() as conn:
+                cur = conn.execute(
+                    "DELETE FROM memory_entries WHERE id = ?", (entry_id,)
+                )
+                deleted = cur.rowcount > 0
+        except sqlite3.Error as exc:
+            logger.warning("[mem] delete_entry failed for %s: %s", entry_id, exc)
+            return False
+
+        if deleted:
+            # 同步 VectorStore（best-effort）
+            if self._vector_store is not None:
+                try:
+                    self._vector_store.delete(entry_id)
+                except Exception as exc:
+                    logger.debug("[mem] VectorStore delete skipped for %s: %s", entry_id, exc)
+            self._dirty = True
+
+        return deleted
+
     def _flush_json(self) -> None:
         """No-op: JSON dual-write removed (T3-1, ADR-011 single source of truth).
         SQLite memory_entries table is the canonical store. Kept for backward compat.

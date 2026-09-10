@@ -77,10 +77,12 @@
           <legend>{{ t('view.licenses.customerInfo') }}</legend>
           <label class="lic-field">
             <span>{{ t('view.licenses.customerName') }}</span>
+            <!-- placeholder 为格式示例，不参与 i18n（保持跨语言一致的客户名示例） -->
             <input v-model="form.customer_name" class="lic-input" placeholder="Acme Corporation" />
           </label>
           <label class="lic-field">
             <span>{{ t('view.licenses.customerEmail') }}</span>
+            <!-- placeholder 为格式示例，不参与 i18n（保持跨语言一致的邮箱格式演示） -->
             <input v-model="form.customer_email" class="lic-input" type="email" placeholder="admin@acme.com" />
           </label>
         </fieldset>

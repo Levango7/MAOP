@@ -50,7 +50,8 @@ async def remove_rule(rule_id: str, request: Request) -> dict[str, Any]:
 
 @router.get("/permission/rules")
 @handle_api_errors
-async def list_rules(limit: int = Query(100, ge=1, le=500)) -> dict[str, Any]:
+async def list_rules(request: Request, limit: int = Query(100, ge=1, le=500)) -> dict[str, Any]:
+    require_admin(request)
     from maop.core.security.permission import PermissionManager
     pm = PermissionManager(root_dir=str(MAOP_ROOT))
     rules = pm.list_rules(limit=limit)
@@ -59,7 +60,8 @@ async def list_rules(limit: int = Query(100, ge=1, le=500)) -> dict[str, Any]:
 
 @router.get("/permission/check")
 @handle_api_errors
-async def check_permission(agent: str, action: str = "*") -> dict[str, Any]:
+async def check_permission(request: Request, agent: str, action: str = "*") -> dict[str, Any]:
+    require_admin(request)
     from maop.core.security.permission import PermissionManager
     pm = PermissionManager(root_dir=str(MAOP_ROOT))
     check = pm.check(agent=agent, action=action)
@@ -68,7 +70,8 @@ async def check_permission(agent: str, action: str = "*") -> dict[str, Any]:
 
 @router.get("/approval/pending")
 @handle_api_errors
-async def list_pending_approvals(limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+async def list_pending_approvals(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    require_admin(request)
     from maop.core.agent.delegation.human_proxy import HumanProxy
     hp = HumanProxy(root_dir=str(MAOP_ROOT))
     pending = hp.pending(limit=limit)

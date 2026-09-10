@@ -427,14 +427,7 @@ async def oidc_callback(
             detail="SSO callback error",
         )
         # 批次3A: 脱敏——回调错误细节不暴露给客户端，仅审计日志记录。
-        return JSONResponse(
-            status_code=400,
-            content={
-                "status": "error",
-                "error": "SSO callback error",
-                "code": "SSO_CALLBACK_ERROR",
-            },
-        )
+        raise HTTPException(status_code=400, detail="SSO callback error")
     except KeyError as exc:
         # 批次3A: 脱敏——KeyError 细节不暴露给客户端，仅日志记录。
         logger.warning("[sso] OIDC callback provider not found: %s", exc)
@@ -449,14 +442,7 @@ async def oidc_callback(
             detail="SSO token exchange failed",
         )
         # 批次3A: 脱敏——token exchange 错误细节不暴露给客户端，仅审计日志记录。
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "error": "SSO token exchange failed",
-                "code": "SSO_TOKEN_EXCHANGE_FAILED",
-            },
-        )
+        raise HTTPException(status_code=401, detail="SSO token exchange failed")
     _audit(
         request,
         "sso.login.success",
@@ -535,23 +521,9 @@ async def saml_acs(
         )
         if isinstance(exc, SSOError):
             # 批次3A: 脱敏——签名错误细节不暴露给客户端，仅审计日志记录。
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "status": "error",
-                    "error": "SAML signature verification failed",
-                    "code": "SSO_SIGNATURE_INVALID",
-                },
-            )
+            raise HTTPException(status_code=403, detail="SAML signature verification failed")
         # 批次3A: 脱敏——ACS 错误细节不暴露给客户端，仅审计日志记录。
-        return JSONResponse(
-            status_code=400,
-            content={
-                "status": "error",
-                "error": "SAML ACS processing error",
-                "code": "SSO_CALLBACK_ERROR",
-            },
-        )
+        raise HTTPException(status_code=400, detail="SAML ACS processing error")
     _audit(
         request,
         "sso.login.success",

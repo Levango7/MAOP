@@ -159,11 +159,11 @@ async function execAction(action, task) {
       if (!validActions.includes(action)) throw new Error(`Unknown action: ${action}`);
       const body = task ? { task } : {};
       const r = await api.post(`/api/control/${action}`, body);
-      execResult.value = { ok: true, msg: r.msg || r.message || r.detail || `${action} executed` };
+      execResult.value = { ok: true, msg: r.msg || r.message || r.detail || t('view.control.actionExecuted', { action }) };
     }
     await loadJobs();
   } catch (e) {
-    execResult.value = { ok: false, msg: e.message || `${action} failed` };
+    execResult.value = { ok: false, msg: e.message || t('view.control.actionFailed', { action }) };
     toast.error(e.message || t('view.control.actionFailed', { action }));
   } finally {
     loading.value = false;
@@ -175,10 +175,10 @@ async function maintainAction(action) {
   maintResult.value = null;
   try {
     const r = await api.post('/api/control/maintain', { action });
-    maintResult.value = { ok: true, msg: r.msg || r.message || r.detail || `${action} completed` };
+    maintResult.value = { ok: true, msg: r.msg || r.message || r.detail || t('view.control.actionCompleted', { action }) };
     toast.success(t('view.control.actionCompleted', { action }));
   } catch (e) {
-    maintResult.value = { ok: false, msg: e.message || `${action} failed` };
+    maintResult.value = { ok: false, msg: e.message || t('view.control.actionFailed', { action }) };
     toast.error(e.message || t('view.control.actionFailed', { action }));
   } finally {
     loading.value = false;

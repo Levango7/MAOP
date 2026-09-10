@@ -101,6 +101,9 @@ export function useDagProgress(executionId, options = {}) {
   // ── SSE connection ────────────────────────────────────────
 
   function connectSSE() {
+    // L8 fix: SSR 守卫——EventSource 在非浏览器环境（SSR / Node 测试）下未定义，
+    // 直接 new EventSource() 会抛 ReferenceError。提前返回避免崩溃。
+    if (typeof EventSource === 'undefined') return;
     // M6 fix: 移除 URL query 中的 token，避免日志/浏览器历史/Referer 泄漏。
     // 原：url = `/api/stream/dag/${executionId}?token=${token}`
     // 现：通过 EventSource withCredentials: true 依赖 httpOnly cookie 认证。

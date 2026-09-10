@@ -10,12 +10,8 @@ export function useWebSocket(url = '') {
   let reconnectTimer = null;
   let reconnectAttempts = 0;
 
-  function getWsToken() {
-    // M7 fix: token no longer read from localStorage (XSS-readable). The
-    // same-origin WS handshake carries the httpOnly maop_token cookie,
-    // which the backend now accepts (fallback after subprotocol/query).
-    return '';
-  }
+  // L3 fix: getWsToken() 已是死代码（M7 fix 后始终返回 ''），移除该函数
+  // 并简化 connect() 中的 WebSocket 构造——不再需要 token 三元分支。
 
   function connect() {
     // SSR 守卫: 在非浏览器环境（SSR / Node 测试）下直接返回，避免访问全局 location 抛 ReferenceError。
@@ -24,13 +20,9 @@ export function useWebSocket(url = '') {
     try {
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
       const baseUrl = url || `${proto}//${location.host}/ws`;
-      const token = getWsToken();
-      // P1-10 fix: send JWT via Sec-WebSocket-Protocol subprotocol (not URL
-      // query) so the token never appears in access logs / browser history.
-      // The backend (server.py:612-623) accepts it from the subprotocol.
-      ws = token
-        ? new WebSocket(baseUrl, ['token', token])
-        : new WebSocket(baseUrl);
+      // L3 fix: token 由 httpOnly cookie 自动携带（同源 WS 握手），不再通过
+      // Sec-WebSocket-Protocol 子协议传递。移除 getWsToken() 死代码分支。
+      ws = new WebSocket(baseUrl);
       ws.onopen = () => {
         connected.value = true;
         error.value = null;
@@ -74,10 +66,13 @@ export function useWebSocket(url = '') {
     }
     if (reconnectTimer) return;
     reconnectAttempts++;
+    // L4 fix: 指数退避重连——固定 3s 间隔在后端长时间不可达时会产生大量
+    // 无效重连请求。改为 3000 * 2^min(attempts,5)，上限 96s，避免重连风暴。
+    const delay = 3000 * Math.pow(2, Math.min(reconnectAttempts, 5));
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connect();
-    }, 3000);
+    }, delay);
   }
 
   function send(data) {
@@ -92,7 +87,10 @@ export function useWebSocket(url = '') {
       reconnectTimer = null;
     }
     if (ws) {
-      ws.close();
+      // M3 fix: ws.close() 可能抛错（如 socket 已处于 CLOSING/CLOSED 状态或
+      // 浏览器内部异常），包裹 try-catch 以 best-effort 方式关闭，避免
+      // disconnect() 抛错中断调用方清理流程。
+      try { ws.close(); } catch { /* best-effort */ }
       ws = null;
     }
     connected.value = false;

@@ -112,20 +112,14 @@ async def api_model_switch(body: ModelSwitchRequest, request: Request) -> dict[s
         ypath = MAOP_ROOT / "config" / "agents.yaml"
     if not ypath.exists():
         # 批次3A: 统一响应格式为 {status, error}，消除 {success, message, data} 混用。
-        return JSONResponse(
-            status_code=404,
-            content={"status": "error", "error": "agents.yaml not found"},
-        )
+        raise HTTPException(status_code=404, detail="agents.yaml not found")
     import yaml
     _text = await asyncio.to_thread(Path(ypath).read_text, encoding="utf-8")
     data = yaml.safe_load(_text)
     agents = data.get("agents", {})
     if agent_name not in agents:
         # 批次3A: 统一响应格式为 {status, error}，消除 {success, message, data} 混用。
-        return JSONResponse(
-            status_code=404,
-            content={"status": "error", "error": f"Unknown agent: {agent_name}"},
-        )
+        raise HTTPException(status_code=404, detail=f"Unknown agent: {agent_name}")
     mpath = MAOP_ROOT / "models.yaml"
     if not mpath.exists():
         mpath = MAOP_ROOT / "config" / "models.yaml"
@@ -136,10 +130,7 @@ async def api_model_switch(body: ModelSwitchRequest, request: Request) -> dict[s
         valid_models = set(mdata.get("models", {}).keys()) if isinstance(mdata, dict) else set()
         if valid_models and new_model not in valid_models:
             # 批次3A: 统一响应格式为 {status, error}，消除 {success, message, data} 混用。
-            return JSONResponse(
-                status_code=404,
-                content={"status": "error", "error": f"Unknown model: {new_model}. Valid: {sorted(valid_models)}"},
-            )
+            raise HTTPException(status_code=404, detail=f"Unknown model: {new_model}. Valid: {sorted(valid_models)}")
 
     agents[agent_name]["model"] = new_model
     _dumped = yaml.dump(data, allow_unicode=True, default_flow_style=False)

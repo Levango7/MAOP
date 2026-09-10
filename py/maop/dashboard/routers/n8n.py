@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
@@ -29,10 +31,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/n8n", tags=["n8n"])
 
+
+class TriggerWorkflowRequest(BaseModel):
+    """POST /api/n8n/workflows/{id}/trigger 请求体。"""
+    data: dict[str, Any] = {}
+    wait: bool = False
+
+
 # Module-level singleton cache for N8nClient — avoids re-creating the client
 # (and re-reading env config) on every request. Invalidated if env changes.
 _n8n_client: N8nClient | None = None
 _n8n_client_env: tuple[str, str] | None = None
+_n8n_client_lock = threading.Lock()
 
 
 def _get_client() -> N8nClient:
@@ -41,7 +51,11 @@ def _get_client() -> N8nClient:
     base_url = os.getenv("N8N_BASE_URL", "http://localhost:5678")
     api_key = os.getenv("N8N_API_KEY", "")
     current_env = (base_url, api_key)
-    if _n8n_client is None or _n8n_client_env != current_env:
+    if _n8n_client is not None and _n8n_client_env == current_env:
+        return _n8n_client
+    with _n8n_client_lock:
+        if _n8n_client is not None and _n8n_client_env == current_env:  # double-checked locking
+            return _n8n_client
         _n8n_client = N8nClient(base_url=base_url, api_key=api_key)
         _n8n_client_env = current_env
     return _n8n_client
@@ -101,25 +115,26 @@ async def list_workflows(request: Request) -> dict[str, Any]:
 async def trigger_workflow(
     workflow_id: str,
     request: Request,
+    body: TriggerWorkflowRequest | None = None,
 ) -> dict[str, Any]:
     """Trigger an n8n workflow by ID.
 
-    P0 fix: 移除函数签名中的 ``data`` 和 ``wait`` 参数——它们会被 FastAPI
-    解释为请求体参数，与 ``await request.json()`` 再次读取请求体冲突。
-    请求体统一通过 ``await request.json()`` 解析。
+    M3 fix: 用 Pydantic TriggerWorkflowRequest 替代 await request.json()，
+    由 FastAPI 自动校验请求体（data/wait 字段类型）。
     """
     require_admin(request)
     if not has_feature(FeatureFlag.N8N_INTEGRATION):
         raise HTTPException(status_code=404, detail="n8n integration not available")
 
-    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    trigger_data = body.data if body else {}
+    wait_for_completion = body.wait if body else False
 
     with _get_client() as client:
         try:
             execution = client.trigger_workflow(
                 workflow_id,
-                data=body.get("data", {}),
-                wait_for_completion=body.get("wait", False),
+                data=trigger_data,
+                wait_for_completion=wait_for_completion,
             )
             return {"status": "ok", **execution.model_dump()}
         except N8nIntegrationError as exc:

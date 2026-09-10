@@ -25,6 +25,7 @@ from maop.dashboard.error_handler import handle_api_errors  # noqa: F401  — re
 from maop.dashboard.routers.state import (  # noqa: F401  — re-exported
     MAOP_ROOT,
     active_jobs,
+    active_jobs_lock,
     get_bridge,
     get_subsystems,
     init_subsystems,

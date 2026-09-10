@@ -80,9 +80,12 @@ export const useUiStore = defineStore('ui', () => {
   }
   function setLocale(l) {
     // L6 fix: 传入无效 locale 时发出警告，避免静默降级导致调试困难。
+    // M2 fix: 无效值回退到 'zh'（与 readLocale() 默认值一致），避免
+    // setLocale 与 readLocale 默认不一致导致用户首次设置无效值后
+    // 刷新页面又回到 'zh' 的困惑。
     if (l !== 'zh' && l !== 'en') {
-      console.warn(`[ui] Invalid locale "${l}", falling back to "en". Supported locales: "zh", "en".`);
-      l = 'en';
+      console.warn(`[ui] Invalid locale "${l}", falling back to "zh". Supported locales: "zh", "en".`);
+      l = 'zh';
     }
     locale.value = l;
     persist();

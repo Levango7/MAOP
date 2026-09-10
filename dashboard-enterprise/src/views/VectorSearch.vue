@@ -132,7 +132,7 @@ const agentCount = computed(() => {
 });
 
 const vectorCols = [
-  { key: 'id', label: 'ID' },
+  { key: 'id', label: t('common.id') },
   { key: 'agent', label: t('view.vector.col.agent') },
   { key: 'score', label: t('view.vector.col.score'), type: 'num' },
   { key: 'timestamp', label: t('view.vector.col.timestamp') },

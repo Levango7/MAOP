@@ -148,7 +148,8 @@ async def disconnect_server(server_name: str, request: Request) -> dict[str, Any
 
 @router.get("/servers")
 @handle_api_errors
-async def list_servers() -> dict[str, Any]:
+async def list_servers(request: Request) -> dict[str, Any]:
+    require_admin(request)
     hub = _get_hub()
     servers = hub.list_servers()
     return {"servers": servers, "count": len(servers)}
@@ -185,7 +186,8 @@ async def remove_server(server_name: str, request: Request) -> dict[str, Any]:
 
 @router.get("/tools")
 @handle_api_errors
-async def list_tools() -> dict[str, Any]:
+async def list_tools(request: Request) -> dict[str, Any]:
+    require_admin(request)
     hub = _get_hub()
     tools = hub.all_tools()
     return {"tools": [t.model_dump() if hasattr(t, "model_dump") else str(t) for t in tools], "count": len(tools)}
@@ -215,7 +217,8 @@ async def call_tool(body: ToolCallRequest, request: Request) -> dict[str, Any]:
 
 @router.get("/health")
 @handle_api_errors
-async def health_check() -> dict[str, Any]:
+async def health_check(request: Request) -> dict[str, Any]:
+    require_admin(request)
     hub = _get_hub()
     health = await hub.health_check_all()
     return {"health": health}
@@ -250,13 +253,14 @@ def _get_marketplace() -> Any:
 
 @router.get("/marketplace/tools")
 @handle_api_errors
-async def marketplace_tools() -> dict[str, Any]:
+async def marketplace_tools(request: Request) -> dict[str, Any]:
     """列出 Marketplace 可安装工具.
 
     聚合所有已启用 registry 的 catalog, 并标注每个工具是否已安装
     (查 ``mcp_installed.yaml``). 网络不可达或 registry 配置缺失时
     返回空列表而非 500, 前端 ``SkillMarket.vue`` 降级为 EmptyState.
     """
+    require_admin(request)
     try:
         mp = _get_marketplace()
         catalog = mp.fetch_catalog()
