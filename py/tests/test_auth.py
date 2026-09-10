@@ -132,7 +132,7 @@ class TestJWTHandler:
         assert len(handler.config.secret) > 0
 
     def test_tampered_signature_rejected(self):
-        """Flip the last signature char — validation MUST reject (e2e v7).
+        """Flip a signature char — validation MUST reject (e2e v7).
 
         Moved from tests/e2e/test_routing_rbac_tenant.py: as an e2e case this
         assertion was irreducibly flaky across runners (win/ub/macOS across
@@ -143,10 +143,22 @@ class TestJWTHandler:
         manager, fully in-memory manager — v1..v6) always passed everywhere.
         At unit level there is no event loop, no httpx and no fixture
         machinery — the invariant is pure HMAC math.
+
+        Note: we tamper with a *middle* character of the signature, not the
+        last one. The last char of a 43-char base64url-encoded 32-byte
+        signature has 2 padding bits — changing it may not alter the decoded
+        bytes (e.g. 'A'→'B' only flips a padding bit), causing the HMAC
+        comparison to pass ~3% of runs. A middle character always carries
+        data bits, so changing it guarantees a different decoded byte.
         """
         handler = JWTHandler(config=JWTConfig(secret="unit-test-secret-0123456789abcdef0123456789abcdef"))
         token = handler.create_token("admin", roles=["admin"])
-        tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+        # Tamper with the middle character of the signature (3rd part)
+        parts = token.split(".")
+        sig = parts[2]
+        mid = len(sig) // 2
+        tampered_sig = sig[:mid] + ("B" if sig[mid] != "B" else "C") + sig[mid + 1:]
+        tampered = ".".join([parts[0], parts[1], tampered_sig])
         result = handler.validate_token(tampered)
         assert result.authenticated is False
         assert result.error, "a rejected token must carry a reason"
