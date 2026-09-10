@@ -306,9 +306,26 @@ _WRITE_PATHS = _collect_write_paths()
 
 
 @pytest.fixture
-async def admin_client():
-    """Async admin client against server.app (no lifespan, admin auth)."""
+async def admin_client(monkeypatch):
+    """Async admin client against server.app (no lifespan, admin auth).
+
+    conftest 设 MAOP_AUTH=0 → AuthMiddleware 以 enabled=False 添加 →
+    _dispatch_disabled 授予 read-only 角色（P0-4 安全修复）。本测试需要
+    admin 角色通过 require_admin 守卫，因此 monkeypatch _dispatch_disabled
+    授予 admin 角色（仅测试用，不影响生产代码）。
+    """
+    from maop.core.security.middleware import AuthMiddleware
     from maop.dashboard.server import app
+
+    # Patch _dispatch_disabled to grant admin role (test-only)
+    async def _admin_dispatch_disabled(self, request, call_next):
+        request.state.auth_roles = ["admin"]
+        request.state.auth_identity = "admin"
+        return await call_next(request)
+
+    monkeypatch.setattr(
+        AuthMiddleware, "_dispatch_disabled", _admin_dispatch_disabled
+    )
 
     saved: dict[str, Any] = {}
     for attr in ("auth_manager", "api_key_auth", "jwt_auth"):
