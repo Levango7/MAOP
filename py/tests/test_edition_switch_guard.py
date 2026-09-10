@@ -8,8 +8,11 @@
   - 错误消息包含 MAOS / License 关键词，便于前端展示明确提示
 
 设计说明:
-  - conftest.py 默认 MAOP_AUTH=0 + MAOP_AUTH_DISABLED_ADMIN=1，中间件授予
-    admin 角色，因此无需 JWT token 即可通过 require_admin 守卫。
+  - conftest.py 默认 MAOP_AUTH=0（auth 关闭），中间件授予 read-only 角色。
+  - 本测试关注 edition 切换门禁逻辑（P1-2），非 admin 权限校验（后者由
+    test_middleware.py / test_adr010_regression.py 覆盖），因此 monkeypatch
+    require_admin 为 no-op，绕过 admin 角色检查。这与 test_dag_sse_endpoint.py、
+    test_agent_token_stream.py 等测试使用相同模式。
   - 测试环境未安装 maop.enterprise 包，_detect_with_license_check(ENTERPRISE)
     必然降级到 PERSONAL，因此切换到 enterprise 应触发 403 门禁。
   - 每个测试前后 reset_edition() 避免全局状态污染。
@@ -25,6 +28,18 @@ from maop.dashboard.server import app
 
 
 @pytest.fixture(autouse=True)
+def _stub_require_admin(monkeypatch):
+    """Stub require_admin to no-op（测试关注 edition 门禁，非 admin 权限）。
+
+    conftest 设 MAOP_AUTH=0 → 中间件授予 read-only 角色（P0-4 安全修复：
+    MAOP_AUTH_DISABLED_ADMIN 已废弃并忽略）。本测试验证 edition 切换门禁
+    逻辑，不验证 admin 权限校验，因此绕过 require_admin 守卫。
+    """
+    import maop.dashboard.routers.info.admin as admin_mod
+    monkeypatch.setattr(admin_mod, "require_admin", lambda request: None)
+
+
+@pytest.fixture(autouse=True)
 def _reset_edition_state():
     """每个测试前后重置 edition 全局状态，避免测试间相互污染。"""
     reset_edition()
@@ -34,7 +49,7 @@ def _reset_edition_state():
 
 @pytest.fixture
 async def client():
-    """创建无 auth 测试客户端（conftest 已配置 auth=0 + disabled_admin=1）。"""
+    """创建无 auth 测试客户端（conftest 已配置 auth=0）。"""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c

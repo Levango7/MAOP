@@ -58,13 +58,14 @@ def test_ac07_evolution_loop_trigger(evolution_loop_factory):
         mock_loop.run_cycle = mock_run_cycle
         mock_loop_class.return_value = mock_loop
 
-        from maop.dashboard.routers.evolve_insights import api_evolution_loop_trigger
+        from maop.dashboard.routers.evolve_insights import api_evolution_loop_trigger, EvolutionLoopTriggerRequest
 
         import asyncio
         mock_request = MagicMock()
         mock_request.json = AsyncMock(return_value={"dry_run": True})
 
-        result = asyncio.run(api_evolution_loop_trigger(mock_request))
+        body = EvolutionLoopTriggerRequest(dry_run=True)
+        result = asyncio.run(api_evolution_loop_trigger(mock_request, body))
 
         assert result["status"] == "ok"
         assert "report" in result
@@ -112,7 +113,7 @@ def test_ac07_evolution_approval_decision(evolution_loop_factory):
         mock_loop._save_report = MagicMock()
         mock_loop_class.return_value = mock_loop
 
-        from maop.dashboard.routers.evolve_insights import api_evolution_approval_decision
+        from maop.dashboard.routers.evolve_insights import api_evolution_approval_decision, EvolutionApprovalDecisionRequest
 
         import asyncio
         mock_request = MagicMock()
@@ -122,7 +123,8 @@ def test_ac07_evolution_approval_decision(evolution_loop_factory):
             "reason": "looks good"
         })
 
-        result = asyncio.run(api_evolution_approval_decision("cycle-001:pending-001", mock_request))
+        body = EvolutionApprovalDecisionRequest(decision="approve", approved_by="admin", reason="looks good")
+        result = asyncio.run(api_evolution_approval_decision("cycle-001:pending-001", mock_request, body))
 
         assert result["status"] == "ok"
         assert result["decision"] == "approve"
@@ -166,7 +168,7 @@ def test_ac07_evolution_loop_rollback(evolution_loop_factory):
         mock_loop.rollback_cycle.return_value = 5
         mock_loop_class.return_value = mock_loop
 
-        from maop.dashboard.routers.evolve_insights import api_evolution_loop_rollback
+        from maop.dashboard.routers.evolve_insights import api_evolution_loop_rollback, EvolutionLoopRollbackRequest
 
         import asyncio
         mock_request = MagicMock()
@@ -175,7 +177,8 @@ def test_ac07_evolution_loop_rollback(evolution_loop_factory):
             "snapshot_id": "snap-001"
         })
 
-        result = asyncio.run(api_evolution_loop_rollback(mock_request))
+        body = EvolutionLoopRollbackRequest(cycle_id="cycle-001", snapshot_id="snap-001")
+        result = asyncio.run(api_evolution_loop_rollback(mock_request, body))
 
         assert result["status"] == "ok"
         assert result["restored_files"] == 5
