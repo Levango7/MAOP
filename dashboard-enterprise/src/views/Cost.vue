@@ -267,11 +267,11 @@ async function load() {
     api.get(`/api/cost/entries?start_date=${start}&limit=50`),
   ]);
   if (s.status === 'fulfilled') summary.value = s.value.summary || summary.value;
-  else error.value = (error.value || '') + 'summary failed. ';
+  else error.value = (error.value || '') + t('view.cost.summaryFailed') + ' ';
   if (b.status === 'fulfilled') budget.value = b.value.budget || {};
-  else error.value = (error.value || '') + 'budget failed. ';
+  else error.value = (error.value || '') + t('view.cost.budgetFailed') + ' ';
   if (e.status === 'fulfilled') entries.value = e.value.entries || [];
-  else error.value = (error.value || '') + 'entries failed. ';
+  else error.value = (error.value || '') + t('view.cost.entriesFailed') + ' ';
   if (error.value) error.value = error.value.trim();
   loading.value = false;
 }

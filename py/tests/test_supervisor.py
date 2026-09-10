@@ -755,13 +755,22 @@ def app_without_supervisor():
 
 
 def test_api_status_returns_404_when_unconfigured(app_without_supervisor):
-    client = TestClient(app_without_supervisor)
+    app = app_without_supervisor
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        return await call_next(request)
+    client = TestClient(app)
     response = client.get("/api/supervisor/status")
     assert response.status_code == 404
 
 
 def test_api_status_returns_snapshot(app_with_supervisor):
     app, sup = app_with_supervisor
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        return await call_next(request)
     sup.record_result("a", success=True, latency=0.1)
     client = TestClient(app)
     response = client.get("/api/supervisor/status")
@@ -773,6 +782,10 @@ def test_api_status_returns_snapshot(app_with_supervisor):
 
 def test_api_rules_list(app_with_supervisor):
     app, _ = app_with_supervisor
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        return await call_next(request)
     client = TestClient(app)
     response = client.get("/api/supervisor/rules")
     assert response.status_code == 200
@@ -783,6 +796,10 @@ def test_api_rules_list(app_with_supervisor):
 
 def test_api_actions_list(app_with_supervisor):
     app, sup = app_with_supervisor
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        return await call_next(request)
     # Trigger an action.
     asyncio.run(sup.degrade("a", factor=0.5, reason="test"))
     client = TestClient(app)

@@ -368,8 +368,9 @@ class TestUpgradeStatus:
 class TestUpgradeCheck:
     def test_agent_not_in_config(self, no_cli_client):
         # _get_agent_config returns None for non-"claude" names.
+        # Batch3C: error returns 404 instead of 200.
         resp = no_cli_client.get("/api/agents/ghost/upgrade/check")
-        assert resp.status_code == 200
+        assert resp.status_code == 404
         body = resp.json()
         assert body["status"] == "error"
 
@@ -387,8 +388,9 @@ class TestUpgradeCheck:
 
 class TestUpgradeRun:
     def test_upgrade_agent_not_in_config(self, no_cli_client):
+        # Batch3C: error returns 404 instead of 200.
         resp = no_cli_client.post("/api/agents/ghost/upgrade")
-        assert resp.status_code == 200
+        assert resp.status_code == 404
         assert resp.json()["status"] == "error"
 
     def test_upgrade_pip_success(self, client, monkeypatch):

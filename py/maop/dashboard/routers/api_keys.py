@@ -19,6 +19,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
 from maop.core.security.api_key_manager import (
     ApiKeyCreate,
@@ -29,10 +30,18 @@ from maop.core.security.api_key_manager import (
     get_api_key_manager,
 )
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/api-keys", tags=["api-keys"])
+
+
+class ValidateRequest(BaseModel):
+    """验证 API Key 的请求体（调试辅助端点）。"""
+    key: str = Field(default="", max_length=512)
+    scope: str = Field(default="", max_length=128)
+    ip: str = Field(default="", max_length=64)
 
 
 def _get_manager(request: Request) -> Any:
@@ -64,6 +73,7 @@ def _actor(request: Request) -> str:
 
 @router.post("", response_model=ApiKeyCreateResult, status_code=201)
 @router.post("/", response_model=ApiKeyCreateResult, status_code=201, include_in_schema=False)
+@handle_api_errors("create api key")
 async def create_api_key(body: ApiKeyCreate, request: Request) -> ApiKeyCreateResult:
     """Create a new API key. The plaintext key is returned **only** here."""
     require_admin(request)
@@ -84,6 +94,7 @@ async def create_api_key(body: ApiKeyCreate, request: Request) -> ApiKeyCreateRe
 
 @router.get("", response_model=list[ApiKeyResponse])
 @router.get("/", response_model=list[ApiKeyResponse], include_in_schema=False)
+@handle_api_errors("list api keys", error_value=[])
 async def list_api_keys(
     request: Request,
     tenant_id: str = Query("", description="Filter by tenant_id"),
@@ -97,6 +108,7 @@ async def list_api_keys(
 
 
 @router.get("/{key_id}", response_model=ApiKeyResponse)
+@handle_api_errors("get api key")
 async def get_api_key(key_id: str, request: Request) -> ApiKeyResponse:
     """Get a single API key by its key_id."""
     require_admin(request)
@@ -110,6 +122,7 @@ async def get_api_key(key_id: str, request: Request) -> ApiKeyResponse:
 
 
 @router.post("/{key_id}/revoke")
+@handle_api_errors("revoke api key")
 async def revoke_api_key(key_id: str, request: Request) -> dict[str, Any]:
     """Soft-revoke an API key (enabled=0, revoked_at set)."""
     require_admin(request)
@@ -127,6 +140,7 @@ async def revoke_api_key(key_id: str, request: Request) -> dict[str, Any]:
 
 
 @router.put("/{key_id}", response_model=ApiKeyResponse)
+@handle_api_errors("update api key")
 async def update_api_key(key_id: str, body: ApiKeyUpdate, request: Request) -> ApiKeyResponse:
     """Update editable metadata of an API key (name/scopes/rate_limit/ip_whitelist)."""
     require_admin(request)
@@ -141,6 +155,7 @@ async def update_api_key(key_id: str, body: ApiKeyUpdate, request: Request) -> A
 
 
 @router.delete("/{key_id}")
+@handle_api_errors("delete api key")
 async def delete_api_key(key_id: str, request: Request) -> dict[str, Any]:
     """Hard-delete an API key and all its usage records."""
     require_admin(request)
@@ -154,6 +169,7 @@ async def delete_api_key(key_id: str, request: Request) -> dict[str, Any]:
 
 
 @router.get("/{key_id}/usage", response_model=ApiKeyUsageResponse)
+@handle_api_errors("api key usage")
 async def get_api_key_usage(
     key_id: str,
     request: Request,
@@ -173,16 +189,16 @@ async def get_api_key_usage(
 
 
 @router.post("/validate")
-async def validate_api_key(request: Request) -> dict[str, Any]:
+@handle_api_errors("validate api key")
+async def validate_api_key(body: ValidateRequest, request: Request) -> dict[str, Any]:
     """Validate a plaintext key without recording usage.
 
     Body: ``{"key": "...", "scope": "read", "ip": "1.2.3.4"}``
     All fields except ``key`` are optional. Admin-only.
     """
     require_admin(request)
-    body = await request.json()
-    plaintext = body.get("key", "")
-    scope = body.get("scope", "")
-    ip = body.get("ip", "")
+    plaintext = body.key
+    scope = body.scope
+    ip = body.ip
     result = _get_manager(request).validate_key(plaintext, client_ip=ip, required_scope=scope)
     return result.model_dump()

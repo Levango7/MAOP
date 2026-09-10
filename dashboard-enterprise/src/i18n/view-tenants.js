@@ -24,6 +24,9 @@ export const messages = {
     'view.tenants.suspendFailed': 'Suspend failed',
     'view.tenants.activateFailed': 'Activate failed',
     'view.tenants.deleteFailed': 'Delete failed',
+    'view.tenants.created': 'Tenant “{name}” created',
+    'view.tenants.suspended': 'Suspended {id}',
+    'view.tenants.activated': 'Activated {id}',
   },
 
   zh: {
@@ -51,5 +54,8 @@ export const messages = {
     'view.tenants.suspendFailed': '暂停失败',
     'view.tenants.activateFailed': '激活失败',
     'view.tenants.deleteFailed': '删除失败',
+    'view.tenants.created': '租户“{name}”已创建',
+    'view.tenants.suspended': '已停用 {id}',
+    'view.tenants.activated': '已激活 {id}',
   },
 };

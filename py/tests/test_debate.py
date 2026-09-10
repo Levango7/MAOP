@@ -674,14 +674,24 @@ def app_without_debate():
 
 def test_api_get_returns_404_when_unconfigured(app_without_debate):
     """验收标准 8: 未配置时返回 404。"""
-    client = TestClient(app_without_debate)
+    app = app_without_debate
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        return await call_next(request)
+    client = TestClient(app)
     response = client.get("/api/debate/some-id")
     assert response.status_code == 404
 
 
 def test_api_history_returns_404_when_unconfigured(app_without_debate):
     """未配置时 history 返回 404。"""
-    client = TestClient(app_without_debate)
+    app = app_without_debate
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        return await call_next(request)
+    client = TestClient(app)
     response = client.get("/api/debate/history")
     assert response.status_code == 404
 
@@ -715,6 +725,10 @@ def test_api_config_requires_admin(app_with_debate):
 def test_api_get_verdict_after_debate(app_with_debate):
     """验收标准 8: GET /api/debate/{id} 返回完整 Verdict。"""
     app, debate = app_with_debate
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        return await call_next(request)
     # 先运行一场辩论
     verdict = asyncio.run(debate.run_debate(
         "test question", ["proposer", "critic_a", "critic_b"],
@@ -730,6 +744,10 @@ def test_api_get_verdict_after_debate(app_with_debate):
 def test_api_get_verdict_explicit_endpoint(app_with_debate):
     """GET /api/debate/{id}/verdict 是 GET /api/debate/{id} 的别名。"""
     app, debate = app_with_debate
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        return await call_next(request)
     verdict = asyncio.run(debate.run_debate(
         "test question", ["proposer", "critic_a", "critic_b"],
     ))
@@ -743,6 +761,10 @@ def test_api_get_verdict_explicit_endpoint(app_with_debate):
 def test_api_get_verdict_404_for_nonexistent(app_with_debate):
     """GET /api/debate/{id} 对不存在的 debate_id 返回 404。"""
     app, _ = app_with_debate
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        return await call_next(request)
     client = TestClient(app)
     response = client.get("/api/debate/nonexistent-id")
     assert response.status_code == 404
@@ -751,6 +773,10 @@ def test_api_get_verdict_404_for_nonexistent(app_with_debate):
 def test_api_history_returns_verdicts(app_with_debate):
     """GET /api/debate/history 返回近期辩论历史。"""
     app, debate = app_with_debate
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        return await call_next(request)
     # 运行几场辩论
     asyncio.run(debate.run_debate("q1", ["proposer", "critic_a", "critic_b"]))
     asyncio.run(debate.run_debate("q2", ["proposer", "critic_a", "critic_b"]))

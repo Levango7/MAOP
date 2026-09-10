@@ -914,7 +914,7 @@ onMounted(load);
 .sso-form-error { color: var(--fail); font-size: var(--fs-sm); margin-top: 8px; }
 
 /* ── 响应式 ───────────────────────────────────────────── */
-@media (max-width: 760px) {
+@media (max-width: 700px) {
   .sso-row { grid-template-columns: 1.4fr 0.7fr 0.8fr 1.2fr; }
   .sso-cell--redirect, .sso-cell--created { display: none; }
 }

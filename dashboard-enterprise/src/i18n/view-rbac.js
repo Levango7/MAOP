@@ -32,12 +32,14 @@ export const messages = {
     'view.rbac.revoked': 'Revoked {role} from {user}',
     'view.rbac.grantFailed': 'Grant failed',
     'view.rbac.revokeFailed': 'Revoke failed',
+    'view.rbac.rolesLoadFailed': 'Failed to load roles',
   },
 
   zh: {
     'view.rbac.subtitle': '基于 Role 的访问控制',
     'view.rbac.enterprise': '企业版',
     'view.rbac.grantRole': '授予角色',
+    'view.rbac.userId': '用户 ID',
     'view.rbac.role': '角色',
     'view.rbac.tenantOptional': '租户（可选）',
     'view.rbac.grant': '授予',
@@ -55,7 +57,6 @@ export const messages = {
     'view.rbac.constant': '常量',
     'view.rbac.noPermissions': '暂无权限',
     'view.rbac.noPermissionsDesc': '尚未定义任何权限。',
-    'view.rbac.userId': '用户 ID',
     'view.rbac.role.admin': '管理员',
     'view.rbac.role.superadmin': '超级管理员',
     'view.rbac.role.editor': '编辑者',
@@ -66,5 +67,6 @@ export const messages = {
     'view.rbac.revoked': '已撤销 {user} 的角色 {role}',
     'view.rbac.grantFailed': '授权失败',
     'view.rbac.revokeFailed': '撤销失败',
+    'view.rbac.rolesLoadFailed': '加载角色失败',
   },
 };

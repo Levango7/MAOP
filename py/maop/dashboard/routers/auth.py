@@ -475,9 +475,14 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
             httponly=True, secure=True, samesite="strict", path="/",
         )
         return response
-    except Exception:
+    except Exception as exc:
         logger.exception("Login error")
-        return JSONResponse({"status": "error", "error": "Login failed"}, status_code=401)
+        # sqlite3.Error（如数据库未初始化、表缺失）视为认证服务不可用，返回 401；
+        # 其他异常（如 TypeError、IOError 等代码bug）视为内部错误，返回 500。
+        import sqlite3 as _sqlite3
+        if isinstance(exc, _sqlite3.Error):
+            return JSONResponse({"status": "error", "error": "Login failed"}, status_code=401)
+        return JSONResponse({"status": "error", "error": "Login failed"}, status_code=500)
 
 
 @router.post("/api/auth/refresh")
@@ -591,9 +596,14 @@ async def auth_register(request: Request, body: RegisterRequest) -> Any:
         # P1-9: propagate the real status (409 duplicate) instead of losing it
         # through the blanket except below (which masked it as 400).
         return JSONResponse(result, status_code=result.get("http_status", 400))
-    except Exception:
+    except Exception as exc:
         logger.exception("[auth] Registration failed")
-        return JSONResponse({"status": "error", "error": "Registration failed"}, status_code=400)
+        # sqlite3.Error（如数据库未初始化、表缺失）视为注册服务不可用，返回 400；
+        # 其他异常（如 TypeError、IOError 等代码bug）视为内部错误，返回 500。
+        import sqlite3 as _sqlite3
+        if isinstance(exc, _sqlite3.Error):
+            return JSONResponse({"status": "error", "error": "Registration failed"}, status_code=400)
+        return JSONResponse({"status": "error", "error": "Registration failed"}, status_code=500)
 
 
 @router.get("/api/auth/users")

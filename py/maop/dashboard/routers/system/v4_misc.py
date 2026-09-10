@@ -13,8 +13,10 @@ import importlib
 import logging
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 from . import _deps
@@ -27,7 +29,8 @@ router = APIRouter()
 # ── Subsystem Status ──────────────────────────────────────────────
 @router.get("/api/subsystems")
 @handle_api_errors
-async def api_subsystems() -> dict[str, Any]:
+async def api_subsystems(request: Request) -> dict[str, Any]:
+    require_admin(request)
     _deps.init_subsystems()
     subs = _deps.get_subsystems()
     result = {}
@@ -47,7 +50,8 @@ async def api_subsystems() -> dict[str, Any]:
 
 @router.get("/api/coordination_report")
 @handle_api_errors
-async def api_coordination_report_v4() -> dict[str, Any]:
+async def api_coordination_report_v4(request: Request) -> dict[str, Any]:
+    require_admin(request)
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
@@ -61,12 +65,16 @@ async def api_coordination_report_v4() -> dict[str, Any]:
         return {"teams": teams, "agent_count": len(teams)}
     except Exception as exc:
         logger.error('Coordination report failed: %s', exc)
-        return {"teams": [], "error": "Coordination report failed"}
+        return JSONResponse(
+            status_code=500,
+            content={"teams": [], "error": "Coordination report failed"},
+        )
 
 
 @router.get("/api/routing")
 @handle_api_errors
-async def api_routing_v4() -> dict[str, Any]:
+async def api_routing_v4(request: Request) -> dict[str, Any]:
+    require_admin(request)
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
@@ -84,12 +92,16 @@ async def api_routing_v4() -> dict[str, Any]:
         return {"routes": routes}
     except Exception as exc:
         logger.error('Routing config failed: %s', exc)
-        return {"routes": [], "error": "Routing config failed"}
+        return JSONResponse(
+            status_code=500,
+            content={"routes": [], "error": "Routing config failed"},
+        )
 
 
 @router.get("/api/security/config")
 @handle_api_errors
-async def api_security_config_v4() -> dict[str, Any]:
+async def api_security_config_v4(request: Request) -> dict[str, Any]:
+    require_admin(request)
     result = {}
     for mod_name, mod_path, _cls_name in [
         ("tls", "maop.core.security.tls", "TLSSettings"),

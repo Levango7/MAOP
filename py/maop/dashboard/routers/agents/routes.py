@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 from . import _deps
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 @router.get("/routes")
 @handle_api_errors
-async def get_agent_routes() -> dict[str, Any]:
+async def get_agent_routes(request: Request) -> dict[str, Any]:
     """返回路由配置 (capability → primary/fallback/tertiary)，合并 agent 信息。
 
     数据来源:
@@ -34,6 +35,7 @@ async def get_agent_routes() -> dict[str, Any]:
     每个 route 包含 Agents.vue 期望的 name/provider/enabled 字段。
     若 routing 配置为空，则从 agent 列表构建 routes。
     """
+    require_admin(request)
     import yaml as _yaml
 
     # 1. 从 registry 获取 agent 信息

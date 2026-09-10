@@ -610,14 +610,23 @@ class MessageQueue:
 
     # ── Helpers ───────────────────────────────────────────────
 
-    def _query(self, sql: str, params: tuple = ()) -> list[dict[str, Any]]:
+    def _query(self, sql: str, params: tuple = (), *, raise_on_error: bool = False) -> list[dict[str, Any]]:
+        """Execute a SQL query and return rows as dicts.
+
+        R4-low fix: previously silently swallowed all exceptions and returned
+        an empty list, making failures invisible to callers. Now accepts
+        ``raise_on_error`` to re-raise; always logs at warning level with
+        exc_info for diagnosability.
+        """
         try:
             with self._connect() as conn:
                 cursor = conn.execute(sql, params)
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
         except Exception as exc:
-            logger.warning("[mq] Query failed: %s", exc)
+            logger.warning("[mq] Query failed (sql=%s): %s", sql, exc, exc_info=True)
+            if raise_on_error:
+                raise
             return []
 
     _VALID_TABLES = frozenset({"queue_messages", "queue_dead_letters", "queue_idempotent"})

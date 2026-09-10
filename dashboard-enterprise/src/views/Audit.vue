@@ -497,7 +497,7 @@ const pieData = computed(() => {
       data: labels.map((l) => counts[l]),
       backgroundColor: labels.map((_, i) => cssVar(palette[i % palette.length], '#3574f0')),
       borderWidth: 2,
-      borderColor: cssVar('--surface', '#fff'),
+      borderColor: cssVar('--surface', '#22242a'),
     }],
   };
 });

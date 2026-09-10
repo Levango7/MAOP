@@ -28,8 +28,9 @@ def _get_budget_guard() -> Any:
 
 @router.get("/api/budget/status")
 @handle_api_errors("Budget status", error_value={"status": "error", "error": "Status failed"})
-async def api_budget_status() -> dict[str, Any]:
+async def api_budget_status(request: Request) -> dict[str, Any]:
     """Return current budget usage status."""
+    require_admin(request)
     guard = _get_budget_guard()
     status = guard.get_status()
     return {"status": "ok", "budget": status.model_dump()}

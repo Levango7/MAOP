@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.scheduling.task_splitter import TaskSplitError, TaskSplitter
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class ExecuteDagRequest(BaseModel):
 # ── 端点 ─────────────────────────────────────────────────────────
 
 @router.post("/api/dag/auto-split")
+@handle_api_errors("dag auto-split")
 async def auto_split(
     body: AutoSplitRequest,
     request: Request,
@@ -68,18 +70,20 @@ async def auto_split(
         logger.warning("[dag/auto-split] 任务拆分失败: %s", exc)
         raise HTTPException(status_code=400, detail="Task split failed") from exc
     except Exception as exc:
-        # 防御性兜底：任何意外错误都返回 400 而非 500，避免泄露内部栈
-        logger.exception("[dag/auto-split] 意外错误")
-        raise HTTPException(status_code=400, detail="Task split failed") from exc
+        # 防御性兜底：内部意外错误返回 500，避免泄露内部栈
+        logger.exception("[dag/auto-split] 任务拆分失败")
+        raise HTTPException(status_code=500, detail="Task split failed") from exc
 
 
 @router.get("/api/dag/health")
+@handle_api_errors("dag health")
 async def dag_health() -> dict[str, Any]:
     """DAG 模块健康检查（无需鉴权，用于前端探活）。"""
     return {"status": "ok", "module": "dag", "features": ["auto-split", "execute"]}
 
 
 @router.post("/api/dag/execute")
+@handle_api_errors("dag execute")
 async def execute_dag(
     body: ExecuteDagRequest,
     request: Request,
@@ -160,6 +164,6 @@ async def execute_dag(
     except HTTPException:
         raise
     except Exception as exc:
-        # 防御性兜底：不泄露内部栈
+        # 防御性兜底：内部意外错误返回 500，不泄露内部栈
         logger.exception("[dag/execute] DAG 执行失败")
-        raise HTTPException(status_code=400, detail="DAG execution failed") from exc
+        raise HTTPException(status_code=500, detail="DAG execution failed") from exc

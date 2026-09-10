@@ -255,8 +255,10 @@ class TestAgentsRoutesContract:
         fake_registry = MagicMock()
         fake_registry.list_agents.return_value = [fake_agent]
 
-        with patch.object(_deps_mod, "_get_registry", return_value=fake_registry):
-            result = asyncio.run(routes_mod.get_agent_routes())
+        with patch.object(_deps_mod, "_get_registry", return_value=fake_registry), \
+             patch.object(routes_mod, "require_admin", return_value=None):
+            mock_request = MagicMock()
+            result = asyncio.run(routes_mod.get_agent_routes(mock_request))
 
         assert "routes" in result, "/api/agents/routes must return {routes: [...]}"
         routes = result["routes"]
@@ -324,11 +326,14 @@ class TestEvolveContract:
     def test_evolve_status_has_data_wrapper(self):
         """Backend wraps in {status, data}, frontend reads data.data.total_evolutions."""
         import asyncio
+        from unittest.mock import MagicMock, patch
 
         from maop.dashboard.routers import evolve_insights as evolve_mod
 
         try:
-            result = asyncio.run(evolve_mod.api_evolve_status())
+            with patch.object(evolve_mod, "require_admin", return_value=None):
+                mock_request = MagicMock()
+                result = asyncio.run(evolve_mod.api_evolve_status(mock_request))
         except Exception as exc:  # pragma: no cover - env-dependent
             pytest.skip(f"api_evolve_status() unavailable in this environment: {exc}")
 

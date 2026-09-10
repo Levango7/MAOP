@@ -360,7 +360,7 @@ onMounted(() => {
 .tasks-table thead th {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: var(--z-raised);
   background: var(--surface-2);
   color: var(--text-muted);
   font-weight: 600;

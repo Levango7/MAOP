@@ -17,6 +17,7 @@ import uuid as _uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -30,8 +31,9 @@ router = APIRouter()
 
 @router.get("/api/workflow/list")
 @handle_api_errors
-async def api_workflow_list() -> dict[str, Any]:
+async def api_workflow_list(request: Request) -> dict[str, Any]:
     """List available workflows from config directory."""
+    require_admin(request)
     cfg_dir = _deps.MAOP_ROOT / "config"
     wfs = []
     for f in cfg_dir.glob("*.yaml"):
@@ -81,7 +83,8 @@ async def api_workflow_run(request: Request) -> dict[str, Any]:
 
 @router.get("/api/workflows")
 @handle_api_errors
-async def api_workflows_v4() -> dict[str, Any]:
+async def api_workflows_v4(request: Request) -> dict[str, Any]:
+    require_admin(request)
     try:
         wfs = []
         wf_dir = _deps.MAOP_ROOT / "config" / "workflows"
@@ -103,4 +106,7 @@ async def api_workflows_v4() -> dict[str, Any]:
         return {"workflows": wfs, "count": len(wfs)}
     except Exception as exc:
         logger.error('Workflows list failed: %s', exc)
-        return {"workflows": [], "count": 0, "error": "Workflows list failed"}
+        return JSONResponse(
+            status_code=500,
+            content={"workflows": [], "count": 0, "error": "Workflows list failed"},
+        )

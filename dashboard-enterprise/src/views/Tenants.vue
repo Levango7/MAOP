@@ -141,7 +141,7 @@ async function createTenant() {
   saving.value = true;
   try {
     await api.post('/api/tenant/create', { ...newTenant.value, tenant_id: newTenant.value.tenant_id.trim(), name: newTenant.value.name.trim() });
-    toast.success(`Tenant “${newTenant.value.name}” created`);
+    toast.success(t('view.tenants.created', { name: newTenant.value.name }));
     showCreate.value = false;
     await load();
   } catch (e) {
@@ -153,7 +153,7 @@ async function createTenant() {
 async function suspend(id) {
   try {
     await api.post(`/api/tenant/${id}/suspend`, {});
-    toast.success(`Suspended ${id}`);
+    toast.success(t('view.tenants.suspended', { id }));
     await load();
   } catch (e) {
     toast.error(e.message || t('view.tenants.suspendFailed'));
@@ -162,7 +162,7 @@ async function suspend(id) {
 async function activate(id) {
   try {
     await api.post(`/api/tenant/${id}/activate`, {});
-    toast.success(`Activated ${id}`);
+    toast.success(t('view.tenants.activated', { id }));
     await load();
   } catch (e) {
     toast.error(e.message || t('view.tenants.activateFailed'));

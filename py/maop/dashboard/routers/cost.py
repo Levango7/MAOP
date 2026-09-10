@@ -23,6 +23,7 @@ def _get_cost_tracker():
 @router.get("/entries")
 @handle_api_errors
 async def get_cost_entries(
+    request: Request,
     session_id: str = Query("", description="Filter by session"),
     agent: str = Query("", description="Filter by agent"),
     model: str = Query("", description="Filter by model"),
@@ -30,6 +31,7 @@ async def get_cost_entries(
     end_date: str = Query("", description="End date (ISO)"),
     limit: int = Query(100, ge=1, le=1000),
 ) -> dict[str, Any]:
+    require_admin(request)
     tracker = _get_cost_tracker()
     entries = tracker.get_entries(
         session_id=session_id or "",
@@ -45,11 +47,13 @@ async def get_cost_entries(
 @router.get("/summary")
 @handle_api_errors
 async def get_cost_summary(
+    request: Request,
     session_id: str = Query("", description="Filter by session"),
     agent: str = Query("", description="Filter by agent"),
     start_date: str = Query("", description="Start date (ISO)"),
     end_date: str = Query("", description="End date (ISO)"),
 ) -> dict[str, Any]:
+    require_admin(request)
     tracker = _get_cost_tracker()
     summary = tracker.summary(
         session_id=session_id or "",
@@ -62,7 +66,8 @@ async def get_cost_summary(
 
 @router.get("/budget")
 @handle_api_errors
-async def get_budget_status() -> dict[str, Any]:
+async def get_budget_status(request: Request) -> dict[str, Any]:
+    require_admin(request)
     tracker = _get_cost_tracker()
     if hasattr(tracker, "budget_status_async"):
         status = await tracker.budget_status_async()
@@ -98,7 +103,8 @@ async def update_budget(body: BudgetConfigRequest, request: Request) -> dict[str
 
 @router.get("/pricing")
 @handle_api_errors
-async def get_pricing() -> dict[str, Any]:
+async def get_pricing(request: Request) -> dict[str, Any]:
+    require_admin(request)
     tracker = _get_cost_tracker()
     return {"pricing": tracker.get_pricing()}
 

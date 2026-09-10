@@ -15,6 +15,7 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
+from fastapi.responses import JSONResponse
 
 from maop.dashboard.error_handler import handle_api_errors
 
@@ -115,4 +116,7 @@ async def api_framework_config(request: Request) -> dict[str, Any]:
         }
     except Exception as exc:
         logger.error('Framework config failed: %s', exc)
-        return {"error": "Framework config failed"}
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Framework config failed"},
+        )

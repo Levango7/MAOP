@@ -27,6 +27,9 @@ export const messages = {
     'view.vector.col.score': 'Score',
     'view.vector.col.timestamp': 'Timestamp',
     // 'ID' kept as abbreviation
+    'view.vector.resultCount': '{count} result(s)',
+    'view.vector.searchTime': 'in {time} ms',
+    'view.vector.noMatchesDesc': 'No vectors matched “{query}”.',
   },
 
   zh: {
@@ -55,5 +58,8 @@ export const messages = {
     'view.vector.col.agent': '智能体',
     'view.vector.col.score': '评分',
     'view.vector.col.timestamp': '时间戳',
+    'view.vector.resultCount': '{count} 条结果',
+    'view.vector.searchTime': '{time} ms',
+    'view.vector.noMatchesDesc': '没有向量匹配“{query}”。',
   },
 };

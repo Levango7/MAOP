@@ -181,10 +181,9 @@ async def api_hooks_list(event: str = "") -> HookListResponse:
 
 @router.post("/api/hooks", response_model=HookResponse)
 @handle_api_errors("Hook create", error_value=HookResponse(id="", name="", event="", url=""))
-async def api_hooks_create(request: Request) -> HookResponse:
+async def api_hooks_create(body: HookCreateRequest, request: Request) -> HookResponse:
     """创建新 hook（webhook 类型）。"""
     require_admin(request)
-    body = HookCreateRequest(**(await request.json()))
 
     if not _is_valid_event(body.event):
         raise HTTPException(400, f"Invalid event type: {body.event}")
@@ -243,14 +242,13 @@ async def api_hooks_get(hook_id: str) -> HookResponse:
 
 @router.put("/api/hooks/{hook_id}", response_model=HookResponse)
 @handle_api_errors("Hook update", error_value=HookResponse(id="", name="", event="", url=""))
-async def api_hooks_update(hook_id: str, request: Request) -> HookResponse:
+async def api_hooks_update(hook_id: str, body: HookUpdateRequest, request: Request) -> HookResponse:
     """更新 hook 配置。
 
     实现策略：先删除旧 hook，再用新参数注册。这样可绕过
     HookManager 未提供 update 方法的限制，并保持持久化层一致。
     """
     require_admin(request)
-    body = HookUpdateRequest(**(await request.json()))
 
     mgr = _get_hook_mgr()
     existing = mgr.get_hook(hook_id)

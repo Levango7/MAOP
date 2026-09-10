@@ -69,8 +69,9 @@ const routes = [
   { path: '/evolve', name: 'evolve', component: () => import('../views/Evolve.vue') },
   { path: '/evolution-history', redirect: { path: '/evolve', query: { tab: 'history' } } },
 
-  // P2-10 fix: catch-all 404 route — redirect unknown paths to home
-  { path: '/:pathMatch(.*)*', redirect: '/home' },
+  // P2-10 fix: catch-all 404 route — redirect unknown paths to home.
+  // 使用命名路由 'overview' 而非硬编码路径 '/home'，更健壮（路径变更时只需改一处）。
+  { path: '/:pathMatch(.*)*', redirect: { name: 'overview' } },
 ];
 
 const router = createRouter({
@@ -156,6 +157,17 @@ function hydrateEditionFromConfig() {
 }
 
 router.beforeEach((to) => {
+  // ── 登录认证守卫 ──
+  // 本项目无独立登录页（/login 路由），登录通过 App.vue 中的 auth overlay
+  // （模态对话框）实现。因此不在此处做路由级 requiresAuth 重定向——
+  // 未登录时由 App.vue 的 auth overlay 拦截并展示登录表单，
+  // 登录成功后 overlay 关闭，用户继续访问目标路由。
+  // 如未来新增独立登录页，可在此添加：
+  //   if (to.meta.requiresAuth !== false) {
+  //     const loggedIn = !!localStorage.getItem('maop_user');
+  //     if (!loggedIn) return { name: 'login' };
+  //   }
+
   if (!to.meta.requiresEnterprise) return true;
   // 安全默认: 'personal' —— 冷加载/后端未就绪时不放行企业版路由
   let editionVal = 'personal';

@@ -21,6 +21,7 @@ the scheduling router's policy). POST endpoints require the ``admin`` role.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -32,6 +33,7 @@ from maop.core.scheduling.supervisor import (
     SupervisorActionRequest,
     SupervisorRule,
 )
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
@@ -73,8 +75,9 @@ def _require_admin(request: Request) -> None:
                  "recent_actions": [], "config": {}, "rules": [],
                  "error": "Supervisor unavailable"},
 )
-async def api_supervisor_status() -> dict[str, Any]:
+async def api_supervisor_status(request: Request) -> dict[str, Any]:
     """Return the full supervisor status snapshot."""
+    require_admin(request)
     sup = _get_supervisor_or_404()
     return sup.get_supervisor_status()
 
@@ -87,8 +90,9 @@ async def api_supervisor_status() -> dict[str, Any]:
     "Supervisor rules",
     error_value={"rules": [], "error": "Query failed"},
 )
-async def api_supervisor_rules_list() -> dict[str, Any]:
+async def api_supervisor_rules_list(request: Request) -> dict[str, Any]:
     """Return the current supervision rule set."""
+    require_admin(request)
     sup = _get_supervisor_or_404()
     return {"rules": [r.model_dump() for r in sup.rules]}
 
@@ -137,10 +141,12 @@ async def api_supervisor_rule_update(
     error_value={"actions": [], "error": "Query failed"},
 )
 async def api_supervisor_actions(
+    request: Request,
     agent_id: str | None = None,
     limit: int = 50,
 ) -> dict[str, Any]:
     """Return control action history (optionally filtered by agent)."""
+    require_admin(request)
     sup = _get_supervisor_or_404()
     actions = sup.get_actions(agent_id=agent_id, limit=limit)
     return {"actions": [a.model_dump() for a in actions]}
@@ -262,12 +268,15 @@ async def api_supervisor_patrol(
     """
     _require_admin(request)
     sup = _get_supervisor_or_404()
+    # 在路由层测量 patrol 持续时间，避免访问 sup 的内部属性 _last_patrol_duration_s
+    _start = time.monotonic()
     probes = await sup.patrol()
+    _duration_s = time.monotonic() - _start
     return {
         "ok": True,
         "agents_checked": len(probes),
         "probes": [p.model_dump() for p in probes],
-        "patrol_duration_s": sup._last_patrol_duration_s,
+        "patrol_duration_s": round(_duration_s, 4),
     }
 
 

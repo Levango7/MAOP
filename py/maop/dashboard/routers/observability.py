@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 
 from maop.config.edition import get_edition
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 from maop.core.monitoring.otel import get_otel_endpoint
 from maop.core.observability import (
     observability_status,
@@ -59,13 +60,15 @@ class RecordRequestModel(BaseModel):
 
 # ── Endpoints ──────────────────────────────────────────────────────
 @router.get("/status")
-async def status() -> Any:
+@handle_api_errors("observability status")
+async def status(request: Request) -> Any:
     """Return the live observability stack status.
 
     Includes edition, tracing enabled flag, tracer type, metrics
     summary, and logging handler info.  Used by the frontend
     Observability.vue panel to render the status badges.
     """
+    require_admin(request)
     try:
         return observability_status()
     except Exception as exc:
@@ -78,13 +81,15 @@ async def status() -> Any:
 
 
 @router.get("/metrics")
-async def metrics() -> Any:
+@handle_api_errors("observability metrics")
+async def metrics(request: Request) -> Any:
     """Return a JSON summary of the four canonical observability metrics.
 
     Complements ``/api/prometheus`` (which returns Prometheus text
     format for scraping) with a JSON view suitable for dashboard
     rendering.
     """
+    require_admin(request)
     from maop.core.observability.metrics import metrics_summary
     return metrics_summary()
 
@@ -107,7 +112,8 @@ async def metrics_prometheus() -> Any:
 
 
 @router.get("/traces")
-async def traces(limit: int = 20) -> Any:
+@handle_api_errors("observability traces")
+async def traces(request: Request, limit: int = 20) -> Any:
     """Return recent trace summary.
 
     When OTel is active and an in-memory span exporter is configured,
@@ -115,6 +121,7 @@ async def traces(limit: int = 20) -> Any:
     (Personal mode), returns ``enabled=False`` so the frontend can
     show the lightweight-mode badge.
     """
+    require_admin(request)
     if not tracing_enabled():
         return {
             "enabled": False,
@@ -134,6 +141,7 @@ async def traces(limit: int = 20) -> Any:
 
 
 @router.post("/record")
+@handle_api_errors("observability record")
 async def record(payload: RecordRequestModel, request: Request) -> Any:
     """Record a custom metric / error event.
 
@@ -228,12 +236,14 @@ async def health() -> Any:
 
 
 @router.get("/config")
-async def config() -> Any:
+@handle_api_errors("observability config")
+async def config(request: Request) -> Any:
     """Return the observability configuration (env-driven).
 
     Lets the frontend show the active OTel endpoint, exporter type,
     service name, etc. without reading env vars directly.
     """
+    require_admin(request)
     return {
         "edition": get_edition().value,
         "otel_enabled": os.getenv("MAOP_OTEL_ENABLED", "").strip() in ("1", "true", "yes"),
@@ -246,6 +256,7 @@ async def config() -> Any:
 
 
 @router.post("/setup")
+@handle_api_errors("observability setup")
 async def setup(request: Request, force: bool = False) -> Any:
     """Trigger (or re-trigger) observability setup.
 

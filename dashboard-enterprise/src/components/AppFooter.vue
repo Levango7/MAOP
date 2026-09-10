@@ -66,7 +66,7 @@ const realtimeConnected = computed(() => realtime.connected);
 .footer-status { display: inline-flex; align-items: center; gap: 5px; color: var(--text-faint); }
 .footer-status.on { color: var(--success); }
 .footer-dot {
-  width: 6px; height: 6px; border-radius: 50%;
+  width: 6px; height: 6px; border-radius: var(--r-full);
   background: var(--text-faint); opacity: .5;
   transition: background var(--motion) var(--ease), opacity var(--motion) var(--ease);
 }

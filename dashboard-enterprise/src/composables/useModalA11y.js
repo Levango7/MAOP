@@ -11,6 +11,13 @@
  *   const dlg = useModalA11y(() => showDialog.value, () => (showDialog.value = false));
  *   // 模态根元素加 ref: <div ref="dlg.rootRef" class="modal-overlay" @click.self="...">
  *
+ * 多模态支持: 传入第三个参数 containerEl 可指定当前模态的根元素，
+ * 避免 document.querySelector 全局查询命中其他模态。containerEl 支持：
+ *   - HTMLElement: 直接使用
+ *   - Vue ref (有 .value): 自动解包
+ *   - getter 函数: 调用获取元素（惰性求值，适合元素动态挂载场景）
+ *   - undefined/null: fallback 到全局查询（向后兼容）
+ *
  * 注意: 现有 modal 的根元素是普通 <div>,不可聚焦,focus trap 靠
  * 把焦点定向到内部第一个 [autofocus]/button/input/[tabindex] 元素实现。
  */
@@ -20,8 +27,28 @@ const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), ' +
   'select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function useModalA11y(isOpen, onClose) {
+const MODAL_ROOT_SELECTOR = '[data-modal-root="true"][aria-modal="true"]';
+
+export function useModalA11y(isOpen, onClose, containerEl) {
   let previousFocus = null;
+
+  /**
+   * 解析当前模态根元素：优先使用传入的 containerEl，fallback 到全局查询。
+   * 支持 HTMLElement / Vue ref / getter 函数三种形式。
+   * @returns {HTMLElement|null}
+   */
+  function resolveRoot() {
+    if (containerEl) {
+      // getter 函数: 惰性求值，适合元素动态挂载场景
+      if (typeof containerEl === 'function') return containerEl();
+      // Vue ref: 自动解包 .value
+      if (containerEl.value) return containerEl.value;
+      // HTMLElement: 直接使用
+      return containerEl;
+    }
+    // fallback: 全局查询（向后兼容单模态场景）
+    return document.querySelector(MODAL_ROOT_SELECTOR);
+  }
 
   function handleKeydown(e) {
     if (!isOpen()) return;
@@ -33,7 +60,7 @@ export function useModalA11y(isOpen, onClose) {
 
   function handleFocusTrap(e) {
     if (!isOpen() || e.key !== 'Tab') return;
-    const root = document.querySelector('[data-modal-root="true"][aria-modal="true"]');
+    const root = resolveRoot();
     if (!root) return;
     const focusables = Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR))
       .filter((el) => el.offsetParent !== null); // visible only
@@ -63,7 +90,7 @@ export function useModalA11y(isOpen, onClose) {
       previousFocus = document.activeElement;
       // 下一拍再聚焦,等 v-if 渲染完成
       requestAnimationFrame(() => {
-        const root = document.querySelector('[data-modal-root="true"][aria-modal="true"]');
+        const root = resolveRoot();
         if (!root) return;
         if (!root.hasAttribute('role')) root.setAttribute('role', 'dialog');
         const target =

@@ -74,7 +74,7 @@ export const messages = {
 
     // ── Coming Soon banner ───────────────────────────────────────
     'view.skills.market.comingSoon': 'Coming Soon',
-    'view.skills.market.comingSoonHint': 'Skill Marketplace — 数据源接入中，预计 v5.2.0 上线。当前仅展示已安装的 MCP 工具。',
+    'view.skills.market.comingSoonHint': 'Skill Marketplace — data source integration in progress, expected v5.2.0. Currently showing installed MCP tools only.',
     'view.skills.market.planned': 'Planned',
   },
 

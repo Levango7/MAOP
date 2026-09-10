@@ -20,6 +20,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from maop.config.edition import FeatureFlag, has_feature
@@ -118,10 +119,13 @@ async def grant_role(body: GrantRequest, request: Request) -> dict[str, Any]:
     try:
         role = Role(body.role)
     except ValueError:
-        return {
-            "status": "error",
-            "error": f"Invalid role '{body.role}'. Valid: {[r.value for r in Role]}",
-        }
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "error": f"Invalid role '{body.role}'. Valid: {[r.value for r in Role]}",
+            },
+        )
     mgr = _get_manager()
     # G-07: tenant_id from JWT, not from body.
     tenant_id = _tenant_id_from_jwt(request)
@@ -148,10 +152,13 @@ async def revoke_role(body: RevokeRequest, request: Request) -> dict[str, Any]:
     try:
         role = Role(body.role)
     except ValueError:
-        return {
-            "status": "error",
-            "error": f"Invalid role '{body.role}'. Valid: {[r.value for r in Role]}",
-        }
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "error": f"Invalid role '{body.role}'. Valid: {[r.value for r in Role]}",
+            },
+        )
     mgr = _get_manager()
     # G-07: tenant_id from JWT, not from body.
     tenant_id = _tenant_id_from_jwt(request)

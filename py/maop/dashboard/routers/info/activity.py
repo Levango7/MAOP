@@ -11,6 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ async def get_activity(request: Request, limit: int = 10) -> dict[str, Any]:
     timeline format compatible with the Overview activity feed.
     No admin required — available to any authenticated user.
     """
+    require_admin(request)
     import time as _time
     from pathlib import Path
 

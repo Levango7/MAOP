@@ -34,6 +34,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sso", tags=["sso"])
 
 
+# ── Pydantic 请求模型（用于 body 参数类型） ────────────────────────
+# 直接复用 sso_store 中的 SSOProviderCreate / SSOProviderUpdate，
+# 让 FastAPI 自动校验请求体，避免手动 ``dict → Pydantic`` 转换。
+from maop.enterprise.sso_store import SSOProviderCreate, SSOProviderUpdate  # noqa: E402
+
+
 # ── Edition 守卫 helper ─────────────────────────────────────────────
 def _require_sso() -> None:
     """SSO 特性开关守卫：Personal 版返回 404。"""
@@ -187,21 +193,12 @@ async def get_config(request: Request) -> dict[str, Any]:
 
 @router.post("/providers")
 @handle_api_errors
-async def create_provider(request: Request, body: dict[str, Any]) -> dict[str, Any]:
+async def create_provider(request: Request, body: SSOProviderCreate) -> dict[str, Any]:
     """添加 IdP 配置（PRD 4.1 / 4.2.1）。"""
     _require_sso()
     from maop.core.security.middleware import require_admin
     require_admin(request)
-    from maop.enterprise.sso_store import SSOProviderCreate
-    try:
-        payload = SSOProviderCreate(**body)
-    except Exception as exc:
-        # 批次3A: 脱敏——校验错误细节不暴露给客户端，仅日志记录。
-        logger.warning("[sso] Invalid provider config: %s", exc)
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid SSO provider configuration",
-        ) from exc
+    payload = body
     reg = _get_registry()
     try:
         resp = reg.store.create(payload)
@@ -264,22 +261,13 @@ async def get_provider(request: Request, provider_id: int) -> dict[str, Any]:
 async def update_provider(
     request: Request,
     provider_id: int,
-    body: dict[str, Any],
+    body: SSOProviderUpdate,
 ) -> dict[str, Any]:
     """更新 IdP 配置。"""
     _require_sso()
     from maop.core.security.middleware import require_admin
     require_admin(request)
-    from maop.enterprise.sso_store import SSOProviderUpdate
-    try:
-        payload = SSOProviderUpdate(**body)
-    except Exception as exc:
-        # 批次3A: 脱敏——校验错误细节不暴露给客户端，仅日志记录。
-        logger.warning("[sso] Invalid provider update: %s", exc)
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid SSO provider update",
-        ) from exc
+    payload = body
     reg = _get_registry()
     try:
         resp = reg.store.update(provider_id, payload)

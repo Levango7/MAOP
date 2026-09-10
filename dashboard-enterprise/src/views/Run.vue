@@ -414,10 +414,10 @@ const dagLayout = computed(() => {
   gap: 6px;
   padding: 6px 12px;
   border: 1px solid var(--brand);
-  border-radius: var(--r-md, 8px);
+  border-radius: var(--r-md, 6px);
   background: var(--brand);
   color: var(--brand-contrast, #fff);
-  font-size: var(--fs-sm, 13px);
+  font-size: var(--fs-sm, 12px);
   font-weight: 500;
   cursor: pointer;
   transition: opacity 0.15s, transform 0.1s;

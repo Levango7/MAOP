@@ -18,7 +18,8 @@ defineProps({
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-1);
+  /* padding 2px 9px 为 Badge 视觉规格固定值，无精确 token 对应 */
   padding: 2px 9px;
   border-radius: var(--r-full);
   font-size: var(--fs-xs);

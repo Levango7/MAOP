@@ -47,8 +47,9 @@ class VectorSearchRequest(BaseModel):
 
 @router.get("/stats")
 @handle_api_errors("knowledge stats")
-async def knowledge_stats() -> dict[str, Any]:
+async def knowledge_stats(request: Request) -> dict[str, Any]:
     """Get knowledge base statistics."""
+    require_admin(request)
     from maop.core.memory.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
     return {"status": "ok", "data": ext.stats()}
@@ -57,12 +58,14 @@ async def knowledge_stats() -> dict[str, Any]:
 @router.get("/facts")
 @handle_api_errors("knowledge facts")
 async def query_facts(
+    request: Request,
     subject: str = "",
     predicate: str = "",
     topic: str = "",
     top: int = 20,
 ) -> dict[str, Any]:
     """Query facts from the knowledge base."""
+    require_admin(request)
     from maop.core.memory.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
     facts = ext.query_facts(subject=subject, predicate=predicate, topic=topic, top=top)
@@ -71,8 +74,9 @@ async def query_facts(
 
 @router.get("/entities/{name}")
 @handle_api_errors("knowledge entity")
-async def get_entity(name: str) -> dict[str, Any]:
+async def get_entity(request: Request, name: str) -> dict[str, Any]:
     """Get a specific entity by name."""
+    require_admin(request)
     from maop.core.memory.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
     entity = ext.get_entity(name)
@@ -84,12 +88,14 @@ async def get_entity(name: str) -> dict[str, Any]:
 @router.get("/relations")
 @handle_api_errors("knowledge relations")
 async def query_relations(
+    request: Request,
     source: str = "",
     target: str = "",
     relation_type: str = "",
     top: int = 20,
 ) -> dict[str, Any]:
     """Query relations from the knowledge base."""
+    require_admin(request)
     from maop.core.memory.knowledge_extractor import KnowledgeExtractor
     ext = KnowledgeExtractor(root_dir=str(MAOP_ROOT))
     relations = ext.query_relations(source=source, target=target, relation_type=relation_type, top=top)
@@ -99,11 +105,13 @@ async def query_relations(
 @router.get("/graph")
 @handle_api_errors("knowledge graph")
 async def get_graph(
+    request: Request,
     center: str = "",
     topic: str = "",
     max_nodes: int = 50,
 ) -> dict[str, Any]:
     """Get graph data for visualization."""
+    require_admin(request)
     from maop.core.memory.knowledge_graph import KnowledgeGraph
     kg = KnowledgeGraph(root_dir=str(MAOP_ROOT))
     if center:
@@ -119,10 +127,12 @@ async def get_graph(
 @router.get("/context")
 @handle_api_errors("knowledge context")
 async def build_context(
+    request: Request,
     entity: str = "",
     max_depth: int = 2,
 ) -> dict[str, Any]:
     """Build LLM context for an entity from the knowledge graph."""
+    require_admin(request)
     from maop.core.memory.knowledge_graph import KnowledgeGraph
     kg = KnowledgeGraph(root_dir=str(MAOP_ROOT))
     context = kg.build_context(entity, max_depth=max_depth)
@@ -149,8 +159,9 @@ async def extract_knowledge(request_body: ExtractRequest, request: Request) -> d
 
 @router.get("/vector/stats")
 @handle_api_errors("vector stats")
-async def vector_stats() -> dict[str, Any]:
+async def vector_stats(request: Request) -> dict[str, Any]:
     """Get vector search statistics."""
+    require_admin(request)
     from maop.memory.vector_search import VectorSearch
     vs = VectorSearch(root_dir=str(MAOP_ROOT))
     return {"status": "ok", "data": vs.stats()}
@@ -184,7 +195,9 @@ kg_router = APIRouter(prefix="/api/knowledge-graph", tags=["knowledge-graph"])
 
 
 @kg_router.get("")
+@handle_api_errors("knowledge graph v2")
 async def get_knowledge_graph_v2(
+    request: Request,
     limit: int = Query(500),
     type: str = Query(""),  # shadows builtin intentionally for API
     time_range: str = Query(""),
@@ -196,6 +209,7 @@ async def get_knowledge_graph_v2(
       - type: comma-separated node types to filter (e.g. "agent,task")
       - time_range: "start,end" ISO-8601 lexicographic comparison
     """
+    require_admin(request)
     # ── Parameter validation ──
     if limit < 1 or limit > 10000:
         raise HTTPException(status_code=400, detail="limit must be between 1 and 10000")

@@ -15,8 +15,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
@@ -343,46 +345,53 @@ ARCHITECTURE = {
 
 @router.get("/pillars")
 @handle_api_errors
-async def get_pillars() -> dict[str, Any]:
+async def get_pillars(request: Request) -> dict[str, Any]:
+    require_admin(request)
     return {"pillars": PILLARS}
 
 
 @router.get("/roles")
 @handle_api_errors
-async def get_roles() -> dict[str, Any]:
+async def get_roles(request: Request) -> dict[str, Any]:
+    require_admin(request)
     return {"groups": ROLES}
 
 
 @router.get("/modules")
 @handle_api_errors
-async def get_modules() -> dict[str, Any]:
+async def get_modules(request: Request) -> dict[str, Any]:
+    require_admin(request)
     return {"packages": MODULES}
 
 
 @router.get("/workflows")
 @handle_api_errors
-async def get_workflows() -> dict[str, Any]:
+async def get_workflows(request: Request) -> dict[str, Any]:
+    require_admin(request)
     return {"roleFlows": WORKFLOWS}
 
 
 @router.get("/architecture")
 @handle_api_errors
-async def get_architecture() -> dict[str, Any]:
+async def get_architecture(request: Request) -> dict[str, Any]:
+    require_admin(request)
     return ARCHITECTURE
 
 
 @router.get("/edition")
 @handle_api_errors
-async def get_edition() -> dict[str, Any]:
+async def get_edition(request: Request) -> dict[str, Any]:
     """Return current edition info, feature flags, backends, and degradations."""
+    require_admin(request)
     from maop.config.edition import edition_info
     return edition_info()
 
 
 @router.get("/config")
 @handle_api_errors
-async def get_config() -> dict[str, Any]:
+async def get_config(request: Request) -> dict[str, Any]:
     """Return current runtime configuration (non-sensitive)."""
+    require_admin(request)
     try:
         from maop.config.settings import MAOPSettings
         s = MAOPSettings()
@@ -407,4 +416,7 @@ async def get_config() -> dict[str, Any]:
     except Exception as exc:
         # 批次3A: 脱敏——系统信息读取错误细节不暴露给客户端，仅日志记录。
         logger.warning("[meta] System info failed: %s", exc)
-        return {"error": "System info unavailable"}
+        return JSONResponse(
+            status_code=500,
+            content={"error": "System info unavailable"},
+        )

@@ -453,7 +453,7 @@ const allocationChartData = computed(() => {
       data: alloc.values || [],
       backgroundColor: (alloc.labels || []).map((_, i) => palette[i % palette.length]),
       borderWidth: 2,
-      borderColor: 'var(--surface, #fff)',
+      borderColor: 'var(--surface, #22242a)',
     }],
   };
 });

@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
@@ -126,8 +126,9 @@ async def chat_stream(request_body: ChatRequestBody, request: Request) -> Any:
 
 @router.get("/models")
 @handle_api_errors("list models")
-async def list_models() -> dict[str, Any]:
+async def list_models(request: Request) -> dict[str, Any]:
     """List available LLM models from models.yaml."""
+    require_admin(request)
     from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
     factory = LLMProviderFactory(root_dir=str(MAOP_ROOT))
     models = factory.list_models(enabled_only=True)
@@ -145,8 +146,9 @@ async def list_models() -> dict[str, Any]:
 
 @router.get("/sessions")
 @handle_api_errors("list chat sessions")
-async def list_sessions() -> dict[str, Any]:
+async def list_sessions(request: Request) -> dict[str, Any]:
     """List all chat sessions."""
+    require_admin(request)
     from maop.core.security.session import SessionManager
     mgr = SessionManager(root_dir=str(MAOP_ROOT))
     sessions = mgr.list()
@@ -155,8 +157,9 @@ async def list_sessions() -> dict[str, Any]:
 
 @router.get("/{session_id}")
 @handle_api_errors("get chat session")
-async def get_session(session_id: str) -> dict[str, Any]:
+async def get_session(request: Request, session_id: str) -> dict[str, Any]:
     """Get messages for a chat session."""
+    require_admin(request)
     engine = _get_engine()
     history = engine.memory.conversation.get_history(session_id)
     return {
@@ -203,8 +206,9 @@ async def memory_consolidate(request: Request) -> dict[str, Any]:
 
 @router.get("/memory/stats")
 @handle_api_errors("memory stats")
-async def memory_stats() -> dict[str, Any]:
+async def memory_stats(request: Request) -> dict[str, Any]:
     """Get memory statistics."""
+    require_admin(request)
     engine = _get_engine()
     stats = engine.memory.stats()
     return {"status": "ok", "data": stats}
@@ -224,7 +228,10 @@ async def upload_image(
     from maop.core.backends.image_store import ImageStore
 
     if file is None:
-        return {"status": "error", "error": "No file provided"}
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "error": "No file provided"},
+        )
 
     content = await file.read()
     store = ImageStore(root_dir=str(MAOP_ROOT))
@@ -239,8 +246,9 @@ async def upload_image(
 
 @router.get("/images/{session_id}")
 @handle_api_errors("list session images")
-async def list_session_images(session_id: str) -> dict[str, Any]:
+async def list_session_images(request: Request, session_id: str) -> dict[str, Any]:
     """List all images for a chat session."""
+    require_admin(request)
     from maop.core.backends.image_store import ImageStore
     store = ImageStore(root_dir=str(MAOP_ROOT))
     images = store.list_session_images(session_id)

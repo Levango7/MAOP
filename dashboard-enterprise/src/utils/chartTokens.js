@@ -44,7 +44,13 @@ export function cssVarAlpha(name, alpha = 0.12) {
       const b = parseInt(hex[2] + hex[2], 16);
       return `rgba(${r},${g},${b},${alpha})`;
     }
-    return v; // hex8 already contains alpha
+    if (hex.length === 8) {
+      // hex8 (#RRGGBBAA) 已内含 alpha 通道，直接返回原值。
+      // 设计意图: CSS 变量定义为 hex8 时，alpha 由设计师在样式表中精确设定，
+      // 此时不覆盖调用者传入的 alpha 参数，保留 CSS 中的权威值。
+      return v;
+    }
+    return v; // 其他未知格式，原样返回
   }
   // already rgb/rgba — replace trailing alpha if present
   const m = /^rgba?\(([^)]+)\)$/.exec(v);
@@ -53,4 +59,21 @@ export function cssVarAlpha(name, alpha = 0.12) {
     if (parts.length >= 3) return `rgba(${parts[0]},${parts[1]},${parts[2]},${alpha})`;
   }
   return v;
+}
+
+/**
+ * 读取 CSS 变量 --r-md 并转为整数（圆角半径）。
+ *
+ * @non-readonly
+ * @param {number} fallback 当 CSS 变量不存在或 DOM 不可读时的回退值
+ * @returns {number} 圆角半径（整数）
+ *
+ * 从 chartOptions.js 移入此文件——本函数本质上是读取 CSS 自定义属性的工具函数，
+ * 与 cssVar / cssVarAlpha 同属 chartTokens 职责，集中在此便于维护。
+ */
+export function cssVarRounded(fallback) {
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--r-md').trim();
+    return v ? parseInt(v, 10) : fallback;
+  } catch { return fallback; }
 }

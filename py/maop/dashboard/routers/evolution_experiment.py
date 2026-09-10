@@ -21,6 +21,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -30,6 +31,74 @@ from .state import MAOP_ROOT
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ── Pydantic 请求模型 ──────────────────────────────────────────────
+class EvolutionEvaluateRequest(BaseModel):
+    """评估一组 trace 性能指标的请求体。"""
+    traces: list[Any] = Field(default_factory=list)
+    baseline: list[Any] | None = None
+
+
+class EvolutionSuggestRequest(BaseModel):
+    """生成改进建议的请求体。"""
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    agent_name: str = Field(default="", max_length=256)
+    enable_llm: bool = True
+
+
+class EvolutionABCreateRequest(BaseModel):
+    """创建 AB 实验的请求体。"""
+    name: str = Field(..., min_length=1, max_length=256)
+    variants: list[str] = Field(default_factory=list)
+    sprt: dict[str, Any] | None = None
+
+
+class EvolutionABRecordRequest(BaseModel):
+    """记录 AB 实验样本的请求体。"""
+    experiment: str = Field(..., min_length=1, max_length=256)
+    variant: str = Field(..., min_length=1, max_length=256)
+    entity_id: str = Field(default="", max_length=256)
+    success: bool = False
+
+
+class EvolutionDeployPromoteRequest(BaseModel):
+    """提升部署的请求体。"""
+    experiment: str = Field(..., min_length=1, max_length=256)
+    winner: str = Field(..., min_length=1, max_length=256)
+    config: dict[str, Any] | None = None
+
+
+class EvolutionDeployRollbackRequest(BaseModel):
+    """回滚部署的请求体。"""
+    experiment: str = Field(..., min_length=1, max_length=256)
+    snapshot_id: str = Field(default="", max_length=256)
+
+
+class EvolutionRunRequest(BaseModel):
+    """触发演化循环的请求体。"""
+    baseline_traces: list[Any] = Field(default_factory=list)
+    candidate_traces: list[Any] = Field(default_factory=list)
+    experiment: str = Field(..., min_length=1, max_length=256)
+    agent_name: str = Field(default="", max_length=256)
+    candidate_config: dict[str, Any] | None = None
+
+
+class EvolutionApproveRequest(BaseModel):
+    """批准提升的请求体。"""
+    experiment: str = Field(..., min_length=1, max_length=256)
+    candidate_config: dict[str, Any] | None = None
+
+
+class EvolutionSkillCompositeRequest(BaseModel):
+    """保存 composite Skill 的请求体。"""
+    name: str = Field(default="", max_length=256)
+    version: str = Field(default="1.0.0", max_length=64)
+    description: str = Field(default="", max_length=10000)
+    source: str = Field(default="manual", max_length=64)
+    tags: list[str] = Field(default_factory=list)
+    steps: list[dict[str, Any]] = Field(default_factory=list)
+    content: str | None = None
 
 
 def _perf_loop() -> Any:
@@ -61,20 +130,19 @@ def _evaluator() -> Any:
 
 @router.post("/api/evolution/evaluate")
 @handle_api_errors("evolution evaluate", error_value={"status": "error", "metrics": {}})
-async def api_evolution_evaluate(request: Request) -> dict[str, Any]:
+async def api_evolution_evaluate(body: EvolutionEvaluateRequest, request: Request) -> dict[str, Any]:
     """评估一组 trace 的性能指标。
 
     Body: {"traces": [...], "baseline": [...] (可选)}
     返回 metrics（+ delta 当提供 baseline）。
     """
     require_admin(request)
-    body = await request.json()
-    traces = body.get("traces", [])
+    traces = body.traces
     evaluator = _evaluator()
     metrics = evaluator.evaluate(traces)
     result: dict[str, Any] = {"status": "ok", "metrics": metrics.to_dict()}
-    if "baseline" in body:
-        delta = evaluator.compare(body["baseline"], traces)
+    if body.baseline is not None:
+        delta = evaluator.compare(body.baseline, traces)
         result["delta"] = delta.to_dict()
     return result
 
@@ -84,20 +152,19 @@ async def api_evolution_evaluate(request: Request) -> dict[str, Any]:
 
 @router.post("/api/evolution/suggest")
 @handle_api_errors("evolution suggest", error_value={"status": "error", "suggestions": []})
-async def api_evolution_suggest(request: Request) -> dict[str, Any]:
+async def api_evolution_suggest(body: EvolutionSuggestRequest, request: Request) -> dict[str, Any]:
     """基于指标生成候选改进建议。
 
     Body: {"metrics": {...}, "agent_name": "...", "enable_llm": true}
     """
     require_admin(request)
-    body = await request.json()
     from maop.core.evolution.evaluator import PerformanceMetrics
     from maop.core.evolution.suggester import ImprovementSuggester, SuggestionContext
 
-    metrics = PerformanceMetrics.model_validate(body.get("metrics", {}))
-    enable_llm = body.get("enable_llm", True)
+    metrics = PerformanceMetrics.model_validate(body.metrics)
+    enable_llm = body.enable_llm
     suggester = ImprovementSuggester(root_dir=str(MAOP_ROOT), enable_llm=enable_llm)
-    ctx = SuggestionContext(agent_name=body.get("agent_name", ""))
+    ctx = SuggestionContext(agent_name=body.agent_name)
     suggestions = suggester.suggest_sync(metrics, ctx)
     return {
         "status": "ok",
@@ -111,18 +178,17 @@ async def api_evolution_suggest(request: Request) -> dict[str, Any]:
 
 @router.post("/api/evolution/ab/create")
 @handle_api_errors("evolution ab create", error_value={"status": "error"})
-async def api_ab_create(request: Request) -> dict[str, Any]:
+async def api_ab_create(body: EvolutionABCreateRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
     from maop.core.evolution.ab_test import SPRTConfig
 
     sprt_cfg = None
-    if body.get("sprt"):
-        sprt_cfg = SPRTConfig.model_validate(body["sprt"])
+    if body.sprt:
+        sprt_cfg = SPRTConfig.model_validate(body.sprt)
     fw = _ab_fw()
     config = fw.create_experiment(
-        name=body["name"],
-        variants=body["variants"],
+        name=body.name,
+        variants=body.variants,
         sprt_config=sprt_cfg,
     )
     return {"status": "ok", "experiment": config.model_dump()}
@@ -130,16 +196,15 @@ async def api_ab_create(request: Request) -> dict[str, Any]:
 
 @router.post("/api/evolution/ab/record")
 @handle_api_errors("evolution ab record", error_value={"status": "error"})
-async def api_ab_record(request: Request) -> dict[str, Any]:
+async def api_ab_record(body: EvolutionABRecordRequest, request: Request) -> dict[str, Any]:
     """记录一个样本并返回当前 SPRT 状态。
 
     Body: {"experiment": "...", "variant": "...", "entity_id": "...", "success": true}
     """
     require_admin(request)
-    body = await request.json()
     fw = _ab_fw()
     state = fw.record(
-        body["experiment"], body["variant"], body.get("entity_id", ""), body.get("success", False),
+        body.experiment, body.variant, body.entity_id, body.success,
     )
     return {"status": "ok", "sprt": state.model_dump()}
 
@@ -164,24 +229,22 @@ async def api_ab_list() -> dict[str, Any]:
 
 @router.post("/api/evolution/deploy/promote")
 @handle_api_errors("evolution promote", error_value={"status": "error"})
-async def api_deploy_promote(request: Request) -> dict[str, Any]:
+async def api_deploy_promote(body: EvolutionDeployPromoteRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
     deployer = _deployer()
     result = deployer.promote(
-        body["experiment"], body["winner"], config=body.get("config"),
+        body.experiment, body.winner, config=body.config,
     )
     return {"status": "ok", "result": result.model_dump()}
 
 
 @router.post("/api/evolution/deploy/rollback")
 @handle_api_errors("evolution rollback", error_value={"status": "error"})
-async def api_deploy_rollback(request: Request) -> dict[str, Any]:
+async def api_deploy_rollback(body: EvolutionDeployRollbackRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
     deployer = _deployer()
     result = deployer.rollback(
-        body["experiment"], snapshot_id=body.get("snapshot_id", ""),
+        body.experiment, snapshot_id=body.snapshot_id,
     )
     return {"status": "ok", "result": result.model_dump()}
 
@@ -200,7 +263,7 @@ async def api_deploy_history(request: Request) -> dict[str, Any]:
 
 @router.post("/api/evolution/run")
 @handle_api_errors("evolution run cycle", error_value={"status": "error"})
-async def api_evolution_run(request: Request) -> dict[str, Any]:
+async def api_evolution_run(body: EvolutionRunRequest, request: Request) -> dict[str, Any]:
     """触发一轮性能演化循环。
 
     Body: {
@@ -212,14 +275,13 @@ async def api_evolution_run(request: Request) -> dict[str, Any]:
     }
     """
     require_admin(request)
-    body = await request.json()
     loop = _perf_loop()
     report = loop.run_evolution_cycle(
-        body["baseline_traces"],
-        body["candidate_traces"],
-        experiment=body["experiment"],
-        agent_name=body.get("agent_name", ""),
-        candidate_config=body.get("candidate_config"),
+        body.baseline_traces,
+        body.candidate_traces,
+        experiment=body.experiment,
+        agent_name=body.agent_name,
+        candidate_config=body.candidate_config,
     )
     return {"status": "ok", "report": report.model_dump()}
 
@@ -245,13 +307,12 @@ async def api_evolution_pending() -> dict[str, Any]:
 
 @router.post("/api/evolution/approve")
 @handle_api_errors("evolution approve", error_value={"status": "error"})
-async def api_evolution_approve(request: Request) -> dict[str, Any]:
+async def api_evolution_approve(body: EvolutionApproveRequest, request: Request) -> dict[str, Any]:
     """人工 gate：批准指定实验的提升。"""
     require_admin(request)
-    body = await request.json()
     loop = _perf_loop()
     result = loop.approve_and_promote(
-        body["experiment"], candidate_config=body.get("candidate_config"),
+        body.experiment, candidate_config=body.candidate_config,
     )
     return {"status": "ok", "result": result}
 
@@ -277,30 +338,29 @@ async def api_evolution_skills() -> dict[str, Any]:
 
 @router.post("/api/evolution/skills/composite")
 @handle_api_errors("evolution skill composite", error_value={"status": "error"})
-async def api_evolution_skill_composite(request: Request) -> dict[str, Any]:
+async def api_evolution_skill_composite(body: EvolutionSkillCompositeRequest, request: Request) -> dict[str, Any]:
     """保存 composite Skill（接入 SkillVersionManager）。"""
     require_admin(request)
     from maop.core.evolution.skill_version import SkillMeta, SkillStep, SkillVersionManager
 
-    body = await request.json()
-    name = (body.get("name") or "").strip()
+    name = (body.name or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="skill name is required")
 
-    steps_raw = body.get("steps") or []
+    steps_raw = body.steps or []
     steps = [SkillStep(**(s if isinstance(s, dict) else {})) for s in steps_raw]
 
     meta = SkillMeta(
         name=name,
-        version=body.get("version", "1.0.0"),
-        description=body.get("description", ""),
-        source=body.get("source", "manual"),
-        tags=body.get("tags", []),
+        version=body.version,
+        description=body.description,
+        source=body.source,
+        tags=body.tags,
         steps=steps,
     )
 
     import json as _json
-    content = body.get("content", _json.dumps(meta.model_dump(), ensure_ascii=False))
+    content = body.content if body.content is not None else _json.dumps(meta.model_dump(), ensure_ascii=False)
 
     try:
         mgr = SkillVersionManager(root_dir=str(MAOP_ROOT))

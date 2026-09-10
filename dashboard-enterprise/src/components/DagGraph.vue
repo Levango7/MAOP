@@ -61,10 +61,10 @@
 
     <!-- Empty state -->
     <div v-if="totalNodes === 0 && !executionId" class="dag-empty">
-      Enter an execution ID to subscribe to DAG progress.
+      {{ t('dag.emptyHint') }}
     </div>
     <div v-if="totalNodes === 0 && executionId && !connected" class="dag-empty">
-      Connecting to execution {{ executionId }}…
+      {{ t('dag.connecting', { id: executionId }) }}
     </div>
 
     <!-- Node detail panel (modal overlay) -->
@@ -78,6 +78,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useDagProgress } from '../composables/useDagProgress.js';
 import { NodeDetailPanel } from './index.js';
+import { useI18n } from '../i18n';
 
 const props = defineProps({
   executionId: { type: String, default: '' },
@@ -88,6 +89,7 @@ const props = defineProps({
 
 const canvasRef = ref(null);
 const selectedNode = ref(null);
+const { t } = useI18n();
 
 // ── DAG progress subscription ──────────────────────────────
 const {
@@ -274,7 +276,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 <style scoped>
 .dag-graph {
   position: relative;
-  border: 1px solid var(--border, rgba(148,163,184,.35));
+  border: 1px solid var(--border, #3c4048);
   border-radius: 8px;
   background: var(--bg-card, #22242a);
   padding: 12px;

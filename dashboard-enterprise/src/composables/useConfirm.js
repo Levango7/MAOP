@@ -15,6 +15,9 @@
  */
 import { reactive } from 'vue';
 
+// CSR-only: 模块级请求队列。本应用为纯客户端渲染（SPA），整个生命周期内只有一个
+// 模块实例，不存在跨请求队列污染。若未来引入 SSR，需改为 per-request 隔离的
+// 状态（如工厂函数 createConfirmState() 返回独立队列，或用 provide/inject 实现组件树级隔离）。
 // 请求队列：每个元素 { message, title, confirmText, cancelText, tone, _resolve }
 const confirmQueue = [];
 

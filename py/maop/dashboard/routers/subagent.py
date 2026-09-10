@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -15,6 +16,26 @@ from .state import MAOP_ROOT
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ── Pydantic 请求模型 ──────────────────────────────────────────────
+class SubAgentSpawnRequest(BaseModel):
+    """生成子代理的请求体。"""
+    agent: str = Field(default="", max_length=256)
+    task: str = Field(default="", max_length=10000)
+    context: str = Field(default="", max_length=50000)
+    model: str = Field(default="", max_length=256)
+
+
+class SubAgentWaitRequest(BaseModel):
+    """等待子代理完成的请求体。"""
+    agent_id: str = Field(default="", max_length=128)
+    timeout: int = Field(default=120, ge=1, le=3600)
+
+
+class SubAgentCancelRequest(BaseModel):
+    """取消子代理的请求体。"""
+    agent_id: str = Field(default="", max_length=128)
 
 _subagent_mgr = None
 
@@ -28,12 +49,11 @@ def _get_subagent_mgr() -> Any:
 
 @router.post("/api/subagent/spawn")
 @handle_api_errors("SubAgent spawn", error_value={"status": "error", "error": "Spawn failed"})
-async def api_subagent_spawn(request: Request) -> dict[str, Any]:
+async def api_subagent_spawn(body: SubAgentSpawnRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    agent_name = body.get("agent", "")
-    task = body.get("task", "")
-    context = body.get("context", "")
+    agent_name = body.agent
+    task = body.task
+    context = body.context
     if not agent_name or not task:
         raise HTTPException(400, "missing agent or task")
     mgr = _get_subagent_mgr()
@@ -43,7 +63,7 @@ async def api_subagent_spawn(request: Request) -> dict[str, Any]:
     # error at runtime. Build the proper AgentConfig with the caller's
     # agent name (and optional model if provided in the body).
     from maop.core.agent.delegation.subagent_lifecycle import AgentConfig
-    model = body.get("model", "")
+    model = body.model
     config = AgentConfig(name=agent_name, model=model)
     agent_id = await mgr.spawn(config=config, task=task, context=context)
     return {"status": "ok", "agent_id": agent_id}
@@ -51,11 +71,10 @@ async def api_subagent_spawn(request: Request) -> dict[str, Any]:
 
 @router.post("/api/subagent/wait")
 @handle_api_errors("SubAgent wait", error_value={"status": "error", "error": "Wait failed"})
-async def api_subagent_wait(request: Request) -> dict[str, Any]:
+async def api_subagent_wait(body: SubAgentWaitRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    agent_id = body.get("agent_id", "")
-    timeout = body.get("timeout", 120)
+    agent_id = body.agent_id
+    timeout = body.timeout
     if not agent_id:
         raise HTTPException(400, "missing agent_id")
     mgr = _get_subagent_mgr()
@@ -67,10 +86,9 @@ async def api_subagent_wait(request: Request) -> dict[str, Any]:
 
 @router.post("/api/subagent/cancel")
 @handle_api_errors("SubAgent cancel", error_value={"status": "error", "error": "Cancel failed"})
-async def api_subagent_cancel(request: Request) -> dict[str, Any]:
+async def api_subagent_cancel(body: SubAgentCancelRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    agent_id = body.get("agent_id", "")
+    agent_id = body.agent_id
     if not agent_id:
         raise HTTPException(400, "missing agent_id")
     mgr = _get_subagent_mgr()
@@ -85,7 +103,8 @@ async def api_subagent_cancel(request: Request) -> dict[str, Any]:
 
 @router.get("/api/subagent/list")
 @handle_api_errors("SubAgent list", error_value={"agents": [], "count": 0, "error": "List failed"})
-async def api_subagent_list() -> dict[str, Any]:
+async def api_subagent_list(request: Request) -> dict[str, Any]:
+    require_admin(request)
     mgr = _get_subagent_mgr()
     agents = mgr.list_agents()
     return {"agents": agents, "count": len(agents)}
@@ -93,7 +112,8 @@ async def api_subagent_list() -> dict[str, Any]:
 
 @router.get("/api/subagent/transcript")
 @handle_api_errors("SubAgent transcript", error_value={"status": "error", "error": "Transcript failed"})
-async def api_subagent_transcript(agent_id: str = "") -> dict[str, Any]:
+async def api_subagent_transcript(request: Request, agent_id: str = "") -> dict[str, Any]:
+    require_admin(request)
     if not agent_id:
         raise HTTPException(400, "missing agent_id")
     mgr = _get_subagent_mgr()

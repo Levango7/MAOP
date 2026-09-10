@@ -860,7 +860,7 @@ async function onTestHook(hook) {
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-.history-state.error { color: var(--danger, #c0392b); }
+.history-state.error { color: var(--danger, #f05545); }
 
 .history-table {
   width: 100%;
@@ -1024,7 +1024,7 @@ async function onTestHook(hook) {
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-.hooks-state.error { color: var(--danger, #c0392b); }
+.hooks-state.error { color: var(--danger, #f05545); }
 .hooks-empty {
   padding: var(--sp-5);
   text-align: center;
@@ -1173,7 +1173,7 @@ async function onTestHook(hook) {
   box-shadow: 0 0 0 2px var(--brand-soft);
 }
 .hooks-form-error {
-  color: var(--danger, #c0392b);
+  color: var(--danger, #f05545);
   font-size: var(--fs-sm);
   margin-top: var(--sp-2);
 }

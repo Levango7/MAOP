@@ -34,9 +34,14 @@ def _stub_require_admin(monkeypatch):
     conftest 设 MAOP_AUTH=0 → 中间件授予 read-only 角色（P0-4 安全修复：
     MAOP_AUTH_DISABLED_ADMIN 已废弃并忽略）。本测试验证 edition 切换门禁
     逻辑，不验证 admin 权限校验，因此绕过 require_admin 守卫。
+
+    需 stub 两个模块：admin（POST /edition 切换）和 meta（GET /edition
+    读取、GET /config 等），两者各自 import require_admin 到自身命名空间。
     """
     import maop.dashboard.routers.info.admin as admin_mod
+    import maop.dashboard.routers.info.meta as meta_mod
     monkeypatch.setattr(admin_mod, "require_admin", lambda request: None)
+    monkeypatch.setattr(meta_mod, "require_admin", lambda request: None)
 
 
 @pytest.fixture(autouse=True)

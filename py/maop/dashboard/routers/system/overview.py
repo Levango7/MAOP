@@ -16,6 +16,7 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from maop import __version__ as MAOP_VERSION
 from maop.core.security.middleware import require_admin
@@ -38,6 +39,7 @@ _FILE_COUNTS_CACHE_TTL = 600.0  # 10 minutes
 @router.get("/api/overview")
 @handle_api_errors
 async def api_overview(request: Request) -> dict[str, Any]:
+    require_admin(request)
     now = time.monotonic()
     cached = _overview_cache.get("data")
     cached_at = _overview_cache.get("ts", 0)
@@ -133,7 +135,10 @@ async def api_overview(request: Request) -> dict[str, Any]:
         return result
     except Exception as exc:
         logger.error('Overview failed: %s', exc)
-        return {"error": "Overview failed", "agents_total": 0, "modules_total": 0, "tests_total": 0}
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Overview failed", "agents_total": 0, "modules_total": 0, "tests_total": 0},
+        )
 
 
 # ── System Resources & Diagnostics (C-7 修复) ─────────────────────

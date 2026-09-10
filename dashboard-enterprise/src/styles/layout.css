@@ -108,7 +108,9 @@
 
 /* ── Responsive step ladder (tablet → phone, density-independent) ─────────
  * Grids step down gracefully so the same view reads well at any width — from
- * a wide desktop down to a phone in portrait or landscape. */
+ * a wide desktop down to a phone in portrait or landscape.
+ * 注：1200px 为大屏 grid 阶梯适配断点，不属于标准响应式断点体系
+ * （标准断点：700px 手机、900px 平板），仅用于 4 列/3 列 grid 降级。 */
 @media (max-width: 1200px) {
   .grid-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -70,7 +70,8 @@ class ModelAddRequest(ModelDef):
 
 @router.get("/api/model/agents")
 @handle_api_errors("Model agents", error_value={"agents": [], "count": 0, "error": "Model agents failed"})
-async def api_model_agents() -> dict[str, Any]:
+async def api_model_agents(request: Request) -> dict[str, Any]:
+    require_admin(request)
     from maop.config.loader import ConfigLoader
     cfg = ConfigLoader(project_root=str(MAOP_ROOT)).load()
     agents = []
@@ -83,7 +84,9 @@ async def api_model_agents() -> dict[str, Any]:
     return {"agents": agents, "count": len(agents)}
 
 @router.get("/api/model/quota")
-async def api_model_quota() -> dict[str, Any]:
+@handle_api_errors("Model quota", error_value={"agents": [], "count": 0, "error": "Model quota failed"})
+async def api_model_quota(request: Request) -> dict[str, Any]:
+    require_admin(request)
     agents_cfg = []
     try:
         from maop.config.loader import ConfigLoader
@@ -155,12 +158,14 @@ def _get_model_registry() -> Any:
 
 @router.get("/api/model/registry")
 @handle_api_errors("Model registry", error_value={"status": "error", "error": "Model registry failed"})
-async def api_model_registry() -> dict[str, Any]:
+async def api_model_registry(request: Request) -> dict[str, Any]:
+    require_admin(request)
     return {"status": "ok", "stats": _get_model_registry().stats()}
 
 @router.get("/api/model/list")
 @handle_api_errors("Model list", error_value={"models": [], "count": 0, "error": "Model list failed"})
-async def api_model_list() -> dict[str, Any]:
+async def api_model_list(request: Request) -> dict[str, Any]:
+    require_admin(request)
     reg = _get_model_registry()
     models = []
     for m in reg.list_models(enabled_only=False):
@@ -174,32 +179,37 @@ async def api_model_list() -> dict[str, Any]:
 
 @router.get("/api/model/providers")
 @handle_api_errors("Model providers", error_value={"providers": [], "error": "Model providers failed"})
-async def api_model_providers() -> dict[str, Any]:
+async def api_model_providers(request: Request) -> dict[str, Any]:
+    require_admin(request)
     return {"providers": _get_model_registry().providers.list_providers()}
 
 @router.get("/api/model/select")
 @handle_api_errors("Model select", error_value={"status": "error", "error": "Model select failed"})
-async def api_model_select(capability: str = "", agent_model: str = "", policy: str = "default") -> dict[str, Any]:
+async def api_model_select(request: Request, capability: str = "", agent_model: str = "", policy: str = "default") -> dict[str, Any]:
+    require_admin(request)
     from maop.model.selector import ModelSelector
     em = ModelSelector(_get_model_registry()).select(capability=capability, agent_model=agent_model, policy_name=policy)
     return {"status": "ok", "effective_model": em.model_dump()}
 
 @router.get("/api/model/budget")
 @handle_api_errors("Model budget", error_value={"status": "error", "error": "Model budget failed"})
-async def api_model_budget() -> dict[str, Any]:
+async def api_model_budget(request: Request) -> dict[str, Any]:
+    require_admin(request)
     from maop.model.budget import BudgetGuard
     reg = _get_model_registry()
     return {"status": "ok", "budget": BudgetGuard(root_dir=str(MAOP_ROOT), config=reg.config.budget).stats()}
 
 @router.get("/api/model/quota/status")
 @handle_api_errors("Model quota", error_value={"status": "error", "error": "Model quota failed"})
-async def api_model_quota_status() -> dict[str, Any]:
+async def api_model_quota_status(request: Request) -> dict[str, Any]:
+    require_admin(request)
     from maop.model.quota import QuotaEnforcer
     return {"status": "ok", "quotas": QuotaEnforcer(_get_model_registry()).usage_all()}
 
 @router.get("/api/model/policies")
 @handle_api_errors("Model policies", error_value={"policies": [], "count": 0, "error": "Model policies failed"})
-async def api_model_policies() -> dict[str, Any]:
+async def api_model_policies(request: Request) -> dict[str, Any]:
+    require_admin(request)
     reg = _get_model_registry()
     policies = []
     for name, p in reg.config.policies.items():
@@ -313,7 +323,8 @@ async def api_key_delete(body: KeyDeleteRequest, request: Request) -> dict[str, 
 
 @router.get("/api/model/key/list")
 @handle_api_errors("Key list", error_value={"providers": [], "error": "Key list failed"})
-async def api_key_list() -> dict[str, Any]:
+async def api_key_list(request: Request) -> dict[str, Any]:
+    require_admin(request)
     vault = _get_api_key_vault()
     return {"providers": vault.list_providers()}
 

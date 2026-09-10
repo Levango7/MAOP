@@ -22,6 +22,10 @@
     <div v-if="error" class="mcp-topo__notice mcp-topo__notice--error">
       <AppIcon name="alert" :size="14" /> {{ error }}
     </div>
+    <!-- Render error banner (vis-network 加载失败) -->
+    <div v-if="renderError" class="mcp-topo__notice mcp-topo__notice--error">
+      <AppIcon name="alert" :size="14" /> {{ renderError }}
+    </div>
 
     <!-- Canvas -->
     <div class="mcp-topo__canvas-wrap">
@@ -83,6 +87,7 @@ const { t } = useI18n();
 
 const canvasRef = ref(null);
 const ready = ref(false);
+const renderError = ref('');
 
 // vis-network instance (lazy-loaded to keep bundle split)
 let network = null;
@@ -193,8 +198,9 @@ async function render() {
   }
   try {
     await loadVisLib();
-  } catch {
-    // 渲染失败时静默处理，错误展示交给外层
+  } catch (e) {
+    // 渲染库加载失败时设置错误提示，避免静默吞错
+    renderError.value = t('view.tools.topo.renderFailed', '拓扑渲染库加载失败，请刷新重试');
     return;
   }
   const { Network, DataSet } = visLib;
@@ -292,6 +298,7 @@ watch(
   gap: 12px;
   color: var(--text-muted);
   background: var(--surface);
+  /* z-index 2 为 loading 覆盖层层级，无精确 token 对应，保留硬编码 */
   z-index: 2;
 }
 .mcp-topo__spin { animation: mcp-topo-spin 1s linear infinite; }
@@ -321,12 +328,12 @@ watch(
   gap: 6px;
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--text);
   font-size: var(--fs-base);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
 .btn-ghost:hover { background: var(--bg-hover, rgba(148,163,184,.16)); border-color: var(--border-strong, rgba(148,163,184,.45)); }
 .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }

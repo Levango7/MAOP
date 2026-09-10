@@ -113,140 +113,162 @@ async function handleUnauthorized() {
   }
 }
 
-export const useApiStore = defineStore('api', {
-  actions: {
-    /**
-     * GET 请求，自动注入 Bearer token。
-     * @param {string} url
-     * @param {object} [opts] { headers } 可选额外 headers
-     */
-    async get(url, opts) {
-      let res = await fetchWithTimeout(url, withAuth({}, (opts && opts.headers) || {}));
+/**
+ * F1: 统一为 Pinia Setup Store 风格（与 edition.js / realtime.js / ui.js 一致）：
+ * state 用 ref，getters 用 computed，actions 用函数。
+ * 本 store 无 state 和 getters，仅包含 actions（转为普通函数并在 return 中暴露）。
+ */
+export const useApiStore = defineStore('api', () => {
+  /**
+   * GET 请求，自动注入 Bearer token。
+   * @param {string} url
+   * @param {object} [opts] { headers } 可选额外 headers
+   */
+  async function get(url, opts) {
+    let res = await fetchWithTimeout(url, withAuth({}, (opts && opts.headers) || {}));
+    if (res.status === 401) {
+      await handleUnauthorized();
+      // Retry once if refresh succeeded (new token is now in localStorage)
+      res = await fetchWithTimeout(url, withAuth({}, (opts && opts.headers) || {}));
       if (res.status === 401) {
-        await handleUnauthorized();
-        // Retry once if refresh succeeded (new token is now in localStorage)
-        res = await fetchWithTimeout(url, withAuth({}, (opts && opts.headers) || {}));
-        if (res.status === 401) {
-          await handleUnauthorized();  // refresh didn't help or no token
-          throw new Error(`API ${url}: 401 Unauthorized`);
-        }
+        await handleUnauthorized();  // refresh didn't help or no token
+        throw new Error(`API ${url}: 401 Unauthorized`);
       }
-      if (!res.ok) throw new Error(`API ${url}: ${res.status}`);
-      return res.json();
-    },
-    /**
-     * POST 请求，自动注入 Bearer token 与 Content-Type。
-     * @param {string} url
-     * @param {object} body JSON body
-     * @param {object} [opts] { headers } 可选额外 headers
-     */
-    async post(url, body, opts) {
-      const headers = Object.assign(
-        { 'Content-Type': 'application/json' },
-        (opts && opts.headers) || {}
-      );
-      let res = await fetchWithTimeout(url, withAuth(
+    }
+    if (!res.ok) throw new Error(`API ${url}: ${res.status}`);
+    return res.json();
+  }
+
+  /**
+   * POST 请求，自动注入 Bearer token 与 Content-Type。
+   * @param {string} url
+   * @param {object} body JSON body
+   * @param {object} [opts] { headers } 可选额外 headers
+   */
+  async function post(url, body, opts) {
+    const headers = Object.assign(
+      { 'Content-Type': 'application/json' },
+      (opts && opts.headers) || {}
+    );
+    let res = await fetchWithTimeout(url, withAuth(
+      { method: 'POST', body: JSON.stringify(body || {}) },
+      headers
+    ));
+    if (res.status === 401) {
+      await handleUnauthorized();
+      res = await fetchWithTimeout(url, withAuth(
         { method: 'POST', body: JSON.stringify(body || {}) },
         headers
       ));
       if (res.status === 401) {
         await handleUnauthorized();
-        res = await fetchWithTimeout(url, withAuth(
-          { method: 'POST', body: JSON.stringify(body || {}) },
-          headers
-        ));
-        if (res.status === 401) {
-          await handleUnauthorized();
-          throw new Error(`API ${url}: 401 Unauthorized`);
-        }
+        throw new Error(`API ${url}: 401 Unauthorized`);
       }
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error || `API ${url}: ${res.status}`);
-      }
-      return res.json();
-    },
-    /** PUT 请求，自动注入 Bearer token */
-    async put(url, body) {
-      // F3: Content-Type 只在 withAuth 的 headers 参数中设置一次。
-      // withAuth 实现中 init.headers = h 会覆盖 extra.headers，故 extra 内
-      // 不再冗余设置 headers（原代码 extra.headers 是被丢弃的死代码）。
-      const putHeaders = { 'Content-Type': 'application/json' };
-      let res = await fetchWithTimeout(url, withAuth(
+    }
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || `API ${url}: ${res.status}`);
+    }
+    return res.json();
+  }
+
+  /** PUT 请求，自动注入 Bearer token */
+  async function put(url, body) {
+    // F3: Content-Type 只在 withAuth 的 headers 参数中设置一次。
+    // withAuth 实现中 init.headers = h 会覆盖 extra.headers，故 extra 内
+    // 不再冗余设置 headers（原代码 extra.headers 是被丢弃的死代码）。
+    const putHeaders = { 'Content-Type': 'application/json' };
+    let res = await fetchWithTimeout(url, withAuth(
+      { method: 'PUT', body: JSON.stringify(body || {}) },
+      putHeaders
+    ));
+    if (res.status === 401) {
+      await handleUnauthorized();
+      res = await fetchWithTimeout(url, withAuth(
         { method: 'PUT', body: JSON.stringify(body || {}) },
         putHeaders
       ));
-      if (res.status === 401) {
-        await handleUnauthorized();
-        res = await fetchWithTimeout(url, withAuth(
-          { method: 'PUT', body: JSON.stringify(body || {}) },
-          putHeaders
-        ));
-        if (res.status === 401) { await handleUnauthorized(); throw new Error(`API ${url}: 401`); }
-      }
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error || `API ${url}: ${res.status}`);
-      }
-      return res.json();
-    },
-    /** DELETE 请求，自动注入 Bearer token */
-    async delete(url) {
-      let res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
-      if (res.status === 401) {
-        await handleUnauthorized();
-        res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
-        if (res.status === 401) { await handleUnauthorized(); throw new Error(`API ${url}: 401`); }
-      }
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error || `API ${url}: ${res.status}`);
-      }
-      return res.json();
-    },
-    /**
-     * 暴露给组件直接使用的工具方法：返回当前 token（便于 UI 显示登录状态）。
-     * M6 fix: token 现由 httpOnly cookie 管理，前端无法读取，始终返回空字符串。
-     * 登录状态请使用 isLoggedIn() 判断。
-     */
-    authToken() {
-      return getAuthToken();
-    },
-    /**
-     * 判断当前是否已登录。
-     * M6 fix: 通过 user 信息存在性判断（token 在 httpOnly cookie 中不可读）。
-     */
-    isLoggedIn() {
-      return isLoggedIn();
-    },
-    /**
-     * 设置登录态（登录成功后调用）。
-     * M6 fix: token 由后端 Set-Cookie httpOnly 管理，前端不接触 token。
-     * 仅存储非敏感的 user 信息用于 UI 登录状态显示。
-     */
-    setAuthToken(token, user) {
-      // token 参数保留以兼容现有调用方，但不存储到 localStorage。
-      // token 由后端通过 Set-Cookie: maop_token=...; HttpOnly; Secure; SameSite=Strict 设置。
-      try {
-        if (user) localStorage.setItem(USER_KEY, user);
-        else localStorage.removeItem(USER_KEY);
-      } catch { /* ignore */ }
-    },
-    /**
-     * 清除登录态（登出）。P1 fix: 通知后端撤销 JWT token。
-     * M6 fix: token 由后端 httpOnly cookie 管理，前端只需清除 user 信息。
-     */
-    async clearAuthToken() {
-      // Notify backend to revoke the token before clearing locally
-      try {
-        await fetchWithTimeout('/api/auth/logout', withAuth({ method: 'POST' }, {}));
-      } catch { /* best-effort — clear locally anyway */ }
-      // M6 fix: 后端会通过 Set-Cookie 清除 httpOnly cookie，前端只需清除 user 信息。
-      try {
-        localStorage.removeItem(USER_KEY);
-      } catch { /* ignore */ }
-    },
-  },
+      if (res.status === 401) { await handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+    }
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || `API ${url}: ${res.status}`);
+    }
+    return res.json();
+  }
+
+  /** DELETE 请求，自动注入 Bearer token */
+  async function del(url) {
+    let res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
+    if (res.status === 401) {
+      await handleUnauthorized();
+      res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
+      if (res.status === 401) { await handleUnauthorized(); throw new Error(`API ${url}: 401`); }
+    }
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || `API ${url}: ${res.status}`);
+    }
+    return res.json();
+  }
+
+  /**
+   * 暴露给组件直接使用的工具方法：返回当前 token（便于 UI 显示登录状态）。
+   * M6 fix: token 现由 httpOnly cookie 管理，前端无法读取，始终返回空字符串。
+   * 登录状态请使用 isLoggedIn() 判断。
+   */
+  function authToken() {
+    return getAuthToken();
+  }
+
+  /**
+   * 判断当前是否已登录。
+   * M6 fix: 通过 user 信息存在性判断（token 在 httpOnly cookie 中不可读）。
+   */
+  function isLoggedInAction() {
+    return isLoggedIn();
+  }
+
+  /**
+   * 设置登录态（登录成功后调用）。
+   * M6 fix: token 由后端 Set-Cookie httpOnly 管理，前端不接触 token。
+   * 仅存储非敏感的 user 信息用于 UI 登录状态显示。
+   */
+  function setAuthToken(token, user) {
+    // token 参数保留以兼容现有调用方，但不存储到 localStorage。
+    // token 由后端通过 Set-Cookie: maop_token=...; HttpOnly; Secure; SameSite=Strict 设置。
+    try {
+      if (user) localStorage.setItem(USER_KEY, user);
+      else localStorage.removeItem(USER_KEY);
+    } catch { /* ignore */ }
+  }
+
+  /**
+   * 清除登录态（登出）。P1 fix: 通知后端撤销 JWT token。
+   * M6 fix: token 由后端 httpOnly cookie 管理，前端只需清除 user 信息。
+   */
+  async function clearAuthToken() {
+    // Notify backend to revoke the token before clearing locally
+    try {
+      await fetchWithTimeout('/api/auth/logout', withAuth({ method: 'POST' }, {}));
+    } catch { /* best-effort — clear locally anyway */ }
+    // M6 fix: 后端会通过 Set-Cookie 清除 httpOnly cookie，前端只需清除 user 信息。
+    try {
+      localStorage.removeItem(USER_KEY);
+    } catch { /* ignore */ }
+  }
+
+  return {
+    // actions
+    get,
+    post,
+    put,
+    delete: del,
+    authToken,
+    isLoggedIn: isLoggedInAction,
+    setAuthToken,
+    clearAuthToken,
+  };
 });
 
 // 模块级导出（便于非 Pinia 上下文使用，如 App.vue 直接 import）

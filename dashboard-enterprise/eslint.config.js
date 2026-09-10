@@ -73,6 +73,10 @@ export default [
       'vue/require-default-prop': 'warn',
       'vue/attribute-hyphenation': 'error',
       'vue/v-on-event-hyphenation': 'error',
+      // Vue 最佳实践规则（R4审查补充）
+      'vue/no-mutating-props': 'warn',
+      'vue/no-side-effects-in-computed-properties': 'warn',
+      'vue/require-explicit-emits': 'warn',
     },
   },
 

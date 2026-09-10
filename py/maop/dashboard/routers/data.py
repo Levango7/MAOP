@@ -60,6 +60,7 @@ async def api_report(request: Request, hours: int = Query(48, ge=1, le=720)) -> 
 @router.get("/api/agents/stats")
 @handle_api_errors("Agents stats", error_value={"agents": [], "count": 0, "error": "Agents stats unavailable"})
 async def api_agents_stats(request: Request) -> dict[str, Any]:
+    require_admin(request)
     agents = await get_bridge().agent_stats()
     return _tenant_filter({"agents": agents, "count": len(agents)}, _request_tenant_id(request))
 
@@ -67,6 +68,7 @@ async def api_agents_stats(request: Request) -> dict[str, Any]:
 @router.get("/api/timeseries")
 @handle_api_errors("Timeseries", error_value={"status": "error", "error": "Timeseries unavailable"})
 async def api_timeseries(request: Request) -> Any:
+    require_admin(request)
     return _tenant_filter(await get_bridge().timeseries(hours=168), _request_tenant_id(request))
 
 
@@ -130,18 +132,21 @@ async def api_snapshot(request: Request) -> Any:
 @router.get("/api/failures")
 @handle_api_errors("Failures", error_value={"status": "error", "error": "Failures unavailable"})
 async def api_failures(request: Request) -> Any:
+    require_admin(request)
     return _tenant_filter(await get_bridge().failures(), _request_tenant_id(request))
 
 
 @router.get("/api/chain")
 @handle_api_errors("Chain", error_value={"status": "error", "error": "Chain unavailable"})
 async def api_chain(request: Request) -> Any:
+    require_admin(request)
     return _tenant_filter(await get_bridge().chain(), _request_tenant_id(request))
 
 
 @router.get("/api/optimizer")
 @handle_api_errors("Optimizer", error_value={"status": "error", "error": "Optimizer report unavailable"})
 async def api_optimizer(request: Request) -> dict[str, Any]:
+    require_admin(request)
     try:
         bridge = get_bridge()
         report = await bridge.report()
@@ -166,7 +171,8 @@ async def api_optimizer(request: Request) -> dict[str, Any]:
 
 @router.get("/api/graph/stats")
 @handle_api_errors("Graph stats", error_value={"nodes": 0, "edges": 0, "status": "error", "error": "Graph stats unavailable"})
-async def api_graph_stats() -> dict[str, Any]:
+async def api_graph_stats(request: Request) -> dict[str, Any]:
+    require_admin(request)
     try:
         bridge = get_bridge()
         nodes = await bridge.graph_nodes()
@@ -190,19 +196,22 @@ async def api_graph_stats() -> dict[str, Any]:
 
 @router.get("/api/graph/nodes")
 @handle_api_errors("Graph nodes", error_value={"nodes": [], "error": "Graph nodes unavailable"})
-async def api_graph_nodes() -> Any:
+async def api_graph_nodes(request: Request) -> Any:
+    require_admin(request)
     return await get_bridge().graph_nodes()
 
 
 @router.get("/api/graph/edges")
 @handle_api_errors("Graph edges", error_value={"edges": [], "error": "Graph edges unavailable"})
-async def api_graph_edges() -> Any:
+async def api_graph_edges(request: Request) -> Any:
+    require_admin(request)
     return await get_bridge().graph_edges()
 
 
 @router.get("/api/graph/neighbors")
 @handle_api_errors("Graph neighbors", error_value={"neighbors": [], "count": 0, "error": "Graph neighbors unavailable"})
-async def api_graph_neighbors(node: str = Query(...)) -> dict[str, Any]:
+async def api_graph_neighbors(request: Request, node: str = Query(...)) -> dict[str, Any]:
+    require_admin(request)
     bridge = get_bridge()
     edges = await bridge.graph_edges()
     neighbors = [e for e in edges if isinstance(e, dict) and (e.get("source") == node or e.get("target") == node)]
@@ -213,13 +222,15 @@ async def api_graph_neighbors(node: str = Query(...)) -> dict[str, Any]:
 
 @router.get("/api/vector/stats")
 @handle_api_errors("Vector stats", error_value={"status": "error", "error": "Vector stats unavailable"})
-async def api_vector_stats() -> Any:
+async def api_vector_stats(request: Request) -> Any:
+    require_admin(request)
     return await get_bridge().memory_stats()
 
 
 @router.get("/api/vector/list")
 @handle_api_errors("Vector list", error_value={"vectors": [], "count": 0, "total": 0, "status": "error", "error": "Vector list unavailable"})
 async def api_vector_list(
+    request: Request,
     limit: int = Query(1000, ge=1, le=10000, description="最大返回条数 (1..10000)"),
     offset: int = Query(0, ge=0, description="跳过条数 (>=0)"),
 ) -> dict[str, Any]:
@@ -230,6 +241,7 @@ async def api_vector_list(
     - offset: >=0，默认 0
     - 返回 total 字段，便于前端分页控件计算总页数
     """
+    require_admin(request)
     try:
         from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=str(get_db_path("vectors")))
@@ -253,7 +265,8 @@ async def api_vector_list(
 
 @router.get("/api/vector/search")
 @handle_api_errors("Vector search", error_value={"query": "", "results": [], "count": 0, "status": "error", "error": "Vector search unavailable"})
-async def api_vector_search(q: str = Query(...), k: int = Query(5, alias="topk")) -> dict[str, Any]:
+async def api_vector_search(request: Request, q: str = Query(...), k: int = Query(5, alias="topk")) -> dict[str, Any]:
+    require_admin(request)
     try:
         from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=str(get_db_path("vectors")))
@@ -274,7 +287,8 @@ async def api_vector_search(q: str = Query(...), k: int = Query(5, alias="topk")
 
 @router.get("/api/wiki/stats")
 @handle_api_errors("Wiki stats", error_value={"status": "error", "error": "Wiki stats unavailable"})
-async def api_wiki_stats() -> dict[str, Any]:
+async def api_wiki_stats(request: Request) -> dict[str, Any]:
+    require_admin(request)
     base = await get_bridge().memory_stats()
     try:
         from maop.core.memory.vector import VectorStore
@@ -288,7 +302,8 @@ async def api_wiki_stats() -> dict[str, Any]:
 
 @router.get("/api/prompts")
 @handle_api_errors("Prompts", error_value={"prompts": [], "status": "error", "error": "Prompts list unavailable"})
-async def api_prompts() -> dict[str, Any]:
+async def api_prompts(request: Request) -> dict[str, Any]:
+    require_admin(request)
     try:
         result = await get_bridge().prompts_list()
         if isinstance(result, dict) and "prompts" in result:
@@ -320,13 +335,15 @@ async def api_prompts() -> dict[str, Any]:
 
 @router.get("/api/coordination")
 @handle_api_errors("Coordination", error_value={"status": "error", "error": "Coordination report unavailable"})
-async def api_coordination() -> Any:
+async def api_coordination(request: Request) -> Any:
+    require_admin(request)
     return await get_bridge().coordination_report()
 
 
 @router.get("/api/teams")
 @handle_api_errors("Teams", error_value={"status": "error", "error": "Teams unavailable"})
-async def api_teams() -> Any:
+async def api_teams(request: Request) -> Any:
+    require_admin(request)
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(MAOP_ROOT)).load()
@@ -342,7 +359,8 @@ async def api_teams() -> Any:
 
 @router.get("/api/skills")
 @handle_api_errors("Skills", error_value={"skills": [], "count": 0, "status": "error", "error": "Skills list unavailable"})
-async def api_skills() -> dict[str, Any]:
+async def api_skills(request: Request) -> dict[str, Any]:
+    require_admin(request)
     try:
         result = await get_bridge().skills_list()
         items = result if isinstance(result, list) else (result.get("skills", []) if isinstance(result, dict) else [])
@@ -378,43 +396,50 @@ async def api_skills() -> dict[str, Any]:
 
 @router.get("/api/tools/stats")
 @handle_api_errors("Tools stats", error_value={"status": "error", "error": "Tools stats unavailable"})
-async def api_tools_stats() -> Any:
+async def api_tools_stats(request: Request) -> Any:
+    require_admin(request)
     return await get_bridge().tools_stats()
 
 
 @router.get("/api/guardrails")
 @handle_api_errors("Guardrails", error_value={"status": "error", "error": "Guardrails report unavailable"})
-async def api_guardrails() -> Any:
+async def api_guardrails(request: Request) -> Any:
+    require_admin(request)
     return await get_bridge().guardrail_report()
 
 
 @router.get("/api/sandbox/list")
 @handle_api_errors("Sandbox list", error_value={"status": "error", "error": "Sandbox list unavailable"})
-async def api_sandbox_list() -> Any:
+async def api_sandbox_list(request: Request) -> Any:
+    require_admin(request)
     return await get_bridge().sandbox_list()
 
 
 @router.get("/api/human/pending")
 @handle_api_errors("Human pending", error_value={"status": "error", "error": "Human pending unavailable"})
-async def api_human_pending() -> Any:
+async def api_human_pending(request: Request) -> Any:
+    require_admin(request)
     return await get_bridge().human_pending()
 
 
 @router.get("/api/mcp/servers")
 @handle_api_errors("MCP servers", error_value={"status": "error", "error": "MCP servers unavailable"})
-async def api_mcp_servers() -> Any:
+async def api_mcp_servers(request: Request) -> Any:
+    require_admin(request)
     return await get_bridge().mcp_servers()
 
 
 @router.get("/api/mcp/tools")
 @handle_api_errors("MCP tools", error_value={"status": "error", "error": "MCP tools unavailable"})
-async def api_mcp_tools() -> Any:
+async def api_mcp_tools(request: Request) -> Any:
+    require_admin(request)
     return await get_bridge().mcp_tools()
 
 
 @router.get("/api/mcp")
 @handle_api_errors("MCP combined", error_value={"servers": [], "tools": [], "server_count": 0, "tool_count": 0, "error": "MCP combined unavailable"})
-async def api_mcp_combined() -> dict[str, Any]:
+async def api_mcp_combined(request: Request) -> dict[str, Any]:
+    require_admin(request)
     servers = await get_bridge().mcp_servers()
     tools = await get_bridge().mcp_tools()
     return {"servers": servers, "tools": tools, "server_count": len(servers), "tool_count": len(tools)}
@@ -424,7 +449,8 @@ async def api_mcp_combined() -> dict[str, Any]:
 
 @router.get("/api/versions")
 @handle_api_errors("Versions", error_value={"status": "error", "error": "Versions unavailable"})
-async def api_versions() -> dict[str, Any]:
+async def api_versions(request: Request) -> dict[str, Any]:
+    require_admin(request)
     try:
         from maop import __version__ as MAOP_ver
     except ImportError:
@@ -435,7 +461,8 @@ async def api_versions() -> dict[str, Any]:
 
 @router.get("/api/providers")
 @handle_api_errors("Providers", error_value={"status": "error", "error": "Providers report unavailable"})
-async def api_providers() -> Any:
+async def api_providers(request: Request) -> Any:
+    require_admin(request)
     return await get_bridge().providers_report()
 
 

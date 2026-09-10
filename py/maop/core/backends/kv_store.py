@@ -71,8 +71,10 @@ class KVStore:
         self._init_db()
         # B12: prune 节流——避免每次读操作都触发全表 DELETE 扫描。
         # 记录上次 prune 时间戳，只在距上次 prune 超过 _prune_interval 秒时才真正执行。
+        # R4-low fix: 60s 间隔导致删除键的空间回收最多延迟 60s，缩短到 30s
+        # 在日志噪音与回收延迟之间取得平衡（prune 本身是 DELETE...WHERE，开销低）。
         self._last_prune_time: float = 0.0
-        self._prune_interval: float = 60.0
+        self._prune_interval: float = 30.0
 
     def _init_db(self) -> None:
         conn = self._pool.acquire()

@@ -70,8 +70,10 @@ export const messages = {
     'view.search.col.level': 'Level',
     'view.search.col.message': 'Message',
     // 'Detail' reuses common.details; 'Name'/'Model'/'Driver'/'Capabilities' reuse common.*
+    'view.search.resultCount': '{count} result(s)',
+    'view.search.resultCountWithTime': '{count} result(s) in {time}ms',
+    'view.search.noMatches': 'No matches for “{query}”.',
   },
-    'view.search.Search failed': 'Search failed',
 
   zh: {
     'view.search.title': '统一搜索',
@@ -143,5 +145,8 @@ export const messages = {
     'view.search.col.level': '级别',
     'view.search.col.message': '消息',
     'view.search.Search failed': '搜索失败',
+    'view.search.resultCount': '{count} 条结果',
+    'view.search.resultCountWithTime': '{count} 条结果（{time}ms）',
+    'view.search.noMatches': '未找到匹配“{query}”的结果。',
   },
 };

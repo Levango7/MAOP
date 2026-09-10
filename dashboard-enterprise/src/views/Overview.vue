@@ -600,7 +600,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
   gap: 2px;
   color: var(--text-faint);
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 .ov-pev__connector-label {
   font-size: var(--fs-2xs);
@@ -664,7 +664,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 .ov-split > * { min-width: 0; margin-bottom: 0; }
 .ov-split .activity-feed { margin-bottom: 0; }
 
-@media (max-width: 1200px) {
+@media (max-width: 1100px) {
   .ov-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ov-pev__phases { grid-template-columns: 1fr 1fr; }
   .ov-pev__phase--last { grid-column: 1 / -1; }
@@ -678,7 +678,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
   .ov-pev__phases { grid-template-columns: 1fr; }
   .ov-pev__phase--last { grid-column: auto; }
 }
-@media (max-width: 520px) {
+@media (max-width: 640px) {
   .ov-actions { grid-template-columns: 1fr; }
 }
 </style>

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from abc import ABC, abstractmethod
 from typing import Any, cast
 
@@ -414,6 +415,10 @@ _queue: QueueBackend | None = None
 _kv: KVBackend | None = None
 _secret: SecretBackend | None = None
 
+# 工厂单例锁：保护 get_*_backend() 中的 check-then-set 临界区，
+# 避免多线程并发首次调用时重复创建后端实例（来源：并发安全审计经验）。
+_factory_lock = threading.Lock()
+
 
 def _edition_defaults() -> dict[str, str]:
     """Return default backend types based on MAOP edition.
@@ -435,42 +440,48 @@ def get_storage_backend(db_path: str = "") -> StorageBackend:
       3. Default → SQLite
     """
     global _storage
+    # 快路径：已初始化则直接返回（无锁，避免热路径开销）。
     if _storage is not None:
         return _storage
-    defaults = _edition_defaults()
-    backend_type = os.getenv("MAOP_STORAGE_BACKEND", defaults["storage"]).lower()
-    if backend_type == "postgresql":
-        try:
-            from maop.core.backends.backends_pg import PostgreSQLStorageBackend
-            _storage = PostgreSQLStorageBackend()
-            logger.info("[backends] Storage: PostgreSQL (edition=%s)", get_edition().value)
+    with _factory_lock:
+        # 双重检查：持锁后再确认一次，避免并发重复创建。
+        if _storage is not None:
             return _storage
-        except Exception as exc:
-            # C9 fix: silently degrading an explicitly-requested PostgreSQL
-            # backend to SQLite causes split-brain data (writes land in a
-            # local file while the rest of the fleet uses PG). Default is
-            # now fail-fast; set MAOP_STORAGE_ALLOW_FALLBACK=1 to opt in to
-            # the old degrade-with-warning behaviour.
-            # 捕获范围覆盖全部不可用形态：psycopg 缺失(ImportError)、
-            # 连接池连不上 PG(psycopg.OperationalError)等。fail-fast 防线
-            # 由 MAOP_STORAGE_ALLOW_FALLBACK（默认关闭）把守。
-            if os.getenv("MAOP_STORAGE_ALLOW_FALLBACK", "0") == "1":
-                logger.warning(
-                    "[backends] PostgreSQL backend not available (%s); "
-                    "MAOP_STORAGE_ALLOW_FALLBACK=1 → degrading to SQLite", exc,
-                )
-                record_degradation("storage", "postgresql", "sqlite")
-            else:
-                raise RuntimeError(
-                    "PostgreSQL storage backend was requested "
-                    "(MAOP_STORAGE_BACKEND/edition) but is not importable or "
-                    f"not reachable: {exc}. Install psycopg/backends_pg deps and "
-                    "check MAOP_PG_DSN, or set MAOP_STORAGE_ALLOW_FALLBACK=1 to "
-                    "explicitly allow degrading to SQLite."
-                ) from exc
-    _storage = SQLiteStorageBackend(db_path=db_path)
-    logger.debug("[backends] Storage: SQLite")
-    return _storage
+        defaults = _edition_defaults()
+        backend_type = os.getenv("MAOP_STORAGE_BACKEND", defaults["storage"]).lower()
+        if backend_type == "postgresql":
+            try:
+                from maop.core.backends.backends_pg import PostgreSQLStorageBackend
+                _storage = PostgreSQLStorageBackend()
+                logger.info("[backends] Storage: PostgreSQL (edition=%s)", get_edition().value)
+                return _storage
+            except Exception as exc:
+                # C9 fix: silently degrading an explicitly-requested PostgreSQL
+                # backend to SQLite causes split-brain data (writes land in a
+                # local file while the rest of the fleet uses PG). Default is
+                # now fail-fast; set MAOP_STORAGE_ALLOW_FALLBACK=1 to opt in to
+                # the old degrade-with-warning behaviour.
+                # 捕获范围覆盖全部不可用形态：psycopg 缺失(ImportError)、
+                # 连接池连不上 PG(psycopg.OperationalError)等。fail-fast 防线
+                # 由 MAOP_STORAGE_ALLOW_FALLBACK（默认关闭）把守。
+                if os.getenv("MAOP_STORAGE_ALLOW_FALLBACK", "0") == "1":
+                    logger.warning(
+                        "[backends] PostgreSQL backend not available (%s); "
+                        "MAOP_STORAGE_ALLOW_FALLBACK=1 → degrading to SQLite", exc,
+                    )
+                    record_degradation("storage", "postgresql", "sqlite")
+                else:
+                    raise RuntimeError(
+                        "PostgreSQL storage backend was requested "
+                        "(MAOP_STORAGE_BACKEND/edition) but is not importable or "
+                        f"not reachable: {exc}. Install psycopg/backend_pg deps and "
+                        "check MAOP_PG_DSN, or set MAOP_STORAGE_ALLOW_FALLBACK=1 to "
+                        "explicitly allow degrading to SQLite."
+                    ) from exc
+        _storage = SQLiteStorageBackend(db_path=db_path)
+        logger.debug("[backends] Storage: SQLite")
+        return _storage
+
 
 
 def get_cache_backend() -> CacheBackend:
@@ -484,37 +495,40 @@ def get_cache_backend() -> CacheBackend:
     global _cache
     if _cache is not None:
         return _cache
-    defaults = _edition_defaults()
-    backend_type = os.getenv("MAOP_CACHE_BACKEND", defaults["cache"]).lower()
-    if backend_type == "redis":
-        try:
-            from maop.core.backends.backends_redis import RedisCacheBackend
-            _cache = RedisCacheBackend()
-            logger.info("[backends] Cache: Redis (edition=%s)", get_edition().value)
+    with _factory_lock:
+        if _cache is not None:
             return _cache
-        except Exception as exc:
-            # 后端不可用的全部真实形态：redis 包缺失(ImportError)、
-            # Redis 服务不可达(ping 抛 redis.exceptions.ConnectionError)等。
-            # fail-fast 防线由 MAOP_CACHE_ALLOW_FALLBACK（默认关闭）把守。
-            if os.getenv("MAOP_CACHE_ALLOW_FALLBACK", "0") == "1":
-                logger.warning("[backends] Redis cache not available (%s), falling back to memory", exc)
-                record_degradation("cache", "redis", "memory")
-            else:
-                raise RuntimeError(
-                    f"Redis cache backend was requested (MAOP_CACHE_BACKEND={backend_type}) "
-                    f"but is not importable or not reachable: {exc}. Install "
-                    "redis/backends_redis deps and check MAOP_REDIS_URL, or set "
-                    "MAOP_CACHE_ALLOW_FALLBACK=1 to allow degrading to memory."
-                ) from exc
-    if backend_type not in ("memory", ""):
-        logger.warning(
-            "[backends] Unknown cache backend %r (MAOP_CACHE_BACKEND=%s); "
-            "falling back to MemoryCacheBackend. Valid values: memory, redis.",
-            backend_type, backend_type,
-        )
-    _cache = MemoryCacheBackend()
-    logger.debug("[backends] Cache: Memory")
-    return _cache
+        defaults = _edition_defaults()
+        backend_type = os.getenv("MAOP_CACHE_BACKEND", defaults["cache"]).lower()
+        if backend_type == "redis":
+            try:
+                from maop.core.backends.backends_redis import RedisCacheBackend
+                _cache = RedisCacheBackend()
+                logger.info("[backends] Cache: Redis (edition=%s)", get_edition().value)
+                return _cache
+            except Exception as exc:
+                # 后端不可用的全部真实形态：redis 包缺失(ImportError)、
+                # Redis 服务不可达(ping 抛 redis.exceptions.ConnectionError)等。
+                # fail-fast 防线由 MAOP_CACHE_ALLOW_FALLBACK（默认关闭）把守。
+                if os.getenv("MAOP_CACHE_ALLOW_FALLBACK", "0") == "1":
+                    logger.warning("[backends] Redis cache not available (%s), falling back to memory", exc)
+                    record_degradation("cache", "redis", "memory")
+                else:
+                    raise RuntimeError(
+                        f"Redis cache backend was requested (MAOP_CACHE_BACKEND={backend_type}) "
+                        f"but is not importable or not reachable: {exc}. Install "
+                        "redis/backends_redis deps and check MAOP_REDIS_URL, or set "
+                        "MAOP_CACHE_ALLOW_FALLBACK=1 to allow degrading to memory."
+                    ) from exc
+        if backend_type not in ("memory", ""):
+            logger.warning(
+                "[backends] Unknown cache backend %r (MAOP_CACHE_BACKEND=%s); "
+                "falling back to MemoryCacheBackend. Valid values: memory, redis.",
+                backend_type, backend_type,
+            )
+        _cache = MemoryCacheBackend()
+        logger.debug("[backends] Cache: Memory")
+        return _cache
 
 
 def get_queue_backend(db_path: str = "") -> QueueBackend:
@@ -535,66 +549,69 @@ def get_queue_backend(db_path: str = "") -> QueueBackend:
     global _queue
     if _queue is not None:
         return _queue
-    defaults = _edition_defaults()
-    backend_type = os.getenv("MAOP_QUEUE_BACKEND", defaults["queue"]).lower()
-    if backend_type == "rabbitmq":
-        # backends_rabbitmq.py 已实现（需可选依赖 pika）。
-        # FeatureFlag.RABBITMQ 未加入 _ENTERPRISE_FEATURES，因 pika 为可选安装；
-        # 缺失时 ImportError 触发降级到 Redis，再降级到 SQLite。
-        try:
-            from maop.core.backends.backends_rabbitmq import RabbitMQQueueBackend
-            _queue = RabbitMQQueueBackend()
-            logger.info("[backends] Queue: RabbitMQ (edition=%s)", get_edition().value)
+    with _factory_lock:
+        if _queue is not None:
             return _queue
-        except Exception as exc:
-            # 后端不可用的全部真实形态：pika 缺失(ImportError)、依赖版本冲突
-            # (TypeError, 如 protobuf 与 pika 不兼容)、broker 不可达
-            # (AMQPError→RuntimeError/OSError)。只捕 ImportError 会让降级链
-            # 在后两者（生产最常见故障）下断裂。
-            # fail-fast 防线由 MAOP_QUEUE_ALLOW_FALLBACK（默认关闭）把守：
-            # 未显式允许降级时，任何失败都向上抛出，不会静默降级。
-            if os.getenv("MAOP_QUEUE_ALLOW_FALLBACK", "0") == "1":
-                logger.warning("[backends] RabbitMQ unavailable (pika/connect: %s), trying Redis fallback", exc)
-                record_degradation("queue", "rabbitmq", "redis", "unavailable_rabbitmq")
-            else:
-                raise RuntimeError(
-                    f"RabbitMQ queue backend was requested (MAOP_QUEUE_BACKEND={backend_type}) "
-                    f"but is unavailable — check pika installation and MAOP_RABBITMQ_URL: {exc}. "
-                    "Set MAOP_QUEUE_ALLOW_FALLBACK=1 to allow degrading to Redis/SQLite."
-                ) from exc
+        defaults = _edition_defaults()
+        backend_type = os.getenv("MAOP_QUEUE_BACKEND", defaults["queue"]).lower()
+        if backend_type == "rabbitmq":
+            # backends_rabbitmq.py 已实现（需可选依赖 pika）。
+            # FeatureFlag.RABBITMQ 未加入 _ENTERPRISE_FEATURES，因 pika 为可选安装；
+            # 缺失时 ImportError 触发降级到 Redis，再降级到 SQLite。
+            try:
+                from maop.core.backends.backends_rabbitmq import RabbitMQQueueBackend
+                _queue = RabbitMQQueueBackend()
+                logger.info("[backends] Queue: RabbitMQ (edition=%s)", get_edition().value)
+                return _queue
+            except Exception as exc:
+                # 后端不可用的全部真实形态：pika 缺失(ImportError)、依赖版本冲突
+                # (TypeError, 如 protobuf 与 pika 不兼容)、broker 不可达
+                # (AMQPError→RuntimeError/OSError)。只捕 ImportError 会让降级链
+                # 在后两者（生产最常见故障）下断裂。
+                # fail-fast 防线由 MAOP_QUEUE_ALLOW_FALLBACK（默认关闭）把守：
+                # 未显式允许降级时，任何失败都向上抛出，不会静默降级。
+                if os.getenv("MAOP_QUEUE_ALLOW_FALLBACK", "0") == "1":
+                    logger.warning("[backends] RabbitMQ unavailable (pika/connect: %s), trying Redis fallback", exc)
+                    record_degradation("queue", "rabbitmq", "redis", "unavailable_rabbitmq")
+                else:
+                    raise RuntimeError(
+                        f"RabbitMQ queue backend was requested (MAOP_QUEUE_BACKEND={backend_type}) "
+                        f"but is unavailable — check pika installation and MAOP_RABBITMQ_URL: {exc}. "
+                        "Set MAOP_QUEUE_ALLOW_FALLBACK=1 to allow degrading to Redis/SQLite."
+                    ) from exc
+                try:
+                    from maop.core.backends.backends_redis import RedisQueueBackend
+                    _queue = RedisQueueBackend()
+                    logger.info("[backends] Queue: Redis (RabbitMQ fallback)")
+                    return _queue
+                except Exception as exc:
+                    # redis 缺失(ImportError)或 Redis 服务不可达(ping 抛
+                    # redis.exceptions.ConnectionError)都应落到 SQLite。
+                    logger.warning("[backends] Redis queue backend not available (%s), falling back to SQLite", exc)
+                    record_degradation("queue", "redis", "sqlite", "redis_unavailable")
+        elif backend_type == "redis":
             try:
                 from maop.core.backends.backends_redis import RedisQueueBackend
                 _queue = RedisQueueBackend()
-                logger.info("[backends] Queue: Redis (RabbitMQ fallback)")
+                logger.info("[backends] Queue: Redis")
                 return _queue
             except Exception as exc:
                 # redis 缺失(ImportError)或 Redis 服务不可达(ping 抛
-                # redis.exceptions.ConnectionError)都应落到 SQLite。
-                logger.warning("[backends] Redis queue backend not available (%s), falling back to SQLite", exc)
-                record_degradation("queue", "redis", "sqlite", "redis_unavailable")
-    elif backend_type == "redis":
-        try:
-            from maop.core.backends.backends_redis import RedisQueueBackend
-            _queue = RedisQueueBackend()
-            logger.info("[backends] Queue: Redis")
-            return _queue
-        except Exception as exc:
-            # redis 缺失(ImportError)或 Redis 服务不可达(ping 抛
-            # redis.exceptions.ConnectionError)。fail-fast 防线由
-            # MAOP_QUEUE_ALLOW_FALLBACK（默认关闭）把守。
-            if os.getenv("MAOP_QUEUE_ALLOW_FALLBACK", "0") == "1":
-                logger.warning("[backends] Redis queue not available (%s), falling back to SQLite", exc)
-                record_degradation("queue", "redis", "sqlite")
-            else:
-                raise RuntimeError(
-                    f"Redis queue backend was requested (MAOP_QUEUE_BACKEND={backend_type}) "
-                    f"but is not importable or not reachable: {exc}. Install redis "
-                    "deps and check MAOP_REDIS_URL, or set MAOP_QUEUE_ALLOW_FALLBACK=1 "
-                    "to allow degrading to SQLite."
-                ) from exc
-    _queue = SQLiteQueueBackend(db_path=db_path)
-    logger.debug("[backends] Queue: SQLite")
-    return _queue
+                # redis.exceptions.ConnectionError)。fail-fast 防线由
+                # MAOP_QUEUE_ALLOW_FALLBACK（默认关闭）把守。
+                if os.getenv("MAOP_QUEUE_ALLOW_FALLBACK", "0") == "1":
+                    logger.warning("[backends] Redis queue not available (%s), falling back to SQLite", exc)
+                    record_degradation("queue", "redis", "sqlite")
+                else:
+                    raise RuntimeError(
+                        f"Redis queue backend was requested (MAOP_QUEUE_BACKEND={backend_type}) "
+                        f"but is not importable or not reachable: {exc}. Install redis "
+                        "deps and check MAOP_REDIS_URL, or set MAOP_QUEUE_ALLOW_FALLBACK=1 "
+                        "to allow degrading to SQLite."
+                    ) from exc
+        _queue = SQLiteQueueBackend(db_path=db_path)
+        logger.debug("[backends] Queue: SQLite")
+        return _queue
 
 
 def get_kv_backend(db_path: str = "") -> KVBackend:
@@ -615,39 +632,42 @@ def get_kv_backend(db_path: str = "") -> KVBackend:
     global _kv
     if _kv is not None:
         return _kv
-    defaults = _edition_defaults()
-    backend_type = os.getenv("MAOP_KV_BACKEND", defaults["kv"]).lower()
-    if backend_type in ("etcd", "consul"):
-        # backends_distributed.py 已实现（需可选依赖 etcd3）。
-        # FeatureFlag.ETCD 未加入 _ENTERPRISE_FEATURES，因 etcd3 为可选安装；
-        # 缺失时 ImportError 触发降级到 SQLite。
-        try:
-            from maop.core.backends.backends_distributed import EtcdKVBackend
-            _kv = EtcdKVBackend()
-            logger.info("[backends] KV: %s (edition=%s)", backend_type, get_edition().value)
+    with _factory_lock:
+        if _kv is not None:
             return _kv
-        except Exception as exc:
-            # 后端不可用的全部真实形态：etcd3 缺失(ImportError)、依赖版本冲突
-            # (TypeError, 如 protobuf 与 etcd3 不兼容)、etcd 集群不可达
-            # (RuntimeError/OSError, 构造期连接失败)。只捕 ImportError 会让
-            # 降级链在后两者（生产最常见）下断裂。
-            # fail-fast 防线由 MAOP_KV_ALLOW_FALLBACK（默认关闭）把守：
-            # 未显式允许降级时，任何失败都向上抛出，不会静默降级。
-            if os.getenv("MAOP_KV_ALLOW_FALLBACK", "0") == "1":
-                logger.warning(
-                    "[backends] %s KV backend unavailable (%s), falling back to SQLite",
-                    backend_type, exc,
-                )
-                record_degradation("kv", backend_type, "sqlite", "unavailable_etcd")
-            else:
-                raise RuntimeError(
-                    f"{backend_type} KV backend was requested (MAOP_KV_BACKEND={backend_type}) "
-                    f"but is unavailable (check etcd3 installation and MAOP_ETCD_HOST/PORT): {exc}. "
-                    "Set MAOP_KV_ALLOW_FALLBACK=1 to allow degrading to SQLite."
-                ) from exc
-    _kv = SQLiteKVBackend(db_path=db_path)
-    logger.debug("[backends] KV: SQLite")
-    return _kv
+        defaults = _edition_defaults()
+        backend_type = os.getenv("MAOP_KV_BACKEND", defaults["kv"]).lower()
+        if backend_type in ("etcd", "consul"):
+            # backends_distributed.py 已实现（需可选依赖 etcd3）。
+            # FeatureFlag.ETCD 未加入 _ENTERPRISE_FEATURES，因 etcd3 为可选安装；
+            # 缺失时 ImportError 触发降级到 SQLite。
+            try:
+                from maop.core.backends.backends_distributed import EtcdKVBackend
+                _kv = EtcdKVBackend()
+                logger.info("[backends] KV: %s (edition=%s)", backend_type, get_edition().value)
+                return _kv
+            except Exception as exc:
+                # 后端不可用的全部真实形态：etcd3 缺失(ImportError)、依赖版本冲突
+                # (TypeError, 如 protobuf 与 etcd3 不兼容)、etcd 集群不可达
+                # (RuntimeError/OSError, 构造期连接失败)。只捕 ImportError 会让
+                # 降级链在后两者（生产最常见）下断裂。
+                # fail-fast 防线由 MAOP_KV_ALLOW_FALLBACK（默认关闭）把守：
+                # 未显式允许降级时，任何失败都向上抛出，不会静默降级。
+                if os.getenv("MAOP_KV_ALLOW_FALLBACK", "0") == "1":
+                    logger.warning(
+                        "[backends] %s KV backend unavailable (%s), falling back to SQLite",
+                        backend_type, exc,
+                    )
+                    record_degradation("kv", backend_type, "sqlite", "unavailable_etcd")
+                else:
+                    raise RuntimeError(
+                        f"{backend_type} KV backend was requested (MAOP_KV_BACKEND={backend_type}) "
+                        f"but is unavailable (check etcd3 installation and MAOP_ETCD_HOST/PORT): {exc}. "
+                        "Set MAOP_KV_ALLOW_FALLBACK=1 to allow degrading to SQLite."
+                    ) from exc
+        _kv = SQLiteKVBackend(db_path=db_path)
+        logger.debug("[backends] KV: SQLite")
+        return _kv
 
 
 def get_secret_backend(root_dir: str = "") -> SecretBackend:
@@ -657,31 +677,47 @@ def get_secret_backend(root_dir: str = "") -> SecretBackend:
       1. MAOP_SECRET_BACKEND env var (explicit override)
       2. MAOP_EDITION=enterprise → HashiCorp Vault
       3. Default → Local encrypted vault
+
+    Fail-fast policy: 与 storage/cache/queue/kv 一致，Vault 不可用时
+    默认抛出 RuntimeError，只有 ``MAOP_SECRET_ALLOW_FALLBACK=1`` 时才
+    降级到 local 加密 vault。
     """
     global _secret
     if _secret is not None:
         return _secret
-    defaults = _edition_defaults()
-    backend_type = os.getenv("MAOP_SECRET_BACKEND", defaults["secret"]).lower()
-    if backend_type == "vault":
-        try:
-            from maop.core.backends.backends_vault import VaultSecretBackend
-            _secret = VaultSecretBackend()
-            logger.info("[backends] Secrets: HashiCorp Vault (edition=%s)", get_edition().value)
+    with _factory_lock:
+        if _secret is not None:
             return _secret
-        except (ImportError, RuntimeError, OSError) as exc:
-            # Secret backend degrades to the local encrypted vault by default
-            # (unlike KV, which is fail-fast unless MAOP_KV_ALLOW_FALLBACK=1).
-            # A missing Vault server, failed auth, or unresolvable address must
-            # not break secret access — fall back to local and record it.
-            logger.warning(
-                "[backends] Vault secrets backend unavailable (%s: %s), falling back to local",
-                type(exc).__name__, exc,
-            )
-            record_degradation("secret", "vault", "local", "unavailable_vault")
-    _secret = LocalSecretBackend(root_dir=root_dir)
-    logger.debug("[backends] Secrets: Local")
-    return _secret
+        defaults = _edition_defaults()
+        backend_type = os.getenv("MAOP_SECRET_BACKEND", defaults["secret"]).lower()
+        if backend_type == "vault":
+            try:
+                from maop.core.backends.backends_vault import VaultSecretBackend
+                _secret = VaultSecretBackend()
+                logger.info("[backends] Secrets: HashiCorp Vault (edition=%s)", get_edition().value)
+                return _secret
+            except (ImportError, RuntimeError, OSError) as exc:
+                # Secret backend 默认 fail-fast（与 storage/cache/queue/kv 一致）。
+                # 只有 MAOP_SECRET_ALLOW_FALLBACK=1 时才降级到 local 加密 vault。
+                # A missing Vault server, failed auth, or unresolvable address must
+                # not silently degrade — fail fast unless explicitly opted in.
+                if os.getenv("MAOP_SECRET_ALLOW_FALLBACK", "0") == "1":
+                    logger.warning(
+                        "[backends] Vault secrets backend unavailable (%s: %s), "
+                        "MAOP_SECRET_ALLOW_FALLBACK=1 → falling back to local",
+                        type(exc).__name__, exc,
+                    )
+                    record_degradation("secret", "vault", "local", "unavailable_vault")
+                else:
+                    raise RuntimeError(
+                        f"Vault secrets backend was requested (MAOP_SECRET_BACKEND={backend_type}) "
+                        f"but is unavailable ({type(exc).__name__}: {exc}). "
+                        "Install hvac/backends_vault deps and check MAOP_VAULT_ADDR/MAOP_VAULT_TOKEN, "
+                        "or set MAOP_SECRET_ALLOW_FALLBACK=1 to allow degrading to local."
+                    ) from exc
+        _secret = LocalSecretBackend(root_dir=root_dir)
+        logger.debug("[backends] Secrets: Local")
+        return _secret
 
 
 def reset_backends() -> None:

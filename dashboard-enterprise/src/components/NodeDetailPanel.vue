@@ -118,7 +118,7 @@ function formatTime(ts) {
   word-break: break-word;
 }
 .ndp-mono {
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: var(--fs-sm);
 }
 .ndp-error .ndp-value { color: var(--fail, #f85149); }
@@ -130,7 +130,7 @@ function formatTime(ts) {
   color: var(--text-code, rgba(148,163,184,.35));
   border-radius: 4px;
   font-size: var(--fs-xs);
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   overflow-x: auto;
   max-height: 200px;
   overflow-y: auto;

@@ -17,8 +17,22 @@
  *   const options = baseLineOptions({ muted, grid: chartGridColor() });
  */
 
-import { cssVar } from './chartTokens.js';
+import { cssVar, cssVarRounded } from './chartTokens.js';
 
+/**
+ * 构造 chart.js 折线图的全局基础 options。
+ *
+ * @non-readonly
+ * @param {object} [opts] 配置项
+ * @param {string} [opts.muted] 弱化文字颜色（默认读取 CSS 变量 --text-muted）
+ * @param {string} [opts.grid] 网格线颜色（默认读取 CSS 变量 --border-subtle）
+ * @param {number} [opts.maxTicks=8] X 轴最大刻度数
+ * @param {boolean} [opts.legendVisible=true] 是否显示图例
+ * @returns {object} chart.js options 对象
+ *
+ * 注意: 此函数通过 cssVar 和 cssVarRounded 读取 DOM CSS 变量，非纯函数。
+ * 在 SSR 或无 DOM 环境下会使用 fallback 默认值。
+ */
 export function baseLineOptions({ muted, grid, maxTicks = 8, legendVisible = true } = {}) {
   const mutedColor = muted || cssVar('--text-muted', '#9aa3b2');
   const gridColor = grid || cssVar('--border-subtle', 'rgba(163,173,190,.15)');
@@ -55,11 +69,4 @@ export function baseLineOptions({ muted, grid, maxTicks = 8, legendVisible = tru
       },
     },
   };
-}
-
-function cssVarRounded(fallback) {
-  try {
-    const v = getComputedStyle(document.documentElement).getPropertyValue('--r-md').trim();
-    return v ? parseInt(v, 10) : fallback;
-  } catch { return fallback; }
 }

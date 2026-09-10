@@ -269,6 +269,10 @@ class TestAgentConfig:
         monkeypatch.setattr("maop.dashboard.routers.system._deps.start_time", 0.0)
         app = FastAPI()
         from maop.dashboard.routers.system import router
+        @app.middleware("http")
+        async def _inject_admin(request, call_next):
+            request.state.auth_roles = ["admin"]
+            return await call_next(request)
         app.include_router(router)
         data = TestClient(app).get("/api/agent/config").json()
         assert data["agents"] == []
@@ -428,6 +432,10 @@ class TestRouting:
         monkeypatch.setattr("maop.dashboard.routers.system.start_time", 0.0)
         app = FastAPI()
         from maop.dashboard.routers.system import router
+        @app.middleware("http")
+        async def _inject_admin(request, call_next):
+            request.state.auth_roles = ["admin"]
+            return await call_next(request)
         app.include_router(router)
         data = TestClient(app).get("/api/routing").json()
         assert data["routes"] == []
@@ -521,20 +529,22 @@ class TestAgentConfigUpdate:
         assert resp.status_code == 400
 
     def test_agents_yaml_not_found(self, system_env, client_coverage):
-        """When agents.yaml doesn't exist, returns error."""
+        """When agents.yaml doesn't exist, returns 404 error."""
+        # Batch3C: error returns 404 instead of 200.
         # Remove agents.yaml
         (system_env / "config" / "agents.yaml").unlink()
         resp = client_coverage.post("/api/agent/config/update", json={"agent": "claude", "model": "x"})
-        assert resp.status_code == 200
+        assert resp.status_code == 404
         assert resp.json()["status"] == "error"
 
     def test_unknown_agent(self, client_coverage):
-        """POST /api/agent/config/update with unknown agent returns error."""
+        """POST /api/agent/config/update with unknown agent returns 404 error."""
+        # Batch3C: error returns 404 instead of 200.
         resp = client_coverage.post(
             "/api/agent/config/update",
             json={"agent": "nonexistent", "model": "x"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 404
         assert resp.json()["status"] == "error"
 
     def test_update_model_happy(self, client_coverage):
@@ -589,9 +599,10 @@ class TestAgentUpgrade:
         assert resp.status_code == 400
 
     def test_unknown_agent(self, client_coverage):
-        """POST /api/agent/upgrade with unknown agent returns error."""
+        """POST /api/agent/upgrade with unknown agent returns 404 error."""
+        # Batch3C: error returns 404 instead of 200.
         resp = client_coverage.post("/api/agent/upgrade", json={"agent": "nonexistent"})
-        assert resp.status_code == 200
+        assert resp.status_code == 404
         assert resp.json()["status"] == "error"
 
     def test_upgrade_via_query_param(self, client_coverage, monkeypatch):

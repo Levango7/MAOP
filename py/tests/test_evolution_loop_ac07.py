@@ -25,7 +25,8 @@ def test_ac07_evolution_loop_status(evolution_loop_factory):
     loop = evolution_loop_factory()
 
     # Mock EvolutionLoop.get_cycle_history - function imports locally from maop.core.evolution.evolution_loop
-    with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as mock_loop_class:
+    with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as mock_loop_class, \
+         patch("maop.dashboard.routers.evolve_insights.require_admin", return_value=None):
         mock_loop = MagicMock()
         mock_loop.get_cycle_history.return_value = []
         mock_loop.get_stats.return_value = {"total_cycles": 0}
@@ -34,7 +35,8 @@ def test_ac07_evolution_loop_status(evolution_loop_factory):
         from maop.dashboard.routers.evolve_insights import api_evolution_loop_status
 
         import asyncio
-        result = asyncio.run(api_evolution_loop_status())
+        mock_request = MagicMock()
+        result = asyncio.run(api_evolution_loop_status(mock_request))
 
         assert result["status"] == "ok"
         assert "state" in result
@@ -73,7 +75,8 @@ def test_ac07_evolution_loop_trigger(evolution_loop_factory):
 
 def test_ac07_evolution_approvals(evolution_loop_factory):
     """GET /api/evolution/approvals 返回待审批列表。"""
-    with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as mock_loop_class:
+    with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as mock_loop_class, \
+         patch("maop.dashboard.routers.evolve_insights.require_admin", return_value=None):
 
         mock_loop = MagicMock()
         mock_loop.get_cycle_history.return_value = [
@@ -92,7 +95,8 @@ def test_ac07_evolution_approvals(evolution_loop_factory):
         from maop.dashboard.routers.evolve_insights import api_evolution_approvals
 
         import asyncio
-        result = asyncio.run(api_evolution_approvals())
+        mock_request = MagicMock()
+        result = asyncio.run(api_evolution_approvals(mock_request))
 
         assert result["status"] == "ok"
         assert "approvals" in result
@@ -134,7 +138,8 @@ def test_ac07_evolution_approval_decision(evolution_loop_factory):
 def test_ac07_evolution_ab_results(evolution_loop_factory):
     """GET /api/evolution/ab/{cycle_id} 返回 A/B 结果。"""
     with patch("maop.core.evolution.evolution_loop.EvolutionLoop"), \
-         patch("maop.core.evolution.ab_test.ABTestManager") as mock_ab_class:
+         patch("maop.core.evolution.ab_test.ABTestManager") as mock_ab_class, \
+         patch("maop.dashboard.routers.evolve_insights.require_admin", return_value=None):
 
         mock_ab = MagicMock()
         mock_ab.evaluate.return_value = MagicMock(
@@ -149,7 +154,8 @@ def test_ac07_evolution_ab_results(evolution_loop_factory):
         from maop.dashboard.routers.evolve_insights import api_evolution_ab_results
 
         import asyncio
-        result = asyncio.run(api_evolution_ab_results("cycle-001"))
+        mock_request = MagicMock()
+        result = asyncio.run(api_evolution_ab_results(mock_request, "cycle-001"))
 
         assert result["status"] == "ok"
         assert result["cycle_id"] == "cycle-001"

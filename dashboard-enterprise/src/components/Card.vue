@@ -79,10 +79,11 @@ const mbStyle = computed(() => {
   flex-wrap: wrap;
   letter-spacing: -0.005em;
 }
-.card__subtitle { width: 100%; font-size: var(--fs-sm); font-weight: 400; color: var(--text-muted); margin-top: 2px; }
+.card__subtitle { width: 100%; font-size: var(--fs-sm); font-weight: 400; color: var(--text-muted); /* margin-top 2px 为视觉微调固定值 */ margin-top: 2px; }
 .card__icon {
   color: var(--brand-strong);
   align-self: center;
+  /* 30px 为图标容器视觉规格固定值 */
   width: 30px; height: 30px;
   display: grid; place-items: center;
   border-radius: var(--r-sm);

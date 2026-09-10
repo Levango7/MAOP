@@ -185,6 +185,7 @@ def _unified_search(query: str, top: int, agent: str = "") -> list[dict[str, Any
 @router.get("/api/memory/deep")
 @handle_api_errors("Memory deep stats", error_value={"status": "error", "error": "Memory stats unavailable", "stats": {}})
 async def api_memory_deep(request: Request) -> dict[str, Any]:
+    require_admin(request)
     from maop.memory.store import MemoryStore
     store = MemoryStore(root_dir=str(MAOP_ROOT))
     stats_obj = store.stats()
@@ -241,6 +242,7 @@ async def api_memory_deep(request: Request) -> dict[str, Any]:
 @router.get("/api/memory/search")
 @handle_api_errors("Memory search", error_value={"status": "error", "error": "Memory search unavailable", "results": []})
 async def api_memory_search(request: Request, q: str = Query(""), k: int = Query(10, alias="topk")) -> dict[str, Any]:
+    require_admin(request)
     # 联合查询 memory_entries + episodic_memory，确保 store 写入的数据能被搜到
     results = _unified_search(query=q, top=k) if q else _unified_search(query="", top=k)
     return {"status": "ok", "query": q, "results": (_rf := _tenant_filter(results, _request_tenant_id(request))), "count": len(_rf)}
@@ -248,6 +250,7 @@ async def api_memory_search(request: Request, q: str = Query(""), k: int = Query
 @router.get("/api/memory/trace")
 @handle_api_errors("Memory trace", error_value={"traces": [], "count": 0, "error": "Memory trace unavailable"})
 async def api_memory_trace(request: Request, agent: str = Query("")) -> dict[str, Any]:
+    require_admin(request)
     # 联合查询 memory_entries + episodic_memory
     unified = _unified_search(query="", top=50)
     traces = []
@@ -262,14 +265,16 @@ async def api_memory_trace(request: Request, agent: str = Query("")) -> dict[str
 
 @router.get("/api/memory/stats")
 @handle_api_errors("Memory stats", error_value={"error": "Memory stats unavailable"})
-async def api_memory_stats_v4() -> dict[str, Any]:
+async def api_memory_stats_v4(request: Request) -> dict[str, Any]:
+    require_admin(request)
     from .state import get_bridge
     return await get_bridge().memory_stats()
 
 # ── Neural / Attention ─────────────────────────────────────────────
 @router.get("/api/neural/status")
 @handle_api_errors("Neural status")
-async def api_neural_status() -> dict[str, Any]:
+async def api_neural_status(request: Request) -> dict[str, Any]:
+    require_admin(request)
     info: dict[str, Any] = {"attention": {"enabled": False, "mechanism": "N/A"}, "transform": {"enabled": False, "layers": 0},
             "embedding": {"enabled": False, "dim": 0, "model": "N/A"}, "vector_store": {"enabled": False, "count": 0}}
     try:
@@ -329,7 +334,8 @@ async def api_neural_attention(request: Request, body: NeuralAttentionRequest) -
 
 @router.get("/api/neural/attention")
 @handle_api_errors("Neural attention query", error_value={"error": "Neural attention unavailable", "results": [], "attention_weights": []})
-async def api_neural_attention_get(q: str = "") -> dict[str, Any]:
+async def api_neural_attention_get(request: Request, q: str = "") -> dict[str, Any]:
+    require_admin(request)
     from maop.memory.store import MemoryStore
     ms = MemoryStore(root_dir=str(MAOP_ROOT))
     raw_results = ms.search(q, top=10) if q else []

@@ -14,6 +14,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from maop.config.edition import FeatureFlag, has_feature
@@ -77,10 +78,13 @@ async def list_tenants(
         try:
             status_filter = TenantStatus(status)
         except ValueError:
-            return {
-                "status": "error",
-                "error": f"Invalid status '{status}'. Valid: {[s.value for s in TenantStatus]}",
-            }
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "error": f"Invalid status '{status}'. Valid: {[s.value for s in TenantStatus]}",
+                },
+            )
     tenants = mgr.list_tenants(status=status_filter)
     result = []
     for t in tenants:
@@ -132,7 +136,10 @@ async def get_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     mgr = _get_manager()
     tenant = mgr.get_tenant(tenant_id)
     if tenant is None:
-        return {"status": "error", "error": f"Tenant '{tenant_id}' not found"}
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "error": f"Tenant '{tenant_id}' not found"},
+        )
     return {"status": "ok", "tenant": tenant.model_dump()}
 
 

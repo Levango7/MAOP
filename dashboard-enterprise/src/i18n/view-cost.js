@@ -47,6 +47,9 @@ export const messages = {
     'view.cost.col.agent': 'Agent',
     'view.cost.col.tokens': 'Tokens',
     'view.cost.col.cost': 'Cost',
+    'view.cost.summaryFailed': 'summary failed.',
+    'view.cost.budgetFailed': 'budget failed.',
+    'view.cost.entriesFailed': 'entries failed.',
   },
 
   zh: {
@@ -97,5 +100,8 @@ export const messages = {
     'view.cost.col.agent': '智能体',
     'view.cost.col.tokens': '令牌',
     'view.cost.col.cost': '成本',
+    'view.cost.summaryFailed': '汇总失败。',
+    'view.cost.budgetFailed': '预算失败。',
+    'view.cost.entriesFailed': '明细失败。',
   },
 };

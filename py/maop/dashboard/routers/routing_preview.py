@@ -12,11 +12,12 @@ import logging
 import os
 from typing import Any, cast
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from maop.config.loader import load_config
 from maop.core.routing.route_scorer import get_route_scorer
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/api/routing", tags=["routing"])
 
 
 @router.post("/match")
+@handle_api_errors("routing preview match")
 async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any]:
     require_admin(request)
     """Preview route matching for a task description.
@@ -33,7 +35,7 @@ async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any
     """
     task = body.get("task", "")
     if not task:
-        return {"error": "task is required"}
+        raise HTTPException(status_code=400, detail="task is required")
 
     # M3 修复：统一使用 get_root_dir() 解析根目录（兼容 MAOP_ROOT_DIR / MAOP_ROOT）
     from maop.config.env import get_root_dir
@@ -52,9 +54,11 @@ async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any
 
     # Also compute all candidate scores for transparency
     task_lower = task.lower()
+    # 优先使用公开方法 score_route，回退到内部方法 _score_route（通过 getattr 避免直接引用）
+    _score_fn = getattr(scorer, "score_route", None) or getattr(scorer, "_score_route")
     all_scores = []
     for rk, route in config.routing.items():
-        score, matched_by = scorer._score_route(task_lower, rk, route)
+        score, matched_by = _score_fn(task_lower, rk, route)
         if score > 0:
             all_scores.append({
                 "routing_key": rk,
@@ -79,6 +83,7 @@ async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any
 
 
 @router.get("/cooldowns")
+@handle_api_errors("routing cooldowns")
 async def get_cooldowns(request: Request) -> dict[str, Any]:
     """Get all agents currently in cooldown (recently failed)."""
     require_admin(request)
@@ -91,11 +96,12 @@ async def get_cooldowns(request: Request) -> dict[str, Any]:
 
 
 @router.get("/scores")
+@handle_api_errors("routing scores")
 async def get_route_scores(request: Request, task: str = "") -> dict[str, Any]:
     """Get scores for all routes against a given task."""
     require_admin(request)
     if not task:
-        return {"error": "task parameter is required"}
+        raise HTTPException(status_code=400, detail="task parameter is required")
 
     # M3 修复：统一使用 get_root_dir() 解析根目录（兼容 MAOP_ROOT_DIR / MAOP_ROOT）
     from maop.config.env import get_root_dir
@@ -104,9 +110,11 @@ async def get_route_scores(request: Request, task: str = "") -> dict[str, Any]:
     config = load_config(root)
     scorer = get_route_scorer(config)
     task_lower = task.lower()
+    # 优先使用公开方法 score_route，回退到内部方法 _score_route（通过 getattr 避免直接引用）
+    _score_fn = getattr(scorer, "score_route", None) or getattr(scorer, "_score_route")
     scores = []
     for rk, route in config.routing.items():
-        score, matched_by = scorer._score_route(task_lower, rk, route)
+        score, matched_by = _score_fn(task_lower, rk, route)
         scores.append({
             "routing_key": rk,
             "score": round(score, 4),

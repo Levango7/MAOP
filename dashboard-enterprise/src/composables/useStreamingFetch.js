@@ -29,8 +29,9 @@ export function useStreamingFetch() {
 
     // AbortController for cancellable streaming (prevents leak on unmount/renavigate)
     const controller = new AbortController();
+    const onAbort = () => controller.abort();
     if (callbacks.signal) {
-      callbacks.signal.addEventListener('abort', () => controller.abort());
+      callbacks.signal.addEventListener('abort', onAbort);
     }
 
     try {
@@ -110,6 +111,10 @@ export function useStreamingFetch() {
       if (onDone) onDone();
     } catch (exc) {
       if (onError) onError(exc.message || String(exc));
+    } finally {
+      if (callbacks.signal) {
+        callbacks.signal.removeEventListener('abort', onAbort);
+      }
     }
   }
 

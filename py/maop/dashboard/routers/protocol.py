@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -15,6 +16,38 @@ from .state import MAOP_ROOT
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ── Pydantic 请求模型 ──────────────────────────────────────────────
+class ProtocolRegisterRequest(BaseModel):
+    """注册协议的请求体。"""
+    name: str = Field(default="", max_length=256)
+    version: str = Field(default="1.0", max_length=64)
+    schema: dict[str, Any] = Field(default_factory=dict)
+    participants: list[str] = Field(default_factory=list)
+    description: str = Field(default="", max_length=10000)
+
+
+class ProtocolUnregisterRequest(BaseModel):
+    """注销协议的请求体。"""
+    name: str = Field(default="", max_length=256)
+    version: str = Field(default="1.0", max_length=64)
+
+
+class ProtocolValidateRequest(BaseModel):
+    """验证协议消息的请求体。"""
+    protocol: str = Field(default="", max_length=256)
+    version: str = Field(default="1.0", max_length=64)
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProtocolSendRequest(BaseModel):
+    """发送协议消息的请求体。"""
+    protocol: str = Field(default="", max_length=256)
+    sender: str = Field(default="", max_length=256)
+    recipient: str = Field(default="", max_length=256)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    version: str = Field(default="1.0", max_length=64)
 
 _protocol_reg = None
 
@@ -28,14 +61,13 @@ def _get_protocol_reg() -> Any:
 
 @router.post("/api/protocol/register")
 @handle_api_errors("Protocol register", error_value={"status": "error", "error": "Register failed"})
-async def api_protocol_register(request: Request) -> dict[str, Any]:
+async def api_protocol_register(body: ProtocolRegisterRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    name = body.get("name", "")
-    version = body.get("version", "1.0")
-    schema_def = body.get("schema", {})
-    participants = body.get("participants", [])
-    description = body.get("description", "")
+    name = body.name
+    version = body.version
+    schema_def = body.schema
+    participants = body.participants
+    description = body.description
     if not name:
         raise HTTPException(400, "missing name")
     reg = _get_protocol_reg()
@@ -46,11 +78,10 @@ async def api_protocol_register(request: Request) -> dict[str, Any]:
 
 @router.post("/api/protocol/unregister")
 @handle_api_errors("Protocol unregister", error_value={"status": "error", "error": "Unregister failed"})
-async def api_protocol_unregister(request: Request) -> dict[str, Any]:
+async def api_protocol_unregister(body: ProtocolUnregisterRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    name = body.get("name", "")
-    version = body.get("version", "1.0")
+    name = body.name
+    version = body.version
     if not name:
         raise HTTPException(400, "missing name")
     reg = _get_protocol_reg()
@@ -60,7 +91,8 @@ async def api_protocol_unregister(request: Request) -> dict[str, Any]:
 
 @router.get("/api/protocol/get")
 @handle_api_errors("Protocol get", error_value={"status": "error", "error": "Get failed"})
-async def api_protocol_get(name: str = "", version: str = "1.0") -> dict[str, Any]:
+async def api_protocol_get(request: Request, name: str = "", version: str = "1.0") -> dict[str, Any]:
+    require_admin(request)
     if not name:
         raise HTTPException(400, "missing name")
     reg = _get_protocol_reg()
@@ -72,7 +104,8 @@ async def api_protocol_get(name: str = "", version: str = "1.0") -> dict[str, An
 
 @router.get("/api/protocol/list")
 @handle_api_errors("Protocol list", error_value={"protocols": [], "count": 0, "error": "List failed"})
-async def api_protocol_list() -> dict[str, Any]:
+async def api_protocol_list(request: Request) -> dict[str, Any]:
+    require_admin(request)
     reg = _get_protocol_reg()
     protocols = reg.list_protocols()
     return {"protocols": [p.model_dump() for p in protocols], "count": len(protocols)}
@@ -80,7 +113,8 @@ async def api_protocol_list() -> dict[str, Any]:
 
 @router.get("/api/protocol/versions")
 @handle_api_errors("Protocol versions", error_value={"versions": [], "error": "Versions failed"})
-async def api_protocol_versions(name: str = "") -> dict[str, Any]:
+async def api_protocol_versions(request: Request, name: str = "") -> dict[str, Any]:
+    require_admin(request)
     if not name:
         raise HTTPException(400, "missing name")
     reg = _get_protocol_reg()
@@ -90,12 +124,11 @@ async def api_protocol_versions(name: str = "") -> dict[str, Any]:
 
 @router.post("/api/protocol/validate")
 @handle_api_errors("Protocol validate", error_value={"valid": False, "error": "Validate failed"})
-async def api_protocol_validate(request: Request) -> dict[str, Any]:
+async def api_protocol_validate(body: ProtocolValidateRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    protocol_name = body.get("protocol", "")
-    version = body.get("version", "1.0")
-    payload = body.get("payload", {})
+    protocol_name = body.protocol
+    version = body.version
+    payload = body.payload
     if not protocol_name:
         raise HTTPException(400, "missing protocol")
     reg = _get_protocol_reg()
@@ -105,14 +138,13 @@ async def api_protocol_validate(request: Request) -> dict[str, Any]:
 
 @router.post("/api/protocol/send")
 @handle_api_errors("Protocol send", error_value={"status": "error", "error": "Send failed"})
-async def api_protocol_send(request: Request) -> dict[str, Any]:
+async def api_protocol_send(body: ProtocolSendRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    body = await request.json()
-    protocol = body.get("protocol", "")
-    sender = body.get("sender", "")
-    recipient = body.get("recipient", "")
-    payload = body.get("payload", {})
-    version = body.get("version", "1.0")
+    protocol = body.protocol
+    sender = body.sender
+    recipient = body.recipient
+    payload = body.payload
+    version = body.version
     if not protocol or not sender or not recipient:
         raise HTTPException(400, "missing protocol, sender, or recipient")
     reg = _get_protocol_reg()
@@ -123,7 +155,8 @@ async def api_protocol_send(request: Request) -> dict[str, Any]:
 
 @router.get("/api/protocol/messages")
 @handle_api_errors("Protocol messages", error_value={"messages": [], "count": 0, "error": "Messages failed"})
-async def api_protocol_messages(recipient: str = "", protocol: str = "", limit: int = 100) -> dict[str, Any]:
+async def api_protocol_messages(request: Request, recipient: str = "", protocol: str = "", limit: int = 100) -> dict[str, Any]:
+    require_admin(request)
     if not recipient:
         raise HTTPException(400, "missing recipient")
     reg = _get_protocol_reg()

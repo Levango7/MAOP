@@ -62,11 +62,11 @@ v-model="query"
 
     <Card
 icon="clipboard" :title="resultTitle" :margin-bottom="0"
-      :subtitle="searched && !searching ? `${resultRows.length} result(s)${searchTime ? ' in ' + searchTime + 'ms' : ''}` : ''">
+      :subtitle="searched && !searching ? (searchTime ? t('view.search.resultCountWithTime', { count: resultRows.length, time: searchTime }) : t('view.search.resultCount', { count: resultRows.length })) : ''">
       <div v-if="searchError" class="err"><EmptyState icon="alert-triangle" :title="t('view.search.searchFailed')" :description="searchError" /></div>
       <Skeleton v-else-if="searching" :lines="6" block />
       <DataTable v-else-if="resultRows.length" :columns="resultColumns" :rows="resultRows" :loading="false" :empty-text="t('view.search.noResults')" />
-      <EmptyState v-else-if="searched" icon="search" :title="t('view.search.noResults')" :description="`No matches for “${lastQuery}”.`" />
+      <EmptyState v-else-if="searched" icon="search" :title="t('view.search.noResults')" :description="t('view.search.noMatches', { query: lastQuery })" />
       <EmptyState v-else icon="search" :title="t('view.search.runSearch')" :description="t('view.search.runSearchHint')" />
     </Card>
   </div>

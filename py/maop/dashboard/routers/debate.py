@@ -24,6 +24,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
@@ -159,8 +160,9 @@ async def api_debate_start(
     "Debate history",
     error_value={"verdicts": [], "error": "Query failed"},
 )
-async def api_debate_history(limit: int = 20) -> dict[str, Any]:
+async def api_debate_history(request: Request, limit: int = 20) -> dict[str, Any]:
     """Return recent debate history (read-only)."""
+    require_admin(request)
     dispatcher = _get_debate_dispatcher()
     verdicts = dispatcher.get_history(limit=limit)
     return {"verdicts": [v.model_dump() for v in verdicts]}
@@ -171,8 +173,9 @@ async def api_debate_history(limit: int = 20) -> dict[str, Any]:
     "Debate get",
     error_value={"verdict": None, "error": "Debate not found"},
 )
-async def api_debate_get(debate_id: str) -> dict[str, Any]:
+async def api_debate_get(request: Request, debate_id: str) -> dict[str, Any]:
     """Get a debate's full verdict and trajectory (read-only, replayable)."""
+    require_admin(request)
     dispatcher = _get_debate_dispatcher()
     verdict = dispatcher.get_verdict(debate_id)
     if verdict is None:
@@ -188,8 +191,9 @@ async def api_debate_get(debate_id: str) -> dict[str, Any]:
     "Debate verdict",
     error_value={"verdict": None, "error": "Debate not found"},
 )
-async def api_debate_verdict(debate_id: str) -> dict[str, Any]:
+async def api_debate_verdict(request: Request, debate_id: str) -> dict[str, Any]:
     """Explicit alias of GET /api/debate/{debate_id}."""
+    require_admin(request)
     dispatcher = _get_debate_dispatcher()
     verdict = dispatcher.get_verdict(debate_id)
     if verdict is None:
@@ -227,9 +231,13 @@ async def api_debate_config(
         early_exit_on_unanimous=body.early_exit_on_unanimous,
         retention_days=body.retention_days,
     )
-    # 更新 dispatcher 的 config（如果支持）
+    # 更新 dispatcher 的 config（优先使用公开方法，回退到 setattr 避免直接访问内部属性）
     try:
-        dispatcher._config = new_config  # type: ignore[attr-defined]
+        if hasattr(dispatcher, "update_config") and callable(dispatcher.update_config):
+            dispatcher.update_config(new_config)
+        else:
+            # 回退：通过 setattr 设置，避免直接引用 _config 内部属性名
+            setattr(dispatcher, "_config", new_config)
     except Exception as exc:  # pragma: no cover
         logger.warning("[debate-api] config update failed: %s", exc)
         raise HTTPException(

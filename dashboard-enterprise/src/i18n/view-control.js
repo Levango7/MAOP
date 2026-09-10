@@ -29,6 +29,7 @@ export const messages = {
     'view.control.actionFailed': '{action} failed',
     'view.control.upgradeTriggered': 'Upgrade triggered for {name}',
     'view.control.upgradeFailed': 'Upgrade failed',
+    'view.control.statusRefreshed': 'Status refreshed',
   },
   zh: {
     'view.control.title': '控制台',
@@ -60,5 +61,6 @@ export const messages = {
     'view.control.actionFailed': '{action} 失败',
     'view.control.upgradeTriggered': '已为 {name} 触发升级',
     'view.control.upgradeFailed': '升级失败',
+    'view.control.statusRefreshed': '状态已刷新',
   },
 };

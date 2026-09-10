@@ -34,8 +34,8 @@
     <template v-else>
       <div v-if="filteredResults.length" class="results-area">
         <div class="results-meta">
-          <span>{{ filteredResults.length }} result{{ filteredResults.length === 1 ? '' : 's' }}</span>
-          <span v-if="searchTime" class="muted">in {{ searchTime }} ms</span>
+          <span>{{ t('view.vector.resultCount', { count: filteredResults.length }) }}</span>
+          <span v-if="searchTime" class="muted">{{ t('view.vector.searchTime', { time: searchTime }) }}</span>
         </div>
         <div v-for="(r, i) in filteredResults" :key="i" class="result-card">
           <div class="result-head">
@@ -57,7 +57,7 @@
         v-else-if="searched"
         icon="search"
         :title="t('view.vector.noMatches')"
-        :description="`No vectors matched “${lastQuery}”.`"
+        :description="t('view.vector.noMatchesDesc', { query: lastQuery })"
       />
     </template>
 

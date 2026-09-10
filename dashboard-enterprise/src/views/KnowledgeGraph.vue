@@ -912,6 +912,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   gap: 12px;
   color: var(--text-muted);
   background: var(--surface);
+  /* z-index 2 为 loading 覆盖层层级，无精确 token 对应，保留硬编码 */
   z-index: 2;
 }
 .kg-spin { animation: kg-spin 1s linear infinite; }

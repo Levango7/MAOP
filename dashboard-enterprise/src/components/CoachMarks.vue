@@ -230,13 +230,13 @@ onBeforeUnmount(() => {
   pointer-events: none;
   /* 修复: 仅 transition transform(GPU 合成, 不 reflow); width/height 瞬间切换,
      避免动画过程中持续重排。will-change 提示浏览器为 transform 建立合成层。 */
-  transition: transform .25s var(--ease);
+  transition: transform var(--motion-normal) var(--ease);
   will-change: transform;
 }
 .cm-popover {
   position: absolute;
   max-width: 320px;
-  z-index: 1;
+  z-index: var(--z-raised);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -259,6 +259,6 @@ onBeforeUnmount(() => {
 }
 .cm-next:hover { background: var(--brand-strong); }
 
-.cm-enter-active, .cm-leave-active { transition: opacity .2s var(--ease); }
+.cm-enter-active, .cm-leave-active { transition: opacity var(--motion-fast) var(--ease); }
 .cm-enter-from, .cm-leave-to { opacity: 0; }
 </style>

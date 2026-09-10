@@ -22,8 +22,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ def _get_store() -> Any:
     error_value={"decisions": [], "total": 0, "error": "Query failed"},
 )
 async def api_routing_decisions_recent(
+    request: Request,
     limit: int = 100,
     stage: str = "",
 ) -> dict[str, Any]:
@@ -68,6 +70,7 @@ async def api_routing_decisions_recent(
         Optional stage filter (``route_scorer`` / ``load_balancer`` /
         ``model_selector`` / ``dispatcher``). Empty string = all stages.
     """
+    require_admin(request)
     store = _get_store()
     capped_limit = max(1, min(int(limit), 1000))
     stage_filter = stage.strip() or None
@@ -87,13 +90,14 @@ async def api_routing_decisions_recent(
     "Routing decisions stats",
     error_value={"total": 0, "by_stage": {}, "last_24h": 0, "error": "Stats failed"},
 )
-async def api_routing_decisions_stats() -> dict[str, Any]:
+async def api_routing_decisions_stats(request: Request) -> dict[str, Any]:
     """Return aggregate decision counts.
 
     - ``total``: all-time decision count.
     - ``by_stage``: decision count per stage.
     - ``last_24h``: decisions recorded in the last 24 hours.
     """
+    require_admin(request)
     store = _get_store()
     stats = store.stats()
     return {
@@ -108,7 +112,7 @@ async def api_routing_decisions_stats() -> dict[str, Any]:
     "Routing decisions by trace",
     error_value={"trace_id": "", "decisions": [], "stages": [], "error": "Query failed"},
 )
-async def api_routing_decisions_by_trace(trace_id: str) -> dict[str, Any]:
+async def api_routing_decisions_by_trace(request: Request, trace_id: str) -> dict[str, Any]:
     """Return the full decision chain for a trace, oldest-first.
 
     The chain is reconstructed by querying all decisions sharing the
@@ -116,6 +120,7 @@ async def api_routing_decisions_by_trace(trace_id: str) -> dict[str, Any]:
     ``stages`` field lists the stages in call order so the caller can
     see the Plan → Route → LB → ModelSelect sequence at a glance.
     """
+    require_admin(request)
     store = _get_store()
     decisions = store.query_by_trace(trace_id)
     stages = [d.stage for d in decisions]

@@ -1,10 +1,41 @@
 """MAOP Sandbox - Working-directory-scoped execution environment management.
 
-SECURITY NOTICE: This module provides working-directory isolation and timeout
-enforcement only. It does NOT provide OS-level sandboxing (no containers,
-chroot, seccomp, or namespace isolation). Code running inside a "sandbox"
-can still access the full filesystem, network, and OS resources of the host
-process. For true isolation, use an external container runtime.
+SECURITY NOTICE — IMPORTANT: READ BEFORE USING THIS MODULE
+=========================================================
+
+This module provides **working-directory isolation** and **timeout enforcement**
+only. It does **NOT** provide OS-level sandboxing. Specifically:
+
+  - **No filesystem isolation**: Code running inside a "sandbox" can still
+    access the full filesystem of the host process (``/etc``, ``~/.ssh``,
+    other users' files, etc.). The workdir boundary is advisory, not enforced
+    by the OS.
+  - **No network isolation**: There is no firewall, network namespace, or
+    egress filtering. Sandboxed code can make arbitrary outbound connections.
+  - **No process isolation**: Sandboxed code runs in the same process space
+    and can ``fork``, ``exec``, inspect/modify host process memory, and
+    access shared resources (IPC, signals, environment variables).
+  - **No syscall filtering**: There is no seccomp-bpf, AppArmor, or SELinux
+    profile. All syscalls available to the host process are available to
+    sandboxed code.
+  - **Timeout is best-effort**: The timeout limits wall-clock duration but
+    does not guarantee timely termination if the code blocks on an
+    uninterruptible operation (e.g., disk I/O, network wait).
+
+**When this sandbox IS appropriate:**
+  - Running trusted/first-party plugin code that needs a clean working
+    directory and a time budget.
+  - Isolating file output between concurrent agent runs.
+  - Enforcing cleanup of temporary artifacts.
+
+**When this sandbox is NOT appropriate (use an external container runtime):**
+  - Executing untrusted or third-party code.
+  - Running code that may attempt filesystem traversal, network exfiltration,
+    or privilege escalation.
+  - Any scenario requiring strong isolation guarantees.
+
+For true OS-level isolation, use Docker, gVisor, Firecracker, or similar
+container runtimes with appropriate security profiles.
 
 Sandboxed execution environment for plugin code. to pure Python with SQLite-backed index.
 Actions: create, run, cleanup, list, info.

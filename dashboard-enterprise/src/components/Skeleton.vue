@@ -29,7 +29,7 @@ defineProps({
 </script>
 
 <style scoped>
-.skeleton-wrap { display: flex; flex-direction: column; gap: 8px; }
+.skeleton-wrap { display: flex; flex-direction: column; gap: var(--sp-2); }
 .skeleton-wrap.block { width: 100%; }
 .skeleton {
   display: block;
@@ -37,7 +37,7 @@ defineProps({
   overflow: hidden;
   background: var(--surface-2);
 }
-.skeleton.circle { border-radius: 50% !important; }
+.skeleton.circle { border-radius: var(--r-full) !important; }
 .skeleton::after {
   content: "";
   position: absolute;

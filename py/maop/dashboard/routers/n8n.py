@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
+from maop.dashboard.error_handler import handle_api_errors
 from maop.enterprise.n8n import (
     N8nClient,
     N8nIntegrationError,
@@ -38,6 +39,7 @@ def _get_client() -> N8nClient:
 
 
 @router.post("/webhook")
+@handle_api_errors("n8n webhook")
 async def receive_webhook(request: Request) -> dict[str, Any]:
     """Receive a webhook from n8n.
 
@@ -63,6 +65,7 @@ async def receive_webhook(request: Request) -> dict[str, Any]:
 
 
 @router.get("/workflows")
+@handle_api_errors("n8n list workflows")
 async def list_workflows(request: Request) -> dict[str, Any]:
     """List all n8n workflows."""
     require_admin(request)
@@ -80,6 +83,7 @@ async def list_workflows(request: Request) -> dict[str, Any]:
 
 
 @router.post("/workflows/{workflow_id}/trigger")
+@handle_api_errors("n8n trigger workflow")
 async def trigger_workflow(
     workflow_id: str,
     request: Request,
@@ -108,6 +112,7 @@ async def trigger_workflow(
 
 
 @router.get("/executions/{execution_id}")
+@handle_api_errors("n8n get execution")
 async def get_execution(execution_id: str, request: Request) -> dict[str, Any]:
     """Get the status of an n8n workflow execution."""
     require_admin(request)
@@ -125,12 +130,15 @@ async def get_execution(execution_id: str, request: Request) -> dict[str, Any]:
 
 
 @router.get("/health")
+@handle_api_errors("n8n health check")
 async def health_check(request: Request) -> dict[str, Any]:
     """Check if n8n is reachable."""
     require_admin(request)
     if not has_feature(FeatureFlag.N8N_INTEGRATION):
         raise HTTPException(status_code=404, detail="n8n integration not available")
 
+    # 从环境变量读取 base_url，避免访问 client 的内部属性 _base_url
+    base_url = os.getenv("N8N_BASE_URL", "http://localhost:5678")
     with _get_client() as client:
         healthy = client.health_check()
-        return {"n8n_reachable": healthy, "base_url": client._base_url}
+        return {"n8n_reachable": healthy, "base_url": base_url}

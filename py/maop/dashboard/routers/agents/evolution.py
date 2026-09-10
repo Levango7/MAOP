@@ -18,6 +18,7 @@ import sys
 from typing import Any
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -132,7 +133,10 @@ async def check_upgrade(name: str, request: Request) -> dict[str, Any]:
 
     agent_cfg = _deps._get_agent_config(name)
     if not agent_cfg:
-        return {"status": "error", "error": f"agent {name} not found in config"}
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "error": f"agent {name} not found in config"},
+        )
 
     return await upgrade_service.check_agent_upgrade(name, agent_cfg)
 
@@ -145,7 +149,10 @@ async def upgrade_agent(name: str, request: Request) -> dict[str, Any]:
 
     agent_cfg = _deps._get_agent_config(name)
     if not agent_cfg:
-        return {"status": "error", "error": f"agent {name} not found in config"}
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "error": f"agent {name} not found in config"},
+        )
 
     return await upgrade_service.upgrade_agent_cli(name, agent_cfg, _deps.MAOP_ROOT)
 

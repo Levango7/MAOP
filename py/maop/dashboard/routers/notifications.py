@@ -138,6 +138,18 @@ class PublishEventRequest(BaseModel):
     tenant_id: str = ""
 
 
+# ── 请求模型：直接复用 enterprise.notification.models 中的 Create/Update ──
+# 让 FastAPI 自动校验请求体，避免手动 ``dict → Pydantic`` 转换。
+from maop.enterprise.notification.models import (  # noqa: E402
+    ChannelCreate,
+    ChannelUpdate,
+    PreferenceUpdate,
+    RuleCreate,
+    RuleUpdate,
+    TemplateCreate,
+)
+
+
 # ── Channel endpoints ─────────────────────────────────────────────
 
 
@@ -159,15 +171,14 @@ async def list_channels(
 
 @router.post("/channels")
 @handle_api_errors
-async def create_channel(body: dict[str, Any], request: Request) -> dict[str, Any]:
+async def create_channel(body: ChannelCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    from maop.enterprise.notification.models import ChannelCreate
     mgr = _get_manager()
     # Inject tenant_id from JWT if not provided in body
-    if not body.get("tenant_id"):
-        body["tenant_id"] = _tenant_id_from_request(request)
-    channel = mgr.create_channel(ChannelCreate(**body))
+    if not body.tenant_id:
+        body.tenant_id = _tenant_id_from_request(request)
+    channel = mgr.create_channel(body)
     return {"status": "ok", "channel": channel.model_dump()}
 
 
@@ -184,12 +195,11 @@ async def get_channel(channel_id: str, request: Request) -> dict[str, Any]:
 
 @router.put("/channels/{channel_id}")
 @handle_api_errors
-async def update_channel(channel_id: str, body: dict[str, Any], request: Request) -> dict[str, Any]:
+async def update_channel(channel_id: str, body: ChannelUpdate, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    from maop.enterprise.notification.models import ChannelUpdate
     mgr = _get_manager()
-    channel = mgr.update_channel(channel_id, ChannelUpdate(**body))
+    channel = mgr.update_channel(channel_id, body)
     if channel is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found")
     return {"status": "ok", "channel": channel.model_dump()}
@@ -228,14 +238,13 @@ async def list_rules(
 
 @router.post("/rules")
 @handle_api_errors
-async def create_rule(body: dict[str, Any], request: Request) -> dict[str, Any]:
+async def create_rule(body: RuleCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    from maop.enterprise.notification.models import RuleCreate
     mgr = _get_manager()
-    if not body.get("tenant_id"):
-        body["tenant_id"] = _tenant_id_from_request(request)
-    rule = mgr.create_rule(RuleCreate(**body))
+    if not body.tenant_id:
+        body.tenant_id = _tenant_id_from_request(request)
+    rule = mgr.create_rule(body)
     return {"status": "ok", "rule": rule.model_dump()}
 
 
@@ -252,12 +261,11 @@ async def get_rule(rule_id: str, request: Request) -> dict[str, Any]:
 
 @router.put("/rules/{rule_id}")
 @handle_api_errors
-async def update_rule(rule_id: str, body: dict[str, Any], request: Request) -> dict[str, Any]:
+async def update_rule(rule_id: str, body: RuleUpdate, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    from maop.enterprise.notification.models import RuleUpdate
     mgr = _get_manager()
-    rule = mgr.update_rule(rule_id, RuleUpdate(**body))
+    rule = mgr.update_rule(rule_id, body)
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
     return {"status": "ok", "rule": rule.model_dump()}
@@ -295,14 +303,13 @@ async def list_templates(
 
 @router.post("/templates")
 @handle_api_errors
-async def create_template(body: dict[str, Any], request: Request) -> dict[str, Any]:
+async def create_template(body: TemplateCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    from maop.enterprise.notification.models import TemplateCreate
     mgr = _get_manager()
-    if not body.get("tenant_id"):
-        body["tenant_id"] = _tenant_id_from_request(request)
-    template = mgr.create_template(TemplateCreate(**body))
+    if not body.tenant_id:
+        body.tenant_id = _tenant_id_from_request(request)
+    template = mgr.create_template(body)
     return {"status": "ok", "template": template.model_dump()}
 
 
@@ -462,9 +469,8 @@ async def get_preferences(request: Request, user_id: str = Query("")) -> dict[st
 
 @router.put("/preferences")
 @handle_api_errors
-async def update_preferences(body: dict[str, Any], request: Request, user_id: str = Query("")) -> dict[str, Any]:
+async def update_preferences(body: PreferenceUpdate, request: Request, user_id: str = Query("")) -> dict[str, Any]:
     _require_feature()
-    from maop.enterprise.notification.models import PreferenceUpdate
     mgr = _get_manager()
     req_user = _user_id_from_request(request)
     req_tenant = _tenant_id_from_request(request)
@@ -472,7 +478,7 @@ async def update_preferences(body: dict[str, Any], request: Request, user_id: st
         user_id = req_user
     if not user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="user_id required")
-    pref = mgr.update_preference(user_id, PreferenceUpdate(**body), tenant_id=req_tenant)
+    pref = mgr.update_preference(user_id, body, tenant_id=req_tenant)
     return {"status": "ok", "preference": pref.model_dump()}
 
 

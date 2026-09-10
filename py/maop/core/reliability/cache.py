@@ -324,18 +324,35 @@ class LRUCache:
     # ── dict-like interface (B8: CacheGuard 兼容) ──────────────
 
     def __contains__(self, key: str) -> bool:
-        """Check if key is present (regardless of TTL expiry)."""
-        with self._lock:
-            return key in self._store
+        """Check if key is present and not TTL-expired.
 
-    def __getitem__(self, key: str) -> Any:
-        """Get value by key. Raises KeyError if missing.
-
-        Note: 不检查 TTL 过期，由调用方自行处理（CacheGuard 自管 TTL）。
+        R4-low fix: previously returned True for expired entries, causing
+        CacheGuard consumers to see stale "present" results. Now checks
+        expires_at and lazily evicts expired entries.
         """
         with self._lock:
             entry = self._store.get(key)
             if entry is None:
+                return False
+            # TTL 过期检查：expires_at > 0 表示有 TTL，已过期则移除并返回 False
+            if entry.expires_at > 0 and time.time() > entry.expires_at:
+                del self._store[key]
+                return False
+            return True
+
+    def __getitem__(self, key: str) -> Any:
+        """Get value by key. Raises KeyError if missing or TTL-expired.
+
+        R4-low fix: previously returned expired values without checking TTL.
+        Now lazily evicts expired entries and raises KeyError on expiry.
+        """
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                raise KeyError(key)
+            # TTL 过期检查：expires_at > 0 表示有 TTL，已过期则移除并抛 KeyError
+            if entry.expires_at > 0 and time.time() > entry.expires_at:
+                del self._store[key]
                 raise KeyError(key)
             return entry.value
 
@@ -779,7 +796,15 @@ class CacheGuard:
             return False
 
     def invalidate_pattern(self, prefix: str) -> int:
-        """Invalidate all keys matching a prefix. Returns count removed."""
+        """Invalidate all keys matching a prefix. Returns count removed.
+
+        R4-low notice: This method performs an O(n) full scan of all cache
+        keys to match the prefix. For large caches (>10k entries) called at
+        high frequency, prefer targeted ``invalidate(key)`` calls for each
+        known key instead. The O(n) cost is acceptable for infrequent bulk
+        invalidation (e.g., config reload, namespace reset) but not for
+        per-request hot paths.
+        """
         with self._lock:
             keys_to_remove = [k for k in self._cache if k.startswith(prefix)]
             for k in keys_to_remove:

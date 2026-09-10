@@ -142,7 +142,7 @@ async function loadRoles() {
     const d = await api.get('/api/rbac/roles');
     roles.value = d.roles || [];
   } catch {
-    rolesError.value = 'Failed to load roles';
+    rolesError.value = t('view.rbac.rolesLoadFailed');
   } finally {
     rolesLoading.value = false;
   }

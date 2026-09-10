@@ -18,6 +18,8 @@ export function useWebSocket(url = '') {
   }
 
   function connect() {
+    // SSR 守卫: 在非浏览器环境（SSR / Node 测试）下直接返回，避免访问全局 location 抛 ReferenceError。
+    if (typeof window === 'undefined') return;
     reconnectAttempts = 0;
     try {
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -30,7 +31,8 @@ router = APIRouter()
 
 @router.get("/api/agent/config")
 @handle_api_errors
-async def api_agent_config() -> dict[str, Any]:
+async def api_agent_config(request: Request) -> dict[str, Any]:
+    require_admin(request)
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
@@ -50,7 +52,10 @@ async def api_agent_config() -> dict[str, Any]:
         return {"agents": agents, "routes": routes, "agent_count": len(agents)}
     except Exception as exc:
         logger.error('Agent config failed: %s', exc)
-        return {"agents": [], "routes": [], "error": "Agent config failed"}
+        return JSONResponse(
+            status_code=500,
+            content={"agents": [], "routes": [], "error": "Agent config failed"},
+        )
 
 
 @router.post("/api/agent/config/update")
@@ -66,13 +71,19 @@ async def api_agent_config_update(request: Request) -> dict[str, Any]:
         if not ypath.exists():
             ypath = _deps.MAOP_ROOT / "agents.yaml"
         if not ypath.exists():
-            return {"status": "error", "error": "agents.yaml not found"}
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "error": "agents.yaml not found"},
+            )
         import yaml
         _text = await asyncio.to_thread(Path(ypath).read_text, encoding="utf-8")
         data = yaml.safe_load(_text)
         agents = data.get("agents", {})
         if agent_name not in agents:
-            return {"status": "error", "error": f"Unknown agent: {agent_name}"}
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "error": f"Unknown agent: {agent_name}"},
+            )
         agent_cfg = agents[agent_name]
 
         # ── Schema validation: validate updates against AgentDef before writing ──
@@ -133,7 +144,10 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]
         cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
         ad = cfg.agents.get(agent_name)
         if not ad:
-            return {"status": "error", "error": f"agent {agent_name} not found"}
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "error": f"agent {agent_name} not found"},
+            )
         cli_path = shutil.which(ad.cli) if ad.cli else None
         info = {
             "agent": agent_name, "cli": ad.cli, "cli_found": cli_path is not None,
@@ -172,7 +186,10 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]
                         except asyncio.TimeoutError:
                             upgrade_proc.kill()
                             await upgrade_proc.wait()
-                            return {"ok": False, "error": "pip install upgrade timed out (120s)"}
+                            return JSONResponse(
+                                status_code=500,
+                                content={"ok": False, "error": "pip install upgrade timed out (120s)"},
+                            )
                         upgrade_r_stdout = upgrade_stdout.decode(errors="replace") if upgrade_stdout else ""
                         upgrade_r_stderr = upgrade_stderr.decode(errors="replace") if upgrade_stderr else ""
                         upgrade_r_returncode = upgrade_proc.returncode
@@ -215,7 +232,8 @@ async def api_agent_upgrade(request: Request, agent: str = "") -> dict[str, Any]
 
 @router.get("/api/agent/upgrade")
 @handle_api_errors
-async def api_agent_upgrade_get(agent: str = "") -> dict[str, Any]:
+async def api_agent_upgrade_get(request: Request, agent: str = "") -> dict[str, Any]:
+    require_admin(request)
     try:
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
@@ -249,4 +267,7 @@ async def api_agent_upgrade_get(agent: str = "") -> dict[str, Any]:
         return {"agents": result}
     except Exception as exc:
         logger.error('Agent upgrade list failed: %s', exc)
-        return {"agents": [], "error": "Agent upgrade list failed"}
+        return JSONResponse(
+            status_code=500,
+            content={"agents": [], "error": "Agent upgrade list failed"},
+        )

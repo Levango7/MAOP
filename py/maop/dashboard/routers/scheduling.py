@@ -27,6 +27,7 @@ from maop.core.scheduling.failure_detector import (
     FailurePatternDetector,
     get_failure_detector,
 )
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ def _detector() -> FailurePatternDetector:
     "Scheduling failure stats",
     error_value={"agents": [], "config": {}, "total_agents": 0, "error": "Query failed"},
 )
-async def api_scheduling_failure_stats() -> dict[str, Any]:
+async def api_scheduling_failure_stats(request: Request) -> dict[str, Any]:
     """Return the per-agent failure-detector snapshot.
 
     Response shape::
@@ -67,6 +68,7 @@ async def api_scheduling_failure_stats() -> dict[str, Any]:
           "total_agents": 0
         }
     """
+    require_admin(request)
     return _detector().get_stats()
 
 

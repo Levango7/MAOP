@@ -10,9 +10,10 @@ here) is fully wired even before a richer notification backend exists.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -40,13 +41,25 @@ class WebhookPayload(BaseModel):
 
 
 @router.post("/webhook")
-async def alertmanager_webhook(payload: WebhookPayload) -> Any:
+async def alertmanager_webhook(payload: WebhookPayload, request: Request) -> Any:
     """Receive Alertmanager webhook posts and log each alert.
 
     Logs ``alertname`` / ``severity`` / ``summary`` for every alert so
     operators can triage from the dashboard logs. Returns a 200 so
     Alertmanager does not retry indefinitely.
+
+    Security: when the ``ALERTS_WEBHOOK_SECRET`` environment variable is
+    set, the request must carry a matching ``X-Webhook-Secret`` header.
+    If the env var is unset the check is skipped (backward-compatible).
     """
+    # ── Shared-secret guard ──────────────────────────────────────────
+    expected_secret = os.getenv("ALERTS_WEBHOOK_SECRET", "").strip()
+    if expected_secret:
+        provided_secret = (request.headers.get("X-Webhook-Secret", "") or "").strip()
+        if provided_secret != expected_secret:
+            logger.warning("[alerts/webhook] rejected: missing or mismatched X-Webhook-Secret")
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
     if not payload.alerts:
         logger.info(
             "[alerts/webhook] received empty alert batch (status=%s, receiver=%s)",

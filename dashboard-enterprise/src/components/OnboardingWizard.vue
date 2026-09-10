@@ -90,13 +90,13 @@ function finish() {
   /* 修复: fallback 与 tokens.css 中 --overlay-scrim 定义 rgba(15, 23, 42, .65) 不一致, 修正 */
   background: var(--overlay-scrim, rgba(15, 23, 42, .65));
   display: flex; align-items: center; justify-content: center;
-  /* 修复: 1rem 硬编码 token 化 → var(--fs-base) */
-  padding: var(--fs-base);
+  /* 修复: 1rem 硬编码 token 化 → var(--sp-4) */
+  padding: var(--sp-4);
 }
 .onboard-wizard { max-width: 520px; width: 100%; }
 /* 修复: 0.875rem 硬编码 token 化 → var(--fs-sm) */
 .onboard-wizard__skip { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-sm); }
-.onboard-wizard__steps { display: flex; gap: 0; /* 修复: 1rem token 化 */ padding: var(--fs-base) var(--sp-6); border-bottom: 1px solid var(--border); }
+.onboard-wizard__steps { display: flex; gap: 0; /* 修复: 1rem token 化 */ padding: var(--sp-4) var(--sp-6); border-bottom: 1px solid var(--border); }
 /* 修复: 4px 硬编码 token 化 → var(--r-sm); 0.75rem → var(--fs-2xs) */
 .onboard-wizard__step-dot { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--r-sm); background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: var(--fs-2xs); padding: 0; }
 .onboard-wizard__step-dot span { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-muted); font-weight: 600; font-size: var(--fs-xs); }
@@ -106,8 +106,8 @@ function finish() {
 .onboard-wizard__step-dot--done { color: var(--success); }
 .onboard-wizard__step-dot:disabled { opacity: 0.4; cursor: not-allowed; }
 .onboard-wizard__body { padding: var(--sp-6); }
-/* 修复: 1rem token 化 → var(--fs-base); 0.5rem → var(--sp-2) */
-.onboard-wizard__step-content p { margin-bottom: var(--fs-base); color: var(--text-muted); }
-.onboard-wizard__quick-actions { display: flex; gap: var(--sp-2); margin-bottom: var(--fs-base); }
+/* 修复: 1rem token 化 → var(--sp-4); 0.5rem → var(--sp-2) */
+.onboard-wizard__step-content p { margin-bottom: var(--sp-4); color: var(--text-muted); }
+.onboard-wizard__quick-actions { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-4); }
 .onboard-wizard__hint { font-size: var(--fs-xs); color: var(--text-muted); }
 </style>

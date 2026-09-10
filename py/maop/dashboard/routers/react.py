@@ -48,9 +48,11 @@ def _get_artifact_store():
 @router.get("/snapshots")
 @handle_api_errors
 async def list_snapshots(
+    request: Request,
     workdir: str = Query("", description="Filter by workdir"),
     limit: int = Query(20, ge=1, le=100),
 ) -> dict[str, Any]:
+    require_admin(request)
     tracker = _get_change_tracker()
     snapshots = tracker.list_snapshots(workdir=workdir, limit=limit)
     return {"snapshots": [s.model_dump() for s in snapshots]}
@@ -72,9 +74,11 @@ async def create_snapshot(body: CreateSnapshotRequest, request: Request) -> dict
 @router.get("/diff")
 @handle_api_errors
 async def diff_snapshots(
+    request: Request,
     workdir: str = Query(..., description="Working directory"),
     since_label: str = Query("", description="Compare since this label"),
 ) -> dict[str, Any]:
+    require_admin(request)
     tracker = _get_change_tracker()
     result = tracker.diff(workdir, since_label=since_label)
     return {"diff": result.model_dump()}
@@ -83,9 +87,11 @@ async def diff_snapshots(
 @router.get("/changes")
 @handle_api_errors
 async def get_change_log(
+    request: Request,
     workdir: str = Query(..., description="Working directory"),
     limit: int = Query(50, ge=1, le=200),
 ) -> dict[str, Any]:
+    require_admin(request)
     tracker = _get_change_tracker()
     changes = tracker.get_change_log(workdir, limit=limit)
     return {"changes": changes}
@@ -102,7 +108,8 @@ async def delete_snapshot(snapshot_id: str, request: Request) -> dict[str, Any]:
 
 @router.get("/artifacts")
 @handle_api_errors
-async def list_artifacts(limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+async def list_artifacts(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    require_admin(request)
     store = _get_artifact_store()
     artifacts = store.list_artifacts(limit=limit)
     return {"artifacts": [a.model_dump() for a in artifacts]}
@@ -124,7 +131,8 @@ async def save_artifact(body: SaveArtifactRequest, request: Request) -> dict[str
 
 @router.get("/artifacts/{name}")
 @handle_api_errors
-async def load_artifact(name: str, version: int | None = Query(None)) -> dict[str, Any]:
+async def load_artifact(request: Request, name: str, version: int | None = Query(None)) -> dict[str, Any]:
+    require_admin(request)
     store = _get_artifact_store()
     content = store.load(name, version=version)
     if content is None:
@@ -137,7 +145,8 @@ async def load_artifact(name: str, version: int | None = Query(None)) -> dict[st
 
 @router.get("/artifacts/{name}/history")
 @handle_api_errors
-async def artifact_history(name: str, limit: int = Query(20)) -> dict[str, Any]:
+async def artifact_history(request: Request, name: str, limit: int = Query(20)) -> dict[str, Any]:
+    require_admin(request)
     store = _get_artifact_store()
     history = store.history(name, limit=limit)
     return {"history": [h.model_dump() for h in history]}

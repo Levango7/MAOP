@@ -29,6 +29,15 @@ from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
+# 直接复用 license_manager 中的 Pydantic 请求模型，让 FastAPI 自动校验。
+from maop.enterprise.license_manager import (  # noqa: E402
+    LicenseCreateRequest,
+    LicenseRenewRequest,
+    LicenseRevokeRequest,
+    LicenseUpdateRequest,
+    LicenseValidateRequest,
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/licenses", tags=["licenses"])
@@ -88,13 +97,11 @@ async def list_licenses(
 
 @router.post("/create")
 @handle_api_errors
-async def create_license(request: Request, body: dict[str, Any]) -> dict[str, Any]:
+async def create_license(request: Request, body: LicenseCreateRequest) -> dict[str, Any]:
     """Issue a new license. Requires admin."""
     require_admin(request)
     _require_feature()
-    from maop.enterprise.license_manager import LicenseCreateRequest
-
-    req = LicenseCreateRequest(**body)
+    req = body
     mgr = _get_manager()
     record = mgr.create_license(
         customer=req.customer,
@@ -110,16 +117,35 @@ async def create_license(request: Request, body: dict[str, Any]) -> dict[str, An
 
 @router.post("/validate")
 @handle_api_errors
-async def validate_license(request: Request, body: dict[str, Any]) -> dict[str, Any]:
+async def validate_license(request: Request, body: LicenseValidateRequest) -> dict[str, Any]:
     """Validate a license key (signature + expiry + revocation)."""
     require_admin(request)
     _require_feature()
-    from maop.enterprise.license_manager import LicenseValidateRequest
-
-    req = LicenseValidateRequest(**body)
+    req = body
     mgr = _get_manager()
     result = mgr.validate_license(req.license_key)
     return {"status": "ok", "validation": result}
+
+
+@router.get("/audit/list")
+@handle_api_errors
+async def list_audit_logs(
+    request: Request,
+    license_id: str = Query(default=""),
+    action: str = Query(default=""),
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, Any]:
+    """List all license audit logs with optional filters."""
+    require_admin(request)
+    _require_feature()
+    mgr = _get_manager()
+    entries = mgr.get_audit_logs(license_id=license_id, action=action, limit=limit, offset=offset)
+    return {
+        "status": "ok",
+        "audit_logs": [e.model_dump() for e in entries],
+        "count": len(entries),
+    }
 
 
 @router.get("/{license_id}")
@@ -142,13 +168,13 @@ async def get_license(license_id: str, request: Request) -> dict[str, Any]:
 
 @router.patch("/{license_id}")
 @handle_api_errors
-async def update_license(license_id: str, request: Request, body: dict[str, Any]) -> dict[str, Any]:
+async def update_license(license_id: str, request: Request, body: LicenseUpdateRequest) -> dict[str, Any]:
     """Update editable license metadata (customer, max_users, fingerprint, features, notes)."""
     require_admin(request)
     _require_feature()
-    from maop.enterprise.license_manager import LicenseNotFoundError, LicenseUpdateRequest
+    from maop.enterprise.license_manager import LicenseNotFoundError
 
-    req = LicenseUpdateRequest(**body)
+    req = body
     mgr = _get_manager()
     try:
         record = mgr.update_license(
@@ -168,13 +194,13 @@ async def update_license(license_id: str, request: Request, body: dict[str, Any]
 
 @router.post("/{license_id}/renew")
 @handle_api_errors
-async def renew_license(license_id: str, request: Request, body: dict[str, Any]) -> dict[str, Any]:
+async def renew_license(license_id: str, request: Request, body: LicenseRenewRequest) -> dict[str, Any]:
     """Renew a license: re-sign with a new expiry date."""
     require_admin(request)
     _require_feature()
-    from maop.enterprise.license_manager import LicenseNotFoundError, LicenseRenewRequest
+    from maop.enterprise.license_manager import LicenseNotFoundError
 
-    req = LicenseRenewRequest(**body)
+    req = body
     mgr = _get_manager()
     try:
         record = mgr.renew_license(license_id, new_expires_at=req.new_expires_at, actor=req.actor)
@@ -187,13 +213,13 @@ async def renew_license(license_id: str, request: Request, body: dict[str, Any])
 
 @router.post("/{license_id}/revoke")
 @handle_api_errors
-async def revoke_license(license_id: str, request: Request, body: dict[str, Any]) -> dict[str, Any]:
+async def revoke_license(license_id: str, request: Request, body: LicenseRevokeRequest) -> dict[str, Any]:
     """Revoke a license."""
     require_admin(request)
     _require_feature()
-    from maop.enterprise.license_manager import LicenseNotFoundError, LicenseRevokeRequest
+    from maop.enterprise.license_manager import LicenseNotFoundError
 
-    req = LicenseRevokeRequest(**body)
+    req = body
     mgr = _get_manager()
     try:
         record = mgr.revoke_license(license_id, reason=req.reason, actor=req.actor)
@@ -235,27 +261,6 @@ async def get_license_audit(
     _require_feature()
     mgr = _get_manager()
     entries = mgr.get_audit_logs(license_id=license_id, limit=limit, offset=offset)
-    return {
-        "status": "ok",
-        "audit_logs": [e.model_dump() for e in entries],
-        "count": len(entries),
-    }
-
-
-@router.get("/audit/list")
-@handle_api_errors
-async def list_audit_logs(
-    request: Request,
-    license_id: str = Query(default=""),
-    action: str = Query(default=""),
-    limit: int = Query(default=100, ge=1, le=1000),
-    offset: int = Query(default=0, ge=0),
-) -> dict[str, Any]:
-    """List all license audit logs with optional filters."""
-    require_admin(request)
-    _require_feature()
-    mgr = _get_manager()
-    entries = mgr.get_audit_logs(license_id=license_id, action=action, limit=limit, offset=offset)
     return {
         "status": "ok",
         "audit_logs": [e.model_dump() for e in entries],

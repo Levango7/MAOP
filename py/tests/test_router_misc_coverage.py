@@ -90,11 +90,12 @@ class TestTenantGet:
         assert resp.status_code == 200
 
     def test_not_found(self, tenant_client, monkeypatch):
+        # Batch3C: error returns 404 instead of 200.
         import maop.dashboard.routers.tenant as tenant_mod
         mgr = tenant_mod._get_manager()
         mgr.get_tenant.return_value = None
         resp = tenant_client.get("/api/tenant/nonexistent")
-        assert resp.status_code == 200
+        assert resp.status_code == 404
         assert resp.json()["status"] == "error"
 
 
@@ -538,8 +539,9 @@ def routing_preview_client(tmp_path, monkeypatch):
 
 class TestRoutingPreviewMatch:
     def test_missing_task(self, routing_preview_client):
+        # Batch3C: missing required field returns 400 instead of 200.
         resp = routing_preview_client.post("/api/routing/match", json={})
-        assert resp.status_code == 200
+        assert resp.status_code == 400
 
     def test_no_match(self, routing_preview_client):
         resp = routing_preview_client.post(
@@ -557,8 +559,9 @@ class TestRoutingPreviewCooldowns:
 
 class TestRoutingPreviewScores:
     def test_missing_task(self, routing_preview_client):
+        # Batch3C: missing required field returns 400 instead of 200.
         resp = routing_preview_client.get("/api/routing/scores")
-        assert resp.status_code == 200
+        assert resp.status_code == 400
 
     def test_with_task(self, routing_preview_client):
         resp = routing_preview_client.get("/api/routing/scores?task=test")

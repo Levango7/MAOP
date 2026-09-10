@@ -431,25 +431,42 @@ class CircuitBreaker:
 
     def is_available(self, agent_name: str) -> bool:
         """Check if the agent is callable (closed or half-open with cooldown elapsed)."""
+        # 锁内只做内存读写与状态转换，SQLite I/O 延迟到锁外执行，
+        # 避免持锁做 I/O 阻塞其他线程（来源：并发安全审计经验）。
+        need_save: tuple[str, BreakerEntry, BreakerState] | None = None
+        result: bool = False
         with self._sync_lock:
             entry = self._data.get(agent_name)
             if entry is None:
-                return True
-            if entry.state == BreakerState.CLOSED:
-                return True
-            if entry.state == BreakerState.HALF_OPEN:
-                return True
-            if entry.state == BreakerState.OPEN:
+                result = True
+            elif entry.state == BreakerState.CLOSED:
+                result = True
+            elif entry.state == BreakerState.HALF_OPEN:
+                result = True
+            elif entry.state == BreakerState.OPEN:
                 if entry.last_failure is not None:
                     elapsed = time.time() - entry.last_failure
                     if elapsed >= entry.cooldown_s:
                         # Auto-transition to half-open
                         old_state = entry.state
                         entry.state = BreakerState.HALF_OPEN
-                        self._save_agent(agent_name, entry, old_state=old_state)
-                        return True
-                return False
-            return False
+                        # 收集需要保存的数据，锁外再执行 I/O
+                        need_save = (agent_name, entry, old_state)
+                        result = True
+                    else:
+                        result = False
+                else:
+                    result = False
+            else:
+                result = False
+        # 锁外执行 SQLite 持久化（若有状态转换）
+        if need_save is not None:
+            save_name, save_entry, save_old_state = need_save
+            try:
+                self._save_agent(save_name, save_entry, old_state=save_old_state)
+            except Exception:
+                logger.warning("[breaker] is_available: _save_agent failed for %s", save_name, exc_info=True)
+        return result
 
     def all_states(self) -> dict[str, BreakerEntry]:
         """Return a snapshot of all agent breaker states, with a short TTL cache.

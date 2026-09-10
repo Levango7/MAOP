@@ -93,6 +93,9 @@ class PostgreSQLStorageBackend(StorageBackend):
             max_size=10,
             kwargs={"autocommit": True},
         )
+        # R4-low fix: 首次 commit/rollback warning 后续降级为 debug，避免日志噪音
+        self._commit_warned: bool = False
+        self._rollback_warned: bool = False
         self._ensure_schema()
 
     def _ensure_schema(self) -> None:
@@ -133,20 +136,36 @@ class PostgreSQLStorageBackend(StorageBackend):
 
     def commit(self) -> None:
         # B9: 不再静默 no-op。pool 在 autocommit=True 模式下，每次
-        # execute 已自动提交，顶层 commit() 无未提交事务可提交。发出
-        # warning 让调用方意识到问题，并改用 transaction() 获得事务能力。
-        logger.warning(
-            "[pg] commit() invoked in autocommit mode (no pending txn); "
-            "use transaction() for explicit transactional control"
-        )
+        # execute 已自动提交，顶层 commit() 无未提交事务可提交。
+        # R4-low fix: 高频操作场景下 warning 产生大量日志噪音，改为 debug。
+        # 首次调用时发 warning 提醒，后续发 debug。
+        if not self._commit_warned:
+            self._commit_warned = True
+            logger.warning(
+                "[pg] commit() invoked in autocommit mode (no pending txn); "
+                "use transaction() for explicit transactional control. "
+                "Subsequent calls will log at debug level."
+            )
+        else:
+            logger.debug(
+                "[pg] commit() in autocommit mode (no pending txn); use transaction() for txn control"
+            )
 
     def rollback(self) -> None:
-        # B9: 不再静默 no-op。autocommit 模式下已执行的语句无法回滚；
-        # 发出 warning 让调用方意识到问题，并改用 transaction() 获得回滚能力。
-        logger.warning(
-            "[pg] rollback() invoked in autocommit mode — already-committed "
-            "statements cannot be rolled back; use transaction() for explicit txn control"
-        )
+        # B9: 不再静默 no-op。autocommit 模式下已执行的语句无法回滚。
+        # R4-low fix: 高频操作场景下 warning 产生大量日志噪音，改为 debug。
+        # 首次调用时发 warning 提醒，后续发 debug。
+        if not self._rollback_warned:
+            self._rollback_warned = True
+            logger.warning(
+                "[pg] rollback() invoked in autocommit mode — already-committed "
+                "statements cannot be rolled back; use transaction() for explicit txn control. "
+                "Subsequent calls will log at debug level."
+            )
+        else:
+            logger.debug(
+                "[pg] rollback() in autocommit mode — already-committed; use transaction() for txn control"
+            )
 
     @contextlib.contextmanager
     def transaction(self) -> Any:

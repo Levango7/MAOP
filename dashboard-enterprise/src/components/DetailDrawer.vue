@@ -136,8 +136,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 .drawer__body { flex: 1; overflow-y: auto; padding: var(--sp-4); }
 .drawer__foot { flex-shrink: 0; padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border); }
 
-.drawer-enter-active, .drawer-leave-active { transition: opacity .18s var(--ease); }
+.drawer-enter-active, .drawer-leave-active { transition: opacity var(--motion) var(--ease); }
 .drawer-enter-from, .drawer-leave-to { opacity: 0; }
-.drawer-enter-active .drawer__panel { transition: transform .22s var(--ease); }
+.drawer-enter-active .drawer__panel { transition: transform var(--motion-normal) var(--ease); }
 .drawer-enter-from .drawer__panel, .drawer-leave-to .drawer__panel { transform: translateX(100%); }
 </style>

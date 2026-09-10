@@ -328,6 +328,9 @@ export const coreMessages = {
     'view.observability.available': 'available',
     'view.observability.missing': 'missing',
     'view.observability.endpointUnavailable': 'endpoint unavailable',
+    // ── DagGraph 组件 (R4审查补充) ──────────────────────────
+    'dag.emptyHint': 'Enter an execution ID to subscribe to DAG progress.',
+    'dag.connecting': 'Connecting to execution {id}…',
   },
   zh: {
     // ── F34 修复: core 键中文翻译补全 (nav/status/action/footer/settings/common/coach/palette/error) ──
@@ -554,6 +557,9 @@ export const coreMessages = {
 
     // ── F33 修复: 顶栏 / 用户模块中文翻译 ──
     'topbar.refreshTime': '最后刷新',
+    // 品牌名保留英文（与 en 字典一致），英文副标题保留原文
+    'topbar.systemName': 'MAOP',
+    'topbar.systemNameEn': 'Multi-Agent Orchestration',
     'topbar.systemNameZh': '多智能体编排平台',
     'topbar.density': '布局',
     'topbar.theme': '主题',
@@ -640,6 +646,9 @@ export const coreMessages = {
     'view.observability.available': '可用',
     'view.observability.missing': '缺失',
     'view.observability.endpointUnavailable': '端点不可用',
+    // ── DagGraph 组件 (R4审查补充) ──────────────────────────
+    'dag.emptyHint': '输入执行 ID 以订阅 DAG 进度。',
+    'dag.connecting': '正在连接执行 {id}…',
   },
 };
 

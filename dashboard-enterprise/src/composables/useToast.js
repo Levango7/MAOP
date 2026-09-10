@@ -1,6 +1,9 @@
 import { reactive } from 'vue';
 
 export const toastState = reactive({ items: [] });
+// CSR-only: 模块级自增 ID。本应用为纯客户端渲染（SPA），整个生命周期内只有一个
+// 模块实例，不存在跨请求 ID 冲突。若未来引入 SSR，需改为 per-request 隔离的
+// ID 生成（如 crypto.randomUUID() 或工厂函数封装实例级计数器）。
 let _id = 0;
 
 export function useToast() {

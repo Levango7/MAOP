@@ -14,8 +14,12 @@ def client():
     return TestClient(_app)
 
 
-def test_app_creates(client):
+def test_app_creates(client, monkeypatch):
     """App boots without crash."""
+    # /api/info/config 现有 require_admin 守卫，stub 为 no-op
+    # （本测试关注 app 启动不崩溃，非 admin 权限校验）
+    import maop.dashboard.routers.info.meta as meta_mod
+    monkeypatch.setattr(meta_mod, "require_admin", lambda request: None)
     assert client is not None
     r = client.get("/api/info/config")
     assert r.status_code in (200, 401, 404)

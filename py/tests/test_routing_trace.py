@@ -610,6 +610,10 @@ def api_client(tmp_path: Path):
     routing_router_module._decision_store = store
 
     app = FastAPI()
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["admin"]
+        return await call_next(request)
     app.include_router(routing_router_module.router)
     client = TestClient(app)
     yield client, store

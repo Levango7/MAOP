@@ -184,7 +184,7 @@ function formatRel(ts) {
 .dt-wrap { position: relative; width: 100%; overflow-x: auto; }
 .dt { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .dt thead th {
-  position: sticky; top: 0; z-index: 1;
+  position: sticky; top: 0; z-index: var(--z-raised);
   background: var(--surface-2);
   color: var(--text-muted);
   font-weight: 600;
@@ -199,7 +199,7 @@ function formatRel(ts) {
 }
 .dt th.sortable { cursor: pointer; }
 .dt th.sortable:hover { color: var(--brand-strong); }
-.dt__th { display: inline-flex; align-items: center; gap: 4px; }
+.dt__th { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .dt__sort { opacity: .3; transition: opacity var(--motion) var(--ease), transform var(--motion) var(--ease); }
 .dt__sort.is-active { opacity: 1; color: var(--brand-strong); transform: rotate(180deg); }
 .dt__sort.is-active.is-desc { transform: rotate(0deg); }
@@ -231,6 +231,7 @@ function formatRel(ts) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* 28px 为分页按钮视觉规格固定值 */
   width: 28px;
   height: 28px;
   border: 1px solid var(--border);
@@ -254,6 +255,7 @@ function formatRel(ts) {
   font-size: var(--fs-sm);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+  /* min-width 60px 为分页信息区视觉规格固定值 */
   min-width: 60px;
   text-align: center;
 }

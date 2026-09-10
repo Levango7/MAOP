@@ -153,7 +153,7 @@ async function execAction(action, task) {
   try {
     if (action === 'status') {
       await api.get('/api/control/status');
-      execResult.value = { ok: true, msg: 'Status refreshed' };
+      execResult.value = { ok: true, msg: t('view.control.statusRefreshed') };
     } else {
       const validActions = ['run', 'pause', 'resume', 'stop', 'validate', 'doctor'];
       if (!validActions.includes(action)) throw new Error(`Unknown action: ${action}`);

@@ -38,6 +38,7 @@ function iconFor(tone) {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
+  /* max-width 360px 为 Toast 视觉规格固定值 */
   max-width: 360px;
   pointer-events: none;
 }
@@ -49,6 +50,7 @@ function iconFor(tone) {
   padding: var(--sp-3) var(--sp-4);
   background: var(--surface);
   border: 1px solid var(--border);
+  /* border-left-width 3px 为 Toast 类型指示条视觉规格固定值 */
   border-left-width: 3px;
   border-radius: var(--r-md);
   box-shadow: var(--shadow-md);

@@ -237,7 +237,13 @@ class TestVaultClose:
 
 class TestVaultDegradation:
     def test_get_secret_backend_vault_degrades(self, monkeypatch):
-        """When hvac cannot be imported, get_secret_backend() falls back to LocalSecretBackend."""
+        """When hvac cannot be imported, get_secret_backend() falls back to
+        LocalSecretBackend only if MAOP_SECRET_ALLOW_FALLBACK=1.
+
+        Batch3D: secret backend now fail-fast by default (RuntimeError),
+        consistent with storage/cache/queue/kv. This test verifies both
+        the fail-fast path and the opt-in degrade path.
+        """
         from maop.core.backends.backends import (
             LocalSecretBackend,
             get_secret_backend,
@@ -247,7 +253,16 @@ class TestVaultDegradation:
         monkeypatch.delitem(sys.modules, "hvac", raising=False)
         monkeypatch.delitem(sys.modules, "maop.core.backends.backends_vault", raising=False)
         monkeypatch.setenv("MAOP_SECRET_BACKEND", "vault")
+        monkeypatch.delenv("MAOP_SECRET_ALLOW_FALLBACK", raising=False)
         reset_backends()
+
+        # Default: fail-fast (RuntimeError) when vault unavailable.
+        with pytest.raises(RuntimeError, match="Vault secrets backend"):
+            get_secret_backend()
+
+        # Explicit opt-in restores the legacy degrade behaviour.
+        reset_backends()
+        monkeypatch.setenv("MAOP_SECRET_ALLOW_FALLBACK", "1")
         try:
             backend = get_secret_backend()
             assert isinstance(backend, LocalSecretBackend)

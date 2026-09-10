@@ -153,6 +153,9 @@ export function useDagProgress(executionId, options = {}) {
   // ── WebSocket connection ──────────────────────────────────
 
   function connectWS() {
+    // SSR 守卫: 在非浏览器环境（SSR / Node 测试）下直接返回，避免 ReferenceError。
+    // 参考 realtime.js:27-30 的守卫写法。
+    if (typeof window === 'undefined') return;
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     // M6 fix: token 现由 httpOnly cookie 管理，不再通过 Sec-WebSocket-Protocol 子协议传递。
     // 浏览器在 WebSocket 握手时会自动携带同源 cookie，后端从 cookie 中读取 token 验证。

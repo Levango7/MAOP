@@ -97,22 +97,27 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
   border-radius: var(--r-lg) 0 0 var(--r-lg);
 }
 .stat__icon {
+  /* 42px 为 StatCard 图标容器视觉规格固定值 */
   width: 42px; height: 42px; border-radius: var(--r-md);
   display: grid; place-items: center; flex-shrink: 0;
   box-shadow: inset 0 1px 0 var(--border-subtle);
 }
+/* gap 3px 为 StatCard body 视觉微调固定值 */
 .stat__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .stat__label { font-size: var(--fs-xs); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 .stat__main-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
 .stat__value { font-size: var(--fs-xl); font-weight: 700; color: var(--text); line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+/* margin-left 3px 为视觉微调固定值 */
 .stat__unit { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); margin-left: 3px; }
+/* gap 2px 为 delta 视觉微调固定值 */
 .stat__delta { display: inline-flex; align-items: center; gap: 2px; font-size: var(--fs-xs); font-weight: 600; }
 .stat__delta.is-up { color: var(--success); }
 .stat__delta.is-down { color: var(--fail); }
 .stat__delta.is-flat { color: var(--text-faint); }
 .stat__delta-arrow { transform: rotate(-90deg); }
 .stat__delta.is-down .stat__delta-arrow { transform: rotate(90deg); }
-.stat__trends { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.stat__trends { display: flex; flex-wrap: wrap; gap: var(--sp-1); justify-content: flex-end; }
+/* gap 2px / padding 1px 6px 为 trend 标签视觉规格固定值 */
 .trend { display: inline-flex; align-items: center; gap: 2px; font-size: var(--fs-2xs); font-weight: 700; padding: 1px 6px; border-radius: var(--r-full); line-height: 1.4; white-space: nowrap; }
 .trend.is-up { color: var(--success); background: var(--success-soft); }
 .trend.is-down { color: var(--fail); background: var(--fail-soft); }

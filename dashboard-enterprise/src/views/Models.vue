@@ -8,7 +8,7 @@
       </template>
       <template #stats>
         <!-- Registry overview -->
-        <section v-if="!registryError.value" class="stat-row">
+        <section v-if="!registryError" class="stat-row">
           <StatCard :label="t('view.models.stat.totalModels')" :value="registry.total_models" icon="cpu" tone="brand" :loading="loading" />
           <StatCard :label="t('view.models.enabled')" :value="registry.enabled_models" icon="check-circle" tone="success" :loading="loading" />
           <StatCard :label="t('view.models.stat.providers')" :value="registry.total_providers" icon="server" tone="info" :loading="loading" />
@@ -16,17 +16,17 @@
         </section>
       </template>
       <template #content>
-        <div v-if="registryError.value" class="grid-2">
+        <div v-if="registryError" class="grid-2">
           <EmptyState
 icon="alert-triangle" :title="t('view.models.couldNotLoadRegistry')"
-            :description="registryError.value" />
+            :description="registryError" />
         </div>
 
         <!-- Model registry -->
         <Card
 :title="t('view.models.modelRegistry')" icon="cpu" :margin-bottom="16"
           :subtitle="`${models.length} ` + t('view.models.registeredModels')">
-          <div v-if="modelsError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadModels')" :description="modelsError.value" /></div>
+          <div v-if="modelsError"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadModels')" :description="modelsError" /></div>
           <Skeleton v-else-if="loading" :lines="6" block />
           <DataTable
 v-else :columns="modelCols" :rows="modelRows" :loading="false"
@@ -37,7 +37,7 @@ v-else :columns="modelCols" :rows="modelRows" :loading="false"
         <Card
 :title="t('view.models.providerHealth')" icon="activity" :margin-bottom="16"
           :subtitle="`${providers.length} ` + t('view.models.providersLabel')">
-          <div v-if="providersError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadProviders')" :description="providersError.value" /></div>
+          <div v-if="providersError"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadProviders')" :description="providersError" /></div>
           <Skeleton v-else-if="loading && !providers.length" :lines="5" block />
           <DataTable v-else :columns="providerCols" :rows="providerRows" :empty-text="t('view.models.noProviders')" />
         </Card>
@@ -46,7 +46,7 @@ v-else :columns="modelCols" :rows="modelRows" :loading="false"
         <Card
 :title="t('view.models.agentDrivers')" icon="bot" :margin-bottom="16"
           :subtitle="`${agents.length} ` + t('view.models.agentsLabel')">
-          <div v-if="agentsError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAgents')" :description="agentsError.value" /></div>
+          <div v-if="agentsError"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAgents')" :description="agentsError" /></div>
           <Skeleton v-else-if="loading && !agents.length" :lines="5" block />
           <DataTable v-else :columns="agentCols" :rows="agentRows" :empty-text="t('view.models.noAgents')" />
         </Card>
@@ -54,7 +54,7 @@ v-else :columns="modelCols" :rows="modelRows" :loading="false"
         <div class="grid-2">
           <!-- Budget -->
           <Card :title="t('view.models.budget')" icon="dollar" :margin-bottom="16">
-            <div v-if="budgetError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadBudget')" :description="budgetError.value" /></div>
+            <div v-if="budgetError"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadBudget')" :description="budgetError" /></div>
             <Skeleton v-else-if="loading && !budget.data" :lines="5" block />
             <div v-else-if="budget.data" class="metric-grid">
               <div class="metric"><span class="metric-k">{{ t('view.models.metric.daily') }}</span><span class="metric-v">${{ fmt(budget.data.daily_spend) }} <em>/ ${{ fmt(budget.data.daily_limit) }}</em></span></div>
@@ -68,7 +68,7 @@ v-else :columns="modelCols" :rows="modelRows" :loading="false"
 
           <!-- CLI availability (real /api/model/quota shape) -->
           <Card :title="t('view.models.agentCliAvailability')" icon="wrench" :margin-bottom="16">
-            <div v-if="quotaError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAvailability')" :description="quotaError.value" /></div>
+            <div v-if="quotaError"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadAvailability')" :description="quotaError" /></div>
             <Skeleton v-else-if="loading && !quota.rows.length" :lines="5" block />
             <DataTable v-else :columns="quotaCols" :rows="quota.rows" :empty-text="t('view.models.noAvailability')" />
           </Card>
@@ -78,7 +78,7 @@ v-else :columns="modelCols" :rows="modelRows" :loading="false"
         <Card
 :title="t('view.models.routingPolicies')" icon="route" :margin-bottom="16"
           :subtitle="`${policies.length} ` + t('view.models.policiesLabel')">
-          <div v-if="policiesError.value"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadPolicies')" :description="policiesError.value" /></div>
+          <div v-if="policiesError"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadPolicies')" :description="policiesError" /></div>
           <Skeleton v-else-if="loading && !policies.length" :lines="4" block />
           <DataTable v-else :columns="policyCols" :rows="policyRows" :empty-text="t('view.models.noPolicies')" />
         </Card>

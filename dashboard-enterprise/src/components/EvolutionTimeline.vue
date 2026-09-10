@@ -281,7 +281,7 @@ const nodes = computed(() => {
 }
 .evo-timeline__dot {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   display: grid;
   place-items: center;
   width: 28px;
@@ -295,7 +295,7 @@ const nodes = computed(() => {
 .evo-timeline__dot.is-flat { color: var(--text-faint); border-color: var(--border-strong); }
 /* 阶段模式：成功/失败色点（迭代 C）*/
 .evo-timeline__dot.is-ok { color: var(--success-strong); border-color: var(--success); background: var(--success-soft); }
-.evo-timeline__dot.is-fail { color: var(--fail); border-color: var(--fail); background: var(--fail-soft, rgba(239,68,68,.12)); }
+.evo-timeline__dot.is-fail { color: var(--fail); border-color: var(--fail); background: var(--fail-soft, rgba(248, 81, 73, .15)); }
 .evo-timeline__card {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -353,7 +353,7 @@ const nodes = computed(() => {
 }
 .evo-timeline__badge.is-fail {
   color: var(--fail);
-  background: var(--fail-soft, rgba(239,68,68,.12));
+  background: var(--fail-soft, rgba(248, 81, 73, .15));
   border-color: color-mix(in srgb, var(--fail) 30%, transparent);
 }
 .evo-timeline__metrics {

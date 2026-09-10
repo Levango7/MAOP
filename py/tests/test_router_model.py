@@ -181,6 +181,10 @@ class TestModelAgents:
                             lambda: FakeModelRegistry())
         app = FastAPI()
         from maop.dashboard.routers.model import router
+        @app.middleware("http")
+        async def _inject_admin(request, call_next):
+            request.state.auth_roles = ["admin"]
+            return await call_next(request)
         app.include_router(router)
         data = TestClient(app).get("/api/model/agents").json()
         assert data["agents"] == []

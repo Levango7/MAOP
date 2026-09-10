@@ -155,11 +155,11 @@ from maop.core.backends.db_utils import find_project_root
 # === Config loading cache ============================================
 #
 # High-frequency call point: every dispatch re-reads agent config. Cache the
-# parsed MaopConfig keyed by config directory + max mtime of the YAML files.
+# parsed MaopConfig keyed by config directory + (mtime, size) signature.
 # A hit returns the previously parsed config without touching disk; a miss
-# re-reads and re-parses. Invalidated automatically when any YAML mtime
+# re-reads and re-parses. Invalidated automatically when any YAML mtime/size
 # changes, and cleared explicitly on reload().
-_agent_config_cache: dict[str, tuple[float, MaopConfig]] = {}
+_agent_config_cache: dict[str, tuple[tuple[float, int], MaopConfig]] = {}
 
 # Monotonic version counter for MaopConfig._version (used by hot-reload
 # detection in RouteScorer). next() on itertools.count is atomic under CPython.
@@ -171,21 +171,29 @@ def _next_config_version() -> int:
     return next(_config_version_seq)
 
 
-def _config_signature(config_dir: Path) -> float:
-    """Return the max mtime across the config YAML files (0.0 if none exist).
+def _config_signature(config_dir: Path) -> tuple[float, int]:
+    """Return a (max_mtime, total_size) signature across config YAML files.
 
     If any of agents.yaml / rules.yaml / models.yaml changes, its mtime
     changes and the cache entry is invalidated.
+
+    R4-low fix: previously used mtime alone, which has second-level precision
+    on many filesystems — same-second edits could go undetected. Combining
+    mtime with file size catches same-second content changes (size differs).
+    Returns (0.0, 0) if no config files exist.
     """
     mtimes: list[float] = []
+    total_size: int = 0
     for name in ("agents.yaml", "rules.yaml", "models.yaml"):
         p = config_dir / name
         try:
             if p.exists():
-                mtimes.append(p.stat().st_mtime)
+                st = p.stat()
+                mtimes.append(st.st_mtime)
+                total_size += st.st_size
         except OSError as exc:
             logger.debug("config.loader: stat failed for %s: %s", p, exc)
-    return max(mtimes) if mtimes else 0.0
+    return (max(mtimes) if mtimes else 0.0, total_size)
 
 
 # ── Config loader ─────────────────────────────────────────────
@@ -218,7 +226,7 @@ class ConfigLoader:
         try:
             sig = _config_signature(self._config_dir)
         except OSError:
-            sig = 0.0
+            sig = (0.0, 0)
         cached = _agent_config_cache.get(cache_key)
         if cached is not None and cached[0] == sig:
             return cached[1]

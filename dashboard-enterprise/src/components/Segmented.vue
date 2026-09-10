@@ -54,6 +54,7 @@ function moveTo(i) {
 <style scoped>
 .segmented {
   display: inline-flex;
+  /* padding 3px 为 Segmented 控件视觉规格固定值 */
   padding: 3px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -64,17 +65,20 @@ function moveTo(i) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* gap 5px 为视觉微调固定值，无精确 token 对应 */
   gap: 5px;
   border: none;
   background: transparent;
   color: var(--text-muted);
   border-radius: calc(var(--r-md) - 3px);
+  /* padding 5px 10px 为 Segmented 项视觉规格固定值 */
   padding: 5px 10px;
   font-size: var(--fs-sm);
   font-weight: 600;
   transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
   white-space: nowrap;
 }
+/* padding 3px 8px 为小尺寸 Segmented 项视觉规格固定值 */
 .seg--sm .seg__item { padding: 3px 8px; font-size: var(--fs-xs); }
 .seg__item:hover { color: var(--text); }
 .seg__item.active {

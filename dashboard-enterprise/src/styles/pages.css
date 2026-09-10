@@ -90,7 +90,7 @@
   align-items: flex-start;
   position: relative;
   padding: var(--sp-3) 0;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 .activity-item + .activity-item { border-top: 1px solid var(--border-subtle); }
 .activity-dot {
@@ -102,7 +102,7 @@
   box-shadow: 0 0 0 3px var(--brand-soft);
   flex-shrink: 0;
   margin-top: 4px;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 .activity-body { flex: 1; min-width: 0; }
 .activity-header {
@@ -1006,6 +1006,7 @@ select:not([class]):not([style*="appearance"]) {
 
 /* ── Spinner (shared by loading icons that receive .spinning) ──────────── */
 @keyframes maop-spin { to { transform: rotate(360deg); } }
+/* .9s 为 spinner 标准时长；--motion-slow 偏短(约 .4s)不适合无限旋转动画，保留原值 */
 .spinning { animation: maop-spin .9s linear infinite; transform-origin: center; }
 
 /* ── Standalone button classes ───────────────────────────────────────────
@@ -1036,7 +1037,7 @@ select:not([class]):not([style*="appearance"]) {
 .btn--primary.is-busy::after, .btn--danger.is-busy::after, .btn--warn.is-busy::after, .btn--ghost.is-busy::after {
   content: ""; position: absolute; width: 14px; height: 14px;
   border: 2px solid var(--text-muted); border-top-color: transparent;
-  border-radius: 50%; animation: maop-spin .7s linear infinite;
+  border-radius: 50%; animation: maop-spin .7s linear infinite; /* .7s 为按钮内 spinner 标准时长，--motion-slow 不适用无限旋转 */
 }
 
 /* Skeleton placeholder block (Logs / Tools / Cost) */

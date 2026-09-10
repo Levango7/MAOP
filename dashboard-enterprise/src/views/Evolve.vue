@@ -622,7 +622,7 @@ onMounted(() => {
   box-shadow: 0 0 0 1px var(--border-strong);
   background: var(--text-faint);
   flex-shrink: 0;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 .evolve-milestones__node--perf       .evolve-milestones__dot { background: var(--success); box-shadow: 0 0 0 1px var(--success); }
 .evolve-milestones__node--behavior   .evolve-milestones__dot { background: var(--info); box-shadow: 0 0 0 1px var(--info); }
@@ -745,7 +745,7 @@ onMounted(() => {
     font-size: var(--fs-sm);
   }
 }
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .evolve-milestones__impact {
     flex-direction: column;
     align-items: flex-start;

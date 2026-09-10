@@ -226,6 +226,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
 .cmdpal__empty { padding: var(--sp-6); text-align: center; color: var(--text-faint); font-size: var(--fs-sm); }
 
-.palette-enter-active, .palette-leave-active { transition: opacity .15s var(--ease); }
+.palette-enter-active, .palette-leave-active { transition: opacity var(--motion-fast) var(--ease); }
 .palette-enter-from, .palette-leave-to { opacity: 0; }
 </style>

@@ -242,12 +242,20 @@ class TestFactoryFunctions:
         assert isinstance(backend, SQLiteQueueBackend)
 
     def test_fallback_on_missing_vault(self, monkeypatch):
-        """Vault secret backend degrades to local when vault unavailable.
+        """Vault secret backend fail-fast by default; degrades to local only
+        when MAOP_SECRET_ALLOW_FALLBACK=1.
 
-        Note: vault backend does not have fail-fast (D1/D2 scope was
-        cache/queue/kv/storage only). ImportError → graceful degrade.
+        Batch3D: secret backend now follows the same fail-fast policy as
+        storage/cache/queue/kv — RuntimeError unless explicitly opted in.
         """
         monkeypatch.setenv("MAOP_SECRET_BACKEND", "vault")
+        monkeypatch.delenv("MAOP_SECRET_ALLOW_FALLBACK", raising=False)
+        # Default: fail-fast (RuntimeError) when vault unavailable.
+        with pytest.raises(RuntimeError, match="Vault secrets backend"):
+            get_secret_backend()
+        # Explicit opt-in restores the legacy degrade behaviour.
+        reset_backends()
+        monkeypatch.setenv("MAOP_SECRET_ALLOW_FALLBACK", "1")
         backend = get_secret_backend()
         assert isinstance(backend, LocalSecretBackend)
 

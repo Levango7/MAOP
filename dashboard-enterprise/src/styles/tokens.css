@@ -128,7 +128,7 @@
   --fs-lg: 16px;  --fs-lg-plus: 17px;  --fs-xl: 18px;  --fs-2xl: 22px;
 
   /* ── Z-index scale ───────────────────────────────────────────────────── */
-  --z-base: 0;  --z-sticky: 30;  --z-drawer: 40;  --z-topbar: 50;
+  --z-base: 0;  --z-sticky: 30;  --z-sidebar: 40;  --z-drawer: 40;  --z-topbar: 50;
   --z-overlay: 80;  --z-modal: 90;  --z-toast: 100;
   /* F32: fixed 顶栏层级（低于侧栏 z-index:20，侧栏展开覆盖顶栏左侧品牌区）。
    * --z-topbar (50) 用于 sticky/文档流顶栏；fixed 全宽顶栏用此独立 token。 */
@@ -154,8 +154,6 @@
   --row-h: 36px;        /* JB 密度基准: 36px 行高而不是 44px */
   --topbar-h: 56px;     /* 收窄顶栏, 让位给内容 */
 
-  /* ── z-index ──────────────────────────────────────────────────────────── */
-  --z-sidebar: 40; --z-topbar: 50; --z-drawer: 60; --z-toast: 80; --z-modal: 90;
 
   /* ── 无辉光策略 — 全部置为 none/透明 ─────────────────────────────────────
    * 辉光是"AI 模板感"的最大来源。JetBrains 式界面顶栏/卡片没有任何光晕,

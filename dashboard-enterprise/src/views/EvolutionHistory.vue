@@ -747,7 +747,7 @@ onMounted(() => {
   gap: 6px;
   padding: 6px 12px;
   border: 1px solid var(--border, rgba(148,163,184,.45));
-  background: var(--surface, #fff);
+  background: var(--surface, #22242a);
   border-radius: 5px;
   cursor: pointer;
   font-size: var(--fs-base);

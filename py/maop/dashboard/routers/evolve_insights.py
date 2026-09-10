@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
@@ -45,7 +46,8 @@ class EvolutionLoopRollbackRequest(BaseModel):
 
 @router.get("/api/evolve/status")
 @handle_api_errors("Evolve status", error_value={"status": "error", "error": "Evolve status unavailable"})
-async def api_evolve_status() -> dict[str, Any]:
+async def api_evolve_status(request: Request) -> dict[str, Any]:
+    require_admin(request)
     from maop.evolve import EvolveEngine
     eng = EvolveEngine(root_dir=str(MAOP_ROOT))
     data: Any = eng.status()
@@ -58,11 +60,12 @@ async def api_evolve_status() -> dict[str, Any]:
 
 @router.get("/api/evolve/metrics")
 @handle_api_errors("Evolve metrics", error_value={"timeseries": [], "heatmap": [], "lineage": []})
-async def api_evolve_metrics() -> dict[str, Any]:
+async def api_evolve_metrics(request: Request) -> dict[str, Any]:
     """演化指标聚合（时间序列 / 热力图 / 世系）。
 
     从 evolution_cycles 表聚合真实数据；优先 EvolutionLoop，空回退 EvolveEngine。
     """
+    require_admin(request)
     from maop.core.evolution.evolution_loop import EvolutionLoop
 
     try:
@@ -187,7 +190,8 @@ async def api_evolve_analyze(request: Request, body: EvolveAnalyzeRequest) -> di
 
 @router.get("/api/evolve/suggestions")
 @handle_api_errors("Evolve suggestions", error_value={"status": "error", "error": "Evolve suggestions unavailable", "suggestions": {"stats": {"by_agent": []}}})
-async def api_evolve_suggestions() -> dict[str, Any]:
+async def api_evolve_suggestions(request: Request) -> dict[str, Any]:
+    require_admin(request)
     from maop.evolve import EvolveEngine
     eng = EvolveEngine(root_dir=str(MAOP_ROOT))
     s: Any = eng.suggest() if hasattr(eng, "suggest") else {}
@@ -212,7 +216,8 @@ async def api_evolve_suggestions() -> dict[str, Any]:
 
 @router.get("/api/evolve/report")
 @handle_api_errors("Evolve report", error_value={"performance": [], "error": "Evolve report unavailable"})
-async def api_evolve_report_v4() -> dict[str, Any]:
+async def api_evolve_report_v4(request: Request) -> dict[str, Any]:
+    require_admin(request)
     from .state import get_bridge
     b = get_bridge()
     agents = await b.agent_stats()
@@ -235,8 +240,9 @@ async def api_evolve_report_v4() -> dict[str, Any]:
 
 @router.get("/api/evolve/strategies")
 @handle_api_errors("Evolve strategies", error_value={"status": "error", "strategies": []})
-async def api_evolve_strategies() -> dict[str, Any]:
+async def api_evolve_strategies(request: Request) -> dict[str, Any]:
     """返回可用进化策略列表。"""
+    require_admin(request)
     from maop.core.evolution.evolution_strategies import STRATEGY_MAP
     strategies = [
         {"name": name, "description": cls.__doc__ or cls.__name__}
@@ -246,8 +252,9 @@ async def api_evolve_strategies() -> dict[str, Any]:
 
 @router.get("/api/evolve/history")
 @handle_api_errors("Evolve history", error_value={"status": "error", "history": []})
-async def api_evolve_history() -> dict[str, Any]:
+async def api_evolve_history(request: Request) -> dict[str, Any]:
     """返回进化循环历史。"""
+    require_admin(request)
     try:
         from maop.core.evolution.evolution_loop import EvolutionLoop
         loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
@@ -263,8 +270,9 @@ async def api_evolve_history() -> dict[str, Any]:
 
 @router.get("/api/evolve/suggestions-list")
 @handle_api_errors("Evolve suggestions list", error_value={"status": "error", "suggestions": []})
-async def api_evolve_suggestions_list() -> dict[str, Any]:
+async def api_evolve_suggestions_list(request: Request) -> dict[str, Any]:
     """返回所有进化建议列表 (含已应用状态)。"""
+    require_admin(request)
     from maop.evolve import EvolveEngine
     eng = EvolveEngine(root_dir=str(MAOP_ROOT))
     suggestions = eng._load_suggestions()
@@ -296,7 +304,7 @@ async def api_evolve_apply_suggestion(request: Request) -> dict[str, Any]:
 
 @router.get("/api/evolution/loop/status")
 @handle_api_errors("Evolution loop status", error_value={"status": "error", "error": "Status unavailable"})
-async def api_evolution_loop_status() -> dict[str, Any]:
+async def api_evolution_loop_status(request: Request) -> dict[str, Any]:
     """闭环状态机当前状态 + 最近 cycle 摘要 (AC-07).
 
     返回：
@@ -305,6 +313,7 @@ async def api_evolution_loop_status() -> dict[str, Any]:
     - 待审批数量
     - 开关状态 (MAOP_EVOLUTION_LOOP_ENABLED)
     """
+    require_admin(request)
     from maop.core.evolution.evolution_loop import EvolutionLoop
     import os
 
@@ -365,11 +374,12 @@ async def api_evolution_loop_trigger(request: Request, body: EvolutionLoopTrigge
 
 @router.get("/api/evolution/approvals")
 @handle_api_errors("Evolution approvals", error_value={"status": "error", "approvals": []})
-async def api_evolution_approvals() -> dict[str, Any]:
+async def api_evolution_approvals(request: Request) -> dict[str, Any]:
     """待审批改进列表 (AC-07).
 
     返回所有处于 pending_approval 状态的建议，含建议详情和上下文。
     """
+    require_admin(request)
     from maop.core.evolution.evolution_loop import EvolutionLoop
 
     try:
@@ -410,14 +420,20 @@ async def api_evolution_approval_decision(approval_id: str, request: Request, bo
     try:
         cycle_id, suggestion_id = approval_id.split(":", 1)
     except ValueError:
-        return {"status": "error", "error": "Invalid approval_id format (cycle_id:suggestion_id)"}
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "error": "Invalid approval_id format (cycle_id:suggestion_id)"},
+        )
 
     decision = body.decision.lower()
     approved_by = body.approved_by
     reason = body.reason
 
     if decision not in ("approve", "reject"):
-        return {"status": "error", "error": "decision must be 'approve' or 'reject'"}
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "error": "decision must be 'approve' or 'reject'"},
+        )
 
     # 这里简化实现：仅更新 LoopReport 的 approval_state
     # 完整实现需持久化审批记录、触发后续 APPLY/AB 流程
@@ -449,7 +465,7 @@ async def api_evolution_approval_decision(approval_id: str, request: Request, bo
 
 @router.get("/api/evolution/ab/{cycle_id}")
 @handle_api_errors("Evolution A/B results", error_value={"status": "error", "ab_result": None})
-async def api_evolution_ab_results(cycle_id: str) -> dict[str, Any]:
+async def api_evolution_ab_results(request: Request, cycle_id: str) -> dict[str, Any]:
     """A/B 结果与显著性检验数据 (AC-06/AC-07).
 
     返回：
@@ -458,6 +474,7 @@ async def api_evolution_ab_results(cycle_id: str) -> dict[str, Any]:
     - Z 检验 p-value
     - SPRT 状态（如适用）
     """
+    require_admin(request)
     from maop.core.evolution.evolution_loop import EvolutionLoop
     from maop.core.evolution.ab_test import ABTestManager
 

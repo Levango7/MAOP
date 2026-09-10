@@ -30,6 +30,7 @@ defineProps({
 .empty__icon {
   display: grid;
   place-items: center;
+  /* 56px 为 EmptyState 图标容器视觉规格固定值 */
   width: 56px;
   height: 56px;
   margin-bottom: var(--sp-3);
@@ -40,6 +41,7 @@ defineProps({
   opacity: .85;
 }
 .empty__title { font-size: var(--fs-md); font-weight: 600; color: var(--text-muted); }
+/* max-width 320px 为 EmptyState 描述文本视觉规格固定值 */
 .empty__desc { font-size: var(--fs-sm); max-width: 320px; line-height: 1.55; }
 .empty__actions { margin-top: var(--sp-3); display: flex; gap: var(--sp-2); }
 </style>

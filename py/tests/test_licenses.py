@@ -490,7 +490,7 @@ class TestLicensesRouter:
     @pytest.mark.asyncio
     async def test_create_and_list(self, admin_request):
         from maop.dashboard.routers.licenses import create_license, list_licenses
-        body = {"customer": "ACME Corp", "expires_at": _future_iso(365)}
+        body = LicenseCreateRequest(customer="ACME Corp", expires_at=_future_iso(365))
         result = await create_license(admin_request, body)
         assert result["status"] == "ok"
         license_id = result["license"]["license_id"]
@@ -502,7 +502,7 @@ class TestLicensesRouter:
     @pytest.mark.asyncio
     async def test_create_and_get(self, admin_request):
         from maop.dashboard.routers.licenses import create_license, get_license
-        body = {"customer": "ACME", "expires_at": _future_iso(365), "max_users": 50}
+        body = LicenseCreateRequest(customer="ACME", expires_at=_future_iso(365), max_users=50)
         created = await create_license(admin_request, body)
         license_id = created["license"]["license_id"]
         got = await get_license(license_id, admin_request)
@@ -523,33 +523,33 @@ class TestLicensesRouter:
     @pytest.mark.asyncio
     async def test_validate_endpoint(self, admin_request):
         from maop.dashboard.routers.licenses import create_license, validate_license
-        body = {"customer": "ACME", "expires_at": _future_iso(365)}
+        body = LicenseCreateRequest(customer="ACME", expires_at=_future_iso(365))
         created = await create_license(admin_request, body)
         key = created["license"]["license_key"]
-        result = await validate_license(admin_request, {"license_key": key})
+        result = await validate_license(admin_request, LicenseValidateRequest(license_key=key))
         assert result["status"] == "ok"
         assert result["validation"]["valid"] is True
 
     @pytest.mark.asyncio
     async def test_revoke_endpoint(self, admin_request):
         from maop.dashboard.routers.licenses import create_license, revoke_license
-        body = {"customer": "ACME", "expires_at": _future_iso(365)}
+        body = LicenseCreateRequest(customer="ACME", expires_at=_future_iso(365))
         created = await create_license(admin_request, body)
         license_id = created["license"]["license_id"]
-        result = await revoke_license(license_id, admin_request, {"reason": "test", "actor": "admin"})
+        result = await revoke_license(license_id, admin_request, LicenseRevokeRequest(reason="test", actor="admin"))
         assert result["status"] == "ok"
         assert result["license"]["status"] == "revoked"
 
     @pytest.mark.asyncio
     async def test_renew_endpoint(self, admin_request):
         from maop.dashboard.routers.licenses import create_license, renew_license
-        body = {"customer": "ACME", "expires_at": _future_iso(30)}
+        body = LicenseCreateRequest(customer="ACME", expires_at=_future_iso(30))
         created = await create_license(admin_request, body)
         license_id = created["license"]["license_id"]
         original_key = created["license"]["license_key"]
         result = await renew_license(
             license_id, admin_request,
-            {"new_expires_at": _future_iso(365), "actor": "admin"},
+            LicenseRenewRequest(new_expires_at=_future_iso(365), actor="admin"),
         )
         assert result["status"] == "ok"
         assert result["license"]["license_key"] != original_key
@@ -557,12 +557,12 @@ class TestLicensesRouter:
     @pytest.mark.asyncio
     async def test_update_endpoint(self, admin_request):
         from maop.dashboard.routers.licenses import create_license, update_license
-        body = {"customer": "ACME", "expires_at": _future_iso(365)}
+        body = LicenseCreateRequest(customer="ACME", expires_at=_future_iso(365))
         created = await create_license(admin_request, body)
         license_id = created["license"]["license_id"]
         result = await update_license(
             license_id, admin_request,
-            {"customer": "ACME Corp", "notes": "updated"},
+            LicenseUpdateRequest(customer="ACME Corp", notes="updated"),
         )
         assert result["status"] == "ok"
         assert result["license"]["customer"] == "ACME Corp"
@@ -578,7 +578,7 @@ class TestLicensesRouter:
             get_license,
             list_licenses,
         )
-        body = {"customer": "ACME", "expires_at": _future_iso(365)}
+        body = LicenseCreateRequest(customer="ACME", expires_at=_future_iso(365))
         created = await create_license(admin_request, body)
         license_id = created["license"]["license_id"]
         result = await delete_license(license_id, admin_request)
@@ -599,10 +599,10 @@ class TestLicensesRouter:
             get_license_audit,
             revoke_license,
         )
-        body = {"customer": "ACME", "expires_at": _future_iso(365)}
+        body = LicenseCreateRequest(customer="ACME", expires_at=_future_iso(365))
         created = await create_license(admin_request, body)
         license_id = created["license"]["license_id"]
-        await revoke_license(license_id, admin_request, {"reason": "test"})
+        await revoke_license(license_id, admin_request, LicenseRevokeRequest(reason="test"))
         result = await get_license_audit(license_id, admin_request, limit=100, offset=0)
         assert result["status"] == "ok"
         assert result["count"] == 2  # created + revoked
@@ -617,10 +617,10 @@ class TestLicensesRouter:
             list_audit_logs,
             revoke_license,
         )
-        body = {"customer": "ACME", "expires_at": _future_iso(365)}
+        body = LicenseCreateRequest(customer="ACME", expires_at=_future_iso(365))
         created = await create_license(admin_request, body)
         license_id = created["license"]["license_id"]
-        await revoke_license(license_id, admin_request, {"reason": "x"})
+        await revoke_license(license_id, admin_request, LicenseRevokeRequest(reason="x"))
         result = await list_audit_logs(
             admin_request, license_id="", action="", limit=100, offset=0,
         )
