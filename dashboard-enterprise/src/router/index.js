@@ -140,6 +140,8 @@ function hydrateEditionFromConfig() {
   if (editionConfigHydrated) return;
   editionConfigHydrated = true;
   // M5 fix: 使用 fetchWithTimeout 添加超时保护，防止后端无响应时 hydrate 永久挂起
+  // P2-10: 刻意不使用 withAuth —— /api/info/config 是公开端点，无需认证即可访问。
+  // 在冷加载场景下用户可能尚未登录，使用 withAuth 反而会因缺少 cookie 导致请求失败。
   fetchWithTimeout('/api/info/config')
     .then((res) => (res.ok ? res.json() : null))
     .then((data) => {

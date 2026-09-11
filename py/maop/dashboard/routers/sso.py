@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -54,40 +55,48 @@ def _require_sso() -> None:
 # ── Registry 单例（懒加载） ─────────────────────────────────────────
 _registry: Any = None
 _sso_manager: Any = None  # 向后兼容：单 IdP 模式
+_registry_lock = threading.Lock()
+_sso_manager_lock = threading.Lock()
 
 
 def _get_registry() -> Any:
     """获取 SSOProviderRegistry 单例。"""
+    # P1-18: 双重检查锁定保护单例初始化
     global _registry
     if _registry is None:
-        from maop.enterprise.sso_registry import SSOProviderRegistry
-        _registry = SSOProviderRegistry()
-        # PRD NFR-C03：启动时从环境变量导入单 IdP 配置（向后兼容）
-        try:
-            from maop.enterprise.sso_store import import_env_provider_if_present
-            import_env_provider_if_present(_registry.store)
-        except Exception as exc:  # pragma: no cover — 防御性
-            logger.warning("[sso] Failed to import env-based provider: %s", exc)
+        with _registry_lock:
+            if _registry is None:
+                from maop.enterprise.sso_registry import SSOProviderRegistry
+                _registry = SSOProviderRegistry()
+                # PRD NFR-C03：启动时从环境变量导入单 IdP 配置（向后兼容）
+                try:
+                    from maop.enterprise.sso_store import import_env_provider_if_present
+                    import_env_provider_if_present(_registry.store)
+                except Exception as exc:  # pragma: no cover — 防御性
+                    logger.warning("[sso] Failed to import env-based provider: %s", exc)
     return _registry
 
 
 def _get_manager() -> Any:
     """向后兼容：单 IdP 模式从环境变量加载 SSOManager。"""
+    # P1-18: 双重检查锁定保护单例初始化
     global _sso_manager
     if _sso_manager is None:
-        from maop.enterprise.sso import SSOConfig, SSOManager, SSOProvider
-        provider = SSOProvider(os.getenv("MAOP_SSO_PROVIDER", "oidc"))
-        config = SSOConfig(
-            provider=provider,
-            client_id=os.getenv("MAOP_SSO_CLIENT_ID", ""),
-            client_secret=os.getenv("MAOP_SSO_CLIENT_SECRET", ""),
-            authorize_url=os.getenv("MAOP_SSO_AUTHORIZE_URL", ""),
-            token_url=os.getenv("MAOP_SSO_TOKEN_URL", ""),
-            userinfo_url=os.getenv("MAOP_SSO_USERINFO_URL", ""),
-            redirect_uri=os.getenv("MAOP_SSO_REDIRECT_URI", ""),
-            scopes=[s.strip() for s in os.getenv("MAOP_SSO_SCOPES", "openid profile email").split(",")],
-        )
-        _sso_manager = SSOManager(config=config)
+        with _sso_manager_lock:
+            if _sso_manager is None:
+                from maop.enterprise.sso import SSOConfig, SSOManager, SSOProvider
+                provider = SSOProvider(os.getenv("MAOP_SSO_PROVIDER", "oidc"))
+                config = SSOConfig(
+                    provider=provider,
+                    client_id=os.getenv("MAOP_SSO_CLIENT_ID", ""),
+                    client_secret=os.getenv("MAOP_SSO_CLIENT_SECRET", ""),
+                    authorize_url=os.getenv("MAOP_SSO_AUTHORIZE_URL", ""),
+                    token_url=os.getenv("MAOP_SSO_TOKEN_URL", ""),
+                    userinfo_url=os.getenv("MAOP_SSO_USERINFO_URL", ""),
+                    redirect_uri=os.getenv("MAOP_SSO_REDIRECT_URI", ""),
+                    scopes=[s.strip() for s in os.getenv("MAOP_SSO_SCOPES", "openid profile email").split(",")],
+                )
+                _sso_manager = SSOManager(config=config)
     return _sso_manager
 
 

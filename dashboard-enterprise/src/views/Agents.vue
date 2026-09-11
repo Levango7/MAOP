@@ -71,7 +71,7 @@
           </div>
         </div>
       </div>
-      <EmptyState v-else icon="route" :title="t('view.agents.noRoutes')" :hint="t('view.agents.noRoutesHint')" />
+      <EmptyState v-else icon="route" :title="t('view.agents.noRoutes')" :description="t('view.agents.noRoutesHint')" />
 
       <!-- Section 2: 最近的实际路由执行记录 -->
       <h4 class="dispatch-section-title">
@@ -131,7 +131,7 @@
           </div>
         </div>
       </div>
-      <EmptyState v-else icon="search" :title="t('view.agents.noScanned')" :hint="t('view.agents.noScannedHint')" />
+      <EmptyState v-else icon="search" :title="t('view.agents.noScanned')" :description="t('view.agents.noScannedHint')" />
     </Card>
 
     <div v-if="viewMode === 'grid'" class="agent-grid">
@@ -205,7 +205,7 @@
             <button class="act-btn small danger" :disabled="!isAdmin" :title="t('view.agents.remove')" :aria-label="t('view.agents.remove')" @click="confirmRemove(a)"><AppIcon name="trash" :size="13" aria-hidden="true" /></button>
           </span>
         </div>
-        <EmptyState v-if="!agents.length" icon="bot" :title="t('view.agents.noAgentsFound')" :hint="t('view.agents.noAgentsFoundHint')" />
+        <EmptyState v-if="!agents.length" icon="bot" :title="t('view.agents.noAgentsFound')" :description="t('view.agents.noAgentsFoundHint')" />
       </div>
     </Card>
 
@@ -242,7 +242,7 @@
       </div>
     </Card>
 
-    <EmptyState v-if="!loading && !agents.length" icon="bot" :title="t('view.agents.noAgents')" :hint="t('view.agents.noAgentsHint')" />
+    <EmptyState v-if="!loading && !agents.length" icon="bot" :title="t('view.agents.noAgents')" :description="t('view.agents.noAgentsHint')" />
 
     <!-- 记忆面板 -->
     <DetailDrawer

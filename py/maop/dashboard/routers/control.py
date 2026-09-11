@@ -53,6 +53,12 @@ async def control_status(request: Request) -> dict[str, Any]:
                 if proc.returncode is not None:
                     job["status"] = "completed" if proc.returncode == 0 else "failed"
                     job["exit_code"] = proc.returncode
+                    # P0-8: 进程已结束，清理 _drain_task 防止内存泄漏。
+                    # communicate() 返回的 task 在进程结束后仍被引用，
+                    # 不会被 GC 回收，长期累积导致内存泄漏。
+                    drain_task = job.pop("_drain_task", None)
+                    if drain_task is not None and not drain_task.done():
+                        drain_task.cancel()
                 else:
                     job["status"] = "running"
             jobs.append({k: v for k, v in job.items() if k != "process"})
@@ -65,7 +71,8 @@ async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     actual_task = body.task or body.workflow or "default"
     # P1: task 参数字符集白名单校验，防止注入非法字符（与 workflow.py:60-63 对齐）
-    if not re.match(r"^[\w\s\.\-]+$", actual_task):
+    # P2-22: \s 允许换行符(\n)，改为显式空格字符避免多行注入
+    if not re.match(r"^[\w\.\- ]+$", actual_task):
         raise HTTPException(
             status_code=400,
             detail="invalid task name: only alphanumeric, spaces, dots, hyphens, underscores allowed",
@@ -223,7 +230,7 @@ async def control_cancel(body: CancelRequest, request: Request) -> dict[str, Any
                 proc.terminate()
             active_jobs[job_id]["status"] = "cancelled"
             return {"status": "ok", "job_id": job_id}
-    raise HTTPException(404, "job not found")
+    raise HTTPException(status_code=404, detail="job not found")
 
 @router.post("/api/control/refresh")
 @handle_api_errors("control refresh")

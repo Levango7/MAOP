@@ -17,6 +17,7 @@ This prevents cross-tenant privilege escalation via forged body parameters.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -38,13 +39,17 @@ router = APIRouter(prefix="/api/rbac", tags=["rbac"])
 # 路由层再加一道显式守卫（双层防护）：即便 manager __init__ 守卫被绕过，
 # 每个端点仍会在入口处检查 FeatureFlag.RBAC，确保 Personal 版返回 404。
 _rbac_manager: Any = None
+_rbac_manager_lock = threading.Lock()
 
 
 def _get_manager() -> Any:
+    # P1-18: 双重检查锁定保护单例初始化
     global _rbac_manager
     if _rbac_manager is None:
-        from maop.enterprise.rbac import RBACManager
-        _rbac_manager = RBACManager()
+        with _rbac_manager_lock:
+            if _rbac_manager is None:
+                from maop.enterprise.rbac import RBACManager
+                _rbac_manager = RBACManager()
     return _rbac_manager
 
 
@@ -86,6 +91,7 @@ async def list_grants(
     """List all RBAC role grants, optionally filtered by user or tenant.
 
     G-07: tenant_id is taken from JWT, not from query/body parameters.
+    P1-19: 非管理员只能查看自己的授权，不能列举所有用户授权。
     """
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.RBAC):
@@ -95,6 +101,11 @@ async def list_grants(
         )
     # G-07: tenant_id from JWT, not from query param.
     tenant_id = _tenant_id_from_jwt(request)
+    # P1-19: 非管理员只能查看自己的授权 — 防止越权列举所有用户授权
+    current_user = _current_user(request)
+    is_admin = _is_admin(request)
+    if not is_admin:
+        user_id = current_user  # 强制非管理员只能查看自己的授权
     mgr = _get_manager()
     grants = mgr.list_grants(user_id=user_id, tenant_id=tenant_id)
     return {
@@ -108,23 +119,22 @@ async def list_grants(
 @handle_api_errors
 async def grant_role(body: GrantRequest, request: Request) -> dict[str, Any]:
     """Grant a role to a user. Requires admin."""
-    require_admin(request)
-    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    # P1-12: 特性守卫在 require_admin 之前 — Personal 版返回 404 而非 403，
+    # 避免泄露路由存在性
     if not has_feature(FeatureFlag.RBAC):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="RBAC not available in this edition",
         )
+    require_admin(request)
     from maop.enterprise.rbac import Role
     try:
         role = Role(body.role)
     except ValueError:
-        return JSONResponse(
+        # P1-11: 使用 raise HTTPException 代替 JSONResponse，统一错误处理
+        raise HTTPException(
             status_code=400,
-            content={
-                "status": "error",
-                "error": f"Invalid role '{body.role}'. Valid: {[r.value for r in Role]}",
-            },
+            detail=f"Invalid role '{body.role}'. Valid: {[r.value for r in Role]}",
         )
     mgr = _get_manager()
     # G-07: tenant_id from JWT, not from body.
@@ -141,23 +151,22 @@ async def grant_role(body: GrantRequest, request: Request) -> dict[str, Any]:
 @handle_api_errors
 async def revoke_role(body: RevokeRequest, request: Request) -> dict[str, Any]:
     """Revoke a role from a user. Requires admin."""
-    require_admin(request)
-    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
+    # P1-12: 特性守卫在 require_admin 之前 — Personal 版返回 404 而非 403，
+    # 避免泄露路由存在性
     if not has_feature(FeatureFlag.RBAC):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="RBAC not available in this edition",
         )
+    require_admin(request)
     from maop.enterprise.rbac import Role
     try:
         role = Role(body.role)
     except ValueError:
-        return JSONResponse(
+        # P1-11: 使用 raise HTTPException 代替 JSONResponse，统一错误处理
+        raise HTTPException(
             status_code=400,
-            content={
-                "status": "error",
-                "error": f"Invalid role '{body.role}'. Valid: {[r.value for r in Role]}",
-            },
+            detail=f"Invalid role '{body.role}'. Valid: {[r.value for r in Role]}",
         )
     mgr = _get_manager()
     # G-07: tenant_id from JWT, not from body.
@@ -227,3 +236,8 @@ def _current_user(request: Request) -> str:
     """Extract user_id from request state (set by auth middleware)."""
     # P1-14 fix: middleware sets auth_identity, not auth_user
     return getattr(request.state, "auth_identity", "") or ""
+
+def _is_admin(request: Request) -> bool:
+    """Check if the current user has admin/superadmin role."""
+    roles = getattr(request.state, "auth_roles", None) or []
+    return bool({"admin", "superadmin"} & set(roles))

@@ -24,13 +24,16 @@ Enhancement (audit-enhancement PRD):
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import threading
 import time as _time
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse, Response
+from pydantic import ValidationError
 
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
@@ -40,7 +43,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
-_MAOP_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+# P2-24: 统一使用 state.MAOP_ROOT，避免各路由器路径计算层数不一致
+try:
+    from maop.dashboard.routers.state import MAOP_ROOT as _MAOP_ROOT
+except ImportError:  # pragma: no cover — state 模块不可用时回退
+    _MAOP_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 def _get_personal_events(
@@ -89,14 +96,36 @@ def _get_personal_summary() -> dict[str, Any]:
 # ── Enterprise helpers ────────────────────────────────────────────
 
 _enterprise_logger: Any = None
+_enterprise_logger_lock = threading.Lock()
 
 
 def _get_enterprise_logger() -> Any:
+    # P1-18: 双重检查锁定保护单例初始化
     global _enterprise_logger
     if _enterprise_logger is None:
-        from maop.enterprise.audit import EnterpriseAuditLogger
-        _enterprise_logger = EnterpriseAuditLogger()
+        with _enterprise_logger_lock:
+            if _enterprise_logger is None:
+                from maop.enterprise.audit import EnterpriseAuditLogger
+                _enterprise_logger = EnterpriseAuditLogger()
     return _enterprise_logger
+
+
+def _iter_enterprise_events(mgr: Any) -> list[Any]:
+    """安全获取企业审计事件列表。
+
+    P0-1: 优先调用公开方法 ``iter_events()``（若可用），
+    否则回退到 ``query()`` 公开 API，避免直接访问 ``_events`` 私有属性。
+    """
+    # 优先使用公开 iter_events() 方法
+    iter_fn = getattr(mgr, "iter_events", None)
+    if callable(iter_fn):
+        try:
+            return list(iter_fn())
+        except Exception as exc:
+            logger.debug("iter_events() failed, falling back to query(): %s", exc)
+    # 回退到 query() 公开 API，limit 取 _max_events 上限以保证完整
+    max_limit = getattr(mgr, "_max_events", 100000)
+    return mgr.query(limit=max_limit)
 
 
 def _filter_enterprise_events(
@@ -110,7 +139,9 @@ def _filter_enterprise_events(
     offset: int = 0,
 ) -> tuple[list[Any], int]:
     since = _time.time() - hours * 3600
-    events = [e for e in mgr._events if e.timestamp >= since]
+    # P0-1: 使用 _iter_enterprise_events 避免直接访问 mgr._events
+    all_events = _iter_enterprise_events(mgr)
+    events = [e for e in all_events if e.timestamp >= since]
     if tenant_id:
         events = [e for e in events if e.tenant_id == tenant_id]
     if action:
@@ -138,23 +169,33 @@ def _ws_broadcast_alert(alert: dict[str, Any]) -> Any:
         broadcast = getattr(_server, "_ws_broadcast", None)
         if broadcast is None:
             return None
-        import asyncio
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
+        # P0-2: asyncio.get_event_loop() 在 Python 3.12+ 已弃用。
+        # 使用 get_running_loop() 获取正在运行的循环；若没有运行中的
+        # 事件循环则跳过广播（避免创建新循环的副作用）。
+        try:
+            asyncio.get_running_loop()
             asyncio.ensure_future(broadcast({"type": "audit_alert", "alert": alert}))
-        else:
-            loop.run_until_complete(broadcast({"type": "audit_alert", "alert": alert}))
+        except RuntimeError:
+            # 没有正在运行的事件循环 — 无法安全广播，跳过
+            logger.debug("ws_broadcast_alert skipped: no running event loop")
     except Exception as exc:
         logger.debug("ws_broadcast_alert skipped: %s", exc)
     return None
 
 
+_alert_engine: Any = None
+_alert_engine_lock = threading.Lock()
+
+
 def _get_alert_engine() -> Any:
     """Lazy-init the singleton AuditAlertEngine (enterprise only)."""
+    # P1-18: 双重检查锁定保护单例初始化
     global _alert_engine
     if _alert_engine is None:
-        from maop.enterprise.audit_enhanced import AuditAlertEngine
-        _alert_engine = AuditAlertEngine(broadcaster=_ws_broadcast_alert)
+        with _alert_engine_lock:
+            if _alert_engine is None:
+                from maop.enterprise.audit_enhanced import AuditAlertEngine
+                _alert_engine = AuditAlertEngine(broadcaster=_ws_broadcast_alert)
     return _alert_engine
 
 
@@ -288,7 +329,9 @@ def _collect_enterprise_events(
     """Return up to ``limit`` AuditEvent objects from the enterprise logger."""
     mgr = _get_enterprise_logger()
     since = _time.time() - hours * 3600
-    events = [e for e in mgr._events if e.timestamp >= since]
+    # P0-1: 使用 _iter_enterprise_events 避免直接访问 mgr._events
+    all_events = _iter_enterprise_events(mgr)
+    events = [e for e in all_events if e.timestamp >= since]
     if tenant_id:
         events = [e for e in events if e.tenant_id == tenant_id]
     return events[-limit:]
@@ -306,7 +349,11 @@ async def advanced_query(request: Request, body: dict[str, Any]) -> dict[str, An
     from maop.enterprise.audit_enhanced import AuditEventQuery
     from maop.enterprise.audit_enhanced import filter_events as _filter
 
-    query = AuditEventQuery(**body)
+    # P0-3: 使用 Pydantic 模型校验请求体，ValidationError → 422
+    try:
+        query = AuditEventQuery(**body)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid query body: {exc}")
     events = _collect_enterprise_events(
         tenant_id=query.tenant_id,
         hours=int(max(1, (_time.time() - query.since) // 3600)) if query.since else 24,
@@ -429,7 +476,11 @@ async def create_alert_rule(request: Request, body: dict[str, Any]) -> dict[str,
     _require_audit_feature()
     from maop.enterprise.audit_enhanced import AuditAlertRuleCreate
 
-    create = AuditAlertRuleCreate(**body)
+    # P0-3: 使用 Pydantic 模型校验请求体，ValidationError → 422
+    try:
+        create = AuditAlertRuleCreate(**body)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid rule body: {exc}")
     engine = _get_alert_engine()
     actor = getattr(request.state, "auth_identity", "") or ""
     rule = engine.create_rule(create, created_by=actor)
@@ -476,7 +527,11 @@ async def update_alert_rule(request: Request, rule_id: str, body: dict[str, Any]
     _require_audit_feature()
     from maop.enterprise.audit_enhanced import AuditAlertRuleUpdate
 
-    update = AuditAlertRuleUpdate(**body)
+    # P0-3: 使用 Pydantic 模型校验请求体，ValidationError → 422
+    try:
+        update = AuditAlertRuleUpdate(**body)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid rule body: {exc}")
     engine = _get_alert_engine()
     rule = engine.update_rule(rule_id, update)
     if rule is None:

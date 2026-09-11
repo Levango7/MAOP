@@ -28,7 +28,7 @@
       <section
         v-if="edition.isEnterprise"
         class="evolve-milestones"
-        aria-label="Evolution milestones timeline"
+        :aria-label="t('view.evolve.milestones.ariaLabel')"
       >
         <header class="evolve-milestones__head">
           <div class="evolve-milestones__title-row">

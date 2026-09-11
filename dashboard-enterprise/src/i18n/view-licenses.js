@@ -79,36 +79,37 @@ export const messages = {
   },
 
   zh: {
-    'view.licenses.subtitle': '签发、续期与吊销企业版 License',
+    // P1-7 fix: 统一中文翻译为"许可证"，消除"License"/"许可证"混用。
+    'view.licenses.subtitle': '签发、续期与吊销企业版许可证',
     'view.licenses.enterprise': '企业版',
     'view.licenses.searchPlaceholder': '按客户或 Key 筛选…',
 
     // ── Actions ────────────────────────────────────────────────
-    'view.licenses.generate': '生成 License',
+    'view.licenses.generate': '生成许可证',
     'view.licenses.generating': '生成中…',
-    'view.licenses.generated': '已为 {name} 生成 License',
+    'view.licenses.generated': '已为 {name} 生成许可证',
     'view.licenses.generateFailed': '生成失败',
     'view.licenses.renew': '续期',
     'view.licenses.renewing': '续期中…',
-    'view.licenses.renewed': 'License {id} 已续期 {days} 天',
+    'view.licenses.renewed': '许可证 {id} 已续期 {days} 天',
     'view.licenses.revoke': '吊销',
-    'view.licenses.revokeConfirm': '确定吊销 License「{id}」？此操作不可恢复。',
-    'view.licenses.revoked': 'License {id} 已吊销',
+    'view.licenses.revokeConfirm': '确定吊销许可证「{id}」？此操作不可恢复。',
+    'view.licenses.revoked': '许可证 {id} 已吊销',
     'view.licenses.viewDetails': '查看详情',
 
     // ── Empty / error ──────────────────────────────────────────
-    'view.licenses.noLicenses': '暂无 License',
-    'view.licenses.noLicensesDesc': '生成 License 以向客户授予企业版访问权限。',
-    'view.licenses.loadError': '无法加载 License 列表',
+    'view.licenses.noLicenses': '暂无许可证',
+    'view.licenses.noLicensesDesc': '生成许可证以向客户授予企业版访问权限。',
+    'view.licenses.loadError': '无法加载许可证列表',
 
     // ── Table columns ──────────────────────────────────────────
     'view.licenses.customerName': '客户名',
     'view.licenses.customerEmail': '邮箱',
-    'view.licenses.licenseKey': 'License Key',
-    'view.licenses.licenseId': 'License ID',
+    'view.licenses.licenseKey': '许可证 Key',
+    'view.licenses.licenseId': '许可证 ID',
     'view.licenses.version': '版本',
     'view.licenses.expiresAt': '过期时间',
-    'view.licenses.maxAgents': '最大 Agent 数',
+    'view.licenses.maxAgents': '最大智能体数',
     'view.licenses.maxUsers': '最大用户数',
     'view.licenses.created': '创建时间',
     'view.licenses.updated': '更新时间',
@@ -138,7 +139,7 @@ export const messages = {
     'view.licenses.customerRequired': '客户名和邮箱为必填项',
 
     // ── Detail drawer ──────────────────────────────────────────
-    'view.licenses.detailTitle': 'License 详情',
+    'view.licenses.detailTitle': '许可证详情',
     'view.licenses.detailInfo': '基本信息',
     'view.licenses.detailQuota': '配额',
     'view.licenses.detailHistory': '操作历史',
@@ -148,7 +149,7 @@ export const messages = {
     'view.licenses.noHistory': '暂无操作历史',
 
     // ── Stats ──────────────────────────────────────────────────
-    'view.licenses.totalLicenses': 'License 总数',
+    'view.licenses.totalLicenses': '许可证总数',
     'view.licenses.activeLicenses': '正式生效',
     'view.licenses.expiringSoon': '即将过期',
     'view.licenses.status': '状态',

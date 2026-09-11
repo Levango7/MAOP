@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { withAuth, handleUnauthorized, fetchWithTimeout } from './api.js';
+import { useI18n } from '../i18n/index.js';
 
 // L3 fix: 提取硬编码的 API 路径为命名常量，便于统一维护与路径变更。
 const API_ENDPOINT_EDITION = '/api/info/edition';
@@ -72,7 +73,9 @@ export const useEditionStore = defineStore('edition', () => {
         // M1 fix: 重试仍 401 时设置 switchError，让调用方可感知鉴权失败，
         // 而非静默 return 导致调用方误以为 fetch 成功但未更新状态。
         if (res.status === 401) {
-          switchError.value = 'Authentication required';
+          // P1-9 fix: 使用 i18n key 替代硬编码英文 'Authentication required'。
+          const { t } = useI18n();
+          switchError.value = t('auth.authenticationRequired');
           return false;
         }
       }
@@ -129,7 +132,9 @@ export const useEditionStore = defineStore('edition', () => {
       // fetchEdition 失败后仍返回成功（错误吞噬）。switchError 由下方 catch 设置。
       const fetchOk = await fetchEdition();
       if (!fetchOk) {
-        const msg = switchError.value || 'Failed to refresh edition info after switch';
+        // P1-9 fix: 使用 i18n key 替代硬编码英文。
+        const { t } = useI18n();
+        const msg = switchError.value || t('edition.refreshFailed');
         switchError.value = msg;
         throw new Error(msg);
       }

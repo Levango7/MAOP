@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -56,12 +57,16 @@ class WorktreeRollbackRequest(BaseModel):
     checkpoint_id: str = Field(default="", max_length=128)
 
 _worktree_mgr = None
+_worktree_mgr_lock = threading.Lock()
 
 def _get_worktree_mgr() -> Any:
+    # P1-18: 双重检查锁定保护单例初始化
     global _worktree_mgr
     if _worktree_mgr is None:
-        from maop.core.agent.memory_ctx.worktree import WorktreeManager
-        _worktree_mgr = WorktreeManager(root_dir=str(MAOP_ROOT))
+        with _worktree_mgr_lock:
+            if _worktree_mgr is None:
+                from maop.core.agent.memory_ctx.worktree import WorktreeManager
+                _worktree_mgr = WorktreeManager(root_dir=str(MAOP_ROOT))
     return _worktree_mgr
 
 

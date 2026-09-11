@@ -45,7 +45,7 @@ export function useWebSocket(url = '') {
           }
           return; // don't schedule reconnect on auth failure
         }
-        scheduleReconnect();
+        _scheduleReconnect();
       };
       ws.onerror = (e) => {
         error.value = e;
@@ -53,11 +53,13 @@ export function useWebSocket(url = '') {
       };
     } catch (e) {
       error.value = e;
-      scheduleReconnect();
+      _scheduleReconnect();
     }
   }
 
-  function scheduleReconnect() {
+  // P2-9 fix: 统一命名为 _scheduleReconnect（下划线前缀表示内部函数），
+  // 与 useDagProgress.js 保持一致。
+  function _scheduleReconnect() {
     // P2-12: stop reconnecting after MAX_RECONNECT_ATTEMPTS to avoid
     // infinite retry loops when the backend is permanently down.
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {

@@ -28,7 +28,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-MAOP_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+# P2-24: 统一使用 state.MAOP_ROOT，避免路径计算层数不一致
+from .state import MAOP_ROOT  # noqa: E402
 
 
 def _get_engine():

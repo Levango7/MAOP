@@ -5,11 +5,18 @@
  * Auth: httpOnly cookie only (M7 fix — no localStorage token, no
  * Authorization header; the cookie is sent automatically for same-origin).
  *
+ * P1-2 fix: 组件卸载时自动中止所有进行中的流，避免资源泄漏。
+ * 使用 onScopeDispose 在当前 effect scope 销毁时 abort 所有活跃 controller。
+ *
  * @returns {{ stream: Function }}
  */
-
+import { onScopeDispose, getCurrentInstance } from 'vue';
 
 export function useStreamingFetch() {
+  // P1-2 fix: 维护本 composable 创建的所有 AbortController，以便在
+  // scope 销毁时统一中止，避免组件卸载后流仍挂起导致资源泄漏。
+  const _activeControllers = new Set();
+
   /**
    * Send a POST request and stream the SSE response.
    *
@@ -29,6 +36,8 @@ export function useStreamingFetch() {
 
     // AbortController for cancellable streaming (prevents leak on unmount/renavigate)
     const controller = new AbortController();
+    // P1-2 fix: 注册到活跃集合，stream 结束后移除。
+    _activeControllers.add(controller);
     const onAbort = () => controller.abort();
     // M4 fix: fetch 开始前检查外部 signal 是否已 aborted。
     // 若外部 signal 在调用 stream() 之前已 aborted，addEventListener('abort')
@@ -147,7 +156,22 @@ export function useStreamingFetch() {
       if (callbacks.signal) {
         callbacks.signal.removeEventListener('abort', onAbort);
       }
+      // P1-2 fix: stream 结束后从活跃集合移除，避免 onScopeDispose 时
+      // 对已完成的 controller 调用 abort（虽无害但无意义）。
+      _activeControllers.delete(controller);
     }
+  }
+
+  // P1-2 fix: 在当前 effect scope 销毁时中止所有活跃流。
+  // 使用 getCurrentInstance() 守卫，仅在组件 setup 上下文中注册，
+  // 避免在 Pinia store 等非组件上下文中调用 onScopeDispose 抛 Vue 警告。
+  if (getCurrentInstance()) {
+    onScopeDispose(() => {
+      for (const ctrl of _activeControllers) {
+        try { ctrl.abort(); } catch { /* already aborted */ }
+      }
+      _activeControllers.clear();
+    });
   }
 
   return { stream };

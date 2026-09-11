@@ -74,6 +74,8 @@ export const messages = {
     'view.search.resultCount': '{count} result(s)',
     'view.search.resultCountWithTime': '{count} result(s) in {time}ms',
     'view.search.noMatches': 'No matches for “{query}”.',
+    // ── #126: 权重标签 ──
+    'view.search.weight': 'weight {w}',
   },
 
   zh: {
@@ -151,5 +153,7 @@ export const messages = {
     'view.search.resultCount': '{count} 条结果',
     'view.search.resultCountWithTime': '{count} 条结果（{time}ms）',
     'view.search.noMatches': '未找到匹配「{query}」的结果。',
+    // ── #126: 权重标签 ──
+    'view.search.weight': '权重 {w}',
   },
 };

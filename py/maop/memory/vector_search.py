@@ -230,16 +230,37 @@ class VectorSearch:
         logger.info("[vector] Indexed %d entries (semantic=%s)", indexed, self._semantic_available)
         return indexed
 
-    def search(self, query: str, top: int = 10) -> list[VectorResult]:
+    def search(self, query: str, top: int = 10, *, limit: int = 10_000) -> list[VectorResult]:
         """Search for entries similar to the query.
 
         Uses cosine similarity between query embedding and stored vectors.
+
+        Parameters
+        ----------
+        query : str
+            Search query text.
+        top : int
+            Number of top results to return.
+        limit : int
+            Maximum vectors to load into memory for scoring (1..10_000,
+            default 10_000). Prevents OOM on large datasets by capping the
+            number of embeddings read from SQLite per search. Aligned with
+            ``core/memory/vector_store.py`` pagination strategy. When the
+            vectors table exceeds ``limit`` rows, only the first ``limit``
+            (by rowid order) are scored — callers needing full coverage
+            should use ``VectorStore`` instead.
         """
         query_vec = self.embed(query)
 
+        # 修复: 钳制 limit 上限，防止全表载入导致 OOM。与
+        # core/memory/vector_store.py list_all 的分页策略对齐。
+        limit = max(1, min(int(limit), 10_000))
+
         with sqlite_connect(self._db_path) as conn:
             try:
-                rows = conn.execute("SELECT id, embedding FROM vectors").fetchall()
+                rows = conn.execute(
+                    "SELECT id, embedding FROM vectors LIMIT ?", (limit,),
+                ).fetchall()
             except sqlite3.OperationalError:
                 # 表不存在或数据库结构异常，返回空结果
                 return []

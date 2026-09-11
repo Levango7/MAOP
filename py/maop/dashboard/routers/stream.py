@@ -135,7 +135,11 @@ async def dag_progress_stream(execution_id: str, request: Request) -> Any:
     from maop.core.reliability.event_bus import get_event_bus
 
     bus = get_event_bus()
-    last_event_id = int(request.headers.get("Last-Event-ID", "0"))
+    # P1-17: Last-Event-ID 异常处理 — 无效值回退到 0
+    try:
+        last_event_id = int(request.headers.get("Last-Event-ID", "0"))
+    except (ValueError, TypeError):
+        last_event_id = 0
 
     async def generate():
         # Fetch history events for this execution
@@ -247,7 +251,11 @@ async def _stream_from_event_bus(execution_id: str, request: Request) -> Any:
     # P1-13: replay history events for late-joining clients so tokens
     # emitted before the SSE connection opened are not lost.
     sent_complete = False
-    last_event_id = int(request.headers.get("Last-Event-ID", "0"))
+    # P1-17: Last-Event-ID 异常处理 — 无效值回退到 0
+    try:
+        last_event_id = int(request.headers.get("Last-Event-ID", "0"))
+    except (ValueError, TypeError):
+        last_event_id = 0
     for evt in bus.get_history(limit=500):
         if evt._id <= last_event_id:
             continue

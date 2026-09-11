@@ -16,7 +16,7 @@
         :options="tabOptions"
         size="md"
         class="run-tabs"
-        aria-label="Run mode"
+        :aria-label="t('view.run.modeLabel')"
       />
     </PageHeader>
 

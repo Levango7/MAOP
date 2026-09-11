@@ -11,12 +11,13 @@
  *
  * SSE mode (default):
  *   - Uses EventSource (browser-native auto-reconnect + Last-Event-ID).
- *   - URL: /api/stream/dag/{executionId}?token={jwt}
+ *   - URL: /api/stream/dag/{executionId}
+ *   - Auth: httpOnly cookie via EventSource { withCredentials: true }.
  *   - Events: "node-status" (data: {node_id, status, timestamp, metadata, seq})
  *             "execution-complete" (closes connection)
  *
  * WebSocket mode:
- *   - Uses WebSocket with Sec-WebSocket-Protocol subprotocol for JWT.
+ *   - Uses WebSocket; auth via same-origin httpOnly cookie (browser auto-sends).
  *   - URL: ws://host/ws/dag/{executionId}
  *   - Downstream: {type: "node-status"|"execution-complete"|"ping", data}
  *   - Upstream:   {action: "cancel"|"pause", node_id} / {type: "pong"}
@@ -72,11 +73,12 @@ export function useDagProgress(executionId, options = {}) {
 
   function _applyEvent(data) {
     if (!data || !data.node_id || !data.status) return;
-    // Append to events (cap at maxEvents to avoid unbounded growth).
-    events.value.push(data);
-    if (events.value.length > maxEvents) {
-      events.value = events.value.slice(-maxEvents);
-    }
+    // P2-4 fix: 一次性构造新数组，避免 push + slice 两次响应式触发。
+    // 追加事件并裁剪到 maxEvents 上限（防止无限增长）。
+    const next = events.value.length >= maxEvents
+      ? events.value.slice(-(maxEvents - 1)).concat(data)
+      : events.value.concat(data);
+    events.value = next;
     // Update nodeStates reactively (new object to trigger reactivity).
     nodeStates.value = { ...nodeStates.value, [data.node_id]: data.status };
   }
@@ -212,6 +214,9 @@ export function useDagProgress(executionId, options = {}) {
 
   function connect() {
     manuallyDisconnected = false;
+    // P1-1 fix: 重置重连计数器，避免 disconnect 后 reconnectAttempts 已达上限
+    // 导致再次 connect 时 _scheduleReconnect 直接返回无法重连。
+    reconnectAttempts = 0;
     if (transport === 'sse') {
       connectSSE();
     } else {

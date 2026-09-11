@@ -7,7 +7,7 @@
       :filter-schema="filterSchema"
       search-key="search"
       :search-placeholder="t('view.tasks.searchPlaceholder')"
-      :results-label="`${total} / ${total}`"
+      :results-label="`${tasks.length} / ${total}`"
       :error-title="t('view.tasks.loadError')"
       :empty-title="t('view.tasks.empty')"
       :empty-desc="t('view.tasks.emptyDesc')"

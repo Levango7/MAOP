@@ -3,28 +3,28 @@
     <Transition name="drawer">
       <div v-if="open" class="detail-drawer" @keydown.esc="onClose">
         <!-- 遮罩 -->
-        <div class="drawer__scrim" @click="onClose"></div>
+        <div class="detail-drawer__scrim" @click="onClose"></div>
 
         <!-- 面板 -->
         <aside
           ref="panelRef"
-          class="drawer__panel"
+          class="detail-drawer__panel"
           role="dialog"
           aria-modal="true"
           :aria-label="title || 'Detail'"
           tabindex="-1"
         >
-          <header class="drawer__head">
-            <AppIcon v-if="icon" :name="icon" :size="16" class="drawer__icon" />
-            <h3 class="drawer__title">{{ title }}</h3>
-            <button class="drawer__close" type="button" :aria-label="t('action.close')" @click="onClose">
+          <header class="detail-drawer__head">
+            <AppIcon v-if="icon" :name="icon" :size="16" class="detail-drawer__icon" />
+            <h3 class="detail-drawer__title">{{ title }}</h3>
+            <button class="detail-drawer__close" type="button" :aria-label="t('action.close')" @click="onClose">
               <AppIcon name="x" :size="16" />
             </button>
           </header>
-          <div class="drawer__body">
+          <div class="detail-drawer__body">
             <slot />
           </div>
-          <footer v-if="$slots.footer" class="drawer__foot">
+          <footer v-if="$slots.footer" class="detail-drawer__foot">
             <slot name="footer" />
           </footer>
         </aside>
@@ -103,8 +103,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 
 <style scoped>
 .detail-drawer { position: fixed; inset: 0; z-index: calc(var(--z-modal) + 5); }
-.drawer__scrim { position: absolute; inset: 0; background: var(--overlay-scrim); }
-.drawer__panel {
+.detail-drawer__scrim { position: absolute; inset: 0; background: var(--overlay-scrim); }
+.detail-drawer__panel {
   position: absolute;
   top: 0; right: 0; bottom: 0;
   width: min(480px, 92vw);
@@ -115,7 +115,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
   flex-direction: column;
   outline: none;
 }
-.drawer__head {
+.detail-drawer__head {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -123,22 +123,22 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.drawer__icon { color: var(--brand-strong); }
-.drawer__title { font-size: var(--fs-md); font-weight: 600; color: var(--text); margin: 0; flex: 1; }
+.detail-drawer__icon { color: var(--brand-strong); }
+.detail-drawer__title { font-size: var(--fs-md); font-weight: 600; color: var(--text); margin: 0; flex: 1; }
 /* R7 修复: border-radius 从 var(--r-sm) 统一为 var(--r-md) (与 .close-btn / .modal__x 一致) */
-.drawer__close {
+.detail-drawer__close {
   display: grid; place-items: center;
   width: 30px; height: 30px;
   background: transparent; border: none; border-radius: var(--r-md);
   color: var(--text-muted); cursor: pointer;
   transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
 }
-.drawer__close:hover { background: var(--surface-2); color: var(--text); }
-.drawer__body { flex: 1; overflow-y: auto; padding: var(--sp-4); }
-.drawer__foot { flex-shrink: 0; padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border); }
+.detail-drawer__close:hover { background: var(--surface-2); color: var(--text); }
+.detail-drawer__body { flex: 1; overflow-y: auto; padding: var(--sp-4); }
+.detail-drawer__foot { flex-shrink: 0; padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border); }
 
 .drawer-enter-active, .drawer-leave-active { transition: opacity var(--motion) var(--ease); }
 .drawer-enter-from, .drawer-leave-to { opacity: 0; }
-.drawer-enter-active .drawer__panel { transition: transform var(--motion-normal) var(--ease); }
-.drawer-enter-from .drawer__panel, .drawer-leave-to .drawer__panel { transform: translateX(100%); }
+.drawer-enter-active .detail-drawer__panel { transition: transform var(--motion-normal) var(--ease); }
+.drawer-enter-from .detail-drawer__panel, .drawer-leave-to .detail-drawer__panel { transform: translateX(100%); }
 </style>

@@ -145,6 +145,18 @@ class PostgreSQLStorageBackend(StorageBackend):
             is committed immediately by PostgreSQL. There is never a
             pending transaction to commit at this level.
 
+        .. tip:: 推荐用法 — 使用 :meth:`transaction` 上下文管理器
+
+            对于需要原子性提交的多步操作，**始终使用** :meth:`transaction`
+            而非本方法::
+
+                with backend.transaction() as tx:
+                    tx.execute("INSERT INTO maop_kv(key, value) VALUES (%s, %s)", ("k", "v"))
+                    tx.execute("UPDATE maop_meta SET value=%s WHERE key=%s", (v, "k"))
+                # 正常退出自动 commit，异常自动 rollback
+
+            本方法在 autocommit 模式下是 no-op，调用它不会提交任何事务。
+
         **When you DO need transactional commit:**
         Use the :meth:`transaction` context manager, which switches the
         connection to ``autocommit=False`` and commits/rolls back on
@@ -196,6 +208,19 @@ class PostgreSQLStorageBackend(StorageBackend):
             immediately by PostgreSQL. By the time ``rollback()`` is
             called, the statements are already durable — there is nothing
             to roll back.
+
+        .. tip:: 推荐用法 — 使用 :meth:`transaction` 上下文管理器
+
+            对于需要回滚保障的多步操作，**始终使用** :meth:`transaction`
+            而非本方法::
+
+                with backend.transaction() as tx:
+                    tx.execute("INSERT INTO maop_kv(key, value) VALUES (%s, %s)", ("k", "v"))
+                    tx.execute("UPDATE maop_meta SET value=%s WHERE key=%s", (v, "k"))
+                    raise SomeError()  # 自动 rollback，两条语句一起回滚
+                # 正常退出自动 commit
+
+            本方法在 autocommit 模式下是 no-op，已执行的语句无法回滚。
 
         **When you DO need transactional rollback:**
         Use the :meth:`transaction` context manager, which rolls back

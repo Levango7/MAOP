@@ -78,7 +78,8 @@
  * 组块之间的距离应该大于组块内部距离(完形心理学: 接近律)。此前这里 24
  * 而卡片内 padding 也 20, 几乎相等, 视觉上无法分组。
  * ─────────────────────────────────────────────────────────────────────── */
-.section { margin-bottom: var(--sp-4); }
+/* R9 修复: .section 定义已移至 pages.css (margin-top + margin-bottom),
+ * 此处冗余定义已删除避免覆盖冲突。 */
 
 .grid-cards {
   display: grid;

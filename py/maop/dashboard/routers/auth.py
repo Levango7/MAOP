@@ -58,13 +58,14 @@ from maop.core.backends.db_utils import get_db_path, sqlite_connect
 from maop.core.security.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig, load_jwt_secret
 
 _env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
-# High 安全修复 (2.3): secure-by-default。只有显式声明本地开发环境
-# (dev/development/local/test) 才默认禁用认证；staging/QA/demo/未设置/
-# 拼写错误一律默认启用。与 settings._default_auth_enabled 保持一致。
-_env_is_dev = os.environ.get("MAOP_ENV", "").strip().lower() in (
-    "dev", "development", "local", "test",
-)
-_auth_enabled = os.environ.get("MAOP_AUTH", "0" if _env_is_dev else "1") == "1"
+# P0-4: 从 settings.py 读取 auth_enabled / tls_enabled，而非直接读 MAOP_AUTH 环境变量。
+# settings.py 通过 Pydantic Settings 统一管理配置（支持 .env、settings.yaml、环境变量），
+# 并与 _default_auth_enabled 的 secure-by-default 策略保持一致。
+from maop.config.settings import get_settings as _get_settings
+
+_settings = _get_settings()
+_auth_enabled = _settings.auth_enabled
+_tls_enabled = _settings.tls_enabled
 # M6 fix (Phase R5): OWASP 2023 推荐 600k 迭代 for PBKDF2-HMAC-SHA256
 _AUTH_PBKDF2_ITERATIONS = 600_000
 _auth_mgr: AuthManager | None = None
@@ -474,7 +475,7 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
         })
         response.set_cookie(
             key="maop_token", value=token, max_age=7200,
-            httponly=True, secure=True, samesite="strict", path="/",
+            httponly=True, secure=_tls_enabled, samesite="strict", path="/",
         )
         return response
     except HTTPException:
@@ -525,14 +526,14 @@ async def auth_refresh(request: Request):
         })
         response.set_cookie(
             key="maop_token", value=new_token, max_age=7200,
-            httponly=True, secure=True, samesite="strict", path="/",
+            httponly=True, secure=_tls_enabled, samesite="strict", path="/",
         )
         # Revoke old token so it can't be used after refresh
         try:
             mgr.jwt_handler.revoke_token(token)
-        except Exception:
-            logger.warning('[auth] auth_refresh：吊销旧 token 失败已忽略（best-effort），可能残留可用的旧 token', exc_info=True)
-            # best-effort revocation
+        except Exception as exc:
+            # P0-5: 修正 logger.warning 格式，使用 as exc + %s + exc_info=True
+            logger.warning('[auth] auth_refresh：吊销旧 token 失败已忽略（best-effort）: %s', exc, exc_info=True)
         return response
     except HTTPException:
         raise
@@ -588,6 +589,17 @@ async def auth_register(request: Request, body: RegisterRequest) -> Any:
         if len(password) < 8:
             raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
+        # P0-6: roles 白名单校验 — 防止攻击者注入 "superadmin" 等非法角色。
+        # 仅允许已知的低/中权限角色通过注册接口分配；高权限角色（admin/superadmin）
+        # 必须通过专门的提权接口（受 require_superadmin 保护）授予。
+        _ALLOWED_REGISTER_ROLES = frozenset({"read", "write", "operator"})
+        invalid_roles = [r for r in roles if r not in _ALLOWED_REGISTER_ROLES]
+        if invalid_roles:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid roles: {invalid_roles}. Allowed roles for registration: {sorted(_ALLOWED_REGISTER_ROLES)}",
+            )
+
         db_path = get_db_path("auth")
         if not db_path.exists():
             get_auth_mgr()
@@ -597,10 +609,14 @@ async def auth_register(request: Request, body: RegisterRequest) -> Any:
         )
         if result["status"] == "ok":
             logger.info("[auth] New user registered: %s (roles: %s)", username, roles)
+            # P0-7: 移除 http_status 字段，避免内部状态泄露到响应体
+            result.pop("http_status", None)
             return result
         # P1-9: propagate the real status (409 duplicate) instead of losing it
         # through the blanket except below (which masked it as 400).
-        return JSONResponse(result, status_code=result.get("http_status", 400))
+        # P0-7: 提取 http_status 用于 HTTP 状态码，但从响应体中移除
+        http_status = result.pop("http_status", 400)
+        return JSONResponse(result, status_code=http_status)
     except HTTPException:
         raise
     except Exception as exc:

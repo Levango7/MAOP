@@ -50,14 +50,16 @@ class AddMessageRequest(BaseModel):
 
 def _get_session_mgr():
     from maop.core.security.session import SessionManager
-    root = Path(__file__).resolve().parent.parent.parent.parent
-    return SessionManager(root_dir=str(root))
+    # P2-24: 统一使用 state.MAOP_ROOT
+    from .state import MAOP_ROOT
+    return SessionManager(root_dir=str(MAOP_ROOT))
 
 
 def _get_conversation_mgr():
     from maop.core.agent.llm_chat.conversation import ConversationManager
-    root = Path(__file__).resolve().parent.parent.parent.parent
-    return ConversationManager(root_dir=str(root))
+    # P2-24: 统一使用 state.MAOP_ROOT
+    from .state import MAOP_ROOT
+    return ConversationManager(root_dir=str(MAOP_ROOT))
 
 
 @router.get("/")

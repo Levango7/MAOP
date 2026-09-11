@@ -137,6 +137,9 @@ export const coreMessages = {
     'auth.password': 'Password',
     'auth.loginFailed': 'Login failed',
     'auth.networkError': 'Network error',
+    // P1-9 fix: edition store switchError 使用 i18n key 替代硬编码英文。
+    'auth.authenticationRequired': 'Authentication required',
+    'edition.refreshFailed': 'Failed to refresh edition info after switch',
 
     // ── Footer ──────────────────────────────────────────────────
     'footer.tagline': 'Multi-Agent Orchestration Platform',
@@ -565,6 +568,9 @@ export const coreMessages = {
 
     // ── 认证 (P3: 添加 auth.loginFailed 中文翻译, 用于 App.vue:242) ──
     'auth.loginFailed': '登录失败',
+    // P1-9 fix: edition store switchError 使用 i18n key 替代硬编码英文。
+    'auth.authenticationRequired': '需要认证',
+    'edition.refreshFailed': '切换后刷新版本信息失败',
 
     // ── F33 修复: 顶栏 / 用户模块中文翻译 ──
     'topbar.refreshTime': '最后刷新',

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -32,12 +33,16 @@ class BridgeSyncConfigRequest(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
 
 _agent_proxy = None
+_agent_proxy_lock = threading.Lock()
 
 def _get_bridge() -> Any:
+    # P1-18: 双重检查锁定保护单例初始化
     global _agent_proxy
     if _agent_proxy is None:
-        from maop.core.agent.delegation.agent_proxy import AgentProxy
-        _agent_proxy = AgentProxy(root_dir=str(MAOP_ROOT))
+        with _agent_proxy_lock:
+            if _agent_proxy is None:
+                from maop.core.agent.delegation.agent_proxy import AgentProxy
+                _agent_proxy = AgentProxy(root_dir=str(MAOP_ROOT))
     return _agent_proxy
 
 

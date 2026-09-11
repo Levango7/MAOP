@@ -1,7 +1,7 @@
 <template>
   <div
     class="segmented"
-    :class="['seg--' + size, { 'seg--equal': equal }]"
+    :class="['segmented--' + size, { 'segmented--equal': equal }]"
     role="radiogroup"
     @keydown.left.prevent="move(-1)"
     @keydown.right.prevent="move(1)"
@@ -14,7 +14,7 @@
       v-for="opt in options"
       :key="opt.value"
       type="button"
-      class="seg__item"
+      class="segmented__item"
       :class="{ active: opt.value === modelValue }"
       role="radio"
       :aria-checked="opt.value === modelValue"
@@ -61,7 +61,7 @@ function moveTo(i) {
   border-radius: var(--r-md);
   gap: 2px;
 }
-.seg__item {
+.segmented__item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -79,15 +79,15 @@ function moveTo(i) {
   white-space: nowrap;
 }
 /* padding 3px 8px 为小尺寸 Segmented 项视觉规格固定值 */
-.seg--sm .seg__item { padding: 3px 8px; font-size: var(--fs-xs); }
-.seg__item:hover { color: var(--text); }
-.seg__item:disabled { opacity: 0.45; cursor: not-allowed; }
-.seg__item.active {
+.segmented--sm .segmented__item { padding: 3px 8px; font-size: var(--fs-xs); }
+.segmented__item:hover { color: var(--text); }
+.segmented__item:disabled { opacity: 0.45; cursor: not-allowed; }
+.segmented__item.active {
   background: var(--surface);
   color: var(--brand-strong);
   box-shadow: var(--shadow-sm);
 }
 /* Equal-width mode: all buttons share the same width regardless of label length */
-.seg--equal { display: inline-flex; }
-.seg--equal .seg__item { flex: 1 1 0; min-width: 0; }
+.segmented--equal { display: inline-flex; }
+.segmented--equal .segmented__item { flex: 1 1 0; min-width: 0; }
 </style>

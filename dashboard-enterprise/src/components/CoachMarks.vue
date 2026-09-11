@@ -3,16 +3,16 @@
     <Transition name="cm">
       <div v-if="active" class="coach-marks" data-coach-root>
         <!-- 半透明遮罩: 点击任意处跳到下一步, 但高亮区本身可点穿 -->
-        <div class="cm-scrim" @click="next"></div>
+        <div class="coach-marks__scrim" @click="next"></div>
 
         <!-- 高亮框(四个角标, 用 border 描出聚焦区域) -->
-        <div v-if="current" class="cm-spotlight" :style="spotTop ? spotlightStyle : { display: 'none' }" aria-hidden="true"></div>
+        <div v-if="current" class="coach-marks__spotlight" :style="spotTop ? spotlightStyle : { display: 'none' }" aria-hidden="true"></div>
 
         <!-- 气泡 -->
         <div
           v-if="current"
           ref="popoverEl"
-          class="cm-popover"
+          class="coach-marks__popover"
           :style="popoverStyle"
           role="dialog"
           aria-modal="true"
@@ -20,12 +20,12 @@
           tabindex="-1"
           :aria-label="t('a11y.guideStep', { n: step + 1 })"
         >
-          <div class="cm-step">{{ step + 1 }} / {{ steps.length }}</div>
-          <div class="cm-title">{{ current.title }}</div>
-          <div class="cm-body">{{ current.body }}</div>
-          <div class="cm-actions">
-            <button class="cm-skip" type="button" :aria-label="t('action.skip')" @click="finish">{{ t('action.skip') }}</button>
-            <button class="cm-next" type="button" @click="next">
+          <div class="coach-marks__step">{{ step + 1 }} / {{ steps.length }}</div>
+          <div class="coach-marks__title">{{ current.title }}</div>
+          <div class="coach-marks__body">{{ current.body }}</div>
+          <div class="coach-marks__actions">
+            <button class="coach-marks__skip" type="button" :aria-label="t('action.skip')" @click="finish">{{ t('action.skip') }}</button>
+            <button class="coach-marks__next" type="button" @click="next">
               {{ step === steps.length - 1 ? t('action.done') : t('action.next') }}
             </button>
           </div>
@@ -215,13 +215,13 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: var(--z-modal, 90);
 }
-.cm-scrim {
+.coach-marks__scrim {
   position: absolute;
   inset: 0;
   background: var(--overlay-scrim);
   cursor: pointer;
 }
-.cm-spotlight {
+.coach-marks__spotlight {
   position: absolute;
   top: 0;
   left: 0;
@@ -233,7 +233,7 @@ onBeforeUnmount(() => {
   transition: transform var(--motion-normal) var(--ease);
   will-change: transform;
 }
-.cm-popover {
+.coach-marks__popover {
   position: absolute;
   max-width: 320px;
   z-index: var(--z-raised);
@@ -243,21 +243,21 @@ onBeforeUnmount(() => {
   box-shadow: var(--shadow-lg);
   padding: var(--sp-4);
 }
-.cm-step { font-size: var(--fs-xs); color: var(--text-faint); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.cm-title { font-size: var(--fs-md); font-weight: 700; color: var(--text); margin: 4px 0 var(--sp-2); }
-.cm-body { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.55; margin-bottom: var(--sp-3); }
-.cm-actions { display: flex; justify-content: space-between; gap: var(--sp-2); }
-.cm-skip {
+.coach-marks__step { font-size: var(--fs-xs); color: var(--text-faint); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.coach-marks__title { font-size: var(--fs-md); font-weight: 700; color: var(--text); margin: 4px 0 var(--sp-2); }
+.coach-marks__body { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.55; margin-bottom: var(--sp-3); }
+.coach-marks__actions { display: flex; justify-content: space-between; gap: var(--sp-2); }
+.coach-marks__skip {
   background: transparent; border: none; color: var(--text-faint);
   font-size: var(--fs-sm); cursor: pointer; padding: var(--sp-1) var(--sp-2);
 }
-.cm-skip:hover { color: var(--text); }
-.cm-next {
+.coach-marks__skip:hover { color: var(--text); }
+.coach-marks__next {
   background: var(--brand); color: var(--brand-contrast);
   border: 1px solid var(--brand); border-radius: var(--r-md);
   padding: var(--sp-1) var(--sp-3); font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
 }
-.cm-next:hover { background: var(--brand-strong); }
+.coach-marks__next:hover { background: var(--brand-strong); }
 
 .cm-enter-active, .cm-leave-active { transition: opacity var(--motion-fast) var(--ease); }
 .cm-enter-from, .cm-leave-to { opacity: 0; }

@@ -11,6 +11,7 @@ All operations require admin role via ``require_admin``.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -26,13 +27,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/tenant", tags=["tenant"])
 
 _tenant_manager: Any = None
+_tenant_manager_lock = threading.Lock()
 
 
 def _get_manager() -> Any:
+    # P1-18: 双重检查锁定保护单例初始化
     global _tenant_manager
     if _tenant_manager is None:
-        from maop.enterprise.tenant import TenantManager
-        _tenant_manager = TenantManager()
+        with _tenant_manager_lock:
+            if _tenant_manager is None:
+                from maop.enterprise.tenant import TenantManager
+                _tenant_manager = TenantManager()
     return _tenant_manager
 
 
@@ -137,9 +142,10 @@ async def get_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     mgr = _get_manager()
     tenant = mgr.get_tenant(tenant_id)
     if tenant is None:
-        return JSONResponse(
+        # P1-13: 使用 raise HTTPException 代替 JSONResponse，统一错误处理
+        raise HTTPException(
             status_code=404,
-            content={"status": "error", "error": f"Tenant '{tenant_id}' not found"},
+            detail=f"Tenant '{tenant_id}' not found",
         )
     return {"status": "ok", "tenant": tenant.model_dump()}
 

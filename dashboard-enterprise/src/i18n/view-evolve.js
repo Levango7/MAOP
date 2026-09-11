@@ -72,6 +72,8 @@ export const messages = {
     'view.evolve.milestones.msBehavior2Title': 'Human-in-the-loop gate',
     'view.evolve.milestones.msBehavior2Desc': 'High-risk config changes now require explicit approval, with pending queue and one-click approve/reject.',
     'view.evolve.milestones.msBehavior2Impact': '0 unapproved promotions',
+    // ── #126: a11y 标签 ──
+    'view.evolve.milestones.ariaLabel': 'Evolution milestones timeline',
   },
   zh: {
     'view.evolve.title': '规则驱动自动调优',
@@ -146,5 +148,7 @@ export const messages = {
     'view.evolve.milestones.msBehavior2Title': '人工审批闸门',
     'view.evolve.milestones.msBehavior2Desc': '高风险配置变更现需显式批准，提供待审队列与一键批准/拒绝。',
     'view.evolve.milestones.msBehavior2Impact': '0 次未审批晋升',
+    // ── #126: a11y 标签 ──
+    'view.evolve.milestones.ariaLabel': '演化里程碑时间线',
   },
 };

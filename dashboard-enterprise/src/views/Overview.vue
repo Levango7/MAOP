@@ -36,7 +36,7 @@
       <span class="ov-hero__status">{{ heroLabel }}</span>
       <span class="ov-hero__sep" aria-hidden="true"></span>
       <span class="ov-hero__kpi">
-        {{ data?.agents_total ?? '—' }} {{ t('view.overview.statActiveAgents').toLowerCase() }}
+        {{ data?.agents_total ?? '—' }} {{ t('view.overview.statActiveAgents') }}
         · {{ data?.delegations_total ?? '—' }} {{ t('view.overview.heroTasksRunning') }}
       </span>
       <span class="ov-hero__fresh muted">{{ t('view.overview.updated') }} {{ freshnessText }}</span>
@@ -48,7 +48,7 @@
     <section
       v-if="!error && edition.isEnterprise"
       class="ov-pev"
-      aria-label="Plan-Execute-Verify workflow"
+      :aria-label="t('view.overview.pev.ariaLabel')"
     >
       <header class="ov-pev__head">
         <div class="ov-pev__title-row">
@@ -90,7 +90,7 @@
     </section>
 
     <!-- ── 层 2: Action 磁贴 — 引导用户"下一步做什么" ── -->
-    <nav class="ov-actions" aria-label="Quick actions">
+    <nav class="ov-actions" :aria-label="t('view.overview.quickActions.ariaLabel')">
       <router-link v-for="a in quickActions" :key="a.to" :to="a.to" class="ov-action">
         <AppIcon :name="a.icon" :size="16" class="ov-action__icon" />
         <span class="ov-action__label">{{ t(a.label) }}</span>

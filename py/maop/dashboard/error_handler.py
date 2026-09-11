@@ -25,6 +25,7 @@ to work; callers may opt into the unified schema by raising
 
 import functools
 import logging
+import re
 import types
 from collections.abc import Callable
 from typing import Any
@@ -34,6 +35,27 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+# P0-9: 4xx 错误脱敏 — 防止 exc.detail 泄露内部信息（文件路径、堆栈、内部 ID 等）。
+# 对 4xx detail 进行长度截断 + 敏感模式移除，保留对客户端有用的安全信息。
+_SENSITIVE_PATTERN = re.compile(
+    r"(?:[/\\][\w./\\-]+|0x[0-9a-fA-F]+|<object at 0x[0-9a-fA-F]+>|Traceback[\s\S]*|File \"[^\"]+\")"
+)
+_MAX_DETAIL_LEN = 200
+
+
+def _sanitize_detail(detail: Any) -> str:
+    """对 4xx 错误 detail 进行脱敏处理。
+
+    - 截断超长消息（防止堆栈/大对象泄露）
+    - 移除文件路径、内存地址、堆栈轨迹等敏感模式
+    """
+    text = str(detail) if detail is not None else ""
+    if len(text) > _MAX_DETAIL_LEN:
+        text = text[:_MAX_DETAIL_LEN] + "..."
+    text = _SENSITIVE_PATTERN.sub("[redacted]", text)
+    return text
 
 
 class ErrorSchema(BaseModel):
@@ -108,6 +130,8 @@ def handle_api_errors(
         # which does NOT define `logger`. Referencing a closure cell avoids the
         # NameError that previously turned every handled error into a 500.
         _logger = logger
+        # P0-9: 捕获 _sanitize_detail 到闭包中，避免 types.FunctionType 重建后不可见
+        _sanitize = _sanitize_detail
         @functools.wraps(fn)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
@@ -124,8 +148,9 @@ def handle_api_errors(
                         status_code=exc.status_code,
                     )
                 _logger.warning("%s raised HTTPException: %s", op, exc.detail)
+                # P0-9: 4xx 也进行脱敏，防止 exc.detail 泄露内部信息
                 return _error_response(
-                    error=str(exc.detail) if exc.detail is not None else "",
+                    error=_sanitize(exc.detail),
                     code=f"HTTP_{exc.status_code}",
                     status_code=exc.status_code,
                 )

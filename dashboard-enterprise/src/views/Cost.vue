@@ -118,7 +118,7 @@
       </div>
     </Card>
 
-    <Card :title="t('view.cost.recentEntries')" icon="clipboard" margin-bottom="0">
+    <Card :title="t('view.cost.recentEntries')" icon="clipboard" :margin-bottom="0">
       <template #actions>
         <Badge v-if="!loading" tone="neutral">{{ entries.length }} {{ t('view.cost.shown') }}</Badge>
       </template>
@@ -180,7 +180,7 @@ const dailyPct = computed(() => {
 const monthlyPct = computed(() => {
   const lim = budget.value.monthly_limit_usd;
   if (!lim) return 0;
-  return Math.min(100, (budget.value.monthly_spent_usd / lim) * 100);
+  return Math.min(100, ((Number(budget.value.monthly_spent_usd) || 0) / lim) * 100);
 });
 function modelPct(m) {
   const info = summary.value.by_model?.[m];

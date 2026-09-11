@@ -58,6 +58,7 @@ function onCancel() { resolve(false); }
   align-items: center;
   justify-content: center;
   background: var(--overlay-scrim);
+  backdrop-filter: blur(4px);
 }
 .confirm-dialog {
   min-width: 320px;

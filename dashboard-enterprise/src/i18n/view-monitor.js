@@ -71,6 +71,8 @@ export const messages = {
     'view.monitor.dagInputHint': 'Enter an execution_id above to stream real-time DAG node status.',
     // ── 状态指示 (L6 修复: i18n 命名空间统一) ──
     'view.monitor.statusLive': 'Live',
+    // ── #126: 队列标签 ──
+    'view.monitor.queue': 'Queue',
   },
   zh: {
     'view.monitor.title': '监控与维护',
@@ -144,5 +146,7 @@ export const messages = {
     'view.monitor.dagInputHint': '在上方输入 execution_id 以流式订阅实时 DAG 节点状态。',
     // ── 状态指示 (L6 修复: i18n 命名空间统一) ──
     'view.monitor.statusLive': '在线',
+    // ── #126: 队列标签 ──
+    'view.monitor.queue': '队列',
   },
 };

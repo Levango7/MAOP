@@ -56,8 +56,10 @@ Endpoints:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import threading
 import time
 from typing import Any
 
@@ -76,14 +78,18 @@ router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
 _notification_manager: Any = None
 _event_bus: Any = None
+_manager_lock = threading.Lock()
 
 
 def _get_manager() -> Any:
+    # P1-18: 双重检查锁定保护单例初始化
     global _notification_manager, _event_bus
     if _notification_manager is None:
-        from maop.enterprise.notification import EventBus, NotificationManager
-        _event_bus = EventBus()
-        _notification_manager = NotificationManager(event_bus=_event_bus)
+        with _manager_lock:
+            if _notification_manager is None:
+                from maop.enterprise.notification import EventBus, NotificationManager
+                _event_bus = EventBus()
+                _notification_manager = NotificationManager(event_bus=_event_bus)
     return _notification_manager
 
 
@@ -561,7 +567,7 @@ async def delete_notification(notification_id: str, request: Request) -> dict[st
 
 _ws_clients: set[WebSocket] = set()
 
-import asyncio
+# P2-25: import asyncio 已移至模块顶部
 
 _ws_lock = asyncio.Lock()
 
@@ -611,6 +617,9 @@ async def notifications_ws(ws: WebSocket) -> Any:
             if parts:
                 token = parts[-1]
     from maop.dashboard.routers import auth as _auth_mod
+    # P0-10: 从 JWT 中提取 tenant_id 和 user_id，用于后续命令的越权校验
+    ws_user_id: str = ""
+    ws_tenant_id: str = ""
     if _auth_mod._auth_enabled:
         # P0 fix (2026-08-29): a missing token must be rejected. The previous
         # `if token:` guard skipped validation entirely when no token was
@@ -625,6 +634,9 @@ async def notifications_ws(ws: WebSocket) -> Any:
             if not payload or not getattr(payload, "authenticated", False):
                 await ws.close(code=4401, reason="Invalid token")
                 return
+            # P0-10: 提取 JWT 中的 identity（user_id）和 tenant_id
+            ws_user_id = getattr(payload, "identity", "") or ""
+            ws_tenant_id = getattr(payload, "tenant_id", "") or ""
         except Exception:
             await ws.close(code=4401, reason="Authentication failed")
             return
@@ -646,10 +658,13 @@ async def notifications_ws(ws: WebSocket) -> Any:
                         notif_id = cmd.get("id", "")
                         if notif_id:
                             mgr = _get_manager()
-                            mgr.mark_read(notif_id)
+                            # P0-10: 越权校验 — mark_read 必须作用于当前用户的通知
+                            mgr.mark_read(notif_id, user_id=ws_user_id) if ws_user_id else mgr.mark_read(notif_id)
                             await ws.send_json({"type": "ok", "action": "mark_read", "id": notif_id})
                     elif action == "unread_count":
-                        user_id = cmd.get("user_id", "")
+                        # P0-10: 越权校验 — 强制使用 JWT 中的 user_id，
+                        # 忽略客户端提供的 user_id，防止查询其他用户的通知计数
+                        user_id = ws_user_id or cmd.get("user_id", "")
                         mgr = _get_manager()
                         count = mgr.unread_count(user_id)
                         await ws.send_json({"type": "unread_count", "count": count})

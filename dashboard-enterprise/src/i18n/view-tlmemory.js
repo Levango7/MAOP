@@ -14,7 +14,8 @@ export const messages = {
     'view.tlmemory.memoryEntries': 'Memory Entries',
     'view.tlmemory.searchPlaceholder': 'Search memories (task, content, tags)…',
     'view.tlmemory.noMemories': 'No memories found',
-    'view.tlmemory.noResults': 'No results for',
+    // #126: 完整的 noResults 文本（带 {query} 参数）
+    'view.tlmemory.noResults': 'No results matching "{query}".',
     'view.tlmemory.runSearchHint': 'Run a search to list memory entries.',
     'view.tlmemory.score': 'score',
 
@@ -65,7 +66,8 @@ export const messages = {
     'view.tlmemory.memoryEntries': '记忆条目',
     'view.tlmemory.searchPlaceholder': '搜索记忆（任务、内容、标签）…',
     'view.tlmemory.noMemories': '未找到记忆',
-    'view.tlmemory.noResults': '未找到与',
+    // #126: 完整的 noResults 文本（带 {query} 参数）
+    'view.tlmemory.noResults': '未找到匹配 "{query}" 的结果。',
     'view.tlmemory.runSearchHint': '执行搜索以列出记忆条目。',
     'view.tlmemory.score': '评分',
 

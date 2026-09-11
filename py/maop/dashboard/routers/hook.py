@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -39,12 +40,16 @@ class HookTriggerRequest(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
 
 _hook_mgr = None
+_hook_mgr_lock = threading.Lock()
 
 def _get_hook_mgr() -> Any:
+    # P1-18: 双重检查锁定保护单例初始化
     global _hook_mgr
     if _hook_mgr is None:
-        from maop.core.agent.plugins_hooks.hook_manager import HookManager
-        _hook_mgr = HookManager(root_dir=str(MAOP_ROOT))
+        with _hook_mgr_lock:
+            if _hook_mgr is None:
+                from maop.core.agent.plugins_hooks.hook_manager import HookManager
+                _hook_mgr = HookManager(root_dir=str(MAOP_ROOT))
     return _hook_mgr
 
 

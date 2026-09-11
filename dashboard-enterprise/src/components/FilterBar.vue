@@ -99,7 +99,7 @@ function set(key, val) { props.modelValue[key] = val; }
   font-family: inherit;
   transition: border-color var(--motion) var(--ease);
 }
-.filterbar__input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
+.filterbar__input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
 .filterbar__input::placeholder { color: var(--text-faint); }
 .filterbar__select {
   /* 右侧留出箭头空间(--sp-7=32px), 避免文字与箭头重叠 */

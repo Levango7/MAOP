@@ -14,8 +14,8 @@
       <div class="search-bar">
         <div class="input-wrap">
           <input
-v-model="query"
-:aria-label="placeholder" class="search-input" :placeholder="placeholder"
+            v-model="query"
+            :aria-label="placeholder" class="search-input" :placeholder="placeholder"
             :disabled="searching" @keydown.enter="doSearch" />
           <AppIcon name="search" :size="16" class="input-icon-right" />
         </div>
@@ -61,7 +61,7 @@ v-model="query"
     </Card>
 
     <Card
-icon="clipboard" :title="resultTitle" :margin-bottom="0"
+      icon="clipboard" :title="resultTitle" :margin-bottom="0"
       :subtitle="searched && !searching ? (searchTime ? t('view.search.resultCountWithTime', { count: resultRows.length, time: searchTime }) : t('view.search.resultCount', { count: resultRows.length })) : ''">
       <div v-if="searchError" class="err"><EmptyState icon="alert-triangle" :title="t('view.search.searchFailed')" :description="searchError" /></div>
       <Skeleton v-else-if="searching" :lines="6" block />
@@ -173,7 +173,7 @@ const resultRows = computed(() => {
   if (tab === 'graph' && graphMode.value === 'neighbors') {
     return r.map(n => typeof n === 'string'
       ? { name: n, detail: '' }
-      : { name: n.id || n.name || n.label || '—', detail: n.weight !== null && n.weight !== undefined ? ('weight ' + n.weight) : (n.detail || '') });
+      : { name: n.id || n.name || n.label || '—', detail: n.weight !== null && n.weight !== undefined ? t('view.search.weight', { w: n.weight }) : (n.detail || '') });
   }
   if (tab === 'graph' && graphMode.value === 'edges') {
     return r.map(e => Array.isArray(e)

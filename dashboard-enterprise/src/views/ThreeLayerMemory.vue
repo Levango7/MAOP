@@ -52,8 +52,8 @@
       <Card :title="t('view.tlmemory.byTopic')" icon="scroll" :margin-bottom="16">
         <div v-if="topicEntries.length" class="chip-list">
           <button
-v-for="topic in topicEntries" :key="topic.key" class="chip" :class="{ active: query === topic.key }"
-                  @click="searchTopic(topic.key)">
+            v-for="topic in topicEntries" :key="topic.key" class="chip" :class="{ active: query === topic.key }"
+            @click="searchTopic(topic.key)">
             {{ topic.key }} <span class="chip-count">{{ topic.value }}</span>
           </button>
         </div>
@@ -104,8 +104,8 @@ v-for="topic in topicEntries" :key="topic.key" class="chip" :class="{ active: qu
         </div>
       </div>
       <EmptyState
-v-else-if="!loading" icon="search" :title="t('view.tlmemory.noMemories')"
-                  :description="query ? t('view.tlmemory.noResults') + ' “' + query + '”.' : t('view.tlmemory.runSearchHint')" />
+        v-else-if="!loading" icon="search" :title="t('view.tlmemory.noMemories')"
+        :description="query ? t('view.tlmemory.noResults', { query }) : t('view.tlmemory.runSearchHint')" />
       <Skeleton v-else height="200px" />
     </Card>
 
@@ -129,7 +129,7 @@ v-else-if="!loading" icon="search" :title="t('view.tlmemory.noMemories')"
             <label class="field">
               <span class="field__label">{{ t('view.tlmemory.content') }} *</span>
               <textarea
-v-model="addForm.content" class="field__input" rows="4"
+                v-model="addForm.content" class="field__input" rows="4"
                 :placeholder="t('view.tlmemory.contentPlaceholder')"></textarea>
             </label>
             <div class="add-form__two-col">
@@ -312,7 +312,7 @@ onMounted(refreshAll);
 }
 .mem-error-banner {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; margin-bottom: 16px;
+  padding: 8px 12px; margin-bottom: var(--sp-4);
   background: var(--fail-soft); border: 1px solid var(--fail);
   border-radius: var(--r-md); color: var(--fail);
   font-size: var(--fs-sm); font-family: var(--font-mono); word-break: break-word;

@@ -22,6 +22,8 @@ export const messages = {
     'view.run.close': 'Close',
     'view.run.subtaskCount': '{n} sub-tasks',
     'view.run.edgeCount': '{n} dependencies',
+    // ── #126: 运行模式标签 ──
+    'view.run.modeLabel': 'Run mode',
   },
   zh: {
     'view.run.aiSplit': 'AI 拆分',
@@ -46,5 +48,7 @@ export const messages = {
     'view.run.close': '关闭',
     'view.run.subtaskCount': '{n} 个子任务',
     'view.run.edgeCount': '{n} 条依赖',
+    // ── #126: 运行模式标签 ──
+    'view.run.modeLabel': '运行模式',
   },
 };

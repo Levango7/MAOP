@@ -38,6 +38,9 @@
   --brand-faint: rgba(53, 116, 240, .08);
   --brand-soft: rgba(53, 116, 240, .12);
   --brand-contrast: #ffffff;
+  /* R9 修复: --on-fail / --on-warn 亮色定义 (与 tokens.css :root 一致) */
+  --on-fail: var(--brand-contrast);
+  --on-warn: var(--brand-contrast);
 
   --border-subtle: rgba(89, 97, 110, .14);
   --border-faint: rgba(89, 97, 110, .07);

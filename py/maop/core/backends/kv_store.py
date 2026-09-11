@@ -248,20 +248,27 @@ class KVStore:
         self._maybe_prune()
         conn = self._pool.acquire()
         try:
-            placeholders = ",".join("?" * len(keys))
             # B12: 查询自身过滤过期键。
             now = self._now()
-            rows = conn.execute(
-                f"SELECT key, value FROM kv_store WHERE key IN ({placeholders}) AND namespace = ? "
-                "AND (ttl_expires IS NULL OR ttl_expires > ?)",
-                (*keys, namespace, now),
-            ).fetchall()
             result: dict[str, Any] = {}
-            for row in rows:
-                try:
-                    result[row["key"]] = json.loads(row["value"])
-                except (json.JSONDecodeError, TypeError):
-                    result[row["key"]] = row["value"]
+            # 修复: 分 chunk 执行，每 chunk 最多 CHUNK_SIZE 个 key 参数，
+            # 防止 len(keys) 超过 SQLite 单语句参数上限（默认 999）导致
+            # "too many SQL variables" 错误。每批参数数 = chunk_size + 2
+            # (namespace + now) = 502，留足余量。与 image_store.py 对齐。
+            CHUNK_SIZE = 500
+            for i in range(0, len(keys), CHUNK_SIZE):
+                chunk = keys[i:i + CHUNK_SIZE]
+                placeholders = ",".join("?" * len(chunk))
+                rows = conn.execute(
+                    f"SELECT key, value FROM kv_store WHERE key IN ({placeholders}) AND namespace = ? "
+                    "AND (ttl_expires IS NULL OR ttl_expires > ?)",
+                    (*chunk, namespace, now),
+                ).fetchall()
+                for row in rows:
+                    try:
+                        result[row["key"]] = json.loads(row["value"])
+                    except (json.JSONDecodeError, TypeError):
+                        result[row["key"]] = row["value"]
             return result
         finally:
             self._pool.release(conn)

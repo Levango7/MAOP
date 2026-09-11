@@ -29,7 +29,8 @@ export const messages = {
     'view.overview.failureRanking': 'Failure Ranking',
     'view.overview.noFailures': 'No failures recorded',
     'view.overview.activeDegradations': 'Active Degradations',
-    'view.overview.statActiveAgents': 'Active Agents',
+    // #126: 移除代码侧 .toLowerCase()，字典直接定义小写形式
+    'view.overview.statActiveAgents': 'active agents',
     'view.overview.statDelegations': 'Delegations (48h)',
     'view.overview.statSuccessRate': 'Success Rate',
     'view.overview.statAvgLatency': 'Avg Latency',
@@ -64,6 +65,9 @@ export const messages = {
     'view.overview.pev.verify.state': 'Gated',
     'view.overview.pev.connector': 'then',
     'view.overview.loadFailed': 'Failed to load overview',
+    // ── #126: a11y 标签 ──
+    'view.overview.pev.ariaLabel': 'Plan-Execute-Verify workflow',
+    'view.overview.quickActions.ariaLabel': 'Quick actions',
   },
 
   zh: {
@@ -96,6 +100,7 @@ export const messages = {
     'view.overview.failureRanking': '故障排行',
     'view.overview.noFailures': '暂无故障记录',
     'view.overview.activeDegradations': '当前降级项',
+    // #126: 移除代码侧 .toLowerCase()，字典直接定义小写形式（中文无大小写）
     'view.overview.statActiveAgents': '活跃智能体',
     'view.overview.statDelegations': '委派数 (48h)',
     'view.overview.statSuccessRate': '成功率',
@@ -131,5 +136,8 @@ export const messages = {
     'view.overview.pev.verify.state': '门禁',
     'view.overview.pev.connector': '而后',
     'view.overview.loadFailed': '加载概览失败',
+    // ── #126: a11y 标签 ──
+    'view.overview.pev.ariaLabel': '计划-执行-验证工作流',
+    'view.overview.quickActions.ariaLabel': '快捷操作',
   },
 };

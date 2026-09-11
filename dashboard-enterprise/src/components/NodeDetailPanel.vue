@@ -1,40 +1,40 @@
 <template>
   <div v-if="node" class="node-detail-panel">
-    <div class="ndp-header">
-      <span class="ndp-status-dot" :class="`ndp-status-${node.status}`"></span>
+    <div class="node-detail-panel__header">
+      <span class="node-detail-panel__status-dot" :class="`node-detail-panel__status-${node.status}`"></span>
       <h4>{{ node.node_id }}</h4>
-      <button class="ndp-close" :aria-label="t('common.close')" @click="$emit('close')">
+      <button class="node-detail-panel__close" :aria-label="t('common.close')" @click="$emit('close')">
         <AppIcon name="x" :size="16" />
       </button>
     </div>
-    <div class="ndp-body">
-      <div class="ndp-row">
-        <span class="ndp-label">{{ t('view.nodedetailpanel.status') }}</span>
-        <span class="ndp-value" :class="`ndp-status-${node.status}`">{{ node.status }}</span>
+    <div class="node-detail-panel__body">
+      <div class="node-detail-panel__row">
+        <span class="node-detail-panel__label">{{ t('view.nodedetailpanel.status') }}</span>
+        <span class="node-detail-panel__value" :class="`node-detail-panel__status-${node.status}`">{{ node.status }}</span>
       </div>
-      <div class="ndp-row">
-        <span class="ndp-label">{{ t('view.nodedetailpanel.timestamp') }}</span>
-        <span class="ndp-value">{{ formatTime(node.timestamp) }}</span>
+      <div class="node-detail-panel__row">
+        <span class="node-detail-panel__label">{{ t('view.nodedetailpanel.timestamp') }}</span>
+        <span class="node-detail-panel__value">{{ formatTime(node.timestamp) }}</span>
       </div>
-      <div v-if="meta.assigned_agent" class="ndp-row">
-        <span class="ndp-label">{{ t('view.nodedetailpanel.agent') }}</span>
-        <span class="ndp-value">{{ meta.assigned_agent }}</span>
+      <div v-if="meta.assigned_agent" class="node-detail-panel__row">
+        <span class="node-detail-panel__label">{{ t('view.nodedetailpanel.agent') }}</span>
+        <span class="node-detail-panel__value">{{ meta.assigned_agent }}</span>
       </div>
-      <div v-if="meta.duration_ms" class="ndp-row">
-        <span class="ndp-label">{{ t('view.nodedetailpanel.duration') }}</span>
-        <span class="ndp-value">{{ meta.duration_ms }} ms</span>
+      <div v-if="meta.duration_ms" class="node-detail-panel__row">
+        <span class="node-detail-panel__label">{{ t('view.nodedetailpanel.duration') }}</span>
+        <span class="node-detail-panel__value">{{ meta.duration_ms }} ms</span>
       </div>
-      <div v-if="meta.error" class="ndp-row ndp-error">
-        <span class="ndp-label">{{ t('view.nodedetailpanel.error') }}</span>
-        <span class="ndp-value ndp-mono">{{ meta.error }}</span>
+      <div v-if="meta.error" class="node-detail-panel__row node-detail-panel__error">
+        <span class="node-detail-panel__label">{{ t('view.nodedetailpanel.error') }}</span>
+        <span class="node-detail-panel__value node-detail-panel__mono">{{ meta.error }}</span>
       </div>
-      <div v-if="meta.traceback" class="ndp-row ndp-traceback">
-        <span class="ndp-label">{{ t('view.nodedetailpanel.traceback') }}</span>
-        <pre class="ndp-traceback-pre">{{ meta.traceback }}</pre>
+      <div v-if="meta.traceback" class="node-detail-panel__row node-detail-panel__traceback">
+        <span class="node-detail-panel__label">{{ t('view.nodedetailpanel.traceback') }}</span>
+        <pre class="node-detail-panel__traceback-pre">{{ meta.traceback }}</pre>
       </div>
-      <div v-if="meta.reason" class="ndp-row">
-        <span class="ndp-label">{{ t('view.nodedetailpanel.reason') }}</span>
-        <span class="ndp-value">{{ meta.reason }}</span>
+      <div v-if="meta.reason" class="node-detail-panel__row">
+        <span class="node-detail-panel__label">{{ t('view.nodedetailpanel.reason') }}</span>
+        <span class="node-detail-panel__value">{{ meta.reason }}</span>
       </div>
     </div>
   </div>
@@ -74,7 +74,7 @@ function formatTime(ts) {
   overflow: hidden;
   font-size: var(--fs-base);
 }
-.ndp-header {
+.node-detail-panel__header {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -82,13 +82,13 @@ function formatTime(ts) {
   border-bottom: 1px solid var(--border);
   background: var(--bg-muted);
 }
-.ndp-header h4 {
+.node-detail-panel__header h4 {
   margin: 0;
   flex: 1;
   font-size: var(--fs-md);
   font-weight: 600;
 }
-.ndp-close {
+.node-detail-panel__close {
   border: none;
   background: none;
   cursor: pointer;
@@ -98,32 +98,33 @@ function formatTime(ts) {
   display: flex;
   align-items: center;
 }
-.ndp-close:hover { background: var(--surface-hover); }
-.ndp-body { padding: var(--sp-2) var(--sp-3); }
-.ndp-row {
+.node-detail-panel__close:hover { background: var(--surface-hover); }
+.node-detail-panel__body { padding: var(--sp-2) var(--sp-3); }
+.node-detail-panel__row {
   display: flex;
   gap: var(--sp-3);
   padding: var(--sp-1) 0;
   align-items: flex-start;
 }
-.ndp-row + .ndp-row { border-top: 1px solid var(--border-light); }
-.ndp-label {
+/* R9 修复: --border-light 统一为 --border-subtle (与其他组件一致) */
+.node-detail-panel__row + .node-detail-panel__row { border-top: 1px solid var(--border-subtle); }
+.node-detail-panel__label {
   width: 80px;
   flex-shrink: 0;
   color: var(--text-muted);
   font-weight: 500;
 }
-.ndp-value {
+.node-detail-panel__value {
   flex: 1;
   word-break: break-word;
 }
-.ndp-mono {
+.node-detail-panel__mono {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
 }
-.ndp-error .ndp-value { color: var(--fail); }
-.ndp-traceback { flex-direction: column; gap: var(--sp-1); }
-.ndp-traceback-pre {
+.node-detail-panel__error .node-detail-panel__value { color: var(--fail); }
+.node-detail-panel__traceback { flex-direction: column; gap: var(--sp-1); }
+.node-detail-panel__traceback-pre {
   margin: 0;
   padding: var(--sp-2);
   background: var(--bg-code);
@@ -136,20 +137,20 @@ function formatTime(ts) {
   overflow-y: auto;
   white-space: pre-wrap;
 }
-.ndp-status-dot {
+.node-detail-panel__status-dot {
   width: 10px;
   height: 10px;
   border-radius: var(--r-full);
   flex-shrink: 0;
 }
-.ndp-status-pending { color: var(--text-faint); }
-.ndp-status-pending .ndp-status-dot, .ndp-status-dot.status-pending { background: var(--text-faint); }
-.ndp-status-running { color: var(--info); }
-.ndp-status-running .ndp-status-dot, .ndp-status-dot.status-running { background: var(--info); }
-.ndp-status-success { color: var(--success); }
-.ndp-status-success .ndp-status-dot, .ndp-status-dot.status-success { background: var(--success); }
-.ndp-status-failed { color: var(--fail); }
-.ndp-status-failed .ndp-status-dot, .ndp-status-dot.status-failed { background: var(--fail); }
-.ndp-status-skipped { color: var(--warn); }
-.ndp-status-skipped .ndp-status-dot, .ndp-status-dot.status-skipped { background: var(--warn); }
+.node-detail-panel__status-pending { color: var(--text-faint); }
+.node-detail-panel__status-pending .node-detail-panel__status-dot, .node-detail-panel__status-dot.status-pending { background: var(--text-faint); }
+.node-detail-panel__status-running { color: var(--info); }
+.node-detail-panel__status-running .node-detail-panel__status-dot, .node-detail-panel__status-dot.status-running { background: var(--info); }
+.node-detail-panel__status-success { color: var(--success); }
+.node-detail-panel__status-success .node-detail-panel__status-dot, .node-detail-panel__status-dot.status-success { background: var(--success); }
+.node-detail-panel__status-failed { color: var(--fail); }
+.node-detail-panel__status-failed .node-detail-panel__status-dot, .node-detail-panel__status-dot.status-failed { background: var(--fail); }
+.node-detail-panel__status-skipped { color: var(--warn); }
+.node-detail-panel__status-skipped .node-detail-panel__status-dot, .node-detail-panel__status-dot.status-skipped { background: var(--warn); }
 </style>

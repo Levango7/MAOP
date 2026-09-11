@@ -255,6 +255,12 @@ class KnowledgeGraph:
 
     def get_subgraph_by_topic(self, topic: str, max_nodes: int = 50) -> Subgraph:
         """Get a subgraph of all entities related to a topic."""
+        # 修复: 钳制 max_nodes 上限，防止 IN 子句参数总数超过 SQLite 限制。
+        # relations 查询使用 entity_names + entity_names + [max_nodes*2]，
+        # 参数总数 = 2 * len(entity_names) + 1，而 len(entity_names) <= max_nodes，
+        # 故参数总数 <= 2 * max_nodes + 1。SQLite 默认参数上限 999，
+        # max_nodes <= 499 时参数数 <= 999，留足余量。
+        max_nodes = min(max_nodes, 499)
         nodes: list[GraphNode] = []
         edges: list[GraphEdge] = []
 

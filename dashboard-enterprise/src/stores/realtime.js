@@ -88,6 +88,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
       stopMessage = null;
     }
     connected.value = false;
+    // P2-7: 刻意不重置 snapshot 和 lastUpdate —— 保留最后一次推送的数据，
+    // 让组件在断连期间仍能展示最后一次的快照而非空白。重连后新数据会
+    // 自然覆盖。这是有意的设计选择，不是遗漏。
   }
 
   // Expose snapshot as a read-only computed so consumers get a stable

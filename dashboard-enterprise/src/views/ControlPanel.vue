@@ -10,8 +10,8 @@
     <Card :title="t('view.control.executionControls')" icon="play" :margin-bottom="16">
       <div class="btn-grid">
         <button
-v-for="a in execActions" :key="a.action" class="ctrl-btn" :class="'tone-' + a.tone"
-                :disabled="loading" @click="execAction(a.action)">
+          v-for="a in execActions" :key="a.action" class="ctrl-btn" :class="'tone-' + a.tone"
+          :disabled="loading" @click="execAction(a.action)">
           <AppIcon :name="a.icon" :size="16" /> {{ t(a.label) }}
         </button>
       </div>
@@ -23,9 +23,9 @@ v-for="a in execActions" :key="a.action" class="ctrl-btn" :class="'tone-' + a.to
     <Card :title="t('view.control.maintenanceActions')" icon="wrench" :margin-bottom="16">
       <div class="btn-grid">
         <button
-v-for="m in maintActions" :key="m.action" class="ctrl-btn"
-                :class="m.tone ? 'tone-' + m.tone : ''"
-                :disabled="loading" @click="maintainAction(m.action)">
+          v-for="m in maintActions" :key="m.action" class="ctrl-btn"
+          :class="m.tone ? 'tone-' + m.tone : ''"
+          :disabled="loading" @click="maintainAction(m.action)">
           <AppIcon :name="m.icon" :size="16" /> {{ t(m.label) }}
         </button>
       </div>
@@ -50,8 +50,8 @@ v-for="m in maintActions" :key="m.action" class="ctrl-btn"
         </div>
       </div>
       <EmptyState
-v-else-if="!loading" icon="activity" :title="t('view.control.noRunningJobs')"
-                  :description="t('view.control.noRunningJobsDesc')" />
+        v-else-if="!loading" icon="activity" :title="t('view.control.noRunningJobs')"
+        :description="t('view.control.noRunningJobsDesc')" />
       <Skeleton v-else height="80px" />
     </Card>
 
@@ -73,15 +73,15 @@ v-else-if="!loading" icon="activity" :title="t('view.control.noRunningJobs')"
             </div>
           </div>
           <button
-class="act-btn small" :disabled="loading || a.status === 'up-to-date'"
-                  @click="upgradeAgent(a.name)">
+            class="act-btn small" :disabled="loading || a.status === 'up-to-date'"
+            @click="upgradeAgent(a.name)">
             <AppIcon name="upload" :size="12" /> {{ t('view.control.upgrade') }}
           </button>
         </div>
       </div>
       <EmptyState
-v-else-if="!loading" icon="refresh" :title="t('view.control.noUpgradeInfo')"
-                  :description="t('view.control.noUpgradeInfoDesc')" />
+        v-else-if="!loading" icon="refresh" :title="t('view.control.noUpgradeInfo')"
+        :description="t('view.control.noUpgradeInfoDesc')" />
       <Skeleton v-else height="120px" />
     </Card>
   </div>

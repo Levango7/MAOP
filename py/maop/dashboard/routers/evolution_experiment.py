@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
@@ -290,9 +290,10 @@ async def api_evolution_run(body: EvolutionRunRequest, request: Request) -> dict
 
 @router.get("/api/evolution/cycles")
 @handle_api_errors("evolution cycles", error_value={"status": "error", "cycles": []})
-async def api_evolution_cycles(request: Request) -> dict[str, Any]:
+async def api_evolution_cycles(request: Request, limit: int = Query(50, ge=1, le=1000)) -> dict[str, Any]:
     experiment = request.query_params.get("experiment", "")
-    limit = int(request.query_params.get("limit", "50"))
+    # P1-20: 使用 FastAPI Query 参数校验替代 int(request.query_params.get(...))，
+    # 自动处理异常值并限制范围 [1, 1000]
     loop = _perf_loop()
     cycles = loop.get_cycle_history(experiment=experiment, limit=limit)
     return {"status": "ok", "cycles": [c.model_dump() for c in cycles]}

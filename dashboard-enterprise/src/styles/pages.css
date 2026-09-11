@@ -245,8 +245,8 @@
   display: inline-block;
   flex-shrink: 0;
 }
-.status-dot.on, .agent-dot.is-active { background: var(--success); }
-.status-dot.off { background: var(--text-faint); }
+.status-dot.on, .agent-dot.is-active { background: var(--success); box-shadow: 0 0 0 2px var(--success-soft); }
+.status-dot.off { background: var(--text-faint); opacity: .5; }
 .status-dot.small { width: 6px; height: 6px; }
 .agent-bar, .agent-name, .agent-load, .agent-queue { display: flex; }
 .agent-bar { align-items: center; gap: var(--sp-3); }
@@ -683,9 +683,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .faint { color: var(--text-faint); }
 .mono { font-family: var(--font-mono); }
 .muted.mono, .mono.muted { color: var(--text-faint); }
-.status-dot { width: 8px; height: 8px; border-radius: var(--r-full); background: var(--text-faint); display: inline-block; flex-shrink: 0; }
-.status-dot.on { background: var(--success); box-shadow: 0 0 0 2px var(--success-soft); }
-.status-dot.off { background: var(--text-faint); opacity: .5; }
+/* R9 修复: .status-dot / .status-dot.on / .status-dot.off 重复定义已删除,
+ * 合并到第 248-249 行 (on 添加 box-shadow, off 添加 opacity:.5)。 */
 
 /* ── Overview page specifics ─────────────────────────────────────────── */
 .info-list { display: flex; flex-direction: column; }
@@ -1077,7 +1076,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 }
 /* Log output list */
 .log-list {
-  display: flex; flex-direction: column; max-height: 460px; overflow-y: auto;
+  display: flex; flex-direction: column; max-height: calc(100vh - var(--topbar-h) - 200px); overflow-y: auto;
   font-family: var(--font-mono); font-size: var(--fs-sm);
   border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg);
 }
@@ -1141,7 +1140,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 /* Modal form fields */
 .field__label { display: block; color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: var(--sp-2); }
 .field__input {
-  width: 100%; padding: var(--sp-3); background: var(--surface); color: var(--text);
+  width: 100%; height: var(--row-h); padding: 0 var(--sp-3); background: var(--surface); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--r-md); font-size: var(--fs-base); font-family: inherit;
   transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
 }
@@ -1206,7 +1205,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .sse-indicator.off { color: var(--text-faint); }
 .resource-fail.admin { color: var(--warn); }
 /* Event stream */
-.event-list { display: flex; flex-direction: column; max-height: 360px; overflow-y: auto; font-family: var(--font-mono); font-size: var(--fs-sm); }
+.event-list { display: flex; flex-direction: column; max-height: calc(100vh - var(--topbar-h) - 280px); overflow-y: auto; font-family: var(--font-mono); font-size: var(--fs-sm); }
 .event-row { display: grid; grid-template-columns: 88px 64px 1fr; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border-subtle); align-items: baseline; }
 .event-row:last-child { border-bottom: none; }
 .event-time { color: var(--text-faint); white-space: nowrap; }

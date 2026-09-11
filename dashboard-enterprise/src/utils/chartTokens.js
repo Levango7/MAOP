@@ -35,7 +35,10 @@ export function cssVar(name, fallback = '') {
   }
   try {
     const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    _styleCache.set(name, v);
+    // P2-12 fix: 不缓存空字符串。getComputedStyle 可能成功但返回空值
+    // （如样式表未加载完成、变量未定义），缓存空值会导致后续调用永远
+    // 返回 fallback 而非重新尝试读取。仅在获得非空值时缓存。
+    if (v) _styleCache.set(name, v);
     return v || fallback;
   } catch {
     return fallback;

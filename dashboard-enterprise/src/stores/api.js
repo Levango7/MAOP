@@ -143,7 +143,12 @@ export const useApiStore = defineStore('api', () => {
         throw new Error(`API ${url}: 401 Unauthorized`);
       }
     }
-    if (!res.ok) throw new Error(`API ${url}: ${res.status}`);
+    if (!res.ok) {
+      // P1-4 fix: 与 post/put/del 保持一致，先尝试解析 errBody.error，
+      // 给出更具体的错误信息而非仅 HTTP 状态码。
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || `API ${url}: ${res.status}`);
+    }
     return res.json();
   }
 
@@ -180,12 +185,21 @@ export const useApiStore = defineStore('api', () => {
     return res.json();
   }
 
-  /** PUT 请求，自动注入 Bearer token */
-  async function put(url, body) {
+  /**
+   * PUT 请求，自动注入 Bearer token。
+   * @param {string} url
+   * @param {object} body JSON body
+   * @param {object} [opts] { headers } 可选额外 headers
+   */
+  async function put(url, body, opts) {
     // F3: Content-Type 只在 withAuth 的 headers 参数中设置一次。
     // withAuth 实现中 init.headers = h 会覆盖 extra.headers，故 extra 内
     // 不再冗余设置 headers（原代码 extra.headers 是被丢弃的死代码）。
-    const putHeaders = { 'Content-Type': 'application/json' };
+    // P1-5 fix: 接受 opts 参数，与 get/post 保持一致。
+    const putHeaders = Object.assign(
+      { 'Content-Type': 'application/json' },
+      (opts && opts.headers) || {}
+    );
     let res = await fetchWithTimeout(url, withAuth(
       { method: 'PUT', body: JSON.stringify(body || {}) },
       putHeaders
@@ -197,7 +211,8 @@ export const useApiStore = defineStore('api', () => {
         putHeaders
       ));
       // H3 fix: 消除重复调用 handleUnauthorized()，避免 maop:unauthorized 事件重复触发。
-      if (res.status === 401) { throw new Error(`API ${url}: 401`); }
+      // P1-3 fix: 统一 401 错误消息为 "401 Unauthorized"（与 get/post 一致）。
+      if (res.status === 401) { throw new Error(`API ${url}: 401 Unauthorized`); }
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
@@ -206,14 +221,21 @@ export const useApiStore = defineStore('api', () => {
     return res.json();
   }
 
-  /** DELETE 请求，自动注入 Bearer token */
-  async function del(url) {
-    let res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
+  /**
+   * DELETE 请求，自动注入 Bearer token。
+   * @param {string} url
+   * @param {object} [opts] { headers } 可选额外 headers
+   */
+  async function del(url, opts) {
+    // P1-5 fix: 接受 opts 参数，与 get/post/put 保持一致。
+    const delHeaders = (opts && opts.headers) || {};
+    let res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, delHeaders));
     if (res.status === 401) {
       await handleUnauthorized();
-      res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, {}));
+      res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, delHeaders));
       // H3 fix: 消除重复调用 handleUnauthorized()，避免 maop:unauthorized 事件重复触发。
-      if (res.status === 401) { throw new Error(`API ${url}: 401`); }
+      // P1-3 fix: 统一 401 错误消息为 "401 Unauthorized"（与 get/post 一致）。
+      if (res.status === 401) { throw new Error(`API ${url}: 401 Unauthorized`); }
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));

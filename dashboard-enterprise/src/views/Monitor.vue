@@ -32,12 +32,12 @@
             <div v-for="a in agentStatuses" :key="a.name" class="agent-row">
               <span class="agent-dot" :class="a.healthy ? 'ok' : 'bad'"></span>
               <span class="agent-name">{{ a.name }}</span>
-              <span class="agent-queue">Queue: {{ a.queue }}</span>
+              <span class="agent-queue">{{ t('view.monitor.queue') }}: {{ a.queue }}</span>
               <div class="agent-bar"><div class="bar-fill" :style="{ width: a.load + '%', background: a.load > 80 ? 'var(--warn)' : 'var(--brand)' }"></div></div>
               <span class="agent-load">{{ a.load }}%</span>
             </div>
           </div>
-          <EmptyState v-else icon="bot" :title="t('view.monitor.noAgentStatus')" :hint="t('view.monitor.noAgentStatusHint')" />
+          <EmptyState v-else icon="bot" :title="t('view.monitor.noAgentStatus')" :description="t('view.monitor.noAgentStatusHint')" />
         </Card>
 
         <Card :title="t('view.monitor.systemResources')" icon="server" :margin-bottom="0">
@@ -169,7 +169,7 @@
           v-else
           icon="network"
           :title="t('view.monitor.noDagSub')"
-          :hint="t('view.monitor.dagInputHint')"
+          :description="t('view.monitor.dagInputHint')"
         />
       </Card>
     </div>

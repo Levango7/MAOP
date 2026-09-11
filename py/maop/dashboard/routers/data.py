@@ -265,7 +265,7 @@ async def api_vector_list(
 
 @router.get("/api/vector/search")
 @handle_api_errors("Vector search", error_value={"query": "", "results": [], "count": 0, "status": "error", "error": "Vector search unavailable"})
-async def api_vector_search(request: Request, q: str = Query(...), k: int = Query(5, alias="topk")) -> dict[str, Any]:
+async def api_vector_search(request: Request, q: str = Query(...), k: int = Query(5, alias="topk", le=1000)) -> dict[str, Any]:
     require_admin(request)
     try:
         from maop.core.memory.vector import VectorStore
@@ -501,6 +501,9 @@ async def api_logs(request: Request, type: str = "", limit: int = Query(500, ge=
     log_dir = MAOP_ROOT / "logs"
     if log_dir.exists():
         for f in sorted(log_dir.glob(f"*{log_name}*"), reverse=True):
+            # P2-23: glob 可能匹配目录，只处理文件
+            if not f.is_file():
+                continue
             try:
                 # P2-9 fix: bounded read — only tail last `limit` lines
                 tail = await asyncio.to_thread(_read_log_tail, f, limit)
@@ -549,7 +552,7 @@ async def api_logs_checker(request: Request, limit: int = Query(500, ge=1, le=50
 
 @router.get("/api/logs/analysis")
 @handle_api_errors("Logs analysis", error_value={"total": 0, "status": "error", "error": "Logs analysis unavailable"})
-async def api_logs_analysis(request: Request, type: str = Query("delegations", description="分析哪一路日志流（与日志页所选类型一致）")) -> dict[str, Any]:
+async def api_logs_analysis(request: Request, type: str = Query("delegations", description="分析哪一路日志流（与日志页所选类型一致）", pattern=r"^[a-zA-Z0-9_\-\.]+$")) -> dict[str, Any]:
     # 批次3A: 日志端点添加 require_admin 鉴权，防止未授权用户读取系统日志。
     require_admin(request)
     # 一号用户实测修复（2026-08-31）：原实现硬编码 name="delegations" ——

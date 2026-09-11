@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -38,12 +39,16 @@ class SubAgentCancelRequest(BaseModel):
     agent_id: str = Field(default="", max_length=128)
 
 _subagent_mgr = None
+_subagent_mgr_lock = threading.Lock()
 
 def _get_subagent_mgr() -> Any:
+    # P1-18: 双重检查锁定保护单例初始化
     global _subagent_mgr
     if _subagent_mgr is None:
-        from maop.core.agent.delegation.subagent_lifecycle import SubAgentManager
-        _subagent_mgr = SubAgentManager(root_dir=str(MAOP_ROOT))
+        with _subagent_mgr_lock:
+            if _subagent_mgr is None:
+                from maop.core.agent.delegation.subagent_lifecycle import SubAgentManager
+                _subagent_mgr = SubAgentManager(root_dir=str(MAOP_ROOT))
     return _subagent_mgr
 
 

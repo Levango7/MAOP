@@ -92,7 +92,7 @@
           <span class="health-detail">{{ h.detail }}</span>
         </div>
       </div>
-      <EmptyState v-else icon="shield" :title="t('view.observability.noHealthData')" :hint="t('view.observability.noHealthHint')" />
+      <EmptyState v-else icon="shield" :title="t('view.observability.noHealthData')" :description="t('view.observability.noHealthHint')" />
     </Card>
 
     <!-- ── Trace info ─────────────────────────────────────────── -->
@@ -338,9 +338,9 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .edition-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--r-sm);
   padding: 3px 10px;
-  border-radius: 12px;
+  border-radius: var(--r-xl);
   font-size: var(--fs-sm);
   font-weight: 600;
   background: var(--bg-tag);
@@ -353,9 +353,9 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .tracing-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--r-md);
   padding: 3px 10px;
-  border-radius: 12px;
+  border-radius: var(--r-xl);
   font-size: var(--fs-sm);
   font-weight: 600;
 }
@@ -379,15 +379,15 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
 }
 .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: var(--sp-4);
 }
-.mt { margin-top: 16px; }
+.mt { margin-top: var(--sp-4); }
 
 @media (max-width: 900px) {
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }

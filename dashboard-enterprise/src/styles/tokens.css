@@ -45,6 +45,10 @@
   --brand-faint: rgba(53, 116, 240, .10);
   --brand-soft: rgba(53, 116, 240, .18);
   --brand-contrast: #ffffff;
+  /* R9 修复: --on-fail / --on-warn — 按钮 danger/warn 悬停态文字色,
+   * 语义为"在饱和色背景上的可读文字", 与 --brand-contrast 同族。 */
+  --on-fail: var(--brand-contrast);
+  --on-warn: var(--brand-contrast);
 
   --border-subtle: rgba(163, 173, 190, .13);
   --border-faint: rgba(163, 173, 190, .07);
