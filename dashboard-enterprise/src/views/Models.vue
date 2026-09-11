@@ -52,8 +52,8 @@
             <div v-if="budgetError"><EmptyState icon="alert-triangle" :title="t('view.models.failedLoadBudget')" :description="budgetError" /></div>
             <Skeleton v-else-if="loading && !budget.data" :lines="5" block />
             <div v-else-if="budget.data" class="metric-grid">
-              <div class="metric"><span class="metric-k">{{ t('view.models.metric.daily') }}</span><span class="metric-v">${{ fmt(budget.data.daily_spend) }} <em>/ ${{ fmt(budget.data.daily_limit) }}</em></span></div>
-              <div class="metric"><span class="metric-k">{{ t('view.models.metric.monthly') }}</span><span class="metric-v">${{ fmt(budget.data.monthly_spend) }} <em>/ ${{ fmt(budget.data.monthly_limit) }}</em></span></div>
+              <div class="metric"><span class="metric-k">{{ t('view.models.metric.daily') }}</span><span class="metric-v">{{ formatUSD(budget.data.daily_spend) }} <em>/ {{ formatUSD(budget.data.daily_limit) }}</em></span></div>
+              <div class="metric"><span class="metric-k">{{ t('view.models.metric.monthly') }}</span><span class="metric-v">{{ formatUSD(budget.data.monthly_spend) }} <em>/ {{ formatUSD(budget.data.monthly_limit) }}</em></span></div>
               <div class="metric"><span class="metric-k">{{ t('view.models.metric.utilization') }}</span><span class="metric-v">{{ pct(budget.data.daily_utilization) }}%</span></div>
               <div class="metric"><span class="metric-k">{{ t('view.models.metric.alertAt') }}</span><span class="metric-v">{{ pct(budget.data.alert_threshold) }}%</span></div>
               <div class="metric"><span class="metric-k">{{ t('view.models.metric.hardStop') }}</span><span class="metric-v"><Badge :tone="budget.data.hard_stop ? 'fail' : 'neutral'">{{ budget.data.hard_stop ? t('view.models.enabled') : t('view.models.disabled') }}</Badge></span></div>
@@ -143,8 +143,12 @@ const budgetError = ref('');
 const registry = reactive({ error: '', total_models: 0, enabled_models: 0, total_providers: 0, thinking_capable: 0 });
 const registryError = ref('');
 
-const fmt = (n) => (n === null ? '0.00' : Number(n).toFixed(2));
+
 const pct = (n) => (n === null || n === undefined ? 0 : Number(n) > 1 ? Math.round(Number(n)) : Math.round(Number(n) * 100));
+/** 格式化美元金额，消除硬编码 '$' 符号 */
+function formatUSD(v, digits = 2) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(v) || 0);
+}
 
 /* ---- columns ---- */
 const modelCols = [
@@ -215,7 +219,7 @@ const agentRows = computed(() => agents.value.map(a => ({
 const policyRows = computed(() => policies.value.map(p => ({
   name: p.name,
   strategy: p.strategy || '—',
-  max_cost_per_task: p.max_cost_per_task !== null && p.max_cost_per_task !== undefined ? `$${Number(p.max_cost_per_task).toFixed(3)}` : '—',
+  max_cost_per_task: p.max_cost_per_task !== null && p.max_cost_per_task !== undefined ? formatUSD(p.max_cost_per_task, 3) : '—',
   prefer_low_latency: p.prefer_low_latency ? 'yes' : 'no',
   fallback_on_error: p.fallback_on_error ? 'yes' : 'no',
 })));
@@ -293,5 +297,4 @@ onMounted(loadAll);
 onUnmounted(() => { if (_switchTimer) clearTimeout(_switchTimer); });
 </script>
 
-<style scoped></style>
 

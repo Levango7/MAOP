@@ -160,7 +160,7 @@
         <div class="modal" role="dialog" aria-modal="true">
           <div class="modal__head">
             <h3>{{ t('view.tools.createSkillTitle') }}</h3>
-            <button class="modal__x" type="button" :aria-label="t('common.close')" @click="closeCreate">×</button>
+            <button class="modal__x" type="button" :aria-label="t('common.close')" @click="closeCreate"><AppIcon name="x" :size="16" /></button>
           </div>
           <div class="modal__body">
             <label class="field">

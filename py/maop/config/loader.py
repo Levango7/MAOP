@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+import threading
 from pathlib import Path
 from typing import Any, cast
 
@@ -160,6 +161,10 @@ from maop.core.backends.db_utils import find_project_root
 # re-reads and re-parses. Invalidated automatically when any YAML mtime/size
 # changes, and cleared explicitly on reload().
 _agent_config_cache: dict[str, tuple[tuple[float, int], MaopConfig]] = {}
+# H-7 fix: 保护 _agent_config_cache 的并发读写复合操作（get + 写入），
+# 避免 TOCTOU 竞态导致多线程重复解析配置。
+# （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
+_agent_config_cache_lock = threading.Lock()
 
 # Monotonic version counter for MaopConfig._version (used by hot-reload
 # detection in RouteScorer). next() on itertools.count is atomic under CPython.
@@ -227,9 +232,12 @@ class ConfigLoader:
             sig = _config_signature(self._config_dir)
         except OSError:
             sig = (0.0, 0)
-        cached = _agent_config_cache.get(cache_key)
-        if cached is not None and cached[0] == sig:
-            return cached[1]
+        # H-7 fix: 锁内执行缓存读 + 写复合操作，防止 TOCTOU 竞态。
+        # 注意：磁盘 I/O（_load_yaml）在锁外执行，避免持锁阻塞。
+        with _agent_config_cache_lock:
+            cached = _agent_config_cache.get(cache_key)
+            if cached is not None and cached[0] == sig:
+                return cached[1]
 
         agents_data = _load_yaml(self._config_dir / "agents.yaml") or {}
         rules_data = _load_yaml(self._config_dir / "rules.yaml") or {}
@@ -282,7 +290,9 @@ class ConfigLoader:
         )
         cfg._raw_models = models_data or {}
         cfg._version = _next_config_version()
-        _agent_config_cache[cache_key] = (sig, cfg)
+        # H-7 fix: 锁内写入缓存
+        with _agent_config_cache_lock:
+            _agent_config_cache[cache_key] = (sig, cfg)
         return cfg
 
     def reload(self) -> MaopConfig:
@@ -291,7 +301,9 @@ class ConfigLoader:
         Clears the config cache first so the next load() is guaranteed to
         re-read from disk regardless of mtime.
         """
-        _agent_config_cache.clear()
+        # H-7 fix: 锁内清空缓存
+        with _agent_config_cache_lock:
+            _agent_config_cache.clear()
         return self.load()
 
 

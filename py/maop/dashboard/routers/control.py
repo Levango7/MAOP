@@ -56,7 +56,7 @@ async def control_status(request: Request) -> dict[str, Any]:
                 else:
                     job["status"] = "running"
             jobs.append({k: v for k, v in job.items() if k != "process"})
-    return {"active_jobs": jobs, "jobs": jobs, "count": len(jobs)}
+    return {"status": "ok", "active_jobs": jobs, "jobs": jobs, "count": len(jobs)}
 
 @router.post("/api/control/run")
 @handle_api_errors("control run")
@@ -86,7 +86,7 @@ async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
         active_jobs[job_id] = {"action": "run", "status": "running",
             "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": actual_task,
             "process": proc, "_drain_task": _drain_task}
-    return {"job_id": job_id, "status": "started", "task": actual_task}
+    return {"status": "ok", "job_id": job_id, "task": actual_task}
 
 @router.post("/api/control/pause")
 @handle_api_errors("control pause")
@@ -145,7 +145,8 @@ async def control_pause_status(request: Request) -> dict[str, Any]:
         running_jobs = sum(1 for job in jobs_snapshot if job.get("status") == "running")
         total_jobs = len(active_jobs)
     return {
-        "status": "paused" if is_paused else "running",
+        # M-4 fix: 统一 status 值为 "ok"，用 is_paused 字段表达状态。
+        "status": "ok",
         "is_paused": is_paused,
         "pause_file": str(pause_file),
         "paused_jobs": paused_jobs,
@@ -181,7 +182,7 @@ async def control_validate(request: Request) -> dict[str, Any]:
         result = validate_config(MAOP_ROOT)
         with active_jobs_lock:
             active_jobs[job_id] = {"action": "validate", "status": "completed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "config validation", "result": result.model_dump()}
-        return {"job_id": job_id, "status": "completed", "result": result.model_dump()}
+        return {"status": "ok", "job_id": job_id, "result": result.model_dump()}
     except Exception:
         logger.exception("Validate failed")
         with active_jobs_lock:
@@ -200,7 +201,7 @@ async def control_doctor(request: Request) -> dict[str, Any]:
         results = health_check(MAOP_ROOT)
         with active_jobs_lock:
             active_jobs[job_id] = {"action": "doctor", "status": "completed", "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": "system diagnostics", "result": [r.model_dump() for r in results]}
-        return {"job_id": job_id, "status": "completed", "result": [r.model_dump() for r in results]}
+        return {"status": "ok", "job_id": job_id, "result": [r.model_dump() for r in results]}
     except Exception:
         logger.exception("Doctor check failed")
         with active_jobs_lock:
@@ -221,7 +222,7 @@ async def control_cancel(body: CancelRequest, request: Request) -> dict[str, Any
             if proc and proc.returncode is None:
                 proc.terminate()
             active_jobs[job_id]["status"] = "cancelled"
-            return {"job_id": job_id, "status": "cancelled"}
+            return {"status": "ok", "job_id": job_id}
     raise HTTPException(404, "job not found")
 
 @router.post("/api/control/refresh")
@@ -298,7 +299,8 @@ async def _maintain_prune() -> dict[str, Any]:
         return {"status": "ok", "action": "prune", "pruned": pruned_count, "remaining": total_after, "total_before": total_before, "pruned_ids": list(pruned_ids)[:20]}
     except Exception:
         logger.exception("Prune failed")
-        return {"status": "error", "action": "prune", "msg": "Failed: prune unavailable"}
+        # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
+        raise HTTPException(status_code=500, detail="Prune failed")
 
 
 async def _maintain_health() -> dict[str, Any]:
@@ -399,4 +401,5 @@ async def api_control_maintain(body: MaintainRequest, request: Request) -> dict[
         return {"status": "ok", "action": action or "noop"}
     except Exception:
         logger.exception("Maintain action failed")
-        return {"status": "error", "error": "Maintain action failed"}
+        # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
+        raise HTTPException(status_code=500, detail="Maintain action failed")

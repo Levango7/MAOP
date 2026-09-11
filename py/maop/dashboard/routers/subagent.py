@@ -98,7 +98,10 @@ async def api_subagent_cancel(body: SubAgentCancelRequest, request: Request) -> 
     # ("object bool can't be used in 'await' expression"). Drop the
     # await so the call works as designed.
     ok = mgr.cancel(agent_id)
-    return {"status": "ok" if ok else "not_found", "agent_id": agent_id}
+    if not ok:
+        # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
+        raise HTTPException(status_code=404, detail="Subagent not found")
+    return {"status": "ok", "agent_id": agent_id}
 
 
 @router.get("/api/subagent/list")
@@ -107,7 +110,7 @@ async def api_subagent_list(request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_subagent_mgr()
     agents = mgr.list_agents()
-    return {"agents": agents, "count": len(agents)}
+    return {"status": "ok", "agents": agents, "count": len(agents)}
 
 
 @router.get("/api/subagent/transcript")

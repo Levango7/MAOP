@@ -115,7 +115,7 @@ export const messages = {
 
     // ── Status ─────────────────────────────────────────────────
     'view.licenses.statusTrial': '试用',
-    'view.licenses.statusActive': '正式',
+    'view.licenses.statusActive': '有效',
     'view.licenses.statusExpired': '到期',
     'view.licenses.statusRevoked': '已吊销',
 

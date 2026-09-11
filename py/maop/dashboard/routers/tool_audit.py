@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
@@ -40,7 +40,7 @@ async def api_tool_audit_entries(
     tool_name: str = "",
     agent: str = "",
     success: bool | None = None,
-    limit: int = 50,
+    limit: int = Query(50, ge=1, le=1000),
 ) -> dict[str, Any]:
     require_admin(request)
     audit = _get_tool_audit()

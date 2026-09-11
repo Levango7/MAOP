@@ -102,7 +102,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 </script>
 
 <style scoped>
-.detail-drawer { position: fixed; inset: 0; z-index: calc(var(--z-modal, 90) + 5); }
+.detail-drawer { position: fixed; inset: 0; z-index: calc(var(--z-modal) + 5); }
 .drawer__scrim { position: absolute; inset: 0; background: var(--overlay-scrim); }
 .drawer__panel {
   position: absolute;

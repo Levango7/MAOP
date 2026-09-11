@@ -356,6 +356,9 @@ def get_settings() -> MAOPSettings:
 
     M-10 fix: 使用 threading.Lock + 双检锁保护单例创建，
     避免多线程并发调用时创建多个 MAOPSettings 实例。
+
+    L-2 fix: 创建后检查 jwt_secret 是否为空且环境变量未设置，
+    若是则发出安全警告（不阻止启动，运行时会走 load_jwt_secret() 兜底）。
     """
     global _settings
     if _settings is None:
@@ -363,7 +366,25 @@ def get_settings() -> MAOPSettings:
             # 双检锁：持锁后再次检查，防止等待期间已被其他线程初始化
             if _settings is None:
                 _settings = MAOPSettings()
+                # L-2 fix: jwt_secret 空值安全告警
+                _warn_empty_jwt_secret(_settings)
     return _settings
+
+
+def _warn_empty_jwt_secret(settings: MAOPSettings) -> None:
+    """L-2 fix: 若 jwt_secret 为空且 MAOP_JWT_SECRET 环境变量未设置，发出警告。
+
+    空值在运行时会走 load_jwt_secret() 兜底，但若兜底也失败则 JWT 签名
+    将使用空密钥，存在安全风险。此处仅告警不阻止启动。
+    """
+    if settings.jwt_secret == "" and not os.environ.get("MAOP_JWT_SECRET"):
+        import logging as _logging
+        _logger = _logging.getLogger(__name__)
+        _logger.warning(
+            "[settings] jwt_secret is empty and MAOP_JWT_SECRET env var is not set. "
+            "JWT signing will fall back to load_jwt_secret(); if that also fails, "
+            "the server will refuse to start. Set MAOP_JWT_SECRET for production."
+        )
 
 
 def reload_settings() -> MAOPSettings:

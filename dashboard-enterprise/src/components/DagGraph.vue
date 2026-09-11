@@ -311,7 +311,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 .dag-conn-indicator {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   flex-shrink: 0;
 }
 .dag-conn-indicator.on { background: var(--success); }

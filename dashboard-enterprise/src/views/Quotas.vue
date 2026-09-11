@@ -283,7 +283,7 @@ import EmptyState from '../components/EmptyState.vue';
 import ListPageLayout from '../components/ListPageLayout.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
 import { baseLineOptions } from '../utils/chartOptions.js';
-import { cssVar } from '../utils/chartTokens.js';
+import { cssVar, cssVarAlpha } from '../utils/chartTokens.js';
 
 ChartJS.register(
   LineElement, PointElement, LinearScale, CategoryScale,
@@ -453,7 +453,7 @@ const allocationChartData = computed(() => {
       data: alloc.values || [],
       backgroundColor: (alloc.labels || []).map((_, i) => palette[i % palette.length]),
       borderWidth: 2,
-      borderColor: 'var(--surface)',
+      borderColor: cssVar('--surface'),
     }],
   };
 });
@@ -469,17 +469,15 @@ const allocationChartOptions = {
 /** 使用量趋势折线图 */
 const trendChartData = computed(() => {
   const td = trendData.value || { labels: [], series: [] };
-  const palette = [
-    cssVar('--chart-1'), cssVar('--chart-2'), cssVar('--chart-3'),
-    cssVar('--chart-4'), cssVar('--chart-5'), cssVar('--chart-6'),
-  ];
+  const paletteNames = ['--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5', '--chart-6'];
+  const palette = paletteNames.map(cssVar);
   return {
     labels: td.labels || [],
     datasets: (td.series || []).map((s, i) => ({
       label: s.label || '',
       data: s.data || [],
       borderColor: palette[i % palette.length],
-      backgroundColor: palette[i % palette.length] + '20',
+      backgroundColor: cssVarAlpha(paletteNames[i % paletteNames.length], 0.12),
       fill: false,
       tension: 0.3,
       pointRadius: 0,
@@ -836,7 +834,7 @@ onMounted(loadAll);
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: calc(var(--z-modal, 90) + 10);
+  z-index: calc(var(--z-modal) + 10);
   background: var(--overlay-scrim);
   display: flex;
   align-items: center;

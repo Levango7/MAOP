@@ -33,6 +33,7 @@
     <!-- AI 任务拆分对话框 (t194) -->
     <div
       v-if="splitDialogOpen"
+      v-modal-a11y
       class="split-overlay"
       role="dialog"
       aria-modal="true"
@@ -420,7 +421,7 @@ const dagLayout = computed(() => {
   font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
-  transition: opacity var(--motion-fast, 120ms), transform var(--motion-fast, 120ms);
+  transition: opacity var(--motion-fast), transform var(--motion-fast);
 }
 .ai-split-btn:hover:not(:disabled) { opacity: 0.9; }
 .ai-split-btn:active:not(:disabled) { transform: scale(0.98); }
@@ -635,7 +636,7 @@ const dagLayout = computed(() => {
   font-weight: 500;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: opacity var(--motion-fast, 120ms);
+  transition: opacity var(--motion-fast);
 }
 .split-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .split-btn--ghost {

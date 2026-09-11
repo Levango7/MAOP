@@ -16,6 +16,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from maop.dashboard.error_handler import handle_api_errors
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
@@ -41,6 +43,7 @@ class WebhookPayload(BaseModel):
 
 
 @router.post("/webhook")
+@handle_api_errors
 async def alertmanager_webhook(payload: WebhookPayload, request: Request) -> Any:
     """Receive Alertmanager webhook posts and log each alert.
 
@@ -50,15 +53,19 @@ async def alertmanager_webhook(payload: WebhookPayload, request: Request) -> Any
 
     Security: when the ``ALERTS_WEBHOOK_SECRET`` environment variable is
     set, the request must carry a matching ``X-Webhook-Secret`` header.
-    If the env var is unset the check is skipped (backward-compatible).
+    H-3 fix: fail-closed —— 若 env var 未设置则默认拒绝（403），
+    避免未配置密钥时 webhook 被任意调用。
     """
-    # ── Shared-secret guard ──────────────────────────────────────────
+    # ── Shared-secret guard (fail-closed) ───────────────────────────
     expected_secret = os.getenv("ALERTS_WEBHOOK_SECRET", "").strip()
-    if expected_secret:
-        provided_secret = (request.headers.get("X-Webhook-Secret", "") or "").strip()
-        if provided_secret != expected_secret:
-            logger.warning("[alerts/webhook] rejected: missing or mismatched X-Webhook-Secret")
-            raise HTTPException(status_code=401, detail="Unauthorized")
+    if not expected_secret:
+        # H-3 fix: fail-closed —— 密钥未配置时拒绝请求，而非放行。
+        logger.warning("[alerts/webhook] rejected: ALERTS_WEBHOOK_SECRET not configured")
+        raise HTTPException(status_code=403, detail="Webhook secret not configured")
+    provided_secret = (request.headers.get("X-Webhook-Secret", "") or "").strip()
+    if provided_secret != expected_secret:
+        logger.warning("[alerts/webhook] rejected: missing or mismatched X-Webhook-Secret")
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
     if not payload.alerts:
         logger.info(

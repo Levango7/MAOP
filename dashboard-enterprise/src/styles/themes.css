@@ -92,8 +92,8 @@
   --bg-card: var(--surface);
   --bg-muted: rgba(148, 163, 184, .16);
   --bg-hover: rgba(148, 163, 184, .16);
-  --bg-code: #1e293b;
-  --text-code: rgba(148, 163, 184, .35);
+  --bg-code: #f6f7f9;
+  --text-code: #4e5566;
   --bg-elev: rgba(148, 163, 184, .15);
   --bg-tag: rgba(148, 163, 184, .16);
   --border-light: rgba(148, 163, 184, .16);

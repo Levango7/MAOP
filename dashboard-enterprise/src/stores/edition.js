@@ -55,6 +55,9 @@ export const useEditionStore = defineStore('edition', () => {
   const hasDegradations = computed(() => degradations.value.length > 0);
 
   // ---- actions ----
+  // H-2 fix: fetchEdition 返回 boolean 表示成功/失败（true=成功，false=失败），
+  // 保持原有 gracefully 契约（不 throw，独立调用方与测试不受影响）。
+  // switchEdition 通过检查返回值感知 fetchEdition 失败，避免错误吞噬。
   async function fetchEdition() {
     loading.value = true;
     try {
@@ -70,10 +73,10 @@ export const useEditionStore = defineStore('edition', () => {
         // 而非静默 return 导致调用方误以为 fetch 成功但未更新状态。
         if (res.status === 401) {
           switchError.value = 'Authentication required';
-          return;
+          return false;
         }
       }
-      if (!res.ok) { console.error('Failed to fetch edition info: HTTP', res.status); return; }
+      if (!res.ok) { console.error('Failed to fetch edition info: HTTP', res.status); return false; }
       const data = await res.json();
       // P1-H1: 后端未返回有效 edition 时 fallback 'personal'（安全失败）
       edition.value = data.edition || 'personal';
@@ -81,8 +84,10 @@ export const useEditionStore = defineStore('edition', () => {
       backends.value = data.backends || {};
       degradations.value = data.degradations || [];
       persistEdition(edition.value, features.value, backends.value, degradations.value);
+      return true;
     } catch (e) {
       console.error('Failed to fetch edition info:', e);
+      return false;
     } finally {
       loading.value = false;
     }
@@ -120,7 +125,14 @@ export const useEditionStore = defineStore('edition', () => {
         throw new Error(msg);
       }
       // 刷新完整 edition 信息（features/backends/degradations 可能已变化）
-      await fetchEdition();
+      // H-2 fix: 检查 fetchEdition 返回值，失败时抛错，避免 switchEdition 在
+      // fetchEdition 失败后仍返回成功（错误吞噬）。switchError 由下方 catch 设置。
+      const fetchOk = await fetchEdition();
+      if (!fetchOk) {
+        const msg = switchError.value || 'Failed to refresh edition info after switch';
+        switchError.value = msg;
+        throw new Error(msg);
+      }
       // L1 fix: 移除冗余的 persistEdition() 调用——fetchEdition() 内部成功
       // 获取数据后已调用 persistEdition() 持久化最新状态，此处重复调用
       // 不仅冗余，还在 fetchEdition 失败时用旧数据覆盖可能已部分更新的状态。

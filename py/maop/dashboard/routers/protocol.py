@@ -6,7 +6,7 @@ import logging
 import threading
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
@@ -164,7 +164,7 @@ async def api_protocol_send(body: ProtocolSendRequest, request: Request) -> dict
 
 @router.get("/api/protocol/messages")
 @handle_api_errors("Protocol messages", error_value={"messages": [], "count": 0, "error": "Messages failed"})
-async def api_protocol_messages(request: Request, recipient: str = "", protocol: str = "", limit: int = 100) -> dict[str, Any]:
+async def api_protocol_messages(request: Request, recipient: str = "", protocol: str = "", limit: int = Query(100, ge=1, le=1000)) -> dict[str, Any]:
     require_admin(request)
     if not recipient:
         raise HTTPException(400, "missing recipient")

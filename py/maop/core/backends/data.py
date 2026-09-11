@@ -469,9 +469,14 @@ class MaopDatabase:
                 cursor = conn.execute(sql, params)
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as exc:
+        except sqlite3.OperationalError as exc:
+            # 表不存在或 JSON1 扩展不可用等预期异常，返回空列表
             logger.warning("JSON1 query failed: %s", exc)
             return []
+        except Exception as exc:
+            # 非预期异常，记录日志并重新抛出
+            logger.error("JSON1 query unexpected error: %s", exc, exc_info=True)
+            raise
 
     def json_each(
         self,
@@ -515,9 +520,14 @@ class MaopDatabase:
                 cursor = conn.execute(sql, (json_path, limit))
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as exc:
+        except sqlite3.OperationalError as exc:
+            # 表不存在或 JSON1 扩展不可用等预期异常，返回空列表
             logger.warning("json_each failed: %s", exc)
             return []
+        except Exception as exc:
+            # 非预期异常，记录日志并重新抛出
+            logger.error("json_each unexpected error: %s", exc, exc_info=True)
+            raise
 
     # ── FTS5 full-text search (P2-2) ────────────────────────
 

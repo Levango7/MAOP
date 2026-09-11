@@ -245,9 +245,18 @@ class ComplianceManager:
             return 0
 
     def _delete_memory(self, conn: sqlite3.Connection, user_id: str, tenant_id: str) -> int:
-        """Delete user memory entries (short-term + long-term)."""
+        """Delete user memory entries (short-term + long-term).
+
+        M-3 fix: 对 f-string 插值的表名添加白名单验证，防止 SQL 注入。
+        （来源：agent-ops/backend-readonly-audit-batch-grep-danger-pattern-checklist）
+        """
+        # M-3 fix: 白名单验证表名，防止 SQL 注入
+        _ALLOWED_MEMORY_TABLES = frozenset(
+            {"memory_entries", "long_term_memory", "short_term_memory"}
+        )
         total = 0
         for table in ("memory_entries", "long_term_memory", "short_term_memory"):
+            assert table in _ALLOWED_MEMORY_TABLES, f"Unexpected table name: {table!r}"
             try:
                 query = f"DELETE FROM {table} WHERE user_id = ?" + self._tenant_filter(tenant_id)
                 params: tuple[Any, ...] = (user_id, tenant_id) if tenant_id else (user_id,)

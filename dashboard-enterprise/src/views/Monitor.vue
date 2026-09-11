@@ -243,6 +243,11 @@ function isForbidden(e) {
   return e?.status === 403 || (e && typeof e.message === 'string' && e.message.includes(': 403'));
 }
 
+/** 格式化美元金额，消除硬编码 '$' 符号 */
+function formatUSD(v, digits = 2) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(v) || 0);
+}
+
 // Subscribe to the shared realtime snapshot (single global WS, no second SSE
 // channel). The backend pushes the same `state` event on /ws that it used to
 // push on /api/stream, so consuming it here removes the duplicate connection.
@@ -276,7 +281,7 @@ const metrics = ref([
   { labelKey: 'view.monitor.metricRequests', icon: 'activity', value: '0', unit: '', tone: 'brand' },
   { labelKey: 'view.monitor.metricActiveAgents', icon: 'bot', value: '0', unit: '', tone: 'brand' },
   { labelKey: 'view.monitor.metricQueueDepth', icon: 'server', value: '0', unit: '', tone: 'warn' },
-  { labelKey: 'view.monitor.metricCostHr', icon: 'dollar', value: '$0.00', unit: '', tone: 'success' },
+  { labelKey: 'view.monitor.metricCostHr', icon: 'dollar', value: formatUSD(0), unit: '', tone: 'success' },
 ]);
 
 const agentStatuses = ref([]);
@@ -400,7 +405,7 @@ async function pollData() {
     const data = await api.get('/api/live');
     metrics.value[0].value = String(data.requests_per_min || 0);
     metrics.value[2].value = String(data.queue_depth || 0);
-    metrics.value[3].value = '$' + (data.cost_per_hour || 0).toFixed(2);
+    metrics.value[3].value = formatUSD(data.cost_per_hour || 0);
     if (data.agents) {
       // No synthetic load — fall back to 0 when the backend omits it.
       agentStatuses.value = data.agents.map(a => ({
@@ -522,7 +527,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 4px;
-  border-bottom: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .agent-health-row:last-child {
   border-bottom: none;
@@ -628,7 +633,7 @@ onUnmounted(() => {
   gap: 12px;
   padding: 8px 4px 4px;
   margin-top: 6px;
-  border-top: 1px dashed var(--border-light);
+  border-top: 1px dashed var(--border-subtle);
   font-size: var(--fs-xs);
   color: var(--text-faint);
   font-family: var(--font-mono);

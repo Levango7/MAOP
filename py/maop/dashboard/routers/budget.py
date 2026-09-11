@@ -7,7 +7,7 @@ import threading
 from typing import Any
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -21,9 +21,10 @@ router = APIRouter()
 
 class BudgetRecordRequest(BaseModel):
     """POST /api/budget/record 请求体。"""
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    cost_usd: float = 0.0
+    # M-3 fix: 添加值域约束，防止负数 token/cost。
+    prompt_tokens: int = Field(default=0, ge=0)
+    completion_tokens: int = Field(default=0, ge=0)
+    cost_usd: float = Field(default=0.0, ge=0.0)
 
 
 _budget_guard = None

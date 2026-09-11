@@ -776,8 +776,9 @@ def test_api_status_returns_snapshot(app_with_supervisor):
     response = client.get("/api/supervisor/status")
     assert response.status_code == 200
     data = response.json()
-    assert "agents" in data
-    assert "patrol" in data
+    # R8 fix: 响应包裹为 {status, data} 格式。
+    assert "agents" in data["data"]
+    assert "patrol" in data["data"]
 
 
 def test_api_rules_list(app_with_supervisor):

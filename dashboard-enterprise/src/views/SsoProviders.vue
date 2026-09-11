@@ -847,7 +847,7 @@ onMounted(load);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: var(--z-modal, 200);
+  z-index: var(--z-modal);
   padding: 16px;
 }
 .sso-dialog {
@@ -895,7 +895,7 @@ onMounted(load);
 }
 .sso-input:focus { outline: none; border-color: var(--brand); }
 .sso-input:disabled { opacity: 0.6; cursor: not-allowed; }
-.sso-textarea { resize: vertical; font-family: var(--font-mono, monospace); font-size: var(--fs-sm); }
+.sso-textarea { resize: vertical; font-family: var(--font-mono); font-size: var(--fs-sm); }
 .req { color: var(--fail); font-style: normal; margin-left: 2px; }
 
 .sso-toggles { display: flex; gap: 20px; }

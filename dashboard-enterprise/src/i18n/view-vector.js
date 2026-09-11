@@ -60,6 +60,6 @@ export const messages = {
     'view.vector.col.timestamp': '时间戳',
     'view.vector.resultCount': '{count} 条结果',
     'view.vector.searchTime': '{time} ms',
-    'view.vector.noMatchesDesc': '没有向量匹配“{query}”。',
+    'view.vector.noMatchesDesc': '没有向量匹配「{query}」。',
   },
 };

@@ -368,13 +368,13 @@ onMounted(() => {
   letter-spacing: 0.03em;
   font-size: var(--fs-xs);
   padding: var(--sp-3);
-  border-bottom: 1px solid var(--border-strong, var(--border));
+  border-bottom: 1px solid var(--border-strong);
   white-space: nowrap;
   text-align: left;
 }
 .tasks-table tbody td {
   padding: var(--sp-3);
-  border-bottom: 1px solid var(--border-subtle, var(--border));
+  border-bottom: 1px solid var(--border-subtle);
   color: var(--text);
   vertical-align: middle;
 }
@@ -401,7 +401,7 @@ onMounted(() => {
 .task-id {
   font-size: var(--fs-xs);
   color: var(--text-faint);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   margin-top: 2px;
 }
 .tasks-table__time,

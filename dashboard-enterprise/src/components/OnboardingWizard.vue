@@ -110,7 +110,7 @@ useModalA11y(
   /* 修复: z-index: 100 硬编码 token 化 → var(--z-modal) */
   z-index: var(--z-modal);
   /* 修复: fallback 与 tokens.css 中 --overlay-scrim 定义 rgba(15, 23, 42, .65) 不一致, 修正 */
-  background: var(--overlay-scrim, rgba(15, 23, 42, .65));
+  background: var(--overlay-scrim);
   display: flex; align-items: center; justify-content: center;
   /* 修复: 1rem 硬编码 token 化 → var(--sp-4) */
   padding: var(--sp-4);
@@ -121,9 +121,9 @@ useModalA11y(
 .onboard-wizard__steps { display: flex; gap: 0; /* 修复: 1rem token 化 */ padding: var(--sp-4) var(--sp-6); border-bottom: 1px solid var(--border); }
 /* 修复: 4px 硬编码 token 化 → var(--r-sm); 0.75rem → var(--fs-2xs) */
 .onboard-wizard__step-dot { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--r-sm); background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: var(--fs-2xs); padding: 0; }
-.onboard-wizard__step-dot span { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-muted); font-weight: 600; font-size: var(--fs-xs); }
-.onboard-wizard__step-dot--active span { background: var(--brand); color: var(--brand-contrast, #fff); }
-.onboard-wizard__step-dot--done span { background: var(--success); color: var(--brand-contrast, #fff); }
+.onboard-wizard__step-dot span { width: 28px; height: 28px; border-radius: var(--r-full); display: flex; align-items: center; justify-content: center; background: var(--bg-muted); font-weight: 600; font-size: var(--fs-xs); }
+.onboard-wizard__step-dot--active span { background: var(--brand); color: var(--brand-contrast); }
+.onboard-wizard__step-dot--done span { background: var(--success); color: var(--brand-contrast); }
 .onboard-wizard__step-dot--active { color: var(--brand); }
 .onboard-wizard__step-dot--done { color: var(--success); }
 .onboard-wizard__step-dot:disabled { opacity: 0.4; cursor: not-allowed; }

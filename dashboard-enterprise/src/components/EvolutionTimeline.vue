@@ -286,7 +286,7 @@ const nodes = computed(() => {
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   border: 1px solid var(--border);
   background: var(--surface);
   margin-bottom: var(--sp-2);
@@ -295,7 +295,7 @@ const nodes = computed(() => {
 .evo-timeline__dot.is-flat { color: var(--text-faint); border-color: var(--border-strong); }
 /* 阶段模式：成功/失败色点（迭代 C）*/
 .evo-timeline__dot.is-ok { color: var(--success-strong); border-color: var(--success); background: var(--success-soft); }
-.evo-timeline__dot.is-fail { color: var(--fail); border-color: var(--fail); background: var(--fail-soft, rgba(248, 81, 73, .15)); }
+.evo-timeline__dot.is-fail { color: var(--fail); border-color: var(--fail); background: var(--fail-soft); }
 .evo-timeline__card {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -353,7 +353,7 @@ const nodes = computed(() => {
 }
 .evo-timeline__badge.is-fail {
   color: var(--fail);
-  background: var(--fail-soft, rgba(248, 81, 73, .15));
+  background: var(--fail-soft);
   border-color: color-mix(in srgb, var(--fail) 30%, transparent);
 }
 .evo-timeline__metrics {
@@ -362,7 +362,7 @@ const nodes = computed(() => {
   gap: 3px;
   margin-top: 2px;
   padding-top: 6px;
-  border-top: 1px solid var(--border-subtle, var(--border));
+  border-top: 1px solid var(--border-subtle);
 }
 .evo-timeline__metric {
   display: flex;

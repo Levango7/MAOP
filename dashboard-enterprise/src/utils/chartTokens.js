@@ -63,6 +63,10 @@ export function cssVarAlpha(name, alpha = 0.12) {
       // hex8 (#RRGGBBAA) 已内含 alpha 通道，直接返回原值。
       // 设计意图: CSS 变量定义为 hex8 时，alpha 由设计师在样式表中精确设定，
       // 此时不覆盖调用者传入的 alpha 参数，保留 CSS 中的权威值。
+      // L-2 fix: 此处有意忽略 alpha 参数——这不是 bug 而是设计决策。
+      // 当设计师需要精确控制透明度时，会在 tokens.css 中用 hex8 格式定义
+      // CSS 变量（如 --chart-1: #3574f01f），此时 alpha=0x1f/255≈0.12 是
+      // 权威值；调用方传入的 alpha 参数应被忽略以避免覆盖设计师意图。
       return v;
     }
     return v; // 其他未知格式，原样返回
@@ -85,10 +89,13 @@ export function cssVarAlpha(name, alpha = 0.12) {
  *
  * 从 chartOptions.js 移入此文件——本函数本质上是读取 CSS 自定义属性的工具函数，
  * 与 cssVar / cssVarAlpha 同属 chartTokens 职责，集中在此便于维护。
+ *
+ * M-4 fix: 复用 cssVar() 的 _styleCache 缓存，避免每次调用都执行
+ * getComputedStyle（与 cssVar 性能特征一致）。缓存由 invalidateCssVarCache()
+ * 统一失效。M-5 fix: chartOptions.js 中 baseLineOptions() 调用 cssVarRounded(8)
+ * 亦因此自动获得缓存。
  */
 export function cssVarRounded(fallback) {
-  try {
-    const v = getComputedStyle(document.documentElement).getPropertyValue('--r-md').trim();
-    return v ? parseInt(v, 10) : fallback;
-  } catch { return fallback; }
+  const v = cssVar('--r-md', '');
+  return v ? parseInt(v, 10) : fallback;
 }

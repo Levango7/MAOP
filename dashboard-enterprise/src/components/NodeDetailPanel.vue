@@ -98,7 +98,7 @@ function formatTime(ts) {
   display: flex;
   align-items: center;
 }
-.ndp-close:hover { background: var(--bg-hover); }
+.ndp-close:hover { background: var(--surface-hover); }
 .ndp-body { padding: var(--sp-2) var(--sp-3); }
 .ndp-row {
   display: flex;
@@ -139,7 +139,7 @@ function formatTime(ts) {
 .ndp-status-dot {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   flex-shrink: 0;
 }
 .ndp-status-pending { color: var(--text-faint); }

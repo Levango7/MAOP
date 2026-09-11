@@ -780,14 +780,14 @@ onUnmounted(() => {
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-3);
 }
-@media (max-width: 1100px) { .two-col { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
 
 /* ── 热力图 ── */
 .heatmap { overflow-x: auto; overflow-y: auto; max-height: 400px; margin-top: var(--sp-2); }
 .heatmap__table { width: 100%; border-collapse: collapse; font-size: var(--fs-xs); }
 .heatmap__table th,
 .heatmap__table td {
-  border: 1px solid var(--border-subtle, var(--border));
+  border: 1px solid var(--border-subtle);
   padding: 4px 6px;
   text-align: center;
 }
@@ -858,7 +858,7 @@ onUnmounted(() => {
 .rule-row:hover { border-color: var(--border-strong); }
 .rule-row__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .rule-row__name { font-weight: 600; color: var(--text); }
-.rule-row__cond { font-size: var(--fs-xs); color: var(--text-muted); font-family: var(--font-mono, monospace); word-break: break-all; }
+.rule-row__cond { font-size: var(--fs-xs); color: var(--text-muted); font-family: var(--font-mono); word-break: break-all; }
 .rule-row__state {
   display: inline-flex;
   align-items: center;

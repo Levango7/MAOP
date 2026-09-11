@@ -169,7 +169,8 @@ async def validate_session(request: Request, session_id: str = "") -> dict[str, 
     from maop.core.security.middleware import require_admin
     require_admin(request)
     if not session_id:
-        return {"status": "error", "error": "Missing session_id"}
+        # H-2 fix: 缺少参数应返回 400，而非 200 + status=error。
+        raise HTTPException(status_code=400, detail="Missing session_id")
     mgr = _get_manager()
     session = mgr.validate_session(session_id)
     if session is None:

@@ -437,9 +437,9 @@ class TestRouting:
             request.state.auth_roles = ["admin"]
             return await call_next(request)
         app.include_router(router)
-        data = TestClient(app).get("/api/routing").json()
-        assert data["data"]["routes"] == []
-        assert "error" in data
+        # R8 fix: 异常分支应返回 500，而非 200 + status=error。
+        resp = TestClient(app).get("/api/routing")
+        assert resp.status_code == 500
 
 
 # ── /api/security/config ────────────────────────────────────────────

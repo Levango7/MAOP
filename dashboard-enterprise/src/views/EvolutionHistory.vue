@@ -753,7 +753,7 @@ onMounted(() => {
   gap: 4px 12px;
   align-items: center;
   padding: 10px 12px;
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: 6px;
 }
 .pending-item__main {
@@ -813,7 +813,7 @@ onMounted(() => {
   margin-bottom: 10px;
   padding: 4px 10px;
   background: var(--surface-2);
-  border: 1px solid var(--border-subtle, var(--border));
+  border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
   font-size: var(--fs-sm);
   width: fit-content;
@@ -857,7 +857,7 @@ onMounted(() => {
 .suggestion-item__auto { flex: 0 0 auto; }
 .suggestion-item__body {
   padding: 10px 12px;
-  border-top: 1px solid var(--border-subtle, var(--border));
+  border-top: 1px solid var(--border-subtle);
 }
 .suggestion-grid {
   display: grid;
@@ -883,7 +883,7 @@ onMounted(() => {
   margin: 2px 0 0;
   padding: 8px 10px;
   background: var(--surface-2);
-  border: 1px solid var(--border-subtle, var(--border));
+  border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
@@ -901,7 +901,7 @@ onMounted(() => {
   line-height: 18px;
   color: var(--text-muted);
   background: var(--surface-2);
-  border: 1px solid var(--border-subtle, var(--border));
+  border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
   cursor: pointer;
 }
@@ -967,7 +967,7 @@ onMounted(() => {
 }
 .diff-line__text { color: var(--text); word-break: break-all; }
 .diff-line--added { background: var(--success-soft); }
-.diff-line--added .diff-line__text { color: var(--success-strong, var(--success)); }
+.diff-line--added .diff-line__text { color: var(--success-strong); }
 .diff-line--removed { background: var(--fail-soft); }
 .diff-line--removed .diff-line__text { color: var(--fail); }
 .diff-line--unchanged .diff-line__text { color: var(--text-muted); }
@@ -1013,7 +1013,7 @@ onMounted(() => {
   font-size: var(--fs-xs);
   padding: 10px 12px;
   background: var(--surface-2);
-  border: 1px solid var(--border-subtle, var(--border));
+  border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
   overflow-x: auto;
   white-space: pre;

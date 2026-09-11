@@ -204,15 +204,15 @@ const entryRows = computed(() =>
     agent: e.agent || '—',
     model: e.model || '—',
     tokens: formatNum(e.total_tokens),
-    cost: '$' + (e.cost_usd || 0).toFixed(6),
+    cost: formatUSD(e.cost_usd || 0, 6),
     latency: (e.latency_ms ?? 0) + 'ms',
   }))
 );
 
-function money(v) {
-  const n = Number(v) || 0;
-  return '$' + n.toFixed(4);
+function formatUSD(v, digits = 2) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(v) || 0);
 }
+function money(v) { return formatUSD(v, 4); }
 function formatNum(n) {
   const v = Number(n) || 0;
   if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + 'M';
@@ -279,5 +279,4 @@ async function load() {
 onMounted(load);
 </script>
 
-<style scoped></style>
 

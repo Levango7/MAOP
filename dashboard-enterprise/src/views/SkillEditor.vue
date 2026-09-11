@@ -495,7 +495,7 @@ onMounted(load);
   align-items: stretch;
   min-height: 480px;
 }
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
   .composer { grid-template-columns: 1fr; }
 }
 

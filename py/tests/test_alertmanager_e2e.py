@@ -418,13 +418,22 @@ def test_docker_compose_base_alertmanager() -> None:
 
 
 @pytest.fixture
-def webhook_client() -> TestClient:
-    """构造仅挂载 alerts 路由的 TestClient（无需认证）."""
+def webhook_client(monkeypatch) -> TestClient:
+    """构造仅挂载 alerts 路由的 TestClient（无需认证）.
+
+    R8 fix: 设置 ALERTS_WEBHOOK_SECRET 以通过 fail-closed 守卫。
+    来源：2026-09-11-external-webhook-endpoint-signature-verification-required
+    """
+    monkeypatch.setenv("ALERTS_WEBHOOK_SECRET", "test-secret")
     from maop.dashboard.routers.alerts import router
 
     app = FastAPI()
     app.include_router(router)
     return TestClient(app)
+
+
+# R8 fix: 所有 webhook 请求必须携带 X-Webhook-Secret header 以通过共享密钥守卫。
+_WEBHOOK_HEADERS = {"X-Webhook-Secret": "test-secret"}
 
 
 def _make_alert(
@@ -497,7 +506,7 @@ def test_webhook_endpoint_registered() -> None:
 def test_webhook_returns_200_for_empty_payload(webhook_client: TestClient) -> None:
     """空 alerts 列表返回 200 + status=ok + received=0."""
     payload = _make_alertmanager_payload(alerts=[])
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ok"
@@ -507,7 +516,7 @@ def test_webhook_returns_200_for_empty_payload(webhook_client: TestClient) -> No
 def test_webhook_returns_200_for_single_alert(webhook_client: TestClient) -> None:
     """单个 firing 告警返回 200 + received=1."""
     payload = _make_alertmanager_payload()
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ok"
@@ -522,7 +531,7 @@ def test_webhook_returns_200_for_multiple_alerts(webhook_client: TestClient) -> 
         _make_alert(alertname="MAOPMemoryStoreGrowing", severity="info"),
     ]
     payload = _make_alertmanager_payload(alerts=alerts)
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 3
 
@@ -539,7 +548,7 @@ def test_webhook_critical_severity(webhook_client: TestClient) -> None:
         description="MAOP has been down for more than 1 minute.",
     )
     payload = _make_alertmanager_payload(receiver="critical", alerts=[alert])
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 1
 
@@ -548,7 +557,7 @@ def test_webhook_warning_severity(webhook_client: TestClient) -> None:
     """warning 级别告警被正确接收."""
     alert = _make_alert(alertname="MAOPHighMemory", severity="warning")
     payload = _make_alertmanager_payload(alerts=[alert])
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 1
 
@@ -561,7 +570,7 @@ def test_webhook_info_severity(webhook_client: TestClient) -> None:
         summary="Memory store exceeds 100K entries and growing",
     )
     payload = _make_alertmanager_payload(alerts=[alert])
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 1
 
@@ -573,7 +582,7 @@ def test_webhook_firing_status(webhook_client: TestClient) -> None:
     """firing 状态告警被正确接收."""
     alert = _make_alert(status="firing")
     payload = _make_alertmanager_payload(status="firing", alerts=[alert])
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 1
 
@@ -582,7 +591,7 @@ def test_webhook_resolved_status(webhook_client: TestClient) -> None:
     """resolved 状态告警被正确接收（send_resolved=true 场景）."""
     alert = _make_alert(status="resolved")
     payload = _make_alertmanager_payload(status="resolved", alerts=[alert])
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 1
 
@@ -594,7 +603,7 @@ def test_webhook_mixed_status_alerts(webhook_client: TestClient) -> None:
         _make_alert(alertname="MAOPHighMemory", status="resolved"),
     ]
     payload = _make_alertmanager_payload(alerts=alerts)
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 2
 
@@ -609,7 +618,7 @@ def test_webhook_real_alertmanager_payload_shape(webhook_client: TestClient) -> 
     assert payload["version"] == "4"
     assert "groupKey" in payload
     assert "truncatedAlerts" in payload
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
 
 
@@ -624,7 +633,7 @@ def test_webhook_slo_burn_alert(webhook_client: TestClient) -> None:
     alert["labels"]["slo"] = "availability"
     alert["labels"]["burn_rate"] = "fast"
     payload = _make_alertmanager_payload(receiver="critical", alerts=[alert])
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 1
 
@@ -639,7 +648,7 @@ def test_webhook_circuit_breaker_alert(webhook_client: TestClient) -> None:
         agent="code-reviewer",
     )
     payload = _make_alertmanager_payload(receiver="critical", alerts=[alert])
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 1
 
@@ -649,7 +658,7 @@ def test_webhook_circuit_breaker_alert(webhook_client: TestClient) -> None:
 
 def test_webhook_minimal_payload(webhook_client: TestClient) -> None:
     """最小 payload（仅 alerts 字段）仍被接受."""
-    resp = webhook_client.post("/api/alerts/webhook", json={"alerts": []})
+    resp = webhook_client.post("/api/alerts/webhook", json={"alerts": []}, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 0
 
@@ -661,7 +670,7 @@ def test_webhook_alert_missing_labels(webhook_client: TestClient) -> None:
         "status": "firing",
         "alerts": [{"status": "firing", "labels": {}, "annotations": {}}],
     }
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 1
 
@@ -677,7 +686,7 @@ def test_webhook_alert_missing_annotations(webhook_client: TestClient) -> None:
             "annotations": {},
         }],
     }
-    resp = webhook_client.post("/api/alerts/webhook", json=payload)
+    resp = webhook_client.post("/api/alerts/webhook", json=payload, headers=_WEBHOOK_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["received"] == 1
 

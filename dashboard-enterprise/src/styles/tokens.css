@@ -179,7 +179,7 @@
    * 保留 --bg-hover 仅为向后兼容; 新代码应优先使用 --surface-hover。 */
   --bg-hover: rgba(148, 163, 184, .16);
   --bg-code: #1e293b;
-  --text-code: rgba(148, 163, 184, .35);
+  --text-code: rgba(148, 163, 184, .65);
   --bg-elev: rgba(148, 163, 184, .15);
   --bg-tag: rgba(148, 163, 184, .16);
   --border-light: rgba(148, 163, 184, .16);

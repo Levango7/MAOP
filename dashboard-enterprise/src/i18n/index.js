@@ -180,6 +180,7 @@ export const coreMessages = {
     'common.retry': 'Retry',
     'common.live': 'Live',
     'common.offline': 'Offline',
+    'common.me': 'me',
     // Coach marks (iteration B2)
     'coach.actions.title': 'Quick actions',
     'coach.actions.body': 'These four tiles cover the most common starting points: run a task, start a chat, browse agents, or view logs.',
@@ -494,6 +495,7 @@ export const coreMessages = {
     'common.retry': '重试',
     'common.live': '在线',
     'common.offline': '离线',
+    'common.me': '我',
     'common.actions': '操作',
     'common.status': '状态',
     'common.model': '模型',

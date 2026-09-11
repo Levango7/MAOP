@@ -100,7 +100,7 @@ const subtitleText = computed(() => props.subtitle || (meta.subtitle ? t(meta.su
   gap: var(--sp-2);
 }
 .page-header__sub {
-  font-size: var(--fs-sm, 13px);
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   margin: 5px 0 0;
   line-height: 1.45;

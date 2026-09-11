@@ -19,7 +19,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -57,13 +57,15 @@ class ChatRequestBody(BaseModel):
     model: str = ""
     system_prompt: str = ""
     stream: bool = False
-    max_tokens: int = 4096
-    temperature: float = 0.7
+    # M-3 fix: 添加值域约束。
+    max_tokens: int = Field(default=4096, ge=1, le=128000)
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
 
 
 class MemorySearchRequest(BaseModel):
     query: str
-    top: int = 10
+    # M-3 fix: 添加值域约束。
+    top: int = Field(default=10, ge=1, le=100)
 
 
 # ── Chat Endpoints ───────────────────────────────────────────────

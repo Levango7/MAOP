@@ -22,7 +22,7 @@ import logging
 import threading
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -62,7 +62,7 @@ def _get_store() -> Any:
 )
 async def api_routing_decisions_recent(
     request: Request,
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=1000),
     stage: str = "",
 ) -> dict[str, Any]:
     """List recent routing decisions, newest-first.

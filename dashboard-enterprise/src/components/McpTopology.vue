@@ -263,7 +263,7 @@ watch(
   padding: var(--sp-2) var(--sp-3);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-md, 8px);
+  border-radius: var(--r-md);
 }
 .mcp-topo__stats { display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center; }
 .mcp-topo__actions { display: flex; gap: var(--sp-2); }
@@ -273,7 +273,7 @@ watch(
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-md, 8px);
+  border-radius: var(--r-md);
   font-size: var(--fs-base);
 }
 .mcp-topo__notice--error { background: var(--fail-soft); border: 1px solid var(--fail); color: var(--fail-strong); }
@@ -282,7 +282,7 @@ watch(
   position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-md, 8px);
+  border-radius: var(--r-md);
   overflow: hidden;
   min-height: 480px;
   height: clamp(480px, 60vh, 720px);
@@ -301,7 +301,7 @@ watch(
   /* z-index 2 为 loading 覆盖层层级，无精确 token 对应，保留硬编码 */
   z-index: 2;
 }
-.mcp-topo__spin { animation: maop-spin calc(var(--motion-normal) * 4) linear infinite; }
+.mcp-topo__spin { animation: maop-spin .9s linear infinite; /* 与 pages.css .spinning 一致: 0.9s 为 spinner 标准时长 */ }
 
 .mcp-topo__legend {
   display: flex;
@@ -314,7 +314,7 @@ watch(
 .mcp-topo__dot {
   display: inline-block;
   width: 10px; height: 10px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   flex-shrink: 0;
 }
 .mcp-topo__dot--server { background: var(--brand); border-radius: 2px; }
@@ -334,6 +334,6 @@ watch(
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
-.mcp-topo__btn:hover { background: var(--bg-hover, rgba(148,163,184,.16)); border-color: var(--border-strong, #4e545f); }
+.mcp-topo__btn:hover { background: var(--surface-hover); border-color: var(--border-strong); }
 .mcp-topo__btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

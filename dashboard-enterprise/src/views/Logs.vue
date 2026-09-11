@@ -166,7 +166,7 @@ async function load() {
       error_patterns: d.error_patterns || [],
     };
   } else {
-    error.value = error.value || ((a.reason && a.reason.message) || 'Analysis failed');
+    error.value = error.value || ((a.reason && a.reason.message) || t('view.logs.analysisFailed'));
   }
   loading.value = false;
   await nextTick();
@@ -176,5 +176,4 @@ async function load() {
 onMounted(load);
 </script>
 
-<style scoped></style>
 

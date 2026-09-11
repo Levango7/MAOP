@@ -115,7 +115,7 @@ v-else-if="!loading" icon="search" :title="t('view.tlmemory.noMemories')"
         <div class="modal" role="dialog" aria-modal="true">
           <div class="modal__head">
             <h3>{{ t('view.tlmemory.addMemoryTitle') }}</h3>
-            <button class="modal__x" type="button" :aria-label="t('common.close')" @click="showAdd = false">×</button>
+            <button class="modal__x" type="button" :aria-label="t('common.close')" @click="showAdd = false"><AppIcon name="x" :size="16" /></button>
           </div>
           <div class="modal__body">
             <label class="field">
@@ -228,9 +228,9 @@ function formatTime(ts) {
   if (isNaN(d.getTime())) return String(ts);
   return d.toLocaleString(bcp47Locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
-function splitTags(t) {
-  if (!t) return [];
-  return String(t).split(',').map((x) => x.trim()).filter(Boolean);
+function splitTags(text) {
+  if (!text) return [];
+  return String(text).split(',').map((x) => x.trim()).filter(Boolean);
 }
 
 async function loadStats() {

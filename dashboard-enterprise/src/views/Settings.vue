@@ -357,11 +357,11 @@
     </div>
 
     <!-- ── Hook create/edit dialog（任务199）────────────────────── -->
-    <div v-if="hookDialogOpen" class="hooks-modal-overlay" @click.self="closeHookDialog">
+    <div v-if="hookDialogOpen" v-modal-a11y class="hooks-modal-overlay" @click.self="closeHookDialog">
       <div class="hooks-modal" role="dialog" aria-modal="true">
         <header class="hooks-modal-head">
           <h3>{{ hookDialogMode === 'create' ? t('view.hooks.dialogTitleCreate') : t('view.hooks.dialogTitleEdit') }}</h3>
-          <button type="button" class="hooks-modal-close" @click="closeHookDialog">✕</button>
+          <button type="button" class="hooks-modal-close" @click="closeHookDialog"><AppIcon name="x" :size="16" /></button>
         </header>
         <div class="hooks-modal-body">
           <div class="hooks-form-row">
@@ -415,11 +415,11 @@
     </div>
 
     <!-- ── Snapshot detail modal ────────────────────────────────── -->
-    <div v-if="detailModalOpen" class="history-modal-overlay" @click.self="closeDetailModal">
+    <div v-if="detailModalOpen" v-modal-a11y class="history-modal-overlay" @click.self="closeDetailModal">
       <div class="history-modal" role="dialog" aria-modal="true">
         <header class="history-modal-head">
           <h3>{{ t('view.settings.detailTitle') }}</h3>
-          <button type="button" class="history-modal-close" @click="closeDetailModal">✕</button>
+          <button type="button" class="history-modal-close" @click="closeDetailModal"><AppIcon name="x" :size="16" /></button>
         </header>
         <div class="history-modal-body">
           <div v-if="historyDetailLoading !== null" class="history-state">{{ t('view.settings.historyLoading') }}</div>
@@ -459,7 +459,7 @@ import { useUiStore } from '../stores/ui.js';
 import { useI18n } from '../i18n/index.js';
 import { useToast } from '../composables/useToast.js';
 import { useConfirm } from '../composables/useConfirm.js';
-import { Card, Badge, Segmented, PageHeader } from '../components/index.js';
+import { AppIcon, Card, Badge, Segmented, PageHeader } from '../components/index.js';
 
 const api = useApiStore();
 const editionStore = useEditionStore();
@@ -871,7 +871,7 @@ async function onTestHook(hook) {
 .history-table td {
   padding: var(--sp-2) var(--sp-3);
   text-align: left;
-  border-bottom: 1px solid var(--border-subtle, var(--border));
+  border-bottom: 1px solid var(--border-subtle);
 }
 .history-table th {
   font-weight: 600;
@@ -960,15 +960,15 @@ async function onTestHook(hook) {
 .detail-meta-item { display: flex; flex-direction: column; gap: 2px; }
 .detail-meta-label { font-size: var(--fs-sm); color: var(--text-muted); }
 .detail-meta-value { font-weight: 500; color: var(--text); }
-.detail-payload-section { border-top: 1px solid var(--border-subtle, var(--border)); padding-top: var(--sp-3); }
+.detail-payload-section { border-top: 1px solid var(--border-subtle); padding-top: var(--sp-3); }
 .detail-payload-title { font-size: var(--fs-sm); color: var(--text-muted); margin-bottom: var(--sp-2); }
 .detail-payload-pre {
   background: var(--surface-2, var(--surface));
-  border: 1px solid var(--border-subtle, var(--border));
+  border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
   padding: var(--sp-3);
   font-size: var(--fs-sm);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   overflow-x: auto;
   max-height: 320px;
   overflow-y: auto;
@@ -1041,7 +1041,7 @@ async function onTestHook(hook) {
 .hooks-table td {
   padding: var(--sp-2) var(--sp-3);
   text-align: left;
-  border-bottom: 1px solid var(--border-subtle, var(--border));
+  border-bottom: 1px solid var(--border-subtle);
 }
 .hooks-table th {
   font-weight: 600;
@@ -1063,7 +1063,7 @@ async function onTestHook(hook) {
   background: var(--brand-soft);
   color: var(--brand-strong);
   font-size: var(--fs-xs);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
 }
 .hooks-actions-col { white-space: nowrap; text-align: right; }
 .hooks-action-btn {

@@ -39,7 +39,7 @@
             </div>
             <div class="users-cell users-cell--name" role="cell">
               <span class="users-uname">{{ u.username }}</span>
-              <span v-if="u.username === currentName" class="users-self">me</span>
+              <span v-if="u.username === currentName" class="users-self">{{ t('common.me') }}</span>
             </div>
             <div class="users-cell users-cell--roles" role="cell">
               <span v-for="r in (u.roles || [])" :key="r" class="users-role" :class="'users-role--' + r">{{ r }}</span>
@@ -82,7 +82,7 @@
             <input v-model="form.password" type="password" autocomplete="new-password" />
           </label>
           <label v-else>
-            <span>{{ t('users.password') }} ({{ t('common.empty') || 'leave empty to keep' }})</span>
+            <span>{{ t('users.password') }} ({{ t('common.empty') }})</span>
             <input v-model="form.password" type="password" autocomplete="new-password" />
           </label>
           <label>
@@ -188,7 +188,7 @@ async function submitForm() {
   try {
     if (dialogMode.value === 'register') {
       if (!form.value.username || !form.value.password) {
-        formError.value = t('users.username') + ' / ' + t('users.password') + ' required';
+        formError.value = t('users.username') + ' / ' + t('users.password') + ' ' + t('common.required');
         submitting.value = false;
         return;
       }
@@ -315,7 +315,7 @@ onMounted(fetchUsers);
 .users-dialog-overlay {
   position: fixed; inset: 0; background: var(--overlay-scrim);
   display: flex; align-items: center; justify-content: center;
-  z-index: var(--z-modal, 200);
+  z-index: var(--z-modal);
 }
 .users-dialog {
   position: relative;

@@ -101,7 +101,7 @@ function onCancel() { resolve(false); }
   color: var(--text-muted);
 }
 .confirm-dialog__cancel:hover {
-  background: var(--bg-hover);
+  background: var(--surface-hover);
 }
 .confirm-dialog__confirm {
   border: none;

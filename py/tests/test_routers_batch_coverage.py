@@ -313,7 +313,13 @@ async def admin_client(monkeypatch):
     _dispatch_disabled 授予 read-only 角色（P0-4 安全修复）。本测试需要
     admin 角色通过 require_admin 守卫，因此 monkeypatch _dispatch_disabled
     授予 admin 角色（仅测试用，不影响生产代码）。
+
+    R8 fix: 设置 ALERTS_WEBHOOK_SECRET 以通过 alerts webhook fail-closed 守卫。
+    来源：2026-09-11-external-webhook-endpoint-signature-verification-required
     """
+    # R8 fix: 配置 webhook 共享密钥，避免 fail-closed 返回 403。
+    monkeypatch.setenv("ALERTS_WEBHOOK_SECRET", "test-secret")
+
     from maop.core.security.middleware import AuthMiddleware
     from maop.dashboard.server import app
 
@@ -357,7 +363,13 @@ async def test_write_endpoint_reachable(admin_client, method, path):
     if body is None:
         # Endpoint expects multipart or no body — just send empty JSON.
         body = {}
-    resp = await admin_client.request(method, path, json=body, timeout=20)
+
+    # R8 fix: alerts webhook 需要 X-Webhook-Secret header 通过共享密钥守卫。
+    headers = {"Authorization": "Bearer test-token"}
+    if path.endswith("/api/alerts/webhook"):
+        headers["X-Webhook-Secret"] = "test-secret"
+
+    resp = await admin_client.request(method, path, json=body, headers=headers, timeout=20)
     # The only unacceptable statuses are 401/403 — those would mean admin auth
     # did not propagate. Business errors (400/404/409/422), downstream failures
     # (500/502), and redirects (302) are all valid for a smoke pass.

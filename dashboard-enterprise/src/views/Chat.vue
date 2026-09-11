@@ -320,7 +320,7 @@ function onImageAttach(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = (ev) => { pendingImage.value = ev.target.result; };
-  if (file.size > 5 * 1024 * 1024) { toast.error(t('view.chat.imageTooLarge') || 'Image must be under 5MB'); return; }
+  if (file.size > 5 * 1024 * 1024) { toast.error(t('view.chat.imageTooLarge')); return; }
     reader.readAsDataURL(file);
   e.target.value = '';
 }

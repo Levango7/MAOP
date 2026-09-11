@@ -175,6 +175,14 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 顶栏硬编码值说明 (无精确 token 对应, 为顶栏紧凑布局微调):
+ *   gap: 12px — 品牌区内部 logo↔brandtext 间距 (比 --sp-3 略宽, 视觉分组)
+ *   gap: 10px — 刷新区/用户区内部元素间距 (紧凑胶囊布局)
+ *   gap: 8px  — 品牌名行/状态行内 inline 元素间距 (≈ --sp-2)
+ *   gap: 6px/5px/4px — 图例点/状态点/角色点等微间距 (亚 token 级别)
+ *   padding: 5px 12px/14px — 胶囊按钮非对称内边距 (左图标右文字)
+ *   height: 36px — 分隔符竖线高度 (≈ --row-h, 视觉与控件对齐)
+ *   padding-left: 8px — 版本号与状态指示器的分隔间距 (≈ --sp-2) */
 .topbar {
   /* 层叠覆盖布局 (2026-08-13 重构): 顶栏全宽 fixed, z-index 低于侧栏 (z-index:20),
      侧栏展开时覆盖顶栏左侧品牌区, 折叠时品牌区自然露出。
@@ -207,15 +215,7 @@ onMounted(() => {
   pointer-events: none;
   z-index: var(--z-raised);
 }
-/* 右上品牌微光 */
-.topbar::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: var(--topbar-glow);
-  opacity: .7;
-}
+/* 右上品牌微光: --topbar-glow 为 none, 伪元素无视觉效果, 已移除避免多余渲染 */
 
 /* ① 品牌区 */
 .topbar__brand { display: flex; align-items: center; gap: 12px; flex-shrink: 0; position: relative; }
@@ -256,7 +256,7 @@ onMounted(() => {
 }
 .topbar__live { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
 .topbar__livedot {
-  width: 6px; height: 6px; border-radius: 50%;
+  width: 6px; height: 6px; border-radius: var(--r-full);
   background: var(--text-faint);
   transition: background var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
 }
@@ -343,7 +343,7 @@ onMounted(() => {
 .topbar__avatar {
   width: 34px; height: 34px; flex-shrink: 0;
   border-radius: var(--r-full);
-  background: linear-gradient(135deg, var(--brand) 0%, var(--chart-6) 100%);
+  background: var(--brand);
   color: var(--brand-contrast); font-size: var(--fs-base); font-weight: 700;
   display: grid; place-items: center;
   box-shadow: var(--shadow-brand), var(--shadow-inset-highlight);
@@ -374,7 +374,7 @@ onMounted(() => {
   margin-top: 1px;
 }
 .topbar__roledot {
-  width: 4px; height: 4px; border-radius: 50%;
+  width: 4px; height: 4px; border-radius: var(--r-full);
   background: var(--brand-strong);
 }
 

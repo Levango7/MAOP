@@ -36,6 +36,15 @@ export function useModalA11y(isOpen, onClose, containerEl) {
   // querySelectorAll（模态内元素多时性能开销显著）。仅在 root 变化时重新查询。
   let _focusableCache = null;
   let _focusableCacheRoot = null;
+  // H-3 fix: MutationObserver 监听缓存 root 内的 DOM 变化，动态内容
+  //（v-if、异步加载、表单展开等）变化时自动失效缓存，避免 focus trap
+  // 命中陈旧元素列表导致焦点跳到已移除/隐藏的元素上。
+  let _focusableObserver = null;
+
+  function invalidateFocusableCache() {
+    _focusableCache = null;
+    _focusableCacheRoot = null;
+  }
 
   function getFocusables(root) {
     if (_focusableCacheRoot === root && _focusableCache) {
@@ -44,6 +53,21 @@ export function useModalA11y(isOpen, onClose, containerEl) {
     _focusableCacheRoot = root;
     _focusableCache = Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR))
       .filter((el) => el.offsetParent !== null); // visible only
+    // H-3 fix: 为新缓存的 root 挂载 MutationObserver，监听子树变化自动失效缓存。
+    // 先断开旧 observer（root 变化场景），再为新 root 建立 observer。
+    if (_focusableObserver) {
+      _focusableObserver.disconnect();
+      _focusableObserver = null;
+    }
+    if (typeof MutationObserver !== 'undefined') {
+      _focusableObserver = new MutationObserver(invalidateFocusableCache);
+      _focusableObserver.observe(root, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['disabled', 'tabindex', 'hidden', 'style', 'class'],
+      });
+    }
     return _focusableCache;
   }
 
@@ -132,6 +156,11 @@ export function useModalA11y(isOpen, onClose, containerEl) {
     if (hasWindow) {
       window.removeEventListener('keydown', handleKeydown);
       window.removeEventListener('keydown', handleFocusTrap, true);
+    }
+    // H-3 fix: 断开 MutationObserver，释放引用避免泄漏。
+    if (_focusableObserver) {
+      _focusableObserver.disconnect();
+      _focusableObserver = null;
     }
   });
 }

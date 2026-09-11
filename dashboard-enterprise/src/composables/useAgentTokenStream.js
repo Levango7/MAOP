@@ -36,13 +36,22 @@ export function useAgentTokenStream() {
    * @param {function(object): void} [callbacks.onDone] - Called with completion data.
    * @param {function(string): void} [callbacks.onError] - Called on error.
    * @param {AbortSignal} [callbacks.signal] - Optional abort signal.
-   * @returns {void}
+   * @returns {{ close: Function }} 句柄；signal 已 aborted 时返回空操作句柄。
    */
   function subscribe(executionId, callbacks = {}) {
     const { onToken, onMeta, onDone, onError, signal } = callbacks;
 
     // Close any existing connection
     close();
+
+    // H-1 fix: 若传入的 signal 已 aborted，直接返回空操作句柄，避免创建
+    // EventSource（构造即建立网络连接）后立即被丢弃造成资源泄漏。
+    // 同时 M-6 fix: 当 signal 已 aborted 时，addEventListener('abort') 不会
+    // 触发回调，此处入口拦截确保后续不会注册一个永远不触发的监听器。
+    if (signal?.aborted) {
+      streaming.value = false;
+      return { close: () => {} };
+    }
 
     streaming.value = true;
     content.value = '';
@@ -58,6 +67,8 @@ export function useAgentTokenStream() {
         close();
         if (onDone) onDone({ reason: 'aborted' });
       };
+      // M-6 fix: 上方 H-1 已在函数入口拦截 signal.aborted 场景，确保
+      // 到达此处时 signal 尚未 aborted，addEventListener('abort') 能正常触发。
       signal.addEventListener('abort', externalAbortHandler);
     }
 

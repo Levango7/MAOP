@@ -109,11 +109,11 @@ start_time = time.time()
 from maop.config.env import get_tls_enabled as _get_tls_enabled
 
 tls_enabled = _get_tls_enabled()
-_env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
-# High 安全修复 (2.3): secure-by-default，与 routers/auth.py 和
-# settings._default_auth_enabled 保持一致。
-_env_is_dev = os.environ.get("MAOP_ENV", "").strip().lower() in (
-    "dev", "development", "local", "test",
-)
-auth_enabled = os.environ.get("MAOP_AUTH", "0" if _env_is_dev else "1") == "1"
+# H-4 fix: 消除 auth_enabled 双真相源 —— 统一从 settings.py 的 MAOPSettings.auth_enabled
+# 获取，与 server.py 保持单一来源。旧代码使用 os.environ.get("MAOP_AUTH", ...)
+# 直接读取环境变量，绕过了 settings.py 的 AliasChoices（MAOP_AUTH_ENABLED 优先）
+# 和 _default_auth_enabled 的 secure-by-default 策略。
+from maop.config.settings import get_settings as _get_settings
+
+auth_enabled = _get_settings().auth_enabled
 rl_enabled = os.environ.get("MAOP_RATE_LIMIT", os.environ.get("MAOP_RATE_LIMIT_ENABLED", "1")) == "1"

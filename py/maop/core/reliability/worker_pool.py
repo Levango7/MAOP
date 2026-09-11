@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -117,6 +118,16 @@ class WorkerPool:
         self._worker_status: dict[int, WorkerStatus] = dict.fromkeys(range(self._max_workers), WorkerStatus.IDLE)
 
         self._running = False
+
+        # H-2 fix: 预初始化 _shared_loop = None，并用锁保护懒创建，
+        # 消除多协程并发到达懒初始化点的 TOCTOU 竞态。
+        # （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
+        self._shared_loop: Any = None
+        self._loop_lock = threading.Lock()
+        # H-3/H-4 fix: 用锁保护 _completed/_failed/_cpu_active 计数器更新，
+        # 避免多线程并发下的读-改-写竞态。临界区极短（单个 +=），
+        # 不会阻塞事件循环。
+        self._counter_lock = threading.Lock()
 
     # ── Lifecycle ─────────────────────────────────────────────
 
@@ -218,8 +229,12 @@ class WorkerPool:
                 from maop.maop_loop import MaopLoop
                 # P2-2 fix: reuse shared MaopLoop to avoid re-opening 5 SQLite
                 # connections per task (was causing connection exhaustion)
-                if not hasattr(self, '_shared_loop') or self._shared_loop is None:  # type: ignore
-                    self._shared_loop = MaopLoop(root_dir=self._root_dir)
+                # H-2 fix: 双检锁保护 _shared_loop 懒创建，消除 TOCTOU 竞态。
+                # （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
+                if self._shared_loop is None:
+                    with self._loop_lock:
+                        if self._shared_loop is None:
+                            self._shared_loop = MaopLoop(root_dir=self._root_dir)
                 loop = self._shared_loop
                 result = await loop.run(
                     task=task, workdir=actual_workdir, skip_verify=skip_verify,
@@ -227,7 +242,9 @@ class WorkerPool:
                 )
                 wt.result = result
                 wt.status = "success"
-                self._completed += 1
+                # H-3 fix: 锁内更新 _completed 计数器
+                with self._counter_lock:
+                    self._completed += 1
                 if not self._futures[wt.id].done():
                     self._futures[wt.id].set_result(result)
             except asyncio.CancelledError:
@@ -237,7 +254,9 @@ class WorkerPool:
             except Exception as exc:
                 wt.status = "failed"
                 wt.error = str(exc)
-                self._failed += 1
+                # H-3 fix: 锁内更新 _failed 计数器
+                with self._counter_lock:
+                    self._failed += 1
                 if not self._futures[wt.id].done():
                     self._futures[wt.id].set_exception(exc)
                 logger.warning("Worker %d task failed: %s", worker_id, exc)
@@ -323,7 +342,9 @@ class WorkerPool:
         if self._cpu_pool is None:
             self._cpu_pool = ProcessPoolExecutor(max_workers=self._max_cpu_workers)
 
-        self._cpu_active += 1
+        # H-4 fix: 锁内更新 _cpu_active 计数器
+        with self._counter_lock:
+            self._cpu_active += 1
         try:
             loop = asyncio.get_running_loop()
             # Use functools.partial for pickle compatibility
@@ -331,7 +352,8 @@ class WorkerPool:
             result = await loop.run_in_executor(self._cpu_pool, fn)
             return result
         finally:
-            self._cpu_active -= 1
+            with self._counter_lock:
+                self._cpu_active -= 1
 
     # ── Query ─────────────────────────────────────────────────
 
@@ -378,6 +400,9 @@ class WorkerPool:
 # ── Global pool singleton ──────────────────────────────────────
 
 _global_pool: WorkerPool | None = None
+# H-1 fix: 保护单例创建的锁，避免多线程并发时创建多个实例
+# （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
+_pool_lock = threading.Lock()
 
 
 def get_worker_pool(
@@ -385,12 +410,19 @@ def get_worker_pool(
     max_cpu_workers: int = 0,
     root_dir: str | None = None,
 ) -> WorkerPool:
-    """Get or create the global worker pool singleton."""
+    """Get or create the global worker pool singleton.
+
+    H-1 fix: 使用 threading.Lock + 双检锁（DCLP）保护单例创建，
+    避免多线程并发调用时创建多个 WorkerPool 实例。
+    """
     global _global_pool
     if _global_pool is None:
-        _global_pool = WorkerPool(
-            max_workers=max_workers,
-            max_cpu_workers=max_cpu_workers,
-            root_dir=root_dir,
-        )
+        with _pool_lock:
+            # 双检锁：持锁后再次检查，防止等待期间已被其他线程初始化
+            if _global_pool is None:
+                _global_pool = WorkerPool(
+                    max_workers=max_workers,
+                    max_cpu_workers=max_cpu_workers,
+                    root_dir=root_dir,
+                )
     return _global_pool

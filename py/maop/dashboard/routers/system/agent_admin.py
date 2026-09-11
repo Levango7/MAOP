@@ -18,6 +18,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -27,6 +28,25 @@ from . import _deps
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ── Pydantic 请求模型 (H-3 fix: 输入校验) ──────────────────────────
+class AgentConfigUpdateRequest(BaseModel):
+    """POST /api/agent/config/update 请求体。
+
+    所有字段可选，仅作为更新字段透传给 agents.yaml。
+    capabilities 使用 Any 类型以保留手动校验（list[str] 检查），
+    避免 Pydantic 在请求体校验阶段直接返回 422。
+    """
+    agent: str = Field(default="", max_length=256)
+    model: str | None = Field(default=None, max_length=256)
+    cli: str | None = Field(default=None, max_length=256)
+    cli_args: list[str] | None = None
+    driver: str | None = Field(default=None, max_length=256)
+    timeout_s: Any = None
+    description: str | None = Field(default=None, max_length=10000)
+    wrapper: str | None = Field(default=None, max_length=10000)
+    capabilities: Any = None
 
 
 @router.get("/api/agent/config")
@@ -57,15 +77,11 @@ async def api_agent_config(request: Request) -> dict[str, Any]:
 
 @router.post("/api/agent/config/update")
 @handle_api_errors
-async def api_agent_config_update(request: Request) -> dict[str, Any]:
+async def api_agent_config_update(body: AgentConfigUpdateRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    # P0 fix: JSON 解析失败时返回 400 而非 500。
-    try:
-        body = await request.json()
-    except Exception as exc:
-        logger.warning("[agent_admin] Invalid JSON in config update request: %s", exc)
-        raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
-    agent_name = body.get("agent", "")
+    # H-3 fix: 用 Pydantic AgentConfigUpdateRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（agent/model/cli/... 字段类型）。
+    agent_name = body.agent
     if not agent_name:
         raise HTTPException(400, "missing agent name")
     try:
@@ -93,11 +109,12 @@ async def api_agent_config_update(request: Request) -> dict[str, Any]:
         # ── Schema validation: validate updates against AgentDef before writing ──
         from maop.config.loader import AgentDef
         merged = dict(agent_cfg)
+        body_dict = body.model_dump(exclude_none=True)
         for key in ("model", "cli", "cli_args", "driver", "timeout_s", "description", "wrapper"):
-            if key in body:
-                merged[key] = body[key]
-        if "capabilities" in body:
-            caps = body["capabilities"]
+            if key in body_dict:
+                merged[key] = body_dict[key]
+        if "capabilities" in body_dict:
+            caps = body_dict["capabilities"]
             if not isinstance(caps, list):
                 raise HTTPException(400, "capabilities must be a list of strings")
             for c in caps:
@@ -114,10 +131,10 @@ async def api_agent_config_update(request: Request) -> dict[str, Any]:
             raise HTTPException(400, "Config validation failed") from ve
 
         for key in ("model", "cli", "cli_args", "driver", "timeout_s", "description", "wrapper"):
-            if key in body:
-                agent_cfg[key] = body[key]
-        if "capabilities" in body:
-            agent_cfg["capabilities"] = body["capabilities"]
+            if key in body_dict:
+                agent_cfg[key] = body_dict[key]
+        if "capabilities" in body_dict:
+            agent_cfg["capabilities"] = body_dict["capabilities"]
         _dumped = yaml.dump(data, allow_unicode=True, default_flow_style=False)
         await asyncio.to_thread(Path(ypath).write_text, _dumped, encoding="utf-8")
         return {"status": "ok", "agent": agent_name, "config": agent_cfg}

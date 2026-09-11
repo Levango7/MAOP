@@ -108,7 +108,7 @@ class TestControlRunPost:
             resp = client.post("/api/control/run", json={})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "started"
+        assert data["status"] == "ok"
         assert data["task"] == "default"
         assert "job_id" in data
 
@@ -118,7 +118,7 @@ class TestControlRunPost:
             resp = client.post("/api/control/run", json={"task": "hello"})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "started"
+        assert data["status"] == "ok"
         assert data["task"] == "hello"
         assert data["job_id"] in clean_jobs
 
@@ -183,7 +183,7 @@ class TestControlValidate:
         assert resp.status_code == 200
         data = resp.json()
         assert "job_id" in data
-        assert data["status"] in ("completed", "failed")
+        assert data["status"] == "ok"
 
 
 # ── POST /api/control/doctor ──────────────────────────────────────
@@ -193,7 +193,7 @@ class TestControlDoctor:
         assert resp.status_code == 200
         data = resp.json()
         assert "job_id" in data
-        assert data["status"] in ("completed", "failed")
+        assert data["status"] == "ok"
 
 
 # ── POST /api/control/cancel ──────────────────────────────────────
@@ -204,7 +204,7 @@ class TestControlCancel:
         resp = client.post("/api/control/cancel", json={"job_id": "abc123"})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "cancelled"
+        assert data["status"] == "ok"
         assert data["job_id"] == "abc123"
         proc.terminate.assert_called_once()
 
@@ -365,7 +365,7 @@ class TestControlRun:
         resp = client_coverage.post("/api/control/run", json={"task": "test-task"})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "started"
+        assert data["status"] == "ok"
         assert "job_id" in data
 
     def test_run_with_workflow(self, client_coverage):
@@ -437,7 +437,7 @@ class TestControlCancelCoverage:
         job_id = run_resp.json()["job_id"]
         resp = client_coverage.post("/api/control/cancel", json={"job_id": job_id})
         assert resp.status_code == 200
-        assert resp.json()["status"] == "cancelled"
+        assert resp.json()["status"] == "ok"
 
 
 class TestControlRefreshCoverage:

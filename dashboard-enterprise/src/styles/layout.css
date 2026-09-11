@@ -104,6 +104,8 @@
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
   .field-row { flex-direction: column; align-items: stretch; }
   .field-row > .field-label { min-width: 0; }
+  .grid-cards { grid-template-columns: 1fr; }
+  .content-shell { padding: 16px; }
 }
 
 /* ── Responsive step ladder (tablet → phone, density-independent) ─────────
@@ -116,11 +118,6 @@
 }
 @media (max-width: 900px) {
   .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-/* Phones (portrait & landscape): single column, full-width cards */
-@media (max-width: 700px) {
-  .grid-cards { grid-template-columns: 1fr; }
-  .content-shell { padding: 16px; }
 }
 
 /* ── Short / landscape viewports: compress vertical rhythm ────────────────

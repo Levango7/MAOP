@@ -42,7 +42,7 @@ export const messages = {
     'view.chat.noSessionsHint': '发起一次对话后会出现在这里',
     'view.chat.sessionMessages': '条消息',
     'view.chat.deleteSession': '删除会话',
-    'view.chat.deleteSessionConfirm': '删除会话“{title}”？此操作不可恢复。',
+    'view.chat.deleteSessionConfirm': '删除会话「{title}」？此操作不可恢复。',
     'view.chat.deleteFailed': '删除失败',
     'view.chat.emptySession': '空会话',
     'view.chat.untitled': '未命名',

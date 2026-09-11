@@ -127,6 +127,10 @@ class MemoryManager:
         # （如 LRU move_to_end 与 popitem 竞争）。用专用锁保护所有
         # _working_cache 操作，锁粒度仅覆盖 OrderedDict 操作，不包含磁盘 I/O。
         self._working_cache_lock = threading.Lock()
+        # H-8 fix: 保护 _maybe_consolidate() 的并发执行，使用非阻塞 acquire，
+        # 获取失败则跳过本次 consolidation（已有 consolidation 在进行）。
+        # （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
+        self._consolidate_lock = threading.Lock()
         self._ensure_db()
 
     def _ensure_db(self) -> None:
@@ -345,25 +349,36 @@ class MemoryManager:
         }
 
     def _maybe_consolidate(self) -> None:
-        """Check if consolidation should be triggered and run it."""
-        cfg = self._config.consolidation
-        stats = self._memory.stats()
-        if stats.total_entries < cfg.entry_threshold:
-            return
+        """Check if consolidation should be triggered and run it.
 
-        if self._last_consolidation:
-            try:
-                last = datetime.fromisoformat(self._last_consolidation)
-                now = datetime.now(timezone.utc)
-                if (now - last).days < cfg.days_since_last:
-                    return
-            except (ValueError, TypeError):
-                pass
-
+        H-8 fix: 使用非阻塞锁保护并发执行。如果已有 consolidation 在进行，
+        acquire(blocking=False) 返回 False，直接跳过本次触发，避免
+        多线程并发触发重复 consolidation 导致资源浪费和潜在竞态。
+        （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
+        """
+        if not self._consolidate_lock.acquire(blocking=False):
+            return  # 已有 consolidation 在进行，跳过本次
         try:
-            self.consolidate()
-        except Exception as exc:
-            logger.warning("[memory_manager] Auto-consolidation failed: %s", exc)
+            cfg = self._config.consolidation
+            stats = self._memory.stats()
+            if stats.total_entries < cfg.entry_threshold:
+                return
+
+            if self._last_consolidation:
+                try:
+                    last = datetime.fromisoformat(self._last_consolidation)
+                    now = datetime.now(timezone.utc)
+                    if (now - last).days < cfg.days_since_last:
+                        return
+                except (ValueError, TypeError):
+                    pass
+
+            try:
+                self.consolidate()
+            except Exception as exc:
+                logger.warning("[memory_manager] Auto-consolidation failed: %s", exc)
+        finally:
+            self._consolidate_lock.release()
 
     @staticmethod
     def _infer_topic(text: str) -> str:

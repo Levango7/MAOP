@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
@@ -82,7 +82,10 @@ async def api_hook_unregister(body: HookIdRequest, request: Request) -> dict[str
         raise HTTPException(400, "missing id")
     mgr = _get_hook_mgr()
     removed = mgr.unregister(hook_id)
-    return {"status": "ok" if removed else "not_found", "removed": removed}
+    if not removed:
+        # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
+        raise HTTPException(status_code=404, detail="Hook not found")
+    return {"status": "ok", "removed": removed}
 
 
 @router.post("/api/hook/enable")
@@ -94,7 +97,10 @@ async def api_hook_enable(body: HookIdRequest, request: Request) -> dict[str, An
         raise HTTPException(400, "missing id")
     mgr = _get_hook_mgr()
     result = mgr.enable(hook_id)
-    return {"status": "ok" if result else "not_found"}
+    if not result:
+        # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
+        raise HTTPException(status_code=404, detail="Hook not found")
+    return {"status": "ok"}
 
 
 @router.post("/api/hook/disable")
@@ -106,7 +112,10 @@ async def api_hook_disable(body: HookIdRequest, request: Request) -> dict[str, A
         raise HTTPException(400, "missing id")
     mgr = _get_hook_mgr()
     result = mgr.disable(hook_id)
-    return {"status": "ok" if result else "not_found"}
+    if not result:
+        # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
+        raise HTTPException(status_code=404, detail="Hook not found")
+    return {"status": "ok"}
 
 
 @router.get("/api/hook/list")
@@ -115,7 +124,7 @@ async def api_hook_list(request: Request, event: str = "") -> dict[str, Any]:
     require_admin(request)
     mgr = _get_hook_mgr()
     hooks = mgr.list_hooks(event=event or "")
-    return {"hooks": [h.model_dump() for h in hooks], "count": len(hooks)}
+    return {"status": "ok", "hooks": [h.model_dump() for h in hooks], "count": len(hooks)}
 
 
 @router.get("/api/hook/get")
@@ -146,11 +155,11 @@ async def api_hook_trigger(body: HookTriggerRequest, request: Request) -> dict[s
 
 @router.get("/api/hook/logs")
 @handle_api_errors("Hook logs", error_value={"logs": [], "error": "Logs failed"})
-async def api_hook_logs(request: Request, event: str = "", limit: int = 100) -> dict[str, Any]:
+async def api_hook_logs(request: Request, event: str = "", limit: int = Query(100, ge=1, le=1000)) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_hook_mgr()
     logs = mgr.get_logs(event=event or "", limit=limit)
-    return {"logs": logs, "count": len(logs)}
+    return {"status": "ok", "logs": logs, "count": len(logs)}
 
 
 @router.get("/api/hook/events")
@@ -159,4 +168,4 @@ async def api_hook_events(request: Request) -> dict[str, Any]:
     require_admin(request)
     from maop.core.agent.plugins_hooks.hook_manager import LifecycleEvent
     events = [{"name": e.value, "phase": e.value.split(".")[-1], "domain": e.value.split(".")[0]} for e in LifecycleEvent]
-    return {"events": events, "count": len(events)}
+    return {"status": "ok", "events": events, "count": len(events)}

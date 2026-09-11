@@ -620,7 +620,7 @@ onMounted(load);
 .modal-overlay {
   position: fixed; inset: 0; background: var(--overlay-scrim);
   display: flex; align-items: center; justify-content: center;
-  z-index: var(--z-modal, 200);
+  z-index: var(--z-modal);
 }
 .modal {
   position: relative;

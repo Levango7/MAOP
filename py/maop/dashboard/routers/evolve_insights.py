@@ -44,6 +44,11 @@ class EvolutionLoopRollbackRequest(BaseModel):
     cycle_id: str = ""
     snapshot_id: str = ""
 
+
+class EvolveApplySuggestionRequest(BaseModel):
+    """POST /api/evolve/apply-suggestion 请求体。"""
+    suggestion_id: str = ""
+
 @router.get("/api/evolve/status")
 @handle_api_errors("Evolve status", error_value={"status": "error", "error": "Evolve status unavailable"})
 async def api_evolve_status(request: Request) -> dict[str, Any]:
@@ -91,12 +96,12 @@ async def api_evolve_metrics(request: Request) -> dict[str, Any]:
                 timeseries = d.get("timeseries", [])
                 heatmap = d.get("heatmap", [])
                 lineage = d.get("lineage", [])
-            return {"timeseries": timeseries, "heatmap": heatmap, "lineage": lineage}
+            return {"status": "ok", "timeseries": timeseries, "heatmap": heatmap, "lineage": lineage}
         except Exception:
-            return {"timeseries": [], "heatmap": [], "lineage": []}
+            return {"status": "ok", "timeseries": [], "heatmap": [], "lineage": []}
 
     if not history:
-        return {"timeseries": [], "heatmap": [], "lineage": []}
+        return {"status": "ok", "timeseries": [], "heatmap": [], "lineage": []}
 
     timeseries = [
         {
@@ -145,7 +150,7 @@ async def api_evolve_metrics(request: Request) -> dict[str, Any]:
         {"agent": k, **v} for k, v in agent_counts.items()
     ]
 
-    return {"timeseries": timeseries, "heatmap": heatmap, "lineage": lineage}
+    return {"status": "ok", "timeseries": timeseries, "heatmap": heatmap, "lineage": lineage}
 
 
 @router.post("/api/evolve/analyze")
@@ -235,7 +240,7 @@ async def api_evolve_report_v4(request: Request) -> dict[str, Any]:
             "avg_latency_ms": a.get("avg_latency_ms", a.get("avg_duration_ms", 0)) or 0,
             "fail_count": fail, "total_count": total,
             "tags": ",".join(a.get("tags", [])) if isinstance(a.get("tags"), list) else ""})
-    return {"performance": perf}
+    return {"status": "ok", "performance": perf}
 
 
 @router.get("/api/evolve/strategies")
@@ -285,13 +290,14 @@ async def api_evolve_suggestions_list(request: Request) -> dict[str, Any]:
 
 @router.post("/api/evolve/apply-suggestion")
 @handle_api_errors("Evolve apply suggestion", error_value={"status": "error", "error": "Apply failed"})
-async def api_evolve_apply_suggestion(request: Request) -> dict[str, Any]:
+async def api_evolve_apply_suggestion(request: Request, body: EvolveApplySuggestionRequest) -> dict[str, Any]:
     """手动应用指定进化建议。"""
     require_admin(request)
+    # H-3 fix: 用 Pydantic EvolveApplySuggestionRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（suggestion_id 字段类型）。
     from maop.evolve import EvolveEngine
     eng = EvolveEngine(root_dir=str(MAOP_ROOT))
-    body = await request.json()
-    suggestion_id = body.get("suggestion_id", "")
+    suggestion_id = body.suggestion_id
     result: Any = eng.apply(suggestion_id)
     if hasattr(result, 'model_dump'):
         result = result.model_dump()
@@ -349,7 +355,8 @@ async def api_evolution_loop_status(request: Request) -> dict[str, Any]:
         }
     except Exception as exc:
         logger.warning("Evolution loop status failed: %s", exc, exc_info=True)
-        return {"status": "error", "error": "Evolution loop status unavailable", "state": "unknown"}
+        # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
+        raise HTTPException(status_code=500, detail="Evolution loop status unavailable") from exc
 
 
 @router.post("/api/evolution/loop/trigger")
@@ -369,7 +376,8 @@ async def api_evolution_loop_trigger(request: Request, body: EvolutionLoopTrigge
         return {"status": "ok", "report": report.model_dump()}
     except Exception as exc:
         logger.warning("Evolution loop trigger failed: %s", exc, exc_info=True)
-        return {"status": "error", "error": "Evolution loop trigger failed, please try again later"}
+        # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
+        raise HTTPException(status_code=500, detail="Evolution loop trigger failed, please try again later") from exc
 
 
 @router.get("/api/evolution/approvals")
@@ -402,7 +410,8 @@ async def api_evolution_approvals(request: Request) -> dict[str, Any]:
         return {"status": "ok", "approvals": approvals, "total": len(approvals)}
     except Exception as exc:
         logger.warning("Evolution approvals failed: %s", exc, exc_info=True)
-        return {"status": "error", "error": "Evolution approvals unavailable", "approvals": []}
+        # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
+        raise HTTPException(status_code=500, detail="Evolution approvals unavailable") from exc
 
 
 @router.post("/api/evolution/approvals/{approval_id}/decision")
@@ -503,7 +512,8 @@ async def api_evolution_ab_results(request: Request, cycle_id: str) -> dict[str,
         }
     except Exception as exc:
         logger.warning("Evolution A/B results failed: %s", exc, exc_info=True)
-        return {"status": "error", "error": "Evolution A/B results unavailable", "ab_result": None}
+        # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
+        raise HTTPException(status_code=500, detail="Evolution A/B results unavailable") from exc
 
 
 @router.post("/api/evolution/loop/rollback")
@@ -531,4 +541,5 @@ async def api_evolution_loop_rollback(request: Request, body: EvolutionLoopRollb
         return {"status": "ok", "restored_files": restored, "cycle_id": cycle_id}
     except Exception as exc:
         logger.warning("Evolution rollback failed: %s", exc, exc_info=True)
-        return {"status": "error", "error": "Evolution rollback failed, please try again later"}
+        # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
+        raise HTTPException(status_code=500, detail="Evolution rollback failed, please try again later") from exc

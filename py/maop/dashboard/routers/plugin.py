@@ -115,7 +115,7 @@ async def load_all_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     results = mgr.load_all()
-    return {"plugins": [p.model_dump() for p in results]}
+    return {"status": "ok", "plugins": [p.model_dump() for p in results]}
 
 
 @router.post("/start-all")
@@ -124,7 +124,7 @@ async def start_all_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     results = mgr.start_all()
-    return {"plugins": [p.model_dump() for p in results]}
+    return {"status": "ok", "plugins": [p.model_dump() for p in results]}
 
 
 @router.post("/stop-all")
@@ -133,4 +133,4 @@ async def stop_all_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     results = mgr.stop_all()
-    return {"plugins": [p.model_dump() for p in results]}
+    return {"status": "ok", "plugins": [p.model_dump() for p in results]}

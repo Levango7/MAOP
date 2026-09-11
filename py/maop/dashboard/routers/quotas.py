@@ -207,7 +207,10 @@ async def resolve_alert(
     _require_tenant_isolation()
     mgr = _get_manager()
     resolved = mgr.resolve_alert(alert_id)
-    return {"status": "ok" if resolved else "not_found", "resolved": resolved}
+    if not resolved:
+        # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return {"status": "ok", "resolved": resolved}
 
 
 @router.get("/{tenant_id}/alerts")
@@ -349,7 +352,10 @@ async def delete_quota(
     _require_tenant_isolation()
     mgr = _get_manager()
     deleted = mgr.delete_quota(tenant_id, resource)
-    return {"status": "ok" if deleted else "not_found", "deleted": deleted}
+    if not deleted:
+        # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
+        raise HTTPException(status_code=404, detail="Quota not found")
+    return {"status": "ok", "deleted": deleted}
 
 
 # ── 使用量端点(三段路径,不与二段冲突) ────────────────────────────

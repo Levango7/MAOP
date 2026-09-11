@@ -138,10 +138,10 @@ const vectorCols = [
   { key: 'timestamp', label: t('view.vector.col.timestamp') },
 ];
 
-function normTags(t) {
-  if (!t) return [];
-  if (Array.isArray(t)) return t.map(String);
-  return String(t).split(',').map((s) => s.trim()).filter(Boolean);
+function normTags(tags) {
+  if (!tags) return [];
+  if (Array.isArray(tags)) return tags.map(String);
+  return String(tags).split(',').map((s) => s.trim()).filter(Boolean);
 }
 function shortId(r) {
   const c = r.content || r.text || '';
@@ -194,5 +194,4 @@ onMounted(async () => {
 });
 </script>
 
-<style scoped></style>
 

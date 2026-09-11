@@ -55,7 +55,7 @@ export const messages = {
     'view.control.noRunningJobs': '暂无运行中的任务',
     'view.control.noRunningJobsDesc': '您启动的任务将显示在此处。',
     'view.control.noUpgradeInfo': '暂无更新信息',
-    'view.control.noUpgradeInfoDesc': '点击“检查更新”以扫描智能体 CLI。',
+    'view.control.noUpgradeInfoDesc': '点击「检查更新」以扫描智能体 CLI。',
     'view.control.current': '当前',
     'view.control.latest': '最新',
     'view.control.actionCompleted': '{action} 已完成',

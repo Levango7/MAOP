@@ -2,7 +2,7 @@
   <div class="agents-page view-enter">
     <PageHeader>
       <span class="live-tag" :class="{ active: realtime.connected }">
-        <AppIcon :name="realtime.connected ? 'radio' : 'radio'" :size="12" />
+        <AppIcon :name="realtime.connected ? 'radio' : 'radio-off'" :size="12" />
         {{ realtime.connected ? t('common.live') : t('common.offline') }}
       </span>
       <Segmented
@@ -1232,14 +1232,14 @@ onMounted(() => {
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  cursor: pointer; transition: border-color var(--motion-fast, 120ms) var(--ease, ease), background var(--motion-fast, 120ms) var(--ease, ease);
+  cursor: pointer; transition: border-color var(--motion-fast) var(--ease, ease), background var(--motion-fast) var(--ease, ease);
 }
 .model-option:hover:not(.disabled) {
-  border-color: var(--accent, var(--brand));
+  border-color: var(--accent);
   background: var(--surface-2);
 }
 .model-option.selected {
-  border-color: var(--accent, var(--brand));
+  border-color: var(--accent);
   background: color-mix(in srgb, var(--brand) 8%, var(--surface));
 }
 .model-option.disabled { opacity: .5; cursor: not-allowed; }

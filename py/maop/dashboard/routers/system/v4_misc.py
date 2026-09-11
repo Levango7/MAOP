@@ -71,8 +71,8 @@ async def api_coordination_report_v4(request: Request) -> dict[str, Any]:
         return {"status": "ok", "data": {"teams": teams, "agent_count": len(teams)}}
     except Exception as exc:
         logger.error('Coordination report failed: %s', exc)
-        # P3 fix: 异常分支格式与正常分支对齐 {status, data, error}。
-        return {"status": "error", "data": {"teams": [], "agent_count": 0}, "error": "Coordination report unavailable"}
+        # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
+        raise HTTPException(status_code=500, detail="Coordination report unavailable") from exc
 
 
 @router.get("/api/routing")
@@ -97,8 +97,8 @@ async def api_routing_v4(request: Request) -> dict[str, Any]:
         return {"status": "ok", "data": {"routes": routes}}
     except Exception as exc:
         logger.error('Routing config failed: %s', exc)
-        # P3 fix: 异常分支格式与正常分支对齐 {status, data, error}。
-        return {"status": "error", "data": {"routes": []}, "error": "Routing config unavailable"}
+        # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
+        raise HTTPException(status_code=500, detail="Routing config unavailable") from exc
 
 
 @router.get("/api/security/config")

@@ -559,7 +559,8 @@ class TestObservabilityRouter:
         resp = client.get("/api/observability/metrics")
         assert resp.status_code == 200
         data = resp.json()
-        assert "edition" in data
+        # R8 fix: 响应包裹为 {status, data} 格式。
+        assert "edition" in data["data"]
 
     def test_config_endpoint(self):
         """GET /api/observability/config returns the OTel config."""

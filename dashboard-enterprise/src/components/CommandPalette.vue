@@ -159,7 +159,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
 <style scoped>
 /* R7 修复: z-index 从 calc(var(--z-modal) + 10) = 100 降为 + 5 = 95, 避免与 Toast z-index 冲突 */
-.cmdpal { position: fixed; inset: 0; z-index: calc(var(--z-modal, 90) + 5); }
+.cmdpal { position: fixed; inset: 0; z-index: calc(var(--z-modal) + 5); }
 .cmdpal__scrim { position: absolute; inset: 0; background: var(--overlay-scrim); }
 
 .cmdpal__panel {

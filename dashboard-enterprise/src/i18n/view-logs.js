@@ -30,6 +30,7 @@ export const messages = {
     'view.logs.type.delegations': 'Delegations',
     'view.logs.type.checker': 'Checker',
     'view.logs.streamFailed': 'Log stream failed',
+    'view.logs.analysisFailed': 'Analysis failed',
   },
 
   zh: {
@@ -63,5 +64,6 @@ export const messages = {
     'view.logs.type.delegations': '委派',
     'view.logs.type.checker': '检查器',
     'view.logs.streamFailed': '日志流失败',
+    'view.logs.analysisFailed': '分析失败',
   },
 };

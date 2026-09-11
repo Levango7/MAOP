@@ -558,7 +558,7 @@ onMounted(load);
 .lic-overlay {
   position: fixed; inset: 0; background: var(--overlay-scrim);
   display: flex; align-items: center; justify-content: center;
-  z-index: var(--z-modal, 200);
+  z-index: var(--z-modal);
 }
 .lic-dialog {
   position: relative;
@@ -595,7 +595,7 @@ onMounted(load);
 }
 .lic-field:last-child { margin-bottom: 0; }
 .lic-input {
-  background: var(--bg, var(--surface-2)); border: 1px solid var(--border);
+  background: var(--bg); border: 1px solid var(--border);
   border-radius: var(--r-md); padding: 8px 10px; color: var(--text); font-size: var(--fs-base);
   font-family: inherit; transition: border-color var(--motion) var(--ease);
 }
@@ -615,7 +615,7 @@ onMounted(load);
 .lic-dl { display: grid; grid-template-columns: 110px 1fr; gap: var(--sp-1) var(--sp-3); font-size: var(--fs-base); }
 .lic-dl dt { color: var(--text-muted); font-weight: 600; }
 .lic-dl dd { margin: 0; color: var(--text); word-break: break-all; }
-.lic-mono { font-family: var(--font-mono, monospace); font-size: var(--fs-sm); }
+.lic-mono { font-family: var(--font-mono); font-size: var(--fs-sm); }
 
 .lic-history { display: flex; flex-direction: column; gap: var(--sp-2); }
 .lic-history-item {

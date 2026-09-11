@@ -97,7 +97,8 @@ async def session_stats(request: Request) -> dict[str, Any]:
     # P1 fix: 读端点也需要 admin 鉴权。
     require_admin(request)
     mgr = _get_session_mgr()
-    return mgr.stats()
+    # M-1 fix: 包裹为 {status, data} 统一响应格式。
+    return {"status": "ok", "data": mgr.stats()}
 
 @router.get("/{session_id}")
 @handle_api_errors
@@ -239,14 +240,15 @@ async def list_sessions_paginated(
     # P1 fix: 读端点也需要 admin 鉴权。
     require_admin(request)
     mgr = _get_session_mgr()
-    return mgr.list_paginated(
+    # M-1 fix: 包裹为 {status, data} 统一响应格式。
+    return {"status": "ok", "data": mgr.list_paginated(
         status=status,
         search=search,
         page=page,
         limit=limit,
         sort=sort,
         order=order,
-    )
+    )}
 
 
 @tasks_router.post("/{session_id}/rerun")

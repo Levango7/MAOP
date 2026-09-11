@@ -150,6 +150,6 @@ export const messages = {
     // 第123行已存在正确键名 'view.search.searchFailed'，与 en 字典第48行对齐。
     'view.search.resultCount': '{count} 条结果',
     'view.search.resultCountWithTime': '{count} 条结果（{time}ms）',
-    'view.search.noMatches': '未找到匹配“{query}”的结果。',
+    'view.search.noMatches': '未找到匹配「{query}」的结果。',
   },
 };

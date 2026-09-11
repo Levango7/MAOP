@@ -18,6 +18,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -27,6 +28,13 @@ from . import _deps
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ── Pydantic 请求模型 (H-3 fix: 输入校验) ──────────────────────────
+class WorkflowRunRequest(BaseModel):
+    """POST /api/workflow/run 请求体。"""
+    name: str = Field(default="", max_length=256)
+    task: str = Field(default="", max_length=10000)
 
 
 @router.get("/api/workflow/list")
@@ -44,16 +52,12 @@ async def api_workflow_list(request: Request) -> dict[str, Any]:
 
 @router.post("/api/workflow/run")
 @handle_api_errors
-async def api_workflow_run(request: Request) -> dict[str, Any]:
+async def api_workflow_run(body: WorkflowRunRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    # P0 fix: JSON 解析失败时返回 400 而非 500。
-    try:
-        body = await request.json()
-    except Exception as exc:
-        logger.warning("[workflow] Invalid JSON in workflow run request: %s", exc)
-        raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
-    wf_name = body.get("name", "")
-    task = body.get("task", "")
+    # H-3 fix: 用 Pydantic WorkflowRunRequest 替代 await request.json()，
+    # 由 FastAPI 自动校验请求体（name/task 字段类型）。
+    wf_name = body.name
+    task = body.task
     if not wf_name:
         raise HTTPException(400, "missing workflow name")
 

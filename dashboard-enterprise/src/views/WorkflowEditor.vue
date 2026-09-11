@@ -618,7 +618,7 @@ defineExpose({
   background: var(--surface-2);
   cursor: grab;
   user-select: none;
-  transition: border-color var(--motion-fast, 120ms), background var(--motion-fast, 120ms);
+  transition: border-color var(--motion-fast), background var(--motion-fast);
 }
 .wf-palette-item:hover {
   border-color: var(--brand);
@@ -785,9 +785,7 @@ defineExpose({
 
 .wf-file-input { display: none; }
 
-@media (max-width: 1100px) {
-  .wf-layout { grid-template-columns: 180px 1fr 240px; }
-}
+
 @media (max-width: 900px) {
   .wf-layout { grid-template-columns: 1fr; }
   .wf-canvas { min-height: 360px; }

@@ -100,8 +100,8 @@ class TestHookUnregister:
     def test_not_found(self, hook_env, hook_client):
         hook_env.unregister.return_value = False
         resp = hook_client.post("/api/hook/unregister", json={"id": "nonexistent"})
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "not_found"
+        # R8 fix: 资源未找到应返回 404，而非 200 + status=not_found。
+        assert resp.status_code == 404
 
 
 class TestHookEnable:
@@ -116,7 +116,8 @@ class TestHookEnable:
     def test_not_found(self, hook_env, hook_client):
         hook_env.enable.return_value = False
         resp = hook_client.post("/api/hook/enable", json={"id": "nonexistent"})
-        assert resp.status_code == 200
+        # R8 fix: 资源未找到应返回 404，而非 200 + status=not_found。
+        assert resp.status_code == 404
 
 
 class TestHookDisable:

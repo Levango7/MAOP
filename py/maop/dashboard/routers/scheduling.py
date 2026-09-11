@@ -76,7 +76,8 @@ async def api_scheduling_failure_stats(request: Request) -> dict[str, Any]:
         }
     """
     require_admin(request)
-    return _detector().get_stats()
+    # M-1 fix: 包裹为 {status, data} 统一响应格式。
+    return {"status": "ok", "data": _detector().get_stats()}
 
 
 @router.post("/failure-stats/reset")

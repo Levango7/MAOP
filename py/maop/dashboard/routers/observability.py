@@ -19,7 +19,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
@@ -91,7 +91,8 @@ async def metrics(request: Request) -> Any:
     """
     require_admin(request)
     from maop.core.observability.metrics import metrics_summary
-    return metrics_summary()
+    # M-1 fix: 包裹为 {status, data} 统一响应格式。
+    return {"status": "ok", "data": metrics_summary()}
 
 
 @router.get("/metrics/prometheus")
@@ -115,7 +116,7 @@ async def metrics_prometheus(request: Request) -> Any:
 
 @router.get("/traces")
 @handle_api_errors("observability traces")
-async def traces(request: Request, limit: int = 20) -> Any:
+async def traces(request: Request, limit: int = Query(20, ge=1, le=1000)) -> Any:
     """Return recent trace summary.
 
     When OTel is active and an in-memory span exporter is configured,
@@ -126,6 +127,7 @@ async def traces(request: Request, limit: int = 20) -> Any:
     require_admin(request)
     if not tracing_enabled():
         return {
+            "status": "ok",
             "enabled": False,
             "edition": get_edition().value,
             "hint": "Tracing disabled. Set MAOP_OTEL_ENABLED=1 and install opentelemetry-sdk to enable.",
@@ -134,6 +136,7 @@ async def traces(request: Request, limit: int = 20) -> Any:
     # OTel is enabled but we don't have a built-in in-memory exporter
     # — operators point Jaeger/Tempo at the Collector for trace UI.
     return {
+        "status": "ok",
         "enabled": True,
         "edition": get_edition().value,
         "hint": "Traces are exported via OTLP to the Collector. Inspect them in Jaeger/Tempo.",

@@ -137,6 +137,10 @@ class EventBus:
         # High fix: keep strong references to fire-and-forget publish tasks
         # created by publish_sync so they are not garbage-collected mid-flight.
         self._pending_publish_tasks: set[asyncio.Task] = set()
+        # H-6 fix: 保护 _pending_publish_tasks 集合的并发 add/discard 操作，
+        # 避免 publish_sync 从多线程调用时集合内部状态损坏。
+        # （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
+        self._pending_lock = threading.Lock()
 
     # ── Subscribe ─────────────────────────────────────────────
 
@@ -348,9 +352,11 @@ class EventBus:
             # High fix: keep a strong reference to the task so it is not
             # garbage-collected before completion (asyncio only holds weak
             # references to tasks). Discard on completion.
+            # H-6 fix: 用锁保护集合的 add 和 add_done_callback 操作。
             task = asyncio.ensure_future(self.publish(event))
-            self._pending_publish_tasks.add(task)
-            task.add_done_callback(self._pending_publish_tasks.discard)
+            with self._pending_lock:
+                self._pending_publish_tasks.add(task)
+                task.add_done_callback(self._pending_publish_tasks.discard)
             return 0  # best-effort
         else:
             return asyncio.run(self.publish(event))

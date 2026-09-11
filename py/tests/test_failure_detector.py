@@ -498,8 +498,9 @@ def test_router_get_failure_stats(scheduling_client: TestClient):
     resp = scheduling_client.get("/api/scheduling/failure-stats")
     assert resp.status_code == 200
     body = resp.json()
-    assert "agents" in body
-    assert any(a["agent_id"] == "router-agent" for a in body["agents"])
+    # R8 fix: 响应包裹为 {status, data} 格式。
+    assert "agents" in body["data"]
+    assert any(a["agent_id"] == "router-agent" for a in body["data"]["agents"])
 
 
 def test_router_reset_specific_agent(scheduling_client: TestClient):

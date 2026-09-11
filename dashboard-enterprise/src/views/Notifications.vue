@@ -630,7 +630,7 @@ onMounted(loadAll);
   position: fixed; inset: 0;
   background: var(--overlay-scrim);
   display: flex; align-items: center; justify-content: center;
-  z-index: calc(var(--z-modal, 90) + 5);
+  z-index: calc(var(--z-modal) + 5);
 }
 .modal {
   background: var(--surface);

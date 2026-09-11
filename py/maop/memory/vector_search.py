@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import sqlite3
 import struct
 from pathlib import Path
 from typing import Any
@@ -188,8 +189,12 @@ class VectorSearch:
         with sqlite_connect(self._db_path) as conn:
             try:
                 already = {r["id"] for r in conn.execute("SELECT id FROM vectors").fetchall()}
-            except Exception:
+            except sqlite3.OperationalError:
+                # 表不存在或数据库结构异常，按空集处理
                 already = set()
+            except Exception:
+                logger.warning("vector_search.index_all: 读取已索引 ID 列表失败", exc_info=True)
+                raise
 
         mem_db = self._root / "data" / "memory.db"
         if not mem_db.exists():
@@ -200,8 +205,12 @@ class VectorSearch:
                 rows = conn.execute(
                     "SELECT id, task, content, agent FROM memory_entries ORDER BY timestamp DESC",
                 ).fetchall()
-            except Exception:
+            except sqlite3.OperationalError:
+                # 表不存在或数据库结构异常，返回 0
                 return 0
+            except Exception:
+                logger.warning("vector_search.index_all: 读取 memory_entries 失败", exc_info=True)
+                raise
 
         for row in rows:
             if row["id"] in already:
@@ -231,8 +240,12 @@ class VectorSearch:
         with sqlite_connect(self._db_path) as conn:
             try:
                 rows = conn.execute("SELECT id, embedding FROM vectors").fetchall()
-            except Exception:
+            except sqlite3.OperationalError:
+                # 表不存在或数据库结构异常，返回空结果
                 return []
+            except Exception:
+                logger.warning("vector_search.search: 读取向量数据失败", exc_info=True)
+                raise
 
         if not rows:
             return []
@@ -266,8 +279,11 @@ class VectorSearch:
                 ).fetchone()
                 if row:
                     return f"{row['task']}: {row['content']}"
+            except sqlite3.OperationalError:
+                logger.warning("vector_search._get_entry_text: memory_entries 表不存在或结构异常", exc_info=True)
             except Exception:
                 logger.warning("vector_search._get_entry_text: 读取记忆条目文本失败，已忽略并返回空", exc_info=True)
+                raise
         return ""
 
     def stats(self) -> dict[str, Any]:
@@ -278,9 +294,13 @@ class VectorSearch:
                 last_log = conn.execute(
                     "SELECT * FROM index_log ORDER BY id DESC LIMIT 1",
                 ).fetchone()
-            except Exception:
+            except sqlite3.OperationalError:
+                # 表不存在或数据库结构异常
                 total = 0
                 last_log = None
+            except Exception:
+                logger.warning("vector_search.stats: 读取统计信息失败", exc_info=True)
+                raise
 
         return {
             "total_vectors": total,

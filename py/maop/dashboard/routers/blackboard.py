@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from maop.core.reliability.blackboard import (
@@ -138,7 +138,7 @@ async def clear_domain(domain: str, request: Request) -> dict[str, Any]:
 
 @router.get("/history")
 @handle_api_errors("blackboard history")
-async def get_history(limit: int = 100) -> dict[str, Any]:
+async def get_history(limit: int = Query(100, ge=1, le=1000)) -> dict[str, Any]:
     """获取操作历史（最近 ``limit`` 条）。"""
     bb = get_blackboard()
     return {"status": "ok", "data": bb.get_history(limit=limit)}

@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -64,6 +64,7 @@ async def list_tenants(
     status: str = "",
 ) -> dict[str, Any]:
     """List all tenants, optionally filtered by status."""
+
     require_admin(request)
     # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
     if not has_feature(FeatureFlag.TENANT_ISOLATION):
@@ -175,7 +176,10 @@ async def activate_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
         )
     mgr = _get_manager()
     activated = mgr.activate_tenant(tenant_id)
-    return {"status": "ok" if activated else "not_found", "activated": activated}
+    if not activated:
+        # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return {"status": "ok", "activated": activated}
 
 
 @router.delete("/{tenant_id}")
@@ -191,7 +195,10 @@ async def delete_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
         )
     mgr = _get_manager()
     deleted = mgr.delete_tenant(tenant_id)
-    return {"status": "ok" if deleted else "not_found", "deleted": deleted}
+    if not deleted:
+        # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return {"status": "ok", "deleted": deleted}
 
 
 @router.get("/{tenant_id}/usage")

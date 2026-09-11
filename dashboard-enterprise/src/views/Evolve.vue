@@ -612,7 +612,7 @@ onMounted(() => {
   left: 50%;
   transform: translateX(-50%);
   width: 2px;
-  background: var(--border-subtle, var(--border));
+  background: var(--border-subtle);
   border-radius: 1px;
 }
 .evolve-milestones__dot {
@@ -630,7 +630,7 @@ onMounted(() => {
 .evolve-milestones__node--capability .evolve-milestones__dot { background: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
 .evolve-milestones__card {
   background: var(--surface-2);
-  border: 1px solid var(--border-subtle, var(--border));
+  border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
   padding: var(--sp-3);
   display: flex;
@@ -685,7 +685,7 @@ onMounted(() => {
   align-items: center;
   gap: var(--sp-2);
   padding-top: var(--sp-1);
-  border-top: 1px dashed var(--border-subtle, var(--border));
+  border-top: 1px dashed var(--border-subtle);
   margin-top: 2px;
 }
 .evolve-milestones__impact-label {
@@ -716,7 +716,7 @@ onMounted(() => {
 }
 .heatmap__table th,
 .heatmap__table td {
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-subtle);
   padding: 4px 6px;
   text-align: center;
   white-space: nowrap;

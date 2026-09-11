@@ -24,7 +24,7 @@ import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from maop.core.scheduling.failure_detector import get_supervisor
 from maop.core.scheduling.supervisor import (
@@ -73,7 +73,8 @@ async def api_supervisor_status(request: Request) -> dict[str, Any]:
     """Return the full supervisor status snapshot."""
     require_admin(request)
     sup = _get_supervisor_or_404()
-    return sup.get_supervisor_status()
+    # M-1 fix: 包裹为 {status, data} 统一响应格式。
+    return {"status": "ok", "data": sup.get_supervisor_status()}
 
 
 # ── Rules ──────────────────────────────────────────────────────
@@ -129,7 +130,7 @@ async def api_supervisor_rule_update(
 async def api_supervisor_actions(
     request: Request,
     agent_id: str | None = None,
-    limit: int = 50,
+    limit: int = Query(50, ge=1, le=1000),
 ) -> dict[str, Any]:
     """Return control action history (optionally filtered by agent)."""
     require_admin(request)

@@ -142,7 +142,7 @@ async def load_artifact(request: Request, name: str, version: int | None = Query
 
 @router.get("/artifacts/{name}/history")
 @handle_api_errors
-async def artifact_history(request: Request, name: str, limit: int = Query(20)) -> dict[str, Any]:
+async def artifact_history(request: Request, name: str, limit: int = Query(20, ge=1, le=1000)) -> dict[str, Any]:
     require_admin(request)
     store = _get_artifact_store()
     history = store.history(name, limit=limit)

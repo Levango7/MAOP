@@ -83,7 +83,7 @@ export const messages = {
     'view.overview.actionLogs': '查看日志',
     'view.overview.noRecentDelegations': '暂无近期委派',
     'view.overview.noActivity': '暂无近期活动',
-    'view.overview.noActivityHint': '在"执行"里跑一个任务或委派一个智能体，事件会显示在这里。',
+    'view.overview.noActivityHint': '在「执行」里跑一个任务或委派一个智能体，事件会显示在这里。',
     'view.overview.throughput': '吞吐量 (168h)',
     'view.overview.noTimeseries': '暂无时序数据',
     'view.overview.throughputUnavailable': '吞吐量历史数据当前不可用。',

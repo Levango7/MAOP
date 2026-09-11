@@ -780,13 +780,17 @@ class CacheGuard:
                 else:
                     self._stats.hits += 1
                     return entry
-
-        self._stats.misses += 1
+            # H-5 fix: _stats.misses 移入锁内更新，避免与并发的 hits/null_hits
+            # 更新竞态导致统计偏差。
+            # （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
+            self._stats.misses += 1
 
         if self._sf is not None:
             result, was_dedup = self._sf.execute(key, lambda: self._load_and_store(key, loader, ttl))
             if was_dedup:
-                self._stats.singleflight_dedups += 1
+                # L-1 fix: singleflight_dedups 统计计数器移入锁内更新
+                with self._lock:
+                    self._stats.singleflight_dedups += 1
             return result
         else:
             return self._load_and_store(key, loader, ttl)

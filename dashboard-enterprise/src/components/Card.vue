@@ -67,7 +67,7 @@ const mbStyle = computed(() => {
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--border-subtle, var(--border));
+  border-bottom: 1px solid var(--border-subtle);
   min-height: var(--row-h);
 }
 .card__title {

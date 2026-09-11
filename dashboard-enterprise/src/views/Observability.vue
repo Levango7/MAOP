@@ -433,7 +433,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   grid-column: 3;
   font-size: var(--fs-sm);
   color: var(--text-muted);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
 }
 .pipeline-status {
   grid-column: 3;
@@ -465,7 +465,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   font-weight: 500;
 }
 .config-value.mono {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: var(--fs-sm);
 }
 
@@ -493,7 +493,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   border-bottom: 1px solid var(--border-soft);
 }
 .metric-row:last-child { border-bottom: none; }
-.mono { font-family: var(--font-mono, monospace); font-size: var(--fs-sm); }
+.mono { font-family: var(--font-mono); font-size: var(--fs-sm); }
 .col-name { color: var(--text); }
 .col-type { text-align: center; }
 .col-value {
@@ -504,7 +504,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .col-extra {
   font-size: var(--fs-sm);
   color: var(--text-muted);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
 }
 .type-tag {
   display: inline-block;
@@ -570,7 +570,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   color: var(--text-muted);
 }
 .trace-enable code {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   background: var(--bg-tag);
   padding: 1px 6px;
   border-radius: 3px;

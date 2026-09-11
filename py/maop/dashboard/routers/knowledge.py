@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -40,7 +40,8 @@ class ExtractRequest(BaseModel):
 
 class VectorSearchRequest(BaseModel):
     query: str
-    top: int = 10
+    # M-3 fix: 添加值域约束。
+    top: int = Field(default=10, ge=1, le=100)
 
 
 # ── Knowledge Graph Endpoints ────────────────────────────────────
@@ -62,7 +63,7 @@ async def query_facts(
     subject: str = "",
     predicate: str = "",
     topic: str = "",
-    top: int = 20,
+    top: int = Query(20, ge=1, le=1000),
 ) -> dict[str, Any]:
     """Query facts from the knowledge base."""
     require_admin(request)
@@ -92,7 +93,7 @@ async def query_relations(
     source: str = "",
     target: str = "",
     relation_type: str = "",
-    top: int = 20,
+    top: int = Query(20, ge=1, le=1000),
 ) -> dict[str, Any]:
     """Query relations from the knowledge base."""
     require_admin(request)
@@ -108,7 +109,7 @@ async def get_graph(
     request: Request,
     center: str = "",
     topic: str = "",
-    max_nodes: int = 50,
+    max_nodes: int = Query(50, ge=1, le=10000),
 ) -> dict[str, Any]:
     """Get graph data for visualization."""
     require_admin(request)
@@ -129,7 +130,7 @@ async def get_graph(
 async def build_context(
     request: Request,
     entity: str = "",
-    max_depth: int = 2,
+    max_depth: int = Query(2, ge=1, le=10),
 ) -> dict[str, Any]:
     """Build LLM context for an entity from the knowledge graph."""
     require_admin(request)
