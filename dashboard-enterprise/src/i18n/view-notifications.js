@@ -46,10 +46,7 @@ export const messages = {
     'view.notifications.allMarkedRead': 'All notifications marked as read',
     'view.notifications.loadMore': 'Load more',
     'view.notifications.noMore': 'No more notifications',
-    'view.notifications.justNow': 'just now',
-    'view.notifications.minutesAgo': '{n}m ago',
-    'view.notifications.hoursAgo': '{n}h ago',
-    'view.notifications.daysAgo': '{n}d ago',
+
 
     // ── Detail drawer ──
     'view.notifications.detailTitle': 'Notification detail',
@@ -137,10 +134,7 @@ export const messages = {
     'view.notifications.allMarkedRead': '已全部标记为已读',
     'view.notifications.loadMore': '加载更多',
     'view.notifications.noMore': '没有更多通知',
-    'view.notifications.justNow': '刚刚',
-    'view.notifications.minutesAgo': '{n} 分钟前',
-    'view.notifications.hoursAgo': '{n} 小时前',
-    'view.notifications.daysAgo': '{n} 天前',
+
 
     // ── 详情面板 ──
     'view.notifications.detailTitle': '通知详情',

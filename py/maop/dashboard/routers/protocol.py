@@ -92,7 +92,10 @@ async def api_protocol_unregister(body: ProtocolUnregisterRequest, request: Requ
         raise HTTPException(400, "missing name")
     reg = _get_protocol_reg()
     removed = reg.unregister(name, version)
-    return {"status": "ok" if removed else "not_found", "removed": removed}
+    if not removed:
+        # P2 fix: 404 应返回 404 状态码，而非 200。
+        raise HTTPException(status_code=404, detail=f"Protocol {name} v{version} not found")
+    return {"status": "ok", "removed": removed}
 
 
 @router.get("/api/protocol/get")

@@ -246,7 +246,7 @@ async function loadStats() {
     stats.episodic_by_outcome = s.episodic_by_outcome || {};
     memError.value = '';
   } catch (e) {
-    console.error('[memory] loadStats failed:', e);
+    console.warn('[memory] loadStats failed:', e);
     memError.value = (e && e.message) ? e.message : String(e);
     stats.total_entries = 0; stats.total_traces = 0; stats.total_trajectory_steps = 0;
     stats.by_agent = {}; stats.by_topic = {};
@@ -274,7 +274,7 @@ async function runSearch() {
       outcome: r.outcome || '',
     }));
   } catch (e) {
-    console.error('[memory] runSearch failed:', e);
+    console.warn('[memory] runSearch failed:', e);
     toast.error(t('view.tlmemory.searchFailed') + (e && e.message ? ': ' + e.message : ''));
     entries.value = [];
   } finally {
@@ -316,5 +316,17 @@ onMounted(refreshAll);
   background: var(--fail-soft); border: 1px solid var(--fail);
   border-radius: var(--r-md); color: var(--fail);
   font-size: var(--fs-sm); font-family: var(--font-mono); word-break: break-word;
+}
+
+/* ── 响应式断点 ── */
+@media (max-width: 900px) {
+  .add-form__two-col {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .add-form__two-col {
+    gap: var(--sp-2);
+  }
 }
 </style>

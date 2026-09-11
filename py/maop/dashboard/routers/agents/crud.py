@@ -325,14 +325,16 @@ async def unregister_agent(name: str, request: Request) -> dict[str, Any]:
     # 2. 从扫描表移除
     try:
         scanner.unregister(name)
-    except Exception as exc:
-        errors.append(f"scanner cleanup: {exc}")
+    except Exception:
+        logger.warning('[agents/crud] unregister_agent：scanner cleanup 失败', exc_info=True)
+        errors.append("scanner cleanup failed")
 
     # 3. 从 agents.yaml 移除（文件读写在线程池执行，不阻塞事件循环）
     try:
         await asyncio.to_thread(_remove_agent_from_yaml, name)
-    except Exception as exc:
-        errors.append(f"yaml cleanup: {exc}")
+    except Exception:
+        logger.warning('[agents/crud] unregister_agent：yaml cleanup 失败', exc_info=True)
+        errors.append("yaml cleanup failed")
 
     # 4. 记录审计日志
     try:

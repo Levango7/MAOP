@@ -36,7 +36,7 @@ export const messages = {
   },
 
   zh: {
-    'view.rbac.subtitle': '基于 Role 的访问控制',
+    'view.rbac.subtitle': '基于角色的访问控制',
     'view.rbac.enterprise': '企业版',
     'view.rbac.grantRole': '授予角色',
     'view.rbac.userId': '用户 ID',

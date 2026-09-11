@@ -88,17 +88,17 @@ async def api_supervisor_rules_list(request: Request) -> dict[str, Any]:
     """Return the current supervision rule set."""
     require_admin(request)
     sup = _get_supervisor_or_404()
-    return {"rules": [r.model_dump() for r in sup.rules]}
+    return {"status": "ok", "rules": [r.model_dump() for r in sup.rules]}
 
 
 @router.post("/rules")
 @handle_api_errors(
     "Supervisor rules update",
-    error_value={"ok": False, "error": "Update failed"},
+    error_value={"status": "error", "error": "Update failed"},
 )
 async def api_supervisor_rule_update(
     request: Request,
-    body: list[dict[str, Any]],
+    body: list[SupervisorRule],
 ) -> dict[str, Any]:
     """Hot-update the supervision rule set (admin only).
 
@@ -108,22 +108,14 @@ async def api_supervisor_rule_update(
     """
     require_admin(request)
     sup = _get_supervisor_or_404()
-    try:
-        new_rules = [SupervisorRule(**r) for r in body]
-    except Exception as exc:
-        # 批次3A: 脱敏——校验错误细节不暴露给客户端，仅日志记录。
-        logger.warning("[supervisor-api] Invalid rule schema: %s", exc)
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid supervisor rule schema",
-        ) from exc
+    new_rules = body
     sup.set_rules(new_rules)
     logger.info(
         "[supervisor-api] rule set updated (%d rules, by=%s)",
         len(new_rules),
         getattr(getattr(request, "state", None), "auth_identity", "unknown"),
     )
-    return {"ok": True, "rule_count": len(new_rules)}
+    return {"status": "ok", "rule_count": len(new_rules)}
 
 
 # ── Actions ────────────────────────────────────────────────────
@@ -143,7 +135,7 @@ async def api_supervisor_actions(
     require_admin(request)
     sup = _get_supervisor_or_404()
     actions = sup.get_actions(agent_id=agent_id, limit=limit)
-    return {"actions": [a.model_dump() for a in actions]}
+    return {"status": "ok", "actions": [a.model_dump() for a in actions]}
 
 
 @router.post("/action")
@@ -180,7 +172,7 @@ async def api_supervisor_action(
                 body.agent_id, reason=reason, level=level,
                 extra=params.get("extra"),
             )
-            return {"ok": True, "action": "alert", "agent_id": body.agent_id}
+            return {"status": "ok", "action": "alert", "agent_id": body.agent_id}
         if action_str == "replace":
             replacement = params.get("replacement")
             if not replacement:
@@ -193,7 +185,7 @@ async def api_supervisor_action(
                 routing_key=str(params.get("routing_key", "")),
                 triggered_by=triggered_by,
             )
-            return {"ok": True, "action": record.action.value,
+            return {"status": "ok", "action": record.action.value,
                     "action_id": record.action_id}
         if action_str == "degrade":
             factor = float(params.get("factor", 0.5))
@@ -203,7 +195,7 @@ async def api_supervisor_action(
                 timeout_s=params.get("timeout_s"),
                 triggered_by=triggered_by,
             )
-            return {"ok": True, "action": record.action.value,
+            return {"status": "ok", "action": record.action.value,
                     "action_id": record.action_id}
         if action_str == "terminate":
             force = bool(params.get("force", False))
@@ -211,7 +203,7 @@ async def api_supervisor_action(
                 body.agent_id, reason=reason,
                 triggered_by=triggered_by, force=force,
             )
-            return {"ok": True, "action": record.action.value,
+            return {"status": "ok", "action": record.action.value,
                     "action_id": record.action_id}
         if action_str == "upgrade":
             target_version = params.get("target_version")
@@ -224,7 +216,7 @@ async def api_supervisor_action(
                 body.agent_id, str(target_version), reason=reason,
                 triggered_by=triggered_by,
             )
-            return {"ok": True, "action": record.action.value,
+            return {"status": "ok", "action": record.action.value,
                     "action_id": record.action_id}
         raise HTTPException(
             status_code=400,
@@ -267,7 +259,7 @@ async def api_supervisor_patrol(
     probes = await sup.patrol()
     _duration_s = time.monotonic() - _start
     return {
-        "ok": True,
+        "status": "ok",
         "agents_checked": len(probes),
         "probes": [p.model_dump() for p in probes],
         "patrol_duration_s": round(_duration_s, 4),

@@ -244,12 +244,14 @@
 import { ref, computed } from 'vue';
 import { useI18n } from '../i18n/index.js';
 import { useToast } from '../composables/useToast.js';
+import { useApiStore } from '../stores/api.js';
 import ListPageLayout from '../components/ListPageLayout.vue';
 import Badge from '../components/Badge.vue';
 import AppIcon from '../components/AppIcon.vue';
 
 const { t } = useI18n();
 const toast = useToast();
+const api = useApiStore();
 
 // ── 节点类型元数据 ──────────────────────────────────────────
 const nodeTypes = [
@@ -539,16 +541,7 @@ async function onExecuteClick() {
   if (executing.value || !nodes.value.length) return;
   executing.value = true;
   try {
-    const body = JSON.stringify(exportDag());
-    const res = await fetch('/api/dag/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || data.message || `HTTP ${res.status}`);
-    }
+    const data = await api.post('/api/dag/execute', exportDag());
     toast.success(t('view.workflow.executeOk', { id: data.run_id || data.id || 'n/a' }));
   } catch (e) {
     toast.error(t('view.workflow.executeFailed', { msg: e.message }));
@@ -638,7 +631,7 @@ defineExpose({
 .wf-palette-item--agent .wf-palette-item__icon { color: var(--brand); }
 .wf-palette-item--tool .wf-palette-item__icon { color: var(--success); }
 .wf-palette-item--condition .wf-palette-item__icon { color: var(--warn); }
-.wf-palette-item--parallel .wf-palette-item__icon { color: var(--info, #4cc2ff); }
+.wf-palette-item--parallel .wf-palette-item__icon { color: var(--info); }
 
 /* ── 中间画布 ─────────────────────────────────────────── */
 .wf-canvas {
@@ -681,8 +674,8 @@ defineExpose({
   box-shadow: var(--shadow-sm);
   cursor: grab;
   user-select: none;
-  /* z-index 2 为节点拖拽层级，无精确 token 对应，保留硬编码 */
-  z-index: 2;
+  /* 节点拖拽层级: 使用 --z-raised token 适配主题层级体系 */
+  z-index: var(--z-raised);
 }
 .wf-node:hover { border-color: var(--brand); }
 .wf-node.is-selected {
@@ -692,7 +685,7 @@ defineExpose({
 .wf-node--agent { border-left: 3px solid var(--brand); }
 .wf-node--tool { border-left: 3px solid var(--success); }
 .wf-node--condition { border-left: 3px solid var(--warn); }
-.wf-node--parallel { border-left: 3px solid var(--info, #4cc2ff); }
+.wf-node--parallel { border-left: 3px solid var(--info); }
 .wf-node__icon { color: var(--text-muted); flex-shrink: 0; }
 .wf-node__label {
   font-size: var(--fs-sm);
@@ -769,7 +762,7 @@ defineExpose({
   font-size: var(--fs-sm);
   padding: 6px 8px;
 }
-.wf-field__textarea { min-height: 80px; resize: vertical; font-family: ui-monospace, monospace; }
+.wf-field__textarea { min-height: 80px; resize: vertical; font-family: var(--font-mono); }
 
 /* ── 底部工具栏 ───────────────────────────────────────── */
 .wf-toolbar {

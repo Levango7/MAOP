@@ -38,8 +38,8 @@
  * 猫头鹰选择器 .overview > * + * 保证页头/错误卡/指标网格/时间线等
  * 任意相邻两个直接子块之间都有 16px,不依赖各组件的 margin-bottom
  * 是否被纳入上面的全局选择器列表 (本次 bug 的根因就是 overview 漏了)。 */
-.overview > * + * { margin-top: var(--sp-4); }
-.overview > * + * { margin-bottom: 0; }
+/* R7 修复: 合并两行重复的 .overview > * + * 选择器 */
+.overview > * + * { margin-top: var(--sp-4); margin-bottom: 0; }
 .stats-grid:last-child, .status-strip:last-child, .row:last-child,
 .two-col:last-child { margin-bottom: 0; }
 
@@ -188,13 +188,16 @@
 .session-item.active { background: var(--brand-soft); border-color: var(--brand); }
 
 /* Card inner padding helper */
-.role-card, .tenant-card, .skill-card, .entry-card, .layer-card, .log-card,
+/* R7 修复: .entry-card 已移至 994 行单独定义 (padding: var(--sp-4)), 避免此处的 sp-5 被覆盖 */
+.role-card, .tenant-card, .skill-card, .layer-card, .log-card,
 .result-card, .resource-item, .agent-row, .grant-row, .quota,
 .dispatch-card {
   padding: var(--sp-5);
 }
-.role-card__head, .tenant-card__head, .skill-card__top, .entry-header,
-.layer-card__head, .log-card .card__head, .result-head {
+/* R7 修复: .entry-header / .result-head 已移至 979/995 行单独定义 (space-between 布局),
+ * 此处移除二者, 避免 margin-bottom 与 space-between 布局冲突 */
+.role-card__head, .tenant-card__head, .skill-card__top,
+.layer-card__head, .log-card .card__head {
   display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3);
 }
 .role-card__head h3, .tenant-card__head h3, .skill-card__id, .entry-task,
@@ -202,7 +205,8 @@
 .skill-card__icon { color: var(--brand); }
 .skill-card__desc, .entry-body, .layer-card__desc, .tenant-meta, .grant-meta,
 .result-body, .entry-time { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.6; }
-.skill-card__meta, .entry-score, .layer-card__meta, .tenant-id, .grant-user,
+/* R7 修复: .entry-score 已移至 998 行单独定义 (color: --brand-strong), 此处移除避免 color 被覆盖 */
+.skill-card__meta, .layer-card__meta, .tenant-id, .grant-user,
 .entry-footer, .result-foot { margin-top: var(--sp-3); font-size: var(--fs-xs); color: var(--text-faint); display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); }
 .tenant-actions, .skills-actions, .skills-head, .grant-list .grant-row {
   display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
@@ -216,7 +220,8 @@
 .metric__label { font-size: var(--fs-sm); color: var(--text-muted); font-weight: 500; }
 .metric__val { font-size: var(--fs-md); font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text); }
 
-.bar, .metric__bar, .res-bar, .metric__bar {
+/* R7 修复: .metric__bar 在选择器列表中重复出现两次, 删除多余的一个 */
+.bar, .metric__bar, .res-bar {
   height: 6px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden;
   box-shadow: var(--shadow-inset-track);
 }
@@ -331,7 +336,8 @@
 }
 .link-btn { background: transparent; border-color: transparent; color: var(--brand-strong); padding-left: 0; padding-right: 0; }
 .ctrl-btn.btn--primary, .send-btn.btn--primary { color: var(--brand-contrast); background: var(--brand); border-color: var(--brand); }
-.link-btn { color: var(--brand-strong); }
+/* R7 修复: .link-btn :hover 状态 (原 334 行重复 color 定义已替换为 :hover 反馈) */
+.link-btn:hover { color: var(--brand); text-decoration: underline; }
 
 /* ── Inputs / forms ────────────────────────────────────────────────────── */
 .input, .search-input, .filter-input, .num-input {
@@ -446,10 +452,12 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .edition-btn:hover:not(:disabled) { color: var(--text); }
 .edition-btn:disabled { opacity: .4; cursor: not-allowed; }
 .edition-perm-hint { color: var(--text-faint); font-size: var(--fs-xs); }
-.edition-error-msg { color: var(--fail); font-size: var(--fs-xs); }
-.edition-notice { font-size: var(--fs-xs); color: var(--success); }
+.edition-error-msg { color: var(--fail); font-size: var(--fs-xs); margin-top: var(--sp-2); }
+.edition-notice { font-size: var(--fs-xs); color: var(--success); margin-top: var(--sp-2); }
 .edition-notice.degraded { color: var(--warn); }
-.switch-form, .switch-result { padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
+/* R7 修复: .switch-result 被 492 行完全覆盖 (border:none/background:none/padding:0),
+ * 此处仅保留 .switch-form 的盒子样式, 避免对 .switch-result 写无效属性 */
+.switch-form { padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
 .switch-form { display: flex; flex-direction: column; gap: var(--sp-4); }
 .switch-fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
 .switch-fields .field { margin-bottom: 0; }
@@ -601,7 +609,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .msg-text code { font-family: var(--font-mono); font-size: .9em; }
 .msg-meta { font-size: var(--fs-xs); color: var(--text-faint); margin-top: var(--sp-1); display: flex; gap: var(--sp-3); flex-wrap: wrap; }
 .msg-image { max-width: 240px; border-radius: var(--r-md); margin-top: var(--sp-2); border: 1px solid var(--border); }
-.cursor { display: inline-block; width: 7px; height: 14px; background: var(--brand); border-radius: 1px; animation: maop-shimmer calc(var(--motion-normal) * 4) steps(2) infinite; vertical-align: middle; }
+/* R7 修复: shimmer 时长统一使用 var(--motion-slow) (与 Skeleton.vue:49 一致) */
+.cursor { display: inline-block; width: 7px; height: 14px; background: var(--brand); border-radius: 1px; animation: maop-shimmer calc(var(--motion-slow) * 4) steps(2) infinite; vertical-align: middle; }
 .image-preview {
   position: relative; display: inline-block; margin-top: var(--sp-2);
 }
@@ -768,14 +777,13 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .deg-reason { color: var(--text-faint); font-size: var(--fs-xs); }
 
 .edition-switch-row { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
-.edition-switch-buttons { display: flex; gap: var(--sp-2); }
-.edition-notice { font-size: var(--fs-sm); color: var(--text-muted); margin-top: var(--sp-2); }
-.edition-error-msg { color: var(--fail); font-size: var(--fs-sm); margin-top: var(--sp-2); }
+/* R7 修复: .edition-switch-buttons / .edition-notice / .edition-error-msg 重复定义已删除,
+ * 保留 427/449/450 行的基础定义并补充 margin-top (原 771/772/773 行覆盖了 color/font-size, 破坏语义) */
 .edition-perm-hint { color: var(--text-faint); font-size: var(--fs-xs); margin-top: var(--sp-2); }
 .switching-indicator { color: var(--brand-strong); font-size: var(--fs-sm); }
 
 /* ── Monitor: agent / resource rows ───────────────────────────────────── */
-.agent-status-list { display: flex; flex-direction: column; gap: var(--sp-3); }
+/* R7 修复: .agent-status-list / .resource-list 已在 140 行定义, 此处重复定义已删除 */
 /* Agent row: grid layout for consistent alignment (dot | name | queue | bar | load) */
 .monitor-page .agent-row {
   display: grid;
@@ -788,7 +796,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .monitor-page .agent-queue { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; }
 .monitor-page .agent-load { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
 .monitor-page .agent-bar { min-width: 80px; }
-.resource-list { display: flex; flex-direction: column; gap: var(--sp-3); }
+/* R7 修复: .resource-list 已在 140 行定义, 此处重复定义已删除 */
 .resource-item { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
 .resource-fail { color: var(--fail); }
 /* ── ControlPanel: job & agent rows (human-friendly visualization) ─────── */
@@ -970,13 +978,15 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .perf-val { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text); text-align: right; }
 
 /* Detail close button */
-.close-btn { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text-muted); width: 28px; height: 28px; display: grid; place-items: center; cursor: pointer; transition: color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease); }
+/* R7 修复: 关闭按钮统一尺寸 30px / 圆角 var(--r-md) (与 .modal__x 一致) */
+.close-btn { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text-muted); width: 30px; height: 30px; display: grid; place-items: center; cursor: pointer; transition: color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease); }
 .close-btn:hover { border-color: var(--border-strong); color: var(--text); }
 
 /* ── VectorSearch result cards ────────────────────────────────────────── */
 .results-area { display: flex; flex-direction: column; gap: var(--sp-3); }
 .result-card { padding: var(--sp-4); }
-.result-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+/* R7 修复: 从 196 行移出后补充 margin-bottom (原由共享选择器提供) */
+.result-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .result-foot { display: flex; gap: var(--sp-3); flex-wrap: wrap; margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-faint); }
 .result-body { margin-top: var(--sp-2); }
 .ctrl { display: flex; align-items: center; gap: var(--sp-2); }
@@ -992,7 +1002,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .layers-note { font-size: var(--fs-sm); color: var(--text-muted); }
 .breakdown { display: flex; flex-direction: column; gap: var(--sp-2); }
 .entry-card { padding: var(--sp-4); }
-.entry-header { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+/* R7 修复: 从 196 行移出后补充 margin-bottom (原由共享选择器提供) */
+.entry-header { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .entry-task { font-weight: 600; }
 .entry-time { font-family: var(--font-mono); }
 .entry-score { color: var(--brand-strong); font-weight: 600; }
@@ -1030,7 +1041,10 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
 .btn-ghost:hover { background: var(--surface-2); border-color: var(--border-strong); color: var(--text); }
 .btn-danger { background: var(--fail-soft); border: 1px solid var(--fail); color: var(--fail); }
-.btn-danger:hover { background: var(--fail-soft); }
+/* R7 修复: 原 :hover background 与默认相同, 无视觉反馈; 增加 border-color + transform */
+.btn-danger:hover { background: var(--fail-soft); border-color: var(--fail-strong); transform: translateY(-1px); }
+/* R7 修复: 添加 :active 状态, 提供按下反馈 */
+.btn-primary:active, .btn-ghost:active, .btn-danger:active { transform: translateY(1px); }
 .btn-primary:disabled, .btn-ghost:disabled, .btn-danger:disabled { opacity: .55; cursor: not-allowed; }
 /* Busy state: hide label, show a spinner ring (covers BOTH button systems) */
 .btn-primary.is-busy, .btn-ghost.is-busy,
@@ -1234,8 +1248,9 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .models-view .metric-k { font-size: var(--fs-sm); color: var(--text-muted); }
 .models-view .metric-v { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text); text-align: right; }
 .models-view .metric-v em { color: var(--text-faint); font-style: normal; font-size: var(--fs-xs); }
-.switch-result.is-ok { color: var(--success); border-color: var(--success); }
-.switch-result.is-fail { color: var(--fail); border-color: var(--fail); }
+/* R7 修复: 添加 border:1px solid, 原 492 行 border:none 导致 border-color 无效 */
+.switch-result.is-ok { color: var(--success); border: 1px solid var(--success); }
+.switch-result.is-fail { color: var(--fail); border: 1px solid var(--fail); }
 
 /* ── Tenants view extras ────────────────────────────────────────────── */
 .bar-fill.is-high { background: linear-gradient(90deg, var(--warn), var(--warn-strong)); }

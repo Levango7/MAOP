@@ -76,11 +76,7 @@ export const messages = {
     'view.quotas.legendLow': 'Low',
     'view.quotas.legendHigh': 'High',
     'view.quotas.legendOver': 'Over',
-    // Time
-    'view.quotas.justNow': 'just now',
-    'view.quotas.minutesAgo': '{n} min ago',
-    'view.quotas.hoursAgo': '{n} h ago',
-    'view.quotas.daysAgo': '{n} d ago',
+
   },
   zh: {
     'view.quotas.subtitle': '跨租户资源配额与使用情况',
@@ -159,10 +155,6 @@ export const messages = {
     'view.quotas.legendLow': '低',
     'view.quotas.legendHigh': '高',
     'view.quotas.legendOver': '超额',
-    // 时间
-    'view.quotas.justNow': '刚刚',
-    'view.quotas.minutesAgo': '{n} 分钟前',
-    'view.quotas.hoursAgo': '{n} 小时前',
-    'view.quotas.daysAgo': '{n} 天前',
+
   },
 };

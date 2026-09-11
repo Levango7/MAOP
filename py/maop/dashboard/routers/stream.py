@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from maop.core.security.middleware import require_admin
@@ -115,7 +115,7 @@ async def list_active_streams(request: Request) -> dict[str, Any]:
     from maop.core.reliability.streaming import get_stream_registry
     registry = get_stream_registry()
     active = registry.active()
-    return {"active": active, "count": len(active)}
+    return {"status": "ok", "active": active, "count": len(active)}
 
 @router.get("/dag/{execution_id}")
 @handle_api_errors
@@ -329,7 +329,8 @@ async def stream_trace(trace_id: str, request: Request) -> Any:
     streamer = registry.get(trace_id)
 
     if streamer is None:
-        return {"status": "not_found", "trace_id": trace_id, "message": "No active stream for this trace_id"}
+        # P2 fix: 404 应返回 404 状态码，而非 200。
+        raise HTTPException(status_code=404, detail=f"No active stream for trace_id {trace_id}")
 
     async def generate():
         async for chunk in streamer.sse.stream():

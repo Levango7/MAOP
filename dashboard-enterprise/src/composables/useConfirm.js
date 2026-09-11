@@ -23,8 +23,7 @@ const confirmQueue = [];
 
 // L9 fix: _resolve 是 Promise resolve 函数，属于内部实现细节，不应暴露在响应式
 // 状态中（响应式代理会包装函数、触发不必要的依赖追踪，且外部组件不应直接调用 resolve）。
-// 改为模块级变量，仅 resolve() 内部使用。
-let _currentResolve = null;
+// resolve() 直接从队首元素 head._resolve 调用，无需额外的模块级变量。
 
 // 对外暴露的响应式状态（始终投影队首请求），保持与 ConfirmDialog.vue 的 API 兼容
 export const confirmState = reactive({
@@ -45,7 +44,6 @@ function applyHeadToState() {
     confirmState.confirmText = head.confirmText;
     confirmState.cancelText = head.cancelText;
     confirmState.tone = head.tone;
-    _currentResolve = head._resolve;
     confirmState.visible = true;
   } else {
     confirmState.visible = false;
@@ -54,7 +52,6 @@ function applyHeadToState() {
     confirmState.confirmText = '';
     confirmState.cancelText = '';
     confirmState.tone = 'danger';
-    _currentResolve = null;
   }
 }
 

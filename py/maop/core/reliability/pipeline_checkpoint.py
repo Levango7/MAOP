@@ -305,9 +305,15 @@ class PipelineCheckpoint:
         status: str = "",
         limit: int = 50,
     ) -> list[RunState]:
-        """List pipeline runs with optional filters."""
+        """List pipeline runs with optional filters.
+
+        R7 修复（N+1 查询）：原实现先查 run_id 列表，再循环调用
+        ``get_run()`` 逐个获取详情，每次都打开新连接执行 2 条 SQL。
+        改为在单次连接中批量查询所有 runs 及其 steps，将 N+1 条 SQL
+        降为 2 条（1 条 runs + 1 条 steps）。
+        """
         with self._connect() as conn:
-            sql = "SELECT run_id FROM pipeline_runs WHERE 1=1"
+            sql = "SELECT * FROM pipeline_runs WHERE 1=1"
             params: list[Any] = []
             if workflow_name:
                 sql += " AND workflow_name = ?"
@@ -318,9 +324,62 @@ class PipelineCheckpoint:
             sql += " ORDER BY created_at DESC LIMIT ?"
             params.append(limit)
 
-            rows = conn.execute(sql, params).fetchall()
+            run_rows = conn.execute(sql, params).fetchall()
+            if not run_rows:
+                return []
 
-        return [r for row in rows if (r := self.get_run(row[0])) is not None]
+            run_cols = [d[0] for d in conn.execute("SELECT * FROM pipeline_runs LIMIT 0").description]
+            run_datas = [dict(zip(run_cols, row)) for row in run_rows]
+
+            # 批量查询所有相关 runs 的 steps（单条 SQL + IN 子句）
+            run_ids = [d["run_id"] for d in run_datas]
+            # 分 chunk 执行，防止参数数量超过 SQLite 限制（默认 999）
+            CHUNK_SIZE = 500
+            all_step_rows: list[dict[str, Any]] = []
+            step_cols: list[str] = []
+            for i in range(0, len(run_ids), CHUNK_SIZE):
+                chunk = run_ids[i:i + CHUNK_SIZE]
+                placeholders = ",".join("?" * len(chunk))
+                step_cursor = conn.execute(
+                    f"SELECT * FROM pipeline_step_checkpoints "
+                    f"WHERE run_id IN ({placeholders}) ORDER BY run_id, rowid",
+                    chunk,
+                )
+                if not step_cols and step_cursor.description:
+                    step_cols = [d[0] for d in step_cursor.description]
+                for row in step_cursor.fetchall():
+                    all_step_rows.append(dict(zip(step_cols, row)))
+
+        # 按 run_id 分组 steps
+        steps_by_run: dict[str, list[dict[str, Any]]] = {}
+        for sr in all_step_rows:
+            steps_by_run.setdefault(sr.get("run_id", ""), []).append(sr)
+
+        results: list[RunState] = []
+        for run_data in run_datas:
+            run_id = run_data["run_id"]
+            steps = []
+            for d in steps_by_run.get(run_id, []):
+                steps.append(StepCheckpoint(
+                    step_name=d.get("step_name", ""),
+                    status=d.get("status", "pending"),
+                    output=d.get("output", ""),
+                    started_at=d.get("started_at", 0.0),
+                    completed_at=d.get("completed_at", 0.0),
+                    metadata=json.loads(d.get("metadata", "{}")),
+                    attempts=d.get("attempts", 0),
+                    error=d.get("error", ""),
+                ))
+            results.append(RunState(
+                run_id=run_id,
+                workflow_name=run_data.get("workflow_name", ""),
+                status=run_data.get("status", "running"),
+                steps=steps,
+                variables=json.loads(run_data.get("variables", "{}")),
+                created_at=run_data.get("created_at", 0.0),
+                updated_at=run_data.get("updated_at", 0.0),
+            ))
+        return results
 
     def cleanup(self, max_age_days: int = 30) -> int:
         """Remove old completed/failed runs. Returns count removed."""

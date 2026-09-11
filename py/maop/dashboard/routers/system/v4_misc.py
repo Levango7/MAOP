@@ -1,4 +1,4 @@
-"""V4 miscellaneous endpoints: subsystems, coordination, routing, security.
+﻿"""V4 miscellaneous endpoints: subsystems, coordination, routing, security.
 
 Endpoints:
     GET /api/subsystems           — subsystem availability report
@@ -38,7 +38,8 @@ async def api_subsystems(request: Request) -> dict[str, Any]:
         result[name] = {
             "available": info.get("available", False),
             "module": info.get("module", ""),
-            "error": info.get("error"),
+            # P1 fix: 仅返回是否有错误，不透传异常字符串。
+            "error": bool(info.get("error")),
         }
     # P2 fix: 统一响应格式为 {status, data}。
     return {
@@ -70,7 +71,8 @@ async def api_coordination_report_v4(request: Request) -> dict[str, Any]:
         return {"status": "ok", "data": {"teams": teams, "agent_count": len(teams)}}
     except Exception as exc:
         logger.error('Coordination report failed: %s', exc)
-        return {"teams": [], "agent_count": 0}
+        # P3 fix: 异常分支格式与正常分支对齐 {status, data, error}。
+        return {"status": "error", "data": {"teams": [], "agent_count": 0}, "error": "Coordination report unavailable"}
 
 
 @router.get("/api/routing")
@@ -95,7 +97,8 @@ async def api_routing_v4(request: Request) -> dict[str, Any]:
         return {"status": "ok", "data": {"routes": routes}}
     except Exception as exc:
         logger.error('Routing config failed: %s', exc)
-        return {"routes": []}
+        # P3 fix: 异常分支格式与正常分支对齐 {status, data, error}。
+        return {"status": "error", "data": {"routes": []}, "error": "Routing config unavailable"}
 
 
 @router.get("/api/security/config")

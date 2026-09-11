@@ -152,7 +152,7 @@ async def list_servers(request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
     servers = hub.list_servers()
-    return {"servers": servers, "count": len(servers)}
+    return {"status": "ok", "servers": servers, "count": len(servers)}
 
 
 @router.post("/servers")
@@ -190,7 +190,7 @@ async def list_tools(request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
     tools = hub.all_tools()
-    return {"tools": [t.model_dump() if hasattr(t, "model_dump") else str(t) for t in tools], "count": len(tools)}
+    return {"status": "ok", "tools": [t.model_dump() if hasattr(t, "model_dump") else str(t) for t in tools], "count": len(tools)}
 
 
 @router.post("/call")
@@ -221,7 +221,7 @@ async def health_check(request: Request) -> dict[str, Any]:
     require_admin(request)
     hub = _get_hub()
     health = await hub.health_check_all()
-    return {"health": health}
+    return {"status": "ok", "health": health}
 
 
 # ── Marketplace ─────────────────────────────────────────────────
@@ -267,7 +267,7 @@ async def marketplace_tools(request: Request) -> dict[str, Any]:
         installed = {s.get("name") for s in mp.list_installed()}
     except Exception as exc:
         logger.warning("[mcp.marketplace_tools] fetch failed: %s", exc)
-        return {"tools": [], "count": 0}
+        return {"status": "ok", "tools": [], "count": 0}
     tools: list[dict[str, Any]] = []
     for srv in catalog:
         tools.append({
@@ -284,7 +284,7 @@ async def marketplace_tools(request: Request) -> dict[str, Any]:
             "verified": srv.verified,
             "install_count": srv.install_count,
         })
-    return {"tools": tools, "count": len(tools)}
+    return {"status": "ok", "tools": tools, "count": len(tools)}
 
 
 @router.post("/marketplace/tools/{tool_id}/install")

@@ -94,8 +94,9 @@ def _lazy_import(name: str, module_path: str, class_name: str) -> None:
         mod = importlib.import_module(module_path)
         cls = getattr(mod, class_name)
         _SUBSYSTEMS[name] = {"class": cls, "available": True, "module": module_path}
-    except Exception as exc:
-        _SUBSYSTEMS[name] = {"class": None, "available": False, "error": str(exc), "module": module_path}
+    except Exception:
+        # P1 fix: 不向客户端透传异常字符串（信息泄露），仅记录布尔标志。
+        _SUBSYSTEMS[name] = {"class": None, "available": False, "error": True, "module": module_path}
 
 def get_subsystems() -> dict[str, Any]:
     return _SUBSYSTEMS

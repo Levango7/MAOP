@@ -416,7 +416,7 @@ const dagLayout = computed(() => {
   border: 1px solid var(--brand);
   border-radius: var(--r-md, 6px);
   background: var(--brand);
-  color: var(--brand-contrast, #fff);
+  color: var(--brand-contrast);
   font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
@@ -474,7 +474,7 @@ const dagLayout = computed(() => {
   border-radius: var(--r-sm, 6px);
   display: inline-flex;
 }
-.split-dialog__close:hover { background: var(--surface-hover, rgba(255, 255, 255, .06)); }
+.split-dialog__close:hover { background: var(--surface-hover); }
 .split-dialog__body {
   padding: 20px;
   overflow-y: auto;
@@ -539,7 +539,7 @@ const dagLayout = computed(() => {
 
 /* DAG SVG */
 .split-dag {
-  background: var(--surface-alt, rgba(0,0,0,0.02));
+  background: var(--surface-alt);
   border: 1px solid var(--border);
   border-radius: var(--r-md, 8px);
   padding: 12px;
@@ -580,7 +580,7 @@ const dagLayout = computed(() => {
 .split-subtasks { display: flex; flex-direction: column; gap: 8px; }
 .split-subtask {
   padding: 10px 12px;
-  background: var(--surface-alt, rgba(0,0,0,0.02));
+  background: var(--surface-alt);
   border: 1px solid var(--border);
   border-radius: var(--r-md, 8px);
 }
@@ -598,7 +598,7 @@ const dagLayout = computed(() => {
   height: 22px;
   padding: 0 6px;
   background: var(--brand);
-  color: var(--brand-contrast, #fff);
+  color: var(--brand-contrast);
   border-radius: var(--r-sm, 6px);
   font-size: var(--fs-xs);
   font-weight: 600;
@@ -645,7 +645,7 @@ const dagLayout = computed(() => {
 }
 .split-btn--primary {
   background: var(--brand);
-  color: var(--brand-contrast, #fff);
+  color: var(--brand-contrast);
 }
 .split-btn--primary:hover:not(:disabled) { opacity: 0.9; }
 
@@ -656,5 +656,18 @@ const dagLayout = computed(() => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* ── 响应式断点 ── */
+@media (max-width: 900px) {
+  .split-dialog__header {
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+}
+@media (max-width: 640px) {
+  .run-tabs {
+    margin-left: 0;
+  }
 }
 </style>

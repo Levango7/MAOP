@@ -151,9 +151,14 @@ class _StdioTransport:
         # request. Read lines until we find the response whose "id" matches
         # this request, skipping notifications (no "id") and stale responses,
         # within an overall 30s deadline.
-        deadline = asyncio.get_event_loop().time() + 30
+        # R7 修复：在 async 函数内用 get_running_loop() 替代已弃用的
+        # get_event_loop()（Python 3.12+ 无当前循环时抛 RuntimeError，
+        # 3.10+ 已弃用隐式创建循环的行为）。此处位于 async def
+        # send_request 内，必然有运行中的循环。
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 30
         while True:
-            remaining = deadline - asyncio.get_event_loop().time()
+            remaining = deadline - loop.time()
             if remaining <= 0:
                 return {"error": {"message": f"Timeout waiting for response to request id={self._request_id}"}}
 

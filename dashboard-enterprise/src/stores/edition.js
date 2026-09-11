@@ -133,6 +133,21 @@ export const useEditionStore = defineStore('edition', () => {
     }
   }
 
+  /**
+   * 从外部数据源（如 /api/info/config）hydrate edition 状态。
+   * 仅更新 data 中实际存在的字段，并同步持久化快照。
+   * 用于 router 守卫中替代直接修改 st.edition 的反模式。
+   * @param {{edition?: string, features?: object, backends?: object, degradations?: array}} data
+   */
+  function hydrateEdition(data) {
+    if (!data || typeof data !== 'object') return;
+    if (typeof data.edition === 'string') edition.value = data.edition;
+    if (data.features && typeof data.features === 'object') features.value = data.features;
+    if (data.backends && typeof data.backends === 'object') backends.value = data.backends;
+    if (Array.isArray(data.degradations)) degradations.value = data.degradations;
+    persistEdition(edition.value, features.value, backends.value, degradations.value);
+  }
+
   return {
     // state
     edition,
@@ -150,5 +165,6 @@ export const useEditionStore = defineStore('edition', () => {
     // actions
     fetchEdition,
     switchEdition,
+    hydrateEdition,
   };
 });

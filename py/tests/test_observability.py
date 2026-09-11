@@ -670,6 +670,10 @@ class TestObservabilityRouter:
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
+        @app.middleware("http")
+        async def _inject_admin(request, call_next):
+            request.state.auth_roles = ["admin"]
+            return await call_next(request)
         app.include_router(router)
         client = TestClient(app)
         resp = client.get("/api/observability/health")
@@ -686,6 +690,10 @@ class TestObservabilityRouter:
         from maop.dashboard.routers.observability import router
 
         app = FastAPI()
+        @app.middleware("http")
+        async def _inject_admin(request, call_next):
+            request.state.auth_roles = ["admin"]
+            return await call_next(request)
         app.include_router(router)
         client = TestClient(app)
         resp = client.get("/api/observability/metrics/prometheus")

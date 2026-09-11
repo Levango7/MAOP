@@ -109,7 +109,7 @@ class TestTenantSuspend:
         mgr = tenant_mod._get_manager()
         mgr.suspend_tenant.return_value = False
         resp = tenant_client.post("/api/tenant/nonexistent/suspend")
-        assert resp.status_code == 200
+        assert resp.status_code == 404
 
 
 class TestTenantActivate:

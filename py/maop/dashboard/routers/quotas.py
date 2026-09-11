@@ -334,7 +334,8 @@ async def update_quota(
             period=body.period,
         )
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # P3 fix: 不透传异常字符串，使用脱敏固定文案。
+        raise HTTPException(status_code=404, detail="Quota not found") from exc
     return {"status": "ok", "quota": quota.model_dump()}
 
 

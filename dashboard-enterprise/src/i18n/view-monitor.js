@@ -30,7 +30,7 @@ export const messages = {
     'view.monitor.descReindex': 'Re-index all vector entries',
     'view.monitor.descCompact': 'VACUUM SQLite to reclaim space',
     'view.monitor.statusReady': 'Ready',
-    'view.monitor.statusRunning': 'Running...',
+    'view.monitor.statusRunning': 'Running…',
     'view.monitor.statusDone': 'Done',
     'view.monitor.statusFailed': 'Failed',
     'view.monitor.metricRequests': 'Requests/min',

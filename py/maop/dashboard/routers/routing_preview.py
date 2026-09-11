@@ -47,6 +47,7 @@ async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any
 
     if match is None:
         return {
+            "status": "ok",
             "task": task,
             "matched": False,
             "message": "No route matched — would fall through to legacy routing",
@@ -71,6 +72,7 @@ async def preview_match(body: dict[str, Any], request: Request) -> dict[str, Any
     all_scores.sort(key=lambda x: cast(float, x["score"]), reverse=True)
 
     return {
+        "status": "ok",
         "task": task,
         "matched": True,
         "routing_key": match.routing_key,
@@ -90,6 +92,7 @@ async def get_cooldowns(request: Request) -> dict[str, Any]:
     scorer = get_route_scorer()
     cooldowns = scorer.get_cooldown_status()
     return {
+        "status": "ok",
         "count": len(cooldowns),
         "cooldowns": cooldowns,
     }
@@ -122,4 +125,4 @@ async def get_route_scores(request: Request, task: str = "") -> dict[str, Any]:
             "primary": route.primary,
         })
     scores.sort(key=lambda x: cast(float, x["score"]), reverse=True)
-    return {"task": task, "scores": scores}
+    return {"status": "ok", "task": task, "scores": scores}

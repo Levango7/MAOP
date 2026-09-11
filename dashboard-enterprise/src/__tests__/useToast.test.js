@@ -71,7 +71,7 @@ describe('useToast timer cleanup', () => {
     toast.info('i');
     expect(toastState.items).toHaveLength(4);
     expect(toastState.items[0].tone).toBe('success');
-    expect(toastState.items[1].tone).toBe('fail');
+    expect(toastState.items[1].tone).toBe('error');
     expect(toastState.items[2].tone).toBe('warn');
     expect(toastState.items[3].tone).toBe('info');
   });

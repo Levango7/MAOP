@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -12,6 +13,18 @@ from maop.dashboard.error_handler import handle_api_errors
 from .state import MAOP_ROOT
 
 router = APIRouter(prefix="/api/plugins", tags=["plugins"])
+
+
+class PluginStartRequest(BaseModel):
+    """启动插件请求体."""
+
+    config: dict[str, Any] | None = None
+
+
+class PluginConfigUpdateRequest(BaseModel):
+    """更新插件配置请求体."""
+
+    config: dict[str, Any] = {}
 
 
 def _get_plugin_manager():
@@ -27,7 +40,7 @@ async def list_plugins(request: Request, state: str = Query("", description="Fil
     mgr = _get_plugin_manager()
     filter_state = PluginState(state) if state else None
     plugins = mgr.list_plugins(state=filter_state)
-    return {"plugins": [p.model_dump() for p in plugins]}
+    return {"status": "ok", "plugins": [p.model_dump() for p in plugins]}
 
 
 @router.get("/{plugin_id}")
@@ -38,7 +51,7 @@ async def get_plugin(request: Request, plugin_id: str) -> dict[str, Any]:
     info = mgr.get_plugin(plugin_id)
     if info is None:
         raise HTTPException(status_code=404, detail="Plugin not found")
-    return {"plugin": info.model_dump()}
+    return {"status": "ok", "plugin": info.model_dump()}
 
 
 @router.post("/discover")
@@ -47,7 +60,7 @@ async def discover_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     found = mgr.discover()
-    return {"discovered": [p.model_dump() for p in found]}
+    return {"status": "ok", "discovered": [p.model_dump() for p in found]}
 
 
 @router.post("/{plugin_id}/load")
@@ -56,17 +69,17 @@ async def load_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     info = mgr.load(plugin_id)
-    return {"plugin": info.model_dump()}
+    return {"status": "ok", "plugin": info.model_dump()}
 
 
 @router.post("/{plugin_id}/start")
 @handle_api_errors
-async def start_plugin(plugin_id: str, request: Request, body: dict | None = None) -> dict[str, Any]:
+async def start_plugin(plugin_id: str, request: Request, body: PluginStartRequest | None = None) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
-    config = body.get("config") if body else None
+    config = body.config if body else None
     info = mgr.start(plugin_id, config=config)
-    return {"plugin": info.model_dump()}
+    return {"status": "ok", "plugin": info.model_dump()}
 
 
 @router.post("/{plugin_id}/stop")
@@ -75,7 +88,7 @@ async def stop_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     info = mgr.stop(plugin_id)
-    return {"plugin": info.model_dump()}
+    return {"status": "ok", "plugin": info.model_dump()}
 
 
 @router.post("/{plugin_id}/reload")
@@ -84,16 +97,16 @@ async def reload_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
     info = mgr.reload(plugin_id)
-    return {"plugin": info.model_dump()}
+    return {"status": "ok", "plugin": info.model_dump()}
 
 
 @router.put("/{plugin_id}/config")
 @handle_api_errors
-async def update_plugin_config(plugin_id: str, request: Request, body: dict) -> dict[str, Any]:
+async def update_plugin_config(plugin_id: str, request: Request, body: PluginConfigUpdateRequest) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_plugin_manager()
-    info = mgr.update_config(plugin_id, config=body.get("config", {}))
-    return {"plugin": info.model_dump()}
+    info = mgr.update_config(plugin_id, config=body.config)
+    return {"status": "ok", "plugin": info.model_dump()}
 
 
 @router.post("/load-all")

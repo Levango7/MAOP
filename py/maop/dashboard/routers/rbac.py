@@ -163,7 +163,10 @@ async def revoke_role(body: RevokeRequest, request: Request) -> dict[str, Any]:
     # G-07: tenant_id from JWT, not from body.
     tenant_id = _tenant_id_from_jwt(request)
     revoked = mgr.revoke_role(body.user_id, role, tenant_id=tenant_id)
-    return {"status": "ok" if revoked else "not_found", "revoked": revoked}
+    if not revoked:
+        # P2 fix: 404 应返回 404 状态码，而非 200。
+        raise HTTPException(status_code=404, detail="Grant not found")
+    return {"status": "ok", "revoked": revoked}
 
 
 @router.get("/roles")

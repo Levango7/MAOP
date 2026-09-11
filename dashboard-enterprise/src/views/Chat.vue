@@ -465,4 +465,17 @@ onMounted(async () => {
 .stream-tokens, .stream-speed {
   font-variant-numeric: tabular-nums;
 }
+
+/* ── 响应式断点 ── */
+@media (max-width: 900px) {
+  .stream-meta {
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+  }
+}
+@media (max-width: 640px) {
+  .stream-meta {
+    font-size: var(--fs-2xs);
+  }
+}
 </style>

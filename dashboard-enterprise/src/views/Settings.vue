@@ -860,7 +860,7 @@ async function onTestHook(hook) {
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-.history-state.error { color: var(--danger); }
+.history-state.error { color: var(--fail); }
 
 .history-table {
   width: 100%;
@@ -903,8 +903,8 @@ async function onTestHook(hook) {
   background: var(--brand-soft);
 }
 .history-action-btn.danger:hover:not(:disabled) {
-  border-color: var(--danger);  /* F-views: token 由 tokens.css 提供 */
-  background: var(--danger-soft);  /* F-views: token 由 tokens.css 提供 */
+  border-color: var(--fail);  /* F-views: token 由 tokens.css 提供 */
+  background: var(--fail-soft);  /* F-views: token 由 tokens.css 提供 */
 }
 .history-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -1011,7 +1011,7 @@ async function onTestHook(hook) {
 .hooks-btn.primary {
   background: var(--brand);
   border-color: var(--brand);
-  color: white;
+  color: var(--brand-contrast);
 }
 .hooks-btn.primary:hover:not(:disabled) {
   background: var(--brand-strong);
@@ -1024,7 +1024,7 @@ async function onTestHook(hook) {
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-.hooks-state.error { color: var(--danger); }
+.hooks-state.error { color: var(--fail); }
 .hooks-empty {
   padding: var(--sp-5);
   text-align: center;
@@ -1083,8 +1083,8 @@ async function onTestHook(hook) {
   background: var(--brand-soft);
 }
 .hooks-action-btn.danger:hover:not(:disabled) {
-  border-color: var(--danger);  /* F-views: token 由 tokens.css 提供 */
-  background: var(--danger-soft);  /* F-views: token 由 tokens.css 提供 */
+  border-color: var(--fail);  /* F-views: token 由 tokens.css 提供 */
+  background: var(--fail-soft);  /* F-views: token 由 tokens.css 提供 */
 }
 .hooks-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -1173,7 +1173,7 @@ async function onTestHook(hook) {
   box-shadow: 0 0 0 2px var(--brand-soft);
 }
 .hooks-form-error {
-  color: var(--danger);
+  color: var(--fail);
   font-size: var(--fs-sm);
   margin-top: var(--sp-2);
 }
@@ -1183,5 +1183,21 @@ async function onTestHook(hook) {
   display: flex;
   justify-content: flex-end;
   gap: var(--sp-2);
+}
+
+/* ── 响应式断点 ── */
+@media (max-width: 900px) {
+  .detail-meta-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .hooks-form-row-inline {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .detail-meta-grid {
+    grid-template-columns: 1fr;
+    gap: var(--sp-2);
+  }
 }
 </style>

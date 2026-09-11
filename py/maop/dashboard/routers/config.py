@@ -69,7 +69,7 @@ async def list_config_history(
     require_admin(request)
     hist = _history(request)
     items = hist.list_history(limit=limit)
-    return {"history": items, "count": len(items)}
+    return {"status": "ok", "history": items, "count": len(items)}
 
 
 # ── Get a specific version ────────────────────────────────────────
@@ -88,7 +88,7 @@ async def get_config_version(
     record = hist.get_version(version)
     if record is None:
         raise HTTPException(status_code=404, detail=f"Config version {version} not found")
-    return record
+    return {"status": "ok", **record}
 
 
 # ── Rollback ──────────────────────────────────────────────────────

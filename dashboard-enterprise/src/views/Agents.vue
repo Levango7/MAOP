@@ -1151,7 +1151,7 @@ onMounted(() => {
   border-radius: var(--r-sm);
   background: var(--surface-3);
 }
-.route-node.primary { border-left: 3px solid var(--ok); }
+.route-node.primary { border-left: 3px solid var(--success); }
 .route-node.fallback { border-left: 3px solid var(--warn); }
 .route-node.tertiary { border-left: 3px solid var(--text-faint); }
 .route-agent { font-weight: 600; font-size: var(--fs-sm); }
@@ -1360,5 +1360,22 @@ onMounted(() => {
   display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
   padding: var(--sp-6); color: var(--text-faint);
   font-size: var(--fs-sm);
+}
+
+/* ── 响应式断点 ── */
+@media (max-width: 900px) {
+  .decision-row {
+    grid-template-columns: 100px 1fr auto;
+    font-size: var(--fs-xs);
+  }
+}
+@media (max-width: 640px) {
+  .dispatch-grid {
+    grid-template-columns: 1fr;
+  }
+  .decision-row {
+    grid-template-columns: 1fr;
+    gap: var(--sp-1);
+  }
 }
 </style>

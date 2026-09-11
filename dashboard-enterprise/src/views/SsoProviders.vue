@@ -308,7 +308,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
-import { useApiStore } from '../stores/api.js';
+import { useApiStore, fetchWithTimeout, withAuth } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
 import { useConfirm } from '../composables/useConfirm.js';
 import { useI18n } from '../i18n';
@@ -740,7 +740,8 @@ async function downloadMetadata(p) {
     return;
   }
   try {
-    const res = await fetch(`/api/v1/sso/providers/${p.id}/metadata`);
+    // metadata 端点返回 XML 文本而非 JSON, 使用 api store 基础设施 (认证+超时) 获取 text
+    const res = await fetchWithTimeout(`/api/v1/sso/providers/${p.id}/metadata`, withAuth({}, {}));
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const xml = await res.text();
     // 触发浏览器下载

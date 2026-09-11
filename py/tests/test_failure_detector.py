@@ -513,7 +513,7 @@ def test_router_reset_specific_agent(scheduling_client: TestClient):
         json={"agent_id": "drop"},
     )
     assert resp.status_code == 200
-    assert resp.json()["ok"] is True
+    assert resp.json()["status"] == "ok"
     assert detector.get_agent_health("drop") is None
     assert detector.get_agent_health("keep") is not None
 

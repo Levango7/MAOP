@@ -176,3 +176,5 @@ async function load() {
 onMounted(load);
 </script>
 
+<style scoped></style>
+

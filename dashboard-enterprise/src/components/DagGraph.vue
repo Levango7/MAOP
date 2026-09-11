@@ -277,9 +277,9 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 <style scoped>
 .dag-graph {
   position: relative;
-  border: 1px solid var(--border, #3c4048);
+  border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  background: var(--bg-card, #22242a);
+  background: var(--bg-card);
   padding: var(--sp-3);
 }
 
@@ -293,19 +293,19 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 .dag-progress-track {
   flex: 1;
   height: 6px;
-  background: var(--bg-muted, rgba(148,163,184,.16));
+  background: var(--bg-muted);
   border-radius: var(--r-xs);
   overflow: hidden;
 }
 .dag-progress-fill {
   height: 100%;
-  background: var(--brand, #3574f0);
+  background: var(--brand);
   border-radius: var(--r-xs);
   transition: width var(--motion-slow) var(--ease);
 }
 .dag-progress-text {
   font-size: var(--fs-sm);
-  color: var(--text-muted, #9aa3b2);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 .dag-conn-indicator {
@@ -314,8 +314,8 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
   border-radius: 50%;
   flex-shrink: 0;
 }
-.dag-conn-indicator.on { background: var(--success, #3fb950); }
-.dag-conn-indicator.off { background: var(--text-muted, #9aa3b2); }
+.dag-conn-indicator.on { background: var(--success); }
+.dag-conn-indicator.off { background: var(--text-muted); }
 
 /* DAG canvas */
 .dag-canvas {
@@ -328,13 +328,13 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 
 /* Edges */
 .dag-edge {
-  stroke: var(--border, #3c4048);
+  stroke: var(--border);
   stroke-width: 1.5;
   fill: none;
 }
-.dag-edge.edge-success { stroke: var(--success, #3fb950); stroke-width: 2; }
-.dag-edge.edge-failed { stroke: var(--fail, #f85149); stroke-width: 2; stroke-dasharray: 4 3; }
-.dag-edge.edge-skipped { stroke: var(--warn, #d29922); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.dag-edge.edge-success { stroke: var(--success); stroke-width: 2; }
+.dag-edge.edge-failed { stroke: var(--fail); stroke-width: 2; stroke-dasharray: 4 3; }
+.dag-edge.edge-skipped { stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 3 3; }
 
 /* Nodes */
 .dag-node-group { cursor: pointer; }
@@ -349,11 +349,11 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 .dag-node-circle.status-success { fill: var(--success); }
 .dag-node-circle.status-failed { fill: var(--fail); }
 .dag-node-circle.status-skipped { fill: var(--warn); }
-.dag-node-group:hover .dag-node-circle { stroke: var(--brand, #3574f0); stroke-width: 3; }
+.dag-node-group:hover .dag-node-circle { stroke: var(--brand); stroke-width: 3; }
 
 .dag-node-label {
   font-size: var(--fs-xs);
-  fill: var(--text, #e8eaf0);
+  fill: var(--text);
   font-family: inherit;
   user-select: none;
 }
@@ -372,7 +372,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 .dag-empty {
   text-align: center;
   padding: var(--sp-7);
-  color: var(--text-muted, #9aa3b2);
+  color: var(--text-muted);
   font-size: var(--fs-base);
 }
 
@@ -383,7 +383,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--overlay-scrim, rgba(15, 23, 42, .65));
+  background: var(--overlay-scrim);
   display: flex;
   align-items: center;
   justify-content: center;

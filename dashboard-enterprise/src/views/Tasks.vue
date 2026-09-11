@@ -494,4 +494,16 @@ onMounted(() => {
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
+
+/* ── 响应式断点 ── */
+@media (max-width: 900px) {
+  .tasks-table {
+    font-size: var(--fs-xs);
+  }
+}
+@media (max-width: 640px) {
+  .tasks-view {
+    gap: var(--sp-2);
+  }
+}
 </style>

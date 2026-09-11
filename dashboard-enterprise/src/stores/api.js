@@ -284,4 +284,6 @@ export const useApiStore = defineStore('api', () => {
 });
 
 // 模块级导出（便于非 Pinia 上下文使用，如 App.vue 直接 import）
-export { getAuthToken, withAuth, handleUnauthorized, isLoggedIn, fetchWithTimeout };
+// R7 fix: getAuthToken 为内部实现细节（始终返回空字符串，token 由 httpOnly cookie 管理），
+// 不再对外导出。登录状态应通过 isLoggedIn() 判断。
+export { withAuth, handleUnauthorized, isLoggedIn, fetchWithTimeout };

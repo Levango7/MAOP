@@ -170,7 +170,7 @@ export const messages = {
     'view.agents.upgrade': '升级',
     'view.agents.memory': '记忆',
     'view.agents.evolve': '自进化',
-    'view.agents.remove': '移除',
+    'view.agents.remove': '移除智能体',
     'view.agents.memoryFor': '记忆：{name}',
     'view.agents.totalMemories': '总计',
     'view.agents.evolutionCount': '进化次数',

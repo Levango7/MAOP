@@ -95,7 +95,7 @@ async def metrics(request: Request) -> Any:
 
 
 @router.get("/metrics/prometheus")
-async def metrics_prometheus() -> Any:
+async def metrics_prometheus(request: Request) -> Any:
     """Return all metrics in Prometheus text exposition format.
 
     This is a thin wrapper around the global metrics collector, mounted
@@ -103,6 +103,8 @@ async def metrics_prometheus() -> Any:
     scrape endpoint remains ``/api/prometheus`` (registered in
     server.py).
     """
+    # P1 fix: metrics 端点需要 admin 鉴权，防止指标信息泄露。
+    require_admin(request)
     from maop.core.monitoring.monitoring import metrics as _global_metrics
     text = _global_metrics.to_prometheus()
     return PlainTextResponse(
@@ -172,7 +174,7 @@ async def record(payload: RecordRequestModel, request: Request) -> Any:
 
 
 @router.get("/health")
-async def health() -> Any:
+async def health(request: Request) -> Any:
     """Deep health check of the observability pipeline.
 
     Checks:
@@ -182,6 +184,8 @@ async def health() -> Any:
       * Prometheus endpoint reachable (self)
       * deploy/ configs present
     """
+    # P1 fix: health 端点需要 admin 鉴权，防止健康检查细节泄露。
+    require_admin(request)
     checks: dict[str, dict[str, Any]] = {}
 
     # OTel SDK

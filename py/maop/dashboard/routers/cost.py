@@ -41,7 +41,7 @@ async def get_cost_entries(
         end_date=end_date or "",
         limit=limit,
     )
-    return {"entries": [e.model_dump() for e in entries]}
+    return {"status": "ok", "entries": [e.model_dump() for e in entries]}
 
 
 @router.get("/summary")
@@ -61,7 +61,7 @@ async def get_cost_summary(
         start_date=start_date or "",
         end_date=end_date or "",
     )
-    return {"summary": summary.model_dump()}
+    return {"status": "ok", "summary": summary.model_dump()}
 
 
 @router.get("/budget")
@@ -73,7 +73,7 @@ async def get_budget_status(request: Request) -> dict[str, Any]:
         status = await tracker.budget_status_async()
     else:
         status = tracker.budget_status()
-    return {"budget": status.model_dump()}
+    return {"status": "ok", "budget": status.model_dump()}
 
 
 class BudgetConfigRequest(BaseModel):
@@ -82,6 +82,26 @@ class BudgetConfigRequest(BaseModel):
     daily_limit_usd: float | None = Field(default=None, ge=0)
     monthly_limit_usd: float | None = Field(default=None, ge=0)
     alert_threshold: float | None = Field(default=None, ge=0, le=1)
+
+
+class UpdatePricingRequest(BaseModel):
+    """更新定价请求体."""
+
+    prompt_per_1m: float = Field(default=0.0, ge=0)
+    completion_per_1m: float = Field(default=0.0, ge=0)
+
+
+class RecordCostRequest(BaseModel):
+    """记录成本请求体."""
+
+    session_id: str = ""
+    agent: str = ""
+    model: str = ""
+    prompt_tokens: int = Field(default=0, ge=0)
+    completion_tokens: int = Field(default=0, ge=0)
+    total_tokens: int = Field(default=0, ge=0)
+    latency_ms: float = Field(default=0.0, ge=0)
+    metadata: dict[str, Any] | None = None
 
 
 @router.put("/budget")
@@ -98,7 +118,7 @@ async def update_budget(body: BudgetConfigRequest, request: Request) -> dict[str
         monthly_limit_usd=body.monthly_limit_usd,
         alert_threshold=body.alert_threshold,
     )
-    return {"budget": status.model_dump()}
+    return {"status": "ok", "budget": status.model_dump()}
 
 
 @router.get("/pricing")
@@ -106,47 +126,47 @@ async def update_budget(body: BudgetConfigRequest, request: Request) -> dict[str
 async def get_pricing(request: Request) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_cost_tracker()
-    return {"pricing": tracker.get_pricing()}
+    return {"status": "ok", "pricing": tracker.get_pricing()}
 
 
 @router.put("/pricing/{model}")
 @handle_api_errors
-async def update_pricing(model: str, body: dict, request: Request) -> dict[str, Any]:
+async def update_pricing(model: str, body: UpdatePricingRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_cost_tracker()
     tracker.update_pricing(
         model=model,
-        prompt_per_1m=body.get("prompt_per_1m", 0.0),
-        completion_per_1m=body.get("completion_per_1m", 0.0),
+        prompt_per_1m=body.prompt_per_1m,
+        completion_per_1m=body.completion_per_1m,
     )
-    return {"updated": model}
+    return {"status": "ok", "updated": model}
 
 
 @router.post("/record")
 @handle_api_errors
-async def record_cost(body: dict, request: Request) -> dict[str, Any]:
+async def record_cost(body: RecordCostRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_cost_tracker()
     if hasattr(tracker, "record_async"):
         entry = await tracker.record_async(
-            session_id=body.get("session_id", ""),
-            agent=body.get("agent", ""),
-            model=body.get("model", ""),
-            prompt_tokens=body.get("prompt_tokens", 0),
-            completion_tokens=body.get("completion_tokens", 0),
-            total_tokens=body.get("total_tokens", 0),
-            latency_ms=body.get("latency_ms", 0),
-            metadata=body.get("metadata"),
+            session_id=body.session_id,
+            agent=body.agent,
+            model=body.model,
+            prompt_tokens=body.prompt_tokens,
+            completion_tokens=body.completion_tokens,
+            total_tokens=body.total_tokens,
+            latency_ms=body.latency_ms,
+            metadata=body.metadata,
         )
     else:
         entry = tracker.record(
-            session_id=body.get("session_id", ""),
-            agent=body.get("agent", ""),
-            model=body.get("model", ""),
-            prompt_tokens=body.get("prompt_tokens", 0),
-            completion_tokens=body.get("completion_tokens", 0),
-            total_tokens=body.get("total_tokens", 0),
-            latency_ms=body.get("latency_ms", 0),
-            metadata=body.get("metadata"),
+            session_id=body.session_id,
+            agent=body.agent,
+            model=body.model,
+            prompt_tokens=body.prompt_tokens,
+            completion_tokens=body.completion_tokens,
+            total_tokens=body.total_tokens,
+            latency_ms=body.latency_ms,
+            metadata=body.metadata,
         )
-    return {"entry": entry.model_dump()}
+    return {"status": "ok", "entry": entry.model_dump()}

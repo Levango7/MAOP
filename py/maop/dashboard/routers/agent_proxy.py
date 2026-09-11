@@ -40,7 +40,7 @@ async def api_bridge_adapters(request: Request) -> dict[str, Any]:
             statuses.append(s.model_dump())
         except Exception:
             statuses.append({"name": name, "error": "status unavailable"})
-    return {"adapters": statuses, "count": len(statuses)}
+    return {"status": "ok", "adapters": statuses, "count": len(statuses)}
 
 
 @router.post("/api/bridge/call")
@@ -74,7 +74,7 @@ async def api_bridge_health(request: Request) -> dict[str, Any]:
     require_admin(request)
     bridge = _get_bridge()
     health = bridge.health_check_all()
-    return {"health": health}
+    return {"status": "ok", "health": health}
 
 
 @router.post("/api/bridge/sync-config")

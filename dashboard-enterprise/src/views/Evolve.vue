@@ -716,7 +716,7 @@ onMounted(() => {
 }
 .heatmap__table th,
 .heatmap__table td {
-  border: 1px solid var(--border-light, rgba(148,163,184,.35));
+  border: 1px solid var(--border-light);
   padding: 4px 6px;
   text-align: center;
   white-space: nowrap;
@@ -747,8 +747,7 @@ onMounted(() => {
   .evolve-milestones__card-title {
     font-size: var(--fs-sm);
   }
-}
-@media (max-width: 640px) {
+
   .evolve-milestones__impact {
     flex-direction: column;
     align-items: flex-start;

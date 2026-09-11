@@ -45,7 +45,7 @@ async def api_tool_audit_entries(
     require_admin(request)
     audit = _get_tool_audit()
     entries = audit.query(tool_name=tool_name, agent=agent, success=success, limit=limit)
-    return {"entries": [e.model_dump() for e in entries], "count": len(entries)}
+    return {"status": "ok", "entries": [e.model_dump() for e in entries], "count": len(entries)}
 
 
 @router.get("/api/tool-audit/stats")

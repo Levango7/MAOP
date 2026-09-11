@@ -223,7 +223,7 @@ onMounted(load);
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-4);
-  background: var(--info-soft, rgba(76, 194, 255, .13));
+  background: var(--info-soft);
   border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
   border-radius: var(--r-md);
   margin-bottom: var(--sp-2);
@@ -242,7 +242,7 @@ onMounted(load);
 .coming-soon-banner__title {
   font-size: var(--fs-base);
   font-weight: 600;
-  color: var(--info-strong, #79c0ff);
+  color: var(--info-strong);
 }
 .coming-soon-banner__desc {
   font-size: var(--fs-sm);
@@ -345,4 +345,20 @@ onMounted(load);
 .btn--primary { background: var(--brand); color: var(--brand-contrast); border: none; }
 .btn--ghost { background: transparent; }
 .btn--sm { padding: 4px 8px; font-size: var(--fs-xs); }
+
+/* ── 响应式断点 ── */
+@media (max-width: 900px) {
+  .coming-soon-banner {
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+}
+@media (max-width: 640px) {
+  .skill-market-page {
+    gap: var(--sp-2);
+  }
+  .coming-soon-banner {
+    padding: var(--sp-2) var(--sp-3);
+  }
+}
 </style>

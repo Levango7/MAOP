@@ -93,47 +93,47 @@ export function useStreamingFetch() {
           }, STREAM_TIMEOUT_MS);
           buffer += decoder.decode(value, { stream: true });
 
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            currentEvent = line.slice(7).trim();
-            continue;
-          }
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') {
-            if (onDone) onDone();
-            return;
-          }
-          try {
-            const parsed = JSON.parse(data);
-            if (currentEvent === 'error' || parsed.error) {
-              const errMsg = typeof parsed.error === 'string'
-                ? parsed.error
-                : (parsed.error && parsed.error.message) || 'Stream error';
-              if (onError) onError(errMsg);
-              currentEvent = '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              currentEvent = line.slice(7).trim();
+              continue;
+            }
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') {
+              if (onDone) onDone();
               return;
             }
-            if (parsed.content) {
-              fullContent += parsed.content;
-              if (onData) onData(fullContent, parsed);
+            try {
+              const parsed = JSON.parse(data);
+              if (currentEvent === 'error' || parsed.error) {
+                const errMsg = typeof parsed.error === 'string'
+                  ? parsed.error
+                  : (parsed.error && parsed.error.message) || 'Stream error';
+                if (onError) onError(errMsg);
+                currentEvent = '';
+                return;
+              }
+              if (parsed.content) {
+                fullContent += parsed.content;
+                if (onData) onData(fullContent, parsed);
+              }
+              if (parsed.session_id || parsed.tokens || parsed.model) {
+                const meta = {};
+                if (parsed.session_id) meta.session_id = parsed.session_id;
+                if (parsed.tokens) meta.tokens = parsed.tokens;
+                if (parsed.model) meta.model = parsed.model;
+                if (onMeta) onMeta(meta);
+              }
+            } catch {
+              // Non-JSON data line, skip
             }
-            if (parsed.session_id || parsed.tokens || parsed.model) {
-              const meta = {};
-              if (parsed.session_id) meta.session_id = parsed.session_id;
-              if (parsed.tokens) meta.tokens = parsed.tokens;
-              if (parsed.model) meta.model = parsed.model;
-              if (onMeta) onMeta(meta);
-            }
-          } catch {
-            // Non-JSON data line, skip
+            currentEvent = '';
           }
-          currentEvent = '';
         }
-      }
       } finally {
         // M6 fix: 无论流式读取正常结束、中途 return 还是抛错，都清理超时计时器，
         // 避免定时器泄漏导致 abort 在连接已关闭后仍触发。

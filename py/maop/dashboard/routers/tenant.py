@@ -156,7 +156,10 @@ async def suspend_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
         )
     mgr = _get_manager()
     suspended = mgr.suspend_tenant(tenant_id)
-    return {"status": "ok" if suspended else "not_found", "suspended": suspended}
+    if not suspended:
+        # P2 fix: 404 应返回 404 状态码，而非 200。
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return {"status": "ok", "suspended": suspended}
 
 
 @router.post("/{tenant_id}/activate")

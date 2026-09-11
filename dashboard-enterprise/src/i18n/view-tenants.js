@@ -13,7 +13,7 @@ export const messages = {
     'view.tenants.loadError': 'Could not load tenants',
     'view.tenants.create': 'Create',
     'view.tenants.creating': 'Creating…',
-    'view.tenants.deleteConfirm': 'Delete tenant "{id}"? This cannot be undone.',
+    'view.tenants.deleteConfirm': 'Delete tenant “{id}”? This cannot be undone.',
     'view.tenants.deleted': 'Deleted {id}',
     'view.tenants.planStarter': 'Starter',
     'view.tenants.planPro': 'Pro',

@@ -125,10 +125,11 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 }
 .drawer__icon { color: var(--brand-strong); }
 .drawer__title { font-size: var(--fs-md); font-weight: 600; color: var(--text); margin: 0; flex: 1; }
+/* R7 修复: border-radius 从 var(--r-sm) 统一为 var(--r-md) (与 .close-btn / .modal__x 一致) */
 .drawer__close {
   display: grid; place-items: center;
   width: 30px; height: 30px;
-  background: transparent; border: none; border-radius: var(--r-sm);
+  background: transparent; border: none; border-radius: var(--r-md);
   color: var(--text-muted); cursor: pointer;
   transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
 }

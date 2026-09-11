@@ -55,7 +55,7 @@ async def list_snapshots(
     require_admin(request)
     tracker = _get_change_tracker()
     snapshots = tracker.list_snapshots(workdir=workdir, limit=limit)
-    return {"snapshots": [s.model_dump() for s in snapshots]}
+    return {"status": "ok", "snapshots": [s.model_dump() for s in snapshots]}
 
 
 @router.post("/snapshots")
@@ -68,7 +68,7 @@ async def create_snapshot(body: CreateSnapshotRequest, request: Request) -> dict
         label=body.label,
     )
     snap = tracker.get_snapshot(snap_id)
-    return {"snapshot": snap.model_dump() if snap else None}
+    return {"status": "ok", "snapshot": snap.model_dump() if snap else None}
 
 
 @router.get("/diff")
@@ -81,7 +81,7 @@ async def diff_snapshots(
     require_admin(request)
     tracker = _get_change_tracker()
     result = tracker.diff(workdir, since_label=since_label)
-    return {"diff": result.model_dump()}
+    return {"status": "ok", "diff": result.model_dump()}
 
 
 @router.get("/changes")
@@ -94,7 +94,7 @@ async def get_change_log(
     require_admin(request)
     tracker = _get_change_tracker()
     changes = tracker.get_change_log(workdir, limit=limit)
-    return {"changes": changes}
+    return {"status": "ok", "changes": changes}
 
 
 @router.delete("/snapshots/{snapshot_id}")
@@ -103,7 +103,7 @@ async def delete_snapshot(snapshot_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_change_tracker()
     ok = tracker.delete_snapshot(snapshot_id)
-    return {"deleted": ok}
+    return {"status": "ok", "deleted": ok}
 
 
 @router.get("/artifacts")
@@ -112,7 +112,7 @@ async def list_artifacts(request: Request, limit: int = Query(50, ge=1, le=200))
     require_admin(request)
     store = _get_artifact_store()
     artifacts = store.list_artifacts(limit=limit)
-    return {"artifacts": [a.model_dump() for a in artifacts]}
+    return {"status": "ok", "artifacts": [a.model_dump() for a in artifacts]}
 
 
 @router.post("/artifacts")
@@ -126,7 +126,7 @@ async def save_artifact(body: SaveArtifactRequest, request: Request) -> dict[str
         tag=body.tag,
         metadata=body.metadata,
     )
-    return {"version": version}
+    return {"status": "ok", "version": version}
 
 
 @router.get("/artifacts/{name}")
@@ -137,7 +137,7 @@ async def load_artifact(request: Request, name: str, version: int | None = Query
     content = store.load(name, version=version)
     if content is None:
         raise HTTPException(status_code=404, detail="Artifact not found")
-    return {"name": name, "content": content}
+    return {"status": "ok", "name": name, "content": content}
 
 
 @router.get("/artifacts/{name}/history")
@@ -146,7 +146,7 @@ async def artifact_history(request: Request, name: str, limit: int = Query(20)) 
     require_admin(request)
     store = _get_artifact_store()
     history = store.history(name, limit=limit)
-    return {"history": [h.model_dump() for h in history]}
+    return {"status": "ok", "history": [h.model_dump() for h in history]}
 
 
 @router.post("/artifacts/{name}/restore")
@@ -155,7 +155,7 @@ async def restore_artifact(name: str, body: RestoreArtifactRequest, request: Req
     require_admin(request)
     store = _get_artifact_store()
     ok = store.restore(name, version=body.version)
-    return {"restored": ok}
+    return {"status": "ok", "restored": ok}
 
 
 @router.delete("/artifacts/{name}")
@@ -164,4 +164,4 @@ async def delete_artifact(name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     store = _get_artifact_store()
     ok = store.delete_artifact(name)
-    return {"deleted": ok}
+    return {"status": "ok", "deleted": ok}

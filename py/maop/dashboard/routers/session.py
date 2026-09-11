@@ -63,13 +63,16 @@ def _get_conversation_mgr():
 @router.get("/")
 @handle_api_errors
 async def list_sessions(
+    request: Request,
     status: str = Query("", description="Filter by status"),
     agent: str = Query("", description="Filter by agent"),
     limit: int = Query(50, ge=1, le=200),
 ) -> dict[str, Any]:
+    # P1 fix: 读端点也需要 admin 鉴权，防止会话信息泄露。
+    require_admin(request)
     mgr = _get_session_mgr()
     sessions = mgr.list(status=status, agent=agent, limit=limit)
-    return {"sessions": [s.model_dump() for s in sessions]}
+    return {"status": "ok", "sessions": [s.model_dump() for s in sessions]}
 
 
 @router.post("/")
@@ -85,23 +88,27 @@ async def create_session(body: CreateSessionRequest, request: Request) -> dict[s
         token_budget=body.token_budget,
     )
     session = mgr.get(sid)
-    return {"session": session.model_dump() if session else None}
+    return {"status": "ok", "session": session.model_dump() if session else None}
 
 
 @router.get("/stats")
 @handle_api_errors
-async def session_stats() -> dict[str, Any]:
+async def session_stats(request: Request) -> dict[str, Any]:
+    # P1 fix: 读端点也需要 admin 鉴权。
+    require_admin(request)
     mgr = _get_session_mgr()
     return mgr.stats()
 
 @router.get("/{session_id}")
 @handle_api_errors
-async def get_session(session_id: str) -> dict[str, Any]:
+async def get_session(session_id: str, request: Request) -> dict[str, Any]:
+    # P1 fix: 读端点也需要 admin 鉴权。
+    require_admin(request)
     mgr = _get_session_mgr()
     session = mgr.get(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"session": session.model_dump()}
+    return {"status": "ok", "session": session.model_dump()}
 
 
 @router.patch("/{session_id}")
@@ -120,7 +127,7 @@ async def update_session(session_id: str, body: UpdateSessionRequest, request: R
         token_budget=body.token_budget,
         message_count=body.message_count,
     )
-    return {"updated": ok}
+    return {"status": "ok", "updated": ok}
 
 
 @router.delete("/{session_id}")
@@ -129,7 +136,7 @@ async def delete_session(session_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_session_mgr()
     ok = mgr.delete(session_id)
-    return {"deleted": ok}
+    return {"status": "ok", "deleted": ok}
 
 
 
@@ -137,12 +144,15 @@ async def delete_session(session_id: str, request: Request) -> dict[str, Any]:
 @handle_api_errors
 async def get_messages(
     session_id: str,
+    request: Request,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
+    # P1 fix: 读端点也需要 admin 鉴权。
+    require_admin(request)
     cmgr = _get_conversation_mgr()
     messages = cmgr.get_history(session_id, limit=limit, offset=offset)
-    return {"messages": [m.model_dump() for m in messages]}
+    return {"status": "ok", "messages": [m.model_dump() for m in messages]}
 
 
 @router.post("/{session_id}/messages")
@@ -159,29 +169,35 @@ async def add_message(session_id: str, body: AddMessageRequest, request: Request
     )
     smgr = _get_session_mgr()
     smgr.touch(session_id)
-    return {"message_id": msg_id}
+    return {"status": "ok", "message_id": msg_id}
 
 
 @router.get("/{session_id}/context")
 @handle_api_errors
 async def get_context_window(
     session_id: str,
+    request: Request,
     max_tokens: int = Query(4000, ge=100, le=128000),
 ) -> dict[str, Any]:
+    # P1 fix: 读端点也需要 admin 鉴权。
+    require_admin(request)
     cmgr = _get_conversation_mgr()
     window = cmgr.get_context_window(session_id, max_tokens=max_tokens)
-    return {"context": window.model_dump()}
+    return {"status": "ok", "context": window.model_dump()}
 
 
 @router.get("/{session_id}/context/compressed")
 @handle_api_errors
 async def get_compressed_context(
     session_id: str,
+    request: Request,
     max_tokens: int = Query(4000, ge=100, le=128000),
 ) -> dict[str, Any]:
+    # P1 fix: 读端点也需要 admin 鉴权。
+    require_admin(request)
     cmgr = _get_conversation_mgr()
     window = cmgr.get_compressed_context(session_id, max_tokens=max_tokens)
-    return {"context": window.model_dump()}
+    return {"status": "ok", "context": window.model_dump()}
 
 
 @router.delete("/{session_id}/messages")
@@ -190,7 +206,7 @@ async def clear_messages(session_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     cmgr = _get_conversation_mgr()
     count = cmgr.clear_session(session_id)
-    return {"cleared": count}
+    return {"status": "ok", "cleared": count}
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -200,6 +216,7 @@ async def clear_messages(session_id: str, request: Request) -> dict[str, Any]:
 @tasks_router.get("")
 @handle_api_errors
 async def list_sessions_paginated(
+    request: Request,
     status: str = Query("all", description="Filter by status: running/completed/failed/all"),
     search: str = Query("", description="Search keyword (matches agent/workdir/metadata)"),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
@@ -219,6 +236,8 @@ async def list_sessions_paginated(
           "total_pages": 5
         }
     """
+    # P1 fix: 读端点也需要 admin 鉴权。
+    require_admin(request)
     mgr = _get_session_mgr()
     return mgr.list_paginated(
         status=status,
@@ -244,4 +263,4 @@ async def rerun_session(session_id: str, request: Request) -> dict[str, Any]:
     new_session = mgr.rerun(session_id)
     if new_session is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"session": new_session.model_dump(), "rerun_from": session_id}
+    return {"status": "ok", "session": new_session.model_dump(), "rerun_from": session_id}

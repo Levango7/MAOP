@@ -147,14 +147,9 @@ function hydrateEditionFromConfig() {
       try {
         const st = useEditionStore();
         if (st) {
-          st.edition = data.edition;
-          // 同步持久化快照，供下次冷加载读取
-          localStorage.setItem('maop_edition', JSON.stringify({
-            edition: st.edition,
-            features: st.features,
-            backends: st.backends,
-            degradations: st.degradations,
-          }));
+          // R7 fix: 通过 store action hydrate，避免直接修改 Pinia state。
+          // hydrateEdition 内部会同步持久化 localStorage 快照。
+          st.hydrateEdition(data);
         }
       } catch { /* ignore */ }
     })

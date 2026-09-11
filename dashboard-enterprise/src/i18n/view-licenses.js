@@ -92,7 +92,7 @@ export const messages = {
     'view.licenses.renewing': '续期中…',
     'view.licenses.renewed': 'License {id} 已续期 {days} 天',
     'view.licenses.revoke': '吊销',
-    'view.licenses.revokeConfirm': '确定吊销 License"{id}"？此操作不可恢复。',
+    'view.licenses.revokeConfirm': '确定吊销 License「{id}」？此操作不可恢复。',
     'view.licenses.revoked': 'License {id} 已吊销',
     'view.licenses.viewDetails': '查看详情',
 

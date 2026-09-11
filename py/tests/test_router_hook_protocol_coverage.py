@@ -261,7 +261,7 @@ class TestProtocolUnregister:
             "/api/protocol/unregister",
             json={"name": "nonexistent"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 404
 
 
 class TestProtocolGet:

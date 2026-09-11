@@ -70,7 +70,11 @@ const router = useRouter();
 
 const STORAGE_KEY = 'maop_onboarding_completed';
 
-const completed = ref(localStorage.getItem(STORAGE_KEY) === '1');
+// R7 修复: localStorage 访问需 try-catch 防护 (隐私模式 / 配额超限 / 禁用场景)
+function lsGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function lsSet(key, val) { try { localStorage.setItem(key, val); } catch { /* noop */ } }
+
+const completed = ref(lsGet(STORAGE_KEY) === '1');
 const visible = ref(!completed.value);
 const step = ref(0);
 const rootRef = ref(null);
@@ -83,7 +87,7 @@ const steps = [
 
 function skip() {
   visible.value = false;
-  localStorage.setItem(STORAGE_KEY, '1');
+  lsSet(STORAGE_KEY, '1');
 }
 
 function finish() {

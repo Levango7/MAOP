@@ -25,7 +25,7 @@ import AppIcon from './AppIcon.vue';
 const { dismiss } = useToast();
 function iconFor(tone) {
   return tone === 'success' ? 'check-circle'
-    : tone === 'fail' ? 'x-circle'
+    : tone === 'error' ? 'x-circle'
     : tone === 'warn' ? 'alert-triangle'
     : 'info';
 }
@@ -62,8 +62,8 @@ function iconFor(tone) {
 }
 .toast--success { border-left-color: var(--success); }
 .toast--success .toast__msg, .toast--success :deep(svg) { color: var(--success); }
-.toast--fail { border-left-color: var(--fail); }
-.toast--fail :deep(svg) { color: var(--fail); }
+.toast--error { border-left-color: var(--fail); }
+.toast--error :deep(svg) { color: var(--fail); }
 .toast--warn { border-left-color: var(--warn); }
 .toast--warn :deep(svg) { color: var(--warn); }
 .toast--info { border-left-color: var(--brand); }

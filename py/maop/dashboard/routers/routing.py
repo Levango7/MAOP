@@ -82,6 +82,7 @@ async def api_routing_decisions_recent(
     decisions = store.query_recent(limit=capped_limit, stage=stage_filter)
     total = store.count(stage=stage_filter)
     return {
+        "status": "ok",
         "decisions": [d.to_dict() for d in decisions],
         "count": len(decisions),
         "total": total,
@@ -106,6 +107,7 @@ async def api_routing_decisions_stats(request: Request) -> dict[str, Any]:
     store = _get_store()
     stats = store.stats()
     return {
+        "status": "ok",
         "total": stats.get("total", 0),
         "by_stage": stats.get("by_stage", {}),
         "last_24h": stats.get("last_24h", 0),
@@ -130,6 +132,7 @@ async def api_routing_decisions_by_trace(request: Request, trace_id: str) -> dic
     decisions = store.query_by_trace(trace_id)
     stages = [d.stage for d in decisions]
     return {
+        "status": "ok",
         "trace_id": trace_id,
         "decisions": [d.to_dict() for d in decisions],
         "count": len(decisions),

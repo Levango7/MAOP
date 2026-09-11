@@ -409,12 +409,12 @@ function formatTime(ts) {
   if (!time || Number.isNaN(time)) return '—';
   const diff = Math.max(0, now - time);
   const min = Math.floor(diff / 60000);
-  if (min < 1) return t('view.quotas.justNow');
-  if (min < 60) return t('view.quotas.minutesAgo', { n: min });
+  if (min < 1) return t('common.justNow');
+  if (min < 60) return t('common.minutesAgo', { n: min });
   const h = Math.floor(min / 60);
-  if (h < 24) return t('view.quotas.hoursAgo', { n: h });
+  if (h < 24) return t('common.hoursAgo', { n: h });
   const d = Math.floor(h / 24);
-  return t('view.quotas.daysAgo', { n: d });
+  return t('common.daysAgo', { n: d });
 }
 
 // ── 统计卡片计算属性 ────────────────────────────────────────────
@@ -453,7 +453,7 @@ const allocationChartData = computed(() => {
       data: alloc.values || [],
       backgroundColor: (alloc.labels || []).map((_, i) => palette[i % palette.length]),
       borderWidth: 2,
-      borderColor: 'var(--surface, #22242a)',
+      borderColor: 'var(--surface)',
     }],
   };
 });

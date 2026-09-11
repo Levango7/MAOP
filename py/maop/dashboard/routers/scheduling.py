@@ -22,6 +22,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Request
+from pydantic import BaseModel, Field
 
 from maop.core.scheduling.failure_detector import (
     FailurePatternDetector,
@@ -33,6 +34,12 @@ from maop.dashboard.error_handler import handle_api_errors
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/scheduling", tags=["scheduling"])
+
+
+class FailureStatsResetRequest(BaseModel):
+    """重置失败检测器状态请求体."""
+
+    agent_id: str | None = Field(default=None, max_length=200)
 
 
 def _detector() -> FailurePatternDetector:
@@ -75,11 +82,11 @@ async def api_scheduling_failure_stats(request: Request) -> dict[str, Any]:
 @router.post("/failure-stats/reset")
 @handle_api_errors(
     "Scheduling failure stats reset",
-    error_value={"ok": False, "error": "Reset failed"},
+    error_value={"status": "error", "error": "Reset failed"},
 )
 async def api_scheduling_failure_stats_reset(
     request: Request,
-    body: dict[str, Any] | None = None,
+    body: FailureStatsResetRequest | None = None,
 ) -> dict[str, Any]:
     """Clear failure-detector state.
 
@@ -89,15 +96,14 @@ async def api_scheduling_failure_stats_reset(
     ladder.
     """
     require_admin(request)
-    payload = body or {}
-    agent_id = str(payload.get("agent_id", "") or "").strip() or None
+    agent_id = (body.agent_id if body and body.agent_id else "").strip() or None
     _detector().reset(agent_id)
     logger.info(
         "[scheduling-api] failure-detector reset (agent_id=%s, by=%s)",
         agent_id or "ALL",
         getattr(getattr(request, "state", None), "auth_identity", "unknown"),
     )
-    return {"ok": True, "reset_agent": agent_id or "ALL"}
+    return {"status": "ok", "reset_agent": agent_id or "ALL"}
 
 
 __all__ = ["router"]

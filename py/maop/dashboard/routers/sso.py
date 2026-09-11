@@ -155,7 +155,10 @@ async def logout(body: LogoutRequest, request: Request) -> dict[str, Any]:
     _require_sso()
     mgr = _get_manager()
     logged_out = mgr.logout(body.session_id)
-    return {"status": "ok" if logged_out else "not_found", "logged_out": logged_out}
+    if not logged_out:
+        # P2 fix: 404 应返回 404 状态码，而非 200。
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"status": "ok", "logged_out": logged_out}
 
 
 @router.get("/validate")
@@ -170,7 +173,8 @@ async def validate_session(request: Request, session_id: str = "") -> dict[str, 
     mgr = _get_manager()
     session = mgr.validate_session(session_id)
     if session is None:
-        return {"status": "invalid", "valid": False}
+        # P2 fix: 401 应返回 401 状态码，而非 200。
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
     return {
         "status": "ok",
         "valid": True,

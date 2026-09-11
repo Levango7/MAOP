@@ -343,7 +343,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   border-radius: 12px;
   font-size: var(--fs-sm);
   font-weight: 600;
-  background: var(--bg-tag, rgba(148,163,184,.16));
+  background: var(--bg-tag);
   color: var(--text-muted);
 }
 .edition-badge.enterprise {
@@ -370,7 +370,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .tracing-badge.on .dot { background: var(--success); }
 .tracing-badge.off {
-  background: var(--bg-tag, rgba(148,163,184,.16));
+  background: var(--bg-tag);
   color: var(--text-faint);
 }
 .tracing-badge.off .dot { background: var(--text-faint); }
@@ -411,7 +411,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   align-items: center;
   gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px solid var(--border-soft, rgba(148,163,184,.16));
+  border-bottom: 1px solid var(--border-soft);
 }
 .pipeline-row:last-child, .config-row:last-child, .health-row:last-child {
   border-bottom: none;
@@ -487,10 +487,10 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid var(--border, rgba(148,163,184,.35));
+  border-bottom: 1px solid var(--border);
 }
 .metric-row {
-  border-bottom: 1px solid var(--border-soft, rgba(148,163,184,.16));
+  border-bottom: 1px solid var(--border-soft);
 }
 .metric-row:last-child { border-bottom: none; }
 .mono { font-family: var(--font-mono, monospace); font-size: var(--fs-sm); }
@@ -529,7 +529,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 /* ── Health & trace ─────────────────────────────────────────────── */
 .refresh-btn {
   background: none;
-  border: 1px solid var(--border, rgba(148,163,184,.35));
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 4px 8px;
   cursor: pointer;
@@ -571,7 +571,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .trace-enable code {
   font-family: var(--font-mono, monospace);
-  background: var(--bg-tag, rgba(148,163,184,.16));
+  background: var(--bg-tag);
   padding: 1px 6px;
   border-radius: 3px;
   font-size: var(--fs-xs);

@@ -441,7 +441,8 @@ async def api_evolution_approval_decision(approval_id: str, request: Request, bo
         # 此处通过内部方法读取循环报告以支持审批决策持久化。
         report = loop._load_report(cycle_id)  # 假设有此方法或通过 DB 查询
         if not report:
-            return {"status": "error", "error": f"Cycle {cycle_id} not found"}
+            # P2 fix: 404 应返回 404 状态码，而非 200。
+            raise HTTPException(status_code=404, detail=f"Cycle {cycle_id} not found")
 
         if decision == "approve":
             # 将 suggestion_id 从 pending_approval 移到 approved 列表
@@ -521,7 +522,8 @@ async def api_evolution_loop_rollback(request: Request, body: EvolutionLoopRollb
     snapshot_id = body.snapshot_id
 
     if not cycle_id:
-        return {"status": "error", "error": "cycle_id required"}
+        # P2 fix: 400 应返回 400 状态码，而非 200。
+        raise HTTPException(status_code=400, detail="cycle_id required")
 
     try:
         loop = EvolutionLoop(root_dir=str(MAOP_ROOT))

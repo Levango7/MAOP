@@ -388,12 +388,12 @@ function relativeTime(ts) {
   if (!ms) return '';
   const diff = Math.max(0, Date.now() - ms);
   const m = Math.floor(diff / 60000);
-  if (m < 1) return t('view.notifications.justNow');
-  if (m < 60) return t('view.notifications.minutesAgo', { n: m });
+  if (m < 1) return t('common.justNow');
+  if (m < 60) return t('common.minutesAgo', { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return t('view.notifications.hoursAgo', { n: h });
+  if (h < 24) return t('common.hoursAgo', { n: h });
   const d = Math.floor(h / 24);
-  return t('view.notifications.daysAgo', { n: d });
+  return t('common.daysAgo', { n: d });
 }
 function formatTime(ts) {
   const ms = toMs(ts);
@@ -576,7 +576,7 @@ onMounted(loadAll);
 .notif-row:hover { border-color: var(--border-strong); background: var(--surface-2); }
 .notif-row.is-unread { background: color-mix(in srgb, var(--brand-soft) 35%, var(--surface)); }
 .notif-row__bar { width: 4px; height: 32px; border-radius: 2px; background: var(--border); }
-.notif-row__bar.bar-info { background: var(--info, #4cc2ff); }
+.notif-row__bar.bar-info { background: var(--info); }
 .notif-row__bar.bar-warning { background: var(--warn); }
 .notif-row__bar.bar-error { background: var(--fail); }
 .notif-row__bar.bar-success { background: var(--success); }
@@ -587,7 +587,7 @@ onMounted(loadAll);
   background: var(--surface-2);
   color: var(--text-muted);
 }
-.notif-row__icon.ic-info { color: var(--info, #4cc2ff); }
+.notif-row__icon.ic-info { color: var(--info); }
 .notif-row__icon.ic-warning { color: var(--warn); }
 .notif-row__icon.ic-error { color: var(--fail); }
 .notif-row__icon.ic-success { color: var(--success); }

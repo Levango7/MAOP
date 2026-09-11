@@ -67,8 +67,8 @@ function formatTime(ts) {
 
 <style scoped>
 .node-detail-panel {
-  background: var(--bg-card, #22242a);
-  border: 1px solid var(--border, #3c4048);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-card);
   overflow: hidden;
@@ -79,8 +79,8 @@ function formatTime(ts) {
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--border, #3c4048);
-  background: var(--bg-muted, rgba(148,163,184,.16));
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-muted);
 }
 .ndp-header h4 {
   margin: 0;
@@ -94,11 +94,11 @@ function formatTime(ts) {
   cursor: pointer;
   padding: var(--sp-1);
   border-radius: var(--r-sm);
-  color: var(--text-muted, #9aa3b2);
+  color: var(--text-muted);
   display: flex;
   align-items: center;
 }
-.ndp-close:hover { background: var(--bg-hover, rgba(148,163,184,.16)); }
+.ndp-close:hover { background: var(--bg-hover); }
 .ndp-body { padding: var(--sp-2) var(--sp-3); }
 .ndp-row {
   display: flex;
@@ -106,11 +106,11 @@ function formatTime(ts) {
   padding: var(--sp-1) 0;
   align-items: flex-start;
 }
-.ndp-row + .ndp-row { border-top: 1px solid var(--border-light, rgba(148,163,184,.16)); }
+.ndp-row + .ndp-row { border-top: 1px solid var(--border-light); }
 .ndp-label {
   width: 80px;
   flex-shrink: 0;
-  color: var(--text-muted, #9aa3b2);
+  color: var(--text-muted);
   font-weight: 500;
 }
 .ndp-value {
@@ -121,13 +121,13 @@ function formatTime(ts) {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
 }
-.ndp-error .ndp-value { color: var(--fail, #f85149); }
+.ndp-error .ndp-value { color: var(--fail); }
 .ndp-traceback { flex-direction: column; gap: var(--sp-1); }
 .ndp-traceback-pre {
   margin: 0;
   padding: var(--sp-2);
-  background: var(--bg-code, #1e293b);
-  color: var(--text-code, rgba(148,163,184,.35));
+  background: var(--bg-code);
+  color: var(--text-code);
   border-radius: var(--r-sm);
   font-size: var(--fs-xs);
   font-family: var(--font-mono);

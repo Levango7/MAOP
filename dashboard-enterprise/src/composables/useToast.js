@@ -33,7 +33,7 @@ export function useToast() {
     show,
     dismiss,
     success: (m, o) => show(m, { ...o, tone: 'success' }),
-    error: (m, o) => show(m, { ...o, tone: 'fail' }),
+    error: (m, o) => show(m, { ...o, tone: 'error' }),
     warn: (m, o) => show(m, { ...o, tone: 'warn' }),
     info: (m, o) => show(m, { ...o, tone: 'info' }),
   };

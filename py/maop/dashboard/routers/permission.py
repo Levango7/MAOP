@@ -55,7 +55,7 @@ async def list_rules(request: Request, limit: int = Query(100, ge=1, le=500)) ->
     from maop.core.security.permission import PermissionManager
     pm = PermissionManager(root_dir=str(MAOP_ROOT))
     rules = pm.list_rules(limit=limit)
-    return {"rules": [r.model_dump() for r in rules], "count": len(rules)}
+    return {"status": "ok", "rules": [r.model_dump() for r in rules], "count": len(rules)}
 
 
 @router.get("/permission/check")
@@ -65,7 +65,7 @@ async def check_permission(request: Request, agent: str, action: str = "*") -> d
     from maop.core.security.permission import PermissionManager
     pm = PermissionManager(root_dir=str(MAOP_ROOT))
     check = pm.check(agent=agent, action=action)
-    return check.model_dump()
+    return {"status": "ok", **check.model_dump()}
 
 
 @router.get("/approval/pending")
@@ -75,7 +75,7 @@ async def list_pending_approvals(request: Request, limit: int = Query(50, ge=1, 
     from maop.core.agent.delegation.human_proxy import HumanProxy
     hp = HumanProxy(root_dir=str(MAOP_ROOT))
     pending = hp.pending(limit=limit)
-    return {"pending": [p.model_dump() for p in pending], "count": len(pending)}
+    return {"status": "ok", "pending": [p.model_dump() for p in pending], "count": len(pending)}
 
 
 @router.post("/approval/{request_id}/approve")

@@ -20,6 +20,7 @@ latency target (spec 4.1.1).
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any
@@ -335,18 +336,22 @@ class DagProgressEmitter:
 # (cancel/pause conflict detection — spec 5.2.3 anomaly 3).
 # Emitters auto-register on construction and unregister on
 # emit_execution_complete().
-
+# R7 修复：加锁保护 _emitter_registry 的并发读写，防止多线程下
+# register/unregister/get 竞态导致字典内部状态损坏。
 _emitter_registry: dict[str, DagProgressEmitter] = {}
+_emitter_registry_lock = threading.Lock()
 
 
 def _register_emitter(execution_id: str, emitter: DagProgressEmitter) -> None:
     """Register an emitter in the global registry (internal)."""
-    _emitter_registry[execution_id] = emitter
+    with _emitter_registry_lock:
+        _emitter_registry[execution_id] = emitter
 
 
 def _unregister_emitter(execution_id: str) -> None:
     """Unregister an emitter from the global registry (internal)."""
-    _emitter_registry.pop(execution_id, None)
+    with _emitter_registry_lock:
+        _emitter_registry.pop(execution_id, None)
 
 
 def get_emitter(execution_id: str) -> DagProgressEmitter | None:
@@ -355,4 +360,5 @@ def get_emitter(execution_id: str) -> DagProgressEmitter | None:
     Returns None if no execution is in progress for the given id.
     Used by the WebSocket cancel/pause handler.
     """
-    return _emitter_registry.get(execution_id)
+    with _emitter_registry_lock:
+        return _emitter_registry.get(execution_id)

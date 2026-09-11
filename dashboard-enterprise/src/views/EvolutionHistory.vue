@@ -753,7 +753,7 @@ onMounted(() => {
   gap: 4px 12px;
   align-items: center;
   padding: 10px 12px;
-  border: 1px solid var(--border-light, rgba(148,163,184,.35));
+  border: 1px solid var(--border-light);
   border-radius: 6px;
 }
 .pending-item__main {
@@ -772,14 +772,14 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border: 1px solid var(--border, rgba(148,163,184,.45));
-  background: var(--surface, #22242a);
+  border: 1px solid var(--border);
+  background: var(--surface);
   border-radius: 5px;
   cursor: pointer;
   font-size: var(--fs-base);
 }
 .btn-action:hover:not(:disabled) {
-  background: var(--surface-2, rgba(148,163,184,.16));
+  background: var(--surface-2);
 }
 .btn-action:disabled {
   opacity: 0.6;
@@ -790,7 +790,7 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border: 1px solid var(--border, rgba(148,163,184,.45));
+  border: 1px solid var(--border);
   background: transparent;
   border-radius: 5px;
   cursor: pointer;
@@ -966,9 +966,9 @@ onMounted(() => {
   text-align: center;
 }
 .diff-line__text { color: var(--text); word-break: break-all; }
-.diff-line--added { background: var(--success-soft, rgba(34,197,94,.10)); }
+.diff-line--added { background: var(--success-soft); }
 .diff-line--added .diff-line__text { color: var(--success-strong, var(--success)); }
-.diff-line--removed { background: var(--fail-soft, rgba(239,68,68,.10)); }
+.diff-line--removed { background: var(--fail-soft); }
 .diff-line--removed .diff-line__text { color: var(--fail); }
 .diff-line--unchanged .diff-line__text { color: var(--text-muted); }
 
@@ -1028,5 +1028,18 @@ onMounted(() => {
   border: none;
   border-top: 1px solid var(--border);
   margin: 10px 0;
+}
+
+/* ── 响应式断点 ── */
+@media (max-width: 900px) {
+  .suggestion-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .pending-item {
+    grid-template-columns: 1fr;
+    gap: var(--sp-1);
+  }
 }
 </style>

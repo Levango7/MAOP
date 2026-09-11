@@ -137,21 +137,21 @@ class TestSubsystems:
     def test_returns_subsystem_registry(self, client):
         resp = client.get("/api/subsystems")
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert "subsystems" in data
         assert "count" in data
         assert "available" in data
         assert "unavailable" in data
 
     def test_subsystem_has_available_and_module(self, client):
-        data = client.get("/api/subsystems").json()
+        data = client.get("/api/subsystems").json()["data"]
         for info in data["subsystems"].values():
             assert "available" in info
             assert "module" in info
             assert "error" in info
 
     def test_available_count(self, client):
-        data = client.get("/api/subsystems").json()
+        data = client.get("/api/subsystems").json()["data"]
         assert data["available"] >= 1
         assert data["unavailable"] >= 0
 
@@ -415,7 +415,7 @@ class TestRouting:
     def test_returns_routes(self, client):
         resp = client.get("/api/routing")
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert "routes" in data
         assert isinstance(data["routes"], list)
 
@@ -438,7 +438,7 @@ class TestRouting:
             return await call_next(request)
         app.include_router(router)
         data = TestClient(app).get("/api/routing").json()
-        assert data["routes"] == []
+        assert data["data"]["routes"] == []
         assert "error" in data
 
 
@@ -453,7 +453,7 @@ class TestSecurityConfig:
         assert isinstance(data, dict)
 
     def test_has_expected_modules(self, client):
-        data = client.get("/api/security/config").json()
+        data = client.get("/api/security/config").json()["data"]
         # These are the modules checked in the endpoint
         for mod in ("tls", "auth", "rate_limit", "guardrail", "sandbox"):
             assert mod in data
@@ -700,7 +700,7 @@ class TestSystemGetEndpoints:
         """GET /api/subsystems returns subsystem registry."""
         resp = client_coverage.get("/api/subsystems")
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert "subsystems" in data
         assert "count" in data
 
@@ -757,7 +757,7 @@ class TestSystemGetEndpoints:
         """GET /api/coordination_report returns teams."""
         resp = client_coverage.get("/api/coordination_report")
         assert resp.status_code == 200
-        assert "teams" in resp.json()
+        assert "teams" in resp.json()["data"]
 
     def test_workflows_v4(self, client_coverage):
         """GET /api/workflows returns workflow list."""
@@ -769,7 +769,7 @@ class TestSystemGetEndpoints:
         """GET /api/routing returns routing config."""
         resp = client_coverage.get("/api/routing")
         assert resp.status_code == 200
-        assert "routes" in resp.json()
+        assert "routes" in resp.json()["data"]
 
     def test_security_config(self, client_coverage):
         """GET /api/security/config returns security module availability."""

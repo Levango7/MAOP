@@ -474,7 +474,7 @@ onUnmounted(() => {
 .dag-exec-input {
   font-size: var(--fs-sm);
   padding: 4px 8px;
-  border: 1px solid var(--border, rgba(148,163,184,.35));
+  border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg-card);
   color: var(--text);
@@ -492,7 +492,7 @@ onUnmounted(() => {
 .agent-health-refresh {
   font-size: var(--fs-sm);
   padding: 4px 10px;
-  border: 1px solid var(--border, rgba(148,163,184,.35));
+  border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg-card);
   color: var(--text);
@@ -522,7 +522,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 4px;
-  border-bottom: 1px solid var(--border-light, rgba(148,163,184,.12));
+  border-bottom: 1px solid var(--border-light);
 }
 .agent-health-row:last-child {
   border-bottom: none;
@@ -545,7 +545,7 @@ onUnmounted(() => {
   font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--border, rgba(148,163,184,.25));
+  border-bottom: 1px solid var(--border);
 }
 .row-drained .ah-name {
   color: var(--fail);
@@ -568,7 +568,7 @@ onUnmounted(() => {
 .mini-bar {
   flex: 1;
   height: 6px;
-  background: var(--bg-elev, rgba(148,163,184,.15));
+  background: var(--bg-elev);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -628,7 +628,7 @@ onUnmounted(() => {
   gap: 12px;
   padding: 8px 4px 4px;
   margin-top: 6px;
-  border-top: 1px dashed var(--border-light, rgba(148,163,184,.18));
+  border-top: 1px dashed var(--border-light);
   font-size: var(--fs-xs);
   color: var(--text-faint);
   font-family: var(--font-mono);

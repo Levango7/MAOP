@@ -677,8 +677,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 @media (max-width: 640px) {
   .ov-pev__phases { grid-template-columns: 1fr; }
   .ov-pev__phase--last { grid-column: auto; }
-}
-@media (max-width: 640px) {
+
   .ov-actions { grid-template-columns: 1fr; }
 }
 </style>

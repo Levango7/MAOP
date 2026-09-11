@@ -131,7 +131,7 @@ async def api_worktree_list(request: Request, root_id: str = "", active_only: bo
     require_admin(request)
     mgr = _get_worktree_mgr()
     branches = mgr.list_branches(root_id=root_id, active_only=active_only)
-    return {"branches": [b.model_dump() for b in branches], "count": len(branches)}
+    return {"status": "ok", "branches": [b.model_dump() for b in branches], "count": len(branches)}
 
 
 @router.post("/api/worktree/merge")

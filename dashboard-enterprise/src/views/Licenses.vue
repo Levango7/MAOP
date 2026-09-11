@@ -630,4 +630,17 @@ onMounted(load);
   background: var(--surface-3, var(--surface-2)); padding: 1px 6px; border-radius: var(--r-full);
 }
 .lic-muted { color: var(--text-faint); font-size: var(--fs-base); }
+
+/* ── 响应式断点 ── */
+@media (max-width: 900px) {
+  .lic-quota-row {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .lic-dl {
+    grid-template-columns: 1fr;
+    gap: var(--sp-1);
+  }
+}
 </style>
