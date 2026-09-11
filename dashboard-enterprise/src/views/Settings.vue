@@ -467,6 +467,18 @@ const ui = useUiStore();
 const { t } = useI18n();
 const toast = useToast();
 const { showConfirm } = useConfirm();
+
+// ── API 路径常量 ──
+const API = {
+  AUTH_STATUS: '/api/auth/status',
+  ADRS: '/api/info/adrs',
+  CONFIG_HISTORY: '/api/config/history?limit=100',
+  INFO_CONFIG: '/api/info/config',
+  HEALTH: '/api/health',
+  HOOKS: '/api/hooks',
+  HOOKS_EVENTS: '/api/hooks/events',
+};
+
 const edition = ref({});
 const config = ref({});
 const isAdmin = ref(false);
@@ -496,7 +508,7 @@ async function detectAdmin() {
   } catch { /* ignore malformed roles */ }
   // Auth disabled (e.g. MAOP_AUTH_DISABLED_ADMIN) → treat the session as superuser.
   try {
-    const d = await api.get('/api/auth/status');
+    const d = await api.get(API.AUTH_STATUS);
     if (d && d.auth_enabled === false) return true;
   } catch { /* ignore */ }
   try {
@@ -568,7 +580,7 @@ const adrs = ref(adrsFallback);
 
 async function loadAdrs() {
   try {
-    const data = await api.get('/api/info/adrs');
+    const data = await api.get(API.ADRS);
     if (Array.isArray(data) && data.length > 0) adrs.value = data;
   } catch { /* keep fallback list */ }
 }
@@ -588,7 +600,7 @@ async function loadHistory() {
   historyLoading.value = true;
   historyError.value = '';
   try {
-    const data = await api.get('/api/config/history?limit=100');
+    const data = await api.get(API.CONFIG_HISTORY);
     const items = Array.isArray(data.history) ? data.history : [];
     historyItems.value = items;
     latestVersion.value = items.length > 0 ? items[0].version : null;
@@ -650,8 +662,8 @@ async function load() {
     degradations: editionStore.degradations,
     enterprise_available: editionStore.isEnterprise,
   };
-  try { config.value = await api.get('/api/info/config'); } catch { config.value = {}; }
-  try { const h = await api.get('/api/health'); if (h && h.version) appVersion.value = h.version; } catch { /* keep placeholder */ }
+  try { config.value = await api.get(API.INFO_CONFIG); } catch { config.value = {}; }
+  try { const h = await api.get(API.HEALTH); if (h && h.version) appVersion.value = h.version; } catch { /* keep placeholder */ }
   loadAdrs();
   // Pre-load config history in parallel (best-effort; admin-gated on server).
   loadHistory().catch(() => { /* non-fatal — tab will show error state */ });
@@ -690,7 +702,7 @@ async function loadHooks() {
   hooksLoading.value = true;
   hooksError.value = '';
   try {
-    const data = await api.get('/api/hooks');
+    const data = await api.get(API.HOOKS);
     hooksList.value = Array.isArray(data.hooks) ? data.hooks : [];
   } catch (e) {
     hooksError.value = t('view.hooks.loadError') + (e && e.message ? `: ${e.message}` : '');
@@ -702,7 +714,7 @@ async function loadHooks() {
 
 async function loadHookEvents() {
   try {
-    const data = await api.get('/api/hooks/events');
+    const data = await api.get(API.HOOKS_EVENTS);
     hookEvents.value = Array.isArray(data.events) ? data.events : [];
   } catch { /* 静默失败，下拉框为空 */ }
 }
@@ -765,7 +777,7 @@ async function onSaveHook() {
       retry_count: hookForm.value.retry_count,
     };
     if (hookDialogMode.value === 'create') {
-      await api.post('/api/hooks', payload);
+      await api.post(API.HOOKS, payload);
     } else {
       await api.put(`/api/hooks/${hookForm.value.id}`, payload);
     }

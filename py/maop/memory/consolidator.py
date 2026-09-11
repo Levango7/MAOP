@@ -319,6 +319,9 @@ class DreamConsolidator:
 
         for group in groups:
             # Fetch full content for each entry in the group
+            # R10 note: search(entry_id=eid, top=1) 通过 entry_id 精确定位
+            # 单条记忆条目，top=1 确保只返回匹配的那一条。如果 entry_id 不存在
+            # 或已被删除，results 为空列表，该条目被跳过（continue 逻辑在下方）。
             contents: list[str] = []
             for eid in group.entry_ids:
                 results = self._store.search(entry_id=eid, top=1)

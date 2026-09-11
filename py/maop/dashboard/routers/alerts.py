@@ -9,6 +9,7 @@ here) is fully wired even before a richer notification backend exists.
 """
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 from typing import Any
@@ -63,7 +64,7 @@ async def alertmanager_webhook(payload: WebhookPayload, request: Request) -> Any
         logger.warning("[alerts/webhook] rejected: ALERTS_WEBHOOK_SECRET not configured")
         raise HTTPException(status_code=403, detail="Webhook secret not configured")
     provided_secret = (request.headers.get("X-Webhook-Secret", "") or "").strip()
-    if provided_secret != expected_secret:
+    if not hmac.compare_digest(provided_secret, expected_secret):
         logger.warning("[alerts/webhook] rejected: missing or mismatched X-Webhook-Secret")
         raise HTTPException(status_code=401, detail="Unauthorized")
 

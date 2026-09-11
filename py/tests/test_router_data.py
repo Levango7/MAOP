@@ -200,15 +200,14 @@ class TestPrompts:
 
     def test_prompts_error_fallback(self, client, temp_maop_root, monkeypatch):
         # Consolidated: prompts endpoint lives in data module now
+        # 修复8: 错误响应应返回 500，而非 200 + status=error
         def bad_bridge():
             b = AsyncMock()
             b.prompts_list.side_effect = Exception("boom")
             return b
         monkeypatch.setattr(data_mod, "get_bridge", bad_bridge)
         resp = client.get("/api/prompts")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "prompts" in data
+        assert resp.status_code == 500
 
 
 # ── Coordination / teams / skills ─────────────────────────────────

@@ -163,7 +163,7 @@ async def api_optimizer(request: Request) -> dict[str, Any]:
                                     "Use LoadBalancer for multi-agent tasks"]}, _request_tenant_id(request))
     except Exception as exc:
         logger.error('Optimizer report failed: %s', exc)
-        return {"status": "error", "error": "Optimizer report unavailable"}
+        raise HTTPException(status_code=500, detail="Optimizer report unavailable")
 
 
 
@@ -191,7 +191,7 @@ async def api_graph_stats(request: Request) -> dict[str, Any]:
                 "avg_degree": avg_degree, "max_degree": max(degrees.values()) if degrees else 0}
     except Exception as exc:
         logger.error('Graph stats failed: %s', exc)
-        return {"nodes": 0, "edges": 0, "status": "error", "error": "Graph stats unavailable"}
+        raise HTTPException(status_code=500, detail="Graph stats unavailable")
 
 
 @router.get("/api/graph/nodes")
@@ -260,7 +260,7 @@ async def api_vector_list(
         }
     except Exception as exc:
         logger.error('Vector list failed: %s', exc)
-        return {"vectors": [], "count": 0, "total": 0, "status": "error", "error": "Vector list unavailable"}
+        raise HTTPException(status_code=500, detail="Vector list unavailable")
 
 
 @router.get("/api/vector/search")
@@ -282,7 +282,7 @@ async def api_vector_search(request: Request, q: str = Query(...), k: int = Quer
             return {"query": q, "results": results, "count": len(results), "fallback": "memory"}
         except Exception as exc:
             logger.error('Vector search fallback failed: %s', exc)
-            return {"query": q, "results": [], "count": 0, "status": "error", "error": "Vector search unavailable"}
+            raise HTTPException(status_code=500, detail="Vector search unavailable")
 
 
 @router.get("/api/wiki/stats")
@@ -330,7 +330,7 @@ async def api_prompts(request: Request) -> dict[str, Any]:
         return {"prompts": prompts}
     except Exception as exc:
         logger.error('Prompts list failed: %s', exc)
-        return {"prompts": [], "status": "error", "error": "Prompts list unavailable"}
+        raise HTTPException(status_code=500, detail="Prompts list unavailable")
 
 
 @router.get("/api/coordination")
@@ -389,7 +389,7 @@ async def api_skills(request: Request) -> dict[str, Any]:
         return {"skills": skills, "count": len(skills)}
     except Exception as exc:
         logger.error('Skills list failed: %s', exc)
-        return {"skills": [], "count": 0, "status": "error", "error": "Skills list unavailable"}
+        raise HTTPException(status_code=500, detail="Skills list unavailable")
 
 
 # ── Tools ───────────────────────────────────────────────────────────────
@@ -602,4 +602,4 @@ async def api_logs_analysis(request: Request, type: str = Query("delegations", d
                 "type": type or "delegations"}
     except Exception as exc:
         logger.error('Logs analysis failed: %s', exc)
-        return {"total": 0, "status": "error", "error": "Logs analysis unavailable"}
+        raise HTTPException(status_code=500, detail="Logs analysis unavailable")

@@ -198,6 +198,9 @@ class ChangeTracker:
         total_size = 0
 
         with self._connect() as conn:
+            # R10: 先 INSERT snapshots 占位（file_count=0），收集完所有
+            # file_states 后才 UPDATE 真实的 file_count/total_size，
+            # 确保快照记录的一致性——避免中途读到不完整的 file_count。
             conn.execute(
                 "INSERT INTO snapshots (id, workdir, label, file_count, total_size, created_at) VALUES (?,?,?,?,?,?)",
                 (snap_id, str(workdir_path), label, 0, 0, now),

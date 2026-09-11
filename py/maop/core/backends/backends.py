@@ -144,14 +144,34 @@ class SQLiteStorageBackend(StorageBackend):
             return [dict(r) for r in cur.fetchall()]
 
     def commit(self) -> None:
+        # autocommit 模式语义说明：
+        # 连接以 isolation_level=None（autocommit）打开，独立语句自动提交。
+        # 只有调用方显式执行 "BEGIN" 后，commit() 才会真正提交事务；
+        # 否则 commit() 是空操作（无事务进行中）。
         with self._lock:
             if self._conn is not None and self._conn.in_transaction:
                 self._conn.commit()
+            elif self._conn is not None:
+                logger.debug(
+                    "[backends] commit() called in autocommit mode with no "
+                    "active transaction; this is a no-op. Use explicit BEGIN "
+                    "to start a transaction."
+                )
 
     def rollback(self) -> None:
+        # autocommit 模式语义说明：
+        # 同 commit()，只有显式 BEGIN 后 rollback() 才真正回滚事务。
+        # 在 autocommit 模式下对独立语句调用 rollback() 是空操作，
+        # 因为语句已自动提交无法回滚。
         with self._lock:
             if self._conn is not None and self._conn.in_transaction:
                 self._conn.rollback()
+            elif self._conn is not None:
+                logger.debug(
+                    "[backends] rollback() called in autocommit mode with no "
+                    "active transaction; this is a no-op. Use explicit BEGIN "
+                    "to start a transaction."
+                )
 
     def close(self) -> None:
         with self._lock:

@@ -375,7 +375,16 @@ class DAGScheduler:
 
         awaitable: Awaitable[Any]
         if node.is_cpu_intensive:
-            pool = self._pool or get_worker_pool()
+            pool = self._pool
+            if pool is None:
+                # R10 fix: 未注入专用 pool 时回退到全局单例，记录警告以便
+                # 运维定位未配置专用 pool 的调度器实例。
+                logger.warning(
+                    "[dag_scheduler] no dedicated worker pool injected; "
+                    "falling back to global singleton for CPU-intensive "
+                    "task %r", node.id,
+                )
+                pool = get_worker_pool()
             awaitable = pool.run_cpu(func, *node.args, **node.kwargs)
         else:
             result = func(*node.args, **node.kwargs)

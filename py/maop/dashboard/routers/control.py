@@ -369,11 +369,22 @@ async def _maintain_reindex() -> dict[str, Any]:
 
 
 async def _maintain_vacuum() -> dict[str, Any]:
-    """vacuum 维护操作：压缩 SQLite 数据库。"""
+    """vacuum 维护操作：压缩 SQLite 数据库。
+
+    注意：VACUUM 会锁定整个数据库并重建，应在低峰期执行。
+    优先使用 PRAGMA incremental_vacuum（非阻塞式逐步回收空闲页），
+    若 auto_vacuum 未开启则回退到 VACUUM。
+    """
     try:
         from maop.core.backends.db_utils import sqlite_connect
         with sqlite_connect() as conn:  # type: ignore
-            conn.execute("VACUUM")
+            # P2-9 fix: 优先使用 incremental_vacuum 避免全表锁定阻塞写入。
+            av = conn.execute("PRAGMA auto_vacuum").fetchone()[0]
+            if av:
+                conn.execute("PRAGMA incremental_vacuum")
+            else:
+                # auto_vacuum 未开启，回退到 VACUUM（应在低峰期执行）
+                conn.execute("VACUUM")
         return {"status": "ok", "action": "vacuum", "msg": "Database compacted"}
     except Exception:
         logger.exception("Database vacuum failed")

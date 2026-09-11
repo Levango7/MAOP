@@ -106,6 +106,15 @@ defineProps({
 });
 const api = useApiStore();
 const toast = useToast();
+
+// ── API 路径常量 ──
+const API = {
+  STATUS: '/api/control/status',
+  MAINTAIN: '/api/control/maintain',
+  UPGRADE: '/api/agent/upgrade',
+  upgradeAgent: (name) => `/api/agent/upgrade?agent=${encodeURIComponent(name)}`,
+};
+
 const loading = ref(false);
 const jobs = ref([]);
 const agents = ref([]);
@@ -152,7 +161,7 @@ async function execAction(action, task) {
   execResult.value = null;
   try {
     if (action === 'status') {
-      await api.get('/api/control/status');
+      await api.get(API.STATUS);
       execResult.value = { ok: true, msg: t('view.control.statusRefreshed') };
     } else {
       const validActions = ['run', 'pause', 'resume', 'stop', 'validate', 'doctor'];
@@ -174,7 +183,7 @@ async function maintainAction(action) {
   loading.value = true;
   maintResult.value = null;
   try {
-    const r = await api.post('/api/control/maintain', { action });
+    const r = await api.post(API.MAINTAIN, { action });
     maintResult.value = { ok: true, msg: r.msg || r.message || r.detail || t('view.control.actionCompleted', { action }) };
     toast.success(t('view.control.actionCompleted', { action }));
   } catch (e) {
@@ -187,7 +196,7 @@ async function maintainAction(action) {
 
 async function loadJobs() {
   try {
-    const data = await api.get('/api/control/status');
+    const data = await api.get(API.STATUS);
     const arr = Array.isArray(data) ? data : (data.jobs || data.active_jobs || []);
     jobs.value = arr.map((j, index) => ({
       id: j.id || j.name || `job-${index}`,
@@ -203,7 +212,7 @@ async function loadJobs() {
 async function checkUpgrade() {
   loading.value = true;
   try {
-    const data = await api.get('/api/agent/upgrade');
+    const data = await api.get(API.UPGRADE);
     agents.value = (data.agents || []).map((a) => ({
       name: a.name,
       current: a.current || '—',
@@ -220,7 +229,7 @@ async function checkUpgrade() {
 async function upgradeAgent(name) {
   loading.value = true;
   try {
-    await api.post('/api/agent/upgrade?agent=' + encodeURIComponent(name), {});
+    await api.post(API.upgradeAgent(name), {});
     toast.success(t('view.control.upgradeTriggered', { name }));
     await checkUpgrade();
   } catch (e) {

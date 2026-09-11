@@ -15,7 +15,7 @@ import sys
 import time
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from maop.dashboard.error_handler import handle_api_errors
@@ -25,6 +25,18 @@ from . import _deps
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _read_log_tail_text(path: Any, max_bytes: int = 1024 * 1024) -> str:
+    """有界读取文件尾部文本（默认 1MB），避免大文件 OOM。
+
+    若文件小于 max_bytes 则全量读取；否则 seek 到末尾 max_bytes 处再读取。
+    """
+    size = path.stat().st_size
+    with open(path, "rb") as fh:
+        if size > max_bytes:
+            fh.seek(size - max_bytes)
+        return fh.read().decode("utf-8", errors="replace")
 
 
 @router.get("/api/framework/status")
@@ -62,14 +74,15 @@ async def api_framework_status(request: Request) -> dict[str, Any]:
 
 @router.get("/api/framework/logs")
 @handle_api_errors
-async def api_framework_logs(request: Request, limit: int = Query(50)) -> dict[str, Any]:
+async def api_framework_logs(request: Request, limit: int = Query(50, ge=1, le=500)) -> dict[str, Any]:
     _deps.require_admin(request)
     logs = []
     log_dir = _deps.MAOP_ROOT / "logs"
     if log_dir.exists():
         for f in sorted(log_dir.glob("*.jsonl"), reverse=True):
             try:
-                _text = await asyncio.to_thread(f.read_text, encoding="utf-8")
+                # P2-9 fix: 有界读取——只读文件尾部 1MB，避免大日志文件 OOM。
+                _text = await asyncio.to_thread(_read_log_tail_text, f, 1024 * 1024)
                 lines = _text.strip().split("\n")
                 for line in lines[-limit:]:
                     try:

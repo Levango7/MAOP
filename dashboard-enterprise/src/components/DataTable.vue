@@ -36,7 +36,7 @@
           </td>
         </tr>
         <tr v-if="!loading && !sortedRows.length">
-          <td :colspan="cols.length" class="dt__empty">{{ emptyText }}</td>
+          <td :colspan="cols.length" class="dt__empty">{{ emptyText || t('common.noData') }}</td>
         </tr>
       </tbody>
     </table>
@@ -80,7 +80,7 @@ const props = defineProps({
   rows: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   rowKey: { type: String, default: 'id' },
-  emptyText: { type: String, default: 'No data' },
+  emptyText: { type: String, default: '' },
   sortable: { type: Boolean, default: false },
   compact: { type: Boolean, default: false },
   clickable: { type: Boolean, default: false },

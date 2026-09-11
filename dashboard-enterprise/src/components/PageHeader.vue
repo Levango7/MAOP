@@ -44,7 +44,7 @@ const titleText = computed(() => props.title || (meta.label ? t(meta.label) : ''
 const subtitleText = computed(() => props.subtitle || (meta.subtitle ? t(meta.subtitle) : ''));
 </script>
 
-<style>
+<style scoped>
 /* 页面级标题栏 — 2026-08-12 精修,对齐"workbench"设计语言
  * - margin-bottom: 16px(--sp-3 → --sp-4),与 .section/.card 节奏一致
  * - 去掉渐变 hairline / 左侧品牌装饰条 / 图标渐变徽章+内发光

@@ -30,7 +30,7 @@
  *
  * Auto-cleanup: onUnmounted → disconnect().
  */
-import { ref, computed, onUnmounted } from 'vue';
+import { ref, computed, onUnmounted, getCurrentInstance } from 'vue';
 
 const TERMINAL_STATUSES = new Set(['success', 'failed', 'skipped']);
 
@@ -93,7 +93,9 @@ export function useDagProgress(executionId, options = {}) {
     if (manuallyDisconnected) return;
     if (reconnectAttempts >= maxReconnectAttempts) return;
     reconnectAttempts++;
-    const delay = reconnectDelay * Math.pow(2, reconnectAttempts - 1); // exponential backoff
+    // R10 fix: 重连退避添加 60s 上限，避免指数退避在长时间断连后
+    // 产生过大延迟（如第 10 次重连 = 2^9 * 1000 = 512s）导致连接永远无法恢复。
+    const delay = Math.min(reconnectDelay * Math.pow(2, reconnectAttempts - 1), 60000); // exponential backoff w/ 60s cap
     clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(() => {
       if (!manuallyDisconnected) connect();
@@ -103,6 +105,11 @@ export function useDagProgress(executionId, options = {}) {
   // ── SSE connection ────────────────────────────────────────
 
   function connectSSE() {
+    // R10 fix: 先关闭旧 EventSource 连接，避免重复 connect 时旧连接泄漏。
+    if (eventSource) {
+      try { eventSource.close(); } catch { /* ignore */ }
+      eventSource = null;
+    }
     // L8 fix: SSR 守卫——EventSource 在非浏览器环境（SSR / Node 测试）下未定义，
     // 直接 new EventSource() 会抛 ReferenceError。提前返回避免崩溃。
     if (typeof EventSource === 'undefined') return;
@@ -154,6 +161,11 @@ export function useDagProgress(executionId, options = {}) {
   // ── WebSocket connection ──────────────────────────────────
 
   function connectWS() {
+    // R10 fix: 先关闭旧 WebSocket 连接，避免重复 connect 时旧连接泄漏。
+    if (ws) {
+      try { ws.close(); } catch { /* ignore */ }
+      ws = null;
+    }
     // SSR 守卫: 在非浏览器环境（SSR / Node 测试）下直接返回，避免 ReferenceError。
     // 参考 realtime.js:27-30 的守卫写法。
     if (typeof window === 'undefined') return;
@@ -213,6 +225,10 @@ export function useDagProgress(executionId, options = {}) {
   // ── Public API ────────────────────────────────────────────
 
   function connect() {
+    // R10 fix: 先关闭旧连接（含 eventSource/ws/reconnectTimer），避免重复
+    // connect 时旧连接泄漏。connectSSE/connectWS 内部也会各自关闭对应句柄，
+    // 此处统一 disconnect() 确保无论 transport 类型都清理干净。
+    disconnect();
     manuallyDisconnected = false;
     // P1-1 fix: 重置重连计数器，避免 disconnect 后 reconnectAttempts 已达上限
     // 导致再次 connect 时 _scheduleReconnect 直接返回无法重连。
@@ -253,7 +269,11 @@ export function useDagProgress(executionId, options = {}) {
   }
 
   // ── Auto-cleanup on unmount ───────────────────────────────
-  onUnmounted(disconnect);
+  // R10 fix: 加 getCurrentInstance() 守卫，避免在非组件 setup 上下文
+  // （如 Pinia store、纯单元测试）中调用 onUnmounted 抛 Vue 警告。
+  if (getCurrentInstance()) {
+    onUnmounted(disconnect);
+  }
 
   return {
     // Reactive state

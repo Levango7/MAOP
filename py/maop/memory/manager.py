@@ -33,6 +33,7 @@ import logging
 import os
 import threading
 import time
+import uuid
 from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -686,7 +687,7 @@ class MemoryManager:
 
         normalized = normalize_layer_name(layer)
         if normalized == "working":
-            key = kwargs.pop("key", "") or f"mem-{int(time.time() * 1000)}"
+            key = kwargs.pop("key", "") or f"mem-{int(time.time() * 1000)}-{uuid.uuid4().hex[:4]}"
             self.working_put(key, content, ttl_s=kwargs.pop("ttl_s", None))
             return key
         if normalized == "short_term":

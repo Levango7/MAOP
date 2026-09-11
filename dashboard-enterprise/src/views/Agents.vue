@@ -263,11 +263,11 @@
       <!-- 添加记忆表单 -->
       <div v-if="memoryAddForm" class="memory-add-form">
         <select v-model="memoryAddType" class="mem-add-select" :aria-label="t('view.agents.memoryType')">
-          <option value="interaction">interaction</option>
-          <option value="preference">preference</option>
-          <option value="error_pattern">error_pattern</option>
-          <option value="performance">performance</option>
-          <option value="lesson">lesson</option>
+          <option value="interaction">{{ t('view.agents.memTypeInteraction') }}</option>
+          <option value="preference">{{ t('view.agents.memTypePreference') }}</option>
+          <option value="error_pattern">{{ t('view.agents.memTypeErrorPattern') }}</option>
+          <option value="performance">{{ t('view.agents.memTypePerformance') }}</option>
+          <option value="lesson">{{ t('view.agents.memTypeLesson') }}</option>
         </select>
         <textarea
 v-model="memoryAddContent" class="mem-add-textarea" rows="3"
@@ -994,7 +994,7 @@ async function detectAdmin() {
 onMounted(() => {
   loadAgents();
   loadDecisions();
-  detectAdmin().then((v) => (isAdmin.value = v));
+  detectAdmin().then((v) => (isAdmin.value = v)).catch(() => { /* detectAdmin handles error internally */ });
 });
 </script>
 

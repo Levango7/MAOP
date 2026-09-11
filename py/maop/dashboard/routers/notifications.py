@@ -193,6 +193,7 @@ async def create_channel(body: ChannelCreate, request: Request) -> dict[str, Any
 @router.get("/channels/{channel_id}")
 @handle_api_errors
 async def get_channel(channel_id: str, request: Request) -> dict[str, Any]:
+    require_admin(request)
     _require_feature()
     mgr = _get_manager()
     channel = mgr.get_channel(channel_id)
@@ -259,6 +260,7 @@ async def create_rule(body: RuleCreate, request: Request) -> dict[str, Any]:
 @router.get("/rules/{rule_id}")
 @handle_api_errors
 async def get_rule(rule_id: str, request: Request) -> dict[str, Any]:
+    require_admin(request)
     _require_feature()
     mgr = _get_manager()
     rule = mgr.get_rule(rule_id)
@@ -324,6 +326,7 @@ async def create_template(body: TemplateCreate, request: Request) -> dict[str, A
 @router.get("/templates/{template_id}")
 @handle_api_errors
 async def get_template(template_id: str, request: Request) -> dict[str, Any]:
+    require_admin(request)
     _require_feature()
     mgr = _get_manager()
     template = mgr.get_template(template_id)

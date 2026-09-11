@@ -254,6 +254,7 @@ async def api_deploy_rollback(body: EvolutionDeployRollbackRequest, request: Req
 @router.get("/api/evolution/deploy/history")
 @handle_api_errors("evolution deploy history", error_value={"status": "error", "history": []})
 async def api_deploy_history(request: Request) -> dict[str, Any]:
+    require_admin(request)
     experiment = request.query_params.get("experiment", "")
     deployer = _deployer()
     history = deployer.get_history(experiment=experiment, limit=100)
@@ -291,6 +292,7 @@ async def api_evolution_run(body: EvolutionRunRequest, request: Request) -> dict
 @router.get("/api/evolution/cycles")
 @handle_api_errors("evolution cycles", error_value={"status": "error", "cycles": []})
 async def api_evolution_cycles(request: Request, limit: int = Query(50, ge=1, le=1000)) -> dict[str, Any]:
+    require_admin(request)
     experiment = request.query_params.get("experiment", "")
     # P1-20: 使用 FastAPI Query 参数校验替代 int(request.query_params.get(...))，
     # 自动处理异常值并限制范围 [1, 1000]
@@ -413,6 +415,7 @@ async def api_evolution_narrative(cycle_id: str, request: Request) -> dict[str, 
         format=markdown → ``{"status": "ok", "format": "markdown", "markdown": "..."}``
         format=json     → ``{"status": "ok", "format": "json", "narrative": {...}}``
     """
+    require_admin(request)
     fmt = request.query_params.get("format", "markdown").lower()
     loop = _evo_loop()
     report = _find_cycle_report(loop, cycle_id)

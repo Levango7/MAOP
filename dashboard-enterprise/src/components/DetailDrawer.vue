@@ -11,7 +11,7 @@
           class="detail-drawer__panel"
           role="dialog"
           aria-modal="true"
-          :aria-label="title || 'Detail'"
+          :aria-label="title || t('common.details')"
           tabindex="-1"
         >
           <header class="detail-drawer__head">

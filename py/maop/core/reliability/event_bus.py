@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 import logging
 import re
 import threading
@@ -218,7 +219,7 @@ class EventBus:
         for sub in matching_subs:
             # Apply filter regex if set
             if sub.filter_regex is not None:
-                import json
+
                 data_str = json.dumps(event.data, default=str)
                 if not sub.filter_regex.search(data_str):
                     continue

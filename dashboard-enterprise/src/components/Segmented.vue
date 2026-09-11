@@ -75,7 +75,7 @@ function moveTo(i) {
   padding: 5px 10px;
   font-size: var(--fs-sm);
   font-weight: 600;
-  transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
   white-space: nowrap;
 }
 /* padding 3px 8px 为小尺寸 Segmented 项视觉规格固定值 */

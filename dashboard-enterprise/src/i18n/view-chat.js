@@ -55,8 +55,8 @@ export const messages = {
     'view.chat.selectAgentToStart': '选择一个智能体即可开始对话',
     'view.chat.imageTooLarge': '图片不能超过 5MB',
     // ── #126: token/字符统计标签 ──
-    'view.chat.tokens': '{n} tokens',
-    'view.chat.tokPerSec': '{n} tok/s',
-    'view.chat.chars': '{n} chars',
+    'view.chat.tokens': '{n} 个token',
+    'view.chat.tokPerSec': '{n} token/秒',
+    'view.chat.chars': '{n} 字符',
   },
 };

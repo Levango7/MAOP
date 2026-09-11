@@ -310,8 +310,10 @@ class MaopDatabase:
         """Save or update a checkpoint."""
         now = datetime.now(timezone.utc).isoformat()
         state_json = json.dumps(state, ensure_ascii=False)
-        # B11: 用 uuid4 生成 ID，避免 id(state) % 99999 在 CPython 地址复用下冲突。
-        cp_id = f"{agent}_{task}_{phase}_{uuid.uuid4().hex[:8]}"
+        # B11/R10 fix: 使用固定的 f"{agent}_{task}_{phase}" 作为 ID，
+        # 避免每次 save 生成不同 uuid 导致同一 checkpoint 产生多条记录。
+        # 结合下面的 DELETE + INSERT 保证 (agent, task) 唯一性。
+        cp_id = f"{agent}_{task}_{phase}"
 
         # H-1 fix: 在同一事务内原子完成 DELETE + INSERT，避免并发下数据丢失。
         # checkpoints 表无 (agent, task) UNIQUE 约束，不能用 INSERT OR REPLACE，
@@ -323,7 +325,7 @@ class MaopDatabase:
                     (agent, task),
                 )
                 conn.execute(
-                    """INSERT INTO checkpoints (id, agent, task, phase, state_json, created, updated)
+                    """INSERT OR REPLACE INTO checkpoints (id, agent, task, phase, state_json, created, updated)
                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
                     (cp_id, agent, task, phase, state_json, now, now),
                 )

@@ -30,6 +30,7 @@ import logging
 import os
 import re
 import shutil
+import sqlite3
 import threading
 import time
 from datetime import datetime, timezone
@@ -399,8 +400,14 @@ class DbBackup:
                                 "[backup] %s wal_checkpoint failed (continuing): %s",
                                 db_name, cp_exc,
                             )
-                    conn.execute(f"VACUUM INTO '{backup_path}'")
-            except Exception:
+                    # Windows 下 VACUUM INTO 的路径需使用正斜杠，
+                    # 反斜杠会被 SQLite 当作转义字符导致路径错误。
+                    backup_path_str = str(backup_path).replace('\\', '/')
+                    conn.execute(f"VACUUM INTO '{backup_path_str}'")
+            except sqlite3.OperationalError:
+                # 仅捕获 VACUUM 不支持的操作错误（如旧版 SQLite 不支持 VACUUM INTO），
+                # 其他异常（如 IntegrityError、OperationalError: database is locked）
+                # 不应被掩盖，应向上传播。
                 shutil.copy2(str(db_path), str(backup_path))
 
             duration_ms = int((time.monotonic() - start) * 1000)

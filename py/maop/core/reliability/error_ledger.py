@@ -128,6 +128,13 @@ class ErrorLedger:
         root_cause: str = "",
         pattern: str = "",
     ) -> str:
+        """Record an error event in the ledger.
+
+        R10 note: 此方法执行 SELECT + UPDATE/INSERT 两步操作，best-effort 语义。
+        在并发场景下，两个相同 pattern 的 record 可能同时读到 existing=None，
+        导致插入两条记录而非递增 recurrence。这在错误统计场景下可接受
+        （最多多记录一条重复条目），不影响系统正确性。
+        """
         event = ErrorEvent(
             error_type=error_type, context=context,
             trigger=trigger or {}, output=output,

@@ -234,6 +234,13 @@ import StatCard from '../components/StatCard.vue';
 
 const { t } = useI18n();
 const api = useApiStore();
+
+// ── API 路径常量 ──
+const API = {
+  LIST: '/api/notifications/list',
+  PREFERENCES: '/api/notifications/preferences',
+  READ_ALL: '/api/notifications/read-all',
+};
 const toast = useToast();
 const { showConfirm } = useConfirm();
 
@@ -407,7 +414,7 @@ async function loadAll() {
   error.value = '';
   offset.value = 0;
   try {
-    const d = await api.get('/api/notifications/list', {
+    const d = await api.get(API.LIST, {
       limit: PAGE_SIZE,
       offset: 0,
     });
@@ -426,7 +433,7 @@ async function loadMore() {
   loadingMore.value = true;
   try {
     const next = offset.value + PAGE_SIZE;
-    const d = await api.get('/api/notifications/list', {
+    const d = await api.get(API.LIST, {
       limit: PAGE_SIZE,
       offset: next,
     });
@@ -469,7 +476,7 @@ async function markRead(n) {
 async function markAllRead() {
   if (!hasUnread.value) return;
   try {
-    await api.post('/api/notifications/read-all', {});
+    await api.post(API.READ_ALL, {});
     notifications.value.forEach((n) => { n.read = true; });
     toast.success(t('view.notifications.allMarkedRead'));
   } catch (e) {
@@ -499,7 +506,7 @@ async function openPreferences() {
   prefOpen.value = true;
   prefError.value = '';
   try {
-    const d = await api.get('/api/notifications/preferences');
+    const d = await api.get(API.PREFERENCES);
     const prefs = d.preferences || d || {};
     channels.value = (d.channels || prefs.channels || [
       { key: 'email' }, { key: 'webhook' }, { key: 'in_app' }, { key: 'sms' },
@@ -520,7 +527,7 @@ async function openPreferences() {
 async function savePreferences() {
   prefSaving.value = true;
   try {
-    await api.put('/api/notifications/preferences', { preferences });
+    await api.put(API.PREFERENCES, { preferences });
     toast.success(t('view.notifications.prefSaved'));
     prefOpen.value = false;
   } catch (e) {

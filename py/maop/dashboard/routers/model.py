@@ -81,7 +81,7 @@ async def api_model_agents(request: Request) -> dict[str, Any]:
             "model": getattr(ad, "model", ""), "timeout_s": ad.timeout_s,
             "capabilities": ad.capabilities, "description": ad.description,
             "cli_available": cli_path is not None, "cli_path": cli_path or ""})
-    return {"agents": agents, "count": len(agents)}
+    return {"status": "ok", "agents": agents, "count": len(agents)}
 
 @router.get("/api/model/quota")
 @handle_api_errors("Model quota", error_value={"agents": [], "count": 0, "error": "Model quota failed"})
@@ -97,7 +97,7 @@ async def api_model_quota(request: Request) -> dict[str, Any]:
                 "available": cli_path is not None, "cli_path": cli_path or "", "driver": ad.driver})
     except Exception:
         logger.debug("Failed to load agent config", exc_info=True)
-    return {"agents": agents_cfg, "count": len(agents_cfg)}
+    return {"status": "ok", "agents": agents_cfg, "count": len(agents_cfg)}
 
 @router.post("/api/model/switch")
 @handle_api_errors("Model switch", error_value={"status": "error", "error": "Model switch failed"})
@@ -166,13 +166,13 @@ async def api_model_list(request: Request) -> dict[str, Any]:
             "capabilities": m.capabilities, "latency_tier": m.latency_tier.value,
             "quality_tier": m.quality_tier.value, "enabled": m.enabled,
             "provider_healthy": reg.providers.is_healthy(m.provider)})
-    return {"models": models, "count": len(models)}
+    return {"status": "ok", "models": models, "count": len(models)}
 
 @router.get("/api/model/providers")
 @handle_api_errors("Model providers", error_value={"providers": [], "error": "Model providers failed"})
 async def api_model_providers(request: Request) -> dict[str, Any]:
     require_admin(request)
-    return {"providers": _get_model_registry().providers.list_providers()}
+    return {"status": "ok", "providers": _get_model_registry().providers.list_providers()}
 
 @router.get("/api/model/select")
 @handle_api_errors("Model select", error_value={"status": "error", "error": "Model select failed"})
@@ -207,7 +207,7 @@ async def api_model_policies(request: Request) -> dict[str, Any]:
         policies.append({"name": name, "strategy": p.strategy.value, "max_cost_per_task": p.max_cost_per_task,
             "prefer_low_latency": p.prefer_low_latency, "fallback_on_error": p.fallback_on_error,
             "fallback_on_timeout": p.fallback_on_timeout})
-    return {"policies": policies, "count": len(policies)}
+    return {"status": "ok", "policies": policies, "count": len(policies)}
 
 # ── Provider CRUD ────────────────────────────────────────────────────
 

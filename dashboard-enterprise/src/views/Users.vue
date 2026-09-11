@@ -121,6 +121,13 @@ const api = useApiStore();
 const toast = useToast();
 const { showConfirm } = useConfirm();
 
+// ── API 路径常量 ──
+const API = {
+  USERS: '/api/auth/users',
+  REGISTER: '/api/auth/register',
+  user: (name) => `/api/auth/users/${encodeURIComponent(name)}`,
+};
+
 const users = ref([]);
 const loading = ref(false);
 const dialogOpen = ref(false);
@@ -154,7 +161,7 @@ async function fetchUsers() {
   if (!isAdmin.value) return;
   loading.value = true;
   try {
-    const d = await api.get('/api/auth/users');
+    const d = await api.get(API.USERS);
     if (d && d.status === 'ok') users.value = d.users || [];
   } catch (e) {
     console.warn('[users] fetch failed', e);
@@ -192,7 +199,7 @@ async function submitForm() {
         submitting.value = false;
         return;
       }
-      const d = await api.post('/api/auth/register', {
+      const d = await api.post(API.REGISTER, {
         username: form.value.username,
         password: form.value.password,
         roles: form.value.roles,
@@ -201,7 +208,7 @@ async function submitForm() {
     } else {
       const body = { roles: form.value.roles };
       if (form.value.password) body.password = form.value.password;
-      const d = await api.put('/api/auth/users/' + encodeURIComponent(form.value.username), body);
+      const d = await api.put(API.user(form.value.username), body);
       if (d.status !== 'ok') formError.value = d.error || t('view.users.failed');
     }
     if (!formError.value) {
@@ -219,7 +226,7 @@ async function confirmDelete(u) {
   const ok = await showConfirm({ message: t('users.confirmDelete'), tone: 'danger' });
   if (!ok) return;
   try {
-    await api.delete('/api/auth/users/' + encodeURIComponent(u.username));
+    await api.delete(API.user(u.username));
     await fetchUsers();
   } catch (e) {
     toast.error(e.message || t('view.users.failed'));

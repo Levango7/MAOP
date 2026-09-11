@@ -21,7 +21,7 @@
  * 注意: 现有 modal 的根元素是普通 <div>,不可聚焦,focus trap 靠
  * 把焦点定向到内部第一个 [autofocus]/button/input/[tabindex] 元素实现。
  */
-import { watch, onBeforeUnmount } from 'vue';
+import { watch, onBeforeUnmount, getCurrentInstance } from 'vue';
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), ' +
@@ -150,17 +150,21 @@ export function useModalA11y(isOpen, onClose, containerEl) {
     }
   });
 
-  onBeforeUnmount(() => {
-    // SSR-safe: mirror the mount-time guard so removal never throws if window
-    // was undefined at setup (e.g. composable imported but never mounted in SSR).
-    if (hasWindow) {
-      window.removeEventListener('keydown', handleKeydown);
-      window.removeEventListener('keydown', handleFocusTrap, true);
-    }
-    // H-3 fix: 断开 MutationObserver，释放引用避免泄漏。
-    if (_focusableObserver) {
-      _focusableObserver.disconnect();
-      _focusableObserver = null;
-    }
-  });
+  // R10 fix: 加 getCurrentInstance() 守卫，避免在非组件 setup 上下文
+  // （如 Pinia store、纯单元测试）中调用 onBeforeUnmount 抛 Vue 警告。
+  if (getCurrentInstance()) {
+    onBeforeUnmount(() => {
+      // SSR-safe: mirror the mount-time guard so removal never throws if window
+      // was undefined at setup (e.g. composable imported but never mounted in SSR).
+      if (hasWindow) {
+        window.removeEventListener('keydown', handleKeydown);
+        window.removeEventListener('keydown', handleFocusTrap, true);
+      }
+      // H-3 fix: 断开 MutationObserver，释放引用避免泄漏。
+      if (_focusableObserver) {
+        _focusableObserver.disconnect();
+        _focusableObserver = null;
+      }
+    });
+  }
 }

@@ -241,10 +241,10 @@ async def api_memory_deep(request: Request) -> dict[str, Any]:
 
 @router.get("/api/memory/search")
 @handle_api_errors("Memory search", error_value={"status": "error", "error": "Memory search unavailable", "results": []})
-async def api_memory_search(request: Request, q: str = Query(""), k: int = Query(10, alias="topk")) -> dict[str, Any]:
+async def api_memory_search(request: Request, q: str = Query(""), k: int = Query(10, ge=1, le=100, alias="topk")) -> dict[str, Any]:
     require_admin(request)
     # 联合查询 memory_entries + episodic_memory，确保 store 写入的数据能被搜到
-    results = _unified_search(query=q, top=k) if q else _unified_search(query="", top=k)
+    results = _unified_search(query=q, top=k)
     return {"status": "ok", "query": q, "results": (_rf := _tenant_filter(results, _request_tenant_id(request))), "count": len(_rf)}
 
 @router.get("/api/memory/trace")

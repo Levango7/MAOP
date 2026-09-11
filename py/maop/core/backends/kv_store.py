@@ -108,6 +108,10 @@ class KVStore:
         self._pool.close_all()
 
     def __del__(self) -> None:
+        # R10 fix: 守卫——如果 __init__ 异常退出，self._pool 可能未定义，
+        # 此时 __del__ 不应抛 AttributeError。
+        if not hasattr(self, "_pool"):
+            return
         with contextlib.suppress(Exception):
             self.close()
 

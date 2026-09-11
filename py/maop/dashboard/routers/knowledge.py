@@ -200,7 +200,7 @@ kg_router = APIRouter(prefix="/api/knowledge-graph", tags=["knowledge-graph"])
 @handle_api_errors("knowledge graph v2")
 async def get_knowledge_graph_v2(
     request: Request,
-    limit: int = Query(500),
+    limit: int = Query(500, ge=1, le=1000),
     type: str = Query(""),  # shadows builtin intentionally for API
     time_range: str = Query(""),
 ) -> dict[str, Any]:

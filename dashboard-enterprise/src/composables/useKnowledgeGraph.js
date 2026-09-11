@@ -24,6 +24,12 @@ import { useApiStore } from '../stores/api.js';
 // L5 fix: 提取节点类型集合为命名常量，避免魔法数字 4 散落在过滤逻辑中。
 const ALL_NODE_TYPES = ['agent', 'task', 'memory', 'concept'];
 const ALL_NODE_TYPE_COUNT = ALL_NODE_TYPES.length;
+// R10 fix: 以下 NODE_STYLE / EDGE_STYLE / NEUTRAL_*_STYLE 中的十六进制颜色
+// 为 vis-network 专用配置。vis-network 的 color 字段不支持 CSS 变量
+// （它内部直接将颜色值写入 canvas，不经过 CSS 解析），因此无法通过
+// cssVar() 读取 CSS 变量。这些颜色与 design-tokens.css 中的语义 token
+// 保持手动同步（--color-agent / --color-task / ...），若主题切换需支持
+// 暗色模式，应通过 vis-network 的 setOptions() 在主题变更时动态更新。
 export const NODE_STYLE = {
   agent:   { color: { background: '#E3F2FD', border: '#1565C0', highlight: { background: '#BBDEFB', border: '#1565C0' } }, icon: { code: 'f2bd' }, shape: 'icon' },
   task:    { color: { background: '#FFF3E0', border: '#E65100', highlight: { background: '#FFE0B2', border: '#E65100' } }, icon: { code: 'f073' }, shape: 'icon' },
@@ -39,6 +45,7 @@ export const EDGE_STYLE = {
 };
 
 // Default neutral style for unknown types (forward compatibility).
+// R10 fix: 同上，vis-network 专用颜色不跟随 CSS 主题变量。
 const NEUTRAL_NODE_STYLE = {
   color: { background: '#F5F5F5', border: '#616161' },
   shape: 'dot',

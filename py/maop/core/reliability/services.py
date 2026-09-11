@@ -74,6 +74,10 @@ class ServiceContainer:
 
     def get(self, name: str, *, raise_on_failure: bool = True) -> Any | None:
         # Fast path without lock for already-built singletons.
+        # R10 note: 此处无锁读取 self._instances 依赖 CPython GIL 保证 dict 读操作
+        # 原子性。在 GIL 保护的实现上安全；在 nogil/free-threaded Python 上可能需要
+        # 改为完全加锁。最坏情况是两个线程同时未命中快路径，都进入锁内构建，
+        # 但锁内的二次检查（re-check）保证了只构建一次。
         if name in self._instances:
             return self._instances[name]
         with self._lock:

@@ -243,7 +243,10 @@ class MAOPSettings(BaseSettings):
         """B24: 生产环境校验 database_url 不为默认无认证值。"""
         env = os.environ.get("MAOP_ENV", "").strip().lower()
         if env == "production" and v == "postgresql+psycopg2://localhost:5432/maop":
-            raise RuntimeError(
+            # R10 fix: 使用 ValueError 而非 RuntimeError，Pydantic field_validator
+            # 能正确捕获 ValueError 并转为 ValidationError，RuntimeError 会绕过
+            # Pydantic 的校验错误处理机制。
+            raise ValueError(
                 "database_url is set to the default value in production. "
                 "Set MAOP_DATABASE_URL to a connection string with authentication."
             )
@@ -255,7 +258,8 @@ class MAOPSettings(BaseSettings):
         """B24: 生产环境校验 redis_url 不为默认无认证值。"""
         env = os.environ.get("MAOP_ENV", "").strip().lower()
         if env == "production" and v == "redis://localhost:6379/0":
-            raise RuntimeError(
+            # R10 fix: 同上，使用 ValueError 替代 RuntimeError。
+            raise ValueError(
                 "redis_url is set to the default value in production. "
                 "Set MAOP_REDIS_URL to a connection string with authentication."
             )

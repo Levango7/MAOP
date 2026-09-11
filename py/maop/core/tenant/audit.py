@@ -107,7 +107,14 @@ class AuditLogger:
         result: str = "ok",
         detail: dict[str, Any] | None = None,
     ) -> AuditEntry:
-        """Append one audit entry.  Returns the stored :class:`AuditEntry`."""
+        """Append one audit entry.  Returns the stored :class:`AuditEntry`.
+
+        R10 note: 此方法执行 SELECT(prev) + INSERT 两步操作，理论上非原子。
+        在并发场景下，两个并发 log 可能读到相同的 prev_seq，导致 seq 重复。
+        但由于 SQLite 的 WAL 模式下写操作是串行的，且 audit_log 的 seq 重复
+        只影响哈希链的完整性校验（不影响审计记录本身的正确性），此处接受
+        best-effort 语义。如需严格原子性，可在调用方加租户级互斥锁。
+        """
         detail = detail or {}
         detail_json = self._truncate_detail(detail)
         ts = datetime.now(timezone.utc).isoformat()

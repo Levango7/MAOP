@@ -27,6 +27,7 @@ export function useStreamingFetch() {
    * @param {function(object): void} [callbacks.onMeta] - Called with metadata (session_id, tokens, model)
    * @param {function(): void} [callbacks.onDone] - Called when stream completes
    * @param {function(string): void} [callbacks.onError] - Called on error
+   * @param {number} [callbacks.timeoutMs] - Stream inactivity timeout in ms (default 30000)
    * @returns {Promise<void>}
    */
   async function stream(url, body, callbacks = {}) {
@@ -49,6 +50,10 @@ export function useStreamingFetch() {
     if (callbacks.signal) {
       callbacks.signal.addEventListener('abort', onAbort);
     }
+
+    // R10 fix: 超时标志位声明在 try 块外，确保 catch 块也能访问，
+    // 避免超时 abort 触发的异常在 catch 中重复调用 onError。
+    let timedOut = false;
 
     try {
       const res = await fetch(url, {
@@ -83,11 +88,15 @@ export function useStreamingFetch() {
 
       // M6 fix: 流式读取超时机制。某些后端在连接建立后不再发送任何数据
       // （如 agent 卡死、队列阻塞），reader.read() 会永久挂起导致前端
-      // Promise 永不 resolve。设置 30s 无数据超时，超时后 abort 连接。
-      const STREAM_TIMEOUT_MS = 30000;
+      // Promise 永不 resolve。设置无数据超时，超时后 abort 连接。
+      // R10 fix: STREAM_TIMEOUT_MS 改为可配置参数（默认 30s），避免硬编码
+      // 不可调整，调用方可根据业务场景（如长思考 agent）传入更大超时。
+      const STREAM_TIMEOUT_MS = callbacks.timeoutMs ?? 30000;
+
       let streamTimer = setTimeout(() => {
+        timedOut = true;
         try { controller.abort(); } catch { /* already aborted */ }
-        if (onError) onError('Stream timeout: no data received in 30s');
+        if (onError) onError(`Stream timeout: no data received in ${STREAM_TIMEOUT_MS / 1000}s`);
       }, STREAM_TIMEOUT_MS);
 
       try {
@@ -97,8 +106,9 @@ export function useStreamingFetch() {
           // 收到数据，重置超时计时器
           clearTimeout(streamTimer);
           streamTimer = setTimeout(() => {
+            timedOut = true;
             try { controller.abort(); } catch { /* already aborted */ }
-            if (onError) onError('Stream timeout: no data received in 30s');
+            if (onError) onError(`Stream timeout: no data received in ${STREAM_TIMEOUT_MS / 1000}s`);
           }, STREAM_TIMEOUT_MS);
           buffer += decoder.decode(value, { stream: true });
 
@@ -151,7 +161,9 @@ export function useStreamingFetch() {
 
       if (onDone) onDone();
     } catch (exc) {
-      if (onError) onError(exc.message || String(exc));
+      // R10 fix: 若异常由超时 abort 触发（timedOut=true），onError 已在超时
+      // 回调中调用，此处跳过避免重复通知调用方。
+      if (!timedOut && onError) onError(exc.message || String(exc));
     } finally {
       if (callbacks.signal) {
         callbacks.signal.removeEventListener('abort', onAbort);

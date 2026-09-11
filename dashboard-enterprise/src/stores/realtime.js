@@ -31,8 +31,10 @@ export const useRealtimeStore = defineStore('realtime', () => {
     // P1 fix: use protocol-relative URL so wss:// is used on HTTPS pages
     // P2-9 fix: when location.port is empty (reverse proxy on 80/443),
     // omit the port to avoid an invalid `ws://host:/ws` URL.
-    const wsProto = typeof location !== 'undefined' && location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsPort = typeof location !== 'undefined' && location.port ? `:${location.port}` : '';
+    // R10 fix: 统一 location 访问风格，使用 `typeof window !== 'undefined' && window.location`
+    // 与上方 hostname 守卫一致，避免裸 `location` 在非浏览器环境（SSR/Node 测试）抛 ReferenceError。
+    const wsProto = typeof window !== 'undefined' && window.location && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsPort = typeof window !== 'undefined' && window.location && window.location.port ? `:${window.location.port}` : '';
     const url = `${wsProto}//${hostname}${wsPort}/ws`;
 
     // useWebSocket auto-registers onMounted/onUnmounted only when called

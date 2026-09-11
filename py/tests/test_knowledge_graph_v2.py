@@ -382,13 +382,15 @@ class TestKnowledgeGraphEndpoint:
 
     def test_endpoint_limit_zero_returns_400(self, app_and_client):
         client = app_and_client
+        # 修复2: FastAPI Query(ge=1) 约束自动返回 422，而非手动 400
         resp = client.get("/api/knowledge-graph?limit=0")
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_endpoint_limit_too_large_returns_400(self, app_and_client):
         client = app_and_client
+        # 修复2: FastAPI Query(le=1000) 约束自动返回 422，而非手动 400
         resp = client.get("/api/knowledge-graph?limit=99999")
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_endpoint_time_range_invalid_returns_400(self, app_and_client):
         client = app_and_client

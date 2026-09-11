@@ -137,14 +137,20 @@ class ImageStore:
         if not content_type:
             content_type = self._ext_to_mime(ext)
 
-        with sqlite_connect(self._db_path) as conn:
-            conn.execute(
-                """INSERT INTO images (id, session_id, filename, content_type, size_bytes,
-                   width, height, checksum, created_at, file_path)
-                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                (img_id, session_id, safe_filename, content_type, len(data),
-                 0, 0, checksum, now, str(file_path)),
-            )
+        try:
+            with sqlite_connect(self._db_path) as conn:
+                conn.execute(
+                    """INSERT INTO images (id, session_id, filename, content_type, size_bytes,
+                       width, height, checksum, created_at, file_path)
+                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    (img_id, session_id, safe_filename, content_type, len(data),
+                     0, 0, checksum, now, str(file_path)),
+                )
+        except Exception:
+            # DB INSERT 失败时清理已写入的磁盘文件，避免孤儿文件
+            with contextlib.suppress(Exception):
+                file_path.unlink(missing_ok=True)
+            raise
 
         logger.info("[image_store] Saved %s (%d bytes) for session %s", img_id, len(data), session_id)
         return img_id

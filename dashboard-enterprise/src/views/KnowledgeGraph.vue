@@ -436,7 +436,7 @@ function applyServerFilter() {
   }
   kg.fetchGraph(params).then(() => {
     nextTick(() => renderGraph());
-  });
+  }).catch(() => { /* fetchGraph handles error internally */ });
 }
 
 function resetAll() {
@@ -449,13 +449,13 @@ function resetAll() {
   clearSelection();
   kg.fetchGraph({ limit: 500 }).then(() => {
     nextTick(() => renderGraph());
-  });
+  }).catch(() => { /* fetchGraph handles error internally */ });
 }
 
 function refresh() {
   kg.fetchGraph(kg.lastParams.value || { limit: limit.value }).then(() => {
     nextTick(() => renderGraph());
-  });
+  }).catch(() => { /* fetchGraph handles error internally */ });
 }
 
 // ── Selection / highlight ──
@@ -771,7 +771,7 @@ function scheduleRender() {
 onMounted(() => {
   kg.fetchGraph({ limit: limit.value }).then(() => {
     nextTick(() => renderGraph());
-  });
+  }).catch(() => { /* fetchGraph handles error internally */ });
 });
 
 onBeforeUnmount(() => {
@@ -849,6 +849,11 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   .kg-detail { display: none; }
   .kg-filter { font-size: var(--fs-sm); }
   .kg-filter-label { font-size: var(--fs-xs); }
+}
+@media (max-width: 640px) {
+  .kg-layout { grid-template-columns: 1fr; min-height: 400px; }
+  .kg-filter { display: none; }
+  .kg-canvas { min-height: 400px; }
 }
 
 /* ── Filter panel ── */

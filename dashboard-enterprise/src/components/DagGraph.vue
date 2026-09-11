@@ -302,6 +302,7 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
   background: var(--brand);
   border-radius: var(--r-xs);
   transition: width var(--motion-slow) var(--ease);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--brand) 30%, transparent);
 }
 .dag-progress-text {
   font-size: var(--fs-sm);

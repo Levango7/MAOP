@@ -39,6 +39,19 @@ from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
+# 修复12: 提前 import Pydantic 模型用于端点参数类型注解，让 FastAPI 自动校验请求体。
+# 个人版无 enterprise 模块时回退到宽松 BaseModel，避免 ImportError 阻断 router 加载。
+try:
+    from maop.enterprise.audit_enhanced import AuditAlertRuleCreate, AuditAlertRuleUpdate
+except ImportError:  # pragma: no cover — personal edition
+    from pydantic import BaseModel as _BaseModel
+
+    class AuditAlertRuleCreate(_BaseModel):
+        model_config = {"extra": "allow"}
+
+    class AuditAlertRuleUpdate(_BaseModel):
+        model_config = {"extra": "allow"}
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
@@ -353,7 +366,8 @@ async def advanced_query(request: Request, body: dict[str, Any]) -> dict[str, An
     try:
         query = AuditEventQuery(**body)
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=f"Invalid query body: {exc}")
+        logger.warning("Invalid query body: %s", exc)
+        raise HTTPException(status_code=422, detail="Invalid query body")
     events = _collect_enterprise_events(
         tenant_id=query.tenant_id,
         hours=int(max(1, (_time.time() - query.since) // 3600)) if query.since else 24,
@@ -470,20 +484,13 @@ async def get_heatmap(
 
 @router.post("/alert/rules")
 @handle_api_errors
-async def create_alert_rule(request: Request, body: dict[str, Any]) -> dict[str, Any]:
+async def create_alert_rule(request: Request, body: AuditAlertRuleCreate) -> dict[str, Any]:
     """Create a new alert rule."""
     require_admin(request)
     _require_audit_feature()
-    from maop.enterprise.audit_enhanced import AuditAlertRuleCreate
-
-    # P0-3: 使用 Pydantic 模型校验请求体，ValidationError → 422
-    try:
-        create = AuditAlertRuleCreate(**body)
-    except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=f"Invalid rule body: {exc}")
     engine = _get_alert_engine()
     actor = getattr(request.state, "auth_identity", "") or ""
-    rule = engine.create_rule(create, created_by=actor)
+    rule = engine.create_rule(body, created_by=actor)
     return {"status": "ok", "rule": rule.model_dump(mode="json")}
 
 
@@ -521,19 +528,12 @@ async def get_alert_rule(request: Request, rule_id: str) -> dict[str, Any]:
 
 @router.put("/alert/rules/{rule_id}")
 @handle_api_errors
-async def update_alert_rule(request: Request, rule_id: str, body: dict[str, Any]) -> dict[str, Any]:
+async def update_alert_rule(request: Request, rule_id: str, body: AuditAlertRuleUpdate) -> dict[str, Any]:
     """Update an existing alert rule (partial update)."""
     require_admin(request)
     _require_audit_feature()
-    from maop.enterprise.audit_enhanced import AuditAlertRuleUpdate
-
-    # P0-3: 使用 Pydantic 模型校验请求体，ValidationError → 422
-    try:
-        update = AuditAlertRuleUpdate(**body)
-    except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=f"Invalid rule body: {exc}")
     engine = _get_alert_engine()
-    rule = engine.update_rule(rule_id, update)
+    rule = engine.update_rule(rule_id, body)
     if rule is None:
         raise HTTPException(status_code=404, detail=f"Rule {rule_id} not found")
     return {"status": "ok", "rule": rule.model_dump(mode="json")}

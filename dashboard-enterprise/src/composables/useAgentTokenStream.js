@@ -9,7 +9,7 @@
  *
  * @returns {{ subscribe: Function, close: Function }}
  */
-import { ref, onUnmounted } from 'vue';
+import { ref, onUnmounted, getCurrentInstance } from 'vue';
 
 export function useAgentTokenStream() {
   const streaming = ref(false);
@@ -85,7 +85,10 @@ export function useAgentTokenStream() {
     } catch (exc) {
       streaming.value = false;
       if (onError) onError(`Failed to create EventSource: ${exc.message}`);
-      return;
+      // R10 fix: 统一 subscribe 的返回值类型为 { close: Function }，
+      // 与上方 signal.aborted 分支和 JSDoc 声明保持一致，避免调用方
+      // 对返回值做 .close() 时抛 TypeError。
+      return { close: () => {} };
     }
 
     eventSource.addEventListener('token', (ev) => {
@@ -162,9 +165,13 @@ export function useAgentTokenStream() {
   }
 
   // Auto-cleanup on component unmount
-  onUnmounted(() => {
-    close();
-  });
+  // R10 fix: 加 getCurrentInstance() 守卫，避免在非组件 setup 上下文
+  // （如 Pinia store、纯单元测试）中调用 onUnmounted 抛 Vue 警告。
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      close();
+    });
+  }
 
   return { streaming, content, tokenCount, meta, subscribe, close };
 }

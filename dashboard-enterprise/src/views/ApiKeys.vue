@@ -305,6 +305,13 @@ import AppIcon from '../components/AppIcon.vue';
 
 const { t } = useI18n();
 const api = useApiStore();
+
+// ── API 路径常量 ──
+const API = {
+  KEYS: '/api/api-keys',
+  key: (id) => `/api/api-keys/${encodeURIComponent(id)}`,
+  revoke: (id) => `/api/api-keys/${encodeURIComponent(id)}/revoke`,
+};
 const toast = useToast();
 const { showConfirm } = useConfirm();
 
@@ -427,7 +434,7 @@ async function load() {
   loading.value = true;
   error.value = '';
   try {
-    const d = await api.get('/api/api-keys');
+    const d = await api.get(API.KEYS);
     keys.value = Array.isArray(d) ? d : (d.keys || []);
   } catch (e) {
     error.value = e.message || String(e);
@@ -452,7 +459,7 @@ async function generate() {
   }
   saving.value = true;
   try {
-    const d = await api.post('/api/api-keys', {
+    const d = await api.post(API.KEYS, {
       name: form.value.name.trim(),
       scopes: form.value.scopes,
       rate_limit: Number(form.value.rate_limit) || 0,
@@ -514,7 +521,7 @@ async function saveEdit() {
   }
   saving.value = true;
   try {
-    await api.put('/api/api-keys/' + encodeURIComponent(editForm.value.key_id), {
+    await api.put(API.key(editForm.value.key_id), {
       name: editForm.value.name.trim(),
       scopes: editForm.value.scopes,
       rate_limit: Number(editForm.value.rate_limit) || 0,
@@ -535,7 +542,7 @@ async function revoke(k) {
   const ok = await showConfirm({ message: t('view.apikeys.revokeConfirm', { name: k.name }), tone: 'danger' });
   if (!ok) return;
   try {
-    await api.post('/api/api-keys/' + encodeURIComponent(k.key_id) + '/revoke', {});
+    await api.post(API.revoke(k.key_id), {});
     toast.success(t('view.apikeys.revoked', { name: k.name }));
     await load();
   } catch (e) {
@@ -548,7 +555,7 @@ async function openDetail(k) {
   showDetail.value = true;
   detail.value = { ...k };
   try {
-    const d = await api.get('/api/api-keys/' + encodeURIComponent(k.key_id));
+    const d = await api.get(API.key(k.key_id));
     detail.value = d || detail.value;
   } catch {
     // 保留列表中的基础信息,统计区为空
@@ -730,5 +737,9 @@ onMounted(load);
   .ak-row { grid-template-columns: 1fr 1fr 0.8fr 90px; }
   .ak-cell--scopes, .ak-cell--lastused, .ak-cell--created { display: none; }
   .stat-summary { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .ak-row { grid-template-columns: 1fr 80px; }
+  .ak-cell--status { display: none; }
 }
 </style>

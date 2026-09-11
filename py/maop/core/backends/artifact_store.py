@@ -160,12 +160,18 @@ class ArtifactStore:
             # 使用 safe_write_text 进行原子写入，防止崩溃导致数据损坏
             safe_write_text(blob_file, content, encoding="utf-8")
 
-            conn.execute(
-                "INSERT INTO artifact_versions (id, artifact_name, version, content_hash, size_bytes, tag, metadata, blob_path, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?)",
-                (version_id, name, version, content_hash, size, tag,
-                 json.dumps(metadata or {}), str(blob_file), now),
-            )
+            try:
+                conn.execute(
+                    "INSERT INTO artifact_versions (id, artifact_name, version, content_hash, size_bytes, tag, metadata, blob_path, created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?)",
+                    (version_id, name, version, content_hash, size, tag,
+                     json.dumps(metadata or {}), str(blob_file), now),
+                )
+            except Exception:
+                # DB INSERT 失败时清理已写入的 blob 文件，避免孤儿文件
+                with contextlib.suppress(Exception):
+                    blob_file.unlink(missing_ok=True)
+                raise
 
         logger.info("[artifact] Saved %s v%d (hash=%s, tag=%s)", name, version, content_hash, tag)
         return cast(int, version)

@@ -269,6 +269,14 @@ const api = useApiStore();
 const toast = useToast();
 const { showConfirm } = useConfirm();
 
+// ── API 路径常量 ──
+const API = {
+  RULES: '/api/audit/rules',
+  ALERTS: '/api/audit/alerts',
+  SUMMARY: '/api/audit/summary',
+  EVENTS: '/api/audit/events',
+};
+
 const loading = ref(true);
 const lastUpdated = ref('');
 const events = reactive({ value: [], error: '' });
@@ -609,7 +617,7 @@ async function loadRules() {
   rulesLoading.value = true;
   rulesError.value = '';
   try {
-    const d = await api.get('/api/audit/rules');
+    const d = await api.get(API.RULES);
     rules.value = d.rules || [];
   } catch (e) {
     rulesError.value = e.message || t('view.audit.rulesUnavailable');
@@ -634,7 +642,7 @@ async function saveRule() {
       await api.put(`/api/audit/rules/${r.id}`, r);
       toast.success(t('view.audit.ruleUpdated'));
     } else {
-      await api.post('/api/audit/rules', r);
+      await api.post(API.RULES, r);
       toast.success(t('view.audit.ruleCreated'));
     }
     ruleEditor.open = false;
@@ -682,7 +690,7 @@ async function loadHistory() {
   historyLoading.value = true;
   historyError.value = '';
   try {
-    const d = await api.get('/api/audit/alerts');
+    const d = await api.get(API.ALERTS);
     history.value = d.alerts || d.history || [];
   } catch (e) {
     historyError.value = e.message || t('view.audit.historyUnavailable');
@@ -694,7 +702,7 @@ async function loadHistory() {
 // ── 数据加载 ──
 async function loadSummary() {
   try {
-    const d = await api.get('/api/audit/summary');
+    const d = await api.get(API.SUMMARY);
     const s = d.summary || d;
     summary.data = {
       total: s.total || s.total_events || 0,
@@ -708,7 +716,7 @@ async function loadSummary() {
 }
 async function loadEvents() {
   try {
-    const d = await api.get('/api/audit/events');
+    const d = await api.get(API.EVENTS);
     events.value = (d.events || []).map((e) => ({
       ...e,
       time: e.time || e.timestamp,

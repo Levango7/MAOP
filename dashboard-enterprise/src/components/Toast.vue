@@ -61,7 +61,7 @@ function iconFor(tone) {
   cursor: pointer;
 }
 .toast--success { border-left-color: var(--success); }
-.toast--success .toast__msg, .toast--success :deep(svg) { color: var(--success); }
+.toast--success :deep(svg) { color: var(--success); }
 .toast--error { border-left-color: var(--fail); }
 .toast--error :deep(svg) { color: var(--fail); }
 .toast--warn { border-left-color: var(--warn); }

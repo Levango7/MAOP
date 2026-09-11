@@ -17,6 +17,7 @@ to use Alembic instead of the built-in SQL-file migration system.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 from datetime import datetime, timezone
@@ -357,8 +358,6 @@ class AlembicBridge:
         except Exception as exc:
             return {"backend": "alembic", "error": str(exc)}
 
-
-import os
 
 
 def get_migration_backend(

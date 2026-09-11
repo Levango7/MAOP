@@ -98,7 +98,7 @@
         </div>
         <div v-else class="agent-health-list">
           <div class="agent-health-row agent-health-header">
-            <span class="ah-name">Agent</span>
+            <span class="ah-name">{{ t('view.monitor.healthAgent') }}</span>
             <span class="ah-failure">{{ t('view.monitor.healthFailureRate') }}</span>
             <span class="ah-latency">{{ t('view.monitor.healthLatency') }}</span>
             <span class="ah-timeout">{{ t('view.monitor.healthTimeoutRate') }}</span>

@@ -222,9 +222,9 @@ async def memory_stats(request: Request) -> dict[str, Any]:
 @router.post("/upload")
 @handle_api_errors("image upload")
 async def upload_image(
+    request: Request,
     session_id: str = "",
     file: UploadFile | None = None,
-    request: Request = None,  # type: ignore  # FastAPI 注入，运行时永不 None
 ) -> dict[str, Any]:
     """Upload an image for multimodal chat."""
     require_admin(request)

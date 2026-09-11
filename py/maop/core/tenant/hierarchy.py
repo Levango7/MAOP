@@ -361,6 +361,19 @@ class OrganizationHierarchy:
 
             # 重建闭包：先删除以 org_id 为根的子树的所有外入边，
             # 再重新插入。
+            # R10 fix: 重建前验证闭包表一致性——确认 org_id 在闭包表中
+            # 存在自环（ancestor=descendant=org_id, distance=0），否则
+            # 后续重建 SQL 可能产生错误的闭包关系。
+            self_loop = conn.execute(
+                "SELECT 1 FROM tenant_org_closure "
+                "WHERE ancestor = ? AND descendant = ? AND distance = 0",
+                (org_id, org_id),
+            ).fetchone()
+            if not self_loop:
+                raise HierarchyError(
+                    f"closure table inconsistent: no self-loop for {org_id!r}; "
+                    "rebuild closure before moving"
+                )
             # 1. 删除所有 (a, d) where d in subtree(org_id) and a not in subtree(org_id)
             conn.execute(
                 """DELETE FROM tenant_org_closure

@@ -215,14 +215,17 @@ class ConfigMutator:
         if not self._suggestions_file.exists():
             return
         import json
-        with open(self._suggestions_file, encoding="utf-8") as f:
-            suggestions = json.load(f)
-        for s in suggestions:
-            if s.get("id") == suggestion_id:
-                s["applied"] = True
-                break
-        with open(self._suggestions_file, "w", encoding="utf-8") as f:
-            json.dump(suggestions, f, indent=2, ensure_ascii=False)
+        # R10 fix: 使用 FileLock 保护 suggestions JSON 文件的读-改-写操作，
+        # 防止并发进程同时修改导致更新丢失。
+        with FileLock(self._suggestions_file, timeout_seconds=5):
+            with open(self._suggestions_file, encoding="utf-8") as f:
+                suggestions = json.load(f)
+            for s in suggestions:
+                if s.get("id") == suggestion_id:
+                    s["applied"] = True
+                    break
+            with open(self._suggestions_file, "w", encoding="utf-8") as f:
+                json.dump(suggestions, f, indent=2, ensure_ascii=False)
 
     def _trigger_reload(self) -> bool:
         """Trigger ConfigHotReload if available."""
@@ -402,6 +405,20 @@ class ConfigMutator:
         new_value = params.get("new_value", 0)
 
         if not cache_name or not parameter:
+            return changes
+
+        # R10 fix: setattr 白名单校验，只允许预定义的可安全调整的缓存属性，
+        # 防止通过 suggestion 注入任意属性名导致安全风险（如覆盖内部方法）。
+        _ALLOWED_CACHE_ATTRS = frozenset({
+            "ttl", "ttl_s", "max_size", "max_scan", "max_entries",
+            "similarity_threshold", "threshold", "negative_ttl",
+            "eviction_policy", "max_age_days",
+        })
+        if parameter not in _ALLOWED_CACHE_ATTRS:
+            logger.warning(
+                "[mutator] Refusing to set disallowed cache attribute %r "
+                "(not in whitelist)", parameter,
+            )
             return changes
 
         try:

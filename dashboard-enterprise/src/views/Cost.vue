@@ -149,6 +149,9 @@ const api = useApiStore();
 const { t } = useI18n();
 const toast = useToast();
 
+// ── API 路径常量 ──
+const API = { BUDGET: '/api/cost/budget' };
+
 const period = ref('7d');
 const loading = ref(false);
 const error = ref(null);
@@ -236,7 +239,7 @@ function cancelEdit() {
 async function saveBudget() {
   saving.value = true;
   try {
-    const res = await api.put('/api/cost/budget', {
+    const res = await api.put(API.BUDGET, {
       daily_limit_usd: Number(form.value.daily_limit_usd) || 0,
       monthly_limit_usd: Number(form.value.monthly_limit_usd) || 0,
       alert_threshold: (Number(form.value.alert_threshold) || 0) / 100,
@@ -263,7 +266,7 @@ async function load() {
   const start = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
   const [s, b, e] = await Promise.allSettled([
     api.get(`/api/cost/summary?start_date=${start}`),
-    api.get('/api/cost/budget'),
+    api.get(API.BUDGET),
     api.get(`/api/cost/entries?start_date=${start}&limit=50`),
   ]);
   if (s.status === 'fulfilled') summary.value = s.value.summary || summary.value;

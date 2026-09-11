@@ -382,7 +382,8 @@ class VectorStore:
             self._cache[entry_id] = vector
             self._text_cache[entry_id] = text
             self._meta_cache[entry_id] = meta
-            # 淘汰超限项
+            # 淘汰超限项（LRU 语义：配合 _get_entry_info 中的 pop+reinsert，
+            # next(iter(...)) 返回最久未访问的项）
             if len(self._cache) > self._cache_max_size:
                 oldest = next(iter(self._cache))
                 self._cache.pop(oldest, None)
@@ -763,9 +764,10 @@ class VectorStore:
                         (self._cache_max_size,),
                     ).fetchall()
 
-                for row in rows:
-                    # B22: 加锁保护缓存写入
-                    with self._cache_lock:
+                # B22: 批量加锁——将锁持有范围从"每行一个锁"改为"一次锁处理所有行"，
+                # 显著减少锁获取/释放开销和缓存填充时间。
+                with self._cache_lock:
+                    for row in rows:
                         self._cache[row["id"]] = json.loads(row["vector"])
                         self._text_cache[row["id"]] = row["text"] or ""
                         self._meta_cache[row["id"]] = json.loads(row["metadata"] or "{}")
@@ -778,6 +780,12 @@ class VectorStore:
         with self._cache_lock:
             text = self._text_cache.get(entry_id, "")
             meta = self._meta_cache.get(entry_id, {})
+            # LRU: 缓存命中时将访问的项移到字典末尾（pop 后重新插入），
+            # 使淘汰时 next(iter(...)) 返回最久未访问的项而非最旧插入的项。
+            if (text or meta) and entry_id in self._text_cache:
+                self._text_cache[entry_id] = self._text_cache.pop(entry_id)
+            if (text or meta) and entry_id in self._meta_cache:
+                self._meta_cache[entry_id] = self._meta_cache.pop(entry_id)
         if text or meta:
             return text, meta
         try:

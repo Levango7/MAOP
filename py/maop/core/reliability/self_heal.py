@@ -156,7 +156,10 @@ class SelfHealEngine:
     def _execute_action(self, action: HealAction, rule_name: str) -> bool:
         try:
             if action == HealAction.VACUUM:
-                db_path = self._data_dir / "maop.db"
+                # R10 fix: 使用 get_db_path 确保与引擎自身 DB 路径一致，
+                # 而非硬编码 self._data_dir / "maop.db"（在 MAOP_DATA_DIR
+                # 或 per-module 模式下可能不一致）。
+                db_path = get_db_path("self_heal")
                 if db_path.exists():
                     with sqlite_connect(db_path) as conn:
                         conn.execute("VACUUM")

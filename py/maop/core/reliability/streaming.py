@@ -75,8 +75,14 @@ class SubprocessStreamer:
                 timeout=timeout,
             )
         except asyncio.TimeoutError:
-            proc.kill()
-            await proc.wait()
+            # R10 fix: 先 terminate（SIGTERM）给子进程清理机会，
+            # 等待 2s 后若仍存活再 kill（SIGKILL）强制终止。
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
             self.sse.send_json(
                 event="exec_timeout",
                 trace_id=self._trace_id,
