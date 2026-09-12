@@ -261,7 +261,7 @@
                 class="pager__btn"
                 type="button"
                 :disabled="recordsPage === 1"
-                :aria-label="t('common.refresh')"
+                :aria-label="t('view.agentBilling.records.prevPage')"
                 @click="recordsPage--"
               >‹</button>
               <span class="pager__info">{{ recordsPage }} / {{ recordsTotalPages }}</span>
@@ -269,7 +269,7 @@
                 class="pager__btn"
                 type="button"
                 :disabled="recordsPage === recordsTotalPages"
-                :aria-label="t('action.next')"
+                :aria-label="t('view.agentBilling.records.nextPage')"
                 @click="recordsPage++"
               >›</button>
             </div>

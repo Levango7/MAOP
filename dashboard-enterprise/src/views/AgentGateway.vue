@@ -465,10 +465,10 @@ async function deletePermission(p) {
   if (!window.confirm(t('view.agentGateway.permissions.confirmDelete', { pattern }))) return;
   try {
     await api.delete(`/api/model-gateway/permissions/${encodeURIComponent(pattern)}`);
-    toast.success(t('view.agentGateway.form.successUpdate'));
+    toast.success(t('view.agentGateway.permissions.deleteSuccess'));
     await loadPermissions();
   } catch (err) {
-    toast.error((err && err.message) || t('view.agentGateway.form.failedSave'));
+    toast.error((err && err.message) || t('view.agentGateway.permissions.deleteFailed'));
   }
 }
 

@@ -69,7 +69,7 @@ async def api_model_gateway_permissions_list(request: Request) -> dict[str, Any]
     perms = gateway.list_permissions()
     return {
         "status": "ok",
-        "permissions": [p.model_dump() for p in perms],
+        "permissions": [p.model_dump(mode="json") for p in perms],
         "count": len(perms),
     }
 
@@ -86,7 +86,7 @@ async def api_model_gateway_permissions_add(body: ModelPermission, request: Requ
     return {"status": "ok", "model_pattern": body.model_pattern}
 
 
-@router.delete("/api/model-gateway/permissions/{model_pattern}")
+@router.delete("/api/model-gateway/permissions/{model_pattern:path}")
 @handle_api_errors("Model gateway permissions delete", error_value={"status": "error", "error": "Delete failed"})
 async def api_model_gateway_permissions_delete(model_pattern: str, request: Request) -> dict[str, Any]:
     """删除权限规则。"""
@@ -108,7 +108,7 @@ async def api_model_gateway_check(body: ModelCheckRequest, request: Request) -> 
         raise HTTPException(400, "missing model")
     gateway = _get_model_gateway()
     decision = gateway.check_access(body.model, agent=body.agent, session_id=body.session_id)
-    return {"status": "ok", "decision": decision.model_dump()}
+    return {"status": "ok", "decision": decision.model_dump(mode="json")}
 
 
 # ── API 端点：使用量 ────────────────────────────────────────────────

@@ -65,7 +65,7 @@ async def api_quota_get(agent_name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     bucket = _get_quota_bucket()
     entry = bucket.get_quota(agent_name)
-    return {"status": "ok", "agent_name": agent_name, "quota": entry.model_dump()}
+    return {"status": "ok", "agent_name": agent_name, "quota": entry.model_dump(mode="json")}
 
 
 @router.put("/api/quota/{agent_name}")
@@ -87,7 +87,7 @@ async def api_quota_consume(agent_name: str, body: QuotaConsumeRequest, request:
     require_admin(request)
     bucket = _get_quota_bucket()
     result = bucket.consume(agent_name, body.amount)
-    return {"status": "ok", "agent_name": agent_name, "result": result.model_dump()}
+    return {"status": "ok", "agent_name": agent_name, "result": result.model_dump(mode="json")}
 
 
 @router.post("/api/quota/{agent_name}/refund")

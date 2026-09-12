@@ -211,14 +211,17 @@ class AgentCatalog:
         """注册或更新一个 Agent（按 name 幂等 upsert）.
 
         若同名 Agent 已存在，其所有字段将被新 descriptor 覆盖。
+
+        先持久化到 SQLite，成功后再更新内存索引，保证持久化失败时
+        内存与存储一致（不会出现内存已改但未落盘的情况）。
         """
         with self._lock:
-            self._agents[descriptor.name] = descriptor
             try:
                 self._store.upsert(descriptor.to_store_dict())
             except Exception as exc:
                 logger.error("[agent_catalog] persist failed for %s: %s", descriptor.name, exc)
                 raise
+            self._agents[descriptor.name] = descriptor
         logger.info("[agent_catalog] registered agent: %s", descriptor.name)
 
     # ── Get ───────────────────────────────────────────────────────
@@ -261,15 +264,20 @@ class AgentCatalog:
 
     # ── Delete ────────────────────────────────────────────────────
     def delete(self, name: str) -> bool:
-        """注销一个 Agent。返回是否实际删除了记录。"""
+        """注销一个 Agent。返回是否实际删除了记录。
+
+        先从 SQLite 删除，成功后再更新内存索引，保证持久化失败时
+        内存与存储一致。
+        """
         with self._lock:
-            existed = self._agents.pop(name, None) is not None
+            existed = name in self._agents
             if existed:
                 try:
                     self._store.delete(name)
                 except Exception as exc:
                     logger.error("[agent_catalog] delete failed for %s: %s", name, exc)
                     raise
+                self._agents.pop(name, None)
                 logger.info("[agent_catalog] deleted agent: %s", name)
             return existed
 
@@ -278,6 +286,9 @@ class AgentCatalog:
         """更新指定 Agent 的健康状态 + 检查时间戳.
 
         Agent 不存在时静默忽略（no-op），仅记录 debug 日志。
+
+        先持久化到 SQLite，成功后再更新内存索引，保证持久化失败时
+        内存与存储一致。
         """
         now = time.time()
         with self._lock:
@@ -290,12 +301,12 @@ class AgentCatalog:
                 "healthy": healthy,
                 "last_health_check": now,
             })
-            self._agents[name] = updated
             try:
                 self._store.update_health(name, healthy, now)
             except Exception as exc:
                 logger.error("[agent_catalog] persist health failed for %s: %s", name, exc)
                 raise
+            self._agents[name] = updated
 
     # ── Fallback chain ────────────────────────────────────────────
     def get_fallback_chain(self, name: str) -> list[AgentDescriptor]:

@@ -349,12 +349,22 @@ class AgentRouter:
         """轮询选择：基于 key 维护索引，每次调用前进一位.
 
         空候选返回 None；单候选直接返回。
+
+        当 ``_round_robin_idx`` 超过 1000 个条目时，清理最旧的 500 个条目，
+        防止字典无限增长（每个唯一的 ``(capabilities, session_id)`` 组合
+        创建一个条目，永不清理）。
         """
         if not agents:
             return None
         if len(agents) == 1:
             return agents[0]
         with self._lock:
+            # 清理过期的轮询索引，防止 _round_robin_idx 无限增长
+            if len(self._round_robin_idx) > 1000:
+                # 保留最近500个条目（删除最早的500个）
+                keys = list(self._round_robin_idx.keys())
+                for k in keys[:500]:
+                    del self._round_robin_idx[k]
             idx = self._round_robin_idx.get(key, 0) % len(agents)
             selected = agents[idx]
             self._round_robin_idx[key] = (idx + 1) % len(agents)
@@ -393,11 +403,8 @@ class AgentRouter:
                     chain.append(agent)
                     seen.add(agent.name)
         else:
-            # 无能力声明时，补充所有其他启用 Agent
-            for agent in self._catalog.list_enabled():
-                if agent.name not in seen:
-                    chain.append(agent)
-                    seen.add(agent.name)
+            # 无能力声明时，只使用显式 fallback_agents，不补充其他 Agent
+            pass  # chain already has fallback_agents from above
 
         return chain
 

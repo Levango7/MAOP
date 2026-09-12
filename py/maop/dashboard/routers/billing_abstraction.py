@@ -67,7 +67,7 @@ async def api_billing_charge(body: BillingChargeRequest, request: Request) -> di
     return {
         "status": "ok",
         "success": result.success,
-        "record": result.record.model_dump() if result.record else None,
+        "record": result.record.model_dump(mode="json") if result.record else None,
         "error": result.error,
     }
 
@@ -82,6 +82,8 @@ async def api_billing_estimate(
 ) -> dict[str, Any]:
     """估算成本（不实际扣减）。"""
     require_admin(request)
+    if tokens < 0 or calls < 0:
+        raise HTTPException(400, "tokens and calls must be non-negative")
     if not agent_name:
         raise HTTPException(400, "missing agent_name")
     engine = _get_billing_engine()
@@ -120,6 +122,6 @@ async def api_billing_records(
     records = engine.get_billing_records(agent_name=agent_name, limit=limit)
     return {
         "status": "ok",
-        "records": [r.model_dump() for r in records],
+        "records": [r.model_dump(mode="json") for r in records],
         "count": len(records),
     }

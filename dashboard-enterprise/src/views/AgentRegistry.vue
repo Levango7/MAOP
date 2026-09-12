@@ -878,7 +878,9 @@ async function loadStats() {
 
 async function loadAll() {
   loading.value = true;
-  await Promise.allSettled([loadAgents(), loadStats()]);
+  await Promise.allSettled([loadAgents()]);
+  // agents加载完成后再加载stats，确保fallback派生数据可用
+  await Promise.allSettled([loadStats()]);
   loading.value = false;
 }
 
@@ -915,7 +917,7 @@ onMounted(() => {
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .btn-danger {
   display: inline-flex; align-items: center; gap: var(--sp-1);
-  background: var(--danger, var(--fail)); color: #fff;
+  background: var(--danger, var(--fail)); color: var(--on-danger, var(--text-inverse, #fff));
   border: none; border-radius: var(--r-md);
   padding: 7px 16px; font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);

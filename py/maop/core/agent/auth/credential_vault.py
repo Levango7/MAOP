@@ -161,7 +161,7 @@ class CredentialVault:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._pool: ConnectionPool = get_pool(self.db_path)
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._crypto = _CryptoEngine(self._load_or_create_key())
         self._init_db()
 
@@ -318,100 +318,104 @@ class CredentialVault:
 
     def store(self, credential: Credential, *, created_by: str = "") -> str:
         """存储凭证（加密后落盘）。返回凭证 ID。"""
-        cred_id = credential.id or secrets.token_hex(16)
-        now = time.time()
-        encrypted = self._encrypt_credential(credential)
-        expires_at = credential.oauth_expires_at if (
-            credential.credential_type == CredentialType.OAUTH_TOKEN
-            and credential.oauth_expires_at
-        ) else 0.0
-        conn = self._pool.acquire()
-        try:
-            conn.execute(
-                f"INSERT OR REPLACE INTO {_VAULT_TABLE} "
-                f"(id, agent_name, credential_type, encrypted_data, expires_at, "
-                f"last_used_at, last_tested_at, last_test_result, created_by, "
-                f"created_at, updated_at) "
-                f"VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?)",
-                (
-                    cred_id, credential.agent_name,
-                    credential.credential_type.value, encrypted, expires_at,
-                    created_by, str(now), str(now),
-                ),
-            )
-            conn.commit()
-        finally:
-            self._pool.release(conn)
-        self._audit(cred_id, "store", actor=created_by, result="ok")
-        logger.info("[credential_vault] 存储凭证 id=%s agent=%s type=%s",
-                    cred_id, credential.agent_name, credential.credential_type.value)
-        return cred_id
+        with self._lock:
+            cred_id = credential.id or secrets.token_hex(16)
+            now = time.time()
+            encrypted = self._encrypt_credential(credential)
+            expires_at = credential.oauth_expires_at if (
+                credential.credential_type == CredentialType.OAUTH_TOKEN
+                and credential.oauth_expires_at
+            ) else 0.0
+            conn = self._pool.acquire()
+            try:
+                conn.execute(
+                    f"INSERT OR REPLACE INTO {_VAULT_TABLE} "
+                    f"(id, agent_name, credential_type, encrypted_data, expires_at, "
+                    f"last_used_at, last_tested_at, last_test_result, created_by, "
+                    f"created_at, updated_at) "
+                    f"VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?)",
+                    (
+                        cred_id, credential.agent_name,
+                        credential.credential_type.value, encrypted, expires_at,
+                        created_by, str(now), str(now),
+                    ),
+                )
+                conn.commit()
+            finally:
+                self._pool.release(conn)
+            self._audit(cred_id, "store", actor=created_by, result="ok")
+            logger.info("[credential_vault] 存储凭证 id=%s agent=%s type=%s",
+                        cred_id, credential.agent_name, credential.credential_type.value)
+            return cred_id
 
     def retrieve(self, credential_id: str, *, actor: str = "") -> Credential:
         """读取并解密凭证。记录审计日志与 last_used_at。"""
-        conn = self._pool.acquire()
-        try:
-            row = conn.execute(
-                f"SELECT * FROM {_VAULT_TABLE} WHERE id = ?", (credential_id,)
-            ).fetchone()
-            if row is None:
-                raise KeyError(f"凭证不存在: {credential_id}")
-            conn.execute(
-                f"UPDATE {_VAULT_TABLE} SET last_used_at = ? WHERE id = ?",
-                (time.time(), credential_id),
-            )
-            conn.commit()
-        finally:
-            self._pool.release(conn)
-        cred = self._decrypt_credential(row["encrypted_data"], row)
-        self._audit(credential_id, "retrieve", actor=actor, result="ok")
-        return cred
+        with self._lock:
+            conn = self._pool.acquire()
+            try:
+                row = conn.execute(
+                    f"SELECT * FROM {_VAULT_TABLE} WHERE id = ?", (credential_id,)
+                ).fetchone()
+                if row is None:
+                    raise KeyError(f"凭证不存在: {credential_id}")
+                conn.execute(
+                    f"UPDATE {_VAULT_TABLE} SET last_used_at = ? WHERE id = ?",
+                    (time.time(), credential_id),
+                )
+                conn.commit()
+            finally:
+                self._pool.release(conn)
+            cred = self._decrypt_credential(row["encrypted_data"], row)
+            self._audit(credential_id, "retrieve", actor=actor, result="ok")
+            return cred
 
     def list_all(self) -> list[CredentialSummary]:
         """列出所有凭证摘要（不含敏感字段明文）。"""
-        conn = self._pool.acquire()
-        try:
-            rows = conn.execute(
-                f"SELECT * FROM {_VAULT_TABLE} ORDER BY created_at DESC"
-            ).fetchall()
-        finally:
-            self._pool.release(conn)
-        summaries: list[CredentialSummary] = []
-        for row in rows:
+        with self._lock:
+            conn = self._pool.acquire()
             try:
-                cred = self._decrypt_credential(row["encrypted_data"], row)
-                preview = self._mask(self._primary_secret(cred))
-            except Exception:
-                preview = "[decrypt-error]"
-            summaries.append(CredentialSummary(
-                id=row["id"],
-                agent_name=row["agent_name"],
-                credential_type=CredentialType(row["credential_type"]),
-                preview=preview,
-                expires_at=row["expires_at"],
-                last_used_at=row["last_used_at"],
-                last_tested_at=row["last_tested_at"],
-                last_test_result=row["last_test_result"],
-                created_by=row["created_by"] or "",
-                created_at=row["created_at"] or "",
-                updated_at=row["updated_at"] or "",
-            ))
-        return summaries
+                rows = conn.execute(
+                    f"SELECT * FROM {_VAULT_TABLE} ORDER BY created_at DESC"
+                ).fetchall()
+            finally:
+                self._pool.release(conn)
+            summaries: list[CredentialSummary] = []
+            for row in rows:
+                try:
+                    cred = self._decrypt_credential(row["encrypted_data"], row)
+                    preview = self._mask(self._primary_secret(cred))
+                except Exception:
+                    preview = "[decrypt-error]"
+                summaries.append(CredentialSummary(
+                    id=row["id"],
+                    agent_name=row["agent_name"],
+                    credential_type=CredentialType(row["credential_type"]),
+                    preview=preview,
+                    expires_at=row["expires_at"],
+                    last_used_at=row["last_used_at"],
+                    last_tested_at=row["last_tested_at"],
+                    last_test_result=row["last_test_result"],
+                    created_by=row["created_by"] or "",
+                    created_at=row["created_at"] or "",
+                    updated_at=row["updated_at"] or "",
+                ))
+            return summaries
 
     def delete(self, credential_id: str, *, actor: str = "") -> bool:
         """删除凭证。返回是否有行被删除。"""
-        conn = self._pool.acquire()
-        try:
-            cur = conn.execute(
-                f"DELETE FROM {_VAULT_TABLE} WHERE id = ?", (credential_id,)
-            )
-            conn.commit()
-            deleted = cur.rowcount > 0
-        finally:
-            self._pool.release(conn)
-        self._audit(credential_id, "delete", actor=actor,
-                     result="ok" if deleted else "not_found")
-        return deleted
+        with self._lock:
+            conn = self._pool.acquire()
+            try:
+                cur = conn.execute(
+                    f"DELETE FROM {_VAULT_TABLE} WHERE id = ?", (credential_id,)
+                )
+                conn.commit()
+                deleted = cur.rowcount > 0
+            finally:
+                self._pool.release(conn)
+            self._audit(credential_id, "delete", actor=actor,
+                         result="ok" if deleted else "not_found")
+            return deleted
 
     def rotate(self, credential_id: str, *, actor: str = "") -> str:
         """轮换凭证：生成新随机秘密替换原值，返回新凭证 ID（同 ID）。
@@ -420,39 +424,40 @@ class CredentialVault:
         对 OAUTH_TOKEN 清空 access/refresh token（需外部重新授权）；
         对 USERNAME_PASSWORD / COOKIE 生成新随机密码占位（需外部同步更新）。
         """
-        cred = self.retrieve(credential_id, actor=actor)
-        new_secret = secrets.token_urlsafe(32)
-        ct = cred.credential_type
-        if ct == CredentialType.API_KEY:
-            cred.api_key = new_secret
-        elif ct == CredentialType.BEARER_TOKEN:
-            cred.bearer_token = new_secret
-        elif ct == CredentialType.LICENSE_KEY:
-            cred.license_key = new_secret
-        elif ct == CredentialType.OAUTH_TOKEN:
-            cred.oauth_access_token = ""
-            cred.oauth_refresh_token = ""
-            cred.oauth_expires_at = 0.0
-        elif ct == CredentialType.USERNAME_PASSWORD:
-            cred.password = new_secret
-        elif ct == CredentialType.COOKIE:
-            cred.cookie_string = new_secret
-        # 重新加密落盘（保留原 created_at / created_by）。
-        encrypted = self._encrypt_credential(cred)
-        now = time.time()
-        conn = self._pool.acquire()
-        try:
-            conn.execute(
-                f"UPDATE {_VAULT_TABLE} SET encrypted_data = ?, updated_at = ? "
-                f"WHERE id = ?",
-                (encrypted, str(now), credential_id),
-            )
-            conn.commit()
-        finally:
-            self._pool.release(conn)
-        self._audit(credential_id, "rotate", actor=actor, result="ok")
-        logger.info("[credential_vault] 轮换凭证 id=%s type=%s", credential_id, ct.value)
-        return credential_id
+        with self._lock:
+            cred = self.retrieve(credential_id, actor=actor)
+            new_secret = secrets.token_urlsafe(32)
+            ct = cred.credential_type
+            if ct == CredentialType.API_KEY:
+                cred.api_key = new_secret
+            elif ct == CredentialType.BEARER_TOKEN:
+                cred.bearer_token = new_secret
+            elif ct == CredentialType.LICENSE_KEY:
+                cred.license_key = new_secret
+            elif ct == CredentialType.OAUTH_TOKEN:
+                cred.oauth_access_token = ""
+                cred.oauth_refresh_token = ""
+                cred.oauth_expires_at = 0.0
+            elif ct == CredentialType.USERNAME_PASSWORD:
+                cred.password = new_secret
+            elif ct == CredentialType.COOKIE:
+                cred.cookie_string = new_secret
+            # 重新加密落盘（保留原 created_at / created_by）。
+            encrypted = self._encrypt_credential(cred)
+            now = time.time()
+            conn = self._pool.acquire()
+            try:
+                conn.execute(
+                    f"UPDATE {_VAULT_TABLE} SET encrypted_data = ?, updated_at = ? "
+                    f"WHERE id = ?",
+                    (encrypted, str(now), credential_id),
+                )
+                conn.commit()
+            finally:
+                self._pool.release(conn)
+            self._audit(credential_id, "rotate", actor=actor, result="ok")
+            logger.info("[credential_vault] 轮换凭证 id=%s type=%s", credential_id, ct.value)
+            return credential_id
 
     def test(self, credential_id: str, *, actor: str = "") -> bool:
         """测试凭证可用性（解密成功即视为结构有效）。记录测试结果。"""

@@ -203,11 +203,18 @@ class ModelGateway:
         """记录模型使用量（Token 数）。
 
         同时更新内存缓存和 SQLite 持久化。
+
+        跨天运行时清理 ``_daily_usage`` 中非今日的旧数据，防止内存泄漏。
         """
         if tokens <= 0:
             return
         with self._lock:
-            key = self._get_today_key(model)
+            today = self._today_str()
+            # 清理非今日的旧数据，防止跨天运行时 _daily_usage 内存泄漏
+            old_keys = [k for k in self._daily_usage if not k.startswith(f"{today}:")]
+            for k in old_keys:
+                del self._daily_usage[k]
+            key = f"{today}:{model}"
             self._daily_usage[key] = self._daily_usage.get(key, 0) + tokens
             self._persist_usage(model, tokens, agent)
 

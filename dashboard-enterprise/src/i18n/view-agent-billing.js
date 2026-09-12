@@ -79,6 +79,8 @@ export const messages = {
     'view.agentBilling.records.totalTokens': 'Total tokens',
     'view.agentBilling.records.totalCost': 'Total cost',
     'view.agentBilling.records.totalCalls': 'Total calls',
+    'view.agentBilling.records.prevPage': 'Previous page',
+    'view.agentBilling.records.nextPage': 'Next page',
 
     // ── Summary ───────────────────────────────────────────────────
     'view.agentBilling.summary.title': 'Billing Summary',
@@ -181,6 +183,8 @@ export const messages = {
     'view.agentBilling.records.totalTokens': '总 Token',
     'view.agentBilling.records.totalCost': '总成本',
     'view.agentBilling.records.totalCalls': '总调用数',
+    'view.agentBilling.records.prevPage': '上一页',
+    'view.agentBilling.records.nextPage': '下一页',
 
     // ── 摘要 ──────────────────────────────────────────────────────
     'view.agentBilling.summary.title': '计费摘要',

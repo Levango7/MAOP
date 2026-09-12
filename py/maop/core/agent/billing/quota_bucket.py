@@ -166,6 +166,9 @@ class QuotaBucket:
         按免费 → 预付 → 后付顺序扣减。若三桶总剩余 < amount，返回失败
         （不部分扣减，保证原子性）。
 
+        使用 ``BEGIN IMMEDIATE`` 事务包裹读-检-写，防止多进程并发超额。
+        （来源：2026-09-12-python-sqlite-toctou-race-begin-immediate-atomic-fix）
+
         Parameters
         ----------
         agent_name : str
@@ -189,42 +192,57 @@ class QuotaBucket:
             )
 
         with self._lock:
-            quota = self.get_quota(agent_name)
-            quota = self._maybe_auto_reset(agent_name, quota)
-
-            free_remaining = max(0, quota.free_quota - quota.free_used)
-            prepaid_remaining = max(0, quota.prepaid_quota - quota.prepaid_used)
-            postpaid_remaining = max(0, quota.postpaid_quota - quota.postpaid_used)
-            total_remaining = free_remaining + prepaid_remaining + postpaid_remaining
-
-            if total_remaining < amount:
-                return ConsumeResult(
-                    success=False,
-                    consumed=0,
-                    remaining_total=total_remaining,
-                    reason=(
-                        f"insufficient quota: need {amount}, available {total_remaining}"
-                    ),
-                )
-
-            # 按免费 → 预付 → 后付顺序扣减
-            free_deduct = min(amount, free_remaining)
-            remaining_after_free = amount - free_deduct
-            prepaid_deduct = min(remaining_after_free, prepaid_remaining)
-            postpaid_deduct = remaining_after_free - prepaid_deduct
-
-            # 更新 used 值
-            new_free_used = quota.free_used + free_deduct
-            new_prepaid_used = quota.prepaid_used + prepaid_deduct
-            new_postpaid_used = quota.postpaid_used + postpaid_deduct
-
+            # BEGIN IMMEDIATE 获取写锁，保证读-检-写原子性
             with sqlite_connect(self._db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                # 读取当前额度
+                row = conn.execute(
+                    "SELECT * FROM quota_bucket WHERE agent_name = ?",
+                    (agent_name,),
+                ).fetchone()
+                if row is None:
+                    quota = QuotaEntry()
+                else:
+                    quota = self._row_to_entry(row)
+
+                # 自动重置检查（在事务内执行，避免创建新连接）
+                quota = self._maybe_auto_reset_in_txn(conn, agent_name, quota)
+
+                free_remaining = max(0, quota.free_quota - quota.free_used)
+                prepaid_remaining = max(0, quota.prepaid_quota - quota.prepaid_used)
+                postpaid_remaining = max(0, quota.postpaid_quota - quota.postpaid_used)
+                total_remaining = free_remaining + prepaid_remaining + postpaid_remaining
+
+                if total_remaining < amount:
+                    # 额度不足，回滚事务（未做任何修改，回滚安全）
+                    conn.rollback()
+                    return ConsumeResult(
+                        success=False,
+                        consumed=0,
+                        remaining_total=total_remaining,
+                        reason=(
+                            f"insufficient quota: need {amount}, available {total_remaining}"
+                        ),
+                    )
+
+                # 按免费 → 预付 → 后付顺序扣减
+                free_deduct = min(amount, free_remaining)
+                remaining_after_free = amount - free_deduct
+                prepaid_deduct = min(remaining_after_free, prepaid_remaining)
+                postpaid_deduct = remaining_after_free - prepaid_deduct
+
+                # 更新 used 值
+                new_free_used = quota.free_used + free_deduct
+                new_prepaid_used = quota.prepaid_used + prepaid_deduct
+                new_postpaid_used = quota.postpaid_used + postpaid_deduct
+
                 conn.execute(
                     """UPDATE quota_bucket SET
                        free_used = ?, prepaid_used = ?, postpaid_used = ?
                        WHERE agent_name = ?""",
                     (new_free_used, new_prepaid_used, new_postpaid_used, agent_name),
                 )
+                # sqlite_connect 上下文管理器会在正常退出时 commit
 
             new_total_remaining = total_remaining - amount
             logger.debug(
@@ -243,6 +261,9 @@ class QuotaBucket:
     # ── 退还 ────────────────────────────────────────────────────
     def refund(self, agent_name: str, amount: int, bucket: str = "auto") -> None:
         """退还额度.
+
+        使用 ``BEGIN IMMEDIATE`` 事务包裹读-写，保证原子性。
+        （来源：2026-09-12-python-sqlite-toctou-race-begin-immediate-atomic-fix）
 
         Parameters
         ----------
@@ -263,33 +284,43 @@ class QuotaBucket:
             raise ValueError(f"invalid bucket {bucket!r}; expected one of {sorted(valid_buckets)}")
 
         with self._lock:
-            quota = self.get_quota(agent_name)
-            if bucket == "auto":
-                # 按后付 → 预付 → 免费顺序找 used > 0 的桶
-                if quota.postpaid_used > 0:
-                    target = "postpaid"
-                elif quota.prepaid_used > 0:
-                    target = "prepaid"
-                elif quota.free_used > 0:
-                    target = "free"
-                else:
-                    logger.debug(
-                        "[quota_bucket] refund auto: no used quota for %s, no-op",
-                        agent_name,
-                    )
-                    return
-            else:
-                target = bucket
-
-            # 扣减 used（不能低于 0）
-            if target == "free":
-                new_used = max(0, quota.free_used - amount)
-            elif target == "prepaid":
-                new_used = max(0, quota.prepaid_used - amount)
-            else:  # postpaid
-                new_used = max(0, quota.postpaid_used - amount)
-
+            # BEGIN IMMEDIATE 保证读-写原子性
             with sqlite_connect(self._db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                row = conn.execute(
+                    "SELECT * FROM quota_bucket WHERE agent_name = ?",
+                    (agent_name,),
+                ).fetchone()
+                if row is None:
+                    quota = QuotaEntry()
+                else:
+                    quota = self._row_to_entry(row)
+
+                if bucket == "auto":
+                    # 按后付 → 预付 → 免费顺序找 used > 0 的桶
+                    if quota.postpaid_used > 0:
+                        target = "postpaid"
+                    elif quota.prepaid_used > 0:
+                        target = "prepaid"
+                    elif quota.free_used > 0:
+                        target = "free"
+                    else:
+                        logger.debug(
+                            "[quota_bucket] refund auto: no used quota for %s, no-op",
+                            agent_name,
+                        )
+                        return
+                else:
+                    target = bucket
+
+                # 扣减 used（不能低于 0）
+                if target == "free":
+                    new_used = max(0, quota.free_used - amount)
+                elif target == "prepaid":
+                    new_used = max(0, quota.prepaid_used - amount)
+                else:  # postpaid
+                    new_used = max(0, quota.postpaid_used - amount)
+
                 if target == "free":
                     conn.execute(
                         "UPDATE quota_bucket SET free_used = ? WHERE agent_name = ?",
@@ -305,6 +336,7 @@ class QuotaBucket:
                         "UPDATE quota_bucket SET postpaid_used = ? WHERE agent_name = ?",
                         (new_used, agent_name),
                     )
+                # sqlite_connect 上下文管理器会在正常退出时 commit
             logger.debug(
                 "[quota_bucket] refund %s: amount=%d bucket=%s",
                 agent_name, amount, target,
@@ -409,6 +441,71 @@ class QuotaBucket:
             max(0, quota.free_quota - quota.free_used)
             + max(0, quota.prepaid_quota - quota.prepaid_used)
             + max(0, quota.postpaid_quota - quota.postpaid_used)
+        )
+
+    def _maybe_auto_reset_in_txn(
+        self, conn: sqlite3.Connection, agent_name: str, quota: QuotaEntry,
+    ) -> QuotaEntry:
+        """在给定事务连接上检查并执行自动重置.
+
+        与 :meth:`_maybe_auto_reset` 逻辑相同，但使用传入的 ``conn`` 而非
+        创建新连接，保证在 ``BEGIN IMMEDIATE`` 事务内执行。
+        """
+        if quota.reset_period == "never":
+            return quota
+
+        now = datetime.now(timezone.utc)
+        if not quota.last_reset:
+            # 首次初始化：记录 last_reset 但不归零 used
+            conn.execute(
+                "UPDATE quota_bucket SET last_reset = ? WHERE agent_name = ?",
+                (now.isoformat(), agent_name),
+            )
+            return quota.model_copy(update={"last_reset": now.isoformat()})
+
+        try:
+            last = datetime.fromisoformat(quota.last_reset)
+        except (ValueError, TypeError):
+            # 损坏的 last_reset：视为需要重置
+            last = None
+
+        need_reset = False
+        if last is None:
+            need_reset = True
+        elif quota.reset_period == "daily":
+            need_reset = last.date() != now.date()
+        elif quota.reset_period == "weekly":
+            # ISO 周数 + 年份相同则同一周
+            need_reset = (last.isocalendar()[0:2] != now.isocalendar()[0:2])
+        elif quota.reset_period == "monthly":
+            need_reset = (last.year, last.month) != (now.year, now.month)
+        else:
+            # 未知周期：不重置
+            return quota
+
+        if not need_reset:
+            return quota
+
+        # 执行重置
+        now_iso = now.isoformat()
+        conn.execute(
+            """UPDATE quota_bucket SET
+               free_used = 0, prepaid_used = 0, postpaid_used = 0,
+               last_reset = ?
+               WHERE agent_name = ?""",
+            (now_iso, agent_name),
+        )
+        logger.debug(
+            "[quota_bucket] auto-reset for %s (period=%s)",
+            agent_name, quota.reset_period,
+        )
+        return quota.model_copy(
+            update={
+                "free_used": 0,
+                "prepaid_used": 0,
+                "postpaid_used": 0,
+                "last_reset": now_iso,
+            }
         )
 
     def _maybe_auto_reset(self, agent_name: str, quota: QuotaEntry) -> QuotaEntry:

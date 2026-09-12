@@ -27,6 +27,8 @@ export const messages = {
     'view.agentGateway.permissions.col.dailyLimit': 'Daily Limit',
     'view.agentGateway.permissions.col.priority': 'Priority',
     'view.agentGateway.permissions.col.actions': 'Actions',
+    'view.agentGateway.permissions.deleteSuccess': 'Permission rule deleted',
+    'view.agentGateway.permissions.deleteFailed': 'Failed to delete permission rule',
 
     // ── Form ──────────────────────────────────────────────────────
     'view.agentGateway.form.titleAdd': 'Add Permission Rule',
@@ -123,6 +125,8 @@ export const messages = {
     'view.agentGateway.permissions.col.dailyLimit': '日限额',
     'view.agentGateway.permissions.col.priority': '优先级',
     'view.agentGateway.permissions.col.actions': '操作',
+    'view.agentGateway.permissions.deleteSuccess': '权限规则已删除',
+    'view.agentGateway.permissions.deleteFailed': '删除权限规则失败',
 
     // ── 表单 ──────────────────────────────────────────────────────
     'view.agentGateway.form.titleAdd': '添加权限规则',
