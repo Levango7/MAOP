@@ -8,10 +8,11 @@
 :root {
   color-scheme: dark;
 
-  /* ── MAOP "Workbench" 设计语言 (2026-08-12 精修) ─────────────────────────
-   * 参照 JetBrains New UI: 中性石墨灰底 × 克制信号蓝 × 1px 描边分隔 ×
-   * 小圆角(8px 上限) × 无辉光。弃用 AI 模板式靛紫(#6366f1)与满屏渐变,
-   * 把"科技感"交给内容本身(图表/图/DAG),外壳只做安静的容器。 */
+  /* ── MAOP "Workbench" 设计语言 (2026-09-13 去AI同质化) ───────────────────
+   * 参照 JetBrains New UI: 中性石墨灰底 × 1px 描边分隔 × 小圆角(8px 上限) ×
+   * 无辉光。弃用 AI 模板式靛紫(#6366f1)与满屏渐变,把"科技感"交给内容本身。
+   * 品牌色从 Azure 蓝(#3574f0)改为青绿色(Teal-600 #0d9488)—— 青绿色在 AI
+   * 工具中极少使用,有辨识度;辅助色用琥珀色(Amber-500 #f59e0b)做强调点缀。 */
 
   /* ── Legacy aliases (backward-compatible with existing views) ────────── */
   --bg: #1b1d21;          /* workbench-100: 近黑石墨, 不带蓝紫倾向 */
@@ -22,8 +23,8 @@
   --text: #e8eaf0;
   --text2: #adb4c2;
   --text3: #7c8595;  /* legacy alias — 语义等价于 --text-faint, 新代码应使用 --text-faint */
-  --accent: #3574f0;      /* Azure-500 灵感: 工程感信号蓝, 非模板紫 */
-  --accent2: #5793f7;
+  --accent: #0d9488;      /* Teal-600: 青绿色品牌主色, 去 AI 同质化 (原 Azure-500 #3574f0) */
+  --accent2: #14b8a6;     /* Teal-500: 青绿色亮变体 */
   --success: #3fb950;
   --warn: #d29922;
   --fail: #f85149;
@@ -40,11 +41,14 @@
   --border-strong: #4e545f;
   --text-muted: #9aa3b2;
   --text-faint: #8a93a3;  /* a11y: 提亮以满足 WCAG AA 4.5:1 (原 #6e7686 仅 3.7:1) */
-  --brand: #3574f0;
-  --brand-strong: #5793f7;
-  --brand-faint: rgba(53, 116, 240, .10);
-  --brand-soft: rgba(53, 116, 240, .18);
+  --brand: #0d9488;       /* Teal-600: 青绿色主品牌色, AI 工具中罕见, 高辨识度 */
+  --brand-strong: #14b8a6;  /* Teal-500: 主品牌色亮变体 */
+  --brand-faint: rgba(13, 148, 136, .10);  /* 青绿色极淡背景 */
+  --brand-soft: rgba(13, 148, 136, .18);   /* 青绿色柔背景 */
   --brand-contrast: #ffffff;
+  /* MAOP 独有辅助色: 琥珀色(Amber-500), 用于强调与点缀, 与青绿形成互补对比 */
+  --accent-warm: #f59e0b;            /* Amber-500: 琥珀色辅助强调色 */
+  --accent-warm-soft: rgba(245, 158, 11, .12);  /* 琥珀色柔背景 */
   /* R9 修复: --on-fail / --on-warn — 按钮 danger/warn 悬停态文字色,
    * 语义为"在饱和色背景上的可读文字", 与 --brand-contrast 同族。 */
   --on-fail: var(--brand-contrast);
@@ -53,8 +57,8 @@
   --border-subtle: rgba(163, 173, 190, .13);
   --border-faint: rgba(163, 173, 190, .07);
 
-  /* ── Chart / data-viz palette — 克制的高斯冷色谱,与品牌蓝同族 ─────────── */
-  --chart-1: #3574f0;  --chart-2: #4cc2ff;  --chart-3: #3fb950;
+  /* ── Chart / data-viz palette — 克制的高斯冷色谱,与品牌青绿同族 ─────────── */
+  --chart-1: #0d9488;  --chart-2: #4cc2ff;  --chart-3: #3fb950;
   --chart-4: #d29922;  --chart-5: #9e8cfc;  --chart-6: #39c5cf;
   --chart-7: #f778ba;  --chart-8: #56d4dd;  --chart-9: #7ee787;
   --chart-10: #ff7b72;
@@ -111,7 +115,7 @@
   --shadow-lg: 0 12px 28px rgba(0, 0, 0, .42);
   --shadow-topbar: 0 1px 0 rgba(0, 0, 0, .30);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, .40);
-  --shadow-brand: 0 2px 10px rgba(53, 116, 240, .30);
+  --shadow-brand: 0 2px 10px rgba(13, 148, 136, .30);
   --shadow-card: 0 4px 16px rgba(0, 0, 0, .30);
   --shadow-modal: 0 12px 40px rgba(0, 0, 0, .50);
   --shadow-inset-highlight: inset 0 1px 0 rgba(255, 255, 255, .25);

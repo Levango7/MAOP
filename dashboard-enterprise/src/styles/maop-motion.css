@@ -1,0 +1,77 @@
+/* =========================================================================
+ * MAOP 独有微交互样式 (2026-09-13 去AI同质化)
+ * --------------------------------------------------------------------------
+ * 这些动画效果刻意区别于 AI 工具模板的常见手法:
+ *   - 卡片悬浮用 translateY 微抬 (非 scale 缩放)
+ *   - 页面切换用位移+淡入 (非纯 fade)
+ *   - 骨架屏用透明度脉冲 (非 spinner 旋转)
+ *   - 品牌下划线用渐变 scaleX (非 box-shadow)
+ *   - 状态指示器用呼吸灯扩散 (非闪烁)
+ * 所有动画尊重 prefers-reduced-motion (由 tokens.css 全局处理)。
+ * ========================================================================= */
+
+/* ── MAOP 独有: 卡片悬浮微抬效果 ──────────────────────────────────────────
+ * 非 AI 模板的 scale(1.02) 缩放, 而是垂直微抬 2px + 柔和阴影。
+ * 视觉感受: 卡片"轻轻被托起", 而非"被放大"。 */
+.maop-card-hover {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.maop-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ── MAOP 独有: 页面切换淡入位移 ──────────────────────────────────────────
+ * 非 AI 模板的纯 opacity fade, 而是从下方 8px 位移 + 淡入。
+ * 视觉感受: 内容"从下方滑入到位", 有方向感。 */
+.maop-page-enter {
+  animation: maop-page-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes maop-page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── MAOP 独有: 数据加载骨架屏脉冲 ──────────────────────────────────────────
+ * 非 AI 模板的 spinner 旋转, 而是透明度脉冲呼吸。
+ * 视觉感受: 占位区"在呼吸", 暗示数据即将到来, 比旋转更安静。 */
+.maop-skeleton-pulse {
+  animation: maop-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes maop-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── MAOP 独有: 品牌色渐变下划线 ──────────────────────────────────────────
+ * 非 AI 模板的 box-shadow 底边, 而是伪元素渐变 scaleX 动画。
+ * 视觉感受: 悬浮时一条青绿色渐变线从左到右"画出", 精致有仪式感。 */
+.maop-brand-underline {
+  position: relative;
+}
+.maop-brand-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--brand), var(--brand-strong));
+  transform: scaleX(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.maop-brand-underline:hover::after {
+  transform: scaleX(1);
+}
+
+/* ── MAOP 独有: 状态指示器呼吸灯 ──────────────────────────────────────────
+ * 非 AI 模板的闪烁(opacity 跳变), 而是品牌色光晕扩散呼吸。
+ * 视觉感受: 状态点"在呼吸", 像心跳监测仪, 有生命感但不刺眼。 */
+.maop-status-breath {
+  animation: maop-breath 2s ease-in-out infinite;
+}
+@keyframes maop-breath {
+  0%, 100% { box-shadow: 0 0 0 0 var(--brand-soft); }
+  50% { box-shadow: 0 0 0 4px var(--brand-faint); }
+}

@@ -1,4 +1,5 @@
 providers:
+  # === 直连供应商（现有，保持不变）===
   agnes:
     base_url: https://api.agnes-ai.cn/v1
     api_key_env: AGNES_API_KEY
@@ -12,6 +13,67 @@ providers:
     type: builtin
   testprov:
     api_key_env: TEST_KEY
+
+  # === 第三方中转平台（新增）===
+  openrouter:
+    type: relay
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    display_name: "OpenRouter"
+    description: "统一API网关，100+模型，按token计费"
+    features: [model_discovery, price_comparison, free_tier, streaming]
+    rate_limit_rpm: 100
+    region: international
+
+  siliconflow:
+    type: relay
+    base_url: https://api.siliconflow.cn/v1
+    api_key_env: SILICONFLOW_API_KEY
+    display_name: "硅基流动"
+    description: "国产中转平台，价格便宜，支持国产模型"
+    features: [model_discovery, price_comparison, free_tier, streaming]
+    rate_limit_rpm: 200
+    region: domestic
+
+  nvidia:
+    type: relay
+    base_url: https://integrate.api.nvidia.com/v1
+    api_key_env: NVIDIA_API_KEY
+    display_name: "NVIDIA NIM"
+    description: "GPU加速推理，适合大模型"
+    features: [model_discovery, gpu_acceleration, streaming]
+    rate_limit_rpm: 60
+    region: international
+
+  opencode-go:
+    type: relay
+    base_url: https://api.opencode-go.com/v1
+    api_key_env: OPENCODE_GO_API_KEY
+    display_name: "OpenCode Go"
+    description: "代码生成中转平台"
+    features: [model_discovery, price_comparison, streaming]
+    rate_limit_rpm: 100
+    region: international
+
+  command-go:
+    type: relay
+    base_url: https://api.command-go.com/v1
+    api_key_env: COMMAND_GO_API_KEY
+    display_name: "Command Go"
+    description: "命令行中转平台"
+    features: [model_discovery, streaming]
+    rate_limit_rpm: 100
+    region: international
+
+  zenmux:
+    type: relay
+    base_url: https://api.zenmux.com/v1
+    api_key_env: ZENMUX_API_KEY
+    display_name: "ZenMuX"
+    description: "多模型中转平台"
+    features: [model_discovery, price_comparison, streaming]
+    rate_limit_rpm: 100
+    region: international
 models:
   agnes-2.5-pro:
     model_id: agnes-2.5-pro

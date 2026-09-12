@@ -313,6 +313,9 @@ onUnmounted(() => {
 </script>
 
 <style>
+/* MAOP 独有微交互样式 (去AI同质化): 卡片微抬/页面位移/骨架脉冲/品牌下划线/呼吸灯 */
+@import './styles/maop-motion.css';
+
 :root { color-scheme: dark; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 

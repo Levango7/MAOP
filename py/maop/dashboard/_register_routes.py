@@ -463,6 +463,21 @@ def register_routers(app: FastAPI) -> None:
     _register_feedback_router(app)
     _register_agent_versions_router(app)
     _register_desktop_dispatch_routers(app)
+    _register_relay_platform_router(app)
+
+
+def _register_relay_platform_router(app: FastAPI) -> None:
+    """注册第三方中转平台管理路由（/api/relay-platforms/*）。
+
+    提供中转平台 CRUD、模型发现、价格对比、平台推荐等端点。
+    使用 try/except 守护，缺失依赖时降级为 warning 而非崩溃。
+    """
+    try:
+        from maop.dashboard.routers import relay_platform as relay_platform_router
+        app.include_router(relay_platform_router.router)
+        logger.info("[server] Router: relay-platforms enabled")
+    except ImportError as _e:
+        logger.warning("[server] Router MISSING: relay_platform (import error: %s)", _e)
 
 
 def _register_desktop_dispatch_routers(app: FastAPI) -> None:
