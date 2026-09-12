@@ -559,17 +559,17 @@ onMounted(() => {
   display: inline-flex; align-items: center; gap: var(--sp-1);
   background: var(--surface-2); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--r-md);
-  padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
+  padding: 7px var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
 .btn-ghost:hover { opacity: .9; }
 .btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
-.btn-ghost--sm { padding: 4px 8px; font-size: var(--fs-xs); }
+.btn-ghost--sm { padding: var(--sp-1) var(--sp-2); font-size: var(--fs-xs); }
 .btn-primary {
   display: inline-flex; align-items: center; gap: var(--sp-1);
   background: var(--brand); color: var(--brand-contrast);
   border: none; border-radius: var(--r-md);
-  padding: 7px 16px; font-size: var(--fs-sm); font-weight: 600;
+  padding: 7px var(--sp-4); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
 .btn-primary:hover { opacity: .9; }
@@ -730,7 +730,7 @@ onMounted(() => {
 .modal {
   position: relative;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-lg); padding: 24px;
+  border-radius: var(--r-lg); padding: var(--sp-6);
   width: calc(100% - 32px); max-width: 560px; max-height: 88vh; overflow-y: auto;
   box-shadow: var(--shadow-lg);
 }

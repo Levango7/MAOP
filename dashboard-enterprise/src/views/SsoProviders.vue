@@ -791,12 +791,12 @@ onMounted(load);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-.sso-cell { padding: 0 4px; }
-.sso-cell--name { display: flex; align-items: center; gap: 8px; }
+.sso-cell { padding: 0 var(--sp-1); }
+.sso-cell--name { display: flex; align-items: center; gap: var(--sp-2); }
 .sso-name { font-weight: 600; color: var(--text); }
 .sso-tenant { font-size: var(--fs-xs); }
 .sso-cell--actions { display: flex; gap: 6px; justify-content: flex-end; }
-.sso-status { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); }
+.sso-status { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-sm); }
 .sso-status.is-on { color: var(--success); }
 .sso-status.is-off { color: var(--text-faint); }
 
@@ -809,7 +809,7 @@ onMounted(load);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 7px 12px;
+  padding: 7px var(--sp-3);
   font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
@@ -823,7 +823,7 @@ onMounted(load);
 }
 .btn--primary:hover { opacity: 0.9; }
 .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn--sm { padding: 4px 8px; font-size: var(--fs-xs); }
+.btn--sm { padding: var(--sp-1) var(--sp-2); font-size: var(--fs-xs); }
 .btn-icon {
   display: grid;
   place-items: center;
@@ -849,14 +849,14 @@ onMounted(load);
   align-items: center;
   justify-content: center;
   z-index: var(--z-modal);
-  padding: 16px;
+  padding: var(--sp-4);
 }
 .sso-dialog {
   position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 24px;
+  padding: var(--sp-6);
   width: 100%;
   max-width: 560px;
   max-height: calc(100vh - 32px);
@@ -879,17 +879,17 @@ onMounted(load);
   transition: color var(--motion) var(--ease), background var(--motion) var(--ease);
 }
 .sso-dialog-close:hover { color: var(--text); background: var(--surface-2); }
-.sso-dialog h3 { margin: 0 0 16px; font-size: var(--fs-lg); color: var(--text); }
+.sso-dialog h3 { margin: 0 0 var(--sp-4); font-size: var(--fs-lg); color: var(--text); }
 
 /* ── 表单 ─────────────────────────────────────────────── */
-.sso-form { display: flex; flex-direction: column; gap: 12px; }
-.sso-form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
+.sso-form { display: flex; flex-direction: column; gap: var(--sp-3); }
+.sso-form label { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); }
 .sso-label { font-weight: 600; }
 .sso-input {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 8px 10px;
+  padding: var(--sp-2) 10px;
   color: var(--text);
   font-size: var(--fs-base);
   font-family: inherit;
@@ -899,7 +899,7 @@ onMounted(load);
 .sso-textarea { resize: vertical; font-family: var(--font-mono); font-size: var(--fs-sm); }
 .req { color: var(--fail); font-style: normal; margin-left: 2px; }
 
-.sso-toggles { display: flex; gap: 20px; }
+.sso-toggles { display: flex; gap: var(--sp-5); }
 .sso-toggle {
   display: inline-flex;
   flex-direction: row;
@@ -915,10 +915,10 @@ onMounted(load);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: 14px;
-  margin: 4px 0;
+  margin: var(--sp-1) 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 .sso-fieldset legend {
   font-size: var(--fs-sm);
@@ -929,7 +929,7 @@ onMounted(load);
 .sso-fieldset-desc { font-size: var(--fs-xs); color: var(--text-faint); margin: 0; }
 
 /* ── 角色映射表 ───────────────────────────────────────── */
-.sso-role-mapping { display: flex; flex-direction: column; gap: 8px; }
+.sso-role-mapping { display: flex; flex-direction: column; gap: var(--sp-2); }
 .sso-role-mapping-rows { display: flex; flex-direction: column; gap: 6px; }
 .sso-role-mapping-row {
   display: grid;
@@ -941,8 +941,8 @@ onMounted(load);
 .sso-role-mapping-empty { font-size: var(--fs-xs); color: var(--text-faint); margin: 0; }
 
 /* ── 对话框底部 ───────────────────────────────────────── */
-.sso-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-.sso-form-error { color: var(--fail); font-size: var(--fs-sm); margin-top: 8px; }
+.sso-dialog-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-4); }
+.sso-form-error { color: var(--fail); font-size: var(--fs-sm); margin-top: var(--sp-2); }
 
 /* ── 响应式 ───────────────────────────────────────────── */
 @media (max-width: 640px) {

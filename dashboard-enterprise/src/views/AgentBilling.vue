@@ -833,7 +833,7 @@ onMounted(() => {
   display: inline-flex; align-items: center; gap: var(--sp-1);
   background: var(--surface-2); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--r-md);
-  padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
+  padding: 7px var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
 .btn-ghost:hover { opacity: .9; }
@@ -843,7 +843,7 @@ onMounted(() => {
   display: inline-flex; align-items: center; gap: var(--sp-1);
   background: var(--brand); color: var(--brand-contrast);
   border: none; border-radius: var(--r-md);
-  padding: 7px 16px; font-size: var(--fs-sm); font-weight: 600;
+  padding: 7px var(--sp-4); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
 .btn-primary:hover { opacity: .9; }
@@ -1082,7 +1082,7 @@ onMounted(() => {
 }
 .summary-bucket__head {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: var(--sp-1);
 }
 .summary-bucket__label {
   font-size: var(--fs-xs); color: var(--text-muted); font-weight: 600;

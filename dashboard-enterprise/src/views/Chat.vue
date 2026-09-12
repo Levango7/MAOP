@@ -457,8 +457,8 @@ onMounted(async () => {
  * 避免两套规则互相覆盖导致分辨率抖动。JS ResizeObserver 强制同步已删除。 */
 .stream-meta {
   display: flex;
-  gap: 8px;
-  margin-top: 4px;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
   font-size: var(--fs-xs);
   color: var(--text-faint);
 }

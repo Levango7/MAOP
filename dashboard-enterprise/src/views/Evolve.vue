@@ -524,7 +524,7 @@ onMounted(() => {
 <style scoped>
 .evolve-chart-desc {
   font-size: var(--fs-sm);
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-2);
 }
 .evolve-chart-box {
   height: 280px;
@@ -707,7 +707,7 @@ onMounted(() => {
   overflow-x: auto;
   overflow-y: auto;
   max-height: 400px;
-  padding: 4px 0;
+  padding: var(--sp-1) 0;
 }
 .heatmap__table {
   border-collapse: collapse;
@@ -717,7 +717,7 @@ onMounted(() => {
 .heatmap__table th,
 .heatmap__table td {
   border: 1px solid var(--border-subtle);
-  padding: 4px 6px;
+  padding: var(--sp-1) 6px;
   text-align: center;
   white-space: nowrap;
 }

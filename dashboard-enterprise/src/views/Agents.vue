@@ -1172,7 +1172,7 @@ onMounted(() => {
 .applied-item {
   display: flex; align-items: center; gap: var(--sp-2);
   padding: var(--sp-2); background: color-mix(in srgb, var(--success) 5%, var(--surface-2));
-  border-radius: var(--r-sm); margin-bottom: 4px;
+  border-radius: var(--r-sm); margin-bottom: var(--sp-1);
 }
 .applied-cat { font-size: var(--fs-2xs); font-weight: 700; color: var(--success); text-transform: uppercase; }
 .applied-desc { font-size: var(--fs-xs); color: var(--text-muted); }
@@ -1199,7 +1199,7 @@ onMounted(() => {
 .confirm-dialog__actions { display: flex; gap: var(--sp-3); justify-content: center; }
 .close-btn {
   background: none; border: none; color: var(--text-faint);
-  cursor: pointer; padding: 4px; border-radius: var(--r-sm);
+  cursor: pointer; padding: var(--sp-1); border-radius: var(--r-sm);
   display: grid; place-items: center;
 }
 .close-btn:hover { color: var(--text); background: var(--surface-2); }
@@ -1259,7 +1259,7 @@ onMounted(() => {
 .route-model { font-size: var(--fs-xs); color: var(--text-muted); }
 .route-sep { color: var(--text-faint); font-size: var(--fs-sm); }
 .route-keywords {
-  display: flex; flex-wrap: wrap; gap: 4px;
+  display: flex; flex-wrap: wrap; gap: var(--sp-1);
   margin-top: 2px;
 }
 .kw-chip {
@@ -1285,7 +1285,7 @@ onMounted(() => {
 }
 .dec-stage {
   font-size: var(--fs-xs); font-weight: 600;
-  padding: 2px 8px; border-radius: var(--r-xs);
+  padding: 2px var(--sp-2); border-radius: var(--r-xs);
   text-align: center; text-transform: uppercase;
   letter-spacing: .03em;
 }

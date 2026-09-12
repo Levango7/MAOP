@@ -730,7 +730,7 @@ onMounted(() => {
 .subtitle {
   font-size: var(--fs-base);
   margin-right: auto;
-  padding-right: 12px;
+  padding-right: var(--sp-3);
 }
 .card-desc {
   font-size: var(--fs-sm);
@@ -739,8 +739,8 @@ onMounted(() => {
 .muted { color: var(--text-muted); }
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-.tab-switch { margin-right: 12px; }
-.embedded-tabs { margin-bottom: 12px; }
+.tab-switch { margin-right: var(--sp-3); }
+.embedded-tabs { margin-bottom: var(--sp-3); }
 
 .pending-list {
   display: flex;
@@ -750,9 +750,9 @@ onMounted(() => {
 .pending-item {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 4px 12px;
+  gap: var(--sp-1) var(--sp-3);
   align-items: center;
-  padding: 10px 12px;
+  padding: 10px var(--sp-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
 }
@@ -774,7 +774,7 @@ onMounted(() => {
   opacity: 0.6;
   cursor: progress;
 }
-.btn-sm { padding: 3px 8px; font-size: var(--fs-sm); }
+.btn-sm { padding: 3px var(--sp-2); font-size: var(--fs-sm); }
 
 /* ── 选中周期标签 ─────────────────────────────────────────── */
 .selected-cycle-tag {
@@ -782,7 +782,7 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   margin-bottom: 10px;
-  padding: 4px 10px;
+  padding: var(--sp-1) 10px;
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
@@ -794,7 +794,7 @@ onMounted(() => {
 .suggestion-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 .suggestion-item {
   border: 1px solid var(--border);
@@ -806,9 +806,9 @@ onMounted(() => {
 .suggestion-item__head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   width: 100%;
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   border: none;
   background: transparent;
   cursor: pointer;
@@ -827,13 +827,13 @@ onMounted(() => {
 }
 .suggestion-item__auto { flex: 0 0 auto; }
 .suggestion-item__body {
-  padding: 10px 12px;
+  padding: 10px var(--sp-3);
   border-top: 1px solid var(--border-subtle);
 }
 .suggestion-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 16px;
+  gap: var(--sp-2) var(--sp-4);
 }
 .suggestion-field {
   display: flex;
@@ -852,7 +852,7 @@ onMounted(() => {
 .suggestion-field__value { color: var(--text); word-break: break-all; }
 .suggestion-field__code {
   margin: 2px 0 0;
-  padding: 8px 10px;
+  padding: var(--sp-2) 10px;
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
@@ -889,7 +889,7 @@ onMounted(() => {
 .compare-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-1);
   font-size: var(--fs-xs);
 }
 .compare-field__label {
@@ -897,7 +897,7 @@ onMounted(() => {
   font-weight: 600;
 }
 .compare-select {
-  padding: 5px var(--sp-7) 5px 8px; /* 右侧留出箭头空间, 避免文字与箭头重叠 */
+  padding: 5px var(--sp-7) 5px var(--sp-2); /* 右侧留出箭头空间, 避免文字与箭头重叠 */
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background-color: var(--surface);
@@ -913,7 +913,7 @@ onMounted(() => {
   background-position: right var(--sp-2) center;
 }
 .diff-result { display: flex; flex-direction: column; gap: 10px; }
-.diff-stats { display: flex; gap: 8px; flex-wrap: wrap; }
+.diff-stats { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .diff-view {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -927,7 +927,7 @@ onMounted(() => {
   display: flex;
   align-items: baseline;
   gap: 0;
-  padding: 0 8px;
+  padding: 0 var(--sp-2);
   white-space: pre;
 }
 .diff-line__gutter {
@@ -951,9 +951,9 @@ onMounted(() => {
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
-.narrative-loading { display: flex; flex-direction: column; gap: 8px; }
+.narrative-loading { display: flex; flex-direction: column; gap: var(--sp-2); }
 .narrative-view {
-  padding: 14px 16px;
+  padding: 14px var(--sp-4);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -962,13 +962,13 @@ onMounted(() => {
   color: var(--text);
   overflow-x: auto;
 }
-.narrative-view :deep(h1) { font-size: 1.4em; font-weight: 700; margin: 0 0 8px; }
+.narrative-view :deep(h1) { font-size: 1.4em; font-weight: 700; margin: 0 0 var(--sp-2); }
 .narrative-view :deep(h2) { font-size: 1.2em; font-weight: 700; margin: 14px 0 6px; }
-.narrative-view :deep(h3) { font-size: 1.05em; font-weight: 600; margin: 12px 0 4px; }
-.narrative-view :deep(h4) { font-size: 1em; font-weight: 600; margin: 10px 0 4px; }
-.narrative-view :deep(p) { margin: 0 0 8px; }
+.narrative-view :deep(h3) { font-size: 1.05em; font-weight: 600;   margin: var(--sp-3) 0 var(--sp-1); }
+.narrative-view :deep(h4) { font-size: 1em; font-weight: 600;   margin: 10px 0 var(--sp-1); }
+.narrative-view :deep(p) { margin: 0 0 var(--sp-2); }
 .narrative-view :deep(ul),
-.narrative-view :deep(ol) { margin: 0 0 8px; padding-left: 22px; }
+.narrative-view :deep(ol) { margin: 0 0 var(--sp-2); padding-left: 22px; }
 .narrative-view :deep(li) { margin: 2px 0; }
 .narrative-view :deep(strong) { font-weight: 700; }
 .narrative-view :deep(.md-code-inline) {
@@ -982,7 +982,7 @@ onMounted(() => {
   display: block;
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
-  padding: 10px 12px;
+  padding: 10px var(--sp-3);
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
@@ -990,8 +990,8 @@ onMounted(() => {
   white-space: pre;
 }
 .narrative-view :deep(blockquote) {
-  margin: 0 0 8px;
-  padding: 6px 12px;
+  margin: 0 0 var(--sp-2);
+  padding: 6px var(--sp-3);
   border-left: 3px solid var(--border-strong);
   color: var(--text-muted);
 }

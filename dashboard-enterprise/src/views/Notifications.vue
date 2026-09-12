@@ -553,7 +553,7 @@ onMounted(loadAll);
 }
 .act-btn:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-2); }
 .act-btn:disabled { opacity: .55; cursor: not-allowed; }
-.act-btn.small { padding: 4px 6px; }
+.act-btn.small { padding: var(--sp-1) 6px; }
 .act-btn.ghost { background: transparent; }
 .act-btn.danger { color: var(--fail); }
 .act-btn.danger:hover:not(:disabled) { border-color: var(--fail); background: var(--fail-soft); }
@@ -591,7 +591,7 @@ onMounted(loadAll);
 .notif-row__icon.ic-warning { color: var(--warn); }
 .notif-row__icon.ic-error { color: var(--fail); }
 .notif-row__icon.ic-success { color: var(--success); }
-.notif-row__main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.notif-row__main { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
 .notif-row__title-line { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .notif-row__title { font-weight: 600; color: var(--text); }
 .notif-row__message {
@@ -602,7 +602,7 @@ onMounted(loadAll);
   white-space: nowrap;
 }
 .notif-row__time { font-size: var(--fs-xs); color: var(--text-faint); white-space: nowrap; }
-.notif-row__actions { display: inline-flex; gap: 4px; }
+.notif-row__actions { display: inline-flex; gap: var(--sp-1); }
 
 .notif-loadmore { display: flex; justify-content: center; padding: var(--sp-3); }
 .notif-no-more { text-align: center; font-size: var(--fs-xs); color: var(--text-faint); padding: var(--sp-2); }

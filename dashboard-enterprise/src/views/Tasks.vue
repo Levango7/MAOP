@@ -499,7 +499,7 @@ onUnmounted(() => {
 .act-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-1);
   padding: var(--sp-1) var(--sp-3);
   background: var(--surface-2);
   border: 1px solid var(--border);

@@ -785,7 +785,7 @@ onUnmounted(() => {
 .heatmap__table th,
 .heatmap__table td {
   border: 1px solid var(--border-subtle);
-  padding: 4px 6px;
+  padding: var(--sp-1) 6px;
   text-align: center;
 }
 .heatmap__corner,
@@ -807,10 +807,10 @@ onUnmounted(() => {
 .live-hint {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-1);
   font-size: var(--fs-xs);
   color: var(--text-muted);
-  padding: 2px 8px;
+  padding: 2px var(--sp-2);
   border-radius: var(--r-full);
   background: var(--surface-2);
 }
@@ -859,7 +859,7 @@ onUnmounted(() => {
 .rule-row__state {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-1);
   font-size: var(--fs-xs);
   font-weight: 600;
 }
@@ -869,7 +869,7 @@ onUnmounted(() => {
 
 /* ── 规则表单 ── */
 .rule-form { display: flex; flex-direction: column; gap: var(--sp-2); }
-.form-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
+.form-label { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
 .form-input {
   padding: var(--sp-2) var(--sp-3);
   background: var(--surface-2);
@@ -886,7 +886,7 @@ onUnmounted(() => {
 .act-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-1);
   padding: var(--sp-1) var(--sp-3);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -899,7 +899,7 @@ onUnmounted(() => {
 }
 .act-btn:hover { border-color: var(--border-strong); background: var(--surface-2); }
 .act-btn:disabled { opacity: .5; cursor: not-allowed; }
-.act-btn.small { padding: 3px 8px; font-size: var(--fs-xs); }
+.act-btn.small { padding: 3px var(--sp-2); font-size: var(--fs-xs); }
 .act-btn.ghost { background: transparent; }
 .act-btn.danger { color: var(--fail); }
 .act-btn.danger:hover { background: var(--fail-soft); border-color: var(--fail); }

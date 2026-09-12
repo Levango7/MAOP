@@ -570,7 +570,7 @@ onMounted(load);
 .btn {
   display: inline-flex; align-items: center; gap: 5px;
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
+  border-radius: var(--r-md); padding: 7px var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
 .btn:hover { opacity: .9; }
@@ -578,7 +578,7 @@ onMounted(load);
   background: var(--brand); color: var(--brand-contrast); border: none;
 }
 .btn--primary:disabled { opacity: .5; cursor: not-allowed; }
-.btn--sm { padding: 4px 8px; font-size: var(--fs-xs); }
+.btn--sm { padding: var(--sp-1) var(--sp-2); font-size: var(--fs-xs); }
 .btn-icon {
   display: grid; place-items: center;
   width: 28px; height: 28px;
@@ -608,8 +608,8 @@ onMounted(load);
   font-size: var(--fs-xs); font-weight: 700; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: .05em;
 }
-.ak-cell { padding: 0 4px; }
-.ak-cell--scopes { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ak-cell { padding: 0 var(--sp-1); }
+.ak-cell--scopes { display: flex; align-items: center; gap: var(--sp-1); flex-wrap: wrap; }
 .ak-cell--actions { display: flex; gap: 6px; justify-content: flex-end; }
 .ak-name { font-weight: 600; color: var(--text); }
 .ak-mono { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text); background: var(--surface-2); padding: 1px 6px; border-radius: var(--r-sm); }
@@ -626,7 +626,7 @@ onMounted(load);
 .modal {
   position: relative;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-lg); padding: 24px;
+  border-radius: var(--r-lg); padding: var(--sp-6);
   width: calc(100% - 32px); max-width: 520px; max-height: 88vh; overflow-y: auto;
   box-shadow: var(--shadow-lg);
 }
@@ -643,20 +643,20 @@ onMounted(load);
 .modal-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-4); }
 
 /* ── 表单 ── */
-.form { display: flex; flex-direction: column; gap: 12px; }
-.form-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
+.form { display: flex; flex-direction: column; gap: var(--sp-3); }
+.form-label { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
 
 
 /* ── 权限范围分组 ── */
-.scope-groups { display: flex; flex-wrap: wrap; gap: 8px; }
+.scope-groups { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .scope-group {
   background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 8px 10px;
+  border-radius: var(--r-md); padding: var(--sp-2) 10px;
   min-width: 140px;
 }
 .scope-group__head { font-size: var(--fs-xs); font-weight: 700; color: var(--text); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
 .scope-chip {
-  display: inline-flex; align-items: center; gap: 4px;
+  display: inline-flex; align-items: center; gap: var(--sp-1);
   padding: 3px 6px; margin: 2px 2px 0 0;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-sm); font-size: var(--fs-xs); cursor: pointer; color: var(--text);
@@ -668,9 +668,9 @@ onMounted(load);
 .key-warn-icon { color: var(--warn); align-self: flex-start; }
 .key-warn { font-size: var(--fs-sm); color: var(--text-muted); margin: 0; line-height: 1.5; }
 .key-box {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: var(--sp-2);
   background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 10px 12px;
+  border-radius: var(--r-md); padding: 10px var(--sp-3);
 }
 .key-full {
   flex: 1; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text);
@@ -680,24 +680,24 @@ onMounted(load);
 /* ── 详情面板 ── */
 .detail-content { display: flex; flex-direction: column; gap: var(--sp-4); }
 .detail-section { display: flex; flex-direction: column; gap: 6px; }
-.detail-section__title { font-size: var(--fs-sm); font-weight: 700; color: var(--text); margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
-.detail-dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: var(--fs-sm); }
+.detail-section__title { font-size: var(--fs-sm); font-weight: 700; color: var(--text); margin: var(--sp-2) 0 var(--sp-1); text-transform: uppercase; letter-spacing: .04em; }
+.detail-dl { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-1) var(--sp-3); font-size: var(--fs-sm); }
 .detail-dl dt { color: var(--text-muted); }
 .detail-dl dd { color: var(--text); margin: 0; }
-.detail-value { font-size: var(--fs-base); color: var(--text); margin: 0 0 8px; }
-.scope-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.detail-value { font-size: var(--fs-base); color: var(--text); margin: 0 0 var(--sp-2); }
+.scope-badges { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
 
 /* ── 统计摘要 ── */
-.stat-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.stat-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .stat-item {
   background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 8px 10px; text-align: center;
+  border-radius: var(--r-md); padding: var(--sp-2) 10px; text-align: center;
 }
 .stat-item__label { display: block; font-size: var(--fs-2xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
 .stat-item__value { display: block; font-size: var(--fs-lg); font-weight: 700; color: var(--text); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
 /* ── 柱状图(调用量趋势) ── */
-.chart-block { margin-top: 12px; }
+.chart-block { margin-top: var(--sp-3); }
 .chart-block__title { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
 .bar-chart { display: flex; align-items: flex-end; gap: 2px; height: 60px; }
 .bar-chart__col { flex: 1; display: flex; align-items: flex-end; height: 100%; }
@@ -709,12 +709,12 @@ onMounted(load);
 .bar-chart__axis {
   display: flex; justify-content: space-between;
   font-size: var(--fs-xs); color: var(--text-faint);
-  margin-top: 4px; font-variant-numeric: tabular-nums;
+  margin-top: var(--sp-1); font-variant-numeric: tabular-nums;
 }
 
 /* ── 状态码分布 ── */
-.dist-rows { display: flex; flex-direction: column; gap: 4px; }
-.dist-row { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 8px; font-size: var(--fs-xs); }
+.dist-rows { display: flex; flex-direction: column; gap: var(--sp-1); }
+.dist-row { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: var(--sp-2); font-size: var(--fs-xs); }
 .dist-row__label { color: var(--text-muted); font-family: var(--font-mono); }
 .dist-row__bar { height: 8px; background: var(--surface-2); border-radius: var(--r-full); overflow: hidden; }
 .dist-row__fill { height: 100%; border-radius: var(--r-full); transition: width var(--motion) var(--ease); }

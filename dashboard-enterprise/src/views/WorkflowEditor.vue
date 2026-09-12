@@ -756,11 +756,11 @@ defineExpose({
 }
 .wf-inspector__hint { font-size: var(--fs-xs); color: var(--text-muted); max-width: 220px; }
 .wf-inspector__form { display: flex; flex-direction: column; gap: var(--sp-2); }
-.wf-field { display: flex; flex-direction: column; gap: 4px; }
+.wf-field { display: flex; flex-direction: column; gap: var(--sp-1); }
 .wf-field__label { font-size: var(--fs-xs); color: var(--text-muted); font-weight: 600; }
 .wf-field__input, .wf-field__textarea {
   font-size: var(--fs-sm);
-  padding: 6px 8px;
+  padding: 6px var(--sp-2);
 }
 .wf-field__textarea { min-height: 80px; resize: vertical; font-family: var(--font-mono); }
 

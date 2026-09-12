@@ -541,7 +541,7 @@ onMounted(load);
 .lic-btn {
   display: inline-flex; align-items: center; gap: 5px;
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
+  border-radius: var(--r-md); padding: 7px var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease), border-color var(--motion) var(--ease);
   font-family: inherit;
 }
@@ -565,7 +565,7 @@ onMounted(load);
 .lic-dialog {
   position: relative;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-lg); padding: 24px;
+  border-radius: var(--r-lg); padding: var(--sp-6);
   width: calc(100% - 32px); max-width: 520px;
   box-shadow: var(--shadow-lg);
   max-height: calc(100vh - 48px); overflow-y: auto;
@@ -580,31 +580,31 @@ onMounted(load);
   transition: color var(--motion) var(--ease), background var(--motion) var(--ease);
 }
 .lic-dialog__close:hover { color: var(--text); background: var(--surface-2); }
-.lic-dialog h3 { margin: 0 0 16px; font-size: var(--fs-lg); color: var(--text); }
+.lic-dialog h3 { margin: 0 0 var(--sp-4); font-size: var(--fs-lg); color: var(--text); }
 
 /* ── Form ────────────────────────────────────────────────────── */
 .lic-fieldset {
   border: 1px solid var(--border); border-radius: var(--r-md);
-  padding: 12px; margin: 0 0 12px;
+  padding: var(--sp-3); margin: 0 0 var(--sp-3);
 }
 .lic-fieldset legend {
   font-size: var(--fs-xs); font-weight: 700; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: .05em; padding: 0 6px;
 }
 .lic-field {
-  display: flex; flex-direction: column; gap: 4px;
-  font-size: var(--fs-sm); color: var(--text-muted); margin-bottom: 8px;
+  display: flex; flex-direction: column; gap: var(--sp-1);
+  font-size: var(--fs-sm); color: var(--text-muted); margin-bottom: var(--sp-2);
 }
 .lic-field:last-child { margin-bottom: 0; }
 .lic-input {
   background: var(--bg); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 8px 10px; color: var(--text); font-size: var(--fs-base);
+  border-radius: var(--r-md); padding: var(--sp-2) 10px; color: var(--text); font-size: var(--fs-base);
   font-family: inherit; transition: border-color var(--motion) var(--ease);
 }
 .lic-input:focus { outline: none; border-color: var(--brand); }
-.lic-quota-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.lic-form-error { color: var(--fail); font-size: var(--fs-sm); margin: 8px 0; }
-.lic-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.lic-quota-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.lic-form-error { color: var(--fail); font-size: var(--fs-sm); margin: var(--sp-2) 0; }
+.lic-dialog-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-4); }
 
 /* ── Detail drawer content ───────────────────────────────────── */
 .lic-detail { display: flex; flex-direction: column; gap: var(--sp-4); }

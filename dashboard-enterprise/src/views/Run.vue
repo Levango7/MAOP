@@ -413,7 +413,7 @@ const dagLayout = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 6px var(--sp-3);
   border: 1px solid var(--brand);
   border-radius: var(--r-md, 6px);
   background: var(--brand);
@@ -436,7 +436,7 @@ const dagLayout = computed(() => {
   align-items: center;
   justify-content: center;
   z-index: var(--z-modal);
-  padding: 16px;
+  padding: var(--sp-4);
 }
 .split-dialog {
   background: var(--surface);
@@ -452,13 +452,13 @@ const dagLayout = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: var(--sp-4) var(--sp-5);
   border-bottom: 1px solid var(--border);
 }
 .split-dialog__title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   color: var(--text);
 }
 .split-dialog__title h2 {
@@ -471,23 +471,23 @@ const dagLayout = computed(() => {
   border: none;
   cursor: pointer;
   color: var(--text-muted);
-  padding: 4px;
+  padding: var(--sp-1);
   border-radius: var(--r-sm, 6px);
   display: inline-flex;
 }
 .split-dialog__close:hover { background: var(--surface-hover); }
 .split-dialog__body {
-  padding: 20px;
+  padding: var(--sp-5);
   overflow-y: auto;
   flex: 1;
 }
 .split-dialog__desc {
-  margin: 0 0 16px;
+  margin: 0 0 var(--sp-4);
   color: var(--text-muted);
   font-size: var(--fs-sm);
   line-height: 1.5;
 }
-.split-form { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.split-form { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--sp-4); }
 .split-form__label {
   font-size: var(--fs-sm);
   font-weight: 500;
@@ -497,7 +497,7 @@ const dagLayout = computed(() => {
 .split-form__input {
   border: 1px solid var(--border);
   border-radius: var(--r-md, 8px);
-  padding: 8px 10px;
+  padding: var(--sp-2) 10px;
   font-size: var(--fs-sm);
   font-family: inherit;
   background: var(--surface);
@@ -516,23 +516,23 @@ const dagLayout = computed(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   background: var(--fail-soft);
   border: 1px solid var(--fail);
   border-radius: var(--r-md, 8px);
   color: var(--fail);
   font-size: var(--fs-sm);
-  margin-bottom: 12px;
+  margin-bottom: var(--sp-3);
 }
 
 /* ── 拆分结果 ─────────────────────────────────────────── */
-.split-result { margin-top: 16px; }
+.split-result { margin-top: var(--sp-4); }
 .split-result__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
+  margin-bottom: var(--sp-3);
+  padding-bottom: var(--sp-2);
   border-bottom: 1px solid var(--border);
 }
 .split-result__title { font-weight: 600; color: var(--text); }
@@ -543,10 +543,10 @@ const dagLayout = computed(() => {
   background: var(--surface-alt);
   border: 1px solid var(--border);
   border-radius: var(--r-md, 8px);
-  padding: 12px;
+  padding: var(--sp-3);
   overflow-x: auto;
   overflow-y: hidden;
-  margin-bottom: 16px;
+  margin-bottom: var(--sp-4);
   /* 窄屏约束: 防止 SVG 撑破容器 */
   max-width: 100%;
 }
@@ -578,9 +578,9 @@ const dagLayout = computed(() => {
 }
 
 /* 子任务列表 */
-.split-subtasks { display: flex; flex-direction: column; gap: 8px; }
+.split-subtasks { display: flex; flex-direction: column; gap: var(--sp-2); }
 .split-subtask {
-  padding: 10px 12px;
+  padding: 10px var(--sp-3);
   background: var(--surface-alt);
   border: 1px solid var(--border);
   border-radius: var(--r-md, 8px);
@@ -622,15 +622,15 @@ const dagLayout = computed(() => {
 .split-dialog__footer {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 20px;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-5);
   border-top: 1px solid var(--border);
 }
 .split-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: var(--sp-2) var(--sp-4);
   border-radius: var(--r-md, 8px);
   font-size: var(--fs-sm);
   font-weight: 500;

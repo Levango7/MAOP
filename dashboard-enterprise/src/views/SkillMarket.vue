@@ -277,7 +277,7 @@ onMounted(load);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 8px 10px 8px 32px;
+  padding: var(--sp-2) 10px var(--sp-2) var(--sp-7);
   font-size: var(--fs-base);
   color: var(--text);
 }
@@ -286,7 +286,7 @@ onMounted(load);
   background-color: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 8px var(--sp-7) 8px 10px; /* 右侧留出箭头空间, 避免文字与箭头重叠 */
+  padding: var(--sp-2) var(--sp-7) var(--sp-2) 10px; /* 右侧留出箭头空间, 避免文字与箭头重叠 */
   font-size: var(--fs-base);
   color: var(--text);
   cursor: pointer;
@@ -337,14 +337,14 @@ onMounted(load);
 .btn {
   display: inline-flex; align-items: center; gap: 5px;
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
+  border-radius: var(--r-md); padding: 7px var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion, 180ms) var(--ease, cubic-bezier(.4, 0, .2, 1));
 }
 .btn:hover { opacity: .9; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn--primary { background: var(--brand); color: var(--brand-contrast); border: none; }
 .btn--ghost { background: transparent; }
-.btn--sm { padding: 4px 8px; font-size: var(--fs-xs); }
+.btn--sm { padding: var(--sp-1) var(--sp-2); font-size: var(--fs-xs); }
 
 /* ── 响应式断点 ── */
 @media (max-width: 900px) {

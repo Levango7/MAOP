@@ -243,14 +243,14 @@ onMounted(fetchUsers);
 .btn-primary {
   display: inline-flex; align-items: center; gap: 5px;
   background: var(--brand); color: var(--brand-contrast); border: none;
-  border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
+  border-radius: var(--r-md); padding: 7px var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
 .btn-primary:hover { opacity: .9; }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .btn-secondary {
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
+  border-radius: var(--r-md); padding: 7px var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer;
 }
 .btn-icon {
@@ -264,8 +264,8 @@ onMounted(fetchUsers);
 .btn-icon--danger:hover { color: var(--fail); border-color: var(--fail); }
 
 .users-locked {
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
-  padding: 60px 20px; color: var(--text-faint); text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-3);
+  padding: 60px var(--sp-5); color: var(--text-faint); text-align: center;
 }
 
 .users-table {
@@ -286,7 +286,7 @@ onMounted(fetchUsers);
   font-size: var(--fs-xs); font-weight: 700; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: .05em;
 }
-.users-cell { padding: 0 4px; }
+.users-cell { padding: 0 var(--sp-1); }
 .users-cell--name { display: flex; align-items: center; gap: 6px; }
 .users-cell--actions { display: flex; gap: 6px; justify-content: flex-end; }
 
@@ -303,7 +303,7 @@ onMounted(fetchUsers);
 }
 
 .users-role {
-  display: inline-block; padding: 1px 6px; margin-right: 4px;
+  display: inline-block; padding: 1px 6px; margin-right: var(--sp-1);
   border-radius: var(--r-sm); font-size: var(--fs-2xs); font-weight: 600;
   background: var(--surface-3); color: var(--text-muted);
 }
@@ -321,7 +321,7 @@ onMounted(fetchUsers);
 .users-dialog {
   position: relative;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-lg); padding: 24px;
+  border-radius: var(--r-lg); padding: var(--sp-6);
   width: calc(100% - 32px); max-width: 440px;
   box-shadow: var(--shadow-lg);
 }
@@ -334,26 +334,26 @@ onMounted(fetchUsers);
   transition: color var(--motion) var(--ease), background var(--motion) var(--ease);
 }
 .users-dialog-close:hover { color: var(--text); background: var(--surface-2); }
-.users-dialog h3 { margin: 0 0 16px; font-size: var(--fs-lg); color: var(--text); }
-.users-form { display: flex; flex-direction: column; gap: 12px; }
-.users-form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
+.users-dialog h3 { margin: 0 0 var(--sp-4); font-size: var(--fs-lg); color: var(--text); }
+.users-form { display: flex; flex-direction: column; gap: var(--sp-3); }
+.users-form label { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); }
 .users-form input[type="text"], .users-form input[type="password"] {
   background: var(--bg); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 8px 10px; color: var(--text); font-size: var(--fs-base);
+  border-radius: var(--r-md); padding: var(--sp-2) 10px; color: var(--text); font-size: var(--fs-base);
 }
 .users-form input:focus { outline: none; border-color: var(--brand); }
 .users-form input:disabled { opacity: .6; }
 
 .users-roles-pick { display: flex; flex-wrap: wrap; gap: 6px; }
 .users-role-chip {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 8px; background: var(--surface-2); border: 1px solid var(--border);
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2); background: var(--surface-2); border: 1px solid var(--border);
   border-radius: var(--r-sm); font-size: var(--fs-xs); cursor: pointer; flex-direction: row;
 }
 .users-role-chip input { margin: 0; }
 
-.users-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-.users-form-error { color: var(--fail); font-size: var(--fs-sm); margin-top: 8px; }
+.users-dialog-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-4); }
+.users-form-error { color: var(--fail); font-size: var(--fs-sm); margin-top: var(--sp-2); }
 
 @media (max-width: 640px) {
   .users-row { grid-template-columns: 40px 1fr 1fr 60px; }

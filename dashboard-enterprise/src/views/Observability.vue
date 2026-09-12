@@ -408,13 +408,13 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .pipeline-list, .config-list, .health-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 .pipeline-row, .config-row, .health-row {
   display: grid;
   grid-template-columns: 14px 1fr auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   padding: 6px 0;
   border-bottom: 1px solid var(--border-soft);
 }
@@ -482,8 +482,8 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .metric-header, .metric-row {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 2fr;
-  gap: 12px;
-  padding: 8px 4px;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-1);
   align-items: center;
 }
 .metric-header {
@@ -513,7 +513,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .type-tag {
   display: inline-block;
-  padding: 1px 8px;
+  padding: 1px var(--sp-2);
   border-radius: var(--r-lg);
   font-size: var(--fs-xs);
   font-weight: 600;
@@ -536,7 +536,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   background: none;
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  padding: 4px 8px;
+  padding: var(--sp-1) var(--sp-2);
   cursor: pointer;
   color: var(--text-muted);
   display: inline-flex;
@@ -548,18 +548,18 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .health-skel, .config-skel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 
 .trace-info {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 .trace-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   font-size: var(--fs-base);
   color: var(--text);
 }
@@ -567,11 +567,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .trace-hint {
   font-size: var(--fs-sm);
   color: var(--text-faint);
-  padding-left: 24px;
+  padding-left: var(--sp-6);
 }
 .trace-enable {
   font-size: var(--fs-sm);
-  padding-left: 24px;
+  padding-left: var(--sp-6);
   color: var(--text-muted);
 }
 .trace-enable code {

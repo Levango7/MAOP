@@ -292,7 +292,7 @@ function renderMarkdown(md) {
 }
 .doc-cat__list { list-style: none; margin: 0; padding: 0; }
 .doc-cat__item {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: var(--sp-2);
   width: 100%; text-align: left;
   padding: 7px 10px;
   border: none; background: transparent;
@@ -379,7 +379,7 @@ function renderMarkdown(md) {
 .docs-article :deep(ul), .docs-article :deep(ol) {
   margin: 0 0 var(--sp-3); padding-left: var(--sp-5);
 }
-.docs-article :deep(li) { margin-bottom: 4px; color: var(--text-muted); }
+.docs-article :deep(li) { margin-bottom: var(--sp-1); color: var(--text-muted); }
 .docs-article :deep(blockquote) {
   border-left: 3px solid var(--brand);
   background: var(--brand-faint);

@@ -481,13 +481,13 @@ onUnmounted(() => {
   font-size: var(--fs-xs);
   color: var(--text-faint);
   font-family: var(--font-mono);
-  margin-top: 4px;
+  margin-top: var(--sp-1);
   word-break: break-word;
 }
 /* v4.5.0: DAG execution input */
 .dag-exec-input {
   font-size: var(--fs-sm);
-  padding: 4px 8px;
+  padding: var(--sp-1) var(--sp-2);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--bg-card);
@@ -505,7 +505,7 @@ onUnmounted(() => {
 /* F1-02: Agent 健康度面板 */
 .agent-health-refresh {
   font-size: var(--fs-sm);
-  padding: 4px 10px;
+  padding: var(--sp-1) 10px;
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--bg-card);
@@ -519,8 +519,8 @@ onUnmounted(() => {
 .agent-health-empty {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
   color: var(--text-faint);
   font-size: var(--fs-sm);
 }
@@ -534,8 +534,8 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 1.4fr 1.6fr 0.9fr 0.8fr 1.6fr 0.9fr;
   align-items: center;
-  gap: 8px;
-  padding: 6px 4px;
+  gap: var(--sp-2);
+  padding: 6px var(--sp-1);
   border-bottom: 1px solid var(--border-subtle);
 }
 .agent-health-row:last-child {
@@ -604,8 +604,8 @@ onUnmounted(() => {
 .status-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
+  gap: var(--sp-1);
+  padding: 2px var(--sp-2);
   border-radius: var(--r-xl);
   font-size: var(--fs-xs);
   font-weight: 500;
@@ -639,8 +639,8 @@ onUnmounted(() => {
 .agent-health-config {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 8px 4px 4px;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-1) var(--sp-1);
   margin-top: 6px;
   border-top: 1px dashed var(--border-subtle);
   font-size: var(--fs-xs);
