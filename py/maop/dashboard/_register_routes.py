@@ -486,6 +486,9 @@ def _register_desktop_dispatch_routers(app: FastAPI) -> None:
     from maop.dashboard.routers import model_gateway as model_gateway_router
     app.include_router(model_gateway_router.router)
 
+    from maop.dashboard.routers import agent_collaboration as agent_collaboration_router
+    app.include_router(agent_collaboration_router.router)
+
 
 # ── Health ─────────────────────────────────────────────────────────
 async def health() -> Any:

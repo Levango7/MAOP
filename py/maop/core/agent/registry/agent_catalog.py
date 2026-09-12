@@ -102,6 +102,8 @@ class AgentDescriptor(BaseModel):
     billing_model: BillingModel = Field(default=BillingModel.BLACKBOX, description="计费模式")
     billing_config: dict[str, Any] = Field(default_factory=dict, description="完整计费配置")
     auth_method: AuthMethod = Field(default=AuthMethod.NONE, description="授权方式")
+    # 区域归属：domestic=国产工具，international=国际工具。用于国产优先路由策略。
+    region: str = Field(default="international", description="区域：domestic(国产) | international(国际)")
     auth_credentials_ref: str = Field(default="", max_length=512, description="凭据引用")
     max_concurrent: int = Field(default=1, ge=1, description="最大并发数")
     rate_limit_per_min: int = Field(default=0, ge=0, description="每分钟速率限制")

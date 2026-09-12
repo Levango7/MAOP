@@ -153,13 +153,14 @@ class TestListStrategies:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ok"
-        assert data["count"] == 5
+        assert data["count"] == 6
         values = [s["value"] for s in data["strategies"]]
         assert "capability_match" in values
         assert "cost_optimized" in values
         assert "load_balanced" in values
         assert "priority" in values
         assert "round_robin" in values
+        assert "domestic_first" in values
 
 
 # ── 3. POST /api/agent-router/acquire ────────────────────────────

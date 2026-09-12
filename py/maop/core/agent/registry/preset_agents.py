@@ -196,6 +196,7 @@ def get_preset_agents() -> list[AgentDescriptor]:
             max_concurrent=1,
             timeout_s=120,
             fallback_agents=["cursor"],
+            region="domestic",  # 国产：字节跳动
         ),
         # 3. Claude Code — Anthropic 按 token 计费 CLI（长上下文 + 推理）
         _make_descriptor(
@@ -270,6 +271,7 @@ def get_preset_agents() -> list[AgentDescriptor]:
             max_concurrent=2,
             timeout_s=120,
             fallback_agents=["cursor"],
+            region="domestic",  # 国产：华为云
         ),
         # 8. Codex — OpenAI 按 token 计费 CLI
         _make_descriptor(
@@ -315,6 +317,7 @@ def get_preset_agents() -> list[AgentDescriptor]:
             max_concurrent=1,
             timeout_s=60,
             fallback_agents=["cursor"],
+            region="domestic",  # 国产：ZCode
         ),
 
         # ════════════════════════════════════════════════════════════
@@ -436,6 +439,7 @@ def get_preset_agents() -> list[AgentDescriptor]:
             max_concurrent=1,
             timeout_s=120,
             fallback_agents=["trae", "cursor"],
+            region="domestic",  # 国产：阿里巴巴
         ),
         # 18. CatPaw — 美团 blackbox AI 代码编辑器
         _make_descriptor(
@@ -452,6 +456,7 @@ def get_preset_agents() -> list[AgentDescriptor]:
             max_concurrent=1,
             timeout_s=120,
             fallback_agents=["cursor", "trae"],
+            region="domestic",  # 国产：美团
         ),
         # 19. DeepSeek Harness — DeepSeek 按 token 计费 CLI（推理 + 长上下文 + 终端）
         _make_descriptor(
@@ -468,6 +473,7 @@ def get_preset_agents() -> list[AgentDescriptor]:
             max_concurrent=2,
             timeout_s=180,
             fallback_agents=["deepseek", "claude-code"],
+            region="domestic",  # 国产：DeepSeek
         ),
         # 20. CodeBuddy — 腾讯 blackbox AI 代码编辑器
         _make_descriptor(
@@ -484,6 +490,7 @@ def get_preset_agents() -> list[AgentDescriptor]:
             max_concurrent=1,
             timeout_s=120,
             fallback_agents=["cursor", "trae"],
+            region="domestic",  # 国产：腾讯
         ),
         # 21. MarsCode — 字节跳动免费 AI 代码编辑器
         _make_descriptor(
@@ -500,6 +507,7 @@ def get_preset_agents() -> list[AgentDescriptor]:
             max_concurrent=1,
             timeout_s=120,
             fallback_agents=["trae", "cursor"],
+            region="domestic",  # 国产：字节跳动
         ),
         # 22. Zed — Zed Industries 免费 AI 代码编辑器
         _make_descriptor(
@@ -694,6 +702,7 @@ def get_preset_agents() -> list[AgentDescriptor]:
             max_concurrent=1,
             timeout_s=60,
             fallback_agents=["qoder", "cursor"],
+            region="domestic",  # 国产：阿里巴巴
         ),
         # 34. CodeGeeX — 智谱AI 免费 IDE 插件
         _make_descriptor(
@@ -710,6 +719,7 @@ def get_preset_agents() -> list[AgentDescriptor]:
             max_concurrent=1,
             timeout_s=60,
             fallback_agents=["zcode", "cursor"],
+            region="domestic",  # 国产：智谱AI
         ),
         # 35. Baidu Comate — 百度免费 IDE 插件
         _make_descriptor(
@@ -726,6 +736,7 @@ def get_preset_agents() -> list[AgentDescriptor]:
             max_concurrent=1,
             timeout_s=60,
             fallback_agents=["cursor", "continue"],
+            region="domestic",  # 国产：百度
         ),
 
         # ════════════════════════════════════════════════════════════

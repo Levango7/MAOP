@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS agent_catalog (
     billing_model        TEXT DEFAULT 'blackbox',
     billing_config       TEXT DEFAULT '{}',
     auth_method          TEXT DEFAULT 'none',
+    region               TEXT DEFAULT 'international',
     auth_credentials_ref TEXT DEFAULT '',
     max_concurrent       INTEGER DEFAULT 1,
     rate_limit_per_min   INTEGER DEFAULT 0,
@@ -72,7 +73,7 @@ _COLUMNS = (
     "name", "display_name", "vendor", "version",
     "adapter_type", "adapter_config", "capabilities",
     "max_context_length", "supports_streaming", "supports_tool_call",
-    "billing_model", "billing_config", "auth_method", "auth_credentials_ref",
+    "billing_model", "billing_config", "auth_method", "region", "auth_credentials_ref",
     "max_concurrent", "rate_limit_per_min", "timeout_s", "retry_count",
     "fallback_agents", "enabled", "healthy", "last_health_check",
     "created_at", "updated_at",
@@ -100,9 +101,30 @@ class AgentCatalogStore:
 
     # ── 建表 ──────────────────────────────────────────────────────
     def ensure_table(self) -> None:
-        """幂等建表：重复调用安全（CREATE TABLE IF NOT EXISTS）。"""
+        """幂等建表：重复调用安全（CREATE TABLE IF NOT EXISTS）。
+
+        包含向后兼容的列迁移：旧表缺少 ``region`` 列时自动
+        ALTER TABLE ADD COLUMN，已有数据默认 'international'。
+        """
         with self._connect() as conn:
             conn.executescript(_AGENT_CATALOG_DDL)
+            # 迁移：为旧表补充 region 列（SQLite 不支持 ADD COLUMN IF NOT EXISTS）
+            self._migrate_add_region(conn)
+
+    @staticmethod
+    def _migrate_add_region(conn: sqlite3.Connection) -> None:
+        """若 agent_catalog 表缺少 region 列，则 ALTER TABLE ADD COLUMN。
+
+        已有数据默认 region='international'，保证向后兼容。
+        幂等：列已存在时跳过。
+        """
+        cursor = conn.execute("PRAGMA table_info(agent_catalog)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "region" not in columns:
+            conn.execute(
+                "ALTER TABLE agent_catalog ADD COLUMN region TEXT DEFAULT 'international'"
+            )
+            logger.info("[agent_catalog_store] migrated: added 'region' column with default 'international'")
 
     # ── Upsert ────────────────────────────────────────────────────
     def upsert(self, data: dict[str, Any]) -> None:
@@ -130,6 +152,7 @@ class AgentCatalogStore:
             data.get("billing_model", "blackbox"),
             json.dumps(data.get("billing_config", {}), default=str),
             data.get("auth_method", "none"),
+            data.get("region", "international"),
             data.get("auth_credentials_ref", ""),
             int(data.get("max_concurrent", 1)),
             int(data.get("rate_limit_per_min", 0)),

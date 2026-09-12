@@ -97,6 +97,7 @@ class RoutingStrategy(str, Enum):
     LOAD_BALANCED = "load_balanced"        # 负载均衡（活跃数越少越优先）
     PRIORITY = "priority"                  # 按优先级（先注册先服务）
     ROUND_ROBIN = "round_robin"            # 轮询
+    DOMESTIC_FIRST = "domestic_first"     # 国产优先（region=domestic 排前，回退国际）
 
 
 # ── Pydantic 模型 ─────────────────────────────────────────────────
@@ -524,6 +525,18 @@ class AgentRouter:
             key=lambda a: (-len(a.capabilities), a.name),
         )
 
+    def _sort_by_domestic_first(self, agents: list[AgentDescriptor]) -> list[AgentDescriptor]:
+        """国产优先排序：region='domestic' 排前，国际排后.
+
+        同 region 内按 name 稳定排序，保证结果确定性。
+        国产 Agent 全部被前置过滤排除时，自然回退到国际 Agent
+        （因为国际 Agent 仍在候选列表中，只是排在后面）。
+        """
+        return sorted(
+            agents,
+            key=lambda a: (0 if a.region == "domestic" else 1, a.name),
+        )
+
     def _sort_by_strategy(
         self,
         agents: list[AgentDescriptor],
@@ -539,6 +552,9 @@ class AgentRouter:
         if strategy == RoutingStrategy.PRIORITY:
             # 按注册顺序（list_enabled 返回 dict 插入顺序）
             return list(agents)
+        if strategy == RoutingStrategy.DOMESTIC_FIRST:
+            # 国产优先：region=domestic 排前，国际排后
+            return self._sort_by_domestic_first(agents)
         # 默认：保持原序
         return list(agents)
 
