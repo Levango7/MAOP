@@ -38,7 +38,7 @@ from __future__ import annotations
 import logging
 import threading
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
@@ -48,11 +48,22 @@ from maop.core.agent.registry.agent_catalog import (
     AgentDescriptor,
     BillingModel,
 )
+from maop.core.agent.router.rate_limiter import RateLimiter
+from maop.core.agent.router.routing_audit import RoutingAuditEvent, RoutingAuditLogger
 # 依赖 sqlite_connect / get_db_path：AgentCatalog 已封装持久化，
 # 此处导入以保持模块依赖图完整（供未来扩展直接访问 DB 时使用）。
 from maop.core.backends.db_utils import get_db_path, sqlite_connect  # noqa: F401
 
+if TYPE_CHECKING:
+    # 仅用于类型注解，避免运行时循环导入
+    from maop.core.agent.llm_chat.model_gateway import ModelGateway
+
 logger = logging.getLogger(__name__)
+
+# model_gateway 权限校验最大重试次数（防止无限循环）
+_MAX_PERMISSION_RETRIES: int = 3
+# 限流重选最大重试次数（防止候选全部被限流时无限循环）
+_MAX_RATE_LIMIT_RETRIES: int = 32
 
 
 # ── 成本优先级映射 ─────────────────────────────────────────────────
@@ -142,21 +153,54 @@ class AgentRouter:
     ----------
     catalog : AgentCatalog | None
         Agent 注册中心。``None`` 时使用 ``AgentCatalog.default()``。
+    audit_logger : RoutingAuditLogger | None
+        路由决策审计日志记录器。``None`` 时审计功能关闭（默认）。
+    model_gateway : ModelGateway | None
+        模型授权网关。``None`` 时跳过模型权限校验（默认）。
+        传入后，路由选中的 Agent 若声明了 ``adapter_config["model"]``，
+        将调用 ``check_access(model, agent=name)`` 校验权限，不通过则
+        排除该 Agent 并重选（最多重试 3 次）。
     """
 
-    def __init__(self, catalog: AgentCatalog | None = None) -> None:
+    def __init__(
+        self,
+        catalog: AgentCatalog | None = None,
+        audit_logger: RoutingAuditLogger | None = None,
+        model_gateway: "ModelGateway | None" = None,
+    ) -> None:
         self._catalog: AgentCatalog = catalog if catalog is not None else AgentCatalog.default()
         self._lock = threading.RLock()
         # capability key -> 当前轮询索引
         self._round_robin_idx: dict[str, int] = {}
         # agent name -> 当前活跃并发数
         self._active_count: dict[str, int] = {}
+        # 限流器：按 Agent 粒度的滑动窗口限流（rate_limit_per_min）
+        self._rate_limiter: RateLimiter = RateLimiter()
+        # 路由决策审计日志（可选；None 表示不记录审计）
+        self._audit_logger: RoutingAuditLogger | None = audit_logger
+        # 模型授权网关（可选；None 表示跳过模型权限校验）
+        self._model_gateway: "ModelGateway | None" = model_gateway
 
     # ── 公共属性 ──────────────────────────────────────────────────
     @property
     def catalog(self) -> AgentCatalog:
         """底层 AgentCatalog（只读访问）。"""
         return self._catalog
+
+    @property
+    def rate_limiter(self) -> RateLimiter:
+        """限流器实例（只读访问，供外部查询当前速率/手动 cleanup）。"""
+        return self._rate_limiter
+
+    @property
+    def audit_logger(self) -> RoutingAuditLogger | None:
+        """审计日志记录器（None 表示未启用审计）。"""
+        return self._audit_logger
+
+    @property
+    def model_gateway(self) -> "ModelGateway | None":
+        """模型授权网关（None 表示未启用模型权限校验）。"""
+        return self._model_gateway
 
     # ── 路由入口 ──────────────────────────────────────────────────
     def route(
@@ -173,10 +217,11 @@ class AgentRouter:
           4. 按 ctx.max_cost_tier 过滤成本偏好
           5. 若 ctx.preferred_agent 在候选中，直接选为 primary
           6. 否则按 strategy 排序/选择
+         6.5 限流过滤 + model_gateway 权限校验（失败则排除重选）
           7. 若 ctx.require_healthy，过滤不健康的
-          8. 取第一个作为 primary
-          9. 构建 fallbacks + alternatives
-         10. 返回 RoutingResult
+          8. 取第一个作为 primary，构建 fallbacks + alternatives
+         8.5 记录路由成功审计
+          9. 返回 RoutingResult
 
         Parameters
         ----------
@@ -193,6 +238,7 @@ class AgentRouter:
         # 1. 获取所有启用 Agent
         candidates = self._catalog.list_enabled()
         if not candidates:
+            self._audit("route_failed", "", strategy, "no enabled agents in catalog", ctx)
             return RoutingResult(reason="no enabled agents in catalog")
 
         # 2. 排除
@@ -207,6 +253,7 @@ class AgentRouter:
         candidates = self._filter_by_cost_tier(candidates, ctx.max_cost_tier)
 
         if not candidates:
+            self._audit("route_failed", "", strategy, "no candidates after filtering", ctx)
             return RoutingResult(reason="no candidates after filtering")
 
         # 5. preferred_agent 优先
@@ -221,18 +268,95 @@ class AgentRouter:
 
         # 6. 按策略选择
         if primary is None:
-            if strategy == RoutingStrategy.ROUND_ROBIN:
-                key = self._rr_key(ctx)
-                primary = self._round_robin_select(candidates, key)
-                reason = f"round_robin selected {primary.name if primary else 'None'}"
-            else:
-                sorted_agents = self._sort_by_strategy(candidates, strategy)
-                if sorted_agents:
-                    primary = sorted_agents[0]
-                    reason = f"{strategy.value} selected {primary.name}"
+            primary, reason = self._select_primary(candidates, strategy, ctx)
 
         if primary is None:
+            self._audit("route_failed", "", strategy, "no primary after strategy selection", ctx)
             return RoutingResult(reason="no primary after strategy selection")
+
+        # 6.5 限流过滤 + model_gateway 权限校验（步骤6之后、步骤7之前）
+        #     校验失败则从候选移除当前 primary 并重选，防止无限循环：
+        #     限流重选上限 = 候选总数（每个最多被排除一次）；
+        #     权限重选上限 = _MAX_PERMISSION_RETRIES（3 次）。
+        rate_retries = 0
+        perm_retries = 0
+        rate_retry_limit = len(candidates)  # 最多排除全部候选
+        while True:
+            # 6.5a 限流检查（rate_limit_per_min=0 表示不限流，直接放行）
+            if not self._rate_limiter.check_and_record(
+                primary.name, primary.rate_limit_per_min,
+            ):
+                rate_retries += 1
+                self._audit(
+                    "rate_limited", primary.name, strategy,
+                    f"rate_limit_per_min={primary.rate_limit_per_min} exceeded",
+                    ctx, extra_context={"rate_retries": rate_retries},
+                )
+                if rate_retries > rate_retry_limit:
+                    self._audit(
+                        "route_failed", "", strategy,
+                        "all candidates rate limited", ctx,
+                    )
+                    return RoutingResult(reason="all candidates rate limited")
+                # 从候选移除并重选
+                candidates = [a for a in candidates if a.name != primary.name]
+                if not candidates:
+                    self._audit(
+                        "route_failed", "", strategy,
+                        "all candidates rate limited", ctx,
+                    )
+                    return RoutingResult(reason="all candidates rate limited")
+                primary, reason = self._select_primary(candidates, strategy, ctx)
+                if primary is None:
+                    self._audit(
+                        "route_failed", "", strategy,
+                        "no primary after rate-limit reselect", ctx,
+                    )
+                    return RoutingResult(reason="no primary after rate-limit reselect")
+                continue
+
+            # 6.5b model_gateway 权限校验（仅当配置了网关且 Agent 声明了 model）
+            if self._model_gateway is not None:
+                model = primary.adapter_config.get("model", "") if primary.adapter_config else ""
+                if model:
+                    decision = self._model_gateway.check_access(
+                        model, agent=primary.name,
+                    )
+                    if not decision.allowed:
+                        perm_retries += 1
+                        self._audit(
+                            "route_failed", primary.name, strategy,
+                            f"model permission denied for {model!r}: {decision.reason}",
+                            ctx, extra_context={
+                                "model": model, "perm_retries": perm_retries,
+                            },
+                        )
+                        if perm_retries > _MAX_PERMISSION_RETRIES:
+                            return RoutingResult(
+                                reason=f"model permission retries exceeded {_MAX_PERMISSION_RETRIES}",
+                            )
+                        # 从候选移除并重选
+                        candidates = [a for a in candidates if a.name != primary.name]
+                        if not candidates:
+                            self._audit(
+                                "route_failed", "", strategy,
+                                "all candidates denied by model gateway", ctx,
+                            )
+                            return RoutingResult(
+                                reason="all candidates denied by model gateway",
+                            )
+                        primary, reason = self._select_primary(candidates, strategy, ctx)
+                        if primary is None:
+                            self._audit(
+                                "route_failed", "", strategy,
+                                "no primary after model-gateway reselect", ctx,
+                            )
+                            return RoutingResult(
+                                reason="no primary after model-gateway reselect",
+                            )
+                        continue
+            # 限流与权限均通过，退出校验循环
+            break
 
         # 7. 健康过滤（对 primary）
         if ctx.require_healthy and not primary.healthy:
@@ -247,6 +371,7 @@ class AgentRouter:
                     primary = sorted_healthy[0] if sorted_healthy else healthy_candidates[0]
                 reason = f"{strategy.value} re-selected healthy {primary.name}"
             else:
+                self._audit("route_failed", "", strategy, "no healthy candidates", ctx)
                 return RoutingResult(reason="no healthy candidates")
 
         # 8. 构建 fallbacks + alternatives
@@ -255,12 +380,94 @@ class AgentRouter:
         fb_names = {a.name for a in fallbacks}
         alternatives = [a for a in candidates if a.name != primary.name and a.name not in fb_names]
 
+        # 8.5 记录路由成功审计
+        self._audit(
+            "route_selected", primary.name, strategy, reason, ctx,
+            extra_context={
+                "fallback_count": len(fallbacks),
+                "alternative_count": len(alternatives),
+            },
+        )
+
         return RoutingResult(
             primary=primary,
             fallbacks=fallbacks,
             reason=reason,
             alternatives=alternatives,
         )
+
+    # ── 内部辅助：策略选择 + 审计 ────────────────────────────────
+    def _select_primary(
+        self,
+        candidates: list[AgentDescriptor],
+        strategy: RoutingStrategy,
+        ctx: RoutingContext,
+    ) -> tuple[AgentDescriptor | None, str]:
+        """按策略从候选中选择 primary，返回 (primary, reason).
+
+        ROUND_ROBIN 使用 ``_round_robin_select``；其余策略使用
+        ``_sort_by_strategy`` 取首位。空候选返回 (None, "")。
+        """
+        if not candidates:
+            return None, ""
+        if strategy == RoutingStrategy.ROUND_ROBIN:
+            key = self._rr_key(ctx)
+            primary = self._round_robin_select(candidates, key)
+            reason = f"round_robin selected {primary.name if primary else 'None'}"
+            return primary, reason
+        sorted_agents = self._sort_by_strategy(candidates, strategy)
+        if not sorted_agents:
+            return None, ""
+        return sorted_agents[0], f"{strategy.value} selected {sorted_agents[0].name}"
+
+    def _audit(
+        self,
+        event_type: str,
+        agent_name: str,
+        strategy: RoutingStrategy | str,
+        reason: str,
+        ctx: RoutingContext | None = None,
+        extra_context: dict[str, Any] | None = None,
+    ) -> None:
+        """记录一条路由审计事件（未配置 audit_logger 时静默跳过）.
+
+        Parameters
+        ----------
+        event_type : str
+            事件类型：route_selected / route_failed / fallback_switched
+            / concurrent_rejected / rate_limited。
+        agent_name : str
+            相关 Agent 名称。
+        strategy : RoutingStrategy | str
+            路由策略。
+        reason : str
+            决策原因。
+        ctx : RoutingContext | None
+            路由上下文（提取 required_capabilities / excluded 等到 context）。
+        extra_context : dict | None
+            额外上下文键值对，合并到 context。
+        """
+        if self._audit_logger is None:
+            return
+        context: dict[str, Any] = {}
+        if ctx is not None:
+            context = {
+                "required_capabilities": [c.value for c in ctx.required_capabilities],
+                "excluded_agents": list(ctx.excluded_agents),
+                "preferred_agent": ctx.preferred_agent,
+                "max_cost_tier": ctx.max_cost_tier,
+                "require_healthy": ctx.require_healthy,
+            }
+        if extra_context:
+            context.update(extra_context)
+        strategy_str = strategy.value if isinstance(strategy, RoutingStrategy) else str(strategy)
+        self._audit_logger.log(RoutingAuditEvent(
+            event_type=event_type,
+            agent_name=agent_name,
+            strategy=strategy_str,
+            reason=reason,
+            context=context,
+        ))
 
     # ── 筛选方法 ──────────────────────────────────────────────────
     def _filter_by_capabilities(
@@ -437,6 +644,12 @@ class AgentRouter:
                     "[agent_router] acquire: %s at capacity %d/%d",
                     agent_name, current, max_concurrent,
                 )
+                # 记录并发拒绝审计
+                self._audit(
+                    "concurrent_rejected", agent_name, "",
+                    f"concurrent capacity {current}/{max_concurrent} reached",
+                    extra_context={"active": current, "max_concurrent": max_concurrent},
+                )
                 return False
             self._active_count[agent_name] = current + 1
             return True
@@ -457,3 +670,32 @@ class AgentRouter:
         """获取 Agent 当前活跃并发数."""
         with self._lock:
             return self._active_count.get(agent_name, 0)
+    # ── 降级切换审计 ──────────────────────────────────────────────
+    def log_fallback_switch(
+        self,
+        from_agent: str,
+        to_agent: str,
+        strategy: RoutingStrategy | str = "",
+        reason: str = "",
+    ) -> None:
+        """记录从 primary 切换到 fallback 的降级事件.
+
+        路由本身只返回降级链，实际切换发生在调用方。调用方在执行降级
+        切换时调用本方法记录审计。
+
+        Parameters
+        ----------
+        from_agent : str
+            原 primary Agent 名称。
+        to_agent : str
+            切换到的 fallback Agent 名称。
+        strategy : RoutingStrategy | str
+            路由策略。
+        reason : str
+            切换原因（如 "concurrent full" / "timeout"）。
+        """
+        self._audit(
+            "fallback_switched", to_agent, strategy,
+            reason or f"switched from {from_agent!r} to {to_agent!r}",
+            extra_context={"from_agent": from_agent, "to_agent": to_agent},
+        )

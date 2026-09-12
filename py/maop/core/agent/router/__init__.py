@@ -28,10 +28,18 @@ from maop.core.agent.router.agent_router import (
     RoutingResult,
     RoutingStrategy,
 )
+from maop.core.agent.router.rate_limiter import RateLimiter
+from maop.core.agent.router.routing_audit import (
+    RoutingAuditEvent,
+    RoutingAuditLogger,
+)
 
 __all__ = [
     "AgentRouter",
     "RoutingContext",
     "RoutingResult",
     "RoutingStrategy",
+    "RateLimiter",
+    "RoutingAuditEvent",
+    "RoutingAuditLogger",
 ]
