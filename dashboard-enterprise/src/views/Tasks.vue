@@ -86,6 +86,39 @@
           </div>
         </Card>
 
+        <!-- 视觉增强: 任务执行时间线 (垂直时间轴, 状态颜色区分) -->
+        <Card
+          v-if="tasks.length"
+          :title="t('view.tasks.timeline.title')"
+          icon="git-commit"
+          margin-bottom="var(--sp-4)"
+        >
+          <div class="timeline" role="list" :aria-label="t('view.tasks.timeline.ariaLabel')">
+            <div
+              v-for="task in tasks.slice(0, 10)"
+              :key="task.id"
+              class="timeline-item"
+              role="listitem"
+            >
+              <div class="timeline-rail">
+                <span class="timeline-dot" :class="'timeline-dot--' + timelineStatus(task)"></span>
+              </div>
+              <div class="timeline-body">
+                <div class="timeline-head">
+                  <span class="timeline-name">{{ taskDisplayName(task) }}</span>
+                  <Badge :tone="statusTone(task.status)">{{ statusLabel(task.status) }}</Badge>
+                </div>
+                <div class="timeline-meta">
+                  <span class="timeline-time">{{ formatTime(task.created_at) }}</span>
+                  <span v-if="formatDuration(task) !== '—'" class="timeline-dur">
+                    {{ t('view.tasks.timeline.duration') }}: {{ formatDuration(task) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
         <!-- 分页控件 -->
         <div v-if="totalPages > 1" class="tasks-pagination">
           <button class="act-btn small" :disabled="page <= 1 || loading" @click="goPage(page - 1)">
@@ -248,6 +281,17 @@ function statusTone(status) {
   if (s === 'paused') return 'warn';
   if (s === 'archived') return 'neutral';
   return 'info'; // active / running / 未知
+}
+
+// ── 视觉增强: 时间线节点状态颜色 ──
+// 成功=绿色 / 失败=红色 / 运行中=蓝色 / 待执行=灰色
+function timelineStatus(task) {
+  const s = String(task.status || '').toLowerCase();
+  if (s === 'completed') return 'success';
+  if (s === 'failed') return 'fail';
+  if (s === 'running' || s === 'active') return 'info';
+  if (s === 'paused') return 'warn';
+  return 'neutral'; // archived / pending / unknown
 }
 
 function statusLabel(status) {
@@ -507,5 +551,109 @@ onUnmounted(() => {
   .tasks-view {
     gap: var(--sp-2);
   }
+}
+
+/* ── 视觉增强: 任务执行时间线 ──────────────────────────────
+ * 垂直时间轴, 左侧竖线+节点, 右侧任务信息。
+ * 节点颜色区分状态: 成功=绿 / 失败=红 / 运行中=蓝 / 待执行=灰。
+ * 运行中节点带脉冲动画。全部使用 design tokens。 */
+.timeline {
+  display: flex;
+  flex-direction: column;
+}
+.timeline-item {
+  display: flex;
+  gap: var(--sp-3);
+  position: relative;
+  padding-bottom: var(--sp-4);
+}
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+/* 竖线: 贯穿所有节点, 最后一项只延伸到 dot 中心 */
+.timeline-item::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border-subtle);
+}
+.timeline-item:last-child::before {
+  bottom: 10px;
+}
+.timeline-rail {
+  flex-shrink: 0;
+  width: 12px;
+  position: relative;
+  z-index: var(--z-raised);
+}
+.timeline-dot {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-full);
+  border: 2px solid var(--surface);
+  transition: background var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+}
+.timeline-dot--success {
+  background: var(--success);
+  box-shadow: 0 0 0 1px var(--success);
+}
+.timeline-dot--fail {
+  background: var(--fail);
+  box-shadow: 0 0 0 1px var(--fail);
+}
+.timeline-dot--info {
+  background: var(--info);
+  box-shadow: 0 0 0 1px var(--info);
+  animation: maop-timeline-pulse 1.5s var(--ease-out) infinite;
+}
+.timeline-dot--warn {
+  background: var(--warn);
+  box-shadow: 0 0 0 1px var(--warn);
+}
+.timeline-dot--neutral {
+  background: var(--text-faint);
+  box-shadow: 0 0 0 1px var(--border);
+}
+@keyframes maop-timeline-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+.timeline-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding-top: 2px;
+}
+.timeline-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.timeline-name {
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+.timeline-meta {
+  display: flex;
+  gap: var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.timeline-dur {
+  color: var(--text-faint);
 }
 </style>

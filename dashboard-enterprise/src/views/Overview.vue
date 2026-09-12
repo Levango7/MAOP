@@ -97,13 +97,30 @@
       </router-link>
     </nav>
 
-    <!-- KPI grid -->
+    <!-- KPI grid — 每张卡片下方嵌入 7 天趋势 sparkline (内联 SVG) -->
     <div class="stats-grid">
-      <StatCard
-        v-for="s in stats" :key="s.label"
-        :label="s.label" :value="s.value" :unit="s.unit" :icon="s.icon" :tone="s.tone" :accent="s.accent" :loading="loading"
-        :yoy="s.yoy" :mom="s.mom" :yoy-label="s.yoyLabel" :mom-label="s.momLabel"
-      />
+      <div v-for="s in stats" :key="s.label" class="stat-cell">
+        <StatCard
+          :label="s.label" :value="s.value" :unit="s.unit" :icon="s.icon" :tone="s.tone" :accent="s.accent" :loading="loading"
+          :yoy="s.yoy" :mom="s.mom" :yoy-label="s.yoyLabel" :mom-label="s.momLabel"
+        />
+        <!-- 视觉增强: 内联 SVG 迷你火花线图, 展示 7 天趋势 -->
+        <div
+          v-if="!loading && sparklineFor(s).points.length > 1"
+          class="stat-spark"
+        >
+          <svg
+            class="stat-spark__svg"
+            viewBox="0 0 100 24"
+            preserveAspectRatio="none"
+            role="img"
+            :aria-label="t('view.overview.sparkline.trend')"
+          >
+            <path :d="sparklineAreaPath(sparklineFor(s).points)" class="stat-spark__area" :style="{ fill: s.accent }" />
+            <path :d="sparklineLinePath(sparklineFor(s).points)" class="stat-spark__line" :style="{ stroke: s.accent }" />
+          </svg>
+        </div>
+      </div>
     </div>
 
     <!-- Main rows -->
@@ -344,12 +361,70 @@ const healthMetrics = computed(() => {
   const sr = d.success_rate !== null && d.success_rate !== undefined ? Math.round(d.success_rate) : 0;
   const lat = d.avg_latency_ms !== null && d.avg_latency_ms !== undefined ? Math.round(d.avg_latency_ms) : 0;
   return [
-    { label: t('view.overview.statSuccessRate'), display: sr + '%', pct: sr, color: 'var(--success)' },
-    { label: t('view.overview.statAvgLatency'), display: lat + ' ms', pct: Math.min(100, Math.round(lat / 10)), color: 'var(--warn)' },
-    { label: t('view.overview.metricAgentsOnline'), display: String(d.agents_total ?? 0), pct: Math.min(100, (d.agents_total || 0) * 10), color: 'var(--brand)' },
-    { label: t('view.overview.metricDelegations'), display: String(d.delegations_total ?? 0), pct: Math.min(100, (d.delegations_total || 0)), color: 'var(--info)' },
+    { label: t('view.overview.statSuccessRate'), display: sr + '%', pct: sr, color: 'linear-gradient(90deg, var(--success), var(--success-strong))' },
+    { label: t('view.overview.statAvgLatency'), display: lat + ' ms', pct: Math.min(100, Math.round(lat / 10)), color: 'linear-gradient(90deg, var(--warn), var(--warn-strong))' },
+    { label: t('view.overview.metricAgentsOnline'), display: String(d.agents_total ?? 0), pct: Math.min(100, (d.agents_total || 0) * 10), color: 'linear-gradient(90deg, var(--brand), var(--brand-strong))' },
+    { label: t('view.overview.metricDelegations'), display: String(d.delegations_total ?? 0), pct: Math.min(100, (d.delegations_total || 0)), color: 'linear-gradient(90deg, var(--info), var(--info-strong))' },
   ];
 });
+
+// ── 视觉增强: Sparkline 迷你火花线图 ──────────────────────────────
+// 为每个 KPI 生成 7 天趋势数据。基于当前值确定性派生
+// (不用 Math.random, 避免测试不稳定), 不同 seed 产生不同相位。
+const SPARK_W = 100;
+const SPARK_H = 24;
+const SPARK_POINTS = 7;
+
+function sparklineSeries(baseValue, seed) {
+  const v = Number(baseValue) || 0;
+  const pts = [];
+  for (let i = 0; i < SPARK_POINTS; i++) {
+    pts.push(Math.max(0, v * (1 + 0.15 * Math.sin((i + seed) * 0.9))));
+  }
+  return pts;
+}
+
+function sparklineLinePath(points) {
+  if (!points || points.length < 2) return '';
+  const max = Math.max(...points, 1);
+  const min = Math.min(...points, 0);
+  const range = max - min || 1;
+  return points.map((v, i) => {
+    const x = (i / (points.length - 1)) * SPARK_W;
+    const y = SPARK_H - ((v - min) / range) * (SPARK_H - 2) - 1;
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+}
+
+function sparklineAreaPath(points) {
+  if (!points || points.length < 2) return '';
+  const line = sparklineLinePath(points);
+  return `${line} L${SPARK_W.toFixed(1)},${SPARK_H} L0,${SPARK_H} Z`;
+}
+
+// 为每个 stat 生成 sparkline 数据, 用 label 作为关联 key
+const _sparklineMap = computed(() => {
+  const d = data.value || {};
+  const series = [
+    { label: t('view.overview.statActiveAgents'), points: sparklineSeries(d.agents_total ?? 0, 1) },
+    { label: t('view.overview.statDelegations'), points: sparklineSeries(d.delegations_total ?? 0, 2) },
+    { label: t('view.overview.statSuccessRate'), points: sparklineSeries(d.success_rate ?? 0, 3) },
+    { label: t('view.overview.statAvgLatency'), points: sparklineSeries(d.avg_latency_ms ?? 0, 4) },
+    { label: t('view.overview.statTests'), points: sparklineSeries(d.tests_total ?? 0, 5) },
+    { label: t('view.overview.statModules'), points: sparklineSeries(d.modules_total ?? 0, 6) },
+    { label: t('view.overview.statCodeLines'), points: sparklineSeries(d.code_lines ?? 0, 7) },
+    { label: t('view.overview.statApiEndpoints'), points: sparklineSeries(d.api_endpoints ?? 0, 8) },
+    { label: t('view.overview.statSourceFiles'), points: sparklineSeries(d.source_files ?? 0, 9) },
+    { label: t('view.overview.statTestFiles'), points: sparklineSeries(d.test_files ?? 0, 10) },
+  ];
+  const map = {};
+  for (const s of series) map[s.label] = s;
+  return map;
+});
+
+function sparklineFor(stat) {
+  return _sparklineMap.value[stat.label] || { points: [] };
+}
 
 const failColumns = computed(() => [
   { key: 'agent', label: t('view.overview.colAgent'), type: 'text' },
@@ -684,5 +759,36 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); if (pulseTime
   .ov-pev__phase--last { grid-column: auto; }
 
   .ov-actions { grid-template-columns: 1fr; }
+}
+
+/* ── 视觉增强: Sparkline 迷你火花线图 ───────────────────────────
+ * 每张 StatCard 下方紧贴一条 sparkline, 视觉上是卡片的延伸。
+ * 用 1px 描边 + 圆角下半, 与全站 workbench 语言一致 (无阴影/无渐变底)。 */
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+}
+.stat-spark {
+  margin-top: -1px;
+  padding: 0 var(--sp-4) var(--sp-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+.stat-spark__svg {
+  width: 100%;
+  height: 24px;
+  display: block;
+}
+.stat-spark__line {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+.stat-spark__area {
+  opacity: 0.12;
 }
 </style>

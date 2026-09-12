@@ -25,6 +25,50 @@
       </button>
     </PageHeader>
 
+    <!-- 视觉增强: Agent 关系拓扑图 (内联 SVG, 节点+连线+脉冲动画) -->
+    <Card
+      v-if="agents.length"
+      :title="t('view.agents.topology.title')"
+      :subtitle="t('view.agents.topology.subtitle')"
+      icon="share-nodes"
+      margin-bottom="var(--sp-6)"
+    >
+      <div class="topo-wrap">
+        <svg
+          v-if="topoNodes.length"
+          class="topo-svg"
+          :viewBox="`0 0 ${TOPO_W} ${TOPO_H}`"
+          preserveAspectRatio="xMidYMid meet"
+          role="img"
+          :aria-label="t('view.agents.topology.ariaLabel')"
+        >
+          <!-- 连线 (路由关系: primary → fallback → tertiary) -->
+          <g class="topo-edges">
+            <path
+              v-for="(e, i) in topoEdges"
+              :key="'e' + i"
+              :d="e.path"
+              class="topo-edge"
+              :class="{ 'topo-edge--active': e.active }"
+            />
+          </g>
+          <!-- 节点 (每个 agent 一个圆, 带脉冲动画) -->
+          <g
+            v-for="n in topoNodes"
+            :key="n.name"
+            class="topo-node"
+            :class="['topo-node--' + n.status, { 'topo-node--selected': n.name === selectedAgent }]"
+            :transform="`translate(${n.x}, ${n.y})`"
+          >
+            <circle class="topo-node__pulse" r="10" />
+            <circle class="topo-node__core" r="10" />
+            <text class="topo-node__label" :y="28">{{ n.shortName }}</text>
+          </g>
+        </svg>
+        <div v-else class="topo-empty muted">{{ t('view.agents.topology.empty') }}</div>
+      </div>
+    </Card>
+
     <Card :title="t('view.agents.dispatchRouter')" :subtitle="t('view.agents.dispatchRouterSub')" margin-bottom="var(--sp-6)">
       <template #actions>
         <button class="btn-action" :class="{ 'pulse-once': loadingDecisions }" :disabled="loadingDecisions" @click="loadDecisions">
@@ -483,7 +527,7 @@ v-for="m in modelSwitchPanel.models" :key="m.name" class="model-option"
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useRealtimeStore } from '../stores/realtime.js';
 import { useToast } from '../composables/useToast.js';
@@ -570,6 +614,57 @@ function agentColor(name) {
   for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
 }
+
+// ── 视觉增强: Agent 关系拓扑图 (内联 SVG) ──────────────────────────
+// 节点 = agents (圆形布局), 连线 = 路由关系 (primary → fallback → tertiary)。
+// active 节点带脉冲动画, 选中节点加粗描边。
+const TOPO_W = 400;
+const TOPO_H = 280;
+const TOPO_CX = 200;
+const TOPO_CY = 140;
+const TOPO_R = 100;
+
+const topoNodes = computed(() => {
+  const list = agents.value;
+  if (!list.length) return [];
+  const n = list.length;
+  return list.map((a, i) => {
+    const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+    return {
+      name: a.name,
+      shortName: a.name && a.name.length > 8 ? a.name.slice(0, 7) + '…' : (a.name || '?'),
+      x: TOPO_CX + TOPO_R * Math.cos(angle),
+      y: TOPO_CY + TOPO_R * Math.sin(angle),
+      status: agentStatus(a),
+    };
+  });
+});
+
+const topoEdges = computed(() => {
+  const nodes = topoNodes.value;
+  if (!nodes.length) return [];
+  const nodeMap = {};
+  for (const n of nodes) nodeMap[n.name] = n;
+  const edges = [];
+  for (const route of routes.value) {
+    const from = route.primary && nodeMap[route.primary];
+    const to = route.fallback && nodeMap[route.fallback];
+    if (from && to) {
+      edges.push({
+        path: `M${from.x.toFixed(1)},${from.y.toFixed(1)} L${to.x.toFixed(1)},${to.y.toFixed(1)}`,
+        active: true,
+      });
+    }
+    const to2 = route.tertiary && nodeMap[route.tertiary];
+    if (to && to2) {
+      edges.push({
+        path: `M${to.x.toFixed(1)},${to.y.toFixed(1)} L${to2.x.toFixed(1)},${to2.y.toFixed(1)}`,
+        active: false,
+      });
+    }
+  }
+  return edges;
+});
 
 function selectAgent(a) {
   selectedAgent.value = a.name;
@@ -1383,5 +1478,102 @@ onMounted(() => {
     grid-template-columns: 1fr;
     gap: var(--sp-1);
   }
+}
+
+/* ── 视觉增强: Agent 关系拓扑图 ──────────────────────────────
+ * 内联 SVG, 节点圆形布局, 连线为路由关系。
+ * active 节点带脉冲环动画, 连线有流动虚线效果。
+ * 全部使用 design tokens, 暗色/亮色自动跟随。 */
+.topo-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.topo-svg {
+  width: 100%;
+  max-width: 480px;
+  height: 280px;
+  display: block;
+}
+.topo-edge {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  opacity: 0.6;
+}
+.topo-edge--active {
+  stroke: var(--brand);
+  opacity: 0.8;
+  animation: maop-topo-flow 2s linear infinite;
+}
+@keyframes maop-topo-flow {
+  to { stroke-dashoffset: -14; }
+}
+.topo-node__core {
+  fill: var(--surface-3);
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  transition: fill var(--motion) var(--ease), stroke var(--motion) var(--ease), stroke-width var(--motion) var(--ease);
+}
+.topo-node--active .topo-node__core {
+  fill: var(--success-soft);
+  stroke: var(--success);
+}
+.topo-node--error .topo-node__core {
+  fill: var(--fail-soft);
+  stroke: var(--fail);
+}
+.topo-node--idle .topo-node__core {
+  fill: var(--surface-2);
+  stroke: var(--text-faint);
+}
+.topo-node--disabled .topo-node__core {
+  fill: var(--surface-2);
+  stroke: var(--border);
+  opacity: 0.5;
+}
+.topo-node__pulse {
+  fill: none;
+  stroke: var(--success);
+  stroke-width: 1.5;
+  opacity: 0;
+}
+.topo-node--active .topo-node__pulse {
+  animation: maop-topo-pulse 2s var(--ease-out) infinite;
+}
+@keyframes maop-topo-pulse {
+  0%   { r: 10; opacity: 0.6; }
+  100% { r: 22; opacity: 0; }
+}
+.topo-node--selected .topo-node__core {
+  stroke-width: 3;
+  stroke: var(--brand);
+}
+.topo-node__label {
+  font-size: 9px;
+  fill: var(--text-muted);
+  text-anchor: middle;
+  font-family: var(--font-sans);
+}
+.topo-empty {
+  text-align: center;
+  padding: var(--sp-6);
+}
+
+/* ── 视觉增强: Agent 状态变化过渡动画 ──
+ * agent-card border / agent-avatar 在状态变化时平滑过渡。 */
+.agent-card {
+  transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
+}
+.agent-avatar {
+  transition: background var(--motion) var(--ease), transform var(--motion) var(--ease);
+}
+.agent-card:hover .agent-avatar {
+  transform: scale(1.06);
+}
+/* Badge 颜色变化过渡 (穿透到 Badge 组件根元素) */
+:deep(.badge) {
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease), border-color var(--motion) var(--ease);
 }
 </style>
