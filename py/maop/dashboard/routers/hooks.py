@@ -17,7 +17,7 @@
   - 复用 ``HookManager`` 的 SQLite 持久化，不在 config/ 下另存 JSON，
     避免双源真相。
   - Pydantic schema 严格校验请求体；错误返回 400/404。
-  - ``require_admin`` 保护写操作；读操作放开以便非管理员查看。
+  - ``require_admin`` 保护所有端点（含读操作），避免泄露 webhook URL 等配置。
 """
 
 from __future__ import annotations
@@ -169,8 +169,10 @@ def _hook_def_to_response(hook_def: Any, name: str = "") -> HookResponse:
 # ── 路由：列出/创建 ──────────────────────────────────────────────────
 @router.get("/api/hooks", response_model=HookListResponse)
 @handle_api_errors("Hooks list", error_value=HookListResponse(hooks=[], count=0))
-async def api_hooks_list(event: str = "") -> HookListResponse:
+async def api_hooks_list(request: Request, event: str = "") -> HookListResponse:
     """列出全部 hook，可选按事件过滤。"""
+    # P1-3 fix: GET 端点暴露 webhook URL 等配置信息，需要 require_admin 保护。
+    require_admin(request)
     mgr = _get_hook_mgr()
     hooks = mgr.list_hooks(event=event or "")
     return HookListResponse(
@@ -213,8 +215,10 @@ async def api_hooks_create(body: HookCreateRequest, request: Request) -> HookRes
 # ── 路由：事件类型（必须在 {hook_id} 之前注册，避免路径被吞）─────────
 @router.get("/api/hooks/events", response_model=EventsListResponse)
 @handle_api_errors("Hooks events", error_value=EventsListResponse(events=[], count=0))
-async def api_hooks_events() -> EventsListResponse:
+async def api_hooks_events(request: Request) -> EventsListResponse:
     """列出所有可用的 lifecycle 事件类型。"""
+    # P1-3 fix: 统一 require_admin 保护，与其它 hooks 端点保持一致。
+    require_admin(request)
     events = [
         EventTypeInfo(
             name=e.value,
@@ -229,8 +233,10 @@ async def api_hooks_events() -> EventsListResponse:
 # ── 路由：单个 hook CRUD ─────────────────────────────────────────────
 @router.get("/api/hooks/{hook_id}", response_model=HookResponse)
 @handle_api_errors("Hook get", error_value=HookResponse(id="", name="", event="", url=""))
-async def api_hooks_get(hook_id: str) -> HookResponse:
+async def api_hooks_get(hook_id: str, request: Request) -> HookResponse:
     """获取单个 hook 详情。"""
+    # P1-3 fix: GET 端点暴露 webhook URL 等配置信息，需要 require_admin 保护。
+    require_admin(request)
     if not hook_id:
         raise HTTPException(400, "missing hook_id")
     mgr = _get_hook_mgr()

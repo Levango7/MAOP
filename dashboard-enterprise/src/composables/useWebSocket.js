@@ -9,6 +9,9 @@ export function useWebSocket(url = '') {
   let ws = null;
   let reconnectTimer = null;
   let reconnectAttempts = 0;
+  // P1-2 fix: 手动断连守卫。disconnect() 设为 true，阻止 ws.onclose 异步
+  // 触发时调用 _scheduleReconnect() 导致自动重连。connect() 重置为 false。
+  let manuallyDisconnected = false;
 
   // L3 fix: getWsToken() 已是死代码（M7 fix 后始终返回 ''），移除该函数
   // 并简化 connect() 中的 WebSocket 构造——不再需要 token 三元分支。
@@ -17,6 +20,7 @@ export function useWebSocket(url = '') {
     // SSR 守卫: 在非浏览器环境（SSR / Node 测试）下直接返回，避免访问全局 location 抛 ReferenceError。
     if (typeof window === 'undefined') return;
     reconnectAttempts = 0;
+    manuallyDisconnected = false; // P1-2 fix: 重置手动断连标志，允许后续重连
     try {
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const baseUrl = url || `${proto}//${window.location.host}/ws`;
@@ -37,6 +41,8 @@ export function useWebSocket(url = '') {
       };
       ws.onclose = (event) => {
         connected.value = false;
+        // P1-2 fix: 手动 disconnect() 触发的 onclose 不应自动重连。
+        if (manuallyDisconnected) return;
         // P1 fix: close code 4401 = auth failure — don't reconnect, trigger login
         if (event.code === 4401) {
           error.value = new Error('Authentication required');
@@ -84,6 +90,7 @@ export function useWebSocket(url = '') {
   }
 
   function disconnect() {
+    manuallyDisconnected = true; // P1-2 fix: 标记手动断连，阻止 onclose 异步重连
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;

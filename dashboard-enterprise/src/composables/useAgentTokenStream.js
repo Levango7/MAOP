@@ -127,7 +127,10 @@ export function useAgentTokenStream() {
       // 简化处理：readyState===CLOSED 时连接已断开；否则视为流错误并 close()。
       // 移除冗余的 streaming.value=false（close() 内部已统一处理）。
       if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+        // P1-1 fix: readyState===CLOSED 时连接已断开，必须调用 close() 清理资源，
+        // 否则 streaming.value 保持 true、eventSource 引用未释放、abortController 未 abort。
         if (onError) onError('Connection closed');
+        close();
         return;
       }
       if (onError) onError('Stream error');
