@@ -414,6 +414,20 @@ def _register_feedback_router(app: FastAPI) -> None:
         logger.warning("[server] Router MISSING: feedback (import error: %s)", _e)
 
 
+def _register_agent_versions_router(app: FastAPI) -> None:
+    """Register the agent-versions router — Agent 版本管理 / 灰度发布.
+
+    版本 CRUD + 激活 + 回滚 + 灰度配置 + 指标查询.
+    写操作需 admin; 读操作需已认证; IDOR 防护非 admin 仅看自己创建的版本.
+    """
+    try:
+        from maop.dashboard.routers import agent_versions as agent_versions_router
+        app.include_router(agent_versions_router.router)
+        logger.info("[server] Router: agent-versions enabled")
+    except ImportError as _e:
+        logger.warning("[server] Router MISSING: agent-versions (import error: %s)", _e)
+
+
 def register_routers(app: FastAPI) -> None:
     """Register all API routers (core + enterprise + optional)."""
     global _app
@@ -442,6 +456,7 @@ def register_routers(app: FastAPI) -> None:
     _register_enterprise_routers(app)
     _register_notifications_and_config(app)
     _register_feedback_router(app)
+    _register_agent_versions_router(app)
 
 
 # ── Health ─────────────────────────────────────────────────────────
