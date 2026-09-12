@@ -141,7 +141,7 @@ import { useStreamingFetch } from '../composables/useStreamingFetch.js';
 import { useToast } from '../composables/useToast.js';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
-import { EmptyState } from '../components/index.js';
+import EmptyState from '../components/EmptyState.vue';
 import DOMPurify from 'dompurify';
 import { useI18n } from '../i18n';
 import { useConfirm } from '../composables/useConfirm.js';

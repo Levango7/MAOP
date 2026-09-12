@@ -266,7 +266,9 @@ const nodes = computed(() => {
 /* 水平轨道线: 淡化, 作为基线背景 */
 .evo-timeline__track {
   position: absolute;
-  top: 14px;
+  /* R11 修复: top 14px 硬编码改为 calc(), 与 .evo-timeline__dot 高度(28px)耦合:
+   * 轨道线需穿过 dot 垂直中心 → top = dot-height / 2 = 14px */
+  top: calc(28px / 2);
   left: 0;
   right: 0;
   height: 2px;
@@ -308,6 +310,7 @@ const nodes = computed(() => {
   transition: border-color var(--motion) var(--ease);
 }
 .evo-timeline__card:hover { border-color: var(--border-strong); }
+.evo-timeline__card:active { transform: scale(0.99); }
 .evo-timeline__node--phase.is-fail .evo-timeline__card { border-color: color-mix(in srgb, var(--fail) 35%, var(--border)); }
 .evo-timeline__node--phase.is-ok .evo-timeline__card { border-color: color-mix(in srgb, var(--success) 30%, var(--border)); }
 .evo-timeline__head { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }

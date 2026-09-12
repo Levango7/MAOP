@@ -258,6 +258,7 @@ onBeforeUnmount(() => {
   padding: var(--sp-1) var(--sp-3); font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
 }
 .coach-marks__next:hover { background: var(--brand-strong); }
+.coach-marks__next:active { transform: scale(0.97); }
 
 .cm-enter-active, .cm-leave-active { transition: opacity var(--motion-fast) var(--ease); }
 .cm-enter-from, .cm-leave-to { opacity: 0; }

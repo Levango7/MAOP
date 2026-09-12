@@ -265,7 +265,7 @@ async def api_vector_list(
 
 @router.get("/api/vector/search")
 @handle_api_errors("Vector search", error_value={"query": "", "results": [], "count": 0, "status": "error", "error": "Vector search unavailable"})
-async def api_vector_search(request: Request, q: str = Query(...), k: int = Query(5, alias="topk", le=1000)) -> dict[str, Any]:
+async def api_vector_search(request: Request, q: str = Query(...), k: int = Query(5, alias="topk", ge=1, le=1000)) -> dict[str, Any]:
     require_admin(request)
     try:
         from maop.core.memory.vector import VectorStore

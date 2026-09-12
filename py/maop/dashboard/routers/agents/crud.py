@@ -6,11 +6,9 @@ disable / health-check(-all) / health-log / diagnose / repair.
 
 from __future__ import annotations
 
-import logging
-
-logger = logging.getLogger(__name__)
-
 import asyncio
+import logging
+import os
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
@@ -21,6 +19,9 @@ from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 from . import _deps
+
+# P2-16: logger 定义移至所有 import 之后
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -50,8 +51,7 @@ def _sync_agent_to_yaml(body) -> bool:
     Runs in a worker thread via asyncio.to_thread — never call directly
     from an async route.
     """
-    import os
-
+    # P2-17: yaml 为可选依赖，延迟加载避免在未安装时阻断模块导入
     import yaml as _yaml
 
     yaml_path = _agents_yaml_path()
@@ -87,6 +87,7 @@ def _remove_agent_from_yaml(name: str) -> None:
     Runs in a worker thread via asyncio.to_thread — never call directly
     from an async route.
     """
+    # P2-17: yaml 为可选依赖，延迟加载避免在未安装时阻断模块导入
     import yaml as _yaml
 
     yaml_path = _agents_yaml_path()

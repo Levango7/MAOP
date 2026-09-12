@@ -152,28 +152,30 @@ class BudgetGuard:
         today = self._today()
         total_tokens = prompt_tokens + completion_tokens
 
+        # P1-1 fix: 原先 SELECT + INSERT/UPDATE 是非原子的 read-modify-write，
+        # 两个线程可能同时 SELECT 到相同状态，然后都执行 INSERT（主键冲突）
+        # 或 UPDATE（计数丢失）。改用单条 INSERT ... ON CONFLICT DO UPDATE
+        # 原子 upsert：date 列是 PRIMARY KEY（满足 ON CONFLICT 目标列要求），
+        # excluded 代表试图插入的新值，tokens_used/cost_used 用累加实现原子计数。
+        # （来源：coding-pattern/2026-09-12-sqlite-read-modify-write-race-upsert-atomic-fix）
         with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO budget_daily (date, tokens_used, cost_used, calls_count) "
+                "VALUES (?, ?, ?, 1) "
+                "ON CONFLICT(date) DO UPDATE SET "
+                "tokens_used = tokens_used + excluded.tokens_used, "
+                "cost_used = cost_used + excluded.cost_used, "
+                "calls_count = calls_count + 1",
+                (today, total_tokens, cost_usd),
+            )
+            # 读取更新后的累计值用于构造 BudgetStatus 和预算超限判断。
             row = conn.execute(
                 "SELECT tokens_used, cost_used, calls_count FROM budget_daily WHERE date = ?",
                 (today,),
             ).fetchone()
-
-            if row is None:
-                conn.execute(
-                    "INSERT INTO budget_daily (date, tokens_used, cost_used, calls_count) VALUES (?, ?, ?, ?)",
-                    (today, total_tokens, cost_usd, 1),
-                )
-                tokens_used = total_tokens
-                cost_used = cost_usd
-                calls_count = 1
-            else:
-                tokens_used = row[0] + total_tokens
-                cost_used = row[1] + cost_usd
-                calls_count = row[2] + 1
-                conn.execute(
-                    "UPDATE budget_daily SET tokens_used = ?, cost_used = ?, calls_count = ? WHERE date = ?",
-                    (tokens_used, cost_used, calls_count, today),
-                )
+            tokens_used = row[0] if row else total_tokens
+            cost_used = row[1] if row else cost_usd
+            calls_count = row[2] if row else 1
 
         budget_exceeded = False
         reason = ""

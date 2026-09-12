@@ -134,6 +134,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
   transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
 }
 .detail-drawer__close:hover { background: var(--surface-2); color: var(--text); }
+.detail-drawer__close:active { transform: scale(0.92); }
 .detail-drawer__body { flex: 1; overflow-y: auto; padding: var(--sp-4); }
 .detail-drawer__foot { flex-shrink: 0; padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border); }
 

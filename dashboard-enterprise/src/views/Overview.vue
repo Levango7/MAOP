@@ -221,7 +221,12 @@ import { useEditionStore } from '../stores/edition.js';
 import { useI18n } from '../i18n';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
-import { Card, StatCard, Badge, DataTable, Skeleton, EmptyState } from '../components/index.js';
+import Card from '../components/Card.vue';
+import StatCard from '../components/StatCard.vue';
+import Badge from '../components/Badge.vue';
+import DataTable from '../components/DataTable.vue';
+import Skeleton from '../components/Skeleton.vue';
+import EmptyState from '../components/EmptyState.vue';
 // 2026-09-01: OnboardingWizard import removed — CoachMarks is the single
 // first-visit guide (see template comment above).
 import { cssVar, cssVarAlpha } from '../utils/chartTokens.js';
@@ -239,6 +244,7 @@ const error = ref('');
 const lastUpdated = ref(null);
 const pulsing = ref(false);
 let refreshTimer = null;
+let pulseTimer = null;
 
 // Activity timeline data — loaded from /api/info/activity
 const recentEvents = ref([]);
@@ -423,7 +429,8 @@ async function load() {
 }
 function refresh() {
   pulsing.value = true;
-  setTimeout(() => (pulsing.value = false), 320);
+  if (pulseTimer) clearTimeout(pulseTimer);
+  pulseTimer = setTimeout(() => (pulsing.value = false), 320);
   load();
 }
 
@@ -432,7 +439,7 @@ onMounted(async () => {
   await load();
   refreshTimer = setInterval(load, 30000);
 });
-onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
+onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); if (pulseTimer) clearTimeout(pulseTimer); });
 </script>
 
 <style scoped>

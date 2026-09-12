@@ -335,5 +335,6 @@ watch(
   transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
 .mcp-topo__btn:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.mcp-topo__btn:active:not(:disabled) { transform: scale(0.97); }
 .mcp-topo__btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

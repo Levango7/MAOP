@@ -219,6 +219,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   cursor: pointer;
 }
 .cmdpal__item:hover, .cmdpal__item.active { background: var(--brand-soft); }
+.cmdpal__item:active { transform: scale(0.99); }
 .cmdpal__item-icon { color: var(--text-muted); flex-shrink: 0; }
 .cmdpal__item.active .cmdpal__item-icon { color: var(--brand-strong); }
 .cmdpal__item-label { font-size: var(--fs-sm); font-weight: 600; }

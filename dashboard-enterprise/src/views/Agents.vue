@@ -25,7 +25,7 @@
       </button>
     </PageHeader>
 
-    <Card :title="t('view.agents.dispatchRouter')" :subtitle="t('view.agents.dispatchRouterSub')" :margin-bottom="24">
+    <Card :title="t('view.agents.dispatchRouter')" :subtitle="t('view.agents.dispatchRouterSub')" margin-bottom="var(--sp-6)">
       <template #actions>
         <button class="btn-action" :class="{ 'pulse-once': loadingDecisions }" :disabled="loadingDecisions" @click="loadDecisions">
           <AppIcon name="refresh" :size="14" />
@@ -97,7 +97,7 @@
       </div>
     </Card>
 
-    <Card :title="t('view.agents.localScan')" :subtitle="t('view.agents.localScanSub')" :margin-bottom="24">
+    <Card :title="t('view.agents.localScan')" :subtitle="t('view.agents.localScanSub')" margin-bottom="var(--sp-6)">
       <template #actions>
         <button class="btn-action" :class="{ 'pulse-once': scanning }" :disabled="scanning || !isAdmin" :title="!isAdmin ? t('nav.editionLocked') : ''" @click="scanLocal">
           <AppIcon name="search" :size="14" />
@@ -154,7 +154,7 @@
         <div class="agent-metrics">
           <div class="metric"><span class="metric-val mono">{{ a.model || 'auto' }}</span><span class="metric-lbl">{{ t('common.model') }}</span></div>
           <div class="metric"><span class="metric-val mono">{{ a.driver || '—' }}</span><span class="metric-lbl">{{ t('common.driver') }}</span></div>
-          <div class="metric"><span class="metric-val">{{ (a.capabilities || []).length }}</span><span class="metric-lbl">{{ t('common.caps') }}</span></div>
+          <div class="metric"><span class="metric-val">{{ (a.capabilities || []).length }}</span><span class="metric-lbl">{{ t('common.capabilities') }}</span></div>
           <div class="metric"><span class="metric-val">{{ a.last_latency_ms || 0 }}<small>ms</small></span><span class="metric-lbl">{{ t('common.latency') }}</span></div>
         </div>
         <div class="agent-actions">
@@ -183,10 +183,10 @@
       </Card>
     </div>
 
-    <Card v-else :margin-bottom="24" :title="t('view.agents.allAgents')" :padded="false">
+    <Card v-else margin-bottom="var(--sp-6)" :title="t('view.agents.allAgents')" :padded="false">
       <div class="agent-table">
         <div class="trow header">
-          <span>{{ t('view.agents.colAgent') }}</span><span>{{ t('common.status') }}</span><span>{{ t('common.model') }}</span><span>{{ t('common.driver') }}</span><span>{{ t('common.caps') }}</span><span>{{ t('common.latency') }}</span><span>{{ t('common.actions') }}</span>
+          <span>{{ t('view.agents.colAgent') }}</span><span>{{ t('common.status') }}</span><span>{{ t('common.model') }}</span><span>{{ t('common.driver') }}</span><span>{{ t('common.capabilities') }}</span><span>{{ t('common.latency') }}</span><span>{{ t('common.actions') }}</span>
         </div>
         <div v-for="a in agents" :key="a.name" class="trow">
           <span class="agent-name">{{ a.name }}</span>
@@ -209,7 +209,7 @@
       </div>
     </Card>
 
-    <Card v-if="selectedAgent" :title="selectedAgent" :margin-bottom="24">
+    <Card v-if="selectedAgent" :title="selectedAgent" margin-bottom="var(--sp-6)">
       <template #actions>
         <button class="close-btn" :aria-label="t('common.close')" @click="selectedAgent = null"><AppIcon name="x" :size="14" /></button>
       </template>
@@ -488,7 +488,13 @@ import { useApiStore } from '../stores/api.js';
 import { useRealtimeStore } from '../stores/realtime.js';
 import { useToast } from '../composables/useToast.js';
 import { useI18n } from '../i18n';
-import { Card, Badge, Skeleton, EmptyState, Segmented, AppIcon, PageHeader } from '../components/index.js';
+import Card from '../components/Card.vue';
+import Badge from '../components/Badge.vue';
+import Skeleton from '../components/Skeleton.vue';
+import EmptyState from '../components/EmptyState.vue';
+import Segmented from '../components/Segmented.vue';
+import AppIcon from '../components/AppIcon.vue';
+import PageHeader from '../components/PageHeader.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
 
 const api = useApiStore();
@@ -1014,7 +1020,7 @@ onMounted(() => {
   position: fixed; inset: 0; z-index: var(--z-modal);
   display: flex; align-items: center; justify-content: center;
   background: var(--overlay-scrim);
-  backdrop-filter: blur(8px);
+
   animation: maop-view-in .2s ease both;
 }
 

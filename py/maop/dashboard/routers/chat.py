@@ -14,6 +14,7 @@ Endpoints:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +34,6 @@ from .state import MAOP_ROOT  # noqa: E402
 
 
 def _get_engine():
-    import os
 
     from maop.core.agent.llm_chat.chat_engine import ChatEngine
     # 一号用户实测（2026-08-31）：原构造用 ChatEngine 默认值（agent="mavis"

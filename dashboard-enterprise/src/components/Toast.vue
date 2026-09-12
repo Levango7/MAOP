@@ -69,6 +69,7 @@ function iconFor(tone) {
 .toast--info { border-left-color: var(--brand); }
 .toast--info :deep(svg) { color: var(--brand-strong); }
 .toast__msg { flex: 1; }
+.toast:hover { background: var(--surface-2); }
 .toast:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 .toast-enter-active, .toast-leave-active { transition: all var(--motion) var(--ease-out); }

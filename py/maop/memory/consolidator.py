@@ -210,7 +210,17 @@ class DreamConsolidator:
         report.total_entries_scanned = stats.total_entries
 
         # Get all entries via search with empty query (returns all)
-        all_results = self._store.search(query="", top=10000)
+        # P2-9 note: top=10000 是硬编码上限。当 memory_entries 超过此数时，
+        # consolidation 只会处理最新的 10000 条，较早的条目不会被合并。
+        # 超限时记录 warning 以便运维感知。
+        _CONSOLIDATOR_TOP_LIMIT = 10000
+        if stats.total_entries > _CONSOLIDATOR_TOP_LIMIT:
+            logger.warning(
+                "[dream] memory_entries (%d) exceeds consolidation top limit (%d); "
+                "only the newest %d entries will be scanned, older entries skipped",
+                stats.total_entries, _CONSOLIDATOR_TOP_LIMIT, _CONSOLIDATOR_TOP_LIMIT,
+            )
+        all_results = self._store.search(query="", top=_CONSOLIDATOR_TOP_LIMIT)
         report.topics_identified = len(stats.by_topic)
 
         # Group by topic

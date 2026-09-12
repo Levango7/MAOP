@@ -46,7 +46,8 @@
 <script setup>
 import { ref } from 'vue';
 import { useI18n } from '../i18n';
-import { AppIcon, PageHeader } from '../components/index.js';
+import AppIcon from '../components/AppIcon.vue';
+import PageHeader from '../components/PageHeader.vue';
 import DOMPurify from 'dompurify';
 
 const { t } = useI18n();
@@ -324,8 +325,7 @@ function renderMarkdown(md) {
   color: var(--text-muted); font-size: var(--fs-sm);
   padding: var(--sp-8) 0; justify-content: center;
 }
-.spinning { animation: doc-spin 1s linear infinite; }
-@keyframes doc-spin { to { transform: rotate(360deg); } }
+.spinning { animation: maop-spin 1s linear infinite; }
 
 .docs-empty {
   display: flex; flex-direction: column; align-items: center; gap: var(--sp-3);

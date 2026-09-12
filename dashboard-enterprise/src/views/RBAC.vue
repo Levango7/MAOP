@@ -10,7 +10,7 @@
         </button>
       </template>
       <template #content>
-        <Card :title="t('view.rbac.roles')" icon="shield" :margin-bottom="16">
+        <Card :title="t('view.rbac.roles')" icon="shield" margin-bottom="var(--sp-4)">
           <div v-if="!rolesLoading" class="role-grid">
             <div v-for="r in roles" :key="r.role" class="role-card">
               <div class="role-card__head">
@@ -29,7 +29,7 @@
           <p v-if="rolesError" class="inline-error">{{ rolesError }}</p>
         </Card>
 
-        <Card :title="t('view.rbac.activeGrants')" icon="clipboard" :margin-bottom="16">
+        <Card :title="t('view.rbac.activeGrants')" icon="clipboard" margin-bottom="var(--sp-4)">
           <div v-if="grants.length" class="grant-list">
             <div v-for="g in grants" :key="g.__key" class="grant-row">
               <div class="grant-meta">
@@ -50,7 +50,7 @@
           <Skeleton v-else height="120px" />
         </Card>
 
-        <Card :title="t('view.rbac.permissionCatalog')" icon="lock" :margin-bottom="16">
+        <Card :title="t('view.rbac.permissionCatalog')" icon="lock" margin-bottom="var(--sp-4)">
           <DataTable
             v-if="permissions.length"
             :columns="permCols"

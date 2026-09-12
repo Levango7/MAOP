@@ -107,11 +107,13 @@ function prefetchHighFrequencyRoutes() {
       if (!route || !route.matched.length) continue;
       // 触发懒加载组件的 import()，将 chunk 加入浏览器缓存
       const components = route.matched.map((m) => m.components?.default);
+      // P2-8 fix: 仅当所有组件 chunk 都成功加载时才标记为已预加载，
+      // 避免部分 import 失败后仍 add(name) 导致后续不再重试预加载。
       Promise.all(
         components
           .filter((c) => typeof c === 'function')
-          .map((c) => Promise.resolve(c()).catch(() => {})),
-      ).then(() => prefetched.add(name));
+          .map((c) => Promise.resolve(c()).catch(() => undefined)),
+      ).then((results) => { if (results.every((r) => r !== undefined)) prefetched.add(name); });
     }
   });
 }
@@ -183,7 +185,8 @@ router.beforeEach((to) => {
   } catch { /* ignore */ }
   // 触发后端 config hydrate（不阻塞本次导航），供后续 SPA 导航使用真实 edition
   hydrateEditionFromConfig();
-  if (editionVal !== 'enterprise') return '/';
+  // P2-7 fix: 直接重定向到 /home，避免 / → /home 的二次重定向。
+  if (editionVal !== 'enterprise') return '/home';
   return true;
 });
 

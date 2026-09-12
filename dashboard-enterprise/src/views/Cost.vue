@@ -106,7 +106,7 @@
       </Card>
     </div>
 
-    <Card :title="t('view.cost.costByAgent')" icon="bot" :margin-bottom="16" class="margin-top">
+    <Card :title="t('view.cost.costByAgent')" icon="bot" margin-bottom="var(--sp-4)" class="margin-top">
       <div v-if="loading" class="blk"><Skeleton block height="14px" /><Skeleton block height="14px" /></div>
       <EmptyState v-else-if="!agentKeys.length" icon="bot" :title="t('view.cost.noAgentSpend')" :description="t('view.cost.noAgentSpendDesc')" />
       <div v-else class="agent-grid">
@@ -143,14 +143,20 @@ import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
 import { useToast } from '../composables/useToast.js';
-import { AppIcon, Card, StatCard, Badge, DataTable, Segmented, Skeleton, EmptyState, PageHeader } from '../components/index.js';
+import AppIcon from '../components/AppIcon.vue';
+import Card from '../components/Card.vue';
+import StatCard from '../components/StatCard.vue';
+import Badge from '../components/Badge.vue';
+import DataTable from '../components/DataTable.vue';
+import Segmented from '../components/Segmented.vue';
+import Skeleton from '../components/Skeleton.vue';
+import EmptyState from '../components/EmptyState.vue';
+import PageHeader from '../components/PageHeader.vue';
 
 const api = useApiStore();
 const { t } = useI18n();
 const toast = useToast();
 
-// ── API 路径常量 ──
-const API = { BUDGET: '/api/cost/budget' };
 
 const period = ref('7d');
 const loading = ref(false);
@@ -239,7 +245,7 @@ function cancelEdit() {
 async function saveBudget() {
   saving.value = true;
   try {
-    const res = await api.put(API.BUDGET, {
+    const res = await api.put('/api/cost/budget', {
       daily_limit_usd: Number(form.value.daily_limit_usd) || 0,
       monthly_limit_usd: Number(form.value.monthly_limit_usd) || 0,
       alert_threshold: (Number(form.value.alert_threshold) || 0) / 100,
@@ -266,7 +272,7 @@ async function load() {
   const start = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
   const [s, b, e] = await Promise.allSettled([
     api.get(`/api/cost/summary?start_date=${start}`),
-    api.get(API.BUDGET),
+    api.get('/api/cost/budget'),
     api.get(`/api/cost/entries?start_date=${start}&limit=50`),
   ]);
   if (s.status === 'fulfilled') summary.value = s.value.summary || summary.value;

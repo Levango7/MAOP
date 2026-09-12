@@ -76,14 +76,14 @@ describe('useToast timer cleanup', () => {
     expect(toastState.items[3].tone).toBe('info');
   });
 
-  it('show() without timeout creates a persistent toast with no timer', () => {
+  it('show() without timeout uses the 3200ms default and auto-dismisses', () => {
     const toast = useToast();
-    // No opts → opts.timeout is undefined → `if (t.timeout)` is falsy → no timer.
-    toast.show('persistent');
-    expect(toastState.items).toHaveLength(1);
-    expect(toastState.items[0]._timer).toBeUndefined();
-    vi.advanceTimersByTime(100000);
-    expect(toastState.items).toHaveLength(1);
+    // P1-1 fix: No opts → opts.timeout is undefined → ?? 3200 default applies.
+    toast.show('default');
+    expect(toastState.items[0].timeout).toBe(3200);
+    expect(toastState.items[0]._timer).toBeTruthy();
+    vi.advanceTimersByTime(3200);
+    expect(toastState.items).toHaveLength(0);
   });
 
   it('show() with timeout:null falls back to the 3200ms default and auto-dismisses', () => {

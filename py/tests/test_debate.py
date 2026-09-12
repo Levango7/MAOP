@@ -821,7 +821,7 @@ def test_api_start_with_admin_role(app_with_debate, monkeypatch):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["ok"] is True
+    assert data["status"] == "ok"
     assert "verdict" in data
 
 
@@ -847,7 +847,7 @@ def test_api_config_with_admin_role(app_with_debate):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["ok"] is True
+    assert data["status"] == "ok"
     assert data["config"]["max_rounds"] == 5
 
 

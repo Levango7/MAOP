@@ -122,7 +122,12 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
-import { StatCard, Card, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
+import StatCard from '../components/StatCard.vue';
+import Card from '../components/Card.vue';
+import Skeleton from '../components/Skeleton.vue';
+import EmptyState from '../components/EmptyState.vue';
+import AppIcon from '../components/AppIcon.vue';
+import PageHeader from '../components/PageHeader.vue';
 import { useI18n } from '../i18n';
 
 const { t } = useI18n();

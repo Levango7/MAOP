@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -23,9 +24,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/info", tags=["info"])
 
 
+class EditionSwitchRequest(BaseModel):
+    """Request body for POST /api/info/edition (P2-8: 替换 await request.json())."""
+
+    edition: str = Field(min_length=1, description="Target edition: 'personal' or 'enterprise'")
+
+
 @router.post("/edition")
 @handle_api_errors
-async def set_edition_endpoint(request: Request) -> dict[str, Any]:
+async def set_edition_endpoint(request: Request, body: EditionSwitchRequest) -> dict[str, Any]:
     """切换运行时 edition（仅 admin）。
 
     请求体: {"edition": "personal" | "enterprise"}
@@ -40,14 +47,8 @@ async def set_edition_endpoint(request: Request) -> dict[str, Any]:
     # 1. admin 权限守卫（未认证由 middleware 拦截返回 401；非 admin 抛 403）
     require_admin(request)
 
-    # 2. 解析请求体
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(400, "Invalid JSON body")
-    target = body.get("edition", "")
-    if not isinstance(target, str) or not target:
-        raise HTTPException(400, "missing 'edition' field")
+    # 2. 解析请求体（P2-8: 由 FastAPI 通过 EditionSwitchRequest Pydantic 模型自动校验）
+    target = body.edition
 
     # 3. 校验 edition 取值
     from maop.config.edition import Edition, get_edition, set_edition

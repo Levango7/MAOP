@@ -248,6 +248,7 @@ function formatRel(ts) {
   color: var(--text);
   border-color: var(--border-strong);
 }
+.dt__pager-btn:active:not(:disabled) { transform: scale(0.95); }
 .dt__pager-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;

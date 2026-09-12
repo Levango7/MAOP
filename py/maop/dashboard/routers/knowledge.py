@@ -213,8 +213,7 @@ async def get_knowledge_graph_v2(
     """
     require_admin(request)
     # ── Parameter validation ──
-    if limit < 1 or limit > 10000:
-        raise HTTPException(status_code=400, detail="limit must be between 1 and 10000")
+    # P2-5: limit 范围已由 Query(ge=1, le=1000) 约束，移除冗余的手动检查
     if time_range:
         parts = time_range.split(",")
         if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():

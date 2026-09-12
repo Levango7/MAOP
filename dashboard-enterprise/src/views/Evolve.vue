@@ -69,7 +69,7 @@
         </ol>
       </section>
 
-    <Card :title="t('view.evolve.statsByAgent')" icon="gauge" :margin-bottom="16">
+    <Card :title="t('view.evolve.statsByAgent')" icon="gauge" margin-bottom="var(--sp-4)">
       <DataTable
         v-if="byAgent.length"
         :columns="agentCols"
@@ -85,7 +85,7 @@ v-else-if="!loading" icon="gauge" :title="t('view.evolve.noData')"
     </Card>
 
     <!-- P2-12: Evolution metrics trend (Chart.js) -->
-    <Card :title="t('view.evolve.timeseries.title')" icon="activity" :margin-bottom="16">
+    <Card :title="t('view.evolve.timeseries.title')" icon="activity" margin-bottom="var(--sp-4)">
       <div class="evolve-chart-desc muted">{{ t('view.evolve.timeseries.desc') }}</div>
       <div class="evolve-chart-box">
         <Line v-if="timeseriesChartData.labels.length" :data="timeseriesChartData" :options="timeseriesChartOptions" />
@@ -94,7 +94,7 @@ v-else-if="!loading" icon="gauge" :title="t('view.evolve.noData')"
     </Card>
 
     <!-- P2-12: Strategy effectiveness heatmap -->
-    <Card :title="t('view.evolve.heatmap.title')" icon="grid" :margin-bottom="16">
+    <Card :title="t('view.evolve.heatmap.title')" icon="grid" margin-bottom="var(--sp-4)">
       <div class="evolve-chart-desc muted">{{ t('view.evolve.heatmap.desc') }}</div>
       <div v-if="heatmapCells.length" class="heatmap">
         <table class="heatmap__table">
@@ -122,7 +122,7 @@ v-else-if="!loading" icon="gauge" :title="t('view.evolve.noData')"
     </Card>
 
     <!-- P2-12: Agent configuration lineage -->
-    <Card :title="t('view.evolve.lineage.title')" icon="git-branch" :margin-bottom="16">
+    <Card :title="t('view.evolve.lineage.title')" icon="git-branch" margin-bottom="var(--sp-4)">
       <div class="evolve-chart-desc muted">{{ t('view.evolve.lineage.desc') }}</div>
       <!-- 迭代 B1: 世系时间线(故事化) + 明细表格(下钻)并存 -->
       <EvolutionTimeline v-if="lineage.length" :items="lineage" class="evo-tl" />
@@ -137,19 +137,19 @@ v-else-if="!loading" icon="gauge" :title="t('view.evolve.noData')"
     </Card>
 
     <div class="two-col">
-      <Card :title="t('view.evolve.strategies')" icon="brain" :margin-bottom="16">
+      <Card :title="t('view.evolve.strategies')" icon="brain" margin-bottom="var(--sp-4)">
         <EmptyState
 icon="brain" :title="t('view.evolve.notAvailable')"
                     :description="t('view.evolve.strategiesNADesc')" />
       </Card>
-      <Card :title="t('view.evolve.history')" icon="scroll" :margin-bottom="16">
+      <Card :title="t('view.evolve.history')" icon="scroll" margin-bottom="var(--sp-4)">
         <EmptyState
 icon="scroll" :title="t('view.evolve.notAvailable')"
                     :description="t('view.evolve.historyNADesc')" />
       </Card>
     </div>
 
-    <Card :title="t('view.evolve.promptHistory')" icon="clipboard" :margin-bottom="16">
+    <Card :title="t('view.evolve.promptHistory')" icon="clipboard" margin-bottom="var(--sp-4)">
       <EmptyState
 icon="clipboard" :title="t('view.evolve.notAvailable')"
                   :description="t('view.evolve.promptNADesc')" />

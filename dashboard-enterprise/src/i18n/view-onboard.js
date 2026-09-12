@@ -10,7 +10,7 @@ export const messages = {
     'view.onboard.step2Desc': 'Browse the Agent catalog and manage your models.',
     'view.onboard.step2Hint': 'You can add new models from the Models page.',
     'view.onboard.step3Desc': 'You are all set! Explore the docs for advanced features.',
-    'view.onboard.docsUrl': '/docs',
+    // P2-10 fix: docsUrl 是 URL 而非可翻译文本，移到组件常量中。
     'view.onboard.createAgent': 'Create Agent',
     'view.onboard.openChat': 'Open Chat',
     'view.onboard.browseAgents': 'Browse Agents',
@@ -29,7 +29,7 @@ export const messages = {
     'view.onboard.step2Desc': '浏览 Agent 目录并管理你的模型。',
     'view.onboard.step2Hint': '你可以在模型页面添加新的模型。',
     'view.onboard.step3Desc': '你已经准备好了！探索文档了解更多高级功能。',
-    'view.onboard.docsUrl': '/docs',
+    // P2-10 fix: docsUrl 是 URL 而非可翻译文本，移到组件常量中。
     'view.onboard.createAgent': '创建 Agent',
     'view.onboard.openChat': '打开对话',
     'view.onboard.browseAgents': '浏览 Agent',

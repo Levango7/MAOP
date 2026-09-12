@@ -109,7 +109,8 @@ function formatTime(ts) {
 /* R9 修复: --border-light 统一为 --border-subtle (与其他组件一致) */
 .node-detail-panel__row + .node-detail-panel__row { border-top: 1px solid var(--border-subtle); }
 .node-detail-panel__label {
-  width: 80px;
+  /* R11 修复: 80px 硬编码改为 CSS 变量 --node-label-w */
+  width: var(--node-label-w);
   flex-shrink: 0;
   color: var(--text-muted);
   font-weight: 500;
@@ -133,7 +134,8 @@ function formatTime(ts) {
   font-size: var(--fs-xs);
   font-family: var(--font-mono);
   overflow-x: auto;
-  max-height: 200px;
+  /* R11 修复: 200px 硬编码改为 CSS 变量 --node-traceback-max-h */
+  max-height: var(--node-traceback-max-h);
   overflow-y: auto;
   white-space: pre-wrap;
 }

@@ -139,7 +139,11 @@ export const coreMessages = {
     'auth.networkError': 'Network error',
     // P1-9 fix: edition store switchError 使用 i18n key 替代硬编码英文。
     'auth.authenticationRequired': 'Authentication required',
+    // P1-3 fix: edition store 401 Unauthorized 使用 i18n key 替代硬编码英文。
+    'auth.unauthorized': 'Unauthorized',
     'edition.refreshFailed': 'Failed to refresh edition info after switch',
+    // P2-12 fix: edition store switchFailed 使用 i18n key 替代硬编码英文。
+    'edition.switchFailed': 'Switch failed: HTTP {status}',
 
     // ── Footer ──────────────────────────────────────────────────
     'footer.tagline': 'Multi-Agent Orchestration Platform',
@@ -203,7 +207,7 @@ export const coreMessages = {
     'common.status': 'Status',
     'common.model': 'Model',
     'common.driver': 'Driver',
-    'common.caps': 'Capabilities',
+    // P2-11 fix: 删除重复键 common.caps，统一使用 common.capabilities。
     'common.latency': 'Latency',
     'common.configuration': 'Configuration',
     'common.capabilities': 'Capabilities',
@@ -503,7 +507,7 @@ export const coreMessages = {
     'common.status': '状态',
     'common.model': '模型',
     'common.driver': '驱动',
-    'common.caps': '能力',
+    // P2-11 fix: 删除重复键 common.caps，统一使用 common.capabilities。
     'common.latency': '延迟',
     'common.configuration': '配置',
     'common.capabilities': '能力',
@@ -570,7 +574,11 @@ export const coreMessages = {
     'auth.loginFailed': '登录失败',
     // P1-9 fix: edition store switchError 使用 i18n key 替代硬编码英文。
     'auth.authenticationRequired': '需要认证',
+    // P1-3 fix: edition store 401 Unauthorized 使用 i18n key 替代硬编码英文。
+    'auth.unauthorized': '未授权',
     'edition.refreshFailed': '切换后刷新版本信息失败',
+    // P2-12 fix: edition store switchFailed 使用 i18n key 替代硬编码英文。
+    'edition.switchFailed': '切换失败: HTTP {status}',
 
     // ── F33 修复: 顶栏 / 用户模块中文翻译 ──
     'topbar.refreshTime': '最后刷新',

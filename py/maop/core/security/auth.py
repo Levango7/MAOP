@@ -22,7 +22,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.backends.db_utils import ConnectionPool, get_db_path, get_pool
+from maop.core.backends.db_utils import ConnectionPool, find_project_root, get_db_path, get_pool
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +220,9 @@ class JWTHandler:
         self._cleanup_interval: float = 600.0
         # P2-2 fix: persist revocation blacklist across restarts so revoked
         # tokens remain invalid after a server restart.
-        root = os.environ.get("MAOP_ROOT_DIR", ".")
+        # P2-10 fix: 原先回退到 "." 会导致 jwt_revoked.json 写入 CWD。改为
+        # 优先读 MAOP_ROOT_DIR 环境变量，未设置时用 find_project_root() 定位。
+        root = os.environ.get("MAOP_ROOT_DIR") or str(find_project_root())
         self._revoked_file = Path(root) / "data" / "jwt_revoked.json"
         self._load_revoked()
 

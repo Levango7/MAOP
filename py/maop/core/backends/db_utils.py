@@ -97,6 +97,9 @@ def sqlite_connect(
         conn.execute("PRAGMA foreign_keys=ON")
     # T2-10: Multi-container SQLite coordination — WAL allows 1 writer + N readers.
     # busy_timeout increased to 10s (env-override: MAOP_SQLITE_BUSY_TIMEOUT_MS).
+    # P2-13 note: f-string 拼接 PRAGMA 值是安全的——_get_busy_timeout_ms()
+    # 已将环境变量验证为非负 int 并回退到默认值，不存在注入风险。PRAGMA
+    # busy_timeout 不支持参数化绑定（PRAGMA 语句不接受 ? 占位符），只能内联。
     conn.execute(f"PRAGMA busy_timeout={_get_busy_timeout_ms()}")
     try:
         yield conn
@@ -156,6 +159,8 @@ class ConnectionPool:
         conn.execute("PRAGMA journal_mode=WAL")
         # T2-10: Multi-container SQLite coordination — WAL allows 1 writer + N readers.
         # busy_timeout increased to 10s (env-override: MAOP_SQLITE_BUSY_TIMEOUT_MS).
+        # P2-13 note: 同上——_get_busy_timeout_ms() 已验证为非负 int，无注入风险。
+        # PRAGMA 不支持参数化绑定，只能 f-string 内联。
         conn.execute(f"PRAGMA busy_timeout={_get_busy_timeout_ms()}")
         return conn
 

@@ -142,7 +142,7 @@ async def api_supervisor_actions(
 @router.post("/action")
 @handle_api_errors(
     "Supervisor manual action",
-    error_value={"ok": False, "error": "Action failed"},
+    error_value={"status": "error", "error": "Action failed"},
 )
 async def api_supervisor_action(
     request: Request,
@@ -243,7 +243,7 @@ async def api_supervisor_action(
 @router.post("/patrol")
 @handle_api_errors(
     "Supervisor manual patrol",
-    error_value={"ok": False, "error": "Patrol failed"},
+    error_value={"status": "error", "error": "Patrol failed"},
 )
 async def api_supervisor_patrol(
     request: Request,

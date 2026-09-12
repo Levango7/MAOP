@@ -234,7 +234,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useI18n } from '../i18n';
 import { useKnowledgeGraph, toVisNode, toVisEdge, progressiveLoad } from '../composables/useKnowledgeGraph.js';
 import PageHeader from '../components/PageHeader.vue';
@@ -774,7 +774,7 @@ onMounted(() => {
   }).catch(() => { /* fetchGraph handles error internally */ });
 });
 
-onBeforeUnmount(() => {
+onUnmounted(() => {
   stopFpsMeasure();
   if (cullRafId) cancelAnimationFrame(cullRafId);
   if (renderTimer) clearTimeout(renderTimer);
@@ -916,8 +916,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   /* loading 覆盖层层级: 使用 --z-raised token 适配主题层级体系 */
   z-index: var(--z-raised);
 }
-.kg-spin { animation: kg-spin 1s linear infinite; }
-@keyframes kg-spin { to { transform: rotate(360deg); } }
+.kg-spin { animation: maop-spin 1s linear infinite; }
 
 /* ── Detail panel ── */
 .kg-detail { display: flex; flex-direction: column; }

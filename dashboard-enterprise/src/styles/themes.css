@@ -93,7 +93,7 @@
   /* Extension tokens (P2-1) — identical literals to :root so light-theme
    * rendering is unchanged from the previous inline fallbacks. */
   --bg-card: var(--surface);
-  --bg-muted: rgba(148, 163, 184, .16);
+  --bg-muted: rgba(148, 163, 184, .16);  /* legacy alias — 亮色与暗色值相同, 语义等价于 --surface-2 派生 */
   --bg-hover: rgba(148, 163, 184, .16);
   --bg-code: #f6f7f9;
   --text-code: #4e5566;

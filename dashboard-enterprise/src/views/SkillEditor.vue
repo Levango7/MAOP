@@ -280,7 +280,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
-import { useI18n } from '../i18n/index.js';
+import { useI18n } from '../i18n';
 import ListPageLayout from '../components/ListPageLayout.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
 import Badge from '../components/Badge.vue';

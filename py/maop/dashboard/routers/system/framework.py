@@ -9,7 +9,9 @@ Endpoints:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 import platform
 import sys
 import time
@@ -59,7 +61,7 @@ async def api_framework_status(request: Request) -> dict[str, Any]:
         if (_deps.MAOP_ROOT / "data").exists()
         else []
     )
-    return {
+    result = {
         "status": "ok",
         "version": MAOP_ver,
         "python": sys.version.split()[0],
@@ -68,8 +70,11 @@ async def api_framework_status(request: Request) -> dict[str, Any]:
         "test_files": test_files,
         "db_files": db_files,
         "uptime_s": round(time.time() - _deps.start_time, 1),
-        "root": str(_deps.MAOP_ROOT),
     }
+    # P2-12: 服务器文件系统路径属于内部信息，仅在 debug 模式下返回，避免泄露
+    if os.environ.get("MAOP_DEBUG", "").lower() in ("1", "true", "yes"):
+        result["root"] = str(_deps.MAOP_ROOT)
+    return result
 
 
 @router.get("/api/framework/logs")
@@ -86,8 +91,7 @@ async def api_framework_logs(request: Request, limit: int = Query(50, ge=1, le=5
                 lines = _text.strip().split("\n")
                 for line in lines[-limit:]:
                     try:
-                        import json as _json
-                        logs.append(_json.loads(line))
+                        logs.append(json.loads(line))
                     except Exception as exc:
                         logger.warning('Failed to parse log line: %s', exc)
                 if len(logs) >= limit:

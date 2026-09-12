@@ -119,11 +119,17 @@ export const useEditionStore = defineStore('edition', () => {
           { method: 'POST', body: JSON.stringify({ edition: targetEdition }) },
           { 'Content-Type': 'application/json' }
         ));
-        if (res.status === 401) { throw new Error('401 Unauthorized'); }
+        if (res.status === 401) {
+          // P1-3 fix: 使用 i18n key 替代硬编码英文 '401 Unauthorized'。
+          const { t } = useI18n();
+          throw new Error(t('auth.unauthorized'));
+        }
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const msg = data.error || data.detail || `Switch failed: HTTP ${res.status}`;
+        // P2-12 fix: 使用 i18n key 替代硬编码英文 'Switch failed: HTTP {status}'。
+        const { t } = useI18n();
+        const msg = data.error || data.detail || t('edition.switchFailed', { status: res.status });
         switchError.value = msg;
         throw new Error(msg);
       }

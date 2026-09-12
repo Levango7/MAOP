@@ -9,7 +9,7 @@
       <StatCard :label="t('view.search.stat.graphEdges')" :value="graphStats.edges" icon="link" tone="success" :loading="statsLoading" />
     </section>
 
-    <Card icon="search" :margin-bottom="16">
+    <Card icon="search" margin-bottom="var(--sp-4)">
       <Segmented v-model="activeTab" :options="tabOptions" />
       <div class="search-bar">
         <div class="input-wrap">
@@ -76,7 +76,14 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
-import { Card, StatCard, DataTable, Segmented, Skeleton, EmptyState, AppIcon, PageHeader } from '../components/index.js';
+import Card from '../components/Card.vue';
+import StatCard from '../components/StatCard.vue';
+import DataTable from '../components/DataTable.vue';
+import Segmented from '../components/Segmented.vue';
+import Skeleton from '../components/Skeleton.vue';
+import EmptyState from '../components/EmptyState.vue';
+import AppIcon from '../components/AppIcon.vue';
+import PageHeader from '../components/PageHeader.vue';
 
 const api = useApiStore();
 const { t } = useI18n();

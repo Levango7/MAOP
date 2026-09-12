@@ -36,7 +36,7 @@
         </select>
       </template>
       <template #content>
-        <Card :title="t('view.tasks.title')" icon="scroll" :margin-bottom="16">
+        <Card :title="t('view.tasks.title')" icon="scroll" margin-bottom="var(--sp-4)">
           <template #actions>
             <span class="muted">{{ t('view.tasks.pageInfo', { page, total: totalPages || 1 }) }}</span>
           </template>
@@ -130,7 +130,7 @@
 // EmptyState / DetailDrawer / AppIcon), 与 Audit.vue / Overview.vue 风格一致。
 // 未引入 Element Plus — 项目组件库为自研, 保持 UI 一致性 (见 README)。
 
-import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
@@ -331,6 +331,11 @@ async function executeRerun() {
 onMounted(() => {
   loadTasks();
 });
+
+// P1-1: 组件卸载时清理 searchDebounce, 避免内存泄漏
+onUnmounted(() => {
+  if (searchDebounce) clearTimeout(searchDebounce);
+});
 </script>
 
 <style scoped>
@@ -485,10 +490,7 @@ onMounted(() => {
 .spinning {
   animation: maop-spin 1s linear infinite;
 }
-@keyframes maop-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+
 
 .muted {
   color: var(--text-muted);

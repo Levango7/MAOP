@@ -413,6 +413,8 @@ async def oidc_callback(
     """OIDC 回调（PRD 4.3）。公开端点。"""
     _require_sso()
     if error:
+        # P2-15: IdP 错误描述仅记录到日志/审计，不泄露到响应体
+        logger.warning("[sso] OIDC callback provider=%s error: %s", provider_id, error)
         _audit(
             request,
             "sso.login.failure",
@@ -424,7 +426,7 @@ async def oidc_callback(
             status_code=400,
             content={
                 "status": "error",
-                "error": f"SSO provider error: {error}",
+                "error": "SSO provider error",
                 "code": "SSO_CALLBACK_ERROR",
             },
         )

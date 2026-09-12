@@ -14,6 +14,8 @@ from typing import Any, cast
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
+from maop.core.backends.db_utils import find_project_root
+
 logger = logging.getLogger(__name__)
 
 # ── Pydantic models ───────────────────────────────────────────
@@ -151,7 +153,6 @@ def _load_yaml(path: Path) -> dict[str, Any] | None:
         return None
 
 
-from maop.core.backends.db_utils import find_project_root
 
 # === Config loading cache ============================================
 #

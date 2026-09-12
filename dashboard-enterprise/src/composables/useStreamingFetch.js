@@ -37,8 +37,6 @@ export function useStreamingFetch() {
 
     // AbortController for cancellable streaming (prevents leak on unmount/renavigate)
     const controller = new AbortController();
-    // P1-2 fix: 注册到活跃集合，stream 结束后移除。
-    _activeControllers.add(controller);
     const onAbort = () => controller.abort();
     // M4 fix: fetch 开始前检查外部 signal 是否已 aborted。
     // 若外部 signal 在调用 stream() 之前已 aborted，addEventListener('abort')
@@ -47,6 +45,10 @@ export function useStreamingFetch() {
       if (onError) onError('Aborted');
       return;
     }
+    // P1-2 fix: 注册到活跃集合，stream 结束后移除。
+    // P2-5 fix: add 移到 aborted 检查之后，避免已 aborted 时 return（在 try 外，
+    // finally 不执行）导致 controller 残留 在 _activeControllers 中。
+    _activeControllers.add(controller);
     if (callbacks.signal) {
       callbacks.signal.addEventListener('abort', onAbort);
     }

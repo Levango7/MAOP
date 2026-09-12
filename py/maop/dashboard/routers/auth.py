@@ -659,8 +659,12 @@ async def auth_delete_user(username: str, request: Request) -> Any:
             None, _db_delete_user, str(db_path), username
         )
         if result.get("status") == "ok":
+            # P0-7: 移除 http_status 字段，避免内部状态泄露到响应体
+            result.pop("http_status", None)
             return result
-        return JSONResponse(result, status_code=result.get("http_status", 500))
+        # P0-7: 提取 http_status 用于 HTTP 状态码，但从响应体中移除
+        http_status = result.pop("http_status", 500)
+        return JSONResponse(result, status_code=http_status)
     except HTTPException:
         raise
     except Exception:
@@ -688,8 +692,12 @@ async def auth_update_user(username: str, request: Request, body: UpdateUserRequ
             None, _db_update_user, str(db_path), username, update_payload
         )
         if result.get("status") == "ok":
+            # P0-7: 移除 http_status 字段，避免内部状态泄露到响应体
+            result.pop("http_status", None)
             return result
-        return JSONResponse(result, status_code=result.get("http_status", 500))
+        # P0-7: 提取 http_status 用于 HTTP 状态码，但从响应体中移除
+        http_status = result.pop("http_status", 500)
+        return JSONResponse(result, status_code=http_status)
     except HTTPException:
         raise
     except Exception:

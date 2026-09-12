@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
+import json
 import logging
+import os
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -127,13 +131,11 @@ async def api_evolve_metrics(request: Request) -> dict[str, Any]:
 
     heatmap: list[dict[str, Any]] = []  # type: ignore[no-redef]
     agent_counts: dict[str, dict[str, Any]] = {}
-    import contextlib
-    import json as _json
 
     for h in history:
         agent = ""
         with contextlib.suppress(Exception):
-            rpt = _json.loads(h.model_dump_json()) if h else {}
+            rpt = json.loads(h.model_dump_json()) if h else {}
             agent = rpt.get("agent", "") or rpt.get("agent_name", "") or ""
         if not agent:
             continue
@@ -321,7 +323,7 @@ async def api_evolution_loop_status(request: Request) -> dict[str, Any]:
     """
     require_admin(request)
     from maop.core.evolution.evolution_loop import EvolutionLoop
-    import os
+
 
     try:
         loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
@@ -441,7 +443,7 @@ async def api_evolution_approval_decision(approval_id: str, request: Request, bo
     # 这里简化实现：仅更新 LoopReport 的 approval_state
     # 完整实现需持久化审批记录、触发后续 APPLY/AB 流程
     from maop.core.evolution.evolution_loop import EvolutionLoop
-    import time
+
 
     try:
         loop = EvolutionLoop(root_dir=str(MAOP_ROOT))

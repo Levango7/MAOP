@@ -395,7 +395,7 @@ async def get_config(request: Request) -> dict[str, Any]:
     try:
         from maop.config.settings import MAOPSettings
         s = MAOPSettings()
-        return {
+        result: dict[str, Any] = {
             "project_name": s.project_name,
             "edition": s.edition,
             "debug": s.debug,
@@ -405,14 +405,17 @@ async def get_config(request: Request) -> dict[str, Any]:
             "dash_workers": s.dash_workers,
             "auth_enabled": s.auth_enabled,
             "tls_enabled": s.tls_enabled,
-            "root_dir": str(s.root_dir),
-            "data_dir": str(s.data_dir),
-            "db_path": str(s.db_path),
-            "memory_db_path": str(s.memory_db_path),
             "rate_limit_enabled": s.rate_limit_enabled,
             "rate_limit_rps": s.rate_limit_rps,
             "rate_limit_burst": s.rate_limit_burst,
         }
+        # P2-13: 内部文件系统路径仅在 debug 模式下返回，避免泄露服务器路径信息
+        if s.debug:
+            result["root_dir"] = str(s.root_dir)
+            result["data_dir"] = str(s.data_dir)
+            result["db_path"] = str(s.db_path)
+            result["memory_db_path"] = str(s.memory_db_path)
+        return result
     except Exception as exc:
         # 批次3A: 脱敏——系统信息读取错误细节不暴露给客户端，仅日志记录。
         logger.warning("[meta] System info failed: %s", exc)

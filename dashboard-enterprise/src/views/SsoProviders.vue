@@ -321,13 +321,6 @@ const api = useApiStore();
 const toast = useToast();
 const { showConfirm } = useConfirm();
 
-// ── API 路径常量 ──
-const API = {
-  PROVIDERS: '/api/v1/sso/providers',
-  provider: (id) => `/api/v1/sso/providers/${id}`,
-  test: (id) => `/api/v1/sso/providers/${id}/test`,
-  metadata: (id) => `/api/v1/sso/providers/${id}/metadata`,
-};
 
 // ── 列表状态 ──────────────────────────────────────────────
 const providers = ref([]);
@@ -445,7 +438,7 @@ function formatRel(ts) {
 async function load() {
   loading.value = true;
   try {
-    const d = await api.get(API.PROVIDERS);
+    const d = await api.get('/api/v1/sso/providers');
     providers.value = d.providers || [];
     error.value = '';
   } catch (e) {
@@ -685,9 +678,9 @@ async function saveProvider() {
   try {
     const payload = buildPayload();
     if (isEditing.value) {
-      await api.put(API.provider(editingId.value), payload);
+      await api.put(`/api/v1/sso/providers/${editingId.value}`, payload);
     } else {
-      await api.post(API.PROVIDERS, payload);
+      await api.post('/api/v1/sso/providers', payload);
     }
     toast.success(t('view.sso.saved'));
     closeDialog();
@@ -703,7 +696,7 @@ async function saveProvider() {
 async function testProvider(p) {
   testingId.value = p.id;
   try {
-    const d = await api.post(API.test(p.id), {});
+    const d = await api.post(`/api/v1/sso/providers/${p.id}/test`, {});
     if (d.reachable) {
       const latency = d.details && typeof d.details.latency_ms === 'number' ? ` (${d.details.latency_ms}ms)` : '';
       toast.success(t('view.sso.testSuccess') + latency);
@@ -720,7 +713,7 @@ async function testProvider(p) {
 // ── 启用/禁用 ─────────────────────────────────────────────
 async function toggleProvider(p) {
   try {
-    await api.put(API.provider(p.id), { enabled: !p.enabled });
+    await api.put(`/api/v1/sso/providers/${p.id}`, { enabled: !p.enabled });
     toast.success(!p.enabled ? t('common.enable') : t('common.disable'));
     await load();
   } catch (e) {
@@ -733,7 +726,7 @@ async function deleteProvider(p) {
   const ok = await showConfirm({ message: t('view.sso.confirmDelete'), tone: 'danger' });
   if (!ok) return;
   try {
-    await api.delete(API.provider(p.id));
+    await api.delete(`/api/v1/sso/providers/${p.id}`);
     toast.success(t('view.sso.deleted'));
     await load();
   } catch (e) {
@@ -749,7 +742,7 @@ async function downloadMetadata(p) {
   }
   try {
     // metadata 端点返回 XML 文本而非 JSON, 使用 api store 基础设施 (认证+超时) 获取 text
-    const res = await fetchWithTimeout(API.metadata(p.id), withAuth({}, {}));
+    const res = await fetchWithTimeout(`/api/v1/sso/providers/${p.id}/metadata`, withAuth({}, {}));
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const xml = await res.text();
     // 触发浏览器下载

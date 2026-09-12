@@ -119,6 +119,6 @@ function set(key, val) { props.modelValue[key] = val; }
   background-repeat: no-repeat;
   background-position: right var(--sp-2) center;
 }
-.filterbar__select:focus { outline: none; border-color: var(--brand); }
+.filterbar__select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
 .filterbar__meta { margin-left: auto; font-size: var(--fs-xs); color: var(--text-faint); white-space: nowrap; }
 </style>

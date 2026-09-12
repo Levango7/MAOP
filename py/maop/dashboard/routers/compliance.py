@@ -36,9 +36,11 @@ def _get_manager(request: Request) -> ComplianceManager:
             return _compliance_mgr
         root_dir = getattr(request.app.state, "root_dir", None)
         if not root_dir:
+            # P2-14: 脱敏错误信息，不暴露 app.state/ComplianceManager 等内部组件名
+            logger.error("[compliance] root_dir not configured on app.state")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Compliance root_dir not configured on app.state — cannot initialize ComplianceManager",
+                detail="Compliance service not configured",
             )
         _compliance_mgr = ComplianceManager(root_dir)
     return _compliance_mgr

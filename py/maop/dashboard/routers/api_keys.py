@@ -16,6 +16,7 @@ Routes (prefix ``/api/api-keys``):
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -54,7 +55,6 @@ def _get_manager(request: Request) -> Any:
 
 def _client_ip(request: Request) -> str:
     """Best-effort client IP extraction (respects MAOP_TRUST_PROXY)."""
-    import os
 
     if os.environ.get("MAOP_TRUST_PROXY", "0") == "1":
         xff = request.headers.get("x-forwarded-for", "")

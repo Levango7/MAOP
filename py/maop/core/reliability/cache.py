@@ -700,8 +700,20 @@ class SingleFlight:
                 self._locks.pop(key, None)
 
     def _wait(self, key: str, event: threading.Event) -> tuple[Any, bool]:
-        """Wait for the executing caller to finish."""
-        event.wait(timeout=self._timeout)
+        """Wait for the executing caller to finish.
+
+        Raises
+        ------
+        TimeoutError
+            If the wait exceeds ``self._timeout`` and the executing caller
+            has not yet set the event. Previously returned ``(None, True)``
+            which was ambiguous — the caller could not distinguish "the
+            computed result is genuinely None" from "wait timed out".
+        """
+        if not event.wait(timeout=self._timeout):
+            raise TimeoutError(
+                f"SingleFlight wait timed out after {self._timeout}s for key={key!r}"
+            )
 
         with self._mutex:
             if key in self._errors:
@@ -808,7 +820,11 @@ class CacheGuard:
         if ttl is not None and self._config.enable_jitter:
             jitter = ttl * self._config.ttl_jitter_ratio * (2 * random.random() - 1)
             effective_ttl = max(1.0, ttl + jitter)
-            self._stats.ttl_jitters += 1
+            # P2-12 fix: ttl_jitters 统计计数器原先在锁外更新，与并发的
+            # hits/misses/null_hits 更新竞态导致统计偏差。移入锁内。
+            # （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
+            with self._lock:
+                self._stats.ttl_jitters += 1
 
         with self._lock:
             if value is None and self._config.enable_null_cache:

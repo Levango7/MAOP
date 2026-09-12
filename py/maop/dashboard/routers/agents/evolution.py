@@ -57,8 +57,15 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                out_b, err_b = await asyncio.wait_for(proc.communicate(), timeout=5)
-                current = (out_b.decode(errors="replace") or err_b.decode(errors="replace")).strip()[:100]
+                try:
+                    out_b, err_b = await asyncio.wait_for(proc.communicate(), timeout=5)
+                except asyncio.TimeoutError:
+                    # P1-10: 超时后必须 kill 子进程并回收，避免进程泄漏
+                    proc.kill()
+                    await proc.wait()
+                    current = "unknown"
+                else:
+                    current = (out_b.decode(errors="replace") or err_b.decode(errors="replace")).strip()[:100]
             except Exception:
                 current = "unknown"
 
@@ -73,7 +80,13 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                out_b, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+                try:
+                    out_b, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+                except asyncio.TimeoutError:
+                    # P1-10: 超时后必须 kill 子进程并回收，避免进程泄漏
+                    proc.kill()
+                    await proc.wait()
+                    out_b = b""
                 if proc.returncode == 0:
                     install_method = "pip"
                     for line in out_b.decode(errors="replace").split("\n"):
@@ -93,7 +106,13 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE,
                         )
-                        out_b, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+                        try:
+                            out_b, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+                        except asyncio.TimeoutError:
+                            # P1-10: 超时后必须 kill 子进程并回收，避免进程泄漏
+                            proc.kill()
+                            await proc.wait()
+                            raise
                         install_method = "npm"
                         latest = "check npm"
                     except Exception:

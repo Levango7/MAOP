@@ -57,7 +57,7 @@
       </div>
 
       <!-- 演化循环历史 -->
-      <Card :title="t('view.evolutionHistory.cycles.title')" icon="activity" :margin-bottom="16">
+      <Card :title="t('view.evolutionHistory.cycles.title')" icon="activity" margin-bottom="var(--sp-4)">
         <div class="card-desc muted">{{ t('view.evolutionHistory.cycles.desc') }}</div>
         <DataTable
           v-if="cycles.length"
@@ -83,7 +83,7 @@
         v-if="selectedCycle"
         :title="t('view.evolutionHistory.phases.title')"
         icon="git-branch"
-        :margin-bottom="16"
+        margin-bottom="var(--sp-4)"
       >
         <template #actions>
           <button class="btn-ghost btn-sm" :aria-label="t('common.close')" @click="selectedCycle = null">
@@ -112,7 +112,7 @@
         v-if="selectedCycle && selectedSuggestions.length"
         :title="t('view.evolutionHistory.suggestions.title')"
         icon="sparkles"
-        :margin-bottom="16"
+        margin-bottom="var(--sp-4)"
       >
         <div class="card-desc muted">{{ t('view.evolutionHistory.suggestions.desc') }}</div>
         <div class="suggestion-list">
@@ -206,7 +206,7 @@
       </Card>
 
       <!-- A/B 实验 -->
-      <Card :title="t('view.evolutionHistory.ab.title')" icon="beaker" :margin-bottom="16">
+      <Card :title="t('view.evolutionHistory.ab.title')" icon="beaker" margin-bottom="var(--sp-4)">
         <div class="card-desc muted">{{ t('view.evolutionHistory.ab.desc') }}</div>
         <DataTable
           v-if="abRows.length"
@@ -224,7 +224,7 @@
       </Card>
 
       <!-- 部署历史 -->
-      <Card :title="t('view.evolutionHistory.deploy.title')" icon="rotate-ccw" :margin-bottom="16">
+      <Card :title="t('view.evolutionHistory.deploy.title')" icon="rotate-ccw" margin-bottom="var(--sp-4)">
         <div class="card-desc muted">{{ t('view.evolutionHistory.deploy.desc') }}</div>
         <DataTable
           v-if="deployRows.length"
@@ -242,7 +242,7 @@
       </Card>
 
       <!-- 待批准（人工 gate） -->
-      <Card :title="t('view.evolutionHistory.pending.title')" icon="clock" :margin-bottom="16">
+      <Card :title="t('view.evolutionHistory.pending.title')" icon="clock" margin-bottom="var(--sp-4)">
         <div class="card-desc muted">{{ t('view.evolutionHistory.pending.desc') }}</div>
         <div v-if="pending.length" class="pending-list">
           <div v-for="item in pending" :key="item.cycle_id" class="pending-item">
@@ -268,7 +268,7 @@
 
     <!-- ════════════ Prompt Diff Tab ════════════ -->
     <template v-else-if="activeTab === 'compare'">
-      <Card :title="t('view.evolutionHistory.compare.title')" icon="git-compare" :margin-bottom="16">
+      <Card :title="t('view.evolutionHistory.compare.title')" icon="git-compare" margin-bottom="var(--sp-4)">
         <div class="card-desc muted">{{ t('view.evolutionHistory.compare.desc') }}</div>
         <div class="compare-controls">
           <label class="compare-field">
@@ -346,7 +346,7 @@
 
     <!-- ════════════ Narrative Tab ════════════ -->
     <template v-else-if="activeTab === 'narrative'">
-      <Card :title="t('view.evolutionHistory.narrative.title')" icon="scroll" :margin-bottom="16">
+      <Card :title="t('view.evolutionHistory.narrative.title')" icon="scroll" margin-bottom="var(--sp-4)">
         <div class="card-desc muted">{{ t('view.evolutionHistory.narrative.desc') }}</div>
         <div class="narrative-controls">
           <label class="compare-field">
@@ -768,36 +768,7 @@ onMounted(() => {
 }
 .btn-action {
   grid-row: 1 / 3;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: var(--fs-base);
-}
-.btn-action:hover:not(:disabled) {
-  background: var(--surface-2);
-}
-.btn-action:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--border);
-  background: transparent;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: var(--fs-base);
-}
-.btn-ghost:hover:not(:disabled) {
-  background: var(--surface-2, rgba(148,163,184,.16));
+
 }
 .btn-ghost.is-busy {
   opacity: 0.6;

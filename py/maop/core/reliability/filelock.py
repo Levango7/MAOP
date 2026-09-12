@@ -4,6 +4,21 @@
 Uses ``fcntl`` on POSIX / ``msvcrt`` on Windows for atomic lock acquisition.
 Falls back to a simple .lock file with PID + timestamp if platform primitives
 are unavailable.
+
+Orphan lock cleanup
+-------------------
+A lock file whose mtime is older than :data:`ORPHAN_THRESHOLD_S` (default 30s)
+is considered orphaned — the process that created it has crashed or been killed
+without releasing the lock. Both :func:`with_file_lock` and :class:`FileLock`
+check for orphans on each acquisition attempt and unconditionally remove them
+before trying to create a new lock file. This means:
+
+* A crashed holder's lock is automatically reclaimed within at most one
+  acquisition retry cycle.
+* The 30s threshold must be longer than the longest legitimate critical section
+  held under the lock. If your protected operation can exceed 30s, raise
+  ``ORPHAN_THRESHOLD_S`` accordingly to avoid premature orphan reclamation
+  (which would allow two holders into the critical section simultaneously).
 """
 
 from __future__ import annotations
@@ -23,7 +38,9 @@ T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
-ORPHAN_THRESHOLD_S = 30  # Locks older than this are considered orphaned
+ORPHAN_THRESHOLD_S = 30  # Locks older than this (seconds) are considered orphaned.
+# See module docstring for the orphan cleanup policy and the requirement that
+# this threshold exceed the longest critical section held under the lock.
 
 
 def _lock_path(target: Path) -> Path:
@@ -57,8 +74,14 @@ def with_file_lock(
 
     Mirrors ``Invoke-WithFileLock``:
       1. Wait up to *timeout_seconds* for the lock to become available.
-      2. Clean up orphaned locks (older than 30 s).
+      2. Clean up orphaned locks (older than :data:`ORPHAN_THRESHOLD_S` = 30s).
       3. Execute *fn*; always release the lock in a ``finally`` block.
+
+    .. note::
+       The orphan threshold (30s) must exceed the longest critical section
+       protected by this lock. If *fn* can run longer than 30s, a concurrent
+       caller may prematurely reclaim the lock. Raise
+       :data:`ORPHAN_THRESHOLD_S` for long-running critical sections.
 
     Parameters
     ----------
@@ -138,6 +161,13 @@ class FileLock:
             data = json.loads(...)
             data["x"] = 42
             write_back(data)
+
+    .. note::
+       Orphaned lock files older than :data:`ORPHAN_THRESHOLD_S` (30s) are
+       automatically removed on acquisition. The protected critical section
+       must complete within this threshold; otherwise a concurrent caller may
+       prematurely reclaim the lock. Raise :data:`ORPHAN_THRESHOLD_S` for
+       long-running sections.
     """
 
     def __init__(self, target: str | Path, timeout_seconds: int = 5) -> None:

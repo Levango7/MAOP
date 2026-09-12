@@ -135,7 +135,8 @@ describe('useEditionStore', () => {
       ok: false,
       status: 401,
     });
-    await expect(store.switchEdition('personal')).rejects.toThrow('401 Unauthorized');
+    // P1-3 fix: 401 错误消息改用 i18n key 'auth.unauthorized'，测试环境默认 zh locale → '未授权'。
+    await expect(store.switchEdition('personal')).rejects.toThrow('未授权');
     expect(store.switching).toBe(false);
   });
 

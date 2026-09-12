@@ -89,7 +89,14 @@
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
-import { AppIcon, Card, StatCard, Badge, Segmented, Skeleton, EmptyState, PageHeader } from '../components/index.js';
+import AppIcon from '../components/AppIcon.vue';
+import Card from '../components/Card.vue';
+import StatCard from '../components/StatCard.vue';
+import Badge from '../components/Badge.vue';
+import Segmented from '../components/Segmented.vue';
+import Skeleton from '../components/Skeleton.vue';
+import EmptyState from '../components/EmptyState.vue';
+import PageHeader from '../components/PageHeader.vue';
 
 const api = useApiStore();
 const { t } = useI18n();

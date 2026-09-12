@@ -31,6 +31,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
+from maop.memory.shared_db import get_memory_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -196,7 +197,7 @@ class VectorSearch:
                 logger.warning("vector_search.index_all: 读取已索引 ID 列表失败", exc_info=True)
                 raise
 
-        mem_db = self._root / "data" / "memory.db"
+        mem_db = get_memory_db_path()
         if not mem_db.exists():
             return 0
 
@@ -290,7 +291,7 @@ class VectorSearch:
 
     def _get_entry_text(self, entry_id: str) -> str:
         """Get the text content for an entry ID from the memory store."""
-        mem_db = self._root / "data" / "memory.db"
+        mem_db = get_memory_db_path()
         if not mem_db.exists():
             return ""
         with sqlite_connect(mem_db) as conn:

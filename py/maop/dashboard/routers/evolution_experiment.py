@@ -17,6 +17,7 @@ EvolutionHistory.vue 消费。
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -366,8 +367,7 @@ async def api_evolution_skill_composite(body: EvolutionSkillCompositeRequest, re
         steps=steps,
     )
 
-    import json as _json
-    content = body.content if body.content is not None else _json.dumps(meta.model_dump(), ensure_ascii=False)
+    content = body.content if body.content is not None else json.dumps(meta.model_dump(), ensure_ascii=False)
 
     try:
         mgr = SkillVersionManager(root_dir=str(MAOP_ROOT))

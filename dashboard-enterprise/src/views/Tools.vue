@@ -35,7 +35,7 @@
           </div>
 
           <template v-for="sec in skillSections" :key="sec.key">
-            <Card v-if="skillFilter === 'all' || skillFilter === sec.key" :title="sec.title" icon="sparkles" :margin-bottom="16">
+            <Card v-if="skillFilter === 'all' || skillFilter === sec.key" :title="sec.title" icon="sparkles" margin-bottom="var(--sp-4)">
               <div v-if="loading" class="blk"><Skeleton block height="48px" /><Skeleton block height="48px" /><Skeleton block height="48px" /></div>
               <EmptyState v-else-if="errors.skills" icon="alert-triangle" tone="fail" :title="t('view.tools.failedLoadSkills')" :description="errors.skills" />
               <div v-else-if="sec.items.length" class="skill-grid">
@@ -156,7 +156,7 @@
 
     <!-- Create skill modal -->
     <Teleport to="body">
-      <div v-if="showCreate" v-modal-a11y class="modal-mask" @click.self="closeCreate" @modal:escape="closeCreate">
+      <div v-if="showCreate" v-modal-a11y class="modal-overlay" @click.self="closeCreate" @modal:escape="closeCreate">
         <div class="modal" role="dialog" aria-modal="true">
           <div class="modal__head">
             <h3>{{ t('view.tools.createSkillTitle') }}</h3>
@@ -193,7 +193,13 @@ import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
 import ListPageLayout from '../components/ListPageLayout.vue';
-import { AppIcon, Card, Badge, DataTable, Segmented, Skeleton, EmptyState } from '../components/index.js';
+import AppIcon from '../components/AppIcon.vue';
+import Card from '../components/Card.vue';
+import Badge from '../components/Badge.vue';
+import DataTable from '../components/DataTable.vue';
+import Segmented from '../components/Segmented.vue';
+import Skeleton from '../components/Skeleton.vue';
+import EmptyState from '../components/EmptyState.vue';
 import McpTopology from '../components/McpTopology.vue';
 
 const api = useApiStore();

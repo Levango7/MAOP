@@ -249,7 +249,8 @@
 .status-dot.off { background: var(--text-faint); opacity: .5; }
 .status-dot.small { width: 6px; height: 6px; }
 .agent-bar, .agent-name, .agent-load, .agent-queue { display: flex; }
-.agent-bar { align-items: center; gap: var(--sp-3); }
+/* R11 修复: 合并第1198行分散定义 (flex/min-width) 到此行 */
+.agent-bar { align-items: center; gap: var(--sp-3); flex: 1; min-width: 90px; }
 .event-count, .mt { margin-top: var(--sp-4); font-size: var(--fs-sm); color: var(--text-muted); }
 .resource-skel { display: flex; flex-direction: column; gap: var(--sp-2); }
 
@@ -274,6 +275,7 @@
 .btn--warn:hover { background: var(--warn); border-color: var(--warn); color: var(--on-warn, #fff); }
 .btn--ghost { background: transparent; border-color: var(--border); }
 .btn--ghost:hover { background: var(--surface-2); border-color: var(--border-strong); }
+/* R11 修复: 32px 为小按钮固定尺寸 (比 --row-h 36px 矮一档), 无精确 token 对应 */
 .btn--sm { height: 32px; padding: 0 var(--sp-3); font-size: var(--fs-sm); }
 
 /* Button grid (wraps action buttons in a flex row) */
@@ -307,7 +309,8 @@
   font-size: var(--fs-sm); font-weight: 600;
   border: 1px solid var(--border); border-radius: var(--r-md);
   cursor: pointer;
-  transition: all var(--motion-fast) var(--ease);
+  /* R11 修复: transition:all 改为具体属性列表, 避免不必要的过渡(如 color/opacity) */
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
   background: var(--surface-2); color: var(--text-muted);
 }
 .ctrl-btn[class*="tone-"] { background: var(--tone-bg, var(--surface-2)); border-color: var(--tone-border, var(--border)); color: var(--tone-text, var(--text-muted)); }
@@ -457,8 +460,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .edition-notice.degraded { color: var(--warn); }
 /* R7 修复: .switch-result 被 492 行完全覆盖 (border:none/background:none/padding:0),
  * 此处仅保留 .switch-form 的盒子样式, 避免对 .switch-result 写无效属性 */
-.switch-form { padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
-.switch-form { display: flex; flex-direction: column; gap: var(--sp-4); }
+/* R11 修复: 合并两个 .switch-form 定义 */
+.switch-form { display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
 .switch-fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
 .switch-fields .field { margin-bottom: 0; }
 .switch-fields .field > label { display: block; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: var(--sp-2); }
@@ -477,9 +480,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   padding-right: var(--sp-7);
 }
 /* 保留原生外观的 select 不受全局箭头影响 */
-.app-layout select:not([class]):not([style*="appearance"]):not([data-native-select]) {
-  /* 有 class 的 select 已由下方规则处理; 无 class 的裸 select 也应用箭头 */
-}
+/* R11 修复: 删除空规则 .app-layout select:not([class]):not([style*="appearance"]):not([data-native-select]) —
+ * 该规则只有注释无样式声明, 无任何效果 */
 
 .switch-select {
   width: 100%; height: var(--row-h); padding: 0 var(--sp-3);
@@ -585,7 +587,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   align-items: center;
   gap: var(--sp-2);
 }
-.agent-select label { font-size: var(--fs-sm); color: var(--text-muted); margin: 0; }
+/* R11 修复: .agent-select label 重复定义合并 — 第588行与643行重复,
+ * 保留643行样式(fs-xs/block/margin-bottom:4px, 后定义覆盖前者), 删除588行 */
 
 .msg-row { display: flex; gap: var(--sp-3); align-items: flex-start; }
 .msg-row:not(.assistant) { flex-direction: row-reverse; }
@@ -611,7 +614,9 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .msg-meta { font-size: var(--fs-xs); color: var(--text-faint); margin-top: var(--sp-1); display: flex; gap: var(--sp-3); flex-wrap: wrap; }
 .msg-image { max-width: 240px; border-radius: var(--r-md); margin-top: var(--sp-2); border: 1px solid var(--border); }
 /* R7 修复: shimmer 时长统一使用 var(--motion-slow) (与 Skeleton.vue:49 一致) */
-.cursor { display: inline-block; width: 7px; height: 14px; background: var(--brand); border-radius: 1px; animation: maop-shimmer calc(var(--motion-slow) * 4) steps(2) infinite; vertical-align: middle; }
+/* R11 修复: .cursor 改用 maop-cursor-blink (opacity 闪烁) 替代 maop-shimmer (translateX 位移),
+ * 光标闪烁语义上应为明暗变化而非水平位移。steps(2) 保留硬切效果。 */
+.cursor { display: inline-block; width: 7px; height: 14px; background: var(--brand); border-radius: 1px; animation: maop-cursor-blink calc(var(--motion-slow) * 4) steps(2) infinite; vertical-align: middle; }
 .image-preview {
   position: relative; display: inline-block; margin-top: var(--sp-2);
 }
@@ -640,6 +645,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .welcome-msg h2 { font-size: var(--fs-lg); font-weight: 700; color: var(--text); margin-bottom: var(--sp-2); }
 .welcome-msg p { max-width: 360px; margin: 0 auto; line-height: 1.6; }
 .welcome-icon { color: var(--brand); opacity: .5; margin-bottom: var(--sp-3); }
+/* R11 修复: 合并自第588行重复定义 (font-size/color/margin 已统一到此) */
 .agent-select label { font-size: var(--fs-xs); color: var(--text-muted); display: block; margin-bottom: 4px; }
 .agent-hint { display: flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--warn); }
 .char-count { color: var(--text-faint); }
@@ -669,8 +675,12 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 }
 .live-tag.active { color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); background: var(--success-soft); }
 .live-tag .pulse-once, .sse-dot { width: 7px; height: 7px; border-radius: var(--r-full); background: var(--success); }
+/* R11 修复: .sse-indicator 状态切换统一为 .is-connected/:not(.is-connected) 方式,
+ * 删除第1202-1205行的 .on/.off 重复定义 (两种方式并存导致不一致) */
 .sse-indicator.is-connected .sse-dot { background: var(--success); }
 .sse-indicator:not(.is-connected) .sse-dot { background: var(--text-faint); }
+.sse-indicator.is-connected { color: var(--success); }
+.sse-indicator:not(.is-connected) { color: var(--text-faint); }
 .chip { padding: 3px var(--sp-2); }
 .chip--static { opacity: .8; }
 .chip-count { color: var(--brand-strong); font-family: var(--font-mono); }
@@ -1195,14 +1205,10 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 
 /* ── Monitor view ───────────────────────────────────────────────────── */
 .monitor-page .card { margin-bottom: var(--sp-4); }
-.agent-bar { flex: 1; min-width: 90px; }
+/* R11 修复: .agent-bar 分散定义已合并至第252行 */
 .agent-dot.ok, .diag-dot.ok { background: var(--success); }
 .agent-dot.bad, .diag-dot.bad { background: var(--fail); }
-/* SSE indicator toggles .on / .off (not .is-connected) */
-.sse-indicator.on .sse-dot { background: var(--success); }
-.sse-indicator.off .sse-dot { background: var(--text-faint); }
-.sse-indicator.on { color: var(--success); }
-.sse-indicator.off { color: var(--text-faint); }
+/* R11 修复: .sse-indicator .on/.off 定义已删除, 统一使用 .is-connected/:not(.is-connected) (见第672行附近) */
 .resource-fail.admin { color: var(--warn); }
 /* Event stream */
 .event-list { display: flex; flex-direction: column; max-height: calc(100vh - var(--topbar-h) - 280px); overflow-y: auto; font-family: var(--font-mono); font-size: var(--fs-sm); }

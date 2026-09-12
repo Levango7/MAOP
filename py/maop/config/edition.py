@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from enum import Enum
 from typing import Any
 
@@ -143,6 +144,14 @@ _BACKEND_DEFAULTS: dict[Edition, dict[str, str]] = {
 _current_edition: Edition | None = None
 _feature_overrides: dict[FeatureFlag, bool] = {}
 _degradation_log: list[dict[str, str]] = []
+# P2-5 fix: 保护模块级可变状态（_current_edition / _feature_overrides /
+# _degradation_log）的并发读写。detect_edition() 的 check-then-set
+# （if _current_edition is not None: return ...; _current_edition = ...）
+# 在无锁时存在 TOCTOU 竞态：多线程可能同时通过 None 检查，重复执行
+# license 校验并覆盖彼此结果。用模块级 Lock 保护所有读写这些状态的
+# 复合操作。
+# （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
+_edition_lock = threading.Lock()
 
 
 def detect_edition() -> Edition:
@@ -163,14 +172,15 @@ def detect_edition() -> Edition:
       重复追加 degradation 日志。若需刷新,显式调用 ``reset_edition()``.
     """
     global _current_edition
-    if _current_edition is not None:
-        return _current_edition
+    with _edition_lock:
+        if _current_edition is not None:
+            return _current_edition
 
-    # 重入保护 (2026-08-11): import maop.enterprise 时其 __init__ 会调
-    # get_edition(), 而此时 detect_edition() 正在执行、_current_edition 尚未赋值,
-    # 导致重复进入 _detect_with_license_check、重复记录 degradation。
-    # 先占位为 PERSONAL(保守值),检测完成后覆盖为真实结果。
-    _current_edition = Edition.PERSONAL
+        # 重入保护 (2026-08-11): import maop.enterprise 时其 __init__ 会调
+        # get_edition(), 而此时 detect_edition() 正在执行、_current_edition 尚未赋值,
+        # 导致重复进入 _detect_with_license_check、重复记录 degradation。
+        # 先占位为 PERSONAL(保守值),检测完成后覆盖为真实结果。
+        _current_edition = Edition.PERSONAL
 
     result: Edition
     env_val = os.getenv("MAOP_EDITION", "").lower().strip()
@@ -194,7 +204,8 @@ def detect_edition() -> Edition:
             logger.exception("[edition] Unexpected error during edition detection")
             result = Edition.PERSONAL
 
-    _current_edition = result
+    with _edition_lock:
+        _current_edition = result
     return result
 
 
@@ -323,16 +334,18 @@ def set_edition(edition: Edition | str) -> None:
                 "without the enterprise package + valid license."
             )
     global _current_edition
-    _current_edition = edition
+    with _edition_lock:
+        _current_edition = edition
     logger.info("[edition] Set to %s", edition.value)
 
 
 def reset_edition() -> None:
     """Reset edition detection (useful for testing)."""
     global _current_edition, _feature_overrides, _degradation_log
-    _current_edition = None
-    _feature_overrides = {}
-    _degradation_log = []
+    with _edition_lock:
+        _current_edition = None
+        _feature_overrides = {}
+        _degradation_log = []
 
 
 def get_edition() -> Edition:
@@ -348,8 +361,9 @@ def has_feature(flag: FeatureFlag | str) -> bool:
     """
     if isinstance(flag, str):
         flag = FeatureFlag(flag)
-    if flag in _feature_overrides:
-        return _feature_overrides[flag]
+    with _edition_lock:
+        if flag in _feature_overrides:
+            return _feature_overrides[flag]
     return flag in _FEATURE_MAP.get(get_edition(), frozenset())
 
 
@@ -371,13 +385,15 @@ def set_feature_override(flag: FeatureFlag | str, enabled: bool) -> None:
         raise RuntimeError("Feature overrides are not allowed in production")
     if isinstance(flag, str):
         flag = FeatureFlag(flag)
-    _feature_overrides[flag] = enabled
+    with _edition_lock:
+        _feature_overrides[flag] = enabled
 
 
 def clear_feature_overrides() -> None:
     """Remove all per-feature overrides."""
     global _feature_overrides
-    _feature_overrides = {}
+    with _edition_lock:
+        _feature_overrides = {}
 
 
 def backend_defaults() -> dict[str, str]:
@@ -404,14 +420,18 @@ def record_degradation(backend: str, requested: str, fallback: str, reason: str 
         "reason": reason,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-    _degradation_log.append(entry)
+    with _edition_lock:
+        _degradation_log.append(entry)
     logger.warning(
         "[edition] Degradation: %s backend '%s' unavailable, falling back to '%s' (%s)",
         backend, requested, fallback, reason,
     )
     try:
         import json
-        log_path = os.path.join(os.getenv("MAOP_ROOT", "."), "data", "degradation.log")
+        # P2-6 fix: 优先读 MAOP_ROOT_DIR（当前规范环境变量），回退到旧名
+        # MAOP_ROOT 以保持向后兼容，最终回退到 "." 。
+        root_dir = os.getenv("MAOP_ROOT_DIR", os.getenv("MAOP_ROOT", "."))
+        log_path = os.path.join(root_dir, "data", "degradation.log")
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
@@ -433,7 +453,8 @@ def record_degradation(backend: str, requested: str, fallback: str, reason: str 
 
 def degradation_log() -> list[dict[str, str]]:
     """Return all recorded degradation events."""
-    return list(_degradation_log)
+    with _edition_lock:
+        return list(_degradation_log)
 
 
 def edition_info() -> dict[str, Any]:

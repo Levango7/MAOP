@@ -49,7 +49,7 @@
     </div>
 
     <div class="breakdown">
-      <Card :title="t('view.tlmemory.byTopic')" icon="scroll" :margin-bottom="16">
+      <Card :title="t('view.tlmemory.byTopic')" icon="scroll" margin-bottom="var(--sp-4)">
         <div v-if="topicEntries.length" class="chip-list">
           <button
             v-for="topic in topicEntries" :key="topic.key" class="chip" :class="{ active: query === topic.key }"
@@ -59,7 +59,7 @@
         </div>
         <EmptyState v-else icon="scroll" :title="t('view.tlmemory.noTopics')" :description="t('view.tlmemory.noTopicDesc')" />
       </Card>
-      <Card :title="t('view.tlmemory.byAgent')" icon="bot" :margin-bottom="16">
+      <Card :title="t('view.tlmemory.byAgent')" icon="bot" margin-bottom="var(--sp-4)">
         <div v-if="agentEntries.length" class="chip-list">
           <span v-for="a in agentEntries" :key="a.key" class="chip chip--static">
             {{ a.key }} <span class="chip-count">{{ a.value }}</span>
@@ -67,7 +67,7 @@
         </div>
         <EmptyState v-else icon="bot" :title="t('view.tlmemory.noAgents')" :description="t('view.tlmemory.noAgentDesc')" />
       </Card>
-      <Card :title="t('view.tlmemory.episodicByOutcome')" icon="activity" :margin-bottom="16">
+      <Card :title="t('view.tlmemory.episodicByOutcome')" icon="activity" margin-bottom="var(--sp-4)">
         <div v-if="outcomeEntries.length" class="chip-list">
           <span v-for="o in outcomeEntries" :key="o.key" class="chip chip--static">
             {{ o.key }} <span class="chip-count">{{ o.value }}</span>
@@ -77,7 +77,7 @@
       </Card>
     </div>
 
-    <Card :title="t('view.tlmemory.memoryEntries')" icon="search" :margin-bottom="16">
+    <Card :title="t('view.tlmemory.memoryEntries')" icon="search" margin-bottom="var(--sp-4)">
       <div class="search-bar">
         <span class="search-icon"><AppIcon name="search" :size="16" /></span>
         <input v-model="query" :aria-label="t('view.tlmemory.searchPlaceholder')" :placeholder="t('view.tlmemory.searchPlaceholder')" @keyup.enter="runSearch" />
@@ -111,7 +111,7 @@
 
     <!-- Add Memory Modal -->
     <Teleport to="body">
-      <div v-if="showAdd" v-modal-a11y class="modal-mask" @click.self="showAdd = false" @modal:escape="showAdd = false">
+      <div v-if="showAdd" v-modal-a11y class="modal-overlay" @click.self="showAdd = false" @modal:escape="showAdd = false">
         <div class="modal" role="dialog" aria-modal="true">
           <div class="modal__head">
             <h3>{{ t('view.tlmemory.addMemoryTitle') }}</h3>

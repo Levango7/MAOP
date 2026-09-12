@@ -234,15 +234,9 @@ import StatCard from '../components/StatCard.vue';
 
 const { t } = useI18n();
 const api = useApiStore();
-
-// ── API 路径常量 ──
-const API = {
-  LIST: '/api/notifications/list',
-  PREFERENCES: '/api/notifications/preferences',
-  READ_ALL: '/api/notifications/read-all',
-};
 const toast = useToast();
 const { showConfirm } = useConfirm();
+
 
 // ── State ──
 const notifications = ref([]);
@@ -414,7 +408,7 @@ async function loadAll() {
   error.value = '';
   offset.value = 0;
   try {
-    const d = await api.get(API.LIST, {
+    const d = await api.get('/api/notifications/list', {
       limit: PAGE_SIZE,
       offset: 0,
     });
@@ -433,7 +427,7 @@ async function loadMore() {
   loadingMore.value = true;
   try {
     const next = offset.value + PAGE_SIZE;
-    const d = await api.get(API.LIST, {
+    const d = await api.get('/api/notifications/list', {
       limit: PAGE_SIZE,
       offset: next,
     });
@@ -476,7 +470,7 @@ async function markRead(n) {
 async function markAllRead() {
   if (!hasUnread.value) return;
   try {
-    await api.post(API.READ_ALL, {});
+    await api.post('/api/notifications/read-all', {});
     notifications.value.forEach((n) => { n.read = true; });
     toast.success(t('view.notifications.allMarkedRead'));
   } catch (e) {
@@ -506,7 +500,7 @@ async function openPreferences() {
   prefOpen.value = true;
   prefError.value = '';
   try {
-    const d = await api.get(API.PREFERENCES);
+    const d = await api.get('/api/notifications/preferences');
     const prefs = d.preferences || d || {};
     channels.value = (d.channels || prefs.channels || [
       { key: 'email' }, { key: 'webhook' }, { key: 'in_app' }, { key: 'sms' },
@@ -527,7 +521,7 @@ async function openPreferences() {
 async function savePreferences() {
   prefSaving.value = true;
   try {
-    await api.put(API.PREFERENCES, { preferences });
+    await api.put('/api/notifications/preferences', { preferences });
     toast.success(t('view.notifications.prefSaved'));
     prefOpen.value = false;
   } catch (e) {
@@ -563,8 +557,7 @@ onMounted(loadAll);
 .act-btn.ghost { background: transparent; }
 .act-btn.danger { color: var(--fail); }
 .act-btn.danger:hover:not(:disabled) { border-color: var(--fail); background: var(--fail-soft); }
-.spinning { animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.spinning { animation: maop-spin 1s linear infinite; }
 
 /* ── Notification list ── */
 .notif-list { display: flex; flex-direction: column; gap: var(--sp-2); }
@@ -637,7 +630,7 @@ onMounted(loadAll);
   position: fixed; inset: 0;
   background: var(--overlay-scrim);
   display: flex; align-items: center; justify-content: center;
-  z-index: calc(var(--z-modal) + 5);
+  z-index: var(--z-modal);
 }
 .modal {
   background: var(--surface);
@@ -649,7 +642,7 @@ onMounted(loadAll);
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
 }
-.modal h3 { margin: 0 0 var(--sp-1); font-size: var(--fs-md); }
+.modal h3 { margin: 0 0 var(--sp-4); font-size: var(--fs-lg); color: var(--text); }
 .modal-desc { margin: 0 0 var(--sp-3); color: var(--text-muted); font-size: var(--fs-sm); }
 .modal-error { color: var(--fail); font-size: var(--fs-sm); margin-bottom: var(--sp-2); }
 .pref-table { width: 100%; border-collapse: collapse; margin-bottom: var(--sp-3); }
@@ -660,16 +653,7 @@ onMounted(loadAll);
   font-size: var(--fs-sm);
 }
 .pref-table th { background: var(--surface-2); color: var(--text-muted); font-weight: 600; }
-.input {
-  width: 100%;
-  padding: 6px 8px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  color: var(--text);
-  font-size: var(--fs-sm);
-  font-family: inherit;
-}
+
 .modal-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); }
 .btn {
   padding: 6px 14px;

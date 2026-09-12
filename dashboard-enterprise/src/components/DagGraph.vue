@@ -321,7 +321,9 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 /* DAG canvas */
 .dag-canvas {
   overflow: auto;
-  max-height: 400px;
+  /* R11 修复: max-height 400px 硬编码改为 clamp() 响应式,
+   * 小屏 300px / 理想 50vh / 上限 400px */
+  max-height: clamp(300px, 50vh, 400px);
 }
 .dag-svg {
   display: block;

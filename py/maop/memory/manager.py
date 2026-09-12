@@ -120,9 +120,18 @@ class MemoryManager:
         self._vector_search: Any = None
         # P1-10 fix: 限制 working cache 大小，LRU 淘汰防止 OOM
         self._working_cache: OrderedDict[str, Any] = OrderedDict()
-        self._working_cache_max_size: int = int(
-            os.getenv("MAOP_WORKING_CACHE_MAX_SIZE", "1000")
-        )
+        # P2-8 fix: MAOP_WORKING_CACHE_MAX_SIZE 非数字时 int() 会抛 ValueError，
+        # 导致 MemoryManager 构造失败。用 try/except 包裹，回退到默认值 1000
+        # 并记录 warning，保持构造成功。
+        _cache_max_size_raw = os.getenv("MAOP_WORKING_CACHE_MAX_SIZE", "1000")
+        try:
+            self._working_cache_max_size: int = int(_cache_max_size_raw)
+        except (ValueError, TypeError):
+            logger.warning(
+                "[memory] Invalid MAOP_WORKING_CACHE_MAX_SIZE=%r; falling back to 1000",
+                _cache_max_size_raw,
+            )
+            self._working_cache_max_size = 1000
         # 修复: _working_cache 是 OrderedDict，非线程安全。多线程并发调用
         # working_put/working_get/delete 时可能触发 OrderedDict 内部状态损坏
         # （如 LRU move_to_end 与 popitem 竞争）。用专用锁保护所有

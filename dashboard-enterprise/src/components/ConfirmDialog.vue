@@ -104,10 +104,12 @@ function onCancel() { resolve(false); }
 .confirm-dialog__cancel:hover {
   background: var(--surface-hover);
 }
+.confirm-dialog__cancel:active { transform: scale(0.98); }
 .confirm-dialog__confirm {
   border: none;
   color: var(--brand-contrast);
 }
+.confirm-dialog__confirm:active { transform: scale(0.98); }
 .confirm-dialog__confirm--danger {
   background: var(--fail);
 }

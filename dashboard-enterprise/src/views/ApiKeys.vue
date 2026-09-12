@@ -296,7 +296,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
 import { useConfirm } from '../composables/useConfirm.js';
-import { useI18n } from '../i18n/index.js';
+import { useI18n } from '../i18n';
 import Badge from '../components/Badge.vue';
 import ListPageLayout from '../components/ListPageLayout.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
@@ -305,15 +305,9 @@ import AppIcon from '../components/AppIcon.vue';
 
 const { t } = useI18n();
 const api = useApiStore();
-
-// ── API 路径常量 ──
-const API = {
-  KEYS: '/api/api-keys',
-  key: (id) => `/api/api-keys/${encodeURIComponent(id)}`,
-  revoke: (id) => `/api/api-keys/${encodeURIComponent(id)}/revoke`,
-};
 const toast = useToast();
 const { showConfirm } = useConfirm();
+
 
 // 权限范围分组(对齐 RBAC 权限模型)
 const SCOPE_GROUPS = [
@@ -434,7 +428,7 @@ async function load() {
   loading.value = true;
   error.value = '';
   try {
-    const d = await api.get(API.KEYS);
+    const d = await api.get('/api/api-keys');
     keys.value = Array.isArray(d) ? d : (d.keys || []);
   } catch (e) {
     error.value = e.message || String(e);
@@ -459,7 +453,7 @@ async function generate() {
   }
   saving.value = true;
   try {
-    const d = await api.post(API.KEYS, {
+    const d = await api.post('/api/api-keys', {
       name: form.value.name.trim(),
       scopes: form.value.scopes,
       rate_limit: Number(form.value.rate_limit) || 0,
@@ -521,7 +515,7 @@ async function saveEdit() {
   }
   saving.value = true;
   try {
-    await api.put(API.key(editForm.value.key_id), {
+    await api.put(`/api/api-keys/${encodeURIComponent(editForm.value.key_id)}`, {
       name: editForm.value.name.trim(),
       scopes: editForm.value.scopes,
       rate_limit: Number(editForm.value.rate_limit) || 0,
@@ -542,7 +536,7 @@ async function revoke(k) {
   const ok = await showConfirm({ message: t('view.apikeys.revokeConfirm', { name: k.name }), tone: 'danger' });
   if (!ok) return;
   try {
-    await api.post(API.revoke(k.key_id), {});
+    await api.post(`/api/api-keys/${encodeURIComponent(k.key_id)}/revoke`, {});
     toast.success(t('view.apikeys.revoked', { name: k.name }));
     await load();
   } catch (e) {
@@ -555,7 +549,7 @@ async function openDetail(k) {
   showDetail.value = true;
   detail.value = { ...k };
   try {
-    const d = await api.get(API.key(k.key_id));
+    const d = await api.get(`/api/api-keys/${encodeURIComponent(k.key_id)}`);
     detail.value = d || detail.value;
   } catch {
     // 保留列表中的基础信息,统计区为空
@@ -645,17 +639,13 @@ onMounted(load);
   transition: color var(--motion) var(--ease), background var(--motion) var(--ease);
 }
 .modal-close:hover { color: var(--text); background: var(--surface-2); }
-.modal h3 { margin: 0 0 16px; font-size: var(--fs-lg); color: var(--text); }
-.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.modal h3 { margin: 0 0 var(--sp-4); font-size: var(--fs-lg); color: var(--text); }
+.modal-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-4); }
 
 /* ── 表单 ── */
 .form { display: flex; flex-direction: column; gap: 12px; }
-.form-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
-.input {
-  background: var(--bg); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 8px 10px; color: var(--text); font-size: var(--fs-base);
-}
-.input:focus { outline: none; border-color: var(--brand); }
+.form-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
+
 
 /* ── 权限范围分组 ── */
 .scope-groups { display: flex; flex-wrap: wrap; gap: 8px; }

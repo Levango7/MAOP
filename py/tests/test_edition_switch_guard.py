@@ -186,19 +186,19 @@ class TestEditionSwitchValidation:
         )
 
     async def test_missing_edition_field_rejected_400(self, client):
-        """缺少 edition 字段返回 400。"""
+        """缺少 edition 字段返回 422（Pydantic 校验）。"""
         resp = await client.post("/api/info/edition", json={})
-        assert resp.status_code == 400, (
-            f"Missing edition field should be 400, got {resp.status_code}"
+        assert resp.status_code == 422, (
+            f"Missing edition field should be 422, got {resp.status_code}"
         )
 
     async def test_invalid_json_body_rejected_400(self, client):
-        """非法 JSON body 返回 400。"""
+        """非法 JSON body 返回 422（Pydantic 校验）。"""
         resp = await client.post(
             "/api/info/edition",
             content=b"not-json",
             headers={"Content-Type": "application/json"},
         )
-        assert resp.status_code == 400, (
-            f"Invalid JSON body should be 400, got {resp.status_code}"
+        assert resp.status_code == 422, (
+            f"Invalid JSON body should be 422, got {resp.status_code}"
         )

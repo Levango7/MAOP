@@ -42,7 +42,7 @@ from maop.dashboard.error_handler import handle_api_errors
 # 修复12: 提前 import Pydantic 模型用于端点参数类型注解，让 FastAPI 自动校验请求体。
 # 个人版无 enterprise 模块时回退到宽松 BaseModel，避免 ImportError 阻断 router 加载。
 try:
-    from maop.enterprise.audit_enhanced import AuditAlertRuleCreate, AuditAlertRuleUpdate
+    from maop.enterprise.audit_enhanced import AuditAlertRuleCreate, AuditAlertRuleUpdate, AuditEventQuery
 except ImportError:  # pragma: no cover — personal edition
     from pydantic import BaseModel as _BaseModel
 
@@ -50,6 +50,10 @@ except ImportError:  # pragma: no cover — personal edition
         model_config = {"extra": "allow"}
 
     class AuditAlertRuleUpdate(_BaseModel):
+        model_config = {"extra": "allow"}
+
+    class AuditEventQuery(_BaseModel):
+        # 宽松回退：允许任意字段，由函数内部再校验
         model_config = {"extra": "allow"}
 
 logger = logging.getLogger(__name__)
@@ -352,22 +356,19 @@ def _collect_enterprise_events(
 
 @router.post("/events/advanced")
 @handle_api_errors
-async def advanced_query(request: Request, body: dict[str, Any]) -> dict[str, Any]:
+async def advanced_query(request: Request, body: AuditEventQuery) -> dict[str, Any]:
     """Advanced multi-field filtering with pagination and sort.
 
     Request body matches ``AuditEventQuery``. Returns events + total count.
     """
     require_admin(request)
     _require_audit_feature()
-    from maop.enterprise.audit_enhanced import AuditEventQuery
+    from maop.enterprise.audit_enhanced import AuditEventQuery as _AuditEventQuery
     from maop.enterprise.audit_enhanced import filter_events as _filter
 
-    # P0-3: 使用 Pydantic 模型校验请求体，ValidationError → 422
-    try:
-        query = AuditEventQuery(**body)
-    except ValidationError as exc:
-        logger.warning("Invalid query body: %s", exc)
-        raise HTTPException(status_code=422, detail="Invalid query body")
+    # P2-7: body 已由 FastAPI 通过 AuditEventQuery Pydantic 模型自动校验，
+    # 无需手动 dict→Pydantic 转换。此处 query 直接使用 body。
+    query = body
     events = _collect_enterprise_events(
         tenant_id=query.tenant_id,
         hours=int(max(1, (_time.time() - query.since) // 3600)) if query.since else 24,
@@ -390,8 +391,8 @@ async def export_events(
     request: Request,
     format: str = Query("csv", pattern="^(csv|json)$"),
     tenant_id: str = "",
-    hours: int = 24,
-    limit: int = 5000,
+    hours: int = Query(24, ge=1, le=87600),
+    limit: int = Query(5000, ge=1, le=100000),
 ) -> Response:
     """Export audit events as CSV or JSON.
 
@@ -421,7 +422,7 @@ async def export_events(
 async def get_stats(
     request: Request,
     tenant_id: str = "",
-    hours: int = 24,
+    hours: int = Query(24, ge=1, le=87600),
 ) -> dict[str, Any]:
     """Aggregate statistics: counts by action / severity / risk / category / actor."""
     require_admin(request)
@@ -438,8 +439,8 @@ async def get_stats(
 async def get_timeline(
     request: Request,
     tenant_id: str = "",
-    hours: int = 24,
-    bucket_s: int = 3600,
+    hours: int = Query(24, ge=1, le=87600),
+    bucket_s: int = Query(3600, ge=1, le=86400),
 ) -> dict[str, Any]:
     """Bucketed time series for charting."""
     require_admin(request)
@@ -463,7 +464,7 @@ async def get_timeline(
 async def get_heatmap(
     request: Request,
     tenant_id: str = "",
-    hours: int = 168,  # default 1 week for day×hour pattern
+    hours: int = Query(168, ge=1, le=87600),  # default 1 week for day×hour pattern
 ) -> dict[str, Any]:
     """7×24 day×hour heatmap of event volume."""
     require_admin(request)

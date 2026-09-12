@@ -5,7 +5,10 @@ SSE endpoints for real-time agent output streaming.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -71,9 +74,7 @@ async def global_state_stream(request: Request) -> Any:
     """
     _check_sse_token(request)
     require_admin(request)
-    import asyncio
-    import json
-    import time
+
 
     async def generate():
         while True:
@@ -130,7 +131,7 @@ async def dag_progress_stream(execution_id: str, request: Request) -> Any:
     """
     _check_sse_token(request)
     require_admin(request)
-    import json
+
 
     from maop.core.reliability.event_bus import get_event_bus
 
@@ -164,7 +165,7 @@ async def dag_progress_stream(execution_id: str, request: Request) -> Any:
                 break
         if not sent_complete:
             # No complete event in history; subscribe for live events
-            import asyncio
+
             queue: asyncio.Queue = asyncio.Queue()
             topic_pattern = f"dag.{execution_id}"
 
@@ -198,7 +199,6 @@ async def _stream_from_streamer(streamer: Any) -> Any:
     Yields SSE-formatted events: ``token`` (each chunk), ``done`` (completion),
     ``error`` (error event).
     """
-    import json
 
     full_content: list[str] = []
     async for chunk in streamer.sse.stream():
@@ -229,12 +229,9 @@ async def _stream_from_event_bus(execution_id: str, request: Request) -> Any:
 
     P1-13: subscribes via the ``agent.{execution_id}.*`` wildcard so
     events published on ``agent.{execution_id}.token``, ``.meta``,
-    ``.done``, ``.error`` are all received. Replays history first
+    ``    .done``, ``.error`` are all received. Replays history first
     (for late-joining clients) then subscribes for live events.
     """
-    import asyncio
-    import json
-
     from maop.core.reliability.event_bus import get_event_bus
 
     bus = get_event_bus()

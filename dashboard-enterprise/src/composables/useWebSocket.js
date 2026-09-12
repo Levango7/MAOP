@@ -18,8 +18,8 @@ export function useWebSocket(url = '') {
     if (typeof window === 'undefined') return;
     reconnectAttempts = 0;
     try {
-      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const baseUrl = url || `${proto}//${location.host}/ws`;
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const baseUrl = url || `${proto}//${window.location.host}/ws`;
       // L3 fix: token 由 httpOnly cookie 自动携带（同源 WS 握手），不再通过
       // Sec-WebSocket-Protocol 子协议传递。移除 getWsToken() 死代码分支。
       ws = new WebSocket(baseUrl);

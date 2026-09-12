@@ -242,7 +242,7 @@
  * 复用 ListPageLayout 作为页面骨架 (页头/三态/插槽)。
  */
 import { ref, computed } from 'vue';
-import { useI18n } from '../i18n/index.js';
+import { useI18n } from '../i18n';
 import { useToast } from '../composables/useToast.js';
 import { useApiStore } from '../stores/api.js';
 import ListPageLayout from '../components/ListPageLayout.vue';

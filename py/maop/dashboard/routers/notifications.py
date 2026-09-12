@@ -530,6 +530,25 @@ async def get_stats(request: Request) -> dict[str, Any]:
 # dynamic routes last.
 
 
+def _check_notification_ownership(notif: Any, request: Request) -> None:
+    """Verify the authenticated user owns ``notif``.
+
+    Non-admin users may only access notifications whose ``user_id`` matches
+    their own identity (and, when multi-tenant, whose ``tenant_id`` matches).
+    Mismatch raises 404 (not 403) to avoid leaking resource existence.
+    Admins bypass the check. Mirrors the isolation logic in
+    :func:`list_notifications` (line 353).
+    """
+    if _is_admin(request):
+        return
+    req_user = _user_id_from_request(request)
+    req_tenant = _tenant_id_from_request(request)
+    if req_user and getattr(notif, "user_id", "") != req_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    if req_tenant and getattr(notif, "tenant_id", "") != req_tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+
+
 @router.get("/{notification_id}")
 @handle_api_errors
 async def get_notification(notification_id: str, request: Request) -> dict[str, Any]:
@@ -538,6 +557,7 @@ async def get_notification(notification_id: str, request: Request) -> dict[str, 
     notif = mgr.get_notification(notification_id)
     if notif is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    _check_notification_ownership(notif, request)
     return {"status": "ok", "notification": notif.model_dump()}
 
 
@@ -546,6 +566,11 @@ async def get_notification(notification_id: str, request: Request) -> dict[str, 
 async def mark_read(notification_id: str, request: Request) -> dict[str, Any]:
     _require_feature()
     mgr = _get_manager()
+    # Fetch first to enforce ownership before mutating (IDOR fix).
+    notif = mgr.get_notification(notification_id)
+    if notif is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    _check_notification_ownership(notif, request)
     ok = mgr.mark_read(notification_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
@@ -557,6 +582,11 @@ async def mark_read(notification_id: str, request: Request) -> dict[str, Any]:
 async def delete_notification(notification_id: str, request: Request) -> dict[str, Any]:
     _require_feature()
     mgr = _get_manager()
+    # Fetch first to enforce ownership before deleting (IDOR fix).
+    notif = mgr.get_notification(notification_id)
+    if notif is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    _check_notification_ownership(notif, request)
     ok = mgr.delete_notification(notification_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")

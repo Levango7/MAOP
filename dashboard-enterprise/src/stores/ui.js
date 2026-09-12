@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { invalidateCssVarCache } from '../utils/chartTokens.js';
 
 /**
  * useUiStore — single source of truth for global presentation state that
@@ -61,6 +62,9 @@ export const useUiStore = defineStore('ui', () => {
     theme.value = t === 'dark' ? 'dark' : 'light';
     persist();
     applyAttrs();
+    // P2-9 fix: 主题切换后失效 CSS 变量缓存，确保 chartTokens 下次读取
+    // 能拿到新主题的 CSS 变量值，而非返回旧缓存导致图表颜色不随主题更新。
+    invalidateCssVarCache();
   }
   function toggleTheme() {
     setTheme(theme.value === 'dark' ? 'light' : 'dark');
@@ -83,11 +87,12 @@ export const useUiStore = defineStore('ui', () => {
     // M2 fix: 无效值回退到 'zh'（与 readLocale() 默认值一致），避免
     // setLocale 与 readLocale 默认不一致导致用户首次设置无效值后
     // 刷新页面又回到 'zh' 的困惑。
+    // P2-13 fix: 不修改函数参数 l，改用独立变量 validLocale 提升可读性。
     if (l !== 'zh' && l !== 'en') {
       console.warn(`[ui] Invalid locale "${l}", falling back to "zh". Supported locales: "zh", "en".`);
-      l = 'zh';
     }
-    locale.value = l;
+    const validLocale = (l !== 'zh' && l !== 'en') ? 'zh' : l;
+    locale.value = validLocale;
     persist();
     applyAttrs();
   }

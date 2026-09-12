@@ -226,6 +226,10 @@ class MemoryStore(SearchMixin):
                 logger.debug("[mem] VectorStore index skipped (unknown error): %s", exc, exc_info=True)
 
         self._dirty = True
+        # P2-7 note: _dirty_count += 1 是非原子 read-modify-write，多线程并发
+        # add_entry 时可能丢失计数增量。但 _flush_json 是 no-op（JSON dual-write
+        # 已移除，SQLite 是唯一真相源），_dirty_count 仅用于触发该 no-op，
+        # 因此竞态不会导致数据丢失或功能错误，最多导致计数偏差。无需加锁。
         self._dirty_count += 1
         if self._dirty_count >= 10:
             self._flush_json()

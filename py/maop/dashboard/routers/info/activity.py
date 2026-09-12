@@ -7,6 +7,8 @@ Endpoints:
 from __future__ import annotations
 
 import logging
+import time
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
@@ -53,11 +55,9 @@ async def get_activity(request: Request, limit: int = Query(default=10, ge=1, le
     Requires admin role.
     """
     require_admin(request)
-    import time as _time
-    from pathlib import Path
 
     events: list[dict[str, Any]] = []
-    now = _time.time()
+    now = time.time()
 
     # 1. System startup event (always first if recently started)
     try:

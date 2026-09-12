@@ -21,7 +21,7 @@
   --border: #3c4048;      /* 中性灰描边, 夜间可读性阈值之上 */
   --text: #e8eaf0;
   --text2: #adb4c2;
-  --text3: #7c8595;
+  --text3: #7c8595;  /* legacy alias — 语义等价于 --text-faint, 新代码应使用 --text-faint */
   --accent: #3574f0;      /* Azure-500 灵感: 工程感信号蓝, 非模板紫 */
   --accent2: #5793f7;
   --success: #3fb950;
@@ -158,6 +158,11 @@
   --maxw: 1440px;
   --row-h: 36px;        /* JB 密度基准: 36px 行高而不是 44px */
   --topbar-h: 56px;     /* 收窄顶栏, 让位给内容 */
+
+  /* ── Component-specific sizing tokens (R11) ──────────────────────────────
+   * 将组件内硬编码尺寸提取为 token, 便于统一调整与主题覆写。 */
+  --node-label-w: 80px;          /* NodeDetailPanel 标签列宽 */
+  --node-traceback-max-h: 200px; /* NodeDetailPanel traceback 滚动区最大高度 */
 
 
   /* ── 无辉光策略 — 全部置为 none/透明 ─────────────────────────────────────
@@ -310,3 +315,5 @@ input, select, textarea { font-family: inherit; }
 
 /* Skeleton shimmer */
 @keyframes maop-shimmer { 100% { transform: translateX(100%); } }
+/* R11 修复: 光标闪烁动画 (opacity 闪烁, 替代 maop-shimmer 的 translateX 位移) */
+@keyframes maop-cursor-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }

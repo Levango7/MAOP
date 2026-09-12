@@ -60,7 +60,7 @@
       </div>
       <div v-else class="audit-body">
         <!-- 操作趋势图 (折线/柱状切换) -->
-        <Card :title="t('view.audit.trendTitle')" icon="activity" :margin-bottom="16">
+        <Card :title="t('view.audit.trendTitle')" icon="activity" margin-bottom="var(--sp-4)">
           <div class="chart-head">
             <span class="muted">{{ t('view.audit.trendDesc') }}</span>
             <Segmented v-model="trendKind" :options="trendKindOptions" size="sm" />
@@ -74,7 +74,7 @@
 
         <!-- 两列: 热力图 + 饼图 -->
         <div class="two-col">
-          <Card :title="t('view.audit.heatmapTitle')" icon="grid" :margin-bottom="16">
+          <Card :title="t('view.audit.heatmapTitle')" icon="grid" margin-bottom="var(--sp-4)">
             <div class="muted">{{ t('view.audit.heatmapDesc') }}</div>
             <div v-if="heatmapUsers.length" class="heatmap">
               <table class="heatmap__table">
@@ -101,7 +101,7 @@
             <EmptyState v-else icon="grid" :title="t('view.audit.heatmapEmpty')" />
           </Card>
 
-          <Card :title="t('view.audit.pieTitle')" icon="clipboard" :margin-bottom="16">
+          <Card :title="t('view.audit.pieTitle')" icon="clipboard" margin-bottom="var(--sp-4)">
             <div class="muted">{{ t('view.audit.pieDesc') }}</div>
             <div class="chart-box pie-box">
               <Pie v-if="pieData.labels.length" :data="pieData" :options="pieOptions" />
@@ -111,7 +111,7 @@
         </div>
 
         <!-- 事件表格 + 实时监控提示 -->
-        <Card :title="t('view.audit.title')" icon="scroll" :margin-bottom="16">
+        <Card :title="t('view.audit.title')" icon="scroll" margin-bottom="var(--sp-4)">
           <template #actions>
             <span class="live-hint" :class="{ 'is-live': liveConnected }">
               <AppIcon :name="liveConnected ? 'radio' : 'clock'" :size="12" />
@@ -269,13 +269,6 @@ const api = useApiStore();
 const toast = useToast();
 const { showConfirm } = useConfirm();
 
-// ── API 路径常量 ──
-const API = {
-  RULES: '/api/audit/rules',
-  ALERTS: '/api/audit/alerts',
-  SUMMARY: '/api/audit/summary',
-  EVENTS: '/api/audit/events',
-};
 
 const loading = ref(true);
 const lastUpdated = ref('');
@@ -617,7 +610,7 @@ async function loadRules() {
   rulesLoading.value = true;
   rulesError.value = '';
   try {
-    const d = await api.get(API.RULES);
+    const d = await api.get('/api/audit/rules');
     rules.value = d.rules || [];
   } catch (e) {
     rulesError.value = e.message || t('view.audit.rulesUnavailable');
@@ -642,7 +635,7 @@ async function saveRule() {
       await api.put(`/api/audit/rules/${r.id}`, r);
       toast.success(t('view.audit.ruleUpdated'));
     } else {
-      await api.post(API.RULES, r);
+      await api.post('/api/audit/rules', r);
       toast.success(t('view.audit.ruleCreated'));
     }
     ruleEditor.open = false;
@@ -656,7 +649,7 @@ async function saveRule() {
 async function toggleRule(rule) {
   try {
     await api.put(`/api/audit/rules/${rule.id}`, { ...rule, enabled: !rule.enabled });
-    toast.success(t('view.audit.ruleToggled', { state: !rule.enabled ? t('common.on') : t('common.off') }));
+    toast.success(t('view.audit.ruleToggled', { state: !rule.enabled ? t('view.audit.stateEnabled') : t('view.audit.stateDisabled') }));
     await loadRules();
   } catch (e) {
     toast.error(e.message || t('view.audit.toggleFailed'));
@@ -690,7 +683,7 @@ async function loadHistory() {
   historyLoading.value = true;
   historyError.value = '';
   try {
-    const d = await api.get(API.ALERTS);
+    const d = await api.get('/api/audit/alerts');
     history.value = d.alerts || d.history || [];
   } catch (e) {
     historyError.value = e.message || t('view.audit.historyUnavailable');
@@ -702,7 +695,7 @@ async function loadHistory() {
 // ── 数据加载 ──
 async function loadSummary() {
   try {
-    const d = await api.get(API.SUMMARY);
+    const d = await api.get('/api/audit/summary');
     const s = d.summary || d;
     summary.data = {
       total: s.total || s.total_events || 0,
@@ -716,7 +709,7 @@ async function loadSummary() {
 }
 async function loadEvents() {
   try {
-    const d = await api.get(API.EVENTS);
+    const d = await api.get('/api/audit/events');
     events.value = (d.events || []).map((e) => ({
       ...e,
       time: e.time || e.timestamp,
@@ -755,11 +748,7 @@ onUnmounted(() => {
 .last-updated { font-size: var(--fs-xs); color: var(--text-faint); }
 
 /* ── 统计卡片行 ── */
-.stat-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--sp-3);
-}
+
 @media (max-width: 900px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .stat-row { grid-template-columns: 1fr; } }  /* F-views: 断点 560px → 640px，与项目标准断点统一 */
 
@@ -880,7 +869,7 @@ onUnmounted(() => {
 
 /* ── 规则表单 ── */
 .rule-form { display: flex; flex-direction: column; gap: var(--sp-2); }
-.form-label { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
+.form-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
 .form-input {
   padding: var(--sp-2) var(--sp-3);
   background: var(--surface-2);
@@ -915,6 +904,5 @@ onUnmounted(() => {
 .act-btn.danger { color: var(--fail); }
 .act-btn.danger:hover { background: var(--fail-soft); border-color: var(--fail); }
 
-@keyframes spin { to { transform: rotate(360deg); } }
-.spinning { animation: spin 1s linear infinite; }
+.spinning { animation: maop-spin 1s linear infinite; }
 </style>

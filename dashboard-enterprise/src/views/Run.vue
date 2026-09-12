@@ -193,14 +193,14 @@
  */
 import { ref, computed, watch, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useApiStore } from '../stores/api.js';
+import { useToast } from '../composables/useToast.js';
+import { useI18n } from '../i18n';
 import PageHeader from '../components/PageHeader.vue';
 import Segmented from '../components/Segmented.vue';
 import AppIcon from '../components/AppIcon.vue';
 import ControlPanel from './ControlPanel.vue';
 import Chat from './Chat.vue';
-import { useApiStore } from '../stores/api.js';
-import { useToast } from '../composables/useToast.js';
-import { useI18n } from '../i18n/index.js';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -652,11 +652,7 @@ const dagLayout = computed(() => {
 
 /* 旋转动画 (loading 状态) */
 .spinning {
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  animation: maop-spin 1s linear infinite;
 }
 
 /* ── 响应式断点 ── */

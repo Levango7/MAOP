@@ -6,7 +6,7 @@
           <AppIcon :name="tab.icon" :size="16" /> {{ t(tab.labelKey) }}
         </button>
       </div>
-      <span class="sse-indicator" :class="realtimeConnected ? 'on' : 'off'" :title="realtimeConnected ? t('view.monitor.sseConnected') : t('view.monitor.sseDisconnected')">
+      <span class="sse-indicator" :class="{ 'is-connected': realtimeConnected }" :title="realtimeConnected ? t('view.monitor.sseConnected') : t('view.monitor.sseDisconnected')">
         <span class="sse-dot"></span>
         <span class="sse-text">{{ t('view.monitor.statusLive') }}</span>
       </span>
@@ -216,7 +216,13 @@ import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useRealtimeStore } from '../stores/realtime.js';
 import { useI18n } from '../i18n';
-import { StatCard, Card, Skeleton, EmptyState, AppIcon, PageHeader, DagGraph } from '../components/index.js';
+import StatCard from '../components/StatCard.vue';
+import Card from '../components/Card.vue';
+import Skeleton from '../components/Skeleton.vue';
+import EmptyState from '../components/EmptyState.vue';
+import AppIcon from '../components/AppIcon.vue';
+import PageHeader from '../components/PageHeader.vue';
+import DagGraph from '../components/DagGraph.vue';
 
 const api = useApiStore();
 const realtime = useRealtimeStore();
@@ -236,6 +242,7 @@ const sseEvents = ref([]);
 let sseEventCounter = 0;
 const statsError = ref('');
 let agentHealthTimer = null;
+let statusResetTimer = null;
 
 // api.get throws a plain Error whose message is "API <url>: <status>".
 // Detect 403 (admin role required) from either a .status field or the message.
@@ -450,7 +457,8 @@ async function runMaint(m) {
     m.status = 'error';
     m.statusText = t('view.monitor.statusFailed');
   }
-  setTimeout(() => { m.status = 'idle'; m.statusText = t('view.monitor.statusReady'); }, 3000);
+  if (statusResetTimer) clearTimeout(statusResetTimer);
+  statusResetTimer = setTimeout(() => { m.status = 'idle'; m.statusText = t('view.monitor.statusReady'); }, 3000);
 }
 
 onMounted(() => {
@@ -464,6 +472,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer);
   if (agentHealthTimer) clearInterval(agentHealthTimer);
+  if (statusResetTimer) clearTimeout(statusResetTimer);
 });
 </script>
 

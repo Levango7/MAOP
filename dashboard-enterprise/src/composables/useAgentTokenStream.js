@@ -122,24 +122,16 @@ export function useAgentTokenStream() {
       }
     });
 
-    eventSource.addEventListener('error', (ev) => {
-      // EventSource 'error' fires on connection loss AND on server-sent error events
+    eventSource.addEventListener('error', () => {
+      // P2-6 fix: EventSource 'error' 事件没有 ev.data，JSON.parse 总会失败。
+      // 简化处理：readyState===CLOSED 时连接已断开；否则视为流错误并 close()。
+      // 移除冗余的 streaming.value=false（close() 内部已统一处理）。
       if (eventSource && eventSource.readyState === EventSource.CLOSED) {
-        streaming.value = false;
         if (onError) onError('Connection closed');
         return;
       }
-      try {
-        const parsed = JSON.parse(ev.data);
-        streaming.value = false;
-        close();
-        if (onError) onError(parsed.error || 'Stream error');
-      } catch {
-        // ReadyState !== CLOSED but parse failed — connection issue
-        streaming.value = false;
-        close();
-        if (onError) onError('Stream connection error');
-      }
+      if (onError) onError('Stream error');
+      close();
     });
   }
 

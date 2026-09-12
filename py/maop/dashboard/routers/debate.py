@@ -102,7 +102,7 @@ def _get_debate_dispatcher() -> Any:
 @router.post("/start")
 @handle_api_errors(
     "Debate start",
-    error_value={"ok": False, "error": "Debate start failed"},
+    error_value={"status": "error", "error": "Debate start failed"},
 )
 async def api_debate_start(
     request: Request,
@@ -146,26 +146,26 @@ async def api_debate_start(
             status_code=500,
             detail="Debate execution failed",
         ) from exc
-    return {"ok": True, "verdict": verdict.model_dump()}
+    return {"status": "ok", "verdict": verdict.model_dump()}
 
 
 @router.get("/history")
 @handle_api_errors(
     "Debate history",
-    error_value={"verdicts": [], "error": "Query failed"},
+    error_value={"status": "error", "verdicts": [], "error": "Query failed"},
 )
 async def api_debate_history(request: Request, limit: int = 20) -> dict[str, Any]:
     """Return recent debate history (read-only)."""
     require_admin(request)
     dispatcher = _get_debate_dispatcher()
     verdicts = dispatcher.get_history(limit=limit)
-    return {"verdicts": [v.model_dump() for v in verdicts]}
+    return {"status": "ok", "verdicts": [v.model_dump() for v in verdicts]}
 
 
 @router.get("/{debate_id}")
 @handle_api_errors(
     "Debate get",
-    error_value={"verdict": None, "error": "Debate not found"},
+    error_value={"status": "error", "verdict": None, "error": "Debate not found"},
 )
 async def api_debate_get(request: Request, debate_id: str) -> dict[str, Any]:
     """Get a debate's full verdict and trajectory (read-only, replayable)."""
@@ -177,13 +177,13 @@ async def api_debate_get(request: Request, debate_id: str) -> dict[str, Any]:
             status_code=404,
             detail=f"debate {debate_id!r} not found",
         )
-    return {"verdict": verdict.model_dump()}
+    return {"status": "ok", "verdict": verdict.model_dump()}
 
 
 @router.get("/{debate_id}/verdict")
 @handle_api_errors(
     "Debate verdict",
-    error_value={"verdict": None, "error": "Debate not found"},
+    error_value={"status": "error", "verdict": None, "error": "Debate not found"},
 )
 async def api_debate_verdict(request: Request, debate_id: str) -> dict[str, Any]:
     """Explicit alias of GET /api/debate/{debate_id}."""
@@ -195,13 +195,13 @@ async def api_debate_verdict(request: Request, debate_id: str) -> dict[str, Any]
             status_code=404,
             detail=f"debate {debate_id!r} not found",
         )
-    return {"verdict": verdict.model_dump()}
+    return {"status": "ok", "verdict": verdict.model_dump()}
 
 
 @router.post("/config")
 @handle_api_errors(
     "Debate config",
-    error_value={"ok": False, "error": "Config update failed"},
+    error_value={"status": "error", "error": "Config update failed"},
 )
 async def api_debate_config(
     request: Request,
@@ -243,7 +243,7 @@ async def api_debate_config(
         new_config.consensus_threshold,
         getattr(getattr(request, "state", None), "auth_identity", "unknown"),
     )
-    return {"ok": True, "config": new_config.model_dump()}
+    return {"status": "ok", "config": new_config.model_dump()}
 
 
 __all__ = ["router"]

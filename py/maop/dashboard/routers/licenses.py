@@ -21,7 +21,9 @@ Endpoints
 from __future__ import annotations
 
 import logging
+import os
 import threading
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -60,9 +62,7 @@ def _get_manager() -> Any:
     with _license_manager_lock:
         if _license_manager is not None:  # double-checked locking
             return _license_manager
-        import os
-        from pathlib import Path
-
+        # P2-17: LicenseManager 为 enterprise 可选依赖，延迟加载
         from maop.enterprise.license_manager import LicenseManager
 
         priv_path_env = os.getenv("MAOP_LICENSE_MGR_PRIVATE_KEY", "").strip()

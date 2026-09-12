@@ -49,7 +49,7 @@ v-for="(s, i) in steps" :key="i"
         <div v-if="step === 2" class="onboard-wizard__step-content">
           <p>{{ t('view.onboard.step3Desc') }}</p>
           <div class="onboard-wizard__quick-actions">
-            <a :href="t('view.onboard.docsUrl')" target="_blank" class="btn btn-ghost">{{ t('view.onboard.readDocs') }}</a>
+            <a href="/docs" target="_blank" class="btn btn-ghost">{{ t('view.onboard.readDocs') }}</a>
           </div>
           <button class="btn btn-primary" @click="finish">{{ t('view.onboard.done') }}</button>
         </div>
@@ -126,6 +126,7 @@ useModalA11y(
 .onboard-wizard__step-dot--done span { background: var(--success); color: var(--brand-contrast); }
 .onboard-wizard__step-dot--active { color: var(--brand); }
 .onboard-wizard__step-dot--done { color: var(--success); }
+.onboard-wizard__step-dot:active:not(:disabled) { transform: scale(0.95); }
 .onboard-wizard__step-dot:disabled { opacity: 0.4; cursor: not-allowed; }
 .onboard-wizard__body { padding: var(--sp-6); }
 /* 修复: 1rem token 化 → var(--sp-4); 0.5rem → var(--sp-2) */

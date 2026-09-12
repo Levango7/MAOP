@@ -87,7 +87,8 @@ describe('Monitor.vue', () => {
   it('shows SSE disconnected indicator by default', async () => {
     mockFetch(defaultRoutes());
     const wrapper = await mountMonitor();
-    expect(wrapper.find('.sse-indicator.off').exists()).toBe(true);
+    /* R11 修复: sse-indicator 类名从 .on/.off 统一为 .is-connected/:not(.is-connected) */
+    expect(wrapper.find('.sse-indicator.is-connected').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -96,7 +97,7 @@ describe('Monitor.vue', () => {
     const realtime = useRealtimeStore();
     realtime.connected = true;
     const wrapper = await mountMonitor();
-    expect(wrapper.find('.sse-indicator.on').exists()).toBe(true);
+    expect(wrapper.find('.sse-indicator.is-connected').exists()).toBe(true);
     wrapper.unmount();
   });
 

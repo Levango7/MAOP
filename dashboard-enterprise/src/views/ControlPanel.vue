@@ -7,7 +7,7 @@
       </button>
     </PageHeader>
 
-    <Card :title="t('view.control.executionControls')" icon="play" :margin-bottom="16">
+    <Card :title="t('view.control.executionControls')" icon="play" margin-bottom="var(--sp-4)">
       <div class="btn-grid">
         <button
           v-for="a in execActions" :key="a.action" class="ctrl-btn" :class="'tone-' + a.tone"
@@ -20,7 +20,7 @@
       </div>
     </Card>
 
-    <Card :title="t('view.control.maintenanceActions')" icon="wrench" :margin-bottom="16">
+    <Card :title="t('view.control.maintenanceActions')" icon="wrench" margin-bottom="var(--sp-4)">
       <div class="btn-grid">
         <button
           v-for="m in maintActions" :key="m.action" class="ctrl-btn"
@@ -34,7 +34,7 @@
       </div>
     </Card>
 
-    <Card :title="t('view.control.runningJobs')" icon="activity" :margin-bottom="16">
+    <Card :title="t('view.control.runningJobs')" icon="activity" margin-bottom="var(--sp-4)">
       <div v-if="jobs.length" class="row-list">
         <div v-for="j in jobs" :key="j.id" class="row-item" :data-status="j.status">
           <div class="row-main">
@@ -55,7 +55,7 @@
       <Skeleton v-else height="80px" />
     </Card>
 
-    <Card :title="t('view.control.agentUpgrade')" icon="refresh" :margin-bottom="16">
+    <Card :title="t('view.control.agentUpgrade')" icon="refresh" margin-bottom="var(--sp-4)">
       <button class="btn-check" :disabled="loading" @click="checkUpgrade">
         <AppIcon name="refresh" :size="15" :class="{ spinning: loading }" /> {{ t('view.control.checkUpgrades') }}
       </button>
@@ -107,13 +107,6 @@ defineProps({
 const api = useApiStore();
 const toast = useToast();
 
-// ── API 路径常量 ──
-const API = {
-  STATUS: '/api/control/status',
-  MAINTAIN: '/api/control/maintain',
-  UPGRADE: '/api/agent/upgrade',
-  upgradeAgent: (name) => `/api/agent/upgrade?agent=${encodeURIComponent(name)}`,
-};
 
 const loading = ref(false);
 const jobs = ref([]);
@@ -161,7 +154,7 @@ async function execAction(action, task) {
   execResult.value = null;
   try {
     if (action === 'status') {
-      await api.get(API.STATUS);
+      await api.get('/api/control/status');
       execResult.value = { ok: true, msg: t('view.control.statusRefreshed') };
     } else {
       const validActions = ['run', 'pause', 'resume', 'stop', 'validate', 'doctor'];
@@ -183,7 +176,7 @@ async function maintainAction(action) {
   loading.value = true;
   maintResult.value = null;
   try {
-    const r = await api.post(API.MAINTAIN, { action });
+    const r = await api.post('/api/control/maintain', { action });
     maintResult.value = { ok: true, msg: r.msg || r.message || r.detail || t('view.control.actionCompleted', { action }) };
     toast.success(t('view.control.actionCompleted', { action }));
   } catch (e) {
@@ -196,7 +189,7 @@ async function maintainAction(action) {
 
 async function loadJobs() {
   try {
-    const data = await api.get(API.STATUS);
+    const data = await api.get('/api/control/status');
     const arr = Array.isArray(data) ? data : (data.jobs || data.active_jobs || []);
     jobs.value = arr.map((j, index) => ({
       id: j.id || j.name || `job-${index}`,
@@ -212,7 +205,7 @@ async function loadJobs() {
 async function checkUpgrade() {
   loading.value = true;
   try {
-    const data = await api.get(API.UPGRADE);
+    const data = await api.get('/api/agent/upgrade');
     agents.value = (data.agents || []).map((a) => ({
       name: a.name,
       current: a.current || '—',
@@ -229,7 +222,7 @@ async function checkUpgrade() {
 async function upgradeAgent(name) {
   loading.value = true;
   try {
-    await api.post(API.upgradeAgent(name), {});
+    await api.post(`/api/agent/upgrade?agent=${encodeURIComponent(name)}`, {});
     toast.success(t('view.control.upgradeTriggered', { name }));
     await checkUpgrade();
   } catch (e) {

@@ -180,7 +180,8 @@ class TestFrameworkStatus:
 
     def test_has_root(self, client):
         data = client.get("/api/framework/status").json()
-        assert "root" in data
+        # P2-12: root 字段仅在 debug 模式下返回，非 debug 模式不应存在
+        assert "root" not in data or isinstance(data.get("root"), str)
 
 
 # ── /api/framework/logs ─────────────────────────────────────────────

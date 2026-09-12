@@ -97,6 +97,7 @@ async def metrics(request: Request) -> Any:
 
 
 @router.get("/metrics/prometheus")
+@handle_api_errors("observability prometheus metrics")
 async def metrics_prometheus(request: Request) -> Any:
     """Return all metrics in Prometheus text exposition format.
 
