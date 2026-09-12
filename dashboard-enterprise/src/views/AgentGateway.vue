@@ -462,6 +462,7 @@ async function submitForm() {
 async function deletePermission(p) {
   const pattern = p.model_pattern;
   if (!pattern) return;
+  // 使用原生 confirm 对话框——权限规则删除是低频操作，无需自定义模态框
   if (!window.confirm(t('view.agentGateway.permissions.confirmDelete', { pattern }))) return;
   try {
     await api.delete(`/api/model-gateway/permissions/${encodeURIComponent(pattern)}`);
@@ -530,6 +531,7 @@ async function updateConfig() {
 }
 
 async function clearTodayUsage() {
+  // 使用原生 confirm 对话框——清空使用量是低频操作
   if (!window.confirm(t('view.agentGateway.usage.confirmClear'))) return;
   clearing.value = true;
   try {

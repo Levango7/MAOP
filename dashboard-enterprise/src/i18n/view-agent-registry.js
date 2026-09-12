@@ -98,18 +98,15 @@ export const messages = {
     'view.agentRegistry.cap.title': 'Capability Map',
     'view.agentRegistry.cap.empty': 'No capabilities found',
     'view.agentRegistry.cap.emptyHint': 'Register agents with capabilities to see them here.',
-    'view.agentRegistry.cap.agentsCount': '{n} agent(s)',
+
     'view.agentRegistry.cap.failedLoad': 'Failed to load capabilities',
 
     // ── Fallback tab ──────────────────────────────────────────────
     'view.agentRegistry.fallback.title': 'Fallback Chains',
     'view.agentRegistry.fallback.empty': 'No fallback chains configured',
     'view.agentRegistry.fallback.emptyHint': 'Add fallback agents when registering or editing an agent.',
-    'view.agentRegistry.fallback.failedLoad': 'Failed to load fallback chains',
     'view.agentRegistry.fallback.primary': 'Primary',
     'view.agentRegistry.fallback.none': 'No fallback',
-    'view.agentRegistry.fallback.chain': 'Chain',
-    'view.agentRegistry.fallback.editHint': 'Drag to reorder fallback agents',
     'view.agentRegistry.fallback.addAgent': 'Add fallback',
     'view.agentRegistry.fallback.remove': 'Remove',
     'view.agentRegistry.fallback.save': 'Save Chain',
@@ -129,7 +126,7 @@ export const messages = {
     'view.agentRegistry.toast.enableSuccess': 'Agent enabled',
     'view.agentRegistry.toast.disableSuccess': 'Agent disabled',
     'view.agentRegistry.toast.toggleFailed': 'Failed to toggle agent',
-    'view.agentRegistry.toast.healthUpdated': 'Health updated',
+
   },
 
   zh: {
@@ -231,18 +228,15 @@ export const messages = {
     'view.agentRegistry.cap.title': '能力图谱',
     'view.agentRegistry.cap.empty': '暂无能力',
     'view.agentRegistry.cap.emptyHint': '注册带能力的 Agent 即可在此查看。',
-    'view.agentRegistry.cap.agentsCount': '{n} 个 Agent',
+
     'view.agentRegistry.cap.failedLoad': '加载能力失败',
 
     // ── 降级链标签页 ──────────────────────────────────────────────
     'view.agentRegistry.fallback.title': '降级链',
     'view.agentRegistry.fallback.empty': '暂无降级链配置',
     'view.agentRegistry.fallback.emptyHint': '在注册或编辑 Agent 时添加降级 Agent。',
-    'view.agentRegistry.fallback.failedLoad': '加载降级链失败',
     'view.agentRegistry.fallback.primary': '主',
     'view.agentRegistry.fallback.none': '无降级',
-    'view.agentRegistry.fallback.chain': '链',
-    'view.agentRegistry.fallback.editHint': '拖拽以重新排序降级 Agent',
     'view.agentRegistry.fallback.addAgent': '添加降级',
     'view.agentRegistry.fallback.remove': '移除',
     'view.agentRegistry.fallback.save': '保存降级链',
@@ -262,6 +256,6 @@ export const messages = {
     'view.agentRegistry.toast.enableSuccess': 'Agent 已启用',
     'view.agentRegistry.toast.disableSuccess': 'Agent 已禁用',
     'view.agentRegistry.toast.toggleFailed': '切换 Agent 状态失败',
-    'view.agentRegistry.toast.healthUpdated': '健康状态已更新',
+
   },
 };

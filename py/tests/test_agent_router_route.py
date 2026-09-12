@@ -204,11 +204,17 @@ class TestReleaseSlot:
         assert resp.status_code == 200
         assert resp.json()["active_count"] == 0
 
-    def test_release_no_active(self, client: TestClient) -> None:
+    def test_release_no_active(self, client: TestClient, catalog: AgentCatalog) -> None:
         """无活跃槽位时释放仍返回 200（幂等）。"""
+        _register_agents(catalog)
         resp = client.post("/api/agent-router/release", json={"agent_name": "free-coder"})
         assert resp.status_code == 200
         assert resp.json()["active_count"] == 0
+
+    def test_release_not_found(self, client: TestClient) -> None:
+        """Agent 不存在返回 404。"""
+        resp = client.post("/api/agent-router/release", json={"agent_name": "nonexistent"})
+        assert resp.status_code == 404
 
 
 # ── 5. GET /api/agent-router/active ──────────────────────────────

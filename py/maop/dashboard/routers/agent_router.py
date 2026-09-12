@@ -13,7 +13,7 @@ import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -45,6 +45,14 @@ class RouteRequest(BaseModel):
         default="capability_match",
         description="路由策略: capability_match/cost_optimized/load_balanced/priority/round_robin",
     )
+
+    @field_validator("max_cost_tier")
+    @classmethod
+    def _validate_cost_tier(cls, v: str) -> str:
+        allowed = {"low", "medium", "high", "any"}
+        if v not in allowed:
+            raise ValueError(f"max_cost_tier must be one of {sorted(allowed)}")
+        return v
 
 
 class AgentSlotRequest(BaseModel):
@@ -164,6 +172,9 @@ async def api_release_slot(body: AgentSlotRequest, request: Request) -> dict[str
     """释放一个 Agent 并发槽位。"""
     require_admin(request)
     agent_router = _get_router()
+    # 检查 agent 是否存在
+    if agent_router.catalog.get(body.agent_name) is None:
+        raise HTTPException(404, f"Agent not found: {body.agent_name}")
     agent_router.release(body.agent_name)
     active = agent_router.get_active_count(body.agent_name)
     return {"status": "ok", "agent_name": body.agent_name, "active_count": active}

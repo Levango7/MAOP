@@ -63,6 +63,8 @@ def _get_quota_bucket() -> QuotaBucket:
 async def api_quota_get(agent_name: str, request: Request) -> dict[str, Any]:
     """获取 Agent 额度配置。"""
     require_admin(request)
+    if not agent_name:
+        raise HTTPException(400, "missing agent_name")
     bucket = _get_quota_bucket()
     entry = bucket.get_quota(agent_name)
     return {"status": "ok", "agent_name": agent_name, "quota": entry.model_dump(mode="json")}

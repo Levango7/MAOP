@@ -10,7 +10,7 @@ import logging
 import threading
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Query
 from pydantic import BaseModel, Field
 
 from maop.core.agent.llm_chat.model_gateway import (
@@ -126,7 +126,10 @@ async def api_model_gateway_usage_record(body: ModelUsageRequest, request: Reque
 
 @router.get("/api/model-gateway/usage")
 @handle_api_errors("Model gateway usage get", error_value={"status": "error", "error": "Get failed"})
-async def api_model_gateway_usage_get(request: Request, model: str = "") -> dict[str, Any]:
+async def api_model_gateway_usage_get(
+    request: Request,
+    model: str = Query("", description="按模型名过滤"),
+) -> dict[str, Any]:
     """获取今日使用量。"""
     require_admin(request)
     gateway = _get_model_gateway()

@@ -13,7 +13,7 @@ import logging
 import threading
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Query
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
@@ -182,12 +182,11 @@ async def api_rotate_credential(credential_id: str, request: Request) -> dict[st
 )
 async def api_credential_audit(
     request: Request,
-    credential_id: str = "",  # noqa: B008
-    limit: int = 100,  # noqa: B008
+    credential_id: str = Query("", description="按凭证 ID 过滤"),
+    limit: int = Query(100, ge=1, le=1000, description="返回条数上限"),
 ) -> dict[str, Any]:
     """查询凭证操作审计日志（按时间倒序）。"""
     require_admin(request)
     vault = _get_vault()
-    capped_limit = max(1, min(int(limit), 1000))
-    logs = vault.get_audit_log(credential_id=credential_id, limit=capped_limit)
+    logs = vault.get_audit_log(credential_id=credential_id, limit=limit)
     return {"status": "ok", "logs": logs, "count": len(logs)}

@@ -111,7 +111,17 @@ class ModelGateway:
           3. 如果允许，检查 daily_token_limit 是否已超
           4. 如果允许，检查 global_daily_token_limit 是否已超
           5. 返回 ModelAccessDecision
+
+        Parameters
+        ----------
+        model : str
+            要检查的模型名称。
+        agent : str
+            预留参数，用于未来按 Agent 粒度的限额检查（当前未使用）。
+        session_id : str
+            预留参数，用于未来按 Session 粒度的限额检查（当前未使用）。
         """
+        # agent/session_id 预留给未来按 Agent/Session 粒度的限额检查
         with self._lock:
             permission = self._find_matching_permission(model)
 

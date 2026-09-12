@@ -231,7 +231,7 @@
                 <div class="records-table__th records-table__th--num" role="columnheader">{{ t('view.agentBilling.records.col.cost') }}</div>
                 <div class="records-table__th" role="columnheader">{{ t('view.agentBilling.records.col.source') }}</div>
               </div>
-              <div v-for="(r, i) in pagedRecords" :key="i" class="records-table__row" role="row">
+              <div v-for="r in pagedRecords" :key="r.timestamp + '-' + r.agent_name + '-' + r.model" class="records-table__row" role="row">
                 <div class="records-table__td" role="cell">
                   <span class="mono">{{ formatTime(r.timestamp || r.time) }}</span>
                 </div>
@@ -653,7 +653,7 @@ async function loadQuota() {
 }
 
 function onAgentChange() {
-  recordsPage.value = 1;
+
   loadQuota();
 }
 

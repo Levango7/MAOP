@@ -10,10 +10,10 @@ import logging
 import threading
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Query
 from pydantic import BaseModel, Field
 
-from maop.core.agent.billing.billing_abstraction import BillingEngine, BillingRecord
+from maop.core.agent.billing.billing_abstraction import BillingEngine
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
@@ -76,14 +76,12 @@ async def api_billing_charge(body: BillingChargeRequest, request: Request) -> di
 @handle_api_errors("Billing estimate", error_value={"status": "error", "error": "Estimate failed"})
 async def api_billing_estimate(
     request: Request,
-    agent_name: str = "",
-    tokens: int = 0,
-    calls: int = 1,
+    agent_name: str = Query("", description="Agent 名称"),
+    tokens: int = Query(0, ge=0, description="Token 数量"),
+    calls: int = Query(1, ge=0, description="调用次数"),
 ) -> dict[str, Any]:
     """估算成本（不实际扣减）。"""
     require_admin(request)
-    if tokens < 0 or calls < 0:
-        raise HTTPException(400, "tokens and calls must be non-negative")
     if not agent_name:
         raise HTTPException(400, "missing agent_name")
     engine = _get_billing_engine()
@@ -111,13 +109,11 @@ async def api_billing_summary(agent_name: str, request: Request) -> dict[str, An
 @handle_api_errors("Billing records", error_value={"status": "error", "error": "Records failed"})
 async def api_billing_records(
     request: Request,
-    agent_name: str = "",
-    limit: int = 100,
+    agent_name: str = Query("", description="按 Agent 过滤"),
+    limit: int = Query(100, ge=1, le=10000, description="返回条数上限"),
 ) -> dict[str, Any]:
     """获取计费记录列表。"""
     require_admin(request)
-    if limit <= 0 or limit > 10000:
-        raise HTTPException(400, "limit must be between 1 and 10000")
     engine = _get_billing_engine()
     records = engine.get_billing_records(agent_name=agent_name, limit=limit)
     return {

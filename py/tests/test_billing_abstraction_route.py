@@ -244,11 +244,11 @@ class TestBillingRecords:
         assert data["records"][0]["agent_name"] == "agent1"
 
     def test_records_invalid_limit(self, client: TestClient):
-        """无效 limit 返回 400。"""
+        """无效 limit 返回 422（FastAPI Query 参数校验）。"""
         resp = client.get("/api/billing/records", params={"limit": 0})
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_records_limit_too_large(self, client: TestClient):
-        """limit 过大返回 400。"""
+        """limit 过大返回 422（FastAPI Query 参数校验）。"""
         resp = client.get("/api/billing/records", params={"limit": 10001})
-        assert resp.status_code == 400
+        assert resp.status_code == 422

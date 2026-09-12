@@ -72,7 +72,7 @@ export const messages = {
     'view.agentGateway.accessCheck.failed': 'Access check failed',
 
     // ── Usage ─────────────────────────────────────────────────────
-    'view.agentGateway.usage.title': 'Usage Monitoring',
+
     'view.agentGateway.usage.todayTitle': 'Today\'s Usage',
     'view.agentGateway.usage.configTitle': 'Global Configuration',
     'view.agentGateway.usage.empty': 'No usage records today',
@@ -170,7 +170,7 @@ export const messages = {
     'view.agentGateway.accessCheck.failed': '访问检查失败',
 
     // ── 使用量 ────────────────────────────────────────────────────
-    'view.agentGateway.usage.title': '使用量监控',
+
     'view.agentGateway.usage.todayTitle': '今日使用量',
     'view.agentGateway.usage.configTitle': '全局配置',
     'view.agentGateway.usage.empty': '今日暂无使用记录',
