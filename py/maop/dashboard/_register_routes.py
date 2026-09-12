@@ -268,6 +268,13 @@ def _register_data_routers(app: FastAPI) -> None:
 
     app.include_router(dag_router.router)
 
+    # 深度数据分析报表引擎 — Agent 效率 / 任务趋势 / 资源利用率 /
+    # 成本分解 / 性能瓶颈 / 综合摘要。复用 CostTracker、TimeSeriesStore、
+    # AuditLog、MetricsCollector 与 psutil，无新增持久化。
+    from maop.dashboard.routers import analysis as analysis_router
+
+    app.include_router(analysis_router.router)
+
 
 def _register_scheduling_routers(app: FastAPI) -> None:
     """Register scheduling / supervisor / debate routers (all optional, guarded)."""
@@ -394,6 +401,19 @@ def _register_notifications_and_config(app: FastAPI) -> None:
         logger.warning("[server] Router MISSING: blackboard (import error: %s)", _e)
 
 
+def _register_feedback_router(app: FastAPI) -> None:
+    """Register the feedback router — 用户反馈评价系统.
+
+    提交/查询/更新/删除反馈, admin 可导出与查看全部, 普通用户仅管理自己的反馈.
+    """
+    try:
+        from maop.dashboard.routers import feedback as feedback_router
+        app.include_router(feedback_router.router)
+        logger.info("[server] Router: feedback enabled")
+    except ImportError as _e:
+        logger.warning("[server] Router MISSING: feedback (import error: %s)", _e)
+
+
 def register_routers(app: FastAPI) -> None:
     """Register all API routers (core + enterprise + optional)."""
     global _app
@@ -421,6 +441,7 @@ def register_routers(app: FastAPI) -> None:
     _register_audit_router(app)
     _register_enterprise_routers(app)
     _register_notifications_and_config(app)
+    _register_feedback_router(app)
 
 
 # ── Health ─────────────────────────────────────────────────────────

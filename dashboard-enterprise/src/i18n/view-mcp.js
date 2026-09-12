@@ -1,0 +1,171 @@
+export const messages = {
+  en: {
+    'view.mcp.title': 'MCP Manager',
+    'view.mcp.sub': 'Manage Model Context Protocol servers, tools, call statistics and concurrency limits.',
+
+    // ── Tabs ──────────────────────────────────────────────────────
+    'view.mcp.tab.servers': 'Servers',
+    'view.mcp.tab.tools': 'Tools',
+    'view.mcp.tab.stats': 'Statistics',
+    'view.mcp.tab.concurrency': 'Concurrency',
+
+    // ── Servers ───────────────────────────────────────────────────
+    'view.mcp.servers.title': 'MCP Servers',
+    'view.mcp.servers.add': 'Add Server',
+    'view.mcp.servers.empty': 'No MCP servers configured',
+    'view.mcp.servers.emptyHint': 'Add a server to expose its tools to MAOP agents.',
+    'view.mcp.servers.failedLoad': 'Failed to load servers',
+    'view.mcp.servers.deleteConfirm': 'Remove this MCP server? Its tools will no longer be available.',
+    'view.mcp.servers.deleteFailed': 'Failed to delete server',
+    'view.mcp.servers.saveFailed': 'Failed to save server',
+
+    // ── Server form (modal) ───────────────────────────────────────
+    'view.mcp.modal.addTitle': 'Add MCP Server',
+    'view.mcp.modal.editTitle': 'Edit MCP Server',
+    'view.mcp.modal.name': 'Name',
+    'view.mcp.modal.url': 'URL',
+    'view.mcp.modal.urlHint': 'http:// or stdio:// scheme',
+    'view.mcp.modal.transport': 'Transport',
+    'view.mcp.modal.authType': 'Authentication',
+    'view.mcp.modal.timeout': 'Timeout (ms)',
+    'view.mcp.modal.auth.none': 'None',
+    'view.mcp.modal.auth.bearer': 'Bearer Token',
+    'view.mcp.modal.auth.basic': 'Basic Auth',
+    'view.mcp.modal.auth.apikey': 'API Key',
+    'view.mcp.modal.token': 'Token / Secret',
+    'view.mcp.modal.saving': 'Saving…',
+    'view.mcp.modal.nameRequired': 'Server name is required',
+
+    // ── Tools ─────────────────────────────────────────────────────
+    'view.mcp.tools.title': 'Tool Inventory',
+    'view.mcp.tools.empty': 'No tools exposed',
+    'view.mcp.tools.emptyHint': 'Tools appear here once at least one server is connected.',
+    'view.mcp.tools.failedLoad': 'Failed to load tools',
+    'view.mcp.tools.filterServer': 'All servers',
+    'view.mcp.tools.params': 'Parameters',
+    'view.mcp.tools.noParams': 'No parameters',
+    'view.mcp.tools.callCount': 'Calls',
+
+    // ── Stats ─────────────────────────────────────────────────────
+    'view.mcp.stats.title': 'Call Statistics',
+    'view.mcp.stats.failedLoad': 'Failed to load statistics',
+    'view.mcp.stats.empty': 'No call data yet',
+    'view.mcp.stats.emptyHint': 'Statistics will appear after tools are invoked.',
+    'view.mcp.stats.overview': 'Overview',
+    'view.mcp.stats.totalCalls': 'Total Calls',
+    'view.mcp.stats.successRate': 'Success Rate',
+    'view.mcp.stats.avgLatency': 'Avg Latency',
+    'view.mcp.stats.timeseries': 'Time Series',
+    'view.mcp.stats.perTool': 'Per-Tool Breakdown',
+    'view.mcp.stats.calls': 'Calls',
+    'view.mcp.stats.latencyMs': 'ms',
+
+    // ── Concurrency ───────────────────────────────────────────────
+    'view.mcp.concurrency.title': 'Concurrency Limits',
+    'view.mcp.concurrency.empty': 'No tools to configure',
+    'view.mcp.concurrency.emptyHint': 'Connect a server and expose tools to set their concurrency limits.',
+    'view.mcp.concurrency.current': 'Current',
+    'view.mcp.concurrency.newLimit': 'New limit',
+    'view.mcp.concurrency.save': 'Apply',
+    'view.mcp.concurrency.saved': 'Updated',
+    'view.mcp.concurrency.saveFailed': 'Failed to update limit',
+    'view.mcp.concurrency.unlimited': 'unlimited',
+    'view.mcp.concurrency.hint': 'Limit how many parallel calls to a tool can run at once.',
+
+    // ── Columns / common ──────────────────────────────────────────
+    'view.mcp.col.status': 'Status',
+    'view.mcp.col.tools': 'Tools',
+    'view.mcp.col.latency': 'Latency',
+    'view.mcp.col.server': 'Server',
+    'view.mcp.col.calls': 'Calls',
+    'view.mcp.col.limit': 'Limit',
+    'view.mcp.col.actions': 'Actions',
+    'view.mcp.status.connected': 'Connected',
+    'view.mcp.status.disconnected': 'Disconnected',
+  },
+
+  zh: {
+    'view.mcp.title': 'MCP 管理器',
+    'view.mcp.sub': '管理 Model Context Protocol 服务、工具、调用统计与并发限制。',
+
+    // ── 标签页 ────────────────────────────────────────────────────
+    'view.mcp.tab.servers': '服务',
+    'view.mcp.tab.tools': '工具',
+    'view.mcp.tab.stats': '统计',
+    'view.mcp.tab.concurrency': '并发',
+
+    // ── 服务 ──────────────────────────────────────────────────────
+    'view.mcp.servers.title': 'MCP 服务',
+    'view.mcp.servers.add': '添加服务',
+    'view.mcp.servers.empty': '未配置 MCP 服务',
+    'view.mcp.servers.emptyHint': '添加一个服务即可将其工具暴露给 MAOP 智能体。',
+    'view.mcp.servers.failedLoad': '加载服务失败',
+    'view.mcp.servers.deleteConfirm': '确认移除该 MCP 服务？其工具将不再可用。',
+    'view.mcp.servers.deleteFailed': '删除服务失败',
+    'view.mcp.servers.saveFailed': '保存服务失败',
+
+    // ── 服务表单（模态框）────────────────────────────────────────
+    'view.mcp.modal.addTitle': '添加 MCP 服务',
+    'view.mcp.modal.editTitle': '编辑 MCP 服务',
+    'view.mcp.modal.name': '名称',
+    'view.mcp.modal.url': '地址',
+    'view.mcp.modal.urlHint': 'http:// 或 stdio:// 协议',
+    'view.mcp.modal.transport': '传输方式',
+    'view.mcp.modal.authType': '认证方式',
+    'view.mcp.modal.timeout': '超时（毫秒）',
+    'view.mcp.modal.auth.none': '无',
+    'view.mcp.modal.auth.bearer': 'Bearer Token',
+    'view.mcp.modal.auth.basic': 'Basic 认证',
+    'view.mcp.modal.auth.apikey': 'API 密钥',
+    'view.mcp.modal.token': '令牌 / 密钥',
+    'view.mcp.modal.saving': '保存中…',
+    'view.mcp.modal.nameRequired': '服务名称为必填项',
+
+    // ── 工具 ──────────────────────────────────────────────────────
+    'view.mcp.tools.title': '工具清单',
+    'view.mcp.tools.empty': '暂无暴露工具',
+    'view.mcp.tools.emptyHint': '至少连接一个服务后，工具将显示在此处。',
+    'view.mcp.tools.failedLoad': '加载工具失败',
+    'view.mcp.tools.filterServer': '全部服务',
+    'view.mcp.tools.params': '参数',
+    'view.mcp.tools.noParams': '无参数',
+    'view.mcp.tools.callCount': '调用次数',
+
+    // ── 统计 ──────────────────────────────────────────────────────
+    'view.mcp.stats.title': '调用统计',
+    'view.mcp.stats.failedLoad': '加载统计失败',
+    'view.mcp.stats.empty': '暂无调用数据',
+    'view.mcp.stats.emptyHint': '工具被调用后，统计数据将显示在此处。',
+    'view.mcp.stats.overview': '概览',
+    'view.mcp.stats.totalCalls': '总调用次数',
+    'view.mcp.stats.successRate': '成功率',
+    'view.mcp.stats.avgLatency': '平均延迟',
+    'view.mcp.stats.timeseries': '时间序列',
+    'view.mcp.stats.perTool': '按工具明细',
+    'view.mcp.stats.calls': '调用',
+    'view.mcp.stats.latencyMs': '毫秒',
+
+    // ── 并发 ──────────────────────────────────────────────────────
+    'view.mcp.concurrency.title': '并发限制',
+    'view.mcp.concurrency.empty': '暂无可配置工具',
+    'view.mcp.concurrency.emptyHint': '连接服务并暴露工具后即可设置并发限制。',
+    'view.mcp.concurrency.current': '当前',
+    'view.mcp.concurrency.newLimit': '新限制',
+    'view.mcp.concurrency.save': '应用',
+    'view.mcp.concurrency.saved': '已更新',
+    'view.mcp.concurrency.saveFailed': '更新限制失败',
+    'view.mcp.concurrency.unlimited': '不限',
+    'view.mcp.concurrency.hint': '限制同一工具可并行执行的调用数量。',
+
+    // ── 列 / 通用 ─────────────────────────────────────────────────
+    'view.mcp.col.status': '状态',
+    'view.mcp.col.tools': '工具数',
+    'view.mcp.col.latency': '延迟',
+    'view.mcp.col.server': '服务',
+    'view.mcp.col.calls': '调用次数',
+    'view.mcp.col.limit': '限制',
+    'view.mcp.col.actions': '操作',
+    'view.mcp.status.connected': '已连接',
+    'view.mcp.status.disconnected': '未连接',
+  },
+};

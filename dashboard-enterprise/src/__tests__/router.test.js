@@ -4,6 +4,7 @@ import router from '../router/index.js';
 // ── 2026-09-01 信息架构重设计（5 组任务流导航）─────────────────────
 // 断言更新为新结构：5 组顶层路径（/home /run /memory /capability /operate）
 // + 设置组 + 企业管理组 + 全部旧路径 301 重定向（深链兼容不断）。
+// ── IA 扩展：新增 13 管理页面 + workflow/evolve 归组 + analysis/feedback ──
 
 describe('Router', () => {
   it('has all expected named routes (IA-2026-09)', () => {
@@ -11,21 +12,23 @@ describe('Router', () => {
     const expected = [
       // 首页组
       'overview', 'tasks',
-      // 执行组
-      'run', 'dispatch',
+      // 执行组（含 workflow 归组）
+      'run', 'dispatch', 'workflow',
       // 记忆组
       'memory', 'search', 'knowledge-graph',
-      // 能力组
-      'agents', 'skills', 'skill-market', 'models',
-      // 运维组
+      // 能力组（含 evolve 归组 + 8 扩展页）
+      'agents', 'skills', 'skill-market', 'models', 'evolve',
+      'mcp', 'plugins', 'subagents', 'routing-rules', 'scheduling', 'protocols', 'worktrees', 'agent-proxy',
+      // 运维组（含 5 扩展页）
       'monitor', 'logs', 'observability', 'cost',
+      'debate', 'blackboard', 'alert-rules', 'webhooks', 'integrations',
+      // 分析与反馈组（IA 新增）
+      'analysis', 'feedback',
       // 企业管理组
       'audit', 'rbac', 'tenants', 'users',
       'licenses', 'sso', 'quotas', 'apikeys',
       // 设置组
       'settings', 'notifications', 'docs',
-      // 保留直达（导航不罗列但深链可达）
-      'workflow-editor', 'evolve',
     ];
     for (const name of expected) {
       expect(names).toContain(name);
@@ -62,7 +65,11 @@ describe('Router', () => {
     // 合并类重定向（带 query 的）
     expect(target('/control')).toBe('/run');
     expect(target('/chat')).toBe('/run');
-    expect(target('/evolution-history')).toBe('/evolve');
+    // IA 扩展: evolve 归入能力组 → /capability/evolve
+    expect(target('/evolution-history')).toBe('/capability/evolve');
+    expect(target('/evolve')).toBe('/capability/evolve');
+    // IA 扩展: workflow-editor 归入执行组 → /run/workflow
+    expect(target('/workflow-editor')).toBe('/run/workflow');
   });
 
   it('knowledge-graph route has no enterprise guard', () => {

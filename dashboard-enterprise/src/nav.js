@@ -28,6 +28,7 @@ export const nav = [
   { section: 'nav.group.run' },
   { to: '/run', label: 'nav.run', icon: 'play', subtitle: 'nav.run.subtitle', matchPaths: ['/control', '/chat'] },
   { to: '/run/agents', label: 'nav.dispatch', icon: 'route', subtitle: 'nav.dispatch.subtitle', matchPaths: ['/agents'] },
+  { to: '/run/workflow', label: 'nav.workflow', icon: 'git-branch', subtitle: 'nav.workflow.subtitle', matchPaths: ['/workflow-editor'] },
 
   // ── 记忆 ─────────────────────────────────────────────────────
   { section: 'nav.group.memory' },
@@ -41,6 +42,16 @@ export const nav = [
   { to: '/capability/skills', label: 'nav.skills', icon: 'beaker', subtitle: 'nav.skills.subtitle', matchPaths: ['/tools', '/skill-editor'] },
   { to: '/capability/market', label: 'nav.skillMarket', icon: 'archive', subtitle: 'nav.skillMarket.subtitle', matchPaths: ['/skill-market'] },
   { to: '/capability/models', label: 'nav.models', icon: 'gauge', subtitle: 'nav.models.subtitle', matchPaths: ['/models'] },
+  { to: '/capability/evolve', label: 'nav.evolve', icon: 'sparkles', subtitle: 'nav.evolve.subtitle', matchPaths: ['/evolve', '/evolution-history'] },
+  // ── 能力扩展：工具/插件/代理编排 ──
+  { to: '/capability/mcp', label: 'nav.mcp', icon: 'plug', subtitle: 'nav.mcp.subtitle' },
+  { to: '/capability/plugins', label: 'nav.plugins', icon: 'box', subtitle: 'nav.plugins.subtitle' },
+  { to: '/capability/subagents', label: 'nav.subagents', icon: 'bot', subtitle: 'nav.subagents.subtitle' },
+  { to: '/capability/routing', label: 'nav.routing', icon: 'route', subtitle: 'nav.routing.subtitle' },
+  { to: '/capability/scheduling', label: 'nav.scheduling', icon: 'clock', subtitle: 'nav.scheduling.subtitle' },
+  { to: '/capability/protocols', label: 'nav.protocols', icon: 'share2', subtitle: 'nav.protocols.subtitle' },
+  { to: '/capability/worktrees', label: 'nav.worktrees', icon: 'git-compare', subtitle: 'nav.worktrees.subtitle' },
+  { to: '/capability/agent-proxy', label: 'nav.agentProxy', icon: 'arrow-left-right', subtitle: 'nav.agentProxy.subtitle' },
 
   // ── 运维 ─────────────────────────────────────────────────────
   { section: 'nav.group.operate' },
@@ -48,6 +59,20 @@ export const nav = [
   { to: '/operate/logs', label: 'nav.logs', icon: 'scroll', subtitle: 'nav.logs.subtitle' },
   { to: '/operate/tracing', label: 'nav.observability', icon: 'zap', subtitle: 'nav.observability.subtitle', matchPaths: ['/observability'] },
   { to: '/operate/cost', label: 'nav.cost', icon: 'dollar', subtitle: 'nav.cost.subtitle' },
+  // ── 运维扩展：协作/告警/集成 ──
+  { to: '/operate/debate', label: 'nav.debate', icon: 'message-square', subtitle: 'nav.debate.subtitle' },
+  { to: '/operate/blackboard', label: 'nav.blackboard', icon: 'clipboard', subtitle: 'nav.blackboard.subtitle' },
+  { to: '/operate/alerts', label: 'nav.alertRules', icon: 'alert', subtitle: 'nav.alertRules.subtitle' },
+  { to: '/operate/webhooks', label: 'nav.webhooks', icon: 'link', subtitle: 'nav.webhooks.subtitle' },
+  { to: '/operate/integrations', label: 'nav.integrations', icon: 'share2', subtitle: 'nav.integrations.subtitle' },
+
+  // ── 分析（IA 新增组：数据分析仪表盘）──────────────────────────
+  { section: 'nav.group.analysis' },
+  { to: '/analysis', label: 'nav.analysis', icon: 'activity', subtitle: 'nav.analysis.subtitle' },
+
+  // ── 反馈（IA 新增组：用户反馈评价）────────────────────────────
+  { section: 'nav.group.feedback' },
+  { to: '/feedback', label: 'nav.feedback', icon: 'message-square', subtitle: 'nav.feedback.subtitle' },
 
   // ── 管理（企业版；个人版整组隐藏）─────────────────────────────
   { section: 'nav.group.admin', enterprise: true },

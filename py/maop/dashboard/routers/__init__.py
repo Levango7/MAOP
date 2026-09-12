@@ -7,4 +7,8 @@ Modular route definitions split by domain:
   - evolve:  self-evolution controls (status, analyze, suggestions)
   - memory:  memory + neural mechanisms (deep, search, trace, attention)
   - system:  framework status, audit, agent config, overview, workflows
+  - feedback: user feedback / ratings (submit, list, summary, export, CRUD)
+  - analysis: deep data analysis report engine (agent efficiency, task trends,
+              resource utilization, cost breakdown, performance bottlenecks,
+              KPI summary)
 """

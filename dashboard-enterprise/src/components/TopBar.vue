@@ -43,6 +43,12 @@
 
     <div class="topbar__spacer"></div>
 
+    <!-- ②.5 分析仪表盘快速入口（IA 扩展：新增"分析"组直达） -->
+    <button class="topbar__quick-analysis" :title="t('nav.analysis')" :aria-label="t('nav.analysis')" @click="goToAnalysis">
+      <AppIcon name="activity" :size="15" />
+      <span class="topbar__quick-analysis-label">{{ t('nav.analysis') }}</span>
+    </button>
+
     <!-- ③ 布局/主题（用户左侧） -->
     <div class="topbar__prefs">
       <div class="topbar__pref-group topbar__pref-group--density" role="group" :aria-label="t('settings.density')" :title="t('settings.density')">
@@ -162,6 +168,9 @@ function doRefresh() {
 }
 
 function goToUsers() { router.push('/users'); }
+
+// IA 扩展: 顶栏直达分析仪表盘（新增"分析"导航组）
+function goToAnalysis() { router.push('/analysis'); }
 
 async function onLogout() {
   try { await api.clearAuthToken(); } catch { /* ignore */ }
@@ -321,6 +330,27 @@ onMounted(() => {
 /* 弹性分隔 */
 .topbar__spacer { flex: 1; }
 
+/* ②.5 分析快速入口: 轻量胶囊按钮, 复用 design token, 不破坏顶栏紧凑布局 */
+.topbar__quick-analysis {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-full);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), border-color var(--motion) var(--ease);
+}
+.topbar__quick-analysis:hover {
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+  border-color: var(--brand);
+}
+.topbar__quick-analysis-label { letter-spacing: .01em; }
+
 /* ③ 布局/主题 */
 .topbar__prefs { display: flex; align-items: center; gap: var(--sp-3); position: relative; }
 
@@ -405,6 +435,9 @@ onMounted(() => {
 @media (max-width: 900px) {
   .topbar { gap: var(--sp-2); padding: 0 var(--sp-3); }
   .topbar__statusline { display: none; }
+  /* 移动端分析入口仅保留图标, 隐藏文字标签 */
+  .topbar__quick-analysis-label { display: none; }
+  .topbar__quick-analysis { padding: 5px; }
   /* 移动端保留主题切换(高使用频次), 仅隐藏密度切换(低使用频次)。
      修复 P3: 此前整个 .topbar__prefs 被隐藏导致移动端无法切换主题。 */
   .topbar__pref-group--density { display: none; }

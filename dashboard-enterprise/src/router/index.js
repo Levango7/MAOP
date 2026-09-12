@@ -14,6 +14,8 @@ const routes = [
   // ── 执行 ──
   { path: '/run', name: 'run', component: () => import('../views/Run.vue') },
   { path: '/run/agents', name: 'dispatch', component: () => import('../views/ControlPanel.vue') },
+  // IA 优化: WorkflowEditor 纳入执行组（原 /workflow-editor 重定向至此）
+  { path: '/run/workflow', name: 'workflow', component: () => import('../views/WorkflowEditor.vue') },
 
   // ── 记忆 ──
   { path: '/memory', name: 'memory', component: () => import('../views/ThreeLayerMemory.vue') },
@@ -25,12 +27,35 @@ const routes = [
   { path: '/capability/skills', name: 'skills', component: () => import('../views/Tools.vue') },
   { path: '/capability/market', name: 'skill-market', component: () => import('../views/SkillMarket.vue') },
   { path: '/capability/models', name: 'models', component: () => import('../views/Models.vue') },
+  // IA 优化: Evolve 纳入能力组（原 /evolve 重定向至此）
+  { path: '/capability/evolve', name: 'evolve', component: () => import('../views/Evolve.vue') },
+  // ── 能力扩展：工具/插件/代理编排 ──
+  { path: '/capability/mcp', name: 'mcp', component: () => import('../views/McpManager.vue') },
+  { path: '/capability/plugins', name: 'plugins', component: () => import('../views/Plugins.vue') },
+  { path: '/capability/subagents', name: 'subagents', component: () => import('../views/Subagents.vue') },
+  { path: '/capability/routing', name: 'routing-rules', component: () => import('../views/RoutingRules.vue') },
+  { path: '/capability/scheduling', name: 'scheduling', component: () => import('../views/Scheduling.vue') },
+  { path: '/capability/protocols', name: 'protocols', component: () => import('../views/Protocols.vue') },
+  { path: '/capability/worktrees', name: 'worktrees', component: () => import('../views/Worktrees.vue') },
+  { path: '/capability/agent-proxy', name: 'agent-proxy', component: () => import('../views/AgentProxy.vue') },
 
   // ── 运维 ──
   { path: '/operate', name: 'monitor', component: () => import('../views/Monitor.vue') },
   { path: '/operate/logs', name: 'logs', component: () => import('../views/Logs.vue') },
   { path: '/operate/tracing', name: 'observability', component: () => import('../views/Observability.vue') },
   { path: '/operate/cost', name: 'cost', component: () => import('../views/Cost.vue') },
+  // ── 运维扩展：协作/告警/集成 ──
+  { path: '/operate/debate', name: 'debate', component: () => import('../views/Debate.vue') },
+  { path: '/operate/blackboard', name: 'blackboard', component: () => import('../views/Blackboard.vue') },
+  { path: '/operate/alerts', name: 'alert-rules', component: () => import('../views/AlertRules.vue') },
+  { path: '/operate/webhooks', name: 'webhooks', component: () => import('../views/Webhooks.vue') },
+  { path: '/operate/integrations', name: 'integrations', component: () => import('../views/Integrations.vue') },
+
+  // ── 分析（IA 新增组：数据分析仪表盘）──
+  { path: '/analysis', name: 'analysis', component: () => import('../views/Analysis.vue') },
+
+  // ── 反馈（IA 新增组：用户反馈评价）──
+  { path: '/feedback', name: 'feedback', component: () => import('../views/Feedback.vue') },
 
   // ── 管理（企业版专属，守卫保持不变）──
   { path: '/audit', name: 'audit', component: () => import('../views/Audit.vue'), meta: { requiresEnterprise: true } },
@@ -64,11 +89,11 @@ const routes = [
   { path: '/cost', redirect: '/operate/cost' },
   { path: '/skill-market', redirect: '/capability/market' },
   { path: '/skill-editor', redirect: '/capability/skills' },
-  // 暂降级入口：workflow-editor 并入执行组的高编排模式（原页面保留可达）
-  { path: '/workflow-editor', name: 'workflow-editor', component: () => import('../views/WorkflowEditor.vue') },
-  // 自演化并入记忆组（原页面保留可达，导航不再罗列）
-  { path: '/evolve', name: 'evolve', component: () => import('../views/Evolve.vue') },
-  { path: '/evolution-history', redirect: { path: '/evolve', query: { tab: 'history' } } },
+  // IA 优化: workflow-editor 纳入执行组 → /run/workflow（旧路径重定向）
+  { path: '/workflow-editor', redirect: '/run/workflow' },
+  // IA 优化: evolve 纯入能力组 → /capability/evolve（旧路径重定向）
+  { path: '/evolve', redirect: '/capability/evolve' },
+  { path: '/evolution-history', redirect: { path: '/capability/evolve', query: { tab: 'history' } } },
 
   // P2-10 fix: catch-all 404 route — redirect unknown paths to home.
   // 使用命名路由 'overview' 而非硬编码路径 '/home'，更健壮（路径变更时只需改一处）。
