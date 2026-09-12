@@ -457,6 +457,34 @@ def register_routers(app: FastAPI) -> None:
     _register_notifications_and_config(app)
     _register_feedback_router(app)
     _register_agent_versions_router(app)
+    _register_desktop_dispatch_routers(app)
+
+
+def _register_desktop_dispatch_routers(app: FastAPI) -> None:
+    """Register desktop Agent dispatch layer routers.
+
+    Bridges Agent catalog / router / credential vault / quota bucket /
+    billing engine / model gateway to the frontend. All endpoints are
+    admin-guarded inside each router.
+    """
+    # Desktop Agent dispatch layer routes
+    from maop.dashboard.routers import agent_catalog as agent_catalog_router
+    app.include_router(agent_catalog_router.router)
+
+    from maop.dashboard.routers import agent_router as agent_router_route_router
+    app.include_router(agent_router_route_router.router)
+
+    from maop.dashboard.routers import credential_vault as credential_vault_router
+    app.include_router(credential_vault_router.router)
+
+    from maop.dashboard.routers import quota as quota_route_router
+    app.include_router(quota_route_router.router)
+
+    from maop.dashboard.routers import billing_abstraction as billing_abstraction_router
+    app.include_router(billing_abstraction_router.router)
+
+    from maop.dashboard.routers import model_gateway as model_gateway_router
+    app.include_router(model_gateway_router.router)
 
 
 # ── Health ─────────────────────────────────────────────────────────
