@@ -575,7 +575,7 @@ onMounted(loadAll);
 }
 .notif-row:hover { border-color: var(--border-strong); background: var(--surface-2); }
 .notif-row.is-unread { background: color-mix(in srgb, var(--brand-soft) 35%, var(--surface)); }
-.notif-row__bar { width: 4px; height: 32px; border-radius: 2px; background: var(--border); }
+.notif-row__bar { width: 4px; height: 32px; border-radius: 2px; background: var(--border); } /* 亚token级微圆角 */
 .notif-row__bar.bar-info { background: var(--info); }
 .notif-row__bar.bar-warning { background: var(--warn); }
 .notif-row__bar.bar-error { background: var(--fail); }

@@ -445,7 +445,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   font-size: var(--fs-xs);
   font-weight: 600;
   padding: 1px 6px;
-  border-radius: 8px;
+  border-radius: var(--r-lg);
 }
 .pipeline-status.ok {
   background: var(--success-soft);
@@ -514,7 +514,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .type-tag {
   display: inline-block;
   padding: 1px 8px;
-  border-radius: 8px;
+  border-radius: var(--r-lg);
   font-size: var(--fs-xs);
   font-weight: 600;
 }
@@ -535,7 +535,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 .refresh-btn {
   background: none;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   padding: 4px 8px;
   cursor: pointer;
   color: var(--text-muted);
@@ -578,7 +578,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   font-family: var(--font-mono);
   background: var(--bg-tag);
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   font-size: var(--fs-xs);
 }
 </style>

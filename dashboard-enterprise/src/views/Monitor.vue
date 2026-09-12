@@ -489,7 +489,7 @@ onUnmounted(() => {
   font-size: var(--fs-sm);
   padding: 4px 8px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   background: var(--bg-card);
   color: var(--text);
   /* 修复: 固定 200px 宽度在小屏挤压 → 改为 min-width + flex 响应式伸缩 */
@@ -507,7 +507,7 @@ onUnmounted(() => {
   font-size: var(--fs-sm);
   padding: 4px 10px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   background: var(--bg-card);
   color: var(--text);
   cursor: pointer;
@@ -583,12 +583,12 @@ onUnmounted(() => {
   flex: 1;
   height: 6px;
   background: var(--bg-elev);
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   overflow: hidden;
 }
 .mini-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   transition: width var(--motion-slow, 280ms) ease;
 }
 .mini-val {
@@ -606,7 +606,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--r-xl);
   font-size: var(--fs-xs);
   font-weight: 500;
 }

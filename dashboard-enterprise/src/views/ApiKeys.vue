@@ -702,7 +702,7 @@ onMounted(load);
 .bar-chart { display: flex; align-items: flex-end; gap: 2px; height: 60px; }
 .bar-chart__col { flex: 1; display: flex; align-items: flex-end; height: 100%; }
 .bar-chart__bar {
-  width: 100%; min-height: 2px; border-radius: 2px 2px 0 0;
+  width: 100%; min-height: 2px; border-radius: 2px 2px 0 0; /* 亚token级微圆角 */
   background: var(--brand);
   transition: height var(--motion) var(--ease);
 }

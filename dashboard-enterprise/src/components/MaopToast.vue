@@ -92,15 +92,16 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* Toast 容器: 固定在右上角, 从上到下堆叠 */
+/* Toast 容器: 固定在右下角, 从下到上堆叠 */
 .maop-toast-host {
   position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 9998;
+  top: auto;
+  right: var(--sp-5);
+  bottom: var(--sp-5);
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-2);
   /* max-width 360px 为 Toast 视觉规格固定值 */
   max-width: 360px;
   pointer-events: none;
@@ -111,41 +112,41 @@ onUnmounted(() => {
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  background: var(--surface, #22242a);
-  border: 1px solid var(--border, #3c4048);
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-left-width: 3px;
-  border-radius: var(--radius, 8px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  font-size: 14px;
-  color: var(--text, #e8eaf0);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-sm);
+  color: var(--text);
 }
 
 /* 语义色: 用 CSS 变量控制左边框与图标颜色, 不用硬编码 */
 .maop-toast--info {
-  border-left-color: var(--brand, #0d9488);
+  border-left-color: var(--brand);
 }
 .maop-toast--info .maop-toast__icon {
-  color: var(--brand, #0d9488);
+  color: var(--brand);
 }
 .maop-toast--success {
-  border-left-color: var(--success, #3fb950);
+  border-left-color: var(--success);
 }
 .maop-toast--success .maop-toast__icon {
-  color: var(--success, #3fb950);
+  color: var(--success);
 }
 .maop-toast--warn {
-  border-left-color: var(--warn, #d29922);
+  border-left-color: var(--warn);
 }
 .maop-toast--warn .maop-toast__icon {
-  color: var(--warn, #d29922);
+  color: var(--warn);
 }
 .maop-toast--error {
-  border-left-color: var(--fail, #f85149);
+  border-left-color: var(--fail);
 }
 .maop-toast--error .maop-toast__icon {
-  color: var(--fail, #f85149);
+  color: var(--fail);
 }
 
 /* 图标: 几何符号, 居中显示 */
@@ -155,7 +156,7 @@ onUnmounted(() => {
   justify-content: center;
   width: 18px;
   height: 18px;
-  font-size: 14px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   font-style: normal;
   flex-shrink: 0;
@@ -173,20 +174,20 @@ onUnmounted(() => {
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--text-muted, #9aa3b2);
-  font-size: 16px;
+  color: var(--text-muted);
+  font-size: var(--fs-lg);
   line-height: 1;
   cursor: pointer;
   border-radius: 4px;
-  transition: background 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-              color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background var(--motion-fast) var(--ease),
+              color var(--motion-fast) var(--ease);
 }
 .maop-toast__close:hover {
-  background: var(--surface-3, #31343c);
-  color: var(--text, #e8eaf0);
+  background: var(--surface-3);
+  color: var(--text);
 }
 .maop-toast__close:focus-visible {
-  outline: 2px solid var(--brand, #0d9488);
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 </style>

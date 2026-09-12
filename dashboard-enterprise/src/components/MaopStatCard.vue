@@ -2,10 +2,9 @@
   <!--
     MAOP 独有统计卡片 (去AI同质化)
     区别于 Element Plus 的 el-card 与 AI 模板常见的阴影卡片:
-    - 顶部 1px 品牌色线条 (MAOP 独有标识, 用伪元素绘制)
     - 标题 + 大数字 + 趋势箭头
-    - 悬浮时微抬效果 (maop-card-hover, translateY -2px)
-    - 1px 描边, 不用阴影 —— JetBrains 式层级语言
+    - 1px 描边, 不用阴影 —— JetBrains New UI 无飘浮层级语言
+    - 悬浮仅描边加深, 不抬升不阴影 (与 StatCard 风格一致)
     - 暗色/亮色主题自动适配 (通过 CSS 变量)
   -->
   <div class="maop-stat" :class="{ 'maop-stat--up': isUp, 'maop-stat--down': isDown }">
@@ -54,8 +53,8 @@ const isDown = computed(() => props.trend !== null && props.trend !== undefined 
 </script>
 
 <style scoped>
-/* MAOP 独有统计卡片: 1px 描边, 无阴影, 顶部品牌色线条
- * 悬浮时微抬 (maop-card-hover 效果内联实现, 避免依赖外部 CSS) */
+/* MAOP 独有统计卡片: 1px 描边, 无阴影, 无飘浮
+ * 悬浮仅描边加深 —— 与 StatCard 风格一致 (JetBrains New UI) */
 .maop-stat {
   position: relative;
   display: flex;
@@ -66,30 +65,13 @@ const isDown = computed(() => props.trend !== null && props.trend !== undefined 
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--surface);
-  /* 悬浮微抬效果 (MAOP 独有, 非 scale 缩放) */
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  /* 描边过渡 —— JetBrains New UI 无飘浮设计语言 */
+  transition: border-color var(--motion-normal) var(--ease);
 }
 
-/* MAOP 独有标识: 顶部 1px 品牌色线条
- * 用伪元素绘制, 区别于 AI 模板的左边框色条 */
-.maop-stat::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: var(--sp-4);
-  right: var(--sp-4);
-  height: 1px;
-  background: linear-gradient(90deg, var(--brand), var(--brand-strong));
-  opacity: 0.6;
-}
-
-/* 悬浮微抬: translateY -2px + 柔和阴影 + 描边加深 */
+/* 悬浮: 仅描边加深, 不抬升不阴影 —— 与 StatCard 一致 */
 .maop-stat:hover {
-  transform: translateY(-2px);
   border-color: var(--border-strong);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 /* 标题行: 标题 + 单位 */
@@ -119,7 +101,7 @@ const isDown = computed(() => props.trend !== null && props.trend !== undefined 
   gap: var(--sp-2);
 }
 .maop-stat__value {
-  font-size: var(--fs-2xl);
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--text);
   line-height: 1.1;
@@ -131,10 +113,10 @@ const isDown = computed(() => props.trend !== null && props.trend !== undefined 
 .maop-stat__trend {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--sp-1);
   font-size: var(--fs-xs);
   font-weight: 700;
-  padding: 2px 6px;
+  padding: var(--sp-1) var(--sp-2);
   border-radius: var(--r-full);
   background: var(--surface-2);
   color: var(--text-faint);

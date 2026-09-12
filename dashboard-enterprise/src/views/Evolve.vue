@@ -613,7 +613,7 @@ onMounted(() => {
   transform: translateX(-50%);
   width: 2px;
   background: var(--border-subtle);
-  border-radius: 1px;
+  border-radius: 1px; /* 亚token级微圆角 */
 }
 .evolve-milestones__dot {
   width: 12px;

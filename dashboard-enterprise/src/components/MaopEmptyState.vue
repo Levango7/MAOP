@@ -32,6 +32,8 @@ defineProps({
 
 <style scoped>
 /* MAOP 独有空状态: 1px 描边卡片包裹, 无阴影, 居中布局 */
+/* 设计说明: 与 EmptyState.vue 的"无边框纯居中"不同,
+ * MaopEmptyState 采用 1px 描边卡片包裹, 适用于需要明确视觉边界的空状态场景。 */
 .maop-empty {
   display: flex;
   flex-direction: column;
@@ -83,7 +85,7 @@ defineProps({
   background: var(--brand-strong);
   transform: rotate(-45deg);
   transform-origin: left center;
-  border-radius: 1px;
+  border-radius: 1px; /* 1px: 斜线端点微圆角, 非卡片圆角, 不适用 r-* token */
   opacity: 0.5;
 }
 

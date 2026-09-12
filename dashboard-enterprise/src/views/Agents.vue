@@ -1116,7 +1116,7 @@ onMounted(() => {
   display: flex; align-items: center; justify-content: center;
   background: var(--overlay-scrim);
 
-  animation: maop-view-in .2s ease both;
+  animation: maop-view-in var(--motion-normal) var(--ease) both;
 }
 
 /* ── 记忆面板（DetailDrawer 内容样式） ── */
@@ -1551,7 +1551,7 @@ onMounted(() => {
   stroke: var(--brand);
 }
 .topo-node__label {
-  font-size: 9px;
+  font-size: var(--fs-3xs);
   fill: var(--text-muted);
   text-anchor: middle;
   font-family: var(--font-sans);

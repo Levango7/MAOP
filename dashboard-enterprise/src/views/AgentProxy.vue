@@ -667,7 +667,7 @@ onMounted(() => {
 .health-chart__bar--ok { fill: var(--success); }
 .health-chart__bar--fail { fill: var(--fail); }
 .health-chart__label {
-  font-size: 10px; fill: var(--text-muted);
+  font-size: var(--fs-2xs); fill: var(--text-muted);
   font-family: var(--font-mono);
 }
 

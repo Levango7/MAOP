@@ -59,7 +59,7 @@ defineProps({
   position: relative;
   z-index: 1;
   font-family: var(--font-sans);
-  font-weight: 800;
+  font-weight: 700; /* Logo 专用, 700 与项目标题一致 */
   color: var(--brand-contrast);
   line-height: 1;
   letter-spacing: -0.05em;
@@ -71,7 +71,7 @@ defineProps({
   height: 24px;
 }
 .maop-logo--small .maop-logo__letter {
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 
 .maop-logo--medium {
@@ -79,7 +79,7 @@ defineProps({
   height: 32px;
 }
 .maop-logo--medium .maop-logo__letter {
-  font-size: 18px;
+  font-size: var(--fs-xl);
 }
 
 .maop-logo--large {
@@ -87,6 +87,6 @@ defineProps({
   height: 48px;
 }
 .maop-logo--large .maop-logo__letter {
-  font-size: 26px;
+  font-size: var(--fs-2xl);
 }
 </style>

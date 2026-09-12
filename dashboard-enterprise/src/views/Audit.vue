@@ -428,7 +428,7 @@ const trendData = computed(() => {
       {
         label: t('view.audit.trendDatasetOps'),
         data: bs.map((b) => b.ops),
-        borderColor: cssVar('--chart-1', '#3574f0'),
+        borderColor: cssVar('--chart-1', '#0d9488'),
         backgroundColor: trendKind.value === 'bar'
           ? cssVarAlpha('--chart-1', 0.6)
           : cssVarAlpha('--chart-1', 0.12),
@@ -496,7 +496,7 @@ const pieData = computed(() => {
     labels,
     datasets: [{
       data: labels.map((l) => counts[l]),
-      backgroundColor: labels.map((_, i) => cssVar(palette[i % palette.length], '#3574f0')),
+      backgroundColor: labels.map((_, i) => cssVar(palette[i % palette.length], '#0d9488')),
       borderWidth: 2,
       borderColor: cssVar('--surface', '#22242a'),
     }],

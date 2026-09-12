@@ -878,7 +878,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   font-size: var(--fs-base);
   background: var(--surface);
   color: var(--text);
@@ -930,7 +930,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   margin: 0;
   padding: 8px;
   background: var(--surface-3);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   font-size: var(--fs-xs);
   font-family: var(--font-mono);
   overflow-x: auto;
@@ -948,7 +948,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
 .kg-memory-summary {
   padding: 8px;
   background: var(--bg-muted);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   font-size: var(--fs-sm);
   line-height: 1.5;
   max-height: 120px;
@@ -963,7 +963,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   gap: 6px;
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--text);
   font-size: var(--fs-base);

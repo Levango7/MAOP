@@ -754,7 +754,7 @@ onMounted(() => {
   align-items: center;
   padding: 10px 12px;
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  border-radius: var(--r-md);
 }
 .pending-item__main {
   display: flex;

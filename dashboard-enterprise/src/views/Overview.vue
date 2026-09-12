@@ -463,7 +463,7 @@ const _ts = computed(() => normalizeTimeseries(data.value?.timeseries));
 
 // Theme-aware chart colors: shared composable reads CSS vars at compute time,
 // so charts follow dark/light theme switches without a remount.
-function chartBrand()     { return cssVar('--chart-1', '#3574f0'); }
+function chartBrand()     { return cssVar('--chart-1', '#0d9488'); }
 function chartMuted()     { return cssVar('--text-muted', '#9aa3b2'); }
 function chartGridColor() { return cssVar('--border-subtle', 'rgba(163,173,190,.15)'); }
 function chartBrandFill() { return cssVarAlpha('--chart-1', .14); }

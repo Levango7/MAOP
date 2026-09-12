@@ -506,8 +506,8 @@ onMounted(() => {
 .stats-chart__bar--1 { fill: var(--info); }
 .stats-chart__bar--2 { fill: var(--warn); }
 .stats-chart__bar--3 { fill: var(--success); }
-.stats-chart__label { font-size: 11px; fill: var(--text-muted); font-family: inherit; }
-.stats-chart__value-text { font-size: 11px; fill: var(--text); font-weight: 600; font-family: var(--font-mono); }
+.stats-chart__label { font-size: var(--fs-xs); fill: var(--text-muted); font-family: inherit; }
+.stats-chart__value-text { font-size: var(--fs-xs); fill: var(--text); font-weight: 600; font-family: var(--font-mono); }
 .stats-chart__empty { text-align: center; padding: var(--sp-4); }
 
 /* ── Modal ────────────────────────────────────────────────────── */

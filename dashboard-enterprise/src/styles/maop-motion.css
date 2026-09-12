@@ -14,19 +14,19 @@
  * 非 AI 模板的 scale(1.02) 缩放, 而是垂直微抬 2px + 柔和阴影。
  * 视觉感受: 卡片"轻轻被托起", 而非"被放大"。 */
 .maop-card-hover {
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--motion-normal) var(--ease),
+              box-shadow var(--motion-normal) var(--ease);
 }
 .maop-card-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-card);
 }
 
 /* ── MAOP 独有: 页面切换淡入位移 ──────────────────────────────────────────
  * 非 AI 模板的纯 opacity fade, 而是从下方 8px 位移 + 淡入。
  * 视觉感受: 内容"从下方滑入到位", 有方向感。 */
 .maop-page-enter {
-  animation: maop-page-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: maop-page-in var(--motion-slow) var(--ease);
 }
 @keyframes maop-page-in {
   from { opacity: 0; transform: translateY(8px); }
@@ -37,7 +37,8 @@
  * 非 AI 模板的 spinner 旋转, 而是透明度脉冲呼吸。
  * 视觉感受: 占位区"在呼吸", 暗示数据即将到来, 比旋转更安静。 */
 .maop-skeleton-pulse {
-  animation: maop-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  /* 循环动画 2s 不适用 motion token */
+  animation: maop-pulse 2s var(--ease) infinite;
 }
 @keyframes maop-pulse {
   0%, 100% { opacity: 1; }
@@ -59,7 +60,7 @@
   height: 2px;
   background: linear-gradient(90deg, var(--brand), var(--brand-strong));
   transform: scaleX(0);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--motion-slow) var(--ease);
 }
 .maop-brand-underline:hover::after {
   transform: scaleX(1);
@@ -69,7 +70,7 @@
  * 非 AI 模板的闪烁(opacity 跳变), 而是品牌色光晕扩散呼吸。
  * 视觉感受: 状态点"在呼吸", 像心跳监测仪, 有生命感但不刺眼。 */
 .maop-status-breath {
-  animation: maop-breath 2s ease-in-out infinite;
+  animation: maop-breath 2s var(--ease) infinite;
 }
 @keyframes maop-breath {
   0%, 100% { box-shadow: 0 0 0 0 var(--brand-soft); }
@@ -100,7 +101,7 @@
   bottom: 0;
   width: 2px;
   background: var(--brand);
-  animation: maop-nav-slide-in 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: maop-nav-slide-in var(--motion-fast) var(--ease);
 }
 @keyframes maop-nav-slide-in {
   from { transform: scaleY(0); transform-origin: top; }
@@ -111,7 +112,7 @@
  * 非 AI 模板的 scale(0.95) 缩放, 而是 translateY(1px) 下沉。
  * 视觉感受: 按钮被"按下去"了, 有物理触感。 */
 .maop-btn-press {
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--motion-fast) var(--ease);
 }
 .maop-btn-press:active {
   transform: translateY(1px);
@@ -122,7 +123,7 @@
  * 视觉感受: 行被"标记"了, 而非"高亮"了, 更克制。 */
 .maop-row-mark {
   position: relative;
-  transition: background 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background var(--motion-fast) var(--ease);
 }
 .maop-row-mark:hover {
   background: var(--brand-faint);
@@ -136,7 +137,7 @@
   width: 1px;
   background: var(--brand);
   transform: scaleY(0);
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--motion-fast) var(--ease);
 }
 .maop-row-mark:hover::before {
   transform: scaleY(1);
@@ -156,8 +157,8 @@
   width: var(--tab-indicator-w, 0);
   height: 2px;
   background: var(--brand);
-  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: left var(--motion-slow) var(--ease),
+              width var(--motion-slow) var(--ease);
 }
 
 /* ── 特效10: MAOP 独有: 进度条品牌色流动 ────────────────────────────────────
@@ -169,6 +170,7 @@
     var(--brand) 50%,
     var(--brand-faint) 100%);
   background-size: 200% 100%;
+  /* 循环动画 1.5s 不适用 motion token */
   animation: maop-flow 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 @keyframes maop-flow {
@@ -180,14 +182,14 @@
  * 非 AI 模板的 fade+scale 弹出, 而是从右侧 16px 滑入。
  * 视觉感受: 通知"递过来"了, 有物理感。 */
 .maop-toast-in {
-  animation: maop-toast-slide 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: maop-toast-slide var(--motion-slow) var(--ease);
 }
 @keyframes maop-toast-slide {
   from { opacity: 0; transform: translateX(16px); }
   to { opacity: 1; transform: translateX(0); }
 }
 .maop-toast-out {
-  animation: maop-toast-slide-out 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: maop-toast-slide-out var(--motion-slow) var(--ease) forwards;
 }
 @keyframes maop-toast-slide-out {
   from { opacity: 1; transform: translateX(0); }
@@ -200,7 +202,7 @@
 .maop-collapse {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: grid-template-rows var(--motion-slow) var(--ease);
 }
 .maop-collapse--open {
   grid-template-rows: 1fr;
@@ -218,7 +220,8 @@
   left: 0;
   height: 2px;
   background: var(--brand);
-  z-index: 9999;
+  z-index: var(--z-toast);
+  /* 循环动画 1.5s 不适用 motion token */
   animation: maop-loading-progress 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 @keyframes maop-loading-progress {
@@ -233,14 +236,14 @@
 .maop-focus-ring:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
-  border-radius: var(--radius, 8px);
+  border-radius: var(--r-lg);
 }
 
 /* ── 特效15: MAOP 独有: 数字翻牌 ────────────────────────────────────────────
  * 非 AI 模板的 count-up 滚动, 而是旧值上滑出+新值下滑入。
  * 视觉感受: 数字"翻了一页", 简洁有节奏感。 */
 .maop-number-flip {
-  animation: maop-flip-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: maop-flip-in var(--motion-slow) var(--ease);
 }
 @keyframes maop-flip-in {
   from { opacity: 0; transform: translateY(-8px); }
