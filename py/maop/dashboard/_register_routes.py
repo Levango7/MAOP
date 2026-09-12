@@ -201,6 +201,11 @@ def _register_workflow_routers(app: FastAPI) -> None:
 
     app.include_router(plugin_router.router)
 
+    # 长任务管理路由 — 自主 Agent（Devin/OpenHands 等）长任务提交/查询/取消/SSE 进度流.
+    from maop.dashboard.routers import long_running_task as long_running_task_router
+
+    app.include_router(long_running_task_router.router)
+
 
 def _register_data_routers(app: FastAPI) -> None:
     """Register data / cost / agents / chat / knowledge / observability routers."""
@@ -488,6 +493,10 @@ def _register_desktop_dispatch_routers(app: FastAPI) -> None:
 
     from maop.dashboard.routers import agent_collaboration as agent_collaboration_router
     app.include_router(agent_collaboration_router.router)
+
+    # Agent 代理网关 — 内网代理 + 审计 + 部门预算（企业场景）。
+    from maop.dashboard.routers import agent_proxy_gateway as agent_proxy_gateway_router
+    app.include_router(agent_proxy_gateway_router.router)
 
 
 # ── Health ─────────────────────────────────────────────────────────
