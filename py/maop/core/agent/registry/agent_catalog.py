@@ -182,16 +182,29 @@ class AgentCatalog:
         self._load_from_store()
 
     def _load_from_store(self) -> None:
-        """启动时从 SQLite 加载所有已持久化的 Agent。"""
+        """启动时从 SQLite 加载所有已持久化的 Agent。
+
+        单条记录损坏不会阻止其他记录加载——逐行 try/except 容错。
+        """
         try:
             rows = self._store.load_all()
-            for row in rows:
-                desc = AgentDescriptor.from_store_dict(row)
-                self._agents[desc.name] = desc
-            if rows:
-                logger.debug("[agent_catalog] loaded %d agents from store", len(rows))
         except Exception as exc:
             logger.warning("[agent_catalog] failed to load from store: %s", exc)
+            return
+        loaded = 0
+        for row in rows:
+            try:
+                desc = AgentDescriptor.from_store_dict(row)
+                self._agents[desc.name] = desc
+                loaded += 1
+            except Exception as exc:
+                logger.warning(
+                    "[agent_catalog] skipping corrupt agent row (name=%s): %s",
+                    row.get("name", "?"),
+                    exc,
+                )
+        if loaded:
+            logger.debug("[agent_catalog] loaded %d agents from store", loaded)
 
     # ── Register / Update ─────────────────────────────────────────
     def register(self, descriptor: AgentDescriptor) -> None:

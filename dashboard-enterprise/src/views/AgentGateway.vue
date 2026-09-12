@@ -441,10 +441,13 @@ async function submitForm() {
       daily_token_limit: Number(formData.daily_token_limit) || 0,
       priority: Number(formData.priority) || 100,
     };
-    await api.post('/api/model-gateway/permissions', payload);
-    toast.success(editing.value
-      ? t('view.agentGateway.form.successUpdate')
-      : t('view.agentGateway.form.successAdd'));
+    if (editing.value) {
+      await api.put(`/api/model-gateway/permissions/${encodeURIComponent(pattern)}`, payload);
+      toast.success(t('view.agentGateway.form.successUpdate'));
+    } else {
+      await api.post('/api/model-gateway/permissions', payload);
+      toast.success(t('view.agentGateway.form.successAdd'));
+    }
     showFormModal.value = false;
     await loadPermissions();
   } catch (err) {

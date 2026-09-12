@@ -39,6 +39,8 @@ const routes = [
   { path: '/capability/worktrees', name: 'worktrees', component: () => import('../views/Worktrees.vue') },
   { path: '/capability/agent-proxy', name: 'agent-proxy', component: () => import('../views/AgentProxy.vue') },
   { path: '/capability/agent-registry', name: 'agent-registry', component: () => import('../views/AgentRegistry.vue') },
+  { path: '/capability/agent-billing', name: 'agent-billing', component: () => import('../views/AgentBilling.vue') },
+  { path: '/capability/agent-gateway', name: 'agent-gateway', component: () => import('../views/AgentGateway.vue') },
 
   // ── 运维 ──
   { path: '/operate', name: 'monitor', component: () => import('../views/Monitor.vue') },

@@ -298,10 +298,12 @@ class ModelGateway:
     def _match_pattern(self, pattern: str, model: str) -> bool:
         """通配符匹配（fnmatch）。
 
-        使用 ``fnmatch.fnmatch`` 进行 shell 风格通配符匹配，
+        使用 ``fnmatch.fnmatchcase`` 进行大小写敏感的 shell 风格通配符匹配，
         支持 ``*``、``?``、``[seq]``、``[!seq]``。
+        ``fnmatchcase`` 保证跨平台行为一致（``fnmatch.fnmatch`` 在 Windows 上
+        会做 ``os.path.normcase`` 大小写规范化，导致权限规则意外匹配）。
         """
-        return fnmatch.fnmatch(model, pattern)
+        return fnmatch.fnmatchcase(model, pattern)
 
     def _find_matching_permission(self, model: str) -> ModelPermission | None:
         """找到最优先匹配的权限规则。
