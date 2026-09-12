@@ -75,3 +75,192 @@
   0%, 100% { box-shadow: 0 0 0 0 var(--brand-soft); }
   50% { box-shadow: 0 0 0 4px var(--brand-faint); }
 }
+/* =========================================================================
+ * MAOP 独有微交互样式 — 第二批 (2026-09-13 扩展)
+ * --------------------------------------------------------------------------
+ * 以下 10 种特效与首批 5 种遵循同一套设计规范:
+ *   缓动函数: cubic-bezier(0.4, 0, 0.2, 1)  — Material 标准缓动
+ *   时长: 0.15s(微交互) / 0.3s(页面级) / 2s(无限循环)
+ *   距离: 1px(描边) / 2px(微抬) / 8px(位移)
+ *   色彩: var(--brand) / var(--brand-soft) / var(--brand-faint)
+ *   禁止: scale 缩放 / 满屏渐变 / 霓虹辉光 / emoji / spinner 旋转
+ * ========================================================================= */
+
+/* ── 特效6: MAOP 独有: 侧边栏激活态左竖线 ──────────────────────────────────
+ * 非 AI 模板的背景色块高亮, 而是左侧 2px 品牌色竖线从上到下"画出"。
+ * 视觉感受: 像 JetBrains 的侧边栏激活指示, 精准不喧闹。 */
+.maop-nav-active {
+  position: relative;
+}
+.maop-nav-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--brand);
+  animation: maop-nav-slide-in 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes maop-nav-slide-in {
+  from { transform: scaleY(0); transform-origin: top; }
+  to { transform: scaleY(1); transform-origin: top; }
+}
+
+/* ── 特效7: MAOP 独有: 按钮按压反馈 ──────────────────────────────────────────
+ * 非 AI 模板的 scale(0.95) 缩放, 而是 translateY(1px) 下沉。
+ * 视觉感受: 按钮被"按下去"了, 有物理触感。 */
+.maop-btn-press {
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.maop-btn-press:active {
+  transform: translateY(1px);
+}
+
+/* ── 特效8: MAOP 独有: 表格行 hover 左线 ────────────────────────────────────
+ * 非 AI 模板的整行背景色变, 而是左侧 1px 品牌色线从上到下画出。
+ * 视觉感受: 行被"标记"了, 而非"高亮"了, 更克制。 */
+.maop-row-mark {
+  position: relative;
+  transition: background 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.maop-row-mark:hover {
+  background: var(--brand-faint);
+}
+.maop-row-mark::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--brand);
+  transform: scaleY(0);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.maop-row-mark:hover::before {
+  transform: scaleY(1);
+}
+
+/* ── 特效9: MAOP 独有: Tab 底部指示器滑动 ──────────────────────────────────
+ * 非 AI 模板的 fade 切换, 而是底部 2px 品牌色线滑动到激活 tab。
+ * 需要JS配合设置 --tab-indicator-x 和 --tab-indicator-w 变量。 */
+.maop-tab-bar {
+  position: relative;
+}
+.maop-tab-bar::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: var(--tab-indicator-x, 0);
+  width: var(--tab-indicator-w, 0);
+  height: 2px;
+  background: var(--brand);
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── 特效10: MAOP 独有: 进度条品牌色流动 ────────────────────────────────────
+ * 非 AI 模板的条纹斜线动画, 而是品牌色渐变从左到右流动。
+ * 视觉感受: 像液体在管道中流动, 有方向感。 */
+.maop-progress-flow {
+  background: linear-gradient(90deg,
+    var(--brand-faint) 0%,
+    var(--brand) 50%,
+    var(--brand-faint) 100%);
+  background-size: 200% 100%;
+  animation: maop-flow 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes maop-flow {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* ── 特效11: MAOP 独有: Toast 从右侧滑入 ────────────────────────────────────
+ * 非 AI 模板的 fade+scale 弹出, 而是从右侧 16px 滑入。
+ * 视觉感受: 通知"递过来"了, 有物理感。 */
+.maop-toast-in {
+  animation: maop-toast-slide 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes maop-toast-slide {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.maop-toast-out {
+  animation: maop-toast-slide-out 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes maop-toast-slide-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(16px); }
+}
+
+/* ── 特效12: MAOP 独有: 折叠面板 grid 展开动画 ──────────────────────────────
+ * 非 AI 模板的 max-height hack, 而是用 grid-template-rows 0fr→1fr。
+ * 视觉感受: 面板"展开"了, 内容自然推下来, 无跳变。 */
+.maop-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.maop-collapse--open {
+  grid-template-rows: 1fr;
+}
+.maop-collapse > * {
+  overflow: hidden;
+}
+
+/* ── 特效13: MAOP 独有: 顶部 2px 品牌色加载条 ──────────────────────────────
+ * 非 AI 模板的 spinner, 而是页面顶部 2px 品牌色条从左到右推进。
+ * 视觉感受: 像 GitHub/YouTube 的页面加载指示, 不打扰内容。 */
+.maop-loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: var(--brand);
+  z-index: 9999;
+  animation: maop-loading-progress 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes maop-loading-progress {
+  0% { width: 0; left: 0; }
+  50% { width: 40%; left: 30%; }
+  100% { width: 0; left: 100%; }
+}
+
+/* ── 特效14: MAOP 独有: 键盘焦点 2px 品牌色环 ──────────────────────────────
+ * 非 AI 模板的 outline: none 去除焦点, 而是保留无障碍焦点环。
+ * 仅键盘焦点显示(鼠标点击不显示), 用 :focus-visible。 */
+.maop-focus-ring:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--radius, 8px);
+}
+
+/* ── 特效15: MAOP 独有: 数字翻牌 ────────────────────────────────────────────
+ * 非 AI 模板的 count-up 滚动, 而是旧值上滑出+新值下滑入。
+ * 视觉感受: 数字"翻了一页", 简洁有节奏感。 */
+.maop-number-flip {
+  animation: maop-flip-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes maop-flip-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================================================
+ * prefers-reduced-motion: 全局禁用所有 MAOP 特效动画
+ * --------------------------------------------------------------------------
+ * tokens.css 已有全局兜底(将 animation/transition 时长压到 .001ms),
+ * 此处显式列出所有 MAOP 特效类, 以 animation:none / transition:none 彻底
+ * 关闭, 避免无限循环动画在辅助技术中造成干扰。
+ * ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .maop-card-hover, .maop-page-enter, .maop-skeleton-pulse,
+  .maop-brand-underline, .maop-status-breath,
+  .maop-nav-active, .maop-btn-press, .maop-row-mark,
+  .maop-progress-flow, .maop-toast-in, .maop-toast-out,
+  .maop-collapse, .maop-loading-bar, .maop-number-flip {
+    animation: none !important;
+    transition: none !important;
+  }
+}
