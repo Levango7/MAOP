@@ -1,5 +1,6 @@
 export const messages = {
   en: {
+    'view.nodedetailpanel.title': 'Node Detail',
     'view.nodedetailpanel.status': 'Status',
     'view.nodedetailpanel.timestamp': 'Timestamp',
     'view.nodedetailpanel.agent': 'Agent',
@@ -9,6 +10,7 @@ export const messages = {
     'view.nodedetailpanel.reason': 'Reason',
   },
   zh: {
+    'view.nodedetailpanel.title': '节点详情',
     'view.nodedetailpanel.status': '状态',
     'view.nodedetailpanel.timestamp': '时间戳',
     'view.nodedetailpanel.agent': '智能体',

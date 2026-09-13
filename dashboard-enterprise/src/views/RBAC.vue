@@ -66,8 +66,8 @@
     </ListPageLayout>
 
     <div v-if="showGrant" v-modal-a11y class="modal-overlay" @click.self="showGrant = false" @modal:escape="showGrant = false">
-      <div class="modal">
-        <h3>{{ t('view.rbac.grantRole') }}</h3>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rbac-grant-title">
+        <h3 id="rbac-grant-title">{{ t('view.rbac.grantRole') }}</h3>
         <label>{{ t('view.rbac.userId') }}</label>
         <input v-model="newGrant.user_id" class="input" placeholder="user@example.com" />
         <label>{{ t('view.rbac.role') }}</label>
@@ -152,8 +152,9 @@ async function loadGrants() {
   try {
     const d = await api.get('/api/rbac/grants');
     grants.value = (d.grants || []).map((g) => ({ ...g, __key: `${g.user_id}|${g.role}|${g.tenant_id || ''}` }));
-  } catch {
+  } catch (e) {
     grants.value = [];
+    grantsError.value = e?.message || String(e);
   } finally {
     grantsLoading.value = false;
   }

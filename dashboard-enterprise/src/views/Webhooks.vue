@@ -81,7 +81,7 @@
 
     <!-- 创建/编辑对话框 -->
     <div v-if="showForm" v-modal-a11y class="modal-overlay" @click.self="closeForm" @modal:escape="closeForm">
-      <div class="modal" role="document">
+      <div class="modal" role="dialog" aria-modal="true">
         <button class="modal-close" type="button" :aria-label="t('common.close')" @click="closeForm">
           <AppIcon name="x" :size="16" aria-hidden="true" />
         </button>

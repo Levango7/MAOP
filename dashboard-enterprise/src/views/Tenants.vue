@@ -50,8 +50,8 @@
     </ListPageLayout>
 
     <div v-if="showCreate" v-modal-a11y class="modal-overlay" @click.self="showCreate = false" @modal:escape="showCreate = false">
-      <div class="modal">
-        <h3>{{ t('view.tenants.createTenant') }}</h3>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tenants-create-title">
+        <h3 id="tenants-create-title">{{ t('view.tenants.createTenant') }}</h3>
         <label>{{ t('view.tenants.tenantId') }}</label>
         <!-- placeholder 为格式示例，不参与 i18n（保持跨语言一致的 ID 命名约定演示） -->
         <input v-model="newTenant.tenant_id" class="input" placeholder="acme-corp" />

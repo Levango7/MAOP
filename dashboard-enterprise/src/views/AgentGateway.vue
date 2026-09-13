@@ -195,7 +195,7 @@
                 <div class="gw-table__th gw-table__th--num" role="columnheader">{{ t('view.agentGateway.usage.col.tokens') }}</div>
                 <div class="gw-table__th" role="columnheader">{{ t('view.agentGateway.usage.col.agent') }}</div>
               </div>
-              <div v-for="(u, i) in usageRows" :key="i" class="gw-table__row" role="row">
+              <div v-for="(u, i) in usageRows" :key="u.model + '-' + i" class="gw-table__row" role="row">
                 <div class="gw-table__td" role="cell">
                   <span class="gw-table__name mono">{{ u.model }}</span>
                 </div>

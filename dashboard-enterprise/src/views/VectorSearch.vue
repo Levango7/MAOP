@@ -61,6 +61,8 @@
       />
     </template>
 
+    <p v-if="searchError" class="inline-error">{{ searchError }}</p>
+
     <Card :title="t('view.vector.indexStats')" icon="database" margin-bottom="var(--sp-4)">
       <div v-if="!statsLoading" class="stat-grid">
         <StatCard :label="t('view.vector.stat.totalEntries')" :value="stats.total_entries ?? 0" icon="database" tone="brand" />
@@ -113,6 +115,7 @@ const searched = ref(false);
 const lastQuery = ref('');
 const results = ref([]);
 const searchTime = ref(0);
+const searchError = ref('');
 
 const stats = ref({});
 const statsLoading = ref(true);
@@ -168,9 +171,11 @@ async function doSearch() {
     const data = await api.get(`/api/vector/search?q=${encodeURIComponent(query.value)}&topk=${topK.value}`);
     results.value = data.results || [];
     searchTime.value = Math.round(performance.now() - start);
-  } catch {
+    searchError.value = '';
+  } catch (e) {
     results.value = [];
     searchTime.value = 0;
+    searchError.value = e?.message || String(e);
   }
   searching.value = false;
 }

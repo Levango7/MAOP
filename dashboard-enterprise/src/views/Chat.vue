@@ -70,7 +70,7 @@
             <p>{{ t('view.chat.welcomeHint') }}</p>
           </div>
 
-          <div v-for="(msg, i) in messages" :key="i" :class="['msg-row', msg.role]">
+          <div v-for="(msg, i) in messages" :key="(msg.id != null ? msg.id : (msg.time || '') + '-' + i)" :class="['msg-row', msg.role]">
             <div class="msg-avatar">
               <AppIcon :name="msg.role === 'user' ? 'user' : 'bot'" :size="18" />
             </div>

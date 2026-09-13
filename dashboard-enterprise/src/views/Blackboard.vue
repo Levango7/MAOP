@@ -128,7 +128,7 @@
               :title="t('view.blackboard.history.empty')"
             />
             <div v-else class="hist-list">
-              <div v-for="(h, i) in history" :key="i" class="hist-item">
+              <div v-for="(h, i) in history" :key="(h.id != null ? h.id : (h.timestamp || h.ts || h.time) + '-' + (h.actor || h.contributor || '') + '-' + i)" class="hist-item">
                 <div class="hist-item__head">
                   <Badge :tone="historyTone(h)">{{ h.op || h.operation || h.action || '—' }}</Badge>
                   <span class="hist-item__actor muted">{{ h.actor || h.contributor || '—' }}</span>

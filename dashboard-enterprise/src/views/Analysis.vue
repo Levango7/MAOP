@@ -240,13 +240,13 @@
                     role="img"
                     :aria-label="t('view.analysis.cost.title')"
                   >
-                    <path v-for="(s, i) in costPieSlices" :key="i" :d="s.d" :class="'an-cost-chart__slice an-cost-chart__slice--' + (i % 5)" />
+                    <path v-for="(s, i) in costPieSlices" :key="s.label + '-' + i" :d="s.d" :class="'an-cost-chart__slice an-cost-chart__slice--' + (i % 5)" />
                   </svg>
                 </div>
                 <div class="an-cost-legend">
                   <div
                     v-for="(s, i) in costPieSlices"
-                    :key="i"
+                    :key="s.label + '-' + i"
                     class="an-cost-legend__item"
                   >
                     <i class="an-cost-legend__dot" :class="'an-cost-legend__dot--' + (i % 5)"></i>

@@ -322,7 +322,7 @@
           <div class="diff-view">
             <div
               v-for="(row, i) in diffRows"
-              :key="i"
+              :key="(row.type || '') + '-' + i + '-' + (row.text || '')"
               class="diff-line"
               :class="'diff-line--' + row.type"
             >

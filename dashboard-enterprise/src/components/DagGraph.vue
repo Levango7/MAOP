@@ -30,7 +30,12 @@
             :key="node.id"
             :transform="`translate(${node.x}, ${node.y})`"
             class="dag-node-group"
+            :tabindex="0"
+            role="button"
+            :aria-label="node.label || node.id"
             @click="onNodeClick(node)"
+            @keydown.enter.prevent="onNodeClick(node)"
+            @keydown.space.prevent="onNodeClick(node)"
           >
             <circle
               :r="nodeRadius"
@@ -68,7 +73,16 @@
     </div>
 
     <!-- Node detail panel (modal overlay) -->
-    <div v-if="selectedNode" v-modal-a11y class="dag-detail-overlay" @click.self="selectedNode = null" @modal:escape="selectedNode = null">
+    <div
+      v-if="selectedNode"
+      v-modal-a11y
+      class="dag-detail-overlay"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('view.nodedetailpanel.title')"
+      @click.self="selectedNode = null"
+      @modal:escape="selectedNode = null"
+    >
       <NodeDetailPanel :node="selectedNode" @close="selectedNode = null" />
     </div>
   </div>
@@ -341,6 +355,10 @@ defineExpose({ cancel, pause, connect, disconnect, events, nodeStates, progress,
 
 /* Nodes */
 .dag-node-group { cursor: pointer; }
+.dag-node-group:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+}
 .dag-node-circle {
   stroke-width: 2;
   stroke: var(--brand-contrast);

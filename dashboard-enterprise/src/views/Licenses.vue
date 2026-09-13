@@ -67,11 +67,11 @@
       @click.self="showGenerate = false"
       @modal:escape="showGenerate = false"
     >
-      <div class="lic-dialog" role="document">
+      <div class="lic-dialog" role="dialog" aria-modal="true" aria-labelledby="licenses-generate-title">
         <button class="lic-dialog__close" type="button" :aria-label="t('common.close')" @click="showGenerate = false">
           <AppIcon name="x" :size="16" aria-hidden="true" />
         </button>
-        <h3>{{ t('view.licenses.generate') }}</h3>
+        <h3 id="licenses-generate-title">{{ t('view.licenses.generate') }}</h3>
 
         <fieldset class="lic-fieldset">
           <legend>{{ t('view.licenses.customerInfo') }}</legend>
@@ -135,11 +135,11 @@
       @click.self="showRenew = false"
       @modal:escape="showRenew = false"
     >
-      <div class="lic-dialog lic-dialog--sm" role="document">
+      <div class="lic-dialog lic-dialog--sm" role="dialog" aria-modal="true" aria-labelledby="licenses-renew-title">
         <button class="lic-dialog__close" type="button" :aria-label="t('common.close')" @click="showRenew = false">
           <AppIcon name="x" :size="16" aria-hidden="true" />
         </button>
-        <h3>{{ t('view.licenses.renew') }}</h3>
+        <h3 id="licenses-renew-title">{{ t('view.licenses.renew') }}</h3>
         <label class="lic-field">
           <span>{{ t('view.licenses.validDays') }}</span>
           <input v-model.number="renewDays" class="lic-input" type="number" min="1" />

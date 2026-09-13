@@ -113,11 +113,11 @@
       @click.self="closeDialog"
       @modal:escape="closeDialog"
     >
-      <div class="sso-dialog" role="document">
+      <div class="sso-dialog" role="dialog" aria-modal="true" aria-labelledby="sso-provider-dialog-title">
         <button class="sso-dialog-close" type="button" :aria-label="t('common.close')" @click="closeDialog">
           <AppIcon name="x" :size="16" aria-hidden="true" />
         </button>
-        <h3>{{ isEditing ? t('view.sso.editProvider') : t('view.sso.addProvider') }}</h3>
+        <h3 id="sso-provider-dialog-title">{{ isEditing ? t('view.sso.editProvider') : t('view.sso.addProvider') }}</h3>
 
         <div class="sso-form">
           <!-- 通用字段 -->

@@ -67,7 +67,7 @@
 
     <!-- 注册/编辑 弹窗 -->
     <div v-if="dialogOpen" v-modal-a11y class="users-dialog-overlay" @click.self="closeDialog" @modal:escape="closeDialog">
-      <div class="users-dialog" role="document">
+      <div class="users-dialog" role="dialog" aria-modal="true">
         <button class="users-dialog-close" type="button" :aria-label="t('common.close')" @click="closeDialog">
           <AppIcon name="x" :size="16" aria-hidden="true" />
         </button>
