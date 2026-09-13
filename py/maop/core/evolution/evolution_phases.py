@@ -186,11 +186,24 @@ class EvolutionPhasesMixin:
                     try:
                         asyncio.get_running_loop()
                         # 已在事件循环内 —— 在独立线程的新循环上同步等待
+                        # P2 修复：coroutine 可能引用主循环原语（绑定主循环的
+                        # asyncio.Lock/Queue 等），在新事件循环中执行时抛
+                        # RuntimeError。包装执行函数捕获并记录 warning，
+                        # 异常向上传播由外层兜底标记 needs_review
                         import concurrent.futures
+
+                        def _run_debate_in_new_loop() -> Any:
+                            try:
+                                return asyncio.run(_debate_coro)
+                            except RuntimeError as _re:
+                                logger.warning(
+                                    "[evo-loop] debate coroutine 在新循环执行时"
+                                    "可能引用了主循环原语: %s", _re,
+                                )
+                                raise
+
                         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _pool:
-                            verdict = _pool.submit(
-                                asyncio.run, _debate_coro
-                            ).result()
+                            verdict = _pool.submit(_run_debate_in_new_loop).result()
                     except RuntimeError:
                         # 无运行中的事件循环 —— 直接同步执行
                         verdict = asyncio.run(_debate_coro)

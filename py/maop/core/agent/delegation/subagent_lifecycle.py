@@ -231,6 +231,17 @@ class SubAgentManager:
                 if isinstance(result, AgentResult):
                     return result
             except asyncio.TimeoutError:
+                # P1-fix: asyncio.shield(atask) 超时后，wait_for 取消的只是
+                # shield 创建的包装协程，被 shield 保护的 atask 本身仍会在
+                # 后台继续运行（这正是 shield 的语义），造成任务泄漏——
+                # 资源不释放、回调不触发，且事件循环关闭时抛
+                # "Task was destroyed but it is pending!" 警告。
+                # 显式取消 atask 并 await 其终止，确保子任务真正结束。
+                atask.cancel()
+                try:
+                    await atask
+                except (asyncio.CancelledError, Exception):
+                    pass
                 self._update_status(agent_id, AgentStatus.FAILED, error="Timeout")
                 return AgentResult(
                     agent_id=agent_id, error="Timeout",

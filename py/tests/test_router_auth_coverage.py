@@ -26,9 +26,14 @@ def auth_env(tmp_path, monkeypatch):
     import maop.dashboard.routers.auth as auth_mod
     auth_mod._auth_mgr = None
 
-    # Reset login failures
-    auth_mod._login_failures.clear()
-    auth_mod._login_failures_by_ip.clear()
+    # P0-1 fix: Reset login failures (SQLite-backed, multi-instance shared)
+    auth_mod._login_failures_table_ready = False
+    try:
+        from maop.core.backends.db_utils import sqlite_connect
+        with sqlite_connect(auth_mod._login_failures_db_path()) as conn:
+            conn.execute("DELETE FROM login_failures")
+    except Exception:
+        pass  # 表可能尚未创建，忽略
 
     return tmp_path
 

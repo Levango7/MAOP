@@ -101,7 +101,8 @@ class SearchMixin:
                                     tags=m["tags"], topic=m["topic"],
                                     trace_id=m["trace_id"], timestamp=m["timestamp"],
                                     score=vr.score * 10,  # Scale vector score
-                                    snippet=m["content"].replace("\n", " ")[:120],
+                                    # 修复: content 可能为 None，用 or 短路兜底空串
+                                    snippet=(m["content"] or "").replace("\n", " ")[:120],
                                 ))
                     # 不重排: FTS5 结果优先 (BM25 分数为负), 向量结果补充在后
                     # 重排会破坏 FTS 优先级 (BM25 负分 vs 向量正分)
@@ -141,7 +142,8 @@ class SearchMixin:
             id=r["id"], agent=r["agent"], task=r["task"],
             tags=r["tags"], topic=r["topic"],
             trace_id=r["trace_id"], timestamp=r["timestamp"],
-            snippet=r["content"].replace("\n", " ")[:120],
+            # 修复: content 可能为 None，用 or 短路兜底空串
+            snippet=(r["content"] or "").replace("\n", " ")[:120],
         ) for r in rows]
 
     def _search_fts5(
@@ -372,5 +374,6 @@ class SearchMixin:
             id=r["id"], agent=r["agent"], task=r["task"],
             tags=r["tags"], topic=r["topic"],
             trace_id=r["trace_id"], timestamp=r["timestamp"],
-            snippet=r["content"].replace("\n", " ")[:120],
+            # 修复: content 可能为 None，用 or 短路兜底空串
+            snippet=(r["content"] or "").replace("\n", " ")[:120],
         ) for r in rows]

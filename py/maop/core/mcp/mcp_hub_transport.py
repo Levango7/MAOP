@@ -132,9 +132,13 @@ class _StdioTransport:
             return {"error": {"message": "Process not started"}}
 
         self._request_id += 1
+        # P1-fix: 用局部变量快照当前请求 id。self._request_id 被多个协程
+        # 共享，若在等待响应期间另一个协程递增了它，下方 msg_id != self._request_id
+        # 会用最新值而非本请求值，导致本协程永远收不到自己的响应。
+        request_id = self._request_id
         request = {
             "jsonrpc": "2.0",
-            "id": self._request_id,
+            "id": request_id,
             "method": method,
             "params": params or {},
         }
@@ -160,7 +164,7 @@ class _StdioTransport:
         while True:
             remaining = deadline - loop.time()
             if remaining <= 0:
-                return {"error": {"message": f"Timeout waiting for response to request id={self._request_id}"}}
+                return {"error": {"message": f"Timeout waiting for response to request id={request_id}"}}
 
             line = await asyncio.wait_for(self._process.stdout.readline(), timeout=remaining)
             if not line:
@@ -177,9 +181,9 @@ class _StdioTransport:
                 # JSON-RPC notification (e.g. progress/log) — not our response.
                 logger.debug("[mcp_hub] Skipping notification: %s", message.get("method", "?"))
                 continue
-            if msg_id != self._request_id:
+            if msg_id != request_id:
                 # Response to an earlier/other request — skip.
-                logger.debug("[mcp_hub] Skipping stale response id=%s (want %s)", msg_id, self._request_id)
+                logger.debug("[mcp_hub] Skipping stale response id=%s (want %s)", msg_id, request_id)
                 continue
             return message
 

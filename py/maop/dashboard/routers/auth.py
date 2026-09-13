@@ -71,6 +71,9 @@ _auth_enabled = _settings.auth_enabled
 _tls_enabled = _settings.tls_enabled
 # M6 fix (Phase R5): OWASP 2023 推荐 600k 迭代 for PBKDF2-HMAC-SHA256
 _AUTH_PBKDF2_ITERATIONS = 600_000
+# P1-4 fix: JWT TTL 从环境变量读取，避免硬编码 7200。
+# MAOP_JWT_TTL_S 默认 7200 秒（2 小时），可通过环境变量覆盖。
+_JWT_TTL_S = float(os.getenv("MAOP_JWT_TTL_S", "7200"))
 _auth_mgr: AuthManager | None = None
 
 
@@ -116,7 +119,7 @@ def get_auth_mgr() -> AuthManager:
 
         cfg = AuthConfig(
             enabled=True,
-            jwt=JWTConfig(secret=jwt_secret, default_ttl_s=7200.0),
+            jwt=JWTConfig(secret=jwt_secret, default_ttl_s=_JWT_TTL_S),
         )
         db_path = get_db_path("auth")
         _auth_mgr = AuthManager(
@@ -304,15 +307,119 @@ def _db_update_user(db_path_str: str, username: str, body: dict) -> dict:
 
 
 # ── Endpoints ──────────────────────────────────────────────────────
-_login_failures: dict[str, list[float]] = {}
-# H6 fix: IP 维度限流。攻击者可用单一密码遍历用户名绕过 username lockout，
-# 增加 IP 维度记录，对同一 IP 的失败登录次数进行限制。
-_login_failures_by_ip: dict[str, list[float]] = {}
-_login_failures_lock = threading.Lock()
+# P0-1 fix: 登录限流计数迁移到 SQLite 表 login_failures，支持多实例部署共享。
+# 原进程内 dict (_login_failures / _login_failures_by_ip) 在多实例部署时各实例
+# 独立计数，攻击者可利用实例切换绕过限流。迁移到 SQLite 后，所有实例共享同一
+# 限流状态（SQLite 是默认后端，单实例零改动兼容）。
+# 注意：跨进程共享时间戳必须用 wall clock (time.time()) 而非 monotonic，
+# 因为 monotonic clock 在不同进程间起点不同、不可比。
+_login_failures_lock = threading.Lock()  # 同进程多线程安全（SQLite 文件锁处理跨进程）
 _MAX_LOGIN_FAILURES = 5
 _LOCKOUT_SECONDS = 900.0
 _MAX_TRACKED_USERS = 10_000  # P1-18 fix: prevent unbounded growth
 _MAX_TRACKED_IPS = 10_000  # H6 fix: prevent unbounded growth for IP tracking
+_login_failures_table_ready = False
+
+
+def _login_failures_db_path() -> str:
+    """登录限流 SQLite 路径（与 auth.db 同目录，独立文件避免锁竞争）。"""
+    return str(get_db_path("auth").parent / "login_failures.db")
+
+
+def _ensure_login_failures_table() -> None:
+    """幂等创建登录限流表。首次调用后置位标志，后续跳过。"""
+    global _login_failures_table_ready
+    if _login_failures_table_ready:
+        return
+    with sqlite_connect(_login_failures_db_path()) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS login_failures (
+                key TEXT NOT NULL,
+                kind TEXT NOT NULL,          -- 'user' | 'ip'
+                fail_times TEXT NOT NULL,    -- JSON array of wall-clock timestamps
+                updated_at REAL NOT NULL,    -- 最近一次失败时间（LRU 淘汰依据）
+                PRIMARY KEY (key, kind)
+            )
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_lf_kind ON login_failures(kind)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_lf_updated ON login_failures(updated_at)"
+        )
+    _login_failures_table_ready = True
+
+
+def _db_get_login_failures(key: str, kind: str, now: float) -> list[float]:
+    """从 SQLite 读取并过滤过期的失败时间戳（wall clock）。"""
+    with sqlite_connect(_login_failures_db_path()) as conn:
+        row = conn.execute(
+            "SELECT fail_times FROM login_failures WHERE key = ? AND kind = ?",
+            (key, kind),
+        ).fetchone()
+    if row is None:
+        return []
+    try:
+        times = json.loads(row["fail_times"])
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return [t for t in times if now - t < _LOCKOUT_SECONDS]
+
+
+def _db_record_login_failure(key: str, kind: str, now: float) -> None:
+    """记录一次失败登录，含过期清理与 LRU 淘汰（防止无限增长）。
+
+    P1-7 fix: LRU 淘汰策略——按 updated_at 升序淘汰最久未活动的记录，
+    预填的静态记录最先被逐出，而刚登录失败的受害者记录因最新而保留。
+    """
+    max_tracked = _MAX_TRACKED_USERS if kind == "user" else _MAX_TRACKED_IPS
+    with sqlite_connect(_login_failures_db_path()) as conn:
+        row = conn.execute(
+            "SELECT fail_times FROM login_failures WHERE key = ? AND kind = ?",
+            (key, kind),
+        ).fetchone()
+        if row:
+            try:
+                times = json.loads(row["fail_times"])
+            except (json.JSONDecodeError, TypeError):
+                times = []
+        else:
+            times = []
+        # 过期过滤 + 追加本次失败
+        times = [t for t in times if now - t < _LOCKOUT_SECONDS]
+        times.append(now)
+        conn.execute(
+            "INSERT OR REPLACE INTO login_failures (key, kind, fail_times, updated_at) VALUES (?, ?, ?, ?)",
+            (key, kind, json.dumps(times), now),
+        )
+        # 过期清理：删除整个锁定窗口外未再失败的记录
+        conn.execute(
+            "DELETE FROM login_failures WHERE kind = ? AND updated_at < ?",
+            (kind, now - _LOCKOUT_SECONDS),
+        )
+        # LRU 淘汰：超限时按 updated_at 升序删除最旧记录（保留当前 key）
+        count = conn.execute(
+            "SELECT COUNT(*) FROM login_failures WHERE kind = ?", (kind,)
+        ).fetchone()[0]
+        if count > max_tracked:
+            excess = count - max_tracked
+            conn.execute(
+                """DELETE FROM login_failures WHERE (key, kind) IN (
+                       SELECT key, kind FROM login_failures
+                       WHERE kind = ? AND key != ?
+                       ORDER BY updated_at ASC LIMIT ?
+                   )""",
+                (kind, key, excess),
+            )
+
+
+def _db_clear_login_failures(key: str, kind: str) -> None:
+    """登录成功后清除该 key 的失败记录。"""
+    with sqlite_connect(_login_failures_db_path()) as conn:
+        conn.execute(
+            "DELETE FROM login_failures WHERE key = ? AND kind = ?",
+            (key, kind),
+        )
 
 
 def _get_client_ip(request: Request) -> str:
@@ -382,68 +489,16 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
         raise HTTPException(status_code=400, detail="Username and password required")
 
     try:
-        now = time.monotonic()
+        # P0-1 fix: 用 wall clock（time.time()）替代 monotonic——跨进程共享
+        # 限流状态时，monotonic clock 在不同进程间起点不同、不可比。
+        now = time.time()
         # H6 fix: 提取客户端 IP 用于 IP 维度限流
         client_ip = _get_client_ip(request)
+        # P0-1 fix: 从 SQLite 读取失败计数（多实例共享同一限流状态）
         with _login_failures_lock:
-            failures = _login_failures.get(username, [])
-            failures = [t for t in failures if now - t < _LOCKOUT_SECONDS]
-            _login_failures[username] = failures
-            # P1-18 fix: periodic cleanup to prevent unbounded growth.
-            # High 安全修复 (2.5): 不再整表 clear() —— 攻击者可用 1 万个不同
-            # 用户名触发 clear 来重置目标账户的锁定计数（暴力破解绕过）。
-            # P1-7 fix (2026-08-29): 原淘汰策略只淘汰"未达 5 次失败"的条目，
-            # 攻击者可预填 1 万个各 4 次失败的用户名占满配额，使新受害者的
-            # 失败记录无法留存/被淘汰 → 锁定机制对其失效。改为：
-            #   1) 先清理纯过期条目；
-            #   2) 仍超限时按"最近一次失败时间"整体 LRU 淘汰（不豁免任何
-            #      未锁定账户——LRU 顺序下最先被淘汰的是最久未活动的记录，
-            #      预填的静态记录会最先被逐出，而刚登录失败的受害者记录
-            #      因最新而必然保留）。
-            # 已锁定（≥5 次）账户不参与淘汰豁免同样成立：若攻击者将 1 万个
-            # 账户全部刷到锁定态，新受害者仍因其时间戳最新而保留；被逐出
-            # 的锁定账户仅意味着"该攻击账户可再尝试 5 次"，不构成绕过。
-            if len(_login_failures) > _MAX_TRACKED_USERS:
-                for user in list(_login_failures):
-                    recent = [
-                        t for t in _login_failures[user]
-                        if now - t < _LOCKOUT_SECONDS
-                    ]
-                    if recent:
-                        _login_failures[user] = recent
-                    else:
-                        del _login_failures[user]
-                if len(_login_failures) > _MAX_TRACKED_USERS:
-                    evictable = sorted(
-                        (u for u in _login_failures if u != username),
-                        key=lambda u: max(_login_failures[u], default=0.0),
-                    )
-                    excess = len(_login_failures) - _MAX_TRACKED_USERS
-                    for u in evictable[:excess]:
-                        del _login_failures[u]
-            # H6 fix: IP 维度限流检查与清理（与 username lockout 逻辑一致）
-            # P1-7 fix: 同 username 维度 — LRU 淘汰策略（见上方 P1-7 注释）。
-            ip_failures = _login_failures_by_ip.get(client_ip, [])
-            ip_failures = [t for t in ip_failures if now - t < _LOCKOUT_SECONDS]
-            _login_failures_by_ip[client_ip] = ip_failures
-            if len(_login_failures_by_ip) > _MAX_TRACKED_IPS:
-                for ip in list(_login_failures_by_ip):
-                    recent = [
-                        t for t in _login_failures_by_ip[ip]
-                        if now - t < _LOCKOUT_SECONDS
-                    ]
-                    if recent:
-                        _login_failures_by_ip[ip] = recent
-                    else:
-                        del _login_failures_by_ip[ip]
-                if len(_login_failures_by_ip) > _MAX_TRACKED_IPS:
-                    evictable_ip = sorted(
-                        (ip for ip in _login_failures_by_ip if ip != client_ip),
-                        key=lambda ip: max(_login_failures_by_ip[ip], default=0.0),
-                    )
-                    excess_ip = len(_login_failures_by_ip) - _MAX_TRACKED_IPS
-                    for ip in evictable_ip[:excess_ip]:
-                        del _login_failures_by_ip[ip]
+            _ensure_login_failures_table()
+            failures = _db_get_login_failures(username, "user", now)
+            ip_failures = _db_get_login_failures(client_ip, "ip", now)
         if len(failures) >= _MAX_LOGIN_FAILURES:
             raise HTTPException(status_code=429, detail="Account locked. Try again later.")
         # H6 fix: IP 维度限流 —— 同一 IP 15 分钟内失败超过 5 次则锁定
@@ -463,16 +518,16 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
 
         if result["status"] != "ok":
             with _login_failures_lock:
-                _login_failures.setdefault(username, []).append(now)
-                _login_failures_by_ip.setdefault(client_ip, []).append(now)  # H6 fix
+                _db_record_login_failure(username, "user", now)
+                _db_record_login_failure(client_ip, "ip", now)  # H6 fix
             raise HTTPException(status_code=401, detail=result.get("error", "Login failed"))
 
         mgr = get_auth_mgr()
-        token = mgr.jwt_handler.create_token(result["username"], roles=result["roles"], ttl_s=7200.0)
+        token = mgr.jwt_handler.create_token(result["username"], roles=result["roles"], ttl_s=_JWT_TTL_S)
         # P1-18 fix: clear failures on successful login
         with _login_failures_lock:
-            _login_failures.pop(username, None)
-            _login_failures_by_ip.pop(client_ip, None)  # H6 fix
+            _db_clear_login_failures(username, "user")
+            _db_clear_login_failures(client_ip, "ip")  # H6 fix
 
         # #4 fix: set JWT as httpOnly cookie (XSS-proof) + return token for API clients
         response = JSONResponse({
@@ -480,10 +535,10 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
             "token": token,
             "username": result["username"],
             "roles": result["roles"],
-            "expires_in": 7200,
+            "expires_in": int(_JWT_TTL_S),
         })
         response.set_cookie(
-            key="maop_token", value=token, max_age=7200,
+            key="maop_token", value=token, max_age=int(_JWT_TTL_S),
             httponly=True, secure=_tls_enabled, samesite="strict", path="/",
         )
         return response
@@ -525,17 +580,17 @@ async def auth_refresh(request: Request):
         new_token = mgr.jwt_handler.create_token(
             result.identity,
             roles=result.roles,
-            ttl_s=7200.0,
+            ttl_s=_JWT_TTL_S,
         )
         response = JSONResponse({
             "status": "ok",
             "token": new_token,
             "username": result.identity,
             "roles": result.roles or [],
-            "expires_in": 7200,
+            "expires_in": int(_JWT_TTL_S),
         })
         response.set_cookie(
-            key="maop_token", value=new_token, max_age=7200,
+            key="maop_token", value=new_token, max_age=int(_JWT_TTL_S),
             httponly=True, secure=_tls_enabled, samesite="strict", path="/",
         )
         # Revoke old token so it can't be used after refresh

@@ -52,6 +52,18 @@ _VALID_CANARY_STATUSES = ("active", "paused", "completed", "failed")
 _CANARY_MIN_PCT = 0
 _CANARY_MAX_PCT = 100
 
+# 修复：SELECT * 改为明确列名 —— 避免表新增列后 dict 键漂移破坏 API 契约，
+# 同时让查询列显式可审计。与 CREATE TABLE 列定义保持一致。
+_AGENT_VERSION_COLUMNS = (
+    "version_id, agent_id, version_number, config_snapshot, changelog, "
+    "status, created_by, tenant_id, created_at, updated_at, activated_at, "
+    "retired_at"
+)
+_CANARY_COLUMNS = (
+    "canary_id, version_id, percentage, target_user_groups, strategy, "
+    "status, duration_seconds, started_at, ended_at, created_by"
+)
+
 
 # ── Pydantic 请求模型 ─────────────────────────────────────────────
 
@@ -248,7 +260,7 @@ def _get_version_row(
 ) -> sqlite3.Row | None:
     """按 ID 读取版本行."""
     return conn.execute(
-        "SELECT * FROM agent_versions WHERE version_id = ?",
+        f"SELECT {_AGENT_VERSION_COLUMNS} FROM agent_versions WHERE version_id = ?",
         (version_id,),
     ).fetchone()
 
@@ -371,7 +383,7 @@ async def list_versions(
 
         rows = conn.execute(
             f"""
-            SELECT * FROM agent_versions{where_sql}
+            SELECT {_AGENT_VERSION_COLUMNS} FROM agent_versions{where_sql}
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
             """,
@@ -657,8 +669,8 @@ async def configure_canary(
             )
         # 检查是否已有 active 灰度
         existing = conn.execute(
-            """
-            SELECT * FROM agent_version_canaries
+            f"""
+            SELECT {_CANARY_COLUMNS} FROM agent_version_canaries
             WHERE version_id = ? AND status = 'active'
             """,
             (version_id,),
@@ -690,7 +702,7 @@ async def configure_canary(
             ),
         )
         canary_row = conn.execute(
-            "SELECT * FROM agent_version_canaries WHERE canary_id = ?",
+            f"SELECT {_CANARY_COLUMNS} FROM agent_version_canaries WHERE canary_id = ?",
             (canary_id,),
         ).fetchone()
         canary = _canary_row_to_dict(canary_row)
@@ -713,7 +725,8 @@ async def get_canary(version_id: str, request: Request) -> dict[str, Any]:
         row = _get_version_row(conn, version_id)
         _check_version_access(row, request)
         canary_rows = conn.execute(
-            "SELECT * FROM agent_version_canaries WHERE version_id = ? ORDER BY started_at DESC",
+            f"SELECT {_CANARY_COLUMNS} FROM agent_version_canaries "
+            f"WHERE version_id = ? ORDER BY started_at DESC",
             (version_id,),
         ).fetchall()
 
@@ -745,8 +758,8 @@ async def get_version_metrics(version_id: str, request: Request) -> dict[str, An
         agent_id = item["agent_id"]
         # 查询同 agent 的 active 版本用于对比
         active_row = conn.execute(
-            """
-            SELECT * FROM agent_versions
+            f"""
+            SELECT {_AGENT_VERSION_COLUMNS} FROM agent_versions
             WHERE agent_id = ? AND status = 'active' AND version_id != ?
             ORDER BY activated_at DESC LIMIT 1
             """,
@@ -755,8 +768,8 @@ async def get_version_metrics(version_id: str, request: Request) -> dict[str, An
         active_item = _version_row_to_dict(active_row) if active_row else None
         # 查询该版本的灰度配置
         canary_row = conn.execute(
-            """
-            SELECT * FROM agent_version_canaries
+            f"""
+            SELECT {_CANARY_COLUMNS} FROM agent_version_canaries
             WHERE version_id = ? AND status = 'active'
             ORDER BY started_at DESC LIMIT 1
             """,

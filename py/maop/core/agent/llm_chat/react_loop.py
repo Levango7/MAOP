@@ -313,7 +313,8 @@ class ReactLoop:
         """
         if prov.lower() in ("openai", "ollama"):
             assistant_msg: dict[str, Any] = {"role": "assistant", "content": None, "tool_calls": []}
-            raw_calls = response_json.get("choices", [{}])[0].get("message", {}).get("tool_calls", [])
+            # 修复: choices 可能为空列表 []，使用 or 短路保证默认值
+            raw_calls = (response_json.get("choices") or [{}])[0].get("message", {}).get("tool_calls", [])
             assistant_msg["tool_calls"] = raw_calls
             conversation.append(assistant_msg)
         elif prov.lower() == "anthropic":

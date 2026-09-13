@@ -36,6 +36,11 @@ def _run_coro_sync(coro: Any) -> Any:
 
     若当前线程已有运行中的事件循环（如在被 async 测试调用时），
     通过线程池在新线程中 ``asyncio.run`` 避免嵌套循环错误。
+
+    P2 修复：coroutine 可能引用主循环原语（绑定主循环的
+    asyncio.Lock/Queue 等），在新事件循环中执行时抛 RuntimeError。
+    包装执行函数捕获并记录 warning，异常向上传播由调用方兜底处理
+    （connect/execute/health_check/disconnect 均有外层 try-except）。
     """
     try:
         loop = asyncio.get_running_loop()
@@ -43,8 +48,18 @@ def _run_coro_sync(coro: Any) -> Any:
         loop = None
 
     if loop is not None and loop.is_running():
+        def _run_in_new_loop() -> Any:
+            try:
+                return asyncio.run(coro)
+            except RuntimeError as re:
+                logger.warning(
+                    "[mcp_bridge] coroutine 在新循环执行时可能引用了"
+                    "主循环原语: %s", re,
+                )
+                raise
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            return pool.submit(asyncio.run, coro).result()
+            return pool.submit(_run_in_new_loop).result()
     return asyncio.run(coro)
 
 

@@ -14,6 +14,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from enum import Enum
@@ -290,6 +291,41 @@ def _remove_pid(root_dir: str | Path) -> None:
 
 # ── Start / Stop / Status ───────────────────────────────────────
 
+def _drain_pipe_to_buffer(pipe: Any, buffer: list[bytes]) -> threading.Thread:
+    """启动后台 daemon 线程持续读取子进程管道，防止管道写满阻塞子进程.
+
+    P2 修复：``subprocess.Popen`` 使用 ``PIPE`` 但主进程不读取时，子进程
+    大量输出会写满 OS 管道缓冲区（通常 64KB）导致子进程 write 阻塞.
+    本函数启动后台线程持续读取管道内容追加到 ``buffer``，既防止阻塞
+    又保留输出用于错误诊断（如子进程过早退出时读取 stderr）.
+
+    Parameters
+    ----------
+    pipe : 文件对象
+        ``proc.stdout`` 或 ``proc.stderr``.
+    buffer : list[bytes]
+        追加读取到的字节块列表（调用方持有，用于事后拼接）.
+
+    Returns
+    -------
+    threading.Thread
+        已启动的 daemon 读取线程（随主进程退出）.
+    """
+    def _reader() -> None:
+        try:
+            # iter(read, b"") 逐块读取直到 EOF（pipe 关闭）
+            for chunk in iter(pipe.read, b""):
+                if chunk:
+                    buffer.append(chunk)
+        except Exception:
+            # 管道已关闭 / IO 异常等忽略，读取线程退出
+            pass
+
+    t = threading.Thread(target=_reader, daemon=True, name="deploy-pipe-drain")
+    t.start()
+    return t
+
+
 def start(
     root_dir: str | Path = ".",
     *,
@@ -365,6 +401,13 @@ def start(
             # Windows 专属常量，POSIX 无——getattr 默认值跨平台安全（mypy 两端不报）
             creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if sys.platform == "win32" else 0,
         )
+        # P2 修复：启动后台 daemon 线程持续排空 stdout/stderr 管道，
+        # 防止子进程大量输出写满管道缓冲区导致阻塞；同时保留输出
+        # 到缓冲区用于错误诊断（子进程过早退出时读取 stderr）
+        _stdout_buf: list[bytes] = []
+        _stderr_buf: list[bytes] = []
+        _stdout_drain = _drain_pipe_to_buffer(proc.stdout, _stdout_buf)
+        _stderr_drain = _drain_pipe_to_buffer(proc.stderr, _stderr_buf)
         _write_pid(root, proc.pid)
         logger.info("MAOP started: pid=%d, dashboard=%s:%d", proc.pid, host, port)
 
@@ -378,13 +421,13 @@ def start(
 
             # 检查子进程是否已退出（启动失败）
             if proc.poll() is not None:
-                # 子进程已退出，读取 stderr 获取错误信息
-                stderr_output = ""
-                try:
-                    if proc.stderr is not None:
-                        stderr_output = proc.stderr.read().decode("utf-8", errors="replace")[-500:]
-                except Exception as exc:
-                    logger.warning("deploy.start: 读取过早退出的 MAOP 子进程 stderr 失败，错误信息缺失，异常: %s", exc, exc_info=True)
+                # 子进程已退出，等待 stderr 排空线程读取完管道剩余内容，
+                # 然后从缓冲区拼接错误信息（P2 修复：管道由后台线程排空，
+                # 主线程不再直接 read 以避免竞争）
+                _stderr_drain.join(timeout=2.0)
+                stderr_output = b"".join(_stderr_buf).decode(
+                    "utf-8", errors="replace"
+                )[-500:]
                 _remove_pid(root)
                 logger.error("MAOP subprocess exited prematurely: %s", stderr_output)
                 return SystemStatus(

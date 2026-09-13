@@ -10,7 +10,7 @@
 - **已发布**：v5.1.0（2026-08-14，minor）— 企业版 6 大功能（许可证/SSO/审计/配额/API Key/通知）+ v5.1.0 6 大新功能（LLM 任务拆分/工作流编辑器/配置历史/Skill 编辑器/异常调度/Hook 配置）+ 版本号统一至 v5.1.0。
 - **上一版**：v5.0.0（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](docs/migration-5.0.md)。
 - **双版架构**：自 2026-07-20 起采用单代码库 + 运行时 Edition 检测（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)）。
-- **阶段二启动**：2026-09-05（48h 长稳判定后）进入阶段二"智能增强"，首版 v5.2.0 = 自演化闭环 MVP（2026-09-05 ~ 10-31），详见下方 v5.2.0 节与 [PRD](docs/prd-three-phase-roadmap.md) / [HLD](docs/hld-three-phase-roadmap.md)。
+- **阶段二开发中（planned）**：2026-09-05（48h 长稳判定后）进入阶段二"智能增强"，首版 v5.2.0 = 自演化闭环 MVP（2026-09-05 ~ 10-31）。⚠️ 开发中，功能尚未可用——详见下方 v5.2.0 节与 [PRD](docs/prd-three-phase-roadmap.md) / [HLD](docs/hld-three-phase-roadmap.md)。
 
 ## v4.4.2 (patch) — 已发布 2026-08-06
 
@@ -125,6 +125,8 @@
 - [x] `CHANGELOG.md` 补 v5.1.0 条目，`ROADMAP.md` 更新当前状态。
 
 ## v5.2.0 (minor) — 进行中（2026-09-05 启动，目标 2026-10-31）
+
+> ⚠️ **开发中，功能尚未可用**：自演化闭环 MVP 正在开发中，验收标准尚未达成（见下方未勾选项）。请勿在生产环境依赖此功能。配置开关 `MAOP_EVOLUTION_LOOP_ENABLED` 默认关闭。
 
 **主题**：自演化闭环 MVP（三阶段路线图 [M2.1](docs/prd-three-phase-roadmap.md)，F2-01）。把已有的 `core/evolution/` 16 模块底座接入主循环，形成可观测、可审批、可回滚的完整闭环。
 

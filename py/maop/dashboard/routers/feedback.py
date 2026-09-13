@@ -42,6 +42,13 @@ router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 # 允许的目标类型白名单 — 防止任意字符串注入.
 _VALID_TARGET_TYPES = ("agent", "task", "result")
 
+# 修复：SELECT * 改为明确列名 —— 避免表新增列后 dict 键漂移破坏 API 契约，
+# 同时让查询列显式可审计。与 CREATE TABLE 列定义保持一致。
+_FEEDBACK_COLUMNS = (
+    "feedback_id, target_type, target_id, user_id, tenant_id, rating, "
+    "comment, tags, created_at, updated_at"
+)
+
 
 # ── Pydantic 请求模型 ─────────────────────────────────────────────
 
@@ -275,7 +282,7 @@ async def list_feedback(
 
         rows = conn.execute(
             f"""
-            SELECT * FROM feedback{where_sql}
+            SELECT {_FEEDBACK_COLUMNS} FROM feedback{where_sql}
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
             """,
@@ -422,7 +429,7 @@ async def export_feedback(
 
     with sqlite_connect(str(db_path)) as conn:
         rows = conn.execute(
-            f"SELECT * FROM feedback{where_sql} ORDER BY created_at DESC",
+            f"SELECT {_FEEDBACK_COLUMNS} FROM feedback{where_sql} ORDER BY created_at DESC",
             params,
         ).fetchall()
     items = [_row_to_dict(r) for r in rows]
@@ -519,7 +526,7 @@ async def update_feedback(
 
     with sqlite_connect(str(db_path)) as conn:
         row = conn.execute(
-            "SELECT * FROM feedback WHERE feedback_id = ?",
+            f"SELECT {_FEEDBACK_COLUMNS} FROM feedback WHERE feedback_id = ?",
             (feedback_id,),
         ).fetchone()
         item = _check_feedback_ownership(row, request)
@@ -550,7 +557,7 @@ async def update_feedback(
         )
         # 重新读取更新后的行
         row = conn.execute(
-            "SELECT * FROM feedback WHERE feedback_id = ?",
+            f"SELECT {_FEEDBACK_COLUMNS} FROM feedback WHERE feedback_id = ?",
             (feedback_id,),
         ).fetchone()
         item = _row_to_dict(row)
@@ -568,7 +575,7 @@ async def delete_feedback(feedback_id: str, request: Request) -> dict[str, Any]:
 
     with sqlite_connect(str(db_path)) as conn:
         row = conn.execute(
-            "SELECT * FROM feedback WHERE feedback_id = ?",
+            f"SELECT {_FEEDBACK_COLUMNS} FROM feedback WHERE feedback_id = ?",
             (feedback_id,),
         ).fetchone()
         # 先校验归属权再删除 — IDOR 防护

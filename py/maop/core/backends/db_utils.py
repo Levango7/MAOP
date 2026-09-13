@@ -88,19 +88,51 @@ def sqlite_connect(
     row_factory : type | None
         Row factory class (default: sqlite3.Row).
     """
-    conn = sqlite3.connect(str(db_path), timeout=timeout)
-    if row_factory:
-        conn.row_factory = row_factory
-    if wal:
-        conn.execute("PRAGMA journal_mode=WAL")
-    if foreign_keys:
-        conn.execute("PRAGMA foreign_keys=ON")
-    # T2-10: Multi-container SQLite coordination — WAL allows 1 writer + N readers.
-    # busy_timeout increased to 10s (env-override: MAOP_SQLITE_BUSY_TIMEOUT_MS).
-    # P2-13 note: f-string 拼接 PRAGMA 值是安全的——_get_busy_timeout_ms()
-    # 已将环境变量验证为非负 int 并回退到默认值，不存在注入风险。PRAGMA
-    # busy_timeout 不支持参数化绑定（PRAGMA 语句不接受 ? 占位符），只能内联。
-    conn.execute(f"PRAGMA busy_timeout={_get_busy_timeout_ms()}")
+    def _open_and_init() -> sqlite3.Connection:
+        conn = sqlite3.connect(str(db_path), timeout=timeout)
+        if row_factory:
+            conn.row_factory = row_factory
+        if wal:
+            conn.execute("PRAGMA journal_mode=WAL")
+        if foreign_keys:
+            conn.execute("PRAGMA foreign_keys=ON")
+        # T2-10: Multi-container SQLite coordination — WAL allows 1 writer + N readers.
+        # busy_timeout increased to 10s (env-override: MAOP_SQLITE_BUSY_TIMEOUT_MS).
+        # P2-13 note: f-string 拼接 PRAGMA 值是安全的——_get_busy_timeout_ms()
+        # 已将环境变量验证为非负 int 并回退到默认值，不存在注入风险。PRAGMA
+        # busy_timeout 不支持参数化绑定（PRAGMA 语句不接受 ? 占位符），只能内联。
+        conn.execute(f"PRAGMA busy_timeout={_get_busy_timeout_ms()}")
+        return conn
+
+    try:
+        conn = _open_and_init()
+    except sqlite3.DatabaseError as exc:
+        # P1-fix: 数据库文件损坏（文件头破坏、非法 SQLite 文件、
+        # WAL/journal 损坏等）导致 PRAGMA 初始化抛 DatabaseError，原先
+        # 未捕获会使 AgentCatalog 等初始化路径整体崩溃。此处删除损坏的
+        # db 及其 WAL/SHM/journal 侧车文件后重建空库，仅重试一次；若重建
+        # 仍失败则异常向上传播（通常是权限/磁盘问题，不应静默吞掉）。
+        # 来源：2026-09-10-python-sqlite-batch-fetchmany-init-memory-peak
+        # （sqlite 连接初始化容错模式）。
+        logger.warning(
+            "SQLite DB %s appears corrupt (%s); deleting and recreating an empty DB.",
+            db_path, exc,
+        )
+        p = Path(db_path)
+        for cand in (
+            p,
+            p.with_name(p.name + "-wal"),
+            p.with_name(p.name + "-shm"),
+            p.with_name(p.name + "-journal"),
+        ):
+            try:
+                cand.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError as rm_err:
+                logger.warning("Failed to remove %s: %s", cand, rm_err)
+        conn = _open_and_init()
+
     try:
         yield conn
         conn.commit()

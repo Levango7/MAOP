@@ -161,7 +161,8 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 )
 
         latency_ms = int((time.perf_counter() - start) * 1000)
-        choice = data.get("choices", [{}])[0]
+        # 修复: choices 可能为空列表 []，使用 or 短路保证默认值
+        choice = (data.get("choices") or [{}])[0]
         usage = data.get("usage", {})
 
         return LLMResponse(
@@ -208,7 +209,8 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                             return
                         try:
                             chunk = json.loads(data_str)
-                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+                            # 修复: choices 可能为空列表 []，使用 or 短路保证默认值
+                            delta = (chunk.get("choices") or [{}])[0].get("delta", {})
                             token = delta.get("content", "")
                             if token:
                                 yield token

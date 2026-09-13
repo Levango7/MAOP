@@ -72,6 +72,10 @@ class HealthCheckScheduler:
         检查间隔秒数（默认 60 秒）.
     timeout_s : float
         单次健康检查超时秒数（默认 10 秒）.
+    max_leaked_threads : int
+        允许并发存在的超时泄漏 daemon 线程上限（默认 16）.
+        超过该阈值时跳过新的健康检查，避免 ``adapter.health_check()``
+        长期阻塞导致线程无限累积（P2 资源泄漏修复）.
     """
 
     def __init__(
@@ -80,6 +84,7 @@ class HealthCheckScheduler:
         adapters: dict[str, AgentAdapter],
         check_interval_s: float = 60.0,
         timeout_s: float = 10.0,
+        max_leaked_threads: int = 16,
     ) -> None:
         self._catalog: AgentCatalog = catalog
         self._adapters: dict[str, AgentAdapter] = adapters
@@ -95,6 +100,10 @@ class HealthCheckScheduler:
 
         # 各 Agent 最新健康状态快照（agent_name → HealthStatus）
         self._statuses: dict[str, HealthStatus] = {}
+
+        # P2 修复：跟踪超时后仍存活的 daemon worker 线程，限制并发泄漏上限
+        self._max_leaked_threads: int = max_leaked_threads
+        self._leaked_workers: list[threading.Thread] = []
 
     # ── 后台线程控制 ──────────────────────────────────────────────
     def start(self) -> None:
@@ -191,6 +200,36 @@ class HealthCheckScheduler:
             logger.debug("[health_check] Agent %r 无适配器，跳过", agent_name)
             return False
 
+        # P2 修复：清理已结束的泄漏线程，检查当前并发泄漏数；
+        # 超过阈值时跳过本次检查，避免线程无限累积导致资源泄漏
+        with self._lock:
+            self._leaked_workers = [
+                t for t in self._leaked_workers if t.is_alive()
+            ]
+            leaked_count = len(self._leaked_workers)
+        if leaked_count >= self._max_leaked_threads:
+            logger.warning(
+                "[health_check] 泄漏 daemon 线程数已达上限 %d/%d，跳过 Agent %r 健康检查",
+                leaked_count, self._max_leaked_threads, agent_name,
+            )
+            # 标记为不健康并回写 catalog，使路由器感知该 Agent 不可用
+            try:
+                self._catalog.update_health(agent_name, False)
+            except Exception as exc:
+                logger.error(
+                    "[health_check] 跳过检查时更新 catalog 失败 (%s): %s",
+                    agent_name, exc,
+                )
+            with self._lock:
+                self._statuses[agent_name] = HealthStatus(
+                    agent_name=agent_name,
+                    healthy=False,
+                    last_check=datetime.now(timezone.utc).isoformat(),
+                    latency_ms=0,
+                    error=f"skipped: leaked threads {leaked_count}/{self._max_leaked_threads}",
+                )
+            return False
+
         start_mono = time.monotonic()
         healthy = False
         error_msg = ""
@@ -209,7 +248,18 @@ class HealthCheckScheduler:
             # 子线程仍在运行 → 超时（daemon 线程随主进程退出，无需手动终止）
             healthy = False
             error_msg = f"timeout after {self._timeout_s}s"
-            logger.warning("[health_check] Agent %r 健康检查超时", agent_name)
+            # P2 修复：记录泄漏 daemon 线程，限制并发泄漏上限
+            with self._lock:
+                # 先清理已结束的泄漏线程，再追加当前超时线程
+                self._leaked_workers = [
+                    t for t in self._leaked_workers if t.is_alive()
+                ]
+                self._leaked_workers.append(worker)
+                leaked = len(self._leaked_workers)
+            logger.warning(
+                "[health_check] Agent %r 健康检查超时，当前泄漏 daemon 线程 %d/%d",
+                agent_name, leaked, self._max_leaked_threads,
+            )
         else:
             healthy = result_box["healthy"]
             error_msg = result_box["error"]

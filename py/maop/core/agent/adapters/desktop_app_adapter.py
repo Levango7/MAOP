@@ -221,7 +221,8 @@ class DesktopAppAdapter(CLIAdapter):
                 if not chunk:
                     break
                 chunks.append(chunk)
-            return b"".join(chunks).decode("utf-8")
+            # 修复: 添加 errors="replace" 避免非法 UTF-8 字节触发 UnicodeDecodeError
+            return b"".join(chunks).decode("utf-8", errors="replace")
         finally:
             sock.close()
 

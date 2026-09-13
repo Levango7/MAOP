@@ -554,7 +554,8 @@ async def _handle_function_calls(
 
         if provider.lower() == "openai" or provider.lower() == "ollama":
             assistant_msg: dict[str, Any] = {"role": "assistant", "content": None, "tool_calls": []}
-            for tc in response.get("choices", [{}])[0].get("message", {}).get("tool_calls", []):
+            # 修复: choices 可能为空列表 []，使用 or 短路保证默认值
+            for tc in (response.get("choices") or [{}])[0].get("message", {}).get("tool_calls", []):
                 assistant_msg["tool_calls"].append(tc)
             if assistant_msg["tool_calls"]:
                 conversation.append(assistant_msg)

@@ -130,10 +130,9 @@ class LDAPSearchMixin:
             entries = list(conn.entries)
             # 处理分页 cookie
             while hasattr(conn, "result") and conn.result.get("controls"):
-                cookie = (
-                    conn.result["controls"]
-                    .get("1.2.840.113556.1.4.319", [None, None, None])[2]
-                )
+                # 修复: 控件值列表长度可能不足 3，先检查长度再取索引避免 IndexError
+                ctrl_value = conn.result["controls"].get("1.2.840.113556.1.4.319", [])
+                cookie = ctrl_value[2] if len(ctrl_value) > 2 else None
                 if not cookie:
                     break
                 conn.search(

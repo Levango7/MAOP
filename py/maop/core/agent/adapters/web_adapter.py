@@ -120,7 +120,20 @@ class WebAdapter(AgentAdapter):
         current: Any = data
         for key in self.config.response_path.split("."):
             if isinstance(current, list):
-                current = current[int(key)]
+                # 修复: 捕获 ValueError（key 非整数）和 IndexError（索引越界），抛出清晰配置错误
+                try:
+                    current = current[int(key)]
+                except ValueError:
+                    raise ValueError(
+                        f"response_path 配置错误: 路径段 '{key}' 不是有效整数索引，"
+                        f"无法在 list 上遍历 (response_path='{self.config.response_path}')"
+                    ) from None
+                except IndexError:
+                    raise IndexError(
+                        f"response_path 配置错误: 索引 '{key}' 越界，"
+                        f"列表长度为 {len(current)} "
+                        f"(response_path='{self.config.response_path}')"
+                    ) from None
             elif isinstance(current, dict):
                 current = current[key]
             else:

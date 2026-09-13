@@ -5,9 +5,10 @@
 # (e.g. MAOP_delegations_total, MAOP_active_agents, MAOP_queue_pending,
 # MAOP_circuit_breaker_state, MAOP_memory_entries). The metric *names* are
 # valid, so these rules evaluate correctly once the counters/gauges start
-# being incremented by the runtime. Until then they stay at 0 and the
-# alerts simply will not fire — that is expected (see audit: core MAOP_*
-# metrics are defined but not yet emitted by production code).
+# being incremented by the runtime.
+# Metrics are emitted by dispatch_core.py, maop_plan.py, agent_registry.py
+# (P2 修复：旧注释称 "metrics not yet emitted" 已过时 —— 上述模块已在
+# 生产代码中 inc()/set() 这些计数器，告警规则可正常触发).
 #
 # This file is loaded by monitoring/prometheus.yml (rule_files). It is
 # complementary to alerts.yml / slo-alerts.yml.

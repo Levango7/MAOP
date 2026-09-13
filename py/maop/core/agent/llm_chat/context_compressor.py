@@ -108,6 +108,32 @@ class ContextCompressor:
     def __init__(self, max_section_tokens: int = 500) -> None:
         self._max_section_tokens = max_section_tokens
 
+    @staticmethod
+    def _normalize_content(content: Any) -> str:
+        """将消息 content 归一化为字符串。
+
+        修复: Anthropic API 格式中 content 可能是 list（text block 列表），
+        例如 ``[{"type": "text", "text": "..."}]``。此函数提取各 block 的
+        text 字段拼接为字符串；若 content 为 None 返回空串，保证向后兼容。
+        """
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            # Anthropic 格式: [{"type": "text", "text": "..."}, ...]
+            parts: list[str] = []
+            for block in content:
+                if isinstance(block, dict):
+                    text = block.get("text")
+                    if text is not None:
+                        parts.append(str(text))
+                elif isinstance(block, str):
+                    parts.append(block)
+            return "".join(parts)
+        # 其他类型安全转为字符串
+        return str(content)
+
     def compress(
         self,
         messages: list[dict[str, Any]],
@@ -127,7 +153,7 @@ class ContextCompressor:
         CompressionResult
         """
         original_text = "\n".join(
-            f"[{m.get('role', '?')}] {m.get('content', '')}"
+            f"[{m.get('role', '?')}] {self._normalize_content(m.get('content', ''))}"
             for m in messages
         )
         original_tokens = self._estimate_tokens(original_text)
@@ -238,7 +264,8 @@ class ContextCompressor:
         """First user message — the original request."""
         for m in messages:
             if m.get("role") == "user":
-                content = m.get("content", "")
+                # 修复: content 可能是 list（Anthropic 格式），归一化为字符串
+                content = self._normalize_content(m.get("content", ""))
                 return cast(str, content[:500])
         return "No primary request found"
 
@@ -259,7 +286,8 @@ class ContextCompressor:
             re.IGNORECASE,
         )
         for m in messages:
-            for match in pattern.finditer(m.get("content", "")):
+            # 修复: content 可能是 list（Anthropic 格式），归一化为字符串
+            for match in pattern.finditer(self._normalize_content(m.get("content", ""))):
                 assumptions.append(match.group(1).strip()[:200])
         if not assumptions:
             return "None explicitly stated"
@@ -278,7 +306,8 @@ class ContextCompressor:
         """
         files: dict[str, str] = {}
         for m in messages:
-            content = m.get("content", "")
+            # 修复: content 可能是 list（Anthropic 格式），归一化为字符串
+            content = self._normalize_content(m.get("content", ""))
             for pattern in self._FILE_PATTERNS:
                 for match in re.finditer(pattern, content, re.IGNORECASE):
                     path = match.group(1) if match.groups() else match.group(0)
@@ -298,7 +327,8 @@ class ContextCompressor:
             re.IGNORECASE,
         )
         for m in messages:
-            for match in pattern.finditer(m.get("content", "")):
+            # 修复: content 可能是 list（Anthropic 格式），归一化为字符串
+            for match in pattern.finditer(self._normalize_content(m.get("content", ""))):
                 decisions.append(match.group(1).strip()[:200])
         if not decisions:
             return "No explicit decisions recorded"
@@ -307,14 +337,16 @@ class ContextCompressor:
     def _extract_current_state(self, messages: list[dict]) -> str:
         """Extract current state from the last few messages."""
         recent = messages[-3:] if len(messages) >= 3 else messages
-        contents = [m.get("content", "")[:300] for m in recent]
+        # 修复: content 可能是 list（Anthropic 格式），归一化后再切片
+        contents = [self._normalize_content(m.get("content", ""))[:300] for m in recent]
         return "\n---\n".join(contents) if contents else "Unknown"
 
     def _extract_error_history(self, messages: list[dict]) -> str:
         """Extract error messages and their resolutions."""
         errors: list[str] = []
         for m in messages:
-            content = m.get("content", "")
+            # 修复: content 可能是 list（Anthropic 格式），归一化为字符串
+            content = self._normalize_content(m.get("content", ""))
             for pattern in self._ERROR_PATTERNS:
                 for match in re.finditer(pattern, content, re.IGNORECASE):
                     errors.append(match.group(0).strip()[:200])
@@ -332,7 +364,8 @@ class ContextCompressor:
         for m in messages:
             if m.get("role") != "user":
                 continue
-            content = m.get("content", "").strip()
+            # 修复: content 可能是 list（Anthropic 格式），归一化为字符串
+            content = self._normalize_content(m.get("content", "")).strip()
             if not content:
                 continue
             # Check if this message looks like a correction
@@ -357,7 +390,8 @@ class ContextCompressor:
         ]
         for m in messages:
             for pattern in patterns:
-                for match in re.finditer(pattern, m.get("content", ""), re.IGNORECASE):
+                # 修复: content 可能是 list（Anthropic 格式），归一化为字符串
+                for match in re.finditer(pattern, self._normalize_content(m.get("content", "")), re.IGNORECASE):
                     pending.append(match.group(1).strip()[:200])
         if not pending:
             return "No pending actions"
@@ -371,7 +405,8 @@ class ContextCompressor:
         ]
         for m in messages:
             for pattern in patterns:
-                for match in re.finditer(pattern, m.get("content", ""), re.IGNORECASE):
+                # 修复: content 可能是 list（Anthropic 格式），归一化为字符串
+                for match in re.finditer(pattern, self._normalize_content(m.get("content", "")), re.IGNORECASE):
                     notes.append(match.group(0).strip()[:200])
         if not notes:
             return "Not specified"
