@@ -134,7 +134,8 @@ class ExecuteMixin:
         # Use WorkerPool semaphore for concurrency control if available
         sem = None
         if self._worker_pool:
-            sem = getattr(self._worker_pool, "_sem", None)
+            # P2-2 fix: 使用公共 property 而非 getattr 访问私有 _sem 属性
+            sem = self._worker_pool.semaphore
         if sem is None:
             sem = asyncio.Semaphore(self._loop_config.max_workers)
 

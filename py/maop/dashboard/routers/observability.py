@@ -179,6 +179,7 @@ async def record(payload: RecordRequestModel, request: Request) -> Any:
 
 
 @router.get("/health")
+@handle_api_errors("observability health")
 async def health(request: Request) -> Any:
     """Deep health check of the observability pipeline.
 

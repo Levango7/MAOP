@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -158,6 +159,9 @@ class Guardrail:
         self._RL_CIRCUIT_THRESHOLD = 5  # 连续失败阈值
         # M-9: 系统级异常直接 fail-open（非业务异常不应阻断请求）
         self._SYSTEM_EXCEPTIONS = (MemoryError, SystemError, OSError, KeyboardInterrupt)
+        # P1-2 fix: 保护 _rate_limiters / _rl_fail_counts 共享状态的并发访问。
+        # check() 可被多线程并发调用，未加锁会导致字典读写竞态。
+        self._lock = threading.Lock()
 
     # ── persistence ──────────────────────────────────────────
 
@@ -245,55 +249,61 @@ class Guardrail:
 
             elif rule.type == RuleType.RATE:
                 # Rate limiting: persistent in-memory token bucket per agent
-                try:
-                    from maop.core.reliability.rate_limiter import RateLimiter, RateLimiterConfig
-                    max_rpm = rule.max_per_minute or rule.limit or 30
-                    # Reuse persistent RateLimiter instance per rule
-                    if rule.id not in self._rate_limiters:
-                        self._rate_limiters[rule.id] = RateLimiter(
-                            config=RateLimiterConfig(max_requests=max_rpm, window_s=60.0),
-                        )
-                    rl = self._rate_limiters[rule.id]
-                    result = rl.consume(agent or "default")
-                    # M-9: 成功调用后重置熔断失败计数
-                    self._rl_fail_counts.pop(rule.id, None)
-                    if not result.allowed:
-                        violations.append(Violation(
-                            rule=rule.id,
-                            severity="warn",
-                            message=f"rate limit exceeded for agent: {agent}",
-                            action=rule.action.value,
-                        ))
-                except Exception as exc:
-                    # M-9: fail-closed 加熔断机制
-                    # 1. 系统级异常（MemoryError/SystemError/OSError）直接 fail-open，
-                    #    因为这类异常下 fail-closed 可能加剧系统压力。
-                    # 2. 业务异常连续失败超过阈值后切换到 fail-open，避免持续阻断。
-                    # 3. 正常情况下保持 fail-closed（安全优先）。
-                    is_system_exc = isinstance(exc, self._SYSTEM_EXCEPTIONS)
-                    fail_count = self._rl_fail_counts.get(rule.id, 0) + 1
-                    self._rl_fail_counts[rule.id] = fail_count
+                # P1-2 fix: _rate_limiters / _rl_fail_counts 是共享可变状态，
+                # 必须在锁内访问，防止多线程并发 check() 时的字典竞态。
+                with self._lock:
+                    try:
+                        from maop.core.reliability.rate_limiter import RateLimiter, RateLimiterConfig
+                        max_rpm = rule.max_per_minute or rule.limit or 30
+                        # Reuse persistent RateLimiter instance per rule
+                        if rule.id not in self._rate_limiters:
+                            self._rate_limiters[rule.id] = RateLimiter(
+                                config=RateLimiterConfig(max_requests=max_rpm, window_s=60.0),
+                            )
+                        rl = self._rate_limiters[rule.id]
+                        result = rl.consume(agent or "default")
+                        # M-9: 成功调用后重置熔断失败计数
+                        self._rl_fail_counts.pop(rule.id, None)
+                        if not result.allowed:
+                            violations.append(Violation(
+                                rule=rule.id,
+                                severity="warn",
+                                message=f"rate limit exceeded for agent: {agent}",
+                                action=rule.action.value,
+                            ))
+                    except Exception as exc:
+                        # M-9: fail-closed 加熔断机制
+                        # 1. 系统级异常（MemoryError/SystemError/OSError）直接 fail-open，
+                        #    因为这类异常下 fail-closed 可能加剧系统压力。
+                        # 2. 业务异常连续失败超过阈值后切换到 fail-open，避免持续阻断。
+                        # 3. 正常情况下保持 fail-closed（安全优先）。
+                        is_system_exc = isinstance(exc, self._SYSTEM_EXCEPTIONS)
+                        fail_count = self._rl_fail_counts.get(rule.id, 0) + 1
+                        self._rl_fail_counts[rule.id] = fail_count
 
-                    if is_system_exc or fail_count > self._RL_CIRCUIT_THRESHOLD:
-                        # fail-open: 允许请求通过，记录警告
-                        logger.warning(
-                            "[guardrail] rate limit check failed (fail-open, rule=%s, "
-                            "fail_count=%d, system_exc=%s): %s",
-                            rule.id, fail_count, is_system_exc, exc,
-                        )
-                    else:
-                        # fail-closed: 视为违规
-                        logger.warning(
-                            "[guardrail] rate limit check failed (fail-closed, rule=%s, "
-                            "fail_count=%d): %s",
-                            rule.id, fail_count, exc,
-                        )
-                        violations.append(Violation(
-                            rule=rule.id,
-                            severity="warn",
-                            message=f"rate limit check error: {exc}",
-                            action=rule.action.value,
-                        ))
+                        if is_system_exc or fail_count > self._RL_CIRCUIT_THRESHOLD:
+                            # fail-open: 允许请求通过，记录警告
+                            logger.warning(
+                                "[guardrail] rate limit check failed (fail-open, rule=%s, "
+                                "fail_count=%d, system_exc=%s): %s",
+                                rule.id, fail_count, is_system_exc, exc,
+                            )
+                        else:
+                            # fail-closed: 视为违规
+                            logger.warning(
+                                "[guardrail] rate limit check failed (fail-closed, rule=%s, "
+                                "fail_count=%d): %s",
+                                rule.id, fail_count, exc,
+                            )
+                            violations.append(Violation(
+                                rule=rule.id,
+                                severity="warn",
+                                # P3-3 fix: 异常详情不放入 violation message（可能
+                                # 泄露内部实现细节），仅记录在日志中。客户端只看到
+                                # 通用错误描述。
+                                message="rate limit check error",
+                                action=rule.action.value,
+                            ))
 
         blocked = [v for v in violations if v.action == "block"]
         passed = len(blocked) == 0

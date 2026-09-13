@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from enum import Enum
 from pathlib import Path
 
 import yaml
@@ -376,7 +377,9 @@ class ModelRegistry:
             for k, v in d.items():
                 if isinstance(v, dict):
                     out[k] = _serialize(v)
-                elif hasattr(v, "value") and isinstance(v, type) is not True:
+                elif isinstance(v, Enum):
+                    # P2-9 fix: 原条件 hasattr(v, "value") and isinstance(v, type) is not True
+                    # 晦涩且脆弱（任何带 value 属性的对象都会匹配）。改为明确检查 Enum 实例。
                     out[k] = v.value
                 else:
                     out[k] = v
@@ -411,6 +414,17 @@ class ModelRegistry:
                 for name, q in self._config.quota.items()
             },
         }
-        with open(path, "w", encoding="utf-8") as f:
-            yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        # P2-4 fix: 原直接 open(path, "w") 写入非原子——进程中断会留下半写文件。
+        # 复用 evolve.py 的 FileLock + safe_write_text 模式保证原子写入。
+        try:
+            from maop.core.reliability.filelock import FileLock
+            from maop.core.reliability.safe_writer import safe_write_text
+            content = yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            lock_path = str(path) + ".lock"
+            with FileLock(lock_path, timeout_seconds=10):
+                safe_write_text(path, content, encoding="utf-8")
+        except Exception as exc:
+            logger.warning("[registry] Atomic save failed, falling back to direct write: %s", exc)
+            with open(path, "w", encoding="utf-8") as f:
+                yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
         logger.info("[registry] Saved models.yaml to %s", path)

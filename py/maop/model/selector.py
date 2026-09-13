@@ -73,6 +73,26 @@ class ModelSelector:
     enable load-aware tie-breaking and quota-aware fallback.
     """
 
+    # P3-2 fix: routing key → capability 映射提为类常量，避免每次调用
+    # select_for_routing_key 时重建字典。
+    _KEY_TO_CAPABILITY: dict[str, str] = {
+        "codegen": "codegen",
+        "chat": "chat",
+        "search": "search",
+        "review": "review",
+        "planning": "planning",
+        "verify": "verify",
+        "refactor": "codegen",
+        "explain": "chat",
+        "quickfix": "codegen",
+        "fileops": "fileops",
+        "docgen": "codegen",
+        "techdoc": "codegen",
+        "mcp": "mcp",
+        "memory": "memory",
+        "pipeline": "pipeline",
+    }
+
     def __init__(
         self,
         registry: ModelRegistry,
@@ -391,25 +411,8 @@ class ModelSelector:
         policy_name: str = "",
     ) -> EffectiveModel:
         """Select model for a routing key (maps routing keys to capabilities)."""
-        # Routing key to capability mapping
-        key_to_capability = {
-            "codegen": "codegen",
-            "chat": "chat",
-            "search": "search",
-            "review": "review",
-            "planning": "planning",
-            "verify": "verify",
-            "refactor": "codegen",
-            "explain": "chat",
-            "quickfix": "codegen",
-            "fileops": "fileops",
-            "docgen": "codegen",
-            "techdoc": "codegen",
-            "mcp": "mcp",
-            "memory": "memory",
-            "pipeline": "pipeline",
-        }
-        capability = key_to_capability.get(routing_key, routing_key)
+        # P3-2 fix: 使用类常量 _KEY_TO_CAPABILITY 替代每次调用重建的局部字典
+        capability = self._KEY_TO_CAPABILITY.get(routing_key, routing_key)
         # Use routing key as policy name if no policy specified
         pn = policy_name or routing_key
         return self.select(

@@ -206,10 +206,21 @@ class TestPgRBACStoreWithBackend:
 
     def test_delete_grant_returns_true(self):
         backend = _mock_backend()
+        # P0-1 修复后使用 DELETE ... RETURNING，fetchall 返回被删除的行。
+        backend.fetchall.return_value = [{"id": 1}]
         with patch("maop.enterprise.pg_persist._get_pg_backend", return_value=backend):
             from maop.enterprise.pg_persist import PgRBACStore
             store = PgRBACStore()
             assert store.delete_grant("u1", "admin", "t1") is True
+
+    def test_delete_grant_returns_false_when_not_found(self):
+        """P0-1 修复：记录不存在时返回 False（DELETE ... RETURNING 返回空）。"""
+        backend = _mock_backend()
+        backend.fetchall.return_value = []
+        with patch("maop.enterprise.pg_persist._get_pg_backend", return_value=backend):
+            from maop.enterprise.pg_persist import PgRBACStore
+            store = PgRBACStore()
+            assert store.delete_grant("u1", "admin", "t1") is False
 
     def test_load_grants_all(self):
         backend = _mock_backend()
@@ -278,13 +289,21 @@ class TestPgTenantStoreWithBackend:
 
     def test_delete_tenant_returns_true(self):
         backend = _mock_backend()
+        # P0-2 修复后利用外键级联删除，只删 tenants 主表，使用 RETURNING 检查。
+        backend.fetchall.return_value = [{"tenant_id": "t1"}]
         with patch("maop.enterprise.pg_persist._get_pg_backend", return_value=backend):
             from maop.enterprise.pg_persist import PgTenantStore
             store = PgTenantStore()
-            backend.execute.reset_mock()
             assert store.delete_tenant("t1") is True
-        # 2 deletes: tenant_usage + tenants
-        assert backend.execute.call_count == 2
+
+    def test_delete_tenant_returns_false_when_not_found(self):
+        """P0-2 修复：租户不存在时返回 False。"""
+        backend = _mock_backend()
+        backend.fetchall.return_value = []
+        with patch("maop.enterprise.pg_persist._get_pg_backend", return_value=backend):
+            from maop.enterprise.pg_persist import PgTenantStore
+            store = PgTenantStore()
+            assert store.delete_tenant("t1") is False
 
     def test_load_tenants_all(self):
         backend = _mock_backend()
@@ -408,10 +427,16 @@ class TestPgAuditStoreWithBackend:
 
     def test_summary_with_data(self):
         backend = _mock_backend()
-        backend.fetchall.return_value = [
-            {"action": "login", "severity": "info"},
-            {"action": "login", "severity": "critical"},
-            {"action": "logout", "severity": "info"},
+        # P1-4 修复后使用 SQL 聚合查询，fetchone 返回 COUNT 结果，
+        # fetchall 返回 GROUP BY 结果。
+        backend.fetchone.side_effect = [
+            {"n": 3},  # total count
+            {"n": 1},  # critical count
+        ]
+        backend.fetchall.side_effect = [
+            [{"action": "login", "n": 2}, {"action": "logout", "n": 1}],  # by_action
+            [{"rl": "low", "n": 3}],  # by_risk
+            [{"cat": "uncategorised", "n": 3}],  # by_category
         ]
         with patch("maop.enterprise.pg_persist._get_pg_backend", return_value=backend):
             from maop.enterprise.pg_persist import PgAuditStore

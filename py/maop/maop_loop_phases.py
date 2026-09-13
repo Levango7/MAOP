@@ -98,6 +98,18 @@ class PhasesMixin:
     # 由 ExecuteMixin 提供的方法（MaopLoop 通过多继承获得）
     _execute_with_strategy: Any
     _execute_with_retry: Any
+    # P1-10 fix: fire-and-forget task 引用集合（在 MaopLoop.__init__ 中初始化）
+    _bg_tasks: set
+
+    def _create_bg_task(self, coro: Any) -> Any:
+        """P1-10 fix: 创建 fire-and-forget task 并持有强引用，防止 GC。
+
+        task 完成或抛异常后通过 done callback 从 _bg_tasks 移除，避免泄漏。
+        """
+        task = asyncio.get_running_loop().create_task(coro)
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
+        return task
 
     @staticmethod
     def _should_execute_parallel(analysis, worker_pool):
@@ -189,7 +201,8 @@ class PhasesMixin:
 
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(self._bus.publish(Event(topic="loop.analyze", data={
+            # P1-10 fix: 持有 task 强引用防止 GC（原 loop.create_task 返回值未保存）
+            self._create_bg_task(self._bus.publish(Event(topic="loop.analyze", data={
                 "trace_id": ctx.trace_id, "analysis": ctx.analysis_dict,
             })))
         except RuntimeError as exc:
@@ -544,7 +557,8 @@ class PhasesMixin:
 
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(self._bus.publish(Event(topic="loop.complete", data={
+            # P1-10 fix: 持有 task 强引用防止 GC（原 loop.create_task 返回值未保存）
+            self._create_bg_task(self._bus.publish(Event(topic="loop.complete", data={
                 "trace_id": ctx.trace_id, "success": success, "duration_ms": total_ms,
             })))
         except RuntimeError as exc:

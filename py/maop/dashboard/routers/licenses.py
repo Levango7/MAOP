@@ -251,7 +251,11 @@ async def delete_license(license_id: str, request: Request) -> dict[str, Any]:
         # 批次3A: 脱敏——LicenseNotFoundError 细节不暴露给客户端，仅日志记录。
         logger.warning("[licenses] License not found: %s", exc)
         raise HTTPException(status_code=404, detail="License not found") from exc
-    return {"status": "ok" if deleted else "error", "deleted": deleted}
+    # P2-3 fix: 删除失败时返回 500 而非 200 + {"status": "error"}，
+    # 由 @handle_api_errors 装饰器统一渲染为 ErrorSchema 响应。
+    if not deleted:
+        raise HTTPException(status_code=500, detail="Failed to delete license")
+    return {"status": "ok", "deleted": True}
 
 
 @router.get("/{license_id}/audit")

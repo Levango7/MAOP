@@ -6,6 +6,7 @@ go through this plane, ensuring every action is audited.
 from __future__ import annotations
 
 import logging
+import threading
 from enum import Enum
 from typing import Any
 
@@ -50,6 +51,11 @@ class ControlPlane:
         self._root_dir = root_dir
         self._handlers: dict[str, Any] = {}
         self._task_states: dict[str, str] = {}
+        # P1-5 fix: _task_states 是模块级可变字典语义的实例可变字典，
+        # 多线程并发 run/pause/resume/stop 会产生读-改-写竞态。
+        # 添加 threading.Lock 保护所有读写操作。
+        # （来源：coding-pattern/2026-09-12-module-level-global-registry-dict-needs-lock）
+        self._task_states_lock = threading.Lock()
         self._register_builtin_handlers()
 
     def _register_builtin_handlers(self) -> None:
@@ -137,31 +143,35 @@ class ControlPlane:
 
     def _handle_control_run(self, target: str = "", detail: dict | None = None) -> dict:
         task_id = target or "default"
-        self._task_states[task_id] = "running"
+        with self._task_states_lock:
+            self._task_states[task_id] = "running"
         logger.info("[control] Task started: %s", task_id)
         return {"started": True, "task": task_id, "status": "running"}
 
     def _handle_control_pause(self, target: str = "", detail: dict | None = None) -> dict:
         task_id = target or "default"
-        prev = self._task_states.get(task_id, "unknown")
-        if prev != "running":
-            return {"paused": False, "task": task_id, "reason": f"task not running (state={prev})"}
-        self._task_states[task_id] = "paused"
+        with self._task_states_lock:
+            prev = self._task_states.get(task_id, "unknown")
+            if prev != "running":
+                return {"paused": False, "task": task_id, "reason": f"task not running (state={prev})"}
+            self._task_states[task_id] = "paused"
         logger.info("[control] Task paused: %s", task_id)
         return {"paused": True, "task": task_id, "status": "paused"}
 
     def _handle_control_resume(self, target: str = "", detail: dict | None = None) -> dict:
         task_id = target or "default"
-        prev = self._task_states.get(task_id, "unknown")
-        if prev != "paused":
-            return {"resumed": False, "task": task_id, "reason": f"task not paused (state={prev})"}
-        self._task_states[task_id] = "running"
+        with self._task_states_lock:
+            prev = self._task_states.get(task_id, "unknown")
+            if prev != "paused":
+                return {"resumed": False, "task": task_id, "reason": f"task not paused (state={prev})"}
+            self._task_states[task_id] = "running"
         logger.info("[control] Task resumed: %s", task_id)
         return {"resumed": True, "task": task_id, "status": "running"}
 
     def _handle_control_stop(self, target: str = "", detail: dict | None = None) -> dict:
         task_id = target or "default"
-        prev = self._task_states.pop(task_id, None)
+        with self._task_states_lock:
+            prev = self._task_states.pop(task_id, None)
         if prev is None:
             return {"stopped": False, "task": task_id, "reason": "task not found"}
         logger.info("[control] Task stopped: %s (was %s)", task_id, prev)

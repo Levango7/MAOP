@@ -204,11 +204,24 @@ class MAOPSettings(BaseSettings):
         P0-6 fix: an empty value is allowed (the runtime falls back to
         load_jwt_secret()), but a non-empty value must be at least 32
         characters to prevent trivially-guessable signing secrets.
+
+        P2-3 fix: 委托给 ``auth._validate_jwt_secret_strength`` 进行完整校验
+        （长度 + 已知弱密钥黑名单），与 ``load_jwt_secret()`` 的校验逻辑保持
+        一致，避免 settings 层与 auth 层校验标准分裂。
+
+        注意：``_validate_jwt_secret_strength`` 在不合法时抛 ``RuntimeError``，
+        但 Pydantic field_validator 只捕获 ``ValueError``/``AssertionError``。
+        因此这里捕获 RuntimeError 并转为 ValueError，使 Pydantic 能将其转为
+        ``ValidationError``（来源：经验文档
+        2026-09-13-pydantic-v2-field-validator-runtimeerror-not-caught）。
         """
         if v == "":
             return v  # 空允许，实际走 load_jwt_secret()
-        if len(v) < 32:
-            raise ValueError("jwt_secret must be at least 32 characters")
+        from maop.core.security.auth import _validate_jwt_secret_strength
+        try:
+            _validate_jwt_secret_strength(v, "MAOPSettings.jwt_secret")
+        except RuntimeError as exc:
+            raise ValueError(str(exc)) from exc
         return v
 
     @field_validator("log_level")

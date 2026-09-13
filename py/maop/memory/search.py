@@ -77,14 +77,25 @@ class SearchMixin:
                     vec_results = self._vector_store.search(query, top=top)
                     # Merge: FTS5 results get priority, vector results supplement
                     fts_ids = {r.id for r in fts_results}
+                    # P1-1 fix: 批量查询向量结果对应的 memory_entries 元数据，
+                    # 消除 N+1 查询。SQLite 参数数量限制（SQLITE_MAX_VARIABLE_NUMBER，
+                    # 默认 999/32766），用 CHUNK_SIZE=500 分批 WHERE id IN (...)。
+                    missing_ids = [vr.id for vr in vec_results if vr.id not in fts_ids]
+                    mem_by_id: dict[str, dict] = {}
+                    CHUNK_SIZE = 500
+                    for i in range(0, len(missing_ids), CHUNK_SIZE):
+                        chunk = missing_ids[i:i + CHUNK_SIZE]
+                        placeholders = ",".join("?" * len(chunk))
+                        rows = self._query(
+                            f"SELECT * FROM memory_entries WHERE id IN ({placeholders})",
+                            tuple(chunk),
+                        )
+                        for r in rows:
+                            mem_by_id[r["id"]] = r
                     for vr in vec_results:
                         if vr.id not in fts_ids:
-                            # Find matching memory entry for metadata
-                            mem_rows = self._query(
-                                "SELECT * FROM memory_entries WHERE id = ? LIMIT 1", (vr.id,)
-                            )
-                            if mem_rows:
-                                m = mem_rows[0]
+                            m = mem_by_id.get(vr.id)
+                            if m:
                                 fts_results.append(SearchResult(
                                     id=m["id"], agent=m["agent"], task=m["task"],
                                     tags=m["tags"], topic=m["topic"],
@@ -244,9 +255,12 @@ class SearchMixin:
         where_clause = " AND ".join(conditions)
         where_sql = f"WHERE {where_clause}" if where_clause else ""
 
+        # P1-2 fix: regex fallback 全表扫描无 LIMIT，对大表会拉取全部行到内存。
+        # 加 LIMIT ? (top*10) 作为候选上界，足够覆盖关键词命中排序后取 top 的场景，
+        # 同时避免对超大表的全量扫描。
         rows = self._query(
-            f"SELECT * FROM memory_entries {where_sql} ORDER BY timestamp DESC",
-            params,
+            f"SELECT * FROM memory_entries {where_sql} ORDER BY timestamp DESC LIMIT ?",
+            params + [top * 10],
         )
         scored: list[SearchResult] = []
         for r in rows:

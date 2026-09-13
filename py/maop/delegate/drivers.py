@@ -39,7 +39,11 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
             exit_code=-1, error=f"Agent '{config.name}' has empty cli (driver=cli)",
             duration_ms=0, trace_id=trace_id, driver="cli", model=config.model,
         )
-    cli_parts = cli.split()
+    # P1-1 fix: use shlex.split instead of str.split so quoted paths with
+    # spaces (e.g. "C:\Program Files\app.exe" --flag) are parsed correctly.
+    # posix=False on Windows so backslashes in paths are not treated as
+    # escapes.
+    cli_parts = shlex.split(cli, posix=(sys.platform != "win32"))
     base_cmd = cli_parts[0]
     pre_args = cli_parts[1:]
     resolved = shutil.which(base_cmd)
@@ -94,6 +98,14 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
                 try:
                     exit_code = await streamer.pipe(proc, timeout=timeout)
                 except asyncio.TimeoutError:
+                    # P0-1 fix: kill the leaked subprocess on streamer timeout.
+                    # Without this, the child process keeps running after we
+                    # return, leaking a PID and possibly holding pipes open.
+                    # Mirrors the kill+wait pattern used in the outer
+                    # TimeoutError / Exception handlers below.
+                    if proc:
+                        proc.kill()
+                        await proc.wait()
                     return new_result(
                         agent=config.name, task=prompt,
                         exit_code=-1, error=f"TIMEOUT after {timeout}s",
@@ -172,7 +184,7 @@ async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,
             "-TimeoutSeconds", str(timeout),
             "-AgentName", config.name,
             "-TraceID", trace_id,
-        ] + (model_args.split() if model_args else [])
+        ] + (shlex.split(model_args, posix=(sys.platform != "win32")) if model_args else [])
 
         proc = await asyncio.create_subprocess_exec(
             *args,
@@ -180,6 +192,51 @@ async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,
         )
+
+        # P2-6 fix: streamer support for wrapper driver (previously only
+        # _run_cli honoured the streamer kwarg; other drivers silently
+        # ignored it and fell back to batch communicate()).
+        if streamer is not None:
+            from maop.core.reliability.streaming import SubprocessStreamer
+            if isinstance(streamer, SubprocessStreamer):
+                try:
+                    exit_code = await streamer.pipe(proc, timeout=timeout)
+                except asyncio.TimeoutError:
+                    if proc:
+                        proc.kill()
+                        await proc.wait()
+                    return new_result(
+                        agent=config.name, task=prompt,
+                        exit_code=-1, error=f"TIMEOUT after {timeout}s",
+                        duration_ms=int((time.monotonic() - start) * 1000),
+                        trace_id=trace_id, driver="wrapper", model=config.model,
+                    )
+                duration_ms = streamer.duration_ms
+                ansi_re = re.compile(r"\x1b\[[0-9;]*m")
+                raw = ansi_re.sub("", streamer.stdout or "").strip()
+                # Try to parse unified JSON schema from wrapper output
+                try:
+                    wrapper_result = json.loads(raw)
+                    if "ok" in wrapper_result:
+                        return new_result(
+                            agent=config.name, task=prompt,
+                            exit_code=wrapper_result.get("exit_code", exit_code),
+                            stdout=wrapper_result.get("stdout", ""),
+                            stderr=wrapper_result.get("stderr", ""),
+                            error=wrapper_result.get("error"),
+                            duration_ms=wrapper_result.get("duration_ms", duration_ms),
+                            trace_id=trace_id, driver="wrapper", model=config.model,
+                        )
+                except (json.JSONDecodeError, ValueError) as exc:
+                    logger.debug("drivers: wrapper streamer JSON parse failed: %s", exc)
+                return new_result(
+                    agent=config.name, task=prompt,
+                    exit_code=exit_code,
+                    stdout=raw,
+                    duration_ms=duration_ms, trace_id=trace_id,
+                    driver="wrapper", model=config.model,
+                )
+
         stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout + 10)
         duration_ms = int((time.monotonic() - start) * 1000)
 
@@ -286,6 +343,31 @@ async def _run_powershell(config: AgentConfig, prompt: str, timeout: int,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,
         )
+
+        # P2-6 fix: streamer support for powershell driver.
+        if streamer is not None:
+            from maop.core.reliability.streaming import SubprocessStreamer
+            if isinstance(streamer, SubprocessStreamer):
+                try:
+                    exit_code = await streamer.pipe(proc, timeout=timeout)
+                except asyncio.TimeoutError:
+                    if proc:
+                        proc.kill()
+                        await proc.wait()
+                    return new_result(
+                        agent=config.name, task=prompt,
+                        exit_code=-1, error=f"TIMEOUT after {timeout}s",
+                        duration_ms=int((time.monotonic() - start) * 1000),
+                        trace_id=trace_id, driver="powershell", model=config.model,
+                    )
+                return new_result(
+                    agent=config.name, task=prompt,
+                    exit_code=exit_code,
+                    stdout=streamer.stdout, stderr=streamer.stderr,
+                    duration_ms=streamer.duration_ms, trace_id=trace_id,
+                    driver="powershell", model=config.model,
+                )
+
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         duration_ms = int((time.monotonic() - start) * 1000)
         ansi_re = re.compile(r"\x1b\[[0-9;]*m")
@@ -357,6 +439,31 @@ async def _run_cmd(config: AgentConfig, prompt: str, timeout: int,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,
         )
+
+        # P2-6 fix: streamer support for cmd driver.
+        if streamer is not None:
+            from maop.core.reliability.streaming import SubprocessStreamer
+            if isinstance(streamer, SubprocessStreamer):
+                try:
+                    exit_code = await streamer.pipe(proc, timeout=timeout)
+                except asyncio.TimeoutError:
+                    if proc:
+                        proc.kill()
+                        await proc.wait()
+                    return new_result(
+                        agent=config.name, task=prompt,
+                        exit_code=-1, error=f"TIMEOUT after {timeout}s",
+                        duration_ms=int((time.monotonic() - start) * 1000),
+                        trace_id=trace_id, driver="cmd", model=config.model,
+                    )
+                return new_result(
+                    agent=config.name, task=prompt,
+                    exit_code=exit_code,
+                    stdout=streamer.stdout, stderr=streamer.stderr,
+                    duration_ms=streamer.duration_ms, trace_id=trace_id,
+                    driver="cmd", model=config.model,
+                )
+
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         duration_ms = int((time.monotonic() - start) * 1000)
         ansi_re = re.compile(r"\x1b\[[0-9;]*m")
@@ -411,9 +518,39 @@ async def _run_python(config: AgentConfig, prompt: str, timeout: int,
             duration_ms=0, trace_id=trace_id, driver="python", model=config.model,
         )
     args_template = config.cli_args or "{task}"
-    task_args = args_template.replace("{task}", prompt)
-    # P1-5 fix: split args safely to prevent parameter injection
-    extra_args = shlex.split(task_args, posix=True) if task_args else []
+    # P0-2 fix: use the same placeholder technique as _run_cli to prevent
+    # parameter injection. Previously the prompt was string-substituted into
+    # the template and the whole thing was shlex.split(), which let shell
+    # metacharacters in the user prompt (e.g. ";", "|", "$()") be parsed as
+    # argument syntax. Now the prompt is swapped in as a single opaque argv
+    # element after splitting, so it is never re-parsed by shlex.
+    task_placeholder = None
+    for ph in ("'{task}'", "{task}", "{{safePrompt}}"):
+        if ph in args_template:
+            task_placeholder = ph
+            break
+
+    if task_placeholder:
+        placeholder = "\x00MAOP_TASK_PLACEHOLDER\x00"
+        safe_template = args_template.replace(task_placeholder, placeholder)
+        try:
+            split_args = shlex.split(safe_template, posix=True)
+        except ValueError as exc:
+            return new_result(
+                agent=config.name, task=prompt,
+                exit_code=-1, error=f"Invalid cli_args template: {exc}",
+                duration_ms=0, trace_id=trace_id, driver="python", model=config.model,
+            )
+        extra_args = [prompt if arg == placeholder else arg for arg in split_args]
+    else:
+        try:
+            extra_args = shlex.split(args_template, posix=True) if args_template else []
+        except ValueError as exc:
+            return new_result(
+                agent=config.name, task=prompt,
+                exit_code=-1, error=f"Invalid cli_args template: {exc}",
+                duration_ms=0, trace_id=trace_id, driver="python", model=config.model,
+            )
 
     start = time.monotonic()
     proc = None
@@ -424,6 +561,31 @@ async def _run_python(config: AgentConfig, prompt: str, timeout: int,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,
         )
+
+        # P2-6 fix: streamer support for python driver.
+        if streamer is not None:
+            from maop.core.reliability.streaming import SubprocessStreamer
+            if isinstance(streamer, SubprocessStreamer):
+                try:
+                    exit_code = await streamer.pipe(proc, timeout=timeout)
+                except asyncio.TimeoutError:
+                    if proc:
+                        proc.kill()
+                        await proc.wait()
+                    return new_result(
+                        agent=config.name, task=prompt,
+                        exit_code=-1, error=f"TIMEOUT after {timeout}s",
+                        duration_ms=int((time.monotonic() - start) * 1000),
+                        trace_id=trace_id, driver="python", model=config.model,
+                    )
+                return new_result(
+                    agent=config.name, task=prompt,
+                    exit_code=exit_code,
+                    stdout=streamer.stdout, stderr=streamer.stderr,
+                    duration_ms=streamer.duration_ms, trace_id=trace_id,
+                    driver="python", model=config.model,
+                )
+
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         duration_ms = int((time.monotonic() - start) * 1000)
         ansi_re = re.compile(r"\x1b\[[0-9;]*m")

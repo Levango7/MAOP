@@ -22,7 +22,7 @@ Usage::
 
 from __future__ import annotations
 
-import copy
+
 import logging
 import threading
 import time
@@ -216,11 +216,14 @@ class SemanticCache:
         # _entries 浅拷贝，然后在锁外执行相似度扫描，显著减少锁持有时间。
         with self._lock:
             scan_keys_snapshot = list(self._order[-self._max_scan:])
-            # R10 fix: 使用 deepcopy 替代浅拷贝 dict(self._entries)，
-            # 防止锁外扫描期间其他线程修改 entry 内部状态（如 access_count）
-            # 导致统计计数竞态。虽然统计计数不影响缓存正确性，但 deepcopy
-            # 确保扫描快照完全独立。
-            entries_snapshot = copy.deepcopy(self._entries)
+            # P2-2 fix: 使用浅拷贝 dict(self._entries) 替代 deepcopy。
+            # deepcopy 会递归复制全量条目（含 embedding 向量列表），
+            # 在高并发下造成显著 CPU/内存开销。浅拷贝是安全的：
+            # SemanticCacheEntry 是 Pydantic 模型，put 总是创建新条目替换
+            # 字典项而非原地修改现有 entry；扫描期间读取的字段
+            # (embedding/created_at/ttl_s) 不会与 put 产生数据竞争。
+            # access_count 的自增在锁内单独完成（见下方 best_key 命中分支）。
+            entries_snapshot = dict(self._entries)
 
         # 锁外执行相似度扫描（O(max_scan) 次余弦计算，无锁竞争）
         best_key, best_score = self._find_similar_snapshot(

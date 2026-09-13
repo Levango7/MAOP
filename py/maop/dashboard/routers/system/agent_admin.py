@@ -52,32 +52,42 @@ class AgentConfigUpdateRequest(BaseModel):
 @router.get("/api/agent/config")
 @handle_api_errors
 async def api_agent_config(request: Request) -> dict[str, Any]:
+    """读取 agents.yaml 配置，返回所有 agent 定义及路由规则。
+
+    仅管理员可调用。返回结构：``{status, agents[], routes[], agent_count}``。
+    配置加载失败时由 ``@handle_api_errors`` 装饰器统一返回 500。
+    """
     require_admin(request)
-    try:
-        from maop.config.loader import ConfigLoader
-        cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
-        agents = []
-        for name, ad in cfg.agents.items():
-            agents.append({
-                "name": name, "cli": ad.cli, "driver": ad.driver,
-                "model": getattr(ad, "model", ""),
-                "timeout_s": ad.timeout_s, "capabilities": ad.capabilities,
-                "description": ad.description, "fallback": getattr(ad, "fallback", ""),
-            })
-        routes = (
-            [{"pattern": r.pattern, "agent": r.agent, "routing_key": r.routing_key} for r in cfg.routes]
-            if hasattr(cfg, "routes")
-            else []
-        )
-        return {"status": "ok", "agents": agents, "routes": routes, "agent_count": len(agents)}
-    except Exception as exc:
-        logger.error('Agent config failed: %s', exc)
-        return {"agents": [], "routes": [], "agent_count": 0, "status": "error", "error": "Agent config failed"}
+    # P1-3 fix: 移除内部 try/except Exception 兜底——此前内部错误被吞掉并以
+    # 200 状态码返回 {"status": "error"}，违反 HTTP 语义。现让异常自然传播，
+    # 由外层 @handle_api_errors 装饰器统一渲染为 500 ErrorSchema 响应。
+    from maop.config.loader import ConfigLoader
+    cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
+    agents = []
+    for name, ad in cfg.agents.items():
+        agents.append({
+            "name": name, "cli": ad.cli, "driver": ad.driver,
+            "model": getattr(ad, "model", ""),
+            "timeout_s": ad.timeout_s, "capabilities": ad.capabilities,
+            "description": ad.description, "fallback": getattr(ad, "fallback", ""),
+        })
+    routes = (
+        [{"pattern": r.pattern, "agent": r.agent, "routing_key": r.routing_key} for r in cfg.routes]
+        if hasattr(cfg, "routes")
+        else []
+    )
+    return {"status": "ok", "agents": agents, "routes": routes, "agent_count": len(agents)}
 
 
 @router.post("/api/agent/config/update")
 @handle_api_errors
 async def api_agent_config_update(body: AgentConfigUpdateRequest, request: Request) -> dict[str, Any]:
+    """更新单个 agent 的配置项并持久化到 agents.yaml。
+
+    仅管理员可调用。请求体由 Pydantic ``AgentConfigUpdateRequest`` 校验，
+    更新前会用 ``AgentDef`` 做 schema 校验，校验失败返回 400；
+    agent 不存在或 agents.yaml 缺失返回 404。
+    """
     require_admin(request)
     # H-3 fix: 用 Pydantic AgentConfigUpdateRequest 替代 await request.json()，
     # 由 FastAPI 自动校验请求体（agent/model/cli/... 字段类型）。

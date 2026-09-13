@@ -185,8 +185,11 @@ class MemoryStore(SearchMixin):
         tags_str = ",".join(tag_list)
         try:
             with self._connect() as conn:
+                # P2-3 fix: 原 INSERT OR REPLACE 静默覆盖同主键行，可能丢失
+                # 既有数据且无任何日志。改为 INSERT + 捕获 IntegrityError，
+                # 主键冲突时记录 warning 并返回 None，让调用方知晓冲突。
                 conn.execute(
-                    """INSERT OR REPLACE INTO memory_entries
+                    """INSERT INTO memory_entries
                        (id, agent, task, content, tags, topic, trace_id,
                         session_id, exit_code, duration_ms, timestamp)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -196,6 +199,10 @@ class MemoryStore(SearchMixin):
                      entry.timestamp),
                 )
             logger.info("[mem] Stored: %s (%s, %s)", entry.id, agent, tags_str)
+        except sqlite3.IntegrityError as exc:
+            # P2-3 fix: 主键冲突（同 id 已存在）— 记录 warning 而非静默覆盖
+            logger.warning("[mem] Store rejected (duplicate id %s): %s", entry.id, exc)
+            return None
         except sqlite3.Error as exc:
             # B25: 改为具体异常类型，sqlite3.Error 覆盖 IntegrityError/OperationalError 等
             logger.warning("[mem] Store failed: %s", exc)

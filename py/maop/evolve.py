@@ -91,7 +91,10 @@ class EvolveResult(BaseModel):
 
 # ── Observability data loader ─────────────────────────────────
 
-def _load_observability_data_from_db(db_path: Path) -> list[dict[str, Any]]:
+def _load_observability_data_from_db(
+    db_path: Path,
+    limit: int = 5000,
+) -> list[dict[str, Any]]:
     """Load delegation history from SQLite (maop.db).
 
     This is the primary data source in production — delegations are
@@ -99,6 +102,14 @@ def _load_observability_data_from_db(db_path: Path) -> list[dict[str, Any]]:
     same dict shape that _compute_stats expects::
 
         {"agent": str, "routing_key": str, "result": {"exit_code": int, "duration_ms": int}}
+
+    Parameters
+    ----------
+    db_path : Path
+        Path to the SQLite database file.
+    limit : int
+        Maximum number of recent delegation rows to load (default 5000).
+        P1-7 fix: 原硬编码 5000 改为可配置参数，调用方可按需调整采样窗口大小。
     """
     if not db_path.exists():
         return []
@@ -107,7 +118,8 @@ def _load_observability_data_from_db(db_path: Path) -> list[dict[str, Any]]:
         with sqlite3.connect(str(db_path)) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
-                "SELECT agent, routing_key, exit_code, duration_ms FROM delegations ORDER BY id DESC LIMIT 5000"
+                "SELECT agent, routing_key, exit_code, duration_ms FROM delegations ORDER BY id DESC LIMIT ?",
+                (limit,),
             ).fetchall()
         return [
             {
@@ -299,17 +311,25 @@ class EvolveEngine:
         result = engine.apply(suggestion_id="S000")
     """
 
-    def __init__(self, root_dir: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        root_dir: str | Path | None = None,
+        *,
+        history_limit: int = 5000,
+    ) -> None:
         if root_dir is None:
             root_dir = Path.cwd()
         self._root = Path(root_dir)
         self._log_dir = self._root / "logs"
         self._db_path = self._root / "data" / "maop.db"
         self._suggestions_file = self._root / "data" / "evolve-suggestions.json"
+        # P1-7 fix: 可配置的历史采样行数，替代 _load_observability_data_from_db
+        # 内的硬编码 5000。
+        self._history_limit = max(1, history_limit)
 
     def _load_data(self) -> list[dict[str, Any]]:
         """Load delegation history: SQLite first, JSON fallback."""
-        data = _load_observability_data_from_db(self._db_path)
+        data = _load_observability_data_from_db(self._db_path, limit=self._history_limit)
         if data:
             return data
         return _load_observability_data(self._log_dir)
@@ -421,6 +441,7 @@ class EvolveEngine:
             return
 
         # 安全写入: 时间戳 backup + FileLock + safe_write + 回读校验
+        backup = None  # P2-8 fix: 预初始化，替代 'backup' in dir() 存在性检查
         try:
             # P2-fix: datetime/timezone 已在模块级导入，删除冗余函数内导入。
             # 以下 filelock/safe_writer 为延迟导入（避免循环依赖），保留。
@@ -437,7 +458,8 @@ class EvolveEngine:
         except Exception as exc:
             logger.warning("[evolve] Failed to write agents.yaml: %s", exc)
             # 尝试恢复 backup
-            if 'backup' in dir() and backup.exists():
+            # P2-8 fix: 用 backup is not None 替代晦涩的 'backup' in dir() 检查
+            if backup is not None and backup.exists():
                 try:
                     shutil.copy2(backup, agents_yaml)
                     logger.info("[evolve] Restored agents.yaml from backup")
@@ -452,12 +474,19 @@ class EvolveEngine:
         return EvolveResult(action="status", stats=stats, suggestions=suggestions)
 
     def _save_suggestions(self, suggestions: list[Suggestion]) -> None:
+        # P1-6 fix: 复用 _apply_to_agents_yaml 的 FileLock + safe_write_text 模式，
+        # 避免并发 evolve 进程交叉写入导致 suggestions 文件损坏。
         try:
             self._suggestions_file.parent.mkdir(parents=True, exist_ok=True)
-            self._suggestions_file.write_text(
-                json.dumps([s.model_dump() for s in suggestions], ensure_ascii=False, indent=2),
-                encoding="utf-8",
+            from maop.core.reliability.filelock import FileLock
+            from maop.core.reliability.safe_writer import safe_write_text
+            content = json.dumps(
+                [s.model_dump() for s in suggestions],
+                ensure_ascii=False, indent=2,
             )
+            lock_path = str(self._suggestions_file) + ".lock"
+            with FileLock(lock_path, timeout_seconds=10):
+                safe_write_text(self._suggestions_file, content, encoding="utf-8")
         except Exception as exc:
             # P2-fix: 删除冗余函数内 import logging，改用模块级 logger
             logger.warning("[evolve] Failed to save suggestions: %s", exc)

@@ -26,6 +26,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .state import MAOP_ROOT
+# P1-1 fix: 引入统一异常处理装饰器，让所有 auth 端点经 handle_api_errors 兜底，
+# 异常（含 HTTPException）统一渲染为 ErrorSchema 响应格式。
+from maop.dashboard.error_handler import handle_api_errors
 
 router = APIRouter()
 
@@ -231,17 +234,16 @@ def _db_login_user(db_path_str: str, username: str, password: str) -> Any:
 def _db_register_user(db_path_str: str, username: str, password: str, roles: list) -> dict:
     """Sync: register a new user.
 
-    P1-9 fix: returns a plain dict with an http_status field instead of a
-    JSONResponse. The old JSONResponse return crashed the caller
-    (`result["status"]` -> TypeError: 'JSONResponse' object is not
-    subscriptable), which the blanket except turned into a misleading
-    400 "Registration failed" — hiding the real 409 duplicate-username case.
+    P3-3 fix: 失败时直接 raise HTTPException，成功时返回纯业务数据 dict，
+    不再将 ``http_status`` 字段混入返回值——避免调用方手动 pop 提取且
+    防止内部状态泄露到响应体。异常经 ``run_in_executor`` 传播回事件循环，
+    由外层 ``@handle_api_errors`` 装饰器统一渲染。
     """
 
     with sqlite_connect(db_path_str) as conn:
         existing = conn.execute("SELECT username FROM users WHERE username = ?", (username,)).fetchone()
         if existing:
-            return {"status": "error", "error": "Username already exists", "http_status": 409}
+            raise HTTPException(status_code=409, detail="Username already exists")
 
         pwd_hash = _hash_password(password)
         conn.execute(
@@ -249,7 +251,7 @@ def _db_register_user(db_path_str: str, username: str, password: str, roles: lis
             (username, pwd_hash, json.dumps(roles), time.time()),
         )
 
-    return {"status": "ok", "username": username, "roles": roles, "http_status": 200}
+    return {"status": "ok", "username": username, "roles": roles}
 
 
 def _db_list_users(db_path_str: str) -> list:
@@ -263,33 +265,38 @@ def _db_list_users(db_path_str: str) -> list:
 
 
 def _db_delete_user(db_path_str: str, username: str) -> dict:
-    """Sync: delete a user. Plain dict + http_status (P1-9, see _db_register_user)."""
+    """Sync: delete a user.
+
+    P3-3 fix: 失败时 raise HTTPException，成功时返回纯业务数据 dict，
+    不再混入 ``http_status`` 字段。
+    """
     with sqlite_connect(db_path_str) as conn:
         result = conn.execute("DELETE FROM users WHERE username = ?", (username,))
         deleted = result.rowcount > 0
 
     if not deleted:
-        return {"status": "error", "error": "User not found", "http_status": 404}
-    return {"status": "ok", "message": f"User {username} deleted", "http_status": 200}
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"status": "ok", "message": f"User {username} deleted"}
 
 
 def _db_update_user(db_path_str: str, username: str, body: dict) -> dict:
     """Sync: update user roles, enabled, or password.
 
-    Plain dict + http_status (P1-9, see _db_register_user).
+    P3-3 fix: 失败时 raise HTTPException，成功时返回纯业务数据 dict，
+    不再混入 ``http_status`` 字段。
     """
 
     with sqlite_connect(db_path_str) as conn:
         existing = conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone()
         if not existing:
-            return {"status": "error", "error": "User not found", "http_status": 404}
+            raise HTTPException(status_code=404, detail="User not found")
         if "roles" in body:
             conn.execute("UPDATE users SET roles = ? WHERE username = ?", (json.dumps(body["roles"]), username))
         if "enabled" in body:
             conn.execute("UPDATE users SET enabled = ? WHERE username = ?", (1 if body["enabled"] else 0, username))
         if "password" in body:
             if not isinstance(body["password"], str) or len(body["password"]) < 8:
-                return {"status": "error", "error": "Password must be at least 8 characters", "http_status": 400}
+                raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
             pwd_hash = _hash_password(body["password"])
             conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", (pwd_hash, username))
 
@@ -323,6 +330,7 @@ def _get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 @router.get("/api/auth/status")
+@handle_api_errors("auth status")
 async def auth_status(request: Request) -> Any:
     """Check if auth is enabled and whether user is logged in.
 
@@ -362,6 +370,7 @@ async def auth_status(request: Request) -> Any:
 
 
 @router.post("/api/auth/login")
+@handle_api_errors("auth login")
 async def auth_login(request: Request, body: LoginRequest) -> Any:
     """Login with username/password, returns JWT token."""
     # 批次3A: 用 Pydantic LoginRequest 替代 await request.json()，
@@ -490,6 +499,7 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
 
 
 @router.post("/api/auth/refresh")
+@handle_api_errors("auth refresh")
 async def auth_refresh(request: Request):
     """Refresh an existing JWT token before it expires.
 
@@ -546,6 +556,7 @@ async def auth_refresh(request: Request):
 
 
 @router.post("/api/auth/logout")
+@handle_api_errors("auth logout")
 async def auth_logout(request: Request) -> Any:
     """Logout - revoke JWT token server-side (P1 fix).
 
@@ -574,6 +585,7 @@ async def auth_logout(request: Request) -> Any:
 
 
 @router.post("/api/auth/register")
+@handle_api_errors("auth register")
 async def auth_register(request: Request, body: RegisterRequest) -> Any:
     """Register a new user (admin only)."""
     # 批次3A: 用 Pydantic RegisterRequest 替代 await request.json()，
@@ -607,16 +619,9 @@ async def auth_register(request: Request, body: RegisterRequest) -> Any:
         result = await asyncio.get_running_loop().run_in_executor(
             None, _db_register_user, str(db_path), username, password, roles
         )
-        if result["status"] == "ok":
-            logger.info("[auth] New user registered: %s (roles: %s)", username, roles)
-            # P0-7: 移除 http_status 字段，避免内部状态泄露到响应体
-            result.pop("http_status", None)
-            return result
-        # P1-9: propagate the real status (409 duplicate) instead of losing it
-        # through the blanket except below (which masked it as 400).
-        # P0-7: 提取 http_status 用于 HTTP 状态码，但从响应体中移除
-        http_status = result.pop("http_status", 400)
-        return JSONResponse(result, status_code=http_status)
+        logger.info("[auth] New user registered: %s (roles: %s)", username, roles)
+        # P3-3 fix: 辅助函数失败时已 raise HTTPException，此处仅成功路径。
+        return result
     except HTTPException:
         raise
     except Exception as exc:
@@ -629,6 +634,7 @@ async def auth_register(request: Request, body: RegisterRequest) -> Any:
 
 
 @router.get("/api/auth/users")
+@handle_api_errors("auth list users")
 async def auth_users(request: Request) -> Any:
     """List all users (admin only)."""
     try:
@@ -648,6 +654,7 @@ async def auth_users(request: Request) -> Any:
 
 
 @router.delete("/api/auth/users/{username}")
+@handle_api_errors("auth delete user")
 async def auth_delete_user(username: str, request: Request) -> Any:
     """Delete a user (admin only, cannot delete admin)."""
     try:
@@ -658,13 +665,8 @@ async def auth_delete_user(username: str, request: Request) -> Any:
         result = await asyncio.get_running_loop().run_in_executor(
             None, _db_delete_user, str(db_path), username
         )
-        if result.get("status") == "ok":
-            # P0-7: 移除 http_status 字段，避免内部状态泄露到响应体
-            result.pop("http_status", None)
-            return result
-        # P0-7: 提取 http_status 用于 HTTP 状态码，但从响应体中移除
-        http_status = result.pop("http_status", 500)
-        return JSONResponse(result, status_code=http_status)
+        # P3-3 fix: 辅助函数失败时已 raise HTTPException，此处仅成功路径。
+        return result
     except HTTPException:
         raise
     except Exception:
@@ -673,6 +675,7 @@ async def auth_delete_user(username: str, request: Request) -> Any:
 
 
 @router.put("/api/auth/users/{username}")
+@handle_api_errors("auth update user")
 async def auth_update_user(username: str, request: Request, body: UpdateUserRequest) -> Any:
     """Update user roles, enabled status, or password (admin only)."""
     # 批次3A: 用 Pydantic UpdateUserRequest 替代 await request.json()，
@@ -691,13 +694,8 @@ async def auth_update_user(username: str, request: Request, body: UpdateUserRequ
         result = await asyncio.get_running_loop().run_in_executor(
             None, _db_update_user, str(db_path), username, update_payload
         )
-        if result.get("status") == "ok":
-            # P0-7: 移除 http_status 字段，避免内部状态泄露到响应体
-            result.pop("http_status", None)
-            return result
-        # P0-7: 提取 http_status 用于 HTTP 状态码，但从响应体中移除
-        http_status = result.pop("http_status", 500)
-        return JSONResponse(result, status_code=http_status)
+        # P3-3 fix: 辅助函数失败时已 raise HTTPException，此处仅成功路径。
+        return result
     except HTTPException:
         raise
     except Exception:

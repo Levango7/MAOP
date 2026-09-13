@@ -129,6 +129,15 @@ class WorkerPool:
         # 不会阻塞事件循环。
         self._counter_lock = threading.Lock()
 
+    @property
+    def semaphore(self) -> "asyncio.Semaphore":
+        """P2-2 fix: 公共只读访问 IO 并发信号量。
+
+        原代码 loop_executor.py 通过 getattr(self._worker_pool, "_sem", None)
+        访问私有属性，违反封装。暴露公共 property 供外部获取信号量。
+        """
+        return self._sem
+
     # ── Lifecycle ─────────────────────────────────────────────
 
     async def start(self) -> None:

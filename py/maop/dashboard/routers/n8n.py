@@ -16,7 +16,7 @@ import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
@@ -36,6 +36,31 @@ class TriggerWorkflowRequest(BaseModel):
     """POST /api/n8n/workflows/{id}/trigger 请求体。"""
     data: dict[str, Any] = {}
     wait: bool = False
+
+
+class N8nWebhookPayload(BaseModel):
+    """POST /api/n8n/webhook 请求体。
+
+    n8n webhook 载荷格式高度灵活——具体字段由工作流节点配置决定，
+    不同工作流可能发送完全不同的 JSON 结构。此处仅声明 n8n 官方文档
+    中常见的元数据字段作为已知字段，其余字段通过 ``extra="allow"``
+    全部保留在 model 中，避免对未知字段返回 422 而拒绝合法 webhook。
+
+    已知字段（n8n 常见 webhook 元数据）：
+      * executionId   — 触发该 webhook 的执行 ID
+      * workflowId    — 工作流 ID
+      * workflowName  — 工作流名称
+      * node          — 触发节点名称
+      * event         — 事件类型
+    """
+    model_config = ConfigDict(extra="allow")
+
+    executionId: str | None = None
+    workflowId: str | None = None
+    workflowName: str | None = None
+    node: str | None = None
+    event: str | None = None
+    data: Any = None
 
 
 # Module-level singleton cache for N8nClient — avoids re-creating the client
@@ -82,14 +107,19 @@ async def receive_webhook(request: Request) -> dict[str, Any]:
     raw_body = await request.body()
     signature = request.headers.get("X-N8N-Signature") or request.headers.get("X-MAOP-Signature")
 
+    # P2-1 fix: 用 Pydantic N8nWebhookPayload 替代裸 await request.json()，
+    # 由 Pydantic 校验 JSON 结构（未知字段通过 extra="allow" 保留）。
+    # 此处不能将 model 声明为函数参数——签名校验需要先读取 raw_body，
+    # 而 FastAPI 解析 body 参数会消费 request stream。因此手动从已缓存
+    # 的 raw_body 解析，既保留签名校验又获得 Pydantic 校验。
     try:
-        payload = await request.json()
+        payload = N8nWebhookPayload.model_validate_json(raw_body)
     except Exception as exc:
         # 批次3A: 脱敏——JSON 解析错误细节不暴露给客户端，仅日志记录。
         logger.warning("[n8n] Invalid JSON in webhook: %s", exc)
         raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
 
-    return handle_n8n_webhook(payload, raw_body=raw_body, signature=signature)
+    return handle_n8n_webhook(payload.model_dump(), raw_body=raw_body, signature=signature)
 
 
 @router.get("/workflows")

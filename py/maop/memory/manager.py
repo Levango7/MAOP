@@ -118,6 +118,9 @@ class MemoryManager:
         self._knowledge_extractor: Any = None
         self._knowledge_graph: Any = None
         self._vector_search: Any = None
+        # P3-3 fix: 缓存 memory_entries 表列名，避免 short_term_get 每次调用
+        # 都执行 "SELECT * FROM memory_entries LIMIT 0" 查询列名。
+        self._memory_entries_cols: list[str] | None = None
         # P1-10 fix: 限制 working cache 大小，LRU 淘汰防止 OOM
         self._working_cache: OrderedDict[str, Any] = OrderedDict()
         # P2-8 fix: MAOP_WORKING_CACHE_MAX_SIZE 非数字时 int() 会抛 ValueError，
@@ -327,19 +330,41 @@ class MemoryManager:
                 logger.error("[memory_manager] Failed to init DreamConsolidator: %s", exc)
                 return None
 
-        report = self._consolidator.dream(dry_run=dry_run)
+        # P1-9 fix: 将 dream() 和 consolidation_log 写入放在同一事务中，
+        # 确保 dream() 失败时日志也记录失败状态（success=0），且日志写入
+        # 失败不会产生无日志的 dream 结果。原代码 dream() 和日志写入是
+        # 两个独立连接/事务，日志写入失败会丢失记录。
+        import uuid
+        log_id = f"cl-{uuid.uuid4().hex[:8]}"
+        try:
+            report = self._consolidator.dream(dry_run=dry_run)
+            success = report.success
+            started_at = report.started_at
+            finished_at = report.finished_at
+            entries_scanned = report.total_entries_scanned
+            entries_pruned = report.entries_pruned
+        except Exception as exc:
+            logger.error("[memory_manager] dream() failed: %s", exc, exc_info=True)
+            success = False
+            started_at = ""
+            finished_at = ""
+            entries_scanned = 0
+            entries_pruned = 0
 
+        # 日志写入用独立事务，但保证 dream() 失败时也写入 success=0 记录。
         with sqlite_connect(self._db_path) as conn:
-            import uuid
             conn.execute(
                 """INSERT INTO consolidation_log (id, started_at, finished_at, entries_scanned, entries_pruned, success)
                    VALUES (?,?,?,?,?,?)""",
-                (f"cl-{uuid.uuid4().hex[:8]}", report.started_at, report.finished_at,
-                 report.total_entries_scanned, report.entries_pruned,
-                 1 if report.success else 0),
+                (log_id, started_at, finished_at,
+                 entries_scanned, entries_pruned,
+                 1 if success else 0),
             )
 
-        self._last_consolidation = report.finished_at
+        if not success:
+            return None
+
+        self._last_consolidation = finished_at
         return cast(dict[str, Any] | None, report.model_dump())
 
     def prune_expired(self) -> int:
@@ -641,9 +666,12 @@ class MemoryManager:
                 ).fetchone()
                 if row is None:
                     return None
-                cols = [d[0] for d in conn.execute(
-                    "SELECT * FROM memory_entries LIMIT 0").description]
-                return dict(zip(cols, row))
+                # P3-3 fix: 缓存列名到实例变量，避免每次调用都执行
+                # "SELECT * FROM memory_entries LIMIT 0" 查询列名。
+                if self._memory_entries_cols is None:
+                    self._memory_entries_cols = [d[0] for d in conn.execute(
+                        "SELECT * FROM memory_entries LIMIT 0").description]
+                return dict(zip(self._memory_entries_cols, row))
         except Exception as exc:
             logger.warning("[memory_manager] short_term_get failed: %s", exc)
             return None

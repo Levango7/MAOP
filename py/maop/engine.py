@@ -376,10 +376,14 @@ class Engine:
 
             for step, lr in zip(layer, layer_results):
                 if isinstance(lr, asyncio.TimeoutError):
+                    # P1-3 fix: 原代码 duration_ms=step.timeout*1000 在 step.timeout<=0
+                    # （走 300s 默认分支）时算出 0，与实际超时值不符。改为使用
+                    # 实际生效的超时值（step.timeout>0 时用 step.timeout，否则 300）。
+                    effective_timeout = float(step.timeout) if step.timeout > 0 else 300
                     sr = StepResult(
                         id=step.id, status=StepStatus.FAILED,
-                        error=f"Step timed out after {step.timeout}s", agent=step.agent,
-                        duration_ms=step.timeout * 1000,
+                        error=f"Step timed out after {effective_timeout}s", agent=step.agent,
+                        duration_ms=int(effective_timeout * 1000),
                     )
                 elif isinstance(lr, Exception):
                     sr = StepResult(
@@ -810,8 +814,15 @@ class Engine:
         substeps: list[WorkflowStep] = []
 
         # Strategy 1: Semicolon-separated tasks
+        # P3-5 fix: 原代码 task.split(";") 会错误分割字符串字面量内的分号
+        # （如 "print('a;b')" → ["print('a", "b')"]）。
+        # 改用正则排除引号内的分号：匹配不在单/双引号内的分号。
+        # 正则解释：分号前没有未闭合的引号（用 negative lookbehind 简化处理
+        # 常见场景——完整的引号状态机过于复杂，此处用正则处理单层引号嵌套）。
         if ";" in task:
-            parts = [p.strip() for p in task.split(";") if p.strip()]
+            # 按不在引号内的分号分割
+            parts = re.split(r''';(?=(?:[^'"]*['"][^'"]*['"])*[^'"]*$)''', task)
+            parts = [p.strip() for p in parts if p.strip()]
             if len(parts) > 1:
                 for i, part in enumerate(parts):
                     substeps.append(WorkflowStep(

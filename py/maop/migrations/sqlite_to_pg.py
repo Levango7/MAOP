@@ -306,19 +306,45 @@ def _count_rows(engine: Engine, table: str) -> int:
 def _iter_batches(
     engine: Engine, table: str, columns: Sequence[str], batch_size: int
 ) -> Iterable[list[dict[str, Any]]]:
-    """Yield batches of transformed rows from the SQLite table."""
+    """Yield batches of transformed rows from the SQLite table.
+
+    P2-6 fix: 原 OFFSET 深分页在每批后越来越慢（OFFSET N 需扫描 N 行）。
+    改用 keyset pagination：以 ``id`` 列为游标（若存在），每批 WHERE id > last_id
+    ORDER BY id LIMIT batch_size，复杂度恒定。若表无 ``id`` 列，回退到 OFFSET。
+    """
     col_list = ", ".join(f'"{c}"' for c in columns)
+    has_id = "id" in columns
     with engine.connect() as conn:
-        offset = 0
-        while True:
-            rows = conn.execute(
-                text(f'SELECT {col_list} FROM "{table}" LIMIT :lim OFFSET :off'),
-                {"lim": batch_size, "off": offset},
-            ).fetchall()
-            if not rows:
-                return
-            yield [_transform_row(table, columns, row) for row in rows]
-            offset += batch_size
+        if has_id:
+            # Keyset pagination: 以 id 为游标，恒定复杂度。
+            last_id: Any = None
+            while True:
+                if last_id is None:
+                    rows = conn.execute(
+                        text(f'SELECT {col_list} FROM "{table}" ORDER BY "id" LIMIT :lim'),
+                        {"lim": batch_size},
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        text(f'SELECT {col_list} FROM "{table}" WHERE "id" > :last ORDER BY "id" LIMIT :lim'),
+                        {"last": last_id, "lim": batch_size},
+                    ).fetchall()
+                if not rows:
+                    return
+                yield [_transform_row(table, columns, row) for row in rows]
+                last_id = rows[-1]["id"]
+        else:
+            # 回退：无 id 列的表用 OFFSET 分页（保持原行为）。
+            offset = 0
+            while True:
+                rows = conn.execute(
+                    text(f'SELECT {col_list} FROM "{table}" LIMIT :lim OFFSET :off'),
+                    {"lim": batch_size, "off": offset},
+                ).fetchall()
+                if not rows:
+                    return
+                yield [_transform_row(table, columns, row) for row in rows]
+                offset += batch_size
 
 
 def _insert_batch(
@@ -454,6 +480,7 @@ def migrate(
     batch_size: int = 1000,
     dry_run: bool = False,
     progress: bool = True,
+    rollback_on_failure: bool = False,
 ) -> dict[str, int]:
     """Run the SQLite → PG data migration.
 
@@ -472,6 +499,9 @@ def migrate(
         INSERT anything.
     progress : bool
         Print per-table progress to stdout.
+    rollback_on_failure : bool
+        P1-8 fix: 若为 True，当任一表复制失败（results[t] < 0）时，
+        回滚已成功复制的表（TRUNCATE），避免 PG 侧残留半成品数据。
 
     Returns
     -------
@@ -512,7 +542,37 @@ def migrate(
         except Exception as exc:
             logger.error("Embedding backfill failed: %s", exc)
 
+    # P1-8 fix: 回滚机制 — 若启用且存在失败表，TRUNCATE 已成功复制的表。
+    if rollback_on_failure and not dry_run:
+        failed = [t for t, n in results.items() if n < 0]
+        if failed:
+            logger.warning(
+                "rollback_on_failure=True, %d failed tables (%s) — rolling back successful copies",
+                len(failed), failed,
+            )
+            try:
+                _rollback_pg_migration(pg_engine, results)
+            except Exception as exc:
+                logger.error("PG rollback failed: %s", exc)
+
     return results
+
+
+def _rollback_pg_migration(pg_engine: Engine, results: dict[str, int]) -> None:
+    """P1-8 fix: 回滚已成功复制到 PG 的表（TRUNCATE）。
+
+    仅 TRUNCATE rows>0 的表（成功复制过的），跳过失败和空表。
+    按外键依赖逆序 TRUNCATE 以避免约束冲突。
+    """
+    successful = [t for t, n in results.items() if n > 0]
+    # 逆序 TRUNCATE（依赖顺序的反向）。
+    with pg_engine.begin() as conn:
+        for table in reversed(successful):
+            try:
+                conn.execute(text(f'TRUNCATE TABLE "{table}" RESTART IDENTITY CASCADE'))
+                logger.info("PG rollback: truncated %s", table)
+            except Exception as exc:
+                logger.error("PG rollback: failed to truncate %s: %s", table, exc)
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -550,6 +610,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Suppress per-table progress output",
     )
     parser.add_argument(
+        "--rollback", action="store_true",
+        help="Roll back (TRUNCATE) successfully copied PG tables if any table fails",
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         help="Logging level (default: INFO)",
     )
@@ -575,6 +639,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         batch_size=args.batch_size,
         dry_run=args.dry_run,
         progress=not args.quiet,
+        rollback_on_failure=args.rollback,
     )
     failed = [t for t, n in results.items() if n < 0]
     if failed:

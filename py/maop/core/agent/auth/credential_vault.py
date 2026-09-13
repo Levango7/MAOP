@@ -115,6 +115,16 @@ class _CryptoEngine:
             from cryptography.fernet import Fernet  # type: ignore[import-untyped]
         except ImportError:
             self.degraded = True
+            # P2-4 fix: 生产环境拒绝降级模式启动。降级模式仅做 base64+hash 混淆，
+            # 不具备真正机密性——任何能读取数据库文件的人都能解密所有凭证。
+            # 在 MAOP_ENV=production 下必须安装 cryptography；开发/测试环境
+            # 允许降级并记录警告。
+            if os.environ.get("MAOP_ENV", "").strip().lower() == "production":
+                raise RuntimeError(
+                    "SECURITY: cryptography 包不可用，CredentialVault 降级为 base64 混淆模式"
+                    "不具备真正机密性，禁止在生产环境 (MAOP_ENV=production) 启动。"
+                    "请安装 cryptography: pip install cryptography"
+                )
             logger.warning(
                 "cryptography 不可用，CredentialVault 降级为 base64 混淆模式——"
                 "不具备真正机密性，生产环境请安装 cryptography。"

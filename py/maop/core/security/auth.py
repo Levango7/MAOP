@@ -425,7 +425,10 @@ class JWTHandler:
                 expires_at=payload.get("exp", 0),
             )
         except Exception as e:
-            return AuthResult(authenticated=False, error=str(e))
+            # P2-1 fix: 异常详情不返回给调用方（可能泄露 token 内部结构、
+            # 密钥信息或堆栈细节），仅在日志中记录完整异常供排查。
+            logger.debug("JWT validation error: %s", e, exc_info=True)
+            return AuthResult(authenticated=False, error="Token validation error")
 
 
 # ── JWT Secret Loading ──────────────────────────────────────────

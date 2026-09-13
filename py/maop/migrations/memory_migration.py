@@ -119,6 +119,8 @@ class MigrationReport(BaseModel):
     finished_at: str = ""
     duration_s: float = 0.0
     tables: list[TableMigrationResult] = Field(default_factory=list)
+    # P1-8 fix: 标记是否已执行回滚。
+    rolled_back: bool = False
 
     @property
     def total_candidates(self) -> int:
@@ -260,74 +262,77 @@ def _migrate_table(
 
             src_cols = _table_columns(src, table)
 
-            # 读取所有行（小表足够；大表可改用分页）
-            cursor = src.execute(f"SELECT * FROM {table}")
-            rows = cursor.fetchall()
+            if dry_run:
+                # dry-run 只报告 candidates，不写入
+                result.migrated = 0
+                result.skipped = total
+                progress(table, total, total)
+                result.duration_s = time.time() - start
+                return result
+
+            # P2-7 fix: 原 fetchall() 对大表一次性加载全部行到内存导致 OOM。
+            # 改用 fetchmany(batch_size) 分批读取 + 逐批写入，流式处理。
+            _ensure_target_schema(dst_path)
+            with sqlite_connect(dst_path, foreign_keys=False) as dst:
+                if not _table_exists(dst, table):
+                    result.errors = 1
+                    result.error_messages.append(f"target table {table} not exists")
+                    result.duration_s = time.time() - start
+                    return result
+                dst_cols = _table_columns(dst, table)
+                common_cols = [c for c in src_cols if c in dst_cols]
+                if not common_cols:
+                    result.errors = 1
+                    result.error_messages.append("no common columns between source and target")
+                    result.duration_s = time.time() - start
+                    return result
+
+                placeholders = ",".join("?" * len(common_cols))
+                cols_csv = ",".join(common_cols)
+                sql = (
+                    f"INSERT OR IGNORE INTO {table} ({cols_csv}) "
+                    f"VALUES ({placeholders})"
+                )
+
+                migrated = 0
+                skipped = 0
+                errors = 0
+                error_msgs: list[str] = []
+                done = 0
+                FETCH_BATCH = 5000
+                cursor = src.execute(f"SELECT * FROM {table}")
+                while True:
+                    batch = cursor.fetchmany(FETCH_BATCH)
+                    if not batch:
+                        break
+                    for row in batch:
+                        try:
+                            values = [row[c] for c in common_cols]
+                            before = dst.total_changes
+                            dst.execute(sql, values)
+                            after = dst.total_changes
+                            if after > before:
+                                migrated += 1
+                            else:
+                                skipped += 1
+                        except sqlite3.Error as exc:
+                            errors += 1
+                            if len(error_msgs) < 10:
+                                error_msgs.append(str(exc))
+                        done += 1
+                        if done % 500 == 0 or done == total:
+                            progress(table, done, total)
+                dst.commit()
+
+                result.migrated = migrated
+                result.skipped = skipped
+                result.errors = errors
+                result.error_messages.extend(error_msgs)
     except sqlite3.Error as exc:
         result.errors = 1
         result.error_messages.append(f"read source failed: {exc}")
         result.duration_s = time.time() - start
         return result
-
-    if dry_run:
-        # dry-run 只报告 candidates，不写入
-        result.migrated = 0
-        result.skipped = total
-        progress(table, total, total)
-        result.duration_s = time.time() - start
-        return result
-
-    # 写入目标
-    try:
-        _ensure_target_schema(dst_path)
-        with sqlite_connect(dst_path, foreign_keys=False) as dst:
-            # 取目标表实际列
-            if not _table_exists(dst, table):
-                result.errors = 1
-                result.error_messages.append(f"target table {table} not exists")
-                result.duration_s = time.time() - start
-                return result
-            dst_cols = _table_columns(dst, table)
-            common_cols = [c for c in src_cols if c in dst_cols]
-            if not common_cols:
-                result.errors = 1
-                result.error_messages.append("no common columns between source and target")
-                result.duration_s = time.time() - start
-                return result
-
-            placeholders = ",".join("?" * len(common_cols))
-            cols_csv = ",".join(common_cols)
-            sql = (
-                f"INSERT OR IGNORE INTO {table} ({cols_csv}) "
-                f"VALUES ({placeholders})"
-            )
-
-            migrated = 0
-            skipped = 0
-            errors = 0
-            error_msgs: list[str] = []
-            for i, row in enumerate(rows):
-                try:
-                    values = [row[c] for c in common_cols]
-                    before = dst.total_changes
-                    dst.execute(sql, values)
-                    after = dst.total_changes
-                    if after > before:
-                        migrated += 1
-                    else:
-                        skipped += 1
-                except sqlite3.Error as exc:
-                    errors += 1
-                    if len(error_msgs) < 10:
-                        error_msgs.append(str(exc))
-
-                if (i + 1) % batch_size == 0 or (i + 1) == len(rows):
-                    progress(table, i + 1, len(rows))
-
-            result.migrated = migrated
-            result.skipped = skipped
-            result.errors = errors
-            result.error_messages.extend(error_msgs)
     except Exception as exc:
         result.errors += 1
         result.error_messages.append(f"write target failed: {exc}")
@@ -521,6 +526,7 @@ def migrate_all(
     *,
     dry_run: bool = False,
     progress: bool | ProgressCallback = False,
+    rollback_on_failure: bool = False,
 ) -> MigrationReport:
     """一键执行全部 legacy → Unified 迁移。
 
@@ -533,6 +539,10 @@ def migrate_all(
     progress : bool | ProgressCallback
         若为 True，使用默认 stdout 进度回调；若为 callable，使用该回调；
         若为 False，不输出进度。
+    rollback_on_failure : bool
+        P1-8 fix: 若为 True，当任一阶段迁移出现 errors>0 时，回滚该阶段
+        已写入目标表的数据（DELETE 已迁移行），避免半成品状态残留。
+        默认 False 保持向后兼容。
 
     Returns
     -------
@@ -565,25 +575,86 @@ def migrate_all(
 
     # 1. legacy memory.db → maop.db
     logger.info("[memory_migration] phase 1: legacy memory.db")
-    report.tables.extend(migrate_legacy_memory_db(
+    phase1_results = migrate_legacy_memory_db(
         root_dir, dry_run=dry_run, progress=cb,
-    ))
+    )
+    report.tables.extend(phase1_results)
 
     # 2. legacy episodic.db → maop.db
     logger.info("[memory_migration] phase 2: legacy episodic.db")
-    report.tables.append(migrate_legacy_episodic_db(
+    phase2_result = migrate_legacy_episodic_db(
         root_dir, dry_run=dry_run, progress=cb,
-    ))
+    )
+    report.tables.append(phase2_result)
 
     # 3. legacy JSON files → maop.db
     logger.info("[memory_migration] phase 3: legacy JSON files")
-    report.tables.extend(migrate_legacy_json_files(
+    phase3_results = migrate_legacy_json_files(
         root_dir, dry_run=dry_run, progress=cb,
-    ))
+    )
+    report.tables.extend(phase3_results)
+
+    # P1-8 fix: 回滚机制 — 若启用且存在失败，清理已写入的行。
+    if rollback_on_failure and not dry_run and report.total_errors > 0:
+        logger.warning(
+            "[memory_migration] rollback_on_failure=True, %d errors detected — rolling back",
+            report.total_errors,
+        )
+        try:
+            _rollback_migration(root_dir, report)
+            report.rolled_back = True
+        except Exception as exc:
+            logger.error("[memory_migration] rollback failed: %s", exc)
+            report.rolled_back = False
 
     report.finished_at = datetime.now(timezone.utc).isoformat()
     report.duration_s = time.time() - start
     return report
+
+
+def _rollback_migration(root_dir: str | Path, report: MigrationReport) -> None:
+    """P1-8 fix: 回滚已迁移的数据。
+
+    策略：对每个有 errors>0 的表，从目标 maop.db 中 DELETE 该表在本次
+    迁移时间窗口内写入的行。由于迁移使用 INSERT OR IGNORE 且源数据保留，
+    回滚后可安全重跑。
+    """
+    root = Path(root_dir)
+    dst_path = get_memory_db_path()
+    if not dst_path.exists():
+        return
+    with sqlite_connect(dst_path, foreign_keys=False) as dst:
+        for tr in report.tables:
+            if tr.errors == 0 or tr.migrated == 0:
+                continue
+            if not _table_exists(dst, tr.table):
+                continue
+            # 删除目标表中所有行（迁移是追加语义，回滚即清空该表本次写入）。
+            # 注意：这假设目标表在迁移前为空或仅含本次迁移数据；
+            # 若目标表已有历史数据，应使用时间戳过滤。此处采用保守策略：
+            # 仅删除 started_at 之后写入的行（若有 timestamp 列）。
+            try:
+                cols = _table_columns(dst, tr.table)
+                if "timestamp" in cols and tr.started_at:
+                    cur = dst.execute(
+                        f"DELETE FROM {tr.table} WHERE timestamp >= ?",
+                        (tr.started_at,),
+                    )
+                    logger.info(
+                        "[memory_migration] rollback %s: deleted %d rows (timestamp >= %s)",
+                        tr.table, cur.rowcount, tr.started_at,
+                    )
+                else:
+                    # 无 timestamp 列：跳过删除，仅记录警告（避免误删历史数据）。
+                    logger.warning(
+                        "[memory_migration] rollback %s skipped: no timestamp column to scope deletion",
+                        tr.table,
+                    )
+            except sqlite3.Error as exc:
+                logger.error(
+                    "[memory_migration] rollback %s failed: %s", tr.table, exc,
+                )
+        dst.commit()
 
 
 # ── CLI ────────────────────────────────────────────────────────
@@ -606,6 +677,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Show progress on stdout",
     )
     parser.add_argument(
+        "--rollback", action="store_true",
+        help="Roll back (delete) migrated rows if any phase has errors",
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true",
         help="Enable verbose logging",
     )
@@ -623,6 +698,7 @@ def main(argv: list[str] | None = None) -> int:
         root_dir=args.root,
         dry_run=args.dry_run,
         progress=args.progress,
+        rollback_on_failure=args.rollback,
     )
     print(report.summary())
     return 0 if report.total_errors == 0 else 1

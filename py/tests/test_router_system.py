@@ -276,8 +276,9 @@ class TestAgentConfig:
             return await call_next(request)
         app.include_router(router)
         data = TestClient(app).get("/api/agent/config").json()
-        assert data["agents"] == []
+        # @handle_api_errors 装饰器现在返回 ErrorSchema 格式
         assert "error" in data
+        assert data.get("status") == "error"
 
 
 # ── /api/agent/upgrade GET ──────────────────────────────────────────

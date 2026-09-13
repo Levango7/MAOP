@@ -278,7 +278,10 @@ async def maop_execute(
                 trace_id=trace_id, routing_key=routing_key,
             )
     except Exception as exc:
-        logger.debug("[execute] Personal cost guard check failed (fail-open): %s", exc)
+        # P2-1 fix: 成本护栏检查自身异常时 fail-open 不阻断主流程，但原 logger.debug
+        # 级别在生产日志中几乎不可见，导致护栏静默失效无法察觉。提升为 logger.warning
+        # 以便运维能从常规日志发现成本护栏检查异常（仍保持 fail-open 语义）。
+        logger.warning("[execute] Personal cost guard check failed (fail-open): %s", exc)
 
     # P0 fix: permission check + pre_dispatch hook must run BEFORE both
     # the react_mode branch and the normal dispatch branch, otherwise
@@ -354,8 +357,8 @@ async def maop_execute(
                 trace_id=trace_id, routing_key=routing_key,
             )
     except Exception as exc:
-        import logging
-        logging.getLogger(__name__).error("[execute] Guardrail pre-check failed (fail-closed): %s", exc)
+        # P3-1 fix: 删除函数内重复 import logging，直接用模块级 logger
+        logger.error("[execute] Guardrail pre-check failed (fail-closed): %s", exc)
         return new_result(
             agent=agent, task=task,
             exit_code=126,
@@ -376,21 +379,25 @@ async def maop_execute(
         registry = get_stream_registry()
         registry.register(trace_id, streamer)
 
-        dispatch_result = await dispatcher.dispatch(
-            agent=agent, task=task,
-            routing_key=routing_key, workdir=workdir,
-            timeout_seconds=timeout_seconds, trace_id=trace_id,
-            streamer=streamer,
-        )
-        result = dispatch_result.result
-        result.trace_id = trace_id
-        registry.unregister(trace_id)
-        # P1-13: emit done event with final content length / token count.
-        _emit_agent_event(trace_id, "done", {
-            "content_length": len(result.stdout or ""),
-            "tokens": len(result.stdout or "") // 4,
-            "exit_code": result.exit_code,
-        })
+        try:
+            dispatch_result = await dispatcher.dispatch(
+                agent=agent, task=task,
+                routing_key=routing_key, workdir=workdir,
+                timeout_seconds=timeout_seconds, trace_id=trace_id,
+                streamer=streamer,
+            )
+            result = dispatch_result.result
+            result.trace_id = trace_id
+            # P1-13: emit done event with final content length / token count.
+            _emit_agent_event(trace_id, "done", {
+                "content_length": len(result.stdout or ""),
+                "tokens": len(result.stdout or "") // 4,
+                "exit_code": result.exit_code,
+            })
+        finally:
+            # P1-4 fix: 将 unregister 移入 finally 块，确保 dispatch 抛异常时
+            # streamer 不会从 registry 泄漏（原代码仅在成功路径调用 unregister）。
+            registry.unregister(trace_id)
     except Exception as exc:
         result = new_result(
             agent=agent, task=task,
@@ -427,8 +434,8 @@ async def maop_execute(
                     trace_id=trace_id, routing_key=routing_key,
                 )
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).error("[execute] Post-guardrail check failed (fail-closed): %s", exc)
+            # P3-1 fix: 删除函数内重复 import logging，直接用模块级 logger
+            logger.error("[execute] Post-guardrail check failed (fail-closed): %s", exc)
             result = new_result(
                 agent=agent, task=task,
                 exit_code=127,

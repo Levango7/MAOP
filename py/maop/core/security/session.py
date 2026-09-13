@@ -24,6 +24,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Any, cast
 
@@ -34,7 +35,13 @@ from maop.core.backends.db_utils import get_db_path, sqlite_connect, validate_id
 logger = logging.getLogger(__name__)
 
 
-class SessionStatus(str):
+class SessionStatus(str, Enum):
+    """会话状态枚举。
+
+    P3-1 fix: 继承 ``(str, Enum)`` 而非仅 ``str``，使成员成为真正的枚举
+    常量（不可变、可迭代、有 ``.value``/``.name``），同时保持与字符串的
+    兼容（``SessionStatus.ACTIVE == "active"`` 为 True）。
+    """
     ACTIVE = "active"
     PAUSED = "paused"
     COMPLETED = "completed"

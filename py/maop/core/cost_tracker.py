@@ -15,8 +15,10 @@ Integration points:
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import sqlite3
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -187,7 +189,7 @@ class CostTracker:
             created_at=datetime.now(timezone.utc).isoformat(),
         )
 
-        import json
+
         with sqlite_connect(self._db_path) as conn:
             conn.execute(
                 """INSERT INTO cost_entries
@@ -505,7 +507,7 @@ class CostTracker:
 
     @staticmethod
     def _row_to_entry(row: sqlite3.Row) -> CostEntry:
-        import json
+
         metadata: dict[str, Any] = {}
         with contextlib.suppress(json.JSONDecodeError, TypeError):
             metadata = json.loads(row["metadata"]) if row["metadata"] else {}
@@ -520,6 +522,9 @@ class CostTracker:
 # ── Singleton accessor ───────────────────────────────────────
 
 _cost_tracker_instance: CostTracker | None = None
+# P1-1 fix: 保护单例创建的锁，避免多线程并发时创建多个实例。
+# 参考 settings.py:get_settings() 的双检锁实现。
+_cost_tracker_lock = threading.Lock()
 
 
 def get_cost_tracker() -> CostTracker:
@@ -531,22 +536,28 @@ def get_cost_tracker() -> CostTracker:
     预算限额与告警阈值从 ``MAOPSettings`` 读取（env: ``MAOP_BUDGET_*``），
     使成本告警无需改代码即可配置；运行时可通过 :meth:`CostTracker.set_budget`
     （Dashboard ``PUT /api/cost/budget``）覆盖。
+
+    P1-1 fix: 使用 threading.Lock + 双检锁保护单例创建，
+    避免多线程并发调用时创建多个 CostTracker 实例。
     """
     global _cost_tracker_instance
     if _cost_tracker_instance is None:
-        daily = monthly = 0.0
-        threshold = 0.8
-        try:
-            from maop.config.settings import get_settings
-            settings = get_settings()
-            daily = settings.budget_daily_limit_usd
-            monthly = settings.budget_monthly_limit_usd
-            threshold = settings.budget_alert_threshold
-        except Exception as exc:  # pragma: no cover - settings 加载失败时回退默认
-            logger.warning("[cost] Failed to load budget settings, using defaults: %s", exc)
-        _cost_tracker_instance = CostTracker(
-            daily_limit_usd=daily,
-            monthly_limit_usd=monthly,
-            alert_threshold=threshold,
-        )
+        with _cost_tracker_lock:
+            # 双检锁：持锁后再次检查，防止等待期间已被其他线程初始化
+            if _cost_tracker_instance is None:
+                daily = monthly = 0.0
+                threshold = 0.8
+                try:
+                    from maop.config.settings import get_settings
+                    settings = get_settings()
+                    daily = settings.budget_daily_limit_usd
+                    monthly = settings.budget_monthly_limit_usd
+                    threshold = settings.budget_alert_threshold
+                except Exception as exc:  # pragma: no cover - settings 加载失败时回退默认
+                    logger.warning("[cost] Failed to load budget settings, using defaults: %s", exc)
+                _cost_tracker_instance = CostTracker(
+                    daily_limit_usd=daily,
+                    monthly_limit_usd=monthly,
+                    alert_threshold=threshold,
+                )
     return _cost_tracker_instance

@@ -86,7 +86,7 @@ class Dispatcher:
 
     def __init__(
         self,
-        MAOP_config: Any | None = None,
+        maop_config: Any | None = None,
         breaker: CircuitBreaker | None = None,
         model_selector: Any | None = None,
         root_dir: str | None = None,
@@ -94,8 +94,12 @@ class Dispatcher:
         registry: Any | None = None,
         capability_matcher: Any | None = None,
         priority_queue: Any | None = None,
+        # P3-4 fix: 保留 MAOP_config 作为向后兼容的别名（PEP8 违规参数名）。
+        MAOP_config: Any | None = None,
     ) -> None:
-        self._config = MAOP_config
+        # P3-4 fix: 优先使用 PEP8 合规的 maop_config，回退到旧 MAOP_config 别名。
+        config = maop_config if maop_config is not None else MAOP_config
+        self._config = config
         self._breaker = breaker or CircuitBreaker()
         self._model_selector = model_selector
         self._effective_model: Any | None = None
@@ -105,7 +109,7 @@ class Dispatcher:
         self._matcher = capability_matcher
         # Delegated subsystems (N2 refactor)
         self._resolver = AgentResolver(
-            MAOP_config, root_dir,
+            config, root_dir,
             registry=registry, capability_matcher=capability_matcher,
         )
         self._sla = SLAMonitor()

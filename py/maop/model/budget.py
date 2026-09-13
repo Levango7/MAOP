@@ -35,14 +35,9 @@ from maop.model.schema import BudgetConfig
 
 logger = logging.getLogger(__name__)
 
-# Emit a DeprecationWarning at import time so callers know to migrate.
-warnings.warn(
-    "maop.model.budget is deprecated since P2-1; use maop.core.cost_tracker.CostTracker "
-    "or maop.core.budget_guard.BudgetGuard instead. The JSON budget_ledger.json path "
-    "has been removed; this module now only provides an in-memory BudgetGuard shim.",
-    DeprecationWarning,
-    stacklevel=2,
-)
+# P2-10 fix: 原在模块导入时发 DeprecationWarning，会污染所有导入链（包括
+# 仅为 re-export CostTracker 而导入的本模块的调用方），且在 pytest 中产生
+# 噪音。将警告移至 BudgetGuard.__init__，仅在真正实例化废弃类时才警告。
 
 
 class BudgetGuard:
@@ -65,6 +60,16 @@ class BudgetGuard:
 
     def __init__(self, root_dir: Path | str | None = None,
                  config: BudgetConfig | None = None) -> None:
+        # P2-10 fix: 模块级废弃警告从 import 时移至此处，仅在实例化 BudgetGuard 时触发。
+        warnings.warn(
+            "maop.model.budget is deprecated since P2-1; use "
+            "maop.core.cost_tracker.CostTracker or "
+            "maop.core.budget_guard.BudgetGuard instead. The JSON budget_ledger.json "
+            "path has been removed; this module now only provides an in-memory "
+            "BudgetGuard shim.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         warnings.warn(
             "maop.model.budget.BudgetGuard is deprecated; use "
             "maop.core.cost_tracker.CostTracker or "
@@ -76,6 +81,23 @@ class BudgetGuard:
         self._config = config or BudgetConfig()
         self._daily_spend: float = 0.0
         self._monthly_spend: float = 0.0
+        # P2-5 fix: 原内存累加器重启归零，导致重启后 can_spend 总是放行直到
+        # 累计超限，与 CostTracker（SQLite 持久化）的当日已花费脱节。
+        # 从 CostTracker 加载当日/当月已花费作为初始值，使内存护栏与持久化状态一致。
+        try:
+            from maop.core.cost_tracker import CostTracker
+            from datetime import datetime, timezone
+            tracker = CostTracker(root_dir=self._root)
+            now = datetime.now(timezone.utc)
+            today_start = now.strftime("%Y-%m-%d")
+            month_start = now.strftime("%Y-%m-01")
+            today_end = (now.replace(hour=23, minute=59, second=59)).isoformat()
+            daily_summary = tracker.summary(start_date=today_start, end_date=today_end)
+            self._daily_spend = float(daily_summary.total_cost_usd)
+            monthly_summary = tracker.summary(start_date=month_start, end_date=today_end)
+            self._monthly_spend = float(monthly_summary.total_cost_usd)
+        except Exception as exc:
+            logger.debug("[model/budget] Failed to load initial spend from CostTracker: %s", exc)
         self._ledger: list[dict] = []  # in-memory cost records (no longer persisted to JSON)
         self._alerted: bool = False
         self._registry: Any = None  # cached ModelRegistry

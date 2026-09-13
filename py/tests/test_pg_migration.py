@@ -307,6 +307,13 @@ def test_json_columns_covers_known_json_tables() -> None:
 def _make_fake_engine(table_columns: dict[str, list[str]], table_rows: dict[str, list[tuple]] | None = None) -> mock.MagicMock:
     """Build a fake SQLAlchemy engine with introspection + execution stubs."""
     table_rows = table_rows or {}
+
+    def _row_id(row: tuple, columns: list[str]) -> Any:
+        """Extract the 'id' value from a row tuple given column names."""
+        if "id" in columns:
+            return row[columns.index("id")]
+        return 0
+
     engine = mock.MagicMock(name="engine")
 
     # inspect(engine).get_table_names() / get_columns(table)
@@ -323,6 +330,25 @@ def _make_fake_engine(table_columns: dict[str, list[str]], table_rows: dict[str,
         engine._inspector = inspector  # keep a reference for test asserts
 
     # engine.connect() → context manager yielding a fake connection.
+    class FakeRow:
+        """Row-like object supporting both index and column-name access."""
+        def __init__(self, values: tuple, columns: list[str] | None = None) -> None:
+            self._values = values
+            self._columns = columns or []
+
+        def __getitem__(self, key: Any) -> Any:
+            if isinstance(key, str):
+                if key in self._columns:
+                    return self._values[self._columns.index(key)]
+                raise KeyError(key)
+            return self._values[key]
+
+        def __iter__(self):
+            return iter(self._values)
+
+        def __len__(self) -> int:
+            return len(self._values)
+
     class FakeConn:
         def execute(self, stmt: Any, params: Any | None = None) -> Any:
             stmt_str = str(stmt)
@@ -330,10 +356,21 @@ def _make_fake_engine(table_columns: dict[str, list[str]], table_rows: dict[str,
                 table = stmt_str.split("FROM")[1].strip().strip('"')
                 return mock.MagicMock(scalar=mock.MagicMock(return_value=len(table_rows.get(table, []))))
             if "SELECT" in stmt_str and "LIMIT" in stmt_str:
-                table = stmt_str.split("FROM")[1].split("LIMIT")[0].strip().strip('"')
+                table = stmt_str.split("FROM")[1].split("ORDER BY")[0].split("LIMIT")[0].strip().strip('"')
                 lim = params["lim"] if params else 1000
-                off = params["off"] if params else 0
-                rows = table_rows.get(table, [])[off:off + lim]
+                cols = table_columns.get(table, [])
+                # P2-6 fix: 支持 keyset pagination（WHERE id > :last ORDER BY id LIMIT :lim）
+                # 和回退 OFFSET 分页（LIMIT :lim OFFSET :off）两种模式。
+                if params and "last" in params:
+                    # keyset pagination: 取 id > last 的行
+                    last = params["last"]
+                    all_rows = table_rows.get(table, [])
+                    filtered = [r for r in all_rows if _row_id(r, cols) > last]
+                    rows = [FakeRow(r, cols) for r in filtered[:lim]]
+                else:
+                    off = params["off"] if params and "off" in params else 0
+                    raw_rows = table_rows.get(table, [])[off:off + lim]
+                    rows = [FakeRow(r, cols) for r in raw_rows]
                 return mock.MagicMock(fetchall=mock.MagicMock(return_value=rows))
             return mock.MagicMock()
 

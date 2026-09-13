@@ -308,7 +308,11 @@ async def api_hooks_delete(hook_id: str, request: Request) -> dict[str, Any]:
     if existing is None:
         raise HTTPException(404, f"Hook {hook_id} not found")
     removed = mgr.unregister(hook_id)
-    return {"status": "ok" if removed else "error", "removed": removed}
+    # P2-2 fix: 操作失败时返回 500 而非 200 + {"status": "error"}，
+    # 由 @handle_api_errors 装饰器统一渲染为 ErrorSchema 响应。
+    if not removed:
+        raise HTTPException(status_code=500, detail="Failed to delete hook")
+    return {"status": "ok", "removed": True}
 
 
 # ── 路由：测试/启用/禁用 ────────────────────────────────────────────
@@ -353,7 +357,10 @@ async def api_hooks_enable(hook_id: str, request: Request) -> dict[str, Any]:
     if mgr.get_hook(hook_id) is None:
         raise HTTPException(404, f"Hook {hook_id} not found")
     ok = mgr.enable(hook_id)
-    return {"status": "ok" if ok else "error"}
+    # P2-2 fix: 操作失败时返回 500 而非 200 + {"status": "error"}。
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to enable hook")
+    return {"status": "ok"}
 
 
 @router.post("/api/hooks/{hook_id}/disable")
@@ -365,4 +372,7 @@ async def api_hooks_disable(hook_id: str, request: Request) -> dict[str, Any]:
     if mgr.get_hook(hook_id) is None:
         raise HTTPException(404, f"Hook {hook_id} not found")
     ok = mgr.disable(hook_id)
-    return {"status": "ok" if ok else "error"}
+    # P2-2 fix: 操作失败时返回 500 而非 200 + {"status": "error"}。
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to disable hook")
+    return {"status": "ok"}

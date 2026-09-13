@@ -161,6 +161,11 @@ class MaopLoop(ExecuteMixin, PhasesMixin):
 
         self._loop_count = 0
 
+        # P1-10 fix: 持有 fire-and-forget asyncio task 引用，防止被 GC 回收。
+        # loop.create_task() 返回的 task 若无强引用，可能在完成前被事件循环 GC。
+        # task 完成后通过 done callback 从集合移除，避免泄漏。
+        self._bg_tasks: set = set()
+
         # Log file
         self._log_file = self._root / "data" / "MAOP-loop.jsonl"
 
