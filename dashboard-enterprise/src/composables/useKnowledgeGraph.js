@@ -19,39 +19,48 @@
 import { ref, computed, readonly } from 'vue';
 import { useApiStore } from '../stores/api.js';
 
+// ── 主题感知颜色辅助函数 ─────────────────────────────────────────────
+// vis-network 的 color 字段不接受 CSS var() 引用（它直接将颜色值写入
+// canvas，不经过 CSS 解析）。cssVar() 在运行时通过 getComputedStyle
+// 读取 CSS 变量的计算值，返回实际颜色字符串（如 "#0d9488"），从而让
+// vis-network 节点/边颜色能跟随主题切换。fallback 保证在 SSR 或 CSS
+// 未加载时仍可用。
+function cssVar(name, fallback) {
+  if (typeof document === 'undefined') return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
 // ── Node/edge style maps (design.md 2.4.5) ───────────────────────────
-// Colors chosen for light theme (user pref: light/white, elegant, natural).
 // L5 fix: 提取节点类型集合为命名常量，避免魔法数字 4 散落在过滤逻辑中。
 const ALL_NODE_TYPES = ['agent', 'task', 'memory', 'concept'];
 const ALL_NODE_TYPE_COUNT = ALL_NODE_TYPES.length;
-// R10 fix: 以下 NODE_STYLE / EDGE_STYLE / NEUTRAL_*_STYLE 中的十六进制颜色
-// 为 vis-network 专用配置。vis-network 的 color 字段不支持 CSS 变量
-// （它内部直接将颜色值写入 canvas，不经过 CSS 解析），因此无法通过
-// cssVar() 读取 CSS 变量。这些颜色与 design-tokens.css 中的语义 token
-// 保持手动同步（--color-agent / --color-task / ...），若主题切换需支持
-// 暗色模式，应通过 vis-network 的 setOptions() 在主题变更时动态更新。
+// R10 fix + P1-4: NODE_STYLE / EDGE_STYLE / NEUTRAL_*_STYLE 中的颜色现在
+// 通过 cssVar() 读取 CSS 变量，支持暗色主题切换。变量名语义为
+// --node-{type}-bg / --node-{type}-border / --edge-{type}-color 等，
+// fallback 保留原 Material Design 浅色值以确保向后兼容。
+// 若需自定义主题，在 tokens.css / themes.css 中定义对应变量即可覆盖。
 export const NODE_STYLE = {
-  agent:   { color: { background: '#E3F2FD', border: '#1565C0', highlight: { background: '#BBDEFB', border: '#1565C0' } }, icon: { code: 'f2bd' }, shape: 'icon' },
-  task:    { color: { background: '#FFF3E0', border: '#E65100', highlight: { background: '#FFE0B2', border: '#E65100' } }, icon: { code: 'f073' }, shape: 'icon' },
-  memory:  { color: { background: '#F3E5F5', border: '#6A1B9A', highlight: { background: '#E1BEE7', border: '#6A1B9A' } }, icon: { code: 'f538' }, shape: 'icon' },
-  concept: { color: { background: '#E8F5E9', border: '#2E7D32', highlight: { background: '#C8E6C9', border: '#2E7D32' } }, icon: { code: 'f02d' }, shape: 'icon' },
+  agent:   { color: { background: cssVar('--node-agent-bg', '#E3F2FD'), border: cssVar('--node-agent-border', '#1565C0'), highlight: { background: cssVar('--node-agent-bg-highlight', '#BBDEFB'), border: cssVar('--node-agent-border', '#1565C0') } }, icon: { code: 'f2bd' }, shape: 'icon' },
+  task:    { color: { background: cssVar('--node-task-bg', '#FFF3E0'), border: cssVar('--node-task-border', '#E65100'), highlight: { background: cssVar('--node-task-bg-highlight', '#FFE0B2'), border: cssVar('--node-task-border', '#E65100') } }, icon: { code: 'f073' }, shape: 'icon' },
+  memory:  { color: { background: cssVar('--node-memory-bg', '#F3E5F5'), border: cssVar('--node-memory-border', '#6A1B9A'), highlight: { background: cssVar('--node-memory-bg-highlight', '#E1BEE7'), border: cssVar('--node-memory-border', '#6A1B9A') } }, icon: { code: 'f538' }, shape: 'icon' },
+  concept: { color: { background: cssVar('--node-concept-bg', '#E8F5E9'), border: cssVar('--node-concept-border', '#2E7D32'), highlight: { background: cssVar('--node-concept-bg-highlight', '#C8E6C9'), border: cssVar('--node-concept-border', '#2E7D32') } }, icon: { code: 'f02d' }, shape: 'icon' },
 };
 
 export const EDGE_STYLE = {
-  delegates:  { color: { color: '#1565C0', highlight: '#FF5722' }, dashes: false, arrows: 'to' },
-  remembers:  { color: { color: '#6A1B9A', highlight: '#FF5722' }, dashes: [5, 5], arrows: 'to' },
-  produces:   { color: { color: '#2E7D32', highlight: '#FF5722' }, dashes: false, arrows: 'to' },
-  depends_on: { color: { color: '#E65100', highlight: '#FF5722' }, dashes: [2, 2], arrows: 'to' },
+  delegates:  { color: { color: cssVar('--edge-delegates-color', '#1565C0'), highlight: cssVar('--edge-highlight', '#FF5722') }, dashes: false, arrows: 'to' },
+  remembers:  { color: { color: cssVar('--edge-remembers-color', '#6A1B9A'), highlight: cssVar('--edge-highlight', '#FF5722') }, dashes: [5, 5], arrows: 'to' },
+  produces:   { color: { color: cssVar('--edge-produces-color', '#2E7D32'), highlight: cssVar('--edge-highlight', '#FF5722') }, dashes: false, arrows: 'to' },
+  depends_on: { color: { color: cssVar('--edge-depends-on-color', '#E65100'), highlight: cssVar('--edge-highlight', '#FF5722') }, dashes: [2, 2], arrows: 'to' },
 };
 
 // Default neutral style for unknown types (forward compatibility).
-// R10 fix: 同上，vis-network 专用颜色不跟随 CSS 主题变量。
+// P1-4: 中性颜色使用全局语义 token，暗色模式下自动跟随主题。
 const NEUTRAL_NODE_STYLE = {
-  color: { background: '#F5F5F5', border: '#616161' },
+  color: { background: cssVar('--surface', '#F5F5F5'), border: cssVar('--text-faint', '#616161') },
   shape: 'dot',
 };
 const NEUTRAL_EDGE_STYLE = {
-  color: { color: '#9E9E9E', highlight: '#FF5722' },
+  color: { color: cssVar('--border', '#9E9E9E'), highlight: cssVar('--edge-highlight', '#FF5722') },
   arrows: 'to',
 };
 

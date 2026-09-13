@@ -246,7 +246,7 @@
   flex-shrink: 0;
 }
 .status-dot.on, .agent-dot.is-active { background: var(--success); box-shadow: 0 0 0 2px var(--success-soft); }
-.status-dot.off { background: var(--text-faint); opacity: .5; }
+.status-dot.off { background: var(--text-faint); opacity: var(--op-disabled); }
 .status-dot.small { width: 6px; height: 6px; }
 .agent-bar, .agent-name, .agent-load, .agent-queue { display: flex; }
 /* R11 修复: 合并第1198行分散定义 (flex/min-width) 到此行 */
@@ -453,7 +453,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 }
 .edition-btn.active { background: var(--brand); color: var(--brand-contrast); box-shadow: var(--shadow-btn-active); }
 .edition-btn:hover:not(:disabled) { color: var(--text); }
-.edition-btn:disabled { opacity: .4; cursor: not-allowed; }
+.edition-btn:disabled { opacity: var(--op-faint); cursor: not-allowed; }
 .edition-perm-hint { color: var(--text-faint); font-size: var(--fs-xs); }
 .edition-error-msg { color: var(--fail); font-size: var(--fs-xs); margin-top: var(--sp-2); }
 .edition-notice { font-size: var(--fs-xs); color: var(--success); margin-top: var(--sp-2); }
@@ -497,7 +497,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
 }
 .switch-select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
-.switch-select:disabled { opacity: .5; cursor: not-allowed; }
+.switch-select:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 .switch-actions { display: flex; align-items: center; gap: var(--sp-3); }
 .switch-result { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); white-space: pre-wrap; border: none; background: none; padding: 0; }
 .inline-error { color: var(--fail); font-size: var(--fs-sm); margin-top: var(--sp-2); }
@@ -576,7 +576,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .chat-header__actions select {
   width: auto; min-width: 160px; height: var(--row-h); cursor: pointer;
   appearance: none; background-image: var(--icon-chevron);
-  background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px;
+  background-repeat: no-repeat; background-position: right var(--sp-3) center; padding-right: var(--sp-7);
   /* CJK font rendering: allow breathing room so Chinese text isn't clipped */
   line-height: 1.5;
   padding-top: 0;
@@ -644,7 +644,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .welcome-msg { text-align: center; padding: var(--sp-10) var(--sp-4); color: var(--text-muted); }
 .welcome-msg h2 { font-size: var(--fs-lg); font-weight: 700; color: var(--text); margin-bottom: var(--sp-2); }
 .welcome-msg p { max-width: 360px; margin: 0 auto; line-height: 1.6; }
-.welcome-icon { color: var(--brand); opacity: .5; margin-bottom: var(--sp-3); }
+.welcome-icon { color: var(--brand); opacity: var(--op-disabled); margin-bottom: var(--sp-3); }
 /* R11 修复: 合并自第588行重复定义 (font-size/color/margin 已统一到此) */
 .agent-select label { font-size: var(--fs-xs); color: var(--text-muted); display: block; margin-bottom: var(--sp-1); }
 .agent-hint { display: flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--warn); }
@@ -723,7 +723,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   transition: color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
 .refresh-btn:hover { color: var(--brand-strong); border-color: var(--brand); background: var(--brand-soft); transform: translateY(-1px); }
-.refresh-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.refresh-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; transform: none; }
 
 /* ── Search page specifics ───────────────────────────────────────────── */
 .opt { display: inline-flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-sm); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-full); cursor: pointer; transition: background var(--motion-fast) var(--ease); }

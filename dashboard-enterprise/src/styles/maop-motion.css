@@ -171,7 +171,7 @@
     var(--brand-faint) 100%);
   background-size: 200% 100%;
   /* 循环动画 1.5s 不适用 motion token */
-  animation: maop-flow 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: maop-flow 1.5s var(--ease) infinite;
 }
 @keyframes maop-flow {
   from { background-position: 200% 0; }
@@ -222,7 +222,7 @@
   background: var(--brand);
   z-index: var(--z-toast);
   /* 循环动画 1.5s 不适用 motion token */
-  animation: maop-loading-progress 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: maop-loading-progress 1.5s var(--ease) infinite;
 }
 @keyframes maop-loading-progress {
   0% { width: 0; left: 0; }
