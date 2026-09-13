@@ -77,13 +77,11 @@
           <legend>{{ t('view.licenses.customerInfo') }}</legend>
           <label class="lic-field">
             <span>{{ t('view.licenses.customerName') }}</span>
-            <!-- placeholder 为格式示例，不参与 i18n（保持跨语言一致的客户名示例） -->
-            <input v-model="form.customer_name" class="lic-input" placeholder="Acme Corporation" />
+            <input v-model="form.customer_name" class="lic-input" :placeholder="t('view.licenses.customerNameExample')" />
           </label>
           <label class="lic-field">
             <span>{{ t('view.licenses.customerEmail') }}</span>
-            <!-- placeholder 为格式示例，不参与 i18n（保持跨语言一致的邮箱格式演示） -->
-            <input v-model="form.customer_email" class="lic-input" type="email" placeholder="admin@acme.com" />
+            <input v-model="form.customer_email" class="lic-input" type="email" :placeholder="t('view.licenses.adminEmailExample')" />
           </label>
         </fieldset>
 
@@ -552,7 +550,8 @@ onMounted(load);
 .lic-btn--primary:hover { opacity: .9; }
 .lic-btn--primary:disabled { opacity: .5; cursor: not-allowed; }
 .lic-btn--danger {
-  background: var(--fail-soft); color: var(--fail); border: 1px solid color-mix(in srgb, var(--fail) 30%, transparent);
+  background: var(--fail-soft); color: var(--fail); border: 1px solid rgba(248, 81, 73, 0.3); /* fallback: color-mix(in srgb, var(--fail) 30%, transparent) */
+  border: 1px solid color-mix(in srgb, var(--fail) 30%, transparent);
 }
 .lic-btn--danger:hover { opacity: .85; }
 

@@ -49,13 +49,14 @@
         <!-- 概览仪表板:热力图 + 资源分配饼图 -->
         <section class="overview-dashboard">
           <Card :title="t('view.quotas.heatmap')" :subtitle="t('view.quotas.heatmapDesc')" icon="gauge">
-            <div class="heatmap">
-              <div class="heatmap__header">
+            <div class="heatmap" role="table" :aria-label="t('view.quotas.heatmap')">
+              <div class="heatmap__header" role="row">
                 <div class="heatmap__corner"></div>
                 <div
                   v-for="r in RESOURCES"
                   :key="r.key"
                   class="heatmap__col-header"
+                  role="columnheader"
                   :title="t('view.quotas.' + r.key)"
                 >{{ t('view.quotas.' + r.key) }}</div>
               </div>
@@ -63,15 +64,17 @@
                 v-for="tenant in tenants"
                 :key="tenant.tenant_id"
                 class="heatmap__row"
+                role="row"
                 :class="{ 'is-over': isTenantOverQuota(tenant) }"
               >
-                <div class="heatmap__row-header" :title="tenant.name || tenant.tenant_id">
+                <div class="heatmap__row-header" role="rowheader" :title="tenant.name || tenant.tenant_id">
                   {{ tenant.name || tenant.tenant_id }}
                 </div>
                 <div
                   v-for="r in RESOURCES"
                   :key="r.key"
                   class="heatmap__cell"
+                  role="cell"
                   :class="heatCellClass(tenant, r)"
                   :title="heatCellTitle(tenant, r)"
                 >{{ heatCellRate(tenant, r) }}%</div>
@@ -665,7 +668,7 @@ onMounted(loadAll);
   min-height: 28px;
 }
 .heatmap__cell--low  { background: var(--success-soft); color: var(--success); }
-.heatmap__cell--mid  { background: color-mix(in srgb, var(--success) 45%, var(--surface)); color: var(--text); }
+.heatmap__cell--mid  { background: rgb(47, 103, 59); /* fallback: color-mix(in srgb, var(--success) 45%, var(--surface)) */ background: color-mix(in srgb, var(--success) 45%, var(--surface)); color: var(--text); }
 .heatmap__cell--high { background: var(--warn-soft); color: var(--warn); }
 .heatmap__cell--over { background: var(--fail-soft); color: var(--fail); font-weight: 700; }
 .heatmap__row.is-over .heatmap__row-header { color: var(--fail); font-weight: 700; }

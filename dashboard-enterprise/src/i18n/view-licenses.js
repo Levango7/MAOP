@@ -25,6 +25,8 @@ export const messages = {
     // ── Table columns ──────────────────────────────────────────
     'view.licenses.customerName': 'Customer',
     'view.licenses.customerEmail': 'Email',
+    'view.licenses.customerNameExample': 'Acme Corporation',
+    'view.licenses.adminEmailExample': 'admin@acme.com',
     'view.licenses.licenseKey': 'License Key',
     'view.licenses.licenseId': 'License ID',
     'view.licenses.version': 'Edition',
@@ -105,6 +107,8 @@ export const messages = {
     // ── Table columns ──────────────────────────────────────────
     'view.licenses.customerName': '客户名',
     'view.licenses.customerEmail': '邮箱',
+    'view.licenses.customerNameExample': 'Acme 公司',
+    'view.licenses.adminEmailExample': 'admin@acme.com',
     'view.licenses.licenseKey': '许可证 Key',
     'view.licenses.licenseId': '许可证 ID',
     'view.licenses.version': '版本',

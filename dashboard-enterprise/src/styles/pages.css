@@ -454,7 +454,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .edition-btn.active { background: var(--brand); color: var(--brand-contrast); box-shadow: var(--shadow-btn-active); }
 .edition-btn:hover:not(:disabled) { color: var(--text); }
 .edition-btn:disabled { opacity: var(--op-faint); cursor: not-allowed; }
-.edition-perm-hint { color: var(--text-faint); font-size: var(--fs-xs); }
+.edition-perm-hint { color: var(--text-faint); font-size: var(--fs-xs); margin-top: var(--sp-2); }
 .edition-error-msg { color: var(--fail); font-size: var(--fs-xs); margin-top: var(--sp-2); }
 .edition-notice { font-size: var(--fs-xs); color: var(--success); margin-top: var(--sp-2); }
 .edition-notice.degraded { color: var(--warn); }
@@ -788,8 +788,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 
 .edition-switch-row { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
 /* R7 修复: .edition-switch-buttons / .edition-notice / .edition-error-msg 重复定义已删除,
- * 保留 427/449/450 行的基础定义并补充 margin-top (原 771/772/773 行覆盖了 color/font-size, 破坏语义) */
-.edition-perm-hint { color: var(--text-faint); font-size: var(--fs-xs); margin-top: var(--sp-2); }
+ * 保留 427/449/450 行的基础定义并补充 margin-top (原 771/772/773 行覆盖了 color/font-size, 破坏语义)。
+ * P2 修复: .edition-perm-hint 重复定义已合并至 457 行 (含 margin-top), 此处删除重复。 */
 .switching-indicator { color: var(--brand-strong); font-size: var(--fs-sm); }
 
 /* ── Monitor: agent / resource rows ───────────────────────────────────── */

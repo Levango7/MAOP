@@ -49,7 +49,7 @@
                 <div class="proto-table__th" role="columnheader">{{ t('view.protocols.col.description') }}</div>
                 <div class="proto-table__th proto-table__th--act" role="columnheader">{{ t('view.protocols.col.actions') }}</div>
               </div>
-              <div v-for="(p, i) in protocols" :key="p.name + '-' + p.version + '-' + i" class="proto-table__row" role="row">
+              <div v-for="(p, i) in protocols" :key="p.name + '-' + p.version" class="proto-table__row" role="row">
                 <div class="proto-table__td" role="cell">
                   <span class="proto-table__name">{{ p.name || '—' }}</span>
                 </div>

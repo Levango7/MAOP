@@ -401,4 +401,18 @@ function renderMarkdown(md) {
   .docs-layout { grid-template-columns: 1fr; }
   .docs-sidebar { position: static; max-height: none; }
 }
+
+/* ── 小屏断点：侧栏折叠为紧凑列表，内容区全宽减距 ── */
+@media (max-width: 640px) {
+  .docs-layout { gap: var(--sp-3); }
+  .docs-sidebar { padding: var(--sp-2); }
+  .doc-cat + .doc-cat { margin-top: var(--sp-3); }
+  .doc-cat__item { padding: var(--sp-2) var(--sp-2); }
+  .docs-content { padding: var(--sp-4); }
+  .docs-article :deep(h1) { font-size: var(--fs-xl); margin-bottom: var(--sp-3); }
+  .docs-article :deep(h2) { font-size: var(--fs-lg); margin: var(--sp-4) 0 var(--sp-2); }
+  .docs-article :deep(pre) { padding: var(--sp-3); }
+  .docs-article :deep(table) { font-size: var(--fs-xs); }
+  .docs-article :deep(th), .docs-article :deep(td) { padding: var(--sp-1) var(--sp-2); }
+}
 </style>

@@ -82,6 +82,8 @@ const routes = [
   { path: '/agents', redirect: '/capability/agents' },
   { path: '/tasks', redirect: '/home/tasks' },
   { path: '/search', redirect: '/memory/search' },
+  // P2-175: VectorSearch.vue 是遗留独立页面（未注册路由），已被 Search.vue（/memory/search）替代。
+  // 保留组件文件供测试覆盖，旧 /vector 路径重定向到统一搜索入口。
   { path: '/vector', redirect: '/memory/search' },
   { path: '/knowledge-graph', redirect: '/memory/graph' },
   { path: '/tools', redirect: '/capability/skills' },
@@ -96,6 +98,8 @@ const routes = [
   { path: '/workflow-editor', redirect: '/run/workflow' },
   // IA 优化: evolve 纯入能力组 → /capability/evolve（旧路径重定向）
   { path: '/evolve', redirect: '/capability/evolve' },
+  // P2-175: EvolutionHistory.vue 是 Evolve.vue 的嵌入组件（<EvolutionHistory embedded />），
+  // 非独立路由页面，故不注册独立路由。旧路径重定向到 Evolve 的 history tab。
   { path: '/evolution-history', redirect: { path: '/capability/evolve', query: { tab: 'history' } } },
 
   // P2-10 fix: catch-all 404 route — redirect unknown paths to home.

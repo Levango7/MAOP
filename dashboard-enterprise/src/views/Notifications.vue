@@ -579,7 +579,7 @@ onMounted(loadAll);
   transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease);
 }
 .notif-row:hover { border-color: var(--border-strong); background: var(--surface-2); }
-.notif-row.is-unread { background: color-mix(in srgb, var(--brand-soft) 35%, var(--surface)); }
+.notif-row.is-unread { background: rgba(32, 46, 50, 0.713); /* fallback: color-mix(in srgb, var(--brand-soft) 35%, var(--surface)) */ background: color-mix(in srgb, var(--brand-soft) 35%, var(--surface)); }
 .notif-row__bar { width: 4px; height: 32px; border-radius: 2px; background: var(--border); } /* 亚token级微圆角 */
 .notif-row__bar.bar-info { background: var(--info); }
 .notif-row__bar.bar-warning { background: var(--warn); }

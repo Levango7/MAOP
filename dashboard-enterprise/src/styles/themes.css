@@ -106,6 +106,9 @@
   --border-soft: rgba(148, 163, 184, .16);
   --surface-hover: rgba(0, 0, 0, .04);
   --surface-alt: rgba(0, 0, 0, .02);
+  /* P2 修复: --surface-tint-faint 亮色覆写 (暗色定义在 tokens.css :root, 此前亮色缺失
+   * 导致回退到暗色值 rgba(15,23,42,.03)。亮色用 #1d2129 基底极淡色调, 与亮色阴影色系一致。 */
+  --surface-tint-faint: rgba(29, 33, 41, .03);
   /* --danger 亮色: 统一为 --fail 亮色值 #d1242f (原 #c0392b, 语义关系见 tokens.css)。
    * #d1242f on #f2f3f5 ≈ 5.4:1, 满足 WCAG AA。 */
   --danger: #d1242f;

@@ -600,7 +600,7 @@ onUnmounted(() => {
 .mini-fill {
   height: 100%;
   border-radius: var(--r-xs);
-  transition: width var(--motion-slow, 280ms) ease;
+  transition: width var(--motion-slow, 280ms) var(--ease);
 }
 .mini-val {
   font-family: var(--font-mono);
