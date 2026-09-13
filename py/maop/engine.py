@@ -52,6 +52,9 @@ logger = logging.getLogger(__name__)
 # 导致 pause 后系统继续执行。现新增 check_pause() 在任务派发前检查标记文件。
 PAUSE_CHECK_INTERVAL_S: float = 1.0  # pause 检查轮询间隔（秒）
 PAUSE_FILE_NAME: str = ".maop_pause"  # pause 标记文件名（与 control.py 一致）
+# P2-fix: pause 最大超时限制——防止 pause 标记文件未被清理导致引擎无限阻塞。
+# 超过此限制后记录 warning 并继续执行，避免整个引擎卡死。
+MAX_PAUSE_SECONDS: int = 3600  # pause 最大等待时长（秒），默认 1 小时
 
 # P1-5 fix: PLAN-step dynamic decomposition recursion cap. Each recursion
 # level multiplies the number of steps; without a cap, adversarial/looping
@@ -90,10 +93,22 @@ async def check_pause_async() -> None:
 
     在任务派发前调用此函数，确保暂停期间不执行新任务。
     使用异步 sleep 避免阻塞事件循环。
+
+    P2-fix: 添加 MAX_PAUSE_SECONDS 超时限制——如果 pause 持续时间超过此限制，
+    记录 warning 并继续执行，防止 pause 标记文件未被清理导致引擎无限阻塞。
     """
+    waited = 0.0
     while is_paused():
+        if waited >= MAX_PAUSE_SECONDS:
+            logger.warning(
+                "系统暂停已超过 %d 秒（MAX_PAUSE_SECONDS），可能 pause 标记文件未被清理；"
+                "放弃等待，继续执行以避免引擎无限阻塞。",
+                MAX_PAUSE_SECONDS,
+            )
+            return
         logger.info("系统已暂停（.maop_pause 存在），等待恢复...")
         await asyncio.sleep(PAUSE_CHECK_INTERVAL_S)
+        waited += PAUSE_CHECK_INTERVAL_S
 
 
 
@@ -553,6 +568,67 @@ class Engine:
                         "executing as atomic task",
                         step.id, _MAX_PLAN_DEPTH,
                     )
+                if substeps:
+                    # P2-fix: PLAN 子步骤依赖检查——防止循环依赖或乱序执行。
+                    # 1) 检查子步骤ID无重复；2) 检查显式依赖引用的步骤ID存在；
+                    # 3) 检测循环依赖。发现问题时记录 error 并跳过有问题的子步骤。
+                    _sub_ids = [s.id for s in substeps]
+                    _id_set = set()
+                    _seen_ids: set[str] = set()
+                    for _sid in _sub_ids:
+                        if _sid in _id_set:
+                            logger.error(
+                                "[engine] step %s: plan 子步骤 ID 重复 '%s'，跳过重复项",
+                                step.id, _sid,
+                            )
+                        else:
+                            _id_set.add(_sid)
+                            _seen_ids.add(_sid)
+                    # 过滤掉重复 ID 的子步骤（保留首次出现）
+                    _deduped: list[WorkflowStep] = []
+                    for sub in substeps:
+                        if sub.id not in _seen_ids:
+                            continue  # 重复 ID，已跳过
+                        _seen_ids.discard(sub.id)  # 标记已处理
+                        # 检查依赖引用是否存在
+                        _missing_deps = [
+                            dep for dep in (sub.depends_on or [])
+                            if dep not in _id_set and dep != step.id
+                        ]
+                        if _missing_deps:
+                            logger.error(
+                                "[engine] step %s: 子步骤 '%s' 引用了不存在的依赖 %s，跳过该子步骤",
+                                step.id, sub.id, _missing_deps,
+                            )
+                            continue
+                        _deduped.append(sub)
+                    # 简单循环依赖检测：DFS 检查是否有子步骤通过 depends_on 形成环
+                    _dep_graph = {s.id: set(s.depends_on or []) & _id_set for s in _deduped}
+                    _visiting: set[str] = set()
+                    _visited: set[str] = set()
+                    _cyclic_ids: set[str] = set()
+
+                    def _detect_cycle(_node: str, _path: set[str]) -> None:
+                        if _node in _visited:
+                            return
+                        if _node in _path:
+                            _cyclic_ids.update(_path)
+                            return
+                        _path.add(_node)
+                        for _nbr in _dep_graph.get(_node, set()):
+                            _detect_cycle(_nbr, _path)
+                        _path.discard(_node)
+                        _visited.add(_node)
+
+                    for _nid in _dep_graph:
+                        _detect_cycle(_nid, set())
+                    if _cyclic_ids:
+                        logger.error(
+                            "[engine] step %s: 检测到循环依赖 %s，跳过相关子步骤",
+                            step.id, sorted(_cyclic_ids),
+                        )
+                        _deduped = [s for s in _deduped if s.id not in _cyclic_ids]
+                    substeps = _deduped
                 if substeps:
                     # Execute sub-steps recursively
                     sub_results = []

@@ -54,6 +54,11 @@ from maop.delegate.sla_monitor import SLAMonitor
 # pre-split behaviour (tests / dashboards key on this logger name).
 logger = logging.getLogger("maop.delegate.dispatcher")
 
+# P3-fix: 常量提升——将魔法数字/字符串提为模块级常量，便于统一维护与调优。
+_DEFAULT_DISPATCH_CONCURRENCY: int = 10  # 默认并发限制（settings 加载失败时降级使用）
+_DEFAULT_MAX_SUBAGENT_DEPTH: int = 5     # 子代理递归委派最大深度
+_DEFAULT_PRIORITY: int = 3               # 默认调度优先级（1=最高, 5=最低）
+
 
 # ── Dispatcher ────────────────────────────────────────────────
 
@@ -111,8 +116,17 @@ class Dispatcher:
         self._priority_queue = priority_queue
         # P2 fix: global concurrency limiter to prevent overwhelming downstream LLM APIs.
         # Uses settings.dispatch_concurrency (env: MAOP_DISPATCH_CONCURRENCY, default: 10).
-        from maop.config.settings import get_settings
-        _concurrency = get_settings().dispatch_concurrency
+        # P1-fix: get_settings 异常保护——配置文件损坏/加载失败时降级到默认并发值，
+        # 而非让原始异常向上传播导致整个 dispatch 崩溃。
+        try:
+            from maop.config.settings import get_settings
+            _concurrency = get_settings().dispatch_concurrency
+        except Exception as exc:
+            logger.warning(
+                "[dispatch] get_settings 失败，降级到默认并发值 %d: %s",
+                _DEFAULT_DISPATCH_CONCURRENCY, exc,
+            )
+            _concurrency = _DEFAULT_DISPATCH_CONCURRENCY
         self._semaphore = asyncio.Semaphore(_concurrency)
 
     @property
@@ -538,6 +552,8 @@ class Dispatcher:
             return DispatchResult(result=result, breaker_tripped=False)
 
         # 1.1. Guardrail check — reject if input violates safety rules
+        # P2-fix: guardrail 参数名统一为 `guardrail`（与 guardrail.py 模块名一致），
+        # 调用 gr.check() 的关键字参数 content/agent/task 与 Guardrail.check 签名完全匹配。
         try:
             from maop.core.security.guardrail import Guardrail
             gr = Guardrail()
@@ -760,7 +776,7 @@ class Dispatcher:
         *,
         routing_key: str = "",
         trace_id: str = "",
-        max_depth: int = 5,
+        max_depth: int = _DEFAULT_MAX_SUBAGENT_DEPTH,  # P3-fix: 使用模块级常量
     ) -> DispatchResult:
         """Spawn a sub-agent and dispatch the task through it.
 

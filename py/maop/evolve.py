@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+import sqlite3  # P2-fix: 从函数内提升到模块级（标准库，无循环导入风险）
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -102,7 +103,7 @@ def _load_observability_data_from_db(db_path: Path) -> list[dict[str, Any]]:
     if not db_path.exists():
         return []
     try:
-        import sqlite3
+
         with sqlite3.connect(str(db_path)) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
@@ -120,8 +121,8 @@ def _load_observability_data_from_db(db_path: Path) -> list[dict[str, Any]]:
             for r in rows
         ]
     except Exception as exc:
-        import logging
-        logging.getLogger(__name__).warning("[evolve] Failed to load from DB %s: %s", db_path, exc)
+        # P2-fix: 删除冗余函数内 import logging，改用模块级 logger
+        logger.warning("[evolve] Failed to load from DB %s: %s", db_path, exc)
         return []
 
 
@@ -136,8 +137,8 @@ def _load_observability_data(log_dir: Path) -> list[dict[str, Any]]:
             return raw
         return [raw]
     except Exception as exc:
-        import logging
-        logging.getLogger(__name__).warning("[evolve] Failed to load JSON %s: %s", log_file, exc)
+        # P2-fix: 删除冗余函数内 import logging，改用模块级 logger
+        logger.warning("[evolve] Failed to load JSON %s: %s", log_file, exc)
         return []
 
 
@@ -421,8 +422,8 @@ class EvolveEngine:
 
         # 安全写入: 时间戳 backup + FileLock + safe_write + 回读校验
         try:
-            from datetime import datetime, timezone
-
+            # P2-fix: datetime/timezone 已在模块级导入，删除冗余函数内导入。
+            # 以下 filelock/safe_writer 为延迟导入（避免循环依赖），保留。
             from maop.core.reliability.filelock import FileLock
             from maop.core.reliability.safe_writer import safe_write_text
             ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
@@ -458,8 +459,8 @@ class EvolveEngine:
                 encoding="utf-8",
             )
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("[evolve] Failed to save suggestions: %s", exc)
+            # P2-fix: 删除冗余函数内 import logging，改用模块级 logger
+            logger.warning("[evolve] Failed to save suggestions: %s", exc)
 
     def _load_suggestions(self) -> list[Suggestion]:
         if not self._suggestions_file.exists():

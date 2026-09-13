@@ -332,8 +332,10 @@ async def maop_execute(
                 },
             )
         except Exception as exc:
-            # P1-13: emit error event so SSE subscribers terminate cleanly.
-            _emit_agent_event(trace_id, "error", {"error": f"ReAct loop error: {exc}"})
+            # P1-SSE fix: 对外 SSE error event 只发送通用错误消息，详细异常
+            # （可能含堆栈跟踪、连接字符串、文件路径等）仅记录到 logger，避免信息泄露。
+            logger.error("[execute] ReAct loop error (trace_id=%s): %s", trace_id, exc, exc_info=True)
+            _emit_agent_event(trace_id, "error", {"error": "Internal server error"})
             return new_result(
                 agent=agent, task=task,
                 exit_code=-1, error=f"ReAct loop error: {exc}",
@@ -395,8 +397,10 @@ async def maop_execute(
             exit_code=-1, error=f"Dispatch error: {exc}",
             trace_id=trace_id, routing_key=routing_key,
         )
-        # P1-13: emit error event so SSE subscribers terminate cleanly.
-        _emit_agent_event(trace_id, "error", {"error": str(exc)})
+        # P1-SSE fix: 对外 SSE error event 只发送通用错误消息，详细异常
+        # （可能含堆栈跟踪、连接字符串、文件路径等）仅记录到 logger，避免信息泄露。
+        logger.error("[execute] Dispatch error (trace_id=%s): %s", trace_id, exc, exc_info=True)
+        _emit_agent_event(trace_id, "error", {"error": "Internal server error"})
 
     # Function-call loop: if agent returned tool_calls, execute and re-dispatch
     if result.is_success() and tools is not None and result.stdout:
@@ -407,6 +411,7 @@ async def maop_execute(
             timeout_seconds=timeout_seconds, trace_id=trace_id,
             dispatcher=dispatcher, tools=tools,
             provider=provider, max_tool_rounds=max_tool_rounds,
+            guardrail=guardrail,
         )
 
     # Post-guardrail check (on output)
@@ -473,6 +478,7 @@ async def _handle_function_calls(
     tools: list[dict],
     provider: str,
     max_tool_rounds: int,
+    guardrail: Guardrail | None = None,
 ) -> MaopResult:
     """Handle function-call loop: parse tool_calls, execute, re-dispatch.
 
@@ -565,5 +571,39 @@ async def _handle_function_calls(
 
         if not result.is_success():
             break
+
+        # P1-guardrail fix: 每轮 re-dispatch 后重新检查 guardrail，防止多轮
+        # 迭代绕过护栏限制。若 guardrail 检查失败则终止循环而非继续下一轮。
+        # 复用与 post-guardrail check 相同的 check(result.stdout) 模式。
+        if guardrail is not None and result.stdout:
+            try:
+                round_post_check = guardrail.check(result.stdout)
+                if not round_post_check.passed:
+                    logger.warning(
+                        "[execute] Guardrail blocked output in re-dispatch round %d: %s",
+                        round_idx + 1, getattr(round_post_check, 'reason', str(round_post_check)),
+                    )
+                    result = new_result(
+                        agent=agent, task=task,
+                        exit_code=127,
+                        error=f"Output guardrail (round {round_idx + 1}): "
+                              f"{getattr(round_post_check, 'reason', str(round_post_check))}",
+                        stdout=result.stdout,
+                        trace_id=trace_id, routing_key=routing_key,
+                    )
+                    break
+            except Exception as exc:
+                logger.error(
+                    "[execute] Guardrail check in re-dispatch round %d failed (fail-closed): %s",
+                    round_idx + 1, exc,
+                )
+                result = new_result(
+                    agent=agent, task=task,
+                    exit_code=127,
+                    error=f"Guardrail check error in re-dispatch (fail-closed): {exc}",
+                    stdout=result.stdout,
+                    trace_id=trace_id, routing_key=routing_key,
+                )
+                break
 
     return result

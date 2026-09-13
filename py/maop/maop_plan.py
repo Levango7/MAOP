@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re  # P3-fix: 从函数内提升到模块级（标准库，无循环导入风险）
 import time
 from typing import Any
 
@@ -199,9 +200,8 @@ def maop_plan(
         Routing result with selected_agent, routing_key, gates, budget.
     """
     # H8 修复：记录 plan 阶段耗时与委派计数
-    import time as _time
-
-    _plan_start = _time.monotonic()
+    # P3-fix: 删除冗余函数内 import time as _time，改用模块级 time
+    _plan_start = time.monotonic()
 
     # Priority 1: explicit routing_key override
     if routing_key:
@@ -250,7 +250,7 @@ def maop_plan(
         )
 
         MAOP_DELEGATIONS_TOTAL.inc()
-        MAOP_DELEGATION_DURATION.observe(_time.monotonic() - _plan_start)
+        MAOP_DELEGATION_DURATION.observe(time.monotonic() - _plan_start)
     except Exception:
         # 指标记录失败不应影响业务逻辑；记录 debug 日志便于排查
         logger.debug("record plan delegation metrics failed", exc_info=True)
@@ -285,11 +285,11 @@ class WorkflowResult(BaseModel):
 
 def _interpolate_vars(text: str, variables: dict[str, Any]) -> str:
     """Replace ${var} placeholders in text with variable values."""
-    import re as _re
+    # P3-fix: re 已在模块级导入，删除冗余函数内 import re as _re
     def _replace(m):
         key = m.group(1)
         return str(variables.get(key, m.group(0)))
-    return _re.sub(r"\$\{([^}]+)\}", _replace, text)
+    return re.sub(r"\$\{([^}]+)\}", _replace, text)
 
 
 def _evaluate_condition(condition: str, variables: dict[str, Any]) -> bool:
@@ -454,11 +454,9 @@ def execute_workflow(
     if has_deps:
         levels = _topological_sort(steps)
         for level_indices in levels:
-            parallel_steps = []
-            for i in level_indices:
-                step = steps[i]
-                if step.parallel and len(level_indices) > 1:
-                    parallel_steps.append(i)
+            # P3-fix: 删除未使用的 parallel_steps 死代码——原代码构建了
+            # parallel_steps 列表但从未使用，所有 level_indices 中的步骤
+            # 均通过下方循环顺序执行。
             for i in level_indices:
                 _execute_step(i, steps[i], config, result, step_outputs)
     else:

@@ -194,11 +194,16 @@ def _gate_dry_run(plan: dict, result: MaopResult | None) -> GateResult:
 
     has_structured_signal = False
     structured = result.structured_output
+    # P2-fix: 为 and/or 混用的布尔表达式添加括号，明确求值顺序。
+    # 原代码依赖默认优先级（and > or），可读性差且容易出错。
+    # 语义：structured 是 dict 且（有 dry_run 标志 或（有 dry_run_artifacts 且是非空列表））
     if isinstance(structured, dict) and (
         structured.get("dry_run")
-        or "dry_run_artifacts" in structured
-        and isinstance(structured["dry_run_artifacts"], list)
-        and structured["dry_run_artifacts"]
+        or (
+            "dry_run_artifacts" in structured
+            and isinstance(structured["dry_run_artifacts"], list)
+            and structured["dry_run_artifacts"]
+        )
     ):
         has_structured_signal = True
 
