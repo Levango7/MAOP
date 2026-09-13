@@ -38,7 +38,8 @@
 
 | 文档 | 说明 |
 |------|------|
-| [部署指南](./deployment.md) | Docker Compose 快速启动与 Kubernetes 生产部署指南 |
+| [部署指南](./deployment.md) | 全部署方式覆盖：Docker Compose、Kubernetes（Operator/Helm）、裸机（PM2/systemd）、TLS、监控、升级回滚 |
+| [环境变量配置](./configuration.md) | 全部环境变量权威参考（100+ 变量），含默认值、必填标注、生产检查清单 |
 | [运维手册](./runbook.md) | 生产环境运维 Runbook — PG 故障切换、备份恢复、监控告警 |
 | [故障排查](./troubleshooting.md) | 系统化故障排查手册，含诊断工具、常见问题与解决流程 |
 | [容量规划](./capacity-planning.md) | 各组件资源需求基准、小/中/大/超大部署配置、扩缩容策略 |
@@ -119,4 +120,4 @@
 
 ---
 
-*文档索引维护：MAOP 团队 ｜ 最后更新：2026-08-30*
+*文档索引维护：MAOP 团队 ｜ 最后更新：2026-09-14*

@@ -88,6 +88,9 @@ class DataProxy(
         self._tool_mgr: Any = None
         self._sandbox_mgr: Any = None
         self._human_proxy: Any = None
+        # Perf opt: 缓存 CostTracker 实例，避免 live() 每 15s 重复创建
+        # 并触发 _init_db() 的 CREATE TABLE IF NOT EXISTS 开销。
+        self._cost_tracker: Any = None
 
         self._ensure_db_schema()
 
@@ -203,18 +206,19 @@ class DataProxy(
         """
         start = time.monotonic()
 
-        # Get delegation counts
-        rows = await self._query_maop(
-            "SELECT agent, "
-            "COUNT(*) as total, "
-            "SUM(CASE WHEN exit_code = 0 THEN 1 ELSE 0 END) as successes, "
-            "AVG(CASE WHEN exit_code = 0 THEN 1.0 ELSE 0.0 END) as success_rate "
-            "FROM delegations GROUP BY agent ORDER BY total DESC"
-        )
-
-        # Get circuit-breaker states
-        cb_rows = await self._query_maop(
-            "SELECT agent, state, failures, threshold FROM circuit_breaker_state"
+        # Perf opt: 两个独立查询并行执行，总延迟从 sum(两查询)
+        # 降为 max(两查询)。原串行实现每次调用阻塞 ~2 × 单查询延迟。
+        rows, cb_rows = await asyncio.gather(
+            self._query_maop(
+                "SELECT agent, "
+                "COUNT(*) as total, "
+                "SUM(CASE WHEN exit_code = 0 THEN 1 ELSE 0 END) as successes, "
+                "AVG(CASE WHEN exit_code = 0 THEN 1.0 ELSE 0.0 END) as success_rate "
+                "FROM delegations GROUP BY agent ORDER BY total DESC"
+            ),
+            self._query_maop(
+                "SELECT agent, state, failures, threshold FROM circuit_breaker_state"
+            ),
         )
         cb_map = {r["agent"]: r for r in cb_rows}
 
@@ -263,54 +267,70 @@ class DataProxy(
         """
         start = time.monotonic()
 
-        # Recent delegations (last 5 min)
+        # Perf opt: 三个独立 DB 查询并行执行，总延迟从 3 × 单查询
+        # 降为 1 × 最慢查询。原串行实现每次调用阻塞 ~3 × 单查询延迟。
         since = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
-        recent = await self._query_maop(
-            "SELECT agent, task, exit_code, duration_ms, timestamp "
-            "FROM delegations WHERE timestamp >= ? "
-            "ORDER BY timestamp DESC LIMIT 20",
-            (since,),
-        )
-
-        # Open circuit breakers
-        open_breakers = await self._query_maop(
-            "SELECT agent, state, failures FROM circuit_breaker_state "
-            "WHERE state = 'open'"
-        )
-
-        # Error log (last 10)
-        errors = await self._query_maop(
-            "SELECT agent, error, timestamp FROM error_log "
-            "ORDER BY timestamp DESC LIMIT 10"
+        recent, open_breakers, errors = await asyncio.gather(
+            self._query_maop(
+                "SELECT agent, task, exit_code, duration_ms, timestamp "
+                "FROM delegations WHERE timestamp >= ? "
+                "ORDER BY timestamp DESC LIMIT 20",
+                (since,),
+            ),
+            self._query_maop(
+                "SELECT agent, state, failures FROM circuit_breaker_state "
+                "WHERE state = 'open'"
+            ),
+            self._query_maop(
+                "SELECT agent, error, timestamp FROM error_log "
+                "ORDER BY timestamp DESC LIMIT 10"
+            ),
         )
 
         # Frontend contract (Monitor.vue): add requests_per_min, queue_depth,
         # cost_per_hour, agents[] while keeping legacy fields for backward compat.
         requests_per_min = round(len(recent) / 5.0, 1) if recent else 0.0
-        try:
-            qstats = await asyncio.get_event_loop().run_in_executor(
-                None, self._queue_stats_sync
-            )
-            queue_depth = qstats.get("pending", 0)
-        except Exception:
-            queue_depth = 0
-        try:
-            agent_rows = await self.agent_stats()
-            agents_list = [
-                {
-                    "name": a.get("agent", ""),
-                    "healthy": a.get("circuit_breaker", "closed") == "closed",
-                    "queue": queue_depth,
-                    "load": min(100, max(0, round(100 - a.get("success_rate", 100.0)))),
-                }
-                for a in agent_rows
-            ]
-        except Exception:
-            agents_list = []
+
+        # Perf opt: queue_stats 和 agent_stats 是独立操作，并行执行。
+        # queue_stats 通过线程池执行同步队列查询，agent_stats 通过
+        # 线程池执行 DB 查询，两者无数据依赖。
+        async def _get_queue_depth() -> int:
+            try:
+                qstats = await asyncio.get_event_loop().run_in_executor(
+                    None, self._queue_stats_sync
+                )
+                return qstats.get("pending", 0)
+            except Exception:
+                return 0
+
+        async def _get_agent_rows() -> list[dict[str, Any]]:
+            try:
+                return await self.agent_stats()
+            except Exception:
+                return []
+
+        queue_depth, agent_rows = await asyncio.gather(
+            _get_queue_depth(),
+            _get_agent_rows(),
+        )
+        agents_list = [
+            {
+                "name": a.get("agent", ""),
+                "healthy": a.get("circuit_breaker", "closed") == "closed",
+                "queue": queue_depth,
+                "load": min(100, max(0, round(100 - a.get("success_rate", 100.0)))),
+            }
+            for a in agent_rows
+        ]
         cost_per_hour = 0.0
         try:
-            from maop.core.cost_tracker import CostTracker
-            ct = CostTracker(root_dir=str(self._root))
+            # Perf opt: 复用缓存的 CostTracker 实例，避免每 15s 重复
+            # 创建实例并执行 _init_db()。CostTracker 是线程安全的
+            # （内部使用 sqlite_connect 上下文管理器，每次查询独立连接）。
+            if self._cost_tracker is None:
+                from maop.core.cost_tracker import CostTracker
+                self._cost_tracker = CostTracker(root_dir=str(self._root))
+            ct = self._cost_tracker
             hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
             csum = ct.summary(start_date=hour_ago)
             cost_per_hour = round(getattr(csum, "total_cost_usd", 0.0), 4)

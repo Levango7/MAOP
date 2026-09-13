@@ -68,9 +68,14 @@ async def _ws_push_loop() -> Any:
                 snapshot = _ws_snapshot_cache
             else:
                 bridge = _state.get_bridge()
-                live = await bridge.live()
-                report = await bridge.report(hours=48)
-                ts = await bridge.timeseries(hours=168)
+                # Perf opt: 三个独立查询并行执行，总延迟从 sum(各查询)
+                # 降为 max(各查询)。原串行实现每 15s 阻塞事件循环
+                # ~3 × 单查询延迟；并行后仅 1 × 最慢查询延迟。
+                live, report, ts = await asyncio.gather(
+                    bridge.live(),
+                    bridge.report(hours=48),
+                    bridge.timeseries(hours=168),
+                )
                 snapshot = {"type": "snapshot", "ts": now, "live": live, "report": report, "timeseries": ts}
                 _ws_snapshot_cache = snapshot
                 _ws_snapshot_ts = now
