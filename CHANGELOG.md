@@ -49,6 +49,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **hot_reload 监视范围扩展**：从仅监视 3 个配置文件扩展至 5 个（新增 `mcp_servers.yaml` / `tool_whitelist.yaml`），防止 MCP 配置漂移未检测。
 - **RateLimitMiddleware 死代码清除**：删除 `_lock_time: dict[str, float] = {}`（未在运行时读取）。
 
+### Fixed（第六轮+第七轮 — 2026-09-14）
+
+> 第六轮审查发现 28 项问题（2P0+8P1+16P2+2P3），第七轮验证发现 2 处遗漏，全部修复。测试 7742 通过，零回归。
+
+#### P0 严重
+- **登录限流多实例失效**：`auth.py` 将进程内 dict（`_login_failures`/`_login_failures_by_ip`）迁移到 SQLite 表 `login_failures`（复合主键 `(key, kind)`），多实例部署共享计数；时间戳从 `time.monotonic()` 改为 `time.time()`（跨进程可比）；保留 LRU 淘汰防表无限增长。
+- **自演化闭环未完成却宣传**：`ROADMAP.md` v5.2.0 节标注"开发中（planned）"+ ⚠️ 警告，不再标注"阶段二启动"。
+
+#### P1 高
+- **StdioTransport 并发竞态**：`mcp_hub_transport.py` `send_request` 中 `self._request_id += 1` 后用局部变量 `request_id` 快照，后续匹配全用局部变量，避免协程间竞态。
+- **TenantManager 无锁保护**：`tenant.py` 加 `threading.RLock()`，9 个公共方法全部 `with self._lock:` 包裹。
+- **asyncio.shield 超时后任务泄漏**：`subagent_lifecycle.py` `except TimeoutError` 分支增加 `atask.cancel()` + `await atask` 等待终止。
+- **SQLite 数据库损坏崩溃**：`db_utils.py` 抽取 `_open_and_init()`，捕获 `sqlite3.DatabaseError` 后删除 db+侧车文件重建空库，仅重试一次。
+- **Agent 可用数与宣传不符**：`README.md` 修正为"26 个开箱可用 + 5 个需额外配置"。
+- **OnboardingWizard 死链**：删除废弃组件 `OnboardingWizard.vue`。
+- **404 静默重定向无反馈**：新建 `NotFound.vue`（404 提示+3秒倒计时），`router/index.js` catch-all 从 `redirect` 改为 `component`。
+- **JWT TTL 硬编码**：`auth.py` 提取 `_JWT_TTL_S = float(os.getenv("MAOP_JWT_TTL_S", "7200"))`，替换全部 7 处硬编码。
+
+#### P2 中
+- **choices 空列表 IndexError**：`(response.get("choices") or [{}])[0]` 模式修复 4 处（`maop_execute.py`/`react_loop.py`/`llm_providers.py`×2）。
+- **context_compressor content 类型混淆**：新增 `_normalize_content` 静态方法，处理 None/str/list/其他类型，修复 8 处。
+- **memory/search content 为 None**：`(m["content"] or "")` 保护修复 5 处（含第七轮验证发现的 2 处遗漏）。
+- **desktop_app_adapter decode 缺 errors**：`.decode("utf-8", errors="replace")`。
+- **LDAP 控件值索引越界**：`len()` 检查后再取索引。
+- **web_adapter response_path 遍历错误**：try-except 包裹 `current[int(key)]`。
+- **health_check_scheduler 线程泄漏**：`_leaked_workers` 列表跟踪 + `_max_leaked_threads` 阈值限制。
+- **deploy.py Popen 管道未读取**：后台 daemon 线程排空管道。
+- **跨线程 coroutine 循环绑定**：`evolution_phases.py`/`mcp_bridge_adapter.py` 捕获 `RuntimeError`。
+- **SELECT * 改明确列名**：`agent_versions.py` 7 处、`feedback.py` 5 处，使用模块级列名常量。
+- **prometheus-alerts.yml 注释过时**：更新为实际 metrics 来源。
+
 ### Changed
 - **PyPI 包名变更**：`maop` → `maop-orchestrator`（PyPI 上 `maop` 被他人占用）。`import maop` 不变，仅 `pip install maop-orchestrator`。`pyproject.toml` 新增 `[tool.hatch.build.targets.wheel] packages = ["maop"]` 确保 import 名不变。14 个文档文件同步更新。
 - **48h 长稳测试脚本**：新建 `scripts/run_soak_48h.ps1`（一键启动/停止/查看）+ `deliverables/soak-test-report-48h.md`（监控指南 + 结果模板）。
