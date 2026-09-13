@@ -101,7 +101,7 @@
   border: 2px solid var(--surface);
   box-shadow: 0 0 0 3px var(--brand-soft);
   flex-shrink: 0;
-  margin-top: 4px;
+  margin-top: var(--sp-1);
   z-index: var(--z-raised);
 }
 .activity-body { flex: 1; min-width: 0; }
@@ -646,7 +646,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .welcome-msg p { max-width: 360px; margin: 0 auto; line-height: 1.6; }
 .welcome-icon { color: var(--brand); opacity: .5; margin-bottom: var(--sp-3); }
 /* R11 修复: 合并自第588行重复定义 (font-size/color/margin 已统一到此) */
-.agent-select label { font-size: var(--fs-xs); color: var(--text-muted); display: block; margin-bottom: 4px; }
+.agent-select label { font-size: var(--fs-xs); color: var(--text-muted); display: block; margin-bottom: var(--sp-1); }
 .agent-hint { display: flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--warn); }
 .char-count { color: var(--text-faint); }
 .streaming .msg-bubble { border-left: 3px solid var(--brand); }
@@ -869,7 +869,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 }
 .control-panel .row-main .agent-field {
   font-size: var(--fs-xs); color: var(--text-muted);
-  display: inline-flex; align-items: center; gap: 4px;
+  display: inline-flex; align-items: center; gap: var(--sp-1);
 }
 .control-panel .row-main .agent-field .field-label { color: var(--text-faint); }
 .control-panel .row-main .agent-field .field-val { color: var(--text); font-family: var(--font-mono); font-size: var(--fs-2xs); }
@@ -917,7 +917,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   width: 42px; height: 42px; border-radius: var(--r-full); flex-shrink: 0;
   display: grid; place-items: center; color: var(--brand-contrast); font-weight: 700; font-size: var(--fs-lg-plus);
 }
-.agent-identity { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.agent-identity { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
 .agent-identity h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-desc { margin: 0 0 var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 

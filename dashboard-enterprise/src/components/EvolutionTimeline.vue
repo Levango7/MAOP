@@ -306,7 +306,7 @@ const nodes = computed(() => {
   min-height: 64px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-1);
   transition: border-color var(--motion) var(--ease);
 }
 .evo-timeline__card:hover { border-color: var(--border-strong); }
@@ -343,7 +343,7 @@ const nodes = computed(() => {
 .evo-timeline__badge {
   display: inline-flex;
   align-items: center;
-  padding: 1px 8px;
+  padding: 1px var(--sp-2);
   border-radius: var(--r-full);
   font-size: var(--fs-xs);
   font-weight: 600;

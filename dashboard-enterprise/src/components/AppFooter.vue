@@ -79,7 +79,7 @@ const realtimeConnected = computed(() => realtime.connected);
 .app-footer__copy { color: var(--text-faint); white-space: nowrap; }
 
 @media (max-width: 900px) {  /* F7: 断点统一 899px → 900px，与 pages.css / 项目其他组件一致 */
-  .app-footer { padding: var(--sp-2) 16px; }
+  .app-footer { padding: var(--sp-2) var(--sp-4); }
   .app-footer__inner { justify-content: center; gap: var(--sp-1); }
   .app-footer__copy { width: 100%; text-align: center; }
 }

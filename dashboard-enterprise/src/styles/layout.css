@@ -52,7 +52,7 @@
 
 /* Subtitle under a page title */
 .page-head__sub {
-  margin: 4px 0 0;
+  margin: var(--sp-1) 0 0;
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
@@ -106,7 +106,7 @@
   .field-row { flex-direction: column; align-items: stretch; }
   .field-row > .field-label { min-width: 0; }
   .grid-cards { grid-template-columns: 1fr; }
-  .content-shell { padding: 16px; }
+  .content-shell { padding: var(--sp-4); }
 }
 
 /* ── Responsive step ladder (tablet → phone, density-independent) ─────────

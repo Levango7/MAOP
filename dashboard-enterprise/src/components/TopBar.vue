@@ -227,7 +227,7 @@ onMounted(() => {
 /* 右上品牌微光: --topbar-glow 为 none, 伪元素无视觉效果, 已移除避免多余渲染 */
 
 /* ① 品牌区 */
-.topbar__brand { display: flex; align-items: center; gap: 12px; flex-shrink: 0; position: relative; }
+.topbar__brand { display: flex; align-items: center; gap: var(--sp-3); flex-shrink: 0; position: relative; }
 .topbar__logo {
   display: grid; place-items: center;
   width: 34px; height: 34px;
@@ -238,7 +238,7 @@ onMounted(() => {
   position: relative;
 }
 .topbar__brandtext { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
-.topbar__brandname-row { display: flex; align-items: baseline; gap: 8px; }
+.topbar__brandname-row { display: flex; align-items: baseline; gap: var(--sp-2); }
 .topbar__brandname {
   font-size: var(--fs-lg); font-weight: 700; color: var(--text);
   letter-spacing: -0.012em;
@@ -260,7 +260,7 @@ onMounted(() => {
   letter-spacing: .015em; margin-top: 1px;
 }
 .topbar__statusline {
-  display: flex; align-items: center; gap: 8px; margin-top: 3px;
+  display: flex; align-items: center; gap: var(--sp-2); margin-top: 3px;
   font-size: var(--fs-2xs); color: var(--text-faint);
 }
 .topbar__live { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
@@ -276,7 +276,7 @@ onMounted(() => {
 }
 .topbar__ver {
   font-family: var(--font-mono);
-  padding-left: 8px;
+  padding-left: var(--sp-2);
   border-left: 1px solid var(--border-subtle);
   color: var(--text-faint);
 }
@@ -292,7 +292,7 @@ onMounted(() => {
 /* ② 刷新区 */
 .topbar__refresh {
   display: flex; align-items: center; gap: 10px;
-  padding: 5px 12px 5px 5px;
+  padding: 5px var(--sp-3) 5px 5px;
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-full);
@@ -333,7 +333,7 @@ onMounted(() => {
 /* ②.5 分析快速入口: 轻量胶囊按钮, 复用 design token, 不破坏顶栏紧凑布局 */
 .topbar__quick-analysis {
   display: flex; align-items: center; gap: 6px;
-  padding: 5px 12px;
+  padding: 5px var(--sp-3);
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-full);
@@ -398,7 +398,7 @@ onMounted(() => {
   letter-spacing: -0.005em;
 }
 .topbar__userrole {
-  display: inline-flex; align-items: center; gap: 4px;
+  display: inline-flex; align-items: center; gap: var(--sp-1);
   font-size: var(--fs-2xs); color: var(--brand-strong);
   font-weight: 600; letter-spacing: .02em;
   margin-top: 1px;
@@ -410,7 +410,7 @@ onMounted(() => {
 
 .topbar__logout-btn {
   display: flex; align-items: center; gap: 6px;
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   background: var(--surface-2); border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
   color: var(--fail); font-size: var(--fs-xs);
@@ -443,10 +443,10 @@ onMounted(() => {
   .topbar__pref-group--density { display: none; }
   .topbar__usermeta { display: none; }
   .topbar__logout-text { display: none; }
-  .topbar__refresh { padding: 4px; }
+  .topbar__refresh { padding: var(--sp-1); }
   .topbar__refreshmeta { display: none; }
   .topbar__divider { display: none; }
-  .topbar__avatar-btn { padding: 4px; }
+  .topbar__avatar-btn { padding: var(--sp-1); }
   .topbar__brandedition { display: none; }
 }
 

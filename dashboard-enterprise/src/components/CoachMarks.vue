@@ -244,7 +244,7 @@ onBeforeUnmount(() => {
   padding: var(--sp-4);
 }
 .coach-marks__step { font-size: var(--fs-xs); color: var(--text-faint); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.coach-marks__title { font-size: var(--fs-md); font-weight: 700; color: var(--text); margin: 4px 0 var(--sp-2); }
+.coach-marks__title { font-size: var(--fs-md); font-weight: 700; color: var(--text); margin: var(--sp-1) 0 var(--sp-2); }
 .coach-marks__body { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.55; margin-bottom: var(--sp-3); }
 .coach-marks__actions { display: flex; justify-content: space-between; gap: var(--sp-2); }
 .coach-marks__skip {
