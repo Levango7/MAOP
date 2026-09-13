@@ -155,4 +155,11 @@ function formatTime(ts) {
 .node-detail-panel__status-failed .node-detail-panel__status-dot, .node-detail-panel__status-dot.status-failed { background: var(--fail); }
 .node-detail-panel__status-skipped { color: var(--warn); }
 .node-detail-panel__status-skipped .node-detail-panel__status-dot, .node-detail-panel__status-dot.status-skipped { background: var(--warn); }
+
+/* a11y: 键盘焦点环 (P0 focus-visible 补充) */
+.node-detail-panel__close:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 </style>

@@ -6,7 +6,7 @@
         <div class="dag-progress-fill" :style="{ width: progress + '%' }"></div>
       </div>
       <span class="dag-progress-text">{{ completedCount }} / {{ totalNodes }} ({{ progress }}%)</span>
-      <span class="dag-conn-indicator" :class="connected ? 'on' : 'off'" :title="connected ? 'Connected' : 'Disconnected'"></span>
+      <span class="dag-conn-indicator" :class="connected ? 'on' : 'off'" :title="connected ? t('dag.connected') : t('dag.disconnected')"></span>
     </div>
 
     <!-- DAG visualization (SVG) -->

@@ -1,6 +1,6 @@
 <template>
   <!-- 顶部 2px 品牌色加载条: 由全局事件 maop-loading-start / maop-loading-stop 控制 -->
-  <div v-if="loading" class="maop-loading-bar" role="progressbar" aria-label="loading"></div>
+  <div v-if="loading" class="maop-loading-bar" role="progressbar" :aria-label="t('a11y.loading')"></div>
 </template>
 
 <script setup>
@@ -10,6 +10,9 @@
 // 所有 addEventListener 均在 onUnmounted 中配对 removeEventListener,
 // handler 使用命名函数引用以保证移除成功 (经验: 匿名箭头函数无法移除)。
 import { ref, onUnmounted } from 'vue'
+import { useI18n } from '../i18n'
+
+const { t } = useI18n()
 
 const loading = ref(false)
 

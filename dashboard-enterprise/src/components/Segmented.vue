@@ -82,7 +82,7 @@ function moveTo(i) {
 .segmented--sm .segmented__item { padding: 3px var(--sp-2); font-size: var(--fs-xs); }
 .segmented__item:hover { color: var(--text); }
 .segmented__item:active { transform: scale(0.97); }
-.segmented__item:disabled { opacity: 0.45; cursor: not-allowed; }
+.segmented__item:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 .segmented__item.active {
   background: var(--surface);
   color: var(--brand-strong);
@@ -91,4 +91,11 @@ function moveTo(i) {
 /* Equal-width mode: all buttons share the same width regardless of label length */
 .segmented--equal { display: inline-flex; }
 .segmented--equal .segmented__item { flex: 1 1 0; min-width: 0; }
+
+/* a11y: 键盘焦点环 (P0 focus-visible 补充) */
+.segmented__item:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 </style>

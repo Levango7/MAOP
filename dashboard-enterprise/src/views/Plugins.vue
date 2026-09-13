@@ -192,9 +192,9 @@
         @click.self="closeConfig"
         @modal:escape="closeConfig"
       >
-        <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="plugins-modal-config-title">
           <div class="modal__head">
-            <h3>{{ t('view.plugins.modal.configTitle') }}</h3>
+            <h3 id="plugins-modal-config-title">{{ t('view.plugins.modal.configTitle') }}</h3>
             <button class="modal__x" type="button" :aria-label="t('common.close')" @click="closeConfig">
               <AppIcon name="x" :size="16" />
             </button>

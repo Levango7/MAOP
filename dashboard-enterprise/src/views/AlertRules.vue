@@ -622,6 +622,7 @@ onMounted(loadAll);
   transition: border-color var(--motion) var(--ease);
 }
 .input:focus { outline: none; border-color: var(--brand); }
+.input:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--brand); }
 
 /* ── 详情面板 ── */
 .detail-content { display: flex; flex-direction: column; gap: var(--sp-4); }

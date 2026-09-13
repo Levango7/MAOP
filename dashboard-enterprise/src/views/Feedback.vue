@@ -593,11 +593,14 @@ onMounted(() => {
 .mono { font-family: var(--font-mono); font-size: var(--fs-xs); }
 
 /* ── Buttons ───────────────────────────────────────────────────── */
+/* NOTE: .btn-ghost/.btn-primary/.modal 等为多 view 共享样式，重复定义见
+   AgentBilling/AgentGateway/AgentProxy/AgentRegistry/Analysis/Blackboard/Debate。
+   全局基础样式见 src/styles/pages.css（BEM 命名 .btn--ghost），此处 scoped 隔离不冲突。 */
 .btn-ghost {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  padding: var(--sp-1) var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--surface);

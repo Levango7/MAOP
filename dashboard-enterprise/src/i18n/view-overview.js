@@ -51,6 +51,11 @@ export const messages = {
     'view.overview.getLicense': 'MAOS Enterprise',
     'view.overview.colRate': 'Rate',
 
+    // ── Edition 标签（i18n 化名）──
+    'view.overview.edition.personal': 'Personal',
+    'view.overview.edition.team': 'Team',
+    'view.overview.edition.enterprise': 'Enterprise',
+
     // ── Plan-Execute-Verify (MAOS 企业版差异化) ──────────────
     'view.overview.pev.title': 'Plan → Execute → Verify',
     'view.overview.pev.subtitle': 'MAOS enterprise workflow — every delegation runs through a closed three-phase loop',
@@ -121,6 +126,11 @@ export const messages = {
     'view.overview.colRate': '比率',
     'view.overview.maosUpgrade': '想要 SSO 单点登录、RBAC 权限、审计日志？升级到',
     'view.overview.getLicense': 'MAOS 企业版',
+
+    // ── Edition 标签（i18n 化名）──
+    'view.overview.edition.personal': '个人版',
+    'view.overview.edition.team': '团队版',
+    'view.overview.edition.enterprise': '企业版',
 
     // ── Plan-Execute-Verify 工作流叙事 (企业版差异化) ──────────────
     'view.overview.pev.title': '规划 → 执行 → 验证',

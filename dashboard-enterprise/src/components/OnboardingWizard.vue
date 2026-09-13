@@ -14,12 +14,13 @@
         <h2>{{ t('view.onboard.title') }}</h2>
       </template>
       <template #actions>
-        <button class="onboard-wizard__skip" @click="skip">{{ t('view.onboard.skip') }}</button>
+        <button type="button" class="onboard-wizard__skip" @click="skip">{{ t('view.onboard.skip') }}</button>
       </template>
 
       <nav class="onboard-wizard__steps">
         <button
 v-for="(s, i) in steps" :key="i"
+          type="button"
           class="onboard-wizard__step-dot" :class="{ 'onboard-wizard__step-dot--active': i === step, 'onboard-wizard__step-dot--done': i < step }"
           :disabled="i > step" @click="step = i">
           <span>{{ i + 1 }}</span>
@@ -51,7 +52,7 @@ v-for="(s, i) in steps" :key="i"
           <div class="onboard-wizard__quick-actions">
             <a href="/docs" target="_blank" class="btn btn-ghost">{{ t('view.onboard.readDocs') }}</a>
           </div>
-          <button class="btn btn-primary" @click="finish">{{ t('view.onboard.done') }}</button>
+          <button type="button" class="btn btn-primary" @click="finish">{{ t('view.onboard.done') }}</button>
         </div>
       </div>
     </Card>
@@ -127,10 +128,21 @@ useModalA11y(
 .onboard-wizard__step-dot--active { color: var(--brand); }
 .onboard-wizard__step-dot--done { color: var(--success); }
 .onboard-wizard__step-dot:active:not(:disabled) { transform: scale(0.95); }
-.onboard-wizard__step-dot:disabled { opacity: 0.4; cursor: not-allowed; }
+.onboard-wizard__step-dot:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 .onboard-wizard__body { padding: var(--sp-6); }
 /* 修复: 1rem token 化 → var(--sp-4); 0.5rem → var(--sp-2) */
 .onboard-wizard__step-content p { margin-bottom: var(--sp-4); color: var(--text-muted); }
 .onboard-wizard__quick-actions { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-4); }
 .onboard-wizard__hint { font-size: var(--fs-xs); color: var(--text-muted); }
+
+/* a11y: 键盘焦点环 (P0 focus-visible 补充) */
+.onboard-wizard__skip:focus-visible,
+.onboard-wizard__step-dot:focus-visible,
+.onboard-wizard__quick-actions a:focus-visible,
+.onboard-wizard__quick-actions .btn:focus-visible,
+.onboard-wizard__body .btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 </style>

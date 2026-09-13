@@ -250,7 +250,7 @@ function formatRel(ts) {
 }
 .dt__pager-btn:active:not(:disabled) { transform: scale(0.95); }
 .dt__pager-btn:disabled {
-  opacity: 0.45;
+  opacity: var(--op-disabled);
   cursor: not-allowed;
 }
 .dt__pager-info {
@@ -260,5 +260,13 @@ function formatRel(ts) {
   /* min-width 60px 为分页信息区视觉规格固定值 */
   min-width: 60px;
   text-align: center;
+}
+
+/* a11y: 键盘焦点环 (P0 focus-visible 补充) */
+.dt th.sortable:focus-visible,
+.dt__pager-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
 }
 </style>

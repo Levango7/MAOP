@@ -880,6 +880,7 @@ onUnmounted(() => {
   font-family: inherit;
 }
 .form-input:focus { outline: none; border-color: var(--brand); }
+.form-input:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--brand); }
 .form-check { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
 
 /* ── 通用按钮 ── */

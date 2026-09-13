@@ -235,8 +235,8 @@
       @click.self="showAdjust = false"
       @modal:escape="showAdjust = false"
     >
-      <div class="modal">
-        <h3>{{ t('view.quotas.adjustTitle') }}</h3>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="quotas-adjust-modal-title">
+        <h3 id="quotas-adjust-modal-title">{{ t('view.quotas.adjustTitle') }}</h3>
         <p class="muted">{{ t('view.quotas.adjustFor', { name: adjustTarget ? (adjustTarget.name || adjustTarget.tenant_id) : '' }) }}</p>
         <div class="adjust-form">
           <div v-for="r in RESOURCES" :key="r.key" class="adjust-row">

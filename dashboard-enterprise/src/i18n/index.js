@@ -338,6 +338,8 @@ export const coreMessages = {
     'a11y.yes': 'Yes',
     'a11y.no': 'No',
     'a11y.search': 'Search',
+    'a11y.closeNotification': 'Close notification',
+    'a11y.loading': 'Loading',
 
     // ── Observability view (P3: 替换 Observability.vue 中硬编码英文字符串) ──
     'view.observability.enterprise': 'Enterprise',
@@ -381,6 +383,8 @@ export const coreMessages = {
     // ── DagGraph 组件 (R4审查补充) ──────────────────────────
     'dag.emptyHint': 'Enter an execution ID to subscribe to DAG progress.',
     'dag.connecting': 'Connecting to execution {id}…',
+    'dag.connected': 'Connected',
+    'dag.disconnected': 'Disconnected',
   },
   zh: {
     // ── F34 修复: core 键中文翻译补全 (nav/status/action/footer/settings/common/coach/palette/error) ──
@@ -703,6 +707,8 @@ export const coreMessages = {
     'a11y.yes': '是',
     'a11y.no': '否',
     'a11y.search': '搜索',
+    'a11y.closeNotification': '关闭通知',
+    'a11y.loading': '加载中',
 
     // ── Observability view (P3: Observability.vue 硬编码英文的中文翻译) ──
     'view.observability.enterprise': '企业版',
@@ -746,6 +752,8 @@ export const coreMessages = {
     // ── DagGraph 组件 (R4审查补充) ──────────────────────────
     'dag.emptyHint': '输入执行 ID 以订阅 DAG 进度。',
     'dag.connecting': '正在连接执行 {id}…',
+    'dag.connected': '已连接',
+    'dag.disconnected': '已断开',
   },
 };
 

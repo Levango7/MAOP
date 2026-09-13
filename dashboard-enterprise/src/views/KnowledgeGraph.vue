@@ -43,7 +43,7 @@
     <div class="kg-layout">
       <!-- Left: filter panel -->
       <aside class="kg-filter">
-        <Card :title="t('view.kg.filter.title')" icon="filter" :margin-bottom="12">
+        <Card :title="t('view.kg.filter.title')" icon="filter" margin-bottom="var(--sp-3)">
           <div class="kg-filter-section">
             <div class="kg-filter-label">{{ t('view.kg.filter.nodeTypes') }}</div>
             <label v-for="tp in NODE_TYPES" :key="tp" class="kg-checkbox">
@@ -106,7 +106,7 @@
         </Card>
 
         <!-- Timeline (T20) -->
-        <Card :title="t('view.kg.timeline.title')" icon="clock" :margin-bottom="12">
+        <Card :title="t('view.kg.timeline.title')" icon="clock" margin-bottom="var(--sp-3)">
           <div class="kg-timeline">
             <div class="kg-timeline-row">
               <label>{{ t('view.kg.timeline.start') }}</label>
@@ -917,6 +917,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   z-index: var(--z-raised);
 }
 .kg-spin { animation: maop-spin 1s linear infinite; }
+@keyframes maop-spin { to { transform: rotate(360deg); } }
 
 /* ── Detail panel ── */
 .kg-detail { display: flex; flex-direction: column; }

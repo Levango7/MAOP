@@ -262,4 +262,12 @@ onBeforeUnmount(() => {
 
 .cm-enter-active, .cm-leave-active { transition: opacity var(--motion-fast) var(--ease); }
 .cm-enter-from, .cm-leave-to { opacity: 0; }
+
+/* a11y: 键盘焦点环 (P0 focus-visible 补充) */
+.coach-marks__skip:focus-visible,
+.coach-marks__next:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 </style>

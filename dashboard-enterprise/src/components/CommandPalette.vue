@@ -230,4 +230,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
 .palette-enter-active, .palette-leave-active { transition: opacity var(--motion-fast) var(--ease); }
 .palette-enter-from, .palette-leave-to { opacity: 0; }
+
+/* a11y: 键盘焦点环 (P0 focus-visible 补充)
+ * .cmdpal__input 有 outline:none 覆盖全局 :focus-visible, 需显式恢复 */
+.cmdpal__input:focus-visible,
+.cmdpal__item:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 </style>

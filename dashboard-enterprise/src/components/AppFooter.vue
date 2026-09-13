@@ -83,4 +83,11 @@ const realtimeConnected = computed(() => realtime.connected);
   .app-footer__inner { justify-content: center; gap: var(--sp-1); }
   .app-footer__copy { width: 100%; text-align: center; }
 }
+
+/* a11y: 键盘焦点环 (P0 focus-visible 补充) */
+.app-footer__link:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 </style>

@@ -151,9 +151,9 @@
         @click.self="closeAddModal"
         @modal:escape="closeAddModal"
       >
-        <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="protocols-modal-add-title">
           <div class="modal__head">
-            <h3>{{ t('view.protocols.modal.addTitle') }}</h3>
+            <h3 id="protocols-modal-add-title">{{ t('view.protocols.modal.addTitle') }}</h3>
             <button class="modal__x" type="button" :aria-label="t('common.close')" @click="closeAddModal">
               <AppIcon name="x" :size="16" />
             </button>

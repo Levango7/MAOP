@@ -281,9 +281,9 @@
         @click.self="closeServerModal"
         @modal:escape="closeServerModal"
       >
-        <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mcp-modal-server-title">
           <div class="modal__head">
-            <h3>{{ editingServer ? t('view.mcp.modal.editTitle') : t('view.mcp.modal.addTitle') }}</h3>
+            <h3 id="mcp-modal-server-title">{{ editingServer ? t('view.mcp.modal.editTitle') : t('view.mcp.modal.addTitle') }}</h3>
             <button class="modal__x" type="button" :aria-label="t('common.close')" @click="closeServerModal">
               <AppIcon name="x" :size="16" />
             </button>
@@ -349,9 +349,9 @@
         @click.self="closeDeleteConfirm"
         @modal:escape="closeDeleteConfirm"
       >
-        <div class="modal modal--sm" role="dialog" aria-modal="true">
+        <div class="modal modal--sm" role="dialog" aria-modal="true" aria-labelledby="mcp-modal-delete-title">
           <div class="modal__head">
-            <h3>{{ t('common.confirm') }}</h3>
+            <h3 id="mcp-modal-delete-title">{{ t('common.confirm') }}</h3>
             <button class="modal__x" type="button" :aria-label="t('common.close')" @click="closeDeleteConfirm">
               <AppIcon name="x" :size="16" />
             </button>

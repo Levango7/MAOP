@@ -75,7 +75,11 @@
             :key="n.id"
             class="notif-row"
             :class="{ 'is-unread': !n.read, ['lvl-' + n.level]: true }"
+            role="button"
+            tabindex="0"
             @click="openDetail(n)"
+            @keydown.enter="openDetail(n)"
+            @keydown.space.prevent="openDetail(n)"
           >
             <span class="notif-row__bar" :class="'bar-' + n.level" aria-hidden="true" />
             <span class="notif-row__icon" :class="'ic-' + n.level">
@@ -177,8 +181,8 @@
       @click.self="prefOpen = false"
       @modal:escape="prefOpen = false"
     >
-      <div class="modal">
-        <h3>{{ t('view.notifications.preferencesTitle') }}</h3>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="notif-pref-modal-title">
+        <h3 id="notif-pref-modal-title">{{ t('view.notifications.preferencesTitle') }}</h3>
         <p class="modal-desc">{{ t('view.notifications.preferencesDesc') }}</p>
         <div v-if="prefError" class="modal-error">{{ prefError }}</div>
         <table class="pref-table">
@@ -558,6 +562,7 @@ onMounted(loadAll);
 .act-btn.danger { color: var(--fail); }
 .act-btn.danger:hover:not(:disabled) { border-color: var(--fail); background: var(--fail-soft); }
 .spinning { animation: maop-spin 1s linear infinite; }
+@keyframes maop-spin { to { transform: rotate(360deg); } }
 
 /* ── Notification list ── */
 .notif-list { display: flex; flex-direction: column; gap: var(--sp-2); }

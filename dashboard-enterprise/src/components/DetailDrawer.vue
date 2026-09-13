@@ -142,4 +142,11 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 .drawer-enter-from, .drawer-leave-to { opacity: 0; }
 .drawer-enter-active .detail-drawer__panel { transition: transform var(--motion-normal) var(--ease); }
 .drawer-enter-from .detail-drawer__panel, .drawer-leave-to .detail-drawer__panel { transform: translateX(100%); }
+
+/* a11y: 键盘焦点环 (P0 focus-visible 补充) */
+.detail-drawer__close:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 </style>

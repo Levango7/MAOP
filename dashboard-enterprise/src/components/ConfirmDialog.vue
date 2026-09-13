@@ -12,10 +12,11 @@
       <div v-if="confirmState.title" class="confirm-dialog__title">{{ confirmState.title }}</div>
       <div class="confirm-dialog__message">{{ confirmState.message }}</div>
       <div class="confirm-dialog__actions">
-        <button class="confirm-dialog__cancel" @click="onCancel">
+        <button type="button" class="confirm-dialog__cancel" @click="onCancel">
           {{ confirmState.cancelText || t('common.cancel') }}
         </button>
         <button
+          type="button"
           class="confirm-dialog__confirm"
           :class="'confirm-dialog__confirm--' + confirmState.tone"
           @click="onConfirm"
@@ -121,5 +122,13 @@ function onCancel() { resolve(false); }
 }
 .confirm-dialog__confirm--info:hover {
   background: var(--brand-strong);
+}
+
+/* a11y: 键盘焦点环 (P0 focus-visible 补充) */
+.confirm-dialog__cancel:focus-visible,
+.confirm-dialog__confirm:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
 }
 </style>

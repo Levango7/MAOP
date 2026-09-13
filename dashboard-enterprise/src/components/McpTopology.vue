@@ -336,5 +336,12 @@ watch(
 }
 .mcp-topo__btn:hover { background: var(--surface-hover); border-color: var(--border-strong); }
 .mcp-topo__btn:active:not(:disabled) { transform: scale(0.97); }
-.mcp-topo__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.mcp-topo__btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
+
+/* a11y: 键盘焦点环 (P0 focus-visible 补充) */
+.mcp-topo__btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 </style>

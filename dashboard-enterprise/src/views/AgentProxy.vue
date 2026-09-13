@@ -555,11 +555,14 @@ onMounted(() => {
 .mono { font-family: var(--font-mono); font-size: var(--fs-xs); }
 
 /* ── Buttons ───────────────────────────────────────────────────── */
+/* NOTE: .btn-ghost/.btn-primary/.modal 等为多 view 共享样式，重复定义见
+   AgentBilling/AgentGateway/AgentRegistry/Analysis/Blackboard/Debate/Feedback。
+   全局基础样式见 src/styles/pages.css（BEM 命名 .btn--ghost），此处 scoped 隔离不冲突。 */
 .btn-ghost {
   display: inline-flex; align-items: center; gap: var(--sp-1);
   background: var(--surface-2); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--r-md);
-  padding: 7px var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
+  padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
 .btn-ghost:hover { opacity: .9; }
@@ -703,6 +706,7 @@ onMounted(() => {
   transition: border-color var(--motion) var(--ease);
 }
 .field__input:focus { outline: none; border-color: var(--brand); }
+.field__input:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--brand); }
 .field__select {
   appearance: none; -webkit-appearance: none;
   background-image: var(--icon-chevron);
@@ -720,6 +724,7 @@ onMounted(() => {
   transition: border-color var(--motion) var(--ease);
 }
 .field__textarea:focus { outline: none; border-color: var(--brand); }
+.field__textarea:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--brand); }
 
 /* ── Modal ─────────────────────────────────────────────────────── */
 .modal-overlay {

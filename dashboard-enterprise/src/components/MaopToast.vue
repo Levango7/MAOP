@@ -13,7 +13,7 @@
       <span class="maop-toast__msg">{{ item.message }}</span>
       <button
         class="maop-toast__close"
-        :aria-label="'close notification'"
+        :aria-label="t('a11y.closeNotification')"
         @click="dismiss(item.id)"
       >×</button>
     </div>
@@ -31,6 +31,9 @@
 // 中配对 removeEventListener; 每个 toast 的自动关闭定时器在 dismiss 时 clearTimeout。
 // (经验来源: 2026-09-10-vue-composable-lifecycle-cleanup-env-safety-checklist)
 import { ref, onUnmounted } from 'vue'
+import { useI18n } from '../i18n'
+
+const { t } = useI18n()
 
 const items = ref([])
 // 模块级自增 ID (纯客户端 SPA, 无 SSR 跨请求冲突风险)

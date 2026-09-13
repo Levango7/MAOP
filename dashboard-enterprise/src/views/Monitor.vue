@@ -294,6 +294,17 @@ const metrics = ref([
 const agentStatuses = ref([]);
 
 const resources = ref([]);
+/**
+ * 键盘左右箭头在 tab 间切换（WAI-ARIA Authoring Practices: tabs pattern）。
+ * @param {number} dir -1 = 前一个，+1 = 后一个；在 tabs 数组内循环。
+ */
+function switchTab(dir) {
+  const idx = tabs.findIndex((tab) => tab.key === activeTab.value);
+  if (idx === -1) return;
+  const next = (idx + dir + tabs.length) % tabs.length;
+  activeTab.value = tabs[next].key;
+}
+
 const resourcesLoading = ref(true);
 
 const diagnostics = ref([]);

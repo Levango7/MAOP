@@ -13,7 +13,7 @@
     </div>
     <PageHeader>
       <template #badges>
-        <Badge v-if="edition.edition" :tone="edition.edition === 'enterprise' ? 'brand' : 'neutral'">{{ edition.edition }}</Badge>
+        <Badge v-if="edition.edition" :tone="edition.edition === 'enterprise' ? 'brand' : 'neutral'">{{ t('view.overview.edition.' + edition.edition) }}</Badge>
       </template>
       <span v-if="lastUpdated" class="freshness" :class="{ stale: isStale }">
         {{ t('view.overview.updated') }} {{ freshnessText }}
@@ -54,7 +54,7 @@
         <div class="ov-pev__title-row">
           <AppIcon name="route" :size="16" class="ov-pev__title-icon" />
           <h2 class="ov-pev__title">{{ t('view.overview.pev.title') }}</h2>
-          <Badge tone="brand">{{ edition.edition }}</Badge>
+          <Badge tone="brand">{{ t('view.overview.edition.' + edition.edition) }}</Badge>
         </div>
         <p class="ov-pev__subtitle muted">{{ t('view.overview.pev.subtitle') }}</p>
       </header>

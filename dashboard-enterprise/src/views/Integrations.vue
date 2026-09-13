@@ -227,9 +227,9 @@
         @click.self="closeTrigger"
         @modal:escape="closeTrigger"
       >
-        <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="integrations-modal-trigger-title">
           <div class="modal__head">
-            <h3>{{ t('view.integrations.trigger.title') }}</h3>
+            <h3 id="integrations-modal-trigger-title">{{ t('view.integrations.trigger.title') }}</h3>
             <button class="modal__x" type="button" :aria-label="t('common.close')" @click="closeTrigger">
               <AppIcon name="x" :size="16" />
             </button>

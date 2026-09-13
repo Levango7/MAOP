@@ -454,4 +454,14 @@ onMounted(() => {
   .topbar__brandtext { display: none; }
   .topbar__refresh { display: none; }
 }
+
+/* a11y: 键盘焦点环 (P0 focus-visible 补充) */
+.topbar__refresh-btn:focus-visible,
+.topbar__quick-analysis:focus-visible,
+.topbar__avatar-btn:focus-visible,
+.topbar__logout-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 </style>

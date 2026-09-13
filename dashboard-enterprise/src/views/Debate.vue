@@ -556,11 +556,14 @@ onMounted(() => {
 .deb-table__participants { font-size: var(--fs-xs); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ── Buttons ───────────────────────────────────────────────────── */
+/* NOTE: .btn-ghost/.btn-primary/.modal 等为多 view 共享样式，重复定义见
+   AgentBilling/AgentGateway/AgentProxy/AgentRegistry/Analysis/Blackboard/Feedback。
+   全局基础样式见 src/styles/pages.css（BEM 命名 .btn--ghost），此处 scoped 隔离不冲突。 */
 .btn-ghost {
   display: inline-flex; align-items: center; gap: 6px;
   background: var(--surface-2); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--r-md);
-  padding: 6px var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
+  padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
 }
 .btn-ghost:hover { opacity: .9; }
