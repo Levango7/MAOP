@@ -81,6 +81,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **P2 前端 token 出 localStorage（M7）**：`useWebSocket.js`/`useStreamingFetch.js`/`useAgentTokenStream.js` 移除 `maop_token` localStorage 读取；后端 `/ws` 握手新增 httpOnly cookie 回退（`_register_routes.py`），SSE URL 不再携带 token（顺带消除 token 进 URL/访问日志的泄露面，与 WS P1-10 修复方向对齐）
 - **代码清理**：`engine.py` 函数内 `import re as _re` 提升至模块顶层
 
+### Fixed（2026-09-14 后端第五轮质量审查修复，83 项）
+
+> 第五轮验证审查发现 83 个问题（5 P0 + 27 P1 + 29 P2 + 22 P3），全部已修复。
+> 测试结果：后端 9807 通过，前端 477/478 通过（预先存在失败），MAOS 2560 通过。
+
+#### P0 严重（5 项）
+- `drivers.py`：streamer 超时后 kill 子进程，防止孤儿进程泄漏
+- `drivers.py`：`_run_python` 使用占位符参数传递，防止 `shlex.split` 参数注入
+- `pg_persist.py`：`delete_grant`/`delete_tenant`/`delete_rule` 使用 `RETURNING` 检查实际删除行数
+
+#### P1 高（27 项）
+- 路由层：8 端点添加 `@handle_api_errors` 装饰器，统一错误响应格式
+- 核心层：`cost_tracker` 单例双检锁、`guardrail` 共享状态锁
+- 编排层：SSE 异常脱敏（不泄露内部错误详情）、guardrail 多轮 re-dispatch 检查
+- 数据层：N+1 查询批量优化、regex 全表扫描 `LIMIT`、`_task_states` 加锁、`FileLock` 原子写入、迁移回滚机制、fire-and-forget task GC
+- MAOS：`ALTER TABLE` 异常精确化、summary SQL 聚合、N+1 查询改批量、`SELECT *` 改明确列名
+
+#### P2 中（29 项）
+- 路由层：Pydantic model 替代 `request.json()`、操作失败 raise `HTTPException`
+- 核心层：`validate_token` 异常脱敏、`jwt_secret` 弱密钥校验、`credential_vault` 生产降级
+- 编排层：pause 超时限制、PLAN 子步骤依赖检查、成本护栏 `logger.warning`
+- 数据层：keyset pagination、`fetchmany` 流式读取、原子写入、内存累加器初始值
+- MAOS：`builtins.list`、`type:ignore` 显式处理、`acknowledge_alert` rowcount 检查
+
+#### P3 低（22 项）
+- 代码风格：重复 import 清理、常量提升、docstring 精简、布尔优先级括号、死代码删除
+
 ## [5.1.0-personal] — 2026-08-27
 
 > 个人版交付门禁（Phase 1）完成。基于 v5.1.0 + 140 项安全审核修复，补齐 3 项 P0 门禁后交付。
