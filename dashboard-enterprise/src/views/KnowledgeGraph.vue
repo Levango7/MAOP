@@ -971,7 +971,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
   transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 .btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 .btn--primary { background: var(--brand); color: var(--brand-contrast); border-color: var(--brand); }
 .btn--primary:hover { background: var(--brand-strong); }
 

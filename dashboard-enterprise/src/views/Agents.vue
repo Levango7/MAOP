@@ -1500,7 +1500,7 @@ onMounted(() => {
   stroke: var(--border-strong);
   stroke-width: 1.5;
   stroke-dasharray: 4 3;
-  opacity: 0.6;
+  opacity: var(--op-muted);
 }
 .topo-edge--active {
   stroke: var(--brand);
@@ -1531,7 +1531,7 @@ onMounted(() => {
 .topo-node--disabled .topo-node__core {
   fill: var(--surface-2);
   stroke: var(--border);
-  opacity: 0.5;
+  opacity: var(--op-disabled);
 }
 .topo-node__pulse {
   fill: none;

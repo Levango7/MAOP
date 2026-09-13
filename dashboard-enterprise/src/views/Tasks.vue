@@ -514,7 +514,7 @@ onUnmounted(() => {
   background: var(--brand-soft);
 }
 .act-btn:disabled {
-  opacity: 0.5;
+  opacity: var(--op-disabled);
   cursor: not-allowed;
 }
 .act-btn.small {

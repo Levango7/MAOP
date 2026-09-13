@@ -912,7 +912,7 @@ async function onTestHook(hook) {
   border-color: var(--fail);  /* F-views: token 由 tokens.css 提供 */
   background: var(--fail-soft);  /* F-views: token 由 tokens.css 提供 */
 }
-.history-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.history-action-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 
 /* ── Snapshot detail modal ──────────────────────────────────────── */
 .history-modal-overlay {
@@ -1022,7 +1022,7 @@ async function onTestHook(hook) {
 .hooks-btn.primary:hover:not(:disabled) {
   background: var(--brand-strong);
 }
-.hooks-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.hooks-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 
 .hooks-state {
   padding: var(--sp-4);
@@ -1092,7 +1092,7 @@ async function onTestHook(hook) {
   border-color: var(--fail);  /* F-views: token 由 tokens.css 提供 */
   background: var(--fail-soft);  /* F-views: token 由 tokens.css 提供 */
 }
-.hooks-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.hooks-action-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 
 .hooks-toggle {
   display: inline-flex;

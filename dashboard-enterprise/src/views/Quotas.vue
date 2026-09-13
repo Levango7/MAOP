@@ -703,7 +703,7 @@ onMounted(loadAll);
 }
 .quota-card:hover { border-color: var(--border-strong); }
 .quota-card.is-over { border-color: var(--fail); border-left: 3px solid var(--fail); }
-.quota-card.is-suspended { opacity: 0.65; }
+.quota-card.is-suspended { opacity: var(--op-suspended); }
 .quota-card__head {
   display: flex;
   align-items: flex-start;
@@ -816,7 +816,7 @@ onMounted(loadAll);
   border-radius: var(--r-md);
   border-left: 3px solid var(--warn);
 }
-.alert-item.is-resolved { border-left-color: var(--success); opacity: 0.7; }
+.alert-item.is-resolved { border-left-color: var(--success); opacity: var(--op-resolved); }
 .alert-item__head {
   display: flex;
   align-items: center;

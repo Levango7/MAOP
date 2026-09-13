@@ -155,6 +155,17 @@
   --ease: cubic-bezier(.4, 0, .2, 1);
   --ease-out: cubic-bezier(.16, 1, .3, 1);
 
+  /* ── Opacity scale — 语义化透明度, 替换散落的硬编码 opacity 值 ──────────
+   * 用于 disabled 控件、hover 态、muted 内容、overlay 遮罩等场景。
+   * 动画关键帧中的 0/1 不替换 (起止状态, 非语义透明度)。 */
+  --op-disabled: 0.5;     /* disabled 控件/按钮 */
+  --op-hover: 0.9;        /* hover 态轻微透明 */
+  --op-muted: 0.6;        /* muted/次要内容 */
+  --op-faint: 0.4;        /* faint/极淡内容 */
+  --op-resolved: 0.7;     /* 已完成/已解决状态 */
+  --op-suspended: 0.65;   /* 已暂停状态 */
+  --op-overlay: 0.12;     /* overlay/遮罩极淡背景 */
+
   /* ── Layout ───────────────────────────────────────────────────────────── */
   --sidebar-w: 232px;
   --rail-w: 64px;

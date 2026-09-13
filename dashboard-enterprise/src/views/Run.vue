@@ -423,9 +423,9 @@ const dagLayout = computed(() => {
   cursor: pointer;
   transition: opacity var(--motion-fast), transform var(--motion-fast);
 }
-.ai-split-btn:hover:not(:disabled) { opacity: 0.9; }
+.ai-split-btn:hover:not(:disabled) { opacity: var(--op-hover); }
 .ai-split-btn:active:not(:disabled) { transform: scale(0.98); }
-.ai-split-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-split-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 
 /* ── 拆分对话框 ─────────────────────────────────────────── */
 .split-overlay {
@@ -610,7 +610,7 @@ const dagLayout = computed(() => {
   font-size: var(--fs-sm);
   color: var(--text-muted);
 }
-.split-subtask__no-deps { font-style: italic; opacity: 0.7; }
+.split-subtask__no-deps { font-style: italic; opacity: var(--op-resolved); }
 .split-subtask__desc {
   margin: 6px 0 0;
   font-size: var(--fs-sm);
@@ -638,7 +638,7 @@ const dagLayout = computed(() => {
   border: 1px solid transparent;
   transition: opacity var(--motion-fast);
 }
-.split-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.split-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 .split-btn--ghost {
   background: transparent;
   border-color: var(--border);
@@ -648,7 +648,7 @@ const dagLayout = computed(() => {
   background: var(--brand);
   color: var(--brand-contrast);
 }
-.split-btn--primary:hover:not(:disabled) { opacity: 0.9; }
+.split-btn--primary:hover:not(:disabled) { opacity: var(--op-hover); }
 
 /* 旋转动画 (loading 状态) */
 .spinning {

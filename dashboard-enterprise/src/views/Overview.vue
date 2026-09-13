@@ -786,9 +786,9 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); if (pulseTime
   stroke-width: 1.5;
   stroke-linejoin: round;
   stroke-linecap: round;
-  opacity: 0.9;
+  opacity: var(--op-hover);
 }
 .stat-spark__area {
-  opacity: 0.12;
+  opacity: var(--op-overlay);
 }
 </style>

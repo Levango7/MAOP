@@ -75,7 +75,7 @@ const realtimeConnected = computed(() => realtime.connected);
 .app-footer__links { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .app-footer__link { color: var(--text-muted); text-decoration: none; transition: color var(--motion) var(--ease); }
 .app-footer__link:hover { color: var(--brand-strong); }
-.app-footer__sep { color: var(--border-strong); opacity: .6; }
+.app-footer__sep { color: var(--border-strong); opacity: var(--op-muted); }
 .app-footer__copy { color: var(--text-faint); white-space: nowrap; }
 
 @media (max-width: 900px) {  /* F7: 断点统一 899px → 900px，与 pages.css / 项目其他组件一致 */

@@ -771,7 +771,7 @@ onMounted(() => {
 
 }
 .btn-ghost.is-busy {
-  opacity: 0.6;
+  opacity: var(--op-muted);
   cursor: progress;
 }
 .btn-sm { padding: 3px var(--sp-2); font-size: var(--fs-sm); }

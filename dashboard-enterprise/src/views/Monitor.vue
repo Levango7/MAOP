@@ -513,7 +513,7 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .agent-health-refresh:disabled {
-  opacity: 0.5;
+  opacity: var(--op-disabled);
   cursor: not-allowed;
 }
 .agent-health-empty {

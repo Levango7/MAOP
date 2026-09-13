@@ -821,8 +821,8 @@ onMounted(load);
   color: var(--brand-contrast);
   border: none;
 }
-.btn--primary:hover { opacity: 0.9; }
-.btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn--primary:hover { opacity: var(--op-hover); }
+.btn--primary:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 .btn--sm { padding: var(--sp-1) var(--sp-2); font-size: var(--fs-xs); }
 .btn-icon {
   display: grid;
@@ -837,7 +837,7 @@ onMounted(load);
   transition: color var(--motion) var(--ease), border-color var(--motion) var(--ease);
 }
 .btn-icon:hover { color: var(--text); border-color: var(--border-strong); }
-.btn-icon:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-icon:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 .btn-icon--danger:hover { color: var(--fail); border-color: var(--fail); }
 
 /* ── 对话框 ───────────────────────────────────────────── */
@@ -895,7 +895,7 @@ onMounted(load);
   font-family: inherit;
 }
 .sso-input:focus { outline: none; border-color: var(--brand); }
-.sso-input:disabled { opacity: 0.6; cursor: not-allowed; }
+.sso-input:disabled { opacity: var(--op-muted); cursor: not-allowed; }
 .sso-textarea { resize: vertical; font-family: var(--font-mono); font-size: var(--fs-sm); }
 .req { color: var(--fail); font-style: normal; margin-left: 2px; }
 

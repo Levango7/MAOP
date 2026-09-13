@@ -543,7 +543,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   align-items: center;
 }
 .refresh-btn:hover { color: var(--brand); border-color: var(--brand); }
-.refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.refresh-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 
 .health-skel, .config-skel {
   display: flex;
