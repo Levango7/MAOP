@@ -64,7 +64,7 @@ class SearchMixin:
                     id=r["id"], agent=r["agent"], task=r["task"],
                     tags=r["tags"], topic=r["topic"],
                     trace_id=r["trace_id"], timestamp=r["timestamp"],
-                    snippet=r["content"][:120],
+                    snippet=(r["content"] or "")[:120],
                 )]
             return []
 
@@ -271,7 +271,7 @@ class SearchMixin:
             for kw in keywords:
                 score += len(re.findall(re.escape(kw), search_text, re.IGNORECASE))
             if score > 0:
-                snippet = r["content"].replace("\n", " ")[:120]
+                snippet = (r["content"] or "").replace("\n", " ")[:120]
                 scored.append(SearchResult(
                     id=r["id"], agent=r["agent"], task=r["task"],
                     tags=r["tags"], topic=r["topic"],
