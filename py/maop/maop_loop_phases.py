@@ -478,7 +478,15 @@ class PhasesMixin:
                 try:
                     from maop.core.evolution.evolution_loop import EvolutionLoop
                     loop = EvolutionLoop(root_dir=self._root)
-                    loop_report = loop.run_cycle(dry_run=True, auto_rollback=True)
+                    # v5.2.0: dry_run 可配置（AC-03）。
+                    # 默认 True 保持向后兼容（未设置环境变量时仅预览不 APPLY）；
+                    # 设置 MAOP_EVOLUTION_DRY_RUN=0/false/no 时实际执行 APPLY。
+                    evolution_dry_run = os.getenv(
+                        "MAOP_EVOLUTION_DRY_RUN", "true"
+                    ).strip().lower() in ("true", "1", "yes", "on")
+                    loop_report = loop.run_cycle(
+                        dry_run=evolution_dry_run, auto_rollback=True,
+                    )
                     self._log("evolve", "INFO",
                               f"EvolutionLoop({loop_report.cycle_id}): "
                               f"{loop_report.errors_observed} errors → "

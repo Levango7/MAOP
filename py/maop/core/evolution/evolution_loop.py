@@ -210,11 +210,30 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
         report.phases.append(validate)
         report.validation_improved = validate.details.get("improved", False)
 
-        # Auto-rollback: if not improved and we have a snapshot, undo APPLY.
+        # v5.2.0: A/B SPRT 决策联动回滚（AC-04）。
+        # 从 VALIDATE 阶段提取 ab_recommendation：
+        # - "promote"：treatment 显著胜出，跳过回滚（即使错误未减少）。
+        # - "rollback"：treatment 未胜出，强制回滚。
+        # - "continue" / None：数据不足或无 A/B 实验，退化为传统逻辑（未改善则回滚）。
+        ab_recommendation = validate.details.get("ab_recommendation")
+        should_rollback = False
+        if ab_recommendation == "promote":
+            # A/B 判定 treatment 胜出，跳过回滚。
+            logger.info("[evo-loop] AB/SPRT promote → skip rollback")
+            should_rollback = False
+        elif ab_recommendation == "rollback":
+            # A/B 判定 treatment 未胜出，强制回滚。
+            should_rollback = True
+            logger.info("[evo-loop] AB/SPRT rollback → force rollback")
+        else:
+            # 传统路径：无 A/B 决策或 CONTINUE，未改善则回滚。
+            should_rollback = not report.validation_improved
+
+        # Auto-rollback: 执行回滚（需有快照且实际应用了变更）。
         if (
             not dry_run
             and auto_rollback
-            and not report.validation_improved
+            and should_rollback
             and report.snapshot_id
             and apply_result.details.get("applied", 0) > 0
         ):

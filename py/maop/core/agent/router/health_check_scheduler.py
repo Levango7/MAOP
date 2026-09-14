@@ -73,9 +73,13 @@ class HealthCheckScheduler:
     timeout_s : float
         单次健康检查超时秒数（默认 10 秒）.
     max_leaked_threads : int
-        允许并发存在的超时泄漏 daemon 线程上限（默认 16）.
+        允许并发存在的超时泄漏 daemon 线程上限（默认 16）。
         超过该阈值时跳过新的健康检查，避免 ``adapter.health_check()``
-        长期阻塞导致线程无限累积（P2 资源泄漏修复）.
+        长期阻塞导致线程无限累积（P2 资源泄漏修复）。
+    discovery : AgentDiscovery, optional
+        Agent 自动发现器实例。若提供，``check_once()`` 会额外调用
+        ``discover_desktop_apps()`` 检测桌面应用是否运行，将结果写入
+        ``_statuses`` 快照。不提供时行为完全不变（向后兼容）。
     """
 
     def __init__(
@@ -85,6 +89,7 @@ class HealthCheckScheduler:
         check_interval_s: float = 60.0,
         timeout_s: float = 10.0,
         max_leaked_threads: int = 16,
+        discovery: Any = None,
     ) -> None:
         self._catalog: AgentCatalog = catalog
         self._adapters: dict[str, AgentAdapter] = adapters
@@ -104,6 +109,11 @@ class HealthCheckScheduler:
         # P2 修复：跟踪超时后仍存活的 daemon worker 线程，限制并发泄漏上限
         self._max_leaked_threads: int = max_leaked_threads
         self._leaked_workers: list[threading.Thread] = []
+
+        # P2 健康检查集成：可选的 AgentDiscovery 实例。
+        # 若提供，check_once() 会额外调用 discover_desktop_apps() 检测桌面应用
+        # 是否运行，将结果写入 _statuses。不提供时行为完全不变（向后兼容）。
+        self._discovery: Any = discovery
 
     # ── 后台线程控制 ──────────────────────────────────────────────
     def start(self) -> None:
@@ -163,6 +173,10 @@ class HealthCheckScheduler:
 
         同步执行，主要用于测试或手动触发.
         单个 Agent 检查失败不影响其他 Agent.
+
+        若初始化时提供了 ``discovery``（AgentDiscovery 实例），还会额外调用
+        ``discover_desktop_apps()`` 检测桌面应用是否运行，将结果写入
+        ``_statuses`` 快照。不改变现有 CLI agent 的健康检查行为。
         """
         agents = self._catalog.list_all()
         for agent in agents:
@@ -171,6 +185,15 @@ class HealthCheckScheduler:
             except Exception as exc:
                 logger.warning(
                     "[health_check] 检查 Agent %r 时异常: %s", agent.name, exc
+                )
+
+        # P2 集成：若提供了 discovery，额外检查桌面应用运行状态
+        if self._discovery is not None:
+            try:
+                self._check_desktop_apps()
+            except Exception as exc:
+                logger.warning(
+                    "[health_check] 桌面应用健康检查异常: %s", exc
                 )
 
     def check_agent(self, agent_name: str) -> bool:
@@ -304,6 +327,55 @@ class HealthCheckScheduler:
         except Exception as exc:
             result_box["healthy"] = False
             result_box["error"] = f"{type(exc).__name__}: {exc}"
+
+    # ── 桌面应用健康检查（P2 集成）─────────────────────────────────
+    def _check_desktop_apps(self) -> None:
+        """通过 AgentDiscovery 检测桌面应用是否运行，将结果写入 _statuses.
+
+        调用 ``self._discovery.discover_desktop_apps()`` 获取已安装的桌面应用
+        列表，对每个应用调用 ``_check_process()`` 检测进程是否在运行，
+        将结果以 ``"desktop:<name>"`` 为 key 写入 ``_statuses`` 快照。
+
+        - 不修改 ``AgentCatalog``（桌面应用发现结果不回写 catalog，
+          避免干扰现有 CLI agent 路由决策）
+        - 单个应用检查失败不影响其他应用
+        - 已在 ``_adapters`` 中注册的同名 Agent 跳过（避免重复检查）
+        """
+        discovered = self._discovery.discover_desktop_apps()
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        for agent in discovered:
+            try:
+                # 已在 _adapters 中注册的 Agent 跳过（已由 check_agent 处理）
+                if agent.name in self._adapters:
+                    continue
+
+                # 检测进程是否运行
+                # 优先用 process_name（如 "Cursor.exe"），回退到 name
+                check_name = agent.name
+                healthy = self._discovery._check_process(check_name)
+
+                status = HealthStatus(
+                    agent_name=f"desktop:{agent.name}",
+                    healthy=healthy,
+                    last_check=now_iso,
+                    latency_ms=0,
+                    error="" if healthy else "process not running",
+                )
+                with self._lock:
+                    self._statuses[f"desktop:{agent.name}"] = status
+
+                logger.debug(
+                    "[health_check] 桌面应用 %s: %s",
+                    agent.name,
+                    "running" if healthy else "not running",
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[health_check] 检查桌面应用 %s 失败: %s",
+                    agent.name,
+                    exc,
+                )
 
     # ── 状态查询 ──────────────────────────────────────────────────
     def get_status(self) -> dict[str, HealthStatus]:

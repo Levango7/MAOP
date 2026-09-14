@@ -7,6 +7,7 @@ T2 架构债治理：从 ``evolution_loop.py`` 拆分。公开 API 不变。
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -357,11 +358,60 @@ class EvolutionPhasesMixin:
             else:
                 logger.info("[evo-loop] Validation: no improvement (%d → %d)", baseline_errors, current_unhealed)
 
+            # v5.2.0: 接入 A/B SPRT 决策（AC-04）。
+            # 在传统错误计数判定之上，叠加序贯概率比检验（SPRT）结果，
+            # 为 run_cycle 的回滚分支提供更细粒度的 promote/rollback 建议。
+            # 向后兼容：无 A/B 实验或框架构造失败时，ab_recommendation 保持 None，
+            # 不影响既有回滚逻辑。
+            ab_recommendation: str | None = None
+            ab_decision = ""
+            ab_winner = ""
+            ab_experiment = ""
+            try:
+                from maop.core.evolution.ab_test import ABTestFramework, SPRTDecision
+                ab_fw = ABTestFramework(root_dir=str(self._root))
+                # 优先使用环境变量指定的实验名，否则取最新创建的实验。
+                ab_experiment = os.getenv("MAOP_AB_EXPERIMENT", "").strip()
+                if not ab_experiment:
+                    experiments = ab_fw.list_experiments()
+                    if experiments:
+                        ab_experiment = experiments[0]
+                if ab_experiment:
+                    sprt_result = ab_fw.evaluate_sprt(ab_experiment)
+                    ab_decision = sprt_result.decision.value
+                    ab_winner = sprt_result.winner
+                    if sprt_result.decision == SPRTDecision.ACCEPT_H1:
+                        # treatment 显著胜出 → 建议推广（跳过回滚）。
+                        ab_recommendation = "promote"
+                        logger.info(
+                            "[evo-loop] AB/SPRT: ACCEPT_H1 (winner=%s) → promote",
+                            ab_winner,
+                        )
+                    elif sprt_result.decision == SPRTDecision.ACCEPT_H0:
+                        # treatment 未胜出 → 建议回滚。
+                        ab_recommendation = "rollback"
+                        logger.info("[evo-loop] AB/SPRT: ACCEPT_H0 → rollback")
+                    else:
+                        # CONTINUE：数据不足，继续收集，不改变回滚决策。
+                        ab_recommendation = "continue"
+                        logger.info("[evo-loop] AB/SPRT: CONTINUE (insufficient data)")
+            except Exception as ab_exc:
+                # A/B 框架不可用或查询失败时不阻断 VALIDATE 主流程。
+                logger.debug("[evo-loop] AB/SPRT evaluation skipped: %s", ab_exc)
+
             return PhaseResult(
                 phase=LoopPhase.VALIDATE,
                 success=True,
                 duration_s=round(time.time() - start, 3),
-                details={"improved": improved, "baseline": baseline_errors, "current": current_unhealed},
+                details={
+                    "improved": improved,
+                    "baseline": baseline_errors,
+                    "current": current_unhealed,
+                    "ab_recommendation": ab_recommendation,
+                    "ab_decision": ab_decision,
+                    "ab_winner": ab_winner,
+                    "ab_experiment": ab_experiment,
+                },
             )
         except Exception as exc:
             logger.warning("[evo-loop] Validate phase failed: %s", exc)
