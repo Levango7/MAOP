@@ -17,7 +17,7 @@ class AgentConfig(BaseModel):
     """Agent definition from agents.yaml."""
     name: str
     cli: str = ""
-    driver: str = "cli"  # cli | wrapper | powershell | cmd
+    driver: str = "cli"  # cli | wrapper | powershell | cmd | desktop_app | ide_extension | vibe_coding
     cli_args: str = ""
     capabilities: list[str] = Field(default_factory=list)
     timeout_s: int = 180
@@ -32,6 +32,15 @@ class AgentConfig(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
     supports_vision: bool = False
     image_arg_template: str = ""
+    # ── 桌面应用驱动专用字段（仅 driver=desktop_app 时有意义，其他 driver 忽略）──
+    # 桌面应用进程名（如 "Cursor.exe"），用于检测应用是否运行
+    process_name: str | None = None
+    # IPC 通信路径：Windows Named Pipe 或 Unix Socket 文件路径
+    ipc_path: str | None = None
+    # 本地 HTTP 端口 URL（如 "http://localhost:3456"）
+    http_url: str | None = None
+    # 通信方式回退顺序（如 ["cli", "ipc", "http"]）
+    fallback_order: list[str] | None = None
 
 
 class DispatchResult(BaseModel):

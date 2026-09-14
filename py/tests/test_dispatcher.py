@@ -633,7 +633,8 @@ class TestDriverRegistry:
         assert "python" in _DRIVERS
 
     def test_driver_count(self):
-        assert len(_DRIVERS) == 5
+        # 5 个基础驱动 + 3 个新驱动（desktop_app / ide_extension / vibe_coding）
+        assert len(_DRIVERS) == 8
 
 
 class TestGuardrailIntegration:

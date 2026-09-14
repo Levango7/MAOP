@@ -627,6 +627,106 @@ async def _run_python(config: AgentConfig, prompt: str, timeout: int,
         )
 
 
+# ── 桌面应用 / IDE 扩展 / Vibe Coding 驱动 ───────────────────
+#
+# 以下三个 driver 函数通过 ``adapter_factory.build_adapter`` 创建对应
+# 适配器，调用 ``connect`` → ``execute`` → ``disconnect`` 生命周期，
+# 将适配器返回的字符串结果转换为 ``MaopResult``。
+#
+# 适配器的 ``connect/execute/disconnect`` 是同步接口，用 ``asyncio.to_thread``
+# 放到线程池执行，避免阻塞调度事件循环。超时由 ``asyncio.wait_for`` 保护。
+
+
+async def _run_via_adapter(
+    config: AgentConfig,
+    prompt: str,
+    timeout: int,
+    workdir: str,
+    trace_id: str,
+    *,
+    streamer: Any = None,
+) -> MaopResult:
+    """通用适配器驱动 — 通过 ``build_adapter`` 创建适配器并执行任务。
+
+    适用于 ``desktop_app`` / ``ide_extension`` / ``vibe_coding`` 三种 driver。
+    生命周期：``connect()`` → ``execute()`` → ``disconnect()``，
+    任一阶段失败均返回带错误信息的 ``MaopResult``，``disconnect`` 在 finally 中保证执行。
+    """
+    from maop.core.agent.adapters.adapter_factory import build_adapter
+
+    start = time.monotonic()
+    driver_name = config.driver
+
+    # 1. 构建适配器（工厂内部根据 driver 分支）
+    try:
+        adapter = build_adapter(config)
+    except Exception as exc:
+        return new_result(
+            agent=config.name, task=prompt,
+            exit_code=-2, error=f"build_adapter 失败: {exc}",
+            duration_ms=int((time.monotonic() - start) * 1000),
+            trace_id=trace_id, driver=driver_name, model=config.model,
+        )
+
+    # 2. 在线程池中执行 connect → execute → disconnect
+    def _run_sync() -> str:
+        """同步执行适配器生命周期，返回 execute 结果字符串。"""
+        if not adapter.connect():
+            raise RuntimeError(f"适配器 {type(adapter).__name__} 连接失败")
+        try:
+            return adapter.execute(prompt)
+        finally:
+            try:
+                adapter.disconnect()
+            except Exception:
+                pass  # disconnect 失败不影响已获取的结果
+
+    try:
+        stdout = await asyncio.wait_for(
+            asyncio.to_thread(_run_sync),
+            timeout=timeout,
+        )
+        duration_ms = int((time.monotonic() - start) * 1000)
+        return new_result(
+            agent=config.name, task=prompt,
+            exit_code=0, stdout=stdout,
+            duration_ms=duration_ms,
+            trace_id=trace_id, driver=driver_name, model=config.model,
+        )
+    except asyncio.TimeoutError:
+        return new_result(
+            agent=config.name, task=prompt,
+            exit_code=-1, error=f"TIMEOUT after {timeout}s",
+            duration_ms=int((time.monotonic() - start) * 1000),
+            trace_id=trace_id, driver=driver_name, model=config.model,
+        )
+    except Exception as exc:
+        return new_result(
+            agent=config.name, task=prompt,
+            exit_code=-2, error=f"适配器执行失败: {exc}",
+            duration_ms=int((time.monotonic() - start) * 1000),
+            trace_id=trace_id, driver=driver_name, model=config.model,
+        )
+
+
+async def _run_desktop_app(config: AgentConfig, prompt: str, timeout: int,
+                           workdir: str, trace_id: str, streamer: Any = None) -> MaopResult:
+    """桌面应用驱动 — 通过 DesktopAppAdapter 执行（优先 CLI，回退 IPC/HTTP）。"""
+    return await _run_via_adapter(config, prompt, timeout, workdir, trace_id, streamer=streamer)
+
+
+async def _run_ide_extension(config: AgentConfig, prompt: str, timeout: int,
+                             workdir: str, trace_id: str, streamer: Any = None) -> MaopResult:
+    """IDE 插件驱动 — 通过 IDEExtensionAdapter 执行（WebSocket 通信）。"""
+    return await _run_via_adapter(config, prompt, timeout, workdir, trace_id, streamer=streamer)
+
+
+async def _run_vibe_coding(config: AgentConfig, prompt: str, timeout: int,
+                           workdir: str, trace_id: str, streamer: Any = None) -> MaopResult:
+    """Vibe Coding 驱动 — 通过 VibeCodingAdapter 执行（Web 平台项目生成）。"""
+    return await _run_via_adapter(config, prompt, timeout, workdir, trace_id, streamer=streamer)
+
+
 # ── Driver dispatch table ────────────────────────────────────
 
 DRIVERS = {
@@ -635,4 +735,8 @@ DRIVERS = {
     "powershell": _run_powershell,
     "cmd": _run_cmd,
     "python": _run_python,
+    # 桌面应用 / IDE 扩展 / Vibe Coding 驱动（接入调度主链路）
+    "desktop_app": _run_desktop_app,
+    "ide_extension": _run_ide_extension,
+    "vibe_coding": _run_vibe_coding,
 }

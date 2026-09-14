@@ -38,7 +38,9 @@ class AgentDef(BaseModel):
     """One agent entry from agents.yaml."""
     cli: str = ""
     cli_args: str = ""
-    driver: str = "cli"  # cli | powershell | wrapper
+    # driver 类型：基础驱动（cli/powershell/wrapper/cmd/python）+
+    # 桌面应用 / IDE 扩展 / Vibe Coding 三种新驱动（接入调度主链路）
+    driver: str = "cli"  # cli | powershell | wrapper | desktop_app | ide_extension | vibe_coding
     capabilities: list[str] = Field(default_factory=list)
     model: str = ""
     # P2-8 fix: enabled field was silently ignored (extra='ignore' default),
@@ -52,6 +54,15 @@ class AgentDef(BaseModel):
     description: str = ""
     wrapper: str = ""  # for driver=wrapper
     subagents: dict[str, SubagentDef] = Field(default_factory=dict)
+    # ── 桌面应用驱动专用字段（仅 driver=desktop_app 时有意义，其他 driver 忽略）──
+    # 桌面应用进程名，用于检测应用是否运行（如 "Cursor.exe"）
+    process_name: str | None = None
+    # IPC 通信路径：Windows 为 Named Pipe（如 \\.\\pipe\\cursor），Linux/Mac 为 Unix Socket
+    ipc_path: str | None = None
+    # 本地 HTTP 端口 URL（如 "http://localhost:3456"）
+    http_url: str | None = None
+    # 通信方式回退顺序（如 ["cli", "ipc", "http"]），仅 desktop_app driver 使用
+    fallback_order: list[str] | None = None
 
 
 class WorkflowStepDef(BaseModel):

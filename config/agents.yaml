@@ -152,6 +152,13 @@ agents:
     model: auto
     model_display: auto (Cursor Agent CLI, GPT-5.5/Claude on upgrade)
     timeout_s: 120
+    # ── 桌面应用调度示例（取消注释即可启用 desktop_app driver）──
+    # 切换后优先 CLI，CLI 不可用时回退 IPC / 本地 HTTP：
+    # driver: desktop_app
+    # process_name: "Cursor.exe"       # Windows 进程名（用于检测应用是否运行）
+    # ipc_path: "\\\.\\pipe\\cursor"   # IPC Named Pipe（Windows）/ Unix Socket（Linux）
+    # http_url: "http://localhost:3456" # 本地 HTTP 端口
+    # fallback_order: ["cli", "ipc", "http"]  # 通信方式回退顺序
   deepcode:
     capabilities:
     - codegen

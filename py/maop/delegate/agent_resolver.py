@@ -20,6 +20,20 @@ from maop.delegate.models import AgentConfig
 logger = logging.getLogger(__name__)
 
 
+def _safe_opt(val: Any) -> str | None:
+    """安全提取可选字符串字段 — 非 str 值（如测试 Mock）转为 None。"""
+    if isinstance(val, str):
+        return val
+    return None
+
+
+def _safe_opt_list(val: Any) -> list[str] | None:
+    """安全提取可选列表字段 — 非 list 值转为 None。"""
+    if isinstance(val, list):
+        return val
+    return None
+
+
 def _wildcard_match(pattern: str, name: str) -> bool:
     """Simple wildcard match using fnmatch-style * and ?.
 
@@ -230,6 +244,13 @@ class AgentResolver:
             provider=getattr(defn, 'provider', ''),
             wrapper=cast(str, getattr(defn, 'wrapper', None) or ""),
             command=getattr(defn, 'command', ''),
+            # 桌面应用驱动专用字段透传（仅 driver=desktop_app 时使用）。
+            # 用 _safe_opt 做类型守卫：非 str/None 值（如测试中的 MagicMock）转为 None，
+            # 避免 Pydantic 验证失败。
+            process_name=_safe_opt(getattr(defn, 'process_name', None)),
+            ipc_path=_safe_opt(getattr(defn, 'ipc_path', None)),
+            http_url=_safe_opt(getattr(defn, 'http_url', None)),
+            fallback_order=_safe_opt_list(getattr(defn, 'fallback_order', None)),
         )
         self._cache[name] = cfg
         self._cache_versions[name] = getattr(self._config, '_version', 0) if self._config else 0

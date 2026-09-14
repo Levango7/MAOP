@@ -294,7 +294,11 @@ class TestRunPythonEdgeCases:
 
 class TestDriversTable:
     def test_all_drivers_registered(self):
-        assert set(DRIVERS.keys()) == {"cli", "wrapper", "powershell", "cmd", "python"}
+        assert set(DRIVERS.keys()) == {
+            "cli", "wrapper", "powershell", "cmd", "python",
+            # 桌面应用 / IDE 扩展 / Vibe Coding 驱动（接入调度主链路）
+            "desktop_app", "ide_extension", "vibe_coding",
+        }
 
     def test_drivers_are_coroutines(self):
         import inspect
