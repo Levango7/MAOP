@@ -1,34 +1,17 @@
 """MAOP Vector Store — SQLite-backed tiered vector similarity search.
 
-Provides semantic search capability using a four-tier fallback chain:
+Four-tier fallback chain:
 
     HNSW (hnswlib, optional) → sqlite-vec (default) → NumPy → pure Python
 
-Tier selection is governed by an index-size threshold
-(:attr:`VectorStore.hnsw_threshold`):
-
-    * ``count < hnsw_threshold`` (default 100_000) → sqlite-vec ANN
-    * ``count ≥ hnsw_threshold`` and ``hnswlib`` installed → HNSW ANN
-    * Any tier failure transparently falls back to the next tier.
-
-Storage: SQLite-backed vector index for persistence.
-
-Usage::
-
-    vs = VectorStore(db_path="data/vectors.db")
-
-    # Index documents
-    vs.index("doc1", "Fix login timeout bug", metadata={"agent": "claude"})
-    vs.index("doc2", "Deploy new config system", metadata={"agent": "kimi"})
-
-    # Search by text (auto-embeds query)
-    results = vs.search("authentication timeout", top=5)
-
-    # Search by vector (pre-computed embedding)
-    results = vs.search_vector(query_vec, top=5)
-
-Split from ``vector.py``; embedding providers and cosine similarity live in
-:mod:`maop.core.memory.vector_embed`.
+Tier selection is governed by :attr:`VectorStore.hnsw_threshold`
+(default 100_000). Split from ``vector.py``; embeddings live in
+:mod:`maop.core.memory.vector_embed`, the HNSW wrapper in
+:mod:`maop.core.memory.hnsw_index`, and the search-tier methods in
+:mod:`maop.core.memory.vector_search_mixin` (mixed in via
+:class:`VectorSearchMixin`). ``VectorStore`` and
+``DEFAULT_HNSW_THRESHOLD`` are re-exported from
+:mod:`maop.core.memory.vector` for backward compatibility.
 """
 
 from __future__ import annotations
@@ -47,9 +30,13 @@ from maop.core.backends.db_utils import sqlite_connect
 from maop.core.memory.vector_embed import (
     EmbeddingProvider,
     HashEmbedding,
-    VectorSearchResult,
-    cosine_similarity,
 )
+
+# HNSW index wrapper (split out to hnsw_index.py).
+from maop.core.memory.hnsw_index import _HnswIndex
+
+# Search-tier methods (split out to vector_search_mixin.py).
+from maop.core.memory.vector_search_mixin import VectorSearchMixin
 
 logger = logging.getLogger(__name__)
 
@@ -76,182 +63,9 @@ CREATE INDEX IF NOT EXISTS idx_ve_created ON vector_entries(created_at);
 DEFAULT_HNSW_THRESHOLD = 100_000
 
 
-class _HnswIndex:
-    """Thin wrapper around ``hnswlib`` for cosine-similarity ANN.
-
-    Lifecycle:
-      * Built lazily on first search when ``len(vectors) >= threshold``.
-      * Persisted to ``<db_path>.hnsw`` so restarts do not rebuild.
-      * Marked dirty on delete/clear; rebuilt on next search.
-
-    The wrapper never raises on missing ``hnswlib`` — callers detect
-    availability via :meth:`available` and skip the tier silently.
-    """
-
-    def __init__(
-        self,
-        path: Path,
-        dim: int,
-        *,
-        max_elements: int = 1_000_000,
-        m: int = 16,
-        ef_construction: int = 200,
-        ef_search: int = 64,
-    ) -> None:
-        self._path = path
-        self._dim = dim
-        self._max_elements = max_elements
-        self._m = m
-        self._ef_construction = ef_construction
-        self._ef_search = ef_search
-        self._index: Any = None
-        # internal label → entry_id mapping (hnswlib returns labels)
-        self._label_to_id: dict[int, str] = {}
-        self._id_to_label: dict[str, int] = {}
-        self._dirty = True
-
-    @staticmethod
-    def available() -> bool:
-        """Return True iff ``hnswlib`` is importable."""
-        try:
-            import hnswlib  # noqa: F401
-            return True
-        except ImportError:
-            return False
-
-    def _new_index(self) -> Any:
-        import hnswlib
-        idx = hnswlib.Index(space="cosine", dim=self._dim)
-        idx.init_index(
-            max_elements=self._max_elements,
-            ef_construction=self._ef_construction,
-            M=self._m,
-        )
-        idx.set_ef(self._ef_search)
-        return idx
-
-    def build(self, items: list[tuple[str, list[float]]]) -> None:
-        """Build the HNSW index from ``(id, vector)`` pairs.
-
-        Reuses the on-disk index when possible and only adds missing
-        labels, keeping incremental indexing cheap.
-        """
-        if not items:
-            self._dirty = False
-            return
-        # Load existing index if present and compatible
-        if self._index is None and self._path.exists():
-            try:
-                import hnswlib
-                idx = hnswlib.Index(space="cosine", dim=self._dim)
-                idx.load_index(str(self._path))
-                self._index = idx
-            except Exception as exc:
-                logger.debug("[vector] HNSW load failed, will rebuild: %s", exc)
-                self._index = None
-
-        if self._index is None:
-            # Size max_elements to 2x current count, capped at config
-            target_max = max(self._max_elements, len(items) * 2)
-            self._max_elements = target_max
-            self._index = self._new_index()
-            self._label_to_id.clear()
-            self._id_to_label.clear()
-
-        # Ensure capacity
-        cur_count = self._index.get_current_count()
-        if cur_count + len(items) > self._max_elements:
-            new_max = max(self._max_elements * 2, cur_count + len(items))
-            self._index.resize_index(new_max)
-            self._max_elements = new_max
-
-        # Add items with sequential labels
-        import numpy as np
-        new_labels: list[int] = []
-        new_vecs: list[list[float]] = []
-        for entry_id, vec in items:
-            if entry_id in self._id_to_label:
-                continue  # already indexed
-            if len(vec) != self._dim:
-                # dim mismatch — skip silently; tier downgrade will handle
-                logger.debug(
-                    "[vector] HNSW skip %s: dim %d != %d",
-                    entry_id, len(vec), self._dim,
-                )
-                continue
-            label = cur_count + len(new_labels)
-            self._label_to_id[label] = entry_id
-            self._id_to_label[entry_id] = label
-            new_labels.append(label)
-            new_vecs.append(vec)
-
-        if new_labels:
-            data = np.array(new_vecs, dtype=np.float32)
-            self._index.add_items(data, np.array(new_labels))
-            try:
-                self._index.save_index(str(self._path))
-            except Exception as exc:
-                logger.debug("[vector] HNSW save failed: %s", exc)
-
-        self._dirty = False
-
-    def mark_dirty(self) -> None:
-        """Mark the index as needing rebuild on next search."""
-        self._dirty = True
-
-    def invalidate(self) -> None:
-        """Drop the in-memory index and delete the on-disk file."""
-        self._index = None
-        self._label_to_id.clear()
-        self._id_to_label.clear()
-        self._dirty = True
-        try:
-            if self._path.exists():
-                self._path.unlink()
-        except Exception as exc:
-            logger.debug("[vector] HNSW unlink failed: %s", exc)
-
-    def search(
-        self,
-        query_vector: list[float],
-        top: int,
-    ) -> list[tuple[str, float]]:
-        """Return ``(entry_id, similarity)`` pairs.
-
-        Similarity is cosine in [0, 1] (1 − distance).
-        """
-        if self._index is None or self._dirty:
-            raise RuntimeError("HNSW index not built or dirty")
-        if len(query_vector) != self._dim:
-            raise RuntimeError(
-                f"HNSW dim mismatch: query {len(query_vector)} != index {self._dim}"
-            )
-        import numpy as np
-        labels, distances = self._index.knn_query(
-            np.array([query_vector], dtype=np.float32), k=top,
-        )
-        out: list[tuple[str, float]] = []
-        for label, dist in zip(labels[0], distances[0]):
-            entry_id = self._label_to_id.get(int(label))
-            if entry_id is None:
-                continue
-            # cosine space: distance = 1 - cos_sim
-            sim = max(0.0, 1.0 - float(dist))
-            out.append((entry_id, sim))
-        return out
-
-    @property
-    def dim(self) -> int:
-        return self._dim
-
-    @property
-    def size(self) -> int:
-        return len(self._id_to_label)
-
-
 # ── VectorStore ───────────────────────────────────────────────
 
-class VectorStore:
+class VectorStore(VectorSearchMixin):
     """SQLite-backed vector store with tiered cosine similarity search.
 
     Search tier chain (best → worst):
@@ -259,7 +73,8 @@ class VectorStore:
         HNSW (hnswlib) → sqlite-vec → NumPy → pure Python
 
     Tier selection is automatic based on index size and dependency
-    availability. See :data:`DEFAULT_HNSW_THRESHOLD`.
+    availability. See :data:`DEFAULT_HNSW_THRESHOLD`. Search methods
+    are inherited from :class:`VectorSearchMixin`.
 
     Parameters
     ----------
@@ -473,257 +288,6 @@ class VectorStore:
 
         return count
 
-    # ── Search ────────────────────────────────────────────────
-
-    def search(
-        self,
-        query: str,
-        *,
-        top: int = 10,
-        threshold: float = 0.0,
-    ) -> list[VectorSearchResult]:
-        """Search by text query (auto-embeds).
-
-        Parameters
-        ----------
-        query : str
-            Search query text.
-        top : int
-            Maximum results.
-        threshold : float
-            Minimum cosine similarity threshold.
-
-        Returns
-        -------
-        list[VectorSearchResult]
-            Results sorted by similarity descending.
-        """
-        query_vec = self._embedding.embed(query)
-        return self.search_vector(query_vec, top=top, threshold=threshold)
-
-    def search_vector(
-        self,
-        query_vector: list[float],
-        *,
-        top: int = 10,
-        threshold: float = 0.0,
-    ) -> list[VectorSearchResult]:
-        """Search by pre-computed vector.
-
-        Parameters
-        ----------
-        query_vector : list[float]
-            Query embedding vector.
-        top : int
-            Maximum results.
-        threshold : float
-            Minimum cosine similarity.
-
-        Returns
-        -------
-        list[VectorSearchResult]
-            Results sorted by similarity descending.
-        """
-        # Load all vectors (with cache)
-        # B22: 加锁保护缓存读取
-        with self._cache_lock:
-            cache_empty = not self._cache
-        if cache_empty:
-            self._load_cache()
-
-        with self._cache_lock:
-            cache_empty = not self._cache
-            cache_len = len(self._cache)
-        if cache_empty:
-            return []
-
-        # P1-5: Tier 0 — HNSW (best, optional). Only attempted when
-        # the index size exceeds the configured threshold and hnswlib
-        # is available. Falls back silently on any failure.
-        if self._enable_hnsw and cache_len >= self.hnsw_threshold:
-            try:
-                return self._search_vector_hnsw(query_vector, top, threshold)
-            except Exception as e:
-                logger.debug("[vector] HNSW tier failed: %s", e, exc_info=True)
-
-        # Tier 1 — sqlite-vec ANN (default dep, ~100x faster than brute-force)
-        try:
-            return self._search_vector_sqlite_vec(query_vector, top, threshold)
-        except Exception as e:
-            logger.debug("ignored: %s", e, exc_info=True)
-
-        # Tier 2 — numpy-accelerated batch similarity
-        try:
-            import numpy as np
-            return self._search_vector_numpy(query_vector, top, threshold, np)
-        except ImportError:
-            pass
-
-        # Fallback: pure Python
-        return self._search_vector_python(query_vector, top, threshold)
-
-    # ── HNSW tier (P1-5) ──────────────────────────────────────
-
-    def _hnsw_add(self, items: list[tuple[str, list[float]]]) -> None:
-        """Feed new ``(id, vector)`` pairs into the HNSW index.
-
-        No-op when HNSW is disabled, when no items are supplied, or
-        when the vectors are zero-length (we cannot infer a dimension).
-        The index is built lazily on the first call that supplies a
-        non-empty vector; subsequent calls incrementally append.
-        """
-        if not self._enable_hnsw or not items:
-            return
-        # Infer dim from first non-empty vector
-        for _, vec in items:
-            if vec:
-                if self._hnsw_dim is None:
-                    self._hnsw_dim = len(vec)
-                elif len(vec) != self._hnsw_dim:
-                    # Mixed dims — skip HNSW entirely for safety
-                    logger.debug(
-                        "[vector] HNSW disabled: dim mismatch %d != %d",
-                        len(vec), self._hnsw_dim,
-                    )
-                    self._enable_hnsw = False
-                    return
-                break
-        if self._hnsw_dim is None:
-            return  # all vectors empty
-        if self._hnsw_index is None:
-            self._hnsw_index = _HnswIndex(
-                path=self._path.with_suffix(self._path.suffix + ".hnsw"),
-                dim=self._hnsw_dim,
-            )
-        try:
-            self._hnsw_index.build(items)
-        except Exception as exc:
-            logger.debug("[vector] HNSW build failed: %s", exc, exc_info=True)
-            # Disable HNSW for the rest of this store's lifetime so we
-            # don't retry the build on every search.
-            self._enable_hnsw = False
-
-    def _search_vector_hnsw(
-        self,
-        query_vector: list[float],
-        top: int,
-        threshold: float,
-    ) -> list[VectorSearchResult]:
-        """HNSW ANN search (tier 0, best).
-
-        Raises if HNSW is not built or dim mismatches; the caller
-        catches and falls back to sqlite-vec.
-        """
-        if self._hnsw_index is None:
-            raise RuntimeError("HNSW index not initialized")
-        # Rebuild if dirty (e.g. after delete/clear)
-        # B22: 加锁保护缓存读取
-        with self._cache_lock:
-            cache_empty = not self._cache
-        if cache_empty:
-            self._load_cache()
-        # Sync index with current cache when sizes diverge (post-delete)
-        with self._cache_lock:
-            cache_len = len(self._cache)
-            cache_items = list(self._cache.items()) if self._hnsw_index.size != cache_len else None
-        if cache_items is not None:
-            self._hnsw_index.invalidate()
-            self._hnsw_index.build(cache_items)
-        hits = self._hnsw_index.search(query_vector, top)
-        results: list[VectorSearchResult] = []
-        for eid, score in hits:
-            if score < threshold:
-                continue
-            text, meta = self._get_entry_info(eid)
-            results.append(VectorSearchResult(id=eid, text=text, score=score, metadata=meta))
-        return results
-
-    def _search_vector_sqlite_vec(
-        self,
-        query_vector: list[float],
-        top: int,
-        threshold: float,
-    ) -> list[VectorSearchResult]:
-        """sqlite-vec ANN search (optional, ~100x faster than brute-force).
-
-        Requires the ``sqlite-vec`` package. If not installed, raises
-        ImportError which is caught by the caller to fall back to NumPy.
-        """
-        import sqlite_vec
-        with sqlite_connect(self._path, timeout=10, wal=True) as conn:
-            conn.enable_load_extension(True)
-            sqlite_vec.load(conn)
-            # Use virtual table if it exists, else raise to fall back
-            cursor = conn.execute(
-                "SELECT id, text, metadata, distance FROM vec_vectors "
-                "WHERE embedding MATCH ? AND k = ? ORDER BY distance",
-                (json.dumps(query_vector), top),
-            )
-            rows = cursor.fetchall()
-        results: list[VectorSearchResult] = []
-        for row in rows:
-            eid, text, meta_json, dist = row
-            score = max(0.0, 1.0 - float(dist))
-            if score < threshold:
-                continue
-            meta = json.loads(meta_json) if meta_json else {}
-            results.append(VectorSearchResult(id=eid, text=text, score=score, metadata=meta))
-        return results
-
-    def _search_vector_numpy(
-        self,
-        query_vector: list[float],
-        top: int,
-        threshold: float,
-        np: Any,
-    ) -> list[VectorSearchResult]:
-        """NumPy-accelerated batch cosine similarity search."""
-        # B22: 加锁保护缓存读取，获取快照后在锁外计算。
-        with self._cache_lock:
-            ids = list(self._cache.keys())
-            vecs = list(self._cache.values())
-        mat = np.array(vecs, dtype=np.float64)
-        q = np.array(query_vector, dtype=np.float64)
-
-        norms = np.linalg.norm(mat, axis=1)
-        q_norm = np.linalg.norm(q)
-        denom = norms * q_norm
-        denom = np.where(denom < 1e-10, 1.0, denom)
-        sims = (mat @ q) / denom
-
-        mask = sims >= threshold
-        scored = [(float(sims[i]), ids[i]) for i in range(len(ids)) if mask[i]]
-        scored.sort(key=lambda x: x[0], reverse=True)
-        scored = scored[:top]
-
-        results = []
-        for score, eid in scored:
-            text, meta = self._get_entry_info(eid)
-            results.append(VectorSearchResult(id=eid, text=text, score=score, metadata=meta))
-        return results
-
-    def _search_vector_python(
-        self,
-        query_vector: list[float],
-        top: int,
-        threshold: float,
-    ) -> list[VectorSearchResult]:
-        """Pure Python cosine similarity search (fallback)."""
-        scored: list[tuple[float, str, str, dict]] = []
-        # B22: 加锁保护缓存读取，获取快照后在锁外计算。
-        with self._cache_lock:
-            cache_items = list(self._cache.items())
-        for entry_id, vec in cache_items:
-            sim = cosine_similarity(query_vector, vec)
-            if sim >= threshold:
-                text, meta = self._get_entry_info(entry_id)
-                scored.append((sim, entry_id, text, meta))
-
-        scored.sort(key=lambda x: x[0], reverse=True)
-
-        return [VectorSearchResult(
-            id=eid, text=text, score=score, metadata=meta,
-        ) for score, eid, text, meta in scored[:top]]
 
     def _load_cache(self) -> None:
         """Load vectors, text, and metadata from SQLite into memory cache.
