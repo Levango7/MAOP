@@ -222,7 +222,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
           path: py/test-results.xml
@@ -232,7 +232,7 @@ jobs:
         # 2026-08-30: ratchet 失败时需要 coverage.xml 定位平台差异（ubuntu 挂
         # 而 macOS 过），此前不传 artifact 导致只能盲猜。失败也上传。
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.os }}-py${{ matrix.python-version }}
           path: py/coverage.xml
@@ -377,7 +377,7 @@ jobs:
         run: npx vite build
 
       - name: Upload enterprise dist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dashboard-enterprise-dist
           path: dashboard/dist-enterprise/
@@ -450,7 +450,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-e2e-report
           path: dashboard-enterprise/playwright-report/
@@ -458,7 +458,7 @@ jobs:
 
       - name: Upload Playwright traces
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-e2e-traces
           path: dashboard-enterprise/test-results/
@@ -642,7 +642,7 @@ jobs:
       - run: bandit -r maop/ -lll  # fail on high severity only
       - name: Upload SAST report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bandit-sast-report
           path: py/bandit-report.json
@@ -676,7 +676,7 @@ jobs:
       - run: pip install cyclonedx-bom
       - run: cyclonedx-py requirements -o sbom.json -i requirements.lock
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: maop-sbom
           path: py/sbom.json
@@ -731,7 +731,7 @@ jobs:
         run: python py/scripts/trivy_annotate.py trivy-report.json
       - name: Upload container scan report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trivy-container-scan
           path: trivy-report.json
