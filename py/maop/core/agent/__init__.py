@@ -17,6 +17,11 @@ Note:
     P0-2 (2026-08-07): subagent_delegation 已合并到 subagent_lifecycle。
     SubagentManager 是 SubAgentManager 的别名。subagent_delegation 模块
     保留为重定向 shim。
+
+    P2 (2026-09-17): 本模块顶层的惰性 re-export（``__all__`` 155 符号 +
+    ``_SYMBOL_TO_MODULE`` 映射）经全仓审计确认已无外部调用者（0 处
+    ``from maop.core.agent import X``，外部均直接走子模块导入）。该机制
+    保留仅出于历史兼容，计划于 v6.0.0 清理并移除映射表。
 """
 from __future__ import annotations
 
