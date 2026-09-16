@@ -159,9 +159,15 @@ py/test_precommit_*.txt
 py/tests/_baseline_cov*.txt
 py/tests/_final_cov*.txt
 py/.maop-snapshots/
+.maop-snapshots/
 dashboard-enterprise/test-results/
+# 前端测试运行产物（此前被误提交，131KB 的 vitest 结果 JSON）
+dashboard-enterprise/vitest_result.json
 # -- Runtime degradation log --
 data/degradation.log
+# 带时间戳的轮转副本（历史累积产物；原先只忽略固定名，导致
+# data/degradation_<ts>[_<ts>...].log 被误提交）
+data/degradation_*.log
 data/jwt_revoked.json
 # -- Agent tool internal --
 .codeartsdoer/

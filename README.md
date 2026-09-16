@@ -5,7 +5,7 @@
 
 > **定位说明**：MAOP 是**多 Agent 编排与治理层**——通过 Plan-Execute-Verify 循环编排**外部 CLI agent**（内置 31 个第三方 CLI 适配器），而非自研 agent 运行时。内置 LLM provider 用于对话、分析与建议生成，不承担 agent 执行引擎角色。
 >
-> **适配器计数口径**（2026-09-14 实测）：`config/agents.yaml` 顶层共 31 个 agent 条目，其中 1 个为 MAOP 自引用 agent（`max_self_ref_depth=3` 防递归），**第三方 CLI 适配器 30 个**（claude 系、codex、gemini、cursor、kimi 等）。其中 **26 个开箱可用 + 5 个需额外配置**（`enabled: false`，需注册账号/配置 API key 后启用，详见各 agent 的 `description` 字段）。能力矩阵/超时/SLA 配置见该文件。
+> **适配器计数口径**（2026-09-15 实测）：`config/agents.yaml` 顶层共 31 个 agent 条目，其中 1 个为 MAOP 自引用 agent（`max_self_ref_depth=3` 防递归），**第三方 CLI 适配器 30 个**（claude 系、codex、gemini、cursor、kimi 等）。其中 **25 个开箱可用 + 5 个需额外配置**（`enabled: false`，为 deepcode/langcli/mimo/qoder/qwen，需注册账号/配置 API key 后启用，详见各 agent 的 `description` 字段）。能力矩阵/超时/SLA 配置见该文件。
 
 ## Architecture
 
@@ -24,7 +24,7 @@ Entry (maop.ps1 / cli.py)
 | Entry | `maop.ps1`, `cli.py` | CLI & startup |
 | Orchestration | `maop_loop.py`, `engine.py` | Phase pipeline & DAG workflows |
 | Dispatch | `delegate/dispatcher.py`, `delegate/dispatch_core.py`, `maop_plan.py` | Config-driven agent routing |
-| Infrastructure | `core/` (5 files + 17 subpackages) | Shared services & utilities |
+| Infrastructure | `core/` (5 files + 19 subpackages) | Shared services & utilities |
 | Data | SQLite, JSON, YAML | Persistence & configuration |
 
 ## 双版架构（Dual Edition）
@@ -59,7 +59,7 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 | License CRL 在线撤销 | ✗ | ✓ |
 | Vue Dashboard 企业版路由 | ✗ | ✓ |
 
-> 编排外部 CLI agent（适配器数量基于实际集成情况；文档描述"31 个适配器"与代码实际未完全对齐，需核实适配器列表完整性）。非自研运行时。
+> 编排外部 CLI agent（适配器计数 31 个顶层条目 = 1 自引用 + 30 第三方，见上方"适配器计数口径"，已核实）。非自研运行时。
 
 > Enterprise = Personal ∪ Enterprise 独占能力；企业版包含所有功能。
 
@@ -375,8 +375,8 @@ Web dashboard at `http://localhost:9079` with:
 | `core/reliability/event_bus.py` | Async event bus |
 | `core/reliability/circuit_breaker.py` | Circuit breaker pattern |
 | `core/memory/vector.py` | Vector store for semantic search |
-| `core/reliability/streaming.py` | Streaming infrastructure (WebSocket + HTTP SSE at /api/chat/stream; ADR-006 superseded) |
-| `core/security/` | 安全子包：认证、授权、加密、密钥管理等安全相关能力（2026-07 新增；core/ 现有 17 个子包） |
+| `core/reliability/streaming.py` | Streaming infrastructure (WebSocket + HTTP SSE at /api/chat/stream；ADR-006 的"SSE 删除"决定已于 2026-07-21 被 Python 重写取代，SSE 回归) |
+| `core/security/` | 安全子包：认证、授权、加密、密钥管理等安全相关能力（2026-07 新增；core/ 现有 19 个子包） |
 | `config/edition.py` | Dual-edition 注册表与 FeatureFlag gate（[ADR-016](docs/adr/016-dual-edition-architecture.md)） |
 | `enterprise/` | 企业版扩展模块（rbac/tenant/audit/sso/ha/license/n8n 等，仅 `maop-enterprise` 包含） |
 
@@ -419,7 +419,7 @@ Key architectural decisions in [docs/adr/](docs/adr/README.md):
 
 ## 版本说明
 
-MAOP 个人版（v5.1.0）为单机/小团队设计，包含完整的 Agent 编排、记忆系统、工具集成能力。
+MAOP 个人版（v5.2.0）为单机/小团队设计，包含完整的 Agent 编排、记忆系统、工具集成能力。
 
 **企业版功能**（RBAC、多租户、SSO、配额管理、审计日志、分布式执行等）由独立的商业包 **MAOS**（`maop-enterprise`）提供，需商业授权。个人版不包含这些功能。
 

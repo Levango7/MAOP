@@ -15,7 +15,7 @@
 |------|------|
 | [用户指南](./user-guide.md) | MAOP 入门与操作手册，覆盖安装、配置、Agent 管理、记忆系统等核心功能 |
 | [API 示例](./api-examples.md) | 常见用例的 curl / Python 示例，含认证、Agent 调用、记忆检索等场景 |
-| [API 参考](./api-reference.md) | 完整 HTTP 与 WebSocket 端点规格（v5.1.0），448 个端点，供集成方与运维人员查阅 |
+| [API 参考](./api-reference.md) | 完整 HTTP 与 WebSocket 端点规格（v5.2.0），448 个端点（计数待复核），供集成方与运维人员查阅 |
 
 ---
 
@@ -30,7 +30,7 @@
 | [设计规范](./DESIGN_RULES.md) | Dashboard 权威设计规范 — 色彩体系、组件契约、交互模式 |
 | [产品设计 RFC-001](./product-design-rfc-001.md) | MAOP 控制台从"功能仓库"到"工作台"的产品设计演进方案 |
 | [接口盘点报告](./_盘点_MAOP_OpsMesh_Interaction.md) | MAOP × OpsMesh × Interaction 三项目接口盘点，含 API 端点/鉴权/事件总线 |
-| [架构决策记录](./adr/README.md) | ADR 001–017，含双版架构、HA 设计、Python 主引擎、安全加固等关键决策 |
+| [架构决策记录](./adr/README.md) | ADR 001–021，含双版架构、HA 设计、Python 主引擎、安全加固等关键决策 |
 
 ---
 
