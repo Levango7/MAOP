@@ -97,6 +97,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             )
         request.state.auth_roles = ["read"]
         request.state.auth_identity = "anonymous"
+        request.state.tenant_id = ""
         return cast(Response, await call_next(request))
 
     def _is_static_asset(self, path: str) -> bool:
@@ -140,6 +141,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if result.authenticated:
                 request.state.auth_identity = result.identity
                 request.state.auth_roles = result.roles
+                # P0-1 fix: legacy results carry no tenant → "" (unchanged
+                # behaviour); new-ApiKeyManager results propagate theirs.
+                request.state.tenant_id = getattr(result, "tenant_id", "") or ""
                 return cast(Response, await call_next(request))
             return JSONResponse(
                 status_code=401,
@@ -196,6 +200,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if result.authenticated:
                 request.state.auth_identity = result.identity
                 request.state.auth_roles = result.roles
+                # P0-1 fix: JWT results carry no tenant claim yet → "".
+                request.state.tenant_id = getattr(result, "tenant_id", "") or ""
                 return cast(Response, await call_next(request))
             return JSONResponse(
                 status_code=401,
@@ -211,6 +217,16 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # request gets anonymous/read role regardless of MAOP_AUTH setting.
         if not self.enabled:
             return await self._dispatch_disabled(request, call_next)
+
+        # P0-1 fix: default tenant context for EVERY request. Downstream
+        # consumers (enterprise QuotaMiddleware, RBAC/compliance/notification
+        # routers) read ``request.state.tenant_id``; before this fix the
+        # attribute was never assigned on any path, so every consumer fell
+        # back to "" and tenant isolation silently never engaged. API-key
+        # authentication below overrides this default with the key's real
+        # tenant. JWT/dashboard sessions have no tenant claim yet and keep
+        # "" (documented single-tenant fallback in _tenant_id_from_jwt).
+        request.state.tenant_id = ""
 
         # Skip public paths — exact match for most paths; prefix match only
         # for opt-in prefix_public_paths (e.g. /api/stream/agent/{id}).
@@ -314,6 +330,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         request.state.auth_roles = result.roles
         request.state.auth_key_id = result.key_id
         request.state.auth_scopes = result.scopes
+        # P0-1 fix: propagate the API key's tenant so quota / RBAC /
+        # compliance isolation actually engages for key-authenticated
+        # requests instead of silently running tenant-less.
+        request.state.tenant_id = getattr(result, "tenant_id", "") or ""
 
         # Dispatch and record usage after completion.
         start = time.monotonic()

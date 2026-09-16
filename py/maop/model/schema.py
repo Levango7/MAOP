@@ -26,6 +26,11 @@ class ProviderType(str, Enum):
     CUSTOM = "custom"
     BUILTIN = "builtin"
     OLLAMA = "ollama"
+    # 第三方中转平台（openrouter / siliconflow / nvidia-nim 等），
+    # 见 config/models.yaml 与 core/agent/llm_chat/relay_platform.py。
+    # 缺该值会导致 ModelRegistry 加载含 relay 供应商的默认配置时
+    # pydantic 校验失败（ProviderDef.type 拒绝 "relay"）。
+    RELAY = "relay"
 
 
 class ProtocolType(str, Enum):
@@ -118,7 +123,17 @@ class ProviderDef(BaseModel):
     """A model provider definition.
 
     Extended with protocol type, direct API key, and extra headers.
+
+    注意（数据保全）：``config/models.yaml`` 的 provider 条目除本模型声明的
+    字段外，还带有 ``display_name`` / ``description`` / ``features`` /
+    ``rate_limit_rpm`` / ``region`` 等展示与限流元数据。这些字段此前未声明，
+    导致 :meth:`ModelRegistry.save` 用 ``model_dump(exclude_defaults=True)``
+    序列化时把它们静默丢弃（连同 yaml.dump 会抹掉的全部注释）。现将其显式
+    声明，并设 ``extra="allow"``，使"读取 → 修改 → 保存"对配置内容无损。
     """
+
+    model_config = ConfigDict(extra="allow")
+
     type: ProviderType = ProviderType.OPENAI_COMPATIBLE
     protocol: ProtocolType = ProtocolType.OPENAI_COMPLETIONS  # API protocol
     base_url: str = ""
@@ -129,6 +144,12 @@ class ProviderDef(BaseModel):
     health_check_url: str = ""
     extra_headers: dict[str, str] = Field(default_factory=dict)  # Custom headers per request
     enabled: bool = True
+    # ── 展示与限流元数据（此前未声明，保存时会被丢弃）────────────
+    display_name: str = ""              # Human-readable provider name
+    description: str = ""               # Provider description
+    features: list[str] = Field(default_factory=list)  # e.g. model_discovery, streaming
+    rate_limit_rpm: int = 0             # Provider-side requests/minute ceiling (0 = unknown)
+    region: str = ""                    # e.g. international / domestic
 
 
 # ── Model ─────────────────────────────────────────────────────

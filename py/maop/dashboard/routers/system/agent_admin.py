@@ -251,6 +251,10 @@ async def api_agent_upgrade(request: Request, agent: str = Query(..., descriptio
         except Exception as exc:
             logger.warning('Failed to log audit event: %s', exc)
         return {"status": "ok", "info": info}
+    except HTTPException:
+        # 让已带语义状态码的 HTTPException(如 404 agent not found)按原样
+        # 传播；若被下方 except Exception 吞掉会被改写成 500，丢失状态码。
+        raise
     except Exception as exc:
         logger.error("Agent upgrade failed: %s", exc)
         # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
