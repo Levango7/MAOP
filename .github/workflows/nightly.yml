@@ -1,0 +1,87 @@
+# Nightly workflow for MAOP — full E2E + flaky detection + soak tests.
+# P1 fix (2026-09-17): split from ci.yml to enable nightly-only heavy tests.
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 02:00 UTC daily
+  workflow_dispatch: {}   # manual trigger
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false  # don't cancel nightly
+
+permissions:
+  contents: read
+
+jobs:
+  full-e2e:
+    name: Full E2E (all browsers)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard-enterprise/package-lock.json
+      - name: Install Python deps
+        run: pip install -e ./py[dev] --quiet
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: dashboard-enterprise
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+        working-directory: dashboard-enterprise
+      - name: Run E2E (all browsers, no retries)
+        run: npx playwright test --reporter=html
+        working-directory: dashboard-enterprise
+        env:
+          MAOP_AUTH_ENABLED: '0'
+          MAOP_ENV: 'test'
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-nightly
+          path: dashboard-enterprise/playwright-report/
+
+  soak-test:
+    name: Soak Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install deps
+        run: pip install -e ./py[dev] --quiet
+      - name: Run soak tests
+        run: pytest py/tests/soak/ -v --timeout=600
+        env:
+          MAOP_ENV: 'test'
+
+  flaky-detection:
+    name: Flaky Test Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install deps
+        run: pip install -e ./py[dev] --quiet
+      - name: Run tests 3x to detect flaky
+        run: |
+          for i in 1 2 3; do
+            echo "=== Run $i ==="
+            pytest py/tests/ -q --timeout=60 -m "not slow and not serial" --reruns=0 || true
+          done
+        env:
+          MAOP_ENV: 'test'

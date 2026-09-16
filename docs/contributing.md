@@ -1,6 +1,6 @@
 # Contributing to MAOP
 
-MAOP（Multi-Agent Orchestration Platform）是基于 FastAPI 的智能体编排框架，遵循 Plan-Execute-Verify 范式。当前版本 5.1.0，采用 Python >= 3.10、双线发布（Personal/Enterprise），企业版已移至独立仓库 MAOS、CI 通过 GitHub Actions。本指南面向所有贡献者，描述如何搭建环境、提交代码、通过 CI 并参与发布流程。
+MAOP（Multi-Agent Orchestration Platform）是基于 FastAPI 的智能体编排框架，遵循 Plan-Execute-Verify 范式。当前版本 5.2.0，采用 Python >= 3.10、双线发布（Personal/Enterprise），企业版已移至独立仓库 MAOS、CI 通过 GitHub Actions。本指南面向所有贡献者，描述如何搭建环境、提交代码、通过 CI 并参与发布流程。
 
 ---
 

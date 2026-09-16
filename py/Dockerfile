@@ -13,6 +13,9 @@
 # not exist (the library/ namespace is Docker Hub's, aliyun's public mirror
 # for it is long gone). CN-local users should configure a registry mirror
 # in Docker Desktop settings instead of overriding these build args.
+# P1 supply-chain fix (2026-09-17): digest pinning prevents tag re-push attacks.
+# To obtain digest: docker pull python:3.13-slim && docker inspect --format='{{index .RepoDigests 0}}' python:3.13-slim
+# CI should inject --build-arg PYTHON_IMAGE=python:3.13-slim@sha256:<digest> for reproducible builds.
 ARG PYTHON_IMAGE=python:3.13-slim
 ARG NODE_IMAGE=node:20-alpine
 

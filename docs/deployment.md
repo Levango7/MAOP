@@ -2,7 +2,7 @@
 
 > 本文档覆盖 MAOP 的全部部署方式：Docker Compose、Kubernetes（Operator/Helm）、裸机部署（含 PM2 进程管理）、TLS 配置、监控部署及升级回滚。
 >
-> **对应版本**：v5.1.0 ｜ **最后更新**：2026-09-14
+> **对应版本**：v5.2.0 ｜ **最后更新**：2026-09-17
 >
 > **相关文档**：[环境变量配置](./configuration.md) ｜ [运维手册](./runbook.md) ｜ [容量规划](./capacity-planning.md)
 
@@ -220,7 +220,7 @@ metadata:
   name: maop-dashboard
   namespace: default
 spec:
-  image: ghcr.io/maop/dashboard:5.1.0
+  image: ghcr.io/maop/dashboard:5.2.0
   replicas: 1
   env:
     - name: MAOP_ENV
@@ -691,7 +691,7 @@ pm2 restart maop-dashboard  # 或 sudo systemctl restart maop
 ```bash
 # 1. 健康检查
 curl -f http://localhost:9079/api/health
-# 预期: {"status":"ok","version":"5.1.0",...}
+# 预期: {"status":"ok","version":"5.2.0",...}
 
 # 2. 认证测试
 TOKEN=$(curl -s -X POST http://localhost:9079/api/auth/login \

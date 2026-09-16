@@ -62,7 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **TenantManager 无锁保护**：`tenant.py` 加 `threading.RLock()`，9 个公共方法全部 `with self._lock:` 包裹。
 - **asyncio.shield 超时后任务泄漏**：`subagent_lifecycle.py` `except TimeoutError` 分支增加 `atask.cancel()` + `await atask` 等待终止。
 - **SQLite 数据库损坏崩溃**：`db_utils.py` 抽取 `_open_and_init()`，捕获 `sqlite3.DatabaseError` 后删除 db+侧车文件重建空库，仅重试一次。
-- **Agent 可用数与宣传不符**：`README.md` 修正为"26 个开箱可用 + 5 个需额外配置"。
+- **Agent 可用数与宣传不符**：`README.md` 修正为"25 个开箱可用 + 5 个需额外配置"。
 - **OnboardingWizard 死链**：删除废弃组件 `OnboardingWizard.vue`。
 - **404 静默重定向无反馈**：新建 `NotFound.vue`（404 提示+3秒倒计时），`router/index.js` catch-all 从 `redirect` 改为 `component`。
 - **JWT TTL 硬编码**：`auth.py` 提取 `_JWT_TTL_S = float(os.getenv("MAOP_JWT_TTL_S", "7200"))`，替换全部 7 处硬编码。
@@ -258,7 +258,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [5.1.0] — 2026-08-14
+## [5.0.0] — 2026-08-11
 
 ### ⚠ Breaking Changes
 

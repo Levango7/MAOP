@@ -15,6 +15,16 @@ export default defineConfig({
       name: 'chromium',
       use: { browserName: 'chromium' },
     },
+    // P1 fix (2026-09-17): added Firefox + WebKit for cross-browser coverage.
+    // CI runs all 3; local dev can filter with --project=chromium.
+    {
+      name: 'firefox',
+      use: { browserName: 'firefox' },
+    },
+    {
+      name: 'webkit',
+      use: { browserName: 'webkit' },
+    },
   ],
   webServer: [
     // P2 fix (2026-08-14): 同时起后端(9079) + vite(5174)，使 e2e 可真实联调。

@@ -17,10 +17,12 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       thresholds: {
-        lines: 40,
-        functions: 40,
-        branches: 30,
-        statements: 40,
+        // P1 fix (2026-09-17): raised from 40/40/30/40 to 60/60/50/60.
+        // Target: align with backend ratchet FLOOR=80% via progressive increase.
+        lines: 60,
+        functions: 60,
+        branches: 50,
+        statements: 60,
       },
     },
   },

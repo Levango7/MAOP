@@ -1,0 +1,20 @@
+{{/*
+PodDisruptionBudget for MAOP Operator — ensures voluntary disruptions maintain quorum.
+P1 reliability fix (2026-09-17): prevents node drain from evicting all replicas simultaneously.
+*/}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "maop-operator.fullname" . }}-pdb
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "maop-operator.labels" . | nindent 4 }}
+spec:
+  {{- if eq (int .Values.controller.replicas) 1 }}
+  maxUnavailable: 0
+  {{- else }}
+  maxUnavailable: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "maop-operator.selectorLabels" . | nindent 6 }}

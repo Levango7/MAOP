@@ -1,0 +1,35 @@
+# CODEOWNERS for MAOP — defines review ownership for PRs.
+# P1 fix (2026-09-17): ensures domain experts review changes in their areas.
+
+# Default owners
+* @Levango7
+
+# Python backend
+/py/maop/core/          @Levango7
+/py/maop/dashboard/     @Levango7
+/py/maop/delegate/      @Levango7
+/py/maop/security/      @Levango7
+/py/tests/              @Levango7
+
+# Frontend
+/dashboard-enterprise/  @Levango7
+
+# Deployment
+/deploy/                @Levango7
+/docker-compose*.yml    @Levango7
+/py/Dockerfile          @Levango7
+/ecosystem.config.js    @Levango7
+
+# CI / workflows
+/.github/               @Levango7
+
+# Documentation
+/docs/                  @Levango7
+/README.md              @Levango7
+/CHANGELOG.md           @Levango7
+/ROADMAP.md             @Levango7
+
+# Dependencies
+/py/requirements.lock   @Levango7
+/py/pyproject.toml      @Levango7
+/dashboard-enterprise/package.json @Levango7
