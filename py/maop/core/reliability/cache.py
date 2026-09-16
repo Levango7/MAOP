@@ -26,6 +26,13 @@ Usage::
     # Null caching: mark a key as "known absent"
     cache.put_null("user:404", ttl_s=10)
     cache.get("user:404")  # returns SENTINEL_NULL, not None
+
+Module split (physical, no logic change):
+  - cache_advanced.py: LRUCacheAdvancedMixin (get_or_compute, invalidate_prefix,
+    contains, size, keys, stats, cleanup_expired, warmup)
+  - cache_guard.py: CacheGuardConfig, CacheGuardStats, SingleFlight, CacheGuard
+  - cache.py (this file): core LRU + pin + dict-like dunder + get_cache,
+    re-exports guard symbols for backward compatibility.
 """
 
 from __future__ import annotations
@@ -38,8 +45,6 @@ from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
-
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +111,13 @@ class CacheStats:
         return self.hits / total if total > 0 else 0.0
 
 
-class LRUCache:
+# Import advanced operations mixin. cache_advanced.py does NOT import any
+# symbols from this module at top level (it uses lazy imports inside methods),
+# so there is no circular import at module load time.
+from .cache_advanced import LRUCacheAdvancedMixin
+
+
+class LRUCache(LRUCacheAdvancedMixin):
     """Thread-safe LRU cache with TTL expiration and three-protection.
 
     Parameters
@@ -416,192 +427,6 @@ class LRUCache:
         with self._lock:
             return len(self._store)
 
-    # ── Bulk operations ───────────────────────────────────────
-
-    def get_or_compute(
-        self,
-        key: str,
-        compute_fn: Any,  # Callable[[], V]
-        *,
-        ttl_s: float | None = None,
-        null_ttl_s: float = 10.0,
-    ) -> Any:
-        """Get from cache, or compute and cache if missing/expired.
-
-        Implements SingleFlight (stampede protection): if multiple threads
-        call get_or_compute with the same key simultaneously, only one
-        executes compute_fn; the others wait and reuse the result.
-
-        If compute_fn returns None, the key is null-cached with null_ttl_s
-        to prevent penetration on subsequent lookups.
-
-        Parameters
-        ----------
-        key : str
-            Cache key.
-        compute_fn : Callable
-            Zero-arg function to compute the value on cache miss.
-        ttl_s : float | None
-            TTL override for the computed value.
-        null_ttl_s : float
-            TTL for null-cached entries (penetration protection).
-        """
-        # High fix (C-3): loop instead of recursion. Under sustained
-        # contention the old code recursed on every wait timeout and could
-        # hit RecursionError (~1000 frames). The loop is semantically
-        # identical: retry until we either observe a cached value or win
-        # the flight registration and compute ourselves.
-        while True:
-            # First check: fast path (no lock contention)
-            value = self.get(key)
-            if value is not None:
-                return value
-
-            # SingleFlight: ensure only one thread computes for this key
-            with self._flight_lock:
-                if key in self._flights:
-                    # Another thread is computing — wait for it
-                    flight_event = self._flights[key]
-                else:
-                    # We are the first — register our flight
-                    flight_event = threading.Event()
-                    self._flights[key] = flight_event
-                    flight_event = None  # Signal that WE should compute
-
-            if flight_event is None:
-                break  # we are the computing thread
-
-            # Wait for the computing thread
-            flight_event.wait(timeout=_SINGLEFLIGHT_WAIT_TIMEOUT_S)
-            # Now the value should be in cache
-            result = self.get(key)
-            if result is not None:
-                return result
-            # Wait timed out or compute failed — loop and try again
-            # (may become the computing thread on the next iteration).
-
-        # We are the computing thread
-        try:
-            value = compute_fn()
-
-            if value is None:
-                # Null caching: prevent penetration
-                self.put_null(key, ttl_s=null_ttl_s)
-                return None
-
-            self.put(key, value, ttl_s=ttl_s)
-            return value
-        finally:
-            # Signal other waiters
-            with self._flight_lock:
-                event = self._flights.pop(key, None)
-            if event is not None:
-                event.set()
-
-    def invalidate_prefix(self, prefix: str) -> int:
-        """Remove all keys starting with prefix. Returns count removed.
-
-        Complexity: O(n) where n = len(self._store). Scans every key under
-        the lock to test ``k.startswith(prefix)``.
-
-        Rationale: LRUCache is sized by ``max_size`` (default 256, typically
-        < 1000 entries). At this scale the linear scan is cheap and the
-        overhead of maintaining a prefix → keys index (extra memory plus
-        per-put/delete bookkeeping) is not justified. If the cache is ever
-        resized to tens of thousands of entries or ``invalidate_prefix`` is
-        called in a hot path, consider adding an auxiliary trie/prefix index
-        and re-evaluating.
-
-        Thread-safety: holds ``self._lock`` for the whole scan+delete, so
-        concurrent puts/gets block until invalidation completes. Snapshot
-        the keys first to avoid mutating the OrderedDict during iteration
-        (which would raise ``RuntimeError``).
-        """
-        with self._lock:
-            # Snapshot keys first: deleting from self._store while iterating
-            # it directly raises RuntimeError. list(...) forces a copy.
-            keys_to_remove = [k for k in self._store if k.startswith(prefix)]
-            for k in keys_to_remove:
-                del self._store[k]
-            return len(keys_to_remove)
-
-    # ── Query ─────────────────────────────────────────────────
-
-    def contains(self, key: str) -> bool:
-        """Check if key exists and is not expired (without updating LRU)."""
-        with self._lock:
-            entry = self._store.get(key)
-            if entry is None:
-                return False
-            if entry.expires_at > 0 and time.time() > entry.expires_at:
-                del self._store[key]
-                return False
-            return True
-
-    def size(self) -> int:
-        """Current number of entries (including potentially expired)."""
-        with self._lock:
-            return len(self._store)
-
-    def keys(self) -> list[str]:
-        """Return all cache keys (most recent last)."""
-        with self._lock:
-            return list(self._store.keys())
-
-    def stats(self) -> CacheStats:
-        """Return cache statistics."""
-        with self._lock:
-            null_count = sum(
-                1 for e in self._store.values()
-                if e.value is SENTINEL_NULL
-            )
-            return CacheStats(
-                hits=self._hits,
-                misses=self._misses,
-                evictions=self._evictions,
-                size=len(self._store),
-                max_size=self._max_size,
-                null_entries=null_count,
-            )
-
-    # ── Maintenance ───────────────────────────────────────────
-
-    def cleanup_expired(self) -> int:
-        """Remove all expired entries. Returns count removed."""
-        now = time.time()
-        removed = 0
-        with self._lock:
-            keys_to_remove = [
-                k for k, v in self._store.items()
-                if v.expires_at > 0 and now > v.expires_at
-            ]
-            for k in keys_to_remove:
-                del self._store[k]
-                removed += 1
-        return removed
-
-    def warmup(self, entries: dict[str, Any], *, ttl_s: float | None = None) -> int:
-        """Pre-populate cache to prevent cold-start avalanche.
-
-        Parameters
-        ----------
-        entries : dict
-            Key-value pairs to pre-load.
-        ttl_s : float | None
-            TTL for warmup entries (uses jittered TTL).
-
-        Returns
-        -------
-        int
-            Number of entries loaded.
-        """
-        loaded = 0
-        for key, value in entries.items():
-            self.put(key, value, ttl_s=ttl_s)
-            loaded += 1
-        logger.info("[cache] Warmup: %d entries loaded", loaded)
-        return loaded
-
 
 # ── Global cache registry ────────────────────────────────────
 
@@ -623,256 +448,29 @@ def get_cache(name: str, *, max_size: int = 256, default_ttl_s: float = 0.0) -> 
         return _caches[name]
 
 
-# ── Cache Guard (merged from cache_guard.py) ────────────────
+# ── Cache Guard (re-export from cache_guard.py for backward compat) ────
+# Physical split: CacheGuardConfig, CacheGuardStats, SingleFlight, CacheGuard
+# now live in cache_guard.py. They are re-exported here so that all existing
+# ``from maop.core.reliability.cache import CacheGuard`` (and similar) imports
+# continue to work without change.
+# cache_guard.py imports LRUCache lazily (inside CacheGuard.__init__), so
+# there is no circular import at module load time.
+from .cache_guard import (  # noqa: E402
+    CacheGuard,
+    CacheGuardConfig,
+    CacheGuardStats,
+    SingleFlight,
+)
 
-
-class CacheGuardConfig(BaseModel):
-    """Configuration for cache guard."""
-    null_ttl: float = 30.0           # TTL for null-value cache entries (penetration)
-    null_value_marker: str = "__NULL__"  # Sentinel for cached nulls
-    ttl_jitter_ratio: float = 0.1    # +/- 10% jitter on TTL (avalanche)
-    singleflight_timeout: float = 30.0  # Max wait for SingleFlight (breakdown)
-    enable_null_cache: bool = True   # Enable null-value caching
-    enable_jitter: bool = True       # Enable TTL jitter
-    enable_singleflight: bool = True  # Enable SingleFlight
-
-
-class CacheGuardStats(BaseModel):
-    """Statistics for cache guard."""
-    hits: int = 0
-    misses: int = 0
-    null_hits: int = 0        # Null-value cache hits (penetration prevented)
-    singleflight_waits: int = 0  # Times a request waited for SingleFlight
-    singleflight_dedups: int = 0  # Times a duplicate request was deduplicated
-    ttl_jitters: int = 0      # Times TTL jitter was applied
-
-
-class SingleFlight:
-    """Ensure only one caller executes a function for a given key at a time.
-
-    Other callers wait and receive the same result.
-    """
-
-    def __init__(self, timeout: float = 30.0):
-        self._timeout = timeout
-        self._locks: dict[str, threading.Event] = {}
-        self._results: dict[str, Any] = {}
-        self._errors: dict[str, Exception] = {}
-        self._mutex = threading.Lock()
-
-    def execute(
-        self,
-        key: str,
-        fn: Callable[[], Any],
-    ) -> tuple[Any, bool]:
-        """Execute fn for key, deduplicating concurrent calls.
-
-        Returns (result, was_dedup) where was_dedup=True if this call
-        waited for another caller's result.
-        """
-        with self._mutex:
-            if key in self._locks:
-                event = self._locks[key]
-                need_wait = True
-            else:
-                self._results.pop(key, None)
-                self._errors.pop(key, None)
-                event = threading.Event()
-                self._locks[key] = event
-                need_wait = False
-
-        if need_wait:
-            return self._wait(key, event)
-
-        try:
-            result = fn()
-            with self._mutex:
-                self._results[key] = result
-                event.set()
-            return result, False
-        except Exception as e:
-            with self._mutex:
-                self._errors[key] = e
-                event.set()
-            raise
-        finally:
-            with self._mutex:
-                self._locks.pop(key, None)
-
-    def _wait(self, key: str, event: threading.Event) -> tuple[Any, bool]:
-        """Wait for the executing caller to finish.
-
-        Raises
-        ------
-        TimeoutError
-            If the wait exceeds ``self._timeout`` and the executing caller
-            has not yet set the event. Previously returned ``(None, True)``
-            which was ambiguous — the caller could not distinguish "the
-            computed result is genuinely None" from "wait timed out".
-        """
-        if not event.wait(timeout=self._timeout):
-            raise TimeoutError(
-                f"SingleFlight wait timed out after {self._timeout}s for key={key!r}"
-            )
-
-        with self._mutex:
-            if key in self._errors:
-                raise self._errors[key]
-            result = self._results.get(key)
-
-        return result, True
-
-
-class CacheGuard:
-    """Cache guard with penetration/breakdown/avalanche protection.
-
-    Wraps a cache-like object (dict or MAOP.core.cache) with:
-      - Null-value caching (penetration)
-      - SingleFlight deduplication (breakdown)
-      - TTL jitter (avalanche)
-    """
-
-    def __init__(
-        self,
-        cache: dict[str, Any] | None = None,
-        config: CacheGuardConfig | None = None,
-    ):
-        # B8: 默认使用 LRUCache(max_size=1000) 替代裸 dict，防止无限制增长。
-        # 调用方仍可显式传入自定义 cache（dict 或 LRUCache）。
-        self._cache: Any = cache if cache is not None else LRUCache(max_size=1000)
-        self._config = config or CacheGuardConfig()
-        self._stats = CacheGuardStats()
-        self._sf = SingleFlight(
-            timeout=self._config.singleflight_timeout,
-        ) if self._config.enable_singleflight else None
-        self._lock = threading.Lock()
-
-    def get(
-        self,
-        key: str,
-        loader: Callable[[], Any],
-        *,
-        ttl: float | None = None,
-    ) -> Any:
-        """Get a value from cache, loading it if missing.
-
-        Applies all three protections:
-          1. Check cache (including null-value entries)
-          2. SingleFlight to deduplicate concurrent loads
-          3. TTL jitter on store
-
-        Parameters
-        ----------
-        key : str
-            Cache key.
-        loader : Callable
-            Function to load the value if not in cache.
-        ttl : float | None
-            Base TTL in seconds. Jitter is applied if enabled.
-
-        Returns
-        -------
-        Any
-            The cached or loaded value. Returns None if the value
-            doesn't exist (and caches the null).
-        """
-        with self._lock:
-            if key in self._cache:
-                entry = self._cache[key]
-                if isinstance(entry, dict) and "expires" in entry:
-                    if entry["expires"] is not None and time.time() > entry["expires"]:
-                        del self._cache[key]
-                    else:
-                        value = entry["value"]
-                        if value == self._config.null_value_marker:
-                            self._stats.null_hits += 1
-                            return None
-                        self._stats.hits += 1
-                        return value
-                else:
-                    self._stats.hits += 1
-                    return entry
-            # H-5 fix: _stats.misses 移入锁内更新，避免与并发的 hits/null_hits
-            # 更新竞态导致统计偏差。
-            # （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
-            self._stats.misses += 1
-
-        if self._sf is not None:
-            result, was_dedup = self._sf.execute(key, lambda: self._load_and_store(key, loader, ttl))
-            if was_dedup:
-                # L-1 fix: singleflight_dedups 统计计数器移入锁内更新
-                with self._lock:
-                    self._stats.singleflight_dedups += 1
-            return result
-        else:
-            return self._load_and_store(key, loader, ttl)
-
-    def _load_and_store(
-        self,
-        key: str,
-        loader: Callable[[], Any],
-        ttl: float | None,
-    ) -> Any:
-        """Load a value and store it in cache."""
-        value = loader()
-
-        effective_ttl = ttl
-        if ttl is not None and self._config.enable_jitter:
-            jitter = ttl * self._config.ttl_jitter_ratio * (2 * random.random() - 1)
-            effective_ttl = max(1.0, ttl + jitter)
-            # P2-12 fix: ttl_jitters 统计计数器原先在锁外更新，与并发的
-            # hits/misses/null_hits 更新竞态导致统计偏差。移入锁内。
-            # （来源：coding-pattern/python-shared-dict-cache-concurrency-audit-fix-playbook）
-            with self._lock:
-                self._stats.ttl_jitters += 1
-
-        with self._lock:
-            if value is None and self._config.enable_null_cache:
-                null_ttl = self._config.null_ttl
-                if self._config.enable_jitter:
-                    null_ttl *= (1 + self._config.ttl_jitter_ratio * (2 * random.random() - 1))
-                self._cache[key] = {
-                    "value": self._config.null_value_marker,
-                    "expires": time.time() + null_ttl,
-                }
-            else:
-                expires = (time.time() + effective_ttl) if effective_ttl is not None else None
-                self._cache[key] = {
-                    "value": value,
-                    "expires": expires,
-                }
-
-        return value
-
-    def invalidate(self, key: str) -> bool:
-        """Remove a key from cache. Returns True if it existed."""
-        with self._lock:
-            if key in self._cache:
-                del self._cache[key]
-                return True
-            return False
-
-    def invalidate_pattern(self, prefix: str) -> int:
-        """Invalidate all keys matching a prefix. Returns count removed.
-
-        R4-low notice: This method performs an O(n) full scan of all cache
-        keys to match the prefix. For large caches (>10k entries) called at
-        high frequency, prefer targeted ``invalidate(key)`` calls for each
-        known key instead. The O(n) cost is acceptable for infrequent bulk
-        invalidation (e.g., config reload, namespace reset) but not for
-        per-request hot paths.
-        """
-        with self._lock:
-            keys_to_remove = [k for k in self._cache if k.startswith(prefix)]
-            for k in keys_to_remove:
-                del self._cache[k]
-            return len(keys_to_remove)
-
-    def stats(self) -> CacheGuardStats:
-        """Get cache guard statistics."""
-        return self._stats.model_copy()  # type: ignore
-
-    def clear(self) -> None:
-        """Clear all cache entries."""
-        with self._lock:
-            self._cache.clear()
+__all__ = [
+    "SENTINEL_NULL",
+    "CacheEntry",
+    "CacheGuard",
+    "CacheGuardConfig",
+    "CacheGuardStats",
+    "CacheStats",
+    "LRUCache",
+    "SingleFlight",
+    "get_cache",
+    "is_sentinel_null",
+]
