@@ -379,9 +379,11 @@ class TestPgAuditStoreWithBackend:
         with patch("maop.enterprise.pg_persist._get_pg_backend", return_value=backend):
             from maop.enterprise.pg_persist import PgAuditStore
             PgAuditStore()
-        # CREATE TABLE + 4 CREATE INDEX (legacy) + 3 ALTER TABLE ADD COLUMN
-        # + 2 CREATE INDEX (risk_level, category) = 10
-        assert backend.execute.call_count == 10
+        # CREATE TABLE + 4 CREATE INDEX (legacy) + 5 ALTER TABLE ADD COLUMN
+        # (risk_level, category, tags, prev_hash, event_hash)
+        # + 2 CREATE INDEX (risk_level, category) = 12
+        # P1-3：哈希链新增 prev_hash / event_hash 两条 ALTER（+2）。
+        assert backend.execute.call_count == 12
 
     def test_save_event_calls_execute(self):
         backend = _mock_backend()
