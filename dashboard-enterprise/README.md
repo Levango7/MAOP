@@ -135,6 +135,20 @@ Tests use Vitest + Vue Test Utils + jsdom. Test files are co-located in `src/__t
 - CSP headers configured in `nginx.prod.conf`
 - No secrets in frontend code — all via API proxy
 
+## TypeScript Configuration
+
+This is a **JavaScript project** — all source files are `.js` and `.vue`.
+The `tsconfig.json` (with `strict: true`) and `typescript` devDependency
+exist solely to provide **IDE IntelliSense and type-checking assistance**.
+
+- `npm run build` → `vite build` (does **not** invoke `tsc`)
+- `npm run lint` → `eslint src/ --ext .js,.vue` (no `.ts` files checked)
+- The only `.ts` file is `src/env.d.ts` (Vite client type reference)
+- No `.vue` file uses `lang="ts"`
+
+The `strict: true` flag is **advisory** and does not enforce compile-time
+type constraints on the codebase.
+
 ## Build
 
 Production build outputs to `dist/`. The build is configured via `vite.config.js`.
