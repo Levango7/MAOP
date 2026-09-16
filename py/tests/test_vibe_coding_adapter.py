@@ -24,6 +24,19 @@ from maop.core.agent.adapters.vibe_coding_adapter import (
     VibeCodingConfig,
 )
 
+
+@pytest.fixture(autouse=True)
+def _no_system_proxy(monkeypatch):
+    """Strip proxy env vars so invalid.localhost tests see a direct
+    connection error instead of a proxy 502 (same rationale as
+    test_agent_adapters.py)."""
+    for var in (
+        "http_proxy", "https_proxy", "all_proxy",
+        "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+
 # ======================================================================
 # 辅助函数
 # ======================================================================

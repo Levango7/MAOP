@@ -227,7 +227,7 @@ class TestHandleResponseWrongRoot:
             handler.handle_response(b64_xml)
 
 
-# ─– _verify_signature branches (393-461, 481-482) ──────────────────
+# ─– _verify_signature_selfimplemented branches (P0-4 后自研方法仅作单测参照) ─–
 
 
 class TestVerifySignatureBranches:
@@ -247,7 +247,7 @@ class TestVerifySignatureBranches:
         # P1-6 fix 适配: mock _HAS_XMLSEC=True 以到达 cert parse 分支
         with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True):
             with pytest.raises(SSOError, match="cert parse failed"):
-                handler._verify_signature(b"<resp/>", bad_cert)
+                handler._verify_signature_selfimplemented(b"<resp/>", bad_cert)
 
     def test_xml_parse_failed(self):
         """Cover XML parse failure in verify (400-401)."""
@@ -255,8 +255,8 @@ class TestVerifySignatureBranches:
         handler = _make_handler(saml_idp_cert="dummy")
         cert_b64 = base64.b64encode(b"dummy-cert-bytes").decode()
         # P1-6 fix 适配: mock _HAS_XMLSEC=True 以到达 XML parse 分支
-        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="XML parse failed"):
-            handler._verify_signature(b"not valid xml <<<>", cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="XML parse failed"):
+            handler._verify_signature_selfimplemented(b"not valid xml <<<>", cert_b64)
 
     def test_no_signature_element(self):
         """Cover missing Signature element (406-411)."""
@@ -265,8 +265,8 @@ class TestVerifySignatureBranches:
         cert_b64 = base64.b64encode(b"dummy-cert-bytes").decode()
         xml = b'<Response xmlns="urn:oasis:names:tc:SAML:2.0:protocol"/>'
         # P1-6 fix 适配: mock _HAS_XMLSEC=True 以到达 Signature 查找分支
-        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="missing.*Signature"):
-            handler._verify_signature(xml, cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="missing.*Signature"):
+            handler._verify_signature_selfimplemented(xml, cert_b64)
 
     def test_missing_signed_info(self):
         """Cover missing SignedInfo (422)."""
@@ -278,8 +278,8 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="missing SignedInfo"):
-            handler._verify_signature(xml, cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="missing SignedInfo"):
+            handler._verify_signature_selfimplemented(xml, cert_b64)
 
     def test_missing_reference(self):
         """Cover missing Reference (426)."""
@@ -294,8 +294,8 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="missing Reference"):
-            handler._verify_signature(xml, cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="missing Reference"):
+            handler._verify_signature_selfimplemented(xml, cert_b64)
 
     def test_missing_digest_value(self):
         """Cover missing DigestValue (430)."""
@@ -312,8 +312,8 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="missing DigestValue"):
-            handler._verify_signature(xml, cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="missing DigestValue"):
+            handler._verify_signature_selfimplemented(xml, cert_b64)
 
     def test_digest_value_decode_failed(self):
         """Cover DigestValue base64 decode failure (460-461)."""
@@ -331,8 +331,8 @@ class TestVerifySignatureBranches:
     <ds:SignatureValue>val</ds:SignatureValue>
   </ds:Signature>
 </Response>"""
-        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True), self._patch_cert(), pytest.raises(SSOError, match="DigestValue base64 decode"):
-            handler._verify_signature(xml, cert_b64)
+        with self._patch_cert(), pytest.raises(SSOError, match="DigestValue base64 decode"):
+            handler._verify_signature_selfimplemented(xml, cert_b64)
 
 
 # ─– _extract_attributes / _extract_name_id branches (507-526) ──────

@@ -172,6 +172,9 @@ class TestSAMLIntegration:
 
     def test_saml_handler_parses_real_signed_response(self, idp_cert):
         """SAMLHandler.handle_response() should parse a real signed response."""
+        # xmlsec 是验签的硬性依赖（fail-closed）；未安装或加密后端不可用
+        # （如 Windows + CPython 3.14 的 xmlsec 1.3.x 轮子）时跳过。
+        pytest.importorskip("xmlsec", reason="requires xmlsec for signature verification")
         from maop.enterprise.saml_handler import SAMLHandler
         from maop.enterprise.sso import SSOConfig
 

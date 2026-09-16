@@ -596,14 +596,17 @@ class TestAgentConfigUpdate:
 
 class TestAgentUpgrade:
     def test_missing_agent(self, client_coverage):
-        """POST /api/agent/upgrade with no agent name returns 400."""
+        """POST /api/agent/upgrade with no agent name → 422 (FastAPI required
+        query param missing). The endpoint declares ``agent: str = Query(...)``
+        so an absent parameter is rejected by request validation (422) before
+        the handler runs; the handler-level 404 covers unknown agents."""
         resp = client_coverage.post("/api/agent/upgrade", json={})
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_unknown_agent(self, client_coverage):
         """POST /api/agent/upgrade with unknown agent returns 404 error."""
         # Batch3C: error returns 404 instead of 200.
-        resp = client_coverage.post("/api/agent/upgrade", json={"agent": "nonexistent"})
+        resp = client_coverage.post("/api/agent/upgrade?agent=nonexistent")
         assert resp.status_code == 404
         assert resp.json()["status"] == "error"
 

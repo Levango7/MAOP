@@ -44,6 +44,9 @@ def signed_tree(tmp_path, monkeypatch):
     key_dir.mkdir()
     (key_dir / "public_key.pem").write_bytes(pub_pem)
     monkeypatch.setattr(license_mod, "_PUBLIC_KEY_PATH", key_dir / "public_key.pem")
+    # P1-1 公钥指纹固定：临时公钥必须同步覆盖期望指纹，否则
+    # _verify_public_key_fingerprint 用硬编码生产指纹拒绝它（fixture 即失败）。
+    monkeypatch.setenv("MAOP_LICENSE_KEY_FP", hashlib.sha256(pub_pem).hexdigest())
 
     def _sign() -> Path:
         files = {}

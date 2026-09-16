@@ -319,3 +319,83 @@ class TestAuthDisabledDefaultRole:
         with TestClient(app) as client:
             resp = client.get("/api/whoami")
         assert resp.json()["roles"] == ["read"]
+
+
+class TestTenantIdPropagation:
+    """P0-1 regression: AuthMiddleware must define ``request.state.tenant_id``
+    on every path and propagate the API key's tenant for key-authenticated
+    requests.
+
+    Before the fix the attribute was never assigned anywhere, so every
+    downstream consumer (enterprise QuotaMiddleware, RBAC / compliance /
+    notification routers) fell back to ``""`` and tenant isolation silently
+    never engaged — a dead security control. These tests exercise the real
+    middleware dispatch (no hand-set ``request.state``), which is exactly the
+    integration gap the old suite missed.
+    """
+
+    class _StubKeyManager:
+        """Minimal stand-in for ApiKeyManager returning a fixed tenant."""
+
+        def __init__(self, tenant: str) -> None:
+            self._tenant = tenant
+
+        def validate_key(self, plaintext: str, client_ip: str = ""):
+            from types import SimpleNamespace
+
+            return SimpleNamespace(
+                valid=True,
+                rate_limit_exceeded=False,
+                error="",
+                name="svc-" + plaintext,
+                key_id="k1",
+                roles=["admin"],
+                scopes=["*"],
+                tenant_id=self._tenant,
+            )
+
+        def record_usage(self, *args, **kwargs):  # noqa: D102 - stub
+            return None
+
+    def _make_app(self, *, enabled: bool = True, tenant: str = "",
+                  with_manager: bool = True) -> FastAPI:
+        app = FastAPI()
+
+        @app.get("/api/tenant")
+        def read_tenant(request: Request):
+            # NOTE: named read_tenant (not `tenant`) to avoid shadowing the
+            # `tenant` parameter of _make_app — the shadowing silently passed
+            # this endpoint function into the stub as the tenant value.
+            return {"tenant_id": getattr(request.state, "tenant_id", "<missing>")}
+
+        app.add_middleware(AuthMiddleware, enabled=enabled)
+        if with_manager:
+            app.state.api_key_manager = self._StubKeyManager(tenant)
+        return app
+
+    def test_anonymous_request_gets_empty_tenant_default(self):
+        """No credentials, no manager wired → tenant_id defined and empty."""
+        app = self._make_app(enabled=True, with_manager=False)
+        with TestClient(app) as client:
+            resp = client.get("/api/tenant")
+        assert resp.status_code == 200
+        assert resp.json()["tenant_id"] == ""
+
+    def test_api_key_tenant_is_propagated(self):
+        """P0-1 fix: the key's tenant must reach request.state.tenant_id."""
+        app = self._make_app(enabled=True, tenant="acme")
+        with TestClient(app) as client:
+            resp = client.get("/api/tenant", headers={"X-API-Key": "testkey"})
+        assert resp.status_code == 200
+        assert resp.json()["tenant_id"] == "acme", (
+            "P0-1 fix: AuthMiddleware must propagate ApiKeyResult.tenant_id to "
+            "request.state.tenant_id so enterprise isolation actually engages."
+        )
+
+    def test_auth_disabled_gets_empty_tenant(self):
+        """Auth-disabled branch also defines tenant_id (empty)."""
+        app = self._make_app(enabled=False, tenant="acme")
+        with TestClient(app) as client:
+            resp = client.get("/api/tenant")
+        assert resp.json()["tenant_id"] == ""
+

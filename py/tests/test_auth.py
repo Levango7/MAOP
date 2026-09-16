@@ -281,7 +281,7 @@ class TestAuthManager:
         result = mgr.authenticate()
         assert result.authenticated is True
         assert result.identity == "anonymous"
-        assert "guest" in result.roles  # disabled auth grants guest, not admin (security)
+        assert "read" in result.roles  # H-4 fix: disabled auth grants read (not admin/guest)
         store.close()
 
     def test_authenticate_api_key_takes_priority(self, tmp_path):

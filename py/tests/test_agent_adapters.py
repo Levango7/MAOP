@@ -31,6 +31,25 @@ from maop.core.agent.adapters import (
 )
 from maop.core.mcp.mcp_hub_types import ToolResult
 
+
+@pytest.fixture(autouse=True)
+def _no_system_proxy(monkeypatch):
+    """Make network-touching adapter tests hermetic.
+
+    Tests that point adapters at ``invalid.localhost`` assume a direct
+    connection error (DNS/ refused). When the dev machine has an HTTP proxy
+    configured (http_proxy/https_proxy env vars), httpx routes the request
+    through the proxy, which answers ``502 Bad Gateway`` instead — changing
+    both the control flow and the exception message. Strip proxy vars so the
+    client connects directly. Production proxy support is unaffected (this is
+    test-only).
+    """
+    for var in (
+        "http_proxy", "https_proxy", "all_proxy",
+        "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
 # sys.executable 的 basename 去掉 .exe 后为 "python"，在白名单中
 PYTHON_CMD = sys.executable
 

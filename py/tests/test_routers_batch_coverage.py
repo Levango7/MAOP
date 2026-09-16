@@ -31,6 +31,23 @@ from maop.core.security.auth import AuthResult
 _ADMIN_RESULT = AuthResult(authenticated=True, identity="admin", roles=["admin"])
 
 
+@pytest.fixture(autouse=True)
+def _no_real_config_write(monkeypatch):
+    """防止本模块改写仓库内被跟踪的 config/models.yaml。
+
+    本模块对真实 app 批量打写端点；``/api/model/provider/add|delete`` 与
+    ``/api/model/add|delete`` 会调用 ``ModelRegistry.save()``，而 app 的
+    registry 指向 ``MAOP_ROOT/config/models.yaml``（真实仓库文件）——
+    测试会把配置重写成 yaml.dump 结果：注释全丢、``ProviderDef`` 未声明的
+    字段（display_name/description/features/rate_limit_rpm/region）被抹掉，
+    并多出一个 testprov 供应商。本模块只断言 HTTP 语义，不需要真实落盘，
+    故将持久化置为 no-op。
+    """
+    from maop.model.registry import ModelRegistry
+
+    monkeypatch.setattr(ModelRegistry, "save", lambda self: None, raising=True)
+
+
 class _JwtStub:
     """Stand-in for app.state.jwt_auth (duck-typed by AuthMiddleware)."""
 
