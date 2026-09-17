@@ -10,6 +10,15 @@ This module is the manager layer of the plugin subsystem. It depends on
 the hook-declaration layer (``plugin_hooks``) for ``PluginState`` /
 ``PluginManifest`` and on the sandbox layer (``plugin_sandbox``) for
 ``PluginSandbox`` / ``SandboxViolation`` / ``_DEFAULT_ALLOWED_IMPORTS``.
+
+.. note::
+   **这是实际生效的插件实现**（生产引用 37 处，dashboard 路由
+   ``maop.dashboard.routers.plugin`` 调用的就是本模块的 ``PluginManager``）。
+
+   仓库里另有一个**同名但从未接入**的实现：``maop.core.plugins``（复数）
+   的 ``PluginManager`` / ``PluginSpec`` 类型化契约，生产引用 0 处
+   （见该包 ``__init__`` 的 warning）。两者名字相同、语义不同，改动时
+   务必确认改的是哪一个。
 """
 
 from __future__ import annotations
