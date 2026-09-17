@@ -14,38 +14,26 @@ Endpoints
   last_24h).
 
 All endpoints require the ``admin`` role (via ``require_admin`` middleware).
+
+Router 层只保留：路由定义、请求解析、权限检查、调用 service、响应
+格式化。业务逻辑在 ``maop.dashboard.services.routing_service`` 中，
+框架无关。
 """
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import routing_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-_decision_store: Any = None
-_decision_store_lock = threading.Lock()
-
-
-def _get_store() -> Any:
-    """Lazy-init the global :class:`RoutingDecisionStore` singleton."""
-    global _decision_store
-    if _decision_store is not None:
-        return _decision_store
-    with _decision_store_lock:
-        if _decision_store is not None:  # double-checked locking
-            return _decision_store
-        from maop.core.routing.routing_decision import RoutingDecisionStore
-        _decision_store = RoutingDecisionStore()
-    return _decision_store
 
 
 # ── Endpoints ─────────────────────────────────────────────────────
@@ -76,19 +64,7 @@ async def api_routing_decisions_recent(
         ``model_selector`` / ``dispatcher``). Empty string = all stages.
     """
     require_admin(request)
-    store = _get_store()
-    capped_limit = max(1, min(int(limit), 1000))
-    stage_filter = stage.strip() or None
-    decisions = store.query_recent(limit=capped_limit, stage=stage_filter)
-    total = store.count(stage=stage_filter)
-    return {
-        "status": "ok",
-        "decisions": [d.to_dict() for d in decisions],
-        "count": len(decisions),
-        "total": total,
-        "limit": capped_limit,
-        "stage": stage_filter or "",
-    }
+    return {"status": "ok", **routing_service.query_recent_decisions(limit, stage)}
 
 
 @router.get("/api/routing/decisions/stats")
@@ -104,14 +80,7 @@ async def api_routing_decisions_stats(request: Request) -> dict[str, Any]:
     - ``last_24h``: decisions recorded in the last 24 hours.
     """
     require_admin(request)
-    store = _get_store()
-    stats = store.stats()
-    return {
-        "status": "ok",
-        "total": stats.get("total", 0),
-        "by_stage": stats.get("by_stage", {}),
-        "last_24h": stats.get("last_24h", 0),
-    }
+    return {"status": "ok", **routing_service.get_decision_stats()}
 
 
 @router.get("/api/routing/decisions/{trace_id}")
@@ -128,13 +97,4 @@ async def api_routing_decisions_by_trace(request: Request, trace_id: str) -> dic
     see the Plan → Route → LB → ModelSelect sequence at a glance.
     """
     require_admin(request)
-    store = _get_store()
-    decisions = store.query_by_trace(trace_id)
-    stages = [d.stage for d in decisions]
-    return {
-        "status": "ok",
-        "trace_id": trace_id,
-        "decisions": [d.to_dict() for d in decisions],
-        "count": len(decisions),
-        "stages": stages,
-    }
+    return {"status": "ok", **routing_service.query_decisions_by_trace(trace_id)}

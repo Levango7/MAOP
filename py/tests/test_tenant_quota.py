@@ -612,8 +612,8 @@ class TestQuotaRouter:
     def client(self, qm: QuotaManager) -> TestClient:
         """TestClient with quotas router + admin role injected."""
         from maop.dashboard.routers import quotas as quotas_router
-        # 注入 QuotaManager 单例
-        quotas_router._quota_manager = qm
+        # 注入 QuotaManager 单例（service 层提取后通过 _set_manager 转发）
+        quotas_router._set_manager(qm)
         app = FastAPI()
         app.include_router(quotas_router.router)
 

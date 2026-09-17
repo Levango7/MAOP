@@ -16,40 +16,49 @@ Endpoints
 
 All GET endpoints are read-only and do not require admin auth.
 POST endpoints require the ``admin`` role (via ``require_admin`` middleware).
+
+业务逻辑已提取至 ``maop.dashboard.services.scheduling_service``（§2）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
 """
 
 from __future__ import annotations
 
 import logging
-import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from maop.core.scheduling.failure_detector import get_supervisor
 from maop.core.scheduling.supervisor import (
-    AlertLevel,
-    Supervisor,
     SupervisorActionRequest,
     SupervisorRule,
 )
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import scheduling_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/supervisor", tags=["supervisor"])
 
 
-def _get_supervisor_or_404() -> Supervisor:
+def _get_supervisor_or_404() -> Any:
     """Return the process-wide Supervisor singleton or raise 404.
 
     When no Supervisor has been configured (passive-only mode), the
     endpoints return 404 so the dashboard can show a "supervisor not
     enabled" message rather than a confusing 500.
     """
-    sup = get_supervisor()
-    if sup is None or not isinstance(sup, Supervisor):
+    sup = scheduling_service._get_supervisor()
+    if sup is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Supervisor not configured (passive-only mode). "
+                   "Instantiate a Supervisor and call set_supervisor() to enable.",
+        )
+    # 保持与原 router 一致的 isinstance 检查
+    from maop.core.scheduling.supervisor import Supervisor
+    if not isinstance(sup, Supervisor):
         raise HTTPException(
             status_code=404,
             detail="Supervisor not configured (passive-only mode). "
@@ -72,9 +81,9 @@ def _get_supervisor_or_404() -> Supervisor:
 async def api_supervisor_status(request: Request) -> dict[str, Any]:
     """Return the full supervisor status snapshot."""
     require_admin(request)
-    sup = _get_supervisor_or_404()
+    _get_supervisor_or_404()
     # M-1 fix: 包裹为 {status, data} 统一响应格式。
-    return {"status": "ok", "data": sup.get_supervisor_status()}
+    return {"status": "ok", "data": scheduling_service.get_supervisor_status()}
 
 
 # ── Rules ──────────────────────────────────────────────────────
@@ -85,11 +94,12 @@ async def api_supervisor_status(request: Request) -> dict[str, Any]:
     "Supervisor rules",
     error_value={"rules": [], "error": "Query failed"},
 )
-async def api_supervisor_rules_list(request: Request) -> dict[str, Any]:
+async def api_supervisor_rule_list(request: Request) -> dict[str, Any]:
     """Return the current supervision rule set."""
     require_admin(request)
-    sup = _get_supervisor_or_404()
-    return {"status": "ok", "rules": [r.model_dump() for r in sup.rules]}
+    _get_supervisor_or_404()
+    rules = scheduling_service.list_supervisor_rules()
+    return {"status": "ok", "rules": [r.model_dump() for r in rules]}
 
 
 @router.post("/rules")
@@ -108,15 +118,14 @@ async def api_supervisor_rule_update(
     partially applying.
     """
     require_admin(request)
-    sup = _get_supervisor_or_404()
-    new_rules = body
-    sup.set_rules(new_rules)
+    _get_supervisor_or_404()
+    rule_count = scheduling_service.update_supervisor_rules(body)
     logger.info(
         "[supervisor-api] rule set updated (%d rules, by=%s)",
-        len(new_rules),
+        rule_count,
         getattr(getattr(request, "state", None), "auth_identity", "unknown"),
     )
-    return {"status": "ok", "rule_count": len(new_rules)}
+    return {"status": "ok", "rule_count": rule_count}
 
 
 # ── Actions ────────────────────────────────────────────────────
@@ -134,8 +143,8 @@ async def api_supervisor_actions(
 ) -> dict[str, Any]:
     """Return control action history (optionally filtered by agent)."""
     require_admin(request)
-    sup = _get_supervisor_or_404()
-    actions = sup.get_actions(agent_id=agent_id, limit=limit)
+    _get_supervisor_or_404()
+    actions = scheduling_service.get_supervisor_actions(agent_id=agent_id, limit=limit)
     return {"status": "ok", "actions": [a.model_dump() for a in actions]}
 
 
@@ -160,76 +169,23 @@ async def api_supervisor_action(
         }
     """
     require_admin(request)
-    sup = _get_supervisor_or_404()
-    action_str = body.action.strip().lower()
-    params = body.params or {}
-    reason = body.reason or f"manual {action_str} via API"
-    triggered_by = "manual"
-
+    _get_supervisor_or_404()
     try:
-        if action_str == "alert":
-            level = AlertLevel(params.get("level", "warning"))
-            await sup.warn(
-                body.agent_id, reason=reason, level=level,
-                extra=params.get("extra"),
-            )
-            return {"status": "ok", "action": "alert", "agent_id": body.agent_id}
-        if action_str == "replace":
-            replacement = params.get("replacement")
-            if not replacement:
-                raise HTTPException(
-                    status_code=400,
-                    detail="replace requires params.replacement",
-                )
-            record = await sup.replace(
-                body.agent_id, str(replacement), reason=reason,
-                routing_key=str(params.get("routing_key", "")),
-                triggered_by=triggered_by,
-            )
-            return {"status": "ok", "action": record.action.value,
-                    "action_id": record.action_id}
-        if action_str == "degrade":
-            factor = float(params.get("factor", 0.5))
-            record = await sup.degrade(
-                body.agent_id, factor=factor, reason=reason,
-                max_concurrency=params.get("max_concurrency"),
-                timeout_s=params.get("timeout_s"),
-                triggered_by=triggered_by,
-            )
-            return {"status": "ok", "action": record.action.value,
-                    "action_id": record.action_id}
-        if action_str == "terminate":
-            force = bool(params.get("force", False))
-            record = await sup.terminate(
-                body.agent_id, reason=reason,
-                triggered_by=triggered_by, force=force,
-            )
-            return {"status": "ok", "action": record.action.value,
-                    "action_id": record.action_id}
-        if action_str == "upgrade":
-            target_version = params.get("target_version")
-            if not target_version:
-                raise HTTPException(
-                    status_code=400,
-                    detail="upgrade requires params.target_version",
-                )
-            record = await sup.upgrade(
-                body.agent_id, str(target_version), reason=reason,
-                triggered_by=triggered_by,
-            )
-            return {"status": "ok", "action": record.action.value,
-                    "action_id": record.action_id}
-        raise HTTPException(
-            status_code=400,
-            detail=f"unknown action {action_str!r}; expected one of "
-                   f"alert/replace/degrade/terminate/upgrade",
+        result = await scheduling_service.supervisor_action(
+            agent_id=body.agent_id,
+            action=body.action,
+            params=body.params or {},
+            reason=body.reason,
         )
+        return {"status": "ok", **result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except HTTPException:
         raise
     except Exception as exc:
         logger.exception(
             "[supervisor-api] manual action %s on %s failed",
-            action_str, body.agent_id,
+            body.action, body.agent_id,
         )
         raise HTTPException(
             status_code=500,
@@ -254,16 +210,13 @@ async def api_supervisor_patrol(
     found (rules matched + unreachable strikes).
     """
     require_admin(request)
-    sup = _get_supervisor_or_404()
-    # 在路由层测量 patrol 持续时间，避免访问 sup 的内部属性 _last_patrol_duration_s
-    _start = time.monotonic()
-    probes = await sup.patrol()
-    _duration_s = time.monotonic() - _start
+    _get_supervisor_or_404()
+    probes, duration_s = await scheduling_service.supervisor_patrol()
     return {
         "status": "ok",
         "agents_checked": len(probes),
         "probes": [p.model_dump() for p in probes],
-        "patrol_duration_s": round(_duration_s, 4),
+        "patrol_duration_s": round(duration_s, 4),
     }
 
 

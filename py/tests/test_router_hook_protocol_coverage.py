@@ -190,9 +190,9 @@ class TestHookEvents:
 
 @pytest.fixture
 def protocol_env(tmp_path, monkeypatch):
-    monkeypatch.setattr("maop.dashboard.routers.protocol.MAOP_ROOT", tmp_path)
-    import maop.dashboard.routers.protocol as proto_mod
-    proto_mod._protocol_reg = None
+    monkeypatch.setattr("maop.dashboard.routers.state.MAOP_ROOT", tmp_path)
+    from maop.dashboard.services import routing_service
+    routing_service._protocol_reg = None
 
     mock_reg = MagicMock()
     mock_reg.register = MagicMock(return_value=SimpleNamespace(
@@ -214,7 +214,7 @@ def protocol_env(tmp_path, monkeypatch):
         SimpleNamespace(model_dump=lambda: {"id": "m1", "protocol": "test-proto"})
     ])
 
-    monkeypatch.setattr("maop.dashboard.routers.protocol._get_protocol_reg", lambda: mock_reg)
+    monkeypatch.setattr("maop.dashboard.services.routing_service._get_protocol_reg", lambda: mock_reg)
     return mock_reg
 
 

@@ -1,9 +1,13 @@
-"""MAOP Dashboard — Worktree management API endpoints."""
+"""MAOP Dashboard — Worktree management API endpoints.
+
+业务逻辑已提取至 ``maop.dashboard.services.execution_service``（§2）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
+"""
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -11,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import execution_service
 
 from .state import MAOP_ROOT
 
@@ -56,18 +61,10 @@ class WorktreeRollbackRequest(BaseModel):
     node_id: str = Field(default="", max_length=128)
     checkpoint_id: str = Field(default="", max_length=128)
 
-_worktree_mgr = None
-_worktree_mgr_lock = threading.Lock()
 
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
 def _get_worktree_mgr() -> Any:
-    # P1-18: 双重检查锁定保护单例初始化
-    global _worktree_mgr
-    if _worktree_mgr is None:
-        with _worktree_mgr_lock:
-            if _worktree_mgr is None:
-                from maop.core.agent.memory_ctx.worktree import WorktreeManager
-                _worktree_mgr = WorktreeManager(root_dir=str(MAOP_ROOT))
-    return _worktree_mgr
+    return execution_service._get_worktree_mgr(maop_root=MAOP_ROOT)
 
 
 @router.post("/api/worktree/create-root")
@@ -79,7 +76,7 @@ async def api_worktree_create_root(body: WorktreeCreateRootRequest, request: Req
     if not task:
         raise HTTPException(400, "missing task")
     mgr = _get_worktree_mgr()
-    node_id = mgr.create_root(task=task, description=description)
+    node_id = execution_service.worktree_create_root(mgr, task=task, description=description)
     return {"status": "ok", "node_id": node_id}
 
 
@@ -95,7 +92,9 @@ async def api_worktree_branch(body: WorktreeBranchRequest, request: Request) -> 
         raise HTTPException(400, "missing parent_id or name")
     mgr = _get_worktree_mgr()
     try:
-        node_id = mgr.branch(parent_id=parent_id, name=name, description=description, metadata=metadata)
+        node_id = execution_service.worktree_branch(
+            mgr, parent_id=parent_id, name=name, description=description, metadata=metadata,
+        )
         return {"status": "ok", "node_id": node_id}
     except ValueError as exc:
         # 批次3A: 脱敏——ValueError 细节不暴露给客户端，仅日志记录。
@@ -111,7 +110,7 @@ async def api_worktree_abandon(body: WorktreeAbandonRequest, request: Request) -
     if not node_id:
         raise HTTPException(400, "missing id")
     mgr = _get_worktree_mgr()
-    ok = mgr.abandon(node_id)
+    ok = execution_service.worktree_abandon(mgr, node_id)
     if not ok:
         raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
     return {"status": "ok", "id": node_id}
@@ -124,7 +123,7 @@ async def api_worktree_get(request: Request, node_id: str = "") -> dict[str, Any
     if not node_id:
         raise HTTPException(400, "missing node_id")
     mgr = _get_worktree_mgr()
-    info = mgr.get_branch(node_id)
+    info = execution_service.worktree_get(mgr, node_id)
     if info is None:
         raise HTTPException(404, f"Node {node_id} not found")
     return {"status": "ok", "branch": info.model_dump()}
@@ -135,7 +134,7 @@ async def api_worktree_get(request: Request, node_id: str = "") -> dict[str, Any
 async def api_worktree_list(request: Request, root_id: str = "", active_only: bool = False) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_worktree_mgr()
-    branches = mgr.list_branches(root_id=root_id, active_only=active_only)
+    branches = execution_service.worktree_list(mgr, root_id=root_id, active_only=active_only)
     return {"status": "ok", "branches": [b.model_dump() for b in branches], "count": len(branches)}
 
 
@@ -148,7 +147,7 @@ async def api_worktree_merge(body: WorktreeMergeRequest, request: Request) -> di
     if not source:
         raise HTTPException(400, "missing source_branch")
     mgr = _get_worktree_mgr()
-    result = mgr.merge(source_branch=source, target_branch=target)
+    result = execution_service.worktree_merge(mgr, source_branch=source, target_branch=target)
     return {"status": "ok", "merge": result.model_dump()}
 
 
@@ -162,7 +161,7 @@ async def api_worktree_checkpoint(body: WorktreeCheckpointRequest, request: Requ
         raise HTTPException(400, "missing node_id")
     mgr = _get_worktree_mgr()
     try:
-        cp_id = mgr.checkpoint(node_id, label=label)
+        cp_id = execution_service.worktree_checkpoint(mgr, node_id=node_id, label=label)
         return {"status": "ok", "checkpoint_id": cp_id}
     except ValueError as exc:
         # 批次3A: 脱敏——ValueError 细节不暴露给客户端，仅日志记录。
@@ -179,7 +178,7 @@ async def api_worktree_rollback(body: WorktreeRollbackRequest, request: Request)
     if not node_id or not checkpoint_id:
         raise HTTPException(400, "missing node_id or checkpoint_id")
     mgr = _get_worktree_mgr()
-    ok = mgr.rollback(node_id, to_checkpoint=checkpoint_id)
+    ok = execution_service.worktree_rollback(mgr, node_id=node_id, checkpoint_id=checkpoint_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Rollback target not found")
     return {"status": "ok"}

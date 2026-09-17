@@ -206,6 +206,7 @@ class TestPrompts:
             b.prompts_list.side_effect = Exception("boom")
             return b
         monkeypatch.setattr(data_mod, "get_bridge", bad_bridge)
+        monkeypatch.setattr(state_mod, "get_bridge", bad_bridge)
         resp = client.get("/api/prompts")
         assert resp.status_code == 500
 

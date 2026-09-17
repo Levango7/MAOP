@@ -2,20 +2,23 @@
 
 桥接 ``BillingEngine`` 计费引擎到前端，提供计费/估算/摘要/记录列表 4 个端点。
 所有端点需 admin 鉴权。
+
+业务逻辑已提取至 ``maop.dashboard.services.billing_service``（§3）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
 """
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Query
 from pydantic import BaseModel, Field
 
-from maop.core.agent.billing.billing_abstraction import BillingEngine
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import billing_service
 
 logger = logging.getLogger(__name__)
 
@@ -33,19 +36,13 @@ class BillingChargeRequest(BaseModel):
     model: str = Field(default="", max_length=256, description="模型名称")
 
 
-# ── BillingEngine 单例（双重检查锁定）───────────────────────────────
-_billing_engine: BillingEngine | None = None
-_billing_engine_lock = threading.Lock()
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
+def _get_billing_engine() -> Any:
+    return billing_service._get_billing_engine()
 
 
-def _get_billing_engine() -> BillingEngine:
-    """获取 BillingEngine 单例。"""
-    global _billing_engine
-    if _billing_engine is None:
-        with _billing_engine_lock:
-            if _billing_engine is None:
-                _billing_engine = BillingEngine()
-    return _billing_engine
+def _set_billing_engine(engine: Any) -> None:
+    billing_service._set_billing_engine(engine)
 
 
 # ── API 端点 ────────────────────────────────────────────────────────
@@ -56,20 +53,14 @@ async def api_billing_charge(body: BillingChargeRequest, request: Request) -> di
     require_admin(request)
     if not body.agent_name:
         raise HTTPException(400, "missing agent_name")
-    engine = _get_billing_engine()
-    result = engine.charge(
+    result = billing_service.charge_agent(
         body.agent_name,
         tokens=body.tokens,
         calls=body.calls,
         session_id=body.session_id,
         model=body.model,
     )
-    return {
-        "status": "ok",
-        "success": result.success,
-        "record": result.record.model_dump(mode="json") if result.record else None,
-        "error": result.error,
-    }
+    return {"status": "ok", **result}
 
 
 @router.get("/api/billing/estimate")
@@ -84,8 +75,7 @@ async def api_billing_estimate(
     require_admin(request)
     if not agent_name:
         raise HTTPException(400, "missing agent_name")
-    engine = _get_billing_engine()
-    cost = engine.estimate_cost(agent_name, tokens=tokens, calls=calls)
+    cost = billing_service.estimate_agent_cost(agent_name, tokens=tokens, calls=calls)
     return {
         "status": "ok",
         "agent_name": agent_name,
@@ -100,8 +90,7 @@ async def api_billing_estimate(
 async def api_billing_summary(agent_name: str, request: Request) -> dict[str, Any]:
     """获取 Agent 计费摘要。"""
     require_admin(request)
-    engine = _get_billing_engine()
-    summary = engine.get_agent_billing_summary(agent_name)
+    summary = billing_service.get_agent_billing_summary(agent_name)
     return {"status": "ok", "summary": summary}
 
 
@@ -114,10 +103,9 @@ async def api_billing_records(
 ) -> dict[str, Any]:
     """获取计费记录列表。"""
     require_admin(request)
-    engine = _get_billing_engine()
-    records = engine.get_billing_records(agent_name=agent_name, limit=limit)
+    records = billing_service.get_billing_records(agent_name=agent_name, limit=limit)
     return {
         "status": "ok",
-        "records": [r.model_dump(mode="json") for r in records],
+        "records": records,
         "count": len(records),
     }

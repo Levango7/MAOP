@@ -18,6 +18,10 @@
 
 所有操作要求 admin 角色(``require_admin``) + ``FeatureFlag.TENANT_ISOLATION``.
 
+业务逻辑已提取至 ``maop.dashboard.services.billing_service``（§1）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 / 特性守卫 /
+service 调用 / 响应格式化 / 错误处理。
+
 # WARNING: route order matters - static paths must come before parameterized paths.
 # 固定段路径(``/alerts/...``, ``/{tenant_id}/usage``,
 # ``/{tenant_id}/alerts``, ``/history``)必须在参数段路径
@@ -28,63 +32,32 @@
 from __future__ import annotations
 
 import logging
-import sqlite3
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from maop.config.edition import FeatureFlag, has_feature
-from maop.core.backends.db_utils import sqlite_connect, unified_db_path
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import billing_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/quotas", tags=["quotas"])
 
-_quota_manager: Any = None
-_quota_manager_lock = threading.Lock()
 
-
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
 def _get_manager() -> Any:
-    """惰性初始化 QuotaManager 单例(共享 unified maop.db)."""
-    global _quota_manager
-    if _quota_manager is not None:
-        return _quota_manager
-    with _quota_manager_lock:
-        if _quota_manager is not None:  # double-checked locking
-            return _quota_manager
-        from maop.enterprise.quota import QuotaManager
-        _quota_manager = QuotaManager(unified_db_path())
-    return _quota_manager
+    return billing_service._get_quota_manager()
+
+
+def _set_manager(mgr: Any) -> None:
+    billing_service._set_quota_manager(mgr)
 
 
 def _require_tenant_isolation() -> None:
     """企业版特性守卫: Personal 版返回 404."""
-    if not has_feature(FeatureFlag.TENANT_ISOLATION):
-        raise HTTPException(
-            status_code=404,
-            detail="tenant isolation not available in this edition",
-        )
-
-
-def _quota_history_table_exists(conn: sqlite3.Connection) -> bool:
-    """检查 ``quota_history`` 表是否存在于当前数据库.
-
-    使用 ``sqlite_master`` 查询而非 ``PRAGMA table_info`` 以避免在
-    事务中产生隐式提交. 失败时返回 ``False`` (fail-open 语义).
-    """
-    try:
-        row = conn.execute(
-            "SELECT 1 FROM sqlite_master "
-            "WHERE type='table' AND name='quota_history' LIMIT 1",
-        ).fetchone()
-        return row is not None
-    except sqlite3.Error as exc:
-        logger.warning("[quotas.history] table existence check failed: %s", exc)
-        return False
+    billing_service.require_tenant_isolation()
 
 
 # ── 请求模型 ──────────────────────────────────────────────────────
@@ -158,43 +131,10 @@ async def list_quota_history(
     """
     require_admin(request)
     _require_tenant_isolation()
-    db_path = unified_db_path()
-    try:
-        with sqlite_connect(db_path) as conn:
-            if not _quota_history_table_exists(conn):
-                return {"status": "ok", "history": [], "count": 0}
-            if tenant_id is not None:
-                rows = conn.execute(
-                    "SELECT id, tenant_id, resource, field, "
-                    "old_value, new_value, changed_by, changed_at "
-                    "FROM quota_history WHERE tenant_id = ? "
-                    "ORDER BY changed_at DESC LIMIT ? OFFSET ?",
-                    (tenant_id, limit, offset),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT id, tenant_id, resource, field, "
-                    "old_value, new_value, changed_by, changed_at "
-                    "FROM quota_history "
-                    "ORDER BY changed_at DESC LIMIT ? OFFSET ?",
-                    (limit, offset),
-                ).fetchall()
-    except sqlite3.Error as exc:
-        logger.warning("[quotas.history] query failed: %s", exc)
-        return {"status": "ok", "history": [], "count": 0}
-    history: list[dict[str, Any]] = []
-    for r in rows:
-        history.append({
-            "id": r[0],
-            "tenant_id": r[1],
-            "resource": r[2],
-            "field": r[3],
-            "old_value": r[4],
-            "new_value": r[5],
-            "changed_by": r[6],
-            "changed_at": r[7],
-        })
-    return {"status": "ok", "history": history, "count": len(history)}
+    result = billing_service.list_quota_history(
+        tenant_id=tenant_id, limit=limit, offset=offset,
+    )
+    return {"status": "ok", **result}
 
 
 @router.post("/alerts/{alert_id}/resolve")
@@ -205,8 +145,7 @@ async def resolve_alert(
     """标记告警为已解决."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    resolved = mgr.resolve_alert(alert_id)
+    resolved = billing_service.resolve_quota_alert(alert_id)
     if not resolved:
         # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -227,19 +166,18 @@ async def list_alerts(
     """列出配额告警."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
     if resolved == "all":
         resolved_filter: bool | None = None
     elif resolved == "true":
         resolved_filter = True
     else:
         resolved_filter = False
-    alerts = mgr.list_alerts(
+    alerts = billing_service.list_quota_alerts(
         tenant_id, resolved=resolved_filter, limit=limit, offset=offset,
     )
     return {
         "status": "ok",
-        "alerts": [a.model_dump() for a in alerts],
+        "alerts": alerts,
         "count": len(alerts),
     }
 
@@ -255,11 +193,10 @@ async def list_usage(
     """列出租户所有已设配额资源的使用量."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    usages = mgr.list_usage(tenant_id)
+    usages = billing_service.list_quota_usage(tenant_id)
     return {
         "status": "ok",
-        "usages": [u.model_dump() for u in usages],
+        "usages": usages,
         "count": len(usages),
     }
 
@@ -276,12 +213,11 @@ async def set_quota(
     """设置或更新配额."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    quota = mgr.set_quota(
+    quota = billing_service.set_quota(
         tenant_id, resource, body.hard_limit,
         soft_limit=body.soft_limit, period=body.period,
     )
-    return {"status": "ok", "quota": quota.model_dump()}
+    return {"status": "ok", "quota": quota}
 
 
 @router.get("/{tenant_id}")
@@ -292,11 +228,10 @@ async def list_quotas(
     """列出租户的所有配额."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    quotas = mgr.list_quotas(tenant_id)
+    quotas = billing_service.list_quotas(tenant_id)
     return {
         "status": "ok",
-        "quotas": [q.model_dump() for q in quotas],
+        "quotas": quotas,
         "count": len(quotas),
     }
 
@@ -309,14 +244,13 @@ async def get_quota(
     """查询单个配额."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    quota = mgr.get_quota(tenant_id, resource)
+    quota = billing_service.get_quota(tenant_id, resource)
     if quota is None:
         raise HTTPException(
             status_code=404,
             detail=f"Quota not found for tenant={tenant_id} resource={resource}",
         )
-    return {"status": "ok", "quota": quota.model_dump()}
+    return {"status": "ok", "quota": quota}
 
 
 @router.put("/{tenant_id}/{resource}")
@@ -328,9 +262,8 @@ async def update_quota(
     """部分更新配额."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
     try:
-        quota = mgr.update_quota(
+        quota = billing_service.update_quota(
             tenant_id, resource,
             hard_limit=body.hard_limit,
             soft_limit=body.soft_limit,
@@ -339,7 +272,7 @@ async def update_quota(
     except KeyError as exc:
         # P3 fix: 不透传异常字符串，使用脱敏固定文案。
         raise HTTPException(status_code=404, detail="Quota not found") from exc
-    return {"status": "ok", "quota": quota.model_dump()}
+    return {"status": "ok", "quota": quota}
 
 
 @router.delete("/{tenant_id}/{resource}")
@@ -350,8 +283,7 @@ async def delete_quota(
     """删除配额."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    deleted = mgr.delete_quota(tenant_id, resource)
+    deleted = billing_service.delete_quota(tenant_id, resource)
     if not deleted:
         # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
         raise HTTPException(status_code=404, detail="Quota not found")
@@ -369,9 +301,8 @@ async def get_usage(
     """查询单个资源的使用量."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    usage = mgr.get_usage(tenant_id, resource)
-    return {"status": "ok", "usage": usage.model_dump()}
+    usage = billing_service.get_quota_usage(tenant_id, resource)
+    return {"status": "ok", "usage": usage}
 
 
 @router.post("/{tenant_id}/{resource}/usage")
@@ -383,8 +314,7 @@ async def update_usage(
     """增量更新使用量(amount 可正可负)."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    used = mgr.update_usage(
+    used = billing_service.update_quota_usage(
         tenant_id, resource, body.amount, period=body.period,
     )
     return {"status": "ok", "used": used}
@@ -399,8 +329,7 @@ async def set_usage(
     """绝对设置使用量."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    used = mgr.set_usage(
+    used = billing_service.set_quota_usage(
         tenant_id, resource, body.value, period=body.period,
     )
     return {"status": "ok", "used": used}
@@ -414,8 +343,7 @@ async def reset_usage(
     """重置单个资源的使用量."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    deleted = mgr.reset_usage(tenant_id, resource)
+    deleted = billing_service.reset_quota_usage(tenant_id, resource)
     return {"status": "ok", "deleted": deleted}
 
 
@@ -431,9 +359,8 @@ async def check_quota(
     """检查是否允许消耗 amount 单位的 resource(不消费)."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    result = mgr.check_quota(tenant_id, resource, amount=body.amount)
-    return {"status": "ok", "result": result.model_dump()}
+    result = billing_service.check_quota(tenant_id, resource, amount=body.amount)
+    return {"status": "ok", "result": result}
 
 
 @router.post("/{tenant_id}/{resource}/consume")
@@ -445,6 +372,5 @@ async def consume_quota(
     """检查并消费 amount 单位的 resource."""
     require_admin(request)
     _require_tenant_isolation()
-    mgr = _get_manager()
-    result = mgr.consume(tenant_id, resource, amount=body.amount)
-    return {"status": "ok", "result": result.model_dump()}
+    result = billing_service.consume_quota(tenant_id, resource, amount=body.amount)
+    return {"status": "ok", "result": result}

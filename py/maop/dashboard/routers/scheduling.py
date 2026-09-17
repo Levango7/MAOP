@@ -14,6 +14,10 @@ Endpoints
 
 GET endpoints are read-only and do not require admin auth.
 POST endpoints require the ``admin`` role (via ``require_admin`` middleware).
+
+业务逻辑已提取至 ``maop.dashboard.services.scheduling_service``（§1）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
 """
 
 from __future__ import annotations
@@ -24,12 +28,9 @@ from typing import Any
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from maop.core.scheduling.failure_detector import (
-    FailurePatternDetector,
-    get_failure_detector,
-)
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import scheduling_service
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +43,10 @@ class FailureStatsResetRequest(BaseModel):
     agent_id: str | None = Field(default=None, max_length=200)
 
 
-def _detector() -> FailurePatternDetector:
-    """Return the process-wide detector singleton.
-
-    Imported lazily so the router module is import-safe even when the
-    scheduling subsystem has not been initialised (e.g. personal edition
-    fallback to in-process execution).
-    """
-    return get_failure_detector()
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
+def _detector() -> Any:
+    """Return the process-wide detector singleton (透传到 service)."""
+    return scheduling_service._get_detector()
 
 
 @router.get("/failure-stats")
@@ -77,7 +74,7 @@ async def api_scheduling_failure_stats(request: Request) -> dict[str, Any]:
     """
     require_admin(request)
     # M-1 fix: 包裹为 {status, data} 统一响应格式。
-    return {"status": "ok", "data": _detector().get_stats()}
+    return {"status": "ok", "data": scheduling_service.get_failure_stats()}
 
 
 @router.post("/failure-stats/reset")
@@ -98,7 +95,7 @@ async def api_scheduling_failure_stats_reset(
     """
     require_admin(request)
     agent_id = (body.agent_id if body and body.agent_id else "").strip() or None
-    _detector().reset(agent_id)
+    scheduling_service.reset_failure_stats(agent_id)
     logger.info(
         "[scheduling-api] failure-detector reset (agent_id=%s, by=%s)",
         agent_id or "ALL",

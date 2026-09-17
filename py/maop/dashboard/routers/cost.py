@@ -1,4 +1,9 @@
-"""MAOP Dashboard — Cost Tracker API endpoints."""
+"""MAOP Dashboard — Cost Tracker API endpoints.
+
+业务逻辑已提取至 ``maop.dashboard.services.budget_service``（§2）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
+"""
 
 from __future__ import annotations
 
@@ -9,15 +14,18 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import budget_service
 
 router = APIRouter(prefix="/api/cost", tags=["cost"])
 
 
-def _get_cost_tracker():
-    # 使用进程级单例，保证读写的预算配置与 llm_provider 的 auto-record
-    # 共享同一份限额/阈值状态（否则每次新建实例会导致配置丢失）。
-    from maop.core.cost_tracker import get_cost_tracker
-    return get_cost_tracker()
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
+def _get_cost_tracker() -> Any:
+    return budget_service._get_cost_tracker()
+
+
+def _set_cost_tracker(tracker: Any) -> None:
+    budget_service._set_cost_tracker(tracker)
 
 
 @router.get("/entries")
@@ -32,8 +40,7 @@ async def get_cost_entries(
     limit: int = Query(100, ge=1, le=1000),
 ) -> dict[str, Any]:
     require_admin(request)
-    tracker = _get_cost_tracker()
-    entries = tracker.get_entries(
+    entries = budget_service.get_cost_entries(
         session_id=session_id or "",
         agent=agent or "",
         model=model or "",
@@ -41,7 +48,7 @@ async def get_cost_entries(
         end_date=end_date or "",
         limit=limit,
     )
-    return {"status": "ok", "entries": [e.model_dump() for e in entries]}
+    return {"status": "ok", "entries": entries}
 
 
 @router.get("/summary")
@@ -54,26 +61,21 @@ async def get_cost_summary(
     end_date: str = Query("", description="End date (ISO)"),
 ) -> dict[str, Any]:
     require_admin(request)
-    tracker = _get_cost_tracker()
-    summary = tracker.summary(
+    summary = budget_service.get_cost_summary(
         session_id=session_id or "",
         agent=agent or "",
         start_date=start_date or "",
         end_date=end_date or "",
     )
-    return {"status": "ok", "summary": summary.model_dump()}
+    return {"status": "ok", "summary": summary}
 
 
 @router.get("/budget")
 @handle_api_errors
 async def get_budget_status(request: Request) -> dict[str, Any]:
     require_admin(request)
-    tracker = _get_cost_tracker()
-    if hasattr(tracker, "budget_status_async"):
-        status = await tracker.budget_status_async()
-    else:
-        status = tracker.budget_status()
-    return {"status": "ok", "budget": status.model_dump()}
+    budget = await budget_service.get_cost_budget_status()
+    return {"status": "ok", "budget": budget}
 
 
 class BudgetConfigRequest(BaseModel):
@@ -112,29 +114,27 @@ async def update_budget(body: BudgetConfigRequest, request: Request) -> dict[str
     未传入的字段保持不变；``0`` 表示无限额。
     """
     require_admin(request)
-    tracker = _get_cost_tracker()
-    status = tracker.set_budget(
+    budget = budget_service.update_cost_budget(
         daily_limit_usd=body.daily_limit_usd,
         monthly_limit_usd=body.monthly_limit_usd,
         alert_threshold=body.alert_threshold,
     )
-    return {"status": "ok", "budget": status.model_dump()}
+    return {"status": "ok", "budget": budget}
 
 
 @router.get("/pricing")
 @handle_api_errors
 async def get_pricing(request: Request) -> dict[str, Any]:
     require_admin(request)
-    tracker = _get_cost_tracker()
-    return {"status": "ok", "pricing": tracker.get_pricing()}
+    pricing = budget_service.get_pricing()
+    return {"status": "ok", "pricing": pricing}
 
 
 @router.put("/pricing/{model}")
 @handle_api_errors
 async def update_pricing(model: str, body: UpdatePricingRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    tracker = _get_cost_tracker()
-    tracker.update_pricing(
+    budget_service.update_pricing(
         model=model,
         prompt_per_1m=body.prompt_per_1m,
         completion_per_1m=body.completion_per_1m,
@@ -146,27 +146,14 @@ async def update_pricing(model: str, body: UpdatePricingRequest, request: Reques
 @handle_api_errors
 async def record_cost(body: RecordCostRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    tracker = _get_cost_tracker()
-    if hasattr(tracker, "record_async"):
-        entry = await tracker.record_async(
-            session_id=body.session_id,
-            agent=body.agent,
-            model=body.model,
-            prompt_tokens=body.prompt_tokens,
-            completion_tokens=body.completion_tokens,
-            total_tokens=body.total_tokens,
-            latency_ms=body.latency_ms,
-            metadata=body.metadata,
-        )
-    else:
-        entry = tracker.record(
-            session_id=body.session_id,
-            agent=body.agent,
-            model=body.model,
-            prompt_tokens=body.prompt_tokens,
-            completion_tokens=body.completion_tokens,
-            total_tokens=body.total_tokens,
-            latency_ms=body.latency_ms,
-            metadata=body.metadata,
-        )
-    return {"status": "ok", "entry": entry.model_dump()}
+    entry = await budget_service.record_cost(
+        session_id=body.session_id,
+        agent=body.agent,
+        model=body.model,
+        prompt_tokens=body.prompt_tokens,
+        completion_tokens=body.completion_tokens,
+        total_tokens=body.total_tokens,
+        latency_ms=body.latency_ms,
+        metadata=body.metadata,
+    )
+    return {"status": "ok", "entry": entry}

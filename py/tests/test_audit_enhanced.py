@@ -70,20 +70,20 @@ def _no_pg_backend(monkeypatch):
 
 @pytest.fixture
 def fresh_logger(monkeypatch):
-    """Return a fresh EnterpriseAuditLogger and patch the router singleton."""
+    """Return a fresh EnterpriseAuditLogger and patch the service singleton."""
     logger = EnterpriseAuditLogger()
-    # Patch the router's singleton so endpoints use this fresh instance.
-    from maop.dashboard.routers import audit as audit_router
-    monkeypatch.setattr(audit_router, "_enterprise_logger", logger)
+    # Patch the service's singleton so endpoints use this fresh instance.
+    from maop.dashboard.services import observability_service
+    monkeypatch.setattr(observability_service, "_enterprise_logger", logger)
     return logger
 
 
 @pytest.fixture
 def fresh_engine(monkeypatch):
-    """Return a fresh AuditAlertEngine and patch the router singleton."""
+    """Return a fresh AuditAlertEngine and patch the service singleton."""
     engine = AuditAlertEngine()
-    from maop.dashboard.routers import audit as audit_router
-    monkeypatch.setattr(audit_router, "_alert_engine", engine)
+    from maop.dashboard.services import observability_service
+    monkeypatch.setattr(observability_service, "_alert_engine", engine)
     return engine
 
 

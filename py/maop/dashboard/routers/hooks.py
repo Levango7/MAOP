@@ -18,6 +18,10 @@
     避免双源真相。
   - Pydantic schema 严格校验请求体；错误返回 400/404。
   - ``require_admin`` 保护所有端点（含读操作），避免泄露 webhook URL 等配置。
+
+业务逻辑已提取至 ``maop.dashboard.services.execution_service``（§4）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
 """
 
 from __future__ import annotations
@@ -28,10 +32,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from maop.core.agent.plugins_hooks.hook_manager import LifecycleEvent
 from maop.core.security.middleware import require_admin
 from maop.core.security.url_validator import SSRFError, validate_webhook_url
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import execution_service
 
 from .state import MAOP_ROOT
 
@@ -39,21 +43,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# ── HookManager 单例（按需懒加载，便于测试 monkeypatch）──────────────
-_hook_mgr: Any = None
-
-
+# ── HookManager 单例转发（按需懒加载，便于测试 monkeypatch）──────────
 def _get_hook_mgr() -> Any:
-    """返回 HookManager 单例。
+    """返回 HookManager 单例（转发到 service 层）。
 
     测试可通过 ``monkeypatch.setattr("maop.dashboard.routers.hooks._get_hook_mgr", ...)``
-    替换为 mock；也可直接覆写模块级 ``_hook_mgr``。
+    替换为 mock；也可直接覆写 service 模块级 ``_hook_mgr``。
     """
-    global _hook_mgr
-    if _hook_mgr is None:
-        from maop.core.agent.plugins_hooks.hook_manager import HookManager
-        _hook_mgr = HookManager(root_dir=str(MAOP_ROOT))
-    return _hook_mgr
+    return execution_service._get_hook_mgr(maop_root=MAOP_ROOT)
 
 
 # ── Pydantic 请求/响应 schema ────────────────────────────────────────
@@ -126,21 +123,7 @@ class HookTestResponse(BaseModel):
     duration_ms: int = 0
 
 
-# ── 辅助函数 ──────────────────────────────────────────────────────────
-_VALID_EVENTS: set[str] = {e.value for e in LifecycleEvent}
-
-
-def _is_valid_event(event: str) -> bool:
-    """判断事件是否合法：精确匹配或 ``<domain>.*`` 通配。"""
-    if event in _VALID_EVENTS:
-        return True
-    # 允许通配符，如 "agent.*"
-    if event.endswith(".*"):
-        prefix = event[:-2]
-        return any(e.startswith(prefix + ".") for e in _VALID_EVENTS)
-    return False
-
-
+# ── 辅助函数（响应格式化，留在 router 层）─────────────────────────────
 def _hook_def_to_response(hook_def: Any, name: str = "") -> HookResponse:
     """将 HookManager.HookDef 转为 HookResponse。
 
@@ -174,7 +157,7 @@ async def api_hooks_list(request: Request, event: str = "") -> HookListResponse:
     # P1-3 fix: GET 端点暴露 webhook URL 等配置信息，需要 require_admin 保护。
     require_admin(request)
     mgr = _get_hook_mgr()
-    hooks = mgr.list_hooks(event=event or "")
+    hooks = execution_service.hooks_list(mgr, event)
     return HookListResponse(
         hooks=[_hook_def_to_response(h) for h in hooks],
         count=len(hooks),
@@ -187,8 +170,6 @@ async def api_hooks_create(body: HookCreateRequest, request: Request) -> HookRes
     """创建新 hook（webhook 类型）。"""
     require_admin(request)
 
-    if not _is_valid_event(body.event):
-        raise HTTPException(400, f"Invalid event type: {body.event}")
     if body.method.upper() != "POST":
         raise HTTPException(400, f"Unsupported method: {body.method} (only POST supported)")
 
@@ -201,14 +182,12 @@ async def api_hooks_create(body: HookCreateRequest, request: Request) -> HookRes
         raise HTTPException(400, "URL not allowed") from exc
 
     mgr = _get_hook_mgr()
-    hdef = mgr.register(
-        event=body.event,
-        url=body.url,
-        priority=0,
-        description=body.name,
-        source="api",
-    )
-    logger.info("[hooks] Created hook '%s' for event '%s'", hdef.id, body.event)
+    try:
+        hdef = execution_service.hooks_create(
+            mgr, name=body.name, event=body.event, url=body.url,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     return _hook_def_to_response(hdef, name=body.name)
 
 
@@ -219,15 +198,11 @@ async def api_hooks_events(request: Request) -> EventsListResponse:
     """列出所有可用的 lifecycle 事件类型。"""
     # P1-3 fix: 统一 require_admin 保护，与其它 hooks 端点保持一致。
     require_admin(request)
-    events = [
-        EventTypeInfo(
-            name=e.value,
-            phase=e.value.split(".")[-1],
-            domain=e.value.split(".")[0],
-        )
-        for e in LifecycleEvent
-    ]
-    return EventsListResponse(events=events, count=len(events))
+    events = execution_service.hooks_events()
+    return EventsListResponse(
+        events=[EventTypeInfo(**e) for e in events],
+        count=len(events),
+    )
 
 
 # ── 路由：单个 hook CRUD ─────────────────────────────────────────────
@@ -240,7 +215,7 @@ async def api_hooks_get(hook_id: str, request: Request) -> HookResponse:
     if not hook_id:
         raise HTTPException(400, "missing hook_id")
     mgr = _get_hook_mgr()
-    hdef = mgr.get_hook(hook_id)
+    hdef = execution_service.hooks_get(mgr, hook_id)
     if hdef is None:
         raise HTTPException(404, f"Hook {hook_id} not found")
     return _hook_def_to_response(hdef)
@@ -257,7 +232,7 @@ async def api_hooks_update(hook_id: str, body: HookUpdateRequest, request: Reque
     require_admin(request)
 
     mgr = _get_hook_mgr()
-    existing = mgr.get_hook(hook_id)
+    existing = execution_service.hooks_get(mgr, hook_id)
     if existing is None:
         raise HTTPException(404, f"Hook {hook_id} not found")
 
@@ -267,11 +242,6 @@ async def api_hooks_update(hook_id: str, body: HookUpdateRequest, request: Reque
     new_name = body.name if body.name is not None else (existing.description or hook_id)
     new_enabled = body.enabled if body.enabled is not None else existing.enabled
 
-    if not _is_valid_event(new_event):
-        raise HTTPException(400, f"Invalid event type: {new_event}")
-    if not new_url:
-        raise HTTPException(400, "url must not be empty")
-
     # SSRF 防护：拒绝指向内网/云元数据端点的 URL
     try:
         validate_webhook_url(new_url)
@@ -280,19 +250,19 @@ async def api_hooks_update(hook_id: str, body: HookUpdateRequest, request: Reque
         logger.warning("[hooks] SSRF rejected URL: %s", exc)
         raise HTTPException(400, "URL not allowed") from exc
 
-    # 删除旧 hook 并注册新 hook（保留原 id）
-    mgr.unregister(hook_id)
-    hdef = mgr.register(
-        event=new_event,
-        url=new_url,
-        priority=existing.priority,
-        description=new_name,
-        source="api",
-        hook_id=hook_id,
-    )
-    if not new_enabled:
-        mgr.disable(hook_id)
-    logger.info("[hooks] Updated hook '%s'", hook_id)
+    try:
+        hdef = execution_service.hooks_update(
+            mgr,
+            hook_id=hook_id,
+            new_event=new_event,
+            new_url=new_url,
+            new_name=new_name,
+            new_enabled=new_enabled,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except KeyError as exc:
+        raise HTTPException(404, str(exc))
     return _hook_def_to_response(hdef, name=new_name)
 
 
@@ -304,10 +274,10 @@ async def api_hooks_delete(hook_id: str, request: Request) -> dict[str, Any]:
     if not hook_id:
         raise HTTPException(400, "missing hook_id")
     mgr = _get_hook_mgr()
-    existing = mgr.get_hook(hook_id)
-    if existing is None:
-        raise HTTPException(404, f"Hook {hook_id} not found")
-    removed = mgr.unregister(hook_id)
+    try:
+        removed = execution_service.hooks_delete(mgr, hook_id)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc))
     # P2-2 fix: 操作失败时返回 500 而非 200 + {"status": "error"}，
     # 由 @handle_api_errors 装饰器统一渲染为 ErrorSchema 响应。
     if not removed:
@@ -322,30 +292,11 @@ async def api_hooks_test(hook_id: str, request: Request) -> HookTestResponse:
     """触发一次测试事件，向 hook URL 发送 POST 请求。"""
     require_admin(request)
     mgr = _get_hook_mgr()
-    hdef = mgr.get_hook(hook_id)
-    if hdef is None:
-        raise HTTPException(404, f"Hook {hook_id} not found")
-
-    # 临时启用 hook 以便触发（不修改持久化状态）
-    was_enabled = hdef.enabled
-    if not was_enabled:
-        mgr.enable(hook_id)
     try:
-        results = await mgr.trigger(hdef.event, {"test": True, "hook_id": hook_id})
-    finally:
-        if not was_enabled:
-            mgr.disable(hook_id)
-
-    if not results:
-        return HookTestResponse(hook_id=hook_id, success=True, response="no listeners")
-    r = results[0]
-    return HookTestResponse(
-        hook_id=hook_id,
-        success=r.success,
-        response=r.response,
-        error=r.error,
-        duration_ms=r.duration_ms,
-    )
+        result = await execution_service.hooks_test(mgr, hook_id)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc))
+    return HookTestResponse(hook_id=hook_id, **result)
 
 
 @router.post("/api/hooks/{hook_id}/enable")
@@ -354,9 +305,10 @@ async def api_hooks_enable(hook_id: str, request: Request) -> dict[str, Any]:
     """启用 hook。"""
     require_admin(request)
     mgr = _get_hook_mgr()
-    if mgr.get_hook(hook_id) is None:
-        raise HTTPException(404, f"Hook {hook_id} not found")
-    ok = mgr.enable(hook_id)
+    try:
+        ok = execution_service.hooks_enable(mgr, hook_id)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc))
     # P2-2 fix: 操作失败时返回 500 而非 200 + {"status": "error"}。
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to enable hook")
@@ -369,9 +321,10 @@ async def api_hooks_disable(hook_id: str, request: Request) -> dict[str, Any]:
     """禁用 hook。"""
     require_admin(request)
     mgr = _get_hook_mgr()
-    if mgr.get_hook(hook_id) is None:
-        raise HTTPException(404, f"Hook {hook_id} not found")
-    ok = mgr.disable(hook_id)
+    try:
+        ok = execution_service.hooks_disable(mgr, hook_id)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc))
     # P2-2 fix: 操作失败时返回 500 而非 200 + {"status": "error"}。
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to disable hook")

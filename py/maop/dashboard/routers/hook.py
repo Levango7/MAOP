@@ -1,9 +1,13 @@
-"""MAOP Dashboard — Hook management API endpoints."""
+"""MAOP Dashboard — Hook management API endpoints.
+
+业务逻辑已提取至 ``maop.dashboard.services.execution_service``（§3）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
+"""
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -11,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import execution_service
 
 from .state import MAOP_ROOT
 
@@ -39,18 +44,10 @@ class HookTriggerRequest(BaseModel):
     event: str = Field(default="", max_length=256)
     data: dict[str, Any] = Field(default_factory=dict)
 
-_hook_mgr = None
-_hook_mgr_lock = threading.Lock()
 
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
 def _get_hook_mgr() -> Any:
-    # P1-18: 双重检查锁定保护单例初始化
-    global _hook_mgr
-    if _hook_mgr is None:
-        with _hook_mgr_lock:
-            if _hook_mgr is None:
-                from maop.core.agent.plugins_hooks.hook_manager import HookManager
-                _hook_mgr = HookManager(root_dir=str(MAOP_ROOT))
-    return _hook_mgr
+    return execution_service._get_hook_mgr(maop_root=MAOP_ROOT)
 
 
 @router.post("/api/hook/register")
@@ -65,16 +62,13 @@ async def api_hook_register(body: HookRegisterRequest, request: Request) -> dict
     if not event:
         raise HTTPException(400, "missing event")
     mgr = _get_hook_mgr()
-    if url:
-        hdef = mgr.register(event=event, url=url, priority=priority, description=description)
-    elif callback:
-        # 使用日志记录回调而非空回调，确保 hook 触发时有可观测的副作用
-        def _log_callback(evt: str, data: dict[str, Any]) -> None:
-            logger.info("[hook] callback triggered for event=%s", evt)
-
-        hdef = mgr.register(event=event, callback=_log_callback, priority=priority, description=description)
-    else:
-        raise HTTPException(400, "must provide url or callback")
+    try:
+        hdef = execution_service.hook_register(
+            mgr, event=event, url=url, callback=callback,
+            priority=priority, description=description,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     return {"status": "ok", "hook": hdef.model_dump()}
 
 
@@ -86,7 +80,7 @@ async def api_hook_unregister(body: HookIdRequest, request: Request) -> dict[str
     if not hook_id:
         raise HTTPException(400, "missing id")
     mgr = _get_hook_mgr()
-    removed = mgr.unregister(hook_id)
+    removed = execution_service.hook_unregister(mgr, hook_id)
     if not removed:
         # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
         raise HTTPException(status_code=404, detail="Hook not found")
@@ -101,7 +95,7 @@ async def api_hook_enable(body: HookIdRequest, request: Request) -> dict[str, An
     if not hook_id:
         raise HTTPException(400, "missing id")
     mgr = _get_hook_mgr()
-    result = mgr.enable(hook_id)
+    result = execution_service.hook_enable(mgr, hook_id)
     if not result:
         # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
         raise HTTPException(status_code=404, detail="Hook not found")
@@ -116,7 +110,7 @@ async def api_hook_disable(body: HookIdRequest, request: Request) -> dict[str, A
     if not hook_id:
         raise HTTPException(400, "missing id")
     mgr = _get_hook_mgr()
-    result = mgr.disable(hook_id)
+    result = execution_service.hook_disable(mgr, hook_id)
     if not result:
         # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
         raise HTTPException(status_code=404, detail="Hook not found")
@@ -128,7 +122,7 @@ async def api_hook_disable(body: HookIdRequest, request: Request) -> dict[str, A
 async def api_hook_list(request: Request, event: str = "") -> dict[str, Any]:
     require_admin(request)
     mgr = _get_hook_mgr()
-    hooks = mgr.list_hooks(event=event or "")
+    hooks = execution_service.hook_list(mgr, event)
     return {"status": "ok", "hooks": [h.model_dump() for h in hooks], "count": len(hooks)}
 
 
@@ -139,7 +133,7 @@ async def api_hook_get(request: Request, hook_id: str = "") -> dict[str, Any]:
     if not hook_id:
         raise HTTPException(400, "missing hook_id")
     mgr = _get_hook_mgr()
-    hdef = mgr.get_hook(hook_id)
+    hdef = execution_service.hook_get(mgr, hook_id)
     if hdef is None:
         raise HTTPException(404, f"Hook {hook_id} not found")
     return {"status": "ok", "hook": hdef.model_dump()}
@@ -154,7 +148,7 @@ async def api_hook_trigger(body: HookTriggerRequest, request: Request) -> dict[s
     if not event:
         raise HTTPException(400, "missing event")
     mgr = _get_hook_mgr()
-    results = await mgr.trigger(event, data)
+    results = await execution_service.hook_trigger(mgr, event, data)
     return {"status": "ok", "results": [r.model_dump() for r in results], "count": len(results)}
 
 
@@ -163,7 +157,7 @@ async def api_hook_trigger(body: HookTriggerRequest, request: Request) -> dict[s
 async def api_hook_logs(request: Request, event: str = "", limit: int = Query(100, ge=1, le=1000)) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_hook_mgr()
-    logs = mgr.get_logs(event=event or "", limit=limit)
+    logs = execution_service.hook_logs(mgr, event, limit)
     return {"status": "ok", "logs": logs, "count": len(logs)}
 
 
@@ -171,6 +165,5 @@ async def api_hook_logs(request: Request, event: str = "", limit: int = Query(10
 @handle_api_errors("Hook events", error_value={"events": [], "error": "Events failed"})
 async def api_hook_events(request: Request) -> dict[str, Any]:
     require_admin(request)
-    from maop.core.agent.plugins_hooks.hook_manager import LifecycleEvent
-    events = [{"name": e.value, "phase": e.value.split(".")[-1], "domain": e.value.split(".")[0]} for e in LifecycleEvent]
+    events = execution_service.hook_events()
     return {"status": "ok", "events": events, "count": len(events)}

@@ -19,6 +19,7 @@ from maop.core.agent.llm_chat.model_gateway import (
     ModelPermission,
 )
 from maop.dashboard.routers import model_gateway as gateway_route
+from maop.dashboard.services import model_service
 
 
 # ── Fixtures ─────────────────────────────────────────────────────
@@ -39,10 +40,13 @@ def _make_app() -> FastAPI:
 
 @pytest.fixture
 def isolated_gateway(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> ModelGateway:
-    """提供隔离 DB 的 ModelGateway 并注入到路由模块单例。"""
+    """提供隔离 DB 的 ModelGateway 并注入到 service 层单例。
+
+    重构后单例从 router 迁移至 ``model_service``，测试注入点同步调整。
+    """
     db_path = tmp_path / "gateway_test.db"
     gateway = ModelGateway(db_path=db_path)
-    monkeypatch.setattr(gateway_route, "_model_gateway", gateway)
+    monkeypatch.setattr(model_service, "_model_gateway", gateway)
     return gateway
 
 

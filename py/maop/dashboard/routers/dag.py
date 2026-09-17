@@ -6,6 +6,10 @@
 后续可扩展:
   - ``GET  /api/dag/{execution_id}`` — 查询 DAG 执行状态
   - ``POST /api/dag/execute``       — 直接执行一个 DAG
+
+业务逻辑已提取至 ``maop.dashboard.services.execution_service``（§1）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
 """
 
 from __future__ import annotations
@@ -16,9 +20,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from maop.core.scheduling.task_splitter import TaskSplitError, TaskSplitter
+from maop.core.scheduling.task_splitter import TaskSplitError
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import execution_service
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +48,6 @@ class ExecuteDagRequest(BaseModel):
 
 
 # ── 端点 ─────────────────────────────────────────────────────────
-
 @router.post("/api/dag/auto-split")
 @handle_api_errors("dag auto-split")
 async def auto_split(
@@ -59,8 +63,7 @@ async def auto_split(
     """
     require_admin(request)
     try:
-        splitter = TaskSplitter()
-        result = await splitter.split(
+        result = await execution_service.auto_split(
             description=body.description,
             context=body.context,
             max_subtasks=body.max_subtasks,
@@ -94,73 +97,14 @@ async def execute_dag(
     按 edges 推导依赖关系后调用 :class:`Engine` 执行。需要管理员权限。
     """
     require_admin(request)
-    if not body.nodes:
-        raise HTTPException(status_code=400, detail="DAG 无节点，无法执行")
-
     try:
-        from maop.engine import Engine, StepType, WorkflowStep
-
-        # edges source→target 推导 depends_on
-        depends: dict[str, list[str]] = {}
-        for edge in body.edges:
-            src = edge.get("source", "")
-            tgt = edge.get("target", "")
-            if src and tgt:
-                depends.setdefault(tgt, []).append(src)
-
-        _type_map = {
-            "agent": StepType.AGENT,
-            "tool": StepType.AGENT,
-            "condition": StepType.CONDITION,
-            "parallel": StepType.DAG,
-        }
-        steps: list[WorkflowStep] = []
-        for node in body.nodes:
-            nid = node.get("id", "")
-            cfg = node.get("config") or {}
-            steps.append(
-                WorkflowStep(
-                    id=nid,
-                    type=_type_map.get(node.get("type", "agent"), StepType.AGENT),
-                    agent=cfg.get("agent") or cfg.get("tool") or "",
-                    task=node.get("label") or cfg.get("task") or cfg.get("predicate") or "",
-                    depends_on=depends.get(nid, []),
-                )
-            )
-
-        from types import SimpleNamespace
-
-        async def _default_step_executor(step, context, workdir, trace_id):
-            """Default step executor using Dispatcher to run agent/tool steps."""
-            from maop.delegate.dispatch_core import Dispatcher
-            dispatcher = Dispatcher()
-            try:
-                dr = await dispatcher.dispatch(
-                    agent=step.agent,
-                    task=step.task,
-                    workdir=str(workdir) if workdir else "",
-                    trace_id=trace_id or "",
-                )
-                return SimpleNamespace(
-                    output=dr.result.stdout,
-                    exit_code=dr.result.exit_code,
-                    error=dr.result.error or ("" if dr.result.ok else dr.result.stderr),
-                )
-            except Exception as exc:
-                logger.warning("[dag/execute] step executor error: %s", exc)
-                return SimpleNamespace(
-                    output="",
-                    exit_code=1,
-                    error="Step execution failed",
-                )
-
-        result = await Engine(step_executor=_default_step_executor).run(steps)
-        return {
-            "status": "ok",
-            "run_id": result.trace_id,
-            "success": result.success,
-            "steps": [s.model_dump() for s in result.steps],
-        }
+        result = await execution_service.execute_dag(
+            nodes=body.nodes,
+            edges=body.edges,
+        )
+        return {"status": "ok", **result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except HTTPException:
         raise
     except Exception as exc:

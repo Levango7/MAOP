@@ -30,9 +30,10 @@ def _make_app(*routers) -> TestClient:
 
 @pytest.fixture
 def mcp_env(tmp_path, monkeypatch):
-    monkeypatch.setattr("maop.dashboard.routers.mcp.MAOP_ROOT", tmp_path)
-    import maop.dashboard.routers.mcp as mcp_mod
-    mcp_mod._mcp_hub = None
+    # 业务逻辑已提取至 plugin_service；单例与 MAOP_ROOT 由 service 持有。
+    monkeypatch.setattr("maop.dashboard.routers.state.MAOP_ROOT", tmp_path)
+    import maop.dashboard.services.plugin_service as plugin_service
+    plugin_service._set_hub(None)
 
     mock_hub = MagicMock()
     mock_hub.get_server_config = MagicMock(return_value=SimpleNamespace(
@@ -52,7 +53,7 @@ def mcp_env(tmp_path, monkeypatch):
     ))
     mock_hub.health_check_all = AsyncMock(return_value={"s1": {"healthy": True}})
 
-    monkeypatch.setattr("maop.dashboard.routers.mcp._get_hub", lambda: mock_hub)
+    monkeypatch.setattr("maop.dashboard.services.plugin_service._get_hub", lambda: mock_hub)
     return mock_hub
 
 

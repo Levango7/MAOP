@@ -38,7 +38,9 @@ def isolated_bucket(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> QuotaBuc
     """提供隔离 DB 的 QuotaBucket 并注入到路由模块单例。"""
     db_path = tmp_path / "quota_test.db"
     bucket = QuotaBucket(db_path=db_path)
-    monkeypatch.setattr(quota_route, "_quota_bucket", bucket)
+    # Service 层提取后，单例由 billing_service 持有；router 暴露
+    # _set_quota_bucket 转发函数供测试注入隔离实例。
+    quota_route._set_quota_bucket(bucket)
     return bucket
 
 

@@ -118,26 +118,33 @@ class TestMCPHubCanonical:
 
 
 class TestDashboardUsesMCPHub:
-    """The Dashboard MCP router must depend solely on MCPHub (Stack A)."""
+    """The Dashboard MCP layer must depend solely on MCPHub (Stack A).
+
+    业务逻辑已提取至 ``maop.dashboard.services.plugin_service``（§2 MCP），
+    因此 MCPHub 导入与 compat-shim 调用位于 service 文件；router 仅保留
+    路由层逻辑。本测试同步检查 service 与 router 均不导入 Stack B。
+    """
 
     def test_router_imports_mcp_hub(self) -> None:
-        """dashboard/routers/mcp.py must import MCPHub, not Stack B."""
+        """MCP service must import MCPHub, not Stack B; router must not import Stack B."""
         from pathlib import Path
 
-        router_path = (
-            Path(__file__).resolve().parent.parent
-            / "maop" / "dashboard" / "routers" / "mcp.py"
-        )
+        base = Path(__file__).resolve().parent.parent / "maop" / "dashboard"
+        service_path = base / "services" / "plugin_service.py"
+        router_path = base / "routers" / "mcp.py"
+        assert service_path.exists(), f"MCP service missing: {service_path}"
         assert router_path.exists(), f"Dashboard MCP router missing: {router_path}"
-        src = router_path.read_text(encoding="utf-8")
 
-        # Must reference the canonical Stack A implementation.
-        assert "from maop.core.mcp.mcp_hub import" in src, (
-            "Dashboard MCP router must import from maop.core.mcp.mcp_hub (Stack A)"
+        service_src = service_path.read_text(encoding="utf-8")
+        router_src = router_path.read_text(encoding="utf-8")
+
+        # Service must reference the canonical Stack A implementation.
+        assert "from maop.core.mcp.mcp_hub import" in service_src, (
+            "MCP service must import from maop.core.mcp.mcp_hub (Stack A)"
         )
-        assert "MCPHub" in src, "Dashboard MCP router must use MCPHub class"
+        assert "MCPHub" in service_src, "MCP service must use MCPHub class"
 
-        # Must NOT import any Stack B module.
+        # Neither service nor router must import any Stack B module.
         forbidden = [
             "from maop.core.mcp_registry",
             "from maop.core.mcp_client",
@@ -146,22 +153,23 @@ class TestDashboardUsesMCPHub:
             "import maop.core.mcp_client",
             "import maop.core.mcp_transport",
         ]
-        leaked = [token for token in forbidden if token in src]
-        assert not leaked, (
-            f"Dashboard MCP router must not import Stack B modules: {leaked}"
-        )
+        for label, src in (("service", service_src), ("router", router_src)):
+            leaked = [token for token in forbidden if token in src]
+            assert not leaked, (
+                f"MCP {label} must not import Stack B modules: {leaked}"
+            )
 
     def test_router_endpoints_use_compat_shims(self) -> None:
-        """Dashboard endpoints must call MCPHub compat shims, not Stack B."""
+        """MCP service must call MCPHub compat shims, not Stack B."""
         from pathlib import Path
 
-        router_path = (
+        service_path = (
             Path(__file__).resolve().parent.parent
-            / "maop" / "dashboard" / "routers" / "mcp.py"
+            / "maop" / "dashboard" / "services" / "plugin_service.py"
         )
-        src = router_path.read_text(encoding="utf-8")
+        src = service_path.read_text(encoding="utf-8")
 
-        # Compat shims introduced in δ-1 — these are what the router calls.
+        # Compat shims introduced in δ-1 — these are what the service calls.
         expected_calls = [
             "hub.get_server_config(",
             "hub.find_server_id_by_name(",
@@ -174,7 +182,7 @@ class TestDashboardUsesMCPHub:
         ]
         missing = [c for c in expected_calls if c not in src]
         assert not missing, (
-            f"Dashboard MCP router missing MCPHub compat-shim calls: {missing}"
+            f"MCP service missing MCPHub compat-shim calls: {missing}"
         )
 
 

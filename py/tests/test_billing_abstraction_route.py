@@ -50,7 +50,9 @@ def isolated_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> BillingE
         quota_bucket=quota_bucket,
         db_path=db_path,
     )
-    monkeypatch.setattr(billing_route, "_billing_engine", engine)
+    # Service 层提取后，单例由 billing_service 持有；router 暴露
+    # _set_billing_engine 转发函数供测试注入隔离实例。
+    billing_route._set_billing_engine(engine)
     return engine
 
 

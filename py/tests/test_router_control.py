@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from maop.dashboard.routers import control as ctrl
+from maop.dashboard.routers import state
 
 
 def _make_app() -> FastAPI:
@@ -34,9 +35,9 @@ def _fake_proc(returncode=None) -> MagicMock:
 
 @pytest.fixture
 def temp_maop_root(tmp_path, monkeypatch):
-    """Patch MAOP_ROOT in control module to a temp dir."""
+    """Patch MAOP_ROOT in state module to a temp dir."""
     (tmp_path / "logs").mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(ctrl, "MAOP_ROOT", tmp_path)
+    monkeypatch.setattr(state, "MAOP_ROOT", tmp_path)
     return tmp_path
 
 
@@ -44,7 +45,7 @@ def temp_maop_root(tmp_path, monkeypatch):
 def clean_jobs(monkeypatch):
     """Provide a fresh active_jobs dict."""
     jobs: dict = {}
-    monkeypatch.setattr(ctrl, "active_jobs", jobs)
+    monkeypatch.setattr(state, "active_jobs", jobs)
     return jobs
 
 
@@ -53,8 +54,8 @@ def clean_cache(monkeypatch):
     """Provide a fresh cache dict and lock."""
     cache: dict = {}
     lock = asyncio.Lock()
-    monkeypatch.setattr(ctrl, "cache", cache)
-    monkeypatch.setattr(ctrl, "cache_lock", lock)
+    monkeypatch.setattr(state, "cache", cache)
+    monkeypatch.setattr(state, "cache_lock", lock)
     return cache
 
 

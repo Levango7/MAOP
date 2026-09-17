@@ -604,10 +604,11 @@ def api_client(tmp_path: Path):
     """Build a FastAPI TestClient with the routing router mounted and
     the store singleton patched to a temp DB."""
     from maop.dashboard.routers import routing as routing_router_module
+    from maop.dashboard.services import routing_service
 
     store = RoutingDecisionStore(db_path=tmp_path / "routing_decisions.db")
-    # Patch the lazy singleton used by the router's ``_get_store``.
-    routing_router_module._decision_store = store
+    # Patch the lazy singleton used by the service layer's ``_get_decision_store``.
+    routing_service._decision_store = store
 
     app = FastAPI()
     @app.middleware("http")
@@ -617,7 +618,7 @@ def api_client(tmp_path: Path):
     app.include_router(routing_router_module.router)
     client = TestClient(app)
     yield client, store
-    routing_router_module._decision_store = None
+    routing_service._decision_store = None
 
 
 class TestRoutingDecisionsAPI:

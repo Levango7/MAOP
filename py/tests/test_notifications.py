@@ -94,9 +94,10 @@ def client(manager, monkeypatch):
     Patches the router singleton so endpoints use the test manager.
     """
     from maop.dashboard.routers import notifications as notif_router
+    from maop.dashboard.services import notification_service
 
-    monkeypatch.setattr(notif_router, "_notification_manager", manager)
-    monkeypatch.setattr(notif_router, "_event_bus", manager.event_bus)
+    monkeypatch.setattr(notification_service, "_notification_manager", manager)
+    monkeypatch.setattr(notification_service, "_event_bus", manager.event_bus)
 
     app = FastAPI()
 
@@ -1096,8 +1097,9 @@ class TestRouterAuth:
 
     def test_non_admin_cannot_create_channel(self, manager, monkeypatch):
         from maop.dashboard.routers import notifications as notif_router
-        monkeypatch.setattr(notif_router, "_notification_manager", manager)
-        monkeypatch.setattr(notif_router, "_event_bus", manager.event_bus)
+        from maop.dashboard.services import notification_service
+        monkeypatch.setattr(notification_service, "_notification_manager", manager)
+        monkeypatch.setattr(notification_service, "_event_bus", manager.event_bus)
 
         app = FastAPI()
 
@@ -1118,8 +1120,9 @@ class TestRouterAuth:
 
     def test_non_admin_can_list_channels(self, manager, monkeypatch):
         from maop.dashboard.routers import notifications as notif_router
-        monkeypatch.setattr(notif_router, "_notification_manager", manager)
-        monkeypatch.setattr(notif_router, "_event_bus", manager.event_bus)
+        from maop.dashboard.services import notification_service
+        monkeypatch.setattr(notification_service, "_notification_manager", manager)
+        monkeypatch.setattr(notification_service, "_event_bus", manager.event_bus)
 
         app = FastAPI()
 

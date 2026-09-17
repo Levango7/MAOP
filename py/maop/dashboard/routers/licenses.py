@@ -4,6 +4,10 @@ Implements the License Management API (PRD: ``docs/prd-license-management.md``).
 All operations require admin role via ``require_admin`` and are gated by
 ``FeatureFlag.LICENSE_MANAGEMENT`` (enterprise-only).
 
+业务逻辑已提取至 ``maop.dashboard.services.billing_service``（§4）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 / 特性守卫 /
+service 调用 / 响应格式化 / 错误处理。
+
 Endpoints
 ---------
 - GET    /api/licenses/list                — list all licenses
@@ -21,16 +25,13 @@ Endpoints
 from __future__ import annotations
 
 import logging
-import os
-import threading
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import billing_service
 
 # 直接复用 license_manager 中的 Pydantic 请求模型，让 FastAPI 自动校验。
 from maop.enterprise.license_manager import (  # noqa: E402
@@ -45,39 +46,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/licenses", tags=["licenses"])
 
-_license_manager: Any = None
-_license_manager_lock = threading.Lock()
 
-
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
 def _get_manager() -> Any:
-    """Lazy-init the LicenseManager singleton.
+    return billing_service._get_license_manager()
 
-    Uses an in-memory Ed25519 keypair by default (auto-generated on first
-    call). For production issuance, set ``MAOP_LICENSE_MGR_PRIVATE_KEY``
-    to point to the real signing key path.
-    """
-    global _license_manager
-    if _license_manager is not None:
-        return _license_manager
-    with _license_manager_lock:
-        if _license_manager is not None:  # double-checked locking
-            return _license_manager
-        # P2-17: LicenseManager 为 enterprise 可选依赖，延迟加载
-        from maop.enterprise.license_manager import LicenseManager
 
-        priv_path_env = os.getenv("MAOP_LICENSE_MGR_PRIVATE_KEY", "").strip()
-        priv_path = Path(priv_path_env) if priv_path_env else None
-        _license_manager = LicenseManager(private_key_path=priv_path)
-    return _license_manager
+def _set_manager(mgr: Any) -> None:
+    billing_service._set_license_manager(mgr)
 
 
 def _require_feature() -> None:
     """Return 404 if the LICENSE_MANAGEMENT feature is not available."""
-    if not has_feature(FeatureFlag.LICENSE_MANAGEMENT):
-        raise HTTPException(
-            status_code=404,
-            detail="license management not available in this edition",
-        )
+    billing_service.require_license_management()
 
 
 # ── Endpoints ─────────────────────────────────────────────────────
@@ -92,11 +73,10 @@ async def list_licenses(
     """List all licenses, optionally filtered by status."""
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    licenses = mgr.list_licenses(status=status)
+    licenses = billing_service.list_licenses(status=status)
     return {
         "status": "ok",
-        "licenses": [lic.model_dump() for lic in licenses],
+        "licenses": licenses,
         "count": len(licenses),
     }
 
@@ -107,18 +87,16 @@ async def create_license(request: Request, body: LicenseCreateRequest) -> dict[s
     """Issue a new license. Requires admin."""
     require_admin(request)
     _require_feature()
-    req = body
-    mgr = _get_manager()
-    record = mgr.create_license(
-        customer=req.customer,
-        expires_at=req.expires_at,
-        max_users=req.max_users,
-        fingerprint=req.fingerprint,
-        features=req.features,
-        issued_by=req.issued_by,
-        notes=req.notes,
+    record = billing_service.create_license(
+        customer=body.customer,
+        expires_at=body.expires_at,
+        max_users=body.max_users,
+        fingerprint=body.fingerprint,
+        features=body.features,
+        issued_by=body.issued_by,
+        notes=body.notes,
     )
-    return {"status": "ok", "license": record.model_dump()}
+    return {"status": "ok", "license": record}
 
 
 @router.post("/validate")
@@ -127,9 +105,7 @@ async def validate_license(request: Request, body: LicenseValidateRequest) -> di
     """Validate a license key (signature + expiry + revocation)."""
     require_admin(request)
     _require_feature()
-    req = body
-    mgr = _get_manager()
-    result = mgr.validate_license(req.license_key)
+    result = billing_service.validate_license(body.license_key)
     return {"status": "ok", "validation": result}
 
 
@@ -145,11 +121,12 @@ async def list_audit_logs(
     """List all license audit logs with optional filters."""
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    entries = mgr.get_audit_logs(license_id=license_id, action=action, limit=limit, offset=offset)
+    entries = billing_service.list_license_audit_logs(
+        license_id=license_id, action=action, limit=limit, offset=offset,
+    )
     return {
         "status": "ok",
-        "audit_logs": [e.model_dump() for e in entries],
+        "audit_logs": entries,
         "count": len(entries),
     }
 
@@ -162,14 +139,13 @@ async def get_license(license_id: str, request: Request) -> dict[str, Any]:
     _require_feature()
     from maop.enterprise.license_manager import LicenseNotFoundError
 
-    mgr = _get_manager()
     try:
-        record = mgr.get_license(license_id)
+        record = billing_service.get_license(license_id)
     except LicenseNotFoundError as exc:
         # 批次3A: 脱敏——LicenseNotFoundError 细节不暴露给客户端，仅日志记录。
         logger.warning("[licenses] License not found: %s", exc)
         raise HTTPException(status_code=404, detail="License not found") from exc
-    return {"status": "ok", "license": record.model_dump()}
+    return {"status": "ok", "license": record}
 
 
 @router.patch("/{license_id}")
@@ -180,22 +156,20 @@ async def update_license(license_id: str, request: Request, body: LicenseUpdateR
     _require_feature()
     from maop.enterprise.license_manager import LicenseNotFoundError
 
-    req = body
-    mgr = _get_manager()
     try:
-        record = mgr.update_license(
+        record = billing_service.update_license(
             license_id,
-            customer=req.customer,
-            max_users=req.max_users,
-            fingerprint=req.fingerprint,
-            features=req.features,
-            notes=req.notes,
+            customer=body.customer,
+            max_users=body.max_users,
+            fingerprint=body.fingerprint,
+            features=body.features,
+            notes=body.notes,
         )
     except LicenseNotFoundError as exc:
         # 批次3A: 脱敏——LicenseNotFoundError 细节不暴露给客户端，仅日志记录。
         logger.warning("[licenses] License not found: %s", exc)
         raise HTTPException(status_code=404, detail="License not found") from exc
-    return {"status": "ok", "license": record.model_dump()}
+    return {"status": "ok", "license": record}
 
 
 @router.post("/{license_id}/renew")
@@ -206,15 +180,15 @@ async def renew_license(license_id: str, request: Request, body: LicenseRenewReq
     _require_feature()
     from maop.enterprise.license_manager import LicenseNotFoundError
 
-    req = body
-    mgr = _get_manager()
     try:
-        record = mgr.renew_license(license_id, new_expires_at=req.new_expires_at, actor=req.actor)
+        record = billing_service.renew_license(
+            license_id, new_expires_at=body.new_expires_at, actor=body.actor,
+        )
     except LicenseNotFoundError as exc:
         # 批次3A: 脱敏——LicenseNotFoundError 细节不暴露给客户端，仅日志记录。
         logger.warning("[licenses] License not found: %s", exc)
         raise HTTPException(status_code=404, detail="License not found") from exc
-    return {"status": "ok", "license": record.model_dump()}
+    return {"status": "ok", "license": record}
 
 
 @router.post("/{license_id}/revoke")
@@ -225,15 +199,15 @@ async def revoke_license(license_id: str, request: Request, body: LicenseRevokeR
     _require_feature()
     from maop.enterprise.license_manager import LicenseNotFoundError
 
-    req = body
-    mgr = _get_manager()
     try:
-        record = mgr.revoke_license(license_id, reason=req.reason, actor=req.actor)
+        record = billing_service.revoke_license(
+            license_id, reason=body.reason, actor=body.actor,
+        )
     except LicenseNotFoundError as exc:
         # 批次3A: 脱敏——LicenseNotFoundError 细节不暴露给客户端，仅日志记录。
         logger.warning("[licenses] License not found: %s", exc)
         raise HTTPException(status_code=404, detail="License not found") from exc
-    return {"status": "ok", "license": record.model_dump()}
+    return {"status": "ok", "license": record}
 
 
 @router.delete("/{license_id}")
@@ -244,9 +218,8 @@ async def delete_license(license_id: str, request: Request) -> dict[str, Any]:
     _require_feature()
     from maop.enterprise.license_manager import LicenseNotFoundError
 
-    mgr = _get_manager()
     try:
-        deleted = mgr.delete_license(license_id)
+        deleted = billing_service.delete_license(license_id)
     except LicenseNotFoundError as exc:
         # 批次3A: 脱敏——LicenseNotFoundError 细节不暴露给客户端，仅日志记录。
         logger.warning("[licenses] License not found: %s", exc)
@@ -269,10 +242,9 @@ async def get_license_audit(
     """Get the audit log for a specific license."""
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    entries = mgr.get_audit_logs(license_id=license_id, limit=limit, offset=offset)
+    entries = billing_service.get_license_audit(license_id, limit=limit, offset=offset)
     return {
         "status": "ok",
-        "audit_logs": [e.model_dump() for e in entries],
+        "audit_logs": entries,
         "count": len(entries),
     }

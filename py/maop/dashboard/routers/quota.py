@@ -2,20 +2,24 @@
 
 桥接 ``QuotaBucket`` 三桶额度管理器到前端，提供获取/设置/消耗/退还/
 剩余/重置 6 个端点。所有端点需 admin 鉴权。
+
+业务逻辑已提取至 ``maop.dashboard.services.billing_service``（§2）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
 """
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from maop.core.agent.billing.quota_bucket import QuotaBucket, QuotaEntry
+from maop.core.agent.billing.quota_bucket import QuotaEntry
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import billing_service
 
 logger = logging.getLogger(__name__)
 
@@ -42,19 +46,13 @@ class QuotaResetRequest(BaseModel):
     bucket: str = Field(default="all", description="重置哪个桶: free/prepaid/postpaid/all")
 
 
-# ── QuotaBucket 单例（双重检查锁定）─────────────────────────────────
-_quota_bucket: QuotaBucket | None = None
-_quota_bucket_lock = threading.Lock()
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
+def _get_quota_bucket() -> Any:
+    return billing_service._get_quota_bucket()
 
 
-def _get_quota_bucket() -> QuotaBucket:
-    """获取 QuotaBucket 单例。"""
-    global _quota_bucket
-    if _quota_bucket is None:
-        with _quota_bucket_lock:
-            if _quota_bucket is None:
-                _quota_bucket = QuotaBucket()
-    return _quota_bucket
+def _set_quota_bucket(bucket: Any) -> None:
+    billing_service._set_quota_bucket(bucket)
 
 
 # ── API 端点 ────────────────────────────────────────────────────────
@@ -65,9 +63,8 @@ async def api_quota_get(agent_name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     if not agent_name:
         raise HTTPException(400, "missing agent_name")
-    bucket = _get_quota_bucket()
-    entry = bucket.get_quota(agent_name)
-    return {"status": "ok", "agent_name": agent_name, "quota": entry.model_dump(mode="json")}
+    quota = billing_service.get_agent_quota(agent_name)
+    return {"status": "ok", "agent_name": agent_name, "quota": quota}
 
 
 @router.put("/api/quota/{agent_name}")
@@ -77,8 +74,7 @@ async def api_quota_set(agent_name: str, body: QuotaEntry, request: Request) -> 
     require_admin(request)
     if not agent_name:
         raise HTTPException(400, "missing agent_name")
-    bucket = _get_quota_bucket()
-    bucket.set_quota(agent_name, body)
+    billing_service.set_agent_quota(agent_name, body)
     return {"status": "ok", "agent_name": agent_name}
 
 
@@ -87,9 +83,8 @@ async def api_quota_set(agent_name: str, body: QuotaEntry, request: Request) -> 
 async def api_quota_consume(agent_name: str, body: QuotaConsumeRequest, request: Request) -> dict[str, Any]:
     """消耗 Agent 额度。"""
     require_admin(request)
-    bucket = _get_quota_bucket()
-    result = bucket.consume(agent_name, body.amount)
-    return {"status": "ok", "agent_name": agent_name, "result": result.model_dump(mode="json")}
+    result = billing_service.consume_agent_quota(agent_name, body.amount)
+    return {"status": "ok", "agent_name": agent_name, "result": result}
 
 
 @router.post("/api/quota/{agent_name}/refund")
@@ -97,9 +92,8 @@ async def api_quota_consume(agent_name: str, body: QuotaConsumeRequest, request:
 async def api_quota_refund(agent_name: str, body: QuotaRefundRequest, request: Request) -> dict[str, Any]:
     """退还 Agent 额度。"""
     require_admin(request)
-    bucket = _get_quota_bucket()
     try:
-        bucket.refund(agent_name, body.amount, body.bucket)
+        billing_service.refund_agent_quota(agent_name, body.amount, body.bucket)
     except ValueError as exc:
         logger.warning("[quota] refund invalid bucket: %s", exc)
         raise HTTPException(400, "invalid bucket")
@@ -111,8 +105,7 @@ async def api_quota_refund(agent_name: str, body: QuotaRefundRequest, request: R
 async def api_quota_remaining(agent_name: str, request: Request) -> dict[str, Any]:
     """获取 Agent 剩余额度。"""
     require_admin(request)
-    bucket = _get_quota_bucket()
-    remaining = bucket.get_remaining(agent_name)
+    remaining = billing_service.get_agent_remaining(agent_name)
     total = remaining["free"] + remaining["prepaid"] + remaining["postpaid"]
     return {"status": "ok", "agent_name": agent_name, "remaining": remaining, "total": total}
 
@@ -122,9 +115,8 @@ async def api_quota_remaining(agent_name: str, request: Request) -> dict[str, An
 async def api_quota_reset(agent_name: str, body: QuotaResetRequest, request: Request) -> dict[str, Any]:
     """重置 Agent 额度使用量。"""
     require_admin(request)
-    bucket = _get_quota_bucket()
     try:
-        bucket.reset_quota(agent_name, body.bucket)
+        billing_service.reset_agent_quota(agent_name, body.bucket)
     except ValueError as exc:
         logger.warning("[quota] reset invalid bucket: %s", exc)
         raise HTTPException(400, "invalid bucket")

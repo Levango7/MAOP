@@ -126,7 +126,6 @@ class FakeModelRegistry:
 def tmp_root(tmp_path, monkeypatch):
     """Point MAOP_ROOT to a temp dir."""
     monkeypatch.setattr("maop.dashboard.routers.state.MAOP_ROOT", tmp_path)
-    monkeypatch.setattr("maop.dashboard.routers.model.MAOP_ROOT", tmp_path)
     return tmp_path
 
 
@@ -134,9 +133,9 @@ def tmp_root(tmp_path, monkeypatch):
 def client(tmp_root, monkeypatch):
     """TestClient with mocked ConfigLoader and model registry."""
     monkeypatch.setattr("maop.config.loader.ConfigLoader", FakeConfigLoader)
-    # Reset the cached registry and patch _get_model_registry
-    monkeypatch.setattr("maop.dashboard.routers.model._model_registry", None)
-    monkeypatch.setattr("maop.dashboard.routers.model._get_model_registry",
+    # Reset the cached registry and patch _get_model_registry (service layer).
+    monkeypatch.setattr("maop.dashboard.services.model_service._model_registry", None)
+    monkeypatch.setattr("maop.dashboard.services.model_service._get_model_registry",
                         lambda: FakeModelRegistry())
     app = FastAPI()
     @app.middleware("http")
@@ -176,8 +175,8 @@ class TestModelAgents:
     def test_error_returns_empty_list(self, tmp_root, monkeypatch):
         monkeypatch.setattr("maop.config.loader.ConfigLoader",
                             MagicMock(side_effect=RuntimeError("cfg fail")))
-        monkeypatch.setattr("maop.dashboard.routers.model._model_registry", None)
-        monkeypatch.setattr("maop.dashboard.routers.model._get_model_registry",
+        monkeypatch.setattr("maop.dashboard.services.model_service._model_registry", None)
+        monkeypatch.setattr("maop.dashboard.services.model_service._get_model_registry",
                             lambda: FakeModelRegistry())
         app = FastAPI()
         from maop.dashboard.routers.model import router
@@ -409,13 +408,12 @@ def model_env(tmp_path, monkeypatch):
     )
     (tmp_path / "data").mkdir(parents=True, exist_ok=True)
 
-    monkeypatch.setattr("maop.dashboard.routers.model.MAOP_ROOT", tmp_path)
     monkeypatch.setattr("maop.dashboard.routers.state.MAOP_ROOT", tmp_path)
 
-    # Reset model registry + api key vault singletons
-    import maop.dashboard.routers.model as model_mod
-    model_mod._model_registry = None
-    model_mod._api_key_vault = None
+    # Reset model registry + api key vault singletons (service layer).
+    import maop.dashboard.services.model_service as model_svc
+    model_svc._model_registry = None
+    model_svc._api_key_vault = None
 
     return tmp_path
 

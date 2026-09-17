@@ -1,9 +1,13 @@
-"""MAOP Dashboard — Budget Guard API endpoints."""
+"""MAOP Dashboard — Budget Guard API endpoints.
+
+业务逻辑已提取至 ``maop.dashboard.services.budget_service``（§1）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
+"""
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -11,8 +15,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
-
-from .state import MAOP_ROOT
+from maop.dashboard.services import budget_service
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +30,13 @@ class BudgetRecordRequest(BaseModel):
     cost_usd: float = Field(default=0.0, ge=0.0)
 
 
-_budget_guard = None
-_budget_guard_lock = threading.Lock()
-
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
 def _get_budget_guard() -> Any:
-    global _budget_guard
-    if _budget_guard is not None:
-        return _budget_guard
-    with _budget_guard_lock:
-        if _budget_guard is not None:  # double-checked locking
-            return _budget_guard
-        from maop.core.budget_guard import BudgetGuard
-        _budget_guard = BudgetGuard(root_dir=str(MAOP_ROOT))
-    return _budget_guard
+    return budget_service._get_budget_guard()
+
+
+def _set_budget_guard(guard: Any) -> None:
+    budget_service._set_budget_guard(guard)
 
 
 @router.get("/api/budget/status")
@@ -47,9 +44,8 @@ def _get_budget_guard() -> Any:
 async def api_budget_status(request: Request) -> dict[str, Any]:
     """Return current budget usage status."""
     require_admin(request)
-    guard = _get_budget_guard()
-    status = guard.get_status()
-    return {"status": "ok", "budget": status.model_dump()}
+    result = budget_service.get_budget_status()
+    return {"status": "ok", **result}
 
 
 @router.post("/api/budget/reset")
@@ -57,8 +53,7 @@ async def api_budget_status(request: Request) -> dict[str, Any]:
 async def api_budget_reset(request: Request) -> dict[str, Any]:
     """Reset budget counters to zero."""
     require_admin(request)
-    guard = _get_budget_guard()
-    guard.reset_daily()
+    budget_service.reset_budget()
     return {"status": "ok"}
 
 
@@ -67,13 +62,9 @@ async def api_budget_reset(request: Request) -> dict[str, Any]:
 async def api_budget_record(request: Request, body: BudgetRecordRequest) -> dict[str, Any]:
     """Record a budget usage entry."""
     require_admin(request)
-    prompt_tokens = body.prompt_tokens
-    completion_tokens = body.completion_tokens
-    cost_usd = body.cost_usd
-    guard = _get_budget_guard()
-    result = guard.record_usage(
-        prompt_tokens=prompt_tokens,
-        completion_tokens=completion_tokens,
-        cost_usd=cost_usd,
+    result = budget_service.record_budget_usage(
+        prompt_tokens=body.prompt_tokens,
+        completion_tokens=body.completion_tokens,
+        cost_usd=body.cost_usd,
     )
-    return {"status": "ok", "budget": result.model_dump()}
+    return {"status": "ok", **result}

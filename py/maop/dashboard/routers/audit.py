@@ -20,24 +20,23 @@ Enhancement (audit-enhancement PRD):
   - /api/audit/alert/{id}/ack   — acknowledge an alert
   - /api/audit/alert/evaluate   — manually evaluate recent events against rules
   - WebSocket push on alert trigger (via dashboard server's _ws_broadcast)
+
+Business logic lives in :mod:`maop.dashboard.services.observability_service`;
+this router only does request parsing, auth, service dispatch, and
+response formatting.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import threading
-import time as _time
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse, Response
-from pydantic import ValidationError
 
-from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import observability_service
 
 # 修复12: 提前 import Pydantic 模型用于端点参数类型注解，让 FastAPI 自动校验请求体。
 # 个人版无 enterprise 模块时回退到宽松 BaseModel，避免 ImportError 阻断 router 加载。
@@ -60,167 +59,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
-# P2-24: 统一使用 state.MAOP_ROOT，避免各路由器路径计算层数不一致
-try:
-    from maop.dashboard.routers.state import MAOP_ROOT as _MAOP_ROOT
-except ImportError:  # pragma: no cover — state 模块不可用时回退
-    _MAOP_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-
-
-def _get_personal_events(
-    *,
-    action: str = "",
-    actor: str = "",
-    target: str = "",
-    limit: int = 100,
-) -> list[dict[str, Any]]:
-    """Read audit events from personal edition AuditLog (logs/audit.jsonl)."""
-    try:
-        from maop.control.audit import AuditLog
-        events = AuditLog(_MAOP_ROOT / "logs" / "audit.jsonl").read_recent(limit=limit * 5)
-        result = []
-        for e in events:
-            if action and e.action != action:
-                continue
-            if actor and e.actor != actor:
-                continue
-            if target and e.target != target:
-                continue
-            result.append(e.model_dump())
-        return result[:limit]
-    except Exception as exc:
-        logger.error("Personal audit events failed: %s", exc)
-        return []
-
-
-def _get_personal_summary() -> dict[str, Any]:
-    """Get audit summary from personal edition AuditLog."""
-    try:
-        from maop.control.audit import AuditLog
-        log = AuditLog(_MAOP_ROOT / "logs" / "audit.jsonl")
-        events = log.read_recent(limit=500)
-        by_action: dict[str, int] = {}
-        by_actor: dict[str, int] = {}
-        for e in events:
-            by_action[e.action] = by_action.get(e.action, 0) + 1
-            by_actor[e.actor] = by_actor.get(e.actor, 0) + 1
-        return {"total": len(events), "by_action": by_action, "by_actor": by_actor}
-    except Exception as exc:
-        logger.error("Personal audit summary failed: %s", exc)
-        return {"total": 0, "by_action": {}, "by_actor": {}}
-
-
-# ── Enterprise helpers ────────────────────────────────────────────
-
-_enterprise_logger: Any = None
-_enterprise_logger_lock = threading.Lock()
-
-
-def _get_enterprise_logger() -> Any:
-    # P1-18: 双重检查锁定保护单例初始化
-    global _enterprise_logger
-    if _enterprise_logger is None:
-        with _enterprise_logger_lock:
-            if _enterprise_logger is None:
-                from maop.enterprise.audit import EnterpriseAuditLogger
-                _enterprise_logger = EnterpriseAuditLogger()
-    return _enterprise_logger
-
-
-def _iter_enterprise_events(mgr: Any) -> list[Any]:
-    """安全获取企业审计事件列表。
-
-    P0-1: 优先调用公开方法 ``iter_events()``（若可用），
-    否则回退到 ``query()`` 公开 API，避免直接访问 ``_events`` 私有属性。
-    """
-    # 优先使用公开 iter_events() 方法
-    iter_fn = getattr(mgr, "iter_events", None)
-    if callable(iter_fn):
-        try:
-            return list(iter_fn())
-        except Exception as exc:
-            logger.debug("iter_events() failed, falling back to query(): %s", exc)
-    # 回退到 query() 公开 API，limit 取 _max_events 上限以保证完整
-    max_limit = getattr(mgr, "_max_events", 100000)
-    return mgr.query(limit=max_limit)
-
-
-def _filter_enterprise_events(
-    mgr: Any,
-    *,
-    tenant_id: str = "",
-    action: str = "",
-    severity: str = "",
-    hours: int = 24,
-    limit: int = 100,
-    offset: int = 0,
-) -> tuple[list[Any], int]:
-    since = _time.time() - hours * 3600
-    # P0-1: 使用 _iter_enterprise_events 避免直接访问 mgr._events
-    all_events = _iter_enterprise_events(mgr)
-    events = [e for e in all_events if e.timestamp >= since]
-    if tenant_id:
-        events = [e for e in events if e.tenant_id == tenant_id]
-    if action:
-        events = [e for e in events if e.action.value == action]
-    if severity:
-        events = [e for e in events if e.severity.value == severity]
-    total = len(events)
-    return events[offset: offset + limit], total
-
-
-# ── Alert engine singleton + WebSocket broadcaster ────────────────
-
-_alert_engine: Any = None
-
-
-def _ws_broadcast_alert(alert: dict[str, Any]) -> Any:
-    """Push an alert to all connected dashboard WebSocket clients.
-
-    Looks up the running server's ``_ws_broadcast`` coroutine and schedules
-    it on the event loop. Falls back to no-op when the server module is not
-    importable (e.g. unit tests that only mount the router).
-    """
-    try:
-        from maop.dashboard import server as _server
-        broadcast = getattr(_server, "_ws_broadcast", None)
-        if broadcast is None:
-            return None
-        # P0-2: asyncio.get_event_loop() 在 Python 3.12+ 已弃用。
-        # 使用 get_running_loop() 获取正在运行的循环；若没有运行中的
-        # 事件循环则跳过广播（避免创建新循环的副作用）。
-        try:
-            asyncio.get_running_loop()
-            asyncio.ensure_future(broadcast({"type": "audit_alert", "alert": alert}))
-        except RuntimeError:
-            # 没有正在运行的事件循环 — 无法安全广播，跳过
-            logger.debug("ws_broadcast_alert skipped: no running event loop")
-    except Exception as exc:
-        logger.debug("ws_broadcast_alert skipped: %s", exc)
-    return None
-
-
-_alert_engine: Any = None
-_alert_engine_lock = threading.Lock()
-
-
-def _get_alert_engine() -> Any:
-    """Lazy-init the singleton AuditAlertEngine (enterprise only)."""
-    # P1-18: 双重检查锁定保护单例初始化
-    global _alert_engine
-    if _alert_engine is None:
-        with _alert_engine_lock:
-            if _alert_engine is None:
-                from maop.enterprise.audit_enhanced import AuditAlertEngine
-                _alert_engine = AuditAlertEngine(broadcaster=_ws_broadcast_alert)
-    return _alert_engine
-
-
-def _reset_alert_engine_for_tests() -> None:
-    """Reset the singleton — used by unit tests, not by production code."""
-    global _alert_engine
-    _alert_engine = None
-
 
 # ── Endpoints (legacy) ────────────────────────────────────────────
 
@@ -238,36 +76,10 @@ async def list_events(
 ) -> dict[str, Any]:
     """List audit events with optional filters (unified for both editions)."""
     require_admin(request)
-
-    if has_feature(FeatureFlag.AUDIT_LOG):
-        mgr = _get_enterprise_logger()
-        events, total = _filter_enterprise_events(
-            mgr,
-            tenant_id=tenant_id,
-            action=action,
-            severity=severity,
-            hours=hours,
-            limit=limit,
-            offset=offset,
-        )
-        return {
-            "status": "ok",
-            "events": [e.model_dump() for e in events],
-            "count": len(events),
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-        }
-    else:
-        events = _get_personal_events(action=action, limit=limit)
-        return {
-            "status": "ok",
-            "events": events,
-            "count": len(events),
-            "total": len(events),
-            "limit": limit,
-            "offset": offset,
-        }
+    return await observability_service.list_audit_events(
+        tenant_id=tenant_id, action=action, severity=severity,
+        hours=hours, limit=limit, offset=offset,
+    )
 
 
 @router.get("/summary")
@@ -279,13 +91,7 @@ async def get_summary(
 ) -> dict[str, Any]:
     """Get audit event summary (unified for both editions)."""
     require_admin(request)
-
-    if has_feature(FeatureFlag.AUDIT_LOG):
-        mgr = _get_enterprise_logger()
-        summary = mgr.summary(tenant_id=tenant_id, hours=hours)
-        return {"status": "ok", "summary": summary}
-    else:
-        return {"status": "ok", "summary": _get_personal_summary()}
+    return await observability_service.get_audit_summary(tenant_id=tenant_id, hours=hours)
 
 
 @router.get("/filter")
@@ -299,29 +105,9 @@ async def filter_events(
 ) -> dict[str, Any]:
     """Filter audit events by action/actor/target (unified for both editions)."""
     require_admin(request)
-
-    if has_feature(FeatureFlag.AUDIT_LOG):
-        mgr = _get_enterprise_logger()
-        events, total = _filter_enterprise_events(
-            mgr,
-            action=action,
-            hours=24,
-            limit=limit,
-        )
-        return {
-            "status": "ok",
-            "events": [e.model_dump() for e in events],
-            "count": len(events),
-            "total": total,
-        }
-    else:
-        events = _get_personal_events(action=action, actor=actor, target=target, limit=limit)
-        return {
-            "status": "ok",
-            "events": events,
-            "count": len(events),
-            "total": len(events),
-        }
+    return await observability_service.filter_audit_events(
+        action=action, actor=actor, target=target, limit=limit,
+    )
 
 
 # ── Enhancement endpoints (enterprise-only) ──────────────────────
@@ -331,58 +117,12 @@ async def filter_events(
 # raise HTTPException(404) here for direct router mounts.
 
 
-def _require_audit_feature() -> None:
-    """Raise 404 if the audit_log feature is not available."""
-    if not has_feature(FeatureFlag.AUDIT_LOG):
-        raise HTTPException(status_code=404, detail="Audit enhancement requires enterprise edition")
-
-
-def _collect_enterprise_events(
-    *,
-    tenant_id: str = "",
-    hours: int = 24,
-    limit: int = 10000,
-) -> list[Any]:
-    """Return up to ``limit`` AuditEvent objects from the enterprise logger."""
-    mgr = _get_enterprise_logger()
-    since = _time.time() - hours * 3600
-    # P0-1: 使用 _iter_enterprise_events 避免直接访问 mgr._events
-    all_events = _iter_enterprise_events(mgr)
-    events = [e for e in all_events if e.timestamp >= since]
-    if tenant_id:
-        events = [e for e in events if e.tenant_id == tenant_id]
-    return events[-limit:]
-
-
 @router.post("/events/advanced")
 @handle_api_errors
 async def advanced_query(request: Request, body: AuditEventQuery) -> dict[str, Any]:
-    """Advanced multi-field filtering with pagination and sort.
-
-    Request body matches ``AuditEventQuery``. Returns events + total count.
-    """
+    """Advanced multi-field filtering with pagination and sort."""
     require_admin(request)
-    _require_audit_feature()
-    from maop.enterprise.audit_enhanced import AuditEventQuery as _AuditEventQuery
-    from maop.enterprise.audit_enhanced import filter_events as _filter
-
-    # P2-7: body 已由 FastAPI 通过 AuditEventQuery Pydantic 模型自动校验，
-    # 无需手动 dict→Pydantic 转换。此处 query 直接使用 body。
-    query = body
-    events = _collect_enterprise_events(
-        tenant_id=query.tenant_id,
-        hours=int(max(1, (_time.time() - query.since) // 3600)) if query.since else 24,
-        limit=10000,
-    )
-    page, total = _filter(events, query)
-    return {
-        "status": "ok",
-        "events": [e.model_dump(mode="json") for e in page],
-        "count": len(page),
-        "total": total,
-        "limit": query.limit,
-        "offset": query.offset,
-    }
+    return await observability_service.advanced_query_audit_events(body)
 
 
 @router.get("/export")
@@ -394,26 +134,21 @@ async def export_events(
     hours: int = Query(24, ge=1, le=87600),
     limit: int = Query(5000, ge=1, le=100000),
 ) -> Response:
-    """Export audit events as CSV or JSON.
-
-    Returns a ``text/csv`` or ``application/json`` response body suitable
-    for ``Blob`` download in the browser.
-    """
+    """Export audit events as CSV or JSON."""
     require_admin(request)
-    _require_audit_feature()
-    from maop.enterprise.audit_enhanced import export_events_csv, export_events_json
-
-    events = _collect_enterprise_events(tenant_id=tenant_id, hours=hours, limit=limit)
+    content, media_type, filename = await observability_service.export_audit_events(
+        format=format, tenant_id=tenant_id, hours=hours, limit=limit,
+    )
     if format == "json":
         return Response(
-            content=export_events_json(events),
-            media_type="application/json",
-            headers={"Content-Disposition": "attachment; filename=audit_events.json"},
+            content=content,
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
     return PlainTextResponse(
-        content=export_events_csv(events),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=audit_events.csv"},
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
@@ -426,12 +161,7 @@ async def get_stats(
 ) -> dict[str, Any]:
     """Aggregate statistics: counts by action / severity / risk / category / actor."""
     require_admin(request)
-    _require_audit_feature()
-    from maop.enterprise.audit_enhanced import compute_stats
-
-    events = _collect_enterprise_events(tenant_id=tenant_id, hours=hours, limit=100000)
-    stats = compute_stats(events, hours=hours)
-    return {"status": "ok", "stats": stats.model_dump()}
+    return await observability_service.get_audit_stats(tenant_id=tenant_id, hours=hours)
 
 
 @router.get("/timeline")
@@ -444,19 +174,9 @@ async def get_timeline(
 ) -> dict[str, Any]:
     """Bucketed time series for charting."""
     require_admin(request)
-    _require_audit_feature()
-    from maop.enterprise.audit_enhanced import compute_timeline
-
-    events = _collect_enterprise_events(tenant_id=tenant_id, hours=hours, limit=100000)
-    now = _time.time()
-    since = now - hours * 3600
-    points = compute_timeline(events, bucket_s=bucket_s, since=since, until=now)
-    return {
-        "status": "ok",
-        "timeline": [p.model_dump() for p in points],
-        "bucket_s": bucket_s,
-        "hours": hours,
-    }
+    return await observability_service.get_audit_timeline(
+        tenant_id=tenant_id, hours=hours, bucket_s=bucket_s,
+    )
 
 
 @router.get("/heatmap")
@@ -468,16 +188,7 @@ async def get_heatmap(
 ) -> dict[str, Any]:
     """7×24 day×hour heatmap of event volume."""
     require_admin(request)
-    _require_audit_feature()
-    from maop.enterprise.audit_enhanced import compute_heatmap
-
-    events = _collect_enterprise_events(tenant_id=tenant_id, hours=hours, limit=100000)
-    cells = compute_heatmap(events)
-    return {
-        "status": "ok",
-        "heatmap": [c.model_dump() for c in cells],
-        "hours": hours,
-    }
+    return await observability_service.get_audit_heatmap(tenant_id=tenant_id, hours=hours)
 
 
 # ── Alert rule CRUD ───────────────────────────────────────────────
@@ -488,11 +199,8 @@ async def get_heatmap(
 async def create_alert_rule(request: Request, body: AuditAlertRuleCreate) -> dict[str, Any]:
     """Create a new alert rule."""
     require_admin(request)
-    _require_audit_feature()
-    engine = _get_alert_engine()
     actor = getattr(request.state, "auth_identity", "") or ""
-    rule = engine.create_rule(body, created_by=actor)
-    return {"status": "ok", "rule": rule.model_dump(mode="json")}
+    return await observability_service.create_alert_rule(body, actor=actor)
 
 
 @router.get("/alert/rules")
@@ -504,14 +212,7 @@ async def list_alert_rules(
 ) -> dict[str, Any]:
     """List alert rules (optionally filtered by tenant / enabled)."""
     require_admin(request)
-    _require_audit_feature()
-    engine = _get_alert_engine()
-    rules = engine.list_rules(tenant_id=tenant_id, enabled_only=enabled_only)
-    return {
-        "status": "ok",
-        "rules": [r.model_dump(mode="json") for r in rules],
-        "count": len(rules),
-    }
+    return await observability_service.list_alert_rules(tenant_id=tenant_id, enabled_only=enabled_only)
 
 
 @router.get("/alert/rules/{rule_id}")
@@ -519,12 +220,10 @@ async def list_alert_rules(
 async def get_alert_rule(request: Request, rule_id: str) -> dict[str, Any]:
     """Get a single alert rule by ID."""
     require_admin(request)
-    _require_audit_feature()
-    engine = _get_alert_engine()
-    rule = engine.get_rule(rule_id)
-    if rule is None:
+    result = await observability_service.get_alert_rule(rule_id)
+    if result is None:
         raise HTTPException(status_code=404, detail=f"Rule {rule_id} not found")
-    return {"status": "ok", "rule": rule.model_dump(mode="json")}
+    return result
 
 
 @router.put("/alert/rules/{rule_id}")
@@ -532,12 +231,10 @@ async def get_alert_rule(request: Request, rule_id: str) -> dict[str, Any]:
 async def update_alert_rule(request: Request, rule_id: str, body: AuditAlertRuleUpdate) -> dict[str, Any]:
     """Update an existing alert rule (partial update)."""
     require_admin(request)
-    _require_audit_feature()
-    engine = _get_alert_engine()
-    rule = engine.update_rule(rule_id, body)
-    if rule is None:
+    result = await observability_service.update_alert_rule(rule_id, body)
+    if result is None:
         raise HTTPException(status_code=404, detail=f"Rule {rule_id} not found")
-    return {"status": "ok", "rule": rule.model_dump(mode="json")}
+    return result
 
 
 @router.delete("/alert/rules/{rule_id}")
@@ -545,9 +242,7 @@ async def update_alert_rule(request: Request, rule_id: str, body: AuditAlertRule
 async def delete_alert_rule(request: Request, rule_id: str) -> dict[str, Any]:
     """Delete an alert rule."""
     require_admin(request)
-    _require_audit_feature()
-    engine = _get_alert_engine()
-    ok = engine.delete_rule(rule_id)
+    ok = await observability_service.delete_alert_rule(rule_id)
     if not ok:
         raise HTTPException(status_code=404, detail=f"Rule {rule_id} not found")
     return {"status": "ok", "deleted": rule_id}
@@ -568,20 +263,10 @@ async def list_alert_history(
 ) -> dict[str, Any]:
     """List triggered-alert history."""
     require_admin(request)
-    _require_audit_feature()
-    engine = _get_alert_engine()
-    alerts = engine.list_alerts(
-        rule_id=rule_id,
-        tenant_id=tenant_id,
-        acknowledged=acknowledged,
-        since=since,
-        limit=limit,
+    return await observability_service.list_alert_history(
+        rule_id=rule_id, tenant_id=tenant_id,
+        acknowledged=acknowledged, since=since, limit=limit,
     )
-    return {
-        "status": "ok",
-        "alerts": [a.model_dump(mode="json") for a in alerts],
-        "count": len(alerts),
-    }
 
 
 @router.post("/alert/{alert_id}/acknowledge")
@@ -589,13 +274,11 @@ async def list_alert_history(
 async def acknowledge_alert(request: Request, alert_id: str) -> dict[str, Any]:
     """Acknowledge a triggered alert."""
     require_admin(request)
-    _require_audit_feature()
-    engine = _get_alert_engine()
     actor = getattr(request.state, "auth_identity", "") or ""
-    alert = engine.acknowledge_alert(alert_id, acknowledged_by=actor)
-    if alert is None:
+    result = await observability_service.acknowledge_alert(alert_id, actor=actor)
+    if result is None:
         raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
-    return {"status": "ok", "alert": alert.model_dump(mode="json")}
+    return result
 
 
 @router.post("/alert/evaluate")
@@ -605,19 +288,6 @@ async def evaluate_alerts(
     hours: int = 1,
     tenant_id: str = "",
 ) -> dict[str, Any]:
-    """Manually evaluate recent audit events against all enabled rules.
-
-    Returns the list of newly-triggered alerts. Useful for backfilling
-    after rule creation.
-    """
+    """Manually evaluate recent audit events against all enabled rules."""
     require_admin(request)
-    _require_audit_feature()
-    engine = _get_alert_engine()
-    events = _collect_enterprise_events(tenant_id=tenant_id, hours=hours, limit=100000)
-    triggered = engine.evaluate_events(events)
-    return {
-        "status": "ok",
-        "triggered": [a.model_dump(mode="json") for a in triggered],
-        "count": len(triggered),
-        "evaluated_events": len(events),
-    }
+    return await observability_service.evaluate_alerts(hours=hours, tenant_id=tenant_id)

@@ -466,8 +466,10 @@ class TestLicensesRouter:
         set_edition(Edition.ENTERPRISE)
         set_feature_override(FeatureFlag.LICENSE_MANAGEMENT, True)
         # Reset the router-level manager singleton so each test gets a fresh one.
+        # Service 层提取后，单例由 billing_service 持有；router 暴露
+        # _set_manager 转发函数供测试重置单例。
         import maop.dashboard.routers.licenses as router_mod
-        router_mod._license_manager = None
+        router_mod._set_manager(None)
         yield
         set_feature_override(FeatureFlag.LICENSE_MANAGEMENT, False)
 

@@ -256,7 +256,7 @@ def plugin_client(tmp_path, monkeypatch):
     mock_mgr.load_all = MagicMock(return_value=[])
     mock_mgr.start_all = MagicMock(return_value=[])
     mock_mgr.stop_all = MagicMock(return_value=[])
-    monkeypatch.setattr("maop.dashboard.routers.plugin._get_plugin_manager", lambda: mock_mgr)
+    monkeypatch.setattr("maop.dashboard.services.plugin_service._get_plugin_manager", lambda: mock_mgr)
 
     from maop.dashboard.routers.plugin import router
     return _make_app(router)
@@ -526,12 +526,12 @@ def routing_preview_client(tmp_path, monkeypatch):
     from types import SimpleNamespace
 
     mock_config = SimpleNamespace(routing={})
-    monkeypatch.setattr("maop.dashboard.routers.routing_preview.load_config", lambda root: mock_config)
+    monkeypatch.setattr("maop.dashboard.services.routing_service.load_config", lambda root: mock_config)
 
     mock_scorer = MagicMock()
     mock_scorer.match = MagicMock(return_value=None)
     mock_scorer.get_cooldown_status = MagicMock(return_value=[])
-    monkeypatch.setattr("maop.dashboard.routers.routing_preview.get_route_scorer", lambda *a, **kw: mock_scorer)
+    monkeypatch.setattr("maop.dashboard.services.routing_service.get_route_scorer", lambda *a, **kw: mock_scorer)
 
     from maop.dashboard.routers.routing_preview import router
     return _make_app(router)

@@ -1,5 +1,9 @@
 """Dashboard API routes for n8n integration (Enterprise only).
 
+业务逻辑已提取至 ``maop.dashboard.services.integration_service``（§1 n8n）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
+
 Endpoints:
   POST /api/n8n/webhook        - Receive webhook from n8n
   GET  /api/n8n/workflows      - List n8n workflows
@@ -12,7 +16,6 @@ from __future__ import annotations
 
 import logging
 import os
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -21,11 +24,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
-from maop.enterprise.n8n import (
-    N8nClient,
-    N8nIntegrationError,
-    handle_n8n_webhook,
-)
+from maop.dashboard.services import integration_service
+from maop.enterprise.n8n import N8nIntegrationError
 
 logger = logging.getLogger(__name__)
 
@@ -63,27 +63,13 @@ class N8nWebhookPayload(BaseModel):
     data: Any = None
 
 
-# Module-level singleton cache for N8nClient — avoids re-creating the client
-# (and re-reading env config) on every request. Invalidated if env changes.
-_n8n_client: N8nClient | None = None
-_n8n_client_env: tuple[str, str] | None = None
-_n8n_client_lock = threading.Lock()
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
+def _get_client() -> Any:
+    return integration_service._get_client()
 
 
-def _get_client() -> N8nClient:
-    """Return a cached N8nClient singleton, re-created only when env config changes."""
-    global _n8n_client, _n8n_client_env
-    base_url = os.getenv("N8N_BASE_URL", "http://localhost:5678")
-    api_key = os.getenv("N8N_API_KEY", "")
-    current_env = (base_url, api_key)
-    if _n8n_client is not None and _n8n_client_env == current_env:
-        return _n8n_client
-    with _n8n_client_lock:
-        if _n8n_client is not None and _n8n_client_env == current_env:  # double-checked locking
-            return _n8n_client
-        _n8n_client = N8nClient(base_url=base_url, api_key=api_key)
-        _n8n_client_env = current_env
-    return _n8n_client
+def _set_client(client: Any) -> None:
+    integration_service._set_client(client)
 
 
 @router.post("/webhook")
@@ -119,7 +105,9 @@ async def receive_webhook(request: Request) -> dict[str, Any]:
         logger.warning("[n8n] Invalid JSON in webhook: %s", exc)
         raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
 
-    return handle_n8n_webhook(payload.model_dump(), raw_body=raw_body, signature=signature)
+    return integration_service.receive_webhook(
+        payload.model_dump(), raw_body=raw_body, signature=signature,
+    )
 
 
 @router.get("/workflows")
@@ -130,14 +118,13 @@ async def list_workflows(request: Request) -> dict[str, Any]:
     if not has_feature(FeatureFlag.N8N_INTEGRATION):
         raise HTTPException(status_code=404, detail="n8n integration not available")
 
-    with _get_client() as client:
-        try:
-            workflows = client.list_workflows()
-            return {"status": "ok", "workflows": workflows, "count": len(workflows)}
-        except N8nIntegrationError as exc:
-            # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
-            logger.warning("[n8n] Integration error: %s", exc)
-            raise HTTPException(status_code=502, detail="n8n integration error") from exc
+    try:
+        result = integration_service.list_workflows()
+    except N8nIntegrationError as exc:
+        # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
+        logger.warning("[n8n] Integration error: %s", exc)
+        raise HTTPException(status_code=502, detail="n8n integration error") from exc
+    return {"status": "ok", **result}
 
 
 @router.post("/workflows/{workflow_id}/trigger")
@@ -159,18 +146,17 @@ async def trigger_workflow(
     trigger_data = body.data if body else {}
     wait_for_completion = body.wait if body else False
 
-    with _get_client() as client:
-        try:
-            execution = client.trigger_workflow(
-                workflow_id,
-                data=trigger_data,
-                wait_for_completion=wait_for_completion,
-            )
-            return {"status": "ok", **execution.model_dump()}
-        except N8nIntegrationError as exc:
-            # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
-            logger.warning("[n8n] Integration error: %s", exc)
-            raise HTTPException(status_code=502, detail="n8n integration error") from exc
+    try:
+        execution = integration_service.trigger_workflow(
+            workflow_id,
+            data=trigger_data,
+            wait_for_completion=wait_for_completion,
+        )
+    except N8nIntegrationError as exc:
+        # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
+        logger.warning("[n8n] Integration error: %s", exc)
+        raise HTTPException(status_code=502, detail="n8n integration error") from exc
+    return {"status": "ok", **execution}
 
 
 @router.get("/executions/{execution_id}")
@@ -181,14 +167,13 @@ async def get_execution(execution_id: str, request: Request) -> dict[str, Any]:
     if not has_feature(FeatureFlag.N8N_INTEGRATION):
         raise HTTPException(status_code=404, detail="n8n integration not available")
 
-    with _get_client() as client:
-        try:
-            execution = client.get_execution(execution_id)
-            return {"status": "ok", **execution.model_dump()}
-        except N8nIntegrationError as exc:
-            # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
-            logger.warning("[n8n] Integration error: %s", exc)
-            raise HTTPException(status_code=502, detail="n8n integration error") from exc
+    try:
+        execution = integration_service.get_execution(execution_id)
+    except N8nIntegrationError as exc:
+        # 批次3A: 脱敏——集成错误细节不暴露给客户端，仅日志记录。
+        logger.warning("[n8n] Integration error: %s", exc)
+        raise HTTPException(status_code=502, detail="n8n integration error") from exc
+    return {"status": "ok", **execution}
 
 
 @router.get("/health")
@@ -199,8 +184,5 @@ async def health_check(request: Request) -> dict[str, Any]:
     if not has_feature(FeatureFlag.N8N_INTEGRATION):
         raise HTTPException(status_code=404, detail="n8n integration not available")
 
-    # 从环境变量读取 base_url，避免访问 client 的内部属性 _base_url
-    base_url = os.getenv("N8N_BASE_URL", "http://localhost:5678")
-    with _get_client() as client:
-        healthy = client.health_check()
-        return {"status": "ok", "n8n_reachable": healthy, "base_url": base_url}
+    result = integration_service.health_check()
+    return {"status": "ok", **result}

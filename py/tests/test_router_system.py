@@ -398,7 +398,7 @@ class TestAuditEvents:
         # maop.enterprise is not installed (personal-edition CI).
         # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
         pass  # enterprise installed (maop-enterprise wheel): guard removed
-        import maop.dashboard.routers.audit as _audit_mod
+        from maop.dashboard.services import observability_service as _audit_mod
         _audit_mod._enterprise_logger = None
         # 2026-08-11 hardening: 无 license 时 has_feature(AUDIT_LOG) 为 False,
         # 端点会走 personal 分支(内部自捕获,不返回 error)。本测试意图是验证
