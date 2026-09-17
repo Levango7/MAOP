@@ -226,7 +226,7 @@ MAOP Dashboard 由 FastAPI 实现（`py/maop/dashboard/server.py`），路由按
 | **Three-Layer Memory** | `core/three_layer_memory.py` + `core/agent_memory.py` + `core/memory/` | Working → Episodic → Semantic |
 | **Circuit Breaker** | `core/circuit_breaker.py` | 自动 failover |
 | **Budget Guard** | `core/budget_guard.py` + `core/monitoring/budget_guard.py` | 预算守卫 |
-| **Plugin System** | `core/plugin.py` + `core/plugins/` + `core/marketplace/` | 插件注册/load/start/stop/reload + checksum 校验 |
+| **Plugin System** | `core/agent/plugins_hooks/`（plugin.py 的 PluginManager + plugin_sandbox.py + hook_manager.py）+ `core/marketplace/` | 插件注册/load/start/stop/reload + checksum 校验 + 依赖排序 |
 | **Hooks** | `core/hook_manager.py` | 生命周期 hook |
 | **Self-Evolution** | `core/evolution_loop.py` + `core/agent_evolution.py` + `core/agent_performance.py` + `core/ab_test.py` + `core/evolution_strategies.py` | 自演化闭环（PerformanceEvaluator / ABTest SPRT / AutoDeployer） |
 | **Agent Registry** | `core/agent_registry.py` + `core/agent_lifecycle.py` + `core/agent_repair.py` + `core/agent_scanner.py` | agent 注册/扫描/健康/修复 |
