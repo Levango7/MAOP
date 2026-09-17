@@ -240,7 +240,6 @@ module = [
     "maop.core.scheduling.*",
     "maop.core.vector.*",
     "maop.core.evolution.*",
-    "maop.core.plugins.*",
     "maop.core.tenant.*",
 ]
 disallow_untyped_defs = true

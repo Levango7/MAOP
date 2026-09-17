@@ -335,24 +335,124 @@ class PluginManager:
         self.load(plugin_id)
         return self.start(plugin_id, config=info.config)
 
-    def load_all(self) -> list[PluginInfo]:
-        """Discover and load all plugins."""
-        discovered = self.discover()
-        results = []
-        for info in discovered:
-            if info.state == PluginState.ERRORED:
-                results.append(info)
+    # ── Dependency ordering ─────────────────────────────────────
+
+    def _manifest_for(self, info: PluginInfo) -> PluginManifest | None:
+        """Return the manifest for a plugin, re-reading it from disk if needed.
+
+        ``discover()`` caches manifests in memory; ``start_all()``/``stop_all()``
+        may run in a later call (or a fresh process) where only the DB-backed
+        ``PluginInfo`` survives, so fall back to reading ``MAOP-plugin.yaml``
+        from ``info.path``.
+        """
+        cached = self._manifests.get(info.id)
+        if cached is not None:
+            return cached
+        try:
+            path = Path(info.path) / "MAOP-plugin.yaml"
+            if path.exists():
+                manifest = self._load_manifest(path)
+                self._manifests[info.id] = manifest
+                return manifest
+        except Exception as exc:
+            logger.warning(
+                "[plugin] cannot read manifest for %r (%s): %s", info.name, info.path, exc
+            )
+        return None
+
+    def _resolution_order(self, infos: list[PluginInfo]) -> list[PluginInfo]:
+        """Topologically sort plugins so dependencies come first.
+
+        ``PluginManifest.dependencies`` is matched by **name** — plugin IDs carry
+        a random suffix (see :meth:`_plugin_id`) and are therefore not stable
+        identifiers across discoveries. Ties are broken by the incoming order
+        (``discover()`` yields directories sorted by name), so loading stays
+        deterministic.
+
+        Two deliberate non-fatal behaviours, because this runs inside
+        ``load_all()`` where aborting would leave every plugin unloaded:
+
+        * a declared dependency that is not installed is skipped with a
+          WARNING — the dependent plugin is still ordered as best it can be and
+          is left to fail (or not) on its own;
+        * a dependency **cycle** is reported as an ERROR and the remaining
+          plugins fall back to the incoming order.
+
+        Returns:
+            The same ``PluginInfo`` objects, dependency-ordered.
+        """
+        if len(infos) < 2:
+            return list(infos)
+
+        by_name = {i.name: i for i in infos}
+        seq = {i.id: n for n, i in enumerate(infos)}
+        edges: dict[str, list[str]] = {i.id: [] for i in infos}
+        indeg: dict[str, int] = {i.id: 0 for i in infos}
+
+        for info in infos:
+            manifest = self._manifest_for(info)
+            if manifest is None:
                 continue
+            for dep_name in manifest.dependencies:
+                dep = by_name.get(dep_name)
+                if dep is None:
+                    logger.warning(
+                        "[plugin] %r declares dependency %r which is not installed; "
+                        "that edge is ignored for ordering",
+                        info.name, dep_name,
+                    )
+                    continue
+                if dep.id == info.id:
+                    logger.warning("[plugin] %r declares itself as a dependency; ignored", info.name)
+                    continue
+                edges[dep.id].append(info.id)
+                indeg[info.id] += 1
+
+        by_id = {i.id: i for i in infos}
+        ready = sorted((i for i in infos if indeg[i.id] == 0), key=lambda i: seq[i.id])
+        order: list[PluginInfo] = []
+        while ready:
+            current = ready.pop(0)
+            order.append(current)
+            for nxt_id in edges[current.id]:
+                indeg[nxt_id] -= 1
+                if indeg[nxt_id] == 0:
+                    ready.append(by_id[nxt_id])
+            ready.sort(key=lambda i: seq[i.id])
+
+        if len(order) != len(infos):
+            stuck = [i.name for i in infos if i not in order]
+            logger.error(
+                "[plugin] dependency cycle among plugins %s — falling back to "
+                "discovery order for those; fix their MAOP-plugin.yaml "
+                "'dependencies' fields",
+                stuck,
+            )
+            order.extend(i for i in infos if i not in order)
+        return order
+
+    def load_all(self) -> list[PluginInfo]:
+        """Discover and load all plugins, dependencies before dependents."""
+        discovered = self.discover()
+        results = [i for i in discovered if i.state == PluginState.ERRORED]
+        loadable = [i for i in discovered if i.state != PluginState.ERRORED]
+        for info in self._resolution_order(loadable):
             results.append(self.load(info.id))
         return results
 
     def start_all(self) -> list[PluginInfo]:
-        """Start all loaded plugins."""
-        return [self.start(info.id) for info in self.list_plugins(state=PluginState.LOADED)]
+        """Start all loaded plugins in dependency order."""
+        loaded = self.list_plugins(state=PluginState.LOADED)
+        return [self.start(info.id) for info in self._resolution_order(loaded)]
 
     def stop_all(self) -> list[PluginInfo]:
-        """Stop all running plugins."""
-        return [self.stop(info.id) for info in self.list_plugins(state=PluginState.STARTED)]
+        """Stop all running plugins in reverse dependency order.
+
+        Dependents are stopped before the plugins they depend on, so a plugin
+        is never torn down while something that uses it is still running.
+        """
+        started = self.list_plugins(state=PluginState.STARTED)
+        return [self.stop(info.id) for info in reversed(self._resolution_order(started))]
 
     # ── Query ───────────────────────────────────────────────────
 
