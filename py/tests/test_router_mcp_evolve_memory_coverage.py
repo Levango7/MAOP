@@ -134,7 +134,7 @@ class TestMcpHealth:
 
 @pytest.fixture
 def evolve_env(tmp_path, monkeypatch):
-    monkeypatch.setattr("maop.dashboard.routers.evolve_insights.MAOP_ROOT", tmp_path)
+    monkeypatch.setattr("maop.dashboard.routers.state.MAOP_ROOT", tmp_path)
     return tmp_path
 
 

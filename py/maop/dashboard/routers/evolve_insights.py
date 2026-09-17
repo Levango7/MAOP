@@ -1,22 +1,20 @@
-"""Self-evolution endpoints for MAOP Dashboard."""
+"""Self-evolution endpoints for MAOP Dashboard.
+
+业务逻辑由 ``maop.dashboard.services.evolution_service`` 提供；本模块
+仅负责路由定义、请求解析、权限检查、调用 service、响应格式化与错误处理。
+"""
 
 from __future__ import annotations
 
-import contextlib
-import json
 import logging
-import os
-import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
-
-from .state import MAOP_ROOT
+from maop.dashboard.services import evolution_service
 
 logger = logging.getLogger(__name__)
 
@@ -57,14 +55,7 @@ class EvolveApplySuggestionRequest(BaseModel):
 @handle_api_errors("Evolve status", error_value={"status": "error", "error": "Evolve status unavailable"})
 async def api_evolve_status(request: Request) -> dict[str, Any]:
     require_admin(request)
-    from maop.evolve import EvolveEngine
-    eng = EvolveEngine(root_dir=str(MAOP_ROOT))
-    data: Any = eng.status()
-    if hasattr(data, 'model_dump'):
-        data = data.model_dump()
-    elif hasattr(data, 'dict') and not isinstance(data, dict):
-        data = data.dict()
-    return {"status": "ok", "data": data}
+    return evolution_service.get_evolve_status()
 
 
 @router.get("/api/evolve/metrics")
@@ -75,84 +66,7 @@ async def api_evolve_metrics(request: Request) -> dict[str, Any]:
     从 evolution_cycles 表聚合真实数据；优先 EvolutionLoop，空回退 EvolveEngine。
     """
     require_admin(request)
-    from maop.core.evolution.evolution_loop import EvolutionLoop
-
-    try:
-        loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
-        history = loop.get_cycle_history(limit=50)
-
-    except Exception:
-        logger.debug("[evolve/metrics] EvolutionLoop init failed, trying EvolveEngine", exc_info=True)
-        try:
-            from maop.evolve import EvolveEngine
-
-            eng = EvolveEngine(root_dir=str(MAOP_ROOT))
-            raw = eng.status()
-            timeseries = []
-            heatmap = []
-            lineage = []
-            if isinstance(raw, dict):
-                timeseries = raw.get("timeseries", [])
-                heatmap = raw.get("heatmap", [])
-                lineage = raw.get("lineage", [])
-            elif hasattr(raw, "model_dump"):
-                d = raw.model_dump()
-                timeseries = d.get("timeseries", [])
-                heatmap = d.get("heatmap", [])
-                lineage = d.get("lineage", [])
-            return {"status": "ok", "timeseries": timeseries, "heatmap": heatmap, "lineage": lineage}
-        except Exception:
-            return {"status": "ok", "timeseries": [], "heatmap": [], "lineage": []}
-
-    if not history:
-        return {"status": "ok", "timeseries": [], "heatmap": [], "lineage": []}
-
-    timeseries = [
-        {
-            "timestamp": h.started_at,
-            "errors": h.errors_observed,
-            "heals": h.heal_successes,
-            "suggestions": h.suggestions_generated,
-            "duration_s": h.total_duration_s,
-        }
-        for h in history
-    ]
-
-    lineage = [
-        {
-            "cycle_id": h.cycle_id,
-            "started_at": h.started_at,
-            "errors_observed": h.errors_observed,
-            "heal_successes": h.heal_successes,
-            "validation_improved": h.validation_improved,
-        }
-        for h in history
-    ]
-
-    heatmap: list[dict[str, Any]] = []  # type: ignore[no-redef]
-    agent_counts: dict[str, dict[str, Any]] = {}
-
-    for h in history:
-        agent = ""
-        with contextlib.suppress(Exception):
-            rpt = json.loads(h.model_dump_json()) if h else {}
-            agent = rpt.get("agent", "") or rpt.get("agent_name", "") or ""
-        if not agent:
-            continue
-        if agent not in agent_counts:
-            agent_counts[agent] = {"cycles": 0, "errors": 0, "improvement_rate": 0.0}
-        agent_counts[agent]["cycles"] += 1
-        agent_counts[agent]["errors"] += h.errors_observed
-        if agent_counts[agent]["cycles"] > 0:
-            agent_counts[agent]["improvement_rate"] = round(
-                1.0 - (agent_counts[agent]["errors"] / max(1, agent_counts[agent]["cycles"] * 10)), 3
-            )
-
-    heatmap = [
-        {"agent": k, **v} for k, v in agent_counts.items()
-    ]
-
-    return {"status": "ok", "timeseries": timeseries, "heatmap": heatmap, "lineage": lineage}
+    return evolution_service.get_evolve_metrics()
 
 
 @router.post("/api/evolve/analyze")
@@ -161,88 +75,21 @@ async def api_evolve_analyze(request: Request, body: EvolveAnalyzeRequest) -> di
     # 批次3A: 用 Pydantic EvolveAnalyzeRequest 替代 await request.json()，
     # 由 FastAPI 自动校验请求体（action/suggestion_id/hours 字段类型）。
     require_admin(request)
-    from maop.evolve import EvolveEngine
-    eng = EvolveEngine(root_dir=str(MAOP_ROOT))
-    action = body.action
-    if action == "apply":
-        suggestion_id = body.suggestion_id
-        try:
-            result: Any = eng.apply(suggestion_id) if hasattr(eng, "apply") else eng.analyze()
-        except TypeError:
-            result = eng.apply() if hasattr(eng, "apply") else eng.analyze()
-        if hasattr(result, 'model_dump'):
-            result = result.model_dump()
-        return {"status": "ok", "action": "apply", "suggestions": result}
-    elif action == "reset":
-        if hasattr(eng, '_suggestions_file'):
-            sf = eng._suggestions_file
-            if sf and sf.exists():
-                sf.unlink()
-        return {"status": "ok", "action": "reset", "msg": "Suggestions cleared"}
-    elif action == "auto_evolve":
-        try:
-            hours = body.hours
-            result = eng.auto_evolve(hours=hours) if hasattr(eng, "auto_evolve") else eng.analyze()
-        except Exception as exc:
-            logger.warning("auto_evolve failed: %s", exc, exc_info=True)
-            result = {"error": "auto_evolve failed, please try again later"}
-        return {"status": "ok", "action": "auto_evolve", "result": result}
-    else:
-        analyze_result: Any = eng.analyze()
-        if hasattr(analyze_result, 'model_dump'):
-            analyze_result = analyze_result.model_dump()
-        elif hasattr(analyze_result, 'dict') and not isinstance(analyze_result, dict):
-            analyze_result = analyze_result.dict()
-        return {"status": "ok", "action": "analyze", "suggestions": analyze_result}
+    return evolution_service.analyze_evolve(body.action, body.suggestion_id, body.hours)
+
 
 @router.get("/api/evolve/suggestions")
 @handle_api_errors("Evolve suggestions", error_value={"status": "error", "error": "Evolve suggestions unavailable", "suggestions": {"stats": {"by_agent": []}}})
 async def api_evolve_suggestions(request: Request) -> dict[str, Any]:
     require_admin(request)
-    from maop.evolve import EvolveEngine
-    eng = EvolveEngine(root_dir=str(MAOP_ROOT))
-    s: Any = eng.suggest() if hasattr(eng, "suggest") else {}
-    if hasattr(s, 'model_dump'):
-        s = s.model_dump()
-    elif hasattr(s, 'dict') and not isinstance(s, dict):
-        s = s.dict()
-    if not isinstance(s, dict):
-        s = {"action": "suggest", "stats": {"by_agent": []}}
-    if "stats" not in s:
-        s = {"action": "suggest", "stats": s if isinstance(s, dict) else {"by_agent": []}}
-    if "by_agent" not in s.get("stats", {}):
-        try:
-            status = eng.status()
-            if hasattr(status, 'get'):
-                s["stats"]["by_agent"] = status.get("stats", {}).get("by_agent", [])
-            if hasattr(status, 'model_dump'):
-                s["stats"]["by_agent"] = status.model_dump().get("stats", {}).get("by_agent", [])
-        except Exception:
-            s["stats"]["by_agent"] = []
-    return {"status": "ok", "suggestions": s}
+    return evolution_service.get_evolve_suggestions()
+
 
 @router.get("/api/evolve/report")
 @handle_api_errors("Evolve report", error_value={"performance": [], "error": "Evolve report unavailable"})
 async def api_evolve_report_v4(request: Request) -> dict[str, Any]:
     require_admin(request)
-    from .state import get_bridge
-    b = get_bridge()
-    agents = await b.agent_stats()
-    agent_list = agents.get("agents", []) if isinstance(agents, dict) else (agents if isinstance(agents, list) else [])
-    perf = []
-    for a in agent_list:
-        if not isinstance(a, dict):
-            continue
-        sr = a.get("success_rate", 0) or 0
-        total = a.get("total_delegations", a.get("total", 0)) or 0
-        success = a.get("successes", a.get("success", 0)) or 0
-        fail = total - success
-        perf.append({"agent": a.get("name", a.get("agent", "")),
-            "success_rate": sr * 100 if sr <= 1 else sr,
-            "avg_latency_ms": a.get("avg_latency_ms", a.get("avg_duration_ms", 0)) or 0,
-            "fail_count": fail, "total_count": total,
-            "tags": ",".join(a.get("tags", [])) if isinstance(a.get("tags"), list) else ""})
-    return {"status": "ok", "performance": perf}
+    return await evolution_service.get_evolve_report()
 
 
 @router.get("/api/evolve/strategies")
@@ -250,45 +97,24 @@ async def api_evolve_report_v4(request: Request) -> dict[str, Any]:
 async def api_evolve_strategies(request: Request) -> dict[str, Any]:
     """返回可用进化策略列表。"""
     require_admin(request)
-    from maop.core.evolution.evolution_strategies import STRATEGY_MAP
-    strategies = [
-        {"name": name, "description": cls.__doc__ or cls.__name__}
-        for name, cls in STRATEGY_MAP.items()
-    ]
-    return {"status": "ok", "strategies": strategies}
+    return evolution_service.list_evolve_strategies()
+
 
 @router.get("/api/evolve/history")
 @handle_api_errors("Evolve history", error_value={"status": "error", "history": []})
 async def api_evolve_history(request: Request) -> dict[str, Any]:
     """返回进化循环历史。"""
     require_admin(request)
-    try:
-        from maop.core.evolution.evolution_loop import EvolutionLoop
-        loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
-        history = loop.get_cycle_history(limit=20)
-        stats = loop.get_stats()
-        return {
-            "status": "ok",
-            "history": [h.model_dump() for h in history],
-            "stats": stats,
-        }
-    except Exception:
-        return {"status": "ok", "history": [], "stats": {}}
+    return evolution_service.get_evolve_history()
+
 
 @router.get("/api/evolve/suggestions-list")
 @handle_api_errors("Evolve suggestions list", error_value={"status": "error", "suggestions": []})
 async def api_evolve_suggestions_list(request: Request) -> dict[str, Any]:
     """返回所有进化建议列表 (含已应用状态)。"""
     require_admin(request)
-    from maop.evolve import EvolveEngine
-    eng = EvolveEngine(root_dir=str(MAOP_ROOT))
-    suggestions = eng._load_suggestions()
-    return {
-        "status": "ok",
-        "suggestions": [s.model_dump() for s in suggestions],
-        "total": len(suggestions),
-        "applied": sum(1 for s in suggestions if s.applied),
-    }
+    return evolution_service.list_evolve_suggestions()
+
 
 @router.post("/api/evolve/apply-suggestion")
 @handle_api_errors("Evolve apply suggestion", error_value={"status": "error", "error": "Apply failed"})
@@ -297,13 +123,7 @@ async def api_evolve_apply_suggestion(request: Request, body: EvolveApplySuggest
     require_admin(request)
     # H-3 fix: 用 Pydantic EvolveApplySuggestionRequest 替代 await request.json()，
     # 由 FastAPI 自动校验请求体（suggestion_id 字段类型）。
-    from maop.evolve import EvolveEngine
-    eng = EvolveEngine(root_dir=str(MAOP_ROOT))
-    suggestion_id = body.suggestion_id
-    result: Any = eng.apply(suggestion_id)
-    if hasattr(result, 'model_dump'):
-        result = result.model_dump()
-    return {"status": "ok", "result": result}
+    return evolution_service.apply_evolve_suggestion(body.suggestion_id)
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -322,41 +142,9 @@ async def api_evolution_loop_status(request: Request) -> dict[str, Any]:
     - 开关状态 (MAOP_EVOLUTION_LOOP_ENABLED)
     """
     require_admin(request)
-    from maop.core.evolution.evolution_loop import EvolutionLoop
-
-
     try:
-        loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
-        history = loop.get_cycle_history(limit=5)
-        stats = loop.get_stats()
-        evolution_enabled = os.getenv("MAOP_EVOLUTION_LOOP_ENABLED", "").strip().lower() in ("1", "true", "yes", "on")
-
-        # 确定当前状态机状态
-        state = "idle"
-        if history:
-            latest = history[0]
-            if latest.rolled_back:
-                state = "rolled_back"
-            elif latest.validation_improved:
-                state = "validated"
-            elif latest.pending_approval:
-                state = "pending_approval"
-            elif latest.suggestions_applied > 0:
-                state = "applying"
-            else:
-                state = "evaluating"
-
-        return {
-            "status": "ok",
-            "state": state,
-            "evolution_loop_enabled": evolution_enabled,
-            "recent_cycles": [h.model_dump() for h in history],
-            "stats": stats,
-            "pending_approval_count": len(history[0].pending_approval) if history else 0,
-            "pending_approval_ids": history[0].pending_approval if history else [],
-        }
+        return evolution_service.get_evolution_loop_status()
     except Exception as exc:
-        logger.warning("Evolution loop status failed: %s", exc, exc_info=True)
         # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
         raise HTTPException(status_code=500, detail="Evolution loop status unavailable") from exc
 
@@ -368,16 +156,9 @@ async def api_evolution_loop_trigger(request: Request, body: EvolutionLoopTrigge
     # 批次3A: 用 Pydantic EvolutionLoopTriggerRequest 替代 await request.json()，
     # 由 FastAPI 自动校验请求体（dry_run 字段类型）。
     require_admin(request)
-    from maop.core.evolution.evolution_loop import EvolutionLoop
-
-    dry_run = body.dry_run
-
     try:
-        loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
-        report = await loop.run_cycle(dry_run=dry_run, auto_rollback=True)
-        return {"status": "ok", "report": report.model_dump()}
+        return await evolution_service.trigger_evolution_loop(body.dry_run)
     except Exception as exc:
-        logger.warning("Evolution loop trigger failed: %s", exc, exc_info=True)
         # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
         raise HTTPException(status_code=500, detail="Evolution loop trigger failed, please try again later") from exc
 
@@ -390,28 +171,9 @@ async def api_evolution_approvals(request: Request) -> dict[str, Any]:
     返回所有处于 pending_approval 状态的建议，含建议详情和上下文。
     """
     require_admin(request)
-    from maop.core.evolution.evolution_loop import EvolutionLoop
-
     try:
-        loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
-        history = loop.get_cycle_history(limit=10)
-
-        approvals = []
-        for h in history:
-            if h.pending_approval:
-                approvals.append({
-                    "cycle_id": h.cycle_id,
-                    "started_at": h.started_at,
-                    "pending_approval_ids": h.pending_approval,
-                    "approval_state": h.approval_state,
-                    "errors_observed": h.errors_observed,
-                    "suggestions_generated": h.suggestions_generated,
-                    "validation_improved": h.validation_improved,
-                })
-
-        return {"status": "ok", "approvals": approvals, "total": len(approvals)}
+        return evolution_service.list_evolution_approvals()
     except Exception as exc:
-        logger.warning("Evolution approvals failed: %s", exc, exc_info=True)
         # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
         raise HTTPException(status_code=500, detail="Evolution approvals unavailable") from exc
 
@@ -427,50 +189,17 @@ async def api_evolution_approval_decision(approval_id: str, request: Request, bo
     # 批次3A: 用 Pydantic EvolutionApprovalDecisionRequest 替代 await request.json()，
     # 由 FastAPI 自动校验请求体（decision/approved_by/reason 字段类型）。
     require_admin(request)
-
     try:
-        cycle_id, suggestion_id = approval_id.split(":", 1)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid approval_id format (cycle_id:suggestion_id)")
-
-    decision = body.decision.lower()
-    approved_by = body.approved_by
-    reason = body.reason
-
-    if decision not in ("approve", "reject"):
-        raise HTTPException(status_code=400, detail="decision must be 'approve' or 'reject'")
-
-    # 这里简化实现：仅更新 LoopReport 的 approval_state
-    # 完整实现需持久化审批记录、触发后续 APPLY/AB 流程
-    from maop.core.evolution.evolution_loop import EvolutionLoop
-
-
-    try:
-        loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
-        # 尝试读取并更新该 cycle 的报告
-        # M5: _load_report 是 EvolutionLoop 内部协调接口，非公开 API；
-        # 此处通过内部方法读取循环报告以支持审批决策持久化。
-        report = loop._load_report(cycle_id)  # 假设有此方法或通过 DB 查询
-        if not report:
-            # P2 fix: 404 应返回 404 状态码，而非 200。
-            raise HTTPException(status_code=404, detail=f"Cycle {cycle_id} not found")
-
-        if decision == "approve":
-            # 将 suggestion_id 从 pending_approval 移到 approved 列表
-            # 这里简化：更新 approval_state
-            pass  # 实际需更新 DB
-
-        report.approval_state = "approved" if decision == "approve" else "rejected"
-        report.approved_by = approved_by
-        report.approved_at = time.time()
-        # M5: _save_report 是 EvolutionLoop 内部协调接口，非公开 API；
-        # 此处通过内部方法持久化审批后的循环报告。
-        loop._save_report(report)
-
-        return {"status": "ok", "decision": decision, "approval_id": approval_id, "cycle_id": cycle_id}
+        return evolution_service.decide_evolution_approval(
+            approval_id, body.decision, body.approved_by, body.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Cycle {exc.args[0]} not found") from exc
     except Exception as exc:
         logger.warning("Evolution approval decision failed: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail="Evolution approval decision failed, please try again later")
+        raise HTTPException(status_code=500, detail="Evolution approval decision failed, please try again later") from exc
 
 
 @router.get("/api/evolution/ab/{cycle_id}")
@@ -485,35 +214,9 @@ async def api_evolution_ab_results(request: Request, cycle_id: str) -> dict[str,
     - SPRT 状态（如适用）
     """
     require_admin(request)
-    from maop.core.evolution.evolution_loop import EvolutionLoop
-    from maop.core.evolution.ab_test import ABTestManager
-
     try:
-        loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
-        ab_manager = ABTestManager(root_dir=str(MAOP_ROOT))
-
-        # 查找该 cycle 的 A/B 实验
-        # 简化：查找 experiment 名称为 "evo-{cycle_id}" 的实验
-        exp_name = f"evo-{cycle_id}"
-        try:
-            result = ab_manager.evaluate(exp_name)
-            ab_result = {
-                "experiment": exp_name,
-                "p_value": result.p_value,
-                "significant": result.p_value < 0.05,
-                "control": {"success_rate": result.control_rate, "samples": result.control_count},
-                "treatment": {"success_rate": result.treatment_rate, "samples": result.treatment_count},
-            }
-        except Exception:
-            ab_result = None
-
-        return {
-            "status": "ok",
-            "cycle_id": cycle_id,
-            "ab_result": ab_result,
-        }
+        return evolution_service.get_evolution_ab_results(cycle_id)
     except Exception as exc:
-        logger.warning("Evolution A/B results failed: %s", exc, exc_info=True)
         # H-2 fix: 异常分支应返回 500，而非 200 + status=error。
         raise HTTPException(status_code=500, detail="Evolution A/B results unavailable") from exc
 
@@ -528,19 +231,11 @@ async def api_evolution_loop_rollback(request: Request, body: EvolutionLoopRollb
     # 批次3A: 用 Pydantic EvolutionLoopRollbackRequest 替代 await request.json()，
     # 由 FastAPI 自动校验请求体（cycle_id/snapshot_id 字段类型）。
     require_admin(request)
-    from maop.core.evolution.evolution_loop import EvolutionLoop
-
-    cycle_id = body.cycle_id
-    snapshot_id = body.snapshot_id
-
-    if not cycle_id:
-        # P2 fix: 400 应返回 400 状态码，而非 200。
-        raise HTTPException(status_code=400, detail="cycle_id required")
-
     try:
-        loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
-        restored = loop.rollback_cycle(cycle_id, snapshot_id=snapshot_id)
-        return {"status": "ok", "restored_files": restored, "cycle_id": cycle_id}
+        return evolution_service.rollback_evolution_loop(body.cycle_id, body.snapshot_id)
+    except ValueError as exc:
+        # P2 fix: 400 应返回 400 状态码，而非 200。
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.warning("Evolution rollback failed: %s", exc, exc_info=True)
         # H-2 fix: 异常分支应返回 500，而非 200 + status=error。

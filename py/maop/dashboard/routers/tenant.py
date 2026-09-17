@@ -6,39 +6,29 @@ which calls these APIs. Before this router existed, ``Tenants.vue`` got 404
 on every request in ENTERPRISE mode.
 
 All operations require admin role via ``require_admin``.
+
+业务逻辑由 ``maop.dashboard.services.tenant_service`` 提供；本模块
+仅负责路由定义、请求解析、权限检查、特性开关守卫、调用 service、
+响应格式化与错误处理。
 """
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import tenant_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/tenant", tags=["tenant"])
-
-_tenant_manager: Any = None
-_tenant_manager_lock = threading.Lock()
-
-
-def _get_manager() -> Any:
-    # P1-18: 双重检查锁定保护单例初始化
-    global _tenant_manager
-    if _tenant_manager is None:
-        with _tenant_manager_lock:
-            if _tenant_manager is None:
-                from maop.enterprise.tenant import TenantManager
-                _tenant_manager = TenantManager()
-    return _tenant_manager
 
 
 # ── Request models ────────────────────────────────────────────────
@@ -59,6 +49,15 @@ class UpdateTenantRequest(BaseModel):
     max_storage_mb: int | None = None
 
 
+def _require_tenant_isolation() -> None:
+    """企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500。"""
+    if not has_feature(FeatureFlag.TENANT_ISOLATION):
+        raise HTTPException(
+            status_code=404,
+            detail="tenant isolation not available in this edition",
+        )
+
+
 # ── Endpoints ─────────────────────────────────────────────────────
 
 
@@ -71,40 +70,17 @@ async def list_tenants(
     """List all tenants, optionally filtered by status."""
 
     require_admin(request)
-    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
-    if not has_feature(FeatureFlag.TENANT_ISOLATION):
-        raise HTTPException(
-            status_code=404,
-            detail="tenant isolation not available in this edition",
+    _require_tenant_isolation()
+    try:
+        return tenant_service.list_tenants(status=status)
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "error": str(exc),
+            },
         )
-    mgr = _get_manager()
-    from maop.enterprise.tenant import TenantStatus
-    status_filter = None
-    if status:
-        try:
-            status_filter = TenantStatus(status)
-        except ValueError:
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "status": "error",
-                    "error": f"Invalid status '{status}'. Valid: {[s.value for s in TenantStatus]}",
-                },
-            )
-    tenants = mgr.list_tenants(status=status_filter)
-    result = []
-    for t in tenants:
-        d = t.model_dump()
-        try:
-            d["usage"] = mgr.get_usage(t.tenant_id).model_dump()
-        except Exception:
-            d["usage"] = {}
-        result.append(d)
-    return {
-        "status": "ok",
-        "tenants": result,
-        "count": len(tenants),
-    }
 
 
 @router.post("/create")
@@ -112,20 +88,11 @@ async def list_tenants(
 async def create_tenant(body: CreateTenantRequest, request: Request) -> dict[str, Any]:
     """Create a new tenant. Requires admin."""
     require_admin(request)
-    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
-    if not has_feature(FeatureFlag.TENANT_ISOLATION):
-        raise HTTPException(
-            status_code=404,
-            detail="tenant isolation not available in this edition",
-        )
-    from maop.enterprise.tenant import TenantQuota
-    quota = TenantQuota(
-        max_api_calls_per_day=body.max_api_calls_per_day,
-        max_storage_mb=body.max_storage_mb,
+    _require_tenant_isolation()
+    return tenant_service.create_tenant(
+        body.tenant_id, body.name, body.plan,
+        body.max_api_calls_per_day, body.max_storage_mb,
     )
-    mgr = _get_manager()
-    tenant = mgr.create_tenant(body.tenant_id, body.name, plan=body.plan, quota=quota)
-    return {"status": "ok", "tenant": tenant.model_dump()}
 
 
 @router.get("/{tenant_id}")
@@ -133,21 +100,15 @@ async def create_tenant(body: CreateTenantRequest, request: Request) -> dict[str
 async def get_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Get a single tenant by ID."""
     require_admin(request)
-    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
-    if not has_feature(FeatureFlag.TENANT_ISOLATION):
-        raise HTTPException(
-            status_code=404,
-            detail="tenant isolation not available in this edition",
-        )
-    mgr = _get_manager()
-    tenant = mgr.get_tenant(tenant_id)
-    if tenant is None:
+    _require_tenant_isolation()
+    try:
+        return tenant_service.get_tenant(tenant_id)
+    except KeyError:
         # P1-13: 使用 raise HTTPException 代替 JSONResponse，统一错误处理
         raise HTTPException(
             status_code=404,
             detail=f"Tenant '{tenant_id}' not found",
         )
-    return {"status": "ok", "tenant": tenant.model_dump()}
 
 
 @router.post("/{tenant_id}/suspend")
@@ -155,18 +116,12 @@ async def get_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
 async def suspend_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Suspend a tenant. Requires admin."""
     require_admin(request)
-    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
-    if not has_feature(FeatureFlag.TENANT_ISOLATION):
-        raise HTTPException(
-            status_code=404,
-            detail="tenant isolation not available in this edition",
-        )
-    mgr = _get_manager()
-    suspended = mgr.suspend_tenant(tenant_id)
-    if not suspended:
+    _require_tenant_isolation()
+    try:
+        return tenant_service.suspend_tenant(tenant_id)
+    except KeyError:
         # P2 fix: 404 应返回 404 状态码，而非 200。
         raise HTTPException(status_code=404, detail="Tenant not found")
-    return {"status": "ok", "suspended": suspended}
 
 
 @router.post("/{tenant_id}/activate")
@@ -174,18 +129,12 @@ async def suspend_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
 async def activate_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Activate a suspended tenant. Requires admin."""
     require_admin(request)
-    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
-    if not has_feature(FeatureFlag.TENANT_ISOLATION):
-        raise HTTPException(
-            status_code=404,
-            detail="tenant isolation not available in this edition",
-        )
-    mgr = _get_manager()
-    activated = mgr.activate_tenant(tenant_id)
-    if not activated:
+    _require_tenant_isolation()
+    try:
+        return tenant_service.activate_tenant(tenant_id)
+    except KeyError:
         # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
         raise HTTPException(status_code=404, detail="Tenant not found")
-    return {"status": "ok", "activated": activated}
 
 
 @router.delete("/{tenant_id}")
@@ -193,18 +142,12 @@ async def activate_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
 async def delete_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Delete a tenant. Requires admin."""
     require_admin(request)
-    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
-    if not has_feature(FeatureFlag.TENANT_ISOLATION):
-        raise HTTPException(
-            status_code=404,
-            detail="tenant isolation not available in this edition",
-        )
-    mgr = _get_manager()
-    deleted = mgr.delete_tenant(tenant_id)
-    if not deleted:
+    _require_tenant_isolation()
+    try:
+        return tenant_service.delete_tenant(tenant_id)
+    except KeyError:
         # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
         raise HTTPException(status_code=404, detail="Tenant not found")
-    return {"status": "ok", "deleted": deleted}
 
 
 @router.get("/{tenant_id}/usage")
@@ -212,12 +155,5 @@ async def delete_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
 async def get_usage(tenant_id: str, request: Request) -> dict[str, Any]:
     """Get resource usage for a tenant. Requires admin."""
     require_admin(request)
-    # 企业版特性开关守卫：Personal 版直接返回 404，避免 import maop.enterprise.* 抛 500
-    if not has_feature(FeatureFlag.TENANT_ISOLATION):
-        raise HTTPException(
-            status_code=404,
-            detail="tenant isolation not available in this edition",
-        )
-    mgr = _get_manager()
-    usage = mgr.get_usage(tenant_id)
-    return {"status": "ok", "usage": usage.model_dump()}
+    _require_tenant_isolation()
+    return tenant_service.get_tenant_usage(tenant_id)

@@ -13,11 +13,13 @@ EvolutionHistory.vue 消费。
   - /api/evolution/run              — 触发一轮循环
   - /api/evolution/approve          — 人工 gate 批准提升
   - /api/evolution/pending          — 待批准列表
+
+业务逻辑由 ``maop.dashboard.services.evolution_service`` 提供；本模块
+仅负责路由定义、请求解析、权限检查、调用 service、响应格式化与错误处理。
 """
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -26,8 +28,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
-
-from .state import MAOP_ROOT
+from maop.dashboard.services import evolution_service
 
 logger = logging.getLogger(__name__)
 
@@ -102,30 +103,6 @@ class EvolutionSkillCompositeRequest(BaseModel):
     content: str | None = None
 
 
-def _perf_loop() -> Any:
-    from maop.core.evolution.evolution_perf_loop import PerformanceEvolutionLoop
-
-    return PerformanceEvolutionLoop(root_dir=str(MAOP_ROOT))
-
-
-def _ab_fw() -> Any:
-    from maop.core.evolution.ab_test import ABTestFramework
-
-    return ABTestFramework(root_dir=str(MAOP_ROOT))
-
-
-def _deployer() -> Any:
-    from maop.core.evolution.auto_deployer import AutoDeployer
-
-    return AutoDeployer(root_dir=str(MAOP_ROOT))
-
-
-def _evaluator() -> Any:
-    from maop.core.evolution.evaluator import PerformanceEvaluator
-
-    return PerformanceEvaluator()
-
-
 # ── 评估 ───────────────────────────────────────────────────────
 
 
@@ -138,14 +115,7 @@ async def api_evolution_evaluate(body: EvolutionEvaluateRequest, request: Reques
     返回 metrics（+ delta 当提供 baseline）。
     """
     require_admin(request)
-    traces = body.traces
-    evaluator = _evaluator()
-    metrics = evaluator.evaluate(traces)
-    result: dict[str, Any] = {"status": "ok", "metrics": metrics.to_dict()}
-    if body.baseline is not None:
-        delta = evaluator.compare(body.baseline, traces)
-        result["delta"] = delta.to_dict()
-    return result
+    return evolution_service.evaluate_traces(body.traces, body.baseline)
 
 
 # ── 建议生成 ───────────────────────────────────────────────────
@@ -159,19 +129,9 @@ async def api_evolution_suggest(body: EvolutionSuggestRequest, request: Request)
     Body: {"metrics": {...}, "agent_name": "...", "enable_llm": true}
     """
     require_admin(request)
-    from maop.core.evolution.evaluator import PerformanceMetrics
-    from maop.core.evolution.suggester import ImprovementSuggester, SuggestionContext
-
-    metrics = PerformanceMetrics.model_validate(body.metrics)
-    enable_llm = body.enable_llm
-    suggester = ImprovementSuggester(root_dir=str(MAOP_ROOT), enable_llm=enable_llm)
-    ctx = SuggestionContext(agent_name=body.agent_name)
-    suggestions = suggester.suggest_sync(metrics, ctx)
-    return {
-        "status": "ok",
-        "suggestions": [s.model_dump() for s in suggestions],
-        "count": len(suggestions),
-    }
+    return evolution_service.suggest_improvements(
+        body.metrics, body.agent_name, body.enable_llm,
+    )
 
 
 # ── AB 实验 + SPRT ─────────────────────────────────────────────
@@ -181,18 +141,7 @@ async def api_evolution_suggest(body: EvolutionSuggestRequest, request: Request)
 @handle_api_errors("evolution ab create", error_value={"status": "error"})
 async def api_ab_create(body: EvolutionABCreateRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    from maop.core.evolution.ab_test import SPRTConfig
-
-    sprt_cfg = None
-    if body.sprt:
-        sprt_cfg = SPRTConfig.model_validate(body.sprt)
-    fw = _ab_fw()
-    config = fw.create_experiment(
-        name=body.name,
-        variants=body.variants,
-        sprt_config=sprt_cfg,
-    )
-    return {"status": "ok", "experiment": config.model_dump()}
+    return evolution_service.create_ab_experiment(body.name, body.variants, body.sprt)
 
 
 @router.post("/api/evolution/ab/record")
@@ -203,28 +152,23 @@ async def api_ab_record(body: EvolutionABRecordRequest, request: Request) -> dic
     Body: {"experiment": "...", "variant": "...", "entity_id": "...", "success": true}
     """
     require_admin(request)
-    fw = _ab_fw()
-    state = fw.record(
+    return evolution_service.record_ab_sample(
         body.experiment, body.variant, body.entity_id, body.success,
     )
-    return {"status": "ok", "sprt": state.model_dump()}
 
 
 @router.get("/api/evolution/ab/evaluate/{experiment}")
 @handle_api_errors("evolution ab evaluate", error_value={"status": "error"})
 async def api_ab_evaluate(request: Request, experiment: str) -> dict[str, Any]:
     require_admin(request)
-    fw = _ab_fw()
-    result = fw.evaluate_sprt(experiment)
-    return {"status": "ok", "result": result.model_dump()}
+    return evolution_service.evaluate_ab_experiment(experiment)
 
 
 @router.get("/api/evolution/ab/list")
 @handle_api_errors("evolution ab list", error_value={"status": "error", "experiments": []})
 async def api_ab_list(request: Request) -> dict[str, Any]:
     require_admin(request)
-    fw = _ab_fw()
-    return {"status": "ok", "experiments": fw.list_experiments()}
+    return evolution_service.list_ab_experiments()
 
 
 # ── 部署 ───────────────────────────────────────────────────────
@@ -234,22 +178,14 @@ async def api_ab_list(request: Request) -> dict[str, Any]:
 @handle_api_errors("evolution promote", error_value={"status": "error"})
 async def api_deploy_promote(body: EvolutionDeployPromoteRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    deployer = _deployer()
-    result = deployer.promote(
-        body.experiment, body.winner, config=body.config,
-    )
-    return {"status": "ok", "result": result.model_dump()}
+    return evolution_service.promote_deployment(body.experiment, body.winner, body.config)
 
 
 @router.post("/api/evolution/deploy/rollback")
 @handle_api_errors("evolution rollback", error_value={"status": "error"})
 async def api_deploy_rollback(body: EvolutionDeployRollbackRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    deployer = _deployer()
-    result = deployer.rollback(
-        body.experiment, snapshot_id=body.snapshot_id,
-    )
-    return {"status": "ok", "result": result.model_dump()}
+    return evolution_service.rollback_deployment(body.experiment, body.snapshot_id)
 
 
 @router.get("/api/evolution/deploy/history")
@@ -257,9 +193,7 @@ async def api_deploy_rollback(body: EvolutionDeployRollbackRequest, request: Req
 async def api_deploy_history(request: Request) -> dict[str, Any]:
     require_admin(request)
     experiment = request.query_params.get("experiment", "")
-    deployer = _deployer()
-    history = deployer.get_history(experiment=experiment, limit=100)
-    return {"status": "ok", "history": [h.model_dump() for h in history]}
+    return evolution_service.get_deploy_history(experiment=experiment, limit=100)
 
 
 # ── 性能演化循环 ───────────────────────────────────────────────
@@ -279,15 +213,13 @@ async def api_evolution_run(body: EvolutionRunRequest, request: Request) -> dict
     }
     """
     require_admin(request)
-    loop = _perf_loop()
-    report = loop.run_evolution_cycle(
+    return evolution_service.run_evolution_cycle(
         body.baseline_traces,
         body.candidate_traces,
         experiment=body.experiment,
         agent_name=body.agent_name,
         candidate_config=body.candidate_config,
     )
-    return {"status": "ok", "report": report.model_dump()}
 
 
 @router.get("/api/evolution/cycles")
@@ -297,9 +229,7 @@ async def api_evolution_cycles(request: Request, limit: int = Query(50, ge=1, le
     experiment = request.query_params.get("experiment", "")
     # P1-20: 使用 FastAPI Query 参数校验替代 int(request.query_params.get(...))，
     # 自动处理异常值并限制范围 [1, 1000]
-    loop = _perf_loop()
-    cycles = loop.get_cycle_history(experiment=experiment, limit=limit)
-    return {"status": "ok", "cycles": [c.model_dump() for c in cycles]}
+    return evolution_service.get_cycle_history(experiment=experiment, limit=limit)
 
 
 @router.get("/api/evolution/pending")
@@ -307,9 +237,7 @@ async def api_evolution_cycles(request: Request, limit: int = Query(50, ge=1, le
 async def api_evolution_pending(request: Request) -> dict[str, Any]:
     """人工 gate：返回待批准的提升列表。"""
     require_admin(request)
-    loop = _perf_loop()
-    pending = loop.get_pending_approvals()
-    return {"status": "ok", "pending": [c.model_dump() for c in pending]}
+    return evolution_service.get_pending_approvals()
 
 
 @router.post("/api/evolution/approve")
@@ -317,11 +245,9 @@ async def api_evolution_pending(request: Request) -> dict[str, Any]:
 async def api_evolution_approve(body: EvolutionApproveRequest, request: Request) -> dict[str, Any]:
     """人工 gate：批准指定实验的提升。"""
     require_admin(request)
-    loop = _perf_loop()
-    result = loop.approve_and_promote(
+    return evolution_service.approve_and_promote(
         body.experiment, candidate_config=body.candidate_config,
     )
-    return {"status": "ok", "result": result}
 
 
 # ── Skill 编辑器 ────────────────────────────────────────────────
@@ -332,16 +258,7 @@ async def api_evolution_approve(body: EvolutionApproveRequest, request: Request)
 async def api_evolution_skills(request: Request) -> dict[str, Any]:
     """列出已保存的 Skill 原子（从 SkillVersionManager 加载）。"""
     require_admin(request)
-    from maop.core.evolution.skill_version import SkillVersionManager
-
-    try:
-        mgr = SkillVersionManager(root_dir=str(MAOP_ROOT))
-        skills_meta = mgr.list_skills()
-        skills = [m.model_dump() for m in skills_meta]
-        return {"skills": skills}
-    except Exception:
-        logger.debug("[evo/skills] list failed", exc_info=True)
-        return {"skills": []}
+    return evolution_service.list_skills()
 
 
 @router.post("/api/evolution/skills/composite")
@@ -349,56 +266,24 @@ async def api_evolution_skills(request: Request) -> dict[str, Any]:
 async def api_evolution_skill_composite(body: EvolutionSkillCompositeRequest, request: Request) -> dict[str, Any]:
     """保存 composite Skill（接入 SkillVersionManager）。"""
     require_admin(request)
-    from maop.core.evolution.skill_version import SkillMeta, SkillStep, SkillVersionManager
-
-    name = (body.name or "").strip()
-    if not name:
-        raise HTTPException(status_code=400, detail="skill name is required")
-
-    steps_raw = body.steps or []
-    steps = [SkillStep(**(s if isinstance(s, dict) else {})) for s in steps_raw]
-
-    meta = SkillMeta(
-        name=name,
-        version=body.version,
-        description=body.description,
-        source=body.source,
-        tags=body.tags,
-        steps=steps,
-    )
-
-    content = body.content if body.content is not None else json.dumps(meta.model_dump(), ensure_ascii=False)
-
     try:
-        mgr = SkillVersionManager(root_dir=str(MAOP_ROOT))
-        mgr.save_skill(name, content=content, metadata={
-            "source": "dashboard",
-            "steps": steps_raw,
-            "description": meta.description,
-            "tags": meta.tags,
-        })
-        return {"status": "ok", "saved": True, "name": name, "version": meta.version}
+        return evolution_service.save_composite_skill(
+            name=body.name,
+            version=body.version,
+            description=body.description,
+            source=body.source,
+            tags=body.tags,
+            steps=body.steps,
+            content=body.content,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        logger.exception("[evo/skills] save_skill failed for %s", name)
+        logger.exception("[evo/skills] save_skill failed for %s", body.name)
         raise HTTPException(status_code=500, detail="Failed to save skill") from exc
 
 
 # ── 演化案例叙事 ───────────────────────────────────────────────
-
-
-def _evo_loop() -> Any:
-    """EvolutionLoop 实例（ErrorLedger 驱动的七段闭环，写入 evolution_cycles 表）。"""
-    from maop.core.evolution.evolution_loop import EvolutionLoop
-
-    return EvolutionLoop(root_dir=str(MAOP_ROOT))
-
-
-def _find_cycle_report(loop: Any, cycle_id: str) -> Any:
-    """从演化历史中查找指定 cycle_id 的 LoopReport，未命中返回 None。"""
-    for report in loop.get_cycle_history(limit=1000):
-        if report.cycle_id == cycle_id:
-            return report
-    return None
 
 
 @router.get("/api/evolution/narrative/{cycle_id}")
@@ -417,26 +302,10 @@ async def api_evolution_narrative(cycle_id: str, request: Request) -> dict[str, 
     """
     require_admin(request)
     fmt = request.query_params.get("format", "markdown").lower()
-    loop = _evo_loop()
-    report = _find_cycle_report(loop, cycle_id)
-    if report is None:
+    try:
+        return evolution_service.get_evolution_narrative(cycle_id, fmt)
+    except KeyError:
         raise HTTPException(
             status_code=404,
             detail=f"evolution cycle '{cycle_id}' not found",
         )
-    from maop.core.evolution.narrative import EvolutionNarrative
-
-    narrative = EvolutionNarrative()
-    if fmt == "json":
-        return {
-            "status": "ok",
-            "cycle_id": cycle_id,
-            "format": "json",
-            "narrative": narrative.to_json(report),
-        }
-    return {
-        "status": "ok",
-        "cycle_id": cycle_id,
-        "format": "markdown",
-        "markdown": narrative.to_markdown(report),
-    }

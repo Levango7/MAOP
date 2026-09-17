@@ -24,7 +24,7 @@ def _make_app() -> FastAPI:
 
 @pytest.fixture
 def temp_maop_root(tmp_path, monkeypatch):
-    monkeypatch.setattr(ev, "MAOP_ROOT", tmp_path)
+    monkeypatch.setattr(st, "MAOP_ROOT", tmp_path)
     return tmp_path
 
 

@@ -55,7 +55,7 @@ def tenant_client(tmp_path, monkeypatch):
     mock_mgr.get_usage = MagicMock(return_value=SimpleNamespace(
         model_dump=lambda: {"api_calls": 0}
     ))
-    monkeypatch.setattr("maop.dashboard.routers.tenant._get_manager", lambda: mock_mgr)
+    monkeypatch.setattr("maop.dashboard.services.tenant_service._get_manager", lambda: mock_mgr)
 
     from maop.dashboard.routers.tenant import router
     return _make_app(router)
@@ -91,8 +91,8 @@ class TestTenantGet:
 
     def test_not_found(self, tenant_client, monkeypatch):
         # Batch3C: error returns 404 instead of 200.
-        import maop.dashboard.routers.tenant as tenant_mod
-        mgr = tenant_mod._get_manager()
+        import maop.dashboard.services.tenant_service as tenant_svc
+        mgr = tenant_svc._get_manager()
         mgr.get_tenant.return_value = None
         resp = tenant_client.get("/api/tenant/nonexistent")
         assert resp.status_code == 404
@@ -105,8 +105,8 @@ class TestTenantSuspend:
         assert resp.status_code == 200
 
     def test_not_found(self, tenant_client):
-        import maop.dashboard.routers.tenant as tenant_mod
-        mgr = tenant_mod._get_manager()
+        import maop.dashboard.services.tenant_service as tenant_svc
+        mgr = tenant_svc._get_manager()
         mgr.suspend_tenant.return_value = False
         resp = tenant_client.post("/api/tenant/nonexistent/suspend")
         assert resp.status_code == 404
