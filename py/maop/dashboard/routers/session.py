@@ -1,16 +1,20 @@
-"""MAOP Dashboard — Session & Conversation API endpoints."""
+"""MAOP Dashboard — Session & Conversation API endpoints.
+
+Business logic (session/conversation CRUD, pagination, rerun) lives in
+:mod:`maop.dashboard.services.session_service`; this router only does
+request parsing, auth, service dispatch, and response formatting.
+"""
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import session_service
 
 router = APIRouter(prefix="/api/session", tags=["session"])
 
@@ -48,20 +52,6 @@ class AddMessageRequest(BaseModel):
     token_count: int = 0
 
 
-def _get_session_mgr():
-    from maop.core.security.session import SessionManager
-    # P2-24: 统一使用 state.MAOP_ROOT
-    from .state import MAOP_ROOT
-    return SessionManager(root_dir=str(MAOP_ROOT))
-
-
-def _get_conversation_mgr():
-    from maop.core.agent.llm_chat.conversation import ConversationManager
-    # P2-24: 统一使用 state.MAOP_ROOT
-    from .state import MAOP_ROOT
-    return ConversationManager(root_dir=str(MAOP_ROOT))
-
-
 @router.get("/")
 @handle_api_errors
 async def list_sessions(
@@ -72,25 +62,22 @@ async def list_sessions(
 ) -> dict[str, Any]:
     # P1 fix: 读端点也需要 admin 鉴权，防止会话信息泄露。
     require_admin(request)
-    mgr = _get_session_mgr()
-    sessions = mgr.list(status=status, agent=agent, limit=limit)
-    return {"status": "ok", "sessions": [s.model_dump() for s in sessions]}
+    sessions = session_service.list_sessions(status=status, agent=agent, limit=limit)
+    return {"status": "ok", "sessions": sessions}
 
 
 @router.post("/")
 @handle_api_errors
 async def create_session(body: CreateSessionRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    mgr = _get_session_mgr()
-    sid = mgr.create(
+    session = session_service.create_session(
         agent=body.agent,
         workdir=body.workdir,
         tags=body.tags,
         metadata=body.metadata,
         token_budget=body.token_budget,
     )
-    session = mgr.get(sid)
-    return {"status": "ok", "session": session.model_dump() if session else None}
+    return {"status": "ok", "session": session}
 
 
 @router.get("/stats")
@@ -98,28 +85,26 @@ async def create_session(body: CreateSessionRequest, request: Request) -> dict[s
 async def session_stats(request: Request) -> dict[str, Any]:
     # P1 fix: 读端点也需要 admin 鉴权。
     require_admin(request)
-    mgr = _get_session_mgr()
     # M-1 fix: 包裹为 {status, data} 统一响应格式。
-    return {"status": "ok", "data": mgr.stats()}
+    return {"status": "ok", "data": session_service.session_stats()}
+
 
 @router.get("/{session_id}")
 @handle_api_errors
 async def get_session(session_id: str, request: Request) -> dict[str, Any]:
     # P1 fix: 读端点也需要 admin 鉴权。
     require_admin(request)
-    mgr = _get_session_mgr()
-    session = mgr.get(session_id)
+    session = session_service.get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"status": "ok", "session": session.model_dump()}
+    return {"status": "ok", "session": session}
 
 
 @router.patch("/{session_id}")
 @handle_api_errors
 async def update_session(session_id: str, body: UpdateSessionRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    mgr = _get_session_mgr()
-    ok = mgr.update(
+    ok = session_service.update_session(
         session_id,
         status=body.status,
         agent=body.agent,
@@ -137,8 +122,7 @@ async def update_session(session_id: str, body: UpdateSessionRequest, request: R
 @handle_api_errors
 async def delete_session(session_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
-    mgr = _get_session_mgr()
-    ok = mgr.delete(session_id)
+    ok = session_service.delete_session(session_id)
     return {"status": "ok", "deleted": ok}
 
 
@@ -153,25 +137,21 @@ async def get_messages(
 ) -> dict[str, Any]:
     # P1 fix: 读端点也需要 admin 鉴权。
     require_admin(request)
-    cmgr = _get_conversation_mgr()
-    messages = cmgr.get_history(session_id, limit=limit, offset=offset)
-    return {"status": "ok", "messages": [m.model_dump() for m in messages]}
+    messages = session_service.get_messages(session_id, limit=limit, offset=offset)
+    return {"status": "ok", "messages": messages}
 
 
 @router.post("/{session_id}/messages")
 @handle_api_errors
 async def add_message(session_id: str, body: AddMessageRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
-    cmgr = _get_conversation_mgr()
-    msg_id = cmgr.add_message(
+    msg_id = session_service.add_message(
         session_id=session_id,
         role=body.role,
         content=body.content,
         metadata=body.metadata,
         token_count=body.token_count,
     )
-    smgr = _get_session_mgr()
-    smgr.touch(session_id)
     return {"status": "ok", "message_id": msg_id}
 
 
@@ -184,9 +164,8 @@ async def get_context_window(
 ) -> dict[str, Any]:
     # P1 fix: 读端点也需要 admin 鉴权。
     require_admin(request)
-    cmgr = _get_conversation_mgr()
-    window = cmgr.get_context_window(session_id, max_tokens=max_tokens)
-    return {"status": "ok", "context": window.model_dump()}
+    window = session_service.get_context_window(session_id, max_tokens=max_tokens)
+    return {"status": "ok", "context": window}
 
 
 @router.get("/{session_id}/context/compressed")
@@ -198,17 +177,15 @@ async def get_compressed_context(
 ) -> dict[str, Any]:
     # P1 fix: 读端点也需要 admin 鉴权。
     require_admin(request)
-    cmgr = _get_conversation_mgr()
-    window = cmgr.get_compressed_context(session_id, max_tokens=max_tokens)
-    return {"status": "ok", "context": window.model_dump()}
+    window = session_service.get_compressed_context(session_id, max_tokens=max_tokens)
+    return {"status": "ok", "context": window}
 
 
 @router.delete("/{session_id}/messages")
 @handle_api_errors
 async def clear_messages(session_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
-    cmgr = _get_conversation_mgr()
-    count = cmgr.clear_session(session_id)
+    count = session_service.clear_messages(session_id)
     return {"status": "ok", "cleared": count}
 
 
@@ -241,9 +218,8 @@ async def list_sessions_paginated(
     """
     # P1 fix: 读端点也需要 admin 鉴权。
     require_admin(request)
-    mgr = _get_session_mgr()
     # M-1 fix: 包裹为 {status, data} 统一响应格式。
-    return {"status": "ok", "data": mgr.list_paginated(
+    return {"status": "ok", "data": session_service.list_sessions_paginated(
         status=status,
         search=search,
         page=page,
@@ -263,8 +239,7 @@ async def rerun_session(session_id: str, request: Request) -> dict[str, Any]:
     返回新会话对象; 前端可据此跳转到 Run 页面继续执行。
     """
     require_admin(request)
-    mgr = _get_session_mgr()
-    new_session = mgr.rerun(session_id)
+    new_session = session_service.rerun_session(session_id)
     if new_session is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"status": "ok", "session": new_session.model_dump(), "rerun_from": session_id}
+    return {"status": "ok", "session": new_session, "rerun_from": session_id}

@@ -3,12 +3,15 @@
 G-07 security fix: tenant_id is always taken from the JWT-authenticated
 request state (``request.state.tenant_id``), never from the request body.
 This prevents cross-tenant data access via forged body parameters.
+
+ComplianceManager singleton lives in ``maop.dashboard.services.rbac_service``.
+This router only does request parsing, permission checks, service calls,
+response formatting, and error handling.
 """
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -16,34 +19,14 @@ from pydantic import BaseModel
 
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
-from maop.core.tenant.compliance import ComplianceManager
 from maop.dashboard.error_handler import handle_api_errors
+
+# ── Service layer ──────────────────────────────────────────────────
+from maop.dashboard.services import rbac_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/compliance", tags=["compliance"])
-
-_compliance_mgr: ComplianceManager | None = None
-_compliance_mgr_lock = threading.Lock()
-
-
-def _get_manager(request: Request) -> ComplianceManager:
-    global _compliance_mgr
-    if _compliance_mgr is not None:
-        return _compliance_mgr
-    with _compliance_mgr_lock:
-        if _compliance_mgr is not None:  # double-checked locking
-            return _compliance_mgr
-        root_dir = getattr(request.app.state, "root_dir", None)
-        if not root_dir:
-            # P2-14: 脱敏错误信息，不暴露 app.state/ComplianceManager 等内部组件名
-            logger.error("[compliance] root_dir not configured on app.state")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Compliance service not configured",
-            )
-        _compliance_mgr = ComplianceManager(root_dir)
-    return _compliance_mgr
 
 
 def _tenant_id_from_jwt(request: Request) -> str:
@@ -89,9 +72,17 @@ async def delete_user_data(
         )
     require_admin(request)
     tenant_id = _tenant_id_from_jwt(request)
-    mgr = _get_manager(request)
-    report = mgr.delete_user_data(body.user_id, tenant_id=tenant_id)
-    return {"status": "ok", **report.model_dump()}
+    root_dir = getattr(request.app.state, "root_dir", None)
+    try:
+        report = rbac_service.delete_user_data(
+            body.user_id, tenant_id=tenant_id, root_dir=root_dir,
+        )
+    except rbac_service.ComplianceNotConfigured:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Compliance service not configured",
+        )
+    return {"status": "ok", **report}
 
 
 @router.post("/export-user-data")
@@ -112,6 +103,14 @@ async def export_user_data(
         )
     require_admin(request)
     tenant_id = _tenant_id_from_jwt(request)
-    mgr = _get_manager(request)
-    report = mgr.export_user_data(body.user_id, tenant_id=tenant_id)
-    return {"status": "ok", **report.model_dump()}
+    root_dir = getattr(request.app.state, "root_dir", None)
+    try:
+        report = rbac_service.export_user_data(
+            body.user_id, tenant_id=tenant_id, root_dir=root_dir,
+        )
+    except rbac_service.ComplianceNotConfigured:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Compliance service not configured",
+        )
+    return {"status": "ok", **report}

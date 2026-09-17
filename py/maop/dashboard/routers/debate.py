@@ -14,6 +14,10 @@ Endpoints
 
 POST endpoints require the ``admin`` role (via ``require_admin`` middleware).
 GET endpoints are read-only and do not require admin auth.
+
+Business logic lives in :mod:`maop.dashboard.services.chat_service`; this
+module only does request parsing, auth, service dispatch, and response
+formatting.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import chat_service
 
 logger = logging.getLogger(__name__)
 
@@ -66,17 +71,14 @@ class DebateConfigRequest(BaseModel):
 def _get_debate_dispatcher() -> Any:
     """Return the process-wide DebateDispatcher singleton.
 
-    Lazily imports the singleton accessor from the reliability services
-    container. When no dispatcher has been configured, raises 404 so the
-    dashboard can show a "debate not enabled" message.
+    Thin wrapper over :func:`chat_service.resolve_debate_dispatcher`
+    kept on the router module so tests can monkeypatch the accessor
+    (see ``tests/test_debate.py``). Maps service-level outcomes to
+    :class:`HTTPException` (404 when unconfigured, 503 when the
+    service container itself is unavailable).
     """
     try:
-        from maop.config.env import get_root_dir
-        from maop.core.reliability.services import ServiceContainer
-
-        root = str(get_root_dir(default="."))
-        container = ServiceContainer(root_dir=root)
-        dispatcher = container.get("debate_dispatcher", raise_on_failure=False)
+        dispatcher = chat_service.resolve_debate_dispatcher()
         if dispatcher is None:
             raise HTTPException(
                 status_code=404,
@@ -125,20 +127,16 @@ async def api_debate_start(
     """
     require_admin(request)
     dispatcher = _get_debate_dispatcher()
-    from maop.delegate.dispatch_debate import DebateConfig
-
-    config = DebateConfig(
-        max_rounds=body.max_rounds,
-        consensus_threshold=body.consensus_threshold,
-    )
     try:
-        verdict = await dispatcher.run_debate(
-            body.question,
-            body.participants,
+        verdict = await chat_service.start_debate(
+            dispatcher,
+            question=body.question,
+            participants=body.participants,
             context=body.context,
             routing_key=body.routing_key,
             trace_id=body.trace_id,
-            config_override=config,
+            max_rounds=body.max_rounds,
+            consensus_threshold=body.consensus_threshold,
         )
     except Exception as exc:
         logger.exception("[debate-api] start failed")
@@ -158,7 +156,7 @@ async def api_debate_history(request: Request, limit: int = 20) -> dict[str, Any
     """Return recent debate history (read-only)."""
     require_admin(request)
     dispatcher = _get_debate_dispatcher()
-    verdicts = dispatcher.get_history(limit=limit)
+    verdicts = chat_service.get_debate_history(dispatcher, limit=limit)
     return {"status": "ok", "verdicts": [v.model_dump() for v in verdicts]}
 
 
@@ -171,7 +169,7 @@ async def api_debate_get(request: Request, debate_id: str) -> dict[str, Any]:
     """Get a debate's full verdict and trajectory (read-only, replayable)."""
     require_admin(request)
     dispatcher = _get_debate_dispatcher()
-    verdict = dispatcher.get_verdict(debate_id)
+    verdict = chat_service.get_debate_verdict(dispatcher, debate_id)
     if verdict is None:
         raise HTTPException(
             status_code=404,
@@ -189,7 +187,7 @@ async def api_debate_verdict(request: Request, debate_id: str) -> dict[str, Any]
     """Explicit alias of GET /api/debate/{debate_id}."""
     require_admin(request)
     dispatcher = _get_debate_dispatcher()
-    verdict = dispatcher.get_verdict(debate_id)
+    verdict = chat_service.get_debate_verdict(dispatcher, debate_id)
     if verdict is None:
         raise HTTPException(
             status_code=404,
@@ -213,24 +211,18 @@ async def api_debate_config(
     """
     require_admin(request)
     dispatcher = _get_debate_dispatcher()
-    from maop.delegate.dispatch_debate import DebateConfig
-
-    new_config = DebateConfig(
-        max_rounds=body.max_rounds,
-        min_rounds=body.min_rounds,
-        consensus_threshold=body.consensus_threshold,
-        agent_timeout_s=body.agent_timeout_s,
-        round_timeout_s=body.round_timeout_s,
-        max_debate_tokens=body.max_debate_tokens,
-        early_exit_on_unanimous=body.early_exit_on_unanimous,
-        retention_days=body.retention_days,
-    )
-    # 更新 dispatcher 的 config（优先使用公开方法，回退到 setattr）
     try:
-        if hasattr(dispatcher, "update_config") and callable(dispatcher.update_config):
-            dispatcher.update_config(new_config)
-        else:
-            setattr(dispatcher, "_config", new_config)
+        new_config = chat_service.configure_debate(
+            dispatcher,
+            max_rounds=body.max_rounds,
+            min_rounds=body.min_rounds,
+            consensus_threshold=body.consensus_threshold,
+            agent_timeout_s=body.agent_timeout_s,
+            round_timeout_s=body.round_timeout_s,
+            max_debate_tokens=body.max_debate_tokens,
+            early_exit_on_unanimous=body.early_exit_on_unanimous,
+            retention_days=body.retention_days,
+        )
     except Exception as exc:  # pragma: no cover
         logger.warning("[debate-api] config update failed: %s", exc)
         raise HTTPException(

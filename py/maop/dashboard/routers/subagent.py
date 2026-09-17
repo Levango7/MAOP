@@ -1,9 +1,13 @@
-"""MAOP Dashboard — SubAgent management API endpoints."""
+"""MAOP Dashboard — SubAgent management API endpoints.
+
+业务逻辑已提取至 ``maop.dashboard.services.agent_service``（§6）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
+"""
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -11,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import agent_service
 
 from .state import MAOP_ROOT
 
@@ -38,18 +43,14 @@ class SubAgentCancelRequest(BaseModel):
     """取消子代理的请求体。"""
     agent_id: str = Field(default="", max_length=128)
 
-_subagent_mgr = None
-_subagent_mgr_lock = threading.Lock()
 
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
 def _get_subagent_mgr() -> Any:
-    # P1-18: 双重检查锁定保护单例初始化
-    global _subagent_mgr
-    if _subagent_mgr is None:
-        with _subagent_mgr_lock:
-            if _subagent_mgr is None:
-                from maop.core.agent.delegation.subagent_lifecycle import SubAgentManager
-                _subagent_mgr = SubAgentManager(root_dir=str(MAOP_ROOT))
-    return _subagent_mgr
+    return agent_service._get_subagent_mgr(MAOP_ROOT)
+
+
+def _set_subagent_mgr(mgr: Any) -> None:
+    agent_service._set_subagent_mgr(mgr)
 
 
 @router.post("/api/subagent/spawn")
@@ -62,15 +63,9 @@ async def api_subagent_spawn(body: SubAgentSpawnRequest, request: Request) -> di
     if not agent_name or not task:
         raise HTTPException(400, "missing agent or task")
     mgr = _get_subagent_mgr()
-    # F4a (2026-07-22, Phase F): SubAgentManager.spawn expects an
-    # AgentConfig Pydantic model, not a plain dict — passing
-    # ``config={"agent": agent_name}`` raised a Pydantic validation
-    # error at runtime. Build the proper AgentConfig with the caller's
-    # agent name (and optional model if provided in the body).
-    from maop.core.agent.delegation.subagent_lifecycle import AgentConfig
-    model = body.model
-    config = AgentConfig(name=agent_name, model=model)
-    agent_id = await mgr.spawn(config=config, task=task, context=context)
+    agent_id = await agent_service.subagent_spawn(
+        mgr, agent_name=agent_name, task=task, context=context, model=body.model
+    )
     return {"status": "ok", "agent_id": agent_id}
 
 
@@ -83,7 +78,7 @@ async def api_subagent_wait(body: SubAgentWaitRequest, request: Request) -> dict
     if not agent_id:
         raise HTTPException(400, "missing agent_id")
     mgr = _get_subagent_mgr()
-    result = await mgr.wait(agent_id, timeout=timeout)
+    result = await agent_service.subagent_wait(mgr, agent_id, timeout=timeout)
     if result is None:
         raise HTTPException(404, f"Agent {agent_id} not found or timed out")
     return {"status": "ok", "result": result.model_dump() if hasattr(result, "model_dump") else str(result)}
@@ -102,7 +97,7 @@ async def api_subagent_cancel(body: SubAgentCancelRequest, request: Request) -> 
     # ``await mgr.cancel(agent_id)`` raised TypeError at runtime
     # ("object bool can't be used in 'await' expression"). Drop the
     # await so the call works as designed.
-    ok = mgr.cancel(agent_id)
+    ok = agent_service.subagent_cancel(mgr, agent_id)
     if not ok:
         # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
         raise HTTPException(status_code=404, detail="Subagent not found")
@@ -114,8 +109,8 @@ async def api_subagent_cancel(body: SubAgentCancelRequest, request: Request) -> 
 async def api_subagent_list(request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_subagent_mgr()
-    agents = mgr.list_agents()
-    return {"status": "ok", "agents": agents, "count": len(agents)}
+    result = agent_service.subagent_list(mgr)
+    return {"status": "ok", **result}
 
 
 @router.get("/api/subagent/transcript")
@@ -125,5 +120,5 @@ async def api_subagent_transcript(request: Request, agent_id: str = "") -> dict[
     if not agent_id:
         raise HTTPException(400, "missing agent_id")
     mgr = _get_subagent_mgr()
-    transcript = mgr.get_live_transcript(agent_id)
+    transcript = agent_service.subagent_transcript(mgr, agent_id)
     return {"status": "ok", "transcript": transcript}

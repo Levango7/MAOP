@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import logging
-import math
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from maop.core.backends.db_utils import get_db_path
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import memory_service
 
 from .state import MAOP_ROOT
 
@@ -60,183 +58,12 @@ def _tenant_filter(data: Any, tenant_id: str) -> Any:
     return data
 
 
-# ── 联合查询辅助：合并 memory_entries + episodic_memory ──────────────
-# /api/memory/store 写入 episodic_memory（ThreeLayerMemory），
-# 而 /api/memory/search 原先只读 memory_entries（MemoryStore），
-# 导致写入的数据读不到。以下辅助函数同时查两个表并合并结果。
-
-
-def _episodic_to_dict(result: Any) -> dict[str, Any]:
-    """把 EpisodicSearchResult（对象）或 facade dict 转成与 SearchResult 兼容的 dict。
-
-    EpisodicSearchResult.entry 包含: id, task, agent, outcome, score,
-    lessons, summary, metadata, created_at, access_count 等。
-    facade.short_term_search 返回同字段的 dict 形态。
-    """
-    if isinstance(result, dict):
-        # facade.short_term_search 输出（T3 迁移后主路径）
-        meta = result.get("metadata") or {}
-        ts = ""
-        created_at = result.get("created_at")
-        if created_at:
-            try:
-                ts = datetime.fromtimestamp(created_at, tz=timezone.utc).isoformat()
-            except (OSError, ValueError, OverflowError):
-                ts = str(created_at)
-        tags = meta.get("tags", "")
-        lessons = result.get("lessons") or []
-        if not tags and lessons:
-            tags = ",".join(lessons[:5])
-        summary = result.get("summary") or ""
-        task = result.get("task") or ""
-        return {
-            "id": result.get("id", ""),
-            "agent": result.get("agent", ""),
-            "task": task,
-            "tags": tags,
-            "topic": meta.get("topic", ""),
-            "trace_id": meta.get("trace_id", ""),
-            "timestamp": ts,
-            "score": round(
-                (result.get("score") or 0.0) * (result.get("retrieval_weight") or 1.0), 4
-            ),
-            "snippet": (summary or task)[:200],
-            "highlighted": "",
-            "outcome": result.get("outcome", ""),
-            "layer": "episodic",
-        }
-    entry = result.entry
-    meta = entry.metadata or {}
-    ts = ""
-    if entry.created_at:
-        try:
-            ts = datetime.fromtimestamp(entry.created_at, tz=timezone.utc).isoformat()
-        except (OSError, ValueError, OverflowError):
-            ts = str(entry.created_at)
-    tags = meta.get("tags", "")
-    if not tags and entry.lessons:
-        tags = ",".join(entry.lessons[:5])
-    snippet = entry.summary or entry.task
-    return {
-        "id": entry.id,
-        "agent": entry.agent,
-        "task": entry.task,
-        "tags": tags,
-        "topic": meta.get("topic", ""),
-        "trace_id": meta.get("trace_id", ""),
-        "timestamp": ts,
-        "score": round(entry.score * result.retrieval_weight, 4),
-        "snippet": snippet[:200] if snippet else "",
-        "highlighted": "",
-        "outcome": entry.outcome,
-        "layer": "episodic",
-    }
-
-
-def _unified_search(query: str, top: int, agent: str = "") -> list[dict[str, Any]]:
-    """联合查询 memory_entries（MemoryStore）+ episodic_memory（ThreeLayerMemory）。
-
-    返回合并后的 dict 列表，按 score 降序排列，截取 top 条。
-    每条标记 source: "memory_entries" 或 "episodic"。
-    """
-    results: list[dict[str, Any]] = []
-
-    # 来源 1: MemoryStore → memory_entries 表
-    try:
-        from maop.memory.store import MemoryStore
-        store = MemoryStore(root_dir=str(MAOP_ROOT))
-        raw = store.search(query=query, top=top, agent=agent) if hasattr(store, "search") else []
-        for item in raw:
-            if hasattr(item, "model_dump"):
-                d = item.model_dump()
-            elif isinstance(item, dict):
-                d = item
-            else:
-                d = {"content": str(item), "score": 0}
-            d.setdefault("layer", "memory_entries")
-            results.append(d)
-    except Exception:
-        logger.debug("Unified search: MemoryStore failed", exc_info=True)
-
-    # 来源 2: MemoryFacade → episodic_memory 表（T3: 收敛统一入口）
-    try:
-        from maop.memory.facade import MemoryFacade
-        mem = MemoryFacade(root_dir=str(MAOP_ROOT), mode="agent")
-        ep_results = mem.short_term_search(query=query, top=top, agent=agent)
-        for ep in ep_results:
-            results.append(_episodic_to_dict(ep))
-    except Exception:
-        logger.debug("Unified search: MemoryFacade.short_term_search failed", exc_info=True)
-
-    # 合并去重（按 id）并按 score 降序
-    seen: set[str] = set()
-    unique: list[dict[str, Any]] = []
-    for entry in results:
-        rid = entry.get("id", "")
-        if rid and rid in seen:
-            continue
-        if rid:
-            seen.add(rid)
-        unique.append(entry)
-    unique.sort(key=lambda x: x.get("score", 0), reverse=True)
-    return unique[:top]
-
-
 @router.get("/api/memory/deep")
 @handle_api_errors("Memory deep stats", error_value={"status": "error", "error": "Memory stats unavailable", "stats": {}})
 async def api_memory_deep(request: Request) -> dict[str, Any]:
     require_admin(request)
-    from maop.memory.store import MemoryStore
-    store = MemoryStore(root_dir=str(MAOP_ROOT))
-    stats_obj = store.stats()
-    if hasattr(stats_obj, 'model_dump'):
-        stats: dict[str, Any] = stats_obj.model_dump()
-    elif hasattr(stats_obj, 'dict'):
-        stats = stats_obj.dict()
-    else:
-        stats = dict(stats_obj)
-    stats["bloom_filter"] = False
-    stats["vector_index"] = False
-    try:
-        stats["bloom_filter"] = True
-    except Exception:
-        logger.debug("Failed to check bloom filter availability", exc_info=True)
-    try:
-        from maop.core.memory.vector import VectorStore
-        vs = VectorStore(db_path=str(MAOP_ROOT / "data" / "vectors.db"))
-        stats["vector_index"] = True
-        stats["vector_count"] = vs.count() if hasattr(vs, "count") else 0
-    except Exception:
-        logger.debug("Failed to check vector store availability", exc_info=True)
-
-    # 联合最近条目：memory_entries + episodic_memory
-    recent = _unified_search(query="", top=5)
-    stats["recent_entries"] = _tenant_filter(recent, _request_tenant_id(request))
-
-    # 补充 episodic_memory 统计
-    try:
-        # T3: 收敛到 MemoryFacade（mode="agent"），short_term_stats == episodic_stats。
-        from maop.memory.facade import MemoryFacade
-        mem = MemoryFacade(root_dir=str(MAOP_ROOT), mode="agent")
-        ep_stats = mem.short_term_stats()
-        stats["episodic_count"] = ep_stats.get("total", 0)
-        stats["episodic_by_outcome"] = ep_stats.get("by_outcome", {})
-        stats["episodic_avg_score"] = ep_stats.get("avg_score", 0)
-        stats["episodic_consolidated"] = ep_stats.get("consolidated", 0)
-        # by_agent 需要从 episodic_stats 之外获取 (episodic_stats 不含 by_agent)
-        try:
-            from maop.core.backends.db_utils import sqlite_connect
-            with sqlite_connect(str(MAOP_ROOT / "data" / "maop.db"), foreign_keys=False) as conn:
-                rows = conn.execute(
-                    "SELECT agent, COUNT(*) as cnt FROM episodic_memory GROUP BY agent ORDER BY cnt DESC"
-                ).fetchall()
-            stats["episodic_by_agent"] = {r[0] or "unknown": r[1] for r in rows}
-        except Exception:
-            stats["episodic_by_agent"] = {}
-    except Exception:
-        logger.debug("Failed to get episodic stats", exc_info=True)
-        stats.setdefault("episodic_count", 0)
-
+    stats = memory_service.get_memory_deep_stats()
+    stats["recent_entries"] = _tenant_filter(stats.get("recent_entries", []), _request_tenant_id(request))
     return {"status": "ok", "stats": stats}
 
 @router.get("/api/memory/search")
@@ -244,7 +71,7 @@ async def api_memory_deep(request: Request) -> dict[str, Any]:
 async def api_memory_search(request: Request, q: str = Query(""), k: int = Query(10, ge=1, le=100, alias="topk")) -> dict[str, Any]:
     require_admin(request)
     # 联合查询 memory_entries + episodic_memory，确保 store 写入的数据能被搜到
-    results = _unified_search(query=q, top=k)
+    results = memory_service.unified_search(query=q, top=k)
     return {"status": "ok", "query": q, "results": (_rf := _tenant_filter(results, _request_tenant_id(request))), "count": len(_rf)}
 
 @router.get("/api/memory/trace")
@@ -252,7 +79,7 @@ async def api_memory_search(request: Request, q: str = Query(""), k: int = Query
 async def api_memory_trace(request: Request, agent: str = Query("")) -> dict[str, Any]:
     require_admin(request)
     # 联合查询 memory_entries + episodic_memory
-    unified = _unified_search(query="", top=50)
+    unified = memory_service.unified_search(query="", top=50)
     traces = []
     for r_dict in unified:
         if agent and r_dict.get("agent", "") != agent:
@@ -275,30 +102,7 @@ async def api_memory_stats_v4(request: Request) -> dict[str, Any]:
 @handle_api_errors("Neural status")
 async def api_neural_status(request: Request) -> dict[str, Any]:
     require_admin(request)
-    info: dict[str, Any] = {"attention": {"enabled": False, "mechanism": "N/A"}, "transform": {"enabled": False, "layers": 0},
-            "embedding": {"enabled": False, "dim": 0, "model": "N/A"}, "vector_store": {"enabled": False, "count": 0}}
-    try:
-        from maop.core.memory.vector import VectorStore
-        vs = VectorStore(db_path=str(get_db_path("vectors")))
-        info["vector_store"] = {"enabled": True, "count": vs.count() if hasattr(vs, "count") else 0}
-        if hasattr(vs, "_embedder"):
-            emb = vs._embedder
-            info["embedding"] = {"enabled": True, "dim": getattr(emb, "dim", 0), "model": getattr(emb, "model_name", "unknown")}
-    except Exception:
-        logger.exception("Neural vector store check failed")
-        info["vector_store"]["error"] = "Vector store unavailable"
-    try:
-        from maop.memory.store import MemoryStore
-        store = MemoryStore(root_dir=str(MAOP_ROOT))
-        stats = store.stats()
-        _te = stats.total_entries if hasattr(stats, 'total_entries') else 0
-        info["attention"] = {"enabled": True, "mechanism": "FTS5_rank + vector_similarity", "total_entries": _te}
-    except Exception:
-        logger.debug("Failed to get memory stats", exc_info=True)
-    try:
-        info["transform"] = {"enabled": True, "layers": 3, "steps": ["plan", "execute", "verify"]}
-    except Exception:
-        logger.debug("Failed to check workflow engine", exc_info=True)
+    info = memory_service.get_neural_status()
     return {"status": "ok", "mechanisms": info}
 
 @router.post("/api/neural/attention")
@@ -311,50 +115,15 @@ async def api_neural_attention(request: Request, body: NeuralAttentionRequest) -
     top_k = body.top_k
     if not query:
         raise HTTPException(400, "missing query")
-    from maop.memory.store import MemoryStore
-    store = MemoryStore(root_dir=str(MAOP_ROOT))
-    raw_results = store.search(query=query, top=top_k)
-    results = []
-    for r in raw_results:
-        if hasattr(r, 'model_dump'):
-            results.append(r.model_dump())
-        elif isinstance(r, dict):
-            results.append(r)
-        else:
-            results.append({"content": str(r), "score": 0})
-    scores = [r.get("score", 0) for r in results]
-    if scores:
-        mx = max(scores)
-        exps = [math.exp(s - mx) for s in scores]
-        total = sum(exps)
-        weights = [e / total for e in exps]
-    else:
-        weights = []
+    results, weights = memory_service.compute_attention(query=query, top_k=top_k)
     return {"query": query, "results": results, "attention_weights": weights, "count": len(results)}
 
 @router.get("/api/neural/attention")
 @handle_api_errors("Neural attention query", error_value={"error": "Neural attention unavailable", "results": [], "attention_weights": []})
 async def api_neural_attention_get(request: Request, q: str = "") -> dict[str, Any]:
     require_admin(request)
-    from maop.memory.store import MemoryStore
-    ms = MemoryStore(root_dir=str(MAOP_ROOT))
-    raw_results = ms.search(q, top=10) if q else []
-    results = []
-    for r in raw_results:
-        if hasattr(r, 'model_dump'):
-            results.append(r.model_dump())
-        elif isinstance(r, dict):
-            results.append(r)
-        else:
-            results.append({"content": str(r), "score": 0})
-    scores = [r.get("score", 0) for r in results]
-    if scores:
-        mx = max(scores)
-        exps = [math.exp(s - mx) for s in scores]
-        total = sum(exps)
-        weights = [round(e / total, 4) for e in exps]
-    else:
-        weights = []
+    results, weights = memory_service.compute_attention(query=q, top_k=10)
+    weights = [round(w, 4) for w in weights]
     return {"query": q, "results": results, "attention_weights": weights, "count": len(results)}
 
 # ── Memory Write (manual entry) ────────────────────────────────────────
@@ -374,23 +143,13 @@ async def api_memory_store(request: Request, body: MemoryStoreRequest) -> dict[s
         raise HTTPException(400, "content is required")
 
     try:
-        # T3: 收敛到 MemoryFacade（mode="agent"），store 按 layer 路由到同一底层。
-        from maop.memory.facade import MemoryFacade
-        raw_tags = body.tags
-        if isinstance(raw_tags, str):
-            tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
-        elif isinstance(raw_tags, (list, tuple)):
-            tags = [str(t).strip() for t in raw_tags if str(t).strip()]
-        else:
-            tags = []
-        mem = MemoryFacade(root_dir=str(MAOP_ROOT), mode="agent")
-        entry_id = mem.store(
+        entry_id = memory_service.store_memory(
             layer=layer,
             content=content,
             agent=body.agent,
             topic=body.topic,
             task=body.task,
-            tags=tags,
+            tags=body.tags,
             ttl_s=body.ttl_s,
         )
         return {"status": "ok", "id": entry_id, "layer": layer}

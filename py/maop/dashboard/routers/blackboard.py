@@ -20,13 +20,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from maop.core.reliability.blackboard import (
-    BlackboardDomain,
-    InvalidDomainError,
-    get_blackboard,
-)
+from maop.core.reliability.blackboard import InvalidDomainError
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import blackboard_service
 
 logger = logging.getLogger(__name__)
 
@@ -58,38 +55,29 @@ async def get_snapshot() -> dict[str, Any]:
 
     返回 ``{domain: [entry_dict...]}`` 字典。
     """
-    bb = get_blackboard()
-    return {"status": "ok", "data": bb.get_snapshot()}
+    return {"status": "ok", "data": blackboard_service.get_snapshot()}
 
 
 @router.get("/domains")
 @handle_api_errors("blackboard domains")
 async def list_domains() -> dict[str, Any]:
     """列出所有允许的域（白名单）与当前非空域。"""
-    bb = get_blackboard()
-    return {
-        "status": "ok",
-        "data": {
-            "allowed": [d.value for d in BlackboardDomain],
-            "active": bb.get_domains(),
-        },
-    }
+    return {"status": "ok", "data": blackboard_service.list_domains()}
 
 
 @router.get("/domains/{domain}")
 @handle_api_errors("blackboard read domain")
 async def read_domain(domain: str) -> dict[str, Any]:
     """读取指定域内所有条目。"""
-    bb = get_blackboard()
     try:
-        entries = bb.read(domain)
+        entries = blackboard_service.read_domain(domain)
     except InvalidDomainError as exc:
         # 批次3A: 脱敏——InvalidDomainError 细节不暴露给客户端，仅日志记录。
         logger.warning("[blackboard] Invalid domain: %s", exc)
         raise HTTPException(status_code=400, detail="Invalid domain") from exc
     return {
         "status": "ok",
-        "data": [e.to_dict() for e in entries],
+        "data": entries,
         "count": len(entries),
     }
 
@@ -105,9 +93,8 @@ async def write_entry(
     - 若黑板已启用 EventBus，写入会通过 ``publish(Event)`` 广播。
     """
     require_admin(request)
-    bb = get_blackboard()
     try:
-        entry = await bb.write(
+        entry = await blackboard_service.write_entry(
             body.domain,
             body.content,
             body.contributor,
@@ -118,7 +105,7 @@ async def write_entry(
         # 批次3A: 脱敏——InvalidDomainError 细节不暴露给客户端，仅日志记录。
         logger.warning("[blackboard] Invalid domain: %s", exc)
         raise HTTPException(status_code=400, detail="Invalid domain") from exc
-    return {"status": "ok", "data": entry.to_dict()}
+    return {"status": "ok", "data": entry}
 
 
 @router.post("/clear/{domain}")
@@ -126,9 +113,8 @@ async def write_entry(
 async def clear_domain(domain: str, request: Request) -> dict[str, Any]:
     """清除指定域（admin 鉴权）。返回被清除的条目数。"""
     require_admin(request)
-    bb = get_blackboard()
     try:
-        cleared = await bb.clear(domain)
+        cleared = await blackboard_service.clear_domain(domain)
     except InvalidDomainError as exc:
         # 批次3A: 脱敏——InvalidDomainError 细节不暴露给客户端，仅日志记录。
         logger.warning("[blackboard] Invalid domain: %s", exc)
@@ -140,21 +126,11 @@ async def clear_domain(domain: str, request: Request) -> dict[str, Any]:
 @handle_api_errors("blackboard history")
 async def get_history(limit: int = Query(100, ge=1, le=1000)) -> dict[str, Any]:
     """获取操作历史（最近 ``limit`` 条）。"""
-    bb = get_blackboard()
-    return {"status": "ok", "data": bb.get_history(limit=limit)}
+    return {"status": "ok", "data": blackboard_service.get_history(limit=limit)}
 
 
 @router.get("/stats")
 @handle_api_errors("blackboard stats")
 async def blackboard_stats() -> dict[str, Any]:
     """黑板统计信息。"""
-    bb = get_blackboard()
-    return {
-        "status": "ok",
-        "data": {
-            "total_entries": bb.total_entries(),
-            "active_domains": bb.get_domains(),
-            "event_bus_enabled": bb.event_bus_enabled,
-            "allowed_domains": [d.value for d in BlackboardDomain],
-        },
-    }
+    return {"status": "ok", "data": blackboard_service.get_stats()}

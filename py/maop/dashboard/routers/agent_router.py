@@ -4,12 +4,15 @@
 路由选择、列出策略、管理并发槽位。
 
 所有端点要求 admin 角色（via ``require_admin`` 守卫）。
+
+业务逻辑已提取至 ``maop.dashboard.services.agent_service``（§2）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
 """
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -17,6 +20,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import agent_service
 
 logger = logging.getLogger(__name__)
 
@@ -61,27 +65,13 @@ class AgentSlotRequest(BaseModel):
     agent_name: str = Field(..., min_length=1, max_length=256, description="Agent 名称")
 
 
-# ── 单例（双重检查锁定）────────────────────────────────────────────
-_router: Any = None
-_router_lock = threading.Lock()
-
-
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
 def _get_router() -> Any:
-    """惰性初始化全局 AgentRouter 单例。"""
-    global _router
-    if _router is None:
-        with _router_lock:
-            if _router is None:
-                from maop.core.agent.router.agent_router import AgentRouter
-                _router = AgentRouter()
-    return _router
+    return agent_service._get_router()
 
 
 def _set_router(router: Any) -> None:
-    """供测试注入自定义 router（隔离 DB）。"""
-    global _router
-    with _router_lock:
-        _router = router
+    agent_service._set_router(router)
 
 
 # ── 端点 ──────────────────────────────────────────────────────────
@@ -93,41 +83,19 @@ def _set_router(router: Any) -> None:
 async def api_agent_route(body: RouteRequest, request: Request) -> dict[str, Any]:
     """执行路由选择，返回主 Agent + 降级链 + 候选。"""
     require_admin(request)
-    from maop.core.agent.registry.agent_catalog import AgentCapability
-    from maop.core.agent.router.agent_router import (
-        RoutingContext,
-        RoutingStrategy,
-    )
-
-    # 转换能力枚举
     try:
-        caps = [AgentCapability(c) for c in body.required_capabilities]
+        result = agent_service.agent_route(
+            required_capabilities=body.required_capabilities,
+            preferred_agent=body.preferred_agent,
+            excluded_agents=body.excluded_agents,
+            max_cost_tier=body.max_cost_tier,
+            require_healthy=body.require_healthy,
+            session_id=body.session_id,
+            strategy=body.strategy,
+        )
     except ValueError as exc:
-        raise HTTPException(400, f"Invalid capability: {exc}")
-
-    # 转换策略枚举
-    try:
-        strategy = RoutingStrategy(body.strategy)
-    except ValueError:
-        raise HTTPException(400, f"Invalid strategy: {body.strategy}")
-
-    ctx = RoutingContext(
-        required_capabilities=caps,
-        preferred_agent=body.preferred_agent,
-        excluded_agents=body.excluded_agents,
-        max_cost_tier=body.max_cost_tier,
-        require_healthy=body.require_healthy,
-        session_id=body.session_id,
-    )
-    agent_router = _get_router()
-    result = agent_router.route(ctx, strategy=strategy)
-    return {
-        "status": "ok",
-        "primary": result.primary.model_dump(mode="json") if result.primary else None,
-        "fallbacks": [a.model_dump(mode="json") for a in result.fallbacks],
-        "alternatives": [a.model_dump(mode="json") for a in result.alternatives],
-        "reason": result.reason,
-    }
+        raise HTTPException(400, str(exc))
+    return {"status": "ok", **result}
 
 
 @router.get("/api/agent-router/strategies")
@@ -138,13 +106,8 @@ async def api_agent_route(body: RouteRequest, request: Request) -> dict[str, Any
 async def api_list_strategies(request: Request) -> dict[str, Any]:
     """列出所有可用路由策略。"""
     require_admin(request)
-    from maop.core.agent.router.agent_router import RoutingStrategy
-
-    strategies = [
-        {"value": s.value, "name": s.name}
-        for s in RoutingStrategy
-    ]
-    return {"status": "ok", "strategies": strategies, "count": len(strategies)}
+    result = agent_service.list_strategies()
+    return {"status": "ok", **result}
 
 
 @router.post("/api/agent-router/acquire")
@@ -155,12 +118,10 @@ async def api_list_strategies(request: Request) -> dict[str, Any]:
 async def api_acquire_slot(body: AgentSlotRequest, request: Request) -> dict[str, Any]:
     """占用一个 Agent 并发槽位。"""
     require_admin(request)
-    agent_router = _get_router()
-    ok = agent_router.acquire(body.agent_name)
-    if not ok:
+    result = agent_service.acquire_slot(body.agent_name)
+    if result is None:
         raise HTTPException(409, f"Cannot acquire slot for agent: {body.agent_name}")
-    active = agent_router.get_active_count(body.agent_name)
-    return {"status": "ok", "agent_name": body.agent_name, "active_count": active}
+    return {"status": "ok", **result}
 
 
 @router.post("/api/agent-router/release")
@@ -171,13 +132,10 @@ async def api_acquire_slot(body: AgentSlotRequest, request: Request) -> dict[str
 async def api_release_slot(body: AgentSlotRequest, request: Request) -> dict[str, Any]:
     """释放一个 Agent 并发槽位。"""
     require_admin(request)
-    agent_router = _get_router()
-    # 检查 agent 是否存在
-    if agent_router.catalog.get(body.agent_name) is None:
+    result = agent_service.release_slot(body.agent_name)
+    if result is None:
         raise HTTPException(404, f"Agent not found: {body.agent_name}")
-    agent_router.release(body.agent_name)
-    active = agent_router.get_active_count(body.agent_name)
-    return {"status": "ok", "agent_name": body.agent_name, "active_count": active}
+    return {"status": "ok", **result}
 
 
 @router.get("/api/agent-router/active")
@@ -188,11 +146,5 @@ async def api_release_slot(body: AgentSlotRequest, request: Request) -> dict[str
 async def api_active_counts(request: Request) -> dict[str, Any]:
     """获取所有 Agent 的当前活跃并发数。"""
     require_admin(request)
-    agent_router = _get_router()
-    # 从 catalog 获取所有 agent 名，结合 _active_count 返回
-    catalog = agent_router.catalog
-    all_agents = catalog.list_all()
-    active: dict[str, int] = {}
-    for a in all_agents:
-        active[a.name] = agent_router.get_active_count(a.name)
-    return {"status": "ok", "active": active, "count": len(active)}
+    result = agent_service.active_counts()
+    return {"status": "ok", **result}

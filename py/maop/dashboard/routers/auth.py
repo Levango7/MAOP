@@ -3,19 +3,19 @@
 Extracted from server.py for separation of concerns.
 Provides: login, logout, register, user CRUD, auth status.
 Uses PBKDF2-HMAC-SHA256 for password hashing, JWT for tokens.
+
+Business logic (password hashing, AuthManager singleton, user CRUD,
+login rate limiting) lives in ``maop.dashboard.services.auth_service``.
+This router only does request parsing, permission checks, service
+calls, response formatting, and error handling.
 """
 
 from __future__ import annotations
 
 import asyncio
-import base64
-import hashlib
-import hmac
-import json
 import logging
 import os
 import sqlite3
-import threading
 import time
 from typing import Any
 
@@ -29,8 +29,52 @@ from .state import MAOP_ROOT
 # P1-1 fix: 引入统一异常处理装饰器，让所有 auth 端点经 handle_api_errors 兜底，
 # 异常（含 HTTPException）统一渲染为 ErrorSchema 响应格式。
 from maop.dashboard.error_handler import handle_api_errors
+from maop.core.security.middleware import require_admin as _require_admin
+
+# ── Service layer ──────────────────────────────────────────────────
+from maop.dashboard.services import auth_service
 
 router = APIRouter()
+
+
+# ── Backward-compat attributes for test fixtures ───────────────────
+# Test fixtures (test_router_auth_coverage.py) reset these to force
+# re-initialisation:  auth_mod._auth_mgr = None
+#                     auth_mod._login_failures_table_ready = False
+# We sync them to auth_service before each service call that depends
+# on the singleton state.
+_auth_mgr: Any = None
+_login_failures_table_ready: bool = False
+
+
+def _login_failures_db_path() -> str:
+    """Backward compat — delegates to auth_service."""
+    return auth_service.login_failures_db_path()
+
+
+def _sync_auth_state() -> None:
+    """Sync router-level reset flags into auth_service (for test fixtures)."""
+    global _auth_mgr, _login_failures_table_ready
+    if _auth_mgr is None:
+        auth_service._auth_mgr = None
+    if not _login_failures_table_ready:
+        auth_service._login_failures_table_ready = False
+
+
+# Backward-compat aliases — test fixtures call these via auth_mod.
+_hash_password = auth_service.hash_password
+_verify_password = auth_service.verify_password
+_password_needs_rehash = auth_service.password_needs_rehash
+get_auth_mgr = auth_service.get_auth_mgr
+
+# Backward-compat alias — 保留为真实模块属性（而非仅转发读取），因为：
+#   1. ``server.py`` 的 lifespan 与 ``routers/notifications.py`` 的 WS 处理器
+#      都按 ``_auth_mod._auth_enabled`` 读取；
+#   2. 测试用 monkeypatch.setattr(_auth_mod, "_auth_enabled", ...) 切换认证开关，
+#      该 API 要求属性存在且可写。
+# 认证状态的权威来源仍是 ``auth_service.auth_enabled``；此处只是导入期快照，
+# 与重构前 ``_auth_enabled = _settings.auth_enabled`` 的语义一致。
+_auth_enabled = auth_service.auth_enabled
 
 
 # ── Pydantic 请求模型 (批次3A: 输入校验) ───────────────────────────
@@ -56,372 +100,8 @@ class UpdateUserRequest(BaseModel):
     enabled: bool | None = None
     password: str | None = None
 
-# ── Auth config ────────────────────────────────────────────────────
-from maop.core.backends.db_utils import get_db_path, sqlite_connect
-from maop.core.security.auth import APIKeyStore, AuthConfig, AuthManager, JWTConfig, load_jwt_secret
 
-_env_is_prod = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
-# P0-4: 从 settings.py 读取 auth_enabled / tls_enabled，而非直接读 MAOP_AUTH 环境变量。
-# settings.py 通过 Pydantic Settings 统一管理配置（支持 .env、settings.yaml、环境变量），
-# 并与 _default_auth_enabled 的 secure-by-default 策略保持一致。
-from maop.config.settings import get_settings as _get_settings
-
-_settings = _get_settings()
-_auth_enabled = _settings.auth_enabled
-_tls_enabled = _settings.tls_enabled
-# M6 fix (Phase R5): OWASP 2023 推荐 600k 迭代 for PBKDF2-HMAC-SHA256
-_AUTH_PBKDF2_ITERATIONS = 600_000
-# P1-4 fix: JWT TTL 从环境变量读取，避免硬编码 7200。
-# MAOP_JWT_TTL_S 默认 7200 秒（2 小时），可通过环境变量覆盖。
-_JWT_TTL_S = float(os.getenv("MAOP_JWT_TTL_S", "7200"))
-_auth_mgr: AuthManager | None = None
-
-
-# ── Password helpers ───────────────────────────────────────────────
-def _hash_password(password: str) -> str:
-    """Hash a password for dashboard users using PBKDF2-HMAC-SHA256."""
-
-    salt = os.urandom(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, _AUTH_PBKDF2_ITERATIONS)
-    return f"pbkdf2_sha256${_AUTH_PBKDF2_ITERATIONS}${base64.b64encode(salt).decode()}${base64.b64encode(digest).decode()}"
-
-
-def _verify_password(password: str, stored_hash: str) -> bool:
-    """Verify PBKDF2 hashes only. Legacy unsalted SHA-256 is no longer accepted."""
-
-    if not stored_hash.startswith("pbkdf2_sha256$"):
-        logger.warning("[auth] Rejected legacy unsalted hash format. User must reset password.")
-        return False
-
-    try:
-        _, iterations_s, salt_b64, digest_b64 = stored_hash.split("$", 3)
-        digest = hashlib.pbkdf2_hmac(
-            "sha256",
-            password.encode(),
-            base64.b64decode(salt_b64),
-            int(iterations_s),
-        )
-        return hmac.compare_digest(digest, base64.b64decode(digest_b64))
-    except Exception:
-        return False
-
-
-def _password_needs_rehash(stored_hash: str) -> bool:
-    return not stored_hash.startswith("pbkdf2_sha256$")
-
-
-# ── Auth manager singleton ─────────────────────────────────────────
-def get_auth_mgr() -> AuthManager:
-    """Lazy-init AuthManager singleton. Called by lifespan and endpoints."""
-    global _auth_mgr
-    if _auth_mgr is None:
-        jwt_secret = load_jwt_secret(MAOP_ROOT / "data")
-
-        cfg = AuthConfig(
-            enabled=True,
-            jwt=JWTConfig(secret=jwt_secret, default_ttl_s=_JWT_TTL_S),
-        )
-        db_path = get_db_path("auth")
-        _auth_mgr = AuthManager(
-            config=cfg,
-            key_store=APIKeyStore(db_path=str(db_path)),
-        )
-        _ensure_default_user()
-    return _auth_mgr
-
-
-def _ensure_default_user() -> None:
-    """Create default admin user on first run if none exists."""
-    try:
-        db_path = get_db_path("auth")
-        with sqlite_connect(str(db_path)) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    username TEXT PRIMARY KEY,
-                    password_hash TEXT NOT NULL,
-                    roles TEXT NOT NULL DEFAULT '["admin"]',
-                    created_at REAL NOT NULL,
-                    enabled INTEGER NOT NULL DEFAULT 1
-                )
-            """)
-            existing = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-            if existing == 0:
-                # H7 fix: 支持 Docker secrets 标准（MAOP_ADMIN_PASSWORD_FILE）。
-                # 优先读取 MAOP_ADMIN_PASSWORD_FILE 指向的文件内容作为密码，
-                # 回退到 MAOP_ADMIN_PASSWORD 环境变量。
-                admin_pwd = ""
-                pwd_file = os.environ.get("MAOP_ADMIN_PASSWORD_FILE", "")
-                if pwd_file:
-                    try:
-                        with open(pwd_file, "r", encoding="utf-8") as f:
-                            admin_pwd = f.read().strip()
-                    except OSError as exc:
-                        logger.warning(
-                            "[auth] MAOP_ADMIN_PASSWORD_FILE=%s 读取失败: %s",
-                            pwd_file, exc,
-                        )
-                if not admin_pwd:
-                    admin_pwd = os.environ.get("MAOP_ADMIN_PASSWORD", "")
-                if not admin_pwd:
-                    import secrets
-                    admin_pwd = secrets.token_urlsafe(16)
-                    # S4 fix: DO NOT persist the plaintext password to disk.
-                    # Surface it once via the log so the operator can read it
-                    # from stdout/logs, and require an explicit
-                    # MAOP_ADMIN_PASSWORD in production (fail-fast).
-                    env = os.environ.get("MAOP_ENV", "").strip().lower()
-                    if env == "production":
-                        raise RuntimeError(
-                            "SECURITY: MAOP_ADMIN_PASSWORD must be set explicitly in "
-                            "production (MAOP_ENV=production). Refusing to start with a "
-                            "random, non-persisted admin password."
-                        )
-                    # P0-5 fix: DO NOT print the plaintext password to logs.
-                    # Write it to a mode-0600 file beside the auth DB instead,
-                    # so the operator can read it once without it persisting
-                    # in stdout/log aggregators.
-                    pwd_file_path = db_path.parent / "admin_password_once.txt"
-                    pwd_file_path.write_text(admin_pwd, encoding="utf-8")
-                    try:
-                        pwd_file_path.chmod(0o600)
-                    except OSError:
-                        pass  # Windows
-                    logger.warning(
-                        "MAOP_ADMIN_PASSWORD not set — generated a ONE-TIME random "
-                        "admin password. It has been written to %s (mode 0o600). "
-                        "Set MAOP_ADMIN_PASSWORD to persist it across restarts.",
-                        pwd_file_path,
-                    )
-                pwd_hash = _hash_password(admin_pwd)
-                conn.execute(
-                    "INSERT INTO users (username, password_hash, roles, created_at, enabled) VALUES (?, ?, ?, ?, 1)",
-                    ("admin", pwd_hash, '["admin","read","write","execute"]', time.time()),
-                )
-                logger.info("[auth] Default admin user created (password from MAOP_ADMIN_PASSWORD env)")
-    except Exception as exc:
-        logger.warning("[auth] Failed to create default user: %s", exc)
-
-
-# ── Admin guard ────────────────────────────────────────────────────
-from maop.core.security.middleware import require_admin as _require_admin
-
-
-# ── Sync DB helpers (for run_in_executor) ──────────────────────────
-def _db_login_user(db_path_str: str, username: str, password: str) -> Any:
-    """Sync: validate user credentials, return result dict."""
-
-    with sqlite_connect(db_path_str) as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE username = ? AND enabled = 1",
-            (username,),
-        ).fetchone()
-
-    if row is None:
-        return {"status": "error", "error": "Invalid credentials"}
-
-    stored_hash = row["password_hash"]
-    if not _verify_password(password, stored_hash):
-        return {"status": "error", "error": "Invalid credentials"}
-
-    if _password_needs_rehash(stored_hash):
-        with sqlite_connect(db_path_str) as conn:
-            conn.execute(
-                "UPDATE users SET password_hash = ? WHERE username = ?",
-                (_hash_password(password), username),
-            )
-
-    roles = json.loads(row["roles"])
-    return {"status": "ok", "username": username, "roles": roles}
-
-
-def _db_register_user(db_path_str: str, username: str, password: str, roles: list) -> dict:
-    """Sync: register a new user.
-
-    P3-3 fix: 失败时直接 raise HTTPException，成功时返回纯业务数据 dict，
-    不再将 ``http_status`` 字段混入返回值——避免调用方手动 pop 提取且
-    防止内部状态泄露到响应体。异常经 ``run_in_executor`` 传播回事件循环，
-    由外层 ``@handle_api_errors`` 装饰器统一渲染。
-    """
-
-    with sqlite_connect(db_path_str) as conn:
-        existing = conn.execute("SELECT username FROM users WHERE username = ?", (username,)).fetchone()
-        if existing:
-            raise HTTPException(status_code=409, detail="Username already exists")
-
-        pwd_hash = _hash_password(password)
-        conn.execute(
-            "INSERT INTO users (username, password_hash, roles, created_at, enabled) VALUES (?, ?, ?, ?, 1)",
-            (username, pwd_hash, json.dumps(roles), time.time()),
-        )
-
-    return {"status": "ok", "username": username, "roles": roles}
-
-
-def _db_list_users(db_path_str: str) -> list:
-    """Sync: list all users."""
-
-    with sqlite_connect(db_path_str) as conn:
-        rows = conn.execute("SELECT username, roles, created_at, enabled FROM users ORDER BY created_at").fetchall()
-
-    return [{"username": r["username"], "roles": json.loads(r["roles"]),
-             "created_at": r["created_at"], "enabled": bool(r["enabled"])} for r in rows]
-
-
-def _db_delete_user(db_path_str: str, username: str) -> dict:
-    """Sync: delete a user.
-
-    P3-3 fix: 失败时 raise HTTPException，成功时返回纯业务数据 dict，
-    不再混入 ``http_status`` 字段。
-    """
-    with sqlite_connect(db_path_str) as conn:
-        result = conn.execute("DELETE FROM users WHERE username = ?", (username,))
-        deleted = result.rowcount > 0
-
-    if not deleted:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"status": "ok", "message": f"User {username} deleted"}
-
-
-def _db_update_user(db_path_str: str, username: str, body: dict) -> dict:
-    """Sync: update user roles, enabled, or password.
-
-    P3-3 fix: 失败时 raise HTTPException，成功时返回纯业务数据 dict，
-    不再混入 ``http_status`` 字段。
-    """
-
-    with sqlite_connect(db_path_str) as conn:
-        existing = conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone()
-        if not existing:
-            raise HTTPException(status_code=404, detail="User not found")
-        if "roles" in body:
-            conn.execute("UPDATE users SET roles = ? WHERE username = ?", (json.dumps(body["roles"]), username))
-        if "enabled" in body:
-            conn.execute("UPDATE users SET enabled = ? WHERE username = ?", (1 if body["enabled"] else 0, username))
-        if "password" in body:
-            if not isinstance(body["password"], str) or len(body["password"]) < 8:
-                raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-            pwd_hash = _hash_password(body["password"])
-            conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", (pwd_hash, username))
-
-    return {"status": "ok", "message": f"User {username} updated"}
-
-
-# ── Endpoints ──────────────────────────────────────────────────────
-# P0-1 fix: 登录限流计数迁移到 SQLite 表 login_failures，支持多实例部署共享。
-# 原进程内 dict (_login_failures / _login_failures_by_ip) 在多实例部署时各实例
-# 独立计数，攻击者可利用实例切换绕过限流。迁移到 SQLite 后，所有实例共享同一
-# 限流状态（SQLite 是默认后端，单实例零改动兼容）。
-# 注意：跨进程共享时间戳必须用 wall clock (time.time()) 而非 monotonic，
-# 因为 monotonic clock 在不同进程间起点不同、不可比。
-_login_failures_lock = threading.Lock()  # 同进程多线程安全（SQLite 文件锁处理跨进程）
-_MAX_LOGIN_FAILURES = 5
-_LOCKOUT_SECONDS = 900.0
-_MAX_TRACKED_USERS = 10_000  # P1-18 fix: prevent unbounded growth
-_MAX_TRACKED_IPS = 10_000  # H6 fix: prevent unbounded growth for IP tracking
-_login_failures_table_ready = False
-
-
-def _login_failures_db_path() -> str:
-    """登录限流 SQLite 路径（与 auth.db 同目录，独立文件避免锁竞争）。"""
-    return str(get_db_path("auth").parent / "login_failures.db")
-
-
-def _ensure_login_failures_table() -> None:
-    """幂等创建登录限流表。首次调用后置位标志，后续跳过。"""
-    global _login_failures_table_ready
-    if _login_failures_table_ready:
-        return
-    with sqlite_connect(_login_failures_db_path()) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS login_failures (
-                key TEXT NOT NULL,
-                kind TEXT NOT NULL,          -- 'user' | 'ip'
-                fail_times TEXT NOT NULL,    -- JSON array of wall-clock timestamps
-                updated_at REAL NOT NULL,    -- 最近一次失败时间（LRU 淘汰依据）
-                PRIMARY KEY (key, kind)
-            )
-        """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_lf_kind ON login_failures(kind)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_lf_updated ON login_failures(updated_at)"
-        )
-    _login_failures_table_ready = True
-
-
-def _db_get_login_failures(key: str, kind: str, now: float) -> list[float]:
-    """从 SQLite 读取并过滤过期的失败时间戳（wall clock）。"""
-    with sqlite_connect(_login_failures_db_path()) as conn:
-        row = conn.execute(
-            "SELECT fail_times FROM login_failures WHERE key = ? AND kind = ?",
-            (key, kind),
-        ).fetchone()
-    if row is None:
-        return []
-    try:
-        times = json.loads(row["fail_times"])
-    except (json.JSONDecodeError, TypeError):
-        return []
-    return [t for t in times if now - t < _LOCKOUT_SECONDS]
-
-
-def _db_record_login_failure(key: str, kind: str, now: float) -> None:
-    """记录一次失败登录，含过期清理与 LRU 淘汰（防止无限增长）。
-
-    P1-7 fix: LRU 淘汰策略——按 updated_at 升序淘汰最久未活动的记录，
-    预填的静态记录最先被逐出，而刚登录失败的受害者记录因最新而保留。
-    """
-    max_tracked = _MAX_TRACKED_USERS if kind == "user" else _MAX_TRACKED_IPS
-    with sqlite_connect(_login_failures_db_path()) as conn:
-        row = conn.execute(
-            "SELECT fail_times FROM login_failures WHERE key = ? AND kind = ?",
-            (key, kind),
-        ).fetchone()
-        if row:
-            try:
-                times = json.loads(row["fail_times"])
-            except (json.JSONDecodeError, TypeError):
-                times = []
-        else:
-            times = []
-        # 过期过滤 + 追加本次失败
-        times = [t for t in times if now - t < _LOCKOUT_SECONDS]
-        times.append(now)
-        conn.execute(
-            "INSERT OR REPLACE INTO login_failures (key, kind, fail_times, updated_at) VALUES (?, ?, ?, ?)",
-            (key, kind, json.dumps(times), now),
-        )
-        # 过期清理：删除整个锁定窗口外未再失败的记录
-        conn.execute(
-            "DELETE FROM login_failures WHERE kind = ? AND updated_at < ?",
-            (kind, now - _LOCKOUT_SECONDS),
-        )
-        # LRU 淘汰：超限时按 updated_at 升序删除最旧记录（保留当前 key）
-        count = conn.execute(
-            "SELECT COUNT(*) FROM login_failures WHERE kind = ?", (kind,)
-        ).fetchone()[0]
-        if count > max_tracked:
-            excess = count - max_tracked
-            conn.execute(
-                """DELETE FROM login_failures WHERE (key, kind) IN (
-                       SELECT key, kind FROM login_failures
-                       WHERE kind = ? AND key != ?
-                       ORDER BY updated_at ASC LIMIT ?
-                   )""",
-                (kind, key, excess),
-            )
-
-
-def _db_clear_login_failures(key: str, kind: str) -> None:
-    """登录成功后清除该 key 的失败记录。"""
-    with sqlite_connect(_login_failures_db_path()) as conn:
-        conn.execute(
-            "DELETE FROM login_failures WHERE key = ? AND kind = ?",
-            (key, kind),
-        )
-
-
+# ── Helpers (request-dependent, stay in router) ────────────────────
 def _get_client_ip(request: Request) -> str:
     """Extract client IP for login rate limiting.
 
@@ -436,6 +116,8 @@ def _get_client_ip(request: Request) -> str:
             return xff.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
+
+# ── Endpoints ──────────────────────────────────────────────────────
 @router.get("/api/auth/status")
 @handle_api_errors("auth status")
 async def auth_status(request: Request) -> Any:
@@ -449,7 +131,8 @@ async def auth_status(request: Request) -> Any:
     接受 cookie），任一有效即 has_token=true。
     """
     has_token = False
-    if _auth_enabled:
+    if auth_service.auth_enabled:
+        _sync_auth_state()
         mgr = None
         candidates = []
         auth_header = request.headers.get("Authorization", "")
@@ -463,7 +146,7 @@ async def auth_status(request: Request) -> Any:
                 continue
             try:
                 if mgr is None:
-                    mgr = get_auth_mgr()
+                    mgr = auth_service.get_auth_mgr()
                 result = mgr.jwt_handler.validate_token(token)
                 if result.authenticated:
                     has_token = True
@@ -471,7 +154,7 @@ async def auth_status(request: Request) -> Any:
             except Exception:
                 logger.debug('auth status validate failed', exc_info=True)
     return {
-        "auth_enabled": _auth_enabled,
+        "auth_enabled": auth_service.auth_enabled,
         "has_token": has_token,
     }
 
@@ -489,45 +172,47 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
         raise HTTPException(status_code=400, detail="Username and password required")
 
     try:
+        _sync_auth_state()
         # P0-1 fix: 用 wall clock（time.time()）替代 monotonic——跨进程共享
         # 限流状态时，monotonic clock 在不同进程间起点不同、不可比。
         now = time.time()
         # H6 fix: 提取客户端 IP 用于 IP 维度限流
         client_ip = _get_client_ip(request)
         # P0-1 fix: 从 SQLite 读取失败计数（多实例共享同一限流状态）
-        with _login_failures_lock:
-            _ensure_login_failures_table()
-            failures = _db_get_login_failures(username, "user", now)
-            ip_failures = _db_get_login_failures(client_ip, "ip", now)
-        if len(failures) >= _MAX_LOGIN_FAILURES:
+        with auth_service.login_failures_lock:
+            auth_service.ensure_login_failures_table()
+            failures = auth_service.db_get_login_failures(username, "user", now)
+            ip_failures = auth_service.db_get_login_failures(client_ip, "ip", now)
+        if len(failures) >= auth_service.MAX_LOGIN_FAILURES:
             raise HTTPException(status_code=429, detail="Account locked. Try again later.")
         # H6 fix: IP 维度限流 —— 同一 IP 15 分钟内失败超过 5 次则锁定
-        if len(ip_failures) >= _MAX_LOGIN_FAILURES:
+        if len(ip_failures) >= auth_service.MAX_LOGIN_FAILURES:
             raise HTTPException(
                 status_code=429,
                 detail="Too many login attempts from this IP. Try again later.",
             )
 
+        from maop.core.backends.db_utils import get_db_path
         db_path = get_db_path("auth")
         if not db_path.exists():
-            get_auth_mgr()
+            auth_service.get_auth_mgr()
 
         result = await asyncio.get_running_loop().run_in_executor(
-            None, _db_login_user, str(db_path), username, password
+            None, auth_service.db_login_user, str(db_path), username, password
         )
 
         if result["status"] != "ok":
-            with _login_failures_lock:
-                _db_record_login_failure(username, "user", now)
-                _db_record_login_failure(client_ip, "ip", now)  # H6 fix
+            with auth_service.login_failures_lock:
+                auth_service.db_record_login_failure(username, "user", now)
+                auth_service.db_record_login_failure(client_ip, "ip", now)  # H6 fix
             raise HTTPException(status_code=401, detail=result.get("error", "Login failed"))
 
-        mgr = get_auth_mgr()
-        token = mgr.jwt_handler.create_token(result["username"], roles=result["roles"], ttl_s=_JWT_TTL_S)
+        mgr = auth_service.get_auth_mgr()
+        token = mgr.jwt_handler.create_token(result["username"], roles=result["roles"], ttl_s=auth_service._JWT_TTL_S)
         # P1-18 fix: clear failures on successful login
-        with _login_failures_lock:
-            _db_clear_login_failures(username, "user")
-            _db_clear_login_failures(client_ip, "ip")  # H6 fix
+        with auth_service.login_failures_lock:
+            auth_service.db_clear_login_failures(username, "user")
+            auth_service.db_clear_login_failures(client_ip, "ip")  # H6 fix
 
         # #4 fix: set JWT as httpOnly cookie (XSS-proof) + return token for API clients
         response = JSONResponse({
@@ -535,11 +220,11 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
             "token": token,
             "username": result["username"],
             "roles": result["roles"],
-            "expires_in": int(_JWT_TTL_S),
+            "expires_in": int(auth_service._JWT_TTL_S),
         })
         response.set_cookie(
-            key="maop_token", value=token, max_age=int(_JWT_TTL_S),
-            httponly=True, secure=_tls_enabled, samesite="strict", path="/",
+            key="maop_token", value=token, max_age=int(auth_service._JWT_TTL_S),
+            httponly=True, secure=auth_service.tls_enabled, samesite="strict", path="/",
         )
         return response
     except HTTPException:
@@ -569,7 +254,8 @@ async def auth_refresh(request: Request):
         )
     token = auth_header[7:]
     try:
-        mgr = get_auth_mgr()
+        _sync_auth_state()
+        mgr = auth_service.get_auth_mgr()
         result = mgr.jwt_handler.validate_token(token)
         if not result.authenticated:
             raise HTTPException(
@@ -580,18 +266,18 @@ async def auth_refresh(request: Request):
         new_token = mgr.jwt_handler.create_token(
             result.identity,
             roles=result.roles,
-            ttl_s=_JWT_TTL_S,
+            ttl_s=auth_service._JWT_TTL_S,
         )
         response = JSONResponse({
             "status": "ok",
             "token": new_token,
             "username": result.identity,
             "roles": result.roles or [],
-            "expires_in": int(_JWT_TTL_S),
+            "expires_in": int(auth_service._JWT_TTL_S),
         })
         response.set_cookie(
-            key="maop_token", value=new_token, max_age=int(_JWT_TTL_S),
-            httponly=True, secure=_tls_enabled, samesite="strict", path="/",
+            key="maop_token", value=new_token, max_age=int(auth_service._JWT_TTL_S),
+            httponly=True, secure=auth_service.tls_enabled, samesite="strict", path="/",
         )
         # Revoke old token so it can't be used after refresh
         try:
@@ -627,7 +313,8 @@ async def auth_logout(request: Request) -> Any:
         token = request.cookies.get("maop_token", "")
     if token:
         try:
-            mgr = get_auth_mgr()
+            _sync_auth_state()
+            mgr = auth_service.get_auth_mgr()
             revoked = mgr.jwt_handler.revoke_token(token)
             if revoked:
                 logger.info("[auth] Token revoked via logout")
@@ -646,6 +333,7 @@ async def auth_register(request: Request, body: RegisterRequest) -> Any:
     # 批次3A: 用 Pydantic RegisterRequest 替代 await request.json()，
     # 由 FastAPI 自动校验请求体（username/password/roles 字段类型）。
     try:
+        _sync_auth_state()
         _require_admin(request)
         username = body.username.strip()
         password = body.password
@@ -667,18 +355,21 @@ async def auth_register(request: Request, body: RegisterRequest) -> Any:
                 detail=f"Invalid roles: {invalid_roles}. Allowed roles for registration: {sorted(_ALLOWED_REGISTER_ROLES)}",
             )
 
+        from maop.core.backends.db_utils import get_db_path
         db_path = get_db_path("auth")
         if not db_path.exists():
-            get_auth_mgr()
+            auth_service.get_auth_mgr()
 
         result = await asyncio.get_running_loop().run_in_executor(
-            None, _db_register_user, str(db_path), username, password, roles
+            None, auth_service.db_register_user, str(db_path), username, password, roles
         )
         logger.info("[auth] New user registered: %s (roles: %s)", username, roles)
-        # P3-3 fix: 辅助函数失败时已 raise HTTPException，此处仅成功路径。
+        # P3-3 fix: 辅助函数失败时已 raise，此处仅成功路径。
         return result
     except HTTPException:
         raise
+    except auth_service.UsernameAlreadyExists:
+        raise HTTPException(status_code=409, detail="Username already exists")
     except Exception as exc:
         logger.exception("[auth] Registration failed")
         # sqlite3.Error（如数据库未初始化、表缺失）视为注册服务不可用，返回 400；
@@ -693,12 +384,14 @@ async def auth_register(request: Request, body: RegisterRequest) -> Any:
 async def auth_users(request: Request) -> Any:
     """List all users (admin only)."""
     try:
+        _sync_auth_state()
         _require_admin(request)
+        from maop.core.backends.db_utils import get_db_path
         db_path = get_db_path("auth")
         if not db_path.exists():
-            get_auth_mgr()
+            auth_service.get_auth_mgr()
         users = await asyncio.get_running_loop().run_in_executor(
-            None, _db_list_users, str(db_path)
+            None, auth_service.db_list_users, str(db_path)
         )
         return {"status": "ok", "users": users}
     except HTTPException:
@@ -713,17 +406,21 @@ async def auth_users(request: Request) -> Any:
 async def auth_delete_user(username: str, request: Request) -> Any:
     """Delete a user (admin only, cannot delete admin)."""
     try:
+        _sync_auth_state()
         _require_admin(request)
         if username == "admin":
             raise HTTPException(status_code=403, detail="Cannot delete admin user")
+        from maop.core.backends.db_utils import get_db_path
         db_path = get_db_path("auth")
         result = await asyncio.get_running_loop().run_in_executor(
-            None, _db_delete_user, str(db_path), username
+            None, auth_service.db_delete_user, str(db_path), username
         )
-        # P3-3 fix: 辅助函数失败时已 raise HTTPException，此处仅成功路径。
+        # P3-3 fix: 辅助函数失败时已 raise，此处仅成功路径。
         return result
     except HTTPException:
         raise
+    except auth_service.UserNotFound:
+        raise HTTPException(status_code=404, detail="User not found")
     except Exception:
         logger.exception("[auth] Delete user %s failed", username)
         raise HTTPException(status_code=500, detail="Failed to delete user")
@@ -736,8 +433,9 @@ async def auth_update_user(username: str, request: Request, body: UpdateUserRequ
     # 批次3A: 用 Pydantic UpdateUserRequest 替代 await request.json()，
     # 由 FastAPI 自动校验请求体（roles/enabled/password 字段类型）。
     try:
+        _sync_auth_state()
         _require_admin(request)
-        # 构造与 _db_update_user 兼容的 dict（只包含显式提供的字段）
+        # 构造与 db_update_user 兼容的 dict（只包含显式提供的字段）
         update_payload: dict[str, Any] = {}
         if body.roles is not None:
             update_payload["roles"] = body.roles
@@ -745,14 +443,19 @@ async def auth_update_user(username: str, request: Request, body: UpdateUserRequ
             update_payload["enabled"] = body.enabled
         if body.password is not None:
             update_payload["password"] = body.password
+        from maop.core.backends.db_utils import get_db_path
         db_path = get_db_path("auth")
         result = await asyncio.get_running_loop().run_in_executor(
-            None, _db_update_user, str(db_path), username, update_payload
+            None, auth_service.db_update_user, str(db_path), username, update_payload
         )
-        # P3-3 fix: 辅助函数失败时已 raise HTTPException，此处仅成功路径。
+        # P3-3 fix: 辅助函数失败时已 raise，此处仅成功路径。
         return result
     except HTTPException:
         raise
+    except auth_service.UserNotFound:
+        raise HTTPException(status_code=404, detail="User not found")
+    except auth_service.PasswordTooShort:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     except Exception:
         logger.exception("[auth] User update failed")
         raise HTTPException(status_code=500, detail="Update failed")

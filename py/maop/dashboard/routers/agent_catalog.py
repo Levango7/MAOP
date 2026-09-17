@@ -4,12 +4,15 @@
 Agent 元数据（注册、查询、搜索、健康状态、统计）。
 
 所有端点要求 admin 角色（via ``require_admin`` 守卫）。
+
+业务逻辑已提取至 ``maop.dashboard.services.agent_service``（§1）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
 """
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -17,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import agent_service
 
 logger = logging.getLogger(__name__)
 
@@ -47,27 +51,13 @@ class UpdateHealthRequest(BaseModel):
     healthy: bool = Field(..., description="健康状态")
 
 
-# ── 单例（双重检查锁定，与 agent_proxy.py 风格对齐）──────────────────
-_catalog: Any = None
-_catalog_lock = threading.Lock()
-
-
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
 def _get_catalog() -> Any:
-    """惰性初始化全局 AgentCatalog 单例。"""
-    global _catalog
-    if _catalog is None:
-        with _catalog_lock:
-            if _catalog is None:
-                from maop.core.agent.registry.agent_catalog import AgentCatalog
-                _catalog = AgentCatalog.default()
-    return _catalog
+    return agent_service._get_catalog()
 
 
 def _set_catalog(catalog: Any) -> None:
-    """供测试注入自定义 catalog（隔离 DB）。"""
-    global _catalog
-    with _catalog_lock:
-        _catalog = catalog
+    agent_service._set_catalog(catalog)
 
 
 # ── 端点 ──────────────────────────────────────────────────────────
@@ -82,18 +72,8 @@ async def api_list_agents(
 ) -> dict[str, Any]:
     """列出所有已注册 Agent，可选按 enabled 过滤。"""
     require_admin(request)
-    catalog = _get_catalog()
-    if enabled is True:
-        agents = catalog.list_enabled()
-    elif enabled is False:
-        agents = [a for a in catalog.list_all() if not a.enabled]
-    else:
-        agents = catalog.list_all()
-    return {
-        "status": "ok",
-        "agents": [a.model_dump(mode="json") for a in agents],
-        "count": len(agents),
-    }
+    result = agent_service.list_agents(enabled)
+    return {"status": "ok", **result}
 
 
 @router.get("/api/agent-catalog/agents/{name}")
@@ -104,11 +84,10 @@ async def api_list_agents(
 async def api_get_agent(name: str, request: Request) -> dict[str, Any]:
     """获取单个 Agent 详情。"""
     require_admin(request)
-    catalog = _get_catalog()
-    desc = catalog.get(name)
-    if desc is None:
+    agent = agent_service.get_agent(name)
+    if agent is None:
         raise HTTPException(404, f"Agent not found: {name}")
-    return {"status": "ok", "agent": desc.model_dump(mode="json")}
+    return {"status": "ok", "agent": agent}
 
 
 @router.post("/api/agent-catalog/agents")
@@ -121,45 +100,24 @@ async def api_register_agent(
 ) -> dict[str, Any]:
     """注册新 Agent（或更新同名 Agent）。"""
     require_admin(request)
-    from maop.core.agent.registry.agent_catalog import (
-        AgentCapability,
-        AgentDescriptor,
-        AuthMethod,
-        BillingModel,
-    )
-
-    # 转换枚举
     try:
-        caps = [AgentCapability(c) for c in body.capabilities]
+        agent = agent_service.register_agent(
+            name=body.name,
+            display_name=body.display_name,
+            vendor=body.vendor,
+            version=body.version,
+            adapter_type=body.adapter_type,
+            capabilities=body.capabilities,
+            billing_model=body.billing_model,
+            auth_method=body.auth_method,
+            max_concurrent=body.max_concurrent,
+            rate_limit_per_min=body.rate_limit_per_min,
+            timeout_s=body.timeout_s,
+            enabled=body.enabled,
+        )
     except ValueError as exc:
-        raise HTTPException(400, f"Invalid capability: {exc}")
-    try:
-        bm = BillingModel(body.billing_model)
-    except ValueError:
-        raise HTTPException(400, f"Invalid billing_model: {body.billing_model}")
-    try:
-        am = AuthMethod(body.auth_method)
-    except ValueError:
-        raise HTTPException(400, f"Invalid auth_method: {body.auth_method}")
-
-    desc = AgentDescriptor(
-        name=body.name,
-        display_name=body.display_name,
-        vendor=body.vendor,
-        version=body.version,
-        adapter_type=body.adapter_type,
-        capabilities=caps,
-        billing_model=bm,
-        auth_method=am,
-        max_concurrent=body.max_concurrent,
-        rate_limit_per_min=body.rate_limit_per_min,
-        timeout_s=body.timeout_s,
-        enabled=body.enabled,
-    )
-    catalog = _get_catalog()
-    catalog.register(desc)
-    logger.info("[agent_catalog_route] registered agent: %s", body.name)
-    return {"status": "ok", "agent": desc.model_dump(mode="json")}
+        raise HTTPException(400, str(exc))
+    return {"status": "ok", "agent": agent}
 
 
 @router.delete("/api/agent-catalog/agents/{name}")
@@ -170,8 +128,7 @@ async def api_register_agent(
 async def api_delete_agent(name: str, request: Request) -> dict[str, Any]:
     """删除（注销）一个 Agent。"""
     require_admin(request)
-    catalog = _get_catalog()
-    deleted = catalog.delete(name)
+    deleted = agent_service.delete_agent(name)
     if not deleted:
         raise HTTPException(404, f"Agent not found: {name}")
     return {"status": "ok", "deleted": name}
@@ -187,11 +144,9 @@ async def api_update_agent_health(
 ) -> dict[str, Any]:
     """更新指定 Agent 的健康状态。"""
     require_admin(request)
-    catalog = _get_catalog()
-    desc = catalog.get(name)
-    if desc is None:
+    found = agent_service.update_agent_health(name, body.healthy)
+    if not found:
         raise HTTPException(404, f"Agent not found: {name}")
-    catalog.update_health(name, body.healthy)
     return {"status": "ok", "name": name, "healthy": body.healthy}
 
 
@@ -208,26 +163,11 @@ async def api_search_agents(
 ) -> dict[str, Any]:
     """按能力搜索 Agent，返回具备所有指定能力的启用 Agent。"""
     require_admin(request)
-    from maop.core.agent.registry.agent_catalog import AgentCapability
-
-    catalog = _get_catalog()
-    if not capability:
-        agents = catalog.list_enabled()
-    else:
-        try:
-            caps = [AgentCapability(c) for c in capability]
-        except ValueError as exc:
-            raise HTTPException(400, f"Invalid capability: {exc}")
-        # 逐个能力搜索取交集（search 已过滤 enabled=True）
-        result_sets = [set(a.name for a in catalog.search(c)) for c in caps]
-        common = set.intersection(*result_sets) if result_sets else set()
-        all_agents = {a.name: a for a in catalog.list_enabled()}
-        agents = [all_agents[n] for n in sorted(common)]
-    return {
-        "status": "ok",
-        "agents": [a.model_dump(mode="json") for a in agents],
-        "count": len(agents),
-    }
+    try:
+        result = agent_service.search_agents(capability)
+    except ValueError as exc:
+        raise HTTPException(400, f"Invalid capability: {exc}")
+    return {"status": "ok", **result}
 
 
 @router.get("/api/agent-catalog/stats")
@@ -238,9 +178,5 @@ async def api_search_agents(
 async def api_catalog_stats(request: Request) -> dict[str, Any]:
     """返回 Agent Catalog 统计信息。"""
     require_admin(request)
-    catalog = _get_catalog()
-    return {
-        "status": "ok",
-        "count": catalog.count(),
-        "healthy_count": catalog.count_healthy(),
-    }
+    result = agent_service.catalog_stats()
+    return {"status": "ok", **result}

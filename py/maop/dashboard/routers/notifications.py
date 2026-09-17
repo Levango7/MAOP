@@ -5,6 +5,11 @@ require admin role via :func:`require_admin`. Read operations (list/get for
 the authenticated user) are open to any authenticated user — the manager
 filters by ``tenant_id`` from the JWT claim for isolation.
 
+Business logic (manager singleton, CRUD, send, broadcast, stats) lives in
+:mod:`maop.dashboard.services.notification_service`; this router only does
+request parsing, auth/identity extraction, ownership checks, service
+dispatch, and response formatting.
+
 Endpoints:
   Channels:
     GET    /api/notifications/channels
@@ -56,10 +61,8 @@ Endpoints:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-import threading
 import time
 from typing import Any
 
@@ -68,58 +71,11 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import notification_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
-
-
-# ── Manager singleton ─────────────────────────────────────────────
-
-_notification_manager: Any = None
-_event_bus: Any = None
-_manager_lock = threading.Lock()
-
-
-def _get_manager() -> Any:
-    # P1-18: 双重检查锁定保护单例初始化
-    global _notification_manager, _event_bus
-    if _notification_manager is None:
-        with _manager_lock:
-            if _notification_manager is None:
-                from maop.enterprise.notification import EventBus, NotificationManager
-                _event_bus = EventBus()
-                _notification_manager = NotificationManager(event_bus=_event_bus)
-    return _notification_manager
-
-
-def get_notification_manager() -> Any:
-    """Public accessor — used by server.py to wire the WS broadcaster."""
-    return _get_manager()
-
-
-def _tenant_id_from_request(request: Request) -> str:
-    """Extract tenant_id from JWT-injected request state.
-
-    Falls back to empty string (single-tenant / personal edition).
-    """
-    return getattr(request.state, "tenant_id", "") or ""
-
-
-def _user_id_from_request(request: Request) -> str:
-    """Extract the authenticated user's identity from request state."""
-    return getattr(request.state, "auth_identity", "") or ""
-
-
-def _require_feature() -> None:
-    """Gate enterprise-only feature. Notifications work in both editions
-    but the router is registered only when MULTI_USER is on (server.py).
-    For personal edition we still allow the router (notifications are
-    useful in single-user mode too) — no-op here.
-    """
-    # Intentionally permissive: notifications are available in both editions.
-    # The FeatureFlag check is done at router registration time in server.py.
-    return
 
 
 # ── Request models for endpoints not covered by manager models ────
@@ -158,6 +114,55 @@ from maop.enterprise.notification.models import (  # noqa: E402
 )
 
 
+# ── Identity / auth helpers (router-layer concerns) ───────────────
+
+
+def _tenant_id_from_request(request: Request) -> str:
+    """Extract tenant_id from JWT-injected request state.
+
+    Falls back to empty string (single-tenant / personal edition).
+    """
+    return getattr(request.state, "tenant_id", "") or ""
+
+
+def _user_id_from_request(request: Request) -> str:
+    """Extract the authenticated user's identity from request state."""
+    return getattr(request.state, "auth_identity", "") or ""
+
+
+def _is_admin(request: Request) -> bool:
+    roles = getattr(request.state, "auth_roles", None) or []
+    return bool({"admin", "superadmin"} & set(roles))
+
+
+def _require_feature() -> None:
+    """Gate enterprise-only feature. Notifications work in both editions
+    but the router is registered only when MULTI_USER is on (server.py).
+    For personal edition we still allow the router (notifications are
+    useful in single-user mode too) — no-op here.
+    """
+    # Intentionally permissive: notifications are available in both editions.
+    # The FeatureFlag check is done at router registration time in server.py.
+    return
+
+
+# ── Backward-compat accessor re-exports ───────────────────────────
+
+
+def get_notification_manager() -> Any:
+    """Public accessor — used by server.py to wire the WS broadcaster."""
+    return notification_service.get_notification_manager()
+
+
+def wire_broadcaster() -> None:
+    """Wire the notification manager's broadcaster to this router's WS pool.
+
+    Called by server.py after both the notification router and the main
+    WebSocket pool are initialised.
+    """
+    notification_service.wire_broadcaster()
+
+
 # ── Channel endpoints ─────────────────────────────────────────────
 
 
@@ -168,13 +173,12 @@ async def list_channels(
     tenant_id: str = Query("", description="Filter by tenant (admin only)"),
 ) -> dict[str, Any]:
     _require_feature()
-    mgr = _get_manager()
     # Non-admin users can only see their own tenant's channels
     req_tenant = _tenant_id_from_request(request)
     if not _is_admin(request) and req_tenant:
         tenant_id = req_tenant
-    items = mgr.list_channels(tenant_id=tenant_id)
-    return {"status": "ok", "channels": [i.model_dump() for i in items], "count": len(items)}
+    items = notification_service.list_channels(tenant_id=tenant_id)
+    return {"status": "ok", "channels": items, "count": len(items)}
 
 
 @router.post("/channels")
@@ -182,12 +186,11 @@ async def list_channels(
 async def create_channel(body: ChannelCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
     # Inject tenant_id from JWT if not provided in body
     if not body.tenant_id:
         body.tenant_id = _tenant_id_from_request(request)
-    channel = mgr.create_channel(body)
-    return {"status": "ok", "channel": channel.model_dump()}
+    channel = notification_service.create_channel(body)
+    return {"status": "ok", "channel": channel}
 
 
 @router.get("/channels/{channel_id}")
@@ -195,11 +198,10 @@ async def create_channel(body: ChannelCreate, request: Request) -> dict[str, Any
 async def get_channel(channel_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    channel = mgr.get_channel(channel_id)
+    channel = notification_service.get_channel(channel_id)
     if channel is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found")
-    return {"status": "ok", "channel": channel.model_dump()}
+    return {"status": "ok", "channel": channel}
 
 
 @router.put("/channels/{channel_id}")
@@ -207,11 +209,10 @@ async def get_channel(channel_id: str, request: Request) -> dict[str, Any]:
 async def update_channel(channel_id: str, body: ChannelUpdate, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    channel = mgr.update_channel(channel_id, body)
+    channel = notification_service.update_channel(channel_id, body)
     if channel is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found")
-    return {"status": "ok", "channel": channel.model_dump()}
+    return {"status": "ok", "channel": channel}
 
 
 @router.delete("/channels/{channel_id}")
@@ -219,8 +220,7 @@ async def update_channel(channel_id: str, body: ChannelUpdate, request: Request)
 async def delete_channel(channel_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    ok = mgr.delete_channel(channel_id)
+    ok = notification_service.delete_channel(channel_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found")
     return {"status": "ok", "deleted": True}
@@ -237,12 +237,11 @@ async def list_rules(
     event_type: str = Query(""),
 ) -> dict[str, Any]:
     _require_feature()
-    mgr = _get_manager()
     req_tenant = _tenant_id_from_request(request)
     if not _is_admin(request) and req_tenant:
         tenant_id = req_tenant
-    items = mgr.list_rules(tenant_id=tenant_id, event_type=event_type)
-    return {"status": "ok", "rules": [i.model_dump() for i in items], "count": len(items)}
+    items = notification_service.list_rules(tenant_id=tenant_id, event_type=event_type)
+    return {"status": "ok", "rules": items, "count": len(items)}
 
 
 @router.post("/rules")
@@ -250,11 +249,10 @@ async def list_rules(
 async def create_rule(body: RuleCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
     if not body.tenant_id:
         body.tenant_id = _tenant_id_from_request(request)
-    rule = mgr.create_rule(body)
-    return {"status": "ok", "rule": rule.model_dump()}
+    rule = notification_service.create_rule(body)
+    return {"status": "ok", "rule": rule}
 
 
 @router.get("/rules/{rule_id}")
@@ -262,11 +260,10 @@ async def create_rule(body: RuleCreate, request: Request) -> dict[str, Any]:
 async def get_rule(rule_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    rule = mgr.get_rule(rule_id)
+    rule = notification_service.get_rule(rule_id)
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
-    return {"status": "ok", "rule": rule.model_dump()}
+    return {"status": "ok", "rule": rule}
 
 
 @router.put("/rules/{rule_id}")
@@ -274,11 +271,10 @@ async def get_rule(rule_id: str, request: Request) -> dict[str, Any]:
 async def update_rule(rule_id: str, body: RuleUpdate, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    rule = mgr.update_rule(rule_id, body)
+    rule = notification_service.update_rule(rule_id, body)
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
-    return {"status": "ok", "rule": rule.model_dump()}
+    return {"status": "ok", "rule": rule}
 
 
 @router.delete("/rules/{rule_id}")
@@ -286,8 +282,7 @@ async def update_rule(rule_id: str, body: RuleUpdate, request: Request) -> dict[
 async def delete_rule(rule_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    ok = mgr.delete_rule(rule_id)
+    ok = notification_service.delete_rule(rule_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
     return {"status": "ok", "deleted": True}
@@ -303,12 +298,11 @@ async def list_templates(
     tenant_id: str = Query(""),
 ) -> dict[str, Any]:
     _require_feature()
-    mgr = _get_manager()
     req_tenant = _tenant_id_from_request(request)
     if not _is_admin(request) and req_tenant:
         tenant_id = req_tenant
-    items = mgr.list_templates(tenant_id=tenant_id)
-    return {"status": "ok", "templates": [i.model_dump() for i in items], "count": len(items)}
+    items = notification_service.list_templates(tenant_id=tenant_id)
+    return {"status": "ok", "templates": items, "count": len(items)}
 
 
 @router.post("/templates")
@@ -316,11 +310,10 @@ async def list_templates(
 async def create_template(body: TemplateCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
     if not body.tenant_id:
         body.tenant_id = _tenant_id_from_request(request)
-    template = mgr.create_template(body)
-    return {"status": "ok", "template": template.model_dump()}
+    template = notification_service.create_template(body)
+    return {"status": "ok", "template": template}
 
 
 @router.get("/templates/{template_id}")
@@ -328,11 +321,10 @@ async def create_template(body: TemplateCreate, request: Request) -> dict[str, A
 async def get_template(template_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    template = mgr.get_template(template_id)
+    template = notification_service.get_template(template_id)
     if template is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
-    return {"status": "ok", "template": template.model_dump()}
+    return {"status": "ok", "template": template}
 
 
 @router.delete("/templates/{template_id}")
@@ -340,8 +332,7 @@ async def get_template(template_id: str, request: Request) -> dict[str, Any]:
 async def delete_template(template_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    ok = mgr.delete_template(template_id)
+    ok = notification_service.delete_template(template_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
     return {"status": "ok", "deleted": True}
@@ -364,7 +355,6 @@ async def list_notifications(
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     _require_feature()
-    mgr = _get_manager()
     # Non-admin: force user_id and tenant_id to their own
     req_tenant = _tenant_id_from_request(request)
     req_user = _user_id_from_request(request)
@@ -372,10 +362,10 @@ async def list_notifications(
         user_id = req_user
         if req_tenant:
             tenant_id = req_tenant
-    items, total = mgr.list_notifications(
+    items, total = notification_service.list_notifications(
         tenant_id=tenant_id,
         user_id=user_id,
-        status=notif_status,
+        notif_status=notif_status,
         channel_id=channel_id,
         event_type=event_type,
         unread_only=unread_only,
@@ -384,7 +374,7 @@ async def list_notifications(
     )
     return {
         "status": "ok",
-        "notifications": [i.model_dump() for i in items],
+        "notifications": items,
         "count": len(items),
         "total": total,
     }
@@ -394,12 +384,11 @@ async def list_notifications(
 @handle_api_errors
 async def mark_all_read(request: Request, user_id: str = Query("")) -> dict[str, Any]:
     _require_feature()
-    mgr = _get_manager()
     req_tenant = _tenant_id_from_request(request)
     req_user = _user_id_from_request(request)
     if not _is_admin(request):
         user_id = req_user
-    count = mgr.mark_all_read(user_id=user_id, tenant_id=req_tenant)
+    count = notification_service.mark_all_read(user_id=user_id, tenant_id=req_tenant)
     return {"status": "ok", "marked_read": count}
 
 
@@ -410,12 +399,11 @@ async def unread_count(
     user_id: str = Query(""),
 ) -> dict[str, Any]:
     _require_feature()
-    mgr = _get_manager()
     req_tenant = _tenant_id_from_request(request)
     req_user = _user_id_from_request(request)
     if not _is_admin(request):
         user_id = req_user
-    count = mgr.unread_count(user_id=user_id, tenant_id=req_tenant)
+    count = notification_service.unread_count(user_id=user_id, tenant_id=req_tenant)
     return {"status": "ok", "unread_count": count}
 
 
@@ -427,21 +415,19 @@ async def unread_count(
 async def send_notification(body: SendNotificationRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    from maop.enterprise.notification.models import NotificationLevel
-    mgr = _get_manager()
     if not body.tenant_id:
         body.tenant_id = _tenant_id_from_request(request)
-    notif = await mgr.send_notification(
+    notif = await notification_service.send_notification(
         channel_id=body.channel_id,
         title=body.title,
         body=body.body,
-        level=NotificationLevel(body.level),
+        level=body.level,
         tenant_id=body.tenant_id,
         user_id=body.user_id,
         event_type=body.event_type,
         event_payload=body.event_payload,
     )
-    return {"status": "ok", "notification": notif.model_dump()}
+    return {"status": "ok", "notification": notif}
 
 
 # ── Dead letters (admin) ─────────────────────────────────────────
@@ -456,9 +442,8 @@ async def list_dead_letters(
 ) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    items = mgr.list_dead_letters(tenant_id=tenant_id, limit=limit)
-    return {"status": "ok", "dead_letters": [i.model_dump() for i in items], "count": len(items)}
+    items = notification_service.list_dead_letters(tenant_id=tenant_id, limit=limit)
+    return {"status": "ok", "dead_letters": items, "count": len(items)}
 
 
 # ── Preferences ──────────────────────────────────────────────────
@@ -468,29 +453,27 @@ async def list_dead_letters(
 @handle_api_errors
 async def get_preferences(request: Request, user_id: str = Query("")) -> dict[str, Any]:
     _require_feature()
-    mgr = _get_manager()
     req_user = _user_id_from_request(request)
     if not _is_admin(request):
         user_id = req_user
     if not user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="user_id required")
-    pref = mgr.get_preference(user_id)
-    return {"status": "ok", "preference": pref.model_dump() if pref else None}
+    pref = notification_service.get_preference(user_id)
+    return {"status": "ok", "preference": pref}
 
 
 @router.put("/preferences")
 @handle_api_errors
 async def update_preferences(body: PreferenceUpdate, request: Request, user_id: str = Query("")) -> dict[str, Any]:
     _require_feature()
-    mgr = _get_manager()
     req_user = _user_id_from_request(request)
     req_tenant = _tenant_id_from_request(request)
     if not _is_admin(request):
         user_id = req_user
     if not user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="user_id required")
-    pref = mgr.update_preference(user_id, body, tenant_id=req_tenant)
-    return {"status": "ok", "preference": pref.model_dump()}
+    pref = notification_service.update_preference(user_id, body, tenant_id=req_tenant)
+    return {"status": "ok", "preference": pref}
 
 
 # ── Event publishing ─────────────────────────────────────────────
@@ -501,10 +484,9 @@ async def update_preferences(body: PreferenceUpdate, request: Request, user_id: 
 async def publish_event(body: PublishEventRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
     if not body.tenant_id:
         body.tenant_id = _tenant_id_from_request(request)
-    delivered = await mgr.event_bus.emit(
+    delivered = await notification_service.publish_event(
         body.event_type, body.payload, tenant_id=body.tenant_id
     )
     return {"status": "ok", "delivered_to": delivered}
@@ -518,8 +500,7 @@ async def publish_event(body: PublishEventRequest, request: Request) -> dict[str
 async def get_stats(request: Request) -> dict[str, Any]:
     require_admin(request)
     _require_feature()
-    mgr = _get_manager()
-    return {"status": "ok", "stats": mgr.stats()}
+    return {"status": "ok", "stats": notification_service.get_stats()}
 
 
 # ── Dynamic notification routes (MUST come after all static paths) ──
@@ -553,8 +534,7 @@ def _check_notification_ownership(notif: Any, request: Request) -> None:
 @handle_api_errors
 async def get_notification(notification_id: str, request: Request) -> dict[str, Any]:
     _require_feature()
-    mgr = _get_manager()
-    notif = mgr.get_notification(notification_id)
+    notif = notification_service.get_notification(notification_id)
     if notif is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
     _check_notification_ownership(notif, request)
@@ -565,13 +545,12 @@ async def get_notification(notification_id: str, request: Request) -> dict[str, 
 @handle_api_errors
 async def mark_read(notification_id: str, request: Request) -> dict[str, Any]:
     _require_feature()
-    mgr = _get_manager()
     # Fetch first to enforce ownership before mutating (IDOR fix).
-    notif = mgr.get_notification(notification_id)
+    notif = notification_service.get_notification(notification_id)
     if notif is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
     _check_notification_ownership(notif, request)
-    ok = mgr.mark_read(notification_id)
+    ok = notification_service.mark_read(notification_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
     return {"status": "ok", "read": True}
@@ -581,13 +560,12 @@ async def mark_read(notification_id: str, request: Request) -> dict[str, Any]:
 @handle_api_errors
 async def delete_notification(notification_id: str, request: Request) -> dict[str, Any]:
     _require_feature()
-    mgr = _get_manager()
     # Fetch first to enforce ownership before deleting (IDOR fix).
-    notif = mgr.get_notification(notification_id)
+    notif = notification_service.get_notification(notification_id)
     if notif is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
     _check_notification_ownership(notif, request)
-    ok = mgr.delete_notification(notification_id)
+    ok = notification_service.delete_notification(notification_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
     return {"status": "ok", "deleted": True}
@@ -597,31 +575,8 @@ async def delete_notification(notification_id: str, request: Request) -> dict[st
 # Per-client connection set + lock. The manager's broadcaster pushes
 # InApp notifications to all connected clients. Clients can also send
 # "ping" to keep the connection alive.
-
-_ws_clients: set[WebSocket] = set()
-
-# P2-25: import asyncio 已移至模块顶部
-
-_ws_lock = asyncio.Lock()
-
-
-async def _ws_broadcast_notification(notif: dict[str, Any]) -> None:
-    """Broadcast a notification to all connected /api/notifications/ws clients."""
-    async with _ws_lock:
-        clients = list(_ws_clients)
-    if not clients:
-        return
-    msg = {"type": "notification", "data": notif}
-    dead: list[WebSocket] = []
-    for ws in clients:
-        try:
-            await asyncio.wait_for(ws.send_json(msg), timeout=5.0)
-        except Exception:
-            dead.append(ws)
-    if dead:
-        async with _ws_lock:
-            for ws in dead:
-                _ws_clients.discard(ws)
+# Connection state lives in notification_service; this endpoint only
+# handles auth + message dispatch.
 
 
 @router.websocket("/ws")
@@ -674,8 +629,7 @@ async def notifications_ws(ws: WebSocket) -> Any:
             await ws.close(code=4401, reason="Authentication failed")
             return
     await ws.accept()
-    async with _ws_lock:
-        _ws_clients.add(ws)
+    await notification_service.register_ws_client(ws)
     try:
         await ws.send_json({"type": "hello", "msg": "MAOP Notifications WebSocket", "ts": time.time()})
         while True:
@@ -690,16 +644,14 @@ async def notifications_ws(ws: WebSocket) -> Any:
                     if action == "mark_read":
                         notif_id = cmd.get("id", "")
                         if notif_id:
-                            mgr = _get_manager()
                             # P0-10: 越权校验 — mark_read 必须作用于当前用户的通知
-                            mgr.mark_read(notif_id, user_id=ws_user_id) if ws_user_id else mgr.mark_read(notif_id)
+                            notification_service.mark_read(notif_id, user_id=ws_user_id)
                             await ws.send_json({"type": "ok", "action": "mark_read", "id": notif_id})
                     elif action == "unread_count":
                         # P0-10: 越权校验 — 强制使用 JWT 中的 user_id，
                         # 忽略客户端提供的 user_id，防止查询其他用户的通知计数
                         user_id = ws_user_id or cmd.get("user_id", "")
-                        mgr = _get_manager()
-                        count = mgr.unread_count(user_id)
+                        count = notification_service.unread_count(user_id, tenant_id=ws_tenant_id)
                         await ws.send_json({"type": "unread_count", "count": count})
                 except Exception:
                     # best-effort：WebSocket 命令为即时推送，畸形/异常输入直接忽略保证连接不断
@@ -708,25 +660,4 @@ async def notifications_ws(ws: WebSocket) -> Any:
     except WebSocketDisconnect:
         pass
     finally:
-        async with _ws_lock:
-            _ws_clients.discard(ws)
-
-
-# ── Helpers ──────────────────────────────────────────────────────
-
-
-def _is_admin(request: Request) -> bool:
-    roles = getattr(request.state, "auth_roles", None) or []
-    return bool({"admin", "superadmin"} & set(roles))
-
-
-def wire_broadcaster() -> None:
-    """Wire the notification manager's broadcaster to this router's WS pool.
-
-    Called by server.py after both the notification router and the main
-    WebSocket pool are initialised. Once wired, every InApp notification
-    created by the manager is pushed to all connected ``/api/notifications/ws``
-    clients AND (optionally) to the main ``/ws`` pool.
-    """
-    mgr = _get_manager()
-    mgr.set_broadcaster(_ws_broadcast_notification)
+        await notification_service.unregister_ws_client(ws)

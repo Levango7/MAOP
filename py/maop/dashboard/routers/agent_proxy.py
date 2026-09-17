@@ -1,9 +1,13 @@
-"""MAOP Dashboard — Agent Bridge API endpoints."""
+"""MAOP Dashboard — Agent Bridge API endpoints.
+
+业务逻辑已提取至 ``maop.dashboard.services.agent_service``（§3）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
+"""
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -11,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import agent_service
 
 from .state import MAOP_ROOT
 
@@ -32,18 +37,14 @@ class BridgeSyncConfigRequest(BaseModel):
     adapter: str = Field(default="", max_length=256)
     config: dict[str, Any] = Field(default_factory=dict)
 
-_agent_proxy = None
-_agent_proxy_lock = threading.Lock()
 
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
 def _get_bridge() -> Any:
-    # P1-18: 双重检查锁定保护单例初始化
-    global _agent_proxy
-    if _agent_proxy is None:
-        with _agent_proxy_lock:
-            if _agent_proxy is None:
-                from maop.core.agent.delegation.agent_proxy import AgentProxy
-                _agent_proxy = AgentProxy(root_dir=str(MAOP_ROOT))
-    return _agent_proxy
+    return agent_service._get_bridge(MAOP_ROOT)
+
+
+def _set_bridge(bridge: Any) -> None:
+    agent_service._set_bridge(bridge)
 
 
 @router.get("/api/bridge/adapters")
@@ -51,16 +52,10 @@ def _get_bridge() -> Any:
 async def api_bridge_adapters(request: Request) -> dict[str, Any]:
     """List available bridge adapters."""
     require_admin(request)
-    bridge = _get_bridge()
-    names = bridge.list_adapters()
-    statuses = []
-    for name in names:
-        try:
-            s = bridge.get_status(name)
-            statuses.append(s.model_dump())
-        except Exception:
-            statuses.append({"name": name, "error": "status unavailable"})
-    return {"status": "ok", "adapters": statuses, "count": len(statuses)}
+    # 确保 bridge 单例用 MAOP_ROOT 初始化
+    agent_service._get_bridge(MAOP_ROOT)
+    result = agent_service.bridge_adapters()
+    return {"status": "ok", **result}
 
 
 @router.post("/api/bridge/call")
@@ -74,9 +69,9 @@ async def api_bridge_call(body: BridgeCallRequest, request: Request) -> dict[str
     task = body.task
     if not adapter_name or not task:
         raise HTTPException(400, "missing adapter or task")
-    bridge = _get_bridge()
+    agent_service._get_bridge(MAOP_ROOT)
     try:
-        result = bridge.call(adapter_name, task, **body.kwargs)
+        result = agent_service.bridge_call(adapter_name, task, body.kwargs)
         return {"status": "ok", "result": result}
     except KeyError as exc:
         # 批次3A: 脱敏——KeyError 细节不暴露给客户端，仅日志记录。
@@ -93,8 +88,8 @@ async def api_bridge_call(body: BridgeCallRequest, request: Request) -> dict[str
 async def api_bridge_health(request: Request) -> dict[str, Any]:
     """Check bridge adapter health status."""
     require_admin(request)
-    bridge = _get_bridge()
-    health = bridge.health_check_all()
+    agent_service._get_bridge(MAOP_ROOT)
+    health = agent_service.bridge_health()
     return {"status": "ok", "health": health}
 
 
@@ -109,9 +104,9 @@ async def api_bridge_sync_config(body: BridgeSyncConfigRequest, request: Request
     config = body.config
     if not adapter_name:
         raise HTTPException(400, "missing adapter")
-    bridge = _get_bridge()
+    agent_service._get_bridge(MAOP_ROOT)
     try:
-        bridge.sync_config(adapter_name, config)
+        agent_service.bridge_sync_config(adapter_name, config)
         return {"status": "ok"}
     except KeyError as exc:
         # 批次3A: 脱敏——KeyError 细节不暴露给客户端，仅日志记录。

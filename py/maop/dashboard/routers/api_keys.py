@@ -11,6 +11,11 @@ Routes (prefix ``/api/api-keys``):
   DELETE /{key_id}          hard-delete key + usage
   POST   /{key_id}/revoke   soft-revoke key
   GET    /{key_id}/usage    paginated usage stats
+
+API key manager resolution lives in
+``maop.dashboard.services.auth_service``.  This router only does request
+parsing, permission checks, service calls, response formatting, and
+error handling.
 """
 
 from __future__ import annotations
@@ -28,10 +33,12 @@ from maop.core.security.api_key_manager import (
     ApiKeyResponse,
     ApiKeyUpdate,
     ApiKeyUsageResponse,
-    get_api_key_manager,
 )
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+
+# ── Service layer ──────────────────────────────────────────────────
+from maop.dashboard.services import auth_service
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +54,7 @@ class ValidateRequest(BaseModel):
 
 def _get_manager(request: Request) -> Any:
     """Return the ApiKeyManager from app.state, falling back to the global singleton."""
-    mgr = getattr(request.app.state, "api_key_manager", None)
-    if mgr is not None:
-        return mgr
-    return get_api_key_manager()
+    return auth_service.resolve_api_key_manager(request.app.state)
 
 
 def _client_ip(request: Request) -> str:

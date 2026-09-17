@@ -14,14 +14,17 @@ PRD ``docs/prd-sso-integration.md`` 实现：
 
 所有端点由 ``FeatureFlag.SSO`` 守卫，Personal 版返回 404。
 管理端点（CRUD + test）需 ``require_admin``；登录/回调/metadata/enabled 公开。
+
+SSO 单例管理（registry + legacy manager） lives in
+``maop.dashboard.services.auth_service``.  This router only does request
+parsing, permission checks, service calls, response formatting, and
+error handling.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import secrets
-import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -30,6 +33,9 @@ from pydantic import BaseModel
 
 from maop.config.edition import FeatureFlag, has_feature
 from maop.dashboard.error_handler import handle_api_errors
+
+# ── Service layer ──────────────────────────────────────────────────
+from maop.dashboard.services import auth_service
 
 logger = logging.getLogger(__name__)
 
@@ -52,54 +58,6 @@ def _require_sso() -> None:
         )
 
 
-# ── Registry 单例（懒加载） ─────────────────────────────────────────
-_registry: Any = None
-_sso_manager: Any = None  # 向后兼容：单 IdP 模式
-_registry_lock = threading.Lock()
-_sso_manager_lock = threading.Lock()
-
-
-def _get_registry() -> Any:
-    """获取 SSOProviderRegistry 单例。"""
-    # P1-18: 双重检查锁定保护单例初始化
-    global _registry
-    if _registry is None:
-        with _registry_lock:
-            if _registry is None:
-                from maop.enterprise.sso_registry import SSOProviderRegistry
-                _registry = SSOProviderRegistry()
-                # PRD NFR-C03：启动时从环境变量导入单 IdP 配置（向后兼容）
-                try:
-                    from maop.enterprise.sso_store import import_env_provider_if_present
-                    import_env_provider_if_present(_registry.store)
-                except Exception as exc:  # pragma: no cover — 防御性
-                    logger.warning("[sso] Failed to import env-based provider: %s", exc)
-    return _registry
-
-
-def _get_manager() -> Any:
-    """向后兼容：单 IdP 模式从环境变量加载 SSOManager。"""
-    # P1-18: 双重检查锁定保护单例初始化
-    global _sso_manager
-    if _sso_manager is None:
-        with _sso_manager_lock:
-            if _sso_manager is None:
-                from maop.enterprise.sso import SSOConfig, SSOManager, SSOProvider
-                provider = SSOProvider(os.getenv("MAOP_SSO_PROVIDER", "oidc"))
-                config = SSOConfig(
-                    provider=provider,
-                    client_id=os.getenv("MAOP_SSO_CLIENT_ID", ""),
-                    client_secret=os.getenv("MAOP_SSO_CLIENT_SECRET", ""),
-                    authorize_url=os.getenv("MAOP_SSO_AUTHORIZE_URL", ""),
-                    token_url=os.getenv("MAOP_SSO_TOKEN_URL", ""),
-                    userinfo_url=os.getenv("MAOP_SSO_USERINFO_URL", ""),
-                    redirect_uri=os.getenv("MAOP_SSO_REDIRECT_URI", ""),
-                    scopes=[s.strip() for s in os.getenv("MAOP_SSO_SCOPES", "openid profile email").split(",")],
-                )
-                _sso_manager = SSOManager(config=config)
-    return _sso_manager
-
-
 class LogoutRequest(BaseModel):
     session_id: str
 
@@ -119,7 +77,7 @@ async def authorize(request: Request, state: str = "") -> Any:
     _pending_states，handle_callback 时校验并一次性消费。
     """
     _require_sso()
-    mgr = _get_manager()
+    mgr = auth_service.get_sso_manager()
     # P2 fix: state 为空时自动生成随机 state，确保 CSRF 保护始终生效。
     if not state:
         state = secrets.token_urlsafe(32)
@@ -147,7 +105,7 @@ async def callback(
             status_code=400,
             content={"status": "error", "error": "Missing authorization code"},
         )
-    mgr = _get_manager()
+    mgr = auth_service.get_sso_manager()
     session = mgr.handle_callback(code, state=state)
     return {
         "status": "ok",
@@ -162,7 +120,7 @@ async def callback(
 async def logout(body: LogoutRequest, request: Request) -> dict[str, Any]:
     """Invalidate an SSO session（单 IdP 向后兼容）。"""
     _require_sso()
-    mgr = _get_manager()
+    mgr = auth_service.get_sso_manager()
     logged_out = mgr.logout(body.session_id)
     if not logged_out:
         # P2 fix: 404 应返回 404 状态码，而非 200。
@@ -180,7 +138,7 @@ async def validate_session(request: Request, session_id: str = "") -> dict[str, 
     if not session_id:
         # H-2 fix: 缺少参数应返回 400，而非 200 + status=error。
         raise HTTPException(status_code=400, detail="Missing session_id")
-    mgr = _get_manager()
+    mgr = auth_service.get_sso_manager()
     session = mgr.validate_session(session_id)
     if session is None:
         # P2 fix: 401 应返回 401 状态码，而非 200。
@@ -204,7 +162,7 @@ async def get_config(request: Request) -> dict[str, Any]:
     因此保留无 require_admin——与 /enabled 端点保持一致。
     """
     _require_sso()
-    mgr = _get_manager()
+    mgr = auth_service.get_sso_manager()
     config = mgr.config
     return {
         "status": "ok",
@@ -230,7 +188,7 @@ async def create_provider(request: Request, body: SSOProviderCreate) -> dict[str
     from maop.core.security.middleware import require_admin
     require_admin(request)
     payload = body
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     try:
         resp = reg.store.create(payload)
     except ValueError as exc:
@@ -255,7 +213,7 @@ async def list_providers(
     _require_sso()
     from maop.core.security.middleware import require_admin
     require_admin(request)
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     rows, total = reg.store.list(
         protocol=protocol,
         enabled=enabled,
@@ -277,7 +235,7 @@ async def get_provider(request: Request, provider_id: int) -> dict[str, Any]:
     _require_sso()
     from maop.core.security.middleware import require_admin
     require_admin(request)
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     resp = reg.store.get(provider_id)
     if resp is None:
         raise HTTPException(
@@ -299,7 +257,7 @@ async def update_provider(
     from maop.core.security.middleware import require_admin
     require_admin(request)
     payload = body
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     try:
         resp = reg.store.update(provider_id, payload)
     except ValueError as exc:
@@ -323,7 +281,7 @@ async def delete_provider(request: Request, provider_id: int) -> dict[str, Any]:
     _require_sso()
     from maop.core.security.middleware import require_admin
     require_admin(request)
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     ok = reg.store.delete(provider_id)
     if not ok:
         raise HTTPException(
@@ -342,7 +300,7 @@ async def test_provider(request: Request, provider_id: int) -> dict[str, Any]:
     _require_sso()
     from maop.core.security.middleware import require_admin
     require_admin(request)
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     try:
         result = reg.test_connection(provider_id)
     except KeyError as exc:
@@ -363,7 +321,7 @@ async def test_provider(request: Request, provider_id: int) -> dict[str, Any]:
 async def get_provider_metadata(request: Request, provider_id: int) -> Any:
     """SAML SP Metadata（PRD 4.2.4）。公开端点（IdP 端拉取）。"""
     _require_sso()
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     try:
         xml = reg.get_sp_metadata(provider_id)
     except KeyError as exc:
@@ -387,7 +345,7 @@ async def get_provider_metadata(request: Request, provider_id: int) -> Any:
 async def oidc_login(request: Request, provider_id: int, state: str = "") -> Any:
     """OIDC 登录跳转（PRD 4.3）。公开端点。"""
     _require_sso()
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     try:
         url, _state = reg.prepare_oidc_authorize(provider_id, state=state)
     except KeyError as exc:
@@ -430,7 +388,7 @@ async def oidc_callback(
                 "code": "SSO_CALLBACK_ERROR",
             },
         )
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     try:
         session = reg.handle_oidc_callback(provider_id, code, state=state)
     except ValueError as exc:
@@ -483,7 +441,7 @@ async def oidc_callback(
 async def saml_login(request: Request, provider_id: int, relay_state: str = "") -> Any:
     """SAML 登录跳转（PRD 4.4）。公开端点。"""
     _require_sso()
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     try:
         url, _rs = reg.prepare_saml_authorize(provider_id, relay_state=relay_state)
     except KeyError as exc:
@@ -513,7 +471,7 @@ async def saml_acs(
 ) -> Any:
     """SAML ACS 端点（PRD 4.4）。公开端点。"""
     _require_sso()
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     try:
         session = reg.handle_saml_acs(
             provider_id,
@@ -564,7 +522,7 @@ async def saml_acs(
 async def list_enabled_providers(request: Request) -> dict[str, Any]:
     """列出已启用 IdP（登录页用，PRD 4.2.5）。公开端点，不返回敏感配置。"""
     _require_sso()
-    reg = _get_registry()
+    reg = auth_service.get_sso_registry()
     return {"status": "ok", **reg.list_enabled_for_login()}
 
 

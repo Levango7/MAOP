@@ -1,16 +1,20 @@
-"""MAOP Dashboard — ReAct Loop & Change Tracker API endpoints."""
+"""MAOP Dashboard — ReAct Loop & Change Tracker API endpoints.
+
+Business logic (snapshot/artifact CRUD) lives in
+:mod:`maop.dashboard.services.chat_service`; this module only does
+request parsing, auth, service dispatch, and response formatting.
+"""
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import chat_service
 
 from .state import MAOP_ROOT
 
@@ -36,13 +40,23 @@ class RestoreArtifactRequest(BaseModel):
 
 
 def _get_change_tracker():
-    from maop.core.reliability.change_tracker import ChangeTracker
-    return ChangeTracker(root_dir=str(MAOP_ROOT))
+    """Return a ChangeTracker bound to MAOP_ROOT.
+
+    Thin wrapper over :func:`chat_service.make_change_tracker` kept on
+    the router module so tests can monkeypatch the factory (see
+    ``tests/test_router_misc_coverage.py``).
+    """
+    return chat_service.make_change_tracker(MAOP_ROOT)
 
 
 def _get_artifact_store():
-    from maop.core.backends.artifact_store import ArtifactStore
-    return ArtifactStore(root_dir=str(MAOP_ROOT))
+    """Return an ArtifactStore bound to MAOP_ROOT.
+
+    Thin wrapper over :func:`chat_service.make_artifact_store` kept on
+    the router module so tests can monkeypatch the factory (see
+    ``tests/test_router_misc_coverage.py``).
+    """
+    return chat_service.make_artifact_store(MAOP_ROOT)
 
 
 @router.get("/snapshots")
@@ -54,8 +68,8 @@ async def list_snapshots(
 ) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_change_tracker()
-    snapshots = tracker.list_snapshots(workdir=workdir, limit=limit)
-    return {"status": "ok", "snapshots": [s.model_dump() for s in snapshots]}
+    snapshots = chat_service.list_snapshots(tracker, workdir=workdir, limit=limit)
+    return {"status": "ok", "snapshots": snapshots}
 
 
 @router.post("/snapshots")
@@ -63,12 +77,8 @@ async def list_snapshots(
 async def create_snapshot(body: CreateSnapshotRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_change_tracker()
-    snap_id = tracker.snapshot(
-        workdir=body.workdir,
-        label=body.label,
-    )
-    snap = tracker.get_snapshot(snap_id)
-    return {"status": "ok", "snapshot": snap.model_dump() if snap else None}
+    snap = chat_service.create_snapshot(tracker, workdir=body.workdir, label=body.label)
+    return {"status": "ok", "snapshot": snap}
 
 
 @router.get("/diff")
@@ -80,8 +90,8 @@ async def diff_snapshots(
 ) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_change_tracker()
-    result = tracker.diff(workdir, since_label=since_label)
-    return {"status": "ok", "diff": result.model_dump()}
+    diff = chat_service.diff_snapshots(tracker, workdir, since_label=since_label)
+    return {"status": "ok", "diff": diff}
 
 
 @router.get("/changes")
@@ -93,7 +103,7 @@ async def get_change_log(
 ) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_change_tracker()
-    changes = tracker.get_change_log(workdir, limit=limit)
+    changes = chat_service.get_change_log(tracker, workdir, limit=limit)
     return {"status": "ok", "changes": changes}
 
 
@@ -102,7 +112,7 @@ async def get_change_log(
 async def delete_snapshot(snapshot_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     tracker = _get_change_tracker()
-    ok = tracker.delete_snapshot(snapshot_id)
+    ok = chat_service.delete_snapshot(tracker, snapshot_id)
     return {"status": "ok", "deleted": ok}
 
 
@@ -111,8 +121,8 @@ async def delete_snapshot(snapshot_id: str, request: Request) -> dict[str, Any]:
 async def list_artifacts(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
     require_admin(request)
     store = _get_artifact_store()
-    artifacts = store.list_artifacts(limit=limit)
-    return {"status": "ok", "artifacts": [a.model_dump() for a in artifacts]}
+    artifacts = chat_service.list_artifacts(store, limit=limit)
+    return {"status": "ok", "artifacts": artifacts}
 
 
 @router.post("/artifacts")
@@ -120,7 +130,8 @@ async def list_artifacts(request: Request, limit: int = Query(50, ge=1, le=200))
 async def save_artifact(body: SaveArtifactRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     store = _get_artifact_store()
-    version = store.save(
+    version = chat_service.save_artifact(
+        store,
         name=body.name,
         content=body.content,
         tag=body.tag,
@@ -134,7 +145,7 @@ async def save_artifact(body: SaveArtifactRequest, request: Request) -> dict[str
 async def load_artifact(request: Request, name: str, version: int | None = Query(None)) -> dict[str, Any]:
     require_admin(request)
     store = _get_artifact_store()
-    content = store.load(name, version=version)
+    content = chat_service.load_artifact(store, name, version=version)
     if content is None:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return {"status": "ok", "name": name, "content": content}
@@ -145,8 +156,8 @@ async def load_artifact(request: Request, name: str, version: int | None = Query
 async def artifact_history(request: Request, name: str, limit: int = Query(20, ge=1, le=1000)) -> dict[str, Any]:
     require_admin(request)
     store = _get_artifact_store()
-    history = store.history(name, limit=limit)
-    return {"status": "ok", "history": [h.model_dump() for h in history]}
+    history = chat_service.artifact_history(store, name, limit=limit)
+    return {"status": "ok", "history": history}
 
 
 @router.post("/artifacts/{name}/restore")
@@ -154,7 +165,7 @@ async def artifact_history(request: Request, name: str, limit: int = Query(20, g
 async def restore_artifact(name: str, body: RestoreArtifactRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
     store = _get_artifact_store()
-    ok = store.restore(name, version=body.version)
+    ok = chat_service.restore_artifact(store, name, version=body.version)
     return {"status": "ok", "restored": ok}
 
 
@@ -163,5 +174,5 @@ async def restore_artifact(name: str, body: RestoreArtifactRequest, request: Req
 async def delete_artifact(name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
     store = _get_artifact_store()
-    ok = store.delete_artifact(name)
+    ok = chat_service.delete_artifact(store, name)
     return {"status": "ok", "deleted": ok}

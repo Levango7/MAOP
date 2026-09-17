@@ -9,12 +9,15 @@ Endpoints:
   POST /api/chat/memory/search — Search across memory layers
   POST /api/chat/consolidate   — Trigger memory consolidation
   GET  /api/chat/memory/stats  — Get memory statistics
+
+Business logic lives in :mod:`maop.dashboard.services.chat_service`; this
+module only does request parsing, auth, service dispatch, and response
+formatting.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import chat_service
 
 logger = logging.getLogger(__name__)
 
@@ -34,18 +38,13 @@ from .state import MAOP_ROOT  # noqa: E402
 
 
 def _get_engine():
+    """Return a ChatEngine bound to MAOP_ROOT.
 
-    from maop.core.agent.llm_chat.chat_engine import ChatEngine
-    # 一号用户实测（2026-08-31）：原构造用 ChatEngine 默认值（agent="mavis"
-    # —— agents.yaml 无此 agent，幽灵引用）且不传 default_model —— 内置
-    # provider 路径从不激活，永远 fallback 到 dispatcher 再报 agent 不存在。
-    # 修复：默认 agent 用真实存在的 MAOP 自引用；默认模型经
-    # MAOP_LLM_DEFAULT_MODEL 注入（models.yaml 中配置的任一模型名）。
-    return ChatEngine(
-        root_dir=str(MAOP_ROOT),
-        default_agent=os.environ.get("MAOP_LLM_DEFAULT_AGENT", "MAOP"),
-        default_model=os.environ.get("MAOP_LLM_DEFAULT_MODEL", ""),
-    )
+    Thin wrapper over :func:`chat_service.make_chat_engine` kept on the
+    router module so stability tests can monkeypatch the engine factory
+    (see ``tests/stability/test_boundary_inputs.py``).
+    """
+    return chat_service.make_chat_engine(MAOP_ROOT)
 
 
 # ── Request/Response Models ──────────────────────────────────────
@@ -76,9 +75,8 @@ class MemorySearchRequest(BaseModel):
 async def chat(request_body: ChatRequestBody, request: Request) -> dict[str, Any]:
     """Send a chat message and get a full response."""
     require_admin(request)
-    from maop.core.agent.llm_chat.chat_engine import ChatRequest
     engine = _get_engine()
-    chat_req = ChatRequest(
+    chat_req = chat_service.build_chat_request(
         session_id=request_body.session_id,
         message=request_body.message,
         images=request_body.images,
@@ -89,8 +87,7 @@ async def chat(request_body: ChatRequestBody, request: Request) -> dict[str, Any
         max_tokens=request_body.max_tokens,
         temperature=request_body.temperature,
     )
-    response = await engine.chat(chat_req)
-    return {"status": "ok", "data": response.model_dump()}
+    return await chat_service.send_chat(engine, chat_req)
 
 
 @router.post("/stream")
@@ -98,9 +95,8 @@ async def chat(request_body: ChatRequestBody, request: Request) -> dict[str, Any
 async def chat_stream(request_body: ChatRequestBody, request: Request) -> Any:
     """Send a chat message and get an SSE streaming response."""
     require_admin(request)
-    from maop.core.agent.llm_chat.chat_engine import ChatRequest
     engine = _get_engine()
-    chat_req = ChatRequest(
+    chat_req = chat_service.build_chat_request(
         session_id=request_body.session_id,
         message=request_body.message,
         images=request_body.images,
@@ -112,12 +108,10 @@ async def chat_stream(request_body: ChatRequestBody, request: Request) -> Any:
         temperature=request_body.temperature,
     )
 
-    async def event_generator():
-        async for chunk in engine.chat_stream(chat_req):
-            yield chunk
-
+    # StreamingResponse construction stays in the router; the async
+    # iterable (generator) is owned by the service.
     return StreamingResponse(
-        event_generator(),
+        chat_service.stream_chat_chunks(engine, chat_req),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -132,17 +126,8 @@ async def chat_stream(request_body: ChatRequestBody, request: Request) -> Any:
 async def list_models(request: Request) -> dict[str, Any]:
     """List available LLM models from models.yaml."""
     require_admin(request)
-    from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
-    factory = LLMProviderFactory(root_dir=str(MAOP_ROOT))
-    models = factory.list_models(enabled_only=True)
-    providers = factory.list_providers(enabled_only=True)
-    return {
-        "status": "ok",
-        "data": {
-            "models": [m.model_dump() for m in models],
-            "providers": [p.model_dump() for p in providers],
-        },
-    }
+    data = chat_service.list_llm_models(MAOP_ROOT)
+    return {"status": "ok", "data": data}
 
 
 # ── Session Management ───────────────────────────────────────────
@@ -152,10 +137,8 @@ async def list_models(request: Request) -> dict[str, Any]:
 async def list_sessions(request: Request) -> dict[str, Any]:
     """List all chat sessions."""
     require_admin(request)
-    from maop.core.security.session import SessionManager
-    mgr = SessionManager(root_dir=str(MAOP_ROOT))
-    sessions = mgr.list()
-    return {"status": "ok", "data": [s.model_dump() for s in sessions]}
+    data = chat_service.list_chat_sessions(MAOP_ROOT)
+    return {"status": "ok", "data": data["sessions"]}
 
 
 @router.get("/{session_id}")
@@ -164,15 +147,8 @@ async def get_session(request: Request, session_id: str) -> dict[str, Any]:
     """Get messages for a chat session."""
     require_admin(request)
     engine = _get_engine()
-    history = engine.memory.conversation.get_history(session_id)
-    return {
-        "status": "ok",
-        "data": {
-            "session_id": session_id,
-            "messages": [m.model_dump() for m in history],
-            "message_count": len(history),
-        },
-    }
+    data = chat_service.get_session_messages(engine, session_id)
+    return {"status": "ok", "data": data}
 
 
 @router.delete("/{session_id}")
@@ -181,7 +157,7 @@ async def clear_session(session_id: str, request: Request) -> dict[str, Any]:
     """Clear all messages in a chat session."""
     require_admin(request)
     engine = _get_engine()
-    count = engine.memory.conversation.clear_session(session_id)
+    count = chat_service.clear_session(engine, session_id)
     return {"status": "ok", "cleared": count}
 
 
@@ -193,7 +169,7 @@ async def memory_search(request_body: MemorySearchRequest, request: Request) -> 
     """Search across all memory layers."""
     require_admin(request)
     engine = _get_engine()
-    results = engine.memory.search_all_layers(query=request_body.query, top=request_body.top)
+    results = chat_service.search_memory(engine, request_body.query, request_body.top)
     return {"status": "ok", "data": results}
 
 
@@ -203,7 +179,7 @@ async def memory_consolidate(request: Request) -> dict[str, Any]:
     """Trigger L2 → L3 memory consolidation."""
     require_admin(request)
     engine = _get_engine()
-    report = engine.memory.consolidate()
+    report = chat_service.consolidate_memory(engine)
     return {"status": "ok", "data": report}
 
 
@@ -213,7 +189,7 @@ async def memory_stats(request: Request) -> dict[str, Any]:
     """Get memory statistics."""
     require_admin(request)
     engine = _get_engine()
-    stats = engine.memory.stats()
+    stats = chat_service.get_memory_stats(engine)
     return {"status": "ok", "data": stats}
 
 
@@ -228,7 +204,6 @@ async def upload_image(
 ) -> dict[str, Any]:
     """Upload an image for multimodal chat."""
     require_admin(request)
-    from maop.core.backends.image_store import ImageStore
 
     if file is None:
         return JSONResponse(
@@ -237,9 +212,9 @@ async def upload_image(
         )
 
     content = await file.read()
-    store = ImageStore(root_dir=str(MAOP_ROOT))
-    img_id = store.save(
-        session_id=session_id or "default",
+    img_id = chat_service.save_image(
+        MAOP_ROOT,
+        session_id=session_id,
         filename=file.filename or "upload.png",
         data=content,
         content_type=file.content_type or "",
@@ -252,10 +227,8 @@ async def upload_image(
 async def list_session_images(request: Request, session_id: str) -> dict[str, Any]:
     """List all images for a chat session."""
     require_admin(request)
-    from maop.core.backends.image_store import ImageStore
-    store = ImageStore(root_dir=str(MAOP_ROOT))
-    images = store.list_session_images(session_id)
-    return {"status": "ok", "data": [img.model_dump() for img in images]}
+    images = chat_service.list_session_images(MAOP_ROOT, session_id)
+    return {"status": "ok", "data": images}
 
 
 @router.delete("/images/{image_id}")
@@ -263,11 +236,8 @@ async def list_session_images(request: Request, session_id: str) -> dict[str, An
 async def delete_image(image_id: str, request: Request) -> dict[str, Any]:
     """Delete an uploaded image."""
     require_admin(request)
-    from maop.core.backends.image_store import ImageStore
-    store = ImageStore(root_dir=str(MAOP_ROOT))
-    deleted = store.delete(image_id)
+    deleted = chat_service.delete_image(MAOP_ROOT, image_id)
     if not deleted:
-        from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=404,
             content={"status": "error", "error": "Image not found"},

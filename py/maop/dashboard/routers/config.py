@@ -13,6 +13,10 @@ The router looks up the :class:`ConfigHistory` instance via
 ``request.app.state.config_history`` first, falling back to the
 process-wide singleton.  Tests can therefore inject a fresh instance on
 ``app.state`` for isolation.
+
+Business logic (list/get/rollback) lives in
+:mod:`maop.dashboard.services.system_service`; this router only does
+request parsing, auth, service dispatch, and response formatting.
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from maop.core.config.config_history import ConfigHistory, get_config_history
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import system_service
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +73,7 @@ async def list_config_history(
     """
     require_admin(request)
     hist = _history(request)
-    items = hist.list_history(limit=limit)
+    items = system_service.list_config_history(hist, limit=limit)
     return {"status": "ok", "history": items, "count": len(items)}
 
 
@@ -85,7 +90,7 @@ async def get_config_version(
     """
     require_admin(request)
     hist = _history(request)
-    record = hist.get_version(version)
+    record = system_service.get_config_version(hist, version)
     if record is None:
         raise HTTPException(status_code=404, detail=f"Config version {version} not found")
     return {"status": "ok", **record}
@@ -109,7 +114,7 @@ async def rollback_config(
     require_admin(request)
     hist = _history(request)
     try:
-        restored = hist.rollback(version)
+        restored = system_service.rollback_config(hist, version)
     except ValueError as exc:
         # 批次3A: 脱敏——ValueError 细节不暴露给客户端，仅日志记录。
         logger.warning("[config-api] Rollback failed: %s", exc)

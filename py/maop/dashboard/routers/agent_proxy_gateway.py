@@ -5,19 +5,23 @@
 
 所有端点要求 admin 角色（via ``require_admin`` 守卫）。
 审计日志只追加不修改——本路由仅提供查询端点，无修改/删除端点。
+
+业务逻辑已提取至 ``maop.dashboard.services.agent_service``（§4）。
+本 router 仅保留：路由定义 / 请求参数解析 / 权限检查 /
+service 调用 / 响应格式化 / 错误处理。
 """
 
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, Request, Query
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.services import agent_service
 
 logger = logging.getLogger(__name__)
 
@@ -54,28 +58,13 @@ class CheckBudgetRequest(BaseModel):
     cost: float = Field(..., ge=0.0, description="待扣减成本(USD)")
 
 
-# ── 单例（双重检查锁定）────────────────────────────────────────────
-
-_gateway: Any = None
-_gateway_lock = threading.Lock()
-
-
+# ── 单例转发（供测试注入，转发到 service 层）──────────────────────
 def _get_gateway() -> Any:
-    """惰性初始化全局 AgentProxyGateway 单例。"""
-    global _gateway
-    if _gateway is None:
-        with _gateway_lock:
-            if _gateway is None:
-                from maop.core.agent.auth.agent_proxy_gateway import AgentProxyGateway
-                _gateway = AgentProxyGateway()
-    return _gateway
+    return agent_service._get_gateway()
 
 
 def _set_gateway(gateway: Any) -> None:
-    """供测试注入自定义 gateway（隔离 DB）。"""
-    global _gateway
-    with _gateway_lock:
-        _gateway = gateway
+    agent_service._set_gateway(gateway)
 
 
 # ── 代理规则端点 ──────────────────────────────────────────────────
@@ -91,21 +80,13 @@ async def api_add_proxy_rule(
 ) -> dict[str, Any]:
     """添加代理规则。"""
     require_admin(request)
-    from maop.core.agent.auth.agent_proxy_gateway import ProxyRule
-
-    rule = ProxyRule(
+    rule_id = agent_service.add_proxy_rule(
         internal_path=body.internal_path,
         external_agent=body.external_agent,
         allowed_departments=body.allowed_departments,
         enabled=body.enabled,
     )
-    gateway = _get_gateway()
-    gateway.add_proxy_rule(rule)
-    logger.info(
-        "[agent_proxy_route] 添加规则 id=%s path=%s",
-        rule.rule_id, rule.internal_path,
-    )
-    return {"status": "ok", "rule_id": rule.rule_id}
+    return {"status": "ok", "rule_id": rule_id}
 
 
 @router.get("/api/agent-proxy/rules")
@@ -116,13 +97,8 @@ async def api_add_proxy_rule(
 async def api_list_proxy_rules(request: Request) -> dict[str, Any]:
     """列出全部代理规则。"""
     require_admin(request)
-    gateway = _get_gateway()
-    rules = gateway.list_proxy_rules()
-    return {
-        "status": "ok",
-        "rules": [r.model_dump(mode="json") for r in rules],
-        "count": len(rules),
-    }
+    result = agent_service.list_proxy_rules()
+    return {"status": "ok", **result}
 
 
 @router.delete("/api/agent-proxy/rules/{rule_id}")
@@ -133,8 +109,7 @@ async def api_list_proxy_rules(request: Request) -> dict[str, Any]:
 async def api_remove_proxy_rule(rule_id: str, request: Request) -> dict[str, Any]:
     """移除代理规则。"""
     require_admin(request)
-    gateway = _get_gateway()
-    gateway.remove_proxy_rule(rule_id)
+    agent_service.remove_proxy_rule(rule_id)
     return {"status": "ok", "removed": rule_id}
 
 
@@ -154,13 +129,8 @@ async def api_query_audit(
 ) -> dict[str, Any]:
     """查询审计日志（按时间倒序）。"""
     require_admin(request)
-    gateway = _get_gateway()
-    events = gateway.query_audit(user=user, agent=agent, limit=limit)
-    return {
-        "status": "ok",
-        "events": [e.model_dump(mode="json") for e in events],
-        "count": len(events),
-    }
+    result = agent_service.query_audit(user=user, agent=agent, limit=limit)
+    return {"status": "ok", **result}
 
 
 # ── 部门预算端点 ──────────────────────────────────────────────────
@@ -176,22 +146,14 @@ async def api_set_department_budget(
 ) -> dict[str, Any]:
     """设置部门预算。"""
     require_admin(request)
-    from maop.core.agent.auth.agent_proxy_gateway import DepartmentBudget
-
-    budget = DepartmentBudget(
+    result = agent_service.set_department_budget(
         department=body.department,
         agent=body.agent,
         monthly_budget=body.monthly_budget,
         used=body.used,
         reset_day=body.reset_day,
     )
-    gateway = _get_gateway()
-    gateway.set_department_budget(budget)
-    logger.info(
-        "[agent_proxy_route] 设置预算 dept=%s agent=%s monthly=%.2f",
-        body.department, body.agent, body.monthly_budget,
-    )
-    return {"status": "ok", "department": body.department, "agent": body.agent}
+    return {"status": "ok", **result}
 
 
 @router.get("/api/agent-proxy/budget")
@@ -205,13 +167,8 @@ async def api_get_budget_summary(
 ) -> dict[str, Any]:
     """查询预算汇总。"""
     require_admin(request)
-    gateway = _get_gateway()
-    budgets = gateway.get_budget_summary(department=department)
-    return {
-        "status": "ok",
-        "budgets": [b.model_dump(mode="json") for b in budgets],
-        "count": len(budgets),
-    }
+    result = agent_service.get_budget_summary(department)
+    return {"status": "ok", **result}
 
 
 @router.post("/api/agent-proxy/budget/check")
@@ -224,8 +181,7 @@ async def api_check_budget(
 ) -> dict[str, Any]:
     """检查部门预算是否足够扣减。"""
     require_admin(request)
-    gateway = _get_gateway()
-    ok = gateway.check_budget(body.department, body.agent, body.cost)
+    ok = agent_service.check_budget(body.department, body.agent, body.cost)
     return {
         "status": "ok",
         "allowed": ok,
