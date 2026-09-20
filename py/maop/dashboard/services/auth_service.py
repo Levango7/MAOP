@@ -146,6 +146,41 @@ def get_auth_mgr() -> AuthManager:
     return _auth_mgr
 
 
+def _users_has_tenant_column(conn: Any) -> bool:
+    """``users`` 表当前是否已有 ``tenant_id`` 列（供写路径退化使用）。"""
+    try:
+        return "tenant_id" in {
+            row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()
+        }
+    except Exception:  # pragma: no cover
+        return False
+
+
+def _migrate_users_columns(conn: Any) -> None:
+    """给存量 ``users`` 表补上后加的列（幂等）。
+
+    与 :meth:`maop.core.security.api_key_manager.ApiKeyManager._migrate_columns`
+    同一模式：读 ``PRAGMA table_info`` 拿已有列，缺的列再 ``ALTER TABLE ADD
+    COLUMN``。缺省值必须是空串，这样**存量用户升级后租户仍为 ""**，
+    其行为与升级前完全一致（配额 / RBAC / 合规都按"未分配租户"处理）。
+    """
+    try:
+        existing = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    except Exception as exc:  # pragma: no cover - 极端情况下表不可读
+        logger.warning("[auth] 无法读取 users 表结构，跳过列迁移: %s", exc)
+        return
+    new_cols = [("tenant_id", "TEXT NOT NULL DEFAULT ''")]
+    for col, decl in new_cols:
+        if col not in existing:
+            try:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} {decl}")
+                logger.info("[auth] users 表已补充列: %s", col)
+            except Exception as exc:
+                # 重复列 / 权限不足等：记 warning 而不是让启动崩掉——
+                # 缺该列只会让租户链路退化，不应阻断整个认证服务。
+                logger.warning("[auth] users 表补充列 %s 失败: %s", col, exc)
+
+
 def _ensure_default_user() -> None:
     """Create default admin user on first run if none exists."""
     try:
@@ -157,9 +192,14 @@ def _ensure_default_user() -> None:
                     password_hash TEXT NOT NULL,
                     roles TEXT NOT NULL DEFAULT '["admin"]',
                     created_at REAL NOT NULL,
-                    enabled INTEGER NOT NULL DEFAULT 1
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    tenant_id TEXT NOT NULL DEFAULT ''
                 )
             """)
+            # 存量库补列。模式照抄 maop.core.security.api_key_manager
+            # 的 _migrate_columns——api_keys.tenant_id 就是这么加的，
+            # 不另造机制。
+            _migrate_users_columns(conn)
             existing = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
             if existing == 0:
                 # H7 fix: support Docker secrets standard (MAOP_ADMIN_PASSWORD_FILE).
@@ -237,11 +277,30 @@ def db_login_user(db_path_str: str, username: str, password: str) -> Any:
             )
 
     roles = json.loads(row["roles"])
-    return {"status": "ok", "username": username, "roles": roles}
+    # 租户随登录结果返回，供 routers/auth.py 写入 JWT 的 "tenant" claim。
+    # 用 keys() 判存在性而非直接取：列迁移失败时（见 _migrate_users_columns）
+    # 缺列应退化为"未分配租户"，而不是让登录 500。
+    tenant_id = ""
+    try:
+        if "tenant_id" in row.keys():
+            tenant_id = row["tenant_id"] or ""
+    except Exception:  # pragma: no cover - 非 Row 类型的兜底
+        tenant_id = ""
+    return {"status": "ok", "username": username, "roles": roles, "tenant_id": tenant_id}
 
 
-def db_register_user(db_path_str: str, username: str, password: str, roles: list) -> dict:
+def db_register_user(
+    db_path_str: str,
+    username: str,
+    password: str,
+    roles: list,
+    tenant_id: str = "",
+) -> dict:
     """Sync: register a new user.
+
+    Args:
+        tenant_id: 租户归属。缺省 ``""``（未分配）——保持与存量用户一致，
+            未显式指定时不会意外获得隔离。
 
     Raises ``UsernameAlreadyExists`` if the username is taken.
     Returns a plain business-data dict on success.
@@ -253,22 +312,46 @@ def db_register_user(db_path_str: str, username: str, password: str, roles: list
             raise UsernameAlreadyExists("Username already exists")
 
         pwd_hash = hash_password(password)
+        # 列可能不存在（迁移失败时），此时退化：不带 tenant_id 插入。
+        cols = "username, password_hash, roles, created_at, enabled"
+        # 注意 enabled 原为 SQL 字面量 1，改为动态列数后必须显式补上，
+        # 否则会出现"5 列 4 值"的错位。
+        vals: tuple = (username, pwd_hash, json.dumps(roles), time.time(), 1)
+        if _users_has_tenant_column(conn):
+            cols += ", tenant_id"
+            vals = (*vals, tenant_id or "")
         conn.execute(
-            "INSERT INTO users (username, password_hash, roles, created_at, enabled) VALUES (?, ?, ?, ?, 1)",
-            (username, pwd_hash, json.dumps(roles), time.time()),
+            f"INSERT INTO users ({cols}) VALUES ({', '.join('?' * len(vals))})",
+            vals,
         )
 
-    return {"status": "ok", "username": username, "roles": roles}
+    return {"status": "ok", "username": username, "roles": roles, "tenant_id": tenant_id or ""}
 
 
 def db_list_users(db_path_str: str) -> list:
     """Sync: list all users."""
 
     with sqlite_connect(db_path_str) as conn:
-        rows = conn.execute("SELECT username, roles, created_at, enabled FROM users ORDER BY created_at").fetchall()
+        if _users_has_tenant_column(conn):
+            rows = conn.execute(
+                "SELECT username, roles, created_at, enabled, tenant_id "
+                "FROM users ORDER BY created_at"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT username, roles, created_at, enabled FROM users ORDER BY created_at"
+            ).fetchall()
 
-    return [{"username": r["username"], "roles": json.loads(r["roles"]),
-             "created_at": r["created_at"], "enabled": bool(r["enabled"])} for r in rows]
+    out = []
+    for r in rows:
+        item = {"username": r["username"], "roles": json.loads(r["roles"]),
+                "created_at": r["created_at"], "enabled": bool(r["enabled"])}
+        try:
+            item["tenant_id"] = r["tenant_id"] or ""
+        except Exception:  # pragma: no cover - 缺列时退化为未分配
+            item["tenant_id"] = ""
+        out.append(item)
+    return out
 
 
 def db_delete_user(db_path_str: str, username: str) -> dict:

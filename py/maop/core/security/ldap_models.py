@@ -124,6 +124,10 @@ class AuthResult(BaseModel):
     user: LDAPUser | None = None
     roles: list[str] = Field(default_factory=list)
     error: str = ""
+    #: 租户归属。LDAP 侧暂不推导（需先定义"用哪个 LDAP 属性映射租户"的
+    #: 规则，不在本期臆造），统一缺省 ""；字段存在是为了让认证中间件
+    #: 的 ``getattr(result, "tenant_id", "")`` 对两条链路行为一致。
+    tenant_id: str = ""
 
 
 __all__ = [

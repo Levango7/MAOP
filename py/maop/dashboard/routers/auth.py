@@ -208,7 +208,15 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
             raise HTTPException(status_code=401, detail=result.get("error", "Login failed"))
 
         mgr = auth_service.get_auth_mgr()
-        token = mgr.jwt_handler.create_token(result["username"], roles=result["roles"], ttl_s=auth_service._JWT_TTL_S)
+        # 租户写入 JWT：登录后凭证携带归属，中间件据此注入
+        # request.state.tenant_id，配额 / RBAC / 合规的隔离才真正生效。
+        # result 可能缺该键（列迁移失败时），故用 .get 退化为空串。
+        token = mgr.jwt_handler.create_token(
+            result["username"],
+            roles=result["roles"],
+            ttl_s=auth_service._JWT_TTL_S,
+            tenant_id=result.get("tenant_id", "") or "",
+        )
         # P1-18 fix: clear failures on successful login
         with auth_service.login_failures_lock:
             auth_service.db_clear_login_failures(username, "user")
@@ -262,11 +270,13 @@ async def auth_refresh(request: Request):
                 status_code=401,
                 detail=result.error or "Token invalid or expired",
             )
-        # Issue new token with same identity + roles
+        # Issue new token with same identity + roles + tenant。
+        # 保留原 token 的租户（可能为空串=未分配），避免续期后租户丢失。
         new_token = mgr.jwt_handler.create_token(
             result.identity,
             roles=result.roles,
             ttl_s=auth_service._JWT_TTL_S,
+            tenant_id=getattr(result, "tenant_id", "") or "",
         )
         response = JSONResponse({
             "status": "ok",

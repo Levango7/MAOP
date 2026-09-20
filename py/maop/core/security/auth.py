@@ -36,6 +36,14 @@ class AuthResult(BaseModel):
     roles: list[str] = Field(default_factory=list)
     error: str = ""
     expires_at: float = 0.0
+    #: 租户归属。默认空串表示"未分配租户"——与 ``api_keys.tenant_id``
+    #: 的缺省保持一致。认证中间件把它注入 ``request.state.tenant_id``，
+    #: 配额 / RBAC / 合规据此做租户隔离。
+    #:
+    #: **重要**：保持缺省 ``""`` 是刻意的。存量用户升级后仍为 ""，
+    #: 其行为与升级前完全一致；只有显式分配了租户的用户才会进入隔离。
+    #: 这样"补齐租户链路"本身不构成行为变更，无需额外的开关。
+    tenant_id: str = ""
 
 
 class APIKey(BaseModel):
@@ -337,8 +345,15 @@ class JWTHandler:
         *,
         roles: list[str] | None = None,
         ttl_s: float | None = None,
+        tenant_id: str = "",
     ) -> str:
-        """Create a JWT token."""
+        """Create a JWT token.
+
+        Args:
+            tenant_id: 租户归属。缺省 ``""``（未分配）。写入 ``tenant`` claim；
+                缺省时不写入该 claim，使新签发的 token 与存量 token 结构兼容
+                （见 :meth:`validate_token` 的向后兼容说明）。
+        """
         now = time.time()
         exp = now + (ttl_s or self.config.default_ttl_s)
 
@@ -350,6 +365,8 @@ class JWTHandler:
             "iat": now,
             "exp": exp,
         }
+        if tenant_id:
+            payload["tenant"] = tenant_id
 
         header_b64 = self._b64url_encode(json.dumps(header, separators=(",", ":")).encode())
         payload_b64 = self._b64url_encode(json.dumps(payload, separators=(",", ":")).encode())
@@ -418,11 +435,20 @@ class JWTHandler:
             if is_revoked:
                 return AuthResult(authenticated=False, error="Token revoked")
 
+            # 向后兼容：存量 token 没有 "tenant" claim（本字段后加），
+            # 缺失一律按"未分配租户"处理，**不得**因缺该 claim 判定 token
+            # 无效——否则会让所有已登录用户被强制登出。
+            tenant_claim = payload.get("tenant", "")
+            if not isinstance(tenant_claim, str):
+                # 防御：claim 被篡改成非字符串时按未分配处理，不抛异常。
+                tenant_claim = ""
+
             return AuthResult(
                 authenticated=True,
                 identity=payload.get("sub", ""),
                 roles=payload.get("roles", []),
                 expires_at=payload.get("exp", 0),
+                tenant_id=tenant_claim,
             )
         except Exception as e:
             # P2-1 fix: 异常详情不返回给调用方（可能泄露 token 内部结构、
