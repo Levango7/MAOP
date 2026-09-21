@@ -619,7 +619,7 @@ def _rollback_migration(root_dir: str | Path, report: MigrationReport) -> None:
     迁移时间窗口内写入的行。由于迁移使用 INSERT OR IGNORE 且源数据保留，
     回滚后可安全重跑。
     """
-    root = Path(root_dir)
+    Path(root_dir)
     dst_path = get_memory_db_path()
     if not dst_path.exists():
         return

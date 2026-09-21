@@ -186,7 +186,7 @@ def search_agents(capability: list[str]) -> dict[str, Any]:
     else:
         caps = [AgentCapability(c) for c in capability]
         # 逐个能力搜索取交集（search 已过滤 enabled=True）
-        result_sets = [set(a.name for a in catalog.search(c)) for c in caps]
+        result_sets = [{a.name for a in catalog.search(c)} for c in caps]
         common = set.intersection(*result_sets) if result_sets else set()
         all_agents = {a.name: a for a in catalog.list_enabled()}
         agents = [all_agents[n] for n in sorted(common)]

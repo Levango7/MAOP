@@ -131,10 +131,6 @@ def test_ac04_no_pending_when_all_approved():
         ),
     ]
 
-    suggestions = [
-        {"id": "s1", "mutation_type": "adjust_timeout", "severity": "HIGH", "auto_applicable": True},
-        {"id": "s2", "mutation_type": "adjust_retries", "severity": "MEDIUM", "auto_applicable": True},
-    ]
 
     with patch("maop.core.evolution.evolution_strategies.StrategyEngine") as mock_engine_class:
         mock_engine = MagicMock()

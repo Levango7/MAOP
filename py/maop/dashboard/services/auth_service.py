@@ -282,7 +282,7 @@ def db_login_user(db_path_str: str, username: str, password: str) -> Any:
     # 缺列应退化为"未分配租户"，而不是让登录 500。
     tenant_id = ""
     try:
-        if "tenant_id" in row.keys():
+        if "tenant_id" in row:
             tenant_id = row["tenant_id"] or ""
     except Exception:  # pragma: no cover - 非 Row 类型的兜底
         tenant_id = ""

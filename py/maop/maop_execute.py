@@ -337,7 +337,7 @@ async def maop_execute(
         except Exception as exc:
             # P1-SSE fix: 对外 SSE error event 只发送通用错误消息，详细异常
             # （可能含堆栈跟踪、连接字符串、文件路径等）仅记录到 logger，避免信息泄露。
-            logger.error("[execute] ReAct loop error (trace_id=%s): %s", trace_id, exc, exc_info=True)
+            logger.exception("[execute] ReAct loop error (trace_id=%s)", trace_id)
             _emit_agent_event(trace_id, "error", {"error": "Internal server error"})
             return new_result(
                 agent=agent, task=task,
@@ -406,7 +406,7 @@ async def maop_execute(
         )
         # P1-SSE fix: 对外 SSE error event 只发送通用错误消息，详细异常
         # （可能含堆栈跟踪、连接字符串、文件路径等）仅记录到 logger，避免信息泄露。
-        logger.error("[execute] Dispatch error (trace_id=%s): %s", trace_id, exc, exc_info=True)
+        logger.exception("[execute] Dispatch error (trace_id=%s)", trace_id)
         _emit_agent_event(trace_id, "error", {"error": "Internal server error"})
 
     # Function-call loop: if agent returned tool_calls, execute and re-dispatch

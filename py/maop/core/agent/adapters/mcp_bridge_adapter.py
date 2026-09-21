@@ -138,11 +138,10 @@ class MCPBridgeAdapter(AgentAdapter):
         ``task`` 作为 ``{"prompt": task}`` 参数传入工具，额外 ``kwargs``
         合并到参数字典中。工具返回错误时抛出 ``RuntimeError``。
         """
-        if not self._connected:
-            if not self.connect():
-                raise RuntimeError(
-                    "MCPBridgeAdapter not connected — connect() failed"
-                )
+        if not self._connected and not self.connect():
+            raise RuntimeError(
+                "MCPBridgeAdapter not connected — connect() failed"
+            )
 
         arguments: dict[str, Any] = {"prompt": task}
         arguments.update(kwargs)

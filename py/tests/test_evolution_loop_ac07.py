@@ -22,7 +22,7 @@ import pytest  # noqa: F401
 
 def test_ac07_evolution_loop_status(evolution_loop_factory):
     """GET /api/evolution/loop/status 返回状态机状态 + 最近 cycle。"""
-    loop = evolution_loop_factory()
+    evolution_loop_factory()
 
     # Mock EvolutionLoop.get_cycle_history - function imports locally from maop.core.evolution.evolution_loop
     with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as mock_loop_class, \

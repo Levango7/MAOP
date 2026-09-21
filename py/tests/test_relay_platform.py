@@ -432,7 +432,6 @@ def test_concurrent_access(manager: RelayPlatformManager):
 
 def test_concurrent_register_and_list(manager: RelayPlatformManager):
     """并发注册 + 列表查询混合操作。"""
-    num_threads = 8
     errors: list[Exception] = []
 
     def registrar() -> None:

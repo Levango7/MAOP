@@ -14,6 +14,7 @@ import base64
 import hashlib
 import json
 from pathlib import Path
+from typing import ClassVar
 
 import maop.enterprise.license as license_mod
 import pytest
@@ -79,7 +80,9 @@ def signed_tree(tmp_path, monkeypatch):
         private_key = priv
         # Pick a real module file (excluding __init__.py, which the
         # manifest signing tool skips) for tamper tests
-        _mods = [f for f in sorted(ent.glob("*.py")) if f.name != "__init__.py"]
+        _mods: ClassVar[list] = [
+            f for f in sorted(ent.glob("*.py")) if f.name != "__init__.py"
+        ]
         sample_module = _mods[0] if _mods else None
 
     return Ctx

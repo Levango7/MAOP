@@ -157,7 +157,9 @@ class HarnessAuthProvider:
         ]
         for fmt in formats:
             try:
-                dt = datetime.strptime(expires_at, fmt)
+                # 入参格式可能本就不含时区，下一行显式判断 dt.tzinfo is None
+                # 并按本地时间转 UTC；强行要求 %z 会让无时区的合法输入解析失败。
+                dt = datetime.strptime(expires_at, fmt)  # noqa: DTZ007
                 # 不带时区的视为本地时间，统一转 UTC 以便比较。
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)

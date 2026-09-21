@@ -145,12 +145,10 @@ class HTTPAdapter(AgentAdapter):
                 headers=self._build_headers(),
             )
             # 发送轻量请求验证可达性（容忍 404，拒绝连接错误）
-            try:
-                self._client.get("/health", timeout=5.0)
-            except httpx.ConnectError:
-                # /health 不存在但服务可达时可能返回 404，
-                # 只有连接级别错误才算不可达
-                raise
+            # /health 不存在但服务可达时可能返回 404，
+            # 只有连接级别错误（ConnectError）才算不可达——直接向上传播。
+            # TRY203：原 try/except 仅做裸 raise，等价于不捕获。
+            self._client.get("/health", timeout=5.0)
             self._connected = True
             logger.info("[http_adapter] Connected to %s", self.config.base_url)
             return True
@@ -168,9 +166,8 @@ class HTTPAdapter(AgentAdapter):
         请求失败时按 ``max_retries`` 重试，全部失败后抛出
         ``RuntimeError``。
         """
-        if not self._connected or self._client is None:
-            if not self.connect():
-                raise RuntimeError("HTTPAdapter not connected — connect() failed")
+        if (not self._connected or self._client is None) and not self.connect():
+            raise RuntimeError("HTTPAdapter not connected — connect() failed")
 
         url = self._build_url()
         body = self._build_body(task, **kwargs)

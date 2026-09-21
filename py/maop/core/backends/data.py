@@ -475,9 +475,9 @@ class MaopDatabase:
             # 表不存在或 JSON1 扩展不可用等预期异常，返回空列表
             logger.warning("JSON1 query failed: %s", exc)
             return []
-        except Exception as exc:
+        except Exception :
             # 非预期异常，记录日志并重新抛出
-            logger.error("JSON1 query unexpected error: %s", exc, exc_info=True)
+            logger.exception("JSON1 query unexpected error")
             raise
 
     def json_each(
@@ -526,9 +526,9 @@ class MaopDatabase:
             # 表不存在或 JSON1 扩展不可用等预期异常，返回空列表
             logger.warning("json_each failed: %s", exc)
             return []
-        except Exception as exc:
+        except Exception :
             # 非预期异常，记录日志并重新抛出
-            logger.error("json_each unexpected error: %s", exc, exc_info=True)
+            logger.exception("json_each unexpected error")
             raise
 
     # ── FTS5 full-text search (P2-2) ────────────────────────

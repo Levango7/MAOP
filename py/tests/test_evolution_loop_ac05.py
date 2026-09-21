@@ -50,7 +50,11 @@ def test_ac05_rollback_cycle_with_mocked_changetracker(evolution_loop_factory):
         mock_ct_class.return_value = mock_ct
 
         # 插入一个 cycle 报告到 DB（模拟已有 snapshot）
-        from maop.core.evolution.evolution_loop_types import LoopPhase, LoopReport, PhaseResult  # noqa: F401
+        from maop.core.evolution.evolution_loop_types import (  # noqa: F401
+            LoopPhase,
+            LoopReport,
+            PhaseResult,
+        )
         report = LoopReport(
             cycle_id="test-cycle-001",
             snapshot_id="snap-test-001",

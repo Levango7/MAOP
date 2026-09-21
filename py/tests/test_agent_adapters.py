@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from maop.core.agent.adapters import (
     CLIAdapter,
@@ -101,7 +102,7 @@ class TestCLIAdapterConfig:
 
     def test_config_extra_forbid(self):
         """未知字段被拒绝（extra='forbid'）。"""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             CLIAdapterConfig(command="python", unknown_field=True)
 
 

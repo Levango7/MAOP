@@ -486,9 +486,9 @@ __all__ = [
     "_find_step",
     "_resolve_template",
     "_topological_sort",
-    "json_dumps_safe",
-    "safe_eval",
+    "check_pause_async",
     # Pause helpers (re-exported from engine_pause for backward compat)
     "is_paused",
-    "check_pause_async",
+    "json_dumps_safe",
+    "safe_eval",
 ]

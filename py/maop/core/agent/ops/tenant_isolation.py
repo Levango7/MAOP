@@ -377,10 +377,9 @@ class TenantIsolation:
                 return False
             # 额度检查
             quota = self.get_tenant_quota(tenant_id, agent_name)
-            if quota is not None and quota.quota_limit > 0:
-                if quota.quota_used >= quota.quota_limit:
-                    return False
-            return True
+            if quota is None or quota.quota_limit <= 0:
+                return True          # 未设额度 = 不限
+            return quota.quota_used < quota.quota_limit
 
     # ── 使用情况 ────────────────────────────────────────────────
     def get_tenant_usage(self, tenant_id: str) -> list[TenantUsage]:

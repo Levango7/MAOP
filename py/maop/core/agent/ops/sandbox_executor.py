@@ -389,6 +389,7 @@ class SandboxExecutor:
             command,
             shell=True,
             cwd=cwd,
+            check=False,   # PLW1510：显式声明不做返回码检查（原为默认行为）
             env=env,
             capture_output=True,
             timeout=config.max_execution_time_s,

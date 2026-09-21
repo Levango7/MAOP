@@ -56,7 +56,6 @@ def _login_failures_db_path() -> str:
 
 def _sync_auth_state() -> None:
     """Sync router-level reset flags into auth_service (for test fixtures)."""
-    global _auth_mgr, _login_failures_table_ready
     if _auth_mgr is None:
         auth_service._auth_mgr = None
     if not _login_failures_table_ready:
@@ -300,8 +299,8 @@ async def auth_refresh(request: Request):
         return response
     except HTTPException:
         raise
-    except Exception as exc:
-        logger.exception("[auth] Token refresh failed: %s", exc)
+    except Exception :
+        logger.exception("[auth] Token refresh failed")
         raise HTTPException(
             status_code=500,
             detail="Refresh failed, please try again later",

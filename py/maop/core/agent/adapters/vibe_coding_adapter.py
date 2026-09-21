@@ -183,10 +183,8 @@ class VibeCodingAdapter(WebAdapter):
                     headers=self._build_headers(),
                 )
                 # 验证平台可达（容忍非 2xx，拒绝连接错误）
-                try:
-                    self._client.get(self.vibe_config.base_url, timeout=5.0)
-                except httpx.ConnectError:
-                    raise
+                # TRY203：原 try/except 仅做裸 raise，等价于不捕获。
+                self._client.get(self.vibe_config.base_url, timeout=5.0)
                 self._connected = True
                 logger.info(
                     "[vibe_coding] 已连接到 %s (%s)",
@@ -208,11 +206,10 @@ class VibeCodingAdapter(WebAdapter):
         ``kwargs`` 可传入 ``template`` 覆盖配置中的项目模板。
         """
         with self._lock:
-            if not self._connected or self._client is None:
-                if not self.connect():
-                    raise RuntimeError(
-                        "VibeCodingAdapter 未连接 — connect() 失败"
-                    )
+            if (not self._connected or self._client is None) and not self.connect():
+                raise RuntimeError(
+                    "VibeCodingAdapter 未连接 — connect() 失败"
+                )
             template = kwargs.get(
                 "template", self.vibe_config.project_template
             )

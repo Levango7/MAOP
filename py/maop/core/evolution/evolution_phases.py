@@ -193,9 +193,13 @@ class EvolutionPhasesMixin:
                         # 异常向上传播由外层兜底标记 needs_review
                         import concurrent.futures
 
-                        def _run_debate_in_new_loop() -> Any:
+                        # B023：用默认参数显式绑定循环变量 _debate_coro。
+                        # 当前调用点 _pool.submit(...).result() 在同轮内阻塞求值，
+                        # 故无实际缺陷；显式绑定是防止日后改为延迟/并发调用时
+                        # 静默捕获到错误迭代的协程。
+                        def _run_debate_in_new_loop(_coro: Any = _debate_coro) -> Any:
                             try:
-                                return asyncio.run(_debate_coro)
+                                return asyncio.run(_coro)
                             except RuntimeError as _re:
                                 logger.warning(
                                     "[evo-loop] debate coroutine 在新循环执行时"

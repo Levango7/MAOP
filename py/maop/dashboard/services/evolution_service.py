@@ -684,7 +684,7 @@ def decide_evolution_approval(
     Raises the underlying exception on persistence failure (router maps to 500).
     """
     try:
-        cycle_id, suggestion_id = approval_id.split(":", 1)
+        cycle_id, _suggestion_id = approval_id.split(":", 1)
     except ValueError as exc:
         raise ValueError("Invalid approval_id format (cycle_id:suggestion_id)") from exc
 
@@ -727,7 +727,7 @@ def get_evolution_ab_results(cycle_id: str) -> dict[str, Any]:
     from maop.core.evolution.ab_test import ABTestManager
 
     try:
-        loop = _evo_loop()
+        _evo_loop()
         ab_manager = ABTestManager(root_dir=str(state.MAOP_ROOT))
 
         # 查找该 cycle 的 A/B 实验

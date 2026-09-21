@@ -56,8 +56,8 @@ class MemoryManagerMixin:
             finished_at = report.finished_at
             entries_scanned = report.total_entries_scanned
             entries_pruned = report.entries_pruned
-        except Exception as exc:
-            logger.error("[memory_manager] dream() failed: %s", exc, exc_info=True)
+        except Exception :
+            logger.exception("[memory_manager] dream() failed")
             success = False
             started_at = ""
             finished_at = ""

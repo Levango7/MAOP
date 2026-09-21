@@ -234,7 +234,7 @@ class AgentCollaboration(CollaborationExecutorMixin):
                         step.name, result.error,
                     )
 
-        total_duration = time.monotonic() - start_time
+        time.monotonic() - start_time
         return self._aggregate_results(step_results)
 
 

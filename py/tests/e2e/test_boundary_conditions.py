@@ -14,6 +14,7 @@ from pathlib import Path  # noqa: F401
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import ValidationError
 
 os.environ.setdefault("MAOP_ENV", "test")
 os.environ.setdefault("MAOP_AUTH", "0")
@@ -37,7 +38,7 @@ class TestEmptyInput:
 
     def test_empty_string_agent_name_rejected(self, tmp_path):
         """空字符串作为 agent 名称应被 Pydantic 拒绝（min_length=1）。"""
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(ValidationError) as exc_info:
             AgentDescriptor(name="")
         # Pydantic ValidationError
         assert "min_length" in str(exc_info.value) or "at least 1" in str(exc_info.value)
@@ -92,7 +93,7 @@ class TestOversizedInput:
     def test_oversized_agent_name_rejected(self, tmp_path):
         """超长字符串（10000字符）作为 agent 名称应被拒绝（max_length=256）。"""
         long_name = "a" * 10000
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(ValidationError) as exc_info:
             AgentDescriptor(name=long_name)
         assert "max_length" in str(exc_info.value) or "at most 256" in str(exc_info.value)
 
@@ -104,7 +105,7 @@ class TestOversizedInput:
 
     def test_name_one_over_max_rejected(self, tmp_path):
         """257 字符应被拒绝（边界值+1）。"""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AgentDescriptor(name="a" * 257)
 
     def test_large_batch_register_1000(self, tmp_path):
@@ -127,12 +128,12 @@ class TestOversizedInput:
 
     def test_oversized_display_name_rejected(self, tmp_path):
         """超长 display_name（>256）应被拒绝。"""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AgentDescriptor(name="ok", display_name="x" * 10000)
 
     def test_fallback_self_reference_rejected(self, tmp_path):
         """fallback_agents 包含自身应被拒绝（防无限循环）。"""
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(ValidationError) as exc_info:
             AgentDescriptor(name="self_loop", fallback_agents=["self_loop"])
         assert "fallback" in str(exc_info.value).lower() or "itself" in str(exc_info.value).lower()
 
@@ -264,9 +265,13 @@ class TestErrorChain:
         """数据库连接断开时 register 应抛异常，不静默吞错。"""
         catalog = AgentCatalog(db_path=tmp_path / "cat.db")
         # 破坏 store 的 upsert 方法
-        with patch.object(catalog._store, "upsert", side_effect=RuntimeError("DB connection lost")):
-            with pytest.raises(RuntimeError, match="DB connection lost"):
-                catalog.register(AgentDescriptor(name="will_fail"))
+        with (
+            patch.object(
+                catalog._store, "upsert", side_effect=RuntimeError("DB connection lost")
+            ),
+            pytest.raises(RuntimeError, match="DB connection lost"),
+        ):
+            catalog.register(AgentDescriptor(name="will_fail"))
 
     @pytest.mark.xfail(
         reason="已知脆弱点 BUG-001：AgentCatalog 初始化时连接池创建早于 _load_from_store "
@@ -401,20 +406,20 @@ class TestTypeConfusion:
 
     def test_negative_max_concurrent_rejected(self, tmp_path):
         """负数 max_concurrent 应被拒绝（ge=1）。"""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AgentDescriptor(name="test", max_concurrent=-1)
 
     def test_zero_max_concurrent_rejected(self, tmp_path):
         """零 max_concurrent 应被拒绝（ge=1）。"""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AgentDescriptor(name="test", max_concurrent=0)
 
     def test_negative_timeout_rejected(self, tmp_path):
         """负数 timeout 应被拒绝（gt=0）。"""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AgentDescriptor(name="test", timeout_s=-1.0)
 
     def test_zero_timeout_rejected(self, tmp_path):
         """零 timeout 应被拒绝（gt=0）。"""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AgentDescriptor(name="test", timeout_s=0.0)

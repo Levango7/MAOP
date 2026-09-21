@@ -18,6 +18,7 @@ from typing import Any
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from maop.core.agent.adapters.vibe_coding_adapter import (
     VibeCodingAdapter,
@@ -335,7 +336,7 @@ class TestVibeCodingConfigValidation:
             VibeCodingConfig(platform="bolt-new", poll_interval_s=-1)
 
         # 未知字段被拒绝
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             VibeCodingConfig(platform="bolt-new", unknown_field=True)
 
         # 合法配置

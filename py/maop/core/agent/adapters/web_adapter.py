@@ -155,10 +155,8 @@ class WebAdapter(AgentAdapter):
                 headers=self._build_headers(),
             )
             # 验证 API URL 可达（容忍非 2xx，拒绝连接错误）
-            try:
-                self._client.get(self.config.api_url, timeout=5.0)
-            except httpx.ConnectError:
-                raise
+            # TRY203：原 try/except 仅做裸 raise，等价于不捕获。
+            self._client.get(self.config.api_url, timeout=5.0)
             self._connected = True
             logger.info("[web_adapter] Connected to %s", self.config.api_url)
             return True
@@ -172,9 +170,8 @@ class WebAdapter(AgentAdapter):
 
     def execute(self, task: str, **kwargs: Any) -> str:
         """发送 HTTP POST 请求并返回提取后的响应字符串。"""
-        if not self._connected or self._client is None:
-            if not self.connect():
-                raise RuntimeError("WebAdapter not connected — connect() failed")
+        if (not self._connected or self._client is None) and not self.connect():
+            raise RuntimeError("WebAdapter not connected — connect() failed")
 
         body = self._build_body(task)
         body.update(kwargs)

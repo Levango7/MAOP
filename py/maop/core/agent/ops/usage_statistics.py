@@ -354,10 +354,15 @@ class UsageStatistics:
     def recommend_agent(
         self,
         task_type: str = "",
-        capabilities: list[str] = [],
+        capabilities: list[str] | None = None,
         prefer_free: bool = True,
     ) -> list[AgentRecommendation]:
         """智能推荐 Agent.
+
+        .. note::
+           ``capabilities`` 原先用 ``[]`` 作默认值（B006 可变默认参数）——
+           可变对象作默认值会在多次调用间共享，一旦被就地修改就串味。
+           已改为 ``None`` 并在函数内建新列表。
 
         基于历史统计与 Agent 元数据，综合评分推荐最适合的 Agent。
 
@@ -389,12 +394,13 @@ class UsageStatistics:
         list[AgentRecommendation]
             按综合评分降序排列的推荐列表。
         """
+        if capabilities is None:      # B006：避免可变默认参数
+            capabilities = []
         all_stats = self.get_all_stats(period="all")
         if not all_stats:
             return []
 
         recommendations: list[AgentRecommendation] = []
-        reasons: list[str] = []
 
         for stats in all_stats:
             # ── 成功率得分（40%）──

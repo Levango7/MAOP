@@ -14,6 +14,7 @@ import threading
 from typing import Any  # noqa: F401
 
 import pytest
+from pydantic import ValidationError
 
 from maop.core.agent.discovery.config_template import (
     ConfigTemplate,
@@ -52,7 +53,7 @@ class TestConfigTemplateModel:
 
     def test_config_template_requires_name(self) -> None:
         """测试 name 为空时抛出校验错误。"""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             ConfigTemplate(name="", adapter_type="cli")
 
 

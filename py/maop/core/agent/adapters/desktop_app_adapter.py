@@ -142,9 +142,7 @@ class DesktopAppAdapter(CLIAdapter):
         if not self._app_config.ipc_path:
             return False
         # Windows 旧版本可能不支持 AF_UNIX
-        if not hasattr(socket, "AF_UNIX"):
-            return False
-        return True
+        return hasattr(socket, "AF_UNIX")
 
     def _is_http_available(self) -> bool:
         """检测 HTTP 是否可用（URL 非空）。"""
@@ -341,12 +339,11 @@ class DesktopAppAdapter(CLIAdapter):
         任一方式成功即返回结果。
         """
         with self._lock:
-            if not self._connected:
-                if not self.connect():
-                    raise RuntimeError(
-                        f"DesktopAppAdapter '{self._app_config.app_name}' "
-                        f"全部通信方式不可用"
-                    )
+            if not self._connected and not self.connect():
+                raise RuntimeError(
+                    f"DesktopAppAdapter '{self._app_config.app_name}' "
+                    f"全部通信方式不可用"
+                )
 
             last_error: Exception | None = None
             for method in self._app_config.fallback_order:

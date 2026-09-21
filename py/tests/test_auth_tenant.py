@@ -62,7 +62,7 @@ def test_legacy_token_without_claim_still_valid(handler):
 def test_non_string_tenant_claim_is_ignored(handler):
     """claim 被篡改成非字符串时按未分配处理，不抛异常。"""
     token = handler.create_token("eve", roles=["admin"], tenant_id="acme")
-    header, payload_b64, _sig = token.split(".")
+    header, _payload_b64, _sig = token.split(".")
     forged = {"iss": "MAOP", "sub": "eve", "roles": ["admin"],
               "iat": 1.0, "exp": 4.0e9, "tenant": 12345}
     new_payload = base64.urlsafe_b64encode(

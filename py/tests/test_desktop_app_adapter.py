@@ -285,7 +285,7 @@ class TestFallbackOrder:
         # CLI 返回结果（但不应该被调用）
         cli_mock = _patch_cli_execute(monkeypatch, return_value="cli_result")
         # HTTP 返回结果
-        http_mock_client = _patch_http_client(monkeypatch, response_text="http_first")
+        _patch_http_client(monkeypatch, response_text="http_first")
 
         config = DesktopAppConfig(
             app_name="cursor",

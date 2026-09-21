@@ -244,9 +244,11 @@ class TestVerifySignatureBranches:
         # Valid base64 but not a valid DER cert
         bad_cert = base64.b64encode(b"not a cert").decode()
         # P1-6 fix 适配: mock _HAS_XMLSEC=True 以到达 cert parse 分支
-        with patch("maop.enterprise.saml_handler._HAS_XMLSEC", True):
-            with pytest.raises(SSOError, match="cert parse failed"):
-                handler._verify_signature_selfimplemented(b"<resp/>", bad_cert)
+        with (
+            patch("maop.enterprise.saml_handler._HAS_XMLSEC", True),
+            pytest.raises(SSOError, match="cert parse failed"),
+        ):
+            handler._verify_signature_selfimplemented(b"<resp/>", bad_cert)
 
     def test_xml_parse_failed(self):
         """Cover XML parse failure in verify (400-401)."""

@@ -67,7 +67,7 @@ class TestModelPermission:
         assert p.priority == 10
 
     def test_wildcard_star(self):
-        p = ModelPermission(model_pattern="*")
+        ModelPermission(model_pattern="*")
         gw = ModelGateway()
         assert gw._match_pattern("*", "gpt-4o") is True
         assert gw._match_pattern("*", "claude-3") is True
@@ -473,7 +473,7 @@ class TestModelGatewayPersistence:
                 ModelPermission(model_pattern="init-*", allowed=True, priority=5),
             ]
         )
-        gw1 = ModelGateway(config=cfg, db_path=db)
+        ModelGateway(config=cfg, db_path=db)
         # 新实例不传 config，应从 DB 加载
         gw2 = ModelGateway(db_path=db)
         perms = gw2.list_permissions()

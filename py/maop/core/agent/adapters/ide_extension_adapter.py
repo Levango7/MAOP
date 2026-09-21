@@ -96,7 +96,7 @@ class IDEExtensionConfig(BaseModel):
         """校验 Companion URL 以 ws:// 或 wss:// 开头。"""
         if not v:
             raise ValueError("companion_url 不能为空")
-        if not (v.startswith("ws://") or v.startswith("wss://")):
+        if not (v.startswith(("ws://", "wss://"))):
             raise ValueError(
                 f"companion_url 必须以 'ws://' 或 'wss://' 开头，得到 '{v}'"
             )
@@ -287,9 +287,11 @@ class IDEExtensionAdapter(AgentAdapter):
                 ) from exc
 
             if not isinstance(response, dict):
-                raise RuntimeError(
-                    f"Companion 响应不是 JSON 对象: {response!r}"
-                )
+                    # 此处 isinstance 校验的是外部进程返回的**响应形态**（协议违约），
+                    # 不是调用方入参类型；本模块统一用 RuntimeError 表达运行期故障。
+                    raise RuntimeError(  # noqa: TRY004
+                        f"Companion 响应不是 JSON 对象: {response!r}"
+                    )
 
             return response
 
@@ -407,12 +409,11 @@ class IDEExtensionAdapter(AgentAdapter):
         """
         with self._lock:
             # 自动连接
-            if not self._connected:
-                if not self.connect():
-                    raise RuntimeError(
-                        f"IDEExtensionAdapter 无法连接 Companion: "
-                        f"{self._config.companion_url}"
-                    )
+            if not self._connected and not self.connect():
+                raise RuntimeError(
+                    f"IDEExtensionAdapter 无法连接 Companion: "
+                    f"{self._config.companion_url}"
+                )
 
             timeout_s = float(kwargs.get("timeout_s", self._config.command_timeout_s))
             command = self._build_command("execute", task=task, timeout_s=timeout_s)
@@ -452,9 +453,8 @@ class IDEExtensionAdapter(AgentAdapter):
         """
         with self._lock:
             # 未连接时尝试连接
-            if not self._connected:
-                if not self.connect():
-                    return False
+            if not self._connected and not self.connect():
+                return False
 
             # 第一步：ping 检测 Companion 连通性
             try:

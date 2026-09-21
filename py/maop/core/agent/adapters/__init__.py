@@ -55,17 +55,17 @@ from maop.core.agent.adapters.web_adapter import WebAdapter, WebAdapterConfig
 __all__ = [
     "CLIAdapter",
     "CLIAdapterConfig",
-    "HTTPAdapter",
-    "HTTPAdapterConfig",
-    "MCPBridgeAdapter",
-    "MCPBridgeAdapterConfig",
-    "WebAdapter",
-    "WebAdapterConfig",
     # 桌面应用 / IDE 扩展 / Vibe Coding 适配器（接入调度主链路）
     "DesktopAppAdapter",
     "DesktopAppConfig",
+    "HTTPAdapter",
+    "HTTPAdapterConfig",
     "IDEExtensionAdapter",
     "IDEExtensionConfig",
+    "MCPBridgeAdapter",
+    "MCPBridgeAdapterConfig",
     "VibeCodingAdapter",
     "VibeCodingConfig",
+    "WebAdapter",
+    "WebAdapterConfig",
 ]

@@ -250,9 +250,8 @@ class CLIAdapter(AgentAdapter):
         若未连接会自动调用 ``connect()``。超时抛出 ``TimeoutError``，
         非零退出码抛出 ``RuntimeError``。
         """
-        if not self._connected:
-            if not self.connect():
-                raise RuntimeError("CLIAdapter not connected — connect() failed")
+        if not self._connected and not self.connect():
+            raise RuntimeError("CLIAdapter not connected — connect() failed")
 
         cmd = self._build_command(task)
         cwd = self._validate_cwd()

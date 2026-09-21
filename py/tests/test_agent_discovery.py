@@ -17,6 +17,7 @@ from typing import Any  # noqa: F401
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from maop.core.agent.discovery.agent_discovery import (
     SCAN_TARGETS,
@@ -65,12 +66,12 @@ class TestDiscoveredAgent:
 
     def test_discovered_agent_requires_name(self) -> None:
         """测试 DiscoveredAgent name 为空时抛出校验错误。"""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             DiscoveredAgent(name="", source="cli")
 
     def test_discovered_agent_requires_source(self) -> None:
         """测试 DiscoveredAgent source 为空时抛出校验错误。"""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             DiscoveredAgent(name="test", source="")
 
 
@@ -330,7 +331,7 @@ class TestDiscoverAll:
             # goose 只出现一次（保留 desktop 来源的）
             assert names.count("goose") == 1
             assert "aider" in names
-            goose = [r for r in result if r.name == "goose"][0]
+            goose = next(r for r in result if r.name == "goose")
             assert goose.source == "desktop"
 
     def test_discover_all_merges_all_sources(self) -> None:
@@ -487,8 +488,10 @@ class TestAutoRegister:
                 raise RuntimeError("注册失败")
             original_register(desc)
 
-        with patch.object(catalog, "register", side_effect=mock_register):
-            with patch.object(catalog, "get", return_value=None):
-                count = discovery.auto_register(catalog, discovered)
+        with (
+            patch.object(catalog, "register", side_effect=mock_register),
+            patch.object(catalog, "get", return_value=None),
+        ):
+            count = discovery.auto_register(catalog, discovered)
         # good-agent 注册成功，bad-agent 失败被跳过
         assert count == 1

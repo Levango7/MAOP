@@ -151,7 +151,7 @@ def _build_ide_extension_adapter(config: AgentConfig) -> IDEExtensionAdapter:
     """
     # 推断 Companion WebSocket URL
     companion_url = config.http_url or ""
-    if not (companion_url.startswith("ws://") or companion_url.startswith("wss://")):
+    if not (companion_url.startswith(("ws://", "wss://"))):
         companion_url = "ws://localhost:7890"
 
     ext_config = IDEExtensionConfig(

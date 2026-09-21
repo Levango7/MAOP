@@ -129,7 +129,7 @@ class TestConnect:
 
     def test_connect_already_connected(self, monkeypatch):
         """已连接时再次 connect 直接返回 True，不重复连接。"""
-        ws_mock = _patch_websockets_connect(monkeypatch)
+        _patch_websockets_connect(monkeypatch)
         config = _make_config()
         adapter = IDEExtensionAdapter(config)
 
@@ -233,7 +233,7 @@ class TestHealthCheck:
             json.dumps({"success": True, "result": "pong"}),
             json.dumps({"success": True, "result": "healthy"}),
         ]
-        ws_mock = _patch_websockets_connect(
+        _patch_websockets_connect(
             monkeypatch,
             ws_mock=_make_ws_mock(recv_side_effect=responses),
         )
@@ -523,7 +523,7 @@ class TestSyncConfig:
 
     def test_sync_config_not_reconnect_when_disconnected(self, monkeypatch):
         """未连接时 sync_config 不自动重连。"""
-        connect_mock = _patch_websockets_connect(monkeypatch)
+        _patch_websockets_connect(monkeypatch)
         config = _make_config()
         adapter = IDEExtensionAdapter(config)
         # 不连接，直接 sync_config

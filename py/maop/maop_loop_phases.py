@@ -200,7 +200,7 @@ class PhasesMixin:
             ctx.analysis_dict = simple_result.model_dump()
 
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # P1-10 fix: 持有 task 强引用防止 GC（原 loop.create_task 返回值未保存）
             self._create_bg_task(self._bus.publish(Event(topic="loop.analyze", data={
                 "trace_id": ctx.trace_id, "analysis": ctx.analysis_dict,
@@ -564,7 +564,7 @@ class PhasesMixin:
                        trace_id=ctx.trace_id, duration_ms=total_ms, feedback_cycles=ctx.feedback_cycles)
 
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # P1-10 fix: 持有 task 强引用防止 GC（原 loop.create_task 返回值未保存）
             self._create_bg_task(self._bus.publish(Event(topic="loop.complete", data={
                 "trace_id": ctx.trace_id, "success": success, "duration_ms": total_ms,

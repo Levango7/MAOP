@@ -608,7 +608,7 @@ async def analysis_agent_efficiency(
     Returns each agent's task completion rate, average execution time,
     token consumption, and cost efficiency (tasks per USD).
     """
-    start_ts, end_ts, iso_from, iso_to = _parse_date_range(date_from, date_to)
+    _start_ts, _end_ts, iso_from, iso_to = _parse_date_range(date_from, date_to)
     note = ""
 
     # 1) Cost summary broken down by agent
@@ -879,7 +879,7 @@ async def analysis_cost_breakdown(
 
     Returns the cost breakdown and a per-bucket trend series.
     """
-    start_ts, end_ts, iso_from, iso_to = _parse_date_range(date_from, date_to)
+    _start_ts, _end_ts, iso_from, iso_to = _parse_date_range(date_from, date_to)
     note = ""
 
     try:
@@ -968,7 +968,7 @@ async def analysis_performance_bottlenecks(
 
     Returns slowest endpoints, slowest agents, and top memory consumers.
     """
-    start_ts, end_ts, iso_from, iso_to = _parse_date_range(date_from, date_to)
+    _start_ts, _end_ts, iso_from, iso_to = _parse_date_range(date_from, date_to)
     note = ""
 
     # 1) Slowest endpoints from MetricsCollector histograms

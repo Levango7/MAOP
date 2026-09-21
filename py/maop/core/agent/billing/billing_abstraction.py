@@ -27,7 +27,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.agent.billing.quota_bucket import ConsumeResult, QuotaBucket, QuotaEntry  # noqa: F401
+from maop.core.agent.billing.quota_bucket import (  # noqa: F401
+    ConsumeResult,
+    QuotaBucket,
+    QuotaEntry,
+)
 from maop.core.agent.registry.agent_catalog import (
     AgentCatalog,
     AgentDescriptor,

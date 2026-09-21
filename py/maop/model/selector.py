@@ -12,7 +12,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from maop.core.monitoring.monitoring import (
     MAOP_MODEL_SELECTION_LOAD_AWARE,
@@ -75,7 +75,7 @@ class ModelSelector:
 
     # P3-2 fix: routing key → capability 映射提为类常量，避免每次调用
     # select_for_routing_key 时重建字典。
-    _KEY_TO_CAPABILITY: dict[str, str] = {
+    _KEY_TO_CAPABILITY: ClassVar[dict[str, str]] = {
         "codegen": "codegen",
         "chat": "chat",
         "search": "search",
