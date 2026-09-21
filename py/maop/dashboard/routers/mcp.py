@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
-from maop.dashboard.routers.state import MAOP_ROOT
+from maop.dashboard.routers.state import MAOP_ROOT  # noqa: F401
 from maop.dashboard.services import plugin_service
 
 logger = logging.getLogger(__name__)

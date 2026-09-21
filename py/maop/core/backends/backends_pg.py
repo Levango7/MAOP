@@ -83,7 +83,7 @@ class PostgreSQLStorageBackend(StorageBackend):
     """PostgreSQL storage backend using psycopg3 + connection pool."""
 
     def __init__(self, dsn: str = "") -> None:
-        import psycopg  # noqa: F401 — guard: ImportError if psycopg missing
+        import psycopg  # noqa: F401
         from psycopg_pool import ConnectionPool
 
         self._dsn = dsn or _build_dsn()

@@ -16,7 +16,6 @@ import urllib.error
 from typing import Any
 
 import pytest
-
 from maop.enterprise.sso import (
     SSOConfig,
     SSOManager,

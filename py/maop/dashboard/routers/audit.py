@@ -41,7 +41,11 @@ from maop.dashboard.services import observability_service
 # 修复12: 提前 import Pydantic 模型用于端点参数类型注解，让 FastAPI 自动校验请求体。
 # 个人版无 enterprise 模块时回退到宽松 BaseModel，避免 ImportError 阻断 router 加载。
 try:
-    from maop.enterprise.audit_enhanced import AuditAlertRuleCreate, AuditAlertRuleUpdate, AuditEventQuery
+    from maop.enterprise.audit_enhanced import (
+        AuditAlertRuleCreate,
+        AuditAlertRuleUpdate,
+        AuditEventQuery,
+    )
 except ImportError:  # pragma: no cover — personal edition
     from pydantic import BaseModel as _BaseModel
 

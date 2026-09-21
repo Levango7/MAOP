@@ -5,8 +5,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-
 from maop.enterprise.n8n import (
     N8nClient,
     N8nIntegrationError,

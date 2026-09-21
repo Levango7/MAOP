@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import threading
-import time
+import time  # noqa: F401
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +23,6 @@ from maop.core.agent.auth.agent_proxy_gateway import (
     DepartmentBudget,
     ProxyRule,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────────────
 

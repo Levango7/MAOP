@@ -25,14 +25,16 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .state import MAOP_ROOT
+from maop.core.security.middleware import require_admin as _require_admin
+
 # P1-1 fix: 引入统一异常处理装饰器，让所有 auth 端点经 handle_api_errors 兜底，
 # 异常（含 HTTPException）统一渲染为 ErrorSchema 响应格式。
 from maop.dashboard.error_handler import handle_api_errors
-from maop.core.security.middleware import require_admin as _require_admin
 
 # ── Service layer ──────────────────────────────────────────────────
 from maop.dashboard.services import auth_service
+
+from .state import MAOP_ROOT  # noqa: F401
 
 router = APIRouter()
 

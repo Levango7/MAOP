@@ -37,7 +37,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    import redis  # noqa: F401  (for type hints only)
+    import redis  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

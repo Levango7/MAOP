@@ -104,7 +104,7 @@ class PublishEventRequest(BaseModel):
 
 # ── 请求模型：直接复用 enterprise.notification.models 中的 Create/Update ──
 # 让 FastAPI 自动校验请求体，避免手动 ``dict → Pydantic`` 转换。
-from maop.enterprise.notification.models import (  # noqa: E402
+from maop.enterprise.notification.models import (
     ChannelCreate,
     ChannelUpdate,
     PreferenceUpdate,
@@ -112,7 +112,6 @@ from maop.enterprise.notification.models import (  # noqa: E402
     RuleUpdate,
     TemplateCreate,
 )
-
 
 # ── Identity / auth helpers (router-layer concerns) ───────────────
 

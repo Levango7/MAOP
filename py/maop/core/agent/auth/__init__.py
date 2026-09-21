@@ -10,14 +10,14 @@ from __future__ import annotations
 
 from maop.core.agent.auth.credential_vault import (
     Credential,
+    CredentialSummary,
     CredentialType,
     CredentialVault,
-    CredentialSummary,
 )
 
 __all__ = [
     "Credential",
+    "CredentialSummary",
     "CredentialType",
     "CredentialVault",
-    "CredentialSummary",
 ]

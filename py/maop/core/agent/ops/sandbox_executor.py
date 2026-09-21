@@ -21,7 +21,7 @@ import logging
 import os
 import re
 import subprocess
-import sys
+import sys  # noqa: F401
 import threading
 import time
 from typing import Any

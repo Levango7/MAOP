@@ -38,18 +38,18 @@ Usage::
 from __future__ import annotations
 
 # Re-export embedding/similarity building blocks.
-from maop.core.memory.vector_embed import (  # noqa: F401
-    EmbeddingProvider,
-    HashEmbedding,
-    SentenceTransformerEmbedding,
-    VectorEntry,
-    VectorSearchResult,
-    cosine_similarity,
+from maop.core.memory.vector_embed import (
+    EmbeddingProvider,  # noqa: F401
+    HashEmbedding,  # noqa: F401
+    SentenceTransformerEmbedding,  # noqa: F401
+    VectorEntry,  # noqa: F401
+    VectorSearchResult,  # noqa: F401
+    cosine_similarity,  # noqa: F401
 )
 
 # Re-export vector store and HNSW threshold constant.
-from maop.core.memory.vector_store import (  # noqa: F401
-    DEFAULT_HNSW_THRESHOLD,
-    VectorStore,
+from maop.core.memory.vector_store import (
+    DEFAULT_HNSW_THRESHOLD,  # noqa: F401
+    VectorStore,  # noqa: F401
 )
 

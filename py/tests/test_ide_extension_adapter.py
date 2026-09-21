@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch  # noqa: F401
 
 import pytest
 
@@ -24,7 +24,6 @@ from maop.core.agent.adapters.ide_extension_adapter import (
     IDEExtensionAdapter,
     IDEExtensionConfig,
 )
-
 
 # ======================================================================
 # 辅助函数

@@ -24,7 +24,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any  # noqa: F401
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -716,7 +716,6 @@ class RelayPlatformManager:
 
     def close(self) -> None:
         """清理资源（当前 SQLite 每次操作都关闭连接，无需特殊处理）。"""
-        pass
 
 
 # ── 模块级单例（可选，方便全局访问）────────────────────────────────

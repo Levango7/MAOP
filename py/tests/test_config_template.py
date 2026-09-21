@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import threading
-from typing import Any
+from typing import Any  # noqa: F401
 
 import pytest
 
@@ -19,7 +19,6 @@ from maop.core.agent.discovery.config_template import (
     ConfigTemplate,
     ConfigTemplateManager,
 )
-
 
 # ── ConfigTemplate 模型测试 ────────────────────────────────────────
 

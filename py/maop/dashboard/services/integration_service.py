@@ -22,7 +22,7 @@ from typing import Any
 
 from maop.enterprise.n8n import (
     N8nClient,
-    N8nIntegrationError,
+    N8nIntegrationError,  # noqa: F401
     handle_n8n_webhook,
 )
 

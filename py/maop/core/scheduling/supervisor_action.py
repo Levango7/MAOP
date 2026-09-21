@@ -13,12 +13,12 @@ from typing import Any
 
 from maop.core.scheduling.failure_detector import _AgentState
 from maop.core.scheduling.supervisor_models import (
-    _SupervisorAgentState,
     ActionRecord,
     AgentOperationalStatus,
     AlertLevel,
     SupervisorAction,
     TerminateRefusedError,
+    _SupervisorAgentState,
 )
 
 logger = logging.getLogger(__name__)

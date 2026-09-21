@@ -11,8 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.agent.ops.health_scorer import HealthScore, HealthScorer
-
+from maop.core.agent.ops.health_scorer import HealthScore, HealthScorer  # noqa: F401
 
 # ── Fixtures ─────────────────────────────────────────────────────
 

@@ -611,7 +611,7 @@ def configure_debate(
     if hasattr(dispatcher, "update_config") and callable(dispatcher.update_config):
         dispatcher.update_config(new_config)
     else:
-        setattr(dispatcher, "_config", new_config)
+        dispatcher._config = new_config
     return new_config
 
 

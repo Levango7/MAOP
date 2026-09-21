@@ -45,7 +45,7 @@ router = APIRouter(prefix="/api/sso", tags=["sso"])
 # ── Pydantic 请求模型（用于 body 参数类型） ────────────────────────
 # 直接复用 sso_store 中的 SSOProviderCreate / SSOProviderUpdate，
 # 让 FastAPI 自动校验请求体，避免手动 ``dict → Pydantic`` 转换。
-from maop.enterprise.sso_store import SSOProviderCreate, SSOProviderUpdate  # noqa: E402
+from maop.enterprise.sso_store import SSOProviderCreate, SSOProviderUpdate
 
 
 # ── Edition 守卫 helper ─────────────────────────────────────────────

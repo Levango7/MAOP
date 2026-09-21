@@ -15,8 +15,8 @@ import sys
 import time
 from typing import Any
 
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse  # noqa: F401
 
 from maop import __version__ as MAOP_VERSION
 from maop.core.security.middleware import require_admin

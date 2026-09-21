@@ -7,15 +7,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any  # noqa: F401
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from maop.core.agent.billing.quota_bucket import QuotaBucket, QuotaEntry
+from maop.core.agent.billing.quota_bucket import QuotaBucket, QuotaEntry  # noqa: F401
 from maop.dashboard.routers import quota as quota_route
-
 
 # ── Fixtures ─────────────────────────────────────────────────────
 

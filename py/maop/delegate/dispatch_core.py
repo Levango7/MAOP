@@ -34,14 +34,14 @@ from typing import Any
 from maop.core.monitoring.otel import get_tracer
 from maop.core.monitoring.otel import span as otel_span
 from maop.core.reliability.error_schema import new_result
-from maop.delegate.drivers import DRIVERS as _DRIVERS
-from maop.delegate.models import DispatchResult
-from maop.delegate.dispatch_priority import DispatchPriorityMixin
-from maop.delegate.dispatch_recording import DispatchRecordingMixin
 from maop.delegate.dispatch_impl import (
     DispatchImplMixin,
     _record_dispatcher_decision,
 )
+from maop.delegate.dispatch_priority import DispatchPriorityMixin
+from maop.delegate.dispatch_recording import DispatchRecordingMixin
+from maop.delegate.drivers import DRIVERS as _DRIVERS
+from maop.delegate.models import DispatchResult
 
 # NOTE: ``_get_load_balancer`` / ``_get_subagent_manager`` are NOT imported
 # at module scope here. They are re-exported by ``dispatcher.py`` and tests

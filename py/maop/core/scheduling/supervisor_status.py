@@ -17,11 +17,11 @@ from typing import Any
 from maop.core.scheduling.supervisor_models import (
     _EVOLUTION_TRIGGER_COOLDOWN_S,
     _EVOLUTION_TRIGGER_DEGRADED_COUNT,
-    _SupervisorAgentState,
     ActionRecord,
     AgentOperationalStatus,
     HealthProbe,
     SupervisorAction,
+    _SupervisorAgentState,
 )
 
 logger = logging.getLogger(__name__)

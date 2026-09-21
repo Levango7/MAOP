@@ -23,6 +23,12 @@
 
 from __future__ import annotations
 
+from maop.core.agent.vendor.vendor_billing import (
+    AgentUsage,
+    BudgetStatus,
+    VendorBilling,
+    VendorBillingSummary,
+)
 from maop.core.agent.vendor.vendor_ecosystem import (
     Vendor,
     VendorEcosystem,
@@ -31,12 +37,6 @@ from maop.core.agent.vendor.vendor_ecosystem import (
 from maop.core.agent.vendor.vendor_sso import (
     VendorSession,
     VendorSSO,
-)
-from maop.core.agent.vendor.vendor_billing import (
-    AgentUsage,
-    BudgetStatus,
-    VendorBilling,
-    VendorBillingSummary,
 )
 
 __all__ = [

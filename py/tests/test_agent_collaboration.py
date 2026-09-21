@@ -30,7 +30,7 @@ from maop.core.agent.registry.agent_catalog import (
 from maop.core.agent.router.agent_collaboration import (
     AgentCollaboration,
     CollaborationPattern,
-    CollaborationResult,
+    CollaborationResult,  # noqa: F401
     CollaborationStep,
     StepResult,
     list_predefined_patterns,
@@ -39,7 +39,6 @@ from maop.core.agent.router.agent_collaboration import (
     pattern_review_and_fix,
 )
 from maop.core.agent.router.agent_router import AgentRouter
-
 
 # ── Fixtures ─────────────────────────────────────────────────────
 

@@ -25,7 +25,6 @@ from maop.core.agent.router.routing_audit import (
     RoutingAuditLogger,
 )
 
-
 # ── Fixtures ─────────────────────────────────────────────────────
 
 

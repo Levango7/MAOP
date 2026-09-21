@@ -33,19 +33,19 @@ from __future__ import annotations
 import logging
 
 # ── Re-export Dispatcher class + decision-record helper ──
-from maop.delegate.dispatch_core import (  # noqa: F401
-    Dispatcher,
-    _record_dispatcher_decision,
-    otel_span,
+from maop.delegate.dispatch_core import (
+    Dispatcher,  # noqa: F401
+    _record_dispatcher_decision,  # noqa: F401
+    otel_span,  # noqa: F401
 )
 
 # ── Re-export tool / lazy-subsystem helpers ──
-from maop.delegate.dispatch_tools import (  # noqa: F401
-    _get_load_balancer,
-    _get_runtime,
-    _get_sandbox_manager,
-    _get_subagent_manager,
-    _retry_with_backoff,
+from maop.delegate.dispatch_tools import (
+    _get_load_balancer,  # noqa: F401
+    _get_runtime,  # noqa: F401
+    _get_sandbox_manager,  # noqa: F401
+    _get_subagent_manager,  # noqa: F401
+    _retry_with_backoff,  # noqa: F401
 )
 
 # ── Re-export the driver registry (same dict object as drivers.DRIVERS) ──
@@ -55,11 +55,11 @@ from maop.delegate.dispatch_tools import (  # noqa: F401
 from maop.delegate.drivers import DRIVERS as _DRIVERS  # noqa: F401
 
 # ── Re-export models (backward compatibility) ──
-from maop.delegate.models import (  # noqa: F401
-    AgentConfig,
-    DispatchResult,
-    _escape_for_cmd,
-    _escape_for_ps_command,
+from maop.delegate.models import (
+    AgentConfig,  # noqa: F401
+    DispatchResult,  # noqa: F401
+    _escape_for_cmd,  # noqa: F401
+    _escape_for_ps_command,  # noqa: F401
 )
 
 # Module-level logger pinned to the canonical name so that any caller

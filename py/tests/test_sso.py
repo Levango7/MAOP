@@ -15,7 +15,6 @@ import time
 from typing import Any
 
 import pytest
-
 from maop.enterprise.sso import (
     SSOConfig,
     SSOError,

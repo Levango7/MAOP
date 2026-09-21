@@ -6,11 +6,11 @@
 
 from __future__ import annotations
 
-import asyncio
+import asyncio  # noqa: F401
 import os
 import threading
 import time
-from pathlib import Path
+from pathlib import Path  # noqa: F401
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -24,9 +24,8 @@ from maop.core.security.auth import (
     APIKeyStore,
     AuthConfig,
     AuthManager,
-    AuthResult,
+    AuthResult,  # noqa: F401
 )
-
 
 # =====================================================================
 # a) 空输入测试

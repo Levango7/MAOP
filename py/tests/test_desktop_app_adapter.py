@@ -12,8 +12,8 @@ from __future__ import annotations
 import socket
 import subprocess
 import sys
-from typing import Any
-from unittest.mock import MagicMock, patch
+from typing import Any  # noqa: F401
+from unittest.mock import MagicMock, patch  # noqa: F401
 
 import pytest
 

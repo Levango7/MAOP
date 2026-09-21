@@ -15,9 +15,9 @@ AC-07：While 闭环运行，dashboard `/evolve` 必须展示状态机当前状�
 
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
+import pytest  # noqa: F401
 
 
 def test_ac07_evolution_loop_status(evolution_loop_factory):
@@ -32,9 +32,9 @@ def test_ac07_evolution_loop_status(evolution_loop_factory):
         mock_loop.get_stats.return_value = {"total_cycles": 0}
         mock_loop_class.return_value = mock_loop
 
-        from maop.dashboard.routers.evolve_insights import api_evolution_loop_status
-
         import asyncio
+
+        from maop.dashboard.routers.evolve_insights import api_evolution_loop_status
         mock_request = MagicMock()
         result = asyncio.run(api_evolution_loop_status(mock_request))
 
@@ -47,7 +47,6 @@ def test_ac07_evolution_loop_status(evolution_loop_factory):
 
 def test_ac07_evolution_loop_trigger(evolution_loop_factory):
     """POST /api/evolution/loop/trigger 触发闭环。"""
-    from unittest.mock import AsyncMock
 
     with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as mock_loop_class, \
          patch("maop.dashboard.routers.evolve_insights.require_admin", return_value=None):
@@ -60,9 +59,12 @@ def test_ac07_evolution_loop_trigger(evolution_loop_factory):
         mock_loop.run_cycle = mock_run_cycle
         mock_loop_class.return_value = mock_loop
 
-        from maop.dashboard.routers.evolve_insights import api_evolution_loop_trigger, EvolutionLoopTriggerRequest
-
         import asyncio
+
+        from maop.dashboard.routers.evolve_insights import (
+            EvolutionLoopTriggerRequest,
+            api_evolution_loop_trigger,
+        )
         mock_request = MagicMock()
         mock_request.json = AsyncMock(return_value={"dry_run": True})
 
@@ -92,9 +94,9 @@ def test_ac07_evolution_approvals(evolution_loop_factory):
         ]
         mock_loop_class.return_value = mock_loop
 
-        from maop.dashboard.routers.evolve_insights import api_evolution_approvals
-
         import asyncio
+
+        from maop.dashboard.routers.evolve_insights import api_evolution_approvals
         mock_request = MagicMock()
         result = asyncio.run(api_evolution_approvals(mock_request))
 
@@ -106,7 +108,6 @@ def test_ac07_evolution_approvals(evolution_loop_factory):
 
 def test_ac07_evolution_approval_decision(evolution_loop_factory):
     """POST /api/evolution/approvals/{id}/decision 审批通过/拒绝。"""
-    from unittest.mock import AsyncMock
 
     with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as mock_loop_class, \
          patch("maop.dashboard.routers.evolve_insights.require_admin", return_value=None):
@@ -117,9 +118,12 @@ def test_ac07_evolution_approval_decision(evolution_loop_factory):
         mock_loop._save_report = MagicMock()
         mock_loop_class.return_value = mock_loop
 
-        from maop.dashboard.routers.evolve_insights import api_evolution_approval_decision, EvolutionApprovalDecisionRequest
-
         import asyncio
+
+        from maop.dashboard.routers.evolve_insights import (
+            EvolutionApprovalDecisionRequest,
+            api_evolution_approval_decision,
+        )
         mock_request = MagicMock()
         mock_request.json = AsyncMock(return_value={
             "decision": "approve",
@@ -151,9 +155,9 @@ def test_ac07_evolution_ab_results(evolution_loop_factory):
         )
         mock_ab_class.return_value = mock_ab
 
-        from maop.dashboard.routers.evolve_insights import api_evolution_ab_results
-
         import asyncio
+
+        from maop.dashboard.routers.evolve_insights import api_evolution_ab_results
         mock_request = MagicMock()
         result = asyncio.run(api_evolution_ab_results(mock_request, "cycle-001"))
 
@@ -165,7 +169,6 @@ def test_ac07_evolution_ab_results(evolution_loop_factory):
 
 def test_ac07_evolution_loop_rollback(evolution_loop_factory):
     """POST /api/evolution/loop/rollback 手动触发回滚。"""
-    from unittest.mock import AsyncMock
 
     with patch("maop.core.evolution.evolution_loop.EvolutionLoop") as mock_loop_class, \
          patch("maop.dashboard.routers.evolve_insights.require_admin", return_value=None):
@@ -174,9 +177,12 @@ def test_ac07_evolution_loop_rollback(evolution_loop_factory):
         mock_loop.rollback_cycle.return_value = 5
         mock_loop_class.return_value = mock_loop
 
-        from maop.dashboard.routers.evolve_insights import api_evolution_loop_rollback, EvolutionLoopRollbackRequest
-
         import asyncio
+
+        from maop.dashboard.routers.evolve_insights import (
+            EvolutionLoopRollbackRequest,
+            api_evolution_loop_rollback,
+        )
         mock_request = MagicMock()
         mock_request.json = AsyncMock(return_value={
             "cycle_id": "cycle-001",

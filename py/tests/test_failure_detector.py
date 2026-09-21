@@ -56,7 +56,7 @@ def detector_with_bus():
     （topic/data 字段），而非 MAOS notification.EventBus 的 EventPayload
     （event_type/payload）。本 fixture 使用 core bus 以匹配真实发布 API。
     """
-    pass  # enterprise installed (maop-enterprise wheel): guard removed
+    # enterprise installed (maop-enterprise wheel): guard removed
     from maop.core.reliability.event_bus import EventBus
 
     bus = EventBus()

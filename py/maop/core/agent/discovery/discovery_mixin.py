@@ -18,8 +18,8 @@ import sys
 import threading
 
 from maop.core.agent.discovery.discovery_models import (
-    DiscoveredAgent,
     SCAN_TARGETS,
+    DiscoveredAgent,
     _get_display_info,
 )
 

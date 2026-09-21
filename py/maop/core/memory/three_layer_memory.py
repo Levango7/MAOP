@@ -44,16 +44,16 @@ from maop.core.memory.semantic import SemanticMixin
 
 # T2 拆分后 types/utils 常量移至子模块；主文件保留 re-export 兼容
 # `from maop.core.memory.three_layer_memory import X` 的既有引用。
-from maop.core.memory.three_layer_memory_types import (  # noqa: F401  # re-export 兼容
-    ContextHead,
-    FocusMode,
-    QualityDimensions,
-    decay_weight,
+from maop.core.memory.three_layer_memory_types import (  # re-export 兼容
+    ContextHead,  # noqa: F401
+    FocusMode,  # noqa: F401
+    QualityDimensions,  # noqa: F401
+    decay_weight,  # noqa: F401
 )
-from maop.core.memory.three_layer_memory_utils import (  # noqa: F401  # re-export 兼容
-    _compress_text,
-    _is_negative_feedback,
-    _text_relevance,
+from maop.core.memory.three_layer_memory_utils import (  # re-export 兼容
+    _compress_text,  # noqa: F401
+    _is_negative_feedback,  # noqa: F401
+    _text_relevance,  # noqa: F401
 )
 from maop.core.memory.transform import TransformMixin
 from maop.core.memory.working_memory import WorkingMemoryMixin

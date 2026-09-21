@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
 # P2-24: 统一使用 state.MAOP_ROOT，避免路径计算层数不一致
-from .state import MAOP_ROOT  # noqa: E402
+from .state import MAOP_ROOT  # noqa: F401
 
 
 class ExtractRequest(BaseModel):

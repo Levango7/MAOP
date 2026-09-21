@@ -23,7 +23,7 @@ import logging
 import os
 import threading
 import time as _time
-from pathlib import Path
+from pathlib import Path  # noqa: F401
 from typing import Any
 
 from maop.config.edition import FeatureFlag, get_edition, has_feature

@@ -25,7 +25,6 @@ from maop.core.agent.registry.agent_catalog import (
 )
 from maop.core.cost_tracker import CostTracker
 
-
 # ── Fixtures ─────────────────────────────────────────────────────
 
 

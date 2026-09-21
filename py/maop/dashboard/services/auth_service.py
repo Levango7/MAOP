@@ -26,7 +26,7 @@ import hmac
 import json
 import logging
 import os
-import sqlite3
+import sqlite3  # noqa: F401
 import threading
 import time
 from pathlib import Path

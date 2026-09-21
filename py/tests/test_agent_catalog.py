@@ -22,7 +22,6 @@ from maop.core.agent.registry.agent_catalog import (
 )
 from maop.core.agent.registry.agent_catalog_store import AgentCatalogStore
 
-
 # ── Fixtures ─────────────────────────────────────────────────────
 
 

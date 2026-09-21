@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from maop.enterprise.crl import CRLChecker, CRLError, LicenseRevokedError
 from maop.enterprise.license import LicenseInfo
 from typing_extensions import Self

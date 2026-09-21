@@ -45,15 +45,15 @@ from maop.core.evolution.evolution_analyzers import EvolutionAnalyzersMixin
 # T2: PerformanceEvolutionLoop / EvolutionCycleReport 已拆分至
 # maop.core.evolution.evolution_perf_loop，此处 re-export 保持 API。
 from maop.core.evolution.evolution_collectors import EvolutionCollectorsMixin
-from maop.core.evolution.evolution_loop_types import (  # noqa: F401  # re-export 保持 API（测试经 evolution_loop 引用）
+from maop.core.evolution.evolution_loop_types import (  # re-export 保持 API（测试经 evolution_loop 引用）
     EvolutionSuggestion,
-    LoopPhase,
+    LoopPhase,  # noqa: F401
     LoopReport,
-    PhaseResult,
+    PhaseResult,  # noqa: F401
 )
-from maop.core.evolution.evolution_perf_loop import (  # noqa: F401  # re-export 保持 API
-    EvolutionCycleReport,
-    PerformanceEvolutionLoop,
+from maop.core.evolution.evolution_perf_loop import (  # re-export 保持 API
+    EvolutionCycleReport,  # noqa: F401
+    PerformanceEvolutionLoop,  # noqa: F401
 )
 from maop.core.evolution.evolution_phases import EvolutionPhasesMixin
 

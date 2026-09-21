@@ -21,7 +21,6 @@ import time
 from typing import Any
 
 import pytest
-
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from maop.enterprise.audit import (
@@ -32,7 +31,7 @@ from maop.enterprise.audit import (
     EnterpriseAuditLogger,
 )
 from maop.enterprise.audit_enhanced import (
-    AlertBroadcaster,  # noqa: F401  (type alias import for completeness)
+    AlertBroadcaster,  # noqa: F401
     AlertConditionType,
     AlertSeverity,
     AuditAlertEngine,

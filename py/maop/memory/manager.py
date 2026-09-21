@@ -41,13 +41,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from maop.core.backends.db_utils import sqlite_connect
+from maop.memory.manager_mixin import MemoryManagerMixin
 from maop.memory.memory_models import (
     ConsolidationTrigger,
     MemoryContext,
     MemoryLayer,
     MemoryManagerConfig,
 )
-from maop.memory.manager_mixin import MemoryManagerMixin
 from maop.memory.shared_db import (
     get_memory_db_path,
 )
@@ -61,10 +61,10 @@ logger = logging.getLogger(__name__)
 # Re-export models for backward compatibility.
 # ``from maop.memory.manager import MemoryManagerConfig`` must keep working.
 __all__ = [
-    "MemoryManager",
-    "MemoryLayer",
-    "MemoryContext",
     "ConsolidationTrigger",
+    "MemoryContext",
+    "MemoryLayer",
+    "MemoryManager",
     "MemoryManagerConfig",
 ]
 

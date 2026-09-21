@@ -46,9 +46,9 @@ from maop.core.agent.discovery.config_template import (
 )
 
 __all__ = [
-    "AgentDiscovery",
-    "DiscoveredAgent",
     "SCAN_TARGETS",
+    "AgentDiscovery",
     "ConfigTemplate",
     "ConfigTemplateManager",
+    "DiscoveredAgent",
 ]

@@ -18,7 +18,7 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse  # noqa: F401
 
 from maop.dashboard.error_handler import handle_api_errors
 

@@ -16,7 +16,7 @@ from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import plugin_service
 
-from .state import MAOP_ROOT
+from .state import MAOP_ROOT  # noqa: F401
 
 router = APIRouter(prefix="/api/plugins", tags=["plugins"])
 

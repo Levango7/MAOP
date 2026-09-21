@@ -22,7 +22,6 @@ from fastapi.testclient import TestClient
 
 from maop.dashboard.routers import agent_versions as av_router
 
-
 # ── Fixtures ──────────────────────────────────────────────────────
 
 

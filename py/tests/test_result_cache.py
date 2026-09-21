@@ -13,11 +13,10 @@ from pathlib import Path
 import pytest
 
 from maop.core.agent.ops.result_cache import (
-    CacheEntry,
-    CacheStats,
+    CacheEntry,  # noqa: F401
+    CacheStats,  # noqa: F401
     ResultCache,
 )
-
 
 # ── Fixtures ─────────────────────────────────────────────────────
 

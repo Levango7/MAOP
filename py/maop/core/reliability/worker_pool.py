@@ -130,7 +130,7 @@ class WorkerPool:
         self._counter_lock = threading.Lock()
 
     @property
-    def semaphore(self) -> "asyncio.Semaphore":
+    def semaphore(self) -> asyncio.Semaphore:
         """P2-2 fix: 公共只读访问 IO 并发信号量。
 
         原代码 loop_executor.py 通过 getattr(self._worker_pool, "_sem", None)

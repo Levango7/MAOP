@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-
 @pytest.fixture(autouse=True)
 def enterprise_mode():
     """Enable enterprise edition so the PostgreSQL feature flag is available."""

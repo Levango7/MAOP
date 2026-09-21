@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
-from pathlib import Path
+from pathlib import Path  # noqa: F401
 from typing import Any
 
 from fastapi import APIRouter, Query, Request

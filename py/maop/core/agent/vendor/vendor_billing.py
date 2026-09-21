@@ -24,9 +24,9 @@
 from __future__ import annotations
 
 import logging
-import sqlite3
+import sqlite3  # noqa: F401
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone  # noqa: F401
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -361,15 +361,14 @@ class VendorBilling:
         """
         if monthly_budget < 0:
             raise ValueError("月度预算不能为负数")
-        with self._lock:
-            with sqlite_connect(self._db_path) as conn:
-                conn.execute(
-                    """INSERT INTO vendor_budget (vendor_name, monthly_budget)
+        with self._lock, sqlite_connect(self._db_path) as conn:
+            conn.execute(
+                """INSERT INTO vendor_budget (vendor_name, monthly_budget)
                        VALUES (?, ?)
                        ON CONFLICT(vendor_name) DO UPDATE SET
                          monthly_budget=excluded.monthly_budget""",
-                    (vendor_name, monthly_budget),
-                )
+                (vendor_name, monthly_budget),
+            )
         logger.debug(
             "[vendor_billing] 厂商 %s 月度预算设为 %.2f",
             vendor_name, monthly_budget,

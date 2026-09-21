@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import logging
-import sqlite3
+import sqlite3  # noqa: F401
 import threading
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -25,8 +25,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from maop.core.backends.db_utils import get_db_path, sqlite_connect
 from maop.core.agent.ops.health_scorer import HealthScorer
+from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
 

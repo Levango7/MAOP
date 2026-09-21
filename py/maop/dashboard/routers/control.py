@@ -8,7 +8,7 @@ formatting.
 
 from __future__ import annotations
 
-import asyncio  # noqa: F401 — re-exported for test monkeypatch (ctrl.asyncio)
+import asyncio  # noqa: F401
 import logging
 from typing import Any
 

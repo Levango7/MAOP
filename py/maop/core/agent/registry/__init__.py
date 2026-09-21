@@ -32,10 +32,10 @@ from maop.core.agent.registry.agent_catalog_store import AgentCatalogStore
 __all__ = [
     "AgentCapability",
     "AgentCatalog",
+    "AgentCatalogStore",
     "AgentDescriptor",
     "AuthMethod",
     "BillingModel",
-    "AgentCatalogStore",
     "get_catalog",
     "reset_catalog",
 ]

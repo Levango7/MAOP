@@ -326,8 +326,7 @@ class AgentProxyGateway:
         limit : int
             返回条数上限（默认 100）。
         """
-        if limit < 1:
-            limit = 1
+        limit = max(limit, 1)
         with self._lock:
             conn = self._pool.acquire()
             try:

@@ -365,18 +365,18 @@ if __name__ == "__main__":
 
 
 # Re-export for backward compatibility (tests and other modules import these from server)
-from maop.dashboard._middleware_stack import (  # noqa: F401
-    _global_exception_handler,
-    _normalize_api_path,
+from maop.dashboard._middleware_stack import (
+    _global_exception_handler,  # noqa: F401
+    _normalize_api_path,  # noqa: F401
 )
-from maop.dashboard._register_routes import (  # noqa: F401
-    _CSP_VIOLATION_MAX,
-    _csp_violations,
-    health,
+from maop.dashboard._register_routes import (
+    _CSP_VIOLATION_MAX,  # noqa: F401
+    _csp_violations,  # noqa: F401
+    health,  # noqa: F401
 )
-from maop.dashboard._ws_manager import (  # noqa: F401
-    _ws_broadcast,
-    _ws_clients,
-    _ws_lock,
-    _ws_push_loop,
+from maop.dashboard._ws_manager import (
+    _ws_broadcast,  # noqa: F401
+    _ws_clients,  # noqa: F401
+    _ws_lock,  # noqa: F401
+    _ws_push_loop,  # noqa: F401
 )

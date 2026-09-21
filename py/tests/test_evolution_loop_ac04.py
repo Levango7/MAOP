@@ -13,14 +13,14 @@ AC-04：If 改进处于 `PendingApproval` 且未审批，系统必须阻止其�
 
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-import pytest
+import pytest  # noqa: F401
 
 
 def test_ac04_evaluate_returns_pending_approval(evolution_loop_factory):
     """EVALUATE 阶段返回 pending_approval 列表（should_apply=False 且 severity=HIGH/MEDIUM）。"""
-    from maop.core.evolution.evolution_strategies import EvolutionDecision
+    from maop.core.evolution.evolution_strategies import EvolutionDecision  # noqa: F401
 
     loop = evolution_loop_factory()
 
@@ -110,7 +110,6 @@ def test_ac04_apply_skips_pending_approval():
     _phase_apply 只接收 evaluate.details.get("approved", [])，不包含 pending_approval。
     此处仅做文档化行为验证，实际已由其他集成测试覆盖。
     """
-    pass
 
 
 def test_ac04_no_pending_when_all_approved():
@@ -142,9 +141,10 @@ def test_ac04_no_pending_when_all_approved():
         mock_engine.evaluate.return_value = decisions
         mock_engine_class.return_value = MagicMock(evaluate=lambda _: decisions)
 
-        from maop.core.evolution.evolution_loop import EvolutionLoop
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
+        from maop.core.evolution.evolution_loop import EvolutionLoop
 
         with tempfile.TemporaryDirectory() as tmp:
             loop = EvolutionLoop(root_dir=Path(tmp) / "evo")
@@ -157,4 +157,4 @@ def test_ac04_no_pending_when_all_approved():
             assert phase_result.details.get("pending_approval", []) == []
 
 
-import tempfile
+import tempfile  # noqa: F401

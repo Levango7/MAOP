@@ -151,22 +151,21 @@ class RoutingAuditLogger:
             event.timestamp = datetime.now(timezone.utc).isoformat()
 
         context_json = json.dumps(event.context, ensure_ascii=False, default=str)
-        with self._lock:
-            with sqlite_connect(self._db_path) as conn:
-                conn.execute(
-                    "INSERT INTO routing_audit_logs "
-                    "(id, timestamp, event_type, agent_name, strategy, reason, context_json) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        event.id,
-                        event.timestamp,
-                        event.event_type,
-                        event.agent_name,
-                        event.strategy,
-                        event.reason,
-                        context_json,
-                    ),
-                )
+        with self._lock, sqlite_connect(self._db_path) as conn:
+            conn.execute(
+                "INSERT INTO routing_audit_logs "
+                "(id, timestamp, event_type, agent_name, strategy, reason, context_json) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    event.id,
+                    event.timestamp,
+                    event.event_type,
+                    event.agent_name,
+                    event.strategy,
+                    event.reason,
+                    context_json,
+                ),
+            )
         logger.debug(
             "[routing_audit] 记录事件: type=%s agent=%s strategy=%s",
             event.event_type, event.agent_name, event.strategy,
@@ -196,25 +195,24 @@ class RoutingAuditLogger:
         if limit <= 0:
             return []
 
-        with self._lock:
-            with sqlite_connect(self._db_path) as conn:
-                if agent_name:
-                    rows = conn.execute(
-                        "SELECT id, timestamp, event_type, agent_name, "
-                        "strategy, reason, context_json "
-                        "FROM routing_audit_logs "
-                        "WHERE agent_name = ? "
-                        "ORDER BY timestamp DESC LIMIT ?",
-                        (agent_name, limit),
-                    ).fetchall()
-                else:
-                    rows = conn.execute(
-                        "SELECT id, timestamp, event_type, agent_name, "
-                        "strategy, reason, context_json "
-                        "FROM routing_audit_logs "
-                        "ORDER BY timestamp DESC LIMIT ?",
-                        (limit,),
-                    ).fetchall()
+        with self._lock, sqlite_connect(self._db_path) as conn:
+            if agent_name:
+                rows = conn.execute(
+                    "SELECT id, timestamp, event_type, agent_name, "
+                    "strategy, reason, context_json "
+                    "FROM routing_audit_logs "
+                    "WHERE agent_name = ? "
+                    "ORDER BY timestamp DESC LIMIT ?",
+                    (agent_name, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT id, timestamp, event_type, agent_name, "
+                    "strategy, reason, context_json "
+                    "FROM routing_audit_logs "
+                    "ORDER BY timestamp DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
 
         events: list[RoutingAuditEvent] = []
         for row in rows:
@@ -246,15 +244,14 @@ class RoutingAuditLogger:
         int
             日志条数。
         """
-        with self._lock:
-            with sqlite_connect(self._db_path) as conn:
-                if agent_name:
-                    row = conn.execute(
-                        "SELECT COUNT(*) FROM routing_audit_logs WHERE agent_name = ?",
-                        (agent_name,),
-                    ).fetchone()
-                else:
-                    row = conn.execute(
-                        "SELECT COUNT(*) FROM routing_audit_logs"
-                    ).fetchone()
-                return int(row[0]) if row else 0
+        with self._lock, sqlite_connect(self._db_path) as conn:
+            if agent_name:
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM routing_audit_logs WHERE agent_name = ?",
+                    (agent_name,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM routing_audit_logs"
+                ).fetchone()
+            return int(row[0]) if row else 0

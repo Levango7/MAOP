@@ -31,14 +31,14 @@ from typing import Any
 
 from maop.core.backends.db_utils import sqlite_connect
 
+# HNSW index wrapper (split out to hnsw_index.py).
+from maop.core.memory.hnsw_index import _HnswIndex
+
 # Embedding/similarity building blocks (split out to vector_embed.py).
 from maop.core.memory.vector_embed import (
     VectorSearchResult,
     cosine_similarity,
 )
-
-# HNSW index wrapper (split out to hnsw_index.py).
-from maop.core.memory.hnsw_index import _HnswIndex
 
 logger = logging.getLogger(__name__)
 

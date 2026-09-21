@@ -209,10 +209,9 @@ class VendorEcosystem:
         vendor : Vendor
             厂商描述对象。
         """
-        with self._lock:
-            with sqlite_connect(self._db_path) as conn:
-                conn.execute(
-                    """INSERT INTO vendor_registry
+        with self._lock, sqlite_connect(self._db_path) as conn:
+            conn.execute(
+                """INSERT INTO vendor_registry
                        (name, display_name, region, sso_enabled,
                         unified_billing, metadata)
                        VALUES (?, ?, ?, ?, ?, ?)
@@ -222,15 +221,15 @@ class VendorEcosystem:
                          sso_enabled=excluded.sso_enabled,
                          unified_billing=excluded.unified_billing,
                          metadata=excluded.metadata""",
-                    (
-                        vendor.name,
-                        vendor.display_name,
-                        vendor.region,
-                        int(vendor.sso_enabled),
-                        int(vendor.unified_billing),
-                        vendor.model_dump_json(),
-                    ),
-                )
+                (
+                    vendor.name,
+                    vendor.display_name,
+                    vendor.region,
+                    int(vendor.sso_enabled),
+                    int(vendor.unified_billing),
+                    vendor.model_dump_json(),
+                ),
+            )
         logger.debug("[vendor] 注册厂商 %s", vendor.name)
 
     def register_agent_to_vendor(self, agent_name: str, vendor_name: str) -> None:

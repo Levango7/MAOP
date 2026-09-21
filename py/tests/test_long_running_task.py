@@ -21,16 +21,15 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from maop.core.agent.router.long_running_task import (
-    LongRunningTask,
-    LongRunningTaskManager,
     STATUS_CANCELLED,
     STATUS_COMPLETED,
     STATUS_FAILED,
     STATUS_PENDING,
     STATUS_RUNNING,
     STATUS_TIMEOUT,
+    LongRunningTask,
+    LongRunningTaskManager,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────────────
 

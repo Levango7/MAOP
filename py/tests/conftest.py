@@ -146,10 +146,10 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 #         loop.run_cycle(dry_run=True)
 #
 # 禁止在测试 module-top 写：
-#     from maop.core.evolution.evolution_loop import EvolutionLoop  # noqa
+#     from maop.core.evolution.evolution_loop import EvolutionLoop
 # （会触发模块级 _init_db 路径固化 — 跨测试污染）
 
-from typing import Any  # noqa: E402
+from typing import Any
 
 # 拟扩展的 evolution 单例属性名（spec §15 + ADR-019 同类风险登记）。
 # 任何 evol 子模块在 module 顶层定义 `_*_instance` / `_*_singleton` / `_*_db_path` 等

@@ -39,21 +39,22 @@ import shutil
 import subprocess
 from typing import Any
 
+from maop.core.agent.discovery.discovery_mixin import AgentDiscoveryMixin
+
 # ── 向后兼容 re-export ──────────────────────────────────────────────
 # 以下符号从 discovery_models re-export，保持所有
 # ``from maop.core.agent.discovery.agent_discovery import ...`` 调用不变。
 from maop.core.agent.discovery.discovery_models import (
-    DiscoveredAgent,
+    _VENDOR_MAP,  # noqa: F401
     SCAN_TARGETS,
-    _VENDOR_MAP,
-    _get_display_info,
+    DiscoveredAgent,
+    _get_display_info,  # noqa: F401
 )
-from maop.core.agent.discovery.discovery_mixin import AgentDiscoveryMixin
 
 __all__ = [
+    "SCAN_TARGETS",
     "AgentDiscovery",
     "DiscoveredAgent",
-    "SCAN_TARGETS",
 ]
 
 logger = logging.getLogger(__name__)

@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import os
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from pathlib import Path  # noqa: F401
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -25,15 +25,15 @@ def loop_phases(monkeypatch, tmp_path):
     不依赖真实 MaopLoop（避免引入循环 / 业务副作用），只 mock 出 _phase_evolve
     真正用到的属性：_root / _loop_config / _bus / _log / _loop_count / _consolidator。
     """
-    from maop.maop_loop_phases import PhasesMixin
     from maop.loop_models import LoopConfig
+    from maop.maop_loop_phases import PhasesMixin
 
     class _Stub(PhasesMixin):
         def __init__(self, root, bus, consolidator=None):
             self._root = root
             self._loop_config = LoopConfig()
             self._bus = bus
-            self._log = lambda phase, level, msg, trace_id: None  # noqa: E731
+            self._log = lambda phase, level, msg, trace_id: None
             self._loop_count = 0
             self._consolidator = consolidator
 

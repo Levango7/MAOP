@@ -253,7 +253,10 @@ class Guardrail:
                 # 必须在锁内访问，防止多线程并发 check() 时的字典竞态。
                 with self._lock:
                     try:
-                        from maop.core.reliability.rate_limiter import RateLimiter, RateLimiterConfig
+                        from maop.core.reliability.rate_limiter import (
+                            RateLimiter,
+                            RateLimiterConfig,
+                        )
                         max_rpm = rule.max_per_minute or rule.limit or 30
                         # Reuse persistent RateLimiter instance per rule
                         if rule.id not in self._rate_limiters:

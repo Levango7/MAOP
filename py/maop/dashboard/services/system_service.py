@@ -27,7 +27,7 @@ import time
 import uuid as _uuid
 from typing import Any
 
-from maop.core.config.config_history import ConfigHistory, get_config_history
+from maop.core.config.config_history import ConfigHistory, get_config_history  # noqa: F401
 
 # Shared runtime state — accessed via the ``state`` module so that tests
 # which monkeypatch ``state.MAOP_ROOT`` / ``state.active_jobs`` etc. take
@@ -177,7 +177,7 @@ def get_pause_status() -> dict[str, Any]:
     pause_file = state.MAOP_ROOT / "logs" / ".maop_pause"
     is_paused = pause_file.exists()
     with state.active_jobs_lock:
-        jobs_snapshot = list(active_jobs.values())
+        jobs_snapshot = list(state.active_jobs.values())
         paused_jobs = sum(1 for job in jobs_snapshot if job.get("status") == "paused")
         running_jobs = sum(1 for job in jobs_snapshot if job.get("status") == "running")
         total_jobs = len(state.active_jobs)

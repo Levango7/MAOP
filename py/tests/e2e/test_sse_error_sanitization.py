@@ -28,10 +28,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from maop.core.reliability.error_schema import MaopResult, new_result  # noqa: F401
 from maop.core.reliability.event_bus import Event, get_event_bus
-from maop.core.reliability.error_schema import MaopResult, new_result
-from maop.delegate.models import DispatchResult
-
+from maop.delegate.models import DispatchResult  # noqa: F401
 
 # -- 辅助：等待 EventBus fire-and-forget 任务完成 -------------------
 

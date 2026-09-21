@@ -32,7 +32,7 @@ def _make_app(*routers) -> TestClient:
 def mcp_env(tmp_path, monkeypatch):
     # 业务逻辑已提取至 plugin_service；单例与 MAOP_ROOT 由 service 持有。
     monkeypatch.setattr("maop.dashboard.routers.state.MAOP_ROOT", tmp_path)
-    import maop.dashboard.services.plugin_service as plugin_service
+    from maop.dashboard.services import plugin_service
     plugin_service._set_hub(None)
 
     mock_hub = MagicMock()

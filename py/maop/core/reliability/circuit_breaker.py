@@ -437,11 +437,7 @@ class CircuitBreaker:
         result: bool = False
         with self._sync_lock:
             entry = self._data.get(agent_name)
-            if entry is None:
-                result = True
-            elif entry.state == BreakerState.CLOSED:
-                result = True
-            elif entry.state == BreakerState.HALF_OPEN:
+            if entry is None or entry.state == BreakerState.CLOSED or entry.state == BreakerState.HALF_OPEN:
                 result = True
             elif entry.state == BreakerState.OPEN:
                 if entry.last_failure is not None:

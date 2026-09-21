@@ -12,11 +12,10 @@ from pathlib import Path
 import pytest
 
 from maop.core.agent.billing.quota_bucket import (
-    ConsumeResult,
+    ConsumeResult,  # noqa: F401
     QuotaBucket,
     QuotaEntry,
 )
-
 
 # ── Fixtures ─────────────────────────────────────────────────────
 

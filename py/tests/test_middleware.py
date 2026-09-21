@@ -354,7 +354,7 @@ class TestTenantIdPropagation:
                 tenant_id=self._tenant,
             )
 
-        def record_usage(self, *args, **kwargs):  # noqa: D102 - stub
+        def record_usage(self, *args, **kwargs):
             return None
 
     def _make_app(self, *, enabled: bool = True, tenant: str = "",

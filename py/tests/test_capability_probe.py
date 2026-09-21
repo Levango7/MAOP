@@ -18,11 +18,10 @@ from maop.core.agent.ops.capability_probe import (
     ProbeResult,
 )
 from maop.core.agent.registry.agent_catalog import (
-    AgentCatalog,
     AgentCapability,
+    AgentCatalog,
     AgentDescriptor,
 )
-
 
 # ── Fixtures ─────────────────────────────────────────────────────
 

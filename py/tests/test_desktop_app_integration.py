@@ -10,9 +10,9 @@
 """
 from __future__ import annotations
 
-import asyncio
+import asyncio  # noqa: F401
 import inspect
-import sys
+import sys  # noqa: F401
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -26,11 +26,10 @@ from maop.core.agent.adapters import (
 )
 from maop.core.agent.adapters.adapter_factory import build_adapter
 from maop.core.agent.adapters.desktop_app_adapter import DesktopAppConfig
-from maop.core.agent.adapters.ide_extension_adapter import IDEExtensionConfig
-from maop.core.agent.adapters.vibe_coding_adapter import VibeCodingConfig
+from maop.core.agent.adapters.ide_extension_adapter import IDEExtensionConfig  # noqa: F401
+from maop.core.agent.adapters.vibe_coding_adapter import VibeCodingConfig  # noqa: F401
 from maop.delegate.drivers import DRIVERS, _run_desktop_app
 from maop.delegate.models import AgentConfig
-
 
 # ======================================================================
 # 辅助函数
@@ -332,7 +331,7 @@ class TestConfigPassing:
 
     def test_make_config_safe_opt_magicmock(self):
         """MagicMock 不会导致验证失败（_safe_opt 将非 str 值转为 None）。"""
-        from maop.config.loader import AgentDef
+        from maop.config.loader import AgentDef  # noqa: F401
         from maop.delegate.agent_resolver import AgentResolver
 
         # 用 MagicMock 作为 defn，模拟测试中常见的 mock 场景
@@ -381,7 +380,11 @@ class TestAdaptersExport:
         # 验证可以通过包路径直接导入
         from maop.core.agent.adapters import (
             DesktopAppAdapter as _DAA,
+        )
+        from maop.core.agent.adapters import (
             IDEExtensionAdapter as _IEA,
+        )
+        from maop.core.agent.adapters import (
             VibeCodingAdapter as _VCA,
         )
         assert _DAA is DesktopAppAdapter
@@ -391,7 +394,11 @@ class TestAdaptersExport:
         # 验证 Config 类也可导入
         from maop.core.agent.adapters import (
             DesktopAppConfig as _DAC,
+        )
+        from maop.core.agent.adapters import (
             IDEExtensionConfig as _IEC,
+        )
+        from maop.core.agent.adapters import (
             VibeCodingConfig as _VCC,
         )
         assert isinstance(_DAC, type)

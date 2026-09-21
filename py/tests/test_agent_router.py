@@ -15,7 +15,7 @@ from maop.core.agent.registry.agent_catalog import (
     AgentCapability,
     AgentCatalog,
     AgentDescriptor,
-    AuthMethod,
+    AuthMethod,  # noqa: F401
     BillingModel,
 )
 from maop.core.agent.router.agent_router import (
@@ -24,7 +24,6 @@ from maop.core.agent.router.agent_router import (
     RoutingResult,
     RoutingStrategy,
 )
-
 
 # ── Fixtures ─────────────────────────────────────────────────────
 

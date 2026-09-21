@@ -75,14 +75,14 @@ from maop.core.mcp.mcp_hub_transport import (
     _StreamableHttpTransport,
     _WebSocketTransport,
 )
-from maop.core.mcp.mcp_hub_types import (  # noqa: F401  # 类型 re-export（测试与外部经 mcp_hub 引用）
+from maop.core.mcp.mcp_hub_types import (  # 类型 re-export（测试与外部经 mcp_hub 引用）
     MCPPermissionDeniedError,
     MCPRateLimitedError,
-    MCPResource,
+    MCPResource,  # noqa: F401
     MCPServerConfig,
-    MCPTool,
-    ResourceContent,
-    ServerInfo,
+    MCPTool,  # noqa: F401
+    ResourceContent,  # noqa: F401
+    ServerInfo,  # noqa: F401
     ServerStatus,
     ToolResult,
     TransportType,

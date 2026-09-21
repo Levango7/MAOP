@@ -30,19 +30,19 @@ from typing import Any
 from maop.core.backends.db_utils import get_db_path
 
 # ── Re-exports from models.py (backward compatibility) ───────
-from maop.memory.models import (  # noqa: F401
+from maop.memory.models import (
     _FTS5_DDL,
     _MEMORY_DDL,
-    SYNONYM_MAP,
-    FacetResult,
+    SYNONYM_MAP,  # noqa: F401
+    FacetResult,  # noqa: F401
     MemoryEntry,
     MemoryStats,
-    SearchResult,
+    SearchResult,  # noqa: F401
     TraceEntry,
     TrajectoryStep,
     _is_valid_id,
-    _new_id,
-    expand_keywords,
+    _new_id,  # noqa: F401
+    expand_keywords,  # noqa: F401
 )
 
 # ── Search logic from search.py ──────────────────────────────

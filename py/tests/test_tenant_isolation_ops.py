@@ -24,7 +24,6 @@ from maop.core.agent.ops.tenant_isolation import (
     TenantUsage,
 )
 
-
 # ── Fixtures ─────────────────────────────────────────────────────
 
 

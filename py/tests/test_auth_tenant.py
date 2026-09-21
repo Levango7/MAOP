@@ -12,7 +12,7 @@ from __future__ import annotations
 import base64
 import json
 import sqlite3
-import tempfile
+import tempfile  # noqa: F401
 
 import pytest
 

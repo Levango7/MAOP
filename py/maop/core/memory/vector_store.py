@@ -26,14 +26,14 @@ from typing import Any
 
 from maop.core.backends.db_utils import sqlite_connect
 
+# HNSW index wrapper (split out to hnsw_index.py).
+from maop.core.memory.hnsw_index import _HnswIndex
+
 # Embedding/similarity building blocks (split out to vector_embed.py).
 from maop.core.memory.vector_embed import (
     EmbeddingProvider,
     HashEmbedding,
 )
-
-# HNSW index wrapper (split out to hnsw_index.py).
-from maop.core.memory.hnsw_index import _HnswIndex
 
 # Search-tier methods (split out to vector_search_mixin.py).
 from maop.core.memory.vector_search_mixin import VectorSearchMixin

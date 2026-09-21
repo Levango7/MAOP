@@ -46,7 +46,7 @@ import logging
 import os
 import threading
 from abc import ABC, abstractmethod
-from typing import Any, cast
+from typing import Any, cast  # noqa: F401
 
 from maop.config.edition import get_edition, record_degradation
 
@@ -435,23 +435,23 @@ def cache_delete(key: str) -> bool:
 # public symbol is re-exported here so legacy ``from maop.core.backends
 # .backends import X`` / ``import *`` keeps working unchanged.
 
-from maop.core.backends.backends_queue import (  # noqa: E402,F401
-    KVBackend,
-    SQLiteKVBackend,
-    SQLiteQueueBackend,
-    QueueBackend,
-    get_kv_backend,
-    get_queue_backend,
-    kv_get,
-    kv_set,
-    queue_consume,
-    queue_publish,
+from maop.core.backends.backends_queue import (
+    KVBackend,  # noqa: F401
+    QueueBackend,  # noqa: F401
+    SQLiteKVBackend,  # noqa: F401
+    SQLiteQueueBackend,  # noqa: F401
+    get_kv_backend,  # noqa: F401
+    get_queue_backend,  # noqa: F401
+    kv_get,  # noqa: F401
+    kv_set,  # noqa: F401
+    queue_consume,  # noqa: F401
+    queue_publish,  # noqa: F401
 )
-from maop.core.backends.backends_secret import (  # noqa: E402,F401
-    LocalSecretBackend,
-    SecretBackend,
-    get_secret_backend,
-    secret_get,
-    secret_set,
+from maop.core.backends.backends_secret import (
+    LocalSecretBackend,  # noqa: F401
+    SecretBackend,  # noqa: F401
+    get_secret_backend,  # noqa: F401
+    secret_get,  # noqa: F401
+    secret_set,  # noqa: F401
 )
 

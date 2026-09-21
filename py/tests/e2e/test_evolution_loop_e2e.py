@@ -15,8 +15,7 @@ import os
 import time
 from unittest.mock import MagicMock, patch
 
-import pytest
-
+import pytest  # noqa: F401
 
 # ── 辅助：构造预设 PhaseResult ──────────────────────────────
 

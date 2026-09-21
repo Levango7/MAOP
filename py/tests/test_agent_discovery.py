@@ -11,9 +11,9 @@
 
 from __future__ import annotations
 
-import os
+import os  # noqa: F401
 import threading
-from typing import Any
+from typing import Any  # noqa: F401
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -27,7 +27,6 @@ from maop.core.agent.registry.agent_catalog import (
     AgentCatalog,
     AgentDescriptor,
 )
-
 
 # ── DiscoveredAgent 模型测试 ───────────────────────────────────────
 

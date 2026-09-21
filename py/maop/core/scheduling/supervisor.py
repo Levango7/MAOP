@@ -55,20 +55,18 @@ from typing import Any
 
 from maop.core.observability.metrics import get_metrics
 from maop.core.scheduling.failure_detector import FailurePatternDetector
-
 from maop.core.scheduling.supervisor_action import SupervisorActionMixin
 from maop.core.scheduling.supervisor_dispatch import SupervisorDispatchMixin
 from maop.core.scheduling.supervisor_health import HealthChecker
 from maop.core.scheduling.supervisor_models import (
-    M_SUPERVISOR_ACTIONS_TOTAL,
-    M_SUPERVISOR_PATROL_AGENTS,
-    M_SUPERVISOR_PATROL_DURATION,
-    M_SUPERVISOR_PATROL_ISSUES,
     _DEFAULT_PATROL_CONCURRENCY,
     _EVOLUTION_TRIGGER_COOLDOWN_S,
     _MAX_ACTION_HISTORY,
     _MAX_PENDING_ALERTS,
-    _SupervisorAgentState,
+    M_SUPERVISOR_ACTIONS_TOTAL,
+    M_SUPERVISOR_PATROL_AGENTS,
+    M_SUPERVISOR_PATROL_DURATION,
+    M_SUPERVISOR_PATROL_ISSUES,
     ActionRecord,
     AgentOperationalStatus,
     AlertLevel,
@@ -78,6 +76,7 @@ from maop.core.scheduling.supervisor_models import (
     SupervisorActionRequest,
     SupervisorRule,
     TerminateRefusedError,
+    _SupervisorAgentState,
 )
 from maop.core.scheduling.supervisor_patrol import SupervisorPatrolMixin
 from maop.core.scheduling.supervisor_rules import RuleEngine, default_rules

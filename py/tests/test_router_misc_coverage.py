@@ -64,7 +64,7 @@ def tenant_client(tmp_path, monkeypatch):
 class TestTenantList:
     def test_list(self, tenant_client):
         # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-        pass  # enterprise installed (maop-enterprise wheel): guard removed
+        # enterprise installed (maop-enterprise wheel): guard removed
         resp = tenant_client.get("/api/tenant/list")
         assert resp.status_code == 200
 
@@ -76,7 +76,7 @@ class TestTenantList:
 class TestTenantCreate:
     def test_happy(self, tenant_client):
         # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-        pass  # enterprise installed (maop-enterprise wheel): guard removed
+        # enterprise installed (maop-enterprise wheel): guard removed
         resp = tenant_client.post(
             "/api/tenant/create",
             json={"tenant_id": "t1", "name": "test"},

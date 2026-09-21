@@ -22,7 +22,6 @@ from maop.core.agent.registry.agent_catalog import (
 )
 from maop.dashboard.routers import billing_abstraction as billing_route
 
-
 # ── Fixtures ─────────────────────────────────────────────────────
 
 

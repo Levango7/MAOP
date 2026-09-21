@@ -16,7 +16,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse  # noqa: F401
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors

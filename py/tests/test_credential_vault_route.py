@@ -26,7 +26,6 @@ from maop.core.agent.auth.credential_vault import (
     CredentialVault,
 )
 
-
 # ── Fixtures ─────────────────────────────────────────────────────
 
 

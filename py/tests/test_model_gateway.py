@@ -23,7 +23,6 @@ from maop.core.agent.llm_chat.model_gateway import (
     ModelPermission,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────
 
 

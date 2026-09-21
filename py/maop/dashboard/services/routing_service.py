@@ -198,7 +198,7 @@ def preview_route_match(task: str) -> dict[str, Any]:
     # 计算所有候选路由的分数以提供透明度
     task_lower = task.lower()
     # 优先使用公开方法 score_route，回退到内部方法 _score_route
-    _score_fn = getattr(scorer, "score_route", None) or getattr(scorer, "_score_route")
+    _score_fn = getattr(scorer, "score_route", None) or scorer._score_route
     all_scores: list[dict[str, Any]] = []
     for rk, route in config.routing.items():
         score, matched_by = _score_fn(task_lower, rk, route)
@@ -256,7 +256,7 @@ def get_route_scores(task: str) -> dict[str, Any]:
     scorer = get_route_scorer(config)
     task_lower = task.lower()
     # 优先使用公开方法 score_route，回退到内部方法 _score_route
-    _score_fn = getattr(scorer, "score_route", None) or getattr(scorer, "_score_route")
+    _score_fn = getattr(scorer, "score_route", None) or scorer._score_route
     scores: list[dict[str, Any]] = []
     for rk, route in config.routing.items():
         score, matched_by = _score_fn(task_lower, rk, route)

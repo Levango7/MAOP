@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 def get_session_mgr() -> Any:
     """Create a :class:`SessionManager` bound to ``MAOP_ROOT``."""
     from maop.core.security.session import SessionManager
+
     # P2-24: 统一使用 state.MAOP_ROOT
     from maop.dashboard.routers.state import MAOP_ROOT
     return SessionManager(root_dir=str(MAOP_ROOT))
@@ -43,6 +44,7 @@ def get_session_mgr() -> Any:
 def get_conversation_mgr() -> Any:
     """Create a :class:`ConversationManager` bound to ``MAOP_ROOT``."""
     from maop.core.agent.llm_chat.conversation import ConversationManager
+
     # P2-24: 统一使用 state.MAOP_ROOT
     from maop.dashboard.routers.state import MAOP_ROOT
     return ConversationManager(root_dir=str(MAOP_ROOT))

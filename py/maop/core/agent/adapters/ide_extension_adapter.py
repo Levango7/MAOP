@@ -36,7 +36,7 @@ import logging
 import threading
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator  # noqa: F401
 
 from maop.core.agent.delegation.agent_proxy import AgentAdapter
 

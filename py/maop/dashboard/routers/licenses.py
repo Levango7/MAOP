@@ -34,7 +34,7 @@ from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import billing_service
 
 # 直接复用 license_manager 中的 Pydantic 请求模型，让 FastAPI 自动校验。
-from maop.enterprise.license_manager import (  # noqa: E402
+from maop.enterprise.license_manager import (
     LicenseCreateRequest,
     LicenseRenewRequest,
     LicenseRevokeRequest,

@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field  # noqa: F401
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors

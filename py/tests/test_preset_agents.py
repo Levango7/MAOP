@@ -27,7 +27,6 @@ from maop.core.agent.registry.preset_agents import (
     register_presets,
 )
 
-
 # ── Fixtures ─────────────────────────────────────────────────────
 
 

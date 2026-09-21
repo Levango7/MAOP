@@ -20,12 +20,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from maop.core.agent.registry.agent_catalog import (
-    AgentCatalog,
     AgentCapability,
+    AgentCatalog,
     AgentDescriptor,
     BillingModel,
 )
-
 
 # ── Fixtures ─────────────────────────────────────────────────────
 

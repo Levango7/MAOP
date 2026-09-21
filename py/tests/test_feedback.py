@@ -13,7 +13,7 @@
 
 from __future__ import annotations
 
-import json
+import json  # noqa: F401
 import time
 
 import pytest
@@ -21,7 +21,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from maop.dashboard.routers import feedback as feedback_router
-
 
 # ── Fixtures ──────────────────────────────────────────────────────
 

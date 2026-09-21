@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any  # noqa: F401
 
 import pytest
 from fastapi import FastAPI
@@ -15,12 +15,11 @@ from fastapi.testclient import TestClient
 
 from maop.core.agent.llm_chat.model_gateway import (
     ModelGateway,
-    ModelGatewayConfig,
-    ModelPermission,
+    ModelGatewayConfig,  # noqa: F401
+    ModelPermission,  # noqa: F401
 )
 from maop.dashboard.routers import model_gateway as gateway_route
 from maop.dashboard.services import model_service
-
 
 # ── Fixtures ─────────────────────────────────────────────────────
 

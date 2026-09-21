@@ -34,6 +34,23 @@ import uuid
 from typing import Any
 
 from maop.core.reliability.event_bus import EventBus, get_event_bus
+
+# Re-export the plan depth cap and the step execution helper.
+from maop.engine_executor import (
+    _MAX_PLAN_DEPTH,  # noqa: F401
+    execute_step_helper,
+)
+
+# Re-export pause helpers for backward compatibility
+# (``from maop.engine import is_paused, check_pause_async`` must still work).
+from maop.engine_pause import (
+    MAX_PAUSE_SECONDS,  # noqa: F401
+    PAUSE_CHECK_INTERVAL_S,  # noqa: F401
+    PAUSE_FILE_NAME,  # noqa: F401
+    _get_pause_file_path,  # noqa: F401
+    check_pause_async,
+    is_paused,
+)
 from maop.engine_types import (
     EngineResult,
     StepResult,
@@ -47,21 +64,6 @@ from maop.engine_utils import (
     _topological_sort,
     json_dumps_safe,
     safe_eval,
-)
-# Re-export pause helpers for backward compatibility
-# (``from maop.engine import is_paused, check_pause_async`` must still work).
-from maop.engine_pause import (
-    MAX_PAUSE_SECONDS,
-    PAUSE_CHECK_INTERVAL_S,
-    PAUSE_FILE_NAME,
-    _get_pause_file_path,
-    check_pause_async,
-    is_paused,
-)
-# Re-export the plan depth cap and the step execution helper.
-from maop.engine_executor import (
-    _MAX_PLAN_DEPTH,
-    execute_step_helper,
 )
 
 logger = logging.getLogger(__name__)

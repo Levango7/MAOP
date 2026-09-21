@@ -24,9 +24,9 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from maop.core.agent.registry.agent_catalog import (
-    AgentCatalog,
     AgentCapability,
-    AgentDescriptor,
+    AgentCatalog,
+    AgentDescriptor,  # noqa: F401
 )
 
 logger = logging.getLogger(__name__)

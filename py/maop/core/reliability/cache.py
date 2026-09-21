@@ -455,7 +455,7 @@ def get_cache(name: str, *, max_size: int = 256, default_ttl_s: float = 0.0) -> 
 # continue to work without change.
 # cache_guard.py imports LRUCache lazily (inside CacheGuard.__init__), so
 # there is no circular import at module load time.
-from .cache_guard import (  # noqa: E402
+from .cache_guard import (
     CacheGuard,
     CacheGuardConfig,
     CacheGuardStats,

@@ -19,10 +19,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-import pytest
-
+import pytest  # noqa: F401
 
 # ─────────────────────────────────────────────────────────────────
 # 辅助：真实数据注入（不使用 MagicMock）

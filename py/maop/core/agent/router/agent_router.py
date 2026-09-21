@@ -50,6 +50,7 @@ from maop.core.agent.registry.agent_catalog import (
 )
 from maop.core.agent.router.rate_limiter import RateLimiter
 from maop.core.agent.router.routing_audit import RoutingAuditEvent, RoutingAuditLogger
+
 # 依赖 sqlite_connect / get_db_path：AgentCatalog 已封装持久化，
 # 此处导入以保持模块依赖图完整（供未来扩展直接访问 DB 时使用）。
 from maop.core.backends.db_utils import get_db_path, sqlite_connect  # noqa: F401
@@ -167,7 +168,7 @@ class AgentRouter:
         self,
         catalog: AgentCatalog | None = None,
         audit_logger: RoutingAuditLogger | None = None,
-        model_gateway: "ModelGateway | None" = None,
+        model_gateway: ModelGateway | None = None,
     ) -> None:
         self._catalog: AgentCatalog = catalog if catalog is not None else AgentCatalog.default()
         self._lock = threading.RLock()
@@ -180,7 +181,7 @@ class AgentRouter:
         # 路由决策审计日志（可选；None 表示不记录审计）
         self._audit_logger: RoutingAuditLogger | None = audit_logger
         # 模型授权网关（可选；None 表示跳过模型权限校验）
-        self._model_gateway: "ModelGateway | None" = model_gateway
+        self._model_gateway: ModelGateway | None = model_gateway
 
     # ── 公共属性 ──────────────────────────────────────────────────
     @property
@@ -199,7 +200,7 @@ class AgentRouter:
         return self._audit_logger
 
     @property
-    def model_gateway(self) -> "ModelGateway | None":
+    def model_gateway(self) -> ModelGateway | None:
         """模型授权网关（None 表示未启用模型权限校验）。"""
         return self._model_gateway
 

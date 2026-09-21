@@ -36,8 +36,8 @@ from maop.core.agent.auth.credential_vault import (
 from maop.core.agent.billing.billing_abstraction import BillingEngine
 from maop.core.agent.billing.quota_bucket import QuotaBucket, QuotaEntry
 from maop.core.agent.registry.agent_catalog import (
-    AgentCatalog,
     AgentCapability,
+    AgentCatalog,
     AgentDescriptor,
     AuthMethod,
     BillingModel,
@@ -47,7 +47,6 @@ from maop.core.agent.router.agent_router import (
     RoutingContext,
     RoutingStrategy,
 )
-
 
 # ── Fixtures ─────────────────────────────────────────────────────
 

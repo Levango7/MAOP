@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import os
 
-import sqlalchemy as sa  # noqa: F401  (Alembic op 需要)
+import sqlalchemy as sa  # noqa: F401
 from alembic import op
 
 # Revision identifiers, used by Alembic.

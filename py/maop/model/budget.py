@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any
 
 # Re-export CostTracker as the canonical cost source (P2-1).
-from maop.core.cost_tracker import CostTracker  # noqa: F401  — re-exported for callers
+from maop.core.cost_tracker import CostTracker  # noqa: F401
 from maop.model.schema import BudgetConfig
 
 logger = logging.getLogger(__name__)
@@ -85,8 +85,9 @@ class BudgetGuard:
         # 累计超限，与 CostTracker（SQLite 持久化）的当日已花费脱节。
         # 从 CostTracker 加载当日/当月已花费作为初始值，使内存护栏与持久化状态一致。
         try:
-            from maop.core.cost_tracker import CostTracker
             from datetime import datetime, timezone
+
+            from maop.core.cost_tracker import CostTracker
             tracker = CostTracker(root_dir=self._root)
             now = datetime.now(timezone.utc)
             today_start = now.strftime("%Y-%m-%d")

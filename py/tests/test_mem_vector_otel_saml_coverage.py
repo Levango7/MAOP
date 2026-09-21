@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import pytest
 
-
 # ── Memory Search (via real MemoryStore) ────────────────────────────
 
 class TestMemorySearch:

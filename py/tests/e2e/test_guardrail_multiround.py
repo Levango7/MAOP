@@ -27,7 +27,6 @@ from maop.core.reliability.error_schema import MaopResult, new_result
 from maop.core.security.guardrail import CheckResult, Violation
 from maop.delegate.models import DispatchResult
 
-
 # -- 辅助：构造成功结果（含 tool_calls JSON，使循环继续） ----------
 
 

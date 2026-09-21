@@ -19,7 +19,7 @@ import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field  # noqa: F401
 
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin

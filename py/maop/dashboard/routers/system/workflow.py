@@ -17,7 +17,7 @@ import uuid as _uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse  # noqa: F401
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin

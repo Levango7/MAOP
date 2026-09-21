@@ -18,7 +18,7 @@ formatting.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+from pathlib import Path  # noqa: F401
 from typing import Any
 
 from fastapi import APIRouter, Request, UploadFile
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 # P2-24: 统一使用 state.MAOP_ROOT，避免路径计算层数不一致
-from .state import MAOP_ROOT  # noqa: E402
+from .state import MAOP_ROOT
 
 
 def _get_engine():

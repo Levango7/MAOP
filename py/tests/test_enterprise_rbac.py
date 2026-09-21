@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
-
 from maop.enterprise.rbac import (
     Permission,
     PermissionDenied,

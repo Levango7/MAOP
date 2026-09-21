@@ -53,15 +53,15 @@ from __future__ import annotations
 # Re-export for backward compatibility — all public symbols remain
 # importable from ``maop.core.tenant.compliance``.  The noqa F401 marker
 # on each import suppresses ruff's unused-import warning for re-exports.
-from maop.core.tenant.compliance_manager import (  # noqa: F401
-    ComplianceManager,
-    DeletionReport,
-    ExportReport,
+from maop.core.tenant.compliance_manager import (
+    ComplianceManager,  # noqa: F401
+    DeletionReport,  # noqa: F401
+    ExportReport,  # noqa: F401
 )
-from maop.core.tenant.gdpr_manager import (  # noqa: F401
-    DataPortabilityReport,
-    DataSubjectRequest,
-    GDPRComplianceManager,
-    ProcessingAgreement,
-    ProcessingRecord,
+from maop.core.tenant.gdpr_manager import (
+    DataPortabilityReport,  # noqa: F401
+    DataSubjectRequest,  # noqa: F401
+    GDPRComplianceManager,  # noqa: F401
+    ProcessingAgreement,  # noqa: F401
+    ProcessingRecord,  # noqa: F401
 )

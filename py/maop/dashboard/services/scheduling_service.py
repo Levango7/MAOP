@@ -21,7 +21,7 @@
 from __future__ import annotations
 
 import logging
-import threading
+import threading  # noqa: F401
 import time
 from typing import Any
 

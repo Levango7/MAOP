@@ -26,7 +26,7 @@ import sys
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from pathlib import Path  # noqa: F401
 from typing import Any, Literal
 
 from maop.core.backends.db_utils import get_db_path
@@ -39,9 +39,9 @@ from maop.dashboard.routers import state
 # Re-export analysis helpers for backward compatibility (analysis.py
 # originally imported them from analysis_helpers; now both the router
 # and this service can import from here).
-from maop.dashboard.routers.analysis_helpers import (  # noqa: F401
+from maop.dashboard.routers.analysis_helpers import (
     _bucket_index,
-    _bucket_seconds,
+    _bucket_seconds,  # noqa: F401
     _get_audit_events,
     _get_cache_stats,
     _get_cost_tracker,

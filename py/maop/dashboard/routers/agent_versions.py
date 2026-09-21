@@ -45,7 +45,7 @@ from maop.dashboard.routers.agent_versions_helpers import (
     VersionUpdate,
     _is_admin,
     _require_authenticated_user,
-    _reset_schema_for_tests,
+    _reset_schema_for_tests,  # noqa: F401
     _tenant_id_from_request,
     _user_id_from_request,
 )

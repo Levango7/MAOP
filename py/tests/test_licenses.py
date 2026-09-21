@@ -19,8 +19,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
-
 from maop.enterprise.license_manager import (
     LicenseCreateRequest,
     LicenseManager,
@@ -43,8 +41,8 @@ def manager(tmp_path: Path) -> LicenseManager:
     需要私钥。测试生成临时 Ed25519 密钥对（PEM 落盘到 tmp_path）并
     通过 private_key_path 注入，模拟真实签发环境。
     """
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
     key = Ed25519PrivateKey.generate()
     key_pem = key.private_bytes(
@@ -444,14 +442,15 @@ class TestLicensesRouter:
         为路由单例生成临时 Ed25519 签名密钥并通过
         MAOP_LICENSE_MGR_PRIVATE_KEY 注入（_get_manager 读取该环境变量）。
         """
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
         from maop.config.edition import (
             Edition,
             FeatureFlag,
             set_edition,
             set_feature_override,
         )
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-        from cryptography.hazmat.primitives import serialization
 
         key = Ed25519PrivateKey.generate()
         key_pem = key.private_bytes(

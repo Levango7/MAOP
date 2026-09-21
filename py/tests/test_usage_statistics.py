@@ -9,17 +9,16 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any  # noqa: F401
 
 import pytest
 
 from maop.core.agent.ops.usage_statistics import (
-    AgentRecommendation,
-    AgentStats,
-    CostAnalysis,
+    AgentRecommendation,  # noqa: F401
+    AgentStats,  # noqa: F401
+    CostAnalysis,  # noqa: F401
     UsageStatistics,
 )
-
 
 # ── Mock Catalog（模拟 AgentCatalog，用于推荐测试）──────────────
 

@@ -20,7 +20,6 @@ from maop.core.agent.billing.quota_bucket import (
     QuotaEntry,
 )
 
-
 # ── Fixtures ─────────────────────────────────────────────────────
 
 

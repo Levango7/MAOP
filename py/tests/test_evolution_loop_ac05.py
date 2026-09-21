@@ -14,17 +14,18 @@ AC-05：When 注入劣化候选，系统必须在 5 分钟内触发自动回滚�
 from __future__ import annotations
 
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-import pytest
+import pytest  # noqa: F401
 
 
 def test_ac05_degradation_suggestion_structure():
     """验证 _build_degradation_test_suggestion 返回结构正确。"""
+    import tempfile
+    from pathlib import Path
+
     from maop.core.evolution.evolution_loop import EvolutionLoop
     from maop.core.evolution.evolution_loop_types import EvolutionSuggestion
-    from pathlib import Path
-    import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
         loop = EvolutionLoop(root_dir=Path(tmp) / "evo")
@@ -49,7 +50,7 @@ def test_ac05_rollback_cycle_with_mocked_changetracker(evolution_loop_factory):
         mock_ct_class.return_value = mock_ct
 
         # 插入一个 cycle 报告到 DB（模拟已有 snapshot）
-        from maop.core.evolution.evolution_loop_types import LoopReport, LoopPhase, PhaseResult
+        from maop.core.evolution.evolution_loop_types import LoopPhase, LoopReport, PhaseResult  # noqa: F401
         report = LoopReport(
             cycle_id="test-cycle-001",
             snapshot_id="snap-test-001",
@@ -142,7 +143,7 @@ def test_ac05_no_rollback_when_auto_rollback_false():
     """
     # 这个测试主要是文档化行为，实际 run_cycle 内部逻辑已保证
     # 我们在 AC-01/AC-02 测试中已验证 dry_run=True 时不进入回滚分支
-    pass  # 行为已在其他测试覆盖
+    # 行为已在其他测试覆盖
 
 
 def test_ac05_snapshot_id_generated_only_when_not_dry_run(evolution_loop_factory):
