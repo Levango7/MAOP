@@ -24,7 +24,18 @@ import pytest
 #    while identical code + env passes locally。）
 #
 # 故在此显式检测：企业包不可用时跳过这些文件的收集，而不是让整轮测试崩掉。
-_ENTERPRISE_MARKER = "maop.enterprise"
+# 两种写法都要匹配：`maop.enterprise`（导入路径）与 `maop-enterprise`（包名 /
+# 注释里常这么写，如 test_router_misc_coverage.py 的
+# "enterprise installed (maop-enterprise wheel): guard removed"）。
+_ENTERPRISE_MARKERS = ("maop.enterprise", "maop-enterprise")
+# 间接依赖（自身不含上述字样，但经 fixture/被导入模块链式引入 maop.enterprise）。
+# 例：test_relay_platform.py → routers.relay_platform → services.integration_service
+#     → maop.enterprise.n8n（模块级导入）。
+# 注：生产侧已有守卫（_register_relay_platform_router 用 try/except 降级为
+# warning），故这**不是**产品缺陷，只是这些测试需要企业包。
+_ENTERPRISE_INDIRECT = (
+    "test_relay_platform.py",
+)
 # 注意：find_spec 在模块不可导入时会**抛出** ImportError / ModuleNotFoundError，
 # 而不是返回 None。若不捕获，conftest 自身加载失败会让整轮测试全崩（比不守卫
 # 更糟）。故必须 try/except。
@@ -35,11 +46,14 @@ except (ImportError, ValueError):  # ModuleNotFoundError 是 ImportError 子类
 
 if _ent_spec is None:
     _tests_root = Path(__file__).resolve().parent
-    collect_ignore = [
+    _ignored = {
         str(p.relative_to(_tests_root))
-        for p in sorted(_tests_root.rglob("test_*.py"))
-        if _ENTERPRISE_MARKER in p.read_text(encoding="utf-8", errors="ignore")
-    ]
+        for p in _tests_root.rglob("test_*.py")
+        if any(m in p.read_text(encoding="utf-8", errors="ignore")
+               for m in _ENTERPRISE_MARKERS)
+    }
+    _ignored.update(_ENTERPRISE_INDIRECT)
+    collect_ignore = sorted(_ignored)
 
 # ── Force test environment BEFORE any maop import ──────────────────
 # server.py import 时固化 _auth_enabled / _rl_enabled（get_settings 单例、
