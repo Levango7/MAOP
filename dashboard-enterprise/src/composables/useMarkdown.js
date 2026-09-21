@@ -42,6 +42,9 @@ function inline(s) {
   // 加粗 **text**
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   // 还原行内代码占位符
+  // eslint-disable-next-line no-control-regex -- \x00 在此是有意的**占位符哨兵**：
+  // 先把行内代码替换成 \x00CODE<n>\x00，待其余 Markdown 规则处理完再还原，
+  // 避免代码内容被后续正则误伤。哨兵在 return 前必被本行替换掉，不会进入输出。
   out = out.replace(/\x00CODE(\d+)\x00/g, (_, idx) => codePlaceholders[Number(idx)] || '');
   return out;
 }

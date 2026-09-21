@@ -65,7 +65,12 @@ export default [
       'no-debugger': 'error',
       'prefer-const': 'error',
       'no-var': 'error',
-      'eqeqeq': ['error', 'always'],
+      // eqeqeq：null: 'ignore' 允许 `== null` / `!= null` 这一惯用写法。
+      // 这是 ESLint 官方为该规则提供的例外，理由是 `x == null` 同时匹配
+      // null 与 undefined，而 `x === null` 会漏掉 undefined——后者才是
+      // 真实 bug 源。全库 23 处 eqeqeq 违规**全部**是 == null / != null，
+      // 无一处是 == 0 / == '' 这类真正需要收紧的类型强制转换。
+      'eqeqeq': ['error', 'always', { null: 'ignore' }],
 
       // ── Vue 规则 ─────────────────────────────────────────────
       'vue/multi-word-component-names': 'off',
