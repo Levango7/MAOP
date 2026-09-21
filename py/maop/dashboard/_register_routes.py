@@ -84,6 +84,22 @@ def _register_enterprise_routers(app: FastAPI) -> None:
                 _e,
             )
         try:
+            # 合规路由（GDPR/CCPA 删除与导出 + 2026-09-21 新增的 GDPR 法定流程）。
+            # 修复：routers/compliance.py 一直定义了 router 却从未 include ——
+            # 因此 /api/compliance/* 全部 404（请求会落到 SPA fallback），
+            # 既有的 delete-user-data / export-user-data 也一直不可达。
+            # 与本项目曾踩过的 kg_router 同类：定义但未挂载。
+            from maop.dashboard.routers import compliance as compliance_router
+
+            app.include_router(compliance_router.router)
+            logger.info("[server] Enterprise router: compliance enabled")
+        except ImportError as _e:
+            logger.warning(
+                "[server] Enterprise router MISSING: compliance "
+                "(import error: %s). /api/compliance/* will 404.",
+                _e,
+            )
+        try:
             # C4 (2026-07-22): SSO router — bridges SSOManager to frontend.
             from maop.dashboard.routers import sso as sso_router
             app.include_router(sso_router.router)

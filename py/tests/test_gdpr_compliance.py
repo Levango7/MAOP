@@ -24,6 +24,53 @@ def gdpr(tmp_path: Path) -> GDPRComplianceManager:
     return GDPRComplianceManager(tmp_path)
 
 
+# ── 路由必须真的挂载 ────────────────────────────────────────────────
+
+
+def test_compliance_router_is_registered():
+    """合规路由必须真的 include 进 app，否则 /api/compliance/* 全部 404。
+
+    2026-09-21 修复：``routers/compliance.py`` 一直定义了 router 却从未被
+    ``app.include_router()`` 挂载（``_register_routes.py`` 里 compliance
+    出现 0 次），因此既有的 delete-user-data / export-user-data **也**一直
+    不可达——请求会落到 SPA fallback 返回 HTML。与本项目曾踩过的
+    ``kg_router`` 同类缺陷（定义但未挂载）。
+
+    注意：断言用 OpenAPI schema 而非 ``app.routes[i].path``——后者对部分
+    路由对象会取到空串，会导致"明明挂载了却测出 0"的假阴性。
+    """
+    from unittest.mock import patch
+
+    from fastapi import FastAPI
+
+    import maop.dashboard._register_routes as RR
+
+    with patch.object(RR, "has_feature", return_value=True):
+        app = FastAPI()
+        RR._register_enterprise_routers(app)
+        paths = set(app.openapi()["paths"].keys())
+
+    compliance = {p for p in paths if p.startswith("/api/compliance")}
+    assert compliance, "合规路由未挂载 —— /api/compliance/* 会全部 404"
+
+    # 既有端点
+    assert "/api/compliance/delete-user-data" in compliance
+    assert "/api/compliance/export-user-data" in compliance
+    # 本次新增的 GDPR 端点
+    for expected in (
+        "/api/compliance/gdpr/access-request",
+        "/api/compliance/gdpr/erasure-request",
+        "/api/compliance/gdpr/portability-request",
+        "/api/compliance/gdpr/requests",
+        "/api/compliance/gdpr/requests/{request_id}",
+        "/api/compliance/gdpr/dpa",
+        "/api/compliance/gdpr/dpa/{dpa_id}",
+        "/api/compliance/gdpr/processing-records",
+        "/api/compliance/gdpr/processing-records/{record_id}",
+    ):
+        assert expected in compliance, f"缺少端点: {expected}"
+
+
 # ── 管理器行为（此前 0 覆盖）────────────────────────────────────────
 
 
