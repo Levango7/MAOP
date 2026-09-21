@@ -68,6 +68,12 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install "ruff==0.16.3" "mypy==2.3.1"
+      # FIX: mypy 必须在**依赖齐全**的环境里跑。此前本 job 只装 ruff+mypy，
+      # 于是 pydantic / httpx / fastapi 等全部解析为 Any，产生了 12 个
+      # no-any-return —— 这些在依赖齐全时并不存在（本地同版本 mypy 复核为
+      # Success: no issues found in 468 source files）。
+      # 缺依赖的类型检查等于没有检查，故补装项目依赖。
+      - run: pip install -e .
       - run: ruff check maop/ tests/
       # 显式 --no-warn-unused-ignores：不依赖 pyproject [tool.mypy] 读取
       # （CI 依赖缺失环境下 type:ignore 大量 unused，pyproject 配置若未
