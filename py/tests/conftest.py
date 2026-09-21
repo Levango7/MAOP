@@ -25,7 +25,15 @@ import pytest
 #
 # 故在此显式检测：企业包不可用时跳过这些文件的收集，而不是让整轮测试崩掉。
 _ENTERPRISE_MARKER = "maop.enterprise"
-if importlib.util.find_spec("maop.enterprise") is None:
+# 注意：find_spec 在模块不可导入时会**抛出** ImportError / ModuleNotFoundError，
+# 而不是返回 None。若不捕获，conftest 自身加载失败会让整轮测试全崩（比不守卫
+# 更糟）。故必须 try/except。
+try:
+    _ent_spec = importlib.util.find_spec("maop.enterprise")
+except (ImportError, ValueError):  # ModuleNotFoundError 是 ImportError 子类
+    _ent_spec = None
+
+if _ent_spec is None:
     _tests_root = Path(__file__).resolve().parent
     collect_ignore = [
         str(p.relative_to(_tests_root))
