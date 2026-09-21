@@ -394,9 +394,17 @@ class SandboxExecutor:
         cwd: str | None = config.working_dir if config.working_dir else None
 
         # 执行
+        # nosec B602 —— 此处 shell=True 是**有意**的：本执行器的用途就是执行
+        # CLI 命令行（含管道/重定向等 shell 语法），Windows 下尤其依赖 shell。
+        # 威胁模型：命令来源必须是受信任的 agent 描述符；本模块在应用层额外
+        # 施加了目录白名单、网络禁用与资源上限（见 validate_config /
+        # check_permissions）。
+        # 注意：本模块目前**尚未接线**（生产代码零引用），若后续接入，必须先
+        # 确认命令来源可信且不可被外部输入注入，再考虑是否需要改为 shell=False
+        # 并自行做参数切分。
         return subprocess.run(
             command,
-            shell=True,
+            shell=True,  # nosec B602 — 有意使用 shell（见上方说明）
             cwd=cwd,
             check=False,   # PLW1510：显式声明不做返回码检查（原为默认行为）
             env=env,

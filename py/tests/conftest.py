@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import importlib.util
 import os
 import shutil
 import sys
@@ -10,6 +11,27 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
+# ── 企业版测试的可选性 ────────────────────────────────────────────
+# `maop.enterprise` 由**独立的 maop-enterprise 包（MAOS 私有仓库）**提供，
+# 通过同命名空间注入到 maop 包里（ADR-017 双仓库物理隔离）。
+#
+# - 本地开发机：通常 editable 安装了 MAOS → maop.enterprise 可导入 →
+#   企业版测试正常收集运行。
+# - CI / 纯净环境：只有 maop，没有 maop-enterprise → 26 个测试文件在
+#   **收集阶段**就 ImportError，导致整轮 pytest 全平台失败。
+#   （workflow 注释亦记载：2026-08-30 unit tests failed on ALL 9 platforms
+#    while identical code + env passes locally。）
+#
+# 故在此显式检测：企业包不可用时跳过这些文件的收集，而不是让整轮测试崩掉。
+_ENTERPRISE_MARKER = "maop.enterprise"
+if importlib.util.find_spec("maop.enterprise") is None:
+    _tests_root = Path(__file__).resolve().parent
+    collect_ignore = [
+        str(p.relative_to(_tests_root))
+        for p in sorted(_tests_root.rglob("test_*.py"))
+        if _ENTERPRISE_MARKER in p.read_text(encoding="utf-8", errors="ignore")
+    ]
 
 # ── Force test environment BEFORE any maop import ──────────────────
 # server.py import 时固化 _auth_enabled / _rl_enabled（get_settings 单例、
