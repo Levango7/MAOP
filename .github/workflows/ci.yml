@@ -443,13 +443,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-
 
+      # FIX: playwright.config.js 声明了 chromium / firefox / webkit 三个
+      # project，但此前这里只装 chromium，导致 firefox 与 webkit 启动时报
+      # "Executable doesn't exist at .../firefox-1538/firefox/firefox"，
+      # 两个浏览器的用例全部失败。改为安装配置中声明的全部浏览器。
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps
 
       - name: Install Playwright system deps (cache hit)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: npx playwright install-deps
 
       - name: Run Playwright E2E tests
         run: npx playwright test --reporter=github,html
