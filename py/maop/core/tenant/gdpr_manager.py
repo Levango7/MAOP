@@ -156,6 +156,32 @@ def _due_at(months: int = 1) -> str:
 
 
 class GDPRComplianceManager:
+    """GDPR 合规管理器（数据主体请求、DPA 登记、处理活动记录）。
+
+    .. warning::
+       **当前未接入主流程**（2026-09-21 核实）：全仓库**无任何生产代码实例化**
+       本类，也**无任何测试覆盖**。它在 ``compliance.py`` 中的 import 带
+       ``# noqa: F401``，属于**纯再导出**（仅为保持对外 API 兼容），不是使用。
+
+       实际生效的合规实现是
+       :class:`maop.core.tenant.compliance_manager.ComplianceManager`，
+       经 ``get_compliance_manager()`` 由 dashboard 路由
+       ``maop/dashboard/routers/compliance.py`` 调用，**但它只有
+       ``delete_user_data`` / ``export_user_data`` 两个方法**。
+
+       **这意味着本类提供的能力目前全部缺失**（不是"已实现但未启用"，
+       而是压根没有调用点）：
+
+       * 数据主体请求追踪：``access_request`` / ``right_to_erasure`` /
+         ``data_portability`` / ``get_request`` / ``list_requests``
+       * DPA（数据处理协议）登记：``register_dpa`` / ``get_dpa`` / ``list_dpas``
+       * 处理活动记录（**GDPR 第 30 条**要求）：
+         ``record_processing_activity`` / ``get_processing_record`` /
+         ``list_processing_records``
+
+       历史：本文件由 ``e2e0f2a``（Phase 1-3 上帝模块拆分）拆出，此后仅
+       1 次提交、从未被接线。不要因为"文件存在"就推断 GDPR 合规已实现。
+    """
     """GDPR 合规增强 — 数据主体权利、DPA、处理记录。
 
     与 :class:`ComplianceManager` 协作：底层用户数据操作委托给
