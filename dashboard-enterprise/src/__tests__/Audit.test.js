@@ -29,6 +29,17 @@ import Segmented from '../components/Segmented.vue';
 import EmptyState from '../components/EmptyState.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
 
+// Chart.js 在 jsdom 下无法工作：它需要真实布局，而 jsdom 的
+// getComputedStyle 返回 null，chart.js 内部访问 null.ownerDocument 会抛
+// "Cannot read properties of null (reading 'ownerDocument')"。
+// 仅靠 global.stubs 不够（chart 实例可能在 unmount 后仍触发 resize）。
+// 故在模块层面直接替换 vue-chartjs，确保任何路径都不会实例化真实图表。
+vi.mock('vue-chartjs', () => ({
+  Line: { name: 'Line', template: '<div class="chart-stub" />' },
+  Bar: { name: 'Bar', template: '<div class="chart-stub" />' },
+  Pie: { name: 'Pie', template: '<div class="chart-stub" />' },
+}));
+
 
 
 // PageHeader calls useRoute() which needs a router context; stub it so we can

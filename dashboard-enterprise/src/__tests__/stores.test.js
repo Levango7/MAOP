@@ -134,6 +134,7 @@ describe('useEditionStore', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 401,
+      json: () => Promise.resolve({}),
     });
     // P1-3 fix: 401 错误消息改用 i18n key 'auth.unauthorized'，测试环境默认 zh locale → '未授权'。
     await expect(store.switchEdition('personal')).rejects.toThrow('未授权');
@@ -230,6 +231,10 @@ describe('useApiStore auth header injection', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
+      // 真实 fetch Response 必有 json()；错误分支会调用 res.json()，
+      // mock 缺 json 会因同步 TypeError（res.json is not a function）
+      // 绕开 .catch(() => ({})) 的容错，暴露出与实际不符的报错。
+      json: () => Promise.resolve({}),
     });
     await expect(store.get('/api/fail')).rejects.toThrow('API /api/fail: 500');
   });
@@ -242,6 +247,7 @@ describe('useApiStore auth header injection', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 401,
+      json: () => Promise.resolve({}),
     });
     await expect(store.get('/api/protected')).rejects.toThrow('401 Unauthorized');
     // M6 fix: user 信息应被清除（token 不再存储在 localStorage）
