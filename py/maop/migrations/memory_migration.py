@@ -98,6 +98,10 @@ class TableMigrationResult(BaseModel):
     errors: int = 0  # 写入失败行数
     dry_run: bool = False
     duration_s: float = 0.0
+    # 迁移开始时刻（epoch 秒）。回滚逻辑用它按 timestamp 列删除"本次迁移写入的行"，
+    # 避免误删历史数据。此前 rollback 读取 tr.started_at 但该字段并不存在——
+    # 由于 except 只捕获 sqlite3.Error，AttributeError 会直接让回滚崩溃。
+    started_at: float = 0.0
     error_messages: list[str] = Field(default_factory=list)
 
     def summary(self) -> str:
@@ -235,6 +239,7 @@ def _migrate_table(
         source=str(src_path),
         destination=str(dst_path),
         dry_run=dry_run,
+        started_at=time.time(),
     )
     start = time.time()
     progress = progress or _noop_progress
@@ -437,6 +442,7 @@ def migrate_legacy_json_files(
             source=str(json_file),
             destination=str(dst_path),
             dry_run=dry_run,
+            started_at=time.time(),
         )
         start = time.time()
 

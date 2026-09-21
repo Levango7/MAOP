@@ -227,6 +227,15 @@ disable_error_code = ["attr-defined", "has-type", "no-any-return"]
 module = "maop.dashboard.routers.*"
 disable_error_code = ["arg-type", "return-value", "no-any-return"]
 
+# services 层与 routers 层对等，同因豁免 no-any-return（95 处）。
+# 根因：部分依赖是**惰性导入**且被标注为 Any（如 billing_service 的
+# _get_quota_manager() -> Any），于是通过这些对象调用得到的返回值一律是 Any，
+# 导致所有转发它们的函数都被判 no-any-return。要根治需给这些 manager 补完整
+# 类型注解（属独立重构），故先按 routers 同款豁免，避免噪音淹没真实类型错误。
+[[tool.mypy.overrides]]
+module = "maop.dashboard.services.*"
+disable_error_code = ["no-any-return"]
+
 [[tool.mypy.overrides]]
 module = "maop.cli"
 disable_error_code = ["arg-type"]
@@ -251,6 +260,38 @@ disallow_incomplete_defs = true
 module = "opentelemetry.*"
 ignore_missing_imports = true
 disable_error_code = ["attr-defined"]
+
+# 剩余 Mixin 拆分模块 —— 与上方 T2（memory/evolution/mcp）和 P0-3（DataProxy
+# channels）**同一模式**：Mixin 通过组合类（Supervisor / MemoryManager /
+# LRUCacheAdvanced / Dispatcher / AgentDiscovery 等）获得宿主属性
+# （self._lock / self._agents / self._db_connect / self.get / self.register 等），
+# mypy 无法静态推断；宿主属性由组合类的 __init__ 保证。
+# 豁免：attr-defined（宿主属性）+ has-type（惰性属性）
+#       + no-any-return（attr-defined 连锁：属性未定义 → 返回被推断为 Any）。
+#
+# 注意：以下 3 个模块**不在此列**，因为它们的 attr-defined 是真实缺陷，已单独修复：
+#   - maop.migrations.memory_migration：读 TableMigrationResult.started_at
+#     但该字段不存在，且 except 只捕获 sqlite3.Error → AttributeError 会让回滚崩溃
+#   - maop.dashboard.services.evolution_service：读 EvaluationResult.control_rate 等
+#     不存在的字段 → 被 except Exception 吞掉，A/B 评估结果恒为 None
+#   - maop.core.agent.adapters.desktop_app_adapter：socket.AF_UNIX 在 Windows
+#     不存在，但已有 hasattr 守卫（mypy 看不穿），改为行尾定向 ignore
+[[tool.mypy.overrides]]
+module = [
+    "maop.core.scheduling.supervisor_action",
+    "maop.core.scheduling.supervisor_status",
+    "maop.core.scheduling.supervisor_patrol",
+    "maop.core.scheduling.supervisor_dispatch",
+    "maop.memory.manager_mixin",
+    "maop.core.reliability.cache_advanced",
+    "maop.core.memory.vector_search_mixin",
+    "maop.delegate.dispatch_priority",
+    "maop.delegate.dispatch_recording",
+    "maop.delegate.dispatch_impl",
+    "maop.core.agent.router.collaboration_executor",
+    "maop.core.agent.discovery.discovery_mixin",
+]
+disable_error_code = ["attr-defined", "has-type", "no-any-return"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -248,6 +248,8 @@ def update_version(
             params,
         )
         row = _get_version_row(conn, version_id)
+        if row is None:  # 写入后立即回读，理论上非空；守卫与函数开头一致
+            raise VersionNotFound("Version not found")
         item = _version_row_to_dict(row)
 
     return item
@@ -337,6 +339,8 @@ def activate_version(version_id: str) -> dict[str, Any]:
             (now, version_id),
         )
         row = _get_version_row(conn, version_id)
+        if row is None:  # 写入后立即回读，理论上非空；守卫与函数开头一致
+            raise VersionNotFound("Version not found")
         item = _version_row_to_dict(row)
 
     return item
@@ -399,6 +403,8 @@ def rollback_version(
             (now, now, target_version_id),
         )
         row = _get_version_row(conn, target_version_id)
+        if row is None:  # 写入后立即回读，理论上非空；守卫与函数开头一致
+            raise VersionNotFound("Version not found")
         item = _version_row_to_dict(row)
 
     return {

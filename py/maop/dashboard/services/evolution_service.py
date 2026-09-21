@@ -735,12 +735,27 @@ def get_evolution_ab_results(cycle_id: str) -> dict[str, Any]:
         exp_name = f"evo-{cycle_id}"
         try:
             result = ab_manager.evaluate(exp_name)
+            # 修复：EvaluationResult 并没有 control_rate / control_count /
+            # treatment_rate / treatment_count 字段——A/B 数据实际在
+            # `variants`（list[VariantStats]，含 name/samples/successes/
+            # success_rate）。此前读取不存在的属性会抛 AttributeError，
+            # 又被下方 except Exception 吞掉，导致 ab_result 恒为 None，
+            # 即 **A/B 评估结果一直是空**（静默失效，无报错）。
+            variants = {v.name: v for v in result.variants}
+            control = variants.get("control")
+            treatment = variants.get("treatment")
             ab_result = {
                 "experiment": exp_name,
                 "p_value": result.p_value,
                 "significant": result.p_value < 0.05,
-                "control": {"success_rate": result.control_rate, "samples": result.control_count},
-                "treatment": {"success_rate": result.treatment_rate, "samples": result.treatment_count},
+                "control": {
+                    "success_rate": control.success_rate if control else 0.0,
+                    "samples": control.samples if control else 0,
+                },
+                "treatment": {
+                    "success_rate": treatment.success_rate if treatment else 0.0,
+                    "samples": treatment.samples if treatment else 0,
+                },
             }
         except Exception:
             ab_result = None

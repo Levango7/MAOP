@@ -172,6 +172,10 @@ class WebAdapter(AgentAdapter):
         """发送 HTTP POST 请求并返回提取后的响应字符串。"""
         if (not self._connected or self._client is None) and not self.connect():
             raise RuntimeError("WebAdapter not connected — connect() failed")
+        # mypy：上面是复合条件，无法收窄 _client。显式判定——若 connect()
+        # 返回 True 却没建立 client，这里给出明确报错而非 AttributeError。
+        if self._client is None:
+            raise RuntimeError("WebAdapter not connected — connect() failed")
 
         body = self._build_body(task)
         body.update(kwargs)

@@ -142,6 +142,12 @@ class _CryptoEngine:
             raw = plaintext.encode()
             salted = bytes(a ^ self._混淆盐[i % len(self._混淆盐)] for i, a in enumerate(raw))
             return "DEG::" + base64.b64encode(salted).decode()
+        # mypy：_fernet 类型为 Fernet | None，但 non-degraded 分支必然已赋值
+        # （degraded 为真时才置 None）。显式收窄，避免 None.encrypt。
+        if self._fernet is None:
+            raise RuntimeError(
+                "CredentialVault 未初始化 Fernet（非降级模式下不应发生）"
+            )
         return self._fernet.encrypt(plaintext.encode()).decode()
 
     def decrypt(self, token: str) -> str:
@@ -151,6 +157,10 @@ class _CryptoEngine:
                 raw = bytes(a ^ self._混淆盐[i % len(self._混淆盐)] for i, a in enumerate(salted))
                 return raw.decode()
             raise ValueError("降级模式下密文格式不正确")
+        if self._fernet is None:
+            raise RuntimeError(
+                "CredentialVault 未初始化 Fernet（非降级模式下不应发生）"
+            )
         return self._fernet.decrypt(token.encode()).decode()
 
 

@@ -205,7 +205,10 @@ class DesktopAppAdapter(CLIAdapter):
 
     def _ipc_call(self, task: str) -> str:
         """执行一次 IPC 调用 — 创建 socket、发送任务、接收响应。"""
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        # socket.AF_UNIX 在 Windows 上不存在，但调用方已在 _ipc_available()
+        # 与本函数入口用 `hasattr(socket, "AF_UNIX")` 守卫，走到这里时该属性
+        # 必然存在。mypy 无法穿透 hasattr 对模块属性做收窄，故行尾定向豁免。
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)  # type: ignore[attr-defined]
         sock.settimeout(self._app_config.ipc_timeout_s)
         try:
             sock.connect(self._app_config.ipc_path)
