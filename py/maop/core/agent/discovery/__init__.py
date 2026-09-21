@@ -1,5 +1,16 @@
 """MAOP Agent Discovery — 自动发现系统中已安装的 AI Agent 工具。
 
+.. warning::
+   **本包未接入主流程**（2026-09-21 核实）。
+
+   全仓库**无任何生产代码 import 本包**（既非显式 import，也不在惰性映射 /
+   入口点 / 配置中）；仅由测试文件直接引用。两个模块共约 774 行：
+   ``agent_discovery``（795 行的跨平台扫描实现）与 ``config_template``。
+
+   来源：``423b969``（企业级Agent调度平台10个模块 — 厂商生态+运维+执行安全）
+   一次性创建，此后从未被接线；CHANGELOG 亦未记载本包。
+
+
 跨平台扫描（Windows / Linux / Mac），覆盖四类来源：
   - 桌面应用（Windows 注册表 + 开始菜单 / Linux .desktop / Mac /Applications）
   - PATH 中的 CLI 工具
