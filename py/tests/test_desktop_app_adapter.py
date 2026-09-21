@@ -97,9 +97,18 @@ def _patch_process_detection(
     """mock ``subprocess.run``，模拟进程检测结果。"""
     if running:
         stdout = f"{process_name}     1234 Console  1  100,000 K"
+        # 两平台进程命中时都是 0
+        returncode = 0
     else:
         stdout = "INFO: No tasks are running which match the specified criteria."
-    mock_result = _make_subprocess_result(returncode=0, stdout=stdout)
+        # 未命中时的**真实返回码**随平台而异：
+        #   - Windows tasklist：返回 0，靠 stdout 里没有进程名来判断
+        #   - Linux/Mac pgrep -x：返回 **1**
+        # 而 desktop_app_adapter 的 Linux 分支只看 `returncode == 0`。
+        # 此前这里恒为 0，导致该用例在 Linux/macOS 上误判为 True（Windows 上
+        # 因还检查 stdout 而侥幸通过）——CI 的 ubuntu/macos 因此失败。
+        returncode = 0 if sys.platform.startswith("win") else 1
+    mock_result = _make_subprocess_result(returncode=returncode, stdout=stdout)
     monkeypatch.setattr(subprocess, "run", MagicMock(return_value=mock_result))
 
 
