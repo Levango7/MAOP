@@ -423,7 +423,8 @@ class AgentProxyGateway:
             if row is None:
                 # 未设置预算 = 不限制。
                 return True
-            return (row["used"] + cost) <= (row["monthly_budget"] + 1e-9)
+            # row["used"]/row["monthly_budget"] 为 Any，比较结果也是 Any。
+            return bool((row["used"] + cost) <= (row["monthly_budget"] + 1e-9))
 
     def consume_budget(self, department: str, agent: str, cost: float) -> None:
         """扣减部门预算（原子 UPDATE）。

@@ -25,6 +25,13 @@ logger = logging.getLogger(__name__)
 class SupervisorPatrolMixin:
     """Patrol (巡检) capability for the assembled Supervisor class."""
 
+    # 宿主属性（由组合类 Supervisor.__init__ 赋值）的类型声明。
+    # 巡检任务在「未启动」和「stop() 之后」都为 None，故必须声明为可空。
+    # 若不声明，mypy 会按 Mixin 内的 `self._patrol_task = create_task(...)`
+    # 推断成非空的 Task[None]，随后组合类赋 None、stop() 赋 None 都会报
+    # assignment 冲突。
+    _patrol_task: asyncio.Task[None] | None
+
     def _list_registered_agents(self) -> list[str]:
         """Return the list of registered agent ids to patrol.
 

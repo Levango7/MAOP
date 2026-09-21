@@ -36,7 +36,9 @@ import logging
 import os
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypeVar
+
+_T = TypeVar("_T")
 
 # 顶层导入 etcd3 —— 未安装时抛出带清晰提示的 ImportError，
 # 由 backends.py 工厂函数的 try/except ImportError 捕获后降级。
@@ -178,7 +180,10 @@ class EtcdKVBackend(KVBackend):
         self._client = self._create_client()
         logger.info("[etcd] 重连成功 host=%s port=%s", self._host, self._port)
 
-    def _with_retry(self, op_name: str, op_fn: Callable[[], Any]) -> Any:
+    # 泛型化：此前 op_fn/返回值都写死为 Any，导致 4 个调用点（get/delete/
+    # list_keys/cas）全部被判 no-any-return。改为 TypeVar 后返回值随 op_fn
+    # 的返回类型推导，调用点不再产生 Any 泄漏。
+    def _with_retry(self, op_name: str, op_fn: Callable[[], _T]) -> _T:
         """带重连重试的操作包装器。
 
         M3 修复：捕获操作中的连接异常，重建客户端后重试。

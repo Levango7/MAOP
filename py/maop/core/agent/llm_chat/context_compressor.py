@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 
@@ -266,7 +266,8 @@ class ContextCompressor:
             if m.get("role") == "user":
                 # 修复: content 可能是 list（Anthropic 格式），归一化为字符串
                 content = self._normalize_content(m.get("content", ""))
-                return cast(str, content[:500])
+                # _normalize_content 已返回 str，此前的 cast(str, ...) 是冗余的
+                return content[:500]
         return "No primary request found"
 
     def _extract_assumptions(self, messages: list[dict]) -> str:

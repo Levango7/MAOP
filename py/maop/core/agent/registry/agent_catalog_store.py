@@ -196,7 +196,9 @@ class AgentCatalogStore:
             cursor = conn.execute(
                 "DELETE FROM agent_catalog WHERE name = ?", (name,)
             )
-            return cursor.rowcount > 0
+            # cursor.rowcount 在 sqlite3 stub 中为 Any，比较结果也是 Any；
+            # 显式转 bool 以匹配声明的返回类型。
+            return bool(cursor.rowcount > 0)
 
     # ── Health update ─────────────────────────────────────────────
     def update_health(self, name: str, healthy: bool, ts: float | None = None) -> None:

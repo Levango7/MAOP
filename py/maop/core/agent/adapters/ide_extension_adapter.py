@@ -197,8 +197,10 @@ class IDEExtensionAdapter(AgentAdapter):
         if self._ws is None:
             raise RuntimeError("WebSocket 未连接")
         await self._ws.send(message)
+        # self._ws 为 Any（惰性注入的 websocket 客户端），recv() 返回值
+        # 也是 Any；显式转 str 以匹配声明的返回类型。
         response = await asyncio.wait_for(self._ws.recv(), timeout=timeout_s)
-        return response
+        return str(response)
 
     async def _async_disconnect(self) -> None:
         """异步断开 WebSocket 连接。"""
@@ -381,7 +383,7 @@ class IDEExtensionAdapter(AgentAdapter):
                 )
             else:
                 self._connected = False
-            return ok
+            return bool(ok)
 
     def execute(self, task: str, **kwargs: Any) -> str:
         """通过 Companion 调用 IDE 插件执行任务。

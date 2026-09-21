@@ -182,9 +182,11 @@ class LRUCacheAdvancedMixin:
         from .cache import SENTINEL_NULL, CacheStats
 
         with self._lock:
-            null_count = sum(
-                1 for e in self._store.values()
-                if e.value is SENTINEL_NULL
+            # 原写法 sum(1 for ... if ...) 被 mypy 判为
+            # "Generator has incompatible item type int; expected bool"（对
+            # sum 重载的误判）。改用等价的计数写法，语义不变。
+            null_count = len(
+                [e for e in self._store.values() if e.value is SENTINEL_NULL]
             )
             return CacheStats(
                 hits=self._hits,

@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
@@ -25,9 +25,17 @@ router = APIRouter()
 # ── Pydantic 请求模型 ──────────────────────────────────────────────
 class ProtocolRegisterRequest(BaseModel):
     """注册协议的请求体。"""
+
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str = Field(default="", max_length=256)
     version: str = Field(default="1.0", max_length=64)
-    schema: dict[str, Any] = Field(default_factory=dict)
+    # 字段名不能直接用 `schema` —— 那会遮蔽 pydantic 的
+    # `BaseModel.schema()`（v2 中已废弃的类方法），并在模块导入时触发
+    # UserWarning: Field name "schema" shadows an attribute in parent
+    # "BaseModel"。改用 alias 保持**线上字段名仍为 "schema"**（前端
+    # Protocols.vue 发送的正是该键），仅 Python 侧属性名改为 schema_def。
+    schema_def: dict[str, Any] = Field(default_factory=dict, alias="schema")
     participants: list[str] = Field(default_factory=list)
     description: str = Field(default="", max_length=10000)
 
@@ -61,7 +69,7 @@ async def api_protocol_register(body: ProtocolRegisterRequest, request: Request)
     if not body.name:
         raise HTTPException(400, "missing name")
     return {"status": "ok", **routing_service.register_protocol(
-        body.name, body.version, body.schema, body.participants, body.description,
+        body.name, body.version, body.schema_def, body.participants, body.description,
     )}
 
 

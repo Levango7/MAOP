@@ -50,7 +50,14 @@ class VectorSearchMixin:
     gain :meth:`search` / :meth:`search_vector` and the four private
     tier backends. All methods access state via ``self`` and therefore
     share the host store's caches, locks, and HNSW index handle.
+
     """
+
+    # 宿主属性（由组合类 VectorStore.__init__ 赋值，均为可空）：HNSW 索引在
+    # 未启用/不可用时为 None，维度在首次写入前为 None。显式声明为可空，
+    # 否则 mypy 会按 Mixin 内的赋值推断成非空类型，与组合类的 | None 冲突。
+    _hnsw_index: _HnswIndex | None
+    _hnsw_dim: int | None
 
     # ── Search ────────────────────────────────────────────────
 

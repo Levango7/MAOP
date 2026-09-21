@@ -227,10 +227,19 @@ class SandboxExecutor:
                 duration_s=duration,
             )
 
+        # subprocess.run(..., text=False) 返回的是 bytes。SandboxResult 的
+        # stdout/stderr 声明为 str —— pydantic v2 的 lax 模式虽会自动把 bytes
+        # 解码成 str，但那依赖隐式转换（且非 UTF-8 字节会抛 ValidationError）。
+        # 这里显式解码并用 errors="replace" 容错，行为可控。
+        def _to_text(raw: bytes | str) -> str:
+            if isinstance(raw, bytes):
+                return raw.decode("utf-8", errors="replace")
+            return raw
+
         return SandboxResult(
             success=return_code == 0,
-            stdout=stdout,
-            stderr=stderr,
+            stdout=_to_text(stdout),
+            stderr=_to_text(stderr),
             return_code=return_code,
             duration_s=duration,
             killed=killed,

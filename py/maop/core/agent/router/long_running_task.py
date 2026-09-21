@@ -245,10 +245,15 @@ class LongRunningTaskManager:
         if self._is_memory:
             assert self._memory_conn is not None
             cursor = self._memory_conn.execute(sql, params)
-            return cursor.fetchone()
+            # Cursor.fetchone() 在 sqlite3 stub 中返回 Any，显式落到声明的
+            # Row | None 上再返回。
+            row: sqlite3.Row | None = cursor.fetchone()
+            return row
         with sqlite_connect(self._db_path) as conn:
             cursor = conn.execute(sql, params)
-            return cursor.fetchone()
+            # 变量名与上方分支的 row 区分开（同一函数内重复注解会触发 no-redef）
+            disk_row: sqlite3.Row | None = cursor.fetchone()
+            return disk_row
 
     def _query_all(
         self,

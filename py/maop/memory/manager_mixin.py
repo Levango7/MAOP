@@ -29,6 +29,11 @@ logger = logging.getLogger(__name__)
 class MemoryManagerMixin:
     """Consolidation / maintenance / unified-protocol methods (impl detail)."""
 
+    # 宿主属性（由组合类 MemoryManager.__init__ 赋值）：列名缓存为惰性填充，
+    # 未填充时为 None。显式声明为可空，否则 mypy 会按 Mixin 内赋值推断成
+    # 非空，与组合类的 | None 标注冲突。
+    _memory_entries_cols: list[str] | None
+
     # ── Consolidation ───────────────────────────────────────
 
     def consolidate(self, dry_run: bool = False) -> dict[str, Any] | None:

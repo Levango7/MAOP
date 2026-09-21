@@ -377,7 +377,10 @@ class CapabilityProbe:
     def _safe_execute(adapter: Any, task: str) -> str | None:
         """安全调用 adapter.execute，异常时返回 None."""
         try:
-            return adapter.execute(task)
+            # adapter 为 Any（惰性注入），execute() 返回值也是 Any；
+            # 显式收窄到声明的 str | None。
+            result = adapter.execute(task)
+            return result if result is None else str(result)
         except Exception as exc:
             logger.debug("[capability_probe] adapter.execute failed: %s", exc)
             return None

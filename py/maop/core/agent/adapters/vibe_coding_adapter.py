@@ -323,7 +323,7 @@ class VibeCodingAdapter(WebAdapter):
                 logger.info(
                     "[vibe_coding] 项目 %s 生成完成", project_id
                 )
-                return project_url
+                return str(project_url)
 
             if status == "failed":
                 error = status_info.get("error", "未知错误")
@@ -353,7 +353,9 @@ class VibeCodingAdapter(WebAdapter):
         try:
             resp = client.get(self._status_url(project_id), timeout=10.0)
             resp.raise_for_status()
-            return resp.json()
+            # client 为 Any，resp.json() 返回值也是 Any；显式落到 dict 上。
+            data: dict[str, Any] = resp.json()
+            return data
         except Exception as exc:
             raise RuntimeError(f"轮询状态失败: {exc}") from exc
 
@@ -389,7 +391,7 @@ class VibeCodingAdapter(WebAdapter):
         export_url = data.get("download_url") or data.get("url")
         if not export_url:
             raise RuntimeError(f"导出响应缺少 download_url: {data}")
-        return export_url
+        return str(export_url)
 
     def _download_project(self, export_url: str) -> bytes:
         """下载项目文件，返回文件字节内容。"""

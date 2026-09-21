@@ -178,7 +178,9 @@ def _validate_dns_resolution(hostname: str) -> None:
     seen: set[str] = set()
     for family, _type, _proto, _canon, sockaddr in infos:
         # sockaddr is (host, port) for IPv4 or (host, port, flow, scope) for IPv6
-        addr_str = sockaddr[0]
+        # getaddrinfo 的 sockaddr 元组首元素类型随 family 变化（部分 family
+        # 可能是 int），统一转 str 后再交给 ipaddress.ip_address。
+        addr_str = str(sockaddr[0])
         if addr_str in seen:
             continue
         seen.add(addr_str)

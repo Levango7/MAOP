@@ -136,7 +136,7 @@ async def api_overview(request: Request) -> dict[str, Any]:
         api_endpoints = sum(
             1 for r in request.app.routes if getattr(r, 'path', '').startswith('/api/')
         )
-        result = {
+        result: dict[str, Any] = {
             "status": "ok",
             "agents_total": agent_count, "modules_total": source_files,
             "tests_total": tests_total,
@@ -294,7 +294,9 @@ async def api_system_diagnostics(request: Request) -> dict[str, Any]:
     """
     require_admin(request)
 
-    result: dict[str, dict[str, Any]] = {}
+    # 混合值类型：各诊断项是 dict（{ok, result}），末尾还会写入
+    # result["status"] = "ok"（str）。故值类型必须是 Any，不能窄化为 dict。
+    result: dict[str, Any] = {}
 
     # ── Database: 尝试 SELECT 1 ──
     try:

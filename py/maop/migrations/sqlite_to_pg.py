@@ -332,7 +332,11 @@ def _iter_batches(
                 if not rows:
                     return
                 yield [_transform_row(table, columns, row) for row in rows]
-                last_id = rows[-1]["id"]
+                # 注意：不要改成 row._mapping["id"] —— 该属性是 SQLAlchemy 内部
+                # 实现，测试用的 FakeRow（tests/test_pg_migration.py）只实现了
+                # __getitem__，改用 _mapping 会让迁移测试直接 AttributeError。
+                # 行尾 ignore：Row 运行时支持字符串键访问，只是 mypy stub 未声明。
+                last_id = rows[-1]["id"]  # type: ignore[call-overload]
         else:
             # 回退：无 id 列的表用 OFFSET 分页（保持原行为）。
             offset = 0

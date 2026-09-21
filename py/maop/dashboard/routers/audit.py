@@ -49,13 +49,16 @@ try:
 except ImportError:  # pragma: no cover — personal edition
     from pydantic import BaseModel as _BaseModel
 
-    class AuditAlertRuleCreate(_BaseModel):
+    # 以下 3 个类是**个人版回退**：仅当上方 enterprise 导入失败时才定义。
+    # mypy 无法理解"导入可能失败"，会报 no-redef（认为与 import 的名字冲突），
+    # 故定向豁免。运行时两个分支互斥，不会真的重复定义。
+    class AuditAlertRuleCreate(_BaseModel):  # type: ignore[no-redef]
         model_config = {"extra": "allow"}
 
-    class AuditAlertRuleUpdate(_BaseModel):
+    class AuditAlertRuleUpdate(_BaseModel):  # type: ignore[no-redef]
         model_config = {"extra": "allow"}
 
-    class AuditEventQuery(_BaseModel):
+    class AuditEventQuery(_BaseModel):  # type: ignore[no-redef]
         # 宽松回退：允许任意字段，由函数内部再校验
         model_config = {"extra": "allow"}
 

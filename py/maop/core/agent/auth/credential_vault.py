@@ -109,6 +109,11 @@ class _CryptoEngine:
     降级模式不具备真正的机密性——仅做编码混淆，生产环境必须安装 cryptography。
     """
 
+    # 类型在此处**一次性**声明：此前 132 行 self._fernet = None 与 137 行
+    # `self._fernet: Any = Fernet(...)` 各带一次类型信息，mypy 报
+    # "Attribute already defined"（no-redef）。改为类级注解后两处都只是赋值。
+    _fernet: Any
+
     def __init__(self, key_material: bytes) -> None:
         self.degraded: bool = False
         try:
@@ -134,7 +139,7 @@ class _CryptoEngine:
             return
         # Fernet 需要 32 字节 url-safe base64 密钥。
         fernet_key = base64.urlsafe_b64encode(hashlib.sha256(key_material).digest())
-        self._fernet: Any = Fernet(fernet_key)
+        self._fernet = Fernet(fernet_key)
 
     def encrypt(self, plaintext: str) -> str:
         if self.degraded:
@@ -148,7 +153,7 @@ class _CryptoEngine:
             raise RuntimeError(
                 "CredentialVault 未初始化 Fernet（非降级模式下不应发生）"
             )
-        return self._fernet.encrypt(plaintext.encode()).decode()
+        return str(self._fernet.encrypt(plaintext.encode()).decode())
 
     def decrypt(self, token: str) -> str:
         if self.degraded:
@@ -161,7 +166,7 @@ class _CryptoEngine:
             raise RuntimeError(
                 "CredentialVault 未初始化 Fernet（非降级模式下不应发生）"
             )
-        return self._fernet.decrypt(token.encode()).decode()
+        return str(self._fernet.decrypt(token.encode()).decode())
 
 
 # ── 凭证保险库 ──────────────────────────────────────────────────────

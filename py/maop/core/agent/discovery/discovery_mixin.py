@@ -181,7 +181,12 @@ class AgentDiscoveryMixin:
                             rf"\App Paths\{exe_name}"
                         )
                         with winreg.OpenKey(hive, key_path) as key:
-                            value, _ = winreg.QueryValueEx(key, None)
+                            # winreg.QueryValueEx 的第二参数传 None 表示读取
+                            # 该键的「默认值」——这是 Windows API 的有效用法
+                            # （NULL value name），不能用 "" 替代（那会查找名为
+                            # 空字符串的具名值）。mypy 的 stub 只声明了 str，
+                            # 故定向豁免。
+                            value, _ = winreg.QueryValueEx(key, None)  # type: ignore[arg-type]
                             if value and os.path.isfile(value):
                                 return value
                     except OSError:
