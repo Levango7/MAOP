@@ -126,6 +126,9 @@ def reject_request(root_dir: str, request_id: str, reason: str = "") -> bool:
 _compliance_mgr: Any = None
 _compliance_mgr_lock = threading.Lock()
 
+_gdpr_mgr: Any = None
+_gdpr_mgr_lock = threading.Lock()
+
 
 class ComplianceNotConfigured(Exception):
     """Raised when root_dir is not configured (→ 500)."""
@@ -149,6 +152,31 @@ def get_compliance_manager(root_dir: str | None) -> Any:
         from maop.core.tenant.compliance import ComplianceManager
         _compliance_mgr = ComplianceManager(root_dir)
     return _compliance_mgr
+
+
+def get_gdpr_manager(root_dir: str | None) -> Any:
+    """Lazy-init GDPRComplianceManager singleton.
+
+    提供 ``ComplianceManager`` 之外缺失的 GDPR 法定流程：数据主体请求追踪、
+    DPA 登记（Art. 28）、处理活动记录（Art. 30）。
+
+    与 :func:`get_compliance_manager` 同构：``root_dir`` 取自
+    ``request.app.state.root_dir``，未配置则抛
+    :class:`ComplianceNotConfigured`（→ 500）。
+    """
+    global _gdpr_mgr
+    if _gdpr_mgr is not None:
+        return _gdpr_mgr
+    with _gdpr_mgr_lock:
+        if _gdpr_mgr is not None:  # double-checked locking
+            return _gdpr_mgr
+        if not root_dir:
+            logger.error("[gdpr] root_dir not configured")
+            raise ComplianceNotConfigured("Compliance service not configured")
+        from maop.core.tenant.gdpr_manager import GDPRComplianceManager
+
+        _gdpr_mgr = GDPRComplianceManager(root_dir)
+    return _gdpr_mgr
 
 
 def delete_user_data(user_id: str, *, tenant_id: str, root_dir: str | None) -> dict:
