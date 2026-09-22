@@ -55,9 +55,25 @@ def _login_failures_db_path() -> str:
 
 
 def _sync_auth_state() -> None:
-    """Sync router-level reset flags into auth_service (for test fixtures)."""
+    """Sync router-level reset flags into auth_service (for test fixtures).
+
+    P0 修复（登出后 token 不失效）：原实现只在 ``_auth_mgr is None`` 时把
+    ``auth_service._auth_mgr`` 清空，但**生产代码从不把本模块的 shim 设为
+    非 None**，于是每次调用都清空一次真实单例。后果：
+      - logout 走 ``auth_service.get_auth_mgr()`` → 拿到一个**刚新建的**
+        manager，把 token 写进它的 ``_revoked``；
+      - 而中间件用的是 lifespan 期创建、被 ``app.state.auth_manager``
+        持有的**长生命周期**实例，它的 ``_revoked`` 永远看不到这条记录；
+      - 结果 logout 返回 200 "Token revoked."，token 却依然可用。
+
+    修法：重置是**一次性**意图（供测试 fixture 强制重建），故消费掉它 ——
+    清空后立刻取回/创建真实单例并回填 shim，后续调用不再重复清空。
+    """
+    global _auth_mgr
     if _auth_mgr is None:
         auth_service._auth_mgr = None
+        # 消费一次性重置：立刻回填，避免每次调用都清空真实单例。
+        _auth_mgr = auth_service.get_auth_mgr()
     if not _login_failures_table_ready:
         auth_service._login_failures_table_ready = False
 
@@ -324,8 +340,17 @@ async def auth_logout(request: Request) -> Any:
         token = request.cookies.get("maop_token", "")
     if token:
         try:
-            _sync_auth_state()
-            mgr = auth_service.get_auth_mgr()
+            # P0 修复（登出后 token 不失效）：必须吊销在**中间件实际使用的**
+            # manager 实例上。中间件读的是 request.app.state.auth_manager
+            # （由 lifespan 设置、长期存活）；若这里改用
+            # auth_service.get_auth_mgr()，在单例被重置过的情况下会拿到一个
+            # **新建实例**，token 被写进它的 _revoked，而中间件持有的旧实例
+            # 看不到 → logout 返回 200 "Token revoked." 但 token 依然可用。
+            # 故优先取 app.state，取不到再回退到单例。
+            mgr = getattr(request.app.state, "auth_manager", None)
+            if mgr is None:
+                _sync_auth_state()
+                mgr = auth_service.get_auth_mgr()
             revoked = mgr.jwt_handler.revoke_token(token)
             if revoked:
                 logger.info("[auth] Token revoked via logout")

@@ -181,7 +181,21 @@ class TestEditionSwitchRBAC:
         )
 
     async def test_missing_edition_field_rejected(self, client):
-        """缺少 edition 字段返回 400。"""
+        """缺少 edition 字段被拒绝（FastAPI/Pydantic 校验 → 422）。
+
+        注意区分两种情况：
+        - **缺失**必填字段：由 Pydantic 在进入处理器**之前**拦截，FastAPI
+          标准行为是 422 Unprocessable Entity。端点自 P2-8 起用
+          ``EditionSwitchRequest`` 模型替代手写 ``await request.json()``，
+          故本用例原先期望的 400 已不成立（400 是手工校验时代的产物）。
+        - **取值非法**（如 "foo"）：能进入处理器，由其中的
+          ``HTTPException(400, ...)`` 返回 400 —— 见
+          ``test_invalid_edition_rejected``。
+
+        本仓库其他端点同样依赖 422（见 routers/auth.py 中
+        "由 FastAPI 自动校验请求体并返回 422" 的说明），且无全局
+        422→400 转换器，故此处按框架标准断言 422。
+        """
         token = await _login(client)
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -190,8 +204,9 @@ class TestEditionSwitchRBAC:
             json={},
             headers=headers,
         )
-        assert resp.status_code == 400, (
-            f"Missing edition field should be 400, got {resp.status_code}"
+        assert resp.status_code == 422, (
+            f"Missing edition field should be 422 (Pydantic validation), "
+            f"got {resp.status_code}"
         )
 
     async def test_switch_to_enterprise_returns_actual_edition(self, client):
