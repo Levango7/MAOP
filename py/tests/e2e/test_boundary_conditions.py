@@ -108,12 +108,19 @@ class TestOversizedInput:
         with pytest.raises(ValidationError):
             AgentDescriptor(name="a" * 257)
 
+    @pytest.mark.timeout(150)
     def test_large_batch_register_1000(self, tmp_path):
         """批量注册 1000 个 agent 应在合理时间内完成。
 
         发现：当前实现每次 register 单独写入 SQLite（无批量优化），
         1000 条耗时约 40-50s。这是性能脆弱点，阈值放宽至 90s 记录现状。
         建议优化：增加 batch_register 接口，使用事务批量插入。
+
+        注意：本用例必须**单独放宽 pytest-timeout**。CI 的 e2e 步骤以
+        ``--timeout=60`` 运行，会在 60s 处直接杀掉进程，使下面那条 90s 断言
+        永远没机会执行 —— 快速机器 40-50s 能过，负载重的 runner（实测
+        windows-latest/Python 3.11）超 60s 即被中断，报 Timeout 而非断言失败。
+        此处设为 150s（> 自身 90s 阈值），让断言成为真正的判据。
         """
         catalog = AgentCatalog(db_path=tmp_path / "cat.db")
         start = time.time()
