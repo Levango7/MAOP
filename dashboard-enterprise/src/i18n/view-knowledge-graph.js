@@ -14,7 +14,6 @@ export const messages = {
 
     // ── Page header ───────────────────────────────────────────────
     'view.kg.title': 'Knowledge Graph',
-    'view.kg.sub': 'Explore entities and relations extracted from memory',
 
     // ── Filter panel ─────────────────────────────────────────────
     'view.kg.filter.title': 'Filters',
@@ -34,7 +33,6 @@ export const messages = {
     'view.kg.timeline.title': 'Timeline',
     'view.kg.timeline.start': 'Start',
     'view.kg.timeline.end': 'End',
-    'view.kg.timeline.replay': 'Replay',
     'view.kg.timeline.invalidRange': 'Start time must not be later than end time',
 
     // ── Detail panel ─────────────────────────────────────────────
@@ -45,7 +43,6 @@ export const messages = {
     'view.kg.detail.confidence': 'Confidence',
     'view.kg.detail.properties': 'Properties',
     'view.kg.detail.relations': 'Relations',
-    'view.kg.detail.relationCount': '{count} relation(s)',
     'view.kg.detail.relatedNodes': 'Related Nodes',
     'view.kg.detail.memorySummary': 'Memory Summary',
     'view.kg.detail.noRelations': 'No direct relations',
@@ -60,17 +57,13 @@ export const messages = {
     // ── Empty / error / loading ──────────────────────────────────
     'view.kg.empty.title': 'No knowledge graph data',
     'view.kg.empty.desc': 'Run an orchestration to sediment memory first',
-    'view.kg.error.load': 'Failed to load knowledge graph',
     'view.kg.error.render': 'Graph rendering component failed to load',
-    'view.kg.error.timeout': 'Query timed out, try reducing the limit',
     'view.kg.loading': 'Loading graph…',
     'view.kg.retry': 'Retry',
     'view.kg.refresh': 'Refresh',
 
     // ── LOD / performance ────────────────────────────────────────
     'view.kg.lod.enabled': 'Node count too large — LOD mode enabled',
-    'view.kg.lod.cluster': 'Clustered',
-    'view.kg.lod.hiddenLabels': 'Labels hidden (zoom out to reveal)',
 
     // ── P2-10: Physics threshold & cluster folding ───────────────
     'view.kg.physics.disabled': 'Physics off',
@@ -80,9 +73,6 @@ export const messages = {
     'view.kg.cluster.notice': 'Showing {display} nodes, {folded} folded',
 
     // ── Path highlight ───────────────────────────────────────────
-    'view.kg.path.highlight': 'Highlight path to root',
-    'view.kg.path.clear': 'Clear highlight',
-    'view.kg.path.noPath': 'No path to root found',
   },
 
   zh: {
@@ -92,7 +82,6 @@ export const messages = {
 
     // ── 页面标题 ─────────────────────────────────────────────────
     'view.kg.title': '知识图谱',
-    'view.kg.sub': '探索从记忆中抽取的实体与关系',
 
     // ── 筛选面板 ─────────────────────────────────────────────────
     'view.kg.filter.title': '筛选',
@@ -112,7 +101,6 @@ export const messages = {
     'view.kg.timeline.title': '时间轴',
     'view.kg.timeline.start': '起始',
     'view.kg.timeline.end': '结束',
-    'view.kg.timeline.replay': '回放',
     'view.kg.timeline.invalidRange': '开始时间不得晚于结束时间',
 
     // ── 详情面板 ─────────────────────────────────────────────────
@@ -123,7 +111,6 @@ export const messages = {
     'view.kg.detail.confidence': '置信度',
     'view.kg.detail.properties': '属性',
     'view.kg.detail.relations': '关联关系',
-    'view.kg.detail.relationCount': '{count} 条关联',
     'view.kg.detail.relatedNodes': '关联节点',
     'view.kg.detail.memorySummary': '记忆摘要',
     'view.kg.detail.noRelations': '无直接关联',
@@ -138,17 +125,13 @@ export const messages = {
     // ── 空 / 错误 / 加载 ─────────────────────────────────────────
     'view.kg.empty.title': '暂无知识图谱数据',
     'view.kg.empty.desc': '请先运行编排以沉淀记忆',
-    'view.kg.error.load': '加载知识图谱失败',
     'view.kg.error.render': '图渲染组件加载失败',
-    'view.kg.error.timeout': '查询超时，请尝试减小数量上限',
     'view.kg.loading': '加载图谱中…',
     'view.kg.retry': '重试',
     'view.kg.refresh': '刷新',
 
     // ── LOD / 性能 ───────────────────────────────────────────────
     'view.kg.lod.enabled': '节点数过多 — 已启用 LOD 模式',
-    'view.kg.lod.cluster': '已聚合',
-    'view.kg.lod.hiddenLabels': '已隐藏标签（放大以显示）',
 
     // ── P2-10: 物理模拟阈值 & 聚类折叠 ───────────────────────────
     'view.kg.physics.disabled': '物理模拟已关闭',
@@ -158,8 +141,5 @@ export const messages = {
     'view.kg.cluster.notice': '当前显示 {display} 个节点，已折叠 {folded} 个',
 
     // ── 路径高亮 ─────────────────────────────────────────────────
-    'view.kg.path.highlight': '高亮至根路径',
-    'view.kg.path.clear': '清除高亮',
-    'view.kg.path.noPath': '未找到至根节点的路径',
   },
 };

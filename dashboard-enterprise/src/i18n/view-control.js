@@ -1,6 +1,5 @@
 export const messages = {
   en: {
-    'view.control.title': 'Control Panel',
     'view.control.executionControls': 'Execution Controls',
     'view.control.maintenanceActions': 'Maintenance Actions',
     'view.control.runningJobs': 'Running Jobs',
@@ -33,7 +32,6 @@ export const messages = {
     'view.control.statusRefreshed': 'Status refreshed',
   },
   zh: {
-    'view.control.title': '控制台',
     'view.control.executionControls': '执行控制',
     'view.control.maintenanceActions': '维护操作',
     'view.control.runningJobs': '运行中的任务',

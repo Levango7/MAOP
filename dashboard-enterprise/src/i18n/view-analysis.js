@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.analysis.title': 'Analysis',
-    'view.analysis.sub': 'Data analysis dashboards and insights.',
 
     // ── Tabs ──────────────────────────────────────────────────────
     'view.analysis.tab.summary': 'Summary',
@@ -47,7 +45,6 @@ export const messages = {
     'view.analysis.trends.empty': 'No trend data',
     'view.analysis.trends.emptyHint': 'Trends appear after audit events are recorded.',
     'view.analysis.trends.failedLoad': 'Failed to load task trends',
-    'view.analysis.trends.granularity': 'Granularity',
     'view.analysis.trends.granularity.hour': 'Hour',
     'view.analysis.trends.granularity.day': 'Day',
     'view.analysis.trends.granularity.week': 'Week',
@@ -94,13 +91,9 @@ export const messages = {
     'view.analysis.bottlenecks.col.memory': 'Memory (MB)',
 
     // ── Common ───────────────────────────────────────────────────
-    'view.analysis.note': 'Note',
-    'view.analysis.generatedAt': 'Generated at',
   },
 
   zh: {
-    'view.analysis.title': '数据分析',
-    'view.analysis.sub': '数据分析仪表盘与洞察。',
 
     // ── 标签页 ────────────────────────────────────────────────────
     'view.analysis.tab.summary': '摘要',
@@ -146,7 +139,6 @@ export const messages = {
     'view.analysis.trends.empty': '暂无趋势数据',
     'view.analysis.trends.emptyHint': '审计事件记录后将显示趋势。',
     'view.analysis.trends.failedLoad': '加载任务趋势失败',
-    'view.analysis.trends.granularity': '粒度',
     'view.analysis.trends.granularity.hour': '小时',
     'view.analysis.trends.granularity.day': '天',
     'view.analysis.trends.granularity.week': '周',
@@ -193,7 +185,5 @@ export const messages = {
     'view.analysis.bottlenecks.col.memory': '内存（MB）',
 
     // ── 通用 ──────────────────────────────────────────────────────
-    'view.analysis.note': '备注',
-    'view.analysis.generatedAt': '生成时间',
   },
 };

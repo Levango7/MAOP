@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.logs.title': 'Logs & Analysis',
-    'view.logs.subtitle': 'Live log stream and aggregated delegation analysis.',
 
     'view.logs.filterPlaceholder': 'Filter by message or agent…',
     'view.logs.lines': 'lines',
@@ -34,8 +32,6 @@ export const messages = {
   },
 
   zh: {
-    'view.logs.title': '日志与分析',
-    'view.logs.subtitle': '实时日志流与聚合的委派分析。',
 
     'view.logs.filterPlaceholder': '按消息或智能体筛选…',
     'view.logs.lines': '行',

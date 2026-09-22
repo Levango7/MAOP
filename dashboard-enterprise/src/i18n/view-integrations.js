@@ -16,7 +16,6 @@ export const messages = {
     // ── Header & nav ─────────────────────────────────────────────
     'nav.integrations': 'Integrations',
     'nav.integrations.subtitle': 'N8N and external system integrations',
-    'view.integrations.subtitle': 'Manage n8n workflow integrations: check connectivity, browse workflows, trigger runs and inspect executions.',
 
     // ── Tabs ─────────────────────────────────────────────────────
     'view.integrations.tab.workflows': 'Workflows',
@@ -44,15 +43,12 @@ export const messages = {
     'view.integrations.workflows.triggering': 'Triggering…',
     'view.integrations.workflows.triggerSuccess': 'Workflow triggered (execution {id})',
     'view.integrations.workflows.triggerFailed': 'Failed to trigger workflow',
-    'view.integrations.workflows.viewExec': 'View Execution',
 
     // ── Workflow table columns ───────────────────────────────────
-    'view.integrations.col.id': 'ID',
     'view.integrations.col.name': 'Name',
     'view.integrations.col.active': 'Active',
     'view.integrations.col.nodes': 'Nodes',
     'view.integrations.col.lastExec': 'Last Execution',
-    'view.integrations.col.status': 'Status',
     'view.integrations.col.actions': 'Actions',
 
     // ── Trigger dialog ───────────────────────────────────────────
@@ -73,11 +69,8 @@ export const messages = {
     'view.integrations.executions.lookup': 'Lookup Execution',
     'view.integrations.executions.idPlaceholder': 'Execution ID',
     'view.integrations.executions.col.id': 'Execution ID',
-    'view.integrations.executions.col.workflow': 'Workflow',
     'view.integrations.executions.col.status': 'Status',
     'view.integrations.executions.col.started': 'Started',
-    'view.integrations.executions.col.finished': 'Finished',
-    'view.integrations.executions.col.duration': 'Duration',
     'view.integrations.executions.col.mode': 'Mode',
 
     // ── Execution status ─────────────────────────────────────────
@@ -95,8 +88,6 @@ export const messages = {
     'view.integrations.webhook.hint': 'Configure n8n to POST to this endpoint with an X-N8N-Signature header (HMAC-SHA256 of the body with N8N_WEBHOOK_SECRET).',
 
     // ── Feature flag ─────────────────────────────────────────────
-    'view.integrations.feature.disabled': 'n8n integration is not enabled on this instance',
-    'view.integrations.feature.hint': 'Set the N8N_INTEGRATION feature flag and N8N_BASE_URL/N8N_API_KEY environment variables to enable.',
 
     // ── Stats overview ───────────────────────────────────────────
     'view.integrations.stats.title': 'Integration Statistics',
@@ -111,7 +102,6 @@ export const messages = {
     // ── 页头与导航 ───────────────────────────────────────────────
     'nav.integrations': '集成',
     'nav.integrations.subtitle': 'N8N 与外部系统集成',
-    'view.integrations.subtitle': '管理 n8n 工作流集成：检查连通性、浏览工作流、触发运行并查看执行状态。',
 
     // ── 标签页 ───────────────────────────────────────────────────
     'view.integrations.tab.workflows': '工作流',
@@ -139,15 +129,12 @@ export const messages = {
     'view.integrations.workflows.triggering': '触发中…',
     'view.integrations.workflows.triggerSuccess': '工作流已触发（执行 {id}）',
     'view.integrations.workflows.triggerFailed': '触发工作流失败',
-    'view.integrations.workflows.viewExec': '查看执行',
 
     // ── 工作流表格列 ─────────────────────────────────────────────
-    'view.integrations.col.id': 'ID',
     'view.integrations.col.name': '名称',
     'view.integrations.col.active': '活跃',
     'view.integrations.col.nodes': '节点数',
     'view.integrations.col.lastExec': '最近执行',
-    'view.integrations.col.status': '状态',
     'view.integrations.col.actions': '操作',
 
     // ── 触发对话框 ───────────────────────────────────────────────
@@ -168,11 +155,8 @@ export const messages = {
     'view.integrations.executions.lookup': '查询执行',
     'view.integrations.executions.idPlaceholder': '执行 ID',
     'view.integrations.executions.col.id': '执行 ID',
-    'view.integrations.executions.col.workflow': '工作流',
     'view.integrations.executions.col.status': '状态',
     'view.integrations.executions.col.started': '开始',
-    'view.integrations.executions.col.finished': '结束',
-    'view.integrations.executions.col.duration': '耗时',
     'view.integrations.executions.col.mode': '模式',
 
     // ── 执行状态 ─────────────────────────────────────────────────
@@ -190,8 +174,6 @@ export const messages = {
     'view.integrations.webhook.hint': '配置 n8n 向此端点 POST，并携带 X-N8N-Signature 头（以 N8N_WEBHOOK_SECRET 对 body 计算 HMAC-SHA256）。',
 
     // ── 特性开关 ─────────────────────────────────────────────────
-    'view.integrations.feature.disabled': '本实例未启用 n8n 集成',
-    'view.integrations.feature.hint': '设置 N8N_INTEGRATION 特性开关以及 N8N_BASE_URL/N8N_API_KEY 环境变量以启用。',
 
     // ── 统计概览 ─────────────────────────────────────────────────
     'view.integrations.stats.title': '集成统计',

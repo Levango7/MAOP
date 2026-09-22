@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.models.title': 'Models & Performance',
-    'view.models.subtitle': 'Model registry, provider health, agent drivers and routing policy.',
 
     'view.models.stat.totalModels': 'Total Models',
     'view.models.enabled': 'Enabled',
@@ -77,8 +75,6 @@ export const messages = {
   },
 
   zh: {
-    'view.models.title': '模型与性能',
-    'view.models.subtitle': '模型注册表、提供商健康状态、智能体驱动与路由策略。',
 
     'view.models.stat.totalModels': '模型总数',
     'view.models.enabled': '已启用',

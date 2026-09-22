@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.cost.title': 'Cost Tracking',
-    'view.cost.subtitle': 'Token spend, budget headroom and recent cost entries.',
 
     'view.cost.stat.totalCost': 'Total Cost',
     'view.cost.stat.totalTokens': 'Total Tokens',
@@ -53,8 +51,6 @@ export const messages = {
   },
 
   zh: {
-    'view.cost.title': '成本追踪',
-    'view.cost.subtitle': 'Token 消耗、预算余量与近期成本明细。',
 
     'view.cost.stat.totalCost': '总成本',
     'view.cost.stat.totalTokens': '总 Token 数',

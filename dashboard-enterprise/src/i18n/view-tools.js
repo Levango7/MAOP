@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.tools.title': 'Tools & Skills',
-    'view.tools.sub': 'Registered skills, MCP servers, routing and security posture.',
 
     'view.tools.tab.skills': 'Skills',
     'view.tools.tab.mcp': 'MCP',
@@ -10,10 +8,7 @@ export const messages = {
     'view.tools.tab.prompts': 'Prompts',
     'view.tools.tab.security': 'Security',
 
-    'view.tools.registeredSkills': 'Registered Skills',
     'view.tools.failedLoadSkills': 'Failed to load skills',
-    'view.tools.noSkills': 'No skills registered',
-    'view.tools.noSkillsHint': 'Skill definitions will appear here once discovered.',
     'view.tools.unknown': 'unknown',
     'view.tools.noDescription': 'No description provided.',
 
@@ -35,7 +30,6 @@ export const messages = {
     'view.tools.create': 'Create',
     'view.tools.cancel': 'Cancel',
     'view.tools.creating': 'Creating…',
-    'view.tools.importHint': 'Import a skill definition file (.json)',
     'view.tools.filterAll': 'All',
     'view.tools.filterBuiltin': 'Built-in',
     'view.tools.filterImported': 'Imported',
@@ -100,8 +94,6 @@ export const messages = {
   },
 
   zh: {
-    'view.tools.title': '工具与技能',
-    'view.tools.sub': '已注册技能、MCP 服务、路由与安全态势。',
 
     'view.tools.tab.skills': '技能',
     'view.tools.tab.mcp': 'MCP',
@@ -110,10 +102,7 @@ export const messages = {
     'view.tools.tab.prompts': '提示词',
     'view.tools.tab.security': '安全',
 
-    'view.tools.registeredSkills': '已注册技能',
     'view.tools.failedLoadSkills': '加载技能失败',
-    'view.tools.noSkills': '未注册技能',
-    'view.tools.noSkillsHint': '发现技能定义后将显示在此处。',
     'view.tools.unknown': '未知',
     'view.tools.noDescription': '未提供描述。',
 
@@ -135,7 +124,6 @@ export const messages = {
     'view.tools.create': '创建',
     'view.tools.cancel': '取消',
     'view.tools.creating': '创建中…',
-    'view.tools.importHint': '导入技能定义文件（.json）',
     'view.tools.filterAll': '全部',
     'view.tools.filterBuiltin': '内置',
     'view.tools.filterImported': '已导入',

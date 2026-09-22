@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.mcp.title': 'MCP Manager',
-    'view.mcp.sub': 'Manage Model Context Protocol servers, tools, call statistics and concurrency limits.',
 
     // ── Tabs ──────────────────────────────────────────────────────
     'view.mcp.tab.servers': 'Servers',
@@ -34,7 +32,6 @@ export const messages = {
     'view.mcp.modal.auth.apikey': 'API Key',
     'view.mcp.modal.token': 'Token / Secret',
     'view.mcp.modal.saving': 'Saving…',
-    'view.mcp.modal.nameRequired': 'Server name is required',
 
     // ── Tools ─────────────────────────────────────────────────────
     'view.mcp.tools.title': 'Tool Inventory',
@@ -51,7 +48,6 @@ export const messages = {
     'view.mcp.stats.failedLoad': 'Failed to load statistics',
     'view.mcp.stats.empty': 'No call data yet',
     'view.mcp.stats.emptyHint': 'Statistics will appear after tools are invoked.',
-    'view.mcp.stats.overview': 'Overview',
     'view.mcp.stats.totalCalls': 'Total Calls',
     'view.mcp.stats.successRate': 'Success Rate',
     'view.mcp.stats.avgLatency': 'Avg Latency',
@@ -67,7 +63,6 @@ export const messages = {
     'view.mcp.concurrency.current': 'Current',
     'view.mcp.concurrency.newLimit': 'New limit',
     'view.mcp.concurrency.save': 'Apply',
-    'view.mcp.concurrency.saved': 'Updated',
     'view.mcp.concurrency.saveFailed': 'Failed to update limit',
     'view.mcp.concurrency.unlimited': 'unlimited',
     'view.mcp.concurrency.hint': 'Limit how many parallel calls to a tool can run at once.',
@@ -78,15 +73,12 @@ export const messages = {
     'view.mcp.col.latency': 'Latency',
     'view.mcp.col.server': 'Server',
     'view.mcp.col.calls': 'Calls',
-    'view.mcp.col.limit': 'Limit',
     'view.mcp.col.actions': 'Actions',
     'view.mcp.status.connected': 'Connected',
     'view.mcp.status.disconnected': 'Disconnected',
   },
 
   zh: {
-    'view.mcp.title': 'MCP 管理器',
-    'view.mcp.sub': '管理 Model Context Protocol 服务、工具、调用统计与并发限制。',
 
     // ── 标签页 ────────────────────────────────────────────────────
     'view.mcp.tab.servers': '服务',
@@ -119,7 +111,6 @@ export const messages = {
     'view.mcp.modal.auth.apikey': 'API 密钥',
     'view.mcp.modal.token': '令牌 / 密钥',
     'view.mcp.modal.saving': '保存中…',
-    'view.mcp.modal.nameRequired': '服务名称为必填项',
 
     // ── 工具 ──────────────────────────────────────────────────────
     'view.mcp.tools.title': '工具清单',
@@ -136,7 +127,6 @@ export const messages = {
     'view.mcp.stats.failedLoad': '加载统计失败',
     'view.mcp.stats.empty': '暂无调用数据',
     'view.mcp.stats.emptyHint': '工具被调用后，统计数据将显示在此处。',
-    'view.mcp.stats.overview': '概览',
     'view.mcp.stats.totalCalls': '总调用次数',
     'view.mcp.stats.successRate': '成功率',
     'view.mcp.stats.avgLatency': '平均延迟',
@@ -152,7 +142,6 @@ export const messages = {
     'view.mcp.concurrency.current': '当前',
     'view.mcp.concurrency.newLimit': '新限制',
     'view.mcp.concurrency.save': '应用',
-    'view.mcp.concurrency.saved': '已更新',
     'view.mcp.concurrency.saveFailed': '更新限制失败',
     'view.mcp.concurrency.unlimited': '不限',
     'view.mcp.concurrency.hint': '限制同一工具可并行执行的调用数量。',
@@ -163,7 +152,6 @@ export const messages = {
     'view.mcp.col.latency': '延迟',
     'view.mcp.col.server': '服务',
     'view.mcp.col.calls': '调用次数',
-    'view.mcp.col.limit': '限制',
     'view.mcp.col.actions': '操作',
     'view.mcp.status.connected': '已连接',
     'view.mcp.status.disconnected': '未连接',

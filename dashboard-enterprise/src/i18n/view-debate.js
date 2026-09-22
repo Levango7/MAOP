@@ -15,7 +15,6 @@ export const messages = {
     // ── Header & nav ─────────────────────────────────────────────
     'nav.debate': 'Debate',
     'nav.debate.subtitle': 'Multi-agent discussion and consensus',
-    'view.debate.subtitle': 'Start adversarial debates, inspect verdicts and tune consensus parameters.',
 
     // ── Tabs ─────────────────────────────────────────────────────
     'view.debate.tab.history': 'History',
@@ -32,7 +31,6 @@ export const messages = {
     // ── History table columns ────────────────────────────────────
     'view.debate.col.id': 'Debate ID',
     'view.debate.col.question': 'Question',
-    'view.debate.col.participants': 'Participants',
     'view.debate.col.rounds': 'Rounds',
     'view.debate.col.consensus': 'Consensus',
     'view.debate.col.verdict': 'Verdict',
@@ -78,7 +76,6 @@ export const messages = {
     'view.debate.config.saving': 'Saving…',
     'view.debate.config.saved': 'Configuration saved',
     'view.debate.config.saveFailed': 'Failed to save configuration',
-    'view.debate.config.failedLoad': 'Failed to load configuration',
 
     // ── Verdict detail drawer ────────────────────────────────────
     'view.debate.detail.title': 'Debate Verdict',
@@ -90,9 +87,6 @@ export const messages = {
     'view.debate.detail.trajectory': 'Trajectory',
     'view.debate.detail.emptyTrajectory': 'No trajectory recorded',
     'view.debate.detail.round': 'Round {n}',
-    'view.debate.detail.speaker': 'Speaker',
-    'view.debate.detail.stance': 'Stance',
-    'view.debate.detail.argument': 'Argument',
 
     // ── Validation ───────────────────────────────────────────────
     'view.debate.validate.questionRequired': 'Question is required',
@@ -100,19 +94,12 @@ export const messages = {
     'view.debate.validate.consensusRange': 'Consensus threshold must be between 0 and 1',
 
     // ── Stats overview ───────────────────────────────────────────
-    'view.debate.stats.title': 'Debate Statistics',
-    'view.debate.stats.total': 'Total Debates',
-    'view.debate.stats.consensusRate': 'Consensus Rate',
-    'view.debate.stats.avgRounds': 'Avg Rounds',
-    'view.debate.stats.timeseries': 'Debate Volume',
-    'view.debate.stats.empty': 'No statistics yet',
   },
 
   zh: {
     // ── 页头与导航 ───────────────────────────────────────────────
     'nav.debate': '辩论',
     'nav.debate.subtitle': '多智能体讨论与共识',
-    'view.debate.subtitle': '发起对抗式辩论、查看裁决并调整共识参数。',
 
     // ── 标签页 ───────────────────────────────────────────────────
     'view.debate.tab.history': '历史',
@@ -129,7 +116,6 @@ export const messages = {
     // ── 历史表格列 ───────────────────────────────────────────────
     'view.debate.col.id': '辩论 ID',
     'view.debate.col.question': '问题',
-    'view.debate.col.participants': '参与者',
     'view.debate.col.rounds': '轮数',
     'view.debate.col.consensus': '共识度',
     'view.debate.col.verdict': '裁决',
@@ -175,7 +161,6 @@ export const messages = {
     'view.debate.config.saving': '保存中…',
     'view.debate.config.saved': '配置已保存',
     'view.debate.config.saveFailed': '保存配置失败',
-    'view.debate.config.failedLoad': '加载配置失败',
 
     // ── 裁决详情抽屉 ─────────────────────────────────────────────
     'view.debate.detail.title': '辩论裁决',
@@ -187,9 +172,6 @@ export const messages = {
     'view.debate.detail.trajectory': '轨迹',
     'view.debate.detail.emptyTrajectory': '无轨迹记录',
     'view.debate.detail.round': '第 {n} 轮',
-    'view.debate.detail.speaker': '发言者',
-    'view.debate.detail.stance': '立场',
-    'view.debate.detail.argument': '论据',
 
     // ── 校验 ─────────────────────────────────────────────────────
     'view.debate.validate.questionRequired': '问题为必填项',
@@ -197,11 +179,5 @@ export const messages = {
     'view.debate.validate.consensusRange': '共识阈值必须在 0 到 1 之间',
 
     // ── 统计概览 ─────────────────────────────────────────────────
-    'view.debate.stats.title': '辩论统计',
-    'view.debate.stats.total': '辩论总数',
-    'view.debate.stats.consensusRate': '共识率',
-    'view.debate.stats.avgRounds': '平均轮数',
-    'view.debate.stats.timeseries': '辩论量趋势',
-    'view.debate.stats.empty': '暂无统计数据',
   },
 };

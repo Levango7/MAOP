@@ -1,6 +1,5 @@
 export const messages = {
   en: {
-    'view.licenses.subtitle': 'Issue, renew and revoke enterprise licenses',
     'view.licenses.enterprise': 'Enterprise',
     'view.licenses.searchPlaceholder': 'Filter by customer or key…',
 
@@ -15,7 +14,6 @@ export const messages = {
     'view.licenses.revoke': 'Revoke',
     'view.licenses.revokeConfirm': 'Revoke license "{id}"? This action cannot be undone.',
     'view.licenses.revoked': 'License {id} revoked',
-    'view.licenses.viewDetails': 'View Details',
 
     // ── Empty / error ──────────────────────────────────────────
     'view.licenses.noLicenses': 'No licenses',
@@ -34,7 +32,6 @@ export const messages = {
     'view.licenses.maxAgents': 'Max Agents',
     'view.licenses.maxUsers': 'Max Users',
     'view.licenses.created': 'Created',
-    'view.licenses.updated': 'Updated',
 
     // ── Status ─────────────────────────────────────────────────
     'view.licenses.statusTrial': 'Trial',
@@ -65,9 +62,6 @@ export const messages = {
     'view.licenses.detailInfo': 'Basic Information',
     'view.licenses.detailQuota': 'Quota',
     'view.licenses.detailHistory': 'Operation History',
-    'view.licenses.historyAction': 'Action',
-    'view.licenses.historyTime': 'Time',
-    'view.licenses.historyActor': 'Actor',
     'view.licenses.noHistory': 'No operation history',
 
     // ── Stats ──────────────────────────────────────────────────
@@ -82,7 +76,6 @@ export const messages = {
 
   zh: {
     // P1-7 fix: 统一中文翻译为"许可证"，消除"License"/"许可证"混用。
-    'view.licenses.subtitle': '签发、续期与吊销企业版许可证',
     'view.licenses.enterprise': '企业版',
     'view.licenses.searchPlaceholder': '按客户或 Key 筛选…',
 
@@ -97,7 +90,6 @@ export const messages = {
     'view.licenses.revoke': '吊销',
     'view.licenses.revokeConfirm': '确定吊销许可证「{id}」？此操作不可恢复。',
     'view.licenses.revoked': '许可证 {id} 已吊销',
-    'view.licenses.viewDetails': '查看详情',
 
     // ── Empty / error ──────────────────────────────────────────
     'view.licenses.noLicenses': '暂无许可证',
@@ -116,7 +108,6 @@ export const messages = {
     'view.licenses.maxAgents': '最大智能体数',
     'view.licenses.maxUsers': '最大用户数',
     'view.licenses.created': '创建时间',
-    'view.licenses.updated': '更新时间',
 
     // ── Status ─────────────────────────────────────────────────
     'view.licenses.statusTrial': '试用',
@@ -147,9 +138,6 @@ export const messages = {
     'view.licenses.detailInfo': '基本信息',
     'view.licenses.detailQuota': '配额',
     'view.licenses.detailHistory': '操作历史',
-    'view.licenses.historyAction': '操作',
-    'view.licenses.historyTime': '时间',
-    'view.licenses.historyActor': '执行者',
     'view.licenses.noHistory': '暂无操作历史',
 
     // ── Stats ──────────────────────────────────────────────────

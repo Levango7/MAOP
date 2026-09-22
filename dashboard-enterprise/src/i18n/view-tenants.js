@@ -1,6 +1,5 @@
 export const messages = {
   en: {
-    'view.tenants.subtitle': 'Isolated workspaces and resource quotas',
     'view.tenants.enterprise': 'Enterprise',
     'view.tenants.createTenant': 'Create Tenant',
     'view.tenants.tenantId': 'Tenant ID',
@@ -34,7 +33,6 @@ export const messages = {
   },
 
   zh: {
-    'view.tenants.subtitle': '隔离的工作空间与资源配额',
     'view.tenants.enterprise': '企业版',
     // P1-6 fix: 统一中文翻译为"租户"，消除"Tenant"/"租户"混用。
     'view.tenants.createTenant': '创建租户',

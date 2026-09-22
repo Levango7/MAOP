@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.monitor.title': 'Monitor & Maintenance',
-    'view.monitor.subtitle': 'Live agent health, system resources and maintenance actions',
     'view.monitor.tabMonitor': 'Monitor',
     'view.monitor.tabMaintenance': 'Maintenance',
     'view.monitor.sseConnected': 'SSE connected',
@@ -76,8 +74,6 @@ export const messages = {
     'view.monitor.queue': 'Queue',
   },
   zh: {
-    'view.monitor.title': '监控与维护',
-    'view.monitor.subtitle': '智能体实时健康、系统资源与维护操作',
     'view.monitor.tabMonitor': '监控',
     'view.monitor.tabMaintenance': '维护',
     'view.monitor.sseConnected': 'SSE 已连接',

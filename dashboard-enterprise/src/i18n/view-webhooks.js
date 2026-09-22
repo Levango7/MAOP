@@ -41,7 +41,6 @@ export const messages = {
     'view.webhooks.actionDelete': 'Delete',
     'view.webhooks.actionTest': 'Test',
     'view.webhooks.actionHistory': 'History',
-    'view.webhooks.actionToggle': 'Toggle',
     'view.webhooks.deleteConfirm': 'Delete webhook "{name}"? This action cannot be undone.',
 
     // ── Dialog: create/edit ─────────────────────────────────────
@@ -62,7 +61,6 @@ export const messages = {
     'view.webhooks.placeholderUrl': 'https://example.com/webhook',
     'view.webhooks.placeholderSecret': 'HMAC shared secret',
     'view.webhooks.placeholderToken': 'Bearer token',
-    'view.webhooks.eventsPlaceholder': 'Select events…',
 
     // ── Event types ─────────────────────────────────────────────
     'view.webhooks.eventAgentDispatch': 'Agent Dispatch',
@@ -86,7 +84,6 @@ export const messages = {
     'view.webhooks.testSuccess': 'Webhook test succeeded ({ms}ms)',
     'view.webhooks.testFailed': 'Webhook test failed: {error}',
     'view.webhooks.testNoListener': 'Test sent (no listener responded)',
-    'view.webhooks.testing': 'Testing…',
 
     // ── Trigger history ─────────────────────────────────────────
     'view.webhooks.historyTitle': 'Trigger History',
@@ -111,7 +108,6 @@ export const messages = {
     // ── Toast ───────────────────────────────────────────────────
     'view.webhooks.saved': 'Webhook saved',
     'view.webhooks.deleted': 'Webhook deleted',
-    'view.webhooks.toggled': 'Webhook {state}',
     'view.webhooks.never': 'Never',
   },
   zh: {
@@ -146,7 +142,6 @@ export const messages = {
     'view.webhooks.actionDelete': '删除',
     'view.webhooks.actionTest': '测试',
     'view.webhooks.actionHistory': '历史',
-    'view.webhooks.actionToggle': '切换状态',
     'view.webhooks.deleteConfirm': '确认删除 Webhook "{name}"？此操作不可撤销。',
 
     // ── Dialog: create/edit ─────────────────────────────────────
@@ -167,7 +162,6 @@ export const messages = {
     'view.webhooks.placeholderUrl': 'https://example.com/webhook',
     'view.webhooks.placeholderSecret': 'HMAC 共享密钥',
     'view.webhooks.placeholderToken': 'Bearer token',
-    'view.webhooks.eventsPlaceholder': '选择事件…',
 
     // ── Event types ─────────────────────────────────────────────
     'view.webhooks.eventAgentDispatch': '智能体调度',
@@ -191,7 +185,6 @@ export const messages = {
     'view.webhooks.testSuccess': 'Webhook 测试成功（{ms}ms）',
     'view.webhooks.testFailed': 'Webhook 测试失败：{error}',
     'view.webhooks.testNoListener': '测试已发送（无监听者响应）',
-    'view.webhooks.testing': '测试中…',
 
     // ── Trigger history ─────────────────────────────────────────
     'view.webhooks.historyTitle': '触发历史',
@@ -216,7 +209,6 @@ export const messages = {
     // ── Toast ───────────────────────────────────────────────────
     'view.webhooks.saved': 'Webhook 已保存',
     'view.webhooks.deleted': 'Webhook 已删除',
-    'view.webhooks.toggled': 'Webhook 已{state}',
     'view.webhooks.never': '从未',
   },
 };

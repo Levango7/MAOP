@@ -1,7 +1,6 @@
 export const messages = {
   en: {
     'view.agentRegistry.title': 'Agent Registry',
-    'view.agentRegistry.sub': 'Manage AI agent catalog and capabilities.',
 
     // ── Tabs ──────────────────────────────────────────────────────
     'view.agentRegistry.tab.agents': 'Agents',
@@ -131,7 +130,6 @@ export const messages = {
 
   zh: {
     'view.agentRegistry.title': 'Agent 注册中心',
-    'view.agentRegistry.sub': '管理 AI Agent 目录与能力声明。',
 
     // ── 标签页 ────────────────────────────────────────────────────
     'view.agentRegistry.tab.agents': 'Agent 列表',

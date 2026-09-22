@@ -8,10 +8,6 @@
  */
 export const messages = {
   en: {
-    'view.agentBilling.title': 'Agent Billing',
-    'view.agentBilling.sub': 'Quota management, billing records and cost summaries for agents.',
-    'view.agentBilling.empty': 'No billing data',
-    'view.agentBilling.emptyHint': 'Quota and billing data will appear here once agents start consuming tokens.',
     'view.agentBilling.failedLoad': 'Failed to load billing data',
     'view.agentBilling.refresh': 'Refresh',
 
@@ -105,10 +101,6 @@ export const messages = {
   },
 
   zh: {
-    'view.agentBilling.title': '智能体计费',
-    'view.agentBilling.sub': '智能体额度管理、计费记录与成本摘要。',
-    'view.agentBilling.empty': '暂无计费数据',
-    'view.agentBilling.emptyHint': '智能体消耗 Token 后，额度与计费数据将显示在此处。',
     'view.agentBilling.failedLoad': '加载计费数据失败',
     'view.agentBilling.refresh': '刷新',
 

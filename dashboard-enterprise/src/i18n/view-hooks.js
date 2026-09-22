@@ -8,7 +8,6 @@ export const messages = {
   en: {
     // ── Tab & header ────────────────────────────────────────────
     'view.settings.tabHooks': 'Hook Management',
-    'view.hooks.subtitle': 'Configure event hooks for lifecycle webhooks',
     'view.hooks.createBtn': 'New Hook',
     'view.hooks.refreshBtn': 'Refresh',
     'view.hooks.hint': 'Hooks fire on lifecycle events (e.g. agent.pre_dispatch, loop.complete) and POST to the configured URL.',
@@ -18,7 +17,6 @@ export const messages = {
     'view.hooks.colEvent': 'Event',
     'view.hooks.colUrl': 'URL',
     'view.hooks.colEnabled': 'Enabled',
-    'view.hooks.colStatus': 'Status',
     'view.hooks.colActions': 'Actions',
 
     // ── Status ──────────────────────────────────────────────────
@@ -71,7 +69,6 @@ export const messages = {
   zh: {
     // ── Tab & header ────────────────────────────────────────────
     'view.settings.tabHooks': 'Hook 管理',
-    'view.hooks.subtitle': '为生命周期事件配置 Hook',
     'view.hooks.createBtn': '新建 Hook',
     'view.hooks.refreshBtn': '刷新',
     'view.hooks.hint': 'Hook 在生命周期事件（如 agent.pre_dispatch、loop.complete）触发时向配置的 URL 发送 POST 请求。',
@@ -81,7 +78,6 @@ export const messages = {
     'view.hooks.colEvent': '事件',
     'view.hooks.colUrl': 'URL',
     'view.hooks.colEnabled': '启用',
-    'view.hooks.colStatus': '状态',
     'view.hooks.colActions': '操作',
 
     // ── Status ──────────────────────────────────────────────────

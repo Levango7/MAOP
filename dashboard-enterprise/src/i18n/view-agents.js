@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.agents.title': 'Agent Dispatch & Management',
-    'view.agents.subtitle': 'Routing configuration, live health and per-agent configuration',
     'view.agents.dispatchRouter': 'Dispatch Router',
     'view.agents.dispatchRouterSub': 'Capability-based routing rules (primary → fallback → tertiary) from config/agents.yaml',
     'view.agents.dispatchIntro': 'When a task matches a capability (by keywords or regex), MAOP routes it to the primary agent; if that fails, it cascades to fallback then tertiary. Below are the static rules and the most recent actual routing decisions.',
@@ -13,7 +11,6 @@ export const messages = {
     'view.agents.noRoutesHint': 'Add routing rules in config/agents.yaml',
     'view.agents.noDescription': 'No description',
     'view.agents.health': 'Health',
-    'view.agents.restart': 'Restart',
     'view.agents.switchModel': 'Switch model',
     'view.agents.healthCheck': 'Health check',
     'view.agents.allAgents': 'All Agents',
@@ -40,8 +37,6 @@ export const messages = {
     'view.agents.cliPath': 'CLI Path',
     'view.agents.noScanned': 'No local agents scanned yet',
     'view.agents.noScannedHint': 'Run a scan to detect agent CLIs on this machine',
-    'view.agents.scanResult': 'Scanned {scanned} agent(s), {synced} synced',
-    'view.agents.switchNotSupported': 'Model switching for "{name}" is not yet supported. Edit config/agents.yaml to change the model.',
     'view.agents.healthCheckSent': 'Health check sent to {name}',
     'view.agents.healthCheckFailed': 'Health check failed',
     'view.agents.restarted': '{name} restarted',
@@ -130,8 +125,6 @@ export const messages = {
   },
 
   zh: {
-    'view.agents.title': '智能体调度与管理',
-    'view.agents.subtitle': '路由配置、实时健康与按智能体的配置',
     'view.agents.dispatchRouter': '调度路由器',
     'view.agents.dispatchRouterSub': '基于能力的路由规则（主选 → 降级 → 备选），来自 config/agents.yaml',
     'view.agents.dispatchIntro': '当任务匹配到某项能力（通过关键词或正则）时，MAOP 会将任务路由到主选 agent；若失败则依次降级到 fallback、tertiary。下方展示静态路由规则和最近的实际路由决策记录。',
@@ -143,7 +136,6 @@ export const messages = {
     'view.agents.noRoutesHint': '请在 config/agents.yaml 中添加路由规则',
     'view.agents.noDescription': '无描述',
     'view.agents.health': '健康',
-    'view.agents.restart': '重启',
     'view.agents.switchModel': '切换模型',
     'view.agents.healthCheck': '健康检查',
     'view.agents.allAgents': '全部智能体',
@@ -170,8 +162,6 @@ export const messages = {
     'view.agents.cliPath': 'CLI 路径',
     'view.agents.noScanned': '尚未扫描本地智能体',
     'view.agents.noScannedHint': '运行一次扫描以检测本机上的 Agent CLI',
-    'view.agents.scanResult': '已扫描 {scanned} 个，已同步 {synced} 个',
-    'view.agents.switchNotSupported': '模型切换 "{name}" 暂不支持，请编辑 config/agents.yaml 修改模型。',
     'view.agents.healthCheckSent': '已向 {name} 发送健康检查',
     'view.agents.healthCheckFailed': '健康检查失败',
     'view.agents.restarted': '{name} 已重启',

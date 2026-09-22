@@ -20,12 +20,8 @@ export const messages = {
     'view.sso.editProvider': 'Edit Provider',
     'view.sso.protocol': 'Protocol',
     'view.sso.test': 'Test Connection',
-    'view.sso.testing': 'Testing…',
-    'view.sso.metadata': 'Metadata',
     'view.sso.testSuccess': 'Connection successful',
     'view.sso.testFailed': 'Connection failed',
-    'view.sso.testReachable': 'Reachable',
-    'view.sso.testUnreachable': 'Unreachable',
     'view.sso.confirmDelete': 'Delete this identity provider?',
     'view.sso.deleted': 'Provider deleted',
     'view.sso.saved': 'Provider saved',
@@ -35,14 +31,9 @@ export const messages = {
     'view.sso.disabled': 'Disabled',
     'view.sso.autoRedirect': 'Auto Redirect',
     'view.sso.createdAt': 'Created',
-    'view.sso.updatedAt': 'Updated',
-    'view.sso.tenant': 'Tenant',
     'view.sso.tenantOptional': 'Tenant (optional, empty = global)',
     'view.sso.nameRequired': 'Provider name is required',
-    'view.sso.protocolRequired': 'Protocol is required',
     'view.sso.globalTenant': 'Global',
-    'view.sso.enableShort': 'On',
-    'view.sso.disableShort': 'Off',
 
     // ── 协议标签 ──────────────────────────────────────────────
     'view.sso.protocol.oidc': 'OIDC',
@@ -121,7 +112,6 @@ export const messages = {
     'view.sso.metadata.samlOnly': 'Metadata export is only available for SAML providers',
 
     // ── 自动跳转 ──────────────────────────────────────────────
-    'view.sso.autoRedirectHint': 'When only one provider is enabled, redirect users directly to the IdP login page',
   },
 
   zh: {
@@ -136,12 +126,8 @@ export const messages = {
     'view.sso.editProvider': '编辑提供商',
     'view.sso.protocol': '协议',
     'view.sso.test': '测试连接',
-    'view.sso.testing': '测试中…',
-    'view.sso.metadata': 'Metadata',
     'view.sso.testSuccess': '连接成功',
     'view.sso.testFailed': '连接失败',
-    'view.sso.testReachable': '可达',
-    'view.sso.testUnreachable': '不可达',
     'view.sso.confirmDelete': '确定删除此身份提供商？',
     'view.sso.deleted': '提供商已删除',
     'view.sso.saved': '提供商已保存',
@@ -151,14 +137,9 @@ export const messages = {
     'view.sso.disabled': '已禁用',
     'view.sso.autoRedirect': '自动跳转',
     'view.sso.createdAt': '创建时间',
-    'view.sso.updatedAt': '更新时间',
-    'view.sso.tenant': '租户',
     'view.sso.tenantOptional': '租户（可选，留空表示全局）',
     'view.sso.nameRequired': '提供商名称为必填项',
-    'view.sso.protocolRequired': '协议为必填项',
     'view.sso.globalTenant': '全局',
-    'view.sso.enableShort': '开',
-    'view.sso.disableShort': '关',
 
     // ── 协议标签 ──────────────────────────────────────────────
     'view.sso.protocol.oidc': 'OIDC',
@@ -237,6 +218,5 @@ export const messages = {
     'view.sso.metadata.samlOnly': 'Metadata 导出仅适用于 SAML 提供商',
 
     // ── 自动跳转 ──────────────────────────────────────────────
-    'view.sso.autoRedirectHint': '当仅启用一个提供商时，将用户直接重定向到 IdP 登录页',
   },
 };

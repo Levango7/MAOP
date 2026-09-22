@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.scheduling.title': 'Scheduling',
-    'view.scheduling.sub': 'Monitor agent health, failure rates and adaptive scheduling state.',
 
     // ── Tabs ──────────────────────────────────────────────────────
     'view.scheduling.tab.agents': 'Agent Health',
@@ -37,10 +35,7 @@ export const messages = {
     'view.scheduling.col.status': 'Status',
     'view.scheduling.col.failureRate': 'Failure Rate',
     'view.scheduling.col.avgLatency': 'Avg Latency',
-    'view.scheduling.col.timeoutRate': 'Timeout Rate',
     'view.scheduling.col.weight': 'Weight',
-    'view.scheduling.col.window': 'Window',
-    'view.scheduling.col.recorded': 'Recorded',
     'view.scheduling.col.actions': 'Actions',
 
     // ── Agent status ──────────────────────────────────────────────
@@ -55,8 +50,6 @@ export const messages = {
   },
 
   zh: {
-    'view.scheduling.title': '调度策略',
-    'view.scheduling.sub': '监控智能体健康、失败率与自适应调度状态。',
 
     // ── 标签页 ────────────────────────────────────────────────────
     'view.scheduling.tab.agents': '智能体健康',
@@ -92,10 +85,7 @@ export const messages = {
     'view.scheduling.col.status': '状态',
     'view.scheduling.col.failureRate': '失败率',
     'view.scheduling.col.avgLatency': '平均延迟',
-    'view.scheduling.col.timeoutRate': '超时率',
     'view.scheduling.col.weight': '权重',
-    'view.scheduling.col.window': '窗口',
-    'view.scheduling.col.recorded': '已记录',
     'view.scheduling.col.actions': '操作',
 
     // ── 智能体状态 ────────────────────────────────────────────────

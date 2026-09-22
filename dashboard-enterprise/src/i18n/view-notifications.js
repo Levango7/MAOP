@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.notifications.title': 'Notifications',
-    'view.notifications.subtitle': 'In-app alerts and delivery preferences',
     'view.notifications.enterprise': 'Enterprise',
 
     // ── Stat cards ──
@@ -15,7 +13,6 @@ export const messages = {
     'view.notifications.filterLevel': 'Level',
     'view.notifications.filterCategory': 'Category',
     'view.notifications.filterRead': 'Read status',
-    'view.notifications.readAll': 'All',
     'view.notifications.readUnread': 'Unread only',
     'view.notifications.readRead': 'Read only',
 
@@ -76,9 +73,6 @@ export const messages = {
     'view.notifications.channelSms': 'SMS',
 
     // ── Bell ──
-    'view.notifications.bellTitle': 'Notifications',
-    'view.notifications.bellViewAll': 'View all',
-    'view.notifications.bellEmpty': 'No unread notifications',
     'view.notifications.notificationsUnavailable': 'Notifications unavailable',
     'view.notifications.loadMoreFailed': 'Load more failed',
     'view.notifications.markReadFailed': 'Mark read failed',
@@ -88,8 +82,6 @@ export const messages = {
   },
 
   zh: {
-    'view.notifications.title': '通知中心',
-    'view.notifications.subtitle': '站内通知与送达偏好',
     'view.notifications.enterprise': '企业版',
 
     // ── 统计卡片 ──
@@ -103,7 +95,6 @@ export const messages = {
     'view.notifications.filterLevel': '级别',
     'view.notifications.filterCategory': '类别',
     'view.notifications.filterRead': '阅读状态',
-    'view.notifications.readAll': '全部',
     'view.notifications.readUnread': '仅未读',
     'view.notifications.readRead': '仅已读',
 
@@ -164,9 +155,6 @@ export const messages = {
     'view.notifications.channelSms': '短信',
 
     // ── 铃铛 ──
-    'view.notifications.bellTitle': '通知',
-    'view.notifications.bellViewAll': '查看全部',
-    'view.notifications.bellEmpty': '暂无未读通知',
     'view.notifications.notificationsUnavailable': '通知不可用',
     'view.notifications.loadMoreFailed': '加载更多失败',
     'view.notifications.markReadFailed': '标记已读失败',

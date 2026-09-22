@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.protocols.title': 'Protocols',
-    'view.protocols.sub': 'Manage communication protocols: register, validate and send messages.',
 
     // ── Tabs ──────────────────────────────────────────────────────
     'view.protocols.tab.protocols': 'Protocols',
@@ -27,7 +25,6 @@ export const messages = {
     'view.protocols.modal.description': 'Description',
     'view.protocols.modal.schema': 'Schema (JSON)',
     'view.protocols.modal.saving': 'Saving…',
-    'view.protocols.modal.nameRequired': 'Protocol name is required',
 
     // ── Messages ──────────────────────────────────────────────────
     'view.protocols.messages.title': 'Message Log',
@@ -44,15 +41,10 @@ export const messages = {
     'view.protocols.col.participants': 'Participants',
     'view.protocols.col.description': 'Description',
     'view.protocols.col.actions': 'Actions',
-    'view.protocols.col.sender': 'Sender',
-    'view.protocols.col.recipient': 'Recipient',
-    'view.protocols.col.time': 'Time',
     'view.protocols.col.payload': 'Payload',
   },
 
   zh: {
-    'view.protocols.title': '协议管理',
-    'view.protocols.sub': '管理通信协议：注册、验证与发送消息。',
 
     // ── 标签页 ────────────────────────────────────────────────────
     'view.protocols.tab.protocols': '协议',
@@ -78,7 +70,6 @@ export const messages = {
     'view.protocols.modal.description': '描述',
     'view.protocols.modal.schema': 'Schema (JSON)',
     'view.protocols.modal.saving': '保存中…',
-    'view.protocols.modal.nameRequired': '协议名称为必填项',
 
     // ── 消息 ──────────────────────────────────────────────────────
     'view.protocols.messages.title': '消息日志',
@@ -95,9 +86,6 @@ export const messages = {
     'view.protocols.col.participants': '参与者',
     'view.protocols.col.description': '描述',
     'view.protocols.col.actions': '操作',
-    'view.protocols.col.sender': '发送者',
-    'view.protocols.col.recipient': '接收者',
-    'view.protocols.col.time': '时间',
     'view.protocols.col.payload': '负载',
   },
 };

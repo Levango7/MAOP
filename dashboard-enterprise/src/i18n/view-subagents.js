@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.subagents.title': 'Subagent Manager',
-    'view.subagents.sub': 'Spawn, monitor and manage child agent lifecycles.',
 
     // ── Tabs ──────────────────────────────────────────────────────
     'view.subagents.tab.active': 'Active',
@@ -52,7 +50,6 @@ export const messages = {
     'view.subagents.action.cancel': 'Cancel',
     'view.subagents.action.transcript': 'Transcript',
     'view.subagents.action.waiting': 'Waiting…',
-    'view.subagents.action.cancelling': 'Cancelling…',
 
     // ── Wait modal ────────────────────────────────────────────────
     'view.subagents.wait.title': 'Wait for Subagent',
@@ -60,7 +57,6 @@ export const messages = {
     'view.subagents.wait.submit': 'Wait',
     'view.subagents.wait.success': 'Subagent completed',
     'view.subagents.wait.failed': 'Wait failed',
-    'view.subagents.wait.notFound': 'Subagent not found or timed out',
     'view.subagents.wait.result': 'Result',
 
     // ── Transcript drawer ─────────────────────────────────────────
@@ -75,8 +71,6 @@ export const messages = {
   },
 
   zh: {
-    'view.subagents.title': '子代理管理',
-    'view.subagents.sub': '生成、监控和管理子代理生命周期。',
 
     // ── 标签页 ────────────────────────────────────────────────────
     'view.subagents.tab.active': '活跃',
@@ -127,7 +121,6 @@ export const messages = {
     'view.subagents.action.cancel': '取消',
     'view.subagents.action.transcript': '转录',
     'view.subagents.action.waiting': '等待中…',
-    'view.subagents.action.cancelling': '取消中…',
 
     // ── 等待弹窗 ──────────────────────────────────────────────────
     'view.subagents.wait.title': '等待子代理',
@@ -135,7 +128,6 @@ export const messages = {
     'view.subagents.wait.submit': '等待',
     'view.subagents.wait.success': '子代理已完成',
     'view.subagents.wait.failed': '等待失败',
-    'view.subagents.wait.notFound': '子代理未找到或已超时',
     'view.subagents.wait.result': '结果',
 
     // ── 转录抽屉 ──────────────────────────────────────────────────

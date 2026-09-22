@@ -1,10 +1,5 @@
 export const messages = {
   en: {
-    'view.agentGateway.title': 'Model Gateway',
-    'view.agentGateway.sub': 'Model authorization gateway: permissions, access check and usage monitoring.',
-    'view.agentGateway.empty': 'No data',
-    'view.agentGateway.emptyHint': 'Adjust the configuration or refresh to try again.',
-    'view.agentGateway.failedLoad': 'Failed to load data',
 
     // ── Tabs ──────────────────────────────────────────────────────
     'view.agentGateway.tab.permissions': 'Permissions',
@@ -98,11 +93,6 @@ export const messages = {
   },
 
   zh: {
-    'view.agentGateway.title': '模型网关',
-    'view.agentGateway.sub': '模型授权网关：权限规则、访问检查与使用量监控。',
-    'view.agentGateway.empty': '暂无数据',
-    'view.agentGateway.emptyHint': '调整配置或刷新后重试。',
-    'view.agentGateway.failedLoad': '加载数据失败',
 
     // ── 标签页 ────────────────────────────────────────────────────
     'view.agentGateway.tab.permissions': '权限规则',

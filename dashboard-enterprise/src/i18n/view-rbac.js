@@ -1,6 +1,5 @@
 export const messages = {
   en: {
-    'view.rbac.subtitle': 'Role-based access control',
     'view.rbac.enterprise': 'Enterprise',
     'view.rbac.grantRole': 'Grant Role',
     'view.rbac.userId': 'User ID',
@@ -22,11 +21,6 @@ export const messages = {
     'view.rbac.noPermissions': 'No permissions',
     'view.rbac.noPermissionsDesc': 'No permissions are defined.',
 
-    'view.rbac.role.admin': 'Admin',
-    'view.rbac.role.superadmin': 'Super Admin',
-    'view.rbac.role.editor': 'Editor',
-    'view.rbac.role.viewer': 'Viewer',
-    'view.rbac.role.user': 'User',
     'view.rbac.userIdRequired': 'User ID and role are required',
     'view.rbac.granted': 'Granted {role} to {user}',
     'view.rbac.revoked': 'Revoked {role} from {user}',
@@ -36,7 +30,6 @@ export const messages = {
   },
 
   zh: {
-    'view.rbac.subtitle': '基于角色的访问控制',
     'view.rbac.enterprise': '企业版',
     'view.rbac.grantRole': '授予角色',
     'view.rbac.userId': '用户 ID',
@@ -57,11 +50,6 @@ export const messages = {
     'view.rbac.constant': '常量',
     'view.rbac.noPermissions': '暂无权限',
     'view.rbac.noPermissionsDesc': '尚未定义任何权限。',
-    'view.rbac.role.admin': '管理员',
-    'view.rbac.role.superadmin': '超级管理员',
-    'view.rbac.role.editor': '编辑者',
-    'view.rbac.role.viewer': '查看者',
-    'view.rbac.role.user': '用户',
     'view.rbac.userIdRequired': '用户 ID 和角色为必填项',
     'view.rbac.granted': '已授予 {user} 角色 {role}',
     'view.rbac.revoked': '已撤销 {user} 的角色 {role}',

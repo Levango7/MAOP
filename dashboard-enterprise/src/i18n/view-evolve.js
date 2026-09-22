@@ -1,6 +1,5 @@
 export const messages = {
   en: {
-    'view.evolve.title': 'Rule-Driven Auto-Tuning',
     'view.evolve.subtitle': 'Self-evolution analysis — read-only insights & suggestions (does NOT change live agents)',
     'view.evolve.tabMain': 'Auto-Tuning',
     'view.evolve.tabHistory': 'History',
@@ -40,7 +39,6 @@ export const messages = {
     'view.evolve.lineage.empty': 'No config changes recorded yet',
     'view.evolve.colTimestamp': 'Time',
     'view.evolve.colStrategy': 'Strategy',
-    'view.evolve.colGain': 'Gain',
     'view.evolve.colVersion': 'Version',
     'view.evolve.colChange': 'Change',
     'view.evolve.colImproved': 'Improved',
@@ -52,7 +50,6 @@ export const messages = {
     'view.evolve.milestones.type.behavior': 'Behavior',
     'view.evolve.milestones.type.capability': 'Capability',
     'view.evolve.milestones.impact': 'Impact',
-    'view.evolve.milestones.empty': 'No milestones yet — trigger a tuning run to start the timeline',
     // ── 里程碑叙事内容 (M11 修复: 替换硬编码英文) ──
     'view.evolve.milestones.msCap1Title': 'Self-tuning loop bootstrapped',
     'view.evolve.milestones.msCap1Desc': 'MAOP introduced the closed-loop auto-tuning engine: observe → suggest → A/B → promote/rollback.',
@@ -76,7 +73,6 @@ export const messages = {
     'view.evolve.milestones.ariaLabel': 'Evolution milestones timeline',
   },
   zh: {
-    'view.evolve.title': '规则驱动自动调优',
     'view.evolve.subtitle': '自演化分析建议：只读洞察与改进建议，不改变线上智能体（区别于 Evolution 页的 AB 实验+部署晋升）',
     'view.evolve.tabMain': '自动调优',
     'view.evolve.tabHistory': '历史',
@@ -116,7 +112,6 @@ export const messages = {
     'view.evolve.lineage.empty': '暂无配置变更记录',
     'view.evolve.colTimestamp': '时间',
     'view.evolve.colStrategy': '策略',
-    'view.evolve.colGain': '收益',
     'view.evolve.colVersion': '版本',
     'view.evolve.colChange': '变更',
     'view.evolve.colImproved': '是否改善',
@@ -128,7 +123,6 @@ export const messages = {
     'view.evolve.milestones.type.behavior': '行为调整',
     'view.evolve.milestones.type.capability': '新能力',
     'view.evolve.milestones.impact': '影响',
-    'view.evolve.milestones.empty': '暂无里程碑——触发一次调优以开启时间线',
     // ── 里程碑叙事内容 (M11 修复: 替换硬编码英文) ──
     'view.evolve.milestones.msCap1Title': '自调优闭环启动',
     'view.evolve.milestones.msCap1Desc': 'MAOP 引入闭环自动调优引擎：观察 → 建议 → A/B → 晋升/回滚。',

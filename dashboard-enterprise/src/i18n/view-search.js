@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.search.title': 'Unified Search',
-    'view.search.sub': 'Query memory, vector store, knowledge graph, logs and agents from one place.',
 
     'view.search.stat.memoryEntries': 'Memory Entries',
     'view.search.stat.vectors': 'Vectors',
@@ -79,8 +77,6 @@ export const messages = {
   },
 
   zh: {
-    'view.search.title': '统一搜索',
-    'view.search.sub': '从统一入口检索记忆、向量库、知识图谱、日志与智能体。',
 
     'view.search.stat.memoryEntries': '记忆条目',
     'view.search.stat.vectors': '向量',

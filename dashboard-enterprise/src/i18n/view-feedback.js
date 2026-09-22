@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.feedback.title': 'Feedback',
-    'view.feedback.sub': 'User feedback collection and evaluation.',
 
     // ── Tabs ──────────────────────────────────────────────────────
     'view.feedback.tab.list': 'Feedback List',
@@ -13,7 +11,6 @@ export const messages = {
     'view.feedback.list.empty': 'No feedback yet',
     'view.feedback.list.emptyHint': 'Submit feedback on agents, tasks, or results to see them here.',
     'view.feedback.list.failedLoad': 'Failed to load feedback',
-    'view.feedback.list.export': 'Export',
     'view.feedback.list.exportCsv': 'Export CSV',
     'view.feedback.list.exportJson': 'Export JSON',
 
@@ -23,8 +20,6 @@ export const messages = {
     'view.feedback.col.rating': 'Rating',
     'view.feedback.col.comment': 'Comment',
     'view.feedback.col.tags': 'Tags',
-    'view.feedback.col.user': 'User',
-    'view.feedback.col.created': 'Created',
     'view.feedback.col.actions': 'Actions',
 
     // ── Target types ─────────────────────────────────────────────
@@ -48,8 +43,6 @@ export const messages = {
     'view.feedback.modal.tags': 'Tags',
     'view.feedback.modal.tagsHint': 'Comma-separated tags',
     'view.feedback.modal.saving': 'Saving…',
-    'view.feedback.modal.targetIdRequired': 'Target ID is required',
-    'view.feedback.modal.targetTypeRequired': 'Target type is required',
 
     // ── Summary ──────────────────────────────────────────────────
     'view.feedback.summary.title': 'Feedback Summary',
@@ -64,22 +57,16 @@ export const messages = {
 
     // ── Confirm delete ───────────────────────────────────────────
     'view.feedback.deleteConfirm': 'Delete this feedback entry?',
-    'view.feedback.deleteSuccess': 'Feedback deleted',
     'view.feedback.deleteFailed': 'Failed to delete feedback',
 
     // ── Toast ────────────────────────────────────────────────────
-    'view.feedback.saved': 'Feedback saved',
     'view.feedback.saveFailed': 'Failed to save feedback',
     'view.feedback.exportFailed': 'Failed to export feedback',
 
     // ── Pagination ───────────────────────────────────────────────
-    'view.feedback.page': 'Page',
-    'view.feedback.pageSize': 'Per page',
   },
 
   zh: {
-    'view.feedback.title': '用户反馈',
-    'view.feedback.sub': '用户反馈收集与评价。',
 
     // ── 标签页 ────────────────────────────────────────────────────
     'view.feedback.tab.list': '反馈列表',
@@ -91,7 +78,6 @@ export const messages = {
     'view.feedback.list.empty': '暂无反馈',
     'view.feedback.list.emptyHint': '对智能体、任务或结果提交反馈后将显示在此处。',
     'view.feedback.list.failedLoad': '加载反馈失败',
-    'view.feedback.list.export': '导出',
     'view.feedback.list.exportCsv': '导出 CSV',
     'view.feedback.list.exportJson': '导出 JSON',
 
@@ -101,8 +87,6 @@ export const messages = {
     'view.feedback.col.rating': '评分',
     'view.feedback.col.comment': '评论',
     'view.feedback.col.tags': '标签',
-    'view.feedback.col.user': '用户',
-    'view.feedback.col.created': '创建时间',
     'view.feedback.col.actions': '操作',
 
     // ── 目标类型 ──────────────────────────────────────────────────
@@ -126,8 +110,6 @@ export const messages = {
     'view.feedback.modal.tags': '标签',
     'view.feedback.modal.tagsHint': '逗号分隔的标签',
     'view.feedback.modal.saving': '保存中…',
-    'view.feedback.modal.targetIdRequired': '目标 ID 为必填项',
-    'view.feedback.modal.targetTypeRequired': '目标类型为必填项',
 
     // ── 摘要 ──────────────────────────────────────────────────────
     'view.feedback.summary.title': '反馈摘要',
@@ -142,16 +124,12 @@ export const messages = {
 
     // ── 确认删除 ──────────────────────────────────────────────────
     'view.feedback.deleteConfirm': '确认删除此反馈条目？',
-    'view.feedback.deleteSuccess': '反馈已删除',
     'view.feedback.deleteFailed': '删除反馈失败',
 
     // ── 提示 ──────────────────────────────────────────────────────
-    'view.feedback.saved': '反馈已保存',
     'view.feedback.saveFailed': '保存反馈失败',
     'view.feedback.exportFailed': '导出反馈失败',
 
     // ── 分页 ──────────────────────────────────────────────────────
-    'view.feedback.page': '页码',
-    'view.feedback.pageSize': '每页',
   },
 };

@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.tlmemory.title': 'Three-Layer Memory',
-    'view.tlmemory.subtitle': 'Semantic memory store — entries, traces and topic/agent breakdown.',
     'view.tlmemory.totalEntries': 'Total Entries',
     'view.tlmemory.totalTraces': 'Total Traces',
     'view.tlmemory.trajectorySteps': 'Trajectory Steps',
@@ -19,7 +17,6 @@ export const messages = {
     'view.tlmemory.runSearchHint': 'Run a search to list memory entries.',
     'view.tlmemory.score': 'score',
 
-    'view.tlmemory.layersTitle': 'Three-Layer Architecture',
     'view.tlmemory.layersNote': 'Retrieval cascades L1 → L2 → L3; the search below spans all three layers.',
     'view.tlmemory.layer1Name': 'Working Memory',
     'view.tlmemory.layer1Desc': 'Current-turn context window — a sliding window of in-flight messages, bounded by a token budget.',
@@ -52,8 +49,6 @@ export const messages = {
     'view.tlmemory.noOutcomeDesc': 'No episodic outcome data yet.',
   },
   zh: {
-    'view.tlmemory.title': '三层记忆',
-    'view.tlmemory.subtitle': '语义记忆存储 —— 条目、轨迹及主题/智能体分布概览。',
     'view.tlmemory.totalEntries': '条目总数',
     'view.tlmemory.totalTraces': '轨迹总数',
     'view.tlmemory.trajectorySteps': '轨迹步数',
@@ -71,7 +66,6 @@ export const messages = {
     'view.tlmemory.runSearchHint': '执行搜索以列出记忆条目。',
     'view.tlmemory.score': '评分',
 
-    'view.tlmemory.layersTitle': '三层记忆架构',
     'view.tlmemory.layersNote': '检索按 L1 → L2 → L3 级联回退；下方搜索覆盖全部三层。',
     'view.tlmemory.layer1Name': '工作记忆',
     'view.tlmemory.layer1Desc': '当前轮上下文窗口 —— 滑动窗口保存本轮在途消息，受 token 预算约束。',

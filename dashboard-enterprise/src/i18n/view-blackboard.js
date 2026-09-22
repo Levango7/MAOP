@@ -16,7 +16,6 @@ export const messages = {
     // ── Header & nav ─────────────────────────────────────────────
     'nav.blackboard': 'Blackboard',
     'nav.blackboard.subtitle': 'Shared blackboard for agent collaboration',
-    'view.blackboard.subtitle': 'Shared knowledge blackboard: read entries by domain, write new knowledge, and audit operations.',
 
     // ── Tabs ─────────────────────────────────────────────────────
     'view.blackboard.tab.snapshot': 'Snapshot',
@@ -29,7 +28,6 @@ export const messages = {
     'view.blackboard.snapshot.empty': 'Blackboard is empty',
     'view.blackboard.snapshot.emptyHint': 'Write an entry to a domain to populate the blackboard.',
     'view.blackboard.snapshot.failedLoad': 'Failed to load snapshot',
-    'view.blackboard.snapshot.domain': 'Domain',
     'view.blackboard.snapshot.entries': 'Entries',
 
     // ── Domains ──────────────────────────────────────────────────
@@ -38,8 +36,6 @@ export const messages = {
     'view.blackboard.domains.emptyHint': 'Select a domain above or write a new entry.',
     'view.blackboard.domains.failedLoad': 'Failed to load domains',
     'view.blackboard.domains.select': 'Select domain',
-    'view.blackboard.domains.allowed': 'Allowed domains',
-    'view.blackboard.domains.active': 'Active domains',
     'view.blackboard.domains.add': 'Write Entry',
 
     // ── Domain table columns ─────────────────────────────────────
@@ -48,7 +44,6 @@ export const messages = {
     'view.blackboard.col.confidence': 'Confidence',
     'view.blackboard.col.timestamp': 'Timestamp',
     'view.blackboard.col.domain': 'Domain',
-    'view.blackboard.col.actions': 'Actions',
 
     // ── Write modal ──────────────────────────────────────────────
     'view.blackboard.write.title': 'Write Entry',
@@ -75,9 +70,6 @@ export const messages = {
     'view.blackboard.history.title': 'Operation History',
     'view.blackboard.history.empty': 'No operations recorded',
     'view.blackboard.history.failedLoad': 'Failed to load history',
-    'view.blackboard.history.col.op': 'Operation',
-    'view.blackboard.history.col.actor': 'Actor',
-    'view.blackboard.history.col.target': 'Target',
 
     // ── Stats ────────────────────────────────────────────────────
     'view.blackboard.stats.title': 'Blackboard Statistics',
@@ -101,7 +93,6 @@ export const messages = {
     // ── 页头与导航 ───────────────────────────────────────────────
     'nav.blackboard': '黑板',
     'nav.blackboard.subtitle': '智能体协作共享黑板',
-    'view.blackboard.subtitle': '共享知识黑板：按域读取条目、写入新知识并审计操作。',
 
     // ── 标签页 ───────────────────────────────────────────────────
     'view.blackboard.tab.snapshot': '快照',
@@ -114,7 +105,6 @@ export const messages = {
     'view.blackboard.snapshot.empty': '黑板为空',
     'view.blackboard.snapshot.emptyHint': '向某个域写入条目即可填充黑板。',
     'view.blackboard.snapshot.failedLoad': '加载快照失败',
-    'view.blackboard.snapshot.domain': '域',
     'view.blackboard.snapshot.entries': '条目数',
 
     // ── 域 ───────────────────────────────────────────────────────
@@ -123,8 +113,6 @@ export const messages = {
     'view.blackboard.domains.emptyHint': '在上方选择一个域或写入新条目。',
     'view.blackboard.domains.failedLoad': '加载域失败',
     'view.blackboard.domains.select': '选择域',
-    'view.blackboard.domains.allowed': '允许的域',
-    'view.blackboard.domains.active': '活跃域',
     'view.blackboard.domains.add': '写入条目',
 
     // ── 域表格列 ─────────────────────────────────────────────────
@@ -133,7 +121,6 @@ export const messages = {
     'view.blackboard.col.confidence': '置信度',
     'view.blackboard.col.timestamp': '时间戳',
     'view.blackboard.col.domain': '域',
-    'view.blackboard.col.actions': '操作',
 
     // ── 写入模态 ─────────────────────────────────────────────────
     'view.blackboard.write.title': '写入条目',
@@ -160,9 +147,6 @@ export const messages = {
     'view.blackboard.history.title': '操作历史',
     'view.blackboard.history.empty': '暂无操作记录',
     'view.blackboard.history.failedLoad': '加载历史失败',
-    'view.blackboard.history.col.op': '操作',
-    'view.blackboard.history.col.actor': '执行者',
-    'view.blackboard.history.col.target': '目标',
 
     // ── 统计 ─────────────────────────────────────────────────────
     'view.blackboard.stats.title': '黑板统计',

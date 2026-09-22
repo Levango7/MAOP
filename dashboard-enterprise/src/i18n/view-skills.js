@@ -1,8 +1,6 @@
 export const messages = {
   en: {
     // ── SkillEditor (composer) ───────────────────────────────────
-    'view.skills.editor.title': 'Skill Composer',
-    'view.skills.editor.sub': 'Compose atomic skills into reusable multi-step workflows.',
     'view.skills.editor.badge': 'Composer',
     'view.skills.editor.loadError': 'Failed to load skills',
     'view.skills.editor.noAtoms': 'No atomic skills',
@@ -48,8 +46,6 @@ export const messages = {
     'view.skills.editor.stepsCount': '{n} steps',
 
     // ── SkillMarket ──────────────────────────────────────────────
-    'view.skills.market.title': 'Skill Market',
-    'view.skills.market.sub': 'Browse and install skills & tools from the MCP marketplace.',
     'view.skills.market.badge': 'Market',
     'view.skills.market.loadError': 'Failed to load marketplace tools',
     'view.skills.market.noTools': 'No tools available',
@@ -80,8 +76,6 @@ export const messages = {
 
   zh: {
     // ── SkillEditor（组合编辑器）───────────────────────────────
-    'view.skills.editor.title': '技能组合编辑器',
-    'view.skills.editor.sub': '将原子技能编排为可复用的多步工作流。',
     'view.skills.editor.badge': '编排',
     'view.skills.editor.loadError': '加载技能失败',
     'view.skills.editor.noAtoms': '暂无原子技能',
@@ -127,8 +121,6 @@ export const messages = {
     'view.skills.editor.stepsCount': '{n} 个步骤',
 
     // ── Skill Market（技能市场）────────────────────────────────
-    'view.skills.market.title': '技能市场',
-    'view.skills.market.sub': '浏览并安装 MCP 市场中的技能与工具。',
     'view.skills.market.badge': '市场',
     'view.skills.market.loadError': '加载市场工具失败',
     'view.skills.market.noTools': '暂无可用工具',

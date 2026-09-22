@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.routing.title': 'Routing Rules',
-    'view.routing.sub': 'Inspect routing decision traces and aggregate stats across pipeline stages.',
 
     // ── Tabs ──────────────────────────────────────────────────────
     'view.routing.tab.recent': 'Recent Decisions',
@@ -35,12 +33,8 @@ export const messages = {
     'view.routing.col.traceId': 'Trace ID',
     'view.routing.col.stage': 'Stage',
     'view.routing.col.agent': 'Agent',
-    'view.routing.col.model': 'Model',
-    'view.routing.col.timestamp': 'Time',
     'view.routing.col.score': 'Score',
-    'view.routing.col.reason': 'Reason',
     'view.routing.col.actions': 'Actions',
-    'view.routing.col.count': 'Count',
 
     // ── Stages ────────────────────────────────────────────────────
     'view.routing.stage.route_scorer': 'Route Scorer',
@@ -50,8 +44,6 @@ export const messages = {
   },
 
   zh: {
-    'view.routing.title': '路由规则',
-    'view.routing.sub': '查看路由决策链路与各阶段的聚合统计。',
 
     // ── 标签页 ────────────────────────────────────────────────────
     'view.routing.tab.recent': '最近决策',
@@ -85,12 +77,8 @@ export const messages = {
     'view.routing.col.traceId': '追踪 ID',
     'view.routing.col.stage': '阶段',
     'view.routing.col.agent': '智能体',
-    'view.routing.col.model': '模型',
-    'view.routing.col.timestamp': '时间',
     'view.routing.col.score': '得分',
-    'view.routing.col.reason': '原因',
     'view.routing.col.actions': '操作',
-    'view.routing.col.count': '数量',
 
     // ── 阶段 ──────────────────────────────────────────────────────
     'view.routing.stage.route_scorer': '路由评分',

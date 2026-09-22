@@ -1,11 +1,9 @@
 export const messages = {
   en: {
-    'view.overview.title': 'Overview',
     'view.overview.heroHealthy': 'Healthy',
     'view.overview.heroDegraded': 'Degraded',
     'view.overview.heroDown': 'Unreachable',
     'view.overview.heroTasksRunning': 'tasks running',
-    'view.overview.heroCostPerHour': '/hr',
     'view.overview.actionRun': 'Run Task',
     'view.overview.actionChat': 'New Chat',
     'view.overview.actionAgents': 'Browse Agents',
@@ -79,7 +77,6 @@ export const messages = {
   },
 
   zh: {
-    'view.overview.title': '概览',
     'view.overview.updated': '更新于',
     'view.overview.loadError': '无法加载概览',
     'view.overview.systemHealth': '系统健康',
@@ -88,7 +85,6 @@ export const messages = {
     'view.overview.heroDegraded': '部分降级',
     'view.overview.heroDown': '不可达',
     'view.overview.heroTasksRunning': '个任务运行中',
-    'view.overview.heroCostPerHour': '/小时',
     'view.overview.actionRun': '运行任务',
     'view.overview.actionChat': '新建对话',
     'view.overview.actionAgents': '浏览智能体',

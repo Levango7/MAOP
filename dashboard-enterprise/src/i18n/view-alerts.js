@@ -7,8 +7,6 @@
 export const messages = {
   en: {
     // ── Header & nav ─────────────────────────────────────────────
-    'nav.alerts': 'Alert Rules',
-    'nav.alerts.subtitle': 'Alert rules, thresholds and notification channels',
     'view.alerts.enterprise': 'Enterprise',
     'view.alerts.subtitle': 'Alert rules, thresholds and notification channels',
     'view.alerts.createBtn': 'New Rule',
@@ -44,7 +42,6 @@ export const messages = {
     'view.alerts.actionEdit': 'Edit',
     'view.alerts.actionDelete': 'Delete',
     'view.alerts.actionHistory': 'History',
-    'view.alerts.actionToggle': 'Toggle',
     'view.alerts.deleteConfirm': 'Delete alert rule "{name}"? This action cannot be undone.',
 
     // ── Dialog: create/edit ─────────────────────────────────────
@@ -113,12 +110,9 @@ export const messages = {
     // ── Toast ───────────────────────────────────────────────────
     'view.alerts.saved': 'Alert rule saved',
     'view.alerts.deleted': 'Alert rule deleted',
-    'view.alerts.toggled': 'Alert rule {state}',
   },
   zh: {
     // ── Header & nav ─────────────────────────────────────────────
-    'nav.alerts': '告警规则',
-    'nav.alerts.subtitle': '告警规则、阈值与通知渠道',
     'view.alerts.enterprise': '企业版',
     'view.alerts.subtitle': '告警规则、阈值与通知渠道',
     'view.alerts.createBtn': '新建规则',
@@ -154,7 +148,6 @@ export const messages = {
     'view.alerts.actionEdit': '编辑',
     'view.alerts.actionDelete': '删除',
     'view.alerts.actionHistory': '历史',
-    'view.alerts.actionToggle': '切换状态',
     'view.alerts.deleteConfirm': '确认删除告警规则 "{name}"？此操作不可撤销。',
 
     // ── Dialog: create/edit ─────────────────────────────────────
@@ -223,6 +216,5 @@ export const messages = {
     // ── Toast ───────────────────────────────────────────────────
     'view.alerts.saved': '告警规则已保存',
     'view.alerts.deleted': '告警规则已删除',
-    'view.alerts.toggled': '告警规则已{state}',
   },
 };

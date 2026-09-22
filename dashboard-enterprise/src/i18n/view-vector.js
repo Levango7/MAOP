@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.vector.title': 'Vector Search',
-    'view.vector.sub': 'Semantic retrieval over the memory vector index',
 
     'view.vector.query': 'Query',
     'view.vector.queryPlaceholder': 'Describe what to retrieve…',
@@ -33,8 +31,6 @@ export const messages = {
   },
 
   zh: {
-    'view.vector.title': '向量检索',
-    'view.vector.sub': '对记忆向量索引进行语义检索',
 
     'view.vector.query': '查询',
     'view.vector.queryPlaceholder': '描述要检索的内容…',

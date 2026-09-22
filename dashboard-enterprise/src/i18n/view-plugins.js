@@ -1,7 +1,5 @@
 export const messages = {
   en: {
-    'view.plugins.title': 'Plugin Manager',
-    'view.plugins.sub': 'Install, configure and manage runtime plugins.',
 
     // ── Tabs ──────────────────────────────────────────────────────
     'view.plugins.tab.list': 'Plugins',
@@ -12,7 +10,6 @@ export const messages = {
     'view.plugins.list.empty': 'No plugins installed',
     'view.plugins.list.emptyHint': 'Run discover to scan for available plugins.',
     'view.plugins.list.failedLoad': 'Failed to load plugins',
-    'view.plugins.list.discoverBtn': 'Discover',
     'view.plugins.list.loadAll': 'Load All',
     'view.plugins.list.startAll': 'Start All',
     'view.plugins.list.stopAll': 'Stop All',
@@ -26,7 +23,6 @@ export const messages = {
     'view.plugins.discover.scanning': 'Scanning…',
 
     // ── Columns ───────────────────────────────────────────────────
-    'view.plugins.col.id': 'ID',
     'view.plugins.col.version': 'Version',
     'view.plugins.col.state': 'State',
     'view.plugins.col.actions': 'Actions',
@@ -45,7 +41,6 @@ export const messages = {
     'view.plugins.action.stop': 'Stop',
     'view.plugins.action.reload': 'Reload',
     'view.plugins.action.config': 'Configure',
-    'view.plugins.action.loading': 'Working…',
 
     // ── Config modal ──────────────────────────────────────────────
     'view.plugins.modal.configTitle': 'Plugin Configuration',
@@ -78,8 +73,6 @@ export const messages = {
   },
 
   zh: {
-    'view.plugins.title': '插件管理',
-    'view.plugins.sub': '安装、配置和管理运行时插件。',
 
     // ── 标签页 ────────────────────────────────────────────────────
     'view.plugins.tab.list': '插件列表',
@@ -90,7 +83,6 @@ export const messages = {
     'view.plugins.list.empty': '暂无已安装插件',
     'view.plugins.list.emptyHint': '运行发现以扫描可用插件。',
     'view.plugins.list.failedLoad': '加载插件失败',
-    'view.plugins.list.discoverBtn': '发现',
     'view.plugins.list.loadAll': '全部加载',
     'view.plugins.list.startAll': '全部启动',
     'view.plugins.list.stopAll': '全部停止',
@@ -104,7 +96,6 @@ export const messages = {
     'view.plugins.discover.scanning': '扫描中…',
 
     // ── 列 ────────────────────────────────────────────────────────
-    'view.plugins.col.id': '标识',
     'view.plugins.col.version': '版本',
     'view.plugins.col.state': '状态',
     'view.plugins.col.actions': '操作',
@@ -123,7 +114,6 @@ export const messages = {
     'view.plugins.action.stop': '停止',
     'view.plugins.action.reload': '重载',
     'view.plugins.action.config': '配置',
-    'view.plugins.action.loading': '处理中…',
 
     // ── 配置弹窗 ──────────────────────────────────────────────────
     'view.plugins.modal.configTitle': '插件配置',
