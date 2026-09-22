@@ -71,6 +71,19 @@
   --border-subtle: rgba(163, 173, 190, .13);
   --border-faint: rgba(163, 173, 190, .07);
 
+  /* ── a11y 修复 (2026-09-22): 交互控件专用边框 ──────────────────────────
+   * WCAG 2.2 SC 1.4.11（非文本对比度）要求**用户界面组件**的边界 ≥3:1。
+   * 原 --border (#3c4048) 在 --surface 上仅 1.49:1，输入框/按钮的轮廓几乎
+   * 看不出来，低视力用户难以定位控件。
+   *
+   * 为什么不直接调亮 --border：卡片、分隔线、气泡等**容器**不是"界面组件"，
+   * 1.4.11 对它们豁免；把 --border 整体提到 3:1 会让整个界面变"方框化"，
+   * 破坏 JetBrains 式"靠 1px 细描边分层"的设计语言。故只拆出控件专用色，
+   * 容器继续用细腻的 --border。
+   *
+   * 取值依据: #727a8a → on --surface 3.59:1 / on --bg 3.91:1。 */
+  --border-control: #727a8a;
+
   /* ── Chart / data-viz palette — 克制的高斯冷色谱,与品牌青绿同族 ─────────── */
   --chart-1: #0d9488;  --chart-2: #4cc2ff;  --chart-3: #3fb950;
   --chart-4: #d29922;  --chart-5: #9e8cfc;  --chart-6: #39c5cf;
@@ -242,6 +255,36 @@
    * select 箭头等内联 SVG 图标需随主题切换颜色。data URI 中无法引用 CSS
    * 变量, 故在此按主题分别定义完整 data URI。暗色用 #9aa3b2 (text-muted)。 */
   --icon-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa3b2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+
+  /* ── 知识图谱节点/边颜色 (2026-09-22 补齐) ────────────────────────────
+   * 背景: useKnowledgeGraph.js 用 cssVar('--node-agent-bg', '#E3F2FD') 这类
+   * 写法读取这些变量，注释明写"若需自定义主题，在 tokens.css / themes.css 中
+   * 定义对应变量即可覆盖"—— 但**这 17 个变量此前从未被定义过**，于是永远
+   * 走 Material Design 浅色兜底：
+   *   - 暗色主题下节点仍是浅色底 → 深色 UI 里的浅色孤岛
+   *   - 中性节点用 --surface(暗) 配 vis-network 默认字色 #343434 → 1.25:1 不可读
+   * 现按项目自己的 --chart-* 色系补齐，两主题各自取值。
+   * 暗色: 深色填充 + 亮色描边（--text 在其上 9.9-12.1:1）
+   * ------------------------------------------------------------------- */
+  --node-agent-bg: #1b3a4d;
+  --node-agent-bg-highlight: #24506b;
+  --node-agent-border: var(--chart-2);
+  --node-task-bg: #3b2f18;
+  --node-task-bg-highlight: #54421f;
+  --node-task-border: var(--chart-4);
+  --node-memory-bg: #2c2444;
+  --node-memory-bg-highlight: #3d3060;
+  --node-memory-border: var(--chart-5);
+  --node-concept-bg: #1b3a26;
+  --node-concept-bg-highlight: #24503a;
+  --node-concept-border: var(--chart-3);
+  --edge-delegates-color: var(--chart-2);
+  --edge-remembers-color: var(--chart-5);
+  --edge-produces-color: var(--chart-3);
+  --edge-depends-on-color: var(--chart-4);
+  /* 边高亮: 落地上文 "MAOP 独有辅助色 琥珀" 的设计意图 —— 注释称其"用于
+   * 强调与点缀"，边高亮正是该语义。（此前 --accent-warm 全项目零引用） */
+  --edge-highlight: var(--accent-warm);
 }
 
 /* ── Density 规范 ──────────────────────────────────────────────────────────

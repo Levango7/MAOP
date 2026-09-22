@@ -258,7 +258,7 @@
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
   height: var(--row-h); padding: 0 var(--sp-4);
-  border: 1px solid var(--border-strong); border-radius: var(--r-md);
+  border: 1px solid var(--border-control); border-radius: var(--r-md);
   background: var(--surface-2); color: var(--text);
   font-size: var(--fs-base); font-weight: 600; white-space: nowrap;
   cursor: pointer;
@@ -310,7 +310,7 @@
   display: inline-flex; align-items: center; gap: var(--sp-2);
   height: var(--row-h); padding: 0 var(--sp-3);
   font-size: var(--fs-sm); font-weight: 600;
-  border: 1px solid var(--border); border-radius: var(--r-md);
+  border: 1px solid var(--border-control); border-radius: var(--r-md);
   cursor: pointer;
   /* R11 修复: transition:all 改为具体属性列表, 避免不必要的过渡(如 color/opacity) */
   transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
@@ -332,7 +332,7 @@
   display: inline-flex; align-items: center; gap: var(--sp-2);
   padding: var(--sp-1) var(--sp-3); font-size: var(--fs-sm); font-weight: 600;
   color: var(--text-muted); background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: var(--r-md); cursor: pointer;
+  border: 1px solid var(--border-control); border-radius: var(--r-md); cursor: pointer;
   transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
 .btn-action:hover, .btn-refresh:hover, .btn-check:hover, .act-btn:hover,
@@ -349,17 +349,44 @@
 .input, .search-input, .filter-input, .num-input {
   width: 100%; height: var(--row-h); padding: 0 var(--sp-3);
   background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--r-md);
+  border: 1px solid var(--border-control); border-radius: var(--r-md);
   font-size: var(--fs-base); transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
 }
 .input:focus, .search-input:focus, .filter-input:focus, .num-input:focus {
   outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft);
 }
+/* ── 校验失败态 (2026-09-22 接线) ────────────────────────────────────────
+ * 背景: --input-error-border / --input-error-focus 早已在 tokens.css 与
+ * themes.css 中定义（注释写明"表单校验失败时的边框与聚焦环颜色"），但**全项目
+ * 零引用** —— 表单出错时只在下方显示一条 .form-error 文字，输入框本身没有任何
+ * 标记，用户得自己找是哪个字段错了。
+ *
+ * 这里用属性选择器 [aria-invalid="true"]，而不是自定义 class ——
+ * aria-invalid 是无障碍的标准表达（屏幕阅读器会播报），一处接线即可覆盖
+ * 所有正确标注了的控件，无需逐视图加 class。
+ */
+.input[aria-invalid="true"],
+.search-input[aria-invalid="true"],
+.filter-input[aria-invalid="true"],
+.num-input[aria-invalid="true"],
+.field__input[aria-invalid="true"],
+textarea.query-input[aria-invalid="true"] {
+  border-color: var(--input-error-border);
+}
+.input[aria-invalid="true"]:focus,
+.search-input[aria-invalid="true"]:focus,
+.filter-input[aria-invalid="true"]:focus,
+.num-input[aria-invalid="true"]:focus,
+.field__input[aria-invalid="true"]:focus,
+textarea.query-input[aria-invalid="true"]:focus {
+  outline: none; border-color: var(--input-error-border);
+  box-shadow: 0 0 0 3px var(--input-error-focus);
+}
 /* Textarea variant: auto height, comfortable padding, vertical resize only */
 textarea.query-input {
   width: 100%; min-height: 72px; padding: var(--sp-3) var(--sp-4);
   background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--r-md);
+  border: 1px solid var(--border-control); border-radius: var(--r-md);
   font-size: var(--fs-base); font-family: inherit; line-height: 1.5;
   resize: vertical;
   transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
@@ -489,7 +516,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .switch-select {
   width: 100%; height: var(--row-h); padding: 0 var(--sp-3);
   background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--r-md);
+  border: 1px solid var(--border-control); border-radius: var(--r-md);
   font-size: var(--fs-base); font-family: inherit;
   cursor: pointer; appearance: none;
   /* 主题感知箭头: --icon-chevron 变量在 tokens.css/themes.css 中按主题定义。
@@ -563,7 +590,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .chat-page textarea {
   width: 100%; height: auto; min-height: var(--row-h);
   padding: var(--sp-3); background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--r-md);
+  border: 1px solid var(--border-control); border-radius: var(--r-md);
   font-size: var(--fs-base); font-family: inherit;
   resize: vertical;
   transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
@@ -731,7 +758,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .refresh-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; transform: none; }
 
 /* ── Search page specifics ───────────────────────────────────────────── */
-.opt { display: inline-flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-sm); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-full); cursor: pointer; transition: background var(--motion-fast) var(--ease); }
+.opt { display: inline-flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-sm); background: var(--surface-2); border: 1px solid var(--border-control); border-radius: var(--r-full); cursor: pointer; transition: background var(--motion-fast) var(--ease); }
 .opt:hover { background: var(--surface-3); }
 .opt.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-strong); }
 
@@ -994,7 +1021,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 
 /* Detail close button */
 /* R7 修复: 关闭按钮统一尺寸 30px / 圆角 var(--r-md) (与 .modal__x 一致) */
-.close-btn { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text-muted); width: 30px; height: 30px; display: grid; place-items: center; cursor: pointer; transition: color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease); }
+.close-btn { background: var(--surface-2); border: 1px solid var(--border-control); border-radius: var(--r-md); color: var(--text-muted); width: 30px; height: 30px; display: grid; place-items: center; cursor: pointer; transition: color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease); }
 .close-btn:hover { border-color: var(--border-strong); color: var(--text); }
 
 /* ── VectorSearch result cards ────────────────────────────────────────── */
@@ -1053,7 +1080,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 }
 .btn-primary { background: var(--brand-solid); border: 1px solid var(--brand-solid); color: var(--brand-contrast); }
 .btn-primary:hover { background: var(--brand-solid-hover); border-color: var(--brand-solid-hover); }
-.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+.btn-ghost { background: transparent; border: 1px solid var(--border-control); color: var(--text-muted); }
 .btn-ghost:hover { background: var(--surface-2); border-color: var(--border-strong); color: var(--text); }
 .btn-danger { background: var(--fail-soft); border: 1px solid var(--fail); color: var(--fail); }
 /* R7 修复: 原 :hover background 与默认相同, 无视觉反馈; 增加 border-color + transform */
@@ -1156,7 +1183,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .field__label { display: block; color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: var(--sp-2); }
 .field__input {
   width: 100%; height: var(--row-h); padding: 0 var(--sp-3); background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--r-md); font-size: var(--fs-base); font-family: inherit;
+  border: 1px solid var(--border-control); border-radius: var(--r-md); font-size: var(--fs-base); font-family: inherit;
   transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
 }
 .field__input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
@@ -1274,7 +1301,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 /* ── Audit view extras ──────────────────────────────────────────────── */
 .filter {
   height: var(--row-h); padding: 0 var(--sp-3); background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--r-md);
+  border: 1px solid var(--border-control); border-radius: var(--r-md);
   font-size: var(--fs-sm); color: var(--text); font-family: inherit;
   transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
 }
@@ -1290,7 +1317,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .memory-page .search-bar { position: relative; display: flex; align-items: center; gap: var(--sp-2); }
 .memory-page .search-bar input {
   flex: 1; height: var(--row-h); padding: 0 var(--sp-3);
-  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface); color: var(--text); border: 1px solid var(--border-control); border-radius: var(--r-md);
   font-size: var(--fs-base); font-family: inherit;
   transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
 }

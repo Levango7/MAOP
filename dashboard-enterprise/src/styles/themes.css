@@ -59,6 +59,11 @@
   --border-subtle: rgba(89, 97, 110, .14);
   --border-faint: rgba(89, 97, 110, .07);
 
+  /* a11y (2026-09-22): 交互控件专用边框，满足 WCAG 1.4.11 的 3:1。
+   * 原 --border (#d4d8e0) 在 --surface 上仅 1.43:1。容器仍用 --border。
+   * 取值: #82899a → on --surface 3.50:1 / on --bg 3.16:1。 */
+  --border-control: #82899a;
+
   /* Chart palette — light-tuned (品牌色同步为青绿) */
   --chart-1: #0d9488;  --chart-2: #0a7ea4;  --chart-3: #1f883d;
   --chart-4: #bf8700;  --chart-5: #7c63e0;  --chart-6: #0d9db8;
@@ -132,4 +137,30 @@
 
   /* 主题感知图标 data URI (P3-4): 亮色用 #59616e (text-muted on light)。 */
   --icon-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2359616e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+
+  /* ── 知识图谱节点/边颜色（亮色）—— 见 tokens.css 同名注释 ──────────────
+   * 亮色: 浅色填充 + 深色描边（--text #1d2129 在其上 13.2-14.7:1）。
+   * 边色不复用 --chart-4（亮色下 #bf8700 在 --bg 上仅 2.83:1，作为线条
+   * 不达图形 3:1），depends_on 改用更深的琥珀 #b45309（4.52:1）。 */
+  --node-agent-bg: #dbeafe;
+  --node-agent-bg-highlight: #bfdbfe;
+  --node-agent-border: var(--chart-2);
+  --node-task-bg: #fef3c7;
+  --node-task-bg-highlight: #fde68a;
+  --node-task-border: #b45309;
+  --node-memory-bg: #ede9fe;
+  --node-memory-bg-highlight: #ddd6fe;
+  --node-memory-border: var(--chart-5);
+  --node-concept-bg: #dcfce7;
+  --node-concept-bg-highlight: #bbf7d0;
+  --node-concept-border: var(--chart-3);
+  --edge-delegates-color: var(--chart-2);
+  --edge-remembers-color: var(--chart-5);
+  --edge-produces-color: var(--chart-3);
+  --edge-depends-on-color: #b45309;
+  /* 亮色下 #f59e0b 在 --bg 上仅 1.93:1，作为线条几乎看不见 → 改用深琥珀。 */
+  --edge-highlight: #b45309;
+  /* 同步修正 --accent-warm：亮色主题此前直接沿用暗色的 #f59e0b，
+   * 在浅底上只有 1.93:1，作任何前景色都不达标。 */
+  --accent-warm: #b45309;
 }

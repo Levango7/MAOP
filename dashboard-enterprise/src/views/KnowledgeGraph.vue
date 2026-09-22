@@ -621,7 +621,10 @@ function buildOptions(nodeCount) {
     nodes: {
       shape: 'dot',
       size: 16,
-      font: { size: 14, face: 'Inter, system-ui, sans-serif' },
+      // color 必须显式设置：vis-network 默认 #343434（深灰），在暗色主题下
+      // 压 --surface 只有 1.25:1 —— 中性节点标签完全看不见。
+      // 取 --text 使其跟随主题（暗色浅字 / 亮色深字）。
+      font: { color: cssVar('--text'), size: 14, face: 'Inter, system-ui, sans-serif' },
       borderWidth: 1,
       scaling: { min: 8, max: 24 },
     },
