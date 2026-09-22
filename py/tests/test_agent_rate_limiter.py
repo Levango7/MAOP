@@ -172,10 +172,19 @@ class TestRateLimiterCleanupAndQuery:
         assert rl.get_current_rate("a") == 2
 
     def test_get_current_rate_evicts_expired(self) -> None:
-        """get_current_rate 淘汰过期时间戳."""
+        """get_current_rate 淘汰过期时间戳.
+
+        注意 sleep 时长要显著大于 window：get_current_rate 基于
+        ``time.monotonic()`` 判定过期，而 **Windows 的时钟粒度约 15.6ms**。
+        原先 window=0.05 / sleep=0.06 只留 10ms 余量（不足一个 tick），
+        记录的时间戳被向下量化后 ``now - ts`` 可能只有 ~46.8ms < 50ms，
+        条目不被淘汰 → CI 上 windows-latest/Python 3.11 稳定报
+        ``assert 1 == 0``（Python 3.13 改进了 Windows 定时器精度故通过）。
+        改为 3 倍 window，远离时钟粒度影响。
+        """
         rl = RateLimiter(window_seconds=0.05)
         rl.check_and_record("a", rate_limit_per_min=10)
-        time.sleep(0.06)
+        time.sleep(0.15)
         assert rl.get_current_rate("a") == 0
 
     def test_cleanup_removes_expired(self) -> None:
@@ -183,7 +192,9 @@ class TestRateLimiterCleanupAndQuery:
         rl = RateLimiter(window_seconds=0.05)
         rl.check_and_record("a", rate_limit_per_min=10)
         rl.check_and_record("b", rate_limit_per_min=10)
-        time.sleep(0.06)
+        # 同 test_get_current_rate_evicts_expired：sleep 须显著大于 window，
+        # 否则受 Windows ~15.6ms 时钟粒度影响可能判为未过期。
+        time.sleep(0.15)
         rl.cleanup()
         # 内部队列应被清空
         assert rl.get_current_rate("a") == 0
