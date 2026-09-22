@@ -49,6 +49,20 @@
   /* MAOP 独有辅助色: 琥珀色(Amber-500), 用于强调与点缀, 与青绿形成互补对比 */
   --accent-warm: #f59e0b;            /* Amber-500: 琥珀色辅助强调色 */
   --accent-warm-soft: rgba(245, 158, 11, .12);  /* 琥珀色柔背景 */
+
+  /* ── a11y 修复 (2026-09-22): 实心填充色与"品牌色文字"专用令牌 ──────────
+   * 背景: 原实现把 --brand (#0d9488) 直接当按钮填充 + 白字, 对比度仅 3.74:1;
+   * hover 又切到更亮的 --brand-strong (#14b8a6), 反而降到 2.49:1 —— 方向错了。
+   * WCAG AA 要求 13px 正文 4.5:1。故拆出专用令牌:
+   *   --brand-solid / --fail-solid / --warn-solid  = 承载白字的实心填充
+   *   --brand-text                                 = 品牌色**作文字**时用
+   * 注意 --brand-text 的方向随主题相反: 暗色要更亮、亮色要更暗。
+   */
+  --brand-solid: #0c857a;        /* 白字对比 4.51:1 */
+  --brand-solid-hover: #0a6d64;  /* hover 加深, 白字 6.20:1 */
+  --fail-solid: #d0443d;         /* 白字 4.59:1 */
+  --warn-solid: #976e18;         /* 白字 4.61:1 */
+  --brand-text: #14b8a6;         /* 品牌色作文字: 暗底需更亮, 6.23:1 */
   /* R9 修复: --on-fail / --on-warn — 按钮 danger/warn 悬停态文字色,
    * 语义为"在饱和色背景上的可读文字", 与 --brand-contrast 同族。 */
   --on-fail: var(--brand-contrast);

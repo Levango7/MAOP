@@ -21,7 +21,9 @@
   --accent: #0d9488;      /* Teal-600: 青绿色品牌主色 */
   --accent2: #0f766e;     /* Teal-700: 青绿色暗变体 (亮色主题用深色保证对比度) */
   --success: #1f883d;
-  --warn: #bf8700;
+  /* a11y: 原 #bf8700 作文字色在 --bg 上仅 2.83:1、--surface 上 3.14:1（均不达标）。
+   * 修深为 #8a6100 → --bg 4.99:1 / --surface 5.54:1。 */
+  --warn: #8a6100;
   --fail: #d1242f;
   --radius: 8px;
   --shadow: 0 1px 2px rgba(29, 33, 41, .08);
@@ -41,6 +43,15 @@
   /* MAOP 独有辅助色 (亮色): 琥珀色, 与暗色同值 */
   --accent-warm: #f59e0b;
   --accent-warm-soft: rgba(245, 158, 11, .12);
+
+  /* a11y 修复 (2026-09-22): 实心填充色与品牌色文字（亮色方向与暗色相反）。
+   * --warn 同时修深: 原 #bf8700 作文字色在 --bg 上仅 2.83:1、在 --surface
+   * 上 3.14:1，降级提示 / 过期提示 / 降级计数等 6 处警告文字都读不清。 */
+  --brand-solid: #0c857a;        /* 白字 4.51:1 */
+  --brand-solid-hover: #0a6d64;  /* 白字 6.20:1 */
+  --fail-solid: #b3382f;         /* 白字 5.96:1 */
+  --warn-solid: #996c00;         /* 白字 4.67:1 */
+  --brand-text: #0b7a6f;         /* 品牌色作文字: 亮底需更暗, 5.21:1 */
   /* R9 修复: --on-fail / --on-warn 亮色定义 (与 tokens.css :root 一致) */
   --on-fail: var(--brand-contrast);
   --on-warn: var(--brand-contrast);

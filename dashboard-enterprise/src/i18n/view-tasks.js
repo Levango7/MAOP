@@ -44,6 +44,11 @@ export const messages = {
     // ── 分页 ──
     'view.tasks.prevPage': 'Prev',
     'view.tasks.nextPage': 'Next',
+    // ── 任务执行时间线 (Tasks.vue 垂直时间轴) ──
+    // 修复：这 3 个键此前被 t() 引用但字典缺失，会渲染原始 key。
+    'view.tasks.timeline.title': 'Execution Timeline',
+    'view.tasks.timeline.ariaLabel': 'Task execution timeline',
+    'view.tasks.timeline.duration': 'Duration',
   },
   zh: {
     'view.tasks.title': '任务历史',
@@ -89,5 +94,9 @@ export const messages = {
     // ── 分页 ──
     'view.tasks.prevPage': '上一页',
     'view.tasks.nextPage': '下一页',
+    // ── 任务执行时间线 ──
+    'view.tasks.timeline.title': '执行时间线',
+    'view.tasks.timeline.ariaLabel': '任务执行时间线',
+    'view.tasks.timeline.duration': '耗时',
   },
 };

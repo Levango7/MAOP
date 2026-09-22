@@ -119,6 +119,13 @@ export const messages = {
     // ── 性能指标标签 (M10 修复: 替换硬编码英文) ──
     'view.agents.metricLastLatency': 'Last Latency',
     'view.agents.metricConsecutiveFailures': 'Consecutive Failures',
+    // ── Agent 关系拓扑图 (Agents.vue 内联 SVG) ──
+    // 修复：这 4 个键此前被 t() 引用但字典缺失，会直接把原始 key 渲染到
+    // 卡片标题 / 副标题 / 无障碍标签 / 空态文案上。
+    'view.agents.topology.title': 'Agent Topology',
+    'view.agents.topology.subtitle': 'Routing relationships between agents (primary → fallback → tertiary)',
+    'view.agents.topology.ariaLabel': 'Agent routing topology diagram',
+    'view.agents.topology.empty': 'No agents to visualize',
 
   },
 
@@ -242,6 +249,11 @@ export const messages = {
     // ── 性能指标标签 (M10 修复: 替换硬编码英文) ──
     'view.agents.metricLastLatency': '最近延迟',
     'view.agents.metricConsecutiveFailures': '连续失败次数',
+    // ── Agent 关系拓扑图 ──
+    'view.agents.topology.title': 'Agent 关系拓扑',
+    'view.agents.topology.subtitle': 'Agent 之间的路由关系（主 → 备 → 三级）',
+    'view.agents.topology.ariaLabel': 'Agent 路由拓扑图',
+    'view.agents.topology.empty': '暂无可视化的 Agent',
 
   },
 };

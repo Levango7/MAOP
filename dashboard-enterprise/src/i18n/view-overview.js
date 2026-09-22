@@ -73,6 +73,9 @@ export const messages = {
     // ── #126: a11y 标签 ──
     'view.overview.pev.ariaLabel': 'Plan-Execute-Verify workflow',
     'view.overview.quickActions.ariaLabel': 'Quick actions',
+    // 修复：被 Overview.vue:117 的 :aria-label 引用但字典缺失，
+    // 会让屏幕阅读器读出原始 key。
+    'view.overview.sparkline.trend': 'Trend sparkline',
   },
 
   zh: {
@@ -149,5 +152,6 @@ export const messages = {
     // ── #126: a11y 标签 ──
     'view.overview.pev.ariaLabel': '计划-执行-验证工作流',
     'view.overview.quickActions.ariaLabel': '快捷操作',
+    'view.overview.sparkline.trend': '趋势迷你图',
   },
 };

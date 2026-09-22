@@ -93,6 +93,10 @@ export const messages = {
     'view.tools.builtin.skillRouter': 'MCP server management, tool routing rules, prompt templates, and capability discovery.',
     'view.tools.builtin.securityAudit': 'RBAC roles, permission grants, audit trail, and security configuration overview.',
     'view.tools.importFailed': 'Import failed: {detail}',
+    // 修复：McpTopology.vue 写的是 t('view.tools.topo.renderFailed', '中文兜底')，
+    // 但本项目的 t(key, params) 第二个参数是**插值参数**而非默认值 ——
+    // 键缺失时直接 return key，那句中文兜底从未生效。补上真正的键。
+    'view.tools.topo.renderFailed': 'Failed to load the topology renderer. Please refresh and try again.',
   },
 
   zh: {
@@ -187,5 +191,6 @@ export const messages = {
     'view.tools.builtin.skillRouter': 'MCP 服务管理、工具路由规则、提示词模板与能力发现。',
     'view.tools.builtin.securityAudit': 'RBAC 角色、权限授予、审计追踪与安全配置总览。',
     'view.tools.importFailed': '导入失败：{detail}',
+    'view.tools.topo.renderFailed': '拓扑渲染库加载失败，请刷新重试',
   },
 };

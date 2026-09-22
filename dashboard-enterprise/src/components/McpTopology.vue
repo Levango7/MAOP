@@ -199,8 +199,11 @@ async function render() {
   try {
     await loadVisLib();
   } catch (e) {
-    // 渲染库加载失败时设置错误提示，避免静默吞错
-    renderError.value = t('view.tools.topo.renderFailed', '拓扑渲染库加载失败，请刷新重试');
+    // 渲染库加载失败时设置错误提示，避免静默吞错。
+    // 注意：不要写成 t('key', '中文兜底') —— 本项目的 t(key, params) 第二个
+    // 参数是**插值参数**，不是默认值；键缺失时它直接 return key，
+    // 那句兜底文案永远不会生效。文案请写进 i18n 字典。
+    renderError.value = t('view.tools.topo.renderFailed');
     return;
   }
   const { Network, DataSet } = visLib;
