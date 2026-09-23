@@ -704,11 +704,29 @@ def register_static_routes(app: FastAPI, serve_dir: Path) -> None:
 
     # ── SPA fallback for Vue3 client-side routes ───────────────────────
     # Any non-API, non-asset path returns index.html so the Vue router can
-    # render /monitor, /settings, etc. Mounts and explicit routes above are
-    # matched first, so /api/*, /assets/*, /style.css, /favicon.svg and /ws
-    # are not affected.
+    # render /monitor, /settings, etc.
+    #
+    # 2026-09-23 修复：原实现**没有排除 /api/**，与上方注释的承诺不符。
+    # "已注册的路由先匹配"只对**存在**的 API 路径成立；未注册的 /api/* 会落到
+    # 这里返回 200 + index.html，前端 res.json() 抛
+    #   Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+    # 把"端点不存在"伪装成解析错误，且掩盖真实缺口。本项目已因此踩坑三次
+    # （kg_router、compliance.router 定义未挂载；本次 alerts/audit/mcp 端点
+    # 缺失），每次都靠人肉发现。
+    #
+    # 现在对 /api/ 前缀显式返回 404 JSON，让契约缺口在第一次调用就暴露。
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str) -> Any:
+        if full_path == "api" or full_path.startswith("api/"):
+            return _JResp(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "error": "Not Found",
+                    "code": "HTTP_404",
+                    "detail": f"/{full_path}",
+                },
+            )
         return _serve_index_html(serve_dir)
 
 
