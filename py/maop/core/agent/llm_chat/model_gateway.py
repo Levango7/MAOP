@@ -250,6 +250,57 @@ class ModelGateway:
                     result[m] = v
             return result
 
+    def clear_daily_usage(self, model: str = "") -> int:
+        """清空今日使用量，返回被清零的条目数。
+
+        2026-09-23 新增：供 AgentGateway 的「清空今日用量」使用。
+        此前只有 ``record_usage`` / ``get_daily_usage``，前端
+        ``DELETE /api/model-gateway/usage`` 无对应实现。
+
+        **内存与 SQLite 必须同时清**：用量是双写的（``_daily_usage`` 内存缓存
+        + ``model_gateway_usage`` 表）。只清内存的话，进程重启后
+        ``_load_*`` 会把旧数据读回来，"清空"形同虚设。
+
+        Parameters
+        ----------
+        model : str
+            指定模型时只清该模型；为空时清今日全部模型。
+
+        Returns
+        -------
+        int
+            实际清零的条目数（内存侧计数）。
+        """
+        with self._lock:
+            today = self._today_str()
+            prefix = f"{today}:"
+            if model:
+                keys = [f"{today}:{model}"]
+            else:
+                keys = [k for k in self._daily_usage if k.startswith(prefix)]
+            cleared = 0
+            for key in keys:
+                if key in self._daily_usage:
+                    del self._daily_usage[key]
+                    cleared += 1
+
+            # 持久化侧：删除今日记录（指定模型时只删该模型）
+            with sqlite_connect(self._db_path) as conn:
+                if model:
+                    conn.execute(
+                        "DELETE FROM model_gateway_usage WHERE date = ? AND model = ?",
+                        (today, model),
+                    )
+                else:
+                    conn.execute(
+                        "DELETE FROM model_gateway_usage WHERE date = ?", (today,)
+                    )
+            logger.info(
+                "[model_gateway] cleared daily usage: date=%s model=%s entries=%d",
+                today, model or "*", cleared,
+            )
+            return cleared
+
     # ── Public API: 权限规则管理 ──────────────────────────────────
 
     def add_permission(self, permission: ModelPermission) -> None:

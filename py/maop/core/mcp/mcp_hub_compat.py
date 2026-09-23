@@ -77,6 +77,45 @@ class MCPHubCompatMixin:
             )
         return True
 
+    def update_server(self, server_id: str, config: MCPServerConfig) -> bool:
+        """Update an existing server config **in place**, preserving its id.
+
+        2026-09-23 新增：供 ``PUT /api/mcp/servers/{id}`` 使用。
+
+        不能用 ``add_server`` 代替：后者按 **name** 删除再插入，并**重新生成
+        id**（``uuid4().hex[:16]``）。若前端持有旧 id 做更新，id 会漂移；
+        且改名场景下旧行不会被清掉（name 变了，DELETE 匹配不到），
+        会留下一条指向旧名字的僵尸配置。
+
+        Returns
+        -------
+        bool
+            ``False`` 表示该 id 不存在（调用方应返回 404）。
+        """
+        now = _time.time()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT name FROM mcp_servers WHERE id = ?", (server_id,)
+            ).fetchone()
+            if row is None:
+                return False
+            old_name = row["name"]
+            # 改名时先清掉同名的其他记录，避免与 add_server 的
+            # 「name 唯一」约定冲突（否则同名两条并存）。
+            if config.name and config.name != old_name:
+                conn.execute(
+                    "DELETE FROM mcp_servers WHERE name = ? AND id != ?",
+                    (config.name, server_id),
+                )
+            conn.execute(
+                """UPDATE mcp_servers
+                   SET name = ?, transport = ?, config = ?, updated_at = ?
+                   WHERE id = ?""",
+                (config.name, config.transport.value, config.model_dump_json(),
+                 now, server_id),
+            )
+        return True
+
     def remove_server(self, name: str) -> bool:
         """Remove a registered server by name (compat shim)."""
         server_id = self.find_server_id_by_name(name)

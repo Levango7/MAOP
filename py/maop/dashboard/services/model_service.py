@@ -484,6 +484,36 @@ def add_gateway_permission(perm: Any) -> dict[str, Any]:
     return {"model_pattern": perm.model_pattern}
 
 
+def update_gateway_permission(model_pattern: str, perm: Any) -> dict[str, Any]:
+    """更新权限规则（按原 model_pattern 定位）。
+
+    2026-09-23 新增：供 AgentGateway 的权限编辑使用。
+
+    ``gateway.add_permission`` 本身是 upsert（同 pattern 覆盖），故直接复用；
+    但**若本次修改同时改了 model_pattern**，需先删旧规则，否则会残留一条
+    指向旧 pattern 的规则（改名场景）。
+
+    Parameters
+    ----------
+    model_pattern : str
+        原始 pattern（URL 路径参数），用于定位待更新规则。
+    perm : Any
+        新规则（含可能已变更的 ``model_pattern``）。
+
+    Returns
+    -------
+    dict
+        ``{"model_pattern": str, "renamed_from": str}``。
+    """
+    gateway = _get_model_gateway()
+    new_pattern = getattr(perm, "model_pattern", "")
+    if model_pattern and new_pattern and new_pattern != model_pattern:
+        # 改名：先删旧，再写新（否则旧规则残留）
+        gateway.remove_permission(model_pattern)
+    gateway.add_permission(perm)
+    return {"model_pattern": new_pattern, "renamed_from": model_pattern}
+
+
 def remove_gateway_permission(model_pattern: str) -> dict[str, Any]:
     """删除权限规则。
 
@@ -546,6 +576,21 @@ def get_model_daily_usage(model: str) -> dict[str, Any]:
     usage = gateway.get_daily_usage(model=model)
     total = sum(usage.values())
     return {"usage": usage, "total_tokens": total}
+
+
+def clear_model_daily_usage(model: str = "") -> dict[str, Any]:
+    """清空今日模型使用量。
+
+    2026-09-23 新增：供 AgentGateway 的「清空今日用量」使用。
+
+    Returns
+    -------
+    dict
+        ``{"cleared": int, "model": str}``。
+    """
+    gateway = _get_model_gateway()
+    cleared = gateway.clear_daily_usage(model=model)
+    return {"cleared": cleared, "model": model}
 
 
 def update_gateway_config(config: Any) -> dict[str, Any]:

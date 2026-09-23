@@ -102,6 +102,30 @@ async def add_server(body: ServerCreate, request: Request) -> dict[str, Any]:
     )
 
 
+@router.put("/servers/{server_id}")
+@handle_api_errors
+async def update_server(server_id: str, body: ServerCreate, request: Request) -> dict[str, Any]:
+    """按 id 更新 MCP server 配置。
+
+    2026-09-23 新增：前端 McpManager 编辑服务器时调用本端点，但后端此前只有
+    POST/GET/DELETE —— 请求落到 SPA 兜底返回 200 + HTML，前端报
+    "Unexpected token '<'"，编辑功能不可用。
+    """
+    require_admin(request)
+    result = plugin_service.update_server(
+        server_id,
+        name=body.name,
+        transport=body.transport,
+        command=body.command,
+        args=body.args,
+        url=body.url,
+        env=body.env,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Server {server_id} not found")
+    return result
+
+
 @router.delete("/servers/{server_name}")
 @handle_api_errors
 async def remove_server(server_name: str, request: Request) -> dict[str, Any]:
@@ -110,6 +134,21 @@ async def remove_server(server_name: str, request: Request) -> dict[str, Any]:
     if not removed:
         raise HTTPException(status_code=404, detail=f"Server {server_name} not found")
     return {"status": "ok", "server": server_name}
+
+
+@router.get("/topology")
+@handle_api_errors
+async def mcp_topology(request: Request) -> dict[str, Any]:
+    """MCP 拓扑（servers ↔ tools，外加 Agent 节点）。
+
+    2026-09-23 新增：Tools 页面「MCP 拓扑」标签页调用本端点，但后端无实现
+    —— 请求落到 SPA 兜底返回 200 + HTML，前端报 "Unexpected token '<'"。
+
+    只输出真实存在的关系（tool.server_name → server→tool 边）；
+    Agent 与 MCP server 在后端无关联字段，故不生成 agent 边。
+    """
+    require_admin(request)
+    return {"status": "ok", **plugin_service.topology()}
 
 
 @router.get("/tools")

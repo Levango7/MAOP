@@ -322,6 +322,112 @@ def add_server(
     return {"status": "ok", "server": name}
 
 
+def update_server(
+    server_id: str,
+    *,
+    name: str,
+    transport: str,
+    command: str = "",
+    args: list[str] | None = None,
+    url: str = "",
+    env: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
+    """按 id 更新 MCP server 配置。返回 ``None`` 表示该 id 不存在。
+
+    2026-09-23 新增：前端 McpManager 编辑服务器时调用
+    ``PUT /api/mcp/servers/{id}``，但 service 层只有 add/remove/list
+    （hub 亦只有 ``add_server``，且它会重新生成 id）。
+    """
+    from maop.core.mcp.mcp_hub import MCPServerConfig, TransportType
+    hub = _get_hub()
+    config = MCPServerConfig(
+        name=name,
+        transport=TransportType(transport),
+        command=command,
+        args=args or [],
+        url=url,
+        env=env or {},
+    )
+    ok = hub.update_server(server_id, config)
+    if not ok:
+        return None
+    return {"status": "ok", "server": name, "id": server_id}
+
+
+def topology() -> dict[str, Any]:
+    """MCP 拓扑图数据（servers ↔ tools，外加 Agent 节点）。
+
+    2026-09-23 新增：供 Tools 页面的「MCP 拓扑」标签页使用。前端期望
+    ``{"servers": [], "tools": [], "agents": [], "edges": []}``。
+
+    **边只输出真实存在的关系**。目前后端能确定的只有
+    ``tool.server_name`` → server→tool 一条。
+    Agent 与 MCP server 之间**没有任何存储层面的关联**
+    （``AgentDescriptor.adapter_config`` 里没有 server 字段），
+    所以不生成 agent 边 —— 宁可图上少一条线，也不要画一条编造的线。
+    （前端对 ``type === 'server-agent'`` 的边有特殊配色，该类型当前
+    不会出现；这样至少不会出现指向错误的关系。）
+
+    Returns
+    -------
+    dict
+        ``{"servers": [...], "tools": [...], "agents": [...], "edges": [...]}``
+    """
+    hub = _get_hub()
+
+    raw_servers = hub.list_servers()
+    servers = [
+        s.model_dump(mode="json") if hasattr(s, "model_dump") else dict(s)
+        for s in raw_servers
+    ]
+
+    raw_tools = hub.all_tools()
+    tools = []
+    for t in raw_tools:
+        d = t.model_dump(mode="json") if hasattr(t, "model_dump") else dict(t)
+        name = d.get("name", "")
+        server_name = d.get("server_name", "")
+        # 前端按 tl.id 建节点；MCPTool 无 id 字段，用 server:name 合成，
+        # 保证同一 server 下重名的工具也不会撞 id。
+        d.setdefault("id", f"{server_name}:{name}" if server_name else name)
+        tools.append(d)
+
+    edges = []
+    for t in tools:
+        if t.get("server_name"):
+            edges.append({
+                "id": f"{t['server_name']}->{t.get('id', '')}",
+                "source": t["server_name"],
+                "target": t.get("id", ""),
+                "type": "server-tool",
+            })
+
+    # Agent 节点：来自注册表（本地服务失败不影响拓扑其余部分）
+    agents: list[dict[str, Any]] = []
+    try:
+        from maop.dashboard.services import agent_service
+
+        listed = agent_service.list_agents(None).get("agents", [])
+        for a in listed:
+            if not isinstance(a, dict):
+                a = a.model_dump(mode="json") if hasattr(a, "model_dump") else {}
+            agents.append({
+                "name": a.get("name", ""),
+                # 前端读作 a.provider；本模型字段是 vendor，做一次映射
+                "provider": a.get("provider") or a.get("vendor") or "",
+                "enabled": bool(a.get("enabled", False)),
+            })
+    except Exception as exc:  # 注册表不可用时降级为无 agent 节点
+        logger.warning("[plugin_service] topology: agent list unavailable: %s", exc)
+
+    return {
+        "servers": servers,
+        "tools": tools,
+        "agents": agents,
+        "edges": edges,
+    }
+
+
 def remove_server(server_name: str) -> bool:
     """移除 MCP server 配置。返回是否移除成功。"""
     hub = _get_hub()

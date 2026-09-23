@@ -265,3 +265,116 @@ class TestConfigUpdate:
         # 验证权限已更新
         perms = client.get("/api/model-gateway/permissions").json()
         assert perms["count"] == 1
+
+
+# ── 8. PUT /api/model-gateway/permissions/{model_pattern} ────────
+# 2026-09-23 新增：前端 AgentGateway 的权限编辑此前调用本端点，但后端只有
+# POST/DELETE —— 请求落到 SPA 兜底返回 200 + HTML，前端报
+# "Unexpected token '<'"，编辑功能不可用。
+
+
+class TestPermissionsUpdate:
+    def test_update_existing_rule(self, client: TestClient):
+        """原地更新（pattern 不变）：规则数不变，字段被覆盖。"""
+        client.post("/api/model-gateway/permissions", json={
+            "model_pattern": "gpt-4*",
+            "allowed": True,
+            "priority": 10,
+        })
+        resp = client.put("/api/model-gateway/permissions/gpt-4*", json={
+            "model_pattern": "gpt-4*",
+            "allowed": False,
+            "priority": 99,
+        })
+        assert resp.status_code == 200
+        perms = client.get("/api/model-gateway/permissions").json()
+        assert perms["count"] == 1, "原地更新不应新增规则"
+        assert perms["permissions"][0]["allowed"] is False
+        assert perms["permissions"][0]["priority"] == 99
+
+    def test_update_with_rename_removes_old(self, client: TestClient):
+        """改名场景（URL pattern ≠ body pattern）：旧规则必须被删除。"""
+        client.post("/api/model-gateway/permissions", json={
+            "model_pattern": "old-*",
+            "allowed": True,
+            "priority": 10,
+        })
+        resp = client.put("/api/model-gateway/permissions/old-*", json={
+            "model_pattern": "new-*",
+            "allowed": True,
+            "priority": 10,
+        })
+        assert resp.status_code == 200
+        perms = client.get("/api/model-gateway/permissions").json()
+        patterns = {p["model_pattern"] for p in perms["permissions"]}
+        assert patterns == {"new-*"}, f"改名后应只剩新规则，实际 {patterns}"
+
+    def test_update_missing_pattern_rejected(self, client: TestClient):
+        """body 缺 model_pattern → 422。
+
+        ``ModelPermission.model_pattern`` 是必填字段（``model_pattern: str``
+        无默认值），Pydantic 在路由函数体之前就拦截了，返回 422 而非 400。
+        """
+        resp = client.put("/api/model-gateway/permissions/x", json={"allowed": True})
+        assert resp.status_code == 422
+
+    def test_update_empty_pattern_rejected(self, client: TestClient):
+        """body 传空字符串 → 路由层的显式校验返回 400（Pydantic 拦不到）。"""
+        resp = client.put(
+            "/api/model-gateway/permissions/x", json={"model_pattern": ""}
+        )
+        assert resp.status_code == 400
+
+
+# ── 9. DELETE /api/model-gateway/usage ───────────────────────────
+# 2026-09-23 新增：前端 AgentGateway 的「清空今日用量」。
+# 关键：用量是**内存 + SQLite 双写**，只清一边会导致进程重启后数据复活。
+
+
+class TestUsageClear:
+    def test_clear_empties_usage(self, client: TestClient):
+        """清空后今日用量归零。"""
+        client.post("/api/model-gateway/usage", json={"model": "gpt-4", "tokens": 500})
+        assert client.get("/api/model-gateway/usage").json()["total_tokens"] == 500
+
+        resp = client.delete("/api/model-gateway/usage")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "ok"
+        # 内存侧必须真的清空
+        assert client.get("/api/model-gateway/usage").json()["total_tokens"] == 0
+
+    def test_clear_persisted_side(self, client: TestClient, isolated_gateway):
+        """持久化侧也必须清空 —— 否则重启后旧数据会读回来。
+
+        这是本端点最容易写错的地方：``_daily_usage`` 是内存缓存，
+        SQLite 是持久层，两者都必须清。
+        """
+        from maop.core.backends.db_utils import sqlite_connect
+
+        client.post("/api/model-gateway/usage", json={"model": "gpt-4", "tokens": 500})
+        with sqlite_connect(isolated_gateway._db_path) as conn:
+            before = conn.execute("SELECT COUNT(*) FROM model_gateway_usage").fetchone()[0]
+        assert before == 1, "持久化侧应先有 1 条记录"
+
+        client.delete("/api/model-gateway/usage")
+        with sqlite_connect(isolated_gateway._db_path) as conn:
+            after = conn.execute("SELECT COUNT(*) FROM model_gateway_usage").fetchone()[0]
+        assert after == 0, "持久化侧未清空 —— 重启后用量会复活"
+
+    def test_clear_by_model_keeps_others(self, client: TestClient):
+        """指定 model 时只清该模型，其余保留。"""
+        client.post("/api/model-gateway/usage", json={"model": "gpt-4", "tokens": 100})
+        client.post("/api/model-gateway/usage", json={"model": "claude", "tokens": 200})
+
+        resp = client.delete("/api/model-gateway/usage", params={"model": "gpt-4"})
+        assert resp.status_code == 200
+        usage = client.get("/api/model-gateway/usage").json()["usage"]
+        assert "gpt-4" not in usage
+        assert usage.get("claude") == 200
+
+    def test_clear_empty_is_ok(self, client: TestClient):
+        """无用量时清空不报错。"""
+        resp = client.delete("/api/model-gateway/usage")
+        assert resp.status_code == 200
+        assert resp.json()["cleared"] == 0

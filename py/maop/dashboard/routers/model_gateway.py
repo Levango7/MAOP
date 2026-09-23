@@ -77,6 +77,26 @@ async def api_model_gateway_permissions_delete(model_pattern: str, request: Requ
         raise HTTPException(404, str(exc)) from exc
 
 
+@router.put("/api/model-gateway/permissions/{model_pattern:path}")
+@handle_api_errors("Model gateway permissions update", error_value={"status": "error", "error": "Update failed"})
+async def api_model_gateway_permissions_update(
+    model_pattern: str, body: ModelPermission, request: Request
+) -> dict[str, Any]:
+    """更新权限规则。
+
+    2026-09-23 新增：前端 AgentGateway 的权限编辑此前调用本端点，但后端只有
+    POST/DELETE —— 请求落到 SPA 兜底返回 200 + HTML，前端报
+    "Unexpected token '<'"，编辑功能不可用。
+
+    路径参数 ``model_pattern`` 用于定位原规则；body 中的 ``model_pattern``
+    可以与它不同（改名场景，服务层会先删旧规则）。
+    """
+    require_admin(request)
+    if not body.model_pattern:
+        raise HTTPException(400, "missing model_pattern")
+    return {"status": "ok", **model_service.update_gateway_permission(model_pattern, body)}
+
+
 # ── API 端点：访问检查 ──────────────────────────────────────────────
 @router.post("/api/model-gateway/check")
 @handle_api_errors("Model gateway check", error_value={"status": "error", "error": "Check failed"})
@@ -108,6 +128,24 @@ async def api_model_gateway_usage_get(
     """获取今日使用量。"""
     require_admin(request)
     return {"status": "ok", **model_service.get_model_daily_usage(model)}
+
+
+@router.delete("/api/model-gateway/usage")
+@handle_api_errors("Model gateway usage clear", error_value={"status": "error", "error": "Clear failed"})
+async def api_model_gateway_usage_clear(
+    request: Request,
+    model: str = Query("", description="只清该模型；留空清今日全部"),
+) -> dict[str, Any]:
+    """清空今日使用量。
+
+    2026-09-23 新增：前端 AgentGateway 的「清空今日用量」此前调用本端点，
+    但后端只有 POST/GET —— 请求落到 SPA 兜底返回 200 + HTML，
+    前端报 "Unexpected token '<'"。
+
+    同时清内存缓存与 SQLite（用量是双写的），否则进程重启会读回旧数据。
+    """
+    require_admin(request)
+    return {"status": "ok", **model_service.clear_model_daily_usage(model)}
 
 
 # ── API 端点：配置更新 ──────────────────────────────────────────────
