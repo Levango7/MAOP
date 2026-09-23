@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { useI18n } from '../i18n/index.js';
 
 // M6 fix: token 从 localStorage 迁移到 httpOnly cookie（由后端 Set-Cookie 设置）。
 // httpOnly cookie 无法被 JavaScript 读取，避免 XSS 攻击窃取 token。
@@ -31,6 +32,51 @@ function isLoggedIn() {
   } catch {
     return false;
   }
+}
+
+/**
+ * 把 HTTP 错误映射为**已本地化**的提示。
+ *
+ * 背景（2026-09-23 截图验证发现）：原先各处直接
+ * ``throw new Error(errBody.error || `API ${url}: ${res.status}`)``，
+ * 抛的是**后端原始英文串**（如 "Admin role required"）。视图把它当作错误
+ * 详情渲染，于是中文界面里也会出现英文 —— 实测在 Tasks / Overview / Agents
+ * 三个视图都能复现。
+ *
+ * 策略：常见状态码走 i18n 文案（用户看得懂），并保留原始 error 串作为
+ * 补充信息（便于排查）；非预期状态码则回退原始串，不吞信息。
+ *
+ * @param {object} errBody 已解析的响应体（可能为空对象）
+ * @param {string} url 请求路径
+ * @param {number} status HTTP 状态码
+ * @returns {string} 用于 Error.message 的文案
+ */
+function apiErrorMessage(errBody, url, status) {
+  const raw = (errBody && errBody.error) || '';
+  const KEY_BY_STATUS = {
+    401: 'error.unauthorized',
+    403: 'error.forbidden',
+    404: 'error.notFound',
+    429: 'error.rateLimited',
+  };
+  let key = KEY_BY_STATUS[status];
+  if (!key && status >= 500) key = 'error.server';
+
+  // 技术细节：URL + 状态码。始终保留 —— 这是运维排查的第一手线索，
+  // 也是既有测试断言的一部分（如 'API /api/audit/events: 500'）。
+  // 去掉查询串：路径才是定位问题的关键，而带全量 query 会撑成一行
+  // 70+ 字符的文本，在错误卡片的小字里严重换行（实测 /api/sessions 那条）。
+  const technical = `API ${url.split('?')[0]}: ${status}`;
+
+  if (key) {
+    const { t } = useI18n();
+    const localized = t(key);
+    // t() 在键缺失时返回键本身 —— 此时不要把它当文案用。
+    if (localized && localized !== key) {
+      return `${localized} (${technical})`;
+    }
+  }
+  return raw || technical;
 }
 
 /**
@@ -140,14 +186,14 @@ export const useApiStore = defineStore('api', () => {
       // （内部会尝试 refresh，失败则清除登录态并触发 maop:unauthorized 事件）。
       // 重试仍 401 说明 token 确实无效，直接抛错即可，避免事件重复触发。
       if (res.status === 401) {
-        throw new Error(`API ${url}: 401 Unauthorized`);
+        throw new Error(apiErrorMessage({}, url, 401));
       }
     }
     if (!res.ok) {
       // P1-4 fix: 与 post/put/del 保持一致，先尝试解析 errBody.error，
       // 给出更具体的错误信息而非仅 HTTP 状态码。
       const errBody = await res.json().catch(() => ({}));
-      throw new Error(errBody.error || `API ${url}: ${res.status}`);
+      throw new Error(apiErrorMessage(errBody, url, res.status));
     }
     return res.json();
   }
@@ -175,12 +221,12 @@ export const useApiStore = defineStore('api', () => {
       ));
       // H3 fix: 消除重复调用 handleUnauthorized()，避免 maop:unauthorized 事件重复触发。
       if (res.status === 401) {
-        throw new Error(`API ${url}: 401 Unauthorized`);
+        throw new Error(apiErrorMessage({}, url, 401));
       }
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      throw new Error(errBody.error || `API ${url}: ${res.status}`);
+      throw new Error(apiErrorMessage(errBody, url, res.status));
     }
     return res.json();
   }
@@ -211,12 +257,12 @@ export const useApiStore = defineStore('api', () => {
         putHeaders
       ));
       // H3 fix: 消除重复调用 handleUnauthorized()，避免 maop:unauthorized 事件重复触发。
-      // P1-3 fix: 统一 401 错误消息为 "401 Unauthorized"（与 get/post 一致）。
-      if (res.status === 401) { throw new Error(`API ${url}: 401 Unauthorized`); }
+      // 401 走 apiErrorMessage() 本地化（原先硬编码英文 "401 Unauthorized"）。
+      if (res.status === 401) { throw new Error(apiErrorMessage({}, url, 401)); }
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      throw new Error(errBody.error || `API ${url}: ${res.status}`);
+      throw new Error(apiErrorMessage(errBody, url, res.status));
     }
     return res.json();
   }
@@ -234,12 +280,12 @@ export const useApiStore = defineStore('api', () => {
       await handleUnauthorized();
       res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, delHeaders));
       // H3 fix: 消除重复调用 handleUnauthorized()，避免 maop:unauthorized 事件重复触发。
-      // P1-3 fix: 统一 401 错误消息为 "401 Unauthorized"（与 get/post 一致）。
-      if (res.status === 401) { throw new Error(`API ${url}: 401 Unauthorized`); }
+      // 401 走 apiErrorMessage() 本地化（原先硬编码英文 "401 Unauthorized"）。
+      if (res.status === 401) { throw new Error(apiErrorMessage({}, url, 401)); }
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      throw new Error(errBody.error || `API ${url}: ${res.status}`);
+      throw new Error(apiErrorMessage(errBody, url, res.status));
     }
     return res.json();
   }

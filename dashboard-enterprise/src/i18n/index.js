@@ -338,6 +338,16 @@ export const coreMessages = {
     'dag.connecting': 'Connecting to execution {id}…',
     'dag.connected': 'Connected',
     'dag.disconnected': 'Disconnected',
+    // ── API 错误文案（跨视图）───────────────────────────────────────────
+    // 背景: stores/api.js 原先直接 `throw new Error(errBody.error || 'API …')`，
+    // 抛的是**后端原始英文串**（如 "Admin role required"）。视图把它当错误
+    // 详情渲染 → 中文模式下也显示英文。改为按 HTTP 状态映射到这些键。
+    'error.unauthorized': 'Not signed in, or the session has expired',
+    'error.forbidden': 'Your role does not have permission for this operation',
+    'error.notFound': 'The requested resource does not exist',
+    'error.rateLimited': 'Too many requests, please try again later',
+    'error.server': 'The server encountered an error',
+    'error.network': 'Cannot reach the server',
   },
   zh: {
     // ── F34 修复: core 键中文翻译补全 (nav/status/action/footer/settings/common/coach/palette/error) ──
@@ -660,6 +670,13 @@ export const coreMessages = {
     'dag.connecting': '正在连接执行 {id}…',
     'dag.connected': '已连接',
     'dag.disconnected': '已断开',
+    // ── API 错误文案（跨视图）── 见 en 块同名注释
+    'error.unauthorized': '未登录或登录状态已失效',
+    'error.forbidden': '当前角色无权执行该操作',
+    'error.notFound': '请求的资源不存在',
+    'error.rateLimited': '请求过于频繁，请稍后重试',
+    'error.server': '服务端出现错误',
+    'error.network': '无法连接到服务端',
   },
 };
 

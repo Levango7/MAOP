@@ -249,7 +249,9 @@ describe('useApiStore auth header injection', () => {
       status: 401,
       json: () => Promise.resolve({}),
     });
-    await expect(store.get('/api/protected')).rejects.toThrow('401 Unauthorized');
+    // 2026-09-23: 401 文案改为本地化（原先硬编码英文 '401 Unauthorized'），
+    // 故断言不再绑定具体文案，只校验「抛错 + 含状态码」这一语义。
+    await expect(store.get('/api/protected')).rejects.toThrow(/401/);
     // M6 fix: user 信息应被清除（token 不再存储在 localStorage）
     expect(localStorage.getItem('maop_user')).toBeNull();
   });
