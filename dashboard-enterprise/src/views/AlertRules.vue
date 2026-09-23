@@ -5,8 +5,8 @@
       :error="error"
       :empty="!rules.length"
       :error-title="t('view.alerts.loadError')"
-      :empty-title="t('view.alerts.empty')"
-      :empty-desc="t('view.alerts.emptyDesc')"
+      :empty-title="requiresEnterprise ? t('view.alerts.requiresEnterprise') : t('view.alerts.empty')"
+      :empty-desc="requiresEnterprise ? t('view.alerts.requiresEnterpriseDesc') : t('view.alerts.emptyDesc')"
       :loading-lines="6"
     >
       <template #badges>
@@ -219,6 +219,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
+import { useEditionStore } from '../stores/edition.js';
 import { useToast } from '../composables/useToast.js';
 import { useConfirm } from '../composables/useConfirm.js';
 import { useI18n } from '../i18n';
@@ -231,8 +232,16 @@ import AppIcon from '../components/AppIcon.vue';
 
 const { t } = useI18n();
 const api = useApiStore();
+const edition = useEditionStore();
 const toast = useToast();
 const { showConfirm } = useConfirm();
+
+// 2026-09-23: 后端 /api/audit/alert/* 由 FeatureFlag.AUDIT_LOG 门禁
+// （observability_service._require_audit_feature 抛 404），而 AUDIT_LOG 属
+// 企业版能力。个人版下此页无数据可加载，直接展示版本提示比让用户看一条
+// 404 报错更清楚。模式与 Overview.vue / Evolve.vue 的 edition.isEnterprise
+// 判断一致。
+const requiresEnterprise = computed(() => !edition.isEnterprise);
 
 // 可选指标
 const METRICS = [
@@ -350,9 +359,15 @@ async function loadAll() {
   loading.value = true;
   error.value = '';
   try {
+    // 2026-09-23 修复：路径原为 /api/alerts/*，但后端从未在此前缀下实现过
+    // 告警规则（alerts.py 只提供 POST /api/alerts/webhook）。真正的实现在
+    // audit.py 的 /api/audit/alert/*（其 docstring 明确设计为
+    // "/api/audit/alert/rules — CRUD for alert rules"）。
+    // 路径错配导致请求落到 SPA 兜底返回 HTML，前端报
+    // "Unexpected token '<'" —— 整个页面不可用。
     const [rulesData, statsData] = await Promise.all([
-      api.get('/api/alerts/rules'),
-      api.get('/api/alerts/history').catch(() => null),
+      api.get('/api/audit/alert/rules'),
+      api.get('/api/audit/alert/history').catch(() => null),
     ]);
     rules.value = normalizeRules(rulesData);
     // stats 可能从 history 端点或独立 stats 端点返回
@@ -465,9 +480,9 @@ async function save() {
     if (form.value.channel === 'webhook') payload.webhook_id = form.value.webhook_id;
 
     if (editingId.value) {
-      await api.put(`/api/alerts/rules/${encodeURIComponent(editingId.value)}`, payload);
+      await api.put(`/api/audit/alert/rules/${encodeURIComponent(editingId.value)}`, payload);
     } else {
-      await api.post('/api/alerts/rules', payload);
+      await api.post('/api/audit/alert/rules', payload);
     }
     toast.success(t('view.alerts.saved'));
     showForm.value = false;
@@ -484,7 +499,7 @@ async function removeRule(r) {
   const ok = await showConfirm({ message: t('view.alerts.deleteConfirm', { name: r.name }), tone: 'danger' });
   if (!ok) return;
   try {
-    await api.delete(`/api/alerts/rules/${encodeURIComponent(r.id)}`);
+    await api.delete(`/api/audit/alert/rules/${encodeURIComponent(r.id)}`);
     toast.success(t('view.alerts.deleted'));
     await loadAll();
   } catch (e) {
@@ -499,7 +514,7 @@ async function openHistory(r) {
   historyLoading.value = true;
   historyRecords.value = [];
   try {
-    const d = await api.get('/api/alerts/history', { rule_id: r.id });
+    const d = await api.get('/api/audit/alert/history', { rule_id: r.id });
     const items = Array.isArray(d) ? d : (d.items || d.history || d.records || []);
     historyRecords.value = items.map((h) => ({
       id: h.id || h.ts || Math.random(),
@@ -522,7 +537,14 @@ function closeHistory() {
   historyRecords.value = [];
 }
 
-onMounted(loadAll);
+// 个人版下不发请求：后端必然 404，只会产生一条无意义的报错。
+onMounted(() => {
+  if (requiresEnterprise.value) {
+    loading.value = false;
+    return;
+  }
+  loadAll();
+});
 </script>
 
 <style scoped>

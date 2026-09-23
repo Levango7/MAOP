@@ -610,7 +610,7 @@ async function loadRules() {
   rulesLoading.value = true;
   rulesError.value = '';
   try {
-    const d = await api.get('/api/audit/rules');
+    const d = await api.get('/api/audit/alert/rules');
     rules.value = d.rules || [];
   } catch (e) {
     rulesError.value = e.message || t('view.audit.rulesUnavailable');
@@ -632,10 +632,10 @@ async function saveRule() {
   try {
     const r = ruleEditor.rule;
     if (r.id) {
-      await api.put(`/api/audit/rules/${r.id}`, r);
+      await api.put(`/api/audit/alert/rules/${r.id}`, r);
       toast.success(t('view.audit.ruleUpdated'));
     } else {
-      await api.post('/api/audit/rules', r);
+      await api.post('/api/audit/alert/rules', r);
       toast.success(t('view.audit.ruleCreated'));
     }
     ruleEditor.open = false;
@@ -648,7 +648,7 @@ async function saveRule() {
 }
 async function toggleRule(rule) {
   try {
-    await api.put(`/api/audit/rules/${rule.id}`, { ...rule, enabled: !rule.enabled });
+    await api.put(`/api/audit/alert/rules/${rule.id}`, { ...rule, enabled: !rule.enabled });
     toast.success(t('view.audit.ruleToggled', { state: !rule.enabled ? t('view.audit.stateEnabled') : t('view.audit.stateDisabled') }));
     await loadRules();
   } catch (e) {
@@ -659,7 +659,7 @@ async function deleteRule(rule) {
   const ok = await showConfirm({ message: t('view.audit.ruleConfirmDelete'), tone: 'danger' });
   if (!ok) return;
   try {
-    await api.delete(`/api/audit/rules/${rule.id}`);
+    await api.delete(`/api/audit/alert/rules/${rule.id}`);
     toast.success(t('view.audit.ruleDeleted'));
     await loadRules();
   } catch (e) {
@@ -683,7 +683,10 @@ async function loadHistory() {
   historyLoading.value = true;
   historyError.value = '';
   try {
-    const d = await api.get('/api/audit/alerts');
+    // 2026-09-23 修复：原为 /api/audit/alerts，后端无此路径。
+    // 实际端点是 /api/audit/alert/history，返回 {status, alerts, count}
+    // —— 与下方 `d.alerts` 的读取方式一致。
+    const d = await api.get('/api/audit/alert/history');
     history.value = d.alerts || d.history || [];
   } catch (e) {
     historyError.value = e.message || t('view.audit.historyUnavailable');

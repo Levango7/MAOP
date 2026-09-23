@@ -406,7 +406,7 @@ describe('Audit.vue enhancement', () => {
     mockFetch({
       '/api/audit/events': { events: [] },
       '/api/audit/summary': { summary: { total: 0 } },
-      '/api/audit/rules': {
+      '/api/audit/alert/rules': {
         rules: [
           { id: 'r1', name: 'Critical delete', condition: 'action=delete AND severity=critical', severity: 'critical', enabled: true },
           { id: 'r2', name: 'Failed login', condition: 'action=login AND result=failure', severity: 'warning', enabled: false },
@@ -432,7 +432,7 @@ describe('Audit.vue enhancement', () => {
   it('shows rules error EmptyState when /api/audit/rules fails', async () => {
     global.fetch = vi.fn((url) => {
       const u = String(url).split('?')[0];
-      if (u === '/api/audit/rules') {
+      if (u === '/api/audit/alert/rules') {
         return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}), text: () => Promise.resolve('') });
       }
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ events: [], summary: { total: 0 } }), text: () => Promise.resolve('{}') });
@@ -447,7 +447,7 @@ describe('Audit.vue enhancement', () => {
     // Should show error EmptyState with the rules error message
     const empties = wrapper.findAllComponents(EmptyState);
     expect(empties.length).toBeGreaterThanOrEqual(1);
-    expect(wrapper.text()).toContain('API /api/audit/rules: 500');
+    expect(wrapper.text()).toContain('API /api/audit/alert/rules: 500');
     wrapper.unmount();
   });
 
@@ -455,7 +455,7 @@ describe('Audit.vue enhancement', () => {
     mockFetch({
       '/api/audit/events': { events: [] },
       '/api/audit/summary': { summary: { total: 0 } },
-      '/api/audit/rules': { rules: [] },
+      '/api/audit/alert/rules': { rules: [] },
     });
     const wrapper = await mountAudit();
 
@@ -483,7 +483,7 @@ describe('Audit.vue enhancement', () => {
     mockFetch({
       '/api/audit/events': { events: [] },
       '/api/audit/summary': { summary: { total: 0 } },
-      '/api/audit/alerts': {
+      '/api/audit/alert/history': {
         alerts: [
           { id: 'a1', time: '2026-01-01T00:00:00Z', rule_name: 'Critical delete', event: 'delete db', actor: 'alice', severity: 'critical' },
         ],

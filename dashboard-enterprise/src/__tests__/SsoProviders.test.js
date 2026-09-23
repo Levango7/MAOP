@@ -100,7 +100,7 @@ describe('SsoProviders.vue', () => {
 
   function defaultRoutes(overrides = {}) {
     return {
-      '/api/v1/sso/providers': { status: 'ok', providers: defaultProviders(), count: 2, total: 2 },
+      '/api/sso/providers': { status: 'ok', providers: defaultProviders(), count: 2, total: 2 },
       ...overrides,
     };
   }
@@ -151,7 +151,7 @@ describe('SsoProviders.vue', () => {
   // ── 空态 / 错误态 ─────────────────────────────────────────
 
   it('renders empty state when no providers returned', async () => {
-    mockFetch(defaultRoutes({ '/api/v1/sso/providers': { status: 'ok', providers: [], count: 0, total: 0 } }));
+    mockFetch(defaultRoutes({ '/api/sso/providers': { status: 'ok', providers: [], count: 0, total: 0 } }));
     const wrapper = await mountView();
     // 空态时不渲染数据行（只有 head 行或完全无表格行）
     const dataRows = wrapper.findAll('.sso-row:not(.sso-row--head)');
@@ -170,7 +170,7 @@ describe('SsoProviders.vue', () => {
     );
     const wrapper = await mountView();
     // 错误态: ListPageLayout 渲染 EmptyState with error 文本
-    expect(wrapper.text()).toContain('API /api/v1/sso/providers: 500');
+    expect(wrapper.text()).toContain('API /api/sso/providers: 500');
     wrapper.unmount();
   });
 
@@ -256,7 +256,7 @@ describe('SsoProviders.vue', () => {
 
   it('deletes a provider after confirm and reloads the list', async () => {
     mockFetch({
-      '/api/v1/sso/providers': { status: 'ok', providers: defaultProviders(), count: 2, total: 2 },
+      '/api/sso/providers': { status: 'ok', providers: defaultProviders(), count: 2, total: 2 },
     });
     mockShowConfirm.mockReturnValue(Promise.resolve(true));
 
@@ -265,7 +265,7 @@ describe('SsoProviders.vue', () => {
 
     // 让 DELETE 返回成功, 之后 list 返回剩余 1 个
     mockFetch({
-      '/api/v1/sso/providers': {
+      '/api/sso/providers': {
         status: 'ok',
         providers: [defaultProviders()[0]],
         count: 1,

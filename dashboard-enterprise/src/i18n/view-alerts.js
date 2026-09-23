@@ -76,6 +76,11 @@ export const messages = {
     'view.alerts.empty': 'No alert rules configured',
     'view.alerts.emptyDesc': 'Create a rule to get notified when metrics cross thresholds.',
     'view.alerts.loadError': 'Failed to load alert rules',
+    // 2026-09-23: 后端 /api/audit/alert/* 由 FeatureFlag.AUDIT_LOG 门禁，
+    // 个人版返回 404 "Audit enhancement requires enterprise edition"。
+    // 此前页面无版本判断，个人版用户只会看到一条费解的报错。
+    'view.alerts.requiresEnterprise': 'Alert rules require the Enterprise edition',
+    'view.alerts.requiresEnterpriseDesc': 'This feature is gated by the audit-log capability. Switch to Enterprise to manage alert rules.',
     'view.alerts.saveError': 'Failed to save alert rule',
     'view.alerts.deleteError': 'Failed to delete alert rule',
     'view.alerts.historyError': 'Failed to load alert history',
@@ -182,6 +187,9 @@ export const messages = {
     'view.alerts.empty': '暂无告警规则',
     'view.alerts.emptyDesc': '新建规则以在指标越过阈值时收到通知。',
     'view.alerts.loadError': '加载告警规则失败',
+    // 2026-09-23: 见 en 块同名注释
+    'view.alerts.requiresEnterprise': '告警规则需要企业版',
+    'view.alerts.requiresEnterpriseDesc': '该功能由审计日志能力门禁。切换到企业版后可管理告警规则。',
     'view.alerts.saveError': '保存告警规则失败',
     'view.alerts.deleteError': '删除告警规则失败',
     'view.alerts.historyError': '加载告警历史失败',
