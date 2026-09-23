@@ -93,6 +93,13 @@ jobs:
       - name: Config drift audit
         run: python scripts/check_config_drift.py
 
+      # 前后端 API 契约检查。单元测试**抓不到**这类缺陷：前端测试 mock 的是
+      # 前端自己写的路径，等于用错误验证错误。2026-09-23 实测发现 19 处路径
+      # 错配（告警规则/审计规则/SSO），且未注册路径会被 SPA 兜底返回
+      # 200 + HTML，只查状态码完全发现不了。
+      - name: API contract (frontend ↔ backend)
+        run: python scripts/check_api_contract.py
+
       - name: Doc↔Code reconcile
         run: python scripts/doc_reconcile.py
 
