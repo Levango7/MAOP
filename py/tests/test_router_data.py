@@ -255,17 +255,11 @@ class TestInfoEndpoints:
 
 
 # ── MCP ───────────────────────────────────────────────────────────
+# 2026-09-23：本模块的 GET /api/mcp/servers 与 /api/mcp/tools 已删除
+# （同路径重复注册，遮蔽了 routers/mcp.py 的 CRUD 实现，且响应形状
+# 与前端期望不符）。这两个端点的测试移至 test_mcp_route_crud.py。
+# 仅保留 /api/mcp（combined）——Tools.vue 消费它，形状兼容。
 class TestMcp:
-    def test_mcp_servers(self, client, mock_bridge):
-        resp = client.get("/api/mcp/servers")
-        assert resp.status_code == 200
-        assert len(resp.json()) == 1
-
-    def test_mcp_tools(self, client, mock_bridge):
-        resp = client.get("/api/mcp/tools")
-        assert resp.status_code == 200
-        assert len(resp.json()) == 1
-
     def test_mcp_combined(self, client, mock_bridge):
         resp = client.get("/api/mcp")
         assert resp.status_code == 200

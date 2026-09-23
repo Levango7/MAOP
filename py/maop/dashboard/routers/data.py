@@ -261,18 +261,17 @@ async def api_human_pending(request: Request) -> Any:
     return await data_service.get_human_pending()
 
 
-@router.get("/api/mcp/servers")
-@handle_api_errors("MCP servers", error_value={"status": "error", "error": "MCP servers unavailable"})
-async def api_mcp_servers(request: Request) -> Any:
-    require_admin(request)
-    return await data_service.get_mcp_servers()
-
-
-@router.get("/api/mcp/tools")
-@handle_api_errors("MCP tools", error_value={"status": "error", "error": "MCP tools unavailable"})
-async def api_mcp_tools(request: Request) -> Any:
-    require_admin(request)
-    return await data_service.get_mcp_tools()
+# 2026-09-23 移除：本模块此前的 ``GET /api/mcp/servers`` 与 ``GET /api/mcp/tools``
+# 是**同路径重复注册**（本项目第四次），遮蔽了 ``routers/mcp.py`` 的 CRUD 实现。
+# 两套实现指向**不同存储**：本模块经 DataProxy 读静态配置
+# ``config/mcp_servers.yaml``（裸数组、无 id、无状态字段）；
+# mcp.py 经 plugin_service/MCPHub（SQLite，含 id/status/tool_count）。
+# 前端 McpManager 是该路径唯一消费方，期望 hub 形状（``data.servers`` 取
+# ``{servers:[...]}`` 包装、``v-for :key="s.id"``、PUT ``/servers/{id}``）——
+# 被遮蔽的响应让服务器/工具列表**自始至终为空**（``data.servers`` 恒为
+# undefined），且新建的 PUT 端点永远拿不到 id 可打。
+# ``GET /api/mcp``（combined）保留：Tools.vue 消费它，且形状兼容。
+# 后续：把 mcp_discovery 发现的 YAML 服务器播种进 hub，使 omniroute 出现在 UI。
 
 
 @router.get("/api/mcp")
