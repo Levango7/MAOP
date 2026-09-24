@@ -9,7 +9,12 @@ legacy single-file implementation (``maop/core/tenant.py``) and wires in:
 
 Backward compatibility: the original API (``create_tenant``, ``get_tenant``,
 ``check_quota``, ``check_agent_access``, ``check_model_access``) is preserved
-verbatim so existing callers and ``maop.core.security.tenant`` keep working.
+verbatim so existing callers keep working.
+
+2026-09-25: ``maop.core.security.tenant`` 已删除 —— 它是本模块的**严格子集**
+（同类名同方法，本模块额外提供 ``rls`` / ``quota`` / ``audit``），且此前
+仅被测试引用。历史导入路径 ``from maop.core.security import TenantManager``
+仍可用，由 ``core/security/__init__.py`` 重定向到本模块。
 """
 
 from __future__ import annotations
