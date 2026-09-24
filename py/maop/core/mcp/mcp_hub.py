@@ -483,6 +483,15 @@ class MCPHub(MCPHubMetricsMixin, MCPHubOpsMixin, MCPHubCompatMixin):
             # 2026-09-23: 工具级并发上限。键与 /api/mcp/tools 暴露的 id 同构。
             # 仅当 limit > 0 时 acquire —— 0 表示不限制（前端徽章也以 0 为
             # "unlimited"）。default 只在显式配置过 limit 的工具上才可能生效。
+            #
+            # **语义：排队等待，超时才拒绝**（与上面 server 级一致，同为 30s）。
+            # 真实环境实测（2026-09-24）：服务端固定 sleep 3s，并发发 2 个调用 ——
+            #   limit=0 → 总耗时 3.14s（并发执行）
+            #   limit=1 → 总耗时 8.98s（串行化，2.86×）
+            # 即超出上限的调用会**等槽位**而非立即报错；只有等待超过
+            # ``_TOOL_ACQUIRE_TIMEOUT_S`` 才返回 is_error。
+            # 若产品期望"忙时立即拒绝"，需把超时改为 0 —— 那是语义变更，
+            # 不只是参数调整。
             tool_slot_key: str | None = None
             tool_key = self.tool_key(server_name, tool_name)
             tool_limit = self.get_tool_concurrency_limit(tool_key)
