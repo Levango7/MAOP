@@ -198,6 +198,24 @@ async def update_tool(tool_id: str, body: ToolLimitUpdate, request: Request) -> 
     return result
 
 
+@router.post("/sync-config")
+@handle_api_errors
+async def mcp_sync_config(request: Request) -> dict[str, Any]:
+    """从配置文件同步 MCP 服务器（幂等）。
+
+    2026-09-24 新增。``config/mcp_servers.yaml`` 头部承诺「servers MAOP can
+    connect to」，但此前**没有任何代码读它** —— ``MCPDiscovery`` 写好了却零调用方，
+    也没有启动播种路径，配置的服务器从未被连接（静默失效，无任何报错）。
+
+    dashboard 启动时会自动调用一次；本端点用于**手动重新同步**
+    （例如刚编辑过 YAML 而不想重启进程）。
+
+    幂等：按 name 跳过已注册的服务器，不会重新生成 id。
+    """
+    require_admin(request)
+    return {"status": "ok", **plugin_service.sync_mcp_config()}
+
+
 @router.get("/tools")
 @handle_api_errors
 async def list_tools(request: Request) -> dict[str, Any]:

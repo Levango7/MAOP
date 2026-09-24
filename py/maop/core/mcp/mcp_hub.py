@@ -686,6 +686,70 @@ class MCPHub(MCPHubMetricsMixin, MCPHubOpsMixin, MCPHubCompatMixin):
         """MCP 调用统计快照（供 ``GET /api/mcp/stats``）。"""
         return self._call_stats.snapshot(hours=hours)
 
+    # ── 2026-09-24: 从配置文件播种 ────────────────────────────────
+
+    def seed_from_config(self) -> dict[str, Any]:
+        """发现标准位置的 MCP 配置并注册**尚未注册**的服务器（幂等）。
+
+        为什么要这个方法
+        ----------------
+        ``config/mcp_servers.yaml`` 头部写明「servers MAOP can connect to」，
+        ``MCPDiscovery`` 也写好了（其 docstring 甚至给出预期用法
+        ``for cfg in configs: hub.add_server(cfg)``）—— 但**那段代码从来没被
+        实现**：``MCPDiscovery`` 与 ``ToolDiscovery`` 两个模块全仓**零调用方**，
+        也没有任何启动播种路径。结果是该配置**静默失效**：写进去的服务器
+        从未被连接，且没有任何报错提示。
+
+        幂等性（关键）
+        --------------
+        按 **name** 跳过已注册的服务器。不能用「每次全量 ``add_server``」
+        实现 —— ``add_server`` 内部是 ``DELETE WHERE name`` + INSERT 并
+        **重新生成 uuid**，每次启动都会让 id 漂移，破坏前端持有的 id
+        （McpManager 的 ``:key`` 与 ``PUT /servers/{id}`` 都依赖它）。
+
+        Returns
+        -------
+        dict
+            ``{"added": [...], "skipped": [...], "errors": [...], "found": int}``。
+        """
+        from maop.core.mcp.mcp_discovery import MCPDiscovery
+
+        try:
+            configs, report = MCPDiscovery(self._root).discover()
+        except Exception as exc:
+            logger.warning("[mcp_hub] seed_from_config: discovery failed: %s", exc, exc_info=True)
+            return {"added": [], "skipped": [], "errors": [str(exc)], "found": 0}
+
+        existing = {s.name for s in self.list_servers()}
+        added: list[str] = []
+        skipped: list[str] = []
+        for cfg in configs:
+            if cfg.name in existing:
+                skipped.append(cfg.name)
+                continue
+            try:
+                self.add_server(cfg)
+                added.append(cfg.name)
+                existing.add(cfg.name)
+            except Exception as exc:
+                report.errors.append(f"{cfg.name}: {exc}")
+                logger.warning(
+                    "[mcp_hub] seed_from_config: failed to register '%s': %s",
+                    cfg.name, exc, exc_info=True,
+                )
+
+        if added or report.errors:
+            logger.info(
+                "[mcp_hub] seed_from_config: found=%d added=%s skipped=%d errors=%d",
+                len(configs), added, len(skipped), len(report.errors),
+            )
+        return {
+            "added": added,
+            "skipped": skipped,
+            "errors": report.errors,
+            "found": len(configs),
+        }
+
     # ── δ-3: permission + audit helpers ──────────────────────────
 
 

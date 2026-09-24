@@ -496,6 +496,16 @@ def mcp_call_stats(hours: int = 24) -> dict[str, Any]:
     return hub.call_stats(hours=hours)
 
 
+def sync_mcp_config() -> dict[str, Any]:
+    """从 ``config/mcp_servers.yaml`` 等标准位置同步服务器配置（幂等）。
+
+    2026-09-24 新增：供 ``POST /api/mcp/sync-config`` 与 dashboard 启动时调用。
+    此前该配置**静默失效** —— 没有任何代码读它（详见 ``MCPHub.seed_from_config``）。
+    """
+    hub = _get_hub()
+    return hub.seed_from_config()
+
+
 async def call_tool(
     tool: str,
     arguments: dict[str, Any],

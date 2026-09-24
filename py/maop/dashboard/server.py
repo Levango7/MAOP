@@ -168,6 +168,27 @@ async def lifespan(app: FastAPI) -> Any:
         except Exception as exc:
             logger.warning("[lifespan] Failed to start log-rotate scheduler: %s", exc)
 
+    # ── 从 config/mcp_servers.yaml 播种 MCP 服务器 ──────────────
+    # 2026-09-24: 此前该配置文件**静默失效** —— MCPDiscovery 写好了却零调用方，
+    # 也没有任何启动播种路径，写在里面的服务器从未被连接。
+    #
+    # 门控在 _bg_enabled 下：seed_from_config 是「先查 name 再 add」，
+    # 多 worker 并发执行会出现「都查到不存在 → 都 INSERT」的竞态，
+    # 而 add_server 是 DELETE+INSERT，交错执行会留下同名重复行。
+    # 与 backup/logrotate 的多 worker 处理一致，只让单 worker 做。
+    if _bg_enabled:
+        try:
+            from maop.dashboard.services import plugin_service
+            _seeded = plugin_service.sync_mcp_config()
+            if _seeded.get("added") or _seeded.get("errors"):
+                logger.info(
+                    "[lifespan] MCP config seeded: added=%s errors=%s",
+                    _seeded.get("added"), _seeded.get("errors"),
+                )
+        except Exception as exc:
+            # 播种失败不应阻塞启动 —— 它只是配置同步，不是服务依赖
+            logger.warning("[lifespan] MCP config seed failed: %s", exc)
+
     try:
         yield
     finally:
