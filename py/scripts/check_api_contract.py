@@ -53,27 +53,16 @@ FRONTEND = REPO / "dashboard-enterprise" / "src"
 # 语义：新增错配会让 CI 失败；修好一项后请从本表删除（脚本会提示）。
 # key = (METHOD, 路径)，路径中路径参数写作 {}
 KNOWN_MISSING: dict[tuple[str, str], str] = {
-    # ── 真实功能缺口（后端无实现，需产品决策）────────────────────────
-    # 2026-09-23 已实现的 4 项已从本表移除：
-    #   DELETE /api/model-gateway/usage（clear_daily_usage，清内存+SQLite）
-    #   PUT    /api/mcp/servers/{}     （hub.update_server，保留 id）
+    # ── 真实功能缺口 ───────────────────────────────────────────────
+    # 2026-09-23 已实现的 7 项已全部从本表移除：
+    #   DELETE /api/model-gateway/usage        （clear_daily_usage，清内存+SQLite）
+    #   PUT    /api/mcp/servers/{}             （hub.update_server，保留 id）
     #   PUT    /api/model-gateway/permissions/{}（复用 add_permission 的 upsert）
-    #   GET    /api/mcp/topology       （servers/tools/agents/edges 聚合）
-    ("GET", "/api/mcp/stats"):
-        "McpManager 用量统计。需要定义统计口径（时间窗/聚合维度）才能落地："
-        "MCP 调用目前只经过 /api/mcp/call，没有任何调用计数或时序存储。"
-        "实现它要先决定「统计什么」，属产品决策，故暂缓。",
-    ("PUT", "/api/mcp/tools/{}"):
-        "McpManager 编辑工具的并发上限。**MCPTool 模型没有 concurrency_limit "
-        "字段**（只有 name/description/input_schema/server_name），也没有 id；"
-        "且不存在任何并发限制的执行点 —— 加个字段只是存个数字，不会真生效。"
-        "要落地需先定并发控制的语义与执行位置，属设计决策，故暂缓。",
-    ("GET", "/api/hooks/{}/history"):
-        "Webhooks「投递历史」面板。hooks.py 无投递记录存储：目前 webhook 触发后"
-        "只记日志/即时响应，没有落库，因此「历史」无从查起。"
-        "需先设计投递记录表（何时落、保留多久），故暂缓。"
-        "该调用带 try/catch 降级（仅面板内报错，不崩页面），影响较小。",
-
+    #   GET    /api/mcp/topology               （servers/tools/agents/edges 聚合）
+    #   GET    /api/mcp/stats                  （MCPCallStats 按小时分桶，call_tool 采集）
+    #   PUT    /api/mcp/tools/{}               （mcp_tool_limits 表 + call_tool 真实限流）
+    #   GET    /api/hooks/{}/history           （hook_logs 表 + response_code 结构化字段）
+    #
     # ── 假阳性（动态拼接，非真实错配）──────────────────────────────
     ("POST", "/api/control/{}"):
         "假阳性：ControlPanel.vue 用 `/api/control/${action}` 动态派发，"

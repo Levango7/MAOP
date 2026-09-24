@@ -347,6 +347,37 @@ def hook_logs(mgr: Any, event: str, limit: int) -> list[Any]:
     return mgr.get_logs(event=event or "", limit=limit)
 
 
+def hook_history(mgr: Any, hook_id: str, limit: int = 100) -> dict[str, Any]:
+    """获取单个 hook 的投递历史（最新的在前）。
+
+    2026-09-23 新增：供 ``GET /api/hooks/{hook_id}/history`` 使用。
+    与 ``hook_logs``（按 event 过滤）的区别：本函数按 **hook_id** 过滤，
+    这正是前端「投递历史」面板所需——它只看单个 hook 的投递记录。
+
+    Returns
+    -------
+    dict
+        ``{"records": [...], "count": int}``。每条含
+        ``id/time/event/status/latency_ms/response_code``（另附原始字段）。
+    """
+    rows = mgr.get_logs(event="", limit=limit, hook_id=hook_id)
+    records = [
+        {
+            "id": r.get("id", ""),
+            "time": r.get("created_at", ""),
+            "event": r.get("event", ""),
+            # 前端 deliveryStatus() 依据 success 判定 ok/failed
+            "success": bool(r.get("success", 0)),
+            "status": "ok" if r.get("success", 0) else "failed",
+            "latency_ms": r.get("duration_ms", 0) or 0,
+            "response_code": r.get("response_code", 0) or 0,
+            "error": r.get("error", "") or "",
+        }
+        for r in rows
+    ]
+    return {"records": records, "count": len(records)}
+
+
 def hook_events() -> list[dict[str, str]]:
     """列出所有可用的 lifecycle 事件类型.
 

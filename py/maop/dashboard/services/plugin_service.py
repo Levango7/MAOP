@@ -435,13 +435,65 @@ def remove_server(server_name: str) -> bool:
 
 
 def list_tools() -> dict[str, Any]:
-    """列出所有 MCP 工具。返回 ``{"tools": ..., "count": int}``。"""
+    """列出所有 MCP 工具。返回 ``{"tools": ..., "count": int}``。
+
+    2026-09-23：为每个工具补 ``id`` 与 ``concurrency_limit``。
+
+    ``MCPTool`` 模型只有 name/description/input_schema/server_name ——
+    **既无 id 也无并发上限字段**。而前端 McpManager 需要：
+    - ``id``：``v-for :key`` 与 ``PUT /api/mcp/tools/{id}`` 的定位依据
+    - ``concurrency_limit``：并发上限输入框的初值（0 = 不限）
+
+    故在此合成 id（``{server_name}:{name}``，与 hub 的 limit 主键同构），
+    并从 ``mcp_tool_limits`` 表读取上限。若不补，前端拿到的 ``tool.id`` 为
+    undefined，PUT 根本打不出去。
+    """
     hub = _get_hub()
     tools = hub.all_tools()
-    return {
-        "tools": [t.model_dump() if hasattr(t, "model_dump") else str(t) for t in tools],
-        "count": len(tools),
+    try:
+        limits = hub.list_tool_concurrency_limits()
+    except Exception:  # 旧库/替身 hub 无此方法时降级为"全部不限"
+        limits = {}
+
+    out: list[dict[str, Any]] = []
+    for t in tools:
+        d = t.model_dump() if hasattr(t, "model_dump") else dict(t)
+        key = f"{d.get('server_name', '')}:{d.get('name', '')}"
+        d["id"] = key
+        d["concurrency_limit"] = limits.get(key, 0)
+        out.append(d)
+    return {"tools": out, "count": len(out)}
+
+
+def update_tool_concurrency(tool_id: str, concurrency_limit: int) -> dict[str, Any] | None:
+    """设置工具的并发上限（0 = 不限）。返回 ``None`` 表示该工具不存在。
+
+    2026-09-23 新增：前端 McpManager 的「并发限制」输入框调用
+    ``PUT /api/mcp/tools/{id}``，此前后端无实现。
+
+    ``tool_id`` 即 ``{server_name}:{tool_name}`` —— 直接作为 ``mcp_tool_limits``
+    的主键，无需拆分（拆分会在工具名含 ``:`` 时出错）。
+    """
+    hub = _get_hub()
+    # 校验工具存在，避免为拼错的 id 建出无意义的限流记录
+    known = {
+        f"{t.get('server_name', '')}:{t.get('name', '')}"
+        for t in list_tools()["tools"]
     }
+    if tool_id not in known:
+        return None
+    limit = hub.set_tool_concurrency_limit(tool_id, concurrency_limit)
+    return {"status": "ok", "tool": tool_id, "concurrency_limit": limit}
+
+
+def mcp_call_stats(hours: int = 24) -> dict[str, Any]:
+    """MCP 调用统计（供 ``GET /api/mcp/stats``）。
+
+    2026-09-23 新增：前端 McpManager 的统计面板调用本端点，此前后端无实现。
+    数据来自 ``MCPHub._call_stats``（按小时分桶的内存计数器）。
+    """
+    hub = _get_hub()
+    return hub.call_stats(hours=hours)
 
 
 async def call_tool(

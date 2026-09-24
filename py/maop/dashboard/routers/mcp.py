@@ -40,6 +40,15 @@ class ToolCallRequest(BaseModel):
     arguments: dict[str, Any] = {}
 
 
+class ToolLimitUpdate(BaseModel):
+    """``PUT /api/mcp/tools/{tool_id}`` 请求体。
+
+    2026-09-23 新增。前端只发 ``{concurrency_limit}``。
+    """
+
+    concurrency_limit: int = 0
+
+
 # ── 单例转发（供测试注入，转发到 service 层）──────────────────────
 # 保留模块级 ``_mcp_hub`` / ``_mcp_marketplace`` 作为兼容属性：
 # 实际单例由 service 持有，此处仅转发访问器。
@@ -149,6 +158,44 @@ async def mcp_topology(request: Request) -> dict[str, Any]:
     """
     require_admin(request)
     return {"status": "ok", **plugin_service.topology()}
+
+
+@router.get("/stats")
+@handle_api_errors
+async def mcp_stats(request: Request, hours: int = 24) -> dict[str, Any]:
+    """MCP 调用统计（按小时分桶 + 按工具聚合）。
+
+    2026-09-23 新增：McpManager 的统计面板调用本端点，此前后端无实现 ——
+    请求落到 SPA 兜底返回 200 + HTML，前端报 "Unexpected token '<'"。
+
+    数据在 ``MCPHub.call_tool`` 的 finally 块采集（覆盖成功 / JSON-RPC 错误 /
+    tool-level 错误 / 传输异常四条路径），存于 ``MCPHub._call_stats``。
+    仅统计**真正发起传输**的调用：server/tool 级限流拒绝的调用未触达服务端，
+    不计入工具性能统计。
+    """
+    require_admin(request)
+    return {"status": "ok", **plugin_service.mcp_call_stats(hours=hours)}
+
+
+@router.put("/tools/{tool_id}")
+@handle_api_errors
+async def update_tool(tool_id: str, body: ToolLimitUpdate, request: Request) -> dict[str, Any]:
+    """设置工具的并发上限（0 = 不限）。
+
+    2026-09-23 新增：前端 McpManager 的「并发限制」输入框调用本端点，
+    此前后端无实现（``MCPTool`` 模型里连 ``concurrency_limit`` 字段都没有）。
+
+    ``tool_id`` 形如 ``{server_name}:{tool_name}``，与 ``GET /api/mcp/tools``
+    返回的 ``id`` 同构 —— 直接作为限流表主键，无需拆分。
+
+    限制由 ``MCPHub.call_tool`` 真正执行：limit > 0 时按工具 acquire 槽位，
+    超出即返回 ``is_error`` 结果。
+    """
+    require_admin(request)
+    result = plugin_service.update_tool_concurrency(tool_id, body.concurrency_limit)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Tool {tool_id} not found")
+    return result
 
 
 @router.get("/tools")

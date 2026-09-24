@@ -141,6 +141,11 @@ class HookResult(BaseModel):
     error: str = ""
     duration_ms: int = 0
     response: str = ""
+    # 2026-09-23: HTTP 状态码（结构化字段）。
+    # 此前状态码只以字符串形式塞在 ``response``（"HTTP 200"）里，
+    # 前端「投递历史」需要可排序/可判断的数字。0 = 未发起 HTTP（如 callback
+    # 类型、SSRF 拦截、httpx 缺失）或未收到响应。
+    response_code: int = 0
     decision: str = "allow"  # allow | deny | modify
     modified_data: dict[str, Any] = Field(default_factory=dict)
 
@@ -226,6 +231,21 @@ class HookManager:
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_hook_logs_event
                 ON hook_logs(event, created_at)
+            """)
+            # 2026-09-23: hook_logs 增加 response_code 列（供「投递历史」显示
+            # HTTP 状态码）。旧库走 ALTER TABLE 迁移，与上面 callback_path 同法。
+            try:
+                log_cols = [r[1] for r in conn.execute("PRAGMA table_info(hook_logs)").fetchall()]
+                if "response_code" not in log_cols:
+                    conn.execute("ALTER TABLE hook_logs ADD COLUMN response_code INTEGER DEFAULT 0")
+            except Exception as exc:
+                logger.warning(
+                    "[hook_manager] hook_logs migration failed, continuing: %s",
+                    exc, exc_info=True,
+                )
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_hook_logs_hook_id
+                ON hook_logs(hook_id, created_at)
             """)
 
     def _reload_persisted_callbacks(self) -> None:
@@ -514,6 +534,7 @@ class HookManager:
                 hook_id=hdef.id, event=event,
                 success=200 <= resp.status_code < 300,
                 response=f"HTTP {resp.status_code}",
+                response_code=resp.status_code,
             )
         except Exception as exc:
             return HookResult(hook_id=hdef.id, event=event, success=False, error=str(exc))
@@ -547,17 +568,41 @@ class HookManager:
             created_at=row["created_at"], source=row["source"],
         )
 
-    def get_logs(self, event: str = "", limit: int = 100) -> list[dict]:
+    def get_logs(
+        self,
+        event: str = "",
+        limit: int = 100,
+        hook_id: str = "",
+    ) -> list[dict]:
+        """查询 hook 执行日志（最新的在前）。
+
+        Parameters
+        ----------
+        event : str
+            按事件名过滤；空则不过滤。
+        limit : int
+            返回上限。
+        hook_id : str
+            按 hook id 过滤；空则不过滤。
+            2026-09-23 新增：供 ``GET /api/hooks/{id}/history`` 使用。
+            此前只能按 event 过滤（``/api/hook/logs``），而前端「投递历史」
+            面板是**按单个 hook** 查看的，按 event 过滤会混入同事件的其他 hook。
+        """
+        clauses: list[str] = []
+        params: list[Any] = []
+        if event:
+            clauses.append("event = ?")
+            params.append(event)
+        if hook_id:
+            clauses.append("hook_id = ?")
+            params.append(hook_id)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(limit)
         with sqlite_connect(self._db_path) as conn:
-            if event:
-                rows = conn.execute(
-                    "SELECT * FROM hook_logs WHERE event=? ORDER BY created_at DESC LIMIT ?",
-                    (event, limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM hook_logs ORDER BY created_at DESC LIMIT ?", (limit,),
-                ).fetchall()
+            rows = conn.execute(
+                f"SELECT * FROM hook_logs{where} ORDER BY created_at DESC LIMIT ?",
+                tuple(params),
+            ).fetchall()
         return [dict(r) for r in rows]
 
     # ── EventBus Bridge ────────────────────────────────────────
@@ -700,10 +745,10 @@ class HookManager:
         try:
             with sqlite_connect(self._db_path) as conn:
                 conn.execute(
-                    "INSERT INTO hook_logs (id, hook_id, event, success, error, duration_ms, created_at) VALUES (?,?,?,?,?,?,?)",
+                    "INSERT INTO hook_logs (id, hook_id, event, success, error, duration_ms, created_at, response_code) VALUES (?,?,?,?,?,?,?,?)",
                     (log_id, result.hook_id, result.event,
                      1 if result.success else 0, result.error,
-                     result.duration_ms, now),
+                     result.duration_ms, now, result.response_code),
                 )
         except Exception as exc:
             logger.warning(

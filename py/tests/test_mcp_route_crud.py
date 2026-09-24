@@ -18,7 +18,6 @@ from fastapi.testclient import TestClient
 from maop.dashboard.routers import mcp as mcp_route
 from maop.dashboard.services import plugin_service
 
-
 # ── Fixtures ─────────────────────────────────────────────────────
 
 

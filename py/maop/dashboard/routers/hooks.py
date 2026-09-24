@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
@@ -297,6 +297,31 @@ async def api_hooks_test(hook_id: str, request: Request) -> HookTestResponse:
     except KeyError as exc:
         raise HTTPException(404, str(exc))
     return HookTestResponse(hook_id=hook_id, **result)
+
+
+@router.get("/api/hooks/{hook_id}/history")
+@handle_api_errors("Hook history", error_value={"status": "error", "records": [], "count": 0})
+async def api_hooks_history(
+    hook_id: str,
+    request: Request,
+    limit: int = Query(100, ge=1, le=1000),
+) -> dict[str, Any]:
+    """单个 hook 的投递历史（最新的在前）。
+
+    2026-09-23 新增：前端 Webhooks 的「投递历史」面板调用本端点，但后端
+    此前没有 —— 请求落到 SPA 兜底返回 200 + HTML，前端报
+    "Unexpected token '<'"（该调用带 try/catch 降级，故只表现为面板内报错）。
+
+    数据来自 ``hook_logs`` 表（``HookManager._log_result`` 在**成功与异常
+    两条路径**都写入），本端点只做按 ``hook_id`` 的过滤与字段整形。
+    与既有 ``/api/hook/logs`` 的区别：后者按 **event** 过滤，会混入同事件的
+    其他 hook，不适合单 hook 的历史视图。
+    """
+    require_admin(request)
+    mgr = _get_hook_mgr()
+    if mgr.get_hook(hook_id) is None:
+        raise HTTPException(404, f"Hook {hook_id} not found")
+    return {"status": "ok", **execution_service.hook_history(mgr, hook_id, limit)}
 
 
 @router.post("/api/hooks/{hook_id}/enable")
