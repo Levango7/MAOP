@@ -73,9 +73,12 @@
 
 输出三类候选供人工分诊：
 
-  - ``ORPHAN``     —— 无任何导入方（既无运行时也无测试）
-  - ``TEST_ONLY``  —— 仅被 tests/ 导入（最隐蔽：测试全绿但用户碰不到）
-  - ``DEAD_CHAIN`` —— 仅被其他未接线模块导入
+  - ``ORPHAN``        —— 无任何导入方（既无运行时、无测试、也不被包 re-export）
+  - ``TEST_ONLY``     —— 仅被 tests/ 导入（最隐蔽：测试全绿但用户碰不到）
+  - ``EXPORTED_ONLY`` —— 仅被包的 ``__init__`` 真实 import（可通过包名导入，
+                         但**没有任何直接消费者**）。与 ORPHAN 必须区分：
+                         前者"能用但没人用"，后者"彻底无人引用"。
+  - ``DEAD_CHAIN``    —— 仅被其他未接线模块导入
 
 ``KNOWN_UNWIRED`` 中登记的是**已人工取证确认**的未接线模块（含原因与后续打算）。
 """
@@ -255,11 +258,29 @@ def main() -> int:
                 continue
             test_imported |= _imports_of(path)
 
+    # 只被包的 __init__ 真实 import 的模块（re-export 但无直接消费者）。
+    # 单列一类而不是并进 ORPHAN：前者"可通过包名导入"，后者"彻底无人引用"，
+    # 分诊结论完全不同。实测若混为一谈，会把 `core/tenant/*` 误报为死代码 ——
+    # 而 `maop.core.tenant` 实际被 routers/compliance.py 与
+    # services/rbac_service.py 使用，只是用的不是这几个子模块。
+    exported_only: set[str] = set()
+    for path in sorted((PY_ROOT / "maop").rglob("__init__.py")):
+        if "__pycache__" in path.parts:
+            continue
+        for dep in _imports_of(path):
+            if dep != _module_name(path):
+                exported_only.add(dep)
+
     unwired: dict[str, str] = {}
     for mod in sorted(core):
         if runtime_importers.get(mod):
             continue
-        unwired[mod] = "TEST_ONLY" if mod in test_imported else "ORPHAN"
+        if mod in test_imported:
+            unwired[mod] = "TEST_ONLY"
+        elif mod in exported_only:
+            unwired[mod] = "EXPORTED_ONLY"
+        else:
+            unwired[mod] = "ORPHAN"
 
     # 传递性分析（迭代到不动点）：
     # 若某模块的**全部**运行时导入方本身都未接线，那它同样不可达
