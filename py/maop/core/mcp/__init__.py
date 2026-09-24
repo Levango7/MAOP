@@ -1,21 +1,25 @@
 """MCP (Model Context Protocol) subpackage.
 
-MCP 协议相关：hub、传输、适配、缓存、并发、发现、市场、权限、审计、
-工具签名（Ed25519）、工具发现（本地+远程 registry）。
+MCP 协议相关：hub、传输、适配、缓存、并发、发现、市场、权限、审计。
+
+2026-09-25：原 ``tool_signing``（Ed25519 工具签名）与 ``tool_discovery``
+（工具发现）已删除 —— 二者与 ``maop.core.marketplace.*`` 功能重叠且从未接线。
+签名能力统一到 :mod:`maop.core.marketplace.signing`（含密钥轮换/吊销的
+:mod:`~maop.core.marketplace.key_management`）；唯一的功能补充
+（PEM 一站式密钥生成 :func:`~maop.core.marketplace.signing.generate_keypair`）
+已移植过去。工具发现能力由 ``MCPHub.seed_from_config`` 与
+``/api/mcp/tools`` 承担。
 
 Modules:
     mcp_hub, mcp_hub_types, mcp_hub_transport, mcp_adapter, mcp_cache,
-    mcp_concurrency, mcp_discovery, mcp_marketplace, mcp_permission, mcp_audit,
-    tool_signing, tool_discovery
+    mcp_concurrency, mcp_discovery, mcp_marketplace, mcp_permission, mcp_audit
 """
 from __future__ import annotations
 
 import importlib
 
 __all__ = [
-    "DiscoveredTool",
     "DiscoveryReport",
-    "DiscoverySource",
     "MCPAdapter",
     "MCPAuditLogger",
     "MCPAuditRecord",
@@ -41,17 +45,10 @@ __all__ = [
     "ResourceContent",
     "ServerInfo",
     "ServerStatus",
-    "ToolDiscovery",
     "ToolResult",
-    "ToolSignatureError",
-    "ToolSigner",
     "TransportType",
-    "canonical_bytes",
-    "generate_keypair",
     "hash_arguments",
     "logger",
-    "sign_bytes",
-    "verify_bytes",
 ]
 
 # 符号 → 子模块名映射（惰性加载用，含私有符号）
@@ -99,16 +96,7 @@ _SYMBOL_TO_MODULE: dict[str, str] = {
     "_MCP_AUDIT_DDL": "mcp_audit",
     "hash_arguments": "mcp_audit",
     "MCPAuditLogger": "mcp_audit",
-    "ToolSigner": "tool_signing",
-    "ToolSignatureError": "tool_signing",
-    "generate_keypair": "tool_signing",
-    "sign_bytes": "tool_signing",
-    "verify_bytes": "tool_signing",
-    "canonical_bytes": "tool_signing",
-    "DiscoverySource": "tool_discovery",
-    "DiscoveredTool": "tool_discovery",
 
-    "ToolDiscovery": "tool_discovery",
 }
 
 

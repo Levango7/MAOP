@@ -696,7 +696,8 @@ class MCPHub(MCPHubMetricsMixin, MCPHubOpsMixin, MCPHubCompatMixin):
         ``config/mcp_servers.yaml`` 头部写明「servers MAOP can connect to」，
         ``MCPDiscovery`` 也写好了（其 docstring 甚至给出预期用法
         ``for cfg in configs: hub.add_server(cfg)``）—— 但**那段代码从来没被
-        实现**：``MCPDiscovery`` 与 ``ToolDiscovery`` 两个模块全仓**零调用方**，
+        实现**：``MCPDiscovery`` 全仓原本零调用方（``ToolDiscovery`` 已于
+        2026-09-25 作为重叠实现删除），
         也没有任何启动播种路径。结果是该配置**静默失效**：写进去的服务器
         从未被连接，且没有任何报错提示。
 

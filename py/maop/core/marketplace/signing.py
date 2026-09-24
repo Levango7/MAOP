@@ -8,7 +8,7 @@
    ``tests/test_marketplace_f301.py`` 导入（该测试全绿，覆盖签名往返 /
    篡改拒绝 / 错误密钥拒绝 / 畸形签名拒绝）。
 
-   功能完整且设计较 :mod:`maop.core.mcp.tool_signing` 更完善，但没有任何
+   功能完整（2026-09-25 起是仓库内**唯一**的 Ed25519 工具/包签名实现），但没有任何
    用户可达路径。已上线的 :mod:`maop.core.mcp.mcp_marketplace` **不认识
    signature 字段**（其信任模型是 SHA-256 checksum + ``trusted`` 注册表标志），
    因此本模块与线上安装路径之间**没有集成点**。
@@ -133,6 +133,29 @@ def load_public_key_from_bytes(pem_bytes: bytes) -> Ed25519PublicKey:
     return cast(
         Ed25519PublicKey,
         serialization.load_pem_public_key(pem_bytes),
+    )
+
+
+def generate_keypair() -> tuple[str, str]:
+    """Generate a fresh key pair and return it as ``(private_pem, public_pem)``.
+
+    2026-09-25 从已删除的 ``maop.core.mcp.tool_signing`` 移植过来 ——
+    那是该模块相对本模块**唯一**的功能补充：本模块原本只有
+    :func:`generate_key_pair`（返回密钥**对象**），调用方还要再走
+    ``private_key_to_pem`` / ``public_key_to_pem`` 两步才能得到可存储、
+    可传输的 PEM 字符串。签发流程（生成 → 存盘 → 分发）几乎总是需要 PEM，
+    故补这一站式入口。
+
+    Returns
+    -------
+    tuple of (str, str)
+        ``(private_pem, public_pem)`` —— PKCS8 / SubjectPublicKeyInfo 编码，
+        UTF-8 字符串形式（可直接写入文件或存入 :mod:`key_management`）。
+    """
+    private_key, public_key = generate_key_pair()
+    return (
+        private_key_to_pem(private_key).decode("utf-8"),
+        public_key_to_pem(public_key).decode("utf-8"),
     )
 
 

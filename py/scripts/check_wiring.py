@@ -5,13 +5,18 @@
 本项目反复出现同一类问题：**模块实现完整、测试齐全，但零运行时调用方**。
 实例（2026-09-24 排查，AST 取证）：
 
-  - ``core/marketplace/signing.py``      349 行  —— 零导入方
+  - ``core/marketplace/signing.py``      349+ 行 —— 零导入方
   - ``core/marketplace/key_management.py`` 545 行 —— 零导入方
   - ``core/marketplace/sandbox.py``      507 行  —— 零导入方
   - ``core/mcp/tool_signing.py``         207 行  —— 仅被下一条导入
   - ``core/mcp/tool_discovery.py``       293 行  —— 零导入方
 
 合计 **1,901 行**，全部有通过测试，全部从未被任何运行时路径调用。
+
+2026-09-25 后续：``tool_signing.py`` 与 ``tool_discovery.py``（共 500 行）
+经逐项比对确认与 ``core/marketplace/*`` **功能完全重叠**且无任何独有补充，
+已删除；唯一有价值的补充（PEM 一站式密钥生成）已移植为
+``marketplace.signing.generate_keypair``。现剩三件套 1,401 行待排期接入。
 
 危害不在于"代码白写了"，而在于**制造虚假信心**：
   - 测试全绿 ⇒ 读者以为该能力已上线
@@ -109,17 +114,9 @@ KNOWN_UNWIRED: dict[str, str] = {
         "**已复核：线上代码未使用 os.environ.copy()**（全仓仅本模块注释提及），"
         "故当前无实际泄漏 —— 但也意味着该防护并未生效。"
     ),
-    "maop.core.mcp.tool_signing": (
-        "MCP 工具清单 Ed25519 签名。仅被 tool_discovery 导入（传递性死代码）。"
-        "注意与 core/marketplace/signing.py 是**两套并存**的签名实现，接入前需先统一。"
-    ),
-    "maop.core.mcp.tool_discovery": (
-        "本地+远端工具发现（含签名校验）。35 项测试通过，零运行时导入方，"
-        "且无配置入口（没有签名公钥的配置面）。"
-        "ROADMAP.md:173 的签名校验项指的是**阶段三 Agent Marketplace**"
-        "（agent 配置/prompt 模板），与本模块的 MCP 工具签名不是同一件事 ——"
-        "故未被任何已排期路线图项覆盖。待决策：接入，或删除。"
-    ),
+    # 2026-09-25 已删除（不再需要登记）：maop.core.mcp.tool_signing 与
+    # maop.core.mcp.tool_discovery。逐项比对后确认与 marketplace 三件套
+    # 完全重叠，无独有补充；唯一有价值的 PEM 一站式生成已移植进 signing.py。
 }
 
 

@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives import serialization
 
 from maop.core.marketplace.sandbox import (
     _BLOCKED_ENV_VARS,
@@ -28,7 +29,9 @@ from maop.core.marketplace.signing import (
     PackageVerifier,
     SignatureError,
     generate_key_pair,
+    generate_keypair,
     load_public_key,
+    load_public_key_from_bytes,
     private_key_to_pem,
     public_key_to_pem,
     sign_payload,
@@ -47,6 +50,32 @@ class TestEd25519Signing:
         payload = {"name": "test-plugin", "version": "1.0.0", "author": "tester"}
         signature_hex = sign_payload(payload, private_key)
         assert verify(payload, signature_hex, public_key) is True
+
+    def test_generate_keypair_pem_roundtrip(self):
+        """``generate_keypair`` 一站式产出 PEM，且可直接用于签名/验签。
+
+        2026-09-25 从已删除的 ``maop.core.mcp.tool_signing`` 移植过来 ——
+        原模块相对本模块唯一的功能补充。签发流程（生成 → 存盘 → 分发）
+        几乎总是需要 PEM，故补这一站式入口。
+        """
+        private_pem, public_pem = generate_keypair()
+        assert private_pem.startswith("-----BEGIN PRIVATE KEY-----")
+        assert public_pem.startswith("-----BEGIN PUBLIC KEY-----")
+
+        loaded_private = serialization.load_pem_private_key(
+            private_pem.encode("utf-8"), password=None,
+        )
+        loaded_public = load_public_key_from_bytes(public_pem.encode("utf-8"))
+
+        payload = {"name": "test-plugin", "version": "1.0.0"}
+        signature_hex = sign_payload(payload, loaded_private)
+        assert verify(payload, signature_hex, loaded_public) is True
+
+    def test_generate_keypair_pem_is_fresh_each_call(self):
+        """每次调用应产生**不同**的密钥对（否则是重用了固定种子）。"""
+        a_priv, _ = generate_keypair()
+        b_priv, _ = generate_keypair()
+        assert a_priv != b_priv
 
     def test_tampered_payload_rejected(self):
         """Tampering with the payload after signing fails verification."""
