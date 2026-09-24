@@ -1,5 +1,20 @@
 """Marketplace sandbox — isolated execution with whitelist environment.
 
+.. warning::
+
+   **本模块未接入任何运行时路径（2026-09-24 取证）。**
+
+   AST 导入分析确认：全仓**零运行时导入方**，仅被
+   ``tests/test_marketplace_f301.py`` 导入（测试全绿，覆盖白名单剥离
+   JWT_SECRET / DB_PASSWORD / API_KEY）。
+
+   **已复核：当前无实际密钥泄漏。** 全仓搜索 ``os.environ.copy()`` 仅命中
+   本模块自身的注释（说明它替换了什么），线上代码并未使用该危险写法。
+   换言之：**没有漏洞，但这份防护也没生效** —— 它是为未来的沙箱执行路径
+   准备的，而那条路径尚未接入本模块。
+
+   登记于 ``scripts/check_wiring.py`` 的 ``KNOWN_UNWIRED``。
+
 G-02 security fix: replaces ``os.environ.copy()`` (which leaks *all*
 environment variables including JWT_SECRET, DB_PASSWORD, API_KEY, etc.
 into sandboxed subprocesses) with a strict whitelist policy.

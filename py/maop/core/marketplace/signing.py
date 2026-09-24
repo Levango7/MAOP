@@ -1,5 +1,25 @@
 """Marketplace package signing — Ed25519 asymmetric signature verification.
 
+.. warning::
+
+   **本模块未接入任何运行时路径（2026-09-24 取证）。**
+
+   AST 导入分析确认：全仓**零运行时导入方**，仅被
+   ``tests/test_marketplace_f301.py`` 导入（该测试全绿，覆盖签名往返 /
+   篡改拒绝 / 错误密钥拒绝 / 畸形签名拒绝）。
+
+   功能完整且设计较 :mod:`maop.core.mcp.tool_signing` 更完善，但没有任何
+   用户可达路径。已上线的 :mod:`maop.core.mcp.mcp_marketplace` **不认识
+   signature 字段**（其信任模型是 SHA-256 checksum + ``trusted`` 注册表标志），
+   因此本模块与线上安装路径之间**没有集成点**。
+
+   接入时**必须同时接入** :mod:`maop.core.marketplace.key_management`
+   —— 否则密钥无法轮换 / 吊销，一次泄露就只能改代码。
+
+   状态：待决策。ROADMAP.md:173 把签名校验列为**阶段三**（Month 10–21）
+   的 Agent Marketplace 事项且标注「仍待排期」，故尚未排期。
+   登记于 ``scripts/check_wiring.py`` 的 ``KNOWN_UNWIRED``。
+
 G-01 security fix: replaces the previous HMAC-SHA256 symmetric scheme with
 Ed25519 asymmetric signatures. This allows:
 

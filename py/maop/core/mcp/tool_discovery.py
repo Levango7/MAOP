@@ -1,5 +1,23 @@
 """MAOP Tool Discovery — unified local + remote tool discovery with signature checks.
 
+.. warning::
+
+   **本模块未接入任何运行时路径（2026-09-24 取证）。**
+
+   AST 导入分析 + 人工复核确认：全仓**零运行时导入方**，仅被
+   ``tests/test_tool_market.py`` 导入。功能与测试均完整（35 项测试通过），
+   但没有任何用户可达路径，也**没有配置入口**（不存在签名公钥的配置面）。
+
+   **请勿据此认为「MCP 工具签名已可用」** —— 测试全绿与功能可用是正交的。
+
+   与 :mod:`maop.core.marketplace.signing` 是**两套并存**的 Ed25519 实现，
+   且后者设计更完整（含密钥轮换 / 吊销 / 黑名单，见
+   :mod:`maop.core.marketplace.key_management`）。接入前需先统一。
+
+   状态：待决策（接入 MCP marketplace 安装路径，或随
+   ``tool_signing.py`` 一并删除）。登记于 ``scripts/check_wiring.py``
+   的 ``KNOWN_UNWIRED``。
+
 ``ToolDiscovery`` aggregates MCP tool definitions from two sources:
 
   1. **Local** — scans the project's ``config/mcp_servers.yaml`` and the

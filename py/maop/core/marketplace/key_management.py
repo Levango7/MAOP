@@ -1,5 +1,19 @@
 """Marketplace key management — distribution, rotation, and revocation.
 
+.. warning::
+
+   **本模块未接入任何运行时路径（2026-09-24 取证）。**
+
+   AST 导入分析确认：全仓**零运行时导入方**，仅被
+   ``tests/test_marketplace_key_mgmt.py`` 导入（测试全绿，覆盖注册 /
+   轮换宽限期 / 吊销 / 黑名单 / 单工具多密钥共存）。
+
+   它是 :mod:`maop.core.marketplace.signing` 的配套件。**接入签名校验前
+   必须先接入本模块** —— 否则密钥无法轮换与吊销，一旦泄露就只能改代码发布。
+   当前两者均未接入，故整个签名体系对用户不可达。
+
+   登记于 ``scripts/check_wiring.py`` 的 ``KNOWN_UNWIRED``。
+
 Provides three capabilities for Marketplace package signing keys:
 
   * **Key distribution** — developers upload Ed25519 public keys; the

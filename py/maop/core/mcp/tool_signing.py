@@ -1,5 +1,19 @@
 """MAOP Tool Signing — Ed25519 signature generation & verification for MCP tools.
 
+.. warning::
+
+   **本模块未接入任何运行时路径（2026-09-24 取证）。**
+
+   AST 导入分析确认：唯一的导入方是 :mod:`maop.core.mcp.tool_discovery`，
+   而该模块本身也零运行时导入方 —— 即本模块属**传递性死代码**。
+   仅被 ``tests/test_tool_market.py`` 导入。
+
+   与 :mod:`maop.core.marketplace.signing` 是**两套并存**的 Ed25519 实现。
+   后者设计更完整（配 :mod:`~maop.core.marketplace.key_management` 提供
+   密钥轮换 / 吊销 / 黑名单），建议以 marketplace 那套为准，本模块待删。
+
+   登记于 ``scripts/check_wiring.py`` 的 ``KNOWN_UNWIRED``。
+
 Tools distributed through the marketplace carry a cryptographic signature so
 installers can verify they come from a trusted publisher and haven't been
 tampered with.  This module implements Ed25519 signing (RFC 8032) via the
