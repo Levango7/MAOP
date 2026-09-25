@@ -30,10 +30,9 @@ dependencies = [
     #   PYSEC-2026-3036/3037 fixed in 0.0.30, PYSEC-2026-3040 in 0.0.31.
     "python-multipart>=0.0.31",
     "alembic>=1.13.0",
-    # - P0-C CVE audit (2026-08-26): floor raised to 3.14.3 — covers all 14
-    #   aiohttp CVEs reported against 3.13.5 (fixes span 3.14.0 ~ 3.14.3,
-    #   highest being PYSEC-2026-3545/CVE-2026-69244).
-    "aiohttp>=3.14.3",
+    # 2026-09-26: 移除 aiohttp —— 全仓无任何 import（唯一命中是 plugin_sandbox
+    # 的**禁用名单**正则），却为一个从不加载的栈承担 14 个 CVE 的审计面。
+    # 外部插件若需要 aiohttp，应自行声明依赖。
     # - websockets 14+ made breaking asyncio changes; cap below 15.
     "websockets>=12.0,<15",
     # - P0-C CVE audit (2026-08-26): floor raised to 2.13.0 — fixes

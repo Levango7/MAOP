@@ -37,6 +37,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - 2026-09-26
+
+### 文档与依赖口径更正（配合 MAOS 5.2.2）
+
+- **适配器计数口径更正**（README）：`config/agents.yaml` 的 31 个条目实际为
+  23 个开箱可派发的第三方 CLI 适配器 + 5 个需先配置（`enabled: false`）+
+  1 个自研 python 适配器（`doc-pipeline`）+ 1 个 MAOP 自引用。原文写"第三方 30 个 /
+  25 个开箱可用"并把 "claude 系" 列为适配器之一 —— 经核**不存在 claude 适配器条目**
+  （"Claude" 只出现在 copilot/cursor 条目的描述文字里）；`omniroute` 虽
+  `enabled: true` 但 `cli: ''`，派发直接返回 `exit_code=-1`，不计入"开箱可用"。
+- **企业版安装方式更正**：`pip install maop-enterprise` 不可用（该包与主包均未发布
+  到 PyPI，实测两个包名都返回 404），改为从 GitHub Releases 下载 wheel 安装，
+  与 MAOS README 口径统一；企业版模块数 25 → 26。
+- **移除 `aiohttp` 运行时依赖**：全仓无任何 `import aiohttp`（唯一命中是
+  `plugin_sandbox` 的**禁用名单**正则），却为一个从不加载的栈承担 14 个 CVE 的审计面。
+  外部插件若需要应自行声明。（pyproject / requirements.txt / requirements.lock 同步）
+- 同类 CRLF 敏感哈希清理与完整性测试夹具修正见 `54bf1ef`；通知接口身份/租户
+  fail-closed 隔离见 `eb8d914`。
+
 ## [Unreleased]
 
 ### Docs

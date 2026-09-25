@@ -31,7 +31,7 @@ lxml>=6.1.0
 alembic>=1.13.0
 python-multipart>=0.0.31
 aiosqlite>=0.20.0
-aiohttp>=3.14.3
+# aiohttp 已移除（全仓零 import）
 websockets>=12.0,<15
 PyJWT>=2.13.0
 packaging>=24.0

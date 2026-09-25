@@ -3,9 +3,9 @@
 > Python-first agent orchestration framework with Plan-Execute-Verify loop,
 > model management, control plane, and real-time dashboard.
 
-> **定位说明**：MAOP 是**多 Agent 编排与治理层**——通过 Plan-Execute-Verify 循环编排**外部 CLI agent**（内置 31 个第三方 CLI 适配器），而非自研 agent 运行时。内置 LLM provider 用于对话、分析与建议生成，不承担 agent 执行引擎角色。
+> **定位说明**：MAOP 是**多 Agent 编排与治理层**——通过 Plan-Execute-Verify 循环编排**外部 CLI agent**（`config/agents.yaml` 共 31 个条目：23 个开箱可派发的第三方 CLI 适配器 + 5 个需先配置 + 1 个自研适配器 + 1 个自引用），而非自研 agent 运行时。内置 LLM provider 用于对话、分析与建议生成，不承担 agent 执行引擎角色。
 >
-> **适配器计数口径**（2026-09-15 实测）：`config/agents.yaml` 顶层共 31 个 agent 条目，其中 1 个为 MAOP 自引用 agent（`max_self_ref_depth=3` 防递归），**第三方 CLI 适配器 30 个**（claude 系、codex、gemini、cursor、kimi 等）。其中 **25 个开箱可用 + 5 个需额外配置**（`enabled: false`，为 deepcode/langcli/mimo/qoder/qwen，需注册账号/配置 API key 后启用，详见各 agent 的 `description` 字段）。能力矩阵/超时/SLA 配置见该文件。
+> **适配器计数口径**（2026-09-26 用脚本核对 `config/agents.yaml`）：顶层共 **31** 个条目 = **23 个开箱可派发的第三方 CLI 适配器** + **5 个需额外配置**（`enabled: false`：deepcode/langcli/mimo/qoder/qwen，需注册账号或配 API key）+ **1 个自研适配器**（`doc-pipeline`，`driver: python`，不是第三方 CLI）+ **1 个 MAOP 自引用**（`max_self_ref_depth=3` 防递归）。另注意 `omniroute` 虽 `enabled: true` 但 `cli: ''`，派发时直接返回 `exit_code=-1`，故不计入"开箱可用"。本段此前写作"第三方 30 个 / 25 个开箱可用"，并把 "claude 系" 列为适配器之一——经核**不存在 claude 适配器条目**（"Claude" 只出现在 copilot/cursor 条目的描述文字里），两处口径均已更正。能力矩阵/超时/SLA 见该文件。
 
 ## Architecture
 
@@ -59,7 +59,7 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 | License CRL 在线撤销 | ✗ | ✓ |
 | Vue Dashboard 企业版路由 | ✗ | ✓ |
 
-> 编排外部 CLI agent（适配器计数 31 个顶层条目 = 1 自引用 + 30 第三方，见上方"适配器计数口径"，已核实）。非自研运行时。
+> 编排外部 CLI agent（口径：31 个顶层条目 = 23 开箱可派发第三方 + 5 需配置 + 1 自研 + 1 自引用，已用脚本核实，见上方"适配器计数口径"）。非自研运行时。
 
 > Enterprise = Personal ∪ Enterprise 独占能力；企业版包含所有功能。
 
@@ -124,14 +124,16 @@ License 颁发指南见 [docs/enterprise/license-issuance-guide.md](docs/enterpr
 | 仓库 | 可见性 | 许可 | 内容 |
 |------|--------|------|------|
 | [Levango7/MAOP](https://github.com/Levango7/MAOP) | Public | MIT | 核心 + 个人版 |
-| [Levango7/MAOS](https://github.com/Levango7/MAOS) | Private | Commercial | 企业版模块（25 文件） |
+| [Levango7/MAOS](https://github.com/Levango7/MAOS) | **Public**（仓库公开但代码**不开源**） | Commercial | 企业版模块（26 个 .py 文件） |
 
-- `maop`（PyPI, MIT）：核心 + 个人版功能，**不含** `maop/enterprise/`
-- `maop-enterprise`（私有分发, Commercial）：依赖 `maop`，包含 `maop/enterprise/` 模块
+- `maop-orchestrator`（MIT）：核心 + 个人版功能，**不含** `maop/enterprise/`
+- `maop-enterprise`（Commercial，经 GitHub Releases 以 wheel 分发；仓库公开但代码不开源）：依赖 `maop-orchestrator`，提供 `maop/enterprise/` 模块
 
 ```bash
-pip install maop-orchestrator              # 个人版（不含企业代码）
-pip install maop-enterprise   # 企业版（自动依赖 maop，从私有源安装）
+# 个人版（不含企业代码）——注意：两个包均**未发布到 PyPI**（实测 pypi.org 返回 404），
+# 从 GitHub 子目录安装：
+pip install "maop-orchestrator @ git+https://github.com/Levango7/MAOP.git@master#subdirectory=py"
+pip install ./maop_enterprise-<版本>-py3-none-any.whl   # 企业版：从 GitHub Releases 下载 wheel 安装（未发布到 PyPI）
 ```
 
 `maop/enterprise/__init__.py` 在 import 时调用 `set_edition(Edition.ENTERPRISE)`，这是企业版包"存在即激活"的机制。
