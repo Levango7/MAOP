@@ -1137,3 +1137,243 @@ class TestRouterAuth:
 
         r = client.get("/api/notifications/channels")
         assert r.status_code == 200
+
+
+# ── Router identity isolation tests (fail-closed) ────────────────
+
+
+def _client_with_identity(manager, monkeypatch, *, roles, identity, tenant=""):
+    """Build a TestClient injecting ``roles`` / ``identity`` / ``tenant``.
+
+    Same pattern as the inline middlewares in ``TestRouterAuth``.
+    """
+    from maop.dashboard.routers import notifications as notif_router
+    from maop.dashboard.services import notification_service
+
+    monkeypatch.setattr(notification_service, "_notification_manager", manager)
+    monkeypatch.setattr(notification_service, "_event_bus", manager.event_bus)
+    # 本组用例模拟的是**启用认证**的部署（中间件注入真实身份），因此显式
+    # 打开 _auth_enabled：测试环境默认 MAOP_ENV=test 属认证关闭，那时不存在
+    # 身份/租户边界（见 notifications._auth_enabled 的说明）。
+    monkeypatch.setattr(notif_router, "_auth_enabled", lambda: True)
+
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def _inject_identity(request, call_next):
+        request.state.auth_roles = list(roles)
+        request.state.auth_identity = identity
+        request.state.tenant_id = tenant
+        return await call_next(request)
+
+    app.include_router(notif_router.router)
+    return TestClient(app)
+
+
+def _save_notification(manager, notification_id: str, *, user_id: str, tenant_id: str = "") -> None:
+    """Seed a notification straight into the store (bypasses delivery)."""
+    manager.store.save_notification({
+        "notification_id": notification_id,
+        "tenant_id": tenant_id,
+        "user_id": user_id,
+        "channel_id": "ch_seed",
+        "channel_type": "inapp",
+        "level": "info",
+        "title": "seeded",
+        "body": "seeded",
+        "status": "sent",
+        "created_at": time.time(),
+        "read_at": 0,
+        "max_retries": 3,
+    })
+
+
+class TestRouterIdentityIsolation:
+    """Missing identity must fail closed — never degrade to an unfiltered
+    (all-tenant / all-user) query (empty filter == no filter in the store).
+    """
+
+    def test_non_admin_ignores_client_tenant_param(self, manager, monkeypatch):
+        """A non-admin must never be able to select another tenant via
+        ``?tenant_id=`` — the token tenant governs."""
+        manager.create_channel(ChannelCreate(name="victim-ch", type=ChannelType.INAPP, tenant_id="victim"))
+        manager.create_channel(ChannelCreate(name="own-ch", type=ChannelType.INAPP, tenant_id="t1"))
+        client = _client_with_identity(manager, monkeypatch, roles=["viewer"], identity="viewer-user", tenant="t1")
+
+        r = client.get("/api/notifications/channels?tenant_id=victim")
+        assert r.status_code == 200
+        names = {c["name"] for c in r.json()["channels"]}
+        assert names == {"own-ch"}  # victim data must not leak
+
+    def test_tenant_param_has_no_effect_without_tenant_claim(self, manager, monkeypatch):
+        """Without a tenant claim the caller is single-tenant: the query
+        param must not select a tenant — responses must be identical with
+        and without ``?tenant_id=victim``."""
+        manager.create_channel(ChannelCreate(name="victim-ch", type=ChannelType.INAPP, tenant_id="victim"))
+        manager.create_channel(ChannelCreate(name="own-ch", type=ChannelType.INAPP, tenant_id="t1"))
+        client = _client_with_identity(manager, monkeypatch, roles=["viewer"], identity="viewer-user", tenant="")
+
+        with_param = client.get("/api/notifications/channels?tenant_id=victim")
+        without_param = client.get("/api/notifications/channels")
+        assert with_param.status_code == 200
+        assert with_param.json() == without_param.json()
+
+    def test_missing_identity_rejected_on_read_endpoints(self, manager, monkeypatch):
+        """No user identity -> 403 (not an unscoped listing)."""
+        client = _client_with_identity(manager, monkeypatch, roles=["viewer"], identity="", tenant="")
+        assert client.get("/api/notifications/list").status_code == 403
+        assert client.get("/api/notifications/channels").status_code == 403
+        assert client.get("/api/notifications/rules").status_code == 403
+        assert client.get("/api/notifications/templates").status_code == 403
+        assert client.post("/api/notifications/read-all").status_code == 403
+        assert client.get("/api/notifications/unread-count").status_code == 403
+
+    def test_list_and_unread_scoped_to_caller(self, manager, monkeypatch):
+        """Non-admin sees only own notifications even with ?user_id= of
+        another user."""
+        _save_notification(manager, "n_u1", user_id="u1", tenant_id="t1")
+        _save_notification(manager, "n_u2", user_id="u2", tenant_id="t1")
+        client = _client_with_identity(manager, monkeypatch, roles=["viewer"], identity="u1", tenant="t1")
+
+        r = client.get("/api/notifications/list?user_id=u2")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total"] == 1
+        assert [n["user_id"] for n in body["notifications"]] == ["u1"]
+
+        r = client.get("/api/notifications/unread-count?user_id=u2")
+        assert r.status_code == 200
+        assert r.json()["unread_count"] == 1
+
+    def test_admin_sees_all_and_can_filter_by_tenant(self, manager, monkeypatch):
+        """Admin path keeps the query-param semantics (filter or all)."""
+        manager.create_channel(ChannelCreate(name="t1-ch", type=ChannelType.INAPP, tenant_id="t1"))
+        manager.create_channel(ChannelCreate(name="t2-ch", type=ChannelType.INAPP, tenant_id="t2"))
+        _save_notification(manager, "n_a", user_id="alice", tenant_id="t1")
+        _save_notification(manager, "n_b", user_id="bob", tenant_id="t2")
+
+        admin = _client_with_identity(manager, monkeypatch, roles=["superadmin"], identity="root", tenant="")
+        assert admin.get("/api/notifications/channels").json()["count"] == 2
+
+        only_t2 = admin.get("/api/notifications/channels?tenant_id=t2").json()
+        assert only_t2["count"] == 1
+        assert only_t2["channels"][0]["name"] == "t2-ch"
+
+        assert admin.get("/api/notifications/list").json()["total"] == 2
+        assert admin.get("/api/notifications/list?user_id=alice").json()["total"] == 1
+
+    def test_ownership_check_fails_closed(self, manager, monkeypatch):
+        """A caller without a user identity, another user, or a mismatched
+        tenant must all get 404 — never a skipped ownership check."""
+        _save_notification(manager, "n_owned", user_id="owner", tenant_id="t1")
+
+        anon = _client_with_identity(manager, monkeypatch, roles=["viewer"], identity="", tenant="t1")
+        assert anon.get("/api/notifications/n_owned").status_code == 404
+
+        other = _client_with_identity(manager, monkeypatch, roles=["viewer"], identity="other", tenant="t1")
+        assert other.get("/api/notifications/n_owned").status_code == 404
+        assert other.post("/api/notifications/n_owned/read").status_code == 404
+        assert other.delete("/api/notifications/n_owned").status_code == 404
+
+        wrong_tenant = _client_with_identity(manager, monkeypatch, roles=["viewer"], identity="owner", tenant="t2")
+        assert wrong_tenant.get("/api/notifications/n_owned").status_code == 404
+
+        owner = _client_with_identity(manager, monkeypatch, roles=["viewer"], identity="owner", tenant="t1")
+        assert owner.get("/api/notifications/n_owned").status_code == 200
+
+        admin = _client_with_identity(manager, monkeypatch, roles=["admin"], identity="root", tenant="")
+        assert admin.get("/api/notifications/n_owned").status_code == 200
+
+    def test_auth_disabled_keeps_prior_single_tenant_behavior(self, manager, monkeypatch):
+        """认证关闭时不按合成身份过滤（个人版回归保护）。
+
+        认证关闭时中间件把身份固定为 ``"anonymous"``、租户置空，此时不存在
+        用户/租户边界。若仍按 ``"anonymous"`` 过滤，个人版通知列表会变空、
+        按 id 访问会 404 —— 本用例锁住"退回既有行为"这一分支。
+        """
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from maop.dashboard.routers import notifications as notif_router
+        from maop.dashboard.services import notification_service
+
+        manager.create_channel(ChannelCreate(name="local-ch", type=ChannelType.INAPP))
+        _save_notification(manager, "n_any", user_id="someone-else")
+
+        monkeypatch.setattr(notification_service, "_notification_manager", manager)
+        monkeypatch.setattr(notification_service, "_event_bus", manager.event_bus)
+        monkeypatch.setattr(notif_router, "_auth_enabled", lambda: False)
+
+        app = FastAPI()
+
+        @app.middleware("http")
+        async def _inject_anonymous(request, call_next):
+            request.state.auth_roles = ["read"]          # 认证关闭时的固定角色
+            request.state.auth_identity = "anonymous"
+            request.state.tenant_id = ""
+            return await call_next(request)
+
+        app.include_router(notif_router.router)
+        client = TestClient(app)
+
+        r = client.get("/api/notifications/channels")
+        assert r.status_code == 200
+        assert {c["name"] for c in r.json()["channels"]} == {"local-ch"}
+        assert client.get("/api/notifications/list").status_code == 200
+        assert client.get("/api/notifications/n_any").status_code == 200
+
+
+class TestChannelConfigMasking:
+    """Channel responses must never expose plaintext secrets."""
+
+    def test_helper_masks_keys_case_insensitively(self):
+        from maop.dashboard.routers.notifications import _mask_config_in
+
+        item = {"channel_id": "ch", "config": {"PASSWORD": "p", "Token": "t", "host": "h"}}
+        masked = _mask_config_in(item)
+        assert masked["config"] == {"PASSWORD": "***", "Token": "***", "host": "h"}
+        # original untouched (shallow copy)
+        assert item["config"]["PASSWORD"] == "p"
+        # non-dict / missing config passthrough
+        assert _mask_config_in({"config": "not-a-dict"}) == {"config": "not-a-dict"}
+        assert _mask_config_in({"channel_id": "ch"}) == {"channel_id": "ch"}
+
+    def test_created_channel_config_masked_in_all_responses(self, manager, monkeypatch):
+        admin = _client_with_identity(manager, monkeypatch, roles=["admin"], identity="root", tenant="")
+        r = admin.post("/api/notifications/channels", json={
+            "name": "hook",
+            "type": "webhook",
+            "tenant_id": "t1",
+            "config": {"url": "https://hook.test", "secret": "s3cr3t", "password": "pw"},
+        })
+        assert r.status_code == 200
+        created = r.json()["channel"]
+        assert created["config"]["secret"] == "***"
+        assert created["config"]["password"] == "***"
+        assert created["config"]["url"] == "https://hook.test"
+
+        channel_id = created["channel_id"]
+        listed = admin.get("/api/notifications/channels?tenant_id=t1").json()["channels"][0]
+        assert listed["config"]["secret"] == "***"
+        detail = admin.get(f"/api/notifications/channels/{channel_id}").json()["channel"]
+        assert detail["config"]["password"] == "***"
+
+        updated = admin.put(f"/api/notifications/channels/{channel_id}", json={"name": "hook2"})
+        assert updated.json()["channel"]["config"]["secret"] == "***"
+
+    def test_router_masks_plaintext_config_from_service(self, manager, monkeypatch):
+        """Defense in depth: even if the service hands the router a raw
+        (unmasked) payload, the router masks it before responding."""
+        from maop.dashboard.services import notification_service
+
+        monkeypatch.setattr(notification_service, "list_channels", lambda tenant_id="": [
+            {
+                "channel_id": "ch_raw",
+                "name": "raw",
+                "config": {"api_key": "plain-key", "auth_token": "plain-token", "host": "h"},
+                "tenant_id": "t1",
+            },
+        ])
+        client = _client_with_identity(manager, monkeypatch, roles=["admin"], identity="root", tenant="")
+        cfg = client.get("/api/notifications/channels").json()["channels"][0]["config"]
+        assert cfg == {"api_key": "***", "auth_token": "***", "host": "h"}

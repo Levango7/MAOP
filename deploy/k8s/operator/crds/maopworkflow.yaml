@@ -1,3 +1,6 @@
+# ⚠ PLANNED — NOT IMPLEMENTED. This CRD schema describes the intended API shape
+# only: no controller exists in this repository, so no MaopWorkflow is ever
+# scheduled. See ../README.md §Status.
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -27,8 +30,8 @@ spec:
           type: object
           description: >
             MaopWorkflow defines a multi-step agent orchestration as a DAG of
-            MaopTask nodes. The operator topologically sorts the steps, schedules
-            each as a MaopTask, and aggregates overall workflow status.
+            MaopTask nodes. PLANNED — not implemented: no controller currently
+            sorts the steps, schedules MaopTask runs, or aggregates status.
           required:
             - spec
           properties:
@@ -39,7 +42,7 @@ spec:
               properties:
                 tenant:
                   type: string
-                  description: Tenant ID for RLS scoping and quota enforcement.
+                  description: Tenant ID for RLS scoping and quota enforcement (planned — not implemented).
                 steps:
                   type: array
                   minItems: 1

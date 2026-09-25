@@ -1,6 +1,7 @@
 {{/*
-PodDisruptionBudget for MAOP Operator — ensures voluntary disruptions maintain quorum.
-P1 reliability fix (2026-09-17): prevents node drain from evicting all replicas simultaneously.
+PodDisruptionBudget for MAOP Operator — planned: keep quorum during voluntary
+disruptions. NOTE (PLANNED — NOT IMPLEMENTED): no operator pods exist today, so
+this template has no effect yet. P1 reliability fix (2026-09-17).
 */}}
 apiVersion: policy/v1
 kind: PodDisruptionBudget

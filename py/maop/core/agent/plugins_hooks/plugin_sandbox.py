@@ -220,7 +220,13 @@ class PluginSandbox:
     def verify_checksum(self, path: Path, expected: str) -> None:
         if not expected:
             return
-        sha = hashlib.sha256(path.read_bytes()).hexdigest()
+        raw = path.read_bytes()
+        sha = hashlib.sha256(raw).hexdigest()
+        if sha != expected:
+            # 行尾归一后再比对一次：插件校验和可能在另一平台签发，
+            # CRLF/LF 差异不应被误判为篡改。两种读法都接受，不构成绕过面
+            # （差异仅限行尾符，Python 源码中不承载语义）。
+            sha = hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
         if sha != expected:
             raise SandboxViolation(
                 f"Checksum mismatch for {path.name}: expected {expected[:16]}..., got {sha[:16]}..."

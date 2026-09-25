@@ -1,3 +1,6 @@
+# ⚠ PLANNED — NOT IMPLEMENTED. This CRD schema describes the intended API shape
+# only: no controller exists in this repository, so no MaopTask is ever
+# scheduled. See ../README.md §Status.
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -27,8 +30,8 @@ spec:
           type: object
           description: >
             MaopTask represents a single orchestration task submitted to a MAOP
-            agent. The operator creates a bounded execution (pod / job), enforces
-            the tenant quota, and reports completion status.
+            agent. PLANNED — not implemented: no controller creates the bounded
+            execution (pod / job), enforces the tenant quota, or reports status.
           required:
             - spec
           properties:
@@ -46,7 +49,7 @@ spec:
                   description: User prompt / instruction for the agent.
                 tenant:
                   type: string
-                  description: Tenant ID for RLS scoping and quota enforcement.
+                  description: Tenant ID for RLS scoping and quota enforcement (planned — not implemented).
                 maxTurns:
                   type: integer
                   minimum: 1
@@ -92,7 +95,7 @@ spec:
                       default: 30
             status:
               type: object
-              description: Observed state reported by the controller.
+              description: Observed state that the controller is planned to report (not implemented).
               properties:
                 observedGeneration:
                   type: integer

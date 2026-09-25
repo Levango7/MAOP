@@ -134,6 +134,75 @@ def _is_admin(request: Request) -> bool:
     return bool({"admin", "superadmin"} & set(roles))
 
 
+# Secret config keys masked in channel responses. Must mirror MAOS
+# ``notification.store._SECRET_FIELDS`` / ``BaseChannel.mask_config``.
+_SECRET_CONFIG_KEYS = frozenset({"password", "secret", "api_key", "token", "auth_token"})
+
+
+def _auth_enabled() -> bool:
+    """认证是否启用（决定是否存在身份/租户边界）。
+
+    认证关闭时（``MAOP_ENV`` 为 dev/test/local，或显式
+    ``MAOP_AUTH_ENABLED=0``）中间件把身份固定为 ``"anonymous"``、租户置空
+    ——此时**不存在**用户/租户边界（任何人都能访问 dashboard），通知接口
+    必须退回"单租户、不按用户过滤"的既有行为；否则个人版通知列表会因为
+    按 ``"anonymous"`` 过滤而变空、按 id 访问会 404。
+
+    取不到配置时按"已启用"从严处理（fail-closed）。
+    """
+    try:
+        from maop.config.settings import get_settings
+
+        return bool(get_settings().auth_enabled)
+    except Exception:
+        return True
+
+
+def _require_identity(request: Request) -> tuple[str, str]:
+    """Return ``(user_id, tenant_id)`` for the authenticated caller.
+
+    Non-admin callers **must** carry a user identity: when it is missing we
+    fail closed with 403 — a missing identity must never degrade to an
+    unfiltered query ("all tenants / all users"), because the underlying
+    store treats an empty filter as "no constraint" (``WHERE 1=1`` plus
+    ``if tenant_id:`` / ``if user_id:`` dynamic SQL).
+
+    ``tenant_id`` is taken from ``request.state`` and defaults to ``""``,
+    which means single-tenant / personal edition (no tenant filter).
+    Admins return ``("", "")`` — meaning "do not filter". The same applies
+    when auth is disabled entirely (no identity boundary exists).
+    """
+    if _is_admin(request):
+        return "", ""
+    if not _auth_enabled():
+        return "", ""
+    user_id = _user_id_from_request(request)
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated identity required",
+        )
+    return user_id, _tenant_id_from_request(request)
+
+
+def _mask_config_in(item: dict[str, Any]) -> dict[str, Any]:
+    """Return a shallow copy of a channel payload with secrets masked.
+
+    Every ``config`` entry whose lower-cased key is in
+    :data:`_SECRET_CONFIG_KEYS` is replaced with ``"***"``; the key itself
+    is kept so the UI can still show that a secret is configured. A
+    missing or non-dict ``config`` is returned unchanged.
+    """
+    out = dict(item)
+    config = out.get("config")
+    if isinstance(config, dict):
+        out["config"] = {
+            k: ("***" if k.lower() in _SECRET_CONFIG_KEYS else v)
+            for k, v in config.items()
+        }
+    return out
+
+
 def _require_feature() -> None:
     """Gate enterprise-only feature. Notifications work in both editions
     but the router is registered only when MULTI_USER is on (server.py).
@@ -172,11 +241,13 @@ async def list_channels(
     tenant_id: str = Query("", description="Filter by tenant (admin only)"),
 ) -> dict[str, Any]:
     _require_feature()
-    # Non-admin users can only see their own tenant's channels
-    req_tenant = _tenant_id_from_request(request)
-    if not _is_admin(request) and req_tenant:
-        tenant_id = req_tenant
-    items = notification_service.list_channels(tenant_id=tenant_id)
+    # Non-admin: the query param is ignored entirely — tenant comes from the
+    # token, and a missing identity fails closed (403) instead of degrading
+    # to an all-tenant listing. Admin: explicit ?tenant_id= filters, absent
+    # means all tenants.
+    if not _is_admin(request):
+        _, tenant_id = _require_identity(request)
+    items = [_mask_config_in(i) for i in notification_service.list_channels(tenant_id=tenant_id)]
     return {"status": "ok", "channels": items, "count": len(items)}
 
 
@@ -189,7 +260,7 @@ async def create_channel(body: ChannelCreate, request: Request) -> dict[str, Any
     if not body.tenant_id:
         body.tenant_id = _tenant_id_from_request(request)
     channel = notification_service.create_channel(body)
-    return {"status": "ok", "channel": channel}
+    return {"status": "ok", "channel": _mask_config_in(channel)}
 
 
 @router.get("/channels/{channel_id}")
@@ -200,7 +271,7 @@ async def get_channel(channel_id: str, request: Request) -> dict[str, Any]:
     channel = notification_service.get_channel(channel_id)
     if channel is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found")
-    return {"status": "ok", "channel": channel}
+    return {"status": "ok", "channel": _mask_config_in(channel)}
 
 
 @router.put("/channels/{channel_id}")
@@ -211,7 +282,7 @@ async def update_channel(channel_id: str, body: ChannelUpdate, request: Request)
     channel = notification_service.update_channel(channel_id, body)
     if channel is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found")
-    return {"status": "ok", "channel": channel}
+    return {"status": "ok", "channel": _mask_config_in(channel)}
 
 
 @router.delete("/channels/{channel_id}")
@@ -236,9 +307,10 @@ async def list_rules(
     event_type: str = Query(""),
 ) -> dict[str, Any]:
     _require_feature()
-    req_tenant = _tenant_id_from_request(request)
-    if not _is_admin(request) and req_tenant:
-        tenant_id = req_tenant
+    # Non-admin: ignore ?tenant_id=, use the token tenant (fail-closed when
+    # the identity is missing). Admin: keep the query-param semantics.
+    if not _is_admin(request):
+        _, tenant_id = _require_identity(request)
     items = notification_service.list_rules(tenant_id=tenant_id, event_type=event_type)
     return {"status": "ok", "rules": items, "count": len(items)}
 
@@ -297,9 +369,10 @@ async def list_templates(
     tenant_id: str = Query(""),
 ) -> dict[str, Any]:
     _require_feature()
-    req_tenant = _tenant_id_from_request(request)
-    if not _is_admin(request) and req_tenant:
-        tenant_id = req_tenant
+    # Non-admin: ignore ?tenant_id=, use the token tenant (fail-closed when
+    # the identity is missing). Admin: keep the query-param semantics.
+    if not _is_admin(request):
+        _, tenant_id = _require_identity(request)
     items = notification_service.list_templates(tenant_id=tenant_id)
     return {"status": "ok", "templates": items, "count": len(items)}
 
@@ -354,13 +427,11 @@ async def list_notifications(
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     _require_feature()
-    # Non-admin: force user_id and tenant_id to their own
-    req_tenant = _tenant_id_from_request(request)
-    req_user = _user_id_from_request(request)
+    # Non-admin: identity (never the query params) governs the filter —
+    # a missing user identity fails closed (403) instead of returning an
+    # unscoped, all-users listing. Admin: keep the query-param semantics.
     if not _is_admin(request):
-        user_id = req_user
-        if req_tenant:
-            tenant_id = req_tenant
+        user_id, tenant_id = _require_identity(request)
     items, total = notification_service.list_notifications(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -383,11 +454,11 @@ async def list_notifications(
 @handle_api_errors
 async def mark_all_read(request: Request, user_id: str = Query("")) -> dict[str, Any]:
     _require_feature()
-    req_tenant = _tenant_id_from_request(request)
-    req_user = _user_id_from_request(request)
     if not _is_admin(request):
-        user_id = req_user
-    count = notification_service.mark_all_read(user_id=user_id, tenant_id=req_tenant)
+        user_id, tenant_id = _require_identity(request)
+    else:
+        tenant_id = _tenant_id_from_request(request)
+    count = notification_service.mark_all_read(user_id=user_id, tenant_id=tenant_id)
     return {"status": "ok", "marked_read": count}
 
 
@@ -398,11 +469,11 @@ async def unread_count(
     user_id: str = Query(""),
 ) -> dict[str, Any]:
     _require_feature()
-    req_tenant = _tenant_id_from_request(request)
-    req_user = _user_id_from_request(request)
     if not _is_admin(request):
-        user_id = req_user
-    count = notification_service.unread_count(user_id=user_id, tenant_id=req_tenant)
+        user_id, tenant_id = _require_identity(request)
+    else:
+        tenant_id = _tenant_id_from_request(request)
+    count = notification_service.unread_count(user_id=user_id, tenant_id=tenant_id)
     return {"status": "ok", "unread_count": count}
 
 
@@ -514,18 +585,24 @@ def _check_notification_ownership(notif: Any, request: Request) -> None:
     """Verify the authenticated user owns ``notif``.
 
     Non-admin users may only access notifications whose ``user_id`` matches
-    their own identity (and, when multi-tenant, whose ``tenant_id`` matches).
-    Mismatch raises 404 (not 403) to avoid leaking resource existence.
-    Admins bypass the check. Mirrors the isolation logic in
-    :func:`list_notifications` (line 353).
+    their own identity; a caller without a user identity is rejected
+    (fail-closed — the check is never skipped). ``tenant_id`` is enforced
+    whenever the notification carries one: a non-empty ``notif.tenant_id``
+    that differs from the caller's tenant is also rejected. All rejections
+    raise 404 (not 403) to avoid leaking resource existence. Admins bypass
+    the check.
     """
     if _is_admin(request):
         return
+    if not _auth_enabled():
+        # 认证关闭：身份固定为 "anonymous"，不存在归属边界（同 _require_identity）。
+        return
     req_user = _user_id_from_request(request)
     req_tenant = _tenant_id_from_request(request)
-    if req_user and getattr(notif, "user_id", "") != req_user:
+    if not req_user or getattr(notif, "user_id", "") != req_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
-    if req_tenant and getattr(notif, "tenant_id", "") != req_tenant:
+    notif_tenant = getattr(notif, "tenant_id", "") or ""
+    if notif_tenant and notif_tenant != req_tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
 
 

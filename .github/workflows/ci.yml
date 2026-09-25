@@ -313,15 +313,16 @@ jobs:
           files: py/coverage.xml
           fail_ci_if_error: false
 
-  # ── Performance & Reliability (slow) ────────────────────────────
-  # P2 fix (2026-08-14): 性能/可靠性/稳定性测试此前被 test job 的 `-m "not slow"`
-  # 排除，从不被 CI 触发。独立 job 跑这些慢测试。
-  # P2-C-01 fix: 此前 performance job 仅 needs: lint，不被 docker/publish/
-  # compose-smoke 依赖，性能/可靠性/稳定性测试失败不会阻断 main/master 合并。
-  # 现将 docker/publish/compose-smoke job 的 needs 增加 performance，使性能测试
-  # 成为 CI 门禁的一部分。失败会阻断下游发布与部署步骤。
-  performance:
-    name: Performance & Reliability (slow)
+  # ── Perf script smoke + reliability/stability (NOT a load test) ──
+  # 诚实化（2026-09-25）：原名 `performance` 会让人以为 CI 在跑真实负载压测。
+  # 事实：py/tests/performance/ 下没有负载测试 —— test_performance_load.py 只有
+  # 纯 CPU 断言 + skip 占位，test_performance_smoke.py 只对 k6/locust 脚本做
+  # 文本/正则断言，k6 与 locust 从不执行。因此本 job 只提供「脚本语法 / 端点
+  # 引用」级校验（外加 reliability/stability 套件），**不是性能门禁**：
+  # docker / publish / compose-smoke 不再依赖它，不会因它变红或被阻塞。
+  # 真实负载压测需人工在长跑环境以 k6 / locust 执行（见 py/tests/performance/）。
+  perf-smoke:
+    name: Perf Script Smoke + Reliability (non-load)
     runs-on: ubuntu-latest
     needs: lint
     defaults:
@@ -344,7 +345,7 @@ jobs:
           pip install -e .
           pip install pytest pytest-asyncio pytest-timeout pytest-xdist pytest-cov
 
-      - name: Run performance smoke tests
+      - name: Run perf script smoke tests (k6/locust scripts are parsed, not executed)
         run: python -m pytest tests/performance/ -q -m slow --timeout=120 --junitxml=test-results-perf.xml
 
       - name: Run reliability & stability tests
@@ -550,9 +551,10 @@ jobs:
   docker:
     name: Docker build
     runs-on: ubuntu-latest
-    # P2-C-01 fix: add performance to needs so performance/reliability/stability
-    # test failures block the docker build — performance is now a CI gate.
-    needs: [test, frontend, e2e, performance]
+    # 诚实化（2026-09-25）：不再依赖 perf-smoke —— 其前身 `performance` job
+    # 只做脚本文本/正则校验（并恒因 skip 占位而形同虚设），不是负载门禁，
+    # 不应阻塞 docker 构建。构建由 test / frontend / e2e 把关。
+    needs: [test, frontend, e2e]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     steps:
       - uses: actions/checkout@v4
@@ -756,9 +758,9 @@ jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    # P2-C-01 fix: add performance to needs so performance test failures block
-    # PyPI publish — performance is now a CI gate.
-    needs: [test, frontend, e2e, performance]
+    # 诚实化（2026-09-25）：不再依赖 perf-smoke（原 `performance` job，非负载
+    # 门禁，不应阻塞 PyPI 发布）。发布由 test / frontend / e2e 把关。
+    needs: [test, frontend, e2e]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       id-token: write
@@ -786,9 +788,9 @@ jobs:
   compose-smoke:
     name: Compose Smoke
     runs-on: ubuntu-latest
-    # P2-C-01 fix: add performance to needs so performance test failures block
-    # the compose smoke test — performance is now a CI gate.
-    needs: [test, frontend, e2e, docker, performance]
+    # 诚实化（2026-09-25）：不再依赖 perf-smoke（原 `performance` job，非负载
+    # 门禁，不应阻塞 compose 冒烟）。冒烟由 test / frontend / e2e / docker 把关。
+    needs: [test, frontend, e2e, docker]
     if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     environment: staging
     steps:

@@ -279,3 +279,41 @@ def _reset_evolution_singletons():
     """
     yield
     _try_reset_evo_singletons()
+
+
+@pytest.fixture()
+def crl_signer(tmp_path, monkeypatch):
+    """CRL 签名密钥（临时）——2026-09-25 起「无签名 CRL 一律拒绝」。
+
+    生成临时 Ed25519 密钥对，把 enterprise 的信任锚（``_PUBLIC_KEY_PATH``）
+    与期望指纹（``MAOP_LICENSE_KEY_FP``）指向它，并返回
+    ``sign(payload: dict) -> dict``：在 payload 上追加 base64url 签名。
+
+    凡是要验证「撤销条目真正生效」的用例都必须用它签名 CRL，否则 CRL 会
+    被 ``_reject_if_unusable`` 作为不可用数据丢弃。
+    """
+    import base64
+    import hashlib
+    import json
+
+    import maop.enterprise.license as license_mod
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    priv = Ed25519PrivateKey.generate()
+    pub_pem = priv.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    pub_path = tmp_path / "crl_keys" / "public_key.pem"
+    pub_path.parent.mkdir(parents=True, exist_ok=True)
+    pub_path.write_bytes(pub_pem)
+    monkeypatch.setattr(license_mod, "_PUBLIC_KEY_PATH", pub_path)
+    monkeypatch.setenv("MAOP_LICENSE_KEY_FP", hashlib.sha256(pub_pem).hexdigest())
+
+    def sign(payload: dict) -> dict:
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        sig = base64.urlsafe_b64encode(priv.sign(canonical)).rstrip(b"=").decode()
+        return {**payload, "signature": sig}
+
+    return sign

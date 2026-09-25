@@ -291,8 +291,20 @@ class TestCRLIntegration:
     """Integration tests using a real local HTTP server for CRL."""
 
     @pytest.fixture
-    def crl_server(self, tmp_path):
-        """Start a local HTTP server serving CRL data."""
+    def crl_server(self, tmp_path, crl_signer):
+        """Start a local HTTP server serving **signed** CRL data.
+
+        2026-09-25 起「无签名 CRL 一律拒绝」，因此这里用临时密钥签名；
+        ``crl_signer`` 同时把信任锚指向该临时公钥。class 级 ``crl_data``
+        每次 fixture 初始化时重置，避免测试间状态泄漏。
+        """
+        _CRLHandler.crl_data = crl_signer({
+            "revoked": [
+                {"customer": "revoked-corp", "reason": "license_violation",
+                 "revoked_at": "2026-01-01T00:00:00Z"}
+            ],
+            "issued_at": "2026-01-01T00:00:00Z",
+        })
         server = http.server.HTTPServer(("127.0.0.1", 0), _CRLHandler)
         port = server.server_address[1]
         thread = threading.Thread(target=server.serve_forever, daemon=True)

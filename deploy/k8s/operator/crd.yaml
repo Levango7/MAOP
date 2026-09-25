@@ -1,5 +1,10 @@
 # MAOP Operator CRDs — combined multi-document manifest.
 #
+# ⚠ PLANNED — NOT IMPLEMENTED. These CRD schemas describe the intended API
+# shape only: no controller exists in this repository, so no CR is ever
+# reconciled and no RLS / quota / plugin behavior is enforced. Kept for design
+# reference and structure tests (py/tests/test_k8s_operator.py).
+#
 # This file is a concatenation of the individual CRDs under crds/. It is provided
 # as a convenience for kubectl apply -f crd.yaml without Helm.
 #
@@ -40,8 +45,8 @@ spec:
           type: object
           description: >
             MaopAgent declares the desired state of a MAOP agent workload.
-            The operator reconciles this into a Deployment + Service + RLS
-            policies scoped to the configured tenant.
+            PLANNED — not implemented: no controller exists to reconcile this
+            into a Deployment + Service + RLS policies scoped to the tenant.
           required:
             - spec
           properties:
@@ -59,8 +64,9 @@ spec:
                 tenant:
                   type: string
                   description: >
-                    Tenant ID for multi-tenant isolation. The operator enforces
-                    RLS scoping and per-tenant quotas against this value.
+                    Tenant ID for multi-tenant isolation. PLANNED — not
+                    implemented: no controller enforces RLS scoping or
+                    per-tenant quotas against this value yet.
                 replicas:
                   type: integer
                   minimum: 0
@@ -208,8 +214,8 @@ spec:
           type: object
           description: >
             MaopTask represents a single orchestration task submitted to a MAOP
-            agent. The operator creates a bounded execution (pod / job), enforces
-            the tenant quota, and reports completion status.
+            agent. PLANNED — not implemented: no controller creates the bounded
+            execution (pod / job), enforces the tenant quota, or reports status.
           required:
             - spec
           properties:
@@ -227,7 +233,7 @@ spec:
                   description: User prompt / instruction for the agent.
                 tenant:
                   type: string
-                  description: Tenant ID for RLS scoping and quota enforcement.
+                  description: Tenant ID for RLS scoping and quota enforcement (planned — not implemented).
                 maxTurns:
                   type: integer
                   minimum: 1
@@ -377,8 +383,8 @@ spec:
           type: object
           description: >
             MaopWorkflow defines a multi-step agent orchestration as a DAG of
-            MaopTask nodes. The operator topologically sorts the steps, schedules
-            each as a MaopTask, and aggregates overall workflow status.
+            MaopTask nodes. PLANNED — not implemented: no controller currently
+            sorts the steps, schedules MaopTask runs, or aggregates status.
           required:
             - spec
           properties:
@@ -389,7 +395,7 @@ spec:
               properties:
                 tenant:
                   type: string
-                  description: Tenant ID for RLS scoping and quota enforcement.
+                  description: Tenant ID for RLS scoping and quota enforcement (planned — not implemented).
                 steps:
                   type: array
                   minItems: 1

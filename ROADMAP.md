@@ -76,7 +76,7 @@
   - **G-13 隐私政策/DPA**：`docs/privacy-policy.md` + `docs/terms-of-service.md` + `docs/dpa.md` + `docs/cla.md`。
   - **G-14 PG 高可用**：`deploy/patroni/`（Patroni 集群 + HAProxy）+ `docker-compose.prod.yml` PG replica + `docs/runbook.md`。
   - **G-16 CI Playwright E2E**：`.github/workflows/ci.yml` 增加 playwright job。
-  - **G-17 K8s Operator 集成测试**：`py/tests/test_k8s_operator.py` 支持 kind/k3s。
+  - **G-17 K8s Operator 集成测试**：`py/tests/test_k8s_operator.py` 目前**仅做结构断言**（Chart/controller/crd 文件存在性）+ 3 个 skip 占位，kind/k3s 集成验证待实现。
   - **G-09 性能压测**：`py/tests/performance/`（k6 + locust）+ `docs/capacity-planning.md`。
   - **G-10 LDAP 真实环境验证**：`py/tests/test_ldap_real_env.py` + `docs/ldap-integration-guide.md`。
 
@@ -172,7 +172,7 @@
 - **多后端编排器适配**：支持把 MAOP 编排目标导出为 Temporal / Airflow DAG，便于嵌入企业现有调度体系。
 - **Agent Marketplace**：社区共享 agent 配置与 prompt 模板，带版本与签名校验。（v5.1.0 Skill 市场已实现基础导入/导出，社区共享与签名校验仍待排期。）
 - **细粒度成本归因**：按 agent / phase / model 维度的实时成本归因与预算告警。
-- **原生 K8s Operator**：以 CRD 形式声明 MAOP 编排任务，由 Operator 调度执行。（v5.0.0 G-17 已实现 K8s Operator 集成测试基线，CRD 声明式调度已在 `deploy/k8s/operator/` 落地，进一步多租户/插件增强待排期。）
+- **原生 K8s Operator**：以 CRD 形式声明 MAOP 编排任务，由 Operator 调度执行。（**未实现 / planned**：`deploy/k8s/operator/` 目前只有规划中的 API 形状——无 kopf/kubernetes-client/watch controller 实现，`ghcr.io/maop/operator` 镜像无构建来源、未构建；结构测试仅断言文件存在，多租户/插件/RLS 均为 skip 占位，详见该目录 README §Status。）
 
 ## 维护规则
 

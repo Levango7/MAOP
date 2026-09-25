@@ -1,10 +1,18 @@
 # MAOP Operator Helm Chart — Packaging Guide
 
+> **Status: PLANNED — NOT IMPLEMENTED.** 本目录与父目录（`deploy/k8s/operator/`）
+> 只是规划中的 API 形状：仓库内没有 controller 实现，`ghcr.io/maop/operator`
+> 镜像也没有构建来源（未构建）。下列 `helm package` / `helm install` 步骤是
+> **目标流程**，当前执行不会得到可工作的 operator。详见 `../README.md §Status`。
+
 This directory documents how to package and distribute the MAOP operator Helm
 chart. The chart source lives in the parent directory (`deploy/k8s/operator/`);
 this `helm/` folder holds packaging artifacts and release notes.
 
 ## Chart location
+
+> 注意：下图列出的是规划中的文件布局；其中 `templates/`、`crds/`、
+> `crd.yaml`、`controller.yaml` 均为未实现的规划内容（结构测试只断言存在性）。
 
 ```
 deploy/k8s/operator/          ← chart root (Chart.yaml, values.yaml, templates/, crds/)
@@ -69,6 +77,8 @@ helm upgrade maop deploy/k8s/operator \
 ```
 
 ## Multi-tenant + plugins (production override)
+
+> 规划中的配置覆盖示例；`multiTenant` / `plugins` 行为均未实现。
 
 ```bash
 helm upgrade maop deploy/k8s/operator --namespace maop-system \

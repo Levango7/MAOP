@@ -1,14 +1,23 @@
-# MAOP Operator Controller — static deployment manifest.
+# ═══════════════════════════════════════════════════════════════════════════
+# ⚠ 未实现 / 不可部署（NOT IMPLEMENTED / NOT DEPLOYABLE）
 #
-# This file is a Helm-free, `kubectl apply -f controller.yaml`-ready deployment
-# for the MAOP operator controller. It mirrors the Helm chart templates/
-# rendered with default values (values.yaml). Use this for quick installs
-# without Helm; prefer the Helm chart for production (customizable RBAC,
-# replicas, multi-tenant quotas, plugin allowlist, etc.).
+# 本文件（以及整个 deploy/k8s/operator/ 目录）只是规划中的 API 形状
+# （planned API shape）与目标清单，不是可用的安装方式：
+#   - 仓库内没有任何 kopf / kubernetes-client / watch 的 controller 实现代码；
+#   - 镜像 ghcr.io/maop/operator 没有构建来源（无 Dockerfile、无构建 workflow），
+#     该镜像不存在、未构建（详见下方 image 行注释）。
+# 结构测试仅断言本文件存在（py/tests/test_k8s_operator.py），不代表功能可用。
+# `kubectl apply -f controller.yaml` 不会得到一个可工作的 operator。
+# Status 说明见 deploy/k8s/operator/README.md §Status。
+# ═══════════════════════════════════════════════════════════════════════════
 #
-# Apply order: crd.yaml first, then controller.yaml.
+# MAOP Operator Controller — static deployment manifest (planned).
 #
-#   kubectl apply -f crd.yaml
+# 目标形态：Helm-free 的 `kubectl apply -f controller.yaml` 部署清单，镜像
+# Helm chart templates/ 以默认 values.yaml 渲染的结果。实现落地后才可直接
+# 安装；当前仅作设计参考。Apply order: crd.yaml first, then controller.yaml.
+#
+#   kubectl apply -f crd.yaml     # 同样仅规划（CRD 无 controller 消费）
 #   kubectl apply -f controller.yaml
 ---
 apiVersion: v1
@@ -135,6 +144,9 @@ spec:
       serviceAccountName: maop-operator
       containers:
         - name: manager
+          # NOT BUILT: ghcr.io/maop/operator:5.2.0 不存在 —— 本仓库没有该镜像的
+          # 构建来源（无 Dockerfile、无构建 workflow）。此行仅为规划占位，
+          # 拉取会失败（ImagePullBackOff）。详见本文件顶部 Status 说明。
           image: ghcr.io/maop/operator:5.2.0
           imagePullPolicy: IfNotPresent
           args:

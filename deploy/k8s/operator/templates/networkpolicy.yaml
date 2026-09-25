@@ -1,6 +1,8 @@
 {{/*
-NetworkPolicy for MAOP Operator — restrict ingress to webhook + metrics ports only.
-P1 security fix (2026-09-17): enforces zero-trust network isolation in multi-tenant clusters.
+NetworkPolicy for MAOP Operator — planned: restricts ingress to webhook + metrics
+ports only. NOTE (PLANNED — NOT IMPLEMENTED): no operator controller/image exists,
+so no pods match this selector today; this manifest only describes intent.
+P1 security fix (2026-09-17).
 */}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

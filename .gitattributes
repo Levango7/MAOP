@@ -1,0 +1,5 @@
+# Python 源码与 PEM 统一 LF：MAOP 侧的热重载哈希、插件沙箱校验和
+# 以及 MAOS 的模块完整性清单都按归一化字节比对，避免校验与检出平台绑定
+# （详见 MAOS tests/test_public_key_fingerprint.py）。
+*.py text eol=lf
+*.pem text eol=lf

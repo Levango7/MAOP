@@ -51,20 +51,26 @@ jobs:
           path: dashboard-enterprise/playwright-report/
 
   soak-test:
-    name: Soak Test
+    name: Soak Test (manual — CI does not run it)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Install deps
-        run: pip install -e ./py[dev] --quiet
-      - name: Run soak tests
-        run: pytest py/tests/soak/ -v --timeout=600
-        env:
-          MAOP_ENV: 'test'
+      - name: Soak test is manual-only
+        # 诚实化（2026-09-25）：此前本 job 跑 `pytest py/tests/soak/ -v`，但该目录
+        # 只有 standalone 脚本 soak_test.py（无 test 函数）→ 实测
+        # `no tests collected`、退出码 5，nightly 因此恒红。
+        # 真实 soak 属 48h 级长跑（脚本默认 --duration 172800），且依赖 psutil
+        # —— psutil 未在 pyproject / requirements.lock 中声明，CI 环境没有；
+        # GitHub runner 也不适合长跑，故 CI 明确不执行（显式 exit 0），
+        # 由人工在长跑环境执行：
+        #   python py/tests/soak/soak_test.py --duration 172800   # 48h 完整
+        #   python py/tests/soak/soak_test.py --duration 600      # 10min 冒烟
+        # 退出码 0=PASS / 1=FAIL / 2=psutil 缺失；结果写在 deliverables/。
+        run: |
+          echo "soak-test is manual-only: CI does not run the 48h soak test."
+          echo "Run it in a long-run environment (needs psutil, undeclared in pyproject):"
+          echo "  python py/tests/soak/soak_test.py --duration 172800"
+          echo "exit code: 0=PASS, 1=FAIL, 2=psutil missing"
 
   flaky-detection:
     name: Flaky Test Detection
@@ -78,10 +84,25 @@ jobs:
       - name: Install deps
         run: pip install -e ./py[dev] --quiet
       - name: Run tests 3x to detect flaky
+        # 检测目标：同一套测试连跑 3 次，暴露「时好时坏」的不稳定测试。
+        # 诚实化（2026-09-25）：此前循环内每条 pytest 都带 `|| true`，job 恒绿、
+        # 永远发现不了任何问题；现在去掉 `|| true`，累计失败次数，
+        # 任意一次失败即 job 失败（失败 run 的用例 ID 见日志）。
         run: |
+          fails=0
           for i in 1 2 3; do
             echo "=== Run $i ==="
-            pytest py/tests/ -q --timeout=60 -m "not slow and not serial" --reruns=0 || true
+            if pytest py/tests/ -q --timeout=60 -m "not slow and not serial" --reruns=0; then
+              echo "run $i: PASS"
+            else
+              echo "::error::flaky-detection run $i FAILED"
+              fails=$((fails + 1))
+            fi
           done
+          echo "failed runs: $fails/3"
+          if [ "$fails" -ne 0 ]; then
+            echo "::error::$fails of 3 runs failed — treat as flaky/unstable"
+            exit 1
+          fi
         env:
           MAOP_ENV: 'test'

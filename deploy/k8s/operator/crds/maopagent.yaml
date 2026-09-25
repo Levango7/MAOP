@@ -1,3 +1,6 @@
+# ⚠ PLANNED — NOT IMPLEMENTED. This CRD schema describes the intended API shape
+# only: no controller exists in this repository (no kopf / kubernetes-client /
+# watch code), so no MaopAgent is ever reconciled. See ../README.md §Status.
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -27,8 +30,8 @@ spec:
           type: object
           description: >
             MaopAgent declares the desired state of a MAOP agent workload.
-            The operator reconciles this into a Deployment + Service + RLS
-            policies scoped to the configured tenant.
+            PLANNED — not implemented: no controller exists to reconcile this
+            into a Deployment + Service + RLS policies scoped to the tenant.
           required:
             - spec
           properties:
@@ -46,8 +49,9 @@ spec:
                 tenant:
                   type: string
                   description: >
-                    Tenant ID for multi-tenant isolation. The operator enforces
-                    RLS scoping and per-tenant quotas against this value.
+                    Tenant ID for multi-tenant isolation. PLANNED — not
+                    implemented: no controller enforces RLS scoping or
+                    per-tenant quotas against this value yet.
                 replicas:
                   type: integer
                   minimum: 0

@@ -54,7 +54,11 @@ def _file_hash(path: Path) -> str | None:
     if not path.exists():
         return None
     try:
-        return hashlib.sha256(path.read_bytes()).hexdigest()
+        # 行尾归一：同一份文件在 Windows 检出（CRLF）与 Linux CI（LF）下
+        # 不应被判定为「已变更」，否则跨平台开发会触发无意义的假重载。
+        return hashlib.sha256(
+            path.read_bytes().replace(b"\r\n", b"\n")
+        ).hexdigest()
     except Exception as exc:
         logger.warning(
             "[hot_reload] Failed to compute file hash for %s, treating as 'no change' "

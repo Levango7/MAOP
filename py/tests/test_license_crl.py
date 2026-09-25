@@ -37,15 +37,17 @@ def _make_license_info(customer: str = "Test Corp") -> LicenseInfo:
 def _make_crl(
     revoked: list[dict[str, Any]] | None = None,
     expires_in_hours: int = 1,
+    sign=None,
 ) -> dict:
-    """构造一个合法的 CRL JSON dict。"""
+    """构造一个合法的 CRL JSON dict（``sign`` 非空时追加 Ed25519 签名）。"""
     now = datetime.now(timezone.utc)
-    return {
+    payload = {
         "version": 1,
         "updated_at": now.isoformat(),
         "expires_at": (now + timedelta(hours=expires_in_hours)).isoformat(),
         "revoked": revoked or [],
     }
+    return sign(payload) if sign is not None else payload
 
 
 class _FakeResponse:
@@ -101,10 +103,10 @@ class TestCRLChecker:
         assert call_count["n"] == 0
 
     def test_revoked_license_rejected(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, crl_signer
     ) -> None:
         """配置 CRL URL，mock HTTP 返回含撤销条目的 CRL，验证抛 LicenseRevokedError。"""
-        crl = _make_crl(revoked=[
+        crl = _make_crl(sign=crl_signer, revoked=[
             {
                 "customer": "Bad Corp",
                 "revoked_at": "2026-07-25T14:30:00Z",
@@ -130,10 +132,10 @@ class TestCRLChecker:
         assert exc_info.value.revoked_at == "2026-07-25T14:30:00Z"
 
     def test_valid_license_passes_crl(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, crl_signer
     ) -> None:
         """配置 CRL URL，mock HTTP 返回不含撤销条目的 CRL，验证通过。"""
-        crl = _make_crl(revoked=[
+        crl = _make_crl(sign=crl_signer, revoked=[
             {
                 "customer": "Other Corp",
                 "revoked_at": "2026-07-20T10:00:00Z",
@@ -156,10 +158,10 @@ class TestCRLChecker:
         checker.check_license(info)
 
     def test_crl_cache_used_when_fetch_fails(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, crl_signer
     ) -> None:
         """第二次检查时 mock HTTP 失败，验证使用缓存。"""
-        crl = _make_crl(revoked=[])
+        crl = _make_crl(sign=crl_signer, revoked=[])
         call_count = {"n": 0}
 
         def fake_urlopen(req, timeout=None):
@@ -228,18 +230,18 @@ class TestCRLChecker:
         assert reason == ""
 
     def test_expired_crl_cache_refetches(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, crl_signer
     ) -> None:
         """缓存过期时重新拉取。"""
         # 1. 手动写入一个过期的缓存（mtime 设为 2 小时前）
-        old_crl = _make_crl(revoked=[])
+        old_crl = _make_crl(sign=crl_signer, revoked=[])
         cache_path = tmp_path / "crl.json"
         cache_path.write_text(json.dumps(old_crl), encoding="utf-8")
         old_time = time.time() - 7200
         os.utime(str(cache_path), (old_time, old_time))
 
         # 2. Mock HTTP 返回新 CRL（含新撤销条目）
-        new_crl = _make_crl(revoked=[
+        new_crl = _make_crl(sign=crl_signer, revoked=[
             {
                 "customer": "Newly Revoked",
                 "revoked_at": "2026-07-26T00:00:00Z",

@@ -1,8 +1,13 @@
 # Default values for maop-operator.
 # This file is intentionally documented to guide production overrides.
+#
+# ⚠ PLANNED — NOT IMPLEMENTED. These values describe the intended operator
+# configuration only; the repository contains no controller implementation and
+# the image below has never been built. See README.md §Status.
 
 # ── Operator controller image ──────────────────────────────────────
 image:
+  # NOT BUILT: no Dockerfile / build workflow for this image exists in the repo.
   repository: ghcr.io/maop/operator
   tag: "5.2.0"
   pullPolicy: IfNotPresent
@@ -27,7 +32,8 @@ controller:
   logLevel: info
   # Namespaces to watch. Empty = all namespaces (cluster-scoped).
   watchNamespaces: []
-  # Enable multi-tenant isolation (RLS + per-tenant quotas + audit).
+  # Enable multi-tenant isolation (planned: RLS + per-tenant quotas + audit;
+  # not implemented — no controller consumes this value).
   multiTenant:
     enabled: true
     # Default per-tenant quotas applied to new MaopAgent CRs.
@@ -36,7 +42,7 @@ controller:
       maxRequestsPerDay: 10000
       maxAgents: 20
       maxConcurrentTasks: 8
-  # Plugin system configuration.
+  # Plugin system configuration (planned — not implemented).
   plugins:
     enabled: true
     # Comma-separated allowlist of plugin names; empty = all discovered.

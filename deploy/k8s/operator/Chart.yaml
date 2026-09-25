@@ -1,9 +1,12 @@
 apiVersion: v2
 name: maop-operator
 description: |
-  Helm chart for the MAOP Kubernetes Operator — reconciles MaopAgent / MaopPipeline
-  custom resources into running agent workloads with multi-tenant isolation,
-  plugin loading, and RLS-aware data access.
+  PLANNED — NOT IMPLEMENTED. This chart only describes the intended shape of a
+  MAOP Kubernetes Operator for MaopAgent / MaopTask / MaopWorkflow custom
+  resources. No controller exists in this repository (no kopf / kubernetes-client
+  / watch code) and there is no container image build source, so nothing
+  reconciles CRs, enforces multi-tenant isolation / RLS, or loads plugins today.
+  `appVersion` names an image that has never been built. See README.md §Status.
 type: application
 version: 0.3.0
 appVersion: "5.2.0"
@@ -21,5 +24,7 @@ sources:
   - https://github.com/maop/maop
 dependencies: []
 annotations:
+  # Machine-readable status: this chart is a plan only (see description above).
+  "maop.io/implementation-status": "planned-not-implemented"
   "operators.operatorframework.io/bundle.package.v1": "maop-operator"
   "operators.operatorframework.io/bundle.channels.v1": "stable"

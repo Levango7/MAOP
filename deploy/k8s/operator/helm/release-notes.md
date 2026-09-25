@@ -1,5 +1,9 @@
 # MAOP Operator Helm Chart — Release Notes
 
+> **PLANNED — NOT IMPLEMENTED.** 下列条目描述的是规划中的 chart 内容与目标行为；
+> 仓库内没有 controller 实现，`ghcr.io/maop/operator` 镜像从未构建。
+> 详见 `../README.md §Status`。
+
 ## v0.3.0 (appVersion 4.5.0)
 
 ### Added
@@ -23,12 +27,13 @@
 - Admission webhooks now cover all three CR kinds (`maopagents`, `maoptasks`,
   `maopworkflows`).
 
-### Multi-tenant & plugins
-- `controller.multiTenant.enabled=true` (default) wires RLS scoping, per-tenant
-  quotas (`maxTokensPerDay`, `maxRequestsPerDay`, `maxAgents`,
+### Multi-tenant & plugins (planned — not implemented)
+- `controller.multiTenant.enabled=true` (default) is planned to wire RLS scoping,
+  per-tenant quotas (`maxTokensPerDay`, `maxRequestsPerDay`, `maxAgents`,
   `maxConcurrentTasks`), and audit logging into every reconciled workload.
-- `controller.plugins.enabled=true` (default) loads the typed plugin system
-  (`maop.core.plugins`) with `strictApi` enforcement.
+  No controller exists yet, so none of this is enforced.
+- `controller.plugins.enabled=true` (default) is planned to load the typed plugin
+  system (`maop.core.plugins`) with `strictApi` enforcement.
 
 ### Compatibility
 - CRD group: `maop.io`, version: `v1alpha1`, scope: `Namespaced`.

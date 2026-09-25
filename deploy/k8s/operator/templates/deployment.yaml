@@ -1,3 +1,9 @@
+{{/*
+⚠ PLANNED — NOT IMPLEMENTED. This template describes the intended controller
+Deployment only: there is no controller implementation and the referenced image
+(ghcr.io/maop/operator) has no build source in this repository, so it cannot be
+pulled. See ../README.md §Status.
+*/}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -34,6 +40,7 @@ spec:
       {{- end }}
       containers:
         - name: manager
+          # NOT BUILT: no Dockerfile / build workflow for this image exists in the repo.
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
