@@ -28,7 +28,7 @@ aiosqlite>=0.20.0
 sqlite-vec>=0.1.6
 # P0-C CVE audit (2026-08-26): 3.14.3 covers all CVEs reported against 3.13.x.
 # aiohttp 已于 2026-09-26 移除：全仓零 import（详见 pyproject.toml 同处说明）
-websockets>=12.0,<15
+websockets>=12.0,<17
 PyJWT>=2.13.0
 packaging>=24.0
 
