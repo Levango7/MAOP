@@ -54,7 +54,11 @@ def signed_tree(tmp_path, monkeypatch):
             if f.name == "__init__.py":
                 continue
             rel = f"maop/enterprise/{f.name}"
-            files[rel] = hashlib.sha256(f.read_bytes()).hexdigest()
+            # 行尾归一口径必须与 verify_module_integrity / collect_module_hashes
+            # 一致，否则 Windows（CRLF 检出）下本测试自己签的清单必被自己判为篡改。
+            files[rel] = hashlib.sha256(
+                f.read_bytes().replace(b"\r\n", b"\n")
+            ).hexdigest()
         signed_at = "2026-08-11T00:00:00+00:00"
         payload = json.dumps(
             {"files": files, "signed_at": signed_at,

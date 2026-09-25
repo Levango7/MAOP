@@ -100,15 +100,48 @@ print('公钥：public_key.pem（替换 py/maop/enterprise/keys/public_key.pem�
 - **备份**：私钥至少 2 份离线备份（不同物理位置）
 - **轮换**：建议每年轮换一次密钥对（需要为所有客户重新签发 license）
 
-> ⚠️ **警告**：仓库内 `scripts/dev_private_key.pem` 仅为开发测试用，**绝对不能**用于生产签发。该私钥已公开在代码仓库中，任何人都可获取。
+> ⚠️ **警告（2026-09-26 更正）**：本文件此前声称"仓库内 `scripts/dev_private_key.pem`
+> 已公开在代码仓库中"——经核对该文件**在 MAOP 与 MAOS 两仓的整个 git 历史中从未存在过**，
+> 该描述会误导密钥操作人，已删除。实际存在的非生产私钥只有两条路径，且都被 `.gitignore`
+> 排除、绝不入库：`scripts/ci_ephemeral_signing_key.pem`（CI 一次性，由
+> `ci_generate_test_key.py` 生成）与 `scripts/test_signing_key.pem`（本地开发用）。
+> 两者都**不得**用于生产签发（`issue_license.py` 已默认拒绝，需 `--allow-test-key` 才放行）。
 
-### 2.3 密钥轮换流程
+### 2.3 密钥轮换流程（runbook，2026-09-26 补全）
 
-1. 生成新密钥对
-2. 用新私钥为所有活跃客户重新签发 license
-3. 在下一个版本中更新包内的 public_key.pem
-4. 通知客户升级到新版本并更换 license key
-5. 旧密钥作废
+> ⚠️ 下列第 3、4 步是**必须**步骤，漏掉任何一步都会让整个企业包在客户侧被自己的
+> 防篡改机制拒绝（`License public key fingerprint mismatch` / `ModuleTamperError`）。
+> 历史上正是因为缺少这份 runbook，才在 2026-08-30 与 2026-09-26 两次丢失私钥。
+
+1. **生成新密钥对**（在离线机执行，私钥绝不放进仓库目录）：
+   ```
+   python scripts/issue_license.py --gen-keys      --public-out maop/enterprise/keys/public_key.pem      --private-out <仓库外的离线保管路径>
+   ```
+2. **验证私钥可打开并核对公钥**（防止写到一半丢盘）：用 `openssl pkey -in <私钥>` 或
+   `issue_license.py --key <私钥>` 试签一条测试 license。
+3. **更新打包公钥 + 硬编码指纹常量**：公钥即第 1 步的 `--public-out`；同时把
+   `maop/enterprise/license.py` 的 `_DEFAULT_PUBLIC_KEY_FINGERPRINT` 改为
+   **行尾归一后**的公钥 SHA-256：
+   ```
+   python -c "import hashlib;print(hashlib.sha256(     open('maop/enterprise/keys/public_key.pem','rb').read().replace(b'
+',b'
+')).hexdigest())"
+   ```
+   不改这一步，新公钥会被自己的 P1-1 指纹校验拒绝 → license 与完整性校验全废。
+4. **重签完整性清单并验证**：
+   ```
+   python scripts/sign_enterprise_modules.py --key <新私钥>
+   python scripts/verify_manifest.py            # 必须输出 OK
+   ```
+5. **私钥离线保管**：至少 2 份、不同物理位置；文件名带轮换日期；
+   **不要**使用 `scripts/test_signing_key.pem` 或 `scripts/ci_ephemeral_signing_key.pem`
+   作为保管位置（后者会被 CI 脚本覆盖，这正是两次丢钥匙的成因）。
+6. **用新私钥为所有活跃客户重新签发 license**，随新版本分发公钥，通知客户换 key；
+   旧密钥作废。若轮换时尚无任何客户 license 依赖旧公钥，则第 6 步可跳过。
+
+历史事故记录：`MAOS` 提交 `ddd17f9`（2026-08-30）——"本地原配对私钥在模拟 CI 密钥生成时
+被覆盖且未入库不可恢复"。2026-09-26 因同一路径再次丢失，遂完成上述轮换并把 CI 私钥
+路径分离、非 CI 环境默认拒绝执行。
 
 ```
 轮换时间线：
@@ -147,8 +180,8 @@ python scripts/generate_license.py `
 | 参数 | 必填 | 说明 |
 |------|------|------|
 | `--customer` | 是 | 客户/组织名称（写入 license payload） |
-| `--expires` | 是 | 过期日期（YYYY-MM-DD 格式，自动设为当日 23:59:59 UTC） |
-| `--private-key` | 否 | 私钥路径，默认 `scripts/dev_private_key.pem`（仅开发用） |
+| `--days` | 否 | license 有效天数（默认 365；无 `--expires` 这个参数） |
+| `--key` | **是** | 私钥路径（相对仓库根；2026-08 起必填，无默认值——旧文档写的 `--private-key` 不存在） |
 | `--max-users` | 否 | 最大并发用户数（不填 = 无限） |
 | `--fingerprint` | 否 | 机器指纹绑定（不填 = 不绑定） |
 | `--output` | 否 | 输出文件路径（不填 = stdout） |
@@ -303,7 +336,7 @@ curl http://localhost:9079/api/info/edition | python -m json.tool
 ## 7. 安全注意事项
 
 - **私钥绝不离开安全环境**：签发操作必须在离线机器或 HSM 上进行
-- **开发私钥不能用于生产**：`scripts/dev_private_key.pem` 仅用于测试
+- **测试/CI 私钥不能用于生产**：`scripts/test_signing_key.pem` 与 `scripts/ci_ephemeral_signing_key.pem` 仅用于测试（`issue_license.py` 默认拒绝，需 `--allow-test-key`）
 - **license key 不记录日志**：验证日志只记录 customer 和 expires_at，不记录完整 key
 - **定期审计**：每季度核对签发记录与活跃客户列表
 - **密钥泄露响应**：如私钥泄露，立即生成新密钥对 + 为所有客户重新签发 + 发布安全版本
@@ -328,12 +361,12 @@ python scripts/generate_license.py `
 
 | 文件 | 说明 |
 |------|------|
-| `py/maop/enterprise/license.py` | License 校验核心模块 |
-| `py/maop/enterprise/keys/public_key.pem` | 验证公钥（随包分发） |
-| `scripts/generate_license.py` | 签发 CLI 工具 |
-| `scripts/dev_private_key.pem` | 开发测试私钥（仅开发用） |
+| `MAOS: maop/enterprise/license.py` | License 校验核心模块（企业码在私有仓 MAOS） |
+| `MAOS: maop/enterprise/keys/public_key.pem` | 验证公钥（随包分发） |
+| `MAOS: scripts/issue_license.py` | 签发 CLI 工具（无 `generate_license.py`） |
+| `MAOS: scripts/ci_ephemeral_signing_key.pem` | CI 一次性私钥（gitignore，非生产用） |
 | `py/maop/config/edition.py` | Edition 检测与 license 集成 |
-| `py/tests/test_enterprise_license.py` | 13 个测试用例 |
+| `MAOS: tests/test_license.py`、`MAOP: py/tests/test_enterprise_license.py` | license 用例 |
 
 ### 8.3 相关 ADR
 
