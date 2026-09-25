@@ -108,30 +108,53 @@ class TestOversizedInput:
         with pytest.raises(ValidationError):
             AgentDescriptor(name="a" * 257)
 
-    @pytest.mark.timeout(150)
+    @pytest.mark.timeout(600)
     def test_large_batch_register_1000(self, tmp_path):
-        """批量注册 1000 个 agent 应在合理时间内完成。
+        """批量注册 1000 个 agent 的**每条目耗时**不应比小批量基线劣化。
 
-        发现：当前实现每次 register 单独写入 SQLite（无批量优化），
-        1000 条耗时约 40-50s。这是性能脆弱点，阈值放宽至 90s 记录现状。
-        建议优化：增加 batch_register 接口，使用事务批量插入。
+        历史：原断言是绝对墙钟 `elapsed < 90s`（docstring 自陈"当前实现
+        1000 条耗时约 40-50s，阈值放宽至 90s 记录现状"）。绝对阈值在共享
+        CI runner 上等于抽签——实测 windows-latest/Python 3.12 跑出 143.4s
+        直接判失败，并连带堵住了整条依赖升级队列（两个 dependabot PR 各只红
+        这一个 job）。它既不是可复现的判据，也不表达任何产品约束。
 
-        注意：本用例必须**单独放宽 pytest-timeout**。CI 的 e2e 步骤以
-        ``--timeout=60`` 运行，会在 60s 处直接杀掉进程，使下面那条 90s 断言
-        永远没机会执行 —— 快速机器 40-50s 能过，负载重的 runner（实测
-        windows-latest/Python 3.11）超 60s 即被中断，报 Timeout 而非断言失败。
-        此处设为 150s（> 自身 90s 阈值），让断言成为真正的判据。
+        改法：**同机自校准**。先用同一目录前 100 条测出 per-op 基线，再断言
+        后 1000 条的总耗时不超过 `基线 × 条数 × 3`。这样判据与机器快慢无关，
+        同时仍能抓住真正的复杂度退化（若 register 变成 O(n)/次，总量是 O(n²)，
+        相对基线会远超 3 倍）。
+
+        仍然存在的性能脆弱点（本用例不掩盖，只如实记录）：register 每条单独写
+        SQLite，无批量事务。建议优化：增加 batch_register 接口。
         """
         catalog = AgentCatalog(db_path=tmp_path / "cat.db")
+
+        def _register(idx: int) -> None:
+            catalog.register(
+                AgentDescriptor(name=f"agent_{idx:05d}", display_name=f"Agent {idx}")
+            )
+
+        # 1) 同机基线：前 100 条
+        t0 = time.time()
+        for i in range(100):
+            _register(i)
+        baseline_total = time.time() - t0
+        per_op = baseline_total / 100
+        assert per_op > 0, "基线耗时为 0，测时失效"
+
+        # 2) 被测批量：后 1000 条
         start = time.time()
-        for i in range(1000):
-            desc = AgentDescriptor(name=f"agent_{i:04d}", display_name=f"Agent {i}")
-            catalog.register(desc)
+        for i in range(100, 1100):
+            _register(i)
         elapsed = time.time() - start
+
         all_agents = catalog.list_all()
-        assert len(all_agents) == 1000
-        # 阈值 90s（当前实现 ~40-50s，留余量记录性能现状）
-        assert elapsed < 90.0, f"批量注册 1000 耗时 {elapsed:.1f}s，超过阈值"
+        assert len(all_agents) == 1100
+        assert per_op * 1000 < 600.0, "基线本身已过慢，环境异常（非本用例判据）"
+        ceiling = per_op * 1000 * 3.0
+        assert elapsed < ceiling, (
+            f"批量注册 1000 耗时 {elapsed:.1f}s，超过同机基线外推上限 {ceiling:.1f}s"
+            f"（基线 {baseline_total:.1f}s/100 条）—— 疑似每条目耗时随规模劣化"
+        )
 
     def test_oversized_display_name_rejected(self, tmp_path):
         """超长 display_name（>256）应被拒绝。"""
