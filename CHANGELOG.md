@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **企业版安装方式更正**：`pip install maop-enterprise` 不可用（该包与主包均未发布
   到 PyPI，实测两个包名都返回 404），改为从 GitHub Releases 下载 wheel 安装，
   与 MAOS README 口径统一；企业版模块数 25 → 26。
+- **MAOS 仓库可见性整改**：核实发现 MAOS 实际是 public（`gh repo view` 返回
+  `{"isPrivate":false}`），与 ADR-017"企业代码移至**私有**仓库物理隔离"的前提矛盾 ——
+  企业版源码任何人可读。经确认后已于 2026-09-26 转为 **private**。⚠️ 副作用：私有仓库的
+  Releases 资产不再匿名可下，客户交付须改为"直接发 wheel"或授权后 `gh release download`。
 - **移除 `aiohttp` 运行时依赖**：全仓无任何 `import aiohttp`（唯一命中是
   `plugin_sandbox` 的**禁用名单**正则），却为一个从不加载的栈承担 14 个 CVE 的审计面。
   外部插件若需要应自行声明。（pyproject / requirements.txt / requirements.lock 同步）

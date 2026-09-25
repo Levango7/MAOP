@@ -124,16 +124,18 @@ License 颁发指南见 [docs/enterprise/license-issuance-guide.md](docs/enterpr
 | 仓库 | 可见性 | 许可 | 内容 |
 |------|--------|------|------|
 | [Levango7/MAOP](https://github.com/Levango7/MAOP) | Public | MIT | 核心 + 个人版 |
-| [Levango7/MAOS](https://github.com/Levango7/MAOS) | **Public**（仓库公开但代码**不开源**） | Commercial | 企业版模块（26 个 .py 文件） |
+| [Levango7/MAOS](https://github.com/Levango7/MAOS) | **Private**（商业闭源） | Commercial | 企业版模块（26 个 .py 文件） |
 
 - `maop-orchestrator`（MIT）：核心 + 个人版功能，**不含** `maop/enterprise/`
-- `maop-enterprise`（Commercial，经 GitHub Releases 以 wheel 分发；仓库公开但代码不开源）：依赖 `maop-orchestrator`，提供 `maop/enterprise/` 模块
+- `maop-enterprise`（Commercial，**私有仓库**）：依赖 `maop-orchestrator`，提供 `maop/enterprise/` 模块。分发方式：由厂商直接交付 wheel，或授权客户用带 token 的 `gh release download` / Releases 页面下载（私有仓库的 Releases **不对外匿名可下**）
 
 ```bash
 # 个人版（不含企业代码）——注意：两个包均**未发布到 PyPI**（实测 pypi.org 返回 404），
 # 从 GitHub 子目录安装：
 pip install "maop-orchestrator @ git+https://github.com/Levango7/MAOP.git@master#subdirectory=py"
-pip install ./maop_enterprise-<版本>-py3-none-any.whl   # 企业版：从 GitHub Releases 下载 wheel 安装（未发布到 PyPI）
+# 企业版（私有仓库）：安装厂商交付的 wheel，或授权后用 gh 下载
+gh release download enterprise-v<版本> --repo Levango7/MAOS --pattern "*.whl"   # 需 gh auth login
+pip install ./maop_enterprise-<版本>-py3-none-any.whl
 ```
 
 `maop/enterprise/__init__.py` 在 import 时调用 `set_edition(Edition.ENTERPRISE)`，这是企业版包"存在即激活"的机制。
