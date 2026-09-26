@@ -1077,3 +1077,34 @@ class TestShortTermSearchMetadata:
         short = [r for r in results if r.get("layer") == "short_term"]
         assert short, "expected short_term results from facade.search"
         assert any(r.get("metadata") == {"source": "facade"} for r in short)
+
+
+class TestEvolutionThreadRegistry:
+    """record_feedback 触发的后台进化线程必须可被 join。
+
+    此前线程完全脱离管控：它可能活到测试的 MAOP_DATA_DIR 被还原、tmp_path 被
+    删除之后，届时 get_db_path() 解析到的是共享 data/maop.db，与其它 xdist
+    worker 抢同一文件；而 sqlite_connect 的"损坏即删除重建"分支当时还会把
+    "database is locked" 误判成损坏并删掉正在被使用的库 —— 对端写入已被
+    unlink 的页即在 macOS 上 SIGBUS（CI 表现为 worker node down，连带
+    .coverage 丢失、覆盖率门禁假红）。
+    """
+
+    def test_low_quality_feedback_registers_and_joins_thread(self, mem_env):
+        from maop.core.memory.episodic_store import (
+            _EVOLUTION_THREADS,
+            wait_for_evolution_threads,
+        )
+
+        eid = mem_env.episodic_store(task="registry probe", agent="claude", outcome="failure")
+        qd = QualityDimensions(correctness=0.1, completeness=0.1)
+        result = mem_env.submit_feedback(
+            eid, user_feedback="This is terrible and broken", quality_dimensions=qd
+        )
+
+        assert result["updated"] is True
+        assert "evolution_cycle_scheduled" in result["triggered_actions"]
+        assert any(t.name == "evolution-cycle" for t in _EVOLUTION_THREADS)
+        # 返回"等待后仍存活"的个数：>0 说明进化周期里又有失控的挂起点。
+        assert wait_for_evolution_threads(timeout_s=15.0) == 0
+        assert _EVOLUTION_THREADS == []
