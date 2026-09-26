@@ -37,6 +37,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+### websockets 版本范围改判（下界 12.0 → 14.0，上界 <15 → <17）
+
+原来的 `websockets>=12.0,<15` 两头都不对，用回环真连接测试逐版本实测（每个版本都确认
+`websockets.__version__` 真的是它）后改判：
+
+| websockets | 结果 |
+|---|---|
+| 12.0 / 13.0.1 / 13.1 | **失败** `TypeError: BaseEventLoop.create_connection() got an unexpected keyword argument 'additional_headers'` |
+| 14.0 / 14.2 / 15.0.1 / 16.1.1 | 通过（`tests/test_mcp_hub.py` + `tests/test_ide_extension_adapter.py` 各 72 passed） |
+| 17.1 | 也通过，但先不放开 —— 留在护栏外，需要时再抬到 `<18` |
+
+- **下界才是真问题**：`mcp_hub_transport` / `ide_extension_adapter` 用的 `additional_headers`
+  与"连接对象有 `.state` 没有 `.open`"都是新 asyncio 实现的特征，而顶层 `websockets.connect`
+  到 **14.0** 才默认指向它。所以 `>=12.0` 是一条从没成立过的承诺。
+- 原注释"websockets 14+ made breaking asyncio changes; cap below 15"方向反了：14 不是破坏源，
+  14 恰恰是能用的起点。
+- 新增回归测试 `TestWebSocketTransportRealConnection`（真起 `websockets.serve` 做 JSON-RPC
+  round-trip + `is_alive` 生命周期）；此前 `.open` 缺陷静默，就是因为所有用例都在测 mock。
+- CI 侧证据：macOS job 按新约束实装 websockets 16.1.1 且该用例通过。
+- dependabot `#15`（只抬上界到 `<17`、不修下界）由本节取代。
+- ⚠️ 过程记录：本 PR 第一版误以**过期的本地文件**为基线（`git fetch` 被别的会话留下的坏 ref 挡死），
+  把 `pydantic-settings 2.15.0 / uvicorn 0.53.0 / mmh3 5.3.0` 静默回退了；逐行 diff 复核时发现，
+  已改为"一律以 master 内容为基准重建"。同期 #23 也因同一原因回退过前端 11 项依赖，见 #25。
+
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
 ### 前端补 `vue-tsc` 类型门禁
@@ -97,8 +121,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   签名。原测试只在 `_ws is None` 的短路分支覆盖，真实连接从未测到，故长期未暴露。
   现改为优先读 `.state`（新旧实现都有），拿不到才回退 `.open`；新增 4 条用例，
   回滚验证（把实现改回旧写法）确认新用例以 `AttributeError: open` 失败。
-- ⚠️ **`websockets<15` 这条上限保护不了它声称的东西**：上限内的 14.2 已经是新实现，
-  真正的破坏（`.open` 消失）在 14 就已发生。是否放宽到 `<17` 与该缺陷无关。
+- ⚠️ **`websockets<15` 这条上限保护不了它声称的东西**（当时结论，已按实测在下节落地）：
+  上限内的 14.2 已经是新实现，真正的破坏（`.open` 消失）在 14 就已发生。
 
 ### SQLite「损坏即删除重建」范围收紧 —— 主干 CI 崩溃根因（实测）
 
