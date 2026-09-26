@@ -1,4 +1,3 @@
-
 """Tests for HarnessAuthProvider — Harness LICENSE 授权提供者测试。
 
 覆盖：
