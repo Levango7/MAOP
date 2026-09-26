@@ -1,4 +1,3 @@
-
 """SandboxExecutor 白盒测试.
 
 覆盖：SandboxConfig/SandboxResult 构造、配置验证、权限检查、
