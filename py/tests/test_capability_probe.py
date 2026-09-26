@@ -1,4 +1,3 @@
-
 """CapabilityProbe 白盒测试.
 
 覆盖：ProbeResult 构造、静态分析（基于 AgentDescriptor）、动态探测
