@@ -1,4 +1,4 @@
-// ESLint 9.x Flat Config
+// ESLint 9+ Flat Config
 //
 // 由 .eslintrc.json 迁移而来，适配 ESLint 9.x flat config 格式。
 // 参考：
@@ -6,8 +6,9 @@
 //   - https://eslint.vuejs.org/recommended-rules.html
 //
 // 说明：
-//   - 依赖 @eslint/js（ESLint 9.x 自带）、eslint-plugin-vue（已声明于 devDependencies）
-//   - 依赖 globals 包（ESLint 传递依赖，用于声明标准环境全局变量）
+//   - 依赖 @eslint/js 与 eslint-plugin-vue（两者均已显式声明于 devDependencies）
+//   - 依赖 globals 包（显式声明；此前它只是 eslint 9 的传递依赖被提升才碰巧可解析，
+//     eslint 10 不再依赖 @eslint/js / globals，不显式声明就会 ERR_MODULE_NOT_FOUND）
 //   - 依赖 eslint-config-prettier（关闭与 Prettier 冲突的格式化规则）
 
 import js from '@eslint/js';
