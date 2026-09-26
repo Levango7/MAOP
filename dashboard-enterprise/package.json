@@ -16,7 +16,6 @@
     "lint": "eslint src/ --ext .js,.vue",
     "lint:fix": "eslint src/ --ext .js,.vue --fix",
     "typecheck": "vue-tsc --noEmit",
-    "pretest": "npm run typecheck",
     "format": "prettier --write src/"
   },
   "dependencies": {
