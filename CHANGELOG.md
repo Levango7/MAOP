@@ -60,6 +60,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 同类 CRLF 敏感哈希清理与完整性测试夹具修正见 `54bf1ef`；通知接口身份/租户
   fail-closed 隔离见 `eb8d914`。
 
+### 依赖批次（dependabot）与 MCP WebSocket 存活判定修复
+
+- **合入**：#16 `actions/checkout` 4→7、#1 `setup-python` 5→7、#2 `setup-node` 4→7、
+  #17 npm-minor 组、#13 pydantic-settings/uvicorn 等、#14 `hvac>=2.4`、
+  #6 `eslint-plugin-vue` 9→10、#11 `vue-router` 4→5、#10 `jsdom` 26→30（待 CI 收尾）。
+  逐项以"该 PR 自己的 CI run 全绿 + Playwright E2E 96 passed + vitest 478 passed"为准，
+  未绿不合并。
+- **拒绝/挂起（有据）**：#12 `vis-data` 7→8 关闭 —— `vis-network@9.1.13` 要求
+  `vis-data@^7.1.0`，本地 `npm ci` 与 CI Frontend Build 双向证实冲突，须与 vis-network
+  10 同批升级；#7 `eslint` 9→10 在 #6 落地前不可安装（`eslint-plugin-vue@9` 的 peer
+  上界是 eslint 9，ERESOLVE）；#15 放宽 `websockets<15` 上限留待决策（见下）。
+- **修复 `_WebSocketTransport.is_alive`**（`mcp_hub_transport.py`）：原实现
+  `self._ws is not None and self._ws.open` 在**当前依赖范围内即失效** ——
+  `pyproject` 允许到 14.x，而实测 websockets 14.2 下 `websockets.connect` 返回
+  `websockets.asyncio.client.ClientConnection`，该类**没有** `.open` 属性
+  （`AttributeError`），只有 `.state`；`start()` 传的 `additional_headers` 也正是新实现的
+  签名。原测试只在 `_ws is None` 的短路分支覆盖，真实连接从未测到，故长期未暴露。
+  现改为优先读 `.state`（新旧实现都有），拿不到才回退 `.open`；新增 4 条用例，
+  回滚验证（把实现改回旧写法）确认新用例以 `AttributeError: open` 失败。
+- ⚠️ **`websockets<15` 这条上限保护不了它声称的东西**：上限内的 14.2 已经是新实现，
+  真正的破坏（`.open` 消失）在 14 就已发生。是否放宽到 `<17` 与该缺陷无关。
+
 ## [Unreleased]
 
 ### Docs

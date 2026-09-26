@@ -2,6 +2,7 @@
 
 import shutil
 import tempfile
+from types import SimpleNamespace
 
 import pytest
 
@@ -152,6 +153,32 @@ class TestWebSocketTransport:
         cfg = MCPServerConfig(name="test", transport=TransportType.WEBSOCKET, url="ws://localhost:8080")
         t = _WebSocketTransport(cfg)
         assert t.is_alive is False
+
+    @pytest.mark.parametrize("state_name,expected", [("OPEN", True), ("CLOSING", False), ("CLOSED", False)])
+    def test_is_alive_reads_new_asyncio_state(self, state_name, expected):
+        # websockets ≥13.1 起 websockets.connect 返回 ClientConnection，它没有 legacy 的
+        # .open 属性（实测 14.2：AttributeError）。用 __getattr__ 复刻这一点，
+        # 否则旧实现只在 _ws is None 的短路分支被测到，真实连接从未覆盖。
+        class NewStyleConn:
+            def __init__(self, name):
+                self.state = SimpleNamespace(name=name)
+
+            def __getattr__(self, item):
+                raise AttributeError(item)
+
+        cfg = MCPServerConfig(name="test", transport=TransportType.WEBSOCKET, url="ws://localhost:8080")
+        t = _WebSocketTransport(cfg)
+        t._ws = NewStyleConn(state_name)
+        assert t.is_alive is expected
+
+    def test_is_alive_falls_back_to_legacy_open(self):
+        class LegacyConn:
+            open = True
+
+        cfg = MCPServerConfig(name="test", transport=TransportType.WEBSOCKET, url="ws://localhost:8080")
+        t = _WebSocketTransport(cfg)
+        t._ws = LegacyConn()
+        assert t.is_alive is True
 
 
 class TestMCPTool:
