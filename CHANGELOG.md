@@ -84,6 +84,15 @@ lock 仍停在 `2.5.2 / 0.30.6 / 5.2.1`；照 lock 装环境的人拿到的是�
   transitive 条目仍是手写的 `>=` 范围而非精确 pin。要做到"可复现构建"得
   在干净 venv 里 `pip install -r requirements.txt && pip freeze` 重新生成，属独立立项。
 
+### 类型门禁改为显式 CI 步骤（拿到 `workflow` scope 后的收尾）
+
+#23 当时因为 gh token 无 `workflow` scope（GitHub 对改 `.github/workflows/*` 的写入直接拒绝），
+只能把 `vue-tsc --noEmit` 借道 npm 的 `pretest` 生命周期生效。权限到位后按原计划改为显式形态：
+
+- `.github/workflows/ci.yml` 的 frontend job 新增 `- name: Type check (vue-tsc)`（紧跟 `Lint frontend`）。
+- `package.json` 删掉 `pretest`：门禁要在 CI 里**看得见、失败能归因到具体步骤**，不藏在 `npm test` 背后；
+  本地 `npm test` 也回到只跑测试。`typecheck` 脚本保留。
+
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
 ### 前端补 `vue-tsc` 类型门禁
