@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.thread_join_guard import join_all
+
 # Ensure doc-pipeline is importable (configurable via env var, fallback to default)
 DOC_PIPELINE_ROOT = Path(os.environ.get("DOC_PIPELINE_ROOT", r"F:\Nexus\Workflow\doc-pipeline"))
 if DOC_PIPELINE_ROOT.is_dir() and str(DOC_PIPELINE_ROOT) not in sys.path:
@@ -184,6 +186,7 @@ class TestAsyncWebhookEngine:
             server.shutdown()
             shutdown_webhook(timeout_s=2.0)
 
+    @pytest.mark.timeout(240)
     def test_concurrent_emits_thread_safety(self):
         """Multiple threads emitting simultaneously should be safe."""
         from pipeline_core.event_hook import get_hook_manager, shutdown_webhook
@@ -203,8 +206,7 @@ class TestAsyncWebhookEngine:
         threads = [threading.Thread(target=worker, name=f"W{i}") for i in range(10)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert len(errors) == 0, f"Concurrent emit errors: {errors}"
 

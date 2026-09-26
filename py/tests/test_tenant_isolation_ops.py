@@ -23,6 +23,7 @@ from maop.core.agent.ops.tenant_isolation import (
     TenantQuota,
     TenantUsage,
 )
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
@@ -330,6 +331,7 @@ class TestUsage:
 class TestThreadSafety:
     """线程安全测试。"""
 
+    @pytest.mark.timeout(240)
     def test_concurrent_create_tenant(self, iso: TenantIsolation) -> None:
         """并发创建租户不抛异常。"""
         errors: list[Exception] = []
@@ -347,12 +349,12 @@ class TestThreadSafety:
         threads = [threading.Thread(target=_run, args=(i,)) for i in range(10)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == []
         assert len(iso.list_tenants()) == 10
 
+    @pytest.mark.timeout(240)
     def test_concurrent_assign_agent(
         self, iso: TenantIsolation, tenant_id: str,
     ) -> None:
@@ -370,8 +372,7 @@ class TestThreadSafety:
         threads = [threading.Thread(target=_run, args=(i,)) for i in range(10)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == []
         agents = iso.get_tenant_agents(tenant_id)

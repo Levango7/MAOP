@@ -22,6 +22,7 @@ from maop.core.agent.registry.agent_catalog import (
     AgentCatalog,
     AgentDescriptor,
 )
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
@@ -241,6 +242,7 @@ class TestSingleCapabilityProbe:
 class TestThreadSafety:
     """线程安全测试。"""
 
+    @pytest.mark.timeout(240)
     def test_concurrent_probe(self, probe: CapabilityProbe, catalog: AgentCatalog) -> None:
         """并发探测不抛异常。"""
         catalog.register(_make_descriptor("agent-t", [AgentCapability.CHAT]))
@@ -255,8 +257,7 @@ class TestThreadSafety:
         threads = [threading.Thread(target=_run) for _ in range(10)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == []
         stats = probe.get_stats()

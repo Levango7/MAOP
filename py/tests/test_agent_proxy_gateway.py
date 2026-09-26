@@ -23,6 +23,7 @@ from maop.core.agent.auth.agent_proxy_gateway import (
     DepartmentBudget,
     ProxyRule,
 )
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ──────────────────────────────────────────────────────
 
@@ -297,6 +298,7 @@ class TestPersistence:
 
 
 class TestConcurrency:
+    @pytest.mark.timeout(240)
     def test_concurrent_access(self, tmp_path: Any):
         """多线程并发读写应不丢数据、不崩溃。"""
         gw = AgentProxyGateway(db_path=tmp_path / "concurrent.db")
@@ -326,8 +328,7 @@ class TestConcurrency:
         threads = [threading.Thread(target=worker, args=(t,)) for t in range(num_threads)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == [], f"并发错误: {errors}"
         # 验证数据完整性——每线程写入 ops_per_thread 条规则。
@@ -337,6 +338,7 @@ class TestConcurrency:
         assert len(events) == num_threads * ops_per_thread
         gw.close()
 
+    @pytest.mark.timeout(240)
     def test_concurrent_budget_consume(self, tmp_path: Any):
         """多线程并发扣减预算——总扣减不超过月预算。"""
         gw = AgentProxyGateway(db_path=tmp_path / "budget_concurrent.db")
@@ -355,8 +357,7 @@ class TestConcurrency:
         threads = [threading.Thread(target=worker) for _ in range(num_threads)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         summaries = gw.get_budget_summary()
         assert summaries[0].used == num_threads * ops_per_thread * cost_per_op
