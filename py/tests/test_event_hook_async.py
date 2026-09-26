@@ -1,4 +1,3 @@
-
 """Tests for EventHook async webhook delivery (asyncio.Queue + aiohttp)."""
 import os
 import sys
