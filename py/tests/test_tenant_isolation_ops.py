@@ -1,4 +1,3 @@
-
 """TenantIsolation 白盒测试（maop.core.agent.ops.tenant_isolation）.
 
 覆盖：Tenant/TenantQuota/TenantUsage 构造、租户 CRUD、Agent 分配、
