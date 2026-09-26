@@ -1,3 +1,4 @@
+
 """UsageStatistics 白盒测试.
 
 覆盖：调用记录 / 统计聚合 / 排名 / 智能推荐 / 成本分析 / 持久化 / 线程安全。
@@ -19,6 +20,7 @@ from maop.core.agent.ops.usage_statistics import (
     CostAnalysis,  # noqa: F401
     UsageStatistics,
 )
+from tests.thread_join_guard import join_all
 
 # ── Mock Catalog（模拟 AgentCatalog，用于推荐测试）──────────────
 
@@ -323,6 +325,7 @@ class TestPersistenceAndConcurrency:
         assert stats_obj.total_calls == 1
         assert stats_obj.success_count == 1
 
+    @pytest.mark.timeout(240)
     def test_thread_safety(self, stats_mgr: UsageStatistics) -> None:
         """多线程并发记录不应丢失数据。"""
         num_threads = 10
@@ -347,8 +350,7 @@ class TestPersistenceAndConcurrency:
         ]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == []
         all_stats = stats_mgr.get_all_stats(period="all")
