@@ -181,6 +181,50 @@ class TestWebSocketTransport:
         assert t.is_alive is True
 
 
+class TestWebSocketTransportRealConnection:
+    """真起一个回环 WebSocket 服务端，走完整 start/send/is_alive/stop。
+
+    只测 mock 会漏掉"客户端 API 随 websockets 大版本改名/移除"这类破坏 ——
+    `.open` → `.state` 就是这么漏掉的（见 2026-09-26 修复）。这条用例同时是
+    是否放宽 `websockets<15` 上限的判据：版本变了先看它红不红。
+    """
+
+    async def test_round_trip_and_liveness(self):
+        websockets = pytest.importorskip("websockets")
+        import json as _json
+        import socket
+
+        async def handler(connection):
+            async for raw in connection:
+                req = _json.loads(raw)
+                await connection.send(
+                    _json.dumps({"jsonrpc": "2.0", "id": req.get("id"), "result": {"ok": True}})
+                )
+
+        probe = socket.socket()
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+        probe.close()
+
+        server = await websockets.serve(handler, "127.0.0.1", port)
+        cfg = MCPServerConfig(
+            name="ws-real", transport=TransportType.WEBSOCKET, url=f"ws://127.0.0.1:{port}"
+        )
+        transport = _WebSocketTransport(cfg)
+        try:
+            await transport.start()
+            assert transport.is_alive is True
+            response = await transport.send_request("tools/list")
+            assert response["result"] == {"ok": True}
+            assert response["id"] == 1
+        finally:
+            await transport.stop()
+            server.close()
+            await server.wait_closed()
+
+        assert transport.is_alive is False
+
+
 class TestMCPTool:
     def test_tool_creation(self):
         tool = MCPTool(
