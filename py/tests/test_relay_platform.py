@@ -1,3 +1,4 @@
+
 """第三方中转平台管理器测试。
 
 覆盖：
@@ -31,6 +32,7 @@ from maop.core.agent.llm_chat.relay_platform import (
     RelayPlatformManager,
     reset_relay_platform_manager,
 )
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ──────────────────────────────────────────────────────
 
@@ -399,6 +401,7 @@ def test_rate_limit_tracking(manager: RelayPlatformManager):
 # ═══════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.timeout(240)
 def test_concurrent_access(manager: RelayPlatformManager):
     """多线程并发注册/查询/删除不产生竞争错误。"""
     num_threads = 10
@@ -422,14 +425,14 @@ def test_concurrent_access(manager: RelayPlatformManager):
     threads = [threading.Thread(target=worker, args=(t,)) for t in range(num_threads)]
     for t in threads:
         t.start()
-    for t in threads:
-        t.join()
+    join_all(threads, 120.0)
 
     assert errors == [], f"并发访问产生错误: {errors}"
     # 所有平台都已删除
     assert len(manager.list_platforms()) == 0
 
 
+@pytest.mark.timeout(240)
 def test_concurrent_register_and_list(manager: RelayPlatformManager):
     """并发注册 + 列表查询混合操作。"""
     errors: list[Exception] = []
@@ -454,8 +457,7 @@ def test_concurrent_register_and_list(manager: RelayPlatformManager):
         threads.append(threading.Thread(target=lister))
     for t in threads:
         t.start()
-    for t in threads:
-        t.join()
+    join_all(threads, 120.0)
 
     assert errors == []
     assert len(manager.list_platforms()) == 30
