@@ -1,4 +1,3 @@
-
 """Tests for MAOP Phase γ-2 — Priority queue + soft preemption scheduling.
 
 Covers:
