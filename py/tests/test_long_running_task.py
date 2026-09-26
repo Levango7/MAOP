@@ -1,3 +1,4 @@
+
 """长任务管理器测试 — 覆盖 LongRunningTaskManager 全生命周期.
 
 测试用 ``tmp_path`` 隔离 SQLite，每个测试独立数据库，互不干扰。
@@ -30,6 +31,7 @@ from maop.core.agent.router.long_running_task import (
     LongRunningTask,
     LongRunningTaskManager,
 )
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ──────────────────────────────────────────────────────
 
@@ -273,6 +275,7 @@ class TestPersistence:
 class TestConcurrency:
     """测试并发安全."""
 
+    @pytest.mark.timeout(240)
     def test_concurrent_submit(self, manager):
         """多线程并发提交应全部成功，task_id 互不相同."""
         num_threads = 10
@@ -297,8 +300,7 @@ class TestConcurrency:
         ]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         # 所有 ID 应唯一
         assert len(all_ids) == num_threads * tasks_per_thread
