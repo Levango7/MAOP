@@ -37,6 +37,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - 2026-09-26（前端类型门禁）
+
+### 前端补 `vue-tsc` 类型门禁
+
+`dashboard-enterprise` 此前**没有任何类型检查**：`build` 只是 `vite build`，CI 的 frontend job
+跑 `npm ci` / `npm run lint`（eslint）/ `npm test`（vitest）/ `npx vite build`，全仓只有 1 个 `.ts`
+文件（`src/env.d.ts`）——所以 `typescript` 那个 devDependency 升 5.9→7.0（dependabot #9）在 CI 上
+零验证，发布 checklist 里却写着"lint + type check"。
+
+- 新增 `typecheck` 脚本 = `vue-tsc --noEmit`（`vue-tsc ^3.3.11` 入 devDependencies，lockfile 重算）。
+- **接到 `pretest` 生命周期**（`pretest` → `typecheck`）：CI 的 frontend job 本来就会跑 `npm test`，
+  因此不改任何 workflow 文件就能生效（现实约束：本机 gh token 无 `workflow` scope，GitHub 对
+  workflow 文件的写入直接 404）。等能改 workflow 时应换成显式 `- name: Type check (vue-tsc)` 步骤。
+- 实测边界：现仓库 **0 errors**；变异测试确认门禁真会失败（把 `const x: number = "s"` 写进 `.ts`
+  → `error TS2322` + exit 2，且 `npm test` 直接 exit 2、vitest 不再执行）。覆盖 `.ts/.d.ts` 的类型错误、
+  `.vue` 里把 TS 语法写进 JS script 块（TS8010）；**不覆盖**纯 JS 表达式的类型错误
+  （`checkJs: false` —— 打开会一次涌出 **2898** 个既有错误，属单独立项的 ratchet，不在本次范围）。
+
 ## [Unreleased] - 2026-09-26
 
 ### 文档与依赖口径更正（配合 MAOS 5.2.2）
