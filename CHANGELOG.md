@@ -82,6 +82,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚠️ **`websockets<15` 这条上限保护不了它声称的东西**：上限内的 14.2 已经是新实现，
   真正的破坏（`.open` 消失）在 14 就已发生。是否放宽到 `<17` 与该缺陷无关。
 
+### SQLite「损坏即删除重建」范围收紧 —— 主干 CI 崩溃根因（实测）
+
+`sqlite_connect()` 此前 `except sqlite3.DatabaseError` 一律删库重建，而
+`sqlite3.OperationalError` 是 `DatabaseError` 的**子类** —— 于是
+`database is locked` / `unable to open database file` / `disk I/O error` /
+`attempt to write a readonly database` 都会被判成"损坏"，把**别的连接正在写的库**直接
+unlink（本机实测 `py/data/maop.db` 已被测试写到 372MB —— 就是这些泄漏线程的落点）。
+链路上还有第二个放大器：`_open_and_init()` 在
+PRAGMA 抛错时不关闭已经建立的连接（句柄一直捏着文件），Windows 上使重建路径的
+`unlink` 直接失败（`WinError 32 另一个程序正在使用此文件`），损坏恢复在 Windows 上其实
+从未真正走通过。
+
+崩溃链条（CI 上抓到的现场）：`record_feedback()` 触发的 fire-and-forget 守护线程
+（`episodic_store.py`）活过测试的 `MAOP_DATA_DIR` 还原与 `tmp_path` 删除 →
+`get_db_path()` 届时解析到共享的 `data/maop.db` → 多个 xdist worker 并发抢锁 →
+`database is locked` → 触发上面的删除 → 另一个 worker 对已被 unlink 的页写入
+→ macOS `Fatal Python error: Bus error` → `[gw1] node down: Not properly terminated`
+→ pytest 仍报全绿但该 worker 的 `.coverage` 丢失 → `Coverage ratchet gate` 读到
+66.09% vs 基线 81.00% 假红。**三种"flaky"症状同源**，此前被当成三个独立问题。
+
+- 仅当 sqlite 明确报"文件不是/已损坏的数据库镜像"时才允许删除重建
+  （`_recoverable_corruption` 白名单）；其余错误原样抛出。
+- `_open_and_init()` 失败路径补 `conn.close()`。
+- 进化线程登记 + `wait_for_evolution_threads()`，在测试隔离环境还原前收口。
+- 新增 5 条用例：分类器双向断言、锁冲突下**文件必须存活且数据完整**、真损坏仍重建、
+  线程登记与 join。锁冲突那条此前无法通过（它正是删除分支被误触发的路径）。
+
 ## [Unreleased]
 
 ### Docs
