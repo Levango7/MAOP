@@ -1,3 +1,4 @@
+
 """HealthScorer 白盒测试.
 
 覆盖：记录 / 评分计算 / 滑动窗口 / 排序 / 重置 / 持久化 / 线程安全 / 异常。
@@ -12,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from maop.core.agent.ops.health_scorer import HealthScore, HealthScorer  # noqa: F401
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
@@ -272,6 +274,7 @@ class TestValidation:
 class TestThreadSafety:
     """多线程并发记录。"""
 
+    @pytest.mark.timeout(240)
     def test_concurrent_record(self, scorer: HealthScorer) -> None:
         """多线程并发记录不应丢失数据或抛异常。"""
         num_threads = 10
@@ -286,8 +289,7 @@ class TestThreadSafety:
         threads = [threading.Thread(target=worker) for _ in range(num_threads)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         score = scorer.get_score("agent-a")
         # window_size=100，所以最多保留 100 条
