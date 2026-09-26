@@ -1,3 +1,4 @@
+
 """Tests for maop.core.scheduling.failure_detector — adaptive scheduling weights.
 
 Covers:
@@ -30,6 +31,7 @@ from maop.core.scheduling.failure_detector import (
     get_failure_detector,
     set_failure_detector,
 )
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ──────────────────────────────────────────────────────
 
@@ -353,6 +355,7 @@ def test_full_recovery_publishes_agent_recovered_event(detector_with_bus):
 # ── 10. Thread safety ─────────────────────────────────────────────
 
 
+@pytest.mark.timeout(240)
 def test_concurrent_record_result_is_safe(detector: FailurePatternDetector):
     """Concurrent record_result calls from multiple threads do not crash."""
     errors: list[Exception] = []
@@ -370,8 +373,7 @@ def test_concurrent_record_result_is_safe(detector: FailurePatternDetector):
     ]
     for t in threads:
         t.start()
-    for t in threads:
-        t.join()
+    join_all(threads, 120.0)
     assert errors == []
     assert detector.get_stats()["total_agents"] == 4
 
