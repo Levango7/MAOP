@@ -151,6 +151,13 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from maop.config.settings import reload_settings
     reload_settings()
     yield
+    # 先收口后台进化线程：它们在测试结束后才跑完时会重新解析 get_db_path()，
+    # 那时 MAOP_DATA_DIR 已被还原、tmp_path 即将被删 → 会写到共享的
+    # data/maop.db 并与其它 xdist worker 抢锁（历史上还会触发把在用的库当损坏
+    # 删掉，表现为 worker SIGBUS/node down + 覆盖率门禁假红）。monkeypatch 的还
+    # 原发生在本 fixture 结束之后，所以此刻环境仍是本测试隔离的 tmp 目录。
+    from maop.core.memory.episodic_store import wait_for_evolution_threads
+    wait_for_evolution_threads(timeout_s=15.0)
     # 每个测试后清空 ConnectionPool 单例池：每个测试独立 MAOP_DATA_DIR 产生
     # 独立 db_path → 独立池 → 连接句柄跨测试累积，进程 GC 时才回收 →
     # ResourceWarning: unclosed database 洪泛（xdist 全量下耗尽 worker 句柄）。
