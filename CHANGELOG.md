@@ -61,15 +61,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   把 `pydantic-settings 2.15.0 / uvicorn 0.53.0 / mmh3 5.3.0` 静默回退了；逐行 diff 复核时发现，
   已改为"一律以 master 内容为基准重建"。同期 #23 也因同一原因回退过前端 11 项依赖，见 #25。
 
+### requirements.lock 与 pyproject 的镜像关系加上机械强制
+
+`requirements.lock` 的表头一直写着「Source of truth for DIRECT deps: pyproject.toml.
+This file mirrors it」，但**没有任何东西强制它** —— 实测漂移：dependabot #13 抬了
+`pydantic-settings / uvicorn / mmh3` 的 pin 只改了 pyproject 与 requirements.txt，
+lock 仍停在 `2.5.2 / 0.30.6 / 5.2.1`；照 lock 装环境的人拿到的是旧版本。
+
+- 新增守卫 `py/tests/test_requirements_lock_sync.py`（3 条）：直依赖段与 `enterprise` 段
+  必须逐条镜像 pyproject（名字集合 + 约束文本都相等），requirements.txt 不得少包。
+  不用 `tomllib`：CI 矩阵含 Python 3.10，它是 3.11 才进标准库的，故用一个只解析
+  `name = [ ... ]` 数组的窄解析器。
+- lock 里给两段各加显式结束标记（`# END DIRECT DEPENDENCIES` /
+  `# END ENTERPRISE DEPENDENCIES`）：extras 段的标题只是普通注释，靠"下一条注释"划界会把
+  enterprise 条目误读进直依赖段（第一版守卫测试就是这么误报的）。
+- 消除现存漂移：`pydantic-settings==2.15.0`、`uvicorn[standard]==0.53.0`、`mmh3==5.3.0`、
+  `pyyaml>=6.0.2,<7.0.0`（以上随 #24 顺带落了），本 PR 补最后一处
+  `websockets>=12.0,<15 → >=14.0,<17`，并把只属 extras 的 `lxml` 移出直依赖段。
+- 变异验证：把 lock 的 websockets 改回 `>=12.0,<15` → 守卫立刻失败并打印
+  `{'websockets': ('websockets>=14.0,<17', 'websockets>=12.0,<15')}`；改回正确值 → 3 passed。
+- ⚠️ 仍未解决（另案）：这个文件按自身表头就只是 **reference，不是真锁** —— 下半段的
+  transitive 条目仍是手写的 `>=` 范围而非精确 pin。要做到"可复现构建"得
+  在干净 venv 里 `pip install -r requirements.txt && pip freeze` 重新生成，属独立立项。
+
 ### 类型门禁改为显式 CI 步骤（拿到 `workflow` scope 后的收尾）
 
-#23 当时因为 gh token 没有 `workflow` 权限（GitHub 对改 `.github/workflows/*` 的写入直接拒绝），
-把 `vue-tsc --noEmit` 挂在 npm 的 `pretest` 生命周期上借道生效。现在权限到位，按原计划改成显式形态：
+#23 当时因为 gh token 无 `workflow` scope（GitHub 对改 `.github/workflows/*` 的写入直接拒绝），
+只能把 `vue-tsc --noEmit` 借道 npm 的 `pretest` 生命周期生效。权限到位后按原计划改为显式形态：
 
 - `.github/workflows/ci.yml` 的 frontend job 新增 `- name: Type check (vue-tsc)`（紧跟 `Lint frontend`）。
-- `package.json` 删掉 `pretest`：门禁应在 CI 里**看得见、失败能归因到具体步骤**，
-  而不是藏在 `npm test` 背后（也顺带让本地 `npm test` 回到只跑测试）。
-- `typecheck` 脚本保留，本地想手动跑仍然一条命令。
+- `package.json` 删掉 `pretest`：门禁要在 CI 里**看得见、失败能归因到具体步骤**，不藏在 `npm test` 背后；
+  本地 `npm test` 也回到只跑测试。`typecheck` 脚本保留。
 
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
