@@ -305,7 +305,17 @@ class _WebSocketTransport:
 
     @property
     def is_alive(self) -> bool:
-        return self._ws is not None and self._ws.open
+        ws = self._ws
+        if ws is None:
+            return False
+        # start() 用 websockets.connect(...) 且传 additional_headers —— 那是 ≥13.1 的
+        # 新 asyncio 实现（ClientConnection），它没有 legacy WebSocketClientProtocol 的
+        # .open 属性（实测 websockets 14.2：AttributeError）。两个实现都有 .state 枚举，
+        # 故优先按 state 判定，仅在拿不到 state 时回退 legacy 的 .open。
+        state = getattr(ws, "state", None)
+        if state is not None:
+            return getattr(state, "name", str(state)) == "OPEN"
+        return bool(getattr(ws, "open", False))
 
 
 class _StreamableHttpTransport:
