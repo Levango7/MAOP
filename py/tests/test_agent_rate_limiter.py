@@ -1,3 +1,4 @@
+
 """Agent 路由限流器（RateLimiter）单元测试.
 
 覆盖：
@@ -18,7 +19,10 @@ from __future__ import annotations
 import threading
 import time
 
+import pytest
+
 from maop.core.agent.router.rate_limiter import RateLimiter
+from tests.thread_join_guard import join_all
 
 # ── 基本限流 ─────────────────────────────────────────────────────
 
@@ -102,6 +106,7 @@ class TestRateLimiterWindowExpiry:
 
 
 class TestRateLimiterConcurrency:
+    @pytest.mark.timeout(240)
     def test_thread_safe_under_concurrent_access(self) -> None:
         """多线程并发调用不应破坏内部状态.
 
@@ -125,8 +130,7 @@ class TestRateLimiterConcurrency:
         ts = [threading.Thread(target=worker, args=(i,)) for i in range(threads)]
         for t in ts:
             t.start()
-        for t in ts:
-            t.join()
+        join_all(ts, 120.0)
 
         total_allowed = sum(allowed)
         # 放行总数应恰好等于 limit（不多不少）
@@ -134,6 +138,7 @@ class TestRateLimiterConcurrency:
         # 当前速率应等于 limit
         assert rl.get_current_rate("shared") == limit
 
+    @pytest.mark.timeout(240)
     def test_thread_safe_different_agents(self) -> None:
         """多线程对不同 Agent 并发限流，各自独立计数."""
         rl = RateLimiter()
@@ -151,8 +156,7 @@ class TestRateLimiterConcurrency:
         ]
         for t in ts:
             t.start()
-        for t in ts:
-            t.join()
+        join_all(ts, 120.0)
 
         # 每个 Agent 第一次请求都应放行
         assert all(results)
