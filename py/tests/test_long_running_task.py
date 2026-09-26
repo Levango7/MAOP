@@ -1,4 +1,3 @@
-
 """长任务管理器测试 — 覆盖 LongRunningTaskManager 全生命周期.
 
 测试用 ``tmp_path`` 隔离 SQLite，每个测试独立数据库，互不干扰。
