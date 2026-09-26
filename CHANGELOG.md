@@ -88,7 +88,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 `sqlite3.OperationalError` 是 `DatabaseError` 的**子类** —— 于是
 `database is locked` / `unable to open database file` / `disk I/O error` /
 `attempt to write a readonly database` 都会被判成"损坏"，把**别的连接正在写的库**直接
-unlink（本机实测 `py/data/maop.db` 已被测试写到 372MB —— 就是这些泄漏线程的落点）。
+unlink（该共享 DB 一旦成为落点就会涨到很大：本机 `py/data/maop.db` 已 372MB，
+其中 819,972 行 episodic_memory 经查为本地 soak 跑写入的 canned 任务）。
 链路上还有第二个放大器：`_open_and_init()` 在
 PRAGMA 抛错时不关闭已经建立的连接（句柄一直捏着文件），Windows 上使重建路径的
 `unlink` 直接失败（`WinError 32 另一个程序正在使用此文件`），损坏恢复在 Windows 上其实
