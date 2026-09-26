@@ -110,6 +110,24 @@ PRAGMA 抛错时不关闭已经建立的连接（句柄一直捏着文件），W
 - 新增 5 条用例：分类器双向断言、锁冲突下**文件必须存活且数据完整**、真损坏仍重建、
   线程登记与 join。锁冲突那条此前无法通过（它正是删除分支被误触发的路径）。
 
+### 并发用例的无界 `t.join()` 收口（32 处 / 19 文件）
+
+unit job 的配置是 `--timeout=60 --reruns=3`，而并发用例普遍写成 `for t in threads: t.join()`
+—— 真死锁或调度退化时表现为"永久挂起 + 一段线程栈 dump"，既看不出谁卡住，也白烧 4 次 rerun
+（`pytest (windows-latest, 3.13)` 在 `test_result_cache` 上就是这样，见 #21）。
+
+- 新增 `tests/thread_join_guard.py::join_all(threads, timeout_s=120)`：有界等待，超时直接
+  报出仍未结束的线程名。
+- 19 个测试文件里 32 处裸 join 全部改走 `join_all(...)`；对受影响用例补
+  `@pytest.mark.timeout(240)`（31 处，1 处已有 mark），使 **120s 的断言先于 240s 预算触发**，
+  不再被 60s 全局超时截成一段栈。
+- **没有削减任何并发量**：线程数、轮数、断言强度保持原样 —— 放宽的是"等多久算失败"，
+  不是"测多少"。
+
+验证：19 个被改文件单独跑共 512 passed；`tests/e2e/test_boundary_conditions.py` 按 CI 口径
+（`MAOP_AUTH=1 -n 0 --confcutdir=tests/e2e`）29 passed / 1 xpassed；全量 unit 套件
+`-n 4 --timeout=60 --reruns=2` 见下条提交说明；ruff 干净。
+
 ## [Unreleased]
 
 ### Docs
