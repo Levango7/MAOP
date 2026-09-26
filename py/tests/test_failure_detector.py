@@ -1,4 +1,3 @@
-
 """Tests for maop.core.scheduling.failure_detector — adaptive scheduling weights.
 
 Covers:
