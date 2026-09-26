@@ -1,3 +1,4 @@
+
 """路由决策审计日志（RoutingAuditLogger）单元测试.
 
 覆盖：
@@ -24,6 +25,7 @@ from maop.core.agent.router.routing_audit import (
     RoutingAuditEvent,
     RoutingAuditLogger,
 )
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
@@ -175,6 +177,7 @@ class TestRoutingAuditPersistence:
 
 
 class TestRoutingAuditConcurrency:
+    @pytest.mark.timeout(240)
     def test_concurrent_writes_thread_safe(
         self, audit_logger: RoutingAuditLogger,
     ) -> None:
@@ -194,8 +197,7 @@ class TestRoutingAuditConcurrency:
         ts = [threading.Thread(target=worker, args=(i,)) for i in range(threads)]
         for t in ts:
             t.start()
-        for t in ts:
-            t.join()
+        join_all(ts, 120.0)
 
         total = audit_logger.count()
         assert total == threads * per_thread
