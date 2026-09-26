@@ -1,3 +1,4 @@
+
 """边界条件深度测试：空输入、超长输入、并发竞争、错误链。
 
 目标：暴露代码中的脆弱点（未处理的边界、竞态、错误传播缺陷）。
@@ -15,6 +16,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
+
+from tests.thread_join_guard import join_all
 
 os.environ.setdefault("MAOP_ENV", "test")
 os.environ.setdefault("MAOP_AUTH", "0")
@@ -176,6 +179,7 @@ class TestOversizedInput:
 class TestConcurrency:
     """并发竞争条件测试。"""
 
+    @pytest.mark.timeout(240)
     def test_concurrent_register_same_agent(self, tmp_path):
         """多个线程并发注册同一 agent —— 最后写入应胜出，不崩溃。"""
         catalog = AgentCatalog(db_path=tmp_path / "cat.db")
@@ -192,14 +196,14 @@ class TestConcurrency:
         threads = [threading.Thread(target=register) for _ in range(20)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == [], f"并发注册抛异常: {errors}"
         result = catalog.get(name)
         assert result is not None
         assert result.name == name
 
+    @pytest.mark.timeout(240)
     def test_concurrent_register_different_agents(self, tmp_path):
         """并发注册不同 agent 应全部成功。"""
         catalog = AgentCatalog(db_path=tmp_path / "cat.db")
@@ -215,12 +219,12 @@ class TestConcurrency:
         threads = [threading.Thread(target=register, args=(i,)) for i in range(50)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == [], f"并发注册抛异常: {errors}"
         assert len(catalog.list_all()) == 50
 
+    @pytest.mark.timeout(240)
     def test_concurrent_read_write(self, tmp_path):
         """并发读+写不应产生死锁或数据损坏。"""
         catalog = AgentCatalog(db_path=tmp_path / "cat.db")
@@ -255,11 +259,11 @@ class TestConcurrency:
             t.start()
         time.sleep(1.0)
         stop.set()
-        for t in w_threads + r_threads:
-            t.join()
+        join_all(w_threads + r_threads, 120.0)
 
         assert errors == [], f"并发读写抛异常: {errors}"
 
+    @pytest.mark.timeout(240)
     def test_concurrent_apikey_create_revoke(self, tmp_path):
         """并发创建+撤销 API key 应不崩溃。"""
         store = APIKeyStore(db_path=tmp_path / "auth.db")
@@ -276,8 +280,7 @@ class TestConcurrency:
         threads = [threading.Thread(target=create) for _ in range(20)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == [], f"并发创建 API key 抛异常: {errors}"
         assert len(keys) == 20
@@ -370,6 +373,7 @@ class TestErrorChain:
         # 应正常工作
         assert isinstance(catalog.list_all(), list)
 
+    @pytest.mark.timeout(240)
     def test_concurrent_get_while_corrupt_load(self, tmp_path):
         """加载损坏数据时并发 get 不应死锁。"""
         db_path = tmp_path / "partial.db"
@@ -391,8 +395,7 @@ class TestErrorChain:
         threads = [threading.Thread(target=get_agent, args=(f"ok_{i}",)) for i in range(5)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == []
         assert all(r is not None for r in results)
