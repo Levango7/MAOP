@@ -1,3 +1,4 @@
+
 """Tests for MAOP.core.monitoring — StructuredLogger, metrics, MetricsCollector."""
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from maop.core.monitoring.monitoring import (
     MetricsCollector,
     StructuredLogger,
 )
+from tests.thread_join_guard import join_all
 
 # ── StructuredLogger ──────────────────────────────────────────────
 
@@ -172,6 +174,7 @@ class TestCounter:
         out = c.to_prometheus()
         assert "reqs{method=GET} 1.0" in out
 
+    @pytest.mark.timeout(240)
     def test_thread_safety(self):
         c = Counter("reqs")
 
@@ -182,8 +185,7 @@ class TestCounter:
         threads = [threading.Thread(target=worker) for _ in range(10)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
         assert c.get() == 1000.0
 
 
@@ -327,6 +329,7 @@ class TestMetricsCollector:
 class TestMetricConcurrencySafety:
     """OPS-27: concurrent inc()/observe() + export must not raise RuntimeError."""
 
+    @pytest.mark.timeout(240)
     def test_counter_concurrent_export(self):
         import random
 
@@ -353,10 +356,10 @@ class TestMetricConcurrencySafety:
         ]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
         assert not errors, f"concurrent export raised: {errors[:3]}"
 
+    @pytest.mark.timeout(240)
     def test_collector_concurrent_export(self):
         import random
 
@@ -385,6 +388,5 @@ class TestMetricConcurrencySafety:
         ]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
         assert not errors, f"concurrent collector export raised: {errors[:3]}"
