@@ -15,6 +15,8 @@
 # ── Direct dependencies (from pyproject.toml) ────────────────────
 # 本段由 pyproject.toml 的 [project].dependencies 逐条镜像，
 # 漂移会让 tests/test_requirements_lock_sync.py 失败。
+# 本段由 pyproject.toml 的 [project].dependencies 逐条镜像，
+# 漂移会让 tests/test_requirements_lock_sync.py 失败。
 # 5.1 fix: these were missing from the lock entirely (aiohttp, PyJWT,
 # alembic, aiosqlite) or used bare `>=` ranges. They now mirror pyproject.toml
 # as narrow ranges so the lock cannot claim a pin it does not enforce.
@@ -33,7 +35,7 @@ cryptography>=50.0,<51
 aiosqlite>=0.20.0
 python-multipart>=0.0.31
 alembic>=1.13.0
-websockets>=12.0,<15
+websockets>=14.0,<17
 PyJWT>=2.13.0
 packaging>=24.0
 sqlite-vec>=0.1.6
