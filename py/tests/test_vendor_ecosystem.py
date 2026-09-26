@@ -1,3 +1,4 @@
+
 """厂商生态管理测试.
 
 覆盖三个模块：
@@ -32,6 +33,7 @@ from maop.core.agent.vendor.vendor_sso import (
     VendorSession,  # noqa: F401
     VendorSSO,
 )
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
@@ -489,6 +491,7 @@ class TestVendorBilling:
 class TestThreadSafety:
     """多线程并发安全测试。"""
 
+    @pytest.mark.timeout(240)
     def test_concurrent_register_vendors(self, tmp_path: Path) -> None:
         """并发注册厂商不丢数据。"""
         eco = VendorEcosystem(db_path=tmp_path / "vendor.db")
@@ -505,12 +508,12 @@ class TestThreadSafety:
         threads = [threading.Thread(target=worker, args=(i,)) for i in range(20)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == []
         assert len(eco.list_vendors()) == 20
 
+    @pytest.mark.timeout(240)
     def test_concurrent_record_usage(
         self,
         billing: VendorBilling,
@@ -530,8 +533,7 @@ class TestThreadSafety:
         threads = [threading.Thread(target=worker) for _ in range(5)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == []
         summary = billing.get_vendor_summary("alibaba", period="all")
