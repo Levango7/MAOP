@@ -33,8 +33,14 @@ dependencies = [
     # 2026-09-26: 移除 aiohttp —— 全仓无任何 import（唯一命中是 plugin_sandbox
     # 的**禁用名单**正则），却为一个从不加载的栈承担 14 个 CVE 的审计面。
     # 外部插件若需要 aiohttp，应自行声明依赖。
-    # - websockets 14+ made breaking asyncio changes; cap below 15.
-    "websockets>=12.0,<15",
+    # websockets 的真实下界是 14.0，不是 12.0（2026-09-26 实测改判）：
+    # mcp_hub_transport / ide_extension_adapter 用 websockets.connect(..., additional_headers=)
+    # 且依赖新 asyncio 实现的连接对象（.state，无 .open）—— 而顶层 websockets.connect 到
+    # 14.0 才默认指向新实现。回环真连接实测：12.0 / 13.0.1 / 13.1 直接
+    # TypeError: create_connection() got an unexpected keyword argument 'additional_headers'；
+    # 14.0 / 14.2 / 15.0.1 / 16.1.1 / 17.1 全部通过。上界留 <17（17.x 已实测可用，
+    # 但先按未验证区间留护栏；回归测试在 tests/test_mcp_hub.py::TestWebSocketTransportRealConnection）。
+    "websockets>=14.0,<17",
     # - P0-C CVE audit (2026-08-26): floor raised to 2.13.0 — fixes
     #   PYSEC-2026-175..179 (CVE-2026-48522..48526), all patched in 2.13.0.
     "PyJWT>=2.13.0",
