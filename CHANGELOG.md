@@ -61,6 +61,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   把 `pydantic-settings 2.15.0 / uvicorn 0.53.0 / mmh3 5.3.0` 静默回退了；逐行 diff 复核时发现，
   已改为"一律以 master 内容为基准重建"。同期 #23 也因同一原因回退过前端 11 项依赖，见 #25。
 
+### 类型门禁改为显式 CI 步骤（拿到 `workflow` scope 后的收尾）
+
+#23 当时因为 gh token 没有 `workflow` 权限（GitHub 对改 `.github/workflows/*` 的写入直接拒绝），
+把 `vue-tsc --noEmit` 挂在 npm 的 `pretest` 生命周期上借道生效。现在权限到位，按原计划改成显式形态：
+
+- `.github/workflows/ci.yml` 的 frontend job 新增 `- name: Type check (vue-tsc)`（紧跟 `Lint frontend`）。
+- `package.json` 删掉 `pretest`：门禁应在 CI 里**看得见、失败能归因到具体步骤**，
+  而不是藏在 `npm test` 背后（也顺带让本地 `npm test` 回到只跑测试）。
+- `typecheck` 脚本保留，本地想手动跑仍然一条命令。
+
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
 ### 前端补 `vue-tsc` 类型门禁
