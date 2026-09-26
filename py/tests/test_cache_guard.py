@@ -1,4 +1,3 @@
-
 """Tests for MAOP.core.cache_guard — penetration/breakdown/avalanche protection."""
 
 from __future__ import annotations
