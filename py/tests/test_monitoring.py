@@ -1,4 +1,3 @@
-
 """Tests for MAOP.core.monitoring — StructuredLogger, metrics, MetricsCollector."""
 
 from __future__ import annotations
