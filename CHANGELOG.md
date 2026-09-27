@@ -289,7 +289,46 @@ worker 风暴**吞成继续跑**，而 CI 的 frontend job 跑的是不带覆盖
 - 行为验证：在隔离副本（codeload tarball + `npm ci`）用改后的配置跑 `npm run test:coverage`
   → **exit=0**、56 files / 478 tests、无未处理错误、无阈值 ERROR。
 
+### 从弃用分支捞回 K8s Operator 一致性测试，并改掉"整模块 slow"这种永不执行的结构
+
+先给那条悬了很久的分支定性（对 merge-base `a7253d1a` / 分支 / master 三方比 blob，不看
+`compare` 的 ahead_by —— squash 合并下它永远非零、说明不了内容缺失）：
+`fix/k8s-operator-test-setup` 是 **2026-08-25 一轮被放弃的替代实现**，它把 supervisor 拆成
+`supervisor_state.py`，而 master 走的是 `supervisor_{action,dispatch,patrol,status}` 那套，
+两套路数互斥，**不回并**。它的 11 个 commit 已用 tag `archive/k8s-operator-test-setup-20260825`
+→ `95fd9b38` 永久保住，分支本身因此随时可删可恢复。
+
+但它里面**有良**：`py/tests/test_k8s_operator.py` 36 个用例，其中 **35 个是 master 没有的**，
+而且一大半是**不需要任何集群**的 Chart / CRD 静态一致性校验 ——
+
+- sample CR：`spec.model` 必填与类型、`replicas` 类型与上下界、`model` 类型与 schema 一致；
+- CRD：`scope=Namespaced`、`group/Plural/Names`、served version、`subresources.status`、
+  `additionalPrinterColumns`、`status.phase` 枚举取值；
+- Chart 布局：`Chart.yaml` / `values.yaml` / `templates/` / `crds/` / README 是否齐备。
+
+在当前 master 资产上试跑：**28 passed / 8 skipped / 0 failed**（8 个 skip 全是缺 kind / k3s / 集群）。
+
+关键改造是**标记策略**：原文件顶部一行 `pytestmark = pytest.mark.slow` 把整模块排出了默认运行集，
+而 CI 与 nightly 都用 `-m "not slow and …"` 选例 —— 照搬进来就是"写了一整套却永远不会被执行"的
+测试，与本仓反复清理的假门禁同一形状。所以按依赖分层：
+
+- 静态层 / helm CLI 层 / kubectl dry-run 层 → **进 CI**，缺 `helm` / `kubectl` 时各自
+  `skipif` 优雅跳过，不给 runner 引入新依赖；
+- 只有会**真建集群**的 kind / k3s / 已有集群层保留 `@pytest.mark.slow`
+  （GitHub runner 上有 Docker，不能让它在每次 push 时自动起集群）。
+
+master 原有的 6 个基础结构用例**逐行保留**在文件末尾；合并后模块共 42 个用例，
+CI 选择器 `-m "not slow"` 下为 27 passed / 3 skipped（原有 3 个占位）/ 12 deselected。
+
+- 判定不捞的部分：分支对 `docs/adr/011-state-unification.md` 的差异只是把日期挪成一个
+  `## Date` 段（master 版把日期写在 Status 行内），纯格式，不值得动。
+- ⚠️ 过程记录（我自己两次踩坑，都已当场纠正）：① 第一次拼装时把 `CHART_DIR` 定义挪到了文件末尾，
+  而 class 体在导入期就引用它 → collection 直接 `NameError`；常量必须留在模块顶部。
+  ② 我一度用 `git checkout -- <file>` 取基线，而本地 `master` HEAD 是陈旧的（`git fetch` 仍被坏 ref 挡住），
+  随后改为**从远端 master blob 取基线**并逐行核对"master 的 6 个用例是否原样保留"。
+
 ## [Unreleased] - 2026-09-26（前端类型门禁）
+
 
 ### 前端补 `vue-tsc` 类型门禁
 
