@@ -154,6 +154,15 @@ rerunfailures 线程各一条）、allowlist 里模块名必须可导入、夹�
 第三行是这次最值钱的发现：只用伪造样本（`_park` 的模块名里没有点号）**抓不到**这个 bug，
 必须留一条对着真线程的回归位。
 
+- ⚠️ **本 PR 自己造成的第一次红（已修）**：首版用 `getattr(_leak_probe, "_pytestfixturefunction").autouse`
+  证明探针是 autouse —— 本地全量 9984 绿，CI 却 ubuntu/macos 两平台红。根因是 **pytest 版本代差**：
+  dev extra 只写 `pytest>=8.0`，CI 解析到 **9.1.1** 而本地是 **8.3.4**；8.x 的 `@pytest.fixture` 返回
+  "原函数 + `_pytestfixturefunction` 标记"，9.x 返回 `FixtureFunctionDefinition`，那个属性名根本不存在。
+  改成**行为断言**（探针若真 autouse，必在本次 setup 把 `_PROBE_PREV["nodeid"]` 写成我的 nodeid），
+  并在 8.3.4 / 9.1.1 两套环境各做一次变异验证（关掉 `autouse=True` → 两版本都恰好 1 红）。
+  教训：断言第三方库的**私有属性名**就是把测试绑死在某个版本上；`pytest>=8.0` 这种开区间下，
+  凡碰框架内部的用例都要两头实测（本地用 `pip install --target` + `PYTHONPATH` 叠版本，不动共享环境）。
+
 仍未解决：`TestCallSyncFallback` 三元凶的机制还没抓到现行 —— 探针现在只报真嫌疑人，
 等下一次红。
 
