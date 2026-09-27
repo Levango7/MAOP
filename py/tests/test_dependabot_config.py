@@ -97,3 +97,51 @@ def test_labels_are_declared_for_triage():
         assert "dependencies" in labels, f"{entry['package-ecosystem']} 缺 dependencies 标签"
         for label in labels:
             assert re.match(r"^[a-z0-9._/-]+$", label), f"标签命名异常：{label}"
+
+
+# --- 出现两次以上的 action 前缀必须成批 -----------------------------------
+# 为什么需要这条：#28 当时只给 `actions/*` 加了分组，`docker/*` 漏了 —— 后果是
+# 2026-09-27 那次周一扫描又开出 #35 / #36 / #38 三个独立 PR，各跑一轮 ~20 分钟的
+# 9 平台矩阵，并且三者都改 ci.yml 的相邻行、互相冲突要反复 rebase。
+# 靠人记住"哪些前缀该成批"必然会再漏，所以让仓库自己说：凡是在 workflow 里
+# 出现 ≥2 个不同包的 action 前缀，都必须被某个分组 pattern 覆盖。
+_USES_RE = re.compile(r"^\s*(?:-\s+)?uses:\s*([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)", re.MULTILINE)
+
+
+def _action_packages() -> dict[str, set[str]]:
+    """{owner: {repo, ...}}，只统计 GitHub 托管的 action（排除 ./ 本地与 docker://）。"""
+    out: dict[str, set[str]] = {}
+    workflows = (CONFIG.parent / "workflows").glob("*.y*ml")
+    for wf in workflows:
+        for owner, repo in _USES_RE.findall(wf.read_text(encoding="utf-8")):
+            out.setdefault(owner, set()).add(repo)
+    return out
+
+
+def _group_patterns_for_ecosystem(ecosystem: str) -> list[str]:
+    patterns: list[str] = []
+    for entry in _config()["updates"]:
+        if entry["package-ecosystem"] != ecosystem:
+            continue
+        for group in (entry.get("groups") or {}).values():
+            patterns.extend(group.get("patterns") or [])
+    return patterns
+
+
+def test_owners_with_multiple_action_packages_are_batched():
+    """≥2 个包的同前缀 action 必须被某个 dependabot 分组 pattern 覆盖。"""
+    from fnmatch import fnmatch
+
+    patterns = _group_patterns_for_ecosystem("github-actions")
+    assert patterns, "github-actions 生态里一个分组都没有，批量策略未落地"
+    unbatched: dict[str, set[str]] = {}
+    for owner, repos in _action_packages().items():
+        if len(repos) < 2:
+            continue  # 单包前缀只可能开一个 PR，本来就不需要成批
+        if not any(fnmatch(f"{owner}/*", p) or fnmatch(f"{owner}/{r}", p)
+                   for p in patterns for r in repos):
+            unbatched[owner] = repos
+    assert not unbatched, (
+        "这些 action 前缀在 workflow 里有多个包却没被任何 dependabot 分组覆盖，"
+        f"每次扫描都会开一堆互相冲突的独立 PR：{unbatched}"
+    )
