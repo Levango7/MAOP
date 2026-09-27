@@ -166,6 +166,74 @@ rerunfailures 线程各一条）、allowlist 里模块名必须可导入、夹�
 仍未解决：`TestCallSyncFallback` 三元凶的机制还没抓到现行 —— 探针现在只报真嫌疑人，
 等下一次红。
 
+### 依赖与 CI 批次补记（2026-09-27：#40 #41 #42 与 dependabot 6 条）
+
+⚠️ **本段是补记**。下面 9 个变更当天直接落到了 master，**没有一个写了 CHANGELOG 段**，
+违反本文件《发布前 checklist》第 2 条（"CHANGELOG.md 已更新本次版本段"）。
+另有一条流程事实一并记下以免后人误判"每个 commit 都被验证过"：`ci.yml` 的 push 触发带
+`cancel-in-progress: true`，连续 squash-merge 会把**前一个 master 验证跑取消**（实测一段
+连续合并里 6 个 master 跑被 cancelled，只有队尾那个跑完）。
+
+**CI 运行时抬版 —— #41 → `3c8a93c2`**
+
+- `.github/workflows/ci.yml`：`NODE_VERSION` `"20"` → `"24"`。
+- 为什么必须抬（实测，不是推测）：`jsdom@30` 与 `vitest@5` 的 `engines` 都是
+  `^22.22.2 || ^24.15.0 || >=26.0.0`。node 20 下 vitest 5 在 `import jsdom → undici` 时抛
+  `TypeError: webidl.util.markAsUncloneable is not a function`，**56 个测试文件全 error、
+  `Tests no tests`**（#40 首跑的 `Frontend Build` 日志）。抬到 24 后同一棵树 56 files / 478 tests 全绿。
+- 连带顺序约束：`pull_request` 跑用的是 **PR 自带的 workflow 文件**，所以依赖 #41 的 PR 必须
+  先把 master 的 `ci.yml` 正向提交进自己分支，否则不可能变绿（#40 就是这么被挡了一轮）。
+
+**vitest 协同批 —— #40 → `c4622029`**（取代 dependabot #31 / #34）
+
+- `vitest ^3.0.0 → ^5.0.1`、`@vitest/coverage-v8 ^3.2.7 → ^5.0.1`（lock 解析到 5.0.2）。
+- 两包是**精确相等**的 peer 关系，任何一侧单独升都 ERESOLVE：
+  `peer vitest@"5.0.1" from @vitest/coverage-v8@5.0.1`（#31 方向）与
+  `peer vitest@"3.2.7" from @vitest/coverage-v8@3.2.7`（#34 方向）。
+- lock 从 413 条掉到 298 条，逐条核过是**合法收敛**而非回退：`vite@8` 的真实依赖是 `rolldown`
+  （`esbuild` 只是 `peerDependenciesMeta` 里的 optional peer），vitest 3 是经
+  `vite-node → vite@7` 才把 `esbuild`/`rollup` 全家拖进来；vitest 5 去掉 `vite-node` 后它们自然消失。
+  所有 `@rolldown/binding-linux-*` 等平台 native binding 均保留，无任何条目版本变小。
+
+**vis-network 协同批 —— #42 → `02c11010`**（取代 dependabot #37）
+
+- `vis-network ^9.1.13 → ^10.1.2`、`vis-data ^7.1.10 → ^8.0.5`（lock 另含 `vis-util 5.0.7 → 6.0.2`；
+  lock 413 → 413 条，added 0 / removed 0 / downgrades none）。
+- 单升 vis-network 装不上：`peer vis-data@">=8.0.0" from vis-network@10.1.2` 与在架的 `vis-data@7.1.10` 冲突。
+- 验证含真跑图页面的 `Playwright E2E`（96/96 通过）。**口径要说清**：`e2e/knowledge-graph.spec.js`
+  把 `/api/**` 全部 `page.route` 打桩，断言到"画布容器可见 + 页面不崩 + 刷新会重新取数"这一层 ——
+  它能当场抓住 v10 构造器/options API 破坏，但**不等于**真实数据下的布局/交互回归。
+
+**dependabot 6 条（全部 squash 合并）**
+
+| PR | 落点 | 内容 |
+|---|---|---|
+| #30 | `237eb068` | `dompurify ^3.4.15 → ^3.4.16`、`prettier ^3.9.8 → ^3.9.9`（npm-minor 组） |
+| #32 | `70c3507d` | `actions/cache` 4 → 6（actions-batch 组） |
+| #33 | `b718f0ba` | `gitleaks/gitleaks-action` 2.2.1 → 3.0.0 |
+| #35 | `c27f347e` | `docker/build-push-action` 6 → 7 |
+| #36 | `ad706415` | `docker/login-action` 3 → 4 |
+| #38 | `0aca6f13` | `docker/setup-buildx-action` 3 → 4 |
+
+这 6 条能安全批量落，靠的是 #28 给 dependabot 加的分组策略（`actions/*`、docker 系列按 minor/patch
+成批）与两条人工规则：**peer 耦合必须同批**、**major 必须复核门禁覆盖面**。
+
+**仍未纳管（本次不动，等定标）**：`dashboard-enterprise` 的 `npm run test:coverage` 阈值。
+master 实测（vitest 5 之后）：statements 61.09% / branches 46.2% / functions 56.11% / lines 64.03%
+（`56 files / 478 tests` 全通过），而 `vitest.config.js` 的阈值是 60/50/60/60 →
+**functions 与 branches 不达标、命令 exit=1**。
+配置注释显示这组阈值是 2026-09-17 从 40/40/30/40 抬到 60/60/50/60 的；抬的时候没有实测，
+而 CI 的 `Frontend Build` 只跑 `npm ci` / `lint` / `typecheck` / `npm test` / `vite build`
+**从不跑 `test:coverage`**（ci.yml 里所有 coverage 字样都是 Python 侧 ratchet），
+所以这道门禁目前处于"配了但没人执行"的状态。
+
+另外留一条**未解释的观察**，因为它直接影响"要不要拿它当门禁"：同一个隔离副本里连跑三次，
+后两次数值一致（functions 56.11 / 56.14 有小数级抖动），但**第一次**跑出来的总量明显更低
+（lines 49.53% / functions 39.02% / branches 33.25%）。我只跑了 40 秒就得到两种结果，没找到成因；
+配置里有 `dangerouslyIgnoreUnhandledErrors: true`，它可能把中途死掉的文件吞成"通过"从而改变覆盖面 —— 这是猜测，不是结论。
+**含义**：若要把覆盖率纳进 CI，第一步是先证明这个数可复现，否则门禁会变成新的随机红源。
+处置二选一（不顺手改）：纳进 CI 并重新定标 + 加 ratchet（对齐后端做法），或明确降级为"仅本地工具"并在配置里写清楚。
+
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
 ### 前端补 `vue-tsc` 类型门禁
