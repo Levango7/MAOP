@@ -309,12 +309,18 @@ jobs:
         if: failure()
         run: python scripts/junit_annotate.py test-results-e2e.xml
 
-      - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
-        uses: codecov/codecov-action@v4
-        with:
-          files: py/coverage.xml
-          fail_ci_if_error: false
+      # 2026-09-28: 这里原来有一个 `- name: Upload coverage` 用 codecov/codecov-action@v4
+      # 把 py/coverage.xml 传给 Codecov。**已删除**，理由不是嫌它旧，而是它从来没有成功过一次：
+      # 本仓既没有 `CODECOV_TOKEN` secret，也没有 codecov.yml，上传一律被拒 ——
+      # 每次 ubuntu/3.13 腿都打印
+      #   error -- Commit creating failed: {"message":"Token required - not valid tokenless upload"}
+      #   error -- Report creating failed / Upload queued for processing failed（同一原因）
+      # 而步骤里写着 `fail_ci_if_error: false`，于是这些错误**永远不会让 job 变红**。
+      # 净效果：每轮从 cli.codecov.io 下载并校验一个第三方二进制，产出为零，还会让人误以为
+      # "覆盖率在别处也被看着"。真正的覆盖率约束在上面的 `check_coverage_ratchet.py` 与
+      # `Upload coverage data` 产物里，删掉这一步不减少任何门禁。
+      # 要恢复 Codecov：建 `CODECOV_TOKEN` secret，并用 `fail_ci_if_error: true` 重新加回
+      # （否则又变成一个静默失败的假门禁）。
 
   # ── Perf script smoke + reliability/stability (NOT a load test) ──
   # 诚实化（2026-09-25）：原名 `performance` 会让人以为 CI 在跑真实负载压测。
