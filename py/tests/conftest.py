@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import contextlib
 import importlib.util
+import logging
 import os
 import shutil
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
 import pytest
@@ -256,6 +258,55 @@ def _try_reset_evo_singletons() -> None:
                     pass
 
 
+# 测试框架自己的后台线程，不是被测代码的泄漏 —— 报出来只会淹没真嫌疑人。
+# 按 target 函数的**定义模块**判定，不按线程名：自动生成的名字是
+# `Thread-N (run_server)` 这种格式，随 Python 版本与函数名变化，模块名才是稳定指纹。
+# 实测（2026-09-27）`pytest_rerunfailures.py:746 run_server` 会阻塞在 `socket.accept()`
+# 整个 session，导致每条用例 setup 都被记成"残留线程"。
+_HARNESS_THREAD_MODULES = frozenset({"pytest_rerunfailures", "xdist", "_pytest", "execnet"})
+
+
+def _thread_module(thread: threading.Thread) -> str:
+    """target 函数的定义模块；拿不到就是 '?'（宁可多报也不漏报）。"""
+    return getattr(getattr(thread, "_target", None), "__module__", None) or "?"
+
+
+def _thread_origin(thread: threading.Thread) -> str:
+    target = getattr(thread, "_target", None)
+    qual = getattr(target, "__qualname__", None) or "?"
+    return f"{_thread_module(thread)}:{qual}"
+
+
+def _suspicious_threads() -> list[str]:
+    """当前存活的非主线程，剔除测试框架自己的线程。"""
+    out = []
+    for t in threading.enumerate():
+        if t is threading.main_thread():
+            continue
+        if _thread_module(t).split(".", 1)[0] in _HARNESS_THREAD_MODULES:
+            continue
+        out.append(f"{t.name}<-{_thread_origin(t)}")
+    return out
+
+
+def _leak_probe_line(nodeid: str) -> str | None:
+    """决定这条用例要不要记 WARNING；返回 None 表示一切干净。
+
+    单独成函数是为了能被用例直接调用断言 —— pytest 不允许直接调夹具，而"什么时候才报"
+    恰恰是探针唯一可能被改坏的地方（把条件写成 `if False` 也能全员绿）。
+    """
+    patched = _subprocess_mod.run is not _ORIGINAL_SUBPROCESS_RUN
+    threads = _suspicious_threads()
+    prev = _PROBE_PREV.get("nodeid")
+    _PROBE_PREV["nodeid"] = nodeid
+    if not patched and not threads:
+        return None
+    return (
+        f"[leak-probe] test={nodeid} prev={prev} "
+        f"subprocess_run_patched={patched} threads={threads[:8]}"
+    )
+
+
 @pytest.fixture(autouse=True)
 def _leak_probe(request: pytest.FixtureRequest):
     """只观测、不改行为：记下"本用例开始时，进程已经被谁弄脏了"。
@@ -267,10 +318,12 @@ def _leak_probe(request: pytest.FixtureRequest):
 
     - `prev=` 同一 worker 里上一条跑过的用例 nodeid（若 patched=True，它就是嫌疑犯）
     - `subprocess_run_patched=` 全局 `subprocess.run` 是否已不是标准库原版
-    - `threads=` 残留线程名（泄漏后台线程是这一族的已知模式）
+    - `threads=` 残留线程，格式 `名字<-定义模块:限定名`（泄漏后台线程是这一族的已知模式）
 
     只在"可疑"时打 WARNING，避免 8400+ 条噪音；用例失败时 pytest 会把 setup 阶段捕获到的
-    日志印进失败详情，红的那一次自带线索。
+    日志印进失败详情，红的那一次自带线索。框架自己的线程（见 `_HARNESS_THREAD_MODULES`）
+    不算泄漏 —— 实测 `pytest_rerunfailures` 的 `ServerStatusDB.run_server` 整个 session 都
+    阻塞在 `socket.accept()`，不剔除的话每条用例 setup 都会 WARNING，真嫌疑人反而被淹没。
 
     ⚠️ 本探针**刻意不碰数据库 / settings**。早先版本在这里调 `get_db_path()` 想做"跨用例
     工具行串味"取证，但它跑在 `_isolate_data_dir` 之前，提前解析并初始化了 `data_dir` /
@@ -278,19 +331,9 @@ def _leak_probe(request: pytest.FixtureRequest):
     当前 data_dir 查找"）。观测型工具不许有副作用 —— 该夹具因此也定义在 `_isolate_data_dir`
     之后（autouse 夹具按定义顺序执行）。
     """
-    import logging
-    import threading
-
-    nodeid = request.node.nodeid
-    patched = _subprocess_mod.run is not _ORIGINAL_SUBPROCESS_RUN
-    threads = [t.name for t in threading.enumerate() if t is not threading.main_thread()]
-    prev = _PROBE_PREV.get("nodeid")
-    _PROBE_PREV["nodeid"] = nodeid
-    if patched or threads:
-        logging.getLogger("tests.conftest.leak_probe").warning(
-            "[leak-probe] test=%s prev=%s subprocess_run_patched=%s threads=%s",
-            nodeid, prev, patched, threads[:8],
-        )
+    line = _leak_probe_line(request.node.nodeid)
+    if line:
+        logging.getLogger("tests.conftest.leak_probe").warning(line)
     yield
 
 

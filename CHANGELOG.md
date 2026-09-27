@@ -107,14 +107,64 @@ lock 仍停在 `2.5.2 / 0.30.6 / 5.2.1`；照 lock 装环境的人拿到的是�
   用例失败时 pytest 会把 setup 阶段捕获到的日志印进失败详情 —— 红的那一次自带嫌疑人。
 - 自证有效：人为让上一条用例改 `subprocess.run` 不还原，探针准确报
   `subprocess_run_patched=True prev=…test_a_leaks_patch_without_undo`；正常链路不误报。
-- 顺带抓到一处真实泄漏：每条用例开始时都有残留线程 `Thread-1 (run_server)`
-  （dashboard 测试服务器线程从未 join），与 #20 修掉的进化线程同族 —— 本 PR 只观测不修。
+- ~~顺带抓到一处真实泄漏：每条用例开始时都有残留线程 `Thread-1 (run_server)`（dashboard 测试
+  服务器线程从未 join）~~ **这条结论是错的，已撤回**（见下一节）：那条线程属于
+  `pytest_rerunfailures` 插件自己，不是被测代码的泄漏。
 - ⚠️ **过程记录（我自己造成的回归，已修）**：探针第一版顺手调了 `get_db_path("tool_manager")`
   想做"跨用例工具行串味"取证，但它定义在 `_isolate_data_dir` **之前**、autouse 按定义顺序执行，
   于是提前解析并初始化了 `data_dir` / settings 单例，把 `tests/test_secrets.py` 的 4 条用例
   直接弄红（那些用例依赖"密钥文件按当前 data_dir 查找"）—— 本地全量因此 31 failed + 19 errors。
   修法：探针不再触碰 DB/settings（该取证目标也已被证伪），并把夹具移到 `_isolate_data_dir` 之后。
   教训写进夹具 docstring：**观测型工具不许有副作用**。
+
+### 撤回 #39 的"真实泄漏"结论，并把探针改成可被证伪的
+
+给 #39 的探针补变异验证时，两件事同时暴露：
+
+1. **上一条结论是错的**。`Thread-1 (run_server)` 不是"dashboard 测试服务器线程从未 join"，
+   栈帧实测是 `site-packages/pytest_rerunfailures.py:746 in run_server`（限定名
+   `ServerStatusDB.run_server`）阻塞在 `socket.py:298 accept` —— 插件自己的 socket 服务线程，
+   只要 `--reruns` 生效就整个 session 常驻。危害不是刷日志（pytest 只在用例失败时才打印捕获
+   日志），而是**每条用例 setup 都 WARNING、红的那一次自带一个假嫌疑人**。
+2. 探针此前**从没被证明过只会报该报的东西**。
+
+修法（`tests/conftest.py`）：
+
+- 新增 `_suspicious_threads()`：按线程 target 的**定义模块**剔除测试框架自己的线程
+  （`_HARNESS_THREAD_MODULES`）。用模块名而不是线程名 —— `Thread-N (func)` 是自动格式，
+  随 Python 版本与函数名漂移，模块名才是稳定指纹。
+- 条目格式改为 `名字<-定义模块:限定名`；拿不到 target 的 Thread 子类记 `?:?`（宁可多报不漏报）。
+- 判定逻辑从夹具里抽成 `_leak_probe_line()`：pytest 不允许直接调用夹具函数（会报
+  "Fixture called directly"），而"什么时候才报"恰恰是最容易被改坏的一点（写成 `if False`
+  也能全员绿），必须可被用例直接断言。
+
+新增 `tests/test_conftest_leak_probe.py`（9 条）：正向命名泄漏并校验 `prev=` 记账、
+`subprocess.run` 未还原路径、干净时返回 `None`、harness 过滤（伪造样本 + **真实**
+rerunfailures 线程各一条）、allowlist 里模块名必须可导入、夹具仍是 autouse 且定义在
+`_isolate_data_dir` 之后。自检用的线程全部带超时并在 `finally` 里释放 —— 自检工具自己不许泄漏。
+
+变异验证（回滚验证，每次单独改实现再改回）：
+
+| 变异体 | 结果 |
+|---|---|
+| `_leak_probe_line` 恒返回 `None`（探针永不报告） | 2 红 |
+| allowlist 里 `pytest_rerunfailures` 拼错 | 3 红（含可导入性守卫） |
+| 退回"拿 `模块:限定名` 整串 `split('.')`"的原始 bug | **仅**真实线程那条红 |
+
+第三行是这次最值钱的发现：只用伪造样本（`_park` 的模块名里没有点号）**抓不到**这个 bug，
+必须留一条对着真线程的回归位。
+
+- ⚠️ **本 PR 自己造成的第一次红（已修）**：首版用 `getattr(_leak_probe, "_pytestfixturefunction").autouse`
+  证明探针是 autouse —— 本地全量 9984 绿，CI 却 ubuntu/macos 两平台红。根因是 **pytest 版本代差**：
+  dev extra 只写 `pytest>=8.0`，CI 解析到 **9.1.1** 而本地是 **8.3.4**；8.x 的 `@pytest.fixture` 返回
+  "原函数 + `_pytestfixturefunction` 标记"，9.x 返回 `FixtureFunctionDefinition`，那个属性名根本不存在。
+  改成**行为断言**（探针若真 autouse，必在本次 setup 把 `_PROBE_PREV["nodeid"]` 写成我的 nodeid），
+  并在 8.3.4 / 9.1.1 两套环境各做一次变异验证（关掉 `autouse=True` → 两版本都恰好 1 红）。
+  教训：断言第三方库的**私有属性名**就是把测试绑死在某个版本上；`pytest>=8.0` 这种开区间下，
+  凡碰框架内部的用例都要两头实测（本地用 `pip install --target` + `PYTHONPATH` 叠版本，不动共享环境）。
+
+仍未解决：`TestCallSyncFallback` 三元凶的机制还没抓到现行 —— 探针现在只报真嫌疑人，
+等下一次红。
 
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
