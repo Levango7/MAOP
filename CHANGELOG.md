@@ -327,7 +327,38 @@ CI 选择器 `-m "not slow"` 下为 27 passed / 3 skipped（原有 3 个占位�
   ② 我一度用 `git checkout -- <file>` 取基线，而本地 `master` HEAD 是陈旧的（`git fetch` 仍被坏 ref 挡住），
   随后改为**从远端 master blob 取基线**并逐行核对"master 的 6 个用例是否原样保留"。
 
+### 删掉一个"每次都失败、却从不报错"的 codecov 上传步骤
+
+`ci.yml` 的 test job 里原有 `- name: Upload coverage`（`codecov/codecov-action@v4`，
+`fail_ci_if_error: false`）。它不是"版本旧"的问题，而是**从来没成功过一次**：本仓既没有
+`CODECOV_TOKEN` secret，也没有 `codecov.yml`，每次 ubuntu/3.13 腿的真实日志是
+
+```
+error -- Commit creating failed:  {"message":"Token required - not valid tokenless upload"}
+error -- Report creating failed:  {"message":"Token required - not valid tokenless upload"}
+error -- Upload queued for processing failed: {"message":"Token required - not valid tokenless upload"}
+```
+
+而 `fail_ci_if_error: false` 让这些错误**一律不影响 job 结论**。净效果：每轮从
+`cli.codecov.io` 下载并校验一个第三方二进制、产出为零，还留着一个看似存在的"覆盖率也上传了"的印象。
+真正的覆盖率约束一直是 `scripts/check_coverage_ratchet.py`（含企业包那条件门禁）与 `coverage.xml` 产物。
+
+- `.github/workflows/ci.yml`：删除该步骤，并在原位留一段说明**恢复条件** —— 建 `CODECOV_TOKEN`
+  secret 且改回 `fail_ci_if_error: true`；否则加回来就是再造一个静默失败的假门禁。
+- `.github/dependabot.yml`：把 `codecov` 从"有意不成批"的名单里去掉（本仓已不再引用它）。
+- 因此关闭 dependabot 的 #47（`codecov/codecov-action` 4→7）：升一个不产出任何东西的集成没有意义。
+- 防复发（`py/tests/test_ci_workflow_hygiene.py`，3 条）：
+  ① 任何步骤不许设 `fail_ci_if_error: false`；② `continue-on-error: true` 的步骤必须逐条登记理由
+  （现有一条 `Generate bandit report (JSON)` 是**正确的**用法：报告生产者不拦 job，
+  真正的门禁是后面 bandit High=0 那条硬门）；③ 豁免清单里的僵尸条目也要报错。
+- ⚠️ 守卫第一版踩坑并改正：最初用正则在原文里搜 `fail_ci_if_error: false`，结果被**我自己写的
+  解释性注释**判红，同时误伤那处有正当理由的 `continue-on-error`。改成 `yaml.safe_load` 后
+  只看**步骤字段** —— 注释不算数，配置才算数。
+- 变异验证：加回一个 `fail_ci_if_error: false` 的步骤 → 守卫①红；新增未登记的
+  `continue-on-error` 步骤 → 守卫②红；把已登记步骤改名 → 守卫②③同时红；恢复后 3 passed。
+
 ## [Unreleased] - 2026-09-26（前端类型门禁）
+
 
 
 ### 前端补 `vue-tsc` 类型门禁
