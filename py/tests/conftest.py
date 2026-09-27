@@ -125,6 +125,67 @@ def tmp_path() -> Path:
     return Path(d)
 
 
+import subprocess as _subprocess_mod
+
+# 在任何用例跑起来之前抓住标准库原函数，供 _leak_probe 判断"是否还被 mock 着"。
+_ORIGINAL_SUBPROCESS_RUN = _subprocess_mod.run
+_PROBE_PREV: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _leak_probe(request: pytest.FixtureRequest):
+    """只观测、不改行为：在用例开始前记下"谁在用例开始前就已经脏了"。
+
+    动机：`tests/test_tool_manager.py::TestCallSyncFallback` 在 macOS/Windows 上随机红，
+    症状是 `assert '42' in 'ok'`（`subprocess.run` 像是仍被别的用例 mock 成返回
+    stdout="ok"）与两条 `assert True is False`（工具调用本该失败却成功）。本地读代码
+    查不出机制：全仓没有 module/class 作用域的 patch，`ToolManager` 也没有类级共享注册表。
+    于是让 CI 自己交代 —— 每条用例记录：
+
+    - `prev=` 同一 worker 里上一条跑过的用例（若 `subprocess_run_patched=True`，它就是嫌疑犯）
+    - `subprocess_run_patched=` 全局 `subprocess.run` 是否已不是标准库原版
+    - `t1_rows=` 本用例将要用的 DB 里，工具 id `t1` 是否已经有行（跨用例串味的直接证据）
+    - `threads=` 残留线程名（泄漏的后台线程是这一族的已知模式）
+
+    只在"可疑"时以 WARNING 落日志，避免 8400+ 条噪音；用例失败时 pytest 会把 setup 阶段
+    捕获到的日志打在失败详情里，于是红的那一次自带线索。
+    """
+    import logging
+    import sqlite3
+    import subprocess
+    import threading
+
+    nodeid = request.node.nodeid
+    patched = subprocess.run is not _ORIGINAL_SUBPROCESS_RUN
+    threads = [t.name for t in threading.enumerate() if t is not threading.main_thread()]
+    t1_rows = "n/a"
+    db_path = "?"
+    try:
+        from maop.core.backends.db_utils import get_db_path
+
+        db_path = str(get_db_path("tool_manager"))
+        if Path(db_path).exists():
+            with contextlib.closing(sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)) as conn:
+                try:
+                    t1_rows = str(
+                        conn.execute("SELECT count(*) FROM tools WHERE id='t1'").fetchone()[0]
+                    )
+                except sqlite3.Error as exc:  # 表还不存在 = 干净
+                    t1_rows = f"no-table({type(exc).__name__})"
+    except Exception as exc:  # 探针绝不能自己把用例带崩
+        t1_rows = f"probe-error({type(exc).__name__})"
+
+    prev = _PROBE_PREV.get("nodeid")
+    _PROBE_PREV["nodeid"] = nodeid
+    suspicious = patched or threads or (t1_rows.isdigit() and int(t1_rows) > 0)
+    if suspicious:
+        logging.getLogger("tests.conftest.leak_probe").warning(
+            "[leak-probe] test=%s prev=%s subprocess_run_patched=%s t1_rows=%s db=%s threads=%s",
+            nodeid, prev, patched, t1_rows, db_path, threads[:8],
+        )
+    yield
+
+
 @pytest.fixture(autouse=True)
 def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Set MAOP_DATA_DIR to tmp_path/data so each test gets an isolated DB.
