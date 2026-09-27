@@ -52,7 +52,10 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.13"
-  NODE_VERSION: "20"
+  # 2026-09-27: 20 → 24。jsdom@30 与 vitest@5 的 engines 都是
+  # `^22.22.2 || ^24.15.0 || >=26.0.0`；node 20 下 vitest 5 会在 import jsdom→undici 时
+  # 直接 56 个测试文件报错（见 #40 的 Frontend Build 日志），属于跑不受支持的组合。
+  NODE_VERSION: "24"
 
 jobs:
   # ── Lint ────────────────────────────────────────────────────────
@@ -589,7 +592,7 @@ jobs:
         # 发布计划）时跳过登录且只构建不推送，避免 "Username and password
         # required" 失败（9c01b38 首次真正执行 docker job 时暴露）。
         if: github.event_name != 'pull_request' && steps.reg.outputs.configured == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ secrets.REGISTRY_URL || '' }}
           username: ${{ secrets.REGISTRY_USER || '' }}
