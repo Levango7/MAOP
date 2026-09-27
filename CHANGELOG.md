@@ -96,21 +96,25 @@ lock 仍停在 `2.5.2 / 0.30.6 / 5.2.1`；照 lock 装环境的人拿到的是�
 ### 主干 flaky 的 CI 侧观测探针（只观测，不改行为）
 
 `tests/test_tool_manager.py::TestCallSyncFallback` 3 条在 macOS/Windows 随机红（症状
-`assert '42' in 'ok'`、两条 `assert True is False`），把主干和 PR 反复判红。读代码排除了几条
-猜测：全仓没有 module/class 作用域的 `subprocess.run` patch；`ToolManager` 没有类级共享注册表；
-per-test `MAOP_DATA_DIR` 隔离实测有效（DB 路径各不相同）。既然本地推不出来，就让 CI 自己交代：
+`assert '42' in 'ok'`、两条 `assert True is False`），把主干和 PR 反复判红（master `88e75804`
+的验证运行即 3 failed / 8453 passed，其余 8 平台全绿）。读代码排除的猜测：没有 module/class
+作用域的 `subprocess.run` patch；`ToolManager` 无类级共享注册表；per-test `MAOP_DATA_DIR`
+隔离有效。既然本地推不出机制，就让 CI 自己交代。
 
-- `tests/conftest.py` 新增 autouse 探针 `_leak_probe`，在每条用例开始前记录
-  `prev=`（同一 worker 上一条跑过的用例）、`subprocess_run_patched=`（全局 `subprocess.run`
-  是否已不是标准库原版）、`t1_rows=`（本用例将要用的 DB 里工具 `t1` 是否已有行）、
-  `threads=`（残留线程名）。只在"可疑"时打 WARNING，避免 8400+ 条噪音；用例失败时 pytest 会把
-  setup 阶段捕获到的日志印在失败详情里 —— 红的那一次自带嫌疑人。
-- 已证伪/已证真：探针在人为泄漏（上一条用例改了 `subprocess.run` 不还原）时确实报
-  `subprocess_run_patched=True prev=…test_a_leaks_patch_without_undo`；正常用例链路上不报警。
-- **顺带抓到一个真实泄漏**：每条用例开始时都存在残留线程 `Thread-1 (run_server)`
-  （dashboard 测试服务器线程从未 join）—— 与 #20 修掉的进化线程同族，是下一个该收口的对象。
-- 探针自身不 assert、不影响任何断言；`pytest tests/test_tool_manager.py
-  tests/test_agent_adapters.py tests/test_mcp_hub.py` → 188 passed，ruff 干净。
+- `tests/conftest.py` 新增 autouse 探针 `_leak_probe`，在每条用例开始前记
+  `prev=`（同一 worker 上一条跑过的用例 nodeid）、`subprocess_run_patched=`（全局
+  `subprocess.run` 是否仍非标准库原版）、`threads=`（残留线程名）；只在"可疑"时打 WARNING。
+  用例失败时 pytest 会把 setup 阶段捕获到的日志印进失败详情 —— 红的那一次自带嫌疑人。
+- 自证有效：人为让上一条用例改 `subprocess.run` 不还原，探针准确报
+  `subprocess_run_patched=True prev=…test_a_leaks_patch_without_undo`；正常链路不误报。
+- 顺带抓到一处真实泄漏：每条用例开始时都有残留线程 `Thread-1 (run_server)`
+  （dashboard 测试服务器线程从未 join），与 #20 修掉的进化线程同族 —— 本 PR 只观测不修。
+- ⚠️ **过程记录（我自己造成的回归，已修）**：探针第一版顺手调了 `get_db_path("tool_manager")`
+  想做"跨用例工具行串味"取证，但它定义在 `_isolate_data_dir` **之前**、autouse 按定义顺序执行，
+  于是提前解析并初始化了 `data_dir` / settings 单例，把 `tests/test_secrets.py` 的 4 条用例
+  直接弄红（那些用例依赖"密钥文件按当前 data_dir 查找"）—— 本地全量因此 31 failed + 19 errors。
+  修法：探针不再触碰 DB/settings（该取证目标也已被证伪），并把夹具移到 `_isolate_data_dir` 之后。
+  教训写进夹具 docstring：**观测型工具不许有副作用**。
 
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
