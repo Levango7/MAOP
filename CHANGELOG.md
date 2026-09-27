@@ -357,6 +357,23 @@ error -- Upload queued for processing failed: {"message":"Token required - not v
 - 变异验证：加回一个 `fail_ci_if_error: false` 的步骤 → 守卫①红；新增未登记的
   `continue-on-error` 步骤 → 守卫②红；把已登记步骤改名 → 守卫②③同时红；恢复后 3 passed。
 
+### 容器构建对 PyPI 镜像加 3 次退避重试（抗瞬时空索引）
+
+master `cd4099e5` 上 `Container Scan (trivy)` 红过一次，起因不是漏洞也不是代码：镜像构建里
+`pip install -r requirements.lock -i https://pypi.tuna.tsinghua.edu.cn/simple` 得到
+`Could not find a version that satisfies the requirement pyyaml<7.0.0,>=6.0.2 (from versions: none)`。
+`from versions: none` 表示索引**返回了空候选集**（不是版本区间无解 —— 那样会列出可用版本），
+属于镜像侧瞬时故障：同一条 commit 的 `Docker build` 与 `Compose Smoke` 都是绿的，重跑该作业即恢复。
+
+- `py/Dockerfile`：把那层 `RUN pip install …` 包进最多 3 次、20s/40s 退避的重试环。
+- 有意**不**加第二个 index 主机：多信一个源等于扩大供应链面，而用清华源本身是 P1-5 记录的
+  网络可达性决定。3 次仍失败就照旧让构建红 —— 这是给瞬时抖动让路，不是把失败藏起来
+  （本仓刚在 #50 里删掉一个"吞失败"的步骤，不会反过来再种一个）。
+- 验证：`sh -n` 语法通过；用假 `pip` 驱动整段命令做功能验证 —— 第 3 次成功 → `exit 0`；
+  三次全失败 → `exit 1` 并打印 `pip install 连续 3 次失败，放弃`。真实镜像构建由 CI 的
+  `Docker build` / `Container Scan` 作业覆盖（`py/Dockerfile` 在 `on.pull_request.paths` 白名单内，
+  所以本改动一定会触发它们）。
+
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
 
