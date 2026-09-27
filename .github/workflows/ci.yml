@@ -393,6 +393,25 @@ jobs:
         run: npm test
         working-directory: dashboard-enterprise
 
+      - name: Frontend coverage gate
+        # 2026-09-27: `test:coverage` 此前只存在于 package.json，CI 从不跑它 ——
+        # 也就是 vitest.config.js 里的阈值达标与否**从来没人验证过**（今天首次实测即 exit=1，
+        # 因为 2026-09-17 把阈值抬到 60/60/50/60 时没量过）。
+        # 另一层理由：`npm test` 在冷启动丢 worker 的情况下会"半程绿灯"（实测只跑 25/56 文件仍报过），
+        # 覆盖率下限时这种漏跑一定会把总数打下来，所以这一步同时是"测试真的都跑了"的机械哨兵。
+        # 阈值只许往上抬；要降必须连带说明为什么，并走人工复核（同后端 ratchet 的纪律）。
+        run: npm run test:coverage
+        working-directory: dashboard-enterprise
+
+      - name: Upload frontend coverage report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-coverage
+          path: dashboard-enterprise/coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Build enterprise dashboard
         working-directory: dashboard-enterprise
         run: npx vite build

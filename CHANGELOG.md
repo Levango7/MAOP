@@ -256,6 +256,39 @@ master 实测（vitest 5 之后）：statements 61.09% / branches 46.2% / functi
   `{'docker': {'login-action', 'setup-buildx-action', 'build-push-action'}}`；改回 → 6 passed。
 - 该测试对 `actions/*` 亦成立（6 个包已在 `actions-batch` 内），不会误报单包前缀。
 
+### 前端覆盖率门禁：接进 CI、去掉会把半程运行吞成绿灯的开关
+
+上一节记下的"这个数好像不可复现"**是误判，这里更正**。低总数那一轮不是抖动，而是
+**冷启动时 forks worker 起不来**：日志里 31 条
+`[vitest-pool]: Failed to start forks worker for test files …` + `Timeout waiting for worker to respond`，
+实跑只有 **25/56 个测试文件、132/478 个测试**，vitest 自己都在提示
+`This might cause false positive tests`。预热之后同一命令稳定（56/56、478/478，
+statements 61.09 / branches 46.2 / functions 56.1 / lines 64.03）。
+
+真正的危险因此比"数字会抖"严重一档：`dangerouslyIgnoreUnhandledErrors: true` 把这类
+worker 风暴**吞成继续跑**，而 CI 的 frontend job 跑的是不带覆盖率的 `npm test` ——
+那种"一半测试没跑"的情况在今天的 CI 里会直接报绿。
+
+- `dashboard-enterprise/vitest.config.js`：删除 `dangerouslyIgnoreUnhandledErrors: true`。
+  它当初是为 chart.js 在 jsdom 下调 `getContext` 的 unhandled rejection 加的；
+  实测关掉该开关跑覆盖率 → **未处理错误 0 条**、56 files / 478 tests 全过（那条路径早已被测试
+  stub 掉），也就是说这个全局吞异常的开关已经没有存在的理由，只有副作用。
+- `.github/workflows/ci.yml`：`Frontend Build` 新增显式步骤 `Frontend coverage gate`
+  （`npm run test:coverage`）+ 失败时上传 coverage 产物。这一步同时是"测试真的都跑了"的
+  机械哨兵 —— 文件漏跑一定会把覆盖率打到下限以下，比再加一条断言更根本。
+- 阈值改为**实测值留 0.5pp 抖动余量**的可执行下限：
+  statements 60.5 / branches 45.5 / functions 55.5 / lines 63.5。
+  数值比 2026-09-17 拍的 60/60/50/60 低（那两个够不到的维度），但门禁从"**CI 从不执行**"
+  变成"每个前端 PR 都拦"，净强度是上升的；注释里写明**只许往上抬**，目标仍是对齐后端的 80%。
+- 守卫：新增 `py/tests/test_frontend_coverage_gate.py`（4 条）—— CI 必须还在跑该命令、
+  阈值不许低于记录的 FLOORS、`dangerouslyIgnoreUnhandledErrors: true` 不许回来
+  （按配置键匹配，不按裸串，否则会误伤解释性注释 —— 写这条时先踩了自己一次）、
+  `package.json` 里脚本必须还在。
+- 变异验证：① `functions` 降到 50 → 阈值守卫红；② 重新加回开关 → 开关守卫红；
+  ③ 从 ci.yml 删掉该步骤 → CI 步骤守卫红；恢复后 4 passed。
+- 行为验证：在隔离副本（codeload tarball + `npm ci`）用改后的配置跑 `npm run test:coverage`
+  → **exit=0**、56 files / 478 tests、无未处理错误、无阈值 ERROR。
+
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
 ### 前端补 `vue-tsc` 类型门禁
