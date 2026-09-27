@@ -234,6 +234,28 @@ master 实测（vitest 5 之后）：statements 61.09% / branches 46.2% / functi
 **含义**：若要把覆盖率纳进 CI，第一步是先证明这个数可复现，否则门禁会变成新的随机红源。
 处置二选一（不顺手改）：纳进 CI 并重新定标 + 加 ratchet（对齐后端做法），或明确降级为"仅本地工具"并在配置里写清楚。
 
+### dependabot：`docker/*` 也成批，并让"该不该成批"变成机器判的
+
+#28 只给 `actions/*` 建了批量分组，`docker/*` 漏了。后果在 2026-09-27 的周一扫描里实测到：
+`docker/build-push-action` 6→7（#35）、`docker/login-action` 3→4（#36）、
+`docker/setup-buildx-action` 3→4（#38）**各开一个 PR** —— 三轮完整 9 平台矩阵（每轮 ~20 分钟），
+而且三个 PR 都改 `ci.yml` 的相邻行、彼此冲突要反复 rebase。
+
+- `.github/dependabot.yml`：新增 `groups.docker-batch`（`patterns: ["docker/*"]`，
+  `update-types` 含 major/minor/patch）。同前缀、同厂商、只动 `uses:` 版本行 —— 批量风险低、CI 覆盖充分。
+- **有意不扩大**到 `gitleaks/*`、`pypa/*`、`codecov/*`：它们在本仓各只有 1 个包（用 `uses:` 计数核实），
+  组进去省不下一个 PR，反而会把"安全扫描器 major"和"发布工具 major"捆在一起、红了难归因 ——
+  按 #28 写在文件顶部的人工规则，这类 major 就该单独复核门禁覆盖面。
+
+机械强制（不靠人记）：`tests/test_dependabot_config.py` 新增
+`test_owners_with_multiple_action_packages_are_batched` —— 直接从 workflow 里扫 `uses:`，
+**凡同一前缀下有 ≥2 个不同包的，必须被某个 dependabot 分组 pattern 覆盖**。
+这条判据正是本次缺陷的通用形式：下次再加一家 action（比如 `aws/*`）而忘了分组，CI 当场红。
+
+- 变异验证：删掉 `docker-batch` → 该用例失败并精确点名
+  `{'docker': {'login-action', 'setup-buildx-action', 'build-push-action'}}`；改回 → 6 passed。
+- 该测试对 `actions/*` 亦成立（6 个包已在 `actions-batch` 内），不会误报单包前缀。
+
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
 ### 前端补 `vue-tsc` 类型门禁
