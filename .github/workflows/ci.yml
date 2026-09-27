@@ -570,7 +570,7 @@ jobs:
           path: dashboard/dist-enterprise/
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       # if: 表达式不能直接引用 secrets context（Unrecognized named-value:
       # 'secrets'，5e3174b 因此 workflow 解析失败）。先用 env 注入 secrets，
       # 探测步骤输出 configured=true/false，后续 if/push 只引用 steps context。
