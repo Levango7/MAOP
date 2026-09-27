@@ -96,20 +96,28 @@ def test_allowlist_entries_are_real_module_names() -> None:
             pytest.fail(f"过滤器里的 {mod!r} 不是可导入的模块：{exc}")
 
 
-def test_probe_fixture_is_autouse_and_defined_after_data_isolation() -> None:
-    """夹具的**定义顺序**是踩过的坑：探针若在 `_isolate_data_dir` 之前跑，就会提前初始化
-    settings 单例并把 `test_secrets.py` 弄红。顺序断言让那个坑不可能无声回归。
+def test_probe_fixture_is_autouse_and_defined_after_data_isolation(
+    request: pytest.FixtureRequest,
+) -> None:
+    """夹具的**定义顺序**与 autouse 接线都要钉住。
+
+    顺序：探针若在 `_isolate_data_dir` 之前跑，就会提前初始化 settings 单例并把
+    `test_secrets.py` 弄红 —— 那是 #39 踩过的坑，不该靠记忆防守。
     """
     import tests.conftest as conftest_mod
 
     src = inspect.getsource(conftest_mod)
-    probe_at = src.index("def _leak_probe(")
+    probe_at = src.index("@pytest.fixture(autouse=True)\ndef _leak_probe(request")
     isolation_at = src.index("def _isolate_data_dir(")
     assert probe_at > isolation_at, "探针夹具必须定义在数据隔离夹具之后（autouse 按定义顺序执行）"
-    sig = inspect.signature(conftest_mod._leak_probe)
-    assert list(sig.parameters) == ["request"], sig
-    marks = getattr(conftest_mod._leak_probe, "_pytestfixturefunction", None)
-    assert marks is not None and marks.autouse, "探针夹具必须是 autouse，否则什么都观测不到"
+    # autouse 用**行为**证明，不碰 pytest 内部属性：CI 是 pytest 9.1.1、本地 8.3.4
+    # （`pytest>=8.0` 没 pin 死），而 `@pytest.fixture` 的载体在两代里完全不同 ——
+    # 8.x 是"原函数 + `_pytestfixturefunction` 标记"，9.x 返回 `FixtureFunctionDefinition`。
+    # 我第一版就是断言那个标记名，在 CI 上直接红（本地全绿，因为版本不同）。
+    # 夹具若真为 autouse，它必然在本次用例 setup 时把 `_PROBE_PREV["nodeid"]` 写成我的 nodeid。
+    assert _PROBE_PREV.get("nodeid") == request.node.nodeid, (
+        f"探针夹具没有为每条用例自动运行：_PROBE_PREV={_PROBE_PREV!r} 期望含 {request.node.nodeid!r}"
+    )
 
 
 def test_thread_origin_falls_back_when_target_is_unknown() -> None:
