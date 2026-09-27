@@ -65,6 +65,21 @@ updates:
           - "major"
           - "minor"
           - "patch"
+      # 2026-09-27: 上一条规则只覆盖了 `actions/*`，同一批周一扫描里 `docker/*` 的三个包
+      # 仍然各开一个 PR（#35 build-push-action 6→7、#36 login-action 3→4、#38
+      # setup-buildx-action 3→4），三次完整 9 平台矩阵 ≈ 60 分钟，且三者都改 ci.yml 的
+      # 相邻行、互相冲突要反复 rebase。它们同为 docker 官方 action、只动 `uses:` 版本行，
+      # 合成一批即可一次矩阵验证完。
+      # 有意**不**把 gitleaks / pypa / codecov 并进批量组：各自只有 1 个包、一年更新几次，
+      # 组进去省不下 PR，反而会把"安全扫描器 major"和"发布工具 major"捆在一起，
+      # 红了难以归因 —— 按本文件顶部的人工规则，这类 major 就该单独复核门禁覆盖面。
+      docker-batch:
+        patterns:
+          - "docker/*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
   - package-ecosystem: "docker"
     directory: "/py"
     schedule:
