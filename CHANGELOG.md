@@ -93,6 +93,25 @@ lock 仍停在 `2.5.2 / 0.30.6 / 5.2.1`；照 lock 装环境的人拿到的是�
 - `package.json` 删掉 `pretest`：门禁要在 CI 里**看得见、失败能归因到具体步骤**，不藏在 `npm test` 背后；
   本地 `npm test` 也回到只跑测试。`typecheck` 脚本保留。
 
+### 主干 flaky 的 CI 侧观测探针（只观测，不改行为）
+
+`tests/test_tool_manager.py::TestCallSyncFallback` 3 条在 macOS/Windows 随机红（症状
+`assert '42' in 'ok'`、两条 `assert True is False`），把主干和 PR 反复判红。读代码排除了几条
+猜测：全仓没有 module/class 作用域的 `subprocess.run` patch；`ToolManager` 没有类级共享注册表；
+per-test `MAOP_DATA_DIR` 隔离实测有效（DB 路径各不相同）。既然本地推不出来，就让 CI 自己交代：
+
+- `tests/conftest.py` 新增 autouse 探针 `_leak_probe`，在每条用例开始前记录
+  `prev=`（同一 worker 上一条跑过的用例）、`subprocess_run_patched=`（全局 `subprocess.run`
+  是否已不是标准库原版）、`t1_rows=`（本用例将要用的 DB 里工具 `t1` 是否已有行）、
+  `threads=`（残留线程名）。只在"可疑"时打 WARNING，避免 8400+ 条噪音；用例失败时 pytest 会把
+  setup 阶段捕获到的日志印在失败详情里 —— 红的那一次自带嫌疑人。
+- 已证伪/已证真：探针在人为泄漏（上一条用例改了 `subprocess.run` 不还原）时确实报
+  `subprocess_run_patched=True prev=…test_a_leaks_patch_without_undo`；正常用例链路上不报警。
+- **顺带抓到一个真实泄漏**：每条用例开始时都存在残留线程 `Thread-1 (run_server)`
+  （dashboard 测试服务器线程从未 join）—— 与 #20 修掉的进化线程同族，是下一个该收口的对象。
+- 探针自身不 assert、不影响任何断言；`pytest tests/test_tool_manager.py
+  tests/test_agent_adapters.py tests/test_mcp_hub.py` → 188 passed，ruff 干净。
+
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
 ### 前端补 `vue-tsc` 类型门禁
