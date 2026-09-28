@@ -355,8 +355,8 @@ async function loadSystemStats() {
   resourcesLoading.value = true;
   diagnosticsLoading.value = true;
 
-  let resRes = null;
-  let diagRes = null;
+  let resRes;
+  let diagRes;
   try {
     [resRes, diagRes] = await Promise.all([
       api.get('/api/system/resources').catch((e) => (isForbidden(e) ? 'FORBIDDEN' : null)),

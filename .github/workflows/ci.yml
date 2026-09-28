@@ -26,11 +26,10 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.13"
-  # 2026-09-27: 20 → 24。下限由 jsdom 决定：lockfile 实装 jsdom@30.1.1，
-  # engines = `^22.22.2 || ^24.15.0 || >=26.0.0`，node 20 不在支持区间
-  # （vitest 3.2.7 自身只要求 >=18，node 20 下前端测试失败的根因在 jsdom@30）。
-  # 2026-09-29 复核：package.json 声明 jsdom ^30.1.1 / vitest ^3.0.0，
-  # 与 lockfile 一致；此前注释误写 "vitest@5"。
+  # 2026-09-27: 20 → 24。jsdom@30 与 vitest@5 的 engines 都是
+  # `^22.22.2 || ^24.15.0 || >=26.0.0`；node 20 下 vitest 5 会在 import jsdom→undici 时
+  # 直接 56 个测试文件报错（见 #40 的 Frontend Build 日志），属于跑不受支持的组合。
+igin/master
   NODE_VERSION: "24"
 
 jobs:
