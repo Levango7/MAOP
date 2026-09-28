@@ -110,7 +110,7 @@ IDE、单体 agent 工具——对标单体 CLI 时，MAOP 的定位是它的上
 | 迁移 | 根部 `alembic.ini(.template)` + `py/maop/migrations/` |
 | 企业升配 | PostgreSQL / Redis / Vault / RabbitMQ(可选) / etcd(planned)，见 README 能力对比表 |
 | 后端 | Python >= 3.10；FastAPI 0.141.1；Pydantic 2.x + pydantic-settings 2.15；uvicorn 0.53；httpx；PyJWT >= 2.13 |
-| 前端 | Vue 3.5 / vue-router 5.3 / Pinia 4.0 / Vite 8 / vitest 3.2.7（实测 lock）/ Playwright 1.63 |
+| 前端 | Vue 3.5 / vue-router 5.3 / Pinia 4.0 / Vite 8 / vitest 5.0.2（2026-09-29 合并 PR #40 后按 lock 复核；此前该表记的是 3.2.7）/ Playwright 1.63 |
 | 测试与门禁 | pytest 10019 passed（-n 4 全量，忽略 e2e）、覆盖率 84%；ruff；前端 typecheck + coverage 门禁（2026-09-27 起进 CI） |
 
 已知失真：`docs/database-schema.md` 原写"101 张 distinct 表"（2026-08-26 口径），已按上述方法重算为
@@ -158,7 +158,7 @@ IDE、单体 agent 工具——对标单体 CLI 时，MAOP 的定位是它的上
 | `docs/database-schema.md` | 表计数过时（101 vs 实测 130） | 按第 4 节方法重算并更新首尾两处 | 已改 |
 | `README.md`（**本条为误判，撤回**） | 初稿称架构表 "16 subpackages" 过时、应为 18 —— 18 是目录数；守卫口径是"含 `__init__.py` 的真包"= 16，README 原值正确（`py/scripts/doc_reconcile.py` 复验通过） | 不改（一度改成 18，已回滚） | 已复核 |
 | `product-design-rfc-001.md` | 状态仍是 Draft + "待你回复" | 更正为 Implemented，新增"实施结果"节回答原 3 问 | 已改 |
-| `.github/workflows/ci.yml` | 已知 6 处：假称 vitest@5（实 3.2.7）；`publish` job 只在 push.branches 触发、无 tags = 死代码；`pull_request.branches` 缺 develop；monitoring/deploy 被范围分类器归为 docs-only；Node 24 与 docker node:20 漂移；trivy 缓存注释过期。另有 push 腿回退 `head~1` 会截断新分支变更集 | 逐项修复，修完在 ci-gates.md 记录语义 | 已改（2026-09-29，7 项全修：注释改实况 / publish 标注不可达+启用路径 / 补 develop / 分类面加 `deploy/`+`monitoring/`+`alertmanager/`+三个根 conf 并带用例 / node:24-alpine 对齐并实测镜像构建 / trivy 注释更正 / 移除 head~1 回退） |
+| `.github/workflows/ci.yml` | 已知 6 处：假称 vitest@5（实 3.2.7）；`publish` job 只在 push.branches 触发、无 tags = 死代码；`pull_request.branches` 缺 develop；monitoring/deploy 被范围分类器归为 docs-only；Node 24 与 docker node:20 漂移；trivy 缓存注释过期。另有 push 腿回退 `head~1` 会截断新分支变更集 | 逐项修复，修完在 ci-gates.md 记录语义 | 已改（2026-09-29，7 项全修：注释改实况 / publish 标注不可达+启用路径 / 补 develop / 分类面加 `deploy/`+`monitoring/`+`alertmanager/`+三个根 conf 并带用例 / node:24-alpine 对齐并实测镜像构建 / trivy 注释更正 / 移除 head~1 回退）。**其中"注释改实况"一项已随合并再次更正**：当时 lock 是 vitest 3.2.7、注释写 vitest@5 属不实；合并 PR #40 后 vitest 真升到 5.0.2，注释与事实的关系反转，故取远端口径（node 20 跑 vitest 5 会在 import jsdom→undici 时报错，是实测依据而非措辞问题）。 |
 | `docs/README.md` | 索引称 api-reference "448 个端点（计数待复核）"；`_盘点_` 报告（2026-08-11）为 346 端点/41 router，现 router 模块 61 个（顶层 .py 共 62 个，含子目录 79） | 以代码重算端点计数后统一两处口径 | 已改（2026-09-29：口径落在 `api-reference.md`「端点计数」节 —— OpenAPI `paths`×方法，Personal 482 / 企业 554，不含 `/api/v1/*` 别名；README 索引与盘点报告已改为指向该口径） |
 | `py/maop/dashboard/routers/sso.py` | 新增的 400 分支（缺 state）零测试覆盖 | 补路由级测试 | 已改（2026-09-29：`py/tests/test_sso_router_callback_guard.py`，4 例 —— 缺 state→400 / 缺 code→400 / IdP error→400 / Personal 版 404；企业包依赖，CI 按惯例 collect_ignore，本机跑） |
 | `py/maop/dashboard/routers/relay_platform.py` | 三个写端点（注册含 `api_key`、删除、价格对比）**没有任何守卫**，文件甚至没 import `require_admin`，而 docstring 声称本 router 负责"权限检查"；同级 model_gateway / hooks 的写端点逐行调用 | 补 `require_admin(request)` + 鉴权回归测试 | 已改（2026-09-29：`test_relay_platform.py` 新增 3 条，非 admin→403 / 被拒注册不落库 / GET 口径不变，30 passed；`check_admin_coverage.py` 发现数 17→14） |
