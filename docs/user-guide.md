@@ -81,7 +81,9 @@ MAOP 使用 YAML 配置文件，默认位于 `config/` 目录：
 
 - `config/agents.yaml` — Agent 定义
 - `config/models.yaml` — LLM 后端配置
-- `config/tenants.yaml` — 租户配置
+- `config/mcp_servers.yaml`、`config/rules.yaml`、`config/tool_whitelist.yaml` — MCP 服务器、规则与工具白名单
+
+租户不靠 YAML 配置：由企业版 TenantManager 管理，经 `/api/tenants/*` 端点增删查，状态持久化在 SQLite。
 
 ### 3.3 多租户配置
 

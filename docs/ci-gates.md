@@ -11,10 +11,17 @@
 ```
 scope ──┬─→ lint ─→ test(9 平台矩阵) ─→ audit / sbom
         │         └→ perf-smoke / migrations / sast
-        └─→ frontend ─→ e2e
+        ├─→ frontend ─→ e2e
+        └─→ docs-gate（依赖 scope，但无条件跑）
 secret-scan（无条件，永远跑）
 docker / container-scan / compose-smoke / publish（仅 trunk push，见 §4）
 ```
+
+- `docs-gate` 跑 `py/scripts/check_docs_consistency.py --gate`（README + docs/ 的路径存在性、
+  模块计数、表格列数）。它**不跟着 `code=false` 跳过**，理由是这个检查的两类事故分别落在
+  两侧：只改文档会写进不存在的路径，只删代码会让文档里的旧路径失效——两边都必须跑。
+  脚本只用标准库、本机约 3 秒，不属"重活"。判定范围由 `docs/README.md` 第 1–6 章
+  （"当前权威文档"）决定，历史快照/设计文档要在文件头写理由才豁免，脚本会逐条打印。
 
 - `scope` 把变更集交给 `py/scripts/ci_path_scope.py` 分类，输出 `code=true|false`。
 - `code=false`（docs-only）时，`lint` 与 `frontend` 及它们的下游作业被**跳过**（skipped）。
@@ -87,3 +94,4 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 | `py/tests/test_frontend_coverage_gate.py` | 覆盖率门禁在 CI 里、阈值不低于实测、禁全局忽略未处理错误 |
 | `py/tests/test_dependabot_config.py` | dependabot 配置形状 + 同前缀 ≥2 个包的 action 必须成批 |
 | `py/tests/test_requirements_lock_sync.py` | `requirements.lock` 的直依赖段必须逐条镜像 `pyproject.toml` |
+| `py/tests/test_docs_consistency_gate.py` | 文档一致性门禁：范围只来自索引当前章节、豁免必须写理由、注入死路径必须判红、`docs-gate` 作业不许挂 `if` |

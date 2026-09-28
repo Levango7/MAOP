@@ -1,5 +1,6 @@
 # Nexus统一编排平台_HLD
 
+<!-- docs-gate: exempt=设计记录：v1.0 高层设计，含尚未落地的模块路径 -->
 > 文档版本：v1.0
 > 编写日期：2026-08-11
 > 文档性质：高层设计（High-Level Design，HLD）

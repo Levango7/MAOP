@@ -134,10 +134,10 @@ cd py && ruff format maop/
 ### 3.4 安全规范
 
 - **禁止**硬编码密钥、token、密码
-- **必须**通过环境变量或 `core/api_key_vault.py` 读取
+- **必须**通过环境变量或 `core/security/api_key_vault.py` 读取
 - **必须**对路径进行 `os.path.realpath` 校验，防止路径遍历
 - **必须**对所有写操作端点调用 `require_admin(request)`
-- **必须**对插件进行沙箱隔离（`core/sandbox.py`）
+- **必须**对插件进行沙箱隔离（`core/agent/plugins_hooks/plugin_sandbox.py`）
 - **必须**对日志输出进行敏感数据脱敏（`monitoring.py` 的 `_redact_sensitive`）
 
 ---

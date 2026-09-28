@@ -2,7 +2,7 @@
 
 > 本文档是 MAOP 所有环境变量的权威参考。涵盖 `.env.example` 中已定义的变量以及代码中使用但未列入示例的变量。
 >
-> **配置加载优先级**：环境变量 > `.env` 文件 > `config/settings.yaml` > Pydantic 默认值
+> **配置加载优先级**：环境变量 > `.env` 文件 > 代码内默认值（`settings.py` 的 Field defaults）
 >
 > **最后更新**：2026-09-14 ｜ **对应版本**：v5.2.0
 
@@ -94,7 +94,7 @@
 | `MAOP_TLS_KEY_FILE` | （空） | 否 | TLS 私钥路径（长名） |
 | `MAOP_TLS_MIN_VERSION` | `TLSv1_2` | 否 | 最低 TLS 版本：`TLSv1_2` 或 `TLSv1_3`（TLSv1/TLSv1_1 已拒绝） |
 | `MAOP_TLS_ALLOW_DEPRECATED` | `0` | 否 | 允许不安全 TLS 版本（TLSv1/TLSv1_1）。仅用于遗留集成调试 |
-| `MAOP_TLS_CERT_DIR` | `./certs/nginx` | 否 | nginx TLS 证书目录（bind mount，宿主机目录须存在） |
+| `MAOP_TLS_CERT_DIR` | `./certs/nginx` | 否 | nginx TLS 证书目录（bind mount，宿主机目录须存在） <!-- docs-gate: skip=环境变量的默认值是宿主机路径，不是仓库文件 --> |
 | `MAOP_TLS_CERT_FILENAME` | `fullchain.pem` | 否 | 证书文件名（位于 `MAOP_TLS_CERT_DIR` 内） |
 | `MAOP_TLS_KEY_FILENAME` | `privkey.pem` | 否 | 私钥文件名（位于 `MAOP_TLS_CERT_DIR` 内） |
 

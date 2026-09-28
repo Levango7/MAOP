@@ -1,5 +1,6 @@
 # SSO 集成 PRD — OIDC + SAML 2.0 对接 Keycloak/Azure AD
 
+<!-- docs-gate: exempt=需求文档：SSO 集成的目标态设计，非当前路径断言 -->
 ## 文档信息
 
 | 字段 | 值 |

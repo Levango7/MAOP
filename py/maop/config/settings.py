@@ -1,12 +1,12 @@
 """MAOP Settings - Pydantic Settings model for strong-typed configuration.
 
-Loads from:
+Loads from (高优先先赢):
   1. Environment variables (MAOP_ prefix)
   2. .env file in project root
-  3. config/settings.yaml (optional)
+  3. Field defaults declared in this module
 
-All settings have sensible defaults for development.
-Production overrides via environment variables.
+注意：不存在 config/settings.yaml 这一层 —— 本模块只用 Pydantic Settings
+的 env/.env 两个来源（历史上文档曾列过该 YAML 层，代码从未实现）。
 """
 
 from __future__ import annotations

@@ -145,6 +145,28 @@ jobs:
       - name: Doc↔Code reconcile
         run: python scripts/doc_reconcile.py
 
+  # ── Docs gate：文档-代码一致性（README + docs/）────────────────────────
+  # 为什么不放进 lint job：lint 只在 code 变更时跑，而"只改文档"正是这个检查
+  # 最该覆盖的场景；反过来"只删代码"也会让文档里的路径失效——所以两边都要跑，
+  # 干脆做成独立作业、无条件执行。脚本只用标准库，读 115 个 md + 文件索引，
+  # 本机约 3 秒，不属于本 workflow 要跳的"重活"。
+  # 判定范围与豁免口径由脚本自己定义并逐条打印：只对 docs/README.md 第 1–6 章
+  # 所列"当前权威文档"失败；历史快照/设计文档要豁免须在文件头写明理由。
+  docs-gate:
+    name: Docs consistency gate
+    needs: scope
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: py
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Docs consistency (paths / counts / tables)
+        run: python scripts/check_docs_consistency.py --gate
+
   # ── Test ────────────────────────────────────────────────────────
   test:
     name: pytest (${{ matrix.os }}, Python ${{ matrix.python-version }})

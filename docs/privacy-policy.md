@@ -30,7 +30,7 @@ MAOP（Multi-Agent Orchestration Platform）尊重并保护用户隐私。本隐
 个人版**不收集、不上传**任何信息至 MAOP 团队服务器。所有数据存储在用户本地文件系统：
 
 - `data/maop.db`（SQLite）：编排状态、记忆、配置。
-- `data/.api-key`（可选）：API key 加密密钥。
+- `data/.enc_key`（可选）：API key 加密密钥（`api_key_vault` 首次使用时自动生成）。
 - `logs/`：运行日志。
 
 > **遥测说明**：MAOP 默认**不**启用任何遥测或"phone home"机制。`MAOP_OTEL_ENABLED=0` 为默认值，仅当用户显式配置 OpenTelemetry exporter 时才会上传指标，且目标地址由用户完全控制。

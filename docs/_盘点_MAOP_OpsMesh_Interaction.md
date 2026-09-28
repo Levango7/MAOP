@@ -1,5 +1,6 @@
 # 接口盘点报告：MAOP + OpsMesh + Interaction
 
+<!-- docs-gate: exempt=时间点快照：2026-08-11 跨三仓接口盘点，其中的路径是当时的事实 -->
 > 盘点时间：2026-08-11
 > 盘点范围：F:\Nexus\MAOP、F:\Nexus\OpsMesh、F:\Nexus\Interaction
 > 盘点维度：对外 API 端点 / 端口配置 / 鉴权机制 / 事件总线 / 多租户隔离 / 健康检查可观测性 / 部署方式 / Agent 机制

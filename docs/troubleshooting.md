@@ -399,7 +399,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 **症状**：API 间歇性卡顿，单请求慢但 CPU/内存正常。
 **原因**：异步路由中调用了同步阻塞 API（如 `subprocess.run`、同步 `requests.post`）。
-**解决**：升级到 4.3.0+，已将 `system.py` 的 `subprocess.run` 改为 `asyncio.create_subprocess_exec`；自定义插件中若需调用子进程，统一使用 `asyncio.create_subprocess_exec` 或 `loop.run_in_executor`。
+**解决**：升级到 4.3.0+，已将 `dashboard/services/system_service.py` 的 `subprocess.run` 改为 `asyncio.create_subprocess_exec`；自定义插件中若需调用子进程，统一使用 `asyncio.create_subprocess_exec` 或 `loop.run_in_executor`。
 
 ---
 
@@ -479,11 +479,11 @@ python scripts/generate_license.py --customer "..." --edition enterprise
 ### 9.3 SSO 登录失败
 
 **症状**：`/api/sso/authorize` 重定向失败或 IdP 报错。
-**原因**：SAML IdP metadata URL 错误、`config/sso.yaml` 配置缺失、ACS URL 未在 IdP 注册。
+**原因**：SAML IdP metadata URL 错误、SSO provider 未注册（IdP 参数存在 provider 的 `config` 字段里，通过 `POST /api/sso/providers` 写入）、ACS URL 未在 IdP 注册。
 **解决**：
 
 - 检查 SAML IdP metadata URL 可达性。
-- 检查 `config/sso.yaml` 中的 `entity_id`、`acs_url`、`idp_metadata_url`。
+- 检查 provider `config` 中的 `entity_id`、`acs_url`、`idp_metadata_url`（`GET /api/sso/providers/{id}` 可查看）。
 - 查看 `/api/sso/config` 返回值是否与 IdP 侧一致。
 
 ### 9.4 n8n 集成不可用

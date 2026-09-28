@@ -52,8 +52,8 @@ MAOP 旨在解决企业级多智能体编排的核心挑战：
 | 合规 | `core/tenant/compliance.py` | GDPR、DPA |
 | LDAP | `core/security/ldap_provider.py` | AD 集成 |
 
-> 模块路径为 2026-09-29 实核（此前表中写的 `core/agent_*`、`core/three_layer_memory`、
-> `core/multimodal` 等路径在代码树中不存在；多模态推理属 HLD 阶段二路线图项，
+> 模块路径为 2026-09-29 实核（此前表中写的 `core/agent_*`、`core/three_layer_memory`、 <!-- docs-gate: skip=此句在说明这些路径不存在 -->
+> `core/multimodal` 等路径在代码树中不存在；多模态推理属 HLD 阶段二路线图项， <!-- docs-gate: skip=此句在说明这些路径不存在 -->
 > 当前多模态能力仅在 LLM 对话 `core/agent/llm_chat/` 与图片存储 `core/backends/image_store.py` 层面）。
 
 ## 第2章 多租户设计
@@ -71,7 +71,7 @@ MAOP 旨在解决企业级多智能体编排的核心挑战：
 
 表：闭包表结构
 
-| 列 |' | 类型 | 说明 |
+| 列 | 类型 | 说明 |
 |------|------|------|
 | ancestor | TEXT | 祖先 org_id |
 | descendant | TEXT | 后代 org_id |
@@ -107,7 +107,7 @@ effective_permissions(org):
 | Art. 15 | `access_request` | 知情权 / 访问请求 |
 | Art. 17 | `right_to_erasure` | 删除权 / 被遗忘权 |
 | Art. 20 | `data_portability` | 数据可携权 |
-| Art. 28 |" | `register_dpa` | 数据处理协议 |
+| Art. 28 | `register_dpa` | 数据处理协议 |
 | Art. 30 | `record_processing_activity` | 处理记录 |
 
 ### 3.2 级联删除顺序

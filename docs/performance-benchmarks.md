@@ -393,13 +393,13 @@ curl http://127.0.0.1:9079/api/prometheus | grep -E "duration|total|queue"
 
 - `py/final_regression.log` — 回归测试基线日志
 - `py/tests/test_stress.py` — 压力测试断言
-- `py/maop/core/worker_pool.py` — WorkerPool 默认配置
-- `py/maop/core/cache.py` — LRU 缓存与 SingleFlight
-- `py/maop/core/event_bus.py` — EventBus 历史与死信
-- `py/maop/core/circuit_breaker.py` — 熔断器状态机
-- `py/maop/core/rate_limiter.py` — 令牌桶与滑动窗口
-- `py/maop/core/tls.py` — TLS 最小版本
-- `py/maop/core/monitoring.py` — Prometheus Histogram 桶
+- `py/maop/core/reliability/worker_pool.py` — WorkerPool 默认配置
+- `py/maop/core/reliability/cache.py` — LRU 缓存与 SingleFlight
+- `py/maop/core/reliability/event_bus.py` — EventBus 历史与死信
+- `py/maop/core/reliability/circuit_breaker.py` — 熔断器状态机
+- `py/maop/core/reliability/rate_limiter.py` — 令牌桶与滑动窗口
+- `py/maop/core/security/tls.py` — TLS 最小版本
+- `py/maop/core/monitoring/monitoring.py` — Prometheus Histogram 桶
 - `py/maop/dashboard/routers/auth.py` — PBKDF2 迭代
 - `py/maop/loop_models.py` — LoopConfig 默认值
 - `monitoring/prometheus.yml` — 抓取与评估间隔

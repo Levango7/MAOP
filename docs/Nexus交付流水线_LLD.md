@@ -1,5 +1,6 @@
 # Nexus交付流水线_LLD
 
+<!-- docs-gate: exempt=设计记录：v1.0 低层设计，含尚未落地的模块路径 -->
 > 文档版本：v1.0
 > 编写日期：2026-08-11
 > 文档性质：低层设计文档（Low-Level Design，LLD）

@@ -121,7 +121,7 @@ GitHub Actions CI 分两步：
 - `py/maop/model/schema.py` — Pydantic 模型定义
 - `py/maop/model/registry.py` — ModelRegistry + ProviderRegistry
 - `py/maop/model/selector.py` — ModelSelector
-- `py/maop/model/fallback.py` — FallbackManager
+- `py/maop/model/fallback.py` — FallbackManager <!-- docs-gate: skip=FallbackManager 尚未落地（本清单其余项已实现） -->
 - `py/maop/model/quota.py` — QuotaEnforcer
 - `py/maop/model/budget.py` — BudgetGuard
 - `py/maop/control/__init__.py` — 控制面模块入口
