@@ -223,6 +223,11 @@ def rotate_logs(
                 continue
             if f.suffix.lower() not in ROTATE_EXTENSIONS:
                 continue
+            if _ROTATED_RE.match(f.name):
+                # Never rotate a rotation: an oversized backup would otherwise
+                # chain into <name>_<ts1>_<ts2>... until the path-length limit
+                # breaks the rename (Windows WinError 123).
+                continue
             if _rotate_file(f, max_size_bytes, compress, dry_run):
                 result.rotated.append(f.name)
 

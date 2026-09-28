@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -100,3 +101,58 @@ class TestLogRotate:
         config = LogRotateConfig(max_size_kb=512, retain_count=5)
         result = rotate_logs(config=config, log_dir=logs, data_dir=tmp_path / "data")
         assert len(result.rotated) >= 1
+
+    def test_rotated_backup_not_re_rotated(self, tmp_path: Path):
+        """回归：超过阈值的轮转备份不得被再次轮转（链式命名 bug）。
+
+        修复前 app_20260101-000000.log（600KB）会被再轮转成
+        app_20260101-000000_<now>.log，链名逐次变长直至 rename 失败
+        （Windows WinError 123），日志目录堆满 0 字节链式文件。
+        """
+        logs = tmp_path / "logs"
+        logs.mkdir()
+        backup = logs / "app_20260101-000000.log"
+        backup.write_text("x" * (600 * 1024), encoding="utf-8")
+
+        result = rotate_logs(max_size_kb=512, log_dir=logs, data_dir=tmp_path / "data")
+        assert result.rotated == []
+        assert backup.exists()
+
+    def test_repeated_rotation_does_not_chain(self, tmp_path: Path, monkeypatch):
+        """回归：两次轮转只产出单时间戳备份，不产出链式名。"""
+        import maop.core.reliability.log_rotate as log_rotate_mod
+
+        stamps = iter(["20260101-000000", "20260101-010000"])
+
+        class _Stamp:
+            def __init__(self, value: str) -> None:
+                self._value = value
+
+            def strftime(self, _fmt: str) -> str:
+                return self._value
+
+        class _FakeDatetime:
+            @classmethod
+            def now(cls, _tz: object = None) -> _Stamp:
+                return _Stamp(next(stamps))
+
+        monkeypatch.setattr(log_rotate_mod, "datetime", _FakeDatetime)
+
+        logs = tmp_path / "logs"
+        logs.mkdir()
+        (logs / "app.log").write_text("x" * (600 * 1024), encoding="utf-8")
+
+        first = rotate_logs(max_size_kb=512, log_dir=logs, data_dir=tmp_path / "data")
+        assert first.rotated == ["app.log"]
+
+        (logs / "app.log").write_text("x" * (600 * 1024), encoding="utf-8")
+        second = rotate_logs(max_size_kb=512, log_dir=logs, data_dir=tmp_path / "data")
+        assert second.rotated == ["app.log"]
+
+        names = sorted(p.name for p in logs.iterdir())
+        assert set(names) == {
+            "app_20260101-000000.log",
+            "app_20260101-010000.log",
+            "app.log",
+        }
+        assert all(len(re.findall(r"\d{8}-\d{6}", n)) <= 1 for n in names)
