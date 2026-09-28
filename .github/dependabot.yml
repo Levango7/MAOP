@@ -1,5 +1,13 @@
 # Dependabot Configuration for MAOP
 # P1 fix (2026-09-17): automates dependency update detection and PR creation.
+#
+# 两条人工规则（2026-09-26，dependabot 无法自动表达，写在这里备忘）：
+# 1) 同生态内有 peer 依赖耦合的 bump 必须同批落地，否则会 ERESOLVE：
+#    例：eslint ↔ eslint-plugin-vue（plugin 9 的 peer 上界是 eslint 9）、
+#        vis-data ↔ vis-network（v8 需 vis-network>=10）。
+# 2) major 一律单独评估、不并进分组：必须看它是否触及"CI 根本没有验证"的表面。
+#    例：typescript 5→7 在补 vue-tsc 门禁前是"永远绿"的假绿 —— 门禁上线后立刻暴露
+#        vue-tsc 3.3.11 依赖 TS 内部 `typescript/lib/tsc`，TS7 直接崩。
 version: 2
 updates:
   - package-ecosystem: "pip"
@@ -45,6 +53,33 @@ updates:
       - "ci"
     commit-message:
       prefix: "deps(ci)"
+    # 2026-09-26: actions 此前无分组 → 一次周一扫描同时开出 #1 setup-python、#2 setup-node、
+    # #3 upload-artifact、#4 download-artifact 四个 PR，各自要跑完整 9 平台矩阵（每个 ~20 分钟），
+    # 而且四个都改同一对文件（ci.yml / nightly.yml）的相邻行，合并时互相冲突、需要反复 rebase。
+    # 合成一批：一次矩阵即可验证，且这些只是 `uses:` 版本号行，批量风险低、CI 覆盖充分。
+    groups:
+      actions-batch:
+        patterns:
+          - "actions/*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+      # 2026-09-27: 上一条规则只覆盖了 `actions/*`，同一批周一扫描里 `docker/*` 的三个包
+      # 仍然各开一个 PR（#35 build-push-action 6→7、#36 login-action 3→4、#38
+      # setup-buildx-action 3→4），三次完整 9 平台矩阵 ≈ 60 分钟，且三者都改 ci.yml 的
+      # 相邻行、互相冲突要反复 rebase。它们同为 docker 官方 action、只动 `uses:` 版本行，
+      # 合成一批即可一次矩阵验证完。
+      # 有意**不**把 gitleaks / pypa 并进批量组：各自只有 1 个包、一年更新几次，
+      # 组进去省不下 PR，反而会把"安全扫描器 major"和"发布工具 major"捆在一起，
+      # 红了难以归因 —— 按本文件顶部的人工规则，这类 major 就该单独复核门禁覆盖面。
+      docker-batch:
+        patterns:
+          - "docker/*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
   - package-ecosystem: "docker"
     directory: "/py"
     schedule:
@@ -56,3 +91,9 @@ updates:
       - "docker"
     commit-message:
       prefix: "deps(docker)"
+    # 与 pip/npm 同一口径：minor/patch 成一批，major 保持单独 PR 以便逐个评估。
+    groups:
+      docker-minor:
+        update-types:
+          - "minor"
+          - "patch"

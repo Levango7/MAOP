@@ -9,36 +9,8 @@ name: MAOP CI
 on:
   push:
     branches: [main, master, develop]
-    paths:
-      - 'py/**'
-      - 'config/**'
-      - 'dashboard/**'
-      - 'dashboard-enterprise/**'
-      - '.github/workflows/ci.yml'
-      # Doc↔Code reconcile 门禁（lint job step 8）显式核对 README/ROADMAP，
-      # 若排除在触发路径外，文档修复提交永远无法通过该门禁。
-      - 'README.md'
-      - 'ROADMAP.md'
-      # 77baf30: Docker 面文件此前不在触发路径 —— .dockerignore 修复提交
-      # push 后 CI 静默不跑（docker job 是门禁一部分，必须覆盖）。
-      - 'py/Dockerfile'
-      - '.dockerignore'
-      - 'docker-compose.yml'
-      - 'docker-compose.prod.yml'
   pull_request:
     branches: [main, master]
-    paths:
-      - 'py/**'
-      - 'config/**'
-      - 'dashboard/**'
-      - 'dashboard-enterprise/**'
-      - '.github/workflows/ci.yml'
-      - 'README.md'
-      - 'ROADMAP.md'
-      - 'py/Dockerfile'
-      - '.dockerignore'
-      - 'docker-compose.yml'
-      - 'docker-compose.prod.yml'
   workflow_dispatch:
 
 # F-P1-4 fix: cancel superseded CI runs on the same ref to save runner time.
@@ -52,19 +24,80 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.13"
-  NODE_VERSION: "20"
+  # 2026-09-27: 20 → 24。jsdom@30 与 vitest@5 的 engines 都是
+  # `^22.22.2 || ^24.15.0 || >=26.0.0`；node 20 下 vitest 5 会在 import jsdom→undici 时
+  # 直接 56 个测试文件报错（见 #40 的 Frontend Build 日志），属于跑不受支持的组合。
+  NODE_VERSION: "24"
 
 jobs:
+  # ── CI scope：把"要不要跑重活"从 workflow 触发层搬到 job 级 ──────────────
+  # 原先用 `on.pull_request.paths` 白名单，问题不是"少跑一点"，而是**不匹配的 PR 整个
+  # workflow 一条 check 都不产生** —— "CI 全绿"和"CI 没跑"在 API 上完全同形，
+  # 本仓真被它骗过（一个只改 CHANGELOG.md 的 PR 被当成全绿合掉，见 CHANGELOG）。
+  # 现在 PR 一律触发本 workflow，由这个作业明确报告 code / docs-only：
+  # 跳过是**看得见**的状态，不是缺席。分类规则在 py/scripts/ci_path_scope.py，
+  # 由 py/tests/test_ci_path_scope.py 钉住（含"白名单不许回来"的结构断言）。
+  scope:
+    name: CI scope (code vs docs-only)
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve comparison base
+        id: base
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+            # 新分支或强推时 before 可能是全 0 / 对象不存在
+            if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              base=$(git rev-parse "${head}~1" 2>/dev/null || echo "")
+            fi
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+
+      - name: Collect changed files
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ steps.base.outputs.base }}"; head="${{ steps.base.outputs.head }}"
+          : > /tmp/ci_changed.txt
+          if [ -n "$base" ] && git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            git diff --name-only "$base" "$head" > /tmp/ci_changed.txt || : > /tmp/ci_changed.txt
+          else
+            echo "::notice::无法确定 diff 基线（新分支/浅历史）→ 按全量 CI 处理"
+          fi
+          echo "变更文件数: $(wc -l < /tmp/ci_changed.txt)  (base=${base:-none})"
+
+      - name: Classify changeset
+        id: classify
+        working-directory: py
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci_path_scope.py --files-from /tmp/ci_changed.txt --github-output "$GITHUB_OUTPUT"
   # ── Lint ────────────────────────────────────────────────────────
   lint:
     name: Lint (ruff + mypy)
+    needs: scope
+    if: needs.scope.outputs.code == 'true'   # docs-only 时跳过（跳过可见，不像白名单那样静默）
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: py
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install "ruff==0.16.3" "mypy==2.3.1"
@@ -133,9 +166,9 @@ jobs:
             python-version: "3.12"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -235,7 +268,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
           path: py/test-results.xml
@@ -245,7 +278,7 @@ jobs:
         # 2026-08-30: ratchet 失败时需要 coverage.xml 定位平台差异（ubuntu 挂
         # 而 macOS 过），此前不传 artifact 导致只能盲猜。失败也上传。
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.os }}-py${{ matrix.python-version }}
           path: py/coverage.xml
@@ -306,12 +339,18 @@ jobs:
         if: failure()
         run: python scripts/junit_annotate.py test-results-e2e.xml
 
-      - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
-        uses: codecov/codecov-action@v4
-        with:
-          files: py/coverage.xml
-          fail_ci_if_error: false
+      # 2026-09-28: 这里原来有一个 `- name: Upload coverage` 用 codecov/codecov-action@v4
+      # 把 py/coverage.xml 传给 Codecov。**已删除**，理由不是嫌它旧，而是它从来没有成功过一次：
+      # 本仓既没有 `CODECOV_TOKEN` secret，也没有 codecov.yml，上传一律被拒 ——
+      # 每次 ubuntu/3.13 腿都打印
+      #   error -- Commit creating failed: {"message":"Token required - not valid tokenless upload"}
+      #   error -- Report creating failed / Upload queued for processing failed（同一原因）
+      # 而步骤里写着 `fail_ci_if_error: false`，于是这些错误**永远不会让 job 变红**。
+      # 净效果：每轮从 cli.codecov.io 下载并校验一个第三方二进制，产出为零，还会让人误以为
+      # "覆盖率在别处也被看着"。真正的覆盖率约束在上面的 `check_coverage_ratchet.py` 与
+      # `Upload coverage data` 产物里，删掉这一步不减少任何门禁。
+      # 要恢复 Codecov：建 `CODECOV_TOKEN` secret，并用 `fail_ci_if_error: true` 重新加回
+      # （否则又变成一个静默失败的假门禁）。
 
   # ── Perf script smoke + reliability/stability (NOT a load test) ──
   # 诚实化（2026-09-25）：原名 `performance` 会让人以为 CI 在跑真实负载压测。
@@ -329,9 +368,9 @@ jobs:
       run:
         working-directory: py
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -364,11 +403,13 @@ jobs:
   # ── Frontend Build ──────────────────────────────────────────────
   frontend:
     name: Frontend Build
+    needs: scope
+    if: needs.scope.outputs.code == 'true'   # docs-only 时跳过（跳过可见，不像白名单那样静默）
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -382,16 +423,39 @@ jobs:
         run: npm run lint
         working-directory: dashboard-enterprise
 
+      - name: Type check (vue-tsc)
+        run: npm run typecheck
+        working-directory: dashboard-enterprise
+
       - name: Run frontend tests
         run: npm test
         working-directory: dashboard-enterprise
+
+      - name: Frontend coverage gate
+        # 2026-09-27: `test:coverage` 此前只存在于 package.json，CI 从不跑它 ——
+        # 也就是 vitest.config.js 里的阈值达标与否**从来没人验证过**（今天首次实测即 exit=1，
+        # 因为 2026-09-17 把阈值抬到 60/60/50/60 时没量过）。
+        # 另一层理由：`npm test` 在冷启动丢 worker 的情况下会"半程绿灯"（实测只跑 25/56 文件仍报过），
+        # 覆盖率下限时这种漏跑一定会把总数打下来，所以这一步同时是"测试真的都跑了"的机械哨兵。
+        # 阈值只许往上抬；要降必须连带说明为什么，并走人工复核（同后端 ratchet 的纪律）。
+        run: npm run test:coverage
+        working-directory: dashboard-enterprise
+
+      - name: Upload frontend coverage report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-coverage
+          path: dashboard-enterprise/coverage/
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Build enterprise dashboard
         working-directory: dashboard-enterprise
         run: npx vite build
 
       - name: Upload enterprise dist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dashboard-enterprise-dist
           path: dashboard/dist-enterprise/
@@ -409,9 +473,9 @@ jobs:
       run:
         working-directory: dashboard-enterprise
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -422,7 +486,7 @@ jobs:
 
       # P2 fix (2026-08-14): 起后端依赖 Python 环境，供 playwright webServer
       # 启动 ../py/start_dashboard.py（真实前后端联调 smoke）。
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -443,7 +507,7 @@ jobs:
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -468,7 +532,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-e2e-report
           path: dashboard-enterprise/playwright-report/
@@ -476,7 +540,7 @@ jobs:
 
       - name: Upload Playwright traces
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-e2e-traces
           path: dashboard-enterprise/test-results/
@@ -510,9 +574,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           # P3-C-02 fix: use env.PYTHON_VERSION (3.13) to match production.
           # Was hardcoded to "3.12" which is inconsistent with the production
@@ -557,16 +621,16 @@ jobs:
     needs: [test, frontend, e2e]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download enterprise dist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dashboard-enterprise-dist
           path: dashboard/dist-enterprise/
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       # if: 表达式不能直接引用 secrets context（Unrecognized named-value:
       # 'secrets'，5e3174b 因此 workflow 解析失败）。先用 env 注入 secrets，
       # 探测步骤输出 configured=true/false，后续 if/push 只引用 steps context。
@@ -585,13 +649,13 @@ jobs:
         # 发布计划）时跳过登录且只构建不推送，避免 "Username and password
         # required" 失败（9c01b38 首次真正执行 docker job 时暴露）。
         if: github.event_name != 'pull_request' && steps.reg.outputs.configured == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ secrets.REGISTRY_URL || '' }}
           username: ${{ secrets.REGISTRY_USER || '' }}
           password: ${{ secrets.REGISTRY_PASS || '' }}
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: py/Dockerfile
@@ -622,8 +686,8 @@ jobs:
       run:
         working-directory: py
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install pip-audit
@@ -640,8 +704,8 @@ jobs:
       run:
         working-directory: py
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install bandit
@@ -661,7 +725,7 @@ jobs:
       - run: bandit -r maop/ -lll  # fail on high severity only
       - name: Upload SAST report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bandit-sast-report
           path: py/bandit-report.json
@@ -671,11 +735,11 @@ jobs:
     name: Secret Scan (gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # full history for secret scan
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2.2.1
+        uses: gitleaks/gitleaks-action@v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -688,14 +752,14 @@ jobs:
       run:
         working-directory: py
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install cyclonedx-bom
       - run: cyclonedx-py requirements -o sbom.json -i requirements.lock
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: maop-sbom
           path: py/sbom.json
@@ -706,7 +770,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build image for scan
         # Explicit build-args (Docker Hub direct) — see the docker job's
         # "Build and push" step for the ARG-scope root cause.
@@ -750,7 +814,7 @@ jobs:
         run: python py/scripts/trivy_annotate.py trivy-report.json
       - name: Upload container scan report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trivy-container-scan
           path: trivy-report.json
@@ -768,9 +832,9 @@ jobs:
       run:
         working-directory: py
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -794,7 +858,7 @@ jobs:
     if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     environment: staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Compose up (smoke)
         # 5d80ce2: every bash construct in this step (for/$(seq)/while-read
