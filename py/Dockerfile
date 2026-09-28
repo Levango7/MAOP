@@ -49,9 +49,22 @@ WORKDIR /build
 # so the image deps now match the audited deps. Previously requirements.txt
 # could drift from requirements.lock, causing image/audit inconsistency.
 COPY py/requirements.lock .
-# P1-5: pip 使用清华源（避免无梯子时 pip install 超时）
-RUN pip install --no-cache-dir --prefix=/install -r requirements.lock \
-    -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
+# P1-5: pip 使用清华源（避免无梯子时 pip install 超时）。
+# 2026-09-28: 外面套一层最多 3 次的退避重试。起因是 master `cd4099e5` 上
+# `Container Scan (trivy)` 红、而同一个 commit 的 `Docker build` / `Compose Smoke` 都绿 ——
+# 日志是镜像偶发返回空候选集：
+#   ERROR: Could not find a version that satisfies the requirement pyyaml<7.0.0,>=6.0.2 (from versions: none)
+# "from versions: none" 是索引没给东西，不是版本区间无解，属于瞬时故障（重跑即恢复）。
+# 有意**不**加第二个 index 主机：多信一个源就是扩大供应链面，而用清华源本身是网络可达性决定
+# 的（P1-5 原注释）。3 次仍失败则让构建照常红 —— 这不是把失败藏起来，只是不被一次抖动骗过。
+RUN for attempt in 1 2 3; do \
+      pip install --no-cache-dir --prefix=/install -r requirements.lock \
+        -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn \
+        && break; \
+      if [ "$attempt" = 3 ]; then echo "pip install 连续 3 次失败，放弃" >&2; exit 1; fi; \
+      echo "pip install 第 $attempt 次失败，退避 $((attempt * 20))s 后重试" >&2; \
+      sleep $((attempt * 20)); \
+    done
 
 # Stage 2: Runtime
 # PYTHON_IMAGE ARG allows CI to pin digest: --build-arg PYTHON_IMAGE=python:3.13-slim@sha256:xxx
