@@ -85,10 +85,12 @@ IDE、单体 agent 工具——对标单体 CLI 时，MAOP 的定位是它的上
 | 治理与安全 | `core/security/`、`core/tenant/`、`core/config/`、`budget_guard.py`、`personal_cost_guard.py` | 认证授权沙箱、租户隔离、预算守卫 |
 | 可观测与成本 | `core/monitoring/`、`core/observability/`、`cost_tracker.py`、`core/reliability/` | 指标、链路、熔断、降级 |
 | 集成与扩展 | `core/mcp/`、`core/marketplace/`、`plugins/`、`core/utils/` | MCP Hub、技能市场、插件 |
-| 控制面 | `dashboard/`（62 个顶层 router 模块，含子目录共 79 个 .py）、`control/`、`concurrency.py` | FastAPI 服务与统一控制 |
+| 控制面 | `dashboard/`（61 个顶层 router 模块，另有 `__init__.py`；含子目录共 79 个 .py）、`control/`、`concurrency.py` | FastAPI 服务与统一控制 |
 
-`core/` 现为 **5 个顶层 .py + 18 个子包**（2026-09-29 实测）。README 架构表写
-"5 files + 16 subpackages"，**已过时 2 个，须改**。
+`core/` 现为 **5 个顶层 .py + 16 个子包**（2026-09-29 实测；目录共 18 个，但 `core/cache/`、
+`core/data/` 不含 `__init__.py`，按 lint job 守卫 `py/scripts/doc_reconcile.py` 的口径
+"只统计真实包"不计入）。README 架构表写的 "5 files + 16 subpackages" **核对无误，不需要改**
+—— 本文档初稿曾按"目录数 18"判它过时，是误判，已更正。
 
 ### 3.2 成熟度分级
 
@@ -104,7 +106,7 @@ IDE、单体 agent 工具——对标单体 CLI 时，MAOP 的定位是它的上
 
 | 项 | 现状（2026-09-29 实测） |
 |----|------------------------|
-| 数据库 | SQLite + WAL + busy_timeout（env 可覆盖 `MAOP_SQLITE_BUSY_TIMEOUT_MS`）；表去重后 **130 个** CREATE TABLE 表名（含 1 个临时表 `_subagents_new`；其中 53 个来自 PG 迁移 `migrations/pg/versions/001_initial_schema.py`）。统计方法：正则扫描 `py/maop/**/*.py` 全部 CREATE TABLE 形式 |
+| 数据库 | SQLite + WAL + busy_timeout（env 可覆盖 `MAOP_SQLITE_BUSY_TIMEOUT_MS`）；表去重后 **130 个** CREATE TABLE 表名（含 1 个重建用临时表 `_subagents_new` 与 1 个版本账本表 `_migrations`；其中 53 个来自 PG 迁移 `migrations/pg/versions/001_initial_schema.py`）。统计方法：正则扫描 `py/maop/**/*.py` 全部 CREATE TABLE 形式 |
 | 迁移 | 根部 `alembic.ini(.template)` + `py/maop/migrations/` |
 | 企业升配 | PostgreSQL / Redis / Vault / RabbitMQ(可选) / etcd(planned)，见 README 能力对比表 |
 | 后端 | Python >= 3.10；FastAPI 0.141.1；Pydantic 2.x + pydantic-settings 2.15；uvicorn 0.53；httpx；PyJWT >= 2.13 |
@@ -112,7 +114,7 @@ IDE、单体 agent 工具——对标单体 CLI 时，MAOP 的定位是它的上
 | 测试与门禁 | pytest 10019 passed（-n 4 全量，忽略 e2e）、覆盖率 84%；ruff；前端 typecheck + coverage 门禁（2026-09-27 起进 CI） |
 
 已知失真：`docs/database-schema.md` 原写"101 张 distinct 表"（2026-08-26 口径），已按上述方法重算为
-130 并更新；`.github/workflows/ci.yml:27-28` 注释称 vitest@5，实为 3.2.7（待修，见 6.2）。
+130 并更新；ci.yml 的 vitest@5 假注释等 7 处失真已修（2026-09-29，见 6.2）。
 
 ---
 
@@ -138,6 +140,7 @@ IDE、单体 agent 工具——对标单体 CLI 时，MAOP 的定位是它的上
 | `archive/` | 107 文件 / 1.2 MB，**全部被 git 跟踪**，零运行时引用 | 先 `git tag archive-v4.0-before-removal`，再 `git rm -r archive/` | 方案早已写好（`docs/audits/archive-cleanup-plan.md`，2026-08-16）但从未执行；注意 `dashboard/` 的 fallback 仍指向 `DASH_DIR`，删前确认无引用 |
 | `plugins/` | 空目录，0 跟踪文件 | 删除，或补 README 说明插件目录约定 | 空目录无信息量 |
 | `data/` 运行残留 | degradation 日志 11 个，文件名呈"链式拼接"（每次轮转把旧名当前缀，如 `degradation_..._20260913-232600.log`） | 清理；先查轮转命名 bug | 链式文件名是 bug 征兆（轮转未替换而是追加），不是设计 |
+| `py/scripts/check_docs_consistency.py`（本轮新发现） | 全仓零引用：CI、测试、文档都不调用它；它自己扫出 1427 条"不一致"也无人消费，且以路径启发式误报为主（把 `src/styles/tokens.css` 当根路径等） | 修复后接线，或删除 | 一个没人读的报告脚本+误报，等于把"文档一致性"伪装成已覆盖；要留就必须先治误报再接进 lint |
 | `deliverables/` | 21 文件 / 4.6 MB（仅 9 个被跟踪） | 保留近期交付，其余移入 `docs/archive/` 或删除 | 需人工核对哪些是发布证据 |
 
 ### 6.2 改（失真与不一致）
@@ -146,11 +149,11 @@ IDE、单体 agent 工具——对标单体 CLI 时，MAOP 的定位是它的上
 |------|------|------|------|
 | `technical-whitepaper.md` | "内置 31 个第三方 CLI 适配器"与 README 口径冲突；`\| MCP 工具市场 \| \`E\`core/mcp_*\` \|` 乱码；子系统表模块路径不存在（`core/agent_*`、`core/three_layer_memory`、`core/multimodal`） | 按 1.4 口径改写；修乱码；路径实核后更正（多模态标注为路线图项） | 已改 |
 | `docs/database-schema.md` | 表计数过时（101 vs 实测 130） | 按第 4 节方法重算并更新首尾两处 | 已改 |
-| `README.md` | 架构表 "16 subpackages" 过时（实测 18） | 改 | 已改 |
+| `README.md`（**本条为误判，撤回**） | 初稿称架构表 "16 subpackages" 过时、应为 18 —— 18 是目录数；守卫口径是"含 `__init__.py` 的真包"= 16，README 原值正确（`py/scripts/doc_reconcile.py` 复验通过） | 不改（一度改成 18，已回滚） | 已复核 |
 | `product-design-rfc-001.md` | 状态仍是 Draft + "待你回复" | 更正为 Implemented，新增"实施结果"节回答原 3 问 | 已改 |
-| `.github/workflows/ci.yml` | 已知 6 处：:27-28 假称 vitest@5（实 3.2.7）；`publish` job（:822-828）只在 push.branches 触发、无 tags = 死代码；`pull_request.branches` 缺 develop；monitoring/deploy 被范围分类器归为 docs-only；Node 24 与 docker node:20 漂移；:793 trivy 缓存注释过期 | 逐项修复，修完在 ci-gates.md 记录语义 | 待执行 |
-| `docs/README.md` | 索引称 api-reference "448 个端点（计数待复核）"；`_盘点_` 报告（2026-08-11）为 346 端点/41 router，现 router 模块已 62 个（顶层 .py，含子目录 79） | 以代码重算端点计数后统一两处口径 | 待执行 |
-| `py/maop/dashboard/routers/sso.py` | 新增的 400 分支（缺 state）零测试覆盖 | 补路由级测试 | 待执行 |
+| `.github/workflows/ci.yml` | 已知 6 处：假称 vitest@5（实 3.2.7）；`publish` job 只在 push.branches 触发、无 tags = 死代码；`pull_request.branches` 缺 develop；monitoring/deploy 被范围分类器归为 docs-only；Node 24 与 docker node:20 漂移；trivy 缓存注释过期。另有 push 腿回退 `head~1` 会截断新分支变更集 | 逐项修复，修完在 ci-gates.md 记录语义 | 已改（2026-09-29，7 项全修：注释改实况 / publish 标注不可达+启用路径 / 补 develop / 分类面加 `deploy/`+`monitoring/`+`alertmanager/`+三个根 conf 并带用例 / node:24-alpine 对齐并实测镜像构建 / trivy 注释更正 / 移除 head~1 回退） |
+| `docs/README.md` | 索引称 api-reference "448 个端点（计数待复核）"；`_盘点_` 报告（2026-08-11）为 346 端点/41 router，现 router 模块 61 个（顶层 .py 共 62 个，含子目录 79） | 以代码重算端点计数后统一两处口径 | 已改（2026-09-29：口径落在 `api-reference.md`「端点计数」节 —— OpenAPI `paths`×方法，Personal 482 / 企业 554，不含 `/api/v1/*` 别名；README 索引与盘点报告已改为指向该口径） |
+| `py/maop/dashboard/routers/sso.py` | 新增的 400 分支（缺 state）零测试覆盖 | 补路由级测试 | 已改（2026-09-29：`py/tests/test_sso_router_callback_guard.py`，4 例 —— 缺 state→400 / 缺 code→400 / IdP error→400 / Personal 版 404；企业包依赖，CI 按惯例 collect_ignore，本机跑） |
 
 ### 6.3 留（不动）
 
@@ -170,12 +173,21 @@ IDE、单体 agent 工具——对标单体 CLI 时，MAOP 的定位是它的上
 ## 7. 执行顺序
 
 1. **口径统一**（已完成 2026-09-29）：technical-whitepaper 更正（1.4 口径 + 模块路径）→
-   README 子包计数 18 → database-schema 重算 130 → RFC-001 状态 → docs/README 索引。
-2. **文档收口（去 AI 味）**：docs 40/113 含 emoji（881 处，重灾区在 `docs/archive/` 与
-   design-review/audit 系列）；`audit-report-corrected(-v2)`、`design-review-report(-v2)` 等
-   v1/v2 并存对合并或标注；CHANGELOG 中的会话叙事体（"变异验证"等）改为条目体。
+   README 子包计数（复核后原值正确，见 6.2）→ database-schema 重算 130 → RFC-001 状态 →
+   docs/README 索引。
+2. **文档收口（去 AI 味）**（已完成 2026-09-29，`docs/archive/` 与 `deliverables/` 除外）：
+   先重算口径——活跃 docs 实为 **26 个文件 / 400 处** emoji（`✅❌⚠️🔴🟡🟢` 等严格 emoji 集；
+   此前"40/113、881 处"混入了框线符（`─│┌` 等）与 `✓`，粗算作废），已全部清零，覆盖
+   `design-review-report(-v2)`、`audit-report-corrected(-v2)`、`evaluation-report`、
+   `prd-sso-integration`、ADR-008/016/017/019、`enterprise/*`、`quickstart`、`migration-5.0` 等；
+   根级 `ROADMAP`/`SECURITY`/`CHANGELOG` 同步清零，README 只清 `⚠️`、特性矩阵的 `✓/✗/○` 属排版记号保留。
+   v1/v2 并存对（`audit-report-corrected(-v2)`、`design-review-report(-v2)`）此前已加 SUPERSEDED
+   标注并在 docs/README 建索引，本轮复核确认无需再动。CHANGELOG 顶部会话叙事体（8 节 / 175 行）
+   改写为 `## [Unreleased] - 2026-09-29` 日期化条目体（Fixed/Added/Changed），保留证据
+   （测试名、变异验证、已知限制），去掉"过程记录/自我复盘"叙事。
+   `deliverables/`（21 文件）随第 3 步"保留/删除"决策后再处理。
 3. **死重清理**：`archive/` tag → 删除；`plugins/`、`data/` 残留、`deliverables/` 归档。
-4. **失真修复**：ci.yml 六项；如有行为变化同步 ci-gates.md。
+4. **失真修复**：ci.yml 七项（已完成 2026-09-29，见 6.2）；行为变化已同步 `docs/ci-gates.md`。
 5. **补测**：sso 路由 400 分支。
 6. **提交**：按主题分批（口径合并为一批、清理为一批、CI 为一批），每批独立可回滚。
 
