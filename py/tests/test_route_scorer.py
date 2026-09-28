@@ -229,6 +229,14 @@ class TestSelectAgent:
 # ── Tests: get_route_scorer singleton ─────────────────────────
 
 class TestGetRouteScorer:
+    @pytest.fixture(autouse=True)
+    def _isolate_singleton(self):
+        """隔离单例：本类内裸 get_route_scorer() 调用若泄漏 config=None
+        单例会污染同 worker 的其他测试。"""
+        RouteScorer.reset()
+        yield
+        RouteScorer.reset()
+
     def test_get_route_scorer_returns_instance(self):
         from maop.core.routing.route_scorer import get_route_scorer
         scorer = get_route_scorer()
@@ -240,3 +248,25 @@ class TestGetRouteScorer:
         scorer = get_route_scorer(config=simple_config)
         assert isinstance(scorer, RouteScorer)
         assert scorer.config is simple_config
+
+    def test_config_recovers_configless_singleton(self, simple_config: MaopConfig):
+        """2026-09-28 修复回归：裸 get_route_scorer()（config=None，生产路径
+        =routing_service.get_route_cooldowns）先初始化后，真实 config 必须能
+        替换单例——否则 config 路由进程级退化为默认 chat。"""
+        from maop.core.routing.route_scorer import get_route_scorer
+
+        bare = get_route_scorer()
+        assert bare.config is None
+        bare.mark_agent_failed("kimi")
+
+        scorer = get_route_scorer(config=simple_config)
+        assert scorer.config is simple_config
+        assert "kimi" in scorer._cooldowns  # 冷却状态跨恢复保留
+
+    def test_configless_call_does_not_displace_real_config(self, simple_config: MaopConfig):
+        from maop.core.routing.route_scorer import get_route_scorer
+
+        scorer = get_route_scorer(config=simple_config)
+        again = get_route_scorer()  # 无 config 调用不得覆盖已有真实配置
+        assert again is scorer
+        assert again.config is simple_config

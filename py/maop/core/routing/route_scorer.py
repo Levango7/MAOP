@@ -473,6 +473,12 @@ def get_route_scorer(config: MaopConfig | None = None) -> RouteScorer:
     ignore config to prevent race conditions from concurrent requests
     mutating the shared singleton.
 
+    Config recovery (2026-09-28): when the singleton was first created
+    without a config (e.g. a cooldown-status endpoint calling bare
+    ``get_route_scorer()`` before any routing call), the first real config
+    passed afterwards replaces it — otherwise config routing would stay
+    silently disabled for the whole process lifetime.
+
     P2-1 fix: hot-reload support. When a config with a newer ``_version``
     is passed (e.g. after ``MaopConfig.reload()``), the singleton is
     reinitialized so routing changes take effect without a process restart.
@@ -485,6 +491,21 @@ def get_route_scorer(config: MaopConfig | None = None) -> RouteScorer:
             if _instance is None:
                 _instance = RouteScorer(config=config)
                 return _instance
+
+    # Config recovery (2026-09-28): the guard below requires
+    # ``_instance.config is not None``, so a config-less first init (bare
+    # get_route_scorer(), e.g. routing_service.get_route_cooldowns) used to
+    # ignore every later real config, silently degrading config routing to
+    # the default. Accept the first real config in that case.
+    if config is not None and _instance.config is None:
+        with _singleton_lock:
+            if _instance.config is None:
+                # Preserve cooldown state across the swap (same as the
+                # version-reload path below)
+                old_cooldowns = _instance._cooldowns
+                _instance = RouteScorer(config=config)
+                _instance._cooldowns = old_cooldowns
+        return _instance
 
     # Hot-reload: reinitialize if the passed config is different
     # 1. Identity check: different config object (test isolation / hot-reload)
