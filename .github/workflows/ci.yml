@@ -10,7 +10,9 @@ on:
   push:
     branches: [main, master, develop]
   pull_request:
-    branches: [main, master]
+    # develop 是长期集成分支（BRANCH_STRATEGY：feature/fix 的 PR 目标即 develop），
+    # 2026-09-29 补上；此前 PR 目标为 develop 时整个 workflow 不触发。
+    branches: [main, master, develop]
   workflow_dispatch:
 
 # F-P1-4 fix: cancel superseded CI runs on the same ref to save runner time.
@@ -24,9 +26,11 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.13"
-  # 2026-09-27: 20 → 24。jsdom@30 与 vitest@5 的 engines 都是
-  # `^22.22.2 || ^24.15.0 || >=26.0.0`；node 20 下 vitest 5 会在 import jsdom→undici 时
-  # 直接 56 个测试文件报错（见 #40 的 Frontend Build 日志），属于跑不受支持的组合。
+  # 2026-09-27: 20 → 24。下限由 jsdom 决定：lockfile 实装 jsdom@30.1.1，
+  # engines = `^22.22.2 || ^24.15.0 || >=26.0.0`，node 20 不在支持区间
+  # （vitest 3.2.7 自身只要求 >=18，node 20 下前端测试失败的根因在 jsdom@30）。
+  # 2026-09-29 复核：package.json 声明 jsdom ^30.1.1 / vitest ^3.0.0，
+  # 与 lockfile 一致；此前注释误写 "vitest@5"。
   NODE_VERSION: "24"
 
 jobs:
@@ -58,9 +62,14 @@ jobs:
           else
             base="${{ github.event.before }}"
             head="${{ github.sha }}"
-            # 新分支或强推时 before 可能是全 0 / 对象不存在
-            if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
-              base=$(git rev-parse "${head}~1" 2>/dev/null || echo "")
+            # 新分支或强推时 before 是空/全 0/对象不存在。此时**不再回退
+            # head~1**（2026-09-29 修正）：新分支首推可能带多个提交，
+            # diff head~1..head 只看到最后一个提交 —— 若最后一个是 docs
+            # 改动而前面有代码改动，分类器会把整个 push 判成 docs-only 而
+            # 跳过重活（"全绿"与"没跑"再次同形）。保持 base 为空，由
+            # Collect changed files 走"无法确定则全量"的保守分支。
+            if [ -n "$base" ] && ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              base=""
             fi
           fi
           echo "base=$base" >> "$GITHUB_OUTPUT"
@@ -667,9 +676,14 @@ jobs:
           #     the ARG above every FROM.
           # (2) aliyun mirrors are slow/unreachable from GitHub runners —
           #     pass Docker Hub direct images explicitly.
+          # 2026-09-29: node:20-alpine → node:24-alpine，与 env.NODE_VERSION 对齐。
+          # 漂移的代价是"CI 绿 ≠ 镜像里也绿"：镜内 frontend-builder 跑同一个
+          # lockfile 的 npm ci，而 jsdom@30.1.1 的 engines 是 ^22.22.2 || ^24.15.0
+          # || >=26.0.0 —— node 20 不在支持区间（frontend/e2e job 在 node 20 上
+          # 失败过，2026-09-27 才升的 24）。node 24 跑同一命令在 CI 已两个 job 全绿。
           build-args: |
             PYTHON_IMAGE=python:3.13-slim
-            NODE_IMAGE=node:20-alpine
+            NODE_IMAGE=node:24-alpine
           push: ${{ github.event_name != 'pull_request' && steps.reg.outputs.configured == 'true' }}
           tags: |
             ${{ secrets.REGISTRY_URL || 'maop' }}/maop:latest
@@ -774,7 +788,7 @@ jobs:
       - name: Build image for scan
         # Explicit build-args (Docker Hub direct) — see the docker job's
         # "Build and push" step for the ARG-scope root cause.
-        run: docker build -f py/Dockerfile --build-arg PYTHON_IMAGE=python:3.13-slim --build-arg NODE_IMAGE=node:20-alpine -t maop:scan .
+        run: docker build -f py/Dockerfile --build-arg PYTHON_IMAGE=python:3.13-slim --build-arg NODE_IMAGE=node:24-alpine -t maop:scan .
       - name: Install trivy CLI
         # 5d80ce2: the trivy-action wrapper failed 3 rounds in a row with no
         # report and no diagnosable output. Install the CLI directly — its
@@ -790,9 +804,10 @@ jobs:
       - name: Run trivy vulnerability scan
         # P3-C-03 fix: CRITICAL findings block CI; HIGH still reported for
         # review. ignore-unfixed: only report findings with a fix available.
-        # DB caching via actions/cache keyed on the week — avoids the GHCR
-        # anonymous pull rate-limits suspected of killing the action-based
-        # runs (3 rounds: no report, no readable error).
+        # 2026-09-29 更正：本步骤此前注释为 "DB caching via actions/cache
+        # keyed on the week"——那是 trivy-action 时期的方案；自 5d80ce2 改为
+        # 直装 CLI 后，本 job 没有任何缓存步骤，trivy 每次运行自行拉取 DB
+        # （全仓唯一的 actions/cache 是 e2e job 的 Playwright 浏览器缓存）。
         run: |
           trivy image --severity CRITICAL --ignore-unfixed \
             --format json --output trivy-report.json \
@@ -824,6 +839,15 @@ jobs:
     runs-on: ubuntu-latest
     # 诚实化（2026-09-25）：不再依赖 perf-smoke（原 `performance` job，非负载
     # 门禁，不应阻塞 PyPI 发布）。发布由 test / frontend / e2e 把关。
+    #
+    # 2026-09-29 复核：本 job **当前不可达**。`on.push` 只声明了 branches
+    # （main/master/develop），GitHub 的 branches 过滤会排除所有 tag push，
+    # 因此 `if: ... refs/tags/v` 永远不成立 —— 把 tag 打进 Ref 也换不来一次运行。
+    # PyPI 也从未真正发布过（CHANGELOG:245：两个包名实测 404）。
+    # 启用需要两步（均属外部副作用，需单独决策，勿顺手改）：
+    #   ① 在 on.push 下补 `tags: ['v*']`；
+    #   ② 在 PyPI 为 maop 配置 trusted publisher（本 job 用 OIDC，无 token secret）。
+    # 在此之前保留本 job 作为"发布管线已就位"的样板，但不要把它当既有能力宣传。
     needs: [test, frontend, e2e]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -880,7 +904,8 @@ jobs:
           # compose build previously used the Dockerfile's aliyun defaults
           # with no override path).
           PYTHON_IMAGE: python:3.13-slim
-          NODE_IMAGE: node:20-alpine
+          # 2026-09-29: 同 docker job，node:20 → node:24（jsdom@30 engines 区间）
+          NODE_IMAGE: node:24-alpine
         run: python py/scripts/compose_smoke.py
 
       - name: Run smoke tests

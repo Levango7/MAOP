@@ -1,7 +1,7 @@
 # CI 门禁与触发面
 
 > 面向改 MAOP 的人：哪些检查一定会跑、哪些会被跳过、以及**怎么分辨"跳过了"和"根本没跑"**。
-> 最后更新：2026-09-28（job 级 scope 判定落地后）。
+> 最后更新：2026-09-29（部署工件纳入分类面、publish 死代码注释、镜像 node 对齐后）。
 
 ## 1. 触发模型
 
@@ -18,10 +18,17 @@ docker / container-scan / compose-smoke / publish（仅 trunk push，见 §4）
 
 - `scope` 把变更集交给 `py/scripts/ci_path_scope.py` 分类，输出 `code=true|false`。
 - `code=false`（docs-only）时，`lint` 与 `frontend` 及它们的下游作业被**跳过**（skipped）。
-- 分类面与历史 `on.*.paths` 白名单等价：`py/`、`config/`、`dashboard/`、`dashboard-enterprise/`、
-  `.github/workflows/`、`py/Dockerfile`、`requirements.lock|txt`、compose、`.dockerignore`，
-  外加根目录 `README.md` / `ROADMAP.md`（lint job 的 Doc↔Code reconcile 门禁会读它们）。
+- 分类面 = `py/`、`config/`、`dashboard/`、`dashboard-enterprise/`、`.github/workflows/`、
+  `deploy/`、`monitoring/`、`alertmanager/`、compose 两件、`.dockerignore`，外加根文件
+  `README.md` / `ROADMAP.md` / `py/Dockerfile` / `py/requirements.lock|txt` /
+  `nginx.conf` / `nginx.prod.conf` / `alertmanager.yml`。
+  其中 `deploy/`、`alertmanager/`、`monitoring/` 与三个根 conf 是 2026-09-29 补进来的
+  （原 `on.*.paths` 白名单漏了它们）：`deploy/` 与 `alertmanager.*` 有测试直接读
+  （Helm chart、otel/grafana 配置、告警模板），`monitoring/` 与 nginx conf 是 compose
+  栈的挂载源 —— 都属"改了会影响 CI 结论"，不是 docs。
 - **拿不准时一律按"跑全量"处理**（基线算不出、变更集为空 → `code=true`）。宁可多跑，不可静默少跑。
+- push 腿解析 base 时**不回退 `head~1`**：新分支首推可能带多个提交，只看最后一个会把
+  "前面有代码改动"的 push 误判成 docs-only（2026-09-29 移除该回退，宁走"基线未知 → 全量"）。
 
 ## 2. 为什么不用 `on.pull_request.paths` 白名单
 
@@ -41,7 +48,11 @@ PR 触发器不许再出现 `paths`、`scope` 必须是无条件根作业、`lin
 2. **`Container Scan (trivy)` 红不一定是漏洞**：镜像构建走第三方 PyPI 源，偶发返回空候选集会报
    `... (from versions: none)`；同一 commit 的 `Docker build` / `Compose Smoke` 若都绿，
    单独重跑即恢复。已给该层加 3 次退避重试。
-3. **`Publish to PyPI` 在多数情况下是 skipped**，不是失败。
+3. **`Publish to PyPI` 永远不跑，不是失败、也不是"偶尔 skipped"**。`on.push` 只声明了
+   branches，GitHub 的 branches 过滤排除所有 tag push，而该 job 的条件是
+   `refs/tags/v*` —— 条件永远不成立。PyPI 侧也从未发布过（`CHANGELOG.md:245`：包名实测 404）。
+   要让发布真正发生需两步：`on.push` 补 `tags: ['v*']` + 在 PyPI 配置 trusted publisher
+   （该 job 走 OIDC，无 token secret）。在此之前不要对外称"已支持 PyPI 发布"。
 
 ## 4. 容器作业的特别提示（改 `py/Dockerfile` 前必读）
 
@@ -49,6 +60,14 @@ PR 触发器不许再出现 `paths`、`scope` 必须是无条件根作业、`lin
 一类的条件，**PR 腿上看不到它们**；而且它们在 `needs: [test, frontend, e2e]` 下游，
 矩阵没跑完之前连 check 都不会创建。所以：**改 Dockerfile 拿不到 PR 级 CI 证明**，
 请在本地用同一基础镜像把那条 `RUN` 单独跑一遍再提 PR，别把验证交给不会执行的 gate。
+
+镜像内的前端构建（`frontend-builder` 阶段的 `npm ci` + `npm run build`）**是 CI 里唯一执行
+生产前端构建的地方** —— 前端 job 只跑 lint/typecheck/test/coverage，从不跑 `vite build`。
+所以 2026-09-29 把 `NODE_IMAGE` 默认值从 `node:20-alpine` 对齐到 `node:24-alpine`
+（与 `env.NODE_VERSION` 一致）：镜内 `npm ci` 读的是同一个 lockfile，jsdom@30.1.1 的
+engines 是 `^22.22.2 || ^24.15.0 || >=26.0.0`，node 20 不在区间内。
+本地验证方式（已实测通过，node v24.21.0，`✓ built in 29.62s`）：
+`docker build -f py/Dockerfile --target frontend-builder --build-arg NODE_IMAGE=node:24-alpine -t maop-fe-smoke .`
 
 ## 5. 前端覆盖率门禁
 

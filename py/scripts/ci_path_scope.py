@@ -19,13 +19,25 @@ import argparse
 import sys
 from collections.abc import Iterable
 
-# 与迁移前 `on.*.paths` 白名单一一对应；改这里就等于改触发面，必须带用例。
+# 迁移前 `on.*.paths` 白名单的超集：原白名单漏掉了一批"CI 会读、会挂载"的部署工件，
+# 2026-09-29 补齐（下注）。改这里就等于改触发面，必须带用例。
 CODE_PREFIXES: tuple[str, ...] = (
     "py/",
     "config/",
     "dashboard/",
     "dashboard-enterprise/",
     ".github/workflows/",
+    # 2026-09-29 补：部署工件是 CI 的输入，不是"配置旁支"。
+    # deploy/ / alertmanager/ 有测试直接读：test_k8s_operator.py 从
+    # deploy/k8s/operator 读 Helm chart，test_observability.py 读
+    # deploy/otel-collector.yaml 与 grafana json，test_alertmanager_e2e.py 读
+    # alertmanager.yml 与 alertmanager/templates —— 漏判会让"改了被测工件却不跑
+    # 测试矩阵"成立，正是本分类器要防的静默少跑。
+    # monitoring/ 与 nginx 两个 conf 是 compose 栈的挂载源（monitoring/tls
+    # profile 的告警规则与 ingress），内容坏掉时栈起不来而非"文档不准"。
+    "deploy/",
+    "monitoring/",
+    "alertmanager/",
     "docker-compose.yml",
     "docker-compose.prod.yml",
     ".dockerignore",
@@ -34,7 +46,18 @@ CODE_PREFIXES: tuple[str, ...] = (
 # README/ROADMAP 被 lint job 的 Doc↔Code reconcile 门禁显式核对，
 # 所以它们算"会影响 CI 结论"的文件，不是 docs-only。
 CODE_FILES: frozenset[str] = frozenset(
-    {"README.md", "ROADMAP.md", "py/Dockerfile", "py/requirements.lock", "py/requirements.txt"}
+    {
+        "README.md",
+        "ROADMAP.md",
+        "py/Dockerfile",
+        "py/requirements.lock",
+        "py/requirements.txt",
+        # compose 直接挂载的根级文件（nginx = tls ingress，alertmanager.yml =
+        # 告警出口模板，由 alertmanager/render-config.sh 在容器启动时渲染）。
+        "nginx.conf",
+        "nginx.prod.conf",
+        "alertmanager.yml",
+    }
 )
 
 

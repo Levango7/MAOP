@@ -42,7 +42,8 @@ x-maop-build: &maop-build
     # (e.g. docker.m.daocloud.io/library/...). The compose-smoke CI job sets
     # these explicitly.
     PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.13-slim}
-    NODE_IMAGE: ${NODE_IMAGE:-node:20-alpine}
+    # 2026-09-29: node:20 → node:24，与 CI env.NODE_VERSION 及 py/Dockerfile 对齐
+    NODE_IMAGE: ${NODE_IMAGE:-node:24-alpine}
 
 services:
   # ── PostgreSQL (optional, --profile postgres) ──────────────────────────────────────────────────────────────

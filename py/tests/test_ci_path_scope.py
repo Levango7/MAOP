@@ -67,6 +67,15 @@ def test_docs_only_changesets_are_docs_only(paths: list[str]) -> None:
         [".dockerignore"],
         ["README.md"],                      # Doc↔Code reconcile 门禁会读它
         ["ROADMAP.md"],
+        # 部署工件（2026-09-29 补进触发面）：deploy/ 与 alertmanager.* 有测试直接读，
+        # monitoring/ 与 nginx*.conf 是 compose 挂载源 —— 不能判成 docs-only。
+        ["deploy/k8s/operator/Chart.yaml"],
+        ["deploy/otel-collector.yaml"],
+        ["alertmanager/templates/maop.tmpl"],
+        ["alertmanager.yml"],
+        ["monitoring/prometheus.yml"],
+        ["nginx.conf"],
+        ["nginx.prod.conf"],
         ["CHANGELOG.md", "py/pyproject.toml"],  # 混合变更集必须按"要跑"处理
     ],
 )

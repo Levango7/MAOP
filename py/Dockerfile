@@ -17,12 +17,15 @@
 # To obtain digest: docker pull python:3.13-slim && docker inspect --format='{{index .RepoDigests 0}}' python:3.13-slim
 # CI should inject --build-arg PYTHON_IMAGE=python:3.13-slim@sha256:<digest> for reproducible builds.
 ARG PYTHON_IMAGE=python:3.13-slim
-ARG NODE_IMAGE=node:20-alpine
+# 2026-09-29: node:20 → node:24，与 CI 的 env.NODE_VERSION 对齐。jsdom@30.1.1
+# （lockfile 实装）engines = ^22.22.2 || ^24.15.0 || >=26.0.0，node 20 不在区间；
+# 镜内 frontend-builder 与 CI frontend job 跑同一个 lockfile，两边必须同大版本。
+ARG NODE_IMAGE=node:24-alpine
 
 # Stage 0: Frontend Builder (H6 fix)
 # H6 fix: 原 Dockerfile 未包含前端构建步骤，fresh clone 或 CI 环境中 assets 缺失，
 # 导致 Docker 部署后前端白页。现新增前端构建阶段，在镜像构建时执行 npm run build。
-# P1-5: 国内源（用户无梯子时 node:20-alpine 可能拉取失败，改用阿里云镜像）
+# P1-5: 国内源（用户无梯子时 node 镜像可能拉取失败，改用阿里云镜像）
 FROM ${NODE_IMAGE} AS frontend-builder
 WORKDIR /build
 # 先复制 package*.json 以利用 Docker 层缓存
