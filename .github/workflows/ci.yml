@@ -9,36 +9,8 @@ name: MAOP CI
 on:
   push:
     branches: [main, master, develop]
-    paths:
-      - 'py/**'
-      - 'config/**'
-      - 'dashboard/**'
-      - 'dashboard-enterprise/**'
-      - '.github/workflows/ci.yml'
-      # Doc↔Code reconcile 门禁（lint job step 8）显式核对 README/ROADMAP，
-      # 若排除在触发路径外，文档修复提交永远无法通过该门禁。
-      - 'README.md'
-      - 'ROADMAP.md'
-      # 77baf30: Docker 面文件此前不在触发路径 —— .dockerignore 修复提交
-      # push 后 CI 静默不跑（docker job 是门禁一部分，必须覆盖）。
-      - 'py/Dockerfile'
-      - '.dockerignore'
-      - 'docker-compose.yml'
-      - 'docker-compose.prod.yml'
   pull_request:
     branches: [main, master]
-    paths:
-      - 'py/**'
-      - 'config/**'
-      - 'dashboard/**'
-      - 'dashboard-enterprise/**'
-      - '.github/workflows/ci.yml'
-      - 'README.md'
-      - 'ROADMAP.md'
-      - 'py/Dockerfile'
-      - '.dockerignore'
-      - 'docker-compose.yml'
-      - 'docker-compose.prod.yml'
   workflow_dispatch:
 
 # F-P1-4 fix: cancel superseded CI runs on the same ref to save runner time.
@@ -58,9 +30,67 @@ env:
   NODE_VERSION: "24"
 
 jobs:
+  # ── CI scope：把"要不要跑重活"从 workflow 触发层搬到 job 级 ──────────────
+  # 原先用 `on.pull_request.paths` 白名单，问题不是"少跑一点"，而是**不匹配的 PR 整个
+  # workflow 一条 check 都不产生** —— "CI 全绿"和"CI 没跑"在 API 上完全同形，
+  # 本仓真被它骗过（一个只改 CHANGELOG.md 的 PR 被当成全绿合掉，见 CHANGELOG）。
+  # 现在 PR 一律触发本 workflow，由这个作业明确报告 code / docs-only：
+  # 跳过是**看得见**的状态，不是缺席。分类规则在 py/scripts/ci_path_scope.py，
+  # 由 py/tests/test_ci_path_scope.py 钉住（含"白名单不许回来"的结构断言）。
+  scope:
+    name: CI scope (code vs docs-only)
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve comparison base
+        id: base
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+            # 新分支或强推时 before 可能是全 0 / 对象不存在
+            if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              base=$(git rev-parse "${head}~1" 2>/dev/null || echo "")
+            fi
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+
+      - name: Collect changed files
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ steps.base.outputs.base }}"; head="${{ steps.base.outputs.head }}"
+          : > /tmp/ci_changed.txt
+          if [ -n "$base" ] && git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            git diff --name-only "$base" "$head" > /tmp/ci_changed.txt || : > /tmp/ci_changed.txt
+          else
+            echo "::notice::无法确定 diff 基线（新分支/浅历史）→ 按全量 CI 处理"
+          fi
+          echo "变更文件数: $(wc -l < /tmp/ci_changed.txt)  (base=${base:-none})"
+
+      - name: Classify changeset
+        id: classify
+        working-directory: py
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci_path_scope.py --files-from /tmp/ci_changed.txt --github-output "$GITHUB_OUTPUT"
   # ── Lint ────────────────────────────────────────────────────────
   lint:
     name: Lint (ruff + mypy)
+    needs: scope
+    if: needs.scope.outputs.code == 'true'   # docs-only 时跳过（跳过可见，不像白名单那样静默）
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -373,6 +403,8 @@ jobs:
   # ── Frontend Build ──────────────────────────────────────────────
   frontend:
     name: Frontend Build
+    needs: scope
+    if: needs.scope.outputs.code == 'true'   # docs-only 时跳过（跳过可见，不像白名单那样静默）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
