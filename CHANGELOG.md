@@ -374,6 +374,42 @@ master `cd4099e5` 上 `Container Scan (trivy)` 红过一次，起因不是漏洞
   `Docker build` / `Container Scan` 作业覆盖（`py/Dockerfile` 在 `on.pull_request.paths` 白名单内，
   所以本改动一定会触发它们）。
 
+### `ci.yml` 的 `paths` 白名单换成 job 级判定：让"CI 没跑"变成看得见的状态
+
+**要修的缺陷**：`on.push.paths` / `on.pull_request.paths` 是白名单，不匹配时**整个 workflow 一条
+check 都不产生**。于是 `pending=0 && fail=0` 对"全绿"和"根本没跑"两种情况同时成立 —— 这不是
+理论风险：本会话真的把一个只改 `CHANGELOG.md` 的 PR 当成"CI 全绿"合掉了（#44），发现时靠的正是
+这条歧义。同类误判我在监视脚本里也踩过四次（checks 还没注册就判"完成"）。
+
+- `.github/workflows/ci.yml`：删掉两处 `paths:` 白名单（`on.push` / `on.pull_request` 现在只留
+  `branches`），改为新增一个**无条件运行的 `scope` 作业**：checkout 全历史 → 算出变更清单
+  → 交给脚本分类 → 输出 `code=true|false`；`lint` 与 `frontend` 变成 `needs: scope` +
+  `if: needs.scope.outputs.code == 'true'`，其余作业经 `needs` 链自动跳过。
+  README/ROADMAP 仍算 code（lint job 的 Doc↔Code reconcile 门禁会读它们），
+  `py/Dockerfile`、`requirements.lock/txt`、compose、`.dockerignore` 同理 —— 与旧白名单等价，
+  只是判断点从"要不要启动 workflow"移到"哪些作业跑"。
+- `secret-scan` (gitleaks) 保持**无条件**：既是安全面该有的样子，也保证每个 PR 至少有一条
+  真实 check 存在，不会再出现"零 check 的绿"。
+- `py/scripts/ci_path_scope.py`：分类规则单独成脚本而**不是内联 bash**，为了可单测；
+  空变更集/算不出基线一律**保守判"跑全量"**（宁可多跑不可漏判）。
+- `py/tests/test_ci_path_scope.py`（26 条）：分类正反用例（含混合变更集、`./` 归一化）+
+  CLI 写 `GITHUB_OUTPUT` 的行为用例 + **4 条结构断言**：PR 触发器里不许再有 `paths`、
+  `scope` 必须是无条件根作业、`lint`/`frontend` 必须挂在 `scope` 上、
+  并且必须至少存在一条无条件作业（否则保护规则没有可指的"永远存在的 check"）。
+
+- ⚠️ 我自己在这次编辑里踩的坑（当场发现并改正）：第一次用正则批量删 `paths:` 块，被块内
+  **注释行打断**，只删掉了 `paths:` 那一行，剩下 `- 'README.md'` 等列表项成了
+  `push:` 下的孤儿 → YAML 直接解析失败。改成从 master 重新取基线、逐行按缩进消费，
+  并且每步都 `yaml.safe_load` 复验。教训：**改 workflow 文件必须解析验证，不能只靠文本替换**。
+- 变异验证（5 个变异体，各被恰好一条断言抓住，恢复后 26 passed）：
+  ① `paths` 白名单塞回来 → 结构断言红；② `lint` 去掉 `needs: scope` → 红；
+  ③ 给 `scope` 加 `if:` → 红；④ 给 `secret-scan` 加 `needs:` → 红；
+  ⑤ 分类规则里丢掉 `README.md` → 正反用例红。
+
+**下一步**（尚未做，需要这一步先落地并被验证）：把 master 的 required checks 指到
+`CI scope (code vs docs-only)` / `Secret Scan (gitleaks)` 等永远存在的作业上。开保护前必须先实测
+GitHub 对"被 `if:` 跳过的 required check 算不算满足"这一语义 —— 若算不满足，docs-only PR 会被永久卡住。
+
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
 
