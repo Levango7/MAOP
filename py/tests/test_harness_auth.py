@@ -23,6 +23,7 @@ from typing import Any
 import pytest
 
 from maop.core.agent.auth.harness_auth import HarnessAuthProvider, HarnessLicense
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ──────────────────────────────────────────────────────
 
@@ -251,6 +252,7 @@ class TestPersistence:
 class TestConcurrency:
     """多线程并发安全。"""
 
+    @pytest.mark.timeout(240)
     def test_concurrent_access(self, tmp_path: Any) -> None:
         """多线程并发注册 / 验证 / 绑定不应出错且数据一致。"""
         db_path = tmp_path / "concurrent.db"
@@ -283,8 +285,7 @@ class TestConcurrency:
         threads = [threading.Thread(target=worker, args=(t,)) for t in range(num_threads)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
         provider.close()
 
         # 不应有任何错误。

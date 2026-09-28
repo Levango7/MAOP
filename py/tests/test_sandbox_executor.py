@@ -18,6 +18,7 @@ from maop.core.agent.ops.sandbox_executor import (
     SandboxExecutor,
     SandboxResult,
 )
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
@@ -326,6 +327,7 @@ class TestExecute:
 class TestThreadSafety:
     """线程安全测试。"""
 
+    @pytest.mark.timeout(240)
     def test_concurrent_execute(
         self, executor: SandboxExecutor, basic_config: SandboxConfig,
     ) -> None:
@@ -349,8 +351,7 @@ class TestThreadSafety:
         threads = [threading.Thread(target=_run) for _ in range(10)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert errors == []
         stats = executor.get_stats()

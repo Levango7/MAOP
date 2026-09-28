@@ -235,6 +235,12 @@ class TestPersistenceAndConcurrency:
         assert entry is not None
         assert entry.result == "result-1"
 
+    # CI 的 unit job 用 `--timeout=60`（pytest-timeout 每用例 60s）+ `--reruns=3`。
+    # 本用例 10 线程 × 30 轮 × (put+get)，每次操作都新建一条 SQLite 连接并跑
+    # journal_mode=WAL —— 串行在同一个 RLock 上。本机实测 13.7s（≈4× 余量），
+    # 而共享 runner 上实测会越过 60s（windows-3.13 曾在此挂起 4 次 rerun 后失败）。
+    # 这里按用例放宽超时，而不是削减并发量。
+    @pytest.mark.timeout(240)
     def test_thread_safety(self, cache: ResultCache) -> None:
         """多线程并发读写不应出错。"""
         num_threads = 10
@@ -258,7 +264,12 @@ class TestPersistenceAndConcurrency:
         for t in threads:
             t.start()
         for t in threads:
-            t.join()
+            # 无界 join 会把一次并发竞态表现成"永久挂起"：CI 上只剩 pytest-timeout
+            # 的线程栈 dump，看不出失败原因。有界等待 + 显式断言让同一问题变成可读
+            # 失败（180s < 上面的 240s 用例预算，所以断言一定先于超时杀进程）。
+            t.join(timeout=180)
+        alive = [t.name for t in threads if t.is_alive()]
+        assert alive == [], f"工作线程未在 180s 内结束：{alive}"
 
         assert errors == []
         stats = cache.get_stats()

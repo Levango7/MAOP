@@ -17,6 +17,7 @@ from maop.core.agent.ops.sla_manager import (
     SLAManager,
     SLAStatus,
 )
+from tests.thread_join_guard import join_all
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
@@ -340,6 +341,7 @@ class TestPersistence:
 class TestThreadSafety:
     """多线程并发操作。"""
 
+    @pytest.mark.timeout(240)
     def test_concurrent_define_and_check(
         self, scorer: HealthScorer, sla_manager: SLAManager,
     ) -> None:
@@ -358,8 +360,7 @@ class TestThreadSafety:
         threads = [threading.Thread(target=worker, args=(i,)) for i in range(num_threads)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         # 所有 Agent 的 SLA 都应已定义
         statuses = sla_manager.check_all_sla()

@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import threading
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -24,6 +26,35 @@ from maop.core.memory.three_layer_memory_utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+# record_feedback() 会在后台守护线程里跑一次进化周期（见 _run_evolution_cycle）。
+# 线程是 fire-and-forget 的：生产路径不阻塞退出，但在测试里它可能活过
+# monkeypatch 还原 + tmp_path 删除，届时 get_db_path() 解析到的是共享的
+# data/maop.db，会与其它 xdist worker 并发写同一文件。这里登记线程并在测试
+# teardown 里 join，把这个窗口关掉。
+_EVOLUTION_THREADS: list[threading.Thread] = []
+_EVOLUTION_LOCK = threading.Lock()
+
+
+def register_evolution_thread(thread: threading.Thread) -> None:
+    """登记一个后台进化线程，顺带回收已结束的条目。"""
+    with _EVOLUTION_LOCK:
+        _EVOLUTION_THREADS[:] = [t for t in _EVOLUTION_THREADS if t.is_alive()]
+        _EVOLUTION_THREADS.append(thread)
+
+
+def wait_for_evolution_threads(timeout_s: float = 30.0) -> int:
+    """join 掉所有已登记的进化线程，返回超时后仍存活的个数。"""
+    with _EVOLUTION_LOCK:
+        pending = list(_EVOLUTION_THREADS)
+        _EVOLUTION_THREADS.clear()
+    deadline = time.monotonic() + timeout_s
+    alive = 0
+    for thread in pending:
+        thread.join(timeout=max(0.0, deadline - time.monotonic()))
+        if thread.is_alive():
+            alive += 1
+    return alive
 
 
 _EPISODIC_DDL = """
@@ -421,13 +452,14 @@ class EpisodicStoreMixin:
                         "Evolution reflection triggered but failed: %s", exc
                     )
 
-            import threading
-            threading.Thread(
+            worker = threading.Thread(
                 target=_run_evolution_cycle,
                 args=(str(self._root),),
                 name="evolution-cycle",
                 daemon=True,
-            ).start()
+            )
+            register_evolution_thread(worker)
+            worker.start()
             triggered_actions.append("evolution_cycle_scheduled")
 
             try:

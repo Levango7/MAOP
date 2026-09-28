@@ -24,6 +24,7 @@ from maop.core.monitoring.monitoring import (
     get_priority_wait_histogram,
 )
 from maop.core.reliability.priority_queue import PriorityTask, PriorityTaskQueue
+from tests.thread_join_guard import join_all
 
 # ── PriorityTaskQueue ──────────────────────────────────────────
 
@@ -164,6 +165,7 @@ class TestPriorityTaskQueue:
 
 
 class TestPriorityTaskQueueConcurrency:
+    @pytest.mark.timeout(240)
     def test_concurrent_push_pop(self):
         """Concurrent producers + consumers must not corrupt the heap.
 
@@ -198,8 +200,7 @@ class TestPriorityTaskQueueConcurrency:
         threads = [threading.Thread(target=producer, args=(p,)) for p in range(producers)]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         # All items should now be queued.
         total = producers * n_per_producer
@@ -209,8 +210,7 @@ class TestPriorityTaskQueueConcurrency:
         cons = [threading.Thread(target=consumer) for _ in range(4)]
         for t in cons:
             t.start()
-        for t in cons:
-            t.join()
+        join_all(cons, 120.0)
 
         assert len(popped) == total
         assert len(q) == 0

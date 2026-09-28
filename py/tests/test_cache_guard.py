@@ -13,6 +13,7 @@ from maop.core.reliability.cache import (
     CacheGuardStats,
     SingleFlight,
 )
+from tests.thread_join_guard import join_all
 
 
 class TestCacheGuardConfig:
@@ -53,6 +54,7 @@ class TestSingleFlight:
         with pytest.raises(ValueError, match="boom"):
             sf.execute("k", boom)
 
+    @pytest.mark.timeout(240)
     def test_concurrent_dedup(self):
         sf = SingleFlight()
         call_count = 0
@@ -76,8 +78,7 @@ class TestSingleFlight:
             t = threading.Thread(target=worker)
             threads.append(t)
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         # Only one thread should have actually executed
         assert call_count == 1
@@ -217,6 +218,7 @@ class TestCacheGuardSingleFlight:
         result = cg.get("k", lambda: "v")
         assert result == "v"
 
+    @pytest.mark.timeout(240)
     def test_singleflight_dedup_counted(self):
         cg = CacheGuard()
         call_count = 0
@@ -239,8 +241,7 @@ class TestCacheGuardSingleFlight:
             t = threading.Thread(target=worker)
             threads.append(t)
             t.start()
-        for t in threads:
-            t.join()
+        join_all(threads, 120.0)
 
         assert all(r == "loaded" for r in results)
         assert cg.stats().singleflight_dedups >= 1
