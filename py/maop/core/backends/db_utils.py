@@ -64,6 +64,28 @@ def validate_identifier(name: str, context: str = "identifier") -> str:
     return name
 
 
+# 只有 sqlite 明确说"这个文件不是/已不是一个可用的数据库镜像"时才允许删文件重建。
+# sqlite3.OperationalError（database is locked / unable to open database file /
+# disk I/O error / attempt to write a readonly database / no space left on device）
+# 是 sqlite3.DatabaseError 的子类，早先的 `except DatabaseError` 会把它们一并当成
+# 损坏，于是"另一个连接正占着这个库"就会触发**删除正在使用的数据库文件** ——
+# 对方随后对已被 unlink 的页写入即 SIGBUS（CI 上表现为 xdist worker
+# "node down: Not properly terminated"，连带 .coverage 丢失 → 覆盖率门禁假红）。
+_RECOVERABLE_CORRUPTION = (
+    "file is not a database",
+    "database disk image is malformed",
+    "header page is malformed",
+    "file header changed",
+    "unsupported file format",
+)
+
+
+def _recoverable_corruption(exc: sqlite3.DatabaseError, db_path: str | Path) -> bool:
+    """判断异常是否属于"文件本身损坏、删掉重建才安全"。"""
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _RECOVERABLE_CORRUPTION)
+
+
 @contextmanager
 def sqlite_connect(
     db_path: str | Path,
@@ -90,18 +112,25 @@ def sqlite_connect(
     """
     def _open_and_init() -> sqlite3.Connection:
         conn = sqlite3.connect(str(db_path), timeout=timeout)
-        if row_factory:
-            conn.row_factory = row_factory
-        if wal:
-            conn.execute("PRAGMA journal_mode=WAL")
-        if foreign_keys:
-            conn.execute("PRAGMA foreign_keys=ON")
-        # T2-10: Multi-container SQLite coordination — WAL allows 1 writer + N readers.
-        # busy_timeout increased to 10s (env-override: MAOP_SQLITE_BUSY_TIMEOUT_MS).
-        # P2-13 note: f-string 拼接 PRAGMA 值是安全的——_get_busy_timeout_ms()
-        # 已将环境变量验证为非负 int 并回退到默认值，不存在注入风险。PRAGMA
-        # busy_timeout 不支持参数化绑定（PRAGMA 语句不接受 ? 占位符），只能内联。
-        conn.execute(f"PRAGMA busy_timeout={_get_busy_timeout_ms()}")
+        try:
+            if row_factory:
+                conn.row_factory = row_factory
+            if wal:
+                conn.execute("PRAGMA journal_mode=WAL")
+            if foreign_keys:
+                conn.execute("PRAGMA foreign_keys=ON")
+            # T2-10: Multi-container SQLite coordination — WAL allows 1 writer + N readers.
+            # busy_timeout increased to 10s (env-override: MAOP_SQLITE_BUSY_TIMEOUT_MS).
+            # P2-13 note: f-string 拼接 PRAGMA 值是安全的——_get_busy_timeout_ms()
+            # 已将环境变量验证为非负 int 并回退到默认值，不存在注入风险。PRAGMA
+            # busy_timeout 不支持参数化绑定（PRAGMA 语句不接受 ? 占位符），只能内联。
+            conn.execute(f"PRAGMA busy_timeout={_get_busy_timeout_ms()}")
+        except Exception:
+            # PRAGMA 失败时若不关连接，句柄会一直捏着这个文件：Windows 上
+            # 直接导致下面的"删除损坏库重建" unlink 失败（WinError 32 文件占用），
+            # 于是重建永远走不通。
+            conn.close()
+            raise
         return conn
 
     try:
@@ -114,6 +143,11 @@ def sqlite_connect(
         # 仍失败则异常向上传播（通常是权限/磁盘问题，不应静默吞掉）。
         # 来源：2026-09-10-python-sqlite-batch-fetchmany-init-memory-peak
         # （sqlite 连接初始化容错模式）。
+        if not _recoverable_corruption(exc, db_path):
+            # 2026-09-26: 这里原先无条件走"删除重建"，而 sqlite 的
+            # "database is locked" 等 OperationalError 也是 DatabaseError 子类
+            # → 并发场景下会把别人正在写的库删掉。非损坏类错误一律原样抛出。
+            raise
         logger.warning(
             "SQLite DB %s appears corrupt (%s); deleting and recreating an empty DB.",
             db_path, exc,
