@@ -29,7 +29,6 @@ env:
   # 2026-09-27: 20 → 24。jsdom@30 与 vitest@5 的 engines 都是
   # `^22.22.2 || ^24.15.0 || >=26.0.0`；node 20 下 vitest 5 会在 import jsdom→undici 时
   # 直接 56 个测试文件报错（见 #40 的 Frontend Build 日志），属于跑不受支持的组合。
-igin/master
   NODE_VERSION: "24"
 
 jobs:
