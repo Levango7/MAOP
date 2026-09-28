@@ -10,9 +10,25 @@
    与解析出的实际目录递归 *.py 计数对比。
 3. Markdown 表格列数校验：校验每个表格行（含分隔行）列数一致，破版则报告。
 
+## 状态与已知假阳性（2026-09-29 复核）
+
+**未接入 CI**，定位为人工审计工具：enterprise/ 为 MAOS 跨仓、前端路径为
+dashboard-enterprise/ 内简写、docs/archive/ 属历史快照——路径启发式无法
+区分这些语境。当前 1438 条发现中约一半来自 docs/archive/。使用时建议先
+跳过以下假阳性类别：
+
+- 跨仓引用：``maop/enterprise/...``（实体在 MAOS 仓库，非本仓缺失）
+- 前端简写：``src/...``、``ThreeLayerMemory.vue`` 等（相对 dashboard-enterprise/）
+- 历史快照：``docs/archive/**`` 中的路径多为当时的真实结构
+
+真阳性示例（工具价值验证）：README 模块表中的 ``core/security/tenant.py``
+已于 2026-09-25 删除（并入 ``core/tenant/``），表项由本工具扫出后已修正。
+
+若未来要接入 CI，需先按上述类别加豁免，再只对当前文档（非 archive）启用。
+
 用法: python scripts/check_docs_consistency.py
 
-退出码: 0 = 全部通过；1 = 发现不一致。
+退出码: 0 = 全部通过；1 = 发现不一致（含上述假阳性，需人工分类）。
 """
 
 from __future__ import annotations

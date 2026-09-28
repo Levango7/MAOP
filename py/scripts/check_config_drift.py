@@ -4,12 +4,18 @@ Runs in CI to prevent new os.getenv/os.environ calls from being added
 without going through the settings module. The baseline is the current
 count; any increase fails the check.
 
+Also checks version sync: ``maop/__init__.py`` 的 ``__version__`` 必须与
+``pyproject.toml`` 的 ``version`` 一致（能力自根 scripts/doc_reconcile.py
+并入，2026-09-29；该文件本身从未被 CI 执行）。
+
 Usage: python scripts/check_config_drift.py
+Exit: 0 = 无漂移；1 = getenv 增长或版本不一致
 """
 
 from __future__ import annotations
 
 import pathlib
+import re
 import sys
 
 # 2026-08-15: 148→226。8-01 后两周迭代新增的直接 env 读取
@@ -37,20 +43,57 @@ def count_getenv_calls(root: pathlib.Path) -> int:
     return count
 
 
+def version_drift(py_dir: pathlib.Path) -> str:
+    """比对 __init__.py 的 __version__ 与 pyproject.toml 的 version。
+
+    返回 "" = 一致；否则返回描述问题的一行文本（含无法解析的显式告警，
+    避免"没跑"与"全绿"同形）。
+    """
+    init_file = py_dir / "maop" / "__init__.py"
+    pyproject = py_dir / "pyproject.toml"
+    m_init = re.search(
+        r"""__version__\s*=\s*["']([^"']+)["']""",
+        init_file.read_text(encoding="utf-8", errors="ignore"),
+    )
+    m_toml = re.search(
+        r"""^version\s*=\s*["']([^"']+)["']""",
+        pyproject.read_text(encoding="utf-8", errors="ignore"),
+        re.MULTILINE,
+    )
+    if not m_init or not m_toml:
+        return "无法解析 __version__（maop/__init__.py）或 version（pyproject.toml）"
+    if m_init.group(1) != m_toml.group(1):
+        return (
+            f"版本漂移: maop/__init__.py={m_init.group(1)} "
+            f"≠ pyproject.toml={m_toml.group(1)}"
+        )
+    return ""
+
+
 def main() -> int:
-    root = pathlib.Path(__file__).resolve().parent.parent / "maop"
+    py_dir = pathlib.Path(__file__).resolve().parent.parent
+    root = py_dir / "maop"
     current = count_getenv_calls(root)
     print(f"os.getenv/os.environ calls (excluding tests + settings): {current}")
     print(f"Baseline: {BASELINE}")
+    failed = False
     if current > BASELINE:
         print(f"FAIL: +{current - BASELINE} new os.getenv calls detected.")
         print("Use maop.config.settings.get_settings() instead of os.getenv().")
-        return 1
-    if current < BASELINE:
+        failed = True
+    elif current < BASELINE:
         print(f"GOOD: -{BASELINE - current} calls removed since baseline. Update BASELINE.")
     else:
         print("OK: no drift.")
-    return 0
+
+    drift = version_drift(py_dir)
+    if drift:
+        print(f"FAIL: {drift}")
+        failed = True
+    else:
+        print("OK: version sync (__init__.py == pyproject.toml).")
+
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

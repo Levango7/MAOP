@@ -1,12 +1,32 @@
 #!/usr/bin/env python3
-"""CI anti-regression check: verify all write-endpoint routers use require_admin.
+"""写端点 admin 守护盘点工具（人工审计用，未接入 CI）。
 
-Scans dashboard router modules for POST/PUT/DELETE/PATCH endpoints
-and ensures each calls require_admin(request).  Exits non-zero if
-any write endpoint is missing the guard.
+扫描 dashboard 各 router 的 POST/PUT/DELETE/PATCH 端点，报告**函数体内**
+没有调用 require_admin 的那一些。产出的每一条都需人工分类后处理。
+
+## 当前发现的分类（2026-09-29 复核，18 条 ≈ 15 个唯一端点）
+
+- 用户级端点（设计如此，非缺陷）：notifications 已读/偏好（走
+  ``_require_identity``）、feedback 提交、auth_refresh、sso logout。
+- 外部回调（由对方 token 认证，不走 admin 角色）：alertmanager / n8n
+  webhook、sso saml_acs。
+- **待决策**：relay_platform 的 3 个写端点无任何鉴权（其同级模块
+  model_gateway / hooks 均有 require_admin），已作为发现上报，未擅自修改。
+
+## 已知盲区（结论需人工确认）
+
+- 只识别函数体内的 require_admin 调用；router 级 ``dependencies=[...]``
+  守护看不见。
+- 只匹配 require_admin / _require_admin 两个名字，自定义守护看不见。
+- ``PUBLIC_ENDPOINTS`` 为硬编码清单，新增公共端点会先以"违规"形式出现。
+
+若未来要接入 CI 做回归门禁，需先为上述已分类端点引入豁免表
+（参考 py/scripts/check_api_contract.py 的 KNOWN_MISSING 模式），
+否则会常红。
 
 Usage:
     python scripts/check_admin_coverage.py
+Exit: 0 = 无发现；1 = 有需人工分类的写端点
 """
 
 from __future__ import annotations
@@ -49,6 +69,7 @@ def check_router(path: Path) -> list[str]:
                 if node.name not in PUBLIC_ENDPOINTS and not _has_require_admin(node):
                     line = node.lineno
                     violations.append(f"{path.name}:{line} {node.name}() — missing require_admin")
+                break  # 一个函数挂多个写方法装饰器（如 post("") + post("/")）只报一次
     return violations
 
 

@@ -26,6 +26,16 @@ against itself. Only comparing the two real route sets catches it.
 2. 解析前端：``api.get/post/put/delete`` 的字面量与模板字符串调用
    （``${expr}`` 归一为路径参数占位）
 3. 比对方法 + 路径模板，报告前端调用但后端不存在者
+4. 解析 README.md 中的 ``/api/*`` 引用（完整 URL、内联代码、散文裸路径
+   三式），用同一后端路由集验证存在性；README 描述端点时不写方法，
+   故方法无关（任一同路径路由即算命中，也接受前缀族引用）
+
+## 与根 scripts/doc_reconcile.py 的关系（2026-09-29）
+
+根 ``scripts/doc_reconcile.py`` 只做 README 的 ``/api/*`` 示例校验，且用
+**朴素子串匹配**——看不见 FastAPI ``prefix`` 组合（``/api/cost/summary``
+被误报不存在），且 CI lint job 的 ``working-directory: py`` 使该文件
+从未被执行过。其能力已并入本脚本（第 4 项），原文件已删除。
 
 ## 已知盲区（脚本会显式打印，不静默）
 
@@ -34,7 +44,7 @@ against itself. Only comparing the two real route sets catches it.
   需要人工确认那些路径。
 
 Usage: python scripts/check_api_contract.py
-Exit: 0 = 通过（无新增错配）；1 = 发现未登记的前端→后端错配
+Exit: 0 = 通过（无新增错配）；1 = 发现未登记的前端→后端错配或 README 死引用
 """
 
 from __future__ import annotations
@@ -47,6 +57,7 @@ import sys
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
 BACKEND = REPO / "py" / "maop"
 FRONTEND = REPO / "dashboard-enterprise" / "src"
+README = REPO / "README.md"
 
 # ── 已知「前端调用但后端无实现」的端点 ────────────────────────────────
 # 这些是**功能未实现**（非路径错配），需要产品决策，故登记豁免。
@@ -83,6 +94,11 @@ _PREFIX = re.compile(r"APIRouter\([^)]*?prefix\s*=\s*[\"']([^\"']*)[\"']", re.DO
 _DECORATOR = re.compile(
     r"@\w+\.(get|post|put|delete|patch)\(\s*[\"']([^\"']*)[\"']"
 )
+# README 中的 /api/* 引用：完整 URL 式、内联代码式、散文裸路径式
+# （裸路径排除前导 \w 以免命中 URL 尾部，URL 由第一条正则负责）
+_README_URL_RE = re.compile(r"https?://\S+?(/api/[^\s`\"')\]]+)")
+_README_CODE_RE = re.compile(r"`(/api/[A-Za-z0-9_/{}.$\-]+)`")
+_README_BARE_RE = re.compile(r"(?<![\w`])/api/[A-Za-z0-9_/{}.$\-]+")
 
 
 def _normalize(path: str) -> str:
@@ -131,6 +147,27 @@ def parse_frontend() -> tuple[set[tuple[str, str]], int, list[str]]:
     return calls, unresolved, samples
 
 
+def parse_readme() -> list[str]:
+    """解析 README.md 中的 /api/* 引用，返回去重排序后的路径列表。"""
+    if not README.is_file():
+        return []
+    text = README.read_text(encoding="utf-8", errors="ignore")
+    refs = {_normalize(m.group(1)) for m in _README_URL_RE.finditer(text)}
+    refs |= {_normalize(m.group(1)) for m in _README_CODE_RE.finditer(text)}
+    refs |= {_normalize(m.group(0)) for m in _README_BARE_RE.finditer(text)}
+    return sorted(refs)
+
+
+def readme_path_covered(path: str, backend: set[tuple[str, str]]) -> bool:
+    """README 端点引用是否在后端存在（方法无关，接受前缀族引用）。"""
+    base = _normalize(path).rstrip("/")
+    for _method, bp in backend:
+        b = bp.rstrip("/")
+        if b == base or b.startswith(base + "/"):
+            return True
+    return False
+
+
 def is_covered(method: str, path: str, backend: set[tuple[str, str]]) -> bool:
     """前端路径是否被后端某条路由覆盖（支持路径参数与前缀省略）。"""
     norm = _normalize(path)
@@ -167,6 +204,17 @@ def main() -> int:
         for s in samples:
             print(f"      {s}")
 
+    readme_refs = parse_readme()
+    readme_missing = [
+        p for p in readme_refs if not readme_path_covered(p, backend)
+    ]
+    if readme_refs:
+        status = (
+            f"，其中 {len(readme_missing)} 处后端不存在"
+            if readme_missing else "，全部命中后端"
+        )
+        print(f"README /api/* 引用: {len(readme_refs)} 处{status}")
+
     missing = sorted(
         (m, p) for m, p in frontend if not is_covered(m, p, backend)
     )
@@ -187,18 +235,26 @@ def main() -> int:
         print("提示：未注册的 /api/* 会被 SPA 兜底返回 200 + HTML，")
         print("      前端 res.json() 报 \"Unexpected token '<'\" —— 只查状态码发现不了。")
 
+    if readme_missing:
+        print(f"FAIL: README 引用了后端不存在的端点 {len(readme_missing)} 处：")
+        for p in readme_missing:
+            print(f"        {p}")
+        print("  照抄 README 的 curl 示例会拿到 SPA 兜底 200 + HTML，")
+        print("  请修正文档或补齐实现。")
+        print()
+
     if fixed:
         print(f"NOTE: {len(fixed)} 处已登记的缺失端点现已可用，请从 KNOWN_MISSING 删除：")
         for method, path in sorted(fixed):
             print(f"  {method:<7} {path}")
 
-    if new:
+    if new or readme_missing:
         return 1
 
     if missing:
         print(f"OK: 无新增错配。已知未实现端点 {len(missing)} 处（已登记豁免）。")
     else:
-        print("OK: 前端调用的端点全部在后端存在。")
+        print("OK: 前端调用与 README 引用的端点全部在后端存在。")
     return 0
 
 
