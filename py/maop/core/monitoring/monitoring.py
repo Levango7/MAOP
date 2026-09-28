@@ -532,7 +532,11 @@ metrics = MetricsCollector()
 # 调用，导致运维盲区。现补充注释并在对应业务逻辑处添加调用。
 
 # MAOP_DELEGATIONS_TOTAL — 任务委派总数计数器。
-# 预期调用位置：dispatch_core.py 任务派发时 .inc()；maop_plan.py plan 执行时 .inc()。
+# 唯一调用位置：dispatch_core.py 任务派发时 .inc()。
+# 2026-09-28 双计数修复：此前 maop_plan.py 建 plan 时也 .inc()，而 success/failed
+# 只在派发侧计数——健康环路任务 total:success ≈ 2:1，success/total<0.8 告警
+# （monitoring/alerts.yml）与 SLO burn（slo-alerts.yml）误报、failed/total 被稀释
+# 一半（prometheus-alerts.yml 漏报）。plan 构建不是委派，计数一律在派发侧。
 MAOP_DELEGATIONS_TOTAL = metrics.counter("MAOP_delegations_total", "Total task delegations")
 
 # MAOP_DELEGATIONS_SUCCESS — 任务委派成功数计数器。
@@ -544,8 +548,9 @@ MAOP_DELEGATIONS_SUCCESS = metrics.counter("MAOP_delegations_success", "Successf
 MAOP_DELEGATIONS_FAILED = metrics.counter("MAOP_delegations_failed", "Failed delegations")
 
 # MAOP_DELEGATION_DURATION — 任务委派耗时直方图（秒）。
-# 预期调用位置：dispatch_core.py 任务完成时 .observe(duration)；
-# maop_plan.py plan 执行完成时 .observe(duration)。
+# 唯一调用位置：dispatch_core.py 委派完成时 .observe(委派时长)。
+# 2026-09-28 双计数修复：此前 maop_plan.py 把 plan 构建耗时也 observe 进本直方图
+# （plan 构建远快于真实委派，稀释 P95，MAOPHighLatency 告警被抑制），已移除。
 MAOP_DELEGATION_DURATION = metrics.histogram("MAOP_delegation_duration_seconds", "Delegation duration")
 
 # MAOP_ACTIVE_AGENTS — 活跃 agent 数量仪表。

@@ -283,3 +283,40 @@ class TestExecuteWorkflow:
         result = execute_workflow("var_wf", config=config, initial_vars={"project": "MAOP"})
         assert result.steps_completed == 1
         assert result.variables.get("steps.0.output") is not None
+
+
+# ── 2026-09-28 委派指标双计数修复回归 ──────────────────────────
+
+class TestPlanMetricsSideEffects:
+    """建 plan 不得触碰委派指标——计数与耗时的唯一调用点在派发侧（dispatch_core）。
+
+    历史缺陷：maop_plan() 建 plan 时也 .inc() MAOP_DELEGATIONS_TOTAL 并 observe
+    MAOP_DELEGATION_DURATION，而 success/failed 只在派发侧计数 → 健康环路任务
+    total:success ≈ 2:1，success/total 告警分母膨胀、P95 被稀释（详见
+    monitoring.py 的指标注释）。
+    """
+
+    def test_plan_build_does_not_touch_delegation_metrics(self):
+        from maop.core.monitoring.monitoring import (
+            MAOP_DELEGATION_DURATION,
+            MAOP_DELEGATIONS_FAILED,
+            MAOP_DELEGATIONS_SUCCESS,
+            MAOP_DELEGATIONS_TOTAL,
+        )
+
+        total_before = MAOP_DELEGATIONS_TOTAL.get()
+        success_before = MAOP_DELEGATIONS_SUCCESS.get()
+        failed_before = MAOP_DELEGATIONS_FAILED.get()
+        duration_before = MAOP_DELEGATION_DURATION.to_prometheus()
+
+        plan = maop_plan("run the ci pipeline", routing_key="pipeline")
+
+        assert plan.routing_key == "pipeline"
+        assert MAOP_DELEGATIONS_TOTAL.get() == total_before, (
+            "maop_plan() must not count a delegation (dispatch-side only)"
+        )
+        assert MAOP_DELEGATIONS_SUCCESS.get() == success_before
+        assert MAOP_DELEGATIONS_FAILED.get() == failed_before
+        assert MAOP_DELEGATION_DURATION.to_prometheus() == duration_before, (
+            "maop_plan() must not observe plan-build time into the delegation histogram"
+        )

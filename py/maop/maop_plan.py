@@ -54,6 +54,14 @@ class Plan(BaseModel):
     """Scheduling priority: 1 (highest) to 5 (lowest). Default 3 (normal)."""
     sla_tier: str = "standard"
     """SLA tier: best_effort | standard | critical."""
+    dry_run: bool = False
+    """声明本计划期望 dry-run 执行（``maop_verify._gate_dry_run`` 的合同键）。
+
+    2026-09-28 no-op 修复：此前 maop_plan 为 deploy/pipeline/fileops 路由
+    追加 "dry-run" gate 但从未设置本字段，``_gate_dry_run`` 对未声明
+    dry_run 的 plan 恒 PASS——闸门存在却从未生效。现由
+    ``MAOP_DRY_RUN_ENFORCE=1`` 显式启用后置 True（要求执行链路能自报
+    dry-run 信号），未启用时保持历史行为。"""
 
     def is_deadline_urgent(self, threshold_ms: int = 30000) -> bool:
         """Return True if deadline is set and the remaining time is below threshold.
@@ -199,10 +207,6 @@ def maop_plan(
     Plan
         Routing result with selected_agent, routing_key, gates, budget.
     """
-    # H8 修复：记录 plan 阶段耗时与委派计数
-    # P3-fix: 删除冗余函数内 import time as _time，改用模块级 time
-    _plan_start = time.monotonic()
-
     # Priority 1: explicit routing_key override
     if routing_key:
         rk = routing_key
@@ -238,29 +242,29 @@ def maop_plan(
     # Security-sensitive routes require content-safety gate
     if rk in ("security", "quickfix", "review"):
         gates.append("content-safety")
-    # Deployment/infrastructure routes require dry-run gate
+    # Deployment/infrastructure routes require dry-run gate.
+    # 2026-09-28 no-op 修复：此前只挂 gate、从不设置 plan["dry_run"]=True，
+    # _gate_dry_run 对未声明的 plan 恒 PASS——"安全闸门"对这三条路由从未
+    # 生效。gate 的合同是校验执行结果自报 dry-run 信号，而当前执行器
+    # （外部 CLI）不产出该信号，直接置 True 会把三条路由全部打断；改为
+    # 显式 opt-in（MAOP_DRY_RUN_ENFORCE=1），未设置时与历史行为一致。
     if rk in ("deploy", "pipeline", "fileops"):
         gates.append("dry-run")
+    dry_run_enforced = (
+        os.getenv("MAOP_DRY_RUN_ENFORCE", "").strip().lower() in ("1", "true", "yes")
+    )
+    plan_dry_run = bool(rk in ("deploy", "pipeline", "fileops") and dry_run_enforced)
 
-    # H8 修复：记录 plan 耗时与委派计数（指标调用）
-    try:
-        from maop.core.monitoring.monitoring import (
-            MAOP_DELEGATION_DURATION,
-            MAOP_DELEGATIONS_TOTAL,
-        )
-
-        MAOP_DELEGATIONS_TOTAL.inc()
-        MAOP_DELEGATION_DURATION.observe(time.monotonic() - _plan_start)
-    except Exception:
-        # 指标记录失败不应影响业务逻辑；记录 debug 日志便于排查
-        logger.debug("record plan delegation metrics failed", exc_info=True)
-
+    # 2026-09-28 双计数修复：此处曾 .inc() MAOP_DELEGATIONS_TOTAL 并 observe
+    # MAOP_DELEGATION_DURATION——建 plan 不是委派（success/failed 只在派发侧
+    # 计数，双写使 success/total 告警分母膨胀），指标唯一调用点在 dispatch_core。
     return Plan(
         task=task,
         selected_agent=agent,
         routing_key=rk,
         gates=gates,
         budget=budget,
+        dry_run=plan_dry_run,
     )
 
 

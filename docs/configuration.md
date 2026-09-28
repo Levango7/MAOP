@@ -355,6 +355,7 @@
 | `MAOP_ROUTE_DECISION_MODE` | （空） | 否 | 路由决策模式 |
 | `MAOP_MODEL_SELECTION_LOAD_AWARE` | （空） | 否 | 模型选择负载感知开关 |
 | `MAOP_TASK_DEADLINE_SECONDS` | （空） | 否 | 任务截止时间（秒） |
+| `MAOP_DRY_RUN_ENFORCE` | `0` | 否 | 强制 deploy/pipeline/fileops 路由声明 dry-run（`plan.dry_run=True`），使 "dry-run" gate 真正校验执行结果信号。默认 no-op；**fail-closed**——当前执行器不产出 dry-run 信号，开启后这三条路由任务会卡在 verify。路由表无 "deploy" 键，实际只影响 pipeline/fileops |
 
 ## 29. 超时配置
 
