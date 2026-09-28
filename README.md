@@ -24,7 +24,7 @@ Entry (maop.ps1 / cli.py)
 | Entry | `maop.ps1`, `cli.py` | CLI & startup |
 | Orchestration | `maop_loop.py`, `engine.py` | Phase pipeline & DAG workflows |
 | Dispatch | `delegate/dispatcher.py`, `delegate/dispatch_core.py`, `maop_plan.py` | Config-driven agent routing |
-| Infrastructure | `core/` (5 files + 18 subpackages) | Shared services & utilities |
+| Infrastructure | `core/` (5 files + 16 subpackages) | Shared services & utilities |
 | Data | SQLite, JSON, YAML | Persistence & configuration |
 
 ## 双版架构（Dual Edition）
@@ -140,7 +140,7 @@ pip install ./maop_enterprise-<版本>-py3-none-any.whl
 
 `maop/enterprise/__init__.py` 在 import 时调用 `set_edition(Edition.ENTERPRISE)`，这是企业版包"存在即激活"的机制。
 
-> **⚠️ 开发者注意**：开发企业版功能需要同时 clone 两个仓库：
+> **开发者注意**：开发企业版功能需要同时 clone 两个仓库：
 > ```bash
 > git clone https://github.com/Levango7/MAOP.git
 > git clone https://github.com/Levango7/MAOS.git
@@ -180,7 +180,7 @@ maop health
 pytest py/tests
 ```
 
-> **⚠️ Security Notes for Development:**
+> **Security Notes for Development:**
 > - `start.sh` defaults to `127.0.0.1` — do NOT set `MAOP_HOST=0.0.0.0` without `MAOP_AUTH=1`
 > - Never commit `.env` files (see `.gitignore`)
 > - Run `make lint` before committing (includes ruff + mypy)

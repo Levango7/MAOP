@@ -18,6 +18,11 @@
 
 MAOP Dashboard 由 FastAPI 实现（`py/maop/dashboard/server.py`），路由按域拆分到 `py/maop/dashboard/routers/` 下 41 个 router 文件，共注册 **346 个端点**（含 `/api/v1/*` 自动别名）。监听端口默认 **9079**。
 
+> 更正 **2026-09-29**：本节数字为 2026-08-11 口径，已过时——`routers/` 现有 **61 个顶层 router 模块**
+> （62 个顶层 .py，含子目录 79），端点数按 `docs/api-reference.md`「端点计数」节的 OpenAPI 方法
+> 重算为 **482**（Personal）/ **554**（企业版），且该口径**不含** `/api/v1/*` 别名。本节表格的分组结构
+> 仍有参考价值，数字请以 api-reference 为准。
+
 #### 1.1.1 核心 HTTP REST 端点（按 router 分组）
 
 | 路径前缀 | router 文件 | 主要端点 | 功能 |

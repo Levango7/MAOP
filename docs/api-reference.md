@@ -24,6 +24,25 @@ http://127.0.0.1:9079
 | `/api/stream` | SSE 长连接 |
 | `/api/auth/{login,logout,refresh}` | 登录流前端约定 |
 
+### 端点计数（2026-09-29 重算）
+
+| 口径 | `/api` 路径 × 方法 | 唯一路径 |
+| --- | --- | --- |
+| Personal 版（默认） | **482** | 424 |
+| Enterprise 版（含 rbac/tenant/sso/quotas/n8n/license 等企业路由） | **554** | 483 |
+
+方法分布（Personal）：GET 274 / POST 170 / DELETE 26 / PUT 18 / PATCH 1。另有 **2 个实际挂载的 WebSocket 端点**
+（应用级 `/ws`、`/api/notifications/ws`），不计入上表。注：`ws_dag.py` 的 `/ws/dag/{execution_id}`
+与 `ws_broadcast.py` 内的 `/ws` 路由**从未被 include**（前者仅测试引用，后者仅导出广播函数），
+属死代码，不计入。统计方法同 HTTP：遍历挂载后的 `app.routes` 递归 `original_router`。
+
+统计方法：加载 `maop.dashboard.server.app` 后读 `app.openapi()["paths"]`，对每条路径统计
+GET/POST/PUT/DELETE/PATCH（不含 HEAD/OPTIONS）；`/api/v1/*` 是逐条镜像的别名、不计入；
+4 处 `include_in_schema=False` 是尾斜杠重复路由（同端点的另一种写法）、同样不计入。
+企业版数量需 `set_edition(ENTERPRISE)` 后重新导入 app 再数（env 变量不足以切换版本）。
+历史口径 346（`_盘点_MAOP_OpsMesh_Interaction.md`，2026-08-11，含别名）与 448（本仓索引旧值）
+均已作废。
+
 ### Authentication
 
 采用 JWT Bearer Token，登录后所有受保护接口需在请求头携带：
@@ -400,10 +419,6 @@ curl -X POST http://127.0.0.1:9079/api/agents/scan -H "Authorization: Bearer $TO
 
 实时推送系统快照，每 15 秒一次。
 
-```bash
-curl -N http://127.0.0.1:9079/api/stream/trace-123 -H "Authorization: Bearer $TOKEN"
-```
-
 ```python
 import websockets, asyncio, json
 
@@ -414,6 +429,8 @@ async def listen():
 
 asyncio.run(listen())
 ```
+
+通知推送另见 `/api/notifications/ws`（`routers/notifications.py`，同样为 WebSocket）。
 
 ---
 

@@ -1,8 +1,8 @@
 # MAOP Database Schema
 
 > Auto-generated from source code CREATE TABLE statements.
-> ⚠️ 计数更正 **2026-09-29**（重算）：`py/maop/**/*.py` 中 CREATE TABLE 去重表名 **130 个**
-> （含 1 个临时迁移表 `_subagents_new`；其中 53 个来自 PG 迁移
+> 计数更正 **2026-09-29**（重算）：`py/maop/**/*.py` 中 CREATE TABLE 去重表名 **130 个**
+> （含 1 个重建用临时表 `_subagents_new` 与 1 个版本账本表 `_migrations`；其中 53 个来自 PG 迁移
 > `migrations/pg/versions/001_initial_schema.py`）。统计方法：正则匹配
 > `CREATE TABLE [IF NOT EXISTS] <name>` 全部形式后去重。
 > 此前 2026-08-26 记录的"101 张"为旧口径，已作废；本文档当前记录其中的 53 张，
