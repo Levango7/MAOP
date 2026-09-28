@@ -1,6 +1,6 @@
 # RFC-001: MAOP 控制台产品设计演进 — 从"功能仓库"到"工作台"
 
-- **状态**: Draft (待审阅)
+- **状态**: Implemented（2026-09-29 复核）——A/B/C 三迭代均已落地，实施结果见文末
 - **作者**: InsCode
 - **日期**: 2026-08-12
 - **影响范围**: `dashboard-enterprise/` 全部 22 个视图、`src/nav.js`、`src/components/*`、新增 3 个组件
@@ -213,12 +213,22 @@ v1.0 ──●──────●──────●──── vCurrent
 
 ---
 
-## 6. 待你回复
+## 6. 实施结果（2026-09-29 复核）
 
-请过目本 RFC，针对以下 3 点回复：
+本文的三个迭代全部落地。实施中与草案有两处偏离，以实现为准：
 
-1. **导航重排的 6 分组**是否合理？有想改名/合并/移动的吗？
-2. **Overview 三段式**布局你认可吗？还是希望 Hero 区更突出(比如占首屏 1/2)?
-3. **迭代 C 的 DetailDrawer 取代 Modal**是否符合你的预期？
+1. **导航分组：不是 6 组，是 7 组任务流。** A-1 于 2026-09-01 以"任务流"方案重做：
+   首页 / 执行 / 记忆 / 能力 / 运维 / 分析 / 反馈 + 企业"管理"组（`enterprise: true` 过滤）。
+   与草案的差别：草案按"工作台/构建/数据资产/监控/治理"切分，实现改为按用户任务流切分，
+   并新增分析、反馈两组。唯一真相源是 `dashboard-enterprise/src/nav.js`；
+   旧路由（`/control`、`/chat`、`/evolution-history`、`/vector` 等）经 `matchPaths` 301 保留。
+2. **Overview 三段式：已落地，但 HeroStrip 未做成独立组件。** `views/Overview.vue` 内联实现：
+   `ov-hero`（健康结论 + 任务数 + 刷新时间）→ `ov-pev`（Plan-Execute-Verify 循环条）→
+   `ov-actions`（快捷动作）→ 图表 + 活动流（`ov-split`）。比草案多了一条 PEV 循环条。
 
-任意一点有异议我可以调整 RFC；无异议回复"通过"，我即开始任务拆分与执行。
+B / C 迭代的组件均已落地并接线（2026-09-29 实测引用数）：
+`EvolutionTimeline`、`CoachMarks`、`CommandPalette`；`ListPageLayout`（34 个引用文件）、
+`FilterBar`、`DetailDrawer`（12 个视图，Modal 仅保留于破坏性确认与全局表单）、
+`PageHeader`（22 处）。**第 3 题（DetailDrawer 取代 Modal）已按预期实施。**
+
+遗留（转处置台账，见 [product-consolidation.md](product-consolidation.md)）：本节问题不再需要回复。

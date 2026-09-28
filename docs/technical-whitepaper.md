@@ -1,7 +1,9 @@
 # MAOP 技术白皮书
 
 > Multi Agents Orchestration Platform — 架构、设计、性能技术白皮书
-> 定位：编排与治理**外部 CLI agent** 的框架层（内置 31 个第三方 CLI 适配器）；内置 LLM 用于对话/分析/建议，不承担 agent 执行引擎角色。
+> 定位：编排与治理**外部 CLI agent** 的控制面。`config/agents.yaml` 顶层共 31 条 = 23 个开箱可派发的
+> 第三方 CLI 适配器 + 5 个需额外配置 + 1 个自研适配器（doc-pipeline）+ 1 个自引用（MAOP 自身）；
+> 内置 LLM 用于对话/分析/建议，不承担 agent 执行引擎角色。口径与 README 定位说明段一致（2026-09-26 核对）。
 
 ## 第1章 架构概览
 
@@ -40,15 +42,19 @@ MAOP 旨在解决企业级多智能体编排的核心挑战：
 
 | 子系统 | 模块 | 职责 |
 |--------|------|------|
-| Agent 管理 | `core/agent_*` | 生命周期、注册、修复 |
-| MCP 工具市场 | `E`core/mcp_*` | 工具发现、调用、审计 |
-| 多模态推理 | `core/multimodal` | 统一接口 |
-| 演化引擎 | `core/evolution_*` | 策略迭代 |
-| 三层记忆 | `core/three_layer_memory` | 短期 / 长期 / 向量 |
-| 租户隔离 | `core/tenant` | RLS、配额、审计 |
-| 安全 | `core/security` | 认证、授权、沙箱 |
-| 合规 | `core/tenant/compliance` | GDPR、DPA |
-| LDAP | `core/security/ldap_provider` | AD 集成 |
+| Agent 管理 | `core/agent/` | 生命周期、注册、修复 |
+| MCP 工具市场 | `core/mcp/` | 工具发现、调用、审计 |
+| 模型管理 | `model/`（registry / schema） | 模型注册、选择、降级 |
+| 演化引擎 | `core/evolution/` | 策略迭代 |
+| 三层记忆 | `core/memory/three_layer_memory.py` | 短期 / 长期 / 向量 |
+| 租户隔离 | `core/tenant/` | RLS、配额、审计 |
+| 安全 | `core/security/` | 认证、授权、沙箱 |
+| 合规 | `core/tenant/compliance.py` | GDPR、DPA |
+| LDAP | `core/security/ldap_provider.py` | AD 集成 |
+
+> 模块路径为 2026-09-29 实核（此前表中写的 `core/agent_*`、`core/three_layer_memory`、
+> `core/multimodal` 等路径在代码树中不存在；多模态推理属 HLD 阶段二路线图项，
+> 当前多模态能力仅在 LLM 对话 `core/agent/llm_chat/` 与图片存储 `core/backends/image_store.py` 层面）。
 
 ## 第2章 多租户设计
 

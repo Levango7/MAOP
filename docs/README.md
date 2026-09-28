@@ -26,9 +26,10 @@
 | [技术白皮书](./technical-whitepaper.md) | MAOP 架构、设计目标、多租户隔离、合规性、可观测性技术白皮书 |
 | [Nexus 统一编排平台 HLD](./Nexus统一编排平台_HLD.md) | 五层架构（交互层→网关层→编排层→能力节点层→事件/可观测层）高层设计 |
 | [Nexus 交付流水线 LLD](./Nexus交付流水线_LLD.md) | 需求→编码→审查→构建→测试→部署→压测→回归 8 阶段交付流水线低层设计 |
-| [数据库 Schema](./database-schema.md) | 数据库表结构参考（101 张表，当前记录 53 张） |
+| [数据库 Schema](./database-schema.md) | 数据库表结构参考（130 张表，2026-09-29 重算；当前记录 53 张） |
 | [设计规范](./DESIGN_RULES.md) | Dashboard 权威设计规范 — 色彩体系、组件契约、交互模式 |
-| [产品设计 RFC-001](./product-design-rfc-001.md) | MAOP 控制台从"功能仓库"到"工作台"的产品设计演进方案 |
+| [产品整合方案](./product-consolidation.md) | 产品定位（外部 CLI agent 的编排与治理层）+ 资产盘点 + 留/删/补/改处置台账与执行顺序 |
+| [产品设计 RFC-001](./product-design-rfc-001.md) | MAOP 控制台从"功能仓库"到"工作台"的产品设计演进方案（A/B/C 三迭代已实施，见文末实施结果） |
 | [接口盘点报告](./_盘点_MAOP_OpsMesh_Interaction.md) | MAOP × OpsMesh × Interaction 三项目接口盘点，含 API 端点/鉴权/事件总线 |
 | [架构决策记录](./adr/README.md) | ADR 001–021，含双版架构、HA 设计、Python 主引擎、安全加固等关键决策 |
 
