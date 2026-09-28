@@ -170,7 +170,7 @@ Task Input
 
 **旧结论**：干净环境无法安装，`pip install -e .` 直接失败。
 
-**当前状态**：✅ **已修复**
+**当前状态**：**已修复**
 
 - `pyproject.toml:11`：`pydantic-settings==2.5.2` 明确声明为直接依赖
 - `requirements.lock:16`：`pydantic-settings==2.5.2` 已锁定
@@ -180,7 +180,7 @@ Task Input
 
 **旧结论**：`data_bridge.py:59` `fallback_to_ps: bool = True`，系统无法脱离 PS。
 
-**当前状态**：✅ **已彻底删除**
+**当前状态**：**已彻底删除**
 
 - `data_bridge.py` 664 行纯 Python
 - `fallback_to_ps` 参数已不存在
@@ -194,7 +194,7 @@ Task Input
 
 **旧结论**：`message_queue.db` vs `queue.db`、`human-queue.json` vs `human_queue.db`、`circuit-breaker.json` 命名混乱。
 
-**当前状态**：✅ **已统一**
+**当前状态**：**已统一**
 
 - `maop_loop.py:230`：消息队列使用 `data/queue.db`（唯一真源）
 - `maop_loop.py:122-124`：熔断状态使用 `maop.db` 的 `circuit_breaker_state` 表（注释明确声明）
@@ -206,7 +206,7 @@ Task Input
 
 **旧结论**：浮动版本依赖，不可重现构建。
 
-**当前状态**：✅ **已修复**
+**当前状态**：**已修复**
 
 - `requirements.lock` 存在，36 个包精确锁定
 - 直接依赖：fastapi==0.115.0 / uvicorn[standard]==0.30.6 / pydantic==2.13.4 / pydantic-settings==2.5.2 / pyyaml==6.0.2 / httpx==0.28.1 / python-dotenv==1.0.1 / mmh3==5.2.1
@@ -642,21 +642,21 @@ agents:
 
 | 编号 | 漏洞 | 严重程度 | 状态 |
 |------|------|---------|------|
-| S-01 | `db_backup.py` VACUUM INTO 注入 | Critical | ✅ 已修复 |
-| S-02 | `auth.py` JWT 密钥临时生成 | Critical | ✅ 已修复 |
-| S-03 | `auth.py` APIKeyStore 线程不安全 | High | ✅ 已修复 |
-| S-04 | `dispatcher.py` PS cli_args 注入 | Critical | ✅ 已修复 |
-| S-05 | `system.py` pip 白名单绕过 | High | ✅ 已修复 |
-| S-06 | `model.py` model/switch 验证缺失 | High | ✅ 已修复 |
-| S-07 | `auth.py` 登录暴力破解 | High | ✅ 已修复 |
-| S-08 | `middleware.py` 公开路径遗漏 | Medium | ✅ 已修复 |
-| S-09 | `tls.py` 占位符证书 | High | ✅ 已修复 |
-| S-10 | `data.py` query() 内部 API 暴露 | Medium | ✅ 已修复 |
-| S-11 | `kv_store.py` 连接泄漏 | Medium | ✅ 已修复 |
-| SQL 注入 | `message_queue._count()` 表名注入 | Critical | ✅ 已修复 |
-| 路径注入 | `db_backup.py` VACUUM INTO 路径 | Critical | ✅ 已修复 |
-| 校验缺失 | `migration.py` 校验和 | High | ✅ 已修复 |
-| GET→POST | `/api/control/run` 状态变更 | High | ✅ 已修复 |
+| S-01 | `db_backup.py` VACUUM INTO 注入 | Critical | 已修复 |
+| S-02 | `auth.py` JWT 密钥临时生成 | Critical | 已修复 |
+| S-03 | `auth.py` APIKeyStore 线程不安全 | High | 已修复 |
+| S-04 | `dispatcher.py` PS cli_args 注入 | Critical | 已修复 |
+| S-05 | `system.py` pip 白名单绕过 | High | 已修复 |
+| S-06 | `model.py` model/switch 验证缺失 | High | 已修复 |
+| S-07 | `auth.py` 登录暴力破解 | High | 已修复 |
+| S-08 | `middleware.py` 公开路径遗漏 | Medium | 已修复 |
+| S-09 | `tls.py` 占位符证书 | High | 已修复 |
+| S-10 | `data.py` query() 内部 API 暴露 | Medium | 已修复 |
+| S-11 | `kv_store.py` 连接泄漏 | Medium | 已修复 |
+| SQL 注入 | `message_queue._count()` 表名注入 | Critical | 已修复 |
+| 路径注入 | `db_backup.py` VACUUM INTO 路径 | Critical | 已修复 |
+| 校验缺失 | `migration.py` 校验和 | High | 已修复 |
+| GET→POST | `/api/control/run` 状态变更 | High | 已修复 |
 
 ### 11.2 安全架构
 

@@ -447,8 +447,8 @@ superadmin > admin > operator > viewer
 
 | 分类 | Flag | Personal | Enterprise |
 |---|---|---|---|
-| 核心能力 | `COST_TRACKING`、`CIRCUIT_BREAKER`、`MEMORY_STORE`、`HOT_RELOAD`、`HOOKS`、`PLUGIN_SYSTEM`、`MCP_HUB`、`VECTOR_SEARCH`、`REACT_LOOP`、`BUDGET_GUARD` | ✅ | ✅ |
-| 企业能力 | `RBAC`、`AUDIT_LOG`、`MULTI_USER`、`SSO`、`DASHBOARD_ANALYTICS`、`VUE_DASHBOARD`、`POSTGRESQL`、`REDIS`、`VAULT`、`TENANT_ISOLATION`、`TLS_AUTO`、`AUTH_AUTO`、`N8N_INTEGRATION` | ❌ | ✅ |
+| 核心能力 | `COST_TRACKING`、`CIRCUIT_BREAKER`、`MEMORY_STORE`、`HOT_RELOAD`、`HOOKS`、`PLUGIN_SYSTEM`、`MCP_HUB`、`VECTOR_SEARCH`、`REACT_LOOP`、`BUDGET_GUARD` | 是 | 是 |
+| 企业能力 | `RBAC`、`AUDIT_LOG`、`MULTI_USER`、`SSO`、`DASHBOARD_ANALYTICS`、`VUE_DASHBOARD`、`POSTGRESQL`、`REDIS`、`VAULT`、`TENANT_ISOLATION`、`TLS_AUTO`、`AUTH_AUTO`、`N8N_INTEGRATION` | 否 | 是 |
 | 可选后端 | `RABBITMQ`、`ETCD` | 按需 | 按需 |
 
 **检测流程**（`detect_edition()`）：
@@ -660,10 +660,10 @@ require_feature(FeatureFlag.TENANT_ISOLATION)  # 抛 FeatureNotAvailable
 | Build | `nav.build` | Run、Agents、Evolve |
 | Data Assets | `nav.assets` | Memory、KnowledgeGraph、Search、Vector、Tools |
 | Observe | `nav.observe` | Observability、Logs、Cost |
-| Govern | `nav.govern` | Models、Audit⚠️、RBAC⚠️、Tenants⚠️、Users⚠️ |
+| Govern | `nav.govern` | Models、Audit、RBAC、Tenants、Users|
 | System | `nav.system` | Settings、Docs |
 
-⚠️ = `enterprise: true`，Personal 版通过 `filterNavByEdition()` 隐藏。
+= `enterprise: true`，Personal 版通过 `filterNavByEdition()` 隐藏。
 
 ### 5.4 页面组件清单
 
@@ -912,27 +912,27 @@ export const messages = {
 
 | 组件 | 文件 | 用途 | 是否导出 |
 |---|---|---|---|
-| `AppIcon` | AppIcon.vue | 统一图标集（简约小众风格） | ✅ |
-| `Card` | Card.vue | 卡片容器 | ✅ |
-| `StatCard` | StatCard.vue | 统计卡片 | ✅ |
-| `Badge` | Badge.vue | 徽章/标签 | ✅ |
-| `DataTable` | DataTable.vue | 数据表格（排序、骨架、空态） | ✅ |
-| `Segmented` | Segmented.vue | 分段控件 | ✅ |
-| `Skeleton` | Skeleton.vue | 骨架屏 | ✅ |
-| `EmptyState` | EmptyState.vue | 空状态 | ✅ |
-| `Toast` | Toast.vue | 全局通知 | ✅ |
-| `PageHeader` | PageHeader.vue | 页面头部 | ✅ |
-| `DagGraph` | DagGraph.vue | DAG 图可视化 | ✅ |
-| `NodeDetailPanel` | NodeDetailPanel.vue | 节点详情面板 | ✅ |
-| `ListPageLayout` | ListPageLayout.vue | **列表页骨架** | ❌（按需 import） |
-| `FilterBar` | FilterBar.vue | **声明式过滤器** | ❌ |
-| `DetailDrawer` | DetailDrawer.vue | **详情抽屉** | ❌ |
-| `TopBar` | TopBar.vue | 顶栏 | ❌ |
-| `AppFooter` | AppFooter.vue | 页脚 | ❌ |
-| `CoachMarks` | CoachMarks.vue | 引导标记 | ❌ |
-| `CommandPalette` | CommandPalette.vue | 命令面板（Ctrl+K） | ❌ |
-| `McpTopology` | McpTopology.vue | MCP 拓扑图 | ❌ |
-| `EvolutionTimeline` | EvolutionTimeline.vue | 演化时间线 | ❌ |
+| `AppIcon` | AppIcon.vue | 统一图标集（简约小众风格） | 是 |
+| `Card` | Card.vue | 卡片容器 | 是 |
+| `StatCard` | StatCard.vue | 统计卡片 | 是 |
+| `Badge` | Badge.vue | 徽章/标签 | 是 |
+| `DataTable` | DataTable.vue | 数据表格（排序、骨架、空态） | 是 |
+| `Segmented` | Segmented.vue | 分段控件 | 是 |
+| `Skeleton` | Skeleton.vue | 骨架屏 | 是 |
+| `EmptyState` | EmptyState.vue | 空状态 | 是 |
+| `Toast` | Toast.vue | 全局通知 | 是 |
+| `PageHeader` | PageHeader.vue | 页面头部 | 是 |
+| `DagGraph` | DagGraph.vue | DAG 图可视化 | 是 |
+| `NodeDetailPanel` | NodeDetailPanel.vue | 节点详情面板 | 是 |
+| `ListPageLayout` | ListPageLayout.vue | **列表页骨架** | （按需 import） |
+| `FilterBar` | FilterBar.vue | **声明式过滤器** | 否 |
+| `DetailDrawer` | DetailDrawer.vue | **详情抽屉** | 否 |
+| `TopBar` | TopBar.vue | 顶栏 | 否 |
+| `AppFooter` | AppFooter.vue | 页脚 | 否 |
+| `CoachMarks` | CoachMarks.vue | 引导标记 | 否 |
+| `CommandPalette` | CommandPalette.vue | 命令面板（Ctrl+K） | 否 |
+| `McpTopology` | McpTopology.vue | MCP 拓扑图 | 否 |
+| `EvolutionTimeline` | EvolutionTimeline.vue | 演化时间线 | 否 |
 
 ### 9.2 关键可复用组件
 
@@ -1033,21 +1033,21 @@ export const messages = {
 
 | 文件 | 用途 | 必需 |
 |---|---|---|
-| `py/maop/dashboard/routers/<feature>.py` | FastAPI 路由 | ✅ |
-| `py/maop/enterprise/<feature>.py` | 业务逻辑 Manager | ✅ |
+| `py/maop/dashboard/routers/<feature>.py` | FastAPI 路由 | 是 |
+| `py/maop/enterprise/<feature>.py` | 业务逻辑 Manager | 是 |
 | `py/maop/enterprise/pg_persist.py`（追加） | PG 持久化 Store | 若需 PG |
-| `py/maop/config/edition.py`（追加 FeatureFlag） | 特性开关 | ✅ |
-| `py/maop/dashboard/server.py`（追加 include_router） | 路由注册 | ✅ |
+| `py/maop/config/edition.py`（追加 FeatureFlag） | 特性开关 | 是 |
+| `py/maop/dashboard/server.py`（追加 include_router） | 路由注册 | 是 |
 
 #### 前端
 
 | 文件 | 用途 | 必需 |
 |---|---|---|
-| `dashboard-enterprise/src/views/<Feature>.vue` | 页面组件 | ✅ |
-| `dashboard-enterprise/src/i18n/view-<feature>.js` | 翻译 | ✅ |
-| `dashboard-enterprise/src/router/index.js`（追加路由） | 路由注册 | ✅ |
-| `dashboard-enterprise/src/nav.js`（追加导航项） | 导航菜单 | ✅ |
-| `dashboard-enterprise/src/i18n/index.js`（追加 nav key） | 导航翻译 | ✅ |
+| `dashboard-enterprise/src/views/<Feature>.vue` | 页面组件 | 是 |
+| `dashboard-enterprise/src/i18n/view-<feature>.js` | 翻译 | 是 |
+| `dashboard-enterprise/src/router/index.js`（追加路由） | 路由注册 | 是 |
+| `dashboard-enterprise/src/nav.js`（追加导航项） | 导航菜单 | 是 |
+| `dashboard-enterprise/src/i18n/index.js`（追加 nav key） | 导航翻译 | 是 |
 
 #### 数据库
 

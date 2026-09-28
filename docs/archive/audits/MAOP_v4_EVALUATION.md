@@ -15,7 +15,7 @@
 
 ---
 
-## 📋 目录
+## 目录
 
 1. [执行摘要](#1-执行摘要)
 2. [项目全局指标](#2-项目全局指标)
@@ -58,16 +58,16 @@
 
 | 能力领域 | v3.5.0 状态 | v4.0.0 状态 | 关键模块 |
 |---------|------------|------------|---------|
-| **基础编排** | ✅ Plan→Execute→Verify | ✅ + ReAct 微循环 | `maop_loop` / `react_loop` |
-| **弹性** | ✅ 熔断/缓存/限流 | ✅ + 策略进化 | `circuit_breaker` / `evolution_strategies` |
-| **安全** | ✅ TLS/JWT/审计 | ✅ + 插件沙箱/变更审查 | `plugin` / `change_tracker` / `permission` |
-| **可观测** | ✅ 监控/WS/Prometheus | ✅ + 实时成本追踪 | `cost_tracker` / `monitoring` |
-| **可扩展** | ⚠️ MCP/协议 | ✅ + 插件系统 + Agent 发现 | `plugin` / `agent_scanner` / `agent_registry` |
-| **知识管理** | ❌ 静态 JSON | ✅ 动态图谱 + 抽取 + 推理 | `knowledge_graph` / `knowledge_extractor` |
-| **LLM 抽象** | ⚠️ model/registry | ✅ + 统一供应商接口 | `llm_provider` / `model/registry` |
-| **前端** | ✅ 零构建 SPA | ✅ + Vite + React SPA | `dashboard/` + `dashboard-vite/` |
-| **Agent 生态** | ⚠️ 手动配置 | ✅ 自动扫描/注册/匹配 | `agent_scanner` / `capability_matcher` |
-| **成本管控** | ❌ 无 | ✅ 实时追踪 + 预算告警 | `cost_tracker` |
+| **基础编排** | Plan→Execute→Verify | + ReAct 微循环 | `maop_loop` / `react_loop` |
+| **弹性** | 熔断/缓存/限流 | + 策略进化 | `circuit_breaker` / `evolution_strategies` |
+| **安全** | TLS/JWT/审计 | + 插件沙箱/变更审查 | `plugin` / `change_tracker` / `permission` |
+| **可观测** | 监控/WS/Prometheus | + 实时成本追踪 | `cost_tracker` / `monitoring` |
+| **可扩展** | MCP/协议 | + 插件系统 + Agent 发现 | `plugin` / `agent_scanner` / `agent_registry` |
+| **知识管理** | 静态 JSON | 动态图谱 + 抽取 + 推理 | `knowledge_graph` / `knowledge_extractor` |
+| **LLM 抽象** | model/registry | + 统一供应商接口 | `llm_provider` / `model/registry` |
+| **前端** | 零构建 SPA | + Vite + React SPA | `dashboard/` + `dashboard-vite/` |
+| **Agent 生态** | 手动配置 | 自动扫描/注册/匹配 | `agent_scanner` / `capability_matcher` |
+| **成本管控** | 无 | 实时追踪 + 预算告警 | `cost_tracker` |
 
 ---
 
@@ -97,7 +97,7 @@
 > | 顶层模块 (maop/*.py) | 14 文件 / ~4,205 行 | **13 文件 / 4,574 行** | 文件 -1（迁移到子包），LOC +369 |
 > | memory/ | 6 模块 / ~1,549 行 | **7 文件 / 2,283 行** | +1 模块（three_layer_memory） |
 > | model/ | 6 模块 / ~1,500 行 | **7 文件 / 1,252 行** | +1 模块，LOC 略低（部分代码已下沉至 core/） |
-> | delegate/ | 5 文件 / ~1,200 行 | **5 文件 / 1,290 行** | ✓ 一致 |
+> | delegate/ | 5 文件 / ~1,200 行 | **5 文件 / 1,290 行** | 一致 |
 > | 测试文件 | 109 文件 / ~10,000 行 | **144 文件 / 33,511 行** | +35 文件 / +23,511 行，主要来自 t06-t16 新增的契约测试与模块测试 |
 | **powerShell（已归档）** | 63 文件 | ~9,000 行（零运行时依赖） | — |
 | **前端（Dashboard）** | 2 套 | 零构建 SPA + Vite React SPA | — |
@@ -147,30 +147,30 @@
 
 | 旧（PEV） | 新（MAOP） | 已同步？ |
 |----------|-----------|---------|
-| `py/pev/` → `py/MAOP/` | ✅ `pyproject.toml` 确认 |
-| `pev_loop.py` → `maop_loop.py` | ✅ |
-| `pev_execute.py` → `maop_execute.py` | ✅ |
-| `pev_verify.py` → `maop_verify.py` | ✅ |
-| `pev_plan.py` → `maop_plan.py` | ✅ |
-| `pev.ps1` → `maop.ps1` | ✅ |
-| `pev.db` → `MAOP.db` | ✅ |
-| `PEV_audit_report.md` → `MAOP_audit_report.md` | ✅ |
-| `PEV_COMPREHENSIVE_ANALYSIS.md` → `MAOP_COMPREHENSIVE_ANALYSIS.md` | ✅ |
-| README 内结构图 | ⚠️ 仍写 `py\\pev\\`、`pev_loop.py` |
-| docs/adr/ 内容 | ⚠️ 仍引用 PEV |
-| py/README.md | ⚠️ 仍写 pev |
+| `py/pev/` → `py/MAOP/` | `pyproject.toml` 确认 |
+| `pev_loop.py` → `maop_loop.py` | 已改 |
+| `pev_execute.py` → `maop_execute.py` | 已改 |
+| `pev_verify.py` → `maop_verify.py` | 已改 |
+| `pev_plan.py` → `maop_plan.py` | 已改 |
+| `pev.ps1` → `maop.ps1` | 已改 |
+| `pev.db` → `MAOP.db` | 已改 |
+| `PEV_audit_report.md` → `MAOP_audit_report.md` | 已改 |
+| `PEV_COMPREHENSIVE_ANALYSIS.md` → `MAOP_COMPREHENSIVE_ANALYSIS.md` | 已改 |
+| README 内结构图 | 仍写 `py\\pev\\`、`pev_loop.py` |
+| docs/adr/ 内容 | 仍引用 PEV |
+| py/README.md | 仍写 pev |
 
 ### 3.3 依赖变化
 
 | 依赖 | PEV v3.5.0 | MAOP v4.0.0 | 影响 |
 |------|-----------|-------------|------|
-| `pydantic-settings` | ✅ 已加 | ✅ | — |
-| `requirements.lock` | ✅ 已加 | ✅ | — |
-| `numpy` | ❌ 无 | ✅ `>=1.24.0` | 向量计算必需 |
-| `cryptography` | ⚠️ 可选（明文降级） | ✅ `>=42.0` **核心依赖** | API Key Vault 加密 |
-| `pytest-cov` | ⚠️ 手动安装 | ✅ dev 依赖 | CI 覆盖率门控 |
-| `types-PyYAML` | ❌ 无 | ✅ dev 依赖 | mypy 类型检查 |
-| mypy 配置 | ❌ 无 | ✅ 完整配置 | 类型安全 |
+| `pydantic-settings` | 已加 | 已加 | — |
+| `requirements.lock` | 已加 | 已加 | — |
+| `numpy` | 无 | `>=1.24.0` | 向量计算必需 |
+| `cryptography` | 可选（明文降级） | `>=42.0` **核心依赖** | API Key Vault 加密 |
+| `pytest-cov` | 手动安装 | dev 依赖 | CI 覆盖率门控 |
+| `types-PyYAML` | 无 | dev 依赖 | mypy 类型检查 |
+| mypy 配置 | 无 | 完整配置 | 类型安全 |
 
 ---
 
@@ -554,11 +554,11 @@ class LLMProvider:
 **适配器**：
 | 供应商 | 适配器 | 状态 |
 |--------|--------|------|
-| OpenAI | `OpenAIProvider` | ✅ |
-| Anthropic | `AnthropicProvider` | ✅ |
-| Google Gemini | `GeminiProvider` | ✅ |
-| Ollama | `OllamaProvider` | ✅ |
-| 自定义 | `CustomProvider` | ✅ |
+| OpenAI | `OpenAIProvider` | 已修复 |
+| Anthropic | `AnthropicProvider` | 已修复 |
+| Google Gemini | `GeminiProvider` | 已修复 |
+| Ollama | `OllamaProvider` | 已修复 |
+| 自定义 | `CustomProvider` | 已修复 |
 
 **特性**：
 - 自动重试（指数退避）
@@ -1012,34 +1012,34 @@ docker-compose.yml（2,144 字节）：编排
 
 | 编号 | 漏洞 | 严重程度 | 状态 |
 |------|------|---------|------|
-| S-01 | `db_backup.py` VACUUM INTO 注入 | Critical | ✅ |
-| S-02 | `auth.py` JWT 密钥临时生成 | Critical | ✅ |
-| S-03 | `auth.py` APIKeyStore 线程不安全 | High | ✅ |
-| S-04 | `dispatcher.py` PS cli_args 注入 | Critical | ✅ |
-| S-05 | `system.py` pip 白名单绕过 | High | ✅ |
-| S-06 | `model.py` model/switch 验证缺失 | High | ✅ |
-| S-07 | `auth.py` 登录暴力破解 | High | ✅ |
-| S-08 | `middleware.py` 公开路径遗漏 | Medium | ✅ |
-| S-09 | `tls.py` 占位符证书 | High | ✅ |
-| S-10 | `data.py` query() 内部 API 暴露 | Medium | ✅ |
-| S-11 | `kv_store.py` 连接泄漏 | Medium | ✅ |
-| SQL 注入 | `message_queue._count()` 表名注入 | Critical | ✅ |
-| 路径注入 | `db_backup.py` VACUUM INTO 路径 | Critical | ✅ |
-| 校验缺失 | `migration.py` 校验和 | High | ✅ |
-| GET→POST | `/api/control/run` 状态变更 | High | ✅ |
+| S-01 | `db_backup.py` VACUUM INTO 注入 | Critical | 已修复 |
+| S-02 | `auth.py` JWT 密钥临时生成 | Critical | 已修复 |
+| S-03 | `auth.py` APIKeyStore 线程不安全 | High | 已修复 |
+| S-04 | `dispatcher.py` PS cli_args 注入 | Critical | 已修复 |
+| S-05 | `system.py` pip 白名单绕过 | High | 已修复 |
+| S-06 | `model.py` model/switch 验证缺失 | High | 已修复 |
+| S-07 | `auth.py` 登录暴力破解 | High | 已修复 |
+| S-08 | `middleware.py` 公开路径遗漏 | Medium | 已修复 |
+| S-09 | `tls.py` 占位符证书 | High | 已修复 |
+| S-10 | `data.py` query() 内部 API 暴露 | Medium | 已修复 |
+| S-11 | `kv_store.py` 连接泄漏 | Medium | 已修复 |
+| SQL 注入 | `message_queue._count()` 表名注入 | Critical | 已修复 |
+| 路径注入 | `db_backup.py` VACUUM INTO 路径 | Critical | 已修复 |
+| 校验缺失 | `migration.py` 校验和 | High | 已修复 |
+| GET→POST | `/api/control/run` 状态变更 | High | 已修复 |
 
 ### 11.2 v4.0.0 新增安全层
 
 | 安全能力 | 实现 | 新增 |
 |---------|------|------|
-| 插件安全沙箱 | `PluginSandbox`（受限 builtins + 导入守卫 + 超时） | ✅ |
-| SHA-256 校验 | 插件 manifest 强制校验 | ✅ |
-| 变更审查 | `ChangeTracker` 检测未授权文件修改 | ✅ |
-| 权限引擎 | `PermissionManager` allow/ask/deny | ✅ |
-| 密钥加密核心依赖 | `cryptography` 从可选升为核心 | ✅ |
-| CORS 强化 | 环境变量 `PEV_CORS_ORIGINS` 配置 | ✅ |
-| TLS 版本强制 | `PEV_TLS_MIN_VERSION` 配置 | ✅ |
-| mypy 类型检查 | 完整 mypy 配置覆盖所有模块 | ✅ |
+| 插件安全沙箱 | `PluginSandbox`（受限 builtins + 导入守卫 + 超时） | 已实现 |
+| SHA-256 校验 | 插件 manifest 强制校验 | 已实现 |
+| 变更审查 | `ChangeTracker` 检测未授权文件修改 | 已实现 |
+| 权限引擎 | `PermissionManager` allow/ask/deny | 已实现 |
+| 密钥加密核心依赖 | `cryptography` 从可选升为核心 | 已实现 |
+| CORS 强化 | 环境变量 `PEV_CORS_ORIGINS` 配置 | 已实现 |
+| TLS 版本强制 | `PEV_TLS_MIN_VERSION` 配置 | 已实现 |
+| mypy 类型检查 | 完整 mypy 配置覆盖所有模块 | 已实现 |
 
 ### 11.3 多层次安全架构
 
@@ -1065,19 +1065,19 @@ docker-compose.yml（2,144 字节）：编排
 | 旧报告断言 | 实际状态 | 错误原因 |
 |-----------|---------|---------|
 | "项目版本 3.2.x" | **4.0.0** | 基于过时文档，未检查最新文件 |
-| "pydantic-settings 缺失" | ✅ `pyproject.toml:11` 已声明 | 当时未读取最新 pyproject.toml |
-| "data_bridge 有 PS 回退" | ✅ 纯 Python，零 PS 引用 | 未验证 data_bridge.py 内容 |
-| "状态分裂脑" | ✅ ADR-011 已实施 | 未验证 pev_loop.py 实际路径 |
-| "无锁文件" | ✅ requirements.lock 存在 | 未验证 |
-| "README 陈旧" | ✅ 已重写 | 未读新版本 |
-| "动态路由未移植" | ✅ dynamic_router.py (364 行) | 未检查文件 |
-| "migration.py 空壳" | ✅ 实装含 checksum 校验 | 未检查 |
+| "pydantic-settings 缺失" | `pyproject.toml:11` 已声明 | 当时未读取最新 pyproject.toml |
+| "data_bridge 有 PS 回退" | 纯 Python，零 PS 引用 | 未验证 data_bridge.py 内容 |
+| "状态分裂脑" | ADR-011 已实施 | 未验证 pev_loop.py 实际路径 |
+| "无锁文件" | requirements.lock 存在 | 未验证 |
+| "README 陈旧" | 已重写 | 未读新版本 |
+| "动态路由未移植" | dynamic_router.py (364 行) | 未检查文件 |
+| "migration.py 空壳" | 实装含 checksum 校验 | 未检查 |
 | "核心模块 13 个" | **46 个** | 未遍历实际目录 |
 | "测试 34 个文件" | **109 个（2,640 测试）** | 未检查实际文件 |
-| "无 MCP 支持" | ✅ 完整 MCP 框架 | 未检查 |
-| "无子代理" | ✅ subagent.py (238 行) | 未检查 |
-| "无权限管理" | ✅ permission.py (159 行) | 未检查 |
-| "无流式输出" | ✅ streaming.py (194 行) | 未检查 |
+| "无 MCP 支持" | 完整 MCP 框架 | 未检查 |
+| "无子代理" | subagent.py (238 行) | 未检查 |
+| "无权限管理" | permission.py (159 行) | 未检查 |
+| "无流式输出" | streaming.py (194 行) | 未检查 |
 
 ### 12.2 教训
 
@@ -1207,17 +1207,17 @@ data/
 ```
 PEV v3.5.0                           MAOP v4.0.0
 ──────────                           ──────────
-📦 28,448 行 Python                  📦 36,755 行 Python  (+29%)
-🧪 100 测试文件 / 2,306 测试          🧪 109 测试文件 / 2,640 测试 (+14%)
-🏗️  30 core 模块                     🏗️  46 core 模块
-🖥️  19 dashboard 路由                🖥️  26 dashboard 路由
-📋 零构建 SPA                         📋 零构建 SPA + Vite + React SPA
-🔌 无插件系统                          🔌 完整插件系统 + 安全沙箱
-🧠 静态 JSON 图谱                     🧠 动态知识图谱 + 抽取 + 推理
-💰 无成本管控                          💰 实时成本追踪 + 预算告警
-🤖 无自主推理                          🤖 ReAct (Thought→Action→Observation)
-🔑 cryptography 可选                  🔑 cryptography 核心依赖
-🔢 无 numpy                            🔢 numpy ≥1.24.0 (向量计算)
+28,448 行 Python                  36,755 行 Python  (+29%)
+100 测试文件 / 2,306 测试          109 测试文件 / 2,640 测试 (+14%)
+ 30 core 模块                      46 core 模块
+ 19 dashboard 路由                 26 dashboard 路由
+零构建 SPA                         零构建 SPA + Vite + React SPA
+无插件系统                          完整插件系统 + 安全沙箱
+静态 JSON 图谱                     动态知识图谱 + 抽取 + 推理
+无成本管控                          实时成本追踪 + 预算告警
+无自主推理                          ReAct (Thought→Action→Observation)
+cryptography 可选                  cryptography 核心依赖
+无 numpy                            numpy ≥1.24.0 (向量计算)
 ```
 
 ### 评语
@@ -1242,7 +1242,7 @@ MAOP v4.0.0 在不到一天的时间内，从 PEV v3.5.0 完成了项目重命�
 | Section 8 测试体系 | 109 测试文件 / 2,640 测试函数 | **144 测试文件 / 3,145 测试函数** | 同 Section 2.2 |
 | Section 11 安全审计 | "109 个（2,640 测试）" | **144 个（3,145 测试）** | 同上 |
 | Section 13 行动建议 CI 全绿验证 | "在 CI 环境完整跑通 2,640 测试" | **"在 CI 环境完整跑通 3,145 测试"** | 同上；另注：CI 实际状态见 t06 修正（已移除 continue-on-error） |
-| Section 14 演进路线图 | "📦 36,755 行 / 🧪 109 测试文件 / 2,640 测试" | **📦 82,660 行（py/ 全）/ 49,092 行（maop/）/ 🧪 144 测试文件 / 3,145 测试** | 历史快照数字保留，仅追加实测对照 |
+| Section 14 演进路线图 | "36,755 行 / 109 测试文件 / 2,640 测试" | **82,660 行（py/ 全）/ 49,092 行（maop/）/ 144 测试文件 / 3,145 测试** | 历史快照数字保留，仅追加实测对照 |
 | Section 15 评语 | "新增 16 个核心模块（5,601 行新代码）" | 数据保留（v3.5.0 → v4.0.0 迁移时刻快照） | 当前累计新增更多 |
 
 ### 16.2 架构表述修正

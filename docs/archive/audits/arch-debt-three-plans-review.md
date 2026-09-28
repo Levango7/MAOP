@@ -66,7 +66,7 @@
 
 | 检查项 | 结论 |
 |--------|------|
-| 任务间文件冲突 | ⚠️ 任务2 与任务3 都动 `three_layer_memory.py` → **执行顺序：先做任务3 批次 A**（facade 增强 + short_term_search 补字段，纯增量可沙箱执行），再做任务2 拆分；或将补字段合并进任务2 的 episodic 拆分 |
+| 任务间文件冲突 | 任务2 与任务3 都动 `three_layer_memory.py` → **执行顺序：先做任务3 批次 A**（facade 增强 + short_term_search 补字段，纯增量可沙箱执行），再做任务2 拆分；或将补字段合并进任务2 的 episodic 拆分 |
 | 任务1 与任务2/3 | 无冲突（tool_manager.py 不在拆分清单） |
 | 共同前提 | 本机 git / 全量 pytest / 沙箱禁 git rm，三方案一致 |
 

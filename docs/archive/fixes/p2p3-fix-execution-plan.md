@@ -67,10 +67,10 @@ def _load_cache(self) -> None:
 
 | 已有措施 | 实际生效 | 说明 |
 |----------|----------|------|
-| `_cache_max_size = 50000` 限制 | ❌ 未生效 | 仅定义了属性，`_load_cache()` 中从未检查或使用此限制 |
-| sqlite-vec ANN 索引优先路径 | ✅ 生效 | `search_vector()` 优先尝试 `_search_vector_sqlite_vec()`，避免遍历缓存 |
-| NumPy 加速 | ✅ 生效 | `_search_vector_numpy()` 批量矩阵运算 |
-| HNSW 分层（memory 版） | ✅ 生效 | 100K 以上向量走 HNSW |
+| `_cache_max_size = 50000` 限制 | 未生效 | 仅定义了属性，`_load_cache()` 中从未检查或使用此限制 |
+| sqlite-vec ANN 索引优先路径 | 生效 | `search_vector()` 优先尝试 `_search_vector_sqlite_vec()`，避免遍历缓存 |
+| NumPy 加速 | 生效 | `_search_vector_numpy()` 批量矩阵运算 |
+| HNSW 分层（memory 版） | 生效 | 100K 以上向量走 HNSW |
 
 **核心问题**: 虽然 sqlite-vec/HNSW 路径不依赖 `_cache`，但 NumPy 和纯 Python 回退路径需要 `_cache`。且 `_search_vector_hnsw()` 在第 703-704 行也会调用 `_load_cache()` 作为重建索引的数据源。当数据集超过可用内存时，`_load_cache()` 仍然会 OOM。
 
@@ -192,7 +192,7 @@ print(f'OK: search returned {len(results)} results')
 
 ### 2.5 可行性结论
 
-**✅ 可行**。方案改动小，保持 API 兼容，sqlite-vec/HNSW 主路径不受影响，仅 NumPy/Python 回退路径在大数据集时降级为最近 N 条搜索（已有注释说明此场景应使用 sqlite-vec/HNSW）。
+**可行**。方案改动小，保持 API 兼容，sqlite-vec/HNSW 主路径不受影响，仅 NumPy/Python 回退路径在大数据集时降级为最近 N 条搜索（已有注释说明此场景应使用 sqlite-vec/HNSW）。
 
 ---
 
@@ -253,10 +253,10 @@ vectors.value = v.vectors || [];
 
 | 维度 | 状态 | 说明 |
 |------|------|------|
-| `list_all()` 分页支持 | ✅ 已实现 | 默认 limit=1000，最大 10000 |
-| API 端点暴露分页参数 | ❌ 未暴露 | `api_vector_list()` 无 limit/offset 参数 |
-| 前端传递分页参数 | ❌ 未传递 | Vue 组件无分页控件 |
-| OOM 风险 | ⚠️ 已缓解 | 默认 limit=1000 已避免全量加载 |
+| `list_all()` 分页支持 | 已实现 | 默认 limit=1000，最大 10000 |
+| API 端点暴露分页参数 | 未暴露 | `api_vector_list()` 无 limit/offset 参数 |
+| 前端传递分页参数 | 未传递 | Vue 组件无分页控件 |
+| OOM 风险 | 已缓解 | 默认 limit=1000 已避免全量加载 |
 
 **核心问题**: 虽然 `list_all()` 默认 limit=1000 已避免 OOM，但 API 层未暴露分页参数，前端无法翻页查看完整数据。
 
@@ -348,9 +348,9 @@ onMounted(async () => {
 
 | 调用方 | 兼容性 | 说明 |
 |--------|--------|------|
-| 前端 `VectorSearch.vue` | ✅ 完全兼容 | 不传 limit/offset 时使用默认值 1000/0 |
-| `VectorSearch.test.js` | ✅ 完全兼容 | mock 返回 `{ vectors: [] }`，新增字段不影响 |
-| 其他 API 调用者 | ✅ 完全兼容 | 新增查询参数有默认值 |
+| 前端 `VectorSearch.vue` | 完全兼容 | 不传 limit/offset 时使用默认值 1000/0 |
+| `VectorSearch.test.js` | 完全兼容 | mock 返回 `{ vectors: [] }`，新增字段不影响 |
+| 其他 API 调用者 | 完全兼容 | 新增查询参数有默认值 |
 
 ### 3.3 风险评估
 
@@ -390,7 +390,7 @@ curl "http://127.0.0.1:9079/api/vector/list?limit=10001"
 
 ### 3.5 可行性结论
 
-**✅ 可行**。`list_all()` 已有分页基础设施，API 层仅需透传参数，完全向后兼容，前端可选择性添加分页控件。
+**可行**。`list_all()` 已有分页基础设施，API 层仅需透传参数，完全向后兼容，前端可选择性添加分页控件。
 
 ---
 
@@ -462,14 +462,14 @@ def check_quota(self, tenant_id: str, *, tokens_used: int = 0, requests_used: in
 
 | 调用点 | 文件 | 行号 | 上下文 | 是否 async | 是否阻塞 |
 |--------|------|------|--------|------------|----------|
-| `_record_cost()` | `py/maop/core/llm_provider.py` | 852 | 被 `chat_with_fallback` (async) 调用 | ✅ async 上下文 | ⚠️ 阻塞 |
-| `record_cost()` 路由 | `py/maop/dashboard/routers/cost.py` | 96 | FastAPI async 路由 | ✅ async 上下文 | ⚠️ 阻塞 |
+| `_record_cost()` | `py/maop/core/llm_provider.py` | 852 | 被 `chat_with_fallback` (async) 调用 | async 上下文 | 阻塞 |
+| `record_cost()` 路由 | `py/maop/dashboard/routers/cost.py` | 96 | FastAPI async 路由 | async 上下文 | 阻塞 |
 
 **`_record_cost` 调用链**:
 ```
 chat_with_fallback() [async]           # llm_provider.py 第 782 行
   └─ _record_cost(resp, kwargs) [sync] # llm_provider.py 第 794/828 行
-       └─ get_cost_tracker().record()  # llm_provider.py 第 852 行 [sync sqlite3] ⚠️
+       └─ get_cost_tracker().record()  # llm_provider.py 第 852 行 [sync sqlite3] 
 ```
 
 **tenant.check_quota() 调用路径**:
@@ -765,7 +765,7 @@ curl -X POST http://127.0.0.1:9079/api/cost/record \
 
 ### 4.5 可行性结论
 
-**✅ 可行**。与项目现有 `asyncio.to_thread` 模式一致（circuit_breaker 已用此模式），保持同步方法向后兼容，async 版本为新增。关键注意点：`_record_cost` 改为 async 后，所有调用点必须加 `await`，且 `agent/llm_chat/llm_provider.py` 需同步修改。
+**可行**。与项目现有 `asyncio.to_thread` 模式一致（circuit_breaker 已用此模式），保持同步方法向后兼容，async 版本为新增。关键注意点：`_record_cost` 改为 async 后，所有调用点必须加 `await`，且 `agent/llm_chat/llm_provider.py` 需同步修改。
 
 ---
 
@@ -843,10 +843,10 @@ def start(
 
 | 维度 | 状态 | 说明 |
 |------|------|------|
-| `validate_config()` 启动前校验 | ✅ 已有 | 检查目录、配置文件、Python 包 |
-| `health_check()` 方法 | ✅ 已有 | 检查 4 个组件健康状态 |
-| `start()` 后就绪检查 | ❌ 缺失 | 启动后直接返回 STARTING，不轮询 health_check |
-| PID 管理 | ✅ 已有 | 写入/读取/清理 PID 文件 |
+| `validate_config()` 启动前校验 | 已有 | 检查目录、配置文件、Python 包 |
+| `health_check()` 方法 | 已有 | 检查 4 个组件健康状态 |
+| `start()` 后就绪检查 | 缺失 | 启动后直接返回 STARTING，不轮询 health_check |
+| PID 管理 | 已有 | 写入/读取/清理 PID 文件 |
 
 **核心问题**: `start()` 启动子进程后立即返回 `STARTING` 状态，调用方无法知道服务是否真正就绪。如果 uvicorn 启动失败（端口占用、导入错误等），调用方仍会收到 `STARTING` 而非 `ERROR`。
 
@@ -1058,9 +1058,9 @@ def _wait_for_ready(
 
 | 调用方 | 兼容性 | 说明 |
 |--------|--------|------|
-| 现有调用 `start(root_dir)` | ✅ 完全兼容 | `wait_ready=True` 默认开启，但行为改进（返回 RUNNING 而非 STARTING） |
-| 需要原行为 | ✅ 可选 | 传 `wait_ready=False` 即可 |
-| CLI 调用 | ✅ 兼容 | CLI 可加 `--no-wait` 参数映射到 `wait_ready=False` |
+| 现有调用 `start(root_dir)` | 完全兼容 | `wait_ready=True` 默认开启，但行为改进（返回 RUNNING 而非 STARTING） |
+| 需要原行为 | 可选 | 传 `wait_ready=False` 即可 |
+| CLI 调用 | 兼容 | CLI 可加 `--no-wait` 参数映射到 `wait_ready=False` |
 
 ### 5.3 风险评估
 
@@ -1132,7 +1132,7 @@ print(f'Status: {status.status.value}')
 
 ### 5.5 可行性结论
 
-**✅ 可行**。`health_check()` 已存在，仅需添加轮询逻辑。`wait_ready` 参数保持向后兼容，默认开启就绪检查提升健壮性。跨平台需验证 `proc.poll()` 和 `stderr.read()` 行为。
+**可行**。`health_check()` 已存在，仅需添加轮询逻辑。`wait_ready` 参数保持向后兼容，默认开启就绪检查提升健壮性。跨平台需验证 `proc.poll()` 和 `stderr.read()` 行为。
 
 ---
 
@@ -1220,10 +1220,10 @@ npm run dev
 
 | 修复项 | 可行性 | 建议 |
 |--------|--------|------|
-| M3 | ✅ 可行 | 采用分页加载方案，保持 sqlite-vec/HNSW 主路径不受影响 |
-| M4 | ✅ 可行 | API 层透传分页参数，`list_all()` 已有基础设施 |
-| M5 | ✅ 可行 | 与项目现有 `asyncio.to_thread` 模式一致，保持同步方法向后兼容 |
-| M8 | ✅ 可行 | `health_check()` 已存在，添加轮询逻辑，`wait_ready` 参数保持兼容 |
+| M3 | 可行 | 采用分页加载方案，保持 sqlite-vec/HNSW 主路径不受影响 |
+| M4 | 可行 | API 层透传分页参数，`list_all()` 已有基础设施 |
+| M5 | 可行 | 与项目现有 `asyncio.to_thread` 模式一致，保持同步方法向后兼容 |
+| M8 | 可行 | `health_check()` 已存在，添加轮询逻辑，`wait_ready` 参数保持兼容 |
 
 ### 8.2 建议执行顺序
 

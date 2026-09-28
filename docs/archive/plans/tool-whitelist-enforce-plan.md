@@ -18,7 +18,7 @@
 | tools 表 schema | 含 `command TEXT NOT NULL` 字段（`tool_manager.py:172-185`） |
 | 本机 tools 表 | `data/maop.db` 存在但 **无 tools 表**——工具在部署环境经 `register(id, command=...)` 入 DB，仓库内无种子 |
 | audit 日志 | `[tool_policy] audit: tool %r not in whitelist ...` warning（本机未实际跑过调用，无收集数据） |
-| 测试独立性 | `test_tool_manager.py` 全部用 `tmp_path` 临时目录构造，**不依赖仓库 yaml 默认值** ✓（改默认 audit 不影响测试） |
+| 测试独立性 | `test_tool_manager.py` 全部用 `tmp_path` 临时目录构造，**不依赖仓库 yaml 默认值** （改默认 audit 不影响测试） |
 
 **关键事实**：本机无法导出"真实工具清单"（空表）。工具权威来源是部署环境 DB。阶段二的 allow 清单必须在**部署环境**生成，仓库内只能：① 预置高危 deny（安全默认）；② 提供导出脚本与切换检查清单。
 
@@ -119,12 +119,12 @@ deny:
 
 | # | 风险 | 等级 | 缓解 |
 |---|------|------|------|
-| 1 | **部署方未生成 allow 就切 enforce → 全部工具被拒（工具瘫痪）** | 🔴 高 | 选项 A 仓库保持 audit + 检查清单第 4 步灰度验证；enforce 拒绝为 ok=False 不抛异常（不崩进程），可日志快速定位 |
-| 2 | **deny 误伤合法工具**（如工具命令恰为 `rm` 开头） | 🟡 中 | deny 只覆盖 rm/mkfs/dd/shutdown/reboot/halt/poweroff/sudo 8 类，均为破坏性命令；导出脚本会标注命中 deny 的工具，评审时发现误伤可移除规则 |
-| 3 | **enforce 误拦后 agent 静默降级**（ok=False 被上层忽略） | 🟡 中 | `_enforce_policy` 拒绝时 `logger.warning`；检查清单第 4 步要求盯防日志；后续可加 dashboard 工具 blocked 标注（非本次范围） |
-| 4 | **audit 日志噪音** | 🟢 低 | warning 级别，切 enforce 后自然消失 |
-| 5 | **新工具注册后未同步 allow 被拦** | 🟢 低 | 检查清单第 5 步文档化注册流程；enforce 下新工具默认拒绝属最小权限预期 |
-| 6 | **fail-open 掩盖 enforce 未生效**（配置损坏降级 audit） | 🟢 低 | `_load_yaml` 失败会 logger.warning 明确提示；检查清单第 4 步验证实际生效（构造一次拒绝场景） |
+| 1 | **部署方未生成 allow 就切 enforce → 全部工具被拒（工具瘫痪）** | 高 | 选项 A 仓库保持 audit + 检查清单第 4 步灰度验证；enforce 拒绝为 ok=False 不抛异常（不崩进程），可日志快速定位 |
+| 2 | **deny 误伤合法工具**（如工具命令恰为 `rm` 开头） | 中 | deny 只覆盖 rm/mkfs/dd/shutdown/reboot/halt/poweroff/sudo 8 类，均为破坏性命令；导出脚本会标注命中 deny 的工具，评审时发现误伤可移除规则 |
+| 3 | **enforce 误拦后 agent 静默降级**（ok=False 被上层忽略） | 中 | `_enforce_policy` 拒绝时 `logger.warning`；检查清单第 4 步要求盯防日志；后续可加 dashboard 工具 blocked 标注（非本次范围） |
+| 4 | **audit 日志噪音** | 低 | warning 级别，切 enforce 后自然消失 |
+| 5 | **新工具注册后未同步 allow 被拦** | 低 | 检查清单第 5 步文档化注册流程；enforce 下新工具默认拒绝属最小权限预期 |
+| 6 | **fail-open 掩盖 enforce 未生效**（配置损坏降级 audit） | 低 | `_load_yaml` 失败会 logger.warning 明确提示；检查清单第 4 步验证实际生效（构造一次拒绝场景） |
 
 **不变量（行为零变化）**：
 - audit 模式下未命中规则的工具：放行行为不变（选项 A 不引入 allow 的拒绝）

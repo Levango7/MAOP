@@ -75,7 +75,7 @@ RFC-001 自身诊断精准：MAOP 独有的 **Plan-Execute-Verify 循环** 与 *
 | 配额管理 | **P0 假功能** | 前端 `/api/tenant/{id}/usage/trend` 等，后端在 `/api/quotas/*`，tenant.py 无这些路径 |
 | 工作流编辑器执行 | **P1 未实现** | `WorkflowEditor.vue` 调 `/api/dag/execute`，`dag.py` 只有 auto-split/health |
 | Evolve metrics / SkillEditor / SkillMarket | **P1 未实现** | 前端调用不存在的端点 |
-| 成本告警配置 | ✅ 已补（本次） | env/API/UI 三通道已落地 |
+| 成本告警配置 | 已补（本次） | env/API/UI 三通道已落地 |
 
 **结论**：v5.1.0 的"企业版 6 大功能"与"6 大新功能"中，约 **1/3 是"有 UI 无后端"的假功能**。
 

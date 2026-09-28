@@ -10,12 +10,12 @@
 
 H2 合并计划共 26 项可合并，其中 6 项已在 Task 54 中安全合并完成：
 
-- `test_maop_execute_coverage3.py` ✅
-- `test_react_loop_coverage3.py` ✅
-- `test_tool_manager_coverage3.py` ✅
-- `test_queue_worker_coverage.py` ✅
-- `test_memory_manager_search_coverage3.py` ✅
-- `test_engine_extended.py` ✅
+- `test_maop_execute_coverage3.py` 
+- `test_react_loop_coverage3.py` 
+- `test_tool_manager_coverage3.py` 
+- `test_queue_worker_coverage.py` 
+- `test_memory_manager_search_coverage3.py` 
+- `test_engine_extended.py` 
 
 剩余 20 项中又有 6 项已在 Task 54 完成（清单中标注"跳过"），故本计划仅覆盖 **14 项**。
 
@@ -245,17 +245,17 @@ python -m pytest py/tests/test_config_mutator_whitebox.py -v --tb=short
 
 | 补丁类名 | 冲突状态 | 重命名方案 |
 |---------|---------|-----------|
-| TestControlStatus | ⚠️ 冲突 | → TestControlStatusCoverage |
+| TestControlStatus | 冲突 | → TestControlStatusCoverage |
 | TestControlRun | 无冲突 | — |
 | TestControlPauseResume | 无冲突 | — |
-| TestControlStop | ⚠️ 冲突 | → TestControlStopCoverage |
-| TestControlValidate | ⚠️ 冲突 | → TestControlValidateCoverage |
-| TestControlDoctor | ⚠️ 冲突 | → TestControlDoctorCoverage |
-| TestControlCancel | ⚠️ 冲突 | → TestControlCancelCoverage |
-| TestControlRefresh | ⚠️ 冲突 | → TestControlRefreshCoverage |
-| TestControlClearCache | ⚠️ 冲突 | → TestControlClearCacheCoverage |
+| TestControlStop | 冲突 | → TestControlStopCoverage |
+| TestControlValidate | 冲突 | → TestControlValidateCoverage |
+| TestControlDoctor | 冲突 | → TestControlDoctorCoverage |
+| TestControlCancel | 冲突 | → TestControlCancelCoverage |
+| TestControlRefresh | 冲突 | → TestControlRefreshCoverage |
+| TestControlClearCache | 冲突 | → TestControlClearCacheCoverage |
 | TestControlProviderHealth | 无冲突（主测试为 TestProviderHealth） | — |
-| TestControlMaintain | ⚠️ 冲突 | → TestControlMaintainCoverage |
+| TestControlMaintain | 冲突 | → TestControlMaintainCoverage |
 
 表：M07 fixture 与 import 冲突表
 

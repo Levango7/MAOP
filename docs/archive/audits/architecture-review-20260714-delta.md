@@ -7,13 +7,13 @@
 
 | 变化 | 上午评审时 | 现在 | 性质 |
 |------|-----------|------|------|
-| 测试套件 | 几乎无 | **34 个 test_*.py**（含 phase4–7、new_modules、missing_modules、enhancements、migration） | ✅ 重大质量投入 |
-| migration.py | 空壳 | **已实装**（Migration / MigrationManager / CLI，含 checksum 校验） | ✅ 修复 |
-| 容器化 | 无 | 新增 `docker-compose.yml` + `Dockerfile`（dashboard 容器化） | ✅ 新增 |
-| 安全红线 | 待确认 | `REMEDIATION_PLAN.md` 标记 Phase 0（命令注入/路径穿越/JSON 加固）**全部 ✅** | ✅ 修复 |
-| 备份清理 | 散落 | 29 个备份文件归入 `dashboard/.backup/` | ✅ 清理 |
-| 项目描述 | "Python 主引擎" | pyproject 改为 **"PS engine + Python service layer"** | ✅ 诚实重定位 |
-| README | 反映 PS 架构 | **未更新**，仍称 `server-v2.ps1` 为 canonical（8080） | ⚠️ 文档漂移（新隐患） |
+| 测试套件 | 几乎无 | **34 个 test_*.py**（含 phase4–7、new_modules、missing_modules、enhancements、migration） | 重大质量投入 |
+| migration.py | 空壳 | **已实装**（Migration / MigrationManager / CLI，含 checksum 校验） | 修复 |
+| 容器化 | 无 | 新增 `docker-compose.yml` + `Dockerfile`（dashboard 容器化） | 新增 |
+| 安全红线 | 待确认 | `REMEDIATION_PLAN.md` 标记 Phase 0（命令注入/路径穿越/JSON 加固）**全部 ** | 修复 |
+| 备份清理 | 散落 | 29 个备份文件归入 `dashboard/.backup/` | 清理 |
+| 项目描述 | "Python 主引擎" | pyproject 改为 **"PS engine + Python service layer"** | 诚实重定位 |
+| README | 反映 PS 架构 | **未更新**，仍称 `server-v2.ps1` 为 canonical（8080） | 文档漂移（新隐患） |
 
 ## 二、上午 4 个 P0 的重新核验（逐条，附证据）
 
@@ -28,19 +28,19 @@
 
 ## 三、新增隐患（上午未出现 / 未强调）
 
-1. **⚠️ README 与实现严重脱节（最高优先级文档问题）**
+1. **README 与实现严重脱节（最高优先级文档问题）**
    - README 结构块**完全没提 `py/` 包**；仍写 `server-v2.ps1` 为 canonical HTTP server（port 8080）。
    - 现实：`py/maop/dashboard/server.py`（FastAPI）才是 9078 端口真服务，`server.py:2` 自述 "FastAPI replacement for dashboard/server-v2.ps1"。
    - `REMEDIATION_PLAN.md 1.1.2` 称已"删除 dashboard/server.ps1"，README 仍列其为 DEPRECATED——两文档互相矛盾。
    - 风险：任何新人/后续 agent 按 README 理解架构会完全误判。
 
-2. **⚠️ `config/routing.yaml` 仍不存在**
+2. **`config/routing.yaml` 仍不存在**
    - `config/` 仅 `agents.yaml`(Jul 8) + `rules.yaml`(Jul 12)。`hot_reload` 监听的路由文件是幽灵文件（上午已提，至今未建）。
 
-3. **⚠️ 队列层分裂脑（P0-3 的具体化）**
+3. **队列层分裂脑（P0-3 的具体化）**
    - Python `queue.db`（自动建空）vs PS `human-queue.json`：同一条队列状态两个真相源，无同步机制。
 
-4. **⚠️ YAML 解析 PS 依赖未消（REMEDIATION_PLAN 2.1 标 TODO）**
+4. **YAML 解析 PS 依赖未消（REMEDIATION_PLAN 2.1 标 TODO）**
    - `dag-engine.ps1` / `validate-config.ps1` → Python bridge 仍"待后续"，PS 仍掌握部分配置解析路径。
 
 ## 四、整体判断（更新）

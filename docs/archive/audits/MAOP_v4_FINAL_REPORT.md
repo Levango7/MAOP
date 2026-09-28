@@ -9,7 +9,7 @@
 
 ---
 
-## 📋 目录
+## 目录
 
 1. [执行摘要](#1-执行摘要)
 2. [项目全局指标](#2-项目全局指标)
@@ -50,17 +50,17 @@
 
 | 能力领域 | v3.5.0 | v4.0.0 | 关键模块 |
 |---------|--------|--------|---------|
-| **基础编排** | ✅ Plan→Execute→Verify | ✅ + ReAct 微循环 | `maop_loop` + `react_loop` |
-| **插件化扩展** | ❌ 无 | ✅ 完整生命周期 + 安全沙箱 | `plugin`（632 行） |
-| **知识管理** | ❌ 静态 JSON | ✅ 动态图谱 + 抽取 + 推理 | `knowledge_graph` + `knowledge_extractor` |
-| **成本管控** | ❌ 无 | ✅ 实时追踪 + 预算告警 | `cost_tracker`（366 行） |
-| **可观测追踪** | ❌ 无 | ✅ OpenTelemetry 原生 | `otel`（175 行） |
-| **弹性** | ✅ 熔断/缓存/限流 | ✅ + 策略进化 | `circuit_breaker` + `evolution_strategies` |
-| **安全** | ✅ TLS/JWT/审计 | ✅ + 插件沙箱 + 变更审查 | `plugin` + `change_tracker` + `permission` |
-| **LLM 抽象** | ⚠️ model/registry | ✅ + 统一供应商接口 | `llm_provider`（604 行） |
-| **前端** | ✅ 零构建 SPA | ✅ + Vite + React | `dashboard/` + `dashboard-vite/` |
-| **Agent 生态** | ⚠️ 手动配置 | ✅ 自动扫描 + 注册 + 匹配 | `agent_scanner` + `agent_registry` |
-| **名称空间** | PEV 旧名 | ✅ maop（全小写统一） | 全项目同步 |
+| **基础编排** | Plan→Execute→Verify | + ReAct 微循环 | `maop_loop` + `react_loop` |
+| **插件化扩展** | 无 | 完整生命周期 + 安全沙箱 | `plugin`（632 行） |
+| **知识管理** | 静态 JSON | 动态图谱 + 抽取 + 推理 | `knowledge_graph` + `knowledge_extractor` |
+| **成本管控** | 无 | 实时追踪 + 预算告警 | `cost_tracker`（366 行） |
+| **可观测追踪** | 无 | OpenTelemetry 原生 | `otel`（175 行） |
+| **弹性** | 熔断/缓存/限流 | + 策略进化 | `circuit_breaker` + `evolution_strategies` |
+| **安全** | TLS/JWT/审计 | + 插件沙箱 + 变更审查 | `plugin` + `change_tracker` + `permission` |
+| **LLM 抽象** | model/registry | + 统一供应商接口 | `llm_provider`（604 行） |
+| **前端** | 零构建 SPA | + Vite + React | `dashboard/` + `dashboard-vite/` |
+| **Agent 生态** | 手动配置 | 自动扫描 + 注册 + 匹配 | `agent_scanner` + `agent_registry` |
+| **名称空间** | PEV 旧名 | maop（全小写统一） | 全项目同步 |
 
 ---
 
@@ -97,8 +97,8 @@
 | **前端** | 零构建 SPA | 零构建 SPA + **Vite React SPA** | 新增 |
 | **依赖** | 8 核心 + 可选 cryptography | **10 核心（含 numpy + cryptography）** | 加固 |
 | **包名** | `pev/` | **`maop/`**（全小写） | 归一化 |
-| **OTel 追踪** | ❌ 无 | ✅ 原生 | 新增 |
-| **插件系统** | ❌ 无 | ✅ 完整生命周期 | 新增 |
+| **OTel 追踪** | 无 | 原生 | 新增 |
+| **插件系统** | 无 | 完整生命周期 | 新增 |
 
 ### 2.3 版本跃迁时间线
 
@@ -654,21 +654,21 @@ ml  = ["sentence-transformers>=2.0"]
 
 | 编号 | 漏洞 | 严重程度 | 状态 |
 |------|------|---------|------|
-| S-01 | `db_backup.py` VACUUM INTO 注入 | Critical | ✅ |
-| S-02 | `auth.py` JWT 密钥临时生成 | Critical | ✅ |
-| S-03 | `auth.py` APIKeyStore 线程不安全 | High | ✅ |
-| S-04 | `dispatcher.py` PS cli_args 注入 | Critical | ✅ |
-| S-05 | `system.py` pip 白名单绕过 | High | ✅ |
-| S-06 | `model.py` model/switch 验证缺失 | High | ✅ |
-| S-07 | `auth.py` 暴力破解登录 | High | ✅ |
-| S-08 | `middleware.py` 公开路径遗漏 | Medium | ✅ |
-| S-09 | `tls.py` 占位符证书 | High | ✅ |
-| S-10 | `data.py` query() 暴露 | Medium | ✅ |
-| S-11 | `kv_store.py` 连接泄漏 | Medium | ✅ |
-| — | message_queue SQL 注入 | Critical | ✅ |
-| — | db_backup 路径注入 | Critical | ✅ |
-| — | migration 校验和缺失 | High | ✅ |
-| — | control/run GET→POST | High | ✅ |
+| S-01 | `db_backup.py` VACUUM INTO 注入 | Critical | 已修复 |
+| S-02 | `auth.py` JWT 密钥临时生成 | Critical | 已修复 |
+| S-03 | `auth.py` APIKeyStore 线程不安全 | High | 已修复 |
+| S-04 | `dispatcher.py` PS cli_args 注入 | Critical | 已修复 |
+| S-05 | `system.py` pip 白名单绕过 | High | 已修复 |
+| S-06 | `model.py` model/switch 验证缺失 | High | 已修复 |
+| S-07 | `auth.py` 暴力破解登录 | High | 已修复 |
+| S-08 | `middleware.py` 公开路径遗漏 | Medium | 已修复 |
+| S-09 | `tls.py` 占位符证书 | High | 已修复 |
+| S-10 | `data.py` query() 暴露 | Medium | 已修复 |
+| S-11 | `kv_store.py` 连接泄漏 | Medium | 已修复 |
+| — | message_queue SQL 注入 | Critical | 已修复 |
+| — | db_backup 路径注入 | Critical | 已修复 |
+| — | migration 校验和缺失 | High | 已修复 |
+| — | control/run GET→POST | High | 已修复 |
 
 ### 10.2 安全架构层
 
@@ -723,11 +723,11 @@ MAOP_OTEL_SERVICE_NAME=maop   # 服务名
 
 | 位置 | 状态 | 操作 |
 |------|------|------|
-| `py/maop/`（小写） | ✅ 主包已归一化 | — |
-| `py/MAOP/`（大写） | ⚠️ 残留 | 删掉或改为 symlink |
-| `README.md` 结构图 | ⚠️ 仍写 `pev_loop.py` | 批量替换 |
-| `py/README.md` | ⚠️ 仍写 pev | 手动改正 |
-| `docs/adr/` 12 文件 | ⚠️ 仍引用 PEV | 建议统一 |
+| `py/maop/`（小写） | 主包已归一化 | — |
+| `py/MAOP/`（大写） | 残留 | 删掉或改为 symlink |
+| `README.md` 结构图 | 仍写 `pev_loop.py` | 批量替换 |
+| `py/README.md` | 仍写 pev | 手动改正 |
+| `docs/adr/` 12 文件 | 仍引用 PEV | 建议统一 |
 
 ### 12.2 P2：质量优化
 
@@ -820,12 +820,12 @@ MAOP_OTEL_SERVICE_NAME=maop   # 服务名
 | 特性 | MAOP v4.0.0 | 典型编排框架 |
 |------|------------|------------|
 | 编排循环 | Plan→Execute→Verify→Evolve + ReAct | 通常仅 Plan→Execute |
-| 插件系统 | ✅ 完整生命周期 + 安全沙箱 | ⚠️ 少数有 |
-| 知识图谱 | ✅ 动态 + 推理 + LLM 上下文 | ❌ 罕见 |
-| 成本管控 | ✅ 实时追踪 + 预算告警 | ⚠️ 少数有 |
-| 可观测性 | ✅ OTel + Prometheus + WS + 结构化日志 | ⚠️ 部分 |
-| MCP 支持 | ✅ 完整客户端 + 注册 + 传输 | ❌ 罕见 |
-| 子代理 | ✅ 层次化委托 + 消息传递 | ✅ 普遍 |
+| 插件系统 | 完整生命周期 + 安全沙箱 | 少数有 |
+| 知识图谱 | 动态 + 推理 + LLM 上下文 | 罕见 |
+| 成本管控 | 实时追踪 + 预算告警 | 少数有 |
+| 可观测性 | OTel + Prometheus + WS + 结构化日志 | 部分 |
+| MCP 支持 | 完整客户端 + 注册 + 传输 | 罕见 |
+| 子代理 | 层次化委托 + 消息传递 | 普遍 |
 | 代码量 | 37,173 行 | 通常 5K-20K |
 | 测试 | 2,702 个 | 通常 100-500 |
 | 语言/依赖 | 纯 Python、10 核心依赖 | 通常更多 |
