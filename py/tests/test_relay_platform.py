@@ -9,6 +9,7 @@
   - 速率限制跟踪
   - 线程安全并发访问
   - FastAPI 路由端点（TestClient）
+  - 写端点 admin 鉴权（非 admin → 403，且被拒的注册不落库）
 
 所有测试使用 tmp_path 隔离 SQLite，互不影响。
 """
@@ -68,6 +69,24 @@ def app_with_router(manager: RelayPlatformManager) -> FastAPI:
 @pytest.fixture
 def client(app_with_router: FastAPI) -> TestClient:
     return TestClient(app_with_router)
+
+
+@pytest.fixture
+def client_non_admin(manager: RelayPlatformManager) -> TestClient:
+    """鉴权角色为普通用户的测试客户端（写端点应被 require_admin 拒绝）。"""
+    from maop.dashboard.routers.relay_platform import router as relay_router
+
+    app = FastAPI()
+    app.state.relay_platform_manager = manager
+
+    @app.middleware("http")
+    async def _stub_user_auth(request: Request, call_next):
+        request.state.auth_roles = ["user"]
+        request.state.auth_identity = "test-user"
+        return await call_next(request)
+
+    app.include_router(relay_router)
+    return TestClient(app)
 
 
 def _make_platform(
@@ -661,3 +680,49 @@ def test_api_compare_prices(client: TestClient, manager: RelayPlatformManager):
     assert len(data) == 1
     assert data[0]["platform_name"] == "openrouter"
     assert data[0]["total_per_1k"] == 0.020
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 写端点鉴权回归（2026-09-29：本 router 三个写端点此前完全无守卫）
+# ═══════════════════════════════════════════════════════════════════
+
+_REGISTER_PAYLOAD = {
+    "name": "evil",
+    "type": "relay",
+    "base_url": "https://api.evil.com/v1",
+    "api_key": "stolen-outbound-target",
+    "display_name": "Evil",
+    "description": "should not be created",
+    "features": ["model_discovery"],
+    "rate_limit_rpm": 10,
+    "region": "international",
+    "enabled": True,
+}
+
+
+def test_write_endpoints_reject_non_admin(client_non_admin: TestClient):
+    """非 admin 角色调用写端点 → 403（与 model_gateway / hooks 口径一致）。"""
+    resp = client_non_admin.post("/api/relay-platforms", json=_REGISTER_PAYLOAD)
+    assert resp.status_code == 403
+    assert resp.json()["code"] == "HTTP_403"
+
+    assert client_non_admin.delete("/api/relay-platforms/openrouter").status_code == 403
+
+    resp = client_non_admin.post(
+        "/api/relay-platforms/compare", json={"model_id": "gpt-4o"}
+    )
+    assert resp.status_code == 403
+
+
+def test_rejected_register_does_not_persist(
+    client_non_admin: TestClient, manager: RelayPlatformManager
+):
+    """守卫须在 service 调用之前：被拒的注册不得落库。"""
+    resp = client_non_admin.post("/api/relay-platforms", json=_REGISTER_PAYLOAD)
+    assert resp.status_code == 403
+    assert manager.get_platform("evil") is None
+
+
+def test_read_endpoints_not_admin_locked(client_non_admin: TestClient):
+    """GET 端点口径不变：不要求 admin 角色。"""
+    assert client_non_admin.get("/api/relay-platforms").status_code == 200

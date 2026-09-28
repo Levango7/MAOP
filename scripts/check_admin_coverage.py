@@ -4,14 +4,14 @@
 扫描 dashboard 各 router 的 POST/PUT/DELETE/PATCH 端点，报告**函数体内**
 没有调用 require_admin 的那一些。产出的每一条都需人工分类后处理。
 
-## 当前发现的分类（2026-09-29 复核，18 条 ≈ 15 个唯一端点）
+## 当前发现的分类（2026-09-29 复核，14 个唯一端点）
 
 - 用户级端点（设计如此，非缺陷）：notifications 已读/偏好（走
   ``_require_identity``）、feedback 提交、auth_refresh、sso logout。
 - 外部回调（由对方 token 认证，不走 admin 角色）：alertmanager / n8n
   webhook、sso saml_acs。
-- **待决策**：relay_platform 的 3 个写端点无任何鉴权（其同级模块
-  model_gateway / hooks 均有 require_admin），已作为发现上报，未擅自修改。
+- 已补鉴权（同日）：relay_platform 的 register/remove/compare 三个写端点，
+  此前无任何守卫（同级 model_gateway / hooks 均有 require_admin）。
 
 ## 已知盲区（结论需人工确认）
 

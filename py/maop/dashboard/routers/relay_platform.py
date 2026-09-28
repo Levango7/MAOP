@@ -10,11 +10,14 @@ service 调用 / 响应格式化 / 错误处理。
 
 端点：
   GET    /                       列出所有平台（可按 type 过滤）
-  POST   /                       注册平台
-  DELETE /{name}                 删除平台
+  POST   /                       注册平台（admin）
+  DELETE /{name}                 删除平台（admin）
   GET    /{name}/models          发现平台可用模型
-  POST   /compare                价格对比（body: {model_id: str}）
+  POST   /compare                价格对比（admin；body: {model_id: str}）
   GET    /recommend/{model_id}   推荐最优平台
+
+鉴权口径与同级 router 一致：写端点首行 ``require_admin(request)``
+（注册体含 ``api_key``，删除直接影响出网凭据；model_gateway / hooks 亦同）。
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ from maop.core.agent.llm_chat.relay_platform import (
     PriceComparison,
     RelayPlatform,
 )
+from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import integration_service
 
@@ -76,6 +80,7 @@ async def register_platform(
     body: RelayPlatform, request: Request
 ) -> RelayPlatform:
     """注册或更新一个中转平台。"""
+    require_admin(request)
     mgr = integration_service.get_relay_manager(request.app.state)
     return integration_service.register_platform(mgr, body)
 
@@ -84,6 +89,7 @@ async def register_platform(
 @handle_api_errors("delete relay platform")
 async def remove_platform(name: str, request: Request) -> dict[str, Any]:
     """删除一个中转平台。"""
+    require_admin(request)
     mgr = integration_service.get_relay_manager(request.app.state)
     deleted = integration_service.remove_platform(mgr, name)
     if not deleted:
@@ -112,6 +118,7 @@ async def compare_prices(
     body: ComparePricesRequest, request: Request
 ) -> list[PriceComparison]:
     """对比同一模型在不同平台的价格。"""
+    require_admin(request)
     mgr = integration_service.get_relay_manager(request.app.state)
     return integration_service.compare_prices(mgr, body.model_id)
 
