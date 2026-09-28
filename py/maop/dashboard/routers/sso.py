@@ -105,6 +105,15 @@ async def callback(
             status_code=400,
             content={"status": "error", "error": "Missing authorization code"},
         )
+    if not state:
+        # 2026-09-28: state 现为必填（CSRF 主防线）。此前空 state 会跳过
+        # SSOManager.handle_callback 的校验（fail-open），本端点公开无鉴权，
+        # 攻击者可注入自己的 authorization code 完成 login-CSRF。
+        # 与 /authorize 的自动生成 state 配对使用（同进程存取 _pending_states）。
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "error": "Missing state parameter"},
+        )
     mgr = auth_service.get_sso_manager()
     session = mgr.handle_callback(code, state=state)
     return {

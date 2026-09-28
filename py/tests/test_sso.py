@@ -67,6 +67,17 @@ def _make_saml_config(**overrides: Any) -> SSOConfig:
     return SSOConfig(**defaults)
 
 
+def _authorize(mgr: SSOManager, state: str = "test-state") -> str:
+    """走一遍 /authorize，让 state 进入 manager 的 _pending_states 后返回它。
+
+    handle_callback 的 state 校验自 2026-09-28 起 fail-closed（缺 state 或
+    未注册的 state 一律 SSOError，MAOS 299d665），测试必须模拟真实的
+    authorize→callback 往返，不能再裸调 handle_callback。
+    """
+    mgr.get_authorize_url(state=state)
+    return state
+
+
 class _FakeResponse:
     """Minimal file-like response object compatible with urllib context mgr."""
 
@@ -340,7 +351,7 @@ class TestHandleCallbackOIDC:
 
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
-        session = mgr.handle_callback("AUTH_CODE_123", state="xyz")
+        session = mgr.handle_callback("AUTH_CODE_123", state=_authorize(mgr, "xyz"))
 
         assert isinstance(session, SSOSession)
         assert session.access_token == "AT-abc-123"
@@ -387,7 +398,7 @@ class TestHandleCallbackOIDC:
 
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
-        session = mgr.handle_callback("CODE", state="")
+        session = mgr.handle_callback("CODE", state=_authorize(mgr))
 
         assert call_count["n"] == 2  # token + userinfo
         user = session.user
@@ -420,7 +431,7 @@ class TestHandleCallbackOIDC:
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
         with pytest.raises(Exception, match="userinfo fetch failed"):
-            mgr.handle_callback("CODE")
+            mgr.handle_callback("CODE", state=_authorize(mgr))
 
     def test_handle_callback_empty_code_raises(self):
         config = _make_oidc_config()
@@ -428,11 +439,23 @@ class TestHandleCallbackOIDC:
         with pytest.raises(ValueError, match="code.*must not be empty"):
             mgr.handle_callback("")
 
+    def test_handle_callback_missing_state_rejected(self):
+        """CSRF 防护 fail-closed：缺 state 的回调一律拒绝（2026-09-28 起）。"""
+        mgr = SSOManager(_make_oidc_config())
+        with pytest.raises(SSOError, match="missing state"):
+            mgr.handle_callback("CODE")
+
+    def test_handle_callback_unregistered_state_rejected(self):
+        """没走过 /authorize 的伪造 state 同样拒绝（防 CSRF / 重放）。"""
+        mgr = SSOManager(_make_oidc_config())
+        with pytest.raises(SSOError, match="mismatch or expired"):
+            mgr.handle_callback("CODE", state="forged-state")
+
     def test_handle_callback_missing_token_url_raises(self):
         config = _make_oidc_config(token_url="")
         mgr = SSOManager(config)
         with pytest.raises(ValueError, match="token_url is required"):
-            mgr.handle_callback("CODE")
+            mgr.handle_callback("CODE", state=_authorize(mgr))
 
     def test_handle_callback_token_endpoint_http_error_raises(self, monkeypatch):
         import urllib.error
@@ -450,7 +473,7 @@ class TestHandleCallbackOIDC:
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
         with pytest.raises(RuntimeError, match="HTTP 400"):
-            mgr.handle_callback("CODE")
+            mgr.handle_callback("CODE", state=_authorize(mgr))
 
     def test_handle_callback_token_endpoint_error_field_raises(self, monkeypatch):
         config = _make_oidc_config()
@@ -467,7 +490,7 @@ class TestHandleCallbackOIDC:
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
         with pytest.raises(RuntimeError, match="invalid_grant"):
-            mgr.handle_callback("CODE")
+            mgr.handle_callback("CODE", state=_authorize(mgr))
 
     def test_handle_callback_non_json_response_raises(self, monkeypatch):
         config = _make_oidc_config()
@@ -479,7 +502,7 @@ class TestHandleCallbackOIDC:
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
         with pytest.raises(RuntimeError, match="non-JSON"):
-            mgr.handle_callback("CODE")
+            mgr.handle_callback("CODE", state=_authorize(mgr))
 
     def test_handle_callback_url_error_raises_runtime(self, monkeypatch):
         import urllib.error
@@ -492,7 +515,7 @@ class TestHandleCallbackOIDC:
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
         with pytest.raises(RuntimeError, match="unreachable"):
-            mgr.handle_callback("CODE")
+            mgr.handle_callback("CODE", state=_authorize(mgr))
 
     def test_handle_callback_non_numeric_expires_in_defaults(self, monkeypatch):
         config = _make_oidc_config()
@@ -511,7 +534,7 @@ class TestHandleCallbackOIDC:
 
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
-        session = mgr.handle_callback("CODE")
+        session = mgr.handle_callback("CODE", state=_authorize(mgr))
         # Default 3600 applied.
         assert abs((session.expires_at - session.created_at) - 3600) < 5
 
@@ -902,7 +925,7 @@ class TestSessionLifecycle:
             return _FakeResponse(token_payload)
 
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-        session = mgr.handle_callback("CODE")
+        session = mgr.handle_callback("CODE", state=_authorize(mgr))
         assert mgr.validate_session(session.session_id) is not None
 
     def test_validate_expired_session_returns_none(self, monkeypatch):
@@ -918,7 +941,7 @@ class TestSessionLifecycle:
             return _FakeResponse(token_payload)
 
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-        session = mgr.handle_callback("CODE")
+        session = mgr.handle_callback("CODE", state=_authorize(mgr))
         # Force expiry by setting expires_at to a clearly past timestamp.
         # (Using 0.0 would be treated as "no expiry set" by validate_session's
         # truthy guard, so use time.time() - 100 instead.)
@@ -936,7 +959,7 @@ class TestSessionLifecycle:
             return _FakeResponse(token_payload)
 
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-        session = mgr.handle_callback("CODE")
+        session = mgr.handle_callback("CODE", state=_authorize(mgr))
         assert mgr.logout(session.session_id) is True
         assert mgr.validate_session(session.session_id) is None
         assert mgr.logout(session.session_id) is False

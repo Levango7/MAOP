@@ -300,6 +300,58 @@ def _detect_with_license_check(requested: Edition) -> Edition:
         return Edition.PERSONAL
 
 
+def _in_test_runner() -> bool:
+    """True when running under a test runner (pytest).
+
+    Used to scope the ``set_edition`` / ``set_feature_override`` guards:
+    test suites legitimately force editions without a license (fixtures
+    such as MAOS's ``enterprise_edition``), while deployments must not be
+    able to flip editions programmatically without one.
+
+    This exemption is deliberate and NOT a security boundary against
+    in-process attackers (who could assign ``_current_edition`` directly);
+    it exists so the documented API path cannot casually unlock enterprise
+    features in a deployed process. Production keeps the full license
+    requirement regardless of the test-runner check.
+    """
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return True
+    import sys
+
+    return "pytest" in sys.modules
+
+
+def _ensure_enterprise_activation_allowed() -> None:
+    """Refuse programmatic ENTERPRISE activation without a valid license.
+
+    2026-09-28 bypass closure: previously only production was guarded
+    (M-2 fix), so a default deployment (``MAOP_ENV`` unset → development)
+    could unlock every enterprise feature with one in-process
+    ``set_edition("enterprise")`` call and no license. Now any
+    non-test-runner context requires license validation; test runners are
+    exempt (see :func:`_in_test_runner`).
+
+    Raises:
+        RuntimeError: enterprise package missing or no valid license.
+    """
+    try:
+        from maop.enterprise.license import LicenseValidator
+
+        info = LicenseValidator().validate_from_env()
+        if info is None:
+            env = os.getenv("MAOP_ENV", "development").lower()
+            raise RuntimeError(
+                "SECURITY: set_edition(ENTERPRISE) refused without a valid "
+                f"MAOP_LICENSE_KEY (env={env}). Activate via license instead "
+                "(MAOP_LICENSE_KEY or data/license.key)."
+            )
+    except ImportError:
+        raise RuntimeError(
+            "SECURITY: set_edition(ENTERPRISE) refused without the "
+            "enterprise package + valid license."
+        )
+
+
 def set_edition(edition: Edition | str) -> None:
     """Programmatically set the edition (overrides env detection).
 
@@ -307,32 +359,18 @@ def set_edition(edition: Edition | str) -> None:
     ``set_feature_override``. ``set_edition(ENTERPRISE)`` is an in-process
     license bypass — without this guard any code path (plugin, test
     leftover, injected module) could flip a production personal deployment
-    to ENTERPRISE without a license. Programmatic overrides remain
-    available in dev/test; production must activate via
-    ``MAOP_LICENSE_KEY`` + ``detect_edition()`` instead.
+    to ENTERPRISE without a license.
+
+    2026-09-28 bypass closure: the production-only guard left the default
+    deployment shape (``MAOP_ENV`` unset → development) unprotected — one
+    line of in-process code unlocked the whole enterprise surface. Now
+    ENTERPRISE requires a valid license in EVERY environment; only test
+    runners are exempt (see :func:`_in_test_runner`).
     """
     if isinstance(edition, str):
         edition = Edition(edition.lower())
-    if edition == Edition.ENTERPRISE and os.getenv("MAOP_ENV", "development").lower() == "production":
-        try:
-            # The enterprise package's __init__ calls set_edition(ENTERPRISE)
-            # at import time as its "present = activated" mechanism; that
-            # legitimate path is allowed to proceed through license
-            # validation below. A *raw* programmatic call in production is
-            # not.
-            from maop.enterprise.license import LicenseValidator
-            info = LicenseValidator().validate_from_env()
-            if info is None:
-                raise RuntimeError(
-                    "SECURITY: set_edition(ENTERPRISE) refused in production "
-                    "without a valid MAOP_LICENSE_KEY. Use license-based "
-                    "activation (MAOP_LICENSE_KEY) in production."
-                )
-        except ImportError:
-            raise RuntimeError(
-                "SECURITY: set_edition(ENTERPRISE) refused in production "
-                "without the enterprise package + valid license."
-            )
+    if edition == Edition.ENTERPRISE and not _in_test_runner():
+        _ensure_enterprise_activation_allowed()
     global _current_edition
     with _edition_lock:
         _current_edition = edition
@@ -380,9 +418,22 @@ def set_feature_override(flag: FeatureFlag | str, enabled: bool) -> None:
 
     Useful for testing or for gradual rollouts.
     Blocked in production to prevent runtime tampering.
+
+    2026-09-28: also blocked outside test runners in non-production — the
+    production-only check let a default (development-mode) deployment
+    unlock enterprise-only flags with one call and no license. There are
+    no production callers of this function; deployments activate features
+    via edition + license (``detect_edition``), not overrides. Tests are
+    exempt (see :func:`_in_test_runner`).
     """
     if os.getenv("MAOP_ENV", "development").lower() == "production":
         raise RuntimeError("Feature overrides are not allowed in production")
+    if not _in_test_runner():
+        raise RuntimeError(
+            "SECURITY: set_feature_override() refused outside test runners — "
+            "feature availability is decided by edition + license, not "
+            "runtime overrides."
+        )
     if isinstance(flag, str):
         flag = FeatureFlag(flag)
     with _edition_lock:

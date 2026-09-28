@@ -42,6 +42,10 @@ def _clean_crl_env(monkeypatch: pytest.MonkeyPatch) -> None:
     # _DEFAULT_PUBLIC_KEY_FINGERPRINT 不匹配。设置跳过标志以绕过指纹校验
     # （仅限测试环境，生产环境绝不可设置此变量）。
     monkeypatch.setenv("MAOP_LICENSE_KEY_FP_SKIP", "1")
+    # 信任锚指向本模块的临时公钥。必须走 monkeypatch 逐用例生效：早前这里是
+    # 模块级全局赋值，测试结束不恢复，同进程后续任何 LicenseValidator() 都会
+    # 读到假公钥并被指纹校验 fail-closed 拒绝（2026-09-29 全量 4 红根因）。
+    monkeypatch.setattr(_license_mod, "_PUBLIC_KEY_PATH", _TEST_PUBLIC_PATH)
 
 _TEST_KEY_DIR = Path(tempfile.mkdtemp(prefix="maop_test_keys_"))
 _TEST_PRIVATE_PATH = _TEST_KEY_DIR / "private.pem"
@@ -61,15 +65,7 @@ _TEST_PUBLIC_PATH.write_bytes(
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
 )
-_license_mod._PUBLIC_KEY_PATH = _TEST_PUBLIC_PATH
 _DEV_PRIVATE_KEY = _TEST_PRIVATE_PATH
-
-
-import tempfile
-
-import maop.enterprise.license as _license_mod
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 
 def _generate_test_license(
