@@ -53,15 +53,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | 17.1 | 通过，暂留在护栏外，需要时再抬到 `<18` |
 
   `additional_headers` 与"连接对象有 `.state` 无 `.open`"都是新 asyncio 实现特征，顶层 `websockets.connect` 到 14.0 才默认指向它 —— `>=12.0` 是从未成立过的承诺；原注释"14+ made breaking asyncio changes"方向相反，14 恰是能用的起点。新增回归测试 `TestWebSocketTransportRealConnection`（真起 `websockets.serve` 做 JSON-RPC round-trip + `is_alive` 生命周期；此前用例全在测 mock，`.open` 缺陷因而长期静默）。CI 证据：macOS job 实装 websockets 16.1.1 且该用例通过。dependabot #15 由本次取代。
+- **日志轮转链式再轮转 bug（Windows `WinError 123` 根因）**：`rotate_logs()` 扫描目录内全部 `.log/.jsonl/.json` 超限文件，但从不跳过**已轮转的备份**（`_ROTATED_RE` 此前只用于清理旧备份），备份自身也超限 → 被再次轮转成 `<name>_<ts1>_<ts2>...` 链式文件名，每次还会把源文件重建为空；链条长度增长到触发 Windows 路径上限后 `os.replace` 抛 `WinError 123`。实测残留：`data/degradation_*.log` 39 个链式文件、`logs/MAOP-structured_*.log` 19 个，均已移出仓库至本地暂存区（可再生成）。修复：轮转循环对命中 `_ROTATED_RE` 的文件直接跳过（`log_rotate.py`）；新增回归测试 2 条（超限备份不再轮转 / 连续两次轮转不产生链式名，冻结 `datetime` 断言文件名集合），`tests/test_log_rotate.py` 8 passed。
 
 ### Added
 
 - **requirements.lock 与 pyproject 的镜像关系加机械强制**：原表头声明 "mirrors pyproject" 但无任何强制（实测漂移：dependabot #13 抬 pin 只改了 pyproject / requirements.txt，lock 仍停旧版本，照 lock 装环境拿到旧包）。新增守卫 `py/tests/test_requirements_lock_sync.py`（3 条）：直依赖段与 enterprise 段必须逐条镜像 pyproject（名字集合 + 约束文本都相等），requirements.txt 不得少包（不用 `tomllib` —— CI 矩阵含 Python 3.10）；lock 两段加显式结束标记（`# END DIRECT DEPENDENCIES` / `# END ENTERPRISE DEPENDENCIES`），避免 extras 段条目被误读进直依赖段。消除既有漂移：`pydantic-settings==2.15.0`、`uvicorn[standard]==0.53.0`、`mmh3==5.3.0`、`pyyaml>=6.0.2,<7.0.0`、`websockets>=14.0,<17`，并将只属 extras 的 `lxml` 移出直依赖段。变异验证：lock 改回旧范围 → 守卫失败并打印差异；改回正确值 → 3 passed。已知限制：该文件仍是 reference（transitive 段为手写 `>=` 范围而非精确 pin），"可复现构建"需在干净 venv 重新生成，属独立立项。
 - **主干 flaky 的 CI 侧观测探针（只观测，不改行为）**：针对 `tests/test_tool_manager.py::TestCallSyncFallback` 3 条在 macOS/Windows 随机红（症状 `assert '42' in 'ok'` 等；读代码已排除 module/class 作用域的 `subprocess.run` patch、类级共享注册表、`MAOP_DATA_DIR` 隔离失效），`py/tests/conftest.py` 新增 autouse 探针 `_leak_probe`：每条用例开始前记录上一条用例 nodeid、全局 `subprocess.run` 是否仍被 patch、残留线程（按线程 target 的定义模块剔除测试框架自身线程），仅可疑时 WARNING，用例失败时随捕获日志自带嫌疑人。判定逻辑抽成 `_leak_probe_line()` 以便被用例直接断言（pytest 不允许直接调用夹具函数）。配套新增 `py/tests/test_conftest_leak_probe.py`（9 条，含对真实 rerunfailures 线程的回归位；autouse 判定用行为断言，不绑定 pytest 私有属性）。变异验证：探针恒返回 `None` → 2 红；allowlist 模块名拼错 → 3 红；退回整串 `split('.')` 原始 bug → 仅真实线程回归位红（伪造样本抓不到）。注：早期版本曾把 `pytest_rerunfailures` 插件自身的 `ServerStatusDB.run_server` 线程误判为泄漏，已按定义模块过滤修正。未决：`TestCallSyncFallback` 三元凶机制未定位，等下一次红取证。
 
+### Added
+
+- **`check_api_contract.py` 增补 README `/api/*` 引用检查**：README 的 curl 示例指向已不存在端点时，照抄会拿到 SPA 兜底 `200 + HTML`。新增 `parse_readme()`（完整 URL / 内联代码 / 散文裸路径三式提取）与 `readme_path_covered()`（方法无关、接受前缀族引用），复用同一份后端路由集判定；当前 README 4 处引用全部命中。能力并入自根 `scripts/doc_reconcile.py` —— 它用朴素子串匹配、看不见 FastAPI `prefix` 组合（`/api/cost/summary` 被误报不存在），且 CI lint job 的 `working-directory: py` 使其从未被执行；原文件已删除（CI 实际运行的是 `py/scripts/doc_reconcile.py`，与本次无关）。
+- **`check_config_drift.py` 增补版本同步检查**：`maop/__init__.py` 的 `__version__` 与 `pyproject.toml` 的 `version` 必须一致（不一致 → FAIL；任一侧不可解析 → 显式打印告警，避免"没跑"与"全绿"同形）。同样并入自根 `scripts/doc_reconcile.py`。三项负例已实测（不一致 / 一致 / 不可解析）。
+
 ### Changed
 
 - **类型门禁改为显式 CI 步骤**：`.github/workflows/ci.yml` frontend job 新增 `- name: Type check (vue-tsc)`（紧跟 `Lint frontend`）；`package.json` 删除 `pretest` 借道（此前因 gh token 无 `workflow` scope，只能借 npm 生命周期生效），本地 `npm test` 回到只跑测试，`typecheck` 脚本保留。
+- **人工审计脚本硬化（两脚本均未接入 CI，定位为人工工具）**：`scripts/check_admin_coverage.py` 修复同一函数挂多个写方法装饰器导致的重复报告（relay_platform `register_platform` 报两次，18 → 17 条），docstring 补记盲区（router 级 `dependencies=[...]` 守护看不见、硬编码 PUBLIC_ENDPOINTS）与当前发现分类；`py/scripts/check_docs_consistency.py` docstring 补记已知假阳性类别（MAOS 跨仓 `enterprise/`、dashboard-enterprise 内简写、`docs/archive/` 历史快照——1438 条发现约一半来自 archive）与接入 CI 的前置条件。**发现上报（未擅自修改）**：relay_platform 三个写端点无任何鉴权，同级 model_gateway / hooks 均有 `require_admin`，留待决策。
+
+### Removed
+
+- **架构级死重清理（安全网 tag `archive-v4.0-before-removal`）**：`git rm -r archive/`（107 文件：js-dashboard 17 / ps-legacy 86 / legacy 4；零运行时引用，方案见 `docs/audits/archive-cleanup-plan.md`，2026-08-16 已成文未执行）；删除根 `otel-collector-config.yaml`（P2-M-02 起 compose 挂载 `deploy/otel-collector.yaml`，见 `docker-compose.yml:263`）、`scripts/migrate_bridge_to_proxy.py`（2026-07-26 重命名迁移已完成的一次性脚本）、`scripts/smoke_test_agents.py`（首 import 即断，功能已被 pytest 覆盖）、根 `scripts/doc_reconcile.py`（能力并入上述两脚本）、空目录 `plugins/`（`PluginManager` 启动自建，`plugin_manager.py:113`）。相关引用同步：README、`docs/DESIGN_RULES.md`、`docs/contributing.md`、`config/agents.yaml`、`maop.ps1`、`dashboard/server.py` 注释、`plugin_manager.py` 注释。
+- **README 模块表死引用修正**：`core/security/tenant.py` 已于 2026-09-25 删除（严格子集并入 `core/tenant/`，见 `core/tenant/manager.py:14`），表项更新为 `core/tenant/manager.py`（由 `check_docs_consistency.py` 扫出，工具价值验证）。
 
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 

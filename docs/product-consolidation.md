@@ -133,15 +133,22 @@ IDE、单体 agent 工具——对标单体 CLI 时，MAOP 的定位是它的上
 
 ## 6. 处置台账
 
-### 6.1 删（死重）
+### 6.1 删（死重）—— 已执行 2026-09-29
 
-| 对象 | 现状 | 处置 | 依据/风险 |
-|------|------|------|-----------|
-| `archive/` | 107 文件 / 1.2 MB，**全部被 git 跟踪**，零运行时引用 | 先 `git tag archive-v4.0-before-removal`，再 `git rm -r archive/` | 方案早已写好（`docs/audits/archive-cleanup-plan.md`，2026-08-16）但从未执行；注意 `dashboard/` 的 fallback 仍指向 `DASH_DIR`，删前确认无引用 |
-| `plugins/` | 空目录，0 跟踪文件 | 删除，或补 README 说明插件目录约定 | 空目录无信息量 |
-| `data/` 运行残留 | degradation 日志 11 个，文件名呈"链式拼接"（每次轮转把旧名当前缀，如 `degradation_..._20260913-232600.log`） | 清理；先查轮转命名 bug | 链式文件名是 bug 征兆（轮转未替换而是追加），不是设计 |
-| `py/scripts/check_docs_consistency.py`（本轮新发现） | 全仓零引用：CI、测试、文档都不调用它；它自己扫出 1427 条"不一致"也无人消费，且以路径启发式误报为主（把 `src/styles/tokens.css` 当根路径等） | 修复后接线，或删除 | 一个没人读的报告脚本+误报，等于把"文档一致性"伪装成已覆盖；要留就必须先治误报再接进 lint |
-| `deliverables/` | 21 文件 / 4.6 MB（仅 9 个被跟踪） | 保留近期交付，其余移入 `docs/archive/` 或删除 | 需人工核对哪些是发布证据 |
+> 本表列出的"已删除对象"路径会触发 `py/scripts/check_docs_consistency.py` 的
+> "路径不存在"提示，属预期——本表即是它们的删除记录，不必修复。
+
+| 对象 | 现状 | 处置 | 依据/风险 | 状态 |
+|------|------|------|-----------|------|
+| `archive/` | 107 文件 / 1.2 MB，**全部被 git 跟踪**，零运行时引用 | 先 `git tag archive-v4.0-before-removal`，再 `git rm -r archive/` | 方案早已写好（`docs/audits/archive-cleanup-plan.md`，2026-08-16）但从未执行；删前已复核零运行时引用 | 已删（tag 已建；107 文件暂存删除；README/DESIGN_RULES/contributing/agents.yaml/maop.ps1/server.py 引用已同步） |
+| `plugins/` | 空目录，0 跟踪文件 | 删除 | `PluginManager` 启动自建（`plugin_manager.py` 内 `mkdir(exist_ok=True)`） | 已删（目录已移除） |
+| `data/` + `logs/` 链式日志 | 39 + 19 个链式拼接文件名（每次轮转把旧名当前缀） | 清理；先查轮转命名 bug | 链式名是 bug 征兆；根因 = `rotate_logs()` 从不跳过已轮转备份，备份被再轮转，源文件被重建为空 | 已修（log_rotate.py 跳过 `_ROTATED_RE` 命中项 + 2 条回归测试，8 passed）+ 残留移出（未跟踪文件，暂存仓库外可恢复区） |
+| 根 `otel-collector-config.yaml` | 被 `deploy/otel-collector.yaml` 取代 | 删除 | P2-M-02 起 compose 挂载 deploy 版（见 `docker-compose.yml` 挂载注释），全仓零其他引用 | 已删 |
+| 根 `scripts/migrate_bridge_to_proxy.py` | 一次性迁移脚本 | 删除 | 重命名迁移 2026-07-26 已完成（`9bf19e58`），无调用方 | 已删 |
+| 根 `scripts/smoke_test_agents.py` | 首 import 即断 | 删除 | 功能已被 `py/tests/` 覆盖 | 已删 |
+| 根 `scripts/doc_reconcile.py` | README API 校验（朴素子串）+ 版本同步检查；CI 从未执行它 | 能力并入 `check_api_contract.py`（README 引用，prefix 感知）与 `check_config_drift.py`（版本同步）后删除 | CI lint job `working-directory: py`，实际执行的是 `py/scripts/doc_reconcile.py`（core 计数守卫） | 已删（能力已并入并各带负例实测） |
+| `py/scripts/check_docs_consistency.py`（本轮新发现） | 全仓零引用；1438 条发现约半数来自 `docs/archive/` 历史快照 | 保留为人工工具；docstring 记假阳性类别与接线前置条件 | 宁可为"人工工具"而非伪装的覆盖；本轮它扫出 README 真死引用 1 处（`core/security/tenant.py` 已于 2026-09-25 合并进 `core/tenant/`） | 已留（硬化 docstring）；接入 CI 需先治假阳性 |
+| `deliverables/` | 21 文件 / 4.6 MB（仅 9 个被跟踪） | 保留被引用文件与进行中 soak 输出；3 个可再生成产物移出 | `coverage-core-evidence.json` / `soak-1h-output.txt` / `soak-test-data-archive-20260831.csv` 均可重跑再生成 | 已清理（3 移出；9 跟踪 + 活跃输出保留） |
 
 ### 6.2 改（失真与不一致）
 
@@ -186,9 +193,15 @@ IDE、单体 agent 工具——对标单体 CLI 时，MAOP 的定位是它的上
    改写为 `## [Unreleased] - 2026-09-29` 日期化条目体（Fixed/Added/Changed），保留证据
    （测试名、变异验证、已知限制），去掉"过程记录/自我复盘"叙事。
    `deliverables/`（21 文件）随第 3 步"保留/删除"决策后再处理。
-3. **死重清理**：`archive/` tag → 删除；`plugins/`、`data/` 残留、`deliverables/` 归档。
+3. **死重清理（已完成 2026-09-29）**：`archive/` tag → `git rm -r archive/`（107 文件）；
+   根 `otel-collector-config.yaml`、`migrate_bridge_to_proxy.py`、`smoke_test_agents.py`、
+   `scripts/doc_reconcile.py` 删除；空 `plugins/` 移除；链式日志残留（39+19）**先修
+   `log_rotate` bug 再移出**；`deliverables/` 3 个可再生成产物移出。明细与依据见 6.1。
+   未跟踪文件的移出是**可恢复**操作（暂存于仓库外 `F:/Nexus/.maop-cleanup-trash-20260929/`，
+   含 MANIFEST.md），跟踪文件的删除以 `archive-v4.0-before-removal` tag 与 git 历史兜底。
 4. **失真修复**：ci.yml 七项（已完成 2026-09-29，见 6.2）；行为变化已同步 `docs/ci-gates.md`。
-5. **补测**：sso 路由 400 分支。
-6. **提交**：按主题分批（口径合并为一批、清理为一批、CI 为一批），每批独立可回滚。
+5. **补测**：sso 路由 400 分支（已完成，见 6.2）。
+6. **提交（待逐批确认，本地不推送）**：批 A log_rotate 修复；批 B 死重清理 + 全仓引用同步；
+   批 C 脚本能力整合与硬化（含 relay_platform 鉴权缺口的发现上报）；批 D 台账与 CHANGELOG。
 
 > 执行记录与本台账的勾选状态，在本文件内就地更新。
