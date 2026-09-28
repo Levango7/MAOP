@@ -360,7 +360,7 @@ Web dashboard at `http://localhost:9079` with:
 - Self-evolution suggestions & analysis
 - Multi-tenant support with per-tenant quotas
 
-前端源码位于 `dashboard-enterprise/`（Vue 3 + Vite），构建产物输出到 `dashboard/dist-enterprise/`。原生JS版本已归档至 `archive/js-dashboard/`。
+前端源码位于 `dashboard-enterprise/`（Vue 3 + Vite），构建产物输出到 `dashboard/dist-enterprise/`。原生 JS 版本已于 v4 移除（git history 留存）。
 
 > **技术栈说明**：Vue 3 是前端框架（声明式 UI、组件化、响应式数据），Vite 是构建工具（dev server + 生产打包）。两者配合使用，无冲突。详见 [DESIGN_RULES.md 第 10 节](docs/DESIGN_RULES.md)。
 
@@ -376,7 +376,7 @@ Web dashboard at `http://localhost:9079` with:
 | `core/evolution/regression.py` | CI/CD regression testing & persona simulation |
 | `core/security/byok.py` | Bring-Your-Own-Key gateway |
 | `core/evolution/skill_version.py` | Skill Git-based version management |
-| `core/security/tenant.py` | Multi-tenant isolation & quota management |
+| `core/tenant/manager.py` | Multi-tenant isolation & quota management（RLS/配额/审计子模块见 `core/tenant/`） |
 | `core/reliability/event_bus.py` | Async event bus |
 | `core/reliability/circuit_breaker.py` | Circuit breaker pattern |
 | `core/memory/vector.py` | Vector store for semantic search |

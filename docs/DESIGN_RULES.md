@@ -2,7 +2,7 @@
 
 > **权威设计规范** — 所有 UI 改动必须遵循此文档。最后更新: 2026-07-31
 
-> **架构说明**: 原生 JS 仪表盘已归档至 `archive/js-dashboard/`，前端统一基于 Vue 3 + Vite 实现。源码位于 `dashboard-enterprise/`，构建产物输出至 `dashboard/dist-enterprise/`。本规范以下所有条款均针对 Vue 3 实现，原生 JS 仪表盘相关约定（per-section `--sc` 18 色体系、`togglePillarItem()` / `showCtrlMsg()` 等全局函数）随归档废弃，不再适用。
+> **架构说明**: 原生 JS 仪表盘已于 v4 移除（git history 留存），前端统一基于 Vue 3 + Vite 实现。源码位于 `dashboard-enterprise/`，构建产物输出至 `dashboard/dist-enterprise/`。本规范以下所有条款均针对 Vue 3 实现，原生 JS 仪表盘相关约定（per-section `--sc` 18 色体系、`togglePillarItem()` / `showCtrlMsg()` 等全局函数）已废弃，不再适用。
 
 ---
 
@@ -132,7 +132,7 @@ Vue 3 实现统一使用 1px 边框 + token 驱动，原三级边框（外框 4p
 
 说明：
 - `/audit`、`/rbac`、`/tenants` 标记 `meta.requiresEnterprise: true`，由路由守卫拦截非企业版访问
-- 原生 JS 仪表盘的「四大工程 / 工作流 / Skills / MCP / 提示词 / 角色 / 模块 / 架构 / 工作流程」等页面已随 `archive/js-dashboard/` 归档，不再存在于 Vue 3 导航
+- 原生 JS 仪表盘的「四大工程 / 工作流 / Skills / MCP / 提示词 / 角色 / 模块 / 架构 / 工作流程」等页面已随原生 JS 仪表盘移除，不再存在于 Vue 3 导航
 - 侧栏支持 rail（折叠至 `--rail-w: 64px`）与移动端抽屉模式（< 900px）
 
 ### 4.2 概览指标
@@ -162,7 +162,7 @@ Vue 3 实现统一使用 1px 边框 + token 驱动，原三级边框（外框 4p
 - 密度切换: `ui.toggleDensity()`（`comfortable` / `compact`，通过 `[data-density]` 属性切换）
 - 状态持久化于 Pinia store + localStorage
 
-说明：原 `togglePillarItem()`（原生 JS 内框折叠）随 `archive/js-dashboard/` 归档废弃。Vue 3 实现中各视图的折叠/展开状态由组件内 `ref()` 或 Pinia store 管理，不再有全局同名函数。
+说明：原 `togglePillarItem()`（原生 JS 内框折叠）已废弃。Vue 3 实现中各视图的折叠/展开状态由组件内 `ref()` 或 Pinia store 管理，不再有全局同名函数。
 
 ---
 

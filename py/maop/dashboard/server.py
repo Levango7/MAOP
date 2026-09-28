@@ -85,7 +85,7 @@ DASH_VUE3_SRC_DIR = MAOP_ROOT / "dashboard-enterprise"
 
 # Unified Vue3 serve directory (both personal & enterprise):
 #   dist-enterprise (Vite build) > dashboard-enterprise (dev source)
-#   Legacy native JS dashboard archived to archive/js-dashboard/
+#   (Legacy native JS dashboard was removed in v4; see git history.)
 from maop.config.settings import get_settings as _get_settings
 
 _edition_cfg = _get_settings()

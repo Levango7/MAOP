@@ -87,7 +87,6 @@ MAOP/
 ├── docs/                    # 文档
 │   └── adr/                 # 架构决策记录
 ├── monitoring/              # 监控配置（Prometheus/Grafana）
-├── archive/                 # 归档代码（PS1 legacy）
 ├── docker-compose.yml       # 生产部署
 └── CHANGELOG.md             # 变更日志
 ```

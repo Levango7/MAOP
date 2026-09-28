@@ -74,7 +74,7 @@ if (Test-Path $pyEntry) {
         return
     }
 } else {
-    Write-Host "[MAOP] ERROR: Python engine not found at $pyEntry. PS scripts have been archived to archive/ps-legacy/." -ForegroundColor Red
+    Write-Host "[MAOP] ERROR: Python engine not found at $pyEntry. The PowerShell engine is EOL and was removed in v4." -ForegroundColor Red
     Write-Host "[MAOP] Install Python 3.10+ and ensure py/maop/ is accessible." -ForegroundColor Red
     exit 1
 }

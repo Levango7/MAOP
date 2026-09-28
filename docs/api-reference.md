@@ -371,7 +371,7 @@ curl http://127.0.0.1:9079/api/overview -H "Authorization: Bearer $TOKEN"
 | GET | `/api/subagent/list` | 子代理列表 | | |
 | GET | `/api/subagent/transcript` | 子代理回执 | | |
 
-### `agent_bridge.py`（prefix=`/api/bridge`）
+### `agent_proxy.py`（prefix=`/api/bridge`）
 
 | Method | Path | Description | Admin | Notes |
 | --- | --- | --- | --- | --- |

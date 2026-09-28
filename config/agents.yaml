@@ -741,7 +741,7 @@ workflows:
     - pipeline
     cli: python -m maop.cli run --task "{task}" --mode pipeline
     description: 'Doc-Pipeline workflow: Planner→Retriever→Checker→Writer→Formatter
-      (11 steps, checkpoint/resume). PS wrapper archived to archive/ps-legacy/.'
+      (11 steps, checkpoint/resume).'
     driver: cli
     model: auto
     model_display: 'Doc-Pipeline v2 (Python workflow: 5 agents, 11 steps)'
