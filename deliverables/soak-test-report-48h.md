@@ -153,12 +153,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_soak_48h.ps1 -Stop
 
 | 指标 | 实测 | 阈值 | 判定 |
 |------|------|------|------|
-| 内存 RSS slope | 4.65 MB/h | < 50 | ✅ |
-| 句柄 slope | -5.82 handles/h | < 5 | ✅ |
-| 连接池 | 0 | — | ✅ |
+| 内存 RSS slope | 4.65 MB/h | < 50 | 通过 |
+| 句柄 slope | -5.82 handles/h | < 5 | 通过 |
+| 连接池 | 0 | — | 通过 |
 | CPU 平均 | 37.5% | — | — |
-| 错误率 | 0 | < 0.1% | ✅ |
-| `overall_pass` | true | — | ✅ |
+| 错误率 | 0 | < 0.1% | 通过 |
+| `overall_pass` | true | — | 通过 |
 
 回归冒烟结论：本轮 P1/P2 修复未引入长稳回归。
 
@@ -198,10 +198,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_soak_48h.ps1 -Stop
 
 | 指标 | 实测值 | 阈值 | 是否通过 |
 | --- | --- | --- | --- |
-| 内存 RSS slope（MB/h） | **-0.028 MB/h**（first 46.88 → last 15.50，下降 31.4 MB；min 11.49 / max 49.27） | < 50 | ✅ 通过 |
-| Handles slope（/h） | **+0.021 /h**（first 167 → last 168；min 163 / max 169，区间 ±3） | < 5 | ✅ 通过 |
-| 连接池占用 slope（conns/h） | **0.0000 conns/h**（恒为 0） | < 1 | ✅ 通过 |
-| 错误率（%） | **0 / 5504 = 0.000%**（stderr log 全程 0 个 `[ERROR]` 行） | < 0.1 | ✅ 通过 |
+| 内存 RSS slope（MB/h） | **-0.028 MB/h**（first 46.88 → last 15.50，下降 31.4 MB；min 11.49 / max 49.27） | < 50 | 通过 |
+| Handles slope（/h） | **+0.021 /h**（first 167 → last 168；min 163 / max 169，区间 ±3） | < 5 | 通过 |
+| 连接池占用 slope（conns/h） | **0.0000 conns/h**（恒为 0） | < 1 | 通过 |
+| 错误率（%） | **0 / 5504 = 0.000%**（stderr log 全程 0 个 `[ERROR]` 行） | < 0.1 | 通过 |
 | 响应延迟 P50（s） | N/A（soak 脚本未采集 mem_op / dag_run 耗时分位） | — | — 数据未采集 |
 | 响应延迟 P95（s） | N/A（同上） | < 2 | — 数据未采集 |
 | 响应延迟 P99（s） | N/A（同上） | < 5 | — 数据未采集 |

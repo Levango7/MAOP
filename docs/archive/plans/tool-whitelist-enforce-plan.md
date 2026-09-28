@@ -18,7 +18,7 @@
 | tools 表 schema | 含 `command TEXT NOT NULL` 字段（`tool_manager.py:172-185`） |
 | 本机 tools 表 | `data/maop.db` 存在但 **无 tools 表**——工具在部署环境经 `register(id, command=...)` 入 DB，仓库内无种子 |
 | audit 日志 | `[tool_policy] audit: tool %r not in whitelist ...` warning（本机未实际跑过调用，无收集数据） |
-| 测试独立性 | `test_tool_manager.py` 全部用 `tmp_path` 临时目录构造，**不依赖仓库 yaml 默认值** （改默认 audit 不影响测试） |
+| 测试独立性 | `test_tool_manager.py` 全部用 `tmp_path` 临时目录构造，**不依赖仓库 yaml 默认值** ✓（改默认 audit 不影响测试） |
 
 **关键事实**：本机无法导出"真实工具清单"（空表）。工具权威来源是部署环境 DB。阶段二的 allow 清单必须在**部署环境**生成，仓库内只能：① 预置高危 deny（安全默认）；② 提供导出脚本与切换检查清单。
 
