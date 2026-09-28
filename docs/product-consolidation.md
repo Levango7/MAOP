@@ -200,6 +200,10 @@ IDE、单体 agent 工具——对标单体 CLI 时，MAOP 的定位是它的上
    同批遗留的 `docs/archive/`（15 文件 / 476 处 emoji，357 行）已于 2026-09-29 清理轮补完：
    正文删除、纯 emoji 单元格按表头换成文字，`design-system-legacy.md` 因"emoji 是文档内容本身"
    豁免；改动经逐行核对（行数 / 每行 `|` 数 / 只动含 emoji 的行）确认无结构性破坏。
+   `deliverables/` 的 emoji 也已清零（4 个被跟踪文件；该目录整体在 `.gitignore` 内，只有历史
+   跟踪的 9 个文件可入库）。此批核对时发现 `docs/archive` 那批把 `✓` 也吞了 2 处（与其声明
+   不符，语义未受损），已随该批恢复并把清理字符类改为显式跳过 `✓`/`✗`。
+   至此"去 AI 味"口径覆盖：活跃 docs + 根级文档 + docs/archive + deliverables。
 3. **死重清理（已完成 2026-09-29）**：`archive/` tag → `git rm -r archive/`（107 文件）；
    根 `otel-collector-config.yaml`、`migrate_bridge_to_proxy.py`、`smoke_test_agents.py`、 <!-- docs-gate: skip=删除/更正台账，故意点名已不存在的路径 -->
    `scripts/doc_reconcile.py` 删除；空 `plugins/` 移除；链式日志残留（39+19）**先修
