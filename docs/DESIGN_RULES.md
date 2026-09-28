@@ -242,11 +242,11 @@ Vue 3 实现统一使用 1px 边框 + token 驱动，原三级边框（外框 4p
 ---
 
 ## 10. 禁止事项
-- ❌ 禁止使用 `alert()` / `confirm()` — 用 `<Toast />` 组件或页面内联状态提示
-- ❌ 禁止直接显示原始 JSON — 转为结构化展示
-- ❌ 禁止硬编码魔法数字 — 从后端 API 获取真实数据
-- ❌ 禁止硬编码色值 — 统一消费 `src/styles/tokens.css` / `themes.css` 中的 CSS 变量
-- ✅ 主前端使用 Vue 3 + Vite（源码 `dashboard-enterprise/`，构建产物 `dashboard/dist-enterprise/`）
-- ❌ 禁止引入第二套前端框架（Lit/React/Svelte 等）— 单一 Vue 3 技术栈
-- ❌ 禁止在 dashboard/ 放调试截图 — 截图是临时文件，用完即删
-- ❌ 禁止复活原生 JS 仪表盘的 per-section `--sc` 18 色体系 — 已归档废弃
+- 禁止使用 `alert()` / `confirm()` — 用 `<Toast />` 组件或页面内联状态提示
+- 禁止直接显示原始 JSON — 转为结构化展示
+- 禁止硬编码魔法数字 — 从后端 API 获取真实数据
+- 禁止硬编码色值 — 统一消费 `src/styles/tokens.css` / `themes.css` 中的 CSS 变量
+- 主前端使用 Vue 3 + Vite（源码 `dashboard-enterprise/`，构建产物 `dashboard/dist-enterprise/`）
+- 禁止引入第二套前端框架（Lit/React/Svelte 等）— 单一 Vue 3 技术栈
+- 禁止在 dashboard/ 放调试截图 — 截图是临时文件，用完即删
+- 禁止复活原生 JS 仪表盘的 per-section `--sc` 18 色体系 — 已归档废弃

@@ -170,15 +170,15 @@ CREATE INDEX IF NOT EXISTS idx_sso_providers_protocol ON sso_providers(protocol)
 
 | 字段 | 必需 | 加密 | 说明 |
 |------|------|------|------|
-| `client_id` | ✅ | ❌ | OIDC 客户端 ID |
-| `client_secret_enc` | ✅ | ✅ | Fernet 加密后的 client_secret |
-| `issuer_url` | ❌ | ❌ | Issuer URL（用于 Discovery，可选） |
-| `authorize_url` | ✅ | ❌ | Authorization endpoint |
-| `token_url` | ✅ | ❌ | Token endpoint |
-| `userinfo_url` | ❌ | ❌ | UserInfo endpoint（可选，不从 id_token 解析时使用） |
-| `redirect_uri` | ✅ | ❌ | 回调 URI，含 `{provider_id}` 占位符 |
-| `scopes` | ❌ | ❌ | OAuth scopes，默认 `["openid", "profile", "email"]` |
-| `use_pkce` | ❌ | ❌ | 是否启用 PKCE，默认 `true` |
+| `client_id` | 是 | 否 | OIDC 客户端 ID |
+| `client_secret_enc` | 是 | | Fernet 加密后的 client_secret |
+| `issuer_url` | 否 | | Issuer URL（用于 Discovery，可选） |
+| `authorize_url` | 是 | 否 | Authorization endpoint |
+| `token_url` | 是 | 否 | Token endpoint |
+| `userinfo_url` | 否 | | UserInfo endpoint（可选，不从 id_token 解析时使用） |
+| `redirect_uri` | 是 | 否 | 回调 URI，含 `{provider_id}` 占位符 |
+| `scopes` | 否 | | OAuth scopes，默认 `["openid", "profile", "email"]` |
+| `use_pkce` | 否 | | 是否启用 PKCE，默认 `true` |
 
 ### 3.3 SAML config 结构
 
@@ -200,14 +200,14 @@ CREATE INDEX IF NOT EXISTS idx_sso_providers_protocol ON sso_providers(protocol)
 
 | 字段 | 必需 | 加密 | 说明 |
 |------|------|------|------|
-| `entity_id` | ✅ | ❌ | IdP Entity ID |
-| `sso_url` | ✅ | ❌ | IdP Single Sign-On Service URL |
-| `slo_url` | ❌ | ❌ | IdP Single Logout Service URL（可选） |
-| `x509_cert_enc` | ✅ | ✅ | Fernet 加密后的 IdP X.509 证书（base64 DER） |
-| `name_id_format` | ❌ | ❌ | NameID Format，默认 `emailAddress` |
-| `acs_url` | ✅ | ❌ | SP Assertion Consumer Service URL，含 `{provider_id}` 占位符 |
-| `sp_entity_id` | ✅ | ❌ | SP Entity ID（本系统） |
-| `want_signed` | ❌ | ❌ | 是否要求签名 Response，默认 `true` |
+| `entity_id` | 是 | 否 | IdP Entity ID |
+| `sso_url` | 是 | 否 | IdP Single Sign-On Service URL |
+| `slo_url` | 否 | | IdP Single Logout Service URL（可选） |
+| `x509_cert_enc` | 是 | | Fernet 加密后的 IdP X.509 证书（base64 DER） |
+| `name_id_format` | 否 | | NameID Format，默认 `emailAddress` |
+| `acs_url` | 是 | 否 | SP Assertion Consumer Service URL，含 `{provider_id}` 占位符 |
+| `sp_entity_id` | 是 | 否 | SP Entity ID（本系统） |
+| `want_signed` | 否 | | 是否要求签名 Response，默认 `true` |
 
 ### 3.4 属性映射结构
 
@@ -1207,12 +1207,12 @@ zh: {
 
 | IdP | OIDC | SAML 2.0 | 备注 |
 |-----|------|----------|------|
-| Azure AD | ✅ | ✅ | 推荐 OIDC（v2.0 endpoint） |
-| Keycloak | ✅ | ✅ | 两种均完整支持 |
-| Okta | ✅ | ✅ | 两种均支持 |
-| ADFS | ✅ | ✅ | SAML 更常见 |
-| Google Workspace | ✅ | ❌ | 仅 OIDC |
-| GitLab | ✅ | ❌ | 仅 OIDC |
+| Azure AD | 是 | | 推荐 OIDC（v2.0 endpoint） |
+| Keycloak | 是 | | 两种均完整支持 |
+| Okta | 是 | | 两种均支持 |
+| ADFS | 是 | | SAML 更常见 |
+| Google Workspace | 是 | 否 | 仅 OIDC |
+| GitLab | 是 | 否 | 仅 OIDC |
 
 ---
 

@@ -608,7 +608,7 @@ MAOP 4.3.0+ 自动脱敏以下密钥格式，原始值不会出现在日志中�
 
 ### 状态码对照（内部状态）
 
-| 状态 | ✅ 健康 | ❌ 异常 |
+| 状态 | 健康 | 异常 |
 |------|---------|---------|
 | Agent | `healthy: true` | `healthy: false` |
 | Provider | `provider.status: ok` | `provider.status: error` |

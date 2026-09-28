@@ -93,11 +93,11 @@ threat model, and operational guidelines.
 
 Last audit: 2026-07-17
 
-- `shell=True` residual: **0** ✅
-- `eval()`/`exec()` usage: **0** ✅
-- Hardcoded secrets: **0** ✅
-- `print()` in production code: **0** (all converted to `logging`) ✅
-- PS fallback: disabled by default, env-gated (`MAOP_FALLBACK_TO_PS=0`) ✅
+- `shell=True` residual: **0**
+- `eval()`/`exec()` usage: **0**
+- Hardcoded secrets: **0**
+- `print()` in production code: **0** (all converted to `logging`)
+- PS fallback: disabled by default, env-gated (`MAOP_FALLBACK_TO_PS=0`)
 
 ## Reporting
 

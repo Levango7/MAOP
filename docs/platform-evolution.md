@@ -107,11 +107,11 @@ GitHub Actions CI 分两步：
 
 | Test Suite | Count | Status |
 |------------|-------|--------|
-| Model Management | 47 | ✅ all passed |
-| Control Plane | 20 | ✅ all passed |
-| Contract Tests | 25 | ✅ all passed |
-| **Total New** | **92** | **✅ all passed** |
-| Existing Tests | 547 | ✅ passed (10 pre-existing failures unrelated) |
+| Model Management | 47 | 全部通过 |
+| Control Plane | 20 | 全部通过 |
+| Contract Tests | 25 | 全部通过 |
+| **Total New** | **92** | **全部通过** |
+| Existing Tests | 547 | 通过 (10 pre-existing failures unrelated) |
 
 ## Files Created/Modified
 

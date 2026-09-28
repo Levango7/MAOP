@@ -25,25 +25,25 @@ Python (约 2000 行)            PowerShell (约 7000 行，保留)
 
 ### 调度流程审计结论
 
-**Fallback 链** ✅ 正确
+**Fallback 链**：正确
 - `maop-plan.ps1` 选定 primary agent → routing table 提供 fallback/tertiary → `maop-loop.ps1` 构建完整 fallback 链
 - 链中无重复（`-notcontains` 检查）
 - 全部失败时有兜底返回 `exit_code=-1, error="All agents failed"`
 
-**Timeout 执行** ✅ 双层保障
+**Timeout 执行**：双层保障
 - `maop-execute.ps1` → `delegate-plugin.ps1`：传递 `-TimeoutSeconds`
 - `delegate-plugin.ps1` 的 4 种 driver 内均有 `$p.WaitForExit($timeout * 1000)` 超时 kill
 - 规则读取：已修复 `config/rules.yaml` → `max_retries=3, timeout_s=120`
 
-**ID 碰撞** ✅ 无风险
+**ID 碰撞**：无风险
 - `[guid]::NewGuid()` 每次运行生成唯一 TraceID
 - SQLite checkpoint 使用 `TraceID` 作为 key
 
-**并发安全** ✅ 已经设计
+**并发安全**：已经设计
 - Dashboard：FastAPI async 天然非阻塞，每次 PS 调用独立子进程
 - PS 引擎：每次 `maop-loop` 运行为独立 powershell.exe 进程，天然隔离
 
-**反馈循环** ✅ 正确
+**反馈循环**：正确
 - Verify 失败 → `maop-loop` 构建 `$feedbackTask` → 第二轮 Plan→Execute→Verify，最多 2 个反馈循环
 
 ### 一个需要注意的边界情况

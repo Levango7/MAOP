@@ -40,7 +40,7 @@ cp .env.example .env
 #   MAOP_DASH_PORT=9079               （可选，默认 9079）
 ```
 
-> 📸 截图：`.env` 文件关键配置区域
+> 截图：`.env` 文件关键配置区域
 
 ## 3. 启动（1 分钟）
 
@@ -60,14 +60,14 @@ npm run dev
 ```
 看到 `Local: http://localhost:5173` 表示启动成功。
 
-> 📸 截图：两个终端窗口分别显示后端和前端的启动日志
+> 截图：两个终端窗口分别显示后端和前端的启动日志
 
 ## 4. 运行第一个 Agent 任务（2 分钟）
 
 ### 4.1 打开 Dashboard
 浏览器访问 `http://localhost:5173`
 
-> 📸 截图：Dashboard 首页（首次访问会显示新手引导）
+> 截图：Dashboard 首页（首次访问会显示新手引导）
 
 ### 4.2 创建 Agent
 1. 点击左侧导航栏 **Agents**
@@ -78,7 +78,7 @@ npm run dev
    - **模型**：选择你配置的 LLM 模型
 4. 点击 **保存**
 
-> 📸 截图：Agent 创建表单
+> 截图：Agent 创建表单
 
 ### 4.3 运行任务
 1. 在 Agent 列表中点击刚创建的 Agent
@@ -87,14 +87,14 @@ npm run dev
 4. 按 Enter 发送
 5. 观察 Agent 的 Plan→Execute→Verify 执行过程
 
-> 📸 截图：Agent 执行结果的 Chat 界面
+> 截图：Agent 执行结果的 Chat 界面
 
 ## 5. 下一步
 
-- 📖 [自演化使用指南](evolution-guide.md) — 了解 Agent 如何自我优化
-- 🔧 [部署指南](deployment.md) — 生产环境部署
-- 🏗 [架构设计文档](adr/) — 深入理解 MAOP 架构
-- 📋 [变更日志](../CHANGELOG.md) — 了解最新功能
+- [自演化使用指南](evolution-guide.md) — 了解 Agent 如何自我优化
+- [部署指南](deployment.md) — 生产环境部署
+- [架构设计文档](adr/) — 深入理解 MAOP 架构
+- [变更日志](../CHANGELOG.md) — 了解最新功能
 
 ## FAQ
 
@@ -112,4 +112,4 @@ npm run dev
 
 ---
 
-需要更多帮助？查看完整文档：[📚 文档中心](README.md)
+需要更多帮助？查看完整文档：[文档中心](README.md)

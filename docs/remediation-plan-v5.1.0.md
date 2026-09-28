@@ -74,7 +74,7 @@ push: ${{ github.event_name == 'push' && env.REGISTRY_URL != '' }}
 
 > **进度更新（2026-08-17）**：已由 5e3174b 部分落地（fastapi 0.115.0→`>=0.141.1,<0.142`、starlette→`>=1.3.1`、cryptography→`<51`、python-dotenv→`>=1.2.2`，三文件对齐），本地 `pip-audit -r requirements.lock` 实测 **No known vulnerabilities found**。剩余项：aiohttp/pyjwt/python-multipart/lxml/idna/h11/pytest 在 lock 中均为范围约束、解析到最新版无漏洞；第 2 步"pip-tools 生成全 pin + hash lock"仍可独立立项。
 
-### P0-3 BudgetGuard 双实现，准入拦截读死账本 ⚠️（本计划最严重项）
+### P0-3 BudgetGuard 双实现，准入拦截读死账本（本计划最严重项）
 
 **证据**：
 - `model/budget.py` BudgetGuard（**JSON 账本** `data/budget_ledger.json`）← `delegate/dispatcher.py:687` 的 `can_spend` 准入拦截用它；

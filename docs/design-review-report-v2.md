@@ -4,7 +4,7 @@
 > 审核日期：2026-08-22
 > 审核范围：对修正后的三份架构增强设计文档进行二次审核（可行性 / 风险性 / 兼容性）
 > 审核依据：首次审核报告（`design-review-report.md`，Task 334）记录的 12 项问题 + 修正后设计文档 + 关键标记 grep 验证
-> 前置审核：首次审核（Task 334）结论为 ⚠️ 有条件通过，退回设计阶段修正 12 项问题
+> 前置审核：首次审核（Task 334）结论为有条件通过，退回设计阶段修正 12 项问题
 
 ---
 
@@ -14,9 +14,9 @@
 
 | 设计文档 | 首次结论 | 二次结论 | 修正项数 | 验证结果 |
 |----------|----------|----------|----------|----------|
-| design-supervisor-agent.md | ⚠️ 有条件通过 | ✅ 通过 | 8 | 8 项全部已修正，未引入高/中严重度新问题 |
-| design-debate-agent.md | ⚠️ 有条件通过 | ✅ 通过 | 7 | 7 项全部已修正，未引入高/中严重度新问题 |
-| design-blackboard.md | ⚠️ 有条件通过 | ✅ 通过 | 4 | 4 项全部已修正，未引入高/中严重度新问题 |
+| design-supervisor-agent.md | 有条件通过 | 通过 | 8 | 8 项全部已修正，未引入高/中严重度新问题 |
+| design-debate-agent.md | 有条件通过 | 通过 | 7 | 7 项全部已修正，未引入高/中严重度新问题 |
+| design-blackboard.md | 有条件通过 | 通过 | 4 | 4 项全部已修正，未引入高/中严重度新问题 |
 
 **二次审核结论摘要**：三份设计文档针对首次审核的 12 项问题（2 高 + 7 中 + 3 低）已全部修正，修正质量高、方案一致。关键的高严重度问题（C-1 / C-3 EventBus 统一）已跨三份文档协同修正，统一采用 `core.reliability.event_bus.EventBus` 的 `publish(Event)` API 与 `get_event_bus()` 全局单例。二次审核未发现高/中严重度的新引入问题，仅发现 2 项极低严重度的文档表述/设计细节差异，不阻塞实施。**建议三份设计进入执行阶段**。
 
@@ -32,7 +32,7 @@
 
 - **所属文档**：design-supervisor-agent.md
 - **首次问题**：`failure_detector.py` 的 `_publish_event` 调用 `emit()`，但 `core.reliability.event_bus.EventBus` 无 `emit()` 方法，存在两个 EventBus 实现 API 不统一。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 908-942 行新增"EventBus API 统一（修正 [C-1]）"小节，明确统一方案：
     1. 统一 API：监督者及其父类一律使用 `core.reliability.event_bus.EventBus.publish(Event)`，不再使用 `emit()`。
@@ -46,7 +46,7 @@
 
 - **所属文档**：design-blackboard.md
 - **首次问题**：黑板用 `core.reliability.event_bus.EventBus`（`publish(Event)`），监督者继承 `failure_detector` 用 `emit()`，两个实例独立则事件无法互通。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 508-524 行新增"2.3.2.1 统一 EventBus 实例与 API（对应审核项 C-3）"小节，明确统一方案：
     1. 全局唯一实例：统一使用 `core.reliability.event_bus.EventBus`，通过 `get_event_bus()` 获取单例，黑板控制器、监督者、执行引擎均注入同一实例。
@@ -61,7 +61,7 @@
 
 - **所属文档**：design-supervisor-agent.md
 - **首次问题**：`HealthChecker.check()` 需对 agent 执行 ping/metrics/resource 三类探针，但设计中未说明探针如何实现。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 677-704 行新增"探针实现方案（补充 [F-1]）"小节，给出三类探针的实现方案对照表：
     - ping：dispatch 轻量任务 `task='__health_ping__'` 测往返延迟，复用 `Dispatcher.dispatch()` 路径（熔断/预算/guardrail 全部生效）。
@@ -74,7 +74,7 @@
 
 - **所属文档**：design-supervisor-agent.md
 - **首次问题**：`replace()` 流程说"更新路由注册表"，但未指明路由注册表的具体代码位置。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 447-454 行新增"路由注册表定位（补充 [F-2]）"说明：
     - 路由映射存储在 `py/maop/core/routing/routing_decision.py` 中（`dispatch_core.py:33` 导入 `RoutingDecisionRecord` 与 `AgentResolver`）。
@@ -86,7 +86,7 @@
 
 - **所属文档**：design-supervisor-agent.md
 - **首次问题**：`upgrade()` 需按 rollout_steps 逐步切流量（10% → 50% → 100%），但现有路由不支持加权分流。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 515-521 行新增"灰度切量方案（补充 [F-3]）"说明：
     - 明确现有 `RoutingDecisionRecord` 与 `AgentResolver` 是单值映射，不支持加权分流。
@@ -99,7 +99,7 @@
 
 - **所属文档**：design-debate-agent.md
 - **首次问题**：辩论型定义 `SupervisorAction` 仅 5 成员（REPLACE/DEGRADE/TERMINATE/UPGRADE/NONE），监督者型定义 7 成员（多 PATROL/ALERT），应统一。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 348-358 行修正枚举定义为 7 成员版本（PATROL/ALERT/REPLACE/DEGRADE/TERMINATE/UPGRADE/NONE），与监督者型一致。
   - 第 349-351 行明确注释"SupervisorAction 枚举定义在 `py/maop/core/scheduling/supervisor.py` 中，辩论型复用监督者型定义（见 design-supervisor-agent.md 2.2.1 节），此处仅作引用说明，不重复定义。"
@@ -109,7 +109,7 @@
 
 - **所属文档**：design-blackboard.md
 - **首次问题**：设计文档写 `EventBus.publish("blackboard.changed", ...)`，但实际 API 是 `publish(event: Event)`，接收 `Event` 对象而非 `(topic, data)`。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 526-569 行新增"2.3.2.2 事件定义与发布 API（对应审核项 F-6）"小节，明确：
     - 事件主题 `blackboard.changed`，`data` 含完整字段，`source="blackboard"`。
@@ -122,7 +122,7 @@
 
 - **所属文档**：design-supervisor-agent.md
 - **首次问题**：`start_patrol_loop()` 创建后台 `asyncio.Task`，未说明启动时机与生命周期管理。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 382-398 行新增"启动时机与生命周期（补充 [R-1]）"说明，明确两种启动方式（由配置 `patrol_loop_start_mode` 决定）：
     - **懒启动（lazy，默认）**：在 `Engine.run()` 首次调用时，若监督者已配置且巡检循环未启动，则通过 `asyncio.create_task()` 懒启动。
@@ -134,7 +134,7 @@
 
 - **所属文档**：design-supervisor-agent.md
 - **首次问题**：`terminate()` 标记 `disabled=True` 后，若该 agent 是某 routing_key 的唯一可用 agent，该 routing_key 将无可用 agent。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 482-494 行新增"边界检查（补充 [R-2]）"说明：
     - terminate 前检查该 agent 是否为某 routing_key 的唯一可用 agent（通过 `routing_decision.py` 查询，排除已 disabled/drained 的 agent）。
@@ -147,7 +147,7 @@
 
 - **所属文档**：design-supervisor-agent.md
 - **首次问题**：设计说"若新版本劣化则自动回退"，但未明确"劣化"的量化标准。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 523-530 行新增"回退触发条件（补充 [R-3]）"说明，明确量化判定标准（任一满足即触发自动回退）：
     - 新版本窗口失败率 > 0.15（`failure_rate > 0.15`）。
@@ -160,7 +160,7 @@
 
 - **所属文档**：design-debate-agent.md
 - **首次问题**：设计说"DEBATE 阶段是纯增量插入，不修改既有阶段签名"，但实际插入需修改 `run_cycle()` 方法体，`_phase_evaluate()` 入参从 `suggestions` 变为 `debated_suggestions`。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 505 行修正"回滚兼容"描述为："DEBATE 阶段插入需修改 `evolution_loop.py:run_cycle()` 方法体，在 `_phase_suggest()` 和 `_phase_evaluate()` 调用之间插入 `_phase_debate()` 调用，并将 `_phase_evaluate()` 入参改为辩论后的建议列表 `debated_suggestions`。`LoopPhase` 枚举新增 DEBATE 成员（在 `evolution_loop_types.py` 中），既有枚举值不变。这是方法体修改而非签名修改，既有调用方不受影响。当 `DebateOrchestrator` 未配置时，`_phase_debate()` 直接透传 suggestions，行为退化为现状，保证向后兼容。"
   - 描述准确反映了实际修改范围（方法体修改而非签名修改），并明确了向后兼容退化路径。
@@ -170,7 +170,7 @@
 
 - **所属文档**：design-debate-agent.md
 - **首次问题**：高频辩论下成本与延迟显著上升，设计中仅"HIGH severity 或显式请求才辩论"作为缓解，未给出成本预算阈值。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 563 行参数表新增 `max_debate_tokens`（默认 50000）：单场辩论总 token 上限，超限后提前终止并降级为单 agent 决策。
   - 第 568 行新增"成本控制"说明：辩论过程中累计各 agent 各轮 token 消耗，超限后提前终止辩论并降级为单 agent 决策（取历史可信度最高的 agent 直接 dispatch），同时在 `Verdict.adjudication_reason` 中记录"成本超限降级"。
@@ -183,7 +183,7 @@
 
 - **所属文档**：design-supervisor-agent.md
 - **首次问题**：full/sample/adaptive 三种巡检策略均需实现，adaptive 策略实现复杂度较高。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 1008-1010 行新增"首版实现范围（补充 [F-4]）"说明：
     - **首版仅实现 full 策略**，`patrol_strategy` 参数首版仅接受 `"full"`，传入 `"sample"` 或 `"adaptive"` 将记录 warning 日志并降级为 full。
@@ -195,7 +195,7 @@
 
 - **所属文档**：design-debate-agent.md
 - **首次问题**：高频辩论下 `debate` 表膨胀，设计中提到"设保留期清理"但未给出具体策略。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 507 行新增"轨迹清理"说明：辩论轨迹保留 30 天，超期记录归档到冷存储后删除。清理任务在 EvolutionLoop 的 CONSOLIDATE 阶段执行——CONSOLIDATE 阶段原有逻辑不变，新增调用 `debate.persistence.cleanup_expired(retention_days=30)` 清理超期辩论记录。清理任务受 CONSOLIDATE 阶段既有频率约束（每轮演化循环执行一次），避免高频清理抢占主流程资源。
   - 第 718 行文件清单中 `persistence.py` 职责也补充了清理机制说明。
@@ -206,7 +206,7 @@
 
 - **所属文档**：design-debate-agent.md
 - **首次问题**：单轮超时 120s，超时方视为弃权，但若 1 个 agent 慢、其余 agent 快，整轮仍需等待慢 agent 超时。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 561 行参数表新增 `agent_timeout_s`（默认 60）：单 agent 超时，超时方视为弃权（confidence=0），不等待慢 agent。
   - 第 570 行新增"超时粒度"说明：超时判定粒度为"单 agent 超时"——每个 agent 有独立的 `agent_timeout_s`，单个 agent 超时即视为弃权，不等待慢 agent 完成后再判定整轮。`round_timeout_s` 作为整轮兜底超时。两者关系：`agent_timeout_s` < `round_timeout_s`，单 agent 超时优先触发。
@@ -217,7 +217,7 @@
 
 - **所属文档**：design-blackboard.md
 - **首次问题**：并发分组依赖知识源正确声明 `read_domains`，若未声明或声明不全，可能导致本应串行的知识源被并发执行。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 466-475 行新增"read_domains 声明与并发校验（对应审核项 R-7）"说明，明确四重校验机制：
     1. **注册时默认值**：未声明 `read_domains`（返回空列表）默认为**只读全部域**（保守策略，等价于 `["*"]`），不与其他知识源并发执行，仅可独占运行。
@@ -230,7 +230,7 @@
 
 - **所属文档**：design-blackboard.md
 - **首次问题**：动态注册知识源的安全对策提到"知识源类名白名单校验"，但未说明白名单的配置方式与加载时机。
-- **修正状态**：✅ 已修正
+- **修正状态**：已修正
 - **验证详情**：
   - 第 653-688 行新增"知识源白名单机制（对应审核项 R-8）"说明，明确四方面：
     1. **白名单配置**：配置在 `config/blackboard.yaml` 中，格式为 `allowed_knowledge_sources` 列表（给出示例）。
@@ -246,25 +246,25 @@
 
 对三份修正后设计文档进行新引入问题检查，重点验证 EventBus 统一方案跨文档一致性、伪代码正确性、枚举定义一致性、边界处理一致性。
 
-### 3.1 EventBus 统一方案跨文档一致性 ✅
+### 3.1 EventBus 统一方案跨文档一致性
 
 三份文档的 EventBus 统一方案完全一致：
 
 | 文档 | 统一方案 | 验证结果 |
 |------|----------|----------|
-| design-supervisor-agent.md | 统一使用 `core.reliability.event_bus.EventBus` 的 `publish(Event)` API，`get_event_bus()` 返回 core 版单例，修正 `_publish_event` 和 TYPE_CHECKING 导入 | ✅ 第 908-942 行明确，与 engine.py 导入一致 |
-| design-debate-agent.md | EventBus API 统一使用 `core.reliability.event_bus.EventBus` 的 `publish(Event)` 方法，`event_bus` 由 `get_event_bus()` 返回全局单例 | ✅ 第 383-390 行明确 |
-| design-blackboard.md | 全局唯一实例统一使用 `core.reliability.event_bus.EventBus`，通过 `get_event_bus()` 获取单例，黑板控制器/监督者/执行引擎均注入同一实例 | ✅ 第 508-524 行明确 |
+| design-supervisor-agent.md | 统一使用 `core.reliability.event_bus.EventBus` 的 `publish(Event)` API，`get_event_bus()` 返回 core 版单例，修正 `_publish_event` 和 TYPE_CHECKING 导入 | 第 908-942 行明确，与 engine.py 导入一致 |
+| design-debate-agent.md | EventBus API 统一使用 `core.reliability.event_bus.EventBus` 的 `publish(Event)` 方法，`event_bus` 由 `get_event_bus()` 返回全局单例 | 第 383-390 行明确 |
+| design-blackboard.md | 全局唯一实例统一使用 `core.reliability.event_bus.EventBus`，通过 `get_event_bus()` 获取单例，黑板控制器/监督者/执行引擎均注入同一实例 | 第 508-524 行明确 |
 
 grep 验证：三份文档中 `enterprise.notification.event_bus` 的出现均为说明性引用（描述当前问题/修正方案），无实际导入残留。`emit()` 的出现均为说明性引用，无实际调用残留。
 
-### 3.2 伪代码 EventBus 调用正确性 ✅
+### 3.2 伪代码 EventBus 调用正确性
 
 黑板文档所有 EventBus 调用均修正为 `publish(Event(...))` 或 `publish_sync(Event(...))` 形式：
 - grep `EventBus.publish("`（错误形式 `EventBus.publish("topic", ...)`）出现 0 处。
 - grep `event_bus.publish(` / `bus.publish(` 出现 8 处，全部为 `publish(Event(...))` 正确形式。
 
-### 3.3 枚举定义一致性 ✅
+### 3.3 枚举定义一致性
 
 `SupervisorAction` 枚举跨文档一致：
 - 监督者文档（第 234-242 行）：7 成员（PATROL/ALERT/REPLACE/DEGRADE/TERMINATE/UPGRADE/NONE）。
@@ -288,7 +288,7 @@ grep 验证：三份文档中 `enterprise.notification.event_bus` 的出现均�
 - **影响**：两份文档的边界处理策略不同，但保护目标一致（都避免 routing_key 无可用 agent 导致调度死锁）。差异源于场景不同——`terminate()` 是通用显式调用（拒绝更安全），`adjudicate()` 是辩论僵局自动裁决（降级为 degrade 更适合自动流程，避免抛异常中断裁决）。
 - **建议**：实施阶段统一为"`terminate()` 方法统一抛 `TerminateRefusedError`，`adjudicate()` 捕获该异常后降级为 degrade"，使 terminate 边界逻辑只在一处实现，adjudicate 复用。此为实施细节，不影响设计架构正确性。
 
-### 3.5 其他检查项 ✅
+### 3.5 其他检查项
 
 - **向后兼容退化路径**：三份文档均明确"未配置时退化为现状"的退化路径（监督者 `supervisor is None` 分支、辩论 `_phase_debate()` 透传、黑板控制器未启动），未因修正引入破坏性变更。
 - **修改文件清单完整性**：三份文档的修改文件清单均更新了修正项（如监督者文档第 1137 行明确标注 `[C-1] 修正 _publish_event`），与正文修正一致。
@@ -304,10 +304,10 @@ grep 验证：三份文档中 `enterprise.notification.event_bus` 的出现均�
 
 | 设计文档 | 首次问题数 | 已修正数 | 未修正数 | 新引入问题 | 二次结论 |
 |----------|-----------|---------|---------|-----------|----------|
-| design-supervisor-agent.md | 8 | 8 | 0 | 0 | ✅ 通过 |
-| design-debate-agent.md | 7 | 7 | 0 | 1（极低，N-1） | ✅ 通过 |
-| design-blackboard.md | 4 | 4 | 0 | 0 | ✅ 通过 |
-| **合计** | **12**（2 高 + 7 中 + 3 低） | **12** | **0** | **1 极低 + 1 低**（N-1/N-2，不阻塞） | **✅ 全部通过** |
+| design-supervisor-agent.md | 8 | 8 | 0 | 0 | 通过 |
+| design-debate-agent.md | 7 | 7 | 0 | 1（极低，N-1） | 通过 |
+| design-blackboard.md | 4 | 4 | 0 | 0 | 通过 |
+| **合计** | **12**（2 高 + 7 中 + 3 低） | **12** | **0** | **1 极低 + 1 低**（N-1/N-2，不阻塞） | **全部通过** |
 
 ### 4.2 修正质量评估
 
@@ -318,7 +318,7 @@ grep 验证：三份文档中 `enterprise.notification.event_bus` 的出现均�
 
 ### 4.3 审核决定
 
-**三份设计文档二次审核全部 ✅ 通过**。
+**三份设计文档二次审核全部通过**。
 
 - 首次审核的 12 项问题（2 高 + 7 中 + 3 低）已全部修正，修正质量高、方案一致。
 - 二次审核未发现高/中严重度的新引入问题。
@@ -334,5 +334,5 @@ grep 验证：三份文档中 `enterprise.notification.event_bus` 的出现均�
 ---
 
 > 审核人：CodeArts 审核代理（Task 346）
-> 审核状态：✅ 通过（三份设计二次审核全部通过）
+> 审核状态：通过（三份设计二次审核全部通过）
 > 下一步：三份设计进入执行阶段，优先实施 EventBus 统一修正（C-1 / C-3）

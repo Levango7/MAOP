@@ -1,6 +1,6 @@
 # MAOP 深度审查修正报告
 
-> **⚠️ SUPERSEDED（已废弃）**：本文档已被 [audit-report-corrected-v2.md](./audit-report-corrected-v2.md) 取代。新读者请直接阅读 v2；本文件仅保留作历史审计脉络，其中结论可能已过时或被后续修复改变。
+> **SUPERSEDED（已废弃）**：本文档已被 [audit-report-corrected-v2.md](./audit-report-corrected-v2.md) 取代。新读者请直接阅读 v2；本文件仅保留作历史审计脉络，其中结论可能已过时或被后续修复改变。
 
 **审查对象**：`F:\Nexus\MAOP\`（Python MAOP 项目）
 **Git HEAD**：`ef80b6a`（243 commits）
@@ -16,39 +16,39 @@
 
 | 编号 | 严重级别 | 论断标题 | 验证结论 | 关键证据（file:line） | 优先级 |
 |------|---------|---------|---------|----------------------|--------|
-| H1 | High | CLI 静默无输出 | ✅ 属实 | `py/maop/cli.py:88,89-90,92,105-110,130` 全为 `pass` | P0 |
-| H2 | High | CI 红门（doc_reconcile） | ✅ 属实 | README 17 vs 实际 18 子包，`exit 1` | P1 |
-| H3 | High | 覆盖率门禁从未执行 | ✅ 属实 | `ci.yml:172-177` 条件化 `if python -c "import maop.enterprise"`；`pyproject.toml:120-121` hatch exclude；enterprise 目录不存在 → 永远跳过 | P0 |
-| H4 | High | 企业版零测试 | ✅ 属实 | `ci.yml:131-153` 显式 `--ignore` 22 个文件；21 文件 `importorskip` 运行时跳过 | P0 |
-| H5 | High | e2e 失败被 `|| true` 掩盖 | ⚠️ 部分属实 | `ci.yml:193` 确有 `|| true`，但设计意图为消除 exit 5 噪音；真 e2e 由独立 Playwright job（`ci.yml:274`）承担，无掩盖 | P2 |
-| H6 | High | Docker 前端白页壳 | ⚠️ 部分属实 | 本地有 170 个 assets 文件；但确实未被 git 跟踪（`.gitignore` 排除），fresh clone 后缺失 | P0 |
-| H7 | High | 生产 compose 首启无法登录 | ✅ 属实 | `docker-compose.prod.yml:374-397` 无 `MAOP_ADMIN_PASSWORD`；`auth.py:124-130` production 时抛 `RuntimeError` | P0 |
-| H8 | High | 指标从不发射 | ⚠️ 部分属实 | 全库有 58 处 `.inc/.set/.observe` 调用（其他指标）；但 `monitoring.py:530-537` 定义的 8 个特定 `MAOP_*` 指标确实无调用方 | P1 |
-| H9 | High | TLS+PG schema 硬断 | ✅ 属实 | `nginx.prod.conf:33-34` 硬编码 `cert.pem` + named volume 空卷；Dockerfile 未 `COPY alembic.ini` → `docker-entrypoint.sh:10-17` 迁移跳过 | P0 |
-| H10 | High | HA 未接线+备份无 off-box | ✅ 属实 | `docker-compose.prod.yml:383` `MAOP_PG_HOST=postgres`（非 haproxy）；`patroni.yml` 未挂载；`db_backup.py:178` 备份在同卷（仅本地 `VACUUM INTO` + `shutil.copy2`，无 S3/远程上传） | P0 |
-| M1 | Medium | 路由引用不存在的 claude | ✅ 属实 | `agents.yaml` 无 claude 定义；routing 13 处引用（行 497,542,557,576,585,588,599,601,627,655,695,708,721）；`maop_plan.py:36,222,237` 硬编码 `agent = "claude"` | P0 |
-| M2 | Medium | 环境变量脱节 | ✅ 属实 | `MAOP_TLS_ENABLED` 规范名但代码读 `MAOP_TLS`（`server.py:286`, `state.py:101`, `cli.py:38`）；`MAOP_HA_BACKEND` 在主代码 `py/maop` 中 0 引用 | P1 |
-| M3 | Medium | 根目录解析不一致 | ✅ 属实 | 6 处读 `MAOP_ROOT_DIR`（`maop_plan.py:132`, `dispatch_core.py:414`, `route_scorer.py:413`, `auth.py:219`, `routing_preview.py:38,98`）vs Dockerfile 设 `MAOP_ROOT`（`:47`）；`data/maop.db`（610304 字节）和 `py/data/maop.db`（36864 字节）都存在 | P1 |
-| M4 | Medium | pause 空壳 | ⚠️ 部分属实 | `control.py:63-75` 有实现但 `.maop_pause` 无人读取，进程未真正暂停 | P1 |
-| M5 | Medium | DAG 循环静默绕过 | ✅ 属实 | `maop_plan.py:335-339` 循环节点强行排入；`engine_utils.py:191-198` 正确报错但被绕过 | P1 |
-| M6 | Medium | 前端安全债 | ✅ 属实 | `api.js:4` localStorage 存 token；`useDagProgress.js:110` URL query 传 token | P0 |
-| M7 | Medium | 一个月 4 版本 | ✅ 属实 | 4 天 4 版本（8/11-8/14）+ 6 个 `enabled:false` agent | P2 |
-| Low-1 | Low | auth.py SQL 注入 | ❌ 不属实 | `auth.py:199-200` 参数化查询，安全 | — |
-| Low-2 | Low | .env.sandbox 入库 | ✅ 属实 | `git ls-files` 确认被跟踪 | P1 |
-| Low-3 | Low | SECURITY.md 异常 | ❌ 不属实 | 第 30 行为正常安全措施描述 | — |
-| Low-4 | Low | haproxy 无认证 admin | ✅ 属实 | `haproxy.cfg:50` `stats admin if TRUE` + `bind *:7000` | P1 |
-| Low-5 | Low | prometheus 重复注册 | ✅ 属实 | `static.py:136` 与 `_register_routes.py:469` 重复定义 | P2 |
+| H1 | High | CLI 静默无输出 | 属实 | `py/maop/cli.py:88,89-90,92,105-110,130` 全为 `pass` | P0 |
+| H2 | High | CI 红门（doc_reconcile） | 属实 | README 17 vs 实际 18 子包，`exit 1` | P1 |
+| H3 | High | 覆盖率门禁从未执行 | 属实 | `ci.yml:172-177` 条件化 `if python -c "import maop.enterprise"`；`pyproject.toml:120-121` hatch exclude；enterprise 目录不存在 → 永远跳过 | P0 |
+| H4 | High | 企业版零测试 | 属实 | `ci.yml:131-153` 显式 `--ignore` 22 个文件；21 文件 `importorskip` 运行时跳过 | P0 |
+| H5 | High | e2e 失败被 `|| true` 掩盖 | 部分属实 | `ci.yml:193` 确有 `|| true`，但设计意图为消除 exit 5 噪音；真 e2e 由独立 Playwright job（`ci.yml:274`）承担，无掩盖 | P2 |
+| H6 | High | Docker 前端白页壳 | 部分属实 | 本地有 170 个 assets 文件；但确实未被 git 跟踪（`.gitignore` 排除），fresh clone 后缺失 | P0 |
+| H7 | High | 生产 compose 首启无法登录 | 属实 | `docker-compose.prod.yml:374-397` 无 `MAOP_ADMIN_PASSWORD`；`auth.py:124-130` production 时抛 `RuntimeError` | P0 |
+| H8 | High | 指标从不发射 | 部分属实 | 全库有 58 处 `.inc/.set/.observe` 调用（其他指标）；但 `monitoring.py:530-537` 定义的 8 个特定 `MAOP_*` 指标确实无调用方 | P1 |
+| H9 | High | TLS+PG schema 硬断 | 属实 | `nginx.prod.conf:33-34` 硬编码 `cert.pem` + named volume 空卷；Dockerfile 未 `COPY alembic.ini` → `docker-entrypoint.sh:10-17` 迁移跳过 | P0 |
+| H10 | High | HA 未接线+备份无 off-box | 属实 | `docker-compose.prod.yml:383` `MAOP_PG_HOST=postgres`（非 haproxy）；`patroni.yml` 未挂载；`db_backup.py:178` 备份在同卷（仅本地 `VACUUM INTO` + `shutil.copy2`，无 S3/远程上传） | P0 |
+| M1 | Medium | 路由引用不存在的 claude | 属实 | `agents.yaml` 无 claude 定义；routing 13 处引用（行 497,542,557,576,585,588,599,601,627,655,695,708,721）；`maop_plan.py:36,222,237` 硬编码 `agent = "claude"` | P0 |
+| M2 | Medium | 环境变量脱节 | 属实 | `MAOP_TLS_ENABLED` 规范名但代码读 `MAOP_TLS`（`server.py:286`, `state.py:101`, `cli.py:38`）；`MAOP_HA_BACKEND` 在主代码 `py/maop` 中 0 引用 | P1 |
+| M3 | Medium | 根目录解析不一致 | 属实 | 6 处读 `MAOP_ROOT_DIR`（`maop_plan.py:132`, `dispatch_core.py:414`, `route_scorer.py:413`, `auth.py:219`, `routing_preview.py:38,98`）vs Dockerfile 设 `MAOP_ROOT`（`:47`）；`data/maop.db`（610304 字节）和 `py/data/maop.db`（36864 字节）都存在 | P1 |
+| M4 | Medium | pause 空壳 | 部分属实 | `control.py:63-75` 有实现但 `.maop_pause` 无人读取，进程未真正暂停 | P1 |
+| M5 | Medium | DAG 循环静默绕过 | 属实 | `maop_plan.py:335-339` 循环节点强行排入；`engine_utils.py:191-198` 正确报错但被绕过 | P1 |
+| M6 | Medium | 前端安全债 | 属实 | `api.js:4` localStorage 存 token；`useDagProgress.js:110` URL query 传 token | P0 |
+| M7 | Medium | 一个月 4 版本 | 属实 | 4 天 4 版本（8/11-8/14）+ 6 个 `enabled:false` agent | P2 |
+| Low-1 | Low | auth.py SQL 注入 | 不属实 | `auth.py:199-200` 参数化查询，安全 | — |
+| Low-2 | Low | .env.sandbox 入库 | 属实 | `git ls-files` 确认被跟踪 | P1 |
+| Low-3 | Low | SECURITY.md 异常 | 不属实 | 第 30 行为正常安全措施描述 | — |
+| Low-4 | Low | haproxy 无认证 admin | 属实 | `haproxy.cfg:50` `stats admin if TRUE` + `bind *:7000` | P1 |
+| Low-5 | Low | prometheus 重复注册 | 属实 | `static.py:136` 与 `_register_routes.py:469` 重复定义 | P2 |
 
 ### 表：论断分类汇总
 
 | 验证结论 | 数量 | 编号 |
 |---------|------|------|
-| ✅ 属实 | 15 | H1, H2, H3, H4, H7, H9, H10, M1, M2, M3, M5, M6, M7, Low-2, Low-4, Low-5 |
-| ⚠️ 部分属实/不准确 | 4 | H5, H6, H8, M4 |
-| ❌ 不属实 | 2 | Low-1, Low-3 |
+| 属实 | 15 | H1, H2, H3, H4, H7, H9, H10, M1, M2, M3, M5, M6, M7, Low-2, Low-4, Low-5 |
+| 部分属实/不准确 | 4 | H5, H6, H8, M4 |
+| 不属实 | 2 | Low-1, Low-3 |
 | **合计** | **21** | — |
 
-> **修正说明**：上表中"属实"计 16 条（含 Low-5），与汇总 15 条的差异源于原文档笔误；以本表为准，**确认问题总数为 19 条**（15 ✅ + 4 ⚠️）。
+> **修正说明**：上表中"属实"计 16 条（含 Low-5），与汇总 15 条的差异源于原文档笔误；以本表为准，**确认问题总数为 19 条**（15 条属实 + 4 条部分属实）。
 
 ---
 

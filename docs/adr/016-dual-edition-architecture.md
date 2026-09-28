@@ -134,18 +134,18 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 
 ### 正面
 
-- ✅ 单一代码库，维护成本最低
-- ✅ 个人版用户零摩擦升级（pip install maop-enterprise 即可）
-- ✅ FeatureFlag 提供 per-feature 粒度控制，支持渐进式 rollout
-- ✅ License 校验提供技术性商业边界
-- ✅ 向后兼容现有 honor-system 部署
+- 单一代码库，维护成本最低
+- 个人版用户零摩擦升级（pip install maop-enterprise 即可）
+- FeatureFlag 提供 per-feature 粒度控制，支持渐进式 rollout
+- License 校验提供技术性商业边界
+- 向后兼容现有 honor-system 部署
 
 ### 负面
 
-- ⚠️ ~~企业版代码在个人版仓库中可见（虽然受 Commercial 许可约束）~~ **已解决**：见 [ADR-017](017-dual-repo-isolation.md)，企业代码已移至私有仓库 MAOS
-- ⚠️ ~~无在线 license 撤销机制~~（已通过 CRL 实现，见 `maop/enterprise/crl.py`）
-- ⚠️ Edition 检测有轻微运行时开销（首次 import 时）
-- ⚠️ FeatureFlag 枚举膨胀风险（需定期审查）
+- ~~企业版代码在个人版仓库中可见（虽然受 Commercial 许可约束）~~ **已解决**：见 [ADR-017](017-dual-repo-isolation.md)，企业代码已移至私有仓库 MAOS
+- ~~无在线 license 撤销机制~~（已通过 CRL 实现，见 `maop/enterprise/crl.py`）
+- Edition 检测有轻微运行时开销（首次 import 时）
+- FeatureFlag 枚举膨胀风险（需定期审查）
 
 ### 缓解措施
 
@@ -160,16 +160,16 @@ require_feature(FeatureFlag.SSO)  # 个人版抛 FeatureNotAvailable
 
 | 组件 | 状态 |
 |------|------|
-| `config/edition.py` Edition 注册表 | ✅ 完整 |
-| `enterprise/` 12 个企业模块（rbac/tenant/audit/sso/ha/container/tls_auto/pg_persist/saml_handler/crl/n8n/license） | ✅ 完整 |
-| `enterprise/license.py` Ed25519 license 校验 | ✅ 完整（2026-07-25） |
-| `enterprise/n8n.py` n8n 集成 | ✅ 完整（2026-07-25） |
-| Settings 集成（edition 字段 + defaults） | ✅ 完整 |
-| Dashboard edition-gated 路由 | ✅ 完整 |
-| 前端 edition store | ✅ 完整 |
-| 双 pyproject 打包 | ✅ 完整 |
-| Docker profiles（postgres/redis/vault/n8n/...） | ✅ 完整 |
-| 测试套件（edition + 12 企业模块 + license + n8n） | ✅ 完整 |
+| `config/edition.py` Edition 注册表 | 完整 |
+| `enterprise/` 12 个企业模块（rbac/tenant/audit/sso/ha/container/tls_auto/pg_persist/saml_handler/crl/n8n/license） | 完整 |
+| `enterprise/license.py` Ed25519 license 校验 | 完整（2026-07-25） |
+| `enterprise/n8n.py` n8n 集成 | 完整（2026-07-25） |
+| Settings 集成（edition 字段 + defaults） | 完整 |
+| Dashboard edition-gated 路由 | 完整 |
+| 前端 edition store | 完整 |
+| 双 pyproject 打包 | 完整 |
+| Docker profiles（postgres/redis/vault/n8n/...） | 完整 |
+| 测试套件（edition + 12 企业模块 + license + n8n） | 完整 |
 
 ### 待完善
 

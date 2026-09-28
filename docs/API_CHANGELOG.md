@@ -19,8 +19,8 @@ All notable changes to the MAOP REST API and WebSocket API.
 - 通知中心 API（企业版）— 邮件/Webhook 通知 + 通知模板 + 事件订阅
 
 ### Changed
-- **⚠ Breaking**：统一错误响应格式对齐 `ErrorSchema` — 所有经 `handle_api_errors` 装饰器（含 `HTTPException`）的端点错误响应采用扁平结构 `{status, error, code, detail, request_id}`（全部 string 类型），取代历史嵌套 `{"error":{code,message}}`
-- **⚠ Breaking**：Engine 无 `step_executor` 时不再返回假成功 — AGENT/DAG/PLAN 步骤在未注入执行器时一律返回 `StepStatus.FAILED` + `error="No step executor configured..."`
+- **Breaking**：统一错误响应格式对齐 `ErrorSchema` — 所有经 `handle_api_errors` 装饰器（含 `HTTPException`）的端点错误响应采用扁平结构 `{status, error, code, detail, request_id}`（全部 string 类型），取代历史嵌套 `{"error":{code,message}}`
+- **Breaking**：Engine 无 `step_executor` 时不再返回假成功 — AGENT/DAG/PLAN 步骤在未注入执行器时一律返回 `StepStatus.FAILED` + `error="No step executor configured..."`
 
 ## v5.0.2 (2026-08-13)
 
@@ -34,7 +34,7 @@ All notable changes to the MAOP REST API and WebSocket API.
 
 ## v5.0.0 (2026-08-11)
 
-### ⚠ Breaking Changes
+### Breaking Changes
 - 移除 `maop.dashboard.provider.create_app()`（自 v4.0.0 起废弃，生产代码应使用 `maop.dashboard.server:app`）
 - 移除 `maop.dashboard.provider._render_html()`（自 v4.0.0 起废弃，v3.x 静态 HTML 渲染器，已被 Vue 3 SPA 取代）
 - 移除 `maop_plan.py` legacy keyword routing（`_fallback_keyword_route` / `_route_by_keyword` 及 `_ROUTING_RULES`，自 v4.0.0 起标记 DEPRECATED）

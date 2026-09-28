@@ -241,7 +241,7 @@ def test_pending_approval_blocks_ab(evolution_loop_factory):
 **禁止**（在 conftest fixture 之前）：
 
 ```python
-# ❌ 错：模块级 import 会触发 _db_path 固化
+# 错：模块级 import 会触发 _db_path 固化
 from maop.core.evolution.evolution_loop import EvolutionLoop  # at module top
 ```
 

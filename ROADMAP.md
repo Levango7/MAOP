@@ -21,7 +21,7 @@
 
 - **ADR-016 状态同步**：将 SAML SSO 从 `Medium / fail-closed 拒绝` 更新为 `Done`，与代码实际状态（`py/maop/enterprise/sso.py` + `saml_handler.py` + `docs/enterprise/saml-sso-guide.md`）对齐。
 - **mypy 告警清理**：修复 `agents.py:252` return-value 类型错误；将 `vector.py` / `runtime.py` 的 `NotImplementedError` 文档化为 `@abstractmethod`，消除 mypy 误报。
-- **覆盖率 80% → 85%**：补齐 `py/tests/` 关键路径用例，CI 阈值同步上调。（✅ 2026-08-21 核实：实测全量覆盖率 82%，ratchet baseline 已修正为 81%、FLOOR=80）
+- **覆盖率 80% → 85%**：补齐 `py/tests/` 关键路径用例，CI 阈值同步上调。（2026-08-21 核实：实测全量覆盖率 82%，ratchet baseline 已修正为 81%、FLOOR=80）
 - **engineering-assurance 交付物补齐**：归档 v4.4.1 修复清单（`v4.4.1-fix-report.md`）；`.env.example` 与代码实际环境变量对齐审计（`env-audit-4.4.2.md`）。
 - **`.env.example` 审计**：对比 `py/maop/` 中 `os.environ.get("MAOP_*")` / `os.getenv("MAOP_*")` 实际使用，补齐缺失变量、移除僵尸变量。
 - **e2e 路由守卫用例**：`dashboard-enterprise/e2e/` 补企业版路由守卫用例（`/audit` `/rbac` `/tenants` 在 personal 版重定向 `/`）。
@@ -43,7 +43,7 @@
 
 ### 范围
 
-- ~~**core/ 子包重构**：按 [`py/maop/core/ARCHITECTURE.md`](py/maop/core/ARCHITECTURE.md) 规划，将 `core/`（107+ 模块）拆分为 9 个职责清晰的子包（如 `core/persistence`、`core/llm`、`core/vector`、`core/mcp`、`core/observability`、`core/security`、`core/config`、`core/runtime`、`core/utils`）。**兼容策略**：保留 `core/__init__.py` re-export，现有 `from maop.core.xxx import yyy` 调用无需改动。~~ ✅ 已完成（2026-08-06）
+- ~~**core/ 子包重构**：按 [`py/maop/core/ARCHITECTURE.md`](py/maop/core/ARCHITECTURE.md) 规划，将 `core/`（107+ 模块）拆分为 9 个职责清晰的子包（如 `core/persistence`、`core/llm`、`core/vector`、`core/mcp`、`core/observability`、`core/security`、`core/config`、`core/runtime`、`core/utils`）。**兼容策略**：保留 `core/__init__.py` re-export，现有 `from maop.core.xxx import yyy` 调用无需改动。~~（已完成，2026-08-06）
 - **流式 DAG 执行进度推送**：Orchestrator 在 DAG 节点级状态变更时通过 SSE/WebSocket 推送增量进度事件，前端实时渲染节点状态（pending/running/success/failed/skipped）。
 - **知识图谱可视化前端**：基于三层记忆（short/long/vector）构建实体-关系图，支持节点筛选、路径高亮、时间轴回放。
 
@@ -127,7 +127,7 @@
 
 ## v5.2.0 (minor) — 已发布（2026-09-08）
 
-> ⚠️ **部分验收标准仍在推进中**：自演化闭环 MVP 已接入主循环（可观测/可审批/可回滚），7 个 evolution API 端点已上线。部分验收标准（见下方未勾选项）仍在迭代验证中。配置开关 `MAOP_EVOLUTION_LOOP_ENABLED` 默认关闭。
+> **部分验收标准仍在推进中**：自演化闭环 MVP 已接入主循环（可观测/可审批/可回滚），7 个 evolution API 端点已上线。部分验收标准（见下方未勾选项）仍在迭代验证中。配置开关 `MAOP_EVOLUTION_LOOP_ENABLED` 默认关闭。
 
 **主题**：自演化闭环 MVP（三阶段路线图 [M2.1](docs/prd-three-phase-roadmap.md)，F2-01）。把已有的 `core/evolution/` 16 模块底座接入主循环，形成可观测、可审批、可回滚的完整闭环。
 
@@ -163,9 +163,9 @@
 
 | 阶段 | 时间窗 | 主题 | 状态 | 关键交付 |
 |------|--------|------|------|----------|
-| 阶段一 | Month 1–3 | 稳定性与规模化 | ✅ 已完成 | 分布式执行、pgvector、UnifiedMemoryProtocol、OTel 可观测性 |
-| 阶段二 | Month 4–9（2026-09-05 启动，至 2027-03） | 智能增强 | 🔄 进行中 | 自演化闭环、多模态记忆、知识图谱推理、Plan 质量学习 |
-| 阶段三 | Month 10–21 | 生态与平台化 | 🔜 待启动 | Agent Marketplace、多后端编排器适配、原生 K8s Operator、细粒度成本归因 |
+| 阶段一 | Month 1–3 | 稳定性与规模化 | 已完成 | 分布式执行、pgvector、UnifiedMemoryProtocol、OTel 可观测性 |
+| 阶段二 | Month 4–9（2026-09-05 启动，至 2027-03） | 智能增强 | 进行中 | 自演化闭环、多模态记忆、知识图谱推理、Plan 质量学习 |
+| 阶段三 | Month 10–21 | 生态与平台化 | 待启动 | Agent Marketplace、多后端编排器适配、原生 K8s Operator、细粒度成本归因 |
 
 ## 长期方向（未排期）
 

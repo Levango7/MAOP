@@ -28,24 +28,24 @@
 
 | 编号 | 原报告声称 | 原报告行号 | 核对结论 | 实际位置 | 结论分类 |
 |------|-----------|-----------|---------|---------|---------|
-| 1 | AGENT/DAG 步骤误报 SUCCESS | `engine.py:441-447` | ❌ 行号错误 | `engine.py:555-579` | 行号错误 |
-| 2 | 管道未读取致死锁 | `control.py:53-58` + `workflow.py:67-70` | ⚠️ 部分准确（已修复） | 同左，但 59-60/72-73 行已加 communicate() | 部分准确 |
-| 3 | 路径遍历风险 | `data.py:435` | ⚠️ 部分准确（已修复） | `data.py:427-442`，已加正则白名单 | 部分准确 |
-| 4 | 依赖失败默认继续执行 | `engine.py:326-328` | ❌ 行号错误 | `engine.py:446-448` | 行号错误 |
-| 5 | retry/timeout/fallback_to 完全未使用 | `engine_types.py:50-55` | ❌ 事实不准确 | timeout 在 `engine.py:278` 被使用 | 事实错误 |
-| 6 | server.py 缺少全局 Cache-Control 头 | `server.py`（全文） | ❌ 事实不准确 | 全库 10 处 Cache-Control 设置 | 事实错误 |
-| 7 | CORS 默认 localhost | `middleware.py:455-457` | ✅ 准确 | `middleware.py:451`（cors_origins 可配置） | 准确 |
-| 8 | agent_executor.py 超时硬编码 60 秒 | `agent_executor.py`（全文） | ❌ 事实错误 | 仅有 `timeout_s=5`（第 92 行） | 事实错误 |
-| 9 | TODO 注释（Skill 后端未实现） | `evolution_experiment.py:257` + `evolve_insights.py:37` | ✅ 准确 | 同左 | 准确 |
+| 1 | AGENT/DAG 步骤误报 SUCCESS | `engine.py:441-447` | 行号错误 | `engine.py:555-579` | 行号错误 |
+| 2 | 管道未读取致死锁 | `control.py:53-58` + `workflow.py:67-70` | 部分准确（已修复） | 同左，但 59-60/72-73 行已加 communicate() | 部分准确 |
+| 3 | 路径遍历风险 | `data.py:435` | 部分准确（已修复） | `data.py:427-442`，已加正则白名单 | 部分准确 |
+| 4 | 依赖失败默认继续执行 | `engine.py:326-328` | 行号错误 | `engine.py:446-448` | 行号错误 |
+| 5 | retry/timeout/fallback_to 完全未使用 | `engine_types.py:50-55` | 事实不准确 | timeout 在 `engine.py:278` 被使用 | 事实错误 |
+| 6 | server.py 缺少全局 Cache-Control 头 | `server.py`（全文） | 事实不准确 | 全库 10 处 Cache-Control 设置 | 事实错误 |
+| 7 | CORS 默认 localhost | `middleware.py:455-457` | 准确 | `middleware.py:451`（cors_origins 可配置） | 准确 |
+| 8 | agent_executor.py 超时硬编码 60 秒 | `agent_executor.py`（全文） | 事实错误 | 仅有 `timeout_s=5`（第 92 行） | 事实错误 |
+| 9 | TODO 注释（Skill 后端未实现） | `evolution_experiment.py:257` + `evolve_insights.py:37` | 准确 | 同左 | 准确 |
 
 ### 表：核对结论分类汇总
 
 | 结论分类 | 数量 | 编号 |
 |---------|------|------|
-| ✅ 准确 | 2 | #7、#9 |
-| ⚠️ 部分准确（风险曾存在，当前已修复） | 2 | #2、#3 |
-| ❌ 行号错误（问题成立但位置标错） | 2 | #1、#4 |
-| ❌ 事实错误/不准确 | 3 | #5、#6、#8 |
+| 准确 | 2 | #7、#9 |
+| 部分准确（风险曾存在，当前已修复） | 2 | #2、#3 |
+| 行号错误（问题成立但位置标错） | 2 | #1、#4 |
+| 事实错误/不准确 | 3 | #5、#6、#8 |
 | **合计** | **9** | — |
 
 > **说明**：#1 与 #4 虽行号错误，但所描述的问题本身经修正行号后确实成立；#2 与 #3 的风险在原报告提出时确实存在，但当前代码中已被修复（详见第 4 章）。
@@ -145,7 +145,7 @@ msg = queue.dequeue(
 | **优先级** | P0 |
 | **文件** | `py/maop/engine.py` |
 | **行号** | 575-591 |
-| **状态** | ✅ 已修复（commit bd631c1） |
+| **状态** | 已修复（commit bd631c1） |
 
 **问题描述**：当 `self._step_executor is not None` 时（第 557 行），代码在第 562-568 行无条件构造 `StepResult(status=StepStatus.SUCCESS, ...)`，不检查 `result.error` 或 `result.exit_code`。若 executor 返回的结果中包含错误（非零退出码或 error 字段非空），步骤仍被标记为 SUCCESS，导致整个 workflow 报告成功但实际执行失败。
 
@@ -188,7 +188,7 @@ sr = StepResult(
 | **优先级** | P0 |
 | **文件** | `py/maop/dashboard/routers/control.py` + `py/maop/dashboard/routers/system/workflow.py` |
 | **行号** | `control.py:53-60` + `workflow.py:67-73` |
-| **状态** | ✅ 已修复 |
+| **状态** | 已修复 |
 
 **问题描述**：子进程通过 `asyncio.create_subprocess_exec` 启动时设置了 `stdout=PIPE, stderr=PIPE`，若不读取管道，当子进程输出超过 OS 管道缓冲区（约 64KB）时会导致死锁。
 
@@ -226,7 +226,7 @@ asyncio.create_task(proc.communicate())
 | **优先级** | P0 |
 | **文件** | `py/maop/dashboard/routers/data.py` |
 | **行号** | 427-442 |
-| **状态** | ✅ 已修复 |
+| **状态** | 已修复 |
 
 **问题描述**：`log_dir.glob(f"*{log_name}*")`（第 442 行）将用户输入直接拼入 glob 模式，若 `log_name` 含 `*` 通配符可枚举目录内所有文件；若含 `..` 可尝试路径遍历（但 glob 在固定 `log_dir` 下搜索，`..` 不会生效）。
 
@@ -252,7 +252,7 @@ if not re.match(r"^[a-zA-Z0-9_\-\.]+$", log_name):
 | **优先级** | P1 |
 | **文件** | `py/maop/engine.py` |
 | **行号** | 446-464 |
-| **状态** | ✅ 已修复（commit bd631c1） |
+| **状态** | 已修复（commit bd631c1） |
 
 **问题描述**：依赖检查逻辑中，仅当 `step.on_failure == "skip"` 或 `step.type == StepType.TERMINAL` 时才跳过失败依赖的步骤。`on_failure` 默认为空字符串（`engine_types.py:53`），导致依赖失败后当前步骤仍继续执行，可能引发连锁失败或数据不一致。
 
@@ -358,10 +358,10 @@ for dep_id in step.depends_on:
 
 | 优先级 | 问题 | 状态 | 建议 |
 |--------|------|------|------|
-| P0 | P0-1 engine.py:575-591 有 executor 时不检查错误 | ✅ 已修复 | commit bd631c1，检查 result.error/exit_code |
-| P1 | P1-4 engine.py:446-464 依赖失败默认继续 | ✅ 已修复 | commit bd631c1，添加 warning 日志提示设置 on_failure |
-| P0 | P0-2 管道死锁 | ✅ 已修复 | 补充大输出场景测试 |
-| P0 | P0-3 路径遍历 | ✅ 已修复 | 补充通配符注入单元测试 |
+| P0 | P0-1 engine.py:575-591 有 executor 时不检查错误 | 已修复 | commit bd631c1，检查 result.error/exit_code |
+| P1 | P1-4 engine.py:446-464 依赖失败默认继续 | 已修复 | commit bd631c1，添加 warning 日志提示设置 on_failure |
+| P0 | P0-2 管道死锁 | 已修复 | 补充大输出场景测试 |
+| P0 | P0-3 路径遍历 | 已修复 | 补充通配符注入单元测试 |
 
 ---
 

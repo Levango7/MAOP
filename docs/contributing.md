@@ -360,12 +360,12 @@ CI 状态对照：
 
 | 检查项 | 本地命令 | CI 强制 |
 |--------|----------|---------|
-| Lint | `ruff check` | ✅ |
-| Format | `ruff format --check` | ✅ |
-| Types | `mypy maop/` | ✅ |
-| Tests | `pytest` | ✅ |
-| Coverage | `>= 60%` | ✅ |
-| Security | `pip-audit` | ✅ |
+| Lint | `ruff check` | 是 |
+| Format | `ruff format --check` | 是 |
+| Types | `mypy maop/` | 是 |
+| Tests | `pytest` | 是 |
+| Coverage | `>= 60%` | 是 |
+| Security | `pip-audit` | 是 |
 
 ---
 

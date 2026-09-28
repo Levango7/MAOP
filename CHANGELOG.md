@@ -37,181 +37,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-### dry-run gate 接线修复（no-op → 显式 opt-in enforce）
+## [Unreleased] - 2026-09-29
 
-`maop_plan` 为 deploy/pipeline/fileops 路由挂 "dry-run" gate，但从不设置
-`plan["dry_run"]`，而 `_gate_dry_run` 对未声明的 plan 恒 PASS（`maop_verify.py`
-的向后兼容合同）——闸门存在却从未生效。修复：`Plan` 新增 `dry_run` 字段，
-`MAOP_DRY_RUN_ENFORCE=1` 时三条路由置 True；未设置保持历史行为（no-op）。
+### Fixed
 
-- 路由口径实测（`load_config()` 运行时验证）：`config/agents.yaml` 路由表
-  **无 "deploy" 键**——真实任务只会命中 pipeline / fileops，deploy 分支仅能经
-  `routing_key` 覆盖触达。
-- ⚠️ enforce 是 fail-closed：gate 校验**执行结果自报**的 dry-run 信号，而当前
-  执行器不产出该信号（全库 grep 无产出方），开启后 pipeline/fileops 任务会卡在
-  verify。先接执行器信号产出再启用。`MAOP_DRY_RUN_ENFORCE` 已写入 `.env.example`
-  / README / docs/configuration.md。
-- 测试：`tests/test_dry_run_gate_wiring.py`（接线 5 例 + gate 行为 3 例，8 passed；
-  修正了初版对不存在的 `build_plan` / `agents_loader` 的引用、错误路由断言与
-  `VerifyResult.gate_results` 属性名）。
+- **dry-run gate 接线修复（no-op → 显式 opt-in enforce）**：`maop_plan` 为 deploy/pipeline/fileops 路由挂 dry-run gate 但从不设置 `plan["dry_run"]`，`_gate_dry_run` 对未声明的 plan 恒 PASS（`maop_verify.py` 的向后兼容合同），闸门从未生效。修复：`Plan` 新增 `dry_run` 字段，`MAOP_DRY_RUN_ENFORCE=1` 时三条路由置 True，未设置保持历史行为。路由口径实测：`config/agents.yaml` 路由表无 "deploy" 键，真实任务只命中 pipeline/fileops（deploy 分支仅能经 `routing_key` 覆盖触达）。新增 `py/tests/test_dry_run_gate_wiring.py`（接线 5 例 + gate 行为 3 例，8 passed）。已知限制：enforce 为 fail-closed，且当前执行器不产出 dry-run 信号（全库无产出方），开启后 pipeline/fileops 任务会卡在 verify，须先接执行器信号产出。`MAOP_DRY_RUN_ENFORCE` 已同步 `.env.example` / `README.md` / `docs/configuration.md`。
+- **委派指标双计数修复（success/total 告警分母膨胀）**：`MAOP_DELEGATIONS_TOTAL` 在 `maop_plan.py`（建 plan）与 `dispatch_core.py`（派发）各 +1，而 success/failed 只在派发侧计数 → 纯环路流量下 total:success ≈ 2:1，`monitoring/alerts.yml` 的 success/total < 0.8 与 `slo-alerts.yml` 的 burn rate 会在健康系统上误报，`prometheus-alerts.yml` 的 failed/total 被稀释一半（漏报）；`MAOP_DELEGATION_DURATION` 亦混入 plan 构建耗时（稀释 P95 延迟告警）。修复：移除 plan 侧两处指标写入（计数/耗时唯一在派发侧），`py/maop/monitoring.py` 注释同步更正。回归测试 `py/tests/test_maop_plan.py::TestPlanMetricsSideEffects`（变异验证：重加 `.inc()` 即红）。
+- **RouteScorer 单例污染修复（config 路由进程级失效）**：`get_route_scorer()` 的热重载守卫要求 `_instance.config is not None`，单例若被无 config 调用先初始化（生产真实路径：dashboard 冷却查询端点 `routing_service.get_route_cooldowns()` 早于任何路由请求裸调），之后所有真实 config 被永久忽略，config 路由静默退化为默认 chat。修复：`_instance.config is None` 时接受首个真实 config 替换单例（冷却状态跨替换保留），identity / 版本热重载语义不变。确定性复现：裸 `get_route_scorer()` 后 `maop_plan("run the ci pipeline", config=load_config())` 修复前 `chat` / 修复后 `pipeline`。回归测试 `py/tests/test_route_scorer.py::TestGetRouteScorer::test_config_recovers_configless_singleton`（含冷却保留断言）与 `test_configless_call_does_not_displace_real_config`。
+- **websockets 依赖范围改判（`>=12.0,<15` → `>=14.0,<17`）**：用回环真连接逐版本实测（每个版本先确认 `websockets.__version__`）：
 
-### 委派指标双计数修复（success/total 告警分母膨胀）
+  | websockets | 结果 |
+  |---|---|
+  | 12.0 / 13.0.1 / 13.1 | 失败：`TypeError: BaseEventLoop.create_connection() got an unexpected keyword argument 'additional_headers'` |
+  | 14.0 / 14.2 / 15.0.1 / 16.1.1 | 通过（`tests/test_mcp_hub.py` + `tests/test_ide_extension_adapter.py` 各 72 passed） |
+  | 17.1 | 通过，暂留在护栏外，需要时再抬到 `<18` |
 
-`MAOP_DELEGATIONS_TOTAL` 在 `maop_plan.py`（建 plan）与 `dispatch_core.py`（派发）
-各 +1，而 success/failed 只在派发侧计数：纯环路流量下 total:success ≈ 2:1——
-`monitoring/alerts.yml` 的 success/total < 0.8 与 `slo-alerts.yml` 的 burn rate
-会在健康系统上误报；`prometheus-alerts.yml` 的 failed/total 被稀释一半（漏报）。
-`MAOP_DELEGATION_DURATION` 同时混入了 plan 构建耗时（稀释 P95 延迟告警）。
-修复：plan 侧两处指标写入移除（计数/耗时唯一在派发侧），`monitoring.py` 指标
-注释同步更正——原注释把两处调用点都写成"预期"，是缺陷的设计层根因。
+  `additional_headers` 与"连接对象有 `.state` 无 `.open`"都是新 asyncio 实现特征，顶层 `websockets.connect` 到 14.0 才默认指向它 —— `>=12.0` 是从未成立过的承诺；原注释"14+ made breaking asyncio changes"方向相反，14 恰是能用的起点。新增回归测试 `TestWebSocketTransportRealConnection`（真起 `websockets.serve` 做 JSON-RPC round-trip + `is_alive` 生命周期；此前用例全在测 mock，`.open` 缺陷因而长期静默）。CI 证据：macOS job 实装 websockets 16.1.1 且该用例通过。dependabot #15 由本次取代。
 
-- 回归测试：`tests/test_maop_plan.py::TestPlanMetricsSideEffects`（建 plan 不得触碰
-  total/success/failed/duration；已做变异验证：重加 `.inc()` 即变红）。
+### Added
 
-### RouteScorer 单例污染修复（config=None 先初始化 → config 路由进程级失效）
+- **requirements.lock 与 pyproject 的镜像关系加机械强制**：原表头声明 "mirrors pyproject" 但无任何强制（实测漂移：dependabot #13 抬 pin 只改了 pyproject / requirements.txt，lock 仍停旧版本，照 lock 装环境拿到旧包）。新增守卫 `py/tests/test_requirements_lock_sync.py`（3 条）：直依赖段与 enterprise 段必须逐条镜像 pyproject（名字集合 + 约束文本都相等），requirements.txt 不得少包（不用 `tomllib` —— CI 矩阵含 Python 3.10）；lock 两段加显式结束标记（`# END DIRECT DEPENDENCIES` / `# END ENTERPRISE DEPENDENCIES`），避免 extras 段条目被误读进直依赖段。消除既有漂移：`pydantic-settings==2.15.0`、`uvicorn[standard]==0.53.0`、`mmh3==5.3.0`、`pyyaml>=6.0.2,<7.0.0`、`websockets>=14.0,<17`，并将只属 extras 的 `lxml` 移出直依赖段。变异验证：lock 改回旧范围 → 守卫失败并打印差异；改回正确值 → 3 passed。已知限制：该文件仍是 reference（transitive 段为手写 `>=` 范围而非精确 pin），"可复现构建"需在干净 venv 重新生成，属独立立项。
+- **主干 flaky 的 CI 侧观测探针（只观测，不改行为）**：针对 `tests/test_tool_manager.py::TestCallSyncFallback` 3 条在 macOS/Windows 随机红（症状 `assert '42' in 'ok'` 等；读代码已排除 module/class 作用域的 `subprocess.run` patch、类级共享注册表、`MAOP_DATA_DIR` 隔离失效），`py/tests/conftest.py` 新增 autouse 探针 `_leak_probe`：每条用例开始前记录上一条用例 nodeid、全局 `subprocess.run` 是否仍被 patch、残留线程（按线程 target 的定义模块剔除测试框架自身线程），仅可疑时 WARNING，用例失败时随捕获日志自带嫌疑人。判定逻辑抽成 `_leak_probe_line()` 以便被用例直接断言（pytest 不允许直接调用夹具函数）。配套新增 `py/tests/test_conftest_leak_probe.py`（9 条，含对真实 rerunfailures 线程的回归位；autouse 判定用行为断言，不绑定 pytest 私有属性）。变异验证：探针恒返回 `None` → 2 红；allowlist 模块名拼错 → 3 红；退回整串 `split('.')` 原始 bug → 仅真实线程回归位红（伪造样本抓不到）。注：早期版本曾把 `pytest_rerunfailures` 插件自身的 `ServerStatusDB.run_server` 线程误判为泄漏，已按定义模块过滤修正。未决：`TestCallSyncFallback` 三元凶机制未定位，等下一次红取证。
 
-`get_route_scorer()` 的热重载守卫要求 `_instance.config is not None`，因此单例若被
-**无 config 调用**先初始化（生产真实路径：dashboard 冷却查询端点
-`routing_service.get_route_cooldowns()` 裸调 `get_route_scorer()` 早于任何路由请求），
-之后传入的所有真实 config 都被永久忽略——config 路由静默退化为默认 chat。修复：
-`_instance.config is None` 时接受首个真实 config 替换单例（冷却状态跨替换保留）；
-identity / 版本语义保持原样（首真实 config 胜出，版本热重载路径不变）。
+### Changed
 
-- 确定性复现（修复前）：裸 `get_route_scorer()` 后
-  `maop_plan("run the ci pipeline", config=load_config())` → `chat`；修复后 → `pipeline`。
-- 回归测试：`tests/test_route_scorer.py::TestGetRouteScorer::test_config_recovers_configless_singleton`
-  （含冷却状态保留断言，红→绿验证）与 `test_configless_call_does_not_displace_real_config`
-  （无 config 调用不得覆盖已有真实配置）。
-- 测试侧既有规避（`TestADR012ConfigRouting` / 接线测试的 `RouteScorer.reset()` fixture）保留。
-
-### websockets 版本范围改判（下界 12.0 → 14.0，上界 <15 → <17）
-
-原来的 `websockets>=12.0,<15` 两头都不对，用回环真连接测试逐版本实测（每个版本都确认
-`websockets.__version__` 真的是它）后改判：
-
-| websockets | 结果 |
-|---|---|
-| 12.0 / 13.0.1 / 13.1 | **失败** `TypeError: BaseEventLoop.create_connection() got an unexpected keyword argument 'additional_headers'` |
-| 14.0 / 14.2 / 15.0.1 / 16.1.1 | 通过（`tests/test_mcp_hub.py` + `tests/test_ide_extension_adapter.py` 各 72 passed） |
-| 17.1 | 也通过，但先不放开 —— 留在护栏外，需要时再抬到 `<18` |
-
-- **下界才是真问题**：`mcp_hub_transport` / `ide_extension_adapter` 用的 `additional_headers`
-  与"连接对象有 `.state` 没有 `.open`"都是新 asyncio 实现的特征，而顶层 `websockets.connect`
-  到 **14.0** 才默认指向它。所以 `>=12.0` 是一条从没成立过的承诺。
-- 原注释"websockets 14+ made breaking asyncio changes; cap below 15"方向反了：14 不是破坏源，
-  14 恰恰是能用的起点。
-- 新增回归测试 `TestWebSocketTransportRealConnection`（真起 `websockets.serve` 做 JSON-RPC
-  round-trip + `is_alive` 生命周期）；此前 `.open` 缺陷静默，就是因为所有用例都在测 mock。
-- CI 侧证据：macOS job 按新约束实装 websockets 16.1.1 且该用例通过。
-- dependabot `#15`（只抬上界到 `<17`、不修下界）由本节取代。
-- ⚠️ 过程记录：本 PR 第一版误以**过期的本地文件**为基线（`git fetch` 被别的会话留下的坏 ref 挡死），
-  把 `pydantic-settings 2.15.0 / uvicorn 0.53.0 / mmh3 5.3.0` 静默回退了；逐行 diff 复核时发现，
-  已改为"一律以 master 内容为基准重建"。同期 #23 也因同一原因回退过前端 11 项依赖，见 #25。
-
-### requirements.lock 与 pyproject 的镜像关系加上机械强制
-
-`requirements.lock` 的表头一直写着「Source of truth for DIRECT deps: pyproject.toml.
-This file mirrors it」，但**没有任何东西强制它** —— 实测漂移：dependabot #13 抬了
-`pydantic-settings / uvicorn / mmh3` 的 pin 只改了 pyproject 与 requirements.txt，
-lock 仍停在 `2.5.2 / 0.30.6 / 5.2.1`；照 lock 装环境的人拿到的是旧版本。
-
-- 新增守卫 `py/tests/test_requirements_lock_sync.py`（3 条）：直依赖段与 `enterprise` 段
-  必须逐条镜像 pyproject（名字集合 + 约束文本都相等），requirements.txt 不得少包。
-  不用 `tomllib`：CI 矩阵含 Python 3.10，它是 3.11 才进标准库的，故用一个只解析
-  `name = [ ... ]` 数组的窄解析器。
-- lock 里给两段各加显式结束标记（`# END DIRECT DEPENDENCIES` /
-  `# END ENTERPRISE DEPENDENCIES`）：extras 段的标题只是普通注释，靠"下一条注释"划界会把
-  enterprise 条目误读进直依赖段（第一版守卫测试就是这么误报的）。
-- 消除现存漂移：`pydantic-settings==2.15.0`、`uvicorn[standard]==0.53.0`、`mmh3==5.3.0`、
-  `pyyaml>=6.0.2,<7.0.0`（以上随 #24 顺带落了），本 PR 补最后一处
-  `websockets>=12.0,<15 → >=14.0,<17`，并把只属 extras 的 `lxml` 移出直依赖段。
-- 变异验证：把 lock 的 websockets 改回 `>=12.0,<15` → 守卫立刻失败并打印
-  `{'websockets': ('websockets>=14.0,<17', 'websockets>=12.0,<15')}`；改回正确值 → 3 passed。
-- ⚠️ 仍未解决（另案）：这个文件按自身表头就只是 **reference，不是真锁** —— 下半段的
-  transitive 条目仍是手写的 `>=` 范围而非精确 pin。要做到"可复现构建"得
-  在干净 venv 里 `pip install -r requirements.txt && pip freeze` 重新生成，属独立立项。
-
-### 类型门禁改为显式 CI 步骤（拿到 `workflow` scope 后的收尾）
-
-#23 当时因为 gh token 无 `workflow` scope（GitHub 对改 `.github/workflows/*` 的写入直接拒绝），
-只能把 `vue-tsc --noEmit` 借道 npm 的 `pretest` 生命周期生效。权限到位后按原计划改为显式形态：
-
-- `.github/workflows/ci.yml` 的 frontend job 新增 `- name: Type check (vue-tsc)`（紧跟 `Lint frontend`）。
-- `package.json` 删掉 `pretest`：门禁要在 CI 里**看得见、失败能归因到具体步骤**，不藏在 `npm test` 背后；
-  本地 `npm test` 也回到只跑测试。`typecheck` 脚本保留。
-
-### 主干 flaky 的 CI 侧观测探针（只观测，不改行为）
-
-`tests/test_tool_manager.py::TestCallSyncFallback` 3 条在 macOS/Windows 随机红（症状
-`assert '42' in 'ok'`、两条 `assert True is False`），把主干和 PR 反复判红（master `88e75804`
-的验证运行即 3 failed / 8453 passed，其余 8 平台全绿）。读代码排除的猜测：没有 module/class
-作用域的 `subprocess.run` patch；`ToolManager` 无类级共享注册表；per-test `MAOP_DATA_DIR`
-隔离有效。既然本地推不出机制，就让 CI 自己交代。
-
-- `tests/conftest.py` 新增 autouse 探针 `_leak_probe`，在每条用例开始前记
-  `prev=`（同一 worker 上一条跑过的用例 nodeid）、`subprocess_run_patched=`（全局
-  `subprocess.run` 是否仍非标准库原版）、`threads=`（残留线程名）；只在"可疑"时打 WARNING。
-  用例失败时 pytest 会把 setup 阶段捕获到的日志印进失败详情 —— 红的那一次自带嫌疑人。
-- 自证有效：人为让上一条用例改 `subprocess.run` 不还原，探针准确报
-  `subprocess_run_patched=True prev=…test_a_leaks_patch_without_undo`；正常链路不误报。
-- ~~顺带抓到一处真实泄漏：每条用例开始时都有残留线程 `Thread-1 (run_server)`（dashboard 测试
-  服务器线程从未 join）~~ **这条结论是错的，已撤回**（见下一节）：那条线程属于
-  `pytest_rerunfailures` 插件自己，不是被测代码的泄漏。
-- ⚠️ **过程记录（我自己造成的回归，已修）**：探针第一版顺手调了 `get_db_path("tool_manager")`
-  想做"跨用例工具行串味"取证，但它定义在 `_isolate_data_dir` **之前**、autouse 按定义顺序执行，
-  于是提前解析并初始化了 `data_dir` / settings 单例，把 `tests/test_secrets.py` 的 4 条用例
-  直接弄红（那些用例依赖"密钥文件按当前 data_dir 查找"）—— 本地全量因此 31 failed + 19 errors。
-  修法：探针不再触碰 DB/settings（该取证目标也已被证伪），并把夹具移到 `_isolate_data_dir` 之后。
-  教训写进夹具 docstring：**观测型工具不许有副作用**。
-
-### 撤回 #39 的"真实泄漏"结论，并把探针改成可被证伪的
-
-给 #39 的探针补变异验证时，两件事同时暴露：
-
-1. **上一条结论是错的**。`Thread-1 (run_server)` 不是"dashboard 测试服务器线程从未 join"，
-   栈帧实测是 `site-packages/pytest_rerunfailures.py:746 in run_server`（限定名
-   `ServerStatusDB.run_server`）阻塞在 `socket.py:298 accept` —— 插件自己的 socket 服务线程，
-   只要 `--reruns` 生效就整个 session 常驻。危害不是刷日志（pytest 只在用例失败时才打印捕获
-   日志），而是**每条用例 setup 都 WARNING、红的那一次自带一个假嫌疑人**。
-2. 探针此前**从没被证明过只会报该报的东西**。
-
-修法（`tests/conftest.py`）：
-
-- 新增 `_suspicious_threads()`：按线程 target 的**定义模块**剔除测试框架自己的线程
-  （`_HARNESS_THREAD_MODULES`）。用模块名而不是线程名 —— `Thread-N (func)` 是自动格式，
-  随 Python 版本与函数名漂移，模块名才是稳定指纹。
-- 条目格式改为 `名字<-定义模块:限定名`；拿不到 target 的 Thread 子类记 `?:?`（宁可多报不漏报）。
-- 判定逻辑从夹具里抽成 `_leak_probe_line()`：pytest 不允许直接调用夹具函数（会报
-  "Fixture called directly"），而"什么时候才报"恰恰是最容易被改坏的一点（写成 `if False`
-  也能全员绿），必须可被用例直接断言。
-
-新增 `tests/test_conftest_leak_probe.py`（9 条）：正向命名泄漏并校验 `prev=` 记账、
-`subprocess.run` 未还原路径、干净时返回 `None`、harness 过滤（伪造样本 + **真实**
-rerunfailures 线程各一条）、allowlist 里模块名必须可导入、夹具仍是 autouse 且定义在
-`_isolate_data_dir` 之后。自检用的线程全部带超时并在 `finally` 里释放 —— 自检工具自己不许泄漏。
-
-变异验证（回滚验证，每次单独改实现再改回）：
-
-| 变异体 | 结果 |
-|---|---|
-| `_leak_probe_line` 恒返回 `None`（探针永不报告） | 2 红 |
-| allowlist 里 `pytest_rerunfailures` 拼错 | 3 红（含可导入性守卫） |
-| 退回"拿 `模块:限定名` 整串 `split('.')`"的原始 bug | **仅**真实线程那条红 |
-
-第三行是这次最值钱的发现：只用伪造样本（`_park` 的模块名里没有点号）**抓不到**这个 bug，
-必须留一条对着真线程的回归位。
-
-- ⚠️ **本 PR 自己造成的第一次红（已修）**：首版用 `getattr(_leak_probe, "_pytestfixturefunction").autouse`
-  证明探针是 autouse —— 本地全量 9984 绿，CI 却 ubuntu/macos 两平台红。根因是 **pytest 版本代差**：
-  dev extra 只写 `pytest>=8.0`，CI 解析到 **9.1.1** 而本地是 **8.3.4**；8.x 的 `@pytest.fixture` 返回
-  "原函数 + `_pytestfixturefunction` 标记"，9.x 返回 `FixtureFunctionDefinition`，那个属性名根本不存在。
-  改成**行为断言**（探针若真 autouse，必在本次 setup 把 `_PROBE_PREV["nodeid"]` 写成我的 nodeid），
-  并在 8.3.4 / 9.1.1 两套环境各做一次变异验证（关掉 `autouse=True` → 两版本都恰好 1 红）。
-  教训：断言第三方库的**私有属性名**就是把测试绑死在某个版本上；`pytest>=8.0` 这种开区间下，
-  凡碰框架内部的用例都要两头实测（本地用 `pip install --target` + `PYTHONPATH` 叠版本，不动共享环境）。
-
-仍未解决：`TestCallSyncFallback` 三元凶的机制还没抓到现行 —— 探针现在只报真嫌疑人，
-等下一次红。
+- **类型门禁改为显式 CI 步骤**：`.github/workflows/ci.yml` frontend job 新增 `- name: Type check (vue-tsc)`（紧跟 `Lint frontend`）；`package.json` 删除 `pretest` 借道（此前因 gh token 无 `workflow` scope，只能借 npm 生命周期生效），本地 `npm test` 回到只跑测试，`typecheck` 脚本保留。
 
 ## [Unreleased] - 2026-09-26（前端类型门禁）
 
@@ -246,7 +96,7 @@ rerunfailures 线程各一条）、allowlist 里模块名必须可导入、夹�
   与 MAOS README 口径统一；企业版模块数 25 → 26。
 - **MAOS 仓库可见性整改**：核实发现 MAOS 实际是 public（`gh repo view` 返回
   `{"isPrivate":false}`），与 ADR-017"企业代码移至**私有**仓库物理隔离"的前提矛盾 ——
-  企业版源码任何人可读。经确认后已于 2026-09-26 转为 **private**。⚠️ 副作用：私有仓库的
+  企业版源码任何人可读。经确认后已于 2026-09-26 转为 **private**。副作用：私有仓库的
   Releases 资产不再匿名可下，客户交付须改为"直接发 wheel"或授权后 `gh release download`。
 - **移除 `aiohttp` 运行时依赖**：全仓无任何 `import aiohttp`（唯一命中是
   `plugin_sandbox` 的**禁用名单**正则），却为一个从不加载的栈承担 14 个 CVE 的审计面。
@@ -273,7 +123,7 @@ rerunfailures 线程各一条）、allowlist 里模块名必须可导入、夹�
   签名。原测试只在 `_ws is None` 的短路分支覆盖，真实连接从未测到，故长期未暴露。
   现改为优先读 `.state`（新旧实现都有），拿不到才回退 `.open`；新增 4 条用例，
   回滚验证（把实现改回旧写法）确认新用例以 `AttributeError: open` 失败。
-- ⚠️ **`websockets<15` 这条上限保护不了它声称的东西**（当时结论，已按实测在下节落地）：
+- **`websockets<15` 这条上限保护不了它声称的东西**（当时结论，已按实测在 2026-09-29 段落地）：
   上限内的 14.2 已经是新实现，真正的破坏（`.open` 消失）在 14 就已发生。
 
 ### SQLite「损坏即删除重建」范围收紧 —— 主干 CI 崩溃根因（实测）
@@ -340,7 +190,7 @@ unit job 的配置是 `--timeout=60 --reruns=3`，而并发用例普遍写成 `f
 
 #### P0 严重
 - **登录限流多实例失效**：`auth.py` 将进程内 dict（`_login_failures`/`_login_failures_by_ip`）迁移到 SQLite 表 `login_failures`（复合主键 `(key, kind)`），多实例部署共享计数；时间戳从 `time.monotonic()` 改为 `time.time()`（跨进程可比）；保留 LRU 淘汰防表无限增长。
-- **自演化闭环未完成却宣传**：`ROADMAP.md` v5.2.0 节标注"开发中（planned）"+ ⚠️ 警告，不再标注"阶段二启动"。
+- **自演化闭环未完成却宣传**：`ROADMAP.md` v5.2.0 节标注"开发中（planned）"并附警告，不再标注"阶段二启动"。
 
 #### P1 高
 - **StdioTransport 并发竞态**：`mcp_hub_transport.py` `send_request` 中 `self._request_id += 1` 后用局部变量 `request_id` 快照，后续匹配全用局部变量，避免协程间竞态。
@@ -470,7 +320,7 @@ unit job 的配置是 `--timeout=60 --reruns=3`，而并发用例普遍写成 `f
 - 修复 /users 路由守卫缺失（补 meta.requiresEnterprise）
 - 修复 Audit.test.js chart.js/jsdom unhandled rejection
 - **统一错误响应格式对齐 `ErrorSchema`**：所有经 `handle_api_errors` 装饰器（含 `HTTPException`）的端点错误响应采用扁平结构 `{status, error, code, detail, request_id}`（全部 string 类型，`status` 默认 `"error"`，其余默认空串），取代历史嵌套 `{"error":{code,message}}` 描述。权威定义见 `py/maop/dashboard/error_handler.py` `ErrorSchema`。
-- **⚠ Breaking（P2-1）：Engine 无 `step_executor` 时不再返回假成功**。AGENT/DAG/PLAN 步骤在未注入执行器时一律返回 `StepStatus.FAILED` + `error="No step executor configured..."`（此前 PLAN 回落路径与 AGENT/DAG 在无执行器时错误地返回 `SUCCESS` 占位文本，构成监控假阳性）。构造 `Engine()` 未传入 `step_executor` 会在日志打印 warning。下游测试改为注入 mock executor（如 `test_integration.py` 的 `_success_executor`、`test_distributed_execution.py` 的 `_mock_step_executor`）。
+- **Breaking（P2-1）：Engine 无 `step_executor` 时不再返回假成功**。AGENT/DAG/PLAN 步骤在未注入执行器时一律返回 `StepStatus.FAILED` + `error="No step executor configured..."`（此前 PLAN 回落路径与 AGENT/DAG 在无执行器时错误地返回 `SUCCESS` 占位文本，构成监控假阳性）。构造 `Engine()` 未传入 `step_executor` 会在日志打印 warning。下游测试改为注入 mock executor（如 `test_integration.py` 的 `_success_executor`、`test_distributed_execution.py` 的 `_mock_step_executor`）。
 
 ## [5.0.2] — 2026-08-13
 
@@ -545,7 +395,7 @@ unit job 的配置是 `--timeout=60 --reruns=3`，而并发用例普遍写成 `f
 
 ## [5.0.0] — 2026-08-11
 
-### ⚠ Breaking Changes
+### Breaking Changes
 
 本版本为 major release，含不兼容变更。详见 [MIGRATION-5.0.md](docs/migration-5.0.md)。
 

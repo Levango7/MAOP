@@ -57,24 +57,24 @@ def _resolve_data_dir() -> Path:
 
 | 模块 | 单例 | 是否在 conftest reset |
 |------|------|---------------------|
-| `core/agent/plugins_hooks/hook_manager.py` | `_hook_manager` | ✅ 已加 |
-| `core/backends/backends.py` | `ConnectionPool` | ✅ `reset_backends` |
-| `core/config/config_history.py` | `_global_history` | ❌ |
-| `core/reliability/event_bus.py` | `_global_bus` | ❌ |
-| `core/reliability/worker_pool.py` | `_global_pool` | ❌ |
-| `core/routing/load_balancer.py` | `_global_lb` | ❌ |
-| `core/routing/route_scorer.py` | `_singleton_lock` (LoadBalancer) | ❌ |
-| `dashboard/routers/hook.py` | `_hook_mgr` | ❌ |
-| `dashboard/routers/mcp.py` | `_mcp_hub` | ❌ |
-| `dashboard/routers/model.py` | `_model_registry` / `_api_key_vault` | ❌ |
-| `dashboard/routers/agent_proxy.py` | `_agent_proxy` | ❌ |
-| `dashboard/routers/budget.py` | `_budget_guard` | ❌ |
-| `dashboard/routers/protocol.py` | `_protocol_reg` | ❌ |
-| `dashboard/routers/subagent.py` | `_subagent_mgr` | ❌ |
-| `dashboard/routers/tool_audit.py` | `_tool_audit` | ❌ |
-| `dashboard/routers/worktree.py` | `_worktree_mgr` | ❌ |
-| `delegate/sla_monitor.py` | `_metrics` | ❌ |
-| `maop_loop_phases.py` | `_otel_tracer` | ❌ |
+| `core/agent/plugins_hooks/hook_manager.py` | `_hook_manager` | 已加 |
+| `core/backends/backends.py` | `ConnectionPool` | `reset_backends` |
+| `core/config/config_history.py` | `_global_history` | 否 |
+| `core/reliability/event_bus.py` | `_global_bus` | 否 |
+| `core/reliability/worker_pool.py` | `_global_pool` | 否 |
+| `core/routing/load_balancer.py` | `_global_lb` | 否 |
+| `core/routing/route_scorer.py` | `_singleton_lock` (LoadBalancer) | 否 |
+| `dashboard/routers/hook.py` | `_hook_mgr` | 否 |
+| `dashboard/routers/mcp.py` | `_mcp_hub` | 否 |
+| `dashboard/routers/model.py` | `_model_registry` / `_api_key_vault` | 否 |
+| `dashboard/routers/agent_proxy.py` | `_agent_proxy` | 否 |
+| `dashboard/routers/budget.py` | `_budget_guard` | 否 |
+| `dashboard/routers/protocol.py` | `_protocol_reg` | 否 |
+| `dashboard/routers/subagent.py` | `_subagent_mgr` | 否 |
+| `dashboard/routers/tool_audit.py` | `_tool_audit` | 否 |
+| `dashboard/routers/worktree.py` | `_worktree_mgr` | 否 |
+| `delegate/sla_monitor.py` | `_metrics` | 否 |
+| `maop_loop_phases.py` | `_otel_tracer` | 否 |
 
 其中持有 `db_path` / `root_dir` / 任何受 `MAOP_DATA_DIR` 影响的资源路径的单例，**理论上都有同样 flaky 风险**。目前全量测试 7432 passed 0 failed 是因为：(a) 多数测试用 mock；(b) 真正调用 get_xxx() 单例的测试恰好以非冲突顺序调度。本质是 **隐性的顺序耦合**。
 

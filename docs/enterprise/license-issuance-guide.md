@@ -100,7 +100,7 @@ print('公钥：public_key.pem（替换 py/maop/enterprise/keys/public_key.pem�
 - **备份**：私钥至少 2 份离线备份（不同物理位置）
 - **轮换**：建议每年轮换一次密钥对（需要为所有客户重新签发 license）
 
-> ⚠️ **警告（2026-09-26 更正）**：本文件此前声称"仓库内 `scripts/dev_private_key.pem`
+> **警告（2026-09-26 更正）**：本文件此前声称"仓库内 `scripts/dev_private_key.pem`
 > 已公开在代码仓库中"——经核对该文件**在 MAOP 与 MAOS 两仓的整个 git 历史中从未存在过**，
 > 该描述会误导密钥操作人，已删除。实际存在的非生产私钥只有两条路径，且都被 `.gitignore`
 > 排除、绝不入库：`scripts/ci_ephemeral_signing_key.pem`（CI 一次性，由
@@ -109,7 +109,7 @@ print('公钥：public_key.pem（替换 py/maop/enterprise/keys/public_key.pem�
 
 ### 2.3 密钥轮换流程（runbook，2026-09-26 补全）
 
-> ⚠️ 下列第 3、4 步是**必须**步骤，漏掉任何一步都会让整个企业包在客户侧被自己的
+> 下列第 3、4 步是**必须**步骤，漏掉任何一步都会让整个企业包在客户侧被自己的
 > 防篡改机制拒绝（`License public key fingerprint mismatch` / `ModuleTamperError`）。
 > 历史上正是因为缺少这份 runbook，才在 2026-08-30 与 2026-09-26 两次丢失私钥。
 

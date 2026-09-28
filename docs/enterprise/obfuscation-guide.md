@@ -9,11 +9,11 @@ MAOP 企业版的防破解是**深度防御**(defence-in-depth)，不存在单�
 
 | 层 | 措施 | 防护对象 | 状态 |
 |---|------|---------|------|
-| L1 | Ed25519 license 签名（必要前提） | 未授权使用（无 license)| ✅ 已实现 |
-| L2 | license 过期 + 宽限期 + CRL 在线撤销 | 过期 / 撤销 license | ✅ 已实现 |
-| L3 | 企业版模块完整性校验（`_integrity_manifest.json`) | 篡改 rbac.py / audit.py 等业务文件 | ✅ 已实现（本轮） |
-| L4 | 移除 honor-system(无 license 静默降级） | 删除 license 文件获取企业功能 | ✅ 已实现（本轮） |
-| L5 | PyArmor 字节码混淆 | 静态阅读源码定位 L1-L4 检查点以打补丁 | 🛠 本指南配置 |
+| L1 | Ed25519 license 签名（必要前提） | 未授权使用（无 license)| 已实现 |
+| L2 | license 过期 + 宽限期 + CRL 在线撤销 | 过期 / 撤销 license | 已实现 |
+| L3 | 企业版模块完整性校验（`_integrity_manifest.json`) | 篡改 rbac.py / audit.py 等业务文件 | 已实现（本轮） |
+| L4 | 移除 honor-system(无 license 静默降级） | 删除 license 文件获取企业功能 | 已实现（本轮） |
+| L5 | PyArmor 字节码混淆 | 静态阅读源码定位 L1-L4 检查点以打补丁 | 本指南配置 |
 | L6 | （未来可选）在线激活 + 能力下发 | 内存补丁、Hook 框架 | 路线图中 |
 
 **核心理念**：单独任何一层都可被绕过，但**叠加成本指数上升**。攻击者必须先破 L5 才能读懂代码定位 L3 的 verify 调用，再伪造有效签名才能绕过 L3 — 此时还需面对 L1。
@@ -36,7 +36,7 @@ python py/scripts/sign_enterprise_modules.py \
 
 | 场景 | 结果 |
 |------|------|
-| manifest 有效 + 所有 hash 匹配 | ENTERPRISE 激活 ✅ |
+| manifest 有效 + 所有 hash 匹配 | ENTERPRISE 激活 |
 | manifest 有效 + 任意文件被改 | 降级 PERSONAL + 记录 degradation |
 | manifest 缺失（开发态） | 警告，不阻断 |
 | manifest 签名无效 | 降级 PERSONAL |
@@ -72,11 +72,11 @@ bash py/scripts/build_obfuscated_enterprise.sh
 
 ### 3.3 策略：混淆范围
 
-- ✅ `maop/enterprise/{rbac,tenant,audit,sso,saml_handler,license,crl,ha,container,pg_persist,n8n,tls_auto}.py`
-- ❌ `maop/enterprise/__init__.py`(import 副作用已重写为调用 `get_edition`，保持明文便于排障）
-- ❌ `maop/enterprise/keys/` (PEM 文件，不是代码）
-- ❌ `maop/enterprise/_integrity_manifest.json`（已被 Ed25519 签名保护，明文无意）
-- ❌ `maop/core/*`、`maop/dashboard/*`：个人版代码，保持明文遵循 MIT
+- 混淆：`maop/enterprise/{rbac,tenant,audit,sso,saml_handler,license,crl,ha,container,pg_persist,n8n,tls_auto}.py`
+- 不混淆：`maop/enterprise/__init__.py`(import 副作用已重写为调用 `get_edition`，保持明文便于排障）
+- 不混淆：`maop/enterprise/keys/` (PEM 文件，不是代码）
+- 不混淆：`maop/enterprise/_integrity_manifest.json`（已被 Ed25519 签名保护，明文无意）
+- 不混淆：`maop/core/*`、`maop/dashboard/*`：个人版代码，保持明文遵循 MIT
 
 ### 3.4 与 L3 的握手顺序（关键）
 

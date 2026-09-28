@@ -6,7 +6,7 @@
 
 MAOP v5.0.0 是一个 major release，包含不兼容变更、配置收敛、流式 Agent token 响应增强，以及 Phase 5b 的发布/性能/合规修复（G-08~G-17）。
 
-### ⚠ 不兼容变更
+### 不兼容变更
 
 详见 [MIGRATION-5.0.md](./migration-5.0.md)。主要变更：
 

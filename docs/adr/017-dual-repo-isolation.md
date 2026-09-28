@@ -12,7 +12,7 @@
 
 ADR-016 (2026-07-25) established the dual-edition architecture: single codebase + runtime edition detection. The design explicitly noted a known drawback:
 
-> ⚠️ 企业版代码在个人版仓库中可见（虽然受 Commercial 许可约束）
+> 企业版代码在个人版仓库中可见（虽然受 Commercial 许可约束）
 
 Mitigation was "Commercial license terms + future code obfuscation."
 
@@ -85,28 +85,28 @@ Repository 2: Levango7/MAOS (private, Commercial)
 
 ### Positive
 
-- ✅ Enterprise code physically isolated (not in public repo)
-- ✅ `pip install maop-orchestrator` no longer includes enterprise code
-- ✅ ADR-016 architecture preserved
-- ✅ No core code synchronization needed
-- ✅ Personal edition remains open source
+- Enterprise code physically isolated (not in public repo)
+- `pip install maop-orchestrator` no longer includes enterprise code
+- ADR-016 architecture preserved
+- No core code synchronization needed
+- Personal edition remains open source
 
 ### Negative
 
-- ⚠️ Enterprise development requires cloning two repositories
-- ⚠️ CI/CD needs to handle conditional enterprise tests
-- ⚠️ Version numbers must be kept in sync manually
+- Enterprise development requires cloning two repositories
+- CI/CD needs to handle conditional enterprise tests
+- Version numbers must be kept in sync manually
 
 ## Implementation
 
 | Step | Status | Description |
 |------|--------|-------------|
-| Create private repo `Levango7/MAOS` | ✅ | 2026-08-20 |
-| Migrate 25 enterprise files to MAOS | ✅ | 2026-08-20 |
-| Add hatch exclude rule to MAOP pyproject.toml | ✅ | 2026-08-20 |
-| Remove `py/maop/enterprise/` from MAOP | ✅ | 2026-08-20 |
-| Update CI/CD for conditional enterprise tests | ✅ | 2026-08-20 |
-| Update README.md dual-edition section | ✅ | 2026-08-20 |
+| Create private repo `Levango7/MAOS` | 完成 | 2026-08-20 |
+| Migrate 25 enterprise files to MAOS | 完成 | 2026-08-20 |
+| Add hatch exclude rule to MAOP pyproject.toml | 完成 | 2026-08-20 |
+| Remove `py/maop/enterprise/` from MAOP | 完成 | 2026-08-20 |
+| Update CI/CD for conditional enterprise tests | 完成 | 2026-08-20 |
+| Update README.md dual-edition section | 完成 | 2026-08-20 |
 
 ## References
 

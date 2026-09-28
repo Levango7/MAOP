@@ -30,11 +30,11 @@ v5.0.0 是一个 **major release**，包含以下类别的变更：
 **迁移**：
 
 ```python
-# ❌ v4.x（已移除）
+# v4.x（已移除）
 from maop.dashboard.provider import create_app
 app = create_app()
 
-# ✅ v5.0.0
+# v5.0.0
 from maop.dashboard.server import app
 # 直接使用 app，无需 create_app()
 # 或在 uvicorn 启动时使用字符串引用
@@ -81,10 +81,10 @@ routing:
 **迁移**：使用独立的 `/api/*` 端点替代。
 
 ```javascript
-// ❌ v4.x（已移除）
+// v4.x（已移除）
 const resp = await fetch('/api/batch?keys=report,live,failures');
 
-// ✅ v5.0.0
+// v5.0.0
 const [report, live, failures] = await Promise.all([
   fetch('/api/report').then(r => r.json()),
   fetch('/api/live').then(r => r.json()),
@@ -122,13 +122,13 @@ const [report, live, failures] = await Promise.all([
 1. 编辑 `.env` 文件，将短名改为规范长名：
 
 ```bash
-# ❌ v4.x
+# v4.x
 MAOP_PORT=9079
 MAOP_WORKERS=4
 MAOP_TLS=0
 MAOP_AUTH=1
 
-# ✅ v5.0.0
+# v5.0.0
 MAOP_DASH_PORT=9079
 MAOP_DASH_WORKERS=4
 MAOP_TLS_ENABLED=0
@@ -175,10 +175,10 @@ maop config migrate --file /path/to/.env --dry-run
 ### 3.1 镜像版本号
 
 ```yaml
-# ❌ v4.x
+# v4.x
 image: ghcr.io/maop/operator:4.5.0
 
-# ✅ v5.0.0
+# v5.0.0
 image: ghcr.io/maop/operator:5.0.0
 ```
 
@@ -278,10 +278,10 @@ maop config migrate            # 执行
 v5.0.0 保留但会发出 `DeprecationWarning`，**v6.0.0 将移除。** 请迁移到 `subagent_lifecycle`：
 
 ```python
-# ❌ v5.0.0 deprecated
+# v5.0.0 deprecated
 from maop.core.agent.delegation import subagent_delegation
 
-# ✅ v5.0.0+
+# v5.0.0+
 from maop.core.agent.delegation import subagent_lifecycle
 ```
 
