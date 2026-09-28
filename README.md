@@ -344,6 +344,7 @@ agents:
 | `MAOP_TLS` | 0 | Enable TLS |
 | `MAOP_JSON_LOG` | 0 | Enable JSON structured logging |
 | `MAOP_PLUGIN_STRICT_CHECKSUM` | 0 | Enforce plugin checksum validation |
+| `MAOP_DRY_RUN_ENFORCE` | 0 | 强制 deploy/pipeline/fileops 路由声明 dry-run（fail-closed：执行器尚无信号产出，开启会使这些任务卡在 verify；详见 `.env.example`） |
 | `MAOP_EDITION` | auto-detect | 强制 edition（personal/enterprise），覆盖自动检测 |
 | `MAOP_LICENSE_KEY` | — | 企业版 license key（缺失时 honor-system，无效时降级 personal + 7 天宽限期） |
 

@@ -58,6 +58,7 @@
 | 文档 | 说明 |
 |------|------|
 | [贡献指南](./contributing.md) | 开发环境搭建、CI/CD 流程、代码规范、发布流程 |
+| [CI 门禁与触发面](./ci-gates.md) | 哪些检查一定跑、哪些会跳过、如何分辨"跳过了"与"根本没跑"；容器作业只在 trunk push 跑的坑与前端覆盖率下限 |
 | [分支策略](./BRANCH_STRATEGY.md) | Trunk-based 开发模型 — master/develop/feature/fix/hotfix/release |
 | [前端设计规范](./frontend-style-guide.md) | Vue 3 前端交互/视觉规范 — ListPageLayout、FilterBar、chartTokens |
 | [API 参考](./api-reference.md) | 完整 HTTP/WebSocket 端点规格，供前端开发与集成联调使用 |
