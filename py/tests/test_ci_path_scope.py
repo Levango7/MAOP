@@ -96,7 +96,10 @@ def test_cli_writes_github_output(tmp_path: Path) -> None:
     lst.write_text("CHANGELOG.md\x00docs/a.md\n", encoding="utf-8")
     r = subprocess.run(
         [sys.executable, str(SCRIPT), "--files-from", str(lst), "--github-output", str(out)],
-        capture_output=True, text=True, check=False,
+        # encoding 必须显式：脚本侧已固定按 UTF-8 输出中文摘要，而 text=True 的
+        # 解码用的是**父进程区域编码**（en-US Windows = cp1252）——不设这里就会
+        # 在读侧抛 UnicodeDecodeError，把崩溃从写侧搬到读侧而已。
+        capture_output=True, text=True, check=False, encoding="utf-8",
     )
     assert r.returncode == 0, r.stderr
     assert out.read_text(encoding="utf-8").strip() == "code=false"
@@ -107,7 +110,8 @@ def test_cli_mixed_changeset_reports_code_true(tmp_path: Path) -> None:
     out = tmp_path / "gh_output"
     r = subprocess.run(
         [sys.executable, str(SCRIPT), "--files-from", "-", "--github-output", str(out)],
-        input="CHANGELOG.md\npy/maop/engine.py\n", capture_output=True, text=True, check=False,
+        input="CHANGELOG.md\npy/maop/engine.py\n",
+        capture_output=True, text=True, check=False, encoding="utf-8",  # 同上：读侧显式 UTF-8
     )
     assert r.returncode == 0, r.stderr
     assert out.read_text(encoding="utf-8").strip() == "code=true"
@@ -131,6 +135,26 @@ def test_cli_survives_non_utf8_console(tmp_path: Path) -> None:
     )
     assert r.returncode == 0, r.stderr
     assert "code=true" in r.stdout, r.stdout
+
+
+def test_cli_stdout_is_valid_utf8_bytes(tmp_path: Path) -> None:
+    """脚本 stdout 的字节必须是合法 UTF-8 —— 跨平台确定的输出契约。
+
+    为什么要有这条：读侧用 `text=True` 时解码走**父进程区域编码**，en-US Windows
+    是 cp1252，遇到中文摘要直接 UnicodeDecodeError；而 zh-CN 本机是 cp936，能把
+    UTF-8 字节吞成乱码且不报错，所以"父进程解码失败"这类问题在本机根本测不出来
+    （实测：去掉 encoding="utf-8" 后本机仍 passed）。契约固定在字节层：任何读者
+    只要按 UTF-8 解就一定能解 —— 这正是脚本 reconfigure 后承诺的东西。
+    """
+    lst = tmp_path / "files.txt"
+    lst.write_text("docs/a.md\n", encoding="utf-8")
+    r = subprocess.run(
+        [sys.executable, str(SCRIPT), "--files-from", str(lst)],
+        capture_output=True, check=False,  # 故意不用 text=True：拿原始字节
+    )
+    assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
+    text = r.stdout.decode("utf-8")  # 解不出来即失败，不依赖任何区域编码
+    assert "docs-only" in text
 
 
 # ── 工作流结构：白名单不许回来 ──────────────────────────────────────
