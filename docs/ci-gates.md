@@ -95,3 +95,19 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 | `py/tests/test_dependabot_config.py` | dependabot 配置形状 + 同前缀 ≥2 个包的 action 必须成批 |
 | `py/tests/test_requirements_lock_sync.py` | `requirements.lock` 的直依赖段必须逐条镜像 `pyproject.toml` |
 | `py/tests/test_docs_consistency_gate.py` | 文档一致性门禁：范围只来自索引当前章节、豁免必须写理由、注入死路径必须判红、`docs-gate` 作业不许挂 `if` |
+
+
+## 7. 开 required checks 的规则（以及本 PR 正在实测的那一点）
+
+触发面改成 job 级之后，"哪些 check 在什么条件下存在"就有了确定性，可以安全地给 master 加保护。
+规则只有一条：**被设为 required 的作业，必须在它想拦的那类 PR 上真的存在。**
+
+- 永远存在的两条（任何 PR 都会跑，包括 docs-only）：
+  `CI scope (code vs docs-only)`、`Secret Scan (gitleaks)`。它们可以直接设为 required。
+- `Lint (ruff + mypy)` / `Frontend Build` / `pytest (…9 平台)` 这类在 docs-only 时会被
+  `needs: scope` + `if:` **跳过**。跳过是否满足 required，取决于平台语义 ——
+  **本 PR 就是拿来做这个实测的**：临时把一条被跳过的作业也设为 required，读 mergeability 判定，
+  测完立即撤销保护。结论会在本 PR 里补齐后再合并。
+- 反过来绝不做的：不要把 required 设成"只在 trunk push 才存在"的作业
+  （`Docker build` / `Container Scan (trivy)` / `Compose Smoke` / `Publish to PyPI`）——
+  它们在 PR 上根本不产生 check，设成 required 会把所有 PR 永久卡住。
