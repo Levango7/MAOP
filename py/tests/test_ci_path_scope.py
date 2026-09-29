@@ -64,6 +64,9 @@ def test_docs_only_changesets_are_docs_only(paths: list[str]) -> None:
         ["dashboard-enterprise/vitest.config.js"],
         ["config/agents.yaml"],
         [".github/workflows/ci.yml"],
+        # required checks 的权威清单必须算代码面：它由 test_ci_required_checks.py 与
+        # ci.yml 形状互相核对，若"只改清单"被判 docs-only，那条守卫就永不执行。
+        [".github/ci-required-checks.json"],
         ["docker-compose.prod.yml"],
         [".dockerignore"],
         ["README.md"],                      # Doc↔Code reconcile 门禁会读它
