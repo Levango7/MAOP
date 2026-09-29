@@ -95,3 +95,63 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 | `py/tests/test_dependabot_config.py` | dependabot 配置形状 + 同前缀 ≥2 个包的 action 必须成批 |
 | `py/tests/test_requirements_lock_sync.py` | `requirements.lock` 的直依赖段必须逐条镜像 `pyproject.toml` |
 | `py/tests/test_docs_consistency_gate.py` | 文档一致性门禁：范围只来自索引当前章节、豁免必须写理由、注入死路径必须判红、`docs-gate` 作业不许挂 `if` |
+
+
+## 7. master 的 required checks：已实测语义 + 现行配置
+
+触发面改成 job 级之后，"哪些 check 在什么条件下存在"有了确定性，才敢给 master 加保护。
+选 required 作业的规则只有一条：**被设为 required 的作业，必须在它想拦的那类 PR 上真的存在。**
+
+### 7.1 实测结论（2026-09-29，本 PR 为夹具）
+
+做法：临时给 master 加保护，每轮换一组 required 上下文，读本 PR 的 `mergeable_state`；
+其中"不存在的上下文"是**正对照**，用来证明这组判定确实在算而不是配置空转。
+
+| 轮 | required 上下文 | #53 判定 |
+|----|---|---|
+| 基线 | 无 | `clean` |
+| A | `CI scope (code vs docs-only)`（success） | `clean` |
+| B | A + `exp53-nonexistent-required-check`（永不上报） | `blocked`（8 次采样稳定） |
+| C | A + `Lint (ruff + mypy)`（**skipped**） | `clean`（7 次采样一致） |
+| 撤除 | 无 | `clean` |
+
+由此确定的三条语义：
+
+1. **上报为 `skipped` 的检查满足 required**（job 被 `if:` 跳过时 Actions 仍会产出一条
+   check run，status `completed` 而 conclusion `skipped`）。所以把 docs-only 时会跳过的重活设为 required，
+   不会卡住文档 PR，却能在代码 PR 上真拦一道。
+2. **从未上报的上下文不满足 required**，会把 PR 永久卡在 `blocked`。B 轮就是这条的证据。
+3. 保护对 **admin 不生效但判定照常计算**：`enforce_admins: false` 时 owner 仍能直推 master，
+   而 `mergeable_state` 依然按 required 集合算。早前"保护形同虚设"的观察属于这条，
+   不是配置无效 —— B 轮 8 秒内翻成 `blocked` 证明配置是活的。
+
+### 7.2 现行配置（本 PR 合并时生效）
+
+required 上下文 5 条，其余保护项全关：
+
+- `CI scope (code vs docs-only)`、`Secret Scan (gitleaks)`、`Docs consistency gate`
+  —— 永远存在，任何 PR 都跑。
+- `Lint (ruff + mypy)`、`Frontend Build` —— docs-only 时跳过（按 §7.1 第 1 条即满足），
+  代码 PR 上必须真过。
+- `strict: false`（不要求分支领先，避免每次主干合并把在跑的 PR 全部判过期）、
+  `enforce_admins: false`（保留 owner 逃生门；并行会话的直推路径不受影响）、
+  无 review 门槛、不要求 linear history / conversation resolution。
+
+### 7.3 明确不进 required 的，以及原因
+
+- **`pytest (…)` 矩阵作业**：docs-only 时那条 skipped check 的**名字是未展开的字面量**
+  `pytest (${{ matrix.os }}, Python ${{ matrix.python-version }})`（实测），而代码 PR 上是
+  9 条展开后的名字。按精确名设 required → docs-only 永远 `blocked`；按通配设则代码面匹配
+  行为尚无实测证据（当前无代码 PR 可对照），所以先不猜。要把 pytest 也纳入 required，
+  正解是加一条名字稳定的聚合作业（`needs: [scope, pytest, …]` + `if: always()`，自己读
+  `needs.*.result` 判成败），而不是折腾上下文匹配。
+- **只在 trunk push 才存在的作业**：`Docker build` / `Container Scan (trivy)` /
+  `Compose Smoke` / `Publish to PyPI`。它们在 PR 上要么根本不产生、要么恒为 skipped，
+  设成 required 等于"永远空满足"，是假门禁。
+
+### 7.4 复测 / 撤销
+
+改配置前先复测语义（平台会变）：`PUT /repos/Levango7/MAOP/branches/master/protection`
+带 `required_status_checks.contexts`，读任一 PR 的 `mergeable_state`；**测完立刻
+`DELETE` 同一路径**。逃生门：`DELETE .../protection` 一键清空，或临时
+`POST .../protection/enforce_admins` 的逆操作。
