@@ -1,5 +1,5 @@
 {
-  "_comment": "master 分支保护里实际生效的 required status checks。这是唯一权威清单：改这里必须同步改 GitHub 分支保护（步骤见 docs/ci-gates.md §7.4），并由 py/tests/test_ci_required_checks.py 与 ci.yml 的作业形状互相核对。kind=always 表示作业无 if 条件、任何事件都跑；kind=scope-gated 表示只被 job 级 scope 条件拦（docs-only 时为 skipped，实测 skipped 满足 required）。",
+  "_comment": "master 分支保护里实际生效的 required status checks。这是唯一权威清单：改这里必须同步改 GitHub 分支保护（步骤见 docs/ci-gates.md §7.4），并由 py/tests/test_ci_required_checks.py 与 ci.yml 的作业形状互相核对。kind=always 表示作业无 if 条件、任何事件都跑；kind=scope-gated 表示只被 job 级 scope 条件拦（docs-only 时为 skipped，实测 skipped 满足 required）；kind=always-guard 表示作业挂 if: always()，因此**任何** PR 都会产出这条 check，并把上游成败折进自己的红绿（见 py/scripts/ci_merge_gate.py）。",
   "branch": "master",
   "contexts": [
     {
@@ -21,16 +21,10 @@
       "kind": "always"
     },
     {
-      "name": "Lint (ruff + mypy)",
+      "name": "CI merge gate",
       "workflow": "ci.yml",
-      "job": "lint",
-      "kind": "scope-gated"
-    },
-    {
-      "name": "Frontend Build",
-      "workflow": "ci.yml",
-      "job": "frontend",
-      "kind": "scope-gated"
+      "job": "gate",
+      "kind": "always-guard"
     }
   ]
 }

@@ -942,3 +942,27 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: echo "::warning::Compose smoke failed — check logs."
+
+  # ── CI merge gate：把上游结论收敛成一条 name 稳定的 required check ─────────────
+  # 为什么需要：矩阵作业 `pytest (...)` 在 docs-only 时上报的是**未展开的模板字面量名**，
+  # push-only 作业在 PR 上恒为 skipped —— 两类都没法当 required 上下文用，于是"测试必须绿"
+  # 只剩人看。本作业用 `if: always()` 保证任何 PR 上都会产出一条 `CI merge gate`，
+  # 再把"跑失败 / 被取消 / 该跑却没跑"折进它的红绿里。判定逻辑在
+  # py/scripts/ci_merge_gate.py，单测与结构守卫见 py/tests/test_ci_merge_gate.py。
+  gate:
+    name: CI merge gate
+    needs: [scope, lint, test, frontend, e2e, migrations, audit, sast, sbom, perf-smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Aggregate upstream job results
+        working-directory: py
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          CODE: ${{ needs.scope.outputs.code }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$NEEDS_JSON" > /tmp/ci_needs.json
+          python3 scripts/ci_merge_gate.py --needs-json /tmp/ci_needs.json --code "$CODE"

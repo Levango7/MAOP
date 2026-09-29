@@ -29,7 +29,7 @@ LIST_FILE = ROOT / ".github" / "ci-required-checks.json"
 WORKFLOWS = ROOT / ".github" / "workflows"
 DOC_FILE = ROOT / "docs" / "ci-gates.md"
 
-KINDS = ("always", "scope-gated")
+KINDS = ("always", "scope-gated", "always-guard")
 ENTRY_KEYS = {"name", "workflow", "job", "kind"}
 
 # 只在 trunk push / tag / 定时上成立的条件片段 —— 带它的作业在 PR 上永远不会产出 check。
@@ -151,6 +151,12 @@ def test_kind_matches_actual_if_condition() -> None:
             assert cond is None, (
                 f"{e['name']!r} 标的是 always，但作业挂了 if={cond!r} —— "
                 f"要么改清单 kind，要么去掉条件。"
+            )
+        elif e["kind"] == "always-guard":
+            # 聚合守卫必须带 if: always()：否则上游一红它就**不产出**，required 上下文
+            # 变成"从未上报" → 所有 PR 永久 blocked（§7.1 的 B 轮语义）。
+            assert isinstance(cond, str) and cond.strip().startswith("always()"), (
+                f"{e['name']!r} 标的是 always-guard，但 if={cond!r} 不以 always() 开头。"
             )
         else:
             assert isinstance(cond, str) and SCOPE_COND in cond, (
