@@ -118,7 +118,7 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 由此确定的三条语义：
 
 1. **上报为 `skipped` 的检查满足 required**（job 被 `if:` 跳过时 Actions 仍会产出一条
-   `completed/skipped` 的 check run）。所以把 docs-only 时会跳过的重活设为 required，
+   check run，status `completed` 而 conclusion `skipped`）。所以把 docs-only 时会跳过的重活设为 required，
    不会卡住文档 PR，却能在代码 PR 上真拦一道。
 2. **从未上报的上下文不满足 required**，会把 PR 永久卡在 `blocked`。B 轮就是这条的证据。
 3. 保护对 **admin 不生效但判定照常计算**：`enforce_admins: false` 时 owner 仍能直推 master，
