@@ -23,6 +23,7 @@ from tests.conftest import (
     _HARNESS_THREAD_MODULES,
     _PROBE_PREV,
     _leak_probe_line,
+    _run_fingerprint,
     _suspicious_threads,
     _thread_module,
     _thread_origin,
@@ -212,3 +213,83 @@ def test_probe_line_fires_on_a_subprocess_run_leak(
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: None)
     line = _leak_probe_line("tests/test_after_patch.py::case")
     assert line is not None and "subprocess_run_patched=True" in line, line
+
+
+def test_run_fingerprint_names_defining_module_and_qualname(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`run_impl` 必须能点名到 fake 的定义处，否则它只是把"被 patch 了"重说一遍。
+
+    真实嫌疑人（`tests/test_agent_adapters.py` 的 `_mock_subprocess_run`）返回的就是这种
+    局部闭包，`__qualname__` 里带着造它的函数名 —— 所以断言形状按那个形状来。
+    """
+    import subprocess
+
+    def _the_suspect_run(cmd, **kwargs):
+        return None
+
+    monkeypatch.setattr(subprocess, "run", _the_suspect_run)
+    fp = _run_fingerprint()
+    assert fp.startswith("tests.test_conftest_leak_probe:"), fp
+    assert "_the_suspect_run" in fp, fp
+
+
+def test_run_fingerprint_does_not_touch_the_mock_it_reports(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """反观察者效应：取证不许在被观测对象上留下调用或新建属性。
+
+    特意不读 `return_value` —— MagicMock 的属性访问会**自动创建子 mock**，那等于探针
+    反过来改变了它要观测的那个 fake。这条用例就是钉住这一点的：以后有人为了多打一个字段
+    去碰 mock，会在这里红。
+    """
+    import subprocess
+    from unittest.mock import MagicMock
+
+    fake = MagicMock(name="run")
+    monkeypatch.setattr(subprocess, "run", fake)
+
+    before = dict(fake.__dict__)
+    fp = _run_fingerprint()
+    after = fake.__dict__
+
+    assert fp.startswith("MagicMock@"), fp
+    assert "unittest.mock" in fp, fp
+    assert fake.call_count == 0, "探针调用了被观测的 fake"
+    assert fake.mock_calls == [], f"探针在被观测的 fake 上留下了调用记录：{fake.mock_calls}"
+    created = set(after) - set(before)
+    assert not created, f"探针在被观测对象上新建了属性（观察者效应）：{sorted(created)}"
+    # 只比键集合不够：读 `return_value` 不新增键，而是把已有的 `_mock_return_value`
+    # 换成一个新建的子 mock。所以还要比**值身份**，并确认没长出任何子 mock。
+    changed = sorted(k for k, v in before.items() if k not in after or after[k] is not v)
+    assert not changed, f"探针改动了被观测对象的内部状态：{changed}"
+    children = getattr(fake, "_mock_children", None)
+    assert not children, f"探针让 MagicMock 自动创建了子 mock（观察者效应）：{sorted(children)}"
+
+
+def test_probe_line_carries_run_impl_only_when_subprocess_is_patched(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """字段存在性：线程泄漏但 subprocess 干净时是 `run_impl=-`；被换掉时是具体定义处。"""
+    import subprocess
+
+    import tests.conftest as c
+
+    monkeypatch.delitem(_PROBE_PREV, "nodeid", raising=False)
+    monkeypatch.setattr(c, "_suspicious_threads", lambda: ["ghost<-some.module:target"])
+    line = _leak_probe_line("tests/x.py::thread_only")
+    assert line is not None and "run_impl=-" in line, line
+
+    monkeypatch.setattr(c, "_suspicious_threads", list)
+    monkeypatch.delitem(_PROBE_PREV, "nodeid", raising=False)
+    assert _leak_probe_line("tests/x.py::clean") is None, "干净时整行都不该打"
+
+    def _culprit_run(cmd, **kwargs):
+        return None
+
+    monkeypatch.setattr(subprocess, "run", _culprit_run)
+    dirty = _leak_probe_line("tests/x.py::patched")
+    assert dirty is not None and "subprocess_run_patched=True" in dirty, dirty
+    assert "run_impl=tests.test_conftest_leak_probe:" in dirty, dirty
+    assert "_culprit_run" in dirty, dirty
+    assert "run_impl=-" not in dirty, dirty

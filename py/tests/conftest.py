@@ -289,6 +289,24 @@ def _suspicious_threads() -> list[str]:
     return out
 
 
+def _run_fingerprint() -> str:
+    """当前 `subprocess.run` 的身份，格式 `定义模块:限定名`。
+
+    只读 `type(fn)` 与函数自身的 `__module__ / __qualname__`：**绝不读 `return_value`**
+    （MagicMock 的自动属性会凭空造出子 mock —— 探针反过来改变被观测对象），也绝不调用它。
+    非函数（Mock / partial / callable 类）退化到 `类型名@类型的模块`，因为对 Mock 实例取
+    dunder 属性同样可能触发自动创建。
+    """
+    fn = _subprocess_mod.run
+    kind = type(fn).__name__
+    if kind != "function":
+        return f"{kind}@{getattr(type(fn), '__module__', '?')}"
+    return (
+        f"{getattr(fn, '__module__', '?')}:"
+        f"{getattr(fn, '__qualname__', getattr(fn, '__name__', '?'))}"
+    )
+
+
 def _leak_probe_line(nodeid: str) -> str | None:
     """决定这条用例要不要记 WARNING；返回 None 表示一切干净。
 
@@ -296,6 +314,7 @@ def _leak_probe_line(nodeid: str) -> str | None:
     恰恰是探针唯一可能被改坏的地方（把条件写成 `if False` 也能全员绿）。
     """
     patched = _subprocess_mod.run is not _ORIGINAL_SUBPROCESS_RUN
+    impl = _run_fingerprint() if patched else "-"
     threads = _suspicious_threads()
     prev = _PROBE_PREV.get("nodeid")
     _PROBE_PREV["nodeid"] = nodeid
@@ -303,7 +322,7 @@ def _leak_probe_line(nodeid: str) -> str | None:
         return None
     return (
         f"[leak-probe] test={nodeid} prev={prev} "
-        f"subprocess_run_patched={patched} threads={threads[:8]}"
+        f"subprocess_run_patched={patched} run_impl={impl} threads={threads[:8]}"
     )
 
 
@@ -318,6 +337,9 @@ def _leak_probe(request: pytest.FixtureRequest):
 
     - `prev=` 同一 worker 里上一条跑过的用例 nodeid（若 patched=True，它就是嫌疑犯）
     - `subprocess_run_patched=` 全局 `subprocess.run` 是否已不是标准库原版
+    - `run_impl=` 当前 `subprocess.run` 的定义处 `模块:限定名`（仅在被换掉时才有值）——
+      把"被 patch 了"升级成"被谁 patch"。fake 多为测试文件里的局部闭包，其
+      `__qualname__` 会带出所在测试方法，故这一项通常直接点名嫌疑人所在文件
     - `threads=` 残留线程，格式 `名字<-定义模块:限定名`（泄漏后台线程是这一族的已知模式）
 
     只在"可疑"时打 WARNING，避免 8400+ 条噪音；用例失败时 pytest 会把 setup 阶段捕获到的
