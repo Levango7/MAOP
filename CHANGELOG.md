@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - 2026-09-30
+
+### Changed
+
+- **泄漏探针补"谁 patch 的"指纹（`run_impl=`）**：`py/tests/conftest.py::_leak_probe` 此前只报 `subprocess_run_patched=True/False`，等于只说"进程被弄脏了"而不说"被谁"。新增 `_run_fingerprint()`，日志多一个字段 `run_impl=<定义模块>:<限定名>`（仅在 `subprocess.run` 被换掉时有值，否则为 `-`）。为什么这样取值：真实嫌疑人形状是测试文件里的局部闭包（`py/tests/test_agent_adapters.py::_mock_subprocess_run` 返回的 `_run`，以及若干 `test_xxx.<locals>._capture_run`），它们的 `__module__/__qualname__` 直接带出**所在文件与所在用例**，于是一次复发就能点名而不是再靠 `output='ok'` 这种间接指纹猜。对 Mock 类对象只报 `类型名@类型的模块`，**刻意不读 `return_value`** —— MagicMock 的属性访问会自动创建子 mock，那等于探针反过来改变自己要观测的对象（观察者效应）；这条约束由 `test_run_fingerprint_does_not_touch_the_mock_it_reports` 钉住（断言零调用、`mock_calls` 为空、且取证前后 `__dict__` 键集合不变）。新增 3 条用例（12 passed），变异验证 5 例各点亮对应断言：指纹退化成常量 / 去掉 `run_impl` 字段 / 取消 `-` 分支 / 去读 `return_value` / 取证时顺手调用 fake。**动机**：`tests/test_tool_manager.py::TestCallSyncFallback` 三条在 macOS 腿随机红（`assert '42' in 'ok'` 与两条 `assert True is False`，返回值都是 `ok=True/exit_code=0/duration_ms=0/output='ok'` 的罐头值），2026-09-29 的 PR #54 与当日主干 run 448 各复发一次、失败用例 ID 逐字相同；`threads=[]` 已排除线程泄漏嫌疑，但"永久 patch"也与"紧邻的前一条用例同断言却通过"矛盾 ⇒ patch 是窗口性的，机制仍未定位 —— 本改动是把"下次复发能点名"这件事先做完。纯观测，不改任何生产代码或用例断言。
+
+---
+
 ## [Unreleased] - 2026-09-29
 
 ### Fixed
