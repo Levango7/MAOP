@@ -52,6 +52,10 @@ CODE_FILES: frozenset[str] = frozenset(
         "py/Dockerfile",
         "py/requirements.lock",
         "py/requirements.txt",
+        # required checks 的权威清单：它由 py/tests/test_ci_required_checks.py 与
+        # ci.yml 作业形状互相核对。若只改这份清单也算 docs-only，那个守卫就**永不执行**，
+        # 清单可以与实际保护脱节 —— 正是本分类器要防的"配了不跑"。
+        ".github/ci-required-checks.json",
         # compose 直接挂载的根级文件（nginx = tls ingress，alertmanager.yml =
         # 告警出口模板，由 alertmanager/render-config.sh 在容器启动时渲染）。
         "nginx.conf",
