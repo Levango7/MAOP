@@ -1,0 +1,36 @@
+{
+  "_comment": "master 分支保护里实际生效的 required status checks。这是唯一权威清单：改这里必须同步改 GitHub 分支保护（步骤见 docs/ci-gates.md §7.4），并由 py/tests/test_ci_required_checks.py 与 ci.yml 的作业形状互相核对。kind=always 表示作业无 if 条件、任何事件都跑；kind=scope-gated 表示只被 job 级 scope 条件拦（docs-only 时为 skipped，实测 skipped 满足 required）。",
+  "branch": "master",
+  "contexts": [
+    {
+      "name": "CI scope (code vs docs-only)",
+      "workflow": "ci.yml",
+      "job": "scope",
+      "kind": "always"
+    },
+    {
+      "name": "Secret Scan (gitleaks)",
+      "workflow": "ci.yml",
+      "job": "secret-scan",
+      "kind": "always"
+    },
+    {
+      "name": "Docs consistency gate",
+      "workflow": "ci.yml",
+      "job": "docs-gate",
+      "kind": "always"
+    },
+    {
+      "name": "Lint (ruff + mypy)",
+      "workflow": "ci.yml",
+      "job": "lint",
+      "kind": "scope-gated"
+    },
+    {
+      "name": "Frontend Build",
+      "workflow": "ci.yml",
+      "job": "frontend",
+      "kind": "scope-gated"
+    }
+  ]
+}

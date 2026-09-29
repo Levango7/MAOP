@@ -95,6 +95,7 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 | `py/tests/test_dependabot_config.py` | dependabot 配置形状 + 同前缀 ≥2 个包的 action 必须成批 |
 | `py/tests/test_requirements_lock_sync.py` | `requirements.lock` 的直依赖段必须逐条镜像 `pyproject.toml` |
 | `py/tests/test_docs_consistency_gate.py` | 文档一致性门禁：范围只来自索引当前章节、豁免必须写理由、注入死路径必须判红、`docs-gate` 作业不许挂 `if` |
+| `py/tests/test_ci_required_checks.py` | required 清单（`.github/ci-required-checks.json`）↔ `ci.yml` 作业形状 ↔ §7.2 散文 三方一致：不许改名/删作业导致上下文永不上报，不许 required 作业在 PR 上恒不产出（沿 needs 链递归查），不许矩阵名当 required |
 
 
 ## 7. master 的 required checks：已实测语义 + 现行配置
@@ -127,6 +128,11 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 
 ### 7.2 现行配置（本 PR 合并时生效）
 
+**唯一权威清单是 `.github/ci-required-checks.json`**（机器可读，含每条对应的 workflow/作业/
+kind），由 `py/tests/test_ci_required_checks.py` 与 `ci.yml` 的作业形状、以及本小节散文
+**三方互相核对**。改保护时：先改清单 → 再按 §7.4 把 GitHub 侧同步 → 守卫用例会在改名、
+删除、或把 required 作业改成"PR 上不产出"时判红。
+
 required 上下文 5 条，其余保护项全关：
 
 - `CI scope (code vs docs-only)`、`Secret Scan (gitleaks)`、`Docs consistency gate`
@@ -155,3 +161,27 @@ required 上下文 5 条，其余保护项全关：
 带 `required_status_checks.contexts`，读任一 PR 的 `mergeable_state`；**测完立刻
 `DELETE` 同一路径**。逃生门：`DELETE .../protection` 一键清空，或临时
 `POST .../protection/enforce_admins` 的逆操作。
+
+复测要带**正对照**：只放一条永不上报的上下文，确认判定真的会翻成 `blocked`。少了这一步，
+"配置没生效"和"语义宽松"会长得一模一样（§7.1 的 B 轮就是干这个的）。
+
+### 7.5 docs-only 合入主干：#52 前后各跑什么（一次误判的证伪记录）
+
+有人看到"主干某次 push 只跑了 18 秒、13 条 skipped"就判定 job 级 scope 把主干兜底验证裁掉了。
+两条实测把它证伪，省得重复争：
+
+1. **改动前更糟，不是更好**：`#52` 之前 `ci.yml` 的 `on.push.paths` 与 `on.pull_request.paths`
+   是同一份白名单，其中**不含** `docs/**` 与 `CHANGELOG.md` —— 只改文档合入主干时整个 workflow
+   **不触发、一条 check 都不产生**。现在至少有 3 条真跑（`CI scope (code vs docs-only)`、
+   `Secret Scan (gitleaks)`、`Docs consistency gate`），其余是**看得见的** skipped。
+   覆盖面不变，可见性严格变好。
+2. **分类器没有漏判**：把旧白名单的每一项喂给发布版 `py/scripts/ci_path_scope.py`，
+   `py/`、`config/`、`dashboard/`、`dashboard-enterprise/`、`.github/workflows/`、`README.md`、
+   `ROADMAP.md`、`py/Dockerfile`、`.dockerignore`、`docker-compose.yml`、
+   `docker-compose.prod.yml` 共 16 条路径**全部判 code=true、零漏判**；而分类器另外把
+   `deploy/`、`monitoring/`、`alertmanager/`、`nginx*.conf` 也算代码（旧白名单没有）⇒ 净增覆盖。
+   空变更集按 code=true 处理，方向是保守的。
+
+方法论一条：**比较两次 run 的时长必须同内容类型**。docs-only 的快跑看着就像"测试被裁"；
+要判"某次改动是否丢了覆盖率"，正解是拿新旧两套判定面**各自回放同一批输入**，
+而不是看单次 run 的结果。
