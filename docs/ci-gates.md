@@ -96,6 +96,7 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 | `py/tests/test_requirements_lock_sync.py` | `requirements.lock` 的直依赖段必须逐条镜像 `pyproject.toml` |
 | `py/tests/test_docs_consistency_gate.py` | 文档一致性门禁：范围只来自索引当前章节、豁免必须写理由、注入死路径必须判红、`docs-gate` 作业不许挂 `if` |
 | `py/tests/test_ci_required_checks.py` | required 清单（`.github/ci-required-checks.json`）↔ `ci.yml` 作业形状 ↔ §7.2 散文 三方一致：不许改名/删作业导致上下文永不上报，不许 required 作业在 PR 上恒不产出（沿 needs 链递归查），不许矩阵名当 required |
+| `py/tests/test_ci_merge_gate.py` | 聚合守卫的两面：判定脚本的策略单测（白名单式 + fail closed + docs-only 的 skipped 必须放行），以及 ci.yml 里 gate 的形状（name 稳定、`if: always()` 不许掉、needs 盖住全部重活、不许纳 push-only 作业） |
 
 
 ## 7. master 的 required checks：已实测语义 + 现行配置
@@ -133,27 +134,36 @@ kind），由 `py/tests/test_ci_required_checks.py` 与 `ci.yml` 的作业形状
 **三方互相核对**。改保护时：先改清单 → 再按 §7.4 把 GitHub 侧同步 → 守卫用例会在改名、
 删除、或把 required 作业改成"PR 上不产出"时判红。
 
-required 上下文 5 条，其余保护项全关：
+required 上下文 4 条，其余保护项全关：
 
 - `CI scope (code vs docs-only)`、`Secret Scan (gitleaks)`、`Docs consistency gate`
   —— 永远存在，任何 PR 都跑。
-- `Lint (ruff + mypy)`、`Frontend Build` —— docs-only 时跳过（按 §7.1 第 1 条即满足），
-  代码 PR 上必须真过。
+- `CI merge gate` —— `if: always()` 的聚合作业：任何 PR 都会产出这一条 check，它把上游
+  lint / 9 平台 pytest / 前端 / e2e / 迁移 / pip-audit / bandit / SBOM / perf-smoke 的结论
+  折进自己的红绿（判定脚本 `py/scripts/ci_merge_gate.py`，规则见 §7.3 末段）。
+  这一条替代了过去单独把 lint、前端设为 required 的做法，覆盖面更大。
 - `strict: false`（不要求分支领先，避免每次主干合并把在跑的 PR 全部判过期）、
   `enforce_admins: false`（保留 owner 逃生门；并行会话的直推路径不受影响）、
   无 review 门槛、不要求 linear history / conversation resolution。
 
-### 7.3 明确不进 required 的，以及原因
+### 7.3 required 的取舍：谁进、谁不进、为什么
 
-- **`pytest (…)` 矩阵作业**：docs-only 时那条 skipped check 的**名字是未展开的字面量**
+- **矩阵作业不能按名字进 required**：docs-only 时那条 skipped check 的**名字是未展开的字面量**
   `pytest (${{ matrix.os }}, Python ${{ matrix.python-version }})`（实测），而代码 PR 上是
-  9 条展开后的名字。按精确名设 required → docs-only 永远 `blocked`；按通配设则代码面匹配
-  行为尚无实测证据（当前无代码 PR 可对照），所以先不猜。要把 pytest 也纳入 required，
-  正解是加一条名字稳定的聚合作业（`needs: [scope, pytest, …]` + `if: always()`，自己读
-  `needs.*.result` 判成败），而不是折腾上下文匹配。
+  9 条展开后的名字。按精确名设 → docs-only 永远 `blocked`；按通配设则代码面匹配行为尚无实测
+  证据。正解就是现在这条聚合作业：一条 name 稳定的 check 覆盖整个矩阵，不必折腾上下文匹配。
+- **聚合作业的判定规则**（`ci_merge_gate.py`，白名单式、fail closed）：
+  ① 任何上游结论不是 `success` 且不是（在 scope 明确判 `code=false` 时的）`skipped` → 红；
+  ② scope 判 `code=true` 却有该跑的作业是 `skipped` → 红（"分类说改了代码但门禁没跑"正是最该拦的）；
+  ③ scope 没输出、needs 为空、缺 `result` 字段、出现未知的新状态 → 一律红。
+  它**必须**挂 `if: always()`：否则上游一红它自己就不产出，required 变成"从未上报"，
+  所有 PR 永久卡在 `blocked`（§7.1 的 B 轮语义）。这条由结构守卫钉住，不许改坏。
+- **`Lint (ruff + mypy)` 与 `Frontend Build` 不再单列 required**：它们已在聚合作业的 needs 里，
+  失败或被跳过都会把 `CI merge gate` 判红。单列只是把同一件事说两遍。
 - **只在 trunk push 才存在的作业**：`Docker build` / `Container Scan (trivy)` /
   `Compose Smoke` / `Publish to PyPI`。它们在 PR 上要么根本不产生、要么恒为 skipped，
-  设成 required 等于"永远空满足"，是假门禁。
+  设成 required 等于"永远空满足"，是假门禁；也**不**把它们放进聚合作业的 needs ——
+  否则严格面下它们在 PR 上永远是 skipped，会把 gate 恒判红。容器面仍靠主干 push 验证。
 
 ### 7.4 复测 / 撤销
 
