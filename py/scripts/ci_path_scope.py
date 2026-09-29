@@ -96,6 +96,16 @@ def summarize(paths: Iterable[str]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # summarize() 输出中文（含全角括号）。Windows 上 sys.stdout 按 **区域代码页**
+    # 编码：en-US runner 是 cp1252，遇到 '（' 直接 UnicodeEncodeError 让脚本崩，
+    # 于是"影响面判定"这一层在 Windows 上根本不产出。zh-CN 机器是 cp936，能编码
+    # 这些字符，所以本地永远复现不了 —— 必须在脚本侧固定 UTF-8，而不是给调用方
+    # 塞 PYTHONIOENCODING（真实 CI 步骤不会这么设）。
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+    except (AttributeError, ValueError):
+        pass  # 极端环境（stdout 已被替换成无 reconfigure 的对象）下不因此失败
+
     ap = argparse.ArgumentParser(description="classify a changeset as code vs docs-only")
     ap.add_argument("--files-from", help="read NUL- or newline-separated paths from a file ('-' = stdin)")
     ap.add_argument("--github-output", help="append code=true|false to this GITHUB_OUTPUT file")

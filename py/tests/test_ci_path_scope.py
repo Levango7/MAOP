@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -110,6 +111,26 @@ def test_cli_mixed_changeset_reports_code_true(tmp_path: Path) -> None:
     )
     assert r.returncode == 0, r.stderr
     assert out.read_text(encoding="utf-8").strip() == "code=true"
+
+
+def test_cli_survives_non_utf8_console(tmp_path: Path) -> None:
+    """强制非 UTF-8 控制台编码，脚本仍须正常产出判定。
+
+    起因（2026-09-29 CI 实测）：summarize() 的中文摘要在 en-US Windows runner 上
+    按 cp1252 编码 stdout，'（' 直接 UnicodeEncodeError → 4 条 Windows pytest 腿
+    全红，而 zh-CN 本机（cp936 能编码这些字）复现不出来。脚本内部已 reconfigure
+    成 UTF-8；此用例把环境固定成 cp1252，防的是这个修法被人"顺手删掉"。
+    变异验证：去掉 reconfigure → 该用例在任意平台上都会红。
+    """
+    lst = tmp_path / "files.txt"
+    lst.write_text("README.md\n", encoding="utf-8")
+    r = subprocess.run(
+        [sys.executable, str(SCRIPT), "--files-from", str(lst)],
+        capture_output=True, text=True, check=False, encoding="utf-8", errors="replace",
+        env={**dict(os.environ), "PYTHONIOENCODING": "cp1252"},
+    )
+    assert r.returncode == 0, r.stderr
+    assert "code=true" in r.stdout, r.stdout
 
 
 # ── 工作流结构：白名单不许回来 ──────────────────────────────────────
