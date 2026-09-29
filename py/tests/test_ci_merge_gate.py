@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -153,6 +154,8 @@ def test_cli_stdout_is_valid_utf8_bytes_under_cp1252_console(tmp_path: Path) -> 
 
     取原始字节严格按 UTF-8 解码：zh-CN 本机 cp936 会把坏输出吞成乱码却不报错，
     只有字节层断言才在所有平台都成立。
+    env 必须继承父进程只覆盖 PYTHONIOENCODING：精简到只剩 PATH 会让 Windows 3.10 的
+    子解释器在启动阶段就死于 _Py_HashRandomization_Init（CI 实测，3.11+ 不复现）。
     """
     f = tmp_path / "needs.json"
     f.write_text(json.dumps(_needs(scope="success", test="success")), encoding="utf-8")
@@ -160,7 +163,7 @@ def test_cli_stdout_is_valid_utf8_bytes_under_cp1252_console(tmp_path: Path) -> 
         [sys.executable, str(SCRIPT), "--needs-json", str(f), "--code", "true"],
         capture_output=True,
         check=False,
-        env={"PYTHONIOENCODING": "cp1252", "PATH": str(Path(sys.executable).parent)},
+        env={**dict(os.environ), "PYTHONIOENCODING": "cp1252"},
     )
     assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
     text = r.stdout.decode("utf-8")  # 解不出就抛，正是这条用例要的行为

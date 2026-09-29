@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`CI merge gate`：把"测试必须绿"从人看变成平台拦**（`py/scripts/ci_merge_gate.py` +
-  `ci.yml` 的 `gate` 作业 + `py/tests/test_ci_merge_gate.py` 17 条）。缺口是这样形成的：
+  `ci.yml` 的 `gate` 作业 + `py/tests/test_ci_merge_gate.py` 18 条）。缺口是这样形成的：
   矩阵作业 `pytest (…)` 在 docs-only 时上报的 check 名是**未展开的模板字面量**，与代码 PR 上
   9 条展开名互不相同（两侧均实测），push-only 作业在 PR 上恒为 skipped —— 两类都当不了 required
   上下文，于是 required 只能覆盖 lint / 前端 / 三条恒跑作业，**最重要的 9 平台测试矩阵始终没有
@@ -54,7 +54,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   （掉了它，上游一红这条 check 就不产出，required 变成"从未上报"→ 所有 PR 永久 blocked，
   即 §7.1 的 B 轮语义），由结构守卫钉住。明确**不**把 push-only 作业放进 needs：那样严格面下
   gate 会在每个 PR 上恒红；容器面仍由主干 push 验证。清单 kind 增加 `always-guard`，
-  `test_ci_required_checks.py` 同步扩展。
+  `test_ci_required_checks.py` 同步扩展。首版接线时 `test_cli_stdout_is_valid_utf8_bytes_under_cp1252_console`
+  在 `windows-latest / Python 3.10` 独红（3.11–3.13 同测全绿，非负载抖动：重跑 3 次同点失败，
+  8596 passed / 1 failed）—— 该用例把子进程 env 精简成只剩 `PYTHONIOENCODING` + `PATH`，
+  3.10 的解释器在 `_Py_HashRandomization_Init` 阶段就取不到随机数而死（`Python runtime state:
+  preinitialized`，returncode 1），根本没跑到脚本。修复是改回继承父 env 只覆盖目标变量
+  （`{**dict(os.environ), "PYTHONIOENCODING": "cp1252"}`），与同族用例
+  `test_ci_path_scope.py::test_cli_survives_non_utf8_console` 口径一致；模拟"非 UTF-8 控制台"
+  只需要换编码变量，连带剥掉 `SystemRoot` 之类是超出意图的。zh-CN 本机 3.14 复现不出来，
+  这条只能靠 CI 版本分裂证据定性。
 
 ### Changed
 
