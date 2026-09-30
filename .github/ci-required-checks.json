@@ -1,5 +1,5 @@
 {
-  "_comment": "master 分支保护里实际生效的 required status checks。这是唯一权威清单：改这里必须同步改 GitHub 分支保护（步骤见 docs/ci-gates.md §7.4），并由 py/tests/test_ci_required_checks.py 与 ci.yml 的作业形状互相核对。kind=always 表示作业无 if 条件、任何事件都跑；kind=scope-gated 表示只被 job 级 scope 条件拦（docs-only 时为 skipped，实测 skipped 满足 required）；kind=always-guard 表示作业挂 if: always()，因此**任何** PR 都会产出这条 check，并把上游成败折进自己的红绿（见 py/scripts/ci_merge_gate.py）。",
+  "_comment": "master 分支保护里实际生效的 required status checks。这是唯一权威清单：改这里必须同步改 GitHub 分支保护（步骤见 docs/ci-gates.md §7.4），并由 py/tests/test_ci_required_checks.py 与 ci.yml 的作业形状互相核对。kind=always 表示作业无 if 条件、任何事件都跑；kind=scope-gated 表示只被 job 级 scope 条件拦（docs-only 时为 skipped，实测 skipped 满足 required）；kind=always-guard 表示作业挂 if: always()，因此**任何** PR 都会产出这条 check，并把上游成败折进自己的红绿（见 py/scripts/ci_merge_gate.py）。注意：上述三方对账全都在仓库内，而 GitHub 分支保护是带外配置，仓库内守卫结构性地看不见它——2026-10-01 实测到一次真实漂移（清单 4 条 vs GitHub 5 条、gate 从未生效），已修并补第四处对账守卫 py/scripts/check_required_checks_drift.py（nightly 作业 required-checks-drift，三态：MATCH=0 / DRIFT=1 / UNVERIFIED=3，验不到不等于一致）。详见 docs/ci-gates.md §7.6。",
   "branch": "master",
   "contexts": [
     {

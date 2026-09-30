@@ -195,3 +195,52 @@ required 上下文 4 条，其余保护项全关：
 方法论一条：**比较两次 run 的时长必须同内容类型**。docs-only 的快跑看着就像"测试被裁"；
 要判"某次改动是否丢了覆盖率"，正解是拿新旧两套判定面**各自回放同一批输入**，
 而不是看单次 run 的结果。
+
+### 7.6 一次真实漂移：清单说 4 条，GitHub 上是 5 条（2026-10-01 已修）
+
+§7.2 那套"清单 ↔ ci.yml ↔ 文档散文"三方对账有个**结构性盲区**：三方**全在仓库里**，
+而 GitHub 分支保护是**带外配置**（Settings 里点的）。仓库里改任何东西都看不见它。
+
+2026-10-01 实测抓到一次真实漂移：
+
+| 来源 | required 上下文 |
+|---|---|
+| `.github/ci-required-checks.json` | 4 条，含 `CI merge gate` |
+| 本文 §7.2 散文 | 同样 4 条，明写"Lint / Frontend Build 不再单列" |
+| **GitHub 实际配置** | **5 条：`Lint` + `Frontend Build` 单列，且没有 `CI merge gate`** |
+
+即 PR #56 设计的"一条 gate 覆盖 lint + 9 平台 pytest + 前端 + e2e + 迁移 + 审计"**从未在
+平台侧生效**。真正在拦的仍只是 lint 与前端构建；三方守卫对此**结构性地看不见**——它们
+互相一致，漂移在第四处。
+
+**为什么三方守卫抓不到**：`test_ci_required_checks.py` 只能读仓库文件；GitHub 那份配置
+不在仓库里，任何仓库内测试都够不着它。这不是"漏写了一条断言"，是覆盖面本身的边界。
+
+**修法**（两步）：
+
+1. 按 §7.4 把 GitHub 侧同步为清单的 4 条（2026-10-01 执行；同步前先用真实 `needs`
+   输入跑过 `ci_merge_gate.py` 三种情形，确认 docs-only 绿、code+failure 红、fail-closed 生效）。
+2. 补上第四处对账：`py/scripts/check_required_checks_drift.py` + `nightly.yml` 的
+   `required-checks-drift` 作业 + `py/tests/test_ci_required_checks_drift.py`（13 例）。
+
+**这个守卫刻意三态，而不是"绿/红"两态**：
+
+| 结论 | 退出码 | 含义 |
+|---|---|---|
+| `MATCH` | 0 | 实况与清单逐条一致 |
+| `DRIFT` | 1 | 不一致，并**点名**多出/缺失的具体条目 |
+| `UNVERIFIED` | 3 | **读不到实况**（无 token / 无 admin 作用域 / 网络失败） |
+
+`UNVERIFIED` 必须与 `MATCH` 分开：读分支保护要 admin 作用域，默认 `GITHUB_TOKEN` 没有
+（必然 403）。**若把"验不到"判成通过，这个守卫就会变成本仓最鄙视的那种"永远绿的门禁"
+——比没有门禁更坏，因为它让人以为门禁在。** 脚本读到失败会打 `::warning` 并明说
+"本次没能读到实况，不等于一致"；nightly 在缺 `REQUIRED_CHECKS_TOKEN` secret 时同样
+**显式说明并跳过**，不静默变绿。
+
+启用真对账：建一个 PAT（`read:repo` 即可）存为仓库 secret `REQUIRED_CHECKS_TOKEN`。
+在此之前 nightly 会把实况打印出来供人工核对。
+
+本地自查（已 `gh auth login`）::
+
+    cd py && python scripts/check_required_checks_drift.py
+    # 退出码 0/1/3 见上表；3 = 没 token，不是"一致"
