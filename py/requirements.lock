@@ -1,14 +1,14 @@
-# MAOP Python — reproducible dependency lock.
+# MAOP Python — direct-dependency mirror reference.
 #
-# Generated reference: 2026-07-16 (re-frozen on demand; see note below)
-# Python:    requires-python >=3.10 (was incorrectly annotated as "3.13+" — fixed)
+# T2.2 (2026-09-30) 定位变更：本文件退为「直依赖镜像参考」——真锁是
+# requirements.frozen.txt（uv 全量解析、精确 ==），pip-audit / SBOM / CI 缓存键
+# 已全部改以 frozen 文件为唯一输入；内容级漂移由 CI 的 lock-drift 作业比对。
+# 本文件保留的价值：直依赖以窄范围（>=, <）镜像 pyproject，防止主版本静默漂移；
+# 由 tests/test_requirements_lock_sync.py 守卫（名字集合 + 约束文本逐条相等）。
 #
-# IMPORTANT (5.1 fix): this lock is a *reference*, not a byte-exact freeze of a
-# production environment. Direct dependencies MUST track pyproject.toml
-# [project.dependencies] and are expressed as narrow ranges (>=, <) here so the
-# file cannot drift into silently different majors. For a truly reproducible
-# build, regenerate after a clean install:
-#   pip install -r requirements.txt && pip freeze > requirements.lock
+# IMPORTANT (5.1 fix): this file is a *reference*, not a freeze. Direct
+# dependencies MUST track pyproject.toml [project.dependencies] as narrow
+# ranges. For a truly reproducible build use requirements.frozen.txt.
 #
 # Source of truth for DIRECT deps: pyproject.toml. This file mirrors it.
 

@@ -59,7 +59,15 @@ PG 侧排序靠 `ctid` 决胜（`pg_persist.py:380-416`），`VACUUM FULL`/行�
 **验收**：重算攻击测试红转绿；既有审计测试零回归；README #10 改写为 v2 语义与残留边界
 （持 key 者仍可重算——需 L2 锚定，锚定是运维流程）。
 
-### T1.2 CRL 出厂安全化（P1 · 规模 S）
+### T1.2 CRL 出厂安全化（P1 · 规模 S）——✅ 代码完成 2026-09-30，落分支 `fix/t1.2-crl-strict-default`（MAOS 仓）
+
+**执行记录**：production（`MAOP_ENV=production`）且未显式设置 `MAOP_CRL_STRICT`
+时默认 strict——CRL 不可达且无缓存即拒绝（fail-closed）；显式 `=0` 降级仍被尊重
+但记 error 日志留痕；开发/测试宽松默认不变。5 条测试 + README #3 改写 +
+MAOS CHANGELOG 记账，ruff clean，全量 200 passed（唯一红灯=清单守卫，预期内）。
+**并入 master 的前置**：用生产私钥重签 manifest（`scripts/sign_enterprise_modules.py
+--key <生产私钥>`）——私钥按 36daaff 纪律不在仓内，本地浅搜未获，等持有方执行。
+遗留：CRL 状态暴露到 license 状态端点（子任务 2）顺延。
 
 **问题**：`MAOP_CRL_STRICT` 默认 0（`crl.py:105,142-146`），非严格下"CRL 服务不可达即放行"
 （`crl.py:173-182`）——出厂行为等于撤销检查可被网络手段绕过（README #3）。
@@ -214,7 +222,15 @@ agents.yaml 能力声明 + enforce 条件化（S）；e2e + 默认开启（S）�
 **验收**：enforce=1 下 pipeline 任务真预演通过、写操作零副作用（临时目录断言）；
 未声明能力的外部 agent 不受影响。
 
-### T2.2 requirements.lock 真锁（P1 · 规模 S-M）
+### T2.2 requirements.lock 真锁（P1 · 规模 S-M）——✅ 完成 2026-09-30
+
+**执行记录**：新增 `py/requirements.frozen.txt`（uv `pip compile --extra enterprise
+--universal`，45 包全 `==` 带溯源）；pip-audit / SBOM(cyclonedx) 输入与 pip 缓存键
+全部换到 frozen 文件（此前审"范围"= 审"能落进范围的任意版本"）；新增 `lock-drift`
+CI 作业（重编译剥注释按内容比对）并纳入 merge gate `REQUIRED_UPSTREAM`；
+守卫测试 `test_frozen_lock.py` 3 条；`requirements.lock` 退为直依赖镜像参考
+（镜像守卫不变）。`ml` extra 未入锁（torch 链 universal 解析失败 + 非生产运行时，
+文件头记录）。旧 T2.2 设计里的"uv lock / pip-compile 二选一"落定为 uv pip compile。
 
 **问题**：lock 下半段传递依赖是手写 `>=` 范围（CHANGELOG 台账自认"reference，不是真锁"）。
 
@@ -310,7 +326,14 @@ helm 图表齐、但零控制器代码（README 自述 PLANNED），集成测试
 **验收（M0）**：kind 集群 apply 一个 MaopTask → operator 拉起执行 → status.phase=Running →
 任务完成 phase=Succeeded，e2e 在 CI 绿。
 
-### T-UI 支线：顶栏 / 左侧边栏布局精修（P2 · 规模 S-M）
+### T-UI 支线：顶栏 / 左侧边栏布局精修（P2 · 规模 S-M）——✅ 核心完成 2026-09-30（用户拍板方向已落地）
+
+**用户拍板（09-30）**：顶栏左侧大标题；顶栏是顶栏不被侧栏盖；侧栏只占顶栏和
+尾栏之间的内容带。已实现：侧栏 `top: var(--topbar-h)` 从顶栏下方开始（桌面
+push 不变、移动 drawer 同样不遮顶栏）、顶栏大标题 `--fs-2xl`/800 + logo 放大、
+品牌区常驻。新增 `e2e/layout.spec.js` 5 条布局契约（chromium 5 passed）+
+`npm run build` 通过。**未做**：子任务 1 断点诊断/900-1100 默认 rail（等用户
+补充当时的窗口宽度/缩放）与子任务 3 顶栏精修余项。
 
 **来源**：用户 2026-09-30 反馈——对顶栏与左侧边栏设计不满意，
 "左侧边栏展开是直接盖在整个页面上"。

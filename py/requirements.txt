@@ -3,8 +3,11 @@
 # ⚠️ 本文件是「开发指引子集」：刻意排除企业版驱动 etcd3（2019 停更 + CVE + Python≥3.13 装不上，
 #    需要时 `pip install "maop[etcd]"` 显式安装）。请勿据此做 SBOM / 漏洞审计。
 #
-# ✅ 权威锁文件是 requirements.lock（pip freeze 生成）：CI 的 SBOM(cyclonedx) 与 pip-audit
-#    均以它为唯一输入。本地 `make install` 用本文件仅为避开 etcd3/torch 等重依赖，便于快速起环境。
+# ✅ 权威锁文件是 requirements.frozen.txt（uv 全量解析、精确 ==，T2.2 2026-09-30）：
+#    CI 的 pip-audit / SBOM / 缓存键均以它为唯一输入。requirements.lock 退为
+#    直依赖镜像参考（窄范围，由 tests/test_requirements_lock_sync.py 守卫）。
+#    本文件是「开发指引子集」，仅为避开 etcd3/torch 等重依赖，便于快速起环境，
+#    勿据此做 SBOM / 漏洞审计。
 #
 # 与 pyproject.toml [project.dependencies] 对齐。
 

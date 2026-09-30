@@ -67,6 +67,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 施工总图（三工作流 13 任务 + T-UI 支线）：`docs/investment-plan-2026Q4.md`。
 
+### 2026-09-30 T2.2：requirements.frozen.txt 真锁（审计输入换精确 pin）+ T-UI 顶栏/侧栏布局
+
+**T2.2 真锁**：
+- 新增 `py/requirements.frozen.txt`：uv 全量解析（base + enterprise extra，
+  universal 跨平台）的精确 `==` 锁，45 包带溯源注释。此前真锁缺位——
+  `requirements.lock` 自认是"参考"（直依赖窄范围 + 传递 `>=` 下界），
+  pip-audit 审范围等于审"能落进范围的任意版本"，漏洞结论随解析漂移。
+- CI 改造：`pip-audit` 与 SBOM(cyclonedx) 的输入换为 frozen 文件；pip 缓存键
+  三处同步；新增 `lock-drift` 作业（重新编译 + 剥注释按内容比对，改
+  pyproject 不重生成锁即红），并纳入 merge gate 的 `REQUIRED_UPSTREAM`
+  （`test_ci_merge_gate.py` 清单同步）。
+- 守卫测试 `py/tests/test_frozen_lock.py` 3 条：文件存在且非空、每行精确
+  pin、pyproject 直依赖 + enterprise extra 名字全覆盖（与内容级漂移检测互补）。
+- `ml` extra 刻意未进 frozen 锁：sentence-transformers→torch 链在 universal
+  解析下触发 numpy 构建失败，且不进生产运行时（文件头有记录，需要时单独补）。
+- `requirements.lock` 定位改为"直依赖镜像参考"（文件头改写），镜像守卫不变；
+  `requirements.txt` / `contributing.md` 的指引同步指向 frozen 真锁。
+
+**T-UI 顶栏/侧栏（用户 09-30 拍板：顶栏是顶栏，侧栏不盖顶栏/整页）**：
+- 侧栏从顶栏下方开始（`top: var(--topbar-h)`），废弃"展开盖品牌区"的层叠
+  设计——顶栏通栏常驻，品牌大标题升档（`--fs-2xl`/800，logo 同步放大）；
+  内容与页脚仍在侧栏右侧（push 语义不变）；移动端 drawer 同样从顶栏下方滑入。
+- 新增 `dashboard-enterprise/e2e/layout.spec.js` 5 条布局契约（桌面侧栏不遮
+  顶栏/内容在侧栏右侧/大标题完整落在顶栏内/rail 收窄不违约/移动 drawer 不遮
+  顶栏），chromium 实测 5 passed；`npm run build` 通过。
+
 ### Added
 
 - **`CI merge gate`：把"测试必须绿"从人看变成平台拦**（`py/scripts/ci_merge_gate.py` +

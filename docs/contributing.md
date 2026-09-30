@@ -333,7 +333,7 @@ git commit -m "security(auth): upgrade PBKDF2 to 600k iterations (OWASP 2023)"
 
 1. Checkout
 2. Setup Python
-3. Install dependencies (`pip install -r py/requirements.lock`)
+3. Install dependencies (`pip install -e "py/[dev]"` — CI 同款；真锁见 `py/requirements.frozen.txt`）
 4. Lint (ruff)
 5. Type check (mypy)
 6. Test (pytest with coverage)
