@@ -37,6 +37,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - 2026-10-01
+
+### Fixed
+
+- **required checks 漂移：GitHub 侧少了一条最关键的门禁（PR #56 的设计此前从未生效）**。
+  2026-10-01 体检实测三方对账（`.github/ci-required-checks.json` / `ci.yml` 作业形状 /
+  `docs/ci-gates.md` §7.2 散文）全部一致地写着 4 条 required（含 `CI merge gate`），
+  而 **GitHub 分支保护实况是旧的 5 条**（`Lint (ruff + mypy)` 与 `Frontend Build` 单列，
+  **没有** `CI merge gate`）。后果：`CI merge gate` 折进去的 9 平台 pytest / Playwright E2E /
+  Alembic 迁移 / pip-audit / bandit / SBOM / perf-smoke **全无平台级强制**——真正在拦的仍
+  只是 lint 与前端构建。这不是配置写错，是**带外配置漂移**：三方守卫能读的全在仓库里，
+  GitHub 那份不在仓库里，仓库内任何测试都够不着它（详见 `docs/ci-gates.md` §7.6）。
+  - **GitHub 侧已同步**为清单的 4 条（`strict: false` / `enforce_admins: false` 等其余保护
+    项逐项核对未变）。同步前先用**真实 `needs` 输入**跑过 `ci_merge_gate.py` 三种情形，
+    确认 docs-only 全 skipped 判绿（否则这条 required 会卡死所有文档 PR）、code=true 且
+    pytest failure 判红、fail-closed 生效——不拿"应该会绿"去改一个会卡住所有 PR 的设置。
+  - **补第四处对账守卫**（根因修复，否则漂移会再次静默复发）：
+    `py/scripts/check_required_checks_drift.py` + `nightly.yml` 新作业
+    `required-checks-drift` + `py/tests/test_ci_required_checks_drift.py`（13 例，含把
+    2026-10-01 这次真实漂移钉成用例）。
+  - **守卫刻意三态而非绿/红两态**：`MATCH`=0 / `DRIFT`=1（点名多出/缺失的具体条目）/
+    `UNVERIFIED`=3（**读不到实况**）。读分支保护要 admin 作用域、默认 `GITHUB_TOKEN` 必然
+    403，所以"验不到"绝不能判成通过——那会让它变成本仓最鄙视的"永远绿的门禁"，比没有
+    门禁更坏，因为它让人以为门禁在。脚本与 nightly 在验不到时都打 warning 并明说
+    "不等于一致"。启用真对账：PAT（`read:repo` 即可）存为 secret `REQUIRED_CHECKS_TOKEN`。
+  - `.github/ci-required-checks.json` 的 `_comment` 与 `docs/ci-gates.md` §7.2/§7.6 同步
+    记下这条边界，避免下一个改保护的人重蹈。
+
 ## [Unreleased] - 2026-09-30
 
 ### 2026-09-30 T3.0：v5.2.0 演化闭环哑弹排除（trigger / 审批 API）

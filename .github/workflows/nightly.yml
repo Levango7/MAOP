@@ -106,3 +106,52 @@ jobs:
           fi
         env:
           MAOP_ENV: 'test'
+
+  # ── required checks 漂移对账（§7.6）────────────────────────────────
+  # 仓库内守卫（test_ci_required_checks.py）只核对清单 / ci.yml / 文档三方，全在仓库里；
+  # GitHub 分支保护是**带外配置**，任何仓库内改动都看不见它。2026-10-01 实测的漂移正是
+  # 三方一致写着 4 条（含 `CI merge gate`）、GitHub 上却是旧的 5 条 —— 聚合作业建好了
+  # 却从未生效，9 平台 pytest / e2e / 迁移 / 审计全无平台级强制。本作业补上第四处。
+  #
+  # 为什么放 nightly 而不是 PR 腿：读分支保护要 admin 作用域，默认 GITHUB_TOKEN 没有
+  # （必然 403）。夜间用 PAT（secret REQUIRED_CHECKS_TOKEN，read:repo 即可）真对账；
+  # 未配置该 secret 时**显式说明并跳过**，不假装通过 —— 恒绿的门禁比没有门禁更坏。
+  required-checks-drift:
+    name: Required checks drift (manifest vs GitHub)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Check for a token that can read branch protection
+        id: tok
+        env:
+          PAT: ${{ secrets.REQUIRED_CHECKS_TOKEN }}
+        run: |
+          if [ -n "$PAT" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compare manifest against live branch protection
+        if: steps.tok.outputs.present == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.REQUIRED_CHECKS_TOKEN }}
+        run: |
+          python py/scripts/check_required_checks_drift.py
+
+      - name: Explain why this was skipped
+        if: steps.tok.outputs.present != 'true'
+        run: |
+          echo "::warning title=Required checks drift::未配置 secret REQUIRED_CHECKS_TOKEN"
+          echo "本次**没有**对账 —— 分支保护是带外配置，仓库内守卫看不见它。"
+          echo "启用方式：建一个 PAT（read:repo 即可）存为仓库 secret REQUIRED_CHECKS_TOKEN。"
+          echo "在此之前，required 上下文的实际状态可人工核对："
+          gh api "repos/${{ github.repository }}/branches/master/protection" \
+            --jq '.required_status_checks.contexts' || true
+

@@ -152,6 +152,80 @@ Day 9+  : 通知客户升级版本 + 更换 license key
 Day 90  : 旧密钥正式作废（给予客户 3 个月迁移窗口）
 ```
 
+### 2.4 源码改动后的重签流程（日常高频操作，runbook）
+
+> **与 §2.3 的区别**：§2.3 是**换密钥对**（一年一次、影响所有客户 license）；
+> 本节是**代码改了、重签完整性清单**——每改动一个 `maop/enterprise/*.py` 就要做一次。
+> 后者频率高得多，却是 2026-10-01 T1.2 真正卡住的那一步（生产私钥不在仓内，
+> `verify_manifest.py` 报红 <!-- docs-gate: skip=跨仓引用：verify_manifest.py 在 MAOS 仓 -->、
+> CI Release guard 报红，但没人知道该按什么顺序操作）。
+
+#### 为什么会红
+
+`maop/enterprise/_integrity_manifest.json` 逐文件记录 `maop/enterprise/**/*.py` 的
+SHA-256。**动了源码而不重签，提交态清单就失真**，
+`verify_manifest.py` 与 <!-- docs-gate: skip=跨仓引用：verify_manifest.py 在 MAOS 仓 -->
+`test_checked_in_manifest_matches_current_sources` 会红，CI 的 Release guard 也会红。
+这是设计如此（防篡改），不是故障。
+
+#### 步骤
+
+0. **先确认只有清单失真**，而不是别的问题：
+   ```bash
+   python scripts/verify_manifest.py          # 期望 FAIL，且 reason 只列改动过的模块
+   ```
+1. **预检钥匙配对**（**新增，最关键的一步**）：
+   ```bash
+   python scripts/presign_manifest.py --key <生产私钥>
+   ```
+   必须输出 `OK: this private key is paired with the packaged public key`。
+   它拦的是**不会当场报错、发货后才炸**的那类失误：拿一把有效的 Ed25519 私钥去签，
+   但它和打包公钥不是配对的那一对——签出来的 manifest 看着完全正常，直到每个客户
+   安装都报签名校验失败。脚本还会点名拒绝 `test_signing_key.pem` /
+   `ci_ephemeral_signing_key.pem`（后者每次 CI 都会被覆盖并**顺带覆盖打包公钥**）。
+   > 拿不到生产私钥时**不要**拿测试钥匙顶替——那正是两次事故的成因。
+2. **重签并立即验证**：
+   ```bash
+   python scripts/sign_enterprise_modules.py --key <生产私钥>
+   python scripts/verify_manifest.py            # 必须 OK
+   ```
+3. **提交**：`maop/enterprise/_integrity_manifest.json` 与源码改动**同一个 commit**，
+   不要拆成两个 commit（拆开会让主干短暂处于"源码已改、清单未签"的红灯态）。
+4. **私钥不落盘进仓库**：签完把私钥放回离线保管位置。若曾把私钥放在
+   `scripts/` 或 `data/` 下，**确认它没被 `git add -A` 带进历史**
+   （两仓 `.gitignore` 均已覆盖这两类路径）。
+
+#### 退出码对照（`presign_manifest.py`）
+
+| 码 | 含义 | 该怎么办 |
+|---|---|---|
+| 0 | 钥匙与打包公钥配对，可安全重签 | 继续第 2 步 |
+| 1 | 钥匙不可用 / 不配对 / 是已知非生产钥匙 | **停下**，别签。按提示找正确的私钥 |
+| 2 | 环境问题（如打包公钥缺失） | 先修环境再重试 |
+
+#### 仍需人工持有的部分（工具替代不了）
+
+本节**不含**任何自动获取私钥的能力，也不该有。生产私钥的**存放位置、备份、
+访问控制**是持钥方的职责；本节的全部作用是让"拿到私钥之后的那几步"不再靠记忆。
+如果生产私钥已经丢失，那是**信任锚轮换**（走 §2.3 全部 6 步 + 重新签发所有客户
+license），不是本节能解决的。
+
+### 2.5 相关文件
+
+> 下列脚本全部位于 **MAOS 仓库**（私有），不在 MAOP 主仓内。ADR-017 之后企业代码已
+> 物理隔离到 MAOS，签发/重签操作都在那边执行。
+
+| 路径（均在 MAOS 仓） | 作用 |
+|---|---|
+| `scripts/presign_manifest.py` <!-- docs-gate: skip=跨仓引用：该脚本在 MAOS 仓，本仓必然不存在 --> | 重签前预检（配对 / 非生产钥匙拒绝） |
+| `scripts/sign_enterprise_modules.py` <!-- docs-gate: skip=跨仓引用 --> | 生成并签名完整性清单 |
+| `scripts/verify_manifest.py` <!-- docs-gate: skip=跨仓引用 --> | 校验**提交态**清单（须在 CI 生成临时密钥**之前**跑） |
+| `scripts/ci_generate_test_key.py` <!-- docs-gate: skip=跨仓引用 --> | CI 一次性密钥（会覆盖打包公钥，仅 CI） |
+| `maop/enterprise/keys/public_key.pem` | 打包信任锚 |
+| `maop/enterprise/_integrity_manifest.json` | 提交态清单（入库） |
+
+> 本文其余章节提到的 `scripts/issue_license.py` 等路径同理，均指 MAOS 仓库。
+
 ## 3. License 签发流程
 
 ### 3.1 使用签发 CLI 工具
