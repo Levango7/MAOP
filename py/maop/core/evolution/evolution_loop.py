@@ -373,6 +373,41 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
                 reports.append(LoopReport.model_validate_json(row[0]))
         return reports
 
+    def get_report(self, cycle_id: str) -> LoopReport | None:
+        """按 cycle_id 读取单条循环报告；不存在返回 None。
+
+        T3.0: 审批 API 的公开读取入口（此前 service 调了不存在的
+        ``_load_report`` 直接 AttributeError）。旧行 JSON 缺新字段时由
+        pydantic 默认值兜底。
+        """
+        with self._db_connect() as conn:
+            row = conn.execute(
+                "SELECT report_json FROM evolution_cycles WHERE id = ?",
+                (cycle_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        with contextlib.suppress(Exception):
+            return LoopReport.model_validate_json(row[0])
+        return None
+
+    def update_report(self, report: LoopReport) -> bool:
+        """更新已落库的循环报告（审批决策持久化）。
+
+        T3.0: ``_save_report`` 是纯 INSERT——对已存在的主键再 INSERT 会撞
+        IntegrityError，审批路径必须走 UPDATE。cycle_id 不存在时返回 False
+        （调用方按 404 语义处理），不抛异常。
+
+        Returns:
+            True 当至少更新了一行。
+        """
+        with self._db_connect() as conn:
+            cur = conn.execute(
+                "UPDATE evolution_cycles SET report_json = ? WHERE id = ?",
+                (report.model_dump_json(), report.cycle_id),
+            )
+            return cur.rowcount > 0
+
     def get_stats(self) -> dict[str, Any]:
         with self._db_connect() as conn:
             total = conn.execute("SELECT COUNT(*) FROM evolution_cycles").fetchone()[0]

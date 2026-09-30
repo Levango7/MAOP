@@ -17,6 +17,7 @@ and is intentionally left unchanged.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import logging
@@ -630,11 +631,15 @@ def get_evolution_loop_status() -> dict[str, Any]:
 async def trigger_evolution_loop(dry_run: bool) -> dict[str, Any]:
     """手动触发一轮闭环（支持 dry_run）（AC-07）.
 
+    T3.0 修复：``run_cycle`` 是同步阻塞实现（SQLite + 文件快照 + 各阶段执行），
+    此前直接 ``await`` 它必然 TypeError → 端点恒 500。现放线程池执行，
+    既修哑弹又不阻塞事件循环。
+
     Raises on failure so the router can map to HTTP 500.
     """
     try:
         loop = _evo_loop()
-        report = await loop.run_cycle(dry_run=dry_run, auto_rollback=True)
+        report = await asyncio.to_thread(loop.run_cycle, dry_run=dry_run, auto_rollback=True)
         return {"status": "ok", "report": report.model_dump()}
     except Exception as exc:
         logger.warning("Evolution loop trigger failed: %s", exc, exc_info=True)
@@ -678,13 +683,14 @@ def decide_evolution_approval(
     """审批通过 / 拒绝 (AC-07).
 
     ``approval_id`` 格式：``cycle_id:suggestion_id``。
-    Raises ``ValueError`` for invalid ``approval_id`` format or unknown
-    ``decision`` value (router maps to 400).
+    Raises ``ValueError`` for invalid ``approval_id`` format, unknown
+    ``decision`` value, or a suggestion not pending in that cycle
+    (router maps to 400).
     Raises ``KeyError`` if the cycle is not found (router maps to 404).
     Raises the underlying exception on persistence failure (router maps to 500).
     """
     try:
-        cycle_id, _suggestion_id = approval_id.split(":", 1)
+        cycle_id, suggestion_id = approval_id.split(":", 1)
     except ValueError as exc:
         raise ValueError("Invalid approval_id format (cycle_id:suggestion_id)") from exc
 
@@ -693,29 +699,46 @@ def decide_evolution_approval(
         raise ValueError("decision must be 'approve' or 'reject'")
 
     loop = _evo_loop()
-    # M5: _load_report 是 EvolutionLoop 内部协调接口，非公开 API；
-    # 此处通过内部方法读取循环报告以支持审批决策持久化。
-    report = loop._load_report(cycle_id)
-    if not report:
+    # T3.0 修复：此前调用不存在的 ``loop._load_report``（AttributeError → 端点
+    # 恒 500），且 approve 分支是 ``pass``——决策根本不落库，闭环断链。
+    # 现在走公开 API 读取/更新：suggestion 从 pending 挪入 approved/rejected
+    # 两支，全部决策完后 approval_state 收敛（枚举语义见 LoopReport 注释）。
+    report = loop.get_report(cycle_id)
+    if report is None:
         raise KeyError(cycle_id)
 
-    if normalized_decision == "approve":
-        # 将 suggestion_id 从 pending_approval 积到 approved 列表
-        # 这里简化：更新 approval_state
-        pass  # 实际需更新 DB
+    if suggestion_id not in report.pending_approval:
+        raise ValueError(
+            f"Suggestion {suggestion_id!r} is not pending approval in cycle {cycle_id!r}"
+        )
 
-    report.approval_state = "approved" if normalized_decision == "approve" else "rejected"
+    if normalized_decision == "approve":
+        report.approved_suggestions.append(suggestion_id)
+    else:
+        report.rejected_suggestions.append(suggestion_id)
+    report.pending_approval = [sid for sid in report.pending_approval if sid != suggestion_id]
+
+    if report.pending_approval:
+        report.approval_state = "pending"
+    elif report.approved_suggestions and report.rejected_suggestions:
+        report.approval_state = "partial"
+    elif report.approved_suggestions:
+        report.approval_state = "approved"
+    else:
+        report.approval_state = "rejected"
+
     report.approved_by = approved_by
     report.approved_at = time.time()
-    # M5: _save_report 是 EvolutionLoop 内部协调接口，非公开 API；
-    # 此处通过内部方法持久化审批后的循环报告。
-    loop._save_report(report)
+    if not loop.update_report(report):
+        # 并发窗口内该 cycle 被删除——按 404 语义处理
+        raise KeyError(cycle_id)
 
     return {
         "status": "ok",
         "decision": normalized_decision,
         "approval_id": approval_id,
         "cycle_id": cycle_id,
+        "approval_state": report.approval_state,
     }
 
 

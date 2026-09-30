@@ -97,6 +97,11 @@ class LoopReport(BaseModel):
     # 建议在 EVALUATE 阶段被策略判定为 need_approval（should_apply=False 且 non-trivial）
     # 的 suggestion_id 列表，暂存待审批。不进入 APPLY 阶段。
     pending_approval: list[str] = Field(default_factory=list)
+    # T3.0: 审批决策结果。pending_approval 中每条建议经
+    # POST /api/evolution/approvals/{id}/decision 决策后归入其中一支；
+    # 全部决策完后 approval_state 收敛为 approved / rejected / partial。
+    approved_suggestions: list[str] = Field(default_factory=list)
+    rejected_suggestions: list[str] = Field(default_factory=list)
     # 审批状态：n/a（无需审批）| pending | approved | rejected | partial
     approval_state: str = "n/a"
     approved_by: str = ""

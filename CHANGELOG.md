@@ -39,6 +39,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-30
 
+### 2026-09-30 T3.0：v5.2.0 演化闭环哑弹排除（trigger / 审批 API）
+
+`dashboard/services/evolution_service.py` 的三个恒 500 缺陷 + 一个持久化缺陷
+（2026-09-29 体检发现；AC-07 首版测试全 mock 了 EvolutionLoop，所以从未暴露）：
+
+- **trigger 恒 500**：`trigger_evolution_loop` 对同步的 `run_cycle`
+  （`evolution_loop.py:139` 是普通 `def`）做 `await` → TypeError。改
+  `asyncio.to_thread` 执行，顺带不再阻塞事件循环。
+- **审批 API 恒 500**：`decide_evolution_approval` 调用全包不存在的
+  `loop._load_report` → AttributeError（`:696` 的注释还宣称它是"内部协调接口"）。
+  新增 `EvolutionLoop.get_report(cycle_id)` / `update_report(report)` 公开读写。
+- **审批不落库（第四雷）**：approve 分支是 `pass  # 实际需更新 DB`；且旧
+  `_save_report` 是纯 INSERT——对已落库的 cycle 再保存会撞主键
+  IntegrityError。`update_report` 为 UPDATE 语义，幽灵 id 返回 False（调用方按
+  404 处理），不抛异常。
+- **决策语义落地**：`LoopReport` 新增 `approved_suggestions` / `rejected_suggestions`
+  （带默认值，旧 JSON 行兼容）——建议从 pending 归入两支，全部决策完
+  approval_state 收敛 approved/rejected/partial（枚举注释早就有 partial，此前无实现）；
+  非 pending 的 suggestion 决策 → ValueError（路由 400）。
+- **测试**：删除两个 mock 掩盖下恰好错过哑弹的用例（mock 了 async `run_cycle`
+  与不存在的 `_load_report`，等于把 bug 钉进了测试），换 4 条非 mock 回归——
+  trigger 真实落库断言、approve+reject 混合决策收敛 partial、404/400 错误路径、
+  get/update_report 契约。演化全套 88 passed、e2e 7 passed、ruff clean。
+- **已知遗留（T3.1）**：approve 后建议回流**下一轮** APPLY 仍断——`run_cycle`
+  只消费当轮 evaluate 产出的 approved 列表；本轮保证决策正确持久化、状态可见。
+
+施工总图（三工作流 13 任务 + T-UI 支线）：`docs/investment-plan-2026Q4.md`。
+
 ### Added
 
 - **`CI merge gate`：把"测试必须绿"从人看变成平台拦**（`py/scripts/ci_merge_gate.py` +
