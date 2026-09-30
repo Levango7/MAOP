@@ -748,7 +748,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - run: pip install uv
+      # 钉与生成端一致的 uv 版本：uv 升级换解析算法会造成全量假漂移红灯。
+      # 升级 uv 时需同步本机重生成 requirements.frozen.txt 并一起提交。
+      - run: pip install "uv==0.11.30"
       - name: Recompile and diff (content compare, comments ignored)
         run: |
           uv pip compile pyproject.toml --extra enterprise --universal -o /tmp/frozen.check.txt
