@@ -8,7 +8,7 @@
          顶栏不再重复提供 — 见 App.vue -->
     <div class="topbar__brand">
       <div class="topbar__logo" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
         </svg>
       </div>
@@ -193,8 +193,8 @@ onMounted(() => {
  *   height: 36px — 分隔符竖线高度 (≈ --row-h, 视觉与控件对齐)
  *   padding-left: 8px — 版本号与状态指示器的分隔间距 (≈ --sp-2) */
 .topbar {
-  /* 层叠覆盖布局 (2026-08-13 重构): 顶栏全宽 fixed, z-index 低于侧栏 (z-index:20),
-     侧栏展开时覆盖顶栏左侧品牌区, 折叠时品牌区自然露出。
+  /* 通栏 fixed (T-UI 2026-09-30): 顶栏是顶栏——不被侧栏覆盖, 侧栏从顶栏下方开始;
+     品牌大标题常驻可见 (废弃"展开盖品牌区"的层叠设计)。
      F32: z-index 硬编码 token 化 → var(--z-topbar-fixed) */
   position: fixed;
   top: 0;
@@ -230,7 +230,7 @@ onMounted(() => {
 .topbar__brand { display: flex; align-items: center; gap: var(--sp-3); flex-shrink: 0; position: relative; }
 .topbar__logo {
   display: grid; place-items: center;
-  width: 34px; height: 34px;
+  width: 38px; height: 38px;
   border-radius: var(--r-md);
   background: var(--brand);
   color: var(--brand-contrast);
@@ -240,8 +240,9 @@ onMounted(() => {
 .topbar__brandtext { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
 .topbar__brandname-row { display: flex; align-items: baseline; gap: var(--sp-2); }
 .topbar__brandname {
-  font-size: var(--fs-lg); font-weight: 700; color: var(--text);
-  letter-spacing: -0.012em;
+  /* T-UI: 顶栏左侧大标题——与页面标题同档 --fs-2xl; 侧栏下移后品牌区常驻, 撑得起大字 */
+  font-size: var(--fs-2xl); font-weight: 800; color: var(--text);
+  letter-spacing: -0.02em;
 }
 .topbar__brandedition {
   /* 修复: 9.5px 硬编码 token 化 → calc(var(--fs-2xs) - .5px) (10px - 0.5px) */

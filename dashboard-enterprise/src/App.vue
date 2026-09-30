@@ -1,8 +1,9 @@
 <template>
-  <!-- 层叠覆盖布局: 顶栏全宽 fixed (z-index:10), 侧栏全高 fixed (z-index:20) 覆盖顶栏左侧;
-       折叠时侧栏变窄(--rail-w), 顶栏左侧品牌区自然露出; 内容区用 padding 腾位 -->
+  <!-- 三段式布局 (T-UI 2026-09-30): 顶栏通栏 fixed (z-index:10) 品牌大标题常驻;
+       侧栏 fixed 从顶栏下方开始 (top: var(--topbar-h)), 只占顶栏与页脚之间的内容带;
+       内容区用 padding 腾位 (push 语义)。移动端 <900px 侧栏变 drawer 抽屉。 -->
   <div class="app-layout" :class="{ 'rail': ui.rail && !isMobile, 'sidebar-open': sidebarOpen && isMobile }">
-    <!-- 顶栏: 全宽 fixed (z-index:10), 侧栏 (z-index:20) 展开时覆盖其左侧品牌区 -->
+    <!-- 顶栏: 全宽 fixed, 不被侧栏覆盖 -->
     <TopBar />
 
     <!-- Mobile drawer backdrop -->
@@ -326,9 +327,9 @@ onUnmounted(() => {
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 /* 层叠覆盖布局 (2026-08-13 按用户指定重构):
- * 顶栏全宽 fixed (z-index:10) 始终不动; 侧栏全高 fixed (z-index:20) 覆盖顶栏左侧,
- * 展开时盖住顶栏左侧品牌区, 折叠 (rail) 时侧栏收窄为 64px, 品牌区自然露出。
- * 内容区用 padding-top/padding-left 给顶栏与侧栏腾位, 过渡平滑。
+ * 顶栏通栏 fixed (z-index:10) 始终可见, 品牌大标题常驻; 侧栏 fixed (z-index:20)
+ * 从顶栏下方开始 (top: var(--topbar-h)), 只占顶栏与页脚之间的内容带,
+ * 折叠 (rail) 时收窄为 64px。内容区用 padding-top/padding-left 腾位, 过渡平滑。
  */
 .app-layout {
   /* 顶栏与侧栏均为 fixed, 不需要 flex row; 内容区用 padding 腾位 */
@@ -337,11 +338,12 @@ onUnmounted(() => {
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────── */
-/* 侧栏: 全高 fixed, z-index:20 高于顶栏 (z-index:10), 覆盖顶栏左侧品牌区。
-   展开时宽 --sidebar-w 盖住品牌区, rail 时宽 --rail-w 品牌区露出。 */
+/* 侧栏: fixed 全高但从顶栏下方开始, 与顶栏互不覆盖 (T-UI 2026-09-30:
+   废弃"侧栏盖品牌区"的层叠设计——品牌区随展开消失的观感差, 用户拍板顶栏是顶栏)。
+   移动端 <900px 此 top 值同样生效: drawer 抽屉从顶栏下方滑入。 */
 .sidebar {
   position: fixed;
-  top: 0;
+  top: var(--topbar-h);
   left: 0;
   bottom: 0;
   width: var(--sidebar-w);
@@ -354,11 +356,13 @@ onUnmounted(() => {
   transition: width var(--motion) var(--ease);
 }
 
-/* 侧栏头部: 仅放折叠按钮。展开时按钮靠左, rail 时居中。 */
+/* 侧栏头部: 仅放折叠按钮。展开时按钮靠左, rail 时居中。
+   侧栏已从顶栏下方开始, 头部不再与顶栏对齐, 取紧凑行高
+   (44px = 密度基准 --row-h 36 + 8, 无精确 token, 顶栏同类微调口径)。 */
 .sidebar-head {
   display: flex;
   align-items: center;
-  height: var(--topbar-h);
+  height: 44px;
   padding: 0 var(--sp-3);
   flex-shrink: 0;
   position: relative;
@@ -472,8 +476,9 @@ onUnmounted(() => {
 .app-layout > .topbar { border-bottom: 1px solid var(--border-strong); }
 
 /* ── Content (padding 给顶栏与侧栏腾位) ─────────────────────────── */
-/* 顶栏 fixed 全宽 (z-index:10) + 侧栏 fixed 全高 (z-index:20) 均脱离文档流,
-   内容区用 padding-top/padding-left 腾位; rail 时 padding-left 随侧栏宽度收窄。 */
+/* 顶栏 fixed 全宽 (z-index:10) + 侧栏 fixed 自顶栏下方 (z-index:20) 均脱离文档流,
+   内容区用 padding-top/padding-left 腾位; rail 时 padding-left 随侧栏宽度收窄。
+   页脚 (AppFooter) 在 .content 内、位于侧栏右侧——侧栏只占顶栏与页脚之间的内容带。 */
 .content {
   padding-top: var(--topbar-h);
   padding-left: var(--sidebar-w);
@@ -569,8 +574,8 @@ onUnmounted(() => {
 .sidebar-backdrop { position: fixed; inset: 0; background: var(--overlay-scrim); z-index: var(--z-overlay, 98); animation: maop-view-in var(--motion) var(--ease); }
 
 @media (max-width: 899px) {
-  /* 侧栏变为 drawer: z-index:30 高于顶栏(10)与桌面侧栏(20), 滑入滑出。
-     position/top/left/bottom 已由桌面基类设为 fixed 全高, 此处仅覆盖 z-index 与 transform。 */
+  /* 侧栏变为 drawer: z-index:30, 从顶栏下方滑入滑出 (top 承自桌面基类,
+     同样不遮挡顶栏——汉堡按钮与品牌留在顶栏内可点)。此处仅覆盖 z-index 与 transform。 */
   .sidebar {
     z-index: 30;
     transform: translateX(-100%);
