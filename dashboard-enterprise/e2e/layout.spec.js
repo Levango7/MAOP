@@ -5,6 +5,16 @@ import { test, expect } from '@playwright/test'
 //   2. 侧栏从顶栏下方开始, 只占顶栏与页脚之间的内容带
 //   3. 移动端 drawer 同样从顶栏下方滑入
 // 几何断言读 boundingBox 动态值, 不钉 --topbar-h 具体数(随密度切换 56/64px)。
+//
+// ⚠️ 必须预关 CoachMarks 新手引导（localStorage 'maop_onboarding_done'=1）:
+//    首次访问的引导遮罩 (.coach-marks__scrim) 会拦截汉堡/折叠按钮的点击,
+//    本地 chromium 因时序侥幸通过、webkit/CI 上把重试烧尽变红（实测）。
+//    CoachMarks.vue:60 STORAGE_KEY, =1 即永不显示（幂等）。
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try { localStorage.setItem('maop_onboarding_done', '1') } catch { /* ignore */ }
+  })
+})
 
 test.describe('T-UI desktop layout', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
