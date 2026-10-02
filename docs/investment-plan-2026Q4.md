@@ -231,6 +231,9 @@ CI 作业（重编译剥注释按内容比对）并纳入 merge gate `REQUIRED_U
 守卫测试 `test_frozen_lock.py` 3 条；`requirements.lock` 退为直依赖镜像参考
 （镜像守卫不变）。`ml` extra 未入锁（torch 链 universal 解析失败 + 非生产运行时，
 文件头记录）。旧 T2.2 设计里的"uv lock / pip-compile 二选一"落定为 uv pip compile。
+**2026-10-03 修假红**：作业冷解析遇上游发新版（sqlalchemy/dotenv/uvloop 各+1 patch）
+判红——非漂移；改偏好模式（提交版锁预置输出路径，uv 以其 pin 为偏好集），
+实测基准绿/新增依赖变异红（见 CHANGELOG 2026-10-03 段）。
 
 **问题**：lock 下半段传递依赖是手写 `>=` 范围（CHANGELOG 台账自认"reference，不是真锁"）。
 

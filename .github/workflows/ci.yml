@@ -737,6 +737,14 @@ jobs:
   # 本作业重新编译并与提交版比对（剥注释、按内容比，忽略注释差异）；改了
   # pyproject.toml 不重新生成锁即红。requirements.lock 仍是"直依赖镜像参考"，
   # 由 tests/test_requirements_lock_sync.py 守卫，两文件分工见各自文件头。
+  #
+  # ⚠️ 2026-10-03 假红修复：冷启动编译发现上游两天内发了新版
+  # （sqlalchemy 2.1.1→2.1.2 等）→ 与提交版 diff 判红——这不是漂移，是
+  # "锁没追上游"的假红（每次上游发 patch 都要红一次，靠人肉重生成才能绿，
+  # 违背门禁语义；去追新的活归 dependabot）。修法=偏好模式：先把提交版锁
+  # cp 到输出路径再编译，uv 对已存在的输出文件默认以其 pin 为偏好集——
+  # 只有 pyproject 约束收紧到既有 pin 不满足（或新增依赖）才会变，那才是
+  # 真漂移。实测 `--no-cache` 下偏好来自输出文件本身、非 uv 缓存。
   lock-drift:
     name: Lock drift (uv pip compile)
     runs-on: ubuntu-latest
@@ -751,8 +759,10 @@ jobs:
       # 钉与生成端一致的 uv 版本：uv 升级换解析算法会造成全量假漂移红灯。
       # 升级 uv 时需同步本机重生成 requirements.frozen.txt 并一起提交。
       - run: pip install "uv==0.11.30"
-      - name: Recompile and diff (content compare, comments ignored)
+      - name: Recompile and diff (preference mode, comments ignored)
         run: |
+          # 偏好模式：输出文件预置为提交版锁，uv 会以其 pin 为 preference 集。
+          cp requirements.frozen.txt /tmp/frozen.check.txt
           uv pip compile pyproject.toml --extra enterprise --universal -o /tmp/frozen.check.txt
           grep -v '^\s*#' /tmp/frozen.check.txt | sed '/^\s*$/d' | sort > /tmp/a.txt
           grep -v '^\s*#' requirements.frozen.txt | sed '/^\s*$/d' | sort > /tmp/b.txt
