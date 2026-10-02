@@ -243,7 +243,17 @@ Python 3.10 兼容注意沿用既有守卫测试的口径（不用 3.11+ 标准�
 **子任务**：生成脚本 + 首次全量生成（S）；守卫测试升级（S）；CI job（S）。
 **验收**：改 pyproject 不改 lock → CI 红；lock 可在干净 venv 一键复现环境。
 
-### T2.3 `TestCallSyncFallback` flaky 抓现行（P1 · 规模 S，时间盒 2 天）
+### T2.3 `TestCallSyncFallback` flaky 抓现行（P1 · 规模 S，时间盒 2 天）——◐ 阶段一完成 2026-10-02（止血），泄漏源归位仍是开放题
+
+**进展**：CI 现行（run 36792737281 macOS 腿 + Nightly 同族）+ 探针拍全现场——
+污染源=存活到本文件执行期的全局 `subprocess.run` MagicMock
+（`run_impl=MagicMock@unittest.mock`，最早污染边界=TestCallSyncFallback 执行期间）；
+全库常规 patch 用法排查无作用域破绽，头号嫌疑=异步/后台线程路径上未 unwind 的
+with-patch（同条探针带出残留线程 `mcp-adapter-bg`）。**止血已落**：
+`test_tool_manager.py` 模块级密闭守卫 `_hermetic_subprocess_run`（每用例 setup
+恢复标准库原版，本文件免疫）+ `TestHermeticGuard` 两条变异可证自检；探针在守卫
+之前执行，追凶线索保留。**剩余**：找到泄漏源本身（守卫/探针告警即线索），
+时间盒续期见 CHANGELOG 2026-10-02 段。
 
 **问题**：台账自认"三元凶的机制还没抓到现行"，探针已收敛到只报真嫌疑人。
 
