@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from unittest.mock import patch
+import subprocess as _subprocess_mod
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -21,6 +23,35 @@ import maop.core.agent.tools.tool_manager as _tm
 from maop.core.agent.tools.tool_manager import ToolCallResult, ToolDef, ToolManager
 from maop.core.agent.tools.tool_policy import ToolPolicy
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
+
+# T2.3 (2026-10-02): 模块导入时冻结标准库原版 subprocess.run —— 密闭守卫的基准。
+_STDLIB_SUBPROCESS_RUN = _subprocess_mod.run
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_subprocess_run():
+    """T2.3: 让本文件对"全局 subprocess.run 被泄漏 mock 污染"免疫。
+
+    CI 实测三次红（run 36792737281 macOS 腿 + Nightly）：某个前置测试留下的
+    全局 ``subprocess.run`` MagicMock 存活到本文件执行（conftest 泄漏探针实证
+    ``subprocess_run_patched=True run_impl=MagicMock@unittest.mock``，最早污染
+    边界在本类执行期间）。``ToolManager._call_sync_fallback`` 是全库少数直接走
+    全局 ``subprocess.run`` 的路径 —— 三元凶（with_running_loop / timeout /
+    with_stderr）随机红，症状 ``assert '42' in 'ok'``、``assert True is False``。
+
+    泄漏源尚未归位（所有常规 patch/monkeypatch 用法已排查作用域完好，怀疑
+    异步/后台线程路径上的 with-patch 未 unwind）。本夹具在**每条用例开始时**
+    把全局恢复为标准库原版，测试对泄漏免疫；conftest 的探针夹具先于本夹具
+    执行（conftest 级 autouse 先于模块级），泄漏照常被记录 —— 追凶线索不丢。
+    谁修好了泄漏源，本夹具自动变 no-op。变异验证见 ``TestHermeticGuard``。
+    """
+    if _subprocess_mod.run is not _STDLIB_SUBPROCESS_RUN:
+        logging.getLogger(__name__).warning(
+            "[hermetic-guard] repaired leaked subprocess.run -> %r",
+            _subprocess_mod.run,
+        )
+        _subprocess_mod.run = _STDLIB_SUBPROCESS_RUN
+    yield
 
 
 @pytest.fixture
@@ -658,6 +689,41 @@ class TestCallSyncFallback:
         result = asyncio.run(_run())
         assert result.ok is False
         assert "err" in result.error
+
+
+class TestHermeticGuard:
+    """密闭守卫自检（变异验证）：拆掉 `_hermetic_subprocess_run` 本类即红。
+
+    test_a 故意把全局 subprocess.run 换成泄漏型 MagicMock 且**不还原**——
+    真实泄漏源在别的模块、行为等价。test_b 的 setup 阶段守卫必须已把它修回
+    标准库原版；守卫被移除/改坏时 test_b 断言失败。两条必须同文件按定义序执行
+    （pytest 同类内按定义序跑，xdist 分桶也不拆同类）。
+    """
+
+    def test_a_dirty_the_global_subprocess_run(self):
+        _subprocess_mod.run = MagicMock(
+            return_value=SimpleNamespace(returncode=0, stdout="ok", stderr="")
+        )
+        # 故意泄漏——等价于真实 CI 污染现场
+
+    def test_b_guard_restored_stdlib_original(self):
+        assert _subprocess_mod.run is _STDLIB_SUBPROCESS_RUN, (
+            "密闭守卫没有把泄漏的 subprocess.run 修回标准库原版 —— "
+            "守卫夹具被移除或改坏了（变异验证命中）"
+        )
+        # 顺手验行为：fallback 路径能拿到真实子进程输出
+        mgr = ToolManager(root_dir=_tm_get_tmp())
+        mgr.register("echo42", command="python -c print(42)")
+        result = mgr.call_sync("echo42")
+        assert result.ok is True
+        assert "42" in result.output
+
+
+def _tm_get_tmp():
+    """TestHermeticGuard 用的最小 tmp 目录（避免依赖 fixture 参数顺序）。"""
+    import tempfile
+
+    return tempfile.mkdtemp(prefix="maop-hermetic-")
 
 
 # ── 工具白名单策略（T1） ───────────────────────────────────────

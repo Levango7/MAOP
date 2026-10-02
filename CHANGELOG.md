@@ -39,6 +39,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-02 T2.3 阶段一：TestCallSyncFallback 三元凶 CI 红的止血（密闭守卫）
+
+挂账已久的"三元凶机制未抓现行"在 CI 上现行了（run 36792737281 的 macOS 腿、
+Nightly 36835438520 同族），探针这回把现场拍全了：
+
+- **污染源画像**：存活到 `tests/test_tool_manager.py` 执行期的**全局
+  `subprocess.run` MagicMock**（探针实锤 `subprocess_run_patched=True
+  run_impl=MagicMock@unittest.mock`；最早污染边界=TestCallSyncFallback 执行
+  期间——它前一条 `test_call_sync_normal` setup 时还干净，而 normal 走异步
+  子进程路径不碰 `subprocess.run`，所以它自己能绿）。`_call_sync_fallback`
+  是全库少数直接走全局 `subprocess.run` 的路径，三元凶（with_running_loop /
+  timeout / with_stderr）于是随机红：`assert '42' in 'ok'`、两条
+  `assert True is False`，失败的 `ToolCallResult` 带 `duration_ms=0` 的 mock 指纹。
+- **泄漏源仍未归位**：全库常规 `patch/monkeypatch` 用法逐个排查作用域完好
+  （无裸 start、无模块/类级残留），头号嫌疑是**异步/后台线程路径上未 unwind
+  的 with-patch**（协程被弃置在 with 块内则 `__exit__` 永不执行）——
+  探针同条还带出残留线程 `mcp-adapter-bg`。此为开放题，守卫与探针的告警就是找它的线索。
+- **止血**：`test_tool_manager.py` 模块级 autouse 守卫
+  `_hermetic_subprocess_run` —— 导入时冻结标准库原版，每条用例 setup 时把
+  全局恢复之；本文件对泄漏免疫，master 转绿。conftest 探针（conftest 级
+  autouse）先于守卫执行，泄漏照常留痕。守卫自检 `TestHermeticGuard` 两条：
+  test_a 故意泄漏等价污染现场，test_b 断言守卫已修复——**拆守卫即红**。
+- 本文件 81 passed（+2 守卫自检）、ruff clean。
+
 ### Fixed
 
 - **required checks 漂移：GitHub 侧少了一条最关键的门禁（PR #56 的设计此前从未生效）**。
