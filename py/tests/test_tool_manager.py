@@ -28,24 +28,6 @@ from maop.core.backends.db_utils import get_db_path, sqlite_connect
 _STDLIB_SUBPROCESS_RUN = _subprocess_mod.run
 
 
-def _autouse_guards() -> set[str]:
-    """本模块里所有 autouse 夹具名（守卫自检断言"守卫确实是 autouse"用）。
-
-    从 pytest 的 fixture 标记里读而不是硬编码列表：守卫改名或漏标
-    ``@pytest.fixture(autouse=True)`` 时断言会自己变红。惰性求值——模块导入时
-    守卫尚未定义。
-    """
-    import sys
-
-    mod = sys.modules[__name__]
-    names: set[str] = set()
-    for name, obj in vars(mod).items():
-        marker = getattr(obj, "_pytestfixturefunction", None)
-        if marker is not None and getattr(marker, "autouse", False):
-            names.add(name)
-    return names
-
-
 @pytest.fixture(autouse=True)
 def _hermetic_subprocess_run():
     """T2.3: 让本文件对"全局 subprocess.run 被泄漏 mock 污染"免疫。
@@ -740,10 +722,18 @@ class TestHermeticGuard:
         finally:
             _subprocess_mod.run = _STDLIB_SUBPROCESS_RUN
 
-    def test_b_guard_is_autouse_and_wired(self):
-        """守卫夹具必须是 autouse（否则本文件的用例不受保护）。"""
-        assert "_hermetic_subprocess_run" in _autouse_guards(), (
-            "守卫夹具不再是 autouse —— 本文件的免疫性消失（变异验证命中）"
+    def test_b_guard_is_autouse_and_wired(self, request):
+        """守卫夹具必须是 autouse（否则本文件的用例不受保护）。
+
+        用**行为证明**而非内部 API：autouse 夹具必然出现在它所作用用例的
+        ``request.fixturenames`` 里——本用例并未主动请求它，它还在清单里就
+        证明 autouse 生效。一旦失去 autouse，本用例不请求它 → 清单里没有 →
+        断言红。这条不依赖 pytest 内部属性（`_pytestfixturefunction` 探测
+        在 CI 浮动的 pytest 版本上返回空集，实测 ubuntu/3.12 腿翻车，
+        2026-10-04）。
+        """
+        assert "_hermetic_subprocess_run" in request.fixturenames, (
+            "守卫夹具没有作用到本用例 —— 不再是 autouse（变异验证命中）"
         )
         # 顺手验行为：fallback 路径能拿到真实子进程输出
         mgr = ToolManager(root_dir=_tm_get_tmp())
