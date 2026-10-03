@@ -1,30 +1,32 @@
 # gitleaks 配置 —— MAOP
 #
 # 2026-10-03 重构背景（见 CHANGELOG 2026-10-03 段）：
-#   原先 secret-scan 直接 `gitleaks protect` 扫**全历史**，于是一次性吐出 34 条
-#   历史发现，此后每次 push 恒红，且发现混着两类东西，信号价值被稀释——
-#   这正是与 lock-drift 同款的"门禁代人受过"病。
-#   现改为两段式：**新增提交走 HEAD-only 全规则扫描**（防新泄漏，红即真），
-#   历史遗留走逐条甄别后的指纹 allowlist（每条都写明为什么是假阳性）。
+#   原先 secret-scan 直接扫**全历史**，一次性吐出历史发现后每次 push 恒红，
+#   且发现混着两类东西，信号价值被稀释——这与 T2.2 lock-drift 同款"门禁代人受过"。
+#   现改为两段式（见 ci.yml secret-scan）：① 本次 push 的新提交走同一扫描
+#   （新泄漏必红）；② 全历史扫描叠加本文件的逐条甄别 allowlist。
 #
-# 甄别结论（2026-10-03，SARIF 原文核对）：
-#   - 33 条假阳性：测试夹具（test-env-secret-key-… / sk-e2e-secret-key-…）、
+# ⚠️ 语法纪律：全局 allowlist 的键是**单数** `[allowlist]`（复数 `[[allowlists]]`
+#   是规则内语法，写成复数会被静默忽略——本轮踩过：本地新版容忍、CI 的
+#   8.24.2 完全不生效，报 43 条）。
+# ⚠️ 版本纪律：allowlist 必须按 **CI 实际使用的 gitleaks 版本**核对（本地自编译版
+#   规则集不同：同仓本地报 0 条、CI v8.24.2 报 43 条，多出的 9 条全是内容安全
+#   检测夹具）。升级版本时用同一版本本地复扫再更新本文件。
+#
+# 甄别结论（2026-10-03，CI 同版 v8.24.2 逐条核对原文）：
+#   - 42 条假阳性：测试夹具（test-env-secret-key-… / sk-e2e-secret-key-… /
+#     sk-abcdefghijkl… / ghp_abcdefghijkl… 内容安全检测夹具等）、
 #     文档 curl 占位（X-API-Key: admin-key / <64-char-hex> / <strong-password>）、
 #     CI 测试 secret（test-secret-at-least-32-chars-long / maop_dev）；
-#   - 1 条真实凭据：Qoder CN 个人令牌 `pt-zDIDIXo…`，见下方
-#     scripts/dev_private_key.pem 同节的处置记录（用户 2026-10-03 确认已失效/吊销）。
+#   - 1 条真实凭据：Qoder CN 个人令牌 `pt-zDIDIXo…`，见下方处置记录。
 #
-# 规则：新增指纹一律**不要**直接加进本文件——先按"是不是真凭据"判，真凭据走吊销流程。
+# 规则：新增指纹一律**不要**直接加进来——先判"是不是真凭据"，真凭据走吊销流程。
 
 [extend]
-# 用 gitleaks 默认规则集（自带的规则覆盖足够，不锁版本号避免升级即失效）
 useDefault = true
 
-# 历史已知项的指纹 allowlist。newest-commit 指"首现提交"，配合 CI 的
-# `--log-opts` 默认值只影响排序，不影响过滤。
-# 每条都带 reason，便于复核。
-[[allowlists]]
-description = "2026-10-03 甄别：历史测试夹具/文档占位符假密钥（详见 CHANGELOG 当日段）"
+[allowlist]
+description = "2026-10-03 逐条甄别：42 条假阳性 + 1 条已吊销真实凭据（详见 CHANGELOG 当日段）"
 paths = [
   '''py/tests/test_credential_vault\.py''',
   '''py/tests/test_credential_vault_route\.py''',
@@ -32,33 +34,28 @@ paths = [
   '''py/tests/test_json_logging\.py''',
   '''py/tests/test_router_auth_coverage\.py''',
   '''py/tests/test_parametrized_coverage\.py''',
+  # 内容安全检测夹具（sk-… / ghp_… 打码式假串，用于验证"检测器能抓到密钥"）
+  '''py/tests/test_parametrized_coverage3\.py''',
+  '''py/tests/test_maop_verify\.py''',
+  '''py/tests/test_maop_execute\.py''',
+  '''py/tests/test_phase4\.py''',
   '''py/tests/test_guardrail\.py''',
   '''docs/api-examples\.md''',
   '''docs/integration-guide\.md''',
   '''py/SECURITY\.md''',
   '''\.github/workflows/ci\.yml''',
-]
-
-# 已删除路径的历史残留（archive/ 与 seed data，e722754 已从当前树清除）：
-[[allowlists]]
-description = "2026-10-03 甄别：archive/ps-legacy + seed data/routes.json 的历史残留（当前树已无）"
-paths = [
+  # 已删除路径的历史残留（archive/ 与 seed data/routes.json，e722754 已清除）
   '''archive/ps-legacy/healthcheck\.ps1''',
   '''data/routes\.json''',
-]
-
-# 真实凭据处置记录（不是"假阳性"，是"已吊销的历史凭据"）：
-#   - scripts/dev_private_key.pem：拆分前旧开发密钥，指纹 4095462e…，与任何信任锚均不配对
-#     （dc4316b "安全密钥清理" 已从当前树移除）。
-#   - 该提交中同现的 Qoder CN PAT `pt-zDIDIXoMabdSC3DlbiDcEK0f_019f1025-aac1-70ef-899c-1b58db89e992`
-#     —— 真实凭据从初始提交 aa02e40 起留在历史、经 e722754 从当前树移除、git log -S 可取。
-#     用户 2026-10-03 确认该令牌已失效/吊销，故以 allowlist 归档记录；
-#     若将来需要彻底清史，这两条 must 先吊销再 filter-repo 重写历史（全员重新 clone）。
-[[allowlists]]
-description = "2026-10-03 处置：已吊销的旧 dev 私钥 + QoderCN PAT 历史残留（用户确认失效）"
-paths = [
+  # 旧开发密钥（拆分前的 scripts/dev_private_key.pem，指纹 4095462e…，与任何
+  # 信任锚均不配对；dc4316b「安全密钥清理」已从当前树移除）
   '''scripts/dev_private_key\.pem''',
 ]
 regexes = [
+  # 真实凭据的处置记录（不是"假阳性"，是"已吊销的历史凭据"）：
+  #   Qoder CN PAT，自初始提交 aa02e40 起留在历史、经 e722754 从当前树移除，
+  #   git log -S 仍可取回。用户 2026-10-03 确认该令牌已失效/吊销，故归档记录。
+  #   若将来需彻底清史：先吊销任何同类在用凭据，再用 git filter-repo 重写历史
+  #   并要求全员重新 clone（旧克隆须清理）。
   '''pt-zDIDIXoMabdSC3DlbiDcEK0f_019f1025-aac1-70ef-899c-1b58db89e992''',
 ]
