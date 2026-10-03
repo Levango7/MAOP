@@ -39,6 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-03 Playwright E2E 全类修复：CoachMarks 引导遮罩全局预关 + rail 断言等动画收敛
+
+run 37075633241 的 Playwright 腿红出两例，根因都不在业务代码：
+
+- **knowledge-graph.spec 被 coach-marks 引导遮罩拦截点击**（30s 超时，错误日志
+  明确 `coach-marks__scrim ... intercepts pointer events`）——上次只修了 layout
+  spec 自己的 beforeEach，这次把注入提到 `playwright.config.js` 配置层（各
+  project 的 storageState 内联 localStorage `'maop_onboarding_done'=1`，
+  CoachMarks.vue:60 幂等标记），**所有 spec 自动继承，新 spec 不再漏**；
+- **layout.spec 的 rail 断言**点击折叠后立即读 boundingBox，拿到 CSS 过渡的
+  中间值（CI 实测 104-110px）误红——改 `expect.poll` 等宽度收敛 <100px 再断。
+- 本地验证：两个 spec 三浏览器 55 passed；删掉 spec 内重复 beforeEach、仅靠
+  配置层注入在 webkit 上 19 passed 零 flaky。
+
 ### 2026-10-03 lock-drift 假红修复：门禁改偏好模式（上游发新版不再红，真漂移照抓）
 
 T2.2 引入的 `lock-drift` 作业首度运行即红（run 37029314736，唯一红条——三元凶
