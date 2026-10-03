@@ -117,6 +117,8 @@ class EvolutionPhasesMixin:
                                 metadata={"pattern": pattern, "error_type": latest.error_type, "context": latest.context},
                             ).model_dump())
 
+            self._merge_queued_suggestions(suggestions)
+
             self._write_suggestions(suggestions)
 
             return PhaseResult(
@@ -128,6 +130,45 @@ class EvolutionPhasesMixin:
         except Exception as exc:
             logger.warning("[evo-loop] Suggest phase failed: %s", exc)
             return PhaseResult(phase=LoopPhase.SUGGEST, success=False, error=str(exc), duration_s=round(time.time() - start, 3), details={"count": len(suggestions), "suggestions": suggestions})
+
+    def _merge_queued_suggestions(self, suggestions: list[dict[str, Any]]) -> None:
+        """把建议队列里"尚未应用且本轮未重新产出"的条目并入本轮建议集。
+
+        T3.1 修的链路断点：队列文件 ``data/evolve-suggestions.json`` 此前是
+        **只写不读**——``_write_suggestions`` 会把新建议写进去，但 SUGGEST
+        阶段从不读它，而 ConfigMutator.apply_suggestion 恰恰按 id 从这个文件
+        取建议（config_mutator.py:63）。结果是：外部注入的建议（如
+        ``maop evolution inject-degradation`` 的劣化演练条目）永远到不了
+        EVALUATE/APPLY，演练链路形同虚设。
+
+        合并规则（保守，避免把陈旧条目当新工作）：
+          - 跳过 ``applied=True`` 的（已应用，重放无意义）；
+          - 跳过本轮已重新产出的同 id 条目（ledger 生成的优先）；
+          - 其余按队列顺序追加。
+        """
+        import json
+
+        queue_file = self._root / "data" / "evolve-suggestions.json"
+        if not queue_file.exists():
+            return
+        try:
+            queued = json.loads(queue_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return
+        if not isinstance(queued, list):
+            return
+
+        current_ids = {s.get("id") for s in suggestions}
+        for item in queued:
+            if not isinstance(item, dict):
+                continue
+            sid = item.get("id")
+            if not sid or sid in current_ids:
+                continue
+            if item.get("applied", False):
+                continue
+            suggestions.append(item)
+            current_ids.add(sid)
 
     def _phase_debate(self, suggestions: list[dict[str, Any]]) -> PhaseResult:
         """C-2: DEBATE 阶段 — 对每条建议发起辩论，过滤低置信度结论。

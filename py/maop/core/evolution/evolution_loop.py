@@ -28,6 +28,7 @@ Usage::
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import sqlite3
 import time
@@ -424,8 +425,57 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
             "total_heal_successes": total_heals,
         }
 
-    # AC-05 / spec §16: 自动回滚 SLA 验证辅助方法
-    # 仅供测试使用（生产无入口），构造必然失败的 mutation。
+    # AC-05 / spec §16: 自动回滚 SLA 验证辅助
+    # T3.1: 此前注释写着"仅供测试使用（生产无入口）"——现在接了真实入口
+    # （`maop evolution inject-degradation` CLI + dashboard 演练端点），
+    # 运维可以在预发真实演练"劣化注入 → 自动回滚 <5min"的验收链路。
+    def build_degradation_suggestion(self) -> EvolutionSuggestion:
+        """构造一条必然导致 VALIDATE 失败的劣化建议（AC-05 演练用）。
+
+        mutation_type="adjust_timeout" + timeout_s=-1 会被 VALIDATE 阶段拒绝，
+        触发 auto_rollback=True 分支，5 分钟内回滚。
+
+        Public wrapper over :meth:`_build_degradation_test_suggestion`
+        （保留私有名向后兼容既有测试）。
+        """
+        return self._build_degradation_test_suggestion()
+
+    def inject_degradation_suggestion(self) -> EvolutionSuggestion:
+        """把劣化建议**落盘**到建议队列，使其能被下一轮 run_cycle 真实消费。
+
+        这是 T3.1 补上的关键一环：``_write_suggestions`` 是 merge 语义
+        （evolution_agent.py:153-172 保留已存在条目），因此外部注入的建议
+        不会被下一轮 SUGGEST 覆盖掉。会进入 EVALUATE → （Balanced 策略下
+        HIGH 级自动放行）→ APPLY 真改 agents.yaml → VALIDATE 判定失败 →
+        真 ChangeTracker 回滚。
+
+        与只打印对象的区别：以前这条路径只存在于测试代码里（"生产无入口"），
+        运维无法演练；现在 ``maop evolution inject-degradation`` 落盘后紧跟
+        ``maop evolution trigger`` 即完成一次真实演练。
+        """
+        suggestion = self.build_degradation_suggestion()
+        payload = suggestion.model_dump()
+        # model_dump 会带上向后兼容别名，保持与 SUGGEST 阶段产出的形状一致，
+        # 否则 ConfigMutator 读 mutation_type 时取不到值
+        payload.setdefault("type", payload.get("mutation_type", ""))
+        payload.setdefault("suggestion_type", payload.get("category", ""))
+        payload["auto_applicable"] = True  # 演练条目显式可自动应用
+        payload["source"] = "degradation_drill"
+
+        path = self._root / "data" / "evolve-suggestions.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        existing: list[dict[str, Any]] = []
+        if path.exists():
+            try:
+                existing = json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                existing = []
+        existing_ids = {s.get("id") for s in existing}
+        if suggestion.id not in existing_ids:
+            existing.append(payload)
+            path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+        return suggestion
+
     def _build_degradation_test_suggestion(self) -> EvolutionSuggestion:
         """构造必然导致 VALIDATE 失败的测试建议（仅 AC-05 验收用）。
 

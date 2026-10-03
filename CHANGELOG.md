@@ -39,6 +39,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-03 T3.1-a/b：劣化注入接真实入口 + 真回滚 E2E（v5.2.0 验收 #1/#2 落地）
+
+v5.2.0 的两条验收此前是空的——AC-05 的测试全 mock（`rollback_cycle` 测的是 mock
+出来的 `ChangeTracker`，<5min SLA 测的是"mock 快照 + 空调用耗时"），劣化注入的
+能力只存在于测试代码里（源码注释自述"生产无入口"）。本笔让链路真跑。
+
+- **真 bug：建议队列只写不读**（`evolution_phases._phase_suggest`）。
+  `data/evolve-suggestions.json` 被 `_write_suggestions` 写进去，却从不被
+  SUGGEST 阶段读取；而 `ConfigMutator.apply_suggestion` 恰恰按 id 从这个文件
+  取建议（`config_mutator.py:63`）。结果：任何外部注入的建议永远到不了
+  EVALUATE/APPLY——演练链路形同虚设。修法：SUGGEST 阶段新增
+  `_merge_queued_suggestions()`，把队列中"未应用且本轮未重新产出"的条目并入
+  本轮建议集（跳过 `applied=True`、跳过同 id 重生成项，避免陈旧条目当新工作）。
+- **劣化注入公开入口**：`EvolutionLoop.build_degradation_suggestion()`（构造）
+  + `inject_degradation_suggestion()`（**落盘**进队列，能被下一轮真实消费）；
+  CLI `maop evolution <inject-degradation|trigger|status>`。
+- **真实 E2E**（`py/tests/test_evolution_loop_real_e2e.py`，3 条，除数据目录外
+  零 mock）：ErrorLedger 真写入 → auto_promote 真阈值 → EVALUATE 真分流 →
+  APPLY 真改 `config/agents.yaml` → VALIDATE 判定失败 → ChangeTracker 真快照
+  回滚，断言 agents.yaml **字节级**恢复原状 + 全程 <300s SLA。
+- **过程中被真实语义纠正的三处**（原测试想当然，代码是对的，已按真实语义重写）：
+  OBSERVE 的 `errors_observed` 是**热点数**（distinct pattern）非总次数；
+  回滚条件含 `applied > 0`，且只恢复**快照后被改动过**的文件；零热点时
+  `run_cycle` 按设计提前返回整轮。
+- 演化全套 91 passed（新增 3 条真实 E2E），ruff clean。
+
 ### 2026-10-03 Secret Scan 门禁重构 + 历史凭据处置（真凭据一条已吊销归档）
 
 secret-scan 首度以全量条目运行（workflow_dispatch run 37082948735）时红，
