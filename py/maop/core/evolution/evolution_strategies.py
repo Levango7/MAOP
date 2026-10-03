@@ -244,12 +244,17 @@ class StrategyEngine:
 
         return decisions
 
-    def apply(self, suggestion_id: str) -> dict[str, Any]:
-        """Apply a suggestion using ConfigMutator."""
+    def apply(self, suggestion_id: str, *, human_approved: bool = False) -> dict[str, Any]:
+        """Apply a suggestion using ConfigMutator.
+
+        ``human_approved`` 由 EvolutionLoop 的跨轮审批回流传入——被人工批准
+        的建议豁免 ``auto_applicable`` 前置检查（该检查的语义是"未经人确认
+        不许自动应用"，人工批准即那道确认）。
+        """
         try:
             from maop.core.reliability.config_mutator import ConfigMutator
             mutator = ConfigMutator(root_dir=self._root)
-            result = mutator.apply_suggestion(suggestion_id)
+            result = mutator.apply_suggestion(suggestion_id, human_approved=human_approved)
 
             if result.applied:
                 self._history.append({

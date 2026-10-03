@@ -58,8 +58,19 @@ class ConfigMutator:
         self._agents_yaml = self._root / "config" / "agents.yaml"
         self._suggestions_file = self._root / "data" / "evolve-suggestions.json"
 
-    def apply_suggestion(self, suggestion_id: str) -> MutationResult:
-        """Apply a single suggestion to agents.yaml."""
+    def apply_suggestion(
+        self, suggestion_id: str, *, human_approved: bool = False
+    ) -> MutationResult:
+        """Apply a single suggestion to agents.yaml.
+
+        ``human_approved=True`` 表示该建议已经过**人工闸门批准**
+        （EvolutionLoop 的跨轮审批回流会带上这个标志）。此时豁免
+        ``auto_applicable`` 前置检查——那条检查的语义是"未经人确认不许自动
+        应用"，而人工批准**正是**那道确认本身；没有这个豁免，批准过的
+        建议每次 apply 都会被 "Suggestion is not auto-applicable" 挡回，
+        人工闸门形同虚设（与 T3.1-e 修的 approved_suggestions 无消费者
+        是同一类断点的最后一环）。
+        """
         suggestion = self._load_suggestion(suggestion_id)
         if not suggestion:
             return MutationResult(
@@ -67,7 +78,7 @@ class ConfigMutator:
                 error=f"Suggestion {suggestion_id} not found",
             )
 
-        if not suggestion.get("auto_applicable", False):
+        if not human_approved and not suggestion.get("auto_applicable", False):
             return MutationResult(
                 suggestion_id=suggestion_id,
                 mutation_type=suggestion.get("type", ""),

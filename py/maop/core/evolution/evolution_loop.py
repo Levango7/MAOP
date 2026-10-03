@@ -128,6 +128,10 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
         self._debate_enabled = debate_enabled
         self._debate_dispatcher = debate_dispatcher
         self._debate_participants = debate_participants or []
+        # T3.1-e：把历史读取能力注入 mixin —— EVALUATE 阶段据此把上一轮
+        # 人工批准的建议回流放行（PhasesMixin 被多个宿主复用，不能假设
+        # 宿主都有 get_cycle_history）。
+        self._cycle_history_reader = self.get_cycle_history
         self._init_db()
 
     def _init_db(self) -> None:
@@ -151,6 +155,9 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
         """
         report = LoopReport(started_at=time.time(), dry_run=dry_run)
         logger.info("[evo-loop] Starting cycle %s (dry_run=%s)", report.cycle_id, dry_run)
+        # T3.1-e：本轮 cycle_id 供 EVALUATE 回流时排除自身（历史按 started_at 排序，
+        # 同秒开跑时可能把自己排到"上一轮"位置）
+        self._current_cycle_id = report.cycle_id
 
         observe = self._phase_observe()
         report.phases.append(observe)

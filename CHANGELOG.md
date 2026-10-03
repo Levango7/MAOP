@@ -39,6 +39,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-03 T3.1-e：人工审批跨轮回流——批准的建议下一轮真被应用
+
+v5.2.0 验收 #1 的最后一环。此前 `approved_suggestions` 只被写入
+（`evolution_service.decide_evolution_approval` 落库）而**没有任何消费者**：
+人工批准的建议要等同类错误再次触发、由规则引擎重新产出同一 id 才可能落地，
+人工闸门形同"记录了但不执行"。本笔接通 approve → APPLY 全链路。
+
+- **EVALUATE 阶段回放**（`evolution_phases._carry_approved_from_last_cycle`）：
+  读上一条 cycle 报告的 `approved_suggestions`，从建议队列取回条目元数据，
+  **把策略重新拦下的那一条从 pending 移到 approved**（人工决定高于策略判断，
+  cooldown/限流都不否决人的决定），记录在 `details["carried_over"]` 供审计与
+  前端呈现。边界：已应用/已移出队列的不重放；同 id 不重复；**仍走同一 APPLY
+  路径**（真实变更 → 快照 → VALIDATE → 失败回滚），不新增旁路。
+- **人工批准豁免 auto_applicable 前置检查**（`config_mutator.apply_suggestion`
+  与 `strategy_engine.apply` 新增 `human_approved` 关键字参数）：那条检查的语义
+  是"未经人确认不许自动应用"，而人工批准**正是**那道确认。没有这个豁免，
+  批准过的建议每次 apply 都被 "Suggestion is not auto-applicable" 挡回——
+  这是同一条断链上的最后一环，单独修 EVALUATE 回放仍跑不通。
+- **宿主能力注入**：`EvolutionLoop.__init__` 把 `get_cycle_history` 以
+  `_cycle_history_reader` 注入 mixin（`PhasesMixin` 被 `PerformanceEvolutionLoop`
+  等复用，不能假设宿主都有该方法）；`run_cycle` 设 `_current_cycle_id` 供回放
+  排除自身（历史按 `started_at` 排序，同秒开跑可能把自己排到"上一轮"）。
+- **测试**（`tests/test_evolution_approval_carryover.py`，2 条，零 mock）：
+  审批落库 → 下一轮即使该建议不再被规则产出也被回放进 APPLY 并真执行；
+  回放在报告里留痕。**变异验证**：关掉回放 → 2 条全红。
+- 演化全套 96 passed、ruff clean。
+- 过程中踩到的两个环境坑（记此备查）：editable 安装使 `import maop` 永远解析到
+  主工作树，**临时 worktree 里跑测试必须显式设 PYTHONPATH** 指向 worktree，
+  否则测的是旧分支代码；`git log --oneline` 按日期排序会因并行提交时间戳交错
+  误判"提交没合入"，必须 `merge-base --is-ancestor` 核实。
+
 ### 2026-10-03 T3.1-d：开关零回归基线落地 + ROADMAP v5.2.0 四条验收全部勾选
 
 验收 #3「`MAOP_EVOLUTION_LOOP_ENABLED` 开启后主循环零回归」此前只是一句承诺——
