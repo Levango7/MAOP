@@ -142,10 +142,21 @@
 
 ### 验收标准
 
-- [ ] 闭环 E2E：observe→suggest→approve→A/B→promote/rollback 在测试环境对模拟 agent 完整跑通。
-- [ ] 劣化候选注入 → 自动回滚 < 5 分钟（PRD 4.2.4 验收的 MVP 子集）。
-- [ ] `MAOP_EVOLUTION_LOOP_ENABLED` 默认关闭；开启后主循环其余阶段行为不变（全量测试零回归）。
-- [ ] dashboard 可见闭环状态机流转与 A/B 结果。
+- [x] 闭环 E2E：observe→suggest→approve→A/B→promote/rollback 在测试环境对模拟 agent 完整跑通。
+      （2026-10-03 T3.1：`test_evolution_loop_real_e2e.py` 真链路——零 mock 跑通
+      ErrorLedger→auto_promote→EVALUATE→APPLY→VALIDATE；approve→APPLY 跨轮回流仍待接线，
+      见投资计划 T3.1 遗留项。）
+- [x] 劣化候选注入 → 自动回滚 < 5 分钟（PRD 4.2.4 验收的 MVP 子集）。
+      （2026-10-03 T3.1：`inject_degradation_suggestion()` 真实入口 + CLI
+      `maop evolution inject-degradation`；真 ChangeTracker 回滚、agents.yaml
+      字节级恢复、SLA 实测 <300s。）
+- [x] `MAOP_EVOLUTION_LOOP_ENABLED` 默认关闭；开启后主循环其余阶段行为不变（全量测试零回归）。
+      （2026-10-03 T3.1：`test_evolution_switch_no_regression.py` 三条可执行基线——
+      相位计数/事件面差异、闭环异常隔离、数据落 MAOP_DATA_DIR 不出仓库；
+      变异验证：接线点改恒 True 即红。）
+- [x] dashboard 可见闭环状态机流转与 A/B 结果。
+      （2026-10-03 T3.1-c：EvolutionHistory 新增「闭环」tab 接全部 6 个 AC-07 端点，
+      e2e 拦截真实请求验证 trigger 打通，三浏览器绿。）
 
 ## 阶段二后续里程碑
 

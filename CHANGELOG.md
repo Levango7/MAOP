@@ -39,6 +39,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-03 T3.1-d：开关零回归基线落地 + ROADMAP v5.2.0 四条验收全部勾选
+
+验收 #3「`MAOP_EVOLUTION_LOOP_ENABLED` 开启后主循环零回归」此前只是一句承诺——
+AC-01/AC-02 只验接线点（单函数 `_phase_evolve` 被调/不被调），"全量测试零回归"
+没有任何自动化承载。新增 `py/tests/test_evolution_switch_no_regression.py`
+三条**可执行**基线：
+
+- **相位与事件面基线**：开关 0/1 两种取值下 `_phase_evolve` 之后的相位计数一致，
+  事件面唯一增量是预期中的 `loop.evolution_cycle`（闭环是独立分支）；
+- **异常隔离**：闭环内部抛异常时主流程照常推进（"独立分支跑失败不影响主路径"
+  这一核心承诺此前无测试）；
+- **数据隔离**：闭环 SQLite 走统一 `MAOP_DATA_DIR`（**不跟 root_dir 走**——
+  root_dir 管快照/配置面，SQLite 归统一数据面，此为设计而非缺陷），
+  且断言绝不落进仓库。
+
+**变异验证**：把接线点 `if evolution_loop_enabled:` 改成恒 `True` → 第 1 条立即
+判红（相位计数被改变）；还原后 7 passed。
+
+ROADMAP 同步：v5.2.0 四条验收标准**全部勾选**（#1 留注：approve→APPLY 的跨轮
+回流仍未接线，见投资计划 T3.1 遗留）。
+
 ### 2026-10-03 T3.1-c：自演化闭环面板接上六个 AC-07 端点（验收 #4 落地）
 
 此前 `/api/evolution/loop/*` 六个端点（status / trigger / approvals / decision /
