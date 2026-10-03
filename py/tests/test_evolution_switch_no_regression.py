@@ -68,8 +68,6 @@ async def _run_evolve(stub: _Stub) -> tuple[int, list]:
 @pytest.mark.asyncio
 async def test_ac03_switch_on_keeps_loop_count_and_shape(monkeypatch, tmp_path):
     """基线 1：开关开/关，_phase_evolve 之后的相位计数与主 analyze 路径一致。"""
-    import asyncio
-
     # 开关=0（默认关闭）
     monkeypatch.delenv("MAOP_EVOLUTION_LOOP_ENABLED", raising=False)
     stub_off = _Stub(root=tmp_path, bus=MagicMock())

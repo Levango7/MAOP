@@ -27,7 +27,6 @@ import pytest
 
 from maop.core.evolution.evolution_loop import EvolutionLoop
 from maop.core.evolution.evolution_loop_types import LoopPhase
-from maop.core.reliability.change_tracker import ChangeTracker
 from maop.core.reliability.error_ledger import ErrorLedger
 
 # AC-05 SLA：劣化注入到自动回滚 <5 分钟（spec-v5.2.0 §16）
