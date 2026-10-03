@@ -418,18 +418,12 @@ class EvolutionPhasesMixin:
             logger.debug("[evo-loop] carry-over skipped: %s", exc)
             return []
 
-        by_id = {
-            item.get("id"): item
-            for item in queued
-            if isinstance(item, dict) and item.get("id")
-        }
-        if os.getenv("MAOP_DEBUG_CARRYOVER"):
-            logger.info(
-                "[evo-loop][debug] carry ids=%s queue_ids=%s applied_flags=%s",
-                carried_ids,
-                list(by_id),
-                {k[:8]: v.get("applied") for k, v in by_id.items()},
-            )
+        by_id: dict[str, dict[str, Any]] = {}
+        for item in queued:
+            if isinstance(item, dict):
+                sid = item.get("id")
+                if isinstance(sid, str) and sid:
+                    by_id[sid] = item
         existing = {a.get("suggestion_id") for a in approved} | {
             p.get("suggestion_id") for p in pending_approval
         }

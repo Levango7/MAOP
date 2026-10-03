@@ -652,7 +652,7 @@ def _evolution_inject_degradation() -> None:
     """
     from maop.core.evolution.evolution_loop import EvolutionLoop
 
-    loop = EvolutionLoop()
+    loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
     suggestion = loop.inject_degradation_suggestion()
     print(
         "injected degradation suggestion (queued): "
@@ -665,7 +665,7 @@ def _evolution_inject_degradation() -> None:
 def _evolution_trigger(*, dry_run: bool) -> None:
     from maop.core.evolution.evolution_loop import EvolutionLoop
 
-    loop = EvolutionLoop()
+    loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
     report = loop.run_cycle(dry_run=dry_run, auto_rollback=True)
     print(json.dumps(report.summary(), ensure_ascii=False, indent=2))
     print(
@@ -677,7 +677,7 @@ def _evolution_trigger(*, dry_run: bool) -> None:
 def _evolution_status() -> None:
     from maop.core.evolution.evolution_loop import EvolutionLoop
 
-    loop = EvolutionLoop()
+    loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
     print(json.dumps(loop.get_stats(), ensure_ascii=False, indent=2))
     for report in loop.get_cycle_history(limit=5):
         print(
