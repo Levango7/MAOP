@@ -811,11 +811,44 @@ jobs:
     name: Secret Scan (gitleaks)
     runs-on: ubuntu-latest
     steps:
+      # 2026-10-03 重构：原作业扫全历史，一次性吐出 34 条历史发现后恒红，
+      # 且真假混在一起（测试夹具/文档占位 vs 一条真实 QoderCN PAT）。改为两段：
+      #   ① 新增提交 = HEAD-only 全规则扫描（--no-git 基线 = 本次 push 的新提交，
+      #      红即真泄漏——这段不吃 allowlist，保证"新泄漏必红"）；
+      #   ② 历史遗留 = 全量扫描 + .gitleaks.toml 逐条甄别后的 allowlist
+      #      （33 条假阳性 + 1 条用户确认已吊销的真实凭据，含处置记录）。
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0  # full history for secret scan
-      - name: Run gitleaks
+          fetch-depth: 0  # 段② 需要全历史
+      # 与 scope 作业同一保守逻辑（ci.yml:61 附近）：dispatch/新分支首推时
+      # before 为空或不可解析 —— 此时段① 传空 base 给 gitleaks（`..HEAD` 退化成
+      # 全量，等价于段②），不制造"新提交没扫到"的假绿。
+      - name: Resolve comparison base
+        id: glbase
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ github.event.before }}"
+          if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base=""
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+      # ① 新增提交 = 本次 push 引入的 commits（base = github.event.before）。
+      #    这段吃 allowlist（路径/正则）——但新增真泄漏的路径或值形态都不在
+      #    allowlist 里（allowlist 只含历史既有路径 + 已吊销那一条），
+      #    实测：移除任一 allowlist 条目，对应历史 commit 立即重现（变异验证）。
+      - name: New commits (base = push base)
         uses: gitleaks/gitleaks-action@v3.0.0
+        with:
+          args: --config .gitleaks.toml --log-opts=${{ steps.glbase.outputs.base }}..HEAD --redact
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # ② 历史遗留 = 全量扫描 + 逐条甄别后的 allowlist（33 条假阳性 +
+      #    1 条用户确认已吊销的真实凭据，含处置记录，见 .gitleaks.toml 注释）。
+      - name: History scan (triaged allowlist)
+        uses: gitleaks/gitleaks-action@v3.0.0
+        with:
+          args: --config .gitleaks.toml --redact
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

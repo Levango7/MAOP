@@ -39,6 +39,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-03 Secret Scan 门禁重构 + 历史凭据处置（真凭据一条已吊销归档）
+
+secret-scan 首度以全量条目运行（workflow_dispatch run 37082948735）时红，
+SARIF 34 条发现逐条核对后两类分明：
+
+- **33 条假阳性**（新增泄漏不会命中，进 allowlist 无损门禁）：
+  测试夹具假密钥（`test-env-secret-key-…` / `sk-e2e-secret-key-…` 等）、
+  文档 curl 占位（`X-API-Key: admin-key` / `<64-char-hex>` / `<strong-password>`）、
+  CI 测试 secret（`test-secret-at-least-32-chars-long` / `maop_dev`）；
+- **1 条真实凭据**：**Qoder CN 个人令牌**
+  `pt-zDIDIXoMabdSC3DlbiDcEK0f_019f1025-aac1-70ef-899c-1b58db89e992`
+  出现在 `archive/ps-legacy/healthcheck.ps1:95` 与 `data/routes.json:10`（自
+  commit `aa02e40` 起，历经 `62a8767` / `2c65b5d` / `b5126e1` 扩散，**`e722754`
+  已从当前树移除，但 `git log -S` 可从历史取回**）。用户 2026-10-03 确认
+  **该令牌已失效/吊销**，以 allowlist 归档记录（含指纹正则与 commit 线索）。
+  若将来需彻底清史：先吊销其他任何同类凭据，再用 `git filter-repo` 重写历史
+  并要求全员重新 clone（旧克隆须清理）。
+- 另有 `scripts/dev_private_key.pem`（拆分前旧开发密钥，指纹 `4095462e…`，
+  与任何信任锚均不配对；`dc4316b`「安全密钥清理」已从当前树移除）——同样归档。
+
+**门禁形态重构（本次重点）**：原作业直接全历史扫描、发现一次性吐出后恒红
+（与 T2.2 lock-drift 同款"门禁代人受过"病——每次 push 都要人肉甄别或加例外）。
+现为两段式（`.gitleaks.toml` + ci.yml）：① **本次 push 的新提交**走同一扫描
+（base 解析与 scope 作业同一保守逻辑，dispatch/首推为空时退化为全量，不制造
+假绿）；② **全历史**扫描叠加**逐条带理由**的 allowlist。
+
+**变异验证**（本地同版 gitleaks）：
+- 基准：全历史 635 commits 扫描 → `no leaks found`；
+- 变异：移除 `test_credential_vault.py` 一条 allowlist → 对应 commit 立即报
+  **4 leaks**（exit=1），allowlist 还原后复测转绿——证明 allowlist 是精确豁免
+  而非关掉门禁。
+- 禁则（写进 `.gitleaks.toml` 注释）：新指纹一律先判真假，真凭据走吊销流程，
+  不许直接进 allowlist。
+
 ### 2026-10-03 Playwright E2E 全类修复：CoachMarks 引导遮罩全局预关 + rail 断言等动画收敛
 
 run 37075633241 的 Playwright 腿红出两例，根因都不在业务代码：
