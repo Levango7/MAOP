@@ -6,15 +6,11 @@ import { test, expect } from '@playwright/test'
 //   3. 移动端 drawer 同样从顶栏下方滑入
 // 几何断言读 boundingBox 动态值, 不钉 --topbar-h 具体数(随密度切换 56/64px)。
 //
-// ⚠️ 必须预关 CoachMarks 新手引导（localStorage 'maop_onboarding_done'=1）:
-//    首次访问的引导遮罩 (.coach-marks__scrim) 会拦截汉堡/折叠按钮的点击,
-//    本地 chromium 因时序侥幸通过、webkit/CI 上把重试烧尽变红（实测）。
-//    CoachMarks.vue:60 STORAGE_KEY, =1 即永不显示（幂等）。
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    try { localStorage.setItem('maop_onboarding_done', '1') } catch { /* ignore */ }
-  })
-})
+// ⚠️ CoachMarks 新手引导的 .coach-marks__scrim 全屏遮罩会拦截汉堡/折叠按钮
+//    的点击（本地 chromium 时序侥幸、webkit/CI 上烧尽重试变红）。已在
+//    playwright.config.js 对各 project 全局注入 localStorage
+//    'maop_onboarding_done'=1（CoachMarks.vue:60 STORAGE_KEY，=1 即永不显示），
+//    此处不再重复 beforeEach——新 spec 自动继承。
 
 test.describe('T-UI desktop layout', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -56,9 +52,14 @@ test.describe('T-UI desktop layout', () => {
     await page.locator('.sidebar-toggle').click()
     const topbar = page.locator('.topbar')
     const tb = await topbar.boundingBox()
-    const sb = await page.locator('.sidebar').boundingBox()
+    const sidebar = page.locator('.sidebar')
+    // 侧栏宽度有 CSS transition（232→64px），点击后立即读 boundingBox 会拿到
+    // 中间值（CI 实测 104-110px 被误判红）——轮询等宽度收敛到 rail 值再断。
+    await expect.poll(async () => (await sidebar.boundingBox())?.width ?? Infinity, {
+      message: 'sidebar should settle to rail width after collapse',
+    }).toBeLessThan(100)
+    const sb = await sidebar.boundingBox()
     expect(sb.y).toBeGreaterThanOrEqual(tb.y + tb.height - 1)
-    expect(sb.width).toBeLessThan(100) // rail 收窄态
   })
 })
 
