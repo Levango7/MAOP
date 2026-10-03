@@ -117,7 +117,31 @@ README #7 更新与部署文档（S）。**验收**：双副本集成测试（�
 **子任务**：水印存取 + HMAC（S）；license 校验接入 + 错误码 + 测试（S）；CLI + 文档（S）。
 **验收**：模拟回拨 48h → 拒绝；回拨 1h → 正常；水印文件被篡改 → 检出。
 
-### T1.5 核心代码二进制化：Cython AOT 自建管线（P2 · 规模 M-L）
+### T1.5 核心代码二进制化：Cython AOT 自建管线（P2 · 规模 M-L）——✅ spike 已过（2026-10-03），路线成立
+
+**spike 实测结论（本机真跑，非推演）**：
+- **工具链零成本**：Cython 3.3.0（Apache）+ **本机既有 MSYS2 mingw gcc**
+  即可链接 CPython 扩展（`cython -3 -X embedsignature=True` + `gcc -shared -fPIC -O2`）。
+  **不需要 MSVC、不需要采购任何东西**——原设计假设要装 Visual Studio Build Tools，
+  实测不成立，这一条把 T1.5 的最大不确定项消掉了。
+- **兼容率 22/22**：`maop/enterprise` 全部源模块编译成 .pyd 成功（`__init__.py`
+  按惯例不编译）。唯一真实不兼容点：`clock_guard.py` 同一作用域**重复标注**变量
+  （`verdict: ClockVerdict | None = None` 出现两次，Python 合法 / Cython 判
+  redeclaration）——已修，删掉第二次标注即可，运行时语义不变。
+- **行为零差异**：22 个 .pyd **顶替源码**加载后，MAOS 全量 **473 passed /
+  22 skipped**，与源码态完全一致。pydantic 模型、cryptography、SQLite、
+  运行时反射（inspect/descriptor）全部无恙——"薄壳模式风险"在真跑下不成立。
+- **体积代价**：源码合计 0.55 MB → 产物 **7.86 MB**（约 14×）。wheel 体积与
+  常驻内存相应上升，属可接受代价（需在发布说明里讲清）。
+- **正式方案的前置改造（必做）**：完整性 manifest 现按 `*.py` 收集
+  （`scripts/sign_enterprise_modules.py::collect_module_hashes`）。走二进制化后
+  **必须改为对 `.pyd`/`.so` 产物签名**，否则防篡改覆盖的是源码而非真正执行的
+  二进制——等于把刚补上的反向校验（T1.1-L2 之后的 fail-closed）又开了个口子。
+  连带：`verify_module_integrity` 的反向枚举也要按产物口径。
+
+**未覆盖（正式方案的剩余工作量）**：wheel 打包（bdist_wheel 带 .pyd 的多平台
+产物）、Linux/macOS 编译（CI 矩阵）、体积与启动耗时基准、发布链顺序改造
+（源码 → cythonize → **对产物**签名 → 构建 wheel）。
 
 **问题**：.py 明文随 wheel 分发，进程内/文件级攻击者可任意改代码（README #4/#11 的根）。
 
@@ -126,7 +150,7 @@ README #7 更新与部署文档（S）。**验收**：双副本集成测试（�
 | 路线 | 成本 | 保护强度 | 结论 |
 |---|---|---|---|
 | PyArmor Pro 采购 | ~$89-158 + license 管理 | 字节码 VM，反混淆工具链存在 | **否决**（用户决策：不采购）；且它本身就是国产商业工具，无"更国产"的替代品——调研未发现成气候的国产 PyArmor 替代产品 |
-| **Cython AOT 编译 .pyd/.so** | 0（开源 Apache） | **无字节码可反编译**，等同原生软件的逆向门槛 | **主选**：社区成熟标准打法（"核心编二进制 + 薄壳入口"），我们自建构建管线即"自己造土壤" |
+| **Cython AOT 编译 .pyd/.so** | 0（开源 Apache） | **无字节码可反编译**，等同原生软件的逆向门槛 | **主选（spike 已验证可行）**：社区成熟标准打法（"核心编二进制 + 薄壳入口"），我们自建构建管线即"自己造土壤" |
 | Nuitka | 0（开源 Apache-2.0） | 同为 AOT，偏整程序打包 | 备选：适合将来做单二进制交付形态，wheel 库分发不如 Cython 贴合 |
 | 自研字节码加密加载器 | 1-2 周开发 | 弱——密钥必在本地，内存 dump 可取回代码对象（PyArmor 本质就是这思路的商业强化版） | **否决**：同样的开发量，Cython 路线防护高一个量级 |
 | Virbox/加密狗（深盾等国产） | 商务谈判 | 授权硬件强绑定 | **不选**：面向二进制程序加固+加密狗授权，对 Python 库形态过重；留作将来高敏感客户的加购选项 |

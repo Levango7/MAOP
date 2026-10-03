@@ -39,6 +39,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-04 T1.5 兼容审计（spike）：Cython AOT 22/22 编译通过，路线成立
+
+投资计划 T1.5 的可行性问题（"不做不知道做了多贵"）本机实测收口，结论写进
+`docs/investment-plan-2026Q4.md`：
+
+- **零采购**：Cython 3.3.0（Apache）+ 本机既有 MSYS2 mingw gcc 即可链接
+  CPython 扩展，**不需要 MSVC、不花钱**——原设计"要装 Visual Studio Build Tools"
+  的假设实测不成立，最大不确定项消除；
+- **22/22 模块编译成 .pyd**，唯一不兼容点是 `clock_guard.py` 同作用域重复标注
+  （MAOS 侧 `cecb3f5` 已修）；
+- **行为零差异**：22 个 .pyd 顶替源码后，MAOS 全量 473 passed / 22 skipped；
+  pydantic / cryptography / SQLite / 反射全部无恙，"薄壳模式风险"不成立；
+- **体积代价** 0.55 MB 源码 → 7.86 MB 产物（14×）；
+- **正式方案前置**：完整性 manifest 现按 `*.py` 收集，走二进制化后必须改为
+  对 `.pyd`/`.so` 产物签名（含 `verify_module_integrity` 的反向枚举），否则
+  防篡改覆盖的是源码而非真正执行的二进制。
+
 ### 2026-10-04 T2.3-2：泄漏源定位 + 会话级守卫（`subprocess.run` 污染跨用例的治本）
 
 三元凶（`TestCallSyncFallback` 三条在 macOS/Windows 随机红）的开放题收口。
