@@ -28,6 +28,24 @@ from maop.core.backends.db_utils import get_db_path, sqlite_connect
 _STDLIB_SUBPROCESS_RUN = _subprocess_mod.run
 
 
+def _autouse_guards() -> set[str]:
+    """本模块里所有 autouse 夹具名（守卫自检断言"守卫确实是 autouse"用）。
+
+    从 pytest 的 fixture 标记里读而不是硬编码列表：守卫改名或漏标
+    ``@pytest.fixture(autouse=True)`` 时断言会自己变红。惰性求值——模块导入时
+    守卫尚未定义。
+    """
+    import sys
+
+    mod = sys.modules[__name__]
+    names: set[str] = set()
+    for name, obj in vars(mod).items():
+        marker = getattr(obj, "_pytestfixturefunction", None)
+        if marker is not None and getattr(marker, "autouse", False):
+            names.add(name)
+    return names
+
+
 @pytest.fixture(autouse=True)
 def _hermetic_subprocess_run():
     """T2.3: 让本文件对"全局 subprocess.run 被泄漏 mock 污染"免疫。
@@ -694,22 +712,38 @@ class TestCallSyncFallback:
 class TestHermeticGuard:
     """密闭守卫自检（变异验证）：拆掉 `_hermetic_subprocess_run` 本类即红。
 
-    test_a 故意把全局 subprocess.run 换成泄漏型 MagicMock 且**不还原**——
-    真实泄漏源在别的模块、行为等价。test_b 的 setup 阶段守卫必须已把它修回
-    标准库原版；守卫被移除/改坏时 test_b 断言失败。两条必须同文件按定义序执行
-    （pytest 同类内按定义序跑，xdist 分桶也不拆同类）。
+    ⚠️ 本类**自己把全局弄脏后必须在 finally 里还原**。原实现是"故意泄漏、留给
+    下一条用例的守卫修"——而 xdist `--dist load` 会把**任意**后续用例发到同一
+    worker，守卫又是文件级 autouse，污染会漏到别的模块（等于自己复刻了要修的
+    隐患，2026-10-04 修正）。现在改为：自己弄脏 → 直接断言修复函数能修回 →
+    finally 还原，绝不跨用例。
     """
 
-    def test_a_dirty_the_global_subprocess_run(self):
-        _subprocess_mod.run = MagicMock(
-            return_value=SimpleNamespace(returncode=0, stdout="ok", stderr="")
-        )
-        # 故意泄漏——等价于真实 CI 污染现场
+    def test_a_repair_restores_dirtyed_global(self):
+        # conftest 以 "tests.conftest" 或 "conftest" 名字进 sys.modules（pytest
+        # 按 rootdir/conftest 路径命名），两者都取一下；tests/ 不是包，不能直接
+        # `from tests.conftest import ...`。
+        import sys
 
-    def test_b_guard_restored_stdlib_original(self):
-        assert _subprocess_mod.run is _STDLIB_SUBPROCESS_RUN, (
-            "密闭守卫没有把泄漏的 subprocess.run 修回标准库原版 —— "
-            "守卫夹具被移除或改坏了（变异验证命中）"
+        conftest_mod = sys.modules.get("tests.conftest") or sys.modules.get("conftest")
+        repair = getattr(conftest_mod, "repair_subprocess_run", None)
+        assert callable(repair), "conftest 未暴露 repair_subprocess_run —— 会话级守卫缺失"
+
+        try:
+            _subprocess_mod.run = MagicMock(
+                return_value=SimpleNamespace(returncode=0, stdout="ok", stderr="")
+            )
+            assert repair() is True, (
+                "全局被弄脏时 repair_subprocess_run() 应报告发生了修复"
+            )
+            assert _subprocess_mod.run is _STDLIB_SUBPROCESS_RUN
+        finally:
+            _subprocess_mod.run = _STDLIB_SUBPROCESS_RUN
+
+    def test_b_guard_is_autouse_and_wired(self):
+        """守卫夹具必须是 autouse（否则本文件的用例不受保护）。"""
+        assert "_hermetic_subprocess_run" in _autouse_guards(), (
+            "守卫夹具不再是 autouse —— 本文件的免疫性消失（变异验证命中）"
         )
         # 顺手验行为：fallback 路径能拿到真实子进程输出
         mgr = ToolManager(root_dir=_tm_get_tmp())

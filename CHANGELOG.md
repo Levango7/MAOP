@@ -39,6 +39,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-04 T2.3-2：泄漏源定位 + 会话级守卫（`subprocess.run` 污染跨用例的治本）
+
+三元凶（`TestCallSyncFallback` 三条在 macOS/Windows 随机红）的开放题收口。
+上一轮只做了文件级"密闭守卫"（`test_tool_manager.py` 内 autouse 修复），本轮
+先**定位**再**治本**。
+
+**定位结论（AST 静态取证 + 动态复现）**：
+- AST 扫全库 `subprocess.run` 的 123 处触碰点（37 处相关）：`patch` 用法全部是
+  with 块或同步装饰器、`monkeypatch.setattr` 全部自动还原，**无一处裸 start 或
+  直接赋值泄漏**；
+- 真正的活跃泄漏源是**上一轮我自己引入的**：`TestHermeticGuard.test_a_dirty_the_global_subprocess_run`
+  故意把全局 `subprocess.run` 换成 MagicMock 且**不还原**，靠"下一条用例的守卫修复"
+  ——而守卫是**文件级** autouse，xdist `--dist load` 又会把**任意**后续用例发到同一
+  worker。等于修 flaky 时复刻了同一个隐患，且足以再次打红三元凶。
+
+**治本三层**：
+1. **守卫自检自还原**：`TestHermeticGuard` 改为"自己弄脏 → 直接断言
+   `repair_subprocess_run()` 能修回 → finally 还原"，不再依赖下一条用例；
+2. **会话级不变量**：conftest 的泄漏探针夹具在 **teardown 也复核一次**，发现污染
+   立即恢复标准库原版并记 WARNING——泄漏**跨不过用例边界**，xdist 随机分发也就无从传播
+   （此前只有 setup 侧观测，污染可以无限存活）；
+3. **可归因**：给 `unittest.mock._patch.start/stop` 挂幂等钩子，记录每个仍在生效的
+   patcher 的目标、启动用例 nodeid、启动栈（滤掉 mock 包内部帧）。teardown 检测到污染时
+   直接点名"哪条用例哪一行"，把"只知道 prev"升级为"知道责任人"。直接赋值型泄漏
+   （不经 patcher）退化为 `impl=` 指纹，属预期上限。
+
+**验证**：两条注入式复现（直接赋值型 / 未 stop 的 patcher 型）串行跑——受害用例均
+PASSED（污染未跨界），REPAIR WARNING 分别输出 `impl=MagicMock@…` 与
+`culprit: tests/…::test_leak_via_unstopped_patcher @ runner.py:174`。新测试 4 条
+钉住修复/归因/幂等/栈裁剪，**变异验证**：把 `repair_subprocess_run` 改成 no-op
+→ 3 条转红。相关文件 201 passed、ruff clean。
+
 ### 2026-10-03 T3.1-e：人工审批跨轮回流——批准的建议下一轮真被应用
 
 v5.2.0 验收 #1 的最后一环。此前 `approved_suggestions` 只被写入

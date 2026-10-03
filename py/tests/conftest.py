@@ -326,6 +326,122 @@ def _leak_probe_line(nodeid: str) -> str | None:
     )
 
 
+# ── 归因：谁在什么用例、哪一行替换了 subprocess.run ────────────────────
+#
+# 探针原本只能报"上一条用例 nodeid"（prev=），但 xdist `--dist load` 会把**任意**
+# 后续用例发到同一 worker，prev 与真正的肇事者可能隔着几十条 —— 定位效率极低。
+# 这里给 `unittest.mock._patch.start/stop` 挂一对钩子，记录每个**仍在生效**的
+# patcher：目标、启动时的用例 nodeid、启动栈顶几帧。teardown 发现全局被换掉时，
+# 直接把"谁在何行"打进日志，从"知道现象"升级到"知道责任人"。
+_PATCH_SITES: dict[int, dict[str, object]] = {}
+_PATCH_INSTANCES: dict[int, object] = {}
+
+
+def _patch_target_is_subprocess_run(patcher: object) -> bool:
+    """判断 patcher 的目标是否落在 ``subprocess.run``（含 `<mod>.subprocess.run` 形式）。"""
+    getter = getattr(patcher, "get_original", None)
+    if not callable(getter):
+        return False
+    try:
+        getter()
+    except Exception:
+        return False
+    return getattr(patcher, "attribute", None) == "run" and "subprocess" in str(
+        getattr(patcher, "target", "")
+    )
+
+
+def _short_stack(skip: int = 2) -> str:
+    """抓当前调用栈里"调用方"的最后几帧（定位 patch 起始位置用）。
+
+    必须跳过 mock 包内部帧（``unittest/mock/…``）——patch 的 start → __enter__
+    链路全在 mock 里，直接取栈顶只会得到 ``_manager.py:120`` 这种无信息量的
+    行号。过滤后取**最靠近用户代码**的几帧。
+    """
+    import traceback
+
+    frames = traceback.extract_stack()[:-skip]
+    # 过滤两类噪声：conftest 自身；unittest/mock 包内部（start → __enter__ 链路
+    # 全在 mock 里，会把栈顶占满 _manager.py / _callers.py 这种无信息量的帧）。
+    user_frames = [
+        f
+        for f in frames
+        if "conftest.py" not in f.filename
+        and "/unittest/" not in f.filename.replace("\\", "/")
+        and Path(f.filename).name not in ("_callers.py", "_manager.py", "python.py")
+    ]
+    tail = user_frames[-3:]
+    return " <- ".join(
+        f"{Path(f.filename).name}:{f.lineno}" for f in tail
+    ) or "<unknown>"
+
+
+def _install_patch_attribution() -> None:
+    """给 mock._patch.start/stop 挂钩子（幂等）。"""
+    from unittest import mock as _mock
+
+    if getattr(_mock._patch, "_leakhunt_wrapped", False):
+        return
+
+    orig_start = _mock._patch.start
+    orig_stop = _mock._patch.stop
+
+    def start(self, *a, **kw):  # type: ignore[no-untyped-def]
+        result = orig_start(self, *a, **kw)
+        try:
+            if _patch_target_is_subprocess_run(self):
+                _PATCH_SITES[id(self)] = {
+                    "nodeid": _PROBE_PREV.get("nodeid", "<unknown>"),
+                    "site": _short_stack(),
+                    "target": str(getattr(self, "target", "?")),
+                }
+                _PATCH_INSTANCES[id(self)] = self
+        except Exception:  # 观测不许影响被观测对象
+            pass
+        return result
+
+    def stop(self, *a, **kw):  # type: ignore[no-untyped-def]
+        result = orig_stop(self, *a, **kw)
+        _PATCH_SITES.pop(id(self), None)
+        _PATCH_INSTANCES.pop(id(self), None)
+        return result
+
+    _mock._patch.start = start  # type: ignore[method-assign]
+    _mock._patch.stop = stop  # type: ignore[method-assign]
+    _mock._patch._leakhunt_wrapped = True  # type: ignore[attr-defined]
+
+
+def _leak_attribution() -> str:
+    """描述当前仍在生效的 subprocess.run patcher；无则返回空串。"""
+    if not _PATCH_SITES:
+        return ""
+    parts = [
+        f"{meta['nodeid']} @ {meta['site']} (target={meta['target']})"
+        for meta in _PATCH_SITES.values()
+    ]
+    return "; ".join(parts)
+
+
+def repair_subprocess_run() -> bool:
+    """把全局 ``subprocess.run`` 恢复为标准库原版；返回是否发生了修复。
+
+    T2.3-2（2026-10-04）：泄漏的 ``subprocess.run`` 会**跨用例存活**，在 xdist
+    ``--dist load`` 下被随机传播到后续任意用例（曾打红
+    ``TestCallSyncFallback`` 三元凶）。这里在每条用例 teardown 强制复核并修复，
+    让污染跨不过用例边界——治本，而不只是受害文件自保。
+    修复前先记 WARNING（含 patcher 归因），不静默。
+    """
+    if _subprocess_mod.run is _ORIGINAL_SUBPROCESS_RUN:
+        return False
+    who = _leak_attribution() or f"impl={_run_fingerprint()}"
+    logging.getLogger("tests.conftest.leak_probe").warning(
+        "[leak-probe] REPAIR subprocess.run <- standard library; culprit: %s",
+        who,
+    )
+    _subprocess_mod.run = _ORIGINAL_SUBPROCESS_RUN
+    return True
+
+
 @pytest.fixture(autouse=True)
 def _leak_probe(request: pytest.FixtureRequest):
     """只观测、不改行为：记下"本用例开始时，进程已经被谁弄脏了"。
@@ -352,11 +468,18 @@ def _leak_probe(request: pytest.FixtureRequest):
     settings 单例，直接把 `tests/test_secrets.py` 的 4 条用例弄红（那些用例依赖"密钥文件按
     当前 data_dir 查找"）。观测型工具不许有副作用 —— 该夹具因此也定义在 `_isolate_data_dir`
     之后（autouse 夹具按定义顺序执行）。
+
+    **teardown 侧的修复**（T2.3-2）：setup 只观测；yield 之后调用
+    ``repair_subprocess_run()``——全局被换掉就恢复原版并记 WARNING（含 mock
+    patcher 归因）。这是结构性不变量：泄漏的 ``subprocess.run`` 跨不过用例
+    边界，xdist 的随机分发也就无从传播。
     """
+    _install_patch_attribution()
     line = _leak_probe_line(request.node.nodeid)
     if line:
         logging.getLogger("tests.conftest.leak_probe").warning(line)
     yield
+    repair_subprocess_run()
 
 
 @pytest.fixture

@@ -293,3 +293,74 @@ def test_probe_line_carries_run_impl_only_when_subprocess_is_patched(
     assert "run_impl=tests.test_conftest_leak_probe:" in dirty, dirty
     assert "_culprit_run" in dirty, dirty
     assert "run_impl=-" not in dirty, dirty
+
+
+# ── T2.3-2: 会话级修复 + patcher 归因（治本层）────────────────────────
+
+
+def test_repair_restores_dirtyed_global(monkeypatch: pytest.MonkeyPatch) -> None:
+    """全局被换掉时 repair_subprocess_run() 报告修复并还原；干净时返回 False。"""
+    import subprocess
+
+    import tests.conftest as c
+
+    original = subprocess.run
+    assert c.repair_subprocess_run() is False, "干净时不应报告修复"
+
+    def fake(*a, **k):
+        return None
+
+    monkeypatch.setattr(subprocess, "run", fake)
+    assert c.repair_subprocess_run() is True, "被弄脏时应报告修复"
+    assert subprocess.run is original, "修复后应还原为标准库原版"
+
+
+def test_repair_logs_culprit_with_nodeid(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """归因报告点名"哪条用例"——泄漏源是未 stop 的 patcher 时可精确定位到用例 nodeid。"""
+    import logging
+    import subprocess
+    from unittest.mock import MagicMock, patch
+
+    import tests.conftest as c
+
+    original = subprocess.run
+    monkeypatch.setitem(c._PROBE_PREV, "nodeid", "tests/offender.py::test_leaks")
+    patcher = patch("subprocess.run", MagicMock())
+    patcher.start()
+    try:
+        with caplog.at_level(logging.WARNING, logger="tests.conftest.leak_probe"):
+            repaired = c.repair_subprocess_run()
+        assert repaired is True
+        text = "\n".join(r.getMessage() for r in caplog.records)
+        assert "REPAIR" in text, text
+        assert "tests/offender.py::test_leaks" in text, (
+            f"归因未点名肇事用例：{text}"
+        )
+    finally:
+        try:
+            patcher.stop()
+        except RuntimeError:
+            pass  # repair 已还原，stop 会报"未 start"——预期
+        subprocess.run = original
+
+
+def test_patch_attribution_installed_once() -> None:
+    """归因钩子幂等（重复安装会把 start/stop 套娃）。"""
+    from unittest import mock as _mock
+
+    import tests.conftest as c
+
+    c._install_patch_attribution()
+    c._install_patch_attribution()
+    assert getattr(_mock._patch, "_leakhunt_wrapped", False) is True
+
+
+def test_short_stack_filters_mock_frames() -> None:
+    """栈裁剪必须滤掉 mock 包内部帧——否则归因只会报 _manager.py:120 这种废信息。"""
+    import tests.conftest as c
+
+    stack = c._short_stack()
+    for noise in ("_manager.py", "_callers.py", "conftest.py"):
+        assert noise not in stack, f"归因栈里混入噪声帧 {noise}: {stack}"
