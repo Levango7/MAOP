@@ -39,6 +39,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-03 T3.1-c：自演化闭环面板接上六个 AC-07 端点（验收 #4 落地）
+
+此前 `/api/evolution/loop/*` 六个端点（status / trigger / approvals / decision /
+ab / rollback）上线后**前端零页面调用**——v5.2.0"dashboard 可见闭环状态机与 A/B
+结果"的验收一直悬空，运维只能 curl。`EvolutionHistory.vue` 新增"闭环"tab：
+
+- **状态机卡片**：当前态（idle/evaluating/applying/validated/pending_approval/
+  rolled_back）+ 闭环开关状态 + 四个统计卡（周期数/有改善/已应用/待审批）；
+- **手动触发**：真调 trigger 端点，带 `dry_run` 参数（真跑 / 演练两枚按钮）；
+- **人工闸门**：待审批列表 + 逐条批准/拒绝（调 decision 端点，approved_by 取
+  当前登录用户）；
+- **最近周期表**：应用数/是否改善/是否回滚/快照 id + 行内「A/B 结果」「回滚」
+  两个动作（ab 与 rollback 端点）；A/B 结果就地展开 JSON。
+- 面板按现有 Card/StatCard/EmptyState/Segmented 模式写，i18n 双语键 +30（en/zh），
+  样式 scoped，与既有三个 tab 并存不改动其行为。
+- **e2e**（`e2e/evolution-loop-panel.spec.js`，2 条）：闭环 tab 可渲染且状态机/
+  触发控件可见；点击触发**拦截真实请求**验证确实打到 `/api/evolution/loop/trigger`
+  且带布尔 `dry_run`（防"按钮存在但不连端点"的假通过）。三浏览器 21 passed
+  （含 layout spec 回归），`vue-tsc --noEmit` 与 `npm run build` 均零错误。
+
 ### 2026-10-03 T3.1-a/b：劣化注入接真实入口 + 真回滚 E2E（v5.2.0 验收 #1/#2 落地）
 
 v5.2.0 的两条验收此前是空的——AC-05 的测试全 mock（`rollback_cycle` 测的是 mock

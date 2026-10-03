@@ -266,6 +266,162 @@
       </Card>
     </template>
 
+    <!-- ════════════ Closed Loop Tab（T3.1-c / AC-07）════════════ -->
+    <template v-else-if="activeTab === 'loop'">
+      <div class="loop-toolbar">
+        <div class="loop-state">
+          <span class="label muted">{{ t('view.evolutionHistory.loop.state') }}</span>
+          <span class="value">{{ loopStateLabel }}</span>
+          <span
+            class="loop-enabled"
+            :class="{ on: loopStatus.evolution_loop_enabled }"
+          >{{ loopStatus.evolution_loop_enabled ? t('view.evolutionHistory.loop.enabled') : t('view.evolutionHistory.loop.disabled') }}</span>
+        </div>
+        <div class="loop-actions">
+          <button
+            class="btn-ghost"
+            :disabled="loopTriggering"
+            @click="triggerLoop(true)"
+          >
+            <AppIcon name="eye" :size="15" />
+            <span>{{ t('view.evolutionHistory.loop.triggerDry') }}</span>
+          </button>
+          <button
+            class="btn-primary"
+            :class="{ 'is-busy': loopTriggering }"
+            :disabled="loopTriggering"
+            @click="triggerLoop(false)"
+          >
+            <AppIcon name="play" :size="15" />
+            <span>{{ t('view.evolutionHistory.loop.trigger') }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 闭环统计 -->
+      <div class="stat-row">
+        <StatCard
+          :label="t('view.evolutionHistory.loop.totalCycles')"
+          :value="loopStatus.stats?.total_cycles ?? 0"
+          icon="activity"
+          tone="brand"
+        />
+        <StatCard
+          :label="t('view.evolutionHistory.loop.improvedCycles')"
+          :value="loopStatus.stats?.improved_cycles ?? 0"
+          icon="check"
+          tone="success"
+        />
+        <StatCard
+          :label="t('view.evolutionHistory.loop.totalApplied')"
+          :value="loopStatus.stats?.total_suggestions_applied ?? 0"
+          icon="zap"
+          tone="info"
+        />
+        <StatCard
+          :label="t('view.evolutionHistory.loop.pending')"
+          :value="loopStatus.pending_approval_count || 0"
+          icon="clock"
+          tone="warn"
+        />
+      </div>
+
+      <!-- 人工闸门 -->
+      <Card
+        :title="t('view.evolutionHistory.loop.approvals')"
+        icon="check-square"
+        margin-bottom="var(--sp-4)"
+      >
+        <template v-if="loopApprovals.length">
+          <div v-for="item in loopApprovals" :key="item.cycle_id" class="loop-approval">
+            <div class="loop-approval-meta">
+              <span class="cid">{{ item.cycle_id }}</span>
+              <span class="muted">{{ item.suggestions_generated }} · {{ item.errors_observed }}</span>
+            </div>
+            <div class="loop-approval-actions">
+              <button
+                v-for="sid in item.pending_approval_ids"
+                :key="sid"
+                class="btn-ghost"
+                :disabled="loopDeciding === `${item.cycle_id}:${sid}`"
+                @click="decideLoop(`${item.cycle_id}:${sid}`, 'approve')"
+              >
+                {{ t('view.evolutionHistory.loop.approve') }}
+              </button>
+              <button
+                v-for="sid in item.pending_approval_ids"
+                :key="`${sid}-rej`"
+                class="btn-ghost"
+                :disabled="loopDeciding === `${item.cycle_id}:${sid}`"
+                @click="decideLoop(`${item.cycle_id}:${sid}`, 'reject')"
+              >
+                {{ t('view.evolutionHistory.loop.reject') }}
+              </button>
+            </div>
+          </div>
+        </template>
+        <EmptyState
+          v-else
+          icon="check-square"
+          :title="t('view.evolutionHistory.noData')"
+          :description="t('view.evolutionHistory.loop.desc')"
+        />
+      </Card>
+
+      <!-- 最近周期（含回滚与 A/B 入口） -->
+      <Card
+        :title="t('view.evolutionHistory.loop.recentCycles')"
+        icon="history"
+      >
+        <template v-if="loopStatus.recent_cycles?.length">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>{{ t('view.evolutionHistory.colCycle') }}</th>
+                <th>{{ t('view.evolutionHistory.colSuggestions') }}</th>
+                <th>{{ t('view.evolutionHistory.colSuccess') }}</th>
+                <th>{{ t('view.evolutionHistory.colRolledBack') }}</th>
+                <th>{{ t('view.evolutionHistory.colSnapshot') }}</th>
+                <th>{{ t('view.evolutionHistory.colAction') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in loopStatus.recent_cycles" :key="c.cycle_id">
+                <td class="cid">{{ c.cycle_id }}</td>
+                <td>{{ c.suggestions_applied }}</td>
+                <td>{{ c.validation_improved ? '✓' : '—' }}</td>
+                <td>{{ c.rolled_back ? '✓' : '—' }}</td>
+                <td class="muted">{{ c.snapshot_id || '—' }}</td>
+                <td class="loop-row-actions">
+                  <button class="btn-ghost" @click="loadLoopAb(c.cycle_id)">
+                    {{ t('view.evolutionHistory.loop.ab') }}
+                  </button>
+                  <button
+                    class="btn-ghost"
+                    :disabled="loopRollingBack === c.cycle_id"
+                    @click="rollbackLoop(c.cycle_id, c.snapshot_id)"
+                  >
+                    {{ t('view.evolutionHistory.loop.rollback') }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="loopAbCycleId" class="loop-ab">
+            <div class="label muted">{{ t('view.evolutionHistory.loop.ab') }} · {{ loopAbCycleId }}</div>
+            <pre v-if="loopAbResult" class="loop-ab-payload">{{ JSON.stringify(loopAbResult, null, 2) }}</pre>
+            <p v-else class="muted">{{ t('view.evolutionHistory.loop.abEmpty') }}</p>
+          </div>
+        </template>
+        <EmptyState
+          v-else
+          icon="history"
+          :title="t('view.evolutionHistory.noData')"
+          :description="t('view.evolutionHistory.loop.desc')"
+        />
+      </Card>
+    </template>
+
     <!-- ════════════ Prompt Diff Tab ════════════ -->
     <template v-else-if="activeTab === 'compare'">
       <Card :title="t('view.evolutionHistory.compare.title')" icon="git-compare" margin-bottom="var(--sp-4)">
@@ -427,9 +583,114 @@ const approving = ref('');
 const activeTab = ref('history');
 const tabOptions = computed(() => [
   { value: 'history', label: t('view.evolutionHistory.tab.history'), icon: 'activity' },
+  { value: 'loop', label: t('view.evolutionHistory.tab.loop'), icon: 'refresh-cw' },
   { value: 'compare', label: t('view.evolutionHistory.tab.compare'), icon: 'git-compare' },
   { value: 'narrative', label: t('view.evolutionHistory.tab.narrative'), icon: 'scroll' },
 ]);
+
+// ── T3.1-c：自演化闭环面板（AC-07 六端点）────────────────────
+// 此前前端零页面调用 /api/evolution/loop/* —— v5.2.0 的"dashboard 可见闭环
+// 状态机与 A/B 结果"验收一直悬空。本面板把六个端点接上：状态机 / 手动触发 /
+// 人工闸门 / A/B 结果 / 回滚。
+function ls(key, fallback = '') {
+  try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+}
+
+const loopStatus = ref({ state: 'idle', recent_cycles: [], stats: {} });
+const loopApprovals = ref([]);
+const loopTriggering = ref(false);
+const loopDeciding = ref('');
+const loopRollingBack = ref('');
+const loopAbResult = ref(null);
+const loopAbCycleId = ref('');
+
+const loopStateLabel = computed(() =>
+  t(`view.evolutionHistory.loop.state.${loopStatus.value.state || 'idle'}`),
+);
+
+async function loadLoopStatus() {
+  try {
+    const res = await api.get('/api/evolution/loop/status');
+    loopStatus.value = {
+      state: res.state || 'idle',
+      evolution_loop_enabled: res.evolution_loop_enabled,
+      recent_cycles: res.recent_cycles || [],
+      stats: res.stats || {},
+      pending_approval_count: res.pending_approval_count || 0,
+    };
+  } catch {
+    loopStatus.value = { state: 'idle', recent_cycles: [], stats: {} };
+  }
+}
+
+async function loadLoopApprovals() {
+  try {
+    const res = await api.get('/api/evolution/approvals');
+    loopApprovals.value = res.approvals || [];
+  } catch {
+    loopApprovals.value = [];
+  }
+}
+
+async function triggerLoop(dryRun) {
+  loopTriggering.value = true;
+  try {
+    await api.post('/api/evolution/loop/trigger', { dry_run: dryRun });
+    toast.success(t('view.evolutionHistory.loop.triggered'));
+    await Promise.all([loadLoopStatus(), loadLoopApprovals()]);
+  } catch (e) {
+    toast.error(e.message || t('view.evolutionHistory.loop.triggerFailed'));
+  } finally {
+    loopTriggering.value = false;
+  }
+}
+
+async function decideLoop(approvalId, decision) {
+  loopDeciding.value = approvalId;
+  try {
+    await api.post(`/api/evolution/approvals/${encodeURIComponent(approvalId)}/decision`, {
+      decision,
+      approved_by: ls('maop_user') || 'admin',
+      reason: '',
+    });
+    toast.success(t('view.evolutionHistory.loop.approved'));
+    await Promise.all([loadLoopStatus(), loadLoopApprovals()]);
+  } catch (e) {
+    toast.error(e.message || t('view.evolutionHistory.loop.decisionFailed'));
+  } finally {
+    loopDeciding.value = '';
+  }
+}
+
+async function rollbackLoop(cycleId, snapshotId) {
+  loopRollingBack.value = cycleId;
+  try {
+    await api.post('/api/evolution/loop/rollback', {
+      cycle_id: cycleId,
+      snapshot_id: snapshotId || '',
+    });
+    toast.success(t('view.evolutionHistory.loop.rolledBack'));
+    await loadLoopStatus();
+  } catch (e) {
+    toast.error(e.message || t('view.evolutionHistory.loop.rollbackFailed'));
+  } finally {
+    loopRollingBack.value = '';
+  }
+}
+
+async function loadLoopAb(cycleId) {
+  loopAbCycleId.value = cycleId;
+  try {
+    const res = await api.get(`/api/evolution/ab/${encodeURIComponent(cycleId)}`);
+    loopAbResult.value = res.ab_result || null;
+  } catch {
+    loopAbResult.value = null;
+  }
+}
+
+async function loadLoopAll() {
+  await Promise.all([loadLoopStatus(), loadLoopApprovals()]);
+}
 
 // ── 迭代 C：选中周期 + 建议展开 ────────────────────────────────
 const selectedCycle = ref(null);
@@ -723,10 +984,75 @@ async function approve(item) {
 
 onMounted(() => {
   loadAll();
+  // T3.1-c：闭环面板数据（首屏即加载，切到该 tab 不再空窗）
+  loadLoopAll();
 });
 </script>
 
 <style scoped>
+/* ── T3.1-c：闭环面板 ───────────────────────────────────── */
+.loop-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-4);
+}
+.loop-state {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.loop-state .label { font-size: var(--fs-xs); }
+.loop-state .value {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text);
+}
+.loop-enabled {
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+}
+.loop-enabled.on {
+  color: var(--success);
+  border-color: var(--success);
+  background: var(--success-soft, transparent);
+}
+.loop-actions { display: flex; gap: var(--sp-2); }
+.loop-approval {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.loop-approval-meta { display: flex; align-items: center; gap: var(--sp-3); }
+.loop-approval-actions { display: flex; gap: var(--sp-2); }
+.loop-row-actions { display: flex; gap: var(--sp-2); }
+.loop-ab {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border-subtle);
+}
+.loop-ab-payload {
+  margin-top: var(--sp-2);
+  max-height: 240px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: var(--sp-3);
+}
+.cid { font-family: var(--font-mono); font-size: var(--fs-2xs); }
+
 .subtitle {
   font-size: var(--fs-base);
   margin-right: auto;
