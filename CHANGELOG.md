@@ -65,13 +65,25 @@ SARIF 34 条发现逐条核对后两类分明：
 （base 解析与 scope 作业同一保守逻辑，dispatch/首推为空时退化为全量，不制造
 假绿）；② **全历史**扫描叠加**逐条带理由**的 allowlist。
 
-**变异验证**（本地同版 gitleaks）：
-- 基准：全历史 635 commits 扫描 → `no leaks found`；
-- 变异：移除 `test_credential_vault.py` 一条 allowlist → 对应 commit 立即报
-  **4 leaks**（exit=1），allowlist 还原后复测转绿——证明 allowlist 是精确豁免
-  而非关掉门禁。
+**变异验证**（CI 同版 gitleaks v8.24.2，全历史口径）：
+- 基准：635 commits 扫描 → `no leaks found`（本地两个版本均绿）；
+- 变异：移除 `test_maop_verify.py` 一条 allowlist → 全历史立即报 **4 leaks**
+  （exit=1），还原后复测转绿——证明 allowlist 是精确豁免而非关掉门禁。
 - 禁则（写进 `.gitleaks.toml` 注释）：新指纹一律先判真假，真凭据走吊销流程，
   不许直接进 allowlist。
+
+**本门禁连踩三坑（均为"红得没道理"，一并记账）**：
+1. **同名 artifact 409**（run 37094969085）：同 job 内两次 `gitleaks-action`
+   都要上传 `gitleaks-results.sarif` → HTTP 409 Conflict；两段扫描其实都报
+   `no leaks found`，步骤仍失败。段②改直接跑 gitleaks CLI（钉 v8.24.2），
+   产物独立命名上传。
+2. **allowlist 语法被静默忽略**（run 37097802399）：全局 allowlist 的键是**单数**
+   `[allowlist]`（复数 `[[allowlists]]` 是规则内语法）。写成复数时本地新版容忍、
+   CI 的 8.24.2 完全不生效 → 报 43 条。已改单数。
+3. **规则集随版本变**：同一仓库，本地自编译版报 0 条、CI v8.24.2 报 43 条
+   （多出 9 条全是内容安全检测夹具 `sk-abcdefghijkl…` / `ghp_abcdefghijkl…`
+   之类打码假串，逐条核对原文确认非真凭据）。allowlist 必须按 **CI 实际使用的
+   gitleaks 版本**核对——已写入配置注释作纪律。
 
 ### 2026-10-03 Playwright E2E 全类修复：CoachMarks 引导遮罩全局预关 + rail 断言等动画收敛
 
