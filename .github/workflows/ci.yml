@@ -845,12 +845,30 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # ② 历史遗留 = 全量扫描 + 逐条甄别后的 allowlist（33 条假阳性 +
       #    1 条用户确认已吊销的真实凭据，含处置记录，见 .gitleaks.toml 注释）。
+      #    ⚠️ 必须用 CLI 而不是第二次 gitleaks-action：同 job 内两次 action 都会
+      #    上传同名 artifact（gitleaks-results.sarif）→ HTTP 409 Conflict 假红
+      #    （2026-10-03 实测 run 37094969085：两段扫描都报 no leaks found，步骤
+      #    仍因 artifact 冲突失败）。这里直接跑 CLI 装到 job 上，段①的 action
+      #    仍可上传它的产物名，两边不冲突。
+      - name: Install gitleaks CLI
+        run: |
+          set -euo pipefail
+          GL_VER=8.24.2
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GL_VER}/gitleaks_${GL_VER}_linux_x64.tar.gz" \
+            | tar -xz gitleaks -C /usr/local/bin
+          gitleaks version
       - name: History scan (triaged allowlist)
-        uses: gitleaks/gitleaks-action@v3.0.0
+        run: |
+          set -euo pipefail
+          gitleaks git --config .gitleaks.toml . \
+            --redact --report-format sarif --report-path gl-history.sarif
+      - name: Upload history scan report
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          args: --config .gitleaks.toml --redact
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: gitleaks-history-report
+          path: py/gl-history.sarif
+          if-no-files-found: ignore
 
   # ── SBOM (cyclonedx) ───────────────────────────────────────────
   sbom:
