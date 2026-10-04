@@ -39,6 +39,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-04 评估批 B1–B6：两处真 bug、门禁措辞、泄漏可见性、两处新守卫
+
+对 `26645340` 做只读评估后发现并修复的六项。每一项都做了**变异验证**（改回旧写法即红）。
+
+**真 bug（一行级，各带回归用例）**
+- `chat_engine.py` 流式回退读 `getattr(result.result, "output", "")`，而 `MaopResult`
+  只有 `stdout` —— 带默认值的 `getattr` 把"字段名写错"变成**静默空流**：provider 流
+  失败时 chat 一个 token 都不产，且没有任何异常可查。同一 bug 的非流式副本
+  （`_call_llm_fallback`）2026-08 已修，**流式那份被漏掉了**。现直读 `stdout`，并补
+  `TestStreamLlmStdoutRegression`（成功产出内容 + 失败仍产错误文本，后者防"无条件吐
+  stdout"也能过第一条）。
+  - **顺带发现一处"测试与实现错得一样"**：`test_llm_provider.py::test_stream_llm_fallback`
+    用 `MagicMock` 并设 `mock_result.result.output = ...`（同一个不存在的字段）。
+    MagicMock 对任意属性名都收，所以它替这个 bug 打了很久的掩护 —— 改完实现后它才红。
+    已改为用**真实** `MaopResult`/`DispatchResult`：字段名再写错会当场抛错。
+    这正是"替身对被测量那一维失明"的典型：替身越宽容，越测不出接线错误。
+- `AgentConfig.env` 是**死字段**：全库无一处读取，配了不生效，子进程静默继承服务器
+  全量环境。现由 `drivers.py::_agent_env()` 接线到全部 5 处 `create_subprocess_exec`；
+  空 env 返回 `None`（= 不传 env，与历史行为逐字节一致），只有明写 `env:` 才改变行为。
+  收窄继承面是独立的安全议题，**本次不做**（agent CLI 普遍依赖 PATH/HOME 等基础变量）。
+
+**CI merge gate：级联跳过不再背"该跑没跑"的锅**
+run 476 现场：`test` 失败 ⇒ `needs: test` 的 `audit`/`sbom` 被连带跳过。旧实现把三条
+都当"该跑的作业没跑"，注解里真正的红点 `test` 反而被淹。现在有硬失败时 skipped 只作
+`::notice::` 提示（新增 `cascade_skips()`），无硬失败时才保留"该跑没跑"的判定。
+
+**泄漏修复必须在绿跑里也可见**
+`repair_subprocess_run()` 的 WARNING 走 logging，而 pytest 默认只打印**失败用例**捕获
+的日志 —— 修复生效后用例不再失败，于是"泄漏源仍在活跃"彻底隐身。现于
+`pytest_sessionfinish` 无条件汇总并输出 `::warning::`（xdist 下每 worker 各报各的）。
+
+**推翻上一条（T2.3-2）的根因结论**
+`bd64d0b`（引入 `TestHermeticGuard`，即"上一轮我自己引入的泄漏源"）= 2026-10-02，
+而 run 460 的 head `962d3492` = 2026-10-01；`git merge-base --is-ancestor bd64d0b
+962d3492` → **NO**。它不可能是 run 460 的泄漏源。且该"自泄漏"存在期间的
+run 461/462/465/466/467 共 **45 条 pytest 腿全绿** —— 是理论隐患，不是活跃肇因。
+**原始泄漏者至今未归位**：会话级守卫挡住的是症状，因此现状是"被掩盖"而非"已修复"。
+可用线索：run 460 现场的 5 条 `mcp-adapter-bg` 线程；`MCPAdapter.__init__:167`
+构造即起 daemon 线程，只有 `disconnect():295` 才回收。
+
+**新增守卫（各带变异验证）**
+- `test_nightly_flaky_coverage.py`：nightly 的 flaky 检测原先只在 ubuntu + 3.13 上
+  串行跑 3 遍，而两家凶出现在 **macos-latest/3.13** 与 **windows-latest/3.12** ——
+  探针与症状不相交，结构上守不住它声称守的东西。现改为矩阵（ubuntu/macos/windows，
+  复刻 ci.yml 的 `-n 2` 与 Windows `-n 0`）＋ serial-marker 步骤，全程 `--reruns=0`；
+  守卫钉住覆盖面、并发配置、"每条腿都是 ci.yml 真跑过的组合"，并对每条腿做
+  `bash -n` 语法校验（矩阵值插错位置会让整条腿静默跑成别的东西）。
+- `test_env_example_drift.py`：`ROADMAP.md` 把"`.env.example` 与代码 `MAOP_*` 差异为
+  零"勾成 `- [x]`，却**没有任何守卫**。首轮扫描（只看 `os.getenv`）漏 18 个；补上
+  第二条来源（pydantic `MAOPSettings` 的 `env_prefix="MAOP_"` 映射 + `AliasChoices`
+  别名）后**实漏 29 个**，含 v5.2.0 旗舰开关 `MAOP_EVOLUTION_LOOP_ENABLED`。29 个
+  已全部补齐（含真实默认值）；反向断言（声明了但代码全不读需有说明）与
+  `ENTERPRISE_SIDE_VARS` 豁免清单（消费方在 `maop.enterprise`／MAOS 仓）一并入库。
+
 ### 2026-10-04 T1.5 兼容审计（spike）：Cython AOT 22/22 编译通过，路线成立
 
 投资计划 T1.5 的可行性问题（"不做不知道做了多贵"）本机实测收口，结论写进
