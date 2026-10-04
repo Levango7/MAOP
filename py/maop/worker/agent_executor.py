@@ -4,6 +4,14 @@ Cloud-native entry point for distributed agent execution.
 Reads tasks from the message queue, dispatches via Dispatcher,
 and records results.
 
+⚠️ **本仓没有 `agent_tasks` 的生产者**（2026-10-05 全仓核对）：`docker-compose.yml`
+部署了 `agent-exec` 服务，但没有一处非测试代码往这个 topic 投消息 —— 所以这个容器
+起得来、跑得转，但永远拿不到任务。要么由使用方（MAOS / 外部系统）投递，要么补一个
+提交入口；在那之前把"云原生分布式执行"当成已具备能力是言过其实。
+
+两处语义修正见 `_process_message` 的 docstring（失败也 ACK、日志读错对象）——
+正是因为这条链没人走，它们才一直没被发现。
+
 Environment variables:
   MAOP_ROOT        — Project root directory (default: /app)
   MAOP_DATA_DIR    — Data directory (default: /app/data)
@@ -19,6 +27,7 @@ import os
 import signal
 import sys
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger("maop.worker.agent_executor")
 
@@ -51,6 +60,64 @@ def _setup_logging() -> None:
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         stream=sys.stdout,
     )
+
+
+async def _process_message(
+    queue: Any, dispatcher: Any, msg: Any, consumer_id: str,
+) -> None:
+    """执行一条消息并按结果 ACK / NACK。
+
+    抽成独立函数是为了能被用例直接驱动 —— 原先它内联在 `_consume` 的闭包里，
+    只能靠"起真 worker"才能测，实际上等于没测。
+
+    2026-10-05 两处修正（都在原先的"死路径"里，但 MAOS 侧可能真的有生产者，
+    所以代码本身得是对的）：
+
+    1. **失败也 ACK**：原实现只在**抛异常**时 NACK，而 `Dispatcher.dispatch` 失败时
+       是**正常返回**的 —— `DispatchResult.result.exit_code != 0`。于是失败任务被 ACK 掉、
+       永不重试，与"nack 重试到上限再进死信"的设计意图相反。现按 `exit_code` 判定。
+    2. **日志读错了对象**：`getattr(result, "agent"/"exit_code", ...)` 取的是
+       `DispatchResult` 的属性，而这两个字段在 `result.result`（MaopResult）上，
+       所以日志恒为 `agent=unknown exit_code=-1`，排障时等于没有信息。
+
+    注意：权限门拒绝（exit_code=126）也会走 NACK ⇒ 重试到上限后进死信。
+    "永久性失败不该重试"是队列层面的另一个设计议题，本函数不擅自区分。
+    """
+    try:
+        dispatch_result = await dispatcher.dispatch(
+            agent=msg.payload.get("agent", "claude"),
+            task=msg.payload.get("task", ""),
+            routing_key=msg.payload.get("routing_key", ""),
+            trace_id=msg.id,
+        )
+    except Exception as exc:
+        logger.exception("Dispatch failed for task id=%s", msg.id)
+        try:
+            await asyncio.to_thread(queue.nack, msg.id, error=str(exc))
+        except Exception as nack_exc:
+            logger.warning("Failed to NACK message %s: %s", msg.id, nack_exc)
+        await asyncio.sleep(1)
+        return
+
+    inner = getattr(dispatch_result, "result", None)
+    exit_code = getattr(inner, "exit_code", -1)
+    logger.info(
+        "Task completed: agent=%s exit_code=%s",
+        getattr(inner, "agent", "unknown"), exit_code,
+    )
+
+    if exit_code == 0:
+        # ACK 成功派发：否则会被 _reclaim_unacked 收回并重复执行
+        #（历史问题：同一任务最多跑 4 次）。
+        await asyncio.to_thread(queue.ack, msg.id, consumer_id=consumer_id)
+        return
+
+    error = getattr(inner, "error", "") or f"exit_code={exit_code}"
+    logger.warning("Dispatch returned non-zero (%s) for task id=%s — NACK", exit_code, msg.id)
+    try:
+        await asyncio.to_thread(queue.nack, msg.id, error=error)
+    except Exception as nack_exc:
+        logger.warning("Failed to NACK message %s: %s", msg.id, nack_exc)
 
 
 def run() -> None:
@@ -100,33 +167,7 @@ def run() -> None:
                     continue
 
                 logger.info("Executing task: %s (id=%s)", msg.payload.get("task", "")[:80], msg.id)
-
-                try:
-                    result = await dispatcher.dispatch(
-                        agent=msg.payload.get("agent", "claude"),
-                        task=msg.payload.get("task", ""),
-                        routing_key=msg.payload.get("routing_key", ""),
-                        trace_id=msg.id,
-                    )
-
-                    logger.info(
-                        "Task completed: agent=%s exit_code=%s",
-                        getattr(result, "agent", "unknown"),
-                        getattr(result, "exit_code", -1),
-                    )
-                    # P0 fix: ACK on successful dispatch so the message is not
-                    # reclaimed by _reclaim_unacked and re-executed (previously
-                    # caused each task to run up to 4 times).
-                    await asyncio.to_thread(queue.ack, msg.id, consumer_id=consumer_id)
-                except Exception as exc:
-                    # P0 fix: NACK on dispatch failure so the message is re-queued
-                    # or dead-lettered instead of lingering in 'processing'.
-                    logger.exception("Dispatch failed for task id=%s", msg.id)
-                    try:
-                        await asyncio.to_thread(queue.nack, msg.id, error=str(exc))
-                    except Exception as nack_exc:
-                        logger.warning("Failed to NACK message %s: %s", msg.id, nack_exc)
-                    await asyncio.sleep(1)
+                await _process_message(queue, dispatcher, msg, consumer_id)
 
             except Exception:
                 logger.exception("Worker error")
