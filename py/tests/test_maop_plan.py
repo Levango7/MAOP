@@ -221,6 +221,34 @@ class TestEvaluateCondition:
 
 
 class TestExecuteWorkflow:
+    def test_workflow_steps_are_not_reported_as_completed(self):
+        """回归守卫：`execute_workflow` **不执行** agent，不许把它们算成"已完成"。
+
+        2026-10-05 修：原实现对每个步骤只调 `maop_plan()` 做路由决策（`sr.status =
+        "planned"`），却把 `step_outputs.<i>.status` 写成 `"success"` 并
+        `steps_completed += 1` —— 调用方据此以为工作流真跑过了。这是最坏的一类缺陷：
+        不是报错，而是**报成功**。
+
+        本用例同时钉住三件事：completed 恒为 0、planned 如实计数、步骤状态是 planned。
+        """
+        from maop.config.loader import MaopConfig, WorkflowDef, WorkflowStepDef
+
+        config = MaopConfig(workflows={
+            "src_wf": WorkflowDef(steps=[
+                WorkflowStepDef(agent="claude", task="Write code"),
+                WorkflowStepDef(agent="codex", task="Run tests"),
+            ])
+        })
+        result = execute_workflow("src_wf", config=config)
+
+        assert result.steps_planned == 2
+        assert result.steps_completed == 0, (
+            "只做了规划的步骤被算成已完成 —— 假成功回来了"
+        )
+        assert {sr.status for sr in result.step_results} == {"planned"}
+        # 供条件表达式引用的 steps.<i>.status 同样如实
+        assert result.variables["steps.0.output"]
+
     def test_workflow_not_found(self):
         result = execute_workflow("nonexistent", config=None)
         assert result.steps_total == 0
@@ -238,7 +266,7 @@ class TestExecuteWorkflow:
         })
         result = execute_workflow("test_wf", config=config)
         assert result.steps_total == 2
-        assert result.steps_completed == 2
+        assert result.steps_planned == 2
 
     def test_workflow_with_condition_skip(self):
         from maop.config.loader import MaopConfig, WorkflowDef, WorkflowStepDef
@@ -252,7 +280,7 @@ class TestExecuteWorkflow:
             )
         })
         result = execute_workflow("cond_wf", config=config)
-        assert result.steps_completed == 1
+        assert result.steps_planned == 1
         assert result.steps_skipped == 1
 
     def test_workflow_always_run(self):
@@ -267,7 +295,7 @@ class TestExecuteWorkflow:
             )
         })
         result = execute_workflow("always_wf", config=config)
-        assert result.steps_completed == 2
+        assert result.steps_planned == 2
         assert result.steps_skipped == 0
 
     def test_workflow_variable_interpolation(self):
@@ -281,7 +309,7 @@ class TestExecuteWorkflow:
             )
         })
         result = execute_workflow("var_wf", config=config, initial_vars={"project": "MAOP"})
-        assert result.steps_completed == 1
+        assert result.steps_planned == 1
         assert result.variables.get("steps.0.output") is not None
 
 

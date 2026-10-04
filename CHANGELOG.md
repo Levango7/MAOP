@@ -39,6 +39,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-05 评估批 D/E：verify 工件门、三处"接线没接上"、主派发链端到端守卫
+
+**D：verify 第一次真的看磁盘**
+此前七个内置 gate（exit_code / output / content-safety / syntax-check / lint / dry-run /
+schema）**全部只看退出码与 stdout 的正则**，`workdir` 一路传到 `VerifyEngine.verify()`
+却从不下传给 gate —— "验证通过"的真实含义只是"进程退出 0 且打印了点什么"，agent 一个
+文件都没产出也算通过。新增 `expected_files` 门（存在性 / `min_bytes` 防占位 /
+`kind: file|dir`），路径必须落在 `workdir` 内（`../`、绝对路径、符号链接逃逸一律拒），
+**不声明就不跑**（对既有 plan 零行为变化）。`verify()` 按签名自适应下传 workdir，
+既有两参数自定义 gate 继续可用。
+
+**D2：`agent_executor` 两处语义 bug**
+（前提：`agent_tasks` 这条链在本仓**没有生产者**，docker-compose 却部署了 `agent-exec`
+—— 容器起得来但永远拿不到任务，所以 bug 一直没人发现。）
+① **失败也 ACK**：原实现只在抛异常时 NACK，而 `dispatch` 失败是**正常返回**
+（`result.result.exit_code != 0`）⇒ 失败任务被 ACK 掉、永不重试，与"重试到上限再进死信"
+的意图相反；② 日志取的是 `DispatchResult.agent/exit_code`（字段其实在 `.result` 上），
+恒为 `agent=unknown exit_code=-1`。
+
+**D3：主派发链的端到端守卫**
+`tests/test_dispatcher.py` 大量直接替换 `_DRIVERS`，所以 **Dispatcher → driver 注册表 →
+子进程** 被剪断时可以全绿。新增 `test_dispatch_e2e.py`：一个替身都不用，真实
+`AgentConfig` + 真实注册表 + 真实子进程，且子进程**往磁盘写哨兵文件**。
+
+**E1：`execute_workflow` 不再报假成功**
+它对每个步骤只调 `maop_plan()`（`sr.status="planned"`），却把 `step_outputs` 写成
+`"success"` 并 `steps_completed += 1`——**不是报错，是报成功**。现拆出 `steps_planned`
+（它真正做的事），`steps_completed` 只在真执行过才计数（本函数恒 0），状态如实写
+`"planned"`，docstring 说明名不副实与替代路径。既有 6 处断言与实现"错得一样"，已同步更正。
+
+**E2：`/api/bridge/*` 从"恒 404"到可用**
+`AgentProxy.register()` 全仓只有定义处与测试调用 —— 注册表从来是空的。现由
+`bridge_call` **按需**从 agents.yaml 构建并注册（复用 `AgentResolver` + `adapter_factory`）；
+刻意不启动时批量注册 30+ 个适配器。构建失败只记日志、最终仍 404，不许在 500 里塞假成功。
+
+**E3：主循环理会 `.maop_pause`**
+`pause_control()` 写的标记文件此前**只有 engine.py 查**，`maop run` 这条主链从不查 ——
+运维以为按下了暂停，任务照常派发。现与 engine.py 同一 helper/同一标记文件。
+⚠️ 语义是"等待恢复"（最长 `MAX_PAUSE_SECONDS`=3600s 后放弃），残留标记文件会让
+`maop run` 最长停 1 小时 —— 与 engine.py 一致，已在代码注释标明与删除办法。
+
 ### 2026-10-05 Ubuntu 26.04 金丝雀：把"被动换 OS"变成"量出来的迁移"
 
 官方 changelog（2026-09-17）：`ubuntu-latest` 将在 **2026-10-19 ~ 11-19** 窗口内迁到

@@ -281,6 +281,11 @@ class PlanStepResult(BaseModel):
 class WorkflowResult(BaseModel):
     workflow_name: str
     steps_total: int = 0
+    # `steps_planned` 与 `steps_completed` 必须分开（2026-10-05 修）：
+    # `execute_workflow` 只做规划、不执行任何 agent，早先却把每个规划过的步骤都记进
+    # `steps_completed` 并在 step_outputs 里标成 "success" —— 调用方据此以为工作流
+    # 真的跑过了。现在"完成"只统计真执行过的步骤数。
+    steps_planned: int = 0
     steps_completed: int = 0
     steps_skipped: int = 0
     step_results: list[PlanStepResult] = Field(default_factory=list)
@@ -421,10 +426,16 @@ def execute_workflow(
     config: MaopConfig | None = None,
     initial_vars: dict[str, Any] | None = None,
 ) -> WorkflowResult:
-    """Execute a named workflow from config with DAG scheduling.
+    """Plan a named workflow from config, with DAG scheduling. **不执行任何 agent。**
+
+    ⚠️ 名字里的 "execute" 名不副实（2026-10-05 复核）：本函数对每个步骤只调
+    `maop_plan()` 做路由决策，**从不派发** agent；`WorkflowResult.steps_planned` 才是
+    它真正做的事，`steps_completed` 只有在别的代码真执行过之后才有意义。要真的跑工作流，
+    走 `maop run`（MaopLoop）或直接 `Dispatcher.dispatch()`。
 
     Steps with depends_on are scheduled via topological sort.
-    Steps at the same level can run in parallel (marked with parallel=True).
+    Steps at the same level are run in order (the `parallel` flag is currently
+    only recorded, execution is sequential — see the P3-fix note below).
 
     Parameters
     ----------
@@ -493,8 +504,10 @@ def _execute_step(
     plan = maop_plan(resolved_task, config=config)
     sr.status = "planned"
     sr.output = f"agent={plan.selected_agent} rk={plan.routing_key}"
-    step_outputs[str(index)] = {"status": "success", "output": sr.output, "agent": step.agent}
+    # 状态如实写 "planned"：本函数不派发任何 agent，之前写 "success" 是假成功
+    #（条件里若写 `steps.0.status == 'success'` 会因此恒假 —— 那正是"没执行"的正确反映）。
+    step_outputs[str(index)] = {"status": "planned", "output": sr.output, "agent": step.agent}
     result.variables[f"steps.{index}.output"] = sr.output
-    result.steps_completed += 1
+    result.steps_planned += 1
     result.step_results.append(sr)
 

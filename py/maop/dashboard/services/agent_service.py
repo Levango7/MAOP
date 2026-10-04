@@ -371,17 +371,55 @@ def bridge_adapters() -> dict[str, Any]:
     return {"adapters": statuses, "count": len(statuses)}
 
 
+def _register_adapter_from_config(bridge: Any, adapter_name: str) -> bool:
+    """把 agents.yaml 里配置的 agent 按需构建成 bridge 适配器并注册。
+
+    为什么需要它（2026-10-05）：`AgentProxy` 的注册表**从来没有人往里放过东西** ——
+    `register()` 在全仓只有定义处和测试调用。于是 `/api/bridge/adapters` 永远返回空表、
+    `/api/bridge/call` 对任何名字都回 404（那个 404 是"适配器未找到"的正常语义，不是
+    端点坏了；坏的是**从来没人注册**）。路由、鉴权、请求模型、错误脱敏都写好了，
+    缺的只是这一步。
+
+    刻意做成**按需**（调用时才建）而不是启动时批量注册：agents.yaml 有 30+ 条配置，
+    启动即构造全部适配器既慢又可能踩到重量级适配器的构造副作用。
+
+    Returns
+    -------
+    bool
+        是否成功注册（配置里没有这个 agent 或构建失败时为 False）。
+    """
+    from maop.config.loader import ConfigLoader
+    from maop.core.agent.adapters.adapter_factory import build_adapter
+    from maop.delegate.agent_resolver import AgentResolver
+
+    try:
+        config = ConfigLoader(project_root=getattr(bridge, "_root", None)).load()
+        agent_cfg = AgentResolver(config).resolve(adapter_name)
+        if agent_cfg is None:
+            return False
+        bridge.register(adapter_name, build_adapter(agent_cfg))
+        return True
+    except Exception as exc:
+        logger.warning("[bridge] 按需注册适配器 %s 失败：%s", adapter_name, exc)
+        return False
+
+
 def bridge_call(adapter_name: str, task: str, kwargs: dict[str, Any]) -> Any:
     """通过 bridge 适配器代理调用。
+
+    若该名字还没注册但 agents.yaml 里有同名 agent，则先按需构建并注册 —— 否则这个
+    端点对开箱配置也只会回 404（注册表本来是空的）。
 
     Raises
     ------
     KeyError
-        适配器不存在。
+        适配器不存在（既没注册、配置里也没有）。
     RuntimeError
         调用执行失败。
     """
     bridge = _get_bridge()
+    if bridge.get(adapter_name) is None:
+        _register_adapter_from_config(bridge, adapter_name)
     return bridge.call(adapter_name, task, **kwargs)
 
 

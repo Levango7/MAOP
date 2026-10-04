@@ -472,6 +472,48 @@
 - [ ] `MAOP_BACKUP_S3_BUCKET` — 配置 off-box 备份
 - [ ] `MAOP_PERSONAL_COST_CAP` — 设置成本上限护栏
 
+## 验证门（`plan.gates`）
+
+Verify 阶段按 plan 里声明的 `gates` 列表逐条执行。内置门（`py/maop/maop_verify.py`
+的 `GATE_REGISTRY`）：
+
+| 门 | 看什么 | 说明 |
+|---|---|---|
+| `exit_code` | 退出码 | 默认门之一 |
+| `output` | stdout 非空 | 默认门之一 |
+| `content-safety` | stdout 正则 | 基础密钥/凭据泄漏检查 |
+| `syntax-check` | stdout 正则 | 常见语法错误特征 |
+| `lint` | stdout 正则 | `E###` / `F###` / `W###` 特征 |
+| `dry-run` | plan 声明 + 执行结果信号 | 契约校验门，不是 dry-run 执行器；见 `MAOP_DRY_RUN_ENFORCE` |
+| `schema` | `plan.expected_schema` | 结构化输出字段与类型 |
+| `expected_files` | **磁盘**（`workdir` 下的产物） | 2026-10-05 新增，见下 |
+
+### `expected_files`：唯一一个看磁盘的门
+
+在此之前**没有任何门看过磁盘** —— 其余七个全部只看退出码与 stdout 正则，于是
+「验证通过」的真实含义只是「进程退出 0 且打印了点什么」，agent 一个文件都没产出也算通过。
+
+声明方式（**不声明就不跑**，对既有 plan 零行为变化）：
+
+```json
+{
+  "gates": ["exit_code", "expected_files"],
+  "expected_files": [
+    "out/report.md",
+    {"path": "out/data.json", "min_bytes": 1024},
+    {"path": "out", "kind": "dir"}
+  ]
+}
+```
+
+- 相对路径按 `workdir` 解析；**必须落在 `workdir` 内**（`../`、绝对路径、符号链接逃逸
+  一律判失败 —— 声明可能由 LLM 产出，放行等于让 plan 去探测宿主文件系统）。
+- `min_bytes` 用来拦「写个空文件交差」；`kind` 取 `file`（默认）或 `dir`。
+- 声明了却没给 `workdir`、或声明格式不合法，一律 fail-closed。
+
+**注意**：内置的 plan/路由目前**不会自动声明** `expected_files`（各路由该产出什么文件是
+产品决定）—— 要用它得在 plan 里显式写上，或由自定义 planner 产出。
+
 ---
 
 > **注意**：`.env.example` 是环境变量示例的单一事实来源（single source of truth）。本文档是对其的补充和扩展说明。如发现变量不一致，请以 `.env.example` 和 `py/maop/config/settings.py` 为准并提交 issue。

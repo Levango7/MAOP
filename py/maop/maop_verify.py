@@ -6,9 +6,11 @@ content safety, and custom gates. Returns structured VerifyResult.
 
 from __future__ import annotations
 
+import inspect
 import logging
 import re
-from typing import Any, Literal
+from pathlib import Path
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
 
@@ -45,7 +47,8 @@ class VerifyResult(BaseModel):
 
 # ── Built-in gates ────────────────────────────────────────────
 
-def _gate_exit_code(plan: dict, result: MaopResult | None) -> GateResult:
+def _gate_exit_code(plan: dict, result: MaopResult | None,
+              workdir: str = "") -> GateResult:
     """Check that exit code is 0."""
     if result is None:
         return GateResult(name="exit_code", passed=False, reason="No execution result")
@@ -54,7 +57,8 @@ def _gate_exit_code(plan: dict, result: MaopResult | None) -> GateResult:
     return GateResult(name="exit_code", passed=False, reason=f"exit_code={result.exit_code}")
 
 
-def _gate_output(plan: dict, result: MaopResult | None) -> GateResult:
+def _gate_output(plan: dict, result: MaopResult | None,
+              workdir: str = "") -> GateResult:
     """Check that output is non-empty."""
     if result is None:
         return GateResult(name="output", passed=False, reason="No execution result")
@@ -63,7 +67,8 @@ def _gate_output(plan: dict, result: MaopResult | None) -> GateResult:
     return GateResult(name="output", passed=False, reason="Empty output")
 
 
-def _gate_content_safety(plan: dict, result: MaopResult | None) -> GateResult:
+def _gate_content_safety(plan: dict, result: MaopResult | None,
+              workdir: str = "") -> GateResult:
     """Basic content safety check — no secrets/keys leaked."""
     if result is None or not result.stdout:
         return GateResult(name="content-safety", passed=True)
@@ -85,7 +90,8 @@ def _gate_content_safety(plan: dict, result: MaopResult | None) -> GateResult:
     return GateResult(name="content-safety", passed=True)
 
 
-def _gate_syntax_check(plan: dict, result: MaopResult | None) -> GateResult:
+def _gate_syntax_check(plan: dict, result: MaopResult | None,
+              workdir: str = "") -> GateResult:
     """Check output doesn't contain obvious syntax errors."""
     if result is None or not result.stdout:
         return GateResult(name="syntax-check", passed=True)
@@ -107,7 +113,8 @@ def _gate_syntax_check(plan: dict, result: MaopResult | None) -> GateResult:
     return GateResult(name="syntax-check", passed=True)
 
 
-def _gate_lint(plan: dict, result: MaopResult | None) -> GateResult:
+def _gate_lint(plan: dict, result: MaopResult | None,
+              workdir: str = "") -> GateResult:
     """Check output doesn't contain lint errors (basic)."""
     if result is None or not result.stdout:
         return GateResult(name="lint", passed=True)
@@ -128,7 +135,8 @@ def _gate_lint(plan: dict, result: MaopResult | None) -> GateResult:
     return GateResult(name="lint", passed=True)
 
 
-def _gate_dry_run(plan: dict, result: MaopResult | None) -> GateResult:
+def _gate_dry_run(plan: dict, result: MaopResult | None,
+              workdir: str = "") -> GateResult:
     """Dry-run gate — verifies that a dry-run was actually performed.
 
     .. note::
@@ -239,7 +247,8 @@ def _gate_dry_run(plan: dict, result: MaopResult | None) -> GateResult:
 
 # ── Gate registry ─────────────────────────────────────────────
 
-def _gate_schema(plan: dict, result: MaopResult | None) -> GateResult:
+def _gate_schema(plan: dict, result: MaopResult | None,
+              workdir: str = "") -> GateResult:
     """Validate structured output against expected_schema from the plan.
 
     The plan may specify ``expected_schema`` as a JSON Schema dict.
@@ -284,6 +293,131 @@ def _gate_schema(plan: dict, result: MaopResult | None) -> GateResult:
     return GateResult(name="schema", passed=True)
 
 
+def _gate_expected_files(plan: dict, result: MaopResult | None,
+                         workdir: str = "") -> GateResult:
+    """工件门：plan 里声明的产物必须真的落在 workdir 上。
+
+    为什么加它：在此之前**没有任何 gate 看过磁盘** —— 七个内置 gate 全部只看
+    `exit_code` 与 stdout 的正则（`workdir` 一路传到 `verify()` 却从不下传给 gate）。
+    于是"验证通过"的真实含义只是"进程退出 0 且打印了点什么"，agent 完全没产出文件
+    也算通过。
+
+    plan 里的声明方式（**不声明就不跑**，所以对既有 plan 零行为变化）::
+
+        {
+          "gates": ["exit_code", "expected_files"],
+          "expected_files": [
+            "out/report.md",                       # 存在即可
+            {"path": "out/data.json", "min_bytes": 1024},
+            {"path": "out", "kind": "dir"},
+          ]
+        }
+
+    安全：所有路径都按 `workdir` 解析并**必须落在 workdir 内** —— 声明来自 plan
+    （可能由 LLM 产出），允许 `../` 或绝对路径就等于让 plan 去探测宿主文件系统。
+    越界（含符号链接逃逸）、workdir 缺失或不是目录一律判失败（fail-closed）。
+    """
+    declared = plan.get("expected_files")
+    if not declared:
+        # 未声明 = 本门不适用。返回 passed 而不是失败：否则所有历史 plan 一夜之间全红。
+        return GateResult(name="expected_files", passed=True, reason="未声明 expected_files，跳过")
+
+    if not workdir:
+        return GateResult(
+            name="expected_files", passed=False,
+            reason="plan 声明了 expected_files，但没有 workdir 可供校验（fail-closed）",
+        )
+
+    base = Path(workdir).resolve()
+    if not base.is_dir():
+        return GateResult(name="expected_files", passed=False,
+                          reason=f"workdir 不存在或不是目录：{base}")
+
+    if isinstance(declared, (str, dict)):
+        declared = [declared]
+    if not isinstance(declared, list):
+        return GateResult(name="expected_files", passed=False,
+                          reason=f"expected_files 必须是列表，实际是 {type(declared).__name__}")
+
+    for entry in declared:
+        if isinstance(entry, str):
+            spec: dict[str, Any] = {"path": entry}
+        elif isinstance(entry, dict):
+            spec = entry
+        else:
+            return GateResult(name="expected_files", passed=False,
+                              reason=f"expected_files 条目必须是字符串或对象：{entry!r}")
+
+        raw = str(spec.get("path", "")).strip()
+        if not raw:
+            return GateResult(name="expected_files", passed=False, reason="expected_files 条目缺少 path")
+
+        target = Path(raw).resolve() if Path(raw).is_absolute() else (base / raw).resolve()
+        if target != base and base not in target.parents:
+            # 用 resolve() 之后再比较（而非字符串前缀）：符号链接指向外部同样被拦下。
+            return GateResult(
+                name="expected_files", passed=False,
+                reason=f"路径越出 workdir，拒绝校验：{raw} → {target}",
+            )
+
+        kind = str(spec.get("kind", "file") or "file")
+        if not target.exists():
+            return GateResult(name="expected_files", passed=False,
+                              reason=f"声明产物不存在：{raw}")
+        if kind == "dir" and not target.is_dir():
+            return GateResult(name="expected_files", passed=False,
+                              reason=f"声明产物应为目录但是文件：{raw}")
+        if kind == "file":
+            if not target.is_file():
+                return GateResult(name="expected_files", passed=False,
+                                  reason=f"声明产物应为文件但是目录：{raw}")
+            min_bytes = spec.get("min_bytes")
+            if min_bytes is not None:
+                try:
+                    need = int(min_bytes)
+                except (TypeError, ValueError):
+                    return GateResult(name="expected_files", passed=False,
+                                      reason=f"min_bytes 不是整数：{min_bytes!r}")
+                size = target.stat().st_size
+                if size < need:
+                    return GateResult(
+                        name="expected_files", passed=False,
+                        reason=f"产物过小（可能只是占位）：{raw} 实际 {size} 字节 < 要求 {need}",
+                    )
+
+    return GateResult(name="expected_files", passed=True,
+                      reason=f"已校验 {len(declared)} 项声明产物")
+
+
+def _call_gate(gate_fn: Any, plan: dict, result: MaopResult | None, workdir: str) -> GateResult:
+    """调用一个 gate，按需下传 `workdir`。
+
+    内置 gate 都收第三个参数；但 `VerifyEngine(custom_gates=...)` 是公开构造参数，
+    既有外部 gate 是 `(plan, result)` 两参数 —— 直接三参调用会把它们打挂。所以这里
+    按签名判定，两种都支持。
+
+    刻意**不用** `try: f(a,b,c) except TypeError: f(a,b)`：gate 内部抛的 TypeError
+    会被吞成"签名不匹配"，把一个真实的 gate bug 变成静默重试。
+
+    返回处一律 `cast`：`gate_fn` 是 `Any`（注册表里混着内置函数与外部插件），
+    mypy 的 no-any-return 会在这里报错；签名判定本身保证调用形状正确，返回值则由
+    调用方按 `GateResult` 使用 —— 真返回了别的东西，`verify()` 构造 `VerifyResult`
+    时 pydantic 会拒绝（不是静默放过）。
+    """
+    try:
+        params = list(inspect.signature(gate_fn).parameters.values())
+    except (TypeError, ValueError):
+        # 拿不到签名（内建/C 实现）→ 按旧约定调用
+        return cast(GateResult, gate_fn(plan, result))
+    if any(p.kind is p.VAR_POSITIONAL for p in params):
+        return cast(GateResult, gate_fn(plan, result, workdir))
+    positional = [p for p in params
+                  if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
+    if len(positional) >= 3:
+        return cast(GateResult, gate_fn(plan, result, workdir))
+    return cast(GateResult, gate_fn(plan, result))
+
+
 GATE_REGISTRY: dict[str, Any] = {
     "exit_code": _gate_exit_code,
     "output": _gate_output,
@@ -292,6 +426,8 @@ GATE_REGISTRY: dict[str, Any] = {
     "lint": _gate_lint,
     "dry-run": _gate_dry_run,
     "schema": _gate_schema,
+    # 唯一一个看磁盘的门（需要 plan 声明 expected_files，见其 docstring）。
+    "expected_files": _gate_expected_files,
 }
 
 
@@ -357,7 +493,7 @@ class VerifyEngine:
                 continue
 
             try:
-                gr = gate_fn(plan, result)
+                gr = _call_gate(gate_fn, plan, result, workdir)
                 gate_results.append(gr)
             except Exception as exc:
                 engine_errored = True
