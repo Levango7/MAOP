@@ -97,6 +97,8 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 | `py/tests/test_docs_consistency_gate.py` | 文档一致性门禁：范围只来自索引当前章节、豁免必须写理由、注入死路径必须判红、`docs-gate` 作业不许挂 `if` |
 | `py/tests/test_ci_required_checks.py` | required 清单（`.github/ci-required-checks.json`）↔ `ci.yml` 作业形状 ↔ §7.2 散文 三方一致：不许改名/删作业导致上下文永不上报，不许 required 作业在 PR 上恒不产出（沿 needs 链递归查），不许矩阵名当 required |
 | `py/tests/test_ci_merge_gate.py` | 聚合守卫的两面：判定脚本的策略单测（白名单式 + fail closed + docs-only 的 skipped 必须放行），以及 ci.yml 里 gate 的形状（name 稳定、`if: always()` 不许掉、needs 盖住全部重活、不许纳 push-only 作业） |
+| `py/tests/test_nightly_flaky_coverage.py` | nightly `flaky-detection` 的**覆盖面**：必须覆盖实测出过问题的平台（macos/3.13、windows/3.12）、每条腿 `--reruns=0`、复刻 ci.yml 的并发配置（Linux/macOS `-n 2`、Windows `-n 0`）、矩阵值渲染后是合法 bash 且不留占位符、每条腿都得是 ci.yml 真跑过的组合 |
+| `py/tests/test_env_example_drift.py` | `.env.example` ↔ 代码实读的 `MAOP_*` 变量双向一致（两条来源都要算：`os.getenv` 直读 + `MAOPSettings` 的 `env_prefix`/`AliasChoices` 映射）；反向不许留下无说明的"没人认的开关"；企业版变量走 `ENTERPRISE_SIDE_VARS` 逐条登记 |
 
 
 ## 7. master 的 required checks：已实测语义 + 现行配置
@@ -158,6 +160,11 @@ required 上下文 4 条，其余保护项全关：
   ③ scope 没输出、needs 为空、缺 `result` 字段、出现未知的新状态 → 一律红。
   它**必须**挂 `if: always()`：否则上游一红它自己就不产出，required 变成"从未上报"，
   所有 PR 永久卡在 `blocked`（§7.1 的 B 轮语义）。这条由结构守卫钉住，不许改坏。
+  - 规则②的**例外**（2026-10-04 修）：同轮里已存在硬失败时，`skipped` 是 `needs:` 链上的
+    **级联跳过**，不再列为不通过原因，改由 `cascade_skips()` 输出 `::notice::`。
+    起因是 run 476：`test` 失败后 `needs: test` 的 `audit`/`sbom` 被连同报成"该跑的作业没跑"，
+    注解里真正的红点反被淹没 —— **判定没错但归错了因**。有硬失败时红点必然已由那个失败给出，
+    所以这不改变红绿，只修措辞。
 - **`Lint (ruff + mypy)` 与 `Frontend Build` 不再单列 required**：它们已在聚合作业的 needs 里，
   失败或被跳过都会把 `CI merge gate` 判红。单列只是把同一件事说两遍。
 - **只在 trunk push 才存在的作业**：`Docker build` / `Container Scan (trivy)` /
@@ -244,3 +251,38 @@ required 上下文 4 条，其余保护项全关：
 
     cd py && python scripts/check_required_checks_drift.py
     # 退出码 0/1/3 见上表；3 = 没 token，不是"一致"
+
+## 8. nightly 的 flaky 检测：覆盖面本身也要被钉住（2026-10-04）
+
+`Flaky Test Detection` 自称"暴露时好时坏的不稳定测试"，但原实现只在
+**ubuntu-latest + 3.13** 上串行跑 3 遍。而实测出过问题的两家凶
+（`tests/test_tool_manager.py::TestCallSyncFallback`）出现在
+**macos-latest/3.13** 与 **windows-latest/3.12** —— 探针采样平台与症状出现平台
+**不相交**，结构上就不可能红。这是本仓反复出现的那一类"假门禁"，只是这次伪装成
+"我们已经在做 nightly flaky 检测了"。
+
+修正后的覆盖（由 `py/tests/test_nightly_flaky_coverage.py` 钉住）：
+
+| 腿 | 重复次数 | 并发 | 依据 |
+|---|---|---|---|
+| ubuntu-latest / 3.13 | 3 | `-n 2` | 基线腿 |
+| macos-latest / 3.13 | 3 | `-n 2` | 症状出现过的平台（run 36792737281） |
+| windows-latest / 3.12 | 2 | `-n 0` | 症状出现过的平台；CI 在 Windows 上因 xdist 竞态本就走串行 |
+
+另加一步 `-m "not slow and serial" -n 0` 的单次运行：ci.yml 把用例拆成
+`not slow and not serial` 与 `not slow and serial` 两步，而原 flaky 作业只跑了前者，
+`serial` 那一族（共享全局状态 / 固定端口）从没在无重试条件下被观察过。
+
+两条硬约束：
+
+1. **全程 `--reruns=0`**。ci.yml 的 pytest 腿带 `--reruns=3`，会把 flaky 重试成绿；
+   只有关掉重试，"时好时坏"才可见。守卫对每条腿都断言这一点。
+2. **矩阵值必须真的插进脚本**。守卫把每条腿渲染一遍，断言没有残留 `${{ }}` 占位符，
+   并对渲染结果跑 `bash -n` —— 插错位置（例如把 `-n 2` 塞进引号内）会让整条腿静默
+   跑成别的东西，属于"看不见的失效"。
+
+超时按实测定：run 477 的同一套 CI 腿为 ubuntu 6min / macos 3min / windows-3.12 14min
+（且那是**含** `--reruns=3` 的耗时），最慢腿跑 2 遍约 28min ⇒ `timeout-minutes: 60`。
+
+**仍未覆盖**：Windows 只跑 2 遍而不是 3 遍，是为了把墙钟压在 1 小时内；若日后再次
+出现 Windows 侧的长尾 flaky，优先调这条腿的次数而不是放宽整个矩阵。

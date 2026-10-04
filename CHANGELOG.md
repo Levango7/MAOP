@@ -39,6 +39,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-04 评估批 B1–B6：两处真 bug、门禁措辞、泄漏可见性、两处新守卫
+
+对 `26645340` 做只读评估后发现并修复的六项。每一项都做了**变异验证**（改回旧写法即红）。
+
+**真 bug（一行级，各带回归用例）**
+- `chat_engine.py` 流式回退读 `getattr(result.result, "output", "")`，而 `MaopResult`
+  只有 `stdout` —— 带默认值的 `getattr` 把"字段名写错"变成**静默空流**：provider 流
+  失败时 chat 一个 token 都不产，且没有任何异常可查。同一 bug 的非流式副本
+  （`_call_llm_fallback`）2026-08 已修，**流式那份被漏掉了**。现直读 `stdout`，并补
+  `TestStreamLlmStdoutRegression`（成功产出内容 + 失败仍产错误文本，后者防"无条件吐
+  stdout"也能过第一条）。
+  - **顺带发现一处"测试与实现错得一样"**：`test_llm_provider.py::test_stream_llm_fallback`
+    用 `MagicMock` 并设 `mock_result.result.output = ...`（同一个不存在的字段）。
+    MagicMock 对任意属性名都收，所以它替这个 bug 打了很久的掩护 —— 改完实现后它才红。
+    已改为用**真实** `MaopResult`/`DispatchResult`：字段名再写错会当场抛错。
+    这正是"替身对被测量那一维失明"的典型：替身越宽容，越测不出接线错误。
+- `AgentConfig.env` 在 `delegate/` 这条**主派发链**上被静默忽略：同一个 agent 配置
+  走适配器路径（`core/agent/adapters/cli_adapter.py`、`core/agent/lifecycle/runtime.py`、
+  `core/mcp/mcp_hub_transport.py`）时 `env:` 生效，走 `delegate/` 时 5 个 driver
+  全都不传它 —— 配了不生效且没有任何提示。现由 `drivers.py::_agent_env()` 补齐到
+  5 处 `create_subprocess_exec`，合并口径 `{**os.environ, **config.env}` 与既有 4 处
+  保持一致；空 env 返回 `None`（= 不传 env，与历史行为逐字节一致）。
+  收窄继承面是独立的安全议题，**本次不做**（agent CLI 普遍依赖 PATH/HOME 等基础变量）。
+  - 订正：本条初版写作"全库无一处读取"，**不准确**。起因是我排查时用了
+    `grep ... | grep -vE "os.env"` 过滤噪音，而既有那 4 处的形态正是
+    `{**os.environ, **self.config.env}` —— 过滤器把要找的行一起删掉了。准确说法是
+    "适配器路径读、delegate 主链漏"。
+  - `scripts/check_config_drift.py` 的 BASELINE 随之 227→228（该门禁是逐行文本计数，
+    只允许减少）。本次是既有既定形态的第 5 处实例，非新模式，理由已写进脚本注释。
+
+**回归与本批修复（自曝）**
+- 给 `pytest_sessionfinish` 加会话结束报告时，`print(中文)` 在 en-US runner 的 cp1252
+  控制台上抛 `UnicodeEncodeError`，异常从钩子冒出去把整个 pytest 会话崩成 exit=1，
+  而 junit 里"没有任何失败用例"—— 于是"守卫报了个警"变成"测试作业失败"。CI 实测红在
+  windows-latest 3.10 与 3.13。**这是本仓栽过的同一个坑**（`ci_merge_gate.py` /
+  `ci_path_scope.py` 都为此做了 stdout reconfigure 并写了警告注释），我照抄了那套写法
+  去写 gate，却在测试钩子里漏了同一件事。现改为按需降级（UTF-8 → ascii 转义），
+  并补一条模拟 cp1252 stdout 的用例把它钉死。
+- **随之发现修复本身是假阳性**：报告在 CI 与本地都开始报"仍有测试在泄漏"，归因指向
+  `tests/test_agent_adapters.py::_mock_subprocess_run.<locals>._run`（CI 21 次 / 单文件 13 次）。
+  实测证伪：把"进入用例前"的状态逐条打印，该文件 **64/64 条都是 STDLIB** —— 跨用例污染
+  本就不存在。
+  根因是**检查点位置错了**：pytest 夹具终结是 LIFO，而 `tests/conftest.py` 里
+  `_isolate_data_dir(tmp_path, monkeypatch)` **先于** `_leak_probe` 建立，于是 `monkeypatch`
+  的撤销排在 `_leak_probe` teardown **之后** —— teardown 侧检查必然把用例**自己**作用域内的
+  `monkeypatch.setattr("...subprocess.run", ...)` 看成泄漏。**T2.3-2 的 teardown 侧修复因此
+  一直在报假警**（只是当时只在日志里、没人看）。
+  修法：观测与修复一起挪到 **setup 侧**（`yield` 之前）——下一条用例进来时真泄漏仍在，
+  作用域内的 patch 已还原，两个方向都不误伤。已加结构守卫钉住"必须在 yield 之前"。
+  另修自检用例：`TestHermeticGuard::test_a_repair_restores_dirtyed_global` 故意弄脏再修，
+  会把计数 +1 却不还原 ⇒ 一次正常全绿跑也会打出假警报，现用 monkeypatch 还原。
+
+**CI merge gate：级联跳过不再背"该跑没跑"的锅**
+run 476 现场：`test` 失败 ⇒ `needs: test` 的 `audit`/`sbom` 被连带跳过。旧实现把三条
+都当"该跑的作业没跑"，注解里真正的红点 `test` 反而被淹。现在有硬失败时 skipped 只作
+`::notice::` 提示（新增 `cascade_skips()`），无硬失败时才保留"该跑没跑"的判定。
+
+**泄漏修复必须在绿跑里也可见**
+`repair_subprocess_run()` 的 WARNING 走 logging，而 pytest 默认只打印**失败用例**捕获
+的日志 —— 修复生效后用例不再失败，于是"泄漏源仍在活跃"彻底隐身。现于
+`pytest_sessionfinish` 无条件汇总并输出 `::warning::`（xdist 下每 worker 各报各的）。
+
+**推翻上一条（T2.3-2）的根因结论**
+`bd64d0b`（引入 `TestHermeticGuard`，即"上一轮我自己引入的泄漏源"）= 2026-10-02，
+而 run 460 的 head `962d3492` = 2026-10-01；`git merge-base --is-ancestor bd64d0b
+962d3492` → **NO**。它不可能是 run 460 的泄漏源。且该"自泄漏"存在期间的
+run 461/462/465/466/467 共 **45 条 pytest 腿全绿** —— 是理论隐患，不是活跃肇因。
+**原始泄漏者至今未归位**：会话级守卫挡住的是症状，因此现状是"被掩盖"而非"已修复"。
+可用线索：run 460 现场的 5 条 `mcp-adapter-bg` 线程；`MCPAdapter.__init__:167`
+构造即起 daemon 线程，只有 `disconnect():295` 才回收。
+
+**新增守卫（各带变异验证）**
+- `test_nightly_flaky_coverage.py`：nightly 的 flaky 检测原先只在 ubuntu + 3.13 上
+  串行跑 3 遍，而两家凶出现在 **macos-latest/3.13** 与 **windows-latest/3.12** ——
+  探针与症状不相交，结构上守不住它声称守的东西。现改为矩阵（ubuntu/macos/windows，
+  复刻 ci.yml 的 `-n 2` 与 Windows `-n 0`）＋ serial-marker 步骤，全程 `--reruns=0`；
+  守卫钉住覆盖面、并发配置、"每条腿都是 ci.yml 真跑过的组合"，并对每条腿做
+  `bash -n` 语法校验（矩阵值插错位置会让整条腿静默跑成别的东西）。
+- `test_env_example_drift.py`：`ROADMAP.md` 把"`.env.example` 与代码 `MAOP_*` 差异为
+  零"勾成 `- [x]`，却**没有任何守卫**。首轮扫描（只看 `os.getenv`）漏 18 个；补上
+  第二条来源（pydantic `MAOPSettings` 的 `env_prefix="MAOP_"` 映射 + `AliasChoices`
+  别名）后**实漏 29 个**，含 v5.2.0 旗舰开关 `MAOP_EVOLUTION_LOOP_ENABLED`。29 个
+  已全部补齐（含真实默认值）；反向断言（声明了但代码全不读需有说明）与
+  `ENTERPRISE_SIDE_VARS` 豁免清单（消费方在 `maop.enterprise`／MAOS 仓）一并入库。
+
 ### 2026-10-04 T1.5 兼容审计（spike）：Cython AOT 22/22 编译通过，路线成立
 
 投资计划 T1.5 的可行性问题（"不做不知道做了多贵"）本机实测收口，结论写进

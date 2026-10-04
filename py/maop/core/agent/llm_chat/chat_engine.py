@@ -357,7 +357,11 @@ class ChatEngine:
             )
 
             if result.result and result.result.is_success():
-                output = getattr(result.result, "output", "") or ""
+                # 必须直接读 `stdout`：MaopResult（core/reliability/error_schema.py）
+                # 没有 `output` 字段，此前用 `getattr(..., "output", "")` 把字段名写错
+                # 变成了静默空流 —— provider 流转失败时 chat 返回 0 个 token
+                # 而不是回退内容，且没有任何异常能提示。
+                output = result.result.stdout or ""
                 chunk_size = max(1, len(output) // 20)
                 for i in range(0, len(output), chunk_size):
                     yield output[i:i + chunk_size]

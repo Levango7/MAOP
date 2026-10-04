@@ -73,39 +73,80 @@ jobs:
           echo "exit code: 0=PASS, 1=FAIL, 2=psutil missing"
 
   flaky-detection:
-    name: Flaky Test Detection
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
+    name: Flaky Test Detection (${{ matrix.os }}, py${{ matrix.python-version }})
+    # 覆盖面修正（2026-10-04）：原实现只在 ubuntu + 3.13 上串行跑 3 遍，而实测的
+    # 两家凶（`TestCallSyncFallback`）出现在 **macos-latest/3.13** 与
+    # **windows-latest/3.12** —— 它检测的平台与真出问题的平台不相交，等于守不住
+    # 它声称守的东西。现在按"历史上真出过问题的腿"组矩阵，并复刻 CI 的真实并发
+    # 配置（见 ci.yml「Run unit tests」）：
+    #   - Linux/macOS: xdist 并行（CI 用 -n 2）
+    #   - Windows: 串行（CI 用 -n 0 —— xdist 3.8.0 在 Windows 有 execnet worker 竞态）
+    # 每轮都带 --reruns=0：CI 的 --reruns=3 会把 flaky 重试成绿，只有这里去掉重试
+    # 才看得见"时好时坏"。
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: '3.13'
+            repeats: 3
+            xdist: '-n 2'
+          - os: macos-latest
+            python-version: '3.13'
+            repeats: 3
+            xdist: '-n 2'
+          - os: windows-latest
+            python-version: '3.12'
+            repeats: 2
+            xdist: '-n 0'
+    runs-on: ${{ matrix.os }}
+    # 超时按实测定（run 477 的同一套 CI 腿）：ubuntu 6min / macos 3min /
+    # windows-3.12 14min —— 且那是**含** --reruns=3 的耗时。最慢腿 windows 跑 2 遍
+    # 约 28min，60min 给约 2 倍余量；矩阵并行，总墙钟由最慢腿决定。
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.13'
+          python-version: ${{ matrix.python-version }}
       - name: Install deps
         run: pip install -e ./py[dev] --quiet
-      - name: Run tests 3x to detect flaky
-        # 检测目标：同一套测试连跑 3 次，暴露「时好时坏」的不稳定测试。
+      - name: Run tests ${{ matrix.repeats }}x to detect flaky
+        # 检测目标：同一套测试连跑 N 次，暴露「时好时坏」的不稳定测试。
         # 诚实化（2026-09-25）：此前循环内每条 pytest 都带 `|| true`，job 恒绿、
-        # 永远发现不了任何问题；现在去掉 `|| true`，累计失败次数，
-        # 任意一次失败即 job 失败（失败 run 的用例 ID 见日志）。
+        # 永远发现不了任何问题；现在去掉 `|| true`，累计失败次数，任意一次失败即
+        # job 失败（失败 run 的用例 ID 见日志）。
+        shell: bash
+        env:
+          MAOP_ENV: 'test'
         run: |
           fails=0
-          for i in 1 2 3; do
-            echo "=== Run $i ==="
-            if pytest py/tests/ -q --timeout=60 -m "not slow and not serial" --reruns=0; then
+          for i in $(seq 1 ${{ matrix.repeats }}); do
+            echo "=== Run $i (xdist: ${{ matrix.xdist }}) ==="
+            if python -m pytest py/tests/ -q --ignore=py/tests/contract \
+                 -m "not slow and not serial" --timeout=60 --reruns=0 \
+                 ${{ matrix.xdist }}; then
               echo "run $i: PASS"
             else
-              echo "::error::flaky-detection run $i FAILED"
+              echo "::error::flaky-detection run $i FAILED (${{ matrix.os }}, py${{ matrix.python-version }})"
               fails=$((fails + 1))
             fi
           done
-          echo "failed runs: $fails/3"
+          echo "failed runs: $fails/${{ matrix.repeats }}"
           if [ "$fails" -ne 0 ]; then
-            echo "::error::$fails of 3 runs failed — treat as flaky/unstable"
+            echo "::error::$fails of ${{ matrix.repeats }} runs failed on ${{ matrix.os }} — treat as flaky/unstable"
             exit 1
           fi
+      - name: Run serial-marker tests once (no retries)
+        # ci.yml 把 `not slow and not serial` 与 `not slow and serial` 分成两步跑；
+        # 本作业原先只跑了前者，**serial 那一族**（共享全局状态 / 固定端口）从没在
+        # 无重试条件下被观察过 —— 而它们恰恰是最容易 flaky 的一批。
+        shell: bash
         env:
           MAOP_ENV: 'test'
+        run: |
+          python -m pytest py/tests/ -q --ignore=py/tests/contract \
+            -m "not slow and serial" -n 0 --timeout=60 --reruns=0
 
   # ── required checks 漂移对账（§7.6）────────────────────────────────
   # 仓库内守卫（test_ci_required_checks.py）只核对清单 / ci.yml / 文档三方，全在仓库里；

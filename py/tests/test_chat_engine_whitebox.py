@@ -3,6 +3,8 @@
 Covers three bugs found via real-agent integration testing:
   1. chat_engine.py:279 — ``getattr(result.result, 'output', None)`` →
      ``result.result.stdout`` (MaopResult has no ``output`` attribute).
+     2026-10-04: 同一处错误在**流式分支** ``_stream_llm_fallback`` 里
+     还有一份拷贝（当时只修了非流式那份），见 ``TestStreamLlmStdoutRegression``。
   2. chat_engine.py:143 — ``content = await ... or ""`` prevents None
      from reaching Pydantic's ``ChatResponse(content: str)``.
   3. Stream / field / agent-routing regressions for ChatResponse &
@@ -136,6 +138,77 @@ class TestCallLlmStdoutRegression:
 
         assert result == "Dispatch failed"
         assert "should-not-see-this" not in result
+
+
+class TestStreamLlmStdoutRegression:
+    """Regression: _stream_llm_fallback 必须读 ``result.result.stdout``。
+
+    这是上面 Bug 1 的**流式副本**：非流式那份 2026-08 已修，流式那份原地留着
+    ``getattr(result.result, "output", "")``。因为 getattr 带了默认值，它不是
+    抛错而是**静默空流** —— provider 流转失败时 chat 一个 token 都不产，日志里
+    也没有任何异常。这类"修了一份拷贝、漏了另一份"只有断言"回退真的产出内容"
+    才守得住：改回 ``.output`` 时这里会红（拼接结果是空串）。
+    """
+
+    @pytest.mark.asyncio
+    async def test_stream_fallback_yields_stdout_content(self, tmp_path):
+        """Dispatch 成功 → 回退流必须把 stdout 切成 token 产出。"""
+        engine = ChatEngine(root_dir=str(tmp_path), config=_make_config())
+        dispatch_result = _make_dispatch_result(stdout="hello-from-stdout")
+
+        with (
+            patch("maop.config.loader.ConfigLoader") as MockLoader,
+            patch("maop.delegate.dispatcher.Dispatcher") as MockDispatcher,
+        ):
+            MockLoader.return_value.load.return_value = MagicMock()
+            MockDispatcher.return_value.dispatch = AsyncMock(return_value=dispatch_result)
+
+            request = ChatRequest(message="hi", stream=True)
+            chunks = [
+                chunk
+                async for chunk in engine._stream_llm_fallback(
+                    "test-agent",
+                    [{"role": "user", "content": "hi"}],
+                    request,
+                )
+            ]
+
+        assert "".join(chunks) == "hello-from-stdout"
+        assert len(chunks) > 1, "回退路径应当做分段模拟（不是一次性整段吐出）"
+
+    @pytest.mark.asyncio
+    async def test_stream_fallback_yields_error_on_failure(self, tmp_path):
+        """Dispatch 失败 → 产出错误文本，绝不把 stdout 当成功内容吐出。
+
+        负向对照：防止"无条件 yield stdout"也能过第一条用例。
+        """
+        engine = ChatEngine(root_dir=str(tmp_path), config=_make_config())
+        dispatch_result = _make_dispatch_result(
+            ok=False,
+            exit_code=1,
+            stdout="should-not-see-this",
+            error="Dispatch failed",
+        )
+
+        with (
+            patch("maop.config.loader.ConfigLoader") as MockLoader,
+            patch("maop.delegate.dispatcher.Dispatcher") as MockDispatcher,
+        ):
+            MockLoader.return_value.load.return_value = MagicMock()
+            MockDispatcher.return_value.dispatch = AsyncMock(return_value=dispatch_result)
+
+            request = ChatRequest(message="hi", stream=True)
+            chunks = [
+                chunk
+                async for chunk in engine._stream_llm_fallback(
+                    "test-agent",
+                    [{"role": "user", "content": "hi"}],
+                    request,
+                )
+            ]
+
+        assert "".join(chunks) == "Dispatch failed"
+        assert "should-not-see-this" not in "".join(chunks)
 
 
 # ═══════════════════════════════════════════════════════════════════

@@ -117,6 +117,15 @@ import subprocess as _subprocess_mod
 
 _ORIGINAL_SUBPROCESS_RUN = _subprocess_mod.run
 _PROBE_PREV: dict[str, str] = {}
+# 本进程内 `repair_subprocess_run()` 实际修过多少次（会话结束时汇总上报，见
+# `_repair_report`）。按进程计数：xdist 下每个 worker 各报各的。
+_REPAIR_COUNT = 0
+# 每次修复时的归因串（最多留最近 5 条）。必须在会话结束时一起报出来 ——
+# 归因原来只进 logging，而 pytest 默认只打印**失败用例**捕获的日志，
+# 修复过的用例当然不会失败 ⇒ 线索在绿跑里彻底看不见。CI 实测（2026-10-04，
+# windows-latest 3.10/3.13）：确实发生了修复，但日志里一条 culprit 都看不到。
+_REPAIR_WHO: list[str] = []
+_REPAIR_WHO_MAX = 5
 
 
 @pytest.fixture
@@ -180,6 +189,13 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Clean up all temp directories created by our ``tmp_path`` override."""
+    # 泄漏修复汇总：必须放在这里且**无条件**执行 —— 修复过的用例不会再失败，
+    # 于是 logging 那条 WARNING 在绿跑里永远不会被 pytest 印出来（它默认只打印
+    # 失败用例捕获的日志）。不在这里报，泄漏源就真的没人看得见了。
+    worker = (getattr(session.config, "workerinput", None) or {}).get("workerid", "master")
+    report = _repair_report(str(worker))
+    if report:
+        _emit_session_warning(report)
     # 清空 ConnectionPool 模块级单例池：池连接 release() 回池不关闭，每个测试
     # 独立 MAOP_DATA_DIR 会产生大量池与连接句柄，进程退出时 GC 才回收 →
     # ResourceWarning: unclosed database 洪泛（xdist 全量下耗尽 worker 句柄）。
@@ -431,15 +447,61 @@ def repair_subprocess_run() -> bool:
     让污染跨不过用例边界——治本，而不只是受害文件自保。
     修复前先记 WARNING（含 patcher 归因），不静默。
     """
+    global _REPAIR_COUNT
     if _subprocess_mod.run is _ORIGINAL_SUBPROCESS_RUN:
         return False
     who = _leak_attribution() or f"impl={_run_fingerprint()}"
+    _REPAIR_COUNT += 1
+    if len(_REPAIR_WHO) < _REPAIR_WHO_MAX:
+        _REPAIR_WHO.append(who)
     logging.getLogger("tests.conftest.leak_probe").warning(
         "[leak-probe] REPAIR subprocess.run <- standard library; culprit: %s",
         who,
     )
     _subprocess_mod.run = _ORIGINAL_SUBPROCESS_RUN
     return True
+
+
+def _emit_session_warning(text: str) -> None:
+    """把消息作为 GitHub 注解打到 stdout —— 在非 UTF-8 控制台也必须不崩。
+
+    为什么要单列：CI 实测（2026-10-04，windows-latest 3.10/3.13）本函数的 `print`
+    直接抛 `UnicodeEncodeError: 'charmap' codec can't encode ...`，异常从
+    `pytest_sessionfinish` 冒出去，把整个 pytest 会话崩成 exit=1 —— 于是"守卫报了个
+    警"变成了"测试作业失败"，性质完全不同，而且 junit 里没有任何失败用例（红得莫名）。
+
+    这是本仓栽过的同一个坑（`scripts/ci_merge_gate.py`、`ci_path_scope.py` 都为此
+    做了 stdout reconfigure）。此处用**按需降级**而不是全局 reconfigure：注解本身
+    退化成 ASCII 转义（`\\uXXXX`）仍然可读，且不影响本进程其它输出。
+    """
+    line = f"::warning title=leak-probe::{text}"
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        print(line.encode("ascii", "backslashreplace").decode("ascii"))
+
+
+def _repair_report(worker: str = "master") -> str | None:
+    """会话结束时要不要报"本进程修过几次泄漏"；一次都没修则返回 None。
+
+    单独成函数是为了能被用例直接断言（pytest 不允许直接调夹具，而这里要钉的
+    恰恰是"全绿时也会报"这个语义）。
+
+    为什么需要它：`repair_subprocess_run()` 的 WARNING 走 logging，而 pytest 默认
+    **只在用例失败时**才把捕获的日志打进报告 —— 修复生效后用例当然不失败了，
+    于是"泄漏源仍在活跃"这件事在绿跑里完全不可见，连带 culprit 归因一起消失。
+    这里在 session 结束时无条件汇总一次（修复次数 + 归因 + worker），并以
+    ``::warning::`` 输出（runner 会把它渲染成 PR 注解）。
+    """
+    if _REPAIR_COUNT == 0:
+        return None
+    who = " | ".join(_REPAIR_WHO) if _REPAIR_WHO else "<无归因记录>"
+    return (
+        f"[leak-probe] 本进程共修复被替换的 subprocess.run {_REPAIR_COUNT} 次"
+        f"（worker={worker}）：仍有测试在跨用例泄漏全局 subprocess.run。"
+        "症状已被会话级守卫挡住，但泄漏源未定位 —— "
+        f"culprit: {who}"
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -469,17 +531,28 @@ def _leak_probe(request: pytest.FixtureRequest):
     当前 data_dir 查找"）。观测型工具不许有副作用 —— 该夹具因此也定义在 `_isolate_data_dir`
     之后（autouse 夹具按定义顺序执行）。
 
-    **teardown 侧的修复**（T2.3-2）：setup 只观测；yield 之后调用
-    ``repair_subprocess_run()``——全局被换掉就恢复原版并记 WARNING（含 mock
-    patcher 归因）。这是结构性不变量：泄漏的 ``subprocess.run`` 跨不过用例
-    边界，xdist 的随机分发也就无从传播。
+    **检查与修复都放在 setup 侧**（2026-10-04 修正，T2.3-2 的 teardown 版是错的）：
+    观测 → 修复，都发生在**本用例开始之前**。
+
+    为什么必须挪到 setup：pytest 的夹具终结是 LIFO，而本文件里
+    `_isolate_data_dir(tmp_path, monkeypatch)` 先于本夹具建立 —— 于是 `monkeypatch`
+    的"撤销"排在**本夹具 teardown 之后**。放在 teardown 检查，会把**用例自己**
+    `monkeypatch.setattr("...cli_adapter.subprocess.run", ...)` 的正常作用域误判成泄漏：
+    实测 `tests/test_agent_adapters.py` 单文件就 13 次假修复。而假修复会被
+    `_repair_report` 当成真泄漏在 PR 上打 `::warning::` —— 一条只会喊狼来了的探针，
+    正是本仓最反对的东西。
+
+    实证（2026-10-04）：把"进入用例前"的状态逐条打出来，`test_agent_adapters.py`
+    全部 **64/64 条都是 STDLIB** —— 跨用例污染本就不存在，此前报的全是假阳性；
+    setup 侧检查既不会漏掉真泄漏（下一条用例进来时它还在），也不会误伤作用域内的 patch。
     """
     _install_patch_attribution()
     line = _leak_probe_line(request.node.nodeid)
     if line:
         logging.getLogger("tests.conftest.leak_probe").warning(line)
-    yield
+    # 先观测（上面，留下 prev=/run_impl= 证据）再修 —— 顺序不能反，否则归因就没了。
     repair_subprocess_run()
+    yield
 
 
 @pytest.fixture

@@ -304,6 +304,9 @@ def test_repair_restores_dirtyed_global(monkeypatch: pytest.MonkeyPatch) -> None
 
     import tests.conftest as c
 
+    # 本用例会真的把计数器 +1，而计数器在 session 结束时会被上报（_repair_report）。
+    # 不还原的话，一次正常的全绿跑会打出 ::warning:: —— 自检工具自己制造假警报。
+    monkeypatch.setattr(c, "_REPAIR_COUNT", c._REPAIR_COUNT)
     original = subprocess.run
     assert c.repair_subprocess_run() is False, "干净时不应报告修复"
 
@@ -325,6 +328,7 @@ def test_repair_logs_culprit_with_nodeid(
 
     import tests.conftest as c
 
+    monkeypatch.setattr(c, "_REPAIR_COUNT", c._REPAIR_COUNT)
     original = subprocess.run
     monkeypatch.setitem(c._PROBE_PREV, "nodeid", "tests/offender.py::test_leaks")
     patcher = patch("subprocess.run", MagicMock())
@@ -364,3 +368,193 @@ def test_short_stack_filters_mock_frames() -> None:
     stack = c._short_stack()
     for noise in ("_manager.py", "_callers.py", "conftest.py"):
         assert noise not in stack, f"归因栈里混入噪声帧 {noise}: {stack}"
+
+
+# ── T2.3-3: 修复次数必须在**绿跑里也可见**（2026-10-04）───────────────
+#
+# 为什么要有这一层：`repair_subprocess_run()` 的 WARNING 走 logging，而 pytest
+# 默认只把**失败用例**捕获的日志印进报告。修复生效后用例不失败了 —— 于是"泄漏
+# 源仍在活跃"这件事在绿跑里彻底隐身。在泄漏源至今未归位的前提下，那等于永久
+# 丢掉线索。所以会话结束时无条件汇总一次（xdist 下每 worker 各报各的）。
+
+
+def test_repair_report_is_silent_on_a_clean_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """一次都没修 → 不吭声。没有这条，它会退化成每条 CI 跑都刷屏的噪音。"""
+    import tests.conftest as c
+
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 0)
+    assert c._repair_report() is None
+
+
+def test_repair_report_names_count_and_worker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """报告要点名"修了几次"和"哪个 worker"，否则无法据此定位。"""
+    import tests.conftest as c
+
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 3)
+    text = c._repair_report("gw7")
+    assert text is not None
+    assert "3" in text and "gw7" in text, text
+    assert "泄漏源未定位" in text, text
+
+
+def test_sessionfinish_emits_the_warning_annotation(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """接线证明：真调用 session 结束钩子，stdout 里必须出现 ::warning::。
+
+    这是本层唯一会红在"函数对但没人调用"上的断言 —— 只测 `_repair_report()`
+    的话，把钩子里那三行删掉照样全绿（本仓栽过同形的坑）。
+
+    三个模块级单例重置被替换成 no-op：它们是给**会话真正结束**用的，在测试中途
+    调用会关掉别的用例正在用的连接池。要做断言的只有"报告有没有被打印"。
+    """
+    from types import SimpleNamespace
+
+    import tests.conftest as c
+
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 2)
+    monkeypatch.setattr(c, "_tmp_dirs", [])
+    monkeypatch.setattr("maop.core.backends.db_utils.close_all_pools", lambda: None)
+    monkeypatch.setattr("maop.core.backends.backends.reset_backends", lambda: None)
+    monkeypatch.setattr(
+        "maop.core.agent.plugins_hooks.hook_manager.reset_hook_manager", lambda: None
+    )
+
+    class _Session:
+        def __init__(self) -> None:
+            self.config = SimpleNamespace(workerinput={})
+
+    c.pytest_sessionfinish(_Session(), 0)  # type: ignore[arg-type]
+
+    out = capsys.readouterr().out
+    assert "::warning title=leak-probe::" in out, out
+    assert "2" in out, out
+    assert "master" in out, out
+
+
+def test_sessionfinish_is_silent_when_no_repair_happened(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """对照：干净跑不许出现 ::warning::（否则注解区会被自己人淹掉）。"""
+    from types import SimpleNamespace
+
+    import tests.conftest as c
+
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 0)
+    monkeypatch.setattr(c, "_tmp_dirs", [])
+    monkeypatch.setattr("maop.core.backends.db_utils.close_all_pools", lambda: None)
+    monkeypatch.setattr("maop.core.backends.backends.reset_backends", lambda: None)
+    monkeypatch.setattr(
+        "maop.core.agent.plugins_hooks.hook_manager.reset_hook_manager", lambda: None
+    )
+
+    class _Session:
+        def __init__(self) -> None:
+            self.config = SimpleNamespace(workerinput={})
+
+    c.pytest_sessionfinish(_Session(), 0)  # type: ignore[arg-type]
+
+    assert "::warning title=leak-probe::" not in capsys.readouterr().out
+
+
+# ── T2.3-3b: 会话结束报告的编码安全（2026-10-04 CI 实测）─────────────
+#
+# CI 实测（windows-latest 3.10/3.13）：`print(中文)` 在 en-US runner 的 cp1252
+# 控制台上抛 UnicodeEncodeError，而它发生在 `pytest_sessionfinish` 里 —— 异常冒出去
+# 把整个 pytest 会话崩成 exit=1，junit 里却"没有任何失败用例"。于是"守卫报了个警"
+# 变成了"测试作业失败"。本仓在 scripts/ci_merge_gate.py 栽过同形，这次是在测试钩子里。
+
+
+class _Cp1252Stdout:
+    """模拟 cp1252 控制台：写非 ASCII 直接抛，行为与 Windows runner 一致。"""
+
+    def __init__(self) -> None:
+        self.written: list[str] = []
+
+    def write(self, text: str) -> int:
+        text.encode("cp1252")  # 中文在这里抛 UnicodeEncodeError
+        self.written.append(text)
+        return len(text)
+
+    def flush(self) -> None:
+        pass
+
+
+def test_emit_session_warning_survives_a_cp1252_console(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """cp1252 控制台下必须降级成 ASCII，而不是把会话崩掉。"""
+    import sys
+
+    import tests.conftest as c
+
+    fake = _Cp1252Stdout()
+    monkeypatch.setattr(sys, "stdout", fake)
+
+    c._emit_session_warning("本进程共修复被替换的 subprocess.run 3 次")  # 不许抛
+
+    assert fake.written, "降级路径什么都没写出去 —— 报告丢了"
+    joined = "".join(fake.written)
+    assert joined.isascii(), joined
+    assert "::warning title=leak-probe::" in joined, joined
+    # 中文应退化成 \uXXXX 转义而不是被丢弃
+    assert "\\u" in joined, joined
+
+
+def test_emit_session_warning_keeps_utf8_text_when_possible(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """正常（UTF-8）控制台下走原样输出，不做无谓转义。"""
+    import tests.conftest as c
+
+    c._emit_session_warning("泄漏修复 2 次")
+    out = capsys.readouterr().out
+    assert out.startswith("::warning title=leak-probe::"), out
+    assert "泄漏修复 2 次" in out, out
+
+
+def test_repair_report_includes_culprit_attribution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """报告必须带归因串 —— 只报次数的话，拿到告警也查不下去。
+
+    这是 CI 实测暴露的：Windows 腿上确实发生了修复（`_REPAIR_COUNT > 0`），
+    但 logging 里的 culprit 只对**失败用例**可见，日志里一条都看不到。
+    """
+    import tests.conftest as c
+
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 2)
+    monkeypatch.setattr(c, "_REPAIR_WHO", ["tests/somewhere.py::test_x @ some.py:42"])
+    text = c._repair_report("gw3")
+    assert text is not None
+    assert "tests/somewhere.py::test_x @ some.py:42" in text, text
+
+
+def test_leak_probe_repairs_on_the_setup_side() -> None:
+    """修复必须在 **setup 侧**（yield 之前）—— 这是探针"不喊狼来了"的关键。
+
+    为什么不能放 teardown：pytest 夹具终结是 LIFO，而本仓 `tests/conftest.py` 里
+    `_isolate_data_dir(tmp_path, monkeypatch)` **先于** `_leak_probe` 建立 ⇒
+    `monkeypatch` 的撤销排在 `_leak_probe` teardown **之后**。于是 teardown 侧检查会把
+    用例**自己**作用域内的 `monkeypatch.setattr("...subprocess.run", ...)` 误判成泄漏
+    —— 实测 `tests/test_agent_adapters.py` 单文件 13 次假修复，而假修复会被
+    `_repair_report` 当成真泄漏在 PR 上打 `::warning::`。
+
+    实证：把"进入用例前"的状态逐条打出来，该文件 64/64 条都是 STDLIB，
+    跨用例污染本就不存在。setup 侧检查既不会漏真泄漏（下一条用例进来时它还在），
+    也不会误伤作用域内的 patch。
+    """
+    import inspect
+
+    import tests.conftest as c
+
+    body = inspect.getsource(c._leak_probe).split('"""')[-1]
+    assert "repair_subprocess_run()" in body, "夹具里没有调用 repair_subprocess_run()"
+    assert "yield" in body, "夹具结构变了（找不到 yield）"
+    assert body.index("repair_subprocess_run()") < body.index("yield"), (
+        "repair_subprocess_run() 必须在 yield 之前 —— 挪到 teardown 会把用例自己"
+        "作用域内的 monkeypatch 误判成跨用例泄漏（见 docstring）"
+    )
+    assert "repair_subprocess_run()" not in body[body.index("yield"):], (
+        "yield 之后不应再有修复调用（重复/错位都会让计数失真）"
+    )

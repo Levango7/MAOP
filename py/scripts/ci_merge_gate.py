@@ -29,16 +29,37 @@ PASSING_RESULTS = frozenset({"success"})
 SKIPPABLE_RESULTS = frozenset({"skipped"})
 
 
+def _is_hard_failure(result: object) -> bool:
+    """非空、且既不是 success 也不是 skipped —— 即"真的挂了"。"""
+    return (
+        isinstance(result, str)
+        and bool(result)
+        and result not in PASSING_RESULTS
+        and result not in SKIPPABLE_RESULTS
+    )
+
+
 def evaluate(needs: dict, code: str) -> list[str]:
     """返回不通过原因列表；空列表表示放行。
 
     `needs` 形如 `{"lint": {"result": "success"}, "test": {"result": "skipped"}, ...}`。
     本函数不读环境变量也不打印，纯粹便于被用例逐条钉住。
+
+    **级联跳过不背锅**（2026-10-04 修）：作业挂在 `needs:` 链上时，上游一挂它就
+    是 `skipped`。run 476 实测：`test` 失败 ⇒ `needs: test` 的 `audit`/`sbom` 被
+    连带跳过，旧实现把它们也报成"该跑的作业没跑"——判定没错但**归错了因**，看
+    注解的人会去查 sbom 而放过真正的红点。现在：只要这轮里存在硬失败，strict 面
+    下的 skipped 就不再单独列为不通过原因（红点已经由那个失败给出），改由
+    `cascade_skips()` 作为提示说明。
     """
     if not isinstance(needs, dict) or not needs:
         return ["needs 输入为空或形状不对 —— 无法判断上游是否跑过（fail closed）"]
 
     strict = code.strip().lower() != "false"  # 只有明确的 false 才允许 skipped
+    hard_failure = any(
+        _is_hard_failure((m or {}).get("result") if isinstance(m, dict) else None)
+        for m in needs.values()
+    )
     offenders: list[str] = []
     for job_id, meta in sorted(needs.items()):
         result = meta.get("result") if isinstance(meta, dict) else None
@@ -50,6 +71,9 @@ def evaluate(needs: dict, code: str) -> list[str]:
         if not strict and result in SKIPPABLE_RESULTS:
             continue
         if strict and result in SKIPPABLE_RESULTS:
+            if hard_failure:
+                # 上游有硬失败 ⇒ 它是被连带的；真正的红点由那个失败报出。
+                continue
             offenders.append(
                 f"{job_id}: 被判成代码变更（code={code}）却处于 skipped —— "
                 f"该跑的作业没跑，等于没有门禁"
@@ -57,6 +81,29 @@ def evaluate(needs: dict, code: str) -> list[str]:
             continue
         offenders.append(f"{job_id}: result={result}")
     return offenders
+
+
+def cascade_skips(needs: dict, code: str) -> list[str]:
+    """strict 面下"因上游硬失败而没执行"的作业，**只用于提示、不参与判定**。
+
+    与 `evaluate()` 的分工：`evaluate()` 决定红绿，本函数只解释"为什么这些作业
+    没出现在失败清单里"。分开是为了让"判定"与"措辞"各自可被单独钉住——把两者
+    混在一个返回值里，正是上一版把级联跳过错报成"该跑没跑"的原因。
+    """
+    if code.strip().lower() == "false":
+        return []
+    if not isinstance(needs, dict) or not needs:
+        return []
+    if not any(
+        _is_hard_failure((m or {}).get("result") if isinstance(m, dict) else None)
+        for m in needs.values()
+    ):
+        return []
+    return [
+        f"{job_id}: 未执行（上游失败导致级联跳过，不计入失败）"
+        for job_id, meta in sorted(needs.items())
+        if isinstance(meta, dict) and meta.get("result") in SKIPPABLE_RESULTS
+    ]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -76,6 +123,8 @@ def main(argv: list[str] | None = None) -> int:
     offenders = evaluate(needs, args.code)
     results = {k: (v.get("result") if isinstance(v, dict) else None) for k, v in needs.items()}
     print(f"CI merge gate: code={args.code or 'n/a'} 上游结论={results}")
+    for note in cascade_skips(needs, args.code):
+        print(f"::notice title=CI merge gate::{note}")
     if offenders:
         for reason in offenders:
             print(f"::error title=CI merge gate::{reason}")
