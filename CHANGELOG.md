@@ -77,10 +77,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ci_path_scope.py` 都为此做了 stdout reconfigure 并写了警告注释），我照抄了那套写法
   去写 gate，却在测试钩子里漏了同一件事。现改为按需降级（UTF-8 → ascii 转义），
   并补一条模拟 cp1252 stdout 的用例把它钉死。
-- 该报告之所以触发，是因为 CI 的 Windows 腿上**确实发生了 `subprocess.run` 泄漏修复**
-  （否则 `report` 为 None，连 print 都不会执行）。本机全量（Windows/3.14、`-n 2`）跑下来
-  是 0 次，说明该泄漏与 CI 环境相关。已让报告带上 culprit 归因串（原来只进 logging，
-  而 pytest 只打印失败用例的日志 ⇒ CI 日志里一条都看不到），下一次 CI 跑会直接点名。
+- **随之发现修复本身是假阳性**：报告在 CI 与本地都开始报"仍有测试在泄漏"，归因指向
+  `tests/test_agent_adapters.py::_mock_subprocess_run.<locals>._run`（CI 21 次 / 单文件 13 次）。
+  实测证伪：把"进入用例前"的状态逐条打印，该文件 **64/64 条都是 STDLIB** —— 跨用例污染
+  本就不存在。
+  根因是**检查点位置错了**：pytest 夹具终结是 LIFO，而 `tests/conftest.py` 里
+  `_isolate_data_dir(tmp_path, monkeypatch)` **先于** `_leak_probe` 建立，于是 `monkeypatch`
+  的撤销排在 `_leak_probe` teardown **之后** —— teardown 侧检查必然把用例**自己**作用域内的
+  `monkeypatch.setattr("...subprocess.run", ...)` 看成泄漏。**T2.3-2 的 teardown 侧修复因此
+  一直在报假警**（只是当时只在日志里、没人看）。
+  修法：观测与修复一起挪到 **setup 侧**（`yield` 之前）——下一条用例进来时真泄漏仍在，
+  作用域内的 patch 已还原，两个方向都不误伤。已加结构守卫钉住"必须在 yield 之前"。
+  另修自检用例：`TestHermeticGuard::test_a_repair_restores_dirtyed_global` 故意弄脏再修，
+  会把计数 +1 却不还原 ⇒ 一次正常全绿跑也会打出假警报，现用 monkeypatch 还原。
 
 **CI merge gate：级联跳过不再背"该跑没跑"的锅**
 run 476 现场：`test` 失败 ⇒ `needs: test` 的 `audit`/`sbom` 被连带跳过。旧实现把三条

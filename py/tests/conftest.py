@@ -531,17 +531,28 @@ def _leak_probe(request: pytest.FixtureRequest):
     当前 data_dir 查找"）。观测型工具不许有副作用 —— 该夹具因此也定义在 `_isolate_data_dir`
     之后（autouse 夹具按定义顺序执行）。
 
-    **teardown 侧的修复**（T2.3-2）：setup 只观测；yield 之后调用
-    ``repair_subprocess_run()``——全局被换掉就恢复原版并记 WARNING（含 mock
-    patcher 归因）。这是结构性不变量：泄漏的 ``subprocess.run`` 跨不过用例
-    边界，xdist 的随机分发也就无从传播。
+    **检查与修复都放在 setup 侧**（2026-10-04 修正，T2.3-2 的 teardown 版是错的）：
+    观测 → 修复，都发生在**本用例开始之前**。
+
+    为什么必须挪到 setup：pytest 的夹具终结是 LIFO，而本文件里
+    `_isolate_data_dir(tmp_path, monkeypatch)` 先于本夹具建立 —— 于是 `monkeypatch`
+    的"撤销"排在**本夹具 teardown 之后**。放在 teardown 检查，会把**用例自己**
+    `monkeypatch.setattr("...cli_adapter.subprocess.run", ...)` 的正常作用域误判成泄漏：
+    实测 `tests/test_agent_adapters.py` 单文件就 13 次假修复。而假修复会被
+    `_repair_report` 当成真泄漏在 PR 上打 `::warning::` —— 一条只会喊狼来了的探针，
+    正是本仓最反对的东西。
+
+    实证（2026-10-04）：把"进入用例前"的状态逐条打出来，`test_agent_adapters.py`
+    全部 **64/64 条都是 STDLIB** —— 跨用例污染本就不存在，此前报的全是假阳性；
+    setup 侧检查既不会漏掉真泄漏（下一条用例进来时它还在），也不会误伤作用域内的 patch。
     """
     _install_patch_attribution()
     line = _leak_probe_line(request.node.nodeid)
     if line:
         logging.getLogger("tests.conftest.leak_probe").warning(line)
-    yield
+    # 先观测（上面，留下 prev=/run_impl= 证据）再修 —— 顺序不能反，否则归因就没了。
     repair_subprocess_run()
+    yield
 
 
 @pytest.fixture

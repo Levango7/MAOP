@@ -528,3 +528,33 @@ def test_repair_report_includes_culprit_attribution(
     text = c._repair_report("gw3")
     assert text is not None
     assert "tests/somewhere.py::test_x @ some.py:42" in text, text
+
+
+def test_leak_probe_repairs_on_the_setup_side() -> None:
+    """修复必须在 **setup 侧**（yield 之前）—— 这是探针"不喊狼来了"的关键。
+
+    为什么不能放 teardown：pytest 夹具终结是 LIFO，而本仓 `tests/conftest.py` 里
+    `_isolate_data_dir(tmp_path, monkeypatch)` **先于** `_leak_probe` 建立 ⇒
+    `monkeypatch` 的撤销排在 `_leak_probe` teardown **之后**。于是 teardown 侧检查会把
+    用例**自己**作用域内的 `monkeypatch.setattr("...subprocess.run", ...)` 误判成泄漏
+    —— 实测 `tests/test_agent_adapters.py` 单文件 13 次假修复，而假修复会被
+    `_repair_report` 当成真泄漏在 PR 上打 `::warning::`。
+
+    实证：把"进入用例前"的状态逐条打出来，该文件 64/64 条都是 STDLIB，
+    跨用例污染本就不存在。setup 侧检查既不会漏真泄漏（下一条用例进来时它还在），
+    也不会误伤作用域内的 patch。
+    """
+    import inspect
+
+    import tests.conftest as c
+
+    body = inspect.getsource(c._leak_probe).split('"""')[-1]
+    assert "repair_subprocess_run()" in body, "夹具里没有调用 repair_subprocess_run()"
+    assert "yield" in body, "夹具结构变了（找不到 yield）"
+    assert body.index("repair_subprocess_run()") < body.index("yield"), (
+        "repair_subprocess_run() 必须在 yield 之前 —— 挪到 teardown 会把用例自己"
+        "作用域内的 monkeypatch 误判成跨用例泄漏（见 docstring）"
+    )
+    assert "repair_subprocess_run()" not in body[body.index("yield"):], (
+        "yield 之后不应再有修复调用（重复/错位都会让计数失真）"
+    )

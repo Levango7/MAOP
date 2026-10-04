@@ -701,7 +701,7 @@ class TestHermeticGuard:
     finally 还原，绝不跨用例。
     """
 
-    def test_a_repair_restores_dirtyed_global(self):
+    def test_a_repair_restores_dirtyed_global(self, monkeypatch):
         # conftest 以 "tests.conftest" 或 "conftest" 名字进 sys.modules（pytest
         # 按 rootdir/conftest 路径命名），两者都取一下；tests/ 不是包，不能直接
         # `from tests.conftest import ...`。
@@ -710,6 +710,11 @@ class TestHermeticGuard:
         conftest_mod = sys.modules.get("tests.conftest") or sys.modules.get("conftest")
         repair = getattr(conftest_mod, "repair_subprocess_run", None)
         assert callable(repair), "conftest 未暴露 repair_subprocess_run —— 会话级守卫缺失"
+
+        # 本用例是**故意**弄脏再修的，会把 `_REPAIR_COUNT` +1；而该计数在 session
+        # 结束时会被上报（`_repair_report`）→ 不还原就会让一次正常的全绿跑
+        # 打出"仍有测试在泄漏"的假警报。自检工具自己不许制造假警报。
+        monkeypatch.setattr(conftest_mod, "_REPAIR_COUNT", conftest_mod._REPAIR_COUNT)
 
         try:
             _subprocess_mod.run = MagicMock(
