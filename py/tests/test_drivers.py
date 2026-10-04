@@ -12,6 +12,7 @@ _HAS_POWERSHELL = sys.platform == "win32" or bool(shutil.which("pwsh")) or bool(
 _IS_WINDOWS = sys.platform == "win32"
 
 from maop.delegate.drivers import (
+    _agent_env,
     _run_cli,
     _run_cmd,
     _run_powershell,
@@ -158,3 +159,126 @@ class TestAgentConfig:
         )
         assert config.name == "my-agent"
         assert config.cli_args == "-p '{task}'"
+
+
+# ── AgentConfig.env 接线（2026-10-04）──────────────────────────────────
+#
+# 背景：``AgentConfig.env`` 在 models.py 里声明、可以写在 agents.yaml，但当时
+# **全库无一处读取** —— 配了不生效，子进程静默继承服务器全量环境。这类"字段
+# 存在≠能力存在"只有让真实子进程把值打出来才守得住（mock create_subprocess_exec
+# 会对"漏传 env"失明：它只看调用参数，不看子进程实际拿到什么）。
+
+_ENV_PROBE_KEY = "MAOP_TEST_AGENT_ENV_PROBE"
+
+
+def _as_posix(path) -> str:
+    """给 driver 传路径时统一用正斜杠。
+
+    Windows 上 ``cli_args`` 会被 ``shlex.split(..., posix=True)`` 切分，反斜杠
+    会被当转义吃掉（这是既存缺陷，已单独上报，不在本改动范围内）；正斜杠在两
+    平台都被接受，故测试用它，避免把另一个缺陷混进来。
+    """
+    return str(path).replace("\\", "/")
+
+
+def _write_env_probe(tmp_path) -> object:
+    """写一个把指定环境变量打到 stdout 的子进程脚本。"""
+    probe = tmp_path / "env_probe.py"
+    probe.write_text(
+        "import os, sys\n"
+        f"sys.stdout.write(os.environ.get({_ENV_PROBE_KEY!r}, 'MISSING'))\n",
+        encoding="utf-8",
+    )
+    return probe
+
+
+class TestAgentEnvWiring:
+    """``AgentConfig.env`` 必须真的传进子进程。"""
+
+    @pytest.mark.asyncio
+    async def test_configured_env_reaches_the_child_process(self, tmp_path):
+        """真实子进程断言：配了 env 就一定要看得到。
+
+        把 ``env=_agent_env(config)`` 从 ``_run_cli`` 拿掉这条即红（实测过）。
+        """
+        config = _config(
+            cli=sys.executable,
+            cli_args=_as_posix(_write_env_probe(tmp_path)),
+            env={_ENV_PROBE_KEY: "wired-ok"},
+        )
+        result = await _run_cli(config, "ignored", 30, ".", "t-env-on")
+        assert result.exit_code == 0, f"stderr={result.stderr!r}"
+        assert result.stdout == "wired-ok"
+
+    @pytest.mark.asyncio
+    async def test_env_is_absent_when_not_configured(self, tmp_path, monkeypatch):
+        """对照组：没配 env 时子进程看不到该变量。
+
+        没有这条，上面那条可能因为"变量本来就在宿主环境里"而假绿。
+        """
+        monkeypatch.delenv(_ENV_PROBE_KEY, raising=False)
+        config = _config(
+            cli=sys.executable,
+            cli_args=_as_posix(_write_env_probe(tmp_path)),
+        )
+        result = await _run_cli(config, "ignored", 30, ".", "t-env-off")
+        assert result.exit_code == 0, f"stderr={result.stderr!r}"
+        assert result.stdout == "MISSING"
+
+    def test_agent_env_is_none_when_nothing_configured(self):
+        """空 env → ``None``（= 不传 env，走默认继承）。
+
+        这是向后兼容契约：只有 agents.yaml 明写了 env 才改变行为。若改成无脑
+        ``{**os.environ}``，"配了才生效"的语义与默认继承路径就一起没了。
+        """
+        assert _agent_env(_config()) is None
+        assert _agent_env(_config(env={})) is None
+
+    def test_agent_env_merges_and_agent_side_wins(self, monkeypatch):
+        """合并语义：以服务器环境为底，agent 侧同名键覆盖。"""
+        monkeypatch.setenv("MAOP_TEST_BASE_KEY", "server-value")
+        merged = _agent_env(_config(env={
+            "MAOP_TEST_BASE_KEY": "agent-value",
+            "MAOP_TEST_EXTRA_KEY": "extra",
+        }))
+        assert merged is not None
+        assert merged["MAOP_TEST_BASE_KEY"] == "agent-value"
+        assert merged["MAOP_TEST_EXTRA_KEY"] == "extra"
+        assert "PATH" in merged or "Path" in merged, "基础继承面不能被砍掉"
+
+    def test_every_subprocess_call_passes_agent_env(self):
+        """结构守卫：drivers.py 每一处 ``create_subprocess_exec`` 都要带上 env。
+
+        行为测试只能覆盖被真正跑过的 driver；新加第六个 driver 时忘了 env=，
+        只有这条会红。用 AST 读真实源码（不 mock —— mock 对"漏传"这一维失明）。
+        """
+        import ast
+        import pathlib
+
+        src_path = pathlib.Path(__file__).resolve().parents[1] / "maop" / "delegate" / "drivers.py"
+        tree = ast.parse(src_path.read_text(encoding="utf-8"))
+
+        def _callee_name(func: ast.AST) -> str:
+            if isinstance(func, ast.Attribute):
+                return func.attr
+            if isinstance(func, ast.Name):
+                return func.id
+            return ""
+
+        calls = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and _callee_name(node.func) == "create_subprocess_exec"
+        ]
+        # 先证明选择器没写空：否则下面"没有缺 env 的调用"会因为一个都没匹配到而假绿。
+        assert calls, (
+            "在 drivers.py 里没匹配到 create_subprocess_exec —— 选择器失效，"
+            "这条守卫会静默变成空断言"
+        )
+        missing = [
+            node.lineno for node in calls
+            if not any(kw.arg == "env" for kw in node.keywords)
+        ]
+        assert not missing, (
+            f"drivers.py 第 {missing} 行的 create_subprocess_exec 没传 env= —— "
+            "AgentConfig.env 在这些 driver 上会重新变成死字段"
+        )

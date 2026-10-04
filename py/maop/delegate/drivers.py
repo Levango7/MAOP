@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import shlex
 import shutil
@@ -26,6 +27,23 @@ from maop.core.reliability.error_schema import MaopResult, new_result
 from maop.delegate.models import AgentConfig, _escape_for_cmd, _escape_for_ps_command
 
 logger = logging.getLogger(__name__)
+
+
+def _agent_env(config: AgentConfig) -> dict[str, str] | None:
+    """Agent 级环境变量：``config.env`` 叠加在服务器环境之上（agent 侧优先）。
+
+    返回 ``None`` 表示"不传 env"——此时 subprocess 走默认继承，与历史行为逐字节
+    一致；只有 agents.yaml 明写了 ``env:`` 才会进合并分支。此前 ``AgentConfig.env``
+    从未被任何 driver 读取，是纯死字段：配了也不生效，且子进程会静默继承服务器
+    全量环境。
+
+    注意这里**不缩减**继承面（仍以 ``os.environ`` 为底）：agent CLI 普遍依赖
+    PATH/HOME 等基础变量，砍掉会直接打挂现网 agent。收窄继承面是独立的安全议题，
+    需要单独评估与回归，不在本改动范围内。
+    """
+    if not config.env:
+        return None
+    return {**os.environ, **config.env}
 
 
 async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
@@ -90,6 +108,7 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,
+            env=_agent_env(config),
         )
 
         if streamer is not None:
@@ -191,6 +210,7 @@ async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,
+            env=_agent_env(config),
         )
 
         # P2-6 fix: streamer support for wrapper driver (previously only
@@ -342,6 +362,7 @@ async def _run_powershell(config: AgentConfig, prompt: str, timeout: int,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,
+            env=_agent_env(config),
         )
 
         # P2-6 fix: streamer support for powershell driver.
@@ -438,6 +459,7 @@ async def _run_cmd(config: AgentConfig, prompt: str, timeout: int,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,
+            env=_agent_env(config),
         )
 
         # P2-6 fix: streamer support for cmd driver.
@@ -560,6 +582,7 @@ async def _run_python(config: AgentConfig, prompt: str, timeout: int,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir or None,
+            env=_agent_env(config),
         )
 
         # P2-6 fix: streamer support for python driver.
