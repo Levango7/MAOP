@@ -889,3 +889,33 @@ class TestLoopResultFields:
     def test_analysis_default(self):
         r = LoopResult(task="t")
         assert r.analysis == {}
+
+
+class TestPauseIsHonoredOnTheMainLoop:
+    """主循环必须理会 `.maop_pause`（2026-10-05）。
+
+    此前**只有 engine.py 查 pause**（`engine_pause.check_pause_async`），主循环不查 ——
+    于是 `pause_control()` 写的标记文件对 `maop run` 这条主链完全无效：运维以为按下了
+    暂停，任务照常派发。
+
+    钉法用**源码结构**而不是跑一遍完整循环：真跑要等 PAUSE_CHECK_INTERVAL_S 才回到
+    检查点，会把用例拖成分钟级；而"在派发阶段之前查了"这一维，断言真实源码里的
+    调用顺序就足够准（mock 反而可能把"没接"测成绿的）。
+    """
+
+    def test_check_pause_async_runs_before_the_execute_phase(self) -> None:
+        import pathlib as _pathlib
+
+        src = _pathlib.Path(__file__).resolve().parents[1] / "maop" / "maop_loop.py"
+        text = src.read_text(encoding="utf-8")
+
+        assert "await check_pause_async()" in text, (
+            "主循环里没有暂停检查 —— pause_control() 写的 .maop_pause 对它又变成摆设"
+        )
+        idx_check = text.index("await check_pause_async()")
+        idx_execute = text.index("self._phase_execute(")
+        assert idx_check < idx_execute, (
+            "暂停检查出现在 execute 阶段之后 —— 派发已经发生了，等于没拦"
+        )
+        # 与 engine.py 同一口径（同一 helper / 同一标记文件），别自己造第二套
+        assert "from maop.engine_pause import check_pause_async" in text

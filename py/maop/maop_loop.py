@@ -43,6 +43,7 @@ from maop.core.monitoring.otel import span as otel_span
 from maop.core.reliability.cache import SingleFlight
 from maop.core.reliability.event_bus import EventBus, get_event_bus
 from maop.core.reliability.log_rotate import rotate_logs
+from maop.engine_pause import check_pause_async
 from maop.loop_executor import ExecuteMixin
 from maop.loop_models import LoopConfig, LoopResult, RequirementAnalysis  # noqa: F401
 from maop.maop_loop_phases import PhasesMixin, _get_otel_tracer
@@ -281,6 +282,16 @@ class MaopLoop(ExecuteMixin, PhasesMixin):
             if pr.skip_remaining:
                 return self._build_loop_result(ctx, start)
 
+            # 暂停检查（2026-10-05）：此前**只有 engine.py 查 pause**，主循环不查 ——
+            # 于是 `pause_control()` 写的 `.maop_pause` 对这条主链完全无效：运维以为
+            # 按下了暂停，任务照常派发。现在与 engine.py 同一口径（同 helper、同标记文件）。
+            #
+            # ⚠️ 语义是"**等待**恢复"而不是"退出"：`check_pause_async` 每秒记一条日志、
+            # 最长等 MAX_PAUSE_SECONDS（当前 3600s）后放弃等待继续执行。所以**残留的
+            # `.maop_pause` 会让 `maop run` 最长停 1 小时**。这是 engine.py 早就有的语义，
+            # 此处刻意保持一致而不是自造第二套；排查时删掉 `<root>/logs/.maop_pause` 即可。
+            # （"一次性的 `maop run` 遇到 pause 该等待还是该直接停"是产品取舍，未擅自改。）
+            await check_pause_async()
             pr = await self._phase_execute(ctx, workdir, retry)
             if pr.skip_remaining:
                 return self._build_loop_result(ctx, start)
