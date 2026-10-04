@@ -69,6 +69,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `scripts/check_config_drift.py` 的 BASELINE 随之 227→228（该门禁是逐行文本计数，
     只允许减少）。本次是既有既定形态的第 5 处实例，非新模式，理由已写进脚本注释。
 
+**回归与本批修复（自曝）**
+- 给 `pytest_sessionfinish` 加会话结束报告时，`print(中文)` 在 en-US runner 的 cp1252
+  控制台上抛 `UnicodeEncodeError`，异常从钩子冒出去把整个 pytest 会话崩成 exit=1，
+  而 junit 里"没有任何失败用例"—— 于是"守卫报了个警"变成"测试作业失败"。CI 实测红在
+  windows-latest 3.10 与 3.13。**这是本仓栽过的同一个坑**（`ci_merge_gate.py` /
+  `ci_path_scope.py` 都为此做了 stdout reconfigure 并写了警告注释），我照抄了那套写法
+  去写 gate，却在测试钩子里漏了同一件事。现改为按需降级（UTF-8 → ascii 转义），
+  并补一条模拟 cp1252 stdout 的用例把它钉死。
+- 该报告之所以触发，是因为 CI 的 Windows 腿上**确实发生了 `subprocess.run` 泄漏修复**
+  （否则 `report` 为 None，连 print 都不会执行）。本机全量（Windows/3.14、`-n 2`）跑下来
+  是 0 次，说明该泄漏与 CI 环境相关。已让报告带上 culprit 归因串（原来只进 logging，
+  而 pytest 只打印失败用例的日志 ⇒ CI 日志里一条都看不到），下一次 CI 跑会直接点名。
+
 **CI merge gate：级联跳过不再背"该跑没跑"的锅**
 run 476 现场：`test` 失败 ⇒ `needs: test` 的 `audit`/`sbom` 被连带跳过。旧实现把三条
 都当"该跑的作业没跑"，注解里真正的红点 `test` 反而被淹。现在有硬失败时 skipped 只作
