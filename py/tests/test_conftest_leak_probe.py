@@ -304,6 +304,9 @@ def test_repair_restores_dirtyed_global(monkeypatch: pytest.MonkeyPatch) -> None
 
     import tests.conftest as c
 
+    # 本用例会真的把计数器 +1，而计数器在 session 结束时会被上报（_repair_report）。
+    # 不还原的话，一次正常的全绿跑会打出 ::warning:: —— 自检工具自己制造假警报。
+    monkeypatch.setattr(c, "_REPAIR_COUNT", c._REPAIR_COUNT)
     original = subprocess.run
     assert c.repair_subprocess_run() is False, "干净时不应报告修复"
 
@@ -325,6 +328,7 @@ def test_repair_logs_culprit_with_nodeid(
 
     import tests.conftest as c
 
+    monkeypatch.setattr(c, "_REPAIR_COUNT", c._REPAIR_COUNT)
     original = subprocess.run
     monkeypatch.setitem(c._PROBE_PREV, "nodeid", "tests/offender.py::test_leaks")
     patcher = patch("subprocess.run", MagicMock())
@@ -364,3 +368,90 @@ def test_short_stack_filters_mock_frames() -> None:
     stack = c._short_stack()
     for noise in ("_manager.py", "_callers.py", "conftest.py"):
         assert noise not in stack, f"归因栈里混入噪声帧 {noise}: {stack}"
+
+
+# ── T2.3-3: 修复次数必须在**绿跑里也可见**（2026-10-04）───────────────
+#
+# 为什么要有这一层：`repair_subprocess_run()` 的 WARNING 走 logging，而 pytest
+# 默认只把**失败用例**捕获的日志印进报告。修复生效后用例不失败了 —— 于是"泄漏
+# 源仍在活跃"这件事在绿跑里彻底隐身。在泄漏源至今未归位的前提下，那等于永久
+# 丢掉线索。所以会话结束时无条件汇总一次（xdist 下每 worker 各报各的）。
+
+
+def test_repair_report_is_silent_on_a_clean_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """一次都没修 → 不吭声。没有这条，它会退化成每条 CI 跑都刷屏的噪音。"""
+    import tests.conftest as c
+
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 0)
+    assert c._repair_report() is None
+
+
+def test_repair_report_names_count_and_worker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """报告要点名"修了几次"和"哪个 worker"，否则无法据此定位。"""
+    import tests.conftest as c
+
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 3)
+    text = c._repair_report("gw7")
+    assert text is not None
+    assert "3" in text and "gw7" in text, text
+    assert "泄漏源未定位" in text, text
+
+
+def test_sessionfinish_emits_the_warning_annotation(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """接线证明：真调用 session 结束钩子，stdout 里必须出现 ::warning::。
+
+    这是本层唯一会红在"函数对但没人调用"上的断言 —— 只测 `_repair_report()`
+    的话，把钩子里那三行删掉照样全绿（本仓栽过同形的坑）。
+
+    三个模块级单例重置被替换成 no-op：它们是给**会话真正结束**用的，在测试中途
+    调用会关掉别的用例正在用的连接池。要做断言的只有"报告有没有被打印"。
+    """
+    from types import SimpleNamespace
+
+    import tests.conftest as c
+
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 2)
+    monkeypatch.setattr(c, "_tmp_dirs", [])
+    monkeypatch.setattr("maop.core.backends.db_utils.close_all_pools", lambda: None)
+    monkeypatch.setattr("maop.core.backends.backends.reset_backends", lambda: None)
+    monkeypatch.setattr(
+        "maop.core.agent.plugins_hooks.hook_manager.reset_hook_manager", lambda: None
+    )
+
+    class _Session:
+        def __init__(self) -> None:
+            self.config = SimpleNamespace(workerinput={})
+
+    c.pytest_sessionfinish(_Session(), 0)  # type: ignore[arg-type]
+
+    out = capsys.readouterr().out
+    assert "::warning title=leak-probe::" in out, out
+    assert "2" in out, out
+    assert "master" in out, out
+
+
+def test_sessionfinish_is_silent_when_no_repair_happened(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """对照：干净跑不许出现 ::warning::（否则注解区会被自己人淹掉）。"""
+    from types import SimpleNamespace
+
+    import tests.conftest as c
+
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 0)
+    monkeypatch.setattr(c, "_tmp_dirs", [])
+    monkeypatch.setattr("maop.core.backends.db_utils.close_all_pools", lambda: None)
+    monkeypatch.setattr("maop.core.backends.backends.reset_backends", lambda: None)
+    monkeypatch.setattr(
+        "maop.core.agent.plugins_hooks.hook_manager.reset_hook_manager", lambda: None
+    )
+
+    class _Session:
+        def __init__(self) -> None:
+            self.config = SimpleNamespace(workerinput={})
+
+    c.pytest_sessionfinish(_Session(), 0)  # type: ignore[arg-type]
+
+    assert "::warning title=leak-probe::" not in capsys.readouterr().out

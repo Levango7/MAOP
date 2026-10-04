@@ -117,6 +117,9 @@ import subprocess as _subprocess_mod
 
 _ORIGINAL_SUBPROCESS_RUN = _subprocess_mod.run
 _PROBE_PREV: dict[str, str] = {}
+# 本进程内 `repair_subprocess_run()` 实际修过多少次（会话结束时汇总上报，见
+# `_repair_report`）。按进程计数：xdist 下每个 worker 各报各的。
+_REPAIR_COUNT = 0
 
 
 @pytest.fixture
@@ -180,6 +183,13 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Clean up all temp directories created by our ``tmp_path`` override."""
+    # 泄漏修复汇总：必须放在这里且**无条件**执行 —— 修复过的用例不会再失败，
+    # 于是 logging 那条 WARNING 在绿跑里永远不会被 pytest 印出来（它默认只打印
+    # 失败用例捕获的日志）。不在这里报，泄漏源就真的没人看得见了。
+    worker = (getattr(session.config, "workerinput", None) or {}).get("workerid", "master")
+    report = _repair_report(str(worker))
+    if report:
+        print(f"::warning title=leak-probe::{report}")
     # 清空 ConnectionPool 模块级单例池：池连接 release() 回池不关闭，每个测试
     # 独立 MAOP_DATA_DIR 会产生大量池与连接句柄，进程退出时 GC 才回收 →
     # ResourceWarning: unclosed database 洪泛（xdist 全量下耗尽 worker 句柄）。
@@ -431,15 +441,39 @@ def repair_subprocess_run() -> bool:
     让污染跨不过用例边界——治本，而不只是受害文件自保。
     修复前先记 WARNING（含 patcher 归因），不静默。
     """
+    global _REPAIR_COUNT
     if _subprocess_mod.run is _ORIGINAL_SUBPROCESS_RUN:
         return False
     who = _leak_attribution() or f"impl={_run_fingerprint()}"
+    _REPAIR_COUNT += 1
     logging.getLogger("tests.conftest.leak_probe").warning(
         "[leak-probe] REPAIR subprocess.run <- standard library; culprit: %s",
         who,
     )
     _subprocess_mod.run = _ORIGINAL_SUBPROCESS_RUN
     return True
+
+
+def _repair_report(worker: str = "master") -> str | None:
+    """会话结束时要不要报"本进程修过几次泄漏"；一次都没修则返回 None。
+
+    单独成函数是为了能被用例直接断言（pytest 不允许直接调夹具，而这里要钉的
+    恰恰是"全绿时也会报"这个语义）。
+
+    为什么需要它：`repair_subprocess_run()` 的 WARNING 走 logging，而 pytest 默认
+    **只在用例失败时**才把捕获的日志打进报告 —— 修复生效后用例当然不失败了，
+    于是"泄漏源仍在活跃"这件事在绿跑里完全不可见。泄漏源至今没归位的前提下，
+    这会让我们永久失去线索。这里在 session 结束时无条件汇总一次，并以
+    ``::warning::`` 输出（runner 会把它渲染成 PR 注解）。
+    """
+    if _REPAIR_COUNT == 0:
+        return None
+    return (
+        f"[leak-probe] 本进程共修复被替换的 subprocess.run {_REPAIR_COUNT} 次"
+        f"（worker={worker}）：仍有测试在跨用例泄漏全局 subprocess.run。"
+        "症状已被会话级守卫挡住，但泄漏源未定位 —— 请按用例日志里的 "
+        "culprit:/run_impl: 归因继续追。"
+    )
 
 
 @pytest.fixture(autouse=True)
