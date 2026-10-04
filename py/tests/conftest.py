@@ -120,6 +120,12 @@ _PROBE_PREV: dict[str, str] = {}
 # 本进程内 `repair_subprocess_run()` 实际修过多少次（会话结束时汇总上报，见
 # `_repair_report`）。按进程计数：xdist 下每个 worker 各报各的。
 _REPAIR_COUNT = 0
+# 每次修复时的归因串（最多留最近 5 条）。必须在会话结束时一起报出来 ——
+# 归因原来只进 logging，而 pytest 默认只打印**失败用例**捕获的日志，
+# 修复过的用例当然不会失败 ⇒ 线索在绿跑里彻底看不见。CI 实测（2026-10-04，
+# windows-latest 3.10/3.13）：确实发生了修复，但日志里一条 culprit 都看不到。
+_REPAIR_WHO: list[str] = []
+_REPAIR_WHO_MAX = 5
 
 
 @pytest.fixture
@@ -189,7 +195,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     worker = (getattr(session.config, "workerinput", None) or {}).get("workerid", "master")
     report = _repair_report(str(worker))
     if report:
-        print(f"::warning title=leak-probe::{report}")
+        _emit_session_warning(report)
     # 清空 ConnectionPool 模块级单例池：池连接 release() 回池不关闭，每个测试
     # 独立 MAOP_DATA_DIR 会产生大量池与连接句柄，进程退出时 GC 才回收 →
     # ResourceWarning: unclosed database 洪泛（xdist 全量下耗尽 worker 句柄）。
@@ -446,12 +452,33 @@ def repair_subprocess_run() -> bool:
         return False
     who = _leak_attribution() or f"impl={_run_fingerprint()}"
     _REPAIR_COUNT += 1
+    if len(_REPAIR_WHO) < _REPAIR_WHO_MAX:
+        _REPAIR_WHO.append(who)
     logging.getLogger("tests.conftest.leak_probe").warning(
         "[leak-probe] REPAIR subprocess.run <- standard library; culprit: %s",
         who,
     )
     _subprocess_mod.run = _ORIGINAL_SUBPROCESS_RUN
     return True
+
+
+def _emit_session_warning(text: str) -> None:
+    """把消息作为 GitHub 注解打到 stdout —— 在非 UTF-8 控制台也必须不崩。
+
+    为什么要单列：CI 实测（2026-10-04，windows-latest 3.10/3.13）本函数的 `print`
+    直接抛 `UnicodeEncodeError: 'charmap' codec can't encode ...`，异常从
+    `pytest_sessionfinish` 冒出去，把整个 pytest 会话崩成 exit=1 —— 于是"守卫报了个
+    警"变成了"测试作业失败"，性质完全不同，而且 junit 里没有任何失败用例（红得莫名）。
+
+    这是本仓栽过的同一个坑（`scripts/ci_merge_gate.py`、`ci_path_scope.py` 都为此
+    做了 stdout reconfigure）。此处用**按需降级**而不是全局 reconfigure：注解本身
+    退化成 ASCII 转义（`\\uXXXX`）仍然可读，且不影响本进程其它输出。
+    """
+    line = f"::warning title=leak-probe::{text}"
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        print(line.encode("ascii", "backslashreplace").decode("ascii"))
 
 
 def _repair_report(worker: str = "master") -> str | None:
@@ -462,17 +489,18 @@ def _repair_report(worker: str = "master") -> str | None:
 
     为什么需要它：`repair_subprocess_run()` 的 WARNING 走 logging，而 pytest 默认
     **只在用例失败时**才把捕获的日志打进报告 —— 修复生效后用例当然不失败了，
-    于是"泄漏源仍在活跃"这件事在绿跑里完全不可见。泄漏源至今没归位的前提下，
-    这会让我们永久失去线索。这里在 session 结束时无条件汇总一次，并以
+    于是"泄漏源仍在活跃"这件事在绿跑里完全不可见，连带 culprit 归因一起消失。
+    这里在 session 结束时无条件汇总一次（修复次数 + 归因 + worker），并以
     ``::warning::`` 输出（runner 会把它渲染成 PR 注解）。
     """
     if _REPAIR_COUNT == 0:
         return None
+    who = " | ".join(_REPAIR_WHO) if _REPAIR_WHO else "<无归因记录>"
     return (
         f"[leak-probe] 本进程共修复被替换的 subprocess.run {_REPAIR_COUNT} 次"
         f"（worker={worker}）：仍有测试在跨用例泄漏全局 subprocess.run。"
-        "症状已被会话级守卫挡住，但泄漏源未定位 —— 请按用例日志里的 "
-        "culprit:/run_impl: 归因继续追。"
+        "症状已被会话级守卫挡住，但泄漏源未定位 —— "
+        f"culprit: {who}"
     )
 
 

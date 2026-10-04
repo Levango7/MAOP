@@ -455,3 +455,76 @@ def test_sessionfinish_is_silent_when_no_repair_happened(
     c.pytest_sessionfinish(_Session(), 0)  # type: ignore[arg-type]
 
     assert "::warning title=leak-probe::" not in capsys.readouterr().out
+
+
+# ── T2.3-3b: 会话结束报告的编码安全（2026-10-04 CI 实测）─────────────
+#
+# CI 实测（windows-latest 3.10/3.13）：`print(中文)` 在 en-US runner 的 cp1252
+# 控制台上抛 UnicodeEncodeError，而它发生在 `pytest_sessionfinish` 里 —— 异常冒出去
+# 把整个 pytest 会话崩成 exit=1，junit 里却"没有任何失败用例"。于是"守卫报了个警"
+# 变成了"测试作业失败"。本仓在 scripts/ci_merge_gate.py 栽过同形，这次是在测试钩子里。
+
+
+class _Cp1252Stdout:
+    """模拟 cp1252 控制台：写非 ASCII 直接抛，行为与 Windows runner 一致。"""
+
+    def __init__(self) -> None:
+        self.written: list[str] = []
+
+    def write(self, text: str) -> int:
+        text.encode("cp1252")  # 中文在这里抛 UnicodeEncodeError
+        self.written.append(text)
+        return len(text)
+
+    def flush(self) -> None:
+        pass
+
+
+def test_emit_session_warning_survives_a_cp1252_console(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """cp1252 控制台下必须降级成 ASCII，而不是把会话崩掉。"""
+    import sys
+
+    import tests.conftest as c
+
+    fake = _Cp1252Stdout()
+    monkeypatch.setattr(sys, "stdout", fake)
+
+    c._emit_session_warning("本进程共修复被替换的 subprocess.run 3 次")  # 不许抛
+
+    assert fake.written, "降级路径什么都没写出去 —— 报告丢了"
+    joined = "".join(fake.written)
+    assert joined.isascii(), joined
+    assert "::warning title=leak-probe::" in joined, joined
+    # 中文应退化成 \uXXXX 转义而不是被丢弃
+    assert "\\u" in joined, joined
+
+
+def test_emit_session_warning_keeps_utf8_text_when_possible(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """正常（UTF-8）控制台下走原样输出，不做无谓转义。"""
+    import tests.conftest as c
+
+    c._emit_session_warning("泄漏修复 2 次")
+    out = capsys.readouterr().out
+    assert out.startswith("::warning title=leak-probe::"), out
+    assert "泄漏修复 2 次" in out, out
+
+
+def test_repair_report_includes_culprit_attribution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """报告必须带归因串 —— 只报次数的话，拿到告警也查不下去。
+
+    这是 CI 实测暴露的：Windows 腿上确实发生了修复（`_REPAIR_COUNT > 0`），
+    但 logging 里的 culprit 只对**失败用例**可见，日志里一条都看不到。
+    """
+    import tests.conftest as c
+
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 2)
+    monkeypatch.setattr(c, "_REPAIR_WHO", ["tests/somewhere.py::test_x @ some.py:42"])
+    text = c._repair_report("gw3")
+    assert text is not None
+    assert "tests/somewhere.py::test_x @ some.py:42" in text, text
