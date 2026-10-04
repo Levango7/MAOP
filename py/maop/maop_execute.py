@@ -20,6 +20,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from maop.core.reliability.error_schema import MaopResult, new_result
+from maop.core.security.dispatch_gate import check_dispatch_gate
 from maop.core.security.guardrail import Guardrail
 from maop.delegate.dispatcher import Dispatcher
 
@@ -117,81 +118,22 @@ async def _check_permission_and_hooks(
     trace_id: str,
     permission_manager: Any = None,
 ) -> MaopResult | None:
-    """Run permission check and pre_dispatch hook before dispatch.
+    """派发前安全门（权限规则 + ``agent.pre_dispatch`` 钩子）。
 
-    Returns ``None`` if dispatch may proceed, or a ``MaopResult``
-    (exit_code=126) if permission/hook denies the call.
+    2026-10-04：实现搬到 ``maop/core/security/dispatch_gate.py``，并**接在真正的漏斗**
+    ``Dispatcher.dispatch()`` 上 —— 此前这套检查只存在于本函数，而 ``maop_execute()``
+    全仓零生产调用方，于是三个真实入口（CLI run / dashboard DAG / chat 回退）全都绕过了
+    权限判断与钩子否决。保留本函数只是为了让既有调用点与用例不必改签名；判定语义完全由
+    共享实现给出（含"未启用时不改变行为"的开关语义）。
 
-    P0 fix: extracted so both the ``react_mode`` branch and the normal
-    dispatch branch go through the same security gate. Previously
-    (maop_execute.py:202-286) the ``react_mode`` branch returned before
-    reaching the permission check and pre_dispatch hook, allowing a
-    caller to bypass all security gates by setting ``react_mode=True``.
+    历史（见 dispatch_gate 模块文档）：曾有个 P0 —— ``react_mode`` 分支在到达权限检查前
+    就 return，使调用方可以用 ``react_mode=True`` 绕过全部安全门。把门收敛到唯一漏斗后，
+    这类"某条分支提前返回"的绕过方式不再成立。
     """
-    # Permission check — consult PermissionManager before dispatch
-    try:
-        from pathlib import Path as _Path
-
-        from maop.core.security.permission import PermissionManager
-        _root = _Path(__file__).resolve().parent.parent.parent
-        pm = permission_manager if permission_manager is not None else PermissionManager(root_dir=str(_root))
-        perm = pm.check(agent=agent, action=routing_key or "execute")
-        if perm.decision == "deny":
-            return new_result(
-                agent=agent, task=task,
-                exit_code=126,
-                error=f"Permission denied: {perm.reason or 'rule=' + perm.matched_rule}",
-                trace_id=trace_id, routing_key=routing_key,
-            )
-        if perm.decision == "ask":
-            from maop.core.agent.delegation.human_proxy import HumanProxy
-            hp = HumanProxy(root_dir=str(_root))
-            req_id = hp.request(
-                task=task, agent=agent,
-                priority="high", reason=f"Permission check: agent={agent} action={routing_key or 'execute'}",
-                metadata={"routing_key": routing_key, "trace_id": trace_id},
-            )
-            logger.warning("[execute] Permission=ask, request %s pending human approval — denying until approved", req_id)
-            return new_result(
-                agent=agent, task=task,
-                exit_code=126,
-                error=f"Permission pending human approval (request={req_id}): {perm.reason or 'agent=' + agent}",
-                trace_id=trace_id, routing_key=routing_key,
-            )
-    except Exception as exc:
-        logger.error("[execute] Permission check failed (fail-closed): %s", exc)
-        return new_result(
-            agent=agent, task=task,
-            exit_code=126,
-            error=f"Permission check failed: {exc}",
-            trace_id=trace_id, routing_key=routing_key,
-        )
-
-    # Hook: agent.pre_dispatch — hooks can veto dispatch by returning decision="deny"
-    try:
-        from maop.core.agent.plugins_hooks.hook_manager import LifecycleEvent, get_hook_manager
-        mgr = get_hook_manager()
-        hook_results = await mgr.trigger(LifecycleEvent.AGENT_PRE_DISPATCH, {
-            "agent": agent, "task": task, "routing_key": routing_key, "trace_id": trace_id,
-        })
-        for hr in hook_results:
-            if hr.decision == "deny":
-                return new_result(
-                    agent=agent, task=task,
-                    exit_code=126,
-                    error=f"Hook vetoed dispatch: hook={hr.hook_id} reason={hr.error or 'denied'}",
-                    trace_id=trace_id, routing_key=routing_key,
-                )
-    except Exception as exc:
-        logger.error("[execute] Hook pre_dispatch failed (fail-closed): %s", exc)
-        return new_result(
-            agent=agent, task=task,
-            exit_code=126,
-            error=f"Hook pre_dispatch error (fail-closed): {exc}",
-            trace_id=trace_id, routing_key=routing_key,
-        )
-
-    return None
+    return await check_dispatch_gate(
+        agent=agent, task=task, routing_key=routing_key,
+        trace_id=trace_id, permission_manager=permission_manager,
+    )
 
 
 async def maop_execute(

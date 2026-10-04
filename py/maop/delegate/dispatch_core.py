@@ -34,6 +34,7 @@ from typing import Any
 from maop.core.monitoring.otel import get_tracer
 from maop.core.monitoring.otel import span as otel_span
 from maop.core.reliability.error_schema import new_result
+from maop.core.security.dispatch_gate import check_dispatch_gate
 from maop.delegate.dispatch_impl import (
     DispatchImplMixin,
     _record_dispatcher_decision,
@@ -146,10 +147,22 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
             with otel_span(tracer, f"dispatch.{agent}", trace_id=trace_id,
                            attributes={"agent": agent, "task": task[:80], "routing_key": routing_key,
                                        "sla.priority": priority, "sla.deadline_ms": deadline_ms or 0}):
-                result = await self._dispatch_impl(agent, task, routing_key=routing_key,
-                                                    workdir=workdir, timeout_seconds=timeout_seconds,
-                                                    trace_id=trace_id, streamer=streamer,
-                                                    priority=priority, deadline_ms=deadline_ms)
+                # 派发前安全门（权限规则 + pre_dispatch 钩子），见
+                # core/security/dispatch_gate.py。这里是**唯一漏斗**，三个真实入口
+                # （CLI run / dashboard DAG / chat 回退）都经此，故门一次接线全覆盖。
+                # 默认关闭（MAOP_PERMISSION_ENFORCE 未设时立即返回 None，不改变行为）。
+                gate_block = await check_dispatch_gate(
+                    agent=agent, task=task, routing_key=routing_key, trace_id=trace_id,
+                )
+                if gate_block is not None:
+                    # 被拒的派发没到过 driver：不记 agent 性能（那不是 agent 的执行
+                    # 结果，混进去会污染自适应路由/演化分析的统计）。
+                    result = DispatchResult(result=gate_block, breaker_tripped=False)
+                else:
+                    result = await self._dispatch_impl(agent, task, routing_key=routing_key,
+                                                        workdir=workdir, timeout_seconds=timeout_seconds,
+                                                        trace_id=trace_id, streamer=streamer,
+                                                        priority=priority, deadline_ms=deadline_ms)
 
             # Phase γ-4: set span attributes + persist decision record.
             # The dispatcher span is the PARENT of the routing chain —
@@ -175,7 +188,9 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
             )
             # C1 fix: 主路径记录 agent 执行性能数据（此前 record() 从不被调用，
             # 自适应路由/演化分析的 agent_performance 表长期为空）
-            self._record_agent_performance(agent, routing_key, result)
+            # 被安全门拒掉的派发没到过 driver，不算一次"agent 执行"，跳过记录。
+            if gate_block is None:
+                self._record_agent_performance(agent, routing_key, result)
             # H8 修复：记录委派耗时指标
             try:
                 from maop.core.monitoring.monitoring import (
