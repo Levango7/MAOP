@@ -176,6 +176,17 @@ class MAOPSettings(BaseSettings):
     admin_password: str = Field(default="", description="Initial admin password (auto-generated if empty)")
     api_key: str = Field(default="", description="API key for external services")
     key_file: str = Field(default="", description="Path to API key file")
+    # 派发权限门（见 py/maop/core/security/dispatch_gate.py）。默认 False =
+    # 门挂载但不改变任何行为，与历史一致 —— 范式同 MAOP_DRY_RUN_ENFORCE。
+    # ⚠️ 启用前必须先在权限规则表里给要用的 agent 加 allow 规则：
+    #    PermissionManager 的**无匹配规则默认是 ask**（= 挂起待人工批准 ⇒ 派发被拒），
+    #    直接置 1 会把所有派发拒掉。
+    permission_enforce: bool = Field(
+        default=False,
+        description="Enforce PermissionManager + pre_dispatch hook on every dispatch "
+                    "(env: MAOP_PERMISSION_ENFORCE). Default off; enable only after "
+                    "seeding allow rules — unmatched agent/action defaults to 'ask'.",
+    )
 
     # ── Logging ───────────────────────────────────────────────────
     json_log_file: str = Field(default="", description="Path to JSON log file (default: stdout)")

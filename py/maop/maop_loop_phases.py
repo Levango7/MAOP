@@ -462,6 +462,18 @@ class PhasesMixin:
                 from maop.evolve import EvolveEngine
                 evolve_engine = EvolveEngine(root_dir=self._root)
                 evolve_result = evolve_engine.analyze()
+                # ⚠️ 下面这个分支**按构造不可达**（2026-10-05 实测确认）：`analyze()`
+                # 返回 `EvolveResult(action="analyze", stats=stats)`，而 `suggestions`
+                # 的默认值是空表（evolve.py:`EvolveResult`），它只有 `suggest()` 才会填。
+                # 保留它不动是**遵守 AC-01**（`docs/spec-v5.2.0-evolution-loop.md:97`，P0）：
+                # "开关未设置时系统必须保持现有 _phase_evolve 行为（仅 analyze）"，
+                # 且该条的验收要求 trace/event 序列 byte-level 一致 —— 改成 `suggest()`
+                # 会写 evolve-suggestions.json 并多发事件，直接违反 AC-01。
+                #
+                # 因此这里不是"忘了接"：想让主循环产出建议，得先修 AC-01（改规范），
+                # 或者走既有的独立开关 `MAOP_EVOLUTION_LOOP_ENABLED`（完整闭环）与
+                # dashboard 的 suggest 入口。此注释只是把"看起来会报建议"的错觉标掉 ——
+                # 否则下一个人会以为这条链是通的。
                 if evolve_result and evolve_result.suggestions:
                     self._log("evolve", "INFO",
                               f"Evolve: {len(evolve_result.suggestions)} suggestions",

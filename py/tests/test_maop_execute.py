@@ -12,6 +12,26 @@ from maop.delegate.dispatcher import DispatchResult
 from maop.maop_execute import Delegate, Observability, maop_execute
 
 
+@pytest.fixture(autouse=True)
+def _enforce_dispatch_gate(monkeypatch):
+    """本文件测的是"门开着时的判定"，所以统一把开关打开。
+
+    2026-10-04：派发安全门改成 opt-in（``MAOP_PERMISSION_ENFORCE``，默认关，范式同
+    ``MAOP_DRY_RUN_ENFORCE`` —— 因为 ``PermissionManager`` 无匹配规则时默认 ``ask``，
+    默认启用会把开箱即用的所有派发拒掉）。于是这里必须显式启用，否则测到的是
+    "门没开时的 no-op"：permission/hook 的断言全部失效，hook 触发计数也会变少。
+
+    "默认关 = 不改变行为"这一半由 ``test_dispatch_gate.py::test_gate_is_inert_by_default``
+    与 ``..._when_gate_disabled`` 钉住。
+    """
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        "maop.config.settings.get_settings",
+        lambda: SimpleNamespace(permission_enforce=True),
+    )
+
+
 def make_dispatch_result(exit_code=0, stdout="ok", stderr=""):
     """Create a mock DispatchResult."""
     result = new_result(agent="test", task="test", exit_code=exit_code,

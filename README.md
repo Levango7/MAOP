@@ -303,7 +303,13 @@ MAOP includes built-in cost tracking for LLM API usage:
 
 # Via API
 curl http://localhost:9079/api/cost/summary
-# Returns: {"today": 1.23, "week": 8.45, "month": 32.10, "by_agent": {...}}
+# Returns: {"status": "ok", "summary": {"total_tokens": 0, "total_cost_usd": 0.0,
+#                                      "total_calls": 0, "by_model": {...},
+#                                      "by_agent": {...}, "by_session": {...}}}
+# 字段定义见 core/cost_tracker.py::CostSummary；支持 ?session_id= / ?agent=
+# / ?start_date= / ?end_date= 过滤（2026-10-05 与实现核对更正：此前这里写的是
+# 无信封的 {"today","week","month"...}，两层都不对——既没有 today/week/month
+# 字段，响应体外还有 status/summary 信封）。
 
 # Set budget limits
 curl -X PUT http://localhost:9079/api/cost/budget `

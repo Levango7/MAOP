@@ -39,6 +39,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-05 Ubuntu 26.04 金丝雀：把"被动换 OS"变成"量出来的迁移"
+
+官方 changelog（2026-09-17）：`ubuntu-latest` 将在 **2026-10-19 ~ 11-19** 窗口内迁到
+Ubuntu 26.04；要留在旧版需显式钉 `ubuntu-24.04`，`ubuntu-26.04` 已 GA。
+
+与其等主干在 10-19 那天被动换 OS（会同时影响 9 条 pytest 腿、容器构建与 Playwright），
+不如先量：nightly 新增 `ubuntu26-canary` 作业，**显式**跑 `ubuntu-26.04` + py3.13，
+命令口径对齐 ci.yml 的 Linux 腿（`-n 2`），但**不带 `--reruns`** —— canary 要看真结果，
+重试只会把"这个 OS 上会挂"掩盖成绿。
+
+刻意不挂在 PR 上配 `continue-on-error`：那就是又一个"吞失败的门"，本仓明令禁止
+（`py/tests/test_ci_workflow_hygiene.py` 会拦）。挂在 nightly 上，红了只说明"我们还没
+准备好迁"，不堵任何 PR。
+
+迁移完成（26.04 持续绿）后：把 ci.yml 矩阵的 os 换成 26.04 并删掉本作业。
+
 ### 2026-10-04 评估批 B1–B6：两处真 bug、门禁措辞、泄漏可见性、两处新守卫
 
 对 `26645340` 做只读评估后发现并修复的六项。每一项都做了**变异验证**（改回旧写法即红）。

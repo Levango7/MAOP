@@ -32,7 +32,10 @@
 - [x] ADR-016 待完善表中 SAML 行状态为 `Done`，且引用 `docs/enterprise/saml-sso-guide.md`。
 - [x] `mypy py/maop` 零 error，`ruff check` 零告警。
 - [x] CI 覆盖率：实测 82%（ratchet baseline=81, FLOOR=80），2026-08-21 核实修正。
-- [x] `deliverables/engineering-assurance/` 包含 `v4.4.1-fix-report.md` 与 `env-audit-4.4.2.md`。
+- [ ] `deliverables/engineering-assurance/` 包含 `v4.4.1-fix-report.md` 与 `env-audit-4.4.2.md`。
+      **2026-10-05 核对：不成立，已从勾选改回未勾** —— 全仓搜不到该目录与两份文件，且
+      `.gitignore:174` 忽略整个 `deliverables/`，这类交付物结构性地不可能作为仓库内物证。
+      要恢复勾选，需先把它们纳入版本控制，或改由外部交付物系统承载并在此注明位置。
 - [x] `.env.example` 与代码 `MAOP_*` 变量集合差异为零（或差异均有明确注释说明）。
 - [x] `dashboard-enterprise/e2e/` 路由守卫用例通过。
 - [x] `ROADMAP.md` 入库并被 README 引用。
@@ -87,7 +90,9 @@
 - [x] 短名环境变量加 `DeprecationWarning`，`.env.example` 标注 deprecated alias。
 - [x] 流式 Agent token 响应端点 + 前端 composable + Chat.vue 集成完成。
 - [x] `ruff check` 0 error，`mypy` 0 error，测试 0 failed，前端构建成功。
-- [ ] `archive/` 目录清空或移至独立仓库（推迟到 v6.0.0，避免 major 范围膨胀）。
+- [x] `archive/` 目录清空或移至独立仓库（推迟到 v6.0.0，避免 major 范围膨胀）。
+      **2026-10-05 核对：已完成** —— `CHANGELOG` 记 2026-09-29 已 `git rm -r archive/`（107 文件），
+      实测根目录已无 `archive/`；此前一直挂着未勾，属漏勾。
 
 ## v5.1.0 (minor) — 已发布 2026-08-14
 
@@ -127,7 +132,8 @@
 
 ## v5.2.0 (minor) — 已发布（2026-09-08）
 
-> **部分验收标准仍在推进中**：自演化闭环 MVP 已接入主循环（可观测/可审批/可回滚），7 个 evolution API 端点已上线。部分验收标准（见下方未勾选项）仍在迭代验证中。配置开关 `MAOP_EVOLUTION_LOOP_ENABLED` 默认关闭。
+> **自演化闭环 MVP 已接入主循环**（可观测/可审批/可回滚），配置开关 `MAOP_EVOLUTION_LOOP_ENABLED` 默认关闭，下方四项验收标准**均已完成**。
+> **2026-10-05 核对更正**：横幅原写「部分验收标准（见下方未勾选项）仍在迭代验证中」，但下方已无未勾选项（横幅漏更新）；原写的「7 个 evolution API 端点」与任何可数集合都不对应 —— 实测端点为 `dashboard/routers/evolve_insights.py` 9 个 `/api/evolve/*` 加 6 个 `/api/evolution/*`，另 `evolution_experiment.py` 16 个，故不再给单个数字。
 
 **主题**：自演化闭环 MVP（三阶段路线图 [M2.1](docs/prd-three-phase-roadmap.md)，F2-01）。把已有的 `core/evolution/` 16 模块底座接入主循环，形成可观测、可审批、可回滚的完整闭环。
 
