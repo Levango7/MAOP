@@ -15,6 +15,45 @@ permissions:
   contents: read
 
 jobs:
+  # ── Ubuntu 26.04 金丝雀（2026-10-04 加）─────────────────────────────
+  # 官方 changelog（2026-09-17）：`ubuntu-latest` 将在 **2026-10-19 ~ 11-19**
+  # 的窗口内迁到 Ubuntu 26.04；要留在旧版需显式钉 `ubuntu-24.04`，而
+  # `ubuntu-26.04` 已 GA 可生产使用。
+  #
+  # 与其等主干在 10-19 那天被动换 OS（届时会同时影响 9 条 pytest 腿、容器构建与
+  # Playwright），不如先在 nightly 上把差异量出来：这条腿**显式**用 26.04，跑与 CI
+  # 同口径的 pytest。它红了只说明"我们还没准备好迁"，不堵任何 PR —— 这正是 nightly
+  # 该干的事（对比：把 canary 挂在 PR 上并 continue-on-error，就又是一个"吞失败的门"，
+  # 本仓明令禁止，见 py/tests/test_ci_workflow_hygiene.py）。
+  #
+  # 迁移完成（26.04 持续绿）后：把 ci.yml 的矩阵 os 换成 26.04（或显式 ubuntu-26.04）
+  # 并删掉本作业；在那之前 ci.yml 保持 `ubuntu-latest`，走完 10-19 的窗口即为 26。
+  ubuntu26-canary:
+    name: Ubuntu 26.04 canary (py3.13)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install deps
+        run: pip install -e ./py[dev] --quiet
+      - name: Run unit tests (same command shape as ci.yml)
+        # 口径对齐 ci.yml 的 Linux 腿：-n 2；但**不带 --reruns**（canary 要看真结果，
+        # 重试只会把"这个 OS 上会挂"掩盖成绿）。排除 serial 标记那批 —— 它们需要
+        # 串行，由各自的步骤负责。
+        shell: bash
+        env:
+          MAOP_ENV: 'test'
+        run: |
+          python -m pytest py/tests/ -q --ignore=py/tests/contract             -m "not slow and not serial" --timeout=60 --reruns=0 -n 2             --junitxml=canary-ubuntu26.xml
+      - name: Surface failing test ids
+        if: failure()
+        shell: bash
+        run: |
+          cd py && python scripts/junit_annotate.py ../canary-ubuntu26.xml || true
+
   full-e2e:
     name: Full E2E (all browsers)
     runs-on: ubuntu-latest
