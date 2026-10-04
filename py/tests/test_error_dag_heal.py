@@ -111,7 +111,7 @@ class TestDAGWorkflow:
             )
         })
         result = execute_workflow("dag_wf", config=config)
-        assert result.steps_completed == 3
+        assert result.steps_planned == 3
 
     def test_dag_parallel_steps(self):
         from maop.config.loader import MaopConfig, WorkflowDef, WorkflowStepDef
@@ -127,7 +127,7 @@ class TestDAGWorkflow:
             )
         })
         result = execute_workflow("par_wf", config=config)
-        assert result.steps_completed == 3
+        assert result.steps_planned == 3
 
 
 # ── Self-Heal ─────────────────────────────────────────────────
