@@ -18,6 +18,8 @@ from maop.core.agent.llm_chat.llm_provider import (
     OpenAICompatibleProvider,
     ProviderConfig,
 )
+from maop.core.reliability.error_schema import MaopResult
+from maop.delegate.models import DispatchResult
 
 # ═══════════════════════════════════════════════════════════════════
 # Pydantic Model Tests
@@ -527,13 +529,27 @@ class TestChatEngineProviderIntegration:
 
     @pytest.mark.asyncio
     async def test_stream_llm_fallback(self, tmp_path):
+        """回退路径必须把 ``MaopResult.stdout`` 切成 token 产出。
+
+        ⚠️ 本用例原先用 ``MagicMock`` 并写 ``mock_result.result.output = ...``。
+        MagicMock 对任意属性名都收，于是**测试和当时的实现错得一模一样**：代码读
+        ``getattr(result.result, "output", "")``，测试也提供 ``.output`` ——
+        "字段名写错"这件事在两侧同时成立，用例恒绿。真实类型 ``MaopResult``
+        没有 ``output``，只有 ``stdout``（2026-10-04 修复）。
+
+        现在改用**真实模型对象**：字段名再写错会当场抛错，而不是静默变绿 ——
+        这正是替身"对被测量那一维失明"的典型翻车点。
+        """
         engine = ChatEngine(root_dir=tmp_path, default_model="")
 
+        dispatch_result = DispatchResult(
+            result=MaopResult(
+                agent="mavis", task="Hi", exit_code=0,
+                stdout="Chunked response here",
+            ),
+        )
         with patch("maop.delegate.dispatcher.Dispatcher") as MockDispatcher:
-            mock_result = MagicMock()
-            mock_result.result.is_success.return_value = True
-            mock_result.result.output = "Chunked response here"
-            MockDispatcher.return_value.dispatch = AsyncMock(return_value=mock_result)
+            MockDispatcher.return_value.dispatch = AsyncMock(return_value=dispatch_result)
 
             request = ChatRequest(message="Hi")
             tokens = []
