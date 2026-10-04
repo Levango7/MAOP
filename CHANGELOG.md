@@ -55,10 +55,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     MagicMock 对任意属性名都收，所以它替这个 bug 打了很久的掩护 —— 改完实现后它才红。
     已改为用**真实** `MaopResult`/`DispatchResult`：字段名再写错会当场抛错。
     这正是"替身对被测量那一维失明"的典型：替身越宽容，越测不出接线错误。
-- `AgentConfig.env` 是**死字段**：全库无一处读取，配了不生效，子进程静默继承服务器
-  全量环境。现由 `drivers.py::_agent_env()` 接线到全部 5 处 `create_subprocess_exec`；
-  空 env 返回 `None`（= 不传 env，与历史行为逐字节一致），只有明写 `env:` 才改变行为。
+- `AgentConfig.env` 在 `delegate/` 这条**主派发链**上被静默忽略：同一个 agent 配置
+  走适配器路径（`core/agent/adapters/cli_adapter.py`、`core/agent/lifecycle/runtime.py`、
+  `core/mcp/mcp_hub_transport.py`）时 `env:` 生效，走 `delegate/` 时 5 个 driver
+  全都不传它 —— 配了不生效且没有任何提示。现由 `drivers.py::_agent_env()` 补齐到
+  5 处 `create_subprocess_exec`，合并口径 `{**os.environ, **config.env}` 与既有 4 处
+  保持一致；空 env 返回 `None`（= 不传 env，与历史行为逐字节一致）。
   收窄继承面是独立的安全议题，**本次不做**（agent CLI 普遍依赖 PATH/HOME 等基础变量）。
+  - 订正：本条初版写作"全库无一处读取"，**不准确**。起因是我排查时用了
+    `grep ... | grep -vE "os.env"` 过滤噪音，而既有那 4 处的形态正是
+    `{**os.environ, **self.config.env}` —— 过滤器把要找的行一起删掉了。准确说法是
+    "适配器路径读、delegate 主链漏"。
+  - `scripts/check_config_drift.py` 的 BASELINE 随之 227→228（该门禁是逐行文本计数，
+    只允许减少）。本次是既有既定形态的第 5 处实例，非新模式，理由已写进脚本注释。
 
 **CI merge gate：级联跳过不再背"该跑没跑"的锅**
 run 476 现场：`test` 失败 ⇒ `needs: test` 的 `audit`/`sbom` 被连带跳过。旧实现把三条

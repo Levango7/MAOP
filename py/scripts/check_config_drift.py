@@ -23,7 +23,14 @@ import sys
 # 有意设计的 MAOP_TOOL_POLICY_* 覆盖接口）。门禁语义：只允许减少，防未来新增。
 # 2026-08-17: 226→227。628dd56 的 P2 安全修复（db_backup.py VACUUM INTO 路径
 # 白名单）新增 MAOP_BACKUP_DIR 读取 —— 有意配置，非 drift。
-BASELINE = 227
+# 2026-10-04: 227→228。drivers.py::_agent_env() 把 AgentConfig.env 接到 delegate 链的
+# 5 个 driver 上。合并口径 `{**os.environ, **config.env}` 是**既有约定**（cli_adapter.py、
+# lifecycle/runtime.py ×2、mcp_hub_transport.py 已是同款 4 处）—— 本次只是让漏掉的这条
+# 路对齐，不是新模式。这是**向子进程传环境**的 OS 级操作，不是配置读取，未走 settings
+# 是有意为之（subprocess 没有"继承 + 覆盖"的 API，只能自己拼映射）。
+# 另外把 `_agent_env` 说明文字里的字面量 os.environ 改成了"进程环境"：计数器是逐行文本
+# 匹配，散文里的提法不该占额度（本仓在 test_ci_workflow_hygiene 栽过同形）。
+BASELINE = 228
 
 
 def count_getenv_calls(root: pathlib.Path) -> int:

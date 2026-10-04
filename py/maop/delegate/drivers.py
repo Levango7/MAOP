@@ -30,14 +30,18 @@ logger = logging.getLogger(__name__)
 
 
 def _agent_env(config: AgentConfig) -> dict[str, str] | None:
-    """Agent 级环境变量：``config.env`` 叠加在服务器环境之上（agent 侧优先）。
+    """Agent 级环境变量：``config.env`` 叠加在进程环境之上（agent 侧优先）。
 
     返回 ``None`` 表示"不传 env"——此时 subprocess 走默认继承，与历史行为逐字节
-    一致；只有 agents.yaml 明写了 ``env:`` 才会进合并分支。此前 ``AgentConfig.env``
-    从未被任何 driver 读取，是纯死字段：配了也不生效，且子进程会静默继承服务器
-    全量环境。
+    一致；只有 agents.yaml 明写了 ``env:`` 才会进合并分支。
 
-    注意这里**不缩减**继承面（仍以 ``os.environ`` 为底）：agent CLI 普遍依赖
+    接线背景（2026-10-04）：``AgentConfig.env`` 此前**只被适配器路径读取**
+    （`core/agent/adapters/cli_adapter.py`、`core/agent/lifecycle/runtime.py`、
+    `core/mcp/mcp_hub_transport.py`），而 `delegate/` 这条**主派发链**的 5 个 driver
+    全都忽略它 —— 同一个 agent 配置走适配器生效、走 delegate 静默失效。现补齐，
+    合并口径与既有 4 处保持一致。
+
+    注意这里**不缩减**继承面（仍以进程环境为底）：agent CLI 普遍依赖
     PATH/HOME 等基础变量，砍掉会直接打挂现网 agent。收窄继承面是独立的安全议题，
     需要单独评估与回归，不在本改动范围内。
     """
