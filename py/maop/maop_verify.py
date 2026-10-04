@@ -10,7 +10,7 @@ import inspect
 import logging
 import re
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
 
@@ -398,19 +398,24 @@ def _call_gate(gate_fn: Any, plan: dict, result: MaopResult | None, workdir: str
 
     刻意**不用** `try: f(a,b,c) except TypeError: f(a,b)`：gate 内部抛的 TypeError
     会被吞成"签名不匹配"，把一个真实的 gate bug 变成静默重试。
+
+    返回处一律 `cast`：`gate_fn` 是 `Any`（注册表里混着内置函数与外部插件），
+    mypy 的 no-any-return 会在这里报错；签名判定本身保证调用形状正确，返回值则由
+    调用方按 `GateResult` 使用 —— 真返回了别的东西，`verify()` 构造 `VerifyResult`
+    时 pydantic 会拒绝（不是静默放过）。
     """
     try:
         params = list(inspect.signature(gate_fn).parameters.values())
     except (TypeError, ValueError):
         # 拿不到签名（内建/C 实现）→ 按旧约定调用
-        return gate_fn(plan, result)
+        return cast(GateResult, gate_fn(plan, result))
     if any(p.kind is p.VAR_POSITIONAL for p in params):
-        return gate_fn(plan, result, workdir)
+        return cast(GateResult, gate_fn(plan, result, workdir))
     positional = [p for p in params
                   if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
     if len(positional) >= 3:
-        return gate_fn(plan, result, workdir)
-    return gate_fn(plan, result)
+        return cast(GateResult, gate_fn(plan, result, workdir))
+    return cast(GateResult, gate_fn(plan, result))
 
 
 GATE_REGISTRY: dict[str, Any] = {
