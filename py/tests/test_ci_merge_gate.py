@@ -92,6 +92,69 @@ def test_code_changeset_with_a_skipped_job_is_rejected() -> None:
     assert "skipped" in reasons[0] and "该跑" in reasons[0], reasons
 
 
+# ── 级联跳过：别把"上游挂了连带我"报成"我没跑"（run 476 现场）───────
+
+
+def test_cascade_skips_are_not_blamed_as_missing_runs() -> None:
+    """run 476 复现：test 失败 ⇒ needs: test 的 audit/sbom 被连带跳过。
+
+    旧实现把三条都当"该跑的作业没跑"，注解里 audit/sbom 各占一条 error，
+    真正的红点 test 反而被淹。现在只报 test，级联的两个降为提示。
+    """
+    needs = _needs(
+        scope="success", lint="success",
+        test="failure", audit="skipped", sbom="skipped",
+    )
+    reasons = gate_mod.evaluate(needs, "true")
+    assert reasons == ["test: result=failure"], reasons
+    assert not any("audit" in r or "sbom" in r for r in reasons), reasons
+
+    notes = gate_mod.cascade_skips(needs, "true")
+    assert any(n.startswith("audit:") for n in notes), notes
+    assert any(n.startswith("sbom:") for n in notes), notes
+    assert all("级联跳过" in n for n in notes), notes
+
+
+def test_cascade_note_is_silent_when_nothing_failed() -> None:
+    """没有硬失败时不存在"级联"，提示必须为空 —— 否则它就成了新的噪音源。"""
+    needs = _needs(scope="success", lint="success", test="skipped")
+    assert gate_mod.cascade_skips(needs, "true") == []
+
+
+def test_cascade_note_is_silent_on_docs_only() -> None:
+    """docs-only 时重活被 `if:` 合法跳过，不算级联，也不该出提示。"""
+    needs = _needs(scope="success", lint="skipped", test="skipped")
+    assert gate_mod.cascade_skips(needs, "false") == []
+
+
+def test_cascade_note_survives_malformed_input() -> None:
+    """提示函数不许把判定带崩：形状不对时返回空表即可，红绿仍由 evaluate 决定。"""
+    assert gate_mod.cascade_skips({}, "true") == []
+    assert gate_mod.cascade_skips({"lint": "success"}, "true") == []
+
+
+def test_cli_reports_cascade_skip_as_notice_not_error(tmp_path: Path) -> None:
+    """端到端：级联跳过出现在 stdout 里，且**不是** ::error 注解。
+
+    CI 上这两者渲染完全不同 —— error 会挂到 PR 的注解清单里当失败项，notice
+    只是一行提示。这条断言的就是这个区别。
+    """
+    r = _run_cli(
+        tmp_path,
+        _needs(scope="success", lint="success", test="failure", audit="skipped"),
+        "true",
+    )
+    assert r.returncode == 1, r.stdout
+    error_lines = [line for line in r.stdout.splitlines() if line.startswith("::error")]
+    assert len(error_lines) == 1, error_lines
+    assert "test: result=failure" in error_lines[0], error_lines
+    assert not any("audit" in line for line in error_lines), error_lines
+    assert any(
+        line.startswith("::notice") and "audit:" in line and "级联跳过" in line
+        for line in r.stdout.splitlines()
+    ), r.stdout
+
+
 @pytest.mark.parametrize("code", ["", None, "nonsense"])
 def test_missing_scope_output_is_fail_closed(code) -> None:
     """scope 没输出（作业失败/被取消/表达式拿空串）时按严格面处理：skipped 不算通过。"""
