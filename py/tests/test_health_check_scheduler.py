@@ -264,7 +264,17 @@ def test_get_status(catalog: AgentCatalog) -> None:
 
 
 def test_check_interval(catalog: AgentCatalog) -> None:
-    """验证检查间隔：短间隔下多轮检查被执行."""
+    """验证检查间隔：短间隔下多轮检查被执行.
+
+    ⚠️ 2026-10-05：原实现是 `sleep(0.1)` 后断言"约 5 轮里至少跑到 2 轮" —— 这是
+    **绝对墙钟假设**，在共享 runner 上必炸：新加的 macOS flaky 腿首跑就复现
+    （`assert 1 >= 2`，3 次里挂 1 次）。xdist `-n 2` + macOS runner 上，调度线程
+    100ms 内可能只被调度到一次，与"调度器有没有在循环"这件事无关。
+
+    改为**等条件达成的轮询**（间隔 0.02s，给 5s 预算 = 250 倍余量）：断言强度不变
+    （仍要求真的重复检查 ≥2 次，调度器不循环照样红），但不再假设机器有多快 ——
+    同 `test_large_batch_register_1000` 的自校准思路。
+    """
     adapter = _MockAdapter(healthy=True)
     catalog.register(_desc("agent_a"))
     scheduler = HealthCheckScheduler(
@@ -274,11 +284,17 @@ def test_check_interval(catalog: AgentCatalog) -> None:
     )
 
     scheduler.start()
-    time.sleep(0.1)  # 等待约 5 轮
-    scheduler.stop()
+    try:
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline and adapter.call_count < 2:
+            time.sleep(0.01)
+    finally:
+        scheduler.stop()
 
-    # 验证多轮检查执行（至少 2 次）
-    assert adapter.call_count >= 2
+    assert adapter.call_count >= 2, (
+        f"5s 内只检查了 {adapter.call_count} 次（间隔设的是 0.02s）—— "
+        "这不是慢，是调度器根本没在循环"
+    )
 
 
 # ── 12. timeout ────────────────────────────────────────────────
