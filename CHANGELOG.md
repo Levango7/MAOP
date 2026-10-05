@@ -39,6 +39,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-05 死接线清单：把"哪些模块写了却没人用"变成可执行事实
+
+评估这个仓时最容易出的两种错都是"凭印象数接线"，本次两样都踩了：
+
+- **把活的当死**：我第一次扫全仓导入关系时漏了**相对导入**
+  （`from .routers.agents import crud`）—— 于是把一批正常注册的路由误判成孤儿；
+  也漏了 `python -m` 入口，把 docker-compose 直接拉起的
+  `worker/agent_executor.py`、`worker/queue_worker.py` 当成了"无启动入口"。
+- **把死的当活**：`dashboard/lifespan.py` 看着像应用生命周期钩子，实际
+  `server.py:118` 自内联了一个 `lifespan()`，模块版本**从来没被引用过** ——
+  改这个文件不会生效，是个会被白改的坑。
+
+所以新增 `py/tests/test_dead_wiring_inventory.py`：每次跑测试都用 AST 重算一遍
+"零生产导入方"的模块集合，与清单逐条对齐。三种漂移都会红：
+
+1. **出现新孤儿**（有人加了模块却没人调用）；
+2. **清单里的被接上线**（该把它从清单删掉）；
+3. **清单里的被删除**（僵尸条目要清）。
+
+口径（写在测试 docstring 里）：只统计 `py/maop`；排除包 `__init__.py`（包由子模块隐含
+引用）与 `migrations/`（alembic 按路径加载）；相对导入按定义文件所在包解析；
+`docker-compose*` / `Dockerfile` / `pyproject` / `scripts/` / workflows 里出现点分路径
+也算"被引用"（外部拉起）；**测试文件不算引用方** —— "只在测试里被用到"正是本清单要
+暴露的状态。
+
+清单里 37 个模块分三类：`dynamic`（按名字解析）、`superseded`（已被取代，要点名取代者
+文件）、`unwired`（写了没接线）。`unwired` 是真正待决策的一批，其中成组出现的尤其值得
+注意：`core/agent/ops/*` 整 5 个、`core/reliability/*` 3 个、`core/marketplace/*` 3 个 ——
+不是零散遗漏，是整块功能没接。
+
+自证与变异：扫描器先自证不空转（已知活模块不得在孤儿里、已知死模块必须在）；
+实测两个方向都会红（新建一个假模块 → 报新孤儿；给 `lifespan` 加一行导入 → 报"已被接线"）。
+
 ### 2026-10-05 评估批 D/E：verify 工件门、三处"接线没接上"、主派发链端到端守卫
 
 **D：verify 第一次真的看磁盘**
