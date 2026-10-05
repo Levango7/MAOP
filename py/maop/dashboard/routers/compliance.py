@@ -31,17 +31,12 @@ router = APIRouter(prefix="/api/compliance", tags=["compliance"])
 
 
 def _tenant_id_from_jwt(request: Request) -> str:
-    """Extract tenant_id from JWT-authenticated request state.
+    """委托给唯一实现（见 maop/core/tenant/context.py）。
 
-    G-07 fix: NEVER use body.tenant_id — always use the JWT claim.
+    本函数曾经是各路由里手抄的一份；抄写已经出现分歧（compliance fail-closed
+    而 rbac 软回退），所以统一到共享实现，此处只保留函数名给既有调用点。
     """
-    tenant_id = getattr(request.state, "tenant_id", "") or ""
-    if not tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="tenant_id not found in JWT — cannot process compliance request",
-        )
-    return tenant_id
+    return require_tenant_id(request)
 
 
 class DeleteUserDataRequest(BaseModel):
@@ -129,6 +124,7 @@ async def export_user_data(
 #   * tenant_id 一律取自 JWT；即使请求体携带也强制覆盖，绝不采信。
 # ════════════════════════════════════════════════════════════════════
 
+from maop.core.tenant.context import require_tenant_id
 from maop.core.tenant.gdpr_manager import ProcessingAgreement, ProcessingRecord
 
 

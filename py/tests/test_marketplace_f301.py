@@ -18,13 +18,9 @@ from pathlib import Path
 import pytest
 from cryptography.hazmat.primitives import serialization
 
-from maop.core.marketplace.sandbox import (
-    _BLOCKED_ENV_VARS,
-    _SAFE_ENV_VARS,
-    _SANDBOX_ENV_PREFIX,
-    SandboxManager,
-    build_sandbox_env,
-)
+# 环境白名单实现 2026-10-05 统一到 core/security/sandbox.py（原先那份在
+# marketplace 下且从未接线，而真正在跑的沙箱没做环境过滤）。
+from maop.core.marketplace.sandbox import SandboxManager
 from maop.core.marketplace.signing import (
     PackageVerifier,
     SignatureError,
@@ -36,6 +32,12 @@ from maop.core.marketplace.signing import (
     public_key_to_pem,
     sign_payload,
     verify,
+)
+from maop.core.security.sandbox import (
+    _BLOCKED_ENV_VARS,
+    _SAFE_ENV_VARS,
+    _SANDBOX_ENV_PREFIX,
+    build_sandbox_env,
 )
 
 # ── G-01: Ed25519 signing tests ─────────────────────────────────────

@@ -20,6 +20,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from maop.core.security.middleware import require_admin
+from maop.core.tenant.context import tenant_id_from_request
 from maop.dashboard.error_handler import handle_api_errors  # 批次3A: 统一异常处理装饰器
 from maop.dashboard.services import data_service
 
@@ -33,8 +34,12 @@ router = APIRouter()
 
 
 def _request_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", "")
-    return tid or ""
+    """委托给唯一实现（见 maop/core/tenant/context.py）。
+
+    本函数曾经是各路由里手抄的一份；抄写已经出现分歧（compliance fail-closed
+    而 rbac 软回退），所以统一到共享实现，此处只保留函数名给既有调用点。
+    """
+    return tenant_id_from_request(request)
 
 
 # ── Overview ────────────────────────────────────────────────────────────

@@ -232,6 +232,9 @@ class SandboxManager:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(exec_dir),
+                # G-02: 只转发白名单内的环境变量。不传 env= 时子进程会继承**整份**
+                # 服务器环境（含密钥），沙箱就只约束了工作目录、没约束凭据面。
+                env=build_sandbox_env(),
             )
             try:
                 stdout, _stderr = await asyncio.wait_for(
@@ -317,6 +320,12 @@ class SandboxManager:
                 text=True,
                 timeout=timeout_seconds,
                 cwd=str(exec_dir),
+                # G-02: 同 arun() —— 不传 env= 会继承整份服务器环境（含密钥）。
+                # 注意本模块**有两套并行实现**（同步 run 走 subprocess.run，
+                # 异步 arun 走 create_subprocess_exec），安全相关的改动必须两边都做：
+                # 我第一版只补了 arun，同步路径照旧泄漏，是行为用例（不是结构守卫）
+                # 把它抓出来的 —— 守卫当时只枚举 create_subprocess_exec。
+                env=build_sandbox_env(),
             )
             elapsed_ms = max(1, int((time.monotonic() - start) * 1000))
             output = proc.stdout
@@ -427,3 +436,198 @@ class SandboxManager:
             duration_ms=row["duration_ms"],
             output_lines=row["output_lines"],
         )
+
+# ── 子进程环境白名单（G-02）──────────────────────────────────────
+#
+# 2026-10-05 **从 core/marketplace/sandbox.py 移植过来**：那份实现从来没有接线
+# （该模块零生产导入方），而**真正在跑的**沙箱（本模块）在 create_subprocess_exec
+# 时根本没传 env= —— 于是沙箱里的命令继承整份服务器环境，包括 MAOP_JWT_SECRET /
+# MAOP_PG_PASSWORD 等。sandbox 却把服务端密钥一并递给了被沙箱隔离的进程，
+# 等于只约束了工作目录、没约束凭据面。
+#
+# 白名单可用项目根 `.env.sandbox`（或 MAOP_SANDBOX_ENV_FILE 指向的文件）逐行覆盖：
+# `KEY=yes` 才转发；不在白名单且不匹配 MAOP_SANDBOX_ 前缀的一律剥离。
+# PATH/HOME/SYSTEMROOT/TEMP 等运行必需项默认在白名单里，保证命令仍能跑起来。
+
+_SANDBOX_ENV_PREFIX = "MAOP_SANDBOX_"
+
+# A minimal set of "safe" variables required for the subprocess to run.
+# These are system-level variables that do not contain secrets.
+#
+# Classification (see .env.sandbox for user-tunable overrides):
+#   - 必需变量 (required): PATH, HOME, USER, SYSTEMROOT, TEMP, TMP
+#   - 安全变量 (safe):     LANG, LC_ALL, LC_CTYPE, TMPDIR, COMSPEC,
+#                          APPDATA, LOCALAPPDATA, PROGRAMDATA
+#   - 业务变量 (business): MAOP_* — forwarded only when listed in
+#                          .env.sandbox or matching MAOP_SANDBOX_*
+_SAFE_ENV_VARS: frozenset[str] = frozenset({
+    # ── 必需变量（系统运行必需，不建议禁用）──────────────────
+    "PATH",
+    "HOME",
+    "USER",
+    "SYSTEMROOT",
+    "TEMP",
+    "TMP",
+    # ── 安全变量（不影响安全性）──────────────────────────────
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TMPDIR",
+    # Windows runtime / system DLL resolution helpers (safe, no secrets).
+    "COMSPEC",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "PROGRAMDATA",
+})
+
+# Variables that must NEVER be forwarded even if they match the prefix.
+# This is a defence-in-depth deny-list; the whitelist already excludes them.
+_BLOCKED_ENV_VARS: frozenset[str] = frozenset({
+    "JWT_SECRET",
+    "DB_PASSWORD",
+    "API_KEY",
+    "SECRET_KEY",
+    "MAOP_JWT_SECRET",
+    "MAOP_DB_PASSWORD",
+    "MAOP_API_KEY",
+    "MAOP_SECRET_KEY",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "MAOP_DATABASE_URL",
+    "MAOP_REDIS_URL",
+})
+
+
+# ── Custom whitelist via .env.sandbox ──────────────────────────────
+
+# Module-level cache: {path: (mtime, whitelist_or_None)} to avoid
+# re-reading the config file on every build_sandbox_env() call.
+_whitelist_cache: dict[Path, tuple[float, frozenset[str] | None]] = {}
+
+
+def _resolve_sandbox_config_path(
+    config_file: str | Path | None = None,
+) -> Path:
+    """Resolve the path to the ``.env.sandbox`` config file.
+
+    Priority:
+      1. Explicit *config_file* argument.
+      2. ``MAOP_SANDBOX_ENV_FILE`` environment variable.
+      3. Project-root ``.env.sandbox`` (auto-discovered).
+    """
+    if config_file is not None:
+        return Path(config_file)
+    env_file = os.environ.get("MAOP_SANDBOX_ENV_FILE")
+    if env_file:
+        return Path(env_file)
+    # Auto-discover: sandbox.py lives at <root>/py/maop/core/marketplace/
+    project_root = Path(__file__).resolve().parents[4]
+    return project_root / ".env.sandbox"
+
+
+def _load_sandbox_whitelist(
+    config_file: str | Path | None = None,
+) -> frozenset[str] | None:
+    """Load a custom variable whitelist from ``.env.sandbox``.
+
+    Returns
+    -------
+    frozenset[str] | None
+        The set of variable names marked ``yes``/``true``/``1``, or
+        ``None`` when the file is absent (caller should fall back to
+        the built-in :data:`_SAFE_ENV_VARS`).
+    """
+    path = _resolve_sandbox_config_path(config_file)
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        # File does not exist or is inaccessible → use defaults.
+        return None
+
+    # Return cached result if the file hasn't changed.
+    cached = _whitelist_cache.get(path)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+
+    enabled: set[str] = set()
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().lower()
+            if val in ("yes", "true", "1", "on"):
+                enabled.add(key)
+        result: frozenset[str] | None = frozenset(enabled)
+    except OSError as exc:
+        logger.warning("[sandbox] failed to read %s: %s", path, exc)
+        result = None
+
+    _whitelist_cache[path] = (mtime, result)
+    return result
+
+
+def build_sandbox_env(
+    base_env: dict[str, str] | None = None,
+    *,
+    extra_safe: frozenset[str] = frozenset(),
+    config_file: str | Path | None = None,
+) -> dict[str, str]:
+    """Build a sandbox-safe environment dict.
+
+    G-02 fix: only forwards variables matching the whitelist policy.
+
+    Parameters
+    ----------
+    base_env : dict[str, str] | None
+        The source environment (defaults to ``os.environ``).
+    extra_safe : frozenset[str]
+        Additional variable names to consider safe (merged with the
+        default :data:`_SAFE_ENV_VARS`). Use sparingly.
+    config_file : str | Path | None
+        Path to a ``.env.sandbox`` file that overrides the built-in
+        safe set. When ``None`` the path is resolved via
+        :func:`_resolve_sandbox_config_path` (env var or project-root
+        auto-discovery). If the file does not exist the built-in
+        defaults are used.
+
+    Returns
+    -------
+    dict[str, str]
+        A new dict containing only whitelisted variables.
+    """
+    if base_env is None:
+        base_env = dict(os.environ)
+
+    # Use custom whitelist from .env.sandbox if available, else defaults.
+    custom_whitelist = _load_sandbox_whitelist(config_file)
+    if custom_whitelist is not None:
+        safe = custom_whitelist | extra_safe
+    else:
+        safe = _SAFE_ENV_VARS | extra_safe
+    result: dict[str, str] = {}
+
+    for key, value in base_env.items():
+        # Defence-in-depth: never forward blocked variables.
+        if key in _BLOCKED_ENV_VARS:
+            logger.debug("[sandbox] blocked env var %s stripped", key)
+            continue
+        # Forward safe variables.
+        if key in safe:
+            result[key] = value
+            continue
+        # Forward MAOP_SANDBOX_* variables (explicit sandbox config).
+        if key.startswith(_SANDBOX_ENV_PREFIX):
+            result[key] = value
+            continue
+        # Everything else is stripped.
+
+    logger.debug(
+        "[sandbox] built env with %d vars (source had %d)",
+        len(result), len(base_env),
+    )
+    return result

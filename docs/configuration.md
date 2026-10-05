@@ -472,6 +472,52 @@
 - [ ] `MAOP_BACKUP_S3_BUCKET` — 配置 off-box 备份
 - [ ] `MAOP_PERSONAL_COST_CAP` — 设置成本上限护栏
 
+## 多租户（企业版）现状与边界
+
+**这一节是事实陈述，不是路线图。** 2026-10-05 实测核对，目的是避免「以为隔离了、其实没有」的误判。
+
+### 已隔离
+
+请求侧的租户身份来自 **JWT claim** → 认证中间件写入 `request.state.tenant_id`
+（`py/maop/core/security/middleware.py`）。读它的入口已收口到**唯一实现**
+`py/maop/core/tenant/context.py`：
+
+- `tenant_id_from_request(request)` —— 软读，缺省空串（单租户/个人版）；
+- `require_tenant_id(request)` —— 缺失即 403（合规/审计这类「没租户就没法正确回答」的接口）。
+
+各租户路由（notifications / memory / feedback / data / rbac / compliance /
+agent_versions 等）据此过滤查询结果；`TenantManager` 另提供 `TenantRLS` /
+`scoped_select` / `scoped_insert` 做行级约束。**身份绝不从 body/query 取**
+（调用方能随便声明自己属于哪个租户，这是 G-07 修过的越权口子）。
+
+### **未**隔离（编排链）
+
+以下都在 `maop run` / dashboard DAG / chat 三条真实派发入口的路径上，目前**不分租户**：
+
+| 组件 | 位置 | 现状 |
+|---|---|---|
+| 负载均衡统计 | `_global_lb`（`core/routing/load_balancer.py:567`） | 进程级单例，各租户共享 |
+| 路由评分 | RouteScorer `_instance`（`core/routing/route_scorer.py:465`） | 同上 |
+| 熔断器状态 | `core/reliability/circuit_breaker.py` | 按 agent 分键，**不按租户**；落 `data/maop.db` |
+| 数据文件 | `get_db_path()`（`core/backends/db_utils.py`） | 由 `MAOP_DATA_DIR` 决定，全局单一 |
+| agent/model 访问控制 | —— | `TenantManager.check_agent_access` / `check_model_access` **在派发链上一次都没被调用** |
+| 资源配额 | —— | 同上（`check_resource_quota` 无生产调用方） |
+
+**含义**：多租户部署下，A 租户把某个 agent 打到熔断会连带影响 B 租户；路由决策会受他租户
+负载影响；`TenantManager` 里配的「某租户不许用某 agent」目前**拦不住** `maop run`。
+
+### 已有的「缝」
+
+`py/maop/core/tenant/context.py` 的 `tenant_context(tenant_id)` 提供显式作用域，把租户身份
+带进非请求代码（如派发链）：`with tenant_context(tid): await dispatcher.dispatch(...)`。
+它是为后续接线预留的**唯一**注入点；本轮只提供原语，**没有改变任何执行路径**。
+
+要补齐上表需要动三处：① 派发漏斗里读 `current_tenant()` 并调 `TenantManager` 的检查
+（与既有 `MAOP_PERMISSION_ENFORCE` 同款 opt-in 开关）；② 熔断器/LB 的状态键加租户前缀；
+③ 数据路径按租户分域。**这是设计级改动，尚未排期。**
+
+---
+
 ## 验证门（`plan.gates`）
 
 Verify 阶段按 plan 里声明的 `gates` 列表逐条执行。内置门（`py/maop/maop_verify.py`
