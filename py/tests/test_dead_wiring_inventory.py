@@ -87,8 +87,13 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.core.evolution.prompt_version": ("unwired", "prompt 版本链未接入演化闭环的回滚路径"),
     "maop.core.evolution.regression": ("unwired", "Persona 回归未接入演化闭环"),
     "maop.core.marketplace.key_management": ("unwired", "marketplace 密钥管理未接线"),
-    "maop.core.marketplace.sandbox": ("unwired", "marketplace 沙箱未接线"),
-    "maop.core.marketplace.signing": ("unwired", "marketplace 签名未接线"),
+    "maop.core.marketplace.sandbox": (
+        "superseded",
+        (
+            "core/security/sandbox.py 是在跑的沙箱；本模块的 env 白名单已于 2026-10-05 移植过去，"
+            "剩下的 SandboxManager 是重复实现"
+        ),
+    ),    "maop.core.marketplace.signing": ("unwired", "marketplace 签名未接线"),
     "maop.core.mcp.mcp_adapter": ("unwired", "MCPAdapter 仅测试实例化；adapter_factory 不产出它"),
     "maop.core.memory.hybrid_search": ("unwired", "混合检索未接入记忆读路径"),
     "maop.core.memory.semantic_cache": ("unwired", "语义缓存未接入记忆读路径"),
