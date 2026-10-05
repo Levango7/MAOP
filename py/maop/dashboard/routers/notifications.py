@@ -104,6 +104,7 @@ class PublishEventRequest(BaseModel):
 
 # ── 请求模型：直接复用 enterprise.notification.models 中的 Create/Update ──
 # 让 FastAPI 自动校验请求体，避免手动 ``dict → Pydantic`` 转换。
+from maop.core.tenant.context import tenant_id_from_request
 from maop.enterprise.notification.models import (
     ChannelCreate,
     ChannelUpdate,
@@ -117,11 +118,12 @@ from maop.enterprise.notification.models import (
 
 
 def _tenant_id_from_request(request: Request) -> str:
-    """Extract tenant_id from JWT-injected request state.
+    """委托给唯一实现（见 maop/core/tenant/context.py）。
 
-    Falls back to empty string (single-tenant / personal edition).
+    本函数曾经是各路由里手抄的一份；抄写已经出现分歧（compliance fail-closed
+    而 rbac 软回退），所以统一到共享实现，此处只保留函数名给既有调用点。
     """
-    return getattr(request.state, "tenant_id", "") or ""
+    return tenant_id_from_request(request)
 
 
 def _user_id_from_request(request: Request) -> str:

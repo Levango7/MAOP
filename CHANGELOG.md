@@ -39,6 +39,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-05 评估批 G：沙箱环境过滤真接线、租户身份收口、租户边界写实
+
+**G1 沙箱：从「只约束工作目录」到「也约束凭据面」**
+
+`build_sandbox_env()`（白名单，只转发 PATH/HOME/SYSTEMROOT/TEMP 等运行必需项 + 显式放行的
+`MAOP_SANDBOX_*`）原先写在 `core/marketplace/sandbox.py` 里，而那个模块**零生产导入方**；
+真正在跑的沙箱 `core/security/sandbox.py` 在起子进程时**根本没传 `env=`** —— 沙箱内的命令
+继承**整份**服务器环境，包括 `MAOP_JWT_SECRET` / `MAOP_PG_PASSWORD` 与各类云凭据。
+
+现把白名单实现统一到 `core/security/sandbox.py` 并接到**两个**调用点上。踩到并记录一处教训：
+该模块有**两套并行实现**（同步 `run()` 走 `subprocess.run`，异步 `arun()` 走
+`create_subprocess_exec`），我第一版只补了异步那份，而**结构守卫当时只枚举
+`create_subprocess_exec`** —— 守卫绿、行为用例红。守卫已扩为枚举全部启动方式，并加了
+"两套实现都必须被覆盖"的断言。
+
+**G2 租户身份收口（消掉已经发生的漂移）**
+
+`request.state.tenant_id` 是唯一来源，但读它的函数在各路由里**手抄了 7 份**，且已经分歧：
+`compliance.py` 无租户即 403（fail-closed），`rbac.py` 同名同注释却软回退空串 ——
+"没租户怎么办"取决于走到哪个路由。现统一到 `core/tenant/context.py` 的两个语义明确的函数
+（`tenant_id_from_request` 软读 / `require_tenant_id` fail-closed），7 个旧函数名保留为转发，
+`sso.py` 里另外 4 处直接读取也一并收口。新增守卫：路由层**不许**再直接读
+`request.state.tenant_id`（判据只认请求状态上的，不认 `getattr(result/notif/payload, ...)`
+—— 早先版本一律命中、一次报出 3 处误报）。
+
+另提供 `tenant_context()` 上下文原语作为把租户身份带进编排链的**唯一**注入点（本轮只提供
+原语，不改变任何执行路径）。
+
+**G3 租户边界写实**
+
+新增 `docs/configuration.md`「多租户（企业版）现状与边界」：明确列出**已隔离**的
+（请求侧 JWT claim + 各租户路由过滤 + TenantRLS）与**未隔离**的（LB 统计 / 路由评分 /
+熔断器状态 / 数据路径全局单一；`check_agent_access`/`check_model_access`/配额在派发链上
+一次都没被调用）。避免"以为隔离了、其实没有"的误判。
+
 ### 2026-10-05 死接线清单：把"哪些模块写了却没人用"变成可执行事实
 
 评估这个仓时最容易出的两种错都是"凭印象数接线"，本次两样都踩了：

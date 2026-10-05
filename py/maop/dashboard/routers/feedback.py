@@ -30,6 +30,7 @@ from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
+from maop.core.tenant.context import tenant_id_from_request
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import chat_service
 
@@ -74,8 +75,12 @@ def _user_id_from_request(request: Request) -> str:
 
 
 def _tenant_id_from_request(request: Request) -> str:
-    """提取 tenant_id (多租户隔离)."""
-    return getattr(request.state, "tenant_id", "") or ""
+    """委托给唯一实现（见 maop/core/tenant/context.py）。
+
+    本函数曾经是各路由里手抄的一份；抄写已经出现分歧（compliance fail-closed
+    而 rbac 软回退），所以统一到共享实现，此处只保留函数名给既有调用点。
+    """
+    return tenant_id_from_request(request)
 
 
 def _is_admin(request: Request) -> bool:

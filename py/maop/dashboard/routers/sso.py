@@ -45,6 +45,7 @@ router = APIRouter(prefix="/api/sso", tags=["sso"])
 # ── Pydantic 请求模型（用于 body 参数类型） ────────────────────────
 # 直接复用 sso_store 中的 SSOProviderCreate / SSOProviderUpdate，
 # 让 FastAPI 自动校验请求体，避免手动 ``dict → Pydantic`` 转换。
+from maop.core.tenant.context import tenant_id_from_request
 from maop.enterprise.sso_store import SSOProviderCreate, SSOProviderUpdate
 
 
@@ -553,7 +554,7 @@ def _audit(
         from maop.enterprise.audit import AuditSeverity, EnterpriseAuditLogger
         logger_ = EnterpriseAuditLogger()
         actor = getattr(getattr(request, "state", None), "auth_identity", "") or ""
-        tenant_id = getattr(getattr(request, "state", None), "tenant_id", "") or ""
+        tenant_id = tenant_id_from_request(request)
         ip = request.client.host if request.client else ""
         logger_.log(
             action,
