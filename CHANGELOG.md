@@ -39,6 +39,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-06 评估批 I：把"分发"做成不需要外部账号也能用的一条路
+
+**I1 `Release Assets` 作业（零账号分发）+ 端到端实测**
+
+`Publish to PyPI` 的触发面虽然已打通，但仍卡在"需要 PyPI 账号 + trusted publisher 配置"这个外部动作上，
+而维护者的实际处境是**没有该账号** ⇒ "发布管线已就位"对他等于没有分发路径。本轮先实测澄清两条旧断言：
+① **不需要梯子** —— 本机 `pypi.org` TCP 0.22s / `https://pypi.org/` HTTP 200、`upload.pypi.org`
+TCP 0.35s、`docs.pypi.org` 可抓正文；② **公开包不涉及费用** —— 官方 FAQ 原文
+"PyPI does not support publishing private packages… the recommended solution is to run your own
+deployment of the devpi project"，即"要花钱/要自建"只出现在想要**私有索引**时。
+
+新增 `release-assets` 作业：tag push 时构建 wheel + sdist 并挂到对应 GitHub Release，只用 runner
+自带的 `gh` 与 `contents: write`，不引入第三方 action、不需要任何外部账号。
+`py/scripts/attach_release_assets.py` 三条硬规矩：空产物目录直接失败（"构建成功但什么都没产出"
+是同形失效）、缺 wheel 失败、**上传后回读 release assets 校验**（命令 0 退出 ≠ 附件真挂上）。
+守卫 `TestReleaseAssets` + 6 条脚本用例；变异验证：改掉作业键名 ⇒ 守卫按"作业缺失"红。
+
+端到端已跑通并留下可安装地址：在 `v5.2.0` 的 tag 提交（`665e3524`）上 `python -m build` 出
+wheel（1,241,526 B）/ sdist（1,749,318 B），METADATA 实测 `Name: maop-orchestrator /
+Version: 5.2.0`，上传后回读两个附件都在，`pip install <release-url>` 成功且装出来的包
+`python -m maop --help` 正常输出。（该 release 原本 `assets: []`，是这次补挂的；
+**附件必须从对应 tag 构建**，否则就是版本名与实际内容不符的发行物。）
+
+**I3 租户隔离：我先否掉了自己上一轮给的"最小切法"**
+
+上轮建议"从派发链上的 `check_agent_access` 起，代价小"。实测**不成立**：dashboard 的 DAG 执行路径
+`routers/dag.py` → `execution_service.execute_dag()` → `_default_step_executor` → `dispatch`
+这四层里 `tenant` 出现次数是 **0** —— 漏斗根本读不到租户身份。照原计划加 `MAOP_TENANT_ENFORCE`
+只会做出一个"开了也拦不住任何东西"的空开关，正是要避免的假门禁形态。
+准确前置（4 步下传 + 1 个未定策略：开启状态下"没有租户身份"的派发算拒还是算放行 ——
+个人版 `maop run` 与 chat 回退都没有租户身份）已写进 `docs/configuration.md`；
+**本批没动运行时代码**：宁可留一个明确的未接线事实，也不要一个看起来已启用的门禁。
+
+**I4 compose 里空转的 worker 写实**
+
+`agent-exec` 容器消费的 `agent_tasks` 队列在开源侧**没有生产者**（全仓零 enqueue，
+`queue_worker.py` 注释自认 "intentionally excluded"），该服务会正常启动、健康检查通过、然后空转。
+在 compose 项上方写清这条边界（保留部署是为与 MAOS 交付形态对齐），避免读者把它当"分布式执行已生效"的证据。
+
+**I5 三家凶再测：把 run 460 现场那条线索量出来了（并修掉，但不越界归因）**
+
+上一轮 run 460 的失败现场里有一条 "`subprocess.run` 被 MagicMock 替换 + 5 条
+`mcp-adapter-bg` 线程存活"。本轮定向复现：单进程跑 `tests/test_mcp_adapter.py`
+后实测残留 **5 条** 存活 daemon 线程 —— 与现场数字一致。机制是清楚的：
+`mock_hub` 只替换了 `MCPHub`，`_BackgroundLoop` 是**真的**（文件 docstring 明写），
+而该文件从头到尾**没调用过 `MCPAdapter.disconnect()` / `shutdown()`**。
+
+加了 autouse fixture `_reap_background_loops`：记录本用例起过的 loop，用例结束时全部
+`shutdown()`，并**断言线程确实死了**（`shutdown()` 将来退化就会红）。
+修后实测：残留 5 → **0**，34 条用例全绿。变异验证：把 `shutdown()` 的 `join` 去掉 ⇒
+断言红（"起了 1 个后台 loop，shutdown 后仍有 1 个线程存活"）。
+
+⚠️ **口径要收紧**：线程残留与 `subprocess.run` 被替身污染**不是同一件事**，
+本轮只是排除一个真实存在的干扰源（跨用例存活的后台 loop 会让"谁改了全局状态"的归因不可信）。
+**原始泄漏者仍未归位**，flaky 也仍未复现 —— 不说"已治本"。
+
+另一条方法学收获：第一次测量得到"0 线程"是**假的** —— `pyproject.toml` 的
+`addopts` 带 `-n auto`，`pytest_sessionfinish` 跑在 xdist 控制进程里，那里本来就没有
+测试线程。加 `-n 0` 才测到真值。这和本仓"xdist 下每 worker 各报各的"是同一类坑。
+
+**I6 本机全量 3 红：两条是跨仓契约漂移，其中一条让 admin 的列表恒空**
+
+批 I 收口前跑本机全量（`pytest py/tests/ -q -n 2 -m "not slow and not serial" --timeout=60 --reruns=0`）：
+**3 failed, 9783 passed, 56 skipped**（919s）。先做归属判定，再谈修复 ——
+在 `origin/master`（8fb8dad）建临时 worktree 用同一解释器跑同样三条：**同样 3 红**，
+所以不是批 I 引入的回归；批 I 的 diff 里 `py/maop/` 运行代码为 0 改动。
+
+三条红各自的真因都在**双仓契约**上（公开 CI 看不见它们，因为 CI 环境没有 `maop.enterprise`
+—— 又一次"依赖必须两头实测"）：
+
+1. `test_module_integrity.py::test_intact_tree_verifies`：MAOS `591a092`（10-04）给防篡改清单加了
+   **反向校验**（磁盘模块集合必须 ⊆ 清单声明集合，未登记即 fail-closed，因为"新增一个 .py 而不重签"
+   就是绕开整套防篡改的后门）。MAOP 侧的测试 fixture 却仍只签**顶层 `*.py` 并跳过 `__init__.py`**，
+   于是真实清单里合法存在的 `maop/enterprise/__init__.py` 与 `notification/` 子包 6 个文件被判成
+   未登记模块。修法是把收集口径对齐 MAOS：`rglob("*.py")`、排除 `__pycache__`、**含 `__init__.py` 与子包**。
+2. `test_notifications.py` 两条（store 级 + router 级）：MAOS `f9cbc70`（10-03）把
+   `list_channels/list_rules/list_templates` 的空租户语义从"所有租户"收紧为**"没有租户的行"**，
+   跨租户必须显式 `all_tenants=True`。MAOP 的三个列表端点仍在给 admin 的"不加过滤"传空串 ——
+   结果是**企业版 admin 的渠道/规则/模板列表恒空**（实测 `count: 0`），而路由注释与测试都写着"absent means all tenants"。
+   这不是测试过期，是**真实功能断了**。修法：`notification_service` 三函数增加 `all_tenants` 转发，
+   路由用新的 `_read_scope()` 统一判定 —— admin 且无显式过滤才给 `all_tenants=True`；
+   非 admin 一律 `False`（租户仍只来自 token，缺身份仍 403 fail-closed，语义未削弱）。
+
+**兼容性事实（必须先说）**：`f9cbc70` **不在任何已发布的 MAOS tag 里**
+（`enterprise-v5.2.2` 指向 `843976e`，2026-09-26，早于该硬化提交）。因此 MAOP master 从本批起
+要求 **MAOS ≥ `f9cbc70`**；对着已发布的 5.2.2 wheel 调用会 `TypeError: unexpected keyword 'all_tenants'`。
+按本仓惯例不加兼容垫片 —— 双仓 lockstep 交付，缺能力就该响亮地失败，
+而检测点就是这三条测试（装了 MAOS 才跑，正是开发机场景）。**MAOS 侧需要切一个 5.2.3，属待你定夺。**
+
+变异验证两组：① 去掉路由里 `all_tenants=all_tenants` 的转发 ⇒ 2 条红
+（`test_admin_sees_all_and_can_filter_by_tenant`、`test_router_masks_plaintext_config_from_service`，
+后者现在断言服务边界真收到 `all_tenants=True`，不再只回数据）；
+② 把 `_read_scope()` 的非 admin 分支改成 `True`（越权授予跨租户）⇒ 2 条边界红
+（`test_non_admin_ignores_client_tenant_param`、`test_tenant_param_has_no_effect_without_tenant_claim`，
+后者补了 `count == 0` 断言，把"空租户声明 = 拿不到任何带租户的行"钉成边界锁）。
+两处变异均已还原（`grep MUT` = 0）。
+
+修后实测：`tests/test_notifications.py tests/test_module_integrity.py -n 0` = **107 passed, 0 failed**；
+`ruff` 4 个改动文件 All checks passed；`mypy` 两个源文件 Success。
+顺带记录一处**未收敛的不对称**：MAOS 的 `list_notifications` 仍把空 `tenant_id` 当"无约束"
+（该提交没动它）。MAOP 侧靠非 admin 必须有身份（否则 403）挡住了越权读取，所以现状不暴露；
+但它是同类的洞，值得在 MAOS 侧一起收口 —— 本轮未动，因为那是另一仓的行为语义。
+
 ### 2026-10-06 评估批 H：把"注释认错"改成"行为打通"（发布链、版本站点、过期标记、两处口径自我更正）
 
 本批没有新架构决策，全部是**把已经承认过的问题真的接上**，以及两处我自己上一轮说错的话。

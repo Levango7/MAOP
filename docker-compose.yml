@@ -152,6 +152,13 @@ services:
         max-file: "3"
 
   # ── Agent Executor Worker ───────────────────────────────────────
+  # ⚠️ 现状（2026-10-06 核实，非缺陷而是边界）：这个容器消费的 `agent_tasks` 队列在
+  # **开源 MAOP 里没有生产者** —— 全仓（含本 compose 文件与所有入口）没有任何 enqueue，
+  # 而 `queue_worker.py` 的注释明确写着该队列"intentionally excluded"。
+  # 所以单独跑这套 OSS 栈时，本服务会正常启动、健康检查通过，然后**空转等活**。
+  # 分布式执行（多机 worker / DAG 节点级分发）是企业版 MAOS HA 特性，生产者在那一侧。
+  # 保留部署是为了与 MAOS 交付形态对齐；别把它当成"分布式执行已生效"的证据。
+  # 语义修复见批 D（失败不再 ACK、日志字段来源），模块 docstring 同样写着这条边界。
   agent-exec:
     build: *maop-build
     container_name: maop-agent-exec

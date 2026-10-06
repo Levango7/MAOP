@@ -515,9 +515,29 @@ agent_versions 等）据此过滤查询结果；`TenantManager` 另提供 `Tenan
 带进非请求代码（如派发链）：`with tenant_context(tid): await dispatcher.dispatch(...)`。
 它是为后续接线预留的**唯一**注入点；本轮只提供原语，**没有改变任何执行路径**。
 
-要补齐上表需要动三处：① 派发漏斗里读 `current_tenant()` 并调 `TenantManager` 的检查
-（与既有 `MAOP_PERMISSION_ENFORCE` 同款 opt-in 开关）；② 熔断器/LB 的状态键加租户前缀；
-③ 数据路径按租户分域。**这是设计级改动，尚未排期。**
+**2026-10-06 更正一处我自己给轻了的估计**：原先写"补齐需动三处"，其中第 ① 处
+（"派发漏斗里读 `current_tenant()` 并调 `TenantManager`"）听起来像加一个开关就行，
+实测**不是** —— dashboard 的 DAG 执行路径上**根本没有租户身份**：
+
+| 层 | 位置 | 实测 |
+|---|---|---|
+| 路由入口 | `py/maop/dashboard/routers/dag.py`（`execute_dag` 端点） | 该文件 `tenant` 出现次数 **0** |
+| 服务层 | `py/maop/dashboard/services/execution_service.py::execute_dag` | 签名里没有租户参数，文件 `tenant` 出现次数 **0** |
+| 步骤执行器 | 同文件 `_default_step_executor` → `dispatcher.dispatch(...)` | 拿不到租户身份 |
+| 漏斗 | `Dispatcher.dispatch()` | 只能从 `current_tenant()` 取，而上面三层没人设过 |
+
+所以在漏斗里加 `MAOP_TENANT_ENFORCE` 开关，做出来会是一个**开了也拦不住任何东西的空开关**
+（没有身份可读 ⇒ 要么恒放行、要么恒拒绝）。真做需要四步 + 一个尚未定的策略：
+
+1. `routers/dag.py` 从 `require_tenant_id(request)` 取身份并下传；
+2. `execution_service.execute_dag()` 签名加租户参数并传给步骤执行器；
+3. `_default_step_executor` 用 `tenant_context(tid)` 包住 `dispatch`；
+4. 漏斗里调 `check_agent_access`（opt-in 开关、fail-closed）；
+5. **待定策略**：开启状态下"没有租户身份"的派发算什么 —— 个人版 `maop run` 与 chat 回退
+   都没有租户身份，判拒会把个人版打死，判放行则多租户下等于没门。这个选择需要产品决定。
+
+因此本项**没有**随批 I 落代码：宁可留一个明确的未接线事实，也不要一个看起来已启用的假门禁。
+其余两项（② 熔断器/LB 状态键加租户前缀、③ 数据路径按租户分域）仍是独立的更大改动。
 
 ---
 

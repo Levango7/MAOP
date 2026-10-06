@@ -484,7 +484,11 @@ class TestNotificationStore:
             })
         t1_channels = store.list_channels(tenant_id="t1")
         assert len(t1_channels) == 2
-        all_channels = store.list_channels()
+        # MAOS 2026-10-03 起，空 tenant 读的是「没有租户的行」而不是「所有行」，
+        # 跨租户必须显式 all_tenants=True。这里同时钉住两面，防止 MAOP 侧
+        # 再有人把空过滤器当成「全部」（那正是那次加固堵的洞）。
+        assert store.list_channels() == []
+        all_channels = store.list_channels(all_tenants=True)
         assert len(all_channels) == 3
 
     def test_delete_channel(self, store):
@@ -1217,6 +1221,9 @@ class TestRouterIdentityIsolation:
         without_param = client.get("/api/notifications/channels")
         assert with_param.status_code == 200
         assert with_param.json() == without_param.json()
+        # 并且这条路径绝不能拿到跨租户数据：all_tenants 只随 admin 授予。
+        # 空租户声明 = 「没有租户的行」，这里两条渠道都带租户，所以必须是 0。
+        assert with_param.json()["count"] == 0
 
     def test_missing_identity_rejected_on_read_endpoints(self, manager, monkeypatch):
         """No user identity -> 403 (not an unscoped listing)."""
@@ -1246,9 +1253,25 @@ class TestRouterIdentityIsolation:
         assert r.json()["unread_count"] == 1
 
     def test_admin_sees_all_and_can_filter_by_tenant(self, manager, monkeypatch):
-        """Admin path keeps the query-param semantics (filter or all)."""
+        """Admin path keeps the query-param semantics (filter or all).
+
+        MAOS 把「空租户」改成「无租户的行」后，admin 的不加过滤必须走
+        ``all_tenants=True``；channels / rules / templates 三个列表端点同批
+        收紧，所以三条都验（漏一条就是那条恒空而没人看见）。
+        """
         manager.create_channel(ChannelCreate(name="t1-ch", type=ChannelType.INAPP, tenant_id="t1"))
         manager.create_channel(ChannelCreate(name="t2-ch", type=ChannelType.INAPP, tenant_id="t2"))
+        manager.create_rule(RuleCreate(
+            name="t1-rule", event_type="task_failed", channel_ids=["ch1"],
+            level=NotificationLevel.WARNING, tenant_id="t1",
+        ))
+        manager.create_rule(RuleCreate(
+            name="t2-rule", event_type="task_failed", channel_ids=["ch1"],
+            level=NotificationLevel.WARNING, tenant_id="t2",
+        ))
+        manager.create_template(TemplateCreate(
+            name="t1-tpl", body="hi {task}", tenant_id="t1",
+        ))
         _save_notification(manager, "n_a", user_id="alice", tenant_id="t1")
         _save_notification(manager, "n_b", user_id="bob", tenant_id="t2")
 
@@ -1258,6 +1281,11 @@ class TestRouterIdentityIsolation:
         only_t2 = admin.get("/api/notifications/channels?tenant_id=t2").json()
         assert only_t2["count"] == 1
         assert only_t2["channels"][0]["name"] == "t2-ch"
+
+        assert admin.get("/api/notifications/rules").json()["count"] == 2
+        assert admin.get("/api/notifications/rules?tenant_id=t2").json()["count"] == 1
+        assert admin.get("/api/notifications/templates").json()["count"] == 1
+        assert admin.get("/api/notifications/templates?tenant_id=t2").json()["count"] == 0
 
         assert admin.get("/api/notifications/list").json()["total"] == 2
         assert admin.get("/api/notifications/list?user_id=alice").json()["total"] == 1
@@ -1366,14 +1394,23 @@ class TestChannelConfigMasking:
         (unmasked) payload, the router masks it before responding."""
         from maop.dashboard.services import notification_service
 
-        monkeypatch.setattr(notification_service, "list_channels", lambda tenant_id="": [
-            {
-                "channel_id": "ch_raw",
-                "name": "raw",
-                "config": {"api_key": "plain-key", "auth_token": "plain-token", "host": "h"},
-                "tenant_id": "t1",
-            },
-        ])
+        seen: dict[str, bool] = {}
+
+        def _stub(tenant_id: str = "", *, all_tenants: bool = False) -> list[dict]:
+            # 记录 kwargs 而不只是回数据：路由若忘了把 all_tenants 传下来，
+            # 这里的断言会红（否则 admin 的跨租户读会静默变成恒空）。
+            seen["all_tenants"] = all_tenants
+            return [
+                {
+                    "channel_id": "ch_raw",
+                    "name": "raw",
+                    "config": {"api_key": "plain-key", "auth_token": "plain-token", "host": "h"},
+                    "tenant_id": "t1",
+                },
+            ]
+
+        monkeypatch.setattr(notification_service, "list_channels", _stub)
         client = _client_with_identity(manager, monkeypatch, roles=["admin"], identity="root", tenant="")
         cfg = client.get("/api/notifications/channels").json()["channels"][0]["config"]
         assert cfg == {"api_key": "***", "auth_token": "***", "host": "h"}
+        assert seen == {"all_tenants": True}

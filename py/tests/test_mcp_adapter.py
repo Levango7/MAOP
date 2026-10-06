@@ -48,6 +48,37 @@ def mock_hub():
         yield mock_instance
 
 
+@pytest.fixture(autouse=True)
+def _reap_background_loops(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest):
+    """每个用例结束时关掉本用例起的所有 `_BackgroundLoop` 线程，并断言线程真死了。
+
+    起因（2026-10-06 实测）：`mock_hub` 只替换了 `MCPHub`，`_BackgroundLoop` 是**真的**
+    （文件 docstring 也这么写），而 `MCPAdapter.disconnect()` 在本文件**一次都没被调用**
+    ⇒ 单进程跑完这个文件后残留 **5 条** 存活的 `mcp-adapter-bg` daemon 线程 ——
+    与 run 460 失败现场报出的"5 条 mcp-adapter-bg"数字完全一致。
+
+    线程残留与那次 `subprocess.run` 被替身污染**不是同一件事**，本 fixture 只是在排除
+    一个真实存在的干扰源：后台 loop 线程跨用例存活，会让"哪个用例改了全局状态"这类
+    归因变得不可信。因此这里不只清理，还**断言清理成功**——将来 `shutdown()` 退化就会红。
+    """
+    created: list[_BackgroundLoop] = []
+    real_init = _BackgroundLoop.__init__
+
+    def spy_init(self: _BackgroundLoop, *args: object, **kwargs: object) -> None:
+        real_init(self, *args, **kwargs)  # type: ignore[arg-type]
+        created.append(self)
+
+    monkeypatch.setattr(_BackgroundLoop, "__init__", spy_init)
+    yield
+    for loop in created:
+        loop.shutdown()
+    alive = [loop for loop in created if loop._thread.is_alive()]
+    assert not alive, (
+        f"{request.node.nodeid} 起了 {len(created)} 个后台 loop，"
+        f"shutdown 后仍有 {len(alive)} 个线程存活"
+    )
+
+
 # ── ABC contract ────────────────────────────────────────────────
 
 

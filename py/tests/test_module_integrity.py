@@ -50,10 +50,15 @@ def signed_tree(tmp_path, monkeypatch):
 
     def _sign() -> Path:
         files = {}
-        for f in sorted(ent.glob("*.py")):
-            if f.name == "__init__.py":
+        # 收集口径必须与 MAOS 侧完全一致：license.verify_module_integrity 的反向
+        # 校验用 rglob("*.py") 排除 __pycache__、**含 __init__.py 与子包**（否则
+        # 「新增模块不重签清单」就是绕开整套防篡改的后门）。此前本 fixture 只签
+        # 顶层 *.py 并跳过 __init__.py，于是真实清单里的 notification/ 子包与
+        # __init__.py 被判成未登记模块，本测试自 2026-10-03 起恒红。
+        for f in sorted(ent.rglob("*.py")):
+            if "__pycache__" in f.parts:
                 continue
-            rel = f"maop/enterprise/{f.name}"
+            rel = f"maop/enterprise/{f.relative_to(ent).as_posix()}"
             # 行尾归一口径必须与 verify_module_integrity / collect_module_hashes
             # 一致，否则 Windows（CRLF 检出）下本测试自己签的清单必被自己判为篡改。
             files[rel] = hashlib.sha256(

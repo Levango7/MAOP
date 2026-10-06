@@ -130,9 +130,13 @@ License 颁发指南见 [docs/enterprise/license-issuance-guide.md](docs/enterpr
 - `maop-enterprise`（Commercial，**私有仓库**）：依赖 `maop-orchestrator`，提供 `maop/enterprise/` 模块。分发方式：由厂商直接交付 wheel，或授权客户用带 token 的 `gh release download` / Releases 页面下载（私有仓库的 Releases **不对外匿名可下**）
 
 ```bash
-# 个人版（不含企业代码）——注意：两个包均**未发布到 PyPI**（实测 pypi.org 返回 404），
-# 从 GitHub 子目录安装：
+# 个人版（不含企业代码）——注意：两个包均**未发布到 PyPI**（实测 pypi.org 返回 404）。
+# 途径 A：从 GitHub 子目录安装（跟着 master 走）：
 pip install "maop-orchestrator @ git+https://github.com/Levango7/MAOP.git@master#subdirectory=py"
+# 途径 B：装 Release 附件（每个 tag 由 CI 的 Release Assets 作业自动构建并挂载）。
+# 下面这条是实测可装的：2026-10-06 从 v5.2.0 的 tag 提交构建、上传后回读校验通过，
+# 安装后 `python -m maop --help` 正常输出（wheel 1,241,526 B / sdist 1,749,318 B）：
+pip install "https://github.com/Levango7/MAOP/releases/download/v5.2.0/maop_orchestrator-5.2.0-py3-none-any.whl"
 # 企业版（私有仓库）：安装厂商交付的 wheel，或授权后用 gh 下载
 gh release download enterprise-v<版本> --repo Levango7/MAOS --pattern "*.whl"   # 需 gh auth login
 pip install ./maop_enterprise-<版本>-py3-none-any.whl

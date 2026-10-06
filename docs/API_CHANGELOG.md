@@ -2,6 +2,22 @@
 
 All notable changes to the MAOP REST API and WebSocket API.
 
+## Unreleased (2026-10-06)
+
+### Changed
+- 通知的三个列表端点 `GET /api/notifications/channels|rules|templates`：admin「不带 `?tenant_id=`」的语义改为**显式跨租户**。
+  MAOS `f9cbc70`（2026-10-03）把空 `tenant_id` 的含义从"所有租户"收紧为"没有租户的行"，跨租户必须走 `all_tenants=True`。
+  MAOP 此前把 admin 的空过滤器原样下传，**后果是这三类列表对 admin 恒空**（实测 `count: 0`）。
+  非 admin 语义不变：租户仍只来自 token，缺身份仍 403 fail-closed，且 `all_tenants` 只随 admin 授予（已加断言）。
+- 内部签名：`maop/dashboard/services/notification_service.py` 的 `list_channels` / `list_rules` / `list_templates`
+  新增 keyword-only `all_tenants`，并转发给 MAOS manager。**因此 MAOP master 要求 MAOS ≥ `f9cbc70`**
+  （该提交不在任何已发 tag 内；对着 `enterprise-v5.2.2` wheel 调用会 `TypeError`）。双仓 lockstep 交付，未加兼容垫片。
+
+### Fixed
+- `py/tests/test_module_integrity.py` 的签名 fixture 与 MAOS 反向校验口径不一致（只签顶层 `*.py`、跳过 `__init__.py`），
+  导致合法清单里的 `maop/enterprise/__init__.py` 与 `notification/` 子包被判成未登记模块、该用例自 10-04 起恒红。
+  现按 MAOS 口径递归收集（`rglob("*.py")`、排除 `__pycache__`、含 `__init__.py` 与子包）。
+
 ## v5.1.0 (2026-08-14)
 
 ### Added

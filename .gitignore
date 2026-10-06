@@ -68,6 +68,9 @@ data/budget_ledger.json
 data/vectors.json
 # runtime DAG execution checkpoints (per-run state, not seed configs)
 data/dag-checkpoints/
+# MAOS clock_guard 的防回拨水位线（enterprise/clock_guard.py: WATERMARK_FILENAME），
+# 本机跑测试时按 MAOP 仓库根写入；纯运行时状态，绝不能入库。
+data/clock_watermark.json
 
 # -- Logs --
 logs/
