@@ -43,6 +43,9 @@
 - [31. 告警通知](#31-告警通知)
 - [32. 未文档化变量补充说明](#32-未文档化变量补充说明)
 - [附录：生产环境检查清单](#附录生产环境检查清单)
+- [多租户（企业版）现状与边界](#多租户企业版现状与边界)
+- [验证门（`plan.gates`）](#验证门plangates)
+- [派发权限门（`MAOP_PERMISSION_ENFORCE`）怎么真正打开](#派发权限门maop_permission_enforce怎么真正打开)
 
 ---
 
@@ -559,6 +562,52 @@ Verify 阶段按 plan 里声明的 `gates` 列表逐条执行。内置门（`py/
 
 **注意**：内置的 plan/路由目前**不会自动声明** `expected_files`（各路由该产出什么文件是
 产品决定）—— 要用它得在 plan 里显式写上，或由自定义 planner 产出。
+
+---
+
+## 派发权限门（`MAOP_PERMISSION_ENFORCE`）怎么真正打开
+
+门本身已经接在唯一漏斗 `Dispatcher.dispatch()` 上（`py/maop/core/security/dispatch_gate.py`），
+CLI run / dashboard DAG / chat 流式回退三个入口共享同一次检查。默认 `0` 时它**挂载但不改变行为**，
+所以"权限门已实现"和"权限门在保护你"是两件事。按下面三步开，缺任何一步都会把派发全拒。
+
+**第 1 步：先种 allow 规则。** `PermissionManager.check()` 在**没有任何规则匹配**时返回
+`decision="ask"`（`py/maop/core/security/permission.py` 的 `check()` 末行兜底），而 ask 会建一条人工审批请求并
+**按拒绝处理**（fail-closed，退出码 126）。所以顺序不能反：先开关、后加规则 = 立即停摆。
+
+规则只有运营入口，没有 CLI —— dashboard API（需 admin/superadmin 角色，见
+`py/maop/core/security/middleware.py` 的 `require_admin()`）：
+
+```bash
+curl -X POST http://<host>/api/permission/rules \
+  -H "Authorization: Bearer <admin-jwt>" -H "Content-Type: application/json" \
+  -d '{"agent":"claude","action":"code.generate","decision":"allow","reason":"内部自用 agent","priority":100}'
+```
+
+字段与语义（模型在 `py/maop/dashboard/routers/permission.py` 的 `RuleCreate`）：
+
+| 字段 | 说明 |
+|---|---|
+| `agent` | agent 名，支持 `fnmatch` 通配（`*`、`?`、`[...]`） |
+| `action` | **是派发时的 `routing_key`，不是 agent 名**；门取的是 `routing_key or "execute"`。要放行默认路径就写 `"execute"` 或 `*` |
+| `decision` | `allow` / `deny` / `ask` |
+| `priority` | 数值大的先匹配（SQL 按 `priority DESC` 排序后取第一条命中） |
+
+落库位置：`get_db_path("permission")`。默认（`MAOP_DB_PER_MODULE=0`）时规则写在统一 SQLite 库的
+`permission_rules` 表里；`=1` 时才按模块拆成独立库文件 —— 查规则前先确认自己在哪种模式。
+
+先确认规则真命中，再开开关：
+
+```bash
+curl -H "Authorization: Bearer <admin-jwt>" \
+  "http://<host>/api/permission/check?agent=claude&action=code.generate"
+# 期望 decision=allow；仍返回 ask 说明 action 写错了（最常见的就是填成了 agent 名）
+```
+
+**第 2 步：** `MAOP_PERMISSION_ENFORCE=1`。
+
+**第 3 步：** 若还依赖 `pre_dispatch` 钩子做二次否决，确认钩子异常也是 fail-closed ——
+门把"检查崩溃"等同于"拒绝"，不会放行。
 
 ---
 

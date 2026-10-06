@@ -39,6 +39,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-06 评估批 H：把"注释认错"改成"行为打通"（发布链、版本站点、过期标记、两处口径自我更正）
+
+本批没有新架构决策，全部是**把已经承认过的问题真的接上**，以及两处我自己上一轮说错的话。
+
+**H4 `Publish to PyPI`：从"永不产生"到可达（并加防回潮守卫）**
+
+2026-09-29 的复核在 `ci.yml` 注释里写清了"本 job 当前不可达"，但**没改行为** —— 于是
+`if: ... refs/tags/v` 依旧恒假，PyPI 上 `maop-orchestrator` / `maop-enterprise` / `maos`
+实测仍全 404（`maop` 是他人的 0.0.0 占位包）。本轮补 `on.push.tags: ['v*']`，并逐环核对依赖链
+`scope → lint → test / frontend / e2e`：tag push 拿不到 diff 基线，`ci_path_scope` 走
+"空变更集 = 全量"的保守分支判 `code=true`，链上**没有**任何分支限定条件会把 publish 级联跳过
+（`docker` 那种 `ref == refs/heads/master` 的条件不在发布链上）。守卫
+`py/tests/test_ci_publish_reachable.py` 覆盖两类同形失效（触发面缺 tag / 链上有分支条件），
+含"删掉 `tags` 就 3 条变红"的变异验证。新增 `py/scripts/check_release_tag.py`：tag 与
+`__version__` 不符就拦在构建之前，并把"仍需在 PyPI 配 trusted publisher"打在成功路径上 ——
+**这一条是外部动作（需 PyPI 账号），我没有替它宣称完成**；未配置时第一条真 tag 会 401/403 红，
+该红就红。`Publish to PyPI` 仍不在 required 清单（也有用例守着，避免它把主干 PR 锁死）。
+
+**H3 版本同步守卫补齐后两处站点**
+
+`check_config_drift.version_drift()` 只比 `__init__.py` 与 `pyproject.toml`，而 CHANGELOG 发布
+checklist 第 3 条要求四处同步。实测漏掉的正是最容易半抬的两处：`py/Dockerfile` 的
+`LABEL version`、`dashboard-enterprise/package.json` 的 `version`。清单改为单一来源的
+`VERSION_SITES`，新守卫 `py/tests/test_version_sync_guard.py` 用合成树**逐站点**证明"单独改它
+会被抓到"以及"文件缺失/JSON 坏掉不会被当成全绿"，并核对文档点名的站点与守卫读的站点一致。
+
+**H1 一个过期标记**
+
+`py/tests/e2e/test_boundary_conditions.py` 的 `xfail(reason="已知脆弱点 BUG-001…")` 是非 strict
+标记，但 CI（ubuntu py3.13 ×3，`--reruns=0`）与本机（Windows py3.14）全部 **XPASS** ——
+`5a9709cb` 已在 `core/backends/db_utils.py` 实现"损坏则删库重建"，`84ed174f` 又收紧为
+"非损坏类错误原样抛出"。缺陷修了、标记没删，等于长期对外宣称"这里还有个已知脆弱点"。
+删除标记使其成为回归锁；变异验证：把恢复分支改成恒 `raise`，该用例立刻红。
+**判据：XPASS 是标记过期的信号，不是运气好。**
+
+**H5/H6 两处口径自我更正**
+
+- 我 2026-10-05 在 `ROADMAP.md` 写的"`.gitignore` 忽略整个 `deliverables/`，这类交付物
+  **结构性地不可能**作为仓库内物证"**不成立**：`.gitignore` 只挡未跟踪文件，
+  `git ls-tree origin/master -- deliverables/` 实测该目录仍有 9 个文件在版本控制内。
+  真实情况是验收标准点名的 `v4.4.1-fix-report.md` / `env-audit-4.4.2.md` **从未进入任何提交**
+  （该目录唯一真实交付物 `comprehensive-review-maop-2026-07-20.md` 已由 `495eaca3` 归档到
+  `docs/archive/audits/`）。条目按"不可满足 + 物证在别处"作废，不再挂成待办。
+- `docs/configuration.md` 补「派发权限门怎么真正打开」：门默认关是已知设计，但此前没写**运营路径**。
+  实测规则入口只有 dashboard API（无 CLI），且 `PermissionManager.check()` 无匹配时返回 `ask`
+  → 按拒处理；更关键的是规则里的 `action` 取的是**派发 `routing_key`（空则 `"execute"`）**，
+  不是 agent 名 —— 写错就永远 `ask`，这是开开关最容易踩的坑。顺带补齐该文档目录（批 G 新增的
+  两节此前也没进目录）。
+
+**H2 行尾归一化落主干**
+
+`* text=auto eol=lf` 此前只在本地工作分支（治的是 Windows 工具写 CRLF 造成的 1179 文件假改动，
+它还会污染 `.gitattributes` 里已登记的哈希类比对）。本轮实测 **1338 个 tracked blob 零 CRLF**
+⇒ 加属性不会改写任何历史内容，索引 blob 无变化；随本批进入 master。
+
 ### 2026-10-05 评估批 G：沙箱环境过滤真接线、租户身份收口、租户边界写实
 
 **G1 沙箱：从「只约束工作目录」到「也约束凭据面」**
