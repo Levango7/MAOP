@@ -94,6 +94,18 @@ checklist 第 3 条要求四处同步。实测漏掉的正是最容易半抬的�
 它还会污染 `.gitattributes` 里已登记的哈希类比对）。本轮实测 **1338 个 tracked blob 零 CRLF**
 ⇒ 加属性不会改写任何历史内容，索引 blob 无变化；随本批进入 master。
 
+**H9/H10 写文档时顺带发现的两个盲区**
+
+- 权限门的 **action 轴没有用例覆盖**：`test_dispatch_gate.py` 里所有真实 `PermissionManager`
+  用例都填 `action="*"`，于是"规则里的 `action` 取的是派发 `routing_key`（空则 `execute`）"
+  这条恰好被通配符遮住 —— 而它正是运维最容易填错的地方（把 agent 名当 action 填 ⇒ 永远 `ask`
+  ⇒ 开关"配了却不生效"）。补双向用例并做变异验证：`action=routing_key or "execute"` 改成
+  `action=agent` ⇒ 两条同时红。
+- `ROADMAP.md` 的「当前状态」还留着批 C 已核实**无出处**的"7 个 evolution API 端点"——
+  当时只在 v5.2.0 节写了更正，漏了这一行（实测 `evolve_insights.py` 15 个路由、其中闭环
+  6 个 `/api/evolution/*`；`evolution_experiment.py` 16 个）。
+  **教训：同一个错误数字常出现在两处，改一处不算改完。**
+
 ### 2026-10-05 评估批 G：沙箱环境过滤真接线、租户身份收口、租户边界写实
 
 **G1 沙箱：从「只约束工作目录」到「也约束凭据面」**
