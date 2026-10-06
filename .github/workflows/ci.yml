@@ -9,6 +9,13 @@ name: MAOP CI
 on:
   push:
     branches: [main, master, develop]
+    # 2026-10-06：补 tag 触发，让 `publish` 作业的 `if: ... refs/tags/v` 真的可能成立。
+    # 此前 `on.push` 只有 branches，而 GitHub 的 branches 过滤会**排除所有 tag push** ——
+    # publish 因此自 2026-09-29 复核起一直是"永不产生"的死作业（当时只在注释里认错，
+    # 没改行为）。守卫见 py/tests/test_ci_publish_reachable.py。
+    # 影响面：只多响应 tag push 事件；branch/PR 行为逐字不变；`Publish to PyPI`
+    # 不在 .github/ci-required-checks.json 的 required 清单里，不会拦住任何合并。
+    tags: ['v*']
   pull_request:
     # develop 是长期集成分支（BRANCH_STRATEGY：feature/fix 的 PR 目标即 develop），
     # 2026-09-29 补上；此前 PR 目标为 develop 时整个 workflow 不触发。
@@ -955,14 +962,18 @@ jobs:
     # 诚实化（2026-09-25）：不再依赖 perf-smoke（原 `performance` job，非负载
     # 门禁，不应阻塞 PyPI 发布）。发布由 test / frontend / e2e 把关。
     #
-    # 2026-09-29 复核：本 job **当前不可达**。`on.push` 只声明了 branches
-    # （main/master/develop），GitHub 的 branches 过滤会排除所有 tag push，
-    # 因此 `if: ... refs/tags/v` 永远不成立 —— 把 tag 打进 Ref 也换不来一次运行。
-    # PyPI 也从未真正发布过（CHANGELOG:245：两个包名实测 404）。
-    # 启用需要两步（均属外部副作用，需单独决策，勿顺手改）：
-    #   ① 在 on.push 下补 `tags: ['v*']`；
-    #   ② 在 PyPI 为 maop 配置 trusted publisher（本 job 用 OIDC，无 token secret）。
-    # 在此之前保留本 job 作为"发布管线已就位"的样板，但不要把它当既有能力宣传。
+    # 2026-09-29 复核曾确认本 job **不可达**（`on.push` 只有 branches ⇒ tag push 被
+    # 平台过滤，`if: ... refs/tags/v` 恒假），当时只留注释、没改行为。
+    # 2026-10-06 打通触发面：`on.push.tags: ['v*']` 已补上，依赖链 scope→lint→test /
+    # frontend / e2e 在 tag push 上都会真跑（tag push 拿不到 diff 基线，
+    # ci_path_scope 按"空变更集 = 全量"的保守分支判 code=true，正是发布想要的）。
+    # 守卫：py/tests/test_ci_publish_reachable.py（含反向对照）。
+    #
+    # 仍缺的**外部**前置（需 PyPI 账号，不能由本仓库完成）：
+    #   在 PyPI 项目 `maop-orchestrator` 把本仓库登记为 trusted publisher
+    #   （Owner=Levango7 / Repository=MAOP / Workflow=ci.yml）。
+    # 未配置时第一条真 tag 会在 `Publish maop` 步骤 401/403 红 ——
+    # 那是**该红就红**，不要再把它改成恒绿。
     needs: [test, frontend, e2e]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -976,6 +987,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Release integrity precheck
+        run: python scripts/check_release_tag.py --ref "${{ github.ref }}"
 
       - name: Build packages
         run: |

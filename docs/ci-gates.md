@@ -1,7 +1,8 @@
 # CI 门禁与触发面
 
 > 面向改 MAOP 的人：哪些检查一定会跑、哪些会被跳过、以及**怎么分辨"跳过了"和"根本没跑"**。
-> 最后更新：2026-09-29（部署工件纳入分类面、publish 死代码注释、镜像 node 对齐后）。
+> 最后更新：2026-10-06（publish 的 tag 触发由"注释认错"改为真打通、版本站点守卫补齐
+> Dockerfile 与 package.json、部署工件纳入分类面、镜像 node 对齐）。
 
 ## 1. 触发模型
 
@@ -14,7 +15,8 @@ scope ──┬─→ lint ─→ test(9 平台矩阵) ─→ audit / sbom
         ├─→ frontend ─→ e2e
         └─→ docs-gate（依赖 scope，但无条件跑）
 secret-scan（无条件，永远跑）
-docker / container-scan / compose-smoke / publish（仅 trunk push，见 §4）
+docker / container-scan / compose-smoke（仅 trunk push，见 §4）
+publish（仅 tag push `v*`；2026-10-06 才补上 tag 触发，见 §3 第 3 条）
 ```
 
 - `docs-gate` 跑 `py/scripts/check_docs_consistency.py --gate`（README + docs/ 的路径存在性、
@@ -55,11 +57,18 @@ PR 触发器不许再出现 `paths`、`scope` 必须是无条件根作业、`lin
 2. **`Container Scan (trivy)` 红不一定是漏洞**：镜像构建走第三方 PyPI 源，偶发返回空候选集会报
    `... (from versions: none)`；同一 commit 的 `Docker build` / `Compose Smoke` 若都绿，
    单独重跑即恢复。已给该层加 3 次退避重试。
-3. **`Publish to PyPI` 永远不跑，不是失败、也不是"偶尔 skipped"**。`on.push` 只声明了
-   branches，GitHub 的 branches 过滤排除所有 tag push，而该 job 的条件是
-   `refs/tags/v*` —— 条件永远不成立。PyPI 侧也从未发布过（`CHANGELOG.md:245`：包名实测 404）。
-   要让发布真正发生需两步：`on.push` 补 `tags: ['v*']` + 在 PyPI 配置 trusted publisher
-   （该 job 走 OIDC，无 token secret）。在此之前不要对外称"已支持 PyPI 发布"。
+3. **`Publish to PyPI`：触发面 2026-10-06 才打通，此前恒不产生**。该 job 的条件是
+   `refs/tags/v*`，而 `on.push` 原先只声明 branches（GitHub 的 branches 过滤会排除所有 tag
+   push）—— 于是它连一条 check 都不创建，"发布管线已就位"是假的。现已补 `tags: ['v*']`，
+   并确认依赖链（scope→lint→test / frontend / e2e）在 tag push 上都会真跑：tag push 拿不到
+   diff 基线，`ci_path_scope` 按"空变更集 = 全量"的保守分支判 `code=true`。
+   守卫：`py/tests/test_ci_publish_reachable.py`（含"删掉 tags 触发就变红"的反向对照），
+   发布前还有 `py/scripts/check_release_tag.py` 核对 tag 与 `__version__`。
+   **仍缺的是外部前置**：在 PyPI 项目 `maop-orchestrator` 把本仓库登记为 trusted publisher
+   （Owner=Levango7 / Repository=MAOP / Workflow=ci.yml，该 job 走 OIDC、无 token secret）。
+   未配置前第一条真 tag 会在 `Publish maop` 步骤 401/403 红 —— 该红就该红。
+   实测口径：PyPI 上 `maop-orchestrator` / `maop-enterprise` / `maos` 目前均 404
+   （`maop` 这个名字是他人的 0.0.0 占位包），所以不要对外称"已可 pip install"。
 
 ## 4. 容器作业的特别提示（改 `py/Dockerfile` 前必读）
 
