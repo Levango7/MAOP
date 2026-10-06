@@ -15,6 +15,7 @@ import fnmatch
 import json
 import pathlib
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -25,6 +26,7 @@ CI = REPO / ".github" / "workflows" / "ci.yml"
 SCRIPTS = REPO / "py" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+import attach_release_assets
 import check_release_tag
 import ci_path_scope
 
@@ -191,3 +193,92 @@ class TestGuardIsNotVacuous:
             "jobs": {"publish": {"if": "startsWith(github.ref, 'refs/tags/v')"}},
         }
         assert unreachable_jobs_for_tag_push(doc) == []
+
+
+class TestReleaseAssets:
+    """GitHub Release 附件作业：零外部账号的分发路径，必须同样"可达且真做事"。"""
+
+    JOB = "release-assets"
+
+    def _job(self) -> dict:
+        jobs = _doc()["jobs"]
+        assert self.JOB in jobs, f"ci.yml 缺 {self.JOB} 作业 ⇒ 没有 PyPI 账号时又变成无分发路径"
+        return jobs[self.JOB]
+
+    def test_reachable_on_tag_push(self) -> None:
+        assert "refs/tags/v" in str(self._job().get("if", "")), "作业条件没锁定 tag，等于永远不跑或每次都跑"
+
+    def test_dependency_chain_runs_on_tag_push(self) -> None:
+        jobs = _doc()["jobs"]
+        offenders = [
+            f"{name}: {jobs[name].get('if')}"
+            for name in _dependency_closure(jobs, self.JOB)
+            if "refs/heads/" in str(jobs[name].get("if") or "")
+        ]
+        assert not offenders, "Release 附件链上有分支限定条件，tag push 会被级联跳过：" + " | ".join(offenders)
+
+    def test_has_contents_write_permission(self) -> None:
+        perms = self._job().get("permissions") or {}
+        assert perms.get("contents") == "write", f"上传 release 附件需要 contents: write，实际 {perms}"
+
+    def test_not_a_required_check(self) -> None:
+        manifest = json.loads((REPO / ".github" / "ci-required-checks.json").read_text(encoding="utf-8-sig"))
+        assert self.JOB not in {c["job"] for c in manifest["contexts"]}, (
+            "Release 附件进 required 会让每次 tag push 的失败锁住主干 PR —— 它必须是独立后果"
+        )
+
+    def test_step_invokes_the_script_with_tag_and_dist(self) -> None:
+        steps = self._job()["steps"]
+        step = next((s for s in steps if "attach_release_assets.py" in str(s.get("run", ""))), None)
+        assert step is not None, "没有调用 attach_release_assets.py 的步骤 ⇒ 构建产物无处可去"
+        run = str(step["run"])
+        assert "GITHUB_REF_NAME" in run, "没把真实 tag 传给脚本"
+        assert "dist" in run, "没指向构建产物目录"
+        assert "|| true" not in run and "continue-on-error" not in str(step), "上传失败不许被吞"
+
+
+class TestAttachReleaseAssetsScript:
+    def _dist(self, tmp_path: Path, names: dict[str, int]) -> Path:
+        d = tmp_path / "dist"
+        d.mkdir()
+        for name, size in names.items():
+            (d / name).write_bytes(b"x" * size)
+        return d
+
+    def test_picks_wheel_and_sdist(self, tmp_path: Path) -> None:
+        d = self._dist(tmp_path, {
+            "maop_orchestrator-5.2.1-py3-none-any.whl": 10,
+            "maop_orchestrator-5.2.1.tar.gz": 20,
+            "random.log": 5,
+        })
+        got = [p.name for p in attach_release_assets.expected_files(d)]
+        assert got == ["maop_orchestrator-5.2.1-py3-none-any.whl", "maop_orchestrator-5.2.1.tar.gz"]
+
+    def test_empty_file_is_not_an_artifact(self, tmp_path: Path) -> None:
+        d = self._dist(tmp_path, {"maop-5.2.1-py3-none-any.whl": 0, "x.tar.gz": 3})
+        assert [p.name for p in attach_release_assets.expected_files(d)] == ["x.tar.gz"]
+
+    def test_existing_release_uses_upload_clobber(self) -> None:
+        files = [Path("a.whl"), Path("a.tar.gz")]
+        cmd = attach_release_assets.build_command(tag="v5.2.1", files=files, release_exists=True)
+        assert cmd[:3] == ["gh", "release", "upload"] and "--clobber" in cmd
+
+    def test_missing_release_creates_it_with_verified_tag(self) -> None:
+        cmd = attach_release_assets.build_command(tag="v5.2.1", files=[Path("a.whl")], release_exists=False)
+        assert cmd[:3] == ["gh", "release", "create"]
+        assert "--verify-tag" in cmd, "不校验 tag 就创建 release，会把不存在的 tag 当成新建对象"
+
+    def test_dry_run_with_no_artifacts_fails_loudly(self, tmp_path: Path) -> None:
+        d = tmp_path / "dist"
+        d.mkdir()
+        code = attach_release_assets.main([
+            "--tag", "v5.2.1", "--dist-dir", str(d), "--repo", "o/r", "--dry-run",
+        ])
+        assert code == 1, "空产物目录必须拦下：否则会出现「release 建好了但什么都没挂上」"
+
+    def test_dry_run_without_repo_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # 在 Actions 里跑测试时 GITHUB_REPOSITORY 是有值的，必须显式清掉才能测到"缺 repo"分支
+        monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+        d = self._dist(tmp_path, {"a-py3-none-any.whl": 1})
+        code = attach_release_assets.main(["--tag", "v5.2.1", "--dist-dir", str(d), "--dry-run"])
+        assert code == 1, "没有 --repo 也没有 GITHUB_REPOSITORY 时必须失败而不是猜默认值"

@@ -1001,6 +1001,45 @@ jobs:
         with:
           packages-dir: dist/
 
+  # ── Release 附件：不需要任何外部账号就能拿到可安装的包 ────────────────
+  # 为什么要独立一条：`Publish to PyPI` 的触发面虽然已打通，但真发布还差 PyPI 账号 +
+  # trusted publisher 配置（外部动作，需要人注册）。在那之前，"发布管线"如果只是
+  # 一句"等配好账号就通了"，等于仍然没有分发路径。GitHub Release 附件没有这个前置：
+  # runner 用自带 token 就能上传，使用者 `pip install <release-asset-url>` 即可。
+  # 只用 GitHub 自带能力（`gh` CLI + `contents: write`），不引入第三方 action。
+  # 与 publish 作业互不依赖：PyPI 配好之后两条路可以并存（GitHub 给即时资产，
+  # PyPI 给 `pip install maop-orchestrator` 的常规体验）。
+  release-assets:
+    name: Release Assets
+    runs-on: ubuntu-latest
+    needs: [test, frontend, e2e]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: py
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Build packages
+        run: |
+          pip install build
+          python -m build
+
+      - name: Attach assets to GitHub Release
+        # 逻辑放在单个 python 调用里（不写 bash 循环/命令替换）—— 本仓有过
+        # "bash 构造在 runner 上静默不执行"的记录（见 compose-smoke 步骤注释）。
+        # 脚本自己会回读 release 的 assets 做校验：命令 0 退出 ≠ 附件真挂上了。
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/attach_release_assets.py --tag "${GITHUB_REF_NAME}" --dist-dir dist
+        shell: bash
+
   # ── Compose Smoke Test（仅冒烟，非部署；真实部署能力待建，见 P1-3 方案 B）─────────────────────────────────────────
   compose-smoke:
     name: Compose Smoke
