@@ -99,6 +99,49 @@ Version: 5.2.0`，上传后回读两个附件都在，`pip install <release-url>
 `addopts` 带 `-n auto`，`pytest_sessionfinish` 跑在 xdist 控制进程里，那里本来就没有
 测试线程。加 `-n 0` 才测到真值。这和本仓"xdist 下每 worker 各报各的"是同一类坑。
 
+**I6 本机全量 3 红：两条是跨仓契约漂移，其中一条让 admin 的列表恒空**
+
+批 I 收口前跑本机全量（`pytest py/tests/ -q -n 2 -m "not slow and not serial" --timeout=60 --reruns=0`）：
+**3 failed, 9783 passed, 56 skipped**（919s）。先做归属判定，再谈修复 ——
+在 `origin/master`（8fb8dad）建临时 worktree 用同一解释器跑同样三条：**同样 3 红**，
+所以不是批 I 引入的回归；批 I 的 diff 里 `py/maop/` 运行代码为 0 改动。
+
+三条红各自的真因都在**双仓契约**上（公开 CI 看不见它们，因为 CI 环境没有 `maop.enterprise`
+—— 又一次"依赖必须两头实测"）：
+
+1. `test_module_integrity.py::test_intact_tree_verifies`：MAOS `591a092`（10-04）给防篡改清单加了
+   **反向校验**（磁盘模块集合必须 ⊆ 清单声明集合，未登记即 fail-closed，因为"新增一个 .py 而不重签"
+   就是绕开整套防篡改的后门）。MAOP 侧的测试 fixture 却仍只签**顶层 `*.py` 并跳过 `__init__.py`**，
+   于是真实清单里合法存在的 `maop/enterprise/__init__.py` 与 `notification/` 子包 6 个文件被判成
+   未登记模块。修法是把收集口径对齐 MAOS：`rglob("*.py")`、排除 `__pycache__`、**含 `__init__.py` 与子包**。
+2. `test_notifications.py` 两条（store 级 + router 级）：MAOS `f9cbc70`（10-03）把
+   `list_channels/list_rules/list_templates` 的空租户语义从"所有租户"收紧为**"没有租户的行"**，
+   跨租户必须显式 `all_tenants=True`。MAOP 的三个列表端点仍在给 admin 的"不加过滤"传空串 ——
+   结果是**企业版 admin 的渠道/规则/模板列表恒空**（实测 `count: 0`），而路由注释与测试都写着"absent means all tenants"。
+   这不是测试过期，是**真实功能断了**。修法：`notification_service` 三函数增加 `all_tenants` 转发，
+   路由用新的 `_read_scope()` 统一判定 —— admin 且无显式过滤才给 `all_tenants=True`；
+   非 admin 一律 `False`（租户仍只来自 token，缺身份仍 403 fail-closed，语义未削弱）。
+
+**兼容性事实（必须先说）**：`f9cbc70` **不在任何已发布的 MAOS tag 里**
+（`enterprise-v5.2.2` 指向 `843976e`，2026-09-26，早于该硬化提交）。因此 MAOP master 从本批起
+要求 **MAOS ≥ `f9cbc70`**；对着已发布的 5.2.2 wheel 调用会 `TypeError: unexpected keyword 'all_tenants'`。
+按本仓惯例不加兼容垫片 —— 双仓 lockstep 交付，缺能力就该响亮地失败，
+而检测点就是这三条测试（装了 MAOS 才跑，正是开发机场景）。**MAOS 侧需要切一个 5.2.3，属待你定夺。**
+
+变异验证两组：① 去掉路由里 `all_tenants=all_tenants` 的转发 ⇒ 2 条红
+（`test_admin_sees_all_and_can_filter_by_tenant`、`test_router_masks_plaintext_config_from_service`，
+后者现在断言服务边界真收到 `all_tenants=True`，不再只回数据）；
+② 把 `_read_scope()` 的非 admin 分支改成 `True`（越权授予跨租户）⇒ 2 条边界红
+（`test_non_admin_ignores_client_tenant_param`、`test_tenant_param_has_no_effect_without_tenant_claim`，
+后者补了 `count == 0` 断言，把"空租户声明 = 拿不到任何带租户的行"钉成边界锁）。
+两处变异均已还原（`grep MUT` = 0）。
+
+修后实测：`tests/test_notifications.py tests/test_module_integrity.py -n 0` = **107 passed, 0 failed**；
+`ruff` 4 个改动文件 All checks passed；`mypy` 两个源文件 Success。
+顺带记录一处**未收敛的不对称**：MAOS 的 `list_notifications` 仍把空 `tenant_id` 当"无约束"
+（该提交没动它）。MAOP 侧靠非 admin 必须有身份（否则 403）挡住了越权读取，所以现状不暴露；
+但它是同类的洞，值得在 MAOS 侧一起收口 —— 本轮未动，因为那是另一仓的行为语义。
+
 ### 2026-10-06 评估批 H：把"注释认错"改成"行为打通"（发布链、版本站点、过期标记、两处口径自我更正）
 
 本批没有新架构决策，全部是**把已经承认过的问题真的接上**，以及两处我自己上一轮说错的话。
