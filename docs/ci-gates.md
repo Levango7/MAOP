@@ -319,6 +319,12 @@ required 上下文 4 条，其余保护项全关：
 0 failed / 2 分 44 秒**（skip 的那批需要真 LDAP 服务），所以放 nightly 不占 PR 时间，
 也不写 `|| true`（本仓禁止吞失败的门禁，§6）。
 
+> 上面这组数字是**进度型**的，截至 `684c15a`（2026-10-06）。现在要重测：
+> `cd py && MAOP_ENV=test python -m pytest tests/ -q -m slow --timeout=300 -n 0 --no-cov`，
+> 或只看族的大小 `python -m pytest tests/ -q --collect-only -m slow`。
+> 各文件的条数同理（`-m slow --collect-only` 按文件分组数）。
+> 这一族的**存在性**由守卫保证，数字变了不代表门禁失效 —— 别照抄旧数。
+
 守卫在 `py/tests/test_nightly_flaky_coverage.py` 的 `TestSlowMarkerCoverage`：它扫出所有
 含 `pytest.mark.slow` 的文件，要求**存在一条路径命中它、且标记表达式没排除 slow 的腿**，
 否则点名报出未覆盖的文件。反向对照也写成了用例（把所有腿都改成 `not slow` 时必须报红），
