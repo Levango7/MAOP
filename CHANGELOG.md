@@ -39,6 +39,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### 2026-10-06 评估批 I：把"分发"做成不需要外部账号也能用的一条路
+
+**I1 `Release Assets` 作业（零账号分发）+ 端到端实测**
+
+`Publish to PyPI` 的触发面虽然已打通，但仍卡在"需要 PyPI 账号 + trusted publisher 配置"这个外部动作上，
+而维护者的实际处境是**没有该账号** ⇒ "发布管线已就位"对他等于没有分发路径。本轮先实测澄清两条旧断言：
+① **不需要梯子** —— 本机 `pypi.org` TCP 0.22s / `https://pypi.org/` HTTP 200、`upload.pypi.org`
+TCP 0.35s、`docs.pypi.org` 可抓正文；② **公开包不涉及费用** —— 官方 FAQ 原文
+"PyPI does not support publishing private packages… the recommended solution is to run your own
+deployment of the devpi project"，即"要花钱/要自建"只出现在想要**私有索引**时。
+
+新增 `release-assets` 作业：tag push 时构建 wheel + sdist 并挂到对应 GitHub Release，只用 runner
+自带的 `gh` 与 `contents: write`，不引入第三方 action、不需要任何外部账号。
+`py/scripts/attach_release_assets.py` 三条硬规矩：空产物目录直接失败（"构建成功但什么都没产出"
+是同形失效）、缺 wheel 失败、**上传后回读 release assets 校验**（命令 0 退出 ≠ 附件真挂上）。
+守卫 `TestReleaseAssets` + 6 条脚本用例；变异验证：改掉作业键名 ⇒ 守卫按"作业缺失"红。
+
+端到端已跑通并留下可安装地址：在 `v5.2.0` 的 tag 提交（`665e3524`）上 `python -m build` 出
+wheel（1,241,526 B）/ sdist（1,749,318 B），METADATA 实测 `Name: maop-orchestrator /
+Version: 5.2.0`，上传后回读两个附件都在，`pip install <release-url>` 成功且装出来的包
+`python -m maop --help` 正常输出。（该 release 原本 `assets: []`，是这次补挂的；
+**附件必须从对应 tag 构建**，否则就是版本名与实际内容不符的发行物。）
+
+**I3 租户隔离：我先否掉了自己上一轮给的"最小切法"**
+
+上轮建议"从派发链上的 `check_agent_access` 起，代价小"。实测**不成立**：dashboard 的 DAG 执行路径
+`routers/dag.py` → `execution_service.execute_dag()` → `_default_step_executor` → `dispatch`
+这四层里 `tenant` 出现次数是 **0** —— 漏斗根本读不到租户身份。照原计划加 `MAOP_TENANT_ENFORCE`
+只会做出一个"开了也拦不住任何东西"的空开关，正是要避免的假门禁形态。
+准确前置（4 步下传 + 1 个未定策略：开启状态下"没有租户身份"的派发算拒还是算放行 ——
+个人版 `maop run` 与 chat 回退都没有租户身份）已写进 `docs/configuration.md`；
+**本批没动运行时代码**：宁可留一个明确的未接线事实，也不要一个看起来已启用的门禁。
+
+**I4 compose 里空转的 worker 写实**
+
+`agent-exec` 容器消费的 `agent_tasks` 队列在开源侧**没有生产者**（全仓零 enqueue，
+`queue_worker.py` 注释自认 "intentionally excluded"），该服务会正常启动、健康检查通过、然后空转。
+在 compose 项上方写清这条边界（保留部署是为与 MAOS 交付形态对齐），避免读者把它当"分布式执行已生效"的证据。
+
+**I5 三家凶再测：把 run 460 现场那条线索量出来了（并修掉，但不越界归因）**
+
+上一轮 run 460 的失败现场里有一条 "`subprocess.run` 被 MagicMock 替换 + 5 条
+`mcp-adapter-bg` 线程存活"。本轮定向复现：单进程跑 `tests/test_mcp_adapter.py`
+后实测残留 **5 条** 存活 daemon 线程 —— 与现场数字一致。机制是清楚的：
+`mock_hub` 只替换了 `MCPHub`，`_BackgroundLoop` 是**真的**（文件 docstring 明写），
+而该文件从头到尾**没调用过 `MCPAdapter.disconnect()` / `shutdown()`**。
+
+加了 autouse fixture `_reap_background_loops`：记录本用例起过的 loop，用例结束时全部
+`shutdown()`，并**断言线程确实死了**（`shutdown()` 将来退化就会红）。
+修后实测：残留 5 → **0**，34 条用例全绿。变异验证：把 `shutdown()` 的 `join` 去掉 ⇒
+断言红（"起了 1 个后台 loop，shutdown 后仍有 1 个线程存活"）。
+
+⚠️ **口径要收紧**：线程残留与 `subprocess.run` 被替身污染**不是同一件事**，
+本轮只是排除一个真实存在的干扰源（跨用例存活的后台 loop 会让"谁改了全局状态"的归因不可信）。
+**原始泄漏者仍未归位**，flaky 也仍未复现 —— 不说"已治本"。
+
+另一条方法学收获：第一次测量得到"0 线程"是**假的** —— `pyproject.toml` 的
+`addopts` 带 `-n auto`，`pytest_sessionfinish` 跑在 xdist 控制进程里，那里本来就没有
+测试线程。加 `-n 0` 才测到真值。这和本仓"xdist 下每 worker 各报各的"是同一类坑。
+
 ### 2026-10-06 评估批 H：把"注释认错"改成"行为打通"（发布链、版本站点、过期标记、两处口径自我更正）
 
 本批没有新架构决策，全部是**把已经承认过的问题真的接上**，以及两处我自己上一轮说错的话。
