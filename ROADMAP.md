@@ -7,7 +7,7 @@
 
 ## 当前状态
 
-- **已发布**：v5.2.0（2026-09-08，minor）— 自演化闭环 MVP 接入主循环（可观测/可审批/可回滚），7 个 evolution API 端点；桌面调度集成；前端可访问性/token 化修复多轮。详见 [CHANGELOG](CHANGELOG.md)。
+- **已发布**：v5.2.0（2026-09-08，minor）— 自演化闭环 MVP 接入主循环（可观测/可审批/可回滚），闭环 API 面实测为 `evolve_insights.py` 的 6 个 `/api/evolution/*` 端点（旧文案"7 个 evolution API 端点"无出处，2026-10-05 已在下方 v5.2.0 节更正，此处当时漏改）；桌面调度集成；前端可访问性/token 化修复多轮。详见 [CHANGELOG](CHANGELOG.md)。
 - **上一版**：v5.1.0（2026-08-14，minor）— 企业版 6 大功能（许可证/SSO/审计/配额/API Key/通知）+ LLM 任务拆分/工作流编辑器/配置历史/Skill 编辑器/异常调度/Hook 配置。
 - **v5.0.0**（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](docs/migration-5.0.md)。
 - **双版架构**：自 2026-07-20 起采用单代码库 + 运行时 Edition 检测（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)）。
