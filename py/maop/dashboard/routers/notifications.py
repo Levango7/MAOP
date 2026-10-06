@@ -160,6 +160,30 @@ def _auth_enabled() -> bool:
         return True
 
 
+def _read_scope(request: Request, tenant_id: str) -> tuple[str, bool]:
+    """Resolve ``(tenant filter, all_tenants)`` for the list endpoints.
+
+    Non-admin: the ``?tenant_id=`` query param is ignored entirely — the token
+    tenant governs, and a missing identity fails closed (403) rather than
+    degrading to an unscoped listing. Cross-tenant reads are never granted.
+
+    Admin: an explicit ``?tenant_id=`` filters; absent means every tenant.
+    MAOS (since the 2026-10-03 empty-tenant hardening) reads an empty
+    ``tenant_id`` as "rows that have no tenant", so "all tenants" must be said
+    out loud through ``all_tenants=True`` — passing ``""`` alone silently
+    returns nothing.
+
+    Auth disabled: no identity/tenant boundary exists at all, so reads are
+    unscoped, matching the pre-hardening behavior these endpoints rely on.
+    """
+    if _is_admin(request):
+        return tenant_id, tenant_id == ""
+    if not _auth_enabled():
+        return "", True
+    _, tenant = _require_identity(request)
+    return tenant, False
+
+
 def _require_identity(request: Request) -> tuple[str, str]:
     """Return ``(user_id, tenant_id)`` for the authenticated caller.
 
@@ -171,8 +195,10 @@ def _require_identity(request: Request) -> tuple[str, str]:
 
     ``tenant_id`` is taken from ``request.state`` and defaults to ``""``,
     which means single-tenant / personal edition (no tenant filter).
-    Admins return ``("", "")`` — meaning "do not filter". The same applies
-    when auth is disabled entirely (no identity boundary exists).
+    Admins return ``("", "")``. For the channels/rules/templates listings that
+    pair is not enough — see ``_read_scope``, which turns "admin with no
+    filter" into MAOS's explicit ``all_tenants=True``. The same applies when
+    auth is disabled entirely (no identity boundary exists).
     """
     if _is_admin(request):
         return "", ""
@@ -243,13 +269,13 @@ async def list_channels(
     tenant_id: str = Query("", description="Filter by tenant (admin only)"),
 ) -> dict[str, Any]:
     _require_feature()
-    # Non-admin: the query param is ignored entirely — tenant comes from the
-    # token, and a missing identity fails closed (403) instead of degrading
-    # to an all-tenant listing. Admin: explicit ?tenant_id= filters, absent
-    # means all tenants.
-    if not _is_admin(request):
-        _, tenant_id = _require_identity(request)
-    items = [_mask_config_in(i) for i in notification_service.list_channels(tenant_id=tenant_id)]
+    tenant_id, all_tenants = _read_scope(request, tenant_id)
+    items = [
+        _mask_config_in(i)
+        for i in notification_service.list_channels(
+            tenant_id=tenant_id, all_tenants=all_tenants
+        )
+    ]
     return {"status": "ok", "channels": items, "count": len(items)}
 
 
@@ -309,11 +335,10 @@ async def list_rules(
     event_type: str = Query(""),
 ) -> dict[str, Any]:
     _require_feature()
-    # Non-admin: ignore ?tenant_id=, use the token tenant (fail-closed when
-    # the identity is missing). Admin: keep the query-param semantics.
-    if not _is_admin(request):
-        _, tenant_id = _require_identity(request)
-    items = notification_service.list_rules(tenant_id=tenant_id, event_type=event_type)
+    tenant_id, all_tenants = _read_scope(request, tenant_id)
+    items = notification_service.list_rules(
+        tenant_id=tenant_id, event_type=event_type, all_tenants=all_tenants
+    )
     return {"status": "ok", "rules": items, "count": len(items)}
 
 
@@ -371,11 +396,8 @@ async def list_templates(
     tenant_id: str = Query(""),
 ) -> dict[str, Any]:
     _require_feature()
-    # Non-admin: ignore ?tenant_id=, use the token tenant (fail-closed when
-    # the identity is missing). Admin: keep the query-param semantics.
-    if not _is_admin(request):
-        _, tenant_id = _require_identity(request)
-    items = notification_service.list_templates(tenant_id=tenant_id)
+    tenant_id, all_tenants = _read_scope(request, tenant_id)
+    items = notification_service.list_templates(tenant_id=tenant_id, all_tenants=all_tenants)
     return {"status": "ok", "templates": items, "count": len(items)}
 
 

@@ -52,10 +52,16 @@ def get_notification_manager() -> Any:
 # Channels
 # ════════════════════════════════════════════════════════════════════════════
 
-def list_channels(tenant_id: str = "") -> list[dict[str, Any]]:
-    """List notification channels filtered by tenant."""
+def list_channels(
+    tenant_id: str = "", *, all_tenants: bool = False
+) -> list[dict[str, Any]]:
+    """List notification channels.
+
+    ``all_tenants`` forwards MAOS's explicit cross-tenant opt-in: MAOS reads an
+    empty ``tenant_id`` as "rows that have no tenant", not "every tenant".
+    """
     mgr = _get_manager()
-    items = mgr.list_channels(tenant_id=tenant_id)
+    items = mgr.list_channels(tenant_id=tenant_id, all_tenants=all_tenants)
     return [i.model_dump() for i in items]
 
 
@@ -90,10 +96,14 @@ def delete_channel(channel_id: str) -> bool:
 # Rules
 # ════════════════════════════════════════════════════════════════════════════
 
-def list_rules(tenant_id: str = "", event_type: str = "") -> list[dict[str, Any]]:
-    """List notification rules filtered by tenant/event_type."""
+def list_rules(
+    tenant_id: str = "", event_type: str = "", *, all_tenants: bool = False
+) -> list[dict[str, Any]]:
+    """List notification rules. ``all_tenants`` — see ``list_channels``."""
     mgr = _get_manager()
-    items = mgr.list_rules(tenant_id=tenant_id, event_type=event_type)
+    items = mgr.list_rules(
+        tenant_id=tenant_id, event_type=event_type, all_tenants=all_tenants
+    )
     return [i.model_dump() for i in items]
 
 
@@ -128,10 +138,12 @@ def delete_rule(rule_id: str) -> bool:
 # Templates
 # ════════════════════════════════════════════════════════════════════════════
 
-def list_templates(tenant_id: str = "") -> list[dict[str, Any]]:
-    """List templates filtered by tenant."""
+def list_templates(
+    tenant_id: str = "", *, all_tenants: bool = False
+) -> list[dict[str, Any]]:
+    """List templates. ``all_tenants`` — see ``list_channels``."""
     mgr = _get_manager()
-    items = mgr.list_templates(tenant_id=tenant_id)
+    items = mgr.list_templates(tenant_id=tenant_id, all_tenants=all_tenants)
     return [i.model_dump() for i in items]
 
 
