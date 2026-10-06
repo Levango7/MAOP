@@ -141,6 +141,44 @@ def test_gate_allows_after_an_allow_rule_is_added(monkeypatch: pytest.MonkeyPatc
     assert _gate(agent="configured-agent", permission_manager=pm) is None
 
 
+def test_rule_action_matches_the_routing_key_not_the_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`action` 维度取的是**派发 routing_key**，不是 agent 名。
+
+    启用权限门时最容易写错的就是这条：规则里把 agent 名当 action 填，门永远判 `ask` ⇒
+    整个开关看起来"配了但没生效"。上面几条用例一律用 `action="*"`，恰好把这根轴遮住了，
+    所以这里用真实 PermissionManager 两个方向都钉一遍。
+    """
+    _set_enforce(monkeypatch, True)
+    from maop.core.security.permission import PermissionManager
+
+    pm = PermissionManager(root_dir=".")
+    pm.add_rule(
+        agent="rk-agent", action="code.generate", decision="allow", reason="按 routing_key 放行",
+    )
+
+    # 命中：routing_key 与规则 action 一致
+    assert _gate(agent="rk-agent", routing_key="code.generate", permission_manager=pm) is None
+    # 不命中：换了 routing_key，同 agent 仍被拒（而不是"agent 有规则就放行"）
+    blocked = _gate(agent="rk-agent", routing_key="code.other", permission_manager=pm)
+    assert blocked is not None and blocked.exit_code == PERMISSION_DENIED_EXIT_CODE
+    # 拿 agent 名当 action 填 —— 这就是运维最容易犯的错，必须判不出来
+    wrong_way = _gate(agent="rk-agent", routing_key="rk-agent", permission_manager=pm)
+    assert wrong_way is not None, "把 agent 名当 action 也能过，说明 action 这根轴没被真正使用"
+
+
+def test_default_action_is_execute_when_routing_key_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`routing_key` 为空时门用 `"execute"` 兜底（`dispatch_gate.py` 的 `routing_key or "execute"`）。"""
+    _set_enforce(monkeypatch, True)
+    from maop.core.security.permission import PermissionManager
+
+    pm = PermissionManager(root_dir=".")
+    pm.add_rule(agent="nokey-agent", action="execute", decision="allow", reason="默认动作放行")
+
+    assert _gate(agent="nokey-agent", routing_key="", permission_manager=pm) is None
+    blocked = _gate(agent="nokey-agent", routing_key="something", permission_manager=pm)
+    assert blocked is not None and blocked.exit_code == PERMISSION_DENIED_EXIT_CODE
+
+
 def test_pre_dispatch_hook_can_veto(monkeypatch: pytest.MonkeyPatch) -> None:
     _set_enforce(monkeypatch, True)
     import maop.core.agent.plugins_hooks.hook_manager as hm_mod

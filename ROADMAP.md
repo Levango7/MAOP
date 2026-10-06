@@ -7,7 +7,7 @@
 
 ## 当前状态
 
-- **已发布**：v5.2.0（2026-09-08，minor）— 自演化闭环 MVP 接入主循环（可观测/可审批/可回滚），7 个 evolution API 端点；桌面调度集成；前端可访问性/token 化修复多轮。详见 [CHANGELOG](CHANGELOG.md)。
+- **已发布**：v5.2.0（2026-09-08，minor）— 自演化闭环 MVP 接入主循环（可观测/可审批/可回滚），闭环 API 面实测为 `evolve_insights.py` 的 6 个 `/api/evolution/*` 端点（旧文案"7 个 evolution API 端点"无出处，2026-10-05 已在下方 v5.2.0 节更正，此处当时漏改）；桌面调度集成；前端可访问性/token 化修复多轮。详见 [CHANGELOG](CHANGELOG.md)。
 - **上一版**：v5.1.0（2026-08-14，minor）— 企业版 6 大功能（许可证/SSO/审计/配额/API Key/通知）+ LLM 任务拆分/工作流编辑器/配置历史/Skill 编辑器/异常调度/Hook 配置。
 - **v5.0.0**（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](docs/migration-5.0.md)。
 - **双版架构**：自 2026-07-20 起采用单代码库 + 运行时 Edition 检测（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)）。
@@ -32,10 +32,17 @@
 - [x] ADR-016 待完善表中 SAML 行状态为 `Done`，且引用 `docs/enterprise/saml-sso-guide.md`。
 - [x] `mypy py/maop` 零 error，`ruff check` 零告警。
 - [x] CI 覆盖率：实测 82%（ratchet baseline=81, FLOOR=80），2026-08-21 核实修正。
-- [ ] `deliverables/engineering-assurance/` 包含 `v4.4.1-fix-report.md` 与 `env-audit-4.4.2.md`。
-      **2026-10-05 核对：不成立，已从勾选改回未勾** —— 全仓搜不到该目录与两份文件，且
-      `.gitignore:174` 忽略整个 `deliverables/`，这类交付物结构性地不可能作为仓库内物证。
-      要恢复勾选，需先把它们纳入版本控制，或改由外部交付物系统承载并在此注明位置。
+- ~~`deliverables/engineering-assurance/` 包含 `v4.4.1-fix-report.md` 与 `env-audit-4.4.2.md`。~~
+      **2026-10-06 作废（不可满足，保留理由；先前两条说明都需要更正）**
+      ① 这两份文件从未进入任何提交：`git log --all -- deliverables/engineering-assurance`
+      只有一条真实交付物 `comprehensive-review-maop-2026-07-20.md`（初始提交带入，
+      后由 `495eaca3` 归档到 `docs/archive/audits/`）。验收标准点名的文件名是凭空写的。
+      ② 我 2026-10-05 的说明"`.gitignore:174` 忽略整个 `deliverables/`，这类交付物
+      结构性地不可能作为仓库内物证"**不成立** —— `.gitignore` 只挡未跟踪文件，
+      `git ls-tree origin/master -- deliverables/` 实测该目录仍有 9 个文件在版本控制内
+      （含 `pypi-upload-guide.md`）。被忽略的是"以后新扔进去的东西"，不是"已入库的物证"。
+      ③ 处置：该版本的工程保障物证实际在 `docs/archive/audits/`，按"物证存在但在别处"记录，
+      不再作为一个可待办项挂着。要恢复成勾选项需重新定义验收物，而不是补一个不存在的文件名。
 - [x] `.env.example` 与代码 `MAOP_*` 变量集合差异为零（或差异均有明确注释说明）。
 - [x] `dashboard-enterprise/e2e/` 路由守卫用例通过。
 - [x] `ROADMAP.md` 入库并被 README 引用。

@@ -1,3 +1,7 @@
+# 全仓文本统一 LF，防止 Windows 工具写入 CRLF 导致 git status 大面积假改动
+# （2026-10-05 修复：曾出现 1179 个文件工作区 CRLF / 索引 LF）
+* text=auto eol=lf
+
 # Python 源码与 PEM 统一 LF：MAOP 侧的热重载哈希、插件沙箱校验和
 # 以及 MAOS 的模块完整性清单都按归一化字节比对，避免校验与检出平台绑定
 # （详见 MAOS tests/test_public_key_fingerprint.py）。

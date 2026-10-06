@@ -313,17 +313,14 @@ class TestErrorChain:
         ):
             catalog.register(AgentDescriptor(name="will_fail"))
 
-    @pytest.mark.xfail(
-        reason="已知脆弱点 BUG-001：AgentCatalog 初始化时连接池创建早于 _load_from_store "
-               "的 try/except，损坏的 DB 文件在 PRAGMA journal_mode=WAL 阶段即抛出 "
-               "DatabaseError 未被捕获。修复建议：在 AgentCatalogStore.__init__ 或 "
-               "sqlite_connect 中增加 DatabaseError 容错，损坏时重建空库。"
-    )
     def test_db_broken_on_load_does_not_crash(self, tmp_path):
-        """启动时数据库损坏应容错加载，不崩溃。
+        """启动时数据库损坏应容错加载，不崩溃（BUG-001 回归锁）。
 
-        BUG-001：当前实现未捕获连接阶段的 DatabaseError。
-        损坏文件 → sqlite_connect → PRAGMA journal_mode=WAL → DatabaseError 直接传播。
+        该用例曾挂 `xfail(reason="已知脆弱点 BUG-001")`，但 5a9709cb 在
+        `core/backends/db_utils.py` 实现了"损坏则删库重建"、84ed174f 又收紧为
+        "非损坏类错误原样抛出"，缺陷已修而标记留着 —— 2026-10-05/06 实测
+        CI（ubuntu py3.13 ×3，--reruns=0）与本机（Windows py3.14）全部 XPASS。
+        去掉标记让它成为真回归锁。
         """
         db_path = tmp_path / "corrupt.db"
         # 写入损坏的数据库文件
