@@ -106,6 +106,27 @@ checklist 第 3 条要求四处同步。实测漏掉的正是最容易半抬的�
   6 个 `/api/evolution/*`；`evolution_experiment.py` 16 个）。
   **教训：同一个错误数字常出现在两处，改一处不算改完。**
 
+**H11 顺着"总数对不上"追出一族用例从来没被执行**
+
+核对本机全量 collect（10339）与 CI 主腿结果（8766）时没有停在"口径不同"，逐条追下去是
+真漏：**所有腿的 `-m` 表达式都排除 `slow`**（ci.yml 主腿 `not slow and not serial`、
+serial 步 `not slow and serial`、nightly 两条腿同样 `not slow …`），而 `perf-smoke` 只对
+`tests/performance/` 显式跑 `-m slow`、对 `reliability/ + stability/` 无标记全跑 ——
+于是**根级 47 条 slow 用例**（`test_ldap_real_env.py` 21、`test_stress.py` 14、
+`test_k8s_operator.py` 12）在 CI 与 nightly 上**一次都不执行**，坏了主干照样全绿。
+其中那 12 条 k8s 静态一致性用例是 2026-10 刚从弃用分支捞回来的（任务 #24）——
+捞回来却没接上执行面，等于白捞。
+
+处理：nightly 新增 `Slow-marker suite` 跑整个 `py/tests/ -m slow`（`-n 0`、`--timeout=300`、
+`--reruns=0`）。本机实测 76 条 **57 passed / 22 skipped / 0 failed / 2 分 44 秒**
+（skip 那批需要真 LDAP 服务），不占 PR 时间，也不写 `|| true`。
+守卫 `TestSlowMarkerCoverage` 扫出所有含 `pytest.mark.slow` 的文件并要求存在一条
+"路径命中且未排除 slow"的腿，含反向对照。变异验证：把该腿的 `-m slow` 改成 `-m "not slow"`
+⇒ 2 条守卫红并精确点名那 3 个文件。
+两处扫描器自伤当场修掉：守卫会匹配到**自己**文件里的 `pytest.mark.slow` 字面量；
+以及"把作业改名"不算删除其步骤，第一次变异因此无效。
+**判据：`-m` 是选择器，每条腿都可以合法地看不见一整族用例；总数对不上必须逐条追到"由哪条腿负责"。**
+
 ### 2026-10-05 评估批 G：沙箱环境过滤真接线、租户身份收口、租户边界写实
 
 **G1 沙箱：从「只约束工作目录」到「也约束凭据面」**

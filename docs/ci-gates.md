@@ -106,7 +106,7 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 | `py/tests/test_docs_consistency_gate.py` | 文档一致性门禁：范围只来自索引当前章节、豁免必须写理由、注入死路径必须判红、`docs-gate` 作业不许挂 `if` |
 | `py/tests/test_ci_required_checks.py` | required 清单（`.github/ci-required-checks.json`）↔ `ci.yml` 作业形状 ↔ §7.2 散文 三方一致：不许改名/删作业导致上下文永不上报，不许 required 作业在 PR 上恒不产出（沿 needs 链递归查），不许矩阵名当 required |
 | `py/tests/test_ci_merge_gate.py` | 聚合守卫的两面：判定脚本的策略单测（白名单式 + fail closed + docs-only 的 skipped 必须放行），以及 ci.yml 里 gate 的形状（name 稳定、`if: always()` 不许掉、needs 盖住全部重活、不许纳 push-only 作业） |
-| `py/tests/test_nightly_flaky_coverage.py` | nightly `flaky-detection` 的**覆盖面**：必须覆盖实测出过问题的平台（macos/3.13、windows/3.12）、每条腿 `--reruns=0`、复刻 ci.yml 的并发配置（Linux/macOS `-n 2`、Windows `-n 0`）、矩阵值渲染后是合法 bash 且不留占位符、每条腿都得是 ci.yml 真跑过的组合 |
+| `py/tests/test_nightly_flaky_coverage.py` | nightly `flaky-detection` 的**覆盖面**：必须覆盖实测出过问题的平台（macos/3.13、windows/3.12）、每条腿 `--reruns=0`、复刻 ci.yml 的并发配置（Linux/macOS `-n 2`、Windows `-n 0`）、矩阵值渲染后是合法 bash 且不留占位符、每条腿都得是 ci.yml 真跑过的组合；另有 `TestSlowMarkerCoverage` 核对**每个含 `slow` 的文件都被某条腿真跑到**（见 §9） |
 | `py/tests/test_env_example_drift.py` | `.env.example` ↔ 代码实读的 `MAOP_*` 变量双向一致（两条来源都要算：`os.getenv` 直读 + `MAOPSettings` 的 `env_prefix`/`AliasChoices` 映射）；反向不许留下无说明的"没人认的开关"；企业版变量走 `ENTERPRISE_SIDE_VARS` 逐条登记 |
 
 
@@ -295,3 +295,35 @@ required 上下文 4 条，其余保护项全关：
 
 **仍未覆盖**：Windows 只跑 2 遍而不是 3 遍，是为了把墙钟压在 1 小时内；若日后再次
 出现 Windows 侧的长尾 flaky，优先调这条腿的次数而不是放宽整个矩阵。
+
+## 9. `slow` 标记那一族：曾经**没有任何一条腿跑它**（2026-10-06）
+
+起因是一次口径核对：本机全量 collect 是 10339 条，而 CI 主腿只有 8766 个结果。
+差额里有一类是真漏 —— 所有腿的标记表达式都排除 `slow`：
+
+| 腿 | 标记表达式 | 对 slow 的处理 |
+|---|---|---|
+| ci.yml `test` 主腿 | `not slow and not serial` | 排除 |
+| ci.yml `test` serial 步 | `not slow and serial` | 排除 |
+| nightly `flaky-detection` / `ubuntu26-canary` | `not slow …` | 排除 |
+| ci.yml `perf-smoke` | `tests/performance/ -m slow` | 只跑 performance 那 25 条 |
+| ci.yml `perf-smoke` | `tests/reliability/ tests/stability/`（无 `-m`） | 顺带跑到 |
+
+于是根级的 **47 条 slow 用例**（`test_ldap_real_env.py` 21、`test_stress.py 14`、
+`test_k8s_operator.py 12`）在 CI 与 nightly 上**一次都不执行** —— 它们坏了主干照样全绿。
+其中 12 条还是 2026-10 刚从弃用分支捞回来的 k8s 静态一致性用例：捞回来却没接上执行面，
+等于白捞。
+
+处理：nightly 新增 `Slow-marker suite` 作业，跑整个 `py/tests/ -m slow`
+（`-n 0` 串行、`--timeout=300`、`--reruns=0`）。本机实测 76 条：**57 passed / 22 skipped /
+0 failed / 2 分 44 秒**（skip 的那批需要真 LDAP 服务），所以放 nightly 不占 PR 时间，
+也不写 `|| true`（本仓禁止吞失败的门禁，§6）。
+
+守卫在 `py/tests/test_nightly_flaky_coverage.py` 的 `TestSlowMarkerCoverage`：它扫出所有
+含 `pytest.mark.slow` 的文件，要求**存在一条路径命中它、且标记表达式没排除 slow 的腿**，
+否则点名报出未覆盖的文件。反向对照也写成了用例（把所有腿都改成 `not slow` 时必须报红），
+因为这类"扫描器恒真"的失效正是本节的成因。变异验证：把 nightly 那条腿的 `-m slow`
+改成 `-m "not slow"` ⇒ 2 条守卫红并精确列出那 3 个文件。
+
+**判据（可复用）**：核对"CI 跑了多少用例"时，总数对不上不一定是跳过或口径差异，
+必须逐条追到"哪一族、由哪条腿负责"。`-m` 表达式是选择器，**每条腿都可以合法地看不见一整族用例**。

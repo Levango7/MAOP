@@ -54,6 +54,47 @@ jobs:
         run: |
           cd py && python scripts/junit_annotate.py ../canary-ubuntu26.xml || true
 
+  # ── slow 标记集合（2026-10-06 加）───────────────────────────────────
+  # 发现过程：核对"CI 跑了多少用例"时发现本机全量 collect 是 10339，而 CI 主腿只有
+  # 8766 个结果。差额不是漏跑就是标记问题 —— 逐条查下来：ci.yml 的 unit / serial 两条腿
+  # 都带 `-m "not slow …"`，perf-smoke 作业只对 `tests/performance/`（`-m slow`）和
+  # `tests/reliability/ + tests/stability/`（无 -m）显式跑。于是**根级的 47 个 slow 用例**
+  # （test_ldap_real_env.py 21、test_stress.py 14、test_k8s_operator.py 12）在任何一条腿里
+  # 都不存在 —— 它们可以无声腐烂，而 CI 天天绿。
+  # 本机实测（`-m slow` 全集合，串行、`--timeout=300`）：**57 passed / 22 skipped / 0 failed，
+  # 2 分 44 秒**；其中上面那 47 条根级用例是 28 passed / 19 skipped / 约 90 秒
+  # （skip 的那批需要真 LDAP 服务）。所以放到 nightly，不占 PR 时间，也不加 `|| true`
+  # （本仓禁止吞失败的门禁，见 py/tests/test_ci_workflow_hygiene.py）。
+  #
+  # 覆盖面由 py/tests/test_nightly_flaky_coverage.py 的 TestSlowMarkerCoverage 机器核对：
+  # 每个带 slow 标记的文件都必须被某条腿真跑到，否则那条守卫红。
+  slow-suite:
+    name: Slow-marker suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install deps
+        run: pip install -e ./py[dev] --quiet
+      - name: Run everything marked slow
+        # `-n 0`：这批是压力/长运行/真实环境用例，并发跑会互相抢 CPU 与端口，
+        # 症状是"只有夜里才红"的假 flaky。串行慢一点，但结论可信。
+        # 不带 --reruns：同 flaky-detection 的理由 —— 重试会把真问题洗成绿。
+        shell: bash
+        env:
+          MAOP_ENV: 'test'
+        run: |
+          python -m pytest py/tests/ -q -m slow --timeout=300 -n 0 --reruns=0 \
+            --junitxml=slow-suite.xml
+      - name: Surface failing test ids
+        if: failure()
+        shell: bash
+        run: |
+          cd py && python scripts/junit_annotate.py ../slow-suite.xml || true
+
   full-e2e:
     name: Full E2E (all browsers)
     runs-on: ubuntu-latest
