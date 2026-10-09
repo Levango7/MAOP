@@ -117,7 +117,7 @@ class PreemptableWorkerPool:
         root_dir: str | None = None,
         true_preemption: bool = False,
         max_preemptions: int = 2,
-        checkpoint: "PipelineCheckpoint | None" = None,
+        checkpoint: PipelineCheckpoint | None = None,
     ) -> None:
         if checkpoint is None and true_preemption:
             # The execution-path wiring that makes true preemption

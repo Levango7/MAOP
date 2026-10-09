@@ -20,20 +20,18 @@ Covers:
 from __future__ import annotations
 
 import asyncio
-
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from maop.core.monitoring.monitoring import MAOP_TASK_PREEMPTION_TOTAL
-from maop.core.reliability.priority_queue import PriorityTask
 from maop.core.reliability.preemptable_worker_pool import PreemptableWorkerPool
+from maop.core.reliability.priority_queue import PriorityTask
 from maop.core.reliability.worker_pool import (
     PoolStats,
     TaskPreemptedError,
     WorkerPool,
-    WorkerStatus,
 )
-
 
 # ── Test doubles ─────────────────────────────────────────
 
@@ -79,12 +77,15 @@ class TestWorkerPoolCancel:
                 mock_loop_cls.return_value = mock_loop
                 task_id = await pool.submit("long task")
                 await asyncio.sleep(0.05)  # let it start running
-                assert pool.get_task(task_id).status == "running"
+                wt = pool.get_task(task_id)
+                assert wt is not None
+                assert wt.status == "running"
 
                 assert pool.cancel(task_id, preempt=True) is True
                 with pytest.raises(TaskPreemptedError):
                     await pool.wait(task_id, timeout=5)
                 wt = pool.get_task(task_id)
+                assert wt is not None
                 assert wt.status == "preempted"
         finally:
             await pool.stop()
@@ -104,7 +105,9 @@ class TestWorkerPoolCancel:
                 assert pool.cancel(task_id) is True
                 with pytest.raises(asyncio.CancelledError):
                     await pool.wait(task_id, timeout=5)
-                assert pool.get_task(task_id).status == "cancelled"
+                wt = pool.get_task(task_id)
+                assert wt is not None
+                assert wt.status == "cancelled"
         finally:
             await pool.stop()
 
@@ -124,7 +127,9 @@ class TestWorkerPoolCancel:
                 await pool.wait(task_id, timeout=5)
                 # Already finished — cancel is a no-op.
                 assert pool.cancel(task_id, preempt=True) is False
-                assert pool.get_task(task_id).status == "success"
+                wt = pool.get_task(task_id)
+                assert wt is not None
+                assert wt.status == "success"
         finally:
             await pool.stop()
 
@@ -151,13 +156,17 @@ class TestWorkerPoolCancel:
                 # Queued behind it (still waiting on the semaphore).
                 queued_id = await pool.submit("queued")
                 await asyncio.sleep(0.05)
-                assert pool.get_task(queued_id).status == "pending"
+                wt = pool.get_task(queued_id)
+                assert wt is not None
+                assert wt.status == "pending"
 
                 # Preempt-cancel the queued task before it starts.
                 assert pool.cancel(queued_id, preempt=True) is True
                 with pytest.raises(TaskPreemptedError):
                     await pool.wait(queued_id, timeout=5)
-                assert pool.get_task(queued_id).status == "preempted"
+                wt = pool.get_task(queued_id)
+                assert wt is not None
+                assert wt.status == "preempted"
 
                 # Unblock the blocker so stop() is clean.
                 pool.cancel(blocker_id, preempt=True)
@@ -275,9 +284,12 @@ class TestMaybePreempt:
         victim_b = PriorityTask(payload={"task": "b"}, priority=3)
         pool._running = {"wp-a": victim_a, "wp-b": victim_b}
         cancelled: list[tuple] = []
-        pool._pool.cancel = lambda wp_id, *, preempt=False: (
-            cancelled.append((wp_id, preempt)) or True
-        )
+
+        def _cancel(wp_id: str, *, preempt: bool = False) -> bool:
+            cancelled.append((wp_id, preempt))
+            return True
+
+        pool._pool.cancel = _cancel  # type: ignore[method-assign]
 
         assert pool._maybe_preempt() is True
         # Lowest priority (5) wins over 3.
@@ -312,9 +324,12 @@ class TestMaybePreempt:
         fresh = PriorityTask(payload={"task": "fresh"}, priority=4)
         pool._running = {"wp-tired": tired, "wp-fresh": fresh}
         cancelled: list[str] = []
-        pool._pool.cancel = lambda wp_id, *, preempt=False: (
-            cancelled.append(wp_id) or True
-        )
+
+        def _cancel(wp_id: str, *, preempt: bool = False) -> bool:
+            cancelled.append(wp_id)
+            return True
+
+        pool._pool.cancel = _cancel  # type: ignore[method-assign]
 
         assert pool._maybe_preempt() is True
         # The exhausted victim is skipped; the fresh p4 task is chosen.
@@ -329,7 +344,11 @@ class TestMaybePreempt:
         pool._queue.push(head)
         victim = PriorityTask(payload={"task": "victim"}, priority=5)
         pool._running = {"wp-victim": victim}
-        pool._pool.cancel = lambda wp_id, *, preempt=False: False  # raced
+
+        def _raced_cancel(wp_id: str, *, preempt: bool = False) -> bool:
+            return False  # raced with completion
+
+        pool._pool.cancel = _raced_cancel  # type: ignore[method-assign]
 
         assert pool._maybe_preempt() is False
         assert victim.preempted_count == 0
@@ -342,7 +361,9 @@ class TestMaybePreempt:
         pool._queue.push(head)
         victim = PriorityTask(payload={"task": "victim"}, priority=5)
         pool._running = {"wp-victim": victim}
-        pool._pool.cancel = lambda wp_id, *, preempt=False: True
+        pool._pool.cancel = (  # type: ignore[method-assign]
+            lambda wp_id, *, preempt=False: True
+        )
 
         before = MAOP_TASK_PREEMPTION_TOTAL.get()
         assert pool._maybe_preempt() is True
@@ -358,9 +379,12 @@ class TestMaybePreempt:
         victim = PriorityTask(payload={"task": "victim"}, priority=5)
         pool._running = {"wp-victim": victim}
         cancelled: list[str] = []
-        pool._pool.cancel = lambda wp_id, *, preempt=False: (
-            cancelled.append(wp_id) or True
-        )
+
+        def _cancel(wp_id: str, *, preempt: bool = False) -> bool:
+            cancelled.append(wp_id)
+            return True
+
+        pool._pool.cancel = _cancel  # type: ignore[method-assign]
         # Even called directly, the soft pool must not cancel.
         assert pool._maybe_preempt() is False
         assert cancelled == []
@@ -381,7 +405,7 @@ class TestWatcherPreemptionBranch:
         async def fake_wait(wp_id):
             raise TaskPreemptedError(f"task {wp_id} preempted")
 
-        pool._pool.wait = fake_wait
+        pool._pool.wait = fake_wait  # type: ignore[method-assign]
         await pool._watch_completion("wp-victim", pt)
 
         # Bookkeeping cleaned…
@@ -429,7 +453,7 @@ class TestDispatchLoopIntegration:
         submitted: list[str] = []
         cancelled: list[tuple] = []
 
-        inner.stats = fake_stats
+        inner.stats = fake_stats  # type: ignore[method-assign]
 
         async def fake_submit(task, *, workdir="", skip_verify=False,
                               agent_name=""):
@@ -439,11 +463,13 @@ class TestDispatchLoopIntegration:
         async def fake_wait(wp_id):
             await asyncio.Event().wait()  # never resolves; stop() cancels
 
-        inner.submit = fake_submit
-        inner.wait = fake_wait
-        inner.cancel = lambda wp_id, *, preempt=False: (
-            cancelled.append((wp_id, preempt)) or True
-        )
+        def _cancel(wp_id: str, *, preempt: bool = False) -> bool:
+            cancelled.append((wp_id, preempt))
+            return True
+
+        inner.submit = fake_submit  # type: ignore[method-assign]
+        inner.wait = fake_wait  # type: ignore[method-assign]
+        inner.cancel = _cancel  # type: ignore[method-assign]
 
         pool._stop_event = asyncio.Event()
         dispatch = asyncio.ensure_future(pool._dispatch_loop())

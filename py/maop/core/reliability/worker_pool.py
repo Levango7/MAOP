@@ -110,7 +110,7 @@ class WorkerPool:
         max_workers: int = 4,
         max_cpu_workers: int = 0,
         root_dir: str | None = None,
-        checkpoint: "PipelineCheckpoint | None" = None,
+        checkpoint: PipelineCheckpoint | None = None,
     ) -> None:
         self._max_workers = max(1, max_workers)
         # Default CPU workers = min(2, cpu_count - 1)
