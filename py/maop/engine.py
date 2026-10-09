@@ -324,113 +324,120 @@ class Engine:
         done: set[str] = set()
         spawned_count = 0
 
-        while True:
-            # Compute the ready layer: steps not yet executed
-            # whose dependencies all have results. For a
-            # static DAG this is exactly _topological_sort's
-            # layering (Kahn's algorithm); it is recomputed
-            # each iteration so steps spawned by the previous
-            # layer join the run.
-            ready = [
-                s for s in step_by_id.values()
-                if s.id not in done
-                and all(dep in done for dep in s.depends_on)
-            ]
-            if not ready:
-                break
+        try:
+            while True:
+                # Compute the ready layer: steps not yet executed
+                # whose dependencies all have results. For a
+                # static DAG this is exactly _topological_sort's
+                # layering (Kahn's algorithm); it is recomputed
+                # each iteration so steps spawned by the previous
+                # layer join the run.
+                ready = [
+                    s for s in step_by_id.values()
+                    if s.id not in done
+                    and all(dep in done for dep in s.depends_on)
+                ]
+                if not ready:
+                    break
 
-            # M4 修复：在每层任务派发前检查 pause 状态，暂停期间不执行新任务
-            await check_pause_async()
+                # M4 修复：在每层任务派发前检查 pause 状态，暂停期间不执行新任务
+                await check_pause_async()
 
-            # Check if any previous step requested abort
-            aborted = any(
-                results[sid].status == StepStatus.FAILED
-                and step_by_id[sid].on_failure == "abort"
-                for sid in done
-            )
-            if aborted:
-                for s in step_by_id.values():
-                    if s.id not in done:
-                        results[s.id] = StepResult(
-                            id=s.id, status=StepStatus.SKIPPED,
-                            error="Aborted due to upstream failure",
-                        )
-                        done.add(s.id)
-                break
-
-            # Execute layer steps in parallel
-            tasks = []
-            for step in ready:
-                # P0-2 fix: wrap each step with asyncio.wait_for to prevent
-                # a single hanging step from blocking the entire engine.
-                tasks.append(asyncio.wait_for(
-                    self._execute_step(step, ctx, results, workdir, trace_id),
-                    timeout=float(step.timeout) if step.timeout > 0 else 300,
-                ))
-            layer_results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for step, lr in zip(ready, layer_results):
-                if isinstance(lr, asyncio.TimeoutError):
-                    # P1-3 fix: 原代码 duration_ms=step.timeout*1000 在 step.timeout<=0
-                    # （走 300s 默认分支）时算出 0，与实际超时值不符。改为使用
-                    # 实际生效的超时值（step.timeout>0 时用 step.timeout，否则 300）。
-                    effective_timeout = float(step.timeout) if step.timeout > 0 else 300
-                    sr = StepResult(
-                        id=step.id, status=StepStatus.FAILED,
-                        error=f"Step timed out after {effective_timeout}s", agent=step.agent,
-                        duration_ms=int(effective_timeout * 1000),
-                    )
-                elif isinstance(lr, Exception):
-                    sr = StepResult(
-                        id=step.id, status=StepStatus.FAILED,
-                        error=str(lr), agent=step.agent,
-                    )
-                else:
-                    sr = lr  # type: ignore
-                results[step.id] = sr
-                done.add(step.id)
-
-                # Update context with step output
-                ctx[step.id] = sr.output or sr.error
-
-            # Dynamic orchestration: merge the steps that this
-            # layer's executors fanned out into the run graph.
-            # Spawned steps depend on their spawner (or an
-            # explicit depends_on), so they always join a later
-            # layer — never the one that spawned them.
-            for directive, source_id in self._drain_spawns(trace_id):
-                deps = (
-                    list(directive.depends_on)
-                    if directive.depends_on is not None
-                    else [source_id]
+                # Check if any previous step requested abort
+                aborted = any(
+                    results[sid].status == StepStatus.FAILED
+                    and step_by_id[sid].on_failure == "abort"
+                    for sid in done
                 )
-                for spawned in directive.steps:
-                    if spawned_count >= _MAX_SPAWNED_STEPS:
-                        logger.error(
-                            "[engine] run %s: spawned-step cap (%d) "
-                            "reached; dropping spawned step '%s'",
-                            trace_id, _MAX_SPAWNED_STEPS, spawned.id,
+                if aborted:
+                    for s in step_by_id.values():
+                        if s.id not in done:
+                            results[s.id] = StepResult(
+                                id=s.id, status=StepStatus.SKIPPED,
+                                error="Aborted due to upstream failure",
+                            )
+                            done.add(s.id)
+                    break
+
+                # Execute layer steps in parallel
+                tasks = []
+                for step in ready:
+                    # P0-2 fix: wrap each step with asyncio.wait_for to prevent
+                    # a single hanging step from blocking the entire engine.
+                    tasks.append(asyncio.wait_for(
+                        self._execute_step(step, ctx, results, workdir, trace_id),
+                        timeout=float(step.timeout) if step.timeout > 0 else 300,
+                    ))
+                layer_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                for step, lr in zip(ready, layer_results):
+                    if isinstance(lr, asyncio.TimeoutError):
+                        # P1-3 fix: 原代码 duration_ms=step.timeout*1000 在 step.timeout<=0
+                        # （走 300s 默认分支）时算出 0，与实际超时值不符。改为使用
+                        # 实际生效的超时值（step.timeout>0 时用 step.timeout，否则 300）。
+                        effective_timeout = float(step.timeout) if step.timeout > 0 else 300
+                        sr = StepResult(
+                            id=step.id, status=StepStatus.FAILED,
+                            error=f"Step timed out after {effective_timeout}s", agent=step.agent,
+                            duration_ms=int(effective_timeout * 1000),
                         )
-                        continue
-                    if spawned.id in step_by_id:
-                        logger.error(
-                            "[engine] run %s: spawned step '%s' duplicates "
-                            "an existing step id; dropping",
-                            trace_id, spawned.id,
+                    elif isinstance(lr, Exception):
+                        sr = StepResult(
+                            id=step.id, status=StepStatus.FAILED,
+                            error=str(lr), agent=step.agent,
                         )
-                        continue
-                    unknown = [d for d in deps if d not in step_by_id]
-                    if unknown:
-                        logger.error(
-                            "[engine] run %s: spawned step '%s' depends on "
-                            "unknown step(s) %s; dropping",
-                            trace_id, spawned.id, unknown,
-                        )
-                        continue
-                    step_by_id[spawned.id] = spawned.model_copy(
-                        update={"depends_on": deps},
+                    else:
+                        sr = lr  # type: ignore
+                    results[step.id] = sr
+                    done.add(step.id)
+
+                    # Update context with step output
+                    ctx[step.id] = sr.output or sr.error
+
+                # Dynamic orchestration: merge the steps that this
+                # layer's executors fanned out into the run graph.
+                # Spawned steps depend on their spawner (or an
+                # explicit depends_on), so they always join a later
+                # layer — never the one that spawned them.
+                for directive, source_id in self._drain_spawns(trace_id):
+                    deps = (
+                        list(directive.depends_on)
+                        if directive.depends_on is not None
+                        else [source_id]
                     )
-                    spawned_count += 1
+                    for spawned in directive.steps:
+                        if spawned_count >= _MAX_SPAWNED_STEPS:
+                            logger.error(
+                                "[engine] run %s: spawned-step cap (%d) "
+                                "reached; dropping spawned step '%s'",
+                                trace_id, _MAX_SPAWNED_STEPS, spawned.id,
+                            )
+                            continue
+                        if spawned.id in step_by_id:
+                            logger.error(
+                                "[engine] run %s: spawned step '%s' duplicates "
+                                "an existing step id; dropping",
+                                trace_id, spawned.id,
+                            )
+                            continue
+                        unknown = [d for d in deps if d not in step_by_id]
+                        if unknown:
+                            logger.error(
+                                "[engine] run %s: spawned step '%s' depends on "
+                                "unknown step(s) %s; dropping",
+                                trace_id, spawned.id, unknown,
+                            )
+                            continue
+                        step_by_id[spawned.id] = spawned.model_copy(
+                            update={"depends_on": deps},
+                        )
+                        spawned_count += 1
+        finally:
+            # Drop the per-run spawn queue on every exit
+            # path: a cancelled or paused run otherwise
+            # leaks the _spawns entry (and a reused
+            # trace_id would pick up the stale queue).
+            self._spawns.pop(trace_id, None)
 
         # A step that never became ready is part of a cycle
         # (or holds a dangling dependency) — the same error

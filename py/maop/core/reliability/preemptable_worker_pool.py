@@ -126,12 +126,25 @@ class PreemptableWorkerPool:
             # preemption safe (durable per-task records).
             # Best-effort: if the store cannot be created,
             # preemption still works — the pool simply runs
-            # without durable records.
-            with contextlib.suppress(Exception):
+            # without durable records. Fail LOUDLY though:
+            # the checkpoint import was silently broken for
+            # a release (wrong module path) precisely
+            # because the old contextlib.suppress(Exception)
+            # hid it — an operator had no way to notice
+            # that true preemption had degraded (ADR-018).
+            try:
                 from maop.core.reliability.pipeline_checkpoint import (
                     PipelineCheckpoint,
                 )
                 checkpoint = PipelineCheckpoint(root_dir=root_dir or ".")
+            except Exception as exc:
+                logger.error(
+                    "[preemptable-pool] true_preemption enabled but "
+                    "the durable checkpoint store is unavailable "
+                    "(%s: %s); running WITHOUT durable "
+                    "preemption records",
+                    type(exc).__name__, exc,
+                )
         self._pool = WorkerPool(
             max_workers=max_workers,
             max_cpu_workers=max_cpu_workers,

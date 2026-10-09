@@ -186,7 +186,17 @@ async def execute_step_helper(
             # Simple boolean evaluation
             try:
                 passed = safe_eval(condition_expr, context)
-            except Exception:
+            except Exception as exc:
+                # A broken expression is indistinguishable
+                # from a false condition unless it is
+                # logged — the step silently SKIPs and
+                # the author never learns the expr is bad.
+                logger.warning(
+                    "[engine] condition step %s: expr %r "
+                    "failed to evaluate (%s: %s) — treating "
+                    "as not passed",
+                    step.id, condition_expr, type(exc).__name__, exc,
+                )
                 passed = False
             status = StepStatus.SUCCESS if passed else StepStatus.SKIPPED
             sr = StepResult(
