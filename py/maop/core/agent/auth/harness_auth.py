@@ -29,7 +29,19 @@ from maop.core.backends.db_utils import ConnectionPool, get_pool
 
 logger = logging.getLogger(__name__)
 
-# ── 常量 ────────────────────────────────────────────────────────────
+
+def _mask_key(license_key: str) -> str:
+    """Mask a license key for logs and errors (first 4 + last 2 chars).
+
+    License keys are credentials: the full value must
+    never reach log files or exception messages (both
+    leak into dashboards and support bundles).
+    """
+    if not license_key:
+        return ""
+    if len(license_key) <= 8:
+        return "*" * len(license_key)
+    return license_key[:4] + "****" + license_key[-2:]
 
 _LICENSE_TABLE = "harness_licenses"
 
@@ -294,10 +306,10 @@ class HarnessAuthProvider:
             finally:
                 self._pool.release(conn)
             if affected == 0:
-                raise KeyError(f"license 不存在: {license_key}")
+                raise KeyError(f"license 不存在: {_mask_key(license_key)}")
             logger.info(
                 "[harness_auth] 绑定 license key=%s -> account=%s",
-                license_key, model_account,
+                _mask_key(license_key), model_account,
             )
 
     def unbind_license(self, license_key: str) -> None:
@@ -322,8 +334,8 @@ class HarnessAuthProvider:
             finally:
                 self._pool.release(conn)
             if affected == 0:
-                raise KeyError(f"license 不存在: {license_key}")
-            logger.info("[harness_auth] 解绑 license key=%s", license_key)
+                raise KeyError(f"license 不存在: {_mask_key(license_key)}")
+            logger.info("[harness_auth] 解绑 license key=%s", _mask_key(license_key))
 
     def revoke_license(self, license_key: str) -> None:
         """吊销 license（将 status 置为 ``revoked``）。
@@ -347,8 +359,8 @@ class HarnessAuthProvider:
             finally:
                 self._pool.release(conn)
             if affected == 0:
-                raise KeyError(f"license 不存在: {license_key}")
-            logger.info("[harness_auth] 吊销 license key=%s", license_key)
+                raise KeyError(f"license 不存在: {_mask_key(license_key)}")
+            logger.info("[harness_auth] 吊销 license key=%s", _mask_key(license_key))
 
     def list_licenses(self) -> list[HarnessLicense]:
         """列出所有 license。

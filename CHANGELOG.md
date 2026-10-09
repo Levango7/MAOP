@@ -71,6 +71,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 9 例（游标一次性/意外节点推进/150 节点大层回归/
 超时触发/默认无超时/单次扫描/检测器每任务一次/
 取消后上报+ACK/stop 强杀卡死 handler）。
+### 泄漏与可见性审计修复
+
+2026-10-09 后端审计第二批（分布式路径之外）：
+
+- **WorkerPool 簿记泄漏**：`_tasks`/`_futures`
+  每提交一个任务永久保留一条——长生命周期池
+  无界增长。改为有界保留：完成条目最多保留
+  ``_COMPLETED_TASK_RETENTION = 4096`` 条、按
+  完成时间淘汰最旧；**运行中的任务永不淘汰**
+  （保留 ``get_task``/``wait`` 的查询语义）。
+  ``stop()`` 现在会取消存活的任务协程（此前
+  stop 后任务继续跑）。
+- **worktree 功能复活**：`create_root(task_id=...)`
+  关键字参数名错误（应为位置参数 ``task``）
+  且 ``WorktreeManager`` 没有 ``cleanup`` 方法
+  ——两处异常都被 ``except Exception`` 静默吞掉，
+  worktree 隔离实际从未生效（死代码）。已改为
+  正确的 ``create_root(wt.id)`` + ``abandon()``。
+- **spawn 队列泄漏**：``Engine._run_single``
+  的运行时扇出队列在 run 被取消/暂停时泄漏
+  ``_spawns[trace_id]`` 条目——用 ``try/finally``
+  保证任何退出路径都清理。
+- **真抢占降级静默**：``PreemptableWorkerPool``
+  在 ``contextlib.suppress(Exception)`` 内自动
+  创建 checkpoint 存储——这正是 γ-3 导入路径
+  错误被隐藏整整一个版本的根因。现在失败时
+  记 ``error`` 日志（best-effort 保留，但可见）。
+- **热路径**：``safe_eval`` 每次调用都
+  ``ast.parse``（现 ``lru_cache`` 512）；
+  ``_resolve_template`` 由「逐 key replace 链」
+  改为单遍 ``re.sub``——既消除 O(上下文×模板)，
+  又修复二阶注入（插入值含 ``{{ other }}``
+  会被再次展开）。
+- **CONDITION 可见性**：表达式求值失败此前
+  静默当作 ``false``（步骤 SKIPPED、作者无
+  感知）——现在记 ``warning``。
+- **license 密钥掩码**：绑定/解绑/吊销的
+  ``info`` 日志与 ``KeyError`` 消息不再包含
+  明文密钥（前 4 + 后 2 位掩码）。
+
+测试：``py/tests/test_backend_audit_batch_b.py``
+16 例（保留语义/最旧淘汰/运行中不淘汰/stop
+取消/spawn 清理（正常+取消）/二阶注入/未知
+key/连字符 key/解析缓存/CONDITION 告警/掩码）。
 
 ### 动态编排（第一刀）——运行时 fan-out
 

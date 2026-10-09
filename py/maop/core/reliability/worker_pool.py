@@ -31,6 +31,7 @@ import os
 import threading
 import time
 import uuid
+from collections import deque
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 from enum import Enum
@@ -45,6 +46,14 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger(__name__)
+
+# Completed tasks retained in _tasks/_futures for
+# post-completion queries (get_task / wait). A
+# long-lived pool otherwise grows one entry per
+# submitted task forever (the 2026-10-09 audit
+# leak); finished entries beyond this cap are
+# evicted oldest-first.
+_COMPLETED_TASK_RETENTION = 4096
 
 
 # ── Models ──────────────────────────────────────────────────────
@@ -135,6 +144,9 @@ class WorkerPool:
         self._sem = asyncio.Semaphore(self._max_workers)
         self._tasks: dict[str, WorkerTask] = {}
         self._futures: dict[str, asyncio.Future] = {}
+        # Completion order of finished tasks, for bounded
+        # retention (see _COMPLETED_TASK_RETENTION).
+        self._finished_order: deque[str] = deque()
         # Phase γ-3: live asyncio task handles (submit returns before the
         # coroutine finishes) and the set of task ids cancelled for
         # preemption, so the CancelledError handler can tell a preemption
@@ -191,6 +203,14 @@ class WorkerPool:
         for fut in self._futures.values():
             if not fut.done():
                 fut.cancel()
+
+        # Cancel live task coroutines (γ-3 handles) so a
+        # stopped pool does not keep executing submitted
+        # work. _run_task routes the CancelledError to the
+        # result future, so every pending future resolves.
+        for handle in self._task_handles.values():
+            if not handle.done():
+                handle.cancel()
 
         # Shutdown CPU pool
         if self._cpu_pool is not None:
@@ -283,7 +303,7 @@ class WorkerPool:
                         try:
                             from maop.core.agent.memory_ctx.worktree import WorktreeManager
                             wt_mgr = WorktreeManager(root_dir=self._root_dir or ".")
-                            worktree_info = wt_mgr.create_root(task_id=wt.id)  # type: ignore
+                            worktree_info = wt_mgr.create_root(wt.id)
                             actual_workdir = str(worktree_info)
                         except Exception as e:
                             logger.debug("ignored: %s", e, exc_info=True)
@@ -342,12 +362,33 @@ class WorkerPool:
             wt.finished_at = time.time()
             if worker_id >= 0:
                 self._worker_status[worker_id] = WorkerStatus.IDLE
-            # Clean up worktree after task completion
+            # Bound the per-task bookkeeping. _tasks/_futures
+            # previously retained one entry per submitted task
+            # forever — unbounded growth on a long-lived pool.
+            # Finished entries stay queryable (get_task/wait)
+            # up to _COMPLETED_TASK_RETENTION; the oldest
+            # finished entries are evicted first. Running
+            # tasks never enter _finished_order, so their
+            # entries are never evicted.
+            self._finished_order.append(wt.id)
+            while (
+                len(self._tasks) > _COMPLETED_TASK_RETENTION
+                and self._finished_order
+            ):
+                oldest = self._finished_order.popleft()
+                self._tasks.pop(oldest, None)
+                self._futures.pop(oldest, None)
+            # Retire the isolated worktree. create_root() returns
+            # the node id; abandon() marks the branch abandoned
+            # (WorktreeManager has no cleanup() method — the old
+            # call raised AttributeError, silently swallowed by
+            # the except below, so worktrees were never retired
+            # and the feature was dead code).
             if worktree_info:
                 try:
                     from maop.core.agent.memory_ctx.worktree import WorktreeManager
                     wt_mgr = WorktreeManager(root_dir=self._root_dir or ".")
-                    wt_mgr.cleanup(worktree_info)  # type: ignore
+                    wt_mgr.abandon(worktree_info)
                 except Exception as e:
                     logger.debug("ignored: %s", e, exc_info=True)
             self._task_handles.pop(wt.id, None)

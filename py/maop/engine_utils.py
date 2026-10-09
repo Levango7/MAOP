@@ -20,8 +20,10 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 from collections import defaultdict
 from collections.abc import Callable
+from functools import lru_cache
 from typing import Any, cast
 
 from maop.engine_types import WorkflowStep
@@ -134,22 +136,49 @@ def _safe_eval_node(node: ast.AST, context: dict) -> Any:
     raise ValueError(f"Unsupported AST node: {type(node).__name__}")
 
 
+def _parse_expr(expr: str) -> ast.Expression:
+    """Parse an expression string (cached — ast.parse is the hot path)."""
+    return ast.parse(expr, mode="eval")
+
+
+_parse_expr = lru_cache(maxsize=512)(_parse_expr)
+
+
 def safe_eval(expr: str, context: dict) -> Any:
     """Safe expression evaluator using AST — no code execution, no builtins access."""
-    tree = ast.parse(expr, mode="eval")
+    tree = _parse_expr(expr)
     return _safe_eval_node(tree, context)
 
 
 # ── Template resolution ───────────────────────────────────────
 
+# Matches {{ key }}: any placeholder name without
+# whitespace or braces (step ids may contain dashes).
+_TEMPLATE_RE = re.compile(r"\{\{\s*([^{}\s]+)\s*\}\}")
+
+
 def _resolve_template(template: str, context: dict[str, Any]) -> str:
-    """Replace {{ key }} placeholders with context values."""
+    """Replace {{ key }} placeholders with context values.
+
+    Single pass over the template: the old per-key
+    ``str.replace`` chain was O(context × template) and —
+    worse — re-scanned text it had just inserted, so a
+    value containing ``{{ other }}`` was expanded again
+    (second-order injection). ``re.sub`` visits each
+    placeholder once; substituted values are never
+    re-expanded. Placeholders whose key is not in the
+    context are left untouched (old behaviour).
+    """
     if not template:
         return template
-    result = template
-    for key, val in context.items():
-        result = result.replace("{{ " + key + " }}", str(val))
-    return result
+    return _TEMPLATE_RE.sub(
+        lambda m: (
+            str(context[m.group(1)])
+            if m.group(1) in context
+            else m.group(0)
+        ),
+        template,
+    )
 
 
 # ── Topological sort ──────────────────────────────────────────
