@@ -1,6 +1,6 @@
 """MAOP — Agent Orchestration Framework (Python rewrite)."""
 
-__version__ = "5.2.1"
+__version__ = "5.3.0"
 
 # Namespace package: allow maop-enterprise to contribute subpackages
 # under the maop.* namespace without conflicting.

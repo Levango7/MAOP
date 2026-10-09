@@ -39,6 +39,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.3.0] — 2026-10-10
+
+### 前端修复：Chat 页 8 个 i18n key 缺失
+
+程序化前端审查（无头 Chrome 抓渲染后 DOM，30 条核心路由）发现
+Chat 页把**原始 i18n key 当可见文本**展示：输入框 placeholder
+显示 `view.chat.inputPlaceholder`、标题显示 `view.chat.title`。
+根因：`Chat.vue` 引用的 8 个 key（`view.chat.title` /
+`newConversation` / `inputPlaceholder` / `selectAgentFirst` /
+`selectAgentToStart` / `chars` + `a11y.send` / `a11y.stop`）不在
+词典中，`t()` 查不到 key 时回退为原始 key。词典补全 en+zh 双语；
+全量扫描 2566 个使用 key vs 2943 个定义 key 确认零缺失。
+（同一轮审查的其余结论：30 路由零应用级控制台错误、nav/router
+一致、en/zh 对齐 98.8%——无待修项。）
+
 ### 分布式执行路径审计修复
 
 2026-10-09 后端审计发现并修复的四个分布式路径缺陷：
