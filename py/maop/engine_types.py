@@ -66,6 +66,33 @@ class StepResult(BaseModel):
     agent: str = ""
 
 
+class SpawnDirective(BaseModel):
+    """Runtime fan-out directive (dynamic orchestration).
+
+    A step executor signals it by returning an object carrying a
+    ``spawn`` attribute holding this directive. After the step
+    succeeds, the engine merges ``steps`` into the *run* graph —
+    they execute in the same run, after the spawning step
+    (``depends_on`` defaults to the spawner's id; set it to
+    reference any step that exists in the run).
+
+    Validation at merge time: duplicate step ids and unknown
+    ``depends_on`` references are dropped with an error log
+    (the run continues). Cycles cannot form: spawned steps may
+    only reference steps that already exist when they are
+    merged, and existing steps' edges never change.
+
+    Boundary: single-process runs only. In distributed
+    execution the step executor runs on the worker, so
+    directives cannot cross the process boundary — they are
+    not delivered (the worker's result posting ignores the
+    attribute).
+    """
+
+    steps: list[WorkflowStep] = Field(default_factory=list)
+    depends_on: list[str] | None = None
+
+
 class EngineResult(BaseModel):
     """Result of the entire engine run."""
     trace_id: str = ""
