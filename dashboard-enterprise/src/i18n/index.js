@@ -293,6 +293,8 @@ export const coreMessages = {
     'a11y.search': 'Search',
     'a11y.closeNotification': 'Close notification',
     'a11y.loading': 'Loading',
+    'a11y.send': 'Send message',
+    'a11y.stop': 'Stop generating',
 
     // ── Observability view (P3: 替换 Observability.vue 中硬编码英文字符串) ──
     'view.observability.enterprise': 'Enterprise',
@@ -625,6 +627,8 @@ export const coreMessages = {
     'a11y.search': '搜索',
     'a11y.closeNotification': '关闭通知',
     'a11y.loading': '加载中',
+    'a11y.send': '发送消息',
+    'a11y.stop': '停止生成',
 
     // ── Observability view (P3: Observability.vue 硬编码英文的中文翻译) ──
     'view.observability.enterprise': '企业版',
