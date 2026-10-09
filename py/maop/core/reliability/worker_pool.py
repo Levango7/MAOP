@@ -40,7 +40,9 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from maop.core.pipeline_checkpoint import PipelineCheckpoint
+    from maop.core.reliability.pipeline_checkpoint import (
+        PipelineCheckpoint,
+    )
 
 logger = logging.getLogger(__name__)
 

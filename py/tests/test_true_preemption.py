@@ -182,7 +182,11 @@ class TestCheckpointWiring:
     @pytest.mark.asyncio
     async def test_successful_task_records_run(self):
         ckpt = FakeCheckpoint()
-        pool = WorkerPool(max_workers=1, root_dir="", checkpoint=ckpt)
+        pool = WorkerPool(
+            max_workers=1,
+            root_dir="",
+            checkpoint=ckpt,  # type: ignore[arg-type]
+        )
         await pool.start()
         try:
             with patch("maop.maop_loop.MaopLoop") as mock_loop_cls:
@@ -202,7 +206,11 @@ class TestCheckpointWiring:
     @pytest.mark.asyncio
     async def test_failed_task_records_fail_step(self):
         ckpt = FakeCheckpoint()
-        pool = WorkerPool(max_workers=1, root_dir="", checkpoint=ckpt)
+        pool = WorkerPool(
+            max_workers=1,
+            root_dir="",
+            checkpoint=ckpt,  # type: ignore[arg-type]
+        )
         await pool.start()
         try:
             with patch("maop.maop_loop.MaopLoop") as mock_loop_cls:
@@ -227,7 +235,11 @@ class TestCheckpointWiring:
         that is the resumable state true preemption relies on.
         """
         ckpt = FakeCheckpoint()
-        pool = WorkerPool(max_workers=1, root_dir="", checkpoint=ckpt)
+        pool = WorkerPool(
+            max_workers=1,
+            root_dir="",
+            checkpoint=ckpt,  # type: ignore[arg-type]
+        )
         await pool.start()
         try:
             with patch("maop.maop_loop.MaopLoop") as mock_loop_cls:
@@ -262,6 +274,35 @@ class TestCheckpointWiring:
         finally:
             await pool.stop()
 
+    async def test_true_preemption_auto_creates_checkpoint(self, tmp_path):
+        """true_preemption=True with no checkpoint wires a real store.
+
+        Regression guard: the auto-create import previously pointed at
+        a non-existent module path, so ``ignore_missing_imports`` hid
+        the failure and the pool silently ran without durable records.
+        """
+        pool = PreemptableWorkerPool(
+            max_workers=1,
+            true_preemption=True,
+            root_dir=str(tmp_path),
+        )
+        try:
+            from maop.core.reliability.pipeline_checkpoint import (
+                PipelineCheckpoint,
+            )
+
+            assert isinstance(pool._pool._checkpoint, PipelineCheckpoint)
+        finally:
+            await pool.stop()
+
+    async def test_soft_pool_auto_create_stays_off(self):
+        """Soft-preemption pools never auto-create a checkpoint."""
+        pool = PreemptableWorkerPool(max_workers=1, true_preemption=False)
+        try:
+            assert pool._pool._checkpoint is None
+        finally:
+            await pool.stop()
+
 
 # ── PreemptableWorkerPool._maybe_preempt ─────────────────
 
@@ -270,7 +311,7 @@ def _make_preempt_pool(true_preemption: bool = True, max_preemptions: int = 2):
         max_workers=1,
         true_preemption=true_preemption,
         max_preemptions=max_preemptions,
-        checkpoint=FakeCheckpoint(),
+        checkpoint=FakeCheckpoint(),  # type: ignore[arg-type]
     )
     return pool
 

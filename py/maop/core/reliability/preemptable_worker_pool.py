@@ -27,7 +27,7 @@ takes longer, never vanishes.
 
 This is safe because the execution path now writes durable state:
 :meth:`WorkerPool._run_task` records every executed task in a
-:class:`~maop.core.pipeline_checkpoint.PipelineCheckpoint` run
+:class:`~maop.core.reliability.pipeline_checkpoint.PipelineCheckpoint` run
 (``start_step``/``complete_step``/``fail_step``). A preempted task
 leaves its checkpoint step in ``running`` status, which
 ``pending_steps()`` reports for retry, and the step's ``attempts``
@@ -77,7 +77,9 @@ from maop.core.reliability.worker_pool import (
 )
 
 if TYPE_CHECKING:
-    from maop.core.pipeline_checkpoint import PipelineCheckpoint
+    from maop.core.reliability.pipeline_checkpoint import (
+        PipelineCheckpoint,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -120,12 +122,15 @@ class PreemptableWorkerPool:
         checkpoint: PipelineCheckpoint | None = None,
     ) -> None:
         if checkpoint is None and true_preemption:
-            # The execution-path wiring that makes true preemption
-            # safe (durable per-task records). Best-effort: if the
-            # store cannot be created, preemption still works — the
-            # pool simply runs without durable records.
+            # The execution-path wiring that makes true
+            # preemption safe (durable per-task records).
+            # Best-effort: if the store cannot be created,
+            # preemption still works — the pool simply runs
+            # without durable records.
             with contextlib.suppress(Exception):
-                from maop.core.pipeline_checkpoint import PipelineCheckpoint
+                from maop.core.reliability.pipeline_checkpoint import (
+                    PipelineCheckpoint,
+                )
                 checkpoint = PipelineCheckpoint(root_dir=root_dir or ".")
         self._pool = WorkerPool(
             max_workers=max_workers,
