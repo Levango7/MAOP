@@ -37,7 +37,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] - 2026-10-01
+## [Unreleased]
+
+## [5.2.1] — 2026-10-09
+
+**本版性质**：patch。发布动因是**解除与已发布 MAOS `enterprise-v5.2.3` 的兼容缺口**（P0）——
+MAOS 该版起"空 `tenant_id` 不再等于所有租户"，其 CHANGELOG 明确要求"MAOP v5.2.1 起声明
+要求 MAOS ≥ enterprise-v5.2.3"，本版号即为对齐该契约而取。
+
+**本版声明（版本兼容地板）**：**MAOP ≥ 5.2.1 要求 MAOS ≥ `enterprise-v5.2.3`**。
+依据与双向失效模式见 README「版本兼容地板」节；该约束无法用 pip 依赖表达（`maop-enterprise`
+是私有包），故由 README 声明 + `py/tests/test_maos_version_floor.py` 守卫。运行时强制检查
+属候选改进，**本版未实施**。
+
+**范围**：v5.2.0（2026-09-08）之后主干累积的 **243 个提交**（其中 119 个 `feat`/`fix`）
+收口为一份可分发制品。下方五个 `### 批次 …` 小节是同一批内容在当时的滚动记录分段，
+本次归位一并并入本版（原均写作 `## [Unreleased] - <日期>`）。ROADMAP 侧的范围与验收标准
+见 [ROADMAP.md](ROADMAP.md) 的 v5.2.1 节。
+
+> **簿记残留（已知，本次未处理）**：本文件另有一个**无日期**的 `## [Unreleased]` 段
+> （内容为「阶段二启动定稿」，PRD/HLD v1.1.0 评审于 2026-09-03），**疑属 v5.2.0** 却从未
+> 并入其版本段。凭日期猜归属会制造新的错账，故保留原状并加注待核实。
+
+### 2026-10-09 Ubuntu 26.04 迁移：按 canary 实测把 Linux 腿显式钉住
+
+`ubuntu-latest` 将在 **2026-10-19 ~ 11-19** 窗口内被 GitHub 迁到 26.04（要留旧版须显式钉
+`ubuntu-24.04`）。10-05 加的 `ubuntu26-canary` 已把差异量出来——**连续绿**（4m50s，口径与
+本腿对齐：`-n 2`、`--reruns=0`）。本批据此收尾：
+
+- `ci.yml` 的 pytest 矩阵 Linux 腿 `ubuntu-latest` → **显式 `ubuntu-26.04`**；同时改掉依赖
+  它的条件 `if: matrix.os == 'ubuntu-latest'`（Enterprise extra smoke 步骤）——不改会让
+  该步骤**静默不再执行**（新 OS 名匹配不上旧字面量），是典型的"看不见的失效"。
+- 删除 nightly 的 `ubuntu26-canary` 作业（38 行）；其使命已由 ci.yml 接管。
+- nightly `flaky-detection` 的 Linux 基线腿同步改 `ubuntu-26.04`。**这不是可选项**：守卫
+  `test_every_leg_is_a_real_ci_leg` 要求每条腿都在 ci.yml 矩阵内，不改就红（nightly 不该
+  观察一个 CI 已不执行的组合）。`REQUIRED_LEGS` 与 `docs/ci-gates.md` §8 表格同步；
+  §9 的腿清单去掉已删除的 canary 行。
+
+**已知并接受的残留（不是遗漏）**：`ci.yml` 另有 **17 个作业**仍是 `runs-on: ubuntu-latest`
+（lint / coverage / e2e / docker / sast / container-scan / publish …），它们不在本批内，将随
+10-19 窗口一起变成 26.04 —— 这正是 10-05 加 canary 时注释写明的方案（"走完 10-19 的窗口
+即为 26"）。canary 只验证了 pytest 腿，**其余作业的 26.04 行为未单独取证**；若那批在 10-19
+后转红，处置方式是各自显式钉版本，而不是回退本批。
+
+验证：`test_nightly_flaky_coverage.py` 11 passed、`test_ci_workflow_hygiene.py` 3 passed、
+`test_ci_required_checks.py` 6 passed；两个 workflow YAML 可解析且作业集合与预期一致。
 
 ### 2026-10-06 评估批 I：把"分发"做成不需要外部账号也能用的一条路
 
@@ -720,9 +764,9 @@ Nightly 36835438520 同族），探针这回把现场拍全了：
   - `.github/ci-required-checks.json` 的 `_comment` 与 `docs/ci-gates.md` §7.2/§7.6 同步
     记下这条边界，避免下一个改保护的人重蹈。
 
-## [Unreleased] - 2026-09-30
+### 批次 2026-09-30
 
-### 2026-09-30 T3.0：v5.2.0 演化闭环哑弹排除（trigger / 审批 API）
+#### 2026-09-30 T3.0：v5.2.0 演化闭环哑弹排除（trigger / 审批 API）
 
 `dashboard/services/evolution_service.py` 的三个恒 500 缺陷 + 一个持久化缺陷
 （2026-09-29 体检发现；AC-07 首版测试全 mock 了 EvolutionLoop，所以从未暴露）：
@@ -750,7 +794,7 @@ Nightly 36835438520 同族），探针这回把现场拍全了：
 
 施工总图（三工作流 13 任务 + T-UI 支线）：`docs/investment-plan-2026Q4.md`。
 
-### 2026-09-30 T2.2：requirements.frozen.txt 真锁（审计输入换精确 pin）+ T-UI 顶栏/侧栏布局
+#### 2026-09-30 T2.2：requirements.frozen.txt 真锁（审计输入换精确 pin）+ T-UI 顶栏/侧栏布局
 
 **T2.2 真锁**：
 - 新增 `py/requirements.frozen.txt`：uv 全量解析（base + enterprise extra，
@@ -776,7 +820,7 @@ Nightly 36835438520 同族），探针这回把现场拍全了：
   顶栏/内容在侧栏右侧/大标题完整落在顶栏内/rail 收窄不违约/移动 drawer 不遮
   顶栏），chromium 实测 5 passed；`npm run build` 通过。
 
-### Added
+#### Added
 
 - **`CI merge gate`：把"测试必须绿"从人看变成平台拦**（`py/scripts/ci_merge_gate.py` +
   `ci.yml` 的 `gate` 作业 + `py/tests/test_ci_merge_gate.py` 18 条）。缺口是这样形成的：
@@ -801,15 +845,15 @@ Nightly 36835438520 同族），探针这回把现场拍全了：
   只需要换编码变量，连带剥掉 `SystemRoot` 之类是超出意图的。zh-CN 本机 3.14 复现不出来，
   这条只能靠 CI 版本分裂证据定性。
 
-### Changed
+#### Changed
 
 - **泄漏探针补"谁 patch 的"指纹（`run_impl=`）**：`py/tests/conftest.py::_leak_probe` 此前只报 `subprocess_run_patched=True/False`，等于只说"进程被弄脏了"而不说"被谁"。新增 `_run_fingerprint()`，日志多一个字段 `run_impl=<定义模块>:<限定名>`（仅在 `subprocess.run` 被换掉时有值，否则为 `-`）。为什么这样取值：真实嫌疑人形状是测试文件里的局部闭包（`py/tests/test_agent_adapters.py::_mock_subprocess_run` 返回的 `_run`，以及若干 `test_xxx.<locals>._capture_run`），它们的 `__module__/__qualname__` 直接带出**所在文件与所在用例**，于是一次复发就能点名而不是再靠 `output='ok'` 这种间接指纹猜。对 Mock 类对象只报 `类型名@类型的模块`，**刻意不读 `return_value`** —— MagicMock 的属性访问会自动创建子 mock，那等于探针反过来改变自己要观测的对象（观察者效应）；这条约束由 `test_run_fingerprint_does_not_touch_the_mock_it_reports` 钉住（断言零调用、`mock_calls` 为空、且取证前后 `__dict__` 键集合不变）。新增 3 条用例（12 passed），变异验证 5 例各点亮对应断言：指纹退化成常量 / 去掉 `run_impl` 字段 / 取消 `-` 分支 / 去读 `return_value` / 取证时顺手调用 fake。**动机**：`tests/test_tool_manager.py::TestCallSyncFallback` 三条在 macOS 腿随机红（`assert '42' in 'ok'` 与两条 `assert True is False`，返回值都是 `ok=True/exit_code=0/duration_ms=0/output='ok'` 的罐头值），2026-09-29 的 PR #54 与当日主干 run 448 各复发一次、失败用例 ID 逐字相同；`threads=[]` 已排除线程泄漏嫌疑，但"永久 patch"也与"紧邻的前一条用例同断言却通过"矛盾 ⇒ patch 是窗口性的，机制仍未定位 —— 本改动是把"下次复发能点名"这件事先做完。纯观测，不改任何生产代码或用例断言。
 
 ---
 
-## [Unreleased] - 2026-09-29
+### 批次 2026-09-29
 
-### Fixed
+#### Fixed
 
 - **dry-run gate 接线修复（no-op → 显式 opt-in enforce）**：`maop_plan` 为 deploy/pipeline/fileops 路由挂 dry-run gate 但从不设置 `plan["dry_run"]`，`_gate_dry_run` 对未声明的 plan 恒 PASS（`maop_verify.py` 的向后兼容合同），闸门从未生效。修复：`Plan` 新增 `dry_run` 字段，`MAOP_DRY_RUN_ENFORCE=1` 时三条路由置 True，未设置保持历史行为。路由口径实测：`config/agents.yaml` 路由表无 "deploy" 键，真实任务只命中 pipeline/fileops（deploy 分支仅能经 `routing_key` 覆盖触达）。新增 `py/tests/test_dry_run_gate_wiring.py`（接线 5 例 + gate 行为 3 例，8 passed）。已知限制：enforce 为 fail-closed，且当前执行器不产出 dry-run 信号（全库无产出方），开启后 pipeline/fileops 任务会卡在 verify，须先接执行器信号产出。`MAOP_DRY_RUN_ENFORCE` 已同步 `.env.example` / `README.md` / `docs/configuration.md`。
 - **委派指标双计数修复（success/total 告警分母膨胀）**：`MAOP_DELEGATIONS_TOTAL` 在 `maop_plan.py`（建 plan）与 `dispatch_core.py`（派发）各 +1，而 success/failed 只在派发侧计数 → 纯环路流量下 total:success ≈ 2:1，`monitoring/alerts.yml` 的 success/total < 0.8 与 `slo-alerts.yml` 的 burn rate 会在健康系统上误报，`prometheus-alerts.yml` 的 failed/total 被稀释一半（漏报）；`MAOP_DELEGATION_DURATION` 亦混入 plan 构建耗时（稀释 P95 延迟告警）。修复：移除 plan 侧两处指标写入（计数/耗时唯一在派发侧），`py/maop/monitoring.py` 注释同步更正。回归测试 `py/tests/test_maop_plan.py::TestPlanMetricsSideEffects`（变异验证：重加 `.inc()` 即红）。
@@ -820,7 +864,7 @@ Nightly 36835438520 同族），探针这回把现场拍全了：
 - **影响面判定脚本在非 UTF-8 控制台崩溃（Windows 四条 pytest 腿全红）**：`ci_path_scope.py` 的中文摘要含全角括号 `（`，Windows 上 `sys.stdout` 按**区域代码页**编码，en-US runner 是 cp1252 → `UnicodeEncodeError` 让脚本以 1 退出；zh-CN 本机是 cp936、能编码这些字符，所以本地怎么跑都绿。由两个既有的子进程用例如实抓到（`test_cli_writes_github_output` / `test_cli_mixed_changeset_reports_code_true`）。修法在脚本侧固定 UTF-8 输出（异常时降级不失败），不给调用方塞 `PYTHONIOENCODING` —— 真实 CI 步骤不会设它，设了也只是把缺陷留在原地。新增可证伪用例 `test_cli_survives_non_utf8_console`（显式 `PYTHONIOENCODING=cp1252` 起子进程，因此在任何平台都能复现）；变异验证：去掉 `reconfigure` → 该用例即红；还原后 `test_ci_path_scope.py` 34 passed。 **但第一版只修了写侧**：下一条 push 的 CI 实测 Windows 仍红 1 条 —— 子进程已固定输出 UTF-8，而用例用 `text=True` 按**父进程区域编码**解码，en-US runner 上变成 `UnicodeDecodeError: 'charmap' codec can't decode byte 0x90`（崩溃只是从写侧搬到读侧）。补法：两处读侧显式 `encoding="utf-8"`；另加跨平台确定的字节契约用例 `test_cli_stdout_is_valid_utf8_bytes`（不用 `text=True`，取原始字节严格按 UTF-8 解）。为什么必须有它：zh-CN 本机 cp936 会把 UTF-8 字节吞成乱码且不报错 —— 实测去掉读侧 `encoding` 后本机仍 passed，即"父进程解码失败"这类问题本机不可测，只有 en-US runner 会暴露，故把契约钉在字节层。变异验证（去掉 reconfigure + 子进程强制 cp1252）→ 该用例判红；最终 `test_ci_path_scope.py` 35 passed、ruff clean。
 - **Nightly 的规模判据踩在刀刃上（假红）**：`tests/e2e/test_boundary_conditions.py::test_large_batch_register_1000` 同机自校准上限是"基线 × 条数 × 3"，Nightly run `36395972637` 连跑 3 次里第 3 次报"耗时 11.0s / 上限 10.6s"—— 实测比值 **2.97 对 3.00**，只差 1%。上浮本身不是退化（register 每条单独写 SQLite、无批量事务，表从 100 行涨到 1100 行时 per-op 自然变贵），而它要抓的复杂度退化量级是几百倍。上限放到 5×：本机实测比值 1.17（余量 4.3×），对 Nightly 最坏观测仍有 1.68× 余量；判据仍咬得住 —— 变异验证把上限临时收到 1.05（低于实测 1.17）用例立即失败并报出实测/上限两个数。
 
-### Added
+#### Added
 
 - **required checks 与 `ci.yml` 作业形状的三方一致性守卫**：master 的 required 上下文此前只活在两处 —— GitHub 设置（仓库里看不见）与 `docs/ci-gates.md` §7.2 的散文。新增机器可读清单 `.github/ci-required-checks.json`（5 条，各带 workflow/作业名/kind），配套 `py/tests/test_ci_required_checks.py` 6 条断言把**清单 ↔ `ci.yml` 作业形状 ↔ §7.2 散文**互相对账：context 必须唯一对应一个作业名（改名或删作业会让 required 永不上报、所有 PR 卡 `blocked`，实测）；required 作业必须在 `pull_request` 上**沿 needs 链递归可达**；kind 必须与作业真实 `if:` 一致；不许把矩阵作业列进清单（矩阵腿在 docs-only 时上报的是未展开的字面量名）；文档与清单不得各说各话。两个失败方向不对称：作业改名立刻可见，而"required 作业变成 PR 上恒不产出"是**静默假门禁** —— 所以可达性判据必须递归：`container-scan` 自己没有 `if:`，却 `needs: docker`（push-only），只查作业自身条件抓不到。变异验证 8 个破坏各点亮对应守卫；反证 —— 把递归摘掉后"祖先 push-only"这一例直接漏网。同时把 `.github/ci-required-checks.json` 加进 `ci_path_scope.py` 的 `CODE_FILES`：否则"只改清单"的 PR 被判 docs-only、这条守卫**永不执行**（正是本轮反复在治的"配了不跑"）。
 - **`docs/ci-gates.md` §7.5：一次误判的证伪记录**：据"主干某次 push 只跑 18 秒、13 条 skipped"曾判定 job 级 scope 把 trunk 兜底验证裁掉了，实测两条推翻 —— ① `#52` 之前 `on.push.paths` 与 `on.pull_request.paths` 是同一份白名单且不含 `docs/**`、`CHANGELOG.md`，docs-only 合入主干本来就**完全不触发 workflow**（0 条 check），现状是"3 条真跑 + 可见的 skipped"，覆盖面不变、可见性变好；② 把旧白名单每一项喂给发布版分类器，16 条路径全部仍判 code=true、零漏判，且分类器另算 `deploy/`、`monitoring/`、`alertmanager/`、`nginx*.conf` ⇒ 净增。方法论：**比较两次 run 的时长必须同内容类型**；判"是否丢了覆盖率"要拿新旧判定面各自回放同一批输入。
@@ -828,7 +872,7 @@ Nightly 36835438520 同族），探针这回把现场拍全了：
 - **`check_config_drift.py` 增补版本同步检查**：`maop/__init__.py` 的 `__version__` 与 `pyproject.toml` 的 `version` 必须一致（不一致 → FAIL；任一侧不可解析 → 显式打印告警，避免"没跑"与"全绿"同形）。同样并入自根 `scripts/doc_reconcile.py`。三项负例已实测（不一致 / 一致 / 不可解析）。
 - **文档一致性检查接入 CI（新 `docs-gate` 作业）**：`py/scripts/check_docs_consistency.py` 此前"零引用、1400+ 条发现无人消费"，本轮治掉假阳性后接进 `ci.yml`。范围由 `docs/README.md` 自己声明的口径决定（第 1–6 章"当前权威文档"，第 7 章归档不算），历史快照/设计文档需文件头 `<!-- docs-gate: exempt=<理由> -->`、单行需 `skip=<理由>`，**理由不得留空且会被逐条打印**。作业**不挂 `if`**：只改文档会写进不存在的路径，只删代码会让文档里的旧路径失效，两边都必须跑（脚本只用标准库，本机约 3 秒）。新增守卫 `py/tests/test_docs_consistency_gate.py` 22 条：后缀简写放行边界（`core/worker_pool.py` 不得因 `core/reliability/worker_pool.py` 而放过）、跨仓/占位符/排版记号分型、gitignore 深层目录匹配、计数口径、假仓库端到端"注入死路径必红 / 空理由豁免不生效"、以及 `docs-gate` 作业不许被加 `if` 的结构断言。
 
-### Changed
+#### Changed
 
 - **master 开启 required checks（带外配置，故在此留痕）**：job 级 scope 落地后按 `docs/ci-gates.md` §7 复测 skipped 语义 —— 以 docs-only PR 为夹具，required 只放一条 success 作业 → `clean`；换成一条**永不上报**的上下文 → 8 秒内翻 `blocked`（正对照，证明判定在算而非配置空转）；换成一条 **skipped** 作业 → 回到 `clean`。结论：**上报为 skipped 即满足 required，从未上报则永久卡住**。据此 required 设 5 条：`CI scope (code vs docs-only)`、`Secret Scan (gitleaks)`、`Docs consistency gate`（恒存在）+ `Lint (ruff + mypy)`、`Frontend Build`（docs-only 时跳过即满足，代码 PR 上必须真过）；`strict: false`、`enforce_admins: false`（保留 owner 逃生门；这也解释了早前"保护形同虚设"的观察 —— admin 绕过的是强制，不是判定）。**pytest 矩阵腿明确不纳入**：docs-only 时那条 skipped check 的名字是未展开的字面量，与代码 PR 上 9 条展开后的名字不同（两侧均实测），按精确名设会把文档 PR 永久卡住；真要覆盖 pytest 应加一条名字稳定的聚合作业读 `needs.*.result`，而不是折腾上下文匹配。同理排除 `Docker build` / `Container Scan (trivy)` / `Compose Smoke` / `Publish to PyPI`：它们在 PR 上恒 skipped 或不产生，设 required 等于"永远空满足"，是假门禁。
 - **并入 origin/master（PR #33–#51）后新增门禁首跑即绿**：合并 vitest 3→5、node 20→24、前端覆盖率门禁接入、codecov 吞错步骤删除等 41 个远端提交，冲突 4 处（`ci.yml` / `CHANGELOG.md` / `package.json` / `package-lock.json`）的解决依据见合并提交 `a25b06a`。CI 实测：`Docs consistency gate`（本轮新接的作业）在首条 push 上 **success**，`Lint (ruff + mypy)`、`Frontend Build`、`Playwright E2E`、`SAST`、`Alembic migrations` 与 ubuntu/macos 各 Python 腿全绿；Windows 腿的红源自下面 Fixed 里的控制台编码问题。版本口径随合并更正：`docs/product-consolidation.md` 的"vitest 3.2.7（实测 lock）"→ 5.0.2，并注明当年那条"ci.yml 假称 vitest@5"的更正记录关系已反转（现在真是 5）。
@@ -837,14 +881,14 @@ Nightly 36835438520 同族），探针这回把现场拍全了：
 - **deliverables 的 emoji 清零 + 一次自纠**：4 个被跟踪的交付文档按同批口径清理（正文删除；纯 emoji 单元格按表头换文字：`判定`/`是否通过`→通过，`个人版`/`企业版`→是/否；`✓` 作线框图勾选记号保留）。核对过程中发现并修正上条所述偏差：恢复 `docs/archive` 被误删的 2 个 `✓`，清理用字符类改为显式跳过 U+2713/U+2717。注：`deliverables/` 整目录在 `.gitignore:174` 内，仅历史被跟踪的 9 个文件可入库，`Delivery-Plan-v5.1.0-Dual-Repo.md` 属未跟踪文件（本地副本一并清理）。
 - **当前权威文档的路径订正（由新门禁扫出）**：`performance-benchmarks.md` 引用 7 个重构前的扁平模块路径（`py/maop/core/worker_pool.py` 等 → `core/reliability|security|monitoring/` 下的真实位置，两个同名模块按内容判定归属）；`contributing.md` 的 `core/api_key_vault.py`、`core/sandbox.py` → `core/security/api_key_vault.py`、`core/agent/plugins_hooks/plugin_sandbox.py`；`troubleshooting.md` 把 `system.py` 更正为 `dashboard/services/system_service.py`，并删掉不存在的 `config/sso.yaml`（SSO IdP 参数实际存在 provider 记录的 `config` 字段里，经 `POST /api/sso/providers` 写入）；`user-guide.md` 删掉不存在的 `config/tenants.yaml`（租户由 TenantManager 经 `/api/tenants/*` 管理）；`privacy-policy.md` 的 `data/.api-key` 更正为代码实际使用的 `data/.enc_key`；`cla.md` 移除仓库内不存在的 `docs/cla-employers.md` 承诺；`technical-whitepaper.md` 两处表格乱码（`| 列 |' |`、`| Art. 28 |" |` 多出的游离引号导致列数错位）已修。
 
-### Removed
+#### Removed
 
 - **架构级死重清理（安全网 tag `archive-v4.0-before-removal`）**：`git rm -r archive/`（107 文件：js-dashboard 17 / ps-legacy 86 / legacy 4；零运行时引用，方案见 `docs/audits/archive-cleanup-plan.md`，2026-08-16 已成文未执行）；删除根 `otel-collector-config.yaml`（P2-M-02 起 compose 挂载 `deploy/otel-collector.yaml`，见 `docker-compose.yml:263`）、`scripts/migrate_bridge_to_proxy.py`（2026-07-26 重命名迁移已完成的一次性脚本）、`scripts/smoke_test_agents.py`（首 import 即断，功能已被 pytest 覆盖）、根 `scripts/doc_reconcile.py`（能力并入上述两脚本）、空目录 `plugins/`（`PluginManager` 启动自建，`plugin_manager.py:113`）。相关引用同步：README、`docs/DESIGN_RULES.md`、`docs/contributing.md`、`config/agents.yaml`、`maop.ps1`、`dashboard/server.py` 注释、`plugin_manager.py` 注释。
 - **README 模块表死引用修正**：`core/security/tenant.py` 已于 2026-09-25 删除（严格子集并入 `core/tenant/`，见 `core/tenant/manager.py:14`），表项更新为 `core/tenant/manager.py`（由 `check_docs_consistency.py` 扫出，工具价值验证）。
 
-## [Unreleased]（PR #33–#51 合并批次：依赖、CI 与探针更正）
+### 批次 PR #33–#51：依赖、CI 与探针更正
 
-### websockets 版本范围改判（下界 12.0 → 14.0，上界 <15 → <17）
+#### websockets 版本范围改判（下界 12.0 → 14.0，上界 <15 → <17）
 
 原来的 `websockets>=12.0,<15` 两头都不对，用回环真连接测试逐版本实测（每个版本都确认
 `websockets.__version__` 真的是它）后改判：
@@ -868,7 +912,7 @@ Nightly 36835438520 同族），探针这回把现场拍全了：
   把 `pydantic-settings 2.15.0 / uvicorn 0.53.0 / mmh3 5.3.0` 静默回退了；逐行 diff 复核时发现，
   已改为"一律以 master 内容为基准重建"。同期 #23 也因同一原因回退过前端 11 项依赖，见 #25。
 
-### requirements.lock 与 pyproject 的镜像关系加上机械强制
+#### requirements.lock 与 pyproject 的镜像关系加上机械强制
 
 `requirements.lock` 的表头一直写着「Source of truth for DIRECT deps: pyproject.toml.
 This file mirrors it」，但**没有任何东西强制它** —— 实测漂移：dependabot #13 抬了
@@ -891,7 +935,7 @@ lock 仍停在 `2.5.2 / 0.30.6 / 5.2.1`；照 lock 装环境的人拿到的是�
   transitive 条目仍是手写的 `>=` 范围而非精确 pin。要做到"可复现构建"得
   在干净 venv 里 `pip install -r requirements.txt && pip freeze` 重新生成，属独立立项。
 
-### 类型门禁改为显式 CI 步骤（拿到 `workflow` scope 后的收尾）
+#### 类型门禁改为显式 CI 步骤（拿到 `workflow` scope 后的收尾）
 
 #23 当时因为 gh token 无 `workflow` scope（GitHub 对改 `.github/workflows/*` 的写入直接拒绝），
 只能把 `vue-tsc --noEmit` 借道 npm 的 `pretest` 生命周期生效。权限到位后按原计划改为显式形态：
@@ -900,7 +944,7 @@ lock 仍停在 `2.5.2 / 0.30.6 / 5.2.1`；照 lock 装环境的人拿到的是�
 - `package.json` 删掉 `pretest`：门禁要在 CI 里**看得见、失败能归因到具体步骤**，不藏在 `npm test` 背后；
   本地 `npm test` 也回到只跑测试。`typecheck` 脚本保留。
 
-### 主干 flaky 的 CI 侧观测探针（只观测，不改行为）
+#### 主干 flaky 的 CI 侧观测探针（只观测，不改行为）
 
 `tests/test_tool_manager.py::TestCallSyncFallback` 3 条在 macOS/Windows 随机红（症状
 `assert '42' in 'ok'`、两条 `assert True is False`），把主干和 PR 反复判红（master `88e75804`
@@ -924,7 +968,7 @@ lock 仍停在 `2.5.2 / 0.30.6 / 5.2.1`；照 lock 装环境的人拿到的是�
   修法：探针不再触碰 DB/settings（该取证目标也已被证伪），并把夹具移到 `_isolate_data_dir` 之后。
   教训写进夹具 docstring：**观测型工具不许有副作用**。
 
-### 撤回 #39 的"真实泄漏"结论，并把探针改成可被证伪的
+#### 撤回 #39 的"真实泄漏"结论，并把探针改成可被证伪的
 
 给 #39 的探针补变异验证时，两件事同时暴露：
 
@@ -973,7 +1017,7 @@ rerunfailures 线程各一条）、allowlist 里模块名必须可导入、夹�
 仍未解决：`TestCallSyncFallback` 三元凶的机制还没抓到现行 —— 探针现在只报真嫌疑人，
 等下一次红。
 
-### 依赖与 CI 批次补记（2026-09-27：#40 #41 #42 与 dependabot 6 条）
+#### 依赖与 CI 批次补记（2026-09-27：#40 #41 #42 与 dependabot 6 条）
 
 ⚠️ **本段是补记**。下面 9 个变更当天直接落到了 master，**没有一个写了 CHANGELOG 段**，
 违反本文件《发布前 checklist》第 2 条（"CHANGELOG.md 已更新本次版本段"）。
@@ -1041,7 +1085,7 @@ master 实测（vitest 5 之后）：statements 61.09% / branches 46.2% / functi
 **含义**：若要把覆盖率纳进 CI，第一步是先证明这个数可复现，否则门禁会变成新的随机红源。
 处置二选一（不顺手改）：纳进 CI 并重新定标 + 加 ratchet（对齐后端做法），或明确降级为"仅本地工具"并在配置里写清楚。
 
-### dependabot：`docker/*` 也成批，并让"该不该成批"变成机器判的
+#### dependabot：`docker/*` 也成批，并让"该不该成批"变成机器判的
 
 #28 只给 `actions/*` 建了批量分组，`docker/*` 漏了。后果在 2026-09-27 的周一扫描里实测到：
 `docker/build-push-action` 6→7（#35）、`docker/login-action` 3→4（#36）、
@@ -1063,7 +1107,7 @@ master 实测（vitest 5 之后）：statements 61.09% / branches 46.2% / functi
   `{'docker': {'login-action', 'setup-buildx-action', 'build-push-action'}}`；改回 → 6 passed。
 - 该测试对 `actions/*` 亦成立（6 个包已在 `actions-batch` 内），不会误报单包前缀。
 
-### 前端覆盖率门禁：接进 CI、去掉会把半程运行吞成绿灯的开关
+#### 前端覆盖率门禁：接进 CI、去掉会把半程运行吞成绿灯的开关
 
 上一节记下的"这个数好像不可复现"**是误判，这里更正**。低总数那一轮不是抖动，而是
 **冷启动时 forks worker 起不来**：日志里 31 条
@@ -1096,7 +1140,7 @@ worker 风暴**吞成继续跑**，而 CI 的 frontend job 跑的是不带覆盖
 - 行为验证：在隔离副本（codeload tarball + `npm ci`）用改后的配置跑 `npm run test:coverage`
   → **exit=0**、56 files / 478 tests、无未处理错误、无阈值 ERROR。
 
-### 从弃用分支捞回 K8s Operator 一致性测试，并改掉"整模块 slow"这种永不执行的结构
+#### 从弃用分支捞回 K8s Operator 一致性测试，并改掉"整模块 slow"这种永不执行的结构
 
 先给那条悬了很久的分支定性（对 merge-base `a7253d1a` / 分支 / master 三方比 blob，不看
 `compare` 的 ahead_by —— squash 合并下它永远非零、说明不了内容缺失）：
@@ -1134,7 +1178,7 @@ CI 选择器 `-m "not slow"` 下为 27 passed / 3 skipped（原有 3 个占位�
   ② 我一度用 `git checkout -- <file>` 取基线，而本地 `master` HEAD 是陈旧的（`git fetch` 仍被坏 ref 挡住），
   随后改为**从远端 master blob 取基线**并逐行核对"master 的 6 个用例是否原样保留"。
 
-### 删掉一个"每次都失败、却从不报错"的 codecov 上传步骤
+#### 删掉一个"每次都失败、却从不报错"的 codecov 上传步骤
 
 `ci.yml` 的 test job 里原有 `- name: Upload coverage`（`codecov/codecov-action@v4`，
 `fail_ci_if_error: false`）。它不是"版本旧"的问题，而是**从来没成功过一次**：本仓既没有
@@ -1164,7 +1208,7 @@ error -- Upload queued for processing failed: {"message":"Token required - not v
 - 变异验证：加回一个 `fail_ci_if_error: false` 的步骤 → 守卫①红；新增未登记的
   `continue-on-error` 步骤 → 守卫②红；把已登记步骤改名 → 守卫②③同时红；恢复后 3 passed。
 
-### 容器构建对 PyPI 镜像加 3 次退避重试（抗瞬时空索引）
+#### 容器构建对 PyPI 镜像加 3 次退避重试（抗瞬时空索引）
 
 master `cd4099e5` 上 `Container Scan (trivy)` 红过一次，起因不是漏洞也不是代码：镜像构建里
 `pip install -r requirements.lock -i https://pypi.tuna.tsinghua.edu.cn/simple` 得到
@@ -1181,8 +1225,8 @@ master `cd4099e5` 上 `Container Scan (trivy)` 红过一次，起因不是漏洞
   `Docker build` / `Container Scan` 作业覆盖（`py/Dockerfile` 在 `on.pull_request.paths` 白名单内，
   所以本改动一定会触发它们）。
 
-## [Unreleased] - 2026-09-26（前端类型门禁）
-### 前端补 `vue-tsc` 类型门禁
+### 批次 2026-09-26（前端类型门禁）
+#### 前端补 `vue-tsc` 类型门禁
 
 `dashboard-enterprise` 此前**没有任何类型检查**：`build` 只是 `vite build`，CI 的 frontend job
 跑 `npm ci` / `npm run lint`（eslint）/ `npm test`（vitest）/ `npx vite build`，全仓只有 1 个 `.ts`
@@ -1198,9 +1242,9 @@ master `cd4099e5` 上 `Container Scan (trivy)` 红过一次，起因不是漏洞
   `.vue` 里把 TS 语法写进 JS script 块（TS8010）；**不覆盖**纯 JS 表达式的类型错误
   （`checkJs: false` —— 打开会一次涌出 **2898** 个既有错误，属单独立项的 ratchet，不在本次范围）。
 
-## [Unreleased] - 2026-09-26
+### 批次 2026-09-26
 
-### 文档与依赖口径更正（配合 MAOS 5.2.2）
+#### 文档与依赖口径更正（配合 MAOS 5.2.2）
 
 - **适配器计数口径更正**（README）：`config/agents.yaml` 的 31 个条目实际为
   23 个开箱可派发的第三方 CLI 适配器 + 5 个需先配置（`enabled: false`）+
@@ -1221,7 +1265,7 @@ master `cd4099e5` 上 `Container Scan (trivy)` 红过一次，起因不是漏洞
 - 同类 CRLF 敏感哈希清理与完整性测试夹具修正见 `54bf1ef`；通知接口身份/租户
   fail-closed 隔离见 `eb8d914`。
 
-### 依赖批次（dependabot）与 MCP WebSocket 存活判定修复
+#### 依赖批次（dependabot）与 MCP WebSocket 存活判定修复
 
 - **合入**：#16 `actions/checkout` 4→7、#1 `setup-python` 5→7、#2 `setup-node` 4→7、
   #17 npm-minor 组、#13 pydantic-settings/uvicorn 等、#14 `hvac>=2.4`、
@@ -1242,7 +1286,7 @@ master `cd4099e5` 上 `Container Scan (trivy)` 红过一次，起因不是漏洞
   回滚验证（把实现改回旧写法）确认新用例以 `AttributeError: open` 失败。
 - ⚠️ **`websockets<15` 这条上限保护不了它声称的东西**（当时结论，已按实测在下节落地）：  上限内的 14.2 已经是新实现，真正的破坏（`.open` 消失）在 14 就已发生。
 
-### SQLite「损坏即删除重建」范围收紧 —— 主干 CI 崩溃根因（实测）
+#### SQLite「损坏即删除重建」范围收紧 —— 主干 CI 崩溃根因（实测）
 
 `sqlite_connect()` 此前 `except sqlite3.DatabaseError` 一律删库重建，而
 `sqlite3.OperationalError` 是 `DatabaseError` 的**子类** —— 于是
@@ -1270,7 +1314,7 @@ PRAGMA 抛错时不关闭已经建立的连接（句柄一直捏着文件），W
 - 新增 5 条用例：分类器双向断言、锁冲突下**文件必须存活且数据完整**、真损坏仍重建、
   线程登记与 join。锁冲突那条此前无法通过（它正是删除分支被误触发的路径）。
 
-### 并发用例的无界 `t.join()` 收口（32 处 / 19 文件）
+#### 并发用例的无界 `t.join()` 收口（32 处 / 19 文件）
 
 unit job 的配置是 `--timeout=60 --reruns=3`，而并发用例普遍写成 `for t in threads: t.join()`
 —— 真死锁或调度退化时表现为"永久挂起 + 一段线程栈 dump"，既看不出谁卡住，也白烧 4 次 rerun
@@ -1289,6 +1333,8 @@ unit job 的配置是 `--timeout=60 --reruns=3`，而并发用例普遍写成 `f
 `-n 4 --timeout=60 --reruns=2` 见下条提交说明；ruff 干净。
 
 ## [Unreleased]
+
+> **归属待核实（2026-10-09 记录）**：本段无日期，内容为「阶段二启动定稿」（PRD/HLD v1.1.0 评审于 2026-09-03、ROADMAP 新增 v5.2.0 节），**疑属 v5.2.0**，但从未并入其版本段。本次归位**未动它**——凭日期猜归属会制造新的错账，留待核实其提交区间后再定。
 
 ### Docs
 - **三阶段路线图阶段二启动定稿**：PRD/HLD 升 v1.1.0（Approved，评审 Levango7 2026-09-03）——Gantt 以 2026-09-05 为阶段二起点重排（消除 v1.0.0 中 Month 1 = 2026-09 与 F2-01 MVP 自 2027-01 起的口径矛盾）、v6.0.0 锚点由"阶段一末"移至阶段二 M2.3、HLD 3.1/3.2/3.3 补代码现状对齐注记；`ROADMAP.md` 新增 v5.2.0 节（自演化闭环 MVP，2026-09-05 启动，`MAOP_EVOLUTION_LOOP_ENABLED` 默认关闭）+ 阶段二后续里程碑锚点（v5.3.0 / v6.0.0 / v7.0.0）。

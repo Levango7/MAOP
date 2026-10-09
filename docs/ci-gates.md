@@ -274,7 +274,7 @@ required 上下文 4 条，其余保护项全关：
 
 | 腿 | 重复次数 | 并发 | 依据 |
 |---|---|---|---|
-| ubuntu-latest / 3.13 | 3 | `-n 2` | 基线腿 |
+| ubuntu-26.04 / 3.13 | 3 | `-n 2` | 基线腿（2026-10-09 随 ci.yml 由 `ubuntu-latest` 显式化） |
 | macos-latest / 3.13 | 3 | `-n 2` | 症状出现过的平台（run 36792737281） |
 | windows-latest / 3.12 | 2 | `-n 0` | 症状出现过的平台；CI 在 Windows 上因 xdist 竞态本就走串行 |
 
@@ -305,7 +305,7 @@ required 上下文 4 条，其余保护项全关：
 |---|---|---|
 | ci.yml `test` 主腿 | `not slow and not serial` | 排除 |
 | ci.yml `test` serial 步 | `not slow and serial` | 排除 |
-| nightly `flaky-detection` / `ubuntu26-canary` | `not slow …` | 排除 |
+| nightly `flaky-detection` | `not slow …` | 排除 |
 | ci.yml `perf-smoke` | `tests/performance/ -m slow` | 只跑 performance 那 25 条 |
 | ci.yml `perf-smoke` | `tests/reliability/ tests/stability/`（无 `-m`） | 顺带跑到 |
 

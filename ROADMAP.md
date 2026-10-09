@@ -8,6 +8,7 @@
 ## 当前状态
 
 - **已发布**：v5.2.0（2026-09-08，minor）— 自演化闭环 MVP 接入主循环（可观测/可审批/可回滚），闭环 API 面实测为 `evolve_insights.py` 的 6 个 `/api/evolution/*` 端点（旧文案"7 个 evolution API 端点"无出处，2026-10-05 已在下方 v5.2.0 节更正，此处当时漏改）；桌面调度集成；前端可访问性/token 化修复多轮。详见 [CHANGELOG](CHANGELOG.md)。
+- **待发布**：**v5.2.1（patch，计划中）** — 主干自 v5.2.0 起已积压 **243 个提交（119 个 `feat`/`fix`）未发布**，其中含解除与 MAOS `enterprise-v5.2.3` 兼容缺口的 P0 修复。范围与验收见下方 v5.2.1 节。
 - **上一版**：v5.1.0（2026-08-14，minor）— 企业版 6 大功能（许可证/SSO/审计/配额/API Key/通知）+ LLM 任务拆分/工作流编辑器/配置历史/Skill 编辑器/异常调度/Hook 配置。
 - **v5.0.0**（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](docs/migration-5.0.md)。
 - **双版架构**：自 2026-07-20 起采用单代码库 + 运行时 Edition 检测（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)）。
@@ -170,6 +171,88 @@
 - [x] dashboard 可见闭环状态机流转与 A/B 结果。
       （2026-10-03 T3.1-c：EvolutionHistory 新增「闭环」tab 接全部 6 个 AC-07 端点，
       e2e 拦截真实请求验证 trigger 打通，三浏览器绿。）
+
+## v5.2.1 (patch) — 计划中（目标 2026-10 中旬）
+
+**主题**：解除与已发布 MAOS `enterprise-v5.2.3` 的兼容缺口，并把 v5.2.0 之后积压的修复
+收口为可分发制品。
+
+> **为什么必须先发这一版**：v5.2.0（2026-09-08）之后主干已有 **243 个提交未发布**
+> （其中 119 个 `feat`/`fix`），积压 31 天，已超出本文件上方"发布节奏规范"对 patch 的
+> 频率约束。期间 MAOS 发布了 `enterprise-v5.2.3`，其通知语义变更（空 `tenant_id`
+> 不再等于"所有租户"，`f9cbc70`）**要求 MAOP 侧配套**——否则企业版 admin 的
+> 渠道/规则/模板列表恒空。**已发布的 MAOP 5.2.0 + MAOS 5.2.3 因此是不兼容组合，
+> 且 MAOP 侧当前没有任何版本地板声明。**（2026-10-09 实测：`all_tenants` 存在于主干
+> `py/maop/dashboard/routers/notifications.py`，但 `git grep all_tenants v5.2.0` 零命中。）
+
+### 范围
+
+- **MAOS 兼容（P0）**：通知列表端点的租户作用域解析改为显式 `all_tenants=True`
+  （`py/maop/dashboard/routers/notifications.py`）；`pyproject.toml` 与 README 声明
+  **MAOS ≥ `enterprise-v5.2.3`** 的版本地板。
+- **CI 可维护性**：pytest 矩阵 Linux 腿显式钉 `ubuntu-26.04`（`ubuntu-latest` 将于
+  2026-10-19 ~ 11-19 被 GitHub 迁到 26.04，已由 nightly 金丝雀实测为绿后迁移）。
+- **WS-2 工程债**：T2.3 `TestCallSyncFallback` flaky 的泄漏源归位（时间盒续期）。
+
+### 验收标准
+
+- [ ] 在 MAOS `enterprise-v5.2.3` 下，企业版 admin 的通知渠道/规则/模板列表不再恒空，
+      由**非 mock** 集成用例锁定。
+- [ ] README 与 CHANGELOG 声明 MAOS 版本地板（`≥ enterprise-v5.2.3`），声明值指向真实存在的
+      tag，并由 `py/tests/test_maos_version_floor.py` 守卫其不被静默删除；`pyproject.toml`
+      因 MAOS 是私有包**无法表达依赖约束**，以注释记录原因。
+- [ ] 发布物从对应 tag 构建，GitHub Release 附件**回读校验**通过（零账号分发路径）。
+- [ ] CI 全绿（含 26.04 腿）。
+
+## v5.2.x (patch 系列) — 计划中
+
+**主题**：商业锁硬化（WS-1）与工程债清偿（WS-2）的剩余任务，按
+[investment-plan-2026Q4](docs/investment-plan-2026Q4.md) §4 的优先级表推进；
+**范围与验收标准以本节为准**，该文档降级为施工记录。
+
+### 范围
+
+- **T1.5 phase 2 — 二进制发行（MAOS）**：三平台矩阵各产出一份**产物签名清单**
+  （`.pyd`/`.so` 按原始字节），发布链顺序改造（源码 → cythonize → **对产物**签名 →
+  构建 wheel），并补体积与启动耗时基准。**三平台矩阵完成前，二进制产物不得发布。**
+- **T1.6 M1 — 离线激活（MAOS）**：设备指纹（多因子）+ 请求/令牌格式与签名 +
+  `validate()` 接入与宽限期（`MAOP_ACTIVATION_GRACE_DAYS`，默认 14 天）+ vendor 签发 CLI。
+- **T2.1 — dry-run 信号产出方（MAOP）**：把 `_gate_dry_run` 从"验信号"变成"做预演"，
+  合同收紧为行首哨兵 `MAOP_DRY_RUN_MARKER: {...}`（JSON 行，旧子串匹配保留一个 minor
+  后移除）；pipeline 与 fileops 两类执行器分别落地，`config/agents.yaml` 加
+  `dry_run_supported` 能力声明。
+- **T2.3 — flaky 泄漏源归位或止损台账化（MAOP）**。
+
+### 验收标准
+
+- [ ] T1.5 phase 2：三平台各一份产物签名清单；`verify_wheel` 在二进制态五项校验全绿；
+      变异验证"未登记 `.so` / 替换 `.pyd` / 删除 `.pyd`"三种均判红。
+- [ ] T1.6 M1：换机在宽限期后失效；token 被篡改/过期/指纹不符一律拒绝；离线全流程演练一遍。
+- [ ] T2.1：`MAOP_DRY_RUN_ENFORCE=1` 下 pipeline 任务真预演通过且写操作零副作用
+      （临时目录断言）；未声明能力的外部 agent 不受影响。
+- [ ] T2.3：连续 7 天 nightly 零假红（修复路线），或止损方案与"未复现条件/复现配方"
+      台账化（降级路线）。
+
+## v5.3.0 (minor) — 计划中（目标 2026-11-01 ~ 2027-01-15，里程碑 M2.2）
+
+**主题**：阶段二 F2-02 多模态记忆落地（PRD 4.3）。
+
+### 范围
+
+- **前置 spike（T3.2，2 周时间盒）**：嵌入扩展接口（`UnifiedMemoryProtocol` 的 modality
+  维度兼容设计）、pgvector 半精度/多向量列方案对比、融合检索（RRF 起步）PoC、
+  KGE 选型对比（Neo4j Enterprise 成本 vs 纯 pgvector 演进路线）。产出：选型 ADR + PoC 分支。
+  **不做功能落地**——落地在本版。
+- **主体**：按 spike 结论落 F2-02（嵌入扩展 / 多向量列 / 融合检索）。
+- **可选（按余力）**：T3.3 K8s Operator M0——kopf 骨架 + `MaopTask` reconcile 最小闭环 +
+  `ghcr.io/maop/operator` 首次真实构建 + kind 集成腿激活（现有 skipif 钩子装了 kind 自动生效）。
+
+### 验收标准
+
+- [ ] 选型 ADR 合入，且记录 PoC **实测**数据（非推演）。
+- [ ] F2-02 的多模态检索在**非 mock** 集成用例下通过。
+- [ ] （若纳入 T3.3 M0）kind 集群 apply 一个 `MaopTask` → operator 拉起执行 →
+      `status.phase` 由 Running 收敛到 Succeeded，e2e 在 CI 绿。
 
 ## 阶段二后续里程碑
 

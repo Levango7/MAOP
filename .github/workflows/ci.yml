@@ -187,7 +187,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # 2026-10-09：Linux 腿由 `ubuntu-latest` 改为显式 `ubuntu-26.04`。
+        # 官方 changelog（2026-09-17）称 `ubuntu-latest` 将在 2026-10-19 ~ 11-19 窗口内
+        # 迁到 26.04；与其在那天被动换 OS，不如现在显式钉住 —— 这条腿已由 nightly 的
+        # `ubuntu26-canary` 连续实测为绿（4m50s，口径与本腿对齐），故按实测迁移。
+        # 其余 `runs-on: ubuntu-latest` 的作业（lint/coverage/e2e/docker 等）按既定方案
+        # 不在此批改动，仍随 10-19 窗口走 —— 这是**已知并接受的残留**，不是遗漏。
+        os: [ubuntu-26.04, windows-latest, macos-latest]
         # 与 pyproject.toml 的 requires-python = ">=3.10" 保持一致
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         # P3-C-01 fix: macOS 仅跑最新 Python（3.13）以节省 CI 资源。
@@ -224,7 +230,7 @@ jobs:
       - name: Enterprise extra smoke (P0-2)
         # 审计 P0-2：`pip install maop-orchestrator[enterprise]` 必须可装（此前 etcd3 在
         # enterprise extra 内、Python≥3.13 装不上 → 付费用户第一步就撞墙）。
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+        if: matrix.os == 'ubuntu-26.04' && matrix.python-version == '3.13'
         run: pip install -e .[enterprise] && python -c "import maop; print('enterprise extra install OK')"
 
       - name: Detect enterprise package

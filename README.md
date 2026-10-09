@@ -144,6 +144,23 @@ pip install ./maop_enterprise-<版本>-py3-none-any.whl
 
 `maop/enterprise/__init__.py` 在 import 时调用 `set_edition(Edition.ENTERPRISE)`，这是企业版包"存在即激活"的机制。
 
+### 版本兼容地板（MAOP ↔ MAOS）
+
+两个包共享 `maop.enterprise` 命名空间，且 MAOP 直接 import 它
+（如 `dashboard/routers/notifications.py` 导入 `maop.enterprise.notification.models`），
+因此二者是**双向锁步**关系。当前声明：
+
+| MAOP | 要求 MAOS | 依据 |
+|---|---|---|
+| **≥ 5.2.1** | **≥ `enterprise-v5.2.3`** | MAOS `enterprise-v5.2.3` 起"空 `tenant_id` 不再等于所有租户"（`f9cbc70`），MAOP 的通知列表端点据此改为显式传 `all_tenants=True`（`a09146b`）。**旧 MAOS 配新 MAOP**：低版本不接受该参数；**新 MAOS 配旧 MAOP**：admin 的渠道/规则/模板列表恒空。 |
+
+> 这条约束**无法用 pip 依赖表达**——`maop-enterprise` 是私有包，既不在
+> `maop-orchestrator` 的依赖里，也不会从 PyPI 解析（`pyproject.toml` 的 `[enterprise]`
+> extra 只列企业模块所需的第三方依赖）。故以本节 + CHANGELOG 声明为准，
+> 并由 `py/tests/test_maos_version_floor.py` 守卫其不被静默删除。
+> 运行时强制检查（启动时读 `importlib.metadata.version("maop-enterprise")` 并告警）
+> 属候选改进，**本版未实施**。
+
 > **开发者注意**：开发企业版功能需要同时 clone 两个仓库：
 > ```bash
 > git clone https://github.com/Levango7/MAOP.git

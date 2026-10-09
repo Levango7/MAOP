@@ -2,7 +2,7 @@
 # PyPI 包名改为 maop-orchestrator（原 `maop` 被 Justin Ryan 2021-07-09 注册为 0.0.0）。
 # import 名仍为 `maop`（由 [tool.hatch.build.targets.wheel] packages 指定）。
 name = "maop-orchestrator"
-version = "5.2.0"
+version = "5.2.1"
 description = "MAOP - Multi-Agent Orchestration Framework (Python-first, Plan-Execute-Verify)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -93,6 +93,10 @@ otel = [
     "opentelemetry-sdk>=1.20",
 ]
 enterprise = [
+    # NOTE（2026-10-09）: 本 extra 只列企业模块所需的第三方依赖。企业代码本身来自
+    # 私有包 `maop-enterprise`（Levango7/MAOS），**不在 PyPI，无法在此表达依赖约束**。
+    # 版本地板（本版起要求 MAOS >= enterprise-v5.2.3）见 README「版本兼容地板」节，
+    # 由 py/tests/test_maos_version_floor.py 守卫。
     "alembic>=1.13",
     "psycopg[binary,pool]>=3.1",
     "asyncpg>=0.29",

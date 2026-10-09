@@ -1,11 +1,11 @@
-<!-- docs-gate: exempt=规划施工图（未并入 ROADMAP 评审），计划态引用多，暂免一致性检查；并入后应删除本豁免 -->
 # 2026 Q4 投入计划：三大工作流细分设计（施工图）
 
 > **定位**：本文是 2026-09-30 体检后"投入决策"的落地施工图，覆盖三个工作流：
 > WS-1 商业锁硬化（MAOS）、WS-2 工程债清偿（MAOP）、WS-3 ROADMAP 主线施工。
 > 来源：2026-09-26 全面评估 P1 残留 + 2026-09-29/30 复查新发现（含两个断 API 哑弹）。
-> **与 ROADMAP.md 的关系**：本文是细分施工设计；各任务开工时应把范围与验收标准并入
-> `ROADMAP.md` 对应版本节（v5.2.x patch / v5.3.0），此后以 ROADMAP 为准，本文降级为施工记录。
+> **与 ROADMAP.md 的关系（2026-10-09 已执行）**：范围与验收标准**已并入 `ROADMAP.md`**
+> 的 v5.2.1 / v5.2.x / v5.3.0 三节，**此后以 ROADMAP 为准**，本文降级为施工记录
+> （保留设计决策与实测过程，不再作为计划真相源）。各任务标题的状态标记同步为实际进度。
 > 所有事实声明都经过 2026-09-29/30 代码核实，引用格式 `文件:行号` 以当时 master 为准。
 
 ## 0. 设计原则
@@ -27,7 +27,7 @@
 无键哈希链可整体重算、CRL 出厂弱模式、SSO 会话单节点、时钟回拨无防护、
 无混淆无在线激活（进程内攻击者想改什么改什么）。
 
-### T1.1 审计哈希链加键（P1 · 规模 M）
+### T1.1 审计哈希链加键（P1 · 规模 M）——✅ 已完成（v2 键控链 `445c403` 10-01；L2 链头锚定 `410008b` 10-03），随 MAOS `enterprise-v5.2.3` 发布
 
 **问题**：`audit.py:65-76` 的 `audit_chain_digest` 是无键 `sha256(prev + "|" + fields)`，
 有 DB 写权限的攻击者改一条后可重算其后整条链，`verify_chain` 无法区分（README #10）。
@@ -59,14 +59,14 @@ PG 侧排序靠 `ctid` 决胜（`pg_persist.py:380-416`），`VACUUM FULL`/行�
 **验收**：重算攻击测试红转绿；既有审计测试零回归；README #10 改写为 v2 语义与残留边界
 （持 key 者仍可重算——需 L2 锚定，锚定是运维流程）。
 
-### T1.2 CRL 出厂安全化（P1 · 规模 S）——✅ 代码完成 2026-09-30，落分支 `fix/t1.2-crl-strict-default`（MAOS 仓）
+### T1.2 CRL 出厂安全化（P1 · 规模 S）——✅ 已完成并已发布（`84b3169` 10-01 合并 PR #1，随 MAOS `enterprise-v5.2.3`）
 
 **执行记录**：production（`MAOP_ENV=production`）且未显式设置 `MAOP_CRL_STRICT`
 时默认 strict——CRL 不可达且无缓存即拒绝（fail-closed）；显式 `=0` 降级仍被尊重
 但记 error 日志留痕；开发/测试宽松默认不变。5 条测试 + README #3 改写 +
-MAOS CHANGELOG 记账，ruff clean，全量 200 passed（唯一红灯=清单守卫，预期内）。
-**并入 master 的前置**：用生产私钥重签 manifest（`scripts/sign_enterprise_modules.py
---key <生产私钥>`）——私钥按 36daaff 纪律不在仓内，本地浅搜未获，等持有方执行。
+MAOS CHANGELOG 记账，ruff clean。
+**合并前置已解除（2026-10-01）**：生产私钥重签 manifest 完成，以 `84b3169` 合并（PR #1）。
+（本条原记"落分支 `fix/t1.2-crl-strict-default`、重签由持有方执行"——该状态已不成立。）
 遗留：CRL 状态暴露到 license 状态端点（子任务 2）顺延。
 
 **问题**：`MAOP_CRL_STRICT` 默认 0（`crl.py:105,142-146`），非严格下"CRL 服务不可达即放行"
@@ -82,7 +82,7 @@ dashboard 可见。非 production 语义不变（测试/离线开发不联网）
 端点加字段，S）；README #3 更新（S）。**验收**：production 下拔网线 → license 拒绝（缓存过期后），
 测试锁定。
 
-### T1.3 SSO 会话 Redis 后端（P2 · 规模 M）
+### T1.3 SSO 会话 Redis 后端（P2 · 规模 M）——✅ 已完成（`2a8b223` 10-01 实现 + 真 Redis 冒烟 `9aa9aaa` 抓到并修一个 P0），随 MAOS `enterprise-v5.2.3` 发布
 
 **问题**：`sso_session_store.py` 仅 SQLite（README #7），多副本部署会话不共享。
 插入点已备好：docstring TODO（`sso_session_store.py:24-26`）；两个消费方
@@ -101,7 +101,7 @@ dashboard 可见。非 production 语义不变（测试/离线开发不联网）
 **子任务**：实现（M）+ fakeredis 单测 + docker-compose 加 Redis 的真容器冒烟（S）+
 README #7 更新与部署文档（S）。**验收**：双副本集成测试（两个进程实例共享会话互通）。
 
-### T1.4 时钟回拨防护（P2 · 规模 S-M）
+### T1.4 时钟回拨防护（P2 · 规模 S-M）——✅ 已完成（`6b68363` 10-01，`clock_guard.py` + 持久化签名水位），随 MAOS `enterprise-v5.2.3` 发布
 
 **问题**：license 过期判断只看本机时钟（README #8），回拨即续命。
 
@@ -117,7 +117,7 @@ README #7 更新与部署文档（S）。**验收**：双副本集成测试（�
 **子任务**：水印存取 + HMAC（S）；license 校验接入 + 错误码 + 测试（S）；CLI + 文档（S）。
 **验收**：模拟回拨 48h → 拒绝；回拨 1h → 正常；水印文件被篡改 → 检出。
 
-### T1.5 核心代码二进制化：Cython AOT 自建管线（P2 · 规模 M-L）——✅ spike 已过（2026-10-03），路线成立
+### T1.5 核心代码二进制化：Cython AOT 自建管线（P2 · 规模 M-L）——◐ spike 已过（2026-10-03）+ phase 1 完成（`50190a5` 10-08，**未发布**）；phase 2 待做
 
 **spike 实测结论（本机真跑，非推演）**：
 - **工具链零成本**：Cython 3.3.0（Apache）+ **本机既有 MSYS2 mingw gcc**
@@ -297,7 +297,7 @@ with-patch（同条探针带出残留线程 `mcp-adapter-bg`）。**止血已落
 
 ## 3. WS-3：ROADMAP 主线施工
 
-### T3.0 v5.2.0 哑弹排除（P0 · 规模 S）——✅ 已完成 2026-09-30（未提交）
+### T3.0 v5.2.0 哑弹排除（P0 · 规模 S）——✅ 已完成 2026-09-30（已随主干提交，非"未提交"）
 
 09-29 核实的三个实质缺陷（都在 `dashboard/services/evolution_service.py`），**已修复**：
 1. `:637` `await loop.run_cycle(...)`——`run_cycle` 是同步 def（`evolution_loop.py:139`），
@@ -320,7 +320,7 @@ with-patch（同条探针带出残留线程 `mcp-adapter-bg`）。**止血已落
 - 遗留到 T3.1：approve 后建议如何回流到下一轮 APPLY（run_cycle 只消费当轮
   evaluate 的 approved 列表，跨轮回流仍是断的——本轮只保证决策正确持久化、状态可见）。
 
-### T3.1 v5.2.0 四条验收收尾（P1 · 规模 M-L）
+### T3.1 v5.2.0 四条验收收尾（P1 · 规模 M-L）——✅ 已完成（2026-10-03，ROADMAP v5.2.0 节四条已全部勾选）
 
 对应 `ROADMAP.md:145-148` 未勾四条：
 1. **E2E 全链路（非 mock）**：mock 边界只留 LLM（录制响应或极小模型），其余真组件：

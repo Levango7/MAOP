@@ -40,7 +40,9 @@ JOB_ID = "flaky-detection"
 # 实测出过问题的腿（macos/windows 各一）＋ 基线腿。
 # 历史证据：run 36792737281（macos-latest/3.13）、nightly + windows-latest/3.12。
 REQUIRED_LEGS = {
-    ("ubuntu-latest", "3.13"),
+    # 2026-10-09：Linux 基线腿随 ci.yml 由 `ubuntu-latest` 改为显式 `ubuntu-26.04`。
+    # 两者都必须在 ci.yml 的矩阵里（见 test_every_leg_is_a_real_ci_leg）。
+    ("ubuntu-26.04", "3.13"),
     ("macos-latest", "3.13"),
     ("windows-latest", "3.12"),
 }
