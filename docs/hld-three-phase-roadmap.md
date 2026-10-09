@@ -686,7 +686,7 @@ stateDiagram-v2
 
 ### 3.2 多模态记忆架构
 
-> **现状对齐（2026-09-03）**：当前记忆为纯文本三层实现（`core/memory/three_layer_memory.py` + `py/maop/memory/unified.py` UnifiedMemoryProtocol，共享 maop.db），`core/memory/` 内无 image/audio/multimodal 引用；多模态仅存在于聊天层（`core/backends/image_store.py`，未进记忆索引）。v5.3.0（M2.2）以 UnifiedMemoryProtocol / MemoryFacade 为扩展点实施本节设计。
+> **现状对齐（2026-09-03）**：当前记忆为纯文本三层实现（`core/memory/three_layer_memory.py` + `py/maop/memory/unified.py` UnifiedMemoryProtocol，共享 maop.db），`core/memory/` 内无 image/audio/multimodal 引用；多模态仅存在于聊天层（`core/backends/image_store.py`，未进记忆索引）。v5.4.0（M2.2）以 UnifiedMemoryProtocol / MemoryFacade 为扩展点实施本节设计。（版本锚点 2026-10-10 由 v5.3.0 后移——v5.3.0 被调度与编排能力打包占用，主题与窗口不变。）
 
 #### 3.2.1 架构图
 

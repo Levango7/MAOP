@@ -9,7 +9,7 @@ description: |
   `appVersion` names an image that has never been built. See README.md §Status.
 type: application
 version: 0.3.0
-appVersion: "5.2.1"
+appVersion: "5.3.0"
 keywords:
   - maop
   - multi-agent

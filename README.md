@@ -451,7 +451,7 @@ Key architectural decisions in [docs/adr/](docs/adr/README.md):
 
 ## 版本说明
 
-MAOP 个人版（v5.2.0）为单机/小团队设计，包含完整的 Agent 编排、记忆系统、工具集成能力。
+MAOP 个人版（v5.3.0）为单机/小团队设计，包含完整的 Agent 编排、记忆系统、工具集成能力。
 
 **企业版功能**（RBAC、多租户、SSO、配额管理、审计日志、分布式执行等）由独立的商业包 **MAOS**（`maop-enterprise`）提供，需商业授权。个人版不包含这些功能。
 
