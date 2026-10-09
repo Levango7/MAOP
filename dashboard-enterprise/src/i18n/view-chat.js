@@ -2,9 +2,14 @@ export const messages = {
   en: {
     'view.chat.agent': 'Agent',
     'view.chat.selectAgent': 'Select agent…',
+    'view.chat.selectAgentFirst': 'Select an agent first',
+    'view.chat.selectAgentToStart': 'Select an agent to start chatting',
     'view.chat.newSession': 'New Session',
+    'view.chat.newConversation': 'New conversation',
+    'view.chat.title': 'Chat',
     'view.chat.startConversation': 'Start a conversation',
     'view.chat.welcomeHint': 'Select an agent and type your message below. Supports text and image input.',
+    'view.chat.inputPlaceholder': 'Type a message…',
     'view.chat.removeImage': 'Remove image',
     'view.chat.attachImage': 'Attach image',
     'view.chat.sessions': 'Sessions',
@@ -20,13 +25,19 @@ export const messages = {
     // ── #126: token/字符统计标签 ──
     'view.chat.tokens': '{n} tokens',
     'view.chat.tokPerSec': '{n} tok/s',
+    'view.chat.chars': '{n} chars',
   },
   zh: {
     'view.chat.agent': '智能体',
     'view.chat.selectAgent': '选择智能体…',
+    'view.chat.selectAgentFirst': '请先选择智能体',
+    'view.chat.selectAgentToStart': '选择智能体开始对话',
     'view.chat.newSession': '新建会话',
+    'view.chat.newConversation': '新对话',
+    'view.chat.title': '对话',
     'view.chat.startConversation': '开始对话',
     'view.chat.welcomeHint': '选择一个智能体，并在下方输入消息。支持文本与图片输入。',
+    'view.chat.inputPlaceholder': '输入消息…',
     'view.chat.removeImage': '移除图片',
     'view.chat.attachImage': '附加图片',
     'view.chat.sessions': '会话',
@@ -42,5 +53,6 @@ export const messages = {
     // ── #126: token/字符统计标签 ──
     'view.chat.tokens': '{n} 个token',
     'view.chat.tokPerSec': '{n} token/秒',
+    'view.chat.chars': '{n} 字符',
   },
 };
