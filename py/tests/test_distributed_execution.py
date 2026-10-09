@@ -34,6 +34,7 @@ from maop.core.scheduling.distributed_scheduler import (
     _NodeSpec,
     node_spec_from_step,
 )
+from maop.core.scheduling.failure_detector import FailurePatternDetector
 from maop.engine import Engine, EngineResult, StepStatus, StepType, WorkflowStep
 
 
@@ -520,6 +521,185 @@ class TestDistributedWorker:
             assert "w-repr" in r
         finally:
             await worker.stop()
+
+
+# ── Priority re-order (worker-side batch ordering) ─────────
+
+def _recording_executor(order: list[str]):
+    """Executor that records execution order and always succeeds."""
+
+    async def executor(
+        node_id: str, payload: dict[str, Any], affinity: set[str],
+    ) -> TaskResult:
+        order.append(node_id)
+        return TaskResult(node_id=node_id, status="success", output={})
+
+    return executor
+
+
+class TestDistributedPriority:
+    """Worker-side batch re-order by task priority (1 highest .. 5)."""
+
+    @pytest.mark.asyncio
+    async def test_batch_reordered_by_priority(
+        self, fake_redis: Any,
+    ) -> None:
+        """Each read batch executes high-priority tasks first.
+
+        Four independent nodes are dispatched with priorities
+        3, 1, 4, 2. A worker with concurrency=2 reads them in
+        two batches of two and must run each batch in priority
+        order: batch 1 (lo, hi) → (hi, lo); batch 2 (lower,
+        mid) → (mid, lower).
+        """
+        order: list[str] = []
+        scheduler = DistributedScheduler(fake_redis, poll_interval=0.05)
+        worker = DistributedWorker(
+            fake_redis, scheduler=scheduler,
+            executor=_recording_executor(order),
+            config=WorkerConfig(
+                worker_id="w-prio", concurrency=2, poll_timeout_ms=10,
+            ),
+        )
+        await worker.start()
+        try:
+            nodes = [
+                _NodeSpec(id="n-lo", priority=3, payload={}),
+                _NodeSpec(id="n-hi", priority=1, payload={}),
+                _NodeSpec(id="n-lower", priority=4, payload={}),
+                _NodeSpec(id="n-mid", priority=2, payload={}),
+            ]
+            result = await scheduler.run(nodes)
+            assert result.success is True
+            assert order == ["n-hi", "n-lo", "n-mid", "n-lower"]
+        finally:
+            await worker.stop()
+
+    @pytest.mark.asyncio
+    async def test_equal_priority_keeps_fifo(
+        self, fake_redis: Any,
+    ) -> None:
+        """Stable sort: equal priorities keep stream (FIFO) order."""
+        order: list[str] = []
+        scheduler = DistributedScheduler(fake_redis, poll_interval=0.05)
+        worker = DistributedWorker(
+            fake_redis, scheduler=scheduler,
+            executor=_recording_executor(order),
+            config=WorkerConfig(
+                worker_id="w-fifo", concurrency=2, poll_timeout_ms=10,
+            ),
+        )
+        await worker.start()
+        try:
+            nodes = [
+                _NodeSpec(id="n-a", priority=2, payload={}),
+                _NodeSpec(id="n-b", priority=2, payload={}),
+            ]
+            result = await scheduler.run(nodes)
+            assert result.success is True
+            assert order == ["n-a", "n-b"]
+        finally:
+            await worker.stop()
+
+    @pytest.mark.asyncio
+    async def test_missing_priority_field_sorts_as_default(
+        self, fake_redis: Any,
+    ) -> None:
+        """A message without a priority field sorts as default (3)."""
+        order: list[str] = []
+        scheduler = DistributedScheduler(fake_redis, poll_interval=0.05)
+        worker = DistributedWorker(
+            fake_redis, scheduler=scheduler,
+            executor=_recording_executor(order),
+            config=WorkerConfig(
+                worker_id="w-nofield", concurrency=2, poll_timeout_ms=10,
+            ),
+        )
+        await worker.start()
+        try:
+            # Raw stream messages: one carries no priority field,
+            # the other an explicit priority 1.
+            fake_redis.xadd(
+                scheduler._task_stream,
+                {"node_id": "n-default", "payload": "{}"},
+            )
+            fake_redis.xadd(
+                scheduler._task_stream,
+                {"node_id": "n-hi", "priority": "1", "payload": "{}"},
+            )
+            for _ in range(100):
+                if len(order) >= 2:
+                    break
+                await asyncio.sleep(0.02)
+            assert order == ["n-hi", "n-default"]
+        finally:
+            await worker.stop()
+
+
+class TestLoadAwareSelection:
+    """Load-aware worker selection (F1-01 adaptive scheduling)."""
+
+    @staticmethod
+    def _scheduler(fake_redis: Any) -> DistributedScheduler:
+        """Scheduler with a private detector (no singleton state)."""
+        return DistributedScheduler(
+            fake_redis,
+            registry=WorkerRegistry(fake_redis),
+            failure_detector=FailurePatternDetector(),
+        )
+
+    def test_prefers_idle_worker(self, fake_redis: Any) -> None:
+        """Equal health: the worker with fewer in-flight tasks wins."""
+        scheduler = self._scheduler(fake_redis)
+        scheduler._registry.register(worker_id="w-busy")
+        scheduler._registry.register(worker_id="w-idle")
+        for i in range(3):
+            scheduler._registry.assign_task("w-busy", f"t{i}")
+        assert scheduler._select_worker() == "w-idle"
+
+    def test_load_tie_breaks_by_registry_order(
+        self, fake_redis: Any,
+    ) -> None:
+        """Equal health and load: first registered worker wins."""
+        scheduler = self._scheduler(fake_redis)
+        scheduler._registry.register(worker_id="w-a")
+        scheduler._registry.register(worker_id="w-b")
+        assert scheduler._select_worker() == "w-a"
+
+    def test_drained_worker_never_selected_even_when_idle(
+        self, fake_redis: Any,
+    ) -> None:
+        """A drained worker (weight 0) is skipped however idle."""
+        scheduler = self._scheduler(fake_redis)
+        scheduler._registry.register(worker_id="w-drained")
+        scheduler._registry.register(worker_id="w-ok")
+        for _ in range(20):
+            scheduler._failure_detector.record_result(
+                "w-drained", success=False,
+            )
+        # w-ok is busy but healthy; the idle drained worker must
+        # not be picked.
+        scheduler._registry.assign_task("w-ok", "t0")
+        assert scheduler._select_worker() == "w-ok"
+
+    def test_all_drained_falls_back_to_first_capable(
+        self, fake_redis: Any,
+    ) -> None:
+        """All capable workers drained → dispatch anyway (legacy)."""
+        scheduler = self._scheduler(fake_redis)
+        scheduler._registry.register(worker_id="w-x")
+        scheduler._registry.register(worker_id="w-y")
+        for wid in ("w-x", "w-y"):
+            for _ in range(20):
+                scheduler._failure_detector.record_result(
+                    wid, success=False,
+                )
+        assert scheduler._select_worker() == "w-x"
+
+    def test_no_capable_returns_none(self, fake_redis: Any) -> None:
+        """Empty registry → None (pre-F1-02 behaviour)."""
+        scheduler = self._scheduler(fake_redis)
+        assert scheduler._select_worker() is None
 
 
 # ── Engine integration tests ──────────────────────────────────────

@@ -14,10 +14,13 @@ Lifecycle
    ``heartbeat_interval`` seconds (default 5s).
 3. **Consumer loop** — the worker reads from the ``maop:sched:tasks``
    stream's ``maop_workers`` consumer group, up to ``concurrency`` tasks
-   at a time. Each task is executed by the configured ``executor``
-   callable (default: a no-op that echoes the payload). Results are
-   posted via :meth:`DistributedScheduler.post_result` and the task is
-   XACKed.
+   at a time. Each read batch is re-ordered by task priority (stable
+   sort — FIFO within a priority) before dispatch, so a worker never
+   starts a lower-priority task it has already read ahead of a
+   higher-priority one. Each task is executed by the configured
+   ``executor`` callable (default: a no-op that echoes the payload).
+   Results are posted via :meth:`DistributedScheduler.post_result`
+   and the task is XACKed.
 4. **Shutdown** — on SIGINT/SIGTERM the worker stops consuming, drains
    in-flight tasks, unregisters, and exits.
 
@@ -48,6 +51,7 @@ from maop.core.scheduling.distributed_scheduler import (
     _F_AFFINITY,
     _F_NODE_ID,
     _F_PAYLOAD,
+    _F_PRIORITY,
     _F_RUN_ID,
     DistributedScheduler,
     SchedulingError,
@@ -63,6 +67,9 @@ logger = logging.getLogger(__name__)
 _DEFAULT_GROUP = "maop_workers"
 # Stream field for the consumer name (used by xreadgroup).
 _F_CONSUMER = "consumer"
+# Priority used when a task carries no priority field
+# (matches the scheduler's node default).
+_DEFAULT_PRIORITY = 3
 
 
 def _default_redis_url() -> str:
@@ -163,6 +170,22 @@ def _decode(v: Any) -> Any:
     if isinstance(v, bytes):
         return v.decode()
     return v
+
+
+def _task_priority(fields: dict[Any, Any]) -> int:
+    """Extract a task's priority from its stream fields.
+
+    Priority 1 is highest, 5 lowest; tasks without the field
+    (or with an unparsable value) fall back to the scheduler's
+    default so they sort after explicit high-priority tasks.
+    """
+    raw = fields.get(_F_PRIORITY.encode(), fields.get(_F_PRIORITY))
+    if raw is None:
+        return _DEFAULT_PRIORITY
+    try:
+        return int(_decode(raw))
+    except (TypeError, ValueError):
+        return _DEFAULT_PRIORITY
 
 
 class DistributedWorker:
@@ -315,11 +338,21 @@ class DistributedWorker:
                     return
                 await asyncio.sleep(poll_interval)
                 continue
-            for _stream, msgs in entries:
-                for msg_id, fields in msgs:
-                    asyncio.ensure_future(
-                        self._handle_task(stream, group, msg_id, fields, sem),
-                    )
+            # Flatten the batch across streams, then re-order by
+            # priority (1 highest .. 5 lowest). Redis Streams is
+            # FIFO; the scheduler writes a priority field so this
+            # loop can honour it within the batch. The sort is
+            # stable, so equal priorities keep stream (FIFO) order.
+            batch = [
+                (msg_id, fields)
+                for _stream, msgs in entries
+                for msg_id, fields in msgs
+            ]
+            batch.sort(key=lambda item: _task_priority(item[1]))
+            for msg_id, fields in batch:
+                asyncio.ensure_future(
+                    self._handle_task(stream, group, msg_id, fields, sem),
+                )
 
     async def _handle_task(
         self,

@@ -20,10 +20,13 @@ Architecture
    worker exists, the node is held back (and retried on the next
    heartbeat tick) rather than dispatched to an incapable worker.
 4. **Priority** — nodes carry a ``priority`` (1 highest .. 5 lowest).
-   The scheduler writes priority into the stream field so workers can
-   read high-priority tasks first (Redis Streams itself is FIFO; the
-   priority is honoured by the worker's consumer-group read ordering
-   and by a local priority re-order on the worker side).
+   The scheduler writes priority into the stream field; workers
+   re-order each read batch by priority (stable sort — FIFO
+   within a priority). Redis Streams itself is FIFO, so this is
+   a *batch-level* guarantee: a worker never starts a
+   lower-priority task ahead of a higher-priority one it has
+   already read, but strict ordering across the whole pool is
+   not enforced.
 5. **Failure detection / auto-reschedule** — the scheduler periodically
    calls :meth:`WorkerRegistry.detect_failures`; each failed worker's
    in-flight task ids are re-enqueued to the stream for another worker
@@ -280,29 +283,45 @@ class DistributedScheduler:
         """Pick the best worker for the next dispatch.
 
         Combines the registry's capability filter with the
-        :class:`FailurePatternDetector` weights:
+        :class:`FailurePatternDetector` weights and worker load:
 
         1. Ask the registry for capable workers (affinity match).
-        2. Multiply each candidate's effective score by its
-           failure-detector weight (1.0 normal, 0.0 drained, 0.3/0.6
-           grey-recovery). Workers with weight 0 are dropped entirely.
-        3. Return the highest-scoring worker id. When all capable
-           workers are drained, fall back to the first capable worker
-           rather than failing the dispatch — the detector will keep
-           recording outcomes and re-drain as needed. This preserves
-           the existing "always dispatch" behaviour when no failure
-           data is available.
+        2. Score each candidate as
+           ``detector_weight / (1 + in_flight_count)`` — the
+           health weight (1.0 normal, 0.0 drained, 0.3/0.6
+           grey-recovery) discounted by how many tasks the worker
+           is already running. Workers with weight 0 are dropped
+           entirely: a drained worker is never picked, however
+           idle it is.
+        3. Return the highest-scoring worker id. Ties break by
+           registry order (``capable_workers`` returns sorted
+           ids) for determinism. When all capable workers are
+           drained, fall back to the first capable worker rather
+           than failing the dispatch — the detector will keep
+           recording outcomes and re-drain as needed. This
+           preserves the existing "always dispatch" behaviour
+           when no failure data is available.
 
-        Returns ``None`` only when the registry has no capable workers
-        at all (same as the pre-F1-02 behaviour).
+        Returns ``None`` only when the registry has no capable
+        workers at all (same as the pre-F1-02 behaviour).
+
+        The load term is best-effort: the registry's in-flight
+        map is process-local (not persisted to Redis), so it
+        reflects the tasks *this* scheduler assigned. Schedulers
+        sharing a pool each see their own slice.
         """
         capable = self._registry.capable_workers(required)
         if not capable:
             return None
-        # Score each candidate by its detector weight. Workers never
+        # Score: detector weight discounted by load. Workers never
         # seen by the detector default to weight 1.0 (full traffic).
         weighted = [
-            (wid, self._failure_detector.get_weight(wid)) for wid in capable
+            (
+                wid,
+                self._failure_detector.get_weight(wid)
+                / (1.0 + len(self._registry.in_flight(wid))),
+            )
+            for wid in capable
         ]
         # Drop fully-drained workers (weight == 0).
         live = [(wid, w) for wid, w in weighted if w > 0.0]
@@ -315,8 +334,8 @@ class DistributedScheduler:
                 len(capable), capable[0],
             )
             return capable[0]
-        # Pick the highest-weight worker; ties broken by registry order
-        # (capable_workers returns sorted ids) for determinism.
+        # Pick the highest-scoring worker; ties broken by registry
+        # order (capable_workers returns sorted ids) for determinism.
         best_wid, best_w = live[0]
         for wid, w in live[1:]:
             if w > best_w:

@@ -410,6 +410,9 @@ def test_select_worker_prefers_high_weight(detector: FailurePatternDetector):
         def complete_task(self, *a, **k):
             pass
 
+        def in_flight(self, worker_id):
+            return set()
+
     # Drain w2; w1 and w3 stay at 1.0.
     for _ in range(4):
         detector.record_result("w2", success=False, latency=0.1)
@@ -440,6 +443,9 @@ def test_select_worker_falls_back_when_all_drained(detector: FailurePatternDetec
 
         def complete_task(self, *a, **k):
             pass
+
+        def in_flight(self, worker_id):
+            return set()
 
     # Drain both.
     for w in ("w1", "w2"):
