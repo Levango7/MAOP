@@ -53,6 +53,7 @@ from maop.engine_pause import (
 )
 from maop.engine_types import (
     EngineResult,
+    SpawnDirective,
     StepResult,
     StepStatus,
     StepType,
@@ -67,6 +68,14 @@ from maop.engine_utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Dynamic orchestration (runtime fan-out): hard cap on the
+# number of steps a single run may accumulate from spawn
+# directives. Each executor return can add steps; without
+# a cap a looping executor could grow the run without
+# bound (same rationale as _MAX_PLAN_DEPTH for the
+# text-driven decomposition).
+_MAX_SPAWNED_STEPS: int = 100
 
 
 # ── Engine ────────────────────────────────────────────────────
@@ -108,6 +117,11 @@ class Engine:
         # nodes to the Redis Streams task queue.
         self._redis_client = redis_client
         self._distributed_scheduler: Any = None  # lazy init
+        # Dynamic orchestration: spawn directives recorded by
+        # step executors during a run, keyed by trace_id
+        # (run() may be invoked concurrently; each run
+        # drains only its own queue).
+        self._spawns: dict[str, list[tuple[SpawnDirective, str]]] = {}
 
     def _get_distributed_scheduler(self) -> Any:
         """Lazily build a DistributedScheduler bound to the Redis client.
@@ -300,29 +314,53 @@ class Engine:
 
         ctx = dict(context)
         results: dict[str, StepResult] = {}
-        layers = _topological_sort(steps)
+        # Dynamic orchestration: the step set grows at
+        # runtime — executors may fan out new steps via
+        # spawn directives. ``step_by_id`` holds every step
+        # known to the run so far (original + spawned);
+        # ``done`` tracks steps that have a result (any
+        # status).
+        step_by_id: dict[str, WorkflowStep] = {s.id: s for s in steps}
+        done: set[str] = set()
+        spawned_count = 0
 
-        for _layer_idx, layer in enumerate(layers):
+        while True:
+            # Compute the ready layer: steps not yet executed
+            # whose dependencies all have results. For a
+            # static DAG this is exactly _topological_sort's
+            # layering (Kahn's algorithm); it is recomputed
+            # each iteration so steps spawned by the previous
+            # layer join the run.
+            ready = [
+                s for s in step_by_id.values()
+                if s.id not in done
+                and all(dep in done for dep in s.depends_on)
+            ]
+            if not ready:
+                break
+
             # M4 修复：在每层任务派发前检查 pause 状态，暂停期间不执行新任务
             await check_pause_async()
 
             # Check if any previous step requested abort
             aborted = any(
-                results.get(s.id, StepResult(id=s.id)).status == StepStatus.FAILED
-                and _find_step(steps, s.id).on_failure == "abort"
-                for s in steps if s.id in results
+                results[sid].status == StepStatus.FAILED
+                and step_by_id[sid].on_failure == "abort"
+                for sid in done
             )
             if aborted:
-                for step in layer:
-                    results[step.id] = StepResult(
-                        id=step.id, status=StepStatus.SKIPPED,
-                        error="Aborted due to upstream failure",
-                    )
-                continue
+                for s in step_by_id.values():
+                    if s.id not in done:
+                        results[s.id] = StepResult(
+                            id=s.id, status=StepStatus.SKIPPED,
+                            error="Aborted due to upstream failure",
+                        )
+                        done.add(s.id)
+                break
 
             # Execute layer steps in parallel
             tasks = []
-            for step in layer:
+            for step in ready:
                 # P0-2 fix: wrap each step with asyncio.wait_for to prevent
                 # a single hanging step from blocking the entire engine.
                 tasks.append(asyncio.wait_for(
@@ -331,7 +369,7 @@ class Engine:
                 ))
             layer_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for step, lr in zip(layer, layer_results):
+            for step, lr in zip(ready, layer_results):
                 if isinstance(lr, asyncio.TimeoutError):
                     # P1-3 fix: 原代码 duration_ms=step.timeout*1000 在 step.timeout<=0
                     # （走 300s 默认分支）时算出 0，与实际超时值不符。改为使用
@@ -350,12 +388,63 @@ class Engine:
                 else:
                     sr = lr  # type: ignore
                 results[step.id] = sr
+                done.add(step.id)
 
                 # Update context with step output
                 ctx[step.id] = sr.output or sr.error
 
+            # Dynamic orchestration: merge the steps that this
+            # layer's executors fanned out into the run graph.
+            # Spawned steps depend on their spawner (or an
+            # explicit depends_on), so they always join a later
+            # layer — never the one that spawned them.
+            for directive, source_id in self._drain_spawns(trace_id):
+                deps = (
+                    list(directive.depends_on)
+                    if directive.depends_on is not None
+                    else [source_id]
+                )
+                for spawned in directive.steps:
+                    if spawned_count >= _MAX_SPAWNED_STEPS:
+                        logger.error(
+                            "[engine] run %s: spawned-step cap (%d) "
+                            "reached; dropping spawned step '%s'",
+                            trace_id, _MAX_SPAWNED_STEPS, spawned.id,
+                        )
+                        continue
+                    if spawned.id in step_by_id:
+                        logger.error(
+                            "[engine] run %s: spawned step '%s' duplicates "
+                            "an existing step id; dropping",
+                            trace_id, spawned.id,
+                        )
+                        continue
+                    unknown = [d for d in deps if d not in step_by_id]
+                    if unknown:
+                        logger.error(
+                            "[engine] run %s: spawned step '%s' depends on "
+                            "unknown step(s) %s; dropping",
+                            trace_id, spawned.id, unknown,
+                        )
+                        continue
+                    step_by_id[spawned.id] = spawned.model_copy(
+                        update={"depends_on": deps},
+                    )
+                    spawned_count += 1
+
+        # A step that never became ready is part of a cycle
+        # (or holds a dangling dependency) — the same error
+        # _topological_sort raised for static DAGs. Spawned
+        # steps cannot create cycles (they may only reference
+        # steps that existed when they were merged), so this
+        # can only come from the caller's graph.
+        stuck = [sid for sid in step_by_id if sid not in done]
+        if stuck:
+            cycle_chain = stuck + [stuck[0]]
+            raise ValueError(f"Cycle detected: {' -> '.join(cycle_chain)}")
+
         total_ms = int((time.monotonic() - start) * 1000)
-        all_results = [results[s.id] for s in steps if s.id in results]
+        all_results = [results[sid] for sid in step_by_id if sid in results]
         success = all(
             r.status in (StepStatus.SUCCESS, StepStatus.SKIPPED)
             for r in all_results
@@ -386,6 +475,32 @@ class Engine:
         return await execute_step_helper(
             self, step, context, results, workdir, trace_id,
         )
+
+    # ── Dynamic orchestration (runtime fan-out) ─────────
+
+    def _record_spawn(
+        self,
+        trace_id: str,
+        directive: SpawnDirective,
+        source_step_id: str,
+    ) -> None:
+        """Record a spawn directive for the run identified by ``trace_id``.
+
+        Called by :func:`maop.engine_executor.execute_step_helper`
+        when a step executor returns a successful result carrying a
+        ``spawn`` attribute. The run loop drains the queue after
+        each layer and merges the steps into the run graph.
+        """
+        self._spawns.setdefault(trace_id, []).append(
+            (directive, source_step_id),
+        )
+
+    def _drain_spawns(
+        self,
+        trace_id: str,
+    ) -> list[tuple[SpawnDirective, str]]:
+        """Return and clear the spawn directives recorded for a run."""
+        return self._spawns.pop(trace_id, [])
 
     # ── Dynamic task decomposition (P1-4) ──────────────────
 

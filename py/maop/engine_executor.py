@@ -319,6 +319,16 @@ async def execute_step_helper(
                     agent=step.agent,
                     duration_ms=int((time.monotonic() - start) * 1000),
                 )
+                # Dynamic orchestration (runtime fan-out): a PLAN
+                # step that ran as an atomic agent step may also
+                # fan out new steps.
+                plan_spawn = getattr(result, "spawn", None)
+                if plan_spawn is not None and hasattr(
+                    plan_spawn, "steps",
+                ):
+                    engine._record_spawn(
+                        trace_id, plan_spawn, step.id,
+                    )
             else:
                 # No executor configured: this PLAN step has no sub-steps and
                 # no executor to run it as an agent step. Reporting SUCCESS
@@ -356,6 +366,13 @@ async def execute_step_helper(
                         step.id, attempt + 1, max_attempts,
                     )
 
+                # Dynamic orchestration (runtime fan-out): capture
+                # the spawn directive, if any, from the executor's
+                # return value. When a fallback agent promotes a
+                # failed attempt, the fallback's directive replaces
+                # the failed attempt's.
+                spawn_directive: Any = getattr(result, "spawn", None)
+
                 # P1-7: fallback_to support — if the step still failed after
                 # all retries and a fallback agent is configured, re-execute
                 # the step with the fallback agent. On fallback success,
@@ -380,6 +397,7 @@ async def execute_step_helper(
                         result_exit_code = fb_exit
                         result_error = ""
                         has_error = False
+                        spawn_directive = getattr(fb_result, "spawn", None)
 
                 sr = StepResult(
                     id=step.id,
@@ -390,6 +408,17 @@ async def execute_step_helper(
                     agent=step.agent,
                     duration_ms=int((time.monotonic() - start) * 1000),
                 )
+
+                # Fan-out is delivered only on success — a failed
+                # step's directive is discarded with the run.
+                if (
+                    not has_error
+                    and spawn_directive is not None
+                    and hasattr(spawn_directive, "steps")
+                ):
+                    engine._record_spawn(
+                        trace_id, spawn_directive, step.id,
+                    )
             else:
                 # No executor configured: cannot actually run agent/DAG step.
                 # Reporting SUCCESS here would be a false positive — fail fast
