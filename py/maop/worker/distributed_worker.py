@@ -222,6 +222,12 @@ class DistributedWorker:
         self._consumer_name: str = ""
         self._running = False
         self._in_flight: set[str] = set()
+        # Strong references to in-flight handler tasks: the
+        # event loop only keeps weak references to tasks, so a
+        # discarded ensure_future() handle can be garbage
+        # collected mid-execution ("Task was destroyed but it
+        # is pending!").
+        self._task_handles: set[asyncio.Task[None]] = set()
         self._stop_event = asyncio.Event()
         # Background tasks.
         self._heartbeat_task: asyncio.Task[None] | None = None
@@ -278,6 +284,15 @@ class DistributedWorker:
             deadline = time.monotonic() + 5.0
             while self._in_flight and time.monotonic() < deadline:
                 await asyncio.sleep(0.1)
+        # Force-cancel handlers that outlived the drain
+        # window so shutdown cannot hang on a stuck executor.
+        # Each handler's finally block posts a terminal
+        # "cancelled" result and ACKs the task.
+        stuck = [t for t in self._task_handles if not t.done()]
+        for t in stuck:
+            t.cancel()
+        if stuck:
+            await asyncio.gather(*stuck, return_exceptions=True)
         # Unregister (graceful).
         self._registry.unregister(self._worker_id)
         logger.info("[dist-worker] %s stopped", self._worker_id)
@@ -350,9 +365,12 @@ class DistributedWorker:
             ]
             batch.sort(key=lambda item: _task_priority(item[1]))
             for msg_id, fields in batch:
-                asyncio.ensure_future(
+                task = asyncio.ensure_future(
                     self._handle_task(stream, group, msg_id, fields, sem),
                 )
+                # Keep a strong reference (see _task_handles).
+                self._task_handles.add(task)
+                task.add_done_callback(self._task_handles.discard)
 
     async def _handle_task(
         self,
@@ -378,45 +396,81 @@ class DistributedWorker:
 
         self._in_flight.add(msg_id_str)
         self._registry.assign_task(self._worker_id, msg_id_str)
-        async with sem:
-            start = time.monotonic()
+        # Terminal-outcome defaults: when the handler is
+        # cancelled before the executor returns (worker
+        # shutdown), the run still receives a terminal
+        # result instead of waiting forever for a node
+        # whose outcome is never coming.
+        status = "cancelled"
+        output = None
+        error = "task cancelled before completion"
+        duration_ms = 0
+        posted = False
+        try:
+            async with sem:
+                start = time.monotonic()
+                try:
+                    result = await self._executor(node_id, payload, affinity)
+                    status = result.status
+                    output = result.output
+                    error = result.error
+                except asyncio.CancelledError:
+                    error = "task cancelled during execution"
+                    raise
+                except Exception as exc:
+                    status = "failed"
+                    output = None
+                    error = f"{type(exc).__name__}: {exc}"
+                    logger.warning(
+                        "[dist-worker] %s task %s (node %s) failed: %s",
+                        self._worker_id, msg_id_str, node_id, exc,
+                    )
+                duration_ms = int((time.monotonic() - start) * 1000)
+            # Post result to the run's results stream.
             try:
-                result = await self._executor(node_id, payload, affinity)
-                status = result.status
-                output = result.output
-                error = result.error
-            except Exception as exc:
-                status = "failed"
-                output = None
-                error = f"{type(exc).__name__}: {exc}"
-                logger.warning(
-                    "[dist-worker] %s task %s (node %s) failed: %s",
-                    self._worker_id, msg_id_str, node_id, exc,
+                self._scheduler.post_result(
+                    run_id,
+                    node_id,
+                    status=status,
+                    output=output,
+                    error=error,
+                    worker_id=self._worker_id,
+                    duration_ms=duration_ms,
                 )
-            duration_ms = int((time.monotonic() - start) * 1000)
-        # Post result to the run's results stream.
-        try:
-            self._scheduler.post_result(
-                run_id,
-                node_id,
-                status=status,
-                output=output,
-                error=error,
-                worker_id=self._worker_id,
-                duration_ms=duration_ms,
-            )
-        except Exception as exc:
-            logger.error(
-                "[dist-worker] %s failed to post result for node %s: %s",
-                self._worker_id, node_id, exc,
-            )
-        # ACK the task so it is not redelivered.
-        try:
-            self._redis.xack(stream, group, msg_id)
-        except Exception as exc:
-            logger.debug("[dist-worker] %s xack error: %s", self._worker_id, exc)
-        self._in_flight.discard(msg_id_str)
-        self._registry.complete_task(self._worker_id, msg_id_str)
+                posted = True
+            except Exception as exc:
+                logger.error(
+                    "[dist-worker] %s failed to post result for node %s: %s",
+                    self._worker_id, node_id, exc,
+                )
+        finally:
+            if not posted:
+                # Cancellation or a failed post must not leave the
+                # scheduler waiting forever: post the terminal
+                # outcome (best-effort) before cleaning up.
+                try:
+                    self._scheduler.post_result(
+                        run_id,
+                        node_id,
+                        status=status,
+                        output=None,
+                        error=error or "task ended without posting a result",
+                        worker_id=self._worker_id,
+                        duration_ms=duration_ms,
+                    )
+                except Exception as exc:
+                    logger.debug(
+                        "[dist-worker] %s fallback post_result failed "
+                        "for node %s: %s",
+                        self._worker_id, node_id, exc,
+                    )
+            # ACK the task so it is not redelivered.
+            try:
+                self._redis.xack(stream, group, msg_id)
+            except Exception as exc:
+                logger.debug("[dist-worker] %s xack error: %s", self._worker_id, exc)
+            self._in_flight.discard(msg_id_str)
+            self._registry.complete_task(self._worker_id, msg_id_str)
 
     # ── Introspection ────────────────────────────────────────────
 

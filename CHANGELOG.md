@@ -39,6 +39,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 分布式执行路径审计修复
+
+2026-10-09 后端审计发现并修复的四个分布式路径缺陷：
+
+- **结果读取挂死**：`_read_results` 每轮轮询都从
+  流头重读且 ``count=100``——单层节点数超过 100
+  时，尾部结果永远读不到，运行永久挂起；且失败
+  检测器每轮重复记录每个已完成任务（权重窗口被
+  重复样本淹没）。结果读取改为按流 ID 游标增量
+  读取（``(ms, seq)`` 数值比较——流 ID 非字典序），
+  每个条目恰好处理一次。
+- **任务取消不安全**：`DistributedWorker._handle_task`
+  被取消时（如 worker 停机）会泄漏 in-flight 槽位、
+  不 ACK、不上报结果——调度器永久等待该节点。现在
+  用 ``try/finally`` 保证任何退出路径都上报终态
+  结果（``cancelled``）、ACK 任务、释放槽位；handler
+  协程句柄存入 ``_task_handles`` 强引用集合（事件
+  循环对任务仅弱引用，丢弃句柄可能被 GC 回收）；
+  ``stop()`` 在 5 秒优雅排空后强制取消仍卡住的
+  handler。
+- **run 级超时**：存活但卡死的 worker 会持续刷新
+  心跳，故障检测永不触发，运行无限等待。
+  ``DistributedScheduler.run`` 新增 ``deadline_s``
+  参数（默认无限制），超时抛 ``SchedulingError``。
+- **重复扫描**：``_dispatch_node`` 每次派发把注册表
+  的 capable-workers 列表算了两遍（选择 + 告警），
+  现在只算一遍。
+
+测试：``py/tests/test_distributed_audit_fixes.py``
+9 例（游标一次性/意外节点推进/150 节点大层回归/
+超时触发/默认无超时/单次扫描/检测器每任务一次/
+取消后上报+ACK/stop 强杀卡死 handler）。
+
 ### 动态编排（第一刀）——运行时 fan-out
 
 执行器现在可以在步**成功后**向当前运行注入新步（运行时

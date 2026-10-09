@@ -279,6 +279,7 @@ class DistributedScheduler:
     def _select_worker(
         self,
         required: str | set[str] | None = None,
+        capable: list[str] | None = None,
     ) -> str | None:
         """Pick the best worker for the next dispatch.
 
@@ -302,6 +303,10 @@ class DistributedScheduler:
            preserves the existing "always dispatch" behaviour
            when no failure data is available.
 
+        ``capable`` may be supplied by callers that already
+        computed the registry's capable list, so a dispatch
+        does not scan it twice.
+
         Returns ``None`` only when the registry has no capable
         workers at all (same as the pre-F1-02 behaviour).
 
@@ -310,7 +315,8 @@ class DistributedScheduler:
         reflects the tasks *this* scheduler assigned. Schedulers
         sharing a pool each see their own slice.
         """
-        capable = self._registry.capable_workers(required)
+        if capable is None:
+            capable = self._registry.capable_workers(required)
         if not capable:
             return None
         # Score: detector weight discounted by load. Workers never
@@ -349,6 +355,7 @@ class DistributedScheduler:
         nodes: list[_NodeSpec],
         *,
         run_id: str = "",
+        deadline_s: float | None = None,
     ) -> DistributedResult:
         """Execute a DAG of nodes across the distributed worker pool.
 
@@ -358,6 +365,13 @@ class DistributedScheduler:
             Nodes to execute (with dependency edges via ``depends_on``).
         run_id : str
             Optional explicit run id. When empty, a UUID4 hex is generated.
+        deadline_s : float | None
+            Wall-clock budget for the whole run. When the budget is
+            exceeded the run raises :class:`SchedulingError` instead of
+            waiting forever for a result that will never arrive (a
+            worker that is alive but stuck keeps refreshing its
+            heartbeat, so failure detection never fires). ``None`` (the
+            default) disables the deadline.
 
         Returns
         -------
@@ -367,6 +381,7 @@ class DistributedScheduler:
         if not run_id:
             run_id = uuid.uuid4().hex[:16]
         start = time.monotonic()
+        deadline = start + deadline_s if deadline_s else None
         node_map = {n.id: n for n in nodes}
         layers = self._compute_layers(nodes)
         results: dict[str, dict[str, Any]] = {
@@ -383,6 +398,11 @@ class DistributedScheduler:
 
         try:
             for layer_idx, layer in enumerate(layers):
+                if deadline is not None and time.monotonic() > deadline:
+                    raise SchedulingError(
+                        f"Distributed run {run_id!r} exceeded its "
+                        f"{deadline_s:.0f}s deadline",
+                    )
                 # Skip nodes whose upstream failed.
                 runnable: list[_NodeSpec] = []
                 for nid in layer:
@@ -401,7 +421,7 @@ class DistributedScheduler:
 
                 # Dispatch the layer and await all results.
                 layer_results = await self._dispatch_and_collect(
-                    run_id, layer_idx, runnable, reschedule_queue,
+                    run_id, layer_idx, runnable, reschedule_queue, deadline,
                 )
                 for nid, res in layer_results.items():
                     results[nid] = res
@@ -480,6 +500,7 @@ class DistributedScheduler:
         layer_idx: int,
         nodes: list[_NodeSpec],
         reschedule_queue: asyncio.Queue[tuple[str, str]],
+        deadline: float | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Dispatch a layer's nodes and wait for all their results."""
         results_stream = self._results_stream(run_id)
@@ -489,6 +510,10 @@ class DistributedScheduler:
         collected: dict[str, dict[str, Any]] = {}
         # Map stream-msg-id → node_id for reschedule correlation.
         msg_to_node: dict[str, str] = {}
+        # Incremental read cursor: (ms, seq) of the last
+        # result-stream entry this layer has processed
+        # (None = nothing read yet).
+        cursor: tuple[int, int] | None = None
 
         # Initial dispatch.
         for node in nodes:
@@ -498,6 +523,12 @@ class DistributedScheduler:
         # Poll for results + handle reschedules until all nodes resolved.
 
         while pending:
+            if deadline is not None and time.monotonic() > deadline:
+                raise SchedulingError(
+                    f"Distributed run {run_id!r} exceeded its deadline "
+                    f"waiting for layer {layer_idx} nodes "
+                    f"{sorted(pending)}",
+                )
             # Drain any reschedule requests from the failure detector.
             while not reschedule_queue.empty():
                 _old_msg_id, node_id = reschedule_queue.get_nowait()
@@ -517,7 +548,9 @@ class DistributedScheduler:
                 msg_to_node[new_msg_id] = node_id
 
             # Read results from the results stream.
-            new_results = self._read_results(results_stream, set(pending))
+            new_results, cursor = self._read_results(
+                results_stream, set(pending), cursor,
+            )
             for node_id, res in new_results.items():
                 collected[node_id] = res
                 pending.pop(node_id, None)
@@ -537,8 +570,11 @@ class DistributedScheduler:
         # F1-02 (异常自适应调度): pick the best worker via the failure
         # detector's weighted selection. Falls back to the legacy
         # "any capable worker" path when no detector is wired in.
-        selected = self._select_worker(node.affinity.required)
+        # The capable-worker scan happens once here and is reused
+        # by _select_worker (it used to be computed twice per
+        # dispatch — once for the warning, once for selection).
         capable = self._registry.capable_workers(node.affinity.required)
+        selected = self._select_worker(node.affinity.required, capable)
         if not capable and node.affinity.required:
             logger.warning(
                 "[dist-sched] node %s requires affinity %s but no capable worker; "
@@ -576,27 +612,44 @@ class DistributedScheduler:
         self,
         results_stream: str,
         expected: set[str],
-    ) -> dict[str, dict[str, Any]]:
+        cursor: tuple[int, int] | None = None,
+    ) -> tuple[dict[str, dict[str, Any]], tuple[int, int]]:
         """Read completed results from the results stream (non-blocking).
 
-        Returns a dict ``{node_id: result_dict}`` for any nodes in
-        ``expected`` whose result has been posted. Uses ``xrange`` to
-        read all entries non-blockingly (unlike ``xread`` with a block
-        timeout, ``xrange`` returns immediately with whatever is
-        available).
+        Returns ``(results, new_cursor)``: a dict ``{node_id:
+        result_dict}`` for nodes in ``expected`` whose result has
+        been posted *after ``cursor``*, plus the ``(ms, seq)`` id
+        of the last entry processed (``None``-cursor means "read
+        from the head").
+
+        The cursor makes reading incremental — every poll only
+        processes entries the caller has not seen yet. Reading
+        from the head on every poll was doubly wasteful: a layer
+        with more than ``count`` posted results never surfaced
+        its tail (the run hung forever waiting for them), and the
+        failure detector re-recorded every completed task on
+        every poll, drowning its weight window in duplicate
+        samples.
+
+        ``xrange``'s ``min`` is inclusive and some client-side
+        fakes ignore it entirely, so already-seen entries are
+        skipped with a numeric ``(ms, seq)`` comparison — stream
+        ids are *not* lexicographically ordered.
         """
         out: dict[str, dict[str, Any]] = {}
+        min_id = "-" if cursor is None else f"{cursor[0]}-{cursor[1]}"
         try:
-            # xrange returns all entries between min and max ids. We use
-            # "-" (smallest) to "+" (largest) to read everything. This is
-            # non-blocking and safe for small result streams.
-            entries = self._redis.xrange(results_stream, min="-", max="+", count=100)
+            entries = self._redis.xrange(results_stream, min=min_id, max="+", count=10000)
         except Exception as exc:
             logger.debug("[dist-sched] xrange on %s failed: %s", results_stream, exc)
-            return out
+            return out, cursor or (0, 0)
         for msg_id, fields in entries:
+            parsed = self._parse_stream_id(_decode(msg_id))
+            if cursor is not None and parsed <= cursor:
+                continue
             node_id = _decode(fields.get(_F_NODE_ID.encode(), fields.get(_F_NODE_ID, b"")))
             if not node_id or node_id not in expected:
+                cursor = parsed
                 continue
             status = _decode(fields.get(_F_STATUS.encode(), fields.get(_F_STATUS, b"")))
             output_raw = _decode(fields.get(_F_OUTPUT.encode(), fields.get(_F_OUTPUT, b"")))
@@ -640,7 +693,17 @@ class DistributedScheduler:
                 except Exception:
                     # registry 清理失败不应影响调度结果
                     logger.debug("complete_task failed", exc_info=True)
-        return out
+            cursor = parsed
+        return out, cursor or (0, 0)
+
+    @staticmethod
+    def _parse_stream_id(mid: str) -> tuple[int, int]:
+        """Parse a Redis stream id ``"<ms>-<seq>"`` into a tuple."""
+        try:
+            ms_str, _, seq_str = mid.partition("-")
+            return int(ms_str), int(seq_str)
+        except ValueError:
+            return (0, 0)
 
     # ── Failure detection loop ───────────────────────────────────
 
