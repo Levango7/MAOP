@@ -39,6 +39,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 分布式调度增强——批量优先级重排 + 负载感知选工
+
+两项 F1-01（分布式执行）的增强，均默认生效、向后兼容：
+
+- **Worker 侧批量优先级重排**：`DistributedWorker` 的消费
+  循环此前按纯 FIFO 读取任务——调度器文档声称的「worker
+  侧本地优先级重排」并未实现（文档/代码不一致）。现在每
+  个读取批次按 `priority`（1 最高 .. 5 最低）稳定排序后
+  派发：worker 不会先启动它已读到的低优先级任务。残余边
+  界如实标注：Redis Streams 本身是 FIFO，跨 worker 的全
+  局严格排序不做保证（批次内保证）；同一优先级保持 FIFO。
+- **负载感知选工**：`DistributedScheduler._select_worker`
+  的打分从「仅失败探测器权重」改为
+  `weight / (1 + 在途任务数)`——健康但空闲的 worker 优先
+  于健康但繁忙的；被排空（weight=0）的 worker 仍然永不
+  入选（无论多空闲）。在途数来自 `WorkerRegistry` 已有的
+  进程内跟踪（`assign_task`/`complete_task`），属尽力而
+  为：多调度器共享 worker 池时各自只看到自己派发的部分。
+
+**已知边界**（非本次范围）：更强的保证（worker 本地优先
+级缓冲池、按优先级分多层 Streams）需要单独的关闭排水设
+计，见 PR 讨论。
+
 ### 真抢占（Phase γ-3）——opt-in，默认行为不变
 
 **背景**：γ-2 的软抢占只记录「would-be preemption」需求信号
