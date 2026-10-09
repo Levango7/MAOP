@@ -525,10 +525,16 @@ class TestDispatcherPriorityIntegration:
 
 
 class TestCheckpointCompleteness:
-    """Documents the Phase γ-2 risk assessment that drove the soft-preemption
-    decision. These tests assert the structural facts about
-    PipelineCheckpoint so that a future change to wire it into the execution
-    path is detectable here (and can flip the scheduler to true preemption).
+    """Documents the preemption decision trail via structural facts.
+
+    Phase γ-2 asserted that ``WorkerPool`` did NOT reference
+    ``PipelineCheckpoint`` — that assertion was a deliberate
+    canary: its failure was the designed signal that the
+    execution path is wired and the scheduler can be upgraded
+    to true preemption. Phase γ-3 is that upgrade, so the
+    assertions below now pin the γ-3 structure (checkpoint
+    wired in; true preemption opt-in with soft preserved as
+    the default).
     """
 
     def test_step_checkpoint_has_required_fields(self):
@@ -540,17 +546,28 @@ class TestCheckpointCompleteness:
         assert hasattr(sc, "attempts")
         assert hasattr(sc, "error")
 
-    def test_worker_pool_does_not_use_checkpoint(self):
-        """WorkerPool._run_task must not reference PipelineCheckpoint.
+    def test_worker_pool_checkpoint_wiring(self):
+        """WorkerPool._run_task writes PipelineCheckpoint records.
 
-        This is the structural reason soft preemption was chosen: cancelling
-        a running task loses its in-progress work because no checkpoint is
-        written. If this test starts failing (checkpoint is wired in), the
-        scheduler can be upgraded to true preemption.
+        Replaces the γ-2 canary ``test_worker_pool_does_not_use_checkpoint``
+        (which asserted the opposite and failed by design once
+        the wiring landed — that failure is this test's origin).
         """
         import inspect
 
         from maop.core.reliability.worker_pool import WorkerPool
         src = inspect.getsource(WorkerPool)
-        assert "PipelineCheckpoint" not in src
-        assert "pipeline_checkpoint" not in src
+        assert "PipelineCheckpoint" in src
+        assert "_checkpoint_begin" in src
+        assert "TaskPreemptedError" in src
+
+    def test_true_preemption_is_opt_in(self):
+        """γ-3 switch defaults off — soft preemption stays the default."""
+        import inspect
+
+        from maop.core.reliability.preemptable_worker_pool import (
+            PreemptableWorkerPool,
+        )
+        sig = inspect.signature(PreemptableWorkerPool.__init__)
+        assert sig.parameters["true_preemption"].default is False
+        assert sig.parameters["max_preemptions"].default == 2

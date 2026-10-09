@@ -39,6 +39,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 真抢占（Phase γ-3）——opt-in，默认行为不变
+
+**背景**：γ-2 的软抢占只记录「would-be preemption」需求信号
+（`MAOP_task_preemption_total`），从不取消运行中的任务——因为
+`PipelineCheckpoint` 未接入执行路径，取消即丢进度且无法恢复。
+本批把该缺口补上：
+
+- **检查点接线**：`WorkerPool._run_task` 现在把每个执行的任务
+  写入 `PipelineCheckpoint`（`start_run`/`start_step`/
+  `complete_step`/`fail_step`，`WorkerPool(checkpoint=...)`
+  注入，不传则不写——零行为变化）。被抢占的任务留下
+  `running` 状态的步骤，`pending_steps()` 将其报告为待重试，
+  步骤的 `attempts` 计数使「抢占-重试」循环可见。
+- **真抢占**：`PreemptableWorkerPool(true_preemption=True)`
+  （默认 `False`，存量部署保持软抢占语义）。当无空闲槽位且
+  队首任务优先级**严格高于**某个运行中任务时，取消该
+  最低优先级任务（`WorkerPool.cancel(preempt=True)`）并以
+  **原 enqueue token 重新入队**——提交方的 `wait()` 由重新
+  调度的副本解析，任务只会变慢、不会丢失。
+- **防抖保护**：任务被抢占 `max_preemptions` 次（默认 2）后
+  不再选为受害者，高优先级突发不能饿死同一个任务。
+- **`TaskPreemptedError`**：抢占取消的任务以其解析结果 future
+  （区别于普通取消的 `CancelledError`），完成 watcher 据此走
+  「重入队」分支而非记错误。
+- **`_run_task` 重构**：try/except 外扩到信号量获取之外——
+  修掉一个潜在挂起：取消若落在等信号量期间，旧代码会让
+  CancelledError 逃逸出协程，结果 future 永不解析（watcher
+  挂死）。
+- **指标口径**：软/真抢占共用 `MAOP_task_preemption_total`
+  （沿用原设计「该计数器将来记录真实取消」），两者以日志行
+  区分（`soft preemption:` vs `TRUE preemption:`）。
+
+**已知边界**（非本次范围）：`MaopLoop.run` 内部相位级进度
+（LLM 对话中途状态）不保留——重新调度的副本完整重跑任务；
+相位级恢复是独立的后续增强。分布式调度侧（`DistributedScheduler`
+的 Redis Streams 优先级弱保证）未动。
+
+测试：`py/tests/test_true_preemption.py`（17 例：取消机制、
+检查点接线、受害者选择/防抖/竞态撤销、watcher 分支、
+dispatch loop 集成）。
+
 ## [5.2.1] — 2026-10-09
 
 **本版性质**：patch。发布动因是**解除与已发布 MAOS `enterprise-v5.2.3` 的兼容缺口**（P0）——

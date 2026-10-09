@@ -98,7 +98,6 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.core.memory.hybrid_search": ("unwired", "混合检索未接入记忆读路径"),
     "maop.core.memory.semantic_cache": ("unwired", "语义缓存未接入记忆读路径"),
     "maop.core.reliability.dag_scheduler": ("unwired", "DAG 调度器未接线"),
-    "maop.core.reliability.pipeline_checkpoint": ("unwired", "pipeline checkpoint 未接线"),
     "maop.core.reliability.preemptable_worker_pool": ("unwired", "抢占式 worker 池未接线"),
     "maop.core.security.byok": ("unwired", "BYOK 未接线"),
     "maop.core.security.ldap_provider": ("unwired", "LDAP provider 未接线（SSO 走 SAML/OIDC）"),

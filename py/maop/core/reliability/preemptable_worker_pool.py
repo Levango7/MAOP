@@ -1,21 +1,11 @@
-"""MAOP Preemptable Worker Pool — Priority-aware soft-preemption scheduler (Phase γ-2).
+"""MAOP Preemptable Worker Pool — Priority-aware preemption scheduler.
 
 Wraps :class:`maop.core.worker_pool.WorkerPool` with a
 :class:`maop.core.priority_queue.PriorityTaskQueue` so that pending tasks
 are admitted in priority + deadline order instead of submission order.
 
-Phase γ-2 design: SOFT preemption
----------------------------------
-True preemption (cancelling a running low-priority task to admit a
-high-priority one) is **not** implemented because
-:class:`maop.core.pipeline_checkpoint.PipelineCheckpoint` is not wired
-into the task execution path (``WorkerPool._run_task`` /
-``MaopLoop.run`` never invoke it) and only saves flat step-level state.
-Cancelling a running task would therefore lose its in-progress work with
-no way to resume.
-
-Soft preemption instead:
-
+Phase γ-2: SOFT preemption (default)
+------------------------------------
 1. Orders the pending queue by ``(priority, deadline_urgency_score,
    enqueue_order)`` via :class:`PriorityTaskQueue`.
 2. Admits the next queued task whenever a worker slot frees up.
@@ -26,10 +16,35 @@ Soft preemption instead:
    running task. The high-priority task is placed at the front of the
    queue and runs as soon as a slot is free.
 
-Once the checkpoint is integrated into the execution path
-(``WorkerPool._run_task`` writes per-step state, and DAG dependencies are
-persisted), the same interface can switch to true preemption by
-cancelling the lowest-priority running task and re-enqueueing it.
+Phase γ-3: TRUE preemption (opt-in via ``true_preemption=True``)
+--------------------------------------------------------------
+When no worker slot is free and the queue head has strictly higher
+priority than a running task, the lowest-priority running task is
+**cancelled** (:meth:`WorkerPool.cancel(preempt=True)`) and **re-enqueued
+under its original token** — its ``wait()``er is resolved by the
+re-admitted copy, so from the submitter's perspective the task simply
+takes longer, never vanishes.
+
+This is safe because the execution path now writes durable state:
+:meth:`WorkerPool._run_task` records every executed task in a
+:class:`~maop.core.reliability.pipeline_checkpoint.PipelineCheckpoint` run
+(``start_step``/``complete_step``/``fail_step``). A preempted task
+leaves its checkpoint step in ``running`` status, which
+``pending_steps()`` reports for retry, and the step's ``attempts``
+counter makes repeated preemption-retry cycles visible. What is *not*
+preserved is mid-task progress *inside* ``MaopLoop.run`` — the
+re-admitted copy re-executes the task in full; phase-level resume is a
+separate, future enhancement.
+
+Thrash protection: a task that has already been preempted
+``max_preemptions`` times (default 2) is no longer eligible as a
+victim, so a burst of high-priority work cannot starve one unlucky
+task indefinitely.
+
+Both soft and true events increment the same
+``MAOP_task_preemption_total`` counter (per the monitoring contract);
+the log lines distinguish them (``soft preemption:`` vs
+``TRUE preemption:``).
 
 Backward compatibility
 ----------------------
@@ -37,7 +52,8 @@ Backward compatibility
 for the common methods (``start``/``stop``/``submit``/``wait``/``stats``).
 ``submit`` gains optional ``priority`` / ``deadline_ms`` keyword args with
 defaults (priority=3, no deadline) that preserve the original behaviour
-when omitted.
+when omitted. ``true_preemption`` defaults to ``False`` — existing
+deployments keep soft-preemption semantics until they opt in.
 """
 
 from __future__ import annotations
@@ -46,7 +62,7 @@ import asyncio
 import contextlib
 import logging
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from maop.core.monitoring.monitoring import (
     MAOP_PRIORITY_QUEUE_SIZE,
@@ -54,7 +70,16 @@ from maop.core.monitoring.monitoring import (
     get_priority_wait_histogram,
 )
 from maop.core.reliability.priority_queue import PriorityTask, PriorityTaskQueue
-from maop.core.reliability.worker_pool import PoolStats, WorkerPool
+from maop.core.reliability.worker_pool import (
+    PoolStats,
+    TaskPreemptedError,
+    WorkerPool,
+)
+
+if TYPE_CHECKING:
+    from maop.core.reliability.pipeline_checkpoint import (
+        PipelineCheckpoint,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +87,7 @@ __all__ = ["PreemptableWorkerPool"]
 
 
 class PreemptableWorkerPool:
-    """Priority-aware worker pool with soft preemption.
+    """Priority-aware worker pool with preemption.
 
     Parameters
     ----------
@@ -72,6 +97,19 @@ class PreemptableWorkerPool:
         Maximum CPU-bound worker processes (forwarded to ``WorkerPool``).
     root_dir : str | None
         MAOP project root (forwarded to ``WorkerPool``).
+    true_preemption : bool
+        Phase γ-3 switch. When ``True``, a queued task with strictly
+        higher priority than a running task *cancels* that running
+        task and re-enqueues it (default ``False`` = soft preemption,
+        i.e. the γ-2 behaviour).
+    max_preemptions : int
+        Thrash protection: a task already preempted this many times
+        (default 2) is no longer eligible as a preemption victim.
+    checkpoint : PipelineCheckpoint | None
+        Durable execution records (forwarded to ``WorkerPool``).
+        When ``true_preemption`` is on and none is supplied, one is
+        created under ``root_dir``. Pass an instance to control the
+        location (or a test double).
     """
 
     def __init__(
@@ -79,11 +117,26 @@ class PreemptableWorkerPool:
         max_workers: int = 4,
         max_cpu_workers: int = 0,
         root_dir: str | None = None,
+        true_preemption: bool = False,
+        max_preemptions: int = 2,
+        checkpoint: PipelineCheckpoint | None = None,
     ) -> None:
+        if checkpoint is None and true_preemption:
+            # The execution-path wiring that makes true
+            # preemption safe (durable per-task records).
+            # Best-effort: if the store cannot be created,
+            # preemption still works — the pool simply runs
+            # without durable records.
+            with contextlib.suppress(Exception):
+                from maop.core.reliability.pipeline_checkpoint import (
+                    PipelineCheckpoint,
+                )
+                checkpoint = PipelineCheckpoint(root_dir=root_dir or ".")
         self._pool = WorkerPool(
             max_workers=max_workers,
             max_cpu_workers=max_cpu_workers,
             root_dir=root_dir,
+            checkpoint=checkpoint,
         )
         self._queue: PriorityTaskQueue = PriorityTaskQueue()
         # Track currently-running task priorities keyed by WorkerPool task id,
@@ -102,6 +155,14 @@ class PreemptableWorkerPool:
         # Map token -> result/exception, for wait() to return/raise.
         self._token_results: dict[str, Any] = {}
         self._token_errors: dict[str, BaseException] = {}
+        # Phase γ-3: true-preemption switch + thrash protection.
+        self._true_preemption = true_preemption
+        self._max_preemptions = max(0, max_preemptions)
+        # WorkerPool task ids cancelled for preemption whose
+        # re-enqueue is pending — the completion watcher uses this
+        # to take the preemption branch instead of recording an
+        # error on the (original) token.
+        self._preempted_wp_ids: set[str] = set()
 
     # ── Lifecycle ───────────────────────────────────────────────
 
@@ -227,8 +288,16 @@ class PreemptableWorkerPool:
             try:
                 stats = self._pool.stats()
                 if stats.idle_workers <= 0:
-                    # No slot available. We do NOT cancel running tasks
-                    # (soft preemption). Just wait briefly before retrying.
+                    # No slot available. Under true preemption
+                    # (γ-3) a queued task with strictly higher
+                    # priority than a running one may cancel that
+                    # running task and take its slot; otherwise we
+                    # do NOT cancel running tasks (soft preemption).
+                    if self._true_preemption:
+                        self._maybe_preempt()
+                    # Wait briefly before retrying — also lets a
+                    # just-issued cancellation land, avoiding
+                    # double-preemption of the same victim.
                     await asyncio.sleep(0.02)
                     continue
 
@@ -280,11 +349,32 @@ class PreemptableWorkerPool:
         Records the result/exception so :meth:`wait` can return/raise,
         and signals the token's completion event. Exceptions are logged
         (not silently swallowed) so failures are observable.
+
+        Phase γ-3: a :class:`TaskPreemptedError` means the task was
+        cancelled by true preemption and has already been re-enqueued
+        under its original token by :meth:`_maybe_preempt`. The token
+        must stay pending — the re-admitted copy spawns a new watcher
+        that will resolve it — so no result, error, or event is
+        recorded here.
         """
         token = f"pt-{pt.enqueue_order}"
         try:
             result = await self._pool.wait(wp_id)
             self._token_results[token] = result
+        except TaskPreemptedError:
+            # The victim was re-enqueued under this token by
+            # _maybe_preempt; discard the preemption mark.
+            # NOTE: no event signalling on this path — the
+            # code after the try/finally below is only reached
+            # on completion/failure, and a `return` here leaves
+            # the token pending for the re-admitted copy.
+            self._preempted_wp_ids.discard(wp_id)
+            logger.info(
+                "[preempt-pool] task %s (wp_id=%s) preempted; "
+                "re-enqueued under token %s",
+                token, wp_id, token,
+            )
+            return
         except BaseException as exc:
             self._token_errors[token] = exc
             # CancelledError is expected during stop(); don't warn for it.
@@ -297,10 +387,93 @@ class PreemptableWorkerPool:
         finally:
             async with self._running_lock:
                 self._running.pop(wp_id, None)
-            # Signal waiters regardless of success/failure.
-            event = self._token_events.get(token)
-            if event is not None:
-                event.set()
+        # Signal waiters regardless of success/failure (but NOT
+        # preemption — see the note above).
+        event = self._token_events.get(token)
+        if event is not None:
+            event.set()
+
+    # ── True preemption (Phase γ-3) ───────────────────────
+
+    def _maybe_preempt(self) -> bool:
+        """Attempt true preemption of a running task.
+
+        Conditions (all required):
+          - the queue is non-empty (there is a waiting head), AND
+          - some running task has a strictly lower priority (larger
+            number) than the queue head, AND
+          - that task has been preempted fewer than
+            ``max_preemptions`` times (thrash protection).
+
+        On success the victim is cancelled via
+        :meth:`WorkerPool.cancel(preempt=True)`, marked in
+        ``_preempted_wp_ids`` (so its completion watcher takes the
+        re-enqueue branch), and **re-pushed onto the priority queue
+        under its original enqueue token** — its submitter's
+        ``wait()`` is resolved by the re-admitted copy.
+
+        Returns ``True`` if a preemption was performed.
+        """
+        # Guard: true preemption is opt-in. The dispatch loop
+        # checks the same flag before calling, but the method
+        # stays inert on its own so it can never cancel a
+        # running task on a soft-preemption pool.
+        if not self._true_preemption:
+            return False
+        head = self._queue.peek()
+        if head is None:
+            return False
+        # Snapshot without the asyncio lock (same discipline as
+        # _maybe_record_soft_preemption: a stale entry at worst
+        # causes a no-op cancel(), which returns False).
+        candidates = [
+            (pt, wp_id)
+            for wp_id, pt in list(self._running.items())
+            if pt.priority > head.priority
+            and pt.preempted_count < self._max_preemptions
+        ]
+        if not candidates:
+            return False
+        # Victim: lowest priority (largest number) first; tie-break
+        # by fewest prior preemptions, then oldest enqueue order
+        # (FIFO fairness).
+        victim_pt, victim_wp_id = min(
+            candidates,
+            key=lambda item: (
+                -item[0].priority,
+                item[0].preempted_count,
+                item[0].enqueue_order,
+            ),
+        )
+        # Mark BEFORE cancelling so the completion watcher takes the
+        # preemption branch instead of recording an error.
+        self._preempted_wp_ids.add(victim_wp_id)
+        victim_pt.preempted_count += 1
+        if not self._pool.cancel(victim_wp_id, preempt=True):
+            # Raced with the victim's normal completion — undo the
+            # marks; the task finished on its own.
+            self._preempted_wp_ids.discard(victim_wp_id)
+            victim_pt.preempted_count -= 1
+            return False
+        # Same counter as soft preemption per the monitoring
+        # contract ("this same counter will record actual
+        # cancellations"); log lines distinguish the two.
+        MAOP_TASK_PREEMPTION_TOTAL.inc()
+        logger.info(
+            "[preempt-pool] TRUE preemption: queued priority=%d "
+            "(token pt-%d) cancelled running priority=%d "
+            "(wp_id=%s, preemptions=%d/%d) — victim re-enqueued",
+            head.priority, head.enqueue_order, victim_pt.priority,
+            victim_wp_id, victim_pt.preempted_count,
+            self._max_preemptions,
+        )
+        # Re-enqueue the victim under its original token:
+        # enqueue_order (hence the token) is preserved, and the
+        # queue-size gauge balance is restored (it was
+        # decremented at admission).
+        self._record_queue_size_inc(victim_pt.priority)
+        self._queue.push(victim_pt)
+        return True
 
     async def wait(self, token: str, timeout: float = 0) -> Any:
         """Wait for a submitted task to complete and return its result.
