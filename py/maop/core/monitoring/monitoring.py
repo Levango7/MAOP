@@ -598,17 +598,21 @@ MAOP_ROUTE_DECISION_MODE = metrics.gauge(
     "Routing decision mode (currently only weighted_sum)",
 )
 
-# Phase γ-2: Priority queue + soft preemption metrics.
+# Phase γ-2/γ-3: Priority queue + preemption metrics.
 #
-# MAOP_task_preemption_total — under soft preemption this counts
-#   "would-be preemption" events: a higher-priority task arrived while
-#   all workers were busy and at least one running task had a lower
-#   priority. The running task is *not* cancelled (checkpoint is not
-#   wired into the execution path, so true cancellation would lose
-#   mid-task progress); the high-priority task is queued ahead and
-#   the event is recorded so monitoring demand for true preemption is
-#   visible. When/if the checkpoint is integrated, this same counter
-#   will record actual cancellations.
+# MAOP_task_preemption_total — counts preemption events of both
+#   kinds (same counter per the original design):
+#   - soft preemption (γ-2, default): a higher-priority task
+#     arrived while all workers were busy and at least one
+#     running task had a lower priority. The running task is
+#     *not* cancelled; the high-priority task is queued ahead
+#     and the event is recorded so monitoring demand is visible.
+#   - true preemption (γ-3, opt-in): the running task *is*
+#     cancelled (WorkerPool.cancel(preempt=True)) and re-enqueued
+#     under its original token — safe because the execution path
+#     writes durable per-task records (PipelineCheckpoint).
+#   The two are distinguished in the logs ("soft preemption:"
+#   vs "TRUE preemption:"), not by metric labels.
 # MAOP_priority_queue_size — gauge per priority level (label=priority).
 # MAOP_priority_queue_wait_seconds — histogram of queue residency time
 #   per priority level. The Histogram class does not carry labels, so

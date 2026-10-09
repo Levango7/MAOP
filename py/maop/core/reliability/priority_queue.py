@@ -15,19 +15,22 @@ to pick the next task to run. Ordering key:
 
 Implementation uses :mod:`heapq` (binary heap) giving ``O(log n)`` push/pop.
 
-Phase γ-2 design note
----------------------
-This queue is the backbone of the *soft preemption* scheduler
-(:class:`maop.core.preemptable_worker_pool.PreemptableWorkerPool`). True
-preemption (cancelling a running low-priority task to admit a high-priority
-one) was *not* implemented because :class:`maop.core.pipeline_checkpoint.
-PipelineCheckpoint` is not wired into the task execution path
-(``WorkerPool._run_task`` / ``MaopLoop.run`` never call it) and only saves
-flat step-level state — mid-task progress would be lost on cancellation.
-Soft preemption therefore orders the *pending* queue by priority/deadline
-and records "would-be preemption" events in
-``MAOP_task_preemption_total`` for monitoring demand, without ever
-cancelling a running task. See the Phase γ-2 report for details.
+Phase γ-2/γ-3 design note
+-------------------------
+This queue is the backbone of the priority scheduler
+(:class:`maop.core.preemptable_worker_pool.PreemptableWorkerPool`).
+Under soft preemption (γ-2, the default) the queue only orders the
+*pending* tasks by priority/deadline and "would-be preemption" events
+are recorded in ``MAOP_task_preemption_total`` for monitoring demand,
+without ever cancelling a running task. Under true preemption (γ-3,
+opt-in via ``true_preemption=True``) a queued task with strictly
+higher priority than a running one cancels that running task
+(:meth:`WorkerPool.cancel(preempt=True)`); the cancelled victim is
+re-pushed onto this queue under its original enqueue token, so its
+``wait()``er is resolved by the re-admitted copy. The durable
+execution record (``PipelineCheckpoint``) makes this safe: the
+cancelled task's checkpoint step stays ``running`` and is reported by
+``pending_steps()`` for retry.
 """
 
 from __future__ import annotations
@@ -61,6 +64,10 @@ class PriorityTask:
     enqueue_order : int
         Counter assigned at enqueue time for FIFO tie-breaking. Populated
         by :meth:`PriorityTaskQueue.push`; callers may leave it at 0.
+    preempted_count : int
+        Phase γ-3: number of times this task has been truly preempted.
+        Incremented by the preemption scheduler before re-enqueueing a
+        cancelled victim; see :class:`PreemptableWorkerPool`.
     """
 
     payload: Any
@@ -68,6 +75,11 @@ class PriorityTask:
     deadline_ms: int | None = None
     created_at: float = field(default_factory=time.time)
     enqueue_order: int = 0
+    # Phase γ-3: how many times this task has been truly preempted
+    # (cancelled mid-run to admit a higher-priority task). Used for
+    # thrash protection: once it reaches the pool's max_preemptions
+    # limit the task is no longer eligible as a preemption victim.
+    preempted_count: int = 0
 
     def deadline_urgency_score(self) -> float:
         """Return the deadline-urgency component of the sort key.
