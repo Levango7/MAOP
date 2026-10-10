@@ -39,6 +39,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 发布链修复 + PyPI 首次上线
+
+- **packages-dir 路径 bug**：`ci.yml` publish 作业的 `packages-dir` 按**工作区根**
+  解析（容器 action 不受 `defaults.run.working-directory` 影响），原写 `dist/`
+  而构建在 `py/` 下执行（产物 `py/dist`）——v5.2.1 与 v5.3.0 两次 tag 发布都倒在
+  `FileNotFoundError: /github/workspace/dist`，且被原注释预期的「401/403
+  （trusted publisher 未配）」掩盖，从未真正验证过。修为 `py/dist/`。
+- **手工发布逃生舱** `publish-manual`：GitHub 的「重跑」使用**原 run 提交里的
+  workflow 文件**，发布链自身有 bug 时修好 ci.yml 也无法让旧 tag run 变绿；
+  新作业从 master 侧 checkout 指定 tag（`workflow_dispatch` 输入 `publish_tag`）、
+  重建并走同一条 OIDC trusted publishing 上传。
+- 守卫：`test_ci_publish_reachable.py` 新增 `TestPublishArtifactPath`
+  （产物目录与构建产出的对齐，参数化两个发布作业）+ `TestManualPublishEscapeHatch`。
+- **PyPI 首次上线**：`maop-orchestrator` 5.3.0 经该通道发布（wheel 1,708,100 B /
+  sdist 2,458,015 B，与 Release 附件字节数一致）；全新 venv 直接
+  `pip install maop-orchestrator` 装出 5.3.0 已验证；README 安装块补该最简途径。
+
 ## [5.3.0] — 2026-10-10
 
 ### 前端修复：Chat 页 8 个 i18n key 缺失
