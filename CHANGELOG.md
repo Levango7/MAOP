@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.3.1] — 2026-10-10
+
 ### 发布链修复 + PyPI 首次上线
 
 - **packages-dir 路径 bug**：`ci.yml` publish 作业的 `packages-dir` 按**工作区根**
@@ -55,6 +57,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PyPI 首次上线**：`maop-orchestrator` 5.3.0 经该通道发布（wheel 1,708,100 B /
   sdist 2,458,015 B，与 Release 附件字节数一致）；全新 venv 直接
   `pip install maop-orchestrator` 装出 5.3.0 已验证；README 安装块补该最简途径。
+
+### PyPI 包元数据补全
+
+- `pyproject.toml` 补全 PyPI 展示元数据（此前四字段为空）：署名
+  `authors = [{name = "Levango7"}]`（与 GitHub commit/tag 身份一致）、`keywords`
+  10 个（multi-agent / agent-orchestration / llm / ai-agents / workflow / dag /
+  orchestration / automation / plan-execute-verify / agent-framework）、
+  `classifiers` 12 条（Python 3.10–3.13 与 CI 矩阵逐条对齐；不虚报
+  `Typing :: Typed`——仓内无 py.typed；`Development Status :: 4 - Beta` 为诚实档位）、
+  `[project.urls]` 六条（Homepage / Repository / Documentation / Issues /
+  Changelog / Releases）。`description` 微调为含关键词的自然句。
+- 影响面：不触碰 dependencies 与 `[enterprise]` extra，锁文件漂移守卫与 MAOS
+  版本地板守卫零影响；构建后端与 license 写法保持 hatchling / `{text="MIT"}` 不变。
+- logo：PyPI 项目页无 logo 字段，展示面仅 README；本次按既定决策不引入图形资产。
+- **同日双版说明**（发布节奏规范的已知偏差）：本版与 v5.3.0 同日（2026-10-10），
+  为用户拍板的元数据即时动作——元数据烘进发布物、无法原地替换已发布的 5.3.0。
+  非安全 hotfix，此处如实记录。
 
 ## [5.3.0] — 2026-10-10
 

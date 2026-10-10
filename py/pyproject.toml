@@ -2,11 +2,33 @@
 # PyPI 包名改为 maop-orchestrator（原 `maop` 被 Justin Ryan 2021-07-09 注册为 0.0.0）。
 # import 名仍为 `maop`（由 [tool.hatch.build.targets.wheel] packages 指定）。
 name = "maop-orchestrator"
-version = "5.3.0"
-description = "MAOP - Multi-Agent Orchestration Framework (Python-first, Plan-Execute-Verify)"
+version = "5.3.1"
+description = "MAOP - Multi-Agent Orchestration Framework with Plan-Execute-Verify loop, task DAGs, model management and a real-time dashboard"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
+# PyPI 元数据（2026-10-10 补全，v5.3.1 上线）：署名与 GitHub commit/tag 身份一致；
+# classifiers 与 CI 矩阵逐条对齐（3.10–3.13），不虚报 Typed（仓内无 py.typed）。
+authors = [{name = "Levango7"}]
+keywords = [
+    "multi-agent", "agent-orchestration", "llm", "ai-agents",
+    "workflow", "dag", "orchestration", "automation",
+    "plan-execute-verify", "agent-framework",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Framework :: FastAPI",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "pyyaml>=6.0.2,<7.0.0",
     "pydantic>=2.9.0,<3.0",
@@ -50,6 +72,14 @@ dependencies = [
     # Falls back to NumPy → pure-Python cosine if the extension fails to load.
     "sqlite-vec>=0.1.6",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Levango7/MAOP"
+Repository = "https://github.com/Levango7/MAOP"
+Documentation = "https://github.com/Levango7/MAOP#readme"
+Issues = "https://github.com/Levango7/MAOP/issues"
+Changelog = "https://github.com/Levango7/MAOP/blob/master/CHANGELOG.md"
+Releases = "https://github.com/Levango7/MAOP/releases"
 
 [project.optional-dependencies]
 dev = [
