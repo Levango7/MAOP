@@ -146,6 +146,87 @@ class TestPublishJobShape:
         assert "github.ref" in str(step.get("run", "")), "没把真实 ref 传进去，检查等于空转"
 
 
+class TestPublishArtifactPath:
+    """产物目录必须与构建步骤的实际产出对齐 —— 发布链上最贵的一类"静默错位"。
+
+    实况（2026-10-10 定位）：publish 作业 `defaults.run.working-directory: py`，
+    `python -m build` 产出在 `py/dist`；而 pypa action 是**容器 action**，不受
+    defaults 影响，`packages-dir` 按**工作区根**解析。原写 `dist/` ⇒
+    `FileNotFoundError: /github/workspace/dist` —— v5.2.1 与 v5.3.0 两次 tag 发布
+    都倒在这里，还被误诊为"trusted publisher 未配的预期红"。
+    本守卫把「构建在哪里产出」与「action 去哪里找」绑死。
+    """
+
+    @pytest.mark.parametrize("job_name", ["publish", "publish-manual"])
+    def test_packages_dir_matches_build_output(self, job_name: str) -> None:
+        job = _doc()["jobs"][job_name]
+        wd = str(
+            ((job.get("defaults") or {}).get("run") or {}).get("working-directory") or ""
+        ).rstrip("/")
+        step = next(
+            s
+            for s in job["steps"]
+            if str(s.get("uses", "")).startswith("pypa/gh-action-pypi-publish")
+        )
+        packages_dir = str((step.get("with") or {}).get("packages-dir") or "").rstrip("/")
+        expected = f"{wd}/dist" if wd else "dist"
+        assert packages_dir == expected, (
+            f"{job_name}: 构建在 {wd or '仓库根'}/ 下执行（产物 {expected}），"
+            f"但 packages-dir={packages_dir!r}（按工作区根解析）⇒ 找不到产物"
+        )
+
+    @pytest.mark.parametrize("job_name", ["publish", "publish-manual"])
+    def test_build_step_runs_in_the_declared_workdir(self, job_name: str) -> None:
+        """packages-dir 的对齐前提：构建步骤确实受 defaults 影响（即 run 步骤）。"""
+        job = _doc()["jobs"][job_name]
+        build = next(s for s in job["steps"] if "Build packages" in str(s.get("name", "")))
+        assert "run" in build, "构建步骤必须是 run 步骤，否则不继承 defaults.working-directory"
+
+
+class TestManualPublishEscapeHatch:
+    """手工发布逃生舱（2026-10-10 建）：tag 发布链自身有 bug 时的修复通道。
+
+    背景：GitHub 的 "Re-run failed jobs" 使用**原 run 提交里的 workflow 文件**，
+    所以修好 ci.yml 无法让旧 tag run 变绿；escape hatch 从 master 侧 checkout
+    目标 tag、重建并走同一 OIDC 路径。它必须只在手工 dispatch 时触发。
+    """
+
+    def _job(self) -> dict:
+        return _doc()["jobs"]["publish-manual"]
+
+    def test_dispatch_only(self) -> None:
+        cond = str(self._job().get("if") or "")
+        assert "workflow_dispatch" in cond, "逃生舱不得在 push/PR 上触发"
+        assert "inputs.publish_tag" in cond, "必须要求明确给出要发布的 tag"
+
+    def test_workflow_dispatch_declares_publish_tag_input(self) -> None:
+        dispatch = _triggers(_doc()).get("workflow_dispatch")
+        assert isinstance(dispatch, dict), "workflow_dispatch 必须是映射才能带 inputs"
+        assert "publish_tag" in (dispatch.get("inputs") or {}), (
+            "dispatch 缺 publish_tag 输入 ⇒ 逃生舱无法被指向目标 tag"
+        )
+
+    def test_checks_out_the_requested_tag(self) -> None:
+        step = next(
+            s for s in self._job()["steps"]
+            if str(s.get("uses", "")).startswith("actions/checkout")
+        )
+        ref = str((step.get("with") or {}).get("ref") or "")
+        assert "inputs.publish_tag" in ref, "必须从目标 tag 的提交构建（与 tag 发布同源）"
+
+    def test_precheck_guards_tag_and_runs_before_build(self) -> None:
+        steps = self._job()["steps"]
+        names = [str(s.get("name") or s.get("uses") or "") for s in steps]
+        pre = next((i for i, n in enumerate(names) if "Release integrity precheck" in n), None)
+        build = next((i for i, n in enumerate(names) if "Build packages" in n), None)
+        assert pre is not None and build is not None and pre < build
+        pre_step = steps[pre]
+        assert "check_release_tag.py" in str(pre_step.get("run", ""))
+        assert "inputs.publish_tag" in str(pre_step.get("run", "")), (
+            "完整性检查必须校验的是**目标 tag** 的版本，不是当前 ref"
+        )
+
+
 class TestReleaseTagScript:
     def test_matching_versions_pass(self, tmp_path: pathlib.Path) -> None:
         init = tmp_path / "maop"

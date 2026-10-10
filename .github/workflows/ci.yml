@@ -21,6 +21,16 @@ on:
     # 2026-09-29 补上；此前 PR 目标为 develop 时整个 workflow 不触发。
     branches: [main, master, develop]
   workflow_dispatch:
+    # 2026-10-10：补 inputs——手工发布一条**已存在的 tag** 的逃生舱（见 publish-manual
+    # 作业）。起因：v5.2.1/v5.3.0 两次 tag 的发布都倒在 packages-dir 路径 bug 上
+    # （产物在 py/dist、action 按工作区根找 dist/），而 GitHub 的"重跑"使用原 run
+    # 提交里的 workflow 文件 —— 修好 ci.yml 也无法让旧 tag run 变绿，只能靠本通道。
+    inputs:
+      publish_tag:
+        description: '要发布到 PyPI 的已存在 tag（如 v5.3.0）；留空则只跑常规 CI'
+        required: false
+        type: string
+        default: ''
 
 # F-P1-4 fix: cancel superseded CI runs on the same ref to save runner time.
 concurrency:
@@ -980,6 +990,12 @@ jobs:
     #   （Owner=Levango7 / Repository=MAOP / Workflow=ci.yml）。
     # 未配置时第一条真 tag 会在 `Publish maop` 步骤 401/403 红 ——
     # 那是**该红就红**，不要再把它改成恒绿。
+    # 2026-10-10 更正：第一、二个真 tag（v5.2.1 / v5.3.0）实际倒在**更早的一环**——
+    # packages-dir 原写 "dist/"，而构建在 py/ 下执行（产物 py/dist），
+    # pypa action 按**工作区根**解析路径 → `FileNotFoundError: /github/workspace/dist`。
+    # "预期 401/403"因此从未被真正验证过（两次红都是路径 bug，被误诊为外部前置）。
+    # 已修为 py/dist/，守卫见 test_ci_publish_reachable.py 的
+    # test_packages_dir_matches_build_output。
     needs: [test, frontend, e2e]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -1005,7 +1021,48 @@ jobs:
       - name: Publish maop
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist/
+          # 容器 action 不受 defaults.run.working-directory 影响，packages-dir
+          # 按**工作区根**解析；构建在 py/ 下执行 ⇒ 产物在 py/dist。
+          packages-dir: py/dist/
+
+  # ── 手工发布：把「已存在的 tag」重新发布到 PyPI（逃生舱，2026-10-10 建）─────
+  # 为什么需要：GitHub 的 "Re-run failed jobs" 使用**原 run 提交里的 workflow 文件** ——
+  # 发布链自身有 bug 时（如 packages-dir 路径写错），修好 ci.yml 也无法让旧 tag run
+  # 变绿。本作业从 master（当前 workflow）侧 checkout 指定 tag、重建并走同一条
+  # OIDC trusted publishing 上传，作为修复通道（OIDC 的 workflow 名仍是 ci.yml，
+  # 与 PyPI 侧 trusted publisher 配置匹配）。只在手工 dispatch 且给出 tag 时运行。
+  publish-manual:
+    name: Publish tag (manual)
+    runs-on: ubuntu-latest
+    # 双引号整串，避免 YAML 把 '' 当特殊值；仅 dispatch 且填了 tag 才触发
+    if: "github.event_name == 'workflow_dispatch' && inputs.publish_tag != ''"
+    permissions:
+      id-token: write
+    defaults:
+      run:
+        working-directory: py
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # 从目标 tag 的提交构建，与 tag 发布同源
+          ref: ${{ inputs.publish_tag }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Release integrity precheck
+        run: python scripts/check_release_tag.py --ref "refs/tags/${{ inputs.publish_tag }}"
+
+      - name: Build packages
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish maop
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: py/dist/
 
   # ── Release 附件：不需要任何外部账号就能拿到可安装的包 ────────────────
   # 为什么要独立一条：`Publish to PyPI` 的触发面虽然已打通，但真发布还差 PyPI 账号 +
