@@ -306,7 +306,10 @@ class WorkerPool:
                             worktree_info = wt_mgr.create_root(wt.id)
                             actual_workdir = str(worktree_info)
                         except Exception as e:
-                            logger.debug("ignored: %s", e, exc_info=True)
+                            logger.warning(
+                                "[worker-pool] worktree 隔离创建失败，任务将在"
+                                "无隔离目录执行: %s", e, exc_info=True,
+                            )
 
                     from maop.maop_loop import MaopLoop
                     # P2-2 fix: reuse shared MaopLoop to avoid re-opening 5 SQLite
@@ -390,7 +393,10 @@ class WorkerPool:
                     wt_mgr = WorktreeManager(root_dir=self._root_dir or ".")
                     wt_mgr.abandon(worktree_info)
                 except Exception as e:
-                    logger.debug("ignored: %s", e, exc_info=True)
+                    logger.warning(
+                        "[worker-pool] worktree 清理失败（分支将保持 ACTIVE）: %s",
+                        e, exc_info=True,
+                    )
             self._task_handles.pop(wt.id, None)
 
     def cancel(self, task_id: str, *, preempt: bool = False) -> bool:
@@ -440,7 +446,10 @@ class WorkerPool:
             self._checkpoint.start_step(run_id, task)
             return run_id
         except Exception as e:
-            logger.debug("[worker-pool] checkpoint begin failed: %s", e)
+            logger.warning(
+                "[worker-pool] checkpoint begin failed（持久记录缺失）: %s",
+                e, exc_info=True,
+            )
             return None
 
     def _checkpoint_end(
@@ -465,7 +474,10 @@ class WorkerPool:
             else:
                 self._checkpoint.fail_step(run_id, step, error=error)
         except Exception as e:
-            logger.debug("[worker-pool] checkpoint end failed: %s", e)
+            logger.warning(
+                "[worker-pool] checkpoint end failed（记录停留在未完成状态）: %s",
+                e, exc_info=True,
+            )
 
     def _find_idle_worker(self) -> int:
         """Find an idle worker slot."""

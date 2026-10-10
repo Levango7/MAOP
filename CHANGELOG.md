@@ -39,6 +39,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 工程完善批 C（审计/审查发现的可执行化）
+
+- **safe_eval 资源上限**：`_SAFE_BINOPS` 的 `ast.Pow` 无限制，`9**9**9**9`
+  可把进程算爆（CPU+内存双杀）。BinOp 分支加指数上限（1024）与结果规模
+  护栏（整数 8192 位 / 序列 8192 项）。调用方均为无 Call 的条件表达式，
+  阈值不伤合法用法。
+- **结果流生命周期**：分布式 per-run 结果流运行后永不清理，历史 run 的流
+  在 Redis 里无限堆积。`run()` 的 finally 里 best-effort 删除（正常/异常/
+  deadline 全覆盖；删不掉只 debug）。刻意不用 XTRIM——MAXLEN 淘汰可能删掉
+  "已投递未收集"的结果，会重演 count=100 挂死那类风险。
+- **失败可见性（ADR-018）**：worker_pool 四处 debug 级吞异常（checkpoint
+  begin/end、worktree create/abandon）——正是 γ-3 导入路径错误被隐藏整整
+  一版的同类病根。修为 warning（exc_info）。
+- （前端 i18n key 完整性守卫见同批前端 PR。）
+
 ## [5.3.1] — 2026-10-10
 
 ### 发布链修复 + PyPI 首次上线
