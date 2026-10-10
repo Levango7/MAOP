@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import time
 from typing import Any
+from unittest.mock import patch
 
 import fakeredis
 import pytest
@@ -317,3 +318,69 @@ class TestHandleTaskCancellation:
         result = await asyncio.wait_for(run_task, timeout=5)
         assert result.results["n-stuck"]["status"] == "cancelled"
         assert result.success is False
+
+
+class TestResultsStreamLifecycle:
+    """per-run 结果流在 run 结束后必须被删除（2026-10-09 审计批 C）。
+
+    背景：流（`maop:sched:results:<run_id>`）此前运行结束后永不清理，
+    历史 run 的流在 Redis 里无限堆积。删除放在 run() 的 finally——
+    正常/异常/deadline 中断全部覆盖，best-effort（删不掉只 debug）。
+    刻意不引入 XTRIM：MAXLEN 淘汰可能删掉"已投递未收集"的结果，
+    会重演 count=100 挂死（>100 节点层尾部结果永不读到）那类风险。
+    """
+
+    @pytest.mark.asyncio
+    async def test_stream_deleted_after_normal_run(
+        self, fake_redis: Any,
+    ) -> None:
+        scheduler = DistributedScheduler(fake_redis, poll_interval=0.02)
+        worker = DistributedWorker(
+            fake_redis, scheduler=scheduler,
+            config=WorkerConfig(worker_id="w-life", concurrency=2),
+        )
+        await worker.start()
+        try:
+            result = await scheduler.run([_NodeSpec(id="n1")], deadline_s=30)
+            assert result.success is True
+            stream = scheduler._results_stream(result.run_id)
+            # 运行期流存在过（worker 投递过结果），run 结束即被删除。
+            assert fake_redis.exists(stream) == 0
+        finally:
+            await worker.stop()
+
+    @pytest.mark.asyncio
+    async def test_stream_deleted_after_deadline_abort(
+        self, fake_redis: Any,
+    ) -> None:
+        scheduler = DistributedScheduler(fake_redis, poll_interval=0.02)
+        run_id = "run-abort"
+        stream = scheduler._results_stream(run_id)
+        # 先投一条无关节点的结果，让流存在（模拟 worker 已投递）。
+        scheduler.post_result(run_id, "phantom", status="success", worker_id="w1")
+        assert fake_redis.exists(stream) == 1
+        # 无 worker：节点 n1 的结果永不到达，deadline 触发中断路径。
+        with pytest.raises(SchedulingError):
+            await scheduler.run(
+                [_NodeSpec(id="n1")], run_id=run_id, deadline_s=0.1,
+            )
+        # 中断路径也删流。
+        assert fake_redis.exists(stream) == 0
+
+    @pytest.mark.asyncio
+    async def test_cleanup_failure_does_not_break_run(
+        self, fake_redis: Any,
+    ) -> None:
+        scheduler = DistributedScheduler(fake_redis, poll_interval=0.02)
+        worker = DistributedWorker(
+            fake_redis, scheduler=scheduler,
+            config=WorkerConfig(worker_id="w-cleanfail", concurrency=2),
+        )
+        await worker.start()
+        try:
+            with patch.object(fake_redis, "delete", side_effect=RuntimeError("boom")):
+                result = await scheduler.run([_NodeSpec(id="n1")], deadline_s=30)
+            # 清理失败只 debug，不冒泡、不影响发布结果。
+            assert result.success is True
+        finally:
+            await worker.stop()

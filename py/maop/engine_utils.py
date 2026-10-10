@@ -29,6 +29,13 @@ from typing import Any, cast
 from maop.engine_types import WorkflowStep
 
 # ── Safe expression evaluator (replaces eval) ─────────────────────
+# 求值器结果规模护栏（2026-10-09 审计）：条件表达式是用户可控文本，
+# 无 Call 能力不代表无资源风险——`9**9**9**9`（幂）、大数乘法链、
+# 超长字符串重复都能把进程算爆或撑爆内存。合法条件表达式（比较/
+# 算术/下标/属性，无函数调用）的规模远低于这些阈值。
+_MAX_EXPONENT = 1024      # 幂运算指数上限（2**1024 ≈ 309 位十进制，远超条件判断需要）
+_MAX_INT_BITS = 8192      # BinOp 整数结果位宽上限（≈2466 位十进制）
+_MAX_SEQ_LEN = 8192       # BinOp 序列结果长度上限（防 `'x' * 10**9` 类字符串重复）
 _SAFE_BINOPS: dict[type[ast.AST], Callable[[Any, Any], Any]] = {
     ast.Add: lambda a, b: a + b,
     ast.Sub: lambda a, b: a - b,
@@ -57,6 +64,23 @@ _SAFE_UNARYOPS = {
     ast.USub: lambda a: -a,
     ast.Not: lambda a: not a,
 }
+
+
+def _guard_magnitude(result: Any) -> Any:
+    """拒绝超出规模上限的 BinOp 结果（常量见文件头护栏）。
+
+    覆盖幂之外的路径：大数乘法链、超长字符串重复等。
+    """
+    if isinstance(result, int):
+        if result.bit_length() > _MAX_INT_BITS:
+            raise ValueError(
+                f"Integer result exceeds {_MAX_INT_BITS} bits"
+            )
+    elif isinstance(result, (str, list, tuple)) and len(result) > _MAX_SEQ_LEN:
+        raise ValueError(
+            f"Sequence result exceeds {_MAX_SEQ_LEN} items"
+        )
+    return result
 
 
 def _reject_unsafe_value(value: Any, accessor: str) -> Any:
@@ -95,7 +119,19 @@ def _safe_eval_node(node: ast.AST, context: dict) -> Any:
         op_fn = _SAFE_BINOPS.get(type(node.op))  # type: ignore
         if op_fn is None:
             raise ValueError(f"Unsupported binary op: {type(node.op).__name__}")
-        return op_fn(_safe_eval_node(node.left, context), _safe_eval_node(node.right, context))  # type: ignore
+        left = _safe_eval_node(node.left, context)
+        right = _safe_eval_node(node.right, context)
+        # 指数上限必须在 ``a ** b`` 之前拦截：9**9**9**9 的外层指数
+        # 387420489 一旦进入 ``**`` 就会真正撑爆内存。
+        if (
+            isinstance(node.op, ast.Pow)
+            and isinstance(right, int)
+            and abs(right) > _MAX_EXPONENT
+        ):
+            raise ValueError(
+                f"Exponent {right} exceeds the limit {_MAX_EXPONENT}"
+            )
+        return _guard_magnitude(op_fn(left, right))  # type: ignore
     if isinstance(node, ast.Compare):
         left = _safe_eval_node(node.left, context)
         for op, comparator in zip(node.ops, node.comparators):

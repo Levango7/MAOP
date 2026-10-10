@@ -446,6 +446,17 @@ class DistributedScheduler:
             except (asyncio.CancelledError, Exception):
                 # 任务取消/清理时的预期异常，静默忽略
                 pass
+            # 结果流生命周期（2026-10-09 审计）：per-run 结果流此前运行结束后
+            # 永不清理，历史 run 的流在 Redis 里无限堆积。流的唯一消费者是
+            # 运行期的 _read_results（失败检测循环读 registry 不读流），
+            # run 退出（正常/异常/超时）即可删除。best-effort：删不掉只 debug。
+            try:
+                self._redis.delete(self._results_stream(run_id))
+            except Exception as exc:
+                logger.debug(
+                    "[dist-sched] results stream cleanup failed for %s: %s",
+                    run_id, exc,
+                )
 
         total_ms = int((time.monotonic() - start) * 1000)
         success = all(

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -265,3 +266,114 @@ class TestMaskKey:
 
     def test_empty_key(self) -> None:
         assert _mask_key("") == ""
+
+
+class TestFailureVisibility:
+    """worker_pool 的静默降级必须可见（2026-10-09 审计批 C，ADR-018）。
+
+    病灶同源：γ-3 的 checkpoint 导入错误曾被 contextlib.suppress 隐藏
+    整整一个版本。checkpoint（持久记录）与 worktree（隔离正确性）失败
+    若只 debug，运维侧无任何感知——现在必须 warning。
+    """
+
+    class _BoomBeginCheckpoint:
+        """start_run 即炸——测 begin 失败提级。"""
+
+        def start_run(self, *a: Any, **kw: Any) -> str:
+            raise RuntimeError("disk full")
+
+        def start_step(self, *a: Any, **kw: Any) -> bool:
+            raise RuntimeError("disk full")
+
+        def complete_step(self, *a: Any, **kw: Any) -> bool:
+            return True
+
+        def fail_step(self, *a: Any, **kw: Any) -> bool:
+            return True
+
+    class _BoomEndCheckpoint:
+        """begin 正常、complete_step 炸——测 end 失败提级。"""
+
+        def start_run(self, *a: Any, **kw: Any) -> str:
+            return "run-x"
+
+        def start_step(self, *a: Any, **kw: Any) -> bool:
+            return True
+
+        def complete_step(self, *a: Any, **kw: Any) -> bool:
+            raise RuntimeError("disk full")
+
+        def fail_step(self, *a: Any, **kw: Any) -> bool:
+            raise RuntimeError("disk full")
+
+    @staticmethod
+    async def _patched_loop_run(*_a: Any, **_kw: Any) -> str:
+        return "done"
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_begin_failure_warns(self, caplog: Any) -> None:
+        pool = WorkerPool(
+            max_workers=1, root_dir="",
+            checkpoint=self._BoomBeginCheckpoint(),
+        )
+        await pool.start()
+        try:
+            with patch("maop.maop_loop.MaopLoop") as mock_cls:
+                mock_loop = MagicMock()
+                mock_loop.run = AsyncMock(side_effect=self._patched_loop_run)
+                mock_cls.return_value = mock_loop
+                tid = await pool.submit("task")
+                await pool.wait(tid, timeout=5)
+            assert any(
+                "checkpoint begin failed" in rec.message
+                and rec.levelname == "WARNING"
+                for rec in caplog.records
+            ), "checkpoint begin 失败必须 warning（不可静默 debug）"
+        finally:
+            await pool.stop()
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_end_failure_warns(self, caplog: Any) -> None:
+        pool = WorkerPool(
+            max_workers=1, root_dir="",
+            checkpoint=self._BoomEndCheckpoint(),
+        )
+        await pool.start()
+        try:
+            with patch("maop.maop_loop.MaopLoop") as mock_cls:
+                mock_loop = MagicMock()
+                mock_loop.run = AsyncMock(side_effect=self._patched_loop_run)
+                mock_cls.return_value = mock_loop
+                tid = await pool.submit("task")
+                await pool.wait(tid, timeout=5)
+            assert any(
+                "checkpoint end failed" in rec.message
+                and rec.levelname == "WARNING"
+                for rec in caplog.records
+            ), "checkpoint end 失败必须 warning（记录会停留在未完成状态）"
+        finally:
+            await pool.stop()
+
+    @pytest.mark.asyncio
+    async def test_worktree_create_failure_warns(
+        self, caplog: Any, tmp_path: Any,
+    ) -> None:
+        pool = WorkerPool(max_workers=1, root_dir=str(tmp_path))
+        await pool.start()
+        try:
+            with patch("maop.maop_loop.MaopLoop") as mock_cls, patch(
+                "maop.core.agent.memory_ctx.worktree.WorktreeManager",
+                side_effect=RuntimeError("git not initialized"),
+            ):
+                mock_loop = MagicMock()
+                mock_loop.run = AsyncMock(side_effect=self._patched_loop_run)
+                mock_cls.return_value = mock_loop
+                tid = await pool.submit("task")
+                await pool.wait(tid, timeout=5)
+            assert any(
+                "worktree 隔离创建失败" in rec.message
+                and rec.levelname == "WARNING"
+                for rec in caplog.records
+            ), "worktree 隔离失败意味着任务无隔离执行，必须 warning"
+        finally:
+            await pool.stop()

@@ -80,6 +80,42 @@ class TestSafeEval:
             safe_eval("'{}'.format", {})
 
 
+class TestSafeEvalResourceLimits:
+    """求值器结果规模护栏（2026-10-09 审计批 C）。
+
+    背景：条件表达式是用户可控文本。无 Call 能力不等于无资源风险——
+    `9**9**9**9`（幂）、大数乘法链、超长字符串重复都能把进程算爆或
+    撑爆内存（DoS 面）。合法条件表达式（比较/算术/下标/属性）的规模
+    远低于护栏阈值。
+    """
+
+    def test_pow_exponent_cap_rejects_before_compute(self):
+        # 9**9**9**9 的外层指数是 387420489，一旦进入 ``**`` 就会真正
+        # 撑爆内存；护栏必须在计算之前拒绝。
+        with pytest.raises(ValueError, match="[Ee]xponent"):
+            safe_eval("9 ** 9 ** 9 ** 9", {})
+
+    def test_reasonable_pow_still_works(self):
+        assert safe_eval("2 ** 10", {}) == 1024
+        assert safe_eval("2 ** 1024", {}) > 0  # 恰在上限内，309 位十进制
+        assert safe_eval("x ** 2", {"x": 300}) == 90000
+
+    def test_int_result_bit_length_cap(self):
+        with pytest.raises(ValueError, match="[Ii]nteger"):
+            safe_eval("10 ** 1000 * 10 ** 1000 * 10 ** 1000", {})
+
+    def test_sequence_length_cap(self):
+        # 字符串/列表重复：合法场景（'{n} tokens' 之类）远小于 8192。
+        with pytest.raises(ValueError, match="[Ss]equence"):
+            safe_eval("'x' * 100000", {})
+        with pytest.raises(ValueError, match="[Ss]equence"):
+            safe_eval("[1] * 100000", {})
+
+    def test_normal_expressions_unaffected(self):
+        assert safe_eval("n > 10 and n < 100", {"n": 50}) is True
+        assert safe_eval("d['count'] * 2 == 20", {"d": {"count": 10}}) is True
+
+
 class TestStepType:
     def test_values(self):
         assert StepType.PLAN == "plan"
