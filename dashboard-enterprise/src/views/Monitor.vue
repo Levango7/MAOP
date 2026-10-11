@@ -116,21 +116,24 @@
               <div class="mini-bar">
                 <div
                   class="mini-fill"
-                  :style="{ width: (a.failure_rate * 100) + '%', background: a.failure_rate > 0.3 ? 'var(--fail)' : a.failure_rate > 0.1 ? 'var(--warn)' : 'var(--success)' }"
+                  :style="{ width: ((a.failure_rate ?? 0) * 100) + '%', background: (a.failure_rate ?? 0) > 0.3 ? 'var(--fail)' : (a.failure_rate ?? 0) > 0.1 ? 'var(--warn)' : 'var(--success)' }"
                 ></div>
               </div>
-              <span class="mini-val">{{ (a.failure_rate * 100).toFixed(1) }}%</span>
+              <span class="mini-val">{{ ((a.failure_rate ?? 0) * 100).toFixed(1) }}%</span>
             </span>
-            <span class="ah-latency">{{ a.avg_latency.toFixed(2) }}s</span>
-            <span class="ah-timeout">{{ (a.timeout_rate * 100).toFixed(1) }}%</span>
+            <!-- 字段防御：后端 get_stats() 恒定返回这些字段，但缺一个就让
+                 render 抛 TypeError → 整页空白（2026-10-10 seeded E2E 桩数据
+                 实测复现）。用 ?? 0 兜底，与本文件 resources 行同款写法。 -->
+            <span class="ah-latency">{{ (a.avg_latency ?? 0).toFixed(2) }}s</span>
+            <span class="ah-timeout">{{ ((a.timeout_rate ?? 0) * 100).toFixed(1) }}%</span>
             <span class="ah-weight">
               <div class="mini-bar">
                 <div
                   class="mini-fill"
-                  :style="{ width: (a.weight * 100) + '%', background: a.weight === 0 ? 'var(--fail)' : a.weight < 1 ? 'var(--warn)' : 'var(--success)' }"
+                  :style="{ width: ((a.weight ?? 0) * 100) + '%', background: (a.weight ?? 0) === 0 ? 'var(--fail)' : (a.weight ?? 0) < 1 ? 'var(--warn)' : 'var(--success)' }"
                 ></div>
               </div>
-              <span class="mini-val">{{ a.weight.toFixed(2) }}</span>
+              <span class="mini-val">{{ (a.weight ?? 0).toFixed(2) }}</span>
             </span>
             <span class="ah-status">
               <span class="status-pill" :class="`pill-${a.status}`">
@@ -141,7 +144,7 @@
           </div>
           <div v-if="agentHealthConfig" class="agent-health-config">
             <span>{{ t('view.monitor.healthWindow') }}: {{ agentHealthConfig.window_size }}</span>
-            <span>{{ t('view.monitor.healthDrainThreshold') }}: {{ (agentHealthConfig.failure_rate_threshold * 100).toFixed(0) }}%</span>
+            <span>{{ t('view.monitor.healthDrainThreshold') }}: {{ ((agentHealthConfig.failure_rate_threshold ?? 0) * 100).toFixed(0) }}%</span>
             <span>{{ t('view.monitor.healthTimeoutThreshold') }}: {{ agentHealthConfig.timeout_threshold }}s</span>
             <span>{{ t('view.monitor.healthRecoverySuccesses') }}: {{ agentHealthConfig.recovery_consecutive_successes }}</span>
           </div>
@@ -326,9 +329,14 @@ async function loadAgentHealth() {
   agentHealthLoading.value = true;
   try {
     const data = await api.get('/api/scheduling/failure-stats');
-    if (data && !data.error) {
-      agentHealth.value = Array.isArray(data.agents) ? data.agents : [];
-      agentHealthConfig.value = data.config || null;
+    // M-1 信封解包：后端返回 { status, data: { agents, config, total_agents } }
+    // （scheduling.py get_failure_stats）。同端点的 Scheduling.vue 早已按
+    // {data.data || data} 解包，此处漏了——agent 健康面板恒为空（2026-10-10
+    // seeded E2E 实测捕获）。容错两种形状。
+    const payload = data.data || data;
+    if (payload && !payload.error) {
+      agentHealth.value = Array.isArray(payload.agents) ? payload.agents : [];
+      agentHealthConfig.value = payload.config || null;
     }
   } catch (e) {
     // 静默失败 — 健康度面板是辅助信息，不应弹错
