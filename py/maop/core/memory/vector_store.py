@@ -19,10 +19,11 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import struct
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from maop.core.backends.db_utils import sqlite_connect
 
@@ -53,6 +54,36 @@ CREATE TABLE IF NOT EXISTS vector_entries (
 
 CREATE INDEX IF NOT EXISTS idx_ve_created ON vector_entries(created_at);
 """
+
+
+def _decode_stored_vector(raw: str | bytes | bytearray | None) -> list[float]:
+    """Decode a stored vector column value (F2-02 B1).
+
+    Accepts both encodings that exist in the wild:
+
+    * JSON text (``"[0.1, 0.2, ...]"``) — the legacy/default encoding written
+      by :meth:`VectorStore.index` and by pre-B1 databases.
+    * little-endian float32 BLOB — the compact encoding written by
+      :class:`~maop.core.memory.multimodal_store.MultimodalStore`
+      (2048 B per 512-dim vector instead of ~10.5 KB of JSON).
+
+    Returns an empty list for empty/``None`` input and raises ``ValueError``
+    for anything that is neither valid JSON nor a float32 byte string, so
+    corrupted rows are surfaced to the caller (which skips them).
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, (bytes, bytearray)):
+        buf = bytes(raw)
+        if len(buf) % 4 != 0:
+            raise ValueError(f"blob vector length {len(buf)} not divisible by 4")
+        return list(struct.unpack(f"<{len(buf) // 4}f", buf))
+    text = raw.strip()
+    if not text:
+        return []
+    if text.startswith("["):
+        return cast(list[float], json.loads(text))
+    raise ValueError("unrecognized vector column encoding")
 
 
 # ── HNSW index wrapper ───────────────────────────────────────
@@ -100,11 +131,21 @@ class VectorStore(VectorSearchMixin):
         *,
         hnsw_threshold: int = DEFAULT_HNSW_THRESHOLD,
         enable_hnsw: bool = True,
+        table_name: str = "vector_entries",
+        create_sql: str | None = None,
+        expected_dim: int | None = None,
     ) -> None:
         if db_path is None:
             db_path = Path(__file__).resolve().parents[2] / "data" / "vectors.db"
         self._path = Path(db_path)
         self._embedding = embedding or HashEmbedding()
+        # F2-02 B1: table/DDL/dimension are parameterized so embedding
+        # "spaces" (e.g. a 512-dim CLIP space) can reuse this store as a
+        # subclass without copying index/search/cache logic. All three
+        # default to the current behavior (legacy vector_entries space).
+        self._table = table_name
+        self._create_sql = create_sql if create_sql is not None else _VECTOR_DDL
+        self._expected_dim = int(expected_dim) if expected_dim else None
         self._cache: dict[str, list[float]] = {}  # id → vector cache
         self._cache_max_size = 50000  # P2 fix: prevent unbounded memory growth
         self._text_cache: dict[str, str] = {}  # id → text cache
@@ -128,7 +169,7 @@ class VectorStore(VectorSearchMixin):
         self._path.parent.mkdir(parents=True, exist_ok=True)
         try:
             with self._connect() as conn:
-                conn.executescript(_VECTOR_DDL)
+                conn.executescript(self._create_sql)
         except Exception as exc:
             logger.warning("Failed to initialize vector DB: %s", exc)
 
@@ -177,7 +218,7 @@ class VectorStore(VectorSearchMixin):
         try:
             with self._connect() as conn:
                 conn.execute(
-                    """INSERT OR REPLACE INTO vector_entries
+                    f"""INSERT OR REPLACE INTO {self._table}
                         (id, text, vector, metadata, created_at)
                         VALUES (?, ?, ?, ?, ?)""",
                     (entry_id, text, json.dumps(vector), json.dumps(meta), now),
@@ -267,7 +308,7 @@ class VectorStore(VectorSearchMixin):
                     count += 1
                 if rows:
                     conn.executemany(
-                        """INSERT OR REPLACE INTO vector_entries
+                        f"""INSERT OR REPLACE INTO {self._table}
                            (id, text, vector, metadata, created_at)
                            VALUES (?, ?, ?, ?, ?)""",
                         rows,
@@ -306,13 +347,13 @@ class VectorStore(VectorSearchMixin):
             with self._connect() as conn:
                 # 先查总数，决定是否分页
                 total = conn.execute(
-                    "SELECT COUNT(*) AS cnt FROM vector_entries"
+                    f"SELECT COUNT(*) AS cnt FROM {self._table}"
                 ).fetchone()["cnt"]
 
                 if total <= self._cache_max_size:
                     # 小数据集：全量加载（保持原行为）
                     rows = conn.execute(
-                        "SELECT id, vector, text, metadata FROM vector_entries"
+                        f"SELECT id, vector, text, metadata FROM {self._table}"
                     ).fetchall()
                 else:
                     # 大数据集：仅加载最近的 _cache_max_size 条
@@ -323,18 +364,43 @@ class VectorStore(VectorSearchMixin):
                         total, self._cache_max_size, self._cache_max_size,
                     )
                     rows = conn.execute(
-                        "SELECT id, vector, text, metadata FROM vector_entries "
+                        f"SELECT id, vector, text, metadata FROM {self._table} "
                         "ORDER BY created_at DESC LIMIT ?",
                         (self._cache_max_size,),
                     ).fetchall()
 
                 # B22: 批量加锁——将锁持有范围从"每行一个锁"改为"一次锁处理所有行"，
                 # 显著减少锁获取/释放开销和缓存填充时间。
+                # F2-02 B1: 解码容忍 JSON / float32 BLOB 双格式；expected_dim
+                # 非空时跳过异维坏行（防 np.array 对 ragged 输入抛
+                # ValueError 穿透 search_vector、拖垮全库检索）。
+                skipped = 0
                 with self._cache_lock:
                     for row in rows:
-                        self._cache[row["id"]] = json.loads(row["vector"])
+                        try:
+                            vec = _decode_stored_vector(row["vector"])
+                        except Exception:
+                            skipped += 1
+                            continue
+                        if self._expected_dim is not None and len(vec) != self._expected_dim:
+                            skipped += 1
+                            continue
+                        # F2-02 B1: 坏 metadata 兜底为 {}——与 _get_entry_info 同款，
+                        # 防一条坏行中止整次加载、留下半满缓存（cache 非空后不再重载，
+                        # 搜索会静默用部分数据）。
+                        try:
+                            meta = json.loads(row["metadata"] or "{}")
+                        except Exception:
+                            meta = {}
+                        self._cache[row["id"]] = vec
                         self._text_cache[row["id"]] = row["text"] or ""
-                        self._meta_cache[row["id"]] = json.loads(row["metadata"] or "{}")
+                        self._meta_cache[row["id"]] = meta
+                if skipped:
+                    logger.warning(
+                        "[vector] Skipped %d row(s) in %s with unexpected "
+                        "dimension/encoding (expected_dim=%s)",
+                        skipped, self._table, self._expected_dim,
+                    )
         except Exception as exc:
             logger.warning("[vector] Cache load failed: %s", exc)
 
@@ -355,7 +421,7 @@ class VectorStore(VectorSearchMixin):
         try:
             with self._connect() as conn:
                 row = conn.execute(
-                    "SELECT text, metadata FROM vector_entries WHERE id = ?",
+                    f"SELECT text, metadata FROM {self._table} WHERE id = ?",
                     (entry_id,),
                 ).fetchone()
                 if row:
@@ -376,7 +442,7 @@ class VectorStore(VectorSearchMixin):
         """Delete an entry by ID."""
         try:
             with self._connect() as conn:
-                conn.execute("DELETE FROM vector_entries WHERE id = ?", (entry_id,))
+                conn.execute(f"DELETE FROM {self._table} WHERE id = ?", (entry_id,))
             # B22: 加锁保护缓存删除
             with self._cache_lock:
                 self._cache.pop(entry_id, None)
@@ -395,7 +461,7 @@ class VectorStore(VectorSearchMixin):
         """Count total indexed entries."""
         try:
             with self._connect() as conn:
-                row = conn.execute("SELECT COUNT(*) as cnt FROM vector_entries").fetchone()
+                row = conn.execute(f"SELECT COUNT(*) as cnt FROM {self._table}").fetchone()
                 return row["cnt"] if row else 0
         except Exception:
             return 0
@@ -429,7 +495,7 @@ class VectorStore(VectorSearchMixin):
             with self._connect() as conn:
                 rows = conn.execute(
                     "SELECT id, text, metadata, created_at "
-                    "FROM vector_entries "
+                    f"FROM {self._table} "
                     "ORDER BY created_at DESC "
                     "LIMIT ? OFFSET ?",
                     (limit, offset),
@@ -453,7 +519,7 @@ class VectorStore(VectorSearchMixin):
         cnt = self.count()
         try:
             with self._connect() as conn:
-                conn.execute("DELETE FROM vector_entries")
+                conn.execute(f"DELETE FROM {self._table}")
             # B22: 加锁保护缓存清空
             with self._cache_lock:
                 self._cache.clear()

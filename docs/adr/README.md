@@ -23,3 +23,4 @@
 | [019](019-module-singleton-testability.md) | 模块级单例的可测性问题（MAOP_DATA_DIR 切换下路径固化） | Accepted (2026-09-02) |
 | [020](020-evolution-loop-safety-boundary.md) | 自演化闭环的安全边界（EvolutionLoop Safety Boundary） | Proposed (Stub, 2026-09-06) — Phase 2 评审填充 |
 | [021](021-dual-wheel-authorization.md) | 双 Wheel 授权模型（D2 决策） | Accepted (2026-08-27) |
+| [022](022-multimodal-memory-store.md) | 多模态记忆的存储空间与检索架构（F2-02 落地选型） | Accepted (2026-10-12) — 两轮独立审核 |

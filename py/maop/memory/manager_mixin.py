@@ -371,11 +371,18 @@ class MemoryManagerMixin:
         text: str,
         metadata: dict[str, Any] | None = None,
     ) -> str:
-        """索引文档到 Long-term Memory（映射到 VectorSearch.index）。"""
+        """索引文档到 Long-term Memory（映射到 VectorSearch.index_entry）。
+
+        修复（F2-02 B1 顺带，设计审核发现）：此前调用的是不存在的
+        ``VectorSearch.index``，AttributeError 被下方 except 吞掉 →
+        chat 模式单条长期记忆写入**静默失效**（只有跑过 ``index_all()``
+        的向量才在库里）。旧测试用 MagicMock 顶替 ``.index`` 掩盖了该缺陷；
+        回归防护见 tests/test_multimodal_integration.py 的接口面扫描用例。
+        """
         if self.vector_search is None:
             return ""
         try:
-            self.vector_search.index(doc_id, text)
+            self.vector_search.index_entry(doc_id, text)
             return doc_id
         except Exception as exc:
             logger.warning("[memory_manager] long_term_index failed: %s", exc)

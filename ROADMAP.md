@@ -287,6 +287,14 @@
   > schema 迁移（推荐独立表方案）**；NDCG 验收需先构造标注数据集。KGE 选型对比
   > 未做（下一 spike 轮次）。
 - **主体**：按 spike 结论落 F2-02（嵌入扩展 / 多向量列 / 融合检索）。
+  > **2026-10-12 Batch-1 已交付**（范围 = 个人版文本+图像 / SQLite 路径）：
+  > ADR-022（选型，两轮独立对抗性审核）+ CLIP 空间存储 + RRF 融合 +
+  > `MemoryFacade.store_multimodal/retrieve_multimodal` + 非 mock 集成用例
+  > （CI 用**预计算真 CLIP 向量夹具**做真语义断言）。本机实证：`index_batch`
+  > 42ms/图（单次前向）、跨模态 top-1 8/8；单张热机 65-293ms 波动 → 异步队列
+  > 仍为 B2 的延迟达标闭环。**未交付**：PG 路径/迁移（B2）、异步队列（B2）、
+  > 音频/视频（B3）、NDCG 数据集（B4）。PRD R02 的"多向量列"落地为"多空间表"，
+  > 偏差与实测证据见 `docs/adr/022-multimodal-memory-store.md`。
 - **可选（按余力）**：T3.3 K8s Operator M0——kopf 骨架 + `MaopTask` reconcile 最小闭环 +
   `ghcr.io/maop/operator` 首次真实构建 + kind 集成腿激活（现有 skipif 钩子装了 kind 自动生效）。
 

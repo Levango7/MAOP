@@ -102,7 +102,6 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.core.security.byok": ("unwired", "BYOK 未接线"),
     "maop.core.security.ldap_provider": ("unwired", "LDAP provider 未接线（SSO 走 SAML/OIDC）"),
     "maop.core.subagent_delegation": ("unwired", "v5.0 起已废弃，双实现说明仍留着"),
-    "maop.core.vector.factory": ("dynamic", "向量后端按名字解析（需保持字符串契约）"),
     "maop.dashboard.provider": ("unwired", "dashboard 旧 provider 入口（v4.0.0 起 create_app 已废弃）"),
     "maop.dashboard.routers.error_handler": ("unwired", "路由层错误处理未挂到 app"),
     "maop.dashboard.static": ("unwired", "静态文件挂载未接入 server.py"),
