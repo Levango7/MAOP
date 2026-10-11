@@ -39,6 +39,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 前端 E2E：交互流 spec（搜索重取 + 聊天发送）
+
+- 新 spec \`e2e/interaction-flows.spec.js\`：渲染契约由 seeded-pages 钉死，
+  本 spec 钉**交互**——防"点了没反应"类回归：
+  - **tasks 搜索**：query-aware 桩（服务端按 search 参数过滤，与真实 handler
+    同语义）→ 填充搜索框 → 300ms 防抖 → 服务端重取 → 行过滤；清空恢复。
+  - **chat 发送**：选 agent（发送按钮前置）→ 输入 → 点击发送 → 用户消息
+    乐观上屏（先于任何网络交互）；SSE 端点空流→前端错误兜底分支也被执行。
+- 调试记录：任务名同现表格与"执行时间线"两个组件（严格模式）——作用域到
+  \`getByRole('table')\`；v-show 隐藏页签内容用 \`toBeAttached\`。
+- 验证：spec 2/2 绿；全量 E2E 155 passed（7 例失败均为本机负载 flaky——
+  失败 spec 隔离复跑 18/18 全过，与新增文件无关；CI 专用 runner 为仲裁）。
+
 ### 前端：M-1 信封漏解包全类清扫（Tools.vue 两处）+ 静态扫描法
 
 - **静态扫描器一次扫完全类**：WorkBuddy 关闭后接手全仓，写了一次性扫描——
