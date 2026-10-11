@@ -39,6 +39,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 前端 E2E：全路由冒烟矩阵 + 每页加载的 403 错误日志修复
+
+- **路由矩阵** `e2e/route-matrix.spec.js`：51 个视图此前仅 6 个 spec 覆盖约
+  12% 的页面。矩阵给**每条个人版主路由**（38 条；8 条企业专属路由由
+  enterprise-route-guard 覆盖）断言：页面挂载、主内容非空、无意外重定向、
+  可见文本不含原始 i18n key（PR #73 那类 bug 的运行时防线——静态守卫看不
+  见动态 key）、零应用级 console error、零未捕获异常。真实后端联调
+  （playwright webServer 起 9079+5174）；仅 chromium 跑（冒烟网浏览器无关，
+  全量三跑会把 Playwright 作业时长翻三倍）。
+- **矩阵当场抓到的真 bug**（本 PR 一并修）：`useEditionStore.fetchEdition`
+  把版本信息端点的 403 记成 `console.error`——该端点 admin-only，而无鉴权
+  模式匿名用户只获得 read 角色（P0-4 安全修复明令禁止授予 admin），403 是
+  预期路径；守卫按 P1-H1 的安全失败默认走 personal，功能本就正确。修：
+  403 降为 `console.debug`，其余失败（网络/5xx）保持 error。**在此之前，
+  无鉴权个人版与普通用户态下每个页面加载都向控制台刷一条 error**。
+- 守卫：admin-only 端点的 403 与企业专属路由的 404（个人版不注册）是
+  no-auth 测试环境下**设计内**的浏览器级网络噪声（页面 fail-closed 降级），
+  矩阵按此过滤；应用自身 error/JS 异常/5xx 仍全量抓捕。
+- 测试：新增 store 用例 2 例（403 不记 error 且版本保持 personal 安全默认 /
+  非 403 失败仍记 error）。
+
 ### 工程完善批 C（审计/审查发现的可执行化）
 
 - **safe_eval 资源上限**：`_SAFE_BINOPS` 的 `ast.Pow` 无限制，`9**9**9**9`

@@ -71,6 +71,34 @@ describe('useEditionStore', () => {
     expect(store.edition).toBe('personal');
   });
 
+  it('fetchEdition treats 403 as expected (no console error)', async () => {
+    // 2026-10-10：版本信息端点是 admin-only；无鉴权模式匿名用户只获得 read
+    // 角色（P0-4 安全修复），403 是预期路径而非错误。此前每次导航都刷
+    // console.error——无鉴权个人版下每个页面加载都有（E2E 路由矩阵实测捕获）。
+    const store = useEditionStore();
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 403 });
+    const ok = await store.fetchEdition();
+    expect(ok).toBe(false);
+    // P1-H1: 安全失败默认仍是 'personal'
+    expect(store.edition).toBe('personal');
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(debugSpy).toHaveBeenCalled();
+    debugSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('fetchEdition still errors on non-403 failures', async () => {
+    // 403 之外的失败（网络/500）是真问题，必须保持 console.error 可见。
+    const store = useEditionStore();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    await store.fetchEdition();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
   // ── switchEdition action 测试 ──
   it('switchEdition has correct default state', () => {
     const store = useEditionStore();
