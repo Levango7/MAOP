@@ -44,6 +44,7 @@ REQUIRED_UPSTREAM = {
     "sbom",
     "perf-smoke",
     "lock-drift",  # T2.2 (2026-09-30): frozen 锁漂移守卫
+    "wheel-install",  # 2026-10-12: 构建出的 wheel 的安装冒烟（editable 测不出少打包/元数据错）
 }
 # push-only 作业在 PR 上恒为 skipped，纳进来只会让"required"变成空满足，故明确排除。
 TRUNK_ONLY_JOBS = {"docker", "container-scan", "compose-smoke", "publish"}

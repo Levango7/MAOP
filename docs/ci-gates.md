@@ -150,7 +150,9 @@ required 上下文 4 条，其余保护项全关：
 - `CI scope (code vs docs-only)`、`Secret Scan (gitleaks)`、`Docs consistency gate`
   —— 永远存在，任何 PR 都跑。
 - `CI merge gate` —— `if: always()` 的聚合作业：任何 PR 都会产出这一条 check，它把上游
-  lint / 9 平台 pytest / 前端 / e2e / 迁移 / pip-audit / bandit / SBOM / perf-smoke 的结论
+  lint / 9 平台 pytest / 前端 / e2e / 迁移 / pip-audit / bandit / SBOM / perf-smoke /
+  lock-drift / **wheel 安装冒烟**（`wheel-install`：把构建出的 wheel 全依赖装进干净 venv 再断言，
+  覆盖 editable 结构上看不见的"少打包一个模块 / 包元数据有误"）的结论
   折进自己的红绿（判定脚本 `py/scripts/ci_merge_gate.py`，规则见 §7.3 末段）。
   这一条替代了过去单独把 lint、前端设为 required 的做法，覆盖面更大。
 - `strict: false`（不要求分支领先，避免每次主干合并把在跑的 PR 全部判过期）、
