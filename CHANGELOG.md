@@ -39,6 +39,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### F2-02 多模态记忆 Batch-1：CLIP 空间 + 跨模态 RRF 融合（M2.2 / ADR-022，部分交付）
+
+ROADMAP v5.4.0 主题的首批落地（ADR-022 经两轮独立对抗性审核通过后开工）。
+范围 = 个人版文本+图像（PRD R06）、SQLite 路径。**PG 路径/异步队列（B2）、
+音频/视频（B3）、NDCG 数据集（B4）明确未做**，验收映射按诚实口径标注（见 ADR-022）。
+
+**选型（ADR-022，附前置实测）**：PRD R02 原文"pgvector 多向量列"经实测证否——
+`pg_backend.py` 是单 `vector(N)` 列 + 初始化 ALTER 架构（表中已有 384 维行时
+`USING embedding::vector(512)` 直接 cast 报错并被 except 吞掉），CLIP(512) 与
+MiniLM(384)/OpenAI(1536) 无法共列。落地为**独立嵌入空间表** `multimodal_entries`
+（自己的库文件 `multimodal.db`、独立维度/编码），既有 `vector_entries` 及其数据零改动。
+偏差记账见 ADR-022 D2 + 本节。
+
+**新增**：
+- `core/memory/multimodal_embed.py`：`MultimodalEmbeddingProvider`（文本+图像共用空间）、
+  `ClipEmbedding`（惰性 import，`pooler_output` 双形态兼容）、`HashModalityEmbedding`
+  （无 torch 的确定性回退，`is_semantic=False` 明示非语义）、`PrecomputedEmbedding`
+  （夹具真 CLIP 向量，供 CI 做**真语义**断言）、`validate_image_input`（扩展名白名单
+  取 ImageStore 子集去掉 .svg、20MB 上限、Pillow verify、`allowed_root` 防穿越）。
+- `core/memory/multimodal_store.py`：`MultimodalStore(VectorStore)` —— 向量存
+  **float32 BLOB（2048 B/条）**而非 JSON（~10.5KB）；`index()` 覆盖走 BLOB 防记账漂移；
+  `index_many` 按 modality 分组单次前向（`index_batch` 覆盖为 LSP 兼容的 int 计数、仍走 BLOB）；modality 一律从 `_meta_cache` 派生
+  （继承的 delete/clear 不会留脏状态）；`stats()` 自建含按模态计数 + degraded 标记。
+- `core/memory/fusion.py`：`reciprocal_rank_fusion` 纯函数（k=60、可加权、
+  ties 按 id 稳定、同列表重复 id 只计最优 rank）。
+- `memory/multimodal.py`：`MultimodalMemory` 服务层（多模态腿 + 注入式文本记忆腿 →
+  RRF 融合；文本腿失败只降级不抛；文本命中形状兼容 dict 与 pydantic 两种）+ 模块级单例
+  `get_multimodal_memory()/reset_multimodal_memory()`。
+- `[multimodal]` optional extra（transformers>=4.40,<6 / pillow / torch），
+  默认安装零增重；未装 extra 走回退 provider 且 `degraded=True` 明示。
+- `MemoryFacade.store_multimodal() / retrieve_multimodal() / multimodal_stats()`（PRD R04）。
+
+**修改（全部为默认值即现状的加法）**：
+- `VectorStore` 新增 `table_name` / `create_sql` / `expected_dim` 参数 +
+  存储向量解码容忍 JSON/float32-BLOB 双格式 + `_load_cache` 坏行加固
+  （异维/坏编码/坏 metadata 跳过并告警——此前一条坏行会让 `np.array` 抛
+  `ValueError` 穿透，拖垮全库检索）。
+- `db_utils.resolve_data_dir()` 公开（原 `_resolve_data_dir`，旧名保留）+ 惰性导出映射同步。
+- `test_dead_wiring_inventory.py`：`maop.core.vector.factory` 从 KNOWN_ORPHANS 移除——
+  B1 的 PG 告警探针是它的**首个生产导入**（只读解析、不做存储；存储语义上仍为预留形态，
+  见 ADR-022 D2）。
+
+**顺带修复（独立审核发现）**：chat 模式 `MemoryManager.long_term_index` 调用**不存在的**
+`VectorSearch.index`（真实类是 `index_entry`），AttributeError 被 except 吞掉 →
+单条长期记忆写入静默失效（旧测试用 MagicMock 的 `.index` 掩盖）。修复 + 新增
+"接口面扫描"回归测试（解析调用点逐一核对真实类成员，防同类再发）。
+
+**实证（本机真跑，非推演）**：CLIP ViT-B/32 经 hf-mirror 可用；单张热机 65-293ms 波动
+（贴着 200ms 阈值，不可依赖）；`index_many` 单次前向 **42ms/图**（含 SQLite 写入）；
+跨模态 top-1 **8/8** 全对（真 CLIP + 真存储 + 真融合）；CI 语义断言用预计算真 CLIP
+向量夹具（`tests/fixtures/clip_gold.json`，对角线矩阵入夹），无 torch 也能跑真几何。
+
 ### CI：新增 `wheel-install` 作业 —— 验证"构建出的 wheel 本身"可用（2026-10-12）
 
 本文件其余作业（test / lint / e2e / perf-smoke / docker …）一律 `pip install -e .`。

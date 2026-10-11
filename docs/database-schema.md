@@ -463,6 +463,34 @@ CREATE TABLE IF NOT EXISTS vector_entries (
 
 ---
 
+## 8b. Multimodal Vector Space — `core/memory/multimodal_store.py`
+
+### multimodal_entries
+
+F2-02（M2.2 B1，ADR-022）——CLIP 文本+图像向量的独立 512 维空间，
+存于独立库文件 `<data_dir>/multimodal.db`，既有 `vector_entries` 的
+维度/ALTER 规则完全不受影响（ADR-022 D2：多列 → 多空间）。
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | TEXT | PRIMARY KEY | Entry ID（默认 `mm-…`） |
+| text | TEXT | NOT NULL DEFAULT '' | 文本载荷（图像为 caption） |
+| vector | BLOB | NOT NULL, DEFAULT X'' | float32 little-endian，512×4 = 2048 B |
+| metadata | TEXT | NOT NULL DEFAULT '{}' | JSON；`modality` 判别（`text`/`image`）、来源引用、`model_id` |
+| created_at | REAL | NOT NULL DEFAULT 0.0 | Unix timestamp |
+
+```sql
+CREATE TABLE IF NOT EXISTS multimodal_entries (
+  id TEXT PRIMARY KEY,
+  text TEXT NOT NULL DEFAULT '',
+  vector BLOB NOT NULL DEFAULT X'',
+  metadata TEXT NOT NULL DEFAULT '{}',
+  created_at REAL NOT NULL DEFAULT 0.0
+);
+```
+
+---
+
 ## 9. Worktree — `core/agent/memory_ctx/worktree.py`
 
 ### worktrees

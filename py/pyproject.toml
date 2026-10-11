@@ -118,6 +118,17 @@ ml = [
     # When absent, VectorStore falls back to sqlite-vec → NumPy → pure Python.
     "hnswlib>=0.8.0",
 ]
+multimodal = [
+    # F2-02 (ADR-022): CLIP text+image embeddings for the multimodal memory
+    # space. Optional — without it the space runs on a deterministic
+    # non-semantic fallback provider (stats()["degraded"]=True). Upper bound
+    # guards against transformers API drift; weights download into
+    # HF_HOME/XDG_CACHE_HOME (~600 MB) and are NOT redistributed by this
+    # project (model-card license note in ADR-022 D8).
+    "transformers>=4.40,<6",
+    "pillow>=10.0",
+    "torch>=2.2",
+]
 otel = [
     "opentelemetry-api>=1.20",
     "opentelemetry-sdk>=1.20",

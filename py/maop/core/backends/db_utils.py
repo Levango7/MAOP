@@ -322,6 +322,16 @@ def _resolve_data_dir() -> Path:
     return root / "data"
 
 
+def resolve_data_dir() -> Path:
+    """Public alias of :func:`_resolve_data_dir` (F2-02 B1).
+
+    Module-level data-file consumers (e.g. the multimodal vector space at
+    ``<data_dir>/multimodal.db``) need the resolved data directory without
+    reaching for the private name.
+    """
+    return _resolve_data_dir()
+
+
 # ────────────────────────────────────────────────────────────────────────────
 # P1-6: SQLAlchemy engine factory with backend selection
 # ────────────────────────────────────────────────────────────────────────────

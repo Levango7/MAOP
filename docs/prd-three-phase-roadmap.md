@@ -348,6 +348,13 @@ MAOP（Multi-Agent Orchestration Platform）在完成 P0–P4 代码优化与 P0
 | F2-02-R05 | 模态元数据：存储模态类型、来源、时间戳、原始引用 | P1 |
 | F2-02-R06 | Personal Edition 支持文本 + 图像（轻量），音频/视频为企业版 | P1 |
 
+> **R02 落地偏差（2026-10-12，ADR-022）**："pgvector 多向量列"经实测证否——
+> 现架构为单 `vector(N)` 列 + 初始化 ALTER，CLIP(512) 与 MiniLM(384)/OpenAI(1536)
+> 无法共列（已有异维行时 cast 直接报错）。Batch-1 落地为**独立嵌入空间表**
+> （独立库文件/维度/编码），"每模态独立索引、共享元数据"的意图由
+> `modality` 判别 + 统一 metadata 满足；PG 侧 partial index 在 B2 落地。
+> 证据与推导见 [docs/adr/022-multimodal-memory-store.md](adr/022-multimodal-memory-store.md)。
+
 #### 4.3.3 非功能需求
 
 | 维度 | 指标 |

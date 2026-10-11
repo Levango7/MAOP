@@ -45,7 +45,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from maop.memory.multimodal import MultimodalMemory
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +223,92 @@ class MemoryFacade:
     ) -> list[dict[str, Any]]:
         """检索 Long-term Memory。"""
         return self._impl.long_term_search(query, top=top)  # type: ignore
+
+    # ── Multimodal Memory (F2-02, PRD 4.3 / R04) ──────────────
+
+    def store_multimodal(
+        self,
+        content: Any,
+        *,
+        modality: str | None = None,
+        caption: str = "",
+        metadata: dict[str, Any] | None = None,
+        entry_id: str | None = None,
+        ext: str | None = None,
+    ) -> str:
+        """存储一条多模态记忆（文本或图像），返回条目 ID。
+
+        - ``content``: 文本（str）或图像（路径 / bytes）；``modality`` 缺省时按类型推断
+        - 依赖 ``[multimodal]`` extra 时用 CLIP 编码；未安装时走确定性回退
+          provider（非语义，``stats()["degraded"]=True``，见 ADR-022）
+        - 既有文本记忆 API 不受影响（独立嵌入空间，ADR-022 D2）
+
+        See Also
+        --------
+        :meth:`retrieve_multimodal`
+        """
+        return self._multimodal().store(
+            content,
+            modality=modality,
+            caption=caption,
+            metadata=metadata,
+            entry_id=entry_id,
+            ext=ext,
+        )
+
+    def retrieve_multimodal(
+        self,
+        query: Any,
+        *,
+        top: int = 10,
+        modalities: list[str] | None = None,
+        include_text_memory: bool = True,
+        ext: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """跨模态检索：多模态空间 + （可选）文本记忆空间，RRF 融合后返回统一排序。
+
+        返回条目的 ``score`` 是 RRF 分数（按排名融合，非余弦相似度），
+        ``best_score`` 保留各来源的原始分数，``sources`` 标识命中来源
+        （``"multimodal"`` / ``"text_memory"``）。
+
+        Parameters
+        ----------
+        query : str | bytes | Path
+            文本查询（跨模态）或图像查询（图找图）。
+        modalities : list[str] | None
+            限定模态（如 ``["image"]``）；None = 全部。
+        include_text_memory : bool
+            是否同时检索既有文本记忆空间并融合；文本腿失败只降级不抛错。
+        """
+        return self._multimodal().retrieve(
+            query,
+            top=top,
+            modalities=modalities,
+            include_text_memory=include_text_memory,
+            ext=ext,
+        )
+
+    def multimodal_stats(self) -> dict[str, Any]:
+        """多模态空间统计（条目数、按模态分组、embedding 模型、degraded 标记）。"""
+        return self._multimodal().stats()
+
+    def _multimodal(self) -> MultimodalMemory:
+        """懒取 MultimodalMemory 单例，并按当前 impl 绑定文本记忆检索腿。
+
+        文本腿经 lambda 适配 keyword-only 签名（``long_term_search(q, *, top=)``），
+        不裸传方法引用（设计审核 N1）。单例按数据目录缓存、按调用重绑
+        adapter，facade 实例本身不缓存底层状态（与类契约一致）。
+        """
+        from maop.memory.multimodal import get_multimodal_memory
+
+        def _text_search(query: str, n: int) -> list[dict[str, Any]]:
+            impl = self._impl
+            fn = getattr(impl, "long_term_search", None)
+            if not callable(fn):
+                return []
+            return list(fn(query, top=n))
+
+        return get_multimodal_memory(text_search=_text_search)
 
     # ── 跨层操作 ───────────────────────────────────────────────
 
