@@ -15,6 +15,7 @@ from typing import Any, Literal, cast
 from pydantic import BaseModel, Field
 
 from maop.core.agent.lifecycle.state_classifier import ClassificationResult, TaskStateClassifier
+from maop.core.reliability.dry_run import DRY_RUN_MARKER, extract_markers
 from maop.core.reliability.error_schema import MaopResult
 
 logger = logging.getLogger(__name__)
@@ -161,8 +162,14 @@ def _gate_dry_run(plan: dict, result: MaopResult | None,
           appears in ``result.structured_output["dry_run_artifacts"]``.
 
     Result signals (any one suffices when ``dry_run=True``):
+      0. ``result.stdout`` contains a line starting with
+         ``MAOP_DRY_RUN_MARKER:`` followed by a JSON object
+         (the T2.1 machine-verified contract — see
+         :mod:`maop.core.reliability.dry_run`).
       1. ``result.stdout`` contains "DRY-RUN" / "dry_run" / "dry-run" /
-         "no changes applied" (case-insensitive).
+         "no changes applied" (case-insensitive). DEPRECATED — kept for
+         one minor release; prose that merely mentions dry-run used to
+         pass this gate.
       2. ``result.structured_output`` is a dict with key ``"dry_run"`` set
          to a truthy value.
       3. ``result.structured_output`` is a dict containing a
@@ -192,6 +199,16 @@ def _gate_dry_run(plan: dict, result: MaopResult | None,
         )
 
     # Probe result for dry-run signals.
+    # T2.1: the line-anchored sentinel (MAOP_DRY_RUN_MARKER: {...}) is the
+    # primary contract — a producer that really rehearsed emits it. It
+    # replaces fuzzy substring matching as the *trusted* signal because
+    # prose that merely mentions "dry-run" cannot fake a line that starts
+    # with the keyword and parses as JSON.
+    markers = extract_markers(result.stdout or "")
+    has_marker_signal = bool(markers)
+
+    # DEPRECATED — kept for one minor release for backward compatibility
+    # with agents that emit the legacy wording. Do not extend this list.
     has_stdout_signal = False
     if result.stdout:
         stdout_lower = result.stdout.lower()
@@ -215,20 +232,29 @@ def _gate_dry_run(plan: dict, result: MaopResult | None,
     ):
         has_structured_signal = True
 
-    if not (has_stdout_signal or has_structured_signal):
+    if not (has_marker_signal or has_stdout_signal or has_structured_signal):
         return GateResult(
             name="dry-run", passed=False,
             reason=(
                 "plan declared dry_run=True but result contains no dry-run "
-                "signal (expected 'DRY-RUN' marker in stdout or "
-                "structured_output.dry_run / .dry_run_artifacts)"
+                f"signal (expected '{DRY_RUN_MARKER}: {{...}}' marker line "
+                "in stdout, or structured_output.dry_run / "
+                ".dry_run_artifacts)"
             ),
         )
 
     # If expected_dry_run_artifacts were declared, verify each is present.
     if expected_artifacts:
         actual_artifacts: list[str] = []
-        if isinstance(structured, dict):
+        # Marker artifacts take precedence (the sentinel is the
+        # machine-verified channel); structured_output remains the
+        # backward-compatible source.
+        for mk in markers:
+            raw_m = mk.get("artifacts")
+            if isinstance(raw_m, list):
+                actual_artifacts = [str(a) for a in raw_m]
+                break
+        if not actual_artifacts and isinstance(structured, dict):
             raw = structured.get("dry_run_artifacts")
             if isinstance(raw, list):
                 actual_artifacts = [str(a) for a in raw]

@@ -251,6 +251,14 @@ class AgentResolver:
             ipc_path=_safe_opt(getattr(defn, 'ipc_path', None)),
             http_url=_safe_opt(getattr(defn, 'http_url', None)),
             fallback_order=_safe_opt_list(getattr(defn, 'fallback_order', None)),
+            # 2026-10-11: 补齐漏透传的已声明字段——此前这里逐字段重建，
+            # agents.yaml 里声明的 env / supports_vision / image_arg_template /
+            # dry_run_supported 在解析后全部丢失（T2.1 的 dispatch 注入
+            # 因此对声明 agent 无效，agent 级 env 声明同样失效）。
+            env=dict(getattr(defn, 'env', None) or {}),
+            supports_vision=bool(getattr(defn, 'supports_vision', False)),
+            image_arg_template=str(getattr(defn, 'image_arg_template', None) or ""),
+            dry_run_supported=bool(getattr(defn, 'dry_run_supported', False)),
         )
         self._cache[name] = cfg
         self._cache_versions[name] = getattr(self._config, '_version', 0) if self._config else 0
