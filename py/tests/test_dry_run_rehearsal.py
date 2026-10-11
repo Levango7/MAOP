@@ -29,6 +29,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from maop.core.reliability.dry_run import (
     DRY_RUN_MARKER,
     DRY_RUN_PREAMBLE,
@@ -244,9 +246,19 @@ class SimpleNamespace:
 
 
 class _RealShapedConfig:
+    """最小但真实形状的配置对象。
+
+    必须带 ``routing`` 与 ``_version``：dispatch 链路会触达
+    RouteScorer 单例（get_route_scorer 只认第一个 config），缺字段会
+    把同一 xdist worker 里的后续测试毒死（AttributeError:
+    _RealShapedConfig has no attribute 'routing'）。
+    """
+
     def __init__(self, agents: list[AgentConfig]) -> None:
         self.agents = agents
         self.workflows: list = []
+        self.routing: dict = {}
+        self._version: int = 0
 
 
 def _probe_script(tmp_path: Path) -> str:
@@ -285,7 +297,19 @@ def _dispatch(tmp_path: Path, *, declared: bool, dry_run: bool) -> dict[str, Any
     return json.loads((tmp_path / "probe.json").read_text(encoding="utf-8"))
 
 
+@pytest.fixture
+def _restore_route_scorer():
+    """快照/恢复 RouteScorer 单例——dispatch 会把本文件的 config 注册进
+    进程级单例，不带恢复会污染同一 xdist worker 的后续测试文件。"""
+    from maop.core.routing import route_scorer as rs
+
+    saved = rs._instance
+    yield
+    rs._instance = saved
+
+
 class TestDispatchDryRunWiring:
+    @pytest.mark.usefixtures("_restore_route_scorer")
     def test_declared_agent_gets_preamble_and_env(self, tmp_path: Path) -> None:
         probe = _dispatch(tmp_path, declared=True, dry_run=True)
         joined = " ".join(probe["argv"])
