@@ -279,6 +279,13 @@
   维度兼容设计）、pgvector 半精度/多向量列方案对比、融合检索（RRF 起步）PoC、
   KGE 选型对比（Neo4j Enterprise 成本 vs 纯 pgvector 演进路线）。产出：选型 ADR + PoC 分支。
   **不做功能落地**——落地在本版。
+  > **2026-10-11 第一次 spike 已交付**（部分）：嵌入侧实测完成，报告见
+  > [docs/spike-multimodal-memory.md](docs/spike-multimodal-memory.md)。核心结论：
+  > CLIP 经 hf-mirror 可用（512 维，语义方向正确）；**单张图像延迟 400-811ms 未达
+  > PRD <200ms，批处理摊销后 53ms/图达标** ⇒ 架构需"异步入队+批处理"；
+  > **pgvector 现为单列+ALTER 架构，无法容纳 384/512 双维度，落地前必须先评审
+  > schema 迁移（推荐独立表方案）**；NDCG 验收需先构造标注数据集。KGE 选型对比
+  > 未做（下一 spike 轮次）。
 - **主体**：按 spike 结论落 F2-02（嵌入扩展 / 多向量列 / 融合检索）。
 - **可选（按余力）**：T3.3 K8s Operator M0——kopf 骨架 + `MaopTask` reconcile 最小闭环 +
   `ghcr.io/maop/operator` 首次真实构建 + kind 集成腿激活（现有 skipif 钩子装了 kind 自动生效）。
