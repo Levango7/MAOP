@@ -406,13 +406,17 @@ async function load() {
     toolCount.value = mc.value.tool_count ?? (mc.value.tools || []).length;
   } else errors.value.mcp = (mc.reason && mc.reason.message) || 'Request failed';
 
-  if (rt.status === 'fulfilled') routes.value = rt.value.routes || [];
+  // M-1 信封解包（2026-10-10 静态扫描 + seeded E2E 实抓）：
+  // /api/routing → {status, data:{routes}}；/api/security/config → {status, data:{...}}。
+  // 两处此前直接读顶层字段 → routing 规则表与安全面板恒空/恒信封。
+  // 容错两种形状（与 Scheduling/Analysis/Tasks/Monitor 同款）。
+  if (rt.status === 'fulfilled') routes.value = (rt.value.data || rt.value).routes || [];
   else errors.value.routing = (rt.reason && rt.reason.message) || 'Request failed';
 
   if (pr.status === 'fulfilled') prompts.value = pr.value.prompts || [];
   else errors.value.prompts = (pr.reason && pr.reason.message) || 'Request failed';
 
-  if (sec.status === 'fulfilled') security.value = sec.value || {};
+  if (sec.status === 'fulfilled') security.value = sec.value.data || sec.value || {};
   else errors.value.security = (sec.reason && sec.reason.message) || 'Request failed';
 
   loading.value = false;

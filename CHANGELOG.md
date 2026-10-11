@@ -39,6 +39,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 前端：M-1 信封漏解包全类清扫（Tools.vue 两处）+ 静态扫描法
+
+- **静态扫描器一次扫完全类**：WorkBuddy 关闭后接手全仓，写了一次性扫描——
+  解析全部 `@X.get` handler 的返回形状（含 APIRouter prefix 归属），筛出
+  `{"status":"ok","data":…}` 信封端点 **28 个**，与前端 130 个 `api.get`
+  调用做交集，再逐个人工核对消费侧解包与否。**除已修的 Tasks/Monitor 外
+  新扫出 Tools.vue 两处**（此前 4 个消费端点对了 2 个——同一 bug 类命中
+  50%，剩下不查必漏）：
+  - `/api/routing`（v4_misc）读 `rt.value.routes` → routing 规则表恒空
+  - `/api/security/config`（v4_misc）读 `sec.value` → 安全面板恒为信封对象
+  - Blackboard/Chat/Scheduling/RoutingRules/Agents 经核对均为正确解包
+    （routing.py 的 decisions 系是 `{"status":"ok",**stats}` 裸铺开，
+    扫描的前缀归属误报、已排除）。
+- 修复：两处均改 `data.data || data` 容错解包（与已修四处同款）。
+- 测试：seeded-pages 追加 tools 用例（信封形状 + 行渲染 + 安全键），
+  **先红后绿证明确有捕获力**（暂存 fix 后红、恢复后绿）；种子 spec 累计 8 例。
+- 扫描器调试三坑（皆因正则）：修饰器名不固定（`@tasks_router.get`）要先解析
+  APIRouter prefix；body 截断正则把 handler 自身 `def` 当边界（且 `async def`
+  匹配不上）；跨行返回要空白归一化后再子串匹配。
+
 ### 前端 E2E：数据渲染扩展（agents / memory 两页）
 
 - `e2e/seeded-pages.spec.js` 追加两页的种子数据用例（形状同样取后端 handler 构造处）：

@@ -244,4 +244,34 @@ test.describe('seeded data rendering (real backend shapes)', () => {
     await expect(page.getByText('96').first()).toBeVisible()
     expect(problems, `runtime problems on /memory`).toEqual([])
   })
+
+  test('tools page renders routing rules and security config (M-1 envelope)', async ({ page }) => {
+    // Tools.vue（/capability/skills）两个 M-1 信封端点：/api/routing 与
+    // /api/security/config 均返回 {status, data}。2026-10-10 静态扫描
+    // （信封端点 ∩ 前端消费）扫出这两处漏解包——routing 规则表与安全
+    // 面板恒空/恒信封。两页签是 v-show 隐藏内容，用 toBeAttached 断言。
+    const problems = collectProblems(page)
+    await stubJson(page, /\/api\/routing(\?|$)/, {
+      status: 'ok',
+      data: {
+        routes: [
+          { pattern: 'code/*', target: 'claude-code', priority: 1 },
+          { pattern: 'review/*', target: 'code-reviewer', priority: 2 },
+        ],
+      },
+    })
+    await stubJson(page, /\/api\/security\/config(\?|$)/, {
+      status: 'ok',
+      data: { tls: true, auth: true, rate_limit: false, guardrail: true },
+    })
+    await page.goto('/capability/skills')
+    // routing 规则行（routeRows: pattern/target/priority）
+    await expect(page.getByText('code/*').first()).toBeAttached()
+    await expect(page.getByText('claude-code').first()).toBeAttached()
+    await expect(page.getByText('review/*').first()).toBeAttached()
+    // 安全配置键（securityKeys=Object.keys(data)；渲染经 labelize 首字母大写）
+    await expect(page.getByText('Tls', { exact: true }).first()).toBeAttached()
+    await expect(page.getByText('Rate Limit', { exact: true }).first()).toBeAttached()
+    expect(problems, `runtime problems on /capability/skills`).toEqual([])
+  })
 })
