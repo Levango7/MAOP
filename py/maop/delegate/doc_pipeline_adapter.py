@@ -160,7 +160,11 @@ def run_pipeline(
     """
     start = time.time()
     if dry_run is None:
-        dry_run = os.environ.get("MAOP_DRY_RUN", "").strip() == "1"
+        # T2.1: env auto-detect — Dispatch sets MAOP_DRY_RUN=1 on the
+        # driver subprocess for plan-declared rehearsals. Read through
+        # settings (the config-drift gate ratchets direct env reads).
+        from maop.config.settings import get_settings
+        dry_run = get_settings().dry_run
 
     if dry_run:
         return _dry_run_pipeline(

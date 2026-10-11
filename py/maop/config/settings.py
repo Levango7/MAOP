@@ -176,6 +176,17 @@ class MAOPSettings(BaseSettings):
     admin_password: str = Field(default="", description="Initial admin password (auto-generated if empty)")
     api_key: str = Field(default="", description="API key for external services")
     key_file: str = Field(default="", description="Path to API key file")
+    # T2.1 (2026-10-11): dry-run 预演进行中的进程内标记。由 Dispatcher 在
+    # plan 声明 dry-run 时对 driver 子进程设置（MAOP_DRY_RUN=1，见
+    # core/security/dispatch_gate 同款 env 通道），doc-pipeline 适配器据此
+    # 自动进入预演（orch.plan() 纯解析、零副作用、打印 MAOP_DRY_RUN_MARKER
+    # 哨兵行）。非运维开关（计划侧开关是 MAOP_DRY_RUN_ENFORCE，maop_plan）。
+    dry_run: bool = Field(
+        default=False,
+        description="Current process executes a dry run (env: MAOP_DRY_RUN). "
+                    "Set by Dispatch on driver subprocesses; consumed by "
+                    "executors (doc-pipeline adapter env auto-detect).",
+    )
     # 派发权限门（见 py/maop/core/security/dispatch_gate.py）。默认 False =
     # 门挂载但不改变任何行为，与历史一致 —— 范式同 MAOP_DRY_RUN_ENFORCE。
     # ⚠️ 启用前必须先在权限规则表里给要用的 agent 加 allow 规则：

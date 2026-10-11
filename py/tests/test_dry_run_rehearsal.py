@@ -204,8 +204,13 @@ class TestPipelineRehearsal:
         assert fake.executed is False, "dry-run executed the pipeline!"
 
     def test_env_autodetect(self, monkeypatch: Any, capsys: Any) -> None:
+        from maop.config import settings as settings_mod
         from maop.delegate import doc_pipeline_adapter as adapter
 
+        # get_settings() is a process-wide singleton built on first call;
+        # reset it so the (monkeypatched) env var is re-read. In production
+        # the driver subprocess starts fresh — no reset needed there.
+        monkeypatch.setattr(settings_mod, "_settings", None)
         monkeypatch.setenv("MAOP_DRY_RUN", "1")
         fake = _FakeOrchestrator()
         with patch.object(adapter, "get_orchestrator", lambda *a, **kw: fake):
