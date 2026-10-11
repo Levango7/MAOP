@@ -39,6 +39,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 前端 E2E：数据渲染扩展（agents / memory 两页）
+
+- `e2e/seeded-pages.spec.js` 追加两页的种子数据用例（形状同样取后端 handler 构造处）：
+  **/capability/agents**（`{status, agents:[model_dump]}`——生产有 31 个 agents.yaml 条目、
+  测试态 403，数据路径此前零覆盖）：断言卡片名称/描述/模型驱动指标渲染；
+  **/memory**（bridge.memory_stats() 裸统计字典，前端顶层读、无信封层）：
+  断言 StatCard 渲染种子数值。
+- 协调：新增 `AGENT-COORD.md`（多代理工作区防撞纪律——显式路径提交、禁 amend、
+  CHANGELOG 段序、E2E 各用各的 spec 文件）。
+- 验证：spec **7/7 绿**；全量 E2E 156 passed（3 例本机负载 flaky——隔离全过、
+  上轮 PR #79 的 CI 22/22 绿为证）；vitest 485 passed；typecheck 干净。
+
 ### 前端 E2E：数据渲染 spec + 抓修两个 M-1 信封漏解包 bug
 
 - **新 spec** `e2e/seeded-pages.spec.js`：no-auth 模式下所有数据端点 403、既有 spec 用
