@@ -39,6 +39,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI：新增 `wheel-install` 作业 —— 验证"构建出的 wheel 本身"可用（2026-10-12）
+
+本文件其余作业（test / lint / e2e / perf-smoke / docker …）一律 `pip install -e .`。
+editable 把源码目录挂上 sys.path，**不会**因"少打包一个模块 / 包元数据有误 /
+控制台入口不可用"而失败；而真实客户 `pip install maop-orchestrator` 拿到的 wheel
+只在这一刻暴露这三类问题。这不是假想风险：v5.3.0 首上 PyPI 当天就要补发
+v5.3.1"补全包元数据"（见 `a0a9e27`），而 `release-assets` / `publish` /
+`publish-manual` 三个作业只**构建** wheel，从不安装并冒烟。
+
+- 新增作业 `wheel-install`（`Wheel install (built artifact)`）：构建 wheel →
+  **全依赖**（不 `--no-deps`，依赖声明写错必须在这里红）装进干净 venv →
+  五条断言：
+  1. `maop` 的导入来源必须落在 venv 内（**自锁**：防止断言跑在源码上而绕过待测机制）；
+  2. `maop.__version__` 存在；
+  3. `from maop import __version__` 可用（与 2 不是同一个异常，单独钉）；
+  4. `python -m maop --help` 走通（CLI 入口）；
+  5. **结构完整**：源码每个 `.py` 都要在已安装产物里（469/469），
+     这是此类作业的独有价值——editable 测试作业结构上看不见"少打一个模块"。
+- 断言步骤 `working-directory: /tmp`：仓库根下有 `maop/`，cwd 会抢在 venv 前面，
+  断言就会跑到源码上。MAOS 的同名作业 2026-10-11 实测踩过这个坑并已修（见 MAOS
+  ci.yml 注释），此处一开始就避开 + 用断言 1 自锁。
+- 新作业纳入 `CI merge gate` 的 needs 与 `REQUIRED_UPSTREAM`（docs §7.2 同步），
+  **未进** required checks 清单 —— 经 gate 折叠即可强制，无需改分支保护。
+
+本机完整彩排（干净 venv + Python 3.13.14 + 全依赖安装 wheel）：五条断言全过；
+变异验证：把源码树换成含多余模块的目录 ⇒ 断言 5 红；在仓库目录内跑 ⇒ 断言 1 红。
+
 ### T2.1 dry-run 真预演（ROADMAP 路线图项）
 
 此前的形态：dry-run **门**自 2026-09 就挂着，但没有任何**执行器产出**它验证的信号——`MAOP_DRY_RUN_ENFORCE=1` 时 deploy/pipeline/fileops 三条路由只会全体 fail-closed（“没信号”而不是“没预演”）。本 PR 把契约、产出方、接线一次落地：

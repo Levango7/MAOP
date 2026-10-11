@@ -971,6 +971,64 @@ jobs:
         with:
           name: trivy-container-scan
           path: trivy-report.json
+  # ── Wheel install：验证"构建出的 wheel 本身"可用 ───────────────────────
+  # 为什么单独一条腿：本文件其余作业（test / lint / e2e / perf-smoke / docker …）
+  # 一律 `pip install -e .`。editable 把源码目录挂上 sys.path，**不会**因
+  # "少打包一个模块 / 包元数据有误 / 控制台入口不可用"而失败。而真实客户装的是
+  # `pip install maop-orchestrator` 拿到的 wheel —— 这三类问题只在那一刻暴露。
+  #
+  # 这不是假想风险：v5.3.0 首上 PyPI 当天就要补发 v5.3.1"补全包元数据"
+  # （CHANGELOG `a0a9e27`）；而 `release-assets` / `publish` / `publish-manual`
+  # 三个作业只**构建** wheel，从不安装并冒烟。这条腿补的就是那个缺口。
+  #
+  # 两条执行纪律（缺一不可）：
+  #   1. 全依赖安装（**不** `--no-deps`）—— 依赖声明错了就该在这里红；
+  #   2. 断言必须**在仓库目录之外**跑（本步 `working-directory: /tmp`）：
+  #      仓库根下有 `maop/`，cwd 会抢在 venv 前面，断言就会跑到源码上、
+  #      完全绕过"安装时少文件"这个待测机制。已用断言 ⓪ 自锁这一点 ——
+  #      MAOS 的同名作业 2026-10-11 实测踩过这个坑（见 MAOS ci.yml 注释）。
+  wheel-install:
+    name: Wheel install (built artifact)
+    needs: scope
+    if: needs.scope.outputs.code == 'true'   # docs-only 时跳过（跳过可见，不像白名单那样静默）
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Build wheel
+        working-directory: py
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+          python -m build --wheel
+
+      - name: Install the built wheel into a clean venv (with dependencies)
+        # 全依赖：requires_dist 写错 / 依赖缺失都会在这一步红。
+        working-directory: py
+        run: |
+          python -m venv /tmp/wheelvenv
+          /tmp/wheelvenv/bin/pip install --quiet dist/*.whl
+          /tmp/wheelvenv/bin/pip show maop-orchestrator | grep -E '^(Name|Version|Requires)'
+
+      - name: Assert the installed artifact actually works
+        # ⓪ 来源自锁 → ① 版本属性 → ② from-import → ③ CLI 入口 → ④ 结构完整。
+        # ④ 是这类作业的独有价值：源码每个 .py 都必须在 wheel 里 —— editable
+        # 测试作业结构上看不见"少打一个模块"。
+        working-directory: /tmp
+        env:
+          MAOP_SRC: ${{ github.workspace }}/py/maop
+        run: |
+          /tmp/wheelvenv/bin/python -c "import os, sys, maop; p = os.path.realpath(maop.__file__); sys.exit('导入来源不在 venv 内（断言跑在源码上，没测到 wheel）：' + p) if not p.startswith(os.path.realpath(sys.prefix)) else print('OK  maop 导入来源 =', p)"
+          /tmp/wheelvenv/bin/python -c "import maop, sys; v = getattr(maop, '__version__', None); sys.exit('maop.__version__ 缺失') if not v else print('OK  maop.__version__ =', v)"
+          /tmp/wheelvenv/bin/python -c "from maop import __version__; print('OK  from maop import __version__ ->', __version__)"
+          /tmp/wheelvenv/bin/python -m maop --help
+          /tmp/wheelvenv/bin/python -c "import os, sys, pathlib, maop; src = pathlib.Path(os.environ['MAOP_SRC']); pkg = pathlib.Path(maop.__file__).parent; s = {p.relative_to(src).as_posix() for p in src.rglob('*.py')}; i = {p.relative_to(pkg).as_posix() for p in pkg.rglob('*.py')}; miss = sorted(s - i); print('OK  结构完整：源码 ' + str(len(s)) + ' / 装后 ' + str(len(i))) if not miss else sys.exit('wheel 缺这些模块（editable 测不出，客户一装就炸）：' + ', '.join(miss[:15]))"
+
   # ── Publish to PyPI ─────────────────────────────────────────────
   publish:
     name: Publish to PyPI
@@ -1162,7 +1220,7 @@ jobs:
   # py/scripts/ci_merge_gate.py，单测与结构守卫见 py/tests/test_ci_merge_gate.py。
   gate:
     name: CI merge gate
-    needs: [scope, lint, test, frontend, e2e, migrations, audit, sast, sbom, perf-smoke, lock-drift]
+    needs: [scope, lint, test, frontend, e2e, migrations, audit, sast, sbom, perf-smoke, lock-drift, wheel-install]
     if: always()
     runs-on: ubuntu-latest
     steps:
