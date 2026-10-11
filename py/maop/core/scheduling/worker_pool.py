@@ -257,22 +257,34 @@ class WorkerRegistry:
         failed: list[tuple[str, set[str]]] = []
         worker_ids = self.list_workers()
         now = time.time()
+        if not worker_ids:
+            return failed
+        # 心跳读取批量化：本方法由失败检测循环**每秒**调用，N 个 worker 原来要
+        # 1+N 次 redis 往返；pipeline 后恒为 2 次（smembers + 一批 get）。
+        # 守卫见 test_scheduling_worker_pool_coverage.py 的往返数用例。
+        pipe = self._redis.pipeline()
         for wid in worker_ids:
-            hb = self._redis.get(self._heartbeat_key(wid))
+            pipe.get(self._heartbeat_key(wid))
+        heartbeats = pipe.execute()
+        dead: list[str] = []
+        for wid, hb in zip(worker_ids, heartbeats):
             if hb is None:
                 # Heartbeat key expired → worker is dead.
+                dead.append(wid)
                 in_flight = self._in_flight.pop(wid, set())
-                # Prune registration.
-                self._redis.srem(self._registry_key(), wid)
-                self._redis.delete(self._worker_key(wid))
-                # Mark status as failed in the metadata hash before delete
-                # is a no-op (we already deleted); keep the local bookkeeping.
                 failed.append((wid, set(in_flight)))
                 logger.warning(
                     "[worker-registry] worker %s failed (heartbeat expired at %s, "
                     "in_flight=%d)",
                     wid, now, len(in_flight),
                 )
+        if dead:
+            # 死亡 worker 的清理合并为一次 pipeline（低频路径，不为它加往返）。
+            pipe = self._redis.pipeline()
+            for wid in dead:
+                pipe.srem(self._registry_key(), wid)
+                pipe.delete(self._worker_key(wid))
+            pipe.execute()
         return failed
 
     # ── Affinity query ───────────────────────────────────────────
@@ -289,12 +301,37 @@ class WorkerRegistry:
         if not required:
             return self.list_workers()
         needed: set[str] = {required} if isinstance(required, str) else set(required)
-        capable: list[str] = []
-        for wid in self.list_workers():
-            caps = self._worker_capabilities(wid)
-            if needed.issubset(caps):
-                capable.append(wid)
-        return capable
+        # caps 批量化读取：本方法在**每次派发**的选工路径上（_select_worker），
+        # N 个 worker 原来要 1+N 次 redis 往返（100 节点层 × 50 worker =
+        # 5000 次）；pipeline 后恒为 2 次（smembers + 一批 hget）。
+        snapshot = self._capabilities_snapshot()
+        return [
+            wid for wid, caps in snapshot.items()
+            if needed.issubset(caps)
+        ]
+
+    def _capabilities_snapshot(self) -> dict[str, set[str]]:
+        """All workers' capability tags in two round-trips (smembers + pipeline).
+
+        顺序沿用 ``list_workers``（sorted），``_select_worker`` 的打分
+        tie-break（registry order）不受影响。
+        """
+        worker_ids = self.list_workers()
+        if not worker_ids:
+            return {}
+        pipe = self._redis.pipeline()
+        for wid in worker_ids:
+            pipe.hget(self._worker_key(wid), _F_CAPABILITIES)
+        rows = pipe.execute()
+        snapshot: dict[str, set[str]] = {}
+        for wid, raw in zip(worker_ids, rows):
+            if raw is None:
+                snapshot[wid] = set()
+                continue
+            if isinstance(raw, bytes):
+                raw = raw.decode()
+            snapshot[wid] = {t for t in raw.split(",") if t}
+        return snapshot
 
     def _worker_capabilities(self, worker_id: str) -> set[str]:
         """Return the capability-tag set for a worker."""
