@@ -228,9 +228,15 @@ async function loadTasks() {
     params.set('order', filters.order);
 
     const data = await api.get(`/api/sessions?${params.toString()}`);
-    tasks.value = data.items || [];
-    total.value = data.total || 0;
-    totalPages.value = data.total_pages || 0;
+    // M-1 信封解包：后端返回 { status, data: { items, total, total_pages } }
+    // （session.py list_sessions_paginated）。不 waffle 解包会让 tasks 恒为
+    // 空数组——任务历史页永远显示空态（与 403/桩的空结果同形，肉眼与既有
+    // 测试都发现不了；2026-10-10 seeded E2E 实测捕获）。容错两种形状，
+    // 与 Scheduling.vue / Analysis.vue 的处理一致。
+    const payload = data.data || data;
+    tasks.value = payload.items || [];
+    total.value = payload.total || 0;
+    totalPages.value = payload.total_pages || 0;
     lastUpdated.value = new Date().toLocaleTimeString();
   } catch (err) {
     error.value = String(err.message || err);

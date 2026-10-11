@@ -39,6 +39,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 前端 E2E：数据渲染 spec + 抓修两个 M-1 信封漏解包 bug
+
+- **新 spec** `e2e/seeded-pages.spec.js`：no-auth 模式下所有数据端点 403、既有 spec 用
+  `{}` 桩——**数据渲染路径从来没被执行过**（"有数据才崩"的页面抓不到）。本 spec 按
+  **后端真实响应形状**（取自 router handler 构造处，不凭空造）灌种子数据并断言渲染，
+  把后端↔前端字段契约钉住：任一侧改名字，这里就红。覆盖 tasks 会话表 / monitor
+  agent 健康面板 / overview KPI+失败榜+活动流 / models 模型与 provider 表。
+- **抓到的真 bug 1**：Tasks.vue 读 `data.items`，而后端返回 M-1 统一信封
+  `{status, data:{items,total,total_pages}}`——不 waffle 解包让**任务历史页永远显示
+  空态**（与 403 的空结果同形，既有测试和肉眼都发现不了）。修为 `data.data || data`。
+- **抓到的真 bug 2**：Monitor.vue 对同一端点 `/api/scheduling/failure-stats` 同样漏
+  解包（同端点的 Scheduling.vue 早已正确解包——M-1 修复时漏了这两个视图）→ agent
+  健康面板恒空。同款修复。
+- **顺带加固**：健康面板 `a.avg_latency.toFixed(2)` 等字段缺一个就让 render 抛
+  TypeError → **整页空白**（桩数据实测复现）。加 `?? 0` 防御（与本文件 resources 行
+  同款写法），并加"部分载荷不白页"钉子用例。
+- 验证：spec **5/5 绿**（两个 bug 修复前红、修复后绿——先红后绿证明确有捕获力）；
+  全量 E2E 153 passed（knowledge-graph 1 例负载 flaky、隔离跑 41 passed 恢复）；
+  vitest 57 文件 485 passed；typecheck 干净。
+
 ### 前端 E2E：全路由冒烟矩阵 + 每页加载的 403 错误日志修复
 
 - **路由矩阵** `e2e/route-matrix.spec.js`：51 个视图此前仅 6 个 spec 覆盖约
