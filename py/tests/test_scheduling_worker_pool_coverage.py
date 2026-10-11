@@ -259,3 +259,96 @@ class TestWorkerRegistryRepr:
         r = repr(registry)
         assert "WorkerRegistry" in r
         assert "timeout=15.0" in r
+
+# ── 批量化读取的往返数守卫（2026-10-10 perf 修复）────────────────────
+#
+# 背景：capable_workers 在每次派发的选工路径上、detect_failures 每秒跑一次，
+# 两者原来对每个 worker 一次 redis 往返（1+N 次）。100 节点层 × 50 worker
+# = 5000 次往返的真实 redis 场景下，这是可测量的派发延迟与事件循环占用。
+# 修为 pipeline 批量化（恒 2 次往返）后，用调用计数代理钉住——防止回归。
+
+
+class _CountingRedis:
+    """fakeredis 代理：计客户端级调用次数。
+
+    pipeline 内的命令直接在底层客户端上执行、不经过本代理，因此
+    ``pipeline()`` + ``execute()`` 只计 2 次——这正是批量化生效的判据。
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
+        self.calls = 0
+
+    def __getattr__(self, name):
+        attr = getattr(self._inner, name)
+        if callable(attr):
+            def counted(*args, **kwargs):
+                self.calls += 1
+                return attr(*args, **kwargs)
+            return counted
+        return attr
+
+
+class TestWorkerRegistryBatchReads:
+    """capable_workers / detect_failures 的往返数必须与 worker 数无关。"""
+
+    def _counted_registry(self, n_workers=5, caps_of=None):
+        client = _CountingRedis(fakeredis.FakeRedis())
+        registry = WorkerRegistry(client, heartbeat_timeout=15.0)
+        for i in range(n_workers):
+            caps = (caps_of or (lambda _i: set()))(i)
+            registry.register(worker_id=f"w{i}", capabilities=caps)
+        client.calls = 0  # 注册后的调用不计入测量
+        return registry, client
+
+    def test_capable_workers_is_o1_roundtrips(self):
+        registry, client = self._counted_registry(n_workers=20)
+        registry.capable_workers({"gpu"})
+        # 修前：smembers 1 + 20×hget = 21 次；修后：smembers 1 + pipeline 2 = 3 次
+        assert client.calls <= 3, (
+            f"capable_workers 用了 {client.calls} 次往返（20 workers）——"
+            "批量化回归了？"
+        )
+
+    def test_detect_failures_is_o1_roundtrips(self):
+        registry, client = self._counted_registry(n_workers=20)
+        registry.detect_failures()
+        # 修前：smembers 1 + 20×get = 21 次；修后：smembers 1 + pipeline 2 = 3 次
+        assert client.calls <= 3, (
+            f"detect_failures 用了 {client.calls} 次往返（20 workers）——"
+            "批量化回归了？"
+        )
+
+    def test_capable_workers_correctness_preserved(self):
+        def caps_of(i):
+            return {"gpu"} if i % 2 == 0 else {"cpu"}
+        registry, _client = self._counted_registry(
+            n_workers=6, caps_of=caps_of,
+        )
+        capable = registry.capable_workers({"gpu"})
+        assert capable == ["w0", "w2", "w4"]
+        # list_workers 的顺序是 sorted，tie-break 语义不变
+        assert registry.capable_workers({"cpu"}) == ["w1", "w3", "w5"]
+        # 空要求 = 全部工人（不经批量化路径，仍是 list_workers 原语义）
+        assert registry.capable_workers(None) == registry.list_workers()
+        assert registry.capable_workers(set()) == registry.list_workers()
+
+    def test_detect_failures_dead_worker_still_pruned(self):
+        registry, client = self._counted_registry(n_workers=3)
+        # 杀掉 w1 的心跳（删除 TTL key）
+        registry._redis.delete(registry._heartbeat_key("w1"))
+        client.calls = 0
+        failed = registry.detect_failures()
+        assert [wid for wid, _tasks in failed] == ["w1"]
+        assert registry.list_workers() == ["w0", "w2"]
+        # 读管道 2 次 + 死亡清理 pipeline 2 次 = 4 次（与 worker 数无关）
+        assert client.calls <= 4, (
+            f"detect_failures（含 1 个死亡 worker）用了 {client.calls} 次往返"
+        )
+
+    def test_all_alive_detect_failures_no_write_pipeline(self):
+        registry, client = self._counted_registry(n_workers=3)
+        failed = registry.detect_failures()
+        assert failed == []
+        # 无死亡 worker 时不应触发清理写管道
+        assert client.calls <= 3

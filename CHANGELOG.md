@@ -59,6 +59,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   矩阵按此过滤；应用自身 error/JS 异常/5xx 仍全量抓捕。
 - 测试：新增 store 用例 2 例（403 不记 error 且版本保持 personal 安全默认 /
   非 403 失败仍记 error）。
+### 分布式注册表批量化（派发热路径性能）
+
+- `capable_workers`（每次派发的选工路径）与 `detect_failures`（失败检测循环
+  每秒一次）原来对每个 worker 一次 redis 往返（1+N 次）——100 节点层 ×
+  50 worker = 5000 次往返/层。修为 pipeline 批量化：恒 2 次往返
+  （smembers + 一批 hget/get），死亡 worker 清理合并为一次 pipeline。
+- 顺序/筛选/tie-break 语义不变（`capable_workers` 仍返回 sorted 顺序）。
+- 守卫：`_CountingRedis` 调用计数代理钉住往返数（20 workers 下 ≤3 次，
+  修前 21 次），防批量化回归。
+- **不做全异步客户端迁移的理由**：批量化后每派发仅剩 1-2 次往返（本地
+  亚毫秒），而 redis.asyncio 迁移要动 20 个调用点 + 全部 fakeredis 测试
+  夹具，收益/风险不成比例；将来 redis 迁远程网络且延迟成瓶颈再评估。
 
 ### 工程完善批 C（审计/审查发现的可执行化）
 
