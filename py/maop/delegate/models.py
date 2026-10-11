@@ -32,6 +32,13 @@ class AgentConfig(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
     supports_vision: bool = False
     image_arg_template: str = ""
+    # T2.1: when the plan requests a dry run (MAOP_DRY_RUN_ENFORCE on
+    # deploy/pipeline/fileops routes), dispatch prepends the dry-run
+    # preamble to the task text only for agents that declare this —
+    # the declaration means "eligible for the instruction", the
+    # verify gate remains the arbiter of whether the run really
+    # rehearsed (marker line). Agents without it are left untouched.
+    dry_run_supported: bool = False
     # ── 桌面应用驱动专用字段（仅 driver=desktop_app 时有意义，其他 driver 忽略）──
     # 桌面应用进程名（如 "Cursor.exe"），用于检测应用是否运行
     process_name: str | None = None

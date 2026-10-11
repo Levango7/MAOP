@@ -39,6 +39,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### T2.1 dry-run 真预演（ROADMAP 路线图项）
+
+此前的形态：dry-run **门**自 2026-09 就挂着，但没有任何**执行器产出**它验证的信号——`MAOP_DRY_RUN_ENFORCE=1` 时 deploy/pipeline/fileops 三条路由只会全体 fail-closed（“没信号”而不是“没预演”）。本 PR 把契约、产出方、接线一次落地：
+
+- **行锚定哨兵契约**（新模块 `py/maop/core/reliability/dry_run.py`）：
+  `MAOP_DRY_RUN_MARKER: {"artifacts": [...], ...}` 必须是**独立成行**的
+  stdout 行。`emit_marker` / `extract_markers` / `DRY_RUN_PREAMBLE`。
+  散文里提到 “dry-run” 再也骗不过受信任通道（旧的模糊子串匹配降级为
+  deprecated 兼容，保留一个 minor）。
+- **门改哨兵为首要信号**（`maop_verify._gate_dry_run`）：哨兵行 /
+  legacy 子串（deprecated）/ structured_output 三类信号；期望 artifact
+  校验优先取哨兵载荷。
+- **pipeline 执行器真预演**（`doc_pipeline_adapter.run_pipeline(dry_run=)`）：
+  经 `orch.plan()` 解析执行计划（纯解析、零副作用）后打印哨兵行；
+  `dry_run=None` 时从 `MAOP_DRY_RUN=1` 环境变量自动探测（CLI 包装器
+  零改动获得该能力）。**顺带修集成断裂**：doc-pipeline 仓库已更名
+  nexusloom，候选路径认新名（此前所有 pipeline 路由 FileNotFoundError）。
+- **dispatch 接线**（per-task，无进程级全局状态）：`plan.dry_run` →
+  `_phase_execute` → `loop_executor` → `Dispatcher.dispatch(dry_run=)`：
+  (a) env 通道 `MAOP_DRY_RUN=1` 随 driver 子进程环境（adapter 自动
+  探测）；(b) 对声明 `dry_run_supported` 的 agent 前置 DRY_RUN_PREAMBLE
+  （agentic CLI 按指令打印哨兵行；门仲裁真假，不合规 fail-closed）。
+- **`AgentConfig.dry_run_supported`** + agents.yaml 声明 5 个 agent
+  （doc-pipeline + cline/cloudbase/codewhale/cursor 四个 fileops）；
+  未声明的 agent 完全不受影响。
+- **顺手修 `AgentResolver._make_config` 漏透传**：逐字段重建丢了
+  env / supports_vision / image_arg_template / dry_run_supported——
+  agent 级 env 声明此前同样失效。
+
+测试 `py/tests/test_dry_run_rehearsal.py` 22 例：哨兵契约（往返/行锚定/
+散文拒绝/畸形跳过/多标记）、门（哨兵通过/无 legacy 关键词散文失败/
+deprecated 兼容/artifact 校验）、pipeline 预演（marker 打印+零执行+
+env 自动探测+默认执行）、dispatch 注入（声明 agent 收到 preamble+env /
+未声明不受影响/常规派发零变化）。
+
 ### 前端 E2E：交互流 spec（搜索重取 + 聊天发送）
 
 - 新 spec \`e2e/interaction-flows.spec.js\`：渲染契约由 seeded-pages 钉死，

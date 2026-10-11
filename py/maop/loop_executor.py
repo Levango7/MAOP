@@ -89,11 +89,16 @@ class ExecuteMixin:
         timeout: int,
         retry: bool,
         trace_id: str,
+        dry_run: bool = False,
     ) -> MaopResult | None:
         """Execute with strategy awareness — parallel or sequential.
 
         If analyzer produced a DAG with parallel groups and WorkerPool is available,
         execute independent subtasks in parallel. Otherwise, fall back to sequential.
+
+        T2.1: ``dry_run`` rides along to the dispatch calls — agents that
+        declare ``dry_run_supported`` then receive the dry-run preamble
+        (no side effects + emit the ``MAOP_DRY_RUN_MARKER`` line).
         """
         # Check if we can execute in parallel
         if self._should_execute_parallel(analysis, self._worker_pool):
@@ -106,6 +111,7 @@ class ExecuteMixin:
                 task=task, analysis=analysis,
                 fallback_chain=fallback_chain, routing_key=routing_key,
                 workdir=workdir, timeout=timeout, trace_id=trace_id,
+                dry_run=dry_run,
             )
 
         # Sequential execution (original behavior)
@@ -113,6 +119,7 @@ class ExecuteMixin:
             task=task, fallback_chain=fallback_chain,
             routing_key=routing_key, workdir=workdir,
             timeout=timeout, retry=retry, trace_id=trace_id,
+            dry_run=dry_run,
         )
 
     async def _execute_parallel(
@@ -124,6 +131,7 @@ class ExecuteMixin:
         workdir: str,
         timeout: int,
         trace_id: str,
+        dry_run: bool = False,
     ) -> MaopResult:
         """Execute subtasks in parallel using WorkerPool + DAG parallel groups."""
         groups = analysis.dag.parallel_groups()
@@ -155,6 +163,7 @@ class ExecuteMixin:
                             task=st.description, fallback_chain=[st_agent],
                             routing_key=routing_key, workdir=workdir,
                             timeout=timeout, retry=False, trace_id=trace_id,
+                            dry_run=dry_run,
                         )
                     except Exception as exc:
                         logger.warning("Subtask %s raised exception: %s", st_id, exc)
@@ -172,6 +181,7 @@ class ExecuteMixin:
                                 task=st_desc, fallback_chain=[st_agent],
                                 routing_key=routing_key, workdir=workdir,
                                 timeout=timeout, retry=False, trace_id=trace_id,
+                                dry_run=dry_run,
                             )
                         except Exception as exc:
                             # P1 fix: catch exception internally so it counts as failure
@@ -244,6 +254,7 @@ class ExecuteMixin:
         timeout: int,
         retry: bool,
         trace_id: str,
+        dry_run: bool = False,
     ) -> MaopResult | None:
         """Execute with fallback chain and iterative retry.
 
@@ -315,6 +326,7 @@ class ExecuteMixin:
                         agent=agent, task=task,
                         routing_key=routing_key, workdir=workdir,
                         timeout_seconds=timeout, trace_id=trace_id,
+                        dry_run=dry_run,
                     )
                     result = dispatch_result.result
 

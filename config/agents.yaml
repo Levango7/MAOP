@@ -59,6 +59,10 @@ agents:
     driver: cli
     model: auto
     timeout_s: 120
+    # T2.1: instruction-based dry-run (agentic CLI). Declaration
+    # = eligible for the preamble; the verify gate arbitrates.
+    dry_run_supported: true
+
   cloudbase:
     capabilities:
     - deploy
@@ -70,6 +74,10 @@ agents:
     driver: cli
     model: auto
     timeout_s: 120
+    # T2.1: instruction-based dry-run (agentic CLI). Declaration
+    # = eligible for the preamble; the verify gate arbitrates.
+    dry_run_supported: true
+
   codebuddy:
     capabilities:
     - codegen
@@ -93,6 +101,10 @@ agents:
     driver: cli
     model: native
     timeout_s: 60
+    # T2.1: instruction-based dry-run (agentic CLI). Declaration
+    # = eligible for the preamble; the verify gate arbitrates.
+    dry_run_supported: true
+
   codex:
     capabilities:
     - codegen
@@ -159,6 +171,10 @@ agents:
     # ipc_path: "\\\.\\pipe\\cursor"   # IPC Named Pipe（Windows）/ Unix Socket（Linux）
     # http_url: "http://localhost:3456" # 本地 HTTP 端口
     # fallback_order: ["cli", "ipc", "http"]  # 通信方式回退顺序
+    # T2.1: instruction-based dry-run (agentic CLI). Declaration
+    # = eligible for the preamble; the verify gate arbitrates.
+    dry_run_supported: true
+
   deepcode:
     capabilities:
     - codegen
@@ -190,6 +206,9 @@ agents:
     model: n/a
     routing_key: pipeline
     timeout_s: 600
+    # T2.1: in-repo adapter — dry_run reaches it via MAOP_DRY_RUN env
+    # and performs a real rehearsal (orch.plan(), no execution).
+    dry_run_supported: true
   forge:
     capabilities:
     - codegen

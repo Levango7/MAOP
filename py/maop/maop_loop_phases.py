@@ -291,6 +291,10 @@ class PhasesMixin:
                 fallback_chain=ctx.fallback_chain, routing_key=ctx.routing_key,
                 workdir=workdir, timeout=int(ctx.timeout), retry=retry,
                 trace_id=ctx.trace_id,
+                # T2.1: plan 声明的 dry-run（MAOP_DRY_RUN_ENFORCE 时
+                # deploy/pipeline/fileops 三路由）流到执行侧——声明了
+                # dry_run_supported 的 agent 会收到预演指令。
+                dry_run=bool(ctx.plan_result.get("dry_run", False)),
             )
             if is_parallel:
                 ctx.parallel_executed = True

@@ -33,6 +33,7 @@ from typing import Any
 
 from maop.core.monitoring.otel import get_tracer
 from maop.core.monitoring.otel import span as otel_span
+from maop.core.reliability.dry_run import DRY_RUN_PREAMBLE
 from maop.core.reliability.error_schema import new_result
 from maop.core.security.dispatch_gate import check_dispatch_gate
 from maop.delegate.dispatch_impl import (
@@ -97,6 +98,7 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
         streamer: Any | None = None,
         priority: int = 3,
         deadline_ms: int | None = None,
+        dry_run: bool = False,
     ) -> DispatchResult:
         """Dispatch a task to the specified agent.
 
@@ -107,6 +109,13 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
         3. Execute via the appropriate driver.
         4. Record result in circuit-breaker.
         5. Return DispatchResult envelope.
+
+        dry_run : bool
+            T2.1: when True, the plan requested a rehearsal. Sets
+            ``MAOP_DRY_RUN=1`` on the driver subprocess env and — for
+            agents declaring ``dry_run_supported`` — prepends the
+            dry-run preamble (no side effects + emit the marker) to
+            the task text. The verify gate remains the arbiter.
 
         Phase γ-1 SLA parameters
         ------------------------
@@ -162,7 +171,8 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
                     result = await self._dispatch_impl(agent, task, routing_key=routing_key,
                                                         workdir=workdir, timeout_seconds=timeout_seconds,
                                                         trace_id=trace_id, streamer=streamer,
-                                                        priority=priority, deadline_ms=deadline_ms)
+                                                        priority=priority, deadline_ms=deadline_ms,
+                                                        dry_run=dry_run)
 
             # Phase γ-4: set span attributes + persist decision record.
             # The dispatcher span is the PARENT of the routing chain —
@@ -218,6 +228,7 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
         deadline_ms: int | None = None,
         sla_tier: str = "standard",
         _failover_depth: int = 0,
+        dry_run: bool = False,
     ) -> DispatchResult:
         """Inner dispatch implementation (Phase γ-1).
 
@@ -337,6 +348,7 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
                     streamer=streamer,
                     priority=priority, deadline_ms=deadline_ms,
                     _failover_depth=_failover_depth + 1,  # P1-11 fix: 增加深度
+                    dry_run=dry_run,
                 )
             result = new_result(
                 agent=agent, task=task,
@@ -412,6 +424,26 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
                 lb.record_start(agent, trace_id or task[:32])
         except Exception as exc:
             logger.debug("LoadBalancer record failed: %s", exc)
+        # T2.1: dry-run wiring — per-task, no process-global state.
+        #   (a) env channel: MAOP_DRY_RUN=1 rides the driver subprocess
+        #       env (merged by drivers._agent_env). The in-repo
+        #       doc-pipeline adapter auto-detects it and performs a real
+        #       rehearsal instead of executing.
+        #   (b) task channel: agents declaring dry_run_supported get
+        #       the dry-run preamble prepended — agentic CLIs comply by
+        #       printing the MAOP_DRY_RUN_MARKER line. The verify gate
+        #       (maop_verify._gate_dry_run) arbitrates whether the run
+        #       really rehearsed; a non-compliant agent fails closed.
+        if dry_run:
+            config = config.model_copy(
+                update={"env": {**config.env, "MAOP_DRY_RUN": "1"}},
+            )
+            if config.dry_run_supported:
+                task = DRY_RUN_PREAMBLE + "\n\n" + task
+                logger.info(
+                    "[dispatch] dry-run preamble injected for agent=%s "
+                    "(routing_key=%s)", agent, routing_key,
+                )
         try:
             # P2 fix: acquire semaphore to limit concurrent dispatches
             async with self._semaphore:

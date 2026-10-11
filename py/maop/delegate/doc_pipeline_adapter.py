@@ -27,6 +27,8 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
+from maop.core.reliability.dry_run import emit_marker
+
 logger = logging.getLogger(__name__)
 
 # doc-pipeline root (resolved lazily to avoid hard dependency)
@@ -46,7 +48,11 @@ def _resolve_doc_pipeline_root() -> Path:
     candidates = [
         Path(os.environ.get("DOC_PIPELINE_ROOT", "")) if os.environ.get("DOC_PIPELINE_ROOT") else Path.home() / "Nexus" / "Workflow" / "doc-pipeline",
         Path.home() / "Nexus" / "Workflow" / "doc-pipeline",
+        Path.home() / "Nexus" / "Workflow" / "nexusloom",
         repo_nexus / "Workflow" / "doc-pipeline",
+        # 2026-10-11: doc-pipeline 仓库已更名 nexusloom（本地路径与远端同改）。
+        # 不认新名会让所有 pipeline 路由 FileNotFoundError——MAOP 集成静默断裂。
+        repo_nexus / "Workflow" / "nexusloom",
     ]
     for p in candidates:
         if (p / "pipeline_core" / "__init__.py").exists():
@@ -135,16 +141,36 @@ def run_pipeline(
     config: dict | None = None,
     task_id: str | None = None,
     wait: bool = True,
+    dry_run: bool | None = None,
 ) -> dict[str, Any]:
     """Run a doc-pipeline workflow from maop.
 
     This is the main entry point called by MAOP's Dispatcher when
     routing a task to the 'doc_pipeline' agent.
 
+    T2.1: ``dry_run`` rehearses the pipeline without executing it —
+    resolves the agent plan (no step runs, no artifact written) and
+    emits the machine-verified sentinel to stdout. When ``None``
+    (the CLI wrapper's default) the flag is auto-detected from the
+    ``MAOP_DRY_RUN=1`` environment variable that dispatch sets on
+    the driver subprocess for plan-declared dry runs.
+
     Returns a dict with task_id, status, result, and error fields
     compatible with MAOP's DispatchResult format.
     """
     start = time.time()
+    if dry_run is None:
+        # T2.1: env auto-detect — Dispatch sets MAOP_DRY_RUN=1 on the
+        # driver subprocess for plan-declared rehearsals. Read through
+        # settings (the config-drift gate ratchets direct env reads).
+        from maop.config.settings import get_settings
+        dry_run = get_settings().dry_run
+
+    if dry_run:
+        return _dry_run_pipeline(
+            pipeline_name=pipeline_name, input_file=input_file,
+            config=config, task_id=task_id, start=start,
+        )
 
     try:
         orch = get_orchestrator()
@@ -191,6 +217,62 @@ def run_pipeline(
     except Exception as e:
         logger.exception("doc-pipeline execution failed")
         return {"task_id": task_id or "", "status": "failed", "error": str(e)}
+
+
+def _dry_run_pipeline(
+    pipeline_name: str,
+    input_file: str,
+    config: dict | None,
+    task_id: str | None,
+    start: float,
+) -> dict[str, Any]:
+    """T2.1: rehearse a pipeline without executing it.
+
+    Resolves the agent execution plan via ``orch.plan()`` (pure
+    resolution — no step runs, no artifact is written) and prints the
+    machine-verified dry-run sentinel as a stdout line of its own so
+    ``maop_verify._gate_dry_run`` (and any operator reading the log)
+    can see that a rehearsal really happened.
+
+    ``status`` stays ``"success"`` because the rehearsal itself
+    succeeded; ``dry_run: True`` and the resolved ``plan`` carry the
+    semantics downstream.
+    """
+    try:
+        orch = get_orchestrator()
+        if not orch.registry.list():
+            orch.discover_agents()
+            orch.register_agents()
+        plan = orch.plan(
+            pipeline_name=pipeline_name, input_file=input_file, config=config,
+        )
+    except Exception as exc:
+        logger.warning("doc_pipeline_adapter dry-run: plan resolution failed: %s", exc)
+        return {
+            "task_id": task_id or "", "status": "failed",
+            "error": f"dry-run plan failed: {exc}",
+        }
+
+    artifacts = [f"pipeline:{pipeline_name}:step{s['step']}:{s['agent']}" for s in plan]
+    # Sentinel first: it must be a stdout line of its own (the CLI
+    # wrapper's print(json.dumps(result)) runs after this).
+    print(emit_marker(artifacts, agent="doc-pipeline"))
+    duration = time.time() - start
+    logger.info(
+        "doc-pipeline DRY-RUN %s: %d steps resolved in %.2fs (no execution)",
+        pipeline_name or "(default)", len(plan), duration,
+    )
+    return {
+        "task_id": task_id or "",
+        "status": "success",
+        "dry_run": True,
+        "pipeline": pipeline_name,
+        "plan": plan,
+        "steps": len(plan),
+        "result": None,
+        "error": None,
+        "duration_sec": round(duration, 2),
+    }
 
 
 def run_plan(

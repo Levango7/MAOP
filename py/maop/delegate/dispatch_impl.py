@@ -151,6 +151,7 @@ class DispatchImplMixin:
         priority: int = 3,
         deadline_ms: int | None = None,
         _failover_depth: int = 0,
+        dry_run: bool = False,
     ) -> DispatchResult:
         # Phase γ-1: derive SLA tier, log SLA context, and record
         # in-flight gauges. The finally block at the end of this method
@@ -176,6 +177,7 @@ class DispatchImplMixin:
                 priority=priority, deadline_ms=deadline_ms,
                 sla_tier=sla_tier,
                 _failover_depth=_failover_depth,
+                dry_run=dry_run,
             )
         finally:
             self._record_sla_dispatch_end(priority, sla_tier, deadline_ms=deadline_ms)
