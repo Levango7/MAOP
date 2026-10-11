@@ -79,7 +79,19 @@ export const useEditionStore = defineStore('edition', () => {
           return false;
         }
       }
-      if (!res.ok) { console.error('Failed to fetch edition info: HTTP', res.status); return false; }
+      if (!res.ok) {
+        // 403 是**预期路径**而非错误：版本信息端点是 admin-only，而无鉴权模式
+        // 的匿名用户只获得 read 角色（P0-4 安全修复明确禁止授予 admin），普通
+        // 登录用户同理。守卫按 P1-H1 的安全失败默认走 'personal'——功能正确。
+        // 记为 debug：否则无鉴权个人版/普通用户态下每个页面加载都向控制台刷
+        // 一条 error（2026-10-10 E2E 路由矩阵实测捕获）。
+        if (res.status === 403) {
+          console.debug('edition info requires admin; keeping secure default (personal)');
+          return false;
+        }
+        console.error('Failed to fetch edition info: HTTP', res.status);
+        return false;
+      }
       const data = await res.json();
       // P1-H1: 后端未返回有效 edition 时 fallback 'personal'（安全失败）
       edition.value = data.edition || 'personal';
