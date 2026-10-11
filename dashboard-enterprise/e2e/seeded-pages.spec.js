@@ -200,4 +200,48 @@ test.describe('seeded data rendering (real backend shapes)', () => {
     await expect(page.getByText('stepfun').first()).toBeVisible()
     expect(problems, `runtime problems on /capability/models`).toEqual([])
   })
+
+  test('agents page renders agent cards from registry shape', async ({ page }) => {
+    const problems = collectProblems(page)
+    // /api/agents → agents/crud.py list_agents: {status, agents:[model_dump]}
+    await stubJson(page, /\/api\/agents(\?|$)/, {
+      status: 'ok',
+      agents: [
+        {
+          name: 'claude-code', description: 'Claude CLI 适配器-seed',
+          model: 'auto', driver: 'cli',
+          capabilities: ['codegen', 'review', 'explain'],
+          enabled: true, healthy: true,
+        },
+        {
+          name: 'copilot-seed', description: 'Copilot 适配器-seed',
+          model: 'gpt-5', driver: 'cli', capabilities: ['codegen'],
+          enabled: false, healthy: false,
+        },
+      ],
+    })
+    await page.goto('/capability/agents')
+    // 卡片：名称、描述、模型/驱动指标、能力计数（.length）
+    await expect(page.getByText('claude-code').first()).toBeVisible()
+    await expect(page.getByText('Claude CLI 适配器-seed')).toBeVisible()
+    await expect(page.getByText('copilot-seed').first()).toBeVisible()
+    expect(problems, `runtime problems on /capability/agents`).toEqual([])
+  })
+
+  test('memory page renders stats from bare stats shape', async ({ page }) => {
+    const problems = collectProblems(page)
+    // /api/memory/stats → bridge.memory_stats()：裸统计字典（顶层字段，
+    // 前端 ThreeLayerMemory.vue 直接读 s.total_entries，无信封层）
+    await stubJson(page, /\/api\/memory\/stats(\?|$)/, {
+      total_entries: 128,
+      total_traces: 64,
+      total_trajectory_steps: 12,
+      episodic_count: 96,
+    })
+    await page.goto('/memory')
+    // StatCard 渲染种子数值
+    await expect(page.getByText('128').first()).toBeVisible()
+    await expect(page.getByText('96').first()).toBeVisible()
+    expect(problems, `runtime problems on /memory`).toEqual([])
+  })
 })
