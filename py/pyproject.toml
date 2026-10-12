@@ -88,7 +88,9 @@ dev = [
     "pytest-cov>=5.0",
     # P2-7: pytest-xdist for parallel test execution (-n auto in addopts).
     "pytest-xdist>=3.5",
-    "ruff>=0.4",
+    # 与 ci.yml lint 作业同源钉版（见 tests/test_lint_toolchain_pins.py）。
+    # 放开下界会让本机/nightly 装到比 CI 新的 ruff，规则集不同 ⇒ 主干凭空红。
+    "ruff==0.16.3",
     "types-PyYAML>=6.0",
     "pydantic-settings==2.15.0",
     "mmh3==5.3.1",
@@ -99,7 +101,7 @@ dev = [
     # P2-4: pytest-rerunfailures for flaky test retry (CI -n auto 并行场景下
     # 偶发重试)。原 ci.yml 手工罗列，现移入 dev extra 统一管理。
     "pytest-rerunfailures>=11.0",
-    "mypy>=1.10",
+    "mypy==2.3.1",
     # Test-only hard deps: tests/test_distributed_execution.py imports fakeredis
     # (mock Redis, no real server); tests/test_enterprise_integration.py imports
     # lxml + defusedxml for SAML XML handling. All were implicit via
