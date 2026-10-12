@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import stat
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -293,7 +294,13 @@ class AgentRepair:
         # 3. 修复权限问题
         if before.cli_exists and not before.cli_executable:
             try:
-                os.chmod(before.cli_path, 0o755)
+                # 只补执行位，不重写整份权限（旧实现 chmod 0o755 会**放宽**
+                # 读权限到 other-readable，bandit B103；这里保留原 mode）。
+                current_mode = os.stat(before.cli_path).st_mode
+                os.chmod(
+                    before.cli_path,
+                    current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
+                )
                 result.actions_taken.append(f"Fixed execute permission: {before.cli_path}")
             except Exception as exc:
                 result.errors.append(f"Failed to fix permission: {exc}")

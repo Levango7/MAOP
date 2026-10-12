@@ -157,6 +157,28 @@ def test_gold_fixture_shape():
         assert len(vec) == 512
 
 
+def test_clip_revision_is_pinned():
+    """B615 guard: the pin must be a 40-hex commit, not a branch name.
+
+    bandit only inspects literals, so a constant could silently become
+    ``"main"`` and re-introduce non-reproducible weights; this asserts the
+    shape, and the fixture records the same revision (gold vectors provably
+    come from it).
+    """
+    import re
+
+    from maop.core.memory.multimodal_embed import DEFAULT_CLIP_REVISION
+
+    assert re.fullmatch(r"[0-9a-f]{40}", DEFAULT_CLIP_REVISION), (
+        f"DEFAULT_CLIP_REVISION must be a 40-hex commit, got {DEFAULT_CLIP_REVISION!r}"
+    )
+    raw = json.loads(GOLD.read_text(encoding="utf-8"))
+    assert raw.get("revision") == DEFAULT_CLIP_REVISION, (
+        "gold fixture revision drifted from the pinned revision — regenerate the "
+        "fixture (F:/tmp/gen_clip_fixture.py) when bumping the pin"
+    )
+
+
 # ── CLIP provider (local-only; CI has no torch) ─────────────
 
 

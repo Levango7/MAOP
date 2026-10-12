@@ -21,6 +21,33 @@ from maop.core.mcp.mcp_hub_types import (
 
 logger = logging.getLogger(__name__)
 
+_ALLOWED_HTTP_SCHEMES = ("http", "https")
+
+
+def _assert_http_url(url: str) -> None:
+    """Validate an MCP server URL before any network call (bandit B310).
+
+    Only ``http``/``https`` are accepted — this blocks ``file://`` (local
+    file exfiltration), ``ftp://`` and other ``urllib`` schemes. Loopback /
+    private hosts are **deliberately allowed**: local MCP servers over
+    ``127.0.0.1`` are the common deployment and blocking them would be a
+    behaviour regression (unlike marketplace installs, which are remote by
+    design and use the stricter :class:`McpMarketplace` SSRF check).
+    """
+    from urllib.parse import urlsplit
+
+    if not url.strip():
+        # Unconfigured server: constructible on purpose — ``is_alive`` reports
+        # False so callers can detect "never configured" without an exception.
+        return
+    parts = urlsplit(url)
+    if parts.scheme.lower() not in _ALLOWED_HTTP_SCHEMES:
+        raise ValueError(
+            f"MCP server URL must be http/https, got scheme {parts.scheme!r}: {url!r}"
+        )
+    if not parts.hostname:
+        raise ValueError(f"MCP server URL has no hostname: {url!r}")
+
 
 class _StdioTransport:
     """Transport via local subprocess stdin/stdout.
@@ -207,6 +234,7 @@ class _SSETransport:
     def __init__(self, config: MCPServerConfig) -> None:
         self._config = config
         self._request_id = 0
+        _assert_http_url(config.url)
         self._base_url = config.url.rstrip("/")
 
     async def start(self) -> None:
@@ -343,6 +371,7 @@ class _StreamableHttpTransport:
     def __init__(self, config: MCPServerConfig) -> None:
         self._config = config
         self._request_id = 0
+        _assert_http_url(config.url)
         self._base_url = config.url.rstrip("/")
         self._session_id = config.session_id or ""
         # Set to True after the first successful request (or after the
@@ -409,7 +438,8 @@ class _StreamableHttpTransport:
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            # URL scheme/host validated in __init__ via _assert_http_url (B310).
+            with urllib.request.urlopen(req, timeout=30) as resp:  # nosec B310
                 status = resp.status
                 content_type = resp.headers.get("Content-Type", "")
                 session_id_hdr = resp.headers.get("Mcp-Session-Id")
