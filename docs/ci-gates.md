@@ -147,7 +147,19 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
    而 `mergeable_state` 依然按 required 集合算。早前"保护形同虚设"的观察属于这条，
    不是配置无效 —— B 轮 8 秒内翻成 `blocked` 证明配置是活的。
 
-### 7.2 现行配置（本 PR 合并时生效）
+### 7.2 现行配置（已生效，非待合并态）
+
+下列 4 条就是 GitHub 分支保护**当前生效**的集合——2026-10-13 实测
+`gh api repos/Levango7/MAOP/branches/master/protection` 与本小节逐字一致。原标题写的
+"本 PR 合并时生效"是错的：合并不改分支保护，同步是 §7.4 那个手工动作，早已执行完毕。
+带外配置仓库内看不见，所以 §7.6 之后补了 nightly 的
+`Required checks drift (manifest vs GitHub)` 作业（三态 MATCH / DRIFT / UNVERIFIED）。
+⚠️ **但截至 2026-10-13 这条作业处于 UNVERIFIED**：nightly run `38224542974` 的注解是
+`未配置 secret REQUIRED_CHECKS_TOKEN`，脚本在没有 token 时只发 warning 并以 0 退出，
+作业照常绿。也就是说**带外漂移现在实际没人守**——"仓库内三方对账 + nightly 全绿"
+并不等于 GitHub 侧一致，本小节能对上的唯一原因是我手工跑了 `gh api`。要么配一个只读
+token 进 secrets，要么把默认 `GITHUB_TOKEN` 的 `administration: read` 权限试通，
+否则这条守卫应当被判为"自我失明"。
 
 **唯一权威清单是 `.github/ci-required-checks.json`**（机器可读，含每条对应的 workflow/作业/
 kind），由 `py/tests/test_ci_required_checks.py` 与 `ci.yml` 的作业形状、以及本小节散文
