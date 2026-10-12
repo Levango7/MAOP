@@ -50,6 +50,7 @@ Usage: python scripts/check_docs_consistency.py [--gate]
 from __future__ import annotations
 
 import fnmatch
+import itertools
 import pathlib
 import re
 import sys
@@ -524,6 +525,96 @@ def _report_count_issue(
         )
 
 
+# ── 校验 4：CHANGELOG 结构（2026-10-12 复评处置）────────────────────
+# CHANGELOG.md 不在 docs 索引也不在 collect_md_files() 范围内，故此处显式读
+# 仓库根文件；文件缺失时打印跳过（fake_repo 夹具没有 CHANGELOG）。
+
+#: 非版本号的章节标题（历史折叠段 / 未归属归档）。双向一致：消失即报错。
+CHANGELOG_EXEMPT_SECTIONS: tuple[str, ...] = (
+    "## [未归属记录]",
+    "## [2.x]",
+    "## [1.x]",
+)
+
+_SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$")
+_CHANGELOG_HEADING_RE = re.compile(r"^## \[([^\]]+)\]")
+
+
+def check_changelog(root: pathlib.Path) -> list[str]:
+    """校验 4：CHANGELOG 结构 —— 单一 Unreleased / SemVer 降序 / 合法版本号。
+
+    排序规则：比较版本号**数字核心**降序；核心相同的（如 ``5.1.0`` 与
+    ``5.1.0-personal``，SemVer 下后者更小但按发布日期在后）不强制先后，
+    避免用排序规则改写真实的发版时间线。
+    """
+    path = root / "CHANGELOG.md"
+    if not path.exists():
+        print("CHANGELOG.md 不存在，跳过结构校验")
+        return []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    issues: list[str] = []
+
+    unreleased: list[int] = []
+    versioned: list[tuple[int, str, tuple[int, int, int]]] = []
+    seen_tags: dict[str, int] = {}
+    found_exempt: set[str] = set()
+
+    for lineno, line in enumerate(lines, start=1):
+        if not line.startswith("## ["):
+            continue
+        m = _CHANGELOG_HEADING_RE.match(line)
+        if not m:
+            issues.append(f"[CHANGELOG.md:{lineno}] 无法解析的章节标题格式: {line[:60]}")
+            continue
+        tag = m.group(1).strip()
+        if tag == "Unreleased":
+            unreleased.append(lineno)
+            continue
+        if any(line.startswith(prefix) for prefix in CHANGELOG_EXEMPT_SECTIONS):
+            for prefix in CHANGELOG_EXEMPT_SECTIONS:
+                if line.startswith(prefix):
+                    found_exempt.add(prefix)
+            continue
+        if not _SEMVER_RE.match(tag):
+            issues.append(
+                f"[CHANGELOG.md:{lineno}] 版本号不符合 SemVer: [{tag}]"
+                "（若是历史归档段，请加入 CHANGELOG_EXEMPT_SECTIONS 并写明理由）"
+            )
+            continue
+        if tag in seen_tags:
+            issues.append(
+                f"[CHANGELOG.md:{lineno}] 重复的版本段 [{tag}]"
+                f"（另一处在 :{seen_tags[tag]}）"
+            )
+            continue
+        seen_tags[tag] = lineno
+        core = tuple(int(x) for x in tag.split("-", 1)[0].split("."))
+        versioned.append((lineno, tag, core))
+
+    if len(unreleased) > 1:
+        issues.append(
+            f"[CHANGELOG.md:{unreleased[1]}] 出现 {len(unreleased)} 个 [Unreleased] 段"
+            f"（首处在 :{unreleased[0]}）—— 历史残留段应改名归档而非占用 Unreleased"
+        )
+    if not unreleased:
+        issues.append("[CHANGELOG.md:1] 缺少 [Unreleased] 段")
+
+    for (line_a, tag_a, core_a), (line_b, tag_b, core_b) in itertools.pairwise(versioned):
+        if core_a < core_b:
+            issues.append(
+                f"[CHANGELOG.md:{line_b}] 版本段顺序非降序: [{tag_b}] 出现在 "
+                f"[{tag_a}]（:{line_a}）之后"
+            )
+
+    for prefix in CHANGELOG_EXEMPT_SECTIONS:
+        if prefix not in found_exempt:
+            issues.append(
+                f"[CHANGELOG.md:1] 豁免段 {prefix!r} 已不存在——"
+                "请从 CHANGELOG_EXEMPT_SECTIONS 移除（双向一致）"
+            )
+    return issues
+
+
 def check_tables(md_files: list[pathlib.Path]) -> list[str]:
     """校验 3：Markdown 表格列数一致性。"""
     issues: list[str] = []
@@ -600,6 +691,7 @@ def main(argv: list[str] | None = None) -> int:
     issues: list[str] = list(path_issues)
     issues += check_module_counts(scope)
     issues += check_tables(scope)
+    issues += check_changelog(REPO_ROOT)
     if skipped:
         print("按语义跳过（非漂移）：" + "、".join(
             f"{name} {count} 处" for name, count in skipped.most_common()

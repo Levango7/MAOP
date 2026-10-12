@@ -179,8 +179,15 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Docs consistency (paths / counts / tables)
+      - name: Docs consistency (paths / counts / tables / changelog)
         run: python scripts/check_docs_consistency.py --gate
+      # ADR-023: 静默异常与文件规模的常态化门禁（复评处置，2026-10-12）。
+      # 两者都是纯 stdlib 脚本，复用本 job 的 Python 环境即可；不新增 job 名
+      # （required checks 清单不动，gate 作业经 needs 折叠强制）。
+      - name: Silent exception gate (ADR-023)
+        run: python scripts/check_silent_exceptions.py
+      - name: File size gate (ADR-023)
+        run: python scripts/check_file_size.py
 
   # ── Test ────────────────────────────────────────────────────────
   test:

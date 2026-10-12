@@ -39,6 +39,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 复评处置：三条防复发门禁 + CHANGELOG/版本锚点结构修复（ADR-023）
+
+外部工具《MAOP 复评报告 2026-10-12》的遗留项处置。方案经独立对抗性审核（首版 REJECT，
+5 项硬伤修订后开工），核对阶段更正了报告的两处误判：`5.1.0-personal` 是**合法 SemVer
+prerelease**（不改）、静默存量的真实根因是旧脚本只匹配 `except Exception` 而非"多行正则逃逸"。
+
+**新增三条门禁（纯 stdlib 脚本，并入 docs-gate job，不新增 job 名）**：
+- `check_silent_exceptions.py`（ADR-023 D1）：AST+tokenize 扫描静默
+  `except … pass/continue/...`；必须有 `# silent-ok: <闭集类别> — <理由>`（类别不在闭集即红）
+  或按 ADR-018 记日志。存量 **81 条静默 + 47 处 `contextlib.suppress`** 进基线，
+  **双向棘轮**（新增红、基线条目失效也红，只许减）。源码按 `utf-8-sig` 读（本仓 17 个文件带 BOM）。
+- `check_file_size.py`（D2）：单文件 800 行上限；`migrations/` 整体豁免（SQL 迁移本体）；
+  存量 7 个 >800 行文件进 allowlist，**每条带拆分排期**，双向一致（拆完必须移除条目）。
+- `check_docs_consistency.py` 新增 CHANGELOG 结构校验（D3）：单一 `[Unreleased]`、
+  版本段按数字核心降序（核心相同者不强制，保留 `5.1.0`/`5.1.0-personal` 真实时间线）、
+  版本号须为 SemVer、历史归档段双向豁免。
+
+**结构性修复（内容零改动，附证据）**：
+- CHANGELOG：第二个 `[Unreleased]`（内容跨 2026-08~09，晚于 5.2.0 的条目）**原地改名归档段**
+  `[未归属记录]`——并入顶部会伪造"未发布工作"；`[5.2.0]` 段整体平移至正确位置
+  （块 sha256 前后一致，纯移动）。
+- 版本锚点：`config/agents.yaml`（v4.3）与 `docs/troubleshooting.md`（v4.3.0）不再内嵌
+  MAOP 版本号，防再次漂移；守卫测试扫 `MAOP v\d` 字面量即红（第三方 CLI 版本不受影响）。
+
+**守卫**：`py/tests/test_quality_gates.py` 26 例（三闸门各自的变异自证 + 双向一致性 +
+ci.yml 接线断言 + 真实树基线成立断言）。控制流零改动（存量清尾是独立批次，排期见 ADR-023 后续表）。
+
 ### F2-02 多模态记忆 Batch-1：CLIP 空间 + 跨模态 RRF 融合（M2.2 / ADR-022，部分交付）
 
 ROADMAP v5.4.0 主题的首批落地（ADR-022 经两轮独立对抗性审核通过后开工）。
@@ -1786,7 +1813,39 @@ unit job 的配置是 `--timeout=60 --reruns=3`，而并发用例普遍写成 `f
 （`MAOP_AUTH=1 -n 0 --confcutdir=tests/e2e`）29 passed / 1 xpassed；全量 unit 套件
 `-n 4 --timeout=60 --reruns=2` 见下条提交说明；ruff 干净。
 
-## [Unreleased]
+## [5.2.0] — 2026-09-08
+
+### Added
+- **自演化闭环 MVP（F2-01 / M2.1）**：`MAOP_EVOLUTION_LOOP_ENABLED` 开关接入主循环，完成 observe→suggest→evaluate→apply→validate→consolidate 完整闭环，默认关闭（AC-01/AC-02）。
+- **人工 gate（AC-04）**：`LoopReport` 新增 `pending_approval` / `approval_state` / `approved_by` / `approved_at` 字段；`_phase_evaluate` 返回 `pending_approval` 列表；`_phase_apply` 仅执行 `approved` 列表，跳过待审批项。
+- **自动回滚 SLA（AC-05）**：`EvolutionLoop._build_degradation_test_suggestion()` 构造必然导致 VALIDATE 失败的测试建议；`run_cycle(auto_rollback=True)` 5 分钟内触发 `rollback_cycle()` 验证。
+- **显著性检验对照（AC-06）**：`_z_test_p_value` 对照 scipy.stats.norm.sf，边界条件（p_pool=0/1、p1=0 vs p2=1）覆盖。
+- **Dashboard /evolve 扩展（AC-07）**：新增 7 个 API 端点（`/api/evolution/loop/status`、`/api/evolution/loop/trigger`、`/api/evolution/approvals`、`/api/evolution/approvals/{id}/decision`、`/api/evolution/ab/{cycle_id}`、`/api/evolution/loop/rollback`、`/api/evolution/loop/status`）。
+- **conftest evolution_loop_factory（AC-08）**：`evolution_loop_factory` fixture + autouse `_reset_evolution_singletons`，避免 ADR-019 模块级单例路径固化同类 bug。
+
+### Changed
+- **EvolutionLoop.run_cycle()**：改为 `async`，`_phase_evolve` 中正确 `await run_cycle()`（修复 coroutine 未 await 导致 `model_dump` 失败）。
+- **_phase_evolve** 接线点：新增 `MAOP_EVOLUTION_LOOP_ENABLED` 环境变量开关，默认 `false` → 兼容 AC-01 零回归 / AC-02 开启完整闭环。
+
+### Fixed
+- **AC-04 人工 gate**：`LoopReport.pending_approval` / `approval_state` / `approved_by` / `approved_at` 字段（默认 `n/a`）。
+- **AC-05 自动回滚 SLA**：`_build_degradation_test_suggestion()` + `rollback_cycle()` 路径验证（5min SLA）。
+- **AC-06 显著性检验对照**：`_z_test_p_value` 对照 scipy.stats.norm.sf，边界条件（p1=0 vs p2=1 必 p<1e-10）。
+- **AC-07 Dashboard**：`/evolve` 页面新增状态机、待审批列表、A/B 结果卡、回滚按钮。
+
+### Soak Test
+- **第一轮**：47.48h / 5504 样本 / RSS slope -0.028 MB/h / Handles +0.021/h / Pool 0 / 错误率 0% → PASS
+- **第二轮**：31.23h / 3620 样本（用户主动停止） / 内存 14.4MB (min 11.7 / max 49.4) / Handles 153 (152-160) / Pool 0 / CPU 平均 63.6% → 趋势一致，**综合判定通过**。
+
+### Security
+- **MAOS audit.py** metadata JSON 字符串解析修复（`_coerce_event_dict` 新增 `metadata` 分支）：SQLite `metadata` 列存储为 `'{}'` 字符串，Pydantic `AuditEvent(metadata: dict)` 校验失败 → query_events 全路径抛 ValidationError：Input should be a valid dictionary [type=dict_type, input_value='{}', input_type=str]。
+
+### Added
+- **ADR-020**：演化闭环安全边界 Stub（Phase 2 评审待填充 5 个待决问题）。
+
+---
+
+## [未归属记录] — 2026-08~09（待核实归属）
 
 > **归属待核实（2026-10-09 记录）**：本段无日期，内容为「阶段二启动定稿」（PRD/HLD v1.1.0 评审于 2026-09-03、ROADMAP 新增 v5.2.0 节），**疑属 v5.2.0**，但从未并入其版本段。本次归位**未动它**——凭日期猜归属会制造新的错账，留待核实其提交区间后再定。
 
@@ -1977,37 +2036,6 @@ unit job 的配置是 `--timeout=60 --reruns=3`，而并发用例普遍写成 `f
 
 - 6 个临时日志文件（docs/_review_*.log）
 
-## [5.2.0] — 2026-09-08
-
-### Added
-- **自演化闭环 MVP（F2-01 / M2.1）**：`MAOP_EVOLUTION_LOOP_ENABLED` 开关接入主循环，完成 observe→suggest→evaluate→apply→validate→consolidate 完整闭环，默认关闭（AC-01/AC-02）。
-- **人工 gate（AC-04）**：`LoopReport` 新增 `pending_approval` / `approval_state` / `approved_by` / `approved_at` 字段；`_phase_evaluate` 返回 `pending_approval` 列表；`_phase_apply` 仅执行 `approved` 列表，跳过待审批项。
-- **自动回滚 SLA（AC-05）**：`EvolutionLoop._build_degradation_test_suggestion()` 构造必然导致 VALIDATE 失败的测试建议；`run_cycle(auto_rollback=True)` 5 分钟内触发 `rollback_cycle()` 验证。
-- **显著性检验对照（AC-06）**：`_z_test_p_value` 对照 scipy.stats.norm.sf，边界条件（p_pool=0/1、p1=0 vs p2=1）覆盖。
-- **Dashboard /evolve 扩展（AC-07）**：新增 7 个 API 端点（`/api/evolution/loop/status`、`/api/evolution/loop/trigger`、`/api/evolution/approvals`、`/api/evolution/approvals/{id}/decision`、`/api/evolution/ab/{cycle_id}`、`/api/evolution/loop/rollback`、`/api/evolution/loop/status`）。
-- **conftest evolution_loop_factory（AC-08）**：`evolution_loop_factory` fixture + autouse `_reset_evolution_singletons`，避免 ADR-019 模块级单例路径固化同类 bug。
-
-### Changed
-- **EvolutionLoop.run_cycle()**：改为 `async`，`_phase_evolve` 中正确 `await run_cycle()`（修复 coroutine 未 await 导致 `model_dump` 失败）。
-- **_phase_evolve** 接线点：新增 `MAOP_EVOLUTION_LOOP_ENABLED` 环境变量开关，默认 `false` → 兼容 AC-01 零回归 / AC-02 开启完整闭环。
-
-### Fixed
-- **AC-04 人工 gate**：`LoopReport.pending_approval` / `approval_state` / `approved_by` / `approved_at` 字段（默认 `n/a`）。
-- **AC-05 自动回滚 SLA**：`_build_degradation_test_suggestion()` + `rollback_cycle()` 路径验证（5min SLA）。
-- **AC-06 显著性检验对照**：`_z_test_p_value` 对照 scipy.stats.norm.sf，边界条件（p1=0 vs p2=1 必 p<1e-10）。
-- **AC-07 Dashboard**：`/evolve` 页面新增状态机、待审批列表、A/B 结果卡、回滚按钮。
-
-### Soak Test
-- **第一轮**：47.48h / 5504 样本 / RSS slope -0.028 MB/h / Handles +0.021/h / Pool 0 / 错误率 0% → PASS
-- **第二轮**：31.23h / 3620 样本（用户主动停止） / 内存 14.4MB (min 11.7 / max 49.4) / Handles 153 (152-160) / Pool 0 / CPU 平均 63.6% → 趋势一致，**综合判定通过**。
-
-### Security
-- **MAOS audit.py** metadata JSON 字符串解析修复（`_coerce_event_dict` 新增 `metadata` 分支）：SQLite `metadata` 列存储为 `'{}'` 字符串，Pydantic `AuditEvent(metadata: dict)` 校验失败 → query_events 全路径抛 ValidationError：Input should be a valid dictionary [type=dict_type, input_value='{}', input_type=str]。
-
-### Added
-- **ADR-020**：演化闭环安全边界 Stub（Phase 2 评审待填充 5 个待决问题）。
-
----
 
 ## [5.0.0] — 2026-08-11
 

@@ -20,10 +20,19 @@ publish（仅 tag push `v*`；2026-10-06 才补上 tag 触发，见 §3 第 3 �
 ```
 
 - `docs-gate` 跑 `py/scripts/check_docs_consistency.py --gate`（README + docs/ 的路径存在性、
-  模块计数、表格列数）。它**不跟着 `code=false` 跳过**，理由是这个检查的两类事故分别落在
+  模块计数、表格列数、**CHANGELOG 结构**——单一 Unreleased / SemVer 降序 / 合法版本号 /
+  归档段双向豁免）。它**不跟着 `code=false` 跳过**，理由是这个检查的两类事故分别落在
   两侧：只改文档会写进不存在的路径，只删代码会让文档里的旧路径失效——两边都必须跑。
   脚本只用标准库、本机约 3 秒，不属"重活"。判定范围由 `docs/README.md` 第 1–6 章
   （"当前权威文档"）决定，历史快照/设计文档要在文件头写理由才豁免，脚本会逐条打印。
+
+- 同一 job 另跑两条 ADR-023 门禁（2026-10-12 复评处置，纯 stdlib、不新增 job 名）：
+  - `py/scripts/check_silent_exceptions.py`：静默 `except … pass/continue/...` 必须有
+    `# silent-ok: <闭集类别> — <理由>`（或按 ADR-018 记日志）；存量 81 条+47 处
+    `contextlib.suppress` 进基线，**双向棘轮**（新增红、基线条目失效也红，只许减）。
+  - `py/scripts/check_file_size.py`：单文件 800 行上限，`migrations/` 整体豁免，
+    存量 7 个文件 allowlist 带拆分排期、双向一致（拆完必须移除条目）。
+  两侧的守卫在 `py/tests/test_quality_gates.py`（变异自证 + 双向一致性 + ci.yml 接线断言）。
 
 - `scope` 把变更集交给 `py/scripts/ci_path_scope.py` 分类，输出 `code=true|false`。
 - `code=false`（docs-only）时，`lint` 与 `frontend` 及它们的下游作业被**跳过**（skipped）。
