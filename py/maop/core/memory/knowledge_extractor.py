@@ -273,11 +273,11 @@ class KnowledgeExtractor:
         where = " AND ".join(conditions) if conditions else "1=1"
         with sqlite_connect(self._db_path) as conn:
             conn.execute(
-                f"UPDATE facts SET access_count = access_count + 1 WHERE {where}",
+                f"UPDATE facts SET access_count = access_count + 1 WHERE {where}",  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
                 params,
             )
             rows = conn.execute(
-                f"SELECT * FROM facts WHERE {where} ORDER BY confidence DESC, created_at DESC LIMIT ?",
+                f"SELECT * FROM facts WHERE {where} ORDER BY confidence DESC, created_at DESC LIMIT ?",  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
                 params + [top],
             ).fetchall()
 
@@ -311,7 +311,7 @@ class KnowledgeExtractor:
         where = " AND ".join(conditions) if conditions else "1=1"
         with sqlite_connect(self._db_path) as conn:
             rows = conn.execute(
-                f"SELECT * FROM relations WHERE {where} ORDER BY confidence DESC LIMIT ?",
+                f"SELECT * FROM relations WHERE {where} ORDER BY confidence DESC LIMIT ?",  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
                 params + [top],
             ).fetchall()
 

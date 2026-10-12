@@ -222,6 +222,31 @@ class TestPipelineRehearsal:
         capsys.readouterr()
         assert result["dry_run"] is True
 
+    def test_dry_run_writes_nothing_into_output_dir(self, tmp_path: Path, capsys: Any) -> None:
+        """ROADMAP T2.1 AC 的「写操作零副作用（临时目录断言）」。
+
+        预演只走 ``orch.plan()``：配置的输出目录在预演后必须**一个文件都没有**
+        （文件系统级断言，不依赖 fake 的 executed 标志），且哨兵行照常产出。
+        """
+        from maop.delegate import doc_pipeline_adapter as adapter
+
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        fake = _FakeOrchestrator()
+        with patch.object(adapter, "get_orchestrator", lambda *a, **kw: fake):
+            result = adapter.run_pipeline(
+                pipeline_name="demo",
+                input_file="in.md",
+                config={"output_dir": str(out_dir)},
+                dry_run=True,
+            )
+        captured = capsys.readouterr()
+        assert result["dry_run"] is True and result["status"] == "success"
+        assert any(ln.startswith(DRY_RUN_MARKER + ":") for ln in captured.out.splitlines())
+        assert list(out_dir.iterdir()) == [], "dry-run 往输出目录写了产物"
+        leftovers = [p for p in tmp_path.rglob("*") if p != out_dir]
+        assert leftovers == [], f"dry-run 在临时根下留下文件: {leftovers}"
+
     def test_no_dry_run_by_default(self) -> None:
         from maop.delegate import doc_pipeline_adapter as adapter
 

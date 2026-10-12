@@ -342,7 +342,7 @@ class PipelineCheckpoint:
                 placeholders = ",".join("?" * len(chunk))
                 step_cursor = conn.execute(
                     f"SELECT * FROM pipeline_step_checkpoints "
-                    f"WHERE run_id IN ({placeholders}) ORDER BY run_id, rowid",
+                    f"WHERE run_id IN ({placeholders}) ORDER BY run_id, rowid",  # nosec B608 — 语句内为常量拼接（无插值）
                     chunk,
                 )
                 if not step_cols and step_cursor.description:

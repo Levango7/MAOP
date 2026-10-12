@@ -226,7 +226,7 @@ class AgentProxyGateway:
             conn = self._pool.acquire()
             try:
                 conn.execute(
-                    f"DELETE FROM {_PROXY_RULE_TABLE} WHERE rule_id = ?",
+                    f"DELETE FROM {_PROXY_RULE_TABLE} WHERE rule_id = ?",  # nosec B608 — 表名为模块常量，where 由固定子句与 ? 组成（已人工核）
                     (rule_id,),
                 )
                 conn.commit()
@@ -241,7 +241,7 @@ class AgentProxyGateway:
             try:
                 rows = conn.execute(
                     f"SELECT * FROM {_PROXY_RULE_TABLE} "
-                    f"ORDER BY internal_path ASC"
+                    f"ORDER BY internal_path ASC"  # nosec B608 — 表名为模块常量，where 由固定子句与 ? 组成（已人工核）
                 ).fetchall()
             finally:
                 self._pool.release(conn)
@@ -259,7 +259,7 @@ class AgentProxyGateway:
                 row = conn.execute(
                     f"SELECT * FROM {_PROXY_RULE_TABLE} "
                     f"WHERE internal_path = ? AND enabled = 1 "
-                    f"ORDER BY rule_id ASC LIMIT 1",
+                    f"ORDER BY rule_id ASC LIMIT 1",  # nosec B608 — 表名为模块常量，where 由固定子句与 ? 组成（已人工核）
                     (internal_path,),
                 ).fetchone()
             finally:
@@ -296,7 +296,7 @@ class AgentProxyGateway:
                     f"INSERT INTO {_AUDIT_EVENT_TABLE} "
                     f"(event_id, timestamp, user, department, agent, "
                     f"action, details, success) "
-                    f"VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    f"VALUES (?, ?, ?, ?, ?, ?, ?, ?)",  # nosec B608 — 表名为模块常量，where 由固定子句与 ? 组成（已人工核）
                     (
                         event.event_id,
                         event.timestamp,
@@ -342,7 +342,7 @@ class AgentProxyGateway:
                 params.append(limit)
                 rows = conn.execute(
                     f"SELECT * FROM {_AUDIT_EVENT_TABLE}{where} "
-                    f"ORDER BY timestamp DESC LIMIT ?",
+                    f"ORDER BY timestamp DESC LIMIT ?",  # nosec B608 — 表名为模块常量，where 由固定子句与 ? 组成（已人工核）
                     params,
                 ).fetchall()
             finally:
@@ -378,7 +378,7 @@ class AgentProxyGateway:
                 # 为保留 used，先查现有 used，再 upsert。
                 existing = conn.execute(
                     f"SELECT used FROM {_DEPT_BUDGET_TABLE} "
-                    f"WHERE department = ? AND agent = ?",
+                    f"WHERE department = ? AND agent = ?",  # nosec B608 — 表名为模块常量，where 由固定子句与 ? 组成（已人工核）
                     (budget.department, budget.agent),
                 ).fetchone()
                 used = existing["used"] if existing is not None else budget.used
@@ -415,7 +415,7 @@ class AgentProxyGateway:
             try:
                 row = conn.execute(
                     f"SELECT monthly_budget, used FROM {_DEPT_BUDGET_TABLE} "
-                    f"WHERE department = ? AND agent = ?",
+                    f"WHERE department = ? AND agent = ?",  # nosec B608 — 表名为模块常量，where 由固定子句与 ? 组成（已人工核）
                     (department, agent),
                 ).fetchone()
             finally:
@@ -437,7 +437,7 @@ class AgentProxyGateway:
                 conn.execute(
                     f"UPDATE {_DEPT_BUDGET_TABLE} "
                     f"SET used = MAX(0.0, used + ?) "
-                    f"WHERE department = ? AND agent = ?",
+                    f"WHERE department = ? AND agent = ?",  # nosec B608 — 表名为模块常量，where 由固定子句与 ? 组成（已人工核）
                     (cost, department, agent),
                 )
                 conn.commit()
@@ -459,13 +459,13 @@ class AgentProxyGateway:
                     rows = conn.execute(
                         f"SELECT * FROM {_DEPT_BUDGET_TABLE} "
                         f"WHERE department = ? "
-                        f"ORDER BY department ASC, agent ASC",
+                        f"ORDER BY department ASC, agent ASC",  # nosec B608 — 表名为模块常量，where 由固定子句与 ? 组成（已人工核）
                         (department,),
                     ).fetchall()
                 else:
                     rows = conn.execute(
                         f"SELECT * FROM {_DEPT_BUDGET_TABLE} "
-                        f"ORDER BY department ASC, agent ASC"
+                        f"ORDER BY department ASC, agent ASC"  # nosec B608 — 表名为模块常量，where 由固定子句与 ? 组成（已人工核）
                     ).fetchall()
             finally:
                 self._pool.release(conn)

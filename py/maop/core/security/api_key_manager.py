@@ -436,7 +436,7 @@ class ApiKeyManager:
             conn = self._pool.acquire()
             try:
                 cur = conn.execute(
-                    f"UPDATE api_keys SET {set_clause} WHERE key_id = ?",
+                    f"UPDATE api_keys SET {set_clause} WHERE key_id = ?",  # nosec B608 — 列名来自 ApiKeyUpdate 模型字段，值绑定为 ?（已人工核）
                     (*updates.values(), key_id),
                 )
                 conn.commit()

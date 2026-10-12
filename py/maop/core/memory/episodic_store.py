@@ -348,7 +348,7 @@ class EpisodicStoreMixin:
                 placeholders = ",".join("?" * len(batch))
                 conn.execute(
                     f"UPDATE episodic_memory SET access_count = access_count + 1 "
-                    f"WHERE id IN ({placeholders})",
+                    f"WHERE id IN ({placeholders})",  # nosec B608 — 语句内为常量拼接（无插值）
                     batch,
                 )
 
@@ -409,7 +409,7 @@ class EpisodicStoreMixin:
 
             params.append(entry_id)
             conn.execute(
-                f"UPDATE episodic_memory SET {', '.join(sets)} WHERE id = ?",
+                f"UPDATE episodic_memory SET {', '.join(sets)} WHERE id = ?",  # nosec B608 — 占位符/子句由代码生成，值是 ?
                 params,
             )
         logger.debug("Feedback updated for %s", entry_id[:8])

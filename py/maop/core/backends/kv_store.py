@@ -265,7 +265,7 @@ class KVStore:
                 placeholders = ",".join("?" * len(chunk))
                 rows = conn.execute(
                     f"SELECT key, value FROM kv_store WHERE key IN ({placeholders}) AND namespace = ? "
-                    "AND (ttl_expires IS NULL OR ttl_expires > ?)",
+                    "AND (ttl_expires IS NULL OR ttl_expires > ?)",  # nosec B608 — 占位符/子句由代码生成，值是 ?
                     (*chunk, namespace, now),
                 ).fetchall()
                 for row in rows:

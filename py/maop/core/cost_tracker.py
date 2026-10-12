@@ -384,7 +384,7 @@ class CostTracker:
 
         with sqlite_connect(self._db_path) as conn:
             rows = conn.execute(
-                f"SELECT * FROM cost_entries {where} ORDER BY created_at DESC LIMIT ?",
+                f"SELECT * FROM cost_entries {where} ORDER BY created_at DESC LIMIT ?",  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
                 params,
             ).fetchall()
         return [self._row_to_entry(r) for r in rows]

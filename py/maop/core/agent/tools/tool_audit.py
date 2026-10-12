@@ -203,25 +203,25 @@ class ToolAuditLog:
             params: list[Any] = [since] if since > 0 else []
 
             total = conn.execute(
-                f"SELECT COUNT(*) FROM tool_audit_log {where}", params
+                f"SELECT COUNT(*) FROM tool_audit_log {where}", params  # nosec B608 — where 为字面量或固定子句与 ? 拼接（已人工核）
             ).fetchone()[0]
 
             success_count = conn.execute(
-                f"SELECT COUNT(*) FROM tool_audit_log {where} {'AND' if where else 'WHERE'} success = 1",
+                f"SELECT COUNT(*) FROM tool_audit_log {where} {'AND' if where else 'WHERE'} success = 1",  # nosec B608 — where 为字面量或固定子句与 ? 拼接（已人工核）
                 params,
             ).fetchone()[0]
 
             avg_dur = conn.execute(
-                f"SELECT AVG(duration_ms) FROM tool_audit_log {where}", params
+                f"SELECT AVG(duration_ms) FROM tool_audit_log {where}", params  # nosec B608 — where 为字面量或固定子句与 ? 拼接（已人工核）
             ).fetchone()[0] or 0.0
 
             by_tool = dict(conn.execute(
-                f"SELECT tool_name, COUNT(*) FROM tool_audit_log {where} GROUP BY tool_name",
+                f"SELECT tool_name, COUNT(*) FROM tool_audit_log {where} GROUP BY tool_name",  # nosec B608 — where 为字面量或固定子句与 ? 拼接（已人工核）
                 params,
             ).fetchall())
 
             by_agent = dict(conn.execute(
-                f"SELECT agent, COUNT(*) FROM tool_audit_log {where} GROUP BY agent",
+                f"SELECT agent, COUNT(*) FROM tool_audit_log {where} GROUP BY agent",  # nosec B608 — where 为字面量或固定子句与 ? 拼接（已人工核）
                 params,
             ).fetchall())
 

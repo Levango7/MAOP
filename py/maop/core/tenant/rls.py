@@ -167,7 +167,7 @@ class TenantRLS:
             self._validate_order_by(order_by)
         safe_limit = int(limit)
         if table not in self._scoped_tables:
-            sql = f"SELECT {columns} FROM {table}"
+            sql = f"SELECT {columns} FROM {table}"  # nosec B608 — 表名经 _scoped_tables 校验，列名为自省结果（已人工核）
             if where:
                 sql += f" WHERE {where}"
             if order_by:
@@ -181,7 +181,7 @@ class TenantRLS:
         if where:
             clauses.append(f"({where})")
             all_params.extend(params)
-        sql = f"SELECT {columns} FROM {table} WHERE " + " AND ".join(clauses)
+        sql = f"SELECT {columns} FROM {table} WHERE " + " AND ".join(clauses)  # nosec B608 — 表名经 _scoped_tables 校验，列名为自省结果（已人工核）
         if order_by:
             sql += f" ORDER BY {order_by}"
         if safe_limit > 0:
@@ -209,7 +209,7 @@ class TenantRLS:
         all_vals = list(values) + [tenant_id]
         placeholders = ", ".join("?" for _ in all_cols)
         col_list = ", ".join(all_cols)
-        sql = f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})"
+        sql = f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})"  # nosec B608 — 表名经 _scoped_tables 校验，列名为自省结果（已人工核）
         return sql, tuple(all_vals)
 
     def enforce_scope(self, tenant_id: str, table: str, row: dict[str, Any]) -> None:

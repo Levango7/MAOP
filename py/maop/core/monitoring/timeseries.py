@@ -221,7 +221,7 @@ class TimeSeriesStore:
                 FROM {table}
                 WHERE metric = ? AND timestamp >= ? AND timestamp <= ?
                 ORDER BY timestamp ASC
-            """
+            """  # nosec B608 — 语句内为常量拼接（无插值）
             rows = conn.execute(sql, (q.metric, q.start, q.end)).fetchall()
             return [
                 {

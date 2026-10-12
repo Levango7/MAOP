@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import pathlib
 import re
+from collections import Counter
 
 import pytest
 
@@ -23,10 +24,50 @@ MAOP = REPO / "py" / "maop"
 #: ``rel_path:rule`` pairs of every ``# nosec`` in ``py/maop``.
 #: Adding one is a decision — review the surrounding validation first.
 NOSEC_INVENTORY: frozenset[str] = frozenset({
-    "maop/core/mcp/mcp_hub_transport.py:B310",
-    "maop/core/mcp/mcp_marketplace.py:B310",
-    "maop/deploy.py:B310",
-    "maop/core/agent/ops/sandbox_executor.py:B602",  # pre-existing (2026-08, x2)
+    "maop/core/agent/auth/agent_proxy_gateway.py:B608:10",
+    "maop/core/agent/auth/credential_vault.py:B608:9",
+    "maop/core/agent/auth/harness_auth.py:B608:8",
+    "maop/core/agent/delegation/subagent_db.py:B608:1",
+    "maop/core/agent/delegation/subagent_lifecycle.py:B608:1",
+    "maop/core/agent/lifecycle/agent_registry.py:B608:1",
+    "maop/core/agent/memory_ctx/worktree.py:B608:1",
+    "maop/core/agent/ops/sandbox_executor.py:B602:2",
+    "maop/core/agent/plugins_hooks/hook_manager.py:B608:1",
+    "maop/core/agent/tools/tool_audit.py:B608:5",
+    "maop/core/backends/data.py:B608:6",
+    "maop/core/backends/image_store.py:B608:2",
+    "maop/core/backends/kv_store.py:B608:1",
+    "maop/core/cost_tracker.py:B608:1",
+    "maop/core/mcp/mcp_hub_ops.py:B608:1",
+    "maop/core/mcp/mcp_hub_transport.py:B310:1",
+    "maop/core/mcp/mcp_marketplace.py:B310:1",
+    "maop/core/memory/episodic_store.py:B608:2",
+    "maop/core/memory/knowledge_extractor.py:B608:3",
+    "maop/core/memory/knowledge_graph.py:B608:4",
+    "maop/core/memory/multimodal_store.py:B608:1",
+    "maop/core/memory/vector_store.py:B608:8",
+    "maop/core/monitoring/timeseries.py:B608:1",
+    "maop/core/reliability/circuit_breaker.py:B608:2",
+    "maop/core/reliability/message_queue.py:B608:1",
+    "maop/core/reliability/pipeline_checkpoint.py:B608:1",
+    "maop/core/security/api_key_manager.py:B608:1",
+    "maop/core/security/session.py:B608:4",
+    "maop/core/tenant/audit.py:B608:2",
+    "maop/core/tenant/compliance_manager.py:B608:11",
+    "maop/core/tenant/gdpr_manager.py:B608:6",
+    "maop/core/tenant/hierarchy.py:B608:4",
+    "maop/core/tenant/rls.py:B608:3",
+    "maop/dashboard/routers/agent_versions_helpers.py:B608:1",
+    "maop/dashboard/services/agent_versions_service.py:B608:8",
+    "maop/dashboard/services/auth_service.py:B608:1",
+    "maop/dashboard/services/chat_service.py:B608:10",
+    "maop/deploy.py:B310:1",
+    "maop/memory/search.py:B608:7",
+    "maop/memory/store.py:B608:1",
+    "maop/migrations/memory_migration.py:B608:4",
+    "maop/migrations/pg/vector_migration.py:B608:1",
+    "maop/migrations/sqlite_to_pg.py:B608:5",
+    "maop/prompt_manager.py:B608:1",
 })
 
 
@@ -82,8 +123,8 @@ def test_agent_repair_does_not_widen_read_permissions():
 # ── nosec inventory ────────────────────────────────────────
 
 
-def _scan_nosec() -> set[str]:
-    found: set[str] = set()
+def _scan_nosec() -> Counter[str]:
+    found: Counter[str] = Counter()
     for path in MAOP.rglob("*.py"):
         if "__pycache__" in path.parts:
             continue
@@ -93,15 +134,21 @@ def _scan_nosec() -> set[str]:
                 continue
             rule = re.search(r"#\s*nosec\s*([A-Z]\d{3})?", line)
             rule_id = (rule.group(1) if rule and rule.group(1) else "ALL")
-            found.add(f"{path.relative_to(REPO / 'py').as_posix()}:{rule_id}")
+            found[f"{path.relative_to(REPO / 'py').as_posix()}:{rule_id}"] += 1
     return found
 
 
 def test_nosec_inventory_matches():
-    """New ``# nosec`` must be registered deliberately (anti-mass-silencing)."""
+    """New ``# nosec`` must be registered deliberately (anti-mass-silencing).
+
+    Registry is ``path:RULE:count`` — line numbers are deliberately NOT used
+    (they shift on any edit above, the 假红 class ADR-023 already covers);
+    a count change means sites were added/removed in that file.
+    """
     actual = _scan_nosec()
-    new = sorted(actual - set(NOSEC_INVENTORY))
-    stale = sorted(set(NOSEC_INVENTORY) - actual)
+    actual_keys = {f"{k}:{n}" for k, n in actual.items()}
+    new = sorted(actual_keys - set(NOSEC_INVENTORY))
+    stale = sorted(set(NOSEC_INVENTORY) - actual_keys)
     assert not new, (
         "new # nosec directives appeared — review the validation around them, "
         f"then add to NOSEC_INVENTORY: {new}"

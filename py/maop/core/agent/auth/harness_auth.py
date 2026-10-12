@@ -241,7 +241,7 @@ class HarnessAuthProvider:
             conn = self._pool.acquire()
             try:
                 row = conn.execute(
-                    f"SELECT * FROM {_LICENSE_TABLE} WHERE license_key = ?",
+                    f"SELECT * FROM {_LICENSE_TABLE} WHERE license_key = ?",  # nosec B608 — 模块常量表名/列清单（非输入）
                     (license_key,),
                 ).fetchone()
             finally:
@@ -273,7 +273,7 @@ class HarnessAuthProvider:
             conn = self._pool.acquire()
             try:
                 row = conn.execute(
-                    f"SELECT model_account FROM {_LICENSE_TABLE} WHERE license_key = ?",
+                    f"SELECT model_account FROM {_LICENSE_TABLE} WHERE license_key = ?",  # nosec B608 — 模块常量表名/列清单（非输入）
                     (license_key,),
                 ).fetchone()
             finally:
@@ -298,7 +298,7 @@ class HarnessAuthProvider:
             try:
                 cur = conn.execute(
                     f"UPDATE {_LICENSE_TABLE} SET model_account = ? "
-                    f"WHERE license_key = ?",
+                    f"WHERE license_key = ?",  # nosec B608 — 模块常量表名/列清单（非输入）
                     (model_account, license_key),
                 )
                 conn.commit()
@@ -326,7 +326,7 @@ class HarnessAuthProvider:
             try:
                 cur = conn.execute(
                     f"UPDATE {_LICENSE_TABLE} SET model_account = '' "
-                    f"WHERE license_key = ?",
+                    f"WHERE license_key = ?",  # nosec B608 — 模块常量表名/列清单（非输入）
                     (license_key,),
                 )
                 conn.commit()
@@ -351,7 +351,7 @@ class HarnessAuthProvider:
             try:
                 cur = conn.execute(
                     f"UPDATE {_LICENSE_TABLE} SET status = 'revoked' "
-                    f"WHERE license_key = ?",
+                    f"WHERE license_key = ?",  # nosec B608 — 模块常量表名/列清单（非输入）
                     (license_key,),
                 )
                 conn.commit()
@@ -372,7 +372,7 @@ class HarnessAuthProvider:
             conn = self._pool.acquire()
             try:
                 rows = conn.execute(
-                    f"SELECT * FROM {_LICENSE_TABLE} ORDER BY license_key"
+                    f"SELECT * FROM {_LICENSE_TABLE} ORDER BY license_key"  # nosec B608 — 模块常量表名/列清单（非输入）
                 ).fetchall()
             finally:
                 self._pool.release(conn)
@@ -396,7 +396,7 @@ class HarnessAuthProvider:
             conn = self._pool.acquire()
             try:
                 row = conn.execute(
-                    f"SELECT * FROM {_LICENSE_TABLE} WHERE license_key = ?",
+                    f"SELECT * FROM {_LICENSE_TABLE} WHERE license_key = ?",  # nosec B608 — 模块常量表名/列清单（非输入）
                     (license_key,),
                 ).fetchone()
                 if row is None:
@@ -416,7 +416,7 @@ class HarnessAuthProvider:
                     # 已过期，自动更新 status。
                     conn.execute(
                         f"UPDATE {_LICENSE_TABLE} SET status = 'expired' "
-                        f"WHERE license_key = ?",
+                        f"WHERE license_key = ?",  # nosec B608 — 模块常量表名/列清单（非输入）
                         (license_key,),
                     )
                     conn.commit()

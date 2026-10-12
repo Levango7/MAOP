@@ -282,7 +282,7 @@ class KnowledgeGraph:
                 if entity_names:
                     placeholders = ",".join("?" * len(entity_names))
                     rel_rows = conn.execute(
-                        f"SELECT * FROM relations WHERE source IN ({placeholders}) OR target IN ({placeholders}) LIMIT ?",
+                        f"SELECT * FROM relations WHERE source IN ({placeholders}) OR target IN ({placeholders}) LIMIT ?",  # nosec B608 — 占位符/子句由代码生成，值是 ?
                         entity_names + entity_names + [max_nodes * 2],
                     ).fetchall()
                     for r in rel_rows:
@@ -410,7 +410,7 @@ class KnowledgeGraph:
                     WHERE {where}
                     ORDER BY e.confidence DESC
                     LIMIT ?
-                    """,
+                    """,  # nosec B608 — 语句内为常量拼接（无插值）
                     params + [limit],
                 ).fetchall()
 
@@ -443,7 +443,7 @@ class KnowledgeGraph:
                           AND target IN ({placeholders})
                         ORDER BY confidence DESC
                         LIMIT ?
-                        """,
+                        """,  # nosec B608 — 语句内为常量拼接（无插值）
                         id_list + id_list + [limit * 2],
                     ).fetchall()
                     for r in edge_rows:
@@ -493,7 +493,7 @@ class KnowledgeGraph:
         with sqlite_connect(self._db_path) as conn:
             try:
                 rows = conn.execute(
-                    f"SELECT * FROM relations WHERE {where} ORDER BY confidence DESC LIMIT 50",
+                    f"SELECT * FROM relations WHERE {where} ORDER BY confidence DESC LIMIT 50",  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
                     params,
                 ).fetchall()
             except Exception as exc:

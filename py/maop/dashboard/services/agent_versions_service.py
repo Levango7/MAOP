@@ -158,7 +158,7 @@ def list_versions(
 
     with sqlite_connect(str(db_path)) as conn:
         total = conn.execute(
-            f"SELECT COUNT(*) AS c FROM agent_versions{where_sql}", params
+            f"SELECT COUNT(*) AS c FROM agent_versions{where_sql}", params  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
         ).fetchone()["c"]
 
         rows = conn.execute(
@@ -166,7 +166,7 @@ def list_versions(
             SELECT {_AGENT_VERSION_COLUMNS} FROM agent_versions{where_sql}
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
-            """,
+            """,  # nosec B608 — 语句内为常量拼接（无插值）
             [*params, page_size, offset],
         ).fetchall()
 
@@ -244,7 +244,7 @@ def update_version(
         params.append(time.time())
         params.append(version_id)
         conn.execute(
-            f"UPDATE agent_versions SET {', '.join(updates)} WHERE version_id = ?",
+            f"UPDATE agent_versions SET {', '.join(updates)} WHERE version_id = ?",  # nosec B608 — 占位符/子句由代码生成，值是 ?
             params,
         )
         row = _get_version_row(conn, version_id)
@@ -457,7 +457,7 @@ def configure_canary(
             f"""
             SELECT {_CANARY_COLUMNS} FROM agent_version_canaries
             WHERE version_id = ? AND status = 'active'
-            """,
+            """,  # nosec B608 — 语句内为常量拼接（无插值）
             (version_id,),
         ).fetchone()
         if existing is not None:
@@ -484,7 +484,7 @@ def configure_canary(
             ),
         )
         canary_row = conn.execute(
-            f"SELECT {_CANARY_COLUMNS} FROM agent_version_canaries WHERE canary_id = ?",
+            f"SELECT {_CANARY_COLUMNS} FROM agent_version_canaries WHERE canary_id = ?",  # nosec B608 — 模块常量表名/列清单（非输入）
             (canary_id,),
         ).fetchone()
         canary = _canary_row_to_dict(canary_row)
@@ -509,7 +509,7 @@ def get_canary(version_id: str) -> dict[str, Any]:
             raise VersionNotFound("Version not found")
         canary_rows = conn.execute(
             f"SELECT {_CANARY_COLUMNS} FROM agent_version_canaries "
-            f"WHERE version_id = ? ORDER BY started_at DESC",
+            f"WHERE version_id = ? ORDER BY started_at DESC",  # nosec B608 — 模块常量表名/列清单（非输入）
             (version_id,),
         ).fetchall()
 
@@ -544,7 +544,7 @@ def get_version_metrics(version_id: str) -> dict[str, Any]:
             SELECT {_AGENT_VERSION_COLUMNS} FROM agent_versions
             WHERE agent_id = ? AND status = 'active' AND version_id != ?
             ORDER BY activated_at DESC LIMIT 1
-            """,
+            """,  # nosec B608 — 语句内为常量拼接（无插值）
             (agent_id, version_id),
         ).fetchone()
         active_item = _version_row_to_dict(active_row) if active_row else None
@@ -554,7 +554,7 @@ def get_version_metrics(version_id: str) -> dict[str, Any]:
             SELECT {_CANARY_COLUMNS} FROM agent_version_canaries
             WHERE version_id = ? AND status = 'active'
             ORDER BY started_at DESC LIMIT 1
-            """,
+            """,  # nosec B608 — 模块常量表名/列清单（非输入）
             (version_id,),
         ).fetchone()
         canary = _canary_row_to_dict(canary_row) if canary_row else None

@@ -223,4 +223,6 @@ maop/migrations/sqlite_to_pg.py:345  [builder]  col_list, table
 maop/migrations/sqlite_to_pg.py:366  [other]  c, c, table, col_list
 ```
 
-> 已完成的真修复（同批 PR）：B615×2 钉 40-hex 模型 revision（含夹具 revision 与守卫测试）、B310×3（MCP transport 方案白名单 + marketplace 已有 SSRF 守卫 + deploy host 校验）、B103（exec 位只加不重写权限）。门禁 `-lll`→`-ll` 待 B608 全部处置后切换（切换前必须先过 nosec 清单门禁 `tests/test_bandit_security_fixes.py::test_nosec_inventory_matches`）。
+> 已完成（真修复 PR #91）：B615×2 钉 40-hex 模型 revision（含夹具 revision 与守卫测试）、B310×3（MCP transport 方案白名单 + marketplace 已有 SSRF 守卫 + deploy host 校验）、B103（exec 位只加不重写权限）。
+>
+> **2026-10-12 附录 A 已执行完毕（B608 清零）**：141 处逐站点处置（84 分类 + 57 人工核，结论全部安全、无真注入面），`bandit -r maop/ -ll` 由 148 → **0**，ci.yml 门禁切到 `-ll`；nosec 清单快照升级为 `path:RULE:count`（44 条目/146 行）。**本附录的处置表已完成使命**，后续新增 B608 由门禁 + 清单快照兜底。

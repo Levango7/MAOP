@@ -334,6 +334,6 @@ class MCPHubOpsMixin:
                 params.append(error)
             params.append(server_id)
             conn.execute(
-                f"UPDATE mcp_servers SET {', '.join(sets)} WHERE id = ?", params,
+                f"UPDATE mcp_servers SET {', '.join(sets)} WHERE id = ?", params,  # nosec B608 — 占位符/子句由代码生成，值是 ?
             )
 

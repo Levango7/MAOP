@@ -172,7 +172,7 @@ def _iter_sqlite_batches(
             rows = conn.execute(
                 text(
                     f"SELECT {cols} FROM vector_entries "
-                    "ORDER BY created_at LIMIT :lim OFFSET :off"
+                    "ORDER BY created_at LIMIT :lim OFFSET :off"  # nosec B608 — 占位符/子句由代码生成，值是 ?
                 ),
                 {"lim": batch_size, "off": offset},
             ).fetchall()

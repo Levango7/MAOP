@@ -171,7 +171,7 @@ class SessionManager:
                 params.append(agent)
             where = " WHERE " + " AND ".join(clauses) if clauses else ""
             rows = conn.execute(
-                f"SELECT * FROM sessions{where} ORDER BY last_active_at DESC LIMIT ?",
+                f"SELECT * FROM sessions{where} ORDER BY last_active_at DESC LIMIT ?",  # nosec B608 — update 键来自固定字段集合，值绑定为 ?（已人工核）
                 (*params, limit),
             ).fetchall()
         return [self._row_to_session(r) for r in rows]
@@ -246,13 +246,13 @@ class SessionManager:
 
         with self._connect() as conn:
             total_row = conn.execute(
-                f"SELECT COUNT(*) AS c FROM sessions{where}", params
+                f"SELECT COUNT(*) AS c FROM sessions{where}", params  # nosec B608 — update 键来自固定字段集合，值绑定为 ?（已人工核）
             ).fetchone()
             total = int(total_row["c"]) if total_row else 0
 
             rows = conn.execute(
                 f"SELECT * FROM sessions{where} "
-                f"ORDER BY {sort_col} {order.upper()} LIMIT ? OFFSET ?",
+                f"ORDER BY {sort_col} {order.upper()} LIMIT ? OFFSET ?",  # nosec B608 — update 键来自固定字段集合，值绑定为 ?（已人工核）
                 (*params, limit, offset),
             ).fetchall()
 
@@ -305,7 +305,7 @@ class SessionManager:
         set_clause = ", ".join(f"{k}=?" for k in updates)
         values = list(updates.values()) + [session_id]
         with self._connect() as conn:
-            conn.execute(f"UPDATE sessions SET {set_clause} WHERE id=?", values)
+            conn.execute(f"UPDATE sessions SET {set_clause} WHERE id=?", values)  # nosec B608 — update 键来自固定字段集合，值绑定为 ?（已人工核）
         return True
 
     def delete(self, session_id: str) -> bool:

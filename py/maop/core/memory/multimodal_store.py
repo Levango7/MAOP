@@ -461,7 +461,7 @@ class MultimodalStore(VectorStore):
             with self._connect() as conn:
                 rows = conn.execute(
                     f"SELECT json_extract(metadata, '$.{MODALITY_KEY}') AS m, "
-                    f"COUNT(*) AS cnt FROM {self._table} GROUP BY m"
+                    f"COUNT(*) AS cnt FROM {self._table} GROUP BY m"  # nosec B608 — 模块常量表名/列清单（非输入）
                 ).fetchall()
             for row in rows:
                 key = str(row["m"] or "unknown")
