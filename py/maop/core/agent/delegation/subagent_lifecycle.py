@@ -443,7 +443,7 @@ class SubAgentManager:
                 params.append(time.time())
             params.append(agent_id)
             conn.execute(
-                f"UPDATE subagents SET {', '.join(sets)} WHERE id = ?", params,
+                f"UPDATE subagents SET {', '.join(sets)} WHERE id = ?", params,  # nosec B608 — 占位符/子句由代码生成，值是 ?
             )
 
     def _append_transcript(

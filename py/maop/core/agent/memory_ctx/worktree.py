@@ -227,7 +227,7 @@ class WorktreeManager:
 
             params.append(node_id)
             conn.execute(
-                f"UPDATE worktree_nodes SET {', '.join(sets)} WHERE id = ?", params,
+                f"UPDATE worktree_nodes SET {', '.join(sets)} WHERE id = ?", params,  # nosec B608 — 占位符/子句由代码生成，值是 ?
             )
         return True
 

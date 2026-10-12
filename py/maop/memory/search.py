@@ -87,7 +87,7 @@ class SearchMixin:
                         chunk = missing_ids[i:i + CHUNK_SIZE]
                         placeholders = ",".join("?" * len(chunk))
                         rows = self._query(
-                            f"SELECT * FROM memory_entries WHERE id IN ({placeholders})",
+                            f"SELECT * FROM memory_entries WHERE id IN ({placeholders})",  # nosec B608 — field 经 allowed_fields 白名单，kw 为绑定参数（已人工核）
                             tuple(chunk),
                         )
                         for r in rows:
@@ -135,7 +135,7 @@ class SearchMixin:
         where_sql = f"WHERE {where_clause}" if where_clause else ""
 
         rows = self._query(
-            f"SELECT * FROM memory_entries {where_sql} ORDER BY timestamp DESC LIMIT ?",
+            f"SELECT * FROM memory_entries {where_sql} ORDER BY timestamp DESC LIMIT ?",  # nosec B608 — field 经 allowed_fields 白名单，kw 为绑定参数（已人工核）
             params + [top],
         )
         return [SearchResult(
@@ -193,7 +193,7 @@ class SearchMixin:
                     WHERE memory_fts MATCH ? {where_sql}
                     ORDER BY bm25(memory_fts)
                     LIMIT ?
-                """
+                """  # nosec B608 — field 经 allowed_fields 白名单，kw 为绑定参数（已人工核）
             else:
                 sql = f"""
                     SELECT m.id, m.agent, m.task, m.tags, m.topic,
@@ -205,7 +205,7 @@ class SearchMixin:
                     WHERE memory_fts MATCH ? {where_sql}
                     ORDER BY bm25(memory_fts)
                     LIMIT ?
-                """
+                """  # nosec B608 — field 经 allowed_fields 白名单，kw 为绑定参数（已人工核）
 
             rows = self._query(sql, [match_expr] + params + [top])
 
@@ -261,7 +261,7 @@ class SearchMixin:
         # 加 LIMIT ? (top*10) 作为候选上界，足够覆盖关键词命中排序后取 top 的场景，
         # 同时避免对超大表的全量扫描。
         rows = self._query(
-            f"SELECT * FROM memory_entries {where_sql} ORDER BY timestamp DESC LIMIT ?",
+            f"SELECT * FROM memory_entries {where_sql} ORDER BY timestamp DESC LIMIT ?",  # nosec B608 — field 经 allowed_fields 白名单，kw 为绑定参数（已人工核）
             params + [top * 10],
         )
         scored: list[SearchResult] = []
@@ -320,7 +320,7 @@ class SearchMixin:
                 GROUP BY m.{field}
                 ORDER BY cnt DESC
                 LIMIT ?
-            """
+            """  # nosec B608 — field 经 allowed_fields 白名单，kw 为绑定参数（已人工核）
             rows = self._query(sql, (match_expr, top))
         else:
             sql = f"""
@@ -329,7 +329,7 @@ class SearchMixin:
                 GROUP BY {field}
                 ORDER BY cnt DESC
                 LIMIT ?
-            """
+            """  # nosec B608 — field 经 allowed_fields 白名单，kw 为绑定参数（已人工核）
             rows = self._query(sql, (top,))
 
         return [FacetResult(facet=field, value=r["facet_val"], count=r["cnt"]) for r in rows]

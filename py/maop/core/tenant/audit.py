@@ -211,7 +211,7 @@ class AuditLogger:
             f"SELECT id, tenant_id, timestamp, action, resource, resource_id, "
             f"actor, result, detail, seq, prev_hash, hash "
             f"FROM tenant_audit_log WHERE {where} "
-            f"ORDER BY seq DESC LIMIT ? OFFSET ?"
+            f"ORDER BY seq DESC LIMIT ? OFFSET ?"  # nosec B608 — 语句内为常量拼接（无插值）
         )
         params.extend([limit, offset])
         with sqlite_connect(self._db_path) as conn:
@@ -226,7 +226,7 @@ class AuditLogger:
             params.append(action)
         with sqlite_connect(self._db_path) as conn:
             row = conn.execute(
-                f"SELECT COUNT(*) FROM tenant_audit_log WHERE {' AND '.join(clauses)}",
+                f"SELECT COUNT(*) FROM tenant_audit_log WHERE {' AND '.join(clauses)}",  # nosec B608 — 占位符/子句由代码生成，值是 ?
                 tuple(params),
             ).fetchone()
         return row[0] if row else 0

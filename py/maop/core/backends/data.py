@@ -458,12 +458,12 @@ class MaopDatabase:
             sql = f"""SELECT *, json_extract({json_column}, ?) AS json_value
                       FROM {table}
                       WHERE json_extract({json_column}, ?) = ?
-                      LIMIT ?"""
+                      LIMIT ?"""  # nosec B608 — 表名经 validate_identifier，派生名来自受控表名（已人工核）
             params: tuple[str, str, Any, int] | tuple[str, int] = (json_path, json_path, value, limit)
         else:
             sql = f"""SELECT *, json_extract({json_column}, ?) AS json_value
                       FROM {table}
-                      LIMIT ?"""
+                      LIMIT ?"""  # nosec B608 — 表名经 validate_identifier，派生名来自受控表名（已人工核）
             params = (json_path, limit)
 
         try:
@@ -516,7 +516,7 @@ class MaopDatabase:
         validate_identifier(json_column, "json_column")
         sql = f"""SELECT je.key, je.value, je.type, je.atom
                   FROM {table}, json_each(json_extract({json_column}, ?)) AS je
-                  LIMIT ?"""
+                  LIMIT ?"""  # nosec B608 — 表名经 validate_identifier，派生名来自受控表名（已人工核）
         try:
             with self._connect() as conn:
                 cursor = conn.execute(sql, (json_path, limit))
@@ -611,7 +611,7 @@ class MaopDatabase:
                               FROM {fts_name}
                               WHERE {fts_name} MATCH ?
                               ORDER BY rank
-                              LIMIT ?"""
+                              LIMIT ?"""  # nosec B608 — 表名经 validate_identifier，派生名来自受控表名（已人工核）
                     cursor = conn.execute(sql, (query, limit))
                     columns = [desc[0] for desc in cursor.description]
                     return [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -625,7 +625,7 @@ class MaopDatabase:
                           FROM {fts_name}
                           WHERE {fts_name} MATCH ?
                           ORDER BY rank
-                          LIMIT ?"""
+                          LIMIT ?"""  # nosec B608 — 表名经 validate_identifier，派生名来自受控表名（已人工核）
                 cursor = conn.execute(sql, (query, limit))
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -643,7 +643,7 @@ class MaopDatabase:
         fts_name = f"{table}_fts"
         try:
             with self._connect() as conn:
-                conn.execute(f"INSERT INTO {fts_name}({fts_name}) VALUES('rebuild')")
+                conn.execute(f"INSERT INTO {fts_name}({fts_name}) VALUES('rebuild')")  # nosec B608 — 表名经 validate_identifier，派生名来自受控表名（已人工核）
             return True
         except Exception as exc:
             logger.warning("FTS5 rebuild failed: %s", exc)

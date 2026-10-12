@@ -321,7 +321,7 @@ def db_register_user(
             cols += ", tenant_id"
             vals = (*vals, tenant_id or "")
         conn.execute(
-            f"INSERT INTO users ({cols}) VALUES ({', '.join('?' * len(vals))})",
+            f"INSERT INTO users ({cols}) VALUES ({', '.join('?' * len(vals))})",  # nosec B608 — 占位符/子句由代码生成，值是 ?
             vals,
         )
 

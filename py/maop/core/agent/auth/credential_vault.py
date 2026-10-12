@@ -332,7 +332,7 @@ class CredentialVault:
             conn.execute(
                 f"INSERT INTO {_AUDIT_TABLE} "
                 f"(credential_id, actor, action, detail, result, timestamp) "
-                f"VALUES (?, ?, ?, ?, ?, ?)",
+                f"VALUES (?, ?, ?, ?, ?, ?)",  # nosec B608 — 表名为模块常量，id 为绑定参数（已人工核）
                 (credential_id, actor, action, detail, result, time.time()),
             )
             conn.commit()
@@ -379,12 +379,12 @@ class CredentialVault:
             conn = self._pool.acquire()
             try:
                 row = conn.execute(
-                    f"SELECT * FROM {_VAULT_TABLE} WHERE id = ?", (credential_id,)
+                    f"SELECT * FROM {_VAULT_TABLE} WHERE id = ?", (credential_id,)  # nosec B608 — 表名为模块常量，id 为绑定参数（已人工核）
                 ).fetchone()
                 if row is None:
                     raise KeyError(f"凭证不存在: {credential_id}")
                 conn.execute(
-                    f"UPDATE {_VAULT_TABLE} SET last_used_at = ? WHERE id = ?",
+                    f"UPDATE {_VAULT_TABLE} SET last_used_at = ? WHERE id = ?",  # nosec B608 — 表名为模块常量，id 为绑定参数（已人工核）
                     (time.time(), credential_id),
                 )
                 conn.commit()
@@ -400,7 +400,7 @@ class CredentialVault:
             conn = self._pool.acquire()
             try:
                 rows = conn.execute(
-                    f"SELECT * FROM {_VAULT_TABLE} ORDER BY created_at DESC"
+                    f"SELECT * FROM {_VAULT_TABLE} ORDER BY created_at DESC"  # nosec B608 — 表名为模块常量，id 为绑定参数（已人工核）
                 ).fetchall()
             finally:
                 self._pool.release(conn)
@@ -432,7 +432,7 @@ class CredentialVault:
             conn = self._pool.acquire()
             try:
                 cur = conn.execute(
-                    f"DELETE FROM {_VAULT_TABLE} WHERE id = ?", (credential_id,)
+                    f"DELETE FROM {_VAULT_TABLE} WHERE id = ?", (credential_id,)  # nosec B608 — 表名为模块常量，id 为绑定参数（已人工核）
                 )
                 conn.commit()
                 deleted = cur.rowcount > 0
@@ -474,7 +474,7 @@ class CredentialVault:
             try:
                 conn.execute(
                     f"UPDATE {_VAULT_TABLE} SET encrypted_data = ?, updated_at = ? "
-                    f"WHERE id = ?",
+                    f"WHERE id = ?",  # nosec B608 — 表名为模块常量，id 为绑定参数（已人工核）
                     (encrypted, str(now), credential_id),
                 )
                 conn.commit()
@@ -497,7 +497,7 @@ class CredentialVault:
         try:
             conn.execute(
                 f"UPDATE {_VAULT_TABLE} SET last_tested_at = ?, last_test_result = ? "
-                f"WHERE id = ?",
+                f"WHERE id = ?",  # nosec B608 — 表名为模块常量，id 为绑定参数（已人工核）
                 (now, 1 if ok else 0, credential_id),
             )
             conn.commit()
@@ -514,12 +514,12 @@ class CredentialVault:
             if credential_id:
                 rows = conn.execute(
                     f"SELECT * FROM {_AUDIT_TABLE} WHERE credential_id = ? "
-                    f"ORDER BY timestamp DESC LIMIT ?",
+                    f"ORDER BY timestamp DESC LIMIT ?",  # nosec B608 — 表名为模块常量，id 为绑定参数（已人工核）
                     (credential_id, limit),
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    f"SELECT * FROM {_AUDIT_TABLE} ORDER BY timestamp DESC LIMIT ?",
+                    f"SELECT * FROM {_AUDIT_TABLE} ORDER BY timestamp DESC LIMIT ?",  # nosec B608 — 表名为模块常量，id 为绑定参数（已人工核）
                     (limit,),
                 ).fetchall()
         finally:

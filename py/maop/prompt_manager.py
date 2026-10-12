@@ -295,7 +295,7 @@ class PromptManager:
             if template_ids:
                 placeholders = ",".join("?" for _ in template_ids)
                 rows = conn.execute(
-                    f"SELECT * FROM prompt_templates WHERE id IN ({placeholders})",
+                    f"SELECT * FROM prompt_templates WHERE id IN ({placeholders})",  # nosec B608 — 占位符/子句由代码生成，值是 ?
                     template_ids,
                 ).fetchall()
             else:

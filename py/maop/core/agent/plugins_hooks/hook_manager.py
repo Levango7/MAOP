@@ -600,7 +600,7 @@ class HookManager:
         params.append(limit)
         with sqlite_connect(self._db_path) as conn:
             rows = conn.execute(
-                f"SELECT * FROM hook_logs{where} ORDER BY created_at DESC LIMIT ?",
+                f"SELECT * FROM hook_logs{where} ORDER BY created_at DESC LIMIT ?",  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
                 tuple(params),
             ).fetchall()
         return [dict(r) for r in rows]

@@ -529,7 +529,7 @@ class MemoryStore(SearchMixin):
                         chunk = pruned_ids[i:i + CHUNK_SIZE]
                         placeholders = ",".join("?" * len(chunk))
                         conn.execute(
-                            f"DELETE FROM memory_entries WHERE id IN ({placeholders})",
+                            f"DELETE FROM memory_entries WHERE id IN ({placeholders})",  # nosec B608 — 占位符/子句由代码生成，值是 ?
                             chunk,
                         )
             except Exception as exc:

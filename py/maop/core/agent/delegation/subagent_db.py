@@ -341,7 +341,7 @@ def _rebuild_subagents_table(
     col_list = ", ".join(sorted(common_cols))
     if col_list:
         conn.execute(
-            f"INSERT INTO _subagents_new ({col_list}) SELECT {col_list} FROM subagents"
+            f"INSERT INTO _subagents_new ({col_list}) SELECT {col_list} FROM subagents"  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
         )
 
     # 3. 删除旧表

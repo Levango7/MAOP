@@ -250,7 +250,7 @@ class ImageStore:
                 chunk = ids[i:i + CHUNK_SIZE]
                 placeholders = ",".join("?" * len(chunk))
                 conn.execute(
-                    f"DELETE FROM images WHERE id IN ({placeholders})",
+                    f"DELETE FROM images WHERE id IN ({placeholders})",  # nosec B608 — 占位符/子句由代码生成，值是 ?
                     chunk,
                 )
         # 删除磁盘文件（数据库事务已提交）
@@ -297,7 +297,7 @@ class ImageStore:
                 chunk = ids[i:i + CHUNK_SIZE]
                 placeholders = ",".join("?" * len(chunk))
                 conn.execute(
-                    f"DELETE FROM images WHERE id IN ({placeholders})",
+                    f"DELETE FROM images WHERE id IN ({placeholders})",  # nosec B608 — 占位符/子句由代码生成，值是 ?
                     chunk,
                 )
 

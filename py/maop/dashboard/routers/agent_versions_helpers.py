@@ -244,7 +244,7 @@ def _get_version_row(
 ) -> sqlite3.Row | None:
     """按 ID 读取版本行."""
     return conn.execute(
-        f"SELECT {_AGENT_VERSION_COLUMNS} FROM agent_versions WHERE version_id = ?",
+        f"SELECT {_AGENT_VERSION_COLUMNS} FROM agent_versions WHERE version_id = ?",  # nosec B608 — 模块常量表名/列清单（非输入）
         (version_id,),
     ).fetchone()
 

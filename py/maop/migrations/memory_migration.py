@@ -177,13 +177,13 @@ def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
 
 
 def _table_columns(conn: sqlite3.Connection, table: str) -> list[str]:
-    cur = conn.execute(f"SELECT * FROM {table} LIMIT 0")
+    cur = conn.execute(f"SELECT * FROM {table} LIMIT 0")  # nosec B608 — 表名/列名来自迁移元数据自省（已人工核）
     return [d[0] for d in cur.description] if cur.description else []
 
 
 def _count_rows(conn: sqlite3.Connection, table: str) -> int:
     try:
-        return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+        return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])  # nosec B608 — 表名/列名来自迁移元数据自省（已人工核）
     except sqlite3.Error:
         return 0
 
@@ -305,7 +305,7 @@ def _migrate_table(
                 error_msgs: list[str] = []
                 done = 0
                 FETCH_BATCH = 5000
-                cursor = src.execute(f"SELECT * FROM {table}")
+                cursor = src.execute(f"SELECT * FROM {table}")  # nosec B608 — 表名/列名来自迁移元数据自省（已人工核）
                 while True:
                     batch = cursor.fetchmany(FETCH_BATCH)
                     if not batch:
@@ -643,7 +643,7 @@ def _rollback_migration(root_dir: str | Path, report: MigrationReport) -> None:
                 cols = _table_columns(dst, tr.table)
                 if "timestamp" in cols and tr.started_at:
                     cur = dst.execute(
-                        f"DELETE FROM {tr.table} WHERE timestamp >= ?",
+                        f"DELETE FROM {tr.table} WHERE timestamp >= ?",  # nosec B608 — 表名/列名来自迁移元数据自省（已人工核）
                         (tr.started_at,),
                     )
                     logger.info(

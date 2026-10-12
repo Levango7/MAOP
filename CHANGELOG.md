@@ -39,6 +39,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 复评处置·第四批：bandit B608×141 逐站点处置清零 → CI 恢复 medium 门禁 `-ll`
+
+141 处**逐站点核过**（84 处按分类加带理由 `# nosec B608`；57 处人工读构造器——结论全部
+安全：子句构造器只含固定子句与 `?`；表名来自字面量闭集 / `_VALID_TABLES` 白名单 /
+`validate_identifier` 校验 / 迁移元数据自省；列名来自 pydantic 模型字段或自省结果；
+`kw`/值一律绑定为参数）。**未发现真注入面**；每处理由写在代码里（13 类模板 + 12 处按文件
+的具体理由，如 `search.py` 的「field 经 allowed_fields 白名单，kw 为绑定参数」）。
+
+**技术坑（实测，踩过一次并回滚）**：bandit 的 nosec 必须落在**报点同一行**——上一行独立
+注释、赋值行注释都不生效；多行 f-string 的报点行末在字符串**内部**，直接追加会把注释写进
+SQL 文本（且 Python 3.14 的 tokenize 把 f-string 拆成 `FSTRING_*` token，按 token 探测会漏）。
+最终应用器改用 AST 的 `JoinedStr`/`Constant` 节点 `end_lineno`：注释落在字符串**收尾行**。
+
+**顺带硬化**：`compliance_manager` 的表名白名单从 `assert` 改为 `if … raise`
+（`-O` 下 assert 失效，白名单必须是硬校验）。
+
+**门禁**：`ci.yml` 的 `bandit -r maop/ -lll` → **`-ll`**（兑现挂了两个月的承诺）；
+`bandit -r maop/ -ll` 计数 **148 → 0**。nosec 清单门禁升级为 `path:RULE:count`
+（44 条目 / 146 行；计数变化即红）——仍**不用行号**（行号位移假红在 ADR-023 已定案）。
+
+### T2.1 验收达成：补文件系统级零副作用断言 + ROADMAP 勾选
+
+PR #84 已交付哨兵契约/pipeline 预演/接线，但 AC 的「写操作零副作用（临时目录断言）」
+一直缺**文件系统级**证据（既有断言只查 fake 的 `executed` 标志）。新增
+`test_dry_run_writes_nothing_into_output_dir`：预演后配置的输出目录必须为空、临时根下
+无残留，且哨兵行照常产出。ROADMAP v5.3.x 节 T2.1 勾选。
+
 ### 复评处置·第三批：bandit 真安全修复（B615/B310/B103）+ nosec 清单门禁
 
 报告建议 2（bandit Medium 债）的**真修复部分**先落地（批量 B608 标注是独立批次，

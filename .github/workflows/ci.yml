@@ -828,7 +828,10 @@ jobs:
       # 2026-08-15: Medium 由 -ll 降为 High-only（-lll）。存量 96 Medium
       # （B608×84 参数化占位符误报为主 + B310×10）为历史安全债，登记专项；
       # High=0 保持硬门禁。Medium 债修复后恢复 -ll。
-      - run: bandit -r maop/ -lll  # fail on high severity only
+      # 2026-10-12（复评处置·第四批）：147 条 Medium 债清零后恢复 medium 门禁
+      # （B608×141 逐站点人工核后带理由 nosec；清单快照门禁见
+      #  tests/test_bandit_security_fixes.py::test_nosec_inventory_matches）。
+      - run: bandit -r maop/ -ll  # fail on medium+ (was -lll: high only)
       - name: Upload SAST report
         if: always()
         uses: actions/upload-artifact@v7

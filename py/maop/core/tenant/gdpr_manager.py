@@ -482,7 +482,7 @@ class GDPRComplianceManager:
             clauses.append("request_type = ?")
             params.append(request_type)
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-        sql = f"SELECT * FROM gdpr_dsr{where} ORDER BY created_at DESC"
+        sql = f"SELECT * FROM gdpr_dsr{where} ORDER BY created_at DESC"  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
         with self._connect() as conn:
             rows = conn.execute(sql, tuple(params)).fetchall()
         return [self._row_to_dsr(r) for r in rows]
@@ -565,7 +565,7 @@ class GDPRComplianceManager:
             clauses.append("status = ?")
             params.append(status)
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-        sql = f"SELECT * FROM gdpr_dpa{where} ORDER BY created_at DESC"
+        sql = f"SELECT * FROM gdpr_dpa{where} ORDER BY created_at DESC"  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
         with self._connect() as conn:
             rows = conn.execute(sql, tuple(params)).fetchall()
         return [self._row_to_dpa(r) for r in rows]
@@ -676,7 +676,7 @@ class GDPRComplianceManager:
         """导出用户主动创建的 agent 配置（排除系统推断的）。"""
         try:
             query = (
-                "SELECT * FROM agents WHERE owner_id = ?"
+                "SELECT * FROM agents WHERE owner_id = ?"  # nosec B608 — 语句内为常量拼接（无插值）
                 + self._base._tenant_filter(tenant_id)
             )
             params: tuple[Any, ...] = (user_id, tenant_id) if tenant_id else (user_id,)
@@ -701,7 +701,7 @@ class GDPRComplianceManager:
                     query = (
                         f"SELECT * FROM {table} WHERE user_id = ? "
                         f"AND (source = 'user' OR source = 'explicit'"
-                        f" OR source = 'manual')"
+                        f" OR source = 'manual')"  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
                         + self._base._tenant_filter(tenant_id).replace(
                             " AND tenant_id = ?", " AND tenant_id = ?",
                         )
@@ -713,7 +713,7 @@ class GDPRComplianceManager:
                 except sqlite3.OperationalError:
                     # 列不存在，回退到全部
                     query = (
-                        f"SELECT * FROM {table} WHERE user_id = ?"
+                        f"SELECT * FROM {table} WHERE user_id = ?"  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
                         + self._base._tenant_filter(tenant_id)
                     )
                     params = (user_id, tenant_id) if tenant_id else (user_id,)
@@ -732,7 +732,7 @@ class GDPRComplianceManager:
         """导出会话元数据（不含隐式行为日志）。"""
         try:
             query = (
-                "SELECT * FROM sessions WHERE user_id = ?"
+                "SELECT * FROM sessions WHERE user_id = ?"  # nosec B608 — 语句内为常量拼接（无插值）
                 + self._base._tenant_filter(tenant_id)
             )
             params: tuple[Any, ...] = (user_id, tenant_id) if tenant_id else (user_id,)

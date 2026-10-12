@@ -271,7 +271,7 @@ class OrganizationHierarchy:
             clauses.append("parent_id = ?")
             params.append(parent_id)
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-        sql = f"SELECT * FROM tenant_organizations{where} ORDER BY created_at"
+        sql = f"SELECT * FROM tenant_organizations{where} ORDER BY created_at"  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
         with sqlite_connect(self._db_path) as conn:
             rows = conn.execute(sql, tuple(params)).fetchall()
         return [self._row_to_org(r) for r in rows]
@@ -442,16 +442,16 @@ class OrganizationHierarchy:
                 descendants = [org_id]
             placeholders = ",".join("?" for _ in descendants)
             conn.execute(
-                f"DELETE FROM tenant_organizations WHERE org_id IN ({placeholders})",
+                f"DELETE FROM tenant_organizations WHERE org_id IN ({placeholders})",  # nosec B608 — 占位符/子句由代码生成，值是 ?
                 tuple(descendants),
             )
             conn.execute(
                 f"DELETE FROM tenant_org_closure WHERE ancestor IN ({placeholders}) "
-                f"OR descendant IN ({placeholders})",
+                f"OR descendant IN ({placeholders})",  # nosec B608 — 占位符/子句由代码生成，值是 ?
                 tuple(descendants) + tuple(descendants),
             )
             conn.execute(
-                f"DELETE FROM tenant_org_permissions WHERE org_id IN ({placeholders})",
+                f"DELETE FROM tenant_org_permissions WHERE org_id IN ({placeholders})",  # nosec B608 — 占位符/子句由代码生成，值是 ?
                 tuple(descendants),
             )
         logger.info(

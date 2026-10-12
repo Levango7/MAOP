@@ -674,7 +674,7 @@ class MessageQueue:
     def _count(self, table: str, where: str = "1=1", params: tuple = ()) -> int:
         if table not in self._VALID_TABLES:
             raise ValueError(f"Invalid table name: {table!r}")
-        rows = self._query(f"SELECT COUNT(*) as cnt FROM {table} WHERE {where}", params)
+        rows = self._query(f"SELECT COUNT(*) as cnt FROM {table} WHERE {where}", params)  # nosec B608 — 表名经 _VALID_TABLES 白名单（已人工核）
         return rows[0]["cnt"] if rows else 0
 
     def purge_acked(self, older_than_s: float = 3600.0) -> int:

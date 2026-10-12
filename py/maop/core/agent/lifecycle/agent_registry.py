@@ -362,7 +362,7 @@ class AgentRegistry:
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         with sqlite_connect(self._db_path) as conn:
             rows = conn.execute(
-                f"SELECT * FROM registered_agents {where} ORDER BY name",
+                f"SELECT * FROM registered_agents {where} ORDER BY name",  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
                 params,
             ).fetchall()
         return [self._row_to_agent(r) for r in rows]

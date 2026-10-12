@@ -709,7 +709,7 @@ class CircuitBreaker:
         try:
             with self._connect() as conn:
                 cursor = conn.execute(
-                    f"SELECT * FROM breaker_events {where_sql} ORDER BY timestamp DESC LIMIT ?",
+                    f"SELECT * FROM breaker_events {where_sql} ORDER BY timestamp DESC LIMIT ?",  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
                     params + [limit],
                 )
                 columns = [desc[0] for desc in cursor.description]
@@ -734,7 +734,7 @@ class CircuitBreaker:
         try:
             with self._connect() as conn:
                 row = conn.execute(
-                    f"SELECT COUNT(*) as cnt FROM breaker_events {where_sql}",
+                    f"SELECT COUNT(*) as cnt FROM breaker_events {where_sql}",  # nosec B608 — 子句构造器只含固定子句与 ? 占位（已人工核）
                     params,
                 ).fetchone()
                 return row["cnt"] if row else 0

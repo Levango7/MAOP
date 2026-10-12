@@ -347,13 +347,13 @@ class VectorStore(VectorSearchMixin):
             with self._connect() as conn:
                 # 先查总数，决定是否分页
                 total = conn.execute(
-                    f"SELECT COUNT(*) AS cnt FROM {self._table}"
+                    f"SELECT COUNT(*) AS cnt FROM {self._table}"  # nosec B608 — 类内受控属性（非输入）
                 ).fetchone()["cnt"]
 
                 if total <= self._cache_max_size:
                     # 小数据集：全量加载（保持原行为）
                     rows = conn.execute(
-                        f"SELECT id, vector, text, metadata FROM {self._table}"
+                        f"SELECT id, vector, text, metadata FROM {self._table}"  # nosec B608 — 类内受控属性（非输入）
                     ).fetchall()
                 else:
                     # 大数据集：仅加载最近的 _cache_max_size 条
@@ -365,7 +365,7 @@ class VectorStore(VectorSearchMixin):
                     )
                     rows = conn.execute(
                         f"SELECT id, vector, text, metadata FROM {self._table} "
-                        "ORDER BY created_at DESC LIMIT ?",
+                        "ORDER BY created_at DESC LIMIT ?",  # nosec B608 — 类内受控属性（非输入）
                         (self._cache_max_size,),
                     ).fetchall()
 
@@ -421,7 +421,7 @@ class VectorStore(VectorSearchMixin):
         try:
             with self._connect() as conn:
                 row = conn.execute(
-                    f"SELECT text, metadata FROM {self._table} WHERE id = ?",
+                    f"SELECT text, metadata FROM {self._table} WHERE id = ?",  # nosec B608 — 类内受控属性（非输入）
                     (entry_id,),
                 ).fetchone()
                 if row:
@@ -442,7 +442,7 @@ class VectorStore(VectorSearchMixin):
         """Delete an entry by ID."""
         try:
             with self._connect() as conn:
-                conn.execute(f"DELETE FROM {self._table} WHERE id = ?", (entry_id,))
+                conn.execute(f"DELETE FROM {self._table} WHERE id = ?", (entry_id,))  # nosec B608 — 类内受控属性（非输入）
             # B22: 加锁保护缓存删除
             with self._cache_lock:
                 self._cache.pop(entry_id, None)
@@ -461,7 +461,7 @@ class VectorStore(VectorSearchMixin):
         """Count total indexed entries."""
         try:
             with self._connect() as conn:
-                row = conn.execute(f"SELECT COUNT(*) as cnt FROM {self._table}").fetchone()
+                row = conn.execute(f"SELECT COUNT(*) as cnt FROM {self._table}").fetchone()  # nosec B608 — 类内受控属性（非输入）
                 return row["cnt"] if row else 0
         except Exception:
             return 0
@@ -497,7 +497,7 @@ class VectorStore(VectorSearchMixin):
                     "SELECT id, text, metadata, created_at "
                     f"FROM {self._table} "
                     "ORDER BY created_at DESC "
-                    "LIMIT ? OFFSET ?",
+                    "LIMIT ? OFFSET ?",  # nosec B608 — 语句内为常量拼接（无插值）
                     (limit, offset),
                 ).fetchall()
             result: list[dict[str, Any]] = []
@@ -519,7 +519,7 @@ class VectorStore(VectorSearchMixin):
         cnt = self.count()
         try:
             with self._connect() as conn:
-                conn.execute(f"DELETE FROM {self._table}")
+                conn.execute(f"DELETE FROM {self._table}")  # nosec B608 — 类内受控属性（非输入）
             # B22: 加锁保护缓存清空
             with self._cache_lock:
                 self._cache.clear()
