@@ -69,7 +69,7 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 
 1. `set_edition()` 程序覆盖（测试 / 灰度）
 2. `MAOP_EDITION` 环境变量
-3. `maop.enterprise` 包可导入性自动探测
+3. `maop.enterprise` 可导入 → 进入 ENTERPRISE **候选**，仍须 license 校验通过才判 ENTERPRISE（缺失/无效保持 `PERSONAL` 并记录降级）
 4. 默认 `PERSONAL`
 
 ### FeatureFlag 统一 Gate
@@ -124,7 +124,7 @@ License 颁发指南见 [docs/enterprise/license-issuance-guide.md](docs/enterpr
 | 仓库 | 可见性 | 许可 | 内容 |
 |------|--------|------|------|
 | [Levango7/MAOP](https://github.com/Levango7/MAOP) | Public | MIT | 核心 + 个人版 |
-| [Levango7/MAOS](https://github.com/Levango7/MAOS) | **Private**（商业闭源） | Commercial | 企业版模块（26 个 .py 文件） |
+| [Levango7/MAOS](https://github.com/Levango7/MAOS) | **Private**（商业闭源） | Commercial | 企业版模块（`maop/enterprise/` 下 29 个 .py） |
 
 - `maop-orchestrator`（MIT）：核心 + 个人版功能，**不含** `maop/enterprise/`
 - `maop-enterprise`（Commercial，**私有仓库**）：依赖 `maop-orchestrator`，提供 `maop/enterprise/` 模块。分发方式：由厂商直接交付 wheel，或授权客户用带 token 的 `gh release download` / Releases 页面下载（私有仓库的 Releases **不对外匿名可下**）
@@ -143,7 +143,7 @@ gh release download enterprise-v<版本> --repo Levango7/MAOS --pattern "*.whl" 
 pip install ./maop_enterprise-<版本>-py3-none-any.whl
 ```
 
-`maop/enterprise/__init__.py` 在 import 时调用 `set_edition(Edition.ENTERPRISE)`，这是企业版包"存在即激活"的机制。
+`maop.enterprise` 可导入**不等于**企业版已激活。`detect_edition()`（`py/maop/config/edition.py`）把可导入仅当作 ENTERPRISE 候选，随后由 `maop.enterprise.license.LicenseValidator` 校验 `MAOP_LICENSE_KEY` 或 `data/license.key`；缺失或无效则保持 `PERSONAL` 并记录降级。2026-08-11 之前 import 即调用 `set_edition(Edition.ENTERPRISE)` 的存在即激活机制是公开绕过路径，已移除；`maop/enterprise/__init__.py` 现在只做 license 感知日志与模块完整性校验。
 
 ### 版本兼容地板（MAOP ↔ MAOS）
 

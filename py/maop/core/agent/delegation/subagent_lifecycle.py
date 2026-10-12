@@ -349,7 +349,7 @@ class SubAgentManager:
         task: str,
         context: dict[str, Any],
     ) -> AgentResult:
-        """Execute a sub-agent task (placeholder for actual LLM call)."""
+        """Execute a sub-agent task via ``_invoke_llm``, then persist its terminal status."""
         start = time.time()
         self._append_transcript(agent_id, "started", {"task": task})
 
