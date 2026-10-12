@@ -303,6 +303,17 @@ env 自动探测+默认执行）、dispatch 注入（声明 agent 收到 preambl
   一版的同类病根。修为 warning（exc_info）。
 - （前端 i18n key 完整性守卫见同批前端 PR。）
 
+### Changed：lint 工具链钉版与 CI 同源
+
+- `pyproject.toml` 的 dev extra 原写 `ruff>=0.4` / `mypy>=1.10`，而 CI 的 lint 作业
+  手写 `pip install "ruff==0.16.3" "mypy==2.3.1"`（`.github/workflows/ci.yml:127`）。
+  两处各说各话且没有东西强制相等：本机与 nightly（`pip install -e ./py[dev]`）装到的是
+  当时最新的 ruff，规则集比 CI 那版更严 ⇒ 同一段代码本地绿、主干红（2026-10-03 两次
+  主干红即此形状，F401 只在 CI 的老 ruff 上复现）。现把 dev extra 收成与 CI 相同的
+  精确 pin，并加守卫 `py/tests/test_lint_toolchain_pins.py`（7 条用例：两处版本一致性、
+  精确 pin 形状、以及"CI 里找不到钉版行/pin 自相矛盾"时 fail closed）。抬版本必须
+  同一笔改两处，否则测试直接红，而不是变成一次莫名的 lint 失败。
+
 ## [5.3.1] — 2026-10-10
 
 ### 发布链修复 + PyPI 首次上线
