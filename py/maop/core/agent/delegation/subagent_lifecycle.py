@@ -240,7 +240,7 @@ class SubAgentManager:
                 atask.cancel()
                 try:
                     await atask
-                except (asyncio.CancelledError, Exception):
+                except (asyncio.CancelledError, Exception):  # silent-ok: interrupt — 用户中断/任务取消
                     pass
                 self._update_status(agent_id, AgentStatus.FAILED, error="Timeout")
                 return AgentResult(

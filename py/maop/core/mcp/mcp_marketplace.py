@@ -272,7 +272,7 @@ class MCPMarketplace:
             addr_str = sockaddr[0]
             try:
                 ip = ipaddress.ip_address(addr_str)
-            except ValueError:
+            except ValueError:  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 continue
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
                 raise ValueError(

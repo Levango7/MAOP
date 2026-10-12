@@ -277,7 +277,7 @@ def _detect_with_license_check(requested: Edition) -> Edition:
                 return Edition.PERSONAL
             elif not ok:
                 logger.debug("[edition] integrity manifest not present; skipping check")
-        except ImportError:
+        except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
             pass  # older installs without integrity module — license check already passed
 
         logger.info(

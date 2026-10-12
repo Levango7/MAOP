@@ -186,7 +186,7 @@ def _validate_dns_resolution(hostname: str) -> None:
         seen.add(addr_str)
         try:
             ip = ipaddress.ip_address(addr_str)
-        except ValueError:
+        except ValueError:  # silent-ok: scan-continue — 扫描中数据形状不符预期
             # Should not happen for getaddrinfo results, but be defensive.
             continue
         # Reuse the same IP check; raises SSRFError on violation.

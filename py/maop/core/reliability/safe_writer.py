@@ -45,7 +45,7 @@ def _fsync_dir(dir_path: Path) -> None:
         return
     try:
         os.fsync(fd)
-    except (OSError, PermissionError):
+    except (OSError, PermissionError):  # silent-ok: platform-limitation — 平台/文件系统不支持（Windows chmod、fsync 目录等）
         # 某些文件系统（如网络挂载）不支持 fsync 目录
         pass
     finally:

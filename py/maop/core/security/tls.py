@@ -145,7 +145,7 @@ def generate_self_signed(
         )
         logger.info("Self-signed cert generated via openssl: %s", cert_path)
         return cert_path, key_path
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):  # silent-ok: lock-race — 锁/文件竞态为预期路径
         pass
 
     # Fallback: write a note that openssl is not available

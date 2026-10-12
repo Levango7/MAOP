@@ -176,7 +176,7 @@ class HarnessAuthProvider:
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)
                 return dt
-            except ValueError:
+            except ValueError:  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 continue
         # 兜底：尝试 datetime.fromisoformat（Python 3.11+ 支持更多格式）。
         try:

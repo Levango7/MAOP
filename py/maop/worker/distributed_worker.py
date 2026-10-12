@@ -309,7 +309,7 @@ class DistributedWorker:
                 logger.warning("[dist-worker] %s heartbeat failed: %s", self._worker_id, exc)
             try:
                 await asyncio.wait_for(self._stop_event.wait(), timeout=interval)
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError:  # silent-ok: expected-signal — 超时/不存在即等待的信号，非错误
                 continue
             else:
                 return
@@ -541,7 +541,7 @@ def run_worker(
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             signal.signal(sig, _signal_handler)
-        except (ValueError, OSError):
+        except (ValueError, OSError):  # silent-ok: interrupt — 用户中断/任务取消
             # Not in main thread (e.g. under test) — skip.
             pass
 
@@ -549,7 +549,7 @@ def run_worker(
         loop.run_until_complete(worker.start())
         # Run until stop_event is set (via signal handler) or Ctrl+C.
         loop.run_until_complete(_wait_for_stop(worker))
-    except KeyboardInterrupt:
+    except KeyboardInterrupt:  # silent-ok: interrupt — 用户中断/任务取消
         pass
     finally:
         loop.run_until_complete(worker.stop())

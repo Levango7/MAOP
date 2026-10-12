@@ -30,10 +30,14 @@
       pass
   ```
 - **标记闭集**（防"任意理由合法化"）：`optional-dep` / `lock-race` / `ws-disconnect` /
-  `interrupt` / `loop-teardown` / `defensive-probe` / `scan-continue`。
-  类别不在闭集 → 门禁红（不是"有标记就放行"）。
-- **存量基线**：81 条静默 + 47 处 `suppress` 写入脚本常量；**双向棘轮**——新增违规红、
-  基线条目失效也红（只能减不能加）。清尾排期见"后续"。
+  `interrupt` / `loop-teardown` / `defensive-probe` / `scan-continue` /
+  `platform-limitation`（Windows chmod、fsync 目录等平台差异）/
+  `best-effort-cleanup`（清理失败不掩盖主错误——原错误已重抛或另行告警）/
+  `expected-signal`（超时/不存在即等待的信号）。类别不在闭集 → 门禁红
+  （不是"有标记就放行"）。
+- **存量已清尾（同批完成）**：81 条静默逐条分类——设计性静默加标记（宽异常 `except Exception`
+  的理由按站点写具体，不用通用文案），其余按 ADR-018 记日志；**基线现为空集**
+  （新增即红，无豁免缓冲）。`contextlib.suppress` 仍为 47 处棘轮（只记数、暂不逐处处置）。
 - **基线键刻意不用行号**：`path::异常类型::语句种类::#第 n 次出现`（源序）——
   行号会因文件上方任何编辑而位移，用行号做键等于"改别处也会假红"（本仓反复栽过的
   假红类）；序号只依赖同类处理器的相对顺序。随附两条回归测试（位移不变键 / 同文件重复唯一）。
@@ -76,8 +80,8 @@
 
 | 项 | 内容 | 状态 |
 |---|---|---|
-| 静默清尾 | 81 条逐条分类（标记或改 warning），基线归零 | 下一批（`docs/audits/review-disposal-plan-2026-10-12.md`） |
-| suppress 棘轮 | 47 → 逐处处置后收紧（含 `contextlib.suppress(Exception)` 的语义审查） | 与上同批 |
+| 静默清尾 | 81 条逐条分类（标记或改 warning），基线归零 | **已完成**（同批，基线=空集） |
+| suppress 棘轮 | 47 处（`contextlib.suppress`）——当前只棘轮计数，逐处语义审查后排期 | 排期中 |
 | 巨型文件拆分 | `data_service.py` / `chat_service.py` / `agent_service.py` / `evolution_service.py` 按域拆分（参照 core/mcp/ 先例） | 排期中 |
 | bandit Medium 债 | 147 条（B608×141 等）分类处置 + 门禁 `-lll`→`-ll` + nosec 清单快照 | 下一批（独立 PR） |
 | keyring 后端 | 个人版 secret 可选 keyring 后端（可选 extra + 回退可见标注） | 待排期 |

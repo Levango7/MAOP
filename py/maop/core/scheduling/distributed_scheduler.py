@@ -443,7 +443,7 @@ class DistributedScheduler:
             failure_task.cancel()
             try:
                 await failure_task
-            except (asyncio.CancelledError, Exception):
+            except (asyncio.CancelledError, Exception):  # silent-ok: interrupt — 用户中断/任务取消
                 # 任务取消/清理时的预期异常，静默忽略
                 pass
             # 结果流生命周期（2026-10-09 审计）：per-run 结果流此前运行结束后
@@ -737,7 +737,7 @@ class DistributedScheduler:
                 await asyncio.wait_for(
                     stop.wait(), timeout=self._failure_check_interval,
                 )
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError:  # silent-ok: expected-signal — 超时/不存在即等待的信号，非错误
                 continue
             else:
                 return

@@ -94,7 +94,7 @@ class _BackgroundLoop:
         if self._loop.is_running():
             try:
                 self._loop.call_soon_threadsafe(self._loop.stop)
-            except RuntimeError:
+            except RuntimeError:  # silent-ok: loop-teardown — 事件循环已停
                 pass  # loop already stopped
         self._thread.join(timeout=5.0)
 

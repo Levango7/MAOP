@@ -262,7 +262,7 @@ class ComplianceManager:
                 params: tuple[Any, ...] = (user_id, tenant_id) if tenant_id else (user_id,)
                 cur = conn.execute(query, params)
                 total += cur.rowcount
-            except sqlite3.OperationalError:
+            except sqlite3.OperationalError:  # silent-ok: defensive-probe — 探测失败即信号
                 pass
         return total
 
@@ -328,7 +328,7 @@ class ComplianceManager:
                     entry = dict(r)
                     entry["_source_table"] = table
                     result.append(entry)
-            except sqlite3.OperationalError:
+            except sqlite3.OperationalError:  # silent-ok: defensive-probe — 探测失败即信号
                 pass
         return result
 

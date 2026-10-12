@@ -36,7 +36,7 @@ def __getattr__(name: str):
     for subpkg in _SUBPACKAGES:
         try:
             submod = importlib.import_module(f".{subpkg}", __name__)
-        except ImportError:
+        except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
             continue
         if name in getattr(submod, "__all__", ()):
             value = getattr(submod, name)
@@ -46,7 +46,7 @@ def __getattr__(name: str):
     for subpkg in _SUBPACKAGES:
         try:
             mod = importlib.import_module(f".{subpkg}.{name}", __name__)
-        except ImportError:
+        except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
             continue
         globals()[name] = mod  # 缓存
         return mod
@@ -55,6 +55,6 @@ def __getattr__(name: str):
         mod = importlib.import_module(f".{name}", __name__)
         globals()[name] = mod  # 缓存
         return mod
-    except ImportError:
+    except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
         pass
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

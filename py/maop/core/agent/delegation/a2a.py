@@ -289,7 +289,7 @@ class A2AManager:
             # 已在事件循环内 —— 调度为后台任务
             asyncio.ensure_future(self.dispatch_task(task_id, agent_name, message))
             return
-        except RuntimeError:
+        except RuntimeError:  # silent-ok: loop-teardown — 事件循环已停
             pass  # 无运行中的事件循环 —— 在新线程上运行
 
         def _bg() -> None:

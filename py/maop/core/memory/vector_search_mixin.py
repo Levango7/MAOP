@@ -142,7 +142,7 @@ class VectorSearchMixin:
         try:
             import numpy as np
             return self._search_vector_numpy(query_vector, top, threshold, np)
-        except ImportError:
+        except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
             pass
 
         # Fallback: pure Python

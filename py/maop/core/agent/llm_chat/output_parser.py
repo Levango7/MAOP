@@ -71,7 +71,7 @@ class OutputParser:
             try:
                 data = json.loads(content)
                 return ParseResult(success=True, data=data, format="code_block")
-            except (json.JSONDecodeError, ValueError):
+            except (json.JSONDecodeError, ValueError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 continue
         return None
 
@@ -81,7 +81,7 @@ class OutputParser:
             try:
                 data = json.loads(stripped)
                 return ParseResult(success=True, data=data, format="raw")
-            except (json.JSONDecodeError, ValueError):
+            except (json.JSONDecodeError, ValueError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 pass
         return None
 
@@ -95,7 +95,7 @@ class OutputParser:
                 try:
                     data = json.loads(candidate)
                     return ParseResult(success=True, data=data, format="embedded")
-                except (json.JSONDecodeError, ValueError):
+                except (json.JSONDecodeError, ValueError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                     continue
         brace_result = self._try_balanced_braces(text)
         if brace_result is not None:
@@ -156,7 +156,7 @@ class OutputParser:
             try:
                 data = json.loads(m.group(1))
                 results.append(ParseResult(success=True, data=data, format="function_prefix"))
-            except (json.JSONDecodeError, ValueError):
+            except (json.JSONDecodeError, ValueError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 pass
 
         return results

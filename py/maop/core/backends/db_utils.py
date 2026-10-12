@@ -161,7 +161,7 @@ def sqlite_connect(
         ):
             try:
                 cand.unlink()
-            except FileNotFoundError:
+            except FileNotFoundError:  # silent-ok: lock-race — 锁/文件竞态为预期路径
                 pass
             except OSError as rm_err:
                 logger.warning("Failed to remove %s: %s", cand, rm_err)

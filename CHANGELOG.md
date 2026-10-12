@@ -39,6 +39,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 复评处置·第二批：静默吞异常存量清尾（81 处全部处置，基线归零）
+
+接 ADR-023 的门禁：81 条静默 `except` 逐条分类——设计性静默按闭集类别加
+`# silent-ok: <类别> — <理由>`（类别集扩到 10：新增 `platform-limitation`
+（Windows chmod/fsync）、`best-effort-cleanup`（清理失败不掩盖主错误）、
+`expected-signal`（超时即等待信号））；宽异常 `except Exception` 的理由**按站点写具体**
+（不做通用文案——复核阶段逐个读上下文后修正了 6 处不准确的理由）。
+清尾后**基线为空集**：任何新增静默处理立即红，无豁免缓冲。
+`contextlib.suppress` 维持 47 处棘轮（暂只记数，逐处语义审查排期在 ADR-023）。
+
 ### 复评处置：三条防复发门禁 + CHANGELOG/版本锚点结构修复（ADR-023）
 
 外部工具《MAOP 复评报告 2026-10-12》的遗留项处置。方案经独立对抗性审核（首版 REJECT，

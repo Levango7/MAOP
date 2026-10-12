@@ -757,7 +757,7 @@ async def notifications_ws(ws: WebSocket) -> Any:
                     # best-effort：WebSocket 命令为即时推送，畸形/异常输入直接忽略保证连接不断
                     logger.warning("处理 WebSocket 通知命令消息失败（notifications_ws），忽略畸形输入", exc_info=True)
                     # ignore malformed input
-    except WebSocketDisconnect:
+    except WebSocketDisconnect:  # silent-ok: ws-disconnect — 客户端断开
         pass
     finally:
         await notification_service.unregister_ws_client(ws)

@@ -551,7 +551,7 @@ class ApiKeyManager:
                 else:
                     if ip == ipaddress.ip_address(entry):
                         return True
-            except ValueError:
+            except ValueError:  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 continue
         return False
 

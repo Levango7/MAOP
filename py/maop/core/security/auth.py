@@ -278,7 +278,7 @@ class JWTHandler:
         except Exception as exc:
             try:
                 tmp_path.unlink(missing_ok=True)
-            except Exception:
+            except Exception:  # silent-ok: best-effort-cleanup — 清理动作 best-effort，原错误已重抛或另行告警
                 pass
             logger.warning("[auth] Could not persist revoked tokens: %s", exc)
 
@@ -562,7 +562,7 @@ def load_jwt_secret(data_dir: str | Path = "data") -> str:
         jwt_file.write_text(secret, encoding="utf-8")
         try:
             jwt_file.chmod(0o600)
-        except OSError:
+        except OSError:  # silent-ok: platform-limitation — 平台/文件系统不支持（Windows chmod、fsync 目录等）
             pass  # Windows
         logger.info("[auth] JWT secret generated and saved to %s", jwt_file)
     except Exception as exc:

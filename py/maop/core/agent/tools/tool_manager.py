@@ -63,7 +63,7 @@ def _parse_version(v: str) -> Any:
     try:
         from packaging.version import Version
         return Version(v)
-    except ImportError:
+    except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
         pass
     except Exception as exc:
         logger.debug("packaging.version.Version(%r) failed: %s", v, exc)

@@ -45,7 +45,7 @@ try:
     from opentelemetry.trace import SpanKind
 
     _OTELE_AVAILABLE = True
-except ImportError:
+except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
     pass
 
 

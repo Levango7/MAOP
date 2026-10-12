@@ -487,7 +487,7 @@ class MemoryFacade:
         if hasattr(impl, "store") and callable(impl.store):
             try:
                 return impl.store(layer, content, **kwargs)  # type: ignore
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 # 底层 store 签名不兼容（如 MemoryManager.store 不存在），
                 # 落到下面的 Facade 兜底路由。
                 pass
@@ -553,7 +553,7 @@ class MemoryFacade:
                 result = impl.search(query, top=top, **kwargs)
                 if isinstance(result, list):
                     return result
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 pass
 
         # Facade 兜底：合并 short_term + long_term
@@ -605,7 +605,7 @@ class MemoryFacade:
                 result = impl.delete(layer, entry_id)
                 if isinstance(result, bool):
                     return result
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 pass
 
         normalized = _normalize_layer(layer)
