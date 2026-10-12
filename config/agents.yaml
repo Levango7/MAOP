@@ -16,7 +16,7 @@ agents:
     - multimodal
     cli: python
     cli_args: -m maop.cli run --task "{task}"
-    description: MAOP v4.3 self-referential agent — can delegate to itself (max_self_ref_depth=3)
+    description: MAOP self-referential agent — can delegate to itself (max_self_ref_depth=3)
     driver: cli
     extracts_queries: true
     model: auto

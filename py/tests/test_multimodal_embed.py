@@ -256,6 +256,7 @@ def _load_clip_or_skip():
         pytest.skip(f"CLIP model unavailable in this environment: {exc}")
 
 
+@pytest.mark.timeout(300)  # 模型加载 ~150s；并行全量跑时 60s 全局超时会误红
 def test_clip_matches_gold_vectors():
     """Self-check against frozen real-CLIP vectors.
 
@@ -272,6 +273,7 @@ def test_clip_matches_gold_vectors():
     assert cos > 0.99, f"CLIP output drifted from gold fixture (cos={cos:.4f})"
 
 
+@pytest.mark.timeout(300)  # 模型加载 ~150s；与上一条同因
 def test_clip_image_batch_single_entry_matches_single():
     emb = _load_clip_or_skip()
     data = _png_bytes()

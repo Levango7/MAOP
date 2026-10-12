@@ -1,6 +1,6 @@
 # MAOP Troubleshooting Manual
 
-本手册系统化梳理 MAOP v4.3.0（基于 FastAPI 的 Plan-Execute-Verify 智能体编排框架）在安装、启动、认证、LLM Provider、Agent 执行、记忆与向量搜索、性能、Dashboard、企业版、数据库迁移、日志分析等场景下的常见问题与诊断流程。所有命令示例均可直接复制运行，企业版相关能力需配合 `MAOP_LICENSE_KEY` 启用。
+本手册系统化梳理 MAOP（基于 FastAPI 的 Plan-Execute-Verify 智能体编排框架）在安装、启动、认证、LLM Provider、Agent 执行、记忆与向量搜索、性能、Dashboard、企业版、数据库迁移、日志分析等场景下的常见问题与诊断流程。所有命令示例均可直接复制运行，企业版相关能力需配合 `MAOP_LICENSE_KEY` 启用。
 
 ---
 
