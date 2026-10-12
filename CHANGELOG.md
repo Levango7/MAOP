@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+（下批工作区：M2.2 B2 —— PG 路径与迁移、异步队列；巨型文件拆分；keyring 后端。）
+
+## [5.4.0] — 2026-10-12
+
 ### 复评处置·第四批：bandit B608×141 逐站点处置清零 → CI 恢复 medium 门禁 `-ll`
 
 141 处**逐站点核过**（84 处按分类加带理由 `# nosec B608`；57 处人工读构造器——结论全部
