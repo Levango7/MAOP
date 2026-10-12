@@ -7,9 +7,9 @@
 
 ## 当前状态
 
-- **已发布**：v5.3.1（2026-10-10，patch）— PyPI 包元数据补全（署名/keywords/classifiers/urls）+ 发布链修复（packages-dir 路径 + 手工发布逃生舱）+ PyPI 首次上线（maop-orchestrator）。详见 CHANGELOG 的 [5.3.1] 段。
-- **上一版**：v5.3.0（2026-10-10，minor）— 调度与编排能力打包（真抢占 γ-3 opt-in / 分布式优先级批量重排 + 负载感知选工 / 动态编排运行时 fan-out）+ 两批后端审计修复（分布式挂死、取消安全、泄漏、热路径）+ 前端 Chat 页 i18n 修复。范围与验收见下方 v5.3.0 节。
-- **待发布**：v5.2.x（patch 系列，WS-1/WS-2 剩余任务，范围见下节）；后续里程碑 v5.4.0（M2.2，目标 2026-11 起）。
+- **已发布**：v5.4.0（2026-10-12，minor）— **M2.2 首批**：多模态记忆（文本+图像 / CLIP 空间 / RRF 融合 / `MemoryFacade.store_multimodal` API，ADR-022）+ 三条防复发门禁（静默异常/文件规模/CHANGELOG，ADR-023）+ bandit Medium 债清零与安全修复（B615/B310/B103，CI 门禁恢复 `-ll`）+ T2.1 dry-run 验收达成。范围与顺延项见下方 v5.4.0 节。
+- **上一版**：v5.3.1（2026-10-10，patch）— PyPI 包元数据补全 + 发布链修复 + PyPI 首次上线。
+- **进行中**：v5.4.x/v5.5.0 —— M2.2 后续批次（B2：PG 路径与迁移、异步队列延迟达标；B3：音频/视频企业版；B4：NDCG 评测与可切换模型）+ 治理面（巨型文件拆分、keyring、suppress 语义审查）。
 - **v5.2.0**（2026-09-08，minor）— 自演化闭环 MVP 接入主循环（可观测/可审批/可回滚），闭环 API 面实测为 `evolve_insights.py` 的 6 个 `/api/evolution/*` 端点（旧文案"7 个 evolution API 端点"无出处，2026-10-05 已在下方 v5.2.0 节更正，此处当时漏改）；桌面调度集成；前端可访问性/token 化修复多轮。详见 [CHANGELOG](CHANGELOG.md)。
 - **v5.0.0**（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](docs/migration-5.0.md)。
 - **双版架构**：自 2026-07-20 起采用单代码库 + 运行时 Edition 检测（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)）。
@@ -269,7 +269,13 @@
 - [ ] T2.3：连续 7 天 nightly 零假红（修复路线），或止损方案与"未复现条件/复现配方"
       台账化（降级路线）。
 
-## v5.4.0 (minor) — 计划中（目标 2026-11-01 ~ 2027-01-15，里程碑 M2.2）
+## v5.4.0 (minor) — 已发布 2026-10-12（里程碑 M2.2 **首批**）
+
+> **计划变更记账（仓库规则 #3）**：原定 v5.4.0 = M2.2 全量收官（B2/B3/B4 + T3.3 可选）。
+> 2026-10-12 用户批准调整为"**M2.2 首批**"先行发布：已合并内容含**真安全修复**
+> （bandit B615/B310/B103）与三条防复发门禁，不宜长期躺在 master 等待主线批次；
+> 原窗口（2026-11-01 起）的内容顺延为 **v5.4.x / v5.5.0**（B2 PG 路径与迁移+异步队列、
+> B3 音频/视频、B4 NDCG 评测与可切换模型），主题与验收标准不变。
 
 > 版本锚点 2026-10-10 由 v5.3.0 后移为 v5.4.0：v5.3.0 被调度与编排能力打包（含新能力
 > 动态编排与默认生效的负载感知选工，按 minor 发布）占用；M2.2 的主题与窗口不变。
@@ -298,15 +304,18 @@
   > 仍为 B2 的延迟达标闭环。**未交付**：PG 路径/迁移（B2）、异步队列（B2）、
   > 音频/视频（B3）、NDCG 数据集（B4）。PRD R02 的"多向量列"落地为"多空间表"，
   > 偏差与实测证据见 `docs/adr/022-multimodal-memory-store.md`。
-- **可选（按余力）**：T3.3 K8s Operator M0——kopf 骨架 + `MaopTask` reconcile 最小闭环 +
-  `ghcr.io/maop/operator` 首次真实构建 + kind 集成腿激活（现有 skipif 钩子装了 kind 自动生效）。
+- **顺延（v5.4.x/v5.5.0）**：M2.2 B2（PG 路径 + alembic 003 + 异步队列 + 存储量化评估）、
+  B3（音频 Whisper / 视频关键帧，企业版边界）、B4（NDCG 标注数据集 + 可切换模型评估）。
+- **未纳入本版**：T3.3 K8s Operator M0（kopf 骨架 + `ghcr.io/maop/operator` 首次构建 +
+  kind 集成腿）——仍按"余力"排期。
 
 ### 验收标准
 
-- [ ] 选型 ADR 合入，且记录 PoC **实测**数据（非推演）。
-- [ ] F2-02 的多模态检索在**非 mock** 集成用例下通过。
+- [x] 选型 ADR 合入，且记录 PoC **实测**数据（非推演）——ADR-022（两轮独立对抗性审核）+ spike 报告。
+- [x] F2-02 的多模态检索在**非 mock** 集成用例下通过——真实 SQLite + **预计算真 CLIP 向量夹具**
+      做真语义排序断言（`tests/test_multimodal_integration.py`）。
 - [ ] （若纳入 T3.3 M0）kind 集群 apply 一个 `MaopTask` → operator 拉起执行 →
-      `status.phase` 由 Running 收敛到 Succeeded，e2e 在 CI 绿。
+      `status.phase` 由 Running 收敛到 Succeeded，e2e 在 CI 绿。**——本版未纳入，顺延。**
 
 ## 阶段二后续里程碑
 
