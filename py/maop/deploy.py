@@ -233,9 +233,15 @@ def health_check(root_dir: str | Path, timeout_s: float = 5.0) -> list[Component
     try:
         import urllib.request
         _cfg = get_settings()
-        _health_url = f"http://{_cfg.dash_host}:{_cfg.dash_port}/api/health"
+        # Scheme is hard-coded http and host/port come from settings; reject a
+        # host that smuggles a path/userinfo (``host/a``, ``user@host``) so the
+        # URL cannot be redirected off the health endpoint (bandit B310).
+        _host = str(_cfg.dash_host)
+        if any(ch in _host for ch in "/@?#"):
+            raise ValueError(f"invalid dash_host in settings: {_host!r}")
+        _health_url = f"http://{_host}:{int(_cfg.dash_port)}/api/health"
         req = urllib.request.Request(_health_url)
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:  # nosec B310
             if resp.status == 200:
                 results.append(ComponentHealth(
                     name="dashboard",

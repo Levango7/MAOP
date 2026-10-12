@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "DEFAULT_CLIP_MODEL",
+    "DEFAULT_CLIP_REVISION",
     "MULTIMODAL_DIM",
     "MULTIMODAL_IMAGE_EXTENSIONS",
     "ClipEmbedding",
@@ -64,6 +65,15 @@ __all__ = [
 MULTIMODAL_DIM = 512
 
 DEFAULT_CLIP_MODEL = "openai/clip-vit-base-patch32"
+
+#: Pinned upstream revision (40-hex commit) of ``DEFAULT_CLIP_MODEL``.
+#: Pinning makes embeddings reproducible across upstream updates and is what
+#: bandit B615 wants; the guard test ``test_clip_revision_is_pinned`` asserts
+#: the 40-hex shape (bandit cannot check a non-literal), and
+#: ``tests/fixtures/clip_gold.json`` records the same revision so the frozen
+#: gold vectors provably come from this revision. Bumping it means: new
+#: weights download (~600 MB unless cached) + regenerate the gold fixture.
+DEFAULT_CLIP_REVISION = "3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268"
 
 #: Raster formats only — ``.svg`` is excluded even though ImageStore allows it
 #: (Pillow cannot rasterise SVG; better to reject early than fail at decode).
@@ -288,6 +298,7 @@ class ClipEmbedding(MultimodalEmbeddingProvider):
         model_name: str = DEFAULT_CLIP_MODEL,
         *,
         device: str = "cpu",
+        revision: str = DEFAULT_CLIP_REVISION,
     ) -> None:
         try:
             import torch  # type: ignore[import-not-found]
@@ -311,9 +322,13 @@ class ClipEmbedding(MultimodalEmbeddingProvider):
         try:
             # transformers stubs type from_pretrained's first arg as
             # PreTrainedModel for some overloads; a model-id string is the
-            # documented usage.
-            self._model = CLIPModel.from_pretrained(model_name).to(device).eval()  # type: ignore[arg-type]
-            self._processor = CLIPProcessor.from_pretrained(model_name)  # type: ignore[arg-type]
+            # documented usage. revision pins the upstream commit (B615).
+            self._model = CLIPModel.from_pretrained(
+                model_name, revision=revision,
+            ).to(device).eval()  # type: ignore[arg-type]
+            self._processor = CLIPProcessor.from_pretrained(
+                model_name, revision=revision,
+            )  # type: ignore[arg-type]
         except Exception as exc:  # OSError, network errors, missing cache…
             raise RuntimeError(
                 f"failed to load CLIP model {model_name!r} "

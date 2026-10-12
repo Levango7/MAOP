@@ -39,6 +39,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 复评处置·第三批：bandit 真安全修复（B615/B310/B103）+ nosec 清单门禁
+
+报告建议 2（bandit Medium 债）的**真修复部分**先落地（批量 B608 标注是独立批次，
+需逐站点核构造器——处置表已生成入 `docs/audits/review-disposal-plan-2026-10-12.md` 附录 A）：
+
+- **B615×2（本轮 B1 新引入的回归）**：CLIP 加载钉 40-hex 模型 revision
+  （`DEFAULT_CLIP_REVISION`，当前 main 的实测 SHA——缓存命中、无需重下）；金标夹具
+  `clip_gold.json` 记同一 revision；守卫测试断言常量是 40-hex 且与夹具一致
+  （bandit 只看字面量，钉成 `"main"` 它不会报——所以必须有这条测试）。
+- **B310×3**：MCP `_StreamableHttpTransport`/`_SSETransport` 增 **scheme 白名单**
+  （`http`/`https`，挡 `file://` 本地文件外泄等；**刻意放行 loopback/私网**——本地
+  MCP 服务器走 127.0.0.1 是常态，封私网属行为回归，与 marketplace 的远端 SSRF 规则
+  分工不同；空 URL 保持可构造、`is_alive=False` 语义不变）；marketplace 已有
+  `_assert_safe_url`（http/https + 私网阻断）→ 仅补 nosec 理由；deploy 健康检查
+  校验 `dash_host` 不得夹带路径/userinfo（`/@?#`）→ nosec + 理由。
+- **B103×1**：`agent_repair` 修复执行位不再 `chmod` 固定 0o755（那会把读权限**放宽**到
+  other-readable），改为 `原 mode | S_IXUSR/GRP/OTH` 只补执行位。
+- **nosec 清单门禁**（`tests/test_bandit_security_fixes.py`）：扫全仓 `# nosec` 逐条登记
+  （新增即红——防"批量 nosec = 静默消音"），并要求每条 nosec 附近有理由文本。
+  当前清单 5 条（3 新 + sandbox_executor 既有 ×2）。
+
+**效果**：`bandit -r maop/ -ll` 147 → **142**（B615×2/B103/B310×2 消失，B310 余 1 已
+带理由 nosec）；B608×141 待逐站点处置后切换门禁 `-lll`→`-ll`（先决条件已写入附录 A）。
+
 ### 复评处置·第二批：静默吞异常存量清尾（81 处全部处置，基线归零）
 
 接 ADR-023 的门禁：81 条静默 `except` 逐条分类——设计性静默按闭集类别加

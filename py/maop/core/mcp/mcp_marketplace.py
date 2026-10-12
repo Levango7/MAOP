@@ -215,7 +215,9 @@ class MCPMarketplace:
         """
         self._assert_safe_url(url)
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=self.NETWORK_TIMEOUT_S) as resp:
+        # scheme/host validated by _assert_safe_url above (http/https only,
+        # private/loopback addresses rejected).
+        with urllib.request.urlopen(req, timeout=self.NETWORK_TIMEOUT_S) as resp:  # nosec B310
             return resp.read()  # type: ignore
 
     @staticmethod

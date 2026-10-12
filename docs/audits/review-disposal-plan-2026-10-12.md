@@ -100,3 +100,127 @@
    理由模板是否足够让未来审计者复核？"变量表名走 validate_identifier + nosec"是否真安全
    （请核 `py/maop/core/backends/db_utils.py` 的 `validate_identifier` 实现强度）？
 6. 排序与分批是否合理？有没有该提前的高风险项（例如 B615 打 nosec 而不是钉版就是错的——我按钉版处理）？
+
+---
+
+## 附录 A：bandit B608（141 处）处置表（2026-10-12 生成，供后续批次逐站点执行）
+
+分类口径：按 f-string 内插值表达式自动归类；`builder`/`other` 两类**必须人工读构造器**（审核要求「行号→类→构造器证据」），不得批量 nosec。
+
+| 类 | 处数 | 处置 |
+|---|---|---|
+| `builder` | 40 | **人工核构造器**：只允许固定子句 + `?`；发现值拼接则改参数化 |
+| `const` | 32 | 模块常量表名/列清单 → `# nosec B608 — 模块常量` |
+| `const-or-literal` | 26 | 语句内无插值（常量拼接）→ 同上 |
+| `generated` | 19 | 占位符/子句由代码生成（值是 `?`）→ nosec + 理由 |
+| `other` | 17 | **人工核**：确认是标识符（闭集/自省）还是值（须参数化） |
+| `attr` | 7 | 类内受控属性 → nosec + 理由 |
+
+### 按文件分布
+
+| 文件 | 处数 |
+|---|---|
+| `maop/core/tenant/compliance_manager.py` | 11 |
+| `maop/core/agent/auth/agent_proxy_gateway.py` | 10 |
+| `maop/dashboard/services/chat_service.py` | 10 |
+| `maop/core/agent/auth/credential_vault.py` | 9 |
+| `maop/core/agent/auth/harness_auth.py` | 8 |
+| `maop/core/memory/vector_store.py` | 8 |
+| `maop/dashboard/services/agent_versions_service.py` | 8 |
+| `maop/memory/search.py` | 7 |
+| `maop/core/backends/data.py` | 6 |
+| `maop/core/tenant/gdpr_manager.py` | 6 |
+| `maop/core/agent/tools/tool_audit.py` | 5 |
+| `maop/migrations/sqlite_to_pg.py` | 5 |
+| `maop/core/memory/knowledge_graph.py` | 4 |
+| `maop/core/security/session.py` | 4 |
+| `maop/core/tenant/hierarchy.py` | 4 |
+| `maop/migrations/memory_migration.py` | 4 |
+| `maop/core/memory/knowledge_extractor.py` | 3 |
+| `maop/core/tenant/rls.py` | 3 |
+| `maop/core/backends/image_store.py` | 2 |
+| `maop/core/memory/episodic_store.py` | 2 |
+| `maop/core/reliability/circuit_breaker.py` | 2 |
+| `maop/core/tenant/audit.py` | 2 |
+| `maop/core/agent/delegation/subagent_db.py` | 1 |
+| `maop/core/agent/delegation/subagent_lifecycle.py` | 1 |
+| `maop/core/agent/lifecycle/agent_registry.py` | 1 |
+| `maop/core/agent/memory_ctx/worktree.py` | 1 |
+| `maop/core/agent/plugins_hooks/hook_manager.py` | 1 |
+| `maop/core/backends/kv_store.py` | 1 |
+| `maop/core/cost_tracker.py` | 1 |
+| `maop/core/mcp/mcp_hub_ops.py` | 1 |
+| `maop/core/memory/multimodal_store.py` | 1 |
+| `maop/core/monitoring/timeseries.py` | 1 |
+| `maop/core/reliability/message_queue.py` | 1 |
+| `maop/core/reliability/pipeline_checkpoint.py` | 1 |
+| `maop/core/security/api_key_manager.py` | 1 |
+| `maop/dashboard/routers/agent_versions_helpers.py` | 1 |
+| `maop/dashboard/services/auth_service.py` | 1 |
+| `maop/memory/store.py` | 1 |
+| `maop/migrations/pg/vector_migration.py` | 1 |
+| `maop/prompt_manager.py` | 1 |
+
+### 需人工核对的站点（57 处）
+
+```
+maop/core/agent/auth/agent_proxy_gateway.py:344  [builder]  _AUDIT_EVENT_TABLE, where
+maop/core/agent/auth/credential_vault.py:387  [other]  _VAULT_TABLE, credential_id, _VAULT_TABLE
+maop/core/agent/delegation/subagent_db.py:344  [builder]  col_list, col_list
+maop/core/agent/lifecycle/agent_registry.py:365  [builder]  ' AND '.join(clauses), where
+maop/core/agent/plugins_hooks/hook_manager.py:603  [builder]  where
+maop/core/agent/tools/tool_audit.py:206  [builder]  where
+maop/core/agent/tools/tool_audit.py:210  [other]  where, 'AND' if where else 'WHERE'
+maop/core/agent/tools/tool_audit.py:215  [builder]  where
+maop/core/agent/tools/tool_audit.py:219  [builder]  where
+maop/core/agent/tools/tool_audit.py:224  [builder]  where
+maop/core/backends/data.py:458  [other]  json_column
+maop/core/backends/data.py:464  [other]  json_column, table, json_column, json_column
+maop/core/backends/data.py:609  [other]  fts_name
+maop/core/backends/data.py:624  [other]  fts_name
+maop/core/backends/data.py:646  [other]  table, fts_name, fts_name
+maop/core/cost_tracker.py:387  [builder]  where
+maop/core/memory/knowledge_extractor.py:276  [builder]  where
+maop/core/memory/knowledge_extractor.py:280  [builder]  where, where
+maop/core/memory/knowledge_extractor.py:314  [builder]  where
+maop/core/memory/knowledge_graph.py:496  [builder]  where
+maop/core/reliability/circuit_breaker.py:712  [builder]  where_sql
+maop/core/reliability/circuit_breaker.py:737  [builder]  where_sql
+maop/core/reliability/message_queue.py:677  [other]  table!r, table, where
+maop/core/security/api_key_manager.py:439  [other]  col, set_clause
+maop/core/security/session.py:174  [builder]  where
+maop/core/security/session.py:249  [builder]  where
+maop/core/security/session.py:254  [builder]  where
+maop/core/security/session.py:308  [builder]  set_clause
+maop/core/tenant/compliance_manager.py:261  [other]  "memory_entries", "long_term_memory", "short_term_memory", table!r, table
+maop/core/tenant/compliance_manager.py:324  [builder]  table
+maop/core/tenant/gdpr_manager.py:485  [builder]  where
+maop/core/tenant/gdpr_manager.py:568  [builder]  where
+maop/core/tenant/gdpr_manager.py:702  [builder]  table
+maop/core/tenant/gdpr_manager.py:716  [builder]  table, table
+maop/core/tenant/hierarchy.py:274  [builder]  where
+maop/core/tenant/rls.py:170  [builder]  columns, table
+maop/core/tenant/rls.py:184  [builder]  where, columns, table
+maop/core/tenant/rls.py:212  [builder]  table, col_list, placeholders
+maop/dashboard/services/agent_versions_service.py:161  [builder]  where_sql
+maop/dashboard/services/chat_service.py:798  [builder]  where_sql
+maop/dashboard/services/chat_service.py:882  [builder]  where_sql
+maop/dashboard/services/chat_service.py:937  [builder]  FEEDBACK_COLUMNS, where_sql
+maop/memory/search.py:90  [other]  r.id for r in fts_results, placeholders
+maop/memory/search.py:138  [builder]  where_sql
+maop/memory/search.py:198  [builder]  where_sql
+maop/memory/search.py:264  [builder]  where_sql
+maop/memory/search.py:315  [other]  kw
+maop/memory/search.py:326  [other]  kw, field, field
+maop/migrations/memory_migration.py:180  [builder]  table
+maop/migrations/memory_migration.py:186  [builder]  table
+maop/migrations/memory_migration.py:308  [builder]  table
+maop/migrations/memory_migration.py:646  [other]  tr.table
+maop/migrations/sqlite_to_pg.py:303  [builder]  table
+maop/migrations/sqlite_to_pg.py:324  [other]  c, col_list, table
+maop/migrations/sqlite_to_pg.py:329  [other]  c, col_list, table, "lim": batch_size
+maop/migrations/sqlite_to_pg.py:345  [builder]  col_list, table
+maop/migrations/sqlite_to_pg.py:366  [other]  c, c, table, col_list
+```
+
+> 已完成的真修复（同批 PR）：B615×2 钉 40-hex 模型 revision（含夹具 revision 与守卫测试）、B310×3（MCP transport 方案白名单 + marketplace 已有 SSRF 守卫 + deploy host 校验）、B103（exec 位只加不重写权限）。门禁 `-lll`→`-ll` 待 B608 全部处置后切换（切换前必须先过 nosec 清单门禁 `tests/test_bandit_security_fixes.py::test_nosec_inventory_matches`）。
