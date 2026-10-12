@@ -344,7 +344,7 @@ class DebateDispatcher:
                 if t.done() and not t.cancelled():
                     try:
                         results.append(t.result())
-                    except Exception:  # pragma: no cover
+                    except Exception:  # pragma: no cover; silent-ok: expected-signal — 已取消任务的 result() 抛异常是预期
                         # 已取消任务的 result() 异常是预期的，静默忽略
                         pass
         # 构造 positions

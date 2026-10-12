@@ -55,10 +55,10 @@ def _current_otel_ids() -> tuple[str, str]:
         ctx = span.get_span_context() if span else None
         if ctx and ctx.is_valid:
             return f"{ctx.trace_id:032x}", f"{ctx.span_id:016x}"
-    except ImportError:
+    except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
         # opentelemetry 未安装是合法状态（Personal edition），静默忽略
         pass
-    except Exception:
+    except Exception:  # silent-ok: defensive-probe — 此处不能记日志（会递归），静默是有意的
         # OTel API 调用异常不应影响日志写入；此处不能使用 logger 调用
         # （会触发递归），静默兜底是有意的防御性设计
         pass

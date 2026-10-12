@@ -705,7 +705,7 @@ async def _run_via_adapter(
         finally:
             try:
                 adapter.disconnect()
-            except Exception:
+            except Exception:  # silent-ok: best-effort-cleanup — disconnect 失败不影响已取得的结果
                 pass  # disconnect 失败不影响已获取的结果
 
     try:

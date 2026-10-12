@@ -314,7 +314,7 @@ class IDEExtensionAdapter(AgentAdapter):
             if self._ws is not None:
                 try:
                     self._run_async(self._async_disconnect())
-                except Exception:
+                except Exception:  # silent-ok: best-effort-cleanup — 旧连接清理失败不影响重连
                     pass
                 self._ws = None
             self._connected = False

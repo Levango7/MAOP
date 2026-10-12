@@ -214,7 +214,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                             token = delta.get("content", "")
                             if token:
                                 yield token
-                        except json.JSONDecodeError:
+                        except json.JSONDecodeError:  # silent-ok: scan-continue — 扫描中数据形状不符预期
                             continue
                     return
             except (httpx.HTTPStatusError, httpx.TimeoutException) as exc:
@@ -390,7 +390,7 @@ class AnthropicProvider(BaseLLMProvider):
                                     yield delta.get("text", "")
                             elif event.get("type") == "message_stop":
                                 return
-                        except json.JSONDecodeError:
+                        except json.JSONDecodeError:  # silent-ok: scan-continue — 扫描中数据形状不符预期
                             continue
                     return
             except (httpx.HTTPStatusError, httpx.TimeoutException) as exc:
@@ -478,7 +478,7 @@ class OllamaProvider(BaseLLMProvider):
                             yield token
                         if chunk.get("done"):
                             return
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError:  # silent-ok: scan-continue — 扫描中数据形状不符预期
                         continue
         except Exception as exc:
             yield f"[Ollama Stream Error] {exc}"

@@ -154,7 +154,7 @@ class BalancedStrategy(BaseStrategy):
                 dt = datetime.fromisoformat(ts)
                 if (now - dt).total_seconds() < hours * 3600:
                     count += 1
-            except (ValueError, TypeError):
+            except (ValueError, TypeError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 pass
         return count
 
@@ -168,7 +168,7 @@ class BalancedStrategy(BaseStrategy):
                     remaining = self._config.cooldown_seconds - elapsed
                     if remaining > 0:
                         return int(remaining)
-                except (ValueError, TypeError):
+                except (ValueError, TypeError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                     pass
         return 0
 

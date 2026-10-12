@@ -302,7 +302,7 @@ class TenantManager:
         for row in rows:
             try:
                 row_dict = dict(row)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 continue
             table = self._infer_table(sql)
             if table and self._rls.is_scoped(table):

@@ -242,7 +242,7 @@ class LDAPSearchMixin:
             if uac:
                 try:
                     is_active = not (int(uac) & 0x2)
-                except ValueError:
+                except ValueError:  # silent-ok: scan-continue — 扫描中数据形状不符预期
                     pass
         else:
             username = _first("uid", "cn")

@@ -170,7 +170,7 @@ class Guardrail:
             try:
                 raw = json.loads(self._path.read_text(encoding="utf-8"))
                 return GuardConfig(**raw)
-            except (json.JSONDecodeError, ValueError, TypeError):
+            except (json.JSONDecodeError, ValueError, TypeError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                 pass
         return _default_config()
 

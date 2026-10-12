@@ -112,7 +112,7 @@ def with_file_lock(
             try:
                 lock_file.unlink()
                 logger.warning("Removed orphan lock: %s", lock_file)
-            except FileNotFoundError:
+            except FileNotFoundError:  # silent-ok: lock-race — 锁/文件竞态为预期路径
                 pass
 
         # Try to create the lock file atomically
@@ -123,7 +123,7 @@ def with_file_lock(
             os.close(fd)
             _write_lock_content(lock_file)
             break
-        except FileExistsError:
+        except FileExistsError:  # silent-ok: lock-race — 锁/文件竞态为预期路径
             pass  # Lock held by another process
 
         # Timeout check
@@ -133,7 +133,7 @@ def with_file_lock(
                 try:
                     lock_file.unlink()
                     continue  # retry immediately
-                except FileNotFoundError:
+                except FileNotFoundError:  # silent-ok: lock-race — 锁/文件竞态为预期路径
                     pass
             raise TimeoutError(f"[filelock] Timeout waiting for lock: {lock_file} ({timeout_seconds}s)")
 
@@ -148,7 +148,7 @@ def with_file_lock(
         try:
             if lock_file.exists():
                 lock_file.unlink()
-        except FileNotFoundError:
+        except FileNotFoundError:  # silent-ok: lock-race — 锁/文件竞态为预期路径
             pass
 
 
@@ -192,7 +192,7 @@ class FileLock:
                 _write_lock_content(self._lock_file)
                 self._acquired = True
                 return self
-            except FileExistsError:
+            except FileExistsError:  # silent-ok: lock-race — 锁/文件竞态为预期路径
                 pass
 
             if time.monotonic() >= deadline:
@@ -200,7 +200,7 @@ class FileLock:
                     try:
                         self._lock_file.unlink()
                         continue
-                    except FileNotFoundError:
+                    except FileNotFoundError:  # silent-ok: lock-race — 锁/文件竞态为预期路径
                         pass
                 raise TimeoutError(f"[filelock] Timeout: {self._lock_file}")
 
@@ -213,5 +213,5 @@ class FileLock:
             try:
                 if self._lock_file.exists():
                     self._lock_file.unlink()
-            except FileNotFoundError:
+            except FileNotFoundError:  # silent-ok: lock-race — 锁/文件竞态为预期路径
                 pass

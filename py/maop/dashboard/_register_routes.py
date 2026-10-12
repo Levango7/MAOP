@@ -782,7 +782,7 @@ def register_websocket(app: FastAPI) -> None:
                 data = await ws.receive_text()
                 if data == "ping":
                     await ws.send_json({"type": "pong", "ts": time.time()})
-        except WebSocketDisconnect:
+        except WebSocketDisconnect:  # silent-ok: ws-disconnect — 客户端断开
             pass
         finally:
             async with _ws_lock:

@@ -211,7 +211,7 @@ class MigrationManager:
             except Exception as exc:
                 try:
                     conn.execute("ROLLBACK")
-                except Exception:
+                except Exception:  # silent-ok: best-effort-cleanup — 清理动作 best-effort，原错误已重抛或另行告警
                     pass
                 raise RuntimeError(
                     f"Migration v{migration.version} failed during execution, rolled back: {exc}"
@@ -247,7 +247,7 @@ class MigrationManager:
             except Exception as exc:
                 try:
                     conn.execute("ROLLBACK")
-                except Exception:
+                except Exception:  # silent-ok: best-effort-cleanup — 清理动作 best-effort，原错误已重抛或另行告警
                     pass
                 raise RuntimeError(
                     f"Rollback of migration v{migration.version} failed, rolled back: {exc}"

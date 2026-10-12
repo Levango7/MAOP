@@ -888,7 +888,7 @@ def get_feedback_summary(
             for tag in json.loads(tr["tags"]):
                 if tag:
                     tag_freq[tag] = tag_freq.get(tag, 0) + 1
-        except (json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, TypeError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
             continue
 
     total = int(agg["total"])

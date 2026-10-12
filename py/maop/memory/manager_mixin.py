@@ -123,7 +123,7 @@ class MemoryManagerMixin:
                     now = datetime.now(timezone.utc)
                     if (now - last).days < cfg.days_since_last:
                         return
-                except (ValueError, TypeError):
+                except (ValueError, TypeError):  # silent-ok: scan-continue — 扫描中数据形状不符预期
                     pass
 
             try:

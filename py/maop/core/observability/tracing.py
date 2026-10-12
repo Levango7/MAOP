@@ -275,7 +275,7 @@ def current_span() -> Any:
         s = otel_trace.get_current_span()
         if s is not None and getattr(s, "is_recording", False):
             return s
-    except ImportError:
+    except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
         pass
     return _NoopSpan()
 
@@ -314,7 +314,7 @@ def detach_trace_context(token: Any) -> None:
     try:
         from opentelemetry import context as otel_context
         otel_context.detach(token)
-    except ImportError:
+    except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
         pass
 
 
@@ -362,7 +362,7 @@ class TraceContextMiddleware:
                 ctx = extract_trace_context(carrier)
                 if ctx is not None:
                     token = otel_context.attach(ctx)
-            except ImportError:
+            except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
                 # opentelemetry 未安装是合法状态，静默忽略
                 pass
             except Exception:
@@ -392,7 +392,7 @@ class TraceContextMiddleware:
                 try:
                     from opentelemetry import context as otel_context
                     otel_context.detach(token)
-                except ImportError:
+                except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
                     # opentelemetry 未安装是合法状态，静默忽略
                     pass
                 except Exception:
@@ -438,7 +438,7 @@ def install_auto_spans() -> int:
             setattr(cls, meth_name, decorated)
             wrapped += 1
             logger.debug("[observability.tracing] auto-span installed: %s.%s", cls_name, meth_name)
-        except ImportError:
+        except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
             continue
         except Exception as exc:
             logger.warning(

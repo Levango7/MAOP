@@ -317,7 +317,7 @@ def _drain_pipe_to_buffer(pipe: Any, buffer: list[bytes]) -> threading.Thread:
             for chunk in iter(pipe.read, b""):
                 if chunk:
                     buffer.append(chunk)
-        except Exception:
+        except Exception:  # silent-ok: defensive-probe — 读线程随管道关闭退出，不影响主流程
             # 管道已关闭 / IO 异常等忽略，读取线程退出
             pass
 

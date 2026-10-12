@@ -83,14 +83,14 @@ def _warn_if_non_sqlite_backend_selected() -> None:
 
         if resolve_backend_name() == "pg":
             selected.append("MAOP_VECTOR_BACKEND")
-    except Exception:  # pragma: no cover - defensive: resolver import/read failure
+    except Exception:  # pragma: no cover - defensive: resolver import/read failure; silent-ok: defensive-probe — 后端探测失败即信号，已由 warning 单独告知
         pass
     try:
         from maop.core.backends.db_utils import get_db_backend
 
         if str(get_db_backend()).strip().lower() in {"pg", "postgresql"}:
             selected.append("MAOP_DB_BACKEND")
-    except Exception:  # pragma: no cover - defensive
+    except Exception:  # pragma: no cover - defensive; silent-ok: defensive-probe — 后端探测失败即信号，已由 warning 单独告知
         pass
     if selected:
         logger.warning(

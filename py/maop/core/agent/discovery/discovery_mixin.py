@@ -189,9 +189,9 @@ class AgentDiscoveryMixin:
                             value, _ = winreg.QueryValueEx(key, None)  # type: ignore[arg-type]
                             if value and os.path.isfile(value):
                                 return value
-                    except OSError:
+                    except OSError:  # silent-ok: optional-dep — 可选依赖未安装
                         continue
-        except ImportError:
+        except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
             pass
 
         # 开始菜单快捷方式目录
@@ -246,7 +246,7 @@ class AgentDiscoveryMixin:
                         content = f.read().lower()
                         if name.lower() in content:
                             return fpath
-                except OSError:
+                except OSError:  # silent-ok: optional-dep — 可选依赖未安装
                     continue
         return ""
 
@@ -341,7 +341,7 @@ class AgentDiscoveryMixin:
                     continue
                 try:
                     entries = os.listdir(ext_dir)
-                except OSError:
+                except OSError:  # silent-ok: optional-dep — 可选依赖未安装
                     continue
                 # 对每个目标扩展检查是否已安装
                 for target in targets:
@@ -431,7 +431,7 @@ class AgentDiscoveryMixin:
                     continue
                 try:
                     ide_dirs = os.listdir(base_dir)
-                except OSError:
+                except OSError:  # silent-ok: optional-dep — 可选依赖未安装
                     continue
                 for ide_dir in ide_dirs:
                     plugins_dir = os.path.join(base_dir, ide_dir, "plugins")
@@ -439,7 +439,7 @@ class AgentDiscoveryMixin:
                         continue
                     try:
                         plugin_entries = os.listdir(plugins_dir)
-                    except OSError:
+                    except OSError:  # silent-ok: optional-dep — 可选依赖未安装
                         continue
                     for target in targets:
                         if any(r.name == target for r in results):

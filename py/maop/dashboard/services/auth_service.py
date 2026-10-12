@@ -230,7 +230,7 @@ def _ensure_default_user() -> None:
                     pwd_file_path.write_text(admin_pwd, encoding="utf-8")
                     try:
                         pwd_file_path.chmod(0o600)
-                    except OSError:
+                    except OSError:  # silent-ok: platform-limitation — 平台/文件系统不支持（Windows chmod、fsync 目录等）
                         pass  # Windows
                     logger.warning(
                         "MAOP_ADMIN_PASSWORD not set — generated a ONE-TIME random "

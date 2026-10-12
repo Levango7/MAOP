@@ -414,7 +414,7 @@ class ChangeTracker:
                     continue
                 try:
                     rel = str(fpath.relative_to(workdir_path))
-                except ValueError:
+                except ValueError:  # silent-ok: scan-continue — 扫描中数据形状不符预期
                     continue
                 if rel not in snap_files:
                     try:

@@ -215,7 +215,7 @@ class CredentialVault:
         key_file.write_bytes(key_material)
         try:
             key_file.chmod(0o600)
-        except OSError:
+        except OSError:  # silent-ok: platform-limitation — 平台/文件系统不支持（Windows chmod、fsync 目录等）
             # Windows 上 chmod 限制，忽略。
             pass
         logger.info("生成新凭证加密密钥: %s", key_file)

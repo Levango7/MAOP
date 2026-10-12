@@ -113,7 +113,7 @@ async def websocket_endpoint(ws: WebSocket) -> Any:
             data = await ws.receive_text()
             if data == "ping":
                 await ws.send_json({"type": "pong", "ts": time.time()})
-    except WebSocketDisconnect:
+    except WebSocketDisconnect:  # silent-ok: ws-disconnect — 客户端断开
         pass
     finally:
         async with ws_state._ws_lock:

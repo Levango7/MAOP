@@ -236,7 +236,7 @@ async def dag_ws_endpoint(ws: WebSocket, execution_id: str) -> Any:
                 await ws.send_json({"type": "pong", "ts": time.time()})
             # Unknown messages are ignored (spec: reject illegal instructions
             # silently rather than disconnecting).
-    except WebSocketDisconnect:
+    except WebSocketDisconnect:  # silent-ok: ws-disconnect — 客户端断开
         pass
     except Exception:
         logger.debug("[dag-ws] endpoint error", exc_info=True)
