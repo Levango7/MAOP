@@ -39,6 +39,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M2.2 B2 PR-3：异步摄入队列，闭合延迟预算（ADR-022 D4）
+
+spike/B1 实测：CLIP 单张图像嵌入热机 65-293ms，贴着 PRD 的 <200ms；而 batch=8
+单次前向摊销 ~53ms/图。⇒ 达标路径就是「到达即入队、后台批处理嵌入」。
+
+- 新 `core/memory/multimodal_ingest.py`：`MultimodalIngestQueue` —— 有界
+  `queue.Queue` + 后台守护线程；`submit()` **不等嵌入**（<10ms 返回，测试钉住）；
+  攒批到 batch_size 或 flush_interval 即一次 `index_many`（后端按 modality 分组、
+  各组一次前向、PG 单事务）；`drain(timeout)` 显式排空（整队合**一批**写——逐条写会
+  破坏摊销，测试钉住）；`close(drain=True)` 关停前排空；批量失败只记日志不杀 worker。
+- `MultimodalMemory.store_async(content, ...)` / `drain_ingest()` /
+  `ingest_queue`：服务层入口（Facade 侧按需再接）。
+- 关停语义：关闭后 submit 返回 `""`（不静默丢数据），测试钉住。
+- 边界：不做跨进程持久化队列（2s 批窗口上，SQLite 队列只会加磁盘故障面）；
+  PG 侧批处理本就单事务（PR-1），队列只是把异步语义补上。
+
+验证：14 例守卫 + 多模态相关 48 例通过。
+
 ### M2.2 B2 PR-2：迁移工具多源引擎 + multimodal BLOB→vector 转换
 
 多模态记忆在独立库文件 `multimodal.db`（ADR-022 D2），而 `sqlite_to_pg`
