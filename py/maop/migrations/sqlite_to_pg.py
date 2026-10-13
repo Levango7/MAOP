@@ -51,6 +51,8 @@ from typing import Any
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 
+from maop.migrations.pg.value_converters import VALUE_CONVERTERS
+
 logger = logging.getLogger("maop.migrations.sqlite_to_pg")
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -129,6 +131,9 @@ _COPY_ORDER: tuple[str, ...] = (
     "ts_5min",
     "ts_1hour",
     "vector_entries",
+    # M2.2 B2: the multimodal space lives in its OWN sqlite file
+    # (multimodal.db) — migrate() copies it via a separate source engine.
+    "multimodal_entries",
     "worktree_nodes",
     "worktree_checkpoints",
     "_migrations",
@@ -170,6 +175,10 @@ _JSON_COLUMNS: dict[str, frozenset[str]] = {
     "ts_5min": frozenset({"tags"}),
     "ts_1hour": frozenset({"tags"}),
     "vector_entries": frozenset({"vector", "metadata"}),
+    # F2-02: JSON text in SQLite → JSONB in PG. The vector column itself is
+    # converted by value_converters (BLOB → pgvector literal), not parsed
+    # as JSON — the converter runs first in _transform_row.
+    "multimodal_entries": frozenset({"metadata"}),
     "worktree_nodes": frozenset({"metadata"}),
     "worktree_checkpoints": frozenset({"snapshot"}),
 }
@@ -235,6 +244,51 @@ def _sqlite_tables(engine: Engine) -> list[str]:
     return tables
 
 
+def _multimodal_source(sqlite_url: str | None) -> tuple[Engine | None, set[str]]:
+    """Return (engine, table names) for the multimodal space's own DB file.
+
+    The multimodal memory space deliberately lives in
+    ``<data_dir>/multimodal.db`` (ADR-022 D2). It is discovered next to the
+    main SQLite database:
+
+    * an explicit ``sqlite_url`` that points *at* a ``multimodal.db`` counts;
+    * otherwise the sibling ``multimodal.db`` next to the main database file;
+    * if that file does not exist (multimodal never used) → ``(None, set())``.
+
+    Returns an empty set (never raising) when anything is off, so legacy
+    single-file migrations keep working unchanged.
+    """
+    if sqlite_url and "multimodal" in sqlite_url:
+        url = sqlite_url
+    elif sqlite_url:
+        # Derive the sibling of the explicitly-given main database.
+        try:
+            path = Path(sqlite_url.replace("sqlite:///", "").split("?", 1)[0])
+            url = f"sqlite:///{(path.parent / 'multimodal.db').as_posix()}"
+        except (ValueError, OSError):
+            return None, set()
+    else:
+        # Reuse get_sqlite_engine's own URL resolution (which already honours
+        # the env var / project default) instead of re-reading the env —
+        # the config-drift gate counts direct env reads.
+        main_url = get_sqlite_engine().url.render_as_string(hide_password=False)
+        path = Path(main_url.replace("sqlite:///", "").split("?", 1)[0])
+        candidate = path.parent / "multimodal.db"
+        if not candidate.exists():
+            return None, set()
+        url = f"sqlite:///{candidate.as_posix()}"
+    try:
+        engine = create_engine(url, echo=False, future=True)
+        names = set(_sqlite_tables(engine))
+    except Exception as exc:  # pragma: no cover - defensive: unreadable file
+        logger.debug("multimodal source %s unusable: %s", url, exc)
+        return None, set()
+    if not names:
+        return None, set()
+    logger.debug("multimodal source %s provides tables %s", url, sorted(names))
+    return engine, names
+
+
 def _ordered_tables(available: Sequence[str]) -> list[str]:
     """Intersect *available* with :data:`_COPY_ORDER`, then append any extras sorted."""
     ordered = [t for t in _COPY_ORDER if t in available]
@@ -279,14 +333,21 @@ def _transform_row(table: str, columns: Sequence[str], row: Sequence[Any]) -> di
 
     * Parses JSON-encoded TEXT columns into Python objects so psycopg2 binds
       them to JSONB.
+    * Applies value converters registered per ``(table, column)`` (e.g. the
+      multimodal space's float32 BLOB → pgvector text literal — raw BLOBs
+      into a ``vector`` column fail with DatatypeMismatch).
     * Applies column renames if any.
     """
     json_cols = _JSON_COLUMNS.get(table, frozenset())
     renames = _COLUMN_RENAMES.get(table, {})
+    converters = VALUE_CONVERTERS
     out: dict[str, Any] = {}
     for col, val in zip(columns, row):
         pg_col = renames.get(col, col)
-        if col in json_cols:
+        conv = converters.get((table, col))
+        if conv is not None:
+            out[pg_col] = conv(val)
+        elif col in json_cols:
             out[pg_col] = _parse_json(val)
         else:
             out[pg_col] = val
@@ -500,7 +561,10 @@ def migrate(
         Rows per INSERT batch (default 1000).
     dry_run : bool
         If True, count rows and print what would be copied but do not
-        INSERT anything.
+        INSERT anything. No PostgreSQL connection is opened at all — a
+        dry-run needs only the SQLite sources, so it works on hosts with
+        no PG driver installed (verified: previously the unconditional
+        ``create_engine`` raised ``ModuleNotFoundError: psycopg2``).
     progress : bool
         Print per-table progress to stdout.
     rollback_on_failure : bool
@@ -514,8 +578,15 @@ def migrate(
         in dry-run mode).
     """
     sqlite_engine = get_sqlite_engine(sqlite_url)
-    pg_engine = get_pg_engine(pg_url)
     available = _sqlite_tables(sqlite_engine)
+    # M2.2 B2: the multimodal space lives in its own database file
+    # (``<data_dir>/multimodal.db``). Without merging it into the source
+    # list here it would never be copied — the "PG table exists" guard would
+    # make the copy report 0 rows and *succeed* (a green lie). Its rows are
+    # pulled through a separate engine so both files migrate in one run.
+    multimodal_engine, multimodal_tables = _multimodal_source(sqlite_url)
+    if multimodal_engine is not None and "multimodal_entries" not in available:
+        available = list(available) + sorted(multimodal_tables)
     if tables:
         wanted = set(tables)
         available = [t for t in available if t in wanted]
@@ -528,11 +599,44 @@ def migrate(
         mode = "dry-run" if dry_run else "live"
         print(f"SQLite → PG migration ({mode}): {len(ordered)} tables")
 
+    def _source_for(table: str) -> Engine:
+        # _multimodal_source only returns tables when its engine is not None,
+        # so the None branch is unreachable by construction.
+        if table in multimodal_tables and multimodal_engine is not None:
+            return multimodal_engine
+        return sqlite_engine
+
+    if dry_run:
+        # No PG connection at all: count rows per source table and report.
+        dry_counts: dict[str, int] = {}
+        for table in ordered:
+            try:
+                dry_counts[table] = _count_rows(_source_for(table), table)
+                if progress:
+                    n_cols = len(_columns(_source_for(table), table))
+                    print(f"  [dry-run] {table}: would copy {dry_counts[table]} rows, {n_cols} columns")
+            except Exception as exc:
+                logger.error("Failed to count table %r: %s", table, exc)
+                dry_counts[table] = -1
+        return dry_counts
+
+    pq_ready = True
+    pg_engine: Engine
+    try:
+        pg_engine = get_pg_engine(pg_url)
+    except Exception as exc:
+        # A live migration without psycopg2 must fail loudly, not silently
+        # copy nothing: report every requested table as failed.
+        logger.error("Cannot build PG engine (%s); a live migration needs psycopg2", exc)
+        pq_ready = False
+    if not pq_ready:
+        return {t: -1 for t in ordered}
+
     results: dict[str, int] = {}
     for table in ordered:
         try:
             results[table] = copy_table(
-                sqlite_engine, pg_engine, table,
+                _source_for(table), pg_engine, table,
                 batch_size=batch_size, dry_run=dry_run, progress=progress,
             )
         except Exception as exc:
