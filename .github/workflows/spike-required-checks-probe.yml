@@ -1,0 +1,83 @@
+name: spike-required-checks-probe
+
+# Throwaway spike: can a job observe GitHub's *effective* required status checks
+# with the default GITHUB_TOKEN (no PAT)? Answers three questions in one run:
+#   1. Is pullRequest.statusCheckRollup.contexts.nodes[].isRequired resolvable at all
+#      (merged PRs return UNPROCESSABLE "A pull request ID or pull request number is required")?
+#   2. Is that GraphQL readable by github.token?
+#   3. Control: does REST /branches/master/protection stay 403 for github.token?
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  probe:
+    name: Required-checks observability probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: read
+    steps:
+      - name: GraphQL rollup for this PR via github.token
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          OWNER="${REPO%%/*}"
+          NAME="${REPO##*/}"
+          QUERY="
+          {
+            repository(owner: \"$OWNER\", name: \"$NAME\") {
+              pullRequest(number: $PR_NUMBER) {
+                number
+                state
+                baseRefName
+                mergeStateStatus
+                statusCheckRollup {
+                  state
+                  contexts(first: 40) {
+                    totalCount
+                    nodes {
+                      __typename
+                      ... on CheckRun { name isRequired status conclusion }
+                      ... on StatusContext { context isRequired state }
+                    }
+                  }
+                }
+              }
+            }
+          }"
+
+          echo "PR=$PR_NUMBER REPO=$REPO"
+          gh api graphql -f query="$QUERY" > /tmp/rollup.json 2> /tmp/rollup.err
+          echo "GRAPHQL_EXIT=$?"
+          echo "--- stderr ---"
+          head -5 /tmp/rollup.err || true
+          echo "--- errors (message x count) ---"
+          jq -r '.errors[]?.message' /tmp/rollup.json 2>/dev/null | sort | uniq -c || echo "no errors key / jq failed"
+          echo "--- nodes: typename | label | isRequired | state ---"
+          jq -r '.data.repository.pullRequest.statusCheckRollup.contexts.nodes[]?
+                 | [.__typename, (.name // .context // "-"), (.isRequired | tostring), (.state // .conclusion // "-")]
+                 | @tsv' /tmp/rollup.json 2>/dev/null || echo "nodes unreadable"
+          echo "--- GraphQL required set (isRequired == true) ---"
+          jq -r '[.data.repository.pullRequest.statusCheckRollup.contexts.nodes[]?
+                 | select(.isRequired == true) | (.name // .context)] | sort | .[]' /tmp/rollup.json 2>/dev/null \
+            || echo "EMPTY-OR-UNREADABLE"
+          echo "--- mergeStateStatus ---"
+          jq -r '.data.repository.pullRequest.mergeStateStatus // "null"' /tmp/rollup.json 2>/dev/null || echo "unreadable"
+
+          echo "--- control A: REST branch protection (github.token) ---"
+          gh api "repos/$REPO/branches/master/protection" --jq '.required_status_checks.contexts | sort | .[]' \
+            2>&1 | head -8 || true
+          echo "--- control B: GraphQL isRequiredCount via repository.branch? ---"
+          gh api graphql -f query="
+          {
+            repository(owner: \"$OWNER\", name: \"$NAME\") {
+              branchRefName: defaultBranchRef { name }
+            }
+          }" 2>&1 | head -8 || true
