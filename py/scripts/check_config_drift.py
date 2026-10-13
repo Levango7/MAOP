@@ -33,7 +33,10 @@ import sys
 # 是有意为之（subprocess 没有"继承 + 覆盖"的 API，只能自己拼映射）。
 # 另外把 `_agent_env` 说明文字里的字面量 os.environ 改成了"进程环境"：计数器是逐行文本
 # 匹配，散文里的提法不该占额度（本仓在 test_ci_workflow_hygiene 栽过同形）。
-BASELINE = 228
+# 228→229（2026-10-13）：migrations/pg/versions/003_multimodal_entries.py 的
+# downgrade 守卫读 MAOP_MIGRATION_DESTRUCTIVE（M2.2 B2 新增迁移）。与 001/002/003
+# 既有迁移的同款守卫同形态（破坏性迁移的显式确认开关），属有意配置非 drift。
+BASELINE = 229
 
 
 def count_getenv_calls(root: pathlib.Path) -> int:

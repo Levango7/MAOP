@@ -28,6 +28,7 @@ from typing import Any
 
 from maop.core.backends.db_utils import resolve_data_dir
 from maop.core.memory.fusion import reciprocal_rank_fusion
+from maop.core.memory.multimodal_backend import MultimodalBackend
 from maop.core.memory.multimodal_embed import ImageInput
 from maop.core.memory.multimodal_store import (
     MODALITY_IMAGE,
@@ -53,16 +54,18 @@ class MultimodalMemory:
 
     def __init__(
         self,
-        store: MultimodalStore | None = None,
+        store: MultimodalStore | MultimodalBackend | None = None,
         text_search: TextSearchFn | None = None,
     ) -> None:
-        self._store = store if store is not None else MultimodalStore()
+        self._store: MultimodalBackend = (
+            store if store is not None else MultimodalStore()
+        )
         self._text_search = text_search
 
     # ── properties ────────────────────────────────────────────
 
     @property
-    def space(self) -> MultimodalStore:
+    def space(self) -> MultimodalBackend:
         """The underlying multimodal vector space (read-only accessor)."""
         return self._store
 
@@ -275,23 +278,80 @@ _lock = threading.Lock()
 _instances: dict[str, MultimodalMemory] = {}
 
 
+def _pg_backend_selected() -> bool:
+    """True iff PostgreSQL is selected for the multimodal space.
+
+    Resolution order (all through :mod:`maop.config.settings` — the
+    config-drift gate counts direct environment reads):
+
+    * ``MAOP_MULTIMODAL_BACKEND`` explicit override wins;
+    * otherwise the data-plane selection (``MAOP_DB_BACKEND`` /
+      ``MAOP_VECTOR_BACKEND``) decides, via the existing resolvers.
+    """
+    try:
+        from maop.config.settings import get_settings
+    except Exception:  # pragma: no cover - defensive: settings import failure
+        return False
+    override = get_settings().multimodal_backend.strip().lower()
+    if override in ("sqlite", "pg", "postgresql"):
+        return override in ("pg", "postgresql")
+    try:
+        from maop.core.backends.db_utils import get_db_backend
+        from maop.core.vector.factory import resolve_backend_name
+
+        return str(get_db_backend()).strip().lower() in ("pg", "postgresql") or (
+            resolve_backend_name() == "pg"
+        )
+    except Exception:  # pragma: no cover - defensive: resolver import/read failure
+        return False
+
+
+def _default_pg_dsn() -> str:
+    """Default PG DSN — reads ``MAOP_DATABASE_URL`` via settings."""
+    try:
+        from maop.config.settings import get_settings
+
+        return get_settings().database_url or (
+            "postgresql+psycopg2://localhost:5432/maop"
+        )
+    except Exception:  # pragma: no cover - defensive
+        return "postgresql+psycopg2://localhost:5432/maop"
+
+
+def _build_store(
+    data_dir: Path, dsn: str | None
+) -> MultimodalBackend:
+    """Construct the backend matching the environment (SQLite default)."""
+    if dsn is None and _pg_backend_selected():
+        from maop.core.memory.multimodal_pg import PgMultimodalBackend
+
+        return PgMultimodalBackend()
+    return MultimodalStore(db_path=data_dir / "multimodal.db")
+
+
 def get_multimodal_memory(
     *,
     text_search: TextSearchFn | None = None,
     data_dir: Path | str | None = None,
+    dsn: str | None = None,
 ) -> MultimodalMemory:
-    """Shared :class:`MultimodalMemory`, keyed by resolved data dir.
+    """Shared :class:`MultimodalMemory`, keyed by resolved backend identity.
+
+    Keys are ``sqlite:<data_dir>`` or ``pg:<dsn>`` so a SQLite instance and a
+    PG instance in the same process cannot collide (ADR-019 single-instance
+    discipline — the previous data-dir-only key silently shared state).
 
     The text-memory adapter is (re)bound on every call so a facade that
     changed mode/impl never keeps a stale leg. Tests reset with
     :func:`reset_multimodal_memory`.
     """
     resolved = Path(data_dir) if data_dir is not None else resolve_data_dir()
-    key = str(resolved)
+    backend_pg = dsn is not None or _pg_backend_selected()
+    key = f"pg:{dsn or _default_pg_dsn()}" if backend_pg else f"sqlite:{resolved}"
     with _lock:
         instance = _instances.get(key)
         if instance is None:
-            store = MultimodalStore(db_path=resolved / "multimodal.db")
+            store = _build_store(resolved, dsn)
             instance = MultimodalMemory(store=store, text_search=text_search)
             _instances[key] = instance
         else:

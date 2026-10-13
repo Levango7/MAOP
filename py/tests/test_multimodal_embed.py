@@ -110,8 +110,13 @@ def test_validate_bytes_without_ext_uses_pillow_sniff():
     assert ext == ".png"
 
 
-def test_validate_bytes_without_ext_and_no_pillow_is_explicit(monkeypatch):
-    """Without Pillow, raw bytes need an explicit ext hint (clear error, not silent)."""
+def test_magic_sniff_works_without_pillow(monkeypatch):
+    """No Pillow: raw bytes are still accepted via magic bytes (zero-dep).
+
+    This is the CI/dev-install path — ``[multimodal]`` is not installed
+    there, and image inputs must not require it. Before the magic-byte
+    sniff existed this raised (2026-10-13 CI red on 5 platforms).
+    """
     import builtins
 
     real_import = builtins.__import__
@@ -122,8 +127,33 @@ def test_validate_bytes_without_ext_and_no_pillow_is_explicit(monkeypatch):
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
-    with pytest.raises(ImageValidationError, match="pass ext="):
-        validate_image_input(PNG_MAGIC + b"\x00" * 8)
+    data, ext = validate_image_input(PNG_MAGIC + b"\x00" * 8)
+    assert ext == ".png" and data.startswith(PNG_MAGIC)
+
+
+def test_unknown_magic_bytes_still_rejected_without_pillow(monkeypatch):
+    """Bytes in no known format still fail loudly (no silent accept)."""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name.startswith("PIL"):
+            raise ImportError("no PIL")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    with pytest.raises(ImageValidationError, match="cannot determine image format"):
+        validate_image_input(b"\x00\x01\x02\x03 definitely not an image")
+
+
+def test_webp_requires_the_container_form_not_mere_riff():
+    """A RIFF payload that is not WEBP must not be accepted as an image."""
+    from maop.core.memory.multimodal_embed import _sniff_magic_ext
+
+    assert _sniff_magic_ext(b"RIFF\x00\x00\x00\x00WAVEfmt ") == ""
+    webp = b"RIFF" + b"\x00" * 4 + b"WEBP" + b"VP8 "
+    assert _sniff_magic_ext(webp) == ".webp"
 
 
 # ── precomputed provider (CI's real-CLIP stand-in) ──────────

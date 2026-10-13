@@ -187,6 +187,17 @@ class MAOPSettings(BaseSettings):
                     "Set by Dispatch on driver subprocesses; consumed by "
                     "executors (doc-pipeline adapter env auto-detect).",
     )
+    # M2.2 B2 (2026-10-13): 多模态记忆空间（multimodal_entries）的后端选择。
+    # 空 = 跟随 MAOP_DB_BACKEND / MAOP_VECTOR_BACKEND（默认 sqlite）；
+    # sqlite = 强制 SQLite；pg / postgresql = 强制 PG（pgvector >=0.5.0）。
+    # 之所以走 settings 字段而不是直接读环境：config-drift 门禁只允许
+    # 通过 settings 读 env（见 scripts/check_config_drift.py）。
+    multimodal_backend: str = Field(
+        default="",
+        description="Multimodal memory space backend override "
+                    "(env: MAOP_MULTIMODAL_BACKEND; empty = follow "
+                    "MAOP_DB_BACKEND/MAOP_VECTOR_BACKEND)",
+    )
     # 派发权限门（见 py/maop/core/security/dispatch_gate.py）。默认 False =
     # 门挂载但不改变任何行为，与历史一致 —— 范式同 MAOP_DRY_RUN_ENFORCE。
     # ⚠️ 启用前必须先在权限规则表里给要用的 agent 加 allow 规则：
