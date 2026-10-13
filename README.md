@@ -462,4 +462,4 @@ MAOP 个人版（v5.3.0）为单机/小团队设计，包含完整的 Agent 编�
 
 MIT License — see [LICENSE](LICENSE) for details.
 
-> **Enterprise Edition Note**: `maop-enterprise` 包及 `py/maop/enterprise/` 模块遵循 Commercial 许可，详见 [docs/enterprise/license-issuance-guide.md](docs/enterprise/license-issuance-guide.md)。
+> **Enterprise Edition Note**: `maop-enterprise` 包及其 `maop/enterprise/` 模块（位于私有仓 [Levango7/MAOS](https://github.com/Levango7/MAOS)，本仓不含该目录）遵循 Commercial 许可，详见 [docs/enterprise/license-issuance-guide.md](docs/enterprise/license-issuance-guide.md)。
