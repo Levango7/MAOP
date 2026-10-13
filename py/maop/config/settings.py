@@ -198,6 +198,32 @@ class MAOPSettings(BaseSettings):
                     "(env: MAOP_MULTIMODAL_BACKEND; empty = follow "
                     "MAOP_DB_BACKEND/MAOP_VECTOR_BACKEND)",
     )
+    # M2.2 B2 收尾 (2026-10-14)：多模态嵌入 provider 与上传自动索引。
+    # 同样走 settings（config-drift 门禁只允许经 settings 读 env）。
+    multimodal_provider: str = Field(
+        default="",
+        description="Multimodal embedding provider (env: MAOP_MULTIMODAL_PROVIDER; "
+                    "empty = auto: real CLIP when the [multimodal] extra and the "
+                    "model weights are available, else the deterministic hash "
+                    "fallback; 'clip' = force CLIP and fail loudly; 'hash' = force "
+                    "the fallback)",
+    )
+    multimodal_auto_index: str = Field(
+        default="",
+        description="Auto-index chat image uploads into the multimodal space "
+                    "(env: MAOP_MULTIMODAL_AUTO_INDEX; empty = auto: on only when "
+                    "the resolved provider is semantic; '1' = force on; '0' = force off)",
+    )
+    # Multi-worker deployments set this to 0 (server.py main() does it
+    # automatically when workers>1). The multimodal ingest queue is per-process,
+    # so with N workers each would load its own CLIP copy and writes would
+    # serialise on the shared store — auto-index therefore steps aside (loudly,
+    # not silently) unless explicitly forced on.
+    background_tasks: bool = Field(
+        default=True,
+        description="Whether this process runs background work "
+                    "(env: MAOP_BACKGROUND_TASKS; 0 in multi-worker mode)",
+    )
     # 派发权限门（见 py/maop/core/security/dispatch_gate.py）。默认 False =
     # 门挂载但不改变任何行为，与历史一致 —— 范式同 MAOP_DRY_RUN_ENFORCE。
     # ⚠️ 启用前必须先在权限规则表里给要用的 agent 加 allow 规则：

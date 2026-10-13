@@ -95,17 +95,34 @@ class MultimodalIngestQueue:
             )
             self._worker.start()
 
-    def close(self, *, drain: bool = True, timeout: float = 5.0) -> None:
-        """Stop the worker. With ``drain`` the pending items are flushed first."""
+    def close(self, *, drain: bool = True, timeout: float = 5.0) -> int:
+        """Stop the worker, returning the number of entries flushed.
+
+        With ``drain`` the pending items are flushed first — including the
+        partial batch a running worker already pulled off the queue, which
+        :meth:`drain` alone cannot see. Idempotent: closing twice flushes once
+        (the second call returns 0).
+        """
         with self._lock:
             if self._closed:
-                return
+                return 0
             self._closed = True
-        if drain:
-            self.drain(timeout=timeout)
+        flushed = self.drain(timeout=timeout) if drain else 0
         worker = self._worker
         if worker is not None:
             worker.join(timeout=timeout + 1.0)
+            if worker.is_alive():  # pragma: no cover - only on a stuck embed
+                logger.error(
+                    "[multimodal-ingest] worker still alive after close; "
+                    "up to %d queued entry(ies) may be lost",
+                    self.pending,
+                )
+        return flushed
+
+    @property
+    def closed(self) -> bool:
+        """True once :meth:`close` ran — submissions then fall back to sync."""
+        return self._closed
 
     # ── submission ───────────────────────────────────────────────
 
@@ -149,7 +166,14 @@ class MultimodalIngestQueue:
                 break
         if not collected:
             return 0
-        return len(collected) if self._write(collected) else 0
+        # Chunked by batch_size: a 50-image backlog must not become one
+        # 50-image forward pass (it would blow past the close() join timeout
+        # and leave a live daemon writing behind the caller's back).
+        flushed = 0
+        for start in range(0, len(collected), self._batch_size):
+            if self._write(collected[start : start + self._batch_size]):
+                flushed += min(self._batch_size, len(collected) - start)
+        return flushed
 
     def _run(self) -> None:
         """Worker loop: accumulate batches, flush on size or interval."""

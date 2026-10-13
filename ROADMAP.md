@@ -317,8 +317,13 @@
   > 外加**驱动二义性根治**（`maop/db_url.py`：裸 `postgresql://` 的驱动此前由
   > SQLAlchemy 小版本决定——2.0=psycopg2、2.1+=psycopg3，本机绿 CI 红；现按实际
   > 可导入驱动显式钉住，6 个入口全接入）。
-  > **仍未交付**：异步队列与任务/worker 的进程间接线（B2 的延迟达标工程闭环）、
-  > PG 侧存储量化评估、音频/视频（B3）、NDCG 数据集与可切换模型（B4）。
+  > **2026-10-14 运行接线（B2 最后一环）**：provider 工厂（此前全仓无一处构造
+  > `ClipEmbedding` ⇒ 生产一直跑 hash 回退）+ 上传自动索引（`save_image` →
+  > 异步队列，checksum 派生条目 id 防重复）+ 停机 close+drain（此前每次优雅
+  > 停机必丢 ≤2s 上传）+ 启动预热。**索引决策修正的实测副作用**：partial-HNSW
+  > 一坏全丢的批嵌入改 per-item 降级。门禁补齐：AST call-site 死代码守卫
+  > （既有 dead-wiring 只管模块级孤儿，类级死代码是盲区）。
+  > **仍未交付**：PG 侧存储量化评估、音频/视频（B3）、NDCG 数据集与可切换模型（B4）。
 - **顺延（v5.4.x/v5.5.0）**：M2.2 B2 余项（异步队列的进程间接线 + PG 侧存储量化评估）、
   B3（音频 Whisper / 视频关键帧，企业版边界）、B4（NDCG 标注数据集 + 可切换模型评估）。
 - **未纳入本版**：T3.3 K8s Operator M0（kopf 骨架 + `ghcr.io/maop/operator` 首次构建 +

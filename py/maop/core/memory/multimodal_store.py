@@ -249,22 +249,34 @@ class MultimodalStore(VectorStore):
             if stored_id:
                 stored.append(stored_id)
 
-        # Image group: one embed_image_batch call (single forward pass).
+        # Image group: one embed_image_batch call (single forward pass), with
+        # per-item degradation. The old behaviour let one bad image (a file the
+        # user deleted between upload and flush, a decode bomb, …) abort the
+        # whole batch — the other 7 images were silently dropped with it. Now:
+        # try the batch once; if it fails, retry item by item and keep the ones
+        # that embed cleanly. A single failure costs at most one extra pass.
         pending_img = [it for it in image_items if it.get("vector") is None]
         if pending_img:
             try:
                 img_vectors = self._mm_embedding.embed_image_batch(
                     [it["image"] for it in pending_img]
                 )
+                for it, img_vec in zip(pending_img, img_vectors):
+                    it["vector"] = img_vec
             except Exception as exc:
                 logger.warning(
-                    "[multimodal] image batch embed failed (%d item(s) skipped): %s",
+                    "[multimodal] image batch embed failed (%d item(s)); "
+                    "retrying per item: %s",
                     len(pending_img), exc,
                 )
-                pending_img = []
-                img_vectors = []
-            for it, img_vec in zip(pending_img, img_vectors):
-                it["vector"] = img_vec
+                for it in pending_img:
+                    try:
+                        it["vector"] = self._mm_embedding.embed_image(it["image"])
+                    except Exception as item_exc:
+                        logger.warning(
+                            "[multimodal] image %s skipped (embed failed): %s",
+                            it.get("id"), item_exc,
+                        )
         for it in image_items:
             eid = str(it.get("id") or "")
             if not eid:

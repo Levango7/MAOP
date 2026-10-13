@@ -170,12 +170,20 @@ def save_image(
     from maop.core.backends.image_store import ImageStore
 
     store = ImageStore(root_dir=str(maop_root))
-    return store.save(
+    image_id = store.save(
         session_id=session_id or "default",
         filename=filename,
         data=data,
         content_type=content_type,
     )
+    # M2.2 B2 收尾: 上传即多模态索进口（异步入队、fail-soft）。默认只在
+    # provider 是语义型 CLIP 时开启——没装 [multimodal] extra 的部署行为不变。
+    from maop.memory.multimodal import maybe_index_uploaded_image
+
+    maybe_index_uploaded_image(
+        maop_root, image_id, session_id=session_id or "default", filename=filename
+    )
+    return image_id
 
 
 def list_session_images(maop_root: Path, session_id: str) -> list[Any]:

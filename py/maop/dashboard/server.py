@@ -142,6 +142,20 @@ async def lifespan(app: FastAPI) -> Any:
     except Exception as exc:
         logger.debug("[lifespan] OTel setup skipped: %s", exc)
 
+    # ── Warm the multimodal provider (M2.2 B2 收尾) ─────────────
+    # Resolving the provider here means the first image upload does not pay
+    # the CLIP model load (~600 MB) inline on a request path. Gated by the
+    # same background-tasks flag as the schedulers: with workers>1 every
+    # worker would otherwise load its own copy of the weights.
+    if _bg_enabled:
+        try:
+            from maop.memory.multimodal import warm_multimodal_space
+            logger.info(
+                "[lifespan] multimodal space: %s", warm_multimodal_space()
+            )
+        except Exception as exc:
+            logger.warning("[lifespan] multimodal provider warm-up failed: %s", exc)
+
     # ── Auto-start backup & log-rotation schedulers ────────────
     _backup_scheduler = None
     _log_rotate_scheduler = None
@@ -208,6 +222,15 @@ async def lifespan(app: FastAPI) -> Any:
                 _log_rotate_scheduler.stop()
             except Exception as exc:
                 logger.warning("[shutdown] Log-rotate scheduler stop failed: %s", exc)
+        # ── Flush the multimodal ingest queue (M2.2 B2 收尾) ─────
+        # close(drain=True), not drain(): the worker may be holding a partial
+        # batch that drain() cannot see — without this every graceful
+        # shutdown loses up to flush_interval_s of uploads.
+        try:
+            from maop.memory.multimodal import drain_multimodal_ingest
+            drain_multimodal_ingest(timeout=3.0)
+        except Exception as exc:
+            logger.warning("[shutdown] Multimodal ingest drain failed: %s", exc)
 
 
 # ── App ────────────────────────────────────────────────────────────

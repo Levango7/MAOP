@@ -126,6 +126,13 @@ PRD R02 原文为 "pgvector 多向量列，每模态独立索引，共享元数�
   本机实测数字（覆盖 batch 路径）写进 PR 证据。
 - 异步队列接线（与任务队列/worker 集成）放 B2，作为 NFR 达标闭环。
   本 ADR 记录该时序承诺：**同步 API 交付不宣称延迟达标**。
+- **2026-10-14 闭环（M2.2 B2 收尾）**：接线落点是**聊天上传**
+  （`chat_service.save_image → maybe_index_uploaded_image → store_async`）——
+  这是运行系统里图片唯一真实的到达事件（task/worker 当前没有产出图片的生产
+  路径，接了就是死码，故未接）。上传请求 <10ms 返回（结构断言：submit 前
+  零次 embed），后台按批嵌入；停机 close+drain 覆盖 worker 手里的部分批。
+  provider 由工厂解析（`resolve_multimodal_provider`），此前全仓无一处构造
+  `ClipEmbedding` ⇒ 生产一直跑 hash 回退，本条一并修正。
 
 ### D5. 版本范围：个人版文本+图像先行，音频/视频为企业版
 
