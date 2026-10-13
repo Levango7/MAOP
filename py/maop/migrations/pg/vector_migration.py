@@ -119,12 +119,16 @@ def get_pg_engine(url: str | None = None) -> Engine:
     """Build a SQLAlchemy engine for the target PostgreSQL database.
 
     Reads ``MAOP_DATABASE_URL`` (or ``MAOP_DB_URL``) when *url* is ``None``.
+    Driver-less URLs are pinned to an installed DBAPI — see
+    :func:`maop.db_url.resolve_pg_driver`.
     """
-    url = (
+    from maop.db_url import resolve_pg_driver
+
+    url = resolve_pg_driver(
         url
         or os.environ.get("MAOP_DATABASE_URL")
         or os.environ.get("MAOP_DB_URL")
-        or "postgresql+psycopg2://localhost:5432/maop"
+        or "postgresql://localhost:5432/maop"
     )
     return create_engine(
         url,

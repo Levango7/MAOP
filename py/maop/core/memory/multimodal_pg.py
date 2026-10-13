@@ -121,8 +121,10 @@ class PgMultimodalBackend:
             self._engine: Engine = engine
             self._owns_engine = False
         else:
+            from maop.db_url import resolve_pg_driver
+
             self._engine = create_engine(
-                dsn or _default_pg_dsn(),
+                resolve_pg_driver(dsn or _default_pg_dsn()),
                 echo=False,
                 future=True,
                 pool_size=5,
@@ -322,11 +324,8 @@ class PgMultimodalBackend:
         modality: str | None = "image",
     ) -> list[VectorSearchResult]:
         query_vector = self._embedding.embed_image(image, ext=ext)
-        if modality is None:
-            return self.search_vector(
-                query_vector, top=top, threshold=threshold, modality=None,
-            )
-        return self._search_filtered(query_vector, top, threshold, modality)
+        return self.search_vector(query_vector, top=top, threshold=threshold,
+                                  modality=modality)
 
     def search_vector(
         self,
@@ -338,8 +337,6 @@ class PgMultimodalBackend:
     ) -> list[VectorSearchResult]:
         if not query_vector:
             return []
-        if modality is None:
-            return self._search_filtered(query_vector, top, threshold, None)
         return self._search_filtered(query_vector, top, threshold, modality)
 
     def _search_filtered(
@@ -349,6 +346,13 @@ class PgMultimodalBackend:
         threshold: float,
         modality: str | None,
     ) -> list[VectorSearchResult]:
+        """Ranked search over the space.
+
+        The space ships *exact* cosine ordering (no ANN index — see
+        ``multimodal_schema.pg_ddl`` for why partial HNSW was rejected), so
+        results are deterministic: identical vectors first, then by cosine
+        similarity.
+        """
         where = "" if modality is None else "WHERE (metadata->>'modality') = :mod"
         sql = text(_SEARCH_SQL.replace("{where}", where))
         params: dict[str, Any] = {"q": _vector_literal(query_vector), "top": max(0, int(top))}
@@ -377,17 +381,21 @@ class PgMultimodalBackend:
         return str(row[0]) if row and row[0] else ""
 
     def delete(self, entry_id: str) -> bool:
-        sql = text(f"DELETE FROM {MM_TABLE} WHERE id = :id")  # nosec B608 — 表名为模块常量，值全部绑定参数
+        # RETURNING makes "was a row removed" deterministic — SQLAlchemy's
+        # rowcount is not reliable across dialects/driver result states.
+        sql = text(f"DELETE FROM {MM_TABLE} WHERE id = :id RETURNING id")  # nosec B608 — 表名为模块常量，值绑定
         with self._engine.begin() as conn:
-            res = conn.execute(sql, {"id": entry_id})
-        return bool(getattr(res, "rowcount", 0))
+            row = conn.execute(sql, {"id": entry_id}).fetchone()
+        return row is not None
 
     def clear(self) -> int:
         """Delete every entry (not part of the protocol; admin utility)."""
-        sql = text(f"DELETE FROM {MM_TABLE}")  # nosec B608 — 表名为模块常量，值全部绑定参数
-        with self._engine.begin() as conn:
-            res = conn.execute(sql)
-        return int(getattr(res, "rowcount", 0) or 0)
+        # COUNT-then-DELETE keeps the return honest (rowcount is unreliable).
+        total = self.count()
+        if total:
+            with self._engine.begin() as conn:
+                conn.execute(text(f"DELETE FROM {MM_TABLE}"))  # nosec B608 — 常量表名
+        return total
 
     def count(self) -> int:
         sql = text(f"SELECT COUNT(*) AS c FROM {MM_TABLE}")  # nosec B608 — 表名为模块常量，值全部绑定参数

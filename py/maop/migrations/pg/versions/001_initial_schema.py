@@ -790,7 +790,11 @@ CREATE INDEX IF NOT EXISTS idx_wt_status ON worktree_nodes(status);
 CREATE INDEX IF NOT EXISTS idx_sessions_tags_gin     ON sessions USING GIN (tags);
 CREATE INDEX IF NOT EXISTS idx_sessions_metadata_gin ON sessions USING GIN (metadata);
 CREATE INDEX IF NOT EXISTS idx_messages_metadata_gin ON messages USING GIN (metadata);
-CREATE INDEX IF NOT EXISTS idx_kv_value_gin          ON kv_store USING GIN (value jsonb_path_ops);
+-- kv_store.value is TEXT (KV payloads may be arbitrary strings), so the
+-- jsonb-path operator class cannot apply directly; index the cast instead
+-- (found by the M2.2 B2 CI leg when a fresh PG tree ran for the first time,
+-- 2026-10-13 — the old form raised DatatypeMismatch on upgrade).
+CREATE INDEX IF NOT EXISTS idx_kv_value_gin          ON kv_store USING GIN ((value::jsonb) jsonb_path_ops);
 CREATE INDEX IF NOT EXISTS idx_episodic_metadata_gin ON episodic_memory USING GIN (metadata);
 CREATE INDEX IF NOT EXISTS idx_queue_payload_gin     ON queue_messages USING GIN (payload);
 
@@ -874,21 +878,37 @@ def _require_destructive_ack(revision_name: str) -> None:
     env = os.environ.get("MAOP_ENV", "").strip().lower()
     if env in ("dev", "development", "local", "test", "ci"):
         return
-    if os.environ.get("MAOP_ALLOW_DESTRUCTIVE_DOWNGRADE", "") == "1":
-        return
+    # Accept both spellings: 002/003 standardised on MAOP_MIGRATION_DESTRUCTIVE
+    # while this revision kept the older MAOP_ALLOW_DESTRUCTIVE_DOWNGRADE name
+    # (found 2026-10-13 when the M2.2 B2 CI leg ran the pg tree for real and
+    # set only the new flag, so `downgrade base` failed on this step).
+    for flag in ("MAOP_MIGRATION_DESTRUCTIVE", "MAOP_ALLOW_DESTRUCTIVE_DOWNGRADE"):
+        if os.environ.get(flag, "") == "1":
+            return
     raise RuntimeError(
         f"SAFETY: downgrade of {revision_name} DROPS all MAOP tables and "
         "permanently deletes data. Refusing outside dev/test environments. "
-        "Set MAOP_ALLOW_DESTRUCTIVE_DOWNGRADE=1 to override (back up first)."
+        "Set MAOP_MIGRATION_DESTRUCTIVE=1 to override (back up first)."
     )
 
 
 def _exec_block(sql: str) -> None:
-    """Execute a multi-statement SQL block, splitting on ';' and skipping comments."""
+    """Execute a multi-statement SQL block, splitting on ';' and skipping comments.
+
+    Order matters: comments are stripped **line-wise first**, then the result
+    is split on ``;``. The previous implementation split first and stripped
+    per statement, so a ``;`` *inside* a comment (e.g. the vector_entries
+    header's "…the default); if your model…") leaked the comment tail into a
+    statement body and PG parsed it as SQL. That path only fires on a fresh
+    database — which is why it survived until the M2.2 B2 CI leg ran the pg
+    tree for real (2026-10-13).
+    """
     bind = op.get_bind()
-    for stmt in sql.split(";"):
-        lines = [ln for ln in stmt.splitlines() if not ln.strip().startswith("--")]
-        cleaned = "\n".join(lines).strip()
+    stripped = "\n".join(
+        ln for ln in sql.splitlines() if not ln.strip().startswith("--")
+    )
+    for stmt in stripped.split(";"):
+        cleaned = stmt.strip()
         if cleaned:
             bind.execute(sa.text(cleaned))
 

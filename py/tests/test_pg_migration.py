@@ -731,8 +731,12 @@ def test_pg_env_py_uses_maop_database_url(monkeypatch: pytest.MonkeyPatch) -> No
     src = env_path.read_text(encoding="utf-8")
     assert "MAOP_DATABASE_URL" in src
     assert "MAOP_DB_URL" in src
-    # The default must be a PG URL, not SQLite.
-    assert "postgresql+psycopg2://localhost:5432/maop" in src
+    # The default must be a PG URL, not SQLite. Driver-less on purpose: the
+    # DBAPI is pinned from what is installed (resolve_pg_driver), because
+    # SQLAlchemy 2.0 reads a bare postgresql:// as psycopg2 while 2.1+ reads
+    # it as psycopg — pinning one driver here would break the other stack.
+    assert "postgresql://localhost:5432/maop" in src
+    assert "resolve_pg_driver" in src
 
 
 def test_pg_env_py_enables_extensions() -> None:

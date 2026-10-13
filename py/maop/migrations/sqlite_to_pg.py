@@ -51,6 +51,7 @@ from typing import Any
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 
+from maop.db_url import resolve_pg_driver
 from maop.migrations.pg.value_converters import VALUE_CONVERTERS
 
 logger = logging.getLogger("maop.migrations.sqlite_to_pg")
@@ -215,12 +216,16 @@ def get_pg_engine(url: str | None = None) -> Engine:
     Reads ``MAOP_DATABASE_URL`` (or ``MAOP_DB_URL``) from the environment
     if *url* is not provided. Connection pool is sized for a batch copy:
     ``pool_size=10, max_overflow=20``.
+
+    The URL is passed through :func:`maop.db_url.resolve_pg_driver` so a
+    driver-less ``postgresql://`` means the same thing whatever SQLAlchemy
+    version the deployment installed (2.0 → psycopg2, 2.1+ → psycopg3).
     """
-    url = (
+    url = resolve_pg_driver(
         url
         or os.environ.get("MAOP_DATABASE_URL")
         or os.environ.get("MAOP_DB_URL")
-        or "postgresql+psycopg2://localhost:5432/maop"
+        or "postgresql://localhost:5432/maop"
     )
     return create_engine(
         url,

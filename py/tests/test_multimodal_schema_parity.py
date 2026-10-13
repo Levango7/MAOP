@@ -44,10 +44,13 @@ def test_sqlite_ddl_matches_spec():
 def test_pg_ddl_carries_vector_column_and_modality_indexes():
     ddl = spec.pg_ddl()
     assert "vector vector(512)" in ddl.replace("\n", " ")
-    # per-modality partial HNSW indexes (ADR-022 D2: 每模态独立索引)
-    assert "USING hnsw" in ddl
-    assert "(metadata->>'modality') = 'image'" in ddl
-    assert "(metadata->>'modality') = 'text'" in ddl
+    # Per-modality indexed, but WITHOUT an ANN index: exact ordering is the
+    # deliberate choice (partial HNSW ranks approximately — see the schema
+    # module docstring for the measurement).
+    assert "USING hnsw" not in ddl.lower()
+    assert "ivfflat" not in ddl.lower()
+    assert "(metadata->>'modality')" in ddl
+    assert "idx_mme_modality" in ddl
 
 
 def _parsed_columns(ddl: str) -> list[str]:

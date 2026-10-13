@@ -184,8 +184,10 @@ class PgVectorBackend(VectorBackend):
             self._engine: Engine = engine
             self._owns_engine = False
         else:
+            from maop.db_url import resolve_pg_driver
+
             self._engine = create_engine(
-                dsn or _default_pg_url(),
+                resolve_pg_driver(dsn or _default_pg_url()),
                 echo=False,
                 future=True,
                 pool_size=5,

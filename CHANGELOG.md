@@ -39,6 +39,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M2.2 B2 PR-4：真 PG 腿（pgvector 镜像 + migration 链 + 非 mock 集成）
+
+- CI「Alembic migrations」作业的 service 容器从 `postgres:16-alpine` 换成
+  **`pgvector/pgvector:pg16`**（env 语义与官方一致，审核实测；pgvector 0.8.7）。
+- 新增 **pg 树迁移链**真跑步骤（`alembic -c migrations/pg/alembic.ini` 的
+  upgrade→downgrade→upgrade）——该树才是 PG schema 的真源（根树是 SQLite-only DDL）。
+- 新增 `tests/test_multimodal_pg_integration.py`（8 例，非 mock）：真实表/列/索引、
+  跨模态排序（真 CLIP 夹具向量）、模态过滤、图找图、批写原子性、delete/clear、
+  确定性（连续同查询同序）。**无 PG 或 psycopg2 时整文件 skip**，默认套件不受影响。
+- **设计修正（实测驱动）**：partial-HNSW 每模态索引改为 **modality B-tree 表达式索引**——
+  pgvector 0.8.7 上 partial HNSW 在只有寥寥数行时会把明显更优的向量排到后面
+  （实测 "a red square" 查询下 img-blue 一度压过 img-red）。空表层上近似索引无收益、
+  有风险；pgvector 官方文档同样建议小数据集走精确扫描。ANN 索引留给后续按数据量评估
+  的迁移（多模态 `D2` 索引决策的偏差，记入 ADR-022）。
+- 踩坑记录（测试隔离）：service 容器被所有 xdist worker 共享 ⇒ fixture 用
+  per-worker **schema**（`search_path` 保留 `public` 以看到库级 vector 扩展）；
+  `pg_indexes`/`information_schema` 是全库视图 ⇒ 断言必须按 `schemaname` 限定，
+  否则旧 DDL 世代的 `public` 表会替 worker 的表作答。
+- 顺带修 `sqlite_to_pg.migrate()` 的 mypy 回归（`pq_ready` 分支 + `results` 重名）。
+- **修复 CI 红（驱动二义性，本轮实测第 6 个 bug）**：alembic 作业只装 `-e py/`+
+  alembic，**没装任何 PG 驱动**；且裸 `postgresql://` 的驱动由 SQLAlchemy 版本决定
+  ——2.0 解析成 psycopg2、**2.1+ 解析成 psycopg (v3)**，于是本机（2.0 绿）与 CI
+  （拉到的 2.1.4）行为不同，PG 腿一上真环境就 `ModuleNotFoundError: No module
+  named 'psycopg'`。修法两件：① 新增 `maop/db_url.py` 的 `resolve_pg_driver()`——
+  按**实际可导入的驱动**显式钉 URL 驱动（优先 psycopg3，回落 psycopg2；都没装则原样
+  返回，让报错仍然指名字段），并接入全部 6 个入口（pg env.py、sqlite_to_pg、
+  vector_migration、db_utils、pg_backend、multimodal_pg）；② CI 安装步骤补
+  `psycopg2-binary`。新增 `tests/test_pg_url.py`（15 例，含两驱动均缺失时的回落分支）。
+
+本地证据：`pgvector/pgvector:pg16` 容器（7655）真跑 8/8（含 xdist 模式 8/8）。
+
 ### M2.2 B2 PR-3：异步摄入队列，闭合延迟预算（ADR-022 D4）
 
 spike/B1 实测：CLIP 单张图像嵌入热机 65-293ms，贴着 PRD 的 <200ms；而 batch=8
