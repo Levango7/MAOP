@@ -37,6 +37,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -45,18 +46,30 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from maop.core.memory.multimodal_embed import (
-    MULTIMODAL_DIM,
     HashModalityEmbedding,
     ImageInput,
     MultimodalEmbeddingProvider,
     validate_image_input,
 )
 from maop.core.memory.multimodal_schema import MM_TABLE, pg_ddl
+from maop.core.memory.multimodal_spaces import (
+    MultimodalSpaceSpec,
+    get_multimodal_space,
+)
 from maop.core.memory.vector_embed import VectorSearchResult
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["PgMultimodalBackend"]
+
+
+def _resolve_space_spec(space: MultimodalSpaceSpec | str | None) -> MultimodalSpaceSpec:
+    """Accept a spec object or a registered space name; ``None`` = default."""
+    if space is None:
+        return get_multimodal_space()
+    if isinstance(space, MultimodalSpaceSpec):
+        return space
+    return get_multimodal_space(str(space))
 
 
 # ``{MM_TABLE}`` is a module constant and every *value* is bound; the two
@@ -65,8 +78,24 @@ __all__ = ["PgMultimodalBackend"]
 # The table name is inlined as a literal (MM_TABLE == "multimodal_entries");
 # a test in tests/test_multimodal_pg_backend.py pins this against the spec so
 # a spec rename can never leave the two disagreeing. Every *value* is bound.
-_UPSERT_SQL = """
-    INSERT INTO multimodal_entries (id, text, vector, metadata, created_at)
+#: Identifier a space's table name must match before it is inlined into SQL.
+#: Table names come from the space registry, but validating here keeps the
+#: inlining safe even for a directly-constructed spec (bandit B608: no
+#: caller-controlled fragment can reach these statements).
+_IDENTIFIER_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
+
+
+def _validate_table(table: str) -> str:
+    """Reject anything that is not a plain lowercase SQL identifier."""
+    if not _IDENTIFIER_RE.match(table):
+        raise ValueError(f"invalid table name for a multimodal space: {table!r}")
+    return table
+
+
+#: Statement shapes. ``{table}`` is filled from the instance's space spec
+# (validated by :func:`_validate_table`); every *value* is a bound parameter.
+_UPSERT_TEMPLATE = """
+    INSERT INTO {table} (id, text, vector, metadata, created_at)
     VALUES (:id, :text, (:vec)::vector, CAST(:meta AS jsonb), :ts)
     ON CONFLICT (id) DO UPDATE SET
       text = EXCLUDED.text,
@@ -75,15 +104,21 @@ _UPSERT_SQL = """
       created_at = EXCLUDED.created_at
 """.strip()
 
-# ``{where}`` is a fixed clause ("WHERE (metadata->>'modality') = :mod") or "".
-_SEARCH_SQL = """
+_SEARCH_TEMPLATE = """
     SELECT id, text, metadata,
            1 - (vector <=> (:q)::vector) AS score
-    FROM multimodal_entries
+    FROM {table}
     {where}
     ORDER BY vector <=> (:q)::vector
     LIMIT :top
 """.strip()
+
+#: Default-space SQL kept as module constants so the existing
+#: ``test_multimodal_pg_backend`` pins ("MM_TABLE in _UPSERT_SQL") still hold.
+_UPSERT_SQL = _UPSERT_TEMPLATE.format(table=_validate_table(MM_TABLE))
+_SEARCH_SQL = _SEARCH_TEMPLATE.format(table=_validate_table(MM_TABLE), where="{where}")
+
+
 
 
 def _default_pg_dsn() -> str:
@@ -116,7 +151,14 @@ class PgMultimodalBackend:
         engine: Engine | None = None,
         embedding: MultimodalEmbeddingProvider | None = None,
         ensure_schema: bool = True,
+        space: MultimodalSpaceSpec | str | None = None,
     ) -> None:
+        """Open one multimodal space on PostgreSQL.
+
+        *space* selects a registered :class:`MultimodalSpaceSpec`; the spec
+        drives the table name, the ``vector(N)`` width and the accepted
+        modalities (ADR-022 D11), so a second space needs no core edits.
+        """
         if engine is not None:
             self._engine: Engine = engine
             self._owns_engine = False
@@ -132,7 +174,22 @@ class PgMultimodalBackend:
                 pool_pre_ping=True,
             )
             self._owns_engine = True
-        self._embedding: MultimodalEmbeddingProvider = embedding or HashModalityEmbedding()
+        self._space_spec = _resolve_space_spec(space)
+        table = _validate_table(self._space_spec.table_name)
+        # Instance-level SQL: the statement shape is shared, the target table
+        # is not (ADR-022 D11 — two spaces may live in one database).
+        self._upsert_sql = _UPSERT_TEMPLATE.format(table=table)
+        self._search_sql = _SEARCH_TEMPLATE.format(table=table, where="{where}")
+        self._table = table
+        provider = embedding or HashModalityEmbedding(dim=self._space_spec.dimension)
+        if embedding is not None and embedding.dimension != self._space_spec.dimension:
+            raise ValueError(
+                f"space {self._space_spec.name!r} expects "
+                f"{self._space_spec.dimension}-dim vectors but provider "
+                f"{getattr(embedding, 'provider_id', '?')} produces "
+                f"{embedding.dimension}"
+            )
+        self._embedding: MultimodalEmbeddingProvider = provider
         if ensure_schema:
             self.ensure_schema()
 
@@ -147,7 +204,8 @@ class PgMultimodalBackend:
         """
         with self._engine.begin() as conn:
             conn.execute(text('CREATE EXTENSION IF NOT EXISTS "vector"'))
-            for statement in pg_ddl().split(";"):
+            ddl = pg_ddl(table=self._table, dim=self._space_spec.dimension)
+            for statement in ddl.split(";"):
                 stmt = statement.strip()
                 if stmt:
                     conn.execute(text(stmt + ";"))
@@ -162,7 +220,9 @@ class PgMultimodalBackend:
         vector: list[float] | None = None,
         metadata: dict | None = None,
     ) -> str:
-        return self._write_one(entry_id, content, vector, metadata, "text")
+        return self.index_modality(
+            "text", entry_id, text=content, vector=vector, metadata=metadata
+        )
 
     def index_image(
         self,
@@ -181,7 +241,51 @@ class PgMultimodalBackend:
         meta.setdefault("source_sha256", hashlib.sha256(data).hexdigest())
         if isinstance(image, (str, Path)):
             meta.setdefault("source_ref", str(image))
-        return self._write_one(entry_id, caption, vector, meta, "image")
+        return self.index_modality(
+            "image", entry_id, text=caption, vector=vector, metadata=meta
+        )
+
+    def index_modality(
+        self,
+        modality: str,
+        entry_id: str,
+        *,
+        text: str = "",
+        vector: list[float] | None = None,
+        metadata: dict | None = None,
+        source_ext: str | None = None,
+        source_bytes: int | None = None,
+        source_sha256: str | None = None,
+        source_ref: str | None = None,
+    ) -> str:
+        """Store an entry in any modality this space accepts (ADR-022 D11).
+
+        The generic write path for modalities the core has no embedder for
+        (enterprise audio/video models live in MAOS): the caller supplies the
+        vector, and nothing here re-interprets the payload.
+        """
+        spec = self._space_spec
+        if not spec.accepts(modality):
+            raise ValueError(
+                f"space {spec.name!r} does not accept modality {modality!r} "
+                f"(supported: {spec.supported_modalities()})"
+            )
+        if vector is None and modality != "text":
+            raise ValueError(
+                f"modality {modality!r} needs an explicit vector (this core "
+                "has no embedder for it — the enterprise edition supplies one "
+                "and writes through this path)"
+            )
+        meta = dict(metadata or {})
+        if source_ext is not None:
+            meta.setdefault("source_ext", source_ext)
+        if source_bytes is not None:
+            meta.setdefault("source_bytes", source_bytes)
+        if source_sha256 is not None:
+            meta.setdefault("source_sha256", source_sha256)
+        if source_ref is not None:
+            meta.setdefault("source_ref", source_ref)
+        return self._write_one(entry_id, text, vector, meta, modality)
 
     def _write_one(
         self,
@@ -196,14 +300,14 @@ class PgMultimodalBackend:
             return ""
         if vector is None:
             vector = self._embedding.embed(text_)
-        if len(vector) != MULTIMODAL_DIM:
+        if len(vector) != self._space_spec.dimension:
             logger.warning(
                 "[multimodal-pg] refusing vector with dim %d (space expects %d) for %s",
-                len(vector), MULTIMODAL_DIM, entry_id,
+                len(vector), self._space_spec.dimension, entry_id,
             )
             return ""
         meta = dict(metadata or {})
-        meta["modality"] = modality
+        meta["modality"] = modality  # caller's modality, never overwritten
         stored = self._upsert_rows([(entry_id, text_, vector, meta)])
         return stored[0] if stored else ""
 
@@ -217,11 +321,15 @@ class PgMultimodalBackend:
             return []
         text_items: list[dict] = []
         image_items: list[dict] = []
+        raw_items: list[dict] = []
         for item in items:
             if not item.get("id"):
                 logger.warning("[multimodal-pg] batch item missing id, skipped")
                 continue
-            if item.get("image") is not None or item.get("modality") == "image":
+            explicit = str(item.get("modality") or "")
+            if explicit and explicit not in ("text", "image"):
+                raw_items.append(item)
+            elif item.get("image") is not None or explicit == "image":
                 image_items.append(item)
             else:
                 text_items.append(item)
@@ -283,7 +391,30 @@ class PgMultimodalBackend:
                 continue
             rows.append((str(it["id"]), str(it.get("caption", "")), row_vec, meta))
 
-        return self._upsert_rows(rows)
+        extra_ids: list[str] = []
+        for it in raw_items:
+            eid = str(it.get("id") or "")
+            try:
+                stored_id = self.index_modality(
+                    str(it["modality"]),
+                    eid,
+                    text=str(it.get("text", "")),
+                    vector=it.get("vector"),
+                    metadata=it.get("metadata"),
+                    source_ref=it.get("source_ref"),
+                    source_sha256=it.get("source_sha256"),
+                    source_bytes=it.get("source_bytes"),
+                    source_ext=it.get("ext"),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[multimodal-pg] %s entry %s failed: %s", it.get("modality"), eid, exc
+                )
+                continue
+            if stored_id:
+                extra_ids.append(stored_id)
+
+        return self._upsert_rows(rows) + extra_ids
 
     def _upsert_rows(
         self, rows: list[tuple[str, str, list[float], dict]]
@@ -292,7 +423,7 @@ class PgMultimodalBackend:
         if not rows:
             return []
         stored: list[str] = []
-        sql = text(_UPSERT_SQL)
+        sql = text(self._upsert_sql)
         now = time.time()
         with self._engine.begin() as conn:
             for entry_id, text_, vector, meta in rows:
@@ -363,7 +494,7 @@ class PgMultimodalBackend:
         similarity.
         """
         where = "" if modality is None else "WHERE (metadata->>'modality') = :mod"
-        sql = text(_SEARCH_SQL.replace("{where}", where))
+        sql = text(self._search_sql.replace("{where}", where))
         params: dict[str, Any] = {"q": _vector_literal(query_vector), "top": max(0, int(top))}
         if modality is not None:
             params["mod"] = modality
@@ -384,7 +515,7 @@ class PgMultimodalBackend:
     # ── bookkeeping ──────────────────────────────────────────────
 
     def modality_of(self, entry_id: str) -> str:
-        sql = text(f"SELECT metadata->>'modality' FROM {MM_TABLE} WHERE id = :id")  # nosec B608 — 表名为模块常量，值全部绑定参数
+        sql = text(f"SELECT metadata->>'modality' FROM {self._table} WHERE id = :id")  # nosec B608 — 表名来自白名单校验的空间 spec，值全部绑定参数
         with self._engine.connect() as conn:
             row = conn.execute(sql, {"id": entry_id}).fetchone()
         return str(row[0]) if row and row[0] else ""
@@ -392,7 +523,7 @@ class PgMultimodalBackend:
     def delete(self, entry_id: str) -> bool:
         # RETURNING makes "was a row removed" deterministic — SQLAlchemy's
         # rowcount is not reliable across dialects/driver result states.
-        sql = text(f"DELETE FROM {MM_TABLE} WHERE id = :id RETURNING id")  # nosec B608 — 表名为模块常量，值绑定
+        sql = text(f"DELETE FROM {self._table} WHERE id = :id RETURNING id")  # nosec B608 — 表名来自白名单校验的空间 spec，值绑定
         with self._engine.begin() as conn:
             row = conn.execute(sql, {"id": entry_id}).fetchone()
         return row is not None
@@ -403,11 +534,11 @@ class PgMultimodalBackend:
         total = self.count()
         if total:
             with self._engine.begin() as conn:
-                conn.execute(text(f"DELETE FROM {MM_TABLE}"))  # nosec B608 — 常量表名
+                conn.execute(text(f"DELETE FROM {self._table}"))  # nosec B608 — 白名单校验表名
         return total
 
     def count(self) -> int:
-        sql = text(f"SELECT COUNT(*) AS c FROM {MM_TABLE}")  # nosec B608 — 表名为模块常量，值全部绑定参数
+        sql = text(f"SELECT COUNT(*) AS c FROM {self._table}")  # nosec B608 — 白名单校验表名，值绑定
         with self._engine.connect() as conn:
             row = conn.execute(sql).fetchone()
         return int(row[0]) if row else 0
@@ -417,7 +548,7 @@ class PgMultimodalBackend:
         try:
             sql = text(
                 f"SELECT COALESCE(metadata->>'modality', 'unknown') AS m, COUNT(*) AS c "
-                f"FROM {MM_TABLE} GROUP BY m"  # nosec B608 — 表名为模块常量，值全部绑定参数
+                f"FROM {self._table} GROUP BY m"  # nosec B608 — 白名单校验表名，值绑定
             )
             with self._engine.connect() as conn:
                 rows = conn.execute(sql).fetchall()
@@ -427,10 +558,10 @@ class PgMultimodalBackend:
             modalities = {}
         provider = self._embedding
         return {
-            "space": f"multimodal-{MULTIMODAL_DIM}",
-            "table": MM_TABLE,
+            "space": self._space_spec.name,
+            "table": self._table,
             "backend": "pg",
-            "dimension": MULTIMODAL_DIM,
+            "dimension": self._space_spec.dimension,
             "total": sum(modalities.values()) or self.count(),
             "modalities": modalities,
             "embedding_model": getattr(provider, "model_id", "unknown"),

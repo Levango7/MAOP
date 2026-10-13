@@ -44,6 +44,19 @@ from maop.core.memory.multimodal_embed import (
     validate_image_input,
 )
 from maop.core.memory.multimodal_schema import sqlite_ddl as _sqlite_ddl
+from maop.core.memory.multimodal_spaces import (
+    MultimodalSpaceSpec,
+    get_multimodal_space,
+)
+
+
+def _resolve_space_spec(space: MultimodalSpaceSpec | str | None) -> MultimodalSpaceSpec:
+    """Accept a spec object or a registered space name; ``None`` = default."""
+    if space is None:
+        return get_multimodal_space()
+    if isinstance(space, MultimodalSpaceSpec):
+        return space
+    return get_multimodal_space(str(space))
 from maop.core.memory.vector_embed import VectorSearchResult, cosine_similarity
 from maop.core.memory.vector_store import VectorStore
 
@@ -116,11 +129,31 @@ class MultimodalStore(VectorStore):
         embedding: MultimodalEmbeddingProvider | None = None,
         *,
         enable_hnsw: bool = False,
+        space: MultimodalSpaceSpec | str | None = None,
     ) -> None:
+        """Open one multimodal space.
+
+        *space* selects a registered :class:`MultimodalSpaceSpec` (default:
+        the built-in CLIP space). The spec drives the table name, the vector
+        dimension and the accepted modalities, so a second space (audio, a
+        different CLIP dimension) needs no core change — ADR-022 D5/D11.
+        """
         if db_path is None:
             _warn_if_pg_available_but_unused()
             db_path = resolve_data_dir() / "multimodal.db"
-        provider = embedding or HashModalityEmbedding()
+        spec = _resolve_space_spec(space)
+        # A space whose dimension differs from the provider's must get a
+        # provider that can actually produce it (the hash fallback takes a
+        # dimension argument; a CLIP provider cannot, and refusing here beats
+        # a dimension mismatch at write time).
+        provider = embedding or HashModalityEmbedding(dim=spec.dimension)
+        if embedding is not None and embedding.dimension != spec.dimension:
+            raise ValueError(
+                f"space {spec.name!r} expects {spec.dimension}-dim vectors but "
+                f"provider {getattr(embedding, 'provider_id', '?')} produces "
+                f"{embedding.dimension}"
+            )
+        self._space_spec = spec
         # Typed handle: the base class attribute is typed as the text-only
         # EmbeddingProvider, which has no image methods.
         self._mm_embedding: MultimodalEmbeddingProvider = provider
@@ -128,9 +161,9 @@ class MultimodalStore(VectorStore):
             db_path,
             provider,
             enable_hnsw=enable_hnsw,
-            table_name="multimodal_entries",
-            create_sql=_MULTIMODAL_DDL,
-            expected_dim=MULTIMODAL_DIM,
+            table_name=spec.table_name,
+            create_sql=_sqlite_ddl(table=spec.table_name),
+            expected_dim=spec.dimension,
         )
 
     # ── Write path ────────────────────────────────────────────
@@ -151,6 +184,60 @@ class MultimodalStore(VectorStore):
         """
         return self.index_text(entry_id, text, vector=vector, metadata=metadata)
 
+    def index_modality(
+        self,
+        modality: str,
+        entry_id: str,
+        *,
+        text: str = "",
+        vector: list[float] | None = None,
+        metadata: dict[str, Any] | None = None,
+        source_ext: str | None = None,
+        source_bytes: int | None = None,
+        source_sha256: str | None = None,
+        source_ref: str | None = None,
+    ) -> str:
+        """Store an entry in any modality this space accepts (ADR-022 D11).
+
+        The generic write path: the caller supplies the vector (its own
+        provider — enterprise audio/video models live in MAOS) and the
+        modality, and nothing here re-interprets the payload. In particular
+        no image validation runs, so audio bytes are not mistaken for images.
+
+        The original payload is still **not** persisted (ADR-022 D6): callers
+        pass ``source_*`` references so the entry stays a pointer, not a
+        second copy of the file.
+        """
+        spec = getattr(self, "_space_spec", None)
+        if spec is not None and not spec.accepts(modality):
+            raise ValueError(
+                f"space {spec.name!r} does not accept modality {modality!r} "
+                f"(supported: {spec.supported_modalities()})"
+            )
+        meta = dict(metadata or {})
+        # The caller's modality wins — never overwrite it (the old
+        # index_text/index_image paths forcibly stamped their own modality,
+        # which silently rewrote explicit ones).
+        meta[MODALITY_KEY] = modality
+        if source_ext is not None:
+            meta.setdefault("source_ext", source_ext)
+        if source_bytes is not None:
+            meta.setdefault("source_bytes", source_bytes)
+        if source_sha256 is not None:
+            meta.setdefault("source_sha256", source_sha256)
+        if source_ref is not None:
+            meta.setdefault("source_ref", source_ref)
+        if vector is None:
+            if modality == MODALITY_TEXT:
+                vector = self._embedding.embed(text)
+            else:
+                raise ValueError(
+                    f"modality {modality!r} needs an explicit vector (this "
+                    "core has no embedder for it — the enterprise edition "
+                    "supplies one and writes through this path)"
+                )
+        return self._write(entry_id, text, vector, meta)
+
     def index_text(
         self,
         entry_id: str,
@@ -160,11 +247,9 @@ class MultimodalStore(VectorStore):
         metadata: dict[str, Any] | None = None,
     ) -> str:
         """Store a text entry (CLIP text encoder side of the shared space)."""
-        meta = dict(metadata or {})
-        meta[MODALITY_KEY] = MODALITY_TEXT
-        if vector is None:
-            vector = self._embedding.embed(content)
-        return self._write(entry_id, content, vector, meta)
+        return self.index_modality(
+            MODALITY_TEXT, entry_id, text=content, vector=vector, metadata=metadata
+        )
 
     def index_image(
         self,
@@ -185,7 +270,6 @@ class MultimodalStore(VectorStore):
         (wired in B2).
         """
         meta = dict(metadata or {})
-        meta[MODALITY_KEY] = MODALITY_IMAGE
         data, resolved_ext = validate_image_input(image, ext=ext)
         meta.setdefault("source_ext", resolved_ext)
         meta.setdefault("source_bytes", len(data))
@@ -194,32 +278,38 @@ class MultimodalStore(VectorStore):
             meta.setdefault("source_ref", str(image))
         if vector is None:
             vector = self._mm_embedding.embed_image(image, ext=ext)
-        return self._write(entry_id, caption, vector, meta)
+        return self.index_modality(
+            MODALITY_IMAGE,
+            entry_id,
+            text=caption,
+            vector=vector,
+            metadata=meta,
+        )
 
     def index_many(self, items: list[dict[str, Any]]) -> list[str]:
         """Store many entries with one batched encoding pass per modality.
 
-        Each item: ``{"id", "text" | "image", "caption"?, "metadata"?,
-        "vector"?, "ext"?}``. Items with a pre-computed ``vector`` skip
-        embedding. Returns the list of stored ids (items that fail
-        validation are skipped with a warning).
+        Each item: ``{"id", "text" | "image", "modality"?, "caption"?,
+        "metadata"?, "vector"?, "ext"?}``. Items with a pre-computed
+        ``vector`` skip embedding. Returns the list of stored ids (items that
+        fail validation are skipped with a warning).
 
-        See :meth:`index_batch` for the LSP-compatible override that keeps
-        the base class's ``int`` count contract.
+        Routing is by the **explicit** ``modality`` field first (an enterprise
+        space's items say ``modality="audio"`` and carry their own vectors);
+        the ``image``/``text`` shape inference below is the backwards-
+        compatible fallback for the built-in space, never an override of an
+        explicit modality.
         """
         if not items:
             return []
         text_items: list[dict[str, Any]] = []
         image_items: list[dict[str, Any]] = []
+        raw_items: list[dict[str, Any]] = []
         for item in items:
-            if item.get("vector") is not None:
-                # Pre-computed vectors need no batching; write directly.
-                kind = item.get("image", None)
-                if kind is not None or item.get("modality") == MODALITY_IMAGE:
-                    image_items.append(item)
-                else:
-                    text_items.append(item)
-            elif item.get("image", None) is not None:
+            explicit = str(item.get("modality") or "")
+            if explicit and explicit != MODALITY_TEXT and explicit != MODALITY_IMAGE:
+                raw_items.append(item)
+            elif item.get("image", None) is not None or explicit == MODALITY_IMAGE:
                 image_items.append(item)
             else:
                 text_items.append(item)
@@ -299,6 +389,33 @@ class MultimodalStore(VectorStore):
             if stored_id:
                 stored.append(stored_id)
 
+        # Explicit non-built-in modalities (audio, video, …): written through
+        # the generic path with their own vectors, no core-side inference.
+        for it in raw_items:
+            eid = str(it.get("id") or "")
+            if not eid:
+                logger.warning("[multimodal] index_many item missing id, skipped")
+                continue
+            try:
+                stored_id = self.index_modality(
+                    str(it["modality"]),
+                    eid,
+                    text=str(it.get("text", "")),
+                    vector=it.get("vector"),
+                    metadata=it.get("metadata"),
+                    source_ref=it.get("source_ref"),
+                    source_sha256=it.get("source_sha256"),
+                    source_bytes=it.get("source_bytes"),
+                    source_ext=it.get("ext"),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[multimodal] %s entry %s failed: %s", it.get("modality"), eid, exc
+                )
+                continue
+            if stored_id:
+                stored.append(stored_id)
+
         return stored
 
     def index_batch(self, entries: list[dict[str, Any]]) -> int:
@@ -318,10 +435,10 @@ class MultimodalStore(VectorStore):
         vector: list[float],
         meta: dict[str, Any],
     ) -> str:
-        if len(vector) != MULTIMODAL_DIM:
+        if len(vector) != self._expected_dim:
             logger.warning(
                 "[multimodal] refusing vector with dim %d (space expects %d) for %s",
-                len(vector), MULTIMODAL_DIM, entry_id,
+                len(vector), self._expected_dim, entry_id,
             )
             return ""
         now = time.time()
@@ -485,11 +602,12 @@ class MultimodalStore(VectorStore):
                     key = str(meta.get(MODALITY_KEY, "unknown"))
                     modalities[key] = modalities.get(key, 0) + 1
         provider = self._embedding
+        spec = getattr(self, "_space_spec", None)
         return {
-            "space": f"multimodal-{MULTIMODAL_DIM}",
+            "space": spec.name if spec is not None else f"multimodal-{MULTIMODAL_DIM}",
             "table": self._table,
             "path": str(self._path),
-            "dimension": MULTIMODAL_DIM,
+            "dimension": self._expected_dim,
             "total": total,
             "modalities": modalities,
             "embedding_model": getattr(provider, "model_id", "unknown"),

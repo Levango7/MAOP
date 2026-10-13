@@ -66,6 +66,27 @@ class MultimodalBackend(Protocol):
         """Store an image entry (path or bytes + optional caption)."""
         ...
 
+    def index_modality(
+        self,
+        modality: str,
+        entry_id: str,
+        *,
+        text: str = "",
+        vector: list[float] | None = None,
+        metadata: dict | None = None,
+        source_ext: str | None = None,
+        source_bytes: int | None = None,
+        source_sha256: str | None = None,
+        source_ref: str | None = None,
+    ) -> str:
+        """Store an entry in any modality the space accepts (ADR-022 D11).
+
+        The generic write path: the caller owns the embedding, so modalities
+        the core has no model for (enterprise audio/video) are written here
+        with their own vectors and are never re-interpreted as images/text.
+        """
+        ...
+
     def index_many(self, items: list[dict]) -> list[str]:
         """Store many entries, one batched encoding pass per modality."""
         ...

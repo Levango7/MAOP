@@ -63,6 +63,8 @@ def _call_sites(sources: list[Path], name: str) -> list[tuple[str, int]]:
         ("store_async", "the upload path must feed the async ingest queue"),
         ("maybe_index_uploaded_image", "chat upload must call the auto-index hook"),
         ("resolve_multimodal_provider", "the service must take its provider from the factory"),
+        ("index_modality", "the space registry's generic write path must be reachable"),
+        ("get_multimodal_space", "the service must build stores through the registry"),
     ],
 )
 def test_wiring_call_sites_exist(symbol: str, where: str) -> None:
@@ -85,6 +87,45 @@ def test_chat_upload_reaches_the_multimodal_space() -> None:
         if isinstance(n, ast.Call)
     }
     assert "maybe_index_uploaded_image" in calls, "save_image no longer indexes uploads"
+
+
+def test_service_builds_stores_through_the_registry() -> None:
+    """The registry must be the single construction path (B3).
+
+    If ``_build_store`` went back to constructing backends directly, the space
+    registry would be decoration and a second space would again need a core
+    edit — the exact thing ADR-022 D5/D11 rules out.
+    """
+    src = (PY_ROOT / "maop" / "memory" / "multimodal.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    calls = {
+        getattr(n.func, "id", None) or getattr(n.func, "attr", None)
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Call)
+    }
+    assert "get_multimodal_space" in calls
+    assert "PgMultimodalBackend" in calls and "MultimodalStore" in calls
+
+
+def test_every_registered_space_renders_its_own_ddl() -> None:
+    """Two spaces in one database must not share a table or an index name."""
+    from maop.core.memory.multimodal_spaces import (
+        MultimodalSpaceSpec,
+        list_multimodal_spaces,
+        register_multimodal_space,
+        reset_multimodal_spaces,
+    )
+
+    reset_multimodal_spaces()
+    register_multimodal_space(
+        MultimodalSpaceSpec(
+            name="audio-512", table_name="audio_entries",
+            dimension=512, modalities=("audio",),
+        )
+    )
+    tables = {s.table_name for s in list_multimodal_spaces()}
+    assert len(tables) == len(list_multimodal_spaces())
+    reset_multimodal_spaces()
 
 
 def test_provider_default_is_not_hardcoded_in_the_store() -> None:

@@ -192,8 +192,10 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     reset_backends()
     from maop.core.agent.plugins_hooks.hook_manager import reset_hook_manager
     reset_hook_manager()
+    from maop.core.memory.multimodal_spaces import reset_multimodal_spaces
     from maop.memory.multimodal import reset_multimodal_memory
     reset_multimodal_memory()
+    reset_multimodal_spaces()
 
 
 @pytest.hookimpl(trylast=True)
@@ -215,8 +217,10 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     reset_backends()
     from maop.core.agent.plugins_hooks.hook_manager import reset_hook_manager
     reset_hook_manager()
+    from maop.core.memory.multimodal_spaces import reset_multimodal_spaces
     from maop.memory.multimodal import reset_multimodal_memory
     reset_multimodal_memory()
+    reset_multimodal_spaces()
     for d in _tmp_dirs:
         with contextlib.suppress(Exception):
             shutil.rmtree(d, ignore_errors=True)

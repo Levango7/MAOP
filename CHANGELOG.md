@@ -93,6 +93,37 @@ B1/B2 交付的是"引擎"，本条补"传动轴"。实测发现**两处真断�
 验证：多模态相关 13 个套件 187 passed；chat/server/settings/env-drift 81 passed；
 ruff+mypy 干净；四门禁全绿（`.env.example` 两变量同步）。
 
+### M2.2 B3：多模态空间扩展契约（注册表 + 通用写入 + 参数化 DDL/迁移）
+
+兑现 ADR-022 D5 承诺的另一半。此前 `MultimodalStore` 把表名/维度/模态硬编码，
+**第二个空间加不进来**——企业侧要上音频空间必须改 core，正是 D5 隔离承诺要排除的。
+本轮（独立审核 REJECT 12 项后修订）：只参数化维度不参数化表名 ⇒ 新空间静默写错表，
+且 `_write` 的 warning 会把它吞成"入库全丢"。
+
+- **空间注册表** `core/memory/multimodal_spaces.py`：`MultimodalSpaceSpec`
+  （name/table_name/dimension/modalities/backend/model_id）+ 注册/查询/列举/重置。
+  默认空间 `multimodal-512` import 时自注册，**取值与 B3 前逐字节一致**（既有
+  三处钉子测试零改动通过）；同名重注册定义不同即报错。
+- **构造路径收殓为一条**：`_build_store` 经注册表取 spec，PG/SQLite 两 backend
+  都把 spec 传到底 ⇒ 注册表是唯一入口而非装饰。
+- **通用写入 `index_modality`**（两后端 + Protocol）：调用方自带向量 ⇒ 不触发
+  图像校验（音频字节不再被 `validate_image_input` 拒）、**modality 不被覆写**
+  （旧 `index_text` 会强制盖章）；不接受该模态的空间抛错并列可选值。
+- **DDL/迁移参数化**：`sqlite_ddl(table,dim)`/`pg_ddl(table,dim)`（默认输出不变，
+  索引名按表名派生 ⇒ 同库两空间不撞名）+ `render_pg_migration()` 生成 alembic
+  revision（测试断言它复现已提交的 003 迁移，防运行时与迁移再漂移）。
+- **按空间隔离**：单例 key 加空间分量；`get_multimodal_memory_if_exists()` 改为
+  返回**全部**实例、停机 drain 遍历关闭（此前任意取一个 ⇒ 第二空间队列丢）。
+- **诚实降级**：provider 维度与 spec 不符 ⇒ `_build_store` 降级同维度 hash 并
+  warning；**显式注入**的 provider 维度不符直接报错（配置错误不该被吞）。
+- 门禁补齐：`test_multimodal_spaces.py` 23 例（注册表语义/默认空间等价/DDL 派生/
+  两空间 SQLite 真跑 + PG stub 引擎断言/迁移渲染/单例隔离）；死代码守卫加
+  `index_modality`/`get_multimodal_space` 两个符号 + "服务层必须经注册表构造"。
+
+**边界（如实记账）**：音频/视频**实现**（Whisper/CLAP/ffmpeg）按 ADR-016 归私有仓
+MAOS，不在 MIT 本仓；MAOS 接入三步见 ADR-022 D11。跨空间融合检索仍不做（RRF 是
+单实例内两腿，跨空间聚合留 B3+）。
+
 ### M2.2 B4：检索质量可度量（NDCG harness + 标注语料 + 判别力门禁）
 
 F2-02 此前只有二值断言（"跨模态 top-1 8/8"），既答不了"质量多少分"也比不了

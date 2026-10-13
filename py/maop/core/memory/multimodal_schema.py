@@ -26,9 +26,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from maop.core.memory.multimodal_embed import MULTIMODAL_DIM
+
 __all__ = [
     "MM_COLUMNS",
     "MM_TABLE",
+    "MULTIMODAL_DIM",
+    "index_prefix",
     "pg_ddl",
     "sqlite_ddl",
 ]
@@ -36,11 +40,23 @@ __all__ = [
 #: Table name shared by both backends.
 MM_TABLE = "multimodal_entries"
 
-#: SQLite pragma applied to the database (WAL is managed by callers).
+#: SQLite index DDL for the default table (kept as a module constant because
+#: the legacy import sites and the schema-parity test compare against it).
 SQLITE_TABLE_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS idx_mme_created "
     f"ON {MM_TABLE}(created_at);"
 )
+
+
+def index_prefix(table: str) -> str:
+    """Short, unique-per-database index name prefix for *table*.
+
+    The default table keeps the historical ``mme`` prefix so the rendered DDL
+    stays byte-identical (a second space in the same database must not collide
+    on index names — ``CREATE INDEX IF NOT EXISTS`` would silently skip the
+    second table's index otherwise).
+    """
+    return "mme" if table == MM_TABLE else table
 
 
 @dataclass(frozen=True)
@@ -99,8 +115,13 @@ MM_COLUMNS: tuple[Column, ...] = (
 )
 
 
-def sqlite_ddl(*, with_index: bool = True) -> str:
-    """Render the SQLite ``CREATE TABLE`` (+ created_at index) DDL."""
+def sqlite_ddl(*, table: str = MM_TABLE, with_index: bool = True) -> str:
+    """Render the SQLite ``CREATE TABLE`` (+ created_at index) DDL.
+
+    *table* selects the target table; the default keeps the historical output
+    byte-identical (the schema-parity test compares the rendered string, so
+    the default must not drift).
+    """
     cols = []
     for c in MM_COLUMNS:
         parts = [c.name, c.sqlite_ddl]
@@ -108,16 +129,24 @@ def sqlite_ddl(*, with_index: bool = True) -> str:
             parts.append(f"DEFAULT {c.default}")
         cols.append(" ".join(parts))
     ddl = (
-        f"CREATE TABLE IF NOT EXISTS {MM_TABLE} (\n  "
+        f"CREATE TABLE IF NOT EXISTS {table} (\n  "
         + ",\n  ".join(cols)
         + "\n);"
     )
     if with_index:
-        ddl += "\n\n" + SQLITE_TABLE_INDEX_DDL
+        if table == MM_TABLE:
+            ddl += "\n\n" + SQLITE_TABLE_INDEX_DDL
+        else:
+            prefix = index_prefix(table)
+            ddl += (
+                "\n\nCREATE INDEX IF NOT EXISTS idx_"
+                f"{prefix}_created ON {table}(created_at);"
+            )
     return ddl
 
 
-def pg_ddl(*, with_indexes: bool = True) -> str:
+def pg_ddl(*, table: str = MM_TABLE, dim: int = MULTIMODAL_DIM,
+           with_indexes: bool = True) -> str:
     """Render the PostgreSQL ``CREATE TABLE`` (+ modality indexes).
 
     The ANN index is deliberately **not** partial-HNSW-per-modality:
@@ -134,14 +163,16 @@ def pg_ddl(*, with_indexes: bool = True) -> str:
     Requires the ``vector`` extension (pgvector), created by the alembic
     env, so this function stays pure DDL.
     """
+    prefix = index_prefix(table)
     cols = []
     for c in MM_COLUMNS:
-        parts = [c.name, c.pg_ddl]
+        pg_type = f"vector({dim}) NOT NULL" if c.name == "vector" else c.pg_ddl
+        parts = [c.name, pg_type]
         if c.default is not None and not c.primary_key:
             parts.append(f"DEFAULT {c.default}")
         cols.append(" ".join(parts))
     ddl = (
-        f"CREATE TABLE IF NOT EXISTS {MM_TABLE} (\n  "
+        f"CREATE TABLE IF NOT EXISTS {table} (\n  "
         + ",\n  ".join(cols)
         + "\n);"
     )
@@ -151,9 +182,9 @@ def pg_ddl(*, with_indexes: bool = True) -> str:
         # B-tree on the modality expression: the filter is the common access
         # pattern ("give me image entries") and stays exact.
         (
-            "CREATE INDEX IF NOT EXISTS idx_mme_modality"
-            f"  ON {MM_TABLE} ((metadata->>'modality'))"
+            f"CREATE INDEX IF NOT EXISTS idx_{prefix}_modality"
+            f"  ON {table} ((metadata->>'modality'))"
         ),
-        f"CREATE INDEX IF NOT EXISTS idx_mme_created ON {MM_TABLE}(created_at)",
+        f"CREATE INDEX IF NOT EXISTS idx_{prefix}_created ON {table}(created_at)",
     ]
     return ddl + "\n\n" + ";\n\n".join(index_lines) + ";"

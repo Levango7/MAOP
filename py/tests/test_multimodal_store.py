@@ -226,6 +226,28 @@ def test_stats_not_degraded_for_semantic_provider(tmp_path):
         model_id = "fake-semantic"
 
         def __init__(self) -> None:
+            self._dim = MULTIMODAL_DIM
+
+        def embed(self, text: str) -> list[float]:
+            return [1.0] + [0.0] * (MULTIMODAL_DIM - 1)
+
+        def embed_image(self, image, *, ext=None) -> list[float]:
+            return [0.0, 1.0] + [0.0] * (MULTIMODAL_DIM - 2)
+
+    store = _mkstore(tmp_path, embedding=_FakeSemantic())
+    assert store.stats()["degraded"] is False
+
+
+def test_provider_dimension_mismatch_is_refused(tmp_path):
+    """A provider that cannot produce the space's width is a config error.
+
+    B3 added the check: without it the store builds, then silently refuses
+    every write with a dimension warning (data loss shaped like success).
+    """
+    class _WrongDim(MultimodalEmbeddingProvider):
+        model_id = "wrong-dim"
+
+        def __init__(self) -> None:
             self._dim = 8
 
         def embed(self, text: str) -> list[float]:
@@ -234,8 +256,8 @@ def test_stats_not_degraded_for_semantic_provider(tmp_path):
         def embed_image(self, image, *, ext=None) -> list[float]:
             return [0.0, 1.0] + [0.0] * 6
 
-    store = _mkstore(tmp_path, embedding=_FakeSemantic())
-    assert store.stats()["degraded"] is False
+    with pytest.raises(ValueError, match="expects 512-dim"):
+        _mkstore(tmp_path, embedding=_WrongDim())
 
 
 def test_fallback_provider_dims_match_space(tmp_path):
