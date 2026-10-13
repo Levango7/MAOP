@@ -64,6 +64,7 @@ def _resolve_data_dir() -> Path:
 | `core/reliability/worker_pool.py` | `_global_pool` | 否 |
 | `core/routing/load_balancer.py` | `_global_lb` | 否 |
 | `core/routing/route_scorer.py` | `_singleton_lock` (LoadBalancer) | 否 |
+| `memory/multimodal.py` | `_instances`（每实例还可能持有 ingest 守护线程）+ provider 工厂缓存 | `reset_multimodal_memory`（close 队列 + 清缓存；2026-10-14 入 conftest teardown） |
 | `dashboard/routers/hook.py` | `_hook_mgr` | 否 |
 | `dashboard/routers/mcp.py` | `_mcp_hub` | 否 |
 | `dashboard/routers/model.py` | `_model_registry` / `_api_key_vault` | 否 |

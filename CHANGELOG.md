@@ -39,6 +39,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M2.2 B2 收尾：多模态运行时接线（provider 工厂 + 上传自动索引 + 停机闭环）
+
+B1/B2 交付的是"引擎"，本条补"传动轴"。实测发现**两处真断链**：异步摄入队列
+零生产调用方；`ClipEmbedding`（真 CLIP provider）**全仓无任何构造点**——
+即生产路径上多模态记忆一直跑在 hash 回退上（非语义）。既有 dead-wiring
+门禁只管模块级孤儿，类级死代码不在其口径内，所以它能长期绿着。
+
+- **provider 工厂** `core/memory/multimodal_embed.resolve_multimodal_provider()`：
+  解析顺序 = 显式注入 > `MAOP_MULTIMODAL_PROVIDER` > 自动探测；自动 = 装了就
+  上 CLIP、否则 hash 回退（缺 extra 记 warning，装了一半/权重不可达记 error），
+  进程内缓存（CLIP ~600MB，绝不允许每请求加载）。`force="clip"` **失败即报错**，
+  不静默降级。接入 `_build_store` 的 SQLite/PG 两个分支（此前只默认 hash），
+  并新增 `embedding=` 注入 seam。
+- **上传自动索引**：`chat_service.save_image()` 落盘后走
+  `maybe_index_uploaded_image()` 异动入队（fail-soft，索引失败不影响上传）。
+  条目 id 由**图片 checksum** 派生（`img-<sha256[:16]>`）——上传库每次上传都发
+  新 uuid，按 uuid 派生会造成重复入库。开关 `MAOP_MULTIMODAL_AUTO_INDEX`：
+  默认**自动**（provider 语义型才开；没装 extra 的部署行为逐字节不变），
+  三态闭集解析 + 非法值 warning。
+- **停机闭环**：dashboard lifespan shutdown 由 `drain()` 改为
+  `close(drain=True)`——后者才覆盖 worker 已取走、攒在批里的条目，否则**每次
+  优雅停机必丢** ≤`flush_interval_s`(2s) 的上传；启动段预热 provider，首个
+  上传不再独扛模型加载。停机用**非创建入口**取单例（没上传过的部署不白加载）。
+- **真丢数据路径修复**：`index_many` 图像组原为"一坏全丢"（8 张里 1 张被删/
+  损坏 ⇒ 整批 skip 只留 warning）——正是接线后最易触发的路径（上传→删除→2s
+  后批次失败）。改 per-item 降级：先整批、失败逐张重试、只跳过失败者，
+  SQLite 与 PG 两后端同修。`drain()` 另改按 `batch_size` 分块（防积压 50 张
+  一次前向拖爆 close 的 join 超时）。
+- **单例卫生（ADR-019）**：`reset_multimodal_memory()` 现在 close 所有队列 +
+  清 provider 缓存，并进 conftest autouse teardown 与 sessionfinish；
+  `get_multimodal_memory()` 只在 `text_search is not None` 时重绑（上传路径
+  不再静默抹掉 RRF 文本腿）。
+- **门禁补齐**：新增 `tests/test_multimodal_wiring_guards.py`——AST call-site
+  检测（grep 会被类定义/docstring 骗过）+ 扫描器自证用例 + 真变异实测
+  （删掉 CLIP 接线 ⇒ 门禁红）。`test_multimodal_provider_factory.py` 9 例、
+  `test_multimodal_autoidx.py` 12 例。
+
+验证：多模态相关 13 个套件 187 passed；chat/server/settings/env-drift 81 passed；
+ruff+mypy 干净；四门禁全绿（`.env.example` 两变量同步）。
+
 ### M2.2 B2 PR-4：真 PG 腿（pgvector 镜像 + migration 链 + 非 mock 集成）
 
 - CI「Alembic migrations」作业的 service 容器从 `postgres:16-alpine` 换成

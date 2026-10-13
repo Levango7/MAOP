@@ -313,6 +313,17 @@ curl -X POST http://localhost:9079/api/chat `
 - Tool lifecycle: register -> enable -> call -> disable
 - Streaming: WebSocket for bidirectional + HTTP SSE for unidirectional real-time output (SSE at /api/chat/stream; ADR-006 superseded)
 
+**Multimodal memory (personal edition, CLIP):** with the `[multimodal]` extra
+installed (`pip install maop-orchestrator[multimodal]`), images uploaded in chat
+are embedded into the same 512-dim CLIP space as text and become searchable
+across modalities ("find the screenshot with the red error banner"). Uploads
+return immediately; embedding runs on a background batch queue, and a graceful
+shutdown flushes what is pending. Without the extra the space still runs on a
+deterministic **non-semantic** fallback (logged as degraded) and upload
+auto-indexing stays off, so nothing changes for existing deployments — see
+`MAOP_MULTIMODAL_PROVIDER` / `MAOP_MULTIMODAL_AUTO_INDEX` in
+[docs/configuration.md](docs/configuration.md) and ADR-022.
+
 ## Cost Tracking
 
 MAOP includes built-in cost tracking for LLM API usage:

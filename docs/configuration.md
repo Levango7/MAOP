@@ -137,6 +137,9 @@
 | `MAOP_MEMORY_PRUNE_TTL_DAYS` | `90` | 否 | 记忆条目 TTL（天），超期自动清理 |
 | `MAOP_MEMORY_PRUNE_ON_STARTUP` | `0` | 否 | 启动时执行记忆清理 |
 | `MAOP_WORKING_CACHE_MAX_SIZE` | `1000` | 否 | 工作记忆缓存最大条目数（`memory/manager.py:129`） |
+| `MAOP_MULTIMODAL_BACKEND` | （空） | 否 | 多模态记忆空间后端：空=跟随 `MAOP_DB_BACKEND`；`sqlite`；`pg`/`postgresql`（pgvector≥0.5.0） |
+| `MAOP_MULTIMODAL_PROVIDER` | （空） | 否 | 多模态嵌入 provider：空=自动（有 `[multimodal]` extra 且权重可用⇒真 CLIP，否则 hash 回退并记 warning）；`clip`=强制 CLIP（失败即报错）；`hash`=强制回退 |
+| `MAOP_MULTIMODAL_AUTO_INDEX` | （空） | 否 | 聊天上传图片是否自动索引进多模态空间：空=自动（仅当 provider 是语义型 CLIP）；`1`=开；`0`=关。开启后上传 <10ms 返回，后台按批嵌入（ADR-022 D4），停机时 close+drain |
 
 ## 7. 缓存与队列后端
 

@@ -249,15 +249,24 @@ class PgMultimodalBackend:
                 img_vectors = self._embedding.embed_image_batch(
                     [it["image"] for it in pending_img]
                 )
+                for it, vec in zip(pending_img, img_vectors):
+                    it["vector"] = vec
             except Exception as exc:
+                # Per-item degradation (same contract as the SQLite backend):
+                # one unreadable image must not drop its batch-mates.
                 logger.warning(
-                    "[multimodal-pg] image batch embed failed (%d skipped): %s",
+                    "[multimodal-pg] image batch embed failed (%d item(s)); "
+                    "retrying per item: %s",
                     len(pending_img), exc,
                 )
-                pending_img = []
-                img_vectors = []
-            for it, vec in zip(pending_img, img_vectors):
-                it["vector"] = vec
+                for it in pending_img:
+                    try:
+                        it["vector"] = self._embedding.embed_image(it["image"])
+                    except Exception as item_exc:
+                        logger.warning(
+                            "[multimodal-pg] image %s skipped (embed failed): %s",
+                            it.get("id"), item_exc,
+                        )
         for it in image_items:
             row_vec = it.get("vector")
             if not row_vec:

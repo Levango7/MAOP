@@ -38,6 +38,7 @@ import io
 import json
 import logging
 import math
+import threading
 from abc import abstractmethod
 from pathlib import Path
 from typing import Any, cast
@@ -58,7 +59,10 @@ __all__ = [
     "ImageValidationError",
     "MultimodalEmbeddingProvider",
     "PrecomputedEmbedding",
+    "reset_multimodal_provider",
+    "resolve_multimodal_provider",
     "validate_image_input",
+    "warm_multimodal_provider",
 ]
 
 #: CLIP ViT-B/32 projection dimension — the single space text and images share.
@@ -495,3 +499,136 @@ class PrecomputedEmbedding(MultimodalEmbeddingProvider):
                 f"image sha256 {key[:12]}… not present in the precomputed "
                 f"fixture; add it (or use a real provider)"
             ) from None
+
+
+# ── provider factory (M2.2 B2 收尾, 2026-10-14) ──────────────────
+# Why a factory: until now *nothing* in the runtime ever constructed
+# ClipEmbedding — MultimodalStore hard-defaulted to HashModalityEmbedding, so
+# the shipped multimodal memory silently ran on the non-semantic hash fallback
+# on every deployment that had not injected a provider by hand. The factory is
+# the single place that decides, and it caches: loading CLIP is ~600 MB of
+# weights and seconds of time, so it must never happen per store/per request.
+
+_PROVIDER_CACHE: dict[str, MultimodalEmbeddingProvider] = {}
+_PROVIDER_LOCK = threading.Lock()
+_WARNED_MISSING_EXTRA = False
+
+
+def _provider_mode(explicit: str | None) -> str:
+    """Normalise the requested provider mode to ``auto``/``clip``/``hash``.
+
+    Unknown values degrade to ``auto`` with a warning rather than raising:
+    a typo in an env var must not take the memory subsystem down.
+    """
+    raw = (explicit if explicit is not None else _settings_provider_mode()).strip().lower()
+    if raw in ("", "auto"):
+        return "auto"
+    if raw == "clip":
+        return "clip"
+    if raw in ("hash", "fallback", "hash-fallback"):
+        return "hash"
+    logger.warning(
+        "[multimodal] unknown provider mode %r, falling back to 'auto' "
+        "(expected: auto|clip|hash)",
+        raw,
+    )
+    return "auto"
+
+
+def _settings_provider_mode() -> str:
+    """Read the override through settings.
+
+    The config-drift gate counts direct environment reads in production
+    code (it scans for the literal access patterns), which is why this goes
+    through the settings singleton rather than reading the process
+    environment here.
+    """
+    try:
+        from maop.config.settings import get_settings
+
+        return get_settings().multimodal_provider or ""
+    except Exception as exc:  # pragma: no cover - defensive: settings import failure
+        logger.debug("[multimodal] settings unavailable for provider mode: %s", exc)
+        return ""
+
+
+def resolve_multimodal_provider(
+    *, force: str | None = None
+) -> MultimodalEmbeddingProvider:
+    """Return the multimodal embedding provider for this process.
+
+    Resolution order: explicit *force* > ``MAOP_MULTIMODAL_PROVIDER`` >
+    auto-detect. In auto mode a real CLIP provider is used when the
+    ``[multimodal]`` extra is installed **and** the weights load; otherwise the
+    deterministic hash fallback is used and the degradation is logged (CI and
+    extra-less installs land here — the fallback keeps the storage/fusion
+    pipeline exercisable, it just is not semantic).
+
+    ``force="clip"`` propagates the construction error instead of falling
+    back: an operator who pinned CLIP must not silently get hash vectors.
+    """
+    mode = _provider_mode(force)
+    with _PROVIDER_LOCK:
+        cached = _PROVIDER_CACHE.get(mode)
+        if cached is not None:
+            return cached
+        if mode == "hash":
+            provider: MultimodalEmbeddingProvider = HashModalityEmbedding()
+        elif mode == "clip":
+            provider = ClipEmbedding()  # raises on failure — intentional
+        else:
+            provider = _auto_provider()
+        _PROVIDER_CACHE[mode] = provider
+        return provider
+
+
+def _auto_provider() -> MultimodalEmbeddingProvider:
+    """CLIP when possible, hash fallback otherwise (logged, never raised)."""
+    global _WARNED_MISSING_EXTRA
+    try:
+        provider = ClipEmbedding()
+    except ImportError as exc:
+        # Extra not installed at all: the documented, expected degraded state.
+        if not _WARNED_MISSING_EXTRA:
+            _WARNED_MISSING_EXTRA = True
+            logger.warning(
+                "[multimodal] CLIP unavailable (%s); using the deterministic "
+                "hash fallback — NOT semantic. Install the extra for real "
+                "multimodal search: pip install maop-orchestrator[multimodal]",
+                exc,
+            )
+        return HashModalityEmbedding()
+    except Exception as exc:
+        # Installed but unusable (weights unreachable / half-installed /
+        # driver mismatch): louder than the missing-extra case because the
+        # operator clearly *intended* to have CLIP.
+        logger.error(
+            "[multimodal] CLIP installed but failed to initialise (%s); using "
+            "the hash fallback for now. Check HF_HOME/XDG_CACHE_HOME and "
+            "HF_ENDPOINT=https://hf-mirror.com for offline installs.",
+            exc,
+        )
+        return HashModalityEmbedding()
+    logger.info(
+        "[multimodal] using CLIP provider (%s, %dd, semantic)",
+        provider.provider_id,
+        provider.dimension,
+    )
+    return provider
+
+
+def reset_multimodal_provider() -> None:
+    """Drop cached providers (test isolation; ADR-019 single-instance hygiene)."""
+    global _WARNED_MISSING_EXTRA
+    with _PROVIDER_LOCK:
+        _PROVIDER_CACHE.clear()
+        _WARNED_MISSING_EXTRA = False
+
+
+def warm_multimodal_provider(*, force: str | None = None) -> MultimodalEmbeddingProvider:
+    """Resolve (and cache) the provider out of band of any request path.
+
+    Called from the dashboard lifespan startup: the first image upload would
+    otherwise pay the ~600 MB model load inline on the request.
+    """
+    return resolve_multimodal_provider(force=force)

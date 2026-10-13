@@ -155,11 +155,19 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     ``SentenceTransformer(model)`` fails fast (LocalEntryNotFoundError) instead
     of hanging on a network download attempt — which would exceed the pytest
     per-test timeout.  Code paths catch this and fall back to HashEmbedding.
+
+    Also pins the multimodal provider to the deterministic hash fallback: the
+    factory's auto mode would otherwise construct a real ``ClipEmbedding`` on
+    developer machines that have the weights cached (a ~600 MB load per
+    process), making the suite's behaviour depend on the machine. Tests that
+    exercise the semantic path inject their own provider (seam:
+    ``get_multimodal_memory(embedding=...)``).
     """
     monkeypatch.setenv("MAOP_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("MAOP_PLUGIN_STRICT_CHECKSUM", "0")
     monkeypatch.setenv("HF_HUB_OFFLINE", "1")
     monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
+    monkeypatch.setenv("MAOP_MULTIMODAL_PROVIDER", "hash")
     # settings 单例在 conftest import server 时已固化（当时 MAOP_DATA_DIR 未设
     # → data_dir 指向仓库根 data/），monkeypatch.setenv 不刷新单例 → 所有测试
     # 共享仓库 data/maop.db → xdist 并发 sqlite3.OperationalError: database
@@ -184,6 +192,8 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     reset_backends()
     from maop.core.agent.plugins_hooks.hook_manager import reset_hook_manager
     reset_hook_manager()
+    from maop.memory.multimodal import reset_multimodal_memory
+    reset_multimodal_memory()
 
 
 @pytest.hookimpl(trylast=True)
@@ -205,6 +215,8 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     reset_backends()
     from maop.core.agent.plugins_hooks.hook_manager import reset_hook_manager
     reset_hook_manager()
+    from maop.memory.multimodal import reset_multimodal_memory
+    reset_multimodal_memory()
     for d in _tmp_dirs:
         with contextlib.suppress(Exception):
             shutil.rmtree(d, ignore_errors=True)
