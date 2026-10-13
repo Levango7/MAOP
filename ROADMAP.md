@@ -331,7 +331,12 @@
   >  （`build_clip_eval_fixture.py`）；"可切换模型的多模型横评"defer，触发条件 =
   >  出现第二候选模型（Chinese-CLIP/AltCLIP）或中文查询低于可接受水位
   >  （中文查询是已知盲区，见 ADR-022 D8/D10）。
-  > **仍未交付**：PG 侧存储量化评估、音频/视频（B3）。
+  > **仍未交付**：音频/视频（B3）。
+  > **2026-10-14 PG 存储量化评估已交付**（真 pgvector 库实测，
+  > `docs/audits/m22-b2-storage-quantization.md`）：万条规模 PG ~2.7KB/条
+  > vs SQLite ~4.2KB/条 ⇒ 换 PG 的理由是并发/运维而非容量；写入吞吐差 8 倍
+  >（PG 单事务批写）⇒ SQLite 上大规模回填会很慢；ANN 索引仍未纳入审计，
+  > 支撑 D2「小表走精确扫描」。NFR「增量 < 原始 1%」的数学记账不受影响。
 - **顺延（v5.4.x/v5.5.0）**：M2.2 B2 余项（异步队列的进程间接线 + PG 侧存储量化评估）、
   B3（音频 Whisper / 视频关键帧，企业版边界）、B4（NDCG 标注数据集 + 可切换模型评估）。
 - **未纳入本版**：T3.3 K8s Operator M0（kopf 骨架 + `ghcr.io/maop/operator` 首次构建 +

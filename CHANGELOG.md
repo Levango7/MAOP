@@ -39,6 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M2.2 B2 存储量化评估：PG vs SQLite 实测（ADR-022 D7 补齐）
+
+ADR-022 D7 此前只说明 SQLite 路径的预算，PG 侧一直没有实测数字。用真
+pgvector 库 + 真代码路径补上（脚本 `scripts/measure_multimodal_storage.py`，
+合成条目写自有前缀后删除，不碰真数据）：
+
+- 万条规模：**PG ~2.7KB/条**（TOAST 压缩后堆均值）vs **SQLite ~4.2KB/条**
+  （4KB 页装不下"2048B 向量+元数据"，页内碎片推高）⇒ 换 PG 的理由是
+  并发/运维而非容量，量级相同。
+- 写入吞吐：PG 16.4s vs SQLite 129.7s（万条，单事务批写 vs 逐行 upsert）
+  ⇒ SQLite 上跑大规模回填会很慢，`sqlite_to_pg` 迁移大批数据时预料这个量级。
+- "NFR 增量 < 原始 1%"的数学记账不受影响（元数据开销比净载假设估的还小）；
+  ANN 索引仍未纳入审计，支撑 ADR-022 D2"小表走精确扫描"的决策。
+
 ### M2.2 B2 收尾：多模态运行时接线（provider 工厂 + 上传自动索引 + 停机闭环）
 
 B1/B2 交付的是"引擎"，本条补"传动轴"。实测发现**两处真断链**：异步摄入队列
