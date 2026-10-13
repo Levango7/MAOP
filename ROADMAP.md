@@ -323,7 +323,15 @@
   > 停机必丢 ≤2s 上传）+ 启动预热。**索引决策修正的实测副作用**：partial-HNSW
   > 一坏全丢的批嵌入改 per-item 降级。门禁补齐：AST call-site 死代码守卫
   > （既有 dead-wiring 只管模块级孤儿，类级死代码是盲区）。
-  > **仍未交付**：PG 侧存储量化评估、音频/视频（B3）、NDCG 数据集与可切换模型（B4）。
+  > **2026-10-14 B4 检索质量度量已交付**（`maop eval multimodal` +
+  > `docs/audits/m22-b4-retrieval-quality.md`）：NDCG@5 harness + 分级标注语料
+  > （12 图 + 8 查询，真 CLIP 冻结夹具）+ 判别力门禁（CLIP 0.866 vs hash 0.101，
+  >  边际 +0.766）。**计划变更记账（规则 #3）**：原计划"NDCG 数据集 50-100 条"，
+  >  实交 12+12——够证明判别力与流程、不够做模型选型结论，扩容随时可做
+  >  （`build_clip_eval_fixture.py`）；"可切换模型的多模型横评"defer，触发条件 =
+  >  出现第二候选模型（Chinese-CLIP/AltCLIP）或中文查询低于可接受水位
+  >  （中文查询是已知盲区，见 ADR-022 D8/D10）。
+  > **仍未交付**：PG 侧存储量化评估、音频/视频（B3）。
 - **顺延（v5.4.x/v5.5.0）**：M2.2 B2 余项（异步队列的进程间接线 + PG 侧存储量化评估）、
   B3（音频 Whisper / 视频关键帧，企业版边界）、B4（NDCG 标注数据集 + 可切换模型评估）。
 - **未纳入本版**：T3.3 K8s Operator M0（kopf 骨架 + `ghcr.io/maop/operator` 首次构建 +

@@ -79,6 +79,34 @@ B1/B2 交付的是"引擎"，本条补"传动轴"。实测发现**两处真断�
 验证：多模态相关 13 个套件 187 passed；chat/server/settings/env-drift 81 passed；
 ruff+mypy 干净；四门禁全绿（`.env.example` 两变量同步）。
 
+### M2.2 B4：检索质量可度量（NDCG harness + 标注语料 + 判别力门禁）
+
+F2-02 此前只有二值断言（"跨模态 top-1 8/8"），既答不了"质量多少分"也比不了
+两个 provider。现在有了可复现的度量，并且产品化成一个自检命令。
+
+- **`maop eval multimodal`**（`core/memory/retrieval_eval.py` + `cli_eval.py`）：
+  对当前进程解析出的 provider 跑 NDCG@5，打印报告。hash 回退会拿到接近随机的
+  分数并附"装 extra"提示——这既是用户自检，也是该模块的生产引用方
+  （工具级死代码是 dead-wiring 门禁的盲区，见 ADR-022 D10）。
+- **指标与语料**：NDCG@5（IDCG 同 k 截断、全零相关 ⇒ 0.0），分级相关
+  （2=同色同形 / 1=同色异形 / 0）；12 张确定性合成图（4 色 × 3 形状）+
+  8 条查询（exact 4 + paraphrase 4），真 CLIP 向量冻结成
+  `fixtures/clip_eval.json`（`scripts/build_clip_eval_fixture.py` 复算，
+  `--check` 模式无 torch 可校验；revision 钉子 + 图片字节哈希双防腐化）。
+  查询文本**不入**被检语料——否则 hash 对相同字符串恒等、#1 白拿。
+- **判别力门禁（本 PR 最重要的三条用例）**：同一数据集、同一代码路径，
+  CLIP **0.8661** vs hash **0.1005**（边际 +0.766）。测试钉 CLIP ≥ 0.75 /
+  hash ≤ 0.25 / 边际 ≥ 0.5；变异实测：把排序改成按 id 排 ⇒ 三条全红。
+- **先量后标**：建夹具时先跑 12×12 sanity 矩阵，发现 CLIP 颜色强、形状弱
+  （circle↔triangle 两处失手）⇒ grade 设计成"同色异形 = 1 分"与模型能力对齐。
+- 测试 23 例（22 常规 + 1 `slow` live-CLIP 互证：本机实测 cosine ≥ 1−1e-4，
+  CI 无 torch 自动 skip）；NDCG 定义用手算值钉住（`log2(i+1)` vs `(i+2)`、
+  IDCG 截断、k 截断三类变异都杀）。
+- **边界**：不宣称 PRD 的"人工评估 NDCG≥0.8"；语料 12+12 而非原计划 50-100
+  （规模缩减按规则 #3 记账在 ROADMAP，扩容随时可做）；多模型横评 defer
+  （触发条件：第二候选模型 / 中文查询低于水位——中文查询是已知盲区）；
+  只评 text→image 单向。
+
 ### M2.2 B2 PR-4：真 PG 腿（pgvector 镜像 + migration 链 + 非 mock 集成）
 
 - CI「Alembic migrations」作业的 service 容器从 `postgres:16-alpine` 换成

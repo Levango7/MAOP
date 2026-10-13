@@ -323,6 +323,9 @@ deterministic **non-semantic** fallback (logged as degraded) and upload
 auto-indexing stays off, so nothing changes for existing deployments — see
 `MAOP_MULTIMODAL_PROVIDER` / `MAOP_MULTIMODAL_AUTO_INDEX` in
 [docs/configuration.md](docs/configuration.md) and ADR-022.
+Measure how well it actually retrieves with `maop eval multimodal`
+(NDCG@5 over a labelled synthetic corpus: ~0.87 with CLIP, ~0.10 on the
+non-semantic fallback — see docs/audits/m22-b4-retrieval-quality.md).
 
 ## Cost Tracking
 

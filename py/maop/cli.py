@@ -714,6 +714,11 @@ def main() -> Any:
     if argv and argv[0] == "evolution":
         cmd_evolution(argv[1:])
         return
+    if argv and argv[0] == "eval":
+        from maop.cli_eval import cmd_eval
+
+        cmd_eval(argv[1:])
+        return
 
     parser = argparse.ArgumentParser(description="MAOP - Agent Orchestration Framework")
     parser.add_argument("action", nargs="?", default="start",
