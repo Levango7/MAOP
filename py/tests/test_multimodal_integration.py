@@ -46,7 +46,19 @@ TEXTS = (
 
 
 @pytest.fixture(autouse=True)
-def _reset_singleton():
+def _reset_singleton(monkeypatch):
+    """Reset the multimodal singleton and pin the backend to SQLite.
+
+    The SQLite pin matters under xdist: a sibling test that selected PG via
+    env can leave the settings singleton pointing there, and the facade's
+    factory would then try to build the PG backend (no driver in CI) — seen
+    2026-10-13 as a 5-platform CI failure in the parity module.
+    """
+    for key in ("MAOP_MULTIMODAL_BACKEND", "MAOP_VECTOR_BACKEND", "MAOP_DB_BACKEND"):
+        monkeypatch.delenv(key, raising=False)
+    from maop.config import settings as settings_mod
+
+    monkeypatch.setattr(settings_mod, "_settings", None)
     reset_multimodal_memory()
     yield
     reset_multimodal_memory()

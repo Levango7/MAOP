@@ -148,16 +148,47 @@ def validate_image_input(
         if ext not in MULTIMODAL_IMAGE_EXTENSIONS:
             raise ImageValidationError(f"unsupported image extension: {ext}")
     else:
-        # No extension hint (raw bytes): let Pillow sniff the real format.
-        sniffed = _sniff_image_ext(data)
+        # No extension hint (raw bytes): try the zero-dependency magic-byte
+        # sniff first (works without Pillow — CI/dev installs have no
+        # pillow in the default extra), then fall back to Pillow's decoder.
+        sniffed = _sniff_magic_ext(data) or _sniff_image_ext(data)
         if sniffed:
             ext = sniffed
         else:
             raise ImageValidationError(
                 "cannot determine image format from payload bytes "
-                "(pass ext=... when Pillow is not installed)"
+                "(pass ext=... when neither the magic bytes nor Pillow "
+                "can identify it)"
             )
     return data, ext
+
+
+#: Magic signatures → extension, for the zero-dependency format sniff.
+#: WEBP is handled separately (RIFF container + ``WEBP`` at offset 8) so
+#: other RIFF payloads (WAV/AVI) are not mis-accepted as images.
+_MAGIC_EXTENSIONS: tuple[tuple[bytes, str], ...] = (
+    (b"\x89PNG\r\n\x1a\n", ".png"),
+    (b"\xff\xd8\xff", ".jpg"),          # JPEG SOI
+    (b"GIF87a", ".gif"),
+    (b"GIF89a", ".gif"),
+    (b"BM", ".bmp"),
+)
+
+
+def _sniff_magic_ext(data: bytes) -> str:
+    """Identify the image format from magic bytes; ``""`` when unknown.
+
+    Deliberately covers only the container magic bytes — no decode. That
+    keeps it dependency-free (``PIL`` is optional, so CI and slim installs
+    must still be able to accept raw image bytes), while a full decode
+    verification remains available via :func:`_sniff_image_ext`.
+    """
+    for magic, ext in _MAGIC_EXTENSIONS:
+        if data.startswith(magic):
+            return ext
+    if len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return ".webp"
+    return ""
 
 
 def _sniff_image_ext(data: bytes) -> str:

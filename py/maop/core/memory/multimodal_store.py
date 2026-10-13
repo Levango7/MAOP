@@ -43,6 +43,7 @@ from maop.core.memory.multimodal_embed import (
     MultimodalEmbeddingProvider,
     validate_image_input,
 )
+from maop.core.memory.multimodal_schema import sqlite_ddl as _sqlite_ddl
 from maop.core.memory.vector_embed import VectorSearchResult, cosine_similarity
 from maop.core.memory.vector_store import VectorStore
 
@@ -56,47 +57,43 @@ MODALITY_IMAGE = "image"
 #: Metadata key holding the modality discriminator.
 MODALITY_KEY = "modality"
 
-_MULTIMODAL_DDL = """
-CREATE TABLE IF NOT EXISTS multimodal_entries (
-  id TEXT PRIMARY KEY,
-  text TEXT NOT NULL DEFAULT '',
-  vector BLOB NOT NULL DEFAULT X'',
-  metadata TEXT NOT NULL DEFAULT '{}',
-  created_at REAL NOT NULL DEFAULT 0.0
-);
-
-CREATE INDEX IF NOT EXISTS idx_mme_created ON multimodal_entries(created_at);
-"""
+# Rendered from the single source of truth in multimodal_schema (M2.2 B2) —
+# the PG migration renders from the same spec, and a parity test keeps the two
+# from drifting. NOT NULL / DEFAULT are enforced at write time (``_write``
+# rejects wrong dimensions) rather than duplicated in the DDL text.
+_MULTIMODAL_DDL = _sqlite_ddl()
 
 
-def _warn_if_non_sqlite_backend_selected() -> None:
-    """B1 ships the SQLite path only; make a silent env mismatch visible.
+def _warn_if_pg_available_but_unused() -> None:
+    """Warn when PostgreSQL is selected for the data plane but this SQLite
+    store is being constructed directly — i.e. a caller bypassed
+    :func:`maop.memory.multimodal.get_multimodal_memory` (which routes to the
+    PG backend in that case).
 
-    ``MAOP_VECTOR_BACKEND`` / ``MAOP_DB_BACKEND`` select PostgreSQL for the
-    *legacy* text stores. The multimodal space ignores them until batch B2 —
-    warn instead of pretending the selection applies. Uses the existing
-    resolvers rather than new environment reads (config-drift gate).
+    Unlike the B1-era probe that warned about ANY ``MAOP_VECTOR_BACKEND=pg``
+    (design review B2 2026-10-13), this only fires on the actual mismatch:
+    the environment selects PG *and* we're writing to the SQLite file. No
+    environment reads of our own — the existing resolvers are reused, so the
+    config-drift gate sees no new direct env access from this module.
     """
-    selected: list[str] = []
-    try:
-        from maop.core.vector.factory import resolve_backend_name
-
-        if resolve_backend_name() == "pg":
-            selected.append("MAOP_VECTOR_BACKEND")
-    except Exception:  # pragma: no cover - defensive: resolver import/read failure; silent-ok: defensive-probe — 后端探测失败即信号，已由 warning 单独告知
-        pass
     try:
         from maop.core.backends.db_utils import get_db_backend
+        from maop.core.vector.factory import resolve_backend_name
 
-        if str(get_db_backend()).strip().lower() in {"pg", "postgresql"}:
-            selected.append("MAOP_DB_BACKEND")
-    except Exception:  # pragma: no cover - defensive; silent-ok: defensive-probe — 后端探测失败即信号，已由 warning 单独告知
-        pass
-    if selected:
+        pg = str(get_db_backend()).strip().lower() in ("pg", "postgresql") or (
+            resolve_backend_name() == "pg"
+        )
+    except Exception:
+        # Resolver import/read failure is not actionable here; the singleton
+        # still resolves backends on its own path.
+        return
+    if pg:
         logger.warning(
-            "[multimodal] %s selects PostgreSQL, but the multimodal space is "
-            "SQLite-only until M2.2 batch B2; using SQLite at %s.",
-            " and ".join(selected), resolve_data_dir() / "multimodal.db",
+            "[multimodal] constructing the SQLite space while the environment "
+            "selects PostgreSQL (MAOP_DB_BACKEND / MAOP_VECTOR_BACKEND). "
+            "Prefer get_multimodal_memory() so the PG backend is used; writing "
+            "to %s instead.",
+            resolve_data_dir() / "multimodal.db",
         )
 
 
@@ -121,7 +118,7 @@ class MultimodalStore(VectorStore):
         enable_hnsw: bool = False,
     ) -> None:
         if db_path is None:
-            _warn_if_non_sqlite_backend_selected()
+            _warn_if_pg_available_but_unused()
             db_path = resolve_data_dir() / "multimodal.db"
         provider = embedding or HashModalityEmbedding()
         # Typed handle: the base class attribute is typed as the text-only

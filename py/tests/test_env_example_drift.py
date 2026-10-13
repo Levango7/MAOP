@@ -48,8 +48,24 @@ ENTERPRISE_SIDE_VARS = {
 }
 
 
+def _mentions_environ(node: ast.expr) -> bool:
+    return (
+        (isinstance(node, ast.Attribute) and node.attr == "environ")
+        or (isinstance(node, ast.Name) and node.id == "environ")
+    )
+
+
 def _enclosing_env_object(func: ast.expr) -> bool:
-    """``os.environ.get`` / ``environ.get`` 形式的调用才算"读环境变量"。"""
+    """``os.environ.get`` / ``environ.get`` / ``(env or os.environ).get`` 形式的
+    调用才算"读环境变量".
+
+    The ``(env or os.environ).get(...)`` form is a deliberate
+    "parameterised default-到环境" idiom (``resolve_backend_name(env=None)``
+    reads ``MAOP_VECTOR_BACKEND`` that way). Excluding it made this gate's
+    "declared-but-never-read" direction report a false positive for exactly
+    that variable (seen 2026-10-13), so the AST also accepts a BoolOp whose
+    operands include ``os.environ``.
+    """
     if not isinstance(func, ast.Attribute):
         return False
     value = func.value
@@ -57,6 +73,8 @@ def _enclosing_env_object(func: ast.expr) -> bool:
         return value.attr == "environ"
     if isinstance(value, ast.Name):               # environ.get（from os import environ）
         return value.id == "environ"
+    if isinstance(value, ast.BoolOp):             # (env or os.environ).get
+        return any(_mentions_environ(operand) for operand in value.values)
     return False
 
 

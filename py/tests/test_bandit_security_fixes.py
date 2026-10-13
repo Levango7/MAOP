@@ -44,6 +44,7 @@ NOSEC_INVENTORY: frozenset[str] = frozenset({
     "maop/core/memory/episodic_store.py:B608:2",
     "maop/core/memory/knowledge_extractor.py:B608:3",
     "maop/core/memory/knowledge_graph.py:B608:4",
+    "maop/core/memory/multimodal_pg.py:B608:5",
     "maop/core/memory/multimodal_store.py:B608:1",
     "maop/core/memory/vector_store.py:B608:8",
     "maop/core/monitoring/timeseries.py:B608:1",
