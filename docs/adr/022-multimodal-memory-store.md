@@ -167,6 +167,27 @@ PRD R02 原文为 "pgvector 多向量列，每模态独立索引，共享元数�
   ③ 备选可切换权重（Chinese-CLIP / AltCLIP / open_clip 社区复现）列入 B4 之前的评估项，
   与 PRD 风险缓解措施"可切换嵌入模型"一致。
 
+### D10. 检索质量可度量（B4，2026-10-14）
+
+- 度量入口 **`maop eval multimodal`**（`core/memory/retrieval_eval.py` +
+  `cli_eval.py`）：对**当前进程解析出的 provider** 跑 NDCG@k，回答"我这个部署
+  的多模态记忆是真的在语义检索吗"。这也是该模块的生产引用方（否则它是
+  dead-wiring 门禁下的孤儿——类级/工具级死代码正是本 ADR 系列反复踩的坑）。
+- 指标 = **NDCG@5**（gain/log2(i+1)、IDCG 同 k 截断、全零相关 ⇒ 0.0），
+  分级相关性（2=同色同形 / 1=同色异形 / 0）。只走 `MultimodalStore.search`
+  的余弦序——**不经 `MultimodalMemory.retrieve`**（那是 RRF rank 分，会压缩
+  待测信号）。
+- 数据集 = 12 张确定性合成图 + 8 条查询，向量用真 CLIP 冻结
+  （`scripts/build_clip_eval_fixture.py` 复算，revision 钉子门禁防腐化）。
+  查询文本不入被检语料（防 hash self-hit 白拿 #1）。
+- 实测（`docs/audits/m22-b4-retrieval-quality.md`）：CLIP **0.8661** vs hash
+  回退 **0.1005**（边际 +0.766）。测试钉 CLIP ≥ 0.75 / hash ≤ 0.25 / 边际 ≥ 0.5，
+  并按实测先跑 12×12 sanity 矩阵再定 grade（发现 CLIP 颜色强、形状弱 ⇒
+  "同色异形"记 1 分，与模型能力对齐）。
+- **本 harness 不承担 PRD 的"人工评估 NDCG≥0.8"验收**；语料 12+12 而非原计划
+  50-100 条（规模缩减按规则 #3 记账在 ROADMAP），多模型横评的触发条件 =
+  出现第二候选模型或中文查询低于可接受水位（中文盲区见 D8）。
+
 ### D9. 可切换嵌入模型（HLD 期望对齐）
 
 - HLD 期望 ADR 覆盖"多模态嵌入模型选型与可切换"（hld-three-phase-roadmap.md:1709）。
