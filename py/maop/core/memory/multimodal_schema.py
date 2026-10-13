@@ -118,11 +118,21 @@ def sqlite_ddl(*, with_index: bool = True) -> str:
 
 
 def pg_ddl(*, with_indexes: bool = True) -> str:
-    """Render the PostgreSQL ``CREATE TABLE`` (+ modality partial indexes).
+    """Render the PostgreSQL ``CREATE TABLE`` (+ modality indexes).
 
-    Requires the ``vector`` extension (pgvector ≥ 0.5.0 for partial HNSW
-    indexes on expressions); the extension is created by the alembic env, not
-    here, so this function stays pure DDL.
+    The ANN index is deliberately **not** partial-HNSW-per-modality:
+    pgvector's approximate indexes trade recall for speed, and a
+    partial-HNSW set on a table smaller than the index's ``ef_construction``
+    can rank a better vector below a worse one (measured 2026-10-13 on
+    pgvector 0.8.7: HNSW returned img-blue above img-red for the query
+    "a red square"). The space therefore ships **exact** cosine scans with
+    B-tree indexes on ``created_at`` and modality-filtered lookups; an ANN
+    index can be added by a later migration once the corpus justifies the
+    recall trade-off (pgvector documents that exact search is preferred for
+    small datasets).
+
+    Requires the ``vector`` extension (pgvector), created by the alembic
+    env, so this function stays pure DDL.
     """
     cols = []
     for c in MM_COLUMNS:
@@ -137,14 +147,13 @@ def pg_ddl(*, with_indexes: bool = True) -> str:
     )
     if not with_indexes:
         return ddl
-    index_lines = []
-    for modality in ("text", "image"):
-        index_lines.append(
-            f"CREATE INDEX IF NOT EXISTS idx_mme_{modality}_embedding\n"
-            f"  ON {MM_TABLE} USING hnsw (vector vector_cosine_ops)\n"
-            f"  WHERE (metadata->>'modality') = '{modality}'"
-        )
-    index_lines.append(
-        f"CREATE INDEX IF NOT EXISTS idx_mme_created ON {MM_TABLE}(created_at)"
-    )
+    index_lines = [
+        # B-tree on the modality expression: the filter is the common access
+        # pattern ("give me image entries") and stays exact.
+        (
+            "CREATE INDEX IF NOT EXISTS idx_mme_modality"
+            f"  ON {MM_TABLE} ((metadata->>'modality'))"
+        ),
+        f"CREATE INDEX IF NOT EXISTS idx_mme_created ON {MM_TABLE}(created_at)",
+    ]
     return ddl + "\n\n" + ";\n\n".join(index_lines) + ";"

@@ -439,8 +439,13 @@ def get_db_engine(
     if backend == "sqlite":
         engine = create_engine(resolved_url, echo=echo, future=True)
     else:
+        # A driver-less postgresql:// resolves to psycopg2 on SQLAlchemy 2.0
+        # but psycopg (v3) on 2.1+, so the driver would depend on the
+        # installed SQLAlchemy rather than on this project's extras. Pin it.
+        from maop.db_url import resolve_pg_driver
+
         engine = create_engine(
-            resolved_url,
+            resolve_pg_driver(resolved_url),
             echo=echo,
             future=True,
             pool_size=pool_size,

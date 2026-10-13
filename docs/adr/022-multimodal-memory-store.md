@@ -50,9 +50,14 @@ PRD R02 原文为 "pgvector 多向量列，每模态独立索引，共享元数�
 
 - 新表 `multimodal_entries(id, text, vector(512)/BLOB, metadata, created_at)`：
   - **模态落在 metadata JSON**（`metadata.modality`，值 `text`/`image`；B3 扩 `audio`/`video`）。
-    SQLite 侧检索过滤在内存模态映射上做（个人版规模精确且快）；**PG 侧 B2 用
-    `modality` 物理列 + 每模态 partial index**（`WHERE modality='image'`）——"每模态独立索引"
+    SQLite 侧检索过滤在内存模态映射上做（个人版规模精确且快）；PG 侧 B2 用
+    **`modality` 表达式 B-tree 索引**（`(metadata->>'modality')`）——"每模态独立索引"
     的意图在 PG 落地，SQLite 侧如实标注为"内存过滤"。
+    > **偏差（2026-10-13 B2 PR-4 实测修正）**：原计划"每模态 partial **HNSW**"。
+    > pgvector 0.8.7 上 partial HNSW 在空表/数行规模会把明显更优的向量排到更差的
+    > 之后（实测查询 "a red square" 时 img-blue 一度压过 img-red），而 pgvector
+    > 官方建议小数据集走精确扫描。故 B2 改为 modality 表达式 B-tree + **精确
+    > 余弦排序**，ANN 索引留给后续按数据量评估的迁移。
   - `metadata` 统一 JSON（来源引用、时间戳、`model_id`、`degraded` 等）——满足"共享元数据"（R05）。
   - CLIP 文本/图像共享 512 维空间 ⇒ 表内**跨模态直查**；未来新模型（新维度）→
     **新表 + 新迁移**（演化路径写死在迁移里，可审计，见 D9）。

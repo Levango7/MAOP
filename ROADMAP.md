@@ -302,7 +302,7 @@
   > （CI 用**预计算真 CLIP 向量夹具**做真语义断言）。本机实证：`index_many`
   > 42ms/图（单次前向）、跨模态 top-1 8/8；单张热机 65-293ms 波动 → 异步队列
   > 仍为 B2 的延迟达标闭环。
-  > **2026-10-13 Batch-2（三项，合并中）**：
+  > **2026-10-13 Batch-2（三项，已交付）**：
   > ① **PG 链路全通**——`pgvector/pgvector:pg16` CI 腿 + pg 树 alembic
   > upgrade/downgrade/upgrade + 多模态 8 例非 mock 集成（本机容器真跑 8/8）；
   > ② **多源迁移**——`sqlite_to_pg` 现在能发现独立的 `multimodal.db`
@@ -310,13 +310,16 @@
   > ③ **异步摄入队列**（ADR-022 D4 闭环）——submit <10ms、攒批一次写、关停降级同步。
   > **索引决策修正**（pgvector 0.8.7 实测）：partial-HNSW 在数行规模会把更优向量
   > 排到更差的之后 ⇒ 改 modality 表达式 B-tree + 精确余弦排序（ANN 索引待数据量
-  > 评估的迁移）。**顺带修掉 pg 树两个从未被 CI 触发的真 bug**（`_exec_block`
+  > 评估的迁移）。**pg 树四个从未被 CI 触发的真 bug 也顺带修掉**（`_exec_block`
   > 把注释内的分号当语句边界；env.py 的 DDL 因事务边界被整体回滚——001/002/003
-  > 在全新库上此前只会"报成功、不建表"）+ 破坏性降级 flag 名（001 用旧名、
-  > 002/003 用新名，`downgrade base` 必挂）现两名字都接受。
+  > 在全新库上此前只会"报成功、不建表"；kv_store 的 GIN 索引建在 TEXT 列上；
+  > 破坏性降级 flag 名 001 用旧名、002/003 用新名 ⇒ `downgrade base` 必挂），
+  > 外加**驱动二义性根治**（`maop/db_url.py`：裸 `postgresql://` 的驱动此前由
+  > SQLAlchemy 小版本决定——2.0=psycopg2、2.1+=psycopg3，本机绿 CI 红；现按实际
+  > 可导入驱动显式钉住，6 个入口全接入）。
   > **仍未交付**：异步队列与任务/worker 的进程间接线（B2 的延迟达标工程闭环）、
   > PG 侧存储量化评估、音频/视频（B3）、NDCG 数据集与可切换模型（B4）。
-- **顺延（v5.4.x/v5.5.0）**：M2.2 B2（PG 路径 + alembic 003 + 异步队列 + 存储量化评估）、
+- **顺延（v5.4.x/v5.5.0）**：M2.2 B2 余项（异步队列的进程间接线 + PG 侧存储量化评估）、
   B3（音频 Whisper / 视频关键帧，企业版边界）、B4（NDCG 标注数据集 + 可切换模型评估）。
 - **未纳入本版**：T3.3 K8s Operator M0（kopf 骨架 + `ghcr.io/maop/operator` 首次构建 +
   kind 集成腿）——仍按"余力"排期。
@@ -326,6 +329,7 @@
 - [x] 选型 ADR 合入，且记录 PoC **实测**数据（非推演）——ADR-022（两轮独立对抗性审核）+ spike 报告。
 - [x] F2-02 的多模态检索在**非 mock** 集成用例下通过——真实 SQLite + **预计算真 CLIP 向量夹具**
       做真语义排序断言（`tests/test_multimodal_integration.py`）。
+- [x] PG 路径同样非 mock 通过——真实 pgvector 容器 + 真 CLIP 夹具（`tests/test_multimodal_pg_integration.py`）。
 - [ ] （若纳入 T3.3 M0）kind 集群 apply 一个 `MaopTask` → operator 拉起执行 →
       `status.phase` 由 Running 收敛到 Succeeded，e2e 在 CI 绿。**——本版未纳入，顺延。**
 

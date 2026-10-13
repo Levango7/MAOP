@@ -98,6 +98,9 @@ class _StubEngine:
         if text_.strip().upper().startswith("SELECT"):
             # modality_of() and other single-column projections
             return _Result([("image",)], rowcount=0)
+        if "RETURNING" in text_.upper():
+            # DELETE ... RETURNING id
+            return _Result([("e1",)], rowcount=1)
         return _Result([], rowcount=1)
 
     def begin(self) -> _Txn:
@@ -140,8 +143,10 @@ def test_ensure_schema_runs_spec_ddl():
     assert 'CREATE EXTENSION IF NOT EXISTS "vector"' in joined
     assert MM_TABLE in joined
     assert "vector(512)" in joined
-    assert "USING hnsw" in joined
-    assert "(metadata->>'modality') = 'image'" in joined
+    # No ANN index by design — exact ordering (ADR-022 / schema docstring).
+    assert "hnsw" not in joined.lower()
+    assert "idx_mme_modality" in joined
+    assert "(metadata->>'modality')" in joined
 
 
 def test_default_dsn_reads_settings(monkeypatch):
