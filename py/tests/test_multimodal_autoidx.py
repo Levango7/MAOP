@@ -238,10 +238,14 @@ def test_embedding_is_not_on_the_request_path(
     upload_root: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Zero embed calls before save_image returns — no wall-clock budget.
+    """Zero embed calls before save_image returns — asserted structurally only.
 
-    A slow provider (0.3 s per image) would blow any sane request budget if
-    embedding ran inline; the assertion is structural so it cannot flake.
+    The provider sleeps 0.3 s per image, so an inline embed cannot hide: it
+    would show up in ``image_calls`` before ``save_image`` returns. No
+    wall-clock budget is asserted on purpose — the upload leg costs file IO plus
+    a sha256 pass, which measured 0.36 s against a 0.25 s bound on the
+    windows-latest/3.10 runner and turned this into a false red (2026-10-13,
+    4/4 reruns). The structural assert is both stronger and leg-independent.
     """
     provider = RecordingProvider(delay=0.3)
     from maop.core.memory import multimodal_embed
@@ -250,7 +254,6 @@ def test_embedding_is_not_on_the_request_path(
         multimodal_embed, "resolve_multimodal_provider", lambda **_kw: provider
     )
     _set_auto_index(monkeypatch, "1")
-    started = time.monotonic()
     chat_service.save_image(
         upload_root,
         session_id="s1",
@@ -258,12 +261,15 @@ def test_embedding_is_not_on_the_request_path(
         data=FIXTURE_PNG,
         content_type="image/png",
     )
-    elapsed = time.monotonic() - started
-    assert provider.image_calls == []  # nothing embedded yet
-    assert elapsed < 0.25  # still asserted as a smoke check, not the contract
-    # …and the entry really does land afterwards.
+    assert provider.image_calls == []  # the contract: nothing embedded yet
+    # …and the deferred work really does land. close_ingest, not drain_ingest:
+    # the worker pulls the item off the queue at once, and drain only sees items
+    # still queued (see ``store_async``/``close_ingest`` docs in
+    # maop/memory/multimodal.py), so counting drain's return races the freshly
+    # started worker. Counting embed calls after the join is deterministic
+    # whoever wrote the batch.
     memory = mm.get_multimodal_memory()
-    assert memory.drain_ingest() == 1
+    memory.close_ingest(timeout=3.0)
     assert len(provider.image_calls) == 1
 
 
