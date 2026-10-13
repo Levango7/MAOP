@@ -340,7 +340,7 @@ def test_shutdown_helper_flushes_without_creating_the_singleton(
     maybe_index_uploaded_image(
         upload_root, "img-does-not-exist", session_id="s1", image_path=None
     )  # missing file → skipped, no instance created
-    assert mm.get_multimodal_memory_if_exists() is None
+    assert mm.get_multimodal_memory_if_exists() == []
 
     image_id = chat_service.save_image(
         upload_root,

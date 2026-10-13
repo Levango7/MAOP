@@ -172,6 +172,45 @@ PRD R02 原文为 "pgvector 多向量列，每模态独立索引，共享元数�
   ③ 备选可切换权重（Chinese-CLIP / AltCLIP / open_clip 社区复现）列入 B4 之前的评估项，
   与 PRD 风险缓解措施"可切换嵌入模型"一致。
 
+### D11. 空间扩展契约（B3，2026-10-14）
+
+兑现 D5 的承诺："模态是字符串注册值、新空间 = 新表 + 新迁移；企业版新增
+provider/模态不改本协议"。此前只兑现了一半：`MultimodalStore` 把表名/维度/
+模态硬编码，第二个空间必须改 core。现状：
+
+- **`core/memory/multimodal_spaces.py`**：`MultimodalSpaceSpec`（name /
+  table_name / dimension / modalities / backend / model_id）+ 进程内注册表
+  （`register_multimodal_space` / `get_multimodal_space` / `list_multimodal_spaces`
+  / `reset_multimodal_spaces`）。默认空间 `multimodal-512` 在 import 时自注册，
+  **取值与 B3 前逐字节一致**（表名、512 维、text/image、`stats()["space"]`），
+  现有测试钉子（test_multimodal_store / schema_parity / pg_backend）零改动通过。
+  同名重注册**定义不同即报错**（否则已建实例继续用旧表而注册表声称新的）。
+- **构造路径收殓为一条**：`_build_store` 经 `get_multimodal_space()` 取 spec 再构库，
+  PG 与 SQLite 两侧都把 spec 传到底。默认空间调研默认 spec ⇒ 注册表不是装饰。
+- **通用写入 `index_modality(modality, id, *, vector=…, source_*=…)`**：
+  两个后端都实现并进了 `MultimodalBackend` Protocol。调用方自带向量 ⇒ 不触发
+  图像校验（音频字节不会再被 `validate_image_input` 拒），modality **不被覆写**
+  （旧 `index_text` 会强制盖章 text）；该空间不接受的 modality 抛错并列可选值。
+- **DDL 参数化**：`sqlite_ddl(table=…, dim=…)` / `pg_ddl(table=…, dim=…)`，
+  默认值输出与 B3 前逐字节相同；索引名按表名派生（`idx_<table>_created`），
+  同一库内两个空间不会因 `IF NOT EXISTS` 静默跳过对方的索引。
+- **迁移也可生成**：`render_pg_migration(spec, revision, down_revision)` 渲染
+  alembic revision，DDL 与运行时同源（test 断言它复现已提交的 003 迁移）。
+- **存储/实例按空间隔离**：单例 key 加空间分量（`sqlite:<dir>:<space>`）；
+  `get_multimodal_memory_if_exists()` 返回**全部**实例，停机 drain 遍历关闭
+  （否则第二个空间的队列在 shutdown 时不 flush）。
+- **维度不匹配的诚实降级**：provider 维度与 spec 不符时，`_build_store` 降级到
+  同维度 hash provider 并 warning（stats `degraded=True 说明真相），而**显式注入**
+  的 provider 维度不符直接报错（那是配置错误）。
+
+**企业侧（MAOS）接入 = 三步**：① `register_multimodal_space(MultimodalSpaceSpec(
+name="audio-512", table_name="audio_entries", dimension=…, modalities=("audio",)))`；
+② 用自己的 provider 产出向量后 `index_modality("audio", id, vector=…)`（PG 迁移用
+`render_pg_migration` 生成）；③ 用 `list_multimodal_spaces()` 探测能力、按 spec.model_id
+记账模型来源。**注册时机**：在 MAOS 包 import 侧车注册（进程级，每个 uvicorn worker
+各自执行；未注册即用会报错并列可用空间，不会静默落到 CLIP 空间）。
+**跨空间融合检索不做**：RRF 融合仍是单实例内两腿；跨空间聚合留 B3+。
+
 ### D10. 检索质量可度量（B4，2026-10-14）
 
 - 度量入口 **`maop eval multimodal`**（`core/memory/retrieval_eval.py` +

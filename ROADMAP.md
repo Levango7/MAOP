@@ -331,7 +331,14 @@
   >  （`build_clip_eval_fixture.py`）；"可切换模型的多模型横评"defer，触发条件 =
   >  出现第二候选模型（Chinese-CLIP/AltCLIP）或中文查询低于可接受水位
   >  （中文查询是已知盲区，见 ADR-022 D8/D10）。
-  > **仍未交付**：音频/视频（B3）。
+  > **2026-10-14 B3 本仓部分已交付（扩展契约）**：空间注册表
+  > （`core/memory/multimodal_spaces.py`，默认空间取值与 B3 前逐字节一致）+
+  > 通用写入 `index_modality`（自有向量、不触发图像校验、modality 不被覆写）+
+  > DDL/迁移参数化（`sqlite_ddl(table,dim)` / `pg_ddl(table,dim)` /
+  > `render_pg_migration`）+ 单例按空间隔离 + 停机 drain 遍历全部空间。
+  > **计划边界记账**：音频/视频的**实现**（Whisper/CLAP/ffmpeg provider）按
+  > ADR-016/022-D5 归私有仓 MAOS，不在 MIT 本仓；MAOS 接入三步见 ADR-022 D11。
+  > **仍未交付**：MAOS 侧音频/视频实现、跨空间融合检索（B3+）。
   > **2026-10-14 PG 存储量化评估已交付**（真 pgvector 库实测，
   > `docs/audits/m22-b2-storage-quantization.md`）：万条规模 PG ~2.7KB/条
   > vs SQLite ~4.2KB/条 ⇒ 换 PG 的理由是并发/运维而非容量；写入吞吐差 8 倍

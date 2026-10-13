@@ -114,7 +114,13 @@ class MultimodalMemory:
         return self._store.index_text(eid, content, metadata=metadata)
 
     def store_batch(self, items: list[dict[str, Any]]) -> list[str]:
-        """Store many entries (modality-grouped batch embedding)."""
+        """Store many entries (modality-grouped batch embedding).
+
+        Items may target any modality the space accepts: an item with an
+        explicit ``modality`` other than text/image (and its own ``vector``)
+        goes through the generic path (ADR-022 D11) instead of being
+        re-interpreted as text or an image.
+        """
         return self._store.index_many(items)
 
     # ── async ingest (M2.2 B2 PR-3, ADR-022 D4) ─────────────────
@@ -429,22 +435,49 @@ def _build_store(
     data_dir: Path,
     dsn: str | None,
     embedding: MultimodalEmbeddingProvider | None = None,
+    space: str | None = None,
 ) -> MultimodalBackend:
-    """Construct the backend matching the environment (SQLite default).
+    """Construct the backend for one registered space (ADR-022 D11).
+
+    The space registry is the single construction path: the default space
+    resolves to the same table/dimension/modalities the store hard-coded
+    before B3, and any other space (enterprise audio, a second CLIP
+    dimension) is a declaration rather than a core edit.
 
     The embedding provider comes from the factory unless the caller injects
-    one (tests, or an operator wiring a different model). Injection is the
-    only way the deterministic-fixture path is used without the factory
-    undoing it, so it must survive to both backends.
+    one (tests, or an operator wiring a different model).
     """
-    from maop.core.memory.multimodal_embed import resolve_multimodal_provider
+    from maop.core.memory.multimodal_embed import HashModalityEmbedding, resolve_multimodal_provider
+    from maop.core.memory.multimodal_spaces import get_multimodal_space
 
-    provider = embedding if embedding is not None else resolve_multimodal_provider()
-    if dsn is None and _pg_backend_selected():
+    spec = get_multimodal_space(space)
+    if embedding is not None:
+        provider = embedding
+    else:
+        provider = resolve_multimodal_provider()
+        if provider.dimension != spec.dimension:
+            # The factory provider serves the default CLIP width. A space with
+            # a different dimension (enterprise audio, a second CLIP size)
+            # degrades to a deterministic provider of the right width instead
+            # of failing — stats()["degraded"] tells the truth either way, and
+            # the enterprise edition injects its own provider when it has one.
+            logger.warning(
+                "[multimodal] space %r wants %d-dim vectors but the resolved "
+                "provider produces %d; using a deterministic fallback of the "
+                "right width (degraded, NOT semantic)",
+                spec.name, spec.dimension, provider.dimension,
+            )
+            provider = HashModalityEmbedding(dim=spec.dimension)
+    wants_pg = spec.backend == "pg" or (
+        spec.backend == "auto" and (dsn is not None or _pg_backend_selected())
+    )
+    if wants_pg:
         from maop.core.memory.multimodal_pg import PgMultimodalBackend
 
-        return PgMultimodalBackend(dsn=dsn, embedding=provider)
-    return MultimodalStore(db_path=data_dir / "multimodal.db", embedding=provider)
+        return PgMultimodalBackend(dsn=dsn, embedding=provider, space=spec)
+    return MultimodalStore(
+        db_path=data_dir / "multimodal.db", embedding=provider, space=spec
+    )
 
 
 def get_multimodal_memory(
@@ -453,12 +486,13 @@ def get_multimodal_memory(
     data_dir: Path | str | None = None,
     dsn: str | None = None,
     embedding: MultimodalEmbeddingProvider | None = None,
+    space: str | None = None,
 ) -> MultimodalMemory:
-    """Shared :class:`MultimodalMemory`, keyed by resolved backend identity.
+    """Shared :class:`MultimodalMemory`, keyed by backend **and** space.
 
-    Keys are ``sqlite:<data_dir>`` or ``pg:<dsn>`` so a SQLite instance and a
-    PG instance in the same process cannot collide (ADR-019 single-instance
-    discipline — the previous data-dir-only key silently shared state).
+    Keys are ``sqlite:<data_dir>:<space>`` / ``pg:<dsn>:<space>`` so neither
+    two backends nor two spaces in the same process can collide (ADR-019
+    single-instance discipline; B3 added the space component).
 
     The text-memory adapter is (re)bound on every call so a facade that
     changed mode/impl never keeps a stale leg — but only when one is passed:
@@ -468,11 +502,18 @@ def get_multimodal_memory(
     """
     resolved = Path(data_dir) if data_dir is not None else resolve_data_dir()
     backend_pg = dsn is not None or _pg_backend_selected()
-    key = f"pg:{dsn or _default_pg_dsn()}" if backend_pg else f"sqlite:{resolved}"
+    from maop.core.memory.multimodal_spaces import get_multimodal_space
+
+    space_name = get_multimodal_space(space).name
+    key = (
+        f"pg:{dsn or _default_pg_dsn()}:{space_name}"
+        if backend_pg
+        else f"sqlite:{resolved}:{space_name}"
+    )
     with _lock:
         instance = _instances.get(key)
         if instance is None:
-            store = _build_store(resolved, dsn, embedding)
+            store = _build_store(resolved, dsn, embedding, space=space_name)
             instance = MultimodalMemory(store=store, text_search=text_search)
             _instances[key] = instance
         elif text_search is not None:
@@ -480,15 +521,17 @@ def get_multimodal_memory(
         return instance
 
 
-def get_multimodal_memory_if_exists() -> MultimodalMemory | None:
-    """Return an existing shared instance, or ``None`` — never create one.
+def get_multimodal_memory_if_exists() -> list[MultimodalMemory]:
+    """All existing shared instances — never creates one.
 
     The shutdown path needs this: calling :func:`get_multimodal_memory` there
     would build a store (and with a CLIP provider load ~600 MB of weights) in
-    a process that never used the multimodal space.
+    a process that never used the multimodal space. Returns a **list** since
+    B3: several spaces can be live in one process, and every one of them owns
+    an ingest queue that must be flushed.
     """
     with _lock:
-        return next(iter(_instances.values()), None) if _instances else None
+        return list(_instances.values())
 
 
 def reset_multimodal_memory() -> None:
@@ -668,14 +711,15 @@ def drain_multimodal_ingest(timeout: float = 3.0) -> int:
     multimodal space pays nothing. Returns the number of flushed entries;
     every failure is swallowed (shutdown must not fail) but counted in logs.
     """
-    memory = get_multimodal_memory_if_exists()
-    if memory is None:
+    memories = get_multimodal_memory_if_exists()
+    if not memories:
         return 0
-    try:
-        flushed = memory.close_ingest(timeout=timeout)
-    except Exception as exc:
-        logger.warning("[multimodal] shutdown ingest drain failed: %s", exc)
-        return 0
+    flushed = 0
+    for memory in memories:
+        try:
+            flushed += memory.close_ingest(timeout=timeout)
+        except Exception as exc:
+            logger.warning("[multimodal] shutdown ingest drain failed: %s", exc)
     if flushed:
         logger.info("[multimodal] shutdown flushed %d queued entr(ies)", flushed)
     return flushed
