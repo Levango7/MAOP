@@ -1,11 +1,19 @@
 name: spike-required-checks-probe
 
-# Throwaway spike: can a job observe GitHub's *effective* required status checks
-# with the default GITHUB_TOKEN (no PAT)? Answers three questions in one run:
-#   1. Is pullRequest.statusCheckRollup.contexts.nodes[].isRequired resolvable at all
-#      (merged PRs return UNPROCESSABLE "A pull request ID or pull request number is required")?
-#   2. Is that GraphQL readable by github.token?
-#   3. Control: does REST /branches/master/protection stay 403 for github.token?
+# Throwaway spike (PR #100, will be closed, not merged). Round 2.
+#
+# Round 1 proved: the runner injects `bash -e`, so a failing gh call killed the
+# step before it printed anything. Local (admin) probes already proved
+# statusCheckRollup...isRequired is UNPROCESSABLE for open AND merged PRs with an
+# admin credential — so that field is dead as an oracle, independent of token.
+#
+# Round 2 asks only what is still unknown: with the **default GITHUB_TOKEN**,
+# which merge-blockage signals are readable?
+#   A) GraphQL pullRequest.mergeStateStatus
+#   B) REST /pulls/{n} -> .mergeable (GitHub may refuse the whole call? no, but check)
+#   C) REST /commits/{sha}/check-runs -> names (does any per-check "required" hint exist?)
+#   D) control: REST /branches/master/protection -> expected 403
+# Each block is independent and never aborts the step.
 
 on:
   pull_request:
@@ -20,64 +28,74 @@ jobs:
       contents: read
       checks: read
       pull-requests: read
+      metadata: read
     steps:
-      - name: GraphQL rollup for this PR via github.token
+      - name: Probe merge-blockage signals with github.token
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
           REPO: ${{ github.repository }}
         run: |
+          set +e
           set -u
           OWNER="${REPO%%/*}"
           NAME="${REPO##*/}"
-          QUERY="
-          {
-            repository(owner: \"$OWNER\", name: \"$NAME\") {
-              pullRequest(number: $PR_NUMBER) {
-                number
-                state
-                baseRefName
-                mergeStateStatus
-                statusCheckRollup {
-                  state
-                  contexts(first: 40) {
-                    totalCount
-                    nodes {
-                      __typename
-                      ... on CheckRun { name isRequired status conclusion }
-                      ... on StatusContext { context isRequired state }
-                    }
-                  }
-                }
-              }
-            }
-          }"
+          hr() { echo "---------------- $* ----------------"; }
 
-          echo "PR=$PR_NUMBER REPO=$REPO"
-          gh api graphql -f query="$QUERY" > /tmp/rollup.json 2> /tmp/rollup.err
-          echo "GRAPHQL_EXIT=$?"
-          echo "--- stderr ---"
-          head -5 /tmp/rollup.err || true
-          echo "--- errors (message x count) ---"
-          jq -r '.errors[]?.message' /tmp/rollup.json 2>/dev/null | sort | uniq -c || echo "no errors key / jq failed"
-          echo "--- nodes: typename | label | isRequired | state ---"
-          jq -r '.data.repository.pullRequest.statusCheckRollup.contexts.nodes[]?
-                 | [.__typename, (.name // .context // "-"), (.isRequired | tostring), (.state // .conclusion // "-")]
-                 | @tsv' /tmp/rollup.json 2>/dev/null || echo "nodes unreadable"
-          echo "--- GraphQL required set (isRequired == true) ---"
-          jq -r '[.data.repository.pullRequest.statusCheckRollup.contexts.nodes[]?
-                 | select(.isRequired == true) | (.name // .context)] | sort | .[]' /tmp/rollup.json 2>/dev/null \
-            || echo "EMPTY-OR-UNREADABLE"
-          echo "--- mergeStateStatus ---"
-          jq -r '.data.repository.pullRequest.mergeStateStatus // "null"' /tmp/rollup.json 2>/dev/null || echo "unreadable"
-
-          echo "--- control A: REST branch protection (github.token) ---"
-          gh api "repos/$REPO/branches/master/protection" --jq '.required_status_checks.contexts | sort | .[]' \
-            2>&1 | head -8 || true
-          echo "--- control B: GraphQL isRequiredCount via repository.branch? ---"
+          hr "A) GraphQL mergeStateStatus (open PR, default token)"
           gh api graphql -f query="
           {
             repository(owner: \"$OWNER\", name: \"$NAME\") {
-              branchRefName: defaultBranchRef { name }
+              pullRequest(number: $PR_NUMBER) {
+                number state isDraft mergeable mergeStateStatus reviewDecision
+                statusCheckRollup { state contexts(first: 40){ totalCount nodes{ __typename } } }
+              }
             }
-          }" 2>&1 | head -8 || true
+          }" > /tmp/a.json 2> /tmp/a.err
+          echo "rcA=$?"
+          head -c 1200 /tmp/a.json; echo
+          head -c 400 /tmp/a.err
+
+          hr "A2) same query WITH isRequired (expect UNPROCESSABLE even for this token)"
+          gh api graphql -f query="
+          {
+            repository(owner: \"$OWNER\", name: \"$NAME\") {
+              pullRequest(number: $PR_NUMBER) {
+                statusCheckRollup { contexts(first: 3){ nodes{ __typename ... on CheckRun { name isRequired } } } }
+              }
+            }
+          }" > /tmp/a2.json 2> /tmp/a2.err
+          echo "rcA2=$?"
+          head -c 1200 /tmp/a2.json; echo
+          head -c 300 /tmp/a2.err
+
+          hr "B) REST /pulls/{n} via default token"
+          gh api "repos/$REPO/pulls/$PR_NUMBER" > /tmp/b.json 2> /tmp/b.err
+          echo "rcB=$?"
+          jq -r '{state,mergeable,mergeable_state,draft,base: .base.ref} | tostring' /tmp/b.json 2>/dev/null | head -c 500
+          head -c 300 /tmp/b.err
+
+          hr "C) REST check-runs for this sha: is any field marking required-ness?"
+          gh api "repos/$REPO/commits/$SHA/check-runs" --per-page 50 > /tmp/c.json 2> /tmp/c.err
+          echo "rcC=$?"
+          echo "   names:"
+          jq -r '.check_runs[] | "     - " + .name + " | " + .status + " | " + (.conclusion // "-")' /tmp/c.json 2>/dev/null | head -40
+          echo "   union of keys across check_runs:"
+          jq -r '[.check_runs[] | keys[]] | unique | .[]' /tmp/c.json 2>/dev/null | tr '\n' ' '
+          echo
+          head -c 300 /tmp/c.err
+
+          hr "C2) does the rollup-vs-manifest comparison hold locally?"
+          jq -r '[.check_runs[].name] | sort | .[]' /tmp/c.json 2>/dev/null | head -40
+
+          hr "D) control: REST branch protection (expected 403)"
+          gh api "repos/$REPO/branches/master/protection" --jq '.required_status_checks.contexts|sort|.[]' 2>&1 | head -6
+          echo "rcD=${PIPESTATUS[0]}"
+
+          hr "E) REST /pulls/{n}/merge (204 means mergeable right now)"
+          code=$(gh api -X GET "repos/$REPO/pulls/$PR_NUMBER/merge" -o /dev/null -w '%{http_code}' 2> /tmp/e.err)
+          echo "http_code=$code"; head -c 300 /tmp/e.err
+
+          hr "done"
+          echo "PROBE_COMPLETED=1"
