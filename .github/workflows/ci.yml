@@ -1245,3 +1245,39 @@ jobs:
           set -euo pipefail
           printf '%s' "$NEEDS_JSON" > /tmp/ci_needs.json
           python3 scripts/ci_merge_gate.py --needs-json /tmp/ci_needs.json --code "$CODE"
+
+  # ── required checks 可满足性金丝雀（§7.7）──────────────────────────────────
+  # 仓库内三方对账（test_ci_required_checks.py）看不见 GitHub 带外配置；nightly 的
+  # check_required_checks_drift.py 能看见却需要 admin PAT。本金丝雀用默认 GITHUB_TOKEN
+  # 读 PR 的可合并性实况（mergeStateStatus + check 汇总），把两种结构性问题变成 PR 上
+  # 看得见的一条 check：① 清单里的 required 从未上报（改名/删除 → 所有 PR 永久 blocked）；
+  # ② 清单全绿却被判 BLOCKED（存在清单外的 required）。判定脚本
+  # py/scripts/check_required_checks_satisfiability.py，单测
+  # py/tests/test_required_checks_satisfiability.py。
+  #
+  # 为什么是**非 required** 的诊断作业：它自己在跑时的 pending 会污染 mergeStateStatus
+  # （required 未满足 = BLOCKED）⇒ 若把它设为 required，它会永远读到自己造成的 BLOCKED。
+  # 它 needs 全部 4 条清单作业后再读；一旦"平台要求得比清单多"发生，PR 本就被平台拦着，
+  # 金丝雀的红只是把病因点出来。方向性局限（证不了"要求得更少"）由带外定时对账兜底（§7.7）。
+  required-checks-canary:
+    name: Required checks satisfiability canary
+    needs: [scope, secret-scan, docs-gate, gate]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Compare PR mergeability rollup against the required-checks manifest
+        working-directory: py
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python3 scripts/check_required_checks_satisfiability.py --repo "$REPO"

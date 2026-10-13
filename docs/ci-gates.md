@@ -164,6 +164,7 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 integration**（run `38287261844`，反例读 secrets 同样 403，证明不是"其实都读得到"）。
 所以要让它真跑起来只有一条路：**配一个只读 PAT 到 `REQUIRED_CHECKS_TOKEN`**。
 在那之前，这条守卫的绿应当被读作 UNVERIFIED，而不是"一致"。
+不建 PAT 时的替代路径见 §7.7：PR 侧金丝雀（默认 token）+ 本机定时对账（`gh auth token`）。
 
 **唯一权威清单是 `.github/ci-required-checks.json`**（机器可读，含每条对应的 workflow/作业/
 kind），由 `py/tests/test_ci_required_checks.py` 与 `ci.yml` 的作业形状、以及本小节散文
@@ -287,6 +288,51 @@ required 上下文 4 条，其余保护项全关：
 
     cd py && python scripts/check_required_checks_drift.py
     # 退出码 0/1/3 见上表；3 = 没 token，不是"一致"
+
+### 7.7 PR 侧金丝雀：用默认 token 读"平台到底在拦什么"（2026-10-13）
+
+§7.6 那条 nightly 对账能读实况，但要 admin PAT；而本项目**不建 PAT**（见 §7.2 的
+`REQUIRED_CHECKS_TOKEN` 说明），于是带外漂移实际长期无人守。2026-10-13 把可行性又摸了一遍，
+结论是：**默认 `GITHUB_TOKEN` 读不到"平台要求什么"，但读得到"平台认为这 PR 能不能合"。**
+把这两件事分开，就有了一条不需要任何 secret 的 PR 侧金丝雀。
+
+**读不到的**（都实测过，别再试）：`StatusCheckRollupContext.isRequired` 字段虽在 schema 里，
+但解析器要一个 pull request ID —— 在 PR 级 / commit 级、merged / open 各态、admin 与默认 token
+下**一律**返回 `A pull request ID or pull request number is required.` ⇒ 不可用；
+`GET /branches/master/protection` 用默认 token 是 **403**；给 workflow 的 `permissions:` 加
+`administration: read` 会让整个 workflow 失效（0 作业），`metadata: read` 同样（均为 2026-10-13 实测）。
+
+**读得到的**：PR 级 GraphQL 的 `mergeStateStatus`（`CLEAN` / `UNSTABLE` / `BLOCKED` / …）与
+`statusCheckRollup.contexts`（每条 check 的名字 + 结论）。默认 token 加
+`pull-requests: read` + `checks: read` 即可，**不需要 admin**。
+
+于是新增作业 **`Required checks satisfiability canary`**（`ci.yml`，**非 required** 的诊断作业）。
+它 `needs: [scope, secret-scan, docs-gate, gate]`（覆盖清单全部 4 条）后再读 PR 汇总，判定：
+
+| 情形 | 结论 | 退出码 |
+|---|---|---|
+| 清单 4 条全部 success/skipped，且 `mergeStateStatus` 可合 | `MATCH` | 0 |
+| 清单里某条**在汇总里根本没出现**（作业被改名/删除）且平台判 `BLOCKED` | `DRIFT` | 1 |
+| 清单 4 条全绿、平台却仍判 `BLOCKED`（存在清单未列出的 required） | `DRIFT` | 1 |
+| 清单内某条自己没过/未完成，或 PR 是草稿 | `NOT-APPLICABLE`（不表态） | 0 |
+| 读不到实况 / `mergeStateStatus=UNKNOWN` 且重试仍未知 | `UNVERIFIED` | 3 |
+
+要点三条：
+
+1. **`UNVERIFIED` 非零退出**：与 §7.4 / §7.6 同一条原则 —— "验不到"绝不判绿。金丝雀读不到
+   汇总时作业真红，而不是静默通过。
+2. **非 required 是刻意选择**：金丝雀自己在跑时的 pending 会让 `mergeStateStatus` 变
+   `BLOCKED`（required 未满足）。把它设成 required ⇒ 它永远读到自己造成的 `BLOCKED`，恒假红。
+   它作为诊断作业的价值在于：一旦"平台要求得比清单多"，PR **本就被平台拦着**，金丝雀的红
+   只是把病因（哪条 required 缺席 / 存在清单外条目）点出来。
+3. **方向性局限**：非 admin 只能证明"平台要求得**多**"，**证不了"要求得**少**"**（保护被放松
+   或删除）。后者是更危险的静默方向，**本作业看不见**。
+
+**证不了的方向由带外定时对账兜底**（第二条线）：在一份 pin 在 master 的工作树上跑 §7.6 的
+`check_required_checks_drift.py`，用本机 `gh auth token`（`repo` 作用域足够读分支保护）做逐条
+**双向**对账，退出码 0/1/3 落进本地日志。它与金丝雀互补：金丝雀只在 PR 上跑，覆盖"清单外的
+required"与"required 从未上报"；定时对账覆盖仓库外的**双向**漂移，含"保护被删"。两者都刻意
+区分"不一致"与"验不到" —— 任何一处的绿都不代表另一处也绿。
 
 ## 8. nightly 的 flaky 检测：覆盖面本身也要被钉住（2026-10-04）
 

@@ -41,6 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 （下批工作区：M2.2 B2 —— PG 路径与迁移、异步队列；巨型文件拆分；keyring 后端。）
 
+### CI：required checks 可满足性金丝雀（PR 侧，无需 secret）
+
+新增 `py/scripts/check_required_checks_satisfiability.py` 与 `ci.yml` 的
+**`Required checks satisfiability canary`** 作业。它用默认 `GITHUB_TOKEN`
+（`pull-requests: read` + `checks: read`）读 PR 的 `mergeStateStatus` 与 check 汇总，在 PR 上
+发现两类结构性漂移：① 清单里的 required **从未上报**（作业改名/删除 → 所有 PR 永久 `blocked`）；
+② 清单全绿却被判 `BLOCKED`（存在清单未列出的 required）。读不到实况一律 `UNVERIFIED` 且**非零退出**，
+绝不静默判绿。刻意做成**非 required** 的诊断作业（自身 pending 会污染 `mergeStateStatus`）。
+方向性局限（证不了"平台要求得更少"）由本机定时对账兜底，两处互补，见 `docs/ci-gates.md` §7.7。
+
 ## [5.4.0] — 2026-10-12
 
 ### 复评处置·第四批：bandit B608×141 逐站点处置清零 → CI 恢复 medium 门禁 `-ll`
