@@ -30,6 +30,7 @@ from maop.core.backends.db_utils import resolve_data_dir
 from maop.core.memory.fusion import reciprocal_rank_fusion
 from maop.core.memory.multimodal_backend import MultimodalBackend
 from maop.core.memory.multimodal_embed import ImageInput
+from maop.core.memory.multimodal_ingest import MultimodalIngestQueue
 from maop.core.memory.multimodal_store import (
     MODALITY_IMAGE,
     MODALITY_TEXT,
@@ -61,6 +62,7 @@ class MultimodalMemory:
             store if store is not None else MultimodalStore()
         )
         self._text_search = text_search
+        self._queue: MultimodalIngestQueue | None = None
 
     # ── properties ────────────────────────────────────────────
 
@@ -106,6 +108,57 @@ class MultimodalMemory:
     def store_batch(self, items: list[dict[str, Any]]) -> list[str]:
         """Store many entries (modality-grouped batch embedding)."""
         return self._store.index_many(items)
+
+    # ── async ingest (M2.2 B2 PR-3, ADR-022 D4) ─────────────────
+
+    @property
+    def ingest_queue(self) -> MultimodalIngestQueue:
+        """Background batcher for non-blocking ingestion (lazily started)."""
+        if self._queue is None:
+            self._queue = MultimodalIngestQueue(self._store)
+        return self._queue
+
+    def store_async(
+        self,
+        content: str | ImageInput,
+        *,
+        modality: str | None = None,
+        caption: str = "",
+        metadata: dict[str, Any] | None = None,
+        entry_id: str | None = None,
+        ext: str | None = None,
+    ) -> str:
+        """Enqueue one entry; returns its id immediately (no embedding wait).
+
+        This is the latency-budget path: a single image embed costs 65-293 ms
+        (ADR-022 D4) while the background batch amortises it to ~53 ms/image.
+        The entry is not searchable until the queue flushes (`drain()` or the
+        flush interval elapses).
+        """
+        eid = entry_id or f"mm-{uuid.uuid4().hex[:16]}"
+        item: dict[str, Any] = {"id": eid}
+        resolved = modality or self._infer_modality(content)
+        if resolved == MODALITY_IMAGE:
+            item["image"] = content
+            item["modality"] = MODALITY_IMAGE
+            item["caption"] = caption
+            if ext is not None:
+                item["ext"] = ext
+        else:
+            if not isinstance(content, str):
+                raise TypeError(
+                    f"text modality requires str content, got {type(content).__name__}"
+                )
+            item["text"] = content
+            item["modality"] = MODALITY_TEXT
+        if metadata:
+            item["metadata"] = dict(metadata)
+        queued = self.ingest_queue.submit(item)
+        return queued or ""
+
+    def drain_ingest(self, timeout: float = 5.0) -> int:
+        """Flush queued ingest entries now; returns the number written."""
+        return self.ingest_queue.drain(timeout=timeout)
 
     @staticmethod
     def _infer_modality(content: Any) -> str:

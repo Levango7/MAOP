@@ -268,8 +268,11 @@ def _multimodal_source(sqlite_url: str | None) -> tuple[Engine | None, set[str]]
         except (ValueError, OSError):
             return None, set()
     else:
-        default = os.environ.get("MAOP_SQLITE_URL") or _default_sqlite_url()
-        path = Path(default.replace("sqlite:///", "").split("?", 1)[0])
+        # Reuse get_sqlite_engine's own URL resolution (which already honours
+        # the env var / project default) instead of re-reading the env —
+        # the config-drift gate counts direct env reads.
+        main_url = get_sqlite_engine().url.render_as_string(hide_password=False)
+        path = Path(main_url.replace("sqlite:///", "").split("?", 1)[0])
         candidate = path.parent / "multimodal.db"
         if not candidate.exists():
             return None, set()
@@ -597,31 +600,35 @@ def migrate(
         print(f"SQLite → PG migration ({mode}): {len(ordered)} tables")
 
     def _source_for(table: str) -> Engine:
-        return multimodal_engine if table in multimodal_tables else sqlite_engine
+        # _multimodal_source only returns tables when its engine is not None,
+        # so the None branch is unreachable by construction.
+        if table in multimodal_tables and multimodal_engine is not None:
+            return multimodal_engine
+        return sqlite_engine
 
     if dry_run:
         # No PG connection at all: count rows per source table and report.
-        results = {}
+        dry_counts: dict[str, int] = {}
         for table in ordered:
             try:
-                results[table] = _count_rows(_source_for(table), table)
+                dry_counts[table] = _count_rows(_source_for(table), table)
                 if progress:
                     n_cols = len(_columns(_source_for(table), table))
-                    print(f"  [dry-run] {table}: would copy {results[table]} rows, {n_cols} columns")
+                    print(f"  [dry-run] {table}: would copy {dry_counts[table]} rows, {n_cols} columns")
             except Exception as exc:
                 logger.error("Failed to count table %r: %s", table, exc)
-                results[table] = -1
-        return results
+                dry_counts[table] = -1
+        return dry_counts
 
     pq_ready = True
+    pg_engine: Engine
     try:
         pg_engine = get_pg_engine(pg_url)
     except Exception as exc:
-        # Defensive: a live migration without psycopg2 installed must fail
-        # loudly, not silently copy nothing.
+        # A live migration without psycopg2 must fail loudly, not silently
+        # copy nothing: report every requested table as failed.
         logger.error("Cannot build PG engine (%s); a live migration needs psycopg2", exc)
         pq_ready = False
-        pg_engine = None  # type: ignore[assignment]
     if not pq_ready:
         return {t: -1 for t in ordered}
 
