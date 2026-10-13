@@ -39,7 +39,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-（下批工作区：M2.2 B2 —— PG 路径与迁移、异步队列；巨型文件拆分；keyring 后端。）
+### M2.2 B2 PR-2：迁移工具多源引擎 + multimodal BLOB→vector 转换
+
+多模态记忆在独立库文件 `multimodal.db`（ADR-022 D2），而 `sqlite_to_pg`
+此前只用一个源引擎自省 `maop.db` ⇒ `multimodal_entries` 对迁移不可见、
+复制**报 0 行且成功**（绿谎）。
+
+- `migrate()` 新增 `_multimodal_source()`：按"显式 url 指向 / 主库同级 /
+  不存在则跳过"发现多模态库，复制时按表选源引擎（不存在时零影响）。
+- 新 `migrations/pg/value_converters.py`：按 (table, column) 注册转换器
+  （唯一一条 = multimodal vector 的 float32 LE BLOB → pgvector 文本字面量，
+  位相等；长度非 4 倍数抛错不补零）。接进 `_transform_row`（转换优先于
+  JSON 解析）；`_JSON_COLUMNS` 只登记 metadata。
+- **dry-run 零 PG 依赖**：修复前无条件 `create_engine` 会让没装 psycopg2
+  的机器连预演都跑不了（本 PR 测试首跑即踩）。现 dry-run 只读 SQLite 侧
+  计数；live 模式建不了 PG 引擎则响亮失败，不静默复制 0 行。
+
+验证：14 例新守卫 + 既有迁移/向量测试 103 例零回归。
+
+（下批工作区：M2.2 B2 PR-3 异步队列、PR-4 CI PG 腿；巨型文件拆分；keyring 后端。）
 
 ## [5.4.0] — 2026-10-12
 
