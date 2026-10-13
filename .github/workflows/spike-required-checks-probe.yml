@@ -28,7 +28,6 @@ jobs:
       contents: read
       checks: read
       pull-requests: read
-      metadata: read
     steps:
       - name: Probe merge-blockage signals with github.token
         env:
