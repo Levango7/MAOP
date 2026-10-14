@@ -39,6 +39,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI 修复：`test_embedding_is_not_on_the_request_path` 摘掉两条可假红的判据
+
+主干 run `38473901358`（`08435817`）只在 **windows-latest / Python 3.10** 一条腿红，
+`1 failed, 9180 passed`，失败点是 `assert elapsed < 0.25` → `assert 0.36 < 0.25`，
+且 `3 rerun` 恰好等于这一条被重跑 3 次仍失败 ⇒ **4 连败，不是一次性 flake**。
+
+- **假红的根据**：紧挨着它的上一行 `assert provider.image_calls == []` **是过的** —— provider
+  一次都没被调用，即嵌入根本没有走请求路径。0.36s 是 `save_image` 自身的文件 IO +
+  `sha256` 读盘 + 单例初始化在重载 runner 上的成本，与被守护的契约无关。同文件模块
+  docstring 第 8-10 行本就写着"asserted as zero embed calls，**not as a wall-clock budget** ——
+  墙钟在 Windows runner 的 `-n auto` 下会 flaky"，这条断言违背的是文件自己声明的准则，已删。
+- **顺带修第二条同族隐患**：`assert memory.drain_ingest() == 1` 只在"调用方抢在刚起的 worker
+  线程之前取走队列"时成立 —— `maop/memory/multimodal.py` 里 `drain_ingest` 的 docstring 明写它
+  **看不见 worker 已取进 partial batch 的条目**。该腿此前在上一条断言就中止，所以这行从未在
+  windows-3.10 上执行过。改成本文件既有测试（`test_reupload_of_identical_bytes_*`）已经在用的
+  `close_ingest()` + 断言嵌入调用次数：无论批次由谁写出，join 之后计数都是确定的。
+- **覆盖率没有净损失**（反向变异实证）：临时把 `MultimodalIngestQueue.submit` 改成"入队即
+  `drain()`"（等价于嵌入回到请求路径），保留的那条断言立刻转红
+  ——`assert [WindowsPath('…b2321dd.png')] == []`，而"变异是否生效"的自检未触发。
+
 ### M2.2 B2 存储量化评估：PG vs SQLite 实测（ADR-022 D7 补齐）
 
 ADR-022 D7 此前只说明 SQLite 路径的预算，PG 侧一直没有实测数字。用真
