@@ -39,6 +39,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 把 §7.7 的"带外对账"从单机脚本收进仓库：`tools/drift-audit/`
+
+方案二此前只活在一台机器的目录里（无版本控制、无回滚点），仓库里 §7.7 只能写通用措辞。
+现在工具入库，路径全部参数化，**不含任何机器本地路径**：
+
+| env | 默认 | 说明 |
+|---|---|---|
+| `MAOP_DRIFT_WT` | 本脚本所属检出 | 对账用哪个检出 |
+| `MAOP_DRIFT_UPDATE` | 关 | `=1` 才 `fetch + --ff-only`（脚本不擅自改别人的工作树） |
+| `MAOP_DRIFT_REPO` | 从 `origin` URL 解析 | 四种 URL 形式实测均得 `owner/name` |
+| `MAOP_DRIFT_TOKEN` | `gh auth token` | 仍**不要求** PAT、不要求仓库 secret |
+| `MAOP_DRIFT_LOG` | `${TMPDIR}/maop-drift-audit.log` | 结论日志 |
+| `MAOP_DRIFT_GAP_H` | 36 | 缺勤阈值（小时） |
+
+`run.sh` 每轮开头做**缺勤可见性**自检：漏跑的轮次不会在日志里留痕，而日志是这条守卫对外的唯一
+凭据，所以超阈值就补一行 `GAP(...)`，并分三态 —— `NO-PRIOR-RUN`（没历史/被删）、`PARSE-FAILED`
+（时间戳解不开）、`SCAN-FAILED`（扫描工具本身缺失）。三态与"确实新鲜"分开是必要的：把"我扫不动"
+说成"没历史"会凭空造一个不存在的事故，把"没历史"说成"新鲜"则让缺勤重新隐形。
+
+`selftest.sh` 11 探针 / `PASS=26 FAIL=0`：正向对照、双向合成漂移各自点名、令牌为空与依赖缺失都
+fail-closed、缺勤四态 + **新鲜时的负对照**（没有负对照，正例可能只是空转）。P10 顺带自己证明了
+自己存在的理由：农场里 `grep` 缺席 ⇒ 打出 `SCAN-FAILED 无法扫描日志（grep 退出码 127）`，而不是
+误报"日志被删"。若把那句写成 `hits="$(grep … | tail -1)"`，`$?` 取到的是 `tail` 的退出码，
+这个区分就不复存在。
+
+`docs/ci-gates.md` §7.7 改为指向 `tools/drift-audit/`；`.gitignore` 增加自测临时目录。
+
 ### CI 修复：`test_embedding_is_not_on_the_request_path` 摘掉两条可假红的判据
 
 主干 run `38473901358`（`08435817`）只在 **windows-latest / Python 3.10** 一条腿红，
