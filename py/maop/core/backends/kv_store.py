@@ -362,6 +362,83 @@ class KVStore:
         finally:
             self._pool.release(conn)
 
+    def add(
+        self,
+        key: str,
+        value: Any,
+        *,
+        namespace: str = "default",
+        ttl: float | None = None,
+    ) -> CASResult:
+        """Atomically create ``key`` unless a *live* entry already holds it.
+
+        Neither existing operation can express "first writer wins the empty
+        slot": :meth:`cas` compares against a row that must already exist
+        (missing key → ``success=False``) and :meth:`set` is an unconditional
+        upsert. A claim/lease protocol starts there, so without this two agents
+        both read "unclaimed", both write, and each believes it holds the claim.
+
+        An entry whose ``ttl_expires`` has passed counts as **absent** even if
+        :meth:`_prune_expired` has not physically deleted it yet — that is what
+        ``get()`` already reports, and it is the difference between a claim that
+        releases at its TTL and one that wedges past it until the next prune.
+
+        Replacing an expired row bumps ``version`` rather than resetting it to 1,
+        so callers may use the version as a fencing token that never decreases.
+
+        Returns ``success=True`` with the stored value and the row's version when
+        the slot was taken. On contention returns ``success=False`` together with
+        the live entry's value and version, so the caller can re-read and use
+        :meth:`cas` instead of guessing.
+        """
+        conn = self._pool.acquire()
+        try:
+            now = self._now()
+            value_json = json.dumps(value, ensure_ascii=False, default=str)
+            expires = now + ttl if ttl is not None else None
+            cursor = conn.execute(
+                """
+                INSERT INTO kv_store
+                    (key, namespace, value, ttl_expires, created_at, updated_at, version)
+                VALUES (?, ?, ?, ?, ?, ?, 1)
+                ON CONFLICT(key, namespace) DO UPDATE SET
+                    value = excluded.value,
+                    ttl_expires = excluded.ttl_expires,
+                    updated_at = excluded.updated_at,
+                    version = kv_store.version + 1
+                WHERE kv_store.ttl_expires IS NOT NULL
+                  AND kv_store.ttl_expires <= excluded.created_at
+                """,
+                (key, namespace, value_json, expires, now, now),
+            )
+            conn.commit()
+
+            row = conn.execute(
+                "SELECT value, version FROM kv_store WHERE key = ? AND namespace = ?",
+                (key, namespace),
+            ).fetchone()
+            if row is None:
+                # Only reachable if another writer deleted the row between our
+                # commit and this read; report "not created" rather than
+                # inventing a success the caller cannot rely on.
+                return CASResult(success=False, current_value=None, current_version=0)
+
+            try:
+                current_value = json.loads(row["value"])
+            except (json.JSONDecodeError, TypeError):
+                current_value = row["value"]
+            current_version = int(row["version"])
+
+            if cursor.rowcount == 1:
+                return CASResult(
+                    success=True, current_value=value, current_version=current_version
+                )
+            return CASResult(
+                success=False, current_value=current_value, current_version=current_version
+            )
+        finally:
+            self._pool.release(conn)
+
     # ── Namespace operations ────────────────────────────────
 
     def list_keys(self, *, namespace: str = "default", prefix: str = "") -> list[str]:
