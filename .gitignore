@@ -192,3 +192,6 @@ attachments/
 
 # WorkBuddy session data (AI assistant workspace memory)
 .workbuddy/
+
+# drift-audit 自测的临时目录（正常收尾会自删；崩溃时别让它进版本库）
+tools/drift-audit/selftest-tmp/
