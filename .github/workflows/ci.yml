@@ -1307,6 +1307,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
+          # 归因用：本轮 run 的 needs 结论 + 本轮 run 的 head sha。
+          # 少了这两个，被新 push 抢占的过期 run 会把"自己没跑成"误判成"平台漂移"（假红）。
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           python3 scripts/check_required_checks_satisfiability.py --repo "$REPO"

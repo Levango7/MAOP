@@ -39,6 +39,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### §7.7 金丝雀补上"归因前置"：过期 run 不再能把自家没跑成判成平台漂移（假红修复）
+
+2026-10-15 实测到一次**我自己写的门禁的假红**：PR #110 的旧 head `cb67725`（run
+`38729427212`）被同 ref 的新 push 抢占取消，`Docs consistency gate` 判 `cancelled`、
+`CI merge gate` 判 `failure`，而带 `if: always()` 的金丝雀在 3.5 小时后仍被调度起来。它读的
+`statusCheckRollup` 跟着 **PR 现 head** 走，而那一刻现 head 的新 run 一条 check 都还没产出 ⇒
+清单 4 条全 `<缺席>` + `mergeStateStatus=BLOCKED` ⇒ 判出 `DRIFT: 4 处`；同一个 PR 四分钟后在真
+head（run 632）上判 `MATCH`。
+
+根因不是时序运气，而是**判据缺一个前提**：`absent && BLOCKED ⇒ DRIFT` 只在"本轮 run 确实有权
+代表这个 PR"时才成立，而"清单与保护真脱节"与"本轮 run 已过期"在汇总里长得一模一样。
+
+- 判定前先过 `attribution()` 两道**独立**归因：① `${{ toJSON(needs) }}` —— 清单作业没全
+  success（failure / cancelled / 被切 / needs 里查不到）就没资格说"缺席是平台造成的"；
+  ② `pullRequest.headRefOid` 对比本轮 run 的 head sha —— 不等即过期 run。两种都判
+  `NOT-APPLICABLE` 弃权（退出码 0，但**不是** MATCH，且把原因写成 annotation）。
+- 两个入参任一为空（env 没接上、JSON 坏）判 `UNVERIFIED`（3），不静默退回旧行为 ——
+  "没接线"不能冒充"接了线且通过"。
+- `kind=scope-gated` 的清单作业允许 `SKIPPED`（docs-only 时合法不产出 check），现在清单里
+  没有这种条目，先写对，免得将来加一条就恒弃权。
+- 测试同时钉**两个方向**（各 4 条）：复刻过期 run 的用例必须**不出现** `DRIFT`；而"needs 全成功
+  + head 未变 + 一条 required 缺席 + BLOCKED"必须**仍是** `DRIFT`。只有前一半的话，这道守卫
+  就是又一个"把自己的判据换成永不表态"的自我失明门禁。变异验证：把 `if reasons:` 改成
+  `if False:` ⇒ 5 条红；把 `return "OK", []` 改成恒弃权 ⇒ 4 条红。
+
+`ci.yml` 的 canary 作业多喂两个 env（`NEEDS_JSON` / `PR_HEAD_SHA`），并有接线守卫
+`test_canary_wiring_feeds_the_attribution_inputs` —— 注释掉 env 或表达式打错时，判定端只会看见
+空串，金丝雀会退化成"永远 UNVERIFIED"，那条守卫就是为了让这种断线当场变红。`docs/ci-gates.md`
+§7.7 的判定表补两行、要点补第 4 条并记下这次假红的完整证据链。
+
 ### 把 §7.7 的"带外对账"从单机脚本收进仓库：`tools/drift-audit/`
 
 方案二此前只活在一台机器的目录里（无版本控制、无回滚点），仓库里 §7.7 只能写通用措辞。

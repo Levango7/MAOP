@@ -110,6 +110,129 @@ def test_skipped_counts_as_satisfied() -> None:
     assert verdict == "MATCH"
 
 
+# ── 归因前置：本轮 run 说的话还代表这个 PR 吗 ─────────────────────────
+
+
+def _entries() -> list[dict]:
+    return canary.read_manifest_entries()
+
+
+def _needs(**overrides: str) -> dict[str, dict]:
+    """默认"本轮 run 的清单作业全成功"，按作业 id 覆盖结论（模拟取消/失败/跳过）。"""
+    results = {str(e["job"]): "success" for e in _entries()}
+    results.update(overrides)
+    return {job: {"result": res} for job, res in results.items()}
+
+
+SAME_SHA = "a" * 40
+OTHER_SHA = "b" * 40
+
+
+def test_parse_needs_uppercases_and_keeps_null_as_empty() -> None:
+    """被跳过/未跑的作业 result 是 null —— 必须折成空串，不能变成 "NONE" 混进可接受集合。"""
+    raw = json.dumps({"scope": {"result": "success", "outputs": {}}, "gate": {"result": None}})
+    parsed = canary.parse_needs(raw)
+    assert parsed["scope"] == "SUCCESS"
+    assert parsed["gate"] == ""
+
+
+def test_parse_needs_bad_or_non_object_json_is_empty() -> None:
+    assert canary.parse_needs("") == {}
+    assert canary.parse_needs("{not json") == {}
+    assert canary.parse_needs("[1, 2]") == {}
+
+
+def test_cancelled_manifest_job_abstains_never_drift() -> None:
+    """真实假红（run 38729427212）：本轮 docs-gate 被切成 cancelled ⇒ 归因不成立，弃权。"""
+    state, reasons = canary.attribution(
+        canary.parse_needs(json.dumps(_needs(**{"docs-gate": "cancelled"}))),
+        _entries(),
+        SAME_SHA,
+        SAME_SHA,
+    )
+    assert state == "ABSTAIN"
+    assert any("docs-gate" in r for r in reasons), "必须点名那个没跑成的作业"
+
+
+def test_failed_manifest_job_abstains() -> None:
+    state, _ = canary.attribution(
+        canary.parse_needs(json.dumps(_needs(gate="failure"))),
+        _entries(),
+        SAME_SHA,
+        SAME_SHA,
+    )
+    assert state == "ABSTAIN"
+
+
+def test_job_missing_from_needs_abstains() -> None:
+    """needs 里查不到清单作业（被改名/删掉 needs）——"不知道"不能算归因成立。"""
+    needs = canary.parse_needs(json.dumps({"scope": {"result": "success"}}))
+    state, reasons = canary.attribution(needs, _entries(), SAME_SHA, SAME_SHA)
+    assert state == "ABSTAIN"
+    assert any("<无记录>" in r for r in reasons)
+
+
+def test_stale_head_sha_abstains_even_when_needs_all_green() -> None:
+    """needs 全成功但 PR 现 head 已变（抢占式取消的时序缝隙）：汇总属于新 head，弃权。"""
+    state, reasons = canary.attribution(
+        canary.parse_needs(json.dumps(_needs())), _entries(), SAME_SHA, OTHER_SHA
+    )
+    assert state == "ABSTAIN"
+    assert any("head" in r for r in reasons)
+
+
+def test_attribution_ok_is_reachable_positive_control() -> None:
+    """守卫不能变成"永远弃权"的门禁：清单作业全成功 + head 未变时归因必须成立。"""
+    state, reasons = canary.attribution(
+        canary.parse_needs(json.dumps(_needs())), _entries(), SAME_SHA, SAME_SHA
+    )
+    assert state == "OK" and reasons == []
+
+
+def test_scope_gated_job_may_legitimately_be_skipped() -> None:
+    """docs-only 时被 scope 拦住的作业本就 skipped —— 那是合法缺席，不该弃权。"""
+    entry = {"name": "X", "job": "x-job", "kind": "scope-gated"}
+    needs = canary.parse_needs(json.dumps({"x-job": {"result": "skipped"}}))
+    state, _ = canary.attribution(needs, [entry], SAME_SHA, SAME_SHA)
+    assert state == "OK"
+
+
+def test_needs_without_attribution_basis_is_unverified_not_pass() -> None:
+    """没接上 NEEDS_JSON / PR_HEAD_SHA ⇒ 判 UNVERIFIED（可见的红），不许静默退回旧行为。"""
+    entries = _entries()
+    assert canary.attribution({}, entries, SAME_SHA, SAME_SHA)[0] == "UNVERIFIED"
+    assert canary.attribution(
+        canary.parse_needs(json.dumps(_needs())), entries, "", SAME_SHA
+    )[0] == "UNVERIFIED"
+    assert canary.attribution(
+        canary.parse_needs(json.dumps(_needs())), entries, SAME_SHA, ""
+    )[0] == "UNVERIFIED"
+
+
+def test_canary_wiring_feeds_the_attribution_inputs() -> None:
+    """脚本在 needs / head sha 缺失时判 UNVERIFIED —— 那前提 ci.yml 真的把两个都喂进来。
+
+    这条是"门禁自我失明"的接线守卫：注释掉了 env、或表达式打错，判定端只会看见空串，
+    金丝雀就退化成本来要修的那个"永远不表态"的样子。
+    """
+    steps = _ci_jobs()[CANARY_JOB_ID]["steps"]
+    step = next(
+        (s for s in steps if "check_required_checks_satisfiability.py" in str(s.get("run", ""))),
+        None,
+    )
+    assert step is not None, "canary 作业里没有调用判定脚本的步骤"
+    env = step.get("env") or {}
+    assert "toJSON(needs)" in str(env.get("NEEDS_JSON", "")), env
+    assert "pull_request.head.sha" in str(env.get("PR_HEAD_SHA", "")), env
+
+
+def test_manifest_jobs_covered_by_canary_needs_for_attribution() -> None:
+    """归因按 `job` 查 needs，清单里的 job 必须就是 ci.yml 的作业 id（否则永远"<无记录>"→永远弃权）。"""
+    jobs = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))["jobs"]
+    missing = [str(e["job"]) for e in _entries() if e["job"] not in jobs]
+    assert not missing, f"清单里的这些 job 在 ci.yml 里不存在：{missing}"
+
+
 # ── 汇总解析 ─────────────────────────────────────────────────────────
 
 
@@ -216,6 +339,91 @@ def test_cli_survives_non_utf8_console() -> None:
     assert "UnicodeEncodeError" not in proc.stderr.decode("utf-8", "replace")
 
 
+# ── 接线：main 的三条归因路径 ─────────────────────────────────────────
+
+
+def _pr(observed: dict[str, str], merge_state: str, head_sha: str) -> dict:
+    nodes = [
+        {"__typename": "CheckRun", "name": name, "status": "COMPLETED", "conclusion": concl}
+        for name, concl in observed.items()
+    ]
+    return {
+        "number": 110,
+        "isDraft": False,
+        "mergeStateStatus": merge_state,
+        "headRefOid": head_sha,
+        "statusCheckRollup": {"contexts": {"totalCount": len(nodes), "nodes": nodes}},
+    }
+
+
+def _main_args(needs: dict | None, head_sha: str) -> list[str]:
+    return [
+        "--token",
+        "t",
+        "--pr",
+        "110",
+        "--repo",
+        "Levango7/MAOP",
+        "--needs-json",
+        "" if needs is None else json.dumps(needs),
+        "--head-sha",
+        head_sha,
+    ]
+
+
+def test_main_superseded_run_is_not_a_false_drift(monkeypatch, capsys) -> None:
+    """复刻 run 38729427212（head cb67725 被抢占取消后金丝雀仍跑完）：本轮 docs-gate=cancelled、
+    gate=failure、head 已过期，而读到的汇总里四条 required 全缺席 + BLOCKED。
+    旧实现据此判出 `DRIFT: 4 处`（同 PR 四分钟后在真 head 上判 MATCH）；现在必须弃权。"""
+    monkeypatch.setattr(
+        canary, "poll_until_settled", lambda *a, **k: _pr({}, "BLOCKED", OTHER_SHA)
+    )
+    rc = canary.main(
+        _main_args(
+            _needs(**{"docs-gate": "cancelled", "gate": "failure"}),
+            SAME_SHA,
+        )
+    )
+    out = capsys.readouterr().out
+    assert rc == canary.EXIT_MATCH, rc
+    assert "NOT-APPLICABLE" in out
+    assert "DRIFT" not in out, "弃权路径里不许漂出 DRIFT 字样"
+
+
+def test_main_still_reports_real_drift_when_attribution_holds(monkeypatch, capsys) -> None:
+    """正对照：归因守卫不能把真漂移也吃掉。needs 全成功、head 未变，却有一条 required 缺席
+    且平台判 BLOCKED ⇒ 必须仍是 DRIFT。"""
+    observed = _all_green()
+    del observed["CI merge gate"]
+    monkeypatch.setattr(
+        canary, "poll_until_settled", lambda *a, **k: _pr(observed, "BLOCKED", SAME_SHA)
+    )
+    rc = canary.main(_main_args(_needs(), SAME_SHA))
+    out = capsys.readouterr().out
+    assert rc == canary.EXIT_DRIFT, out
+    assert "CI merge gate" in out, "必须点名缺席的那条上下文"
+
+
+def test_main_match_with_full_inputs(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        canary, "poll_until_settled", lambda *a, **k: _pr(_all_green(), "CLEAN", SAME_SHA)
+    )
+    rc = canary.main(_main_args(_needs(), SAME_SHA))
+    assert rc == canary.EXIT_MATCH
+    assert "OK:" in capsys.readouterr().out
+
+
+def test_main_without_attribution_inputs_is_unverified(monkeypatch, capsys) -> None:
+    """env 里两个归因入参都没给 ⇒ UNVERIFIED（可见），而不是"照旧判绿"。"""
+    monkeypatch.setattr(
+        canary, "poll_until_settled", lambda *a, **k: _pr(_all_green(), "CLEAN", SAME_SHA)
+    )
+    monkeypatch.delenv("NEEDS_JSON", raising=False)
+    monkeypatch.delenv("PR_HEAD_SHA", raising=False)
+    assert canary.main(_main_args(None, "")) == canary.EXIT_UNVERIFIED
+    assert "不等于通过" in capsys.readouterr().out
+
+
 # ── ci.yml 接线 / 清单 / 文档 三方一致 ───────────────────────────────
 
 
@@ -289,3 +497,5 @@ def test_docs_describe_the_canary() -> None:
     name = _ci_jobs()[CANARY_JOB_ID].get("name", CANARY_JOB_ID)
     assert name in section, f"§7.7 没写出金丝雀作业名 {name!r}"
     assert "UNVERIFIED" in section
+    assert "归因" in section, "§7.7 要写出'缺席'有两种成因，否则读者会把过期 run 当成平台漂移"
+    assert "toJSON(needs)" in section and "headRefOid" in section, "§7.7 要写出两道归因信号各自是什么"

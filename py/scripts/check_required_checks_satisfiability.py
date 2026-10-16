@@ -16,9 +16,27 @@
 所以本金丝雀只能证明「平台要求得比清单**多**」，**无法**证明「平台要求得比清单少」
 （保护被放松 / 删除）。那个危险方向由带外定时对账兜底（§7.7）—— 两处互补，缺一不可。
 
+**归因前置（2026-10-15 一次真实假红之后补上）**：`statusCheckRollup` 跟着 PR 的**现 head**
+走，而金丝雀是在**某一个 workflow run** 里执行的，两者可以错位。run `38729427212`（head
+`cb67725`）被同 ref 的新 push 抢占取消后，金丝雀因 `if: always()` 仍在 3.5 小时后被调度起来；
+它读到的汇总属于"还没有任何 check run"的新 head，于是四条 required 全 `<缺席>` 且
+`mergeStateStatus=BLOCKED` ⇒ 判出 `DRIFT: 4 处`，而同一个 PR 四分钟后在真 head 上判 `MATCH`。
+"缺席"因此有两种成因：清单与保护真的脱节（要红），或本轮 run 的话已不代表 PR 现状（不该红）。
+判定前先用两个**独立**信号归因：
+
+1. `${{ toJSON(needs) }}` —— 本轮 run 里清单作业的**本地**结论。清单作业没 success，
+   汇总里的缺席就可能是"作业被切/没跑成"而非"平台没要求"，金丝雀弃权不表态。
+2. `pullRequest.headRefOid` 对比本轮 run 的 head sha —— 不等说明这是一个过期 run，弃权。
+
+两个信号任一为空（env 没接上）时判 **UNVERIFIED**，不静默退回旧行为——"没接线"不能冒充
+"接了线且通过"。
+
 用法（由 `.github/workflows/ci.yml` 的 canary 作业调用）：:
 
-    python scripts/check_required_checks_satisfiability.py --repo Levango7/MAOP --pr 99
+    python scripts/check_required_checks_satisfiability.py --repo Levango7/MAOP --pr 99 \\
+        --needs-json '<${{ toJSON(needs) }} 的原样输出>' --head-sha <本轮 run 的 head sha>
+
+（两个入参也可以走环境变量 NEEDS_JSON / PR_HEAD_SHA，ci.yml 就是这么喂的。）
 """
 
 from __future__ import annotations
@@ -54,6 +72,7 @@ query($owner: String!, $name: String!, $number: Int!) {
       number
       isDraft
       mergeStateStatus
+      headRefOid
       statusCheckRollup {
         contexts(first: 100) {
           totalCount
@@ -72,8 +91,83 @@ query($owner: String!, $name: String!, $number: Int!) {
 
 def read_manifest(path: Path = MANIFEST) -> list[str]:
     """读权威清单里的 required 上下文名（保持文件内顺序，便于逐条对照）。"""
+    return [str(entry["name"]) for entry in read_manifest_entries(path)]
+
+
+def read_manifest_entries(path: Path = MANIFEST) -> list[dict]:
+    """清单条目原样（要 `job` / `kind` 才能把汇总里的上下文名对回本轮 run 的作业）。"""
     data = json.loads(path.read_text(encoding="utf-8"))
-    return [entry["name"] for entry in data["contexts"]]
+    return list(data["contexts"])
+
+
+def parse_needs(raw: str) -> dict[str, str]:
+    """把 `${{ toJSON(needs) }}` 折成 {作业 id: 结论大写}。
+
+    形状是 `{"scope": {"result": "success", "outputs": {...}}, ...}`；结论缺失或为 null
+    （作业被跳过时 result 可能是 null）折成空串 —— 空串**不在**可接受集合里，因此"不知道"
+    一律走弃权，不会冒充成功。坏 JSON 返回 `{}`，由调用方判 UNVERIFIED。
+    """
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: dict[str, str] = {}
+    for job_id, info in data.items():
+        result = info.get("result") if isinstance(info, dict) else None
+        out[str(job_id)] = str(result).upper() if result else ""
+    return out
+
+
+def attribution(
+    needs: dict[str, str], entries: list[dict], own_head_sha: str, pr_head_sha: str
+) -> tuple[str, list[str]]:
+    """判定前先在两个**独立**信号上归因：本轮 run 说的话还代表这个 PR 吗？
+
+    返回 `(state, reasons)`，state ∈ `{"OK","ABSTAIN","UNVERIFIED"}`：
+    - `UNVERIFIED`：needs 为空/坏 JSON、或两个 sha 任一读不到 ⇒ 归因本身做不了（不是弃权，是没接上）。
+    - `ABSTAIN`：本轮 run 的清单作业没都成功，或本轮 head 已不是 PR 现 head ⇒ 汇总里的
+      "缺席"不可归因于平台配置，金丝雀不表态（**绝不**降级成 MATCH）。
+    - `OK`：可以交给 `evaluate` 判 MATCH/DRIFT。
+    """
+    if not needs:
+        return "UNVERIFIED", [
+            (
+                "拿不到本轮 run 的 needs 结论（NEEDS_JSON 为空或不是合法 JSON）："
+                "没有归因依据，判 UNVERIFIED 而不是沿用旧行为。"
+            )
+        ]
+    if not own_head_sha or not pr_head_sha:
+        return "UNVERIFIED", [
+            (
+                f"拿不到可比的 head sha（本轮 run={own_head_sha!r} / PR 现 head={pr_head_sha!r}）："
+                "无法确认这份汇总属于哪个提交，判 UNVERIFIED。"
+            )
+        ]
+
+    reasons: list[str] = []
+    for entry in entries:
+        job_id = str(entry.get("job", ""))
+        # needs 里只认 success；kind=scope-gated 的作业在 docs-only 时合法 skipped，
+        # 那时它本就不产出 check，"缺席"同样不是漂移。清单里现在没有 scope-gated 条目。
+        allowed = {"SUCCESS", "SKIPPED"} if entry.get("kind") == "scope-gated" else {"SUCCESS"}
+        result = needs.get(job_id)
+        if result not in allowed:
+            reasons.append(
+                f"本轮 run 的作业 {job_id}（清单上下文 {entry.get('name')!r}）结论为 "
+                f"{result if result else '<无记录>'}，不在 {sorted(allowed)} 里 ⇒ "
+                f"汇总里该上下文的缺席/未满足可能是**本轮 run 自己**造成的，不能算平台漂移。"
+            )
+    if own_head_sha != pr_head_sha:
+        reasons.append(
+            f"本轮 run 的 head={own_head_sha[:8]} 已不是 PR 现 head={pr_head_sha[:8]}："
+            f"这是被新 push 抢占的过期 run（它的取消会清空自己的 check run），"
+            f"读到的汇总属于现 head，不能反过来判现 head 漂移。"
+        )
+    if reasons:
+        return "ABSTAIN", reasons
+    return "OK", []
 
 
 def normalize_rollup(pr: dict) -> dict[str, str]:
@@ -215,6 +309,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--pr", type=int, default=None, help="PR 号；默认取 $PR_NUMBER")
     ap.add_argument("--manifest", default=str(MANIFEST))
     ap.add_argument("--token", default=None, help="默认取 $GITHUB_TOKEN")
+    ap.add_argument(
+        "--needs-json",
+        default=None,
+        help="本轮 run 的 needs 结论 JSON（$NEEDS_JSON）；缺失 ⇒ UNVERIFIED。",
+    )
+    ap.add_argument(
+        "--head-sha",
+        default=None,
+        help="本轮 run 的 head sha（$PR_HEAD_SHA）；与 PR 现 head 不等 ⇒ 过期 run，弃权。",
+    )
     args = ap.parse_args(argv)
 
     number = args.pr
@@ -228,10 +332,19 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_MATCH
 
     try:
-        manifest = read_manifest(Path(args.manifest))
-    except (OSError, KeyError, json.JSONDecodeError) as exc:
+        entries = read_manifest_entries(Path(args.manifest))
+        manifest = [str(entry["name"]) for entry in entries]
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
         print(f"::error title=required checks canary::读清单失败：{exc}")
         return EXIT_DRIFT
+
+    needs_raw = (
+        args.needs_json if args.needs_json is not None else os.environ.get("NEEDS_JSON", "")
+    ) or ""
+    own_head_sha = (
+        args.head_sha if args.head_sha is not None else os.environ.get("PR_HEAD_SHA", "")
+    ).strip()
+    needs = parse_needs(needs_raw)
 
     token = args.token or os.environ.get("GITHUB_TOKEN")
     try:
@@ -244,12 +357,32 @@ def main(argv: list[str] | None = None) -> int:
     observed = normalize_rollup(pr)
     merge_state = str(pr.get("mergeStateStatus") or "UNKNOWN")
     is_draft = bool(pr.get("isDraft"))
+    pr_head_sha = str(pr.get("headRefOid") or "").strip()
 
     print(f"required checks canary：{args.repo} PR #{number}")
     print(f"  清单（{len(manifest)} 条）：{manifest}")
     print(f"  mergeStateStatus={merge_state} isDraft={is_draft}")
     summary = ", ".join(f"{name}={observed.get(name, '<缺席>')}" for name in manifest)
     print(f"  汇总结论：{{{summary}}}")
+    own = own_head_sha[:8] or "<空>"
+    present = pr_head_sha[:8] or "<空>"
+    print(f"  归因：本轮 run head={own} / PR 现 head={present}")
+    needs_repr = json.dumps(needs, ensure_ascii=False, sort_keys=True) if needs else "<空>"
+    print(f"  归因：needs={needs_repr}")
+
+    state, pre_reasons = attribution(needs, entries, own_head_sha, pr_head_sha)
+    if state != "OK":
+        command = "warning" if state == "UNVERIFIED" else "notice"
+        for reason in pre_reasons:
+            print(f"::{command} title=required checks canary::{reason}")
+        if state == "UNVERIFIED":
+            print("UNVERIFIED: 归因依据本身缺失，**不等于通过**。")
+            return EXIT_UNVERIFIED
+        print(
+            "NOT-APPLICABLE: 本轮 run 不足以代表 PR 现状（清单作业未全成功或 head 已过期），"
+            "汇总里的缺席不能归因于平台配置，金丝雀不表态（不是通过）。"
+        )
+        return EXIT_MATCH
 
     verdict, reasons = evaluate(manifest, observed, merge_state, is_draft)
     for reason in reasons:
