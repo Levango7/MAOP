@@ -66,6 +66,37 @@ fail-closed、缺勤四态 + **新鲜时的负对照**（没有负对照，正�
 
 `docs/ci-gates.md` §7.7 改为指向 `tools/drift-audit/`；`.gitignore` 增加自测临时目录。
 
+### KV 层补上原子 insert-if-absent（`KVStore.add`）：认领协议缺的那一步
+
+`docs/design-blackboard.md` 早就写了 `LOCKED` / 乐观锁 `version` / `lock(ttl_s)`，但主干符号命中为 0
+（`EntryState`、`VersionConflictError`、`blackboard_locks`、`SUPERSEDED`、`def lock` 各 0）。更关键的是
+**底座本身缺一环**：`kv_store.py` 的 `cas()` 只能对已存在的行做版本比对（`row is None → success=False`），
+`set()` 是无条件 upsert —— 于是"抢空槽的第一人赢"**无处表达**：两个 agent 都读到"没人认领"、都 `set()`、
+都以为自己拿到了。
+
+新增 `KVStore.add(key, value, *, namespace, ttl) -> CASResult`：
+
+- 单条 `INSERT ... ON CONFLICT(key, namespace) DO UPDATE ... WHERE 过期` 完成，**不读后写**；连接池
+  `acquire()` 在 `threading.Lock` 下 pop、一连接不同时给两线程，新连接设了 WAL + `busy_timeout`，原子性成立。
+- **过期的行算"不存在"**：`get()` 本就把过期行藏起来（`ttl_expires > now` 严格），而物理删除受 30s prune
+  节流 —— 若只写 `DO NOTHING`，一个已超时的认领会在行被清掉前**一直抢不到**，锁卡死超过它的 TTL。
+  守卫直接判过期即可抢，不依赖 prune 何时跑。
+- **替换过期行时 `version` 递增而非复位为 1**，使版本号可当 fencing token 用（旧持有者回来能被认出）。
+
+`tests/test_kv_store_add.py` 11 例，两例用真线程跑 8 路并发（断言恰一个赢、败者看到赢家的 version、
+落库的是赢家 payload）。**变异测试**：① 改成"先 SELECT 再 INSERT" ⇒ 并发例转红；② 去掉过期守卫改回
+`DO NOTHING` ⇒ 过期例转红。
+
+过程里抓到一个**空断言**：过期用例最初在两次 `add` 之间调了 `kv.get()`，而 `get()` 会触发
+`_maybe_prune()`，全新库的第一次读**立刻**清掉过期行 ⇒ 变异 ② 当时照样绿。改成先用 `sqlite3` 直查、
+断言"行仍在表里"之后，这条测试才真的在测守卫。教训：断言"过期行还在"不能靠那个会顺手清理的读接口。
+
+`cas()` 不能创建这点由 `test_cas_cannot_create_a_missing_key` 钉住 —— 不是遗留 bug，而是
+`SQLiteKVBackend.cas` 拿 `expected_version=0` 当探针的前提（版本从 1 起，0 永不写）。
+
+本条只做底座，不含 claim/lease 层：`RedisDistributedLock`（实现正确、零生产调用方）与
+`core/coordination/`、`distributed_lease.py` 属他人正在进行中的批次，接在它们之上更合适。
+
 ### CI 修复：`test_embedding_is_not_on_the_request_path` 摘掉两条可假红的判据
 
 主干 run `38473901358`（`08435817`）只在 **windows-latest / Python 3.10** 一条腿红，
