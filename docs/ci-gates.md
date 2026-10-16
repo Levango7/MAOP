@@ -315,9 +315,11 @@ required 上下文 4 条，其余保护项全关：
 | 清单里某条**在汇总里根本没出现**（作业被改名/删除）且平台判 `BLOCKED` | `DRIFT` | 1 |
 | 清单 4 条全绿、平台却仍判 `BLOCKED`（存在清单未列出的 required） | `DRIFT` | 1 |
 | 清单内某条自己没过/未完成，或 PR 是草稿 | `NOT-APPLICABLE`（不表态） | 0 |
+| **归因不成立**：本轮 run 的清单作业没全 success，或本轮 head 已不是 PR 现 head | `NOT-APPLICABLE`（弃权） | 0 |
 | 读不到实况 / `mergeStateStatus=UNKNOWN` 且重试仍未知 | `UNVERIFIED` | 3 |
+| `NEEDS_JSON` / `PR_HEAD_SHA` 缺失或坏 JSON（接线本身断了，归因无从做起） | `UNVERIFIED` | 3 |
 
-要点三条：
+要点四条：
 
 1. **`UNVERIFIED` 非零退出**：与 §7.4 / §7.6 同一条原则 —— "验不到"绝不判绿。金丝雀读不到
    汇总时作业真红，而不是静默通过。
@@ -327,6 +329,21 @@ required 上下文 4 条，其余保护项全关：
    只是把病因（哪条 required 缺席 / 存在清单外条目）点出来。
 3. **方向性局限**：非 admin 只能证明"平台要求得**多**"，**证不了"要求得**少**"**（保护被放松
    或删除）。后者是更危险的静默方向，**本作业看不见**。
+4. **判定前必须先归因（2026-10-15 的一次真实假红换来的）**：`statusCheckRollup` 是跟着 PR 的
+   **现 head** 走的，而金丝雀是在**某一个 workflow run** 里执行的 —— 两者可以错位。PR #110 的
+   旧 head `cb67725`（run `38729427212`）被同 ref 的新 push 抢占取消后，`Docs consistency gate`
+   结论 `cancelled`、`CI merge gate` 结论 `failure`，而带 `if: always()` 的金丝雀 3.5 小时后
+   （18:56Z）仍被调度起来：它读到的是"新 head 上一条 check 都还没产出"的汇总 ⇒ 四条 required
+   全 `<缺席>` + `BLOCKED` ⇒ 判出 `DRIFT: 平台侧的 required 与仓库清单不符（4 处）`。同一个 PR
+   四分钟后在真 head（run 632）上判的是 `MATCH`。**这条红是假的，但机制是真的**：清单与保护
+   真脱节时也是"缺席 + BLOCKED"，两种成因在汇总里长得一模一样。
+   因此判定前加了两道**独立**归因（`py/scripts/check_required_checks_satisfiability.py` 的
+   `attribution()`）：① `${{ toJSON(needs) }}` —— 本轮 run 里清单作业没全 success，就没资格
+   说"缺席是平台造成的"；② `pullRequest.headRefOid` 对比本轮 run 的 head sha —— 不等即过期 run，
+   弃权。两道任一为空（env 没接上）判 `UNVERIFIED` 而不是静默退回旧行为。
+   `py/tests/test_required_checks_satisfiability.py` 里同时钉住**两个方向**：过期 run 的复刻用例
+   必须不出现 `DRIFT`，而"needs 全成功 + head 未变 + 一条 required 缺席 + BLOCKED"必须**仍是**
+   `DRIFT` —— 否则这道守卫就只是一个把金丝雀永久变成弃权的新式自我失明。
 
 **证不了的方向由带外对账兜底**（第二条线，工具已入库 `tools/drift-audit/`）：
 `bash tools/drift-audit/run.sh` 用调用者自己的凭据（`gh auth token`，`repo` 作用域就够读分支保护；
