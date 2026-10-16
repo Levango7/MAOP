@@ -1,0 +1,55 @@
+# Python 相关
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 数据库文件
+*.db
+*.sqlite3
+
+# API密钥目录（安全忽略）
+api key/
+
+# 前端依赖
+node_modules/
+/frontend/build/
+/frontend/.cache/
+/frontend/coverage/
+
+# 环境文件
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 日志文件
+*.log
+logs/

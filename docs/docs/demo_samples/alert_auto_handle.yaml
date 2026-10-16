@@ -1,0 +1,38 @@
+name: 告警自动处理工作流
+version: 1.0
+nodes:
+  - id: trigger
+    type: trigger
+    config:
+      event: alert
+      source: zabbix
+  - id: filter
+    type: filter
+    config:
+      condition: "severity >= 3"
+  - id: llm_analyze
+    type: llm_node
+    config:
+      task: "分析告警根因，提供解决方案"
+      prompt: "收到告警：{{alert_content}}，请分析可能的根因，并提供3条可落地的解决方案"
+  - id: create_ticket
+    type: response
+    config:
+      action: create_itsm_ticket
+      itsm_type: jira
+      project_key: OPS
+  - id: send_notify
+    type: response
+    config:
+      action: send_message
+      channel: feishu
+      target: ops_group
+edges:
+  - from: trigger
+    to: filter
+  - from: filter
+    to: llm_analyze
+  - from: llm_analyze
+    to: create_ticket
+  - from: create_ticket
+    to: send_notify
