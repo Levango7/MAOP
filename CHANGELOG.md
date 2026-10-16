@@ -39,6 +39,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### `compose_smoke.py`：超时不再红得零诊断（主干 run 38867035723 的 `Compose Smoke`）
+
+主干 run `38867035723`（`b4a5900`）唯一红项是 `Compose Smoke`，而日志里除了一句
+`subprocess.TimeoutExpired: ... timed out after 1800 seconds` 什么都没有 —— 作业红了 30 分钟，
+却回答不了"哪个服务起不来"。原因在实现层：`sh()` 用 `capture_output=True` 收着 compose 的输出，
+而 `subprocess.run` 超时时**抛** `TimeoutExpired`，异常一路冒出 `main()`，已经把到的部分输出
+整个丢掉；那条"红也要带病历"的分支（`returncode != 0` 时 dump 尾部 + 错误行）根本没机会执行。
+
+- `sh()` 不再让超时外抛：折成 `rc=124` 并保住掐断前的 stdout/stderr（bytes/None/str 三种形态
+  统一过 `_text()`，下游 `.splitlines()` 不会崩）。
+- up 失败与 health 超时**共用一条诊断** `dump_stack_state()`：`ps -a`（不带 `-a` 时已退出的容器
+  压根不在清单里）+ `config --services` 列出的**每个**服务的日志尾部。原来 health 那条只 dump
+  `dashboard`，pg/redis 卡住时病历不在场。
+- 服务清单取不到 ⇒ 明说"compose 文件本身就没解析过"并**不**再逐个打 logs —— 那时每个服务只会
+  把同一条文件级错误再抄一遍。
+- 诊断按**病因内容**折叠重复（`PS x` 与 `LOG[pg] x` 是同一件事），并打出折叠了几行；抄 N 遍会把
+  唯一那条线索埋掉。
+- 诊断那几步各自 60s 上限（`DIAG_TIMEOUT_S`），且断言它必须显著小于 1800s —— 否则"取病历"能把
+  作业再拖死一遍，把一个看得见的红换成一个看不见的红。
+
+`py/tests/test_compose_smoke_diagnosis.py` 20 条，不需要 docker（假 `subprocess.run` / 假 runner）。
+变异验证三处各抓到 2/2/3 条红：超时改回外抛、折叠改成永不折叠、诊断改回只看 dashboard；
+还原用 `cp` + `cmp` 逐字节回证后 20 passed。入口也在本机真跑过两遍（`docker compose` 客户端可用、
+守护进程不在 ⇒ 天然是一条真实的失败路径），第二遍的输出从 12 行重复收敛到 9 行且带折叠说明。
+**注意**：这条作业的 `if` 只在 `develop/master/main` 的 push 上跑（有守卫
+`test_smoke_script_is_the_only_compose_entrypoint_in_ci` 钉住这点），所以 PR 上不会验到它 ——
+本改动的最终判定仍要等下一次主干 push。
+
 ### §7.7 金丝雀补上"归因前置"：过期 run 不再能把自家没跑成判成平台漂移（假红修复）
 
 2026-10-15 实测到一次**我自己写的门禁的假红**：PR #110 的旧 head `cb67725`（run
