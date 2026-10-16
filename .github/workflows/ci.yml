@@ -924,13 +924,18 @@ jobs:
           set -euo pipefail
           gitleaks git --config .gitleaks.toml . \
             --redact --report-format sarif --report-path gl-history.sarif
+      # 路径必须和上面那条对齐：扫描步没有 working-directory（`gitleaks git .` 要在仓库根
+      # 才能覆盖全库），产物因此落在**仓库根**。2026-10-16 主干 run 38902904241 里它写
+      # `gl-history.sarif`、这里却找 `py/gl-history.sarif`，配上 `if-no-files-found: ignore`
+      # ⇒ 报表从没上传过：69 条命中红在屏幕上，没人能看到是哪 69 条。安全扫描的证据不能丢，
+      # 所以这里用 error —— 报表缺失本身就是一条可见的失败。
       - name: Upload history scan report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: gitleaks-history-report
-          path: py/gl-history.sarif
-          if-no-files-found: ignore
+          path: gl-history.sarif
+          if-no-files-found: error
 
   # ── SBOM (cyclonedx) ───────────────────────────────────────────
   sbom:
