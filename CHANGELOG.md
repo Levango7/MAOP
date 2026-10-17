@@ -39,6 +39,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 主干 `Secret Scan` 的 69 条命中曾经查不动：报表路径与上传路径对不上，还被 `ignore` 消音
+
+2026-10-16 主干 run `38902904241` 里 `Secret Scan (gitleaks)` 判红，扫描步自己打出
+`leaks found: 69`，但**没有任何地方能看到是哪 69 条** —— 因为 `History scan` 那步没有
+`working-directory`（`gitleaks git .` 就必须在仓库根跑，才覆盖全库），报表实际落在**仓库根**的
+`gl-history.sarif`，而紧随其后的上传步去找 `py/gl-history.sarif`，还配了
+`if-no-files-found: ignore` ⇒ 报表"静默地没上传"，上传步自己仍是 success。
+我列过那次 run 的全部 artifact 来确证：`gitleaks-history-report` 根本不存在。
+
+改三处：
+
+- 上传路径对齐为 `gl-history.sarif`（口径由扫描步的工作目录决定，不是由惯例猜）。
+- `if-no-files-found: error`：安全扫描的证据链断掉本身就是一条可见失败，不许当成"没有就算了"。
+- `tests/test_ci_workflow_hygiene.py` 加三条结构守卫（解析 YAML 看**步骤字段**，注释不算数）：
+  ① 声明了 `--report-path` 的作业必须有上传步，且**判据集合为空即红**（防止守卫自己空转成
+  全称命题恒真）；② 报表"生效工作目录 + 文件名"必须与某个上传步的 `path` 完全一致；
+  ③ 扫描报表的上传步不许用 `if-no-files-found: ignore`（只约束扫描器产出的报表，覆盖率/前端
+  产物那些可选上传不在内 —— 它们缺席没有取证价值，红一次反而扰民）。
+
+变异验证三处各有红、且红在该管的那条上：上传路径改回 `py/` ⇒ ② 的路径守卫 1 红；
+`error` 改回 `ignore` ⇒ ③ 1 红；删掉 `--report-path` ⇒ ① 的空集守卫 1 红。还原用 `cp` + `cmp`
+逐字节回证，之后 6 passed。
+
+顺带记一条与本次相关的实测：`main` 被覆盖成新提交后，那笔含 `nvd api-key.txt` 的桌面快照提交
+已**不能从任何 ref 走到**（`git log --all` 与逐 ref 的 `merge-base --is-ancestor` 都是 0/无），
+所以 gitleaks 的全历史扫描理应不再撞见它 —— 本 PR 的 CI 就是这件事的验收现场：
+`Secret Scan` 若回到 `no leaks found`，即证 637 那 69 条是外部误推、非本仓引入。
+**但这不等于泄露已收回**：覆盖 ref 不删对象，GitHub 侧那个 commit 仍按 sha 可取（我实测 API
+仍能取到），密钥吊销与对象清除得人工走。
+
 ### `compose_smoke.py`：超时不再红得零诊断（主干 run 38867035723 的 `Compose Smoke`）
 
 主干 run `38867035723`（`b4a5900`）唯一红项是 `Compose Smoke`，而日志里除了一句
