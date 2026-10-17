@@ -208,6 +208,9 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     report = _repair_report(str(worker))
     if report:
         _emit_session_warning(report)
+    # 收尾自检：最后一个用例留下的泄漏不会被 `_leak_probe` 看见（它检查的是"下一条用例
+    # 开始时"），所以这里补一刀并判红。见 `apply_leak_gate` 的 docstring。
+    apply_leak_gate(session, _residual_leak_attribution(), _REPAIR_COUNT, str(worker))
     # 清空 ConnectionPool 模块级单例池：池连接 release() 回池不关闭，每个测试
     # 独立 MAOP_DATA_DIR 会产生大量池与连接句柄，进程退出时 GC 才回收 →
     # ResourceWarning: unclosed database 洪泛（xdist 全量下耗尽 worker 句柄）。
@@ -478,7 +481,7 @@ def repair_subprocess_run() -> bool:
     return True
 
 
-def _emit_session_warning(text: str) -> None:
+def _emit_session_annotation(text: str, flavor: str = "warning", title: str = "leak-probe") -> None:
     """把消息作为 GitHub 注解打到 stdout —— 在非 UTF-8 控制台也必须不崩。
 
     为什么要单列：CI 实测（2026-10-04，windows-latest 3.10/3.13）本函数的 `print`
@@ -490,11 +493,15 @@ def _emit_session_warning(text: str) -> None:
     做了 stdout reconfigure）。此处用**按需降级**而不是全局 reconfigure：注解本身
     退化成 ASCII 转义（`\\uXXXX`）仍然可读，且不影响本进程其它输出。
     """
-    line = f"::warning title=leak-probe::{text}"
+    line = f"::{flavor} title={title}::{text}"
     try:
         print(line)
     except UnicodeEncodeError:
         print(line.encode("ascii", "backslashreplace").decode("ascii"))
+
+
+def _emit_session_warning(text: str) -> None:
+    _emit_session_annotation(text)
 
 
 def _repair_report(worker: str = "master") -> str | None:
@@ -518,6 +525,41 @@ def _repair_report(worker: str = "master") -> str | None:
         "症状已被会话级守卫挡住，但泄漏源未定位 —— "
         f"culprit: {who}"
     )
+
+
+def _residual_leak_attribution() -> str:
+    """会话收尾时 `subprocess.run` 若仍是替身，返回归因串；干净则返回空串。
+
+    为什么必须有这一步（2026-10-17，T2.3 追出来的盲区）：`_leak_probe` 是
+    **用例开始时**才检查的，所以"最后一个用例把全局函数弄脏"这种泄漏永远不会被看见 ——
+    不是这次没触发，是结构上看不见。实测：`test_sandbox_executor.py::TestThreadSafety`
+    排到别的用例前面时，探针 5/5 报 REPAIR；整文件按自然顺序跑（它是最后一个类）0/5。
+    """
+    if _subprocess_mod.run is _ORIGINAL_SUBPROCESS_RUN:
+        return ""
+    return _leak_attribution() or f"impl={_run_fingerprint()}"
+
+
+def apply_leak_gate(session: pytest.Session, residual: str, repairs: int, worker: str) -> bool:
+    """会话收尾仍有泄漏就判红；返回是否触发了门禁。
+
+    判据只有"当前状态脏不脏"这一条，不掺计数 —— `repairs`（本进程修过几次）走注解，
+    因为"修过"说明源还在但已被修干净，硬拦会把修不干净的旧账变成常驻红。
+    """
+    if not residual:
+        return False
+    _emit_session_annotation(
+        f"[leak-gate] 会话结束时 subprocess.run 仍是被替换状态（worker={worker}，"
+        f"本进程已修复 {repairs} 次）：culprit: {residual}。"
+        "这条是**门禁**不是提醒 —— 会话级 `_leak_probe` 只在下一条用例开始时才检查，"
+        "最后一个用例的泄漏靠这里兜住。",
+        flavor="error",
+        title="leak-gate",
+    )
+    # 不用 raise：历史上 `pytest_sessionfinish` 里冒出的异常会把会话崩成 exit=1，
+    # 却不在 junit 里留下任何失败用例（红得莫名）。改 exitstatus 是干净路径。
+    session.exitstatus = pytest.ExitCode.TESTS_FAILED
+    return True
 
 
 @pytest.fixture(autouse=True)
