@@ -84,6 +84,10 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
         "unwired",
         "健康检查调度器无生产调用方（本批修过它的 flake 测试，但没人启动它）",
     ),
+    # 注：本批入库的 maop/core/cost_router.py **登记不上这份清单** —— compute_orphans() 把
+    # "孤儿导入了它" 也算作有生产导入方，而它唯一的导入方 visual_builder 自己就在下面（孤儿→孤儿链）。
+    # 按真实可达性它到不了运行时；要改判据就得先求不动点，会一次性掀出全仓一批同形态模块，
+    # 所以这里保留工具现有口径，把缺陷与影响面单独转交（见 CHANGELOG 2026-10-17 条目）。
     "maop.core.evolution.prompt_version": ("unwired", "prompt 版本链未接入演化闭环的回滚路径"),
     "maop.core.evolution.regression": ("unwired", "Persona 回归未接入演化闭环"),
     "maop.core.marketplace.key_management": ("unwired", "marketplace 密钥管理未接线"),
@@ -96,6 +100,22 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     ),    "maop.core.marketplace.signing": ("unwired", "marketplace 签名未接线"),
     "maop.core.mcp.mcp_adapter": ("unwired", "MCPAdapter 仅测试实例化；adapter_factory 不产出它"),
     "maop.core.memory.hybrid_search": ("unwired", "混合检索未接入记忆读路径"),
+    "maop.core.memory.knowledge_graph_reasoning": (
+        "unwired",
+        "关系图多跳推理未接入记忆读路径（与 hybrid_search / semantic_cache 同族）；仅测试引用",
+    ),
+    "maop.core.memory.multimodal_av_contracts": (
+        "unwired",
+        "音视频契约层：全仓零引用 —— maop/ 与 tests/ 里没有任何导入方，连测试都没碰它",
+    ),
+    "maop.core.memory.plan_quality": (
+        "unwired",
+        (
+            "F2-04 计划质量学习链仅测试引用。批量训练特征由 _infer_gates(routing_key)+默认预算**重建**"
+            "而非执行期观测 ⇒ 结构排序主张当前不成立（见 test_plan_quality.py::"
+            "test_online_learning_flips_structural_ranking 的 xfail 与前置条件）"
+        ),
+    ),
     "maop.core.memory.semantic_cache": ("unwired", "语义缓存未接入记忆读路径"),
     "maop.core.reliability.blackboard_engine_bridge": (
         "unwired",
@@ -126,6 +146,13 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.core.security.byok": ("unwired", "BYOK 未接线"),
     "maop.core.security.ldap_provider": ("unwired", "LDAP provider 未接线（SSO 走 SAML/OIDC）"),
     "maop.core.subagent_delegation": ("unwired", "v5.0 起已废弃，双实现说明仍留着"),
+    "maop.core.visual_builder": (
+        "unwired",
+        (
+            "ADR-030 F302 可视化构建器，无任何生产导入方；它引用了同样未接线的 cost_router，"
+            "所以这条链整体都到不了运行时"
+        ),
+    ),
     "maop.dashboard.provider": ("unwired", "dashboard 旧 provider 入口（v4.0.0 起 create_app 已废弃）"),
     "maop.dashboard.routers.error_handler": ("unwired", "路由层错误处理未挂到 app"),
     "maop.dashboard.static": ("unwired", "静态文件挂载未接入 server.py"),

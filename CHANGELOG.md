@@ -39,6 +39,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 桌面快照资产入库（69 个文件）：清掉 7 条红，并交出 5 处"文档/口径领先于实现"的实测结论
+
+把 2026-10-16 误推成孤儿提交的那份桌面快照里**确实属于本仓**的 69 个文件逐字节搬进来
+（5 个新模块 + 2 个测试文件 + 60 个合成 PNG 夹具 + ADR 029/030；来源 `c7826c51`，
+69 个 blob OID 与源全等，对 base 的 diff 是 69 条 `A`，未动任何既有文件；
+`gitleaks detect --no-git` 对这批文件 `no leaks found`）。
+
+搬进来之后全集实测 **11010 passed / 7 failed**，逐条处置：
+
+- **ruff 24 条**清零（`--fix` 23 条 + `F841`）。`F841` 那条不是删掉：
+  `test_rank_best_plan_first` 里声明了 `ext = PlanFeatureExtractor()` 却全程手搓训练向量，
+  等于绕开抽取器 —— 改成断言"手搓向量的 dim0/dim4/dim5 极性与抽取器一致"，
+  这样夹具与真实特征口径脱钩时会当场转红。
+- **`test_train_promote_rollback_active_chain`** 是**测试写坏**，不是实现坏：
+  `assert vm.promote(active2.version_id) or vm.promote(m2._version)` 里 `active2` 已被上一条断言
+  证明等于 v1，而 `promote()` 的返回值只表示"这个 id 在链上" ⇒ 永远短路、v2 从未被晋升，
+  该用例**在任何实现下都不可能过**。改成直接 promote v2；反向变异（让 `promote` 返回 True 但不落盘）
+  确认会红，还原后 `cmp` 证字节一致。
+- **结构排序主张不成立，按事实降级为 `strict=True` 的 xfail**（原用例名一拆为二：
+  "在线学习抬高被喂计划的分数"0.4145→0.9601 是真行为，留作通过的锁；"学完后结构更优者排前"是更强主张）。
+  机制实测：批量训练特征由 `ingest_from_agent_performance` 用 `_infer_gates(routing_key)` + 默认预算
+  **重建**，而夹具的 rk `gen`/`sec` 都不命中该启发式的任何分支 ⇒ dim1/dim2 恒 0、dim4 恒 1，
+  这三维权重是不可识别的偏置吸收（实测 `w1=-0.4248`、`w4=+0.2682`），推理期却把 `max_retries=3`
+  外推 3 倍 ⇒ 30 次在线更新后仍差 0.011 把 garbage 排在前面。前置条件（执行期真值落库 +
+  持久化模型加 `feature_schema` 标记）写在 xfail reason 与 `ALLOWED_OVERSIZE` 理由里。
+- **`plan_quality.py` 926 行**进 `ALLOWED_OVERSIZE` 并写明拆分排期与先决条件（不拆的理由是
+  拆分前必须先改特征来源，否则拆出来的文件仍守着同一个缺陷）。
+- **README:27** 的 `core/` 文件数按实测 5→7（`ls *.py` 含 `__init__.py`，与门禁同口径；
+  17 个子包也重新数过）。
+- **`# nosec B608`（`knowledge_graph_reasoning.py:264`）逐行核过再登记**：`where` 只能由
+  `source = ?` / `target = ?` / `1=1` / ` AND relation_type = ?` 四段字面量拼成，
+  `direction` 与 `relation_type` 都不进 SQL 文本、值全走 `params` ⇒ 无注入路径，登记而非改写。
+  bandit `-lll` 硬门 rc=0；另有一条新的 LOW（`B311` 用于非加密场景，:461）不在本仓判据内。
+- **覆盖率**：`cost_router` / `visual_builder` / `multimodal_av_contracts` 原本在 `tests/` 零引用，
+  补 65 条用例后实测 **98% / 100% / 98%**（这三块也是 #116 卡在 `Coverage ratchet gate` 的主要缺口）。
+
+顺带查出并修正的四处"文字强于代码"，都带实测出处：
+
+1. `mypy` 报的 `sqlite_connect(db_path)` 传 `None` **不只是类型问题**：该函数走
+   `sqlite3.connect(str(db_path))` ⇒ 会静默打开/新建一个**字面名叫 `None`** 的库文件，
+   读到的永远是空表。新增 `_resolve_relations_db()`，缺省口径与 `relations` 表的归属方一致
+   （`get_db_path("knowledge_graph")`）。其余 4 条 mypy 错误一并清零（本机 mypy 2.3.1，CI 钉 2.4.0，终判在 CI）。
+2. `multimodal_av_contracts` 的 docstring 声称 MAOS 已提供 `WhisperAudioProvider` /
+   `ClapAudioProvider` / `FramePoolVideoProvider` —— 实测 **MAOS tip `1a19c7f`** 对这三个类名、
+   `embed_audio`/`embed_video` 以及对本模块的 import **全部 0 命中** ⇒ 措辞降级为"预期由企业版提供，尚未落地"。
+3. `get_cost_router()` 的 docstring 写"参数显式传入时覆盖已有配置"，实测**只在首次构造时生效**，
+   单例存在后任何参数都被静默忽略（本仓出过 `get_route_scorer` 单例污染导致生产路由退化的事故）
+   ⇒ docstring 按实测改写，并由测试钉住 + 给出 `reset_cost_router()` 的正对照。
+4. `RoutingDecision.degraded` 注释写"因预算被强制降级"，实现是"没选中 `tier.preferred_model` 就算"
+   ⇒ 调用方自己点名便宜模型也会被记成降级；测试按真实行为命名，注释同步改正，语义不在无人消费时改动。
+
+**两条转交项（我没擅自改判据）**：① `compute_orphans()` 把"孤儿导入了它"也算作有生产导入方，
+所以 `cost_router` 躲过了死接线清单（它唯一的导入方 `visual_builder` 自己就在清单里）——
+按真实可达性这批是 5/5 不通；改成不动点求解会一次性掀出全仓同形态模块，需要单独决定。
+② `visual_builder` 的节点级 `condition` 键是**只出不进**的派生副本，可逆性靠 `config.expression` 成立。
+
 ### T2.3 收口：泄漏源（线程内 patch）+ `_leak_probe` 的结构盲区，并把收尾检查升成门禁
 
 追一个泄漏源追出一个**守卫设计缺陷**。`py/tests/test_sandbox_executor.py::TestThreadSafety`
