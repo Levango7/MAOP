@@ -117,6 +117,7 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 | `py/tests/test_ci_merge_gate.py` | 聚合守卫的两面：判定脚本的策略单测（白名单式 + fail closed + docs-only 的 skipped 必须放行），以及 ci.yml 里 gate 的形状（name 稳定、`if: always()` 不许掉、needs 盖住全部重活、不许纳 push-only 作业） |
 | `py/tests/test_nightly_flaky_coverage.py` | nightly `flaky-detection` 的**覆盖面**：必须覆盖实测出过问题的平台（macos/3.13、windows/3.12）、每条腿 `--reruns=0`、复刻 ci.yml 的并发配置（Linux/macOS `-n 2`、Windows `-n 0`）、矩阵值渲染后是合法 bash 且不留占位符、每条腿都得是 ci.yml 真跑过的组合；另有 `TestSlowMarkerCoverage` 核对**每个含 `slow` 的文件都被某条腿真跑到**（见 §9） |
 | `py/tests/test_env_example_drift.py` | `.env.example` ↔ 代码实读的 `MAOP_*` 变量双向一致（两条来源都要算：`os.getenv` 直读 + `MAOPSettings` 的 `env_prefix`/`AliasChoices` 映射）；反向不许留下无说明的"没人认的开关"；企业版变量走 `ENTERPRISE_SIDE_VARS` 逐条登记 |
+| `py/tests/test_conftest_leak_probe.py` | 测试基建自己的两层守卫：① `_leak_probe`（用例开始时观测 + 修复被污染的全局 `subprocess.run`，含"修复必须排在 `yield` 之前"的顺序守卫）；② **会话收尾门禁** `apply_leak_gate`（会话结束时 `subprocess.run` 仍是替身 ⇒ 打 `::error title=leak-gate::` 并把退出码改成失败）。为什么要第 ② 层：探针只在"下一条用例开始时"才检查，所以**最后一个用例**留下的泄漏结构上看不见（实测：把肇事用例排在别人前面 5/5 报修，按自然顺序当最后一个类 0/5）。门禁的负对照同样钉住"干净会话不许红" |
 
 
 ## 7. master 的 required checks：已实测语义 + 现行配置

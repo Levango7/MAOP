@@ -39,6 +39,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### T2.3 收口：泄漏源（线程内 patch）+ `_leak_probe` 的结构盲区，并把收尾检查升成门禁
+
+追一个泄漏源追出一个**守卫设计缺陷**。`py/tests/test_sandbox_executor.py::TestThreadSafety`
+的 `patch("subprocess.run", ...)` 装在 `_run()` 里 —— `patch` 打的是**进程全局**属性，
+10 个线程各自 enter/exit 同一个目标，恢复顺序一交错就把替身留在进程里。
+
+盲区在于 `_leak_probe` 是"**下一条用例开始时**"才检查（而 `repair_subprocess_run()` 又必须在
+`yield` 之前 —— 那条顺序本身有守卫），所以"最后一个用例弄脏全局函数"这种泄漏**结构上看不见**。
+本地实测把两件事同时钉住：把 `TestThreadSafety` 显式排到别的用例前面 ⇒ 探针 **5/5** 报
+`修复被替换的 subprocess.run 1 次 … culprit: impl=MagicMock@unittest.mock`；整文件按自然顺序跑
+（它是最后一个类）⇒ **0/5**。所以 CI 上"最近几次零条 leak-probe 注解"从来不能用来证明泄漏源
+消失 —— 那个源恰好排在末尾，探针永远不会看见它。（本机未装 pytest-randomly，收集序=源码序。）
+
+两处一起改：
+
+- **源头**：`patch` 移出线程体，改成主线程一次性 `with`，线程构造与 `join` 都在块内；再加一条
+  自证断言 `subprocess.run is standard_run`。改完两种顺序各测 3 次：**0/5、0/5** 无泄漏痕迹。
+- **门禁**：`conftest.py` 新增 `_residual_leak_attribution()` + `apply_leak_gate()`，在
+  `pytest_sessionfinish` 里对"会话结束时仍是替身"打 `::error title=leak-gate::`（含 culprit 与
+  worker）并把 `session.exitstatus` 改成 `TESTS_FAILED`。不 `raise` —— 这层的 `print` 曾在
+  windows-3.10/3.13 抛 `UnicodeEncodeError` 把会话崩成 exit=1 且 junit 里零失败用例（红得莫名），
+  所以注解仍走"按需降级成 ASCII 转义"，改退码才是判红的手段。`_emit_session_warning` 顺势抽成
+  `_emit_session_annotation(text, flavor, title)`，并有用例钉住老调用点的 flavor 没被改错。
+
+验证（`py/tests/test_conftest_leak_probe.py` 新增 8 条）：
+
+- **真入口端到端**：临时塞一个故意泄漏的 scratch 用例 ⇒ `1 passed` 但**退出码 1**，stdout 有
+  `::error title=leak-gate::… culprit: impl=tests.test_zz_scratch_leak:…<lambda>`；删掉 scratch
+  后同目录 22 passed / 退出码 0。（scratch 已删，不在提交里。）
+- **四处变异各有红**：门禁永不触发 ⇒ 2 红；残留自检永远说"干净" ⇒ 1 红；把 `apply_leak_gate()`
+  从钩子里删掉（只剩函数没人调）⇒ 接线守卫 1 红；把 `patch` 装回 `_run()` ⇒ 结构守卫 1 红
+  —— 为此那条守卫改成数"全函数只允许一处 `with patch(`"+位置顺序，只看第一次出现会漏掉嵌套写法。
+  还原 `cp` + `cmp -s` 逐字节回证后 54 passed。
+- **误红风险实测**（升成 gate 前必须量的那一步）：全量 `pytest tests -n auto --no-cov` =
+  **10764 passed / 106 skipped、退出码 0、`leak-gate` 命中 0 次** ⇒ 干净会话不会被判红；
+  同时这也是"没有别的用例在收尾留泄漏"的正面证据（至少在这个门禁能看见的形态下）。
+- `ruff` 对三个改动文件干净；`docs/ci-gates.md` §6 守卫清单补了这一层（连同 5/5 与 0/5 那组数字，
+  写清第 ② 层为什么必须存在）。
+
+**留在原地的**：`repair` 计数（"修过但已修干净"）仍然只是 `::warning::`。把它也做成"必须为 0"的
+棘轮是下一步 —— 现在拦只会把既存欠账变成长驻红，而定位还没做完。
+
 ### 主干 `Secret Scan` 的 69 条命中曾经查不动：报表路径与上传路径对不上，还被 `ignore` 消音
 
 2026-10-16 主干 run `38902904241` 里 `Secret Scan (gitleaks)` 判红，扫描步自己打出

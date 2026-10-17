@@ -558,3 +558,163 @@ def test_leak_probe_repairs_on_the_setup_side() -> None:
     assert "repair_subprocess_run()" not in body[body.index("yield"):], (
         "yield 之后不应再有修复调用（重复/错位都会让计数失真）"
     )
+
+
+# ── 会话收尾门禁（T2.3：`_leak_probe` 的结构盲区）─────────────────────────
+#
+# 盲区在哪：`_leak_probe` 是在**用例开始时**检查"进程被谁弄脏了"（且 repair 在
+# yield 之前，见上面的顺序守卫）。所以"最后一个用例弄脏全局 `subprocess.run`"
+# 这种泄漏根本不会被看见 —— 不是这次没触发，是结构上看不见。实测过：
+# `test_sandbox_executor.py::TestThreadSafety` 排到别的用例前面时探针 5/5 报
+# REPAIR，而按自然顺序（它是该文件最后一个类）0/5。
+# 补的这一步就是"会话结束时再扫一次当前状态"，并且它是**门禁**（改 exitstatus），
+# 不是又一条 ::warning::。
+
+
+def _fake_session() -> object:
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        config=SimpleNamespace(workerinput={}), exitstatus=pytest.ExitCode.OK
+    )
+
+
+def _quiet_sessionfinish(monkeypatch: pytest.MonkeyPatch) -> None:
+    """把会话级清理换成 no-op：测试中途调它们会关掉别的用例在用的连接池。"""
+    import tests.conftest as c
+
+    monkeypatch.setattr(c, "_tmp_dirs", [])
+    monkeypatch.setattr("maop.core.backends.db_utils.close_all_pools", lambda: None)
+    monkeypatch.setattr("maop.core.backends.backends.reset_backends", lambda: None)
+    monkeypatch.setattr(
+        "maop.core.agent.plugins_hooks.hook_manager.reset_hook_manager", lambda: None
+    )
+
+
+def test_residual_attribution_is_empty_on_a_clean_process() -> None:
+    import subprocess
+
+    import tests.conftest as c
+
+    assert c._residual_leak_attribution() == ""
+    assert subprocess.run is c._ORIGINAL_SUBPROCESS_RUN, "前提：此刻确实是标准库原版"
+
+
+def test_residual_attribution_names_the_impostor() -> None:
+    """脏了就必须点名 —— 只说"脏了"的守卫等于把线索又丢一次。"""
+    import subprocess
+
+    import tests.conftest as c
+
+    def leaked_by_someone() -> str:  # pragma: no cover - 只是替身，不执行
+        return "nope"
+
+    subprocess.run = leaked_by_someone  # type: ignore[assignment]
+    try:
+        who = c._residual_leak_attribution()
+        assert who, "被替换状态下必须给出归因"
+        assert "leaked_by_someone" in who, who
+    finally:
+        subprocess.run = c._ORIGINAL_SUBPROCESS_RUN  # type: ignore[assignment]
+    assert c._residual_leak_attribution() == ""
+
+
+def test_gate_turns_a_residual_leak_into_a_failing_session(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """门禁三件事缺一不可：返回 True、改 exitstatus、把 culprit 打进注解。"""
+    import tests.conftest as c
+
+    session = _fake_session()
+    fired = c.apply_leak_gate(session, "impl=tests.evil:test.<locals>.fake", 0, "gw3")  # type: ignore[attr-defined]
+    out = capsys.readouterr().out
+    assert fired is True
+    assert session.exitstatus == pytest.ExitCode.TESTS_FAILED, "会话退码必须被改成失败"  # type: ignore[attr-defined]
+    assert "::error title=leak-gate::" in out, out
+    assert "tests.evil" in out and "gw3" in out, out
+
+
+def test_gate_leaves_a_clean_session_alone(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """负对照：没有残留就不许改退码、不许打注解 —— 否则每条绿跑都白红一次。"""
+    import tests.conftest as c
+
+    session = _fake_session()
+    assert c.apply_leak_gate(session, "", 5, "master") is False  # type: ignore[attr-defined]
+    assert session.exitstatus == pytest.ExitCode.OK, "干净时不许动退码"  # type: ignore[attr-defined]
+    assert "::error" not in capsys.readouterr().out
+
+
+def test_sessionfinish_fires_the_gate(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """接线证明：钩子里真的调了门禁。只测 `apply_leak_gate()` 的话，把钩子里那行删掉照样全绿。"""
+    import tests.conftest as c
+
+    _quiet_sessionfinish(monkeypatch)
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 0)
+    monkeypatch.setattr(c, "_residual_leak_attribution", lambda: "impl=SomeFake@mod")
+    session = _fake_session()
+    c.pytest_sessionfinish(session, 0)  # type: ignore[arg-type]
+    out = capsys.readouterr().out
+    assert "::error title=leak-gate::" in out, out
+    assert session.exitstatus == pytest.ExitCode.TESTS_FAILED  # type: ignore[attr-defined]
+
+
+def test_sessionfinish_keeps_a_clean_session_green(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """正对照的另一半：干净收尾不许有 error、不许改退码。"""
+    import tests.conftest as c
+
+    _quiet_sessionfinish(monkeypatch)
+    monkeypatch.setattr(c, "_REPAIR_COUNT", 0)
+    monkeypatch.setattr(c, "_residual_leak_attribution", lambda: "")
+    session = _fake_session()
+    c.pytest_sessionfinish(session, 0)  # type: ignore[arg-type]
+    out = capsys.readouterr().out
+    assert "::error" not in out, out
+    assert session.exitstatus == pytest.ExitCode.OK  # type: ignore[attr-defined]
+
+
+def test_emit_session_warning_still_uses_the_warning_flavor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """把打印抽成 `_emit_session_annotation` 后，老调用点的口径不能悄悄变：
+    flavor/title 是显式参数，这里双向钉住（warning≠error，一个是线索一个是门禁）。"""
+    import tests.conftest as c
+
+    seen: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        c,
+        "_emit_session_annotation",
+        lambda text, flavor="warning", title="leak-probe": seen.append((text, flavor, title)),
+    )
+    c._emit_session_warning("hello")
+    assert seen == [("hello", "warning", "leak-probe")], seen
+
+
+def test_thread_safety_test_patches_in_the_main_thread() -> None:
+    """源头守卫（结构性、确定性）：mock 不许装在 10 个线程各自的 with 里。
+
+    `patch` 打的是进程全局属性，多线程各自 enter/exit 时恢复顺序一交错就会把替身
+    留在进程里 —— 就是 T2.3 那个泄漏源。功能性的那条断言（`subprocess.run is
+    standard_run`）只能抓交错成功的那几次，这条抓的是写法本身。
+    """
+    import inspect
+
+    from tests.test_sandbox_executor import TestThreadSafety
+
+    body = inspect.getsource(TestThreadSafety.test_concurrent_execute)
+    assert "with patch(" in body, "用例里已不再 patch subprocess.run？那这条守卫要看是否还需要"
+    assert body.count('with patch("subprocess.run"') == 1, (
+        "只能有**一处** patch：外层装一次。再加进 _run() 里就是嵌套 enter/exit，"
+        "最外层退出后确实会还原，但线程交错时仍可能把替身留在进程里 —— 那正是 T2.3 的写法"
+    )
+    with_line = body.index("with patch(")
+    thread_line = body.index("threading.Thread(target=_run)")
+    assert with_line < thread_line, (
+        "patch 必须在主线程、且在起线程之前装好；"
+        "装回 _run() 里就是跨用例泄漏的写法（恢复顺序不确定，会把替身留进进程）"
+    )
