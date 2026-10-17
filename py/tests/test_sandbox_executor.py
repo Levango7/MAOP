@@ -343,16 +343,24 @@ class TestThreadSafety:
 
         def _run() -> None:
             try:
-                with patch("subprocess.run", return_value=mock_proc):
-                    executor.execute("echo ok", basic_config)
+                executor.execute("echo ok", basic_config)
             except Exception as exc:
                 errors.append(exc)
 
-        threads = [threading.Thread(target=_run) for _ in range(10)]
-        for t in threads:
-            t.start()
-        join_all(threads, 120.0)
+        # mock 只在**主线程**装/拆。`patch` 改的是进程全局的 `subprocess.run`，
+        # 让 10 个线程各自 enter/exit 同一个 patch，退出顺序一交错就会把替身留在进程里
+        # —— 那就是跨用例泄漏（T2.3 的源头，2026-10-17 实测：把本用例排在任何用例前面，
+        # conftest 的泄漏探针 5/5 报 REPAIR）。语义不变：线程们看到的仍是同一个替身。
+        standard_run = subprocess.run
+        with patch("subprocess.run", return_value=mock_proc):
+            threads = [threading.Thread(target=_run) for _ in range(10)]
+            for t in threads:
+                t.start()
+            join_all(threads, 120.0)
 
         assert errors == []
         stats = executor.get_stats()
         assert stats["total_executions"] == 10
+        assert subprocess.run is standard_run, (
+            "with 退出后 subprocess.run 必须回到标准库原版 —— 这条红了就是泄漏到了后续用例"
+        )
