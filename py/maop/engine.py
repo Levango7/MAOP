@@ -35,6 +35,14 @@ from typing import Any
 
 from maop.core.reliability.event_bus import EventBus, get_event_bus
 
+# Task backend abstraction (M0 L0.1 — pluggable execution substrate)
+from maop.core.scheduling.task_backend import (
+    DistributedTaskBackend,
+    LocalTaskBackend,
+    TaskBackend,
+    TaskBackendABC,
+)
+
 # Re-export the plan depth cap and the step execution helper.
 from maop.engine_executor import (
     _MAX_PLAN_DEPTH,  # noqa: F401
@@ -122,6 +130,12 @@ class Engine:
         # (run() may be invoked concurrently; each run
         # drains only its own queue).
         self._spawns: dict[str, list[tuple[SpawnDirective, str]]] = {}
+        # M0 L0.1 — Task backend abstraction.
+        # Local backend is always available; distributed requires Redis.
+        self._local_backend: LocalTaskBackend = LocalTaskBackend(self)
+        self._distributed_backend: DistributedTaskBackend | None = None
+        if redis_client is not None:
+            self._distributed_backend = DistributedTaskBackend(redis_client)
 
     def _get_distributed_scheduler(self) -> Any:
         """Lazily build a DistributedScheduler bound to the Redis client.
@@ -185,31 +199,46 @@ class Engine:
         trace_id : str
             Trace ID for observability.
         distributed : bool
-            F1-01 分布式执行: when True and a Redis client is configured,
-            dispatch DAG nodes to the Redis Streams task queue for
-            execution by distributed workers. When the Redis client is
-            unavailable (Personal edition), automatically falls back to
-            single-process execution without error. Default False
-            (single-process, backward-compatible).
+            M0 L0.1: when True and a Redis client is configured,
+            use the distributed backend (Redis Streams). When Redis
+            is unavailable (Personal edition), automatically falls
+            back to local backend with a warning. Default False
+            (local multi-loop execution, backward-compatible).
         """
-        # F1-01: attempt distributed execution when requested and Redis
-        # is available. On any failure (no Redis, scheduler init error,
-        # dispatch error), fall back to single-process execution so the
-        # Personal edition and Redis-outage scenarios never break.
+        if context is None:
+            context = {}
+        if not trace_id:
+            trace_id = uuid.uuid4().hex
+
+        backend = self._get_task_backend(distributed=distributed)
+        if distributed and self._distributed_backend is not None:
+            try:
+                return await backend.run(
+                    steps, context=context, workdir=workdir, trace_id=trace_id,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[engine] distributed execution failed (%s); "
+                    "falling back to local backend",
+                    exc,
+                )
+                return await self._local_backend.run(
+                    steps, context=context, workdir=workdir, trace_id=trace_id,
+                )
+        return await backend.run(
+            steps, context=context, workdir=workdir, trace_id=trace_id,
+        )
+
+    def _get_task_backend(self, distributed: bool = False) -> TaskBackend:
+        """Return the appropriate TaskBackend for the requested mode."""
         if distributed:
-            scheduler = self._get_distributed_scheduler()
-            if scheduler is not None:
-                try:
-                    return await self._run_distributed(
-                        scheduler, steps, context, workdir, trace_id,
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "[engine] distributed execution failed (%s); "
-                        "falling back to single-process",
-                        exc,
-                    )
-        return await self._run_single(steps, context, workdir, trace_id)
+            if self._distributed_backend is not None:
+                return self._distributed_backend
+            logger.warning(
+                "Engine: distributed execution requested but no Redis "
+                "client configured; falling back to local backend."
+            )
+        return self._local_backend
 
     async def _run_distributed(
         self,
@@ -219,83 +248,20 @@ class Engine:
         workdir: str,
         trace_id: str,
     ) -> EngineResult:
-        """Execute steps via the DistributedScheduler (Redis Streams).
+        """Legacy bridge: execute steps via DistributedScheduler.
 
-        Builds :class:`_NodeSpec` objects from the workflow steps,
-        dispatches them to the scheduler, and aggregates the results
-        back into an :class:`EngineResult`.
+        Kept for backward compatibility with callers that dispatch
+        through the scheduler directly. New code should use
+        ``Engine.run(distributed=True)`` which routes through the
+        TaskBackend abstraction.
         """
-        from maop.core.scheduling.distributed_scheduler import (
-            node_spec_from_step,
-        )
-
-        start = time.monotonic()
-        if not trace_id:
-            trace_id = uuid.uuid4().hex
-        if context is None:
-            context = {}
-        ctx = dict(context)
-
-        # Build node specs from workflow steps. Each step's payload
-        # carries its serialised description so workers can execute it.
-        # M4 修复：分布式执行前检查 pause 状态
-        await check_pause_async()
-
-        nodes = []
-        for step in steps:
-            affinity = step.params.get("affinity") if step.params else None
-            priority = int(step.params.get("priority", 3)) if step.params else 3
-            nodes.append(node_spec_from_step(
-                step.id,
-                depends_on=list(step.depends_on),
-                affinity=affinity,
-                priority=priority,
-                payload={
-                    "type": step.type.value,
-                    "agent": step.agent,
-                    "task": _resolve_template(step.task, ctx),
-                    "params": step.params,
-                    "workdir": workdir,
-                    "trace_id": trace_id,
-                },
-                timeout=float(step.timeout),
-            ))
-
-        dist_result = await scheduler.run(nodes, run_id=trace_id)
-
-        # Aggregate distributed results into EngineResult.
-        all_results: list[StepResult] = []
-        for step in steps:
-            res = dist_result.results.get(step.id, {})
-            status_map = {
-                "success": StepStatus.SUCCESS,
-                "failed": StepStatus.FAILED,
-                "skipped": StepStatus.SKIPPED,
-                "pending": StepStatus.PENDING,
-            }
-            status = status_map.get(res.get("status", "pending"), StepStatus.PENDING)
-            sr = StepResult(
-                id=step.id,
-                status=status,
-                output=str(res.get("output", "")) if res.get("output") is not None else "",
-                error=res.get("error", ""),
-                agent=step.agent,
-                duration_ms=int(res.get("duration_ms", 0)),
+        if self._distributed_backend is None:
+            raise RuntimeError(
+                "Engine._run_distributed requires a configured distributed "
+                "backend (redis_client not set)"
             )
-            all_results.append(sr)
-            ctx[step.id] = sr.output or sr.error
-
-        total_ms = int((time.monotonic() - start) * 1000)
-        success = all(
-            r.status in (StepStatus.SUCCESS, StepStatus.SKIPPED)
-            for r in all_results
-        )
-        return EngineResult(
-            trace_id=trace_id,
-            steps=all_results,
-            success=success,
-            total_duration_ms=total_ms,
-            context=ctx,
+        return await self._distributed_backend.run(
+            steps, context=context, workdir=workdir, trace_id=trace_id,
         )
 
     async def _run_single(
@@ -599,11 +565,15 @@ class Engine:
 # deterministic. Ruff treats names in __all__ as used (no F401).
 
 __all__ = [
+    "DistributedTaskBackend",
     "Engine",
     "EngineResult",
+    "LocalTaskBackend",
     "StepResult",
     "StepStatus",
     "StepType",
+    "TaskBackend",
+    "TaskBackendABC",
     "WorkflowStep",
     "_find_step",
     "_resolve_template",

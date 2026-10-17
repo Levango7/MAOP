@@ -180,6 +180,9 @@ def setup_enterprise_guard(app: FastAPI) -> None:
                 or is_tenant_list
                 or any(path.startswith(p) for p in _ENTERPRISE_API_PREFIXES)
             )
+            # Blackboard tenant management API is available in all editions
+            if path.startswith("/api/tenant-blackboard"):
+                return await call_next(request)
             if not is_enterprise_api:
                 return await call_next(request)
             # 先放行让 AuthMiddleware 处理认证；未认证请求由 AuthMiddleware

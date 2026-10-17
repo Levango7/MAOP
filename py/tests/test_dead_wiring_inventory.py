@@ -97,14 +97,42 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.core.mcp.mcp_adapter": ("unwired", "MCPAdapter 仅测试实例化；adapter_factory 不产出它"),
     "maop.core.memory.hybrid_search": ("unwired", "混合检索未接入记忆读路径"),
     "maop.core.memory.semantic_cache": ("unwired", "语义缓存未接入记忆读路径"),
+    "maop.core.reliability.blackboard_engine_bridge": (
+        "unwired",
+        "黑板↔M0 分布式执行后端的桥，DistributedTaskBackend 未构造它",
+    ),
     "maop.core.reliability.dag_scheduler": ("unwired", "DAG 调度器未接线"),
+    "maop.core.reliability.distributed_checkpoint": (
+        "unwired",
+        "Redis 持久化 DAG 运行态以支持崩溃恢复，调度器尚未调用（接上才有 resume）",
+    ),
+    "maop.core.reliability.distributed_lease": (
+        "unwired",
+        "Redis 租约 + fencing token 的互斥原语，尚无生产调用方",
+    ),
+    "maop.core.reliability.event_federation": (
+        "dynamic",
+        "符号经 reliability/__init__ 的 _SYMBOL_TO_MODULE 惰性解析（FederationBus 等），无静态导入",
+    ),
+    "maop.core.reliability.ks_agent_bridge": (
+        "dynamic",
+        "符号经 reliability/__init__ 的 _SYMBOL_TO_MODULE 惰性解析（CallableKnowledgeSource 等）",
+    ),
     "maop.core.reliability.preemptable_worker_pool": ("unwired", "抢占式 worker 池未接线"),
+    "maop.core.scheduling.distributed_checkpoint_coordinator": (
+        "unwired",
+        "包 DistributedScheduler 做层级 checkpoint/重启恢复，调度入口尚未换成它",
+    ),
     "maop.core.security.byok": ("unwired", "BYOK 未接线"),
     "maop.core.security.ldap_provider": ("unwired", "LDAP provider 未接线（SSO 走 SAML/OIDC）"),
     "maop.core.subagent_delegation": ("unwired", "v5.0 起已废弃，双实现说明仍留着"),
     "maop.dashboard.provider": ("unwired", "dashboard 旧 provider 入口（v4.0.0 起 create_app 已废弃）"),
     "maop.dashboard.routers.error_handler": ("unwired", "路由层错误处理未挂到 app"),
     "maop.dashboard.static": ("unwired", "静态文件挂载未接入 server.py"),
+    "maop.dashboard.ws_blackboard_bridge": (
+        "unwired",
+        "黑板写入→WS 推送的桥，lifespan 未启动它（模块 docstring 已同步改为'需显式启动'）",
+    ),
     "maop.dashboard.ws_dag": ("unwired", "DAG WebSocket 未挂到 app"),
     "maop.delegate.doc_pipeline_adapter": ("unwired", "doc-pipeline 适配器未接线"),
     "maop.maop_execute": ("unwired", "全仓零生产调用方（权限门已改由 dispatch_gate 承担）"),

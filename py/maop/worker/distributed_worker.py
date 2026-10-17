@@ -138,6 +138,7 @@ class TaskResult:
     output: Any = None
     error: str = ""
     duration_ms: int = 0
+    spawn_directives: list[dict[str, Any]] | None = None
 
 
 # Type alias for the executor callable.
@@ -414,6 +415,8 @@ class DistributedWorker:
                     status = result.status
                     output = result.output
                     error = result.error
+                    # M0 L0.1-T0.1.8: forward spawn directives from executor
+                    spawn_directives = getattr(result, "spawn_directives", None)
                 except asyncio.CancelledError:
                     error = "task cancelled during execution"
                     raise
@@ -421,12 +424,13 @@ class DistributedWorker:
                     status = "failed"
                     output = None
                     error = f"{type(exc).__name__}: {exc}"
+                    spawn_directives = None
                     logger.warning(
                         "[dist-worker] %s task %s (node %s) failed: %s",
                         self._worker_id, msg_id_str, node_id, exc,
                     )
                 duration_ms = int((time.monotonic() - start) * 1000)
-            # Post result to the run's results stream.
+            # Post result to the results stream.
             try:
                 self._scheduler.post_result(
                     run_id,
@@ -436,6 +440,7 @@ class DistributedWorker:
                     error=error,
                     worker_id=self._worker_id,
                     duration_ms=duration_ms,
+                    spawn_directives=spawn_directives,
                 )
                 posted = True
             except Exception as exc:
@@ -457,6 +462,7 @@ class DistributedWorker:
                         error=error or "task ended without posting a result",
                         worker_id=self._worker_id,
                         duration_ms=duration_ms,
+                        spawn_directives=None,
                     )
                 except Exception as exc:
                     logger.debug(

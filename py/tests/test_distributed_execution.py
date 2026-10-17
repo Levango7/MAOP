@@ -762,16 +762,20 @@ class TestEngineDistributedIntegration:
     async def test_distributed_fallback_on_error(
         self, fake_redis: Any,
     ) -> None:
-        """When DistributedScheduler raises, engine falls back to single-process."""
+        """When the distributed backend raises, engine falls back to single-process."""
 
-        # Patch _get_distributed_scheduler to return a scheduler that raises.
+        # Patch the backend that ``run(distributed=True)`` actually routes
+        # through. Patching ``_get_distributed_scheduler`` (the legacy bridge
+        # used only by ``_run_distributed``) no longer intercepts this path:
+        # the run would reach the real DistributedTaskBackend, poll the fake
+        # Redis results stream forever, and hang the whole suite.
         engine = Engine(redis_client=fake_redis)
 
-        class FailingScheduler:
-            async def run(self, nodes: Any, **kw: Any) -> Any:
+        class FailingBackend:
+            async def run(self, steps: Any, **kw: Any) -> Any:
                 raise RuntimeError("simulated dispatch failure")
 
-        with patch.object(engine, "_get_distributed_scheduler", return_value=FailingScheduler()):
+        with patch.object(engine, "_distributed_backend", FailingBackend()):
             steps = [
                 WorkflowStep(id="s1", type=StepType.AGENT, agent="claude", task="hello"),
             ]

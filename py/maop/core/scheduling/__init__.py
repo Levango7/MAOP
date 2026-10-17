@@ -29,6 +29,12 @@ from maop.core.scheduling.distributed_scheduler import (
     SchedulingError,
     TaskAssignment,
 )
+from maop.core.scheduling.task_backend import (
+    DistributedTaskBackend,
+    LocalTaskBackend,
+    TaskBackend,
+    TaskBackendABC,
+)
 from maop.core.scheduling.worker_pool import (
     WorkerInfo,
     WorkerRegistry,
@@ -37,9 +43,13 @@ from maop.core.scheduling.worker_pool import (
 
 __all__ = [
     "DistributedScheduler",
+    "DistributedTaskBackend",
+    "LocalTaskBackend",
     "NodeAffinity",
     "SchedulingError",
     "TaskAssignment",
+    "TaskBackend",
+    "TaskBackendABC",
     "WorkerInfo",
     "WorkerRegistry",
     "WorkerStatus",

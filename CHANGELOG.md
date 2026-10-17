@@ -81,6 +81,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **留在原地的**：`repair` 计数（"修过但已修干净"）仍然只是 `::warning::`。把它也做成"必须为 0"的
 棘轮是下一步 —— 现在拦只会把既存欠账变成长驻红，而定位还没做完。
 
+### M0–M4 多智能体协调包过门禁：一个被 183 条绿测掩盖的 NameError，与一次我自己引入又被复跑抓住的手误
+
+`wip/snapshot-20261017` 固化的在途资产（M0–M4 协调：a2a 传输服务、blackboard 桥、任务上下文、
+分布式调度/检查点/租约、事件联邦、触发引擎、健康探针、M3 运维面板与租户黑板 API）转交本分支时，
+**六道静态门禁五道不过**。逐项处置，先说结论：143 个 ruff 问题与 31 个 mypy 问题里，各埋着一个
+**测试全绿也发现不了的真 bug**。
+
+**门禁层**
+
+- **config drift 229→230**：`engine_router.py` 直接 `os.environ.get("MAOP_REDIS_URL")`，绕过
+  `MAOPSettings` 单例造成同一配置两个真相源。改为 `get_settings().redis_url`，并用
+  `model_fields_set` 区分"未设（False）／显式设值（True）／显式空串（True, ''）"——若简单按默认值
+  取，未配 Redis 的环境会无故建外部连接，Personal 版"未配置=本地引擎"的语义就丢了。
+- **静默 except 20 处**（ADR-023，baseline 0）：19 处是有理由的 best-effort（optional-dep /
+  lock-race / ws-disconnect / scan-continue 等 10 类闭集），打 `# silent-ok: <类> — <理由>`；
+  1 处是真漏——`agent_registry` 状态持久化失败被吞，黑板上的 agent 状态会静默不一致，补
+  `logger.warning`。`contextlib.suppress` 47 处双向棘轮持平（只许降不许升）。
+- **ruff 143 errors**（干净 master 全绿 ⇒ 全部来自本批新文件），`--fix` 自动修 111 + 手工 32。
+- **mypy 31 errors**（干净 master 0 错误）。
+- **doc_reconcile**：README 的 core/ 子包计数 16→17。
+- **空断言测试**：`test_distributed_e2e.py::test_result_mapping` 只构造对象、不验证契约——改为
+  断言 trace_id 透传、`steps[0].id`、`status == SUCCESS`、`output == "mapped-output"`、
+  `duration_ms == 150`（预投结果流 + scheduler 首轮 poll 即收集，无挂起风险）。
+
+**两个测试抓不住的 bug**
+
+- `RedisAgentStore.remove()` 调 `_json.dumps`，而 `json` 从未 import（ruff F821）。Redis 后端的
+  remove 一调就 NameError；**183 条测试全绿也没暴露，因为测试只覆盖 InMemoryAgentStore 路径**。
+  补 `import json as _json`。
+- `a2a_blackboard_bridge.py`：`a2a_msg.task_id` 为 None 时会把 `None` 当键写进 `_task_routes`，
+  此后任何 None 查表都假命中。加 `if a2a_msg.task_id:` 守卫后才写（同一个 mypy index 错误）。
+
+**一次自己引入又被自己抓住的手误**：PERF102 批量修复 `.items()`→`.values()` 时，有一处写成
+`for v in raw.items()`（v 成元组 → `json.loads` 全抛 → 被 scan-continue 吞掉 → 测试红在
+`test_incomplete_runs_query`）。复跑定位后改回 `.values()`——**"作业绿了"不等于"改对了"，批量
+替换后必须逐点复跑**。
+
+其余 mypy 站点：`distributed_scheduler._dispatch_and_collect` 返回标注写成 `dict`、实际返回
+`(dict, list)` 二元组（调用侧 430/438/584 三处连带错）；`a2a_transport_server` 路由表
+`dict[str, dict[str, Callable]]` 精确化为 `_RouteHandler` 别名；删两个从未引用的私有 Protocol、
+三处死变量；`debate_engine._run_round` 参数原标 `Blackboard`、实收 `BlackboardEntry`。
+
+**门禁口径数字**：config drift 229==229；静默 0/0（suppress 47/47）；mypy 510 文件 0 错误；
+ruff 全绿。单元测试与覆盖率棘门（baseline 81.0%）见 PR 检查。
+
+**一个 flaky 的根因在测试、不在实现**：`test_coordination_m4.py::test_ws_receives_conflict_alert`
+等 scan 的 conflict_alert 广播，但该广播由 scan 请求内的 `asyncio.create_task` 发出——TestClient 每
+请求新 event loop、返回即取消 pending task（隔壁 `test_ws_receives_broadcast` 的注释早已写明这条
+限制），广播在 TestClient 下**可能永不到达**；而收包循环的 try/except 只防“连接断开”、防不了
+“一条都不发”，`receive_json()` 无限阻塞，只能等 pytest-timeout 判红。同一份代码、同一顺序，
+两轮 5 文件复跑一轮 183 passed、一轮直接挂 120s。修法忠于该测试自己的注释原意
+（"may or may not appear... we verify the scan itself worked"）：广播等待改为**有界** —— daemon
+线程 drain + 10s 超时后从测试线程 `ws.close()`（close 只走 send 侧、永不受阻，可让 drain 抛
+`WebSocketDisconnect` 退出，`with` 块退出不僵）；硬断言只留 scan 的 `active_count >= 1`。
+修后该用例连跑 3 次 + 与 `test_blackboard.py`（全局单例 reset 源）组合各 3 次全过。
+
+**第二个挂起：测试 patch 的目标已经不在执行路径上**：`test_distributed_execution.py::test_distributed_fallback_on_error`
+patch 的是 `_get_distributed_scheduler`（legacy 桥，现在只有 `_run_distributed` 用），而
+`run(distributed=True)` 早已改走 `_distributed_backend`（TaskBackend 抽象）。于是"模拟调度失败"根本
+没发生，请求直落真的 `DistributedTaskBackend`，在 fake Redis 的结果流上无限轮询，把 pytest 进程拖到
+**无汇总退出**——表现是"跑到 28% 就没了"，连 FAILED 行都没有，只有 pytest-timeout 的线程栈
+（MainThread 卡在 `pytest_asyncio` 的 `run_until_complete` → Windows IOCP）。修法：patch 目标改为
+`_distributed_backend`，装一个 `run()` 直接抛 `RuntimeError` 的假后端，`engine.py` 219–227 的回退
+分支才真正被验证。修后该文件 59 passed、0 Timeout。
+
+顺带记一条**产品侧同类风险**（本 PR 未改）：`DistributedScheduler._dispatch_and_collect` 的
+`while pending` 只在 `deadline is not None` 时有界；生产上若结果消息丢失且未设 deadline，会无限
+等待。本 PR 只修测试契约，不动调度器的超时语义——那需要单独设计（默认 deadline 取值会影响长任务）。
+
+**全量跑到 100% 后剩下的 3 条红，都是"契约改了、调用方没跟"**：
+
+- `test_distributed_audit_fixes.py::TestReadResultsCursor` 两处仍按二元组解包 `_read_results`，而
+  spawn 扇出已把它改成 `(results, spawns, cursor)` ⇒ `ValueError: too many values to unpack
+  (expected 2, got 3)`。改成三元组解包（该测试只关心 cursor 语义，spawns 用 `_` 忽略）。
+- `test_dead_wiring_inventory.py::test_orphan_set_matches_the_inventory`：7 个新模块零生产导入方。
+  逐条判定而不是一把塞进清单：`ks_agent_bridge` / `event_federation` 经 `reliability/__init__`
+  的 `_SYMBOL_TO_MODULE` + `__getattr__` 惰性解析可达 ⇒ `dynamic`；
+  `blackboard_engine_bridge` / `distributed_checkpoint` / `distributed_lease` /
+  `distributed_checkpoint_coordinator` 确实没有调用方 ⇒ `unwired`；
+  `ws_blackboard_bridge` 的 docstring 原本声称"由 lifespan 自动启动"，而全仓**除它自己外无人
+  import** ⇒ 登记 `unwired` **并同步修正 docstring**——不修就等于让清单给一个假声明背书。
+
 ### 主干 `Secret Scan` 的 69 条命中曾经查不动：报表路径与上传路径对不上，还被 `ignore` 消音
 
 2026-10-16 主干 run `38902904241` 里 `Secret Scan (gitleaks)` 判红，扫描步自己打出
