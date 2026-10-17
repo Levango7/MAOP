@@ -1003,7 +1003,7 @@ class TestA2ATransportServerRoutes:
                 self.cards.append(card)
 
         registry = Registry()
-        status, payload = await self._server(registry=registry).handle_request(
+        status, _payload = await self._server(registry=registry).handle_request(
             "POST", "/a2a/agents/register", b'{"card_id": "a8"}',
         )
         assert status == 201
