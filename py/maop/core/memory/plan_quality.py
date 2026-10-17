@@ -58,9 +58,10 @@ import math
 import random
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
@@ -176,7 +177,7 @@ def compute_quality_label(
     retry_disc = 0.82 ** max(0, retries_used)
 
     multiplier = (cost_disc * lat_disc * retry_disc) ** (1.0 / 3)
-    return round(max(0.55, min(1.0, outcome_mult * multiplier)), 4)
+    return float(round(max(0.55, min(1.0, outcome_mult * multiplier)), 4))
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -363,7 +364,7 @@ class PlanQualityModel:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "PlanQualityModel":
+    def from_dict(cls, d: dict[str, Any]) -> PlanQualityModel:
         m = cls(feature_dim=int(d.get("feature_dim", 10)))
         m._w = list(d.get("w", m._w))
         m._b = float(d.get("b", 0.0))
@@ -405,7 +406,7 @@ class PlanVersion:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "PlanVersion":
+    def from_dict(cls, d: dict[str, Any]) -> PlanVersion:
         return cls(**d)
 
 

@@ -47,7 +47,8 @@ import math
 import threading
 from abc import abstractmethod
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
@@ -209,6 +210,19 @@ def _built_in_rules() -> list[Rule]:
 # ── Datalog-style forward chainer ────────────────────────────────────
 
 
+def _resolve_relations_db(db_path: str | Path | None) -> str | Path:
+    """None **不等于**"随便连一个" —— sqlite_connect 走 ``sqlite3.connect(str(db_path))``，
+
+    传 None 会得到一个字面名为 ``None`` 的库文件（静默新建在 CWD，读到的永远是空表）。
+    relations 表归 KnowledgeGraph 所有，所以缺省口径与它一致：``get_db_path("knowledge_graph")``。
+    """
+    if db_path is None:
+        from maop.core.backends.db_utils import get_db_path
+
+        return get_db_path("knowledge_graph")
+    return db_path
+
+
 class DatalogReasoner:
     """Forward-chaining rule engine over KnowledgeGraph's SQLite tables.
 
@@ -258,7 +272,7 @@ class DatalogReasoner:
 
         validate_identifier("relations")
         try:
-            with sqlite_connect(db_path) as conn:
+            with sqlite_connect(_resolve_relations_db(db_path)) as conn:
                 rows = conn.execute(
                     f"SELECT source, target, relation_type, confidence "
                     f"FROM relations WHERE {where} ORDER BY confidence DESC LIMIT 50",  # nosec B608 — 语句仅含固定子句与 ? 占位
@@ -278,7 +292,7 @@ class DatalogReasoner:
             self._adj.clear()
             try:
                 from maop.core.backends.db_utils import sqlite_connect
-                with sqlite_connect(db_path) as conn:
+                with sqlite_connect(_resolve_relations_db(db_path)) as conn:
                     rows = conn.execute(
                         "SELECT source, target, relation_type, confidence FROM relations",
                     ).fetchall()

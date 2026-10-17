@@ -23,17 +23,17 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from typing import Any, cast
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "VisualNode",
-    "VisualEdge",
-    "VisualDAG",
     "ValidationError",
+    "VisualDAG",
+    "VisualEdge",
+    "VisualNode",
     "compile_visual_dag",
     "decompile_yaml",
     "validate_dag",
@@ -122,15 +122,15 @@ def compile_visual_dag(dag: VisualDAG) -> str:
         nodes_list.append(entry)
 
     for edge in dag.edges:
-        entry: dict[str, Any] = {
+        edge_entry: dict[str, Any] = {
             "source": edge.source,
             "target": edge.target,
         }
         if edge.label:
-            entry["label"] = edge.label
+            edge_entry["label"] = edge.label
         if edge.condition:
-            entry["condition"] = edge.condition
-        edges_list.append(entry)
+            edge_entry["condition"] = edge.condition
+        edges_list.append(edge_entry)
 
     workflow: dict[str, Any] = {
         "name": dag.name,

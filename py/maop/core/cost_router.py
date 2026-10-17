@@ -25,7 +25,6 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +176,8 @@ class RoutingDecision:
     latency_slo_ms: int = 0
     strategy: RoutingStrategy = RoutingStrategy.BALANCED
     timestamp: float = field(default_factory=time.time)
-    degraded: bool = False       # True if forced downgrade due to budget
+    degraded: bool = False       # 实测口径：只要没选 tier.preferred_model 就为 True（quality_first 除外），
+                                 # 因此"调用方自己点名便宜模型"也会被记成降级 —— 见 tests/test_cost_router.py
 
 
 # ── LLMCostRouter ───────────────────────────────────────────────────
@@ -337,6 +337,7 @@ class LLMCostRouter:
 
 _router_instance: LLMCostRouter | None = None
 import threading as _threading
+
 _router_lock = _threading.Lock()
 
 
@@ -347,7 +348,12 @@ def get_cost_router(
 ) -> LLMCostRouter:
     """Return a process-wide LLMCostRouter singleton (lazy).
 
-    Parameters override existing config only when explicitly passed (non-None).
+    参数只在**首次构造**时生效：单例已存在时再传不同 strategy/budget/slo 会被静默忽略
+    （要换配置必须先 ``reset_cost_router()``）。旧文案写的"显式传入时覆盖已有配置"
+    与实现不符，已按实测更正 —— 本仓出过 get_route_scorer 单例污染导致生产路由退化的事故。
+
+    另：``monthly_budget_usd=0.0`` 因为走 ``or`` 链，等价于"未指定"（取 settings 值），
+    不是"预算为零"。
     """
     global _router_instance
     if _router_instance is None:
@@ -360,11 +366,11 @@ def get_cost_router(
                         getattr(settings, "cost_routing_policy", "balanced")
                     )
                     _budget = monthly_budget_usd or settings.budget_monthly_limit_usd
-                    _slo = latency_slo_ms or getattr(settings, "cost_latency_slo_ms", 3000)
+                    _slo = int(latency_slo_ms or getattr(settings, "cost_latency_slo_ms", 3000) or 3000)
                 except Exception:
                     _strategy = strategy or RoutingStrategy.BALANCED
                     _budget = monthly_budget_usd or 0.0
-                    _slo = latency_slo_ms or 3000
+                    _slo = int(latency_slo_ms or 3000)
                 _router_instance = LLMCostRouter(
                     strategy=_strategy,
                     monthly_budget_usd=_budget,

@@ -13,14 +13,17 @@ This module defines that contract:
 
 * :class:`AudioEmbeddingProvider` — the shape any audio embedder must
   satisfy (embed from a file path or raw PCM bytes). The enterprise repo
-  ships ``WhisperAudioProvider`` and ``ClapAudioProvider`` conforming to
-  this; without one, the audio space degrades to
+  is *expected* to ship ``WhisperAudioProvider`` / ``ClapAudioProvider``
+  conforming to this — **as of 2026-10-18 it does not yet**: MAOS tip
+  ``1a19c7f`` has zero occurrences of either class name, of ``embed_audio``
+  / ``embed_video``, and of any import of this module. Until a provider is
+  injected, the audio space degrades to
   :class:`~maop.core.memory.multimodal_embed.HashModalityEmbedding`
   (non-semantic, ``stats()["degraded"] == True``).
 * :class:`VideoEmbeddingProvider` — the shape any video embedder must
-  satisfy (sample ``n`` frames uniformly and pool). The enterprise repo
-  ships ``FramePoolVideoProvider`` (ffmpeg + CLIP); without one, the
-  video space degrades to the hash fallback.
+  satisfy (sample ``n`` frames uniformly and pool). Same status: the
+  planned ``FramePoolVideoProvider`` (ffmpeg + CLIP) is not in MAOS yet,
+  so the video space currently always resolves to the hash fallback.
 
 Additionally :func:`register_builtin_av_spaces** pre-registers an audio-768
 and a video-512 space with the multimodal space registry. The personal
@@ -40,11 +43,10 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from maop.core.memory.multimodal_embed import (
     MULTIMODAL_DIM,
-    MultimodalEmbeddingProvider,
 )
 from maop.core.memory.multimodal_spaces import (
     MultimodalSpaceSpec,
@@ -55,9 +57,9 @@ from maop.core.memory.multimodal_spaces import (
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "AudioEmbeddingProvider",
     "MODALITY_AUDIO",
     "MODALITY_VIDEO",
+    "AudioEmbeddingProvider",
     "VideoEmbeddingProvider",
     "get_audio_space",
     "get_video_space",
