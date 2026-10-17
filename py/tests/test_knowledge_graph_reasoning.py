@@ -13,10 +13,8 @@ Three layers that are being pinned:
 
 from __future__ import annotations
 
-import json
 import math
 import sqlite3
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -27,10 +25,8 @@ from maop.core.memory.knowledge_graph_reasoning import (
     KgeScorer,
     PathPlan,
     Rule,
-    TRANSITIVE_RELATIONS,
     hop_plan,
 )
-
 
 # ── helpers ──────────────────────────────────────────────────────────
 
