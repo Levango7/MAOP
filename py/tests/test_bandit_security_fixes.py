@@ -37,6 +37,7 @@ NOSEC_INVENTORY: frozenset[str] = frozenset({
     "maop/core/backends/data.py:B608:6",
     "maop/core/backends/image_store.py:B608:2",
     "maop/core/backends/kv_store.py:B608:1",
+    "maop/core/coordination/a2a_transport_server.py:B104:1",
     "maop/core/cost_tracker.py:B608:1",
     "maop/core/mcp/mcp_hub_ops.py:B608:1",
     "maop/core/mcp/mcp_hub_transport.py:B310:1",

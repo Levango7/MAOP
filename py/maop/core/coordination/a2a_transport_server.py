@@ -373,7 +373,10 @@ class A2ATransportServer:
         self,
         bridge: Any = None,
         registry: Any = None,
-        host: str = "0.0.0.0",
+        # A2A peers address this node over the network, so the default binds all
+        # interfaces; deployments narrow it via compose/network policy (the same
+        # default as core/agent/delegation/a2a.py).
+        host: str = "0.0.0.0",  # nosec B104 — 节点间通信需对外监听，部署侧用网络策略收敛
         port: int = 9090,
         agent_card_url: str = "",
         agent_card_overrides: dict[str, Any] | None = None,
