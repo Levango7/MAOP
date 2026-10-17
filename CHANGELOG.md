@@ -163,6 +163,36 @@ patch 的是 `_get_distributed_scheduler`（legacy 桥，现在只有 `_run_dist
   `ws_blackboard_bridge` 的 docstring 原本声称"由 lifespan 自动启动"，而全仓**除它自己外无人
   import** ⇒ 登记 `unwired` **并同步修正 docstring**——不修就等于让清单给一个假声明背书。
 
+### CI 首轮红在覆盖率，顺着覆盖率又挖出四个真 bug（分布式恢复/租约其实不工作）
+
+全量在 Linux 上跑到 100%、单元测试全过，红的却是 `Coverage ratchet gate`：master 是 81.43%，
+本 PR 降到 **80.59%**（新增 3261 行只有 **65.6%** 覆盖），跌破 baseline 81.0%。本地 Windows
+测出 81.63% 是**平台虚高**——Windows 专属分支在 Linux 上不计覆盖（平台差集 1550 行，全在既有文件）。
+
+补 `tests/test_coordination_unwired_components.py`（59 条）覆盖那些"登记为未接线、但接口契约
+必须先钉住"的组件时，**测试立刻推翻了实现**——四条都是"测试只走 InMemory / 只走 happy path"
+掩盖的缺陷：
+
+1. `DAGCheckpoint.__init__` 用 `x or default` 处理 `pending_layers` / `created_at`。空集合与
+   `0.0` 都是 falsy ⇒ 从 Redis 反序列化（`pending="[]"`）后被**重新填满全部层**：`is_complete`
+   永假，`recover_run()` 会把已完成的层再跑一遍。改 `is None` 判定。
+2. `mark_layer_done()` 只原子更新 `:pending` / `:completed` **集合**，从不重写 hash 里的 JSON
+   副本 ⇒ `get_run()` 返回 `create_run()` 时的陈旧 pending，恢复点永远是第 0 层。改以集合为
+   权威（`get_run` / `list_interrupted` 都用集合覆盖 hash 值）。
+3. `_renewal_loop` 里 `await self._redis.set(...)` —— 这个类用的是**同步**客户端（`acquire`
+   就不 await），`await bool` 抛 `TypeError` 被 `except Exception` 吞掉 ⇒ **自动续租从未生效**，
+   实例在 TTL 过期后仍认为自己持有租约（双主风险）。去掉 await。
+4. `RedisAgentStore.get()` 的 `hget` 漏了 `await`（异步客户端）⇒ 每次查询 TypeError；
+   `list()` 是对的，只有 `get()` 漏了。
+
+覆盖率变化（这三个模块）：`distributed_checkpoint` 22.4%→94%、`distributed_lease` 26.1%→91%、
+`bb_task_context` 38.2%→69%；另给 `RedisAgentStore` 补了 save/get/remove/list 的回归用例，
+给 `mcp_hub` 的四个传输补了"未 connect 就发请求必须报错"的守卫用例（覆盖我加的那条
+`self._proc.stdin is None` 判定），给调度器 `DistributedCheckpointCoordinator` 补了
+save/load/list/cleanup/serialize 的契约用例，并给 `engine_router._create_redis_client_from_env`
+补了四条分支（未配置 / 显式空串 / 显式有值 / 建连失败）—— 那正是 config drift 修复的语义本身，
+不钉住就等于只换了个真相源。
+
 ### 主干 `Secret Scan` 的 69 条命中曾经查不动：报表路径与上传路径对不上，还被 `ignore` 消音
 
 2026-10-16 主干 run `38902904241` 里 `Secret Scan (gitleaks)` 判红，扫描步自己打出

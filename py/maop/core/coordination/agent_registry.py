@@ -126,7 +126,10 @@ class RedisAgentStore:
     async def get(self, card_id: str) -> Any | None:
         import json as _json
         r = await self._get_redis()
-        data = r.hget(self._REDIS_KEY, card_id)
+        # redis.asyncio: hget is a coroutine — without await this returns a
+        # coroutine object, isinstance(bytes) is False, and d["card_id"] raises
+        # TypeError on every lookup. list() already awaited hgetall.
+        data = await r.hget(self._REDIS_KEY, card_id)
         if data is None:
             return None
         d = _json.loads(data) if isinstance(data, (bytes, bytearray)) else data

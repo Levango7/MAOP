@@ -90,13 +90,20 @@ class DAGCheckpoint:
     ) -> None:
         self.run_id = run_id
         self.layers = layers
-        self.completed_layers = completed_layers or set()
-        self.pending_layers = pending_layers or set(range(len(layers)))
-        self.results = results or {}
+        # NOTE: ``x or default`` is wrong for these fields — an empty set and a
+        # 0.0 timestamp are both falsy but meaningful. With ``or``, a checkpoint
+        # deserialized from Redis (pending="[]") would be re-filled with *every*
+        # layer, so recover_run() re-ran completed layers and is_complete could
+        # never be true. Use explicit ``is None`` checks.
+        self.completed_layers = completed_layers if completed_layers is not None else set()
+        self.pending_layers = (
+            pending_layers if pending_layers is not None else set(range(len(layers)))
+        )
+        self.results = results if results is not None else {}
         self.status = status
-        self.created_at = created_at or time.time()
-        self.updated_at = updated_at or time.time()
-        self.metadata = metadata or {}
+        self.created_at = created_at if created_at is not None else time.time()
+        self.updated_at = updated_at if updated_at is not None else time.time()
+        self.metadata = metadata if metadata is not None else {}
 
     @property
     def total_layers(self) -> int:
@@ -294,7 +301,17 @@ class DAGCheckpointManager:
                 data[key] = val
                 if key == "run_id":
                     data["run_id"] = val
-            return DAGCheckpoint.from_dict(data)
+            ckpt = DAGCheckpoint.from_dict(data)
+            # The :pending / :completed SETS are the source of truth.
+            # mark_layer_done() updates them atomically but never rewrites the
+            # hash's JSON copies, so the hash still carries the state as of
+            # create_run() — trusting it made recover_run() re-dispatch layers
+            # that had already completed. Both keys share the run's TTL, so a
+            # missing set means the whole checkpoint is gone (hgetall was empty
+            # above), never a partially-expired run.
+            ckpt.pending_layers = await self.get_pending_layers(run_id)
+            ckpt.completed_layers = await self.get_completed_layers(run_id)
+            return ckpt
         except Exception as exc:
             logger.warning("[dagckpt] get_run error for %s: %s", run_id, exc)
             return None
@@ -321,6 +338,9 @@ class DAGCheckpointManager:
                     }
                     ckpt = DAGCheckpoint.from_dict(data)
                     if ckpt.status in ("running", None):
+                        # Same reason as get_run(): the sets are authoritative.
+                        ckpt.pending_layers = await self.get_pending_layers(ckpt.run_id)
+                        ckpt.completed_layers = await self.get_completed_layers(ckpt.run_id)
                         results.append(ckpt)
                 except Exception:  # noqa: S112  # silent-ok: scan-continue — 逐 key 加载
                     continue

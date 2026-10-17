@@ -275,7 +275,12 @@ class DistributedLease:
                 await asyncio.sleep(interval)
                 if not self._held:
                     break
-                success = await self._redis.set(
+                # NOTE: the client used here is synchronous (``acquire`` calls
+                # ``set`` without await). ``await`` on its bool return raises
+                # TypeError, which the except below would swallow — the loop
+                # would exit while ``_held`` stayed True, so this instance kept
+                # believing it owned an expired lease (split-brain).
+                success = self._redis.set(
                     self._key,
                     f"{self._holder_id}:{self._token}",
                     xx=True,  # only if key exists
