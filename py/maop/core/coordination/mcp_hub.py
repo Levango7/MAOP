@@ -327,13 +327,21 @@ class RedisMCPRegistry:
         This is a synchronous wrapper; in production, await
         ``async_find_tools`` instead.
         """
-        # Fire-and-coroutine: returns a coroutine for async context
+        # A sync method cannot await the Redis client, and returning an empty
+        # list silently looks like "no tools registered" — say so instead.
+        logger.warning(
+            "[mcp-redis] find_tools() is synchronous and cannot query Redis; "
+            "use await async_find_tools() instead. Returning [].",
+        )
         return []
 
     async def async_find_tools(self, search_term: str = "") -> list[dict[str, Any]]:
         """Async tool search across all Redis-stored MCP server manifests."""
         r = await self._get_redis()
-        items = r.hgetall(self._HASH_KEY)
+        # redis.asyncio: hgetall is a coroutine — without await, items is a
+        # coroutine, isinstance(items, dict) is False, and this silently
+        # returns [] for every search.
+        items = await r.hgetall(self._HASH_KEY)
         results: list[dict[str, Any]] = []
         for _, raw in items.items() if isinstance(items, dict) else []:
             try:

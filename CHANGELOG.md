@@ -219,7 +219,7 @@ patch 的是 `_get_distributed_scheduler`（legacy 桥，现在只有 `_run_dist
   `ws_blackboard_bridge` 的 docstring 原本声称"由 lifespan 自动启动"，而全仓**除它自己外无人
   import** ⇒ 登记 `unwired` **并同步修正 docstring**——不修就等于让清单给一个假声明背书。
 
-### CI 首轮红在覆盖率，顺着覆盖率又挖出四个真 bug（分布式恢复/租约其实不工作）
+### CI 首轮红在覆盖率，顺着覆盖率又挖出六个真 bug（分布式恢复/租约/能力查询其实不工作）
 
 全量在 Linux 上跑到 100%、单元测试全过，红的却是 `Coverage ratchet gate`：master 是 81.43%，
 本 PR 降到 **80.59%**（新增 3261 行只有 **65.6%** 覆盖），跌破 baseline 81.0%。本地 Windows
@@ -240,6 +240,12 @@ patch 的是 `_get_distributed_scheduler`（legacy 桥，现在只有 `_run_dist
    实例在 TTL 过期后仍认为自己持有租约（双主风险）。去掉 await。
 4. `RedisAgentStore.get()` 的 `hget` 漏了 `await`（异步客户端）⇒ 每次查询 TypeError；
    `list()` 是对的，只有 `get()` 漏了。
+5. `RedisMCPRegistry.async_find_tools()` 的 `hgetall` 同样漏 `await` ⇒ `items` 是 coroutine、
+   `isinstance(items, dict)` 为假 ⇒ **每次搜索都返回空列表**。同步版 `find_tools()` 则是直接
+   `return []`（"没查到"和"查不了"长得一样）——改为打 warning 说明它查不了 Redis。
+6. `RedisAgentRegistry.find_agents(capability)` **完全忽略 capability 参数**：只按 status 过滤后
+   把所有 agent 都返回。docstring 写的是"providing the given capability"。改为注册时缓存
+   capabilities 并真正过滤。
 
 覆盖率变化（这三个模块）：`distributed_checkpoint` 22.4%→94%、`distributed_lease` 26.1%→91%、
 `bb_task_context` 38.2%→69%；另给 `RedisAgentStore` 补了 save/get/remove/list 的回归用例，

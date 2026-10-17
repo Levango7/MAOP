@@ -225,6 +225,10 @@ class RedisAgentRegistry:
         self._running = False
         self._probe_task: asyncio.Task | None = None
         self._local_status: dict[str, str] = {}  # card_id → status (local view)
+        # capability 查询要在同步上下文里做，所以注册时把能力快照下来 ——
+        # find_agents() 之前完全忽略 capability 参数，把"按能力找 agent"
+        # 变成了"列出所有 agent"。
+        self._local_capabilities: dict[str, list[str]] = {}
 
     async def start(self) -> None:
         """Start the background health probe task."""
@@ -252,12 +256,16 @@ class RedisAgentRegistry:
         """Register an A2A agent card."""
         await self._store.save(card)
         self._local_status[card.card_id] = "active"
+        self._local_capabilities[card.card_id] = list(
+            getattr(card, "capabilities", []) or [],
+        )
         logger.info("[agent-registry] registered agent %s (%s)", card.card_id, card.name)
 
     async def unregister_agent(self, card_id: str) -> None:
         """Remove an agent card from the registry."""
         await self._store.remove(card_id)
         self._local_status.pop(card_id, None)
+        self._local_capabilities.pop(card_id, None)
         logger.info("[agent-registry] unregistered agent %s", card_id)
 
     async def list_agents(self) -> list[Any]:
@@ -290,9 +298,13 @@ class RedisAgentRegistry:
         for card_id, status in list(self._local_status.items()):
             if only_active and status != "active":
                 continue
-            # We can't await here, so use a best-effort approach:
-            # the health probe updates card capabilities into cache
-            matching.append(CachedAgentRef(card_id=card_id, status=status))
+            caps = self._local_capabilities.get(card_id, [])
+            # 之前这里直接 append，capability 参数形同虚设。
+            if capability and capability not in caps:
+                continue
+            matching.append(
+                CachedAgentRef(card_id=card_id, status=status, capabilities=list(caps)),
+            )
         return matching
 
     # ── Health Probe Loop ─────────────────────────────────────────

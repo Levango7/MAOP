@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import fakeredis
 import pytest
@@ -1060,3 +1060,242 @@ class TestA2ATransportServerRoutes:
         )
         assert status == 500
         assert "does not support" in payload["error"]
+
+
+# ── RedisMCPRegistry 与各传输的发送路径 ─────────────────────────
+
+
+class TestRedisMCPRegistry:
+    @pytest.fixture
+    def registry(self) -> Any:
+        import fakeredis.aioredis
+
+        from maop.core.coordination.mcp_hub import RedisMCPRegistry
+
+        reg = RedisMCPRegistry("redis://unused:6379/0")
+        reg._redis = fakeredis.aioredis.FakeRedis()
+        return reg
+
+    @staticmethod
+    def _server(name: str, tools: list[str]) -> Any:
+        from maop.core.coordination.mcp_hub import MCPServer
+
+        transport = MagicMock()
+        transport.name = "fake"
+        return MCPServer(
+            name=name,
+            transport=transport,
+            description=f"{name} server",
+            tools=[{"name": t} for t in tools],
+        )
+
+    async def test_register_then_async_find_tools(self, registry: Any) -> None:
+        # async_find_tools 的 hgetall 曾经漏 await ⇒ 永远返回 []
+        await registry.register(self._server("fs", ["read", "write"]))
+        hits = await registry.async_find_tools("read")
+        assert len(hits) == 1
+        assert hits[0]["server_name"] == "fs"
+        assert hits[0]["server_description"] == "fs server"
+        assert hits[0]["tool"] == {"name": "read"}
+
+    async def test_async_find_tools_returns_all_without_term(self, registry: Any) -> None:
+        await registry.register(self._server("fs", ["read", "write"]))
+        await registry.register(self._server("git", ["status"]))
+        assert len(await registry.async_find_tools()) == 3
+
+    async def test_unregister_removes_server(self, registry: Any) -> None:
+        await registry.register(self._server("fs", ["read"]))
+        await registry.unregister("fs")
+        assert await registry.async_find_tools() == []
+
+    async def test_async_find_tools_skips_malformed(self, registry: Any) -> None:
+        from maop.core.coordination.mcp_hub import RedisMCPRegistry
+
+        await registry.register(self._server("fs", ["read"]))
+        await registry._redis.hset(RedisMCPRegistry._HASH_KEY, "broken", "not-json")
+        assert len(await registry.async_find_tools()) == 1
+
+    async def test_sync_find_tools_is_explicitly_empty(self, registry: Any) -> None:
+        """同步版查不了 Redis —— 返回空列表，但不许假装查过。"""
+        await registry.register(self._server("fs", ["read"]))
+        assert registry.find_tools("read") == []
+
+
+class TestTransportSendPaths:
+    """四个传输的成功路径（client 用 mock，不联网、不 spawn）。"""
+
+    async def test_sse_posts_jsonrpc(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from maop.core.coordination.mcp_hub import SSETransport
+
+        transport = SSETransport("http://mcp.local/sse")
+        client = MagicMock()
+        client.post = AsyncMock(return_value=MagicMock(json=lambda: {"result": 1}))
+        transport._client = client
+
+        out = await transport.send_request("initialize", {"p": 1})
+        assert out == {"result": 1}
+        args, kwargs = client.post.call_args
+        assert args[0] == "http://mcp.local/sse"
+        assert kwargs["json"]["method"] == "initialize"
+        assert kwargs["json"]["params"] == {"p": 1}
+        assert kwargs["json"]["jsonrpc"] == "2.0"
+        assert kwargs["headers"] == {"Accept": "application/json"}
+
+    async def test_streamable_http_posts_jsonrpc(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from maop.core.coordination.mcp_hub import StreamableHTTPTransport
+
+        transport = StreamableHTTPTransport("http://mcp.local/mcp")
+        client = MagicMock()
+        client.post = AsyncMock(return_value=MagicMock(json=lambda: {"ok": True}))
+        transport._client = client
+
+        assert await transport.send_request("tools/call", {"name": "x"}) == {"ok": True}
+        args, kwargs = client.post.call_args
+        assert args[0] == "http://mcp.local/mcp"
+        assert kwargs["json"]["method"] == "tools/call"
+
+    async def test_websocket_sends_and_reads(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from maop.core.coordination.mcp_hub import WebSocketTransport
+
+        transport = WebSocketTransport("ws://mcp.local/ws")
+        ws = MagicMock()
+        ws.send = AsyncMock()
+        ws.recv = AsyncMock(return_value='{"result": {"content": []}}')
+        transport._ws = ws
+
+        out = await transport.send_request("tools/list", {})
+        assert out == {"result": {"content": []}}
+        sent = ws.send.call_args[0][0]
+        assert '"method": "tools/list"' in sent
+
+    async def test_sse_disconnect_closes_client(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from maop.core.coordination.mcp_hub import SSETransport
+
+        transport = SSETransport("http://mcp.local/sse")
+        client = MagicMock()
+        client.aclose = AsyncMock()
+        transport._client = client
+
+        await transport.disconnect()
+        client.aclose.assert_awaited_once()
+        assert transport._client is None
+
+    async def test_stdio_connect_and_request_roundtrip(self) -> None:
+        """用假 Popen 覆盖 connect/send/disconnect，不真起子进程。"""
+        from unittest.mock import patch
+
+        from maop.core.coordination.mcp_hub import StdioTransport
+
+        proc = MagicMock()
+        proc.stdin = MagicMock()
+        proc.stdout = MagicMock()
+        proc.stdout.readline.return_value = b'{"result": "ok"}'
+
+        with patch("subprocess.Popen", return_value=proc) as popen:
+            transport = StdioTransport("mcp-server", ["--stdio"])
+            await transport.connect()
+            assert popen.call_args[0][0] == ["mcp-server", "--stdio"]
+
+            out = await transport.send_request("initialize", {})
+            assert out == {"result": "ok"}
+            assert b'"method": "initialize"' in proc.stdin.write.call_args[0][0]
+
+            await transport.disconnect()
+            proc.terminate.assert_called_once()
+            assert transport._proc is None
+
+
+# ── RedisAgentRegistry ───────────────────────────────────────────
+
+
+class TestRedisAgentRegistry:
+    @pytest.fixture
+    def registry(self) -> Any:
+        import fakeredis.aioredis
+
+        from maop.core.coordination.agent_registry import RedisAgentRegistry
+
+        reg = RedisAgentRegistry("redis://unused:6379/0", probe_interval=0.05)
+        reg._store._redis = fakeredis.aioredis.FakeRedis()
+        return reg
+
+    @staticmethod
+    def _card(card_id: str, caps: list[str], name: str | None = None) -> Any:
+        from maop.core.coordination.a2a_blackboard_bridge import AgentCard
+
+        return AgentCard(
+            card_id=card_id, name=name or card_id, url=f"http://{card_id}",
+            capabilities=caps,
+        )
+
+    async def test_register_then_list(self, registry: Any) -> None:
+        await registry.register_agent(self._card("a1", ["plan"]))
+        agents = await registry.list_agents()
+        assert [a.card_id for a in agents] == ["a1"]
+        assert registry.get_agent("a1") == "active"
+
+    async def test_find_agents_filters_by_capability(self, registry: Any) -> None:
+        """回归：capability 参数曾经被完全忽略（返回所有 agent）。"""
+        await registry.register_agent(self._card("planner", ["plan"]))
+        await registry.register_agent(self._card("coder", ["code"]))
+
+        planners = registry.find_agents("plan")
+        assert [a.card_id for a in planners] == ["planner"]
+        assert planners[0]._capabilities == ["plan"]
+
+        assert registry.find_agents("gpu") == []
+
+    async def test_find_agents_only_active(self, registry: Any) -> None:
+        await registry.register_agent(self._card("a1", ["plan"]))
+        registry._local_status["a1"] = "degraded"
+        assert registry.find_agents("plan") == []
+        assert len(registry.find_agents("plan", only_active=False)) == 1
+
+    async def test_unregister_removes_from_caches(self, registry: Any) -> None:
+        await registry.register_agent(self._card("a1", ["plan"]))
+        await registry.unregister_agent("a1")
+        assert await registry.list_agents() == []
+        assert registry.get_agent("a1") is None
+        assert registry.find_agents("plan") == []
+
+    async def test_get_agent_async_reads_store(self, registry: Any) -> None:
+        await registry.register_agent(self._card("a1", ["plan"]))
+        loaded = await registry.get_agent_async("a1")
+        assert loaded is not None
+        assert loaded.card_id == "a1"
+        assert await registry.get_agent_async("missing") is None
+
+    async def test_start_stop_probe_task(self, registry: Any) -> None:
+        await registry.start()
+        assert registry._probe_task is not None
+        await registry.stop()
+        assert registry._running is False
+        assert registry._probe_task.cancelled() or registry._probe_task.done()
+
+    async def test_probe_loop_marks_unhealthy_agent_degraded(self, registry: Any) -> None:
+        checker = MagicMock()
+        checker.check = AsyncMock(return_value=False)
+        registry._health_checker = checker
+        await registry.register_agent(self._card("a1", ["plan"]))
+
+        await registry.start()
+        await asyncio.sleep(0.25)  # 越过 probe_interval
+        await registry.stop()
+
+        assert registry.get_agent("a1") == "degraded"
+        checker.check.assert_awaited()
+
+    async def test_probe_loop_survives_store_errors(self, registry: Any) -> None:
+        registry._store.list = AsyncMock(side_effect=ConnectionError("redis down"))
+        await registry.start()
+        await asyncio.sleep(0.15)
+        await registry.stop()
+        assert registry._running is False
