@@ -139,7 +139,9 @@ def compile_visual_dag(dag: VisualDAG) -> str:
         "edges": edges_list,
     }
 
-    return yaml.dump(workflow, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    # yaml 没有 py.typed，dump() 在 mypy 眼里是 Any；mypy 2.4.0 的
+    # no-any-return 会因此判红（本地 2.3.1 不报，CI 钉的是 2.4.0）。
+    return str(yaml.dump(workflow, default_flow_style=False, sort_keys=False, allow_unicode=True))
 
 
 # ── Decompile: YAML → VisualDAG ──────────────────────────────────
