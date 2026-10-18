@@ -93,11 +93,14 @@ class TestReadResultsCursor:
             scheduler.post_result(
                 "run-cursor", f"n{i}", status="success", worker_id="w1",
             )
-        out1, cursor1 = scheduler._read_results(stream, {"n0", "n1", "n2"})
+        # ``_read_results`` returns ``(results, spawns, cursor)`` — the spawn
+        # list was added for runtime fan-out; this test only cares about the
+        # cursor semantics.
+        out1, _spawns1, cursor1 = scheduler._read_results(stream, {"n0", "n1", "n2"})
         assert set(out1) == {"n0", "n1", "n2"}
         assert cursor1 != (0, 0)
         # A second read from the cursor returns nothing new.
-        out2, cursor2 = scheduler._read_results(
+        out2, _spawns2, cursor2 = scheduler._read_results(
             stream, {"n0", "n1", "n2"}, cursor1,
         )
         assert out2 == {}
@@ -114,10 +117,10 @@ class TestReadResultsCursor:
         stream = scheduler._results_stream("run-mixed")
         scheduler.post_result("run-mixed", "other", status="success", worker_id="w1")
         scheduler.post_result("run-mixed", "wanted", status="success", worker_id="w1")
-        out, cursor = scheduler._read_results(stream, {"wanted"})
+        out, _spawns, cursor = scheduler._read_results(stream, {"wanted"})
         assert set(out) == {"wanted"}
         # The cursor moved past both entries.
-        out2, _ = scheduler._read_results(stream, {"wanted"}, cursor)
+        out2, _spawns2, _cursor2 = scheduler._read_results(stream, {"wanted"}, cursor)
         assert out2 == {}
 
 

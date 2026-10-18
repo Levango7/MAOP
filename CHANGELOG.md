@@ -39,6 +39,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 桌面快照资产入库（69 个文件）：清掉 7 条红，并交出 5 处"文档/口径领先于实现"的实测结论
+
+把 2026-10-16 误推成孤儿提交的那份桌面快照里**确实属于本仓**的 69 个文件逐字节搬进来
+（5 个新模块 + 2 个测试文件 + 60 个合成 PNG 夹具 + ADR 029/030；来源 `c7826c51`，
+69 个 blob OID 与源全等，对 base 的 diff 是 69 条 `A`，未动任何既有文件；
+`gitleaks detect --no-git` 对这批文件 `no leaks found`）。
+
+搬进来之后全集实测 **11010 passed / 7 failed**，逐条处置：
+
+- **ruff 24 条**清零（`--fix` 23 条 + `F841`）。`F841` 那条不是删掉：
+  `test_rank_best_plan_first` 里声明了 `ext = PlanFeatureExtractor()` 却全程手搓训练向量，
+  等于绕开抽取器 —— 改成断言"手搓向量的 dim0/dim4/dim5 极性与抽取器一致"，
+  这样夹具与真实特征口径脱钩时会当场转红。
+- **`test_train_promote_rollback_active_chain`** 是**测试写坏**，不是实现坏：
+  `assert vm.promote(active2.version_id) or vm.promote(m2._version)` 里 `active2` 已被上一条断言
+  证明等于 v1，而 `promote()` 的返回值只表示"这个 id 在链上" ⇒ 永远短路、v2 从未被晋升，
+  该用例**在任何实现下都不可能过**。改成直接 promote v2；反向变异（让 `promote` 返回 True 但不落盘）
+  确认会红，还原后 `cmp` 证字节一致。
+- **结构排序主张不成立，按事实降级为 `strict=True` 的 xfail**（原用例名一拆为二：
+  "在线学习抬高被喂计划的分数"0.4145→0.9601 是真行为，留作通过的锁；"学完后结构更优者排前"是更强主张）。
+  机制实测：批量训练特征由 `ingest_from_agent_performance` 用 `_infer_gates(routing_key)` + 默认预算
+  **重建**，而夹具的 rk `gen`/`sec` 都不命中该启发式的任何分支 ⇒ dim1/dim2 恒 0、dim4 恒 1，
+  这三维权重是不可识别的偏置吸收（实测 `w1=-0.4248`、`w4=+0.2682`），推理期却把 `max_retries=3`
+  外推 3 倍 ⇒ 30 次在线更新后仍差 0.011 把 garbage 排在前面。前置条件（执行期真值落库 +
+  持久化模型加 `feature_schema` 标记）写在 xfail reason 与 `ALLOWED_OVERSIZE` 理由里。
+- **`plan_quality.py` 926 行**进 `ALLOWED_OVERSIZE` 并写明拆分排期与先决条件（不拆的理由是
+  拆分前必须先改特征来源，否则拆出来的文件仍守着同一个缺陷）。
+- **README:27** 的 `core/` 文件数按实测 5→7（`ls *.py` 含 `__init__.py`，与门禁同口径；
+  17 个子包也重新数过）。
+- **`# nosec B608`（`knowledge_graph_reasoning.py:264`）逐行核过再登记**：`where` 只能由
+  `source = ?` / `target = ?` / `1=1` / ` AND relation_type = ?` 四段字面量拼成，
+  `direction` 与 `relation_type` 都不进 SQL 文本、值全走 `params` ⇒ 无注入路径，登记而非改写。
+  bandit `-lll` 硬门 rc=0；另有一条新的 LOW（`B311` 用于非加密场景，:461）不在本仓判据内。
+- **覆盖率**：`cost_router` / `visual_builder` / `multimodal_av_contracts` 原本在 `tests/` 零引用，
+  补 65 条用例后实测 **98% / 100% / 98%**（这三块也是 #116 卡在 `Coverage ratchet gate` 的主要缺口）。
+
+顺带查出并修正的四处"文字强于代码"，都带实测出处：
+
+1. `mypy` 报的 `sqlite_connect(db_path)` 传 `None` **不只是类型问题**：该函数走
+   `sqlite3.connect(str(db_path))` ⇒ 会静默打开/新建一个**字面名叫 `None`** 的库文件，
+   读到的永远是空表。新增 `_resolve_relations_db()`，缺省口径与 `relations` 表的归属方一致
+   （`get_db_path("knowledge_graph")`）。其余 4 条 mypy 错误一并清零（本机 mypy 2.3.1，CI 钉 2.4.0，终判在 CI）。
+2. `multimodal_av_contracts` 的 docstring 声称 MAOS 已提供 `WhisperAudioProvider` /
+   `ClapAudioProvider` / `FramePoolVideoProvider` —— 实测 **MAOS tip `1a19c7f`** 对这三个类名、
+   `embed_audio`/`embed_video` 以及对本模块的 import **全部 0 命中** ⇒ 措辞降级为"预期由企业版提供，尚未落地"。
+3. `get_cost_router()` 的 docstring 写"参数显式传入时覆盖已有配置"，实测**只在首次构造时生效**，
+   单例存在后任何参数都被静默忽略（本仓出过 `get_route_scorer` 单例污染导致生产路由退化的事故）
+   ⇒ docstring 按实测改写，并由测试钉住 + 给出 `reset_cost_router()` 的正对照。
+4. `RoutingDecision.degraded` 注释写"因预算被强制降级"，实现是"没选中 `tier.preferred_model` 就算"
+   ⇒ 调用方自己点名便宜模型也会被记成降级；测试按真实行为命名，注释同步改正，语义不在无人消费时改动。
+
+**两条转交项（我没擅自改判据）**：① `compute_orphans()` 把"孤儿导入了它"也算作有生产导入方，
+所以 `cost_router` 躲过了死接线清单（它唯一的导入方 `visual_builder` 自己就在清单里）——
+按真实可达性这批是 5/5 不通；改成不动点求解会一次性掀出全仓同形态模块，需要单独决定。
+② `visual_builder` 的节点级 `condition` 键是**只出不进**的派生副本，可逆性靠 `config.expression` 成立。
+
 ### T2.3 收口：泄漏源（线程内 patch）+ `_leak_probe` 的结构盲区，并把收尾检查升成门禁
 
 追一个泄漏源追出一个**守卫设计缺陷**。`py/tests/test_sandbox_executor.py::TestThreadSafety`
@@ -80,6 +136,124 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **留在原地的**：`repair` 计数（"修过但已修干净"）仍然只是 `::warning::`。把它也做成"必须为 0"的
 棘轮是下一步 —— 现在拦只会把既存欠账变成长驻红，而定位还没做完。
+
+### M0–M4 多智能体协调包过门禁：一个被 183 条绿测掩盖的 NameError，与一次我自己引入又被复跑抓住的手误
+
+`wip/snapshot-20261017` 固化的在途资产（M0–M4 协调：a2a 传输服务、blackboard 桥、任务上下文、
+分布式调度/检查点/租约、事件联邦、触发引擎、健康探针、M3 运维面板与租户黑板 API）转交本分支时，
+**六道静态门禁五道不过**。逐项处置，先说结论：143 个 ruff 问题与 31 个 mypy 问题里，各埋着一个
+**测试全绿也发现不了的真 bug**。
+
+**门禁层**
+
+- **config drift 229→230**：`engine_router.py` 直接 `os.environ.get("MAOP_REDIS_URL")`，绕过
+  `MAOPSettings` 单例造成同一配置两个真相源。改为 `get_settings().redis_url`，并用
+  `model_fields_set` 区分"未设（False）／显式设值（True）／显式空串（True, ''）"——若简单按默认值
+  取，未配 Redis 的环境会无故建外部连接，Personal 版"未配置=本地引擎"的语义就丢了。
+- **静默 except 20 处**（ADR-023，baseline 0）：19 处是有理由的 best-effort（optional-dep /
+  lock-race / ws-disconnect / scan-continue 等 10 类闭集），打 `# silent-ok: <类> — <理由>`；
+  1 处是真漏——`agent_registry` 状态持久化失败被吞，黑板上的 agent 状态会静默不一致，补
+  `logger.warning`。`contextlib.suppress` 47 处双向棘轮持平（只许降不许升）。
+- **ruff 143 errors**（干净 master 全绿 ⇒ 全部来自本批新文件），`--fix` 自动修 111 + 手工 32。
+- **mypy 31 errors**（干净 master 0 错误）。
+- **doc_reconcile**：README 的 core/ 子包计数 16→17。
+- **空断言测试**：`test_distributed_e2e.py::test_result_mapping` 只构造对象、不验证契约——改为
+  断言 trace_id 透传、`steps[0].id`、`status == SUCCESS`、`output == "mapped-output"`、
+  `duration_ms == 150`（预投结果流 + scheduler 首轮 poll 即收集，无挂起风险）。
+
+**两个测试抓不住的 bug**
+
+- `RedisAgentStore.remove()` 调 `_json.dumps`，而 `json` 从未 import（ruff F821）。Redis 后端的
+  remove 一调就 NameError；**183 条测试全绿也没暴露，因为测试只覆盖 InMemoryAgentStore 路径**。
+  补 `import json as _json`。
+- `a2a_blackboard_bridge.py`：`a2a_msg.task_id` 为 None 时会把 `None` 当键写进 `_task_routes`，
+  此后任何 None 查表都假命中。加 `if a2a_msg.task_id:` 守卫后才写（同一个 mypy index 错误）。
+
+**一次自己引入又被自己抓住的手误**：PERF102 批量修复 `.items()`→`.values()` 时，有一处写成
+`for v in raw.items()`（v 成元组 → `json.loads` 全抛 → 被 scan-continue 吞掉 → 测试红在
+`test_incomplete_runs_query`）。复跑定位后改回 `.values()`——**"作业绿了"不等于"改对了"，批量
+替换后必须逐点复跑**。
+
+其余 mypy 站点：`distributed_scheduler._dispatch_and_collect` 返回标注写成 `dict`、实际返回
+`(dict, list)` 二元组（调用侧 430/438/584 三处连带错）；`a2a_transport_server` 路由表
+`dict[str, dict[str, Callable]]` 精确化为 `_RouteHandler` 别名；删两个从未引用的私有 Protocol、
+三处死变量；`debate_engine._run_round` 参数原标 `Blackboard`、实收 `BlackboardEntry`。
+
+**门禁口径数字**：config drift 229==229；静默 0/0（suppress 47/47）；mypy 510 文件 0 错误；
+ruff 全绿。单元测试与覆盖率棘门（baseline 81.0%）见 PR 检查。
+
+**一个 flaky 的根因在测试、不在实现**：`test_coordination_m4.py::test_ws_receives_conflict_alert`
+等 scan 的 conflict_alert 广播，但该广播由 scan 请求内的 `asyncio.create_task` 发出——TestClient 每
+请求新 event loop、返回即取消 pending task（隔壁 `test_ws_receives_broadcast` 的注释早已写明这条
+限制），广播在 TestClient 下**可能永不到达**；而收包循环的 try/except 只防“连接断开”、防不了
+“一条都不发”，`receive_json()` 无限阻塞，只能等 pytest-timeout 判红。同一份代码、同一顺序，
+两轮 5 文件复跑一轮 183 passed、一轮直接挂 120s。修法忠于该测试自己的注释原意
+（"may or may not appear... we verify the scan itself worked"）：广播等待改为**有界** —— daemon
+线程 drain + 10s 超时后从测试线程 `ws.close()`（close 只走 send 侧、永不受阻，可让 drain 抛
+`WebSocketDisconnect` 退出，`with` 块退出不僵）；硬断言只留 scan 的 `active_count >= 1`。
+修后该用例连跑 3 次 + 与 `test_blackboard.py`（全局单例 reset 源）组合各 3 次全过。
+
+**第二个挂起：测试 patch 的目标已经不在执行路径上**：`test_distributed_execution.py::test_distributed_fallback_on_error`
+patch 的是 `_get_distributed_scheduler`（legacy 桥，现在只有 `_run_distributed` 用），而
+`run(distributed=True)` 早已改走 `_distributed_backend`（TaskBackend 抽象）。于是"模拟调度失败"根本
+没发生，请求直落真的 `DistributedTaskBackend`，在 fake Redis 的结果流上无限轮询，把 pytest 进程拖到
+**无汇总退出**——表现是"跑到 28% 就没了"，连 FAILED 行都没有，只有 pytest-timeout 的线程栈
+（MainThread 卡在 `pytest_asyncio` 的 `run_until_complete` → Windows IOCP）。修法：patch 目标改为
+`_distributed_backend`，装一个 `run()` 直接抛 `RuntimeError` 的假后端，`engine.py` 219–227 的回退
+分支才真正被验证。修后该文件 59 passed、0 Timeout。
+
+顺带记一条**产品侧同类风险**（本 PR 未改）：`DistributedScheduler._dispatch_and_collect` 的
+`while pending` 只在 `deadline is not None` 时有界；生产上若结果消息丢失且未设 deadline，会无限
+等待。本 PR 只修测试契约，不动调度器的超时语义——那需要单独设计（默认 deadline 取值会影响长任务）。
+
+**全量跑到 100% 后剩下的 3 条红，都是"契约改了、调用方没跟"**：
+
+- `test_distributed_audit_fixes.py::TestReadResultsCursor` 两处仍按二元组解包 `_read_results`，而
+  spawn 扇出已把它改成 `(results, spawns, cursor)` ⇒ `ValueError: too many values to unpack
+  (expected 2, got 3)`。改成三元组解包（该测试只关心 cursor 语义，spawns 用 `_` 忽略）。
+- `test_dead_wiring_inventory.py::test_orphan_set_matches_the_inventory`：7 个新模块零生产导入方。
+  逐条判定而不是一把塞进清单：`ks_agent_bridge` / `event_federation` 经 `reliability/__init__`
+  的 `_SYMBOL_TO_MODULE` + `__getattr__` 惰性解析可达 ⇒ `dynamic`；
+  `blackboard_engine_bridge` / `distributed_checkpoint` / `distributed_lease` /
+  `distributed_checkpoint_coordinator` 确实没有调用方 ⇒ `unwired`；
+  `ws_blackboard_bridge` 的 docstring 原本声称"由 lifespan 自动启动"，而全仓**除它自己外无人
+  import** ⇒ 登记 `unwired` **并同步修正 docstring**——不修就等于让清单给一个假声明背书。
+
+### CI 首轮红在覆盖率，顺着覆盖率又挖出六个真 bug（分布式恢复/租约/能力查询其实不工作）
+
+全量在 Linux 上跑到 100%、单元测试全过，红的却是 `Coverage ratchet gate`：master 是 81.43%，
+本 PR 降到 **80.59%**（新增 3261 行只有 **65.6%** 覆盖），跌破 baseline 81.0%。本地 Windows
+测出 81.63% 是**平台虚高**——Windows 专属分支在 Linux 上不计覆盖（平台差集 1550 行，全在既有文件）。
+
+补 `tests/test_coordination_unwired_components.py`（59 条）覆盖那些"登记为未接线、但接口契约
+必须先钉住"的组件时，**测试立刻推翻了实现**——四条都是"测试只走 InMemory / 只走 happy path"
+掩盖的缺陷：
+
+1. `DAGCheckpoint.__init__` 用 `x or default` 处理 `pending_layers` / `created_at`。空集合与
+   `0.0` 都是 falsy ⇒ 从 Redis 反序列化（`pending="[]"`）后被**重新填满全部层**：`is_complete`
+   永假，`recover_run()` 会把已完成的层再跑一遍。改 `is None` 判定。
+2. `mark_layer_done()` 只原子更新 `:pending` / `:completed` **集合**，从不重写 hash 里的 JSON
+   副本 ⇒ `get_run()` 返回 `create_run()` 时的陈旧 pending，恢复点永远是第 0 层。改以集合为
+   权威（`get_run` / `list_interrupted` 都用集合覆盖 hash 值）。
+3. `_renewal_loop` 里 `await self._redis.set(...)` —— 这个类用的是**同步**客户端（`acquire`
+   就不 await），`await bool` 抛 `TypeError` 被 `except Exception` 吞掉 ⇒ **自动续租从未生效**，
+   实例在 TTL 过期后仍认为自己持有租约（双主风险）。去掉 await。
+4. `RedisAgentStore.get()` 的 `hget` 漏了 `await`（异步客户端）⇒ 每次查询 TypeError；
+   `list()` 是对的，只有 `get()` 漏了。
+5. `RedisMCPRegistry.async_find_tools()` 的 `hgetall` 同样漏 `await` ⇒ `items` 是 coroutine、
+   `isinstance(items, dict)` 为假 ⇒ **每次搜索都返回空列表**。同步版 `find_tools()` 则是直接
+   `return []`（"没查到"和"查不了"长得一样）——改为打 warning 说明它查不了 Redis。
+6. `RedisAgentRegistry.find_agents(capability)` **完全忽略 capability 参数**：只按 status 过滤后
+   把所有 agent 都返回。docstring 写的是"providing the given capability"。改为注册时缓存
+   capabilities 并真正过滤。
+
+覆盖率变化（这三个模块）：`distributed_checkpoint` 22.4%→94%、`distributed_lease` 26.1%→91%、
+`bb_task_context` 38.2%→69%；另给 `RedisAgentStore` 补了 save/get/remove/list 的回归用例，
+给 `mcp_hub` 的四个传输补了"未 connect 就发请求必须报错"的守卫用例（覆盖我加的那条
+`self._proc.stdin is None` 判定），给调度器 `DistributedCheckpointCoordinator` 补了
+save/load/list/cleanup/serialize 的契约用例，并给 `engine_router._create_redis_client_from_env`
+补了四条分支（未配置 / 显式空串 / 显式有值 / 建连失败）—— 那正是 config drift 修复的语义本身，
+不钉住就等于只换了个真相源。
 
 ### 主干 `Secret Scan` 的 69 条命中曾经查不动：报表路径与上传路径对不上，还被 `ignore` 消音
 

@@ -83,6 +83,10 @@ _F_OUTPUT = "output"
 _F_ERROR = "error"
 _F_WORKER_ID = "worker_id"
 _F_DURATION_MS = "duration_ms"
+# Spawn directives field (M0 L0.1-T0.1.8): a result may carry
+# spawn directives that fan out new steps at runtime.
+_F_SPAWN = "spawn"
+
 
 
 class SchedulingError(RuntimeError):
@@ -420,13 +424,19 @@ class DistributedScheduler:
                     continue
 
                 # Dispatch the layer and await all results.
-                layer_results = await self._dispatch_and_collect(
+                layer_results, layer_spawns = await self._dispatch_and_collect(
                     run_id, layer_idx, runnable, reschedule_queue, deadline,
                 )
                 for nid, res in layer_results.items():
                     results[nid] = res
                     if res.get("status") == "failed":
                         failed.add(nid)
+
+                # M0 L0.1-T0.1.8: enqueue spawned steps into the graph
+                if layer_spawns:
+                    self._merge_spawns(
+                        layer_spawns, node_map, layers, results, run_id,
+                    )
 
                 # ABORT policy: if any node failed, skip all downstream.
                 if failed:
@@ -512,13 +522,14 @@ class DistributedScheduler:
         nodes: list[_NodeSpec],
         reschedule_queue: asyncio.Queue[tuple[str, str]],
         deadline: float | None = None,
-    ) -> dict[str, dict[str, Any]]:
+    ) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
         """Dispatch a layer's nodes and wait for all their results."""
         results_stream = self._results_stream(run_id)
         pending: dict[str, _NodeSpec] = {n.id: n for n in nodes}
         # Track retry counts per node for worker-failure rescheduling.
         retries: dict[str, int] = {n.id: 0 for n in nodes}
         collected: dict[str, dict[str, Any]] = {}
+        all_spawns: list[dict[str, Any]] = []
         # Map stream-msg-id → node_id for reschedule correlation.
         msg_to_node: dict[str, str] = {}
         # Incremental read cursor: (ms, seq) of the last
@@ -558,10 +569,11 @@ class DistributedScheduler:
                 new_msg_id = await self._dispatch_node(run_id, layer_idx, r_node)
                 msg_to_node[new_msg_id] = node_id
 
-            # Read results from the results stream.
-            new_results, cursor = self._read_results(
+            # Read results from the results stream + collect spawns.
+            new_results, new_spawns, cursor = self._read_results(
                 results_stream, set(pending), cursor,
             )
+            all_spawns.extend(new_spawns)
             for node_id, res in new_results.items():
                 collected[node_id] = res
                 pending.pop(node_id, None)
@@ -569,7 +581,7 @@ class DistributedScheduler:
             if pending:
                 await asyncio.sleep(self._poll_interval)
 
-        return collected
+        return collected, all_spawns
 
     async def _dispatch_node(
         self,
@@ -624,14 +636,13 @@ class DistributedScheduler:
         results_stream: str,
         expected: set[str],
         cursor: tuple[int, int] | None = None,
-    ) -> tuple[dict[str, dict[str, Any]], tuple[int, int]]:
+    ) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], tuple[int, int]]:
         """Read completed results from the results stream (non-blocking).
 
-        Returns ``(results, new_cursor)``: a dict ``{node_id:
-        result_dict}`` for nodes in ``expected`` whose result has
-        been posted *after ``cursor``*, plus the ``(ms, seq)`` id
-        of the last entry processed (``None``-cursor means "read
-        from the head").
+        Returns ``(results, spawns, new_cursor)``: a dict ``{node_id:
+        result_dict}``, a list of spawn directive dicts collected from
+        result entries, and the ``(ms, seq)`` id of the last entry
+        processed (``None``-cursor means "read from the head").
 
         The cursor makes reading incremental — every poll only
         processes entries the caller has not seen yet. Reading
@@ -647,18 +658,31 @@ class DistributedScheduler:
         skipped with a numeric ``(ms, seq)`` comparison — stream
         ids are *not* lexicographically ordered.
         """
+        spawns: list[dict[str, Any]] = []
+
         out: dict[str, dict[str, Any]] = {}
         min_id = "-" if cursor is None else f"{cursor[0]}-{cursor[1]}"
         try:
             entries = self._redis.xrange(results_stream, min=min_id, max="+", count=10000)
         except Exception as exc:
             logger.debug("[dist-sched] xrange on %s failed: %s", results_stream, exc)
-            return out, cursor or (0, 0)
+            return out, spawns, cursor or (0, 0)
         for msg_id, fields in entries:
             parsed = self._parse_stream_id(_decode(msg_id))
             if cursor is not None and parsed <= cursor:
                 continue
             node_id = _decode(fields.get(_F_NODE_ID.encode(), fields.get(_F_NODE_ID, b"")))
+
+            # M0 L0.1-T0.1.8: collect spawn directives from result entries
+            spawn_raw = _decode(fields.get(_F_SPAWN.encode(), fields.get(_F_SPAWN, b"")))
+            if spawn_raw:
+                try:
+                    spawn_list = json.loads(spawn_raw) if isinstance(spawn_raw, str) else spawn_raw
+                    if isinstance(spawn_list, list):
+                        spawns.extend(spawn_list)
+                except (json.JSONDecodeError, TypeError):
+                    logger.debug("[dist-sched] spawn field parse failed: %s", spawn_raw)
+
             if not node_id or node_id not in expected:
                 cursor = parsed
                 continue
@@ -705,7 +729,73 @@ class DistributedScheduler:
                     # registry 清理失败不应影响调度结果
                     logger.debug("complete_task failed", exc_info=True)
             cursor = parsed
-        return out, cursor or (0, 0)
+        return out, spawns, cursor or (0, 0)
+
+    def _merge_spawns(
+        self,
+        spawns: list[dict[str, Any]],
+        node_map: dict[str, _NodeSpec],
+        layers: list[list[str]],
+        results: dict[str, dict[str, Any]],
+        run_id: str,
+    ) -> None:
+        """Merge runtime-spawned steps into the DAG.
+
+        Called after a layer completes, this method:
+        1. Parses each spawn directive's ``steps`` and ``depends_on``.
+        2. Validates (duplicate ids and unknown deps are dropped with a log).
+        3. Adds valid spawns to ``node_map`` and appends a new layer.
+        """
+        new_layer: list[str] = []
+        seen_ids: set[str] = set()
+        for directive in spawns:
+            deps_raw = directive.get("depends_on")
+            steps_raw = directive.get("steps", [])
+            if not steps_raw:
+                continue
+            for step in steps_raw:
+                sid = step.get("id", "")
+                if not sid or sid in node_map or sid in seen_ids:
+                    logger.warning(
+                        "[dist-sched] spawn: duplicate or empty step id %r; dropping",
+                        sid,
+                    )
+                    continue
+                # Resolve dependencies: default to the spawning step's id
+                deps = list(deps_raw) if deps_raw else []
+                unknown = [d for d in deps if d not in node_map]
+                if unknown:
+                    logger.warning(
+                        "[dist-sched] spawn: step %r depends on unknown %s; dropping",
+                        sid, unknown,
+                    )
+                    continue
+                # Build _NodeSpec for the spawned step
+                payload = {
+                    k: v for k, v in step.items()
+                    if k not in ("id", "depends_on")
+                }
+                payload["workdir"] = payload.get("workdir", "")
+                payload["trace_id"] = run_id
+                affinity_str = payload.get("affinity")
+                priority = int(payload.get("priority", 3))
+                timeout = float(payload.get("timeout", 0))
+                node_map[sid] = _NodeSpec(
+                    id=sid,
+                    depends_on=deps,
+                    affinity=NodeAffinity.parse(affinity_str),
+                    priority=priority,
+                    timeout=timeout,
+                    payload=payload,
+                )
+                seen_ids.add(sid)
+                new_layer.append(sid)
+        if new_layer:
+            layers.append(new_layer)
+            logger.info(
+                "[dist-sched] run %s: merged %d spawned step(s) into new layer: %s",
+                run_id, len(new_layer), new_layer,
+            )
 
     @staticmethod
     def _parse_stream_id(mid: str) -> tuple[int, int]:
@@ -754,11 +844,22 @@ class DistributedScheduler:
         error: str = "",
         worker_id: str = "",
         duration_ms: int = 0,
+        spawn_directives: list[dict[str, Any]] | None = None,
     ) -> str:
         """Post a node's execution result to the run's results stream.
 
         Called by :class:`~maop.worker.distributed_worker.DistributedWorker`
-        after executing a task. Returns the results-stream message id.
+        after executing a task. When the executor returns spawn directives
+        (runtime fan-out), pass them via ``spawn_directives`` so the
+        scheduler can drain and re-enqueue them.
+
+        Parameters
+        ----------
+        spawn_directives : list[dict] | None
+            Optional list of {"steps": [...], "depends_on": [...]}
+            directives generated by the executor.
+
+        Returns the results-stream message id.
         """
         stream = self._results_stream(run_id)
         fields = {
@@ -770,6 +871,8 @@ class DistributedScheduler:
             _F_WORKER_ID: worker_id,
             _F_DURATION_MS: str(duration_ms),
         }
+        if spawn_directives:
+            fields[_F_SPAWN] = _json_dumps(spawn_directives)
         msg_id = self._redis.xadd(stream, fields)
         return msg_id.decode() if isinstance(msg_id, bytes) else msg_id
 

@@ -298,7 +298,7 @@ def _register_data_routers(app: FastAPI) -> None:
 
 
 def _register_scheduling_routers(app: FastAPI) -> None:
-    """Register scheduling / supervisor / debate routers (all optional, guarded)."""
+    """Register scheduling / supervisor / debate / engine routers (all optional, guarded)."""
     # F1-02 (异常自适应调度): scheduling failure-detector stats endpoint
     # (GET /api/scheduling/failure-stats + POST .../reset). Mounted
     # unconditionally — the detector is process-wide and available in both
@@ -310,6 +310,17 @@ def _register_scheduling_routers(app: FastAPI) -> None:
         logger.info("[server] Router: scheduling enabled")
     except ImportError as _e:
         logger.warning("[server] Router MISSING: scheduling (import error: %s)", _e)
+
+    # M0 L0.1 — Engine distributed execution endpoints:
+    # POST /api/engine/run              — single-task local execution
+    # POST /api/engine/run-distributed  — DAG distributed execution (Redis Streams)
+    try:
+        from maop.dashboard.routers import engine_router as engine_api
+
+        app.include_router(engine_api.router)
+        logger.info("[server] Router: engine enabled")
+    except ImportError as _e:
+        logger.warning("[server] Router MISSING: engine (import error: %s)", _e)
 
     # Supervisor (proactive multi-agent supervision): patrol / alert /
     # replace / degrade / terminate / upgrade. Mounted unconditionally —
@@ -420,6 +431,36 @@ def _register_notifications_and_config(app: FastAPI) -> None:
         logger.info("[server] Router: blackboard enabled")
     except ImportError as _e:
         logger.warning("[server] Router MISSING: blackboard (import error: %s)", _e)
+
+    # ── Blackboard M3 Operations router ────────────────────────────────
+    # M3: 高级黑板 API — 辩论/共识/收敛求解/健康监控/Prometheus 指标。
+    #   POST /api/bb-m3/debate/run — 发起辩论
+    #   GET  /api/bb-m3/consensus/scan — 冲突扫描
+    #   POST /api/bb-m3/convergence/start — 启动收敛求解（异步）
+    #   GET  /api/bb-m3/convergence/{solve_id} — 查询求解状态
+    #   GET  /api/bb-m3/health — 健康快照
+    #   GET  /api/bb-m3/probes — 存活/就绪探针
+    #   GET  /api/bb-m3/metrics — Prometheus 文本指标
+    try:
+        from maop.dashboard.routers import bb_m3_ops as bb_m3_ops_router
+        app.include_router(bb_m3_ops_router.router)
+        logger.info("[server] Router: bb-m3-ops enabled")
+    except ImportError as _e:
+        logger.warning("[server] Router MISSING: bb-m3-ops (import error: %s)", _e)
+
+    # ── Multi-Tenant Blackboard Admin router ──────────────────────────
+    # M4-D: 多租户 Blackboard 管理 API — 租户扫描/详情/清空/RBAC/上下文验证。
+    #   GET  /api/tenant-blackboard/tenants — 租户列表
+    #   GET  /api/tenant-blackboard/tenants/{tenant_id} — 租户详情
+    #   DELETE /api/tenant-blackboard/tenants/{tenant_id} — 清空租户数据
+    #   GET  /api/tenant-blackboard/rbac/permissions — RBAC 权限列表
+    #   POST /api/tenant-blackboard/context/validate — 验证租户上下文
+    try:
+        from maop.dashboard.routers import tenant_blackboard as tenant_blackboard_router
+        app.include_router(tenant_blackboard_router.router)
+        logger.info("[server] Router: tenant-blackboard enabled")
+    except ImportError as _e:
+        logger.warning("[server] Router MISSING: tenant-blackboard (import error: %s)", _e)
 
 
 def _register_feedback_router(app: FastAPI) -> None:

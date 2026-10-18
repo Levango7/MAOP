@@ -27,6 +27,8 @@ env/
 .coverage
 .coverage.*
 coverage.xml
+# JUnit XML produced by the CI test steps (py/test-results*.xml)
+py/test-results*.xml
 htmlcov/
 # Coverage temp files
 _cov*.txt
@@ -124,6 +126,7 @@ dashboard-enterprise/orphan_audit.json
 dashboard-enterprise/audit_api.py
 dashboard-enterprise/audit_orphans.py
 dashboard-enterprise/coverage/
+dashboard-enterprise/.vitest/
 dashboard-enterprise/frontend_dev.log
 test_full.log
 test_*.log

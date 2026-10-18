@@ -169,6 +169,28 @@ class Blackboard:
     def event_bus_enabled(self) -> bool:
         return self._event_bus is not None
 
+    # ── Redis Distributed Sync (M2-A) ─────────────────────────
+
+    def enable_redis_sync(
+        self,
+        redis_url: str = "redis://localhost:6379/12",
+        node_id: str | None = None,
+    ) -> Any:
+        """启用 Redis 分布式同步（M2-A）。
+
+        返回 :class:`~maop.core.reliability.blackboard_redis_sync.RedisBlackboardSync`
+        实例；调用者须 ``await sync.start()`` 启动同步。
+
+        用法::
+
+            bb = Blackboard()
+            sync = bb.enable_redis_sync("redis://localhost:6379/12")
+            await sync.start()
+        """
+        from maop.core.reliability.blackboard_redis_sync import RedisBlackboardSync
+        sync = RedisBlackboardSync(self, redis_url=redis_url, node_id=node_id)
+        return sync
+
     # ── Domain validation (R-7 / R-8) ──────────────────────────
 
     @staticmethod

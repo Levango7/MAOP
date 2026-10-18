@@ -98,6 +98,10 @@ services:
       - MAOP_TLS=${MAOP_TLS:-0}
       - MAOP_TLS_CERT=${MAOP_TLS_CERT:-}
       - MAOP_TLS_KEY=${MAOP_TLS_KEY:-}
+      # M0 L0.1: connect to Redis for distributed scheduling backend
+      # when --profile redis is active (env var left empty → Engine uses local backend).
+      - MAOP_REDIS_URL=${MAOP_REDIS_URL:-}
+      - ${MAOP_REDIS_URL:+MAOP_REDIS_PASSWORD=}
       # P2 安全修复: JWT 签名密钥。
       # - production (MAOP_ENV=production): 必须在 .env 中显式设置
       #   MAOP_JWT_SECRET，否则启动时 load_jwt_secret() 抛 RuntimeError 拒绝启动。
@@ -504,6 +508,59 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    profiles: ["redis"]
+
+  # ── Optional: Redis distributed worker (M0 L0.1, --profile redis) ──
+  # Consumes DAG nodes from the maop:sched:tasks stream and executes them.
+  # Scale horizontally: docker compose --profile redis up -d --scale maop-distributed-worker=3
+  maop-distributed-worker:
+    build: *maop-build
+    entrypoint: ["python", "-m", "maop.worker.distributed_worker"]
+    volumes:
+      - maop-data:/app/data
+      - maop-logs:/app/logs
+      - ./config:/app/config:ro
+    environment:
+      - MAOP_ROOT_DIR=/app
+      - MAOP_ROOT=/app
+      - MAOP_DATA_DIR=/app/data
+      - MAOP_LOG_LEVEL=${MAOP_LOG_LEVEL:-INFO}
+      - MAOP_JSON_LOG=${MAOP_JSON_LOG:-1}
+      - MAOP_STORAGE_BACKEND=${MAOP_STORAGE_BACKEND:-sqlite}
+      - MAOP_CACHE_BACKEND=${MAOP_CACHE_BACKEND:-redis}
+      - MAOP_QUEUE_BACKEND=${MAOP_QUEUE_BACKEND:-redis}
+      - MAOP_REDIS_URL=redis://:${MAOP_REDIS_PASSWORD}@redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+      dashboard:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'maop.worker.distributed_worker' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      mode: replicated
+      replicas: 1
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     profiles: ["redis"]
 
   # ── Optional: n8n workflow automation (Enterprise, --profile n8n) ──

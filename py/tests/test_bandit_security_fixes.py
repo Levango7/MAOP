@@ -37,6 +37,7 @@ NOSEC_INVENTORY: frozenset[str] = frozenset({
     "maop/core/backends/data.py:B608:6",
     "maop/core/backends/image_store.py:B608:2",
     "maop/core/backends/kv_store.py:B608:1",
+    "maop/core/coordination/a2a_transport_server.py:B104:1",
     "maop/core/cost_tracker.py:B608:1",
     "maop/core/mcp/mcp_hub_ops.py:B608:1",
     "maop/core/mcp/mcp_hub_transport.py:B310:1",
@@ -44,6 +45,10 @@ NOSEC_INVENTORY: frozenset[str] = frozenset({
     "maop/core/memory/episodic_store.py:B608:2",
     "maop/core/memory/knowledge_extractor.py:B608:3",
     "maop/core/memory/knowledge_graph.py:B608:4",
+    # 2026-10-17 逐行核过 :244-266：where 只能由 "source = ?" / "target = ?" / "1=1" /
+    # " AND relation_type = ?" 四段字面量拼成，direction 与 relation_type 都不进 SQL 文本，
+    # 值一律走 params 绑定 ⇒ 无注入路径，登记而非改写。
+    "maop/core/memory/knowledge_graph_reasoning.py:B608:1",
     "maop/core/memory/multimodal_pg.py:B608:5",
     "maop/core/memory/multimodal_store.py:B608:1",
     "maop/core/memory/vector_store.py:B608:8",
