@@ -100,8 +100,15 @@ services:
       - MAOP_TLS_KEY=${MAOP_TLS_KEY:-}
       # M0 L0.1: connect to Redis for distributed scheduling backend
       # when --profile redis is active (env var left empty → Engine uses local backend).
+      #
+      # NOTE: both entries use an explicit `:-` default. The previous form
+      # `- ${MAOP_REDIS_URL:+MAOP_REDIS_PASSWORD=}` interpolates to an EMPTY
+      # list item when MAOP_REDIS_URL is unset, which newer docker compose
+      # tolerates (it drops it) but the CI runner's older compose panics on
+      # (`index out of range [-1]` in WithServices) — every compose command
+      # then exits rc=2 and Compose Smoke goes red on master.
       - MAOP_REDIS_URL=${MAOP_REDIS_URL:-}
-      - ${MAOP_REDIS_URL:+MAOP_REDIS_PASSWORD=}
+      - MAOP_REDIS_PASSWORD=${MAOP_REDIS_PASSWORD:-}
       # P2 安全修复: JWT 签名密钥。
       # - production (MAOP_ENV=production): 必须在 .env 中显式设置
       #   MAOP_JWT_SECRET，否则启动时 load_jwt_secret() 抛 RuntimeError 拒绝启动。

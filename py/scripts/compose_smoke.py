@@ -175,6 +175,10 @@ def dump_stack_state(runner=sh) -> None:
 
 
 def main() -> int:
+    # 2026-10-19：先打版本。compose 的插值/解析行为在 v2 与 v5 之间有差异
+    # （空列表项、profile 依赖），病历里没有版本号就只能靠猜。
+    ver = sh(["version"], timeout=60)
+    print(f"docker compose version rc={ver.returncode}: {_text(ver.stdout).strip() or _text(ver.stderr).strip()}")
     print("compose up -d --build ...")
     up = sh(["up", "-d", "--build"])
     if up.returncode != 0:
