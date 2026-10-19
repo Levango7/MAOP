@@ -39,6 +39,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 分布式调度：`deadline=None` 不再等于无限等（原 #116 "未做"项，本次落地）
+
+`_dispatch_and_collect` 的 `while pending` 只在 `deadline is not None` 时检查超时，
+而 `run(deadline_s=None)`（`run()` 自己的默认值）一路会传成 `deadline=None` ⇒
+**结果消息一丢就永久空转**：进程活着、CPU 空转、run 永远不前进，且**不报任何错**。
+这条自 M0 L0.1 起一直挂在"未做 / 风险"里，本次补上兜底。
+
+新增构造参数 `max_collect_wait`（默认 **3600s**，下限 1s）：不显式传 deadline 时用
+`run_started + max_collect_wait` 作实际上限；调用方显式传入的 deadline 若更短，仍以调用方为准。
+默认值刻意取远大于任何合法层时长的 1 小时，只在"丢消息 / worker 全死"时触发，
+不会影响正常长任务的语义。
+
+错误信息区分两种由来并给出排查方向（不再是一句干巴巴的 "exceeded its deadline"）：
+
+```
+Distributed run 'x' gave up after 60.0s waiting for layer 0 nodes ['n1']
+  — safety cap=3600s (no explicit deadline).      # 或 — caller deadline=30.0s
+Most likely the result message was lost or every worker died.
+```
+
+新增 `TestCollectSafetyCap` 4 条：不传 deadline 也超时、显式 deadline 更短时优先、
+默认 cap 为 1 小时、cap 下限为 1s。
+
+> 测试自查记录：第一版把 `max_collect_wait` 设成 0.3，被构造器的 1s 下限悄悄抬成 1.0，
+> 断言区间又写得宽（`0.3 <= waited < 5.0`），于是"测的就是错的值"也显示通过。
+> 定案改为 cap=2.0 + 断言落地值 `safety cap=2s`。
+
+**实测观察（未修，非本次引入）**：`DistributedScheduler.__init__` 在 fakeredis 上单独耗时
+约 **1.67s**，是 `tests/test_distributed_execution.py` 每个用例的固定开销
+（本次 4 条新用例因此多出约 6.7s）。单实例化看起来无害，但该文件 63 条用例合计约 105s，
+其中约 100s 是这个固定开销。若要治，方向是 `FailurePatternDetector` 单例的初始化时机。
+
 ### 桌面快照资产入库（69 个文件）：清掉 7 条红，并交出 5 处"文档/口径领先于实现"的实测结论
 
 把 2026-10-16 误推成孤儿提交的那份桌面快照里**确实属于本仓**的 69 个文件逐字节搬进来

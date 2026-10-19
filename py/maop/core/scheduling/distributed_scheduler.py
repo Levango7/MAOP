@@ -231,6 +231,13 @@ class DistributedScheduler:
         Seconds between worker-failure detection sweeps. Default 1.0s.
     max_retries : int
         Per-node retry count on worker failure. Default 2.
+    max_collect_wait : float
+        Safety cap used when ``_dispatch_and_collect`` is called *without* an
+        explicit deadline. ``deadline=None`` must not mean "wait forever" — one
+        lost result message would leave ``while pending`` spinning and the run
+        would look alive while never advancing. Default 3600s (1 hour), which is
+        deliberately far above any legitimate layer duration so it only fires on
+        lost-message / dead-worker situations.
     """
 
     def __init__(
@@ -244,6 +251,7 @@ class DistributedScheduler:
         failure_check_interval: float = 1.0,
         max_retries: int = 2,
         failure_detector: FailurePatternDetector | None = None,
+        max_collect_wait: float = 3600.0,
     ) -> None:
         self._redis = redis_client
         self._registry = registry or WorkerRegistry(redis_client)
@@ -252,6 +260,8 @@ class DistributedScheduler:
         self._poll_interval = max(0.01, float(poll_interval))
         self._failure_check_interval = max(0.1, float(failure_check_interval))
         self._max_retries = max(0, int(max_retries))
+        # deadline=None 不是无限等。兜底下限 1s，防止误传 0 把每条 run 都判死。
+        self._max_collect_wait = max(1.0, float(max_collect_wait))
         # F1-02 (异常自适应调度): failure-pattern detector. When the caller
         # does not supply one, the process-wide singleton is used so
         # weight adjustments survive across scheduler instances and are
@@ -537,6 +547,16 @@ class DistributedScheduler:
         # (None = nothing read yet).
         cursor: tuple[int, int] | None = None
 
+        # Safety cap. Without an explicit deadline, a single lost result
+        # message keeps `pending` non-empty forever — the process stays alive
+        # and the run never advances. Turn that into an observable error
+        # instead of a silent hang. An explicit deadline still wins when it
+        # is tighter than the cap.
+        run_started = time.monotonic()
+        effective_deadline = (
+            float(deadline) if deadline is not None else run_started + self._max_collect_wait
+        )
+
         # Initial dispatch.
         for node in nodes:
             msg_id = await self._dispatch_node(run_id, layer_idx, node)
@@ -545,11 +565,17 @@ class DistributedScheduler:
         # Poll for results + handle reschedules until all nodes resolved.
 
         while pending:
-            if deadline is not None and time.monotonic() > deadline:
+            if time.monotonic() > effective_deadline:
+                waited = time.monotonic() - run_started
+                origin = (
+                    f"caller deadline={deadline:.1f}s"
+                    if deadline is not None
+                    else f"safety cap={self._max_collect_wait:.0f}s (no explicit deadline)"
+                )
                 raise SchedulingError(
-                    f"Distributed run {run_id!r} exceeded its deadline "
-                    f"waiting for layer {layer_idx} nodes "
-                    f"{sorted(pending)}",
+                    f"Distributed run {run_id!r} gave up after {waited:.1f}s waiting for "
+                    f"layer {layer_idx} nodes {sorted(pending)} — {origin}. "
+                    f"Most likely the result message was lost or every worker died.",
                 )
             # Drain any reschedule requests from the failure detector.
             while not reschedule_queue.empty():
