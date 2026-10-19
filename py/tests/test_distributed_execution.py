@@ -896,3 +896,64 @@ class TestWorkerInfo:
         assert info.capabilities == set()
         assert info.status == WorkerStatus.ACTIVE
         assert info.in_flight == set()
+
+
+# ── _dispatch_and_collect safety cap ─────────────────────────────
+
+class TestCollectSafetyCap:
+    """``deadline=None`` 不是"无限等"。
+
+    结果消息一丢，``while pending`` 就会永久空转：进程活着、CPU 空转、
+    run 永远不前进。兜底上限把这种情况折成可观测的错误。
+    """
+
+    @staticmethod
+    def _node(node_id: str = "n1") -> _NodeSpec:
+        return _NodeSpec(id=node_id, func=None, args=(), kwargs={}, depends_on=[], affinity=NodeAffinity(), priority=3, timeout=0.0, payload={})
+
+    async def test_no_deadline_still_times_out(self, fake_redis: Any) -> None:
+        """显式不传 deadline 也必须超时，且错误要说明原因。"""
+        # NOTE: cap 必须 > 1.0 —— 构造器把 max_collect_wait 下限钉在 1s
+        # （防止误传 0 把每条 run 都判死），传 0.3 会被抬到 1.0 而测不到预期值。
+        sched = DistributedScheduler(
+            fake_redis, poll_interval=0.02, max_collect_wait=2.0,
+        )
+        queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
+        started = time.monotonic()
+
+        with pytest.raises(SchedulingError) as ei:
+            await sched._dispatch_and_collect("run-cap", 0, [self._node()], queue)
+
+        waited = time.monotonic() - started
+        # 真的等了 cap（不是立刻失败），也没有远超（不是卡死）
+        assert 2.0 <= waited < 8.0
+        assert "safety cap=2s" in str(ei.value)
+        assert "n1" in str(ei.value)
+        assert "lost" in str(ei.value)
+
+    async def test_explicit_tighter_deadline_wins(self, fake_redis: Any) -> None:
+        """调用方显式 deadline 比 cap 更短时，以调用方为准。"""
+        sched = DistributedScheduler(
+            fake_redis, poll_interval=0.02, max_collect_wait=3600.0,
+        )
+        queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
+        started = time.monotonic()
+
+        with pytest.raises(SchedulingError) as ei:
+            await sched._dispatch_and_collect(
+                "run-deadline", 0, [self._node()], queue,
+                deadline=started + 0.2,
+            )
+
+        assert time.monotonic() - started < 5.0
+        assert "caller deadline" in str(ei.value)
+
+    def test_default_cap_is_one_hour(self, fake_redis: Any) -> None:
+        """默认 cap 远大于任何合法层时长，只在丢消息/worker 全死时才触发。"""
+        sched = DistributedScheduler(fake_redis)
+        assert sched._max_collect_wait == 3600.0
+
+    def test_cap_floor_is_one_second(self, fake_redis: Any) -> None:
+        """误传 0 / 负数不许把每条 run 都判死。"""
+        sched = DistributedScheduler(fake_redis, max_collect_wait=0)
+        assert sched._max_collect_wait == 1.0
