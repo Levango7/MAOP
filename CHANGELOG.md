@@ -66,10 +66,34 @@ Most likely the result message was lost or every worker died.
 > 断言区间又写得宽（`0.3 <= waited < 5.0`），于是"测的就是错的值"也显示通过。
 > 定案改为 cap=2.0 + 断言落地值 `safety cap=2s`。
 
-**实测观察（未修，非本次引入）**：`DistributedScheduler.__init__` 在 fakeredis 上单独耗时
-约 **1.67s**，是 `tests/test_distributed_execution.py` 每个用例的固定开销
-（本次 4 条新用例因此多出约 6.7s）。单实例化看起来无害，但该文件 63 条用例合计约 105s，
-其中约 100s 是这个固定开销。若要治，方向是 `FailurePatternDetector` 单例的初始化时机。
+**实测观察（未修，非本次代码缺陷；含一次自我纠正）**：
+
+`tests/test_distributed_execution.py` 每条用例的 fixture 都给一个**新的** `fakeredis.FakeRedis()`
+并新建 `DistributedScheduler`，而 `__init__` 末尾的 `_ensure_task_group()` 会对新实例执行
+`xgroup_create(..., mkstream=True)`。分解计时（`fakeredis` 层，非产品代码）：
+
+| 步骤 | 耗时 |
+|---|---|
+| `fakeredis.FakeRedis()` | 0.003s |
+| `WorkerRegistry()` / `FailurePatternDetector()` / `get_failure_detector()` | 各 0.000s |
+| `DistributedScheduler.__init__`（**新** fakeredis 实例） | **1.3–1.4s** |
+| `DistributedScheduler.__init__`（**同一个** fakeredis 实例再次） | **0.000s** |
+| `r.xgroup_create(key, 'maop_workers', id='0', mkstream=True)`（新实例） | **1.396s** |
+
+⇒ 1.4s 落在 **fakeredis 首次建 stream/consumer group 的内部懒初始化**上，
+`__init__` 本身无固定成本。
+
+> **自我纠正**：#121 的提交信息与 PR 描述把这条归因成
+> "`FailurePatternDetector` 单例的初始化时机"，依据只是"第一次慢、后面快"这一现象，
+> 没有分解计时。分解后 `FailurePatternDetector()` 与 `get_failure_detector()` 均为 0.000s，
+> 该归因**错**。同一段里"63 条合计 144s 里约 100s 是这个固定开销"的量级方向对
+> （fixture 每个用例换新 fakeredis ⇒ 63 次 × 1.4s ≈ 88s），但成因是 fakeredis，
+> 不是本仓单例。
+
+**为什么没有继续修**：唯一"省下这 1.4s"的办法是让 fixture 共享同一个 fakeredis 实例，
+但那会让 63 个用例共用 task stream 与 consumer group 状态，构成跨用例泄漏，
+风险远大于 88s 的测试提速。**不建议**用测试提速换隔离性。
+另外该开销只在装 lupa 的本机复现；CI 未装 lupa，实际贡献需从腿长实测，尚未量化。
 
 ### 桌面快照资产入库（69 个文件）：清掉 7 条红，并交出 5 处"文档/口径领先于实现"的实测结论
 
