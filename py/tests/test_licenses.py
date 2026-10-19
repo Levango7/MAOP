@@ -684,7 +684,7 @@ class TestDatetimeParsing:
         assert dt == original
 
     def test_parse_naive_datetime_assumed_utc(self):
-        original = datetime(2027, 12, 31, 10, 0, 0)  # noqa: DTZ001
+        original = datetime(2027, 12, 31, 10, 0, 0)
         dt = LicenseManager._parse_datetime(original)
         assert dt.tzinfo == timezone.utc
         assert dt.hour == 10

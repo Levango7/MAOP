@@ -535,7 +535,7 @@ def cmd_config_migrate(dry_run: bool = False, file: str = ".env") -> None:
             key = stripped.split("=", 1)[0].strip()
             existing_keys.add(key)
 
-    today = date.today().isoformat()  # noqa: DTZ011
+    today = date.today().isoformat()
     for line in lines:
         stripped = line.strip()
         if stripped and not stripped.startswith("#") and "=" in stripped:
