@@ -11,7 +11,7 @@
 #
 # 与 pyproject.toml [project.dependencies] 对齐。
 
-fastapi==0.143.0
+fastapi==0.143.2
 uvicorn[standard]==0.54.0
 pydantic>=2.9.0,<3.0
 pydantic-settings==2.15.0

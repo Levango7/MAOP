@@ -90,7 +90,7 @@ dev = [
     "pytest-xdist>=3.5",
     # 与 ci.yml lint 作业同源钉版（见 tests/test_lint_toolchain_pins.py）。
     # 放开下界会让本机/nightly 装到比 CI 新的 ruff，规则集不同 ⇒ 主干凭空红。
-    "ruff==0.16.10",
+    "ruff==0.17.1",
     "types-PyYAML>=6.0",
     "pydantic-settings==2.15.0",
     "mmh3==5.3.1",
