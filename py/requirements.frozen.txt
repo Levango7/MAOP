@@ -44,7 +44,7 @@ click==8.5.0
     # via uvicorn
 cryptography==50.0.2
     # via maop-orchestrator (pyproject.toml)
-fastapi==0.143.0
+fastapi==0.143.2
     # via maop-orchestrator (pyproject.toml)
 h11==0.16.0
     # via
@@ -52,7 +52,7 @@ h11==0.16.0
     #   uvicorn
 httpcore==1.0.9
     # via httpx
-httptools==0.8.0
+httptools==0.9.0
     # via uvicorn
 httpx==0.28.1
     # via maop-orchestrator (pyproject.toml)
@@ -84,12 +84,12 @@ psycopg-pool==3.3.3
     # via psycopg
 pycparser==3.11 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
     # via cffi
-pydantic==2.14.0
+pydantic==2.14.1
     # via
     #   maop-orchestrator (pyproject.toml)
     #   fastapi
     #   pydantic-settings
-pydantic-core==2.50.0
+pydantic-core==2.50.1
     # via pydantic
 pydantic-settings==2.15.0
     # via maop-orchestrator (pyproject.toml)
