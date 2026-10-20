@@ -169,6 +169,10 @@ py/.maop-snapshots/
 dashboard-enterprise/test-results/
 # 前端测试运行产物（此前被误提交，131KB 的 vitest 结果 JSON）
 dashboard-enterprise/vitest_result.json
+# e2e 的 webServer 以 dashboard-enterprise/ 为 cwd 起后端，会在该目录写
+# data/notifications.db 与 degradation.log；仓库根的 data/* 规则带斜杠、
+# 只匹配根目录，所以这份必须单独忽略（否则一次 git add -A 就捆进二进制 DB）。
+dashboard-enterprise/data/
 # -- Runtime degradation log --
 data/degradation.log
 # 带时间戳的轮转副本（历史累积产物；原先只忽略固定名，导致

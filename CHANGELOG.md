@@ -39,6 +39,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### e2e 可移植性：Windows 上整条 Playwright 腿"根本没跑"（#53）
+
+`dashboard-enterprise/playwright.config.js` 的 webServer 用 POSIX 内联赋值起后端
+（`MAOP_AUTH_ENABLED=0 python …`）。Windows 的 cmd.exe 把 `MAOP_AUTH_ENABLED=0` 当命令名，
+本机实测报 `'MAOP_AUTH_ENABLED' is not recognized`——症状不是"红了"而是"一条都没跑"。
+
+- 改走 Playwright 的 `webServer.env`，并显式以 `process.env` 打底（否则会连 PATH 一起覆盖掉）。
+- 加 `MAOP_MULTIMODAL_PROVIDER=hash`：否则后端启动先去 huggingface 拉 CLIP 权重，本机实测
+  **87 秒**；网络被重置时靠 5 次重试耗满启动超时。e2e 不测多模态嵌入，哈希回退是确定性且
+  快的选择——与 `py/scripts/first_run_smoke.py` 里同一开关、同一理由。
+- webServer `timeout` 60s→180s：给慢机器留余量，CI 上不改变行为。
+- `docs/contributing.md` 记两条当场踩到的坑：worktree 里的 e2e 默认 import **主仓**的
+  editable `maop`（要 `PYTHONPATH=<worktree>/py` 才测得到本 worktree 的代码）；以及上面的权重开关。
+- `.gitignore` 新增 `dashboard-enterprise/data/` 规则：e2e 的 webServer 以前端目录为 cwd 起后端，
+  会在该目录落 `notifications.db` 与 `degradation.log`；仓库根的 `data/*` 规则带斜杠、只匹配根目录，
+  所以这两件此前对 `git add -A` 是可见的（改前实测 `git check-ignore` 两条都 rc=1，改后均命中）。
+- `e2e/seeded-pages.spec.js` 两处 agent 名断言加 `exact: true`：同一页还挂着实时事件流，其
+  `event-msg` 元素里是原始 JSON（实测命中 `{"type":"snapshot",…,"live_agents":["copilot"]}`），
+  子串匹配会同时命中健康行与事件流 ⇒ strict mode violation；撞不撞取决于那一刻快照里有没有这个
+  agent 名，是一条与时序有关的假红。
+
+验证：`--workers=1` 下单跑 3 条目标用例（agent-billing / settings / agent health rows）50.6s 全过；
+`e2e/seeded-pages.spec.js` 整文件 8 条（含两处改后的断言）39.9s 全过。
+
+**未解决，如实记录**：本机全量 chromium 套件（88 条）仍会在约第 65 条之后成批失败——25 条红里
+22 条根因是 `net::ERR_CONNECTION_REFUSED at localhost:5174`（vite dev server 中途消失，
+`[WebServer]` 日志同步停在同一处），其余 3 条单独复跑全绿。同一 commit 在 CI 的
+`Playwright E2E`（chromium + firefox + webkit）为 success ⇒ 判本机 dev-server 稳定性问题，
+不据此宣称已修好，也不把"本地全量绿"当验收口径。
+
 ### M1 第一片：单次运行可复盘（run_events 事实源 + /api/runs）
 
 M0 之后作业详情只有捕获到的 stdout，"这次运行到底发生了什么"在进程退出后
