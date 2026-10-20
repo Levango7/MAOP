@@ -39,6 +39,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Webhooks 页与 /api/hooks 契约对齐（2026-10-21）
+
+- **列表永远为空**：后端返回 `{hooks, count}`，前端只认 `items/webhooks/data`。
+  改为优先读 `hooks`。
+- **事件名全部无效**：前端硬编码 `agent.dispatch` / `task.complete` 等，后端
+  `LifecycleEvent` 实际是 `agent.pre_dispatch` / `step.post_run` 等，创建必 400。
+  改为从 `GET /api/hooks/events` 拉取真实事件，表单改为单选 `event`。
+- **提交字段不匹配**：前端发 `events[]`/`auth_type`/HMAC/bearer/`timeout_s`/
+  `retry_count`，后端请求模型只认 `name/event/url/enabled`。移除这些后端
+  不支持的假控件，按真实契约提交。
+- 测试耗时改读后端 `duration_ms`（原读 `latency_ms` 恒为 0）。
+- 验证：新增 `Webhooks` vitest **2 passed**，eslint 与 `npm run build` 通过。
+- 已知缺口：`HookDef` 本身仍不持久化自定义 headers/超时/重试，补齐需扩展
+  HookDef、SQLite 列与投递链；`last_triggered_at` 也尚未由列表端点返回。
+
 ### MCP server 配置链路：编辑不再清空 URL/命令，认证/超时真正生效（2026-10-21）
 
 - **编辑覆盖丢配置**：`GET /api/mcp/servers` 只回 id/name/transport/status，
