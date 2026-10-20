@@ -72,20 +72,45 @@ describe('ControlPanel.vue', () => {
     wrapper.unmount();
   });
 
-  it('renders running jobs when /api/control/status returns jobs', async () => {
+  it('submits the composer task (unicode) to /api/control/run', async () => {
+    mockFetch(defaultRoutes({
+      '/api/control/run': { status: 'ok', job_id: 'j9' },
+    }));
+    const wrapper = await mountControlPanel();
+    const input = wrapper.find('#maop-task-input');
+    expect(input.exists()).toBe(true);
+    // The composer must stay usable while the page's background refresh runs.
+    expect(input.attributes('disabled')).toBeUndefined();
+    await input.setValue('重构 auth 模块，改用 JWT。');
+    await wrapper.find('.task-composer__run').trigger('click');
+    await flushPromises();
+    const call = global.fetch.mock.calls.find(([url]) => String(url) === '/api/control/run');
+    expect(call).toBeTruthy();
+    expect(JSON.parse(call[1].body).task).toBe('重构 auth 模块，改用 JWT。');
+    expect(wrapper.text()).toContain('j9');
+    wrapper.unmount();
+  });
+
+  it('renders jobs using the backend id/task/start fields and opens detail', async () => {
     mockFetch(defaultRoutes({
       '/api/control/status': {
         jobs: [
-          { id: 'j1', name: 'backup', status: 'running', started_at: '2026-08-20T10:00:00Z' },
-          { id: 'j2', name: 'index', status: 'paused', started_at: '2026-08-20T10:01:00Z' },
+          { id: 'j1', task: 'backup', status: 'completed', start: '2026-08-20T10:00:00Z' },
+          { id: 'j2', action: 'pause', status: 'interrupted', start: '2026-08-20T10:01:00Z' },
         ],
+      },
+      '/api/control/jobs/j1': {
+        job: { id: 'j1', task: 'backup', status: 'completed', stdout: 'persisted output' },
       },
     }));
     const wrapper = await mountControlPanel();
     const rows = wrapper.findAll('.row-item');
     expect(rows.length).toBeGreaterThanOrEqual(2);
     expect(wrapper.text()).toContain('backup');
-    expect(wrapper.text()).toContain('index');
+    expect(wrapper.text()).toContain('2026-08-20T10:00:00Z');
+    await rows.find((row) => row.text().includes('backup')).findAll('button')[0].trigger('click');
+    await flushPromises();
+    expect(global.fetch.mock.calls.some(([url]) => String(url) === '/api/control/jobs/j1')).toBe(true);
     wrapper.unmount();
   });
 

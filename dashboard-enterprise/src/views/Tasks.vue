@@ -132,6 +132,31 @@
       </template>
     </ListPageLayout>
 
+    <!-- 任务详情抽屉（替代原先指向 /run?session= 的死链） -->
+    <DetailDrawer
+      :open="detailTask.open"
+      :title="t('view.tasks.detailTitle')"
+      icon="file-text"
+      @close="detailTask.open = false"
+    >
+      <div v-if="detailTask.task" class="task-detail">
+        <h4 class="task-detail__name">{{ taskDisplayName(detailTask.task) }}</h4>
+        <p class="task-detail__id">{{ detailTask.task.id }}</p>
+        <dl class="task-detail__facts">
+          <dt>{{ t('view.tasks.colStatus') }}</dt>
+          <dd><Badge :tone="statusTone(detailTask.task.status)">{{ statusLabel(detailTask.task.status) }}</Badge></dd>
+          <dt>{{ t('view.tasks.colCreated') }}</dt>
+          <dd>{{ formatTime(detailTask.task.created_at) }}</dd>
+          <dt>{{ t('view.tasks.detailUpdated') }}</dt>
+          <dd>{{ formatTime(detailTask.task.updated_at) }}</dd>
+          <dt>{{ t('view.tasks.colDuration') }}</dt>
+          <dd>{{ formatDuration(detailTask.task) }}</dd>
+          <dt v-if="detailTask.task.agent">{{ t('view.tasks.detailAgent') }}</dt>
+          <dd v-if="detailTask.task.agent">{{ detailTask.task.agent }}</dd>
+        </dl>
+      </div>
+    </DetailDrawer>
+
     <!-- 重跑确认对话框 -->
     <DetailDrawer
       :open="rerunConfirm.open"
@@ -164,7 +189,6 @@
 // 未引入 Element Plus — 项目组件库为自研, 保持 UI 一致性 (见 README)。
 
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
 import { useI18n } from '../i18n';
@@ -177,7 +201,6 @@ import DetailDrawer from '../components/DetailDrawer.vue';
 const { t } = useI18n();
 const api = useApiStore();
 const toast = useToast();
-const router = useRouter();
 
 // ── 状态 ──
 const loading = ref(true);
@@ -342,9 +365,10 @@ function formatDuration(task) {
 }
 
 // ── 查看详情 ──
+const detailTask = reactive({ open: false, task: null });
 function viewDetail(task) {
-  // 跳转到 Run 页面并带上 session id, Run 页可据此加载会话上下文
-  router.push({ path: '/run', query: { session: task.id } });
+  detailTask.task = task;
+  detailTask.open = true;
 }
 
 // ── 重跑确认 + 执行 ──
@@ -662,4 +686,23 @@ onUnmounted(() => {
 .timeline-dur {
   color: var(--text-faint);
 }
+.task-detail__name {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--fs-lg);
+  word-break: break-word;
+}
+.task-detail__id {
+  margin: 0 0 var(--sp-4);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+.task-detail__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm);
+}
+.task-detail__facts dt { color: var(--text-muted); }
+.task-detail__facts dd { margin: 0; word-break: break-word; }
 </style>

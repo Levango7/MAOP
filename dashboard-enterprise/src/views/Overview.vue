@@ -5,12 +5,6 @@
          一号用户实报"右边你自己看看"）。CoachMarks（分步聚光）是唯一首访
          引导；其缺的"创建 Agent/打开对话"快捷入口已由下方 .ov-actions 承担。
          组件文件保留供将来回收，但不再挂载。 -->
-    <!-- MAOS 升级提示: Personal edition 用户可见企业版功能入口 -->
-    <div v-if="edition.edition === 'personal'" class="upgrade-banner">
-      <AppIcon name="star" :size="14" />
-      <span>{{ t('view.overview.maosUpgrade') }}</span>
-      <router-link to="/licenses" class="upgrade-link">{{ t('view.overview.getLicense') }}</router-link>
-    </div>
     <PageHeader>
       <template #badges>
         <Badge v-if="edition.edition" :tone="edition.edition === 'enterprise' ? 'brand' : 'neutral'">{{ t('view.overview.edition.' + edition.edition) }}</Badge>
@@ -42,53 +36,6 @@
       <span class="ov-hero__fresh muted">{{ t('view.overview.updated') }} {{ freshnessText }}</span>
     </div>
 
-    <!-- ── 企业版差异化叙事: Plan-Execute-Verify 三阶段工作流 ──
-         个人版不渲染此区块 (edition.isEnterprise 控制)。
-         纯展示: 不调用任何 API, 不修改任何数据流, 只读 edition store。 -->
-    <section
-      v-if="!error && edition.isEnterprise"
-      class="ov-pev"
-      :aria-label="t('view.overview.pev.ariaLabel')"
-    >
-      <header class="ov-pev__head">
-        <div class="ov-pev__title-row">
-          <AppIcon name="route" :size="16" class="ov-pev__title-icon" />
-          <h2 class="ov-pev__title">{{ t('view.overview.pev.title') }}</h2>
-          <Badge tone="brand">{{ t('view.overview.edition.' + edition.edition) }}</Badge>
-        </div>
-        <p class="ov-pev__subtitle muted">{{ t('view.overview.pev.subtitle') }}</p>
-      </header>
-
-      <ol class="ov-pev__phases" role="list">
-        <li
-          v-for="(phase, idx) in pevPhases"
-          :key="phase.key"
-          class="ov-pev__phase"
-          :class="['ov-pev__phase--' + phase.key, { 'ov-pev__phase--first': idx === 0, 'ov-pev__phase--last': idx === pevPhases.length - 1 }]"
-          role="listitem"
-        >
-          <div class="ov-pev__icon-wrap">
-            <AppIcon :name="phase.icon" :size="20" class="ov-pev__icon" />
-          </div>
-          <div class="ov-pev__phase-body">
-            <div class="ov-pev__phase-head">
-              <span class="ov-pev__phase-title">{{ t(phase.titleKey) }}</span>
-              <Badge :tone="phase.stateTone">{{ t(phase.stateKey) }}</Badge>
-            </div>
-            <p class="ov-pev__phase-desc muted">{{ t(phase.descKey) }}</p>
-          </div>
-          <span
-            v-if="idx < pevPhases.length - 1"
-            class="ov-pev__connector"
-            aria-hidden="true"
-          >
-            <AppIcon name="chevron-right" :size="14" />
-            <span class="ov-pev__connector-label">{{ t('view.overview.pev.connector') }}</span>
-          </span>
-        </li>
-      </ol>
-    </section>
-
     <!-- ── 层 2: Action 磁贴 — 引导用户"下一步做什么" ── -->
     <nav class="ov-actions" :aria-label="t('view.overview.quickActions.ariaLabel')">
       <router-link v-for="a in quickActions" :key="a.to" :to="a.to" class="ov-action">
@@ -97,29 +44,13 @@
       </router-link>
     </nav>
 
-    <!-- KPI grid — 每张卡片下方嵌入 7 天趋势 sparkline (内联 SVG) -->
+    <!-- KPI grid — only real runtime metrics (no codebase vanity numbers) -->
     <div class="stats-grid">
       <div v-for="s in stats" :key="s.label" class="stat-cell">
         <StatCard
           :label="s.label" :value="s.value" :unit="s.unit" :icon="s.icon" :tone="s.tone" :accent="s.accent" :loading="loading"
           :yoy="s.yoy" :mom="s.mom" :yoy-label="s.yoyLabel" :mom-label="s.momLabel"
         />
-        <!-- 视觉增强: 内联 SVG 迷你火花线图, 展示 7 天趋势 -->
-        <div
-          v-if="!loading && sparklineFor(s).points.length > 1"
-          class="stat-spark"
-        >
-          <svg
-            class="stat-spark__svg"
-            viewBox="0 0 100 24"
-            preserveAspectRatio="none"
-            role="img"
-            :aria-label="t('view.overview.sparkline.trend')"
-          >
-            <path :d="sparklineAreaPath(sparklineFor(s).points)" class="stat-spark__area" :style="{ fill: s.accent }" />
-            <path :d="sparklineLinePath(sparklineFor(s).points)" class="stat-spark__line" :style="{ stroke: s.accent }" />
-          </svg>
-        </div>
       </div>
     </div>
 
@@ -195,10 +126,6 @@
           <div class="info-row"><dt>{{ t('common.uptime') }}</dt><dd>{{ data.uptime }}</dd></div>
           <div class="info-row"><dt>{{ t('view.overview.dtPython') }}</dt><dd>{{ data.python_ver }}</dd></div>
           <div class="info-row"><dt>{{ t('common.platform') }}</dt><dd>{{ data.platform }}</dd></div>
-          <div class="info-row"><dt>{{ t('view.overview.dtApiEndpoints') }}</dt><dd>{{ data.api_endpoints }}</dd></div>
-          <div class="info-row"><dt>{{ t('view.overview.dtSourceFiles') }}</dt><dd>{{ data.source_files }}</dd></div>
-          <div class="info-row"><dt>{{ t('view.overview.dtCodeLines') }}</dt><dd>{{ formatNum(data.code_lines) }}</dd></div>
-          <div class="info-row"><dt>{{ t('view.overview.dtTestFiles') }}</dt><dd>{{ data.test_files }}</dd></div>
         </dl>
       </Card>
     </div>
@@ -312,17 +239,8 @@ const heroLabel = computed(() => {
 const quickActions = [
   { to: '/run?tab=structured', label: 'view.overview.actionRun', icon: 'play' },
   { to: '/run?tab=chat', label: 'view.overview.actionChat', icon: 'chat' },
-  { to: '/agents', label: 'view.overview.actionAgents', icon: 'bot' },
-  { to: '/logs', label: 'view.overview.actionLogs', icon: 'scroll' },
-];
-
-// ── Plan-Execute-Verify 三阶段工作流叙事 (企业版差异化) ──
-// 纯静态描述: 不调用 API, 不依赖 data ref, 只读 i18n + edition store。
-// 三个阶段分别用 route/play/check-circle 图标, 状态徽章用 brand/info/success。
-const pevPhases = [
-  { key: 'plan',    icon: 'route',        titleKey: 'view.overview.pev.plan.title',    descKey: 'view.overview.pev.plan.desc',    stateKey: 'view.overview.pev.plan.state',    stateTone: 'brand' },
-  { key: 'execute', icon: 'play',         titleKey: 'view.overview.pev.execute.title', descKey: 'view.overview.pev.execute.desc', stateKey: 'view.overview.pev.execute.state', stateTone: 'info' },
-  { key: 'verify',  icon: 'check-circle', titleKey: 'view.overview.pev.verify.title',  descKey: 'view.overview.pev.verify.desc',  stateKey: 'view.overview.pev.verify.state',  stateTone: 'success' },
+  { to: '/capability/agents', label: 'view.overview.actionAgents', icon: 'bot' },
+  { to: '/operate/logs', label: 'view.overview.actionLogs', icon: 'scroll' },
 ];
 
 // Dedup palette: 10 visually distinct accent colors, one per KPI, so the
@@ -342,12 +260,6 @@ const stats = computed(() => {
     { label: t('view.overview.statDelegations'), value: d.delegations_total ?? '—', icon: 'activity', tone: 'info', accent: ACCENTS[1], yoy: d.delegations_yoy ?? null, mom: d.delegations_mom ?? null, yoyLabel: yl, momLabel: ml },
     { label: t('view.overview.statSuccessRate'), value: d.success_rate !== null && d.success_rate !== undefined ? Number(d.success_rate).toFixed(1) : '—', unit: '%', icon: 'check-circle', tone: 'success', accent: ACCENTS[2], yoy: d.success_rate_yoy ?? null, mom: d.success_rate_mom ?? null, yoyLabel: yl, momLabel: ml },
     { label: t('view.overview.statAvgLatency'), value: d.avg_latency_ms !== null && d.avg_latency_ms !== undefined ? Math.round(d.avg_latency_ms) : '—', unit: 'ms', icon: 'gauge', tone: 'warn', accent: ACCENTS[3] },
-    { label: t('view.overview.statTests'), value: d.tests_total ?? '—', icon: 'clipboard', tone: 'neutral', accent: ACCENTS[4] },
-    { label: t('view.overview.statModules'), value: d.modules_total ?? '—', icon: 'box', tone: 'brand', accent: ACCENTS[5] },
-    { label: t('view.overview.statCodeLines'), value: d.code_lines !== null && d.code_lines !== undefined ? formatNum(d.code_lines) : '—', icon: 'code', tone: 'neutral', accent: ACCENTS[6] },
-    { label: t('view.overview.statApiEndpoints'), value: d.api_endpoints ?? '—', icon: 'server', tone: 'info', accent: ACCENTS[7] },
-    { label: t('view.overview.statSourceFiles'), value: d.source_files !== null && d.source_files !== undefined ? formatNum(d.source_files) : '—', icon: 'file', tone: 'neutral', accent: ACCENTS[8] },
-    { label: t('view.overview.statTestFiles'), value: d.test_files !== null && d.test_files !== undefined ? formatNum(d.test_files) : '—', icon: 'beaker', tone: 'neutral', accent: ACCENTS[9] },
   ];
 });
 
@@ -367,64 +279,6 @@ const healthMetrics = computed(() => {
     { label: t('view.overview.metricDelegations'), display: String(d.delegations_total ?? 0), pct: Math.min(100, (d.delegations_total || 0)), color: 'linear-gradient(90deg, var(--info), var(--info-strong))' },
   ];
 });
-
-// ── 视觉增强: Sparkline 迷你火花线图 ──────────────────────────────
-// 为每个 KPI 生成 7 天趋势数据。基于当前值确定性派生
-// (不用 Math.random, 避免测试不稳定), 不同 seed 产生不同相位。
-const SPARK_W = 100;
-const SPARK_H = 24;
-const SPARK_POINTS = 7;
-
-function sparklineSeries(baseValue, seed) {
-  const v = Number(baseValue) || 0;
-  const pts = [];
-  for (let i = 0; i < SPARK_POINTS; i++) {
-    pts.push(Math.max(0, v * (1 + 0.15 * Math.sin((i + seed) * 0.9))));
-  }
-  return pts;
-}
-
-function sparklineLinePath(points) {
-  if (!points || points.length < 2) return '';
-  const max = Math.max(...points, 1);
-  const min = Math.min(...points, 0);
-  const range = max - min || 1;
-  return points.map((v, i) => {
-    const x = (i / (points.length - 1)) * SPARK_W;
-    const y = SPARK_H - ((v - min) / range) * (SPARK_H - 2) - 1;
-    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-}
-
-function sparklineAreaPath(points) {
-  if (!points || points.length < 2) return '';
-  const line = sparklineLinePath(points);
-  return `${line} L${SPARK_W.toFixed(1)},${SPARK_H} L0,${SPARK_H} Z`;
-}
-
-// 为每个 stat 生成 sparkline 数据, 用 label 作为关联 key
-const _sparklineMap = computed(() => {
-  const d = data.value || {};
-  const series = [
-    { label: t('view.overview.statActiveAgents'), points: sparklineSeries(d.agents_total ?? 0, 1) },
-    { label: t('view.overview.statDelegations'), points: sparklineSeries(d.delegations_total ?? 0, 2) },
-    { label: t('view.overview.statSuccessRate'), points: sparklineSeries(d.success_rate ?? 0, 3) },
-    { label: t('view.overview.statAvgLatency'), points: sparklineSeries(d.avg_latency_ms ?? 0, 4) },
-    { label: t('view.overview.statTests'), points: sparklineSeries(d.tests_total ?? 0, 5) },
-    { label: t('view.overview.statModules'), points: sparklineSeries(d.modules_total ?? 0, 6) },
-    { label: t('view.overview.statCodeLines'), points: sparklineSeries(d.code_lines ?? 0, 7) },
-    { label: t('view.overview.statApiEndpoints'), points: sparklineSeries(d.api_endpoints ?? 0, 8) },
-    { label: t('view.overview.statSourceFiles'), points: sparklineSeries(d.source_files ?? 0, 9) },
-    { label: t('view.overview.statTestFiles'), points: sparklineSeries(d.test_files ?? 0, 10) },
-  ];
-  const map = {};
-  for (const s of series) map[s.label] = s;
-  return map;
-});
-
-function sparklineFor(stat) {
-  return _sparklineMap.value[stat.label] || { points: [] };
-}
 
 const failColumns = computed(() => [
   { key: 'agent', label: t('view.overview.colAgent'), type: 'text' },
@@ -454,11 +308,6 @@ function fmtTick(t) {
   if (isNaN(d.getTime())) return String(t);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
-function formatNum(n) {
-  if (n === null) return '—';
-  return Number(n).toLocaleString();
-}
-
 const _ts = computed(() => normalizeTimeseries(data.value?.timeseries));
 
 // Theme-aware chart colors: shared composable reads CSS vars at compute time,
