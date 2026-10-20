@@ -226,6 +226,10 @@ def cmd_run(task: str, depth: int = 0) -> Any:
         result = asyncio.run(loop.run(task))
         elapsed = (time.monotonic() - start) * 1000
         # 输出执行结果
+        if result.trace_id:
+            # Machine-readable handle: the dashboard parses this line to link a
+            # control job to its run_events timeline (GET /api/runs/{trace_id}).
+            print(f"[TRACE] {result.trace_id}")
         if result.execution:
             if result.execution.stdout:
                 print(result.execution.stdout)

@@ -39,6 +39,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M1 第一片：单次运行可复盘（run_events 事实源 + /api/runs）
+
+M0 之后作业详情只有捕获到的 stdout，"这次运行到底发生了什么"在进程退出后
+就查不到了。Explore 实测定位到根因（file:line 已核）：`delegations` 表 schema
+完备但 `insert_delegation` **只在测试里被调用**；plan 步骤/stdout/verify 结果
+只活在内存 `LoopResult`（`maop_loop_phases.py`）与 `logs/MAOP-structured.log`
+文本行；`cost_entries` 只在 metadata JSON 里带 trace_id；无任何 run_events 表。
+
+- 新增 `maop/core/run_events.py`：append-only `run_events`（trace_id + seq +
+  kind + agent/step/status/duration/payload），字符串入库前截断到 2000 字符；
+  写失败只记日志不抛出（记账不能弄死运行），读失败退化为空列表。
+- 落点：`run.started`（`maop_loop.py`）、`run.plan`、`run.step`（含 feedback
+  重试的每一次尝试）、`run.verify`（门禁结论与 gates 明细）、`run.cost`、
+  `run.finished`（`maop_loop_phases.py`）。
+- 新增只读端点 `GET /api/runs`、`GET /api/runs/{trace_id}`（admin gate；
+  个人版回环 owner 模式即满足），响应走 `{status,data}` 信封；
+  router 薄、逻辑在 `dashboard/services/run_service.py`。
+- `maop run` 现在打印独占一行的 `[TRACE] <id>`，`system_service` 解析后写进
+  job 记录（`trace_id`），作业详情因此能链到时间线；正则要求整行且十六进制，
+  agent 自己引用这个标记不算数。
+- 前端 job 抽屉增加"运行时间线"（步骤/校验/成本按序展示，DetailDrawer 内容
+  Teleport 到 body，故测试断言走 `document.querySelector`）。
+- README 的 `core/` 计数 7→8 files（`scripts/doc_reconcile.py` 复验通过）。
+
+实测：`test_run_events.py` 6 条（含**真跑一次 `MaopLoop.run`** 断言事件序列与
+seq 连续，证明写入点不是死代码）、`test_router_runs.py` 6 条（列表/详情/未知
+trace 404/只读角色 403）、`test_router_control.py` 62 条（含新增 trace 解析与
+落库 2 条）、loop + 文档门禁 + 质量门禁 + 死接线清单合计 190 passed；
+前端 lint 0 error、`vue-tsc` 0、相关用例 20 passed。
+
+
 ### 修复：自引用 agent 的跨进程 fork 炸弹（2026-10-20）
 
 `config/agents.yaml` 的 `MAOP` 自引用条目 `cli_args: -m maop.cli run --task "{task}"`

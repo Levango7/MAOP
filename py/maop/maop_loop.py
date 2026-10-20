@@ -43,6 +43,7 @@ from maop.core.monitoring.otel import span as otel_span
 from maop.core.reliability.cache import SingleFlight
 from maop.core.reliability.event_bus import EventBus, get_event_bus
 from maop.core.reliability.log_rotate import rotate_logs
+from maop.core.run_events import record_run_event
 from maop.engine_pause import check_pause_async
 from maop.loop_executor import ExecuteMixin
 from maop.loop_models import LoopConfig, LoopResult, RequirementAnalysis  # noqa: F401
@@ -246,6 +247,16 @@ class MaopLoop(ExecuteMixin, PhasesMixin):
 
         logger.info("MAOP Loop started | task=%s | trace=%s", task[:80], trace_id)
         self._log("loop", "INFO", "Loop started", trace_id=trace_id, task=task[:80])
+        record_run_event(
+            trace_id, "run.started", agent=agent,
+            payload={
+                "task": task,
+                "workdir": workdir,
+                "retry": retry,
+                "skip_verify": skip_verify,
+                "parent_trace_id": parent_trace_id,
+            },
+        )
 
         if lc.enable_log_rotation:
             try:

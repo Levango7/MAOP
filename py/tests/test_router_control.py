@@ -607,3 +607,31 @@ class TestControlMaintainCoverage:
         """POST /api/control/maintain with action=gc."""
         resp = client_coverage.post("/api/control/maintain", json={"action": "gc"})
         assert resp.status_code == 200
+
+
+# ── run trace linkage (M1: job → /api/runs/{trace_id}) ─────────────
+class TestRunTraceLinkage:
+    def test_extract_trace_id_requires_own_line(self):
+        from maop.dashboard.services import system_service
+
+        assert system_service.extract_trace_id(
+            "你好\n[TRACE] deadbeef\n[OK] run 完成 (12ms)"
+        ) == "deadbeef"
+        # agent 输出里引用这个标记不算数（必须独占一行且是十六进制 trace）
+        assert system_service.extract_trace_id("日志: [TRACE] zzzzzz tail") == ""
+        assert system_service.extract_trace_id("") == ""
+
+    @pytest.mark.asyncio
+    async def test_drain_records_trace_id_on_job(self, temp_maop_root, clean_jobs):
+        from maop.dashboard.services import system_service
+
+        proc = _fake_proc(returncode=0)
+        proc.communicate = AsyncMock(return_value=(b"[TRACE] cafe1234\n", b""))
+        with patch.object(system_service.asyncio, "create_subprocess_exec",
+                          new_callable=AsyncMock, return_value=proc):
+            job_id = await system_service.start_control_run("中文任务")
+
+        await clean_jobs[job_id]["_drain_task"]
+        job = system_service.get_control_job(job_id)
+        assert job["trace_id"] == "cafe1234"
+        assert job["status"] == "completed"

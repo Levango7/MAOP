@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import sys
 import time
 import uuid as _uuid
@@ -210,6 +211,20 @@ def _decode_capture(payload: bytes | None) -> str:
     return text
 
 
+_TRACE_RE = re.compile(r"^\[TRACE\] ([0-9a-fA-F]{6,64})$", re.MULTILINE)
+
+
+def extract_trace_id(stdout: str) -> str:
+    """Pull the run's ``trace_id`` out of ``maop run`` output.
+
+    ``maop run`` prints ``[TRACE] <id>``; that id keys the run_events
+    timeline, so a control job becomes reviewable after the process exits.
+    Anchored to a full line on purpose — agent output may quote the token.
+    """
+    match = _TRACE_RE.search(stdout or "")
+    return match.group(1) if match else ""
+
+
 async def start_control_run(task: str) -> str:
     """Start a new control job from a task. Returns the ``job_id``.
 
@@ -228,7 +243,7 @@ async def start_control_run(task: str) -> str:
     job: dict[str, Any] = {
         "action": "run", "status": "running",
         "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": task,
-        "process": proc, "stdout": "", "stderr": "",
+        "process": proc, "stdout": "", "stderr": "", "trace_id": "",
     }
     with state.active_jobs_lock:
         state.active_jobs[job_id] = job
@@ -239,6 +254,7 @@ async def start_control_run(task: str) -> str:
         with state.active_jobs_lock:
             job["stdout"] = _decode_capture(out)
             job["stderr"] = _decode_capture(err)
+            job["trace_id"] = extract_trace_id(job["stdout"])
             job["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
             if proc.returncode is not None:
                 job["status"] = "completed" if proc.returncode == 0 else "failed"

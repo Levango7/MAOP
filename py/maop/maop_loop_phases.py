@@ -29,6 +29,7 @@ from maop.core.monitoring.otel import get_tracer
 from maop.core.monitoring.otel import setup_provider as otel_setup
 from maop.core.reliability.error_schema import MaopResult
 from maop.core.reliability.event_bus import Event
+from maop.core.run_events import record_run_event
 from maop.loop_analyzer import simple_analyze
 from maop.loop_models import LoopConfig, LoopResult, RequirementAnalysis
 from maop.maop_plan import maop_plan
@@ -37,6 +38,47 @@ from maop.maop_verify import VerifyResult
 logger = logging.getLogger(__name__)
 
 _otel_tracer = None
+
+
+def _record_exec_step(ctx: PhaseContext, exec_result: MaopResult | None) -> None:
+    """Append this execution attempt to ``run_events`` (the per-run timeline)."""
+    if exec_result is None:
+        return
+    attempt = ctx.feedback_cycles + 1
+    record_run_event(
+        ctx.trace_id, "run.step",
+        agent=exec_result.agent, step=attempt,
+        status="ok" if exec_result.is_success() else "failed",
+        duration_ms=exec_result.duration_ms,
+        payload={
+            "task": exec_result.task,
+            "exit_code": exec_result.exit_code,
+            "stdout": exec_result.stdout,
+            "stderr": exec_result.stderr,
+            "error": exec_result.error or "",
+            "routing_key": exec_result.routing_key,
+            "attempt": attempt,
+        },
+    )
+
+
+def _record_verify(ctx: PhaseContext, duration_ms: int) -> None:
+    """Append the gate verdict so a past run's verify result stays queryable."""
+    result = ctx.verify_result
+    if result is None:
+        return
+    status = "error" if result.errored else ("passed" if result.passed else "failed")
+    record_run_event(
+        ctx.trace_id, "run.verify", agent=ctx.agent, status=status,
+        duration_ms=duration_ms,
+        payload={
+            "summary": result.summary,
+            "state": result.state,
+            "block_reason": result.block_reason,
+            "feedback": result.feedback,
+            "gates": [gate.model_dump() for gate in result.gates],
+        },
+    )
 
 
 def _env_truthy(name: str) -> bool:
@@ -230,6 +272,16 @@ class PhasesMixin:
             ctx.agent = ctx.plan_result.get("selected_agent", "claude")
         ctx.routing_key = ctx.plan_result.get("routing_key", "chat")
         ctx.timeout = ctx.plan_result.get("budget", {}).get("timeout_s", lc.default_timeout_s)
+        record_run_event(
+            ctx.trace_id, "run.plan", agent=ctx.agent,
+            duration_ms=int((time.monotonic() - plan_start) * 1000),
+            payload={
+                "task": ctx.task,
+                "routing_key": ctx.routing_key,
+                "timeout_s": ctx.timeout,
+                "plan": ctx.plan_result,
+            },
+        )
 
         # F6a: load_balancer may refine the selection, but only when the
         # caller did not explicitly pin an agent.
@@ -308,6 +360,7 @@ class PhasesMixin:
             self._budget_reconciliation(exec_result, ctx.trace_id)
 
         ctx.execution_result = exec_result
+        _record_exec_step(ctx, exec_result)
 
         exec_duration = int((time.monotonic() - exec_start) * 1000)
         if self._metrics:
@@ -368,6 +421,16 @@ class PhasesMixin:
                 actual_tokens_in=est_tokens_in, actual_tokens_out=est_tokens_out,
                 estimated_cost=estimated_cost,
             )
+            record_run_event(
+                trace_id, "run.cost", agent=exec_result.agent or "",
+                payload={
+                    "model": model_name,
+                    "provider": provider,
+                    "tokens_in": est_tokens_in,
+                    "tokens_out": est_tokens_out,
+                    "estimated_cost": round(estimated_cost, 6),
+                },
+            )
         except Exception as exc:
             logger.warning("[MAOP-loop] Budget reconciliation failed: %s", exc)
 
@@ -384,6 +447,7 @@ class PhasesMixin:
         if self._metrics:
             self._metric_verify_duration.observe(verify_duration)
         self._record_metric("verify_duration_ms", verify_duration)
+        _record_verify(ctx, verify_duration)
 
         return PhaseResult(ok=True)
 
@@ -444,6 +508,7 @@ class PhasesMixin:
             )
 
         ctx.execution_result = exec_result
+        _record_exec_step(ctx, exec_result)
         ctx.verify_result = verify_result
         return PhaseResult(ok=True)
 
@@ -587,6 +652,19 @@ class PhasesMixin:
             })))
         except RuntimeError as exc:
             logger.debug("maop_loop: no running loop for loop.complete publish: %s", exc)
+
+        record_run_event(
+            ctx.trace_id, "run.finished", agent=ctx.agent,
+            status="success" if success else "failed", duration_ms=total_ms,
+            payload={
+                "task": ctx.original_task,
+                "routing_key": ctx.routing_key,
+                "feedback_cycles": ctx.feedback_cycles,
+                "parallel_executed": ctx.parallel_executed,
+                "block_reason": ctx.block_reason,
+                "success": success,
+            },
+        )
 
         return LoopResult(
             task=ctx.original_task, trace_id=ctx.trace_id,
