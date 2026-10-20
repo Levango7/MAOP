@@ -32,7 +32,12 @@ describe('AgentBilling.vue', () => {
           summary: { total_tokens: 1234, total_cost: 0.5, total_calls: 7 },
         };
       } else if (u.startsWith('/api/billing/summary/')) {
-        body = { status: 'ok', summary: {} };
+        body = {
+          status: 'ok',
+          summary: {
+            agent_name: 'coder', total_tokens: 2222, total_cost: 0.25, total_calls: 3,
+          },
+        };
       } else if (u.startsWith('/api/quota/coder')) {
         body = {
           status: 'ok',
@@ -77,6 +82,18 @@ describe('AgentBilling.vue', () => {
 
     // 1234 tokens is formatted as 1.2K by formatTokens.
     expect(wrapper.text()).toContain('1.2K');
+    wrapper.unmount();
+  });
+
+  it('unwraps the per-agent billing summary envelope', async () => {
+    global.fetch = mockFetch();
+    const wrapper = mount(AgentBilling);
+    await flushPromises();
+    await flushPromises();
+
+    // 2222 tokens from {summary:{...}} is formatted as 2.2K; the envelope
+    // itself would render as an empty/zero row.
+    expect(wrapper.text()).toContain('2.2K');
     wrapper.unmount();
   });
 

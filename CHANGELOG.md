@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `GET /api/quota/{agent}` 返回 `{quota: {...}}`，页面直接读顶层桶 ⇒ 额度卡片
   恒显示空值。改为解包 `quota`。
+- `/api/billing/summary/{agent}` 返回 `{summary: {...}}`，汇总 Tab 同样把
+  整个信封当行数据 ⇒ 每行 Agent 名为空、金额为 0。改为解包 `summary`。
 - 记录页发送 `agent`/`range`，后端只认 `agent_name`（`range` 根本不存在）⇒
   两个筛选器都无效。后端新增 `since` 过滤与筛选结果 `summary`，前端改发
   `agent_name` + 秒级 `since`，汇总卡片恢复。

@@ -795,7 +795,7 @@ async function loadSummary() {
       );
       summaryList.value = results
         .filter((r) => r.status === 'fulfilled' && r.value)
-        .map((r) => r.value);
+        .map((r) => r.value.summary || r.value);
     } else {
       summaryList.value = [];
     }
