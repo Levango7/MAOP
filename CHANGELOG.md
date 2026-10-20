@@ -39,6 +39,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 通知偏好：读错键、存错结构（2026-10-21）
+
+- `GET /api/notifications/preferences` 返回 `{preference: {channel_enabled, event_level_min}}`，
+  页面读复数 `preferences` 并按频道嵌套解析 ⇒ 服务器配置从不回填。
+- `PUT` 发送 `{preferences: {channel: {enabled, min_level}}}`，后端模型只认
+  `channel_enabled` / `event_level_min` ⇒ 保存被静默丢弃。
+- 对话框改为真实契约：按 `channel_enabled` 回填开关、保存发 `channel_enabled`；
+  按频道的“最低级别”列从未有后端语义（后端是按事件类型配置），先移除该列。
+- 验证：Notifications vitest 12 passed（键名与保存结构的变异验证）。
+
 ### Agent 计费：额度卡片恒为 0、记录筛选静默失效（2026-10-21）
 
 - `GET /api/quota/{agent}` 返回 `{quota: {...}}`，页面直接读顶层桶 ⇒ 额度卡片
