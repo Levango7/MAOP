@@ -39,6 +39,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 后端可达性纠偏：全量 GET 探针抓到的四个"看起来能跑"的缺陷
+
+对隔离空库起的看板（owner 模式、274 条 GET）逐条打真实请求，配合直接
+`app.openapi()`，抓到的问题都不在业务逻辑里，而在"接线"上：
+
+- **一条路由让整个 OpenAPI 生不出来**：`GET /api/bb-m3/metrics` 写了
+  `response_class=None`，FastAPI 的断言会让 `get_openapi()` 整体失败 ⇒
+  非生产环境的 `/api/docs` 拿不到 schema。改为 `PlainTextResponse`，
+  新增 `tests/test_openapi_schema.py` 对**完整 app** 断言 447 条路径可生成、
+  该端点文档为 `text/plain`（子 app 测试抓不到这类问题）。
+- **中转平台注册表每次请求 500**：`RelayPlatformManager` 无参构造用
+  `:memory:`，但每个方法各开连接 ⇒ 建表与 `SELECT` 落在两个互不相干的
+  空库上（`no such table: relay_platforms`）。改为进程私有临时库（`close()`
+  删除），看板全局单例改落 `unified_db_path()`，平台凭据不再随重启丢失。
+  空库实测 `/api/relay-platforms/recommend/claude` 由 500 → 200。
+- **MCP Marketplace 把事件循环钉住**：`fetch_catalog()`/`install()` 是同步
+  网络 IO，却直接在 async 端点里调用。冷请求实测让后续**至少 22 条** GET
+  各超时 8s（探针按字母序整段变红）。两处改 `asyncio.to_thread`，并加
+  "执行线程 ≠ 调用线程" 的回归用例（不做计时断言，避免机器差异假红）。
+- **首次启动先下 600 MB 模型，下载期间端口都不监听**：lifespan 在
+  uvicorn bind 之前同步 `warm_multimodal_space()`；外网不通时实测 4 分钟
+  仍未监听（连接停在 SYN_SENT）。改为专用 daemon 线程，启动日志先
+  `Application startup complete`，warm-up 完成后再记一行。无 provider
+  覆盖变量实测 10s 内 `/api/health` 200；lifespan 用例同时断言 warm-up
+  跑在 `maop-multimodal-warmup` 线程。
+- E2E `seeded-pages.spec.js` 的 agent 名断言改为限定 `.agent-health-list`：
+  页面级的 `getByText('copilot', {exact:true})` 会同时命中路由列表，属于
+  strict-mode 假红，且是否触发取决于当时后端快照（CI 本轮即因此红）。
+
+验证：受影响 10 个测试文件 `192 passed`；ruff 对全部改动文件通过。
+
 ### 数据层纠偏第三片：prompts / evolve / history_analyzer 也离开空表（#55 收口）
 
 - `coordination_report` 的每-agent 计数改读 `run_events.agent_rollup()`（线程池执行），

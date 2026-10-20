@@ -136,11 +136,19 @@ class RelayPlatformManager:
         Parameters
         ----------
         db_path : Path | None
-            SQLite 数据库路径。``None`` 时使用内存数据库（``:memory:``），
-            适合测试或临时实例。
+            SQLite 数据库路径。``None`` 时创建一个进程私有的临时数据库
+            （``close()`` 时删除）。不能用 ``:memory:``：本类的每个方法
+            各自开连接，而每个 ``:memory:`` 连接都是独立的空库，建表和
+            读取会落在不同的库上。
         """
+        self._temp_db: Path | None = None
         if db_path is None:
-            self._db_path = ":memory:"
+            import tempfile
+
+            fd, tmp_name = tempfile.mkstemp(prefix="maop-relay-", suffix=".db")
+            os.close(fd)
+            self._temp_db = Path(tmp_name)
+            self._db_path = tmp_name
         else:
             self._db_path = str(db_path)
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -715,7 +723,10 @@ class RelayPlatformManager:
     # ── 收尾 ──────────────────────────────────────────────────────
 
     def close(self) -> None:
-        """清理资源（当前 SQLite 每次操作都关闭连接，无需特殊处理）。"""
+        """清理资源：删除默认构造时创建的临时数据库。"""
+        if self._temp_db is not None:
+            self._temp_db.unlink(missing_ok=True)
+            self._temp_db = None
 
 
 # ── 模块级单例（可选，方便全局访问）────────────────────────────────
@@ -742,6 +753,11 @@ def get_relay_platform_manager(
     global _manager_instance
     with _manager_lock:
         if _manager_instance is None:
+            if db_path is None:
+                # 看板不能把注册信息丢在临时库里：平台凭据必须跨重启保留。
+                from maop.core.backends.db_utils import unified_db_path
+
+                db_path = unified_db_path()
             _manager_instance = RelayPlatformManager(db_path=db_path)
         return _manager_instance
 

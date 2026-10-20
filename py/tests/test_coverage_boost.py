@@ -104,9 +104,26 @@ class TestServerLifespan:
 
     def test_lifespan_startup_shutdown(self, monkeypatch):
         # Stub schedulers so no real threads/timers start.
+
+        # The CLIP warm-up must not run on the startup path (it can download
+        # ~600 MB and uvicorn only binds after lifespan startup). Capture the
+        # calling thread to prove it was moved to the dedicated daemon thread.
+        import threading
+
         from maop.core.backends import db_backup
         from maop.core.reliability import log_rotate
         from maop.dashboard import server as srv
+        from maop.memory import multimodal
+
+        warm_thread: list[str] = []
+        warm_started = threading.Event()
+
+        def _fake_warm() -> str:
+            warm_thread.append(threading.current_thread().name)
+            warm_started.set()
+            return "stub"
+
+        monkeypatch.setattr(multimodal, "warm_multimodal_space", _fake_warm)
 
         class _StubBackup:
             def start_scheduler(self, interval_s: float = 3600) -> None:
@@ -144,7 +161,8 @@ class TestServerLifespan:
         try:
             with TestClient(srv.app):
                 # Lifespan ran startup; just entering the block covers startup lines.
-                pass
+                assert warm_started.wait(5), "multimodal warm-up never ran"
+                assert warm_thread == ["maop-multimodal-warmup"]
             # Exiting the block covers shutdown lines.
         finally:
             # Ensure the ws push task is cancelled if it lingers.

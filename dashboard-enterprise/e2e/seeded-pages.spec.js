@@ -109,11 +109,13 @@ test.describe('seeded data rendering (real backend shapes)', () => {
     // Monitor.vue 挂在 /operate（operate 组落地页；旧 /monitor 重定向到此）
     await page.goto('/operate')
     // exact：这页同时挂着实时事件流，其 <span class="event-msg"> 里是原始 JSON
-    // （形如 {"type":"snapshot",…,"live_agents":["copilot"]}）。子串匹配会命中
-    // 健康行 + 事件流两个元素 ⇒ strict mode violation，且是否撞上取决于那一刻
-    // 后端快照里有没有这个 agent 名，是一条与时序有关的假红。
-    await expect(page.getByText('claude', { exact: true })).toBeVisible()
-    await expect(page.getByText('copilot', { exact: true })).toBeVisible()
+    // （形如 {"type":"snapshot",…,"live_agents":["copilot"]}），路由列表也有
+    // 同名 agent。页面级匹配会命中多个元素 ⇒ strict mode violation，且是否
+    // 撞上取决于那一刻后端快照里有没有这个 agent 名，是一条与时序有关的假红。
+    // 本条要钉的是健康行，所以作用域限定在 .agent-health-list。
+    const health = page.locator('.agent-health-list')
+    await expect(health.getByText('claude', { exact: true })).toBeVisible()
+    await expect(health.getByText('copilot', { exact: true })).toBeVisible()
     expect(problems, `runtime problems on /operate`).toEqual([])
   })
 

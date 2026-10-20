@@ -726,3 +726,40 @@ def test_rejected_register_does_not_persist(
 def test_read_endpoints_not_admin_locked(client_non_admin: TestClient):
     """GET 端点口径不变：不要求 admin 角色。"""
     assert client_non_admin.get("/api/relay-platforms").status_code == 200
+
+# ═══════════════════════════════════════════════════════════════════
+# 默认构造 / 全局单例的存储位置
+# ═══════════════════════════════════════════════════════════════════
+
+
+def test_default_constructor_uses_a_working_temp_db():
+    """无参构造必须可读写。
+
+    旧实现用 ``:memory:``，但每个方法各开一条连接——建表和读取落在
+    两个互不相干的空库上，``_load_from_db`` 直接抛 "no such table"。
+    """
+    from pathlib import Path
+
+    mgr = RelayPlatformManager()
+    temp_path = Path(mgr._db_path)
+    try:
+        mgr.register_platform(_make_platform("probe-relay"))
+        assert mgr.get_platform("probe-relay") is not None
+    finally:
+        mgr.close()
+    assert not temp_path.exists(), "close() 应删除临时数据库"
+
+
+def test_global_manager_defaults_to_the_unified_db():
+    """看板经全局单例注册的平台必须跨重启保留（unified maop.db）。"""
+    from pathlib import Path
+
+    from maop.core.agent.llm_chat.relay_platform import get_relay_platform_manager
+    from maop.core.backends.db_utils import unified_db_path
+
+    reset_relay_platform_manager()
+    try:
+        mgr = get_relay_platform_manager()
+        assert Path(mgr._db_path) == unified_db_path()
+    finally:
+        reset_relay_platform_manager()

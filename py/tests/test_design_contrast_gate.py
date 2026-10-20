@@ -33,7 +33,7 @@ def test_npm_script_checks_both_themes_and_the_pair_floor():
 def test_self_test_and_full_gate_pass():
     self_test = subprocess.run(
         [sys.executable, "scripts/wcag.py", "--self-test"],
-        cwd=_FRONTEND, capture_output=True, text=True, timeout=60,
+        check=False, cwd=_FRONTEND, capture_output=True, text=True, timeout=60,
     )
     assert self_test.returncode == 0, self_test.stdout + self_test.stderr
     assert "OK" in self_test.stdout
@@ -46,6 +46,7 @@ def test_self_test_and_full_gate_pass():
             "--pairs", "design/contrast-pairs.txt",
             "--pairs-only", "--min-pairs", "164",
         ],
+        check=False,
         cwd=_FRONTEND, capture_output=True, text=True, timeout=60,
     )
     assert gate.returncode == 0, gate.stdout[-2000:] + gate.stderr[-2000:]

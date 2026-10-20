@@ -7,6 +7,7 @@ service 调用 / 响应格式化 / 错误处理。
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -266,7 +267,8 @@ async def marketplace_tools(request: Request) -> dict[str, Any]:
     返回空列表而非 500, 前端 ``SkillMarket.vue`` 降级为 EmptyState.
     """
     require_admin(request)
-    result = plugin_service.marketplace_tools()
+    # fetch_catalog 会同步访问 registry 网络；放在事件循环里会阻塞所有请求。
+    result = await asyncio.to_thread(plugin_service.marketplace_tools)
     return {"status": "ok", **result}
 
 
@@ -294,7 +296,8 @@ async def marketplace_install(tool_id: str, request: Request) -> dict[str, Any]:
     if not tool_id or not tool_id.strip():
         raise HTTPException(status_code=400, detail="tool_id must not be empty")
     try:
-        result = plugin_service.marketplace_install(tool_id)
+        # 下载 + checksum 校验是同步网络 IO，不能占住事件循环。
+        result = await asyncio.to_thread(plugin_service.marketplace_install, tool_id)
     except ValueError as exc:
         # 批次3A: 脱敏——安装错误细节不暴露给客户端，仅日志记录。
         msg = str(exc)

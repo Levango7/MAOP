@@ -19,6 +19,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
@@ -143,11 +144,9 @@ async def probe_status() -> dict[str, Any]:
     return {"status": "ok", "data": bb_m3_ops_service.get_probe_status()}
 
 
-@router.get("/metrics", response_class=None)
+@router.get("/metrics", response_class=PlainTextResponse)
 @handle_api_errors("bb-m3 prometheus metrics")
-async def prometheus_metrics() -> Any:
+async def prometheus_metrics() -> PlainTextResponse:
     """Return Prometheus-text-format metrics (read-only)."""
-    from fastapi.responses import PlainTextResponse
-
     metrics_text = bb_m3_ops_service.get_prometheus_metrics()
     return PlainTextResponse(content=metrics_text, media_type="text/plain")

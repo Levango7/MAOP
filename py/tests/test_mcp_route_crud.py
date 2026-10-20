@@ -202,3 +202,28 @@ class TestTopology:
         assert resp.status_code == 200
         assert resp.json()["agents"] == []
         assert len(resp.json()["servers"]) == 1
+
+
+def test_marketplace_tools_runs_off_the_event_loop(monkeypatch):
+    """catalog 抓取是同步网络 IO，必须交给线程池。
+
+    放在事件循环里执行时，一个 registry 超时会把整个看板拖住（实测
+    一次冷启动后所有请求串行超时 8s+）。
+    """
+    import asyncio
+    import threading
+
+    seen: dict[str, int] = {}
+
+    def _fake_marketplace_tools() -> dict[str, Any]:
+        seen["thread"] = threading.get_ident()
+        return {"tools": [], "count": 0}
+
+    monkeypatch.setattr(plugin_service, "marketplace_tools", _fake_marketplace_tools)
+    monkeypatch.setattr(mcp_route, "require_admin", lambda request: None)
+
+    caller = threading.get_ident()
+    result = asyncio.run(mcp_route.marketplace_tools(object()))
+
+    assert result == {"status": "ok", "tools": [], "count": 0}
+    assert seen["thread"] != caller, "marketplace_tools 仍在事件循环线程里执行"
