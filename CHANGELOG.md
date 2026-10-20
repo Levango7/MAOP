@@ -113,6 +113,23 @@ wheel 与 sdist 均含 5 个配置和 254 个前端文件，从 sdist 重建 whe
 未构建前端时 `python -m build` 仅告警跳过 UI，不再安装失败。
 设计文档见 `docs/product-v6-blueprint.md`（M0 已落地，M1–M3 待排期）。
 
+### env 读取棘轮：229→240 的逐条记账（2026-10-20）
+
+CI 的 `Lint (ruff + mypy)` 作业里 `scripts/check_config_drift.py` 只允许
+`os.getenv` 与 `os.environ` 的计数下降。M0 让它 +11（240 > 229），首跑 PR 因此红。
+先压掉可省的 4 处：`cmd_start` 复用 `_runtime_root()` 不再自己写第二遍根目录、
+不再 `setdefault("MAOP_HOME")`（与 `default_home()` 同值）、owner+auth 两次写入
+合成一行 `os.environ.update(...)`、`cli_evolution` 不再重复导出根目录。
+
+剩余 +11 记入基线并在代码里逐条写明理由：`cli.py` +6（引导层必须在 settings
+实例化之前决定 owner/auth 并把根目录交给子进程）、`config/home.py` +2
+（解析器先于 settings 存在）、`delegation/depth.py` +2（向子进程传深度是 OS 级
+操作，与 2026-10-04 `_agent_env` 的先例同形）、`security/middleware.py` +1
+（owner 只允许回环，必须每请求取现值，不能进 settings 缓存）。
+复跑 `python scripts/check_config_drift.py` → `OK: no drift.`
+
+
+
 ### 分布式调度：`deadline=None` 不再等于无限等（原 #116 "未做"项，本次落地）
 
 `_dispatch_and_collect` 的 `while pending` 只在 `deadline is not None` 时检查超时，

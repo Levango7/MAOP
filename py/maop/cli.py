@@ -80,17 +80,14 @@ def _emit_unimplemented(name: str) -> None:
 
 def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
     """Start the FastAPI dashboard (Python-native)."""
-    root = ensure_runtime_root()
-    os.environ.setdefault("MAOP_ROOT_DIR", str(root))
-    os.environ.setdefault("MAOP_HOME", str(default_home()))
+    root = _runtime_root()
 
     # Personal edition on loopback is a single-user local tool: start in owner
     # mode instead of forcing the user to find a console-generated password.
     # Remote binds keep the secure-by-default auth policy; an explicit
     # MAOP_AUTH_ENABLED always wins.
     if _loopback_host(host) and _personal_edition_requested() and not _auth_explicitly_set():
-        os.environ["MAOP_AUTH_ENABLED"] = "0"
-        os.environ["MAOP_OWNER_MODE"] = "1"
+        os.environ.update({"MAOP_AUTH_ENABLED": "0", "MAOP_OWNER_MODE": "1"})
         print("[INFO] 个人版本地模式：已启用 owner 免登录（仅回环地址）")
     elif not _loopback_host(host) and not _auth_explicitly_set():
         # Settings already default to auth-on outside explicit local/dev envs.

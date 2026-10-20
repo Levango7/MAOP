@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from typing import Any
 
@@ -11,9 +10,7 @@ from maop.config.home import ensure_runtime_root
 
 
 def _root() -> str:
-    root = ensure_runtime_root()
-    os.environ["MAOP_ROOT_DIR"] = str(root)
-    return str(root)
+    return str(ensure_runtime_root())
 
 
 def cmd_evolution(args: list[str]) -> Any:
