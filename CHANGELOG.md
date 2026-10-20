@@ -39,6 +39,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 告警页的 Webhook 选项与触发历史恒为空（2026-10-21）
+
+- `GET /api/hooks` 返回 `{hooks, count}`，但 AlertRules 只读
+  `items/webhooks/data` ⇒ 「通知渠道 = Webhook」下拉框永远没有可选项。
+- `GET /api/audit/alert/history` 返回 `{alerts, count}`，页面只读
+  `items/history/records` ⇒ 告警历史的抽屉永远为空。
+- 两处均补上真实键名并保留旧键兜底；新增 `AlertRules` vitest 2 条，
+  已做变异验证（去掉对应键后测试转红）。
+
 ### Webhooks 投递配置真正生效 + 最近触发时间（2026-10-21）
 
 - **配置被静默丢弃**：`HookCreateRequest`/`HookUpdateRequest` 接受
