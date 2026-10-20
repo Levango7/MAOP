@@ -39,6 +39,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Agent 目录写路径与聊天 Markdown 纠偏（2026-10-21）
+
+- 静态契约审计（前端 231 个 `/api` 路径 × 后端 447 条 OpenAPI 路径，按 HTTP
+  方法比对）发现个人版唯一的非企业断点：`PUT /api/agent-catalog/agents/{name}`
+  后端不存在，而 AgentRegistry 的保存降级链/编辑/启停三处都调用它（点击必
+  405）；`POST` 请求模型缺 `fallback_agents`/`retry_count`，创建时两字段被
+  静默丢弃。新增 `UpdateAgentRequest` + `PUT` 路由 + `service.update_agent`
+  （未提供字段保留原值，降级链自引用返回 400），注册接口透传两字段。
+- Chat 消息改用统一 `useMarkdown`：原实现把代码块内容直接拼进 HTML（模型输出
+  `a < b` 会被浏览器当标签吞掉），且不支持表格/链接/列表。`useMarkdown` 增加
+  GFM 表格、链接协议白名单（http(s)/mailto/相对路径）、斜体与 `breaks` 选项，
+  DOMPurify 白名单同步扩展。
+- 验证：`test_agent_catalog_route.py` **29 passed**，ruff/mypy 通过；
+  vitest Chat + useMarkdown **21 passed**，eslint 通过，`npm run build` 通过。
+- 其余 29 条未匹配路径均为企业版路由（`requiresEnterprise` 守卫）、动态拼接
+  或帮助文本，个人版不会发起。
+
 ### UI 可达性纠偏：40 条路由真实渲染审计，修三处"页面上写着的错"
 
 用 dev server + 真后端（隔离空库、owner 身份）逐条导航 40 条路由，
