@@ -29,6 +29,7 @@ Usage::
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import os
 import time
@@ -41,6 +42,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
+from maop.core.agent.plugins_hooks.webhook_delivery import deliver_webhook
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 logger = logging.getLogger(__name__)
@@ -127,6 +129,9 @@ class HookDef(BaseModel):
     callback: str = ""  # human-readable name (e.g. "mod.func")
     callback_path: str = ""  # dotted import path for persistence reload
     url: str = ""
+    headers: dict[str, str] = Field(default_factory=dict)  # 自定义投递请求头
+    timeout_s: float = 10.0  # 单次 HTTP 投递超时
+    retry_count: int = 0  # 失败后的重试次数（不含首次投递）
     enabled: bool = True
     priority: int = 0
     description: str = ""
@@ -196,6 +201,9 @@ class HookManager:
                     callback TEXT DEFAULT '',
                     callback_path TEXT DEFAULT '',
                     url TEXT DEFAULT '',
+                    headers TEXT DEFAULT '{}',
+                    timeout_s REAL DEFAULT 10.0,
+                    retry_count INTEGER DEFAULT 0,
                     enabled INTEGER DEFAULT 1,
                     priority INTEGER DEFAULT 0,
                     description TEXT DEFAULT '',
@@ -203,11 +211,17 @@ class HookManager:
                     source TEXT DEFAULT 'api'
                 )
             """)
-            # Schema migration: add callback_path column if missing (older DBs).
+            # Schema migration: add columns missing in older DBs.
             try:
                 cols = [r[1] for r in conn.execute("PRAGMA table_info(hooks)").fetchall()]
                 if "callback_path" not in cols:
                     conn.execute("ALTER TABLE hooks ADD COLUMN callback_path TEXT DEFAULT ''")
+                if "headers" not in cols:
+                    conn.execute("ALTER TABLE hooks ADD COLUMN headers TEXT DEFAULT '{}'")
+                if "timeout_s" not in cols:
+                    conn.execute("ALTER TABLE hooks ADD COLUMN timeout_s REAL DEFAULT 10.0")
+                if "retry_count" not in cols:
+                    conn.execute("ALTER TABLE hooks ADD COLUMN retry_count INTEGER DEFAULT 0")
             except Exception as exc:
                 logger.warning(
                     "[hook_manager] Schema migration ALTER TABLE failed, continuing with existing schema: %s",
@@ -303,6 +317,9 @@ class HookManager:
         *,
         callback: Callable[..., Any] | None = None,
         url: str = "",
+        headers: dict[str, str] | None = None,
+        timeout_s: float = 10.0,
+        retry_count: int = 0,
         priority: int = 0,
         description: str = "",
         source: str = "api",
@@ -318,6 +335,10 @@ class HookManager:
             Python callable for in-process hooks. Receives (event, data) args.
         url : str
             HTTP URL for async webhook delivery.
+        headers : dict | None
+            Extra HTTP headers sent with every webhook delivery.
+        timeout_s, retry_count
+            Per-attempt timeout and extra attempts on network/429/5xx errors.
         priority : int
             Higher priority hooks run first. Default 0.
         description : str
@@ -355,17 +376,21 @@ class HookManager:
 
         hdef = HookDef(
             id=hid, event=event, hook_type=htype,
-            callback=cb_name, callback_path=cb_path, url=url, enabled=True,
+            callback=cb_name, callback_path=cb_path, url=url,
+            headers=dict(headers or {}), timeout_s=float(timeout_s),
+            retry_count=int(retry_count), enabled=True,
             priority=priority, description=description,
             created_at=now, source=source,
         )
 
         with sqlite_connect(self._db_path) as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO hooks (id, event, hook_type, callback, callback_path, url, enabled, priority, description, created_at, source) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO hooks (id, event, hook_type, callback, callback_path, url, headers, timeout_s, retry_count, enabled, priority, description, created_at, source) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (hdef.id, hdef.event, hdef.hook_type.value,
-                 hdef.callback, hdef.callback_path, hdef.url, 1 if hdef.enabled else 0,
+                 hdef.callback, hdef.callback_path, hdef.url,
+                 json.dumps(hdef.headers), hdef.timeout_s, hdef.retry_count,
+                 1 if hdef.enabled else 0,
                  hdef.priority, hdef.description, hdef.created_at, hdef.source),
             )
 
@@ -503,41 +528,19 @@ class HookManager:
         return HookResult(hook_id=hdef.id, event=event, success=True)
 
     async def _invoke_webhook(self, hdef: HookDef, event: str, data: dict[str, Any]) -> HookResult:
-        # SSRF 防御性校验（defense-in-depth）：即使绕过 API 层校验，
-        # 在实际发送 HTTP 请求前再次拒绝内网/云元数据端点。
-        try:
-            from maop.core.security.url_validator import validate_webhook_url
-            validate_webhook_url(hdef.url)
-        except ImportError:
-            # url_validator 不可用时 fail-open（不阻塞已有 hook 链）
-            logger.warning("[hook] url_validator unavailable, skipping SSRF check for '%s'", hdef.id)
-        except ValueError as exc:
-            logger.warning(
-                "[hook] SSRF validation failed for hook '%s' url='%s': %s",
-                hdef.id, hdef.url, exc,
-            )
-            return HookResult(
-                hook_id=hdef.id, event=event,
-                success=False, error=f"SSRF blocked: {exc}",
-            )
-
-        try:
-            import httpx
-        except ImportError:
-            return HookResult(hook_id=hdef.id, event=event, success=False, error="httpx not installed")
-
         payload = {"event": event, "data": data, "hook_id": hdef.id, "timestamp": datetime.now(timezone.utc).isoformat()}
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(hdef.url, json=payload)
-            return HookResult(
-                hook_id=hdef.id, event=event,
-                success=200 <= resp.status_code < 300,
-                response=f"HTTP {resp.status_code}",
-                response_code=resp.status_code,
-            )
-        except Exception as exc:
-            return HookResult(hook_id=hdef.id, event=event, success=False, error=str(exc))
+        success, response, response_code, error = await deliver_webhook(
+            url=hdef.url,
+            hook_id=hdef.id,
+            headers=hdef.headers,
+            timeout_s=hdef.timeout_s,
+            retry_count=hdef.retry_count,
+            payload=payload,
+        )
+        return HookResult(
+            hook_id=hdef.id, event=event, success=success,
+            response=response, response_code=response_code, error=error,
+        )
 
     # ── Query ──────────────────────────────────────────────────
 
@@ -549,24 +552,26 @@ class HookManager:
                 ).fetchall()
             else:
                 rows = conn.execute("SELECT * FROM hooks ORDER BY event, priority DESC").fetchall()
-        return [HookDef(
-            id=r["id"], event=r["event"], hook_type=HookType(r["hook_type"]),
-            callback=r["callback"], url=r["url"], enabled=bool(r["enabled"]),
-            priority=r["priority"], description=r["description"],
-            created_at=r["created_at"], source=r["source"],
-        ) for r in rows]
+        return [self._row_to_hook_def(r) for r in rows]
 
     def get_hook(self, hook_id: str) -> HookDef | None:
         with sqlite_connect(self._db_path) as conn:
             row = conn.execute("SELECT * FROM hooks WHERE id=?", (hook_id,)).fetchone()
         if row is None:
             return None
-        return HookDef(
-            id=row["id"], event=row["event"], hook_type=HookType(row["hook_type"]),
-            callback=row["callback"], url=row["url"], enabled=bool(row["enabled"]),
-            priority=row["priority"], description=row["description"],
-            created_at=row["created_at"], source=row["source"],
-        )
+        return self._row_to_hook_def(row)
+
+    def get_last_triggered_map(self) -> dict[str, str]:
+        """``{hook_id: latest_delivery_created_at}`` from hook_logs, for list UIs."""
+        try:
+            with sqlite_connect(self._db_path) as conn:
+                rows = conn.execute(
+                    "SELECT hook_id, MAX(created_at) AS last_at FROM hook_logs GROUP BY hook_id"
+                ).fetchall()
+        except Exception as exc:
+            logger.warning("[hook] Failed to read last-triggered map: %s", exc)
+            return {}
+        return {r["hook_id"]: r["last_at"] for r in rows if r["last_at"]}
 
     def get_logs(
         self,
@@ -718,13 +723,30 @@ class HookManager:
         for r in rows:
             hook_event = r["event"]
             if hook_event == event or self._wildcard_match(hook_event, event):
-                results.append(HookDef(
-                    id=r["id"], event=r["event"], hook_type=HookType(r["hook_type"]),
-                    callback=r["callback"], url=r["url"], enabled=True,
-                    priority=r["priority"], description=r["description"],
-                    created_at=r["created_at"], source=r["source"],
-                ))
+                results.append(self._row_to_hook_def(r, enabled=True))
         return results
+
+    @staticmethod
+    def _row_to_hook_def(row: Any, *, enabled: bool | None = None) -> HookDef:
+        """Build a HookDef from a hooks-table row, tolerating legacy/default values."""
+        try:
+            raw_headers = json.loads(row["headers"] or "{}")
+        except (TypeError, ValueError):
+            raw_headers = {}
+        headers = (
+            {str(k): str(v) for k, v in raw_headers.items()}
+            if isinstance(raw_headers, dict) else {}
+        )
+        return HookDef(
+            id=row["id"], event=row["event"], hook_type=HookType(row["hook_type"]),
+            callback=row["callback"], url=row["url"],
+            headers=headers,
+            timeout_s=float(row["timeout_s"] or 10.0),
+            retry_count=int(row["retry_count"] or 0),
+            enabled=bool(row["enabled"]) if enabled is None else enabled,
+            priority=row["priority"], description=row["description"],
+            created_at=row["created_at"], source=row["source"],
+        )
 
     @staticmethod
     def _wildcard_match(pattern: str, event: str) -> bool:

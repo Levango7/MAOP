@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -161,6 +162,73 @@ class TestCreateHook:
             "url": "https://example.com/hook",
         })
         assert resp.status_code == 200
+
+
+class TestHookDeliveryConfig:
+    def test_create_persists_config_and_redacts_sensitive_headers(self, client, real_mgr):
+        resp = client.post("/api/hooks", json={
+            "name": "signed-hook",
+            "event": "loop.complete",
+            "url": "https://example.com/hook",
+            "headers": {"Authorization": "Bearer secret", "X-Trace": "abc"},
+            "timeout": 25,
+            "retry_count": 2,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["timeout"] == 25
+        assert data["retry_count"] == 2
+        assert data["headers"]["Authorization"] == "***"
+        assert data["headers"]["X-Trace"] == "abc"
+
+        stored = real_mgr.get_hook(data["id"])
+        assert stored.headers["Authorization"] == "Bearer secret"
+        assert stored.timeout_s == 25.0
+        assert stored.retry_count == 2
+
+    def test_update_preserves_config_when_omitted(self, client, real_mgr):
+        hdef = real_mgr.register(
+            event="loop.complete",
+            url="https://example.com/hook",
+            headers={"Authorization": "Bearer keep-me"},
+            timeout_s=20.0,
+            retry_count=1,
+        )
+        resp = client.put(f"/api/hooks/{hdef.id}", json={"name": "renamed"})
+        assert resp.status_code == 200
+        stored = real_mgr.get_hook(hdef.id)
+        assert stored.headers == {"Authorization": "Bearer keep-me"}
+        assert stored.timeout_s == 20.0
+        assert stored.retry_count == 1
+        assert stored.description == "renamed"
+
+    def test_update_restores_redacted_header_placeholder(self, client, real_mgr):
+        hdef = real_mgr.register(
+            event="loop.complete",
+            url="https://example.com/hook",
+            headers={"Authorization": "Bearer keep-me"},
+        )
+        resp = client.put(f"/api/hooks/{hdef.id}", json={
+            "headers": {"Authorization": "***", "X-New": "v"},
+        })
+        assert resp.status_code == 200
+        stored = real_mgr.get_hook(hdef.id)
+        assert stored.headers == {"Authorization": "Bearer keep-me", "X-New": "v"}
+        assert resp.json()["headers"]["X-New"] == "v"
+
+    def test_list_reports_last_triggered_at(self, client, real_mgr):
+        def cb(event, data):
+            return None
+
+        hdef = real_mgr.register(event="loop.complete", callback=cb)
+        asyncio.run(real_mgr.trigger("loop.complete", {}))
+
+        data = client.get("/api/hooks").json()
+        row = next(h for h in data["hooks"] if h["id"] == hdef.id)
+        assert row["last_triggered_at"]
+
+        detail = client.get(f"/api/hooks/{hdef.id}").json()
+        assert detail["last_triggered_at"] == row["last_triggered_at"]
 
 
 class TestGetHook:

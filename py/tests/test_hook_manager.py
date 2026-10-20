@@ -1,6 +1,8 @@
 """Tests for MAOP.core.hook_manager — Unified lifecycle hook framework."""
 
 import asyncio
+import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -142,6 +144,113 @@ class TestHookTriggerWebhook:
             assert len(results) == 1
             assert not results[0].success
             assert "httpx" in results[0].error
+
+
+class _FakeResponse:
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+
+
+def _install_fake_httpx(monkeypatch, statuses):
+    """Install a fake ``httpx`` module that returns the given status codes."""
+    calls = {"init": [], "post": []}
+    queue = list(statuses)
+
+    class _Client:
+        def __init__(self, **kwargs):
+            calls["init"].append(kwargs)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def post(self, url, **kwargs):
+            calls["post"].append({"url": url, **kwargs})
+            return _FakeResponse(queue.pop(0) if queue else 200)
+
+    monkeypatch.setitem(sys.modules, "httpx", SimpleNamespace(AsyncClient=_Client))
+    return calls
+
+
+class TestHookWebhookDeliveryConfig:
+    def test_delivery_config_persisted_and_readable(self, mgr):
+        hdef = mgr.register(
+            event="loop.complete",
+            url="https://example.com/hook",
+            headers={"X-Trace": "abc"},
+            timeout_s=2.5,
+            retry_count=2,
+        )
+        fetched = mgr.get_hook(hdef.id)
+        assert fetched.headers == {"X-Trace": "abc"}
+        assert fetched.timeout_s == 2.5
+        assert fetched.retry_count == 2
+        listed = mgr.list_hooks()[0]
+        assert listed.headers == {"X-Trace": "abc"}
+        assert listed.timeout_s == 2.5
+        assert listed.retry_count == 2
+
+    def test_delivery_uses_configured_headers_and_timeout(self, mgr, monkeypatch):
+        calls = _install_fake_httpx(monkeypatch, [200])
+        mgr.register(
+            event="loop.complete",
+            url="https://example.com/hook",
+            headers={"X-Trace": "abc"},
+            timeout_s=3.0,
+        )
+        results = asyncio.run(mgr.trigger("loop.complete", {}))
+        assert results[0].success
+        assert calls["init"][0]["timeout"] == 3.0
+        assert calls["post"][0]["headers"] == {"X-Trace": "abc"}
+
+    def test_retries_on_503_then_succeeds(self, mgr, monkeypatch):
+        calls = _install_fake_httpx(monkeypatch, [503, 200])
+        mgr.register(
+            event="loop.complete",
+            url="https://example.com/hook",
+            retry_count=1,
+        )
+        results = asyncio.run(mgr.trigger("loop.complete", {}))
+        assert results[0].success
+        assert results[0].response_code == 200
+        assert len(calls["post"]) == 2
+
+    def test_does_not_retry_client_errors(self, mgr, monkeypatch):
+        calls = _install_fake_httpx(monkeypatch, [400])
+        mgr.register(
+            event="loop.complete",
+            url="https://example.com/hook",
+            retry_count=3,
+        )
+        results = asyncio.run(mgr.trigger("loop.complete", {}))
+        assert not results[0].success
+        assert results[0].response_code == 400
+        assert len(calls["post"]) == 1
+
+    def test_exhausted_retries_reports_attempt_count(self, mgr, monkeypatch):
+        calls = _install_fake_httpx(monkeypatch, [500, 500, 500])
+        mgr.register(
+            event="loop.complete",
+            url="https://example.com/hook",
+            retry_count=2,
+        )
+        results = asyncio.run(mgr.trigger("loop.complete", {}))
+        assert not results[0].success
+        assert results[0].response_code == 500
+        assert "after 3 attempts" in results[0].error
+        assert len(calls["post"]) == 3
+
+    def test_last_triggered_map(self, mgr):
+        def cb(event, data):
+            return None
+
+        hdef = mgr.register(event="loop.complete", callback=cb)
+        asyncio.run(mgr.trigger("loop.complete", {}))
+        mapping = mgr.get_last_triggered_map()
+        assert hdef.id in mapping
+        assert mapping[hdef.id]
 
 
 class TestHookQuery:

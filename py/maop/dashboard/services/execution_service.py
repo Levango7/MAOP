@@ -420,6 +420,9 @@ def hooks_list(mgr: Any, event: str) -> list[Any]:
 def hooks_create(
     mgr: Any, *,
     name: str, event: str, url: str,
+    headers: dict[str, str] | None = None,
+    timeout_s: float = 10.0,
+    retry_count: int = 0,
 ) -> Any:
     """创建新 hook（webhook 类型）— 复数路径 /api/hooks.
 
@@ -431,6 +434,12 @@ def hooks_create(
         事件类型（需为 LifecycleEvent 之一或通配）。
     url : str
         Webhook 接收 URL（已通过 SSRF 校验）。
+    headers : dict | None
+        自定义投递请求头（敏感值已由路由层脱敏/还原）。
+    timeout_s : float
+        单次投递超时秒数。
+    retry_count : int
+        失败后的额外重试次数。
 
     Returns
     -------
@@ -447,6 +456,9 @@ def hooks_create(
     hdef = mgr.register(
         event=event,
         url=url,
+        headers=headers,
+        timeout_s=timeout_s,
+        retry_count=retry_count,
         priority=0,
         description=name,
         source="api",
@@ -464,6 +476,9 @@ def hooks_update(
     mgr: Any, *,
     hook_id: str,
     new_event: str, new_url: str, new_name: str, new_enabled: bool,
+    new_headers: dict[str, str] | None = None,
+    new_timeout_s: float = 10.0,
+    new_retry_count: int = 0,
 ) -> Any:
     """更新 hook 配置（先删除旧 hook 再注册新 hook，保留原 id）.
 
@@ -479,6 +494,12 @@ def hooks_update(
         新名称。
     new_enabled : bool
         是否启用。
+    new_headers : dict | None
+        完整的新请求头集合（调用方负责与旧值合并）。
+    new_timeout_s : float
+        新的投递超时秒数。
+    new_retry_count : int
+        新的失败重试次数。
 
     Returns
     -------
@@ -504,6 +525,9 @@ def hooks_update(
     hdef = mgr.register(
         event=new_event,
         url=new_url,
+        headers=new_headers,
+        timeout_s=new_timeout_s,
+        retry_count=new_retry_count,
         priority=existing.priority,
         description=new_name,
         source="api",
