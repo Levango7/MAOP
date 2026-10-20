@@ -1044,6 +1044,20 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: dashboard-enterprise/package-lock.json
+
+      - name: Build dashboard bundle (wheel asset)
+        # M0: the wheel force-includes dashboard/dist-enterprise. A checkout does
+        # not contain it (build output is untracked), so build it before packing.
+        working-directory: dashboard-enterprise
+        run: |
+          npm ci
+          npm run build
+
       - name: Build wheel
         working-directory: py
         run: |
@@ -1072,6 +1086,16 @@ jobs:
           /tmp/wheelvenv/bin/python -c "from maop import __version__; print('OK  from maop import __version__ ->', __version__)"
           /tmp/wheelvenv/bin/python -m maop --help
           /tmp/wheelvenv/bin/python -c "import os, sys, pathlib, maop; src = pathlib.Path(os.environ['MAOP_SRC']); pkg = pathlib.Path(maop.__file__).parent; s = {p.relative_to(src).as_posix() for p in src.rglob('*.py')}; i = {p.relative_to(pkg).as_posix() for p in pkg.rglob('*.py')}; miss = sorted(s - i); print('OK  结构完整：源码 ' + str(len(s)) + ' / 装后 ' + str(len(i))) if not miss else sys.exit('wheel 缺这些模块（editable 测不出，客户一装就炸）：' + ', '.join(miss[:15]))"
+
+      - name: First-run smoke (init + start + owner APIs)
+        # ⓪ 这是上一版 wheel-install 缺失的一层：只证明"能 import / --help"，
+        # 不证明客户能启动产品。脚本从仓库外启动已安装 wheel，断言首页、
+        # /api/overview、/api/control/status 均为 200（个人版 owner 模式）。
+        run: |
+          python py/scripts/first_run_smoke.py \
+            --python /tmp/wheelvenv/bin/python \
+            --home /tmp/fr-home \
+            --port 9188
 
   # ── Publish to PyPI ─────────────────────────────────────────────
   publish:
@@ -1111,6 +1135,12 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download dashboard bundle (wheel asset)
+        uses: actions/download-artifact@v8
+        with:
+          name: dashboard-enterprise-dist
+          path: dashboard/dist-enterprise
 
       - name: Release integrity precheck
         run: python scripts/check_release_tag.py --ref "${{ github.ref }}"
@@ -1153,6 +1183,18 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: dashboard-enterprise/package-lock.json
+
+      - name: Build dashboard bundle from the target tag (wheel asset)
+        working-directory: dashboard-enterprise
+        run: |
+          npm ci
+          npm run build
+
       - name: Release integrity precheck
         run: python scripts/check_release_tag.py --ref "refs/tags/${{ inputs.publish_tag }}"
 
@@ -1190,6 +1232,12 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download dashboard bundle (wheel asset)
+        uses: actions/download-artifact@v8
+        with:
+          name: dashboard-enterprise-dist
+          path: dashboard/dist-enterprise
 
       - name: Build packages
         run: |

@@ -57,8 +57,9 @@
 | `MAOP_PROJECT_NAME` | `MAOP` | 否 | 项目名称，用于日志和 UI 显示 |
 | `MAOP_PORT` | `9079` | 否 | **已废弃**（v5.0.0）：使用 `MAOP_DASH_PORT`。仅作文档别名，v6.0.0 移除 |
 | `MAOP_DASH_PORT` | `9079` | 否 | Dashboard 监听端口（`server.py` 和 `Dockerfile` 读取） |
-| `MAOP_ROOT` | `/app` | 否 | 项目根目录路径 |
-| `MAOP_ROOT_DIR` | （空） | 否 | 项目根目录（优先于 `MAOP_ROOT`，空则自动检测） |
+| `MAOP_HOME` | `~/.maop` | 否 | wheel 安装的可写目录：`maop init` 写入 config/data/logs/dashboard，数据不进 site-packages |
+| `MAOP_ROOT` | `/app` | 否 | 项目根目录路径（旧名，建议改用 `MAOP_ROOT_DIR`） |
+| `MAOP_ROOT_DIR` | （空） | 否 | 运行根目录（优先于 `MAOP_ROOT`；空则依次探测源码检出与 `MAOP_HOME`） |
 | `MAOP_DEBUG` | `0` | 否 | 调试模式开关。设为 `1`/`true`/`yes` 启用 |
 | `MAOP_LOG_LEVEL` | `INFO` | 否 | 日志级别：`DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL` |
 | `MAOP_EDITION` | `auto` | 否 | 版本选择：`personal`（个人版）/`enterprise`（企业版）/`auto`（按 License 自动检测） |

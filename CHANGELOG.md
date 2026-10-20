@@ -39,6 +39,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 修复：自引用 agent 的跨进程 fork 炸弹（2026-10-20）
+
+`config/agents.yaml` 的 `MAOP` 自引用条目 `cli_args: -m maop.cli run --task "{task}"`
+**从未传递 `--depth`**（`cli.py` 的 docstring 曾声称它传了）。进程内的
+`max_self_ref_depth` 只统计单进程的 call chain，而每个子进程都从 0 开始，
+于是"路由到 MAOP 自己"的任务会无限 fork。实测一次普通中文任务在 90 秒内
+拉出 **16 个以上**同任务 python 进程，父进程退出后子链仍继续增长。
+
+修法是在进程边界传递深度，而不是依赖配置模板：
+
+- 新增 `maop/core/agent/delegation/depth.py`：`MAOP_DELEGATION_DEPTH`
+  标记，`next_depth_env()` 始终把父深度 + 1 写入子进程环境。
+- `delegate/drivers.py`（5 个 driver）、`adapters/cli_adapter.py`、
+  `lifecycle/runtime.py` 的 env 构造统一经过该函数；`blocked_env` 不能移除
+  这个守卫。
+- `maop run` 取 `max(--depth, 继承值)`，到 3 层直接以退出码 1 拒绝，
+  错误信息写明 "hard cap"。
+- `delegate/drivers.py` 把 `cli: python` 固定到当前解释器（`sys.executable`）：
+  venv 启动的服务器下，PATH 上的 `python` 常是系统解释器，子进程会 import
+  另一份 MAOP 源码而丢掉这个守卫（实测正是如此）。
+- `test_delegation_depth.py` 6 条 + 更新后的 adapter/driver env 测试覆盖
+  "无 config.env 也注入"、"blocked_env 移不掉"、"到顶拒绝"、解释器钉定。
+
+修复后同一任务实测：并发链峰值 6 个 python（分支而非无限增长），
+25 秒内完成，退出码 0，服务器停止后残留进程 0；重启后该作业仍以
+`completed` 状态与完整 stdout 返回。
+
+### 首次运行闭环（M0）：装完 wheel 就能打开并派任务（2026-10-20）
+
+把"`pip install` 之后跑不起来"这条链上的每一环都补上了。实测起点：wheel 里**没有**
+`config/agents.yaml` 与前端产物，`MAOP_ROOT` 由 `__file__` 推导后指向 `site-packages`，
+因此 `maop start` 既找不到 agent 配置也找不到 UI；个人版本地启动又默认要求登录，
+关掉认证后 `/api/overview` 仍返回只读 403；`/run` 页面没有任务输入框，
+Tasks 的"查看详情"跳去一个不存在的 `/run?session=`。
+
+- **安装布局**：新增 `maop/config/home.py` 统一根目录解析
+  （`MAOP_ROOT_DIR` > 旧 `MAOP_ROOT` > 源码检出 > `~/.maop`），并实现 `maop init`
+  （复制默认 config 与预构建前端到 `MAOP_HOME`，默认不覆盖已有文件）。
+  `maop start` 在首次运行时自动初始化 home；数据落 `MAOP_HOME/data`，不再写进仓库。
+- **打包**：`pyproject.toml` 用 hatch force-include 把 `../config` 与
+  `../dashboard/dist-enterprise` 装进 `maop/_assets/`（wheel 3.5 MB，含 254 个前端文件）。
+  sdist 同样携带资产，因此从 sdist 重建 wheel 仍可用；新增 `py/hatch_build.py`
+  钩子在"前端未构建 / 从 sdist 构建"时跳过缺失的可选资产，避免
+  `pip install "...#subdirectory=py"` 直接失败。Dashboard 是构建产物：
+  `maop init` 与版本变更后的首次启动会刷新它（config 仍只补缺失文件）。
+- **个人版本地免登录**：仅当"个人版 + 回环地址 + 用户未显式设置认证"时启用
+  `MAOP_OWNER_MODE`，授予 owner 角色；远程绑定仍默认开启认证；非回环且显式关闭认证时
+  只保留只读能力。安全边界收在 `core/security/middleware.py`，并有回归测试覆盖。
+- **任务派发**：`/api/control/run` 现在记录子进程的 stdout/stderr/exit_code/finished_at，
+  新增 `GET /api/control/jobs/{job_id}` 供详情查看；任务文本作为单个 argv 传递，
+  不再用会误伤中文与标点的名称白名单。作业快照追加写入
+  `MAOP_HOME/data/control_jobs.jsonl`，服务重启后仍可查看历史与输出；
+  重启前仍标记为 running 的记录会显示为 `interrupted`，不再永久转圈。
+- **前端首公里**：ControlPanel 增加"新建任务"输入与运行按钮、Job 详情抽屉；
+  Tasks 详情改为抽屉；Overview 删除 PEV 演示段、Math.sin 假曲线与死链 `/licenses`，
+  KPI 收敛为 4 个真实指标；标题/版本改为构建期注入，去掉 localStorage 版本缓存
+  （此前会出现顶栏 v5.3.0、页脚 v5.4.0）。
+- **门禁**：既有 `wheel-install` CI 作业现在先构建前端、再装 wheel，并执行
+  `py/scripts/first_run_smoke.py`（在仓库外目录跑 `maop init` + `maop start`，
+  断言 `/`、`/api/health`、`/api/overview`、`/api/info/edition`、`/api/control/status`
+  均 200 且 `data/maop.db` 生成）；publish / release-assets / publish-manual
+  补上前端产物来源，避免 force-include 依赖未跟踪目录。
+
+实测（2026-10-20，全新 venv + 仓库外工作目录）：`maop init` 写入 5 个配置与 254 个前端文件；
+5 个端点全 200；通过 `/api/control/run` 提交中文任务，job 状态 `completed`、
+`exit_code=0`、stdout 捕获到输出；停止服务器再启动，该 job 仍以 `completed`
+状态、退出码与完整 stdout 可查。真实浏览器（Playwright）从 Composer 提交中文任务，
+详情抽屉自动打开并显示 `completed / exit 0 / 你好！…`。后端全量
+**11192 passed / 98 skipped / 1 xfailed（0 failed，覆盖率 84%）**；前端
+57 个测试文件 **486 passed** 且覆盖率门禁通过；文档门禁 22 passed；ruff 与 mypy 干净。
+wheel 与 sdist 均含 5 个配置和 254 个前端文件，从 sdist 重建 wheel 成功；
+未构建前端时 `python -m build` 仅告警跳过 UI，不再安装失败。
+设计文档见 `docs/product-v6-blueprint.md`（M0 已落地，M1–M3 待排期）。
+
 ### 分布式调度：`deadline=None` 不再等于无限等（原 #116 "未做"项，本次落地）
 
 `_dispatch_and_collect` 的 `while pending` 只在 `deadline is not None` 时检查超时，
