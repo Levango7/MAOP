@@ -326,4 +326,22 @@ describe('Settings.vue Hook 管理 Tab', () => {
     expect(mockToast.success).toHaveBeenCalled();
     wrapper.unmount();
   });
+
+  it('warns instead of reporting success when no hook listener responded', async () => {
+    const hook = makeHook();
+    mockFetch(defaultRoutes({
+      '/api/hooks': { hooks: [hook], count: 1 },
+      'POST /api/hooks/hk-001/test': { hook_id: 'hk-001', success: true, response: 'no listeners', duration_ms: 0 },
+    }));
+    const wrapper = await mountSettings();
+    const tabs = wrapper.findAll('.settings-tab');
+    await tabs[2].trigger('click');
+    await flushPromises();
+    const testBtn = wrapper.findAll('.hooks-action-btn').find(b => b.text().includes('Test'));
+    await testBtn.trigger('click');
+    await flushPromises();
+    expect(mockToast.warn).toHaveBeenCalledWith('Hook test sent (no listener responded)');
+    expect(mockToast.success).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
 });

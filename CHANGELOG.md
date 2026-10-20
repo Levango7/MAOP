@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Hook 测试「无监听者」被误报为成功（2026-10-21）
+
+- 后端无匹配结果时返回 `{success: true, response: "no listeners"}`，Settings 只
+  匹配单数 `"no listener"` ⇒ 提示“成功 0ms”；Webhooks 的成功分支同样先命中。
+  两处改为前缀匹配并给出“无监听者”提示；Settings 新增回归测试（已做变异验证）。
+
 ### 告警页的 Webhook 选项与触发历史恒为空（2026-10-21）
 
 - `GET /api/hooks` 返回 `{hooks, count}`，但 AlertRules 只读

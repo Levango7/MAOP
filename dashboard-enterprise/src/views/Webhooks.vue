@@ -351,7 +351,9 @@ async function testHook(h) {
   testingId.value = h.id;
   try {
     const d = await api.post(`/api/hooks/${encodeURIComponent(h.id)}/test`, {});
-    if (d && d.success) {
+    if (d && typeof d.response === 'string' && d.response.startsWith('no listener')) {
+      toast.info(t('view.webhooks.testNoListener'));
+    } else if (d && d.success) {
       toast.success(t('view.webhooks.testSuccess', { ms: d.duration_ms ?? d.latency_ms ?? d.latency ?? 0 }));
     } else if (d && d.error) {
       toast.error(t('view.webhooks.testFailed', { error: d.error }));
