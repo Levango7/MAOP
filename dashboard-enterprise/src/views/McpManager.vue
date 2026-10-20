@@ -462,7 +462,7 @@ async function openEditServer(s) {
     const data = await api.get(`/api/mcp/servers/${encodeURIComponent(s.id)}`);
     cfg = data.server || null;
   } catch (e) {
-    toast.error(e.message || t('view.mcp.servers.loadFailed'));
+    toast.error(e.message || t('view.mcp.servers.failedLoad'));
   }
   editingServer.value = s;
   resetServerForm();
