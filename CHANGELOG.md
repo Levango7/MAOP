@@ -39,6 +39,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Agent 计费：额度卡片恒为 0、记录筛选静默失效（2026-10-21）
+
+- `GET /api/quota/{agent}` 返回 `{quota: {...}}`，页面直接读顶层桶 ⇒ 额度卡片
+  恒显示空值。改为解包 `quota`。
+- 记录页发送 `agent`/`range`，后端只认 `agent_name`（`range` 根本不存在）⇒
+  两个筛选器都无效。后端新增 `since` 过滤与筛选结果 `summary`，前端改发
+  `agent_name` + 秒级 `since`，汇总卡片恢复。
+- 验证：后端 billing 55 passed（新增 since/summary 用例）；前端新增
+  AgentBilling vitest 3 条（含信封解包与筛选参数的变异验证）。
+
 ### Hook 测试「无监听者」被误报为成功（2026-10-21）
 
 - 后端无匹配结果时返回 `{success: true, response: "no listeners"}`，Settings 只

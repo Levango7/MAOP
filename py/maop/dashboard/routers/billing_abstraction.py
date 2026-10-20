@@ -99,13 +99,21 @@ async def api_billing_summary(agent_name: str, request: Request) -> dict[str, An
 async def api_billing_records(
     request: Request,
     agent_name: str = Query("", description="按 Agent 过滤"),
+    since: str = Query("", description="起始时间（ISO 8601，如 2026-10-01T00:00:00+00:00）"),
     limit: int = Query(100, ge=1, le=10000, description="返回条数上限"),
 ) -> dict[str, Any]:
-    """获取计费记录列表。"""
+    """获取计费记录列表（含筛选结果的汇总）。"""
     require_admin(request)
-    records = billing_service.get_billing_records(agent_name=agent_name, limit=limit)
+    records = billing_service.get_billing_records(
+        agent_name=agent_name, since=since, limit=limit,
+    )
     return {
         "status": "ok",
         "records": records,
         "count": len(records),
+        "summary": {
+            "total_tokens": sum(int(r.get("tokens_consumed", 0) or 0) for r in records),
+            "total_cost": round(sum(float(r.get("cost_usd", 0) or 0) for r in records), 6),
+            "total_calls": sum(int(r.get("calls_made", 0) or 0) for r in records),
+        },
     }

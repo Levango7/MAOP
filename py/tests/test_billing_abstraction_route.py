@@ -244,6 +244,34 @@ class TestBillingRecords:
         assert data["count"] == 1
         assert data["records"][0]["agent_name"] == "agent1"
 
+    def test_records_since_filter_and_summary(self, client: TestClient, isolated_engine: BillingEngine):
+        """since 过滤生效，summary 汇总筛选结果。"""
+        _register_agent(isolated_engine, "agent1", BillingModel.FREE)
+        client.post("/api/billing/charge", json={
+            "agent_name": "agent1", "tokens": 50, "calls": 2,
+        })
+        client.post("/api/billing/charge", json={
+            "agent_name": "agent1", "tokens": 30, "calls": 1,
+        })
+
+        resp = client.get("/api/billing/records", params={
+            "since": "2000-01-01T00:00:00+00:00",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] == 2
+        assert data["summary"] == {
+            "total_tokens": 80, "total_cost": 0.0, "total_calls": 3,
+        }
+
+        future = client.get("/api/billing/records", params={
+            "since": "2999-01-01T00:00:00+00:00",
+        }).json()
+        assert future["count"] == 0
+        assert future["summary"] == {
+            "total_tokens": 0, "total_cost": 0.0, "total_calls": 0,
+        }
+
     def test_records_invalid_limit(self, client: TestClient):
         """无效 limit 返回 422（FastAPI Query 参数校验）。"""
         resp = client.get("/api/billing/records", params={"limit": 0})

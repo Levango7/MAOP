@@ -277,6 +277,7 @@ class BillingEngine:
     def get_billing_records(
         self,
         agent_name: str = "",
+        since: str = "",
         limit: int = 100,
     ) -> list[BillingRecord]:
         """获取计费记录.
@@ -285,6 +286,9 @@ class BillingEngine:
         ----------
         agent_name : str
             筛选指定 Agent。空字符串表示不筛选（返回所有）。
+        since : str
+            起始时间（ISO 时间戳，含则返回 ``timestamp >= since`` 的记录）。
+            时间戳统一由本模块以 UTC ``isoformat()`` 写入，按字符串比较即可。
         limit : int
             返回记录数上限。
 
@@ -293,20 +297,21 @@ class BillingEngine:
         list[BillingRecord]
             按时间倒序排列。
         """
+        clauses: list[str] = []
+        params: list[Any] = []
+        if agent_name:
+            clauses.append("agent_name = ?")
+            params.append(agent_name)
+        if since:
+            clauses.append("timestamp >= ?")
+            params.append(since)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(limit)
         with sqlite_connect(self._db_path) as conn:
-            if agent_name:
-                rows = conn.execute(
-                    """SELECT * FROM billing_records
-                       WHERE agent_name = ?
-                       ORDER BY timestamp DESC LIMIT ?""",
-                    (agent_name, limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """SELECT * FROM billing_records
-                       ORDER BY timestamp DESC LIMIT ?""",
-                    (limit,),
-                ).fetchall()
+            rows = conn.execute(
+                f"SELECT * FROM billing_records{where} ORDER BY timestamp DESC LIMIT ?",  # nosec B608 — 子句只含固定片段与 ? 占位
+                tuple(params),
+            ).fetchall()
         return [self._row_to_record(r) for r in rows]
 
     # ── 内部工具 ────────────────────────────────────────────────
