@@ -555,7 +555,7 @@ onUnmounted(() => {
 .auth-card input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
 .auth-card input::placeholder { color: var(--text-faint); }
 .login-error {
-  color: var(--fail); font-size: var(--fs-xs); margin-bottom: var(--sp-2);
+  color: var(--fail-strong); font-size: var(--fs-xs); margin-bottom: var(--sp-2);
   padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm);
   background: var(--fail-soft); border: 1px solid color-mix(in srgb, var(--fail) 25%, transparent);
 }

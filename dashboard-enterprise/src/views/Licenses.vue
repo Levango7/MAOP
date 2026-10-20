@@ -550,7 +550,7 @@ onMounted(load);
 .lic-btn--primary:hover { opacity: .9; }
 .lic-btn--primary:disabled { opacity: .5; cursor: not-allowed; }
 .lic-btn--danger {
-  background: var(--fail-soft); color: var(--fail); border: 1px solid rgba(248, 81, 73, 0.3); /* fallback: color-mix(in srgb, var(--fail) 30%, transparent) */
+  background: var(--fail-soft); color: var(--fail-strong); border: 1px solid rgba(248, 81, 73, 0.3); /* fallback: color-mix(in srgb, var(--fail) 30%, transparent) */
   border: 1px solid color-mix(in srgb, var(--fail) 30%, transparent);
 }
 .lic-btn--danger:hover { opacity: .85; }

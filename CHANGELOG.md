@@ -98,6 +98,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--text-primary`、`--text-secondary`、`--surface-sunken`、`--radius-md`、
   `--radius-sm`（静默回落）；`AgentRegistry.vue` 引用 `--on-danger`/`--text-inverse`。
   全部改回现有令牌。Badge 5 种色调文字改用 `*-strong`，避免柔底 alpha 稀释。
+- **柔底状态文字扩面**：扩面审计又抓到错误条 / 状态 pill / 热力格 / 角色徽标等
+  33 处仍是「柔底 + 基础色文字」（实测暗色 4.3-4.4、亮色 3.9-4.3），统一改为
+  `fail-strong/warn-strong/success-strong/info-strong`；`histogram` 标签（chart-5
+  压在 chart-5-soft 上亮色 3.94）改用正文色，色相只承担类型编码。
 - **对比度门禁进 CI**：`dashboard-enterprise/scripts/wcag.py`（vendored，含
   `--self-test`、`--pairs-only`、rgba 复合、`--min-pairs`）+ `design/contrast-pairs.txt`
   显式 164 对配对（8 文字令牌 × 5 承载面 + 实底/边框/柔底徽标），接入
@@ -105,8 +109,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 验证：`npm run design:contrast` 164 对全 PASS（自测覆盖"坏配对必须红/缺令牌必须红"）；
 `npm run lint` 0 error；`npx vite build` 通过；前端全量 `57 files / 489 tests` 通过；
-浏览器实测四组页面 0 违规且正控 4.48 仍能报警。约束：亮色仅逐页审计 `/home` 与 `/run`，
-其余路由与 hover 态仍靠令牌门禁兜底（已写进 DESIGN.md Known Gaps）。
+浏览器实测：修复前亮色 `/home` 12 处违规；修复后 18 个主要路由 × 暗/亮共 36 组
+页面均 **0 违规**，正控 4.48 仍能报警。约束：其余路由与 hover 态仍靠令牌门禁兜底
+（已写进 DESIGN.md Known Gaps）。
 
 ### 数据层纠偏第二片：`/api/failures` 与 `/api/timeseries` 也离开空表（#55 优先级 A）
 

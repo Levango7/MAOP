@@ -314,7 +314,7 @@ onMounted(refreshAll);
   display: flex; align-items: center; gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-4);
   background: var(--fail-soft); border: 1px solid var(--fail);
-  border-radius: var(--r-md); color: var(--fail);
+  border-radius: var(--r-md); color: var(--fail-strong);
   font-size: var(--fs-sm); font-family: var(--font-mono); word-break: break-word;
 }
 

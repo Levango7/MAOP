@@ -558,7 +558,7 @@ onUnmounted(() => {
 .act-btn.danger:hover:not(:disabled) {
   border-color: var(--fail);
   background: var(--fail-soft);
-  color: var(--fail);
+  color: var(--fail-strong);
 }
 
 .spinning {

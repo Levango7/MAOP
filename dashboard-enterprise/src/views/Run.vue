@@ -520,7 +520,7 @@ const dagLayout = computed(() => {
   background: var(--fail-soft);
   border: 1px solid var(--fail);
   border-radius: var(--r-md, 8px);
-  color: var(--fail);
+  color: var(--fail-strong);
   font-size: var(--fs-sm);
   margin-bottom: var(--sp-3);
 }

@@ -272,9 +272,9 @@
  * （方向反了 —— hover 应加深）。--fail/--warn 同理。详见 tokens.css 注释。 */
 .btn--primary { background: var(--brand-solid); border-color: var(--brand-solid); color: var(--brand-contrast); box-shadow: var(--shadow-brand); }
 .btn--primary:hover { background: var(--brand-solid-hover); border-color: var(--brand-solid-hover); }
-.btn--danger { background: var(--fail-soft); border-color: var(--fail); color: var(--fail); }
+.btn--danger { background: var(--fail-soft); border-color: var(--fail); color: var(--fail-strong); }
 .btn--danger:hover { background: var(--fail-solid); border-color: var(--fail-solid); color: var(--on-fail, #fff); }
-.btn--warn { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.btn--warn { background: var(--warn-soft); border-color: var(--warn); color: var(--warn-strong); }
 .btn--warn:hover { background: var(--warn-solid); border-color: var(--warn-solid); color: var(--on-warn, #fff); }
 .btn--ghost { background: transparent; border-color: var(--border); }
 .btn--ghost:hover { background: var(--surface-2); border-color: var(--border-strong); }
@@ -314,8 +314,8 @@
 .ctrl-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
 /* Result bar status colors */
-.result-bar.ok { border-color: var(--success); background: var(--success-soft); color: var(--success); }
-.result-bar.err { border-color: var(--fail); background: var(--fail-soft); color: var(--fail); }
+.result-bar.ok { border-color: var(--success); background: var(--success-soft); color: var(--success-strong); }
+.result-bar.err { border-color: var(--fail); background: var(--fail-soft); color: var(--fail-strong); }
 
 /* Small modifier for action buttons */
 .act-btn.small, .ctrl-btn.small { height: 28px; padding: 0 var(--sp-2); font-size: var(--fs-xs); }
@@ -697,7 +697,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   white-space: nowrap;
   letter-spacing: .01em;
 }
-.live-tag.active { color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); background: var(--success-soft); }
+.live-tag.active { color: var(--success-strong); border-color: color-mix(in srgb, var(--success) 30%, transparent); background: var(--success-soft); }
 .live-tag .pulse-once, .sse-dot { width: 7px; height: 7px; border-radius: var(--r-full); background: var(--success); }
 /* R11 修复: .sse-indicator 状态切换统一为 .is-connected/:not(.is-connected) 方式,
  * 删除第1202-1205行的 .on/.off 重复定义 (两种方式并存导致不一致) */
@@ -1074,7 +1074,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .btn-primary:hover { background: var(--brand-solid-hover); border-color: var(--brand-solid-hover); }
 .btn-ghost { background: transparent; border: 1px solid var(--border-control); color: var(--text-muted); }
 .btn-ghost:hover { background: var(--surface-2); border-color: var(--border-strong); color: var(--text); }
-.btn-danger { background: var(--fail-soft); border: 1px solid var(--fail); color: var(--fail); }
+.btn-danger { background: var(--fail-soft); border: 1px solid var(--fail); color: var(--fail-strong); }
 /* R7 修复: 原 :hover background 与默认相同, 无视觉反馈; 增加 border-color + transform */
 .btn-danger:hover { background: var(--fail-soft); border-color: var(--fail-strong); transform: translateY(-1px); }
 /* R7 修复: 添加 :active 状态, 提供按下反馈 */
@@ -1209,7 +1209,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .margin-top { margin-top: var(--sp-5); }
 .view-error {
   display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-4);
-  padding: var(--sp-3) var(--sp-4); color: var(--fail); font-size: var(--fs-sm);
+  padding: var(--sp-3) var(--sp-4); color: var(--fail-strong); font-size: var(--fs-sm);
   background: var(--fail-soft); border: 1px solid color-mix(in srgb, var(--fail) 30%, transparent); border-radius: var(--r-md);
 }
 /* Budget meters */

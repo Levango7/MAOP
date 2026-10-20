@@ -667,10 +667,10 @@ onMounted(loadAll);
   font-weight: 600;
   min-height: 28px;
 }
-.heatmap__cell--low  { background: var(--success-soft); color: var(--success); }
+.heatmap__cell--low  { background: var(--success-soft); color: var(--success-strong); }
 .heatmap__cell--mid  { background: rgb(47, 103, 59); /* fallback: color-mix(in srgb, var(--success) 45%, var(--surface)) */ background: color-mix(in srgb, var(--success) 45%, var(--surface)); color: var(--text); }
-.heatmap__cell--high { background: var(--warn-soft); color: var(--warn); }
-.heatmap__cell--over { background: var(--fail-soft); color: var(--fail); font-weight: 700; }
+.heatmap__cell--high { background: var(--warn-soft); color: var(--warn-strong); }
+.heatmap__cell--over { background: var(--fail-soft); color: var(--fail-strong); font-weight: 700; }
 .heatmap__row.is-over .heatmap__row-header { color: var(--fail); font-weight: 700; }
 .heatmap__legend {
   display: flex;

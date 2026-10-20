@@ -307,9 +307,9 @@ onMounted(fetchUsers);
   border-radius: var(--r-sm); font-size: var(--fs-2xs); font-weight: 600;
   background: var(--surface-3); color: var(--text-muted);
 }
-.users-role--admin { background: var(--fail-soft); color: var(--fail); }
+.users-role--admin { background: var(--fail-soft); color: var(--fail-strong); }
 .users-role--superadmin { background: var(--brand-soft); color: var(--chart-6); }
-.users-role--operator, .users-role--write { background: var(--info-soft); color: var(--info); }
+.users-role--operator, .users-role--write { background: var(--info-soft); color: var(--info-strong); }
 .users-role--read { background: var(--surface-3); color: var(--text-muted); }
 
 /* 弹窗 */
