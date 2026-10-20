@@ -100,6 +100,8 @@ def register_agent(
     max_concurrent: int,
     rate_limit_per_min: int,
     timeout_s: float,
+    retry_count: int = 3,
+    fallback_agents: list[str] | None = None,
     enabled: bool,
 ) -> dict[str, Any]:
     """注册新 Agent（或更新同名 Agent）。
@@ -136,11 +138,35 @@ def register_agent(
         max_concurrent=max_concurrent,
         rate_limit_per_min=rate_limit_per_min,
         timeout_s=timeout_s,
+        retry_count=retry_count,
+        fallback_agents=fallback_agents or [],
         enabled=enabled,
     )
     catalog = _get_catalog()
     catalog.register(desc)
     logger.info("[agent_catalog_service] registered agent: %s", name)
+    return desc.model_dump(mode="json")
+
+
+def update_agent(name: str, changes: dict[str, Any]) -> dict[str, Any] | None:
+    """部分更新已注册 Agent；返回更新后的 descriptor，Agent 不存在时返回 None。
+
+    未出现在 ``changes`` 中的字段保留原值。字段校验由 ``AgentDescriptor``
+    完成（例如降级链自引用会抛 ``ValueError``）。
+    """
+    from maop.core.agent.registry.agent_catalog import AgentDescriptor
+
+    catalog = _get_catalog()
+    existing = catalog.get(name)
+    if existing is None:
+        return None
+
+    merged = existing.model_dump(mode="json")
+    merged.update(changes)
+    merged["name"] = name
+    desc = AgentDescriptor(**merged)
+    catalog.register(desc)
+    logger.info("[agent_catalog_service] updated agent: %s", name)
     return desc.model_dump(mode="json")
 
 
