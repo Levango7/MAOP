@@ -16,6 +16,7 @@
     "lint": "eslint src/ --ext .js,.vue",
     "lint:fix": "eslint src/ --ext .js,.vue --fix",
     "typecheck": "vue-tsc --noEmit",
+    "design:contrast": "python scripts/wcag.py --self-test && python scripts/wcag.py --tokens src/styles/tokens.css --tokens src/styles/themes.css --pairs design/contrast-pairs.txt --pairs-only --min-pairs 164",
     "format": "prettier --write src/"
   },
   "dependencies": {
