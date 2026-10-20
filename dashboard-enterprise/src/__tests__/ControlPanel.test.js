@@ -114,6 +114,41 @@ describe('ControlPanel.vue', () => {
     wrapper.unmount();
   });
 
+  it('loads the run timeline when the job carries a trace_id', async () => {
+    mockFetch(defaultRoutes({
+      '/api/control/run': { status: 'ok', job_id: 'j9' },
+      '/api/control/jobs/j9': {
+        job: { id: 'j9', task: 't', status: 'completed', trace_id: 'tr1', stdout: 'x' },
+      },
+      '/api/runs/tr1': {
+        status: 'ok',
+        data: {
+          summary: { trace_id: 'tr1' },
+          events: [
+            { seq: 1, kind: 'run.step', agent: 'claude', status: 'ok', duration_ms: 1234,
+              payload: { stdout: 'agent said done' } },
+            { seq: 2, kind: 'run.verify', agent: 'claude', status: 'passed', duration_ms: 5,
+              payload: { summary: '门禁全部通过' } },
+          ],
+          decisions: [],
+        },
+      },
+    }));
+    const wrapper = await mountControlPanel();
+    await wrapper.find('#maop-task-input').setValue('重构 auth');
+    await wrapper.find('.task-composer__run').trigger('click');
+    await flushPromises();
+    await flushPromises();
+    expect(global.fetch.mock.calls.some(([url]) => String(url) === '/api/runs/tr1')).toBe(true);
+    // DetailDrawer 内容 Teleport 到 body，wrapper.text() 看不见。
+    const timeline = document.querySelector('.run-timeline');
+    expect(timeline, 'teleported timeline missing').not.toBe(null);
+    expect(timeline.textContent).toContain('agent said done');
+    expect(timeline.textContent).toContain('1234ms');
+    expect(timeline.textContent).toContain('门禁全部通过');
+    wrapper.unmount();
+  });
+
   it('renders agent upgrade rows when /api/agent/upgrade returns agents', async () => {
     mockFetch(defaultRoutes({
       '/api/agent/upgrade': {

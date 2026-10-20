@@ -138,6 +138,18 @@
           <dt>{{ t('view.control.jobFinishedAt') }}</dt><dd>{{ jobDrawer.job.finished_at || '—' }}</dd>
           <dt>{{ t('view.control.jobExitCode') }}</dt><dd>{{ jobDrawer.job.exit_code ?? '—' }}</dd>
         </dl>
+        <template v-if="jobDrawer.job.trace_id">
+          <h4 class="job-detail__heading">{{ t('view.control.runTimeline') }}</h4>
+          <ol v-if="runTimeline.length" class="run-timeline">
+            <li v-for="e in runTimeline" :key="e.seq" class="run-timeline__item">
+              <span class="run-timeline__kind">{{ timelineLabel(e.kind) }}</span>
+              <Badge v-if="e.status" :tone="statusTone(e.status)">{{ e.status }}</Badge>
+              <span class="run-timeline__meta muted">{{ e.agent || '—' }} · {{ e.duration_ms || 0 }}ms</span>
+              <pre v-if="timelineDetail(e)" class="run-timeline__detail">{{ timelineDetail(e) }}</pre>
+            </li>
+          </ol>
+          <p v-else class="muted">{{ t('view.control.runTimelineEmpty') }}</p>
+        </template>
         <h4 class="job-detail__heading">{{ t('view.control.jobStdout') }}</h4>
         <pre class="job-detail__output">{{ jobDrawer.job.stdout || t('view.control.jobNoOutput') }}</pre>
         <template v-if="jobDrawer.job.stderr">
@@ -186,6 +198,7 @@ const submitting = ref(false);
 const upgradeLoading = ref(false);
 const lastJobId = ref('');
 const jobDrawer = reactive({ open: false, id: '', loading: false, job: null });
+const runTimeline = ref([]);
 let jobPollTimer = null;
 const TERMINAL_JOB_STATES = new Set(['completed', 'failed', 'stopped', 'cancelled', 'interrupted']);
 
@@ -270,6 +283,7 @@ async function loadJob(jobId) {
   try {
     const data = await api.get(`/api/control/jobs/${encodeURIComponent(jobId)}`);
     jobDrawer.job = data.job || null;
+    await loadRunTimeline(jobDrawer.job?.trace_id || '');
     const status = jobDrawer.job?.status;
     if (status && !TERMINAL_JOB_STATES.has(status)) {
       jobPollTimer = setTimeout(() => loadJob(jobId), 2000);
@@ -282,6 +296,41 @@ async function loadJob(jobId) {
   } finally {
     jobDrawer.loading = false;
   }
+}
+
+async function loadRunTimeline(traceId) {
+  runTimeline.value = [];
+  if (!traceId) return;
+  try {
+    const data = await api.get(`/api/runs/${encodeURIComponent(traceId)}`);
+    runTimeline.value = data.data?.events || [];
+  } catch {
+    // 时间线是增强信息：拿不到时抽屉仍显示输出，不弹错误打扰用户。
+    runTimeline.value = [];
+  }
+}
+
+const TIMELINE_KIND_KEYS = {
+  'run.started': 'timelineStarted',
+  'run.plan': 'timelinePlan',
+  'run.step': 'timelineStep',
+  'run.verify': 'timelineVerify',
+  'run.cost': 'timelineCost',
+  'run.finished': 'timelineFinished',
+};
+
+function timelineLabel(kind) {
+  const key = TIMELINE_KIND_KEYS[kind];
+  return key ? t(`view.control.${key}`) : kind;
+}
+
+function timelineDetail(event) {
+  const payload = event.payload || {};
+  if (event.kind === 'run.step') return String(payload.stdout || payload.error || '').slice(0, 400);
+  if (event.kind === 'run.verify') return String(payload.summary || '');
+  if (event.kind === 'run.cost') return String(payload.estimated_cost ?? '');
+  if (event.kind === 'run.plan') return String(payload.routing_key || '');
+  return '';
 }
 
 onUnmounted(closeJob);
@@ -455,6 +504,31 @@ onMounted(refreshAll);
   word-break: break-word;
 }
 .job-detail__output--err { border-color: var(--danger); }
+.run-timeline {
+  margin: 0 0 var(--sp-4);
+  padding-left: var(--sp-4);
+  font-size: var(--fs-sm);
+}
+.run-timeline__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.run-timeline__kind { font-weight: 600; }
+.run-timeline__meta { font-size: var(--fs-xs); }
+.run-timeline__detail {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 </style>
 
 
