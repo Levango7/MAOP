@@ -151,7 +151,9 @@ const roleLabel = computed(() => {
 });
 
 const authOn = computed(() => ls('maop_auth_enabled') === 'true');
-const appVersion = computed(() => ls('maop_version') || (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown'));
+// Do not read the version from localStorage: a stale cached value from an
+// older build made the header show v5.3.0 while the footer showed v5.4.0.
+const appVersion = computed(() => (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown'));
 
 // ── 刷新时间 ───────────────────────────────────────────────────────
 const refreshTime = ref(new Date());

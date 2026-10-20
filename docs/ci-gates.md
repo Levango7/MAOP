@@ -117,6 +117,7 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 | `py/tests/test_ci_merge_gate.py` | 聚合守卫的两面：判定脚本的策略单测（白名单式 + fail closed + docs-only 的 skipped 必须放行），以及 ci.yml 里 gate 的形状（name 稳定、`if: always()` 不许掉、needs 盖住全部重活、不许纳 push-only 作业） |
 | `py/tests/test_nightly_flaky_coverage.py` | nightly `flaky-detection` 的**覆盖面**：必须覆盖实测出过问题的平台（macos/3.13、windows/3.12）、每条腿 `--reruns=0`、复刻 ci.yml 的并发配置（Linux/macOS `-n 2`、Windows `-n 0`）、矩阵值渲染后是合法 bash 且不留占位符、每条腿都得是 ci.yml 真跑过的组合；另有 `TestSlowMarkerCoverage` 核对**每个含 `slow` 的文件都被某条腿真跑到**（见 §9） |
 | `py/tests/test_env_example_drift.py` | `.env.example` ↔ 代码实读的 `MAOP_*` 变量双向一致（两条来源都要算：`os.getenv` 直读 + `MAOPSettings` 的 `env_prefix`/`AliasChoices` 映射）；反向不许留下无说明的"没人认的开关"；企业版变量走 `ENTERPRISE_SIDE_VARS` 逐条登记 |
+| `py/scripts/check_config_drift.py`（lint 作业内执行） | `os.getenv` 与 `os.environ` 的计数棘轮：**只许降不许升**，抬基线必须在文件里逐条写明新增来源与理由（2026-10-20 的 229→240 即引导层 home/cli、跨进程深度标记、每请求 owner 判定三组）；同作业还比对四处版本站点 |
 | `py/tests/test_conftest_leak_probe.py` | 测试基建自己的两层守卫：① `_leak_probe`（用例开始时观测 + 修复被污染的全局 `subprocess.run`，含"修复必须排在 `yield` 之前"的顺序守卫）；② **会话收尾门禁** `apply_leak_gate`（会话结束时 `subprocess.run` 仍是替身 ⇒ 打 `::error title=leak-gate::` 并把退出码改成失败）。为什么要第 ② 层：探针只在"下一条用例开始时"才检查，所以**最后一个用例**留下的泄漏结构上看不见（实测：把肇事用例排在别人前面 5/5 报修，按自然顺序当最后一个类 0/5）。门禁的负对照同样钉住"干净会话不许红" |
 
 
@@ -178,8 +179,9 @@ required 上下文 4 条，其余保护项全关：
   —— 永远存在，任何 PR 都跑。
 - `CI merge gate` —— `if: always()` 的聚合作业：任何 PR 都会产出这一条 check，它把上游
   lint / 9 平台 pytest / 前端 / e2e / 迁移 / pip-audit / bandit / SBOM / perf-smoke /
-  lock-drift / **wheel 安装冒烟**（`wheel-install`：把构建出的 wheel 全依赖装进干净 venv 再断言，
-  覆盖 editable 结构上看不见的"少打包一个模块 / 包元数据有误"）的结论
+  lock-drift / **wheel 安装冒烟**（`wheel-install`：先构建前端，把构建出的 wheel 全依赖装进干净 venv，
+  再在仓库外目录跑 `maop init` + `maop start` 并断言首页与个人版端点均 200；覆盖 editable 结构上
+  看不见的"少打包一个模块 / 包元数据有误 / 前端与 config 没进 wheel"）的结论
   折进自己的红绿（判定脚本 `py/scripts/ci_merge_gate.py`，规则见 §7.3 末段）。
   这一条替代了过去单独把 lint、前端设为 required 的做法，覆盖面更大。
 - `strict: false`（不要求分支领先，避免每次主干合并把在跑的 PR 全部判过期）、

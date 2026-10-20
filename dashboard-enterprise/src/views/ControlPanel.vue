@@ -7,6 +7,39 @@
       </button>
     </PageHeader>
 
+    <Card :title="t('view.control.newTask')" icon="play" margin-bottom="var(--sp-4)">
+      <div class="task-composer">
+        <label class="task-composer__label" for="maop-task-input">{{ t('view.control.taskLabel') }}</label>
+        <textarea
+          id="maop-task-input"
+          v-model="taskText"
+          class="task-composer__input"
+          rows="4"
+          :placeholder="t('view.control.taskPlaceholder')"
+          :disabled="submitting"
+          @keydown.ctrl.enter.prevent="runComposedTask"
+          @keydown.meta.enter.prevent="runComposedTask"
+        ></textarea>
+        <div class="task-composer__actions">
+          <span class="task-composer__hint">{{ t('view.control.taskHint') }}</span>
+          <button
+            class="ctrl-btn tone-green task-composer__run"
+            :disabled="submitting || !taskText.trim()"
+            @click="runComposedTask"
+          >
+            <AppIcon name="play" :size="16" /> {{ t('view.control.runTask') }}
+          </button>
+        </div>
+        <div v-if="lastJobId" class="result-bar ok">
+          <AppIcon name="check-circle" :size="14" />
+          <span>{{ t('view.control.jobStarted', { id: lastJobId }) }}</span>
+          <button class="act-btn small" @click="openJob(lastJobId)">
+            {{ t('view.control.viewJob') }}
+          </button>
+        </div>
+      </div>
+    </Card>
+
     <Card :title="t('view.control.executionControls')" icon="play" margin-bottom="var(--sp-4)">
       <div class="btn-grid">
         <button
@@ -44,6 +77,9 @@
             </div>
             <span class="row-sub">{{ j.started_at }}</span>
           </div>
+          <button class="act-btn small" @click="openJob(j.id)">
+            <AppIcon name="file-text" :size="12" /> {{ t('view.control.viewJob') }}
+          </button>
           <button class="act-btn small" :disabled="loading" @click="execAction('stop', j.name)">
             <AppIcon name="square" :size="12" /> {{ t('view.control.stop') }}
           </button>
@@ -56,7 +92,7 @@
     </Card>
 
     <Card :title="t('view.control.agentUpgrade')" icon="refresh" margin-bottom="var(--sp-4)">
-      <button class="btn-check" :disabled="loading" @click="checkUpgrade">
+      <button class="btn-check" :disabled="upgradeLoading" @click="checkUpgrade">
         <AppIcon name="refresh" :size="15" :class="{ spinning: loading }" /> {{ t('view.control.checkUpgrades') }}
       </button>
       <div v-if="agents.length" class="row-list">
@@ -73,22 +109,53 @@
             </div>
           </div>
           <button
-            class="act-btn small" :disabled="loading || a.status === 'up-to-date'"
+            class="act-btn small" :disabled="upgradeLoading || a.status === 'up-to-date'"
             @click="upgradeAgent(a.name)">
             <AppIcon name="upload" :size="12" /> {{ t('view.control.upgrade') }}
           </button>
         </div>
       </div>
       <EmptyState
-        v-else-if="!loading" icon="refresh" :title="t('view.control.noUpgradeInfo')"
+        v-else-if="!upgradeLoading" icon="refresh" :title="t('view.control.noUpgradeInfo')"
         :description="t('view.control.noUpgradeInfoDesc')" />
       <Skeleton v-else height="120px" />
     </Card>
+
+    <DetailDrawer
+      :open="jobDrawer.open"
+      :title="t('view.control.jobDetailTitle', { id: jobDrawer.id })"
+      icon="play"
+      @close="closeJob"
+    >
+      <div v-if="jobDrawer.loading"><Skeleton height="120px" /></div>
+      <div v-else-if="jobDrawer.job" class="job-detail">
+        <div class="job-detail__meta">
+          <Badge :tone="statusTone(jobDrawer.job.status)">{{ jobDrawer.job.status }}</Badge>
+          <span class="job-detail__task">{{ jobDrawer.job.task }}</span>
+        </div>
+        <dl class="job-detail__facts">
+          <dt>{{ t('view.control.jobStartedAt') }}</dt><dd>{{ jobDrawer.job.start || '—' }}</dd>
+          <dt>{{ t('view.control.jobFinishedAt') }}</dt><dd>{{ jobDrawer.job.finished_at || '—' }}</dd>
+          <dt>{{ t('view.control.jobExitCode') }}</dt><dd>{{ jobDrawer.job.exit_code ?? '—' }}</dd>
+        </dl>
+        <h4 class="job-detail__heading">{{ t('view.control.jobStdout') }}</h4>
+        <pre class="job-detail__output">{{ jobDrawer.job.stdout || t('view.control.jobNoOutput') }}</pre>
+        <template v-if="jobDrawer.job.stderr">
+          <h4 class="job-detail__heading">{{ t('view.control.jobStderr') }}</h4>
+          <pre class="job-detail__output job-detail__output--err">{{ jobDrawer.job.stderr }}</pre>
+        </template>
+      </div>
+      <template #footer>
+        <button class="act-btn small" :disabled="jobDrawer.loading" @click="loadJob(jobDrawer.id)">
+          <AppIcon name="refresh" :size="12" /> {{ t('common.refresh') }}
+        </button>
+      </template>
+    </DetailDrawer>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useToast } from '../composables/useToast.js';
 import AppIcon from '../components/AppIcon.vue';
@@ -97,6 +164,7 @@ import Card from '../components/Card.vue';
 import Badge from '../components/Badge.vue';
 import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
+import DetailDrawer from '../components/DetailDrawer.vue';
 import { useI18n } from '../i18n';
 
 const { t } = useI18n();
@@ -113,9 +181,17 @@ const jobs = ref([]);
 const agents = ref([]);
 const execResult = ref(null);
 const maintResult = ref(null);
+const taskText = ref('');
+const submitting = ref(false);
+const upgradeLoading = ref(false);
+const lastJobId = ref('');
+const jobDrawer = reactive({ open: false, id: '', loading: false, job: null });
+let jobPollTimer = null;
+const TERMINAL_JOB_STATES = new Set(['completed', 'failed', 'stopped', 'cancelled', 'interrupted']);
 
 const execActions = [
-  { action: 'run', label: 'view.control.runTask', icon: 'play', tone: 'green' },
+  // "run" lives in the composer above; keeping a blank run button here was a
+  // one-click way to POST an empty task and get a 400.
   { action: 'pause', label: 'view.control.pause', icon: 'pause', tone: 'orange' },
   { action: 'resume', label: 'view.control.resume', icon: 'rotate-ccw', tone: 'blue' },
   { action: 'stop', label: 'view.control.stop', icon: 'square', tone: 'red' },
@@ -148,6 +224,67 @@ function upgradeTone(s) {
   if (v === 'error' || v === 'unavailable') return 'fail';
   return 'neutral';
 }
+
+async function runComposedTask() {
+  const task = taskText.value.trim();
+  if (!task || submitting.value) return;
+  submitting.value = true;
+  execResult.value = null;
+  try {
+    const r = await api.post('/api/control/run', { task });
+    lastJobId.value = r.job_id || '';
+    taskText.value = '';
+    await loadJobs();
+    setTimeout(() => loadJobs(), 1500);
+    openJob(lastJobId.value);
+  } catch (e) {
+    execResult.value = { ok: false, msg: e.message || t('view.control.actionFailed', { action: 'run' }) };
+    toast.error(execResult.value.msg);
+  } finally {
+    submitting.value = false;
+  }
+}
+
+function closeJob() {
+  jobDrawer.open = false;
+  if (jobPollTimer) {
+    clearTimeout(jobPollTimer);
+    jobPollTimer = null;
+  }
+}
+
+function openJob(jobId) {
+  jobDrawer.id = jobId;
+  jobDrawer.open = true;
+  jobDrawer.job = null;
+  loadJob(jobId);
+}
+
+async function loadJob(jobId) {
+  if (!jobId || !jobDrawer.open || jobDrawer.id !== jobId) return;
+  if (jobPollTimer) {
+    clearTimeout(jobPollTimer);
+    jobPollTimer = null;
+  }
+  jobDrawer.loading = true;
+  try {
+    const data = await api.get(`/api/control/jobs/${encodeURIComponent(jobId)}`);
+    jobDrawer.job = data.job || null;
+    const status = jobDrawer.job?.status;
+    if (status && !TERMINAL_JOB_STATES.has(status)) {
+      jobPollTimer = setTimeout(() => loadJob(jobId), 2000);
+    } else {
+      loadJobs();
+    }
+  } catch (e) {
+    toast.error(e.message || t('view.control.jobLoadFailed'));
+    jobDrawer.job = null;
+  } finally {
+    jobDrawer.loading = false;
+  }
+}
+
+onUnmounted(closeJob);
 
 async function execAction(action, task) {
   loading.value = true;
@@ -192,10 +329,10 @@ async function loadJobs() {
     const data = await api.get('/api/control/status');
     const arr = Array.isArray(data) ? data : (data.jobs || data.active_jobs || []);
     jobs.value = arr.map((j, index) => ({
-      id: j.id || j.name || `job-${index}`,
-      name: j.name || j.id || '—',
+      id: j.id || `job-${index}`,
+      name: j.task || j.action || j.id || '—',
       status: j.status || 'unknown',
-      started_at: j.started_at || '—',
+      started_at: j.start || j.started_at || '—',
     }));
   } catch {
     jobs.value = [];
@@ -203,7 +340,7 @@ async function loadJobs() {
 }
 
 async function checkUpgrade() {
-  loading.value = true;
+  upgradeLoading.value = true;
   try {
     const data = await api.get('/api/agent/upgrade');
     agents.value = (data.agents || []).map((a) => ({
@@ -215,12 +352,12 @@ async function checkUpgrade() {
   } catch {
     agents.value = [];
   } finally {
-    loading.value = false;
+    upgradeLoading.value = false;
   }
 }
 
 async function upgradeAgent(name) {
-  loading.value = true;
+  upgradeLoading.value = true;
   try {
     await api.post(`/api/agent/upgrade?agent=${encodeURIComponent(name)}`, {});
     toast.success(t('view.control.upgradeTriggered', { name }));
@@ -228,17 +365,96 @@ async function upgradeAgent(name) {
   } catch (e) {
     toast.error(e.message || t('view.control.upgradeFailed'));
   } finally {
-    loading.value = false;
+    upgradeLoading.value = false;
   }
 }
 
 async function refreshAll() {
   loading.value = true;
-  await Promise.allSettled([loadJobs(), checkUpgrade()]);
+  await loadJobs();
   loading.value = false;
+  // CLI version scanning can be slow; never block the task composer on it.
+  checkUpgrade();
 }
 
 onMounted(refreshAll);
 </script>
+
+<style scoped>
+.task-composer__label {
+  display: block;
+  margin-bottom: var(--sp-2);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+.task-composer__input {
+  width: 100%;
+  resize: vertical;
+  min-height: 96px;
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font: inherit;
+  line-height: 1.5;
+}
+.task-composer__input:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+.task-composer__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+.task-composer__hint {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.task-composer__run {
+  min-width: 120px;
+}
+.job-detail__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.job-detail__task {
+  font-weight: 600;
+  word-break: break-word;
+}
+.job-detail__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--sp-2) var(--sp-3);
+  margin: 0 0 var(--sp-4);
+  font-size: var(--fs-sm);
+}
+.job-detail__facts dt { color: var(--text-muted); }
+.job-detail__facts dd { margin: 0; word-break: break-all; }
+.job-detail__heading {
+  margin: var(--sp-3) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.job-detail__output {
+  max-height: 280px;
+  overflow: auto;
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.job-detail__output--err { border-color: var(--danger); }
+</style>
 
 

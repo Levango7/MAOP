@@ -53,6 +53,17 @@ async def control_status(request: Request) -> dict[str, Any]:
     jobs = system_service.get_control_status()
     return {"status": "ok", "active_jobs": jobs, "jobs": jobs, "count": len(jobs)}
 
+@router.get("/api/control/jobs/{job_id}")
+@handle_api_errors("control job detail")
+async def control_job(job_id: str, request: Request) -> dict[str, Any]:
+    """Return one control job, including captured stdout/stderr."""
+    require_admin(request)
+    job = system_service.get_control_job(job_id)
+    if job is None:
+        raise HTTPException(404, "job not found")
+    return {"status": "ok", "job": job}
+
+
 @router.post("/api/control/run")
 @handle_api_errors("control run")
 async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
@@ -64,7 +75,7 @@ async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
     if not system_service.is_valid_task_name(actual_task):
         raise HTTPException(
             status_code=400,
-            detail="invalid task name: only alphanumeric, spaces, dots, hyphens, underscores allowed",
+            detail="invalid task: empty text or NUL byte is not allowed",
         )
     job_id = await system_service.start_control_run(actual_task)
     return {"status": "ok", "job_id": job_id, "task": actual_task}

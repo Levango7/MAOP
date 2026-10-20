@@ -39,7 +39,8 @@ _NAME_RE = re.compile(r"MAOP_[A-Z0-9_]+")
 # `maop.enterprise` 包里（ADR-017 起企业代码移出本仓）。它们必须留在这里：
 # 企业版用户拿到的就是这个 .env.example。逐条写明理由，新增一条要有人负责。
 ENTERPRISE_SIDE_VARS = {
-    "MAOP_LICENSE_KEY": "商业 License 密钥；读取方在 maop.enterprise（MAOS）",
+    # MAOP_LICENSE_KEY is read by the core CLI for edition detection, so it
+    # is intentionally not listed here; its consumer is this repository.
     "MAOP_CRL_URL": "License 吊销列表地址；企业版 CRL 链路读取",
     "MAOP_CRL_STRICT": "CRL 严格模式；企业版读取（本仓只在 tests 里出现）",
     "MAOP_CRL_CACHE_TTL_S": "CRL 缓存 TTL；企业版读取",

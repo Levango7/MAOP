@@ -135,6 +135,7 @@ const authExpired = ref(false);
 watchEffect(() => {
   if (typeof document !== 'undefined') {
     document.body.dataset.authOpen = authExpired.value ? '1' : '0';
+    document.title = `MAOP · ${edition.isEnterprise ? 'Enterprise' : 'Personal'}`;
   }
 });
 const loginUsername = ref('');
@@ -292,7 +293,6 @@ onMounted(async () => {
     const d = await api.get('/api/health');
     if (d) {
       version.value = d.version || (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown');
-      try { localStorage.setItem('maop_version', version.value); } catch { /* ignore */ }
     }
   } catch { /* ignore */ }
   realtime.connect();

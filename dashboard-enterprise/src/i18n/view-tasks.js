@@ -35,6 +35,9 @@ export const messages = {
     'view.tasks.colActions': 'Actions',
     // ── 操作 ──
     'view.tasks.viewDetail': 'View detail',
+    'view.tasks.detailTitle': 'Task details',
+    'view.tasks.detailUpdated': 'Updated',
+    'view.tasks.detailAgent': 'Agent',
     'view.tasks.rerun': 'Rerun',
     'view.tasks.rerunning': 'Rerunning…',
     'view.tasks.rerunConfirmTitle': 'Confirm rerun',
@@ -85,6 +88,9 @@ export const messages = {
     'view.tasks.colActions': '操作',
     // ── 操作 ──
     'view.tasks.viewDetail': '查看详情',
+    'view.tasks.detailTitle': '任务详情',
+    'view.tasks.detailUpdated': '更新时间',
+    'view.tasks.detailAgent': '智能体',
     'view.tasks.rerun': '重跑',
     'view.tasks.rerunning': '重跑中…',
     'view.tasks.rerunConfirmTitle': '确认重跑',

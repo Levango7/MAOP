@@ -10,14 +10,50 @@ import logging
 logger = logging.getLogger(__name__)
 
 import argparse
-import json
 import os
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
-MAOP_ROOT = Path(__file__).resolve().parent.parent.parent
+from maop.config.home import (
+    default_home,
+    ensure_runtime_root,
+    init_home,
+    resolve_maop_root,
+)
+from maop.core.agent.delegation.depth import (
+    MAX_SELF_DELEGATION_DEPTH,
+    current_depth,
+)
+
+# Backward-compatible constant; commands that write use _runtime_root() so an
+# installed wheel can bootstrap ~/.maop instead of writing into site-packages.
+MAOP_ROOT = resolve_maop_root()
+
+
+def _runtime_root() -> Path:
+    """Return a usable root and export it for child processes/imports."""
+    root = ensure_runtime_root()
+    os.environ["MAOP_ROOT_DIR"] = str(root)
+    return root
+
+
+def _loopback_host(host: str) -> bool:
+    return host.strip().lower() in {"127.0.0.1", "::1", "localhost"}
+
+
+def _auth_explicitly_set() -> bool:
+    return any(
+        key in os.environ for key in ("MAOP_AUTH_ENABLED", "MAOP_AUTH")
+    )
+
+
+def _personal_edition_requested() -> bool:
+    return (
+        os.environ.get("MAOP_EDITION", "personal").strip().lower() != "enterprise"
+        and not os.environ.get("MAOP_LICENSE_KEY", "").strip()
+    )
 
 
 # ── 统一命令执行包装器（H1 修复：CLI 静默无输出）──────────────────
@@ -44,6 +80,28 @@ def _emit_unimplemented(name: str) -> None:
 
 def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
     """Start the FastAPI dashboard (Python-native)."""
+    root = _runtime_root()
+
+    # Personal edition on loopback is a single-user local tool: start in owner
+    # mode instead of forcing the user to find a console-generated password.
+    # Remote binds keep the secure-by-default auth policy; an explicit
+    # MAOP_AUTH_ENABLED always wins.
+    if _loopback_host(host) and _personal_edition_requested() and not _auth_explicitly_set():
+        os.environ.update({"MAOP_AUTH_ENABLED": "0", "MAOP_OWNER_MODE": "1"})
+        print("[INFO] 个人版本地模式：已启用 owner 免登录（仅回环地址）")
+    elif not _loopback_host(host) and not _auth_explicitly_set():
+        # Settings already default to auth-on outside explicit local/dev envs.
+        print("[INFO] 非回环监听：认证默认开启（可用 MAOP_AUTH_ENABLED=1 显式确认）")
+        os.environ.setdefault("MAOP_AUTH_ENABLED", "1")
+
+    print(f"[INFO] 运行目录：{root}")
+    if not (root / "dashboard" / "dist-enterprise" / "index.html").is_file():
+        print(
+            "[WARN] 未找到预构建前端；请运行 `maop init` 或 "
+            "`cd dashboard-enterprise && npm run build`",
+            file=sys.stderr,
+        )
+
     try:
         import uvicorn
 
@@ -79,12 +137,35 @@ def cmd_start(port: int = 9079, host: str = "127.0.0.1") -> Any:
     uvicorn.run(app, host=host, port=port, **uvicorn_kwargs)
 
 
+def cmd_init(home: str | None = None, force: bool = False) -> Any:
+    """Create a writable MAOP home with default config and UI assets."""
+    target = Path(home).expanduser().resolve() if home else default_home()
+    try:
+        result = init_home(target, force=force)
+    except Exception as exc:
+        _emit_fail("init", exc)
+        sys.exit(1)
+
+    copied = len(result["config_copied"])
+    print(f"[OK] init 完成 — home={result['home']}，新增配置文件 {copied} 个")
+    if not result["dashboard_available"]:
+        print(
+            "[WARN] 未找到预构建前端。请构建 dashboard-enterprise 后重试，"
+            "或使用 Docker / 源码运行。",
+            file=sys.stderr,
+        )
+    elif result["dashboard_copied"] == 0:
+        print("[INFO] 前端资产已存在，保持不变（--force 可覆盖）")
+    else:
+        print(f"[INFO] 已写入前端资产 {result['dashboard_copied']} 个文件")
+
+
 def cmd_stop() -> Any:
     """Stop MAOP using Python-native deploy.stop()."""
     start = time.monotonic()
     try:
         from maop.deploy import stop
-        result = stop(MAOP_ROOT)
+        result = stop(_runtime_root())
         elapsed = (time.monotonic() - start) * 1000
         if result.pid:
             print(f"[OK] stop 完成 ({elapsed:.1f}ms) — 已停止 PID={result.pid}")
@@ -100,7 +181,7 @@ def cmd_status() -> Any:
     start = time.monotonic()
     try:
         from maop.deploy import status
-        result = status(MAOP_ROOT)
+        result = status(_runtime_root())
         elapsed = (time.monotonic() - start) * 1000
         # 输出主进程状态
         if result.pid:
@@ -118,24 +199,21 @@ def cmd_status() -> Any:
         logger.warning("cmd_status: 查询 MAOP 状态失败（刻意降级，不阻塞退出码），异常: %s", exc, exc_info=True)
 
 
-_MAX_SELF_DELEGATION_DEPTH = 3  # 与 core/subagent_delegation 的 max_self_ref_depth 一致
-
-
 def cmd_run(task: str, depth: int = 0) -> Any:
     """Run a task through Python-native MaopLoop.
 
-    P1-8 fix: ``--depth`` is passed by agents.yaml's self-referential MAOP
-    agent (``cli_args: ... run --task "{task}" --depth {depth}``). It was
-    previously not a declared argparse argument, so any self-delegation
-    subprocess died on an unrecognized-argument error. Now it is declared
-    and acts as a hard CLI-level backstop: at/beyond the cap the run is
-    refused with a non-zero exit instead of re-entering the orchestration
-    loop (defence-in-depth on top of SubagentManager's own limit).
+    Depth arrives from ``--depth`` or from the inherited
+    ``MAOP_DELEGATION_DEPTH`` marker (set by every spawned agent).  A
+    subprocess gets a fresh counter, so the CLI-level cap is what stops
+    a self-referential agent from forking itself indefinitely.  At the
+    cap the run is refused with a non-zero exit instead of re-entering
+    the orchestration loop.
     """
-    if depth >= _MAX_SELF_DELEGATION_DEPTH:
+    depth = max(depth, current_depth())
+    if depth >= MAX_SELF_DELEGATION_DEPTH:
         print(
             f"[BLOCK] self-delegation depth {depth} reached hard cap "
-            f"({_MAX_SELF_DELEGATION_DEPTH}); refusing to re-enter orchestration loop",
+            f"({MAX_SELF_DELEGATION_DEPTH}); refusing to re-enter orchestration loop",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -144,7 +222,7 @@ def cmd_run(task: str, depth: int = 0) -> Any:
         import asyncio
 
         from maop.maop_loop import MaopLoop
-        loop = MaopLoop(root_dir=str(MAOP_ROOT))
+        loop = MaopLoop(root_dir=str(_runtime_root()))
         result = asyncio.run(loop.run(task))
         elapsed = (time.monotonic() - start) * 1000
         # 输出执行结果
@@ -171,7 +249,7 @@ def cmd_validate() -> Any:
     start = time.monotonic()
     try:
         from maop.deploy import validate_config
-        result = validate_config(MAOP_ROOT)
+        result = validate_config(_runtime_root())
         elapsed = (time.monotonic() - start) * 1000
         if result.valid:
             print(f"[OK] validate 完成 ({elapsed:.1f}ms) — 配置有效")
@@ -193,7 +271,7 @@ def cmd_health() -> Any:
     start = time.monotonic()
     try:
         from maop.deploy import health_check
-        results = health_check(MAOP_ROOT)
+        results = health_check(_runtime_root())
         elapsed = (time.monotonic() - start) * 1000
         all_healthy = True
         for r in results:
@@ -262,7 +340,7 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
     from maop.core.mcp.mcp_marketplace import MCPMarketplace
     # Use the project-root config dir so reads/writes stay local to the project
     # (not the package-shipped default, which is read-only).
-    config_path = MAOP_ROOT / "config" / "mcp_marketplace.yaml"
+    config_path = _runtime_root() / "config" / "mcp_marketplace.yaml"
     mp = MCPMarketplace(config_path=config_path)
 
     if parsed.subcommand == "list-registries":
@@ -617,75 +695,6 @@ def cmd_config(args: list[str]) -> None:
         sys.exit(1)
 
 
-def cmd_evolution(args: list[str]) -> Any:
-    """``maop evolution <subcommand>`` dispatcher.
-
-    Subcommands
-        inject-degradation            注入一条必然导致 VALIDATE 失败的劣化建议
-                                      （AC-05 自动回滚的演练入口；此前该能力
-                                      仅存在于测试代码里，生产无入口）
-        trigger [--dry-run]           手动跑一轮自演化闭环
-        status                        闭环状态机 + 最近 cycle + 统计
-    """
-    if not args:
-        print("usage: maop evolution {inject-degradation|trigger|status}")
-        return
-    sub = args[0]
-    if sub == "inject-degradation":
-        _evolution_inject_degradation()
-    elif sub == "trigger":
-        dry_run = "--dry-run" in args[1:]
-        _evolution_trigger(dry_run=dry_run)
-    elif sub == "status":
-        _evolution_status()
-    else:
-        print(f"unknown evolution subcommand: {sub}")
-        sys.exit(1)
-
-
-def _evolution_inject_degradation() -> None:
-    """把一条必然失败的劣化建议**落盘**到建议队列（演练 AC-05 自动回滚）。
-
-    T3.1: 此前这条路径只存在于测试代码（"生产无入口"）。现在落盘后紧跟
-    ``maop evolution trigger`` 即完成一次真实演练：EVALUATE 放行 HIGH 级
-    建议 → APPLY 真改 agents.yaml → VALIDATE 判定失败 → 真 ChangeTracker 回滚。
-    """
-    from maop.core.evolution.evolution_loop import EvolutionLoop
-
-    loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
-    suggestion = loop.inject_degradation_suggestion()
-    print(
-        "injected degradation suggestion (queued): "
-        f"id={suggestion.id} type={suggestion.mutation_type} "
-        f"severity={suggestion.severity} params={suggestion.mutation_params}"
-    )
-    print("next 'maop evolution trigger' will validate-fail and auto-rollback (<300s SLA)")
-
-
-def _evolution_trigger(*, dry_run: bool) -> None:
-    from maop.core.evolution.evolution_loop import EvolutionLoop
-
-    loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
-    report = loop.run_cycle(dry_run=dry_run, auto_rollback=True)
-    print(json.dumps(report.summary(), ensure_ascii=False, indent=2))
-    print(
-        f"cycle={report.cycle_id} applied={report.suggestions_applied} "
-        f"improved={report.validation_improved} rolled_back={report.rolled_back}"
-    )
-
-
-def _evolution_status() -> None:
-    from maop.core.evolution.evolution_loop import EvolutionLoop
-
-    loop = EvolutionLoop(root_dir=str(MAOP_ROOT))
-    print(json.dumps(loop.get_stats(), ensure_ascii=False, indent=2))
-    for report in loop.get_cycle_history(limit=5):
-        print(
-            f"- {report.cycle_id} applied={report.suggestions_applied} "
-            f"improved={report.validation_improved} rolled_back={report.rolled_back}"
-        )
-
-
 def main() -> Any:
     # Enable JSON structured logging when MAOP_JSON_LOG=1 (for ELK / Loki).
     if os.environ.get("MAOP_JSON_LOG", "0") == "1":
@@ -699,6 +708,20 @@ def main() -> Any:
     # separate from the flat top-level action model. Dispatched before the
     # main parser so the two structures don't interfere.
     argv = sys.argv[1:]
+    if argv and argv[0] == "init":
+        init_parser = argparse.ArgumentParser(
+            prog="maop init",
+            description="Initialize a writable MAOP home (config + dashboard assets)",
+        )
+        init_parser.add_argument(
+            "--home", default=None, help="Target directory (default: ~/.maop)"
+        )
+        init_parser.add_argument(
+            "--force", action="store_true", help="Overwrite existing config/assets"
+        )
+        parsed_init = init_parser.parse_args(argv[1:])
+        cmd_init(parsed_init.home, force=parsed_init.force)
+        return
     if argv and argv[0] == "mcp":
         cmd_mcp(argv[1:])
         return
@@ -712,6 +735,8 @@ def main() -> Any:
         cmd_worker(argv[1:])
         return
     if argv and argv[0] == "evolution":
+        from maop.cli_evolution import cmd_evolution
+
         cmd_evolution(argv[1:])
         return
     if argv and argv[0] == "eval":
@@ -722,17 +747,19 @@ def main() -> Any:
 
     parser = argparse.ArgumentParser(description="MAOP - Agent Orchestration Framework")
     parser.add_argument("action", nargs="?", default="start",
-                        choices=["start", "stop", "status", "run", "validate", "health"])
+                        choices=["init", "start", "stop", "status", "run", "validate", "health"])
     parser.add_argument("--task", "-t", default="", help="Task description (for run)")
     parser.add_argument("--depth", type=int, default=0,
-                        help="Self-delegation depth (internal: agents.yaml MAOP agent "
-                             "passes this on self-delegation; capped at "
-                             f"{_MAX_SELF_DELEGATION_DEPTH})")
+                        help="Self-delegation depth (also inherited via "
+                             "MAOP_DELEGATION_DEPTH; capped at "
+                             f"{MAX_SELF_DELEGATION_DEPTH})")
     parser.add_argument("--port", "-p", type=int, default=9079, help="Dashboard port (default: 9079)")
     parser.add_argument("--host", default="127.0.0.1", help="Dashboard host (default: 127.0.0.1)")
     args = parser.parse_args()
 
-    if args.action == "start":
+    if args.action == "init":
+        cmd_init()
+    elif args.action == "start":
         cmd_start(args.port, args.host)
     elif args.action == "stop":
         cmd_stop()

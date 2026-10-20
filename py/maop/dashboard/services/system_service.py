@@ -20,11 +20,12 @@ routers, not a router itself.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
-import re
 import sys
 import time
 import uuid as _uuid
+from pathlib import Path
 from typing import Any
 
 from maop.core.config.config_history import ConfigHistory, get_config_history  # noqa: F401
@@ -71,30 +72,115 @@ def rollback_config(history: ConfigHistory, version: int) -> dict[str, Any]:
 # Control: job status
 # ════════════════════════════════════════════════════════════════════════════
 
-def get_control_status() -> list[dict[str, Any]]:
-    """Return a status snapshot of all active control jobs.
+_HISTORY_LIMIT = 200
+_HISTORY_STALE = {"running", "paused"}
 
-    Updates ``completed``/``failed`` status for finished processes and
-    cleans up drain tasks to prevent memory leaks (P0-8).
+
+def _history_path() -> Path:
+    return Path(state.MAOP_ROOT) / "data" / "control_jobs.jsonl"
+
+
+def _job_snapshot(job_id: str, job: dict[str, Any]) -> dict[str, Any]:
+    snapshot = {
+        key: value
+        for key, value in job.items()
+        if key not in ("process", "_drain_task")
+    }
+    snapshot["id"] = job_id
+    return snapshot
+
+
+def _append_history(snapshot: dict[str, Any]) -> None:
+    """Append one job snapshot; the last record per id wins on reload."""
+    try:
+        path = _history_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(snapshot, ensure_ascii=False, default=str) + "\n")
+    except OSError:
+        logger.warning("Unable to persist control job history", exc_info=True)
+
+
+def load_control_history(limit: int = _HISTORY_LIMIT) -> list[dict[str, Any]]:
+    """Return persisted jobs, newest first, one record per id.
+
+    A record still marked running/paused was interrupted by a restart:
+    its process cannot survive the server, so it is reported as
+    ``interrupted`` instead of spinning forever in the UI.
     """
-    jobs: list[dict[str, Any]] = []
+    path = _history_path()
+    if not path.is_file():
+        return []
+    records: dict[str, dict[str, Any]] = {}
+    try:
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    logger.warning("Skipping corrupt control job history line")
+                    continue
+                job_id = record.get("id") if isinstance(record, dict) else None
+                if job_id:
+                    records[str(job_id)] = record
+    except OSError:
+        return []
+    for record in records.values():
+        if record.get("status") in _HISTORY_STALE:
+            record["status"] = "interrupted"
+    ordered = sorted(
+        records.values(),
+        key=lambda record: str(record.get("start", "")),
+        reverse=True,
+    )
+    return ordered[:limit]
+
+
+def get_control_status() -> list[dict[str, Any]]:
+    """Return active jobs merged with persisted history, newest first."""
+    active: dict[str, dict[str, Any]] = {}
     # B23: snapshot via list() to avoid RuntimeError during concurrent iteration.
     # H3 fix: active_jobs_lock guards concurrent read/write.
     with state.active_jobs_lock:
-        for job in list(state.active_jobs.values()):
+        for job_id, job in list(state.active_jobs.items()):
             proc = job.get("process")
             if proc is not None:
                 if proc.returncode is not None:
                     job["status"] = "completed" if proc.returncode == 0 else "failed"
                     job["exit_code"] = proc.returncode
-                    # P0-8: process ended — cancel _drain_task to prevent leak.
-                    drain_task = job.pop("_drain_task", None)
-                    if drain_task is not None and not drain_task.done():
-                        drain_task.cancel()
+                    # Let the drain task finish writing stdout/stderr before
+                    # dropping the reference; cancelling it here lost output.
+                    drain_task = job.get("_drain_task")
+                    if drain_task is not None and drain_task.done():
+                        job.pop("_drain_task", None)
                 else:
                     job["status"] = "running"
-            jobs.append({k: v for k, v in job.items() if k != "process"})
-    return jobs
+            active[job_id] = _job_snapshot(job_id, job)
+    merged: dict[str, dict[str, Any]] = {
+        record["id"]: record for record in load_control_history()
+    }
+    merged.update(active)
+    ordered = sorted(
+        merged.values(),
+        key=lambda record: str(record.get("start", "")),
+        reverse=True,
+    )
+    return ordered[:_HISTORY_LIMIT]
+
+
+def get_control_job(job_id: str) -> dict[str, Any] | None:
+    """Return one job snapshot (including captured stdout/stderr)."""
+    with state.active_jobs_lock:
+        job = state.active_jobs.get(job_id)
+        if job is not None:
+            return _job_snapshot(job_id, job)
+    for record in load_control_history():
+        if record.get("id") == job_id:
+            return record
+    return None
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -102,20 +188,35 @@ def get_control_status() -> list[dict[str, Any]]:
 # ════════════════════════════════════════════════════════════════════════════
 
 def is_valid_task_name(task: str) -> bool:
-    """Whitelist-validate the task name to prevent injection.
+    """Validate task *text* passed as one argv element (never a shell).
 
-    Allows alphanumeric, spaces, dots, hyphens, underscores only
-    (P2-22: explicit space char to avoid multiline injection via \\s).
+    The old whitelist rejected every Chinese task and most punctuation,
+    which made the dashboard composer unusable for normal prompts.  Since
+    ``create_subprocess_exec`` receives a list (no shell interpolation),
+    the only unsafe byte is NUL; length is bounded by the Pydantic model.
     """
-    return bool(re.match(r"^[\w\.\- ]+$", task))
+    return bool(task and "\x00" not in task and len(task) <= 10_000)
+
+
+_MAX_CAPTURE_CHARS = 20_000
+
+
+def _decode_capture(payload: bytes | None) -> str:
+    if not payload:
+        return ""
+    text = payload.decode("utf-8", errors="replace")
+    if len(text) > _MAX_CAPTURE_CHARS:
+        return "…(已截断)\n" + text[-_MAX_CAPTURE_CHARS:]
+    return text
 
 
 async def start_control_run(task: str) -> str:
     """Start a new control job from a task. Returns the ``job_id``.
 
-    Spawns ``python -m maop.cli run --task <task>`` as a subprocess and
-    registers it in ``active_jobs``. A drain task is created to consume
-    stdout/stderr to prevent pipe-buffer deadlock (H4 fix).
+    Spawns ``python -m maop.cli run --task <task>`` as a subprocess.
+    Output is captured into the job record so the dashboard can show a
+    real run result instead of only "failed"; the drain task also prevents
+    pipe-buffer deadlock (H4 fix).
     """
     job_id = _uuid.uuid4().hex[:8]
     proc = await asyncio.create_subprocess_exec(
@@ -124,15 +225,27 @@ async def start_control_run(task: str) -> str:
         cwd=str(state.MAOP_ROOT),
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
-    # H4 fix: keep drain-task reference alive to avoid "Task was destroyed"
-    # warnings and prevent pipe-buffer deadlock on large child output.
-    _drain_task = asyncio.create_task(proc.communicate())
+    job: dict[str, Any] = {
+        "action": "run", "status": "running",
+        "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": task,
+        "process": proc, "stdout": "", "stderr": "",
+    }
     with state.active_jobs_lock:
-        state.active_jobs[job_id] = {
-            "action": "run", "status": "running",
-            "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": task,
-            "process": proc, "_drain_task": _drain_task,
-        }
+        state.active_jobs[job_id] = job
+    _append_history(_job_snapshot(job_id, job))
+
+    async def _drain() -> None:
+        out, err = await proc.communicate()
+        with state.active_jobs_lock:
+            job["stdout"] = _decode_capture(out)
+            job["stderr"] = _decode_capture(err)
+            job["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+            if proc.returncode is not None:
+                job["status"] = "completed" if proc.returncode == 0 else "failed"
+                job["exit_code"] = proc.returncode
+            _append_history(_job_snapshot(job_id, job))
+
+    job["_drain_task"] = asyncio.create_task(_drain())
     return job_id
 
 

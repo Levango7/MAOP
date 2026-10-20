@@ -183,23 +183,26 @@ pip install ./maop_enterprise-<版本>-py3-none-any.whl
 
 ## Quick Start
 
+### 方式 A：从 wheel 安装（个人版推荐）
+
 ```bash
-# Install (Python package)
-cd py && pip install -e .
-
-# Build frontend (Vue dashboard, 首次或前端变更后需要)
-cd ../dashboard-enterprise && npm install && npm run build && cd ..
-
-# Start Dashboard (FastAPI, port 9079)
-maop start --port 9079
-
-# Run a task through the orchestration loop
+pip install maop-orchestrator
+maop init                 # 写入 ~/.maop：默认 config + 预构建 Dashboard
+maop start                # 打开 http://127.0.0.1:9079
 maop run --task "refactor auth module"
+```
 
-# Health check
+首次 `maop start` 在个人版 + 回环地址下自动进入 **owner 模式**（仅本机免登录）；
+数据、日志与配置都在 `~/.maop`，不会写入 site-packages。远程监听仍要求认证。
+
+### 方式 B：从源码运行（开发）
+
+```bash
+cd py && pip install -e .
+cd ../dashboard-enterprise && npm install && npm run build && cd ..
+maop start --port 9079
+maop run --task "refactor auth module"
 maop health
-
-# Run tests
 pytest py/tests
 ```
 
@@ -379,7 +382,8 @@ agents:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MAOP_ROOT` | auto-detect | Project root directory |
+| `MAOP_HOME` | `~/.maop` | 可写安装目录（`maop init` 写入 config/data/dashboard） |
+| `MAOP_ROOT_DIR` | auto-detect | 运行根目录；未设置时依次探测源码仓库与 `MAOP_HOME` |
 | `MAOP_ENV` | development | Environment (development/production) |
 | `MAOP_JWT_SECRET` | — | JWT secret (required in production) |
 | `MAOP_OTEL_ENABLED` | 0 | Enable OpenTelemetry tracing |
@@ -424,7 +428,7 @@ Web dashboard at `http://localhost:9079` with:
 | `core/reliability/circuit_breaker.py` | Circuit breaker pattern |
 | `core/memory/vector.py` | Vector store for semantic search |
 | `core/reliability/streaming.py` | Streaming infrastructure (WebSocket + HTTP SSE at /api/chat/stream；ADR-006 的"SSE 删除"决定已于 2026-07-21 被 Python 重写取代，SSE 回归) |
-| `core/security/` | 安全子包：认证、授权、加密、密钥管理等安全相关能力（2026-07 新增；core/ 现有 19 个子包） |
+| `core/security/` | 安全子包：认证、授权、加密、密钥管理等安全相关能力（2026-07 新增；core/ 现有 17 个子包，见架构表） |
 | `config/edition.py` | Dual-edition 注册表与 FeatureFlag gate（[ADR-016](docs/adr/016-dual-edition-architecture.md)） |
 | `enterprise/` | 企业版扩展模块（rbac/tenant/audit/sso/ha/license/n8n 等，仅 `maop-enterprise` 包含） |
 
@@ -467,7 +471,7 @@ Key architectural decisions in [docs/adr/](docs/adr/README.md):
 
 ## 版本说明
 
-MAOP 个人版（v5.3.0）为单机/小团队设计，包含完整的 Agent 编排、记忆系统、工具集成能力。
+MAOP 个人版（v5.4.0）为单机/小团队设计，包含完整的 Agent 编排、记忆系统、工具集成能力。
 
 **企业版功能**（RBAC、多租户、SSO、配额管理、审计日志、分布式执行等）由独立的商业包 **MAOS**（`maop-enterprise`）提供，需商业授权。个人版不包含这些功能。
 

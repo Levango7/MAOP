@@ -28,6 +28,7 @@
 | [Nexus 交付流水线 LLD](./Nexus交付流水线_LLD.md) | 需求→编码→审查→构建→测试→部署→压测→回归 8 阶段交付流水线低层设计 |
 | [数据库 Schema](./database-schema.md) | 数据库表结构参考（130 张表，2026-09-29 重算；当前记录 53 张） |
 | [设计规范](./DESIGN_RULES.md) | Dashboard 权威设计规范 — 色彩体系、组件契约、交互模式 |
+| [v6 产品蓝图](./product-v6-blueprint.md) | Run-first 定位、首公里契约、目标 IA、架构收敛与 M0–M3 里程碑（2026-10-20） |
 | [产品整合方案](./product-consolidation.md) | 产品定位（外部 CLI agent 的编排与治理层）+ 资产盘点 + 留/删/补/改处置台账与执行顺序 |
 | [产品设计 RFC-001](./product-design-rfc-001.md) | MAOP 控制台从"功能仓库"到"工作台"的产品设计演进方案（A/B/C 三迭代已实施，见文末实施结果） |
 | [接口盘点报告](./_盘点_MAOP_OpsMesh_Interaction.md) | MAOP × OpsMesh × Interaction 三项目接口盘点，含 API 端点/鉴权/事件总线 |

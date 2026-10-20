@@ -28,7 +28,7 @@ MAOP（Multi Agents Orchestration Platform）是一个企业级多智能体编�
 
 ### 1.3 版本说明
 
-MAOP 个人版（v5.2.0）为单机/小团队设计，包含完整的 Agent 编排、记忆系统、工具集成能力。
+MAOP 个人版（v5.4.0）为单机/小团队设计，包含完整的 Agent 编排、记忆系统、工具集成能力。
 
 **企业版功能**（RBAC、多租户、SSO、配额管理、审计日志、分布式执行等）由独立的商业包 **MAOS**（`maop-enterprise`）提供，需商业授权。个人版不包含这些功能。
 
@@ -40,6 +40,8 @@ MAOP 个人版（v5.2.0）为单机/小团队设计，包含完整的 Agent 编�
 
 ```bash
 pip install maop-orchestrator
+maop init      # 创建 ~/.maop（默认配置 + 预构建 Dashboard）
+maop start     # 个人版本机默认 owner 模式，无需登录
 ```
 
 ### 2.2 源码安装
@@ -47,20 +49,27 @@ pip install maop-orchestrator
 命令示例：从源码安装 MAOP
 
 ```bash
-git clone https://github.com/your-org/MAOP.git
+git clone https://github.com/Levango7/MAOP.git
 cd MAOP
-pip install -e ".[all]"
+pip install -e "py[dev]"
+cd dashboard-enterprise && npm install && npm run build
 ```
 
 ### 2.3 可选依赖
 
+以 `py/pyproject.toml` 为准，当前只有以下 extras：
+
 | extras | 用途 |
 |--------|------|
-| `[postgresql]` | PostgreSQL 后端 |
-| `[ldap]` | LDAP/AD 集成（ldap3） |
-| `[vector]` | 向量存储（pgvector） |
-| `[dashboard]` | Web Dashboard |
-| `[all]` | 全部可选依赖 |
+| `[dev]` | pytest / ruff / mypy 等开发工具 |
+| `[ml]` | sentence-transformers / hnswlib |
+| `[multimodal]` | CLIP 图像嵌入（torch + transformers） |
+| `[otel]` | OpenTelemetry |
+| `[postgresql]` | PostgreSQL + pgvector |
+| `[enterprise]` | 企业模块所需第三方依赖（企业代码本身在私有仓 MAOS） |
+| `[saml]` / `[etcd]` | 可选 SSO / etcd 后端 |
+
+> `[all]`、`[ldap]`、`[vector]`、`[dashboard]` 在本版本**不存在**，此前文档写错，已更正。
 
 ## 第3章 配置
 

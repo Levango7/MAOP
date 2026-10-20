@@ -23,17 +23,19 @@ import time
 from pathlib import Path
 from typing import Any
 
+from maop.core.agent.delegation.depth import next_depth_env
 from maop.core.reliability.error_schema import MaopResult, new_result
 from maop.delegate.models import AgentConfig, _escape_for_cmd, _escape_for_ps_command
 
 logger = logging.getLogger(__name__)
 
 
-def _agent_env(config: AgentConfig) -> dict[str, str] | None:
+def _agent_env(config: AgentConfig) -> dict[str, str]:
     """Agent 级环境变量：``config.env`` 叠加在进程环境之上（agent 侧优先）。
 
-    返回 ``None`` 表示"不传 env"——此时 subprocess 走默认继承，与历史行为逐字节
-    一致；只有 agents.yaml 明写了 ``env:`` 才会进合并分支。
+    返回的环境**总是**包含 ``MAOP_DELEGATION_DEPTH``（父深度 + 1）：
+    CLI agent 可能再次进入 ``maop run``，而新进程的进程内计数从零开始；
+    没有这个继承标记时，自引用 agent 会无限 fork。
 
     接线背景（2026-10-04）：``AgentConfig.env`` 此前**只被适配器路径读取**
     （`core/agent/adapters/cli_adapter.py`、`core/agent/lifecycle/runtime.py`、
@@ -45,9 +47,8 @@ def _agent_env(config: AgentConfig) -> dict[str, str] | None:
     PATH/HOME 等基础变量，砍掉会直接打挂现网 agent。收窄继承面是独立的安全议题，
     需要单独评估与回归，不在本改动范围内。
     """
-    if not config.env:
-        return None
-    return {**os.environ, **config.env}
+    merged = {**os.environ, **config.env} if config.env else None
+    return next_depth_env(merged)
 
 
 async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
@@ -68,9 +69,16 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
     cli_parts = shlex.split(cli, posix=(sys.platform != "win32"))
     base_cmd = cli_parts[0]
     pre_args = cli_parts[1:]
-    resolved = shutil.which(base_cmd)
-    if resolved:
-        base_cmd = resolved
+    if base_cmd.lower() in {"python", "python3"} and sys.executable:
+        # A venv-launched server still has the system Python first on PATH.
+        # Re-entrant agents must use the interpreter that installed MAOP,
+        # otherwise the child re-imports a different checkout and loses the
+        # delegation-depth guard (observed as an unbounded process chain).
+        base_cmd = sys.executable
+    else:
+        resolved = shutil.which(base_cmd)
+        if resolved:
+            base_cmd = resolved
     args_template = config.cli_args or "-p '{task}'"
     task_placeholder = None
     for ph in ("'{task}'", "{task}", "{{safePrompt}}"):

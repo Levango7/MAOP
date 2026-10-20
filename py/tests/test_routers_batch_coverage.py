@@ -14,6 +14,7 @@ Assertions are meaningful: every endpoint must be reachable under admin auth
 """
 from __future__ import annotations
 
+import asyncio
 import re as _re
 from typing import Any
 
@@ -46,6 +47,39 @@ def _no_real_config_write(monkeypatch):
     from maop.model.registry import ModelRegistry
 
     monkeypatch.setattr(ModelRegistry, "save", lambda self: None, raising=True)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_cli_spawn(monkeypatch):
+    """防止本模块真起外部 CLI 子进程，也不把作业历史写进工作树。
+
+    本模块批量打写端点，其中 ``POST /api/control/run`` 会走到
+    ``system_service.start_control_run()``：`asyncio.create_subprocess_exec`
+    真起 ``python -m maop.cli run --task test``（一次派发几十秒，测试会话
+    结束后还会留下孤儿进程），并把作业快照追加到
+    ``MAOP_ROOT/data/control_jobs.jsonl`` —— 在 CI 与本机都落在**仓库工作树**
+    里（本机实测反复出现未跟踪的 data/control_jobs.jsonl）。本模块只断言
+    HTTP 语义，不需要真跑任务，故 stub 掉派发、并把历史落盘置为 no-op。
+    """
+    from maop.dashboard.services import system_service
+
+    class _FakeProc:
+        returncode = 0
+
+        def terminate(self) -> None:
+            return None
+
+        def kill(self) -> None:
+            return None
+
+        async def communicate(self):
+            return b"", b""
+
+    async def _fake_exec(*args, **kwargs):
+        return _FakeProc()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", _fake_exec, raising=True)
+    monkeypatch.setattr(system_service, "_append_history", lambda snapshot: None, raising=True)
 
 
 class _JwtStub:

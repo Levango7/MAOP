@@ -25,6 +25,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from maop.core.agent.delegation.agent_proxy import AgentAdapter
+from maop.core.agent.delegation.depth import next_depth_env
 from maop.core.mcp.mcp_hub_transport import _StdioTransport
 
 logger = logging.getLogger(__name__)
@@ -182,17 +183,17 @@ class CLIAdapter(AgentAdapter):
                 )
         return str(cwd_path)
 
-    def _build_env(self) -> dict[str, str] | None:
+    def _build_env(self) -> dict[str, str]:
         """构建子进程环境变量，屏蔽 ``blocked_env``。
 
-        Returns ``None`` 表示继承当前环境（``subprocess.run`` 默认行为）。
+        Always returns an env dict so the delegation-depth marker reaches
+        CLI agents that re-enter ``maop run``; ``blocked_env`` may remove
+        other keys but cannot remove the depth guard.
         """
-        if not self.config.env and not self.config.blocked_env:
-            return None
         env = {**os.environ, **self.config.env}
         for key in self.config.blocked_env:
             env.pop(key, None)
-        return env
+        return next_depth_env(env)
 
     def _build_command(self, task: str) -> list[str]:
         """构建完整命令行 argv 列表。"""

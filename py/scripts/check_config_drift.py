@@ -36,7 +36,22 @@ import sys
 # 228→229（2026-10-13）：migrations/pg/versions/003_multimodal_entries.py 的
 # downgrade 守卫读 MAOP_MIGRATION_DESTRUCTIVE（M2.2 B2 新增迁移）。与 001/002/003
 # 既有迁移的同款守卫同形态（破坏性迁移的显式确认开关），属有意配置非 drift。
-BASELINE = 229
+# 229→240（2026-10-20，M0 首跑闭环）：+11，逐条如下——
+#   cli.py +6：`maop start` 的引导层。要在 import server（settings 实例化）之前
+#     决定 owner/auth 策略并把根目录传给子进程，只能直接读写进程环境；
+#     `_personal_edition_requested` 读 MAOP_EDITION / MAOP_LICENSE_KEY 是
+#     edition 检测的同款口径（config/edition.py 亦直读）。
+#   config/home.py +2：home/根解析器本身，必须先于 settings 存在（循环依赖），
+#     读 MAOP_HOME 与 MAOP_ROOT_DIR / 旧 MAOP_ROOT。
+#   core/agent/delegation/depth.py +2：跨进程委托深度守卫（fork 炸弹修复）。
+#     与 `_agent_env` 同一先例——向子进程传环境是 OS 级操作，不是配置读取；
+#     深度标记必须在 spawn 点递增，走 settings 反而丢掉父进程值。
+#   core/security/middleware.py +1：auth-disabled 分支读 MAOP_OWNER_MODE，
+#     每个请求都要现值（owner 只允许回环），不能进 settings 缓存。
+# 已刻意压掉的：`cmd_start` 复用 `_runtime_root()` 而非自己再写一次 env、
+# 不再 setdefault MAOP_HOME（与 default_home() 同值）、owner+auth 两个写入
+# 合成一行 `os.environ.update(...)`、cli_evolution 不再重复导出根目录。
+BASELINE = 240
 
 
 def count_getenv_calls(root: pathlib.Path) -> int:

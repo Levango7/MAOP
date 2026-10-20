@@ -178,18 +178,10 @@ def sqlite_connect(
 
 
 def find_project_root() -> Path:
-    """Find the MAOP project root directory.
+    """Find the runtime root (source checkout or writable ``~/.maop``)."""
+    from maop.config.home import resolve_maop_root
 
-    Walks up from this file's location until finding a directory
-    containing 'config/agents.yaml' or 'py/maop/__init__.py'.
-    """
-    current = Path(__file__).resolve()
-    for parent in current.parents:
-        if (parent / "config" / "agents.yaml").exists():
-            return parent
-        if (parent / "py" / "maop" / "__init__.py").exists():
-            return parent
-    return current.parents[3]
+    return resolve_maop_root()
 
 
 class ConnectionPool:
