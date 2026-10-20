@@ -39,6 +39,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 熔断器写库与看板读库不是同一个文件（2026-10-20）
+
+实测路径（同一进程内比较 `Path(circuit_breaker.__file__).parents[3]/data/maop.db`
+与 `db_utils.unified_db_path()`）：
+
+- `CircuitBreaker()` 默认：`<repo>/py/data/maop.db`
+- 看板 `DataProxy` 读取：`<repo>/data/maop.db`（`MAOP_DATA_DIR` / 项目根解析）
+- `same file? False`
+
+因此 `chat_engine` / `execution_service` / `maop_execute` / `agent_executor`
+这些不传 `breaker=` 的 `Dispatcher` 把熔断状态写进了另一张库，而 `/api/live`、
+`/api/agents/stats` 从统一库读 `circuit_breaker_state` ⇒ 界面上熔断列永远是
+`unknown`/`closed`。默认路径改为 `unified_db_path()`；回归测试用 `MAOP_DATA_DIR`
+指向 tmp，断言落盘文件就是 `<tmp>/maop.db` 且表已建（避免测试污染真实库）。
+
 ### 设计契约与 UI 纠偏：Run 页去彩虹化 + 两套主题对比度实测（2026-10-20）
 
 用户反馈"UI 有很多问题"。这次不再凭观感改样式：先用真实浏览器（`vite preview` +

@@ -27,7 +27,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maop.core.backends.db_utils import sqlite_connect
+from maop.core.backends.db_utils import sqlite_connect, unified_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +191,12 @@ class CircuitBreaker:
 
     def __init__(self, path: Path | str | None = None) -> None:
         if path is None:
-            path = Path(__file__).resolve().parents[3] / "data" / "maop.db"
+            # Must be the same DB the dashboard reads. The previous default
+            # (parents[3]/data/maop.db) resolved to py/data/maop.db, so breaker
+            # state was written to a different file and every dashboard
+            # circuit-breaker column stayed "unknown" (verified 2026-10-20:
+            # breaker default != db_utils.unified_db_path()).
+            path = unified_db_path()
         self._path = Path(path)
         self._data: dict[str, BreakerEntry] = {}
         self._failover_chains: dict[str, FailoverChain] = {}
