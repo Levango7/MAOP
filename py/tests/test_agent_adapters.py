@@ -374,8 +374,10 @@ class TestCLIAdapterSandbox:
         assert "SECRET_VAR" not in env
         assert env.get("MY_VAR") == "visible"
 
-    def test_no_env_override_when_empty(self, monkeypatch):
-        """env 和 blocked_env 都为空时 env=None（继承当前环境）。"""
+    def test_env_inherited_with_depth_marker(self, monkeypatch):
+        """空 env/blocked_env 时仍继承当前环境，并带上委托深度标记。"""
+        monkeypatch.setenv("MAOP_TEST_INHERIT", "yes")
+        monkeypatch.setenv("MAOP_DELEGATION_DEPTH", "1")
         adapter = CLIAdapter(CLIAdapterConfig(command=PYTHON_CMD))
         adapter.connect()
 
@@ -389,7 +391,10 @@ class TestCLIAdapterSandbox:
             "maop.core.agent.adapters.cli_adapter.subprocess.run", _capture_run
         )
         adapter.execute("task")
-        assert captured["env"] is None
+        env = captured["env"]
+        assert env is not None
+        assert env["MAOP_TEST_INHERIT"] == "yes"
+        assert env["MAOP_DELEGATION_DEPTH"] == "2"
 
 
 # ======================================================================

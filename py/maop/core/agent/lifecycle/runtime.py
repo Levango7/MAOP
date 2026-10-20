@@ -25,6 +25,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from maop.core.agent.delegation.depth import next_depth_env
+
 logger = logging.getLogger(__name__)
 
 # Windows cmd.exe built-in commands that cannot be executed with shell=False.
@@ -140,7 +142,7 @@ class LocalRuntime(BaseRuntime):
         cmd_list = _resolve_cmd(command, args)
         full_cmd = " ".join(cmd_list) if cmd_list else command
 
-        env = {**os.environ, **self.config.env}
+        env = next_depth_env({**os.environ, **self.config.env})
         workdir = self.config.workdir or None
         started_at = datetime.now(timezone.utc).isoformat()
         t0 = time.monotonic()
@@ -227,7 +229,7 @@ class IsolatedRuntime(BaseRuntime):
         cmd_list = _resolve_cmd(command, args)
         full_cmd = " ".join(cmd_list) if cmd_list else command
 
-        env = {**os.environ, **self.config.env}
+        env = next_depth_env({**os.environ, **self.config.env})
         env["MAOP_SANDBOX_DIR"] = str(sandbox)
         env["MAOP_RUNTIME"] = "isolated"
 

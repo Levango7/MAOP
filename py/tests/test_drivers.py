@@ -44,6 +44,34 @@ class TestRunCli:
         assert "not found" in result.error.lower() or "error" in result.error.lower()
 
     @pytest.mark.asyncio
+    async def test_python_cli_uses_current_interpreter(self, monkeypatch):
+        """A venv-launched server must not let ``cli: python`` fall back to
+        the system interpreter — that child would import a different MAOP
+        checkout and lose the delegation-depth guard."""
+        captured: dict = {}
+
+        class _Proc:
+            returncode = 0
+
+            async def communicate(self):
+                return b"ok", b""
+
+        async def _fake_exec(*args, **kwargs):
+            captured["args"] = args
+            captured["env"] = kwargs.get("env")
+            return _Proc()
+
+        monkeypatch.setattr(
+            "maop.delegate.drivers.asyncio.create_subprocess_exec", _fake_exec
+        )
+        monkeypatch.delenv("MAOP_DELEGATION_DEPTH", raising=False)
+        config = _config(cli="python", cli_args="-c \"print('ok')\"")
+        result = await _run_cli(config, "test", 10, ".", "t1")
+        assert result.exit_code == 0
+        assert captured["args"][0] == sys.executable
+        assert captured["env"]["MAOP_DELEGATION_DEPTH"] == "1"
+
+    @pytest.mark.asyncio
     async def test_cli_result_fields(self):
         config = _config(cli="python", cli_args="-c \"print('ok')\"")
         result = await _run_cli(config, "test", 10, ".", "t1")
@@ -225,14 +253,19 @@ class TestAgentEnvWiring:
         assert result.exit_code == 0, f"stderr={result.stderr!r}"
         assert result.stdout == "MISSING"
 
-    def test_agent_env_is_none_when_nothing_configured(self):
-        """空 env → ``None``（= 不传 env，走默认继承）。
+    def test_agent_env_always_carries_depth_marker(self, monkeypatch):
+        """空 env 也要带委托深度标记。
 
-        这是向后兼容契约：只有 agents.yaml 明写了 env 才改变行为。若改成无脑
-        ``{**os.environ}``，"配了才生效"的语义与默认继承路径就一起没了。
+        历史契约是"空 env → None（默认继承）"，但那样跨进程的自引用 agent
+        会在新进程里从 0 重新计数。现在恒返回继承环境 + 深度 + 1；
+        agents.yaml 的 ``env:`` 仍只影响它自己的键。
         """
-        assert _agent_env(_config()) is None
-        assert _agent_env(_config(env={})) is None
+        monkeypatch.setenv("MAOP_DELEGATION_DEPTH", "2")
+        env = _agent_env(_config())
+        assert env["MAOP_DELEGATION_DEPTH"] == "3"
+        assert "PATH" in env or "Path" in env
+        env_empty = _agent_env(_config(env={}))
+        assert env_empty["MAOP_DELEGATION_DEPTH"] == "3"
 
     def test_agent_env_merges_and_agent_side_wins(self, monkeypatch):
         """合并语义：以服务器环境为底，agent 侧同名键覆盖。"""
