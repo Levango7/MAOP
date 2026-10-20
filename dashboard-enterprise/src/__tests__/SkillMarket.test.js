@@ -1,10 +1,10 @@
 // Tests for SkillMarket.vue — marketplace list / search / install actions,
-// and the Coming Soon banner indicating planned feature.
+// and the source-unavailable banner (no registry / unreachable).
 //
 // SkillMarket.onMounted calls load() → GET /api/mcp/marketplace/tools.
 // Install posts to /api/mcp/marketplace/tools/{id}/install.
 // We mock global.fetch, stub PageHeader, then assert on the rendered
-// marketplace rows and the Coming Soon informational banner.
+// marketplace rows and the degraded-source banner.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
@@ -76,23 +76,35 @@ describe('SkillMarket.vue', () => {
     wrapper.unmount();
   });
 
-  // ── 2. Coming Soon banner（user#1 fix：仅空数据时降级显示）──
-  it('hides the Coming Soon banner when tools are loaded, shows it only for empty data', async () => {
+  // ── 2. source-unavailable banner（user#1 fix：仅空数据时降级显示）──
+  it('hides the source-unavailable banner when tools are loaded, shows it only for empty data', async () => {
     mockFetch(defaultMarketRoutes());
     const wrapper = await mountMarket();
     // loaded marketplace (3 tools) → banner hidden
     expect(wrapper.findAll('.install-row').length).toBeGreaterThan(0);
-    expect(wrapper.find('.coming-soon-banner').exists()).toBe(false);
+    expect(wrapper.find('.source-unavailable-banner').exists()).toBe(false);
     wrapper.unmount();
 
     // empty marketplace → banner shown as the degraded hint
     mockFetch({ '/api/mcp/marketplace/tools': { tools: [] } });
     const wrapper2 = await mountMarket();
-    const banner = wrapper2.find('.coming-soon-banner');
+    const banner = wrapper2.find('.source-unavailable-banner');
     expect(banner.exists()).toBe(true);
-    expect(banner.text()).toContain('Coming Soon');
-    expect(banner.text()).toContain('Planned');
+    expect(banner.text()).toContain('Marketplace source unavailable');
+    expect(banner.text()).toContain('Unavailable');
+    // 旧文案"预计 v5.2.0 上线"会让人以为功能未开发，实际端点已可用。
+    expect(banner.text()).not.toContain('v5.2.0');
     wrapper2.unmount();
+  });
+
+  // ── 2b. 搜索无命中 ≠ 数据源不可用 ──
+  it('does not show the source-unavailable banner when a search has no hits', async () => {
+    mockFetch(defaultMarketRoutes());
+    const wrapper = await mountMarket();
+    await wrapper.find('.search-box__input').setValue('no-such-tool-xyz');
+    expect(wrapper.findAll('.install-row')).toHaveLength(0);
+    expect(wrapper.find('.source-unavailable-banner').exists()).toBe(false);
+    wrapper.unmount();
   });
 
   // ── 3. 市场工具列表展示 ──
@@ -115,8 +127,8 @@ describe('SkillMarket.vue', () => {
     const wrapper = await mountMarket();
     expect(wrapper.findComponent(EmptyState).exists()).toBe(true);
     expect(wrapper.findAll('.install-row')).toHaveLength(0);
-    // Coming Soon banner 仍然显示
-    expect(wrapper.find('.coming-soon-banner').exists()).toBe(true);
+    // source-unavailable banner 仍然显示
+    expect(wrapper.find('.source-unavailable-banner').exists()).toBe(true);
     wrapper.unmount();
   });
 
@@ -183,9 +195,9 @@ describe('SkillMarket.vue', () => {
     const wrapper = await mountMarket();
     expect(wrapper.findComponent(EmptyState).exists()).toBe(true);
     expect(wrapper.text()).toContain('500');
-    // user#1 fix：错误态显示 EmptyState；Coming Soon banner 只在
+    // user#1 fix：错误态显示 EmptyState；source-unavailable banner 只在
     // "无数据且无错误"的降级场景显示，错误时不重复叠提示。
-    expect(wrapper.find('.coming-soon-banner').exists()).toBe(false);
+    expect(wrapper.find('.source-unavailable-banner').exists()).toBe(false);
     wrapper.unmount();
   });
 });

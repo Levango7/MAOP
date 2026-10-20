@@ -68,10 +68,10 @@ export const messages = {
     'view.skills.market.installFailed': 'Install failed',
     'view.skills.market.alreadyInstalled': 'Already installed',
 
-    // ── Coming Soon banner ───────────────────────────────────────
-    'view.skills.market.comingSoon': '🔜 Coming Soon',
-    'view.skills.market.comingSoonHint': 'Skill Marketplace — data source integration in progress, expected v5.2.0. Currently showing installed MCP tools only.',
-    'view.skills.market.planned': 'Planned',
+    // ── Source-unavailable banner ───────────────────────────────
+    'view.skills.market.sourceUnavailable': 'Marketplace source unavailable',
+    'view.skills.market.sourceUnavailableHint': 'No registry is configured, or the registry is unreachable. Tools appear here once a source responds; installed MCP tools are managed under Capability → MCP.',
+    'view.skills.market.sourceUnavailableBadge': 'Unavailable',
   },
 
   zh: {
@@ -143,9 +143,9 @@ export const messages = {
     'view.skills.market.installFailed': '安装失败',
     'view.skills.market.alreadyInstalled': '已安装',
 
-    // ── Coming Soon banner ───────────────────────────────────────
-    'view.skills.market.comingSoon': '🔜 即将上线',
-    'view.skills.market.comingSoonHint': 'Skill Marketplace — 数据源接入中，预计 v5.2.0 上线。当前仅展示已安装的 MCP 工具。',
-    'view.skills.market.planned': '规划中',
+    // ── Source-unavailable banner ───────────────────────────────
+    'view.skills.market.sourceUnavailable': '仓库源不可用',
+    'view.skills.market.sourceUnavailableHint': '未配置 Marketplace registry，或当前网络不可达。源恢复后工具会出现在这里；已安装的 MCP 工具请到「能力 → MCP」管理。',
+    'view.skills.market.sourceUnavailableBadge': '不可用',
   },
 };

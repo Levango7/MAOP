@@ -39,6 +39,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### UI 可达性纠偏：40 条路由真实渲染审计，修三处"页面上写着的错"
+
+用 dev server + 真后端（隔离空库、owner 身份）逐条导航 40 条路由，
+收集 pageerror / console.error / 非 2xx 的 `/api` 响应 / 空页：
+
+- **技能市场**：数据源为空时横幅写"🔜 即将上线，预计 v5.2.0 上线"——
+  当前已是 5.4.0，且端点与一键安装早已可用。文案改为"仓库源不可用 /
+  未配置 registry 或网络不可达"；同时修掉触发条件：原先搜索无命中也会
+  弹出"数据源不可用"，现在只在 `tools` 整体为空时显示（新增用例钉住）。
+- **Agent 计费**：无 agent 时兜底调用不存在的 `GET /api/billing/summary`
+  （后端只有 `/{agent_name}`），每次进页面必留一条 404。删掉该兜底。
+- **集成（n8n）**：个人版仍请求企业版才注册的 `/api/n8n/workflows`，
+  页面显示"加载失败 / 404"。按 `AlertRules.vue` 同款做法接入 edition
+  门禁：个人版不发请求，直接说明需要企业版；企业版行为不变。
+- **辩论**：`DebateDispatcher` 在 `maop/` 里没有任何实例化点，页面默认
+  必 404。不再把 404 渲染成"加载失败"：改为顶部说明"调度器未配置"并
+  禁用发起/保存（避免必然失败的请求）。为区分 404 与其他失败，API
+  store 的错误对象现在带 `status`/`body`。
+- 实时复核：三条修复后的路由不再产生 `/api` 失败；辩论页显示说明与
+  两个禁用按钮。`npx vitest` 相关 4 文件 **52 passed**、eslint 通过、
+  `npm run build` 44.22s 通过、对比度门禁 164 对全过。
+
 ### 后端可达性纠偏：全量 GET 探针抓到的四个"看起来能跑"的缺陷
 
 对隔离空库起的看板（owner 模式、274 条 GET）逐条打真实请求，配合直接

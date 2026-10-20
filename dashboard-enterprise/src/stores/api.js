@@ -80,6 +80,18 @@ function apiErrorMessage(errBody, url, status) {
 }
 
 /**
+ * Build an Error carrying the HTTP status (and parsed body) so callers can
+ * distinguish "feature not configured" (404) from a real request failure
+ * without parsing the localized message.
+ */
+function httpError(errBody, url, status) {
+  const err = new Error(apiErrorMessage(errBody, url, status));
+  err.status = status;
+  err.body = errBody;
+  return err;
+}
+
+/**
  * 构造带认证的请求配置。
  * M6 fix: 不再手动设置 Authorization header，依赖 httpOnly cookie 自动携带。
  * @param {RequestInit} [extra] 额外 fetch 配置（method/body 等）
@@ -186,14 +198,14 @@ export const useApiStore = defineStore('api', () => {
       // （内部会尝试 refresh，失败则清除登录态并触发 maop:unauthorized 事件）。
       // 重试仍 401 说明 token 确实无效，直接抛错即可，避免事件重复触发。
       if (res.status === 401) {
-        throw new Error(apiErrorMessage({}, url, 401));
+        throw httpError({}, url, 401);
       }
     }
     if (!res.ok) {
       // P1-4 fix: 与 post/put/del 保持一致，先尝试解析 errBody.error，
       // 给出更具体的错误信息而非仅 HTTP 状态码。
       const errBody = await res.json().catch(() => ({}));
-      throw new Error(apiErrorMessage(errBody, url, res.status));
+      throw httpError(errBody, url, res.status);
     }
     return res.json();
   }
@@ -221,12 +233,12 @@ export const useApiStore = defineStore('api', () => {
       ));
       // H3 fix: 消除重复调用 handleUnauthorized()，避免 maop:unauthorized 事件重复触发。
       if (res.status === 401) {
-        throw new Error(apiErrorMessage({}, url, 401));
+        throw httpError({}, url, 401);
       }
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      throw new Error(apiErrorMessage(errBody, url, res.status));
+      throw httpError(errBody, url, res.status);
     }
     return res.json();
   }
@@ -258,11 +270,11 @@ export const useApiStore = defineStore('api', () => {
       ));
       // H3 fix: 消除重复调用 handleUnauthorized()，避免 maop:unauthorized 事件重复触发。
       // 401 走 apiErrorMessage() 本地化（原先硬编码英文 "401 Unauthorized"）。
-      if (res.status === 401) { throw new Error(apiErrorMessage({}, url, 401)); }
+      if (res.status === 401) { throw httpError({}, url, 401); }
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      throw new Error(apiErrorMessage(errBody, url, res.status));
+      throw httpError(errBody, url, res.status);
     }
     return res.json();
   }
@@ -281,11 +293,11 @@ export const useApiStore = defineStore('api', () => {
       res = await fetchWithTimeout(url, withAuth({ method: 'DELETE' }, delHeaders));
       // H3 fix: 消除重复调用 handleUnauthorized()，避免 maop:unauthorized 事件重复触发。
       // 401 走 apiErrorMessage() 本地化（原先硬编码英文 "401 Unauthorized"）。
-      if (res.status === 401) { throw new Error(apiErrorMessage({}, url, 401)); }
+      if (res.status === 401) { throw httpError({}, url, 401); }
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      throw new Error(apiErrorMessage(errBody, url, res.status));
+      throw httpError(errBody, url, res.status);
     }
     return res.json();
   }

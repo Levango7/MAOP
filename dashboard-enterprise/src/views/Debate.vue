@@ -14,6 +14,13 @@
         </button>
       </template>
       <template #content>
+        <div v-if="historyUnconfigured" class="debate-notice" role="status">
+          <AppIcon name="info" :size="16" />
+          <div>
+            <strong>{{ t('view.debate.notConfigured') }}</strong>
+            <p>{{ t('view.debate.notConfiguredHint') }}</p>
+          </div>
+        </div>
         <!-- ── History ─────────────────────────────────────────── -->
         <div v-show="activeTab === 'history'">
           <Card :title="t('view.debate.history.title')" icon="activity" margin-bottom="var(--sp-4)">
@@ -125,7 +132,7 @@
                 <button
                   class="btn-primary"
                   type="button"
-                  :disabled="starting"
+                  :disabled="starting || historyUnconfigured"
                   @click="startDebate"
                 >
                   <AppIcon name="play" :size="14" />
@@ -188,7 +195,7 @@
                 <button
                   class="btn-primary"
                   type="button"
-                  :disabled="configSaving"
+                  :disabled="configSaving || historyUnconfigured"
                   @click="saveConfig"
                 >
                   <AppIcon name="check" :size="14" />
@@ -268,6 +275,10 @@ const tabOptions = [
 // ── Data state ──────────────────────────────────────────────────
 const loading = ref(false);
 const errors = ref({ history: null, config: null });
+// 404 on /api/debate/history means ServiceContainer has no DebateDispatcher.
+// Nothing on this page can work then, so show one explanation and disable the
+// actions instead of a generic "load failed" on every tab.
+const historyUnconfigured = ref(false);
 
 const verdicts = ref([]);
 const configLoaded = ref(false);
@@ -473,8 +484,15 @@ async function loadHistory() {
     const data = await api.get('/api/debate/history?limit=20');
     verdicts.value = data.verdicts || [];
     errors.value = { ...errors.value, history: null };
+    historyUnconfigured.value = false;
   } catch (err) {
     verdicts.value = [];
+    if (err && err.status === 404) {
+      historyUnconfigured.value = true;
+      errors.value = { ...errors.value, history: null };
+      return;
+    }
+    historyUnconfigured.value = false;
     errors.value = { ...errors.value, history: (err && err.message) || t('view.debate.history.failedLoad') };
   }
 }
@@ -505,6 +523,22 @@ onMounted(() => {
 <style scoped>
 /* ── Layout helpers ────────────────────────────────────────────── */
 .blk { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+/* ── Dispatcher not configured notice ─────────────────────────── */
+.debate-notice {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-start;
+  padding: var(--sp-3);
+  margin-bottom: var(--sp-3);
+  border: 1px solid var(--border-control);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.debate-notice strong { color: var(--text); display: block; margin-bottom: 2px; }
+.debate-notice p { margin: 0; }
 .muted { color: var(--text-muted); }
 .mono { font-family: var(--font-mono); font-size: var(--fs-xs); }
 

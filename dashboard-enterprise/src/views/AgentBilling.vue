@@ -783,8 +783,8 @@ async function loadSummary() {
   summaryLoading.value = true;
   summaryError.value = '';
   try {
-    // If we have agents, fetch per-agent summaries in parallel; otherwise fetch a
-    // global summary endpoint as a fallback.
+    // 全局 /api/billing/summary 不存在：没有 agent 时保持空列表，
+    // 不要调用一个必然 404 的端点（会在控制台留下错误并触发错误态）。
     if (agents.value.length) {
       const results = await Promise.allSettled(
         agents.value.map((a) => api.get(`/api/billing/summary/${encodeURIComponent(a)}`)),
@@ -793,8 +793,7 @@ async function loadSummary() {
         .filter((r) => r.status === 'fulfilled' && r.value)
         .map((r) => r.value);
     } else {
-      const data = await api.get('/api/billing/summary');
-      summaryList.value = data.summaries || data.items || [];
+      summaryList.value = [];
     }
   } catch (err) {
     summaryList.value = [];

@@ -239,4 +239,19 @@ describe('Debate.vue', () => {
     expect(wrapper.find('.debate-view').exists()).toBe(true);
     wrapper.unmount();
   });
+
+  it('explains an unconfigured dispatcher (404) and disables actions', async () => {
+    global.fetch = vi.fn(() => Promise.resolve({
+      ok: false, status: 404,
+      json: () => Promise.resolve({ error: 'DebateDispatcher not configured' }),
+      text: () => Promise.resolve(''),
+    }));
+    const wrapper = await mountDebate();
+    expect(wrapper.find('.debate-notice').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Debate dispatcher is not configured');
+    // 发起按钮与配置保存按钮都必须禁用，不能留下必然失败的入口。
+    const disabled = wrapper.findAll('button[disabled]');
+    expect(disabled.length).toBeGreaterThanOrEqual(1);
+    wrapper.unmount();
+  });
 });

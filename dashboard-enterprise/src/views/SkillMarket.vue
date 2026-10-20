@@ -1,15 +1,16 @@
 <template>
   <div class="skill-market-page">
-    <!-- 一号用户实测修复（2026-08-31）：Coming Soon banner 原为常驻 ——
+    <!-- 一号用户实测修复（2026-08-31）：这类"待开发"横幅原为常驻 ——
          给人"整个功能待开发"的错觉，实际 marketplace 聚合 + 一键安装
-         已实现。仅在数据源未配置/不可达（列表为空）时降级提示。 -->
-    <div v-if="!loading && !error && !filteredTools.length" class="coming-soon-banner" role="alert">
-      <AppIcon name="info" :size="16" class="coming-soon-banner__icon" />
-      <div class="coming-soon-banner__content">
-        <span class="coming-soon-banner__title">{{ t('view.skills.market.comingSoon') }}</span>
-        <span class="coming-soon-banner__desc">{{ t('view.skills.market.comingSoonHint') }}</span>
+         已实现。仅在**数据源没有任何返回**（未配置 registry / 不可达）时
+         降级提示；搜索无命中时不得冒充"数据源不可用"。 -->
+    <div v-if="!loading && !error && !tools.length" class="source-unavailable-banner" role="alert">
+      <AppIcon name="info" :size="16" class="source-unavailable-banner__icon" />
+      <div class="source-unavailable-banner__content">
+        <span class="source-unavailable-banner__title">{{ t('view.skills.market.sourceUnavailable') }}</span>
+        <span class="source-unavailable-banner__desc">{{ t('view.skills.market.sourceUnavailableHint') }}</span>
       </div>
-      <Badge tone="info">{{ t('view.skills.market.planned') }}</Badge>
+      <Badge tone="info">{{ t('view.skills.market.sourceUnavailableBadge') }}</Badge>
     </div>
 
     <ListPageLayout
@@ -217,8 +218,8 @@ onMounted(load);
 <style scoped>
 .skill-market-page { display: flex; flex-direction: column; gap: var(--sp-3); }
 
-/* ── Coming Soon banner ── */
-.coming-soon-banner {
+/* ── source-unavailable banner ── */
+.source-unavailable-banner {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
@@ -228,23 +229,23 @@ onMounted(load);
   border-radius: var(--r-md);
   margin-bottom: var(--sp-2);
 }
-.coming-soon-banner__icon {
+.source-unavailable-banner__icon {
   color: var(--info);
   flex-shrink: 0;
 }
-.coming-soon-banner__content {
+.source-unavailable-banner__content {
   display: flex;
   flex-direction: column;
   gap: 2px;
   flex: 1;
   min-width: 0;
 }
-.coming-soon-banner__title {
+.source-unavailable-banner__title {
   font-size: var(--fs-base);
   font-weight: 600;
   color: var(--info-strong);
 }
-.coming-soon-banner__desc {
+.source-unavailable-banner__desc {
   font-size: var(--fs-sm);
   color: var(--text-muted);
   line-height: 1.5;
@@ -348,7 +349,7 @@ onMounted(load);
 
 /* ── 响应式断点 ── */
 @media (max-width: 900px) {
-  .coming-soon-banner {
+  .source-unavailable-banner {
     flex-wrap: wrap;
     gap: var(--sp-2);
   }
@@ -357,7 +358,7 @@ onMounted(load);
   .skill-market-page {
     gap: var(--sp-2);
   }
-  .coming-soon-banner {
+  .source-unavailable-banner {
     padding: var(--sp-2) var(--sp-3);
   }
 }
