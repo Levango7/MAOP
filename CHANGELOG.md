@@ -130,6 +130,36 @@ CI 的 `Lint (ruff + mypy)` 作业里 `scripts/check_config_drift.py` 只允许
 
 
 
+### CI 第二次红：两条 home 测试只在 macOS/Windows 失败（2026-10-20）
+
+重跑 `39410157612` 有 5 条腿红（macos/3.13 + windows 3.10~3.13），Linux 四条全绿。
+两条用例都是同一个形状：
+
+```
+FAILED tests/test_home_bootstrap.py::test_ensure_runtime_root_refreshes_stale_assets
+  AssertionError: assert PosixPath('/var/folders/.../home') == PosixPath('/private/var/folders/.../home')
+FAILED tests/test_home_bootstrap.py::test_ensure_runtime_root_bootstraps_installed_home
+  AssertionError: assert WindowsPath('C:/Users/RUNNER~1/.../home') == WindowsPath('C:/Users/runneradmin/.../home')
+```
+
+被测函数返回的是 `.resolve()` 后的路径，而用例把 **未 resolve 的 `tmp_path` 子目录**
+塞进 monkeypatch 再比较。Linux 的 tmp 不是符号链接、也没有 8.3 短名，所以只在
+macOS（`/var` → `/private/var`）与 Windows CI 账号（`RUNNER~1`）上暴露；本机是
+Windows 但临时目录是长名，因此"本机全绿"没提供任何信号。
+
+- 测试面：新增 `tmp_home` fixture（返回已 resolve 的家目录，两处复用），两条用例改用它。
+- 产品面：新增 `test_returned_root_is_normalized`，用 `somewhere/../home` 这种
+  跨平台等价物钉住"解析器必须返回规范化路径"。
+- 变异验证：把 `Path(value).expanduser().resolve()` 改成不 resolve 后该用例转红
+  （实测 `1 failed`），还原后 `cmp` 证与备份字节一致、10 passed。
+
+顺带修掉排查中发现的测试基建漏洞（与 2026-10-04 的 `_no_real_config_write` 同类）：
+`tests/test_routers_batch_coverage.py` 批量打写端点时，`POST /api/control/run`
+会**真起** `python -m maop.cli run --task test`（一次几十秒，会话结束后留下孤儿进程），
+并把作业历史写进仓库工作树的 `data/control_jobs.jsonl`（本机反复出现未跟踪文件）。
+现补 autouse fixture：stub `asyncio.create_subprocess_exec` + 历史落盘置 no-op。
+实测该模块 232 passed（30s），跑完工作树无 `control_jobs.jsonl`、无残留子进程。
+
 ### 分布式调度：`deadline=None` 不再等于无限等（原 #116 "未做"项，本次落地）
 
 `_dispatch_and_collect` 的 `while pending` 只在 `deadline is not None` 时检查超时，

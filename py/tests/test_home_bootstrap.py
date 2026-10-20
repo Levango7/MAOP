@@ -31,6 +31,19 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
+@pytest.fixture
+def tmp_home(tmp_path: Path) -> Path:
+    """A temp home already resolved.
+
+    The bootstrap functions return ``.resolve()``d paths. pytest's tmp_path is
+    *not* resolved, and on macOS it sits behind the ``/var`` → ``/private/var``
+    symlink while Windows CI accounts resolve to an 8.3 short name
+    (``RUNNER~1``), so an unresolved fixture value compares unequal on exactly
+    the two platforms whose legs would then fail.
+    """
+    return (tmp_path / "home").resolve()
+
+
 def test_explicit_root_dir_wins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     target = tmp_path / "explicit"
     target.mkdir()
@@ -109,9 +122,9 @@ def test_init_refreshes_dashboard_even_without_force(
 
 
 def test_ensure_runtime_root_refreshes_stale_assets(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    home = tmp_path / "home"
+    home = tmp_home
     (home / "config").mkdir(parents=True)
     (home / "config" / "agents.yaml").write_text("agents: {}\n", encoding="utf-8")
     (home / "dashboard" / "dist-enterprise").mkdir(parents=True)
@@ -132,7 +145,7 @@ def test_ensure_runtime_root_refreshes_stale_assets(
     monkeypatch.setattr(home_mod, "bundled_config_dir", lambda: source / "config")
     monkeypatch.setattr(home_mod, "bundled_dashboard_dir", lambda: dashboard)
 
-    assert ensure_runtime_root() == home.resolve()
+    assert ensure_runtime_root() == home
     assert (home / "dashboard" / "dist-enterprise" / "index.html").read_text(
         encoding="utf-8"
     ) == "new"
@@ -140,19 +153,34 @@ def test_ensure_runtime_root_refreshes_stale_assets(
     assert marker["assets_version"] == home_mod._package_version()
 
 
+def test_returned_root_is_normalized(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The resolver hands back normalized paths, on every platform.
+
+    The CI red this pins: a fixture compared an unresolved ``tmp_path`` child
+    against a resolved return value. Linux passed, macOS (``/var`` symlink) and
+    Windows CI (``RUNNER~1``) both failed. ``..`` reproduces the same
+    unresolved-vs-resolved mismatch portably.
+    """
+    (tmp_path / "home").mkdir()
+    indirect = tmp_path / "somewhere" / ".." / "home"
+    monkeypatch.setenv("MAOP_ROOT_DIR", str(indirect))
+    assert resolve_maop_root() == (tmp_path / "home").resolve()
+
+
 def test_ensure_runtime_root_bootstraps_installed_home(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "assets"
     (source / "config").mkdir(parents=True)
     (source / "config" / "agents.yaml").write_text("agents: {}\n", encoding="utf-8")
-    monkeypatch.setattr(home_mod, "default_home", lambda: tmp_path / "home")
-    monkeypatch.setattr(home_mod, "resolve_maop_root", lambda: tmp_path / "home")
+    home = tmp_home
+    monkeypatch.setattr(home_mod, "default_home", lambda: home)
+    monkeypatch.setattr(home_mod, "resolve_maop_root", lambda: home)
     monkeypatch.setattr(home_mod, "bundled_config_dir", lambda: source / "config")
     monkeypatch.setattr(home_mod, "bundled_dashboard_dir", lambda: None)
 
     root = ensure_runtime_root()
-    assert root == (tmp_path / "home").resolve()
+    assert root == home
     assert (root / "config" / "agents.yaml").is_file()
 
 
