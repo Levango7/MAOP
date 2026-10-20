@@ -276,6 +276,8 @@ def _step_projection(row: sqlite3.Row) -> dict[str, Any]:
         "status": event["status"],
         "trace_id": event["trace_id"],
         "error": str(payload.get("error", "") or ""),
+        "stderr": str(payload.get("stderr", "") or ""),
+        "routing_key": str(payload.get("routing_key", "") or ""),
     }
 
 

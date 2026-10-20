@@ -39,6 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 数据层纠偏第三片：prompts / evolve / history_analyzer 也离开空表（#55 收口）
+
+- `coordination_report` 的每-agent 计数改读 `run_events.agent_rollup()`（线程池执行），
+  `active_agents` 从此来自真实尝试而不是空表。
+- `HistoryAnalyzer._cluster_failures` 改读 `failed_steps()`；`run.step` 的 payload
+  本来就带 `routing_key`/`error`，这次把两者一并投影出来（`_step_projection`）。
+- `EvolveEngine` 改读 `recent_steps()`；`delegations` 无产品写入，旧实现每次都是
+  空读后回退 `logs/delegations.json`，现在只有账本为空才回退。
+- 棘轮 `LEGACY_READERS` 从 11 降到 **8**：只剩 `core/backends/data.py` 2 处
+  （表自身的测试专用读写）与 `dashboard/provider.py` 6 处（导出但从未实例化）。
+- 测试：`test_evolve.py` 的 fixture 用 `MAOP_DATA_DIR` 把账本隔离到 tmp（不再读真实库）；
+  新增 `test_run_events_consumers.py` 证明 coordination 的 active_agents 与失败聚类
+  在真实写入事件后**不为空**，且成功事件不会被当成失败。
+
 ### 熔断器写库与看板读库不是同一个文件（2026-10-20）
 
 实测路径（同一进程内比较 `Path(circuit_breaker.__file__).parents[3]/data/maop.db`

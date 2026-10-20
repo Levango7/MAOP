@@ -18,7 +18,7 @@ from maop.evolve import (
     _compute_stats,
     _generate_suggestions,
     _load_observability_data,
-    _load_observability_data_from_db,
+    _load_observability_data_from_events,
 )
 
 # ── Fixtures ──────────────────────────────────────────────────
@@ -32,11 +32,22 @@ def _delegation(agent: str, exit_code: int = 0, routing_key: str = "default",
     }
 
 
+@pytest.fixture(autouse=True)
+def _isolate_run_events(tmp_path, monkeypatch):
+    """Keep the real project ledger out of these tests."""
+    monkeypatch.setenv("MAOP_DATA_DIR", str(tmp_path / "ledger"))
+
+
 @pytest.fixture
-def evolve_root(tmp_path: Path) -> Path:
-    """Create a temp MAOP root with logs/ and data/ dirs."""
+def evolve_root(tmp_path: Path, monkeypatch) -> Path:
+    """Create a temp MAOP root with logs/ and data/ dirs.
+
+    run_events resolves its DB through MAOP_DATA_DIR, so point that at the temp
+    data dir too — otherwise these tests would read the real project ledger.
+    """
     (tmp_path / "logs").mkdir(parents=True, exist_ok=True)
     (tmp_path / "data").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("MAOP_DATA_DIR", str(tmp_path / "data"))
     return tmp_path
 
 
@@ -347,59 +358,41 @@ class TestEvolveEngine:
         assert engine._load_suggestions() == []
 
 
-# ── _load_observability_data_from_db ──────────────────────────
+# ── _load_observability_data_from_events ──────────────────────
 
-def _write_delegations_to_db(root: Path, rows: list[dict]) -> Path:
-    """Write delegation records directly into a SQLite maop.db."""
-    import sqlite3
-    db_path = root / "data" / "maop.db"
-    conn = sqlite3.connect(str(db_path))
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS delegations (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          timestamp TEXT,
-          agent TEXT,
-          task TEXT,
-          routing_key TEXT,
-          exit_code INT,
-          stdout TEXT,
-          stderr TEXT,
-          duration_ms INT,
-          trace_id TEXT
+def _write_events(rows: list[dict]) -> None:
+    """Append run.step events through the production writer."""
+    from maop.core.run_events import record_run_event
+    for i, r in enumerate(rows):
+        exit_code = r.get("exit_code", 0)
+        record_run_event(
+            r.get("trace_id", f"t{i}"),
+            "run.step",
+            agent=r.get("agent", "unknown"),
+            status="ok" if exit_code == 0 else "failed",
+            duration_ms=r.get("duration_ms", 0),
+            payload={
+                "task": r.get("task", ""),
+                "routing_key": r.get("routing_key", ""),
+                "exit_code": exit_code,
+                "error": r.get("stderr", ""),
+            },
         )
-    """)
-    for r in rows:
-        conn.execute(
-            "INSERT INTO delegations (timestamp, agent, task, routing_key, exit_code, stdout, stderr, duration_ms, trace_id) VALUES (?,?,?,?,?,?,?,?,?)",
-            (
-                r.get("timestamp", "2026-01-01T00:00:00Z"),
-                r.get("agent", "unknown"),
-                r.get("task", ""),
-                r.get("routing_key", ""),
-                r.get("exit_code", 0),
-                r.get("stdout", ""),
-                r.get("stderr", ""),
-                r.get("duration_ms", 0),
-                r.get("trace_id", ""),
-            ),
-        )
-    conn.commit()
-    conn.close()
-    return db_path
 
 
-class TestLoadObservabilityDataFromDB:
-    def test_no_db_returns_empty(self, tmp_path: Path):
-        assert _load_observability_data_from_db(tmp_path / "nonexistent.db") == []
+class TestLoadObservabilityDataFromEvents:
+    def test_no_events_returns_empty(self, evolve_root: Path):
+        assert _load_observability_data_from_events() == []
 
-    def test_reads_from_db(self, evolve_root: Path):
-        _write_delegations_to_db(evolve_root, [
+    def test_reads_from_events(self, evolve_root: Path):
+        _write_events([
             {"agent": "claude", "routing_key": "code", "exit_code": 0, "duration_ms": 1500},
             {"agent": "codex", "routing_key": "chat", "exit_code": 1, "duration_ms": 3000},
         ])
-        data = _load_observability_data_from_db(evolve_root / "data" / "maop.db")
+        data = _load_observability_data_from_events()
         assert len(data) == 2
-        # ORDER BY id DESC — newest first
+        # Newest event first (ORDER BY id DESC)
+        assert data[0]["agent"] == "codex"
         agents = {d["agent"] for d in data}
         assert agents == {"claude", "codex"}
         claude_row = next(d for d in data if d["agent"] == "claude")
@@ -407,52 +400,39 @@ class TestLoadObservabilityDataFromDB:
         assert claude_row["result"]["exit_code"] == 0
         assert claude_row["result"]["duration_ms"] == 1500
 
-    def test_null_exit_code_becomes_minus_one(self, evolve_root: Path):
-        import sqlite3
-        db_path = evolve_root / "data" / "maop.db"
-        conn = sqlite3.connect(str(db_path))
-        conn.execute("CREATE TABLE delegations (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, agent TEXT, task TEXT, routing_key TEXT, exit_code INT, stdout TEXT, stderr TEXT, duration_ms INT, trace_id TEXT)")
-        conn.execute("INSERT INTO delegations (agent, exit_code, duration_ms) VALUES ('claude', NULL, NULL)")
-        conn.commit()
-        conn.close()
-        data = _load_observability_data_from_db(db_path)
-        assert len(data) == 1
-        assert data[0]["result"]["exit_code"] == -1
+    def test_missing_payload_fields_use_safe_defaults(self, evolve_root: Path):
+        from maop.core.run_events import record_run_event
+        record_run_event("t-empty", "run.step", agent="claude")
+        data = _load_observability_data_from_events()
+        assert data[0]["result"]["exit_code"] == 0
         assert data[0]["result"]["duration_ms"] == 0
 
-    def test_null_agent_becomes_unknown(self, evolve_root: Path):
-        import sqlite3
-        db_path = evolve_root / "data" / "maop.db"
-        conn = sqlite3.connect(str(db_path))
-        conn.execute("CREATE TABLE delegations (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, agent TEXT, task TEXT, routing_key TEXT, exit_code INT, stdout TEXT, stderr TEXT, duration_ms INT, trace_id TEXT)")
-        conn.execute("INSERT INTO delegations (agent, exit_code) VALUES (NULL, 0)")
-        conn.commit()
-        conn.close()
-        data = _load_observability_data_from_db(db_path)
-        assert data[0]["agent"] == "unknown"
+    def test_empty_agent_events_are_excluded(self, evolve_root: Path):
+        from maop.core.run_events import record_run_event
+        record_run_event("t-no-agent", "run.step", agent="")
+        assert _load_observability_data_from_events() == []
 
     def test_corrupt_db_returns_empty(self, evolve_root: Path):
-        db_path = evolve_root / "data" / "maop.db"
-        db_path.write_text("not a database", encoding="utf-8")
-        assert _load_observability_data_from_db(db_path) == []
+        (evolve_root / "data" / "maop.db").write_text("not a database", encoding="utf-8")
+        assert _load_observability_data_from_events() == []
 
 
-class TestEvolveEngineSQLiteSource:
-    """Verify EvolveEngine reads from SQLite first, JSON as fallback."""
+class TestEvolveEngineEventSource:
+    """Verify EvolveEngine reads run_events first, JSON as fallback."""
 
-    def test_db_takes_priority_over_json(self, evolve_root: Path):
-        # Write both JSON and DB with different data
+    def test_events_take_priority_over_json(self, evolve_root: Path):
+        # Write both JSON and run_events with different data
         _write_delegations(evolve_root, [_delegation("json_agent", exit_code=0)])
-        _write_delegations_to_db(evolve_root, [
-            {"agent": "db_agent", "routing_key": "code", "exit_code": 0, "duration_ms": 100},
+        _write_events([
+            {"agent": "event_agent", "routing_key": "code", "exit_code": 0, "duration_ms": 100},
         ])
         eng = EvolveEngine(root_dir=evolve_root)
         result = eng.analyze()
         agents = {s.agent for s in result.stats.by_agent}
-        assert "db_agent" in agents
+        assert "event_agent" in agents
         assert "json_agent" not in agents
 
-    def test_json_fallback_when_db_empty(self, evolve_root: Path):
+    def test_json_fallback_when_ledger_empty(self, evolve_root: Path):
         _write_delegations(evolve_root, [_delegation("claude"), _delegation("codex", exit_code=1)])
         eng = EvolveEngine(root_dir=evolve_root)
         result = eng.analyze()
@@ -465,16 +445,16 @@ class TestEvolveEngineSQLiteSource:
         assert len(result.stats.by_agent) == 1
         assert result.stats.by_agent[0].agent == "claude"
 
-    def test_suggest_with_db_data(self, evolve_root: Path):
-        _write_delegations_to_db(evolve_root, [
+    def test_suggest_with_event_data(self, evolve_root: Path):
+        _write_events([
             {"agent": "claude", "routing_key": "code", "exit_code": 1, "duration_ms": 100},
         ] * 5)
         eng = EvolveEngine(root_dir=evolve_root)
         result = eng.suggest()
         assert len(result.suggestions) > 0
 
-    def test_status_with_db_data(self, evolve_root: Path):
-        _write_delegations_to_db(evolve_root, [
+    def test_status_with_event_data(self, evolve_root: Path):
+        _write_events([
             {"agent": "claude", "routing_key": "code", "exit_code": 1, "duration_ms": 100},
         ] * 5)
         eng = EvolveEngine(root_dir=evolve_root)
