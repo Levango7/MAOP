@@ -428,7 +428,7 @@ onMounted(() => {
   cursor: pointer;
   transition: background var(--motion) var(--ease);
 }
-.btn-primary:hover { background: var(--brand-strong); }
+.btn-primary:hover { background: var(--brand-solid-hover); }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ── Icon buttons ─────────────────────────────────────────────── */

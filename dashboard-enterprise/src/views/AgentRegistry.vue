@@ -911,7 +911,7 @@ onMounted(() => {
 .btn-ghost--sm { padding: var(--sp-1) var(--sp-2); font-size: var(--fs-xs); }
 .btn-primary {
   display: inline-flex; align-items: center; gap: var(--sp-1);
-  background: var(--brand); color: var(--brand-contrast);
+  background: var(--brand-solid); color: var(--brand-contrast);
   border: none; border-radius: var(--r-md);
   padding: 7px var(--sp-4); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
@@ -920,7 +920,7 @@ onMounted(() => {
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .btn-danger {
   display: inline-flex; align-items: center; gap: var(--sp-1);
-  background: var(--danger, var(--fail)); color: var(--on-danger, var(--text-inverse, #fff));
+  background: var(--fail-solid); color: var(--brand-contrast);
   border: none; border-radius: var(--r-md);
   padding: 7px var(--sp-4); font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; transition: opacity var(--motion) var(--ease);
@@ -1099,7 +1099,7 @@ onMounted(() => {
 .chain-node__idx {
   display: grid; place-items: center;
   width: 20px; height: 20px;
-  border-radius: 50%; background: var(--brand); color: var(--brand-contrast);
+  border-radius: 50%; background: var(--brand-solid); color: var(--brand-contrast);
   font-size: var(--fs-xs); font-weight: 700; flex-shrink: 0;
 }
 .chain-node__arrow { color: var(--text-muted); flex-shrink: 0; }

@@ -1020,7 +1020,7 @@ async function onTestHook(hook) {
   color: var(--brand-contrast);
 }
 .hooks-btn.primary:hover:not(:disabled) {
-  background: var(--brand-strong);
+  background: var(--brand-solid-hover);
 }
 .hooks-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 

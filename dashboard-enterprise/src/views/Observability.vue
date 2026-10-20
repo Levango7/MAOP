@@ -353,7 +353,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .edition-badge.enterprise {
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-text);
 }
 .tracing-badge {
   display: inline-flex;
@@ -520,7 +520,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .type-tag.counter {
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-text);
 }
 .type-tag.histogram {
   background: var(--chart-5-soft);
@@ -542,7 +542,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   display: inline-flex;
   align-items: center;
 }
-.refresh-btn:hover { color: var(--brand); border-color: var(--brand); }
+.refresh-btn:hover { color: var(--brand-text); border-color: var(--brand); }
 .refresh-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 
 .health-skel, .config-skel {

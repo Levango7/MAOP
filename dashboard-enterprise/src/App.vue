@@ -433,7 +433,9 @@ onUnmounted(() => {
   padding-left: var(--sp-5);
 }
 .nav-link.router-link-active {
-  color: var(--brand-strong); background: var(--brand-soft);
+  /* 激活项文字用正文色保证可读（亮色主题 teal-700 压在 brand-soft 上仅 3.97:1）；
+   * 品牌色只承担左侧色条、圆点与图标这些非文本指示（≥3:1）。 */
+  color: var(--text); background: var(--brand-soft);
   border-left-color: var(--brand);
   font-weight: 600;
   padding-left: var(--sp-4);
@@ -537,7 +539,7 @@ onUnmounted(() => {
   transition: background var(--motion) var(--ease), box-shadow var(--motion) var(--ease), transform var(--motion) var(--ease);
 }
 .auth-card button[type="submit"]:hover:not(:disabled) {
-  background: var(--brand-strong); border-color: var(--brand-strong);
+  background: var(--brand-solid-hover); border-color: var(--brand-solid-hover);
   box-shadow: 0 4px 14px color-mix(in srgb, var(--brand) 35%, transparent);
   transform: translateY(-1px);
 }

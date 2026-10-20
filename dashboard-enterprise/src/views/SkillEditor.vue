@@ -560,7 +560,7 @@ onMounted(load);
   border-radius: var(--r-sm); color: var(--text-muted); cursor: pointer;
   flex-shrink: 0;
 }
-.atom-card__add:hover { color: var(--brand); border-color: var(--brand); }
+.atom-card__add:hover { color: var(--brand-text); border-color: var(--brand); }
 
 /* ── 组合区 ── */
 .canvas-empty {

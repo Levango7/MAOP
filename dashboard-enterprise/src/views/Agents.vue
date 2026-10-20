@@ -1289,7 +1289,7 @@ onMounted(() => {
   text-align: center; text-transform: uppercase;
   letter-spacing: .03em;
 }
-.dec-stage.route_scorer { background: color-mix(in srgb, var(--brand) 15%, transparent); color: var(--brand); }
+.dec-stage.route_scorer { background: color-mix(in srgb, var(--brand) 15%, transparent); color: var(--brand-text); }
 .dec-stage.load_balancer { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
 .dec-stage.model_selector { background: color-mix(in srgb, var(--chart-5) 15%, transparent); color: var(--chart-5); }
 .dec-stage.dispatcher { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
@@ -1383,7 +1383,7 @@ onMounted(() => {
   margin: var(--sp-2) 0;
 }
 .upgrade-notice.ok { background: color-mix(in srgb, var(--success) 10%, var(--surface)); color: var(--success); }
-.upgrade-notice.info { background: color-mix(in srgb, var(--brand) 10%, var(--surface)); color: var(--brand); }
+.upgrade-notice.info { background: color-mix(in srgb, var(--brand) 10%, var(--surface)); color: var(--brand-text); }
 .upgrade-notice.warn { background: color-mix(in srgb, var(--warn) 10%, var(--surface)); color: var(--warn); }
 .upgrade-result {
   margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3);

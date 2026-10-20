@@ -67,8 +67,8 @@ function detail(event) {
   margin: 0;
   padding: var(--sp-2);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
+  border-radius: var(--r-sm);
+  background: var(--bg);
   font-size: var(--fs-xs);
   white-space: pre-wrap;
   word-break: break-word;

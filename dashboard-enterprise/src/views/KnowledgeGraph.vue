@@ -945,7 +945,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
 .kg-rel-list { display: flex; flex-direction: column; gap: var(--sp-1); }
 .kg-rel-item { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
 .kg-rel-dir { font-weight: bold; color: var(--text-muted); }
-.kg-rel-dir.out { color: var(--brand); }
+.kg-rel-dir.out { color: var(--brand-text); }
 .kg-rel-dir.in { color: var(--warn); }
 .kg-rel-target { font-family: var(--font-mono); }
 .kg-related-list { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
@@ -977,7 +977,7 @@ watch([() => kg.filteredNodes.value, () => kg.filteredEdges.value], () => {
 .btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
 .btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 .btn--primary { background: var(--brand); color: var(--brand-contrast); border-color: var(--brand); }
-.btn--primary:hover { background: var(--brand-strong); }
+.btn--primary:hover { background: var(--brand-solid-hover); }
 
 .muted { color: var(--text-muted); font-weight: 400; }
 </style>

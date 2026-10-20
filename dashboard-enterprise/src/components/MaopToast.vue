@@ -131,7 +131,7 @@ onUnmounted(() => {
   border-left-color: var(--brand);
 }
 .maop-toast--info .maop-toast__icon {
-  color: var(--brand);
+  color: var(--brand-text);
 }
 .maop-toast--success {
   border-left-color: var(--success);
