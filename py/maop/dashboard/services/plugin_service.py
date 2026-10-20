@@ -298,6 +298,64 @@ def list_servers() -> dict[str, Any]:
     return {"servers": servers, "count": len(servers)}
 
 
+_AUTH_HEADER_NAMES = ("authorization", "x-api-key")
+
+
+def _auth_type_from_headers(headers: dict[str, str]) -> str:
+    """Classify the auth scheme currently stored in headers."""
+    for key, value in headers.items():
+        lowered = key.lower()
+        if lowered == "authorization":
+            if value.lower().startswith("bearer "):
+                return "bearer"
+            if value.lower().startswith("basic "):
+                return "basic"
+        elif lowered == "x-api-key":
+            return "apikey"
+    return "none"
+
+
+def _apply_auth(headers: dict[str, str], auth_type: str, token: str) -> dict[str, str]:
+    """Merge an auth scheme into headers, preserving an existing secret.
+
+    An empty token with the same scheme keeps the stored header, so opening
+    the edit form and saving without retyping the token does not wipe it.
+    """
+    merged = dict(headers)
+    current = _auth_type_from_headers(merged)
+    if auth_type == current and not token:
+        return merged
+    for key in [k for k in merged if k.lower() in _AUTH_HEADER_NAMES]:
+        merged.pop(key, None)
+    if token:
+        if auth_type == "bearer":
+            merged["Authorization"] = f"Bearer {token}"
+        elif auth_type == "basic":
+            merged["Authorization"] = f"Basic {token}"
+        elif auth_type == "apikey":
+            merged["X-API-Key"] = token
+    return merged
+
+
+def get_server_detail(server_id: str) -> dict[str, Any] | None:
+    """Return editable server config for the dashboard (secrets redacted)."""
+    hub = _get_hub()
+    cfg = hub.get_server_config_by_id(server_id)
+    if cfg is None:
+        return None
+    return {
+        "id": server_id,
+        "name": cfg.name,
+        "transport": cfg.transport.value,
+        "url": cfg.url,
+        "command": cfg.command,
+        "args": list(cfg.args),
+        "timeout_s": cfg.timeout_s,
+        "auth_type": _auth_type_from_headers(cfg.headers),
+        "has_auth": _auth_type_from_headers(cfg.headers) != "none",
+    }
+
+
 def add_server(
     *,
     name: str,
@@ -306,6 +364,9 @@ def add_server(
     args: list[str] | None = None,
     url: str = "",
     env: dict[str, str] | None = None,
+    auth_type: str = "none",
+    token: str = "",
+    timeout_s: float = 30.0,
 ) -> dict[str, Any]:
     """添加 MCP server 配置。返回 ``{"status": "ok", "server": name}``。"""
     from maop.core.mcp.mcp_hub import MCPServerConfig, TransportType
@@ -317,6 +378,8 @@ def add_server(
         args=args or [],
         url=url,
         env=env or {},
+        headers=_apply_auth({}, auth_type, token),
+        timeout_s=timeout_s,
     )
     hub.add_server(config)
     return {"status": "ok", "server": name}
@@ -331,23 +394,33 @@ def update_server(
     args: list[str] | None = None,
     url: str = "",
     env: dict[str, str] | None = None,
+    auth_type: str = "none",
+    token: str = "",
+    timeout_s: float = 30.0,
 ) -> dict[str, Any] | None:
     """按 id 更新 MCP server 配置。返回 ``None`` 表示该 id 不存在。
 
-    2026-09-23 新增：前端 McpManager 编辑服务器时调用
-    ``PUT /api/mcp/servers/{id}``，但 service 层只有 add/remove/list
-    （hub 亦只有 ``add_server``，且它会重新生成 id）。
+    保留详情表单未暴露的字段（session_id、权限范围、重连策略、env），
+    避免一次编辑把用户此前的配置抹掉。
     """
     from maop.core.mcp.mcp_hub import MCPServerConfig, TransportType
     hub = _get_hub()
-    config = MCPServerConfig(
-        name=name,
-        transport=TransportType(transport),
-        command=command,
-        args=args or [],
-        url=url,
-        env=env or {},
-    )
+    existing = hub.get_server_config_by_id(server_id)
+    if existing is None:
+        return None
+    data = existing.model_dump()
+    data.update({
+        "name": name,
+        "transport": TransportType(transport),
+        "command": command,
+        "args": args or [],
+        "url": url,
+        "headers": _apply_auth(dict(existing.headers), auth_type, token),
+        "timeout_s": timeout_s,
+    })
+    if env is not None:
+        data["env"] = env
+    config = MCPServerConfig(**data)
     ok = hub.update_server(server_id, config)
     if not ok:
         return None

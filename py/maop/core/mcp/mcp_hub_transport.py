@@ -181,13 +181,13 @@ class _StdioTransport:
         # which may be a server notification or a response to a DIFFERENT
         # request. Read lines until we find the response whose "id" matches
         # this request, skipping notifications (no "id") and stale responses,
-        # within an overall 30s deadline.
+        # within the per-server deadline (``timeout_s``, 30s by default).
         # R7 修复：在 async 函数内用 get_running_loop() 替代已弃用的
         # get_event_loop()（Python 3.12+ 无当前循环时抛 RuntimeError，
         # 3.10+ 已弃用隐式创建循环的行为）。此处位于 async def
         # send_request 内，必然有运行中的循环。
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + 30
+        deadline = loop.time() + self._config.timeout_s
         while True:
             remaining = deadline - loop.time()
             if remaining <= 0:
@@ -252,7 +252,7 @@ class _SSETransport:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=self._config.timeout_s) as client:
                 resp = await client.post(
                     f"{self._base_url}/message",
                     json=request,
@@ -320,7 +320,7 @@ class _WebSocketTransport:
 
         try:
             await self._ws.send(json.dumps(request))
-            response = await asyncio.wait_for(self._ws.recv(), timeout=30)
+            response = await asyncio.wait_for(self._ws.recv(), timeout=self._config.timeout_s)
             return cast(dict[str, Any], json.loads(response))
         except Exception as exc:
             return {"error": {"message": str(exc)}}
@@ -439,7 +439,7 @@ class _StreamableHttpTransport:
 
         try:
             # URL scheme/host validated in __init__ via _assert_http_url (B310).
-            with urllib.request.urlopen(req, timeout=30) as resp:  # nosec B310
+            with urllib.request.urlopen(req, timeout=self._config.timeout_s) as resp:  # nosec B310
                 status = resp.status
                 content_type = resp.headers.get("Content-Type", "")
                 session_id_hdr = resp.headers.get("Mcp-Session-Id")

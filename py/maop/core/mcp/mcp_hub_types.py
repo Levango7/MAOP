@@ -41,6 +41,9 @@ class MCPServerConfig(BaseModel):
     # sends it on every request; when unset, the transport captures the
     # session id returned by the server on the first request.
     session_id: str = ""
+    # Per-server request timeout for transports (stdio line waits, HTTP
+    # requests, WebSocket recv). Defaults keep the previous hard-coded 30s.
+    timeout_s: float = Field(default=30.0, gt=0)
     auto_reconnect: bool = True
     max_reconnect_attempts: int = 3
     reconnect_delay_s: float = 5.0

@@ -293,17 +293,28 @@
               <span class="field__label">{{ t('view.mcp.modal.name') }}</span>
               <input v-model="serverForm.name" class="field__input" :placeholder="t('view.mcp.modal.name')" />
             </label>
-            <label class="field">
+            <label v-if="serverForm.transport !== 'stdio'" class="field">
               <span class="field__label">{{ t('view.mcp.modal.url') }}</span>
               <input v-model="serverForm.url" class="field__input" :placeholder="t('view.mcp.modal.urlHint')" />
             </label>
+            <div v-if="serverForm.transport === 'stdio'" class="field-row">
+              <label class="field">
+                <span class="field__label">{{ t('view.mcp.modal.command') }}</span>
+                <input v-model="serverForm.command" class="field__input" :placeholder="t('view.mcp.modal.commandHint')" />
+              </label>
+              <label class="field">
+                <span class="field__label">{{ t('view.mcp.modal.args') }}</span>
+                <input v-model="serverForm.argsText" class="field__input" :placeholder="t('view.mcp.modal.argsHint')" />
+              </label>
+            </div>
             <div class="field-row">
               <label class="field">
                 <span class="field__label">{{ t('view.mcp.modal.transport') }}</span>
                 <select v-model="serverForm.transport" class="field__input field__select">
-                  <option value="http">HTTP</option>
-                  <option value="stdio">stdio</option>
+                  <option value="streamable_http">Streamable HTTP</option>
                   <option value="sse">SSE</option>
+                  <option value="websocket">WebSocket</option>
+                  <option value="stdio">stdio</option>
                 </select>
               </label>
               <label class="field">
@@ -318,11 +329,16 @@
             </div>
             <label v-if="serverForm.auth_type !== 'none'" class="field">
               <span class="field__label">{{ t('view.mcp.modal.token') }}</span>
-              <input v-model="serverForm.token" class="field__input" type="password" :placeholder="t('view.mcp.modal.token')" />
+              <input
+                v-model="serverForm.token"
+                class="field__input"
+                type="password"
+                :placeholder="editingServer ? t('view.mcp.modal.tokenKeep') : t('view.mcp.modal.token')"
+              />
             </label>
             <label class="field">
               <span class="field__label">{{ t('view.mcp.modal.timeout') }}</span>
-              <input v-model.number="serverForm.timeout" class="field__input" type="number" min="1000" step="1000" placeholder="30000" />
+              <input v-model.number="serverForm.timeout_s" class="field__input" type="number" min="1" step="1" placeholder="30" />
             </label>
           </div>
           <div class="modal__foot">
@@ -385,8 +401,10 @@ import FilterBar from '../components/FilterBar.vue';
 import Segmented from '../components/Segmented.vue';
 import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
+import { useToast } from '../composables/useToast.js';
 
 const api = useApiStore();
+const toast = useToast();
 const { t } = useI18n();
 
 // ── Tab state ───────────────────────────────────────────────────
@@ -413,19 +431,23 @@ const serverSaving = ref(false);
 const serverForm = reactive({
   name: '',
   url: '',
-  transport: 'http',
+  transport: 'streamable_http',
+  command: '',
+  argsText: '',
   auth_type: 'none',
   token: '',
-  timeout: 30000,
+  timeout_s: 30,
 });
 
 function resetServerForm() {
   serverForm.name = '';
   serverForm.url = '';
-  serverForm.transport = 'http';
+  serverForm.transport = 'streamable_http';
+  serverForm.command = '';
+  serverForm.argsText = '';
   serverForm.auth_type = 'none';
   serverForm.token = '';
-  serverForm.timeout = 30000;
+  serverForm.timeout_s = 30;
 }
 
 function openAddServer() {
@@ -434,14 +456,23 @@ function openAddServer() {
   showServerModal.value = true;
 }
 
-function openEditServer(s) {
+async function openEditServer(s) {
+  let cfg = null;
+  try {
+    const data = await api.get(`/api/mcp/servers/${encodeURIComponent(s.id)}`);
+    cfg = data.server || null;
+  } catch (e) {
+    toast.error(e.message || t('view.mcp.servers.loadFailed'));
+  }
   editingServer.value = s;
-  serverForm.name = s.name || '';
-  serverForm.url = s.url || '';
-  serverForm.transport = s.transport || 'http';
-  serverForm.auth_type = s.auth_type || 'none';
-  serverForm.token = '';
-  serverForm.timeout = s.timeout ?? 30000;
+  resetServerForm();
+  serverForm.name = cfg?.name ?? s.name ?? '';
+  serverForm.url = cfg?.url ?? '';
+  serverForm.transport = cfg?.transport || s.transport || 'streamable_http';
+  serverForm.command = cfg?.command ?? '';
+  serverForm.argsText = Array.isArray(cfg?.args) ? cfg.args.join(' ') : '';
+  serverForm.auth_type = cfg?.auth_type || 'none';
+  serverForm.timeout_s = cfg?.timeout_s ?? 30;
   showServerModal.value = true;
 }
 
@@ -456,10 +487,14 @@ async function submitServer() {
   try {
     const payload = {
       name,
-      url: serverForm.url.trim(),
+      url: serverForm.transport === 'stdio' ? '' : serverForm.url.trim(),
       transport: serverForm.transport,
+      command: serverForm.transport === 'stdio' ? serverForm.command.trim() : '',
+      args: serverForm.transport === 'stdio'
+        ? serverForm.argsText.split(/\s+/).filter(Boolean)
+        : [],
       auth_type: serverForm.auth_type,
-      timeout: Number(serverForm.timeout) || 30000,
+      timeout_s: Number(serverForm.timeout_s) || 30,
     };
     if (serverForm.auth_type !== 'none' && serverForm.token) {
       payload.token = serverForm.token;

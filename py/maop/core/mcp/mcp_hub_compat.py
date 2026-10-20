@@ -53,6 +53,25 @@ class MCPHubCompatMixin:
             )
             return None
 
+    def get_server_config_by_id(self, server_id: str) -> MCPServerConfig | None:
+        """Look up a stored server config by id (dashboard detail/edit path)."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT config FROM mcp_servers WHERE id = ? LIMIT 1",
+                (server_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            return MCPServerConfig.model_validate_json(row["config"])  # type: ignore
+        except Exception as exc:
+            logger.warning(
+                "[mcp_hub_compat] Failed to validate MCP server config JSON for id %s: %s",
+                server_id,
+                exc,
+            )
+            return None
+
     def find_server_id_by_name(self, name: str) -> str | None:
         """Look up a server_id by name (most recent record)."""
         with self._connect() as conn:

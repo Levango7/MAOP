@@ -39,6 +39,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### MCP server 配置链路：编辑不再清空 URL/命令，认证/超时真正生效（2026-10-21）
+
+- **编辑覆盖丢配置**：`GET /api/mcp/servers` 只回 id/name/transport/status，
+  而编辑弹窗用 `s.url`/`s.command` 回填 ⇒ 打开编辑再保存会把 url/command
+  写空。新增 `GET /api/mcp/servers/{id}` 详情端点（不回显 token/headers），
+  前端编辑前先取详情。
+- **认证/超时被静默丢弃**：请求模型没有 auth/token/timeout_s 字段。现在
+  `auth_type` 映射为 `Authorization: Bearer|Basic` 或 `X-API-Key`，`timeout_s`
+  落入 `MCPServerConfig` 并用于 stdio/SSE/WebSocket/streamable-http 四种传输
+  （默认 30s 保持原行为）。编辑时 token 留空保留原值，显式切到 `none` 才清除；
+  未暴露的 env/权限范围/重连策略在更新时保留。
+- **transport 选项无效**：前端默认 `http`，但后端 `TransportType` 只有
+  `stdio/sse/websocket/streamable_http`，创建必失败；改为有效选项，stdio
+  增加 command/args 输入。
+- 验证：`test_mcp_route_crud.py` **12 passed**（新增 5 条）、`test_mcp_hub.py`
+  **46 passed**（新增真实 SQLite 往返）、相关 MCP 套件 **176 passed**；
+  McpManager vitest **10 passed**；ruff/mypy 通过。
+
 ### Agent 目录写路径与聊天 Markdown 纠偏（2026-10-21）
 
 - 静态契约审计（前端 231 个 `/api` 路径 × 后端 447 条 OpenAPI 路径，按 HTTP

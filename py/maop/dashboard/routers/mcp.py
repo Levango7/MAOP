@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -26,14 +26,16 @@ router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
 class ServerCreate(BaseModel):
     name: str
-    transport: str = "stdio"
+    transport: Literal["stdio", "sse", "websocket", "streamable_http"] = "stdio"
     command: str = ""
     args: list[str] = []
     url: str = ""
     env: dict[str, str] = {}
+    auth_type: Literal["none", "bearer", "basic", "apikey"] = "none"
+    token: str = ""
+    timeout_s: float = 30.0
     enabled: bool = True
     auto_connect: bool = False
-    timeout: float = 30.0
 
 
 class ToolCallRequest(BaseModel):
@@ -98,6 +100,17 @@ async def list_servers(request: Request) -> dict[str, Any]:
     return {"status": "ok", **result}
 
 
+@router.get("/servers/{server_id}")
+@handle_api_errors
+async def get_server(server_id: str, request: Request) -> dict[str, Any]:
+    """返回单个 server 的可编辑配置（不返回 token/headers 原值）。"""
+    require_admin(request)
+    detail = plugin_service.get_server_detail(server_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Server {server_id} not found")
+    return {"status": "ok", "server": detail}
+
+
 @router.post("/servers")
 @handle_api_errors
 async def add_server(body: ServerCreate, request: Request) -> dict[str, Any]:
@@ -108,7 +121,10 @@ async def add_server(body: ServerCreate, request: Request) -> dict[str, Any]:
         command=body.command,
         args=body.args,
         url=body.url,
-        env=body.env,
+        env=body.env or None,
+        auth_type=body.auth_type,
+        token=body.token,
+        timeout_s=body.timeout_s,
     )
 
 
@@ -129,7 +145,10 @@ async def update_server(server_id: str, body: ServerCreate, request: Request) ->
         command=body.command,
         args=body.args,
         url=body.url,
-        env=body.env,
+        env=body.env or None,
+        auth_type=body.auth_type,
+        token=body.token,
+        timeout_s=body.timeout_s,
     )
     if result is None:
         raise HTTPException(status_code=404, detail=f"Server {server_id} not found")
