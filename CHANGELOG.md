@@ -39,6 +39,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Webhooks 投递配置真正生效 + 最近触发时间（2026-10-21）
+
+- **配置被静默丢弃**：`HookCreateRequest`/`HookUpdateRequest` 接受
+  `headers`/`timeout`/`retry_count`，但 `HookDef`、SQLite 与投递链都没有这些
+  字段，响应还把三者硬编码为默认值。现补齐 hooks 表三列（含旧库 ALTER 迁移）、
+  `register/list/get` 读写；`_invoke_webhook` 使用自定义 headers 与单次超时，
+  对网络错误 / HTTP 429 / 5xx 按 `retry_count` 重试（4xx 不重试）。
+- **敏感头脱敏**：GET 响应中 Authorization/Cookie/X-Api-Key 等值显示为 `***`；
+  PUT 回传 `***` 时保留库中已存值，改其它字段不会误清凭据。
+- **「最近触发」列**：列表/详情返回 `last_triggered_at`（hook_logs 按 hook_id
+  聚合），不再是永远“从未”。上文契约对齐记录中的两项已知缺口就此补齐。
+- **Webhooks 表单**恢复“超时 (秒) / 重试次数”输入（此前因后端不支持被移除）。
+- **安全依赖**：certifi 2026.7.22 → 2026.10.19（PYSEC-2026-4320，pip-audit）。
+- 验证：后端 hooks 相关测试 91 passed（新增配置持久化/脱敏/占位还原/重试/
+  最近触发共 10 条）；前端 Webhooks 3 passed；ruff 与 mypy 通过。
+
 ### Webhooks 页与 /api/hooks 契约对齐（2026-10-21）
 
 - **列表永远为空**：后端返回 `{hooks, count}`，前端只认 `items/webhooks/data`。
