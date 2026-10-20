@@ -292,19 +292,11 @@
   width: 100%;
 }
 
-/* Tone modifiers for action buttons — full palette matching ControlPanel template */
-.tone-green, .tone-success { --tone-bg: var(--success-soft); --tone-border: color-mix(in srgb, var(--success) 35%, transparent); --tone-text: var(--success); }
-.tone-orange, .tone-warn { --tone-bg: var(--warn-soft); --tone-border: color-mix(in srgb, var(--warn) 35%, transparent); --tone-text: var(--warn); }
-.tone-blue, .tone-info { --tone-bg: var(--brand-soft); --tone-border: color-mix(in srgb, var(--brand) 35%, transparent); --tone-text: var(--brand); }
-.tone-red, .tone-danger, .tone-fail { --tone-bg: var(--fail-soft); --tone-border: color-mix(in srgb, var(--fail) 35%, transparent); --tone-text: var(--fail); }
-.tone-purple { --tone-bg: var(--chart-5-soft); --tone-border: color-mix(in srgb, var(--chart-5) 35%, transparent); --tone-text: var(--chart-5); }
-.tone-teal { --tone-bg: color-mix(in srgb, var(--chart-6) 10%, transparent); --tone-border: color-mix(in srgb, var(--chart-6) 35%, transparent); --tone-text: var(--chart-6); }
-.tone-cyan { --tone-bg: var(--info-soft); --tone-border: color-mix(in srgb, var(--info) 35%, transparent); --tone-text: var(--info); }
-.tone-pink { --tone-bg: color-mix(in srgb, var(--chart-7) 10%, transparent); --tone-border: color-mix(in srgb, var(--chart-7) 35%, transparent); --tone-text: var(--chart-7); }
-.tone-lime { --tone-bg: color-mix(in srgb, var(--chart-9) 10%, transparent); --tone-border: color-mix(in srgb, var(--chart-9) 35%, transparent); --tone-text: var(--chart-9); }
-.tone-sky { --tone-bg: var(--info-soft); --tone-border: color-mix(in srgb, var(--info) 35%, transparent); --tone-text: var(--info); }
-.tone-slate { --tone-bg: var(--neutral-bg); --tone-border: color-mix(in srgb, var(--text-muted) 30%, transparent); --tone-text: var(--text-muted); }
-.tone-amber { --tone-bg: var(--warn-soft); --tone-border: color-mix(in srgb, var(--warn) 35%, transparent); --tone-text: var(--warn-strong); }
+/* Tone modifier — 语义色只留给破坏性动作（停止/删除）。
+ * 2026-10-20 移除了 11 色 pastel 调色板：同级动作被染成 5-6 种颜色时，
+ * 颜色不再表示危险等级，只表示"每个按钮都很重要"，层级反而消失。
+ * 其余动作一律用中性 --surface-2 二级按钮，主操作用 .btn--primary。 */
+.tone-danger { --tone-bg: var(--fail-soft); --tone-border: color-mix(in srgb, var(--fail) 35%, transparent); --tone-text: var(--fail); }
 
 .ctrl-btn {
   display: inline-flex; align-items: center; gap: var(--sp-2);

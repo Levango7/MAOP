@@ -67,7 +67,7 @@ describe('ControlPanel.vue', () => {
   it('renders execution control buttons (run/pause/resume/stop)', async () => {
     mockFetch(defaultRoutes());
     const wrapper = await mountControlPanel();
-    // execActions has 6 entries; each renders a .ctrl-btn
+    // composer 的提交按钮 + execActions 5 个 + maintActions 6 个
     const ctrlBtns = wrapper.findAll('.ctrl-btn');
     expect(ctrlBtns.length).toBeGreaterThanOrEqual(6);
     wrapper.unmount();

@@ -39,6 +39,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 设计契约与 UI 纠偏：Run 页去彩虹化 + 两套主题对比度实测（2026-10-20）
+
+用户反馈"UI 有很多问题"。这次不再凭观感改样式：先用真实浏览器（`vite preview` +
+注入 owner 会话）对暗/亮两套主题逐元素量有效前景/背景（含 alpha 复合），并用
+`#777 on #fff = 4.48` 的正控证明探针没失明；修复前亮色 `/home` 实测 **12 处违规**，
+修复后 `dark/light × /home,/run` 四组均为 **0 违规**（每组审计 100-107 个文本节点）。
+
+- **新增 `dashboard-enterprise/DESIGN.md`**（YAML 令牌 + 11 节正文）：单一品牌青绿、
+  语义色只做状态、实底（`--brand-solid`）与品牌文字（`--brand-text`）拆分、
+  可交互边界用 `--border-control`、平铺 + 1px 描边、组件状态与 Known Gaps。
+- **Run 页按钮层级**：任务输入的主操作改为品牌实底主按钮；执行控制 5 个按钮里
+  只有"停止"保留危险色，其余中性；维护操作整组中性并移到运行记录之后。
+  删除 `pages.css` 里 11 色 `tone-*` pastel 调色板（仅保留 `tone-danger`）——
+  同屏 11 种彩色按钮不再表示优先级，只表示"每个都很重要"。
+- **对比度（实测修复值）**：暗色 `--text-faint` 在 surface-3 4.02→4.79、
+  `--fail` 4.22/3.71→5.56/4.90、`--danger` 4.10/3.61→5.42/4.77；
+  亮色 `--text-faint` 4.30/4.18→4.91/4.57、`--success` 4.07/3.96→5.42/4.64、
+  `--fail`/`--danger` 4.39（bg2）→4.71、`--brand-text` 4.37→4.73、
+  `--info` 3.88→4.56、`--fail-strong` 压在 fail-soft 上 4.39→4.56。
+  头像白字从 `--brand`(3.74) 改 `--brand-solid`(4.51)；页脚分隔点从 1.84 改为可读的
+  `--text-faint`；亮色激活导航文字改正文色（teal-700 压在 brand-soft 上仅 3.97）。
+- **系统性实底缺陷**：35 处实底按钮用 `--brand` 垫白字（3.74:1）。把 `--brand`
+  改为与 `--brand-solid` 同值 `#0c857a`；11 处 hover 用更亮的 `--brand-strong`
+  （白字仅 2.49:1）改为 `--brand-solid-hover`；9 处 `--brand` 作文字改
+  `--brand-text`；4 处 danger 实底（确认弹窗 + 3 个视图的 `.btn-danger`）改
+  `--fail-solid`。
+- **令牌漂移**：`ControlPanel.vue`/`RunTimeline.vue` 引用了不存在的
+  `--text-primary`、`--text-secondary`、`--surface-sunken`、`--radius-md`、
+  `--radius-sm`（静默回落）；`AgentRegistry.vue` 引用 `--on-danger`/`--text-inverse`。
+  全部改回现有令牌。Badge 5 种色调文字改用 `*-strong`，避免柔底 alpha 稀释。
+- **对比度门禁进 CI**：`dashboard-enterprise/scripts/wcag.py`（vendored，含
+  `--self-test`、`--pairs-only`、rgba 复合、`--min-pairs`）+ `design/contrast-pairs.txt`
+  显式 164 对配对（8 文字令牌 × 5 承载面 + 实底/边框/柔底徽标），接入
+  `Frontend Build` 的 `npm run design:contrast`。删空清单或漏检会判红，不会空跑成绿。
+
+验证：`npm run design:contrast` 164 对全 PASS（自测覆盖"坏配对必须红/缺令牌必须红"）；
+`npm run lint` 0 error；`npx vite build` 通过；前端全量 `57 files / 489 tests` 通过；
+浏览器实测四组页面 0 违规且正控 4.48 仍能报警。约束：亮色仅逐页审计 `/home` 与 `/run`，
+其余路由与 hover 态仍靠令牌门禁兜底（已写进 DESIGN.md Known Gaps）。
+
 ### 数据层纠偏第二片：`/api/failures` 与 `/api/timeseries` 也离开空表（#55 优先级 A）
 
 上一片把棘轮基线钉在 13；本片减到 **11**（独立复算：AST 数产品码里的
@@ -71,7 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 没有任何 UI 消费 ⇒ **从命令行 `maop run` 发起的运行在界面上完全看不见**，
 "可复盘"只覆盖了从面板发起的那一半。
 
-- `ControlPanel.vue`（`/operate/run` 的 structured Tab）新增"运行记录"卡片：任务、agent、
+- `ControlPanel.vue`（`/run` 页的 structured Tab；旧 `/control` 会重定向到此）新增"运行记录"卡片：任务、agent、
   步数、耗时、开始时间与三态结论（成功 / 失败 / 未结束），点行开运行抽屉看完整时间线。
   未写 `run.finished` 的运行**不许显示成成功或失败**，只能是"未结束"（中性色）。
 - 时间线渲染抽成 `src/components/RunTimeline.vue`，作业抽屉与运行抽屉共用一份；

@@ -23,7 +23,7 @@
         <div class="task-composer__actions">
           <span class="task-composer__hint">{{ t('view.control.taskHint') }}</span>
           <button
-            class="ctrl-btn tone-green task-composer__run"
+            class="ctrl-btn btn--primary task-composer__run"
             :disabled="submitting || !taskText.trim()"
             @click="runComposedTask"
           >
@@ -43,27 +43,14 @@
     <Card :title="t('view.control.executionControls')" icon="play" margin-bottom="var(--sp-4)">
       <div class="btn-grid">
         <button
-          v-for="a in execActions" :key="a.action" class="ctrl-btn" :class="'tone-' + a.tone"
+          v-for="a in execActions" :key="a.action" class="ctrl-btn"
+          :class="a.tone ? 'tone-' + a.tone : ''"
           :disabled="loading" @click="execAction(a.action)">
           <AppIcon :name="a.icon" :size="16" /> {{ t(a.label) }}
         </button>
       </div>
       <div v-if="execResult" class="result-bar" :class="execResult.ok ? 'ok' : 'err'">
         <AppIcon :name="execResult.ok ? 'check-circle' : 'x-circle'" :size="14" /> {{ execResult.msg }}
-      </div>
-    </Card>
-
-    <Card :title="t('view.control.maintenanceActions')" icon="wrench" margin-bottom="var(--sp-4)">
-      <div class="btn-grid">
-        <button
-          v-for="m in maintActions" :key="m.action" class="ctrl-btn"
-          :class="m.tone ? 'tone-' + m.tone : ''"
-          :disabled="loading" @click="maintainAction(m.action)">
-          <AppIcon :name="m.icon" :size="16" /> {{ t(m.label) }}
-        </button>
-      </div>
-      <div v-if="maintResult" class="result-bar" :class="maintResult.ok ? 'ok' : 'err'">
-        <AppIcon :name="maintResult.ok ? 'check-circle' : 'x-circle'" :size="14" /> {{ maintResult.msg }}
       </div>
     </Card>
 
@@ -114,6 +101,19 @@
         v-else-if="!runsLoading" icon="list" :title="t('view.control.noRuns')"
         :description="t('view.control.noRunsDesc')" />
       <Skeleton v-else height="80px" />
+    </Card>
+
+    <Card :title="t('view.control.maintenanceActions')" icon="wrench" margin-bottom="var(--sp-4)">
+      <div class="btn-grid">
+        <button
+          v-for="m in maintActions" :key="m.action" class="ctrl-btn"
+          :disabled="loading" @click="maintainAction(m.action)">
+          <AppIcon :name="m.icon" :size="16" /> {{ t(m.label) }}
+        </button>
+      </div>
+      <div v-if="maintResult" class="result-bar" :class="maintResult.ok ? 'ok' : 'err'">
+        <AppIcon :name="maintResult.ok ? 'check-circle' : 'x-circle'" :size="14" /> {{ maintResult.msg }}
+      </div>
     </Card>
 
     <Card :title="t('view.control.agentUpgrade')" icon="refresh" margin-bottom="var(--sp-4)">
@@ -257,19 +257,20 @@ const TERMINAL_JOB_STATES = new Set(['completed', 'failed', 'stopped', 'cancelle
 const execActions = [
   // "run" lives in the composer above; keeping a blank run button here was a
   // one-click way to POST an empty task and get a 400.
-  { action: 'pause', label: 'view.control.pause', icon: 'pause', tone: 'orange' },
-  { action: 'resume', label: 'view.control.resume', icon: 'rotate-ccw', tone: 'blue' },
-  { action: 'stop', label: 'view.control.stop', icon: 'square', tone: 'red' },
-  { action: 'validate', label: 'view.control.validateConfig', icon: 'check', tone: 'purple' },
-  { action: 'status', label: 'view.control.viewStatus', icon: 'activity', tone: 'teal' },
+  // 只有破坏性动作带语义色；其余是中性二级按钮（见 DESIGN.md §Components）。
+  { action: 'pause', label: 'view.control.pause', icon: 'pause' },
+  { action: 'resume', label: 'view.control.resume', icon: 'rotate-ccw' },
+  { action: 'stop', label: 'view.control.stop', icon: 'square', tone: 'danger' },
+  { action: 'validate', label: 'view.control.validateConfig', icon: 'check' },
+  { action: 'status', label: 'view.control.viewStatus', icon: 'activity' },
 ];
 const maintActions = [
-  { action: 'log-rotate', label: 'view.control.logRotate', icon: 'scroll', tone: 'cyan' },
-  { action: 'prune', label: 'view.control.memoryPrune', icon: 'trash', tone: 'pink' },
-  { action: 'health', label: 'view.control.healthCheck', icon: 'check-circle', tone: 'lime' },
-  { action: 'backup', label: 'view.control.backup', icon: 'database', tone: 'sky' },
-  { action: 'cache-clear', label: 'view.control.cacheClear', icon: 'x-circle', tone: 'slate' },
-  { action: 'reload', label: 'view.control.configReload', icon: 'refresh', tone: 'amber' },
+  { action: 'log-rotate', label: 'view.control.logRotate', icon: 'scroll' },
+  { action: 'prune', label: 'view.control.memoryPrune', icon: 'trash' },
+  { action: 'health', label: 'view.control.healthCheck', icon: 'check-circle' },
+  { action: 'backup', label: 'view.control.backup', icon: 'database' },
+  { action: 'cache-clear', label: 'view.control.cacheClear', icon: 'x-circle' },
+  { action: 'reload', label: 'view.control.configReload', icon: 'refresh' },
 ];
 
 function statusTone(s) {
@@ -521,7 +522,7 @@ onMounted(refreshAll);
 .task-composer__label {
   display: block;
   margin-bottom: var(--sp-2);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: var(--fs-sm);
 }
 .task-composer__input {
@@ -530,9 +531,9 @@ onMounted(refreshAll);
   min-height: 96px;
   padding: var(--sp-3);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  color: var(--text-primary);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--text);
   font: inherit;
   line-height: 1.5;
 }
@@ -576,7 +577,7 @@ onMounted(refreshAll);
 .job-detail__heading {
   margin: var(--sp-3) 0 var(--sp-2);
   font-size: var(--fs-sm);
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 .job-detail__output {
   max-height: 280px;
@@ -584,9 +585,9 @@ onMounted(refreshAll);
   margin: 0 0 var(--sp-3);
   padding: var(--sp-3);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-  color: var(--text-primary);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  color: var(--text);
   font-size: var(--fs-xs);
   white-space: pre-wrap;
   word-break: break-word;
@@ -611,8 +612,8 @@ onMounted(refreshAll);
   margin: 0;
   padding: var(--sp-2);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
+  border-radius: var(--r-sm);
+  background: var(--bg);
   font-size: var(--fs-xs);
   white-space: pre-wrap;
   word-break: break-word;
