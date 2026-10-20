@@ -103,6 +103,19 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 它同时兼作"测试是否都跑了"的哨兵：文件漏跑必然把总数打穿下限（历史上冷启动 worker
 起不来时，一次只跑了 25/56 个文件）。
 
+## 5b. 设计令牌对比度门禁（2026-10-20）
+
+`Frontend Build` 里有一步 `Design tokens (WCAG contrast gate)`（`npm run design:contrast`）。
+它跑仓库内 vendored 的 `dashboard-enterprise/scripts/wcag.py`，按
+`dashboard-enterprise/design/contrast-pairs.txt` 的**显式配对**逐主题核算
+（不用命名自动配对：本项目的品牌文字令牌是 `--brand-text`、可交互边界是
+`--border-control`，与 skill 的默认约定不同）。覆盖 8 个文字令牌 × 5 个实际承载面、
+实底按钮白字、以及 5 组柔底徽标的 **alpha 复合后**对比度，共 164 对。
+
+防失效三件套：`--self-test` 先证明颜色数学、CSS 解析、坏配对/缺令牌必判红；
+`--min-pairs 164` 防止清单被删空后空跑成绿；配对里的令牌改名/删除会直接 FAIL
+而不是静默 SKIP。设计契约在 `dashboard-enterprise/DESIGN.md`（含 Known Gaps）。
+
 ## 6. 守卫清单（谁钉住什么）
 
 | 测试 | 钉住的东西 |
