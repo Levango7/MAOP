@@ -1141,10 +1141,10 @@ onMounted(() => {
   background: var(--surface-3); color: var(--text-muted);
   flex-shrink: 0;
 }
-.mem-type.interaction { background: color-mix(in srgb, var(--chart-1) 15%, transparent); color: var(--chart-1); }
-.mem-type.error_pattern { background: color-mix(in srgb, var(--fail) 15%, transparent); color: var(--fail); }
-.mem-type.lesson { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
-.mem-type.performance { background: color-mix(in srgb, var(--chart-4) 15%, transparent); color: var(--chart-4); }
+.mem-type.interaction { background: var(--brand-soft); color: var(--brand-text); }
+.mem-type.error_pattern { background: var(--fail-soft); color: var(--fail-strong); }
+.mem-type.lesson { background: var(--warn-soft); color: var(--warn-strong); }
+.mem-type.performance { background: var(--warn-soft); color: var(--warn-strong); }
 .mem-content { flex: 1; font-size: var(--fs-xs); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mem-time { font-size: var(--fs-2xs); color: var(--text-faint); flex-shrink: 0; }
 
@@ -1162,9 +1162,9 @@ onMounted(() => {
 .evo-suggestion.auto { background: color-mix(in srgb, var(--success) 8%, var(--surface-2)); }
 .evo-cat { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; color: var(--brand-strong); margin-right: var(--sp-2); }
 .evo-prio { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; padding: 1px 5px; border-radius: var(--r-sm); }
-.prio-high .evo-prio { background: color-mix(in srgb, var(--fail) 15%, transparent); color: var(--fail); }
-.prio-medium .evo-prio { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
-.prio-low .evo-prio { background: color-mix(in srgb, var(--chart-4) 15%, transparent); color: var(--chart-4); }
+.prio-high .evo-prio { background: var(--fail-soft); color: var(--fail-strong); }
+.prio-medium .evo-prio { background: var(--warn-soft); color: var(--warn-strong); }
+.prio-low .evo-prio { background: var(--warn-soft); color: var(--warn-strong); }
 .evo-desc { font-size: var(--fs-sm); color: var(--text); margin: var(--sp-1) 0 0; line-height: 1.5; }
 .evo-action { font-size: var(--fs-xs); color: var(--success); font-weight: 600; }
 .evolution-applied { margin-top: var(--sp-4); }
@@ -1289,10 +1289,10 @@ onMounted(() => {
   text-align: center; text-transform: uppercase;
   letter-spacing: .03em;
 }
-.dec-stage.route_scorer { background: color-mix(in srgb, var(--brand) 15%, transparent); color: var(--brand-text); }
-.dec-stage.load_balancer { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
-.dec-stage.model_selector { background: color-mix(in srgb, var(--chart-5) 15%, transparent); color: var(--chart-5); }
-.dec-stage.dispatcher { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
+.dec-stage.route_scorer { background: var(--brand-soft); color: var(--brand-text); }
+.dec-stage.load_balancer { background: var(--warn-soft); color: var(--warn-strong); }
+.dec-stage.model_selector { background: var(--info-soft); color: var(--info-strong); }
+.dec-stage.dispatcher { background: var(--success-soft); color: var(--success-strong); }
 .dec-agent { font-weight: 600; color: var(--text); }
 .dec-reason { color: var(--text-muted); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dec-time { color: var(--text-faint); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
