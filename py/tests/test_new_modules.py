@@ -99,13 +99,27 @@ class TestKVStore:
             assert store.get("missing", default="fallback") == "fallback"
             store.close()
 
-    def test_ttl_expiration(self):
+    def test_ttl_expiration(self, monkeypatch):
+        """TTL 过期用可控时钟验证，不依赖真实等待。
+
+        原实现是 ``ttl=0.1`` + 紧接着 ``get()``。在慢 runner 上（Windows 的 GC /
+        磁盘 / 杀毒扫描），``set()`` 与 ``get()`` 之间就可能超过 100ms，条目已过期
+        ⇒ ``assert None == 'temp_value'``。2026-10-20 的
+        ``Flaky Test Detection (windows-latest, py3.12)`` 就是这么红的。
+
+        改成 patch ``_now``：过期与否完全由测试推进的时钟决定，既稳定又不用 sleep。
+        """
         from maop.core.backends.kv_store import KVStore
+
+        clock = [1000.0]
+        monkeypatch.setattr(KVStore, "_now", lambda self: clock[0])
+
         with tempfile.TemporaryDirectory() as tmp:
             store = KVStore(Path(tmp) / "kv.db")
             store.set("temp_key", "temp_value", ttl=0.1)
+            # 时钟未前进 ⇒ 必然还在（不再赌 set→get 的耗时）
             assert store.get("temp_key") == "temp_value"
-            time.sleep(0.15)
+            clock[0] += 0.15  # 越过 ttl
             assert store.get("temp_key") is None
             store.close()
 
@@ -245,7 +259,10 @@ class TestCacheGuard:
 
     def test_null_caching(self):
         from maop.core.reliability.cache import CacheGuard, CacheGuardConfig
-        guard = CacheGuard(config=CacheGuardConfig(null_ttl=0.1))
+        # null_ttl 原为 0.1：两次 get() 若因慢 runner 拉开 100ms 以上，
+        # 第二次就会重新加载 ⇒ call_count == 2。这里测的是"null 被缓存"，
+        # 与 TTL 长短无关，放大到 60s 让断言不再依赖两次调用的间隔。
+        guard = CacheGuard(config=CacheGuardConfig(null_ttl=60.0))
         call_count = 0
         def loader():
             nonlocal call_count
