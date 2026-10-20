@@ -39,6 +39,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M1 补全：运行记录列表进 UI（`GET /api/runs` 此前没有任何调用方）
+
+第一片写完事实源与两个只读端点，但前端**只用了详情那一条**：`grep -rn "api/runs" src/`
+实测只有 `/api/runs/${traceId}`（作业抽屉里的时间线）。列表端点与 `fetch_recent_runs()`
+没有任何 UI 消费 ⇒ **从命令行 `maop run` 发起的运行在界面上完全看不见**，
+"可复盘"只覆盖了从面板发起的那一半。
+
+- `ControlPanel.vue`（`/operate/run` 的 structured Tab）新增"运行记录"卡片：任务、agent、
+  步数、耗时、开始时间与三态结论（成功 / 失败 / 未结束），点行开运行抽屉看完整时间线。
+  未写 `run.finished` 的运行**不许显示成成功或失败**，只能是"未结束"（中性色）。
+- 时间线渲染抽成 `src/components/RunTimeline.vue`，作业抽屉与运行抽屉共用一份；
+  状态→色调的映射由调用方以函数 props 传入，不在组件里再写一套口径。
+- 卡片读账本失败时只让列表为空、由空态说明，不参与 `loading`——
+  不能让"读历史"把任务输入框一起锁住。
+- i18n 补 `runHistory`/`viewRun`/`runSteps`/`runIncomplete` 等 15 个键（en+zh 成对）。
+
+验证：`ControlPanel.test.js` 新增 2 例——列表两行的渲染与 finished/incomplete 的色调区分
+（断言 `.badge--success` 与 `.badge--neutral`，不吃翻译文案）、点开抽屉断言
+`.run-timeline` 含事件正文；另加"账本读 500 时面板不炸"一例。
+变异反证：把 `runDrawer.run` 恒置 null ⇒ 恰好 1 例红，且报的是我写的断言消息
+（`run timeline missing`），还原后文件与备份 sha1 逐字节一致、CR 计数 0。
+`npx vitest run` 相关两文件 15 passed；`npm run build` 18.58s 通过；
+`py/scripts/check_api_contract.py` 仍 `OK: 无新增错配`（新增的 `/api/runs?limit=20` 被解析命中）。
+本机全量 vitest 分两段才凑齐：默认 forks 池只起得来 26 个文件（31 个 worker 启动超时），
+`--pool=threads` 起到 49 个（仍 8 个起不来），把那 8 个单独串行再跑 ⇒ **8/8、64 passed**，
+合计 **57 个文件 / 489 个用例全过**（57 = 本机 `src/__tests__/*.test.js` 的文件数）。
+worker 起不来是 worktree 的 `node_modules` 是指向主仓的 junction、加上本机同时压着
+两桩长跑导致的，与被测代码无关；终判仍以 CI `Frontend Build` 为准。
+
 ### 数据层纠偏：看板统计此前一直读一张没人写的表（#54）
 
 `delegations` 表 schema 完备、列齐全，但 `MaopDatabase.insert_delegation()`

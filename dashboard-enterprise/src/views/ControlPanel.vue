@@ -91,6 +91,31 @@
       <Skeleton v-else height="80px" />
     </Card>
 
+    <Card :title="t('view.control.runHistory')" icon="list" margin-bottom="var(--sp-4)">
+      <p class="muted run-history__hint">{{ t('view.control.runHistoryDesc') }}</p>
+      <div v-if="runs.length" class="row-list">
+        <div v-for="r in runs" :key="r.trace_id" class="row-item">
+          <div class="row-main">
+            <div class="row-name">
+              <AppIcon name="flag" :size="14" /> {{ r.task || r.trace_id }}
+              <Badge :tone="runTone(r)">{{ runStatusLabel(r) }}</Badge>
+            </div>
+            <span class="row-sub">
+              {{ r.started_at }} · {{ r.agent || '—' }} ·
+              {{ t('view.control.runSteps', { n: r.steps }) }} · {{ r.duration_ms || 0 }}ms
+            </span>
+          </div>
+          <button class="act-btn small" @click="openRun(r.trace_id)">
+            <AppIcon name="file-text" :size="12" /> {{ t('view.control.viewRun') }}
+          </button>
+        </div>
+      </div>
+      <EmptyState
+        v-else-if="!runsLoading" icon="list" :title="t('view.control.noRuns')"
+        :description="t('view.control.noRunsDesc')" />
+      <Skeleton v-else height="80px" />
+    </Card>
+
     <Card :title="t('view.control.agentUpgrade')" icon="refresh" margin-bottom="var(--sp-4)">
       <button class="btn-check" :disabled="upgradeLoading" @click="checkUpgrade">
         <AppIcon name="refresh" :size="15" :class="{ spinning: loading }" /> {{ t('view.control.checkUpgrades') }}
@@ -140,15 +165,7 @@
         </dl>
         <template v-if="jobDrawer.job.trace_id">
           <h4 class="job-detail__heading">{{ t('view.control.runTimeline') }}</h4>
-          <ol v-if="runTimeline.length" class="run-timeline">
-            <li v-for="e in runTimeline" :key="e.seq" class="run-timeline__item">
-              <span class="run-timeline__kind">{{ timelineLabel(e.kind) }}</span>
-              <Badge v-if="e.status" :tone="statusTone(e.status)">{{ e.status }}</Badge>
-              <span class="run-timeline__meta muted">{{ e.agent || '—' }} · {{ e.duration_ms || 0 }}ms</span>
-              <pre v-if="timelineDetail(e)" class="run-timeline__detail">{{ timelineDetail(e) }}</pre>
-            </li>
-          </ol>
-          <p v-else class="muted">{{ t('view.control.runTimelineEmpty') }}</p>
+          <RunTimeline :events="runTimeline" :tone-fn="statusTone" />
         </template>
         <h4 class="job-detail__heading">{{ t('view.control.jobStdout') }}</h4>
         <pre class="job-detail__output">{{ jobDrawer.job.stdout || t('view.control.jobNoOutput') }}</pre>
@@ -159,6 +176,37 @@
       </div>
       <template #footer>
         <button class="act-btn small" :disabled="jobDrawer.loading" @click="loadJob(jobDrawer.id)">
+          <AppIcon name="refresh" :size="12" /> {{ t('common.refresh') }}
+        </button>
+      </template>
+    </DetailDrawer>
+
+    <DetailDrawer
+      :open="runDrawer.open"
+      :title="t('view.control.runDetailTitle', { id: runDrawer.traceId })"
+      icon="flag"
+      @close="closeRun"
+    >
+      <div v-if="runDrawer.loading"><Skeleton height="120px" /></div>
+      <div v-else-if="runDrawer.run" class="job-detail">
+        <div class="job-detail__meta">
+          <Badge :tone="runTone(runDrawer.run.summary)">{{ runStatusLabel(runDrawer.run.summary) }}</Badge>
+          <span class="job-detail__task">{{ runDrawer.run.summary.task }}</span>
+        </div>
+        <dl class="job-detail__facts">
+          <dt>{{ t('view.control.runAgent') }}</dt><dd>{{ runDrawer.run.summary.agent || '—' }}</dd>
+          <dt>{{ t('view.control.runStartedAt') }}</dt><dd>{{ runDrawer.run.summary.started_at || '—' }}</dd>
+          <dt>{{ t('view.control.runSteps', { n: runDrawer.run.summary.steps }) }}</dt>
+          <dd>{{ runDrawer.run.summary.duration_ms || 0 }}ms</dd>
+          <dt>{{ t('view.control.runVerify') }}</dt>
+          <dd>{{ runDrawer.run.summary.verify_status || '—' }}</dd>
+        </dl>
+        <h4 class="job-detail__heading">{{ t('view.control.runTimeline') }}</h4>
+        <RunTimeline :events="runDrawer.run.events" :tone-fn="statusTone" />
+      </div>
+      <p v-else class="muted">{{ runDrawer.error || t('view.control.runTimelineEmpty') }}</p>
+      <template #footer>
+        <button class="act-btn small" :disabled="runDrawer.loading" @click="loadRun(runDrawer.traceId)">
           <AppIcon name="refresh" :size="12" /> {{ t('common.refresh') }}
         </button>
       </template>
@@ -177,6 +225,7 @@ import Badge from '../components/Badge.vue';
 import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
 import DetailDrawer from '../components/DetailDrawer.vue';
+import RunTimeline from '../components/RunTimeline.vue';
 import { useI18n } from '../i18n';
 
 const { t } = useI18n();
@@ -198,7 +247,10 @@ const submitting = ref(false);
 const upgradeLoading = ref(false);
 const lastJobId = ref('');
 const jobDrawer = reactive({ open: false, id: '', loading: false, job: null });
+const runDrawer = reactive({ open: false, traceId: '', loading: false, run: null, error: '' });
 const runTimeline = ref([]);
+const runs = ref([]);
+const runsLoading = ref(false);
 let jobPollTimer = null;
 const TERMINAL_JOB_STATES = new Set(['completed', 'failed', 'stopped', 'cancelled', 'interrupted']);
 
@@ -270,6 +322,7 @@ function openJob(jobId) {
   jobDrawer.id = jobId;
   jobDrawer.open = true;
   jobDrawer.job = null;
+  runDrawer.open = false; // 一次只开一个抽屉，两个叠在一起会盖住关闭按钮
   loadJob(jobId);
 }
 
@@ -310,27 +363,59 @@ async function loadRunTimeline(traceId) {
   }
 }
 
-const TIMELINE_KIND_KEYS = {
-  'run.started': 'timelineStarted',
-  'run.plan': 'timelinePlan',
-  'run.step': 'timelineStep',
-  'run.verify': 'timelineVerify',
-  'run.cost': 'timelineCost',
-  'run.finished': 'timelineFinished',
-};
-
-function timelineLabel(kind) {
-  const key = TIMELINE_KIND_KEYS[kind];
-  return key ? t(`view.control.${key}`) : kind;
+async function loadRuns() {
+  runsLoading.value = true;
+  try {
+    const data = await api.get('/api/runs?limit=20');
+    runs.value = data.data?.items || [];
+  } catch {
+    // 运行记录是账本投影：读不到就留空由 EmptyState 说明，
+    // 不能因为它把面板其余部分一起弄红。
+    runs.value = [];
+  } finally {
+    runsLoading.value = false;
+  }
 }
 
-function timelineDetail(event) {
-  const payload = event.payload || {};
-  if (event.kind === 'run.step') return String(payload.stdout || payload.error || '').slice(0, 400);
-  if (event.kind === 'run.verify') return String(payload.summary || '');
-  if (event.kind === 'run.cost') return String(payload.estimated_cost ?? '');
-  if (event.kind === 'run.plan') return String(payload.routing_key || '');
-  return '';
+function openRun(traceId) {
+  runDrawer.traceId = traceId;
+  runDrawer.open = true;
+  runDrawer.run = null;
+  runDrawer.error = '';
+  jobDrawer.open = false; // 一次只开一个抽屉
+  loadRun(traceId);
+}
+
+async function loadRun(traceId) {
+  if (!traceId || !runDrawer.open || runDrawer.traceId !== traceId) return;
+  runDrawer.loading = true;
+  try {
+    const data = await api.get(`/api/runs/${encodeURIComponent(traceId)}`);
+    runDrawer.run = data.data || null;
+    if (!runDrawer.run) runDrawer.error = t('view.control.runNotFound');
+  } catch (e) {
+    runDrawer.error = e.message || t('view.control.runLoadFailed');
+    runDrawer.run = null;
+  } finally {
+    runDrawer.loading = false;
+  }
+}
+
+function closeRun() {
+  runDrawer.open = false;
+  runDrawer.run = null;
+  runDrawer.error = '';
+}
+
+// 账本里的运行只有三种可呈现结论：跑完且成功、跑完且失败、还没写 run.finished。
+function runStatusLabel(summary) {
+  if (!summary || summary.status !== 'finished') return t('view.control.runIncomplete');
+  return summary.success ? t('view.control.runSuccess') : t('view.control.runFailed');
+}
+
+function runTone(summary) {
+  if (!summary || summary.status !== 'finished') return 'neutral';
+  return summary.success ? 'success' : 'fail';
 }
 
 onUnmounted(closeJob);
@@ -422,6 +507,9 @@ async function refreshAll() {
   loading.value = true;
   await loadJobs();
   loading.value = false;
+  // 命令行发起的运行不在作业列表里，只能从账本读。不占用 loading，
+  // 免得账本读得慢时把任务输入框一起锁住。
+  loadRuns();
   // CLI version scanning can be slow; never block the task composer on it.
   checkUpgrade();
 }
