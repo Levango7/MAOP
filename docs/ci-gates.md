@@ -115,6 +115,7 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 | `py/tests/test_docs_consistency_gate.py` | 文档一致性门禁：范围只来自索引当前章节、豁免必须写理由、注入死路径必须判红、`docs-gate` 作业不许挂 `if` |
 | `py/tests/test_ci_required_checks.py` | required 清单（`.github/ci-required-checks.json`）↔ `ci.yml` 作业形状 ↔ §7.2 散文 三方一致：不许改名/删作业导致上下文永不上报，不许 required 作业在 PR 上恒不产出（沿 needs 链递归查），不许矩阵名当 required |
 | `py/tests/test_ci_merge_gate.py` | 聚合守卫的两面：判定脚本的策略单测（白名单式 + fail closed + docs-only 的 skipped 必须放行），以及 ci.yml 里 gate 的形状（name 稳定、`if: always()` 不许掉、needs 盖住全部重活、不许纳 push-only 作业） |
+| `py/tests/test_delegations_table_readers.py` | `delegations` 表**无写入方**（`insert_delegation` 只有测试调用），所以读它的地方一律报 0。本门禁按 AST 数产品码里"`FROM/INTO/UPDATE/JOIN delegations`"的字符串字面量（**剥掉 docstring 与裸字符串语句**，避免把散文当命中），只准减不准加：① 出现未登记的文件即红；② 总数超基线即红；③ 登记表里某条已不存在也必须同步删（防台账虚账）；④ 自检喂一份合成文件证明探针活着、并断言真树数到的就是基线（防"0 命中"冒充通过） |
 | `py/tests/test_nightly_flaky_coverage.py` | nightly `flaky-detection` 的**覆盖面**：必须覆盖实测出过问题的平台（macos/3.13、windows/3.12）、每条腿 `--reruns=0`、复刻 ci.yml 的并发配置（Linux/macOS `-n 2`、Windows `-n 0`）、矩阵值渲染后是合法 bash 且不留占位符、每条腿都得是 ci.yml 真跑过的组合；另有 `TestSlowMarkerCoverage` 核对**每个含 `slow` 的文件都被某条腿真跑到**（见 §9） |
 | `py/tests/test_env_example_drift.py` | `.env.example` ↔ 代码实读的 `MAOP_*` 变量双向一致（两条来源都要算：`os.getenv` 直读 + `MAOPSettings` 的 `env_prefix`/`AliasChoices` 映射）；反向不许留下无说明的"没人认的开关"；企业版变量走 `ENTERPRISE_SIDE_VARS` 逐条登记 |
 | `py/scripts/check_config_drift.py`（lint 作业内执行） | `os.getenv` 与 `os.environ` 的计数棘轮：**只许降不许升**，抬基线必须在文件里逐条写明新增来源与理由（2026-10-20 的 229→240 即引导层 home/cli、跨进程深度标记、每请求 owner 判定三组）；同作业还比对四处版本站点 |

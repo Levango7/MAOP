@@ -18,6 +18,17 @@ def db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return path
 
 
+def _backdate(db: Path, *, trace_id: str, stamp: str) -> None:
+    """Age an event. ``record_run_event`` always stamps "now", so window and
+    retention behaviour can only be pinned by rewriting the stored timestamp."""
+    with sqlite3.connect(str(db)) as conn:
+        conn.execute(
+            "UPDATE run_events SET timestamp = ? WHERE trace_id = ?",
+            (stamp, trace_id),
+        )
+        conn.commit()
+
+
 def test_record_and_fetch_preserves_order(db: Path) -> None:
     assert ev.record_run_event("t1", "run.started", payload={"task": "重构 auth"})
     assert ev.record_run_event("t1", "run.step", agent="claude", step=1,
@@ -117,3 +128,93 @@ async def test_loop_run_writes_timeline(tmp_path: Path) -> None:
     runs = ev.fetch_recent_runs(limit=3)
     assert runs[0]["trace_id"] == result.trace_id
     assert runs[0]["task"] == "写一句中文问候"
+
+
+# ── rollups: the bridge reads statistics from this table ────────────
+
+
+def test_agent_rollup_counts_steps_only(db: Path) -> None:
+    ev.record_run_event("r1", "run.started", agent="claude")
+    ev.record_run_event("r1", "run.step", agent="claude", status="ok", duration_ms=100)
+    ev.record_run_event("r1", "run.step", agent="claude", status="failed", duration_ms=200)
+    ev.record_run_event("r2", "run.step", agent="codex", status="ok", duration_ms=50)
+    ev.record_run_event("r2", "run.verify", agent="codex", status="passed")
+
+    rollup = {row["agent"]: row for row in ev.agent_rollup()}
+    assert set(rollup) == {"claude", "codex"}
+    assert (rollup["claude"]["total"], rollup["claude"]["successes"]) == (2, 1)
+    assert rollup["claude"]["success_rate"] == 0.5
+    assert rollup["claude"]["avg_duration_ms"] == 150
+    assert (rollup["codex"]["total"], rollup["codex"]["successes"]) == (1, 1)
+
+
+def test_agent_rollup_ignores_events_without_agent(db: Path) -> None:
+    # An unattributed attempt must not invent a nameless bucket.
+    ev.record_run_event("r3", "run.step", agent="", status="ok")
+    assert ev.agent_rollup() == []
+    assert ev.recent_steps() == []
+
+
+def test_agent_rollup_window_is_not_vacuous(db: Path) -> None:
+    from datetime import datetime, timezone
+
+    ev.record_run_event("r4", "run.step", agent="claude", status="ok")
+    _backdate(db, trace_id="r4", stamp="2000-01-01T00:00:00+00:00")
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    assert ev.agent_rollup(now) == []
+    assert [r["agent"] for r in ev.agent_rollup("1999-01-01T00:00:00+00:00")] == ["claude"]
+    assert [r["agent"] for r in ev.agent_rollup()] == ["claude"]
+
+
+def test_recent_steps_flattens_payload_for_the_live_panel(db: Path) -> None:
+    ev.record_run_event(
+        "r5", "run.step", agent="claude", status="failed", duration_ms=77,
+        payload={"task": "跑测试", "exit_code": 2},
+    )
+    rows = ev.recent_steps()
+    assert len(rows) == 1
+    assert rows[0]["agent"] == "claude"
+    assert rows[0]["task"] == "跑测试"
+    assert rows[0]["exit_code"] == 2
+    assert rows[0]["duration_ms"] == 77
+    assert rows[0]["status"] == "failed"
+    assert rows[0]["trace_id"] == "r5"
+
+
+def test_recent_steps_newest_first_and_limited(db: Path) -> None:
+    for index in range(3):
+        ev.record_run_event(f"t{index}", "run.step", agent="claude", status="ok",
+                            payload={"task": f"任务{index}", "exit_code": 0})
+    assert [r["task"] for r in ev.recent_steps(limit=2)] == ["任务2", "任务1"]
+
+
+# ── retention: append-only must still be bounded ────────────────────
+
+
+def test_prune_removes_only_rows_outside_the_window(db: Path) -> None:
+    ev.record_run_event("fresh", "run.step", agent="claude", status="ok")
+    ev.record_run_event("stale", "run.step", agent="claude", status="ok")
+    _backdate(db, trace_id="stale", stamp="2000-01-01T00:00:00+00:00")
+
+    assert ev.prune_run_events(older_than_days=30) == 1
+    assert len(ev.fetch_run_events("fresh")) == 1
+    assert ev.fetch_run_events("stale") == []
+
+
+def test_prune_clamps_a_zero_window_instead_of_wiping_the_ledger(db: Path) -> None:
+    ev.record_run_event("r6", "run.step", agent="claude", status="ok")
+    assert ev.prune_run_events(older_than_days=0) == 0
+    assert len(ev.fetch_run_events("r6")) == 1
+
+
+def test_rollups_and_prune_degrade_to_empty_on_storage_errors(
+    db: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _boom(*args: Any, **kwargs: Any):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(ev, "sqlite_connect", _boom)
+    assert ev.agent_rollup() == []
+    assert ev.recent_steps() == []
+    assert ev.prune_run_events() == 0

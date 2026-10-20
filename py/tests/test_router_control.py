@@ -353,6 +353,26 @@ class TestControlMaintain:
         data = resp.json()
         assert data["action"] == "prune"
 
+    def test_prune_ages_out_run_events_too(self, client, temp_maop_root):
+        """The action must reach the timeline, not only the memory store."""
+        import sqlite3
+
+        from maop.core import run_events as ev
+
+        assert ev.record_run_event("stale-1", "run.step", agent="claude", status="ok")
+        db_path = ev.get_db_path("run_events", legacy_fallback="maop")
+        with sqlite3.connect(str(db_path)) as conn:
+            conn.execute(
+                "UPDATE run_events SET timestamp = '2000-01-01T00:00:00+00:00' "
+                "WHERE trace_id = 'stale-1'"
+            )
+            conn.commit()
+
+        resp = client.post("/api/control/maintain", json={"action": "prune"})
+        assert resp.status_code == 200
+        assert resp.json()["run_events_pruned"] >= 1
+        assert ev.fetch_run_events("stale-1") == []
+
     def test_health(self, client, temp_maop_root):
         resp = client.post("/api/control/maintain", json={"action": "health"})
         assert resp.status_code == 200

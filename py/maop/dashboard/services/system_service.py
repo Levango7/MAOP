@@ -450,8 +450,12 @@ async def maintain_log_rotate() -> dict[str, Any]:
 
 
 async def maintain_prune() -> dict[str, Any]:
-    """prune maintenance: clean expired memory entries."""
+    """prune maintenance: clean expired memory entries and run history."""
     try:
+        from maop.core.run_events import DEFAULT_RETENTION_DAYS, prune_run_events
+        # First, and never raising: a memory-store failure below must not cost
+        # the caller the timeline prune they asked for.
+        run_events_pruned = prune_run_events(older_than_days=DEFAULT_RETENTION_DAYS)
         from maop.memory.store import MemoryStore
         store = MemoryStore(root_dir=str(state.MAOP_ROOT))
         stats_before = store.stats()
@@ -478,7 +482,8 @@ async def maintain_prune() -> dict[str, Any]:
         total_after = stats_dict_after.get("total_entries", 0)
         return {"status": "ok", "action": "prune", "pruned": pruned_count,
                 "remaining": total_after, "total_before": total_before,
-                "pruned_ids": list(pruned_ids)[:20]}
+                "pruned_ids": list(pruned_ids)[:20],
+                "run_events_pruned": run_events_pruned}
     except Exception:
         logger.exception("Prune failed")
         # H-2 fix: exception branch must raise 500, not 200 + status=error.

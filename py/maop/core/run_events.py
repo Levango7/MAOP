@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
@@ -172,3 +172,111 @@ def fetch_recent_runs(limit: int = 20) -> list[dict[str, Any]]:
             "status": "finished" if finished else "incomplete",
         })
     return summaries
+
+
+#: One ``run.step`` event is one delegation attempt — the row the
+#: ``delegations`` table was supposed to hold but never did (no production
+#: writer ever called ``insert_delegation``).
+STEP_KIND = "run.step"
+
+#: Days of history ``prune_run_events`` keeps when the caller has no opinion.
+DEFAULT_RETENTION_DAYS = 30
+
+
+def agent_rollup(since: str | None = None) -> list[dict[str, Any]]:
+    """Per-agent attempt totals, read from the event spine.
+
+    ``since`` is compared lexicographically against the seconds-precision
+    timestamps written here, so callers must format it with
+    ``timespec="seconds"``; ``None`` means all history.
+    """
+    sql = (
+        "SELECT agent, COUNT(*) AS total,"
+        " SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) AS successes,"
+        " AVG(duration_ms) AS avg_duration_ms"
+        " FROM run_events WHERE kind = ? AND agent <> ?"
+    )
+    params: list[Any] = [STEP_KIND, ""]
+    if since is not None:
+        sql += " AND timestamp >= ?"
+        params.append(since)
+    sql += " GROUP BY agent"
+    db_path = get_db_path("run_events", legacy_fallback="maop")
+    try:
+        with sqlite_connect(db_path) as conn:
+            conn.executescript(SCHEMA_DDL)
+            rows = conn.execute(sql, tuple(params)).fetchall()
+    except sqlite3.Error as exc:
+        logger.warning("[run_events] agent rollup failed: %s", exc)
+        return []
+    rollup: list[dict[str, Any]] = []
+    for row in rows:
+        total = int(row["total"] or 0)
+        successes = int(row["successes"] or 0)
+        rollup.append({
+            "agent": row["agent"],
+            "total": total,
+            "successes": successes,
+            "success_rate": (successes / total) if total else 0.0,
+            "avg_duration_ms": int(row["avg_duration_ms"] or 0),
+        })
+    return rollup
+
+
+def recent_steps(limit: int = 20, since: str | None = None) -> list[dict[str, Any]]:
+    """Newest delegation attempts, flattened for the live panel."""
+    sql = (
+        "SELECT * FROM run_events WHERE kind = ? AND agent <> ?"
+    )
+    params: list[Any] = [STEP_KIND, ""]
+    if since is not None:
+        sql += " AND timestamp >= ?"
+        params.append(since)
+    sql += " ORDER BY id DESC LIMIT ?"
+    params.append(int(limit))
+    db_path = get_db_path("run_events", legacy_fallback="maop")
+    try:
+        with sqlite_connect(db_path) as conn:
+            conn.executescript(SCHEMA_DDL)
+            rows = conn.execute(sql, tuple(params)).fetchall()
+    except sqlite3.Error as exc:
+        logger.warning("[run_events] recent-step read failed: %s", exc)
+        return []
+    steps: list[dict[str, Any]] = []
+    for row in rows:
+        event = _row_to_event(row)
+        payload = event["payload"]
+        steps.append({
+            "agent": event["agent"],
+            "task": str(payload.get("task", "")),
+            "exit_code": int(payload.get("exit_code", 0) or 0),
+            "duration_ms": event["duration_ms"],
+            "timestamp": event["timestamp"],
+            "status": event["status"],
+            "trace_id": event["trace_id"],
+        })
+    return steps
+
+
+def prune_run_events(older_than_days: int = DEFAULT_RETENTION_DAYS) -> int:
+    """Delete events older than the retention window; returns rows removed.
+
+    A bounded window is deliberate: ``run_events`` is append-only, so without a
+    prune one chatty agent grows ``maop.db`` forever — while the window still has
+    to stay wide enough that a run is reviewable after the fact.
+    """
+    days = max(int(older_than_days), 1)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(
+        timespec="seconds"
+    )
+    db_path = get_db_path("run_events", legacy_fallback="maop")
+    try:
+        with sqlite_connect(db_path) as conn:
+            conn.executescript(SCHEMA_DDL)
+            cursor = conn.execute(
+                "DELETE FROM run_events WHERE timestamp < ?", (cutoff,)
+            )
+            return int(cursor.rowcount or 0)
+    except sqlite3.Error as exc:
+        logger.warning("[run_events] prune failed: %s", exc)
+        return 0

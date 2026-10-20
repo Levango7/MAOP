@@ -44,6 +44,13 @@ CREATE TABLE IF NOT EXISTS api_keys (
 
 ### delegations
 
+> **Legacy / no writer.** `MaopDatabase.insert_delegation()` is only ever called
+> from tests, so this table stays empty in a real install and every read against
+> it returns zeros. The per-run record that is actually written is
+> [`run_events`](#2b-run-events--corerun_eventspy) (M1); the remaining readers are
+> registered as shrinking debt in `py/tests/test_delegations_table_readers.py`.
+> Do not add a new reader of this table.
+
 Agent delegation/invocation history with routing and execution results.
 
 | Column | Type | Constraints | Description |
@@ -177,6 +184,50 @@ CREATE TABLE IF NOT EXISTS error_log (
   duration_ms INT
 );
 ```
+
+---
+
+## 2b. Run Events — `core/run_events.py`
+
+### run_events
+
+Append-only per-run timeline — the source of truth for "what happened in run X"
+(M1). Events are inserted, never updated, and keyed by `trace_id` with a
+per-trace `seq`. Bookkeeping failures are logged, not raised, so a storage
+problem cannot kill a run.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | Auto-increment ID |
+| trace_id | TEXT | NOT NULL | Trace ID threaded through routing, memory and cost |
+| seq | INTEGER | NOT NULL | Position within this trace (1-based, gapless) |
+| kind | TEXT | NOT NULL | `run.started` / `run.plan` / `run.step` / `run.verify` / `run.cost` / `run.finished` |
+| agent | TEXT | DEFAULT '' | Agent the event is attributed to |
+| step | INTEGER | DEFAULT 0 | Attempt number within the execute phase |
+| status | TEXT | DEFAULT '' | `ok` / `failed` (steps), `passed` / `failed` / `error` (verify) |
+| duration_ms | INTEGER | DEFAULT 0 | Measured duration for this event |
+| payload | TEXT | DEFAULT '{}' | JSON detail; strings clipped to 2000 characters |
+| timestamp | TEXT | NOT NULL | ISO-8601 UTC, seconds precision |
+
+```sql
+CREATE TABLE IF NOT EXISTS run_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  trace_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  agent TEXT DEFAULT '',
+  step INTEGER DEFAULT 0,
+  status TEXT DEFAULT '',
+  duration_ms INTEGER DEFAULT 0,
+  payload TEXT DEFAULT '{}',
+  timestamp TEXT NOT NULL
+);
+```
+
+One `run.step` row is one delegation attempt, which is what the bridge's
+`report()`, `agent_stats()` and `live()` aggregate. Retention is bounded by
+`prune_run_events()` (30 days by default), invoked by the dashboard's
+`prune` maintenance action.
 
 ---
 
@@ -1685,6 +1736,7 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
 |---|-----------|-------------|--------|
 | 1 | Authentication | core/security/auth.py | api_keys |
 | 2 | Core Data | core/backends/data.py | delegations, metrics, checkpoints, circuit_breaker, error_log |
+| 2b | Run Events | core/run_events.py | run_events |
 | 3 | Session | core/security/session.py | sessions |
 | 4 | Circuit Breaker | core/reliability/circuit_breaker.py | circuit_breaker_state, failover_chains, breaker_events |
 | 5 | API Key Vault | core/security/api_key_vault.py | api_keys |

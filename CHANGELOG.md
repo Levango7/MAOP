@@ -39,6 +39,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 数据层纠偏：看板统计此前一直读一张没人写的表（#54）
+
+`delegations` 表 schema 完备、列齐全，但 `MaopDatabase.insert_delegation()`
+**只有测试在调用**（实测：产品码里除定义处零调用点）。于是所有读它的地方不是报错、
+而是**自信地报 0**——`_query_maop_sync` 把异常吞成 `logger.warning` + `[]`。
+`delegations` 的读者按 AST 数（剥掉 docstring/散文）共 **13 处**，本次改掉其中 3 处：
+
+- `DataProxy.report()`（`/api/report`）、`agent_stats()`（Overview 的每 agent
+  `total_delegations`/成功率）、`live()`（`recent_delegations` 与 `requests_per_min`）
+  改读 `run_events`：一次 `run.step` 事件 = 一次委派尝试（`status='ok'` 计成功）。
+  新增 `run_events.agent_rollup(since)` 与 `recent_steps(limit, since)`，
+  由本模块自己解析库路径（`MAOP_DB_PER_MODULE=1` 时与 `get_db_path()` 不同文件，
+  把口径留在事实源那一侧）。
+- 时间窗改为**秒精度的 ISO** 比较（`timespec="seconds"`）：事实源写的是秒，
+  旧代码写的带微秒，字典序比较在"同一秒"上会把该算进去的行漏掉。
+- 保留期：`prune_run_events(older_than_days=30)`（append-only 不等于不许有界），
+  挂进 `POST /api/control/maintain` 的 `prune` 动作并回 `run_events_pruned`，
+  排在 memory store 之前执行——记账清理不该被别的子系统的失败带走。
+  `older_than_days` 下限钳到 1，防一句 `0` 把审计线清空。
+- 新增棘轮门禁 `py/tests/test_delegations_table_readers.py`：产品码里
+  "`FROM/INTO/UPDATE/JOIN delegations`" 的字符串字面量只准减不准加，
+  未登记的文件、超基线的总数、台账里的虚账三类都判红。基线 **13** = 本表自己的
+  写入/读取方法一对（2，只有测试调用）+ 还没改的读者 11：`provider.py` 6、
+  `data_proxy.failures()/timeseries()` 2、`channels/prompts.py` 1、`evolve.py` 1、
+  `history_analyzer.py` 1 —— 后 11 处是下一片的清单。
+- `docs/database-schema.md` 补 `run_events` 表节（§2b）并把 `delegations` 标成
+  "无写入方、读它一律 0、不要再加读者"；`evolve.py` 的 docstring 原话是
+  "This is the primary data source in production — delegations are persisted via
+  `insert_delegation()`"，与实测相反（那条路恒空，真正喂演进的是
+  `logs/delegations.json` 兜底），改为如实描述先后顺序与去处。
+
+验证：`tests/test_run_events.py` 13 例（新增 rollup/window/limit/clamp/错误退化各例）
++ `test_data_proxy_coverage.py` 改写 4 例 + 新增 `live()` 1 例 + `test_router_control.py`
+新增 1 例（从 HTTP 入口跑通 prune 真的删掉了过期事件）—— 相关三文件 **170 passed**；
+门禁自检另证：喂一份"docstring 里提到 `FROM delegations` + 代码里真读一次"的合成文件，
+只数到 1（散文不误报），且真树数到 13 == 基线。ruff/mypy/文档一致性门禁通过。
+
 ### e2e 可移植性：Windows 上整条 Playwright 腿"根本没跑"（#53）
 
 `dashboard-enterprise/playwright.config.js` 的 webServer 用 POSIX 内联赋值起后端

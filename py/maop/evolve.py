@@ -97,9 +97,14 @@ def _load_observability_data_from_db(
 ) -> list[dict[str, Any]]:
     """Load delegation history from SQLite (maop.db).
 
-    This is the primary data source in production — delegations are
-    persisted via MaopDatabase.insert_delegation().  Returns rows in the
-    same dict shape that _compute_stats expects::
+    Tried first, but it is NOT the source that actually feeds production:
+    ``MaopDatabase.insert_delegation`` has no product caller, so this table is
+    empty and the caller falls back to ``logs/delegations.json``.  The
+    per-run record that IS written is ``run_events`` (M1) — see
+    ``maop/core/run_events.py`` and the ratchet in
+    ``tests/test_delegations_table_readers.py`` for the burn-down.
+
+    Returns rows in the same dict shape that _compute_stats expects::
 
         {"agent": str, "routing_key": str, "result": {"exit_code": int, "duration_ms": int}}
 
