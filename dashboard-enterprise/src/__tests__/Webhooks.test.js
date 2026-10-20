@@ -21,7 +21,10 @@ describe('Webhooks.vue', () => {
   });
 
   const hooks = [
-    { id: 'h1', name: 'deploy', event: 'step.post_run', url: 'https://example.com/hook', enabled: true },
+    {
+      id: 'h1', name: 'deploy', event: 'step.post_run', url: 'https://example.com/hook',
+      enabled: true, timeout: 25, retry_count: 2,
+    },
   ];
   const events = [
     { name: 'step.post_run', phase: 'step', domain: 'execution' },
@@ -91,8 +94,25 @@ describe('Webhooks.vue', () => {
       name: 'notify',
       event: 'step.post_run',
       url: 'https://example.com/notify',
+      timeout: 10,
+      retry_count: 0,
       enabled: true,
     });
+    wrapper.unmount();
+  });
+
+  it('prefills timeout and retry count when editing', async () => {
+    const wrapper = await mountPage();
+    const editBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Edit');
+    expect(editBtn).toBeTruthy();
+    await editBtn.trigger('click');
+    await flushPromises();
+
+    const overlay = wrapper.find('.modal-overlay');
+    const numbers = overlay.findAll('input[type="number"]');
+    expect(numbers.length).toBe(2);
+    expect(numbers[0].element.value).toBe('25');
+    expect(numbers[1].element.value).toBe('2');
     wrapper.unmount();
   });
 });

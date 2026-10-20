@@ -99,6 +99,16 @@
               <option v-for="e in eventOptions" :key="e.name" :value="e.name">{{ e.name }}</option>
             </select>
           </label>
+          <div class="wh-form-row">
+            <label class="form-label">
+              <span>{{ t('view.webhooks.fieldTimeout') }}</span>
+              <input v-model.number="form.timeout" class="input" type="number" min="1" max="300" />
+            </label>
+            <label class="form-label">
+              <span>{{ t('view.webhooks.fieldRetry') }}</span>
+              <input v-model.number="form.retry_count" class="input" type="number" min="0" max="10" />
+            </label>
+          </div>
           <label class="form-label form-label--inline">
             <input v-model="form.enabled" type="checkbox" />
             <span>{{ t('view.webhooks.fieldEnabled') }}</span>
@@ -195,6 +205,8 @@ function defaultForm() {
     name: '',
     url: '',
     event: '',
+    timeout: 10,
+    retry_count: 0,
     enabled: true,
   };
 }
@@ -242,6 +254,8 @@ function normalizeList(d) {
     name: h.name || '',
     url: h.url || '',
     event: h.event || '',
+    timeout: h.timeout ?? 10,
+    retry_count: h.retry_count ?? 0,
     enabled: h.enabled !== false,
     last_triggered_at: h.last_triggered_at || h.last_triggered || null,
   }));
@@ -260,6 +274,8 @@ function openEdit(h) {
     name: h.name || '',
     url: h.url || '',
     event: h.event || '',
+    timeout: h.timeout ?? 10,
+    retry_count: h.retry_count ?? 0,
     enabled: h.enabled !== false,
   };
   showForm.value = true;
@@ -297,6 +313,8 @@ async function save() {
       name: form.value.name.trim(),
       event: form.value.event,
       url: form.value.url.trim(),
+      timeout: Number(form.value.timeout) || 10,
+      retry_count: Number(form.value.retry_count) || 0,
       enabled: form.value.enabled,
     };
 
@@ -417,6 +435,9 @@ onMounted(async () => {
 .btn-icon--danger:hover { color: var(--fail); border-color: var(--fail); }
 .spinning { animation: maop-spin 1s linear infinite; }
 @keyframes maop-spin { to { transform: rotate(360deg); } }
+
+/* ── 表单 ── */
+.wh-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 
 /* ── 提示 ── */
 .wh-hint {
