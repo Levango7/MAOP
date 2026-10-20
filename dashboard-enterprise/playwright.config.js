@@ -51,6 +51,13 @@ export default defineConfig({
       // 起不来（本机实测 "'MAOP_AUTH_ENABLED' is not recognized"）。
       // 显式带 process.env 打底，避免覆盖掉 PATH 等基础变量。
       //
+      // MAOP_OWNER_MODE=1：只关认证是不够的。关掉认证但不开 owner 模式时，
+      // middleware 只给 ["read"]（见 maop/core/security/middleware.py 的
+      // _disabled_auth_roles），所有 admin 端点一律 403 —— 实测后端日志里
+      // 成片的 "Admin role required"，worktrees / hooks / edition / live /
+      // runs / routing 全是空的，e2e 一直在验证一个降级应用。回环 + owner
+      // 才是 `maop start` 在个人版里给的真实身份。
+      //
       // MAOP_MULTIMODAL_PROVIDER=hash：否则后端启动会去 huggingface 拉 CLIP
       // 权重（本机实测因此花 87 秒，且网络被重置时靠 5 次重试耗满超时）。
       // e2e 不测多模态嵌入，哈希回退是确定性且足够快的选择——与
@@ -60,6 +67,7 @@ export default defineConfig({
       env: {
         ...process.env,
         MAOP_AUTH_ENABLED: '0',
+        MAOP_OWNER_MODE: '1',
         MAOP_ENV: 'test',
         MAOP_MULTIMODAL_PROVIDER: 'hash',
       },
