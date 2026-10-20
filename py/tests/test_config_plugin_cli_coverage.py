@@ -282,13 +282,13 @@ class TestCli:
     def test_cmd_validate(self, tmp_path, monkeypatch):
         # cmd_validate calls sys.exit on failure; catch SystemExit.
         from maop import cli
-        monkeypatch.setattr(cli, "MAOP_ROOT", tmp_path)
+        monkeypatch.setattr(cli, "_runtime_root", lambda: tmp_path)
         with pytest.raises((SystemExit, Exception)):
             cli.cmd_validate()
 
     def test_cmd_health(self, tmp_path, monkeypatch):
         from maop import cli
-        monkeypatch.setattr(cli, "MAOP_ROOT", tmp_path)
+        monkeypatch.setattr(cli, "_runtime_root", lambda: tmp_path)
         with pytest.raises((SystemExit, Exception)):
             cli.cmd_health()
 

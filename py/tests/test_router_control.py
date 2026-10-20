@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -60,7 +61,7 @@ def clean_cache(monkeypatch):
 
 
 @pytest.fixture
-def client():
+def client(temp_maop_root):
     return TestClient(_make_app())
 
 
@@ -84,6 +85,33 @@ class TestControlStatus:
         assert data["jobs"][0]["task"] == "t1"
         assert "process" not in data["jobs"][0]
 
+    def test_status_excludes_drain_task_and_includes_capture(self, client, clean_jobs):
+        class _DoneTask:
+            def done(self) -> bool:
+                return True
+
+        proc = _fake_proc(returncode=0)
+        clean_jobs["j1"] = {
+            "action": "run", "status": "running", "task": "t1",
+            "process": proc, "_drain_task": _DoneTask(),
+            "stdout": "ok\n", "stderr": "warn\n",
+        }
+        resp = client.get("/api/control/status")
+        assert resp.status_code == 200
+        job = resp.json()["jobs"][0]
+        assert "_drain_task" not in job
+        assert job["stdout"] == "ok\n"
+        assert job["stderr"] == "warn\n"
+
+    def test_job_detail_returns_capture(self, client, clean_jobs):
+        clean_jobs["j1"] = {
+            "action": "run", "status": "completed", "task": "t1",
+            "stdout": "done", "stderr": "",
+        }
+        resp = client.get("/api/control/jobs/j1")
+        assert resp.status_code == 200
+        assert resp.json()["job"]["stdout"] == "done"
+
     def test_completed_job(self, client, clean_jobs):
         proc = _fake_proc(returncode=0)
         clean_jobs["j1"] = {"action": "run", "status": "running", "task": "t1", "process": proc}
@@ -99,6 +127,47 @@ class TestControlStatus:
         data = resp.json()
         assert data["jobs"][0]["status"] == "failed"
         assert data["jobs"][0]["exit_code"] == 1
+
+
+class TestControlHistory:
+    def _write(self, root, records):
+        path = root / "data" / "control_jobs.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records),
+            encoding="utf-8",
+        )
+
+    def test_persisted_job_is_listed_and_readable_after_restart(
+        self, client, temp_maop_root, clean_jobs
+    ):
+        self._write(temp_maop_root, [
+            {"id": "old1", "action": "run", "status": "completed",
+             "task": "旧任务", "start": "2026-10-19T10:00:00",
+             "finished_at": "2026-10-19T10:00:05",
+             "exit_code": 0, "stdout": "done", "stderr": ""},
+        ])
+        data = client.get("/api/control/status").json()
+        assert data["count"] == 1
+        assert data["jobs"][0]["id"] == "old1"
+        assert data["jobs"][0]["task"] == "旧任务"
+        detail = client.get("/api/control/jobs/old1")
+        assert detail.status_code == 200
+        assert detail.json()["job"]["stdout"] == "done"
+
+    def test_last_record_per_id_wins_and_stale_running_is_interrupted(
+        self, client, temp_maop_root, clean_jobs
+    ):
+        self._write(temp_maop_root, [
+            {"id": "j2", "status": "running", "task": "t", "start": "2026-10-19T10:00:00"},
+            {"id": "j2", "status": "failed", "task": "t", "start": "2026-10-19T10:00:00",
+             "exit_code": 1},
+            {"id": "j3", "status": "running", "task": "stale", "start": "2026-10-19T11:00:00"},
+        ])
+        jobs = {job["id"]: job for job in client.get("/api/control/status").json()["jobs"]}
+        assert jobs["j2"]["status"] == "failed"
+        assert jobs["j2"]["exit_code"] == 1
+        assert jobs["j3"]["status"] == "interrupted"
 
 
 # ── POST /api/control/run ──────────────────────────────────────────
@@ -122,6 +191,13 @@ class TestControlRunPost:
         assert data["status"] == "ok"
         assert data["task"] == "hello"
         assert data["job_id"] in clean_jobs
+
+    def test_unicode_task_is_accepted(self, client, temp_maop_root, clean_jobs):
+        fake_proc = _fake_proc(returncode=None)
+        with patch.object(ctrl.asyncio, "create_subprocess_exec", new_callable=AsyncMock, return_value=fake_proc):
+            resp = client.post("/api/control/run", json={"task": "重构 auth 模块，改用 JWT。"})
+        assert resp.status_code == 200
+        assert resp.json()["task"] == "重构 auth 模块，改用 JWT。"
 
     def test_workflow_param_used_as_task(self, client, temp_maop_root, clean_jobs):
         fake_proc = _fake_proc(returncode=None)

@@ -638,9 +638,31 @@ class TestWorkflowRun:
         resp = client_coverage.post("/api/workflow/run", json={"name": "bad/name"})
         assert resp.status_code == 400
 
-    def test_invalid_task(self, client_coverage):
-        """POST /api/workflow/run with invalid task name returns 400."""
-        resp = client_coverage.post("/api/workflow/run", json={"name": "valid", "task": "bad/task"})
+    def test_task_text_allows_unicode_and_punctuation(self, client_coverage, monkeypatch):
+        """Task text is an argv element, so Chinese and slashes are valid."""
+        import asyncio
+
+        class FakeProc:
+            returncode = 0
+
+            async def communicate(self):
+                return (b"", b"")
+
+        async def fake_exec(*args, **kwargs):
+            return FakeProc()
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        resp = client_coverage.post(
+            "/api/workflow/run",
+            json={"name": "valid", "task": "修复 auth/登录：中文，标点。"},
+        )
+        assert resp.status_code == 200
+
+    def test_task_text_rejects_nul(self, client_coverage):
+        """A NUL byte cannot be passed through exec."""
+        resp = client_coverage.post(
+            "/api/workflow/run", json={"name": "valid", "task": "bad\x00task"}
+        )
         assert resp.status_code == 400
 
     def test_valid_name_starts_job(self, client_coverage, monkeypatch):

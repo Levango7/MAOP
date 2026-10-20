@@ -16,11 +16,12 @@ import importlib
 import os
 import threading
 import time
-from pathlib import Path
 from typing import Any
 
 # ── Paths ──────────────────────────────────────────────────────────
-MAOP_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+from maop.config.home import resolve_maop_root
+
+MAOP_ROOT = resolve_maop_root()
 SRC_DIR = MAOP_ROOT / "src"
 DASH_DIR = MAOP_ROOT / "dashboard"
 

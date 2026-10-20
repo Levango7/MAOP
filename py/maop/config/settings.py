@@ -338,10 +338,16 @@ class MAOPSettings(BaseSettings):
         return v
 
     def resolved_root_dir(self) -> Path:
-        """Get resolved root directory."""
+        """Get resolved root directory.
+
+        Uses the shared home resolver so a wheel install writes into
+        ``~/.maop`` instead of ``site-packages``.
+        """
         if self.root_dir:
-            return Path(self.root_dir).resolve()
-        return Path(__file__).resolve().parent.parent
+            return Path(self.root_dir).expanduser().resolve()
+        from maop.config.home import resolve_maop_root
+
+        return resolve_maop_root()
 
     def resolved_data_dir(self) -> Path:
         """Get resolved data directory."""

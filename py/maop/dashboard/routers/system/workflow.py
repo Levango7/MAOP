@@ -67,11 +67,10 @@ async def api_workflow_run(body: WorkflowRunRequest, request: Request) -> dict[s
             400,
             "invalid workflow name: only alphanumeric, spaces, dots, hyphens, underscores allowed",
         )
-    if task and not _re.match(r'^[a-zA-Z0-9_\-\s\.]+$', task):
-        raise HTTPException(
-            400,
-            "invalid task name: only alphanumeric, spaces, dots, hyphens, underscores allowed",
-        )
+    # Task text is passed as one argv element (no shell), so it may contain
+    # Chinese and punctuation. Only NUL and the length cap are unsafe.
+    if task and ("\x00" in task or len(task) > 10_000):
+        raise HTTPException(400, "invalid task text")
 
     job_id = _uuid.uuid4().hex[:8]
     # Use a proper Python module approach instead of injecting code into -c

@@ -190,6 +190,27 @@ build-backend = "hatchling.build"
 # 否则 hatchling 会找 maop_orchestrator/ 目录（不存在）。
 [tool.hatch.build.targets.wheel]
 packages = ["maop"]
+# M0: a pip-installed wheel must be a runnable product, not just an importable
+# library. Ship the default config and the built Vue dashboard so `maop init`
+# can create a usable home (~/.maop) without a git checkout. The dashboard
+# directory is produced by `cd dashboard-enterprise && npm run build` before
+# building the wheel (CI does this in the release/first-run jobs).
+[tool.hatch.build.targets.wheel.force-include]
+"../config" = "maop/_assets/config"
+"../dashboard/dist-enterprise" = "maop/_assets/dashboard/dist-enterprise"
+# The dashboard bundle is a build artifact, not a tracked file. A plain
+# `pip install "...#subdirectory=py"` has no dist/ yet; the hook drops just
+# that entry instead of failing the whole install.
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "hatch_build.py"
+
+# The sdist must already contain the assets so a wheel built from it (where
+# ../config does not exist) is still runnable.
+[tool.hatch.build.targets.sdist.force-include]
+"../config" = "maop/_assets/config"
+"../dashboard/dist-enterprise" = "maop/_assets/dashboard/dist-enterprise"
+[tool.hatch.build.targets.sdist.hooks.custom]
+path = "hatch_build.py"
 
 # ADR-017: 双仓库物理隔离 — enterprise/ 模块已移至私有仓库 Levango7/MAOS。
 # H3 修复：原 [tool.hatch.build] exclude = ["maop/enterprise"] 配置指向不存在的

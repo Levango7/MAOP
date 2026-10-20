@@ -21,6 +21,28 @@ from starlette.middleware.base import BaseHTTPMiddleware
 logger = logging.getLogger(__name__)
 
 
+def _is_loopback_host(host: str) -> bool:
+    """Return True only for loopback client addresses.
+
+    ``request.client.host`` is the transport peer, not a spoofable
+    ``X-Forwarded-For`` header, so owner mode cannot be claimed by a
+    remote caller behind the same server.
+    """
+    value = (host or "").strip().lower()
+    return value in {"127.0.0.1", "::1", "localhost"} or value.startswith("127.")
+
+
+def _disabled_auth_roles(host: str) -> tuple[list[str], str]:
+    """Roles/identity for an auth-disabled request (owner mode or guest)."""
+    import os
+
+    if os.environ.get("MAOP_OWNER_MODE", "0").strip().lower() in {
+        "1", "true", "yes", "on"
+    } and _is_loopback_host(host):
+        return ["owner", "admin", "superadmin"], "owner"
+    return ["read"], "anonymous"
+
+
 # ── Auth Middleware ────────────────────────────────────────────────
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -79,24 +101,27 @@ class AuthMiddleware(BaseHTTPMiddleware):
     async def _dispatch_disabled(
         self, request: Request, call_next: Callable
     ) -> Response:
-        """Handle the auth-disabled branch: grant anonymous READ-ONLY role.
+        """Handle the auth-disabled branch.
 
-        Security (P0-4 fix): always ``read`` role — never ``admin``. The
-        previous ``MAOP_AUTH_DISABLED_ADMIN=1`` flag granted anonymous users
-        admin role while auth was disabled, a dangerous misconfiguration
-        footgun. The flag is now DEPRECATED and IGNORED. Operators who need
-        admin access must set MAOP_AUTH_ENABLED=1 and log in normally.
+        Default is still anonymous read-only. The one exception is the
+        single-user *owner mode* that ``maop start`` enables for a personal
+        edition bound to loopback: without it the local dashboard is a
+        read-only museum and every run endpoint answers 403. Owner mode is
+        gated on both the explicit ``MAOP_OWNER_MODE`` env and a loopback
+        client, so disabling auth on a remote bind never grants admin.
         """
         import os
         # 检测废弃标志并警告
         if os.environ.get("MAOP_AUTH_DISABLED_ADMIN", "0") == "1":
             logger.warning(
                 "MAOP_AUTH_DISABLED_ADMIN is DEPRECATED and IGNORED. "
-                "Auth-disabled mode always grants read-only role. "
-                "Set MAOP_AUTH_ENABLED=1 and log in for admin access."
+                "Use MAOP_OWNER_MODE=1 with a loopback bind for the local "
+                "single-user owner role."
             )
-        request.state.auth_roles = ["read"]
-        request.state.auth_identity = "anonymous"
+        client_host = getattr(getattr(request, "client", None), "host", "") or ""
+        roles, identity = _disabled_auth_roles(client_host)
+        request.state.auth_roles = roles
+        request.state.auth_identity = identity
         request.state.tenant_id = ""
         return cast(Response, await call_next(request))
 

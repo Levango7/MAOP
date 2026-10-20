@@ -30,7 +30,6 @@ import os
 import signal
 import sys
 from contextlib import asynccontextmanager, suppress
-from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
@@ -67,33 +66,28 @@ def _warn_deprecated_env_aliases() -> None:
 _warn_deprecated_env_aliases()
 
 # ── Paths ──────────────────────────────────────────────────────────
-# 3f335fb: env first, path-derivation fallback. The derivation assumes the
-# repo layout py/maop/dashboard/... — inside the container maop/ sits at
-# /app/maop (one level shallower), so parents[3] resolved to "/" and the
-# backup scheduler tried to mkdir /data (Permission denied in the
-# compose-smoke logs). get_root_dir() honors MAOP_ROOT_DIR / MAOP_ROOT
-# (the container sets MAOP_ROOT=/app) with the derivation as last resort.
-try:
-    from maop.config.env import get_root_dir as _get_root_dir
+# One resolver for source checkouts, wheel installs and containers.  The
+# old __file__-based derivation pointed at site-packages after pip install.
+from maop.config.home import dashboard_dir as _resolve_dashboard_dir
+from maop.config.home import resolve_maop_root as _resolve_maop_root
 
-    MAOP_ROOT = _get_root_dir(default=Path(__file__).resolve().parent.parent.parent.parent)
-except Exception:
-    MAOP_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+MAOP_ROOT = _resolve_maop_root()
 DASH_DIR = MAOP_ROOT / "dashboard"
 DASH_VUE3_DIST_DIR = MAOP_ROOT / "dashboard" / "dist-enterprise"
 DASH_VUE3_SRC_DIR = MAOP_ROOT / "dashboard-enterprise"
 
 # Unified Vue3 serve directory (both personal & enterprise):
-#   dist-enterprise (Vite build) > dashboard-enterprise (dev source)
+#   dist-enterprise (Vite build) > packaged wheel asset > dev source.
 #   (Legacy native JS dashboard was removed in v4; see git history.)
 from maop.config.settings import get_settings as _get_settings
 
 _edition_cfg = _get_settings()
-if DASH_VUE3_DIST_DIR.exists():
-    _SERVE_DIR = DASH_VUE3_DIST_DIR
-elif DASH_VUE3_SRC_DIR.exists():
+_resolved_dashboard = _resolve_dashboard_dir(MAOP_ROOT)
+if _resolved_dashboard is not None and _resolved_dashboard.name == "dist-enterprise":
+    _SERVE_DIR = _resolved_dashboard
+elif _resolved_dashboard is not None:
     # P2-18 fix: dev source dir is not buildable — warn clearly
-    _SERVE_DIR = DASH_VUE3_SRC_DIR
+    _SERVE_DIR = _resolved_dashboard
     logger.warning(
         "[server] Using dashboard-enterprise/ source dir (dev mode). "
         "Vue .vue files cannot be served as static assets — run "
