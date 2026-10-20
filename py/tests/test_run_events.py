@@ -189,6 +189,40 @@ def test_recent_steps_newest_first_and_limited(db: Path) -> None:
     assert [r["task"] for r in ev.recent_steps(limit=2)] == ["任务2", "任务1"]
 
 
+def test_failed_steps_keeps_error_text_and_drops_successes(db: Path) -> None:
+    ev.record_run_event("r6", "run.step", agent="claude", status="ok",
+                        payload={"task": "成的", "exit_code": 0})
+    ev.record_run_event("r6", "run.step", agent="claude", status="failed",
+                        payload={"task": "崩的", "exit_code": 3, "error": "适配器超时"})
+    rows = ev.failed_steps()
+    assert [r["task"] for r in rows] == ["崩的"]
+    assert rows[0]["error"] == "适配器超时"
+    assert rows[0]["exit_code"] == 3
+    assert rows[0]["status"] == "failed"
+
+
+def test_hourly_rollup_buckets_steps_and_ignores_other_kinds(db: Path) -> None:
+    ev.record_run_event("h1", "run.step", agent="claude", status="ok", duration_ms=100)
+    ev.record_run_event("h2", "run.step", agent="claude", status="failed", duration_ms=300)
+    ev.record_run_event("h3", "run.verify", agent="claude", status="passed")
+    _backdate(db, trace_id="h2", stamp="2026-10-19T05:07:11+00:00")
+
+    buckets = ev.hourly_rollup("2026-01-01T00:00:00+00:00")
+    by_hour = {b["hour"]: b for b in buckets}
+    assert by_hour["2026-10-19T05:00:00"] == {
+        "hour": "2026-10-19T05:00:00", "total": 1, "successes": 0, "avg_duration_ms": 300,
+    }
+    assert sum(b["total"] for b in buckets) == 2
+    assert sum(b["successes"] for b in buckets) == 1
+
+
+def test_hourly_rollup_window_excludes_older_hours(db: Path) -> None:
+    ev.record_run_event("h4", "run.step", agent="claude", status="ok")
+    _backdate(db, trace_id="h4", stamp="2020-05-05T05:05:05+00:00")
+    assert ev.hourly_rollup("2021-01-01T00:00:00+00:00") == []
+    assert len(ev.hourly_rollup("2019-01-01T00:00:00+00:00")) == 1
+
+
 # ── retention: append-only must still be bounded ────────────────────
 
 
@@ -217,4 +251,6 @@ def test_rollups_and_prune_degrade_to_empty_on_storage_errors(
     monkeypatch.setattr(ev, "sqlite_connect", _boom)
     assert ev.agent_rollup() == []
     assert ev.recent_steps() == []
+    assert ev.failed_steps() == []
+    assert ev.hourly_rollup("2020-01-01T00:00:00+00:00") == []
     assert ev.prune_run_events() == 0

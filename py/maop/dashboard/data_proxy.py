@@ -39,7 +39,12 @@ from typing import Any
 from pydantic import BaseModel
 
 from maop.core.backends.db_utils import get_db_path, get_pool
-from maop.core.run_events import agent_rollup, recent_steps
+from maop.core.run_events import (
+    agent_rollup,
+    failed_steps,
+    hourly_rollup,
+    recent_steps,
+)
 from maop.dashboard.channels.mcp import McpMixin
 from maop.dashboard.channels.models import ModelsMixin
 from maop.dashboard.channels.prompts import PromptsMixin
@@ -350,13 +355,11 @@ class DataProxy(
     async def failures(self, hours: int = 24) -> list[dict[str, Any]]:
         """Failure report — replaces correlation.ps1 -Action failures."""
         start = time.monotonic()
-        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-
-        rows = await self._query_maop(
-            "SELECT agent, task, exit_code, error, duration_ms, timestamp "
-            "FROM delegations WHERE exit_code != 0 AND timestamp >= ? "
-            "ORDER BY timestamp DESC LIMIT 50",
-            (since,),
+        since = (
+            datetime.now(timezone.utc) - timedelta(hours=hours)
+        ).isoformat(timespec="seconds")
+        rows = await asyncio.get_running_loop().run_in_executor(
+            None, failed_steps, 50, since
         )
 
         self._record_latency(start)
@@ -365,20 +368,14 @@ class DataProxy(
     async def timeseries(self, hours: int = 168) -> list[dict[str, Any]]:
         """Time series data — replaces correlation.ps1 -Action timeseries.
 
-        Returns hourly aggregation of delegations.
+        Returns hourly aggregation of delegation attempts.
         """
         start = time.monotonic()
-        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-
-        rows = await self._query_maop(
-            "SELECT "
-            "  strftime('%Y-%m-%dT%H:00:00', timestamp) as hour, "
-            "  COUNT(*) as total, "
-            "  SUM(CASE WHEN exit_code = 0 THEN 1 ELSE 0 END) as successes, "
-            "  AVG(duration_ms) as avg_duration_ms "
-            "FROM delegations WHERE timestamp >= ? "
-            "GROUP BY hour ORDER BY hour",
-            (since,),
+        since = (
+            datetime.now(timezone.utc) - timedelta(hours=hours)
+        ).isoformat(timespec="seconds")
+        rows = await asyncio.get_running_loop().run_in_executor(
+            None, hourly_rollup, since
         )
 
         self._record_latency(start)

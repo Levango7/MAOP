@@ -39,6 +39,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 数据层纠偏第二片：`/api/failures` 与 `/api/timeseries` 也离开空表（#55 优先级 A）
+
+上一片把棘轮基线钉在 13；本片减到 **11**（独立复算：AST 数产品码里的
+`FROM/INTO delegations` 字面量 = 11，与门禁常数一致）。
+
+- `DataProxy.failures()` → 失败尝试改读 `run_events.failed_steps(limit, since)`：
+  一行 `run.step` 且 `status='failed'` 就是一次失败，错误正文取 payload 的 `error`，
+  并额外带回 `trace_id`（前端从此能跳到那次的完整时间线）。
+- `DataProxy.timeseries()` → 小时聚合改读 `run_events.hourly_rollup(since)`，
+  `strftime('%Y-%m-%dT%H:00:00', timestamp)` 与旧的 `successes / avg_duration_ms`
+  键名保持不变，只把"来源"从空表换成账本。
+- `recent_steps`/`failed_steps` 共用同一个 `_step_projection`，两条喂口的字段口径
+  从此只有 SQL 谓词这一处差异；不在两处各写一份映射（两份映射一定会有一份先改）。
+- `provider.py` 那 6 处**刻意没动**并写下理由：`DashboardProvider(` 在整个 `maop/`
+  包里只出现在它自己的 docstring 里，运行时零实例化（只被 `dashboard/__init__.py`
+  当公共导出 re-export，MAOS 侧对 `delegations` 零引用）⇒ 改它界面数字一个都不变。
+  顺序按可达性，不按台账行数。
+
+验证：`tests/test_run_events.py` 新增 4 例（失败行保留 error/exit_code 且不含成功行、
+小时分桶含跨小时的那一格、窗口外的小时被排除、两个新读法在存储错误时退化为空），
+`test_data_proxy_coverage.py` 新增 2 例（`failures()`/`timeseries()` 在真写事件之后
+**数字不为 0**：total 2 / successes 1）；棘轮登记表同步删掉 `dashboard/data_proxy.py`
+那一行、`BASELINE_TOTAL` 13→11（门禁的"虚账"检查本身就逼着删干净）。
+实测 `129 passed`（bridge + data 路由）、`21 passed`（棘轮 + 事件源）、ruff/mypy 通过。
+
 ### M1 补全：运行记录列表进 UI（`GET /api/runs` 此前没有任何调用方）
 
 第一片写完事实源与两个只读端点，但前端**只用了详情那一条**：`grep -rn "api/runs" src/`

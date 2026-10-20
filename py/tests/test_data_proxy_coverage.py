@@ -288,6 +288,38 @@ class TestReportWithData:
         assert result["success_rate"] == 66.7
 
 
+# ── failures() / timeseries() read the event spine ────────────────
+
+
+class TestFailuresAndTimeseriesFromRunEvents:
+    def test_failures_lists_failed_attempts_with_error(self, tmp_path):
+        from maop.core import run_events as ev
+
+        _init_maop_db(tmp_path)
+        ev.record_run_event("f-ok", "run.step", agent="claude", status="ok",
+                            payload={"task": "成的", "exit_code": 0})
+        ev.record_run_event("f-bad", "run.step", agent="codex", status="failed",
+                            duration_ms=40,
+                            payload={"task": "崩的", "exit_code": 78, "error": "认证失败"})
+        proxy = _make_proxy(tmp_path)
+        rows = asyncio.run(proxy.failures(hours=24))
+        assert [r["task"] for r in rows] == ["崩的"]
+        assert rows[0]["error"] == "认证失败"
+        assert rows[0]["exit_code"] == 78
+        assert rows[0]["trace_id"] == "f-bad"
+
+    def test_timeseries_buckets_attempt_counts(self, tmp_path):
+        from maop.core import run_events as ev
+
+        _init_maop_db(tmp_path)
+        ev.record_run_event("s-1", "run.step", agent="claude", status="ok", duration_ms=100)
+        ev.record_run_event("s-2", "run.step", agent="claude", status="failed", duration_ms=200)
+        proxy = _make_proxy(tmp_path)
+        buckets = asyncio.run(proxy.timeseries(hours=168))
+        assert sum(b["total"] for b in buckets) == 2
+        assert sum(b["successes"] for b in buckets) == 1
+
+
 # ── live() recent-attempt feed ──────────────────────────────────────
 
 

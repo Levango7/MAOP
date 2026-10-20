@@ -225,10 +225,29 @@ def agent_rollup(since: str | None = None) -> list[dict[str, Any]]:
 
 def recent_steps(limit: int = 20, since: str | None = None) -> list[dict[str, Any]]:
     """Newest delegation attempts, flattened for the live panel."""
-    sql = (
-        "SELECT * FROM run_events WHERE kind = ? AND agent <> ?"
+    return _select_steps(
+        "SELECT * FROM run_events WHERE kind = ? AND agent <> ?",
+        [STEP_KIND, ""],
+        since=since,
+        limit=limit,
     )
-    params: list[Any] = [STEP_KIND, ""]
+
+
+def failed_steps(limit: int = 50, since: str | None = None) -> list[dict[str, Any]]:
+    """Newest *failed* attempts with their error text, for the failures feed."""
+    return _select_steps(
+        "SELECT * FROM run_events WHERE kind = ? AND agent <> ? AND status = 'failed'",
+        [STEP_KIND, ""],
+        since=since,
+        limit=limit,
+    )
+
+
+def _select_steps(
+    base_sql: str, params: list[Any], *, since: str | None, limit: int
+) -> list[dict[str, Any]]:
+    """Shared SELECT-and-project for the step feeds (one mapping, two filters)."""
+    sql = base_sql
     if since is not None:
         sql += " AND timestamp >= ?"
         params.append(since)
@@ -240,22 +259,52 @@ def recent_steps(limit: int = 20, since: str | None = None) -> list[dict[str, An
             conn.executescript(SCHEMA_DDL)
             rows = conn.execute(sql, tuple(params)).fetchall()
     except sqlite3.Error as exc:
-        logger.warning("[run_events] recent-step read failed: %s", exc)
+        logger.warning("[run_events] step read failed: %s", exc)
         return []
-    steps: list[dict[str, Any]] = []
-    for row in rows:
-        event = _row_to_event(row)
-        payload = event["payload"]
-        steps.append({
-            "agent": event["agent"],
-            "task": str(payload.get("task", "")),
-            "exit_code": int(payload.get("exit_code", 0) or 0),
-            "duration_ms": event["duration_ms"],
-            "timestamp": event["timestamp"],
-            "status": event["status"],
-            "trace_id": event["trace_id"],
-        })
-    return steps
+    return [_step_projection(row) for row in rows]
+
+
+def _step_projection(row: sqlite3.Row) -> dict[str, Any]:
+    event = _row_to_event(row)
+    payload = event["payload"]
+    return {
+        "agent": event["agent"],
+        "task": str(payload.get("task", "")),
+        "exit_code": int(payload.get("exit_code", 0) or 0),
+        "duration_ms": event["duration_ms"],
+        "timestamp": event["timestamp"],
+        "status": event["status"],
+        "trace_id": event["trace_id"],
+        "error": str(payload.get("error", "") or ""),
+    }
+
+
+def hourly_rollup(since: str) -> list[dict[str, Any]]:
+    """Hourly attempt totals and success counts, oldest hour first."""
+    db_path = get_db_path("run_events", legacy_fallback="maop")
+    try:
+        with sqlite_connect(db_path) as conn:
+            conn.executescript(SCHEMA_DDL)
+            rows = conn.execute(
+                "SELECT strftime('%Y-%m-%dT%H:00:00', timestamp) AS hour, COUNT(*) AS total,"
+                " SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) AS successes,"
+                " AVG(duration_ms) AS avg_duration_ms"
+                " FROM run_events WHERE kind = ? AND timestamp >= ?"
+                " GROUP BY hour ORDER BY hour",
+                (STEP_KIND, since),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        logger.warning("[run_events] hourly rollup failed: %s", exc)
+        return []
+    return [
+        {
+            "hour": row["hour"],
+            "total": int(row["total"] or 0),
+            "successes": int(row["successes"] or 0),
+            "avg_duration_ms": int(row["avg_duration_ms"] or 0),
+        }
+        for row in rows
+    ]
 
 
 def prune_run_events(older_than_days: int = DEFAULT_RETENTION_DAYS) -> int:

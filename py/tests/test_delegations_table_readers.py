@@ -23,12 +23,11 @@ _SQL_PHRASE = re.compile(r"(?:FROM|INTO|UPDATE|JOIN)\s+delegations\b", re.IGNORE
 LEGACY_READERS: dict[str, int] = {
     "core/backends/data.py": 2,  # the table's own writer + reader, tests-only callers
     "dashboard/channels/prompts.py": 1,  # per-agent counts in the prompt feed
-    "dashboard/data_proxy.py": 2,  # failures() and timeseries()
-    "dashboard/provider.py": 6,  # Overview KPI totals and success rates
+    "dashboard/provider.py": 6,  # Overview KPI totals — exported, but never instantiated
     "evolve.py": 1,  # evolution sampling, falls back to logs/delegations.json
     "history_analyzer.py": 1,  # failure clustering
 }
-BASELINE_TOTAL = 13  # measured 2026-10-21 after report()/agent_stats()/live() moved
+BASELINE_TOTAL = 11  # 13 → 11 when failures() and timeseries() moved to run_events
 
 
 def _docstring_like(tree: ast.AST) -> set[int]:
