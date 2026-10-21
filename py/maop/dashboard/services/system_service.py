@@ -480,10 +480,12 @@ async def maintain_prune() -> dict[str, Any]:
         else:
             stats_dict_after = {}
         total_after = stats_dict_after.get("total_entries", 0)
+        from maop.dashboard.services import quota_audit
         return {"status": "ok", "action": "prune", "pruned": pruned_count,
                 "remaining": total_after, "total_before": total_before,
                 "pruned_ids": list(pruned_ids)[:20],
-                "run_events_pruned": run_events_pruned}
+                "run_events_pruned": run_events_pruned,
+                "quota_audit_pruned": quota_audit.prune_audit()}
     except Exception:
         logger.exception("Prune failed")
         # H-2 fix: exception branch must raise 500, not 200 + status=error.
