@@ -39,6 +39,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 静默丢弃字段扫描：engine 单步、hooks enabled/method（2026-10-21）
+
+新增 AST 扫描（比对请求模型的每个字段是否在 handler 里被读取或整体 dump），扫出
+9 处候选，逐项核对后修掉真实缺陷：
+
+- ``POST /api/engine/run``：请求模型声明 ``type/retry/timeout/on_failure``，handler
+  却写死 ``StepType.AGENT`` 且不传其余字段 ⇒ 步骤类型/重试/超时/失败策略全部被丢。
+  现按 ``/run-distributed`` 同样的方式透传（未知 type 回退 AGENT），并把两处重复的
+  类型白名单收成 ``_STEP_TYPES``。
+  ``depends_on`` 在单节点 DAG 里永远不可能满足，改为 400 明确拒绝并指向
+  run-distributed，而不是静默接受（该端点目前无前端调用方，不破坏现有 UI）。
+- ``POST /api/hooks``：``enabled: false`` 被忽略 —— ``HookManager.register()`` 恒以
+  enabled=True 落库 ⇒ "新建即停用"会变成新建即启用。现在创建后按请求停用，响应
+  与库内状态一致。
+- ``PUT /api/hooks/{id}``：``method`` 收下后丢弃（create 会拒绝非 POST，update 不会）。
+  现与 create 一致返回 400。
+- ``maop/core/mcp/mcp_adapter.py`` 的 ``sync_config`` docstring 声称会应用
+  ``enabled`` / ``auto_connect``，而 ``MCPServerConfig`` 根本没有这两个属性 ⇒ 改为如实
+  描述（未知键被忽略）。
+- 假阳性记录：``POST /api/alerts/webhook`` 把整个 payload 交给
+  ``process_alertmanager_webhook``，其中 ``alerts``/``status``/``receiver`` 确实被读取；
+  ``commonLabels``/``commonAnnotations``/``externalURL`` 是 Alertmanager 标准负载里
+  本端点不需要解析的字段（只用于日志），不算丢弃。
+  ``POST /api/chat``/``chat_stream`` 的 ``stream`` 由端点本身决定（是否流式取决于
+  选了哪个端点），不是静默丢弃。
+- **未修，需产品决策**：
+  1. ``ServerCreate.enabled`` / ``auto_connect`` 在 ``MCPServerConfig`` 与整个连接链里
+     没有对应能力，也没有启动时自动连接的消费者 ⇒ 要么实现"停用即拒绝 connect"
+     （改运行时语义），要么从 API 表面摘掉这两个假字段。
+  2. Alertmanager webhook 只写日志，不进入审计告警引擎 ⇒ 前端「告警历史」面板
+     永远看不到外部推送的告警。要不要落库属于产品口径。
+- 验证：新增 ``test_engine_router_single_step.py`` 3 条、hooks 3 条
+  （enabled=false 落库 / enabled=true 保持 / method 非 POST 400）；本分支上
+  engine+hooks+mcp 相关 8 个测试文件 160 passed；对两处修复做变异验证
+  （回退透传、去掉停用 ⇒ 对应测试转红）。
+
 ### 通知偏好：读错键、存错结构（2026-10-21）
 
 - `GET /api/notifications/preferences` 返回 `{preference: {channel_enabled, event_level_min}}`，
