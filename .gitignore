@@ -119,6 +119,11 @@ py/_*.py
 py/_shim_cleanup_report.txt
 config/agents.yaml.bak
 config/agents.yaml.bak2
+# MCP marketplace 的本地状态：`maop mcp add-registry/install` 会把它们写进项目根
+# config/（cli.py 的 _runtime_root()），属于按机器生成的数据，不入库；
+# 随包出厂的默认 registry 在 py/maop/config/mcp_marketplace.yaml，仍受版本控制。
+config/mcp_marketplace.yaml
+config/mcp_installed.yaml
 
 # -- Audit artifacts / temp scripts (not source) --
 dashboard-enterprise/api_audit.json
