@@ -54,6 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 启动播种后新增 `plugin_service.auto_connect_servers()`，只挑
   `enabled && auto_connect && 当前 disconnected` 的服务器；作为后台任务跑，
   不可达的 MCP 服务不拖慢也不阻断仪表板启动，关停时取消任务。
+- **关停排空顺带收口**：lifespan 的 `finally` 原先要为每个待取消任务写一处
+  `with suppress(asyncio.CancelledError)`，第一版把它加在 WS 排空旁边，直接把
+  `check_silent_exceptions` 的 suppress 棘轮顶到 48 > 47 而 CI 判红。现在两个任务
+  走同一个 `drain_cancelled()`（带 `# silent-ok: interrupt` 理由标记），
+  `SUPPRESS_BASELINE` 顺势收到 **46**；这条关停路径此前没有任何测试覆盖，
+  现在由 `test_server_core.py` 三条异步用例钉住（取消要真的落地、必须 await 完成、
+  None 与已结束任务跳过）。
 - `GET /api/mcp/servers` 现在回报 `enabled` / `auto_connect`，列表页据此显示
   「已停用」徽标（此前"断开"与"停用"混在一起）。
 - **YAML 侧同样修**：`config/mcp_servers.yaml` 里早已写着 `enabled: true` 与
@@ -61,8 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `enabled` / `auto_connect` / `timeout(_s)`（保留 `timeout` 旧拼写）。
 - 验证：`test_mcp_route_crud.py` 新增 7 条（持久化 / 409 / PUT 不缺省翻回 /
   停用即断开 / 自动连接筛选）、`test_mcp_hub.py` 真实 hub 闸门 1 条 + 往返断言、
-  `test_mcp_discovery.py` YAML 透传 1 条；MCP 相关 5 个文件 130 passed；
-  server 生命周期相关 31 passed；新增前端 3 条，全量 516 passed、build exit 0、
+  `test_mcp_discovery.py` YAML 透传 1 条、`test_server_core.py` 关停排空 3 条；
+  `pytest -k "server or lifespan or shutdown or mcp"` 606 passed / 6 skipped
+  （首轮跑出 1 条真失败：另一份 `SimpleNamespace` 替身缺 `enabled`，已按真实模型补齐）；
+  `check_silent_exceptions` / `check_docs_consistency --gate` / `check_file_size` 全过，
+  ruff + mypy 干净；新增前端 3 条，全量 516 passed、build exit 0、
   eslint 0 error、对比度 164 对全通过；对"连接闸门"与"add 透传"做变异回验
   （去掉后 5 条测试转红）。
 

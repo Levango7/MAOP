@@ -36,8 +36,11 @@ def mcp_env(tmp_path, monkeypatch):
     plugin_service._set_hub(None)
 
     mock_hub = MagicMock()
+    # 替 MCPServerConfig 建模：字段必须跟真实模型一致，缺字段会让消费端
+    # （connect_server 现在要看 enabled）假失败，也会掩盖真实契约漂移。
     mock_hub.get_server_config = MagicMock(return_value=SimpleNamespace(
         name="test-server", transport="stdio", command="test", args=[], url="", env={},
+        enabled=True, auto_connect=False,
     ))
     mock_hub.remove_server = MagicMock(return_value=True)
     mock_hub.connect = AsyncMock(return_value="server-1")
