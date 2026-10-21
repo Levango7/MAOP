@@ -13,8 +13,10 @@
   - ``POST   /api/quotas/{tenant_id}/{resource}/check``   — 检查配额
   - ``POST   /api/quotas/{tenant_id}/{resource}/consume`` — 检查+消费
   - ``GET    /api/quotas/{tenant_id}/alerts``             — 列出告警
-  - ``POST   /api/quotas/alerts/{alert_id}/resolve``      — 解决告警
+  - ``GET    /api/quotas/alerts/{alert_id}/resolve``      — 解决告警
   - ``GET    /api/quotas/history``                        — 配额变更历史
+  - ``GET    /api/quotas/overview``                       — 租户配额总量分布
+  - ``GET    /api/quotas/{tenant_id}/trend``              — 使用量趋势(按小时分桶)
 
 所有操作要求 admin 角色(``require_admin``) + ``FeatureFlag.TENANT_ISOLATION``.
 
@@ -39,7 +41,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
-from maop.dashboard.services import billing_service
+from maop.dashboard.services import billing_service, quota_audit, tenant_service
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,11 @@ def _set_manager(mgr: Any) -> None:
 def _require_tenant_isolation() -> None:
     """企业版特性守卫: Personal 版返回 404."""
     billing_service.require_tenant_isolation()
+
+
+def _actor(request: Request) -> str:
+    """变更历史里记录的操作人身份."""
+    return getattr(request.state, "auth_identity", "") or ""
 
 
 # ── 请求模型 ──────────────────────────────────────────────────────
@@ -201,6 +208,36 @@ async def list_usage(
     }
 
 
+# ── 概览与趋势端点(固定段路径,必须先注册) ────────────────────────
+
+
+@router.get("/overview")
+@handle_api_errors
+async def quota_overview(request: Request) -> dict[str, Any]:
+    """所有租户的配额总量分布(前端 allocation 饼图).
+
+    值为该租户各项 ``hard_limit`` 之和;跨资源单位不可比(agents 与 storage_mb
+    相加没有物理意义),因此只用于份额对比。
+    """
+    require_admin(request)
+    _require_tenant_isolation()
+    tenants = tenant_service.list_tenants()["tenants"]
+    return {"status": "ok", **quota_audit.quota_overview(tenants)}
+
+
+@router.get("/{tenant_id}/trend")
+@handle_api_errors
+async def quota_usage_trend(
+    tenant_id: str,
+    request: Request,
+    hours: int = Query(default=24, ge=1, le=168),
+) -> dict[str, Any]:
+    """租户使用量趋势(按小时分桶,数据来自 quota_usage_samples)."""
+    require_admin(request)
+    _require_tenant_isolation()
+    return {"status": "ok", "tenant_id": tenant_id, **quota_audit.usage_trend(tenant_id, hours=hours)}
+
+
 # ── 配额 CRUD 端点(参数段路径) ───────────────────────────────────
 
 
@@ -216,6 +253,7 @@ async def set_quota(
     quota = billing_service.set_quota(
         tenant_id, resource, body.hard_limit,
         soft_limit=body.soft_limit, period=body.period,
+        actor=_actor(request),
     )
     return {"status": "ok", "quota": quota}
 
@@ -268,6 +306,7 @@ async def update_quota(
             hard_limit=body.hard_limit,
             soft_limit=body.soft_limit,
             period=body.period,
+            actor=_actor(request),
         )
     except KeyError as exc:
         # P3 fix: 不透传异常字符串，使用脱敏固定文案。
@@ -283,7 +322,7 @@ async def delete_quota(
     """删除配额."""
     require_admin(request)
     _require_tenant_isolation()
-    deleted = billing_service.delete_quota(tenant_id, resource)
+    deleted = billing_service.delete_quota(tenant_id, resource, actor=_actor(request))
     if not deleted:
         # H-1 fix: 资源未找到应返回 404，而非 200 + status=not_found。
         raise HTTPException(status_code=404, detail="Quota not found")
