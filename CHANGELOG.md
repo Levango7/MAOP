@@ -39,6 +39,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chat：`stream` 从被丢掉的字段变成真的开关（2026-10-21）
+
+`ChatRequestBody.stream` 早就声明了，但两个处理器都把值写死 —— `/api/chat`
+恒 `stream=False`、`/api/chat/stream` 恒 `stream=True`。后果不是"少个功能"而是
+**没有任何失败信号**：客户端在 JSON 端点上要求流式，会安静地拿到一个整包响应，
+与根本没发这个字段一模一样。（自查静默丢弃字段时扫出，同批还有
+`control.run.agent`，见下。）
+
+- `/api/chat` 现在按 `body.stream` 决定响应形状：`true` 走 SSE，缺省仍是 JSON。
+- `/api/chat/stream` 语义不变（路径本身就是选择，body 写 `false` 也不改）。
+- 两处 SSE 响应合并为一个 `_sse_response()`：头信息原先手写两份，正是漂移的
+  来源；`test_both_stream_paths_share_one_header_set` 把"同一份头"钉成断言。
+
+未做的一致性说明：同批扫出的 `RunRequest.agent` **没有**一并处理。它需要的不是
+透传 —— `start_control_run()` 起的是 `python -m maop.cli run --task …`，CLI 没有
+agent 相关旗标，主运行链路（MaopLoop）也不构造带 `preferred_agent` 的
+`RoutingContext`（只有 `/api/agent-router` 那条支路用得到）。把"指定 agent"做成
+真能力需要路由侧的产品决策（指定对象不在候选集里时报错还是回退自动路由？），
+所以这里留白，不写一个假装生效的透传。
+
+验证：`test_chat_stream_field.py` 5 条（缺省 JSON / `stream=true` 真流式且不再调
+`send_chat` / `/stream` 不受 body 值影响 / 两端点头一致 / 其余字段仍全量透传）；
+`pytest -k chat` 178 passed 3 skipped（含 batch-coverage 里对 `/api/chat` 的既有
+断言，确认默认行为未变）；`tests/stability` 16 passed；ruff + mypy 干净。
+
 ### 静默丢弃字段扫描：engine 单步、hooks enabled/method（2026-10-21）
 
 新增 AST 扫描（比对请求模型的每个字段是否在 handler 里被读取或整体 dump），扫出
