@@ -95,6 +95,35 @@ PG 写了不回读（`:332`），进程重启即空。所以个人版另起一�
 eslint 0 error、对比度 164 对全过；`check_silent_exceptions` / `check_file_size` /
 `check_docs_consistency --gate` / ruff / mypy 全绿（README 的 `core/` 计数 8→9 随新模块更新）。
 
+### 配额：变更历史只有读没有写，概览与趋势根本没有端点（2026-10-21）
+
+- **历史永远为空**：``GET /api/quotas/history`` 读 ``quota_history``，但整个仓库
+  （MAOP + MAOS）没有任何地方建表或写入 ⇒ 表不存在，端点恒返回空列表，租户详情
+  的「配额变更历史」面板从未有过数据。
+- 新增 ``maop/dashboard/services/quota_audit.py``：建表（``quota_history`` +
+  新表 ``quota_usage_samples``，CREATE IF NOT EXISTS，旧库自动补齐）、按字段
+  diff 写历史（set/update 只记真正变化的字段，delete 记 ``deleted`` 摘要），
+  操作人取自 ``request.state.auth_identity``。审计写失败只记日志、不回滚已
+  成功的配额变更。
+- **采样**：``update/set/reset-usage`` 与成功的 ``consume`` 各写一条采样，
+  ``GET /api/quotas/{tenant_id}/trend`` 按小时分桶返回 ``{labels, series}``；
+  空桶是 ``null``（折线断开）而不是 0 —— 0 会被读成"用量掉到零"，那是假信息。
+- **概览**：新增 ``GET /api/quotas/overview``，按租户汇总 ``hard_limit`` 之和。
+  跨资源单位不可比（agents 与 storage_mb 相加没有物理意义），该聚合只用于份额
+  对比；端点 docstring 与 CHANGELOG 都写明这一点。
+- 路由顺序：``/overview`` 与 ``/{tenant_id}/trend`` 注册在 ``/{tenant_id}``
+  之前，并有测试钉住（否则 ``overview`` 会被当成租户 ID 吞掉）。
+- **保留期**：采样 7 天、历史 90 天，由 ``prune`` 维护动作清理并在响应里回报
+  ``quota_audit_pruned``（此前两张表只会增长）。
+- 前端：Quotas 页 ``loadOverview`` 不再硬编码空对象、详情抽屉并行拉趋势；测试
+  里 ``/api/tenant/quotas/overview``、``/usage/trend``、``/quota/history`` 三个
+  mock 路径后端从未实现，改为真实契约，并把"历史恒空"的旧断言翻成有数据断言。
+- 已知限制：采样与历史沿用 ``sqlite_connect(unified_db_path())``，与既有
+  ``quota_history``/``tenant_quotas`` 同一存储基座（PG 后端未覆盖这一层）。
+- 验证：新增 ``test_quota_audit.py`` 18 条（历史 diff、采样分桶、空桶诚实、
+  概览聚合、路由顺序、422、企业版守卫 404、写失败不阻塞、保留期）；
+  ``test_router_control.py`` 补 prune 端到端接线 1 条；quota/billing/control
+  相关 550 passed / 7 skipped；ruff+mypy 干净；前端 515 passed、build exit 0。
 
 ### 安全：certifi 升到 2026.10.19（GHSA-6q48-6c7w-9gw2 / PYSEC-2026-4320，Critical 9.1）
 

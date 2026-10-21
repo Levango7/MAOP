@@ -1,9 +1,11 @@
 // Tests for Quotas.vue — tenant quota cards, progress bars, heatmap, detail drawer, alerts.
 //
 // Quotas.onMounted calls loadAll() which hits /api/tenant/list and
-// /api/tenant/quotas/overview. We mock global.fetch, stub PageHeader and chart
-// components (Line/Doughnut), then assert on the rendered quota cards, heatmap
-// cells, and detail drawer content.
+// /api/quotas/overview; the detail drawer hits /api/quotas/{id}/alerts,
+// /api/quotas/{id}/usage, /api/quotas/{id}/trend and /api/quotas/history.
+// We mock global.fetch, stub PageHeader and chart components (Line/Doughnut),
+// then assert on the rendered quota cards, heatmap cells, and detail drawer
+// content.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
@@ -116,9 +118,8 @@ describe('Quotas.vue', () => {
   function defaultRoutes(overrides = {}) {
     return {
       '/api/tenant/list': { tenants: TENANTS },
-      '/api/tenant/quotas/overview': {
-        heatmap: [],
-        allocation: { labels: ['Acme Corp', 'Beta Inc'], values: [100, 50] },
+      '/api/quotas/overview': {
+        allocation: { labels: ['Acme Corp', 'Beta Inc'], values: [15254, 3289] },
       },
       ...overrides,
     };
@@ -128,26 +129,27 @@ describe('Quotas.vue', () => {
   function mockFetchFull(overrides = {}) {
     global.fetch = vi.fn((url, opts) => {
       const u = String(url);
+      const path = u.split('?')[0];
       const method = opts?.method || 'GET';
       let body = {};
-      if (u === '/api/tenant/list') {
+      if (path === '/api/tenant/list') {
         body = { tenants: TENANTS };
-      } else if (u === '/api/tenant/quotas/overview') {
-        body = { heatmap: [], allocation: { labels: ['Acme Corp', 'Beta Inc'], values: [100, 50] } };
-      } else if (u.endsWith('/usage/trend')) {
-        body = { labels: ['00:00', '06:00', '12:00', '18:00'], series: [{ label: 'API Calls', data: [10, 20, 30, 25] }] };
-      } else if (u.endsWith('/quota/history')) {
-        body = { history: [{ id: 1, field: 'max_agents', old_value: 5, new_value: 10, changed_by: 'admin', changed_at: Date.now() - 3600000 }] };
-      } else if (u.endsWith('/alerts') && method === 'GET') {
+      } else if (path === '/api/quotas/overview') {
+        body = { allocation: { labels: ['Acme Corp', 'Beta Inc'], values: [15254, 3289] } };
+      } else if (path === '/api/quotas/acme/trend') {
+        body = { labels: ['00:00', '06:00', '12:00', '18:00'], series: [{ label: 'api_calls', data: [10, 20, 30, 25] }] };
+      } else if (path === '/api/quotas/history') {
+        body = { history: [{ id: 'h1', field: 'hard_limit', old_value: '5', new_value: '10', changed_by: 'admin', changed_at: Date.now() - 3600000 }], count: 1 };
+      } else if (path.endsWith('/alerts') && method === 'GET') {
         body = { alerts: [{ id: 'a1', level: 'warning', message: 'API calls approaching limit', time: Date.now() - 1800000, status: 'active' }] };
-      } else if (u.endsWith('/usage') && method === 'GET') {
-        body = { usage: { active_agents: 5, active_users: 30, cpu_cores: 4, memory_mb: 2048, storage_mb: 5120, api_calls_today: 500 } };
-      } else if (u.endsWith('/quota') && method === 'POST') {
+      } else if (path.endsWith('/usage') && method === 'GET') {
+        body = { usages: [{ resource: 'api_calls', used: 500 }] };
+      } else if (method === 'POST') {
         body = { status: 'ok' };
       } else if (u.includes('/resolve')) {
         body = { status: 'ok' };
       }
-      if (overrides[u]) body = overrides[u];
+      if (overrides[path]) body = overrides[path];
       return Promise.resolve({
         ok: true, status: 200,
         json: () => Promise.resolve(body),
@@ -262,9 +264,37 @@ describe('Quotas.vue', () => {
     await viewDetailBtn.trigger('click');
     await flushPromises();
     await flushPromises();
-    // 后端暂无 quota history 端点 → 视图诚实降级为空态(EmptyState), 不渲染历史项
-    expect(wrapper.find('.history-item').exists()).toBe(false);
-    expect(wrapper.findComponent(EmptyState).exists()).toBe(true);
+    // quota_history 现在真的有写入路径（set/update/delete 配额时落库），历史项应渲染
+    expect(wrapper.find('.history-item').exists()).toBe(true);
+    expect(wrapper.text()).toContain('hard_limit');
+    wrapper.unmount();
+  });
+
+  it('fetches the usage trend endpoint when the detail drawer opens', async () => {
+    mockFetchFull();
+    const wrapper = await mountQuotas();
+    const cards = wrapper.findAll('.quota-card');
+    const viewDetailBtn = cards[0].findAll('.quota-card__actions button')[0];
+    await viewDetailBtn.trigger('click');
+    await flushPromises();
+    await flushPromises();
+    const trendCall = global.fetch.mock.calls.find(
+      (c) => String(c[0]).split('?')[0] === '/api/quotas/acme/trend',
+    );
+    expect(trendCall).toBeTruthy();
+    wrapper.unmount();
+  });
+
+  it('loads the allocation overview from /api/quotas/overview', async () => {
+    mockFetch(defaultRoutes());
+    const wrapper = await mountQuotas();
+    await flushPromises();
+    const overviewCall = global.fetch.mock.calls.find(
+      (c) => String(c[0]).split('?')[0] === '/api/quotas/overview',
+    );
+    expect(overviewCall).toBeTruthy();
+    // allocation 有数据 ⇒ 页面不再出现空态占位
+    expect(wrapper.findComponent(EmptyState).exists()).toBe(false);
     wrapper.unmount();
   });
 

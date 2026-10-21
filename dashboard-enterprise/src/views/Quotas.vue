@@ -507,8 +507,16 @@ async function loadTenants() {
 }
 
 async function loadOverview() {
-  // 后端暂无配额聚合概览端点；降级为空，allocation 饼图显示 EmptyState
-  overview.value = { heatmap: [], allocation: { labels: [], values: [] } };
+  try {
+    const d = await api.get('/api/quotas/overview');
+    overview.value = {
+      heatmap: d.heatmap || [],
+      allocation: d.allocation || { labels: [], values: [] },
+    };
+  } catch {
+    // 概览失败不阻塞列表：热力图仍可由租户数据渲染，饼图降级为空态。
+    overview.value = { heatmap: [], allocation: { labels: [], values: [] } };
+  }
 }
 
 async function loadAll() {
@@ -525,13 +533,19 @@ async function openDetail(tenant) {
   detailAlerts.value = [];
 
   const id = tenant.tenant_id;
-  // 并行加载告警、使用量与配额变更历史；trend 后端暂无端点，保持空状态
+  // 并行加载告警、使用量、使用量趋势与配额变更历史。
   const historyUrl = `/api/quotas/history?tenant_id=${encodeURIComponent(id)}&limit=50`;
-  const [alertsRes, usageRes, historyRes] = await Promise.allSettled([
+  const [alertsRes, usageRes, trendRes, historyRes] = await Promise.allSettled([
     api.get(`/api/quotas/${id}/alerts`),
     api.get(`/api/quotas/${id}/usage`),
+    api.get(`/api/quotas/${id}/trend`),
     api.get(historyUrl),
   ]);
+
+  if (trendRes.status === 'fulfilled' && trendRes.value) {
+    const td = trendRes.value;
+    trendData.value = { labels: td.labels || [], series: td.series || [] };
+  }
 
   if (alertsRes.status === 'fulfilled') {
     detailAlerts.value = alertsRes.value.alerts || [];

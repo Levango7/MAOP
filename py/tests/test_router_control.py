@@ -373,6 +373,60 @@ class TestControlMaintain:
         assert resp.json()["run_events_pruned"] >= 1
         assert ev.fetch_run_events("stale-1") == []
 
+    def test_prune_ages_out_quota_audit_too(self, client, temp_maop_root):
+        """prune 也要清掉过期的配额采样/历史，否则两张表只增不减。"""
+        import time
+
+        from maop.core.backends.db_utils import sqlite_connect, unified_db_path
+        from maop.dashboard.services import quota_audit
+
+        quota_audit.record_usage_sample("t-ctl", "api_calls", 10)
+        quota_audit.record_quota_change("t-ctl", "api_calls", "hard_limit", 1, 2)
+        old = time.time() - 400 * 86400.0
+        with sqlite_connect(unified_db_path()) as conn:
+            conn.execute("UPDATE quota_usage_samples SET sampled_at = ?", (old,))
+            conn.execute("UPDATE quota_history SET changed_at = ?", (old,))
+
+        resp = client.post("/api/control/maintain", json={"action": "prune"})
+        assert resp.status_code == 200
+        pruned = resp.json()["quota_audit_pruned"]
+        assert pruned["samples"] >= 1
+        assert pruned["history"] >= 1
+        with sqlite_connect(unified_db_path()) as conn:
+            assert conn.execute("SELECT COUNT(*) FROM quota_usage_samples").fetchone()[0] == 0
+
+    def test_prune_reports_every_ledger_it_owns(self, client, temp_maop_root):
+        """三张台账表都要在同一个响应里回报，少一个都算漏。
+
+        这不是凑数断言：#127（配额）与本支（告警）都往 ``maintain_prune`` 的返回
+        字典里加键，git 把两处当成同一 hunk 冲突 —— 谁"顺手"取一侧，另一个键就会
+        静默消失，而被裁的表继续只增不减。
+        """
+        import time
+
+        from maop.core import alert_ingest
+        from maop.core.backends.db_utils import sqlite_connect
+        from maop.dashboard.services import quota_audit
+
+        alert_ingest.record_alerts([{
+            "status": "firing", "labels": {"alertname": "MAOPDown"}, "annotations": {},
+            "startsAt": "2026-10-01T00:00:00.000Z", "fingerprint": "ctl-aged",
+        }])
+        with sqlite_connect(alert_ingest._db_path()) as conn:
+            conn.execute(
+                "UPDATE alertmanager_alerts SET received_at = ?",
+                (time.time() - 400 * 86400.0,),
+            )
+        quota_audit.record_usage_sample("t-ctl", "api_calls", 10)
+
+        resp = client.post("/api/control/maintain", json={"action": "prune"})
+        assert resp.status_code == 200
+        body = resp.json()
+        for key in ("run_events_pruned", "quota_audit_pruned", "alert_rows_pruned"):
+            assert key in body, f"prune 响应缺 {key}：那张表不再被裁"
+        assert body["alert_rows_pruned"]["expired"] >= 1
+        assert alert_ingest.count_alerts() == 0
+
     def test_health(self, client, temp_maop_root):
         resp = client.post("/api/control/maintain", json={"action": "health"})
         assert resp.status_code == 200

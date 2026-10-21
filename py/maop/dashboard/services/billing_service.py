@@ -29,6 +29,7 @@ from typing import Any
 
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.backends.db_utils import unified_db_path
+from maop.dashboard.services import quota_audit
 
 logger = logging.getLogger(__name__)
 
@@ -176,20 +177,48 @@ def list_quota_usage(tenant_id: str) -> list[dict[str, Any]]:
     return [u.model_dump() for u in usages]
 
 
+def _record_quota_diff(
+    tenant_id: str,
+    resource: str,
+    before: dict[str, Any] | None,
+    after: dict[str, Any],
+    actor: str,
+) -> None:
+    """逐字段比较变更前后配额，为每个真正变化的字段写一条历史."""
+    for field in ("hard_limit", "soft_limit", "period"):
+        new_value = after.get(field)
+        old_value = None if before is None else before.get(field)
+        if before is None:
+            if new_value in (None, "", 0) and field != "period":
+                continue
+            quota_audit.record_quota_change(
+                tenant_id, resource, field, "", new_value, actor,
+            )
+        elif new_value is not None and new_value != old_value:
+            quota_audit.record_quota_change(
+                tenant_id, resource, field, old_value, new_value, actor,
+            )
+
+
 def set_quota(
     tenant_id: str,
     resource: str,
     hard_limit: int,
     soft_limit: int = 0,
     period: str = "total",
+    actor: str = "",
 ) -> dict[str, Any]:
     """设置或更新配额，返回 model_dump 后的 quota dict。"""
     mgr = _get_quota_manager()
+    existing = mgr.get_quota(tenant_id, resource)
+    before = existing.model_dump() if existing is not None else None
     quota = mgr.set_quota(
         tenant_id, resource, hard_limit,
         soft_limit=soft_limit, period=period,
     )
-    return quota.model_dump()
+    after = quota.model_dump()
+    _record_quota_diff(tenant_id, resource, before, after, actor)
+    return after
 
 
 def list_quotas(tenant_id: str) -> list[dict[str, Any]]:
@@ -214,6 +243,7 @@ def update_quota(
     hard_limit: int | None = None,
     soft_limit: int | None = None,
     period: str | None = None,
+    actor: str = "",
 ) -> dict[str, Any]:
     """部分更新配额，返回 model_dump 后的 quota dict。
 
@@ -223,19 +253,34 @@ def update_quota(
         配额不存在时抛出（由 router 映射为 404）。
     """
     mgr = _get_quota_manager()
+    existing = mgr.get_quota(tenant_id, resource)
+    before = existing.model_dump() if existing is not None else None
     quota = mgr.update_quota(
         tenant_id, resource,
         hard_limit=hard_limit,
         soft_limit=soft_limit,
         period=period,
     )
-    return quota.model_dump()
+    after = quota.model_dump()
+    _record_quota_diff(tenant_id, resource, before, after, actor)
+    return after
 
 
-def delete_quota(tenant_id: str, resource: str) -> bool:
+def delete_quota(tenant_id: str, resource: str, actor: str = "") -> bool:
     """删除配额。返回是否成功删除。"""
     mgr = _get_quota_manager()
-    return mgr.delete_quota(tenant_id, resource)
+    existing = mgr.get_quota(tenant_id, resource)
+    deleted = mgr.delete_quota(tenant_id, resource)
+    if deleted and existing is not None:
+        summary = ", ".join(
+            f"{field}={value}"
+            for field, value in existing.model_dump().items()
+            if field in ("hard_limit", "soft_limit", "period")
+        )
+        quota_audit.record_quota_change(
+            tenant_id, resource, "deleted", summary, "", actor,
+        )
+    return deleted
 
 
 def get_quota_usage(tenant_id: str, resource: str) -> dict[str, Any]:
@@ -253,7 +298,9 @@ def update_quota_usage(
 ) -> int:
     """增量更新使用量(amount 可正可负)。返回更新后的 used 值。"""
     mgr = _get_quota_manager()
-    return mgr.update_usage(tenant_id, resource, amount, period=period)
+    used = mgr.update_usage(tenant_id, resource, amount, period=period)
+    quota_audit.record_usage_sample(tenant_id, resource, used, period)
+    return used
 
 
 def set_quota_usage(
@@ -264,13 +311,18 @@ def set_quota_usage(
 ) -> int:
     """绝对设置使用量。返回设置后的 used 值。"""
     mgr = _get_quota_manager()
-    return mgr.set_usage(tenant_id, resource, value, period=period)
+    used = mgr.set_usage(tenant_id, resource, value, period=period)
+    quota_audit.record_usage_sample(tenant_id, resource, used, period)
+    return used
 
 
 def reset_quota_usage(tenant_id: str, resource: str) -> bool:
     """重置单个资源的使用量。返回是否成功删除。"""
     mgr = _get_quota_manager()
-    return mgr.reset_usage(tenant_id, resource)
+    reset = mgr.reset_usage(tenant_id, resource)
+    if reset:
+        quota_audit.record_usage_sample(tenant_id, resource, 0)
+    return reset
 
 
 def check_quota(tenant_id: str, resource: str, amount: int = 1) -> dict[str, Any]:
@@ -284,6 +336,10 @@ def consume_quota(tenant_id: str, resource: str, amount: int = 1) -> dict[str, A
     """检查并消费 amount 单位的 resource。返回 model_dump 后的 result。"""
     mgr = _get_quota_manager()
     result = mgr.consume(tenant_id, resource, amount=amount)
+    if result.allowed:
+        quota_audit.record_usage_sample(
+            tenant_id, resource, mgr.get_usage(tenant_id, resource).used,
+        )
     return result.model_dump()
 
 
