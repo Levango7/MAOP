@@ -20,11 +20,14 @@ import logging
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+
+# ``StepType`` 成员名；请求里出现未知值时回退到 AGENT（与两个端点一致）。
+_STEP_TYPES = ("plan", "agent", "dag", "verify", "condition", "terminal")
 
 logger = logging.getLogger(__name__)
 
@@ -137,12 +140,23 @@ async def api_engine_run(
     require_admin(request)
     engine = _get_engine()
 
+    # 单节点 DAG 里任何依赖都不可能满足：宁可拒绝，也不要静默丢掉后跑出一个
+    # "看起来执行了但其实没等依赖"的结果。
+    if body.depends_on:
+        raise HTTPException(
+            status_code=400,
+            detail="depends_on is not supported on the single-step endpoint; use run-distributed instead",
+        )
+
     from maop.engine_types import StepType, WorkflowStep
     step = WorkflowStep(
         id=body.id or f"step-{uuid.uuid4().hex[:8]}",
-        type=StepType.AGENT,
+        type=StepType(body.type) if body.type in _STEP_TYPES else StepType.AGENT,
         agent=body.agent,
         task=body.task,
+        retry=body.retry,
+        timeout=body.timeout,
+        on_failure=body.on_failure,
     )
     result = await engine.run(
         steps=[step],
@@ -183,7 +197,7 @@ async def api_engine_run_distributed(
     for s in body.steps:
         steps.append(WorkflowStep(
             id=s.id,
-            type=StepType(s.type) if s.type in ("plan", "agent", "dag", "verify", "condition", "terminal") else StepType.AGENT,
+            type=StepType(s.type) if s.type in _STEP_TYPES else StepType.AGENT,
             agent=s.agent,
             task=s.task,
             depends_on=list(s.depends_on),
