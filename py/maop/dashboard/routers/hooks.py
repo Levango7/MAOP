@@ -228,6 +228,10 @@ async def api_hooks_create(body: HookCreateRequest, request: Request) -> HookRes
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    # HookManager.register() 总是以 enabled=True 落库；请求里显式停用时要跟上。
+    if not body.enabled:
+        mgr.disable(hdef.id)
+        hdef = hdef.model_copy(update={"enabled": False})
     return _hook_def_to_response(hdef, name=body.name)
 
 
@@ -275,6 +279,10 @@ async def api_hooks_update(hook_id: str, body: HookUpdateRequest, request: Reque
     HookManager 未提供 update 方法的限制，并保持持久化层一致。
     """
     require_admin(request)
+
+    # 与 create 一致：目前只支持 POST，不能悄悄收下 PUT/GET 再丢掉。
+    if body.method is not None and body.method.upper() != "POST":
+        raise HTTPException(400, f"Unsupported method: {body.method} (only POST supported)")
 
     mgr = _get_hook_mgr()
     existing = execution_service.hooks_get(mgr, hook_id)

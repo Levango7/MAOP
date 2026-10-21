@@ -95,6 +95,42 @@ PG 写了不回读（`:332`），进程重启即空。所以个人版另起一�
 eslint 0 error、对比度 164 对全过；`check_silent_exceptions` / `check_file_size` /
 `check_docs_consistency --gate` / ruff / mypy 全绿（README 的 `core/` 计数 8→9 随新模块更新）。
 
+### 静默丢弃字段扫描：engine 单步、hooks enabled/method（2026-10-21）
+
+新增 AST 扫描（比对请求模型的每个字段是否在 handler 里被读取或整体 dump），扫出
+9 处候选，逐项核对后修掉真实缺陷：
+
+- ``POST /api/engine/run``：请求模型声明 ``type/retry/timeout/on_failure``，handler
+  却写死 ``StepType.AGENT`` 且不传其余字段 ⇒ 步骤类型/重试/超时/失败策略全部被丢。
+  现按 ``/run-distributed`` 同样的方式透传（未知 type 回退 AGENT），并把两处重复的
+  类型白名单收成 ``_STEP_TYPES``。
+  ``depends_on`` 在单节点 DAG 里永远不可能满足，改为 400 明确拒绝并指向
+  run-distributed，而不是静默接受（该端点目前无前端调用方，不破坏现有 UI）。
+- ``POST /api/hooks``：``enabled: false`` 被忽略 —— ``HookManager.register()`` 恒以
+  enabled=True 落库 ⇒ "新建即停用"会变成新建即启用。现在创建后按请求停用，响应
+  与库内状态一致。
+- ``PUT /api/hooks/{id}``：``method`` 收下后丢弃（create 会拒绝非 POST，update 不会）。
+  现与 create 一致返回 400。
+- ``maop/core/mcp/mcp_adapter.py`` 的 ``sync_config`` docstring 声称会应用
+  ``enabled`` / ``auto_connect``，而 ``MCPServerConfig`` 根本没有这两个属性 ⇒ 改为如实
+  描述（未知键被忽略）。
+- 假阳性记录：``POST /api/alerts/webhook`` 把整个 payload 交给
+  ``process_alertmanager_webhook``，其中 ``alerts``/``status``/``receiver`` 确实被读取；
+  ``commonLabels``/``commonAnnotations``/``externalURL`` 是 Alertmanager 标准负载里
+  本端点不需要解析的字段（只用于日志），不算丢弃。
+  ``POST /api/chat``/``chat_stream`` 的 ``stream`` 由端点本身决定（是否流式取决于
+  选了哪个端点），不是静默丢弃。
+- **未修，需产品决策**：
+  1. ``ServerCreate.enabled`` / ``auto_connect`` 在 ``MCPServerConfig`` 与整个连接链里
+     没有对应能力，也没有启动时自动连接的消费者 ⇒ 要么实现"停用即拒绝 connect"
+     （改运行时语义），要么从 API 表面摘掉这两个假字段。
+  2. Alertmanager webhook 只写日志，不进入审计告警引擎 ⇒ 前端「告警历史」面板
+     永远看不到外部推送的告警。要不要落库属于产品口径。
+- 验证：新增 ``test_engine_router_single_step.py`` 3 条、hooks 3 条
+  （enabled=false 落库 / enabled=true 保持 / method 非 POST 400）；本分支上
+  engine+hooks+mcp 相关 8 个测试文件 160 passed；对两处修复做变异验证
+  （回退透传、去掉停用 ⇒ 对应测试转红）。
+
 ### 配额：变更历史只有读没有写，概览与趋势根本没有端点（2026-10-21）
 
 - **历史永远为空**：``GET /api/quotas/history`` 读 ``quota_history``，但整个仓库
@@ -1576,6 +1612,7 @@ env 自动探测+默认执行）、dispatch 注入（声明 agent 收到 preambl
   矩阵按此过滤；应用自身 error/JS 异常/5xx 仍全量抓捕。
 - 测试：新增 store 用例 2 例（403 不记 error 且版本保持 personal 安全默认 /
   非 403 失败仍记 error）。
+
 ### 分布式注册表批量化（派发热路径性能）
 
 - `capable_workers`（每次派发的选工路径）与 `detect_failures`（失败检测循环
@@ -1698,6 +1735,7 @@ Chat 页把**原始 i18n key 当可见文本**展示：输入框 placeholder
 9 例（游标一次性/意外节点推进/150 节点大层回归/
 超时触发/默认无超时/单次扫描/检测器每任务一次/
 取消后上报+ACK/stop 强杀卡死 handler）。
+
 ### 泄漏与可见性审计修复
 
 2026-10-09 后端审计第二批（分布式路径之外）：
