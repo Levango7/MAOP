@@ -163,6 +163,28 @@ class TestCreateHook:
         })
         assert resp.status_code == 200
 
+    def test_create_with_enabled_false_is_persisted_disabled(self, client, real_mgr):
+        """``enabled: false`` 不能被 register() 的默认值覆盖成启用。"""
+        resp = client.post("/api/hooks", json={
+            "name": "paused-hook",
+            "event": "loop.complete",
+            "url": "https://example.com/hook",
+            "enabled": False,
+        })
+        assert resp.status_code == 200
+        assert resp.json()["enabled"] is False
+        assert real_mgr.get_hook(resp.json()["id"]).enabled is False
+
+    def test_create_with_enabled_true_stays_enabled(self, client, real_mgr):
+        resp = client.post("/api/hooks", json={
+            "name": "live-hook",
+            "event": "loop.complete",
+            "url": "https://example.com/hook",
+            "enabled": True,
+        })
+        assert resp.json()["enabled"] is True
+        assert real_mgr.get_hook(resp.json()["id"]).enabled is True
+
 
 class TestHookDeliveryConfig:
     def test_create_persists_config_and_redacts_sensitive_headers(self, client, real_mgr):
@@ -290,6 +312,18 @@ class TestUpdateHook:
             "event": "invalid.event.name",
         })
         assert resp.status_code == 400
+
+    def test_update_rejects_unsupported_method(self, client, real_mgr):
+        """``method`` 只有 POST 被支持，不能收了再静默丢弃。"""
+        hdef = real_mgr.register(
+            event="loop.complete",
+            url="https://example.com/hook",
+        )
+        resp = client.put(f"/api/hooks/{hdef.id}", json={"method": "GET"})
+        assert resp.status_code == 400
+        assert "Unsupported method" in resp.json()["error"]
+        # 未被改写
+        assert real_mgr.get_hook(hdef.id).url == "https://example.com/hook"
 
 
 class TestDeleteHook:

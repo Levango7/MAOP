@@ -262,10 +262,11 @@ class MCPAdapter(AgentAdapter):
     def sync_config(self, config: dict[str, Any]) -> None:
         """Push updated configuration into the in-memory MCPServerConfig.
 
-        Only known fields are applied (``name``, ``transport``,
-        ``command``, ``args``, ``env``, ``url``, ``timeout``,
-        ``enabled``, ``auto_connect``). Unknown keys are silently
-        ignored to keep the API forgiving.
+        Only fields that exist on ``MCPServerConfig`` are applied
+        (``name``, ``transport``, ``command``, ``args``, ``env``, ``url``,
+        ``headers``, ``timeout_s``, ``session_id``, reconnect knobs, …).
+        Unknown keys — including ``enabled`` / ``auto_connect``, which the
+        config model does not carry — are ignored to keep the API forgiving.
 
         Note: this does NOT reconnect. To apply the new config to a
         live connection, call ``disconnect()`` then ``connect()``.
