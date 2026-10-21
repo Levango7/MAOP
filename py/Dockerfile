@@ -47,11 +47,20 @@ FROM ${PYTHON_IMAGE} AS builder
 WORKDIR /build
 
 # Install build dependencies
-# P3-D-01 fix: use requirements.lock (the pinned, audited dependency file)
-# instead of requirements.txt. CI's pip-audit/SBOM also use requirements.lock,
-# so the image deps now match the audited deps. Previously requirements.txt
-# could drift from requirements.lock, causing image/audit inconsistency.
-COPY py/requirements.lock .
+#
+# T2.2 (2026-09-30) 之后，真锁是 requirements.frozen.txt（uv 全量解析、精确 ==）；
+# pip-audit / SBOM / CI 缓存键都已改以 frozen 为唯一输入。**唯独这一处漏改**，
+# 仍在用已退为「直依赖镜像参考」的 requirements.lock —— 那个文件按 T2.2 的设计
+# 只镜像 pyproject 的直接依赖，且是窄范围（>=, <），不含精确的传递依赖 pin。
+#
+# 实测后果（master 9bf5e38，2026-10-21）：
+#   按范围约束装 ⇒ 传递依赖由 pip 现场解析，镜像里装出的是 certifi@2026.6.17；
+#   而 pip-audit 那条腿已随 frozen 升到 certifi==2026.10.19。
+#   ⇒ `Container Scan (trivy)` 报 GHSA-6q48-6c7w-9gw2（CRITICAL），master 转红，
+#     而同一个 commit 的 pip-audit 是绿的 —— 正是"两个事实源"分裂的症状。
+#
+# 换成精确 pin 后，镜像依赖与审计依赖读同一份文件：pip-audit / SBOM / 镜像。
+COPY py/requirements.frozen.txt .
 # P1-5: pip 使用清华源（避免无梯子时 pip install 超时）。
 # 2026-09-28: 外面套一层最多 3 次的退避重试。起因是 master `cd4099e5` 上
 # `Container Scan (trivy)` 红、而同一个 commit 的 `Docker build` / `Compose Smoke` 都绿 ——
@@ -61,7 +70,7 @@ COPY py/requirements.lock .
 # 有意**不**加第二个 index 主机：多信一个源就是扩大供应链面，而用清华源本身是网络可达性决定
 # 的（P1-5 原注释）。3 次仍失败则让构建照常红 —— 这不是把失败藏起来，只是不被一次抖动骗过。
 RUN for attempt in 1 2 3; do \
-      pip install --no-cache-dir --prefix=/install -r requirements.lock \
+      pip install --no-cache-dir --prefix=/install -r requirements.frozen.txt \
         -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn \
         && break; \
       if [ "$attempt" = 3 ]; then echo "pip install 连续 3 次失败，放弃" >&2; exit 1; fi; \
