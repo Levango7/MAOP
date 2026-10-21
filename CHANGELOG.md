@@ -39,6 +39,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 通知页的分页参数从没离开过浏览器（2026-10-21）
+
+`api.get(url, opts)` 的第二个参数是 **fetch init**（内部只有 `opts.headers` 会被读），
+不是查询参数。`Notifications.vue` 两处都按后者写：
+`api.get('/api/notifications/list', { limit: PAGE_SIZE, offset })` ⇒ 参数被静默丢掉，
+后端按自己的 `limit=100` 返回，前端 `PAGE_SIZE=20` 形同虚设；"加载更多"把
+`offset` 加到 20 再请求一次，拿到的还是同一批 100 条并 append ——
+**点一次"加载更多"，整个列表重复一遍**，然后 `length > total` 让按钮自己消失。
+
+同一次全仓扫描（`api.get(含对象第二参数`）只找出 3 个点：这两处 + AlertRules
+的历史抽屉（`{ rule_id }` 从未发出，抽屉把所有规则的历史当成一条的），后者已在
+#131 里一并修掉。其余 6 处 `api.put(url, {...})` 的第二参数是请求体，用法正确。
+
+- 参数改进 URL：`?limit=${PAGE_SIZE}&offset=0` / `&offset=${next}`。
+- 新增 2 条测试：首屏必须带 `limit=20&offset=0`；"加载更多"必须带 `offset=20`
+  且合并后不出现重复行（每行同时渲染 title 与 message，所以按"含 n1 的行数"判定，
+  不是按出现次数 —— 后者一行就命中两次，会把断言写成假绿）。
+- 变异回验：把两处还原成 fetch-init 形状后新用例转红。
+
+验证：Notifications 14 passed（原 12 + 新 2）、AlertRules 7 passed。
+
 ### 配额：变更历史只有读没有写，概览与趋势根本没有端点（2026-10-21）
 
 - **历史永远为空**：``GET /api/quotas/history`` 读 ``quota_history``，但整个仓库
